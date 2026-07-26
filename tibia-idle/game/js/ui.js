@@ -164,7 +164,7 @@ function renderSkills(p) {
     h += `<div class="mb4">
       <div class="row small" style="justify-content:space-between">
         <span class="k">${SKILL_NAMES[k]}</span>
-        <span class="v">${baseLvl}${bonus > 0 ? ` <span style="color:#7ae87a">+${bonus}</span>` : ""}</span>
+        <span class="v">${baseLvl}${bonus > 0 ? ` <span style="color:#7ae87a">+${bonus}</span>` : ""} <span class="dim">${prog.toFixed(1)}%</span></span>
       </div>
       <div class="bar" style="height:8px"><div class="fill skl" style="width:${prog}%"></div></div>
     </div>`;

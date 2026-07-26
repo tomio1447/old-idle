@@ -103,6 +103,48 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "rgba(40,80,40,.32)";
   ctx.fillRect(0, H * 0.68, W, H * 0.32);
 
+  const drawObj = (path, x, y, sc, alpha) => {
+    const img = Sprites.get(path);
+    if (!img || !img.complete || !img.naturalWidth) return;
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+    const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+    ctx.drawImage(img, x * W - w / 2, y * H - h, w, h);
+    ctx.restore();
+  };
+
+  // Sala de treino estilo OTServer: paredes, tochas, racks, barris e caixas.
+  ctx.fillStyle = "rgba(28,22,16,.88)";
+  ctx.fillRect(0, 0, W, H * 0.18);
+  ctx.fillStyle = "rgba(58,45,32,.75)";
+  ctx.fillRect(0, H * 0.16, W, 8);
+  for (let x = 0.05; x < 1; x += 0.12)
+    drawObj("assets/city/wall-brick-h.png", x, 0.19, 1.6, 0.9);
+  drawObj("assets/city/torch-wall.png", 0.09, 0.25, 1.8);
+  drawObj("assets/city/torch-wall.png", 0.91, 0.25, 1.8);
+  drawObj("assets/city/pillar.png", 0.06, 0.73, 1.9, 0.9);
+  drawObj("assets/city/pillar.png", 0.94, 0.73, 1.9, 0.9);
+  drawObj("assets/city/barrel.png", 0.14, 0.86, 1.7);
+  drawObj("assets/city/crate.png", 0.20, 0.87, 1.7);
+  drawObj("assets/city/box.png", 0.86, 0.86, 1.7);
+  drawObj("assets/city/table.png", 0.49, 0.89, 1.6, 0.85);
+  drawObj("assets/city/chair.png", 0.43, 0.88, 1.4, 0.8);
+  drawObj("assets/city/sign.png", 0.50, 0.24, 1.5);
+  // Rack de armas do lado esquerdo.
+  ctx.fillStyle = "rgba(80,55,28,.9)";
+  ctx.fillRect(W * 0.315, H * 0.25, 12, H * 0.34);
+  ctx.fillRect(W * 0.285, H * 0.30, 70, 8);
+  ctx.fillRect(W * 0.285, H * 0.44, 70, 8);
+  drawObj("assets/item/sword.png", 0.30, 0.48, 1.35);
+  drawObj("assets/item/axe.png", 0.34, 0.48, 1.35);
+  drawObj("assets/item/club.png", 0.38, 0.48, 1.35);
+  drawObj("assets/item/brass-shield.png", 0.34, 0.62, 1.25);
+  // Marcadores das baias de treino.
+  ctx.strokeStyle = "rgba(156,232,74,.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(W * 0.22, H * 0.47, W * 0.18, H * 0.24);
+  ctx.strokeRect(W * 0.60, H * 0.47, W * 0.18, H * 0.24);
+
   ctx.textAlign = "left";
   ctx.font = "bold 14px Verdana";
   ctx.fillStyle = "#9ce84a";

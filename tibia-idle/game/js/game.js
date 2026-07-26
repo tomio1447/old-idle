@@ -395,6 +395,12 @@ function drainAcademyEvents() {
       case "hit":
         r.addFloater(0.68, 0.42, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
         r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
+        // O Treiner revida para gerar shielding: explosão de fogo visual no player.
+        r.addEffect(0.28, 0.60, "fire-area");
+        r.addFloater(0.28, 0.48, "treiner hit", "#ff8a3c");
+        renderSkills(G.p);
+        renderStats(G.p);
+        renderTopbar(G.p);
         if (e.skillUp) addLog("skill", `<b>${SKILL_NAMES[e.skill] || e.skill}</b> subiu batendo no Treiner.`);
         if (e.shieldUp) addLog("skill", "<b>Shielding</b> subiu treinando no Treiner.");
         break;
