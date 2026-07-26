@@ -134,6 +134,10 @@ function normalizePlayer(p) {
   if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-fluid";
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
+  p.lootPouch = p.lootPouch || {};
+  p.lootConfig = p.lootConfig || { noCollect: [], noSell: [] };
+  p.lootConfig.noCollect = p.lootConfig.noCollect || [];
+  p.lootConfig.noSell = p.lootConfig.noSell || [];
   p.equip = p.equip || {};
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
@@ -192,6 +196,7 @@ function computeOffline(p) {
     for (const l of m.loot) {
       if (Math.random() * 100 > l.chance) continue;
       if (l.item === "gold-coin") continue;   // ja contabilizado
+      if (isNoCollect(p, l.item)) continue;
       const cnt = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
       loot[l.item] = (loot[l.item] || 0) + cnt;
     }
@@ -233,9 +238,10 @@ function computeOffline(p) {
   if (VOCATIONS[p.voc].weapon === "magic")
     addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
-  // loot vai pra bag respeitando slots; supplies dropados viram cargas.
+  // loot vai para supplies, loot pouch ou bag respeitando slots.
   for (const slug in loot) {
     if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
+    else if (shouldGoLootPouch(slug)) addLootPouch(p, slug, loot[slug]);
     else if (!addItem(p, slug, loot[slug])) delete loot[slug];
   }
   supplyCost = offlineStats.supplyCost;
@@ -734,6 +740,7 @@ function loop(ts) {
         renderSupplies(G.p);
       }
       renderInventory(G.p);
+      renderLootPouch(G.p);
     }
   }
 
@@ -785,6 +792,7 @@ function renderAll() {
   renderEquip(p);
   renderHunts(p);
   renderInventory(p);
+  renderLootPouch(p);
   renderSupplies(p);
   renderSpells(p);
   renderHelper(p);
@@ -938,6 +946,7 @@ function bindControls() {
     for (const c of ch) addLog("info", `Equipou <b>${itemName(c.item)}</b>`);
     renderAll();
   });
+  $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-switch").addEventListener("click", openCharacterModal);
   $("#btn-reset").addEventListener("click", () => {
     if (confirm("Apagar o personagem e recomeçar? Isso não pode ser desfeito."))

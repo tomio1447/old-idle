@@ -657,6 +657,7 @@ function rollLoot(c, p, mob) {
     }
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
+    if (isNoCollect(p, l.item)) continue;
     // filtro de loot
     if (p.config.lootFilter === "valuable" && (it.sell || 0) < 20 &&
         l.item !== "gold-coin") continue;
@@ -668,6 +669,8 @@ function rollLoot(c, p, mob) {
       c.stats.gold += g;
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
+    } else if (shouldGoLootPouch(l.item)) {
+      addLootPouch(p, l.item, count);
     } else if (!addItem(p, l.item, count)) {
       if (!c.bagFullWarned) {
         c.events.push({ t: "bag-full" });
@@ -678,12 +681,11 @@ function rollLoot(c, p, mob) {
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
   }
-  if (mob.influenced) {
+  if (mob.influenced && !isNoCollect(p, "mystic-dust")) {
     const dust = 1 + Math.floor(Math.random() * 4);
-    if (addItem(p, "mystic-dust", dust)) {
-      c.stats.loot["mystic-dust"] = (c.stats.loot["mystic-dust"] || 0) + dust;
-      got.push({ item: "mystic-dust", count: dust });
-    }
+    addLootPouch(p, "mystic-dust", dust);
+    c.stats.loot["mystic-dust"] = (c.stats.loot["mystic-dust"] || 0) + dust;
+    got.push({ item: "mystic-dust", count: dust });
   }
   return got;
 }

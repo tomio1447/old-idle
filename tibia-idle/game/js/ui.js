@@ -356,6 +356,94 @@ function renderInventory(p) {
   });
 }
 
+function renderLootPouch(p) {
+  const box = $("#lootpouch");
+  if (!box) return;
+  p.lootPouch = p.lootPouch || {};
+  const entries = Object.keys(p.lootPouch)
+    .filter((slug) => (p.lootPouch[slug] || 0) > 0 && GAMEDATA.items[slug])
+    .sort((a, b) => (GAMEDATA.items[b].sell || 0) * p.lootPouch[b] -
+                    (GAMEDATA.items[a].sell || 0) * p.lootPouch[a]);
+  if (!entries.length) {
+    box.innerHTML = `<div class="dim small center" style="grid-column:1/-1;padding:10px">Loot Pouch vazia</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
+      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · ${entries.length} tipo(s)
+    </div>` + entries.map((slug) =>
+    `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""}" data-pouch-item="${slug}">
+      ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
+    </div>`).join("");
+  $$("#lootpouch [data-pouch-item]").forEach((el) => {
+    const slug = el.dataset.pouchItem;
+    const locked = isNoSell(p, slug);
+    const it = GAMEDATA.items[slug];
+    el.addEventListener("mouseenter", () => showTip(itemTip(slug,
+      `${p.lootPouch[slug]}x · ${locked ? "Não vender" : "Clique para vender"}`)));
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("click", () => {
+      if (locked) { toast("Item marcado como NÃO VENDER."); return; }
+      const value = (it.sell || 0) * p.lootPouch[slug];
+      if (value <= 0) { toast("Esse item não possui valor de venda."); return; }
+      p.gold += value;
+      addLog("sell", `Vendeu ${p.lootPouch[slug]}x ${it.n} do Loot Pouch por <span class="gold-txt">${fmtFull(value)} gp</span>`);
+      delete p.lootPouch[slug];
+      hideTip();
+      renderAll();
+    });
+  });
+}
+
+function openLootPouchConfigModal() {
+  const p = G.p;
+  const renderList = (key) => lootConfigList(p, key).map((rule, i) => `
+    <div class="stat-row">
+      <span class="k">${rule}</span>
+      <button class="sm danger" data-remove-rule="${key}:${i}">x</button>
+    </div>`).join("") || `<div class="dim tiny" style="padding:8px">Nenhum item configurado.</div>`;
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Configurar Loot Pouch
+      <span style="flex:1"></span><button class="sm" id="lootcfg-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="row wrap" style="gap:10px;align-items:flex-start">
+        <div class="panel-inset" style="padding:8px;flex:1;min-width:230px">
+          <div class="small" style="color:#ff9a6a;font-weight:bold">NÃO COLETAR</div>
+          <div class="tiny dim mb4">Itens desta lista serão ignorados no loot.</div>
+          <div class="row mb8" style="gap:4px">
+            <input id="no-collect-input" placeholder="nome do item" style="flex:1;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+            <button class="sm primary" data-add-rule="noCollect">Add</button>
+          </div>
+          <div class="list" style="max-height:220px">${renderList("noCollect")}</div>
+        </div>
+        <div class="panel-inset" style="padding:8px;flex:1;min-width:230px">
+          <div class="small" style="color:#ffe680;font-weight:bold">NÃO VENDER</div>
+          <div class="tiny dim mb4">Itens desta lista ficam guardados no Loot Pouch.</div>
+          <div class="row mb8" style="gap:4px">
+            <input id="no-sell-input" placeholder="nome do item" style="flex:1;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+            <button class="sm primary" data-add-rule="noSell">Add</button>
+          </div>
+          <div class="list" style="max-height:220px">${renderList("noSell")}</div>
+        </div>
+      </div>
+      <div class="tiny dim mt8">Você pode digitar parte do nome ou slug do item. Ex: meat, gold coin, leather armor.</div>
+    </div>`;
+  $("#modal").classList.add("show");
+  $("#lootcfg-close").addEventListener("click", () => { $("#modal").classList.remove("show"); renderLootPouch(p); });
+  $$("#modal-body [data-add-rule]").forEach((b) => b.addEventListener("click", () => {
+    const key = b.dataset.addRule;
+    const input = key === "noCollect" ? $("#no-collect-input") : $("#no-sell-input");
+    addLootRule(p, key, input.value);
+    openLootPouchConfigModal();
+  }));
+  $$("#modal-body [data-remove-rule]").forEach((b) => b.addEventListener("click", () => {
+    const [key, idx] = b.dataset.removeRule.split(":");
+    removeLootRule(p, key, parseInt(idx, 10));
+    openLootPouchConfigModal();
+  }));
+}
+
 function renderSupplies(p) {
   const box = $("#supplies");
   if (!box) return;

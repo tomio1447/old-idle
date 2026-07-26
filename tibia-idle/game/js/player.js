@@ -28,6 +28,8 @@ function newPlayer(name, voc, sex) {
     equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
+    lootPouch: {},          // loot de hunt para auto-seller
+    lootConfig: { noCollect: [], noSell: [] },
     supplies: { "mana-fluid": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
     stamina: 42 * 3600,     // segundos (42h cheio)
@@ -293,6 +295,72 @@ function removeItem(p, slug, count) {
   return true;
 }
 
+function normalizeLootRule(text) {
+  return String(text || "").trim().toLowerCase();
+}
+
+function itemDisplayName(slug) {
+  const it = GAMEDATA.items[slug];
+  return it ? it.n : slug;
+}
+
+function lootRuleMatches(slug, rule) {
+  rule = normalizeLootRule(rule);
+  if (!rule) return false;
+  const name = normalizeLootRule(itemDisplayName(slug));
+  const id = normalizeLootRule(slug);
+  return id === rule || name === rule || id.indexOf(rule) !== -1 || name.indexOf(rule) !== -1;
+}
+
+function lootConfigList(p, key) {
+  p.lootConfig = p.lootConfig || { noCollect: [], noSell: [] };
+  p.lootConfig.noCollect = p.lootConfig.noCollect || [];
+  p.lootConfig.noSell = p.lootConfig.noSell || [];
+  return p.lootConfig[key] || [];
+}
+
+function isNoCollect(p, slug) {
+  return lootConfigList(p, "noCollect").some((r) => lootRuleMatches(slug, r));
+}
+
+function isNoSell(p, slug) {
+  return lootConfigList(p, "noSell").some((r) => lootRuleMatches(slug, r));
+}
+
+function addLootRule(p, key, text) {
+  const rule = normalizeLootRule(text);
+  if (!rule) return false;
+  const list = lootConfigList(p, key);
+  if (!list.includes(rule)) list.push(rule);
+  return true;
+}
+
+function removeLootRule(p, key, index) {
+  const list = lootConfigList(p, key);
+  list.splice(index, 1);
+}
+
+function shouldGoLootPouch(slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || slug === "gold-coin" || SUPPLIES[slug]) return false;
+  return !it.s;
+}
+
+function addLootPouch(p, slug, count) {
+  count = count || 1;
+  p.lootPouch = p.lootPouch || {};
+  p.lootPouch[slug] = (p.lootPouch[slug] || 0) + count;
+  return true;
+}
+
+function removeLootPouch(p, slug, count) {
+  count = count || 1;
+  if (!p.lootPouch || !p.lootPouch[slug]) return false;
+  p.lootPouch[slug] -= count;
+  if (p.lootPouch[slug] <= 0) delete p.lootPouch[slug];
+  return true;
+}
+
 /* Score de um item para comparacao no auto-equip */
 function itemScore(p, slug) {
   const it = GAMEDATA.items[slug];
@@ -377,29 +445,37 @@ function autoEquip(p) {
 function autoSell(p) {
   let total = 0;
   const sold = [];
-  for (const slug in Object.assign({}, p.bag)) {
+
+  const sellFrom = (container, slug, source) => {
     const it = GAMEDATA.items[slug];
-    if (!it) continue;
+    if (!it || !container[slug]) return;
+    if (isNoSell(p, slug)) return;
     if (slug === "gold-coin") {
-      p.gold += p.bag[slug];
-      total += p.bag[slug];
-      delete p.bag[slug];
-      continue;
+      p.gold += container[slug];
+      total += container[slug];
+      delete container[slug];
+      return;
     }
     // Ammo agora é carga de combate/treino online; não vender no auto-sell.
-    if (it.s === "ammo") continue;
-    // nao vende equipamento util
-    if (it.s) {
+    if (it.s === "ammo") return;
+    // nao vende equipamento util da mochila principal
+    if (source === "bag" && it.s) {
       const equipped = p.equip[it.s];
-      if (!equipped || itemScore(p, slug) > itemScore(p, equipped.item)) continue;
+      if (!equipped || itemScore(p, slug) > itemScore(p, equipped.item)) return;
     }
-    const value = (it.sell || 0) * p.bag[slug];
-    if (value <= 0) continue;
+    const value = (it.sell || 0) * container[slug];
+    if (value <= 0) return;
     total += value;
     p.gold += value;
-    sold.push({ item: slug, count: p.bag[slug], gold: value });
-    delete p.bag[slug];
-  }
+    sold.push({ item: slug, count: container[slug], gold: value, source: source });
+    delete container[slug];
+  };
+
+  for (const slug in Object.assign({}, p.lootPouch || {}))
+    sellFrom(p.lootPouch, slug, "lootPouch");
+  for (const slug in Object.assign({}, p.bag))
+    sellFrom(p.bag, slug, "bag");
+
   return { gold: total, items: sold };
 }
 
