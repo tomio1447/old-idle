@@ -201,12 +201,17 @@ function renderEquip(p) {
   $$("#equip .slot").forEach((el) => {
     const slug = el.dataset.item;
     if (!slug) return;
-    el.addEventListener("mouseenter", () =>
-      showTip(itemTip(slug, "Clique para desequipar")));
+    el.addEventListener("mouseenter", () => {
+      const slot = el.dataset.slot;
+      showTip(itemTip(slug, slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` : "Clique para desequipar"));
+    });
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
       const slot = el.dataset.slot;
-      if (slot !== "ammo") addItem(G.p, slug, 1);
+      if (slot === "backpack") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
+      if (slot !== "ammo" && !addItem(G.p, slug, 1)) {
+        toast("Mochila cheia."); return;
+      }
       delete G.p.equip[slot];
       hideTip();
       renderAll();
@@ -285,19 +290,28 @@ function huntEstimate(p, hu) {
 }
 
 function renderInventory(p) {
-  const entries = Object.keys(p.bag).sort((a, b) => {
+  const slots = bagSlots(p);
+  const entries = Object.keys(p.bag).filter((slug) => (p.bag[slug] || 0) > 0).sort((a, b) => {
     const A = GAMEDATA.items[a], B = GAMEDATA.items[b];
     return (B ? B.sell || 0 : 0) - (A ? A.sell || 0 : 0);
   });
-  if (!entries.length) {
-    $("#inv").innerHTML = `<div class="dim small center" style="padding:14px">Mochila vazia</div>`;
-    return;
+  const displaySlots = Math.max(slots, entries.length);
+  const cells = [];
+  for (let i = 0; i < displaySlots; i++) {
+    const slug = entries[i];
+    if (slug) {
+      cells.push(`<div class="inv-item" data-item="${slug}">${itemImg(slug)}
+        ${p.bag[slug] > 1 ? `<span class="cnt">${p.bag[slug]}</span>` : ""}
+      </div>`);
+    } else {
+      cells.push(`<div class="inv-item empty" title="Slot vazio"></div>`);
+    }
   }
-  $("#inv").innerHTML = entries.map((slug) =>
-    `<div class="inv-item" data-item="${slug}">${itemImg(slug)}
-      ${p.bag[slug] > 1 ? `<span class="cnt">${p.bag[slug]}</span>` : ""}
-    </div>`).join("");
-  $$("#inv .inv-item").forEach((el) => {
+  $("#inv").innerHTML = `
+    <div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
+      Bag padrão: ${bagUsedSlots(p)} / ${slots} slots
+    </div>${cells.join("")}`;
+  $$("#inv .inv-item[data-item]").forEach((el) => {
     const slug = el.dataset.item;
     const it = GAMEDATA.items[slug];
     const hint = it && it.s ? "Clique para equipar" : "Clique para vender";
@@ -318,13 +332,17 @@ function renderInventory(p) {
           return;
         }
         const old = G.p.equip[it.s];
-        if (old) addItem(G.p, old.item, 1);
         removeItem(G.p, slug, 1);
+        if (old && !addItem(G.p, old.item, 1)) {
+          addItem(G.p, slug, 1);
+          toast("Mochila cheia.");
+          return;
+        }
         G.p.equip[it.s] = { item: slug, count: 1 };
         const w = GAMEDATA.items[slug];
         if (w.th && G.p.equip.shield) {
-          addItem(G.p, G.p.equip.shield.item, 1);
-          delete G.p.equip.shield;
+          if (addItem(G.p, G.p.equip.shield.item, 1)) delete G.p.equip.shield;
+          else toast("Sem espaço para guardar o escudo.");
         }
       } else if (it && it.sell) {
         const total = it.sell * G.p.bag[slug];

@@ -61,7 +61,9 @@ function normalizePlayer(p) {
   p.config.autoRestock = false;
   p.supplies = p.supplies || {};
   p.bag = p.bag || {};
+  p.bagSlots = p.bagSlots || 8;
   p.equip = p.equip || {};
+  if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.bank = p.bank || 0;
   return p;
 }
@@ -154,8 +156,10 @@ function computeOffline(p) {
   if (VOCATIONS[p.voc].weapon === "magic")
     addManaSpent(p, Math.floor(kills * 40));
 
-  // loot vai pra bag
-  for (const slug in loot) addItem(p, slug, loot[slug]);
+  // loot vai pra bag respeitando slots da bag
+  for (const slug in loot) {
+    if (!addItem(p, slug, loot[slug])) delete loot[slug];
+  }
   supplyCost = offlineStats.supplyCost;
 
   return {
@@ -321,6 +325,10 @@ function drainEvents() {
         break;
       case "no-ammo":
         addLog("death", `Sem gold para comprar carga de <b>${e.name}</b>.`);
+        break;
+      case "bag-full":
+        addLog("death", "Mochila cheia: loot no chão foi ignorado.");
+        toast("Mochila cheia", "death");
         break;
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");

@@ -501,8 +501,12 @@ function rollLoot(c, p, mob) {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
-    } else {
-      addItem(p, l.item, count);
+    } else if (!addItem(p, l.item, count)) {
+      if (!c.bagFullWarned) {
+        c.events.push({ t: "bag-full" });
+        c.bagFullWarned = true;
+      }
+      continue;
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });

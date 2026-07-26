@@ -167,6 +167,8 @@ function runManaTrainTick(p) {
   const check = manaTrainCanSelect(p, r);
   if (!check.ok) { p.config.manaTrain = null; return { stopped: true, msg: check.msg }; }
   if (p.mp < r.mana) return null;
+  if (r.type === "ammo" && !hasBagSpace(p, r.slug))
+    return { stopped: true, msg: "Mochila cheia para conjurar munição." };
 
   const beforeMl = p.ml;
   p.mp -= r.mana;
@@ -310,6 +312,8 @@ function academyConjureCheck(p, r) {
     return { ok: false, msg: `Requer magic level ${r.ml}.` };
   if (p.mp < r.mana)
     return { ok: false, msg: `Mana insuficiente (${fmtFull(r.mana)}).` };
+  if (r.kind === "ammo" && !hasBagSpace(p, r.slug))
+    return { ok: false, msg: "Mochila cheia para conjurar munição." };
   return { ok: true, msg: "" };
 }
 

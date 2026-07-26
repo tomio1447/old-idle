@@ -271,6 +271,8 @@ button.full { width: 100%; }
   cursor: pointer;
 }
 .inv-item:hover { border-color: var(--gold); }
+.inv-item.empty { cursor: default; opacity: .45; background: #12100d; }
+.inv-item.empty:hover { border-color: #4a463e; }
 .inv-item img { max-width: 32px; max-height: 32px; }
 .inv-item .cnt {
   position: absolute; right: 1px; bottom: 0; font-size: 9px;

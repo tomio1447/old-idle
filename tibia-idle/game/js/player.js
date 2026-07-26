@@ -25,8 +25,9 @@ function newPlayer(name, voc, sex) {
     gold: 0,
     bank: 0,
     blessed: false,
-    equip: {},              // slot -> {item, count}
+    equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
+    bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     supplies: {},           // slug -> count
     hunt: null,             // id da hunt ativa
     stamina: 42 * 3600,     // segundos (42h cheio)
@@ -243,9 +244,25 @@ function expProgress(p) {
 
 /* --------------------------------------------------- inventario */
 
+function bagSlots(p) {
+  return p.bagSlots || 8;
+}
+
+function bagUsedSlots(p) {
+  return Object.keys(p.bag || {}).filter((slug) => (p.bag[slug] || 0) > 0).length;
+}
+
+function hasBagSpace(p, slug) {
+  if (!p.bag) p.bag = {};
+  return !!p.bag[slug] || bagUsedSlots(p) < bagSlots(p);
+}
+
 function addItem(p, slug, count) {
   count = count || 1;
+  if (!p.bag) p.bag = {};
+  if (!hasBagSpace(p, slug)) return false;
   p.bag[slug] = (p.bag[slug] || 0) + count;
+  return true;
 }
 
 function removeItem(p, slug, count) {

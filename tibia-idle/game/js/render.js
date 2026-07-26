@@ -52,7 +52,8 @@ function Renderer(canvas) {
 
 Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
-  const h = Math.round(w * 0.5);
+  // câmera mais alta/quadrada: 15 × 15 SQMs visíveis nos mapas.
+  const h = w;
   if (this.c.width !== w || this.c.height !== h) {
     this.c.width = w;
     this.c.height = h;
@@ -61,13 +62,16 @@ Renderer.prototype.resize = function () {
 };
 
 Renderer.prototype.addFloater = function (x, y, text, color, big) {
+  const life = big ? 2400 : 1900;
   this.floaters.push({
     x: x, y: y, text: text, color: color,
-    life: big ? 1400 : 1000, max: big ? 1400 : 1000,
-    big: !!big, vy: -0.035 - Math.random() * 0.015,
-    vx: (Math.random() - 0.5) * 0.02,
+    life: life, max: life,
+    big: !!big,
+    // hits/range sobem devagar, como no client: legível e sem sumir rápido.
+    vy: -0.005 - Math.random() * 0.004,
+    vx: (Math.random() - 0.5) * 0.008,
   });
-  if (this.floaters.length > 40) this.floaters.shift();
+  if (this.floaters.length > 60) this.floaters.shift();
 };
 
 Renderer.prototype.addEffect = function (x, y, name) {
