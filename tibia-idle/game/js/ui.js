@@ -401,30 +401,42 @@ function renderHelper(p) {
       return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1;
     }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
     const healSup = Object.keys(SUPPLIES).filter((slug) => SUPPLIES[slug].type === "heal");
+    const supplyRow = (slug) => {
+      const s = SUPPLIES[slug]; if (!s) return "";
+      const pw = supplyPower(s, p.level);
+      const kind = s.type === "mana" ? "mana" : "hp";
+      return `<div class="helper-supply-row">
+        <img src="assets/item/${s.sprite}.png" alt="${s.name}">
+        <div style="flex:1;min-width:0">
+          <div class="small">${s.name}</div>
+          <div class="tiny dim">
+            <span class="gold-txt">${fmtFull(supplyPrice(s, p.level))} gp</span>
+            · <span class="charge-highlight">CARGAS ${p.supplies[slug] || 0}</span>
+            · ${kind} ${pw[0]}-${pw[1]}
+          </div>
+        </div>
+      </div>`;
+    };
     healEl.innerHTML = `
-      <div class="row wrap" style="gap:8px;align-items:flex-end">
-        <div style="min-width:150px;flex:1">
-          <label class="small dim">Curar HP abaixo de (%)</label>
-          <input id="helper-heal-at" type="number" min="1" max="99" value="${p.config.healAt}"
-            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-        </div>
-        <div style="min-width:150px;flex:1">
-          <label class="small dim">Preencher mana abaixo de (%)</label>
-          <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
-            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-        </div>
+      <div class="mb8">
+        <label class="small dim">Curar HP abaixo de (%)</label>
+        <input id="helper-heal-at" type="number" min="1" max="99" value="${p.config.healAt}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
+      <div class="mb8">
+        <label class="small dim">Preencher mana abaixo de (%)</label>
+        <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="small dim mt8 mb4">Magias de cura</div>
       <div class="list" style="max-height:90px">${heals.map((id) => {
         const s = SPELLS[id], ok = p.level >= s.lvl;
         return `<div class="stat-row" style="opacity:${ok ? 1 : .45}"><span class="k">${s.name}</span><span class="v">${s.mana} mana · nv ${s.lvl}</span></div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
-      <div class="small dim mt8 mb4">Itens de cura / mana</div>
-      <div class="list" style="max-height:110px">${healSup.concat(["mana-fluid"]).map((slug) => {
-        const s = SUPPLIES[slug]; if (!s) return "";
-        const pw = supplyPower(s, p.level);
-        return `<div class="stat-row"><span class="k">${s.name}</span><span class="v">${fmtFull(supplyPrice(s, p.level))} gp · cargas ${p.supplies[slug] || 0} · ${s.type === "mana" ? "mana" : "hp"} ${pw[0]}-${pw[1]}</span></div>`;
-      }).join("")}</div>`;
+      <div class="small dim mt8 mb4">Itens de HP</div>
+      <div class="list" style="max-height:132px">${healSup.map(supplyRow).join("")}</div>
+      <div class="small dim mt8 mb4">Itens de Mana</div>
+      <div class="list" style="max-height:70px">${["mana-fluid"].map(supplyRow).join("")}</div>`;
     ["helper-heal-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;

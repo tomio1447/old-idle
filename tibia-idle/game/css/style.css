@@ -223,6 +223,25 @@ canvas { image-rendering: pixelated; }
 .log-line.info  { color: #a8a090; }
 .log-line.sell  { color: #c8a860; }
 
+.helper-supply-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.helper-supply-row img {
+  width: 26px; height: 26px;
+  image-rendering: pixelated;
+  flex: none;
+}
+.charge-highlight {
+  color: #ffe680;
+  background: rgba(120,85,10,.35);
+  border: 1px solid rgba(212,175,55,.45);
+  padding: 0 4px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
 /* ---------------------------------------------------------- hunts */
 .hunt-card {
   display: flex; gap: 8px; align-items: center;
