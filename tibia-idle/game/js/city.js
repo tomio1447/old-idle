@@ -488,6 +488,7 @@ function buyTraining(p, skill, times) {
 /* Compra de item na loja */
 function buyItem(p, slug, price) {
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
+  if (!hasBagSpace(p, slug)) return { ok: false, msg: "Mochila cheia." };
   p.gold -= price;
   addItem(p, slug, 1);
   return { ok: true };

@@ -28,8 +28,8 @@ function drawTileSprite(ctx, img, sx, sy, scale) {
 Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
-  // 15 × 15 SQMs visíveis: a câmera usa o menor lado do canvas como base.
-  const S = Math.min(W, H) / (15 * TILE);
+  // 15 × 11 SQMs visíveis: 15 tiles de largura por 11 de altura.
+  const S = Math.min(W / (15 * TILE), H / (11 * TILE));
   const TS = TILE * S;
 
   // ---- camera centrada no jogador, presa aos limites do mapa

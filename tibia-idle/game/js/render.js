@@ -52,8 +52,8 @@ function Renderer(canvas) {
 
 Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
-  // câmera mais alta/quadrada: 15 × 15 SQMs visíveis nos mapas.
-  const h = w;
+  // câmera 15 × 11 SQMs: 15 tiles de largura por 11 de altura.
+  const h = Math.round(w * (11 / 15));
   if (this.c.width !== w || this.c.height !== h) {
     this.c.width = w;
     this.c.height = h;
@@ -138,6 +138,20 @@ function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
   const mpPct = max.mp ? player.mp / max.mp : 0;
   if (mode === "arcs") drawStatusArcs(ctx, x, centerY, player.name, hpPct, mpPct, radius || 34);
   else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct);
+}
+
+function drawTargetSquare(ctx, x, y, w, h) {
+  ctx.save();
+  ctx.strokeStyle = "#ff2020";
+  ctx.lineWidth = 2;
+  ctx.shadowColor = "rgba(255,0,0,.9)";
+  ctx.shadowBlur = 5;
+  ctx.strokeRect(x, y, w, h);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(0,0,0,.85)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.restore();
 }
 
 Renderer.prototype.addCorpse = function (x, y, slug) {
@@ -232,13 +246,18 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 
   const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
   const tx = W * 0.70, ty = H * 0.62;
+  let trainerBox = { x: tx - 22, y: ty - 52, w: 44, h: 74 };
   if (trainer && trainer.complete && trainer.naturalWidth) {
     const sc = 2.4;
     const w = trainer.naturalWidth * sc, h = trainer.naturalHeight * sc;
+    trainerBox = { x: tx - w * 0.43, y: ty - h * 0.48,
+                   w: w * 0.86, h: h * 0.92 };
     ctx.fillStyle = "rgba(0,0,0,.45)";
     ctx.beginPath(); ctx.ellipse(tx, ty + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
     ctx.drawImage(trainer, tx - w / 2, ty - h / 2, w, h);
   } else {
+    drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
     ctx.fillStyle = "#7b5a2a";
     ctx.fillRect(tx - 18, ty - 52, 36, 70);
   }
@@ -396,6 +415,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.beginPath();
         ctx.ellipse(mx, my + h * 0.42, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
+        if (combat.mobs[0] === m) {
+          drawTargetSquare(ctx, mx - w * 0.43, my - h * 0.48,
+                           w * 0.86, h * 0.92);
+        }
         ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
         // barra de vida
         const bw = Math.max(30, w * 0.75), bh = 4;
