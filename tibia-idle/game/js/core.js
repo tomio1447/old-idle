@@ -251,6 +251,12 @@ const SUPPLIES = {
     tier: 1, lvl: 1, sprite: "dragon-ham" },
 };
 
+if (typeof GAMEDATA !== "undefined" && GAMEDATA.items && !GAMEDATA.items["mystic-dust"]) {
+  GAMEDATA.items["mystic-dust"] = {
+    n: "poeira mistica", s: null, t: "loot", sell: 0, w: 0.1,
+  };
+}
+
 /* Cura/dano efetivo de um supply para um dado nivel */
 function supplyPower(s, level) {
   const arr = s.heal || s.damage || s.mana;

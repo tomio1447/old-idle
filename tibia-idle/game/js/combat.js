@@ -5,12 +5,26 @@
 "use strict";
 
 const TICK = 100;   // ms por tick de simulacao
+const COMBAT_GRID_W = 15;
+const COMBAT_GRID_H = 11;
+const INFLUENCED_BASE_CHANCE = 0.005;
+const INFLUENCED_PVP_BONUS = 0.005;
 
-function newCombat(player, huntId) {
+function newCombat(player, huntId, instanceMode) {
   const hunt = GAMEDATA.hunts[huntId];
+  const mode = instanceMode || player.instanceMode || "non-pvp";
+  const pvp = mode === "pvp";
   return {
     huntId: huntId,
     hunt: hunt,
+    instanceMode: mode,
+    pvp: pvp,
+    expMul: pvp ? 1.25 : 1,
+    lootMul: pvp ? 1.25 : 1,
+    skillMul: pvp ? 1.25 : 1,
+    influencedChance: INFLUENCED_BASE_CHANCE + (pvp ? INFLUENCED_PVP_BONUS : 0),
+    raidEnabled: pvp,
+    raidCd: pvp ? 45000 + Math.random() * 45000 : Infinity,
     mobs: [],
     wave: 0,
     playerAtkCd: 0,
@@ -35,14 +49,48 @@ function newCombat(player, huntId) {
   };
 }
 
+function spawnRaider(c, p) {
+  const base = GAMEDATA.monsters["hero"] || GAMEDATA.monsters["black-knight"];
+  if (!base) return;
+  const lvl = Math.max(1, p.level || 1);
+  const def = Object.assign({}, base, {
+    name: "Player Raider",
+    hp: Math.floor(220 + lvl * 18),
+    exp: 0,
+    damage: Math.floor(25 + lvl * 2.2),
+    armor: Math.floor(8 + lvl * 0.35),
+    loot: [],
+    attackSpeed: 1800,
+  });
+  c.mobs.push({
+    slug: "hero", def: def, raider: true,
+    hp: def.hp, maxHp: def.hp,
+    atkCd: 500, id: "raider" + Math.random().toString(36).slice(2, 7),
+    x: 0.92, y: 0.30 + Math.random() * 0.42,
+    dir: "w", moving: false, attackAnim: 0, speed: 0.00008,
+    spawnAt: Date.now(),
+  });
+  c.events.push({ t: "raid" });
+  resolveSQMOccupancy(c);
+}
+
 function spawnWave(c, p) {
   const pack = c.hunt.pack || 3;
   while (c.mobs.length < pack) {
     const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
-    const m = GAMEDATA.monsters[slug];
-    if (!m) break;
+    const base = GAMEDATA.monsters[slug];
+    if (!base) break;
+    const influenced = Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
+    const m = Object.assign({}, base);
+    if (influenced) {
+      m.name = "Influenced " + base.name;
+      m.hp = Math.floor(base.hp * 2);
+      m.damage = Math.floor(base.damage * 1.2);
+      m.armor = Math.floor(base.armor * 1.2);
+    }
     c.mobs.push({
       slug: slug, def: m,
+      influenced: influenced,
       hp: m.hp, maxHp: m.hp,
       atkCd: 400 + Math.random() * 1200,
       id: Math.random().toString(36).slice(2, 8),
@@ -55,6 +103,7 @@ function spawnWave(c, p) {
       spawnAt: Date.now(),
     });
   }
+  resolveSQMOccupancy(c);
   c.wave++;
 }
 
@@ -75,6 +124,61 @@ function pointDistance(a, b) {
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
+}
+
+function entityCell(ent) {
+  return {
+    x: clamp(Math.floor((ent.x || 0) * COMBAT_GRID_W), 0, COMBAT_GRID_W - 1),
+    y: clamp(Math.floor((ent.y || 0) * COMBAT_GRID_H), 0, COMBAT_GRID_H - 1),
+  };
+}
+
+function cellKey(cell) { return cell.x + ":" + cell.y; }
+function sameSQM(a, b) {
+  const ca = entityCell(a), cb = entityCell(b);
+  return ca.x === cb.x && ca.y === cb.y;
+}
+function cellCenter(cell) {
+  return { x: (cell.x + 0.5) / COMBAT_GRID_W, y: (cell.y + 0.5) / COMBAT_GRID_H };
+}
+function isCellFree(cell, occupied) {
+  if (cell.x < 0 || cell.y < 0 || cell.x >= COMBAT_GRID_W || cell.y >= COMBAT_GRID_H) return false;
+  return !occupied.has(cellKey(cell));
+}
+function nearestFreeCell(origin, occupied, prefer) {
+  let best = null, bestScore = Infinity;
+  for (let r = 1; r <= 4; r++) {
+    for (let y = origin.y - r; y <= origin.y + r; y++) {
+      for (let x = origin.x - r; x <= origin.x + r; x++) {
+        const cell = { x, y };
+        if (!isCellFree(cell, occupied)) continue;
+        const score = Math.abs(x - origin.x) + Math.abs(y - origin.y) -
+          (prefer ? ((x - origin.x) * prefer.x + (y - origin.y) * prefer.y) * 0.25 : 0);
+        if (score < bestScore) { bestScore = score; best = cell; }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+function resolveSQMOccupancy(c) {
+  if (!c.player) return;
+  const occupied = new Set([cellKey(entityCell(c.player))]);
+  for (const m of c.mobs) {
+    let cell = entityCell(m);
+    if (!isCellFree(cell, occupied)) {
+      const pc = entityCell(c.player);
+      const prefer = { x: Math.sign(cell.x - pc.x) || 1, y: Math.sign(cell.y - pc.y) || 0 };
+      const free = nearestFreeCell(cell, occupied, prefer) || nearestFreeCell(pc, occupied, prefer);
+      if (free) {
+        const p = cellCenter(free);
+        m.x = p.x; m.y = p.y;
+        cell = free;
+      }
+    }
+    occupied.add(cellKey(cell));
+  }
 }
 
 function playerAttackRange(p) {
@@ -152,6 +256,14 @@ function updateCombatMovement(c, p, dt) {
     movePoint(m, laneTarget, m.speed || 0.00005, dt, range * 0.90);
     m.dir = faceDir(m, pl);
   });
+  resolveSQMOccupancy(c);
+}
+
+function combatSkillGain(c, amount) {
+  return (amount || 1) * (c.skillMul || 1);
+}
+function combatManaSkillGain(c, mana) {
+  return mana * (c.skillMul || 1);
 }
 
 function hasSelectedSupply(p, slug) {
@@ -255,7 +367,7 @@ function playerAttack(c, p, target) {
   // chance de errar para distancia
   if (isDist && Math.random() > hitChance(effSkill(p, "dist"))) {
     c.events.push({ t: "miss", x: target.x, y: target.y });
-    addSkillTries(p, "dist", 1);
+    addSkillTries(p, "dist", combatSkillGain(c, 1));
     return 0;
   }
 
@@ -280,9 +392,9 @@ function playerAttack(c, p, target) {
   if (isMagic) {
     // magia sobe ML pelo gasto de mana (feito no cast)
   } else if (isDist) {
-    addSkillTries(p, "dist", 1);
+    addSkillTries(p, "dist", combatSkillGain(c, 1));
   } else {
-    addSkillTries(p, weaponSkill(p), 1);
+    addSkillTries(p, weaponSkill(p), combatSkillGain(c, 1));
   }
   return raw;
 }
@@ -307,7 +419,7 @@ function tryCastSpell(c, p, target, now) {
   const [id, s] = avail[0];
 
   p.mp -= s.mana;
-  addManaSpent(p, s.mana);
+  addManaSpent(p, combatManaSkillGain(c, s.mana));
   c.spellCd[id] = now + s.cd;
 
   const ml = effMagic(p);
@@ -382,7 +494,7 @@ function tryHeal(c, p, now) {
     const amount = Math.floor((p.level / 5 + ml * 2.0) * s.power *
                               (0.85 + Math.random() * 0.3));
     p.mp -= s.mana;
-    addManaSpent(p, s.mana);
+    addManaSpent(p, combatManaSkillGain(c, s.mana));
     p.hp = Math.min(max.hp, p.hp + amount);
     c.healCd = now + 1000;
     c.events.push({ t: "heal", amount: amount, spell: s.name });
@@ -472,12 +584,12 @@ function mobAttack(c, p, mob) {
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                     screen: true, projectile: monsterAttackRange(mob) > 0.16 });
-    addSkillTries(p, "shield", 1);
+    addSkillTries(p, "shield", combatSkillGain(c, 1));
     return 0;
   }
   p.hp -= raw;
   c.stats.taken += raw;
-  addSkillTries(p, "shield", 1);
+  addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                   screen: true, projectile: monsterAttackRange(mob) > 0.16 });
@@ -489,7 +601,12 @@ function rollLoot(c, p, mob) {
   const got = [];
   for (const l of mob.def.loot) {
     if (Math.random() * 100 > l.chance) continue;
-    const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+    let count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+    if (mob.influenced) count *= 2;
+    else if ((c.lootMul || 1) > 1) {
+      const boosted = count * c.lootMul;
+      count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
+    }
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
     // filtro de loot
@@ -510,6 +627,13 @@ function rollLoot(c, p, mob) {
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
+  }
+  if (mob.influenced) {
+    const dust = 1 + Math.floor(Math.random() * 4);
+    if (addItem(p, "mystic-dust", dust)) {
+      c.stats.loot["mystic-dust"] = (c.stats.loot["mystic-dust"] || 0) + dust;
+      got.push({ item: "mystic-dust", count: dust });
+    }
   }
   return got;
 }
@@ -578,6 +702,13 @@ function combatTick(c, p, dt, now) {
 
   // spawn
   if (!c.mobs.length) spawnWave(c, p);
+  if (c.raidEnabled) {
+    c.raidCd -= dt;
+    if (c.raidCd <= 0 && !c.mobs.some((m) => m.raider)) {
+      spawnRaider(c, p);
+      c.raidCd = 60000 + Math.random() * 90000;
+    }
+  }
 
   // movimentação: player aproxima/kita e monstros procuram distância de ataque
   updateCombatMovement(c, p, dt);
@@ -637,7 +768,7 @@ function combatTick(c, p, dt, now) {
     if (m.hp > 0) { alive.push(m); continue; }
     // recompensa
     const staminaMul = p.stamina > 39 * 3600 ? 1.5 : p.stamina > 0 ? 1.0 : 0.5;
-    const exp = Math.floor(m.def.exp * staminaMul * expStage(p.level));
+    const exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
     addExp(p, exp);
     c.stats.exp += exp;
     c.stats.kills++;

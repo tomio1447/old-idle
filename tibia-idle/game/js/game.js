@@ -65,6 +65,7 @@ function normalizePlayer(p) {
   p.equip = p.equip || {};
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.bank = p.bank || 0;
+  p.instanceMode = p.instanceMode || null;
   return p;
 }
 
@@ -97,9 +98,10 @@ function computeOffline(p) {
   const hours = staminaSec / 3600;
   if (hours <= 0) return null;
 
+  const modeMul = p.instanceMode === "pvp" ? 1.25 : 1;
   const kills = Math.floor(est.kills * hours * effRate);
-  let exp = Math.floor(est.exp * hours * effRate);
-  let gold = Math.floor(est.gold * hours * effRate);
+  let exp = Math.floor(est.exp * hours * effRate * modeMul);
+  let gold = Math.floor(est.gold * hours * effRate * modeMul);
 
   // supplies/ammo offline usam o mesmo modelo de cargas do combate online:
   // cargas existentes são consumidas; se uma carga selecionada está 0, compra
@@ -151,10 +153,11 @@ function computeOffline(p) {
       if (!consumeAmmoCharge(offlineCombat, p)) break;
     }
   }
-  if (sk !== "magic") addSkillTries(p, sk, Math.floor(swings * 0.6));
-  addSkillTries(p, "shield", Math.floor(swings * 0.5));
+  const skillMul = p.instanceMode === "pvp" ? 1.25 : 1;
+  if (sk !== "magic") addSkillTries(p, sk, Math.floor(swings * 0.6 * skillMul));
+  addSkillTries(p, "shield", Math.floor(swings * 0.5 * skillMul));
   if (VOCATIONS[p.voc].weapon === "magic")
-    addManaSpent(p, Math.floor(kills * 40));
+    addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
   // loot vai pra bag respeitando slots da bag
   for (const slug in loot) {
@@ -206,21 +209,55 @@ function showOfflineModal(r) {
 }
 
 /* ------------------------------------------------------------ hunt */
-function startHunt(id) {
+function openInstanceModal(id) {
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Escolha a instância — ${hu.name}</div>
+    <div class="panel-body">
+      <div class="shop-row" style="align-items:flex-start">
+        <div style="flex:1">
+          <div class="small" style="color:#9ce84a">Instância non-pvp</div>
+          <div class="tiny dim">Ninguém pode te raidar. EXP, loot e skills normais.</div>
+        </div>
+        <button class="primary sm" data-instance="non-pvp">Entrar</button>
+      </div>
+      <div class="shop-row" style="align-items:flex-start">
+        <div style="flex:1">
+          <div class="small" style="color:#ff9a6a">Instância pvp</div>
+          <div class="tiny dim">Outros jogadores podem te raidar e matar. EXP, loot e skills +25%. +0,5% de chance de monstro Influenced.</div>
+        </div>
+        <button class="danger sm" data-instance="pvp">Entrar</button>
+      </div>
+      <button class="full mt8" id="instance-cancel">Cancelar</button>
+    </div>`;
+  $("#modal").classList.add("show");
+  $$("#modal-body [data-instance]").forEach((b) =>
+    b.addEventListener("click", () => {
+      $("#modal").classList.remove("show");
+      startHunt(id, b.dataset.instance);
+    }));
+  $("#instance-cancel").addEventListener("click", () => $("#modal").classList.remove("show"));
+}
+
+function startHunt(id, instanceMode) {
+  const hu = GAMEDATA.hunts[id];
+  if (!hu) return;
+  if (!instanceMode) { openInstanceModal(id); return; }
   if (G.training) stopAcademy(false);
   G.inCity = false;
   G.p.hunt = id;
-  G.combat = newCombat(G.p, id);
+  G.p.instanceMode = instanceMode;
+  G.combat = newCombat(G.p, id, instanceMode);
   spawnWave(G.combat, G.p);
-  addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b>`);
-  toast(`Caçando em <b>${hu.name}</b>`);
+  addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
+  toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
   renderAll();
 }
 
 function stopHunt() {
   G.p.hunt = null;
+  G.p.instanceMode = null;
   G.combat = null;
   G.inCity = true;
   addLog("info", "Voltou para a <b style='color:#ffe680'>Cidade de Thais</b>.");
@@ -329,6 +366,10 @@ function drainEvents() {
       case "bag-full":
         addLog("death", "Mochila cheia: loot no chão foi ignorado.");
         toast("Mochila cheia", "death");
+        break;
+      case "raid":
+        addLog("death", "Um <b>Player Raider</b> invadiu sua instância PvP!");
+        toast("Raid PvP na instância!", "death");
         break;
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
@@ -576,13 +617,16 @@ function renderHuntInfo() {
   const hu = GAMEDATA.hunts[p.hunt];
   const est = huntEstimate(p, hu);
   const risk = huntRisk(p, hu);
+  const mode = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
   el.innerHTML = `
     <div class="row mb4" style="justify-content:space-between">
       <b style="color:#d4af37">${hu.name}</b>
       <span class="risk ${risk.cls}">${risk.txt}</span>
     </div>
-    <div class="stat-row"><span class="k">XP / hora</span><span class="v" style="color:#9ce84a">${fmt(est.exp)}</span></div>
-    <div class="stat-row"><span class="k">Gold / hora</span><span class="v gold-txt">${fmt(est.gold)}</span></div>
+    <div class="stat-row"><span class="k">Instância</span><span class="v" style="color:${mode === "pvp" ? "#ff9a6a" : "#9ce84a"}">${mode}</span></div>
+    ${mode === "pvp" ? `<div class="stat-row"><span class="k">Bônus PvP</span><span class="v">+25% exp/loot/skills · raidável</span></div>` : ""}
+    <div class="stat-row"><span class="k">XP / hora</span><span class="v" style="color:#9ce84a">${fmt(est.exp * (mode === "pvp" ? 1.25 : 1))}</span></div>
+    <div class="stat-row"><span class="k">Gold / hora</span><span class="v gold-txt">${fmt(est.gold * (mode === "pvp" ? 1.25 : 1))}</span></div>
     <div class="stat-row"><span class="k">Kills / hora</span><span class="v">${Math.round(est.kills)}</span></div>
     <div class="stat-row"><span class="k">Tempo por kill</span><span class="v">${est.ttk.toFixed(1)}s</span></div>
     <div class="stat-row"><span class="k">Sobrevivência</span><span class="v">${risk.ttd > 900 ? "∞" : Math.round(risk.ttd) + "s"}</span></div>`;
@@ -603,7 +647,8 @@ function startGame(p) {
   p.lastSeen = Date.now();
 
   if (p.hunt && GAMEDATA.hunts[p.hunt]) {
-    G.combat = newCombat(p, p.hunt);
+    p.instanceMode = p.instanceMode || "non-pvp";
+    G.combat = newCombat(p, p.hunt, p.instanceMode);
     spawnWave(G.combat, p);
     G.inCity = false;
   } else {

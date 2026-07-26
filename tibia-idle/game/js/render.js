@@ -419,6 +419,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
           drawTargetSquare(ctx, mx - w * 0.43, my - h * 0.48,
                            w * 0.86, h * 0.92);
         }
+        if (m.influenced) {
+          ctx.save();
+          ctx.shadowColor = "#39a8ff";
+          ctx.shadowBlur = 18;
+          ctx.globalAlpha = 0.9;
+          ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
+          ctx.restore();
+        }
         ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
         // barra de vida
         const bw = Math.max(30, w * 0.75), bh = 4;
@@ -429,11 +437,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.fillStyle = pct > 0.5 ? "#4ec84e" : pct > 0.25 ? "#e8c84a" : "#e04040";
         ctx.fillRect(bx, by, bw * pct, bh);
         // nome + range visual quando está chegando perto
-        ctx.font = "9px Verdana";
+        ctx.font = m.influenced ? "bold 18px Verdana" : "9px Verdana";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,.9)";
         ctx.fillText(m.def.name, mx + 1, by - 4);
-        ctx.fillStyle = "#d8d0b8";
+        ctx.fillStyle = m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#d8d0b8";
         ctx.fillText(m.def.name, mx, by - 5);
       }
     }
