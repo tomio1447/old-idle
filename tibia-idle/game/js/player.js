@@ -41,6 +41,9 @@ function newPlayer(name, voc, sex) {
     config: {
       healAt: 90,           // % de vida para curar
       manaAt: 50,           // % de mana para usar mana fluids
+      healSpell: "",        // magia de cura selecionada pelo Helper
+      healSupply: "",       // runa/potion de cura selecionada pelo Helper
+      manaSupply: "mana-fluid", // item de mana selecionado pelo Helper
       useRunes: true,
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana

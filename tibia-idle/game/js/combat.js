@@ -504,17 +504,24 @@ function tryHeal(c, p, now) {
   if (pct > p.config.healAt) return false;
   if (c.healCd > now) return false;
 
-  // 1. spell de cura
+  // 1. spell de cura: usa a spell selecionada no Helper, se houver.
   const heals = [];
-  for (const id in SPELLS) {
-    const s = SPELLS[id];
-    if (s.type !== "heal") continue;
-    if (s.vocs.indexOf(p.voc) === -1) continue;
-    if (p.level < s.lvl || p.mp < s.mana) continue;
-    heals.push([id, s]);
+  const selectedHealSpell = p.config.healSpell;
+  if (selectedHealSpell) {
+    const s = SPELLS[selectedHealSpell];
+    if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+        p.level >= s.lvl && p.mp >= s.mana) heals.push([selectedHealSpell, s]);
+  } else {
+    for (const id in SPELLS) {
+      const s = SPELLS[id];
+      if (s.type !== "heal") continue;
+      if (s.vocs.indexOf(p.voc) === -1) continue;
+      if (p.level < s.lvl || p.mp < s.mana) continue;
+      heals.push([id, s]);
+    }
   }
   if (heals.length) {
-    heals.sort((a, b) => b[1].power - a[1].power);
+    if (!selectedHealSpell) heals.sort((a, b) => b[1].power - a[1].power);
     const [, s] = heals[0];
     const ml = effMagic(p);
     const amount = Math.floor((p.level / 5 + ml * 2.0) * s.power *
@@ -526,13 +533,20 @@ function tryHeal(c, p, now) {
     c.events.push({ t: "heal", amount: amount, spell: s.name });
     return true;
   }
-  // 2. runa de cura
+  // 2. runa/potion de cura: usa o item selecionado no Helper, se houver.
   if (p.config.useRunes) {
     let best = null;
-    for (const slug in p.supplies) {
-      const s = SUPPLIES[slug];
-      if (!s || s.type !== "heal" || !canRechargeSupply(p, slug)) continue;
-      if (!best || s.tier > SUPPLIES[best].tier) best = slug;
+    const selectedHealSupply = p.config.healSupply;
+    if (selectedHealSupply) {
+      const s = SUPPLIES[selectedHealSupply];
+      if (s && s.type === "heal" && canRechargeSupply(p, selectedHealSupply))
+        best = selectedHealSupply;
+    } else {
+      for (const slug in p.supplies) {
+        const s = SUPPLIES[slug];
+        if (!s || s.type !== "heal" || !canRechargeSupply(p, slug)) continue;
+        if (!best || s.tier > SUPPLIES[best].tier) best = slug;
+      }
     }
     if (best) {
       const s = SUPPLIES[best];
@@ -550,16 +564,27 @@ function tryHeal(c, p, now) {
 
 /* Existe alguma forma de cura disponivel agora? (spell com mana ou runa) */
 function canHeal(c, p) {
-  for (const id in SPELLS) {
-    const s = SPELLS[id];
-    if (s.type !== "heal") continue;
-    if (s.vocs.indexOf(p.voc) === -1) continue;
-    if (p.level >= s.lvl && p.mp >= s.mana) return true;
+  if (p.config.healSpell) {
+    const s = SPELLS[p.config.healSpell];
+    if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+        p.level >= s.lvl && p.mp >= s.mana) return true;
+  } else {
+    for (const id in SPELLS) {
+      const s = SPELLS[id];
+      if (s.type !== "heal") continue;
+      if (s.vocs.indexOf(p.voc) === -1) continue;
+      if (p.level >= s.lvl && p.mp >= s.mana) return true;
+    }
   }
   if (p.config.useRunes) {
-    for (const slug in p.supplies) {
-      const s = SUPPLIES[slug];
-      if (s && s.type === "heal" && canRechargeSupply(p, slug)) return true;
+    if (p.config.healSupply) {
+      const s = SUPPLIES[p.config.healSupply];
+      if (s && s.type === "heal" && canRechargeSupply(p, p.config.healSupply)) return true;
+    } else {
+      for (const slug in p.supplies) {
+        const s = SUPPLIES[slug];
+        if (s && s.type === "heal" && canRechargeSupply(p, slug)) return true;
+      }
     }
   }
   return false;
@@ -579,7 +604,10 @@ function tryMana(c, p) {
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
-  for (const slug in p.supplies) {
+  const candidates = [];
+  if (p.config.manaSupply) candidates.push(p.config.manaSupply);
+  else for (const slug in p.supplies) candidates.push(slug);
+  for (const slug of candidates) {
     const s = SUPPLIES[slug];
     if (!s || s.type !== "mana" || !canRechargeSupply(p, slug)) continue;
     if (!consumeSupplyCharge(c, p, slug)) continue;

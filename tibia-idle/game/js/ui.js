@@ -405,7 +405,8 @@ function renderHelper(p) {
       const s = SUPPLIES[slug]; if (!s) return "";
       const pw = supplyPower(s, p.level);
       const kind = s.type === "mana" ? "mana" : "hp";
-      return `<div class="helper-supply-row">
+      const selected = s.type === "mana" ? p.config.manaSupply === slug : p.config.healSupply === slug;
+      return `<div class="helper-supply-row ${selected ? "selected" : ""}">
         <img src="assets/item/${s.sprite}.png" alt="${s.name}">
         <div style="flex:1;min-width:0">
           <div class="small">${s.name}</div>
@@ -415,6 +416,8 @@ function renderHelper(p) {
             · ${kind} ${pw[0]}-${pw[1]}
           </div>
         </div>
+        <button class="sm ${selected ? "primary" : ""}" data-use-supply="${slug}">
+          ${selected ? "USANDO" : "USAR"}</button>
       </div>`;
     };
     healEl.innerHTML = `
@@ -429,9 +432,17 @@ function renderHelper(p) {
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="small dim mt8 mb4">Magias de cura</div>
-      <div class="list" style="max-height:90px">${heals.map((id) => {
+      <div class="list" style="max-height:115px">${heals.map((id) => {
         const s = SPELLS[id], ok = p.level >= s.lvl;
-        return `<div class="stat-row" style="opacity:${ok ? 1 : .45}"><span class="k">${s.name}</span><span class="v">${s.mana} mana · nv ${s.lvl}</span></div>`;
+        const selected = p.config.healSpell === id;
+        return `<div class="shop-row ${selected ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
+          <div style="flex:1;min-width:0">
+            <div class="small">${s.name}</div>
+            <div class="tiny dim">${s.mana} mana · nv ${s.lvl}</div>
+          </div>
+          <button class="sm ${selected ? "primary" : ""}" data-heal-spell="${id}" ${ok ? "" : "disabled"}>
+            ${selected ? "Selecionada" : "Selecionar Spell"}</button>
+        </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
       <div class="small dim mt8 mb4">Itens de HP</div>
       <div class="list" style="max-height:132px">${healSup.map(supplyRow).join("")}</div>
@@ -447,6 +458,21 @@ function renderHelper(p) {
         else p.config.manaAt = val;
       });
     });
+    $$("#helper-heal [data-heal-spell]").forEach((b) => b.addEventListener("click", () => {
+      p.config.healSpell = b.dataset.healSpell;
+      toast(`Spell de cura selecionada: <b>${SPELLS[p.config.healSpell].name}</b>`);
+      renderHelper(p);
+    }));
+    $$("#helper-heal [data-use-supply]").forEach((b) => b.addEventListener("click", () => {
+      const slug = b.dataset.useSupply;
+      const s = SUPPLIES[slug];
+      if (!s) return;
+      if (!Object.prototype.hasOwnProperty.call(p.supplies, slug)) p.supplies[slug] = 0;
+      if (s.type === "mana") p.config.manaSupply = slug;
+      else p.config.healSupply = slug;
+      toast(`${s.type === "mana" ? "Mana" : "Cura"} selecionada: <b>${s.name}</b>`);
+      renderHelper(p);
+    }));
   }
   if (atkEl) {
     const mode = p.config.attackMode || "chase";
@@ -488,7 +514,7 @@ function renderHelper(p) {
         return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
           <img src="assets/item/${s.sprite}.png">
           <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">cargas ${p.supplies[slug] || 0} · ${fmtFull(supplyPrice(s, p.level))} gp/carga · nv ${s.lvl || 1}</div></div>
-          <button class="sm ${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "primary" : ""}" data-shooter-rune="${slug}" ${ok ? "" : "disabled"}>Usar</button>
+          <button class="sm ${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "primary" : ""}" data-shooter-rune="${slug}" ${ok ? "" : "disabled"}>${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "USANDO" : "USAR"}</button>
         </div>`;
       }).join("")}</div>`;
     $$("#helper-shooter [data-shooter-type]").forEach((b) => b.addEventListener("click", () => {

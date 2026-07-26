@@ -49,6 +49,9 @@ function normalizePlayer(p) {
   p.config = Object.assign({
     healAt: 90,
     manaAt: 50,
+    healSpell: "",
+    healSupply: "",
+    manaSupply: "mana-fluid",
     useRunes: true,
     autoRestock: false,
     manaTrain: null,
@@ -67,6 +70,7 @@ function normalizePlayer(p) {
   p.config.autoRestock = false;
   p.supplies = p.supplies || {};
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
+  if (!p.config.manaSupply) p.config.manaSupply = "mana-fluid";
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.equip = p.equip || {};

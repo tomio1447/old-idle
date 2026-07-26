@@ -228,6 +228,10 @@ canvas { image-rendering: pixelated; }
   padding: 4px 0;
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
+.helper-supply-row.selected, .shop-row.selected {
+  background: rgba(80, 65, 18, .35);
+  outline: 1px solid rgba(212,175,55,.32);
+}
 .helper-supply-row img {
   width: 26px; height: 26px;
   image-rendering: pixelated;
