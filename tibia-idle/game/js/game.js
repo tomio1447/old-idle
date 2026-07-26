@@ -56,6 +56,7 @@ function normalizePlayer(p) {
     autoRestock: false,
     manaTrain: null,
     attackMode: "chase",
+    kiteDistance: 3,
     shooterType: "auto",
     shooterSpell: "",
     shooterRune: "",
@@ -68,6 +69,7 @@ function normalizePlayer(p) {
     lootFilter: "all",
   }, p.config || {});
   p.config.autoRestock = false;
+  p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
   p.supplies = p.supplies || {};
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
   if (!p.config.manaSupply) p.config.manaSupply = "mana-fluid";
@@ -367,7 +369,7 @@ function openInstanceModal(id) {
       <div class="shop-row" style="align-items:flex-start">
         <div style="flex:1">
           <div class="small" style="color:#ff9a6a">Instância pvp</div>
-          <div class="tiny dim">Outros jogadores podem te raidar e matar. EXP, loot e skills +25%. +0,5% de chance de monstro Influenced.</div>
+          <div class="tiny dim">Outros jogadores reais poderão te raidar e matar no online. EXP, loot e skills +25%. +0,5% de chance de monstro Influenced.</div>
         </div>
         <button class="danger sm" data-instance="pvp">Entrar</button>
       </div>
@@ -509,9 +511,11 @@ function drainEvents() {
         addLog("death", "Mochila cheia: loot no chão foi ignorado.");
         toast("Mochila cheia", "death");
         break;
-      case "raid":
-        addLog("death", "Um <b>Player Raider</b> invadiu sua instância PvP!");
-        toast("Raid PvP na instância!", "death");
+      case "raid-real-player":
+        addLog("death", "Raid PvP reservado para jogador real online — nenhum NPC fake foi criado.");
+        break;
+      case "influenced-next":
+        addLog("info", "Teste Influenced: o próximo monstro que nascer virá influenciado.");
         break;
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");

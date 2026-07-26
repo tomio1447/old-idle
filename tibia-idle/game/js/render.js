@@ -52,8 +52,8 @@ function Renderer(canvas) {
 
 Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
-  // câmera 15 × 11 SQMs: 15 tiles de largura por 11 de altura.
-  const h = Math.round(w * (11 / 15));
+  // câmera reduzida e com mais visão: 21 × 13 SQMs.
+  const h = Math.round(w * (13 / 21));
   if (this.c.width !== w || this.c.height !== h) {
     this.c.width = w;
     this.c.height = h;

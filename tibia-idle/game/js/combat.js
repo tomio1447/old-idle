@@ -5,8 +5,8 @@
 "use strict";
 
 const TICK = 100;   // ms por tick de simulacao
-const COMBAT_GRID_W = 15;
-const COMBAT_GRID_H = 11;
+const COMBAT_GRID_W = 21;
+const COMBAT_GRID_H = 13;
 const INFLUENCED_BASE_CHANCE = 0.005;
 const INFLUENCED_PVP_BONUS = 0.005;
 
@@ -23,8 +23,12 @@ function newCombat(player, huntId, instanceMode) {
     lootMul: pvp ? 1.25 : 1,
     skillMul: pvp ? 1.25 : 1,
     influencedChance: INFLUENCED_BASE_CHANCE + (pvp ? INFLUENCED_PVP_BONUS : 0),
-    raidEnabled: pvp,
-    raidCd: pvp ? 45000 + Math.random() * 45000 : Infinity,
+    // RAID será feito por jogadores reais no online. Não simular NPC/Player Raider aqui.
+    raidEnabled: false,
+    raidCd: Infinity,
+    raidMode: pvp ? "real-player" : "none",
+    killsSinceInfluenced: 0,
+    forceNextInfluenced: false,
     mobs: [],
     wave: 0,
     playerAtkCd: 0,
@@ -49,29 +53,10 @@ function newCombat(player, huntId, instanceMode) {
   };
 }
 
-function spawnRaider(c, p) {
-  const base = GAMEDATA.monsters["hero"] || GAMEDATA.monsters["black-knight"];
-  if (!base) return;
-  const lvl = Math.max(1, p.level || 1);
-  const def = Object.assign({}, base, {
-    name: "Player Raider",
-    hp: Math.floor(220 + lvl * 18),
-    exp: 0,
-    damage: Math.floor(25 + lvl * 2.2),
-    armor: Math.floor(8 + lvl * 0.35),
-    loot: [],
-    attackSpeed: 1800,
-  });
-  c.mobs.push({
-    slug: "hero", def: def, raider: true,
-    hp: def.hp, maxHp: def.hp,
-    atkCd: 500, id: "raider" + Math.random().toString(36).slice(2, 7),
-    x: 0.92, y: 0.30 + Math.random() * 0.42,
-    dir: "w", moving: false, attackAnim: 0, speed: 0.00008,
-    spawnAt: Date.now(),
-  });
-  c.events.push({ t: "raid" });
-  resolveSQMOccupancy(c);
+function notifyRealPlayerRaidPending(c) {
+  // Placeholder: no modo online o raid será feito por outro jogador real.
+  // Não cria NPC fake para representar player.
+  c.events.push({ t: "raid-real-player" });
 }
 
 function spawnWave(c, p) {
@@ -80,7 +65,9 @@ function spawnWave(c, p) {
     const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
     const base = GAMEDATA.monsters[slug];
     if (!base) break;
-    const influenced = Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
+    const influenced = !!c.forceNextInfluenced ||
+      Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
+    if (c.forceNextInfluenced) c.forceNextInfluenced = false;
     const m = Object.assign({}, base);
     if (influenced) {
       m.name = "Influenced " + base.name;
@@ -119,6 +106,12 @@ function attackInterval(c, p) {
 function pointDistance(a, b) {
   const dx = (a.x || 0) - (b.x || 0);
   const dy = (a.y || 0) - (b.y || 0);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function pointDistanceSQM(a, b) {
+  const dx = ((a.x || 0) - (b.x || 0)) * COMBAT_GRID_W;
+  const dy = ((a.y || 0) - (b.y || 0)) * COMBAT_GRID_H;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
@@ -236,13 +229,15 @@ function updateCombatMovement(c, p, dt) {
   const mode = p.config.attackMode || "chase";
   if (mode !== "stand") {
     if (mode === "kiting" && desired >= 0.2) {
-      const kiteRange = Math.max(0.46, desired * 0.95);
-      if (cur < kiteRange) {
-        const away = { x: clamp(pl.x - (target.x - pl.x) * 1.25, 0.08, 0.40),
-                       y: clamp(pl.y - (target.y - pl.y) * 0.55, 0.25, 0.75) };
-        movePoint(pl, away, playerSpeed * 1.15, dt, 0.02);
-      } else if (cur > desired * 1.18) {
-        movePoint(pl, target, playerSpeed, dt, desired * 0.98);
+      const kiteSQM = clamp(parseInt(p.config.kiteDistance, 10) || 3, 1, 5);
+      const curSQM = pointDistanceSQM(pl, target);
+      const kiteStopNorm = kiteSQM / COMBAT_GRID_W;
+      if (curSQM < kiteSQM) {
+        const away = { x: clamp(pl.x - (target.x - pl.x) * 1.35, 0.08, 0.40),
+                       y: clamp(pl.y - (target.y - pl.y) * 0.65, 0.25, 0.75) };
+        movePoint(pl, away, playerSpeed * 1.18, dt, 0.02);
+      } else if (curSQM > kiteSQM + 0.8) {
+        movePoint(pl, target, playerSpeed, dt, Math.max(0.02, kiteStopNorm));
       }
     } else if (desired < 0.2) {
       movePoint(pl, target, playerSpeed, dt, desired * 0.82);
@@ -758,8 +753,8 @@ function combatTick(c, p, dt, now) {
   if (!c.mobs.length) spawnWave(c, p);
   if (c.raidEnabled) {
     c.raidCd -= dt;
-    if (c.raidCd <= 0 && !c.mobs.some((m) => m.raider)) {
-      spawnRaider(c, p);
+    if (c.raidCd <= 0) {
+      notifyRealPlayerRaidPending(c);
       c.raidCd = 60000 + Math.random() * 90000;
     }
   }
@@ -828,6 +823,12 @@ function combatTick(c, p, dt, now) {
     c.stats.kills++;
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
+    c.killsSinceInfluenced = (c.killsSinceInfluenced || 0) + 1;
+    if (c.killsSinceInfluenced >= 5) {
+      c.killsSinceInfluenced = 0;
+      c.forceNextInfluenced = true;
+      c.events.push({ t: "influenced-next" });
+    }
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: m.def.name,
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true });

@@ -48,6 +48,7 @@ function newPlayer(name, voc, sex) {
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana
       attackMode: "chase",  // chase | stand | kiting
+      kiteDistance: 3,       // SQMs de distância no modo kiting (1-5)
       shooterType: "auto",  // auto | spell | rune
       shooterSpell: "",
       shooterRune: "",

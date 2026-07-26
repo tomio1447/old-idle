@@ -482,11 +482,21 @@ function renderHelper(p) {
         ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"]].map(([id, label]) =>
           `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}">${label}</button>`).join("")}
       </div>
-      <div class="tiny dim mt8">Kiting faz paladins/mages correrem do alvo. Stand mantém o personagem parado. Chase aproxima do alvo.</div>`;
+      <div class="mt8" style="max-width:180px">
+        <label class="small dim">Distância do Kiting (SQM)</label>
+        <input id="kite-distance" type="number" min="1" max="5" value="${p.config.kiteDistance || 3}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
+      <div class="tiny dim mt8">Kiting faz o personagem manter de 1 a 5 SQMs do monstro targetado. Stand mantém parado. Chase aproxima.</div>`;
     $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
       p.config.attackMode = b.dataset.attackMode;
       renderHelper(p);
     }));
+    const kd = $("#kite-distance");
+    if (kd) kd.addEventListener("change", () => {
+      p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(kd.value, 10) || 3));
+      kd.value = p.config.kiteDistance;
+    });
   }
   if (shooterEl) {
     const attackSpells = Object.keys(SPELLS).filter((id) => {
