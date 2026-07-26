@@ -56,6 +56,7 @@ function normalizePlayer(p) {
     shooterType: "auto",
     shooterSpell: "",
     shooterRune: "",
+    missionCollapsed: false,
     autoSell: true,
     autoEquip: true,
     spellAttack: true,
@@ -72,6 +73,7 @@ function normalizePlayer(p) {
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   p.bank = p.bank || 0;
+  p.missions = p.missions || {};
   p.instanceMode = p.instanceMode || null;
   return p;
 }
@@ -213,6 +215,134 @@ function showOfflineModal(r) {
   $("#modal").classList.add("show");
   $("#modal-ok").addEventListener("click", () => {
     $("#modal").classList.remove("show");
+  });
+}
+
+/* ------------------------------------------------------------ missions */
+const MISSION_DEFS = {
+  rats: {
+    title: "Missão: Esgoto de Rookgaard",
+    tasks: [
+      { monster: "rat", target: 25, reward: { items: [{ slug: "rapier", count: 1 }] } },
+      { monster: "cave-rat", target: 25, reward: { items: [{ slug: "leather-boots", count: 1 }] } },
+      { monster: "bug", target: 25, reward: { items: [{ slug: "leather-armor", count: 1 }] } },
+    ],
+    completeReward: { supplies: [{ slug: "health-potion", count: 10 }], gold: 500 },
+  },
+};
+
+function missionForHunt(id) {
+  if (MISSION_DEFS[id]) return MISSION_DEFS[id];
+  const hu = GAMEDATA.hunts[id];
+  if (!hu) return null;
+  const seen = new Set();
+  const tasks = hu.monsters.filter((m) => !seen.has(m) && seen.add(m))
+    .map((m) => ({ monster: m, target: 25, reward: { supplies: [{ slug: "health-potion", count: 2 }] } }));
+  return {
+    title: "Missão: " + hu.name,
+    tasks: tasks,
+    completeReward: { supplies: [{ slug: "health-potion", count: 10 }], gold: 500 },
+  };
+}
+
+function missionState(p, huntId) {
+  p.missions = p.missions || {};
+  if (!p.missions[huntId])
+    p.missions[huntId] = { progress: {}, claimed: {}, completeClaimed: false };
+  return p.missions[huntId];
+}
+
+function rewardText(reward) {
+  if (!reward) return "—";
+  const out = [];
+  if (reward.gold) out.push(fmtFull(reward.gold) + " gp");
+  (reward.items || []).forEach((r) => out.push((r.count || 1) + "x " + itemName(r.slug)));
+  (reward.supplies || []).forEach((r) => out.push((r.count || 1) + " carga(s) " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
+  return out.join(" · ") || "—";
+}
+
+function grantMissionReward(p, reward) {
+  if (!reward) return true;
+  for (const r of reward.items || []) {
+    if (!addItem(p, r.slug, r.count || 1)) return false;
+  }
+  for (const r of reward.supplies || [])
+    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.count || 1);
+  if (reward.gold) p.gold += reward.gold;
+  return true;
+}
+
+function tryCompleteMissionRewards(p, huntId) {
+  const def = missionForHunt(huntId);
+  if (!def) return;
+  const st = missionState(p, huntId);
+  for (const task of def.tasks) {
+    if ((st.progress[task.monster] || 0) >= task.target && !st.claimed[task.monster]) {
+      if (!grantMissionReward(p, task.reward)) {
+        toast("Mochila cheia para receber recompensa da missão.", "death");
+        return;
+      }
+      st.claimed[task.monster] = true;
+      addLog("level", `Missão: matou ${task.target}x <b>${GAMEDATA.monsters[task.monster] ? GAMEDATA.monsters[task.monster].name : task.monster}</b>. Recompensa: ${rewardText(task.reward)}.`);
+      toast(`Missão concluída: <b>${rewardText(task.reward)}</b>`, "level");
+    }
+  }
+  const all = def.tasks.every((t) => st.claimed[t.monster]);
+  if (all && !st.completeClaimed) {
+    if (!grantMissionReward(p, def.completeReward)) {
+      toast("Mochila cheia para recompensa final da missão.", "death");
+      return;
+    }
+    st.completeClaimed = true;
+    addLog("level", `Missão de <b>${GAMEDATA.hunts[huntId].name}</b> completa. Recompensa final: ${rewardText(def.completeReward)}.`);
+    toast(`Missão completa! <b>${rewardText(def.completeReward)}</b>`, "level");
+  }
+}
+
+function handleMissionKill(p, huntId, monster) {
+  const def = missionForHunt(huntId);
+  if (!def || !def.tasks.some((t) => t.monster === monster)) return;
+  const st = missionState(p, huntId);
+  const task = def.tasks.find((t) => t.monster === monster);
+  st.progress[monster] = Math.min(task.target, (st.progress[monster] || 0) + 1);
+  tryCompleteMissionRewards(p, huntId);
+  renderMission();
+}
+
+function renderMission() {
+  const box = $("#mission-box");
+  if (!box || !G.p || !G.combat || G.training) {
+    if (box) box.style.display = "none";
+    return;
+  }
+  const huntId = G.combat.huntId;
+  const def = missionForHunt(huntId);
+  if (!def) { box.style.display = "none"; return; }
+  const st = missionState(G.p, huntId);
+  const collapsed = !!G.p.config.missionCollapsed;
+  const totalDone = def.tasks.filter((t) => (st.progress[t.monster] || 0) >= t.target).length;
+  box.style.display = "block";
+  box.innerHTML = `
+    <div class="mission-head" id="mission-toggle">
+      <span>${collapsed ? "▸" : "▾"}</span><span>${def.title}</span>
+      <span class="spacer"></span><span>${totalDone}/${def.tasks.length}</span>
+    </div>
+    ${collapsed ? "" : `<div class="mission-body">
+      ${def.tasks.map((t) => {
+        const cur = Math.min(t.target, st.progress[t.monster] || 0);
+        const done = cur >= t.target;
+        const pct = (cur / t.target) * 100;
+        const name = GAMEDATA.monsters[t.monster] ? GAMEDATA.monsters[t.monster].name : t.monster;
+        return `<div class="mission-row ${done ? "done" : ""}">
+          <div style="flex:1"><b>${name}</b><div class="mission-progressbar"><div style="width:${pct}%"></div></div></div>
+          <span>${cur}/${t.target}</span>
+        </div>`;
+      }).join("")}
+      <div class="mission-reward">Final: ${rewardText(def.completeReward)}</div>
+    </div>`}`;
+  $("#mission-toggle").addEventListener("click", () => {
+    G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
+    renderMission();
   });
 }
 
@@ -398,6 +528,7 @@ function drainEvents() {
           }).join(", ");
           addLog("loot", `Loot: ${txt}`);
         }
+        handleMissionKill(G.p, c.huntId, e.mob);
         break;
       }
       case "death":
@@ -599,6 +730,7 @@ function renderAll() {
   renderSupplies(p);
   renderSpells(p);
   renderHelper(p);
+  renderMission();
   renderNpcQuick();
   renderTopbar(p);
   renderHuntInfo();
@@ -841,22 +973,11 @@ function initLogin() {
     const name = ($("#char-name").value || "").trim();
     if (name.length < 2) { toast("Digite um nome válido"); return; }
     const p = newPlayer(name, selVoc, selSex);
-    // kit inicial por vocacao
-    const kits = {
-      knight: ["sword", "brass-armor", "brass-helmet", "wooden-shield",
-               "leather-legs", "leather-boots"],
-      paladin: ["bow", "arrow", "leather-armor", "leather-helmet",
-                "leather-legs", "leather-boots"],
-      druid: ["wooden-wand", "leather-armor", "leather-helmet",
-              "leather-legs", "leather-boots"],
-      sorcerer: ["wooden-wand", "leather-armor", "leather-helmet",
-                 "leather-legs", "leather-boots"],
-    };
-    for (const slug of kits[selVoc] || []) {
-      addItem(p, slug, slug === "arrow" ? 50 : 1);
-    }
-    p.gold = 500;
-    p.supplies["intense-healing-rune"] = 10;
+    // kit inicial igual para todas as vocações
+    addItem(p, "club", 1);
+    addItem(p, "wooden-shield", 1);
+    p.supplies["health-potion"] = 5;
+    p.gold = 0;
     autoEquip(p);
     startGame(p);
   });

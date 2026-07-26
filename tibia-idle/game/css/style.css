@@ -181,6 +181,27 @@ canvas { image-rendering: pixelated; }
   font-size: 11px; color: #fff;
 }
 .hunt-tag { background: rgba(0,0,0,.55); padding: 2px 8px; border-radius: 2px; }
+.mission-box {
+  position: absolute; top: 8px; right: 8px; z-index: 20;
+  width: min(285px, calc(100% - 16px));
+  background: rgba(18,15,10,.88);
+  border: 2px solid; border-color: #6b5a2e #090807 #090807 #6b5a2e;
+  box-shadow: 0 4px 18px rgba(0,0,0,.75);
+  color: var(--text); font-size: 10px;
+}
+.mission-head {
+  display:flex; align-items:center; gap:6px; padding:5px 7px;
+  color:#ffe680; font-weight:bold; cursor:pointer;
+  background: linear-gradient(180deg, rgba(70,55,28,.9), rgba(28,22,14,.9));
+  user-select:none;
+}
+.mission-head .spacer { flex:1; }
+.mission-body { padding:6px 7px; }
+.mission-row { display:flex; justify-content:space-between; gap:6px; padding:2px 0; border-bottom:1px dotted rgba(255,255,255,.08); }
+.mission-row.done { color:#9ce84a; }
+.mission-reward { color:#d4af37; font-size:9px; margin-top:5px; }
+.mission-progressbar { height:4px; background:#090807; border:1px solid #000; margin-top:2px; }
+.mission-progressbar > div { height:100%; background:linear-gradient(180deg,#9ce84a,#4a8a10); }
 
 /* ---------------------------------------------------------- listas */
 .list { max-height: 220px; overflow-y: auto; }
