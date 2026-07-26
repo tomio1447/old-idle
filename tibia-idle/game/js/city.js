@@ -419,7 +419,7 @@ function academyTrainingTick(t, p, dt, now) {
 function bankDeposit(p, amount) {
   amount = Math.min(amount, p.gold);
   if (amount <= 0) return 0;
-  p.gold -= amount;
+  spendGold(p, amount);
   p.bank += amount;
   return amount;
 }
@@ -443,7 +443,7 @@ function buyBlessing(p) {
   const price = blessPrice(p);
   if (p.blessed) return { ok: false, msg: "Você já está abençoado." };
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
-  p.gold -= price;
+  spendGold(p, price);
   p.blessed = true;
   return { ok: true, msg: "Você foi abençoado! A próxima morte custará muito menos." };
 }
@@ -460,7 +460,7 @@ function buyRest(p, hours) {
   const secs = Math.min(hours * 3600, missing);
   const price = restPrice(p, secs / 3600);
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
-  p.gold -= price;
+  spendGold(p, price);
   p.stamina = Math.min(MAX, p.stamina + secs);
   return { ok: true, msg: `Descansou ${(secs / 3600).toFixed(1)}h de stamina.`,
            price: price };
@@ -472,7 +472,7 @@ function buyTraining(p, skill, times) {
   for (let i = 0; i < times; i++) {
     const price = trainPrice(p, skill);
     if (p.gold < price) break;
-    p.gold -= price;
+    spendGold(p, price);
     spent += price;
     if (skill === "magic") {
       p.ml++;
@@ -489,7 +489,7 @@ function buyTraining(p, skill, times) {
 function buyItem(p, slug, price) {
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
   if (!hasBagSpace(p, slug)) return { ok: false, msg: "Mochila cheia." };
-  p.gold -= price;
+  spendGold(p, price);
   addItem(p, slug, 1);
   return { ok: true };
 }

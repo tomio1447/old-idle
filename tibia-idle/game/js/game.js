@@ -47,10 +47,15 @@ function load() {
 
 function normalizePlayer(p) {
   p.config = Object.assign({
-    healAt: 60,
+    healAt: 90,
+    manaAt: 50,
     useRunes: true,
     autoRestock: false,
     manaTrain: null,
+    attackMode: "chase",
+    shooterType: "auto",
+    shooterSpell: "",
+    shooterRune: "",
     autoSell: true,
     autoEquip: true,
     spellAttack: true,
@@ -60,10 +65,12 @@ function normalizePlayer(p) {
   }, p.config || {});
   p.config.autoRestock = false;
   p.supplies = p.supplies || {};
+  if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.equip = p.equip || {};
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
+  p.gold = Math.max(0, Math.floor(p.gold || 0));
   p.bank = p.bank || 0;
   p.instanceMode = p.instanceMode || null;
   return p;
@@ -159,9 +166,10 @@ function computeOffline(p) {
   if (VOCATIONS[p.voc].weapon === "magic")
     addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
-  // loot vai pra bag respeitando slots da bag
+  // loot vai pra bag respeitando slots; supplies dropados viram cargas.
   for (const slug in loot) {
-    if (!addItem(p, slug, loot[slug])) delete loot[slug];
+    if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
+    else if (!addItem(p, slug, loot[slug])) delete loot[slug];
   }
   supplyCost = offlineStats.supplyCost;
 
@@ -501,6 +509,11 @@ function loop(ts) {
       G.tickAcc -= TICK;
     }
     drainEvents();
+    if (G.combat && G.combat.dead && Date.now() >= G.combat.deadUntil) {
+      addLog("death", "Você acordou no templo de Thais.");
+      stopHunt();
+      return;
+    }
 
     if (G.p.level > before) {
       addLog("level", `Subiu para o nível <b>${G.p.level}</b>!`);
@@ -585,6 +598,7 @@ function renderAll() {
   renderInventory(p);
   renderSupplies(p);
   renderSpells(p);
+  renderHelper(p);
   renderNpcQuick();
   renderTopbar(p);
   renderHuntInfo();

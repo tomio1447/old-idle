@@ -112,6 +112,13 @@
       </div>
 
       <div class="panel">
+        <div class="panel-title">Mochila</div>
+        <div class="panel-body">
+          <div class="inv-grid" id="inv"></div>
+        </div>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">Habilidades</div>
         <div class="panel-body" id="skills"></div>
       </div>
@@ -139,29 +146,29 @@
 
       <div class="panel">
         <div class="tabs">
-          <div class="tab active" data-group="mid" data-panel="inv">Mochila</div>
-          <div class="tab" data-group="mid" data-panel="sup">Loja de supplies</div>
-          <div class="tab" data-group="mid" data-panel="spl">Magias</div>
+          <div class="tab active" data-group="mid" data-panel="heal">Helper: Cura</div>
+          <div class="tab" data-group="mid" data-panel="atk">Ataque</div>
+          <div class="tab" data-group="mid" data-panel="shooter">Shooter</div>
           <div class="tab" data-group="mid" data-panel="cfg">Configurar</div>
         </div>
 
-        <div class="panel-body" data-panel-group="mid" data-panel="inv">
-          <div class="inv-grid" id="inv"></div>
+        <div class="panel-body" data-panel-group="mid" data-panel="heal">
+          <div id="helper-heal"></div>
         </div>
 
-        <div class="panel-body" data-panel-group="mid" data-panel="sup" style="display:none">
-          <div class="list" id="supplies" style="max-height:280px"></div>
+        <div class="panel-body" data-panel-group="mid" data-panel="atk" style="display:none">
+          <div id="helper-attack"></div>
         </div>
 
-        <div class="panel-body" data-panel-group="mid" data-panel="spl" style="display:none">
-          <div class="list" id="spells" style="max-height:280px"></div>
+        <div class="panel-body" data-panel-group="mid" data-panel="shooter" style="display:none">
+          <div id="helper-shooter"></div>
         </div>
 
         <div class="panel-body" data-panel-group="mid" data-panel="cfg" style="display:none">
           <div class="mb8">
             <label class="small dim">Curar quando a vida estiver abaixo de
-              <b id="heal-at-val" style="color:#d4af37">60%</b></label>
-            <input type="range" id="heal-at" min="10" max="95" value="60">
+              <b id="heal-at-val" style="color:#d4af37">90%</b></label>
+            <input type="range" id="heal-at" min="10" max="95" value="90">
           </div>
           <label class="toggle"><input type="checkbox" id="cfg-spell">
             Usar magias de ataque</label>

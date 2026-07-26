@@ -357,6 +357,8 @@ function renderInventory(p) {
 }
 
 function renderSupplies(p) {
+  const box = $("#supplies");
+  if (!box) return;
   let h = "";
   for (const slug in SUPPLIES) {
     const s = SUPPLIES[slug];
@@ -375,14 +377,13 @@ function renderSupplies(p) {
       </div>
     </div>`;
   }
-  $("#supplies").innerHTML = h;
+  box.innerHTML = h;
   $$("#supplies [data-buy]").forEach((b) => {
     b.addEventListener("click", () => {
       const slug = b.dataset.buy, n = parseInt(b.dataset.n, 10);
       const s = SUPPLIES[slug];
       const cost = supplyPrice(s, G.p.level) * n;
-      if (G.p.gold < cost) { toast("Ouro insuficiente", ""); return; }
-      G.p.gold -= cost;
+      if (!spendGold(G.p, cost)) { toast("Ouro insuficiente", ""); return; }
       G.p.supplies[slug] = (G.p.supplies[slug] || 0) + n;
       addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
       renderAll();
@@ -390,7 +391,111 @@ function renderSupplies(p) {
   });
 }
 
+function renderHelper(p) {
+  const healEl = $("#helper-heal");
+  const atkEl = $("#helper-attack");
+  const shooterEl = $("#helper-shooter");
+  if (healEl) {
+    const heals = Object.keys(SPELLS).filter((id) => {
+      const s = SPELLS[id];
+      return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1;
+    }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
+    const healSup = Object.keys(SUPPLIES).filter((slug) => SUPPLIES[slug].type === "heal");
+    healEl.innerHTML = `
+      <div class="row wrap" style="gap:8px;align-items:flex-end">
+        <div style="min-width:150px;flex:1">
+          <label class="small dim">Curar HP abaixo de (%)</label>
+          <input id="helper-heal-at" type="number" min="1" max="99" value="${p.config.healAt}"
+            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        </div>
+        <div style="min-width:150px;flex:1">
+          <label class="small dim">Preencher mana abaixo de (%)</label>
+          <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
+            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        </div>
+      </div>
+      <div class="small dim mt8 mb4">Magias de cura</div>
+      <div class="list" style="max-height:90px">${heals.map((id) => {
+        const s = SPELLS[id], ok = p.level >= s.lvl;
+        return `<div class="stat-row" style="opacity:${ok ? 1 : .45}"><span class="k">${s.name}</span><span class="v">${s.mana} mana · nv ${s.lvl}</span></div>`;
+      }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
+      <div class="small dim mt8 mb4">Itens de cura / mana</div>
+      <div class="list" style="max-height:110px">${healSup.concat(["mana-fluid"]).map((slug) => {
+        const s = SUPPLIES[slug]; if (!s) return "";
+        const pw = supplyPower(s, p.level);
+        return `<div class="stat-row"><span class="k">${s.name}</span><span class="v">${fmtFull(supplyPrice(s, p.level))} gp · cargas ${p.supplies[slug] || 0} · ${s.type === "mana" ? "mana" : "hp"} ${pw[0]}-${pw[1]}</span></div>`;
+      }).join("")}</div>`;
+    ["helper-heal-at", "helper-mana-at"].forEach((id) => {
+      const input = $("#" + id);
+      if (!input) return;
+      input.addEventListener("change", () => {
+        const val = Math.max(1, Math.min(99, parseInt(input.value, 10) || 1));
+        input.value = val;
+        if (id === "helper-heal-at") { p.config.healAt = val; $("#heal-at").value = val; $("#heal-at-val").textContent = val + "%"; }
+        else p.config.manaAt = val;
+      });
+    });
+  }
+  if (atkEl) {
+    const mode = p.config.attackMode || "chase";
+    atkEl.innerHTML = `
+      <div class="small dim mb4">Ataque Mode</div>
+      <div class="row wrap" style="gap:6px">
+        ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"]].map(([id, label]) =>
+          `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}">${label}</button>`).join("")}
+      </div>
+      <div class="tiny dim mt8">Kiting faz paladins/mages correrem do alvo. Stand mantém o personagem parado. Chase aproxima do alvo.</div>`;
+    $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
+      p.config.attackMode = b.dataset.attackMode;
+      renderHelper(p);
+    }));
+  }
+  if (shooterEl) {
+    const attackSpells = Object.keys(SPELLS).filter((id) => {
+      const s = SPELLS[id];
+      return s.type === "attack" && s.vocs.indexOf(p.voc) !== -1;
+    }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
+    const attackRunes = Object.keys(SUPPLIES).filter((slug) => SUPPLIES[slug].type === "attack");
+    shooterEl.innerHTML = `
+      <div class="row wrap mb8" style="gap:6px">
+        ${[["auto", "Auto"], ["spell", "Magia"], ["rune", "Runa"]].map(([id, label]) =>
+          `<button class="sm ${p.config.shooterType === id ? "primary" : ""}" data-shooter-type="${id}">${label}</button>`).join("")}
+      </div>
+      <div class="small dim mb4">Magias ofensivas</div>
+      <div class="list" style="max-height:130px">${attackSpells.map((id) => {
+        const s = SPELLS[id];
+        const ok = p.level >= s.lvl;
+        return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
+          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">${s.label} · ${s.mana} mana · nv ${s.lvl}</div></div>
+          <button class="sm ${p.config.shooterSpell === id && p.config.shooterType === "spell" ? "primary" : ""}" data-shooter-spell="${id}" ${ok ? "" : "disabled"}>Usar</button>
+        </div>`;
+      }).join("") || `<div class="dim tiny">Nenhuma magia ofensiva.</div>`}</div>
+      <div class="small dim mt8 mb4">Runas ofensivas</div>
+      <div class="list" style="max-height:150px">${attackRunes.map((slug) => {
+        const s = SUPPLIES[slug], ok = p.level >= (s.lvl || 1);
+        return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
+          <img src="assets/item/${s.sprite}.png">
+          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">cargas ${p.supplies[slug] || 0} · ${fmtFull(supplyPrice(s, p.level))} gp/carga · nv ${s.lvl || 1}</div></div>
+          <button class="sm ${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "primary" : ""}" data-shooter-rune="${slug}" ${ok ? "" : "disabled"}>Usar</button>
+        </div>`;
+      }).join("")}</div>`;
+    $$("#helper-shooter [data-shooter-type]").forEach((b) => b.addEventListener("click", () => {
+      p.config.shooterType = b.dataset.shooterType;
+      renderHelper(p);
+    }));
+    $$("#helper-shooter [data-shooter-spell]").forEach((b) => b.addEventListener("click", () => {
+      p.config.shooterType = "spell"; p.config.shooterSpell = b.dataset.shooterSpell; renderHelper(p);
+    }));
+    $$("#helper-shooter [data-shooter-rune]").forEach((b) => b.addEventListener("click", () => {
+      p.config.shooterType = "rune"; p.config.shooterRune = b.dataset.shooterRune;
+      if (!Object.prototype.hasOwnProperty.call(p.supplies, p.config.shooterRune)) p.supplies[p.config.shooterRune] = 0;
+      renderHelper(p);
+    }));
+  }
+}
+
 function renderTopbar(p) {
+  p.gold = Math.max(0, Math.floor(p.gold || 0));
   $("#gold").textContent = fmtFull(p.gold);
   const cityBtn = $("#btn-city");
   if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
@@ -403,7 +508,7 @@ function renderTopbar(p) {
   } else if (c && c.stats.time > 3000) {
     const hrs = c.stats.time / 3600000;
     $("#xph").textContent = fmt(c.stats.exp / hrs);
-    $("#gph").textContent = fmt((c.stats.gold - c.stats.supplyCost) / hrs);
+    $("#gph").textContent = fmt(Math.max(0, (c.stats.gold - c.stats.supplyCost) / hrs));
     $("#session").textContent = fmtTime(c.stats.time / 1000);
     $("#kills").textContent = fmtFull(c.stats.kills);
   }
@@ -436,6 +541,8 @@ function renderNpcQuick() {
 }
 
 function renderSpells(p) {
+  const box = $("#spells");
+  if (!box) return;
   const list = [];
   for (const id in SPELLS) {
     const s = SPELLS[id];
@@ -444,10 +551,10 @@ function renderSpells(p) {
   }
   list.sort((a, b) => a[1].lvl - b[1].lvl);
   if (!list.length) {
-    $("#spells").innerHTML = `<div class="dim small center" style="padding:10px">Escolha uma vocação para aprender magias.</div>`;
+    box.innerHTML = `<div class="dim small center" style="padding:10px">Escolha uma vocação para aprender magias.</div>`;
     return;
   }
-  $("#spells").innerHTML = list.map(([id, s]) => {
+  box.innerHTML = list.map(([id, s]) => {
     const ok = p.level >= s.lvl;
     return `<div class="row" style="justify-content:space-between;padding:3px 0;opacity:${ok ? 1 : .4};border-bottom:1px solid rgba(0,0,0,.2)">
       <div style="min-width:0">

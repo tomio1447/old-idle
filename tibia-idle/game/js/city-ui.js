@@ -438,8 +438,7 @@ function bindNpc(id, type) {
       const slug = b.dataset.buySup, n = parseInt(b.dataset.n, 10);
       const s = SUPPLIES[slug];
       const cost = supplyPrice(s, p.level) * n;
-      if (p.gold < cost) { toast("Ouro insuficiente"); return; }
-      p.gold -= cost;
+      if (!spendGold(p, cost)) { toast("Ouro insuficiente"); return; }
       p.supplies[slug] = (p.supplies[slug] || 0) + n;
       addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
       refreshNpc(id);

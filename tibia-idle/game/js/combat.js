@@ -233,15 +233,26 @@ function updateCombatMovement(c, p, dt) {
   const cur = pointDistance(pl, target);
   const playerSpeed = 0.000070 + Math.min(0.000035, gearStats(p).speed * 0.0000012);
 
-  // Melee aproxima; distância/magia mantém espaço e kiteia se o monstro encostar.
-  if (desired < 0.2) {
-    movePoint(pl, target, playerSpeed, dt, desired * 0.82);
-  } else {
-    if (cur > desired * 0.92) movePoint(pl, target, playerSpeed, dt, desired * 0.82);
-    else if (cur < 0.22) {
-      const away = { x: clamp(pl.x - (target.x - pl.x), 0.08, 0.36),
-                     y: clamp(pl.y - (target.y - pl.y) * 0.35, 0.25, 0.75) };
-      movePoint(pl, away, playerSpeed, dt, 0.02);
+  const mode = p.config.attackMode || "chase";
+  if (mode !== "stand") {
+    if (mode === "kiting" && desired >= 0.2) {
+      const kiteRange = Math.max(0.46, desired * 0.95);
+      if (cur < kiteRange) {
+        const away = { x: clamp(pl.x - (target.x - pl.x) * 1.25, 0.08, 0.40),
+                       y: clamp(pl.y - (target.y - pl.y) * 0.55, 0.25, 0.75) };
+        movePoint(pl, away, playerSpeed * 1.15, dt, 0.02);
+      } else if (cur > desired * 1.18) {
+        movePoint(pl, target, playerSpeed, dt, desired * 0.98);
+      }
+    } else if (desired < 0.2) {
+      movePoint(pl, target, playerSpeed, dt, desired * 0.82);
+    } else {
+      if (cur > desired * 0.92) movePoint(pl, target, playerSpeed, dt, desired * 0.82);
+      else if (cur < 0.22) {
+        const away = { x: clamp(pl.x - (target.x - pl.x), 0.08, 0.36),
+                       y: clamp(pl.y - (target.y - pl.y) * 0.35, 0.25, 0.75) };
+        movePoint(pl, away, playerSpeed, dt, 0.02);
+      }
     }
   }
   pl.dir = faceDir(pl, target);
@@ -288,8 +299,7 @@ function consumeSupplyCharge(c, p, slug) {
 
   if ((p.supplies[slug] || 0) <= 0) {
     const cost = supplyPrice(s, p.level);
-    if (p.gold < cost) return false;
-    p.gold -= cost;
+    if (!spendGold(p, cost)) return false;
     p.supplies[slug] = 1;
     if (c && c.stats) {
       c.stats.supplyCost += cost;
@@ -328,7 +338,7 @@ function consumeAmmoCharge(c, p) {
       ammo.count = 0;
       return false;
     }
-    p.gold -= cost;
+    if (!spendGold(p, cost)) return false;
     p.bag[slug] = 1;
     if (c && c.stats) {
       c.stats.supplyCost += cost;
@@ -414,9 +424,16 @@ function tryCastSpell(c, p, target, now) {
   }
   if (!avail.length) return false;
   if (c.player && pointDistance(c.player, target) > spellRange()) return false;
-  // usa a mais forte disponivel
-  avail.sort((a, b) => b[1].power - a[1].power);
-  const [id, s] = avail[0];
+  // helper shooter: magia selecionada ou a mais forte disponível
+  let selected = null;
+  if (p.config.shooterType === "spell" && p.config.shooterSpell)
+    selected = avail.find((a) => a[0] === p.config.shooterSpell);
+  if (!selected) {
+    if (p.config.shooterType === "rune") return false;
+    avail.sort((a, b) => b[1].power - a[1].power);
+    selected = avail[0];
+  }
+  const [id, s] = selected;
 
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
@@ -448,10 +465,19 @@ function tryUseRune(c, p, target, now) {
   if (c.runeCd > now) return false;
   if (c.player && pointDistance(c.player, target) > runeRange()) return false;
   let best = null;
-  for (const slug in p.supplies) {
-    const s = SUPPLIES[slug];
-    if (!s || s.type !== "attack" || !canRechargeSupply(p, slug)) continue;
-    if (!best || s.tier > SUPPLIES[best].tier) best = slug;
+  if (p.config.shooterType === "rune" && p.config.shooterRune) {
+    const s = SUPPLIES[p.config.shooterRune];
+    if (s && s.type === "attack") {
+      if (!Object.prototype.hasOwnProperty.call(p.supplies, p.config.shooterRune))
+        p.supplies[p.config.shooterRune] = 0;
+      if (canRechargeSupply(p, p.config.shooterRune)) best = p.config.shooterRune;
+    }
+  } else if (p.config.shooterType !== "spell") {
+    for (const slug in p.supplies) {
+      const s = SUPPLIES[slug];
+      if (!s || s.type !== "attack" || !canRechargeSupply(p, slug)) continue;
+      if (!best || s.tier > SUPPLIES[best].tier) best = slug;
+    }
   }
   if (!best) return false;
   const s = SUPPLIES[best];
@@ -551,7 +577,8 @@ function autoRestock() {
 /* Repoe mana com cogumelos */
 function tryMana(c, p) {
   const max = maxStats(p);
-  if (p.mp > max.mp * 0.35) return false;
+  const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
+  if (p.mp > max.mp * manaAt) return false;
   for (const slug in p.supplies) {
     const s = SUPPLIES[slug];
     if (!s || s.type !== "mana" || !canRechargeSupply(p, slug)) continue;
@@ -618,6 +645,8 @@ function rollLoot(c, p, mob) {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
+    } else if (SUPPLIES[l.item]) {
+      p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (!addItem(p, l.item, count)) {
       if (!c.bagFullWarned) {
         c.events.push({ t: "bag-full" });
@@ -651,7 +680,7 @@ function playerDeath(c, p) {
   p.exp = Math.max(0, p.exp - lostExp);
   while (p.level > 1 && p.exp < expForLevel(p.level)) p.level--;
   const lostGold = Math.floor(p.gold * goldRate);
-  p.gold -= lostGold;
+  spendGold(p, lostGold);
   const max = maxStats(p);
   p.hp = max.hp; p.mp = max.mp;
   if (c.player) {
@@ -674,10 +703,7 @@ function combatTick(c, p, dt, now) {
   // stamina: gasta 1s por segundo caçando
   p.stamina = Math.max(0, p.stamina - dt / 1000);
 
-  if (c.dead) {
-    if (now >= c.deadUntil) { c.dead = false; spawnWave(c, p); }
-    return;
-  }
+  if (c.dead) return;
 
   const max = maxStats(p);
   const g = gearStats(p);

@@ -28,7 +28,7 @@ function newPlayer(name, voc, sex) {
     equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
-    supplies: {},           // slug -> count
+    supplies: { "mana-fluid": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
     stamina: 42 * 3600,     // segundos (42h cheio)
     deaths: 0,
@@ -39,10 +39,15 @@ function newPlayer(name, voc, sex) {
     created: Date.now(),
     // configuracao do auto-hunt
     config: {
-      healAt: 60,           // % de vida para curar
+      healAt: 90,           // % de vida para curar
+      manaAt: 50,           // % de mana para usar mana fluids
       useRunes: true,
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana
+      attackMode: "chase",  // chase | stand | kiting
+      shooterType: "auto",  // auto | spell | rune
+      shooterSpell: "",
+      shooterRune: "",
       autoSell: true,
       autoEquip: true,
       spellAttack: true,
@@ -234,6 +239,15 @@ function addManaSpent(p, mana) {
 function mlProgress(p) {
   const voc = VOCATIONS[p.voc];
   return Math.min(100, (p.manaSpent / mlCost(p.ml, voc.magicFactor)) * 100);
+}
+
+function spendGold(p, amount) {
+  amount = Math.max(0, Math.floor(amount || 0));
+  p.gold = Math.max(0, Math.floor(p.gold || 0));
+  if (amount <= 0) return true;
+  if (p.gold < amount) return false;
+  p.gold = Math.max(0, p.gold - amount);
+  return true;
 }
 
 function expProgress(p) {

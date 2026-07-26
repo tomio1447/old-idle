@@ -245,16 +245,38 @@ const SUPPLIES = {
   "sudden-death-rune": { name: "Sudden Death Rune", price: 155,
     damage: [150, 250], scale: 2.6, type: "attack", element: "death",
     tier: 4, lvl: 45, sprite: "sudden-death-rune" },
+  "health-potion": { name: "Health Potion", price: 45,
+    heal: [75, 125], scale: 0.65, type: "heal", tier: 0, lvl: 1,
+    sprite: "green-flask" },
+  "mana-fluid": { name: "Mana Fluid", price: 80,
+    mana: [75, 125], scale: 0.8, type: "mana", tier: 2, lvl: 1,
+    sprite: "brown-flask" },
   "brown-mushroom": { name: "Brown Mushroom", price: 50, mana: [50, 100],
     scale: 1.2, type: "mana", tier: 1, lvl: 1, sprite: "brown-mushroom" },
   "dragon-ham": { name: "Dragon Ham", price: 30, food: 360, type: "food",
     tier: 1, lvl: 1, sprite: "dragon-ham" },
 };
 
-if (typeof GAMEDATA !== "undefined" && GAMEDATA.items && !GAMEDATA.items["mystic-dust"]) {
-  GAMEDATA.items["mystic-dust"] = {
-    n: "poeira mistica", s: null, t: "loot", sell: 0, w: 0.1,
-  };
+if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
+  if (!GAMEDATA.items["mystic-dust"]) {
+    GAMEDATA.items["mystic-dust"] = {
+      n: "poeira mistica", s: null, t: "loot", sell: 0, w: 0.1,
+    };
+  }
+  if (!GAMEDATA.items["health-potion"]) {
+    GAMEDATA.items["health-potion"] = {
+      n: "health potion", s: null, t: "supply", sell: 2, buy: 45, w: 2.0,
+    };
+  }
+  if (!GAMEDATA.items["mana-fluid"]) {
+    GAMEDATA.items["mana-fluid"] = {
+      n: "mana fluid", s: null, t: "supply", sell: 2, buy: 80, w: 2.0,
+    };
+  }
+  if (GAMEDATA.monsters && GAMEDATA.monsters.goblin &&
+      !GAMEDATA.monsters.goblin.loot.some((l) => l.item === "health-potion")) {
+    GAMEDATA.monsters.goblin.loot.push({ item: "health-potion", chance: 8, max: 1 });
+  }
 }
 
 /* Cura/dano efetivo de um supply para um dado nivel */
