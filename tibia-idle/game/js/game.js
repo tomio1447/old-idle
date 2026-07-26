@@ -143,6 +143,7 @@ function normalizePlayer(p) {
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   p.bank = p.bank || 0;
   p.missions = p.missions || {};
+  p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
   return p;
 }
@@ -382,7 +383,7 @@ function handleMissionKill(p, huntId, monster) {
 
 function renderMission() {
   const box = $("#mission-box");
-  if (!box || !G.p || !G.combat || G.training) {
+  if (!box || !G.p || !G.combat || G.training || G.combat.boss) {
     if (box) box.style.display = "none";
     return;
   }
@@ -415,6 +416,98 @@ function renderMission() {
     G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
     renderMission();
   });
+}
+
+function isMissionComplete(p, huntId) {
+  const def = missionForHunt(huntId);
+  if (!def) return false;
+  const st = missionState(p, huntId);
+  return def.tasks.every((t) => (st.progress[t.monster] || 0) >= t.target);
+}
+
+/* ------------------------------------------------------------ bosses */
+const BOSS_COOLDOWN = 16 * 3600 * 1000;
+const BOSS_DEFS = {
+  "the-monster": {
+    id: "the-monster",
+    name: "The Monster",
+    title: "Boss dos Rats",
+    hunt: "rats",
+    baseMonster: "cave-rat",
+    sprite: "cave-rat",
+    mult: 10,
+    requirement: { mission: "rats", text: "Completar tasks do Bueiro de Rookgaard" },
+    cooldown: BOSS_COOLDOWN,
+    loot: [
+      { item: "platinum-coin", chance: 10, max: 5 },
+      { item: "chain-armor", chance: 10, max: 1 },
+      { item: "legion-helmet", chance: 10, max: 1 },
+      { item: "studded-legs", chance: 10, max: 1 },
+      { item: "copper-shield", chance: 10, max: 1 },
+      { item: "mace", chance: 10, max: 1 },
+      { item: "katana", chance: 10, max: 1 },
+      { item: "leather-boots", chance: 10, max: 1 },
+    ],
+  },
+};
+
+function bossState(p, id) {
+  p.bosses = p.bosses || {};
+  if (!p.bosses[id]) p.bosses[id] = { lastFight: 0, kills: 0 };
+  return p.bosses[id];
+}
+
+function bossReadyInfo(p, boss) {
+  const reqOk = !boss.requirement || !boss.requirement.mission || isMissionComplete(p, boss.requirement.mission);
+  if (!reqOk) return { ok: false, reason: boss.requirement.text, left: 0 };
+  const st = bossState(p, boss.id);
+  const left = Math.max(0, (st.lastFight || 0) + boss.cooldown - Date.now());
+  if (left > 0) return { ok: false, reason: "Cooldown", left: left };
+  return { ok: true, reason: "Disponível", left: 0 };
+}
+
+function renderBosses(p) {
+  const el = $("#bosses");
+  if (!el) return;
+  el.innerHTML = Object.keys(BOSS_DEFS).map((id) => {
+    const b = BOSS_DEFS[id];
+    const r = bossReadyInfo(p, b);
+    const base = GAMEDATA.monsters[b.baseMonster];
+    const mult = applyBossMultiplier(base, b.mult || 10);
+    const loot = b.loot.map((l) => `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`).join("<br>");
+    return `<div class="boss-card ${r.ok ? "" : "locked"}">
+      <div class="row" style="gap:7px;align-items:center">
+        <img src="assets/mob/${b.sprite}_s.png" style="width:34px;height:34px;image-rendering:pixelated">
+        <div style="flex:1;min-width:0">
+          <div class="small" style="color:${r.ok ? "#ffe680" : "#8a8270"};font-weight:bold">${b.name}</div>
+          <div class="tiny dim">${b.title} · HP ${fmtFull(mult.hp)} · DMG ${fmtFull(mult.damage)}</div>
+        </div>
+        <button class="sm ${r.ok ? "danger" : ""}" data-boss="${id}" ${r.ok ? "" : "disabled"}>Entrar</button>
+      </div>
+      <div class="tiny dim mt4">Req: ${b.requirement.text}</div>
+      <div class="tiny ${r.ok ? "" : "dim"}" style="color:${r.ok ? "#9ce84a" : "#ff9a6a"}">${r.left ? "Disponível em " + fmtTime(r.left / 1000) : r.reason}</div>
+      <div class="tiny dim mt4">Drops:<br>${loot}</div>
+    </div>`;
+  }).join("");
+  $$("#bosses [data-boss]").forEach((btn) => btn.addEventListener("click", () => startBoss(btn.dataset.boss)));
+}
+
+function startBoss(id) {
+  const boss = BOSS_DEFS[id];
+  if (!boss) return;
+  const ready = bossReadyInfo(G.p, boss);
+  if (!ready.ok) { toast(ready.reason); return; }
+  if (G.training) stopAcademy(false);
+  if (G.combat) stopHunt();
+  const st = bossState(G.p, id);
+  st.lastFight = Date.now();
+  G.p.hunt = null;
+  G.p.instanceMode = "boss";
+  G.combat = newBossCombat(G.p, boss);
+  G.inCity = false;
+  addLog("death", `Você entrou no boss <b>${boss.name}</b>. Cooldown iniciado: 16h.`);
+  toast(`Boss: <b>${boss.name}</b>`, "death");
+  renderAll();
 }
 
 /* ------------------------------------------------------------ hunt */
@@ -598,7 +691,18 @@ function drainEvents() {
           }).join(", ");
           addLog("loot", `Loot: ${txt}`);
         }
-        handleMissionKill(G.p, c.huntId, e.mob);
+        if (c.boss) {
+          const st = bossState(G.p, c.boss.id);
+          st.kills = (st.kills || 0) + 1;
+          addLog("level", `Boss <b>${c.boss.name}</b> derrotado!`);
+          toast(`Boss derrotado: <b>${c.boss.name}</b>`, "level");
+          renderBosses(G.p);
+          setTimeout(() => {
+            if (G.combat === c && c.bossDefeated) stopHunt();
+          }, 2500);
+        } else {
+          handleMissionKill(G.p, c.huntId, e.mob);
+        }
         break;
       }
       case "death":
@@ -798,6 +902,7 @@ function renderAll() {
   renderHelper(p);
   renderMission();
   renderNpcQuick();
+  renderBosses(p);
   renderTopbar(p);
   renderHuntInfo();
 }
@@ -820,6 +925,19 @@ function renderHuntInfo() {
       <div class="stat-row"><span class="k">Dano causado</span><span class="v">${fmtFull(t.stats.damage || 0)}</span></div>
       <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
       <button class="primary full mt8" onclick="openAcademyConjureModal(true)">Conjure</button>`;
+    return;
+  }
+  if (G.combat && G.combat.boss) {
+    const boss = G.combat.boss;
+    const mob = G.combat.mobs[0];
+    el.innerHTML = `
+      <div class="row mb4" style="justify-content:space-between">
+        <b style="color:#ff9a6a">${boss.name}</b>
+        <span class="risk high">boss</span>
+      </div>
+      <div class="stat-row"><span class="k">Cooldown</span><span class="v">16h por combate</span></div>
+      <div class="stat-row"><span class="k">Vida</span><span class="v">${mob ? Math.ceil(mob.hp) + " / " + mob.maxHp : "derrotado"}</span></div>
+      <div class="stat-row"><span class="k">Sprite</span><span class="v">Cave Rat</span></div>`;
     return;
   }
   if (!p.hunt) {

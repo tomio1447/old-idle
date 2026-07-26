@@ -154,6 +154,38 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
+function drawBossBar(ctx, W, combat) {
+  if (!combat || !combat.boss || !combat.mobs.length) return;
+  const boss = combat.mobs.find((m) => m.boss) || combat.mobs[0];
+  if (!boss || boss.hp <= 0) return;
+  const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+  const bw = Math.min(520, W * 0.72), bh = 18;
+  const x = (W - bw) / 2, y = 10;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.78)";
+  ctx.fillRect(x - 3, y - 3, bw + 6, bh + 24);
+  ctx.strokeStyle = "#8b6b2a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x - 3, y - 3, bw + 6, bh + 24);
+  ctx.fillStyle = "#050505";
+  ctx.fillRect(x, y + 17, bw, bh);
+  const g = ctx.createLinearGradient(0, y + 17, 0, y + 17 + bh);
+  g.addColorStop(0, "#ff5656");
+  g.addColorStop(1, "#7c0808");
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y + 17, bw * pct, bh);
+  ctx.strokeStyle = "#000";
+  ctx.strokeRect(x, y + 17, bw, bh);
+  ctx.font = "bold 13px Verdana";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffe680";
+  ctx.fillText(boss.def.name, W / 2, y + 11);
+  ctx.font = "bold 10px Verdana";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, W / 2, y + 31);
+  ctx.restore();
+}
+
 function drawRookgaardSewer(ctx, W, H) {
   const cols = 21, rows = 13;
   const tw = W / cols, th = H / rows;
@@ -457,6 +489,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   vg.addColorStop(1, "rgba(0,0,0,.72)");
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
+  drawBossBar(ctx, W, combat);
 
   ctx.save();
   if (this.shake > 0) {

@@ -250,6 +250,14 @@ canvas { image-rendering: pixelated; }
   white-space: nowrap;
 }
 
+.boss-card {
+  background: var(--panel-dark);
+  border: 1px solid #16140f;
+  padding: 6px;
+  margin-bottom: 5px;
+}
+.boss-card.locked { opacity: .55; }
+
 /* ---------------------------------------------------------- hunts */
 .hunt-card {
   display: flex; gap: 8px; align-items: center;

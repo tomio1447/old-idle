@@ -63,6 +63,7 @@ function newPlayer(name, voc, sex) {
       missionCollapsed: false,
     },
     missions: {},
+    bosses: {},
     log: [],
     achievements: {},
   };

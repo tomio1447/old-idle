@@ -14,6 +14,16 @@ function displayMonsterName(name) {
   return String(name || "").replace(/^Influenced\s+/i, "");
 }
 
+function applyBossMultiplier(base, mult) {
+  mult = mult || 10;
+  return {
+    hp: Math.floor((base.hp || 1) * mult),
+    exp: Math.floor((base.exp || 0) * mult),
+    damage: Math.floor((base.damage || 1) * mult),
+    armor: Math.floor((base.armor || 0) * mult),
+  };
+}
+
 function newCombat(player, huntId, instanceMode) {
   const hunt = GAMEDATA.hunts[huntId];
   const mode = instanceMode || player.instanceMode || "non-pvp";
@@ -53,6 +63,46 @@ function newCombat(player, huntId, instanceMode) {
     dead: false,
     deadUntil: 0,
   };
+}
+
+function newBossCombat(player, boss) {
+  const c = newCombat(player, boss.hunt || "rats", "non-pvp");
+  const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"];
+  const mult = applyBossMultiplier(base, boss.mult || 10);
+  const def = Object.assign({}, base, {
+    name: boss.name,
+    hp: mult.hp,
+    exp: boss.exp || mult.exp,
+    damage: mult.damage,
+    armor: mult.armor,
+    loot: boss.loot || [],
+    attackSpeed: boss.attackSpeed || base.attackSpeed || 2000,
+  });
+  c.boss = boss;
+  c.bossDefeated = false;
+  c.raidEnabled = false;
+  c.instanceMode = "boss";
+  c.expMul = 1;
+  c.lootMul = 1;
+  c.skillMul = 1;
+  c.mobs = [{
+    slug: boss.sprite || boss.baseMonster || "cave-rat",
+    def: def,
+    boss: true,
+    hp: def.hp,
+    maxHp: def.hp,
+    atkCd: 700,
+    id: "boss-" + boss.id,
+    x: 0.78,
+    y: 0.50,
+    dir: "w",
+    moving: false,
+    attackAnim: 0,
+    speed: boss.speed || 0.000055,
+    spawnAt: Date.now(),
+  }];
+  resolveSQMOccupancy(c);
+  return c;
 }
 
 function notifyRealPlayerRaidPending(c) {
@@ -756,7 +806,10 @@ function combatTick(c, p, dt, now) {
   if (c.buffs.haste > 0) c.buffs.haste -= dt;
 
   // spawn
-  if (!c.mobs.length) spawnWave(c, p);
+  if (!c.mobs.length) {
+    if (c.boss) return;
+    spawnWave(c, p);
+  }
   if (c.raidEnabled) {
     c.raidCd -= dt;
     if (c.raidCd <= 0) {
@@ -811,6 +864,7 @@ function combatTick(c, p, dt, now) {
     c.stats.kills++;
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
+    if (m.boss) c.bossDefeated = true;
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true });
