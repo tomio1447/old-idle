@@ -119,7 +119,7 @@ function renderStats(p) {
 
   $("#p-name").textContent = p.name;
   $("#p-level").textContent = p.level;
-  $("#p-voc").textContent = VOCATIONS[p.voc].name;
+  $("#p-voc").textContent = vocationName(p);
 
   setBar("#bar-hp", p.hp / max.hp, `${fmt(p.hp)} / ${fmt(max.hp)}`);
   setBar("#bar-mp", max.mp ? p.mp / max.mp : 0,
@@ -658,6 +658,8 @@ function renderHelper(p) {
 function renderTopbar(p) {
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   $("#gold").textContent = fmtFull(p.gold);
+  const menuBtn = $("#btn-toggle-menus");
+  if (menuBtn) menuBtn.textContent = G.sideCollapsed ? "Mostrar menus" : "Minimizar menus";
   const cityBtn = $("#btn-city");
   if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
   const c = G.combat;

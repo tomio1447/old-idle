@@ -27,9 +27,9 @@ const NPCS = {
     type: "bank",
   },
   priest: {
-    name: "Irmã Elane", role: "Templo", sprite: "priest",
-    greet: "Que a luz te guie. Posso curar suas feridas e abençoar sua alma.",
-    type: "temple",
+    name: "King Tibianus", role: "Promoção", sprite: "banker",
+    greet: "Greetings, adventurer. I can grant promotions to worthy citizens of Tibia.",
+    type: "promotion",
   },
   trainer: {
     name: "Mestre Dunfir", role: "Academia", sprite: "trainer",

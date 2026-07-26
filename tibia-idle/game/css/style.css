@@ -93,6 +93,13 @@ canvas { image-rendering: pixelated; }
 .col-right { grid-column: 1; grid-row: 1; }
 .col-mid { grid-column: 2; grid-row: 1; }
 .col-left { grid-column: 3; grid-row: 1; }
+#app.side-collapsed .layout {
+  grid-template-columns: minmax(340px, 1fr);
+  max-width: 1080px;
+}
+#app.side-collapsed .col-left,
+#app.side-collapsed .col-right { display: none; }
+#app.side-collapsed .col-mid { grid-column: 1; }
 
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }

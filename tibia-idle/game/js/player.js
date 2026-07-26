@@ -11,6 +11,21 @@ const SKILL_NAMES = {
   dist: "Distância", shield: "Escudo", magic: "Magic Level",
 };
 
+const PROMOTION_NAMES = {
+  knight: "Elite Knight",
+  paladin: "Royal Paladin",
+  druid: "Elder Druid",
+  sorcerer: "Master Sorcerer",
+  none: "Sem vocação",
+};
+
+function vocationName(p) {
+  const voc = typeof p === "string" ? p : p.voc;
+  const promoted = typeof p === "object" && p.promoted;
+  if (promoted && PROMOTION_NAMES[voc]) return PROMOTION_NAMES[voc];
+  return VOCATIONS[voc] ? VOCATIONS[voc].name : voc;
+}
+
 function newPlayer(name, voc, sex) {
   const p = {
     name: name || "Sem Nome",
@@ -25,6 +40,8 @@ function newPlayer(name, voc, sex) {
     gold: 0,
     bank: 0,
     blessed: false,
+    promoted: false,
+    promotedAt: null,
     equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item

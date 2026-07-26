@@ -19,6 +19,7 @@ function openNpc(id) {
     case "sell":   body = npcSell(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
+    case "promotion": body = npcPromotion(p); break;
     case "train":  body = npcTrain(p); break;
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
@@ -56,6 +57,7 @@ function refreshNpc(id) {
     case "sell":   body = npcSell(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
+    case "promotion": body = npcPromotion(p); break;
     case "train":  body = npcTrain(p); break;
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
@@ -96,7 +98,7 @@ function openAcademyConjureModal(showList) {
       <input id="academy-conjure-text" value="conjure:" autocomplete="off"
         style="width:100%;padding:6px;background:#14120e;color:#ffe680;border:2px solid;border-color:#16140f #5a5348 #5a5348 #16140f;margin:4px 0 8px">
       <div class="row mb8" style="justify-content:space-between">
-        <span class="small dim">${VOCATIONS[p.voc].name} · Mana ${Math.floor(p.mp)} / ${maxStats(p).mp}</span>
+        <span class="small dim">${vocationName(p)} · Mana ${Math.floor(p.mp)} / ${maxStats(p).mp}</span>
         <button class="sm primary" id="academy-toggle-list">${showList === false ? "Abrir lista" : "Atualizar lista"}</button>
       </div>
       <div id="academy-conjure-list" class="list" style="max-height:360px;${showList === false ? "display:none" : ""}">
@@ -319,6 +321,57 @@ function npcTemple(p) {
       Com a bênção você perde bem menos experiência ao morrer.</div>`;
 }
 
+/* ---------------------------------------------------------- promoção */
+const PROMOTION_PRICE = 20000;
+const PROMOTION_LEVEL = 20;
+
+function promotionEligibility(p) {
+  if (p.promoted) return { ok: false, msg: "Já promovido" };
+  if (p.level < PROMOTION_LEVEL) return { ok: false, msg: `Requer nível ${PROMOTION_LEVEL}` };
+  if ((p.gold || 0) < PROMOTION_PRICE) return { ok: false, msg: `Requer ${fmtFull(PROMOTION_PRICE)} gp` };
+  return { ok: true, msg: "Pronto" };
+}
+
+function promoteCharacterById(id) {
+  const currentId = G.p ? characterId(G.p) : null;
+  let target = null;
+  if (id === currentId) target = G.p;
+  else target = getCharacters().find((p) => p.id === id);
+  if (!target) return { ok: false, msg: "Personagem não encontrado." };
+  const check = promotionEligibility(target);
+  if (!check.ok) return check;
+  if (!spendGold(target, PROMOTION_PRICE)) return { ok: false, msg: "Ouro insuficiente." };
+  target.promoted = true;
+  target.promotedAt = Date.now();
+  saveCharacterToRoster(target);
+  if (id === currentId) G.p = target;
+  return { ok: true, msg: `${target.name} agora é ${vocationName(target)}!` };
+}
+
+function npcPromotion() {
+  const chars = getCharacters();
+  return `
+    <div class="panel-inset mb8" style="padding:8px">
+      <div class="stat-row"><span class="k">Preço</span><span class="v gold-txt">${fmtFull(PROMOTION_PRICE)} gp</span></div>
+      <div class="stat-row"><span class="k">Nível mínimo</span><span class="v">${PROMOTION_LEVEL}</span></div>
+    </div>
+    <div class="small dim mb4">Escolha o personagem para promover</div>
+    <div class="list" style="max-height:330px">
+      ${chars.map((ch) => {
+        const e = promotionEligibility(ch);
+        return `<div class="shop-row">
+          <div style="flex:1;min-width:0">
+            <div class="small" style="color:${ch.promoted ? "#9ce84a" : "#c8c0a8"}">${ch.name}</div>
+            <div class="tiny dim">${vocationName(ch)} · nível ${ch.level} · ${fmtFull(ch.gold || 0)} gp</div>
+          </div>
+          <div class="tiny ${e.ok ? "" : "dim"}" style="color:${e.ok ? "#9ce84a" : "#ff9a6a"}">${e.msg}</div>
+          <button class="sm primary" data-promote-char="${ch.id}" ${e.ok ? "" : "disabled"}>Promover</button>
+        </div>`;
+      }).join("") || `<div class="dim small center" style="padding:14px">Nenhum personagem salvo.</div>`}
+    </div>
+    <div class="tiny dim mt8">Promoções: Elite Knight, Royal Paladin, Elder Druid e Master Sorcerer.</div>`;
+}
+
 /* ---------------------------------------------------------- academia */
 function npcTrain(p) {
   const st = academyStatus(p);
@@ -331,7 +384,7 @@ function npcTrain(p) {
     <div class="panel-inset mb8" style="padding:8px">
       <div class="stat-row"><span class="k">Sala</span><span class="v">Safezone</span></div>
       <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
-      <div class="stat-row"><span class="k">Vocação</span><span class="v">${VOCATIONS[p.voc].name}</span></div>
+      <div class="stat-row"><span class="k">Vocação</span><span class="v">${vocationName(p)}</span></div>
       <div class="stat-row"><span class="k">Skill treinada</span><span class="v">${skillTxt}</span></div>
       <div class="stat-row"><span class="k">Shielding</span><span class="v">Todos os hits</span></div>
       <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
@@ -495,6 +548,16 @@ function bindNpc(id, type) {
     if (r.ok) addLog("info", "Recebeu a bênção do templo.");
     refreshNpc(id);
   });
+
+  // promoção King Tibianus
+  $$("#npc-content [data-promote-char]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = promoteCharacterById(b.dataset.promoteChar);
+      toast(r.msg, r.ok ? "level" : "");
+      if (r.ok) addLog("level", r.msg);
+      refreshNpc(id);
+      renderAll();
+    }));
 
   // academia
   const academyEnter = $("#academy-enter");

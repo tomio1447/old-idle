@@ -21,6 +21,7 @@ const G = {
   cityRegenHp: 0,
   cityRegenMp: 0,
   manaTrainAcc: 0,
+  sideCollapsed: false,
 };
 
 /* ------------------------------------------------------------ save */
@@ -142,6 +143,8 @@ function normalizePlayer(p) {
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   p.bank = p.bank || 0;
+  p.promoted = !!p.promoted;
+  p.promotedAt = p.promotedAt || null;
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
@@ -1093,6 +1096,12 @@ function bindControls() {
     addLog("sell", `Venda manual: <span class="gold-txt">${fmtFull(r.gold)} gp</span>`);
     renderAll();
   });
+  $("#btn-toggle-menus").addEventListener("click", () => {
+    G.sideCollapsed = !G.sideCollapsed;
+    $("#app").classList.toggle("side-collapsed", G.sideCollapsed);
+    G.renderer.resize();
+    renderTopbar(p);
+  });
   $("#btn-equip").addEventListener("click", () => {
     const ch = autoEquip(p);
     if (!ch.length) { toast("Já está com o melhor equipamento"); return; }
@@ -1185,7 +1194,7 @@ function openCharacterModal() {
             <div style="flex:1;min-width:0">
               <div class="small" style="color:${p.id === currentId ? "#9ce84a" : "#c8c0a8"}">
                 ${p.name}${p.id === currentId ? " · atual" : ""}</div>
-              <div class="tiny dim">${VOCATIONS[p.voc].name} · nível ${p.level} · ${fmtFull(p.gold)} gp</div>
+              <div class="tiny dim">${vocationName(p)} · nível ${p.level} · ${fmtFull(p.gold)} gp</div>
             </div>
             <button class="sm primary" data-load-char="${p.id}" ${p.id === currentId ? "disabled" : ""}>Entrar</button>
           </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
@@ -1228,7 +1237,7 @@ function initLogin() {
     $("#continue-box").style.display = "";
     $("#saved-name").textContent = saved.name;
     $("#saved-info").textContent =
-      `${VOCATIONS[saved.voc].name} · nível ${saved.level}`;
+      `${vocationName(saved)} · nível ${saved.level}`;
     $("#btn-continue").addEventListener("click", () => startGame(saved));
   }
 
