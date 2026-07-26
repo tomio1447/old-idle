@@ -599,6 +599,7 @@ function tryMana(c, p) {
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
+  if (p.config.manaSupply === "") return false;
   const candidates = [];
   if (p.config.manaSupply) candidates.push(p.config.manaSupply);
   else for (const slug in p.supplies) candidates.push(slug);
@@ -766,26 +767,8 @@ function combatTick(c, p, dt, now) {
   tryHeal(c, p, now);
   tryMana(c, p);
 
-  // ---- recuo: sem cura e com pouca vida, sai da hunt em vez de morrer
-  if (c.retreating) {
-    c.retreatT -= dt;
-    p.hp = Math.min(max.hp, p.hp + max.hp * (dt / 12000));
-    p.mp = Math.min(max.mp, p.mp + max.mp * (dt / 10000));
-    if (c.retreatT <= 0 && p.hp >= max.hp * 0.92) {
-      c.retreating = false;
-      c.events.push({ t: "resume" });
-      spawnWave(c, p);
-    }
-    return;
-  }
-  if (p.config.autoRetreat && p.hp < max.hp * 0.3 && !canHeal(c, p)) {
-    c.retreating = true;
-    c.retreatT = 8000;
-    c.mobs = [];
-    c.stats.retreats = (c.stats.retreats || 0) + 1;
-    c.events.push({ t: "retreat" });
-    return;
-  }
+  // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
+  // voltando ao templo/cidade pelo fluxo normal de morte.
 
   // ataque do jogador
   c.playerAtkCd -= dt;

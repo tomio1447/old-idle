@@ -4,6 +4,8 @@
 "use strict";
 
 const SAVE_KEY = "tibia-idle-save-v1";
+const CHARACTERS_KEY = "tibia-idle-characters-v1";
+const ACTIVE_CHARACTER_KEY = "tibia-idle-active-character-v1";
 
 const G = {
   p: null,
@@ -22,9 +24,48 @@ const G = {
 };
 
 /* ------------------------------------------------------------ save */
-function save() {
-  G.p.lastSeen = Date.now();
+function characterId(p) {
+  if (!p.id) p.id = "char-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+  return p.id;
+}
+
+function readRoster() {
   try {
+    const raw = localStorage.getItem(CHARACTERS_KEY);
+    const d = raw ? JSON.parse(raw) : {};
+    return d && typeof d === "object" ? d : {};
+  } catch (e) { return {}; }
+}
+
+function writeRoster(roster) {
+  localStorage.setItem(CHARACTERS_KEY, JSON.stringify(roster));
+}
+
+function saveCharacterToRoster(p) {
+  if (!p) return false;
+  const id = characterId(p);
+  const roster = readRoster();
+  p.lastSeen = Date.now();
+  roster[id] = { v: 1, p: p };
+  writeRoster(roster);
+  localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
+  return true;
+}
+
+function getCharacters() {
+  const roster = readRoster();
+  return Object.keys(roster).map((id) => {
+    const p = roster[id] && roster[id].p ? normalizePlayer(roster[id].p) : null;
+    if (p) p.id = id;
+    return p;
+  }).filter(Boolean).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+}
+
+function save() {
+  if (!G.p) return false;
+  try {
+    saveCharacterToRoster(G.p);
+    // mantém compatibilidade com saves antigos de 1 personagem
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 1, p: G.p,
       session: G.combat ? { hunt: G.combat.huntId, stats: G.combat.stats } : null,
@@ -38,10 +79,28 @@ function save() {
 
 function load() {
   try {
+    const roster = readRoster();
+    const active = localStorage.getItem(ACTIVE_CHARACTER_KEY);
+    if (active && roster[active] && roster[active].p) {
+      const p = normalizePlayer(roster[active].p);
+      p.id = active;
+      return p;
+    }
+    const ids = Object.keys(roster);
+    if (ids.length) {
+      const id = ids[0];
+      localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
+      const p = normalizePlayer(roster[id].p);
+      p.id = id;
+      return p;
+    }
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    return d && d.p ? normalizePlayer(d.p) : null;
+    if (!d || !d.p) return null;
+    const p = normalizePlayer(d.p);
+    saveCharacterToRoster(p);
+    return p;
   } catch (e) { return null; }
 }
 
@@ -72,7 +131,7 @@ function normalizePlayer(p) {
   p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
   p.supplies = p.supplies || {};
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
-  if (!p.config.manaSupply) p.config.manaSupply = "mana-fluid";
+  if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-fluid";
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.equip = p.equip || {};
@@ -545,13 +604,7 @@ function drainEvents() {
         toast("Você morreu!", "death");
         r.shake = 16;
         break;
-      case "retreat":
-        addLog("death", "Sem cura! Recuando para se recuperar…");
-        toast("Recuando: acabaram os supplies", "death");
-        break;
-      case "resume":
-        addLog("info", "Recuperado. Voltando à caçada.");
-        break;
+
     }
   }
   c.events.length = 0;
@@ -888,6 +941,7 @@ function bindControls() {
     for (const c of ch) addLog("info", `Equipou <b>${itemName(c.item)}</b>`);
     renderAll();
   });
+  $("#btn-switch").addEventListener("click", openCharacterModal);
   $("#btn-reset").addEventListener("click", () => {
     if (confirm("Apagar o personagem e recomeçar? Isso não pode ser desfeito."))
       wipeSave();
@@ -938,6 +992,76 @@ function bindControls() {
   $("#loot-filter").value = p.config.lootFilter;
 }
 
+/* ------------------------------------------------------------ personagens */
+function giveStarterKit(p) {
+  addItem(p, "club", 1);
+  addItem(p, "wooden-shield", 1);
+  p.supplies["health-potion"] = Math.max(p.supplies["health-potion"] || 0, 5);
+  p.gold = Math.max(0, p.gold || 0);
+  autoEquip(p);
+  return p;
+}
+
+function createCharacter(name, voc, sex) {
+  const p = newPlayer(name, voc, sex);
+  giveStarterKit(p);
+  normalizePlayer(p);
+  saveCharacterToRoster(p);
+  return p;
+}
+
+function openCharacterModal() {
+  save();
+  const chars = getCharacters();
+  const currentId = G.p ? characterId(G.p) : localStorage.getItem(ACTIVE_CHARACTER_KEY);
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Trocar personagem
+      <span style="flex:1"></span><button class="sm" id="char-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="small dim mb4">Personagens salvos neste navegador</div>
+      <div class="list mb8" style="max-height:260px">
+        ${chars.length ? chars.map((p) => `
+          <div class="shop-row">
+            <div style="flex:1;min-width:0">
+              <div class="small" style="color:${p.id === currentId ? "#9ce84a" : "#c8c0a8"}">
+                ${p.name}${p.id === currentId ? " · atual" : ""}</div>
+              <div class="tiny dim">${VOCATIONS[p.voc].name} · nível ${p.level} · ${fmtFull(p.gold)} gp</div>
+            </div>
+            <button class="sm primary" data-load-char="${p.id}" ${p.id === currentId ? "disabled" : ""}>Entrar</button>
+          </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
+      </div>
+      <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
+      <div id="char-new-box" class="panel-inset" style="display:none;padding:8px">
+        <div class="field"><label>Nome</label><input id="new-char-name" maxlength="20" autocomplete="off"></div>
+        <div class="field"><label>Sexo</label><select id="new-char-sex"><option value="male">Masculino</option><option value="female">Feminino</option></select></div>
+        <div class="field"><label>Vocação</label><select id="new-char-voc">
+          <option value="knight">Knight</option><option value="paladin">Paladin</option>
+          <option value="druid">Druid</option><option value="sorcerer">Sorcerer</option>
+        </select></div>
+        <button class="primary full" id="char-create">Criar e entrar</button>
+      </div>
+      <div class="tiny dim mt8">Ao trocar/criar personagem a página recarrega para iniciar a sessão limpa.</div>
+    </div>`;
+  $("#modal").classList.add("show");
+  $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
+  $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
+    save();
+    localStorage.setItem(ACTIVE_CHARACTER_KEY, b.dataset.loadChar);
+    location.reload();
+  }));
+  $("#char-new-toggle").addEventListener("click", () => {
+    const box = $("#char-new-box");
+    box.style.display = box.style.display === "none" ? "" : "none";
+  });
+  $("#char-create").addEventListener("click", () => {
+    const name = ($("#new-char-name").value || "").trim();
+    if (name.length < 2) { toast("Digite um nome válido"); return; }
+    createCharacter(name, $("#new-char-voc").value, $("#new-char-sex").value);
+    location.reload();
+  });
+}
+
 /* ------------------------------------------------------------ login */
 function initLogin() {
   const saved = load();
@@ -980,13 +1104,7 @@ function initLogin() {
   $("#btn-create").addEventListener("click", () => {
     const name = ($("#char-name").value || "").trim();
     if (name.length < 2) { toast("Digite um nome válido"); return; }
-    const p = newPlayer(name, selVoc, selSex);
-    // kit inicial igual para todas as vocações
-    addItem(p, "club", 1);
-    addItem(p, "wooden-shield", 1);
-    p.supplies["health-potion"] = 5;
-    p.gold = 0;
-    autoEquip(p);
+    const p = createCharacter(name, selVoc, selSex);
     startGame(p);
   });
 

@@ -232,6 +232,10 @@ canvas { image-rendering: pixelated; }
   background: rgba(80, 65, 18, .35);
   outline: 1px solid rgba(212,175,55,.32);
 }
+.helper-supply-row.disabled {
+  background: rgba(80, 20, 20, .22);
+  outline: 1px solid rgba(176,74,74,.22);
+}
 .helper-supply-row img {
   width: 26px; height: 26px;
   image-rendering: pixelated;

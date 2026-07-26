@@ -406,7 +406,8 @@ function renderHelper(p) {
       const pw = supplyPower(s, p.level);
       const kind = s.type === "mana" ? "mana" : "hp";
       const selected = s.type === "mana" ? p.config.manaSupply === slug : p.config.healSupply === slug;
-      return `<div class="helper-supply-row ${selected ? "selected" : ""}">
+      const disabledMana = s.type === "mana" && !selected;
+      return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}">
         <img src="assets/item/${s.sprite}.png" alt="${s.name}">
         <div style="flex:1;min-width:0">
           <div class="small">${s.name}</div>
@@ -416,19 +417,14 @@ function renderHelper(p) {
             · ${kind} ${pw[0]}-${pw[1]}
           </div>
         </div>
-        <button class="sm ${selected ? "primary" : ""}" data-use-supply="${slug}">
-          ${selected ? "USANDO" : "USAR"}</button>
+        <button class="sm ${selected ? "primary" : disabledMana ? "danger" : ""}" data-use-supply="${slug}">
+          ${selected ? "USANDO" : disabledMana ? "DESATIVADO" : "USAR"}</button>
       </div>`;
     };
     healEl.innerHTML = `
       <div class="mb8">
         <label class="small dim">Curar HP abaixo de (%)</label>
         <input id="helper-heal-at" type="number" min="1" max="99" value="${p.config.healAt}"
-          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      </div>
-      <div class="mb8">
-        <label class="small dim">Preencher mana abaixo de (%)</label>
-        <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="small dim mt8 mb4">Magias de cura</div>
@@ -446,7 +442,12 @@ function renderHelper(p) {
       }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
       <div class="small dim mt8 mb4">Itens de HP</div>
       <div class="list" style="max-height:132px">${healSup.map(supplyRow).join("")}</div>
-      <div class="small dim mt8 mb4">Itens de Mana</div>
+      <div class="mt8">
+        <label class="small dim">Preencher mana abaixo de (%)</label>
+        <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
+      <div class="small dim mt8 mb4">Mana Fluid</div>
       <div class="list" style="max-height:70px">${["mana-fluid"].map(supplyRow).join("")}</div>`;
     ["helper-heal-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
@@ -468,9 +469,13 @@ function renderHelper(p) {
       const s = SUPPLIES[slug];
       if (!s) return;
       if (!Object.prototype.hasOwnProperty.call(p.supplies, slug)) p.supplies[slug] = 0;
-      if (s.type === "mana") p.config.manaSupply = slug;
-      else p.config.healSupply = slug;
-      toast(`${s.type === "mana" ? "Mana" : "Cura"} selecionada: <b>${s.name}</b>`);
+      if (s.type === "mana") {
+        p.config.manaSupply = p.config.manaSupply === slug ? "" : slug;
+        toast(p.config.manaSupply ? `Mana selecionada: <b>${s.name}</b>` : "Mana Fluid desativado");
+      } else {
+        p.config.healSupply = slug;
+        toast(`Cura selecionada: <b>${s.name}</b>`);
+      }
       renderHelper(p);
     }));
   }
