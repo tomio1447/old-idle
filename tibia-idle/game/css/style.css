@@ -93,13 +93,17 @@ canvas { image-rendering: pixelated; }
 .col-right { grid-column: 1; grid-row: 1; }
 .col-mid { grid-column: 2; grid-row: 1; }
 .col-left { grid-column: 3; grid-row: 1; }
-#app.side-collapsed .layout {
-  grid-template-columns: minmax(340px, 1fr);
-  max-width: 1080px;
+/* painel minimizado: some com o corpo e mantém só o cabeçalho */
+.panel.collapsed > .panel-body,
+.panel.collapsed > #scene-wrap { display: none !important; }
+.panel.collapsed > .tabs .tab { display: none; }
+.panel.collapsed > .panel-title { border-bottom: none; }
+
+.collapse-btn {
+  min-width: 20px; padding: 1px 6px; line-height: 14px;
+  font-weight: bold; font-size: 13px; flex: none;
 }
-#app.side-collapsed .col-left,
-#app.side-collapsed .col-right { display: none; }
-#app.side-collapsed .col-mid { grid-column: 1; }
+.tabs .collapse-btn { margin: 2px 3px 2px 0; align-self: center; }
 
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }
@@ -490,3 +494,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .ctx-menu .ctx-item.disabled { opacity: .38; cursor: not-allowed; }
 .ctx-menu .ctx-item.disabled:hover { background: none; color: var(--text); }
 .ctx-menu .ctx-hint { font-size: 9px; opacity: .5; }
+
+/* rótulo do painel de abas, visível apenas quando minimizado */
+.tabs-label {
+  display: none; font-size: 11px; font-weight: bold; letter-spacing: .5px;
+  color: var(--text-bright); text-shadow: 1px 1px 0 #000; padding: 5px 8px;
+}
+.panel.collapsed > .tabs .tabs-label { display: block; }

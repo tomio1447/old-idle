@@ -976,11 +976,80 @@ function renderRefill(p) {
   });
 }
 
+/* ---------------------------------------------------------- minimizar painéis */
+const COLLAPSE_KEY = "tibia-idle-collapsed-v1";
+
+/* rótulo usado quando o painel não tem .panel-title (ex.: o helper de abas) */
+const COLLAPSE_LABELS = { helper: "Helper" };
+
+function readCollapsed() {
+  try {
+    const raw = localStorage.getItem(COLLAPSE_KEY);
+    const d = raw ? JSON.parse(raw) : {};
+    return d && typeof d === "object" ? d : {};
+  } catch (e) { return {}; }
+}
+
+function writeCollapsed(state) {
+  try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function setPanelCollapsed(id, collapsed) {
+  const panel = document.querySelector(`[data-collapse="${id}"]`);
+  if (!panel) return;
+  panel.classList.toggle("collapsed", collapsed);
+  const btn = panel.querySelector("[data-collapse-btn]");
+  if (btn) {
+    btn.textContent = collapsed ? "+" : "–";
+    btn.title = collapsed ? "Expandir" : "Minimizar";
+  }
+  const state = readCollapsed();
+  if (collapsed) state[id] = 1; else delete state[id];
+  writeCollapsed(state);
+  if (G.renderer && typeof G.renderer.resize === "function") G.renderer.resize();
+}
+
+/* Injeta o botão "–" no título de cada painel e restaura o estado salvo */
+function initPanelCollapse() {
+  const saved = readCollapsed();
+  $$("[data-collapse]").forEach((panel) => {
+    const id = panel.dataset.collapse;
+    // o painel do helper usa a barra de abas como cabeçalho
+    const head = panel.querySelector(".panel-title") || panel.querySelector(".tabs");
+    if (!head || head.querySelector("[data-collapse-btn]")) return;
+
+    // painel de abas não tem título: cria um rótulo visível só quando minimizado
+    if (head.classList.contains("tabs") && !head.querySelector(".tabs-label")) {
+      const lbl = document.createElement("span");
+      lbl.className = "tabs-label";
+      lbl.textContent = COLLAPSE_LABELS[id] || "Painel";
+      head.insertBefore(lbl, head.firstChild);
+    }
+
+    // garante que o botão fique encostado à direita
+    if (!head.querySelector(".spacer, [style*='flex:1']")) {
+      const sp = document.createElement("span");
+      sp.style.flex = "1";
+      head.appendChild(sp);
+    }
+    const btn = document.createElement("button");
+    btn.className = "sm collapse-btn";
+    btn.dataset.collapseBtn = id;
+    btn.textContent = "–";
+    btn.title = "Minimizar";
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setPanelCollapsed(id, !panel.classList.contains("collapsed"));
+    });
+    head.appendChild(btn);
+
+    if (saved[id]) setPanelCollapsed(id, true);
+  });
+}
+
 function renderTopbar(p) {
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   $("#gold").textContent = fmtFull(p.gold);
-  const menuBtn = $("#btn-toggle-menus");
-  if (menuBtn) menuBtn.textContent = G.sideCollapsed ? "Mostrar menus" : "Minimizar menus";
   const cityBtn = $("#btn-city");
   if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
   const c = G.combat;

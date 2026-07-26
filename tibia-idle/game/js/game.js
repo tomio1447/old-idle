@@ -22,7 +22,6 @@ const G = {
   cityRegenHp: 0,
   cityRegenMp: 0,
   manaTrainAcc: 0,
-  sideCollapsed: false,
 };
 
 /* ------------------------------------------------------------ save */
@@ -1123,12 +1122,7 @@ function bindControls() {
     addLog("sell", `Venda manual: <span class="gold-txt">${fmtFull(r.gold)} gp</span>`);
     renderAll();
   });
-  $("#btn-toggle-menus").addEventListener("click", () => {
-    G.sideCollapsed = !G.sideCollapsed;
-    $("#app").classList.toggle("side-collapsed", G.sideCollapsed);
-    G.renderer.resize();
-    renderTopbar(p);
-  });
+  initPanelCollapse();
   $("#btn-equip").addEventListener("click", () => {
     const ch = autoEquip(p);
     if (!ch.length) { toast("Já está com o melhor equipamento"); return; }
