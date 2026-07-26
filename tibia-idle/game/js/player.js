@@ -40,7 +40,8 @@ function newPlayer(name, voc, sex) {
     config: {
       healAt: 60,           // % de vida para curar
       useRunes: true,
-      autoRestock: true,    // recompra supplies com o ouro da hunt
+      autoRestock: false,   // legado: compras agora acontecem por carga, no uso
+      manaTrain: null,      // receita ativa do treino online de mana
       autoSell: true,
       autoEquip: true,
       spellAttack: true,
@@ -316,16 +317,19 @@ function autoEquip(p) {
     addItem(p, p.equip.shield.item, 1);
     delete p.equip.shield;
   }
-  // municao para paladin
+  // municao para paladin: a mochila guarda as cargas; o slot ammo guarda
+  // qual municao esta selecionada para o auto-buy/consumo em combate.
   if (w && w.t === "distance") {
     let bestAmmo = null, bestAtk = -1;
     for (const slug in p.bag) {
       const it = GAMEDATA.items[slug];
-      if (!it || it.s !== "ammo") continue;
+      if (!it || it.s !== "ammo" || (p.bag[slug] || 0) <= 0) continue;
       if ((it.atk || 0) > bestAtk) { bestAtk = it.atk || 0; bestAmmo = slug; }
     }
     if (bestAmmo && (!p.equip.ammo || p.equip.ammo.item !== bestAmmo)) {
       p.equip.ammo = { item: bestAmmo, count: p.bag[bestAmmo] };
+    } else if (p.equip.ammo) {
+      p.equip.ammo.count = p.bag[p.equip.ammo.item] || 0;
     }
   }
   return changes;
@@ -344,8 +348,10 @@ function autoSell(p) {
       delete p.bag[slug];
       continue;
     }
+    // Ammo agora é carga de combate/treino online; não vender no auto-sell.
+    if (it.s === "ammo") continue;
     // nao vende equipamento util
-    if (it.s && it.s !== "ammo") {
+    if (it.s) {
       const equipped = p.equip[it.s];
       if (!equipped || itemScore(p, slug) > itemScore(p, equipped.item)) continue;
     }

@@ -250,6 +250,17 @@ Container.prototype.getSize = function() {
 
 }
 
+Container.prototype.getNumberOfItems = function() {
+
+  /*
+   * Function Container.getNumberOfItems
+   * Returns the number of occupied slots in the container.
+   */
+
+  return this.container.getSlots().filter((thing) => thing !== null).length;
+
+}
+
 Container.prototype.getWeight = function() {
 
   /*

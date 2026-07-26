@@ -15,6 +15,9 @@ const G = {
   sellTimer: 0,
   saveTimer: 0,
   tickAcc: 0,
+  cityRegenHp: 0,
+  cityRegenMp: 0,
+  manaTrainAcc: 0,
 };
 
 /* ------------------------------------------------------------ save */
@@ -37,8 +40,28 @@ function load() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    return d && d.p ? d.p : null;
+    return d && d.p ? normalizePlayer(d.p) : null;
   } catch (e) { return null; }
+}
+
+function normalizePlayer(p) {
+  p.config = Object.assign({
+    healAt: 60,
+    useRunes: true,
+    autoRestock: false,
+    manaTrain: null,
+    autoSell: true,
+    autoEquip: true,
+    spellAttack: true,
+    autoRetreat: true,
+    lootFilter: "all",
+  }, p.config || {});
+  p.config.autoRestock = false;
+  p.supplies = p.supplies || {};
+  p.bag = p.bag || {};
+  p.equip = p.equip || {};
+  p.bank = p.bank || 0;
+  return p;
 }
 
 function wipeSave() {
@@ -74,20 +97,11 @@ function computeOffline(p) {
   let exp = Math.floor(est.exp * hours * effRate);
   let gold = Math.floor(est.gold * hours * effRate);
 
-  // custo de supplies: consome o que tem
+  // supplies/ammo offline usam o mesmo modelo de cargas do combate online:
+  // cargas existentes são consumidas; se uma carga selecionada está 0, compra
+  // a próxima diretamente do gold balance.
   let supplyCost = 0;
   const usedSupplies = {};
-  const runeUse = Math.floor(kills * 0.35);
-  for (const slug in p.supplies) {
-    if (runeUse <= 0) break;
-    const s = SUPPLIES[slug];
-    const use = Math.min(p.supplies[slug], Math.floor(runeUse / 2));
-    if (use <= 0) continue;
-    p.supplies[slug] -= use;
-    if (p.supplies[slug] <= 0) delete p.supplies[slug];
-    usedSupplies[slug] = use;
-    supplyCost += use * s.price;
-  }
 
   // loot em itens
   const loot = {};
@@ -112,9 +126,27 @@ function computeOffline(p) {
   p.totalKills += kills;
   p.playtime += staminaSec * 1000;
 
+  const offlineStats = { supplyUsed: usedSupplies, supplyCost: 0, supplyBought: {} };
+  const offlineCombat = { stats: offlineStats, events: [] };
+  let runeUse = Math.min(4000, Math.floor(kills * 0.35));
+  const supplySlugs = Object.keys(p.supplies || {}).filter((slug) => {
+    const s = SUPPLIES[slug];
+    return s && (s.type === "heal" || s.type === "attack" || s.type === "mana");
+  });
+  for (let i = 0; i < runeUse && supplySlugs.length; i++) {
+    const slug = supplySlugs[i % supplySlugs.length];
+    if (!consumeSupplyCharge(offlineCombat, p, slug)) break;
+  }
+
   // skills: ganha tries proporcional aos golpes
   const swings = Math.floor(kills * Math.max(1, est.ttk / 2));
   const sk = weaponSkill(p);
+  if (sk === "dist") {
+    const ammoUse = Math.min(4000, Math.floor(swings * 0.6));
+    for (let i = 0; i < ammoUse; i++) {
+      if (!consumeAmmoCharge(offlineCombat, p)) break;
+    }
+  }
   if (sk !== "magic") addSkillTries(p, sk, Math.floor(swings * 0.6));
   addSkillTries(p, "shield", Math.floor(swings * 0.5));
   if (VOCATIONS[p.voc].weapon === "magic")
@@ -122,6 +154,7 @@ function computeOffline(p) {
 
   // loot vai pra bag
   for (const slug in loot) addItem(p, slug, loot[slug]);
+  supplyCost = offlineStats.supplyCost;
 
   return {
     time: staminaSec * 1000, kills: kills, exp: exp, gold: gold,
@@ -139,7 +172,7 @@ function showOfflineModal(r) {
     .map((s) => `<div class="inv-item" title="${itemName(s)}">
         ${itemImg(s)}<span class="cnt">${r.loot[s]}</span></div>`).join("");
   const supRows = Object.keys(r.supplies).map((s) =>
-    `<div class="stat-row"><span class="k">${SUPPLIES[s].name}</span>
+    `<div class="stat-row"><span class="k">${SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)}</span>
      <span class="v">-${r.supplies[s]}</span></div>`).join("");
 
   $("#modal-body").innerHTML = `
@@ -230,6 +263,18 @@ function drainEvents() {
       case "mana":
         r.addFloater(0.13, 0.5, "+" + fmt(e.amount) + " mana", "#6a8aff");
         break;
+      case "supply-buy":
+        addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
+        renderSupplies(G.p);
+        break;
+      case "ammo-buy":
+        addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
+        renderInventory(G.p);
+        renderEquip(G.p);
+        break;
+      case "no-ammo":
+        addLog("death", `Sem gold para comprar carga de <b>${e.name}</b>.`);
+        break;
       case "cast":
         r.addEffect(0.3, 0.5, e.area ? "explosion-area" : "magic-blue");
         break;
@@ -267,6 +312,45 @@ function drainEvents() {
     }
   }
   c.events.length = 0;
+}
+
+function regenInCity(p, dt) {
+  const max = maxStats(p);
+  const g = gearStats(p);
+  const rr = regenRate(p.voc, g.hpreg > 0);
+  G.cityRegenHp += dt;
+  G.cityRegenMp += dt;
+  const hpEvery = Math.max(1000, (rr.hp * 1000) / (1 + g.hpreg * 0.4));
+  const mpEvery = Math.max(800, (rr.mp * 1000) / (1 + g.mpreg * 0.4));
+  while (G.cityRegenHp >= hpEvery) {
+    G.cityRegenHp -= hpEvery;
+    p.hp = Math.min(max.hp, p.hp + 1 + Math.floor(p.level / 20));
+  }
+  while (G.cityRegenMp >= mpEvery) {
+    G.cityRegenMp -= mpEvery;
+    p.mp = Math.min(max.mp, p.mp + 2 + Math.floor(p.level / 15));
+  }
+}
+
+function tickManaTrain(p, dt) {
+  G.manaTrainAcc += dt;
+  if (G.manaTrainAcc < 1000) return;
+  G.manaTrainAcc = 0;
+  const r = runManaTrainTick(p);
+  if (!r) return;
+  if (r.stopped) {
+    toast(r.msg);
+    addLog("skill", `Mana train pausado: ${r.msg}`);
+    return;
+  }
+  addLog("skill", `Mana train criou <b>${r.product}</b> usando ${fmtFull(r.recipe.mana)} mana.`);
+  if (r.mlUp > 0) toast(`Magic Level +${r.mlUp}!`, "level");
+  renderSkills(p);
+  renderInventory(p);
+  renderSupplies(p);
+  renderEquip(p);
+  if (G.activeNpc === "trainer" && $("#modal").classList.contains("show"))
+    refreshNpc("trainer");
 }
 
 /* ------------------------------------------------------------ loop */
@@ -321,8 +405,10 @@ function loop(ts) {
 
   G.renderer.resize();
   if (G.inCity && !G.combat) {
-    // na cidade a stamina regenera devagar (descanso)
+    // na cidade a stamina e a mana regeneram devagar (treino online)
     G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * 0.35);
+    regenInCity(G.p, dt);
+    tickManaTrain(G.p, dt);
     // caminhada: ao chegar num NPC, abre o dialogo dele
     const reached = G.walker.update(dt);
     if (reached) openNpc(reached);
@@ -384,6 +470,7 @@ function renderHuntInfo() {
 
 /* ------------------------------------------------------------ boot */
 function startGame(p) {
+  p = normalizePlayer(p);
   G.p = p;
   G.renderer = new Renderer($("#scene"));
   G.renderer.resize();

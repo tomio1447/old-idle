@@ -77,6 +77,117 @@ function trainPrice(p, skill) {
   return Math.floor(500 * Math.pow(1.35, lvl - 9));
 }
 
+/* Receitas do treino online de mana.
+ * O treino não gasta gold: usa mana, conta como mana spent para ML, e cria
+ * ammo/runa em cargas conforme vocação e requisitos. */
+const MANA_TRAIN_RECIPES = {
+  "paladin-arrow": {
+    name: "Conjurar Arrows", vocs: ["paladin"], type: "ammo",
+    slug: "arrow", amount: 15, mana: 100, level: 13, ml: 0,
+    desc: "Cria 15 arrows para caça de distância.",
+  },
+  "sorc-hmm": {
+    name: "Heavy Magic Missile", vocs: ["sorcerer"], type: "supply",
+    slug: "heavy-magic-missile-rune", charges: 1, mana: 350,
+    level: 25, ml: 3, desc: "Runa ofensiva básica de sorcerer.",
+  },
+  "sorc-gfb": {
+    name: "Great Fireball", vocs: ["sorcerer"], type: "supply",
+    slug: "great-fireball-rune", charges: 1, mana: 530,
+    level: 30, ml: 4, desc: "Runa de fogo em área.",
+  },
+  "sorc-explosion": {
+    name: "Explosion", vocs: ["sorcerer"], type: "supply",
+    slug: "explosion-rune", charges: 1, mana: 570,
+    level: 31, ml: 6, desc: "Runa explosiva para dano físico.",
+  },
+  "sorc-sd": {
+    name: "Sudden Death", vocs: ["sorcerer"], type: "supply",
+    slug: "sudden-death-rune", charges: 1, mana: 985,
+    level: 45, ml: 15, desc: "Runa de alto dano de death.",
+  },
+  "druid-ih": {
+    name: "Intense Healing", vocs: ["druid"], type: "supply",
+    slug: "intense-healing-rune", charges: 1, mana: 120,
+    level: 11, ml: 1, desc: "Runa de cura inicial de druid.",
+  },
+  "druid-uh": {
+    name: "Ultimate Healing", vocs: ["druid"], type: "supply",
+    slug: "ultimate-healing-rune", charges: 1, mana: 400,
+    level: 24, ml: 4, desc: "Runa de cura forte.",
+  },
+  "druid-sd": {
+    name: "Sudden Death", vocs: ["druid"], type: "supply",
+    slug: "sudden-death-rune", charges: 1, mana: 985,
+    level: 45, ml: 15, desc: "Runa ofensiva avançada.",
+  },
+};
+
+function manaTrainRecipesFor(p) {
+  return Object.keys(MANA_TRAIN_RECIPES)
+    .map((id) => Object.assign({ id: id }, MANA_TRAIN_RECIPES[id]))
+    .filter((r) => r.vocs.indexOf(p.voc) !== -1);
+}
+
+function manaTrainReqText(r) {
+  return `nv ${r.level} · ML ${r.ml} · ${fmtFull(r.mana)} mana`;
+}
+
+function manaTrainCanSelect(p, r) {
+  if (r.vocs.indexOf(p.voc) === -1)
+    return { ok: false, msg: "Vocação incompatível." };
+  if (p.level < r.level)
+    return { ok: false, msg: `Requer nível ${r.level}.` };
+  if (p.ml < r.ml)
+    return { ok: false, msg: `Requer magic level ${r.ml}.` };
+  return { ok: true, msg: "" };
+}
+
+function manaTrainProductLabel(r) {
+  if (r.type === "ammo") return `${r.amount}x ${itemName(r.slug)}`;
+  const s = SUPPLIES[r.slug];
+  return `${r.charges || 1} carga(s) de ${s ? s.name : itemName(r.slug)}`;
+}
+
+function setManaTrain(p, id) {
+  if (!id) { p.config.manaTrain = null; return { ok: true, msg: "Mana train pausado." }; }
+  const r = MANA_TRAIN_RECIPES[id];
+  if (!r) return { ok: false, msg: "Receita inválida." };
+  const check = manaTrainCanSelect(p, r);
+  if (!check.ok) return check;
+  p.config.manaTrain = id;
+  return { ok: true, msg: `Mana train ativo: ${r.name}.` };
+}
+
+function runManaTrainTick(p) {
+  const id = p.config && p.config.manaTrain;
+  if (!id) return null;
+  const r = MANA_TRAIN_RECIPES[id];
+  if (!r) { p.config.manaTrain = null; return null; }
+  const check = manaTrainCanSelect(p, r);
+  if (!check.ok) { p.config.manaTrain = null; return { stopped: true, msg: check.msg }; }
+  if (p.mp < r.mana) return null;
+
+  const beforeMl = p.ml;
+  p.mp -= r.mana;
+  addManaSpent(p, r.mana);
+  if (r.type === "ammo") {
+    addItem(p, r.slug, r.amount);
+    if (p.equip.weapon && GAMEDATA.items[p.equip.weapon.item] &&
+        GAMEDATA.items[p.equip.weapon.item].t === "distance") {
+      if (!p.equip.ammo || p.equip.ammo.item === r.slug)
+        p.equip.ammo = { item: r.slug, count: p.bag[r.slug] || 0 };
+    }
+  } else {
+    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
+  }
+  return {
+    recipe: r,
+    product: manaTrainProductLabel(r),
+    mlUp: p.ml - beforeMl,
+  };
+}
+
 /* ------------------------------------------------------------ acoes */
 
 function bankDeposit(p, amount) {

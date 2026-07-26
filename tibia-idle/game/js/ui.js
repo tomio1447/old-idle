@@ -205,8 +205,9 @@ function renderEquip(p) {
       showTip(itemTip(slug, "Clique para desequipar")));
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
-      addItem(G.p, slug, 1);
-      delete G.p.equip[el.dataset.slot];
+      const slot = el.dataset.slot;
+      if (slot !== "ammo") addItem(G.p, slug, 1);
+      delete G.p.equip[slot];
       hideTip();
       renderAll();
     });
@@ -309,6 +310,13 @@ function renderInventory(p) {
           toast(`Requer nível ${it.lvl}`, "");
           return;
         }
+        if (it.s === "ammo") {
+          G.p.equip.ammo = { item: slug, count: G.p.bag[slug] || 0 };
+          toast(`Munição selecionada: <b>${it.n}</b>`);
+          hideTip();
+          renderAll();
+          return;
+        }
         const old = G.p.equip[it.s];
         if (old) addItem(G.p, old.item, 1);
         removeItem(G.p, slug, 1);
@@ -340,12 +348,12 @@ function renderSupplies(p) {
         <img src="assets/item/${s.sprite}.png" style="width:22px;height:22px" alt="">
         <div style="min-width:0">
           <div class="tiny" style="color:#c8c0a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
-          <div class="tiny dim">${s.price} gp · tem ${have}</div>
+          <div class="tiny dim">${fmtFull(supplyPrice(s, p.level))} gp/carga · cargas ${have}</div>
         </div>
       </div>
       <div class="row" style="gap:2px">
-        <button class="sm" data-buy="${slug}" data-n="10">10</button>
-        <button class="sm" data-buy="${slug}" data-n="100">100</button>
+        <button class="sm" data-buy="${slug}" data-n="10">+10c</button>
+        <button class="sm" data-buy="${slug}" data-n="100">+100c</button>
       </div>
     </div>`;
   }
@@ -354,11 +362,11 @@ function renderSupplies(p) {
     b.addEventListener("click", () => {
       const slug = b.dataset.buy, n = parseInt(b.dataset.n, 10);
       const s = SUPPLIES[slug];
-      const cost = s.price * n;
+      const cost = supplyPrice(s, G.p.level) * n;
       if (G.p.gold < cost) { toast("Ouro insuficiente", ""); return; }
       G.p.gold -= cost;
       G.p.supplies[slug] = (G.p.supplies[slug] || 0) + n;
-      addLog("sell", `Comprou ${n}x ${s.name} por ${fmtFull(cost)} gp`);
+      addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
       renderAll();
     });
   });

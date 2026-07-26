@@ -9,6 +9,7 @@ let shopSlot = "all";
 function openNpc(id) {
   const npc = NPCS[id];
   if (!npc) return;
+  G.activeNpc = id;
   const p = G.p;
   let body = "";
 
@@ -40,6 +41,7 @@ function openNpc(id) {
 }
 
 function closeNpc() {
+  G.activeNpc = null;
   $("#modal").classList.remove("show");
   renderAll();
 }
@@ -142,17 +144,17 @@ function npcSupply(p) {
       <img src="assets/item/${s.sprite}.png">
       <div style="flex:1;min-width:0">
         <div class="small">${s.name}</div>
-        <div class="tiny dim">${eff} · tem ${have}${locked ? ` · <span style="color:#ff9a6a">nv ${s.lvl}</span>` : ""}</div>
+        <div class="tiny dim">${eff} · cargas ${have} · ${fmtFull(price)} gp/carga${locked ? ` · <span style="color:#ff9a6a">nv ${s.lvl}</span>` : ""}</div>
       </div>
       <div class="row" style="gap:2px">
         ${[10, 50, 200].map((n) => `<button class="sm" data-buy-sup="${slug}"
           data-n="${n}" ${locked || p.gold < price * n ? "disabled" : ""}>
-          ${n}</button>`).join("")}
+          +${n}c</button>`).join("")}
       </div>
     </div>`;
   }).join("");
   return goldLine(p) + `<div class="list" style="max-height:340px">${rows}</div>
-    <div class="tiny dim mt4">O poder das runas cresce com o seu nível.</div>`;
+    <div class="tiny dim mt4">Supplies usam cargas. Se uma carga selecionada chegar a 0, a próxima é comprada automaticamente no uso.</div>`;
 }
 
 /* ---------------------------------------------------------- vender */
@@ -258,8 +260,40 @@ function npcTrain(p) {
         +1 · ${fmtFull(price)}</button>
     </div>`;
   }).join("");
-  return goldLine(p) + rows +
-    `<div class="tiny dim mt8">Treinar fica mais caro conforme a skill sobe.</div>`;
+
+  const recipes = manaTrainRecipesFor(p);
+  const active = p.config.manaTrain;
+  const manaRows = recipes.length ? recipes.map((r) => {
+    const check = manaTrainCanSelect(p, r);
+    const selected = active === r.id;
+    const ready = p.mp >= r.mana;
+    const sprite = r.type === "ammo" ? r.slug : (SUPPLIES[r.slug] ? SUPPLIES[r.slug].sprite : r.slug);
+    return `<div class="shop-row" style="opacity:${check.ok ? 1 : .45}">
+      <img src="assets/item/${sprite}.png">
+      <div style="flex:1;min-width:0">
+        <div class="small" style="color:${selected ? "#9ce84a" : "#c8c0a8"}">
+          ${r.name}${selected ? " · ativo" : ""}</div>
+        <div class="tiny dim">${manaTrainProductLabel(r)} · ${manaTrainReqText(r)}${check.ok && !ready ? " · aguardando mana" : ""}${!check.ok ? ` · <span style="color:#ff9a6a">${check.msg}</span>` : ""}</div>
+      </div>
+      <button class="sm ${selected ? "danger" : check.ok ? "primary" : ""}"
+        data-mana-train="${selected ? "" : r.id}" ${check.ok ? "" : "disabled"}>
+        ${selected ? "Pausar" : "Ativar"}</button>
+    </div>`;
+  }).join("") : `<div class="dim small center" style="padding:12px">
+      Mana train cria arrows para paladins e runas para druids/sorcerers.
+    </div>`;
+
+  return goldLine(p) + `
+    <div class="small dim mb4">Treino pago instantâneo</div>
+    ${rows}
+    <div class="tiny dim mt8 mb8">Treinar pago fica mais caro conforme a skill sobe.</div>
+    <div class="small dim mb4">Mana Train Online</div>
+    <div class="panel-inset mb8" style="padding:8px">
+      <div class="stat-row"><span class="k">Mana atual</span><span class="v">${Math.floor(p.mp)} / ${maxStats(p).mp}</span></div>
+      <div class="stat-row"><span class="k">Status</span><span class="v" style="color:${active ? "#9ce84a" : "#8a8270"}">${active ? "ativo" : "pausado"}</span></div>
+    </div>
+    <div class="list" style="max-height:260px">${manaRows}</div>
+    <div class="tiny dim mt8">Enquanto estiver online na cidade, o personagem regenera mana e executa a receita ativa automaticamente. Não gasta gold.</div>`;
 }
 
 /* ---------------------------------------------------------- estalagem */
@@ -357,7 +391,7 @@ function bindNpc(id, type) {
       if (p.gold < cost) { toast("Ouro insuficiente"); return; }
       p.gold -= cost;
       p.supplies[slug] = (p.supplies[slug] || 0) + n;
-      addLog("sell", `Comprou ${n}x ${s.name} por ${fmtFull(cost)} gp`);
+      addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
       refreshNpc(id);
     }));
 
@@ -422,6 +456,14 @@ function bindNpc(id, type) {
         toast(`${SKILL_NAMES[sk]} subiu!`, "level");
         addLog("skill", `Treinou <b>${SKILL_NAMES[sk]}</b> por ${fmtFull(r.spent)} gp`);
       }
+      refreshNpc(id);
+    }));
+  $$("#npc-content [data-mana-train]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const recipeId = b.dataset.manaTrain || null;
+      const r = setManaTrain(p, recipeId);
+      toast(r.msg, r.ok && recipeId ? "level" : "");
+      if (r.ok) addLog("skill", r.msg);
       refreshNpc(id);
     }));
 
