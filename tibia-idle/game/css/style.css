@@ -464,3 +464,29 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .toast.death { border-color: var(--red); color: #ff9090; }
 .toast.rare { border-color: #b060ff; color: #dab0ff; }
 @keyframes slidein { from { transform: translateX(30px); opacity: 0; } }
+
+/* menu de contexto (loot pouch / itens) */
+.ctx-menu {
+  position: fixed; z-index: 400; min-width: 178px;
+  background: var(--panel-dark);
+  border: 1px solid var(--border-out);
+  box-shadow: 0 6px 20px rgba(0,0,0,.8);
+  padding: 2px; font-size: 11px; color: var(--text);
+  animation: ctxin .12s ease;
+}
+@keyframes ctxin { from { opacity: 0; transform: translateY(-3px); } }
+.ctx-menu .ctx-title {
+  padding: 5px 8px; color: var(--gold); font-weight: bold;
+  border-bottom: 1px solid var(--border-in); margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ctx-menu .ctx-item {
+  padding: 5px 8px; cursor: pointer; display: flex; gap: 8px;
+  align-items: center; justify-content: space-between; white-space: nowrap;
+}
+.ctx-menu .ctx-item:hover { background: #46402c; color: var(--text-bright); }
+.ctx-menu .ctx-item.danger { color: #ff9090; }
+.ctx-menu .ctx-item.danger:hover { background: #4a2020; }
+.ctx-menu .ctx-item.disabled { opacity: .38; cursor: not-allowed; }
+.ctx-menu .ctx-item.disabled:hover { background: none; color: var(--text); }
+.ctx-menu .ctx-hint { font-size: 9px; opacity: .5; }

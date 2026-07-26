@@ -6,6 +6,7 @@
 const SAVE_KEY = "tibia-idle-save-v1";
 const CHARACTERS_KEY = "tibia-idle-characters-v1";
 const ACTIVE_CHARACTER_KEY = "tibia-idle-active-character-v1";
+const AUTOLOGIN_KEY = "tibia-idle-autologin-v1";
 
 const G = {
   p: null,
@@ -129,12 +130,20 @@ function normalizePlayer(p) {
     autoRetreat: true,
     barMode: "bars",
     lootFilter: "all",
+    refillAmmo: true,
+    refillTarget: 100,
+    refillArrow: "",
+    refillBolt: "",
   }, p.config || {});
   p.config.autoRestock = false;
   p.config.healSpellAt = Math.max(1, Math.min(99, parseInt(p.config.healSpellAt === undefined ? p.config.healAt : p.config.healSpellAt, 10) || 90));
   p.config.healItemAt = Math.max(1, Math.min(99, parseInt(p.config.healItemAt === undefined ? p.config.healAt : p.config.healItemAt, 10) || 60));
   p.config.healAt = Math.max(p.config.healSpellAt, p.config.healItemAt);
   p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
+  p.config.refillTarget = Math.max(1, Math.min(9999, parseInt(p.config.refillTarget, 10) || 100));
+  // paladino sempre tem uma munição padrão selecionada
+  if (p.voc === "paladin" && !p.config.refillArrow && !p.config.refillBolt)
+    p.config.refillArrow = "arrow";
   p.supplies = p.supplies || {};
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
   if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-fluid";
@@ -157,7 +166,18 @@ function normalizePlayer(p) {
 }
 
 function wipeSave() {
+  // remove o personagem atual do roster, não só o save legado
+  const id = G.p ? characterId(G.p) : localStorage.getItem(ACTIVE_CHARACTER_KEY);
+  if (id) {
+    const roster = readRoster();
+    delete roster[id];
+    writeRoster(roster);
+    const rest = Object.keys(roster);
+    if (rest.length) localStorage.setItem(ACTIVE_CHARACTER_KEY, rest[0]);
+    else localStorage.removeItem(ACTIVE_CHARACTER_KEY);
+  }
   localStorage.removeItem(SAVE_KEY);
+  try { sessionStorage.removeItem(AUTOLOGIN_KEY); } catch (e) {}
   location.reload();
 }
 
@@ -248,8 +268,10 @@ function computeOffline(p) {
     addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
   // loot vai para supplies, loot pouch ou bag respeitando slots.
+  // moedas (platinum/crystal) são convertidas direto em gold.
   for (const slug in loot) {
-    if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
+    if (currencyValue(slug)) gold += creditCurrency(p, slug, loot[slug]);
+    else if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
     else if (shouldGoLootPouch(slug)) addLootPouch(p, slug, loot[slug]);
     else if (!addItem(p, slug, loot[slug])) delete loot[slug];
   }
@@ -1114,6 +1136,12 @@ function bindControls() {
     renderAll();
   });
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
+  $("#btn-pouch-sell-all").addEventListener("click", () => {
+    const r = sellAllPouch(p);
+    if (!r.kinds) { toast("Nada para vender na Loot Pouch."); return; }
+    toast(`Loot Pouch vendida por <b>${fmtFull(r.gold)} gp</b>`);
+    renderAll();
+  });
   $("#btn-switch").addEventListener("click", openCharacterModal);
   $("#btn-reset").addEventListener("click", () => {
     if (confirm("Apagar o personagem e recomeçar? Isso não pode ser desfeito."))
@@ -1170,11 +1198,22 @@ function bindControls() {
 
 /* ------------------------------------------------------------ personagens */
 function giveStarterKit(p) {
-  addItem(p, "club", 1);
-  addItem(p, "wooden-shield", 1);
+  if (p.voc === "paladin") {
+    // paladino começa com arco, uma carga de arrow e a spear infinita
+    addItem(p, "bow", 1);
+    addItem(p, "arrow", 1);
+    addItem(p, "spear", 1);
+    addItem(p, "wooden-shield", 1);
+  } else {
+    addItem(p, "club", 1);
+    addItem(p, "wooden-shield", 1);
+  }
   p.supplies["health-potion"] = Math.max(p.supplies["health-potion"] || 0, 5);
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
+  if (p.voc === "paladin" && !p.equip.ammo) {
+    p.equip.ammo = { item: "arrow", count: p.bag["arrow"] || 0 };
+  }
   return p;
 }
 
@@ -1222,8 +1261,13 @@ function openCharacterModal() {
   $("#modal").classList.add("show");
   $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
   $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
-    save();
-    localStorage.setItem(ACTIVE_CHARACTER_KEY, b.dataset.loadChar);
+    const id = b.dataset.loadChar;
+    const roster = readRoster();
+    if (!roster[id] || !roster[id].p) { toast("Personagem não encontrado."); return; }
+    save();                                   // salva o char atual antes de sair
+    localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
+    // marca para entrar direto no personagem escolhido após o reload
+    sessionStorage.setItem(AUTOLOGIN_KEY, id);
     location.reload();
   }));
   $("#char-new-toggle").addEventListener("click", () => {
@@ -1233,7 +1277,8 @@ function openCharacterModal() {
   $("#char-create").addEventListener("click", () => {
     const name = ($("#new-char-name").value || "").trim();
     if (name.length < 2) { toast("Digite um nome válido"); return; }
-    createCharacter(name, $("#new-char-voc").value, $("#new-char-sex").value);
+    const np = createCharacter(name, $("#new-char-voc").value, $("#new-char-sex").value);
+    sessionStorage.setItem(AUTOLOGIN_KEY, characterId(np));
     location.reload();
   });
 }
@@ -1241,6 +1286,23 @@ function openCharacterModal() {
 /* ------------------------------------------------------------ login */
 function initLogin() {
   const saved = load();
+
+  // veio de "Trocar personagem"/"Criar e entrar": entra direto, sem passar
+  // pela tela de criação.
+  let autoId = null;
+  try { autoId = sessionStorage.getItem(AUTOLOGIN_KEY); } catch (e) { autoId = null; }
+  if (autoId) {
+    try { sessionStorage.removeItem(AUTOLOGIN_KEY); } catch (e) {}
+    const roster = readRoster();
+    if (roster[autoId] && roster[autoId].p) {
+      const target = normalizePlayer(roster[autoId].p);
+      target.id = autoId;
+      localStorage.setItem(ACTIVE_CHARACTER_KEY, autoId);
+      startGame(target);
+      return;
+    }
+  }
+
   if (saved) {
     $("#continue-box").style.display = "";
     $("#saved-name").textContent = saved.name;

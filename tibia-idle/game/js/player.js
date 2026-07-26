@@ -80,6 +80,10 @@ function newPlayer(name, voc, sex) {
       barMode: "bars",      // bars | arcs
       lootFilter: "all",    // all | valuable | equip
       missionCollapsed: false,
+      refillAmmo: true,     // paladin: recomprar munição automaticamente
+      refillTarget: 100,    // quantidade alvo por refill
+      refillArrow: "",      // arrow selecionada
+      refillBolt: "",       // bolt selecionada
     },
     missions: {},
     bosses: {},
@@ -175,7 +179,8 @@ function playerDamage(p) {
     return { min: d.min, max: d.max, element: "energy", type: "magic" };
   }
   if (it && it.t === "distance") {
-    const ammo = p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null;
+    // armas de munição infinita (spear) usam só o próprio ataque
+    const ammo = it.inf ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
     const atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
     const d = distanceDamage(effSkill(p, "dist"), atk, 1.0);
     return { min: Math.floor(d.max * 0.2), max: d.max,
@@ -360,9 +365,42 @@ function removeLootRule(p, key, index) {
   list.splice(index, 1);
 }
 
+/* Remove a regra que casa exatamente com o texto/slug informado */
+function removeLootRuleByText(p, key, text) {
+  const rule = normalizeLootRule(text);
+  if (!rule) return false;
+  const list = lootConfigList(p, key);
+  let removed = false;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i] === rule || lootRuleMatches(text, list[i])) { list.splice(i, 1); removed = true; }
+  }
+  return removed;
+}
+
+/* Moedas são convertidas direto em gold, nunca ocupam a pouch */
+const CURRENCY_ITEMS = {
+  "gold-coin": 1,
+  "platinum-coin": 100,
+  "crystal-coin": 10000,
+};
+
+function currencyValue(slug) {
+  return CURRENCY_ITEMS[slug] || 0;
+}
+
+/* Credita moedas no balance do jogador. Retorna o gold gerado. */
+function creditCurrency(p, slug, count) {
+  const unit = currencyValue(slug);
+  if (!unit) return 0;
+  const total = unit * (count || 0);
+  if (total <= 0) return 0;
+  p.gold += total;
+  return total;
+}
+
 function shouldGoLootPouch(slug) {
   const it = GAMEDATA.items[slug];
-  if (!it || slug === "gold-coin" || SUPPLIES[slug]) return false;
+  if (!it || currencyValue(slug) || SUPPLIES[slug]) return false;
   return !it.s;
 }
 
@@ -469,15 +507,16 @@ function autoSell(p) {
   const sellFrom = (container, slug, source) => {
     const it = GAMEDATA.items[slug];
     if (!it || !container[slug]) return;
-    if (isNoSell(p, slug)) return;
-    if (slug === "gold-coin") {
-      p.gold += container[slug];
-      total += container[slug];
+    // moedas sempre viram gold, mesmo marcadas como "não vender"
+    if (currencyValue(slug)) {
+      const g = creditCurrency(p, slug, container[slug]);
+      total += g;
       delete container[slug];
       return;
     }
+    if (isNoSell(p, slug)) return;
     // Ammo/equipamentos não são vendidos automaticamente; boss loot pode ser arrastado para a bag.
-    if (it.s === "ammo" || (source === "lootPouch" && it.s)) return;
+    if (it.s === "ammo" || it.inf || (source === "lootPouch" && it.s)) return;
     // nao vende equipamento util da mochila principal
     if (source === "bag" && it.s) {
       const equipped = p.equip[it.s];

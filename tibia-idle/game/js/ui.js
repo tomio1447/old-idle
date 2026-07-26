@@ -372,6 +372,118 @@ function renderInventory(p) {
   });
 }
 
+/* ---------------------------------------------------------- context menu */
+function hideContextMenu() {
+  const el = document.getElementById("ctx-menu");
+  if (el) el.remove();
+}
+
+/* Menu de opções ancorado no cursor. options: [{label, action, danger, disabled, hint}] */
+function showContextMenu(x, y, title, options) {
+  hideContextMenu();
+  const el = document.createElement("div");
+  el.id = "ctx-menu";
+  el.className = "ctx-menu";
+  el.innerHTML = `<div class="ctx-title">${title}</div>` +
+    options.map((o, i) =>
+      `<div class="ctx-item ${o.danger ? "danger" : ""} ${o.disabled ? "disabled" : ""}"
+        data-ctx="${i}">${o.label}${o.hint ? `<span class="ctx-hint">${o.hint}</span>` : ""}</div>`
+    ).join("");
+  document.body.appendChild(el);
+
+  const r = el.getBoundingClientRect();
+  el.style.left = Math.max(4, Math.min(x, window.innerWidth - r.width - 6)) + "px";
+  el.style.top = Math.max(4, Math.min(y, window.innerHeight - r.height - 6)) + "px";
+
+  el.addEventListener("click", (e) => e.stopPropagation());
+  $$("#ctx-menu [data-ctx]").forEach((node) => {
+    const opt = options[parseInt(node.dataset.ctx, 10)];
+    if (!opt || opt.disabled) return;
+    node.addEventListener("click", () => { hideContextMenu(); opt.action(); });
+  });
+  setTimeout(() => {
+    document.addEventListener("click", hideContextMenu, { once: true });
+    document.addEventListener("contextmenu", hideContextMenu, { once: true });
+    document.addEventListener("keydown", function esc(ev) {
+      if (ev.key === "Escape") { hideContextMenu(); document.removeEventListener("keydown", esc); }
+    });
+  }, 0);
+}
+
+/* Modal com os atributos completos de um item */
+function openItemDetails(slug, count) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return;
+  const rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== 0 && v !== "") rows.push([k, v]); };
+  add("Quantidade", count ? `${fmtFull(count)}x` : null);
+  add("Tipo", it.t || (it.s ? it.s : "loot"));
+  add("Slot", it.s || "—");
+  add("Ataque", it.atk);
+  add("Dano mágico", it.mdmg);
+  add("Defesa", it.def);
+  add("Armadura", it.arm);
+  add("Proteção", it.prot);
+  add("Regen. HP", it.hpreg);
+  add("Regen. Mana", it.mpreg);
+  add("Velocidade", it.spd);
+  add("HP extra", it.hp);
+  add("Mana extra", it.mp);
+  add("Nível mínimo", it.lvl);
+  add("Peso", it.w ? `${it.w} oz` : null);
+  add("Preço de compra", it.buy ? `${fmtFull(it.buy)} gp` : null);
+  add("Preço de venda", it.sell ? `${fmtFull(it.sell)} gp` : null);
+  if (count && it.sell) add("Valor total", `${fmtFull(it.sell * count)} gp`);
+  if (it.inf) add("Especial", "Munição infinita");
+  if (it.th) add("Especial", "Duas mãos");
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Detalhes do item
+      <span style="flex:1"></span><button class="sm" id="details-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="row mb8" style="gap:10px;align-items:center">
+        <div class="inv-item" style="cursor:default">${itemImg(slug)}</div>
+        <div>
+          <div style="color:#d4af37;font-weight:bold">${it.n}</div>
+          <div class="tiny dim">${slug}</div>
+        </div>
+      </div>
+      <div class="list" style="max-height:300px">
+        ${rows.map(([k, v]) => `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}
+      </div>
+    </div>`;
+  $("#modal").classList.add("show");
+  $("#details-close").addEventListener("click", () => $("#modal").classList.remove("show"));
+}
+
+/* Vende um item específico do Loot Pouch */
+function sellPouchItem(p, slug) {
+  const it = GAMEDATA.items[slug];
+  const count = p.lootPouch[slug] || 0;
+  if (!it || count <= 0) return 0;
+  const value = (it.sell || 0) * count;
+  if (value <= 0) { toast("Esse item não possui valor de venda."); return 0; }
+  p.gold += value;
+  addLog("sell", `Vendeu ${count}x ${it.n} do Loot Pouch por <span class="gold-txt">${fmtFull(value)} gp</span>`);
+  delete p.lootPouch[slug];
+  return value;
+}
+
+/* Vende tudo que estiver liberado dentro do Loot Pouch.
+   Só respeita a marca "Não vender" — o resto (inclusive equipamento de boss) é vendido. */
+function sellAllPouch(p) {
+  let total = 0, kinds = 0;
+  for (const slug of Object.keys(p.lootPouch || {})) {
+    const it = GAMEDATA.items[slug];
+    if (!it || isNoSell(p, slug)) continue;      // respeita "Não vender"
+    if ((it.sell || 0) <= 0) continue;
+    total += sellPouchItem(p, slug);
+    kinds++;
+  }
+  return { gold: total, kinds: kinds };
+}
+
 function renderLootPouch(p) {
   const box = $("#lootpouch");
   if (!box) return;
@@ -380,38 +492,106 @@ function renderLootPouch(p) {
     .filter((slug) => (p.lootPouch[slug] || 0) > 0 && GAMEDATA.items[slug])
     .sort((a, b) => (GAMEDATA.items[b].sell || 0) * p.lootPouch[b] -
                     (GAMEDATA.items[a].sell || 0) * p.lootPouch[a]);
+  const sellBtn = $("#btn-pouch-sell-all");
+  if (sellBtn) sellBtn.disabled = !entries.some((s) =>
+    !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0);
   if (!entries.length) {
     box.innerHTML = `<div class="dim small center" style="grid-column:1/-1;padding:10px">Loot Pouch vazia</div>`;
     return;
   }
   box.innerHTML = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
-      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0 && !GAMEDATA.items[s].s).length} vendável · arraste para a bag
+      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · clique no item para as opções
     </div>` + entries.map((slug) =>
     `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""}" data-pouch-item="${slug}" draggable="true">
       ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
     </div>`).join("");
+
   $$("#lootpouch [data-pouch-item]").forEach((el) => {
     const slug = el.dataset.pouchItem;
-    const locked = isNoSell(p, slug);
     const it = GAMEDATA.items[slug];
-    el.addEventListener("mouseenter", () => showTip(itemTip(slug,
-      `${p.lootPouch[slug]}x · Arraste para a bag${locked ? " · Não vender" : " · Clique para vender"}`)));
+    el.addEventListener("mouseenter", () => {
+      const noSell = isNoSell(p, slug), noCollect = isNoCollect(p, slug);
+      const flags = [noSell ? "Não vender" : "", noCollect ? "Não coletar" : ""].filter(Boolean).join(" · ");
+      showTip(itemTip(slug, `${p.lootPouch[slug]}x · Clique para opções${flags ? " · " + flags : ""}`));
+    });
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("dragstart", (e) => {
+      hideContextMenu();
       e.dataTransfer.setData("text/loot-pouch", slug);
       e.dataTransfer.effectAllowed = "move";
     });
-    el.addEventListener("click", () => {
-      if (locked) { toast("Item marcado como NÃO VENDER."); return; }
-      const value = (it.sell || 0) * p.lootPouch[slug];
-      if (value <= 0) { toast("Esse item não possui valor de venda."); return; }
-      p.gold += value;
-      addLog("sell", `Vendeu ${p.lootPouch[slug]}x ${it.n} do Loot Pouch por <span class="gold-txt">${fmtFull(value)} gp</span>`);
-      delete p.lootPouch[slug];
+    const openMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       hideTip();
-      renderAll();
-    });
+      openPouchItemMenu(p, slug, e.clientX, e.clientY);
+    };
+    el.addEventListener("click", openMenu);
+    el.addEventListener("contextmenu", openMenu);
   });
+}
+
+/* Menu de opções de um item do Loot Pouch */
+function openPouchItemMenu(p, slug, x, y) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return;
+  const count = p.lootPouch[slug] || 0;
+  const noSell = isNoSell(p, slug);
+  const noCollect = isNoCollect(p, slug);
+  const value = (it.sell || 0) * count;
+
+  showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, [
+    {
+      label: "Detalhes",
+      action: () => openItemDetails(slug, count),
+    },
+    {
+      label: "Mover para backpack",
+      action: () => {
+        if (!addItem(p, slug, count)) { toast("Mochila cheia."); return; }
+        removeLootPouch(p, slug, count);
+        addLog("info", `Moveu <b>${it.n}</b> do Loot Pouch para a mochila.`);
+        renderAll();
+      },
+    },
+    {
+      label: noCollect ? "Voltar a coletar" : "Não coletar",
+      hint: "autoloot",
+      action: () => {
+        if (noCollect) removeLootRuleByText(p, "noCollect", slug);
+        else addLootRule(p, "noCollect", slug);
+        toast(noCollect ? `<b>${it.n}</b> voltou para o autoloot.`
+                        : `<b>${it.n}</b> será ignorado pelo autoloot.`);
+        renderAll();
+      },
+    },
+    {
+      label: noSell ? "Voltar a vender" : "Não vender",
+      hint: "sell all",
+      action: () => {
+        if (noSell) removeLootRuleByText(p, "noSell", slug);
+        else addLootRule(p, "noSell", slug);
+        toast(noSell ? `<b>${it.n}</b> voltou para o sell all.`
+                     : `<b>${it.n}</b> será ignorado pelo sell all.`);
+        renderAll();
+      },
+    },
+    {
+      label: `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
+      disabled: value <= 0,
+      action: () => { if (sellPouchItem(p, slug) > 0) renderAll(); },
+    },
+    {
+      label: "Destruir",
+      danger: true,
+      action: () => {
+        if (!confirm(`Destruir ${count}x ${it.n}? Isso não pode ser desfeito.`)) return;
+        delete p.lootPouch[slug];
+        addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
+        renderAll();
+      },
+    },
+  ]);
 }
 
 function openLootPouchConfigModal() {
@@ -663,6 +843,137 @@ function renderHelper(p) {
       renderHelper(p);
     }));
   }
+  renderRefill(p);
+}
+
+/* ---------------------------------------------------------- refill (paladin) */
+const REFILL_AMMO = {
+  arrow: ["arrow", "poison-arrow", "burst-arrow"],
+  bolt: ["bolt", "power-bolt", "infernal-bolt"],
+};
+
+function isPaladin(p) { return p && p.voc === "paladin"; }
+
+/* Compra munição até o alvo configurado. Retorna {bought, cost}. */
+function refillAmmo(p, slug, target) {
+  const it = GAMEDATA.items[slug];
+  if (!it || it.s !== "ammo") return { bought: 0, cost: 0 };
+  const price = ammoPrice(slug);
+  const have = p.bag[slug] || 0;
+  let need = Math.max(0, (target || 0) - have);
+  if (need <= 0 || price <= 0) return { bought: 0, cost: 0 };
+  const afford = Math.floor(p.gold / price);
+  need = Math.min(need, afford);
+  if (need <= 0) return { bought: 0, cost: 0 };
+  const cost = need * price;
+  if (!spendGold(p, cost)) return { bought: 0, cost: 0 };
+  if (!addItem(p, slug, need)) { p.gold += cost; return { bought: 0, cost: 0 }; }
+  return { bought: need, cost: cost };
+}
+
+function renderRefill(p) {
+  const tab = $("#tab-refill");
+  const el = $("#helper-refill");
+  if (!el) return;
+  // a aba só existe para paladinos
+  if (tab) tab.style.display = isPaladin(p) ? "" : "none";
+  if (!isPaladin(p)) {
+    const panel = document.querySelector('[data-panel-group="mid"][data-panel="refill"]');
+    if (panel && panel.style.display !== "none") {
+      panel.style.display = "none";
+      const heal = document.querySelector('[data-panel-group="mid"][data-panel="heal"]');
+      const healTab = document.querySelector('.tab[data-group="mid"][data-panel="heal"]');
+      if (heal) heal.style.display = "";
+      if (healTab) { $$('.tab[data-group="mid"]').forEach((t) => t.classList.remove("active")); healTab.classList.add("active"); }
+    }
+    el.innerHTML = "";
+    return;
+  }
+
+  const cfg = p.config;
+  const group = (title, key) => {
+    const list = REFILL_AMMO[key];
+    const selected = cfg[key === "arrow" ? "refillArrow" : "refillBolt"];
+    return `
+      <div class="small dim mt8 mb4">${title}</div>
+      <div class="list" style="max-height:150px">
+        ${list.map((slug) => {
+          const it = GAMEDATA.items[slug];
+          if (!it) return "";
+          const sel = selected === slug;
+          const have = p.bag[slug] || 0;
+          return `<div class="helper-supply-row ${sel ? "selected" : ""}">
+            <img src="assets/item/${slug}.png" alt="${it.n}">
+            <div style="flex:1;min-width:0">
+              <div class="small">${it.n}</div>
+              <div class="tiny dim">
+                <span class="gold-txt">${fmtFull(ammoPrice(slug))} gp</span>
+                · <span class="charge-highlight">TEM ${fmtFull(have)}</span>
+                ${it.atk ? `· atk ${it.atk}` : ""}
+              </div>
+            </div>
+            <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}">
+              ${sel ? "USANDO" : "USAR"}</button>
+          </div>`;
+        }).join("")}
+      </div>`;
+  };
+
+  const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  const infinite = wp && wp.inf;
+
+  el.innerHTML = `
+    <label class="toggle"><input type="checkbox" id="refill-on" ${cfg.refillAmmo ? "checked" : ""}>
+      Refill automático de munição</label>
+    <div class="row mt8" style="gap:8px;align-items:flex-end">
+      <div style="flex:1">
+        <label class="small dim">Comprar até (unidades)</label>
+        <input id="refill-target" type="number" min="1" max="9999" value="${cfg.refillTarget || 100}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
+      <button class="sm primary" id="refill-now">Refill agora</button>
+    </div>
+    <div class="tiny dim mt4">
+      Ao ficar sem munição durante a caçada, o refill compra automaticamente até a quantidade definida.
+      ${infinite ? `<b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
+    </div>
+    ${group("Arrows", "arrow")}
+    ${group("Bolts", "bolt")}`;
+
+  $("#refill-on").addEventListener("change", (e) => {
+    p.config.refillAmmo = e.target.checked;
+    toast(p.config.refillAmmo ? "Refill automático ativado." : "Refill automático desativado.");
+  });
+  const tgt = $("#refill-target");
+  tgt.addEventListener("change", () => {
+    p.config.refillTarget = Math.max(1, Math.min(9999, parseInt(tgt.value, 10) || 100));
+    tgt.value = p.config.refillTarget;
+  });
+  $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
+    const [key, slug] = b.dataset.refillPick.split(":");
+    const field = key === "arrow" ? "refillArrow" : "refillBolt";
+    p.config[field] = p.config[field] === slug ? "" : slug;
+    // seleciona a munição escolhida como ammo ativa
+    if (p.config[field]) {
+      p.equip.ammo = { item: slug, count: p.bag[slug] || 0 };
+      toast(`Munição selecionada: <b>${GAMEDATA.items[slug].n}</b>`);
+    }
+    renderAll();
+  }));
+  $("#refill-now").addEventListener("click", () => {
+    const target = p.config.refillTarget || 100;
+    let bought = 0, cost = 0;
+    for (const field of ["refillArrow", "refillBolt"]) {
+      const slug = p.config[field];
+      if (!slug) continue;
+      const r = refillAmmo(p, slug, target);
+      bought += r.bought; cost += r.cost;
+    }
+    if (!bought) { toast("Nada para comprar (sem seleção, já cheio ou sem gold)."); return; }
+    addLog("buy", `Refill: comprou ${bought}x munição por <span class="gold-txt">${fmtFull(cost)} gp</span>`);
+    toast(`Refill: <b>${bought}</b> unidades por ${fmtFull(cost)} gp`);
+    renderAll();
+  });
 }
 
 function renderTopbar(p) {

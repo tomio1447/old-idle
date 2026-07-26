@@ -373,11 +373,30 @@ function ammoPrice(slug) {
 
 /* Consome 1 carga de ammo. Ao zerar, compra a próxima carga no uso. */
 function consumeAmmoCharge(c, p) {
+  // armas com munição infinita (spear) nunca gastam carga
+  const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  if (wp && wp.inf) return true;
   const ammo = p.equip.ammo;
   if (!ammo || !ammo.item) return true;
   const slug = ammo.item;
   const it = GAMEDATA.items[slug];
   if (!it || it.s !== "ammo") return true;
+
+  if ((p.bag[slug] || 0) <= 0) {
+    // refill automático: compra o lote configurado de uma vez
+    if (p.config && p.config.refillAmmo && typeof refillAmmo === "function") {
+      const r = refillAmmo(p, slug, p.config.refillTarget || 100);
+      if (r.bought > 0) {
+        if (c && c.stats) {
+          c.stats.supplyCost += r.cost;
+          c.stats.supplyBought = c.stats.supplyBought || {};
+          c.stats.supplyBought[slug] = (c.stats.supplyBought[slug] || 0) + r.bought;
+        }
+        if (c && c.events)
+          c.events.push({ t: "ammo-buy", name: `${r.bought}x ${it.n}`, cost: r.cost });
+      }
+    }
+  }
 
   if ((p.bag[slug] || 0) <= 0) {
     const cost = ammoPrice(slug);
@@ -727,6 +746,13 @@ function rollLoot(c, p, mob) {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
+    } else if (currencyValue(l.item)) {
+      // platinum/crystal coin: vendidos na hora e somados ao balance
+      const g = creditCurrency(p, l.item, count);
+      c.stats.gold += g;
+      c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
+      got.push({ item: l.item, count: count });
+      continue;
     } else if (mob.boss) {
       addLootPouch(p, l.item, count);
     } else if (SUPPLIES[l.item]) {

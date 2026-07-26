@@ -124,6 +124,7 @@
         <div class="panel-title">
           <span>Loot Pouch</span>
           <span style="flex:1"></span>
+          <button class="sm primary" id="btn-pouch-sell-all">Sell all</button>
           <button class="sm" id="btn-lootpouch-config">Config</button>
         </div>
         <div class="panel-body">
@@ -163,6 +164,7 @@
           <div class="tab active" data-group="mid" data-panel="heal">Helper: Cura</div>
           <div class="tab" data-group="mid" data-panel="atk">Ataque</div>
           <div class="tab" data-group="mid" data-panel="shooter">Shooter</div>
+          <div class="tab" data-group="mid" data-panel="refill" id="tab-refill" style="display:none">Refill</div>
           <div class="tab" data-group="mid" data-panel="cfg">Configurar</div>
         </div>
 
@@ -176,6 +178,10 @@
 
         <div class="panel-body" data-panel-group="mid" data-panel="shooter" style="display:none">
           <div id="helper-shooter"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="refill" style="display:none">
+          <div id="helper-refill"></div>
         </div>
 
         <div class="panel-body" data-panel-group="mid" data-panel="cfg" style="display:none">
