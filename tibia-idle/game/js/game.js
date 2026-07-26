@@ -108,6 +108,8 @@ function load() {
 function normalizePlayer(p) {
   p.config = Object.assign({
     healAt: 90,
+    healSpellAt: 90,
+    healItemAt: 60,
     manaAt: 50,
     healSpell: "",
     healSupply: "",
@@ -129,6 +131,9 @@ function normalizePlayer(p) {
     lootFilter: "all",
   }, p.config || {});
   p.config.autoRestock = false;
+  p.config.healSpellAt = Math.max(1, Math.min(99, parseInt(p.config.healSpellAt === undefined ? p.config.healAt : p.config.healSpellAt, 10) || 90));
+  p.config.healItemAt = Math.max(1, Math.min(99, parseInt(p.config.healItemAt === undefined ? p.config.healAt : p.config.healItemAt, 10) || 60));
+  p.config.healAt = Math.max(p.config.healSpellAt, p.config.healItemAt);
   p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
   p.supplies = p.supplies || {};
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
@@ -1116,7 +1121,10 @@ function bindControls() {
   });
   $("#heal-at").addEventListener("input", (e) => {
     p.config.healAt = parseInt(e.target.value, 10);
+    p.config.healSpellAt = p.config.healAt;
+    p.config.healItemAt = p.config.healAt;
     $("#heal-at-val").textContent = p.config.healAt + "%";
+    renderHelper(p);
   });
   $("#cfg-runes").addEventListener("change", (e) => {
     p.config.useRunes = e.target.checked;

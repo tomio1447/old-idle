@@ -549,40 +549,44 @@ function tryUseRune(c, p, target, now) {
 function tryHeal(c, p, now) {
   const max = maxStats(p);
   const pct = (p.hp / max.hp) * 100;
-  if (pct > p.config.healAt) return false;
+  const spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
+  const itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
+  if (pct > Math.max(spellAt, itemAt)) return false;
   if (c.healCd > now) return false;
 
-  // 1. spell de cura: usa a spell selecionada no Helper, se houver.
-  const heals = [];
-  const selectedHealSpell = p.config.healSpell;
-  if (selectedHealSpell) {
-    const s = SPELLS[selectedHealSpell];
-    if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
-        p.level >= s.lvl && p.mp >= s.mana) heals.push([selectedHealSpell, s]);
-  } else {
-    for (const id in SPELLS) {
-      const s = SPELLS[id];
-      if (s.type !== "heal") continue;
-      if (s.vocs.indexOf(p.voc) === -1) continue;
-      if (p.level < s.lvl || p.mp < s.mana) continue;
-      heals.push([id, s]);
+  // 1. magia de cura: usa apenas se o HP estiver no limite configurado para spell.
+  if (pct <= spellAt) {
+    const heals = [];
+    const selectedHealSpell = p.config.healSpell;
+    if (selectedHealSpell) {
+      const s = SPELLS[selectedHealSpell];
+      if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+          p.level >= s.lvl && p.mp >= s.mana) heals.push([selectedHealSpell, s]);
+    } else {
+      for (const id in SPELLS) {
+        const s = SPELLS[id];
+        if (s.type !== "heal") continue;
+        if (s.vocs.indexOf(p.voc) === -1) continue;
+        if (p.level < s.lvl || p.mp < s.mana) continue;
+        heals.push([id, s]);
+      }
+    }
+    if (heals.length) {
+      if (!selectedHealSpell) heals.sort((a, b) => b[1].power - a[1].power);
+      const [, s] = heals[0];
+      const ml = effMagic(p);
+      const amount = Math.floor((p.level / 5 + ml * 2.0) * s.power *
+                                (0.85 + Math.random() * 0.3));
+      p.mp -= s.mana;
+      addManaSpent(p, combatManaSkillGain(c, s.mana));
+      p.hp = Math.min(max.hp, p.hp + amount);
+      c.healCd = now + 1000;
+      c.events.push({ t: "heal", amount: amount, spell: s.name });
+      return true;
     }
   }
-  if (heals.length) {
-    if (!selectedHealSpell) heals.sort((a, b) => b[1].power - a[1].power);
-    const [, s] = heals[0];
-    const ml = effMagic(p);
-    const amount = Math.floor((p.level / 5 + ml * 2.0) * s.power *
-                              (0.85 + Math.random() * 0.3));
-    p.mp -= s.mana;
-    addManaSpent(p, combatManaSkillGain(c, s.mana));
-    p.hp = Math.min(max.hp, p.hp + amount);
-    c.healCd = now + 1000;
-    c.events.push({ t: "heal", amount: amount, spell: s.name });
-    return true;
-  }
-  // 2. runa/potion de cura: usa o item selecionado no Helper, se houver.
-  if (p.config.useRunes) {
+  // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item.
+  if (p.config.useRunes && pct <= itemAt) {
     let best = null;
     const selectedHealSupply = p.config.healSupply;
     if (selectedHealSupply) {

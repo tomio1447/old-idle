@@ -531,8 +531,8 @@ function renderHelper(p) {
     };
     healEl.innerHTML = `
       <div class="mb8">
-        <label class="small dim">Curar HP abaixo de (%)</label>
-        <input id="helper-heal-at" type="number" min="1" max="99" value="${p.config.healAt}"
+        <label class="small dim">Usar magia de cura abaixo de (%)</label>
+        <input id="helper-heal-spell-at" type="number" min="1" max="99" value="${p.config.healSpellAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="small dim mt8 mb4">Magias de cura</div>
@@ -548,6 +548,11 @@ function renderHelper(p) {
             ${selected ? "Selecionada" : "Selecionar Spell"}</button>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
+      <div class="mt8">
+        <label class="small dim">Usar item de cura abaixo de (%)</label>
+        <input id="helper-heal-item-at" type="number" min="1" max="99" value="${p.config.healItemAt}"
+          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
       <div class="small dim mt8 mb4">Itens de HP</div>
       <div class="list" style="max-height:132px">${healSup.map(supplyRow).join("")}</div>
       <div class="mt8">
@@ -557,14 +562,19 @@ function renderHelper(p) {
       </div>
       <div class="small dim mt8 mb4">Mana Fluid</div>
       <div class="list" style="max-height:70px">${["mana-fluid"].map(supplyRow).join("")}</div>`;
-    ["helper-heal-at", "helper-mana-at"].forEach((id) => {
+    ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
       input.addEventListener("change", () => {
         const val = Math.max(1, Math.min(99, parseInt(input.value, 10) || 1));
         input.value = val;
-        if (id === "helper-heal-at") { p.config.healAt = val; $("#heal-at").value = val; $("#heal-at-val").textContent = val + "%"; }
+        if (id === "helper-heal-spell-at") p.config.healSpellAt = val;
+        else if (id === "helper-heal-item-at") p.config.healItemAt = val;
         else p.config.manaAt = val;
+        p.config.healAt = Math.max(p.config.healSpellAt || 1, p.config.healItemAt || 1);
+        const healAt = $("#heal-at"), healVal = $("#heal-at-val");
+        if (healAt) healAt.value = p.config.healAt;
+        if (healVal) healVal.textContent = p.config.healAt + "%";
       });
     });
     $$("#helper-heal [data-heal-spell]").forEach((b) => b.addEventListener("click", () => {

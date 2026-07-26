@@ -58,7 +58,9 @@ function newPlayer(name, voc, sex) {
     created: Date.now(),
     // configuracao do auto-hunt
     config: {
-      healAt: 90,           // % de vida para curar
+      healAt: 90,           // legado: % geral de cura
+      healSpellAt: 90,      // % de HP para usar magia de cura
+      healItemAt: 60,       // % de HP para usar item/runa/potion de cura
       manaAt: 50,           // % de mana para usar mana fluids
       healSpell: "",        // magia de cura selecionada pelo Helper
       healSupply: "",       // runa/potion de cura selecionada pelo Helper
