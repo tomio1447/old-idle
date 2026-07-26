@@ -55,6 +55,7 @@ function normalizePlayer(p) {
     autoEquip: true,
     spellAttack: true,
     autoRetreat: true,
+    barMode: "bars",
     lootFilter: "all",
   }, p.config || {});
   p.config.autoRestock = false;
@@ -407,7 +408,8 @@ function drainAcademyEvents() {
     const kind = e.type || e.t;
     switch (kind) {
       case "hit":
-        r.addFloater(0.68, 0.42, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
+        if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmt(e.dmg), "#d8d8d8", e.dmg > 80);
+        r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
         r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
         // O Treiner revida para gerar shielding: explosão de fogo visual no player.
         r.addEffect(0.28, 0.60, "fire-area");
@@ -554,6 +556,7 @@ function renderHuntInfo() {
       <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
       <div class="stat-row"><span class="k">Skill</span><span class="v">${st.skill ? (SKILL_NAMES[st.skill] || st.skill) : "—"}</span></div>
       <div class="stat-row"><span class="k">Hits</span><span class="v">${fmtFull(t.stats.hits)}</span></div>
+      <div class="stat-row"><span class="k">Dano causado</span><span class="v">${fmtFull(t.stats.damage || 0)}</span></div>
       <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
       <button class="primary full mt8" onclick="openAcademyConjureModal(true)">Conjure</button>`;
     return;
@@ -698,6 +701,9 @@ function bindControls() {
   $("#cfg-spell").addEventListener("change", (e) => {
     p.config.spellAttack = e.target.checked;
   });
+  $("#bar-mode").addEventListener("change", (e) => {
+    p.config.barMode = e.target.value;
+  });
   $("#loot-filter").addEventListener("change", (e) => {
     p.config.lootFilter = e.target.value;
   });
@@ -721,6 +727,7 @@ function bindControls() {
   $("#cfg-sell").checked = p.config.autoSell;
   $("#cfg-equip").checked = p.config.autoEquip;
   $("#cfg-spell").checked = p.config.spellAttack;
+  $("#bar-mode").value = p.config.barMode || "bars";
   $("#loot-filter").value = p.config.lootFilter;
 }
 

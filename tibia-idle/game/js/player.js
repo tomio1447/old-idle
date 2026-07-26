@@ -46,6 +46,7 @@ function newPlayer(name, voc, sex) {
       autoEquip: true,
       spellAttack: true,
       autoRetreat: true,    // recua em vez de morrer quando acabam os supplies
+      barMode: "bars",      // bars | arcs
       lootFilter: "all",    // all | valuable | equip
     },
     log: [],

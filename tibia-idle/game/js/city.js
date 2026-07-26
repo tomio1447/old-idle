@@ -285,7 +285,7 @@ function newAcademyTraining(p) {
   return {
     startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
     skill: st.skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
-    stats: { hits: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
+    stats: { hits: 0, damage: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
              supplyUsed: {}, supplyBought: {}, supplyCost: 0 },
     events: [],
   };
@@ -366,6 +366,7 @@ function academyTrainingTick(t, p, dt, now) {
   }
 
   let skillUp = false;
+  let dmg = 0;
   if (st.skill === "magic") {
     if (p.mp < ACADEMY_MAGE_HIT_MANA) {
       if (now - t.lastMsg > 3000) {
@@ -387,17 +388,25 @@ function academyTrainingTick(t, p, dt, now) {
       t.hitCd = 1000;
       return;
     }
+    const d = playerDamage(p);
+    dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.85));
     skillUp = addSkillTries(p, "dist", ACADEMY_SKILL_MULT);
   } else {
+    if (p.voc === "knight") {
+      const d = playerDamage(p);
+      dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.9));
+    }
     skillUp = addSkillTries(p, st.skill, ACADEMY_SKILL_MULT);
   }
 
   const shieldUp = addSkillTries(p, "shield", ACADEMY_SKILL_MULT);
   t.hits++;
   t.stats.hits++;
+  t.stats.damage += dmg;
   if (skillUp) t.stats.skillUps++;
   if (shieldUp) t.stats.shieldUps++;
-  t.events.push({ type: "hit", skill: st.skill, skillUp: skillUp, shieldUp: shieldUp });
+  t.events.push({ type: "hit", skill: st.skill, dmg: dmg,
+                  skillUp: skillUp, shieldUp: shieldUp });
   t.hitCd = academyAttackDelay(t);
 }
 

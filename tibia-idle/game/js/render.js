@@ -83,6 +83,59 @@ Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color) {
   if (this.projectiles.length > 30) this.projectiles.shift();
 };
 
+function drawNameText(ctx, x, y, name) {
+  ctx.font = "bold 10px Verdana";
+  ctx.textAlign = "center";
+  const tw = ctx.measureText(name).width + 10;
+  ctx.fillStyle = "rgba(0,0,0,.78)";
+  ctx.fillRect(x - tw / 2, y - 10, tw, 13);
+  ctx.strokeStyle = "rgba(120,110,90,.55)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - tw / 2, y - 10, tw, 13);
+  ctx.fillStyle = "#f0e8c8";
+  ctx.fillText(name, x, y);
+}
+
+function drawNameBars(ctx, x, y, name, hpPct, mpPct) {
+  drawNameText(ctx, x, y, name);
+  const w = 74, h = 4;
+  const bx = x - w / 2;
+  const hpY = y + 6, mpY = y + 12;
+  ctx.fillStyle = "#050505";
+  ctx.fillRect(bx - 1, hpY - 1, w + 2, h + 2);
+  ctx.fillRect(bx - 1, mpY - 1, w + 2, h + 2);
+  ctx.fillStyle = hpPct > 0.5 ? "#37d747" : hpPct > 0.25 ? "#e8c84a" : "#e04040";
+  ctx.fillRect(bx, hpY, w * Math.max(0, Math.min(1, hpPct)), h);
+  ctx.fillStyle = "#3c66ff";
+  ctx.fillRect(bx, mpY, w * Math.max(0, Math.min(1, mpPct)), h);
+}
+
+function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
+  drawNameText(ctx, x, y - radius - 18, name);
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineWidth = 4;
+  // HP à esquerda
+  ctx.strokeStyle = "rgba(0,0,0,.78)";
+  ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * 0.72, Math.PI * 1.28); ctx.stroke();
+  ctx.strokeStyle = hpPct > 0.5 ? "#37d747" : hpPct > 0.25 ? "#e8c84a" : "#e04040";
+  ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * 1.28, Math.PI * (1.28 - 0.56 * Math.max(0, Math.min(1, hpPct))), true); ctx.stroke();
+  // Mana à direita
+  ctx.strokeStyle = "rgba(0,0,0,.78)";
+  ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * -0.28, Math.PI * 0.28); ctx.stroke();
+  ctx.strokeStyle = "#3c66ff";
+  ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * -0.28, Math.PI * (-0.28 + 0.56 * Math.max(0, Math.min(1, mpPct)))); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
+  const max = maxStats(player);
+  const hpPct = max.hp ? player.hp / max.hp : 0;
+  const mpPct = max.mp ? player.mp / max.mp : 0;
+  if (mode === "arcs") drawStatusArcs(ctx, x, centerY, player.name, hpPct, mpPct, radius || 34);
+  else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct);
+}
+
 Renderer.prototype.addCorpse = function (x, y, slug) {
   this.corpses.push({ x: x, y: y, slug: slug, life: 2000 });
   if (this.corpses.length > 8) this.corpses.shift();
@@ -166,9 +219,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   if (pimg && pimg.complete && pimg.naturalWidth) {
     const sc = 2.5;
     const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+    const top = py - h / 2 + Math.sin(Date.now() / 340) * 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
-    ctx.drawImage(pimg, px - w / 2, py - h / 2 + Math.sin(Date.now() / 340) * 2, w, h);
+    ctx.drawImage(pimg, px - w / 2, top, w, h);
+    drawPlayerStatus(ctx, px, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
   }
 
   const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
@@ -206,7 +261,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "#c8c0a8";
   const sk = training.skill ? (SKILL_NAMES[training.skill] || training.skill) : "—";
   ctx.fillText("Skill: " + sk, 22, H - 38);
-  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ticks ativo", 22, H - 22);
+  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Dano: " + fmtFull(training.stats.damage || 0) + " · Shielding ativo", 22, H - 22);
 
   // efeitos/números flutuantes
   for (let i = this.effects.length - 1; i >= 0; i--) {
@@ -315,8 +370,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.filter = "brightness(2.2) saturate(0.4)";
       this.playerFlash -= dt;
     }
-    ctx.drawImage(pimg, px * W - w / 2 + atkPush, py * H - h / 2 + bob, w, h);
+    const drawX = px * W - w / 2 + atkPush;
+    const drawY = py * H - h / 2 + bob;
+    ctx.drawImage(pimg, drawX, drawY, w, h);
     if (this.playerFlash > 0) ctx.restore();
+    drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
   }
 
   // --- monstros
