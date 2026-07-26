@@ -81,6 +81,116 @@ Renderer.prototype.addCorpse = function (x, y, slug) {
   if (this.corpses.length > 8) this.corpses.shift();
 };
 
+Renderer.prototype.drawAcademy = function (training, player, dt) {
+  const ctx = this.ctx;
+  const W = this.c.width, H = this.c.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const gr = Sprites.ground("temple") || Sprites.ground("city");
+  if (gr && gr.complete && gr.naturalWidth) {
+    const s = 2;
+    const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
+    for (let y = 0; y < H; y += th)
+      for (let x = 0; x < W; x += tw)
+        ctx.drawImage(gr, x, y, tw, th);
+  } else {
+    ctx.fillStyle = "#1d2018";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(40,80,40,.32)";
+  ctx.fillRect(0, H * 0.68, W, H * 0.32);
+
+  ctx.textAlign = "left";
+  ctx.font = "bold 14px Verdana";
+  ctx.fillStyle = "#9ce84a";
+  ctx.fillText("Academia Safezone", 12, 24);
+  ctx.font = "10px Verdana";
+  ctx.fillStyle = "#c8c0a8";
+  ctx.fillText("Treiner padrão · +200% ticks/hit · conjure disponível", 12, 40);
+
+  const outfitName = this.outfitFor(player);
+  const pimg = Sprites.outfit(outfitName, "e");
+  const px = W * 0.28, py = H * 0.64;
+  if (pimg && pimg.complete && pimg.naturalWidth) {
+    const sc = 2.5;
+    const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    ctx.drawImage(pimg, px - w / 2, py - h / 2 + Math.sin(Date.now() / 340) * 2, w, h);
+  }
+
+  const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
+  const tx = W * 0.70, ty = H * 0.62;
+  if (trainer && trainer.complete && trainer.naturalWidth) {
+    const sc = 2.4;
+    const w = trainer.naturalWidth * sc, h = trainer.naturalHeight * sc;
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.beginPath(); ctx.ellipse(tx, ty + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    ctx.drawImage(trainer, tx - w / 2, ty - h / 2, w, h);
+  } else {
+    ctx.fillStyle = "#7b5a2a";
+    ctx.fillRect(tx - 18, ty - 52, 36, 70);
+  }
+
+  ctx.textAlign = "center";
+  ctx.font = "bold 12px Verdana";
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  ctx.fillText("Treiner", tx + 1, ty - 64);
+  ctx.fillStyle = "#ffe680";
+  ctx.fillText("Treiner", tx, ty - 65);
+
+  // barra do Treiner: nunca morre
+  ctx.fillStyle = "#000";
+  ctx.fillRect(tx - 42, ty - 55, 84, 7);
+  ctx.fillStyle = "#4ec84e";
+  ctx.fillRect(tx - 41, ty - 54, 82, 5);
+
+  ctx.textAlign = "left";
+  ctx.font = "11px Verdana";
+  ctx.fillStyle = "rgba(0,0,0,.72)";
+  ctx.fillRect(12, H - 58, 250, 44);
+  ctx.strokeStyle = "rgba(156,232,74,.45)";
+  ctx.strokeRect(12, H - 58, 250, 44);
+  ctx.fillStyle = "#c8c0a8";
+  const sk = training.skill ? (SKILL_NAMES[training.skill] || training.skill) : "—";
+  ctx.fillText("Skill: " + sk, 22, H - 38);
+  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ticks ativo", 22, H - 22);
+
+  // efeitos/números flutuantes
+  for (let i = this.effects.length - 1; i >= 0; i--) {
+    const e = this.effects[i];
+    e.t += dt;
+    if (e.t >= e.dur) { this.effects.splice(i, 1); continue; }
+    const img = Sprites.fx(e.name);
+    if (!img || !img.complete || !img.naturalWidth) continue;
+    const fw = img.naturalWidth / e.frames;
+    const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
+    const sc = 2;
+    ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
+                  e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
+                  fw * sc, img.naturalHeight * sc);
+  }
+  ctx.textAlign = "center";
+  for (let i = this.floaters.length - 1; i >= 0; i--) {
+    const f = this.floaters[i];
+    f.life -= dt;
+    if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
+    const p = 1 - f.life / f.max;
+    const alpha = f.life < 300 ? f.life / 300 : 1;
+    ctx.globalAlpha = alpha;
+    ctx.font = (f.big ? "bold 15px" : "bold 12px") + " Verdana";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    ctx.globalAlpha = 1;
+  }
+};
+
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;

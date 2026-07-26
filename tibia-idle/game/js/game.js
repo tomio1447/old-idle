@@ -8,6 +8,7 @@ const SAVE_KEY = "tibia-idle-save-v1";
 const G = {
   p: null,
   combat: null,
+  training: null,
   renderer: null,
   last: 0,
   autoScroll: true,
@@ -203,6 +204,7 @@ function showOfflineModal(r) {
 function startHunt(id) {
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  if (G.training) stopAcademy(false);
   G.inCity = false;
   G.p.hunt = id;
   G.combat = newCombat(G.p, id);
@@ -223,10 +225,40 @@ function stopHunt() {
   renderAll();
 }
 
-/* Alterna entre cidade e caçada */
+/* Alterna entre cidade, caçada e academia */
 function goToCity() {
-  if (G.p.hunt) stopHunt();
+  if (G.training) stopAcademy();
+  else if (G.p.hunt) stopHunt();
   else { G.inCity = true; renderAll(); }
+}
+
+function startAcademy() {
+  if (!G.p) return;
+  if (G.combat) stopHunt();
+  G.training = newAcademyTraining(G.p);
+  G.inCity = false;
+  G.p.hunt = null;
+  G.combat = null;
+  addLog("info", "Teleportado para a <b style='color:#9ce84a'>Academia Safezone</b>.");
+  toast("Academia Safezone: Treiner ativo", "level");
+  renderAll();
+  openAcademyConjureModal(false);
+}
+
+function stopAcademy(log) {
+  if (!G.training) return;
+  G.training = null;
+  G.inCity = true;
+  G.combat = null;
+  G.p.hunt = null;
+  const m = maxStats(G.p);
+  G.p.hp = m.hp;
+  if (log !== false) {
+    addLog("info", "Saiu da academia e voltou para a <b style='color:#ffe680'>Cidade de Thais</b>.");
+    toast("Voltou para a cidade");
+  }
+  G.activeNpc = null;
+  renderAll();
 }
 
 /* ------------------------------------------------------------ eventos */
@@ -353,6 +385,35 @@ function tickManaTrain(p, dt) {
     refreshNpc("trainer");
 }
 
+function drainAcademyEvents() {
+  const t = G.training;
+  if (!t) return;
+  const r = G.renderer;
+  for (const e of t.events) {
+    const kind = e.type || e.t;
+    switch (kind) {
+      case "hit":
+        r.addFloater(0.68, 0.42, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
+        r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
+        if (e.skillUp) addLog("skill", `<b>${SKILL_NAMES[e.skill] || e.skill}</b> subiu batendo no Treiner.`);
+        if (e.shieldUp) addLog("skill", "<b>Shielding</b> subiu treinando no Treiner.");
+        break;
+      case "msg":
+        addLog("info", e.msg);
+        break;
+      case "ammo-buy":
+        addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
+        renderInventory(G.p);
+        renderEquip(G.p);
+        break;
+      case "no-ammo":
+        addLog("death", `Sem munição/gold para treinar com <b>${e.name}</b>.`);
+        break;
+    }
+  }
+  t.events.length = 0;
+}
+
 /* ------------------------------------------------------------ loop */
 function loop(ts) {
   requestAnimationFrame(loop);
@@ -403,8 +464,21 @@ function loop(ts) {
     }
   }
 
+  if (!G.paused && G.training) {
+    const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
+    regenInCity(G.p, dt);
+    academyTrainingTick(G.training, G.p, dt, Date.now());
+    drainAcademyEvents();
+    if (JSON.stringify(G.p.skills) + G.p.ml !== beforeSkills) {
+      renderSkills(G.p);
+      renderStats(G.p);
+    }
+  }
+
   G.renderer.resize();
-  if (G.inCity && !G.combat) {
+  if (G.training) {
+    G.renderer.drawAcademy(G.training, G.p, dt);
+  } else if (G.inCity && !G.combat) {
     // na cidade a stamina e a mana regeneram devagar (treino online)
     G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * 0.35);
     regenInCity(G.p, dt);
@@ -449,6 +523,21 @@ function renderHuntInfo() {
   const p = G.p;
   const el = $("#hunt-info");
   if (!el) return;
+  if (G.training) {
+    const t = G.training;
+    const st = academyStatus(p);
+    el.innerHTML = `
+      <div class="row mb4" style="justify-content:space-between">
+        <b style="color:#9ce84a">Academia Safezone</b>
+        <span class="risk low">seguro</span>
+      </div>
+      <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
+      <div class="stat-row"><span class="k">Skill</span><span class="v">${st.skill ? (SKILL_NAMES[st.skill] || st.skill) : "—"}</span></div>
+      <div class="stat-row"><span class="k">Hits</span><span class="v">${fmtFull(t.stats.hits)}</span></div>
+      <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
+      <button class="primary full mt8" onclick="openAcademyConjureModal(true)">Conjure</button>`;
+    return;
+  }
   if (!p.hunt) {
     el.innerHTML = `<div class="dim small center" style="padding:8px">Nenhuma caçada ativa</div>`;
     return;
@@ -504,9 +593,8 @@ function startGame(p) {
 function bindControls() {
   const p = G.p;
   $("#btn-city").addEventListener("click", () => {
-    if (G.inCity && !G.combat) { toast("Você já está na cidade"); return; }
+    if (G.inCity && !G.combat && !G.training) { toast("Você já está na cidade"); return; }
     goToCity();
-    toast("Voltou para a cidade");
   });
 
   // interacao com NPCs no canvas da cidade

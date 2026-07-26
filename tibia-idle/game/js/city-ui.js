@@ -65,6 +65,84 @@ function refreshNpc(id) {
   renderTopbar(p);
 }
 
+function openAcademyConjureModal(showList) {
+  const p = G.p;
+  G.activeNpc = "academy-conjure";
+  const recipes = academyConjuresFor(p);
+  const rows = recipes.map((r) => {
+    const check = academyConjureCheck(p, r);
+    const sprite = r.kind === "ammo" ? r.slug :
+      r.kind === "supply" && SUPPLIES[r.slug] ? SUPPLIES[r.slug].sprite : "spellbook";
+    return `<div class="shop-row" style="opacity:${check.ok ? 1 : .45}">
+      ${r.kind === "support" ? `<span style="width:28px;text-align:center">✨</span>` : `<img src="assets/item/${sprite}.png">`}
+      <div style="flex:1;min-width:0">
+        <div class="small">${r.name}</div>
+        <div class="tiny dim"><b>${r.words}</b> · ${academyConjureProduct(r)} · nv ${r.level} · ML ${r.ml} · ${fmtFull(r.mana)} mana</div>
+        <div class="tiny dim">${check.ok ? r.desc : `<span style="color:#ff9a6a">${check.msg}</span>`}</div>
+      </div>
+      <button class="sm ${check.ok ? "primary" : ""}" data-academy-conjure="${r.id}" ${check.ok ? "" : "disabled"}>
+        Conjurar</button>
+    </div>`;
+  }).join("");
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">
+      Academia — Conjure
+      <span style="flex:1"></span>
+      <button class="sm" id="academy-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <label class="small dim">Textbox</label>
+      <input id="academy-conjure-text" value="conjure:" autocomplete="off"
+        style="width:100%;padding:6px;background:#14120e;color:#ffe680;border:2px solid;border-color:#16140f #5a5348 #5a5348 #16140f;margin:4px 0 8px">
+      <div class="row mb8" style="justify-content:space-between">
+        <span class="small dim">${VOCATIONS[p.voc].name} · Mana ${Math.floor(p.mp)} / ${maxStats(p).mp}</span>
+        <button class="sm primary" id="academy-toggle-list">${showList === false ? "Abrir lista" : "Atualizar lista"}</button>
+      </div>
+      <div id="academy-conjure-list" class="list" style="max-height:360px;${showList === false ? "display:none" : ""}">
+        ${rows || `<div class="dim small center" style="padding:14px">Nenhum conjurável para esta vocação.</div>`}
+      </div>
+      <div class="row mt8" style="gap:4px">
+        <button class="full" id="academy-back-city">Voltar para cidade</button>
+      </div>
+    </div>`;
+  $("#modal").classList.add("show");
+  const conjureInput = $("#academy-conjure-text");
+  conjureInput.focus();
+  conjureInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const q = conjureInput.value.toLowerCase().replace(/^conjure:\s*/, "").trim();
+    const found = academyConjuresFor(p).find((r) =>
+      r.words.toLowerCase() === q || r.name.toLowerCase() === q ||
+      r.name.toLowerCase().indexOf(q) !== -1);
+    if (!found) { toast("Conjure não encontrado para sua vocação."); return; }
+    const cast = castAcademyConjure(p, found.id);
+    toast(cast.msg, cast.ok ? "level" : "");
+    if (cast.ok) addLog("skill", cast.msg + (cast.mlUp ? ` Magic Level +${cast.mlUp}!` : ""));
+    openAcademyConjureModal(true);
+  });
+  $("#academy-close").addEventListener("click", () => {
+    G.activeNpc = null;
+    $("#modal").classList.remove("show");
+    renderAll();
+  });
+  $("#academy-toggle-list").addEventListener("click", () => openAcademyConjureModal(true));
+  $("#academy-back-city").addEventListener("click", () => {
+    $("#modal").classList.remove("show");
+    stopAcademy();
+  });
+  $$("#academy-conjure-list [data-academy-conjure]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = castAcademyConjure(p, b.dataset.academyConjure);
+      toast(r.msg, r.ok ? "level" : "");
+      if (r.ok) {
+        addLog("skill", r.msg + (r.mlUp ? ` Magic Level +${r.mlUp}!` : ""));
+        renderAll();
+      }
+      openAcademyConjureModal(true);
+    }));
+}
+
 function goldLine(p) {
   return `<div class="row mb8" style="justify-content:space-between">
     <span class="small dim">Seu ouro</span>
@@ -243,57 +321,29 @@ function npcTemple(p) {
 
 /* ---------------------------------------------------------- academia */
 function npcTrain(p) {
-  const isMage = VOCATIONS[p.voc].weapon === "magic";
-  const skills = isMage ? ["magic", "shield"] :
-    p.voc === "paladin" ? ["dist", "shield", "magic"] :
-    ["sword", "axe", "club", "shield", "magic"];
-  const rows = skills.map((k) => {
-    const lvl = k === "magic" ? p.ml : p.skills[k];
-    const price = trainPrice(p, k);
-    return `<div class="shop-row">
-      <div style="flex:1">
-        <div class="small">${SKILL_NAMES[k]}</div>
-        <div class="tiny dim">nível atual ${lvl}</div>
-      </div>
-      <button class="sm ${p.gold >= price ? "primary" : ""}"
-        data-train="${k}" ${p.gold < price ? "disabled" : ""}>
-        +1 · ${fmtFull(price)}</button>
-    </div>`;
-  }).join("");
-
-  const recipes = manaTrainRecipesFor(p);
-  const active = p.config.manaTrain;
-  const manaRows = recipes.length ? recipes.map((r) => {
-    const check = manaTrainCanSelect(p, r);
-    const selected = active === r.id;
-    const ready = p.mp >= r.mana;
-    const sprite = r.type === "ammo" ? r.slug : (SUPPLIES[r.slug] ? SUPPLIES[r.slug].sprite : r.slug);
-    return `<div class="shop-row" style="opacity:${check.ok ? 1 : .45}">
-      <img src="assets/item/${sprite}.png">
-      <div style="flex:1;min-width:0">
-        <div class="small" style="color:${selected ? "#9ce84a" : "#c8c0a8"}">
-          ${r.name}${selected ? " · ativo" : ""}</div>
-        <div class="tiny dim">${manaTrainProductLabel(r)} · ${manaTrainReqText(r)}${check.ok && !ready ? " · aguardando mana" : ""}${!check.ok ? ` · <span style="color:#ff9a6a">${check.msg}</span>` : ""}</div>
-      </div>
-      <button class="sm ${selected ? "danger" : check.ok ? "primary" : ""}"
-        data-mana-train="${selected ? "" : r.id}" ${check.ok ? "" : "disabled"}>
-        ${selected ? "Pausar" : "Ativar"}</button>
-    </div>`;
-  }).join("") : `<div class="dim small center" style="padding:12px">
-      Mana train cria arrows para paladins e runas para druids/sorcerers.
-    </div>`;
+  const st = academyStatus(p);
+  const skillTxt = st.skill === "magic" ? "Magic Level (65 mana por hit)" :
+    st.skill ? SKILL_NAMES[st.skill] : "aguardando equipamento";
+  const weapon = p.equip.weapon ? itemName(p.equip.weapon.item) : "nenhuma";
+  const ammo = p.equip.ammo ? `${itemName(p.equip.ammo.item)} (${p.bag[p.equip.ammo.item] || 0})` : "nenhuma";
 
   return goldLine(p) + `
-    <div class="small dim mb4">Treino pago instantâneo</div>
-    ${rows}
-    <div class="tiny dim mt8 mb8">Treinar pago fica mais caro conforme a skill sobe.</div>
-    <div class="small dim mb4">Mana Train Online</div>
     <div class="panel-inset mb8" style="padding:8px">
-      <div class="stat-row"><span class="k">Mana atual</span><span class="v">${Math.floor(p.mp)} / ${maxStats(p).mp}</span></div>
-      <div class="stat-row"><span class="k">Status</span><span class="v" style="color:${active ? "#9ce84a" : "#8a8270"}">${active ? "ativo" : "pausado"}</span></div>
+      <div class="stat-row"><span class="k">Sala</span><span class="v">Safezone</span></div>
+      <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
+      <div class="stat-row"><span class="k">Vocação</span><span class="v">${VOCATIONS[p.voc].name}</span></div>
+      <div class="stat-row"><span class="k">Skill treinada</span><span class="v">${skillTxt}</span></div>
+      <div class="stat-row"><span class="k">Shielding</span><span class="v">Todos os hits</span></div>
+      <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
+      <div class="stat-row"><span class="k">Weapon</span><span class="v">${weapon}</span></div>
+      ${p.voc === "paladin" ? `<div class="stat-row"><span class="k">Ammo</span><span class="v">${ammo}</span></div>` : ""}
     </div>
-    <div class="list" style="max-height:260px">${manaRows}</div>
-    <div class="tiny dim mt8">Enquanto estiver online na cidade, o personagem regenera mana e executa a receita ativa automaticamente. Não gasta gold.</div>`;
+    ${st.ok ? "" : `<div class="small mb8" style="color:#ffb060">${st.msg}</div>`}
+    <button class="primary full mb8" id="academy-enter">Teleportar para Academia</button>
+    <button class="full" id="academy-conjure-list">Abrir conjure</button>
+    <div class="tiny dim mt8">
+      Dentro da academia você bate no Treiner em safezone. Knights treinam sword/club/axe conforme a arma, RPs treinam distance, mages gastam 65 mana por hit, e todos ganham shielding.
+    </div>`;
 }
 
 /* ---------------------------------------------------------- estalagem */
@@ -448,24 +498,15 @@ function bindNpc(id, type) {
   });
 
   // academia
-  $$("#npc-content [data-train]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const sk = b.dataset.train;
-      const r = buyTraining(p, sk, 1);
-      if (r.gained) {
-        toast(`${SKILL_NAMES[sk]} subiu!`, "level");
-        addLog("skill", `Treinou <b>${SKILL_NAMES[sk]}</b> por ${fmtFull(r.spent)} gp`);
-      }
-      refreshNpc(id);
-    }));
-  $$("#npc-content [data-mana-train]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const recipeId = b.dataset.manaTrain || null;
-      const r = setManaTrain(p, recipeId);
-      toast(r.msg, r.ok && recipeId ? "level" : "");
-      if (r.ok) addLog("skill", r.msg);
-      refreshNpc(id);
-    }));
+  const academyEnter = $("#academy-enter");
+  if (academyEnter) academyEnter.addEventListener("click", () => {
+    $("#modal").classList.remove("show");
+    startAcademy();
+  });
+  const academyConjure = $("#academy-conjure-list");
+  if (academyConjure) academyConjure.addEventListener("click", () => {
+    openAcademyConjureModal(true);
+  });
 
   // estalagem
   $$("#npc-content [data-rest]").forEach((b) =>

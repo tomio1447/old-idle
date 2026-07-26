@@ -188,6 +188,219 @@ function runManaTrainTick(p) {
   };
 }
 
+/* ------------------------------------------------------------ academia safezone */
+const ACADEMY_SKILL_MULT = 3;      // 200% mais rápido que bater em alvo comum
+const ACADEMY_MAGE_HIT_MANA = 65;
+
+const ACADEMY_CONJURES = {
+  "rp-arrow": {
+    name: "Arrows", vocs: ["paladin"], kind: "ammo", slug: "arrow",
+    amount: 25, mana: 100, level: 13, ml: 0,
+    words: "conjure arrows", desc: "Cria arrows para distance fighting.",
+  },
+  "rp-bolt": {
+    name: "Bolts", vocs: ["paladin"], kind: "ammo", slug: "bolt",
+    amount: 15, mana: 140, level: 20, ml: 1,
+    words: "conjure bolts", desc: "Cria bolts para crossbow.",
+  },
+  "rp-power-bolt": {
+    name: "Power Bolts", vocs: ["paladin"], kind: "ammo", slug: "power-bolt",
+    amount: 5, mana: 220, level: 40, ml: 4,
+    words: "conjure power bolts", desc: "Cria munição forte para treino/caça.",
+  },
+  "sorc-hmm": {
+    name: "Heavy Magic Missile", vocs: ["sorcerer"], kind: "supply",
+    slug: "heavy-magic-missile-rune", charges: 1, mana: 350,
+    level: 25, ml: 3, words: "adori gran", desc: "Cria 1 carga de HMM.",
+  },
+  "sorc-gfb": {
+    name: "Great Fireball", vocs: ["sorcerer"], kind: "supply",
+    slug: "great-fireball-rune", charges: 1, mana: 530,
+    level: 30, ml: 4, words: "adori gran flam", desc: "Cria 1 carga de GFB.",
+  },
+  "sorc-explosion": {
+    name: "Explosion", vocs: ["sorcerer"], kind: "supply",
+    slug: "explosion-rune", charges: 1, mana: 570,
+    level: 31, ml: 6, words: "adevo mas hur", desc: "Cria 1 carga de Explosion.",
+  },
+  "sorc-sd": {
+    name: "Sudden Death", vocs: ["sorcerer"], kind: "supply",
+    slug: "sudden-death-rune", charges: 1, mana: 985,
+    level: 45, ml: 15, words: "adori gran mort", desc: "Cria 1 carga de SD.",
+  },
+  "druid-ih": {
+    name: "Intense Healing", vocs: ["druid"], kind: "supply",
+    slug: "intense-healing-rune", charges: 1, mana: 120,
+    level: 11, ml: 1, words: "adura gran", desc: "Cria 1 carga de IH.",
+  },
+  "druid-uh": {
+    name: "Ultimate Healing", vocs: ["druid"], kind: "supply",
+    slug: "ultimate-healing-rune", charges: 1, mana: 400,
+    level: 24, ml: 4, words: "adura vita", desc: "Cria 1 carga de UH.",
+  },
+  "druid-sd": {
+    name: "Sudden Death", vocs: ["druid"], kind: "supply",
+    slug: "sudden-death-rune", charges: 1, mana: 985,
+    level: 45, ml: 15, words: "adori gran mort", desc: "Cria 1 carga de SD.",
+  },
+  "knight-light": {
+    name: "Utevo Gran Lux", vocs: ["knight"], kind: "support",
+    mana: 60, level: 13, ml: 0, words: "utevo gran lux",
+    desc: "Magia de suporte: luz forte. Conta mana spent para ML.",
+  },
+  "knight-haste": {
+    name: "Utani Hur", vocs: ["knight"], kind: "support",
+    mana: 60, level: 14, ml: 0, words: "utani hur",
+    buff: "haste", duration: 60000,
+    desc: "Magia de suporte: haste no treino por 60s.",
+  },
+};
+
+function academySkillFor(p) {
+  if (p.voc === "knight") {
+    const sk = weaponSkill(p);
+    return ["sword", "axe", "club"].indexOf(sk) !== -1 ? sk : null;
+  }
+  if (p.voc === "paladin") return "dist";
+  if (p.voc === "druid" || p.voc === "sorcerer") return "magic";
+  return "fist";
+}
+
+function academyStatus(p) {
+  const skill = academySkillFor(p);
+  if (p.voc === "knight" && !skill)
+    return { ok: false, skill: null, msg: "Equipe sword, club ou axe para treinar como knight." };
+  if (p.voc === "paladin") {
+    const w = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+    if (!w || w.t !== "distance")
+      return { ok: false, skill: "dist", msg: "Equipe bow/crossbow para treinar distance fighting." };
+    if (!p.equip.ammo || !p.equip.ammo.item)
+      return { ok: false, skill: "dist", msg: "Selecione arrows/bolts na mochila ou conjure munição." };
+  }
+  return { ok: true, skill: skill, msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
+}
+
+function newAcademyTraining(p) {
+  const st = academyStatus(p);
+  return {
+    startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
+    skill: st.skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
+    stats: { hits: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
+             supplyUsed: {}, supplyBought: {}, supplyCost: 0 },
+    events: [],
+  };
+}
+
+function academyAttackDelay(t) {
+  return t.hasteUntil > Date.now() ? 1500 : 2000;
+}
+
+function academyConjuresFor(p) {
+  return Object.keys(ACADEMY_CONJURES)
+    .map((id) => Object.assign({ id: id }, ACADEMY_CONJURES[id]))
+    .filter((r) => r.vocs.indexOf(p.voc) !== -1);
+}
+
+function academyConjureCheck(p, r) {
+  if (!r || r.vocs.indexOf(p.voc) === -1)
+    return { ok: false, msg: "Vocação incompatível." };
+  if (p.level < r.level)
+    return { ok: false, msg: `Requer nível ${r.level}.` };
+  if (p.ml < r.ml)
+    return { ok: false, msg: `Requer magic level ${r.ml}.` };
+  if (p.mp < r.mana)
+    return { ok: false, msg: `Mana insuficiente (${fmtFull(r.mana)}).` };
+  return { ok: true, msg: "" };
+}
+
+function academyConjureProduct(r) {
+  if (r.kind === "ammo") return `${r.amount}x ${itemName(r.slug)}`;
+  if (r.kind === "supply") {
+    const s = SUPPLIES[r.slug];
+    return `${r.charges || 1} carga(s) de ${s ? s.name : itemName(r.slug)}`;
+  }
+  return r.name;
+}
+
+function castAcademyConjure(p, id) {
+  const r = ACADEMY_CONJURES[id];
+  const check = academyConjureCheck(p, r);
+  if (!check.ok) return check;
+
+  const beforeMl = p.ml;
+  p.mp -= r.mana;
+  addManaSpent(p, r.mana);
+
+  if (r.kind === "ammo") {
+    addItem(p, r.slug, r.amount);
+    if (!p.equip.ammo || p.equip.ammo.item === r.slug)
+      p.equip.ammo = { item: r.slug, count: p.bag[r.slug] || 0 };
+  } else if (r.kind === "supply") {
+    p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
+  } else if (r.kind === "support" && typeof G !== "undefined" && G.training) {
+    if (r.buff === "haste") G.training.hasteUntil = Date.now() + (r.duration || 60000);
+    if (r.words === "utevo gran lux") G.training.lightUntil = Date.now() + 180000;
+  }
+
+  return {
+    ok: true,
+    msg: `${r.words}: ${academyConjureProduct(r)}.`,
+    mlUp: p.ml - beforeMl,
+  };
+}
+
+function academyTrainingTick(t, p, dt, now) {
+  t.time += dt;
+  t.hitCd -= dt;
+  if (t.hitCd > 0) return;
+
+  const st = academyStatus(p);
+  t.skill = st.skill;
+  if (!st.ok) {
+    if (now - t.lastMsg > 3000) {
+      t.events.push({ type: "msg", msg: st.msg });
+      t.lastMsg = now;
+    }
+    t.hitCd = 1000;
+    return;
+  }
+
+  let skillUp = false;
+  if (st.skill === "magic") {
+    if (p.mp < ACADEMY_MAGE_HIT_MANA) {
+      if (now - t.lastMsg > 3000) {
+        t.events.push({ type: "msg", msg: "Aguardando mana para bater no Treiner." });
+        t.lastMsg = now;
+      }
+      t.hitCd = 1000;
+      return;
+    }
+    p.mp -= ACADEMY_MAGE_HIT_MANA;
+    t.stats.manaSpent += ACADEMY_MAGE_HIT_MANA;
+    skillUp = addManaSpent(p, ACADEMY_MAGE_HIT_MANA * ACADEMY_SKILL_MULT);
+  } else if (st.skill === "dist") {
+    if (!consumeAmmoCharge(t, p)) {
+      if (now - t.lastMsg > 3000) {
+        t.events.push({ type: "msg", msg: "Sem munição/gold. Use conjure para criar arrows ou bolts." });
+        t.lastMsg = now;
+      }
+      t.hitCd = 1000;
+      return;
+    }
+    skillUp = addSkillTries(p, "dist", ACADEMY_SKILL_MULT);
+  } else {
+    skillUp = addSkillTries(p, st.skill, ACADEMY_SKILL_MULT);
+  }
+
+  const shieldUp = addSkillTries(p, "shield", ACADEMY_SKILL_MULT);
+  t.hits++;
+  t.stats.hits++;
+  if (skillUp) t.stats.skillUps++;
+  if (shieldUp) t.stats.shieldUps++;
+  t.events.push({ type: "hit", skill: st.skill, skillUp: skillUp, shieldUp: shieldUp });
+  t.hitCd = academyAttackDelay(t);
+}
+
 /* ------------------------------------------------------------ acoes */
 
 function bankDeposit(p, amount) {

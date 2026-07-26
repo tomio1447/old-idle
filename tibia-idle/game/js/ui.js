@@ -374,8 +374,15 @@ function renderSupplies(p) {
 
 function renderTopbar(p) {
   $("#gold").textContent = fmtFull(p.gold);
+  const cityBtn = $("#btn-city");
+  if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
   const c = G.combat;
-  if (c && c.stats.time > 3000) {
+  if (G.training) {
+    $("#xph").textContent = "treino";
+    $("#gph").textContent = "0";
+    $("#session").textContent = fmtTime(G.training.time / 1000);
+    $("#kills").textContent = fmtFull(G.training.stats.hits);
+  } else if (c && c.stats.time > 3000) {
     const hrs = c.stats.time / 3600000;
     $("#xph").textContent = fmt(c.stats.exp / hrs);
     $("#gph").textContent = fmt((c.stats.gold - c.stats.supplyCost) / hrs);
@@ -400,7 +407,9 @@ function renderNpcQuick() {
       const id = b.dataset.npc;
       // se estiver na cidade, o personagem caminha ate o NPC;
       // fora dela (caçando) abre direto
-      if (G.inCity && !G.combat && G.walker) {
+      if (G.training && id === "trainer") {
+        openAcademyConjureModal(true);
+      } else if (G.inCity && !G.combat && !G.training && G.walker) {
         if (G.walker.goToNpc(id)) openNpc(id);
       } else {
         openNpc(id);
