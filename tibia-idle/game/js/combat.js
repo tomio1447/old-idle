@@ -10,6 +10,10 @@ const COMBAT_GRID_H = 13;
 const INFLUENCED_BASE_CHANCE = 0.005;
 const INFLUENCED_PVP_BONUS = 0.005;
 
+function displayMonsterName(name) {
+  return String(name || "").replace(/^Influenced\s+/i, "");
+}
+
 function newCombat(player, huntId, instanceMode) {
   const hunt = GAMEDATA.hunts[huntId];
   const mode = instanceMode || player.instanceMode || "non-pvp";
@@ -65,10 +69,12 @@ function spawnWave(c, p) {
     if (!base) break;
     const influenced = Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
     const m = Object.assign({}, base);
+    m.name = displayMonsterName(base.name);
     if (influenced) {
       // Mantém somente o nome original; o destaque visual indica que é influenced.
-      m.name = base.name;
+      // 300% a mais de XP base = 4x a experiência original.
       m.hp = Math.floor(base.hp * 2);
+      m.exp = Math.floor((base.exp || 0) * 4);
       m.damage = Math.floor(base.damage * 1.2);
       m.armor = Math.floor(base.armor * 1.2);
     }
@@ -806,7 +812,7 @@ function combatTick(c, p, dt, now) {
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
     const loot = rollLoot(c, p, m);
-    c.events.push({ t: "kill", mob: m.slug, name: m.def.name,
+    c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true });
   }
   c.mobs = alive;

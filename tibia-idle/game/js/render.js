@@ -552,9 +552,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.font = m.influenced ? "bold 18px Verdana" : "9px Verdana";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,.9)";
-        ctx.fillText(m.def.name, mx + 1, by - 4);
+        const mobName = typeof displayMonsterName === "function" ? displayMonsterName(m.def.name) : String(m.def.name || "").replace(/^Influenced\s+/i, "");
+        ctx.fillText(mobName, mx + 1, by - 4);
         ctx.fillStyle = m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#d8d0b8";
-        ctx.fillText(m.def.name, mx, by - 5);
+        ctx.fillText(mobName, mx, by - 5);
       }
     }
   }
