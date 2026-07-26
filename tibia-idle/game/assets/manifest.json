@@ -1,0 +1,4403 @@
+{
+ "mobs": {
+  "rat": 21,
+  "cave-rat": 56,
+  "snake": 28,
+  "spider": 30,
+  "bug": 45,
+  "wasp": 44,
+  "scorpion": 43,
+  "rotworm": 26,
+  "carrion-worm": 26,
+  "poison-spider": 36,
+  "wolf": 27,
+  "bear": 16,
+  "polar-bear": 42,
+  "troll": 15,
+  "swamp-troll": 76,
+  "frost-troll": 53,
+  "goblin": 61,
+  "orc": 5,
+  "orc-spearman": 50,
+  "orc-warrior": 7,
+  "orc-shaman": 6,
+  "orc-berserker": 8,
+  "orc-rider": 4,
+  "orc-leader": 59,
+  "orc-warlord": 2,
+  "war-wolf": 3,
+  "minotaur": 25,
+  "minotaur-archer": 24,
+  "minotaur-guard": 29,
+  "minotaur-mage": 23,
+  "skeleton": 33,
+  "ghoul": 18,
+  "mummy": 65,
+  "demon-skeleton": 37,
+  "crypt-shambler": 100,
+  "bonebeast": 101,
+  "vampire": 68,
+  "banshee": 78,
+  "lich": 99,
+  "ghost": 48,
+  "cyclops": 22,
+  "dwarf": 69,
+  "dwarf-soldier": 71,
+  "dwarf-guard": 70,
+  "dwarf-geomancer": 66,
+  "stone-golem": 67,
+  "elf": 62,
+  "elf-scout": 64,
+  "elf-arcanist": 63,
+  "witch": 54,
+  "monk": 57,
+  "priestess": 58,
+  "hero": 73,
+  "black-knight": 131,
+  "necromancer": 9,
+  "bonelord": 17,
+  "elder-bonelord": 108,
+  "gazer": 109,
+  "giant-spider": 38,
+  "slime": 19,
+  "fire-devil": 40,
+  "fire-elemental": 49,
+  "dragon": 34,
+  "dragon-lord": 39,
+  "demon": 35,
+  "behemoth": 55,
+  "hydra": 121,
+  "serpent-spawn": 219,
+  "green-djinn": 51,
+  "blue-djinn": 80,
+  "efreet": 103,
+  "marid": 104,
+  "gargoyle": 95,
+  "scarab": 83,
+  "ancient-scarab": 79,
+  "larva": 82,
+  "cobra": 81,
+  "quara-predator": 20,
+  "yeti": 110,
+  "winter-wolf": 52,
+  "hyaena": 94,
+  "lion": 41,
+  "badger": 105,
+  "deer": 31,
+  "rabbit": 74,
+  "pirate-marauder": 93,
+  "pirate-cutthroat": 96,
+  "pirate-buccaneer": 97,
+  "pirate-corsair": 98,
+  "mimic": 92,
+  "pig": 60,
+  "sheep": 14,
+  "black-sheep": 13,
+  "dog": 32,
+  "butterfly": 10,
+  "beholder": 17,
+  "dwarf-miner": 69,
+  "amazon": 137,
+  "valkyrie": 139,
+  "swamp-thing": 51
+ },
+ "items": {
+  "sword": {
+   "id": 2376,
+   "name": "sword",
+   "props": {
+    "article": "a",
+    "name": "sword",
+    "weight": 3500,
+    "defense": 12,
+    "attack": 14,
+    "weaponType": "sword"
+   }
+  },
+  "axe": {
+   "id": 2386,
+   "name": "axe",
+   "props": {
+    "article": "an",
+    "name": "axe",
+    "weight": 4000,
+    "defense": 6,
+    "attack": 12,
+    "weaponType": "axe"
+   }
+  },
+  "club": {
+   "id": 2382,
+   "name": "club",
+   "props": {
+    "article": "a",
+    "name": "club",
+    "weight": 2500,
+    "defense": 7,
+    "attack": 7,
+    "weaponType": "club"
+   }
+  },
+  "rapier": {
+   "id": 2384,
+   "name": "rapier",
+   "props": {
+    "article": "a",
+    "name": "rapier",
+    "weight": 1500,
+    "defense": 8,
+    "attack": 10,
+    "weaponType": "sword"
+   }
+  },
+  "sabre": {
+   "id": 2385,
+   "name": "sabre",
+   "props": {
+    "article": "a",
+    "name": "sabre",
+    "weight": 2500,
+    "defense": 10,
+    "attack": 12,
+    "weaponType": "sword"
+   }
+  },
+  "combat-knife": {
+   "id": 2404,
+   "name": "combat knife",
+   "props": {
+    "article": "a",
+    "name": "combat knife",
+    "weight": 869,
+    "defense": 6,
+    "attack": 8,
+    "weaponType": "sword"
+   }
+  },
+  "mace": {
+   "id": 2398,
+   "name": "mace",
+   "props": {
+    "article": "a",
+    "name": "mace",
+    "weight": 2800,
+    "defense": 11,
+    "attack": 16,
+    "weaponType": "club"
+   }
+  },
+  "hatchet": {
+   "id": 2388,
+   "name": "hatchet",
+   "props": {
+    "article": "a",
+    "name": "hatchet",
+    "weight": 3500,
+    "defense": 8,
+    "attack": 15,
+    "weaponType": "axe"
+   }
+  },
+  "longsword": {
+   "id": 2397,
+   "name": "longsword",
+   "props": {
+    "article": "a",
+    "name": "longsword",
+    "weight": 4200,
+    "defense": 14,
+    "attack": 17,
+    "weaponType": "sword"
+   }
+  },
+  "battle-axe": {
+   "id": 2378,
+   "name": "battle axe",
+   "props": {
+    "article": "a",
+    "name": "battle axe",
+    "weight": 5000,
+    "defense": 10,
+    "attack": 25,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "battle-hammer": {
+   "id": 2417,
+   "name": "battle hammer",
+   "props": {
+    "article": "a",
+    "name": "battle hammer",
+    "weight": 6800,
+    "defense": 14,
+    "attack": 24,
+    "weaponType": "club"
+   }
+  },
+  "morning-star": {
+   "id": 2394,
+   "name": "morning star",
+   "props": {
+    "article": "a",
+    "name": "morning star",
+    "weight": 5400,
+    "defense": 11,
+    "attack": 25,
+    "weaponType": "club"
+   }
+  },
+  "war-hammer": {
+   "id": 2391,
+   "name": "war hammer",
+   "props": {
+    "article": "a",
+    "name": "war hammer",
+    "weight": 8500,
+    "defense": 10,
+    "attack": 45,
+    "weaponType": "club",
+    "slotType": "two-handed"
+   }
+  },
+  "knight-axe": {
+   "id": 2430,
+   "name": "knight axe",
+   "props": {
+    "article": "a",
+    "name": "knight axe",
+    "weight": 5900,
+    "defense": 21,
+    "attack": 33,
+    "weaponType": "axe"
+   }
+  },
+  "barbarian-axe": {
+   "id": 2429,
+   "name": "barbarian axe",
+   "props": {
+    "article": "a",
+    "name": "barbarian axe",
+    "weight": 5100,
+    "defense": 18,
+    "attack": 28,
+    "weaponType": "axe"
+   }
+  },
+  "dragon-hammer": {
+   "id": 2434,
+   "name": "dragon hammer",
+   "props": {
+    "article": "a",
+    "name": "dragon hammer",
+    "weight": 9700,
+    "defense": 20,
+    "attack": 32,
+    "weaponType": "club"
+   }
+  },
+  "fire-axe": {
+   "id": 2432,
+   "name": "fire axe",
+   "props": {
+    "article": "a",
+    "name": "fire axe",
+    "description": "The blade is a magic flame.",
+    "weight": 4000,
+    "defense": 16,
+    "attack": 38,
+    "weaponType": "axe"
+   }
+  },
+  "fire-sword": {
+   "id": 2392,
+   "name": "fire sword",
+   "props": {
+    "article": "a",
+    "name": "fire sword",
+    "description": "The blade is a magic flame.",
+    "weight": 2300,
+    "defense": 20,
+    "attack": 35,
+    "weaponType": "sword"
+   }
+  },
+  "giant-sword": {
+   "id": 2393,
+   "name": "giant sword",
+   "props": {
+    "article": "a",
+    "name": "giant sword",
+    "description": "This sword has been forged by ancient giants.",
+    "weight": 18000,
+    "defense": 22,
+    "attack": 46,
+    "weaponType": "sword",
+    "slotType": "two-handed"
+   }
+  },
+  "warlord-sword": {
+   "id": 2408,
+   "name": "warlord sword",
+   "props": {
+    "article": "a",
+    "name": "warlord sword",
+    "description": "Strong powers flow in this magic sword.",
+    "weight": 6400,
+    "defense": 38,
+    "attack": 53,
+    "weaponType": "sword",
+    "slotType": "two-handed"
+   }
+  },
+  "magic-longsword": {
+   "id": 2390,
+   "name": "magic longsword",
+   "props": {
+    "article": "a",
+    "name": "magic longsword",
+    "description": "It is the magic Cyclopmania Sword.",
+    "weight": 4300,
+    "defense": 40,
+    "attack": 55,
+    "weaponType": "sword",
+    "slotType": "two-handed"
+   }
+  },
+  "thunder-hammer": {
+   "id": 2421,
+   "name": "thunder hammer",
+   "props": {
+    "article": "a",
+    "name": "thunder hammer",
+    "description": "It is blessed by the gods of Tibia.",
+    "weight": 12500,
+    "defense": 35,
+    "attack": 49,
+    "weaponType": "club"
+   }
+  },
+  "stonecutter-axe": {
+   "id": 2431,
+   "name": "stonecutter axe",
+   "props": {
+    "article": "a",
+    "name": "stonecutter axe",
+    "description": "You feel the power of this mighty axe.",
+    "weight": 9900,
+    "defense": 30,
+    "attack": 50,
+    "weaponType": "axe"
+   }
+  },
+  "serpent-sword": {
+   "id": 2409,
+   "name": "serpent sword",
+   "props": {
+    "article": "a",
+    "name": "serpent sword",
+    "weight": 4100,
+    "defense": 15,
+    "attack": 26,
+    "weaponType": "sword"
+   }
+  },
+  "dragon-lance": {
+   "id": 2414,
+   "name": "dragon lance",
+   "props": {
+    "article": "a",
+    "name": "dragon lance",
+    "description": "The extraordinary sharp blade penetrates every armor.",
+    "weight": 6700,
+    "defense": 16,
+    "attack": 47,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "obsidian-lance": {
+   "id": 2425,
+   "name": "obsidian lance",
+   "props": {
+    "article": "an",
+    "name": "obsidian lance",
+    "weight": 8000,
+    "defense": 10,
+    "attack": 34,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "halberd": {
+   "id": 2381,
+   "name": "halberd",
+   "props": {
+    "article": "a",
+    "name": "halberd",
+    "weight": 9000,
+    "defense": 14,
+    "attack": 35,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "guardian-halberd": {
+   "id": 2427,
+   "name": "guardian halberd",
+   "props": {
+    "article": "a",
+    "name": "guardian halberd",
+    "weight": 11000,
+    "defense": 15,
+    "attack": 46,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "great-axe": {
+   "id": 2415,
+   "name": "great axe",
+   "props": {
+    "article": "a",
+    "name": "great axe",
+    "description": "A masterpiece of a dwarven smith.",
+    "weight": 9000,
+    "defense": 22,
+    "attack": 52,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "spike-sword": {
+   "id": 2383,
+   "name": "spike sword",
+   "props": {
+    "article": "a",
+    "name": "spike sword",
+    "weight": 5000,
+    "defense": 21,
+    "attack": 24,
+    "weaponType": "sword"
+   }
+  },
+  "ice-rapier": {
+   "id": 2396,
+   "name": "ice rapier",
+   "props": {
+    "article": "an",
+    "name": "ice rapier",
+    "description": "A deadly but fragile weapon.",
+    "weight": 1500,
+    "attack": 60,
+    "defense": 1,
+    "weaponType": "sword",
+    "charges": 1
+   }
+  },
+  "silver-mace": {
+   "id": 2424,
+   "name": "silver mace",
+   "props": {
+    "article": "a",
+    "name": "silver mace",
+    "weight": 6700,
+    "defense": 30,
+    "attack": 40,
+    "weaponType": "club"
+   }
+  },
+  "clerical-mace": {
+   "id": 2423,
+   "name": "clerical mace",
+   "props": {
+    "article": "a",
+    "name": "clerical mace",
+    "weight": 5800,
+    "defense": 15,
+    "attack": 28,
+    "weaponType": "club"
+   }
+  },
+  "crowbar": {
+   "id": 2416,
+   "name": "crowbar",
+   "props": {
+    "article": "a",
+    "name": "crowbar",
+    "weight": 2100,
+    "defense": 6,
+    "attack": 6,
+    "weaponType": "club"
+   }
+  },
+  "carlin-sword": {
+   "id": 2395,
+   "name": "carlin sword",
+   "props": {
+    "article": "a",
+    "name": "carlin sword",
+    "weight": 4000,
+    "defense": 13,
+    "attack": 15,
+    "weaponType": "sword"
+   }
+  },
+  "double-axe": {
+   "id": 2387,
+   "name": "double axe",
+   "props": {
+    "article": "a",
+    "name": "double axe",
+    "weight": 7000,
+    "defense": 12,
+    "attack": 35,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "orcish-axe": {
+   "id": 2428,
+   "name": "orcish axe",
+   "props": {
+    "article": "an",
+    "name": "orcish axe",
+    "weight": 4500,
+    "defense": 12,
+    "attack": 23,
+    "weaponType": "axe"
+   }
+  },
+  "bright-sword": {
+   "id": 2407,
+   "name": "bright sword",
+   "props": {
+    "article": "a",
+    "name": "bright sword",
+    "description": "The blade shimmers in light blue.",
+    "weight": 2900,
+    "defense": 30,
+    "attack": 36,
+    "weaponType": "sword"
+   }
+  },
+  "epee": {
+   "id": 2438,
+   "name": "epee",
+   "props": {
+    "article": "an",
+    "name": "epee",
+    "weight": 1500,
+    "defense": 23,
+    "attack": 37,
+    "weaponType": "sword"
+   }
+  },
+  "heavy-mace": {
+   "id": 2452,
+   "name": "heavy mace",
+   "props": {
+    "article": "a",
+    "name": "heavy mace",
+    "weight": 11000,
+    "defense": 15,
+    "attack": 49,
+    "weaponType": "club",
+    "slotType": "two-handed"
+   }
+  },
+  "bow": {
+   "id": 2456,
+   "name": "bow",
+   "props": {
+    "article": "a",
+    "name": "bow",
+    "weight": 3100,
+    "weaponType": "distance",
+    "slotType": "two-handed",
+    "ammoType": "arrow",
+    "range": "6"
+   }
+  },
+  "crossbow": {
+   "id": 2455,
+   "name": "crossbow",
+   "props": {
+    "article": "a",
+    "name": "crossbow",
+    "weight": 4000,
+    "weaponType": "distance",
+    "slotType": "two-handed",
+    "ammoType": "bolt",
+    "range": "5"
+   }
+  },
+  "spear": {
+   "id": 2389,
+   "name": "spear",
+   "props": {
+    "article": "a",
+    "name": "spear",
+    "weight": 2000,
+    "attack": 25,
+    "weaponType": "distance",
+    "shootType": "spear",
+    "ammoAction": "move",
+    "range": "5"
+   }
+  },
+  "arrow": {
+   "id": 2544,
+   "name": "arrow",
+   "props": {
+    "article": "an",
+    "name": "arrow",
+    "weight": 70,
+    "attack": 25,
+    "hitChance": "90",
+    "weaponType": "ammunition",
+    "ammoType": "arrow",
+    "shootType": "arrow"
+   }
+  },
+  "bolt": {
+   "id": 2543,
+   "name": "bolt",
+   "props": {
+    "article": "a",
+    "name": "bolt",
+    "weight": 80,
+    "attack": 30,
+    "hitChance": "80",
+    "weaponType": "ammunition",
+    "ammoType": "bolt",
+    "shootType": "bolt"
+   }
+  },
+  "power-bolt": {
+   "id": 2547,
+   "name": "power bolt",
+   "props": {
+    "article": "a",
+    "name": "power bolt",
+    "weight": 80,
+    "attack": 50,
+    "weaponType": "ammunition",
+    "ammoType": "bolt",
+    "shootType": "powerbolt"
+   }
+  },
+  "burst-arrow": {
+   "id": 2546,
+   "name": "burst arrow",
+   "props": {
+    "article": "a",
+    "name": "burst arrow",
+    "weight": 90,
+    "hitChance": "80",
+    "weaponType": "ammunition",
+    "ammoType": "arrow",
+    "shootType": "burstarrow"
+   }
+  },
+  "poison-arrow": {
+   "id": 2545,
+   "name": "poison arrow",
+   "props": {
+    "article": "a",
+    "name": "poison arrow",
+    "weight": 80,
+    "attack": 20,
+    "hitChance": "80",
+    "weaponType": "ammunition",
+    "ammoType": "arrow",
+    "shootType": "poisonarrow"
+   }
+  },
+  "leather-armor": {
+   "id": 2467,
+   "name": "leather armor",
+   "props": {
+    "article": "a",
+    "name": "leather armor",
+    "weight": 6000,
+    "armor": 4,
+    "slotType": "body"
+   }
+  },
+  "chain-armor": {
+   "id": 2464,
+   "name": "chain armor",
+   "props": {
+    "article": "a",
+    "name": "chain armor",
+    "weight": 10000,
+    "armor": 6,
+    "slotType": "body"
+   }
+  },
+  "brass-armor": {
+   "id": 2465,
+   "name": "brass armor",
+   "props": {
+    "article": "a",
+    "name": "brass armor",
+    "weight": 8000,
+    "armor": 8,
+    "slotType": "body"
+   }
+  },
+  "plate-armor": {
+   "id": 2463,
+   "name": "plate armor",
+   "props": {
+    "article": "a",
+    "name": "plate armor",
+    "weight": 12000,
+    "armor": 10,
+    "slotType": "body"
+   }
+  },
+  "scale-armor": {
+   "id": 2483,
+   "name": "scale armor",
+   "props": {
+    "article": "a",
+    "name": "scale armor",
+    "weight": 10500,
+    "armor": 9,
+    "slotType": "body"
+   }
+  },
+  "studded-armor": {
+   "id": 2484,
+   "name": "studded armor",
+   "props": {
+    "article": "a",
+    "name": "studded armor",
+    "weight": 7100,
+    "armor": 5,
+    "slotType": "body"
+   }
+  },
+  "knight-armor": {
+   "id": 2476,
+   "name": "knight armor",
+   "props": {
+    "article": "a",
+    "name": "knight armor",
+    "weight": 12000,
+    "armor": 12,
+    "slotType": "body"
+   }
+  },
+  "crown-armor": {
+   "id": 2487,
+   "name": "crown armor",
+   "props": {
+    "article": "a",
+    "name": "crown armor",
+    "weight": 9900,
+    "armor": 13,
+    "slotType": "body"
+   }
+  },
+  "golden-armor": {
+   "id": 2466,
+   "name": "golden armor",
+   "props": {
+    "article": "a",
+    "name": "golden armor",
+    "description": "It is an enchanted armor.",
+    "weight": 8000,
+    "armor": 14,
+    "slotType": "body"
+   }
+  },
+  "noble-armor": {
+   "id": 2486,
+   "name": "noble armor",
+   "props": {
+    "article": "a",
+    "name": "noble armor",
+    "weight": 12000,
+    "armor": 11,
+    "slotType": "body"
+   }
+  },
+  "dragon-scale-mail": {
+   "id": 2492,
+   "name": "dragon scale mail",
+   "props": {
+    "article": "a",
+    "name": "dragon scale mail",
+    "weight": 11400,
+    "armor": 15,
+    "slotType": "body"
+   }
+  },
+  "magic-plate-armor": {
+   "id": 2472,
+   "name": "magic plate armor",
+   "props": {
+    "article": "a",
+    "name": "magic plate armor",
+    "description": "An enchanted gem glows on the plate armor.",
+    "weight": 8500,
+    "armor": 17,
+    "slotType": "body"
+   }
+  },
+  "demon-armor": {
+   "id": 2494,
+   "name": "demon armor",
+   "props": {
+    "article": "a",
+    "name": "demon armor",
+    "weight": 8000,
+    "armor": 16,
+    "slotType": "body"
+   }
+  },
+  "blue-robe": {
+   "id": 2656,
+   "name": "blue robe",
+   "props": {
+    "article": "a",
+    "name": "blue robe",
+    "description": "It is a magic robe.",
+    "weight": 2200,
+    "armor": 11,
+    "slotType": "body"
+   }
+  },
+  "doublet": {
+   "id": 2485,
+   "name": "doublet",
+   "props": {
+    "article": "a",
+    "name": "doublet",
+    "weight": 2500,
+    "armor": 2,
+    "slotType": "body"
+   }
+  },
+  "coat": {
+   "id": 2651,
+   "name": "coat",
+   "props": {
+    "article": "a",
+    "name": "coat",
+    "weight": 2700,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "dark-armor": {
+   "id": 2489,
+   "name": "dark armor",
+   "props": {
+    "article": "a",
+    "name": "dark armor",
+    "weight": 12000,
+    "armor": 10,
+    "slotType": "body"
+   }
+  },
+  "leather-legs": {
+   "id": 2649,
+   "name": "leather legs",
+   "props": {
+    "name": "leather legs",
+    "weight": 1800,
+    "armor": 1,
+    "slotType": "legs"
+   }
+  },
+  "studded-legs": {
+   "id": 2468,
+   "name": "studded legs",
+   "props": {
+    "name": "studded legs",
+    "weight": 2600,
+    "armor": 2,
+    "slotType": "legs"
+   }
+  },
+  "chain-legs": {
+   "id": 2648,
+   "name": "chain legs",
+   "props": {
+    "name": "chain legs",
+    "weight": 3500,
+    "armor": 3,
+    "slotType": "legs"
+   }
+  },
+  "brass-legs": {
+   "id": 2478,
+   "name": "brass legs",
+   "props": {
+    "name": "brass legs",
+    "weight": 3800,
+    "armor": 5,
+    "slotType": "legs"
+   }
+  },
+  "plate-legs": {
+   "id": 2647,
+   "name": "plate legs",
+   "props": {
+    "name": "plate legs",
+    "weight": 5000,
+    "armor": 7,
+    "slotType": "legs"
+   }
+  },
+  "knight-legs": {
+   "id": 2477,
+   "name": "knight legs",
+   "props": {
+    "name": "knight legs",
+    "weight": 7000,
+    "armor": 8,
+    "slotType": "legs"
+   }
+  },
+  "crown-legs": {
+   "id": 2488,
+   "name": "crown legs",
+   "props": {
+    "name": "crown legs",
+    "weight": 6500,
+    "armor": 8,
+    "slotType": "legs"
+   }
+  },
+  "golden-legs": {
+   "id": 2470,
+   "name": "golden legs",
+   "props": {
+    "name": "golden legs",
+    "weight": 5400,
+    "armor": 9,
+    "slotType": "legs"
+   }
+  },
+  "dragon-scale-legs": {
+   "id": 2469,
+   "name": "dragon scale legs",
+   "props": {
+    "name": "dragon scale legs",
+    "weight": 4800,
+    "armor": 10,
+    "slotType": "legs"
+   }
+  },
+  "leather-helmet": {
+   "id": 2461,
+   "name": "leather helmet",
+   "props": {
+    "article": "a",
+    "name": "leather helmet",
+    "weight": 2200,
+    "armor": 1,
+    "slotType": "head"
+   }
+  },
+  "studded-helmet": {
+   "id": 2482,
+   "name": "studded helmet",
+   "props": {
+    "article": "a",
+    "name": "studded helmet",
+    "weight": 2450,
+    "armor": 2,
+    "slotType": "head"
+   }
+  },
+  "chain-helmet": {
+   "id": 2458,
+   "name": "chain helmet",
+   "props": {
+    "article": "a",
+    "name": "chain helmet",
+    "weight": 4200,
+    "armor": 2,
+    "slotType": "head"
+   }
+  },
+  "brass-helmet": {
+   "id": 2460,
+   "name": "brass helmet",
+   "props": {
+    "article": "a",
+    "name": "brass helmet",
+    "weight": 2700,
+    "armor": 3,
+    "slotType": "head"
+   }
+  },
+  "steel-helmet": {
+   "id": 2457,
+   "name": "steel helmet",
+   "props": {
+    "article": "a",
+    "name": "steel helmet",
+    "weight": 4600,
+    "armor": 6,
+    "slotType": "head"
+   }
+  },
+  "soldier-helmet": {
+   "id": 2481,
+   "name": "soldier helmet",
+   "props": {
+    "article": "a",
+    "name": "soldier helmet",
+    "weight": 3200,
+    "armor": 5,
+    "slotType": "head"
+   }
+  },
+  "viking-helmet": {
+   "id": 2473,
+   "name": "viking helmet",
+   "props": {
+    "article": "a",
+    "name": "viking helmet",
+    "weight": 3900,
+    "armor": 4,
+    "slotType": "head"
+   }
+  },
+  "dwarven-helmet": {
+   "id": 2502,
+   "name": "dwarven helmet",
+   "props": {
+    "article": "a",
+    "name": "dwarven helmet",
+    "weight": 4200,
+    "armor": 6,
+    "slotType": "head"
+   }
+  },
+  "crown-helmet": {
+   "id": 2491,
+   "name": "crown helmet",
+   "props": {
+    "article": "a",
+    "name": "crown helmet",
+    "weight": 2950,
+    "armor": 7,
+    "slotType": "head"
+   }
+  },
+  "royal-helmet": {
+   "id": 2498,
+   "name": "royal helmet",
+   "props": {
+    "article": "a",
+    "name": "royal helmet",
+    "description": "An excellent masterpiece of a smith.",
+    "weight": 4800,
+    "armor": 9,
+    "slotType": "head"
+   }
+  },
+  "demon-helmet": {
+   "id": 2493,
+   "name": "demon helmet",
+   "props": {
+    "article": "a",
+    "name": "demon helmet",
+    "description": "You hear an evil whispering from the inside.",
+    "weight": 2950,
+    "armor": 10,
+    "slotType": "head"
+   }
+  },
+  "devil-helmet": {
+   "id": 2462,
+   "name": "devil helmet",
+   "props": {
+    "article": "a",
+    "name": "devil helmet",
+    "weight": 5000,
+    "armor": 7,
+    "slotType": "head"
+   }
+  },
+  "warrior-helmet": {
+   "id": 2475,
+   "name": "warrior helmet",
+   "props": {
+    "article": "a",
+    "name": "warrior helmet",
+    "weight": 6800,
+    "armor": 8,
+    "slotType": "head"
+   }
+  },
+  "crusader-helmet": {
+   "id": 2497,
+   "name": "crusader helmet",
+   "props": {
+    "article": "a",
+    "name": "crusader helmet",
+    "weight": 5200,
+    "armor": 8,
+    "slotType": "head"
+   }
+  },
+  "horned-helmet": {
+   "id": 2496,
+   "name": "horned helmet",
+   "props": {
+    "article": "a",
+    "name": "horned helmet",
+    "weight": 5100,
+    "armor": 11,
+    "slotType": "head"
+   }
+  },
+  "winged-helmet": {
+   "id": 2474,
+   "name": "winged helmet",
+   "props": {
+    "article": "a",
+    "name": "winged helmet",
+    "description": "It is the Helmet of Hermes.",
+    "weight": 1200,
+    "armor": 10,
+    "slotType": "head"
+   }
+  },
+  "strange-helmet": {
+   "id": 2479,
+   "name": "strange helmet",
+   "props": {
+    "article": "a",
+    "name": "strange helmet",
+    "weight": 4600,
+    "armor": 6,
+    "slotType": "head"
+   }
+  },
+  "mystic-turban": {
+   "id": 2663,
+   "name": "mystic turban",
+   "props": {
+    "article": "a",
+    "name": "mystic turban",
+    "description": "Something is strange about this turban.",
+    "weight": 850,
+    "armor": 1,
+    "slotType": "head"
+   }
+  },
+  "leather-boots": {
+   "id": 2643,
+   "name": "leather boots",
+   "props": {
+    "name": "leather boots",
+    "weight": 900,
+    "armor": 1,
+    "slotType": "feet"
+   }
+  },
+  "boots-of-haste": {
+   "id": 2195,
+   "name": "boots of haste",
+   "props": {
+    "name": "boots of haste",
+    "weight": 750,
+    "slotType": "feet",
+    "speed": 40
+   }
+  },
+  "steel-boots": {
+   "id": 2645,
+   "name": "steel boots",
+   "props": {
+    "name": "steel boots",
+    "weight": 2900,
+    "armor": 3,
+    "slotType": "feet"
+   }
+  },
+  "golden-boots": {
+   "id": 2646,
+   "name": "golden boots",
+   "props": {
+    "name": "golden boots",
+    "weight": 3200,
+    "armor": 4,
+    "slotType": "feet"
+   }
+  },
+  "sandals": {
+   "id": 2642,
+   "name": "sandals",
+   "props": {
+    "name": "sandals",
+    "weight": 600,
+    "slotType": "feet"
+   }
+  },
+  "soft-boots": {
+   "id": 2640,
+   "name": "soft boots",
+   "props": {
+    "name": "soft boots",
+    "weight": 800,
+    "slotType": "feet",
+    "decayTo": 6530,
+    "transformDeEquipTo": 6132,
+    "duration": 14400,
+    "healthGain": 1,
+    "healthTicks": 2000,
+    "manaGain": 2,
+    "manaTicks": 1000,
+    "showduration": true
+   }
+  },
+  "wooden-shield": {
+   "id": 2512,
+   "name": "wooden shield",
+   "props": {
+    "article": "a",
+    "name": "wooden shield",
+    "weight": 4000,
+    "defense": 14,
+    "weaponType": "shield"
+   }
+  },
+  "studded-shield": {
+   "id": 2526,
+   "name": "studded shield",
+   "props": {
+    "article": "a",
+    "name": "studded shield",
+    "weight": 5900,
+    "defense": 15,
+    "weaponType": "shield"
+   }
+  },
+  "brass-shield": {
+   "id": 2511,
+   "name": "brass shield",
+   "props": {
+    "article": "a",
+    "name": "brass shield",
+    "weight": 6000,
+    "defense": 16,
+    "weaponType": "shield"
+   }
+  },
+  "plate-shield": {
+   "id": 2510,
+   "name": "plate shield",
+   "props": {
+    "article": "a",
+    "name": "plate shield",
+    "weight": 6500,
+    "defense": 17,
+    "weaponType": "shield"
+   }
+  },
+  "steel-shield": {
+   "id": 2509,
+   "name": "steel shield",
+   "props": {
+    "article": "a",
+    "name": "steel shield",
+    "weight": 6900,
+    "defense": 21,
+    "weaponType": "shield"
+   }
+  },
+  "copper-shield": {
+   "id": 2530,
+   "name": "copper shield",
+   "props": {
+    "article": "a",
+    "name": "copper shield",
+    "weight": 6300,
+    "defense": 19,
+    "weaponType": "shield"
+   }
+  },
+  "battle-shield": {
+   "id": 2513,
+   "name": "battle shield",
+   "props": {
+    "article": "a",
+    "name": "battle shield",
+    "weight": 6200,
+    "defense": 23,
+    "weaponType": "shield"
+   }
+  },
+  "dragon-shield": {
+   "id": 2516,
+   "name": "dragon shield",
+   "props": {
+    "article": "a",
+    "name": "dragon shield",
+    "weight": 6000,
+    "defense": 31,
+    "weaponType": "shield"
+   }
+  },
+  "tower-shield": {
+   "id": 2528,
+   "name": "tower shield",
+   "props": {
+    "article": "a",
+    "name": "tower shield",
+    "weight": 8200,
+    "defense": 32,
+    "weaponType": "shield"
+   }
+  },
+  "demon-shield": {
+   "id": 2520,
+   "name": "demon shield",
+   "props": {
+    "article": "a",
+    "name": "demon shield",
+    "description": "This powerful shield seems to be as light as air.",
+    "weight": 2600,
+    "defense": 35,
+    "weaponType": "shield"
+   }
+  },
+  "guardian-shield": {
+   "id": 2515,
+   "name": "guardian shield",
+   "props": {
+    "article": "a",
+    "name": "guardian shield",
+    "weight": 5500,
+    "defense": 30,
+    "weaponType": "shield"
+   }
+  },
+  "vampire-shield": {
+   "id": 2534,
+   "name": "vampire shield",
+   "props": {
+    "article": "a",
+    "name": "vampire shield",
+    "description": "Dark powers enchant this shield.",
+    "weight": 3800,
+    "defense": 34,
+    "weaponType": "shield"
+   }
+  },
+  "amazon-shield": {
+   "id": 2537,
+   "name": "amazon shield",
+   "props": {
+    "article": "an",
+    "name": "amazon shield",
+    "weight": 6200,
+    "defense": 32,
+    "weaponType": "shield"
+   }
+  },
+  "medusa-shield": {
+   "id": 2536,
+   "name": "medusa shield",
+   "props": {
+    "article": "a",
+    "name": "medusa shield",
+    "weight": 5800,
+    "defense": 33,
+    "weaponType": "shield"
+   }
+  },
+  "phoenix-shield": {
+   "id": 2539,
+   "name": "phoenix shield",
+   "props": {
+    "article": "a",
+    "name": "phoenix shield",
+    "description": "This shield feels warm to the touch.",
+    "weight": 3500,
+    "defense": 34,
+    "weaponType": "shield"
+   }
+  },
+  "crown-shield": {
+   "id": 2519,
+   "name": "crown shield",
+   "props": {
+    "article": "a",
+    "name": "crown shield",
+    "weight": 6200,
+    "defense": 32,
+    "weaponType": "shield"
+   }
+  },
+  "griffin-shield": {
+   "id": 2533,
+   "name": "griffin shield",
+   "props": {
+    "article": "a",
+    "name": "griffin shield",
+    "weight": 5000,
+    "defense": 29,
+    "weaponType": "shield"
+   }
+  },
+  "ancient-shield": {
+   "id": 2532,
+   "name": "ancient shield",
+   "props": {
+    "article": "an",
+    "name": "ancient shield",
+    "weight": 6100,
+    "defense": 27,
+    "weaponType": "shield"
+   }
+  },
+  "dark-shield": {
+   "id": 2521,
+   "name": "dark shield",
+   "props": {
+    "article": "a",
+    "name": "dark shield",
+    "weight": 5200,
+    "defense": 25,
+    "weaponType": "shield"
+   }
+  },
+  "castle-shield": {
+   "id": 2535,
+   "name": "castle shield",
+   "props": {
+    "article": "a",
+    "name": "castle shield",
+    "weight": 4900,
+    "defense": 28,
+    "weaponType": "shield"
+   }
+  },
+  "scarab-shield": {
+   "id": 2540,
+   "name": "scarab shield",
+   "props": {
+    "article": "a",
+    "name": "scarab shield",
+    "weight": 4700,
+    "defense": 25,
+    "weaponType": "shield"
+   }
+  },
+  "life-ring": {
+   "id": 2168,
+   "name": "life ring",
+   "props": {
+    "article": "a",
+    "name": "life ring",
+    "weight": 80,
+    "slotType": "ring",
+    "transformEquipTo": 2205,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "might-ring": {
+   "id": 2164,
+   "name": "might ring",
+   "props": {
+    "article": "a",
+    "name": "might ring",
+    "weight": 100,
+    "slotType": "ring",
+    "charges": 20,
+    "showcharges": true,
+    "absorbPercentAll": "25"
+   }
+  },
+  "power-ring": {
+   "id": 2166,
+   "name": "power ring",
+   "props": {
+    "article": "a",
+    "name": "power ring",
+    "weight": 80,
+    "slotType": "ring",
+    "transformEquipTo": 2203,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "energy-ring": {
+   "id": 2167,
+   "name": "energy ring",
+   "props": {
+    "article": "an",
+    "name": "energy ring",
+    "weight": 80,
+    "slotType": "ring",
+    "transformEquipTo": 2204,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "sword-ring": {
+   "id": 2207,
+   "name": "sword ring",
+   "props": {
+    "article": "a",
+    "name": "sword ring",
+    "weight": 90,
+    "slotType": "ring",
+    "transformEquipTo": 2210,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "axe-ring": {
+   "id": 2208,
+   "name": "axe ring",
+   "props": {
+    "article": "an",
+    "name": "axe ring",
+    "weight": 90,
+    "slotType": "ring",
+    "transformEquipTo": 2211,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "club-ring": {
+   "id": 2209,
+   "name": "club ring",
+   "props": {
+    "article": "a",
+    "name": "club ring",
+    "weight": 90,
+    "slotType": "ring",
+    "transformEquipTo": 2212,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "dwarven-ring": {
+   "id": 2213,
+   "name": "dwarven ring",
+   "props": {
+    "article": "a",
+    "name": "dwarven ring",
+    "weight": 110,
+    "slotType": "ring",
+    "transformEquipTo": 2215,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "ring-of-healing": {
+   "id": 2214,
+   "name": "ring of healing",
+   "props": {
+    "article": "a",
+    "name": "ring of healing",
+    "weight": 80,
+    "slotType": "ring",
+    "transformEquipTo": 2216,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "time-ring": {
+   "id": 2169,
+   "name": "time ring",
+   "props": {
+    "article": "a",
+    "name": "time ring",
+    "weight": 90,
+    "slotType": "ring",
+    "transformEquipTo": 2206,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "stealth-ring": {
+   "id": 2165,
+   "name": "stealth ring",
+   "props": {
+    "article": "a",
+    "name": "stealth ring",
+    "weight": 100,
+    "slotType": "ring",
+    "transformEquipTo": 2202,
+    "stopduration": true,
+    "showduration": true
+   }
+  },
+  "strange-talisman": {
+   "id": 2161,
+   "name": "strange talisman",
+   "props": {
+    "article": "a",
+    "name": "strange talisman",
+    "weight": 290,
+    "slotType": "necklace",
+    "charges": 200,
+    "showcharges": true,
+    "absorbPercentEnergy": 10
+   }
+  },
+  "silver-amulet": {
+   "id": 2170,
+   "name": "silver amulet",
+   "props": {
+    "article": "a",
+    "name": "silver amulet",
+    "weight": 500,
+    "slotType": "necklace",
+    "charges": 200,
+    "showcharges": true,
+    "absorbPercentPoison": 10
+   }
+  },
+  "bronze-amulet": {
+   "id": 2172,
+   "name": "bronze amulet",
+   "props": {
+    "article": "a",
+    "name": "bronze amulet",
+    "weight": 500,
+    "slotType": "necklace",
+    "charges": 200,
+    "showcharges": true,
+    "absorbPercentManaDrain": "20"
+   }
+  },
+  "dragon-necklace": {
+   "id": 2201,
+   "name": "dragon necklace",
+   "props": {
+    "article": "a",
+    "name": "dragon necklace",
+    "weight": 630,
+    "slotType": "necklace",
+    "charges": 200,
+    "showcharges": true,
+    "absorbPercentFire": 10
+   }
+  },
+  "protection-amulet": {
+   "id": 2200,
+   "name": "protection amulet",
+   "props": {
+    "article": "a",
+    "name": "protection amulet",
+    "weight": 550,
+    "slotType": "necklace",
+    "charges": 250,
+    "showcharges": true,
+    "absorbPercentPhysical": 10
+   }
+  },
+  "stone-skin-amulet": {
+   "id": 2197,
+   "name": "stone skin amulet",
+   "props": {
+    "article": "a",
+    "name": "stone skin amulet",
+    "weight": 760,
+    "slotType": "necklace",
+    "charges": 5,
+    "showcharges": true,
+    "absorbPercentPhysical": 80
+   }
+  },
+  "elven-amulet": {
+   "id": 2198,
+   "name": "elven amulet",
+   "props": {
+    "article": "an",
+    "name": "elven amulet",
+    "weight": 270,
+    "slotType": "necklace",
+    "charges": 50,
+    "showcharges": true,
+    "absorbPercentPhysical": 10,
+    "absorbPercentEnergy": 10,
+    "absorbPercentFire": 10,
+    "absorbPercentPoison": 10
+   }
+  },
+  "amulet-of-loss": {
+   "id": 2173,
+   "name": "amulet of loss",
+   "props": {
+    "article": "an",
+    "name": "amulet of loss",
+    "weight": 420,
+    "slotType": "necklace",
+    "preventitemloss": true,
+    "charges": 1
+   }
+  },
+  "platinum-amulet": {
+   "id": 2171,
+   "name": "platinum amulet",
+   "props": {
+    "article": "a",
+    "name": "platinum amulet",
+    "description": "It is an amulet of protection.",
+    "weight": 600,
+    "armor": 2,
+    "slotType": "necklace"
+   }
+  },
+  "garlic-necklace": {
+   "id": 2199,
+   "name": "garlic necklace",
+   "props": {
+    "article": "a",
+    "name": "garlic necklace",
+    "weight": 380,
+    "slotType": "necklace",
+    "charges": 150,
+    "showcharges": true,
+    "absorbPercentLifeDrain": 20
+   }
+  },
+  "scarab-amulet": {
+   "id": 2135,
+   "name": "scarab amulet",
+   "props": {
+    "article": "a",
+    "name": "scarab amulet",
+    "weight": 120,
+    "slotType": "necklace"
+   }
+  },
+  "star-amulet": {
+   "id": 2131,
+   "name": "star amulet",
+   "props": {
+    "article": "a",
+    "name": "star amulet",
+    "weight": 660,
+    "slotType": "necklace"
+   }
+  },
+  "demonbone-amulet": {
+   "id": 2136,
+   "name": "demonbone amulet",
+   "props": {
+    "article": "a",
+    "name": "demonbone amulet",
+    "weight": 700,
+    "slotType": "necklace"
+   }
+  },
+  "gold-coin": {
+   "id": 2148,
+   "name": "gold coin",
+   "props": {
+    "article": "a",
+    "name": "gold coin",
+    "weight": 10
+   }
+  },
+  "platinum-coin": {
+   "id": 2152,
+   "name": "platinum coin",
+   "props": {
+    "article": "a",
+    "name": "platinum coin",
+    "weight": 10
+   }
+  },
+  "crystal-coin": {
+   "id": 2160,
+   "name": "crystal coin",
+   "props": {
+    "article": "a",
+    "name": "crystal coin",
+    "weight": 10
+   }
+  },
+  "brown-mushroom": {
+   "id": 2789,
+   "name": "brown mushroom",
+   "props": {
+    "article": "a",
+    "name": "brown mushroom",
+    "weight": 20
+   }
+  },
+  "white-mushroom": {
+   "id": 2787,
+   "name": "white mushroom",
+   "props": {
+    "article": "a",
+    "name": "white mushroom",
+    "weight": 40
+   }
+  },
+  "backpack": {
+   "id": 1988,
+   "name": "backpack",
+   "props": {
+    "article": "a",
+    "name": "backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "bag": {
+   "id": 1987,
+   "name": "bag",
+   "props": {
+    "article": "a",
+    "name": "bag",
+    "weight": 800,
+    "containerSize": 8,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "golden-mug": {
+   "id": 2033,
+   "name": "golden mug",
+   "props": {
+    "article": "a",
+    "name": "golden mug",
+    "weight": 470,
+    "type": "fluidContainer"
+   }
+  },
+  "torch": {
+   "id": 2050,
+   "name": "torch",
+   "props": {
+    "article": "a",
+    "name": "torch",
+    "weight": 500,
+    "stopduration": true
+   }
+  },
+  "rope": {
+   "id": 2120,
+   "name": "rope",
+   "props": {
+    "article": "a",
+    "name": "rope",
+    "weight": 1800
+   }
+  },
+  "shovel": {
+   "id": 2554,
+   "name": "shovel",
+   "props": {
+    "article": "a",
+    "name": "shovel",
+    "weight": 3500
+   }
+  },
+  "pick": {
+   "id": 2553,
+   "name": "pick",
+   "props": {
+    "article": "a",
+    "name": "pick",
+    "weight": 3500
+   }
+  },
+  "dragon-ham": {
+   "id": 2672,
+   "name": "dragon ham",
+   "props": {
+    "name": "dragon ham",
+    "description": "It still contains a small part of the power of a dragon.",
+    "weight": 3000,
+    "showcount": "0"
+   }
+  },
+  "ham": {
+   "id": 2671,
+   "name": "ham",
+   "props": {
+    "name": "ham",
+    "weight": 2000,
+    "showcount": "0"
+   }
+  },
+  "meat": {
+   "id": 2666,
+   "name": "meat",
+   "props": {
+    "name": "meat",
+    "weight": 1300,
+    "showcount": "0"
+   }
+  },
+  "cheese": {
+   "id": 2696,
+   "name": "cheese",
+   "props": {
+    "name": "cheese",
+    "weight": 400
+   }
+  },
+  "bread": {
+   "id": 2689,
+   "name": "bread",
+   "props": {
+    "name": "bread",
+    "weight": 500
+   }
+  },
+  "skull": {
+   "id": 2229,
+   "name": "skull",
+   "props": {
+    "article": "a",
+    "name": "skull",
+    "weight": 2180
+   }
+  },
+  "bone": {
+   "id": 2230,
+   "name": "bone",
+   "props": {
+    "article": "a",
+    "name": "bone",
+    "weight": 950
+   }
+  },
+  "small-diamond": {
+   "id": 2145,
+   "name": "small diamond",
+   "props": {
+    "article": "a",
+    "name": "small diamond",
+    "weight": 10
+   }
+  },
+  "small-ruby": {
+   "id": 2147,
+   "name": "small ruby",
+   "props": {
+    "article": "a",
+    "name": "small ruby",
+    "weight": 10
+   }
+  },
+  "small-emerald": {
+   "id": 2149,
+   "name": "small emerald",
+   "props": {
+    "article": "a",
+    "name": "small emerald",
+    "weight": 10
+   }
+  },
+  "small-sapphire": {
+   "id": 2146,
+   "name": "small sapphire",
+   "props": {
+    "article": "a",
+    "name": "small sapphire",
+    "weight": 10
+   }
+  },
+  "small-amethyst": {
+   "id": 2150,
+   "name": "small amethyst",
+   "props": {
+    "article": "a",
+    "name": "small amethyst",
+    "weight": 10
+   }
+  },
+  "talon": {
+   "id": 2151,
+   "name": "talon",
+   "props": {
+    "article": "a",
+    "name": "talon",
+    "weight": 20,
+    "description": "There are many rumours about these magic gems."
+   }
+  },
+  "green-gem": {
+   "id": 2155,
+   "name": "green gem",
+   "props": {
+    "article": "a",
+    "name": "green gem",
+    "weight": 150
+   }
+  },
+  "blue-gem": {
+   "id": 2158,
+   "name": "blue gem",
+   "props": {
+    "article": "a",
+    "name": "blue gem",
+    "weight": 100
+   }
+  },
+  "red-gem": {
+   "id": 2156,
+   "name": "red gem",
+   "props": {
+    "article": "a",
+    "name": "red gem",
+    "weight": 30
+   }
+  },
+  "yellow-gem": {
+   "id": 2154,
+   "name": "yellow gem",
+   "props": {
+    "article": "a",
+    "name": "yellow gem",
+    "weight": 30
+   }
+  },
+  "violet-gem": {
+   "id": 2153,
+   "name": "violet gem",
+   "props": {
+    "article": "a",
+    "name": "violet gem",
+    "weight": 30
+   }
+  },
+  "book": {
+   "id": 1950,
+   "name": "book",
+   "props": {
+    "article": "a",
+    "name": "book",
+    "weight": 1300,
+    "type": "readable"
+   }
+  },
+  "green-mushroom": {
+   "id": 2796,
+   "name": "green mushroom",
+   "props": {
+    "article": "a",
+    "name": "green mushroom",
+    "weight": 10
+   }
+  },
+  "fish": {
+   "id": 2667,
+   "name": "fish",
+   "props": {
+    "article": "a",
+    "name": "fish",
+    "weight": 520
+   }
+  },
+  "broad-sword": {
+   "id": 2413,
+   "name": "broad sword",
+   "props": {
+    "article": "a",
+    "name": "broad sword",
+    "weight": 5250,
+    "defense": 23,
+    "attack": 26,
+    "weaponType": "sword",
+    "slotType": "two-handed"
+   }
+  },
+  "daramanian-mace": {
+   "id": 2439,
+   "name": "daramanian mace",
+   "props": {
+    "article": "a",
+    "name": "daramanian mace",
+    "weight": 6800,
+    "defense": 12,
+    "attack": 21,
+    "weaponType": "club"
+   }
+  },
+  "daramanian-waraxe": {
+   "id": 2440,
+   "name": "daramanian waraxe",
+   "props": {
+    "article": "a",
+    "name": "daramanian waraxe",
+    "weight": 5250,
+    "defense": 15,
+    "attack": 39,
+    "weaponType": "axe"
+   }
+  },
+  "daramanian-axe": {
+   "id": 2441,
+   "name": "daramanian axe",
+   "props": {
+    "article": "a",
+    "name": "daramanian axe",
+    "weight": 5250,
+    "defense": 10,
+    "attack": 15,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "dwarven-axe": {
+   "id": 2435,
+   "name": "dwarven axe",
+   "props": {
+    "article": "a",
+    "name": "dwarven axe",
+    "weight": 8200,
+    "defense": 19,
+    "attack": 31,
+    "weaponType": "axe"
+   }
+  },
+  "dwarven-shield": {
+   "id": 2525,
+   "name": "dwarven shield",
+   "props": {
+    "article": "a",
+    "name": "dwarven shield",
+    "weight": 5500,
+    "defense": 26,
+    "weaponType": "shield"
+   }
+  },
+  "dwarven-armor": {
+   "id": 2503,
+   "name": "dwarven armor",
+   "props": {
+    "article": "a",
+    "name": "dwarven armor",
+    "weight": 13000,
+    "armor": 10,
+    "slotType": "body"
+   }
+  },
+  "dwarven-legs": {
+   "id": 2504,
+   "name": "dwarven legs",
+   "props": {
+    "name": "dwarven legs",
+    "weight": 4000,
+    "armor": 6,
+    "slotType": "legs"
+   }
+  },
+  "war-axe": {
+   "id": 2454,
+   "name": "war axe",
+   "props": {
+    "article": "a",
+    "name": "war axe",
+    "weight": 6150,
+    "defense": 10,
+    "attack": 48,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "twin-axe": {
+   "id": 2447,
+   "name": "twin axe",
+   "props": {
+    "article": "a",
+    "name": "twin axe",
+    "weight": 6400,
+    "defense": 24,
+    "attack": 45,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "hammer-of-wrath": {
+   "id": 2444,
+   "name": "hammer of wrath",
+   "props": {
+    "article": "a",
+    "name": "hammer of wrath",
+    "weight": 7000,
+    "defense": 12,
+    "attack": 48,
+    "weaponType": "club"
+   }
+  },
+  "arcane-staff": {
+   "id": 2453,
+   "name": "arcane staff",
+   "props": {
+    "article": "an",
+    "name": "arcane staff",
+    "weight": 4000,
+    "defense": 30,
+    "attack": 50,
+    "weaponType": "club",
+    "slotType": "two-handed"
+   }
+  },
+  "magic-sword": {
+   "id": 2400,
+   "name": "magic sword",
+   "props": {
+    "article": "a",
+    "name": "magic sword",
+    "description": "It is the Sword of Valor.",
+    "weight": 4200,
+    "defense": 35,
+    "attack": 48,
+    "weaponType": "sword"
+   }
+  },
+  "pharaoh-sword": {
+   "id": 2446,
+   "name": "pharaoh sword",
+   "props": {
+    "article": "a",
+    "name": "pharaoh sword",
+    "weight": 19000,
+    "defense": 23,
+    "attack": 41,
+    "weaponType": "sword"
+   }
+  },
+  "djinn-blade": {
+   "id": 2451,
+   "name": "djinn blade",
+   "props": {
+    "article": "a",
+    "name": "djinn blade",
+    "weight": 2450,
+    "defense": 22,
+    "attack": 38,
+    "weaponType": "sword"
+   }
+  },
+  "poison-dagger": {
+   "id": 2411,
+   "name": "poison dagger",
+   "props": {
+    "article": "a",
+    "name": "poison dagger",
+    "weight": 880,
+    "defense": 8,
+    "attack": 18,
+    "weaponType": "sword"
+   }
+  },
+  "silver-dagger": {
+   "id": 2402,
+   "name": "silver dagger",
+   "props": {
+    "article": "a",
+    "name": "silver dagger",
+    "weight": 1019,
+    "defense": 7,
+    "attack": 8,
+    "weaponType": "sword"
+   }
+  },
+  "throwing-knife": {
+   "id": 2410,
+   "name": "throwing knife",
+   "props": {
+    "article": "a",
+    "name": "throwing knife",
+    "weight": 500,
+    "attack": 25,
+    "weaponType": "distance",
+    "shootType": "throwingknife",
+    "range": "5"
+   }
+  },
+  "throwing-star": {
+   "id": 2399,
+   "name": "throwing star",
+   "props": {
+    "article": "a",
+    "name": "throwing star",
+    "weight": 200,
+    "attack": 30,
+    "weaponType": "distance",
+    "shootType": "throwingstar",
+    "range": "5"
+   }
+  },
+  "katana": {
+   "id": 2412,
+   "name": "katana",
+   "props": {
+    "article": "a",
+    "name": "katana",
+    "weight": 3100,
+    "defense": 12,
+    "attack": 16,
+    "weaponType": "sword"
+   }
+  },
+  "naginata": {
+   "id": 2426,
+   "name": "naginata",
+   "props": {
+    "article": "a",
+    "name": "naginata",
+    "weight": 8000,
+    "defense": 19,
+    "attack": 39,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "scimitar": {
+   "id": 2419,
+   "name": "scimitar",
+   "props": {
+    "article": "a",
+    "name": "scimitar",
+    "weight": 2900,
+    "defense": 13,
+    "attack": 19,
+    "weaponType": "sword"
+   }
+  },
+  "short-sword": {
+   "id": 2406,
+   "name": "short sword",
+   "props": {
+    "article": "a",
+    "name": "short sword",
+    "weight": 3500,
+    "defense": 11,
+    "attack": 11,
+    "weaponType": "sword"
+   }
+  },
+  "dagger": {
+   "id": 2379,
+   "name": "dagger",
+   "props": {
+    "article": "a",
+    "name": "dagger",
+    "weight": 950,
+    "defense": 6,
+    "attack": 8,
+    "weaponType": "sword"
+   }
+  },
+  "staff": {
+   "id": 2401,
+   "name": "staff",
+   "props": {
+    "article": "a",
+    "name": "staff",
+    "weight": 3800,
+    "defense": 25,
+    "attack": 10,
+    "weaponType": "club",
+    "slotType": "two-handed"
+   }
+  },
+  "crystal-mace": {
+   "id": 2445,
+   "name": "crystal mace",
+   "props": {
+    "article": "a",
+    "name": "crystal mace",
+    "weight": 8000,
+    "defense": 16,
+    "attack": 38,
+    "weaponType": "club"
+   }
+  },
+  "skull-staff": {
+   "id": 2436,
+   "name": "skull staff",
+   "props": {
+    "article": "a",
+    "name": "skull staff",
+    "description": "The staff longs for death.",
+    "weight": 1700,
+    "defense": 12,
+    "attack": 36,
+    "weaponType": "club"
+   }
+  },
+  "bone-club": {
+   "id": 2449,
+   "name": "bone club",
+   "props": {
+    "article": "a",
+    "name": "bone club",
+    "weight": 3900,
+    "defense": 8,
+    "attack": 12,
+    "weaponType": "club"
+   }
+  },
+  "bone-sword": {
+   "id": 2450,
+   "name": "bone sword",
+   "props": {
+    "article": "a",
+    "name": "bone sword",
+    "weight": 1900,
+    "defense": 10,
+    "attack": 14,
+    "weaponType": "sword"
+   }
+  },
+  "studded-club": {
+   "id": 2448,
+   "name": "studded club",
+   "props": {
+    "article": "a",
+    "name": "studded club",
+    "weight": 3500,
+    "defense": 8,
+    "attack": 9,
+    "weaponType": "club"
+   }
+  },
+  "small-axe": {
+   "id": 2559,
+   "name": "small axe",
+   "props": {
+    "article": "a",
+    "name": "small axe",
+    "weight": 2000
+   }
+  },
+  "hand-axe": {
+   "id": 2380,
+   "name": "hand axe",
+   "props": {
+    "article": "a",
+    "name": "hand axe",
+    "weight": 1800,
+    "defense": 5,
+    "attack": 10,
+    "weaponType": "axe"
+   }
+  },
+  "wooden-wand": {
+   "id": 2181,
+   "name": "wooden wand",
+   "props": {
+    "article": "a",
+    "name": "wooden wand",
+    "weight": 2650
+   }
+  },
+  "elven-wand": {
+   "id": 2183,
+   "name": "elven wand",
+   "props": {
+    "article": "an",
+    "name": "elven wand",
+    "weight": 2100
+   }
+  },
+  "crystal-wand": {
+   "id": 2184,
+   "name": "crystal wand",
+   "props": {
+    "article": "a",
+    "name": "crystal wand",
+    "weight": 2800
+   }
+  },
+  "wand-of-might": {
+   "id": 2185,
+   "name": "wand of might",
+   "props": {
+    "article": "a",
+    "name": "wand of might",
+    "weight": 2900
+   }
+  },
+  "conjurer-wand": {
+   "id": 2186,
+   "name": "conjurer wand",
+   "props": {
+    "article": "a",
+    "name": "conjurer wand",
+    "weight": 1950
+   }
+  },
+  "ritual-wand": {
+   "id": 2187,
+   "name": "ritual wand",
+   "props": {
+    "article": "a",
+    "name": "ritual wand",
+    "weight": 3050
+   }
+  },
+  "green-spell-wand": {
+   "id": 2188,
+   "name": "green spell wand",
+   "props": {
+    "article": "a",
+    "name": "green spell wand",
+    "weight": 2300
+   }
+  },
+  "yellow-spell-wand": {
+   "id": 2189,
+   "name": "yellow spell wand",
+   "props": {
+    "article": "a",
+    "name": "yellow spell wand",
+    "weight": 2300
+   }
+  },
+  "blue-spell-wand": {
+   "id": 2190,
+   "name": "blue spell wand",
+   "props": {
+    "article": "a",
+    "name": "blue spell wand",
+    "description": "Surges of energy rush through the tip of this wand.",
+    "weight": 2300,
+    "weaponType": "wand",
+    "range": "3"
+   }
+  },
+  "red-spell-wand": {
+   "id": 2191,
+   "name": "red spell wand",
+   "props": {
+    "article": "a",
+    "name": "red spell wand",
+    "description": "Legends say that this wand holds the soul of a young dragon.",
+    "weight": 2300,
+    "weaponType": "wand",
+    "range": "3"
+   }
+  },
+  "golden-wand": {
+   "id": 2182,
+   "name": "golden wand",
+   "props": {
+    "article": "a",
+    "name": "golden wand",
+    "weight": 4300
+   }
+  },
+  "enchanted-staff": {
+   "id": 2433,
+   "name": "enchanted staff",
+   "props": {
+    "article": "an",
+    "name": "enchanted staff",
+    "description": "Temporary magic powers enchant this staff.",
+    "weight": 3800,
+    "defense": 45,
+    "attack": 39,
+    "weaponType": "club",
+    "slotType": "two-handed",
+    "decayTo": 2401,
+    "duration": 60
+   }
+  },
+  "life-crystal": {
+   "id": 2177,
+   "name": "life crystal",
+   "props": {
+    "article": "a",
+    "name": "life crystal",
+    "weight": 250
+   }
+  },
+  "mind-stone": {
+   "id": 2178,
+   "name": "mind stone",
+   "props": {
+    "article": "a",
+    "name": "mind stone",
+    "weight": 250
+   }
+  },
+  "orb": {
+   "id": 2176,
+   "name": "orb",
+   "props": {
+    "article": "an",
+    "name": "orb",
+    "weight": 800
+   }
+  },
+  "crystal-ball": {
+   "id": 2192,
+   "name": "crystal ball",
+   "props": {
+    "article": "a",
+    "name": "crystal ball",
+    "weight": 3400
+   }
+  },
+  "spellbook": {
+   "id": 2175,
+   "name": "spellbook",
+   "props": {
+    "article": "a",
+    "name": "spellbook",
+    "weight": 5800
+   }
+  },
+  "amazon-armor": {
+   "id": 2500,
+   "name": "amazon armor",
+   "props": {
+    "article": "an",
+    "name": "amazon armor",
+    "weight": 9900,
+    "armor": 13,
+    "slotType": "body"
+   }
+  },
+  "amazon-helmet": {
+   "id": 2499,
+   "name": "amazon helmet",
+   "props": {
+    "article": "an",
+    "name": "amazon helmet",
+    "weight": 2950,
+    "armor": 7,
+    "slotType": "head"
+   }
+  },
+  "native-armor": {
+   "id": 2508,
+   "name": "native armor",
+   "props": {
+    "article": "a",
+    "name": "native armor",
+    "slotType": "body",
+    "armor": 7
+   }
+  },
+  "elven-legs": {
+   "id": 2507,
+   "name": "elven legs",
+   "props": {
+    "name": "elven legs",
+    "weight": 4800,
+    "armor": 10,
+    "slotType": "legs"
+   }
+  },
+  "demon-legs": {
+   "id": 2495,
+   "name": "demon legs",
+   "props": {
+    "name": "demon legs",
+    "weight": 5400,
+    "armor": 9,
+    "slotType": "legs"
+   }
+  },
+  "dragon-scale-helmet": {
+   "id": 2506,
+   "name": "dragon scale helmet",
+   "props": {
+    "article": "a",
+    "name": "dragon scale helmet",
+    "description": "It is made of dragon scales.",
+    "weight": 6000,
+    "armor": 10,
+    "slotType": "head"
+   }
+  },
+  "golden-helmet": {
+   "id": 2471,
+   "name": "golden helmet",
+   "props": {
+    "article": "a",
+    "name": "golden helmet",
+    "description": "It is the famous Helmet of the Stars.",
+    "weight": 3200,
+    "armor": 12,
+    "slotType": "head"
+   }
+  },
+  "iron-helmet": {
+   "id": 2459,
+   "name": "iron helmet",
+   "props": {
+    "article": "an",
+    "name": "iron helmet",
+    "weight": 3000,
+    "armor": 5,
+    "slotType": "head"
+   }
+  },
+  "legion-helmet": {
+   "id": 2480,
+   "name": "legion helmet",
+   "props": {
+    "article": "a",
+    "name": "legion helmet",
+    "weight": 3100,
+    "armor": 4,
+    "slotType": "head"
+   }
+  },
+  "dark-helmet": {
+   "id": 2490,
+   "name": "dark helmet",
+   "props": {
+    "article": "a",
+    "name": "dark helmet",
+    "weight": 4600,
+    "armor": 6,
+    "slotType": "head"
+   }
+  },
+  "damaged-helmet": {
+   "id": 2339,
+   "name": "damaged helmet",
+   "props": {
+    "article": "a",
+    "name": "damaged helmet",
+    "description": "This item seems to have several parts missing.",
+    "weight": 1800,
+    "armor": 5
+   }
+  },
+  "helmet-of-the-ancients": {
+   "id": 2342,
+   "name": "helmet of the ancients",
+   "props": {
+    "article": "a",
+    "name": "helmet of the ancients",
+    "description": "The gem of the helmet is burned out and should be replaced.",
+    "weight": 2760,
+    "armor": 8,
+    "slotType": "head"
+   }
+  },
+  "magician-hat": {
+   "id": 2662,
+   "name": "magician hat",
+   "props": {
+    "article": "a",
+    "name": "magician hat",
+    "weight": 750,
+    "armor": 1,
+    "slotType": "head"
+   }
+  },
+  "hat-of-the-mad": {
+   "id": 2323,
+   "name": "hat of the mad",
+   "props": {
+    "article": "a",
+    "name": "hat of the mad",
+    "description": "You have a vague feeling that it looks somewhat silly.",
+    "weight": 700,
+    "armor": 3,
+    "magicpoints": true,
+    "slotType": "head"
+   }
+  },
+  "mastermind-shield": {
+   "id": 2514,
+   "name": "mastermind shield",
+   "props": {
+    "article": "a",
+    "name": "mastermind shield",
+    "description": "It is an enchanted shield.",
+    "weight": 5700,
+    "defense": 37,
+    "weaponType": "shield"
+   }
+  },
+  "shield-of-honour": {
+   "id": 2517,
+   "name": "shield of honour",
+   "props": {
+    "article": "a",
+    "name": "shield of honour",
+    "description": "A mighty shield warded by the gods of Tibia.",
+    "weight": 5400,
+    "defense": 33,
+    "weaponType": "shield"
+   }
+  },
+  "beholder-shield": {
+   "id": 2518,
+   "name": "beholder shield",
+   "props": {
+    "article": "a",
+    "name": "beholder shield",
+    "weight": 4700,
+    "defense": 28,
+    "weaponType": "shield"
+   }
+  },
+  "great-shield": {
+   "id": 2522,
+   "name": "great shield",
+   "props": {
+    "article": "a",
+    "name": "great shield",
+    "description": "The shield is made of dragon scales.",
+    "weight": 8400,
+    "defense": 38,
+    "weaponType": "shield"
+   }
+  },
+  "blessed-shield": {
+   "id": 2523,
+   "name": "blessed shield",
+   "props": {
+    "article": "a",
+    "name": "blessed shield",
+    "description": "The shield grants divine protection.",
+    "weight": 6800,
+    "defense": 40,
+    "weaponType": "shield"
+   }
+  },
+  "ornamented-shield": {
+   "id": 2524,
+   "name": "ornamented shield",
+   "props": {
+    "article": "an",
+    "name": "ornamented shield",
+    "description": "Many gems sparkle on the shield.",
+    "weight": 6700,
+    "defense": 22,
+    "weaponType": "shield"
+   }
+  },
+  "viking-shield": {
+   "id": 2531,
+   "name": "viking shield",
+   "props": {
+    "article": "a",
+    "name": "viking shield",
+    "weight": 6600,
+    "defense": 22,
+    "weaponType": "shield"
+   }
+  },
+  "eagle-shield": {
+   "id": 2538,
+   "name": "eagle shield",
+   "props": {
+    "article": "an",
+    "name": "eagle shield",
+    "weight": 6000,
+    "defense": 30,
+    "weaponType": "shield"
+   }
+  },
+  "black-shield": {
+   "id": 2529,
+   "name": "black shield",
+   "props": {
+    "article": "a",
+    "name": "black shield",
+    "description": "An unholy creature covers the shield.",
+    "weight": 4200,
+    "defense": 18,
+    "weaponType": "shield"
+   }
+  },
+  "bone-shield": {
+   "id": 2541,
+   "name": "bone shield",
+   "props": {
+    "article": "a",
+    "name": "bone shield",
+    "weight": 5500,
+    "defense": 20,
+    "weaponType": "shield"
+   }
+  },
+  "tempest-shield": {
+   "id": 2542,
+   "name": "tempest shield",
+   "props": {
+    "article": "a",
+    "name": "tempest shield",
+    "weight": 5100,
+    "defense": 36,
+    "weaponType": "shield"
+   }
+  },
+  "rose-shield": {
+   "id": 2527,
+   "name": "rose shield",
+   "props": {
+    "article": "a",
+    "name": "rose shield",
+    "weight": 5200,
+    "defense": 27,
+    "weaponType": "shield"
+   }
+  },
+  "crystal-ring": {
+   "id": 2124,
+   "name": "crystal ring",
+   "props": {
+    "article": "a",
+    "name": "crystal ring",
+    "weight": 90,
+    "slotType": "ring"
+   }
+  },
+  "gold-ring": {
+   "id": 2179,
+   "name": "gold ring",
+   "props": {
+    "article": "a",
+    "name": "gold ring",
+    "weight": 100,
+    "slotType": "ring"
+   }
+  },
+  "wedding-ring": {
+   "id": 2121,
+   "name": "wedding ring",
+   "props": {
+    "article": "a",
+    "name": "wedding ring",
+    "weight": 40,
+    "slotType": "ring"
+   }
+  },
+  "ring-of-the-sky": {
+   "id": 2123,
+   "name": "ring of the sky",
+   "props": {
+    "article": "a",
+    "name": "ring of the sky",
+    "weight": 40,
+    "slotType": "ring"
+   }
+  },
+  "ring-of-wishes": {
+   "id": 2357,
+   "name": "ring of wishes",
+   "props": {
+    "article": "a",
+    "name": "ring of wishes",
+    "weight": 90,
+    "slotType": "ring"
+   }
+  },
+  "golden-amulet": {
+   "id": 2130,
+   "name": "golden amulet",
+   "props": {
+    "article": "a",
+    "name": "golden amulet",
+    "description": "Many gems glitter on the amulet.",
+    "weight": 830,
+    "slotType": "necklace"
+   }
+  },
+  "ancient-amulet": {
+   "id": 2142,
+   "name": "ancient amulet",
+   "props": {
+    "article": "an",
+    "name": "ancient amulet",
+    "weight": 840,
+    "slotType": "necklace"
+   }
+  },
+  "starlight-amulet": {
+   "id": 2138,
+   "name": "starlight amulet",
+   "props": {
+    "article": "a",
+    "name": "starlight amulet",
+    "weight": 5200,
+    "armor": 3,
+    "slotType": "necklace"
+   }
+  },
+  "crystal-necklace": {
+   "id": 2125,
+   "name": "crystal necklace",
+   "props": {
+    "article": "a",
+    "name": "crystal necklace",
+    "weight": 490,
+    "slotType": "necklace"
+   }
+  },
+  "ruby-necklace": {
+   "id": 2133,
+   "name": "ruby necklace",
+   "props": {
+    "article": "a",
+    "name": "ruby necklace",
+    "weight": 570,
+    "slotType": "necklace"
+   }
+  },
+  "wolf-tooth-chain": {
+   "id": 2129,
+   "name": "wolf tooth chain",
+   "props": {
+    "article": "a",
+    "name": "wolf tooth chain",
+    "weight": 330,
+    "slotType": "necklace"
+   }
+  },
+  "paw-amulet": {
+   "id": 2218,
+   "name": "paw amulet",
+   "props": {
+    "article": "a",
+    "name": "paw amulet",
+    "weight": 1000
+   }
+  },
+  "elven-brooch": {
+   "id": 2122,
+   "name": "elven brooch",
+   "props": {
+    "article": "an",
+    "name": "elven brooch",
+    "weight": 100
+   }
+  },
+  "vial": {
+   "id": 2006,
+   "name": "vial",
+   "props": {
+    "article": "a",
+    "name": "vial",
+    "weight": 180,
+    "type": "fluidContainer"
+   }
+  },
+  "brown-flask": {
+   "id": 2015,
+   "name": "brown flask",
+   "props": {
+    "article": "a",
+    "name": "brown flask",
+    "weight": 250,
+    "type": "fluidContainer"
+   }
+  },
+  "green-flask": {
+   "id": 2009,
+   "name": "green flask",
+   "props": {
+    "article": "a",
+    "name": "green flask",
+    "weight": 300,
+    "type": "fluidContainer"
+   }
+  },
+  "blue-bottle": {
+   "id": 2007,
+   "name": "blue bottle",
+   "props": {
+    "article": "a",
+    "name": "blue bottle",
+    "weight": 250,
+    "type": "fluidContainer"
+   }
+  },
+  "white-pearl": {
+   "id": 2143,
+   "name": "white pearl",
+   "props": {
+    "article": "a",
+    "name": "white pearl",
+    "weight": 20
+   }
+  },
+  "black-pearl": {
+   "id": 2144,
+   "name": "black pearl",
+   "props": {
+    "article": "a",
+    "name": "black pearl",
+    "weight": 20
+   }
+  },
+  "gold-nugget": {
+   "id": 2157,
+   "name": "gold nugget",
+   "props": {
+    "article": "a",
+    "name": "gold nugget",
+    "weight": 10
+   }
+  },
+  "holy-scarab": {
+   "id": 2140,
+   "name": "holy scarab",
+   "props": {
+    "article": "a",
+    "name": "holy scarab",
+    "weight": 500
+   }
+  },
+  "scarab-coin": {
+   "id": 2159,
+   "name": "scarab coin",
+   "props": {
+    "article": "a",
+    "name": "scarab coin",
+    "weight": 100
+   }
+  },
+  "burning-heart": {
+   "id": 2353,
+   "name": "burning heart",
+   "props": {
+    "article": "a",
+    "name": "burning heart",
+    "description": "It is still beating with unholy life. It seems to be rotting rapidly.",
+    "weight": 400,
+    "decayTo": 0,
+    "duration": 86400
+   }
+  },
+  "blood-orb": {
+   "id": 2363,
+   "name": "blood orb",
+   "props": {
+    "article": "a",
+    "name": "blood orb",
+    "weight": 150
+   }
+  },
+  "roc-feather": {
+   "id": 2366,
+   "name": "roc feather",
+   "props": {
+    "article": "a",
+    "name": "roc feather",
+    "weight": 100
+   }
+  },
+  "phoenix-egg": {
+   "id": 2328,
+   "name": "phoenix egg",
+   "props": {
+    "article": "a",
+    "name": "phoenix egg",
+    "description": "It seems to be burning from inside.",
+    "weight": 30
+   }
+  },
+  "frozen-starlight": {
+   "id": 2361,
+   "name": "frozen starlight",
+   "props": {
+    "article": "a",
+    "name": "frozen starlight",
+    "weight": 20
+   }
+  },
+  "mysterious-fetish": {
+   "id": 2194,
+   "name": "mysterious fetish",
+   "props": {
+    "article": "a",
+    "name": "mysterious fetish",
+    "weight": 490
+   }
+  },
+  "strange-symbol": {
+   "id": 2174,
+   "name": "strange symbol",
+   "props": {
+    "article": "a",
+    "name": "strange symbol",
+    "weight": 200
+   }
+  },
+  "voodoo-doll": {
+   "id": 2322,
+   "name": "voodoo doll",
+   "props": {
+    "article": "a",
+    "name": "voodoo doll",
+    "description": "It looks like a little king.",
+    "weight": 650
+   }
+  },
+  "teddy-bear": {
+   "id": 2112,
+   "name": "teddy bear",
+   "props": {
+    "article": "a",
+    "name": "teddy bear",
+    "weight": 700
+   }
+  },
+  "doll": {
+   "id": 2110,
+   "name": "doll",
+   "props": {
+    "article": "a",
+    "name": "doll",
+    "weight": 650
+   }
+  },
+  "dirty-fur": {
+   "id": 2220,
+   "name": "dirty fur",
+   "props": {
+    "article": "a",
+    "name": "dirty fur",
+    "weight": 200
+   }
+  },
+  "big-bone": {
+   "id": 2231,
+   "name": "big bone",
+   "props": {
+    "article": "a",
+    "name": "big bone",
+    "weight": 1900
+   }
+  },
+  "fishbone": {
+   "id": 2226,
+   "name": "fishbone",
+   "props": {
+    "article": "a",
+    "name": "fishbone",
+    "weight": 70
+   }
+  },
+  "rotten-meat": {
+   "id": 2227,
+   "name": "rotten meat",
+   "props": {
+    "name": "rotten meat",
+    "weight": 60
+   }
+  },
+  "moldy-cheese": {
+   "id": 2235,
+   "name": "moldy cheese",
+   "props": {
+    "article": "a",
+    "name": "moldy cheese",
+    "weight": 400
+   }
+  },
+  "brown-bread": {
+   "id": 2691,
+   "name": "brown bread",
+   "props": {
+    "article": "a",
+    "name": "brown bread",
+    "weight": 400
+   }
+  },
+  "salmon": {
+   "id": 2668,
+   "name": "salmon",
+   "props": {
+    "article": "a",
+    "name": "salmon",
+    "weight": 320,
+    "showcount": "0"
+   }
+  },
+  "shrimp": {
+   "id": 2670,
+   "name": "shrimp",
+   "props": {
+    "name": "shrimp",
+    "weight": 30,
+    "showcount": "0"
+   }
+  },
+  "northern-pike": {
+   "id": 2669,
+   "name": "northern pike",
+   "props": {
+    "article": "a",
+    "name": "northern pike",
+    "weight": 120
+   }
+  },
+  "melon": {
+   "id": 2682,
+   "name": "melon",
+   "props": {
+    "article": "a",
+    "name": "melon",
+    "weight": 950
+   }
+  },
+  "banana": {
+   "id": 2676,
+   "name": "banana",
+   "props": {
+    "article": "a",
+    "name": "banana",
+    "weight": 180
+   }
+  },
+  "orange": {
+   "id": 2675,
+   "name": "orange",
+   "props": {
+    "article": "an",
+    "name": "orange",
+    "weight": 110
+   }
+  },
+  "grapes": {
+   "id": 2681,
+   "name": "grapes",
+   "props": {
+    "name": "grapes",
+    "weight": 250
+   }
+  },
+  "carrot": {
+   "id": 2684,
+   "name": "carrot",
+   "props": {
+    "article": "a",
+    "name": "carrot",
+    "weight": 200
+   }
+  },
+  "pumpkin": {
+   "id": 2683,
+   "name": "pumpkin",
+   "props": {
+    "article": "a",
+    "name": "pumpkin",
+    "weight": 1200
+   }
+  },
+  "cookie": {
+   "id": 2687,
+   "name": "cookie",
+   "props": {
+    "article": "a",
+    "name": "cookie",
+    "weight": 10
+   }
+  },
+  "candy-cane": {
+   "id": 2688,
+   "name": "candy cane",
+   "props": {
+    "article": "a",
+    "name": "candy cane",
+    "weight": 50
+   }
+  },
+  "red-mushroom": {
+   "id": 2788,
+   "name": "red mushroom",
+   "props": {
+    "article": "a",
+    "name": "red mushroom",
+    "weight": 50
+   }
+  },
+  "fire-mushroom": {
+   "id": 2795,
+   "name": "fire mushroom",
+   "props": {
+    "article": "a",
+    "name": "fire mushroom",
+    "weight": 10
+   }
+  },
+  "dark-mushroom": {
+   "id": 2792,
+   "name": "dark mushroom",
+   "props": {
+    "article": "a",
+    "name": "dark mushroom",
+    "weight": 10
+   }
+  },
+  "orange-mushroom": {
+   "id": 2790,
+   "name": "orange mushroom",
+   "props": {
+    "name": "orange mushroom",
+    "weight": 30
+   }
+  },
+  "wood-mushroom": {
+   "id": 2791,
+   "name": "wood mushroom",
+   "props": {
+    "name": "wood mushroom",
+    "weight": 30
+   }
+  },
+  "blood-herb": {
+   "id": 2798,
+   "name": "blood herb",
+   "props": {
+    "article": "a",
+    "name": "blood herb",
+    "weight": 120
+   }
+  },
+  "star-herb": {
+   "id": 2800,
+   "name": "star herb",
+   "props": {
+    "article": "a",
+    "name": "star herb",
+    "weight": 30
+   }
+  },
+  "sling-herb": {
+   "id": 2802,
+   "name": "sling herb",
+   "props": {
+    "article": "a",
+    "name": "sling herb",
+    "weight": 90
+   }
+  },
+  "powder-herb": {
+   "id": 2803,
+   "name": "powder herb",
+   "props": {
+    "article": "a",
+    "name": "powder herb",
+    "weight": 50
+   }
+  },
+  "shadow-herb": {
+   "id": 2804,
+   "name": "shadow herb",
+   "props": {
+    "article": "a",
+    "name": "shadow herb",
+    "weight": 100
+   }
+  },
+  "stone-herb": {
+   "id": 2799,
+   "name": "stone herb",
+   "props": {
+    "article": "a",
+    "name": "stone herb",
+    "weight": 20
+   }
+  },
+  "machete": {
+   "id": 2420,
+   "name": "machete",
+   "props": {
+    "article": "a",
+    "name": "machete",
+    "weight": 1650,
+    "defense": 9,
+    "attack": 12,
+    "weaponType": "sword"
+   }
+  },
+  "scythe": {
+   "id": 2550,
+   "name": "scythe",
+   "props": {
+    "article": "a",
+    "name": "scythe",
+    "weight": 3000,
+    "defense": 3,
+    "attack": 8,
+    "weaponType": "axe",
+    "slotType": "two-handed"
+   }
+  },
+  "sickle": {
+   "id": 2405,
+   "name": "sickle",
+   "props": {
+    "article": "a",
+    "name": "sickle",
+    "weight": 1050,
+    "defense": 4,
+    "attack": 7,
+    "weaponType": "axe"
+   }
+  },
+  "hoe": {
+   "id": 2552,
+   "name": "hoe",
+   "props": {
+    "article": "a",
+    "name": "hoe",
+    "weight": 2800
+   }
+  },
+  "watch": {
+   "id": 2036,
+   "name": "watch",
+   "props": {
+    "article": "a",
+    "name": "watch",
+    "weight": 50
+   }
+  },
+  "blue-backpack": {
+   "id": 2002,
+   "name": "blue backpack",
+   "props": {
+    "article": "a",
+    "name": "blue backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "red-backpack": {
+   "id": 2000,
+   "name": "red backpack",
+   "props": {
+    "article": "a",
+    "name": "red backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "purple-backpack": {
+   "id": 2001,
+   "name": "purple backpack",
+   "props": {
+    "article": "a",
+    "name": "purple backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "grey-backpack": {
+   "id": 2003,
+   "name": "grey backpack",
+   "props": {
+    "article": "a",
+    "name": "grey backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "golden-backpack": {
+   "id": 2004,
+   "name": "golden backpack",
+   "props": {
+    "article": "a",
+    "name": "golden backpack",
+    "weight": 1800,
+    "containerSize": 20,
+    "slotType": "backpack",
+    "type": "container"
+   }
+  },
+  "backpack-of-holding": {
+   "id": 2365,
+   "name": "backpack of holding",
+   "props": {
+    "article": "a",
+    "name": "backpack of holding",
+    "weight": 1500,
+    "containerSize": 24,
+    "slotType": "backpack"
+   }
+  },
+  "present": {
+   "id": 1990,
+   "name": "present",
+   "props": {
+    "article": "a",
+    "name": "present",
+    "weight": 600,
+    "containerSize": 5,
+    "type": "container"
+   }
+  },
+  "letter": {
+   "id": 2597,
+   "name": "letter",
+   "props": {
+    "article": "a",
+    "name": "letter",
+    "weight": 50,
+    "writeable": true,
+    "maxTextLen": 512,
+    "type": "readable"
+   }
+  },
+  "torn-book": {
+   "id": 2236,
+   "name": "torn book",
+   "props": {
+    "article": "a",
+    "name": "torn book",
+    "weight": 1100
+   }
+  },
+  "cookbook": {
+   "id": 2347,
+   "name": "cookbook",
+   "props": {
+    "article": "a",
+    "name": "cookbook",
+    "weight": 1500,
+    "description": "It contains several exotic recipes."
+   }
+  },
+  "spy-report": {
+   "id": 2345,
+   "name": "spy report",
+   "props": {
+    "article": "a",
+    "name": "spy report",
+    "weight": 150,
+    "description": "The report is written in some coded language."
+   }
+  },
+  "blank-rune": {
+   "id": 2260,
+   "name": "blank rune",
+   "props": {
+    "article": "a",
+    "name": "blank rune",
+    "weight": 120
+   }
+  },
+  "intense-healing-rune": {
+   "id": 2265,
+   "name": "intense healing rune",
+   "props": {
+    "article": "an",
+    "name": "intense healing rune",
+    "runeSpellName": "adura gran",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "ultimate-healing-rune": {
+   "id": 2273,
+   "name": "ultimate healing rune",
+   "props": {
+    "article": "an",
+    "name": "ultimate healing rune",
+    "runeSpellName": "adura vita",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "great-fireball-rune": {
+   "id": 2304,
+   "name": "great fireball rune",
+   "props": {
+    "article": "an",
+    "name": "great fireball rune",
+    "runeSpellName": "adori gran flam",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "sudden-death-rune": {
+   "id": 2263,
+   "name": "sudden death rune",
+   "props": {
+    "article": "a",
+    "name": "sudden death rune",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "explosion-rune": {
+   "id": 2313,
+   "name": "explosion rune",
+   "props": {
+    "article": "an",
+    "name": "explosion rune",
+    "runeSpellName": "adevo mas hur",
+    "weight": 120,
+    "charges": 3,
+    "type": "rune"
+   }
+  },
+  "heavy-magic-missile-rune": {
+   "id": 2311,
+   "name": "heavy magic missile rune",
+   "props": {
+    "article": "an",
+    "name": "heavy magic missile rune",
+    "runeSpellName": "adori gran",
+    "weight": 120,
+    "charges": 5,
+    "type": "rune"
+   }
+  },
+  "light-magic-missile-rune": {
+   "id": 2287,
+   "name": "light magic missile rune",
+   "props": {
+    "article": "an",
+    "name": "light magic missile rune",
+    "runeSpellName": "adori",
+    "weight": 120,
+    "charges": 5,
+    "type": "rune"
+   }
+  },
+  "fireball-rune": {
+   "id": 2302,
+   "name": "fireball rune",
+   "props": {
+    "article": "an",
+    "name": "fireball rune",
+    "runeSpellName": "adori flam",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "firebomb-rune": {
+   "id": 2305,
+   "name": "firebomb rune",
+   "props": {
+    "article": "an",
+    "name": "firebomb rune",
+    "runeSpellName": "adevo mas flam",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "poison-bomb-rune": {
+   "id": 2286,
+   "name": "poison bomb rune",
+   "props": {
+    "article": "an",
+    "name": "poison bomb rune",
+    "runeSpellName": "adevo mas pox",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "energy-bomb-rune": {
+   "id": 2262,
+   "name": "energy bomb rune",
+   "props": {
+    "article": "an",
+    "name": "energy bomb rune",
+    "runeSpellName": "adevo mas vis",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "paralyze-rune": {
+   "id": 2278,
+   "name": "paralyze rune",
+   "props": {
+    "article": "an",
+    "name": "paralyze rune",
+    "runeSpellName": "adana ani",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "magic-wall-rune": {
+   "id": 2293,
+   "name": "magic wall rune",
+   "props": {
+    "article": "an",
+    "name": "magic wall rune",
+    "runeSpellName": "adevo grav tera",
+    "weight": 120,
+    "charges": 3,
+    "type": "rune"
+   }
+  },
+  "destroy-field-rune": {
+   "id": 2261,
+   "name": "destroy field rune",
+   "props": {
+    "article": "an",
+    "name": "destroy field rune",
+    "runeSpellName": "adito grav",
+    "weight": 120,
+    "charges": 3,
+    "type": "rune"
+   }
+  },
+  "antidote-rune": {
+   "id": 2266,
+   "name": "antidote rune",
+   "props": {
+    "article": "an",
+    "name": "antidote rune",
+    "runeSpellName": "adana pox",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "animate-dead-rune": {
+   "id": 2316,
+   "name": "animate dead rune",
+   "props": {
+    "article": "an",
+    "name": "animate dead rune",
+    "runeSpellName": "adana mort",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "convince-creature-rune": {
+   "id": 2290,
+   "name": "convince creature rune",
+   "props": {
+    "article": "an",
+    "name": "convince creature rune",
+    "runeSpellName": "adeta sio",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "soulfire-rune": {
+   "id": 2308,
+   "name": "soulfire rune",
+   "props": {
+    "article": "an",
+    "name": "soulfire rune",
+    "runeSpellName": "adevo res flam",
+    "weight": 120,
+    "charges": 2,
+    "type": "rune"
+   }
+  },
+  "chameleon-rune": {
+   "id": 2291,
+   "name": "chameleon rune",
+   "props": {
+    "article": "an",
+    "name": "chameleon rune",
+    "runeSpellName": "adevo ina",
+    "weight": 120,
+    "charges": 1,
+    "type": "rune"
+   }
+  },
+  "desintegrate-rune": {
+   "id": 2310,
+   "name": "desintegrate rune",
+   "props": {
+    "article": "an",
+    "name": "desintegrate rune",
+    "runeSpellName": "adito tera",
+    "weight": 120,
+    "charges": 3,
+    "type": "rune"
+   }
+  },
+  "crystal-arrow": {
+   "id": 2352,
+   "name": "crystal arrow",
+   "props": {
+    "article": "a",
+    "name": "crystal arrow",
+    "description": "This arrow seems not suitable for the use with ordinary bows. It seems to be rotting rapidly.",
+    "weight": 100,
+    "decayTo": 0,
+    "duration": 86400
+   }
+  },
+  "cape": {
+   "id": 2654,
+   "name": "cape",
+   "props": {
+    "article": "a",
+    "name": "cape",
+    "weight": 3200,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "jacket": {
+   "id": 2650,
+   "name": "jacket",
+   "props": {
+    "article": "a",
+    "name": "jacket",
+    "weight": 2400,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "green-tunic": {
+   "id": 2652,
+   "name": "green tunic",
+   "props": {
+    "article": "a",
+    "name": "green tunic",
+    "weight": 930,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "red-tunic": {
+   "id": 2653,
+   "name": "red tunic",
+   "props": {
+    "article": "a",
+    "name": "red tunic",
+    "weight": 3000,
+    "armor": 2,
+    "slotType": "body"
+   }
+  },
+  "red-robe": {
+   "id": 2655,
+   "name": "red robe",
+   "props": {
+    "article": "a",
+    "name": "red robe",
+    "weight": 2600,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "scarf": {
+   "id": 2661,
+   "name": "scarf",
+   "props": {
+    "article": "a",
+    "name": "scarf",
+    "weight": 200,
+    "armor": 1,
+    "slotType": "necklace"
+   }
+  },
+  "cowl": {
+   "id": 2664,
+   "name": "cowl",
+   "props": {
+    "article": "a",
+    "name": "cowl",
+    "weight": 700,
+    "armor": 2,
+    "slotType": "head"
+   }
+  },
+  "simple-dress": {
+   "id": 2657,
+   "name": "simple dress",
+   "props": {
+    "article": "a",
+    "name": "simple dress",
+    "weight": 2400,
+    "armor": 1,
+    "slotType": "body"
+   }
+  },
+  "white-dress": {
+   "id": 2658,
+   "name": "white dress",
+   "props": {
+    "article": "a",
+    "name": "white dress",
+    "weight": 2400,
+    "slotType": "body"
+   }
+  },
+  "ball-gown": {
+   "id": 2659,
+   "name": "ball gown",
+   "props": {
+    "article": "a",
+    "name": "ball gown",
+    "weight": 2500,
+    "slotType": "body"
+   }
+  },
+  "worn-leather-boots": {
+   "id": 2238,
+   "name": "worn leather boots",
+   "props": {
+    "name": "worn leather boots",
+    "weight": 400
+   }
+  },
+  "bunny-slippers": {
+   "id": 2644,
+   "name": "bunny slippers",
+   "props": {
+    "name": "bunny slippers",
+    "weight": 1200,
+    "slotType": "feet"
+   }
+  },
+  "traper-boots": {
+   "id": 2641,
+   "name": "traper boots",
+   "props": {
+    "name": "traper boots",
+    "weight": 900,
+    "armor": 3,
+    "slotType": "feet"
+   }
+  },
+  "boots-of-waterwalking": {
+   "id": 2358,
+   "name": "boots of waterwalking",
+   "props": {
+    "name": "boots of waterwalking",
+    "weight": 800,
+    "slotType": "feet"
+   }
+  },
+  "piggy-bank": {
+   "id": 2114,
+   "name": "piggy bank",
+   "props": {
+    "article": "a",
+    "name": "piggy bank",
+    "weight": 150
+   }
+  },
+  "silver-key": {
+   "id": 2088,
+   "name": "silver key",
+   "props": {
+    "article": "a",
+    "name": "silver key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "golden-key": {
+   "id": 2091,
+   "name": "golden key",
+   "props": {
+    "article": "a",
+    "name": "golden key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "crystal-key": {
+   "id": 2090,
+   "name": "crystal key",
+   "props": {
+    "article": "a",
+    "name": "crystal key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "copper-key": {
+   "id": 2089,
+   "name": "copper key",
+   "props": {
+    "article": "a",
+    "name": "copper key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "bone-key": {
+   "id": 2092,
+   "name": "bone key",
+   "props": {
+    "article": "a",
+    "name": "bone key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "purple-key": {
+   "id": 2086,
+   "name": "purple key",
+   "props": {
+    "article": "a",
+    "name": "purple key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "wooden-key": {
+   "id": 2087,
+   "name": "wooden key",
+   "props": {
+    "article": "a",
+    "name": "wooden key",
+    "type": "key",
+    "weight": 100
+   }
+  },
+  "depot-chest": {
+   "id": 2594,
+   "name": "depot chest",
+   "props": {
+    "article": "a",
+    "name": "depot chest",
+    "containerSize": 30,
+    "type": "container"
+   }
+  },
+  "locker": {
+   "id": 1732,
+   "name": "locker",
+   "props": {
+    "article": "a",
+    "name": "locker",
+    "rotateTo": "1733",
+    "containerSize": 6,
+    "type": "container"
+   }
+  },
+  "mirror": {
+   "id": 1736,
+   "name": "mirror",
+   "props": {
+    "article": "a",
+    "name": "mirror",
+    "rotateTo": "1737"
+   }
+  },
+  "vase": {
+   "id": 2008,
+   "name": "vase",
+   "props": {
+    "article": "a",
+    "name": "vase",
+    "weight": 940,
+    "type": "fluidContainer"
+   }
+  },
+  "candlestick": {
+   "id": 2047,
+   "name": "candlestick",
+   "props": {
+    "article": "a",
+    "name": "candlestick",
+    "weight": 300,
+    "stopduration": true
+   }
+  },
+  "lamp": {
+   "id": 2044,
+   "name": "lamp",
+   "props": {
+    "article": "a",
+    "name": "lamp",
+    "weight": 3000,
+    "stopduration": true
+   }
+  },
+  "gemmed-lamp": {
+   "id": 2344,
+   "name": "gemmed lamp",
+   "props": {
+    "article": "a",
+    "name": "gemmed lamp",
+    "weight": 1300,
+    "description": "It is the djinn leader's sleeping lamp."
+   }
+  },
+  "small-oil-lamp": {
+   "id": 2062,
+   "name": "small oil lamp",
+   "props": {
+    "article": "a",
+    "name": "small oil lamp",
+    "weight": 100,
+    "decayTo": 0,
+    "duration": 60,
+    "stopduration": true
+   }
+  }
+ },
+ "outfits": {
+  "citizen-m": 128,
+  "hunter-m": 129,
+  "mage-m": 130,
+  "knight-m": 131,
+  "nobleman-m": 132,
+  "summoner-m": 133,
+  "warrior-m": 134,
+  "citizen-f": 136,
+  "hunter-f": 137,
+  "summoner-f": 138,
+  "knight-f": 139,
+  "noblewoman-f": 140,
+  "mage-f": 141,
+  "warrior-f": 142
+ },
+ "fx": {
+  "draw-blood": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "lose-energy": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "poff": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "block-hit": {
+   "frames": 3,
+   "w": 32,
+   "h": 32
+  },
+  "explosion-area": {
+   "frames": 8,
+   "w": 32,
+   "h": 32
+  },
+  "explosion-hit": {
+   "frames": 6,
+   "w": 32,
+   "h": 32
+  },
+  "fire-area": {
+   "frames": 8,
+   "w": 32,
+   "h": 32
+  },
+  "yellow-rings": {
+   "frames": 7,
+   "w": 32,
+   "h": 32
+  },
+  "green-rings": {
+   "frames": 7,
+   "w": 32,
+   "h": 32
+  },
+  "hit-area": {
+   "frames": 8,
+   "w": 32,
+   "h": 32
+  },
+  "teleport": {
+   "frames": 8,
+   "w": 32,
+   "h": 32
+  },
+  "energy-damage": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "magic-blue": {
+   "frames": 5,
+   "w": 32,
+   "h": 32
+  },
+  "magic-red": {
+   "frames": 5,
+   "w": 32,
+   "h": 32
+  },
+  "magic-green": {
+   "frames": 5,
+   "w": 32,
+   "h": 32
+  },
+  "hit-by-fire": {
+   "frames": 5,
+   "w": 32,
+   "h": 32
+  },
+  "hit-by-poison": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "mort-area": {
+   "frames": 8,
+   "w": 32,
+   "h": 32
+  },
+  "sound-green": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  },
+  "sound-red": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  },
+  "poison-area": {
+   "frames": 4,
+   "w": 32,
+   "h": 32
+  },
+  "sound-yellow": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  },
+  "sound-purple": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  },
+  "sound-blue": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  },
+  "sound-white": {
+   "frames": 10,
+   "w": 32,
+   "h": 32
+  }
+ }
+}

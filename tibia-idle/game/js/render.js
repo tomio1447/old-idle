@@ -1,0 +1,272 @@
+/*
+ * render.js — desenha a cena de caca (chao, monstros, player, dano flutuante)
+ */
+"use strict";
+
+const Sprites = {
+  cache: {},
+  get(path) {
+    if (this.cache[path] !== undefined) return this.cache[path];
+    const img = new Image();
+    img.src = path;
+    img.onerror = () => { this.cache[path] = null; };
+    this.cache[path] = img;
+    return img;
+  },
+  mob(slug, dir) { return this.get(`assets/mob/${slug}_${dir || "s"}.png`); },
+  item(slug) { return this.get(`assets/item/${slug}.png`); },
+  outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
+  ground(scene) { return this.get(`assets/ground/${scene}.png`); },
+  fx(name) { return this.get(`assets/fx/${name}.png`); },
+  npc(name, dir) { return this.get(`assets/npc/${name}_${dir || "s"}.png`); },
+  deco(name) { return this.get(`assets/npc/deco-${name}.png`); },
+  /* frame de caminhada: f=0 parado, f=1|2 passos */
+  walk(name, dir, f) {
+    const suf = f ? `${dir}${f}` : dir;
+    return this.get(`assets/outfit/${name}_${suf}.png`);
+  },
+};
+
+const FX_FRAMES = {
+  "draw-blood": 3, "lose-energy": 3, "poff": 3, "block-hit": 3,
+  "explosion-area": 3, "explosion-hit": 3, "fire-area": 3, "yellow-rings": 3,
+  "green-rings": 3, "hit-area": 3, "teleport": 3, "energy-damage": 3,
+  "magic-blue": 3, "magic-red": 3, "magic-green": 3, "hit-by-fire": 3,
+  "hit-by-poison": 3, "mort-area": 3, "sound-green": 3, "sound-red": 3,
+  "poison-area": 3, "sound-yellow": 3, "sound-purple": 3, "sound-blue": 3,
+  "sound-white": 3,
+};
+
+function Renderer(canvas) {
+  this.c = canvas;
+  this.ctx = canvas.getContext("2d");
+  this.ctx.imageSmoothingEnabled = false;
+  this.floaters = [];       // numeros de dano
+  this.effects = [];        // animacoes de efeito
+  this.corpses = [];
+  this.shake = 0;
+  this.playerFlash = 0;
+  this.scale = 2;
+}
+
+Renderer.prototype.resize = function () {
+  const w = this.c.parentElement.clientWidth;
+  const h = Math.round(w * 0.5);
+  if (this.c.width !== w || this.c.height !== h) {
+    this.c.width = w;
+    this.c.height = h;
+    this.ctx.imageSmoothingEnabled = false;
+  }
+};
+
+Renderer.prototype.addFloater = function (x, y, text, color, big) {
+  this.floaters.push({
+    x: x, y: y, text: text, color: color,
+    life: big ? 1400 : 1000, max: big ? 1400 : 1000,
+    big: !!big, vy: -0.035 - Math.random() * 0.015,
+    vx: (Math.random() - 0.5) * 0.02,
+  });
+  if (this.floaters.length > 40) this.floaters.shift();
+};
+
+Renderer.prototype.addEffect = function (x, y, name) {
+  if (!FX_FRAMES[name]) name = "draw-blood";
+  this.effects.push({ x: x, y: y, name: name, t: 0,
+                      frames: FX_FRAMES[name], dur: 360 });
+  if (this.effects.length > 20) this.effects.shift();
+};
+
+Renderer.prototype.addCorpse = function (x, y, slug) {
+  this.corpses.push({ x: x, y: y, slug: slug, life: 2000 });
+  if (this.corpses.length > 8) this.corpses.shift();
+};
+
+Renderer.prototype.draw = function (combat, player, dt) {
+  const ctx = this.ctx;
+  const W = this.c.width, H = this.c.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const hunt = combat ? combat.hunt : null;
+  const scene = hunt ? hunt.scene : "cave";
+
+  // --- chao tileado
+  const gr = Sprites.ground(scene);
+  if (gr && gr.complete && gr.naturalWidth) {
+    const s = 2;
+    const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
+    for (let y = 0; y < H; y += th)
+      for (let x = 0; x < W; x += tw)
+        ctx.drawImage(gr, x, y, tw, th);
+  } else {
+    ctx.fillStyle = "#1c1a15";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // vinheta
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.95);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,.72)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  if (this.shake > 0) {
+    ctx.translate((Math.random() - 0.5) * this.shake,
+                  (Math.random() - 0.5) * this.shake);
+    this.shake = Math.max(0, this.shake - dt * 0.02);
+  }
+
+  // --- corpses
+  for (let i = this.corpses.length - 1; i >= 0; i--) {
+    const c = this.corpses[i];
+    c.life -= dt;
+    if (c.life <= 0) { this.corpses.splice(i, 1); continue; }
+    ctx.globalAlpha = Math.min(1, c.life / 1200) * 0.5;
+    const img = Sprites.mob(c.slug, "s");
+    if (img && img.complete && img.naturalWidth) {
+      const sc = 2;
+      ctx.save();
+      ctx.translate(c.x * W, c.y * H);
+      ctx.scale(1, 0.4);
+      ctx.drawImage(img, -img.naturalWidth * sc / 2, -img.naturalHeight * sc / 2,
+                    img.naturalWidth * sc, img.naturalHeight * sc);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- player (lado esquerdo)
+  const px = 0.13, py = 0.62;
+  const outfitName = this.outfitFor(player);
+  const pimg = Sprites.outfit(outfitName, "e");
+  const bob = Math.sin(Date.now() / 340) * 2;
+  if (pimg && pimg.complete && pimg.naturalWidth) {
+    const sc = 2.4;
+    const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+    // sombra
+    ctx.fillStyle = "rgba(0,0,0,.35)";
+    ctx.beginPath();
+    ctx.ellipse(px * W, py * H + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7);
+    ctx.fill();
+    if (this.playerFlash > 0) {
+      ctx.save();
+      ctx.filter = "brightness(2.2) saturate(0.4)";
+      this.playerFlash -= dt;
+    }
+    ctx.drawImage(pimg, px * W - w / 2, py * H - h / 2 + bob, w, h);
+    if (this.playerFlash > 0) ctx.restore();
+  }
+
+  // --- monstros
+  if (combat && !combat.dead) {
+    for (const m of combat.mobs) {
+      const img = Sprites.mob(m.slug, "w");
+      const mx = (0.42 + m.x * 0.5) * W;
+      const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
+      if (img && img.complete && img.naturalWidth) {
+        const sc = m.def.hp > 1500 ? 2.6 : m.def.hp > 500 ? 2.2 : 2.0;
+        const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.beginPath();
+        ctx.ellipse(mx, my + h * 0.42, w * 0.32, h * 0.09, 0, 0, 7);
+        ctx.fill();
+        ctx.drawImage(img, mx - w / 2, my - h / 2, w, h);
+        // barra de vida
+        const bw = Math.max(30, w * 0.75), bh = 4;
+        const bx = mx - bw / 2, by = my - h / 2 - 9;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+        const pct = Math.max(0, m.hp / m.maxHp);
+        ctx.fillStyle = pct > 0.5 ? "#4ec84e" : pct > 0.25 ? "#e8c84a" : "#e04040";
+        ctx.fillRect(bx, by, bw * pct, bh);
+        // nome
+        ctx.font = "9px Verdana";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(0,0,0,.9)";
+        ctx.fillText(m.def.name, mx + 1, by - 4);
+        ctx.fillStyle = "#d8d0b8";
+        ctx.fillText(m.def.name, mx, by - 5);
+      }
+    }
+  }
+
+  // --- efeitos
+  for (let i = this.effects.length - 1; i >= 0; i--) {
+    const e = this.effects[i];
+    e.t += dt;
+    if (e.t >= e.dur) { this.effects.splice(i, 1); continue; }
+    const img = Sprites.fx(e.name);
+    if (!img || !img.complete || !img.naturalWidth) continue;
+    const fw = img.naturalWidth / e.frames;
+    const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
+    const sc = 2;
+    ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
+                  e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
+                  fw * sc, img.naturalHeight * sc);
+  }
+
+  ctx.restore();
+
+  // --- numeros flutuantes
+  ctx.textAlign = "center";
+  for (let i = this.floaters.length - 1; i >= 0; i--) {
+    const f = this.floaters[i];
+    f.life -= dt;
+    if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
+    const p = 1 - f.life / f.max;
+    const alpha = f.life < 300 ? f.life / 300 : 1;
+    const fx = (f.x + f.vx * p * 60) * W;
+    const fy = (f.y + f.vy * p * 22) * H;
+    ctx.globalAlpha = alpha;
+    ctx.font = (f.big ? "bold 15px" : "bold 12px") + " Verdana";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.strokeText(f.text, fx, fy);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, fx, fy);
+    ctx.globalAlpha = 1;
+  }
+
+  // --- tela de morte
+  if (combat && combat.dead) {
+    ctx.fillStyle = "rgba(70,0,0,.55)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = "bold 22px Verdana";
+    ctx.fillStyle = "#ff6060";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 4;
+    ctx.strokeText("VOCÊ MORREU", W / 2, H / 2 - 6);
+    ctx.fillText("VOCÊ MORREU", W / 2, H / 2 - 6);
+    const left = Math.max(0, Math.ceil((combat.deadUntil - Date.now()) / 1000));
+    ctx.font = "12px Verdana";
+    ctx.fillStyle = "#e8b0b0";
+    ctx.fillText("Voltando ao templo em " + left + "s", W / 2, H / 2 + 16);
+  }
+
+  // --- sem hunt
+  if (!combat) {
+    ctx.fillStyle = "rgba(0,0,0,.6)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = "bold 14px Verdana";
+    ctx.fillStyle = "#c8c0a8";
+    ctx.textAlign = "center";
+    ctx.fillText("Escolha uma caçada para começar", W / 2, H / 2);
+  }
+};
+
+/* Retorna o id do NPC sob as coordenadas do canvas */
+Renderer.prototype.npcAt = function (mx, my) {
+  if (!this.npcHit) return null;
+  for (const h of this.npcHit) {
+    if (mx >= h.x - h.w / 2 && mx <= h.x + h.w / 2 &&
+        my >= h.y - h.h / 2 - 18 && my <= h.y + h.h / 2) return h.id;
+  }
+  return null;
+};
+
+Renderer.prototype.outfitFor = function (p) {
+  const suffix = p.sex === "female" ? "f" : "m";
+  const map = { knight: "knight", paladin: "hunter", druid: "summoner",
+                sorcerer: "mage", none: "citizen" };
+  return (map[p.voc] || "citizen") + "-" + suffix;
+};

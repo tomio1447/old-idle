@@ -1,0 +1,3899 @@
+{
+ "sword": {
+  "id": 2376,
+  "name": "sword",
+  "sprite": "sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 14,
+  "defense": 12,
+  "weight": 35.0,
+  "sell": 460
+ },
+ "axe": {
+  "id": 2386,
+  "name": "axe",
+  "sprite": "axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 12,
+  "defense": 6,
+  "weight": 40.0,
+  "sell": 326
+ },
+ "club": {
+  "id": 2382,
+  "name": "club",
+  "sprite": "club",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 7,
+  "defense": 7,
+  "weight": 25.0,
+  "sell": 246
+ },
+ "rapier": {
+  "id": 2384,
+  "name": "rapier",
+  "sprite": "rapier",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 10,
+  "defense": 8,
+  "weight": 15.0,
+  "sell": 320
+ },
+ "sabre": {
+  "id": 2385,
+  "name": "sabre",
+  "sprite": "sabre",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 12,
+  "defense": 10,
+  "weight": 25.0,
+  "sell": 390
+ },
+ "combat-knife": {
+  "id": 2404,
+  "name": "combat knife",
+  "sprite": "combat-knife",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 8,
+  "defense": 6,
+  "weight": 8.69,
+  "sell": 249
+ },
+ "mace": {
+  "id": 2398,
+  "name": "mace",
+  "sprite": "mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 16,
+  "defense": 11,
+  "weight": 28.0,
+  "sell": 483
+ },
+ "hatchet": {
+  "id": 2388,
+  "name": "hatchet",
+  "sprite": "hatchet",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 15,
+  "defense": 8,
+  "weight": 35.0,
+  "sell": 416
+ },
+ "longsword": {
+  "id": 2397,
+  "name": "longsword",
+  "sprite": "longsword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 17,
+  "defense": 14,
+  "weight": 42.0,
+  "sell": 550
+ },
+ "battle-axe": {
+  "id": 2378,
+  "name": "battle axe",
+  "sprite": "battle-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 25,
+  "defense": 10,
+  "twoHanded": true,
+  "weight": 50.0,
+  "sell": 640
+ },
+ "battle-hammer": {
+  "id": 2417,
+  "name": "battle hammer",
+  "sprite": "battle-hammer",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 24,
+  "defense": 14,
+  "weight": 68.0,
+  "sell": 684
+ },
+ "morning-star": {
+  "id": 2394,
+  "name": "morning star",
+  "sprite": "morning-star",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 25,
+  "defense": 11,
+  "weight": 54.0,
+  "sell": 656
+ },
+ "war-hammer": {
+  "id": 2391,
+  "name": "war hammer",
+  "sprite": "war-hammer",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 45,
+  "defense": 10,
+  "twoHanded": true,
+  "weight": 85.0,
+  "sell": 1024
+ },
+ "knight-axe": {
+  "id": 2430,
+  "name": "knight axe",
+  "sprite": "knight-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 33,
+  "defense": 21,
+  "weight": 59.0,
+  "sell": 969
+ },
+ "barbarian-axe": {
+  "id": 2429,
+  "name": "barbarian axe",
+  "sprite": "barbarian-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 28,
+  "defense": 18,
+  "weight": 51.0,
+  "sell": 825
+ },
+ "dragon-hammer": {
+  "id": 2434,
+  "name": "dragon hammer",
+  "sprite": "dragon-hammer",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 32,
+  "defense": 20,
+  "weight": 97.0,
+  "sell": 934
+ },
+ "fire-axe": {
+  "id": 2432,
+  "name": "fire axe",
+  "sprite": "fire-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 38,
+  "defense": 16,
+  "weight": 40.0,
+  "sell": 985
+ },
+ "fire-sword": {
+  "id": 2392,
+  "name": "fire sword",
+  "sprite": "fire-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 35,
+  "defense": 20,
+  "level": 35,
+  "weight": 23.0,
+  "sell": 992
+ },
+ "giant-sword": {
+  "id": 2393,
+  "name": "giant sword",
+  "sprite": "giant-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 46,
+  "defense": 22,
+  "twoHanded": true,
+  "level": 45,
+  "weight": 180.0,
+  "sell": 1235
+ },
+ "warlord-sword": {
+  "id": 2408,
+  "name": "warlord sword",
+  "sprite": "warlord-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 53,
+  "defense": 38,
+  "twoHanded": true,
+  "level": 60,
+  "weight": 64.0,
+  "sell": 1625
+ },
+ "magic-longsword": {
+  "id": 2390,
+  "name": "magic longsword",
+  "sprite": "magic-longsword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 55,
+  "defense": 40,
+  "twoHanded": true,
+  "level": 65,
+  "weight": 43.0,
+  "sell": 1696
+ },
+ "thunder-hammer": {
+  "id": 2421,
+  "name": "thunder hammer",
+  "sprite": "thunder-hammer",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 49,
+  "defense": 35,
+  "level": 55,
+  "weight": 125.0,
+  "sell": 1500
+ },
+ "stonecutter-axe": {
+  "id": 2431,
+  "name": "stonecutter axe",
+  "sprite": "stonecutter-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 50,
+  "defense": 30,
+  "level": 50,
+  "weight": 99.0,
+  "sell": 1440
+ },
+ "serpent-sword": {
+  "id": 2409,
+  "name": "serpent sword",
+  "sprite": "serpent-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 26,
+  "defense": 15,
+  "weight": 41.0,
+  "sell": 739
+ },
+ "dragon-lance": {
+  "id": 2414,
+  "name": "dragon lance",
+  "sprite": "dragon-lance",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 47,
+  "defense": 16,
+  "twoHanded": true,
+  "level": 40,
+  "weight": 67.0,
+  "sell": 1158
+ },
+ "obsidian-lance": {
+  "id": 2425,
+  "name": "obsidian lance",
+  "sprite": "obsidian-lance",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 34,
+  "defense": 10,
+  "twoHanded": true,
+  "level": 30,
+  "weight": 80.0,
+  "sell": 812
+ },
+ "halberd": {
+  "id": 2381,
+  "name": "halberd",
+  "sprite": "halberd",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 35,
+  "defense": 14,
+  "twoHanded": true,
+  "weight": 90.0,
+  "sell": 896
+ },
+ "guardian-halberd": {
+  "id": 2427,
+  "name": "guardian halberd",
+  "sprite": "guardian-halberd",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 46,
+  "defense": 15,
+  "twoHanded": true,
+  "level": 45,
+  "weight": 110.0,
+  "sell": 1123
+ },
+ "great-axe": {
+  "id": 2415,
+  "name": "great axe",
+  "sprite": "great-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 52,
+  "defense": 22,
+  "twoHanded": true,
+  "level": 55,
+  "weight": 90.0,
+  "sell": 1350
+ },
+ "spike-sword": {
+  "id": 2383,
+  "name": "spike sword",
+  "sprite": "spike-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 24,
+  "defense": 21,
+  "weight": 50.0,
+  "sell": 796
+ },
+ "ice-rapier": {
+  "id": 2396,
+  "name": "ice rapier",
+  "sprite": "ice-rapier",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 60,
+  "defense": 1,
+  "weight": 15.0,
+  "sell": 1168
+ },
+ "silver-mace": {
+  "id": 2424,
+  "name": "silver mace",
+  "sprite": "silver-mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 40,
+  "defense": 30,
+  "weight": 67.0,
+  "sell": 1248
+ },
+ "clerical-mace": {
+  "id": 2423,
+  "name": "clerical mace",
+  "sprite": "clerical-mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 28,
+  "defense": 15,
+  "weight": 58.0,
+  "sell": 777
+ },
+ "crowbar": {
+  "id": 2416,
+  "name": "crowbar",
+  "sprite": "crowbar",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 6,
+  "defense": 6,
+  "sell": 260,
+  "weight": 21.0
+ },
+ "carlin-sword": {
+  "id": 2395,
+  "name": "carlin sword",
+  "sprite": "carlin-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 15,
+  "defense": 13,
+  "weight": 40.0,
+  "sell": 496
+ },
+ "double-axe": {
+  "id": 2387,
+  "name": "double axe",
+  "sprite": "double-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 35,
+  "defense": 12,
+  "twoHanded": true,
+  "weight": 70.0,
+  "sell": 864
+ },
+ "orcish-axe": {
+  "id": 2428,
+  "name": "orcish axe",
+  "sprite": "orcish-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 23,
+  "defense": 12,
+  "weight": 45.0,
+  "sell": 633
+ },
+ "bright-sword": {
+  "id": 2407,
+  "name": "bright sword",
+  "sprite": "bright-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 36,
+  "defense": 30,
+  "weight": 29.0,
+  "sell": 1171
+ },
+ "epee": {
+  "id": 2438,
+  "name": "epee",
+  "sprite": "epee",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 37,
+  "defense": 23,
+  "weight": 15.0,
+  "sell": 1078
+ },
+ "heavy-mace": {
+  "id": 2452,
+  "name": "heavy mace",
+  "sprite": "heavy-mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 49,
+  "defense": 15,
+  "twoHanded": true,
+  "weight": 110.0,
+  "sell": 1180
+ },
+ "bow": {
+  "id": 2456,
+  "name": "bow",
+  "sprite": "bow",
+  "slot": "weapon",
+  "type": "distance",
+  "attack": 0,
+  "weight": 31.0,
+  "sell": 2
+ },
+ "crossbow": {
+  "id": 2455,
+  "name": "crossbow",
+  "sprite": "crossbow",
+  "slot": "weapon",
+  "type": "distance",
+  "attack": 0,
+  "weight": 40.0,
+  "sell": 2
+ },
+ "spear": {
+  "id": 2389,
+  "name": "spear",
+  "sprite": "spear",
+  "slot": "weapon",
+  "type": "distance",
+  "attack": 25,
+  "buy": 9,
+  "weight": 20.0,
+  "sell": 480
+ },
+ "arrow": {
+  "id": 2544,
+  "name": "arrow",
+  "sprite": "arrow",
+  "slot": "ammo",
+  "type": "ammo",
+  "attack": 25,
+  "buy": 3,
+  "weight": 0.7,
+  "sell": 480
+ },
+ "bolt": {
+  "id": 2543,
+  "name": "bolt",
+  "sprite": "bolt",
+  "slot": "ammo",
+  "type": "ammo",
+  "attack": 30,
+  "buy": 4,
+  "weight": 0.8,
+  "sell": 576
+ },
+ "power-bolt": {
+  "id": 2547,
+  "name": "power bolt",
+  "sprite": "power-bolt",
+  "slot": "ammo",
+  "type": "ammo",
+  "attack": 50,
+  "buy": 20,
+  "weight": 0.8,
+  "sell": 960
+ },
+ "burst-arrow": {
+  "id": 2546,
+  "name": "burst arrow",
+  "sprite": "burst-arrow",
+  "slot": "ammo",
+  "type": "ammo",
+  "attack": 0,
+  "buy": 15,
+  "weight": 0.9,
+  "sell": 2
+ },
+ "poison-arrow": {
+  "id": 2545,
+  "name": "poison arrow",
+  "sprite": "poison-arrow",
+  "slot": "ammo",
+  "type": "ammo",
+  "attack": 20,
+  "buy": 12,
+  "weight": 0.8,
+  "sell": 384
+ },
+ "leather-armor": {
+  "id": 2467,
+  "name": "leather armor",
+  "sprite": "leather-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 4,
+  "weight": 60.0,
+  "sell": 192
+ },
+ "chain-armor": {
+  "id": 2464,
+  "name": "chain armor",
+  "sprite": "chain-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 6,
+  "weight": 100.0,
+  "sell": 288
+ },
+ "brass-armor": {
+  "id": 2465,
+  "name": "brass armor",
+  "sprite": "brass-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 8,
+  "weight": 80.0,
+  "sell": 384
+ },
+ "plate-armor": {
+  "id": 2463,
+  "name": "plate armor",
+  "sprite": "plate-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 10,
+  "weight": 120.0,
+  "sell": 480
+ },
+ "scale-armor": {
+  "id": 2483,
+  "name": "scale armor",
+  "sprite": "scale-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 9,
+  "weight": 105.0,
+  "sell": 432
+ },
+ "studded-armor": {
+  "id": 2484,
+  "name": "studded armor",
+  "sprite": "studded-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 5,
+  "weight": 71.0,
+  "sell": 240
+ },
+ "knight-armor": {
+  "id": 2476,
+  "name": "knight armor",
+  "sprite": "knight-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 12,
+  "level": 30,
+  "weight": 120.0,
+  "sell": 576
+ },
+ "crown-armor": {
+  "id": 2487,
+  "name": "crown armor",
+  "sprite": "crown-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 13,
+  "level": 35,
+  "weight": 99.0,
+  "sell": 624
+ },
+ "golden-armor": {
+  "id": 2466,
+  "name": "golden armor",
+  "sprite": "golden-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 14,
+  "level": 40,
+  "weight": 80.0,
+  "sell": 672
+ },
+ "noble-armor": {
+  "id": 2486,
+  "name": "noble armor",
+  "sprite": "noble-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 11,
+  "weight": 120.0,
+  "sell": 528
+ },
+ "dragon-scale-mail": {
+  "id": 2492,
+  "name": "dragon scale mail",
+  "sprite": "dragon-scale-mail",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 15,
+  "level": 50,
+  "weight": 114.0,
+  "sell": 720
+ },
+ "magic-plate-armor": {
+  "id": 2472,
+  "name": "magic plate armor",
+  "sprite": "magic-plate-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 17,
+  "mag": 1,
+  "level": 60,
+  "weight": 85.0,
+  "sell": 1216
+ },
+ "demon-armor": {
+  "id": 2494,
+  "name": "demon armor",
+  "sprite": "demon-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 16,
+  "level": 60,
+  "weight": 80.0,
+  "sell": 768
+ },
+ "blue-robe": {
+  "id": 2656,
+  "name": "blue robe",
+  "sprite": "blue-robe",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 11,
+  "mag": 3,
+  "weight": 22.0,
+  "sell": 1728
+ },
+ "doublet": {
+  "id": 2485,
+  "name": "doublet",
+  "sprite": "doublet",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 2,
+  "weight": 25.0,
+  "sell": 96
+ },
+ "coat": {
+  "id": 2651,
+  "name": "coat",
+  "sprite": "coat",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 27.0,
+  "sell": 48
+ },
+ "dark-armor": {
+  "id": 2489,
+  "name": "dark armor",
+  "sprite": "dark-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 10,
+  "weight": 120.0,
+  "sell": 480
+ },
+ "leather-legs": {
+  "id": 2649,
+  "name": "leather legs",
+  "sprite": "leather-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 1,
+  "weight": 18.0,
+  "sell": 48
+ },
+ "studded-legs": {
+  "id": 2468,
+  "name": "studded legs",
+  "sprite": "studded-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 2,
+  "weight": 26.0,
+  "sell": 96
+ },
+ "chain-legs": {
+  "id": 2648,
+  "name": "chain legs",
+  "sprite": "chain-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 3,
+  "weight": 35.0,
+  "sell": 144
+ },
+ "brass-legs": {
+  "id": 2478,
+  "name": "brass legs",
+  "sprite": "brass-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 5,
+  "weight": 38.0,
+  "sell": 240
+ },
+ "plate-legs": {
+  "id": 2647,
+  "name": "plate legs",
+  "sprite": "plate-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 7,
+  "weight": 50.0,
+  "sell": 336
+ },
+ "knight-legs": {
+  "id": 2477,
+  "name": "knight legs",
+  "sprite": "knight-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 8,
+  "level": 30,
+  "weight": 70.0,
+  "sell": 384
+ },
+ "crown-legs": {
+  "id": 2488,
+  "name": "crown legs",
+  "sprite": "crown-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 8,
+  "level": 35,
+  "weight": 65.0,
+  "sell": 384
+ },
+ "golden-legs": {
+  "id": 2470,
+  "name": "golden legs",
+  "sprite": "golden-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 9,
+  "level": 55,
+  "weight": 54.0,
+  "sell": 432
+ },
+ "dragon-scale-legs": {
+  "id": 2469,
+  "name": "dragon scale legs",
+  "sprite": "dragon-scale-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 10,
+  "level": 45,
+  "weight": 48.0,
+  "sell": 480
+ },
+ "leather-helmet": {
+  "id": 2461,
+  "name": "leather helmet",
+  "sprite": "leather-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 1,
+  "weight": 22.0,
+  "sell": 48
+ },
+ "studded-helmet": {
+  "id": 2482,
+  "name": "studded helmet",
+  "sprite": "studded-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 2,
+  "weight": 24.5,
+  "sell": 96
+ },
+ "chain-helmet": {
+  "id": 2458,
+  "name": "chain helmet",
+  "sprite": "chain-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 2,
+  "weight": 42.0,
+  "sell": 96
+ },
+ "brass-helmet": {
+  "id": 2460,
+  "name": "brass helmet",
+  "sprite": "brass-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 3,
+  "weight": 27.0,
+  "sell": 144
+ },
+ "steel-helmet": {
+  "id": 2457,
+  "name": "steel helmet",
+  "sprite": "steel-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 6,
+  "weight": 46.0,
+  "sell": 288
+ },
+ "soldier-helmet": {
+  "id": 2481,
+  "name": "soldier helmet",
+  "sprite": "soldier-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 5,
+  "weight": 32.0,
+  "sell": 240
+ },
+ "viking-helmet": {
+  "id": 2473,
+  "name": "viking helmet",
+  "sprite": "viking-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 4,
+  "weight": 39.0,
+  "sell": 192
+ },
+ "dwarven-helmet": {
+  "id": 2502,
+  "name": "dwarven helmet",
+  "sprite": "dwarven-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 6,
+  "weight": 42.0,
+  "sell": 288
+ },
+ "crown-helmet": {
+  "id": 2491,
+  "name": "crown helmet",
+  "sprite": "crown-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 7,
+  "level": 30,
+  "weight": 29.5,
+  "sell": 336
+ },
+ "royal-helmet": {
+  "id": 2498,
+  "name": "royal helmet",
+  "sprite": "royal-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 9,
+  "level": 40,
+  "weight": 48.0,
+  "sell": 432
+ },
+ "demon-helmet": {
+  "id": 2493,
+  "name": "demon helmet",
+  "sprite": "demon-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 10,
+  "level": 60,
+  "weight": 29.5,
+  "sell": 480
+ },
+ "devil-helmet": {
+  "id": 2462,
+  "name": "devil helmet",
+  "sprite": "devil-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 7,
+  "weight": 50.0,
+  "sell": 336
+ },
+ "warrior-helmet": {
+  "id": 2475,
+  "name": "warrior helmet",
+  "sprite": "warrior-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 8,
+  "level": 35,
+  "weight": 68.0,
+  "sell": 384
+ },
+ "crusader-helmet": {
+  "id": 2497,
+  "name": "crusader helmet",
+  "sprite": "crusader-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 8,
+  "level": 45,
+  "weight": 52.0,
+  "sell": 384
+ },
+ "horned-helmet": {
+  "id": 2496,
+  "name": "horned helmet",
+  "sprite": "horned-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 11,
+  "level": 50,
+  "weight": 51.0,
+  "sell": 528
+ },
+ "winged-helmet": {
+  "id": 2474,
+  "name": "winged helmet",
+  "sprite": "winged-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 10,
+  "level": 55,
+  "weight": 12.0,
+  "sell": 480
+ },
+ "strange-helmet": {
+  "id": 2479,
+  "name": "strange helmet",
+  "sprite": "strange-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 6,
+  "weight": 46.0,
+  "sell": 288
+ },
+ "mystic-turban": {
+  "id": 2663,
+  "name": "mystic turban",
+  "sprite": "mystic-turban",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 1,
+  "mag": 2,
+  "weight": 8.5,
+  "sell": 848
+ },
+ "leather-boots": {
+  "id": 2643,
+  "name": "leather boots",
+  "sprite": "leather-boots",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 1,
+  "weight": 9.0,
+  "sell": 48
+ },
+ "boots-of-haste": {
+  "id": 2195,
+  "name": "boots of haste",
+  "sprite": "boots-of-haste",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 0,
+  "speed": 40,
+  "level": 30,
+  "weight": 7.5,
+  "sell": 640
+ },
+ "steel-boots": {
+  "id": 2645,
+  "name": "steel boots",
+  "sprite": "steel-boots",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 3,
+  "level": 35,
+  "weight": 29.0,
+  "sell": 144
+ },
+ "golden-boots": {
+  "id": 2646,
+  "name": "golden boots",
+  "sprite": "golden-boots",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 4,
+  "level": 70,
+  "weight": 32.0,
+  "sell": 192
+ },
+ "sandals": {
+  "id": 2642,
+  "name": "sandals",
+  "sprite": "sandals",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 0,
+  "weight": 6.0,
+  "sell": 2
+ },
+ "soft-boots": {
+  "id": 2640,
+  "name": "soft boots",
+  "sprite": "soft-boots",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 0,
+  "level": 40,
+  "weight": 8.0,
+  "sell": 2
+ },
+ "wooden-shield": {
+  "id": 2512,
+  "name": "wooden shield",
+  "sprite": "wooden-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 14,
+  "weight": 40.0,
+  "sell": 224
+ },
+ "studded-shield": {
+  "id": 2526,
+  "name": "studded shield",
+  "sprite": "studded-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 15,
+  "weight": 59.0,
+  "sell": 240
+ },
+ "brass-shield": {
+  "id": 2511,
+  "name": "brass shield",
+  "sprite": "brass-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 16,
+  "weight": 60.0,
+  "sell": 256
+ },
+ "plate-shield": {
+  "id": 2510,
+  "name": "plate shield",
+  "sprite": "plate-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 17,
+  "weight": 65.0,
+  "sell": 272
+ },
+ "steel-shield": {
+  "id": 2509,
+  "name": "steel shield",
+  "sprite": "steel-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 21,
+  "weight": 69.0,
+  "sell": 336
+ },
+ "copper-shield": {
+  "id": 2530,
+  "name": "copper shield",
+  "sprite": "copper-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 19,
+  "weight": 63.0,
+  "sell": 304
+ },
+ "battle-shield": {
+  "id": 2513,
+  "name": "battle shield",
+  "sprite": "battle-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 23,
+  "weight": 62.0,
+  "sell": 368
+ },
+ "dragon-shield": {
+  "id": 2516,
+  "name": "dragon shield",
+  "sprite": "dragon-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 31,
+  "level": 40,
+  "weight": 60.0,
+  "sell": 496
+ },
+ "tower-shield": {
+  "id": 2528,
+  "name": "tower shield",
+  "sprite": "tower-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 32,
+  "level": 35,
+  "weight": 82.0,
+  "sell": 512
+ },
+ "demon-shield": {
+  "id": 2520,
+  "name": "demon shield",
+  "sprite": "demon-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 35,
+  "level": 55,
+  "weight": 26.0,
+  "sell": 560
+ },
+ "guardian-shield": {
+  "id": 2515,
+  "name": "guardian shield",
+  "sprite": "guardian-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 30,
+  "weight": 55.0,
+  "sell": 480
+ },
+ "vampire-shield": {
+  "id": 2534,
+  "name": "vampire shield",
+  "sprite": "vampire-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 34,
+  "level": 45,
+  "weight": 38.0,
+  "sell": 544
+ },
+ "amazon-shield": {
+  "id": 2537,
+  "name": "amazon shield",
+  "sprite": "amazon-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 32,
+  "weight": 62.0,
+  "sell": 512
+ },
+ "medusa-shield": {
+  "id": 2536,
+  "name": "medusa shield",
+  "sprite": "medusa-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 33,
+  "level": 45,
+  "weight": 58.0,
+  "sell": 528
+ },
+ "phoenix-shield": {
+  "id": 2539,
+  "name": "phoenix shield",
+  "sprite": "phoenix-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 34,
+  "level": 50,
+  "weight": 35.0,
+  "sell": 544
+ },
+ "crown-shield": {
+  "id": 2519,
+  "name": "crown shield",
+  "sprite": "crown-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 32,
+  "weight": 62.0,
+  "sell": 512
+ },
+ "griffin-shield": {
+  "id": 2533,
+  "name": "griffin shield",
+  "sprite": "griffin-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 29,
+  "weight": 50.0,
+  "sell": 464
+ },
+ "ancient-shield": {
+  "id": 2532,
+  "name": "ancient shield",
+  "sprite": "ancient-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 27,
+  "weight": 61.0,
+  "sell": 432
+ },
+ "dark-shield": {
+  "id": 2521,
+  "name": "dark shield",
+  "sprite": "dark-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 25,
+  "weight": 52.0,
+  "sell": 400
+ },
+ "castle-shield": {
+  "id": 2535,
+  "name": "castle shield",
+  "sprite": "castle-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 28,
+  "weight": 49.0,
+  "sell": 448
+ },
+ "scarab-shield": {
+  "id": 2540,
+  "name": "scarab shield",
+  "sprite": "scarab-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 25,
+  "weight": 47.0,
+  "sell": 400
+ },
+ "life-ring": {
+  "id": 2168,
+  "name": "life ring",
+  "sprite": "life-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "hpreg": 2,
+  "mpreg": 3,
+  "weight": 0.8,
+  "sell": 1056
+ },
+ "might-ring": {
+  "id": 2164,
+  "name": "might ring",
+  "sprite": "might-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "prot": 20,
+  "weight": 1.0,
+  "sell": 640
+ },
+ "power-ring": {
+  "id": 2166,
+  "name": "power ring",
+  "sprite": "power-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "melee": 2,
+  "weight": 0.8,
+  "sell": 2
+ },
+ "energy-ring": {
+  "id": 2167,
+  "name": "energy ring",
+  "sprite": "energy-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "shield": 6,
+  "weight": 0.8,
+  "sell": 2
+ },
+ "sword-ring": {
+  "id": 2207,
+  "name": "sword ring",
+  "sprite": "sword-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "sword": 3,
+  "weight": 0.9,
+  "sell": 2
+ },
+ "axe-ring": {
+  "id": 2208,
+  "name": "axe ring",
+  "sprite": "axe-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "axe": 3,
+  "weight": 0.9,
+  "sell": 2
+ },
+ "club-ring": {
+  "id": 2209,
+  "name": "club ring",
+  "sprite": "club-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "club": 3,
+  "weight": 0.9,
+  "sell": 2
+ },
+ "dwarven-ring": {
+  "id": 2213,
+  "name": "dwarven ring",
+  "sprite": "dwarven-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "hpreg": 1,
+  "weight": 1.1,
+  "sell": 240
+ },
+ "ring-of-healing": {
+  "id": 2214,
+  "name": "ring of healing",
+  "sprite": "ring-of-healing",
+  "slot": "ring",
+  "type": "accessory",
+  "hpreg": 4,
+  "mpreg": 5,
+  "weight": 0.8,
+  "sell": 1920
+ },
+ "time-ring": {
+  "id": 2169,
+  "name": "time ring",
+  "sprite": "time-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "speed": 15,
+  "weight": 0.9,
+  "sell": 240
+ },
+ "stealth-ring": {
+  "id": 2165,
+  "name": "stealth ring",
+  "sprite": "stealth-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "strange-talisman": {
+  "id": 2161,
+  "name": "strange talisman",
+  "sprite": "strange-talisman",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 6,
+  "weight": 2.9,
+  "sell": 192
+ },
+ "silver-amulet": {
+  "id": 2170,
+  "name": "silver amulet",
+  "sprite": "silver-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 8,
+  "weight": 5.0,
+  "sell": 256
+ },
+ "bronze-amulet": {
+  "id": 2172,
+  "name": "bronze amulet",
+  "sprite": "bronze-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 8,
+  "weight": 5.0,
+  "sell": 256
+ },
+ "dragon-necklace": {
+  "id": 2201,
+  "name": "dragon necklace",
+  "sprite": "dragon-necklace",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 15,
+  "weight": 6.3,
+  "sell": 480
+ },
+ "protection-amulet": {
+  "id": 2200,
+  "name": "protection amulet",
+  "sprite": "protection-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 12,
+  "weight": 5.5,
+  "sell": 384
+ },
+ "stone-skin-amulet": {
+  "id": 2197,
+  "name": "stone skin amulet",
+  "sprite": "stone-skin-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 30,
+  "weight": 7.6,
+  "sell": 960
+ },
+ "elven-amulet": {
+  "id": 2198,
+  "name": "elven amulet",
+  "sprite": "elven-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 10,
+  "weight": 2.7,
+  "sell": 320
+ },
+ "amulet-of-loss": {
+  "id": 2173,
+  "name": "amulet of loss",
+  "sprite": "amulet-of-loss",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 5,
+  "weight": 4.2,
+  "sell": 160
+ },
+ "platinum-amulet": {
+  "id": 2171,
+  "name": "platinum amulet",
+  "sprite": "platinum-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 18,
+  "armor": 2,
+  "weight": 6.0,
+  "sell": 672
+ },
+ "garlic-necklace": {
+  "id": 2199,
+  "name": "garlic necklace",
+  "sprite": "garlic-necklace",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 10,
+  "weight": 3.8,
+  "sell": 320
+ },
+ "scarab-amulet": {
+  "id": 2135,
+  "name": "scarab amulet",
+  "sprite": "scarab-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 14,
+  "weight": 1.2,
+  "sell": 448
+ },
+ "star-amulet": {
+  "id": 2131,
+  "name": "star amulet",
+  "sprite": "star-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 16,
+  "weight": 6.6,
+  "sell": 512
+ },
+ "demonbone-amulet": {
+  "id": 2136,
+  "name": "demonbone amulet",
+  "sprite": "demonbone-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 25,
+  "weight": 7.0,
+  "sell": 800
+ },
+ "gold-coin": {
+  "id": 2148,
+  "name": "gold coin",
+  "sprite": "gold-coin",
+  "slot": null,
+  "type": "loot",
+  "sell": 1,
+  "weight": 0.1
+ },
+ "platinum-coin": {
+  "id": 2152,
+  "name": "platinum coin",
+  "sprite": "platinum-coin",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 0.1
+ },
+ "crystal-coin": {
+  "id": 2160,
+  "name": "crystal coin",
+  "sprite": "crystal-coin",
+  "slot": null,
+  "type": "loot",
+  "sell": 10000,
+  "weight": 0.1
+ },
+ "brown-mushroom": {
+  "id": 2789,
+  "name": "brown mushroom",
+  "sprite": "brown-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 15,
+  "buy": 50,
+  "weight": 0.2
+ },
+ "white-mushroom": {
+  "id": 2787,
+  "name": "white mushroom",
+  "sprite": "white-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 0.4
+ },
+ "backpack": {
+  "id": 1988,
+  "name": "backpack",
+  "sprite": "backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "bag": {
+  "id": 1987,
+  "name": "bag",
+  "sprite": "bag",
+  "slot": null,
+  "type": "loot",
+  "weight": 8.0,
+  "sell": 2
+ },
+ "golden-mug": {
+  "id": 2033,
+  "name": "golden mug",
+  "sprite": "golden-mug",
+  "slot": null,
+  "type": "loot",
+  "sell": 200,
+  "weight": 4.7
+ },
+ "torch": {
+  "id": 2050,
+  "name": "torch",
+  "sprite": "torch",
+  "slot": null,
+  "type": "loot",
+  "sell": 2,
+  "buy": 2,
+  "weight": 5.0
+ },
+ "rope": {
+  "id": 2120,
+  "name": "rope",
+  "sprite": "rope",
+  "slot": null,
+  "type": "loot",
+  "sell": 50,
+  "buy": 50,
+  "weight": 18.0
+ },
+ "shovel": {
+  "id": 2554,
+  "name": "shovel",
+  "sprite": "shovel",
+  "slot": null,
+  "type": "loot",
+  "sell": 50,
+  "buy": 50,
+  "weight": 35.0
+ },
+ "pick": {
+  "id": 2553,
+  "name": "pick",
+  "sprite": "pick",
+  "slot": null,
+  "type": "loot",
+  "sell": 50,
+  "weight": 35.0
+ },
+ "dragon-ham": {
+  "id": 2672,
+  "name": "dragon ham",
+  "sprite": "dragon-ham",
+  "slot": null,
+  "type": "loot",
+  "sell": 30,
+  "weight": 30.0
+ },
+ "ham": {
+  "id": 2671,
+  "name": "ham",
+  "sprite": "ham",
+  "slot": null,
+  "type": "loot",
+  "sell": 8,
+  "weight": 20.0
+ },
+ "meat": {
+  "id": 2666,
+  "name": "meat",
+  "sprite": "meat",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 13.0
+ },
+ "cheese": {
+  "id": 2696,
+  "name": "cheese",
+  "sprite": "cheese",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 4.0
+ },
+ "bread": {
+  "id": 2689,
+  "name": "bread",
+  "sprite": "bread",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 5.0
+ },
+ "skull": {
+  "id": 2229,
+  "name": "skull",
+  "sprite": "skull",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 21.8
+ },
+ "bone": {
+  "id": 2230,
+  "name": "bone",
+  "sprite": "bone",
+  "slot": null,
+  "type": "loot",
+  "sell": 2,
+  "weight": 9.5
+ },
+ "small-diamond": {
+  "id": 2145,
+  "name": "small diamond",
+  "sprite": "small-diamond",
+  "slot": null,
+  "type": "loot",
+  "sell": 300,
+  "weight": 0.1
+ },
+ "small-ruby": {
+  "id": 2147,
+  "name": "small ruby",
+  "sprite": "small-ruby",
+  "slot": null,
+  "type": "loot",
+  "sell": 250,
+  "weight": 0.1
+ },
+ "small-emerald": {
+  "id": 2149,
+  "name": "small emerald",
+  "sprite": "small-emerald",
+  "slot": null,
+  "type": "loot",
+  "sell": 250,
+  "weight": 0.1
+ },
+ "small-sapphire": {
+  "id": 2146,
+  "name": "small sapphire",
+  "sprite": "small-sapphire",
+  "slot": null,
+  "type": "loot",
+  "sell": 250,
+  "weight": 0.1
+ },
+ "small-amethyst": {
+  "id": 2150,
+  "name": "small amethyst",
+  "sprite": "small-amethyst",
+  "slot": null,
+  "type": "loot",
+  "sell": 200,
+  "weight": 0.1
+ },
+ "talon": {
+  "id": 2151,
+  "name": "talon",
+  "sprite": "talon",
+  "slot": null,
+  "type": "loot",
+  "sell": 800,
+  "weight": 0.2
+ },
+ "green-gem": {
+  "id": 2155,
+  "name": "green gem",
+  "sprite": "green-gem",
+  "slot": null,
+  "type": "loot",
+  "sell": 5000,
+  "weight": 1.5
+ },
+ "blue-gem": {
+  "id": 2158,
+  "name": "blue gem",
+  "sprite": "blue-gem",
+  "slot": null,
+  "type": "loot",
+  "sell": 5000,
+  "weight": 1.0
+ },
+ "red-gem": {
+  "id": 2156,
+  "name": "red gem",
+  "sprite": "red-gem",
+  "slot": null,
+  "type": "loot",
+  "sell": 1000,
+  "weight": 0.3
+ },
+ "yellow-gem": {
+  "id": 2154,
+  "name": "yellow gem",
+  "sprite": "yellow-gem",
+  "slot": null,
+  "type": "loot",
+  "sell": 1000,
+  "weight": 0.3
+ },
+ "violet-gem": {
+  "id": 2153,
+  "name": "violet gem",
+  "sprite": "violet-gem",
+  "slot": null,
+  "type": "loot",
+  "sell": 1000,
+  "weight": 0.3
+ },
+ "book": {
+  "id": 1950,
+  "name": "book",
+  "sprite": "book",
+  "slot": null,
+  "type": "loot",
+  "sell": 6,
+  "weight": 13.0
+ },
+ "green-mushroom": {
+  "id": 2796,
+  "name": "green mushroom",
+  "sprite": "green-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 25,
+  "weight": 0.1
+ },
+ "fish": {
+  "id": 2667,
+  "name": "fish",
+  "sprite": "fish",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 5.2
+ },
+ "broad-sword": {
+  "id": 2413,
+  "name": "broad sword",
+  "sprite": "broad-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 26,
+  "defense": 23,
+  "twoHanded": true,
+  "weight": 52.5,
+  "sell": 867
+ },
+ "daramanian-mace": {
+  "id": 2439,
+  "name": "daramanian mace",
+  "sprite": "daramanian-mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 21,
+  "defense": 12,
+  "weight": 68.0,
+  "sell": 595
+ },
+ "daramanian-waraxe": {
+  "id": 2440,
+  "name": "daramanian waraxe",
+  "sprite": "daramanian-waraxe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 39,
+  "defense": 15,
+  "weight": 52.5,
+  "sell": 988
+ },
+ "daramanian-axe": {
+  "id": 2441,
+  "name": "daramanian axe",
+  "sprite": "daramanian-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 15,
+  "defense": 10,
+  "twoHanded": true,
+  "weight": 52.5,
+  "sell": 448
+ },
+ "dwarven-axe": {
+  "id": 2435,
+  "name": "dwarven axe",
+  "sprite": "dwarven-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 31,
+  "defense": 19,
+  "weight": 82.0,
+  "sell": 899
+ },
+ "dwarven-shield": {
+  "id": 2525,
+  "name": "dwarven shield",
+  "sprite": "dwarven-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 26,
+  "weight": 55.0,
+  "sell": 416
+ },
+ "dwarven-armor": {
+  "id": 2503,
+  "name": "dwarven armor",
+  "sprite": "dwarven-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 10,
+  "weight": 130.0,
+  "sell": 480
+ },
+ "dwarven-legs": {
+  "id": 2504,
+  "name": "dwarven legs",
+  "sprite": "dwarven-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 6,
+  "weight": 40.0,
+  "sell": 288
+ },
+ "war-axe": {
+  "id": 2454,
+  "name": "war axe",
+  "sprite": "war-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 48,
+  "defense": 10,
+  "twoHanded": true,
+  "weight": 61.5,
+  "sell": 1081
+ },
+ "twin-axe": {
+  "id": 2447,
+  "name": "twin axe",
+  "sprite": "twin-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 45,
+  "defense": 24,
+  "twoHanded": true,
+  "weight": 64.0,
+  "sell": 1248
+ },
+ "hammer-of-wrath": {
+  "id": 2444,
+  "name": "hammer of wrath",
+  "sprite": "hammer-of-wrath",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 48,
+  "defense": 12,
+  "level": 50,
+  "weight": 70.0,
+  "sell": 1113
+ },
+ "arcane-staff": {
+  "id": 2453,
+  "name": "arcane staff",
+  "sprite": "arcane-staff",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 78,
+  "mag": 9,
+  "level": 75,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 40.0,
+  "sell": 4598
+ },
+ "magic-sword": {
+  "id": 2400,
+  "name": "magic sword",
+  "sprite": "magic-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 48,
+  "defense": 35,
+  "level": 70,
+  "weight": 42.0,
+  "sell": 1481
+ },
+ "pharaoh-sword": {
+  "id": 2446,
+  "name": "pharaoh sword",
+  "sprite": "pharaoh-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 41,
+  "defense": 23,
+  "weight": 190.0,
+  "sell": 1155
+ },
+ "djinn-blade": {
+  "id": 2451,
+  "name": "djinn blade",
+  "sprite": "djinn-blade",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 38,
+  "defense": 22,
+  "weight": 24.5,
+  "sell": 1081
+ },
+ "poison-dagger": {
+  "id": 2411,
+  "name": "poison dagger",
+  "sprite": "poison-dagger",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 18,
+  "defense": 8,
+  "weight": 8.8,
+  "sell": 473
+ },
+ "silver-dagger": {
+  "id": 2402,
+  "name": "silver dagger",
+  "sprite": "silver-dagger",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 8,
+  "defense": 7,
+  "weight": 10.19,
+  "sell": 265
+ },
+ "throwing-knife": {
+  "id": 2410,
+  "name": "throwing knife",
+  "sprite": "throwing-knife",
+  "slot": "weapon",
+  "type": "distance",
+  "attack": 25,
+  "weight": 5.0,
+  "sell": 480
+ },
+ "throwing-star": {
+  "id": 2399,
+  "name": "throwing star",
+  "sprite": "throwing-star",
+  "slot": "weapon",
+  "type": "distance",
+  "attack": 30,
+  "weight": 2.0,
+  "sell": 576
+ },
+ "katana": {
+  "id": 2412,
+  "name": "katana",
+  "sprite": "katana",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 16,
+  "defense": 12,
+  "weight": 31.0,
+  "sell": 499
+ },
+ "naginata": {
+  "id": 2426,
+  "name": "naginata",
+  "sprite": "naginata",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 39,
+  "defense": 19,
+  "twoHanded": true,
+  "weight": 80.0,
+  "sell": 1052
+ },
+ "scimitar": {
+  "id": 2419,
+  "name": "scimitar",
+  "sprite": "scimitar",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 19,
+  "defense": 13,
+  "weight": 29.0,
+  "sell": 572
+ },
+ "short-sword": {
+  "id": 2406,
+  "name": "short sword",
+  "sprite": "short-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 11,
+  "defense": 11,
+  "weight": 35.0,
+  "sell": 387
+ },
+ "dagger": {
+  "id": 2379,
+  "name": "dagger",
+  "sprite": "dagger",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 8,
+  "defense": 6,
+  "weight": 9.5,
+  "sell": 249
+ },
+ "staff": {
+  "id": 2401,
+  "name": "staff",
+  "sprite": "staff",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 10,
+  "defense": 25,
+  "twoHanded": true,
+  "weight": 38.0,
+  "sell": 592
+ },
+ "crystal-mace": {
+  "id": 2445,
+  "name": "crystal mace",
+  "sprite": "crystal-mace",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 38,
+  "defense": 16,
+  "weight": 80.0,
+  "sell": 985
+ },
+ "skull-staff": {
+  "id": 2436,
+  "name": "skull staff",
+  "sprite": "skull-staff",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 0,
+  "mag": 3,
+  "level": 30,
+  "vocs": [],
+  "weight": 17.0,
+  "sell": 1200
+ },
+ "bone-club": {
+  "id": 2449,
+  "name": "bone club",
+  "sprite": "bone-club",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 12,
+  "defense": 8,
+  "weight": 39.0,
+  "sell": 358
+ },
+ "bone-sword": {
+  "id": 2450,
+  "name": "bone sword",
+  "sprite": "bone-sword",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 14,
+  "defense": 10,
+  "weight": 19.0,
+  "sell": 428
+ },
+ "studded-club": {
+  "id": 2448,
+  "name": "studded club",
+  "sprite": "studded-club",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 9,
+  "defense": 8,
+  "weight": 35.0,
+  "sell": 300
+ },
+ "small-axe": {
+  "id": 2559,
+  "name": "small axe",
+  "sprite": "small-axe",
+  "slot": null,
+  "type": "loot",
+  "weight": 20.0,
+  "sell": 2
+ },
+ "hand-axe": {
+  "id": 2380,
+  "name": "hand axe",
+  "sprite": "hand-axe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 10,
+  "defense": 5,
+  "weight": 18.0,
+  "sell": 272
+ },
+ "wooden-wand": {
+  "id": 2181,
+  "name": "wooden wand",
+  "sprite": "wooden-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 8,
+  "mag": 1,
+  "level": 7,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 26.5,
+  "sell": 502
+ },
+ "elven-wand": {
+  "id": 2183,
+  "name": "elven wand",
+  "sprite": "elven-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 14,
+  "mag": 2,
+  "level": 13,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 21.0,
+  "sell": 979
+ },
+ "crystal-wand": {
+  "id": 2184,
+  "name": "crystal wand",
+  "sprite": "crystal-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 29,
+  "mag": 4,
+  "level": 26,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 28.0,
+  "sell": 1971
+ },
+ "wand-of-might": {
+  "id": 2185,
+  "name": "wand of might",
+  "sprite": "wand-of-might",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 48,
+  "mag": 6,
+  "level": 40,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 29.0,
+  "sell": 3014
+ },
+ "conjurer-wand": {
+  "id": 2186,
+  "name": "conjurer wand",
+  "sprite": "conjurer-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 21,
+  "mag": 3,
+  "level": 19,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 19.5,
+  "sell": 1468
+ },
+ "ritual-wand": {
+  "id": 2187,
+  "name": "ritual wand",
+  "sprite": "ritual-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 38,
+  "mag": 5,
+  "level": 33,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 30.5,
+  "sell": 2486
+ },
+ "green-spell-wand": {
+  "id": 2188,
+  "name": "green spell wand",
+  "sprite": "green-spell-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 30,
+  "mag": 4,
+  "level": 26,
+  "vocs": [
+   "druid"
+  ],
+  "weight": 23.0,
+  "sell": 1984
+ },
+ "yellow-spell-wand": {
+  "id": 2189,
+  "name": "yellow spell wand",
+  "sprite": "yellow-spell-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 40,
+  "mag": 5,
+  "level": 33,
+  "vocs": [
+   "druid"
+  ],
+  "weight": 23.0,
+  "sell": 2512
+ },
+ "blue-spell-wand": {
+  "id": 2190,
+  "name": "blue spell wand",
+  "sprite": "blue-spell-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 40,
+  "mag": 5,
+  "level": 33,
+  "vocs": [
+   "sorcerer"
+  ],
+  "weight": 23.0,
+  "sell": 2512
+ },
+ "red-spell-wand": {
+  "id": 2191,
+  "name": "red spell wand",
+  "sprite": "red-spell-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 50,
+  "mag": 6,
+  "level": 40,
+  "vocs": [
+   "sorcerer"
+  ],
+  "weight": 23.0,
+  "sell": 3040
+ },
+ "golden-wand": {
+  "id": 2182,
+  "name": "golden wand",
+  "sprite": "golden-wand",
+  "slot": "weapon",
+  "type": "magic",
+  "magicDamage": 58,
+  "mag": 7,
+  "level": 50,
+  "vocs": [
+   "sorcerer",
+   "druid"
+  ],
+  "weight": 43.0,
+  "sell": 3542
+ },
+ "enchanted-staff": {
+  "id": 2433,
+  "name": "enchanted staff",
+  "sprite": "enchanted-staff",
+  "slot": "weapon",
+  "type": "club",
+  "attack": 39,
+  "defense": 45,
+  "twoHanded": true,
+  "weight": 38.0,
+  "sell": 1468
+ },
+ "life-crystal": {
+  "id": 2177,
+  "name": "life crystal",
+  "sprite": "life-crystal",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 4,
+  "weight": 2.5,
+  "sell": 1600
+ },
+ "mind-stone": {
+  "id": 2178,
+  "name": "mind stone",
+  "sprite": "mind-stone",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 6,
+  "weight": 2.5,
+  "sell": 2400
+ },
+ "orb": {
+  "id": 2176,
+  "name": "orb",
+  "sprite": "orb",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 2,
+  "weight": 8.0,
+  "sell": 800
+ },
+ "crystal-ball": {
+  "id": 2192,
+  "name": "crystal ball",
+  "sprite": "crystal-ball",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 2,
+  "weight": 34.0,
+  "sell": 800
+ },
+ "spellbook": {
+  "id": 2175,
+  "name": "spellbook",
+  "sprite": "spellbook",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 2,
+  "weight": 58.0,
+  "sell": 800
+ },
+ "amazon-armor": {
+  "id": 2500,
+  "name": "amazon armor",
+  "sprite": "amazon-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 13,
+  "weight": 99.0,
+  "sell": 624
+ },
+ "amazon-helmet": {
+  "id": 2499,
+  "name": "amazon helmet",
+  "sprite": "amazon-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 7,
+  "weight": 29.5,
+  "sell": 336
+ },
+ "native-armor": {
+  "id": 2508,
+  "name": "native armor",
+  "sprite": "native-armor",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 7,
+  "weight": 1.0,
+  "sell": 336
+ },
+ "elven-legs": {
+  "id": 2507,
+  "name": "elven legs",
+  "sprite": "elven-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 10,
+  "weight": 48.0,
+  "sell": 480
+ },
+ "demon-legs": {
+  "id": 2495,
+  "name": "demon legs",
+  "sprite": "demon-legs",
+  "slot": "legs",
+  "type": "armor",
+  "armor": 9,
+  "level": 60,
+  "weight": 54.0,
+  "sell": 432
+ },
+ "dragon-scale-helmet": {
+  "id": 2506,
+  "name": "dragon scale helmet",
+  "sprite": "dragon-scale-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 10,
+  "weight": 60.0,
+  "sell": 480
+ },
+ "golden-helmet": {
+  "id": 2471,
+  "name": "golden helmet",
+  "sprite": "golden-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 12,
+  "level": 60,
+  "weight": 32.0,
+  "sell": 576
+ },
+ "iron-helmet": {
+  "id": 2459,
+  "name": "iron helmet",
+  "sprite": "iron-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 5,
+  "weight": 30.0,
+  "sell": 240
+ },
+ "legion-helmet": {
+  "id": 2480,
+  "name": "legion helmet",
+  "sprite": "legion-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 4,
+  "weight": 31.0,
+  "sell": 192
+ },
+ "dark-helmet": {
+  "id": 2490,
+  "name": "dark helmet",
+  "sprite": "dark-helmet",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 6,
+  "weight": 46.0,
+  "sell": 288
+ },
+ "damaged-helmet": {
+  "id": 2339,
+  "name": "damaged helmet",
+  "sprite": "damaged-helmet",
+  "slot": null,
+  "type": "loot",
+  "armor": 5,
+  "weight": 18.0,
+  "sell": 240
+ },
+ "helmet-of-the-ancients": {
+  "id": 2342,
+  "name": "helmet of the ancients",
+  "sprite": "helmet-of-the-ancients",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 8,
+  "level": 50,
+  "weight": 27.6,
+  "sell": 384
+ },
+ "magician-hat": {
+  "id": 2662,
+  "name": "magician hat",
+  "sprite": "magician-hat",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 1,
+  "mag": 2,
+  "weight": 7.5,
+  "sell": 848
+ },
+ "hat-of-the-mad": {
+  "id": 2323,
+  "name": "hat of the mad",
+  "sprite": "hat-of-the-mad",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 3,
+  "mag": 3,
+  "weight": 7.0,
+  "sell": 1344
+ },
+ "mastermind-shield": {
+  "id": 2514,
+  "name": "mastermind shield",
+  "sprite": "mastermind-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 37,
+  "level": 60,
+  "weight": 57.0,
+  "sell": 592
+ },
+ "shield-of-honour": {
+  "id": 2517,
+  "name": "shield of honour",
+  "sprite": "shield-of-honour",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 33,
+  "weight": 54.0,
+  "sell": 528
+ },
+ "beholder-shield": {
+  "id": 2518,
+  "name": "beholder shield",
+  "sprite": "beholder-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 28,
+  "weight": 47.0,
+  "sell": 448
+ },
+ "great-shield": {
+  "id": 2522,
+  "name": "great shield",
+  "sprite": "great-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 38,
+  "level": 60,
+  "weight": 84.0,
+  "sell": 608
+ },
+ "blessed-shield": {
+  "id": 2523,
+  "name": "blessed shield",
+  "sprite": "blessed-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 40,
+  "level": 70,
+  "weight": 68.0,
+  "sell": 640
+ },
+ "ornamented-shield": {
+  "id": 2524,
+  "name": "ornamented shield",
+  "sprite": "ornamented-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 22,
+  "weight": 67.0,
+  "sell": 352
+ },
+ "viking-shield": {
+  "id": 2531,
+  "name": "viking shield",
+  "sprite": "viking-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 22,
+  "weight": 66.0,
+  "sell": 352
+ },
+ "eagle-shield": {
+  "id": 2538,
+  "name": "eagle shield",
+  "sprite": "eagle-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 30,
+  "weight": 60.0,
+  "sell": 480
+ },
+ "black-shield": {
+  "id": 2529,
+  "name": "black shield",
+  "sprite": "black-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 18,
+  "weight": 42.0,
+  "sell": 288
+ },
+ "bone-shield": {
+  "id": 2541,
+  "name": "bone shield",
+  "sprite": "bone-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 20,
+  "weight": 55.0,
+  "sell": 320
+ },
+ "tempest-shield": {
+  "id": 2542,
+  "name": "tempest shield",
+  "sprite": "tempest-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 36,
+  "level": 55,
+  "weight": 51.0,
+  "sell": 576
+ },
+ "rose-shield": {
+  "id": 2527,
+  "name": "rose shield",
+  "sprite": "rose-shield",
+  "slot": "shield",
+  "type": "shield",
+  "defense": 27,
+  "weight": 52.0,
+  "sell": 432
+ },
+ "crystal-ring": {
+  "id": 2124,
+  "name": "crystal ring",
+  "sprite": "crystal-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "mag": 1,
+  "weight": 0.9,
+  "sell": 400
+ },
+ "gold-ring": {
+  "id": 2179,
+  "name": "gold ring",
+  "sprite": "gold-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "hpreg": 1,
+  "mpreg": 1,
+  "weight": 1.0,
+  "sell": 432
+ },
+ "wedding-ring": {
+  "id": 2121,
+  "name": "wedding ring",
+  "sprite": "wedding-ring",
+  "slot": "ring",
+  "type": "accessory",
+  "hpreg": 1,
+  "weight": 0.4,
+  "sell": 240
+ },
+ "ring-of-the-sky": {
+  "id": 2123,
+  "name": "ring of the sky",
+  "sprite": "ring-of-the-sky",
+  "slot": "ring",
+  "type": "accessory",
+  "mag": 2,
+  "mpreg": 4,
+  "weight": 0.4,
+  "sell": 1568
+ },
+ "ring-of-wishes": {
+  "id": 2357,
+  "name": "ring of wishes",
+  "sprite": "ring-of-wishes",
+  "slot": "ring",
+  "type": "accessory",
+  "mag": 3,
+  "hpreg": 3,
+  "mpreg": 3,
+  "weight": 0.9,
+  "sell": 2496
+ },
+ "golden-amulet": {
+  "id": 2130,
+  "name": "golden amulet",
+  "sprite": "golden-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 20,
+  "weight": 8.3,
+  "sell": 640
+ },
+ "ancient-amulet": {
+  "id": 2142,
+  "name": "ancient amulet",
+  "sprite": "ancient-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 1,
+  "prot": 10,
+  "weight": 8.4,
+  "sell": 720
+ },
+ "starlight-amulet": {
+  "id": 2138,
+  "name": "starlight amulet",
+  "sprite": "starlight-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 4,
+  "prot": 12,
+  "armor": 3,
+  "weight": 52.0,
+  "sell": 2128
+ },
+ "crystal-necklace": {
+  "id": 2125,
+  "name": "crystal necklace",
+  "sprite": "crystal-necklace",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 12,
+  "weight": 4.9,
+  "sell": 384
+ },
+ "ruby-necklace": {
+  "id": 2133,
+  "name": "ruby necklace",
+  "sprite": "ruby-necklace",
+  "slot": "amulet",
+  "type": "accessory",
+  "prot": 14,
+  "weight": 5.7,
+  "sell": 448
+ },
+ "wolf-tooth-chain": {
+  "id": 2129,
+  "name": "wolf tooth chain",
+  "sprite": "wolf-tooth-chain",
+  "slot": "amulet",
+  "type": "accessory",
+  "melee": 2,
+  "weight": 3.3,
+  "sell": 2
+ },
+ "paw-amulet": {
+  "id": 2218,
+  "name": "paw amulet",
+  "sprite": "paw-amulet",
+  "slot": "amulet",
+  "type": "accessory",
+  "melee": 3,
+  "weight": 10.0,
+  "sell": 2
+ },
+ "elven-brooch": {
+  "id": 2122,
+  "name": "elven brooch",
+  "sprite": "elven-brooch",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 1,
+  "sell": 200,
+  "weight": 1.0
+ },
+ "vial": {
+  "id": 2006,
+  "name": "vial",
+  "sprite": "vial",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 1.8
+ },
+ "brown-flask": {
+  "id": 2015,
+  "name": "brown flask",
+  "sprite": "brown-flask",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 2.5
+ },
+ "green-flask": {
+  "id": 2009,
+  "name": "green flask",
+  "sprite": "green-flask",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 3.0
+ },
+ "blue-bottle": {
+  "id": 2007,
+  "name": "blue bottle",
+  "sprite": "blue-bottle",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 2.5
+ },
+ "white-pearl": {
+  "id": 2143,
+  "name": "white pearl",
+  "sprite": "white-pearl",
+  "slot": null,
+  "type": "loot",
+  "sell": 160,
+  "weight": 0.2
+ },
+ "black-pearl": {
+  "id": 2144,
+  "name": "black pearl",
+  "sprite": "black-pearl",
+  "slot": null,
+  "type": "loot",
+  "sell": 280,
+  "weight": 0.2
+ },
+ "gold-nugget": {
+  "id": 2157,
+  "name": "gold nugget",
+  "sprite": "gold-nugget",
+  "slot": null,
+  "type": "loot",
+  "sell": 850,
+  "weight": 0.1
+ },
+ "holy-scarab": {
+  "id": 2140,
+  "name": "holy scarab",
+  "sprite": "holy-scarab",
+  "slot": null,
+  "type": "loot",
+  "sell": 300,
+  "weight": 5.0
+ },
+ "scarab-coin": {
+  "id": 2159,
+  "name": "scarab coin",
+  "sprite": "scarab-coin",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 1.0
+ },
+ "burning-heart": {
+  "id": 2353,
+  "name": "burning heart",
+  "sprite": "burning-heart",
+  "slot": null,
+  "type": "loot",
+  "sell": 400,
+  "weight": 4.0
+ },
+ "blood-orb": {
+  "id": 2363,
+  "name": "blood orb",
+  "sprite": "blood-orb",
+  "slot": null,
+  "type": "loot",
+  "sell": 500,
+  "weight": 1.5
+ },
+ "roc-feather": {
+  "id": 2366,
+  "name": "roc feather",
+  "sprite": "roc-feather",
+  "slot": null,
+  "type": "loot",
+  "sell": 400,
+  "weight": 1.0
+ },
+ "phoenix-egg": {
+  "id": 2328,
+  "name": "phoenix egg",
+  "sprite": "phoenix-egg",
+  "slot": null,
+  "type": "loot",
+  "sell": 750,
+  "weight": 0.3
+ },
+ "frozen-starlight": {
+  "id": 2361,
+  "name": "frozen starlight",
+  "sprite": "frozen-starlight",
+  "slot": "amulet",
+  "type": "accessory",
+  "mag": 2,
+  "sell": 3000,
+  "weight": 0.2
+ },
+ "mysterious-fetish": {
+  "id": 2194,
+  "name": "mysterious fetish",
+  "sprite": "mysterious-fetish",
+  "slot": null,
+  "type": "loot",
+  "sell": 50,
+  "weight": 4.9
+ },
+ "strange-symbol": {
+  "id": 2174,
+  "name": "strange symbol",
+  "sprite": "strange-symbol",
+  "slot": null,
+  "type": "loot",
+  "sell": 200,
+  "weight": 2.0
+ },
+ "voodoo-doll": {
+  "id": 2322,
+  "name": "voodoo doll",
+  "sprite": "voodoo-doll",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 6.5
+ },
+ "teddy-bear": {
+  "id": 2112,
+  "name": "teddy bear",
+  "sprite": "teddy-bear",
+  "slot": null,
+  "type": "loot",
+  "sell": 10,
+  "weight": 7.0
+ },
+ "doll": {
+  "id": 2110,
+  "name": "doll",
+  "sprite": "doll",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 6.5
+ },
+ "dirty-fur": {
+  "id": 2220,
+  "name": "dirty fur",
+  "sprite": "dirty-fur",
+  "slot": null,
+  "type": "loot",
+  "sell": 30,
+  "weight": 2.0
+ },
+ "big-bone": {
+  "id": 2231,
+  "name": "big bone",
+  "sprite": "big-bone",
+  "slot": null,
+  "type": "loot",
+  "sell": 15,
+  "weight": 19.0
+ },
+ "fishbone": {
+  "id": 2226,
+  "name": "fishbone",
+  "sprite": "fishbone",
+  "slot": null,
+  "type": "loot",
+  "sell": 2,
+  "weight": 0.7
+ },
+ "rotten-meat": {
+  "id": 2227,
+  "name": "rotten meat",
+  "sprite": "rotten-meat",
+  "slot": null,
+  "type": "loot",
+  "sell": 1,
+  "weight": 0.6
+ },
+ "moldy-cheese": {
+  "id": 2235,
+  "name": "moldy cheese",
+  "sprite": "moldy-cheese",
+  "slot": null,
+  "type": "loot",
+  "sell": 1,
+  "weight": 4.0
+ },
+ "brown-bread": {
+  "id": 2691,
+  "name": "brown bread",
+  "sprite": "brown-bread",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 4.0
+ },
+ "salmon": {
+  "id": 2668,
+  "name": "salmon",
+  "sprite": "salmon",
+  "slot": null,
+  "type": "loot",
+  "sell": 6,
+  "weight": 3.2
+ },
+ "shrimp": {
+  "id": 2670,
+  "name": "shrimp",
+  "sprite": "shrimp",
+  "slot": null,
+  "type": "loot",
+  "sell": 8,
+  "weight": 0.3
+ },
+ "northern-pike": {
+  "id": 2669,
+  "name": "northern pike",
+  "sprite": "northern-pike",
+  "slot": null,
+  "type": "loot",
+  "sell": 10,
+  "weight": 1.2
+ },
+ "melon": {
+  "id": 2682,
+  "name": "melon",
+  "sprite": "melon",
+  "slot": null,
+  "type": "loot",
+  "sell": 8,
+  "weight": 9.5
+ },
+ "banana": {
+  "id": 2676,
+  "name": "banana",
+  "sprite": "banana",
+  "slot": null,
+  "type": "loot",
+  "sell": 3,
+  "weight": 1.8
+ },
+ "orange": {
+  "id": 2675,
+  "name": "orange",
+  "sprite": "orange",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 1.1
+ },
+ "grapes": {
+  "id": 2681,
+  "name": "grapes",
+  "sprite": "grapes",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 2.5
+ },
+ "carrot": {
+  "id": 2684,
+  "name": "carrot",
+  "sprite": "carrot",
+  "slot": null,
+  "type": "loot",
+  "sell": 2,
+  "weight": 2.0
+ },
+ "pumpkin": {
+  "id": 2683,
+  "name": "pumpkin",
+  "sprite": "pumpkin",
+  "slot": null,
+  "type": "loot",
+  "sell": 8,
+  "weight": 12.0
+ },
+ "cookie": {
+  "id": 2687,
+  "name": "cookie",
+  "sprite": "cookie",
+  "slot": null,
+  "type": "loot",
+  "sell": 2,
+  "weight": 0.1
+ },
+ "candy-cane": {
+  "id": 2688,
+  "name": "candy cane",
+  "sprite": "candy-cane",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 0.5
+ },
+ "red-mushroom": {
+  "id": 2788,
+  "name": "red mushroom",
+  "sprite": "red-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 20,
+  "weight": 0.5
+ },
+ "fire-mushroom": {
+  "id": 2795,
+  "name": "fire mushroom",
+  "sprite": "fire-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 30,
+  "weight": 0.1
+ },
+ "dark-mushroom": {
+  "id": 2792,
+  "name": "dark mushroom",
+  "sprite": "dark-mushroom",
+  "slot": null,
+  "type": "loot",
+  "sell": 25,
+  "weight": 0.1
+ },
+ "orange-mushroom": {
+  "id": 2790,
+  "name": "orange mushroom",
+  "sprite": "orange-mushroom",
+  "slot": null,
+  "type": "loot",
+  "weight": 0.3,
+  "sell": 2
+ },
+ "wood-mushroom": {
+  "id": 2791,
+  "name": "wood mushroom",
+  "sprite": "wood-mushroom",
+  "slot": null,
+  "type": "loot",
+  "weight": 0.3,
+  "sell": 2
+ },
+ "blood-herb": {
+  "id": 2798,
+  "name": "blood herb",
+  "sprite": "blood-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 500,
+  "weight": 1.2
+ },
+ "star-herb": {
+  "id": 2800,
+  "name": "star herb",
+  "sprite": "star-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 0.3
+ },
+ "sling-herb": {
+  "id": 2802,
+  "name": "sling herb",
+  "sprite": "sling-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 0.9
+ },
+ "powder-herb": {
+  "id": 2803,
+  "name": "powder herb",
+  "sprite": "powder-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 0.5
+ },
+ "shadow-herb": {
+  "id": 2804,
+  "name": "shadow herb",
+  "sprite": "shadow-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 1.0
+ },
+ "stone-herb": {
+  "id": 2799,
+  "name": "stone herb",
+  "sprite": "stone-herb",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 0.2
+ },
+ "machete": {
+  "id": 2420,
+  "name": "machete",
+  "sprite": "machete",
+  "slot": "weapon",
+  "type": "sword",
+  "attack": 12,
+  "defense": 9,
+  "sell": 35,
+  "weight": 16.5
+ },
+ "scythe": {
+  "id": 2550,
+  "name": "scythe",
+  "sprite": "scythe",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 8,
+  "defense": 3,
+  "twoHanded": true,
+  "sell": 12,
+  "weight": 30.0
+ },
+ "sickle": {
+  "id": 2405,
+  "name": "sickle",
+  "sprite": "sickle",
+  "slot": "weapon",
+  "type": "axe",
+  "attack": 7,
+  "defense": 4,
+  "sell": 8,
+  "weight": 10.5
+ },
+ "hoe": {
+  "id": 2552,
+  "name": "hoe",
+  "sprite": "hoe",
+  "slot": null,
+  "type": "loot",
+  "sell": 12,
+  "weight": 28.0
+ },
+ "watch": {
+  "id": 2036,
+  "name": "watch",
+  "sprite": "watch",
+  "slot": null,
+  "type": "loot",
+  "sell": 20,
+  "weight": 0.5
+ },
+ "blue-backpack": {
+  "id": 2002,
+  "name": "blue backpack",
+  "sprite": "blue-backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "red-backpack": {
+  "id": 2000,
+  "name": "red backpack",
+  "sprite": "red-backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "purple-backpack": {
+  "id": 2001,
+  "name": "purple backpack",
+  "sprite": "purple-backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "grey-backpack": {
+  "id": 2003,
+  "name": "grey backpack",
+  "sprite": "grey-backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "golden-backpack": {
+  "id": 2004,
+  "name": "golden backpack",
+  "sprite": "golden-backpack",
+  "slot": null,
+  "type": "loot",
+  "weight": 18.0,
+  "sell": 2
+ },
+ "backpack-of-holding": {
+  "id": 2365,
+  "name": "backpack of holding",
+  "sprite": "backpack-of-holding",
+  "slot": null,
+  "type": "loot",
+  "weight": 15.0,
+  "sell": 2
+ },
+ "present": {
+  "id": 1990,
+  "name": "present",
+  "sprite": "present",
+  "slot": null,
+  "type": "loot",
+  "sell": 5,
+  "weight": 6.0
+ },
+ "letter": {
+  "id": 2597,
+  "name": "letter",
+  "sprite": "letter",
+  "slot": null,
+  "type": "loot",
+  "sell": 1,
+  "weight": 0.5
+ },
+ "torn-book": {
+  "id": 2236,
+  "name": "torn book",
+  "sprite": "torn-book",
+  "slot": null,
+  "type": "loot",
+  "sell": 4,
+  "weight": 11.0
+ },
+ "cookbook": {
+  "id": 2347,
+  "name": "cookbook",
+  "sprite": "cookbook",
+  "slot": null,
+  "type": "loot",
+  "sell": 15,
+  "weight": 15.0
+ },
+ "spy-report": {
+  "id": 2345,
+  "name": "spy report",
+  "sprite": "spy-report",
+  "slot": null,
+  "type": "loot",
+  "sell": 100,
+  "weight": 1.5
+ },
+ "blank-rune": {
+  "id": 2260,
+  "name": "blank rune",
+  "sprite": "blank-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 10,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "intense-healing-rune": {
+  "id": 2265,
+  "name": "intense healing rune",
+  "sprite": "intense-healing-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 95,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "ultimate-healing-rune": {
+  "id": 2273,
+  "name": "ultimate healing rune",
+  "sprite": "ultimate-healing-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 175,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "great-fireball-rune": {
+  "id": 2304,
+  "name": "great fireball rune",
+  "sprite": "great-fireball-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 65,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "sudden-death-rune": {
+  "id": 2263,
+  "name": "sudden death rune",
+  "sprite": "sudden-death-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 155,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "explosion-rune": {
+  "id": 2313,
+  "name": "explosion rune",
+  "sprite": "explosion-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 55,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "heavy-magic-missile-rune": {
+  "id": 2311,
+  "name": "heavy magic missile rune",
+  "sprite": "heavy-magic-missile-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 25,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "light-magic-missile-rune": {
+  "id": 2287,
+  "name": "light magic missile rune",
+  "sprite": "light-magic-missile-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 10,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "fireball-rune": {
+  "id": 2302,
+  "name": "fireball rune",
+  "sprite": "fireball-rune",
+  "slot": null,
+  "type": "loot",
+  "buy": 30,
+  "weight": 1.2,
+  "sell": 2
+ },
+ "firebomb-rune": {
+  "id": 2305,
+  "name": "firebomb rune",
+  "sprite": "firebomb-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "poison-bomb-rune": {
+  "id": 2286,
+  "name": "poison bomb rune",
+  "sprite": "poison-bomb-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "energy-bomb-rune": {
+  "id": 2262,
+  "name": "energy bomb rune",
+  "sprite": "energy-bomb-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "paralyze-rune": {
+  "id": 2278,
+  "name": "paralyze rune",
+  "sprite": "paralyze-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "magic-wall-rune": {
+  "id": 2293,
+  "name": "magic wall rune",
+  "sprite": "magic-wall-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "destroy-field-rune": {
+  "id": 2261,
+  "name": "destroy field rune",
+  "sprite": "destroy-field-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "antidote-rune": {
+  "id": 2266,
+  "name": "antidote rune",
+  "sprite": "antidote-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "animate-dead-rune": {
+  "id": 2316,
+  "name": "animate dead rune",
+  "sprite": "animate-dead-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "convince-creature-rune": {
+  "id": 2290,
+  "name": "convince creature rune",
+  "sprite": "convince-creature-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "soulfire-rune": {
+  "id": 2308,
+  "name": "soulfire rune",
+  "sprite": "soulfire-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "chameleon-rune": {
+  "id": 2291,
+  "name": "chameleon rune",
+  "sprite": "chameleon-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "desintegrate-rune": {
+  "id": 2310,
+  "name": "desintegrate rune",
+  "sprite": "desintegrate-rune",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.2,
+  "sell": 2
+ },
+ "crystal-arrow": {
+  "id": 2352,
+  "name": "crystal arrow",
+  "sprite": "crystal-arrow",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "cape": {
+  "id": 2654,
+  "name": "cape",
+  "sprite": "cape",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 32.0,
+  "sell": 48
+ },
+ "jacket": {
+  "id": 2650,
+  "name": "jacket",
+  "sprite": "jacket",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 24.0,
+  "sell": 48
+ },
+ "green-tunic": {
+  "id": 2652,
+  "name": "green tunic",
+  "sprite": "green-tunic",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 9.3,
+  "sell": 48
+ },
+ "red-tunic": {
+  "id": 2653,
+  "name": "red tunic",
+  "sprite": "red-tunic",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 2,
+  "weight": 30.0,
+  "sell": 96
+ },
+ "red-robe": {
+  "id": 2655,
+  "name": "red robe",
+  "sprite": "red-robe",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 26.0,
+  "sell": 48
+ },
+ "scarf": {
+  "id": 2661,
+  "name": "scarf",
+  "sprite": "scarf",
+  "slot": "amulet",
+  "type": "accessory",
+  "armor": 1,
+  "weight": 2.0,
+  "sell": 48
+ },
+ "cowl": {
+  "id": 2664,
+  "name": "cowl",
+  "sprite": "cowl",
+  "slot": "helmet",
+  "type": "armor",
+  "armor": 2,
+  "weight": 7.0,
+  "sell": 96
+ },
+ "simple-dress": {
+  "id": 2657,
+  "name": "simple dress",
+  "sprite": "simple-dress",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 1,
+  "weight": 24.0,
+  "sell": 48
+ },
+ "white-dress": {
+  "id": 2658,
+  "name": "white dress",
+  "sprite": "white-dress",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 0,
+  "weight": 24.0,
+  "sell": 2
+ },
+ "ball-gown": {
+  "id": 2659,
+  "name": "ball gown",
+  "sprite": "ball-gown",
+  "slot": "armor",
+  "type": "armor",
+  "armor": 0,
+  "weight": 25.0,
+  "sell": 2
+ },
+ "worn-leather-boots": {
+  "id": 2238,
+  "name": "worn leather boots",
+  "sprite": "worn-leather-boots",
+  "slot": null,
+  "type": "loot",
+  "weight": 4.0,
+  "sell": 2
+ },
+ "bunny-slippers": {
+  "id": 2644,
+  "name": "bunny slippers",
+  "sprite": "bunny-slippers",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 0,
+  "weight": 12.0,
+  "sell": 2
+ },
+ "traper-boots": {
+  "id": 2641,
+  "name": "traper boots",
+  "sprite": "traper-boots",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 3,
+  "weight": 9.0,
+  "sell": 144
+ },
+ "boots-of-waterwalking": {
+  "id": 2358,
+  "name": "boots of waterwalking",
+  "sprite": "boots-of-waterwalking",
+  "slot": "boots",
+  "type": "armor",
+  "armor": 0,
+  "weight": 8.0,
+  "sell": 2
+ },
+ "piggy-bank": {
+  "id": 2114,
+  "name": "piggy bank",
+  "sprite": "piggy-bank",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.5,
+  "sell": 2
+ },
+ "silver-key": {
+  "id": 2088,
+  "name": "silver key",
+  "sprite": "silver-key",
+  "slot": null,
+  "type": "loot",
+  "sell": 10,
+  "weight": 1.0
+ },
+ "golden-key": {
+  "id": 2091,
+  "name": "golden key",
+  "sprite": "golden-key",
+  "slot": null,
+  "type": "loot",
+  "sell": 20,
+  "weight": 1.0
+ },
+ "crystal-key": {
+  "id": 2090,
+  "name": "crystal key",
+  "sprite": "crystal-key",
+  "slot": null,
+  "type": "loot",
+  "sell": 30,
+  "weight": 1.0
+ },
+ "copper-key": {
+  "id": 2089,
+  "name": "copper key",
+  "sprite": "copper-key",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "bone-key": {
+  "id": 2092,
+  "name": "bone key",
+  "sprite": "bone-key",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "purple-key": {
+  "id": 2086,
+  "name": "purple key",
+  "sprite": "purple-key",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "wooden-key": {
+  "id": 2087,
+  "name": "wooden key",
+  "sprite": "wooden-key",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "depot-chest": {
+  "id": 2594,
+  "name": "depot chest",
+  "sprite": "depot-chest",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "locker": {
+  "id": 1732,
+  "name": "locker",
+  "sprite": "locker",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "mirror": {
+  "id": 1736,
+  "name": "mirror",
+  "sprite": "mirror",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ },
+ "vase": {
+  "id": 2008,
+  "name": "vase",
+  "sprite": "vase",
+  "slot": null,
+  "type": "loot",
+  "weight": 9.4,
+  "sell": 2
+ },
+ "candlestick": {
+  "id": 2047,
+  "name": "candlestick",
+  "sprite": "candlestick",
+  "slot": null,
+  "type": "loot",
+  "weight": 3.0,
+  "sell": 2
+ },
+ "lamp": {
+  "id": 2044,
+  "name": "lamp",
+  "sprite": "lamp",
+  "slot": null,
+  "type": "loot",
+  "weight": 30.0,
+  "sell": 2
+ },
+ "gemmed-lamp": {
+  "id": 2344,
+  "name": "gemmed lamp",
+  "sprite": "gemmed-lamp",
+  "slot": null,
+  "type": "loot",
+  "weight": 13.0,
+  "sell": 2
+ },
+ "small-oil-lamp": {
+  "id": 2062,
+  "name": "small oil lamp",
+  "sprite": "small-oil-lamp",
+  "slot": null,
+  "type": "loot",
+  "weight": 1.0,
+  "sell": 2
+ }
+}

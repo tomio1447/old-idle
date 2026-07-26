@@ -1,0 +1,478 @@
+{
+ "rats": {
+  "name": "Esgoto de Rookgaard",
+  "level": 1,
+  "monsters": [
+   "rat",
+   "cave-rat",
+   "bug",
+   "snake"
+  ],
+  "color": "#6b7a4a",
+  "scene": "sewer",
+  "avgHp": 29,
+  "avgExp": 7,
+  "avgDamage": 7,
+  "avgArmor": 2,
+  "avgGold": 1.7,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "spiders": {
+  "name": "Caverna das Aranhas",
+  "level": 5,
+  "monsters": [
+   "spider",
+   "poison-spider",
+   "wasp",
+   "scorpion"
+  ],
+  "color": "#4a6b52",
+  "scene": "cave",
+  "avgHp": 49,
+  "avgExp": 24,
+  "avgDamage": 16,
+  "avgArmor": 4,
+  "avgGold": 3.3,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "trolls": {
+  "name": "Ponte dos Trolls",
+  "level": 8,
+  "monsters": [
+   "troll",
+   "swamp-troll",
+   "goblin",
+   "wolf"
+  ],
+  "color": "#5a6b3a",
+  "scene": "swamp",
+  "avgHp": 58,
+  "avgExp": 25,
+  "avgDamage": 18,
+  "avgArmor": 5,
+  "avgGold": 5.2,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "rotworms": {
+  "name": "T\u00fanel dos Rotworms",
+  "level": 12,
+  "monsters": [
+   "rotworm",
+   "cave-rat",
+   "bear",
+   "poison-spider"
+  ],
+  "color": "#7a5a3a",
+  "scene": "cave",
+  "avgHp": 66,
+  "avgExp": 41,
+  "avgDamage": 20,
+  "avgArmor": 5,
+  "avgGold": 5.5,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "orcs": {
+  "name": "Fortaleza Orc",
+  "level": 18,
+  "monsters": [
+   "orc",
+   "orc-spearman",
+   "orc-warrior",
+   "orc-shaman",
+   "war-wolf"
+  ],
+  "color": "#6b4a3a",
+  "scene": "fortress",
+  "avgHp": 100,
+  "avgExp": 58,
+  "avgDamage": 31,
+  "avgArmor": 8,
+  "avgGold": 9.8,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "skeletons": {
+  "name": "Cripta Antiga",
+  "level": 24,
+  "monsters": [
+   "skeleton",
+   "ghoul",
+   "crypt-shambler",
+   "gazer"
+  ],
+  "color": "#5a5a6b",
+  "scene": "crypt",
+  "avgHp": 118,
+  "avgExp": 104,
+  "avgDamage": 41,
+  "avgArmor": 12,
+  "avgGold": 15.0,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "minotaurs": {
+  "name": "Labirinto Minotauro",
+  "level": 30,
+  "monsters": [
+   "minotaur",
+   "minotaur-archer",
+   "minotaur-guard",
+   "minotaur-mage"
+  ],
+  "color": "#8a4a3a",
+  "scene": "labyrinth",
+  "avgHp": 124,
+  "avgExp": 112,
+  "avgDamage": 45,
+  "avgArmor": 11,
+  "avgGold": 14.8,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "dwarves": {
+  "name": "Minas de Kazordoon",
+  "level": 38,
+  "monsters": [
+   "dwarf",
+   "dwarf-soldier",
+   "dwarf-guard",
+   "dwarf-geomancer"
+  ],
+  "color": "#7a6a4a",
+  "scene": "mine",
+  "avgHp": 146,
+  "avgExp": 121,
+  "avgDamage": 45,
+  "avgArmor": 16,
+  "avgGold": 20.4,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "elves": {
+  "name": "Bosque \u00c9lfico",
+  "level": 45,
+  "monsters": [
+   "elf",
+   "elf-scout",
+   "elf-arcanist",
+   "winter-wolf"
+  ],
+  "color": "#3a7a4a",
+  "scene": "forest",
+  "avgHp": 132,
+  "avgExp": 113,
+  "avgDamage": 42,
+  "avgArmor": 10,
+  "avgGold": 15.4,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "orc-fortress": {
+  "name": "Guarda Orc Real",
+  "level": 52,
+  "monsters": [
+   "orc-berserker",
+   "orc-rider",
+   "orc-leader",
+   "orc-warlord"
+  ],
+  "color": "#8a3a2a",
+  "scene": "fortress",
+  "avgHp": 402,
+  "avgExp": 366,
+  "avgDamage": 79,
+  "avgArmor": 18,
+  "avgGold": 44.0,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "cyclops": {
+  "name": "Vale dos Cyclops",
+  "level": 60,
+  "monsters": [
+   "cyclops",
+   "troll",
+   "orc-leader",
+   "hyaena"
+  ],
+  "color": "#6b5a4a",
+  "scene": "valley",
+  "avgHp": 195,
+  "avgExp": 140,
+  "avgDamage": 48,
+  "avgArmor": 14,
+  "avgGold": 19.6,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "mummies": {
+  "name": "Tumbas de Ankrahmun",
+  "level": 70,
+  "monsters": [
+   "mummy",
+   "scarab",
+   "larva",
+   "cobra"
+  ],
+  "color": "#a08a5a",
+  "scene": "desert",
+  "avgHp": 212,
+  "avgExp": 149,
+  "avgDamage": 52,
+  "avgArmor": 16,
+  "avgGold": 20.2,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "undead": {
+  "name": "Catacumbas Sombrias",
+  "level": 82,
+  "monsters": [
+   "demon-skeleton",
+   "bonebeast",
+   "ghost",
+   "vampire"
+  ],
+  "color": "#4a3a5a",
+  "scene": "crypt",
+  "avgHp": 335,
+  "avgExp": 344,
+  "avgDamage": 80,
+  "avgArmor": 25,
+  "avgGold": 32.1,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "golems": {
+  "name": "Templo de Pedra",
+  "level": 95,
+  "monsters": [
+   "stone-golem",
+   "gargoyle",
+   "bonelord",
+   "elder-bonelord"
+  ],
+  "color": "#5a5a5a",
+  "scene": "temple",
+  "avgHp": 365,
+  "avgExp": 315,
+  "avgDamage": 77,
+  "avgArmor": 29,
+  "avgGold": 32.1,
+  "respawn": 0.8,
+  "pack": 3
+ },
+ "djinns": {
+  "name": "Pal\u00e1cio dos Djinns",
+  "level": 110,
+  "monsters": [
+   "green-djinn",
+   "blue-djinn",
+   "witch",
+   "priestess"
+  ],
+  "color": "#4a5a8a",
+  "scene": "palace",
+  "avgHp": 548,
+  "avgExp": 548,
+  "avgDamage": 103,
+  "avgArmor": 20,
+  "avgGold": 43.2,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "giant-spiders": {
+  "name": "Ninho das Aranhas Gigantes",
+  "level": 125,
+  "monsters": [
+   "giant-spider",
+   "poison-spider",
+   "larva",
+   "ancient-scarab"
+  ],
+  "color": "#3a5a3a",
+  "scene": "nest",
+  "avgHp": 484,
+  "avgExp": 456,
+  "avgDamage": 85,
+  "avgArmor": 21,
+  "avgGold": 34.3,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "pirates": {
+  "name": "Ilha Pirata",
+  "level": 140,
+  "monsters": [
+   "pirate-marauder",
+   "pirate-cutthroat",
+   "pirate-buccaneer",
+   "pirate-corsair"
+  ],
+  "color": "#5a6a7a",
+  "scene": "island",
+  "avgHp": 488,
+  "avgExp": 500,
+  "avgDamage": 97,
+  "avgArmor": 26,
+  "avgGold": 43.7,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "necro": {
+  "name": "Torre do Necromante",
+  "level": 155,
+  "monsters": [
+   "necromancer",
+   "banshee",
+   "lich",
+   "priestess"
+  ],
+  "color": "#3a2a4a",
+  "scene": "tower",
+  "avgHp": 575,
+  "avgExp": 602,
+  "avgDamage": 108,
+  "avgArmor": 23,
+  "avgGold": 47.9,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "dragons": {
+  "name": "Covil dos Drag\u00f5es",
+  "level": 175,
+  "monsters": [
+   "dragon",
+   "fire-devil",
+   "fire-elemental",
+   "dragon-lord"
+  ],
+  "color": "#8a3a2a",
+  "scene": "lair",
+  "avgHp": 962,
+  "avgExp": 888,
+  "avgDamage": 128,
+  "avgArmor": 24,
+  "avgGold": 57.5,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "heroes": {
+  "name": "Sal\u00e3o dos Her\u00f3is",
+  "level": 200,
+  "monsters": [
+   "hero",
+   "black-knight",
+   "monk",
+   "vampire"
+  ],
+  "color": "#7a6a3a",
+  "scene": "hall",
+  "avgHp": 879,
+  "avgExp": 676,
+  "avgDamage": 122,
+  "avgArmor": 31,
+  "avgGold": 58.6,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "efreets": {
+  "name": "Deserto Ardente",
+  "level": 230,
+  "monsters": [
+   "efreet",
+   "marid",
+   "ancient-scarab",
+   "fire-elemental"
+  ],
+  "color": "#a06a3a",
+  "scene": "desert",
+  "avgHp": 1162,
+  "avgExp": 1188,
+  "avgDamage": 160,
+  "avgArmor": 31,
+  "avgGold": 73.5,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "frozen": {
+  "name": "Geleiras de Svargrond",
+  "level": 260,
+  "monsters": [
+   "yeti",
+   "quara-predator",
+   "winter-wolf",
+   "polar-bear"
+  ],
+  "color": "#5a8a9a",
+  "scene": "glacier",
+  "avgHp": 518,
+  "avgExp": 470,
+  "avgDamage": 88,
+  "avgArmor": 19,
+  "avgGold": 35.0,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "dragonlords": {
+  "name": "Covil dos Dragon Lords",
+  "level": 300,
+  "monsters": [
+   "dragon-lord",
+   "dragon",
+   "behemoth",
+   "fire-elemental"
+  ],
+  "color": "#9a3a2a",
+  "scene": "lair",
+  "avgHp": 1612,
+  "avgExp": 1450,
+  "avgDamage": 172,
+  "avgArmor": 31,
+  "avgGold": 86.6,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "behemoths": {
+  "name": "Cavernas Behemoth",
+  "level": 360,
+  "monsters": [
+   "behemoth",
+   "cyclops",
+   "dragon-lord",
+   "mimic"
+  ],
+  "color": "#6a4a3a",
+  "scene": "cave",
+  "avgHp": 1540,
+  "avgExp": 1488,
+  "avgDamage": 168,
+  "avgArmor": 34,
+  "avgGold": 92.0,
+  "respawn": 0.8,
+  "pack": 4
+ },
+ "inferno": {
+  "name": "Portal do Inferno",
+  "level": 450,
+  "monsters": [
+   "demon",
+   "dragon-lord",
+   "efreet",
+   "fire-elemental"
+  ],
+  "color": "#b02a1a",
+  "scene": "hell",
+  "avgHp": 3075,
+  "avgExp": 2588,
+  "avgDamage": 229,
+  "avgArmor": 34,
+  "avgGold": 112.6,
+  "respawn": 0.8,
+  "pack": 4
+ }
+}

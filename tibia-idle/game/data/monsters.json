@@ -1,0 +1,2662 @@
+{
+ "rat": {
+  "name": "Rat",
+  "hp": 20,
+  "exp": 5,
+  "damage": 6,
+  "armor": 1,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 60,
+    "max": 4
+   },
+   {
+    "item": "cheese",
+    "chance": 15,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "cave-rat": {
+  "name": "Cave Rat",
+  "hp": 30,
+  "exp": 8,
+  "damage": 8,
+  "armor": 2,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 8
+   },
+   {
+    "item": "cheese",
+    "chance": 12,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "snake": {
+  "name": "Snake",
+  "hp": 35,
+  "exp": 10,
+  "damage": 8,
+  "armor": 3,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 40,
+    "max": 5
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "bug": {
+  "name": "Bug",
+  "hp": 30,
+  "exp": 6,
+  "damage": 7,
+  "armor": 4,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 35,
+    "max": 4
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "spider": {
+  "name": "Spider",
+  "hp": 50,
+  "exp": 12,
+  "damage": 10,
+  "armor": 3,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 50,
+    "max": 8
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "wasp": {
+  "name": "Wasp",
+  "hp": 35,
+  "exp": 12,
+  "damage": 12,
+  "armor": 4,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 45,
+    "max": 6
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "scorpion": {
+  "name": "Scorpion",
+  "hp": 45,
+  "exp": 30,
+  "damage": 18,
+  "armor": 4,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 12
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "rotworm": {
+  "name": "Rotworm",
+  "hp": 65,
+  "exp": 40,
+  "damage": 20,
+  "armor": 5,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 20
+   },
+   {
+    "item": "meat",
+    "chance": 20,
+    "max": 1
+   },
+   {
+    "item": "ham",
+    "chance": 12,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "poison-spider": {
+  "name": "Poison Spider",
+  "hp": 66,
+  "exp": 44,
+  "damage": 22,
+  "armor": 6,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 15
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "goblin": {
+  "name": "Goblin",
+  "hp": 60,
+  "exp": 25,
+  "damage": 18,
+  "armor": 5,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 15
+   },
+   {
+    "item": "small-axe",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "bone-club",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "leather-helmet",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "wolf": {
+  "name": "Wolf",
+  "hp": 55,
+  "exp": 25,
+  "damage": 18,
+  "armor": 4,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 55,
+    "max": 10
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "bear": {
+  "name": "Bear",
+  "hp": 105,
+  "exp": 73,
+  "damage": 32,
+  "armor": 8,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 60,
+    "max": 20
+   },
+   {
+    "item": "ham",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "meat",
+    "chance": 20,
+    "max": 2
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "polar-bear": {
+  "name": "Polar Bear",
+  "hp": 110,
+  "exp": 80,
+  "damage": 34,
+  "armor": 9,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 60,
+    "max": 25
+   },
+   {
+    "item": "ham",
+    "chance": 30,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "skeleton": {
+  "name": "Skeleton",
+  "hp": 50,
+  "exp": 35,
+  "damage": 22,
+  "armor": 8,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 15
+   },
+   {
+    "item": "bone",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "sword",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "brass-shield",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "viking-helmet",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "troll": {
+  "name": "Troll",
+  "hp": 50,
+  "exp": 20,
+  "damage": 16,
+  "armor": 5,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 15
+   },
+   {
+    "item": "leather-boots",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "spear",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "hand-axe",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "swamp-troll": {
+  "name": "Swamp Troll",
+  "hp": 65,
+  "exp": 30,
+  "damage": 20,
+  "armor": 6,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 20
+   },
+   {
+    "item": "club",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "meat",
+    "chance": 15,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "frost-troll": {
+  "name": "Frost Troll",
+  "hp": 55,
+  "exp": 30,
+  "damage": 20,
+  "armor": 6,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 60,
+    "max": 20
+   },
+   {
+    "item": "fish",
+    "chance": 20,
+    "max": 1
+   },
+   {
+    "item": "club",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc": {
+  "name": "Orc",
+  "hp": 70,
+  "exp": 25,
+  "damage": 20,
+  "armor": 6,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 20
+   },
+   {
+    "item": "axe",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "studded-shield",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-spearman": {
+  "name": "Orc Spearman",
+  "hp": 85,
+  "exp": 40,
+  "damage": 28,
+  "armor": 7,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 25
+   },
+   {
+    "item": "spear",
+    "chance": 20,
+    "max": 3
+   },
+   {
+    "item": "studded-armor",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-warrior": {
+  "name": "Orc Warrior",
+  "hp": 125,
+  "exp": 62,
+  "damage": 35,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 35
+   },
+   {
+    "item": "axe",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "chain-armor",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "brass-helmet",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-shaman": {
+  "name": "Orc Shaman",
+  "hp": 60,
+  "exp": 70,
+  "damage": 30,
+  "armor": 5,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 25
+   },
+   {
+    "item": "wooden-wand",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "green-tunic",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-berserker": {
+  "name": "Orc Berserker",
+  "hp": 210,
+  "exp": 195,
+  "damage": 60,
+  "armor": 14,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "double-axe",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "brass-armor",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "chain-helmet",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-rider": {
+  "name": "Orc Rider",
+  "hp": 180,
+  "exp": 110,
+  "damage": 45,
+  "armor": 12,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 45
+   },
+   {
+    "item": "scale-armor",
+    "chance": 7,
+    "max": 1
+   },
+   {
+    "item": "orcish-axe",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-leader": {
+  "name": "Orc Leader",
+  "hp": 270,
+  "exp": 270,
+  "damage": 70,
+  "armor": 18,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 90
+   },
+   {
+    "item": "plate-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "orcish-axe",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "chain-armor",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "orc-warlord": {
+  "name": "Orc Warlord",
+  "hp": 950,
+  "exp": 890,
+  "damage": 140,
+  "armor": 30,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 95,
+    "max": 200
+   },
+   {
+    "item": "plate-armor",
+    "chance": 12,
+    "max": 1
+   },
+   {
+    "item": "great-axe",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "dwarven-shield",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "knight-axe",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "war-wolf": {
+  "name": "War Wolf",
+  "hp": 160,
+  "exp": 95,
+  "damage": 42,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 30
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 2
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "ghoul": {
+  "name": "Ghoul",
+  "hp": 100,
+  "exp": 85,
+  "damage": 40,
+  "armor": 12,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 35
+   },
+   {
+    "item": "bone",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "torch",
+    "chance": 15,
+    "max": 1
+   },
+   {
+    "item": "ham",
+    "chance": 12,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "minotaur": {
+  "name": "Minotaur",
+  "hp": 100,
+  "exp": 50,
+  "damage": 30,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 25
+   },
+   {
+    "item": "mace",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "chain-armor",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "brass-helmet",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "ham",
+    "chance": 15,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "minotaur-archer": {
+  "name": "Minotaur Archer",
+  "hp": 100,
+  "exp": 100,
+  "damage": 45,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 35
+   },
+   {
+    "item": "bow",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "arrow",
+    "chance": 40,
+    "max": 12
+   },
+   {
+    "item": "chain-armor",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "minotaur-guard": {
+  "name": "Minotaur Guard",
+  "hp": 185,
+  "exp": 150,
+  "damage": 55,
+  "armor": 15,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 50
+   },
+   {
+    "item": "battle-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "chain-helmet",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "mace",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "minotaur-mage": {
+  "name": "Minotaur Mage",
+  "hp": 110,
+  "exp": 150,
+  "damage": 50,
+  "armor": 8,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 40
+   },
+   {
+    "item": "wooden-wand",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "cyclops": {
+  "name": "Cyclops",
+  "hp": 260,
+  "exp": 150,
+  "damage": 60,
+  "armor": 20,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "battle-hammer",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "plate-shield",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "ham",
+    "chance": 25,
+    "max": 2
+   },
+   {
+    "item": "club-ring",
+    "chance": 2,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dwarf": {
+  "name": "Dwarf",
+  "hp": 90,
+  "exp": 45,
+  "damage": 28,
+  "armor": 12,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 30
+   },
+   {
+    "item": "pick",
+    "chance": 10,
+    "max": 1
+   },
+   {
+    "item": "hatchet",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "dwarven-shield",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dwarf-soldier": {
+  "name": "Dwarf Soldier",
+  "hp": 135,
+  "exp": 85,
+  "damage": 40,
+  "armor": 16,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 45
+   },
+   {
+    "item": "chain-armor",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "sabre",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "dwarven-shield",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dwarf-guard": {
+  "name": "Dwarf Guard",
+  "hp": 215,
+  "exp": 165,
+  "damage": 58,
+  "armor": 22,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 70
+   },
+   {
+    "item": "dwarven-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "battle-hammer",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "plate-armor",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dwarf-geomancer": {
+  "name": "Dwarf Geomancer",
+  "hp": 145,
+  "exp": 190,
+  "damage": 55,
+  "armor": 12,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "wand-of-might",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "dwarven-ring",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 2,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "elf": {
+  "name": "Elf",
+  "hp": 75,
+  "exp": 42,
+  "damage": 26,
+  "armor": 8,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 25
+   },
+   {
+    "item": "bow",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "arrow",
+    "chance": 35,
+    "max": 10
+   },
+   {
+    "item": "elven-amulet",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "elf-scout": {
+  "name": "Elf Scout",
+  "hp": 120,
+  "exp": 85,
+  "damage": 40,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 40
+   },
+   {
+    "item": "bow",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "arrow",
+    "chance": 40,
+    "max": 15
+   },
+   {
+    "item": "elven-amulet",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "elven-brooch",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "elf-arcanist": {
+  "name": "Elf Arcanist",
+  "hp": 175,
+  "exp": 225,
+  "damage": 62,
+  "armor": 10,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "elven-wand",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "elven-amulet",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "blue-robe",
+    "chance": 2,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "mummy": {
+  "name": "Mummy",
+  "hp": 240,
+  "exp": 150,
+  "damage": 52,
+  "armor": 18,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "bone",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "strange-talisman",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "demon-skeleton": {
+  "name": "Demon Skeleton",
+  "hp": 200,
+  "exp": 240,
+  "damage": 65,
+  "armor": 20,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 70
+   },
+   {
+    "item": "bone",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "battle-shield",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "morning-star",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "iron-helmet",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "crypt-shambler": {
+  "name": "Crypt Shambler",
+  "hp": 195,
+  "exp": 195,
+  "damage": 60,
+  "armor": 16,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "bone",
+    "chance": 40,
+    "max": 2
+   },
+   {
+    "item": "morning-star",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "brass-armor",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "bonebeast": {
+  "name": "Bonebeast",
+  "hp": 515,
+  "exp": 580,
+  "damage": 105,
+  "armor": 30,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 110
+   },
+   {
+    "item": "big-bone",
+    "chance": 25,
+    "max": 1
+   },
+   {
+    "item": "bone-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "scarab-shield",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "bone-sword",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "stone-golem": {
+  "name": "Stone Golem",
+  "hp": 450,
+  "exp": 350,
+  "damage": 85,
+  "armor": 40,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 90
+   },
+   {
+    "item": "small-diamond",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "stone-skin-amulet",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "gargoyle": {
+  "name": "Gargoyle",
+  "hp": 250,
+  "exp": 150,
+  "damage": 58,
+  "armor": 30,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 55
+   },
+   {
+    "item": "bone-shield",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "stone-skin-amulet",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "scarab": {
+  "name": "Scarab",
+  "hp": 340,
+  "exp": 240,
+  "damage": 72,
+  "armor": 28,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 70
+   },
+   {
+    "item": "scarab-coin",
+    "chance": 20,
+    "max": 2
+   },
+   {
+    "item": "scarab-shield",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "scarab-amulet",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "ancient-scarab": {
+  "name": "Ancient Scarab",
+  "hp": 800,
+  "exp": 750,
+  "damage": 130,
+  "armor": 35,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 130
+   },
+   {
+    "item": "scarab-coin",
+    "chance": 40,
+    "max": 4
+   },
+   {
+    "item": "scarab-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "holy-scarab",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "larva": {
+  "name": "Larva",
+  "hp": 170,
+  "exp": 130,
+  "damage": 48,
+  "armor": 12,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 40
+   },
+   {
+    "item": "scarab-coin",
+    "chance": 12,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "cobra": {
+  "name": "Cobra",
+  "hp": 100,
+  "exp": 75,
+  "damage": 38,
+  "armor": 8,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 35
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "witch": {
+  "name": "Witch",
+  "hp": 300,
+  "exp": 340,
+  "damage": 75,
+  "armor": 15,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 70
+   },
+   {
+    "item": "blank-rune",
+    "chance": 12,
+    "max": 2
+   },
+   {
+    "item": "mysterious-fetish",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "cape",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "silver-dagger",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "star-herb",
+    "chance": 10,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "monk": {
+  "name": "Monk",
+  "hp": 240,
+  "exp": 200,
+  "damage": 62,
+  "armor": 20,
+  "element": "holy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 78,
+    "max": 55
+   },
+   {
+    "item": "cowl",
+    "chance": 10,
+    "max": 1
+   },
+   {
+    "item": "sandals",
+    "chance": 10,
+    "max": 1
+   },
+   {
+    "item": "book",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "priestess": {
+  "name": "Priestess",
+  "hp": 290,
+  "exp": 350,
+  "damage": 78,
+  "armor": 14,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 82,
+    "max": 70
+   },
+   {
+    "item": "blank-rune",
+    "chance": 12,
+    "max": 2
+   },
+   {
+    "item": "cape",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "voodoo-doll",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "bonelord": {
+  "name": "Bonelord",
+  "hp": 260,
+  "exp": 260,
+  "damage": 68,
+  "armor": 20,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 60
+   },
+   {
+    "item": "beholder-shield",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "small-emerald",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "bone",
+    "chance": 20,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "elder-bonelord": {
+  "name": "Elder Bonelord",
+  "hp": 500,
+  "exp": 500,
+  "damage": 98,
+  "armor": 25,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 100
+   },
+   {
+    "item": "beholder-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "small-emerald",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "great-shield",
+    "chance": 1,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "gazer": {
+  "name": "Gazer",
+  "hp": 125,
+  "exp": 100,
+  "damage": 42,
+  "armor": 10,
+  "element": "energy",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 75,
+    "max": 45
+   },
+   {
+    "item": "bone",
+    "chance": 20,
+    "max": 1
+   },
+   {
+    "item": "beholder-shield",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "slime": {
+  "name": "Slime",
+  "hp": 160,
+  "exp": 0,
+  "damage": 45,
+  "armor": 5,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 40,
+    "max": 20
+   },
+   {
+    "item": "vial",
+    "chance": 25,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "giant-spider": {
+  "name": "Giant Spider",
+  "hp": 900,
+  "exp": 900,
+  "damage": 140,
+  "armor": 30,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 90,
+    "max": 130
+   },
+   {
+    "item": "plate-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "time-ring",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "spike-sword",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "knight-legs",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "platinum-amulet",
+    "chance": 2,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "vampire": {
+  "name": "Vampire",
+  "hp": 475,
+  "exp": 305,
+  "damage": 88,
+  "armor": 30,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 90
+   },
+   {
+    "item": "vampire-shield",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "black-pearl",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "strange-symbol",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "skull",
+    "chance": 15,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "banshee": {
+  "name": "Banshee",
+  "hp": 550,
+  "exp": 580,
+  "damage": 105,
+  "armor": 25,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 110
+   },
+   {
+    "item": "elven-amulet",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "blue-robe",
+    "chance": 2,
+    "max": 1
+   },
+   {
+    "item": "crystal-necklace",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "ghost": {
+  "name": "Ghost",
+  "hp": 150,
+  "exp": 250,
+  "damage": 62,
+  "armor": 20,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 40
+   },
+   {
+    "item": "morning-star",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "mysterious-fetish",
+    "chance": 5,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "hero": {
+  "name": "Hero",
+  "hp": 1400,
+  "exp": 1200,
+  "damage": 175,
+  "armor": 35,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 92,
+    "max": 200
+   },
+   {
+    "item": "crown-armor",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "crown-legs",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "crown-helmet",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "crown-shield",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "boots-of-haste",
+    "chance": 2,
+    "max": 1
+   },
+   {
+    "item": "fire-sword",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 5,
+    "max": 2
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "black-knight": {
+  "name": "Black Knight",
+  "hp": 1400,
+  "exp": 1000,
+  "damage": 165,
+  "armor": 38,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 90,
+    "max": 180
+   },
+   {
+    "item": "dark-armor",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "dark-helmet",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "dark-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "crown-armor",
+    "chance": 2,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "necromancer": {
+  "name": "Necromancer",
+  "hp": 580,
+  "exp": 580,
+  "damage": 110,
+  "armor": 22,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 100
+   },
+   {
+    "item": "skull-staff",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "boots-of-haste",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "blank-rune",
+    "chance": 15,
+    "max": 3
+   },
+   {
+    "item": "silver-amulet",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "skull",
+    "chance": 20,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "green-djinn": {
+  "name": "Green Djinn",
+  "hp": 800,
+  "exp": 750,
+  "damage": 130,
+  "armor": 25,
+  "element": "earth",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 130
+   },
+   {
+    "item": "green-tunic",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "small-emerald",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "small-oil-lamp",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "green-gem",
+    "chance": 1,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "blue-djinn": {
+  "name": "Blue Djinn",
+  "hp": 800,
+  "exp": 750,
+  "damage": 130,
+  "armor": 25,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 130
+   },
+   {
+    "item": "blue-robe",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "small-sapphire",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "blue-gem",
+    "chance": 1,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "efreet": {
+  "name": "Efreet",
+  "hp": 1650,
+  "exp": 1750,
+  "damage": 205,
+  "armor": 35,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 92,
+    "max": 220
+   },
+   {
+    "item": "small-emerald",
+    "chance": 10,
+    "max": 2
+   },
+   {
+    "item": "green-gem",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 10,
+    "max": 1
+   },
+   {
+    "item": "elven-amulet",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "marid": {
+  "name": "Marid",
+  "hp": 1650,
+  "exp": 1750,
+  "damage": 205,
+  "armor": 35,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 92,
+    "max": 220
+   },
+   {
+    "item": "small-sapphire",
+    "chance": 10,
+    "max": 2
+   },
+   {
+    "item": "blue-gem",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "blue-robe",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "mystic-turban",
+    "chance": 10,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "fire-devil": {
+  "name": "Fire Devil",
+  "hp": 400,
+  "exp": 250,
+  "damage": 72,
+  "armor": 15,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 65
+   },
+   {
+    "item": "torch",
+    "chance": 25,
+    "max": 1
+   },
+   {
+    "item": "small-ruby",
+    "chance": 3,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "fire-elemental": {
+  "name": "Fire Elemental",
+  "hp": 550,
+  "exp": 500,
+  "damage": 100,
+  "armor": 20,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 82,
+    "max": 80
+   },
+   {
+    "item": "small-ruby",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "burning-heart",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "winter-wolf": {
+  "name": "Winter Wolf",
+  "hp": 160,
+  "exp": 100,
+  "damage": 42,
+  "armor": 12,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 70,
+    "max": 35
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 2
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "yeti": {
+  "name": "Yeti",
+  "hp": 800,
+  "exp": 700,
+  "damage": 125,
+  "armor": 25,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 120
+   },
+   {
+    "item": "ham",
+    "chance": 30,
+    "max": 3
+   },
+   {
+    "item": "dirty-fur",
+    "chance": 20,
+    "max": 1
+   },
+   {
+    "item": "small-sapphire",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "quara-predator": {
+  "name": "Quara Predator",
+  "hp": 1000,
+  "exp": 1000,
+  "damage": 150,
+  "armor": 30,
+  "element": "ice",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 150
+   },
+   {
+    "item": "shrimp",
+    "chance": 25,
+    "max": 3
+   },
+   {
+    "item": "small-sapphire",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "northern-pike",
+    "chance": 20,
+    "max": 2
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "pirate-marauder": {
+  "name": "Pirate Marauder",
+  "hp": 300,
+  "exp": 250,
+  "damage": 70,
+  "armor": 20,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 70
+   },
+   {
+    "item": "sabre",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "pirate-cutthroat": {
+  "name": "Pirate Cutthroat",
+  "hp": 400,
+  "exp": 400,
+  "damage": 88,
+  "armor": 25,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 82,
+    "max": 90
+   },
+   {
+    "item": "sabre",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "scale-armor",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "dagger",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "pirate-buccaneer": {
+  "name": "Pirate Buccaneer",
+  "hp": 550,
+  "exp": 550,
+  "damage": 105,
+  "armor": 28,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 85,
+    "max": 110
+   },
+   {
+    "item": "plate-armor",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "epee",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "brass-legs",
+    "chance": 6,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "pirate-corsair": {
+  "name": "Pirate Corsair",
+  "hp": 700,
+  "exp": 800,
+  "damage": 125,
+  "armor": 32,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 88,
+    "max": 140
+   },
+   {
+    "item": "plate-armor",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "epee",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "golden-mug",
+    "chance": 5,
+    "max": 1
+   },
+   {
+    "item": "small-ruby",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "lich": {
+  "name": "Lich",
+  "hp": 880,
+  "exp": 900,
+  "damage": 140,
+  "armor": 30,
+  "element": "death",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 90,
+    "max": 160
+   },
+   {
+    "item": "platinum-amulet",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "skull-staff",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "gold-ring",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "blank-rune",
+    "chance": 15,
+    "max": 3
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dragon": {
+  "name": "Dragon",
+  "hp": 1000,
+  "exp": 700,
+  "damage": 130,
+  "armor": 25,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 92,
+    "max": 110
+   },
+   {
+    "item": "dragon-ham",
+    "chance": 40,
+    "max": 2
+   },
+   {
+    "item": "dragon-shield",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "steel-shield",
+    "chance": 8,
+    "max": 1
+   },
+   {
+    "item": "dragon-scale-mail",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "burst-arrow",
+    "chance": 12,
+    "max": 8
+   },
+   {
+    "item": "small-diamond",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "serpent-sword",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dragon-lord": {
+  "name": "Dragon Lord",
+  "hp": 1900,
+  "exp": 2100,
+  "damage": 210,
+  "armor": 35,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 95,
+    "max": 250
+   },
+   {
+    "item": "dragon-ham",
+    "chance": 50,
+    "max": 4
+   },
+   {
+    "item": "dragon-shield",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "dragon-scale-mail",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "royal-helmet",
+    "chance": 2,
+    "max": 1
+   },
+   {
+    "item": "golden-armor",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 8,
+    "max": 2
+   },
+   {
+    "item": "life-crystal",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "demon": {
+  "name": "Demon",
+  "hp": 8200,
+  "exp": 6000,
+  "damage": 400,
+  "armor": 45,
+  "element": "fire",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 98,
+    "max": 400
+   },
+   {
+    "item": "demon-shield",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "demon-helmet",
+    "chance": 2,
+    "max": 1
+   },
+   {
+    "item": "golden-legs",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "magic-plate-armor",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "fire-axe",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "might-ring",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "small-ruby",
+    "chance": 12,
+    "max": 3
+   },
+   {
+    "item": "giant-sword",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "platinum-amulet",
+    "chance": 4,
+    "max": 1
+   },
+   {
+    "item": "ring-of-healing",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "behemoth": {
+  "name": "Behemoth",
+  "hp": 3000,
+  "exp": 2500,
+  "damage": 250,
+  "armor": 45,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 95,
+    "max": 300
+   },
+   {
+    "item": "great-axe",
+    "chance": 2,
+    "max": 1
+   },
+   {
+    "item": "crown-legs",
+    "chance": 3,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 8,
+    "max": 2
+   },
+   {
+    "item": "stone-skin-amulet",
+    "chance": 4,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "hyaena": {
+  "name": "Hyaena",
+  "hp": 200,
+  "exp": 120,
+  "damage": 45,
+  "armor": 12,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 30
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "lion": {
+  "name": "Lion",
+  "hp": 170,
+  "exp": 120,
+  "damage": 45,
+  "armor": 12,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 65,
+    "max": 30
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "badger": {
+  "name": "Badger",
+  "hp": 40,
+  "exp": 10,
+  "damage": 10,
+  "armor": 3,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 40,
+    "max": 8
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "deer": {
+  "name": "Deer",
+  "hp": 35,
+  "exp": 12,
+  "damage": 8,
+  "armor": 3,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 35,
+    "max": 8
+   },
+   {
+    "item": "meat",
+    "chance": 30,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "rabbit": {
+  "name": "Rabbit",
+  "hp": 15,
+  "exp": 2,
+  "damage": 3,
+  "armor": 1,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "meat",
+    "chance": 40,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "pig": {
+  "name": "Pig",
+  "hp": 25,
+  "exp": 4,
+  "damage": 5,
+  "armor": 2,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 30,
+    "max": 6
+   },
+   {
+    "item": "meat",
+    "chance": 35,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "sheep": {
+  "name": "Sheep",
+  "hp": 20,
+  "exp": 3,
+  "damage": 4,
+  "armor": 1,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 25,
+    "max": 5
+   },
+   {
+    "item": "meat",
+    "chance": 30,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "dog": {
+  "name": "Dog",
+  "hp": 25,
+  "exp": 5,
+  "damage": 6,
+  "armor": 2,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 30,
+    "max": 6
+   },
+   {
+    "item": "meat",
+    "chance": 25,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "mimic": {
+  "name": "Mimic",
+  "hp": 1000,
+  "exp": 1200,
+  "damage": 150,
+  "armor": 35,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 90,
+    "max": 180
+   },
+   {
+    "item": "small-diamond",
+    "chance": 8,
+    "max": 2
+   },
+   {
+    "item": "crystal-necklace",
+    "chance": 6,
+    "max": 1
+   },
+   {
+    "item": "golden-mug",
+    "chance": 8,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "butterfly": {
+  "name": "Butterfly",
+  "hp": 5,
+  "exp": 1,
+  "damage": 1,
+  "armor": 0,
+  "element": "physical",
+  "loot": [],
+  "attackSpeed": 2000
+ }
+}
