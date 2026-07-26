@@ -457,8 +457,8 @@ function autoSell(p) {
       delete container[slug];
       return;
     }
-    // Ammo agora é carga de combate/treino online; não vender no auto-sell.
-    if (it.s === "ammo") return;
+    // Ammo/equipamentos não são vendidos automaticamente; boss loot pode ser arrastado para a bag.
+    if (it.s === "ammo" || (source === "lootPouch" && it.s)) return;
     // nao vende equipamento util da mochila principal
     if (source === "bag" && it.s) {
       const equipped = p.equip[it.s];

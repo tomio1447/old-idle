@@ -421,6 +421,9 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .npc-btn img { height: 26px; object-fit: contain; display: block; margin: 0 auto; }
 .npc-btn .nb { font-size: 8px; color: #a89f88; line-height: 1.15; margin-top: 2px; }
 .npc-btn:hover .nb { color: var(--gold); }
+.boss-quick { grid-template-columns: repeat(4, 1fr); }
+.boss-btn.locked { opacity: .55; }
+.boss-btn img { filter: drop-shadow(0 0 4px rgba(0,0,0,.9)); }
 
 .npc-greet {
   font-style: italic; color: #b8b09a; font-size: 11px;

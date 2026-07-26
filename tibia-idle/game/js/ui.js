@@ -311,6 +311,22 @@ function renderInventory(p) {
     <div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
       Bag padrão: ${bagUsedSlots(p)} / ${slots} slots
     </div>${cells.join("")}`;
+  const invBox = $("#inv");
+  invBox.addEventListener("dragover", (e) => {
+    if (e.dataTransfer && e.dataTransfer.types.includes("text/loot-pouch")) e.preventDefault();
+  });
+  invBox.addEventListener("drop", (e) => {
+    const slug = e.dataTransfer ? e.dataTransfer.getData("text/loot-pouch") : "";
+    if (!slug) return;
+    e.preventDefault();
+    const count = G.p.lootPouch && G.p.lootPouch[slug] ? G.p.lootPouch[slug] : 0;
+    if (count <= 0) return;
+    if (!addItem(G.p, slug, count)) { toast("Mochila cheia."); return; }
+    removeLootPouch(G.p, slug, count);
+    addLog("info", `Moveu <b>${itemName(slug)}</b> do Loot Pouch para a mochila.`);
+    hideTip();
+    renderAll();
+  });
   $$("#inv .inv-item[data-item]").forEach((el) => {
     const slug = el.dataset.item;
     const it = GAMEDATA.items[slug];
@@ -369,9 +385,9 @@ function renderLootPouch(p) {
     return;
   }
   box.innerHTML = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
-      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · ${entries.length} tipo(s)
+      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0 && !GAMEDATA.items[s].s).length} vendável · arraste para a bag
     </div>` + entries.map((slug) =>
-    `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""}" data-pouch-item="${slug}">
+    `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""}" data-pouch-item="${slug}" draggable="true">
       ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
     </div>`).join("");
   $$("#lootpouch [data-pouch-item]").forEach((el) => {
@@ -379,8 +395,12 @@ function renderLootPouch(p) {
     const locked = isNoSell(p, slug);
     const it = GAMEDATA.items[slug];
     el.addEventListener("mouseenter", () => showTip(itemTip(slug,
-      `${p.lootPouch[slug]}x · ${locked ? "Não vender" : "Clique para vender"}`)));
+      `${p.lootPouch[slug]}x · Arraste para a bag${locked ? " · Não vender" : " · Clique para vender"}`)));
     el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/loot-pouch", slug);
+      e.dataTransfer.effectAllowed = "move";
+    });
     el.addEventListener("click", () => {
       if (locked) { toast("Item marcado como NÃO VENDER."); return; }
       const value = (it.sell || 0) * p.lootPouch[slug];

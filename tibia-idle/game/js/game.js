@@ -466,30 +466,65 @@ function bossReadyInfo(p, boss) {
   return { ok: true, reason: "Disponível", left: 0 };
 }
 
+function bossLootText(boss) {
+  return boss.loot.map((l) =>
+    `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`);
+}
+
 function renderBosses(p) {
   const el = $("#bosses");
   if (!el) return;
-  el.innerHTML = Object.keys(BOSS_DEFS).map((id) => {
+  el.innerHTML = `<div class="npc-quick boss-quick">${Object.keys(BOSS_DEFS).map((id) => {
     const b = BOSS_DEFS[id];
     const r = bossReadyInfo(p, b);
-    const base = GAMEDATA.monsters[b.baseMonster];
-    const mult = applyBossMultiplier(base, b.mult || 10);
-    const loot = b.loot.map((l) => `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`).join("<br>");
-    return `<div class="boss-card ${r.ok ? "" : "locked"}">
-      <div class="row" style="gap:7px;align-items:center">
-        <img src="assets/mob/${b.sprite}_s.png" style="width:34px;height:34px;image-rendering:pixelated">
-        <div style="flex:1;min-width:0">
-          <div class="small" style="color:${r.ok ? "#ffe680" : "#8a8270"};font-weight:bold">${b.name}</div>
-          <div class="tiny dim">${b.title} · HP ${fmtFull(mult.hp)} · DMG ${fmtFull(mult.damage)}</div>
-        </div>
-        <button class="sm ${r.ok ? "danger" : ""}" data-boss="${id}" ${r.ok ? "" : "disabled"}>Entrar</button>
-      </div>
-      <div class="tiny dim mt4">Req: ${b.requirement.text}</div>
-      <div class="tiny ${r.ok ? "" : "dim"}" style="color:${r.ok ? "#9ce84a" : "#ff9a6a"}">${r.left ? "Disponível em " + fmtTime(r.left / 1000) : r.reason}</div>
-      <div class="tiny dim mt4">Drops:<br>${loot}</div>
+    return `<div class="npc-btn boss-btn ${r.ok ? "" : "locked"}" data-boss-info="${id}" title="${b.name} — ${r.left ? "Cooldown" : r.reason}">
+      <img src="assets/mob/${b.sprite}_s.png" alt="">
+      <div class="nb">${b.name.split(" ")[0]}</div>
     </div>`;
-  }).join("");
-  $$("#bosses [data-boss]").forEach((btn) => btn.addEventListener("click", () => startBoss(btn.dataset.boss)));
+  }).join("")}</div>`;
+  $$("#bosses [data-boss-info]").forEach((btn) =>
+    btn.addEventListener("click", () => openBossModal(btn.dataset.bossInfo)));
+}
+
+function openBossModal(id) {
+  const boss = BOSS_DEFS[id];
+  if (!boss) return;
+  const ready = bossReadyInfo(G.p, boss);
+  const base = GAMEDATA.monsters[boss.baseMonster];
+  const mult = applyBossMultiplier(base, boss.mult || 10);
+  const st = bossState(G.p, id);
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">
+      <img src="assets/mob/${boss.sprite}_s.png" style="height:24px;image-rendering:pixelated">
+      ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
+      <span style="flex:1"></span><button class="sm" id="boss-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="panel-inset mb8" style="padding:8px">
+        <div class="stat-row"><span class="k">Requisito</span><span class="v">${boss.requirement.text}</span></div>
+        <div class="stat-row"><span class="k">Disponibilidade</span><span class="v" style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.left ? fmtTime(ready.left / 1000) : ready.reason}</span></div>
+        <div class="stat-row"><span class="k">Cooldown</span><span class="v">1 combate a cada 16h</span></div>
+        <div class="stat-row"><span class="k">Vitórias</span><span class="v">${fmtFull(st.kills || 0)}</span></div>
+      </div>
+      <div class="panel-inset mb8" style="padding:8px">
+        <div class="stat-row"><span class="k">Sprite</span><span class="v">Cave Rat</span></div>
+        <div class="stat-row"><span class="k">Vida</span><span class="v">${fmtFull(mult.hp)}</span></div>
+        <div class="stat-row"><span class="k">Dano</span><span class="v">${fmtFull(mult.damage)}</span></div>
+        <div class="stat-row"><span class="k">Defesa</span><span class="v">${fmtFull(mult.armor)}</span></div>
+      </div>
+      <div class="small dim mb4">Drops — 10% cada</div>
+      <div class="list mb8" style="max-height:180px">
+        ${bossLootText(boss).map((line) => `<div class="stat-row"><span class="k">${line}</span></div>`).join("")}
+      </div>
+      <button class="danger full" id="boss-fight" ${ready.ok ? "" : "disabled"}>FIGHT</button>
+      <div class="tiny dim mt8">Ao terminar a luta, vencendo ou morrendo, você será teleportado para a cidade. O loot do boss vai para o Loot Pouch.</div>
+    </div>`;
+  $("#modal").classList.add("show");
+  $("#boss-close").addEventListener("click", () => $("#modal").classList.remove("show"));
+  $("#boss-fight").addEventListener("click", () => {
+    $("#modal").classList.remove("show");
+    startBoss(id);
+  });
 }
 
 function startBoss(id) {

@@ -713,7 +713,7 @@ function rollLoot(c, p, mob) {
     }
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
-    if (isNoCollect(p, l.item)) continue;
+    if (!mob.boss && isNoCollect(p, l.item)) continue;
     // filtro de loot
     if (p.config.lootFilter === "valuable" && (it.sell || 0) < 20 &&
         l.item !== "gold-coin") continue;
@@ -723,6 +723,8 @@ function rollLoot(c, p, mob) {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
+    } else if (mob.boss) {
+      addLootPouch(p, l.item, count);
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (shouldGoLootPouch(l.item)) {
@@ -768,7 +770,7 @@ function playerDeath(c, p) {
   }
   c.mobs = [];
   c.dead = true;
-  c.deadUntil = Date.now() + 10000;   // 10s para voltar
+  c.deadUntil = Date.now() + (c.boss ? 2500 : 10000);   // boss volta mais rápido para a cidade
   c.events.push({ t: "death", exp: lostExp, gold: lostGold, blessed: blessed });
   return { exp: lostExp, gold: lostGold };
 }
