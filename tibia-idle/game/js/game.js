@@ -266,35 +266,49 @@ function drainEvents() {
   const c = G.combat;
   if (!c) return;
   const r = G.renderer;
+  const ex = (e) => e.screen ? (e.x || 0.5) : 0.42 + (e.x || 0.5) * 0.5;
+  const ey = (e) => e.y || 0.5;
   for (const e of c.events) {
     switch (e.t) {
       case "hit": {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
-        const x = 0.42 + (e.x || 0.5) * 0.5;
-        r.addFloater(x, e.y || 0.5, "-" + fmt(e.dmg), col, e.dmg > 200);
-        r.addEffect(x, e.y || 0.5, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
+        const x = ex(e), y = ey(e);
+        if (e.projectile && r.addProjectile)
+          r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62, x, y, col);
+        r.addFloater(x, y, "-" + fmt(e.dmg), col, e.dmg > 200);
+        r.addEffect(x, y, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         break;
       }
       case "miss":
-        r.addFloater(0.42 + (e.x || 0.5) * 0.5, e.y || 0.5, "errou", "#a0a0a0");
+        r.addFloater(ex(e), ey(e), "errou", "#a0a0a0");
         break;
-      case "taken":
-        r.addFloater(0.13, 0.55, "-" + fmt(e.dmg),
-                     (ELEMENTS[e.el] || ELEMENTS.physical).color);
-        r.addEffect(0.13, 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
+      case "range":
+        r.addFloater(ex(e), ey(e), "fora de alcance", "#c8c0a8");
+        break;
+      case "taken": {
+        const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
+        if (e.projectile && r.addProjectile) r.addProjectile(e.sx, e.sy, e.x, e.y, col);
+        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmt(e.dmg), col);
+        r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         r.shake = Math.min(9, 2 + e.dmg / 30);
         r.playerFlash = 90;
         break;
+      }
       case "block":
-        r.addFloater(0.13, 0.55, "bloqueou", "#9ac0e8");
+        if (e.projectile && r.addProjectile) r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8");
+        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
         break;
-      case "heal":
-        r.addFloater(0.13, 0.5, "+" + fmt(e.amount), "#7ae87a");
-        r.addEffect(0.13, 0.6, "green-rings");
+      case "heal": {
+        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
+        r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
+        r.addEffect(px, c.player ? c.player.y : 0.6, "green-rings");
         break;
-      case "mana":
-        r.addFloater(0.13, 0.5, "+" + fmt(e.amount) + " mana", "#6a8aff");
+      }
+      case "mana": {
+        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
+        r.addFloater(px, py, "+" + fmt(e.amount) + " mana", "#6a8aff");
         break;
+      }
       case "supply-buy":
         addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
         renderSupplies(G.p);
@@ -308,13 +322,13 @@ function drainEvents() {
         addLog("death", `Sem gold para comprar carga de <b>${e.name}</b>.`);
         break;
       case "cast":
-        r.addEffect(0.3, 0.5, e.area ? "explosion-area" : "magic-blue");
+        r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
         break;
       case "kill": {
-        const x = 0.42 + (e.x || 0.5) * 0.5;
-        r.addCorpse(x, e.y || 0.5, e.mob);
-        r.addFloater(x, (e.y || 0.5) - 0.06, "+" + fmt(e.exp) + " xp", "#9ce84a");
-        r.addEffect(x, e.y || 0.5, "poff");
+        const x = ex(e), y = ey(e);
+        r.addCorpse(x, y, e.mob);
+        r.addFloater(x, y - 0.06, "+" + fmt(e.exp) + " xp", "#9ce84a");
+        r.addEffect(x, y, "poff");
         addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(e.exp)} xp</span>`);
         if (e.loot && e.loot.length) {
           const txt = e.loot.map((l) => {

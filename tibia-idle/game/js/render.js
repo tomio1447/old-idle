@@ -43,6 +43,7 @@ function Renderer(canvas) {
   this.ctx.imageSmoothingEnabled = false;
   this.floaters = [];       // numeros de dano
   this.effects = [];        // animacoes de efeito
+  this.projectiles = [];    // projeteis/distance shots
   this.corpses = [];
   this.shake = 0;
   this.playerFlash = 0;
@@ -74,6 +75,12 @@ Renderer.prototype.addEffect = function (x, y, name) {
   this.effects.push({ x: x, y: y, name: name, t: 0,
                       frames: FX_FRAMES[name], dur: 360 });
   if (this.effects.length > 20) this.effects.shift();
+};
+
+Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color) {
+  this.projectiles.push({ sx: sx, sy: sy, tx: tx, ty: ty,
+                          color: color || "#ffe680", t: 0, dur: 260 });
+  if (this.projectiles.length > 30) this.projectiles.shift();
 };
 
 Renderer.prototype.addCorpse = function (x, y, slug) {
@@ -287,14 +294,17 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // --- player (lado esquerdo)
-  const px = 0.13, py = 0.62;
+  // --- player
+  const pl = combat && combat.player ? combat.player : { x: 0.13, y: 0.62, dir: "e", moving: false, frame: 0 };
+  const px = pl.x, py = pl.y;
   const outfitName = this.outfitFor(player);
-  const pimg = Sprites.outfit(outfitName, "e");
-  const bob = Math.sin(Date.now() / 340) * 2;
+  const pimg = Sprites.walk(outfitName, pl.dir || "e", pl.moving ? (pl.frame || 1) : 0) ||
+               Sprites.outfit(outfitName, pl.dir || "e");
+  const bob = pl.moving ? 0 : Math.sin(Date.now() / 340) * 2;
   if (pimg && pimg.complete && pimg.naturalWidth) {
     const sc = 2.4;
     const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+    const atkPush = (pl.attackAnim || 0) > 0 ? (pl.dir === "w" ? -5 : pl.dir === "e" ? 5 : 0) : 0;
     // sombra
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
@@ -305,24 +315,26 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.filter = "brightness(2.2) saturate(0.4)";
       this.playerFlash -= dt;
     }
-    ctx.drawImage(pimg, px * W - w / 2, py * H - h / 2 + bob, w, h);
+    ctx.drawImage(pimg, px * W - w / 2 + atkPush, py * H - h / 2 + bob, w, h);
     if (this.playerFlash > 0) ctx.restore();
   }
 
   // --- monstros
   if (combat && !combat.dead) {
-    for (const m of combat.mobs) {
-      const img = Sprites.mob(m.slug, "w");
-      const mx = (0.42 + m.x * 0.5) * W;
+    const mobs = combat.mobs.slice().sort((a, b) => a.y - b.y);
+    for (const m of mobs) {
+      const img = Sprites.mob(m.slug, m.dir || "w");
+      const mx = m.x * W;
       const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
       if (img && img.complete && img.naturalWidth) {
         const sc = m.def.hp > 1500 ? 2.6 : m.def.hp > 500 ? 2.2 : 2.0;
         const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+        const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();
         ctx.ellipse(mx, my + h * 0.42, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
-        ctx.drawImage(img, mx - w / 2, my - h / 2, w, h);
+        ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
         // barra de vida
         const bw = Math.max(30, w * 0.75), bh = 4;
         const bx = mx - bw / 2, by = my - h / 2 - 9;
@@ -331,7 +343,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
         const pct = Math.max(0, m.hp / m.maxHp);
         ctx.fillStyle = pct > 0.5 ? "#4ec84e" : pct > 0.25 ? "#e8c84a" : "#e04040";
         ctx.fillRect(bx, by, bw * pct, bh);
-        // nome
+        // nome + range visual quando está chegando perto
         ctx.font = "9px Verdana";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,.9)";
@@ -340,6 +352,27 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.fillText(m.def.name, mx, by - 5);
       }
     }
+  }
+
+  // --- projeteis / ataques a distancia
+  for (let i = this.projectiles.length - 1; i >= 0; i--) {
+    const p = this.projectiles[i];
+    p.t += dt;
+    if (p.t >= p.dur) { this.projectiles.splice(i, 1); continue; }
+    const q = Math.min(1, p.t / p.dur);
+    const hx = (p.sx + (p.tx - p.sx) * q) * W;
+    const hy = (p.sy + (p.ty - p.sy) * q) * H;
+    ctx.strokeStyle = p.color;
+    ctx.globalAlpha = 0.35 + (1 - q) * 0.45;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo((p.sx + (p.tx - p.sx) * Math.max(0, q - 0.18)) * W,
+               (p.sy + (p.ty - p.sy) * Math.max(0, q - 0.18)) * H);
+    ctx.lineTo(hx, hy);
+    ctx.stroke();
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(hx, hy, 3, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   // --- efeitos

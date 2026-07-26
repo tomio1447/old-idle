@@ -20,6 +20,10 @@ function newCombat(player, huntId) {
     regenHp: 0,
     regenMp: 0,
     buffs: {},
+    player: {
+      x: 0.18, y: 0.62, dir: "e", moving: false,
+      frame: 0, walkT: 0, attackAnim: 0,
+    },
     stats: {
       startedAt: Date.now(), kills: 0, exp: 0, gold: 0, damage: 0,
       taken: 0, deaths: 0, loot: {}, supplyUsed: {}, supplyCost: 0,
@@ -42,8 +46,12 @@ function spawnWave(c, p) {
       hp: m.hp, maxHp: m.hp,
       atkCd: 400 + Math.random() * 1200,
       id: Math.random().toString(36).slice(2, 8),
-      x: 0.15 + Math.random() * 0.7,
-      y: 0.25 + Math.random() * 0.5,
+      x: 0.80 + Math.random() * 0.16,
+      y: 0.30 + Math.random() * 0.42,
+      dir: "w",
+      moving: false,
+      attackAnim: 0,
+      speed: 0.000045 + Math.random() * 0.000025,
       spawnAt: Date.now(),
     });
   }
@@ -57,6 +65,93 @@ function attackInterval(c, p) {
   if (c.buffs.haste && c.buffs.haste > 0) base *= 0.8;
   base -= Math.min(400, g.speed * 4);
   return Math.max(800, base);
+}
+
+function pointDistance(a, b) {
+  const dx = (a.x || 0) - (b.x || 0);
+  const dy = (a.y || 0) - (b.y || 0);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function playerAttackRange(p) {
+  const d = playerDamage(p);
+  if (d.type === "distance") return 0.58;
+  if (d.type === "magic") return 0.52;
+  return 0.145;
+}
+
+function spellRange() { return 0.60; }
+function runeRange() { return 0.62; }
+
+function monsterAttackRange(m) {
+  const slug = m.slug || "";
+  if (/archer|spearman|shaman|mage|witch|priestess|bonelord|gazer|djinn|dragon|fire|efreet|marid|necromancer|lich|quara/.test(slug))
+    return 0.34;
+  if ((m.def && m.def.element && m.def.element !== "physical")) return 0.26;
+  return 0.115;
+}
+
+function faceDir(from, to) {
+  const dx = to.x - from.x, dy = to.y - from.y;
+  if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? "e" : "w";
+  return dy >= 0 ? "s" : "n";
+}
+
+function movePoint(ent, target, speed, dt, stopRange) {
+  const d = pointDistance(ent, target);
+  ent.moving = false;
+  if (d <= stopRange || d <= 0.001) return d;
+  const step = Math.min(d - stopRange, speed * dt);
+  ent.x += ((target.x - ent.x) / d) * step;
+  ent.y += ((target.y - ent.y) / d) * step;
+  ent.x = clamp(ent.x, 0.08, 0.96);
+  ent.y = clamp(ent.y, 0.22, 0.78);
+  ent.dir = faceDir(ent, target);
+  ent.moving = true;
+  ent.walkT = (ent.walkT || 0) + dt;
+  ent.frame = Math.floor((ent.walkT / 180) % 3);
+  return pointDistance(ent, target);
+}
+
+function updateCombatMovement(c, p, dt) {
+  if (!c.player) return;
+  const pl = c.player;
+  pl.attackAnim = Math.max(0, (pl.attackAnim || 0) - dt);
+  pl.moving = false;
+  if (!c.mobs.length) return;
+
+  const target = c.mobs[0];
+  const desired = playerAttackRange(p);
+  const cur = pointDistance(pl, target);
+  const playerSpeed = 0.000070 + Math.min(0.000035, gearStats(p).speed * 0.0000012);
+
+  // Melee aproxima; distância/magia mantém espaço e kiteia se o monstro encostar.
+  if (desired < 0.2) {
+    movePoint(pl, target, playerSpeed, dt, desired * 0.82);
+  } else {
+    if (cur > desired * 0.92) movePoint(pl, target, playerSpeed, dt, desired * 0.82);
+    else if (cur < 0.22) {
+      const away = { x: clamp(pl.x - (target.x - pl.x), 0.08, 0.36),
+                     y: clamp(pl.y - (target.y - pl.y) * 0.35, 0.25, 0.75) };
+      movePoint(pl, away, playerSpeed, dt, 0.02);
+    }
+  }
+  pl.dir = faceDir(pl, target);
+
+  c.mobs.forEach((m, i) => {
+    m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt);
+    const range = monsterAttackRange(m);
+    const laneTarget = {
+      x: pl.x + 0.012 * Math.min(i, 3),
+      y: clamp(pl.y + (i - (c.mobs.length - 1) / 2) * 0.055, 0.26, 0.76),
+    };
+    movePoint(m, laneTarget, m.speed || 0.00005, dt, range * 0.90);
+    m.dir = faceDir(m, pl);
+  });
 }
 
 function hasSelectedSupply(p, slug) {
@@ -144,6 +239,11 @@ function playerAttack(c, p, target) {
   const d = playerDamage(p);
   const isMagic = d.type === "magic";
   const isDist = d.type === "distance";
+  const pos = c.player || { x: 0.18, y: 0.62 };
+  if (pointDistance(pos, target) > playerAttackRange(p)) {
+    c.events.push({ t: "range", x: target.x, y: target.y, screen: true });
+    return false;
+  }
 
   // Distância usa cargas de ammo. Se acabou, compra 1 carga no uso;
   // se não houver gold, o ataque não sai.
@@ -171,8 +271,10 @@ function playerAttack(c, p, target) {
 
   target.hp -= raw;
   c.stats.damage += raw;
+  if (c.player) c.player.attackAnim = 180;
   c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
-                  el: d.element, crit: false });
+                  sx: pos.x, sy: pos.y, screen: true,
+                  projectile: isDist || isMagic, el: d.element, crit: false });
 
   // ganho de skill
   if (isMagic) {
@@ -199,6 +301,7 @@ function tryCastSpell(c, p, target, now) {
     avail.push([id, s]);
   }
   if (!avail.length) return false;
+  if (c.player && pointDistance(c.player, target) > spellRange()) return false;
   // usa a mais forte disponivel
   avail.sort((a, b) => b[1].power - a[1].power);
   const [id, s] = avail[0];
@@ -216,9 +319,14 @@ function tryCastSpell(c, p, target, now) {
     t.hp -= dmg;
     c.stats.damage += dmg;
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
+                    sx: c.player ? c.player.x : 0.18,
+                    sy: c.player ? c.player.y : 0.62,
+                    screen: true, projectile: true,
                     el: s.element || "energy", spell: s.name });
   }
-  c.events.push({ t: "cast", name: s.name, area: !!s.area });
+  if (c.player) c.player.attackAnim = 220;
+  c.events.push({ t: "cast", name: s.name, area: !!s.area,
+                  x: target.x, y: target.y, screen: true });
   return true;
 }
 
@@ -226,6 +334,7 @@ function tryCastSpell(c, p, target, now) {
 function tryUseRune(c, p, target, now) {
   if (!p.config.useRunes) return false;
   if (c.runeCd > now) return false;
+  if (c.player && pointDistance(c.player, target) > runeRange()) return false;
   let best = null;
   for (const slug in p.supplies) {
     const s = SUPPLIES[slug];
@@ -241,7 +350,11 @@ function tryUseRune(c, p, target, now) {
   const dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
   target.hp -= dmg;
   c.stats.damage += dmg;
+  if (c.player) c.player.attackAnim = 180;
   c.events.push({ t: "hit", dmg: dmg, x: target.x, y: target.y,
+                  sx: c.player ? c.player.x : 0.18,
+                  sy: c.player ? c.player.y : 0.62,
+                  screen: true, projectile: true,
                   el: s.element, rune: s.name });
   return true;
 }
@@ -341,6 +454,8 @@ function tryMana(c, p) {
 
 /* Monstro ataca o jogador */
 function mobAttack(c, p, mob) {
+  const pl = c.player || { x: 0.18, y: 0.62 };
+  if (pointDistance(pl, mob) > monsterAttackRange(mob)) return false;
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
@@ -353,15 +468,19 @@ function mobAttack(c, p, mob) {
     raw -= absorbed;
   }
 
+  mob.attackAnim = 180;
   if (raw <= 0) {
-    c.events.push({ t: "block" });
+    c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+                    screen: true, projectile: monsterAttackRange(mob) > 0.16 });
     addSkillTries(p, "shield", 1);
     return 0;
   }
   p.hp -= raw;
   c.stats.taken += raw;
   addSkillTries(p, "shield", 1);
-  c.events.push({ t: "taken", dmg: raw, el: mob.def.element });
+  c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
+                  x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+                  screen: true, projectile: monsterAttackRange(mob) > 0.16 });
   return raw;
 }
 
@@ -407,6 +526,10 @@ function playerDeath(c, p) {
   p.gold -= lostGold;
   const max = maxStats(p);
   p.hp = max.hp; p.mp = max.mp;
+  if (c.player) {
+    c.player.x = 0.18; c.player.y = 0.62;
+    c.player.dir = "e"; c.player.moving = false;
+  }
   c.mobs = [];
   c.dead = true;
   c.deadUntil = Date.now() + 10000;   // 10s para voltar
@@ -452,6 +575,9 @@ function combatTick(c, p, dt, now) {
   // spawn
   if (!c.mobs.length) spawnWave(c, p);
 
+  // movimentação: player aproxima/kita e monstros procuram distância de ataque
+  updateCombatMovement(c, p, dt);
+
   // cura e mana
   tryHeal(c, p, now);
   tryMana(c, p);
@@ -481,21 +607,20 @@ function combatTick(c, p, dt, now) {
   c.playerAtkCd -= dt;
   if (c.playerAtkCd <= 0 && c.mobs.length) {
     const target = c.mobs[0];
-    // prioridade: runa > spell > arma
-    if (!tryUseRune(c, p, target, now)) {
-      if (!tryCastSpell(c, p, target, now)) {
-        playerAttack(c, p, target);
-      }
-    }
-    c.playerAtkCd = attackInterval(c, p);
+    let acted = false;
+    // prioridade: runa > spell > arma, respeitando alcance
+    acted = tryUseRune(c, p, target, now) ||
+             tryCastSpell(c, p, target, now) ||
+             !!playerAttack(c, p, target);
+    c.playerAtkCd = acted ? attackInterval(c, p) : 250;
   }
 
   // monstros atacam
   for (const m of c.mobs) {
     m.atkCd -= dt;
     if (m.atkCd <= 0) {
-      mobAttack(c, p, m);
-      m.atkCd = m.def.attackSpeed || 2000;
+      const acted = mobAttack(c, p, m);
+      m.atkCd = acted === false ? 300 : (m.def.attackSpeed || 2000);
     }
   }
 
@@ -516,7 +641,7 @@ function combatTick(c, p, dt, now) {
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: m.def.name,
-                    exp: exp, loot: loot, x: m.x, y: m.y });
+                    exp: exp, loot: loot, x: m.x, y: m.y, screen: true });
   }
   c.mobs = alive;
 
