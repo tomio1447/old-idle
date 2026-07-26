@@ -154,6 +154,114 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
+function drawRookgaardSewer(ctx, W, H) {
+  const cols = 21, rows = 13;
+  const tw = W / cols, th = H / rows;
+  const tile = (x, y, fill, stroke) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x * tw, y * th, tw + 1, th + 1);
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x * tw + 0.5, y * th + 0.5, tw, th);
+    }
+  };
+
+  const map = [
+    "#####################",
+    "#....#.........#....#",
+    "#....#..~~~~~..#....#",
+    "#.......~~~~~.......#",
+    "#..##...~~=~~...##..#",
+    "#..#....~~=~~....#..#",
+    "#..#..S.~~=~~.G..#..#",
+    "#..#....~~=~~....#..#",
+    "#..##...~~=~~...##..#",
+    "#.......~~~~~.......#",
+    "#....#..~~~~~..#....#",
+    "#....#.........#....#",
+    "#####################",
+  ];
+
+  ctx.fillStyle = "#060806";
+  ctx.fillRect(0, 0, W, H);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const c = map[y][x];
+      if (c === "#") tile(x, y, "#1a1a18", "#080808");
+      else if (c === "~") {
+        const g = ctx.createLinearGradient(0, y * th, 0, (y + 1) * th);
+        g.addColorStop(0, "#244629"); g.addColorStop(0.5, "#13311f"); g.addColorStop(1, "#081d14");
+        tile(x, y, g, "#06110c");
+      } else if (c === "=") tile(x, y, "#66543d", "#2b2115");
+      else tile(x, y, "#333633", "#1b1e1b");
+
+      // pedras rachadas / sujeira no piso
+      if (c === "." && (x + y) % 3 === 0) {
+        ctx.fillStyle = "rgba(0,0,0,.18)";
+        ctx.fillRect(x * tw + tw * 0.15, y * th + th * 0.18, tw * 0.55, 1);
+      }
+      if (c === "#") {
+        ctx.fillStyle = "rgba(255,255,255,.035)";
+        ctx.fillRect(x * tw + 1, y * th + 1, tw - 2, 2);
+      }
+    }
+  }
+
+  // água central com brilho/esgoto fluindo
+  ctx.strokeStyle = "rgba(120,210,110,.16)";
+  ctx.lineWidth = 2;
+  for (let y = 2; y <= 10; y += 2) {
+    ctx.beginPath();
+    ctx.moveTo(8 * tw, (y + 0.5) * th);
+    ctx.bezierCurveTo(9 * tw, y * th, 11 * tw, (y + 1) * th, 13 * tw, (y + 0.5) * th);
+    ctx.stroke();
+  }
+
+  // escada/bueiro de entrada de rookgaard
+  const sx = 6 * tw, sy = 6 * th;
+  ctx.fillStyle = "#15130f";
+  ctx.fillRect(sx + tw * 0.14, sy + th * 0.12, tw * 0.72, th * 0.76);
+  ctx.strokeStyle = "#a78b4c";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(sx + tw * 0.14, sy + th * 0.12, tw * 0.72, th * 0.76);
+  ctx.fillStyle = "#8a6d32";
+  for (let i = 0; i < 4; i++) ctx.fillRect(sx + tw * 0.24, sy + th * (0.23 + i * 0.14), tw * 0.52, 2);
+
+  // grade/ralo
+  const gx = 14 * tw, gy = 6 * th;
+  ctx.fillStyle = "#070707";
+  ctx.fillRect(gx + tw * 0.15, gy + th * 0.15, tw * 0.7, th * 0.7);
+  ctx.strokeStyle = "#777";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    ctx.beginPath(); ctx.moveTo(gx + tw * (0.15 + i * 0.12), gy + th * 0.18); ctx.lineTo(gx + tw * (0.15 + i * 0.12), gy + th * 0.82); ctx.stroke();
+  }
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(gx + tw * 0.18, gy + th * (0.15 + i * 0.15)); ctx.lineTo(gx + tw * 0.82, gy + th * (0.15 + i * 0.15)); ctx.stroke();
+  }
+
+  // canos laterais, poças e musgo
+  ctx.strokeStyle = "#5f6257";
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(1.2 * tw, 3.2 * th); ctx.lineTo(5.5 * tw, 3.2 * th); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(15.5 * tw, 9.7 * th); ctx.lineTo(19.8 * tw, 9.7 * th); ctx.stroke();
+  ctx.fillStyle = "rgba(70,130,52,.28)";
+  [[2,2],[3,9],[17,3],[18,10],[5,7],[15,5]].forEach(([x, y]) => {
+    ctx.beginPath(); ctx.ellipse((x + .5) * tw, (y + .55) * th, tw * .28, th * .12, 0, 0, 7); ctx.fill();
+  });
+
+  // legenda local
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  ctx.fillRect(8, 8, 178, 22);
+  ctx.strokeStyle = "rgba(120,100,60,.6)";
+  ctx.strokeRect(8, 8, 178, 22);
+  ctx.font = "bold 11px Verdana";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#d8c47a";
+  ctx.fillText("Bueiro de Rookgaard", 16, 23);
+}
+
 Renderer.prototype.addCorpse = function (x, y, slug) {
   this.corpses.push({ x: x, y: y, slug: slug, life: 2000 });
   if (this.corpses.length > 8) this.corpses.shift();
@@ -326,17 +434,21 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const hunt = combat ? combat.hunt : null;
   const scene = hunt ? hunt.scene : "cave";
 
-  // --- chao tileado
-  const gr = Sprites.ground(scene);
-  if (gr && gr.complete && gr.naturalWidth) {
-    const s = 2;
-    const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
-    for (let y = 0; y < H; y += th)
-      for (let x = 0; x < W; x += tw)
-        ctx.drawImage(gr, x, y, tw, th);
+  // --- chao/mapa tileado
+  if (scene === "sewer") {
+    drawRookgaardSewer(ctx, W, H);
   } else {
-    ctx.fillStyle = "#1c1a15";
-    ctx.fillRect(0, 0, W, H);
+    const gr = Sprites.ground(scene);
+    if (gr && gr.complete && gr.naturalWidth) {
+      const s = 2;
+      const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
+      for (let y = 0; y < H; y += th)
+        for (let x = 0; x < W; x += tw)
+          ctx.drawImage(gr, x, y, tw, th);
+    } else {
+      ctx.fillStyle = "#1c1a15";
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   // vinheta

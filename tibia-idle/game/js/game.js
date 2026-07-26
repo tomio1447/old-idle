@@ -573,9 +573,6 @@ function drainEvents() {
       case "raid-real-player":
         addLog("death", "Raid PvP reservado para jogador real online — nenhum NPC fake foi criado.");
         break;
-      case "influenced-next":
-        addLog("info", "Teste Influenced: o próximo monstro que nascer virá influenciado.");
-        break;
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
         break;

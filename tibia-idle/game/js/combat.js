@@ -27,8 +27,6 @@ function newCombat(player, huntId, instanceMode) {
     raidEnabled: false,
     raidCd: Infinity,
     raidMode: pvp ? "real-player" : "none",
-    killsSinceInfluenced: 0,
-    forceNextInfluenced: false,
     mobs: [],
     wave: 0,
     playerAtkCd: 0,
@@ -65,12 +63,11 @@ function spawnWave(c, p) {
     const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
     const base = GAMEDATA.monsters[slug];
     if (!base) break;
-    const influenced = !!c.forceNextInfluenced ||
-      Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
-    if (c.forceNextInfluenced) c.forceNextInfluenced = false;
+    const influenced = Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
     const m = Object.assign({}, base);
     if (influenced) {
-      m.name = "Influenced " + base.name;
+      // Mantém somente o nome original; o destaque visual indica que é influenced.
+      m.name = base.name;
       m.hp = Math.floor(base.hp * 2);
       m.damage = Math.floor(base.damage * 1.2);
       m.armor = Math.floor(base.armor * 1.2);
@@ -806,12 +803,6 @@ function combatTick(c, p, dt, now) {
     c.stats.kills++;
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
-    c.killsSinceInfluenced = (c.killsSinceInfluenced || 0) + 1;
-    if (c.killsSinceInfluenced >= 5) {
-      c.killsSinceInfluenced = 0;
-      c.forceNextInfluenced = true;
-      c.events.push({ t: "influenced-next" });
-    }
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: m.def.name,
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true });
