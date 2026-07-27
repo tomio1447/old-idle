@@ -350,7 +350,7 @@ function equipFromBag(p, slug) {
   if (!it || !it.s) return false;
   if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
   if (it.s === "ammo") {
-    p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+    setActiveAmmo(p, slug);
     toast(`Munição selecionada: <b>${it.n}</b>`);
     return true;
   }
@@ -403,11 +403,24 @@ function openBagItemMenu(p, slug, x, y, after) {
       action: () => { if (equipFromBag(p, slug)) refresh(); },
     });
   }
-  opts.push({
-    label: `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
-    disabled: value <= 0 && !currencyValue(slug),
-    action: () => { if (sellBagItem(p, slug) > 0) refresh(); },
-  });
+  // moedas viram gold direto; o resto só é vendido pela Loot Pouch
+  if (currencyValue(slug)) {
+    opts.push({
+      label: `Converter em gold · ${fmtFull(currencyValue(slug) * count)} gp`,
+      action: () => { if (sellBagItem(p, slug) > 0) refresh(); },
+    });
+  } else {
+    opts.push({
+      label: "Mover para Loot Pouch",
+      hint: value > 0 ? `${fmtFull(value)} gp` : "",
+      action: () => {
+        addLootPouch(p, slug, count);
+        delete p.bag[slug];
+        addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
+        refresh();
+      },
+    });
+  }
   opts.push({
     label: "Destruir",
     danger: true,
@@ -974,12 +987,14 @@ function renderRefill(p) {
     </div>`;
 
   $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
-    const [key, slug] = b.dataset.refillPick.split(":");
-    const field = key === "arrow" ? "refillArrow" : "refillBolt";
-    p.config[field] = p.config[field] === slug ? "" : slug;
-    // seleciona a munição escolhida como ammo ativa
-    if (p.config[field]) {
-      p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+    const slug = b.dataset.refillPick.split(":")[1];
+    const already = p.equip.ammo && p.equip.ammo.item === slug;
+    // slot unico: escolher arrow desequipa bolt e vice-versa
+    if (already) {
+      setActiveAmmo(p, null);
+      toast("Munição desequipada.");
+    } else {
+      setActiveAmmo(p, slug);
       toast(`Munição selecionada: <b>${GAMEDATA.items[slug].n}</b>`);
     }
     renderAll();
@@ -1003,8 +1018,7 @@ function renderRefill(p) {
     const slug = (p.equip.ammo && p.equip.ammo.item) || p.config.refillArrow ||
                  p.config.refillBolt || "arrow";
     addAmmo(p, slug, n);
-    if (!p.equip.ammo || !p.equip.ammo.item)
-      p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+    if (!p.equip.ammo || !p.equip.ammo.item) setActiveAmmo(p, slug);
     addLog("info", `[teste] +${n}x <b>${itemName(slug)}</b>.`);
     toast(`[teste] +${n}x ${itemName(slug)}`);
     renderAll();

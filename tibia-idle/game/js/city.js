@@ -17,9 +17,9 @@ const NPCS = {
     type: "supply",
   },
   blacksmith: {
-    name: "Grimwald", role: "Ferreiro", sprite: "blacksmith",
-    greet: "Traga seu loot que eu compro tudo por um bom preço.",
-    type: "sell",
+    name: "Grimwald", role: "Ferreiro — Upgrades", sprite: "blacksmith",
+    greet: "Traga seu equipamento e poeira mística que eu forjo algo melhor.",
+    type: "upgrade",
   },
   banker: {
     name: "Lorde Aldric", role: "Banco de Thais", sprite: "banker",
@@ -175,8 +175,7 @@ function runManaTrainTick(p) {
     addAmmo(p, r.slug, r.amount);
     if (p.equip.weapon && GAMEDATA.items[p.equip.weapon.item] &&
         GAMEDATA.items[p.equip.weapon.item].t === "distance") {
-      if (!p.equip.ammo || p.equip.ammo.item === r.slug)
-        p.equip.ammo = { item: r.slug, count: ammoCount(p, r.slug) };
+      if (!p.equip.ammo || p.equip.ammo.item === r.slug) setActiveAmmo(p, r.slug);
     }
   } else {
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
@@ -186,6 +185,89 @@ function runManaTrainTick(p) {
     product: manaTrainProductLabel(r),
     mlUp: p.ml - beforeMl,
   };
+}
+
+/* ------------------------------------------------------------ ferreiro: upgrades
+ * Upgrade por tiers: cada nivel soma atributos ao item e custa gold +
+ * poeira mistica. A partir do tier 4 pode falhar, consumindo o material
+ * mas nunca destruindo o item. */
+const UPGRADE_MATERIAL = "mystic-dust";
+const UPGRADE_MAX_TIER = 10;
+const UPGRADE_SLOTS = ["weapon", "armor", "helmet", "legs", "shield", "boots"];
+
+/* +6% por tier nos atributos principais do item */
+function upgradeBonusPct(tier) { return (tier || 0) * 6; }
+
+function itemUpgradeTier(p, key) {
+  return (p.upgrades && p.upgrades[key]) || 0;
+}
+
+/* chave estavel: equipamento usa o slot, mochila usa o slug */
+function upgradeKey(source, slot, slug) {
+  return source === "equip" ? "equip:" + slot : "bag:" + slug;
+}
+
+function upgradeCost(p, slug, tier) {
+  const it = GAMEDATA.items[slug];
+  const base = Math.max(40, Math.floor((it && it.sell ? it.sell : 100) * 0.35));
+  const next = (tier || 0) + 1;
+  return {
+    gold: Math.floor(base * Math.pow(1.65, next - 1)),
+    dust: next,                                   // 1 poeira no +1, 2 no +2...
+    chance: next <= 3 ? 100 : Math.max(35, 100 - (next - 3) * 11),
+  };
+}
+
+/* Aplica os bonus de upgrade sobre os atributos de um item */
+function upgradedStats(p, key, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return null;
+  const tier = itemUpgradeTier(p, key);
+  if (!tier) return it;
+  const mul = 1 + upgradeBonusPct(tier) / 100;
+  const out = Object.assign({}, it);
+  for (const f of ["atk", "def", "arm", "mdmg"]) {
+    if (out[f]) out[f] = Math.round(out[f] * mul);
+  }
+  out.tier = tier;
+  return out;
+}
+
+function canUpgrade(p, key, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return { ok: false, msg: "Item inválido." };
+  if (!it.s || UPGRADE_SLOTS.indexOf(it.s) === -1)
+    return { ok: false, msg: "Este tipo de item não pode ser melhorado." };
+  const tier = itemUpgradeTier(p, key);
+  if (tier >= UPGRADE_MAX_TIER)
+    return { ok: false, msg: `Já está no nível máximo (+${UPGRADE_MAX_TIER}).` };
+  const cost = upgradeCost(p, slug, tier);
+  if (p.gold < cost.gold)
+    return { ok: false, msg: `Faltam ${fmtFull(cost.gold - p.gold)} gp.`, cost: cost };
+  const dust = (p.lootPouch && p.lootPouch[UPGRADE_MATERIAL]) || 0;
+  if (dust < cost.dust)
+    return { ok: false, msg: `Precisa de ${cost.dust}x poeira mística (tem ${dust}).`, cost: cost };
+  return { ok: true, msg: "", cost: cost };
+}
+
+function applyUpgrade(p, key, slug) {
+  const check = canUpgrade(p, key, slug);
+  if (!check.ok) return check;
+  const cost = check.cost;
+  p.gold -= cost.gold;
+  removeLootPouch(p, UPGRADE_MATERIAL, cost.dust);
+  p.upgrades = p.upgrades || {};
+
+  const roll = Math.random() * 100;
+  if (roll > cost.chance) {
+    // falha: perde gold e material, o item continua intacto
+    return { ok: true, success: false, cost: cost,
+             msg: `A forja falhou! O ${itemName(slug)} sobreviveu, mas o material foi perdido.` };
+  }
+  const tier = itemUpgradeTier(p, key) + 1;
+  p.upgrades[key] = tier;
+  return { ok: true, success: true, tier: tier, cost: cost,
+           msg: `${itemName(slug)} melhorado para +${tier}!` };
 }
 
 /* ------------------------------------------------------------ academia safezone */
@@ -334,8 +416,7 @@ function castAcademyConjure(p, id) {
   if (r.kind === "ammo") {
     // munição é apenas contagem: não cria item na mochila
     addAmmo(p, r.slug, r.amount);
-    if (!p.equip.ammo || p.equip.ammo.item === r.slug)
-      p.equip.ammo = { item: r.slug, count: ammoCount(p, r.slug) };
+    if (!p.equip.ammo || p.equip.ammo.item === r.slug) setActiveAmmo(p, r.slug);
   } else if (r.kind === "supply") {
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
   } else if (r.kind === "support" && typeof G !== "undefined" && G.training) {
@@ -350,8 +431,36 @@ function castAcademyConjure(p, id) {
   };
 }
 
+/* Conjure em loop: enquanto o auto-conjure estiver ligado e houver mana,
+ * o personagem refaz a receita escolhida automaticamente. */
+function academyAutoConjureTick(t, p, dt) {
+  const id = p.config && p.config.autoConjure;
+  if (!id) return;
+  const r = ACADEMY_CONJURES[id];
+  if (!r) { p.config.autoConjure = null; return; }
+
+  t.conjureCd = (t.conjureCd || 0) - dt;
+  if (t.conjureCd > 0) return;
+  t.conjureCd = 1000;                       // 1 conjure por segundo
+
+  const check = academyConjureCheck(p, r);
+  if (!check.ok) {
+    // sem mana é só esperar; qualquer outro impedimento desliga o loop
+    if (p.mp < r.mana) return;
+    p.config.autoConjure = null;
+    t.events.push({ type: "msg", msg: `Auto-conjure parado: ${check.msg}` });
+    return;
+  }
+  const res = castAcademyConjure(p, id);
+  if (res.ok) {
+    t.stats.conjures = (t.stats.conjures || 0) + 1;
+    t.events.push({ type: "conjure", msg: res.msg, mlUp: res.mlUp });
+  }
+}
+
 function academyTrainingTick(t, p, dt, now) {
   t.time += dt;
+  academyAutoConjureTick(t, p, dt);
   t.hitCd -= dt;
   if (t.hitCd > 0) return;
 

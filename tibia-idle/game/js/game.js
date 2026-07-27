@@ -117,6 +117,7 @@ function normalizePlayer(p) {
     useRunes: true,
     autoRestock: false,
     manaTrain: null,
+    autoConjure: null,
     attackMode: "chase",
     kiteDistance: 3,
     shooterType: "auto",
@@ -158,6 +159,7 @@ function normalizePlayer(p) {
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
   p.ammo = p.ammo || {};
+  p.upgrades = p.upgrades || {};
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   ensureOutfit(p);
   return p;
@@ -721,8 +723,13 @@ function drainEvents() {
         addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
         renderSupplies(G.p);
         break;
+      case "ammo-buy":
+        addLog("sell", `Comprou 1x <b>${e.name}</b> no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
+        renderEquip(G.p);
+        renderRefill(G.p);
+        break;
       case "no-ammo":
-        addLog("death", `Sem <b>${e.name}</b>: o ataque à distância falhou. Conjure munição na academia.`);
+        addLog("death", `Sem <b>${e.name}</b> e sem gold: o ataque à distância falhou.`);
         renderEquip(G.p);
         renderRefill(G.p);
         break;
@@ -840,8 +847,20 @@ function drainAcademyEvents() {
       case "msg":
         addLog("info", e.msg);
         break;
+      case "conjure":
+        addLog("info", `Auto-conjure: <b>${e.msg}</b>`);
+        if (e.mlUp) addLog("skill", "<b>Magic Level</b> subiu conjurando.");
+        renderEquip(G.p);
+        renderSupplies(G.p);
+        renderRefill(G.p);
+        break;
+      case "ammo-buy":
+        addLog("sell", `Comprou 1x <b>${e.name}</b> no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
+        renderEquip(G.p);
+        renderRefill(G.p);
+        break;
       case "no-ammo":
-        addLog("death", `Sem <b>${e.name}</b> para treinar. Conjure munição na academia.`);
+        addLog("death", `Sem <b>${e.name}</b> e sem gold para treinar.`);
         renderEquip(G.p);
         renderRefill(G.p);
         break;
@@ -1184,9 +1203,7 @@ function giveStarterKit(p) {
   p.supplies["health-potion"] = Math.max(p.supplies["health-potion"] || 0, 5);
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
-  if (p.voc === "paladin" && !p.equip.ammo) {
-    p.equip.ammo = { item: "arrow", count: ammoCount(p, "arrow") };
-  }
+  if (p.voc === "paladin" && !p.equip.ammo) setActiveAmmo(p, "arrow");
   return p;
 }
 

@@ -365,9 +365,16 @@ function consumeSupplyCharge(c, p, slug) {
   return true;
 }
 
+/* Preco de 1 unidade de municao */
+function ammoPrice(slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return 0;
+  return it.buy || it.sell || 0;
+}
+
 /* Consome 1 unidade de munição do contador.
- * Munição nunca é comprada: vem de conjure/loot. Se acabar, o ataque
- * simplesmente não sai e o personagem fica exposto. */
+ * Se o contador zerar, compra a próxima unidade no ato descontando do gold.
+ * Sem gold, o ataque não sai e o personagem fica exposto. */
 function consumeAmmoCharge(c, p) {
   // armas com munição infinita (spear) nunca gastam carga
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
@@ -379,9 +386,20 @@ function consumeAmmoCharge(c, p) {
   if (!it || it.s !== "ammo") return true;
 
   if (ammoCount(p, slug) <= 0) {
-    if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
-    ammo.count = 0;
-    return false;
+    // sem estoque: compra 1 unidade no uso
+    const cost = ammoPrice(slug);
+    if (cost <= 0 || !spendGold(p, cost)) {
+      if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
+      ammo.count = 0;
+      return false;
+    }
+    addAmmo(p, slug, 1);
+    if (c && c.stats) {
+      c.stats.supplyCost += cost;
+      c.stats.supplyBought = c.stats.supplyBought || {};
+      c.stats.supplyBought[slug] = (c.stats.supplyBought[slug] || 0) + 1;
+    }
+    if (c && c.events) c.events.push({ t: "ammo-buy", name: it.n, cost: cost });
   }
 
   removeAmmo(p, slug, 1);

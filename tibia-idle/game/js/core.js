@@ -266,13 +266,18 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
   }
   if (!GAMEDATA.items["health-potion"]) {
     GAMEDATA.items["health-potion"] = {
-      n: "health potion", s: null, t: "supply", sell: 2, buy: 45, w: 2.0,
+      n: "health potion", s: null, t: "supply", sell: 45, buy: 45, w: 2.0,
     };
   }
   if (!GAMEDATA.items["mana-fluid"]) {
     GAMEDATA.items["mana-fluid"] = {
-      n: "mana fluid", s: null, t: "supply", sell: 2, buy: 80, w: 2.0,
+      n: "mana fluid", s: null, t: "supply", sell: 80, buy: 80, w: 2.0,
     };
+  }
+  // supplies e municao valem na venda o mesmo que custam na compra
+  for (const slug in SUPPLIES) {
+    const it = GAMEDATA.items[slug];
+    if (it) it.sell = it.buy = SUPPLIES[slug].price;
   }
   if (GAMEDATA.monsters && GAMEDATA.monsters.goblin &&
       !GAMEDATA.monsters.goblin.loot.some((l) => l.item === "health-potion")) {
@@ -291,6 +296,11 @@ function supplyPower(s, level) {
 /* Preco de compra escala com o nivel (supply que cura mais custa mais) */
 function supplyPrice(s, level) {
   return Math.floor(s.price * (1 + (s.scale || 0) * level * 0.012));
+}
+
+/* Valor de venda de um supply: igual ao preco de compra */
+function supplySellPrice(s, level) {
+  return supplyPrice(s, level);
 }
 
 if (typeof module !== "undefined") {

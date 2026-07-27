@@ -17,6 +17,7 @@ function openNpc(id) {
     case "shop":   body = npcShop(p); break;
     case "supply": body = npcSupply(p); break;
     case "sell":   body = npcSell(p); break;
+    case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
     case "promotion": body = npcPromotion(p); break;
@@ -55,6 +56,7 @@ function refreshNpc(id) {
     case "shop":   body = npcShop(p); break;
     case "supply": body = npcSupply(p); break;
     case "sell":   body = npcSell(p); break;
+    case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
     case "promotion": body = npcPromotion(p); break;
@@ -82,8 +84,13 @@ function openAcademyConjureModal(showList) {
         <div class="tiny dim"><b>${r.words}</b> · ${academyConjureProduct(r)} · nv ${r.level} · ML ${r.ml} · ${fmtFull(r.mana)} mana</div>
         <div class="tiny dim">${check.ok ? r.desc : `<span style="color:#ff9a6a">${check.msg}</span>`}</div>
       </div>
-      <button class="sm ${check.ok ? "primary" : ""}" data-academy-conjure="${r.id}" ${check.ok ? "" : "disabled"}>
-        Conjurar</button>
+      <div class="row" style="gap:3px;flex:none">
+        <button class="sm ${check.ok ? "primary" : ""}" data-academy-conjure="${r.id}" ${check.ok ? "" : "disabled"}>
+          Conjurar</button>
+        <button class="sm ${p.config.autoConjure === r.id ? "primary" : ""}"
+          data-academy-loop="${r.id}" title="Conjurar em loop enquanto houver mana">
+          ${p.config.autoConjure === r.id ? "LOOP ON" : "Loop"}</button>
+      </div>
     </div>`;
   }).join("");
 
@@ -104,6 +111,11 @@ function openAcademyConjureModal(showList) {
       <div id="academy-conjure-list" class="list" style="max-height:360px;${showList === false ? "display:none" : ""}">
         ${rows || `<div class="dim small center" style="padding:14px">Nenhum conjurável para esta vocação.</div>`}
       </div>
+      ${p.config.autoConjure && ACADEMY_CONJURES[p.config.autoConjure] ? `
+        <div class="tiny mt8" style="color:#9ce84a">
+          Loop ativo: <b>${ACADEMY_CONJURES[p.config.autoConjure].name}</b> —
+          conjura sozinho sempre que a mana permitir, enquanto estiver na academia.
+        </div>` : `<div class="tiny dim mt8">Use <b>Loop</b> para conjurar automaticamente enquanto houver mana.</div>`}
       <div class="row mt8" style="gap:4px">
         <button class="full" id="academy-back-city">Voltar para cidade</button>
       </div>
@@ -133,6 +145,22 @@ function openAcademyConjureModal(showList) {
     $("#modal").classList.remove("show");
     stopAcademy();
   });
+  $$("#academy-conjure-list [data-academy-loop]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.academyLoop;
+      if (p.config.autoConjure === id) {
+        p.config.autoConjure = null;
+        toast("Auto-conjure desligado.");
+      } else {
+        const chk = academyConjureCheck(p, ACADEMY_CONJURES[id]);
+        // mana baixa nao impede ligar o loop: ele espera encher
+        if (!chk.ok && p.mp >= ACADEMY_CONJURES[id].mana) { toast(chk.msg); return; }
+        p.config.autoConjure = id;
+        toast(`Auto-conjure ligado: <b>${ACADEMY_CONJURES[id].name}</b>`);
+        if (!G.training) toast("Entre na academia para o loop rodar.");
+      }
+      openAcademyConjureModal(true);
+    }));
   $$("#academy-conjure-list [data-academy-conjure]").forEach((b) =>
     b.addEventListener("click", () => {
       const r = castAcademyConjure(p, b.dataset.academyConjure);
@@ -268,6 +296,62 @@ function npcSell(p) {
     <div class="tiny dim center">
       Clique em um item para abrir as opções e vender.<br>
       Para vender o loot de uma vez, use <b>Sell all</b> na Loot Pouch.
+    </div>`;
+}
+
+/* ---------------------------------------------------------- ferreiro */
+function npcUpgrade(p) {
+  const dust = (p.lootPouch && p.lootPouch[UPGRADE_MATERIAL]) || 0;
+  const list = [];
+  for (const slot of UPGRADE_SLOTS) {
+    const e = p.equip[slot];
+    if (e && GAMEDATA.items[e.item])
+      list.push({ source: "equip", slot: slot, slug: e.item });
+  }
+  for (const slug in p.bag) {
+    const it = GAMEDATA.items[slug];
+    if (it && it.s && UPGRADE_SLOTS.indexOf(it.s) !== -1)
+      list.push({ source: "bag", slot: it.s, slug: slug });
+  }
+
+  const rows = list.map((entry) => {
+    const key = upgradeKey(entry.source, entry.slot, entry.slug);
+    const it = GAMEDATA.items[entry.slug];
+    const tier = itemUpgradeTier(p, key);
+    const check = canUpgrade(p, key, entry.slug);
+    const cost = check.cost || upgradeCost(p, entry.slug, tier);
+    const maxed = tier >= UPGRADE_MAX_TIER;
+    const stats = upgradedStats(p, key, entry.slug);
+    const bits = [];
+    if (stats.atk) bits.push(`atk ${stats.atk}`);
+    if (stats.def) bits.push(`def ${stats.def}`);
+    if (stats.arm) bits.push(`arm ${stats.arm}`);
+    return `<div class="shop-row" data-tip="${entry.slug}" style="opacity:${check.ok || maxed ? 1 : .5}">
+      <img src="assets/item/${entry.slug}.png">
+      <div style="flex:1;min-width:0">
+        <div class="small">${it.n}${tier ? ` <b style="color:#d4af37">+${tier}</b>` : ""}
+          <span class="tiny dim">· ${entry.source === "equip" ? "equipado" : "mochila"}</span></div>
+        <div class="tiny dim">${bits.join(" · ") || "sem atributos"}</div>
+        <div class="tiny dim">${maxed ? `<span style="color:#9ce84a">nível máximo</span>`
+          : `${fmtFull(cost.gold)} gp · ${cost.dust}x poeira · ${cost.chance}% sucesso`}</div>
+      </div>
+      <button class="sm ${check.ok ? "primary" : ""}" data-upgrade="${key}|${entry.slug}"
+        ${check.ok ? "" : "disabled"}>${maxed ? "MAX" : `+${tier + 1}`}</button>
+    </div>`;
+  }).join("");
+
+  return goldLine(p) + `
+    <div class="row mb8" style="justify-content:space-between">
+      <span class="small dim">Poeira mística</span>
+      <b style="color:#b060ff">${fmtFull(dust)}</b>
+    </div>
+    <div class="list mb8" style="max-height:330px">
+      ${rows || `<div class="dim small center" style="padding:18px">Nenhum equipamento para melhorar.</div>`}
+    </div>
+    <div class="tiny dim">
+      Cada upgrade soma <b>+6%</b> nos atributos do item. Até <b>+3</b> o sucesso é garantido;
+      a partir do <b>+4</b> a forja pode falhar e consumir o material — o item nunca é destruído.
+      A poeira mística vem de monstros influenciados.
     </div>`;
 }
 
@@ -497,6 +581,19 @@ function bindNpc(id, type) {
       p.supplies[slug] = (p.supplies[slug] || 0) + n;
       addLog("sell", `Comprou ${n} carga(s) de ${s.name} por ${fmtFull(cost)} gp`);
       refreshNpc(id);
+    }));
+
+  // ferreiro: aplicar upgrade
+  $$("#npc-content [data-upgrade]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const [key, slug] = b.dataset.upgrade.split("|");
+      const r = applyUpgrade(p, key, slug);
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, r.success ? "level" : "death");
+      addLog(r.success ? "skill" : "death", r.msg);
+      hideTip();
+      refreshNpc(id);
+      renderAll();
     }));
 
   // vender: clicar no item abre o menu de opções (nunca vende direto)

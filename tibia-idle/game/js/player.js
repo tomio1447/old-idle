@@ -45,6 +45,7 @@ function newPlayer(name, voc, sex) {
     equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
     ammo: {},               // slug -> unidades (munição não ocupa slot)
+    upgrades: {},           // chave do item -> tier de refino do ferreiro
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
     lootConfig: { noCollect: [], noSell: [] },
@@ -69,6 +70,7 @@ function newPlayer(name, voc, sex) {
       useRunes: true,
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana
+      autoConjure: null,
       attackMode: "chase",  // chase | stand | kiting
       kiteDistance: 3,       // SQMs de distância no modo kiting (1-5)
       shooterType: "auto",  // auto | spell | rune
@@ -117,8 +119,11 @@ function gearStats(p) {
   for (const s of SLOTS) {
     const e = p.equip[s];
     if (!e) continue;
-    const it = GAMEDATA.items[e.item];
-    if (!it) continue;
+    const base = GAMEDATA.items[e.item];
+    if (!base) continue;
+    // aplica o refino do ferreiro nos atributos do item equipado
+    const it = typeof upgradedStats === "function"
+      ? upgradedStats(p, "equip:" + s, e.item) : base;
     g.armor += it.arm || 0;
     g.defense += it.def || 0;
     g.attack += it.atk || 0;
@@ -171,7 +176,8 @@ function weaponSkill(p) {
 /* Dano por golpe do jogador */
 function playerDamage(p) {
   const w = p.equip.weapon;
-  const it = w ? GAMEDATA.items[w.item] : null;
+  const it = w ? (typeof upgradedStats === "function"
+    ? upgradedStats(p, "equip:weapon", w.item) : GAMEDATA.items[w.item]) : null;
   const voc = VOCATIONS[p.voc];
 
   if (it && it.t === "magic") {
@@ -318,6 +324,23 @@ function removeAmmo(p, slug, count) {
   if (p.equip.ammo && p.equip.ammo.item === slug)
     p.equip.ammo.count = p.ammo[slug];
   return true;
+}
+
+/* Seleciona a munição ativa. O slot de ammo é único: escolher uma arrow
+ * desequipa automaticamente o bolt anterior (e vice-versa), evitando
+ * qualquer estado com duas munições ativas ao mesmo tempo. */
+function setActiveAmmo(p, slug) {
+  if (!slug) { delete p.equip.ammo; return null; }
+  const it = GAMEDATA.items[slug];
+  if (!it || it.s !== "ammo") return null;
+  p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+  // mantem a config do helper coerente: so um tipo fica marcado
+  if (p.config) {
+    const isBolt = slug.indexOf("bolt") !== -1;
+    p.config.refillArrow = isBolt ? "" : slug;
+    p.config.refillBolt = isBolt ? slug : "";
+  }
+  return p.equip.ammo;
 }
 
 /* Move munição legada que estava ocupando slots da bag para o contador */
@@ -531,7 +554,7 @@ function autoEquip(p) {
       if ((it.atk || 0) > bestAtk) { bestAtk = it.atk || 0; bestAmmo = slug; }
     }
     if (bestAmmo && (!p.equip.ammo || p.equip.ammo.item !== bestAmmo)) {
-      p.equip.ammo = { item: bestAmmo, count: ammoCount(p, bestAmmo) };
+      setActiveAmmo(p, bestAmmo);
     } else if (p.equip.ammo) {
       p.equip.ammo.count = ammoCount(p, p.equip.ammo.item);
     }
