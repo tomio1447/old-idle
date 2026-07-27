@@ -1228,28 +1228,36 @@ function bindControls() {
 }
 
 /* ------------------------------------------------------------ personagens */
+/* Kit inicial: o mesmo que o Canary entrega em Dawnport ao escolher a
+ * vocacao (dawnport_vocation_trial.lua). Antes todo mundo comecava com
+ * club + wooden shield, o que nao existe no servidor e ignorava que cada
+ * vocacao ganha uma arma propria:
+ *
+ *   sorcerer  The Scorcher + spellbook of the novice
+ *   druid     The Chiller  + spellbook of the novice
+ *   paladin   bow + quiver + 100 simple arrows
+ *   knight    dagger + wooden shield
+ *   monk      simple jo staff
+ *
+ * Todos recebem leather helmet, coat, leather legs e leather boots, mais as
+ * potions e runas da vocacao. giveStartingItems (js/supplies.js) le esses
+ * dados; aqui ficam so os ajustes que o motor do jogo precisa. */
 function giveStarterKit(p) {
-  if (p.voc === "paladin") {
-    // paladino começa com arco, uma arrow e a spear infinita
-    addItem(p, "bow", 1);
-    addAmmo(p, "arrow", 1);
-    addItem(p, "spear", 1);
-    addItem(p, "wooden-shield", 1);
+  if (typeof giveStartingItems === "function") {
+    giveStartingItems(p);
   } else {
+    // fallback se supplydata.js nao carregou
     addItem(p, "club", 1);
     addItem(p, "wooden-shield", 1);
   }
-  p.supplies["health-potion"] = Math.max(p.supplies["health-potion"] || 0, 5);
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
   if (p.voc === "paladin") {
-    // paladino começa de bow: a spear fica na mochila como reserva
-    if (!p.equip.weapon || GAMEDATA.items[p.equip.weapon.item].inf) {
-      if (p.equip.weapon) addItem(p, p.equip.weapon.item, 1);
-      removeItem(p, "bow", 1);
+    // paladino sai de bow: o quiver ja vem com simple arrow selecionada
+    if (!p.equip.ammo) setActiveAmmo(p, "simple-arrow");
+    if (!p.equip.weapon && GAMEDATA.items["bow"]) {
       p.equip.weapon = { item: "bow", count: 1 };
     }
-    if (!p.equip.ammo) setActiveAmmo(p, "arrow");
   }
   return p;
 }

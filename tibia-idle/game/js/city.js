@@ -398,6 +398,9 @@ function newAcademyTraining(p) {
   const st = academyStatus(p);
   return {
     startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
+    // marca o contexto como treino: consumeAmmoCharge e o gasto de supply
+    // olham essa flag para nao cobrar arrows/bolts/runas no dummy
+    training: true,
     skill: st.skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
     stats: { hits: 0, damage: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
              supplyUsed: {}, supplyBought: {}, supplyCost: 0 },

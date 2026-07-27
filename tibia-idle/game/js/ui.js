@@ -818,24 +818,48 @@ function renderHelper(p) {
       const s = SPELLS[id];
       return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1;
     }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
-    const healSup = Object.keys(SUPPLIES).filter((slug) => SUPPLIES[slug].type === "heal");
+    // potions da vocacao, com nivel e cura reais do canary. suppliesOf ja
+    // esconde o que a vocacao nunca podera beber (knight nao usa ultimate
+    // mana potion em nivel nenhum) e ordena por nivel.
+    const healSup = (typeof suppliesOf === "function"
+      ? suppliesOf(p, "heal").map((x) => x[0])
+      : Object.keys(SUPPLIES).filter((k) => SUPPLIES[k].type === "heal"));
+    const manaSup = (typeof suppliesOf === "function"
+      ? suppliesOf(p, "mana").map((x) => x[0])
+      : ["mana-fluid"]);
+
     const supplyRow = (slug) => {
       const s = SUPPLIES[slug]; if (!s) return "";
-      const pw = supplyPower(s, p.level);
-      const kind = s.type === "mana" ? "mana" : "hp";
-      const selected = s.type === "mana" ? p.config.manaSupply === slug : p.config.healSupply === slug;
-      const disabledMana = s.type === "mana" && !selected;
-      return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}">
+      const pw = typeof supplyPowerFor === "function"
+        ? supplyPowerFor(p, slug) : supplyPower(s, p.level);
+      const liberado = typeof supplyAllowed === "function"
+        ? supplyAllowed(p, slug) : p.level >= (s.lvl || 1);
+      const motivo = !liberado && typeof supplyBlockReason === "function"
+        ? supplyBlockReason(p, slug) : "";
+      const ehMana = s.type === "mana";
+      const selected = ehMana ? p.config.manaSupply === slug
+                              : p.config.healSupply === slug;
+      const disabledMana = ehMana && !selected;
+      // potion que cura vida E mana (spirit) mostra os dois valores
+      const valores = [];
+      if (s.heal) valores.push(`<span style="color:#7ae87a">hp ${s.heal[0]}-${s.heal[1]}</span>`);
+      if (s.mana) valores.push(`<span style="color:#6a8aff">mana ${s.mana[0]}-${s.mana[1]}</span>`);
+      if (!valores.length) valores.push(`${ehMana ? "mana" : "hp"} ${pw[0]}-${pw[1]}`);
+      return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}"
+                   style="opacity:${liberado ? 1 : .45}">
         <img src="assets/item/${s.sprite}.png" alt="${s.name}">
         <div style="flex:1;min-width:0">
-          <div class="small">${s.name}</div>
+          <div class="small">${s.name}
+            ${s.lvl > 1 ? `<span class="tiny dim">· nv ${s.lvl}</span>` : ""}</div>
           <div class="tiny dim">
             <span class="gold-txt">${fmtFull(supplyPrice(s, p.level))} gp</span>
             · <span class="charge-highlight">CARGAS ${p.supplies[slug] || 0}</span>
-            · ${kind} ${pw[0]}-${pw[1]}
+            · ${valores.join(" · ")}
           </div>
+          ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
         </div>
-        <button class="sm ${selected ? "primary" : disabledMana ? "danger" : ""}" data-use-supply="${slug}">
+        <button class="sm ${selected ? "primary" : disabledMana ? "danger" : ""}"
+          data-use-supply="${slug}" ${liberado ? "" : "disabled"}>
           ${selected ? "USANDO" : disabledMana ? "DESATIVADO" : "USAR"}</button>
       </div>`;
     };
@@ -868,15 +892,15 @@ function renderHelper(p) {
         <input id="helper-heal-item-at" type="number" min="1" max="99" value="${p.config.healItemAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
-      <div class="small dim mt8 mb4">Itens de HP</div>
-      <div class="list" style="max-height:132px">${healSup.map(supplyRow).join("")}</div>
+      <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
+      <div class="list" style="max-height:210px">${healSup.map(supplyRow).join("")}</div>
       <div class="mt8">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
-      <div class="small dim mt8 mb4">Mana Fluid</div>
-      <div class="list" style="max-height:70px">${["mana-fluid"].map(supplyRow).join("")}</div>`;
+      <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
+      <div class="list" style="max-height:210px">${manaSup.map(supplyRow).join("")}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -949,7 +973,11 @@ function renderHelper(p) {
       const s = SPELLS[id];
       return s.type === "attack" && s.vocs.indexOf(p.voc) !== -1;
     }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
-    const attackRunes = Object.keys(SUPPLIES).filter((slug) => SUPPLIES[slug].type === "attack");
+    // as 20 runas de ataque do canary, ordenadas por nivel; cada uma exige
+    // nivel E magic level, como no servidor
+    const attackRunes = typeof suppliesOf === "function"
+      ? suppliesOf(p, "attack").map((x) => x[0])
+      : Object.keys(SUPPLIES).filter((k) => SUPPLIES[k].type === "attack");
     shooterEl.innerHTML = `
       <div class="row wrap mb8" style="gap:6px">
         ${[["auto", "Auto"], ["spell", "Magia"], ["rune", "Runa"]].map(([id, label]) =>
@@ -974,13 +1002,36 @@ function renderHelper(p) {
           <button class="sm ${p.config.shooterSpell === id && p.config.shooterType === "spell" ? "primary" : ""}" data-shooter-spell="${id}" ${ok ? "" : "disabled"}>Usar</button>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia ofensiva.</div>`}</div>
-      <div class="small dim mt8 mb4">Runas ofensivas</div>
-      <div class="list" style="max-height:150px">${attackRunes.map((slug) => {
-        const s = SUPPLIES[slug], ok = p.level >= (s.lvl || 1);
-        return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
+      <div class="small dim mt8 mb4">Runas ofensivas (${attackRunes.length})</div>
+      <div class="list" style="max-height:220px">${attackRunes.map((slug) => {
+        const s = SUPPLIES[slug];
+        const ok = typeof supplyAllowed === "function"
+          ? supplyAllowed(p, slug) : p.level >= (s.lvl || 1);
+        const motivo = !ok && typeof supplyBlockReason === "function"
+          ? supplyBlockReason(p, slug) : "";
+        // dano calculado com a formula real da runa neste personagem
+        const pw = typeof supplyPowerFor === "function"
+          ? supplyPowerFor(p, slug) : supplyPower(s, p.level);
+        const el = s.element && typeof ELEMENTS !== "undefined"
+          ? ELEMENTS[s.element] : null;
+        const usando = p.config.shooterRune === slug &&
+                       p.config.shooterType === "rune";
+        return `<div class="shop-row ${usando ? "selected" : ""}"
+                     style="opacity:${ok ? 1 : .45}">
           <img src="assets/item/${s.sprite}.png">
-          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">cargas ${p.supplies[slug] || 0} · ${fmtFull(supplyPrice(s, p.level))} gp/carga · nv ${s.lvl || 1}</div></div>
-          <button class="sm ${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "primary" : ""}" data-shooter-rune="${slug}" ${ok ? "" : "disabled"}>${p.config.shooterRune === slug && p.config.shooterType === "rune" ? "USANDO" : "USAR"}</button>
+          <div style="flex:1;min-width:0">
+            <div class="small">${s.name}
+              ${pw[1] ? `<span style="color:${el ? el.color : "#ff9a4a"}">· ${pw[0]}-${pw[1]}</span>` : ""}</div>
+            <div class="tiny dim">
+              <span class="charge-highlight">CARGAS ${p.supplies[slug] || 0}</span>
+              · ${fmtFull(supplyPrice(s, p.level))} gp
+              · nv ${s.lvl || 1}${s.ml ? " · ml " + s.ml : ""}
+              ${s.area ? " · área" : ""}
+            </div>
+            ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
+          </div>
+          <button class="sm ${usando ? "primary" : ""}" data-shooter-rune="${slug}"
+            ${ok ? "" : "disabled"}>${usando ? "USANDO" : "USAR"}</button>
         </div>`;
       }).join("")}</div>`;
     $$("#helper-shooter [data-shooter-type]").forEach((b) => b.addEventListener("click", () => {

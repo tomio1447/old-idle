@@ -6,12 +6,39 @@
 /* escala do sprite do jogador na cena de caca (monstro comum usa 2.0) */
 const PLAYER_SCALE = 1.8;
 
+/* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
+ * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
+ * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
+ * Subir esse numero a cada lote de sprites novas forca o download. */
+const ASSET_VERSION = "3";
+
+/* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
+ * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
+ * (e ter que lembrar disso em toda tag nova), um observer aplica o ?v= assim
+ * que o elemento entra no DOM. */
+if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
+  const carimbar = (img) => {
+    const src = img.getAttribute("src");
+    if (!src || src.indexOf("assets/") !== 0 || src.indexOf("?v=") !== -1) return;
+    img.setAttribute("src", src + "?v=" + ASSET_VERSION);
+  };
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        if (n.tagName === "IMG") carimbar(n);
+        else if (n.querySelectorAll) n.querySelectorAll("img").forEach(carimbar);
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+}
+
 const Sprites = {
   cache: {},
   get(path) {
     if (this.cache[path] !== undefined) return this.cache[path];
     const img = new Image();
-    img.src = path;
+    img.src = path + (path.indexOf("?") === -1 ? "?v=" + ASSET_VERSION : "");
     img.onerror = () => { this.cache[path] = null; };
     this.cache[path] = img;
     return img;

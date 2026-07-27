@@ -360,6 +360,9 @@ function canRechargeSupply(p, slug) {
 function consumeSupplyCharge(c, p, slug) {
   const s = SUPPLIES[slug];
   if (!s || !hasSelectedSupply(p, slug) || (s.lvl || 1) > p.level) return false;
+  // no treino nada e cobrado nem consumido: o dummy da academia serve para
+  // subir skill, nao para gastar o estoque de runa e potion do jogador
+  if (c && c.training) return true;
 
   if ((p.supplies[slug] || 0) <= 0) {
     const cost = supplyPrice(s, p.level);
@@ -392,6 +395,10 @@ function ammoPrice(slug) {
  * Se o contador zerar, compra a próxima unidade no ato descontando do gold.
  * Sem gold, o ataque não sai e o personagem fica exposto. */
 function consumeAmmoCharge(c, p) {
+  // modo treino: bater no dummy da academia nao gasta nem compra municao,
+  // igual ao exercise weapon do servidor, que so consome cargas do proprio
+  // exercise. Sem isso treinar distance drenava o gold do jogador.
+  if (c && c.training) return true;
   // armas com munição infinita (spear) nunca gastam carga
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   if (wp && wp.inf) return true;

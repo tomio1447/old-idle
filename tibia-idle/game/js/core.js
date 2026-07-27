@@ -268,38 +268,10 @@ function powerFromFormula(d) {
   return Math.round((v / 100) * 100) / 100;
 }
 
-/* Supplies por carga. `scale` faz a cura/dano acompanhar o nivel do char;
- * o gold só é descontado quando uma carga selecionada está 0 e precisa ser usada. */
-const SUPPLIES = {
-  "intense-healing-rune": { name: "Intense Healing Rune", price: 95,
-    heal: [95, 175], scale: 0.9, type: "heal", tier: 1, lvl: 1,
-    sprite: "intense-healing-rune" },
-  "ultimate-healing-rune": { name: "Ultimate Healing Rune", price: 175,
-    heal: [250, 350], scale: 2.2, type: "heal", tier: 2, lvl: 24,
-    sprite: "ultimate-healing-rune" },
-  "heavy-magic-missile-rune": { name: "Heavy Magic Missile", price: 25,
-    damage: [20, 45], scale: 0.6, type: "attack", element: "energy",
-    tier: 1, lvl: 25, sprite: "heavy-magic-missile-rune" },
-  "explosion-rune": { name: "Explosion Rune", price: 55,
-    damage: [50, 100], scale: 1.1, type: "attack", element: "physical",
-    tier: 2, lvl: 31, sprite: "explosion-rune" },
-  "great-fireball-rune": { name: "Great Fireball Rune", price: 65,
-    damage: [60, 120], scale: 1.4, type: "attack", element: "fire",
-    tier: 3, lvl: 30, sprite: "great-fireball-rune" },
-  "sudden-death-rune": { name: "Sudden Death Rune", price: 155,
-    damage: [150, 250], scale: 2.6, type: "attack", element: "death",
-    tier: 4, lvl: 45, sprite: "sudden-death-rune" },
-  "health-potion": { name: "Health Potion", price: 45,
-    heal: [75, 125], scale: 0.65, type: "heal", tier: 0, lvl: 1,
-    sprite: "health-potion" },
-  "mana-fluid": { name: "Mana Fluid", price: 80,
-    mana: [75, 125], scale: 0.8, type: "mana", tier: 2, lvl: 1,
-    sprite: "mana-fluid" },
-  "brown-mushroom": { name: "Brown Mushroom", price: 50, mana: [50, 100],
-    scale: 1.2, type: "mana", tier: 1, lvl: 1, sprite: "brown-mushroom" },
-  "dragon-ham": { name: "Dragon Ham", price: 30, food: 360, type: "food",
-    tier: 1, lvl: 1, sprite: "dragon-ham" },
-};
+/* SUPPLIES agora e montado em js/supplies.js a partir dos dados reais do
+ * Canary (potions.lua e scripts/runes). A tabela manual que ficava aqui
+ * tinha cura estimada e um `scale` inventado; agora cada potion traz a
+ * faixa exata, o nivel minimo e as vocacoes que podem beber. */
 
 if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
   if (!GAMEDATA.items["mystic-dust"]) {
@@ -316,11 +288,6 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
     GAMEDATA.items["mana-fluid"] = {
       n: "mana fluid", s: null, t: "supply", sell: 80, buy: 80, w: 2.0,
     };
-  }
-  // supplies e municao valem na venda o mesmo que custam na compra
-  for (const slug in SUPPLIES) {
-    const it = GAMEDATA.items[slug];
-    if (it) it.sell = it.buy = SUPPLIES[slug].price;
   }
   if (GAMEDATA.monsters && GAMEDATA.monsters.goblin &&
       !GAMEDATA.monsters.goblin.loot.some((l) => l.item === "health-potion")) {
