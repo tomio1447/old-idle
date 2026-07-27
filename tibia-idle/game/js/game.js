@@ -737,7 +737,7 @@ function drainEvents() {
         renderRefill(G.p);
         break;
       case "no-ammo":
-        addLog("death", `Sem <b>${e.name}</b> e sem gold: o ataque à distância falhou.`);
+        addLog("death", `Sem quiver/munição válida/gold para usar <b>${e.name}</b>: o ataque à distância falhou.`);
         renderEquip(G.p);
         renderRefill(G.p);
         break;
@@ -894,7 +894,7 @@ function drainAcademyEvents() {
         renderRefill(G.p);
         break;
       case "no-ammo":
-        addLog("death", `Sem <b>${e.name}</b> e sem gold para treinar.`);
+        addLog("death", `Sem quiver/munição válida/gold para treinar com <b>${e.name}</b>.`);
         renderEquip(G.p);
         renderRefill(G.p);
         break;

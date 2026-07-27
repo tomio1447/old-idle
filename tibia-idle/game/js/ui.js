@@ -73,6 +73,8 @@ function itemTip(slug, extra) {
   let h = `<div class="tt-name">${it.n}</div>`;
   const st = [];
   if (it.atk) st.push("Ataque " + it.atk);
+  if (it.s === "ammo") st.push((it.ammoKind === "bolt" ? "Bolt (besta)" : "Flecha (arco)") + " · " + fmtFull(ammoPrice(slug)) + " gp/tiro");
+  if (it.cap) st.push("Capacidade quiver " + it.cap);
   if (it.def) st.push("Defesa " + it.def);
   if (it.arm) st.push("Armadura " + it.arm);
   if (it.mdmg) st.push("Dano mágico " + it.mdmg);
@@ -199,13 +201,14 @@ function renderSkills(p) {
 const SLOT_LABELS = {
   helmet: "elmo", amulet: "colar", backpack: "bolsa", armor: "corpo",
   weapon: "arma", shield: "escudo", legs: "pernas", boots: "botas",
-  ring: "anel", ammo: "muni",
+  ring: "anel", quiver: "quiver", ammo: "muni",
 };
 const SLOT_ORDER = [
   null, "helmet", null,
   "amulet", "armor", "backpack",
   "weapon", "legs", "shield",
-  "ring", "boots", "ammo",
+  "ring", "boots", "quiver",
+  null, null, "ammo",
 ];
 
 function renderEquip(p) {
@@ -214,9 +217,9 @@ function renderEquip(p) {
     if (!slot) { h += `<div></div>`; continue; }
     const e = p.equip[slot];
     if (e) {
-      const cnt = slot === "ammo" ? ammoCount(p, e.item) : e.count;
+      const cnt = slot === "ammo" ? "∞" : e.count;
       h += `<div class="slot" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${cnt > 1 ? `<span class="cnt">${cnt}</span>` : ""}
+        ${itemImg(e.item)}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
@@ -228,15 +231,21 @@ function renderEquip(p) {
     if (!slug) return;
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
-      showTip(itemTip(slug, slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` : "Clique para desequipar"));
+      const extra = slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` :
+        slot === "quiver" ? `Quiver equipado. Munição: ${p.equip.ammo ? itemName(p.equip.ammo.item) + " · " + fmtFull(ammoPrice(p.equip.ammo.item)) + " gp/tiro" : "nenhuma"}` :
+        slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro` :
+        "Clique para desequipar";
+      showTip(itemTip(slug, extra));
     });
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
       const slot = el.dataset.slot;
       if (slot === "backpack") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
-      if (slot !== "ammo" && !addItem(G.p, slug, 1)) {
+      if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
+      if (!addItem(G.p, slug, 1)) {
         toast("Mochila cheia."); return;
       }
+      if (slot === "quiver") setActiveAmmo(G.p, null);
       delete G.p.equip[slot];
       hideTip();
       renderAll();
@@ -374,8 +383,9 @@ function equipFromBag(p, slug) {
   if (!it || !it.s) return false;
   if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
   if (it.s === "ammo") {
+    if (!p.equip.quiver) { toast("Equipe um quiver antes de selecionar munição."); return false; }
     setActiveAmmo(p, slug);
-    toast(`Munição selecionada: <b>${it.n}</b>`);
+    toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     return true;
   }
   const old = p.equip[it.s];
@@ -1052,8 +1062,11 @@ function renderHelper(p) {
 
 /* ---------------------------------------------------------- refill (paladin) */
 const REFILL_AMMO = {
-  arrow: ["arrow", "poison-arrow", "burst-arrow"],
-  bolt: ["bolt", "power-bolt", "infernal-bolt"],
+  arrow: ["flash-arrow", "shiver-arrow", "flaming-arrow", "earth-arrow", "simple-arrow",
+          "poison-arrow", "arrow", "envenomed-arrow", "burst-arrow", "sniper-arrow",
+          "tarsal-arrow", "diamond-arrow", "onyx-arrow", "crystalline-arrow"],
+  bolt: ["bolt", "piercing-bolt", "vortex-bolt", "power-bolt", "drill-bolt",
+         "prismatic-bolt", "infernal-bolt", "spectral-bolt"],
 };
 
 function isPaladin(p) { return p && p.voc === "paladin"; }
@@ -1088,20 +1101,20 @@ function renderRefill(p) {
           const it = GAMEDATA.items[slug];
           if (!it) return "";
           const sel = selected === slug;
-          const have = ammoCount(p, slug);
-          return `<div class="helper-supply-row ${sel ? "selected" : ""}">
-            <img src="assets/item/${slug}.png" alt="${it.n}">
+          const ok = p.equip.quiver && p.level >= (it.lvl || 1);
+          return `<div class="helper-supply-row ${sel ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
+            <img src="assets/item/${(AMMO_DEFS[slug] && AMMO_DEFS[slug].sprite) || slug}.png" alt="${it.n}">
             <div style="flex:1;min-width:0">
               <div class="small">${it.n}</div>
               <div class="tiny dim">
-                <span class="charge-highlight">TEM ${fmtFull(have)}</span>
+                <span class="charge-highlight">${fmtFull(ammoPrice(slug))} gp/tiro</span>
                 ${it.atk ? `· atk ${it.atk}` : ""}
-                ${it.poison ? `· <span style="color:#8ac83c">veneno ${it.poison.dmg}x${it.poison.turns}</span>` : ""}
+                ${it.lvl ? `· lvl ${it.lvl}` : ""}
                 ${it.area ? `· <span style="color:#ff8a3c">área 3x3</span>` : ""}
               </div>
             </div>
-            <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}">
-              ${sel ? "USANDO" : "USAR"}</button>
+            <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}" ${ok ? "" : "disabled"}>
+              ${sel ? "EQUIPADA" : "EQUIPAR"}</button>
           </div>`;
         }).join("")}
       </div>`;
@@ -1110,17 +1123,16 @@ function renderRefill(p) {
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   const infinite = wp && wp.inf;
   const sel = p.equip.ammo && p.equip.ammo.item ? p.equip.ammo.item : null;
-  const selCount = sel ? ammoCount(p, sel) : 0;
 
   el.innerHTML = `
     <div class="tiny dim mb8">
-      Sem munição, cada tiro compra 1 unidade descontando do gold.
-      Sem gold e sem munição o personagem não ataca à distância.
-      Conjure na academia e loot também repõem.
-      ${infinite ? `<b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
+      Munição de paladin fica equipada no quiver e <b>não é consumida</b>.
+      Cada tiro desconta o custo em gold. Sem gold, o personagem não ataca à distância.
+      ${p.equip.quiver ? `<b style="color:#9ce84a">Quiver equipado: ${itemName(p.equip.quiver.item)}</b>` : `<b style="color:#ff9090">Equipe um quiver para usar munição.</b>`}
+      ${infinite ? `<br><b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
     </div>
-    ${sel && !infinite && selCount <= 0
-      ? `<div class="tiny mb8" style="color:#ff9090">Sem <b>${itemName(sel)}</b>: cada tiro será comprado por ${fmtFull(ammoPrice(sel))} gp.</div>`
+    ${sel && !infinite
+      ? `<div class="tiny mb8" style="color:#ffe680">Munição atual: <b>${itemName(sel)}</b> · ${fmtFull(ammoPrice(sel))} gp/tiro.</div>`
       : ""}
     ${group("Arrows", "arrow")}
     ${group("Bolts", "bolt")}
@@ -1128,7 +1140,7 @@ function renderRefill(p) {
     <div class="row wrap" style="gap:4px">
       <button class="sm" data-test-give="bow">Buy Bow (grátis)</button>
       <button class="sm" data-test-give="crossbow">Buy Crossbow (grátis)</button>
-      <button class="sm" data-test-ammo="100">+100 munição</button>
+      <button class="sm" data-test-give="quiver">Buy Quiver (grátis)</button>
     </div>`;
 
   $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
@@ -1140,32 +1152,31 @@ function renderRefill(p) {
       toast("Munição desequipada.");
     } else {
       setActiveAmmo(p, slug);
-      toast(`Munição selecionada: <b>${GAMEDATA.items[slug].n}</b>`);
+      toast(`Munição no quiver: <b>${GAMEDATA.items[slug].n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     }
     renderAll();
   }));
 
-  // atalhos de teste: entregam a arma/munição de graça
+  // atalhos de teste: entregam arma/quiver de graça
   $$("#helper-refill [data-test-give]").forEach((b) => b.addEventListener("click", () => {
     const slug = b.dataset.testGive;
-    const old = p.equip.weapon;
-    if (old && old.item !== slug && !addItem(p, old.item, 1)) {
-      toast("Mochila cheia para guardar a arma atual.");
-      return;
+    if (slug === "quiver") {
+      const old = p.equip.quiver;
+      if (old && old.item !== slug && !addItem(p, old.item, 1)) {
+        toast("Mochila cheia para guardar o quiver atual.");
+        return;
+      }
+      p.equip.quiver = { item: slug, count: 1 };
+    } else {
+      const old = p.equip.weapon;
+      if (old && old.item !== slug && !addItem(p, old.item, 1)) {
+        toast("Mochila cheia para guardar a arma atual.");
+        return;
+      }
+      p.equip.weapon = { item: slug, count: 1 };
     }
-    p.equip.weapon = { item: slug, count: 1 };
     addLog("info", `[teste] Recebeu <b>${itemName(slug)}</b> e equipou.`);
     toast(`[teste] <b>${itemName(slug)}</b> equipado.`);
-    renderAll();
-  }));
-  $$("#helper-refill [data-test-ammo]").forEach((b) => b.addEventListener("click", () => {
-    const n = parseInt(b.dataset.testAmmo, 10) || 100;
-    const slug = (p.equip.ammo && p.equip.ammo.item) || p.config.refillArrow ||
-                 p.config.refillBolt || "arrow";
-    addAmmo(p, slug, n);
-    if (!p.equip.ammo || !p.equip.ammo.item) setActiveAmmo(p, slug);
-    addLog("info", `[teste] +${n}x <b>${itemName(slug)}</b>.`);
-    toast(`[teste] +${n}x ${itemName(slug)}`);
     renderAll();
   }));
 }

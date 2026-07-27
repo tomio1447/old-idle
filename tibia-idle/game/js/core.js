@@ -273,6 +273,43 @@ function powerFromFormula(d) {
  * tinha cura estimada e um `scale` inventado; agora cada potion traz a
  * faixa exata, o nivel minimo e as vocacoes que podem beber. */
 
+const AMMO_DEFS = {
+  "flash-arrow":      { n: "flash arrow",      kind: "arrow", atk: 14, lvl: 20, id: 761,   shotCost: 5,  sprite: "flash-arrow" },
+  "shiver-arrow":     { n: "shiver arrow",     kind: "arrow", atk: 14, lvl: 20, id: 762,   shotCost: 5,  sprite: "shiver-arrow" },
+  "flaming-arrow":    { n: "flaming arrow",    kind: "arrow", atk: 14, lvl: 20, id: 763,   shotCost: 5,  sprite: "flaming-arrow" },
+  "earth-arrow":      { n: "earth arrow",      kind: "arrow", atk: 14, lvl: 20, id: 774,   shotCost: 5,  sprite: "earth-arrow" },
+  "simple-arrow":     { n: "simple arrow",     kind: "arrow", atk: 20, lvl: 1,  id: 21470, shotCost: 2,  sprite: "simple-arrow" },
+  "poison-arrow":     { n: "poison arrow",     kind: "arrow", atk: 23, lvl: 1,  id: 3448,  shotCost: 4,  sprite: "poison-arrow" },
+  "arrow":            { n: "arrow",            kind: "arrow", atk: 25, lvl: 1,  id: 3447,  shotCost: 3,  sprite: "arrow" },
+  "envenomed-arrow":  { n: "envenomed arrow",  kind: "arrow", atk: 27, lvl: 70, id: 16143, shotCost: 12, sprite: "envenomed-arrow" },
+  "burst-arrow":      { n: "burst arrow",      kind: "arrow", atk: 27, lvl: 1,  id: 3449,  shotCost: 15, sprite: "burst-arrow", area: 1, noMiss: 1 },
+  "sniper-arrow":     { n: "sniper arrow",     kind: "arrow", atk: 28, lvl: 20, id: 7364,  shotCost: 5,  sprite: "sniper-arrow" },
+  "tarsal-arrow":     { n: "tarsal arrow",     kind: "arrow", atk: 33, lvl: 30, id: 14251, shotCost: 6,  sprite: "tarsal-arrow" },
+  "diamond-arrow":    { n: "diamond arrow",    kind: "arrow", atk: 37, lvl: 150,id: 25757, shotCost: 130,sprite: "diamond-arrow", area: 1, noMiss: 1 },
+  "onyx-arrow":       { n: "onyx arrow",       kind: "arrow", atk: 38, lvl: 40, id: 7365,  shotCost: 7,  sprite: "onyx-arrow" },
+  "crystalline-arrow":{ n: "crystalline arrow",kind: "arrow", atk: 65, lvl: 90, id: 15793, shotCost: 20, sprite: "crystalline-arrow" },
+  "bolt":             { n: "bolt",             kind: "bolt",  atk: 30, lvl: 1,  id: 3446,  shotCost: 4,  sprite: "bolt" },
+  "piercing-bolt":    { n: "piercing bolt",    kind: "bolt",  atk: 33, lvl: 30, id: 7363,  shotCost: 5,  sprite: "piercing-bolt" },
+  "vortex-bolt":      { n: "vortex bolt",      kind: "bolt",  atk: 36, lvl: 40, id: 14252, shotCost: 6,  sprite: "vortex-bolt" },
+  "power-bolt":       { n: "power bolt",       kind: "bolt",  atk: 40, lvl: 55, id: 3450,  shotCost: 7,  sprite: "power-bolt" },
+  "drill-bolt":       { n: "drill bolt",       kind: "bolt",  atk: 56, lvl: 70, id: 16142, shotCost: 12, sprite: "drill-bolt" },
+  "prismatic-bolt":   { n: "prismatic bolt",   kind: "bolt",  atk: 66, lvl: 90, id: 16141, shotCost: 20, sprite: "prismatic-bolt" },
+  "infernal-bolt":    { n: "infernal bolt",    kind: "bolt",  atk: 72, lvl: 110,id: 6528,  shotCost: 13, sprite: "infernal-bolt" },
+  "spectral-bolt":    { n: "spectral bolt",    kind: "bolt",  atk: 78, lvl: 150,id: 25758, shotCost: 70, sprite: "spectral-bolt" },
+};
+
+const QUIVER_DEFS = {
+  "quiver":             { n: "quiver", cap: 6, lvl: 1, sell: 25, buy: 400 },
+  "basic-quiver":       { n: "basic quiver", cap: 8, lvl: 1, sell: 40, buy: 800 },
+  "modified-quiver":    { n: "modified quiver", cap: 10, lvl: 20, sell: 120, buy: 2400 },
+  "ornate-quiver":      { n: "ornate quiver", cap: 12, lvl: 40, sell: 250, buy: 5000, dist: 1 },
+  "jungle-quiver":      { n: "jungle quiver", cap: 14, lvl: 60, sell: 450, buy: 9000, dist: 1 },
+  "naga-quiver":        { n: "naga quiver", cap: 16, lvl: 80, sell: 800, buy: 16000, dist: 2 },
+  "alicorn-quiver":     { n: "alicorn quiver", cap: 18, lvl: 120, sell: 1400, buy: 28000, dist: 2 },
+  "sanguine-quiver":    { n: "sanguine quiver", cap: 20, lvl: 150, sell: 2200, buy: 44000, dist: 3 },
+  "soulpiercer-quiver": { n: "soulpiercer quiver", cap: 22, lvl: 180, sell: 3200, buy: 64000, dist: 4 },
+};
+
 if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
   if (!GAMEDATA.items["mystic-dust"]) {
     GAMEDATA.items["mystic-dust"] = {
@@ -288,6 +325,24 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
     GAMEDATA.items["mana-fluid"] = {
       n: "mana fluid", s: null, t: "supply", sell: 80, buy: 80, w: 2.0,
     };
+  }
+  for (const slug in AMMO_DEFS) {
+    const a = AMMO_DEFS[slug];
+    GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, {
+      n: a.n, s: "ammo", t: "ammo", ammoKind: a.kind, atk: a.atk,
+      lvl: a.lvl > 1 ? a.lvl : undefined, buy: a.shotCost, shotCost: a.shotCost,
+      itemId: a.id, rarity: "none", sell: 0, w: a.kind === "bolt" ? 0.8 : 0.7,
+      el: (GAMEDATA.items[slug] && GAMEDATA.items[slug].el) || "physical",
+      area: a.area, noMiss: a.noMiss,
+    });
+  }
+  for (const slug in QUIVER_DEFS) {
+    const q = QUIVER_DEFS[slug];
+    GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, {
+      n: q.n, s: "quiver", t: "quiver", cap: q.cap,
+      lvl: q.lvl > 1 ? q.lvl : undefined, dist: q.dist || 0,
+      sell: q.sell, buy: q.buy, w: 18,
+    });
   }
   if (GAMEDATA.monsters && GAMEDATA.monsters.goblin &&
       !GAMEDATA.monsters.goblin.loot.some((l) => l.item === "health-potion")) {
@@ -317,5 +372,5 @@ if (typeof module !== "undefined") {
   module.exports = { VOCATIONS, SKILL_CONST, expForLevel, skillCost,
     skillTotalCost, mlCost, meleeDamage, distanceDamage, magicDamage,
     mitigate, hitChance, regenRate, baseStats, ATTACK_SPEED, ELEMENTS,
-    SPELLS, SUPPLIES };
+    SPELLS, SUPPLIES, AMMO_DEFS, QUIVER_DEFS };
 }

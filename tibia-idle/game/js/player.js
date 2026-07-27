@@ -4,7 +4,7 @@
 "use strict";
 
 const SLOTS = ["helmet", "amulet", "backpack", "armor", "weapon", "shield",
-               "legs", "boots", "ring", "ammo"];
+               "legs", "boots", "ring", "quiver", "ammo"];
 
 const SKILL_NAMES = {
   fist: "Punho", sword: "Espada", axe: "Machado", club: "Clava",
@@ -364,7 +364,7 @@ function setActiveAmmo(p, slug) {
   if (!slug) { delete p.equip.ammo; return null; }
   const it = GAMEDATA.items[slug];
   if (!it || it.s !== "ammo") return null;
-  p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+  p.equip.ammo = { item: slug, count: Infinity };
   // mantem a config do helper coerente: so um tipo fica marcado
   if (p.config) {
     const isBolt = slug.indexOf("bolt") !== -1;
@@ -522,17 +522,17 @@ function distanceWeaponPower(p, slug) {
   if (!it || it.t !== "distance") return 0;
   if (it.inf) return it.atk || 0;              // spear: autossuficiente
 
+  if (!p.equip.quiver) return 0;
   let best = 0;
   for (const ammoSlug in GAMEDATA.items) {
     const am = GAMEDATA.items[ammoSlug];
     if (!am || am.s !== "ammo") continue;
-    // munição disponível: em estoque ou comprável com o gold atual
-    const has = ammoCount(p, ammoSlug) > 0;
-    const canBuy = (am.buy || 0) > 0 && p.gold >= (am.buy || 0);
-    if (!has && !canBuy) continue;
+    if (am.lvl && p.level < am.lvl) continue;
+    const price = am.shotCost || am.buy || 0;
+    if (price <= 0 || p.gold < price) continue;
     if ((am.atk || 0) > best) best = am.atk || 0;
   }
-  if (!best) return 0;                          // sem munição: arma inútil
+  if (!best) return 0;                          // sem quiver/munição pagável: arma inútil
   return (it.atk || 0) + best;
 }
 
@@ -550,6 +550,11 @@ function itemScore(p, slug) {
   s += (it.hpreg || 0) * 12;
   s += (it.mpreg || 0) * (isMagic ? 15 : 6);
   s += (it.spd || 0) * 1.5;
+
+  if (it.s === "quiver") {
+    s += 100 + (it.cap || 0) * 3 + (it.dist || 0) * 20;
+    if (!isDist) s -= 80;
+  }
 
   if (it.s === "weapon") {
     if (isMagic) {

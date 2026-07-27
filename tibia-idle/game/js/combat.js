@@ -388,7 +388,15 @@ function consumeSupplyCharge(c, p, slug) {
 function ammoPrice(slug) {
   const it = GAMEDATA.items[slug];
   if (!it) return 0;
-  return it.buy || it.sell || 0;
+  return it.shotCost || it.buy || it.sell || 0;
+}
+
+function ammoCompatibleWithWeapon(ammo, weapon) {
+  if (!ammo || !weapon) return false;
+  const wid = weapon.item || "";
+  const kind = ammo.ammoKind || (ammo.n && ammo.n.indexOf("bolt") !== -1 ? "bolt" : "arrow");
+  if (kind === "bolt") return wid === "crossbow" || /crossbow/.test(wid);
+  return wid === "bow" || (/bow/.test(wid) && !/crossbow/.test(wid));
 }
 
 /* Consome 1 unidade de munição do contador.
@@ -399,35 +407,39 @@ function consumeAmmoCharge(c, p) {
   // igual ao exercise weapon do servidor, que so consome cargas do proprio
   // exercise. Sem isso treinar distance drenava o gold do jogador.
   if (c && c.training) return true;
-  // armas com munição infinita (spear) nunca gastam carga
-  const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  // armas com munição infinita (spear) nunca gastam gold
+  const weapon = p.equip.weapon || null;
+  const wp = weapon ? GAMEDATA.items[weapon.item] : null;
   if (wp && wp.inf) return true;
+  if (!p.equip.quiver) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: "quiver" });
+    return false;
+  }
   const ammo = p.equip.ammo;
-  if (!ammo || !ammo.item) return true;
+  if (!ammo || !ammo.item) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: "munição" });
+    return false;
+  }
   const slug = ammo.item;
   const it = GAMEDATA.items[slug];
-  if (!it || it.s !== "ammo") return true;
-
-  if (ammoCount(p, slug) <= 0) {
-    // sem estoque: compra 1 unidade no uso
-    const cost = ammoPrice(slug);
-    if (cost <= 0 || !spendGold(p, cost)) {
-      if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
-      ammo.count = 0;
-      return false;
-    }
-    addAmmo(p, slug, 1);
-    if (c && c.stats) {
-      c.stats.supplyCost += cost;
-      c.stats.supplyBought = c.stats.supplyBought || {};
-      c.stats.supplyBought[slug] = (c.stats.supplyBought[slug] || 0) + 1;
-    }
-    if (c && c.events) c.events.push({ t: "ammo-buy", name: it.n, cost: cost });
+  if (!it || it.s !== "ammo" || !ammoCompatibleWithWeapon(it, weapon)) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: it ? it.n : "munição" });
+    return false;
   }
-
-  removeAmmo(p, slug, 1);
-  if (c && c.stats)
+  if ((it.lvl || 1) > p.level) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: it.n + " requer nível " + it.lvl });
+    return false;
+  }
+  const cost = ammoPrice(slug);
+  if (cost <= 0 || !spendGold(p, cost)) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
+    return false;
+  }
+  ammo.count = Infinity;
+  if (c && c.stats) {
+    c.stats.supplyCost += cost;
     c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
+  }
   return true;
 }
 
@@ -561,7 +573,7 @@ function applyMonsterCondition(c, p, mob) {
 /* Municao ativa (null quando a arma nao usa municao) */
 function activeAmmoItem(p) {
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
-  if (!wp || wp.t !== "distance" || wp.inf) return null;
+  if (!wp || wp.t !== "distance" || wp.inf || !p.equip.quiver) return null;
   const a = p.equip.ammo;
   if (!a || !a.item) return null;
   const it = GAMEDATA.items[a.item];
@@ -571,10 +583,15 @@ function activeAmmoItem(p) {
 /* Missile (projetil) que cada municao/elemento usa, pelos nomes do
  * CONST_ANI_* do Canary. */
 const AMMO_MISSILE = {
-  "arrow": "arrow", "bolt": "bolt", "poison-arrow": "poison-arrow",
-  "burst-arrow": "burst-arrow", "power-bolt": "power-bolt",
-  "infernal-bolt": "infernal-bolt", "spear": "spear",
-  "royal-spear": "royal-spear", "hunting-spear": "hunting-spear",
+  "arrow": "arrow", "simple-arrow": "arrow", "flash-arrow": "arrow",
+  "shiver-arrow": "arrow", "flaming-arrow": "arrow", "earth-arrow": "arrow",
+  "envenomed-arrow": "poison-arrow", "sniper-arrow": "arrow", "tarsal-arrow": "arrow",
+  "diamond-arrow": "arrow", "onyx-arrow": "arrow", "crystalline-arrow": "arrow",
+  "poison-arrow": "poison-arrow", "burst-arrow": "burst-arrow",
+  "bolt": "bolt", "piercing-bolt": "bolt", "vortex-bolt": "bolt",
+  "power-bolt": "power-bolt", "drill-bolt": "bolt", "prismatic-bolt": "bolt",
+  "infernal-bolt": "infernal-bolt", "spectral-bolt": "bolt",
+  "spear": "spear", "royal-spear": "royal-spear", "hunting-spear": "hunting-spear",
 };
 
 const ELEMENT_MISSILE = {

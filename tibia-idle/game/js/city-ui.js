@@ -189,10 +189,10 @@ function npcShop(p) {
     return true;
   });
   const slots = ["all", "weapon", "shield", "armor", "helmet", "legs",
-                 "boots", "ring", "amulet"];
+                 "boots", "ring", "amulet", "quiver"];
   const names = { all: "Tudo", weapon: "Armas", shield: "Escudos",
     armor: "Armaduras", helmet: "Elmos", legs: "Pernas", boots: "Botas",
-    ring: "Anéis", amulet: "Colares" };
+    ring: "Anéis", amulet: "Colares", quiver: "Quivers" };
 
   const rows = filtered.slice(0, 60).map((e) => {
     const cur = p.equip[e.item.s];
