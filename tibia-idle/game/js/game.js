@@ -743,6 +743,11 @@ function drainEvents() {
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
         break;
+      case "say":
+        // o personagem fala a magia/supply, como no client do Tibia
+        r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");
+        addLog("say", `<b>${G.p.name}</b>: ${e.text}`);
+        break;
       case "kill": {
         const x = ex(e), y = ey(e);
         r.addCorpse(x, y, e.mob);

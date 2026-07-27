@@ -233,6 +233,7 @@ canvas { image-rendering: pixelated; }
 .log-line.death { color: #ff6060; font-weight: bold; }
 .log-line.info  { color: #a8a090; }
 .log-line.sell  { color: #c8a860; }
+.log-line.say   { color: #ffe680; }
 
 .helper-supply-row {
   display: flex; align-items: center; gap: 7px;

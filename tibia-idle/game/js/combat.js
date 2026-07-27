@@ -234,14 +234,23 @@ function playerAttackRange(p) {
   return 0.145;
 }
 
+/* Palavras magicas faladas ao conjurar: usa o proprio id da spell
+ * ("exura-gran" -> "exura gran"). */
+function spellWords(id, s) {
+  if (id && typeof id === "string") return id.replace(/-/g, " ");
+  return (s && s.name ? s.name : "").toLowerCase();
+}
+
 function spellRange() { return 0.60; }
 function runeRange() { return 0.62; }
 
+/* Alcance de ataque do monstro.
+ * O Tibia separa quem luta em melee de quem usa magia/distancia — isso NAO
+ * depende do elemento: bear e snake batem corpo-a-corpo, mesmo a snake
+ * causando veneno. A flag `ranged` no gamedata manda; o resto e melee. */
 function monsterAttackRange(m) {
-  const slug = m.slug || "";
-  if (/archer|spearman|shaman|mage|witch|priestess|bonelord|gazer|djinn|dragon|fire|efreet|marid|necromancer|lich|quara/.test(slug))
-    return 0.34;
-  if ((m.def && m.def.element && m.def.element !== "physical")) return 0.26;
+  const def = m.def || {};
+  if (def.ranged) return def.ranged === 2 ? 0.34 : 0.26;
   return 0.115;
 }
 
@@ -508,6 +517,7 @@ function tryCastSpell(c, p, target, now) {
   if (c.player) c.player.attackAnim = 220;
   c.events.push({ t: "cast", name: s.name, area: !!s.area,
                   x: target.x, y: target.y, screen: true });
+  c.events.push({ t: "say", text: spellWords(id, s) });
   return true;
 }
 
@@ -546,6 +556,7 @@ function tryUseRune(c, p, target, now) {
                   sy: c.player ? c.player.y : 0.62,
                   screen: true, projectile: true,
                   el: s.element, rune: s.name });
+  c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
   return true;
 }
 
@@ -586,6 +597,7 @@ function tryHeal(c, p, now) {
       p.hp = Math.min(max.hp, p.hp + amount);
       c.healCd = now + 1000;
       c.events.push({ t: "heal", amount: amount, spell: s.name });
+      c.events.push({ t: "say", text: spellWords(selectedHealSpell || heals[0][0], s) });
       return true;
     }
   }
@@ -612,6 +624,7 @@ function tryHeal(c, p, now) {
       p.hp = Math.min(max.hp, p.hp + amount);
       c.healCd = now + 1000;
       c.events.push({ t: "heal", amount: amount, rune: s.name });
+      c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
       return true;
     }
   }
@@ -671,6 +684,7 @@ function tryMana(c, p) {
     const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
     p.mp = Math.min(max.mp, p.mp + amount);
     c.events.push({ t: "mana", amount: amount });
+    c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
     return true;
   }
   return false;

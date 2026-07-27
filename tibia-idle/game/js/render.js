@@ -77,6 +77,37 @@ Renderer.prototype.addFloater = function (x, y, text, color, big) {
   if (this.floaters.length > 60) this.floaters.shift();
 };
 
+/* Fala do personagem (magias e supplies), estilo client do Tibia:
+ * texto amarelo acima da cabeca, some sozinho. */
+Renderer.prototype.addSpeech = function (text, color) {
+  this.speech = this.speech || [];
+  // empurra as falas antigas para cima, como no client original
+  for (const sp of this.speech) sp.slot = (sp.slot || 0) + 1;
+  this.speech.push({ text: text, color: color || "#ffe680",
+                     life: 3000, max: 3000, slot: 0 });
+  if (this.speech.length > 4) this.speech.shift();
+};
+
+Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
+  if (!this.speech || !this.speech.length) return;
+  ctx.textAlign = "center";
+  ctx.font = "bold 11px Verdana";
+  for (let i = this.speech.length - 1; i >= 0; i--) {
+    const sp = this.speech[i];
+    sp.life -= dt;
+    if (sp.life <= 0) { this.speech.splice(i, 1); continue; }
+    const a = Math.min(1, sp.life / 700);
+    const ty = y - 34 - (sp.slot || 0) * 13;
+    ctx.globalAlpha = a;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.strokeText(sp.text, x, ty);
+    ctx.fillStyle = sp.color;
+    ctx.fillText(sp.text, x, ty);
+    ctx.globalAlpha = 1;
+  }
+};
+
 Renderer.prototype.addEffect = function (x, y, name) {
   if (!FX_FRAMES[name]) name = "draw-blood";
   this.effects.push({ x: x, y: y, name: name, t: 0,
@@ -384,6 +415,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
     ctx.drawImage(pimg, px - w / 2, top, w, h);
     drawPlayerStatus(ctx, px, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
+    this.drawSpeech(ctx, px, top - 14, dt);
   }
 
   const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
@@ -544,6 +576,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.drawImage(pimg, drawX, drawY, w, h);
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
+    this.drawSpeech(ctx, px * W, drawY - 14, dt);
   }
 
   // --- monstros
