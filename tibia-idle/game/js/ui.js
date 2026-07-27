@@ -329,47 +329,95 @@ function renderInventory(p) {
   });
   $$("#inv .inv-item[data-item]").forEach((el) => {
     const slug = el.dataset.item;
-    const it = GAMEDATA.items[slug];
-    const hint = it && it.s ? "Clique para equipar" : "Clique para vender";
     el.addEventListener("mouseenter", () =>
-      showTip(itemTip(slug, `${p.bag[slug]}x · ${hint}`)));
+      showTip(itemTip(slug, `${p.bag[slug]}x · Clique para opções`)));
     el.addEventListener("mouseleave", hideTip);
-    el.addEventListener("click", () => {
-      if (it && it.s) {
-        if (it.lvl && G.p.level < it.lvl) {
-          toast(`Requer nível ${it.lvl}`, "");
-          return;
-        }
-        if (it.s === "ammo") {
-          G.p.equip.ammo = { item: slug, count: G.p.bag[slug] || 0 };
-          toast(`Munição selecionada: <b>${it.n}</b>`);
-          hideTip();
-          renderAll();
-          return;
-        }
-        const old = G.p.equip[it.s];
-        removeItem(G.p, slug, 1);
-        if (old && !addItem(G.p, old.item, 1)) {
-          addItem(G.p, slug, 1);
-          toast("Mochila cheia.");
-          return;
-        }
-        G.p.equip[it.s] = { item: slug, count: 1 };
-        const w = GAMEDATA.items[slug];
-        if (w.th && G.p.equip.shield) {
-          if (addItem(G.p, G.p.equip.shield.item, 1)) delete G.p.equip.shield;
-          else toast("Sem espaço para guardar o escudo.");
-        }
-      } else if (it && it.sell) {
-        const total = it.sell * G.p.bag[slug];
-        G.p.gold += total;
-        addLog("sell", `Vendeu ${G.p.bag[slug]}x ${it.n} por <span class="gold-txt">${fmtFull(total)} gp</span>`);
-        delete G.p.bag[slug];
-      }
+    const openMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       hideTip();
-      renderAll();
-    });
+      openBagItemMenu(p, slug, e.clientX, e.clientY);
+    };
+    el.addEventListener("click", openMenu);
+    el.addEventListener("contextmenu", openMenu);
   });
+}
+
+/* Equipa um item da mochila. Retorna true se equipou. */
+function equipFromBag(p, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !it.s) return false;
+  if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (it.s === "ammo") {
+    p.equip.ammo = { item: slug, count: p.bag[slug] || 0 };
+    toast(`Munição selecionada: <b>${it.n}</b>`);
+    return true;
+  }
+  const old = p.equip[it.s];
+  removeItem(p, slug, 1);
+  if (old && !addItem(p, old.item, 1)) {
+    addItem(p, slug, 1);
+    toast("Mochila cheia.");
+    return false;
+  }
+  p.equip[it.s] = { item: slug, count: 1 };
+  if (it.th && p.equip.shield) {
+    if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
+    else toast("Sem espaço para guardar o escudo.");
+  }
+  return true;
+}
+
+/* Vende um item da mochila (unica via de venda manual fora da Loot Pouch) */
+function sellBagItem(p, slug) {
+  const it = GAMEDATA.items[slug];
+  const count = p.bag[slug] || 0;
+  if (!it || count <= 0) return 0;
+  if (currencyValue(slug)) {
+    const g = creditCurrency(p, slug, count);
+    delete p.bag[slug];
+    addLog("sell", `Converteu ${count}x ${it.n} em <span class="gold-txt">${fmtFull(g)} gp</span>`);
+    return g;
+  }
+  const value = (it.sell || 0) * count;
+  if (value <= 0) { toast("Esse item não possui valor de venda."); return 0; }
+  p.gold += value;
+  addLog("sell", `Vendeu ${count}x ${it.n} por <span class="gold-txt">${fmtFull(value)} gp</span>`);
+  delete p.bag[slug];
+  return value;
+}
+
+/* Menu de opções de um item da mochila */
+function openBagItemMenu(p, slug, x, y, after) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return;
+  const count = p.bag[slug] || 0;
+  const value = (it.sell || 0) * count;
+  const refresh = () => { if (after) after(); else renderAll(); };
+  const opts = [{ label: "Detalhes", action: () => openItemDetails(slug, count) }];
+
+  if (it.s) {
+    opts.push({
+      label: it.s === "ammo" ? "Selecionar munição" : "Equipar",
+      action: () => { if (equipFromBag(p, slug)) refresh(); },
+    });
+  }
+  opts.push({
+    label: `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
+    disabled: value <= 0 && !currencyValue(slug),
+    action: () => { if (sellBagItem(p, slug) > 0) refresh(); },
+  });
+  opts.push({
+    label: "Destruir",
+    danger: true,
+    action: () => {
+      if (!confirm(`Destruir ${count}x ${it.n}? Isso não pode ser desfeito.`)) return;
+      delete p.bag[slug];
+      addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
+      refresh();
+    },
+  });
+  showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, opts);
 }
 
 /* ---------------------------------------------------------- context menu */

@@ -501,3 +501,38 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   color: var(--text-bright); text-shadow: 1px 1px 0 #000; padding: 5px 8px;
 }
 .panel.collapsed > .tabs .tabs-label { display: block; }
+
+/* change outfit / retratos de personagem */
+.char-portrait {
+  width: 34px; height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel-dark); border: 1px solid var(--border-in);
+}
+.char-portrait img {
+  width: 32px; height: 32px; object-fit: contain;
+  image-rendering: pixelated;
+}
+.outfit-preview {
+  width: 96px; height: 96px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel-dark);
+  border: 2px solid;
+  border-color: var(--border-in) var(--border-out) var(--border-out) var(--border-in);
+}
+.outfit-preview img {
+  width: 76px; height: 76px; object-fit: contain;
+  image-rendering: pixelated;
+}
+.outfit-palette {
+  display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px;
+  background: var(--panel-dark); padding: 4px;
+  border: 1px solid var(--border-in);
+}
+.outfit-palette .swatch {
+  width: 100%; aspect-ratio: 1; cursor: pointer;
+  border: 1px solid rgba(0,0,0,.55);
+}
+.outfit-palette .swatch:hover { outline: 1px solid var(--text-bright); }
+.outfit-palette .swatch.sel {
+  outline: 2px solid var(--gold); outline-offset: -1px; z-index: 1;
+}

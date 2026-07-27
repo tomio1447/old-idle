@@ -223,12 +223,10 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   }
 
   // ---- jogador
-  const outfitName = this.outfitFor(player);
-  const pimg = Sprites.walk(outfitName, walker.dir, walker.frame) ||
-               Sprites.outfit(outfitName, walker.dir);
+  const pimg = OutfitRenderer.forPlayer(player, walker.dir, walker.frame);
   const psx = walker.px * S - camX, psy = walker.py * S - camY;
-  if (pimg && pimg.complete && pimg.naturalWidth) {
-    const w = pimg.naturalWidth * S, h = pimg.naturalHeight * S;
+  if (spriteReady(pimg)) {
+    const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
     const bob = walker.moving ? 0 : Math.sin(Date.now() / 340) * 1.5;
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath();

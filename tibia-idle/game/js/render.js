@@ -3,6 +3,9 @@
  */
 "use strict";
 
+/* escala do sprite do jogador na cena de caca (monstro comum usa 2.0) */
+const PLAYER_SCALE = 1.8;
+
 const Sprites = {
   cache: {},
   get(path) {
@@ -371,12 +374,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "#c8c0a8";
   ctx.fillText("Treiner padrão · +200% ticks/hit · conjure disponível", 12, 40);
 
-  const outfitName = this.outfitFor(player);
-  const pimg = Sprites.outfit(outfitName, "e");
+  const pimg = OutfitRenderer.forPlayer(player, "e", 0);
   const px = W * 0.28, py = H * 0.64;
-  if (pimg && pimg.complete && pimg.naturalWidth) {
-    const sc = 2.5;
-    const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+  if (spriteReady(pimg)) {
+    const sc = PLAYER_SCALE + 0.1;
+    const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const top = py - h / 2 + Math.sin(Date.now() / 340) * 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
@@ -520,13 +522,12 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // --- player
   const pl = combat && combat.player ? combat.player : { x: 0.13, y: 0.62, dir: "e", moving: false, frame: 0 };
   const px = pl.x, py = pl.y;
-  const outfitName = this.outfitFor(player);
-  const pimg = Sprites.walk(outfitName, pl.dir || "e", pl.moving ? (pl.frame || 1) : 0) ||
-               Sprites.outfit(outfitName, pl.dir || "e");
+  const pimg = OutfitRenderer.forPlayer(player, pl.dir || "e",
+                                        pl.moving ? (pl.frame || 1) : 0);
   const bob = pl.moving ? 0 : Math.sin(Date.now() / 340) * 2;
-  if (pimg && pimg.complete && pimg.naturalWidth) {
-    const sc = 2.4;
-    const w = pimg.naturalWidth * sc, h = pimg.naturalHeight * sc;
+  if (spriteReady(pimg)) {
+    const sc = PLAYER_SCALE;
+    const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = (pl.attackAnim || 0) > 0 ? (pl.dir === "w" ? -5 : pl.dir === "e" ? 5 : 0) : 0;
     // sombra
     ctx.fillStyle = "rgba(0,0,0,.35)";
@@ -688,9 +689,7 @@ Renderer.prototype.npcAt = function (mx, my) {
   return null;
 };
 
+/* mantido por compatibilidade: o outfit real vem de playerOutfit() */
 Renderer.prototype.outfitFor = function (p) {
-  const suffix = p.sex === "female" ? "f" : "m";
-  const map = { knight: "knight", paladin: "hunter", druid: "summoner",
-                sorcerer: "mage", none: "citizen" };
-  return (map[p.voc] || "citizen") + "-" + suffix;
+  return playerOutfit(p).name;
 };

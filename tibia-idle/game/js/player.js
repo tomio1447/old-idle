@@ -73,7 +73,6 @@ function newPlayer(name, voc, sex) {
       shooterType: "auto",  // auto | spell | rune
       shooterSpell: "",
       shooterRune: "",
-      autoSell: true,
       autoEquip: true,
       spellAttack: true,
       autoRetreat: true,    // recua em vez de morrer quando acabam os supplies
@@ -89,7 +88,9 @@ function newPlayer(name, voc, sex) {
     bosses: {},
     log: [],
     achievements: {},
+    outfit: null,           // {type, colors:[head,body,legs,feet]}
   };
+  ensureOutfit(p);
   const b = baseStats(p.voc, p.level);
   p.hp = b.hp; p.mp = b.mp;
   return p;
@@ -497,45 +498,6 @@ function autoEquip(p) {
     }
   }
   return changes;
-}
-
-/* Vende todo o loot marcado como vendavel */
-function autoSell(p) {
-  let total = 0;
-  const sold = [];
-
-  const sellFrom = (container, slug, source) => {
-    const it = GAMEDATA.items[slug];
-    if (!it || !container[slug]) return;
-    // moedas sempre viram gold, mesmo marcadas como "não vender"
-    if (currencyValue(slug)) {
-      const g = creditCurrency(p, slug, container[slug]);
-      total += g;
-      delete container[slug];
-      return;
-    }
-    if (isNoSell(p, slug)) return;
-    // Ammo/equipamentos não são vendidos automaticamente; boss loot pode ser arrastado para a bag.
-    if (it.s === "ammo" || it.inf || (source === "lootPouch" && it.s)) return;
-    // nao vende equipamento util da mochila principal
-    if (source === "bag" && it.s) {
-      const equipped = p.equip[it.s];
-      if (!equipped || itemScore(p, slug) > itemScore(p, equipped.item)) return;
-    }
-    const value = (it.sell || 0) * container[slug];
-    if (value <= 0) return;
-    total += value;
-    p.gold += value;
-    sold.push({ item: slug, count: container[slug], gold: value, source: source });
-    delete container[slug];
-  };
-
-  for (const slug in Object.assign({}, p.lootPouch || {}))
-    sellFrom(p.lootPouch, slug, "lootPouch");
-  for (const slug in Object.assign({}, p.bag))
-    sellFrom(p.bag, slug, "bag");
-
-  return { gold: total, items: sold };
 }
 
 /* Peso total carregado */

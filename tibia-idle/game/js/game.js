@@ -123,7 +123,6 @@ function normalizePlayer(p) {
     shooterSpell: "",
     shooterRune: "",
     missionCollapsed: false,
-    autoSell: true,
     autoEquip: true,
     spellAttack: true,
     autoRetreat: true,
@@ -161,6 +160,7 @@ function normalizePlayer(p) {
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
+  ensureOutfit(p);
   return p;
 }
 
@@ -887,15 +887,10 @@ function loop(ts) {
       renderSkills(G.p);
     }
 
-    // auto sell / equip a cada 15s
+    // auto equip a cada 15s (a venda e sempre manual: Sell all ou menu do item)
     G.sellTimer += dt;
     if (G.sellTimer > 15000) {
       G.sellTimer = 0;
-      if (G.p.config.autoSell) {
-        const r = autoSell(G.p);
-        if (r.items.length)
-          addLog("sell", `Vendeu ${r.items.length} tipo(s) de loot por <span class="gold-txt">${fmtFull(r.gold)} gp</span>`);
-      }
       if (G.p.config.autoEquip) {
         const ch = autoEquip(G.p);
         for (const c of ch)
@@ -1116,12 +1111,6 @@ function bindControls() {
     if (k) G.walker.keys[k] = false;
   });
   window.addEventListener("blur", () => { G.walker.keys = {}; });
-  $("#btn-sell").addEventListener("click", () => {
-    const r = autoSell(p);
-    toast(`Vendeu tudo por <b>${fmtFull(r.gold)} gp</b>`);
-    addLog("sell", `Venda manual: <span class="gold-txt">${fmtFull(r.gold)} gp</span>`);
-    renderAll();
-  });
   initPanelCollapse();
   $("#btn-equip").addEventListener("click", () => {
     const ch = autoEquip(p);
@@ -1150,9 +1139,6 @@ function bindControls() {
   });
   $("#cfg-runes").addEventListener("change", (e) => {
     p.config.useRunes = e.target.checked;
-  });
-  $("#cfg-sell").addEventListener("change", (e) => {
-    p.config.autoSell = e.target.checked;
   });
   $("#cfg-equip").addEventListener("change", (e) => {
     p.config.autoEquip = e.target.checked;
@@ -1183,7 +1169,6 @@ function bindControls() {
   $("#heal-at").value = p.config.healAt;
   $("#heal-at-val").textContent = p.config.healAt + "%";
   $("#cfg-runes").checked = p.config.useRunes;
-  $("#cfg-sell").checked = p.config.autoSell;
   $("#cfg-equip").checked = p.config.autoEquip;
   $("#cfg-spell").checked = p.config.spellAttack;
   $("#bar-mode").value = p.config.barMode || "bars";
@@ -1219,6 +1204,117 @@ function createCharacter(name, voc, sex) {
   return p;
 }
 
+/* Desenha o retrato de cada personagem na lista, com o outfit atual dele.
+   Os sprites podem ainda estar carregando, então tenta de novo por alguns frames. */
+function paintCharPortraits(chars, tries) {
+  tries = tries === undefined ? 24 : tries;
+  let missing = false;
+  for (const c of chars) {
+    const box = document.querySelector(`[data-portrait="${c.id}"]`);
+    if (!box || box.dataset.done) continue;
+    const url = OutfitRenderer.preview(c, "s");
+    if (url) {
+      box.innerHTML = `<img src="${url}" alt="">`;
+      box.dataset.done = "1";
+    } else {
+      missing = true;
+    }
+  }
+  if (missing && tries > 0)
+    setTimeout(() => paintCharPortraits(chars, tries - 1), 90);
+}
+
+/* -------------------------------------------------- change outfit */
+function openOutfitModal() {
+  const p = G.p;
+  ensureOutfit(p);
+  // trabalha numa cópia: só aplica ao confirmar
+  const draft = { type: p.outfit.type, colors: p.outfit.colors.slice() };
+  const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
+  let part = 0;
+  let dir = "s";
+
+  const render = () => {
+    const fake = { sex: p.sex, voc: p.voc, outfit: draft };
+    const o = playerOutfit(fake);
+    const url = OutfitRenderer.preview(fake, dir);
+    $("#outfit-preview").innerHTML = url
+      ? `<img src="${url}" alt="">`
+      : `<div class="tiny dim">carregando…</div>`;
+    $("#outfit-name").textContent = (OUTFIT_TYPES.find((t) => t.id === draft.type) || {}).name || draft.type;
+    $$("#outfit-types [data-otype]").forEach((b) =>
+      b.classList.toggle("primary", b.dataset.otype === draft.type));
+    $$("#outfit-parts [data-opart]").forEach((b) =>
+      b.classList.toggle("primary", +b.dataset.opart === part));
+    $$("#outfit-palette [data-ocolor]").forEach((s) =>
+      s.classList.toggle("sel", +s.dataset.ocolor === draft.colors[part]));
+    if (!url) setTimeout(render, 120);
+  };
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Change Outfit
+      <span style="flex:1"></span><button class="sm" id="outfit-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="row mb8" style="gap:12px;align-items:flex-start">
+        <div>
+          <div id="outfit-preview" class="outfit-preview"></div>
+          <div class="row mt4" style="gap:3px;justify-content:center">
+            ${[["n", "↑"], ["w", "←"], ["s", "↓"], ["e", "→"]].map(([d, a]) =>
+              `<button class="sm" data-odir="${d}">${a}</button>`).join("")}
+          </div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="small dim mb4">Outfit</div>
+          <div class="row wrap mb4" id="outfit-types" style="gap:4px">
+            ${OUTFIT_TYPES.map((t) =>
+              `<button class="sm" data-otype="${t.id}">${t.name}</button>`).join("")}
+          </div>
+          <div class="tiny dim">Atual: <b id="outfit-name" style="color:#d4af37"></b></div>
+          <div class="small dim mt8 mb4">Parte a colorir</div>
+          <div class="row wrap" id="outfit-parts" style="gap:4px">
+            ${PARTS.map(([n, i]) =>
+              `<button class="sm" data-opart="${i}">${n}</button>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="small dim mb4">Cor</div>
+      <div id="outfit-palette" class="outfit-palette mb8">
+        ${OUTFIT_PALETTE.map((c, i) =>
+          `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
+      </div>
+      <div class="row" style="gap:6px">
+        <button class="primary" style="flex:1" id="outfit-save">Salvar outfit</button>
+        <button style="flex:none" id="outfit-cancel">Cancelar</button>
+      </div>
+    </div>`;
+  $("#modal").classList.add("show");
+
+  $$("#outfit-types [data-otype]").forEach((b) => b.addEventListener("click", () => {
+    draft.type = b.dataset.otype; render();
+  }));
+  $$("#outfit-parts [data-opart]").forEach((b) => b.addEventListener("click", () => {
+    part = +b.dataset.opart; render();
+  }));
+  $$("#outfit-palette [data-ocolor]").forEach((s) => s.addEventListener("click", () => {
+    draft.colors[part] = +s.dataset.ocolor; render();
+  }));
+  $$("#modal-body [data-odir]").forEach((b) => b.addEventListener("click", () => {
+    dir = b.dataset.odir; render();
+  }));
+  const close = () => openCharacterModal();
+  $("#outfit-close").addEventListener("click", close);
+  $("#outfit-cancel").addEventListener("click", close);
+  $("#outfit-save").addEventListener("click", () => {
+    p.outfit = { type: draft.type, colors: draft.colors.slice() };
+    save();
+    toast("Outfit atualizado!");
+    renderAll();
+    openCharacterModal();
+  });
+  render();
+}
+
 function openCharacterModal() {
   save();
   const chars = getCharacters();
@@ -1232,6 +1328,7 @@ function openCharacterModal() {
       <div class="list mb8" style="max-height:260px">
         ${chars.length ? chars.map((p) => `
           <div class="shop-row">
+            <div class="char-portrait" data-portrait="${p.id}"></div>
             <div style="flex:1;min-width:0">
               <div class="small" style="color:${p.id === currentId ? "#9ce84a" : "#c8c0a8"}">
                 ${p.name}${p.id === currentId ? " · atual" : ""}</div>
@@ -1240,6 +1337,7 @@ function openCharacterModal() {
             <button class="sm primary" data-load-char="${p.id}" ${p.id === currentId ? "disabled" : ""}>Entrar</button>
           </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
       </div>
+      <button class="full mb8" id="char-outfit">👕 Change Outfit</button>
       <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
       <div id="char-new-box" class="panel-inset" style="display:none;padding:8px">
         <div class="field"><label>Nome</label><input id="new-char-name" maxlength="20" autocomplete="off"></div>
@@ -1253,7 +1351,9 @@ function openCharacterModal() {
       <div class="tiny dim mt8">Ao trocar/criar personagem a página recarrega para iniciar a sessão limpa.</div>
     </div>`;
   $("#modal").classList.add("show");
+  paintCharPortraits(chars);
   $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
+  $("#char-outfit").addEventListener("click", () => openOutfitModal());
   $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
     const id = b.dataset.loadChar;
     const roster = readRoster();

@@ -255,7 +255,7 @@ function npcSell(p) {
         <div class="small">${it.n}</div>
         <div class="tiny dim">${p.bag[slug]}x · ${fmtFull(it.sell || 0)} gp cada</div>
       </div>
-      <button class="sm" data-sell-item="${slug}">${fmtFull(val)}</button>
+      <span class="tiny dim">${fmtFull(val)} gp</span>
     </div>`;
   }).join("");
 
@@ -265,8 +265,10 @@ function npcSell(p) {
 
   return goldLine(p) + `
     <div class="list mb8" style="max-height:320px">${rows}</div>
-    <button class="primary full" id="sell-all">
-      Vender tudo por ${fmtFull(total)} gp</button>`;
+    <div class="tiny dim center">
+      Clique em um item para abrir as opções e vender.<br>
+      Para vender o loot de uma vez, use <b>Sell all</b> na Loot Pouch.
+    </div>`;
 }
 
 /* ---------------------------------------------------------- banco */
@@ -497,25 +499,22 @@ function bindNpc(id, type) {
       refreshNpc(id);
     }));
 
-  // vender
-  $$("#npc-content [data-sell-item]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const slug = b.dataset.sellItem;
-      const it = GAMEDATA.items[slug];
-      const val = (it.sell || 0) * p.bag[slug];
-      p.gold += val;
-      addLog("sell", `Vendeu ${p.bag[slug]}x ${it.n} por <span class="gold-txt">${fmtFull(val)} gp</span>`);
-      delete p.bag[slug];
-      hideTip();
-      refreshNpc(id);
-    }));
-  const sellAll = $("#sell-all");
-  if (sellAll) sellAll.addEventListener("click", () => {
-    const r = autoSell(p);
-    toast(`Vendeu tudo por <b>${fmtFull(r.gold)} gp</b>`);
-    addLog("sell", `Vendeu o loot por <span class="gold-txt">${fmtFull(r.gold)} gp</span>`);
-    refreshNpc(id);
-  });
+  // vender: clicar no item abre o menu de opções (nunca vende direto)
+  if (type === "sell") {
+    $$("#npc-content .shop-row[data-tip]").forEach((row) => {
+      const slug = row.dataset.tip;
+      if (!p.bag[slug]) return;
+      row.classList.add("clickable");
+      const openMenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideTip();
+        openBagItemMenu(p, slug, e.clientX, e.clientY, () => refreshNpc(id));
+      };
+      row.addEventListener("click", openMenu);
+      row.addEventListener("contextmenu", openMenu);
+    });
+  }
 
   // banco
   $$("#npc-content [data-dep]").forEach((b) =>

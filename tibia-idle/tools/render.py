@@ -1,9 +1,10 @@
 """Funcoes de renderizacao de outfits/itens do Tibia 7.4 para PNG."""
+import os
 from PIL import Image
 from tibia_assets import Dat, Spr, compose_outfit, OUTFIT_COLORS, bgr_to_rgb
 
-DAT_PATH = "/home/user/base/data/74/Tibia.dat"
-SPR_PATH = "/home/user/base/data/74/Tibia.spr"
+DAT_PATH = os.environ.get("TIBIA_DAT", "/home/user/old-idle/base/data/74/Tibia.dat")
+SPR_PATH = os.environ.get("TIBIA_SPR", "/home/user/old-idle/base/data/74/Tibia.spr")
 
 
 def load():
