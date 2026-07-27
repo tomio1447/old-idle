@@ -21,6 +21,7 @@ const Sprites = {
   outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
   ground(scene) { return this.get(`assets/ground/${scene}.png`); },
   fx(name) { return this.get(`assets/fx/${name}.png`); },
+  missile(name, dir) { return this.get(`assets/missile/${name}_${dir || "e"}.png`); },
   npc(name, dir) { return this.get(`assets/npc/${name}_${dir || "s"}.png`); },
   deco(name) { return this.get(`assets/npc/deco-${name}.png`); },
   /* frame de caminhada: f=0 parado, f=1|2 passos */
@@ -31,15 +32,28 @@ const Sprites = {
 };
 
 const FX_FRAMES = {
-  "draw-blood": 3, "lose-energy": 3, "poff": 3, "block-hit": 3,
-  "explosion-area": 3, "explosion-hit": 3, "fire-area": 3, "yellow-rings": 3,
-  "green-rings": 3, "hit-area": 3, "teleport": 3, "energy-damage": 3,
-  "magic-blue": 3, "magic-red": 3, "magic-green": 3, "hit-by-fire": 3,
-  "hit-by-poison": 3, "mort-area": 3, "sound-green": 3, "sound-red": 3,
-  "poison-area": 3, "sound-yellow": 3, "sound-purple": 3, "sound-blue": 3,
-  "sound-white": 3,
+  "big-clouds": 14, "block-hit": 3, "bubbles": 15, "draw-blood": 4,
+  "energy-area": 8, "energy-damage": 10, "explosion-area": 6,
+  "explosion-hit": 6, "fire-area": 8, "fire-attack": 8, "green-rings": 7,
+  "groundshaker": 7, "hearts": 8, "hit-area": 8, "hit-by-fire": 5,
+  "hit-by-poison": 4, "holy-damage": 5, "ice-area": 9, "ice-attack": 8,
+  "ice-tornado": 9, "lose-energy": 4, "magic-blue": 5, "magic-green": 5,
+  "magic-red": 5, "mort-area": 8, "poff": 4, "poison-area": 4,
+  "purple-energy": 10, "sleep": 8, "small-clouds": 6, "small-plants": 11,
+  "sound-blue": 10, "sound-green": 10, "sound-purple": 10, "sound-red": 10,
+  "sound-white": 10, "sound-yellow": 10, "stones": 8, "stun": 9,
+  "teleport": 8, "watercreature": 16, "yellow-energy": 10, "yellow-rings": 7,
 };
 
+/* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */
+const MISSILE_DIRS = ["e", "se", "s", "sw", "w", "nw", "n", "ne"];
+
+function missileDir(sx, sy, tx, ty) {
+  // angulo -> uma das 8 direcoes desenhadas
+  const ang = Math.atan2(ty - sy, tx - sx);
+  const i = Math.round(ang / (Math.PI / 4));
+  return MISSILE_DIRS[((i % 8) + 8) % 8];
+}
 function Renderer(canvas) {
   this.c = canvas;
   this.ctx = canvas.getContext("2d");
@@ -110,14 +124,19 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
 
 Renderer.prototype.addEffect = function (x, y, name) {
   if (!FX_FRAMES[name]) name = "draw-blood";
+  // os efeitos do 15.x tem de 3 a 16 quadros; ~55ms por quadro mantem a
+  // animacao fluida sem esticar demais os efeitos longos
+  const n = FX_FRAMES[name];
   this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: FX_FRAMES[name], dur: 360 });
+                      frames: n, dur: Math.max(300, Math.min(700, n * 55)) });
   if (this.effects.length > 20) this.effects.shift();
 };
 
-Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color) {
+Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {
   this.projectiles.push({ sx: sx, sy: sy, tx: tx, ty: ty,
-                          color: color || "#ffe680", t: 0, dur: 260 });
+                          color: color || "#ffe680", t: 0, dur: 260,
+                          missile: missile || null,
+                          dir: missileDir(sx, sy, tx, ty) });
   if (this.projectiles.length > 30) this.projectiles.shift();
 };
 
@@ -797,17 +816,27 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const q = Math.min(1, p.t / p.dur);
     const hx = (p.sx + (p.tx - p.sx) * q) * W;
     const hy = (p.sy + (p.ty - p.sy) * q) * H;
-    ctx.strokeStyle = p.color;
-    ctx.globalAlpha = 0.35 + (1 - q) * 0.45;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo((p.sx + (p.tx - p.sx) * Math.max(0, q - 0.18)) * W,
-               (p.sy + (p.ty - p.sy) * Math.max(0, q - 0.18)) * H);
-    ctx.lineTo(hx, hy);
-    ctx.stroke();
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(hx, hy, 3, 0, 7); ctx.fill();
-    ctx.globalAlpha = 1;
+
+    // sprite real do Tibia, já desenhado na direção do voo
+    const img = p.missile ? Sprites.missile(p.missile, p.dir) : null;
+    if (img && img.complete && img.naturalWidth) {
+      const sc = 1.6;
+      const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+      ctx.drawImage(img, hx - w / 2, hy - h / 2, w, h);
+    } else {
+      // fallback: risco luminoso, como antes
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.35 + (1 - q) * 0.45;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo((p.sx + (p.tx - p.sx) * Math.max(0, q - 0.18)) * W,
+                 (p.sy + (p.ty - p.sy) * Math.max(0, q - 0.18)) * H);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(hx, hy, 3, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
   }
 
   // --- efeitos

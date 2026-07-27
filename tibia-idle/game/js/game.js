@@ -684,7 +684,8 @@ function drainEvents() {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
         const x = ex(e), y = ey(e);
         if (e.projectile && r.addProjectile)
-          r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62, x, y, col);
+          r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
+                          x, y, col, e.missile);
         r.addFloater(x, y, "-" + fmt(e.dmg), col, e.dmg > 200);
         r.addEffect(x, y, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         break;
@@ -697,7 +698,8 @@ function drainEvents() {
         break;
       case "taken": {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
-        if (e.projectile && r.addProjectile) r.addProjectile(e.sx, e.sy, e.x, e.y, col);
+        if (e.projectile && r.addProjectile)
+          r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmt(e.dmg), col);
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         r.shake = Math.min(9, 2 + e.dmg / 30);
@@ -705,7 +707,8 @@ function drainEvents() {
         break;
       }
       case "block":
-        if (e.projectile && r.addProjectile) r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8");
+        if (e.projectile && r.addProjectile)
+          r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8", e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
         break;
       case "heal": {

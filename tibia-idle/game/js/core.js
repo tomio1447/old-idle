@@ -157,11 +157,11 @@ const ATTACK_SPEED = { melee: 2000, distance: 2000, magic: 2000 };
 const ELEMENTS = {
   physical: { name: "Físico", color: "#d8d8d8", fx: "draw-blood" },
   fire:     { name: "Fogo",   color: "#ff8a3c", fx: "hit-by-fire" },
-  ice:      { name: "Gelo",   color: "#7ec8ff", fx: "magic-blue" },
+  ice:      { name: "Gelo",   color: "#7ec8ff", fx: "ice-attack" },
   energy:   { name: "Energia",color: "#c07cff", fx: "energy-damage" },
   earth:    { name: "Terra",  color: "#8ac83c", fx: "hit-by-poison" },
   death:    { name: "Morte",  color: "#8a5aa8", fx: "mort-area" },
-  holy:     { name: "Sagrado",color: "#ffe680", fx: "yellow-rings" },
+  holy:     { name: "Sagrado",color: "#ffe680", fx: "holy-damage" },
 };
 
 /* Spells por vocacao: dano/cura, custo de mana, cooldown */

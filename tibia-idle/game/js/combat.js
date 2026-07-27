@@ -466,6 +466,42 @@ function activeAmmoItem(p) {
   return it && it.s === "ammo" ? it : null;
 }
 
+/* Missile (projetil) que cada municao/elemento usa, pelos nomes do
+ * CONST_ANI_* do Canary. */
+const AMMO_MISSILE = {
+  "arrow": "arrow", "bolt": "bolt", "poison-arrow": "poison-arrow",
+  "burst-arrow": "burst-arrow", "power-bolt": "power-bolt",
+  "infernal-bolt": "infernal-bolt", "spear": "spear",
+  "royal-spear": "royal-spear", "hunting-spear": "hunting-spear",
+};
+
+const ELEMENT_MISSILE = {
+  fire: "fire", energy: "energy", earth: "earth", ice: "ice",
+  death: "death", holy: "holy", physical: "small-stone",
+};
+
+/* Escolhe o sprite de projetil de um ataque a distancia do jogador. */
+function playerMissile(p, element) {
+  const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  if (wp && wp.inf && AMMO_MISSILE[p.equip.weapon.item])
+    return AMMO_MISSILE[p.equip.weapon.item];      // spear arremessada
+  const a = p.equip.ammo;
+  if (a && a.item && AMMO_MISSILE[a.item]) return AMMO_MISSILE[a.item];
+  return ELEMENT_MISSILE[element] || "arrow";
+}
+
+/* Projetil de um monstro que ataca a distancia. Arqueiros atiram flecha,
+ * casters cospem o elemento e o resto arremessa pedra. */
+function monsterMissile(mob) {
+  const def = mob.def || {};
+  if (!def.ranged) return null;
+  const slug = mob.slug || "";
+  if (/archer|scout|spearman|hunter/.test(slug))
+    return slug.indexOf("spearman") !== -1 ? "spear" : "arrow";
+  if (/goblin/.test(slug)) return "small-stone";
+  return ELEMENT_MISSILE[def.element] || "small-stone";
+}
+
 /* Executa um ataque do jogador no alvo */
 function playerAttack(c, p, target) {
   const d = playerDamage(p);
@@ -512,7 +548,9 @@ function playerAttack(c, p, target) {
   if (c.player) c.player.attackAnim = 180;
   c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
                   sx: pos.x, sy: pos.y, screen: true,
-                  projectile: isDist || isMagic, el: element, crit: false });
+                  projectile: isDist || isMagic, el: element, crit: false,
+                  missile: isDist ? playerMissile(p, element)
+                                  : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
 
   if (ammo) {
     // poison arrow: envenena o alvo por alguns turnos
@@ -590,7 +628,8 @@ function tryCastSpell(c, p, target, now) {
                     sx: c.player ? c.player.x : 0.18,
                     sy: c.player ? c.player.y : 0.62,
                     screen: true, projectile: true,
-                    el: s.element || "energy", spell: s.name });
+                    el: s.element || "energy", spell: s.name,
+                    missile: ELEMENT_MISSILE[s.element] || "energy" });
   }
   if (c.player) c.player.attackAnim = 220;
   c.events.push({ t: "cast", name: s.name, area: !!s.area,
@@ -633,7 +672,9 @@ function tryUseRune(c, p, target, now) {
                   sx: c.player ? c.player.x : 0.18,
                   sy: c.player ? c.player.y : 0.62,
                   screen: true, projectile: true,
-                  el: s.element, rune: s.name });
+                  el: s.element, rune: s.name,
+                  missile: s.tier >= 4 ? "sudden-death"
+                                       : (ELEMENT_MISSILE[s.element] || "energy") });
   c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
   return true;
 }
@@ -787,7 +828,8 @@ function mobAttack(c, p, mob) {
   mob.attackAnim = 180;
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
-                    screen: true, projectile: monsterAttackRange(mob) > 0.16 });
+                    screen: true, projectile: monsterAttackRange(mob) > 0.16,
+                    missile: monsterMissile(mob) });
     addSkillTries(p, "shield", combatSkillGain(c, 1));
     return 0;
   }
@@ -796,7 +838,8 @@ function mobAttack(c, p, mob) {
   addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
-                  screen: true, projectile: monsterAttackRange(mob) > 0.16 });
+                  screen: true, projectile: monsterAttackRange(mob) > 0.16,
+                  missile: monsterMissile(mob) });
   return raw;
 }
 
