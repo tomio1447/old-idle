@@ -19,6 +19,7 @@ const DEFAULT_OUTFIT_COLORS = {
   paladin:  [78, 68, 58, 76],
   druid:    [79, 78, 78, 76],
   sorcerer: [86, 50, 50, 86],
+  monk:     [94, 88, 88, 94],
   none:     [78, 68, 58, 76],
 };
 
@@ -29,11 +30,12 @@ const OUTFIT_TYPES = [
   { id: "summoner", name: "Summoner" },
   { id: "mage",     name: "Mage" },
   { id: "citizen",  name: "Citizen" },
+  { id: "monk",     name: "Monk" },
 ];
 
 /* outfit padrão de cada vocação */
 const VOC_OUTFIT = { knight: "knight", paladin: "hunter", druid: "summoner",
-                     sorcerer: "mage", none: "citizen" };
+                     sorcerer: "mage", monk: "monk", none: "citizen" };
 
 /* helpers que aceitam tanto <img> quanto <canvas> */
 function spriteReady(s) {

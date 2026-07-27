@@ -160,6 +160,7 @@ function normalizePlayer(p) {
   p.instanceMode = p.instanceMode || null;
   p.ammo = p.ammo || {};
   p.upgrades = p.upgrades || {};
+  p.imbuements = p.imbuements || {};
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   ensureOutfit(p);
   return p;
@@ -1380,6 +1381,7 @@ function openCharacterModal() {
         <div class="field"><label>Vocação</label><select id="new-char-voc">
           <option value="knight">Knight</option><option value="paladin">Paladin</option>
           <option value="druid">Druid</option><option value="sorcerer">Sorcerer</option>
+          <option value="monk">Monk</option>
         </select></div>
         <button class="primary full" id="char-create">Criar e entrar</button>
       </div>
@@ -1441,10 +1443,10 @@ function initLogin() {
   }
 
   let selVoc = "knight", selSex = "male";
-  const vocs = ["knight", "paladin", "druid", "sorcerer"];
+  const vocs = ["knight", "paladin", "druid", "sorcerer", "monk"];
   const outfitOf = (v, s) => {
     const map = { knight: "knight", paladin: "hunter", druid: "summoner",
-                  sorcerer: "mage" };
+                  sorcerer: "mage", monk: "monk" };
     return map[v] + "-" + (s === "female" ? "f" : "m");
   };
   function paintVocs() {

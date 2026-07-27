@@ -34,7 +34,30 @@ const VOCATIONS = {
     skillFactor: 1.8, defFactor: 1.0, atkFactor: 1.0,
     desc: "Magia de fogo/energia. O maior dano mágico do jogo.",
   },
+  // Monk (15.x): luta de punho, ganhos equilibrados e as Virtudes
+  monk: {
+    name: "Monk", hpGain: 10, mpGain: 10, capGain: 25,
+    weapon: "fist", magicFactor: 1.3, mpRegen: 6, hpRegen: 6,
+    skillFactor: 1.1, defFactor: 1.05, atkFactor: 1.0,
+    desc: "Punhos e harmonia. Combos de golpes e as três Virtudes.",
+  },
 };
+
+/* Multiplicadores de skill por vocacao, direto do vocations.xml do Canary.
+ * Quanto MENOR o numero, mais rapido a skill sobe. */
+const SKILL_MULTIPLIER = {
+  sorcerer: { fist: 1.5, club: 2.0, sword: 2.0, axe: 2.0, dist: 2.0, shield: 1.5, magic: 1.1 },
+  druid:    { fist: 1.5, club: 1.8, sword: 1.8, axe: 1.8, dist: 1.8, shield: 1.5, magic: 1.1 },
+  paladin:  { fist: 1.2, club: 1.2, sword: 1.2, axe: 1.2, dist: 1.1, shield: 1.1, magic: 1.1 },
+  knight:   { fist: 1.1, club: 1.1, sword: 1.1, axe: 1.1, dist: 1.4, shield: 1.1, magic: 1.1 },
+  monk:     { fist: 1.1, club: 1.5, sword: 1.5, axe: 1.5, dist: 2.0, shield: 1.2, magic: 1.1 },
+  none:     { fist: 1.5, club: 2.0, sword: 2.0, axe: 2.0, dist: 2.0, shield: 1.5, magic: 1.1 },
+};
+
+function skillMultiplier(voc, skill) {
+  const t = SKILL_MULTIPLIER[voc] || SKILL_MULTIPLIER.none;
+  return t[skill] || 1.5;
+}
 
 /* Constantes de skill do Tibia real: [const, factor] por vocacao */
 const SKILL_CONST = {
@@ -42,6 +65,7 @@ const SKILL_CONST = {
   paladin:  { melee: 1.2, dist: 1.1, shield: 1.1, magic: 1.4, fist: 1.2 },
   druid:    { melee: 1.8, dist: 1.8, shield: 1.5, magic: 1.1, fist: 1.5 },
   sorcerer: { melee: 2.0, dist: 2.0, shield: 1.5, magic: 1.1, fist: 1.5 },
+  monk:     { melee: 1.5, dist: 2.0, shield: 1.2, magic: 1.3, fist: 1.1 },
   none:     { melee: 1.5, dist: 2.0, shield: 1.5, magic: 3.0, fist: 1.5 },
 };
 
@@ -224,6 +248,38 @@ const SPELLS = {
                     vocs: ["knight", "paladin", "druid", "sorcerer"],
                     duration: 60000, label: "Escudo mágico (absorve dano)" },
 };
+
+/* Mescla as magias do Canary (15.x) dentro de SPELLS.
+ * As magias que o jogo ja tinha ficam como estao — sao as balanceadas e
+ * referenciadas pela config do jogador. As do Canary entram por cima,
+ * trazendo as 41 do Monk e o icone de cada uma. */
+(function mergeCanarySpells() {
+  if (typeof window === "undefined" || !window.CANARY || !window.CANARY.spells) return;
+  const power = { heal: 1.0, attack: 1.0 };
+  for (const id in window.CANARY.spells) {
+    const c = window.CANARY.spells[id];
+    if (SPELLS[id]) {                     // ja existe: so completa o visual
+      if (c.icon != null && SPELLS[id].icon == null) SPELLS[id].icon = c.icon;
+      if (c.words && !SPELLS[id].words) SPELLS[id].words = c.words;
+      continue;
+    }
+    if (c.type !== "attack" && c.type !== "heal") continue;
+    // escala o poder pelo custo de mana, para a magia nova nao nascer
+    // desbalanceada em relacao as que ja existiam
+    const p = c.type === "heal"
+      ? Math.max(0.8, Math.min(6, c.mana / 45))
+      : Math.max(0.5, Math.min(5, c.mana / 90));
+    SPELLS[id] = {
+      name: c.name, words: c.words, type: c.type,
+      mana: c.mana, cd: Math.max(1000, c.cd || 2000), lvl: c.lvl || 1,
+      vocs: c.vocs, power: Math.round(p * 10) / 10,
+      element: c.element || (c.type === "attack" ? "energy" : undefined),
+      icon: c.icon, label: c.group === "support" ? "Suporte" :
+        (c.type === "heal" ? "Cura" : "Ataque"),
+      canary: 1,
+    };
+  }
+})();
 
 /* Supplies por carga. `scale` faz a cura/dano acompanhar o nivel do char;
  * o gold só é descontado quando uma carga selecionada está 0 e precisa ser usada. */

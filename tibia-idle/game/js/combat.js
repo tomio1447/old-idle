@@ -554,14 +554,51 @@ function playerAttack(c, p, target) {
   };
 
   let raw = rollDamage();
+
+  // ---- imbuements do 15.x
+  const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
+  let critou = false;
+  if (imb) {
+    if (imb.crit && Math.random() < 0.10) {        // 10% de chance de critico
+      raw = Math.floor(raw * (1 + imb.crit / 100));
+      critou = true;
+    }
+    if (imb.lifeLeech) {
+      const max = maxStats(p);
+      const cura = Math.max(1, Math.floor(raw * imb.lifeLeech / 100));
+      p.hp = Math.min(max.hp, p.hp + cura);
+    }
+    if (imb.manaLeech) {
+      const max = maxStats(p);
+      const mana = Math.max(1, Math.floor(raw * imb.manaLeech / 100));
+      p.mp = Math.min(max.mp, p.mp + mana);
+    }
+  }
+
   target.hp -= raw;
   c.stats.damage += raw;
   if (c.player) c.player.attackAnim = 180;
   c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
                   sx: pos.x, sy: pos.y, screen: true,
-                  projectile: isDist || isMagic, el: element, crit: false,
+                  projectile: isDist || isMagic, el: element, crit: critou,
                   missile: isDist ? playerMissile(p, element)
                                   : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+
+  // Cleave (15.x): certas armas atingem alvos adjacentes por 50% do dano
+  const wpItem = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  if (wpItem && wpItem.cleave && !isDist && !isMagic) {
+    const R = 0.16;
+    for (const m of c.mobs) {
+      if (m === target || m.hp <= 0) continue;
+      if (pointDistance(m, target) > R) continue;
+      const corte = Math.max(1, Math.floor(rollDamage() * 0.5));
+      m.hp -= corte;
+      c.stats.damage += corte;
+      c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y,
+                      screen: true, el: element });
+    }
+    c.events.push({ t: "cleave", x: target.x, y: target.y });
+  }
 
   if (ammo) {
     // poison arrow: envenena o alvo por alguns turnos
@@ -847,6 +884,11 @@ function mobAttack(c, p, mob) {
     return 0;
   }
   p.hp -= raw;
+  // protecao elemental vinda dos imbuements
+  if (typeof imbProtection === "function") {
+    const prot = imbProtection(p, mob.def.element);
+    if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
+  }
   c.stats.taken += raw;
   addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,

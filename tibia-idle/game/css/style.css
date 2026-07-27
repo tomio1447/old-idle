@@ -537,3 +537,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .outfit-palette .swatch.sel {
   outline: 2px solid var(--gold); outline-offset: -1px; z-index: 1;
 }
+
+/* icone de magia no helper */
+.spell-icon {
+  width: 26px; height: 26px; flex: none;
+  image-rendering: pixelated;
+  border: 1px solid var(--border-in);
+  background: #14120e;
+}

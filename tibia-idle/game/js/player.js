@@ -16,6 +16,7 @@ const PROMOTION_NAMES = {
   paladin: "Royal Paladin",
   druid: "Elder Druid",
   sorcerer: "Master Sorcerer",
+  monk: "Exalted Monk",
   none: "Sem vocação",
 };
 
@@ -46,6 +47,7 @@ function newPlayer(name, voc, sex) {
     bag: {},                // slug -> count
     ammo: {},               // slug -> unidades (munição não ocupa slot)
     upgrades: {},           // chave do item -> tier de refino do ferreiro
+    imbuements: {},         // "equip:<slot>" -> [{cat, tier, sub}]
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
     lootConfig: { noCollect: [], noSell: [] },
@@ -140,6 +142,17 @@ function gearStats(p) {
     g.club += it.club || 0;
     g.shield += it.shield || 0;
   }
+  // bonus de skill vindos dos imbuements (15.x)
+  if (typeof imbTotals === "function") {
+    const t = imbTotals(p);
+    g.sword += t.sword || 0;
+    g.axe += t.axe || 0;
+    g.club += t.club || 0;
+    g.shield += t.shield || 0;
+    g.dist += t.dist || 0;
+    g.mag += t.magic || 0;
+    g.speed += t.speed || 0;
+  }
   return g;
 }
 
@@ -160,6 +173,14 @@ function effMagic(p) {
 }
 
 /* Qual skill a arma equipada usa */
+/* Aplica o multiplicador de skill da vocacao (vocations.xml do Canary):
+ * multiplicador menor = skill sobe mais rapido. */
+function skillGainFor(p, skill, tries) {
+  const mul = typeof skillMultiplier === "function"
+    ? skillMultiplier(p.voc, skill) : 1.5;
+  return tries / mul;
+}
+
 function weaponSkill(p) {
   const w = p.equip.weapon;
   if (!w) return "fist";

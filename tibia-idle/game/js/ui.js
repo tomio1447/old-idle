@@ -745,6 +745,12 @@ function renderSupplies(p) {
   });
 }
 
+/* Icone de uma magia, recortado da folha defaultspells.png */
+function spellIcon(s, cls) {
+  if (!s || s.icon == null) return "";
+  return `<img class="spell-icon ${cls || ""}" src="assets/spell/icon-${s.icon}.png" alt="">`;
+}
+
 function renderHelper(p) {
   const healEl = $("#helper-heal");
   const atkEl = $("#helper-attack");
@@ -786,9 +792,10 @@ function renderHelper(p) {
         const s = SPELLS[id], ok = p.level >= s.lvl;
         const selected = p.config.healSpell === id;
         return `<div class="shop-row ${selected ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
+          ${spellIcon(s)}
           <div style="flex:1;min-width:0">
             <div class="small">${s.name}</div>
-            <div class="tiny dim">${s.mana} mana · nv ${s.lvl}</div>
+            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}</div>
           </div>
           <button class="sm ${selected ? "primary" : ""}" data-heal-spell="${id}" ${ok ? "" : "disabled"}>
             ${selected ? "Selecionada" : "Selecionar Spell"}</button>
@@ -883,7 +890,8 @@ function renderHelper(p) {
         const s = SPELLS[id];
         const ok = p.level >= s.lvl;
         return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
-          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">${s.label} · ${s.mana} mana · nv ${s.lvl}</div></div>
+          ${spellIcon(s)}
+          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}</div></div>
           <button class="sm ${p.config.shooterSpell === id && p.config.shooterType === "spell" ? "primary" : ""}" data-shooter-spell="${id}" ${ok ? "" : "disabled"}>Usar</button>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia ofensiva.</div>`}</div>
