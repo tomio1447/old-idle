@@ -264,7 +264,45 @@ class Spr860:
 
 
 # paleta de cores de outfit (identica em todas as versoes)
-from tibia_assets import OUTFIT_COLORS, bgr_to_rgb, compose_outfit  # noqa: E402
+from tibia_assets import OUTFIT_COLORS, bgr_to_rgb  # noqa: E402
+
+
+def compose_outfit(base_img, mask_img, head, body, legs, feet):
+    """Aplica as cores da outfit usando a mascara.
+
+    A versao do parser 7.4 percorria um quadrado fixo de 32x32. Os sprites
+    do 8.60 sao 64x64 (2x2 tiles) e a arte fica no quadrante inferior
+    direito, entao nada era colorido e o outfit saia branco. Aqui o laco
+    acompanha o tamanho real da imagem.
+    """
+    if base_img is None:
+        return None
+    if mask_img is None:
+        return base_img
+    if base_img.size != mask_img.size:
+        mask_img = mask_img.crop((0, 0, base_img.width, base_img.height))
+    b = base_img.load()
+    m = mask_img.load()
+    colors = {
+        (255, 255, 0): head,   # amarelo
+        (255, 0, 0): body,     # vermelho
+        (0, 255, 0): legs,     # verde
+        (0, 0, 255): feet,     # azul
+    }
+    out = base_img.copy()
+    o = out.load()
+    for y in range(base_img.height):
+        for x in range(base_img.width):
+            mp = m[x, y]
+            if mp[3] == 0:
+                continue
+            col = colors.get((mp[0], mp[1], mp[2]))
+            if col is None:
+                continue
+            r, g, bl, a = b[x, y]
+            o[x, y] = (r * col[0] // 255, g * col[1] // 255,
+                       bl * col[2] // 255, a)
+    return out
 
 
 def render_group_860(spr, g, frame=0, xp=0, yp=0, zp=0, layer=0):

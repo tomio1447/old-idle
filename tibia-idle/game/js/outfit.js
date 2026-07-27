@@ -93,8 +93,12 @@ const OutfitRenderer = {
     const mask = Sprites.get(`assets/outfit/${name}_${suf}.mask.png`);
     if (!base) { this.cache[k] = null; return null; }
     if (!base.complete || !base.naturalWidth) return null;
-    // a máscara é opcional: sem ela o sprite sai na cor neutra
-    if (mask && !mask.complete && mask.naturalWidth !== 0) return null;
+    // Espera a máscara terminar de carregar antes de cachear. Sem isto o
+    // canvas era gravado sem cor e o outfit ficava branco — o que só
+    // aparecia ao virar de costas, porque as direções n/w carregam depois.
+    // `mask.complete` já é true quando o arquivo falha (404), e nesse caso
+    // naturalWidth fica 0 e seguimos sem cor, como fallback legítimo.
+    if (mask && !mask.complete) return null;
 
     this.pending[k] = true;
     try {

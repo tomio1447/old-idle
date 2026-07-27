@@ -137,6 +137,31 @@ def parse_monster(path):
         out["poison"] = {"dmg": max(1, round(poison_total / turnos)),
                          "turns": turnos}
 
+    # ---- resistencias elementais (percent > 0 = toma MENOS dano)
+    bloco = re.search(r"monster\.elements\s*=\s*\{(.*?)\n\}", txt, re.S)
+    resist = {}
+    if bloco:
+        for linha in re.findall(r"\{[^{}]*\}", bloco.group(1)):
+            te = re.search(r"type\s*=\s*(COMBAT_\w+)", linha)
+            pc = num(linha, "percent", 0) or 0
+            if not te or not pc:
+                continue
+            el = ELEMENT_MAP.get(te.group(1))
+            if el and el not in resist:
+                resist[el] = int(pc)
+    if resist:
+        out["resist"] = resist
+
+    # ---- foge com pouca vida (runHealth) e velocidade
+    bloco = re.search(r"monster\.flags\s*=\s*\{(.*?)\n\}", txt, re.S)
+    if bloco:
+        rh = num(bloco.group(1), "runHealth", 0) or 0
+        if rh:
+            out["runAt"] = int(rh)
+    sp = num(txt, "monster\\.speed", 0) or 0
+    if sp:
+        out["speed"] = int(sp)
+
     # ---- loot (chance do Canary e em 1/100000)
     bloco = re.search(r"monster\.loot\s*=\s*\{(.*?)\n\}", txt, re.S)
     loot = []
@@ -233,6 +258,17 @@ def main():
             m["poison"] = c["poison"]
         else:
             m.pop("poison", None)
+        # resistencias elementais, fuga e velocidade
+        if c.get("resist"):
+            m["resist"] = c["resist"]
+        else:
+            m.pop("resist", None)
+        if c.get("runAt"):
+            m["runAt"] = c["runAt"]
+        else:
+            m.pop("runAt", None)
+        if c.get("speed"):
+            m["speed"] = c["speed"]
 
         # loot: so itens que o jogo tem sprite/definicao
         novo_loot = []

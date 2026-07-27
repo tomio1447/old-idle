@@ -502,6 +502,17 @@ function monsterMissile(mob) {
   return ELEMENT_MISSILE[def.element] || "small-stone";
 }
 
+/* Aplica a resistencia elemental do monstro (dados do Canary).
+ * percent > 0 = toma MENOS dano; negativo = fraqueza. 100 = imune. */
+function applyResist(mob, element, dano) {
+  const r = mob.def && mob.def.resist;
+  if (!r || !element) return dano;
+  const pc = r[element];
+  if (!pc) return dano;
+  const escala = Math.max(0, 1 - pc / 100);
+  return Math.max(pc >= 100 ? 0 : 1, Math.floor(dano * escala));
+}
+
 /* Executa um ataque do jogador no alvo */
 function playerAttack(c, p, target) {
   const d = playerDamage(p);
@@ -539,7 +550,7 @@ function playerAttack(c, p, target) {
                            target.def.armor * (0.3 + Math.random() * 0.4));
       v -= red;
     }
-    return Math.max(1, Math.floor(v));
+    return applyResist(target, element, Math.max(1, Math.floor(v)));
   };
 
   let raw = rollDamage();
@@ -622,6 +633,7 @@ function tryCastSpell(c, p, target, now) {
   for (const t of targets) {
     let dmg = Math.floor(base * (0.7 + Math.random() * 0.6));
     if (VOCATIONS[p.voc].weapon !== "magic") dmg = Math.floor(dmg * 0.55);
+    dmg = applyResist(t, s.element || "energy", dmg);
     t.hp -= dmg;
     c.stats.damage += dmg;
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
@@ -664,7 +676,8 @@ function tryUseRune(c, p, target, now) {
   c.runeCd = now + 2000;
 
   const pw = supplyPower(s, p.level);
-  const dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
+  const dmg = applyResist(target, s.element,
+                          Math.floor(pw[0] + Math.random() * (pw[1] - pw[0])));
   target.hp -= dmg;
   c.stats.damage += dmg;
   if (c.player) c.player.attackAnim = 180;
