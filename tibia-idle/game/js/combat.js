@@ -269,10 +269,12 @@ function movePoint(ent, target, speed, dt, stopRange) {
   ent.y += ((target.y - ent.y) / d) * step;
   ent.x = clamp(ent.x, 0.08, 0.96);
   ent.y = clamp(ent.y, 0.22, 0.78);
+  // o passo é sempre na direção do destino, então esta é a direção da caminhada
   ent.dir = faceDir(ent, target);
   ent.moving = true;
   ent.walkT = (ent.walkT || 0) + dt;
-  ent.frame = Math.floor((ent.walkT / 180) % 3);
+  // alterna só entre os dois frames de passo (0 é a pose parada)
+  ent.frame = 1 + (Math.floor(ent.walkT / 170) % 2);
   return pointDistance(ent, target);
 }
 
@@ -312,7 +314,9 @@ function updateCombatMovement(c, p, dt) {
       }
     }
   }
-  pl.dir = faceDir(pl, target);
+  // Andando, o sprite olha para onde caminha (movePoint já definiu a direção);
+  // parado, encara o alvo. Sem isso o personagem fugia de costas no kiting.
+  if (!pl.moving) pl.dir = faceDir(pl, target);
 
   c.mobs.forEach((m, i) => {
     m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt);
@@ -322,7 +326,7 @@ function updateCombatMovement(c, p, dt) {
       y: clamp(pl.y + (i - (c.mobs.length - 1) / 2) * 0.055, 0.26, 0.76),
     };
     movePoint(m, laneTarget, m.speed || 0.00005, dt, range * 0.90);
-    m.dir = faceDir(m, pl);
+    if (!m.moving) m.dir = faceDir(m, pl);
   });
   resolveSQMOccupancy(c);
 }
