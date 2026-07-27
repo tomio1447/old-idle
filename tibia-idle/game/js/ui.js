@@ -770,9 +770,13 @@ function renderSupplies(p) {
 }
 
 /* Icone de uma magia, recortado da folha defaultspells.png */
+/* Icone da magia. O indice vem do `clientId` do spells.lua do otclient, que
+ * e exatamente a coluna do spritesheet spell-icons-32x32 do cliente oficial —
+ * por isso cada magia agora mostra o icone certo, e nao um aproximado. */
 function spellIcon(s, cls) {
   if (!s || s.icon == null) return "";
-  return `<img class="spell-icon ${cls || ""}" src="assets/spell/icon-${s.icon}.png" alt="">`;
+  return `<img class="spell-icon ${cls || ""}" src="assets/spell/otc/${s.icon}.png"
+    alt="${s.name || ""}" title="${s.name || ""}">`;
 }
 
 /* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle) */
@@ -845,11 +849,15 @@ function renderHelper(p) {
       <div class="list" style="max-height:115px">${heals.map((id) => {
         const s = SPELLS[id], ok = p.level >= s.lvl;
         const selected = p.config.healSpell === id;
+        // a faixa vem da formula do canary avaliada neste personagem
+        const faixa = ok && typeof spellRangeText === "function"
+          ? spellRangeText(p, s) : "";
         return `<div class="shop-row ${selected ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
           ${spellIcon(s)}
           <div style="flex:1;min-width:0">
-            <div class="small">${s.name}</div>
-            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}</div>
+            <div class="small">${s.name}
+              ${faixa ? `<span style="color:#7ae87a">· ${faixa} hp</span>` : ""}</div>
+            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl} · cd ${Math.round(s.cd / 1000)}s</div>
           </div>
           <button class="sm ${selected ? "primary" : ""}" data-heal-spell="${id}" ${ok ? "" : "disabled"}>
             ${selected ? "Selecionada" : "Selecionar Spell"}</button>
@@ -950,10 +958,19 @@ function renderHelper(p) {
       <div class="small dim mb4">Magias ofensivas</div>
       <div class="list" style="max-height:130px">${attackSpells.map((id) => {
         const s = SPELLS[id];
-        const ok = p.level >= s.lvl;
+        const ok = typeof spellUnlocked === "function"
+          ? spellUnlocked(p, s) : p.level >= s.lvl;
+        const faixa = ok && typeof spellRangeText === "function"
+          ? spellRangeText(p, s) : "";
+        const el = s.element && typeof ELEMENTS !== "undefined" && ELEMENTS[s.element]
+          ? ELEMENTS[s.element] : null;
         return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
           ${spellIcon(s)}
-          <div style="flex:1"><div class="small">${s.name}</div><div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}</div></div>
+          <div style="flex:1;min-width:0">
+            <div class="small">${s.name}
+              ${faixa ? `<span style="color:${el ? el.color : "#ff9a4a"}">· ${faixa}</span>` : ""}</div>
+            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}${s.area ? " · área" : ""}</div>
+          </div>
           <button class="sm ${p.config.shooterSpell === id && p.config.shooterType === "spell" ? "primary" : ""}" data-shooter-spell="${id}" ${ok ? "" : "disabled"}>Usar</button>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia ofensiva.</div>`}</div>
@@ -1219,31 +1236,187 @@ function renderNpcQuick() {
     }));
 }
 
+/* Painel "Magias": o grimorio completo da vocacao.
+ *
+ * Mostra TODAS as magias que a vocacao tem no 15.x (nao so as ofensivas),
+ * agrupadas por tipo, com o icone oficial, as palavras, o custo e — o mais
+ * util — a faixa de dano/cura JA CALCULADA para o personagem atual usando a
+ * formula do canary. Marcar uma magia de ataque a coloca na rotacao do
+ * auto-cast; sem nenhuma marcada o motor usa a de maior dano. */
 function renderSpells(p) {
-  const box = $("#spells");
+  const box = $("#helper-spells");
   if (!box) return;
-  const list = [];
-  for (const id in SPELLS) {
-    const s = SPELLS[id];
-    if (s.vocs.indexOf(p.voc) === -1) continue;
-    list.push([id, s]);
-  }
-  list.sort((a, b) => a[1].lvl - b[1].lvl);
-  if (!list.length) {
-    box.innerHTML = `<div class="dim small center" style="padding:10px">Escolha uma vocação para aprender magias.</div>`;
-    return;
-  }
-  box.innerHTML = list.map(([id, s]) => {
-    const ok = p.level >= s.lvl;
-    return `<div class="row" style="justify-content:space-between;padding:3px 0;opacity:${ok ? 1 : .4};border-bottom:1px solid rgba(0,0,0,.2)">
-      <div style="min-width:0">
-        <div class="tiny" style="color:${s.type === "heal" ? "#7ae87a" : s.type === "buff" ? "#7ad2ff" : "#ffb060"}">${s.name}</div>
-        <div class="tiny dim">${s.label}</div>
+  if (typeof spellsByType !== "function") { box.innerHTML = ""; return; }
+
+  const grupos = spellsByType(p.voc);
+  const filtro = (p.config.spellFilter || "all");
+  const marcadas = p.config.attackSpells || (p.config.attackSpells = []);
+  const somenteDisponiveis = !!p.config.spellOnlyReady;
+
+  const ordem = ["attack", "heal", "cure", "support", "conjure", "summon"];
+  const contagem = ordem.reduce((acc, t) => {
+    acc[t] = (grupos[t] || []).length; return acc;
+  }, {});
+  const total = ordem.reduce((n, t) => n + contagem[t], 0);
+  const liberadas = ordem.reduce((n, t) =>
+    n + (grupos[t] || []).filter((s) => spellUnlocked(p, s)).length, 0);
+
+  const linha = (s) => {
+    const ok = spellUnlocked(p, s);
+    const id = s.id;
+    const marc = marcadas.indexOf(id) !== -1;
+    const faixa = ok ? spellRangeText(p, s) : "";
+    const podeMarcar = s.type === "attack";
+    return `<div class="spell-row ${marc ? "selected" : ""}" style="opacity:${ok ? 1 : .4}">
+      ${spellIcon(s)}
+      <div style="flex:1;min-width:0">
+        <div class="small">${s.name}
+          ${faixa ? `<span style="color:${s.type === "heal" ? "#7ae87a" : "#ff9a4a"}">· ${faixa}</span>` : ""}</div>
+        <div class="tiny dim"><b>${s.words}</b> · ${s.mana} mana · nv ${s.lvl}${s.ml ? " · ml " + s.ml : ""} · cd ${Math.round(s.cd / 1000)}s</div>
+        <div class="tiny dim">${spellDesc(s)}</div>
       </div>
-      <div class="tiny" style="text-align:right;white-space:nowrap">
-        <div style="color:#6a8aff">${s.mana} mana</div>
-        <div class="dim">nv ${s.lvl}</div>
-      </div>
+      ${podeMarcar
+        ? `<button class="sm ${marc ? "primary" : ""}" data-spell-toggle="${id}" ${ok ? "" : "disabled"}>${marc ? "USANDO" : "USAR"}</button>`
+        : `<span class="tiny dim" style="white-space:nowrap">${ok ? "aprendida" : "nv " + s.lvl}</span>`}
     </div>`;
-  }).join("");
+  };
+
+  const secao = (tipo) => {
+    let ls = grupos[tipo] || [];
+    if (somenteDisponiveis) ls = ls.filter((s) => spellUnlocked(p, s));
+    if (!ls.length) return "";
+    return `<div class="small dim mt8 mb4">${SPELL_TIPOS[tipo]} (${ls.length})</div>
+      <div class="list" style="max-height:290px">${ls.map(linha).join("")}</div>`;
+  };
+
+  box.innerHTML = `
+    <div class="tiny dim mb8">
+      <b style="color:#d4af37">${liberadas}</b> de <b>${total}</b> magias de
+      ${VOCATIONS[p.voc].name} liberadas no nível ${p.level}.
+      Valores calculados com a fórmula real do Canary para este personagem.
+    </div>
+    <div class="row wrap mb4" style="gap:4px">
+      ${[["all", "Todas"]].concat(ordem.filter((t) => contagem[t])
+        .map((t) => [t, SPELL_TIPOS[t] + " " + contagem[t]]))
+        .map(([id, label]) =>
+          `<button class="sm ${filtro === id ? "primary" : ""}" data-spell-filter="${id}">${label}</button>`).join("")}
+    </div>
+    <label class="toggle tiny"><input type="checkbox" id="spell-only-ready"
+      ${somenteDisponiveis ? "checked" : ""}> Mostrar só as que já posso lançar</label>
+    ${(filtro === "all" ? ordem : [filtro]).map(secao).join("")
+      || `<div class="dim tiny">Nenhuma magia neste filtro.</div>`}`;
+
+  $$("#helper-spells [data-spell-filter]").forEach((b) =>
+    b.addEventListener("click", () => {
+      p.config.spellFilter = b.dataset.spellFilter;
+      renderSpells(p);
+    }));
+  const chk = $("#spell-only-ready");
+  if (chk) chk.addEventListener("change", () => {
+    p.config.spellOnlyReady = chk.checked;
+    renderSpells(p);
+  });
+  $$("#helper-spells [data-spell-toggle]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.spellToggle;
+      const i = marcadas.indexOf(id);
+      if (i === -1) {
+        marcadas.push(id);
+        // marcar magia no grimorio ja liga o auto-cast, senao nada acontece
+        p.config.spellAttack = true;
+        const cb = $("#cfg-spell");
+        if (cb) cb.checked = true;
+        toast(`Magia adicionada: <b>${SPELLS[id].name}</b>`);
+      } else {
+        marcadas.splice(i, 1);
+        toast(`Magia removida: <b>${SPELLS[id].name}</b>`);
+      }
+      renderSpells(p);
+    }));
+}
+
+/* ------------------------------------------------- barra de cooldown */
+/*
+ * Espelha o modules/game_cooldown do otclient: a fileira da esquerda tem os
+ * grupos da vocacao (sempre visiveis) e a da direita os icones das magias
+ * que estao em cooldown agora.
+ *
+ * Roda a cada frame, entao o DOM e criado uma vez e depois so os estilos
+ * mudam — recriar innerHTML 60x por segundo travava a aba e perdia o
+ * tooltip enquanto o mouse estava em cima.
+ */
+const CD_UI = { grupos: null, voc: null, slots: {} };
+
+function renderCooldownBar(p) {
+  const barra = $("#cooldown-bar");
+  if (!barra || !p || typeof cdVocGroups !== "function") return;
+  const now = Date.now();
+
+  // ---- grupos: so remonta quando a vocacao muda
+  const elGrupos = $("#cd-groups");
+  if (elGrupos && CD_UI.voc !== p.voc) {
+    CD_UI.voc = p.voc;
+    CD_UI.grupos = cdVocGroups(p);
+    elGrupos.innerHTML = CD_UI.grupos.map((g) => `
+      <div class="cd-slot group" data-cd-group="${g.id}" title="${g.pt}">
+        <img src="assets/spell/group/${g.id - 1}.png" alt="${g.pt}">
+        <div class="cd-fill" style="height:0"></div>
+      </div>`).join("");
+  }
+  if (elGrupos && CD_UI.grupos) {
+    for (const g of CD_UI.grupos) {
+      const el = elGrupos.querySelector(`[data-cd-group="${g.id}"]`);
+      if (!el) continue;
+      const st = cdGroupState(p, g.id, now);
+      el.classList.toggle("on", st.ativo);
+      // o overlay encolhe conforme o cooldown corre
+      el.querySelector(".cd-fill").style.height = (st.pct * 100).toFixed(1) + "%";
+    }
+  }
+
+  // ---- magias em cooldown: entram e saem, entao reconcilia por id
+  const elSpells = $("#cd-spells");
+  if (!elSpells) return;
+  const ativos = cdActiveSpells(p, now);
+  const vistos = {};
+  for (const a of ativos) {
+    vistos[a.id] = true;
+    let el = CD_UI.slots[a.id];
+    if (!el || !el.isConnected) {
+      el = document.createElement("div");
+      el.className = "cd-slot spell";
+      el.dataset.cdSpell = a.id;
+      el.title = `${a.spell.name} (${Math.round(a.dur / 1000)}s)`;
+      el.innerHTML =
+        `${a.spell.icon != null
+          ? `<img src="assets/spell/otc20/${a.spell.icon}.png" alt="">` : ""}
+         <div class="cd-fill" style="height:0"></div>
+         <div class="cd-num"></div>`;
+      elSpells.appendChild(el);
+      CD_UI.slots[a.id] = el;
+    }
+    el.querySelector(".cd-fill").style.height = (a.pct * 100).toFixed(1) + "%";
+    const seg = a.resta / 1000;
+    el.querySelector(".cd-num").textContent =
+      seg >= 10 ? Math.ceil(seg) : seg.toFixed(1);
+  }
+  // remove os que terminaram
+  for (const id in CD_UI.slots) {
+    if (vistos[id]) continue;
+    const el = CD_UI.slots[id];
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    delete CD_UI.slots[id];
+  }
+  if (typeof cdPrune === "function") cdPrune(p, now);
+
+  const vazio = !ativos.length;
+  let aviso = elSpells.querySelector(".cd-vazio");
+  if (vazio && !aviso) {
+    aviso = document.createElement("span");
+    aviso.className = "cd-vazio";
+    aviso.textContent = "nenhuma magia em cooldown";
+    elSpells.appendChild(aviso);
+  } else if (!vazio && aviso) {
+    aviso.remove();
+  }
 }

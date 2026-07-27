@@ -553,3 +553,61 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: rgba(0,0,0,.35); color: #c8c0a8; white-space: nowrap;
 }
 .cond-bar .cond.buff { border-color: #9ce84a; color: #9ce84a; }
+
+/* linha do grimorio de magias (aba Magias do helper) */
+.spell-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 5px; border-bottom: 1px solid rgba(0,0,0,.25);
+}
+.spell-row:hover { background: rgba(255,255,255,.04); }
+.spell-row.selected {
+  background: rgba(212,175,55,.10);
+  outline: 1px solid var(--gold); outline-offset: -1px;
+}
+.spell-row .spell-icon { width: 32px; height: 32px; }
+
+/* ---------------------------------------------- barra de cooldown
+ * Copia o layout do modules/game_cooldown do otclient: os icones de grupo
+ * ficam sempre visiveis (opacos quando livres, acesos quando travados) e os
+ * icones das magias em cooldown aparecem so enquanto durar.
+ * O escurecimento e um overlay que encolhe de baixo para cima, igual ao
+ * UIProgressRect do cliente. */
+.cooldown-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; margin-bottom: 4px;
+  background: var(--panel, #1d1a14);
+  border: 1px solid var(--border, #0d0b08);
+  min-height: 30px;
+}
+.cooldown-bar .cd-groups,
+.cooldown-bar .cd-spells { display: flex; align-items: center; gap: 3px; }
+.cooldown-bar .cd-spells { flex-wrap: wrap; }
+.cooldown-bar .cd-sep {
+  width: 1px; align-self: stretch; background: #0d0b08;
+  border-right: 1px solid #3a3428; margin: 0 2px;
+}
+.cd-slot {
+  position: relative; width: 22px; height: 22px; flex: none;
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  overflow: hidden; image-rendering: pixelated;
+}
+.cd-slot img {
+  width: 100%; height: 100%; display: block; image-rendering: pixelated;
+}
+/* grupo livre fica apagado, como o opacity 0.5 do SpellGroupIcon */
+.cd-slot.group { opacity: .45; }
+.cd-slot.group.on { opacity: 1; border-color: var(--gold, #d4af37); }
+/* overlay do cooldown: cobre de cima e some conforme o tempo passa */
+.cd-slot .cd-fill {
+  position: absolute; left: 0; right: 0; top: 0;
+  background: rgba(20, 18, 14, .74);
+  border-bottom: 1px solid rgba(212, 175, 55, .55);
+  pointer-events: none;
+}
+.cd-slot .cd-num {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font-size: 9px; line-height: 10px; text-align: center;
+  color: #ffe680; text-shadow: 0 0 2px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+.cooldown-bar .cd-vazio { font-size: 9px; color: #6b6455; padding-left: 2px; }

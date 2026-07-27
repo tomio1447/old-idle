@@ -151,6 +151,14 @@
         <div id="mission-box" class="mission-box" style="display:none"></div>
       </div>
 
+      <!-- barra de cooldown, no mesmo formato do cliente oficial:
+           grupos sempre visiveis a esquerda, magias em cooldown a direita -->
+      <div id="cooldown-bar" class="cooldown-bar">
+        <div class="cd-groups" id="cd-groups"></div>
+        <div class="cd-sep"></div>
+        <div class="cd-spells" id="cd-spells"></div>
+      </div>
+
       <div class="panel" data-collapse="log">
         <div class="panel-title">Registro da caçada</div>
         <div class="panel-body" style="padding:2px">
@@ -163,6 +171,7 @@
           <div class="tab active" data-group="mid" data-panel="heal">Helper: Cura</div>
           <div class="tab" data-group="mid" data-panel="atk">Ataque</div>
           <div class="tab" data-group="mid" data-panel="shooter">Shooter</div>
+          <div class="tab" data-group="mid" data-panel="spells">Magias</div>
           <div class="tab" data-group="mid" data-panel="refill" id="tab-refill" style="display:none">Refill</div>
           <div class="tab" data-group="mid" data-panel="cfg">Configurar</div>
         </div>
@@ -177,6 +186,10 @@
 
         <div class="panel-body" data-panel-group="mid" data-panel="shooter" style="display:none">
           <div id="helper-shooter"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="spells" style="display:none">
+          <div id="helper-spells"></div>
         </div>
 
         <div class="panel-body" data-panel-group="mid" data-panel="refill" style="display:none">
@@ -256,8 +269,11 @@
 
 <script src="js/gamedata.js"></script>
 <script src="js/canarydata.js"></script>
+<script src="js/spelldata.js"></script>
 <script src="js/buffs.js"></script>
 <script src="js/core.js"></script>
+<script src="js/spells.js"></script>
+<script src="js/cooldown.js"></script>
 <script src="js/outfit.js"></script>
 <script src="js/imbuement.js"></script>
 <script src="js/player.js"></script>

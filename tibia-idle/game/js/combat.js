@@ -740,54 +740,80 @@ function playerAttack(c, p, target) {
   return raw;
 }
 
-/* Tenta lancar uma spell ofensiva */
+/* Tenta lancar uma spell ofensiva.
+ *
+ * O dano vem de spellValues() (js/spells.js), que aplica a formula real do
+ * canary para aquela magia. Antes o dano era `power * (level/5 + ml*1.8)`,
+ * um numero inventado igual para todas — por isso Exori Con e Exevo Mas San
+ * batiam quase o mesmo. Agora Exori Con usa skill de distance e Exevo Mas San
+ * usa magic level, como no servidor.
+ *
+ * A magia usada e a que o jogador marcou no Helper (multiseleção: ele pode
+ * marcar varias e o motor usa a de maior dano fora de cooldown). */
 function tryCastSpell(c, p, target, now) {
   if (!p.config.spellAttack) return false;
+  const escolhidas = p.config.attackSpells;   // lista marcada no Helper
+  const usaLista = Array.isArray(escolhidas) && escolhidas.length > 0;
+
   const avail = [];
   for (const id in SPELLS) {
     const s = SPELLS[id];
     if (s.type !== "attack") continue;
     if (s.vocs.indexOf(p.voc) === -1) continue;
     if (p.level < s.lvl) continue;
+    if (s.ml && effMagic(p) < s.ml) continue;
     if (p.mp < s.mana) continue;
-    if ((c.spellCd[id] || 0) > now) continue;
+    // cooldown proprio da magia E do grupo dela, como no servidor
+    if (!cdReady(p, id, now)) continue;
+    // magia que exige arma (exori, exori min...) nao sai de maos vazias
+    if (s.needWeapon && !(p.equip && p.equip.weapon)) continue;
+    if (usaLista && escolhidas.indexOf(id) === -1) continue;
     avail.push([id, s]);
   }
   if (!avail.length) return false;
   if (c.player && pointDistance(c.player, target) > spellRange()) return false;
-  // helper shooter: magia selecionada ou a mais forte disponível
+  // compatibilidade com a config antiga de shooter unico
   let selected = null;
-  if (p.config.shooterType === "spell" && p.config.shooterSpell)
+  if (!usaLista && p.config.shooterType === "spell" && p.config.shooterSpell)
     selected = avail.find((a) => a[0] === p.config.shooterSpell);
   if (!selected) {
-    if (p.config.shooterType === "rune") return false;
-    avail.sort((a, b) => b[1].power - a[1].power);
+    if (!usaLista && p.config.shooterType === "rune") return false;
+    // escolhe pelo dano estimado NESTE personagem, nao por um peso fixo
+    avail.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
     selected = avail[0];
   }
   const [id, s] = selected;
 
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
-  c.spellCd[id] = now + s.cd;
+  cdStart(p, id, s, now);
+  c.spellCd[id] = now + s.cd;   // mantido: testes antigos leem esse mapa
 
-  const ml = effMagic(p);
-  const base = (p.level / 5 + ml * 1.8) * s.power;
-  const targets = s.area ? c.mobs.slice(0, 4) : [target];
+  const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
+  const targets = nAlvos > 1 ? c.mobs.slice(0, nAlvos) : [target];
+  const elemento = s.element || "energy";
   for (const t of targets) {
-    let dmg = Math.floor(base * (0.7 + Math.random() * 0.6));
-    if (VOCATIONS[p.voc].weapon !== "magic") dmg = Math.floor(dmg * 0.55);
-    dmg = applyResist(t, s.element || "energy", dmg);
+    let dmg = rollSpell(p, s);
+    // buff de vocacao (Virtude, Protector) tambem afeta magia
+    if (typeof buffTotals === "function") {
+      dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
+    }
+    dmg = applyResist(t, elemento, dmg);
     t.hp -= dmg;
     c.stats.damage += dmg;
+    // magias que aplicam condition (Ignite, Envenom, Curse...)
+    if (s.cond && typeof applyCondition === "function") {
+      applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
+    }
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
                     sx: c.player ? c.player.x : 0.18,
                     sy: c.player ? c.player.y : 0.62,
                     screen: true, projectile: true,
-                    el: s.element || "energy", spell: s.name,
-                    missile: ELEMENT_MISSILE[s.element] || "energy" });
+                    el: elemento, spell: s.name,
+                    missile: ELEMENT_MISSILE[elemento] || "energy" });
   }
   if (c.player) c.player.attackAnim = 220;
-  c.events.push({ t: "cast", name: s.name, area: !!s.area,
+  c.events.push({ t: "cast", name: s.name, area: nAlvos > 1,
                   x: target.x, y: target.y, screen: true });
   c.events.push({ t: "say", text: spellWords(id, s) });
   return true;
@@ -851,22 +877,27 @@ function tryHeal(c, p, now) {
     if (selectedHealSpell) {
       const s = SPELLS[selectedHealSpell];
       if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
-          p.level >= s.lvl && p.mp >= s.mana) heals.push([selectedHealSpell, s]);
+          p.level >= s.lvl && p.mp >= s.mana &&
+          cdReady(p, selectedHealSpell, now)) heals.push([selectedHealSpell, s]);
     } else {
       for (const id in SPELLS) {
         const s = SPELLS[id];
         if (s.type !== "heal") continue;
         if (s.vocs.indexOf(p.voc) === -1) continue;
         if (p.level < s.lvl || p.mp < s.mana) continue;
+        if (!cdReady(p, id, now)) continue;
         heals.push([id, s]);
       }
     }
     if (heals.length) {
-      if (!selectedHealSpell) heals.sort((a, b) => b[1].power - a[1].power);
-      const [, s] = heals[0];
-      const ml = effMagic(p);
-      const amount = Math.floor((p.level / 5 + ml * 2.0) * s.power *
-                                (0.85 + Math.random() * 0.3));
+      // sem selecao manual: usa a cura que mais restaura NESTE personagem,
+      // calculada pela formula do canary e nao por um peso fixo
+      if (!selectedHealSpell) {
+        heals.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
+      }
+      const [idCura, s] = heals[0];
+      const amount = Math.max(1, rollSpell(p, s));
+      cdStart(p, idCura, s, now);
       p.mp -= s.mana;
       addManaSpent(p, combatManaSkillGain(c, s.mana));
       p.hp = Math.min(max.hp, p.hp + amount);
@@ -918,8 +949,10 @@ function tryBuff(c, p, now) {
   if (!s) return false;
   if (s.vocs && s.vocs.indexOf(p.voc) === -1) return false;
   if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
+  if (!cdReady(p, chave, now)) return false;
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
+  cdStart(p, chave, s, now);
   applyBuff(p, chave, now);
   c.buffCd = now + Math.max(1000, s.cd || 2000);
   c.events.push({ t: "say", text: spellWords(chave, s) });
@@ -942,8 +975,10 @@ function tryCureCondition(c, p, now) {
     if (!s) continue;
     if (s.vocs && s.vocs.indexOf(p.voc) === -1) continue;
     if (p.level < (s.lvl || 1) || p.mp < s.mana) continue;
+    if (!cdReady(p, def.cure, now)) continue;
     p.mp -= s.mana;
     addManaSpent(p, combatManaSkillGain(c, s.mana));
+    cdStart(p, def.cure, s, now);
     clearCondition(p, tipo);
     c.cureCd = now + 1000;
     c.events.push({ t: "say", text: spellWords(def.cure, s) });

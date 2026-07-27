@@ -910,6 +910,10 @@ function loop(ts) {
   const dt = Math.min(250, ts - G.last || 16);
   G.last = ts;
 
+  // a barra de cooldown anda sozinha, dentro ou fora da hunt — no Tibia o
+  // cooldown nao pausa ao voltar para a cidade
+  if (typeof renderCooldownBar === "function") renderCooldownBar(G.p);
+
   if (!G.paused && G.combat) {
     const before = G.p.level;
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;

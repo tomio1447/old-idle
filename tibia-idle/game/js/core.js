@@ -188,102 +188,85 @@ const ELEMENTS = {
   holy:     { name: "Sagrado",color: "#ffe680", fx: "holy-damage" },
 };
 
-/* Spells por vocacao: dano/cura, custo de mana, cooldown */
-const SPELLS = {
-  "exura":        { name: "Exura", type: "heal", mana: 20, cd: 1000, lvl: 8,
-                    vocs: ["druid", "sorcerer", "paladin", "knight"],
-                    power: 1.0, label: "Cura leve" },
-  "exura-gran":   { name: "Exura Gran", type: "heal", mana: 70, cd: 1000, lvl: 14,
-                    vocs: ["druid", "sorcerer", "paladin"], power: 2.4,
-                    label: "Cura média" },
-  "exura-vita":   { name: "Exura Vita", type: "heal", mana: 160, cd: 1000, lvl: 30,
-                    vocs: ["druid", "sorcerer"], power: 5.0, label: "Cura forte" },
-  "exura-ico":    { name: "Exura Ico", type: "heal", mana: 40, cd: 1000, lvl: 8,
-                    vocs: ["knight"], power: 1.6, label: "Cura de knight" },
-  "exura-san":    { name: "Exura San", type: "heal", mana: 100, cd: 1000, lvl: 35,
-                    vocs: ["paladin"], power: 3.0, label: "Cura de paladin" },
-  "exori":        { name: "Exori", type: "attack", mana: 115, cd: 4000, lvl: 35,
-                    vocs: ["knight"], power: 1.0, element: "physical",
-                    area: true, label: "Golpe em área (melee)" },
-  "exori-gran":   { name: "Exori Gran", type: "attack", mana: 340, cd: 6000, lvl: 90,
-                    vocs: ["knight"], power: 2.2, element: "physical",
-                    label: "Golpe crítico pesado" },
-  "exori-con":    { name: "Exori Con", type: "attack", mana: 25, cd: 2000, lvl: 23,
-                    vocs: ["paladin"], power: 1.4, element: "physical",
-                    label: "Tiro certeiro" },
-  "exevo-mas-san":{ name: "Exevo Mas San", type: "attack", mana: 160, cd: 8000, lvl: 50,
-                    vocs: ["paladin"], power: 2.0, element: "holy",
-                    area: true, label: "Chuva sagrada" },
-  "exori-flam":   { name: "Exori Flam", type: "attack", mana: 20, cd: 2000, lvl: 12,
-                    vocs: ["sorcerer"], power: 0.7, element: "fire",
-                    label: "Chama" },
-  "exori-vis":    { name: "Exori Vis", type: "attack", mana: 20, cd: 2000, lvl: 12,
-                    vocs: ["sorcerer"], power: 0.8, element: "energy",
-                    label: "Raio de energia" },
-  "exevo-flam-hur":{name: "Exevo Flam Hur", type: "attack", mana: 45, cd: 4000, lvl: 18,
-                    vocs: ["sorcerer"], power: 1.2, element: "fire",
-                    area: true, label: "Onda de fogo" },
-  "exevo-vis-hur":{ name: "Exevo Vis Hur", type: "attack", mana: 170, cd: 6000, lvl: 38,
-                    vocs: ["sorcerer"], power: 1.8, element: "energy",
-                    area: true, label: "Onda de energia" },
-  "exevo-gran-mas-vis": { name: "Exevo Gran Mas Vis", type: "attack", mana: 1050,
-                    cd: 40000, lvl: 60, vocs: ["sorcerer"], power: 5.0,
-                    element: "energy", area: true, label: "Ultimate energy" },
-  "exori-frigo":  { name: "Exori Frigo", type: "attack", mana: 20, cd: 2000, lvl: 12,
-                    vocs: ["druid"], power: 0.8, element: "ice",
-                    label: "Estilhaço de gelo" },
-  "exori-tera":   { name: "Exori Tera", type: "attack", mana: 20, cd: 2000, lvl: 12,
-                    vocs: ["druid"], power: 0.7, element: "earth",
-                    label: "Espinho de terra" },
-  "exevo-frigo-hur": { name: "Exevo Frigo Hur", type: "attack", mana: 170, cd: 6000,
-                    lvl: 38, vocs: ["druid"], power: 1.8, element: "ice",
-                    area: true, label: "Onda de gelo" },
-  "exevo-gran-mas-frigo": { name: "Exevo Gran Mas Frigo", type: "attack", mana: 1050,
-                    cd: 40000, lvl: 60, vocs: ["druid"], power: 5.0,
-                    element: "ice", area: true, label: "Ultimate ice" },
-  "utani-hur":    { name: "Utani Hur", type: "buff", mana: 60, cd: 2000, lvl: 14,
-                    vocs: ["knight", "paladin", "druid", "sorcerer"],
-                    duration: 60000, label: "Haste (+velocidade de ataque)" },
-  "utamo-vita":   { name: "Utamo Vita", type: "buff", mana: 50, cd: 2000, lvl: 14,
-                    vocs: ["knight", "paladin", "druid", "sorcerer"],
-                    duration: 60000, label: "Escudo mágico (absorve dano)" },
+/* SPELLS — todas as magias do 15.x, montadas a partir de SPELLDATA.
+ *
+ * SPELLDATA vem de tools/import_otc_spells.py e cruza duas fontes oficiais:
+ * o spells.lua do otclient (lista canonica + indice do icone) e os scripts
+ * Lua do canary (formulas de dano/cura executadas de verdade). Antes essa
+ * tabela era escrita a mao com valores estimados; agora ela e derivada,
+ * entao adicionar magia no servidor e so rodar o importador de novo.
+ *
+ * `power` continua existindo porque o codigo antigo ordena magias por ele;
+ * agora e derivado da formula real em vez de chutado. */
+const SPELL_LABEL = {
+  attack: "Ataque", heal: "Cura", cure: "Cura de condição",
+  support: "Suporte", conjure: "Conjuração", summon: "Invocação",
 };
 
-/* Mescla as magias do Canary (15.x) dentro de SPELLS.
- * As magias que o jogo ja tinha ficam como estao — sao as balanceadas e
- * referenciadas pela config do jogador. As do Canary entram por cima,
- * trazendo as 41 do Monk e o icone de cada uma. */
-(function mergeCanarySpells() {
-  if (typeof window === "undefined" || !window.CANARY || !window.CANARY.spells) return;
-  const power = { heal: 1.0, attack: 1.0 };
-  for (const id in window.CANARY.spells) {
-    const c = window.CANARY.spells[id];
-    if (SPELLS[id]) {                     // ja existe: so completa o visual
-      if (c.icon != null && SPELLS[id].icon == null) SPELLS[id].icon = c.icon;
-      if (c.words && !SPELLS[id].words) SPELLS[id].words = c.words;
-      continue;
-    }
-    // support entra so quando ha um buff correspondente (Virtudes,
-    // Protector, Divine Dazzle) ou quando e uma cura de condition (exana)
-    const ehBuff = typeof BUFFS !== "undefined" && BUFFS[id];
-    const ehCure = /^exana-/.test(id);
-    if (c.type !== "attack" && c.type !== "heal" && !ehBuff && !ehCure) continue;
-    // escala o poder pelo custo de mana, para a magia nova nao nascer
-    // desbalanceada em relacao as que ja existiam
-    const p = c.type === "heal"
-      ? Math.max(0.8, Math.min(6, c.mana / 45))
-      : Math.max(0.5, Math.min(5, c.mana / 90));
-    SPELLS[id] = {
-      name: c.name, words: c.words, type: c.type,
-      mana: c.mana, cd: Math.max(1000, c.cd || 2000), lvl: c.lvl || 1,
-      vocs: c.vocs, power: Math.round(p * 10) / 10,
-      element: c.element || (c.type === "attack" ? "energy" : undefined),
-      icon: c.icon, label: c.group === "support" ? "Suporte" :
-        (c.type === "heal" ? "Cura" : "Ataque"),
-      canary: 1,
+const SPELLS = {};
+
+(function montarSpells() {
+  const dados = (typeof window !== "undefined" && window.SPELLDATA)
+    ? window.SPELLDATA : {};
+  for (const id in dados) {
+    const d = dados[id];
+    const s = {
+      name: d.name, words: d.words, type: d.type,
+      mana: d.mana || 0, cd: Math.max(1000, d.cd || 2000), lvl: d.lvl || 1,
+      ml: d.ml || 0, soul: d.soul || 0,
+      vocs: d.vocs || [], icon: d.icon,
+      element: d.element, area: !!d.area, alvos: d.alvos,
+      range: d.range, needTarget: !!d.needTarget, needWeapon: !!d.needWeapon,
+      premium: !!d.premium, group: d.group, chain: d.chain,
+      cond: d.cond, dispel: d.dispel, regen: d.regen, monk: d.monk,
+      f: d.f, sid: d.sid,
+      // grupos de cooldown: {idDoGrupo: duracaoMs}. Lancar a magia trava o
+      // grupo inteiro, e nao so ela — igual ao servidor.
+      grupos: d.grupos || {}, gcd: d.gcd || 1000,
+      label: SPELL_LABEL[d.type] || "Magia",
     };
+    // power e uma nota relativa usada so para ordenar/escolher a "melhor"
+    // magia no auto-cast; deriva do custo de mana quando nao ha formula
+    s.power = powerFromFormula(d);
+    SPELLS[id] = s;
   }
 })();
+
+/* Ajustes de balanceamento aplicados POR CIMA dos dados oficiais.
+ *
+ * SPELLDATA e gerado do otclient/canary, entao qualquer edicao manual la
+ * seria perdida ao reimportar. As decisoes de design do jogo (que e idle e
+ * progride mais rapido que o Tibia) moram aqui e sobrevivem a reimportacao.
+ * Cada entrada precisa dizer POR QUE diverge do servidor. */
+const SPELL_OVERRIDES = {
+  // o jogador pediu Exura Gran cedo no paladin: no idle o char passa pouco
+  // tempo entre 14 e 20 e ficaria sem cura media nesse intervalo
+  "exura-gran": { lvl: 14 },
+};
+
+(function aplicarOverrides() {
+  for (const id in SPELL_OVERRIDES) {
+    if (!SPELLS[id]) continue;
+    Object.assign(SPELLS[id], SPELL_OVERRIDES[id]);
+  }
+})();
+
+/* Nota relativa da magia: avalia a formula num personagem de referencia
+ * (nivel 100, ml 50, skill 90, attack 40) para poder comparar magias
+ * diferentes numa escala unica. */
+function powerFromFormula(d) {
+  const f = d.f;
+  if (!f) return Math.max(0.5, Math.min(6, (d.mana || 20) / 60));
+  let v;
+  if (f.modo === "magic") {
+    v = (f.lvlMax || 0) * 100 + (f.mlMax || 0) * 50 + (f.flatMax || 0);
+  } else {
+    v = (f.saMax || 0) * 90 * 40 + (f.skMax || 0) * 90 +
+        (f.atMax || 0) * 40 + (f.lvlMax || 0) * 100 + (f.flatMax || 0);
+  }
+  if (d.alvos) v *= 1 + Math.min(3, d.alvos / 8);   // area vale mais
+  return Math.round((v / 100) * 100) / 100;
+}
 
 /* Supplies por carga. `scale` faz a cura/dano acompanhar o nivel do char;
  * o gold só é descontado quando uma carga selecionada está 0 e precisa ser usada. */
