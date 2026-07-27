@@ -1208,7 +1208,15 @@ function giveStarterKit(p) {
   p.supplies["health-potion"] = Math.max(p.supplies["health-potion"] || 0, 5);
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
-  if (p.voc === "paladin" && !p.equip.ammo) setActiveAmmo(p, "arrow");
+  if (p.voc === "paladin") {
+    // paladino começa de bow: a spear fica na mochila como reserva
+    if (!p.equip.weapon || GAMEDATA.items[p.equip.weapon.item].inf) {
+      if (p.equip.weapon) addItem(p, p.equip.weapon.item, 1);
+      removeItem(p, "bow", 1);
+      p.equip.weapon = { item: "bow", count: 1 };
+    }
+    if (!p.equip.ammo) setActiveAmmo(p, "arrow");
+  }
   return p;
 }
 

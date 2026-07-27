@@ -482,6 +482,29 @@ function removeLootPouch(p, slug, count) {
   return true;
 }
 
+/* Poder real de uma arma de distância para o auto-equip.
+ * Uma spear vale o próprio atk (munição infinita). Um bow/crossbow vale o
+ * atk da melhor munição que o jogador consegue usar — e vale 0 se ele não
+ * tem munição nem gold para comprar, evitando trocar por uma arma inútil. */
+function distanceWeaponPower(p, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || it.t !== "distance") return 0;
+  if (it.inf) return it.atk || 0;              // spear: autossuficiente
+
+  let best = 0;
+  for (const ammoSlug in GAMEDATA.items) {
+    const am = GAMEDATA.items[ammoSlug];
+    if (!am || am.s !== "ammo") continue;
+    // munição disponível: em estoque ou comprável com o gold atual
+    const has = ammoCount(p, ammoSlug) > 0;
+    const canBuy = (am.buy || 0) > 0 && p.gold >= (am.buy || 0);
+    if (!has && !canBuy) continue;
+    if ((am.atk || 0) > best) best = am.atk || 0;
+  }
+  if (!best) return 0;                          // sem munição: arma inútil
+  return (it.atk || 0) + best;
+}
+
 /* Score de um item para comparacao no auto-equip */
 function itemScore(p, slug) {
   const it = GAMEDATA.items[slug];
@@ -502,7 +525,14 @@ function itemScore(p, slug) {
       s += (it.mdmg || 0) * 6 + (it.mag || 0) * 60;
       if (it.t !== "magic") s -= 40;
     } else if (isDist) {
-      s += it.t === "distance" ? (it.atk || 0) * 10 : (it.atk || 0) * 3;
+      if (it.t === "distance") {
+        // bow/crossbow tiram o dano da munição (atk 0 no item), enquanto a
+        // spear carrega o atk no próprio item. Comparar atk cru faria a
+        // spear vencer sempre; então avalia o conjunto arma + munição.
+        s += distanceWeaponPower(p, slug) * 10;
+      } else {
+        s += (it.atk || 0) * 3;
+      }
     } else {
       const sk = it.t === "sword" ? "sword" : it.t === "axe" ? "axe" :
                  it.t === "club" ? "club" : null;
@@ -522,11 +552,17 @@ function autoEquip(p) {
     if (slot === "backpack" || slot === "ammo") continue;
     let best = p.equip[slot] ? p.equip[slot].item : null;
     let bestScore = best ? itemScore(p, best) : -1;
+    const cur = best ? GAMEDATA.items[best] : null;
     for (const slug in p.bag) {
       const it = GAMEDATA.items[slug];
       if (!it || it.s !== slot) continue;
       if (it.lvl && p.level < it.lvl) continue;
       if (it.vocs && it.vocs.indexOf(p.voc) === -1) continue;
+      // não troca a arma de distância equipada por uma spear só porque a
+      // munição acabou: as regras de arrow continuam valendo e o jogador
+      // fica sem atacar, em vez de virar arremessador sem avisar.
+      if (slot === "weapon" && it.inf && cur && cur.t === "distance" && !cur.inf)
+        continue;
       const sc = itemScore(p, slug);
       if (sc > bestScore) { bestScore = sc; best = slug; }
     }

@@ -328,6 +328,166 @@ function drawRookgaardSewer(ctx, W, H) {
   ctx.fillText("Bueiro de Rookgaard", 16, 23);
 }
 
+/* Caverna das Aranhas: gruta de pedra com teias, ovos e poças de veneno.
+ * Mesmo esquema do bueiro — mapa em grid desenhado a mão. */
+function drawSpiderCave(ctx, W, H) {
+  const cols = 21, rows = 13;
+  const tw = W / cols, th = H / rows;
+  const tile = (x, y, fill, stroke) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x * tw, y * th, tw + 1, th + 1);
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x * tw + 0.5, y * th + 0.5, tw, th);
+    }
+  };
+
+  // # rocha  . chão de terra  , terra clara  ~ poça de veneno
+  // o ovos   * teia no chão   = ponte de raízes
+  const map = [
+    "#####################",
+    "##...###.......###..#",
+    "#..o..##..***..##...#",
+    "#..,,..#.*~~~*.#..o.#",
+    "#.,,,,.,.*~~~*.,..,.#",
+    "##.,,.,,,.***.,,,.,##",
+    "#...,..=========..,.#",
+    "##.,,.,,,.***.,,,.,##",
+    "#.,,,,.,.*~~~*.,..,.#",
+    "#..o...#.*~~~*.#.,..#",
+    "#..,,..##..***..##o.#",
+    "##...###.......###..#",
+    "#####################",
+  ];
+
+  ctx.fillStyle = "#0a0806";
+  ctx.fillRect(0, 0, W, H);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const c = map[y][x];
+      if (c === "#") {
+        tile(x, y, "#241f1a", "#0d0b09");
+      } else if (c === "~") {
+        const g = ctx.createLinearGradient(0, y * th, 0, (y + 1) * th);
+        g.addColorStop(0, "#3f5c22"); g.addColorStop(0.5, "#28401a"); g.addColorStop(1, "#152811");
+        tile(x, y, g, "#0d1a0a");
+      } else if (c === "=") {
+        tile(x, y, "#5a4526", "#241a0e");
+      } else if (c === ",") {
+        tile(x, y, "#443a2e", "#2a231b");
+      } else {
+        tile(x, y, "#37302a", "#231e19");
+      }
+
+      // relevo da rocha
+      if (c === "#") {
+        ctx.fillStyle = "rgba(255,255,255,.045)";
+        ctx.fillRect(x * tw + 1, y * th + 1, tw - 2, 2);
+        ctx.fillStyle = "rgba(0,0,0,.28)";
+        ctx.fillRect(x * tw + 1, (y + 1) * th - 3, tw - 2, 2);
+      }
+      // cascalho no chão
+      if ((c === "." || c === ",") && (x * 3 + y * 7) % 5 === 0) {
+        ctx.fillStyle = "rgba(0,0,0,.22)";
+        ctx.fillRect(x * tw + tw * 0.2, y * th + th * 0.3, tw * 0.4, 2);
+      }
+      // teia no chão
+      if (c === "*") {
+        ctx.strokeStyle = "rgba(230,230,225,.30)";
+        ctx.lineWidth = 1;
+        const cx = (x + 0.5) * tw, cy = (y + 0.5) * th;
+        for (let a = 0; a < 4; a++) {
+          const ang = (Math.PI / 4) * a;
+          ctx.beginPath();
+          ctx.moveTo(cx - Math.cos(ang) * tw * 0.42, cy - Math.sin(ang) * th * 0.42);
+          ctx.lineTo(cx + Math.cos(ang) * tw * 0.42, cy + Math.sin(ang) * th * 0.42);
+          ctx.stroke();
+        }
+        for (const r of [0.16, 0.3]) {
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, tw * r, th * r, 0, 0, 7);
+          ctx.stroke();
+        }
+      }
+      // casulos de ovos
+      if (c === "o") {
+        const cx = (x + 0.5) * tw, cy = (y + 0.5) * th;
+        ctx.fillStyle = "#d8d2c0";
+        for (const [dx, dy, r] of [[-0.18, 0.05, 0.15], [0.16, -0.1, 0.13], [0.02, 0.2, 0.11]]) {
+          ctx.beginPath();
+          ctx.ellipse(cx + dx * tw, cy + dy * th, tw * r, th * (r + 0.05), 0, 0, 7);
+          ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(120,110,95,.6)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, tw * 0.34, th * 0.3, 0, 0, 7);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ponte de raízes sobre o poço central
+  ctx.strokeStyle = "rgba(30,20,10,.55)";
+  ctx.lineWidth = 2;
+  for (let x = 7; x <= 15; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * tw, 6 * th + th * 0.15);
+    ctx.lineTo(x * tw, 7 * th - th * 0.15);
+    ctx.stroke();
+  }
+
+  // brilho tóxico das poças
+  ctx.strokeStyle = "rgba(150,220,90,.18)";
+  ctx.lineWidth = 2;
+  for (const y of [3, 4, 8, 9]) {
+    ctx.beginPath();
+    ctx.moveTo(10 * tw, (y + 0.5) * th);
+    ctx.bezierCurveTo(10.6 * tw, y * th, 11.4 * tw, (y + 1) * th, 12 * tw, (y + 0.5) * th);
+    ctx.stroke();
+  }
+
+  // teias penduradas nos cantos superiores
+  ctx.strokeStyle = "rgba(235,235,230,.22)";
+  ctx.lineWidth = 1;
+  for (const [ox, oy] of [[1, 1], [19, 1], [1, 11], [19, 11]]) {
+    const cx = ox * tw, cy = oy * th;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (ox < 10 ? 1 : -1) * tw * (0.5 + i * 0.35),
+                 cy + (oy < 6 ? 1 : -1) * th * (1.4 - i * 0.2));
+      ctx.stroke();
+    }
+  }
+
+  // estalactites na rocha do topo
+  ctx.fillStyle = "#1a1612";
+  for (let x = 0; x < cols; x++) {
+    if ((x * 5) % 7 > 3) continue;
+    const h = th * (0.3 + ((x * 13) % 5) * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(x * tw + tw * 0.2, th);
+    ctx.lineTo(x * tw + tw * 0.5, th + h);
+    ctx.lineTo(x * tw + tw * 0.8, th);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // legenda local
+  ctx.fillStyle = "rgba(0,0,0,.55)";
+  ctx.fillRect(8, 8, 190, 22);
+  ctx.strokeStyle = "rgba(120,100,60,.6)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(8, 8, 190, 22);
+  ctx.font = "bold 11px Verdana";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#c8d87a";
+  ctx.fillText("Caverna das Aranhas", 16, 23);
+}
+
 Renderer.prototype.addCorpse = function (x, y, slug) {
   this.corpses.push({ x: x, y: y, slug: slug, life: 2000 });
   if (this.corpses.length > 8) this.corpses.shift();
@@ -503,6 +663,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // --- chao/mapa tileado
   if (scene === "sewer") {
     drawRookgaardSewer(ctx, W, H);
+  } else if (hunt && combat.huntId === "spiders") {
+    drawSpiderCave(ctx, W, H);
   } else {
     const gr = Sprites.ground(scene);
     if (gr && gr.complete && gr.naturalWidth) {
