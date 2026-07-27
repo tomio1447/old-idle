@@ -162,6 +162,8 @@ function normalizePlayer(p) {
   p.upgrades = p.upgrades || {};
   p.imbuements = p.imbuements || {};
   p.dummies = p.dummies || {};
+  p.conditions = p.conditions || {};
+  p.buffs = p.buffs || {};
   if (!p.config.dummy) p.config.dummy = "exercise";
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   ensureOutfit(p);
@@ -748,6 +750,19 @@ function drainEvents() {
         break;
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
+        break;
+      case "player-condition": {
+        const d = CONDITIONS[e.tipo];
+        if (d) addLog("death", `Você está <b style="color:${d.cor}">${d.nome}</b>!`);
+        renderStats(G.p);
+        break;
+      }
+      case "cured":
+        addLog("skill", `Curou <b>${e.nome}</b>.`);
+        renderStats(G.p);
+        break;
+      case "buff":
+        addLog("skill", `Buff ativo: <b>${e.nome}</b>`);
         break;
       case "poisoned":
         r.addEffect(ex(e), ey(e), "hit-by-poison");

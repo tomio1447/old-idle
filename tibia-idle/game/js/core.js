@@ -263,7 +263,11 @@ const SPELLS = {
       if (c.words && !SPELLS[id].words) SPELLS[id].words = c.words;
       continue;
     }
-    if (c.type !== "attack" && c.type !== "heal") continue;
+    // support entra so quando ha um buff correspondente (Virtudes,
+    // Protector, Divine Dazzle) ou quando e uma cura de condition (exana)
+    const ehBuff = typeof BUFFS !== "undefined" && BUFFS[id];
+    const ehCure = /^exana-/.test(id);
+    if (c.type !== "attack" && c.type !== "heal" && !ehBuff && !ehCure) continue;
     // escala o poder pelo custo de mana, para a magia nova nao nascer
     // desbalanceada em relacao as que ja existiam
     const p = c.type === "heal"

@@ -422,38 +422,130 @@ function consumeAmmoCharge(c, p) {
 }
 
 /* ---------------------------------------------------------- condicoes
- * Veneno em turnos, como no Tibia: a cada turno o alvo perde HP fixo.
- * Reaplicar renova a duracao e mantem o maior dano por turno. */
-const POISON_TURN_MS = 2000;
+ * Conditions do Tibia 15.x (CONDITION_* do Canary). Cada uma tira HP por
+ * turno enquanto durar, com o elemento e o efeito visual proprios.
+ * As cures (exana pox/flam/vis/kor/mort) removem a condition
+ * correspondente.
+ */
+const CONDITION_TURN_MS = 2000;
 
-function applyPoison(mob, dmg, turns) {
-  if (!mob || mob.hp <= 0) return;
-  const cur = mob.poison;
+const CONDITIONS = {
+  poison:  { nome: "Envenenado",   el: "earth",  fx: "hit-by-poison",
+             cor: "#8ac83c", cure: "exana-pox" },
+  fire:    { nome: "Queimando",    el: "fire",   fx: "hit-by-fire",
+             cor: "#ff8a3c", cure: "exana-flam" },
+  energy:  { nome: "Eletrificado", el: "energy", fx: "energy-damage",
+             cor: "#c07cff", cure: "exana-vis" },
+  bleed:   { nome: "Sangrando",    el: "physical", fx: "draw-blood",
+             cor: "#d84040", cure: "exana-kor" },
+  cursed:  { nome: "Amaldiçoado",  el: "death",  fx: "mort-area",
+             cor: "#8a5aa8", cure: "exana-mort" },
+  // congelamento nao tem exana proprio no Tibia: passa com o tempo
+  freezing:{ nome: "Congelado",    el: "ice",    fx: "ice-attack",
+             cor: "#7ec8ff", cure: null },
+};
+
+/* Aplica (ou renova) uma condition num alvo — monstro ou jogador. */
+function applyCondition(alvo, tipo, dmg, turns) {
+  if (!alvo || !CONDITIONS[tipo]) return;
+  if (alvo.hp !== undefined && alvo.hp <= 0) return;
+  alvo.conditions = alvo.conditions || {};
+  const cur = alvo.conditions[tipo];
   if (cur) {
+    // reaplicar mantem o pior dano e a maior duracao, como no servidor
     cur.dmg = Math.max(cur.dmg, dmg);
     cur.turns = Math.max(cur.turns, turns);
   } else {
-    mob.poison = { dmg: dmg, turns: turns, acc: 0 };
+    alvo.conditions[tipo] = { dmg: dmg, turns: turns, acc: 0 };
   }
 }
 
-/* Aplica o dano de veneno de todos os monstros envenenados */
-function tickPoison(c, p, dt) {
-  for (const m of c.mobs) {
-    const po = m.poison;
-    if (!po || m.hp <= 0) continue;
-    po.acc += dt;
-    while (po.acc >= POISON_TURN_MS && po.turns > 0 && m.hp > 0) {
-      po.acc -= POISON_TURN_MS;
-      po.turns--;
-      const dmg = Math.max(1, po.dmg);
-      m.hp -= dmg;
-      c.stats.damage += dmg;
-      c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y,
-                      screen: true, el: "earth", poison: true });
-    }
-    if (po.turns <= 0) delete m.poison;
+/* compatibilidade: veneno continua tendo atalho proprio */
+function applyPoison(mob, dmg, turns) {
+  applyCondition(mob, "poison", dmg, turns);
+}
+
+function hasCondition(alvo, tipo) {
+  return !!(alvo && alvo.conditions && alvo.conditions[tipo]);
+}
+
+function clearCondition(alvo, tipo) {
+  if (alvo && alvo.conditions && alvo.conditions[tipo]) {
+    delete alvo.conditions[tipo];
+    return true;
   }
+  return false;
+}
+
+function conditionList(alvo) {
+  if (!alvo || !alvo.conditions) return [];
+  return Object.keys(alvo.conditions);
+}
+
+/* Drena o HP de todas as conditions ativas nos monstros e no jogador. */
+function tickConditions(c, p, dt) {
+  // --- monstros
+  for (const m of c.mobs) {
+    if (m.hp <= 0 || !m.conditions) continue;
+    for (const tipo of Object.keys(m.conditions)) {
+      const co = m.conditions[tipo];
+      const def = CONDITIONS[tipo];
+      co.acc += dt;
+      while (co.acc >= CONDITION_TURN_MS && co.turns > 0 && m.hp > 0) {
+        co.acc -= CONDITION_TURN_MS;
+        co.turns--;
+        const dmg = Math.max(1, co.dmg);
+        m.hp -= dmg;
+        c.stats.damage += dmg;
+        c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y,
+                        screen: true, el: def.el, condition: tipo });
+      }
+      if (co.turns <= 0) delete m.conditions[tipo];
+    }
+  }
+  // --- jogador
+  if (p.conditions) {
+    for (const tipo of Object.keys(p.conditions)) {
+      const co = p.conditions[tipo];
+      const def = CONDITIONS[tipo];
+      co.acc += dt;
+      while (co.acc >= CONDITION_TURN_MS && co.turns > 0 && p.hp > 0) {
+        co.acc -= CONDITION_TURN_MS;
+        co.turns--;
+        const dmg = Math.max(1, co.dmg);
+        p.hp -= dmg;
+        c.stats.taken += dmg;
+        c.events.push({ t: "taken", dmg: dmg, el: def.el, condition: tipo,
+                        x: c.player ? c.player.x : 0.13,
+                        y: c.player ? c.player.y : 0.6, screen: true });
+      }
+      if (co.turns <= 0) delete p.conditions[tipo];
+    }
+    if (p.hp <= 0) playerDeath(c, p);
+  }
+}
+
+/* compatibilidade com o nome antigo */
+function tickPoison(c, p, dt) { tickConditions(c, p, dt); }
+
+/* O monstro aplica a condition dele ao acertar (dados do Canary). */
+function applyMonsterCondition(c, p, mob) {
+  const def = mob.def || {};
+  // veneno vem do campo `poison` importado do Canary
+  if (def.poison) {
+    applyCondition(p, "poison", def.poison.dmg, def.poison.turns);
+    c.events.push({ t: "player-condition", tipo: "poison" });
+    return;
+  }
+  // demais elementos tem chance de aplicar a condition correspondente
+  const porElemento = { fire: "fire", energy: "energy", ice: "freezing",
+                        death: "cursed" };
+  const tipo = porElemento[def.element];
+  if (!tipo) return;
+  if (Math.random() > 0.18) return;             // 18% de chance
+  const dano = Math.max(1, Math.round((def.damage || 10) * 0.08));
+  applyCondition(p, tipo, dano, 4);
+  c.events.push({ t: "player-condition", tipo: tipo });
 }
 
 /* Municao ativa (null quando a arma nao usa municao) */
@@ -554,6 +646,20 @@ function playerAttack(c, p, target) {
   };
 
   let raw = rollDamage();
+
+  // ---- buffs de vocacao (Virtudes, Protector)
+  const bf = typeof buffTotals === "function" ? buffTotals(p) : null;
+  if (bf) {
+    if (bf.dmgDealt !== 1) raw = Math.max(1, Math.floor(raw * bf.dmgDealt));
+    if (bf.lifeOnHit) {
+      const mx = maxStats(p);
+      p.hp = Math.min(mx.hp, p.hp + Math.max(1, Math.floor(raw * bf.lifeOnHit)));
+    }
+    if (bf.manaOnHit) {
+      const mx = maxStats(p);
+      p.mp = Math.min(mx.mp, p.mp + Math.max(1, Math.floor(raw * bf.manaOnHit)));
+    }
+  }
 
   // ---- imbuements do 15.x
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
@@ -800,6 +906,53 @@ function tryHeal(c, p, now) {
   return false;
 }
 
+/* Mantem o buff de vocacao ativo (Virtude do Monk, Protector do Knight,
+ * Divine Dazzle do Paladin). O jogador escolhe qual no Helper. */
+function tryBuff(c, p, now) {
+  if (typeof BUFFS === "undefined") return false;
+  const chave = p.config && p.config.buff;
+  if (!chave || !BUFFS[chave]) return false;
+  if (hasBuff(p, chave, now)) return false;
+  if ((c.buffCd || 0) > now) return false;
+  const s = SPELLS[chave];
+  if (!s) return false;
+  if (s.vocs && s.vocs.indexOf(p.voc) === -1) return false;
+  if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
+  p.mp -= s.mana;
+  addManaSpent(p, combatManaSkillGain(c, s.mana));
+  applyBuff(p, chave, now);
+  c.buffCd = now + Math.max(1000, s.cd || 2000);
+  c.events.push({ t: "say", text: spellWords(chave, s) });
+  c.events.push({ t: "buff", nome: BUFFS[chave].nome });
+  return true;
+}
+
+/* Usa a magia de cura de condition (exana ...) quando o jogador esta
+ * sofrendo um efeito e conhece a magia. Prioriza o efeito mais nocivo. */
+const CURE_ORDEM = ["cursed", "fire", "energy", "bleed", "poison", "freezing"];
+
+function tryCureCondition(c, p, now) {
+  if (!p.conditions) return false;
+  if ((c.cureCd || 0) > now) return false;
+  for (const tipo of CURE_ORDEM) {
+    if (!p.conditions[tipo]) continue;
+    const def = CONDITIONS[tipo];
+    if (!def.cure) continue;
+    const s = SPELLS[def.cure];
+    if (!s) continue;
+    if (s.vocs && s.vocs.indexOf(p.voc) === -1) continue;
+    if (p.level < (s.lvl || 1) || p.mp < s.mana) continue;
+    p.mp -= s.mana;
+    addManaSpent(p, combatManaSkillGain(c, s.mana));
+    clearCondition(p, tipo);
+    c.cureCd = now + 1000;
+    c.events.push({ t: "say", text: spellWords(def.cure, s) });
+    c.events.push({ t: "cured", tipo: tipo, nome: def.nome });
+    return true;
+  }
+  return false;
+}
+
 /* Existe alguma forma de cura disponivel agora? (spell com mana ou runa) */
 function canHeal(c, p) {
   if (p.config.healSpell) {
@@ -863,6 +1016,13 @@ function tryMana(c, p) {
 function mobAttack(c, p, mob) {
   const pl = c.player || { x: 0.18, y: 0.62 };
   if (pointDistance(pl, mob) > monsterAttackRange(mob)) return false;
+
+  // Divine Dazzle (exana amp res): o alvo ofuscado erra golpes
+  const bfm = typeof buffTotals === "function" ? buffTotals(p) : null;
+  if (bfm && bfm.mobMissChance && Math.random() < bfm.mobMissChance) {
+    c.events.push({ t: "miss", x: pl.x, y: pl.y, dazzle: true });
+    return 0;
+  }
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
@@ -884,12 +1044,18 @@ function mobAttack(c, p, mob) {
     return 0;
   }
   p.hp -= raw;
+  // buffs: reduz o dano recebido (Protector, Virtue of Sustain)
+  const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
+  if (bfd && bfd.dmgReceived !== 1)
+    raw = Math.max(1, Math.floor(raw * bfd.dmgReceived));
+
   // protecao elemental vinda dos imbuements
   if (typeof imbProtection === "function") {
     const prot = imbProtection(p, mob.def.element);
     if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
   }
   c.stats.taken += raw;
+  applyMonsterCondition(c, p, mob);
   addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
@@ -1031,8 +1197,14 @@ function combatTick(c, p, dt, now) {
   // movimentação: player aproxima/kita e monstros procuram distância de ataque
   updateCombatMovement(c, p, dt);
 
-  // veneno das poison arrows continua drenando o alvo entre os golpes
-  tickPoison(c, p, dt);
+  // conditions (veneno, fogo, energia, sangramento, maldicao) drenando
+  tickConditions(c, p, dt);
+
+  // buff de vocacao: mantem a Virtude / Protector sempre ativos
+  tryBuff(c, p, now);
+
+  // cura de conditions (exana) antes da cura de HP
+  tryCureCondition(c, p, now);
 
   // cura e mana
   tryHeal(c, p, now);

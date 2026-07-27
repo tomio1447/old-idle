@@ -545,3 +545,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   border: 1px solid var(--border-in);
   background: #14120e;
 }
+
+/* faixa de conditions e buffs ativos */
+.cond-bar { display: flex; flex-wrap: wrap; gap: 3px; margin: 5px 0 3px; }
+.cond-bar .cond {
+  font-size: 9px; padding: 1px 5px; border: 1px solid #6b6455;
+  background: rgba(0,0,0,.35); color: #c8c0a8; white-space: nowrap;
+}
+.cond-bar .cond.buff { border-color: #9ce84a; color: #9ce84a; }

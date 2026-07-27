@@ -48,6 +48,8 @@ function newPlayer(name, voc, sex) {
     ammo: {},               // slug -> unidades (munição não ocupa slot)
     upgrades: {},           // chave do item -> tier de refino do ferreiro
     imbuements: {},         // "equip:<slot>" -> [{cat, tier, sub}]
+    conditions: {},         // veneno/fogo/energia... ativos no jogador
+    buffs: {},              // buff de vocacao -> timestamp de expiracao
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
     lootConfig: { noCollect: [], noSell: [] },
@@ -226,7 +228,15 @@ function playerDefense(p) {
   return {
     armor: g.armor,
     defense: g.defense,
-    shielding: effSkill(p, "shield"),
+    shielding: (function () {
+      let sh = effSkill(p, "shield");
+      // Protector e Virtue of Harmony aumentam o shielding em %
+      if (typeof buffTotals === "function") {
+        const b = buffTotals(p);
+        if (b.shieldPercent) sh = Math.floor(sh * (1 + b.shieldPercent / 100));
+      }
+      return sh;
+    })(),
     protection: g.prot,
   };
 }

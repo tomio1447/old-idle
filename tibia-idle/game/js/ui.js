@@ -112,6 +112,30 @@ function addLog(kind, html) {
 
 /* ------------------------------------------------------------ paineis */
 function renderStats(p) {
+  // faixa de conditions/buffs ativos
+  const box = $("#cond-bar");
+  if (box) {
+    const partes = [];
+    if (typeof conditionList === "function") {
+      for (const t of conditionList(p)) {
+        const d = CONDITIONS[t];
+        if (!d) continue;
+        const c = p.conditions[t];
+        partes.push(`<span class="cond" style="border-color:${d.cor};color:${d.cor}"
+          title="${d.nome}">${d.nome} ${c.turns}</span>`);
+      }
+    }
+    if (typeof buffTotals === "function") {
+      const agora = Date.now();
+      for (const b of buffTotals(p).lista) {
+        const s2 = Math.max(0, Math.ceil((b.ate - agora) / 1000));
+        partes.push(`<span class="cond buff" title="${b.nome}">${b.nome} ${s2}s</span>`);
+      }
+    }
+    box.innerHTML = partes.join("");
+    box.style.display = partes.length ? "" : "none";
+  }
+
   const max = maxStats(p);
   const g = gearStats(p);
   const dmg = playerDamage(p);
@@ -751,6 +775,36 @@ function spellIcon(s, cls) {
   return `<img class="spell-icon ${cls || ""}" src="assets/spell/icon-${s.icon}.png" alt="">`;
 }
 
+/* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle) */
+function renderBuffPicker(p) {
+  if (typeof availableBuffs !== "function") return "";
+  const lista = availableBuffs(p);
+  if (!lista.length) return "";
+  const ativos = typeof buffTotals === "function" ? buffTotals(p).lista : [];
+  const agora = Date.now();
+  return `
+    <div class="small dim mt8 mb4">Buff de vocação</div>
+    <div class="list" style="max-height:150px">
+      ${lista.map(({ chave, buff, spell }) => {
+        const sel = p.config.buff === chave;
+        const at = ativos.find((x) => x.chave === chave);
+        const resta = at ? Math.max(0, Math.ceil((at.ate - agora) / 1000)) : 0;
+        return `<div class="shop-row ${sel ? "selected" : ""}">
+          ${spell ? spellIcon(spell) : ""}
+          <div style="flex:1;min-width:0">
+            <div class="small">${buff.nome}
+              ${resta ? `<span style="color:#9ce84a">· ${resta}s</span>` : ""}</div>
+            <div class="tiny dim">${spell ? `<b>${spell.words || chave}</b> · ${spell.mana} mana · nv ${spell.lvl}` : ""}</div>
+            <div class="tiny dim">${buff.desc}</div>
+          </div>
+          <button class="sm ${sel ? "primary" : ""}" data-buff="${chave}">
+            ${sel ? "ATIVO" : "USAR"}</button>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="tiny dim mt4">O buff é relançado sozinho enquanto estiver selecionado.</div>`;
+}
+
 function renderHelper(p) {
   const healEl = $("#helper-heal");
   const atkEl = $("#helper-attack");
@@ -863,7 +917,15 @@ function renderHelper(p) {
         <input id="kite-distance" type="number" min="1" max="5" value="${p.config.kiteDistance || 3}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
-      <div class="tiny dim mt8">Kiting faz o personagem manter de 1 a 5 SQMs do monstro targetado. Stand mantém parado. Chase aproxima.</div>`;
+      <div class="tiny dim mt8">Kiting faz o personagem manter de 1 a 5 SQMs do monstro targetado. Stand mantém parado. Chase aproxima.</div>
+      ${renderBuffPicker(p)}`;
+    $$("#helper-attack [data-buff]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.buff;
+      p.config.buff = p.config.buff === k ? null : k;
+      toast(p.config.buff ? `Buff selecionado: <b>${BUFFS[k].nome}</b>`
+                          : "Buff desativado.");
+      renderHelper(p);
+    }));
     $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
       p.config.attackMode = b.dataset.attackMode;
       renderHelper(p);
