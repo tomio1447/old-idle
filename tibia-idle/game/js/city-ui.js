@@ -508,7 +508,9 @@ function npcTrain(p) {
     <button class="primary full mb8" id="academy-enter">Teleportar para Academia</button>
     <button class="full" id="academy-conjure-list">Abrir conjure</button>
     <div class="tiny dim mt8">
-      Dentro da academia você bate no Treiner em safezone. Knights treinam sword/club/axe conforme a arma, RPs treinam distance, mages gastam 65 mana por hit, e todos ganham shielding.
+      Dentro da academia você bate no exercise dummy em safezone. A skill treinada
+      segue a arma equipada — sem arma, treina punho. Mages acumulam mana spent
+      sem gastar mana, distance não consome munição, e todos ganham shielding.
     </div>`;
 }
 
