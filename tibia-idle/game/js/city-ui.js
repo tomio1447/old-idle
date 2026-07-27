@@ -466,16 +466,43 @@ function npcTrain(p) {
   const weapon = p.equip.weapon ? itemName(p.equip.weapon.item) : "nenhuma";
   const ammo = p.equip.ammo ? `${itemName(p.equip.ammo.item)} (${ammoCount(p, p.equip.ammo.item)})` : "nenhuma";
 
+  const dummyId = (p.config && p.config.dummy) || "exercise";
+  const dummy = EXERCISE_DUMMIES[dummyId] || EXERCISE_DUMMIES.exercise;
+  const rate = dummy.rate / 100;
+  const isMagic = st.skill === "magic";
+  const porGolpe = isMagic
+    ? `${Math.floor(EXERCISE_MANA * rate)} mana spent`
+    : `${(EXERCISE_TRIES * rate).toFixed(1)} tries`;
+  const intervalo = (exerciseInterval(p) / 1000).toFixed(1);
+
   return goldLine(p) + `
     <div class="panel-inset mb8" style="padding:8px">
       <div class="stat-row"><span class="k">Sala</span><span class="v">Safezone</span></div>
-      <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
+      <div class="stat-row"><span class="k">Dummy</span><span class="v">${dummy.name}</span></div>
       <div class="stat-row"><span class="k">Vocação</span><span class="v">${vocationName(p)}</span></div>
       <div class="stat-row"><span class="k">Skill treinada</span><span class="v">${skillTxt}</span></div>
+      <div class="stat-row"><span class="k">Por golpe</span><span class="v" style="color:#9ce84a">${porGolpe}</span></div>
+      <div class="stat-row"><span class="k">Intervalo</span><span class="v">${intervalo}s</span></div>
+      <div class="stat-row"><span class="k">Taxa do dummy</span><span class="v">${dummy.rate}%</span></div>
       <div class="stat-row"><span class="k">Shielding</span><span class="v">Todos os hits</span></div>
-      <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
       <div class="stat-row"><span class="k">Weapon</span><span class="v">${weapon}</span></div>
-      ${p.voc === "paladin" ? `<div class="stat-row"><span class="k">Ammo</span><span class="v">${ammo}</span></div>` : ""}
+    </div>
+    <div class="small dim mb4">Exercise dummy</div>
+    <div class="row wrap mb8" style="gap:4px">
+      ${Object.keys(EXERCISE_DUMMIES).map((id) => {
+        const d = EXERCISE_DUMMIES[id];
+        const dono = id === "exercise" || (p.dummies && p.dummies[id]);
+        const sel = id === dummyId;
+        return `<button class="sm ${sel ? "primary" : ""}" data-dummy="${id}"
+          title="${dono ? `taxa ${d.rate}%` : `comprar por ${fmtFull(d.price)} gp`}">
+          ${d.name.replace(" Exercise Dummy", "").replace("Exercise Dummy", "Básico")}
+          ${dono ? "" : `· ${fmtFull(d.price)}`}</button>`;
+      }).join("")}
+    </div>
+    <div class="tiny dim mb8">
+      Fórmula do Canary: <b>${isMagic ? "600" : "7"} × taxa</b> por golpe, a cada
+      <b>baseAttackSpeed / rateExerciseTrainingSpeed</b>. Não é preciso ter a
+      exercise weapon — treina com o equipamento atual.
     </div>
     ${st.ok ? "" : `<div class="small mb8" style="color:#ffb060">${st.msg}</div>`}
     <button class="primary full mb8" id="academy-enter">Teleportar para Academia</button>
@@ -661,6 +688,26 @@ function bindNpc(id, type) {
     $("#modal").classList.remove("show");
     startAcademy();
   });
+  // escolher / comprar exercise dummy
+  $$("#npc-content [data-dummy]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.dummy;
+      const d = EXERCISE_DUMMIES[id];
+      if (!d) return;
+      p.dummies = p.dummies || {};
+      const dono = id === "exercise" || p.dummies[id];
+      if (!dono) {
+        if (p.gold < d.price) { toast(`Faltam ${fmtFull(d.price - p.gold)} gp.`); return; }
+        p.gold -= d.price;
+        p.dummies[id] = 1;
+        addLog("sell", `Comprou <b>${d.name}</b> por <span class="gold-txt">${fmtFull(d.price)} gp</span>`);
+      }
+      p.config.dummy = id;
+      toast(`Treinando no <b>${d.name}</b> (${d.rate}%)`);
+      refreshNpc(G.activeNpc || "trainer");
+      renderAll();
+    }));
+
   const academyConjure = $("#academy-conjure-list");
   if (academyConjure) academyConjure.addEventListener("click", () => {
     openAcademyConjureModal(true);

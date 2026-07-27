@@ -161,6 +161,8 @@ function normalizePlayer(p) {
   p.ammo = p.ammo || {};
   p.upgrades = p.upgrades || {};
   p.imbuements = p.imbuements || {};
+  p.dummies = p.dummies || {};
+  if (!p.config.dummy) p.config.dummy = "exercise";
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   ensureOutfit(p);
   return p;

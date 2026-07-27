@@ -271,7 +271,41 @@ function applyUpgrade(p, key, slug) {
 }
 
 /* ------------------------------------------------------------ academia safezone */
-const ACADEMY_SKILL_MULT = 3;      // 200% mais rápido que bater em alvo comum
+/* ------------------------------------------------------- exercise dummies
+ * Treino no formato do Canary (exercise_training_weapons.lua):
+ *
+ *   melee/dist/shield -> addSkillTries(skill, 7 * rate)
+ *   magic             -> addManaSpent(600 * rate)
+ *   intervalo         -> baseAttackSpeed / rateExerciseTrainingSpeed
+ *
+ * onde `rate` e a taxa do dummy dividida por 100. Aqui nao exigimos a
+ * exercise weapon: o personagem treina com o que ja tem equipado, mas os
+ * contadores seguem exatamente a formula do servidor.
+ */
+const EXERCISE_TRIES = 7;          // tries por golpe (7 * rate)
+const EXERCISE_MANA = 600;         // mana spent por golpe magico (600 * rate)
+const RATE_EXERCISE_SPEED = 1.0;   // config.lua: rateExerciseTrainingSpeed
+
+/* dummies do items.xml do Canary: id -> rate */
+const EXERCISE_DUMMIES = {
+  "exercise": { name: "Exercise Dummy", rate: 100, price: 0 },
+  "ferumbras": { name: "Ferumbras Exercise Dummy", rate: 110, price: 25000 },
+  "demon": { name: "Demon Exercise Dummy", rate: 110, price: 25000 },
+  "monk": { name: "Monk Exercise Dummy", rate: 110, price: 25000 },
+};
+
+function dummyRate(p) {
+  const d = EXERCISE_DUMMIES[(p.config && p.config.dummy) || "exercise"]
+            || EXERCISE_DUMMIES.exercise;
+  return d.rate / 100;
+}
+
+/* Intervalo entre golpes, como no servidor: baseAttackSpeed / rate */
+function exerciseInterval(p) {
+  const base = (VOCATIONS[p.voc] && VOCATIONS[p.voc].attackSpeed) || 2000;
+  return Math.max(200, base / RATE_EXERCISE_SPEED);
+}
+
 const ACADEMY_MAGE_HIT_MANA = 65;
 
 const ACADEMY_CONJURES = {
@@ -339,27 +373,25 @@ const ACADEMY_CONJURES = {
 };
 
 function academySkillFor(p) {
-  if (p.voc === "knight") {
-    const sk = weaponSkill(p);
-    return ["sword", "axe", "club"].indexOf(sk) !== -1 ? sk : null;
-  }
-  if (p.voc === "paladin") return "dist";
-  if (p.voc === "druid" || p.voc === "sorcerer") return "magic";
+  // A skill treinada segue a ARMA equipada, como as exercise weapons do
+  // Canary (cada arma treina a sua skill). Sem arma, treina punho — que
+  // e justamente a skill principal do Monk.
+  const sk = weaponSkill(p);
+  if (sk === "magic") return "magic";
+  // vocacoes magicas treinam ML mesmo sem rod/wand equipada
+  if ((p.voc === "druid" || p.voc === "sorcerer") && sk === "fist")
+    return "magic";
+  if (["sword", "axe", "club", "dist", "fist"].indexOf(sk) !== -1) return sk;
   return "fist";
 }
 
 function academyStatus(p) {
-  const skill = academySkillFor(p);
-  if (p.voc === "knight" && !skill)
-    return { ok: false, skill: null, msg: "Equipe sword, club ou axe para treinar como knight." };
-  if (p.voc === "paladin") {
-    const w = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
-    if (!w || w.t !== "distance")
-      return { ok: false, skill: "dist", msg: "Equipe bow/crossbow para treinar distance fighting." };
-    if (!p.equip.ammo || !p.equip.ammo.item)
-      return { ok: false, skill: "dist", msg: "Selecione arrows/bolts na aba Refill ou conjure munição." };
-  }
-  return { ok: true, skill: skill, msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
+  // No Canary o treino exige a exercise weapon. Aqui a exigencia foi
+  // removida: o personagem treina com o equipamento que ja tem, e a
+  // skill treinada segue a arma (ou o punho, se estiver desarmado).
+  const skill = academySkillFor(p) || "fist";
+  return { ok: true, skill: skill,
+           msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
 }
 
 function newAcademyTraining(p) {
@@ -373,8 +405,10 @@ function newAcademyTraining(p) {
   };
 }
 
-function academyAttackDelay(t) {
-  return t.hasteUntil > Date.now() ? 1500 : 2000;
+function academyAttackDelay(t, p) {
+  // baseAttackSpeed / rateExerciseTrainingSpeed, como no servidor
+  const base = p ? exerciseInterval(p) : 2000;
+  return t.hasteUntil > Date.now() ? base * 0.75 : base;
 }
 
 function academyConjuresFor(p) {
@@ -477,39 +511,26 @@ function academyTrainingTick(t, p, dt, now) {
 
   let skillUp = false;
   let dmg = 0;
+  const rate = dummyRate(p);
   if (st.skill === "magic") {
-    if (p.mp < ACADEMY_MAGE_HIT_MANA) {
-      if (now - t.lastMsg > 3000) {
-        t.events.push({ type: "msg", msg: "Aguardando mana para bater no Treiner." });
-        t.lastMsg = now;
-      }
-      t.hitCd = 1000;
-      return;
-    }
-    p.mp -= ACADEMY_MAGE_HIT_MANA;
-    t.stats.manaSpent += ACADEMY_MAGE_HIT_MANA;
-    skillUp = addManaSpent(p, ACADEMY_MAGE_HIT_MANA * ACADEMY_SKILL_MULT);
+    // magia: o servidor conta mana spent, sem exigir mana do jogador
+    const ganho = Math.floor(EXERCISE_MANA * rate);
+    t.stats.manaSpent += ganho;
+    skillUp = addManaSpent(p, ganho);
   } else if (st.skill === "dist") {
-    if (!consumeAmmoCharge(t, p)) {
-      if (now - t.lastMsg > 3000) {
-        t.events.push({ type: "msg", msg: "Sem munição/gold. Use conjure para criar arrows ou bolts." });
-        t.lastMsg = now;
-      }
-      t.hitCd = 1000;
-      return;
-    }
+    // sem exigir municao: o treino aqui nao consome arrows
     const d = playerDamage(p);
     dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.85));
-    skillUp = addSkillTries(p, "dist", ACADEMY_SKILL_MULT);
+    skillUp = addSkillTries(p, "dist", EXERCISE_TRIES * rate);
   } else {
-    if (p.voc === "knight") {
+    if (p.voc === "knight" || p.voc === "monk") {
       const d = playerDamage(p);
       dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.9));
     }
-    skillUp = addSkillTries(p, st.skill, ACADEMY_SKILL_MULT);
+    skillUp = addSkillTries(p, st.skill, EXERCISE_TRIES * rate);
   }
 
-  const shieldUp = addSkillTries(p, "shield", ACADEMY_SKILL_MULT);
+  const shieldUp = addSkillTries(p, "shield", EXERCISE_TRIES * rate);
   t.hits++;
   t.stats.hits++;
   t.stats.damage += dmg;
@@ -517,7 +538,7 @@ function academyTrainingTick(t, p, dt, now) {
   if (shieldUp) t.stats.shieldUps++;
   t.events.push({ type: "hit", skill: st.skill, dmg: dmg,
                   skillUp: skillUp, shieldUp: shieldUp });
-  t.hitCd = academyAttackDelay(t);
+  t.hitCd = academyAttackDelay(t, p);
 }
 
 /* ------------------------------------------------------------ acoes */
