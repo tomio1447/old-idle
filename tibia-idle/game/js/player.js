@@ -44,6 +44,7 @@ function newPlayer(name, voc, sex) {
     promotedAt: null,
     equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
     bag: {},                // slug -> count
+    ammo: {},               // slug -> unidades (munição não ocupa slot)
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
     lootConfig: { noCollect: [], noSell: [] },
@@ -79,8 +80,6 @@ function newPlayer(name, voc, sex) {
       barMode: "bars",      // bars | arcs
       lootFilter: "all",    // all | valuable | equip
       missionCollapsed: false,
-      refillAmmo: true,     // paladin: recomprar munição automaticamente
-      refillTarget: 100,    // quantidade alvo por refill
       refillArrow: "",      // arrow selecionada
       refillBolt: "",       // bolt selecionada
     },
@@ -296,6 +295,46 @@ function bagSlots(p) {
   return p.bagSlots || 8;
 }
 
+/* ---------------------------------------------------- municao (contador)
+ * Munição não ocupa slot da mochila: vive em p.ammo como contagem pura.
+ * É reposta apenas por conjure e loot — nunca comprada. */
+function ammoCount(p, slug) {
+  return (p.ammo && p.ammo[slug]) || 0;
+}
+
+function addAmmo(p, slug, count) {
+  count = count || 1;
+  if (!p.ammo) p.ammo = {};
+  p.ammo[slug] = (p.ammo[slug] || 0) + count;
+  if (p.equip.ammo && p.equip.ammo.item === slug)
+    p.equip.ammo.count = p.ammo[slug];
+  return p.ammo[slug];
+}
+
+function removeAmmo(p, slug, count) {
+  count = count || 1;
+  if (!p.ammo || !p.ammo[slug]) return false;
+  p.ammo[slug] = Math.max(0, p.ammo[slug] - count);
+  if (p.equip.ammo && p.equip.ammo.item === slug)
+    p.equip.ammo.count = p.ammo[slug];
+  return true;
+}
+
+/* Move munição legada que estava ocupando slots da bag para o contador */
+function migrateAmmoToCounter(p) {
+  if (!p.ammo) p.ammo = {};
+  for (const slug of Object.keys(p.bag || {})) {
+    const it = GAMEDATA.items[slug];
+    if (it && it.s === "ammo") {
+      p.ammo[slug] = (p.ammo[slug] || 0) + p.bag[slug];
+      delete p.bag[slug];
+    }
+  }
+  if (p.equip.ammo && p.equip.ammo.item)
+    p.equip.ammo.count = ammoCount(p, p.equip.ammo.item);
+  return p.ammo;
+}
+
 function bagUsedSlots(p) {
   return Object.keys(p.bag || {}).filter((slug) => (p.bag[slug] || 0) > 0).length;
 }
@@ -482,19 +521,19 @@ function autoEquip(p) {
     addItem(p, p.equip.shield.item, 1);
     delete p.equip.shield;
   }
-  // municao para paladin: a mochila guarda as cargas; o slot ammo guarda
-  // qual municao esta selecionada para o auto-buy/consumo em combate.
+  // municao para paladin: o contador p.ammo guarda as unidades; o slot ammo
+  // guarda qual municao esta selecionada para o consumo em combate.
   if (w && w.t === "distance") {
     let bestAmmo = null, bestAtk = -1;
-    for (const slug in p.bag) {
+    for (const slug in (p.ammo || {})) {
       const it = GAMEDATA.items[slug];
-      if (!it || it.s !== "ammo" || (p.bag[slug] || 0) <= 0) continue;
+      if (!it || it.s !== "ammo" || ammoCount(p, slug) <= 0) continue;
       if ((it.atk || 0) > bestAtk) { bestAtk = it.atk || 0; bestAmmo = slug; }
     }
     if (bestAmmo && (!p.equip.ammo || p.equip.ammo.item !== bestAmmo)) {
-      p.equip.ammo = { item: bestAmmo, count: p.bag[bestAmmo] };
+      p.equip.ammo = { item: bestAmmo, count: ammoCount(p, bestAmmo) };
     } else if (p.equip.ammo) {
-      p.equip.ammo.count = p.bag[p.equip.ammo.item] || 0;
+      p.equip.ammo.count = ammoCount(p, p.equip.ammo.item);
     }
   }
   return changes;

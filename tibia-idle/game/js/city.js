@@ -167,18 +167,16 @@ function runManaTrainTick(p) {
   const check = manaTrainCanSelect(p, r);
   if (!check.ok) { p.config.manaTrain = null; return { stopped: true, msg: check.msg }; }
   if (p.mp < r.mana) return null;
-  if (r.type === "ammo" && !hasBagSpace(p, r.slug))
-    return { stopped: true, msg: "Mochila cheia para conjurar munição." };
 
   const beforeMl = p.ml;
   p.mp -= r.mana;
   addManaSpent(p, r.mana);
   if (r.type === "ammo") {
-    addItem(p, r.slug, r.amount);
+    addAmmo(p, r.slug, r.amount);
     if (p.equip.weapon && GAMEDATA.items[p.equip.weapon.item] &&
         GAMEDATA.items[p.equip.weapon.item].t === "distance") {
       if (!p.equip.ammo || p.equip.ammo.item === r.slug)
-        p.equip.ammo = { item: r.slug, count: p.bag[r.slug] || 0 };
+        p.equip.ammo = { item: r.slug, count: ammoCount(p, r.slug) };
     }
   } else {
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
@@ -277,7 +275,7 @@ function academyStatus(p) {
     if (!w || w.t !== "distance")
       return { ok: false, skill: "dist", msg: "Equipe bow/crossbow para treinar distance fighting." };
     if (!p.equip.ammo || !p.equip.ammo.item)
-      return { ok: false, skill: "dist", msg: "Selecione arrows/bolts na mochila ou conjure munição." };
+      return { ok: false, skill: "dist", msg: "Selecione arrows/bolts na aba Refill ou conjure munição." };
   }
   return { ok: true, skill: skill, msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
 }
@@ -312,8 +310,6 @@ function academyConjureCheck(p, r) {
     return { ok: false, msg: `Requer magic level ${r.ml}.` };
   if (p.mp < r.mana)
     return { ok: false, msg: `Mana insuficiente (${fmtFull(r.mana)}).` };
-  if (r.kind === "ammo" && !hasBagSpace(p, r.slug))
-    return { ok: false, msg: "Mochila cheia para conjurar munição." };
   return { ok: true, msg: "" };
 }
 
@@ -336,9 +332,10 @@ function castAcademyConjure(p, id) {
   addManaSpent(p, r.mana);
 
   if (r.kind === "ammo") {
-    addItem(p, r.slug, r.amount);
+    // munição é apenas contagem: não cria item na mochila
+    addAmmo(p, r.slug, r.amount);
     if (!p.equip.ammo || p.equip.ammo.item === r.slug)
-      p.equip.ammo = { item: r.slug, count: p.bag[r.slug] || 0 };
+      p.equip.ammo = { item: r.slug, count: ammoCount(p, r.slug) };
   } else if (r.kind === "supply") {
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.charges || 1);
   } else if (r.kind === "support" && typeof G !== "undefined" && G.training) {

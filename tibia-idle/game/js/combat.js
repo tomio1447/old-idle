@@ -365,13 +365,9 @@ function consumeSupplyCharge(c, p, slug) {
   return true;
 }
 
-function ammoPrice(slug) {
-  const it = GAMEDATA.items[slug];
-  if (!it) return 0;
-  return it.buy || Math.max(1, Math.floor((it.sell || 0) * 0.02));
-}
-
-/* Consome 1 carga de ammo. Ao zerar, compra a próxima carga no uso. */
+/* Consome 1 unidade de munição do contador.
+ * Munição nunca é comprada: vem de conjure/loot. Se acabar, o ataque
+ * simplesmente não sai e o personagem fica exposto. */
 function consumeAmmoCharge(c, p) {
   // armas com munição infinita (spear) nunca gastam carga
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
@@ -382,42 +378,13 @@ function consumeAmmoCharge(c, p) {
   const it = GAMEDATA.items[slug];
   if (!it || it.s !== "ammo") return true;
 
-  if ((p.bag[slug] || 0) <= 0) {
-    // refill automático: compra o lote configurado de uma vez
-    if (p.config && p.config.refillAmmo && typeof refillAmmo === "function") {
-      const r = refillAmmo(p, slug, p.config.refillTarget || 100);
-      if (r.bought > 0) {
-        if (c && c.stats) {
-          c.stats.supplyCost += r.cost;
-          c.stats.supplyBought = c.stats.supplyBought || {};
-          c.stats.supplyBought[slug] = (c.stats.supplyBought[slug] || 0) + r.bought;
-        }
-        if (c && c.events)
-          c.events.push({ t: "ammo-buy", name: `${r.bought}x ${it.n}`, cost: r.cost });
-      }
-    }
+  if (ammoCount(p, slug) <= 0) {
+    if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
+    ammo.count = 0;
+    return false;
   }
 
-  if ((p.bag[slug] || 0) <= 0) {
-    const cost = ammoPrice(slug);
-    if (cost <= 0 || p.gold < cost) {
-      if (c && c.events) c.events.push({ t: "no-ammo", name: it.n });
-      ammo.count = 0;
-      return false;
-    }
-    if (!spendGold(p, cost)) return false;
-    p.bag[slug] = 1;
-    if (c && c.stats) {
-      c.stats.supplyCost += cost;
-      c.stats.supplyBought = c.stats.supplyBought || {};
-      c.stats.supplyBought[slug] = (c.stats.supplyBought[slug] || 0) + 1;
-    }
-    if (c && c.events)
-      c.events.push({ t: "ammo-buy", name: it.n, cost: cost });
-  }
-
-  p.bag[slug] = Math.max(0, (p.bag[slug] || 0) - 1);
-  ammo.count = p.bag[slug];
+  removeAmmo(p, slug, 1);
   if (c && c.stats)
     c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
   return true;
@@ -757,6 +724,9 @@ function rollLoot(c, p, mob) {
       addLootPouch(p, l.item, count);
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
+    } else if (it.s === "ammo") {
+      // munição lootada vai para o contador, sem ocupar slot
+      addAmmo(p, l.item, count);
     } else if (shouldGoLootPouch(l.item)) {
       addLootPouch(p, l.item, count);
     } else if (!addItem(p, l.item, count)) {

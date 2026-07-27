@@ -128,8 +128,6 @@ function normalizePlayer(p) {
     autoRetreat: true,
     barMode: "bars",
     lootFilter: "all",
-    refillAmmo: true,
-    refillTarget: 100,
     refillArrow: "",
     refillBolt: "",
   }, p.config || {});
@@ -138,7 +136,6 @@ function normalizePlayer(p) {
   p.config.healItemAt = Math.max(1, Math.min(99, parseInt(p.config.healItemAt === undefined ? p.config.healAt : p.config.healItemAt, 10) || 60));
   p.config.healAt = Math.max(p.config.healSpellAt, p.config.healItemAt);
   p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
-  p.config.refillTarget = Math.max(1, Math.min(9999, parseInt(p.config.refillTarget, 10) || 100));
   // paladino sempre tem uma munição padrão selecionada
   if (p.voc === "paladin" && !p.config.refillArrow && !p.config.refillBolt)
     p.config.refillArrow = "arrow";
@@ -160,6 +157,8 @@ function normalizePlayer(p) {
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
+  p.ammo = p.ammo || {};
+  migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   ensureOutfit(p);
   return p;
 }
@@ -271,6 +270,7 @@ function computeOffline(p) {
   for (const slug in loot) {
     if (currencyValue(slug)) gold += creditCurrency(p, slug, loot[slug]);
     else if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
+    else if (GAMEDATA.items[slug] && GAMEDATA.items[slug].s === "ammo") addAmmo(p, slug, loot[slug]);
     else if (shouldGoLootPouch(slug)) addLootPouch(p, slug, loot[slug]);
     else if (!addItem(p, slug, loot[slug])) delete loot[slug];
   }
@@ -721,13 +721,10 @@ function drainEvents() {
         addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
         renderSupplies(G.p);
         break;
-      case "ammo-buy":
-        addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
-        renderInventory(G.p);
-        renderEquip(G.p);
-        break;
       case "no-ammo":
-        addLog("death", `Sem gold para comprar carga de <b>${e.name}</b>.`);
+        addLog("death", `Sem <b>${e.name}</b>: o ataque à distância falhou. Conjure munição na academia.`);
+        renderEquip(G.p);
+        renderRefill(G.p);
         break;
       case "bag-full":
         addLog("death", "Mochila cheia: loot no chão foi ignorado.");
@@ -843,13 +840,10 @@ function drainAcademyEvents() {
       case "msg":
         addLog("info", e.msg);
         break;
-      case "ammo-buy":
-        addLog("sell", `Carga de <b>${e.name}</b> comprada no uso por <span class="gold-txt">${fmtFull(e.cost)} gp</span>`);
-        renderInventory(G.p);
-        renderEquip(G.p);
-        break;
       case "no-ammo":
-        addLog("death", `Sem munição/gold para treinar com <b>${e.name}</b>.`);
+        addLog("death", `Sem <b>${e.name}</b> para treinar. Conjure munição na academia.`);
+        renderEquip(G.p);
+        renderRefill(G.p);
         break;
     }
   }
@@ -1178,9 +1172,9 @@ function bindControls() {
 /* ------------------------------------------------------------ personagens */
 function giveStarterKit(p) {
   if (p.voc === "paladin") {
-    // paladino começa com arco, uma carga de arrow e a spear infinita
+    // paladino começa com arco, uma arrow e a spear infinita
     addItem(p, "bow", 1);
-    addItem(p, "arrow", 1);
+    addAmmo(p, "arrow", 1);
     addItem(p, "spear", 1);
     addItem(p, "wooden-shield", 1);
   } else {
@@ -1191,7 +1185,7 @@ function giveStarterKit(p) {
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
   if (p.voc === "paladin" && !p.equip.ammo) {
-    p.equip.ammo = { item: "arrow", count: p.bag["arrow"] || 0 };
+    p.equip.ammo = { item: "arrow", count: ammoCount(p, "arrow") };
   }
   return p;
 }

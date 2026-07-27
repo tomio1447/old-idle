@@ -190,8 +190,9 @@ function renderEquip(p) {
     if (!slot) { h += `<div></div>`; continue; }
     const e = p.equip[slot];
     if (e) {
+      const cnt = slot === "ammo" ? ammoCount(p, e.item) : e.count;
       h += `<div class="slot" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${e.count > 1 ? `<span class="cnt">${e.count}</span>` : ""}
+        ${itemImg(e.item)}${cnt > 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
@@ -349,7 +350,7 @@ function equipFromBag(p, slug) {
   if (!it || !it.s) return false;
   if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
   if (it.s === "ammo") {
-    p.equip.ammo = { item: slug, count: p.bag[slug] || 0 };
+    p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
     toast(`Munição selecionada: <b>${it.n}</b>`);
     return true;
   }
@@ -902,23 +903,6 @@ const REFILL_AMMO = {
 
 function isPaladin(p) { return p && p.voc === "paladin"; }
 
-/* Compra munição até o alvo configurado. Retorna {bought, cost}. */
-function refillAmmo(p, slug, target) {
-  const it = GAMEDATA.items[slug];
-  if (!it || it.s !== "ammo") return { bought: 0, cost: 0 };
-  const price = ammoPrice(slug);
-  const have = p.bag[slug] || 0;
-  let need = Math.max(0, (target || 0) - have);
-  if (need <= 0 || price <= 0) return { bought: 0, cost: 0 };
-  const afford = Math.floor(p.gold / price);
-  need = Math.min(need, afford);
-  if (need <= 0) return { bought: 0, cost: 0 };
-  const cost = need * price;
-  if (!spendGold(p, cost)) return { bought: 0, cost: 0 };
-  if (!addItem(p, slug, need)) { p.gold += cost; return { bought: 0, cost: 0 }; }
-  return { bought: need, cost: cost };
-}
-
 function renderRefill(p) {
   const tab = $("#tab-refill");
   const el = $("#helper-refill");
@@ -949,14 +933,13 @@ function renderRefill(p) {
           const it = GAMEDATA.items[slug];
           if (!it) return "";
           const sel = selected === slug;
-          const have = p.bag[slug] || 0;
+          const have = ammoCount(p, slug);
           return `<div class="helper-supply-row ${sel ? "selected" : ""}">
             <img src="assets/item/${slug}.png" alt="${it.n}">
             <div style="flex:1;min-width:0">
               <div class="small">${it.n}</div>
               <div class="tiny dim">
-                <span class="gold-txt">${fmtFull(ammoPrice(slug))} gp</span>
-                · <span class="charge-highlight">TEM ${fmtFull(have)}</span>
+                <span class="charge-highlight">TEM ${fmtFull(have)}</span>
                 ${it.atk ? `· atk ${it.atk}` : ""}
               </div>
             </div>
@@ -969,59 +952,63 @@ function renderRefill(p) {
 
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   const infinite = wp && wp.inf;
+  const sel = p.equip.ammo && p.equip.ammo.item ? p.equip.ammo.item : null;
+  const selCount = sel ? ammoCount(p, sel) : 0;
 
   el.innerHTML = `
-    <label class="toggle"><input type="checkbox" id="refill-on" ${cfg.refillAmmo ? "checked" : ""}>
-      Refill automático de munição</label>
-    <div class="row mt8" style="gap:8px;align-items:flex-end">
-      <div style="flex:1">
-        <label class="small dim">Comprar até (unidades)</label>
-        <input id="refill-target" type="number" min="1" max="9999" value="${cfg.refillTarget || 100}"
-          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      </div>
-      <button class="sm primary" id="refill-now">Refill agora</button>
-    </div>
-    <div class="tiny dim mt4">
-      Ao ficar sem munição durante a caçada, o refill compra automaticamente até a quantidade definida.
+    <div class="tiny dim mb8">
+      Munição é reposta apenas por <b>conjure</b> na academia e por <b>loot</b>.
+      Sem munição o personagem não ataca à distância.
       ${infinite ? `<b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
     </div>
+    ${sel && !infinite && selCount <= 0
+      ? `<div class="tiny mb8" style="color:#ff9090">Sem <b>${itemName(sel)}</b>: conjure mais na academia.</div>`
+      : ""}
     ${group("Arrows", "arrow")}
-    ${group("Bolts", "bolt")}`;
+    ${group("Bolts", "bolt")}
+    <div class="small dim mt8 mb4">Testes</div>
+    <div class="row wrap" style="gap:4px">
+      <button class="sm" data-test-give="bow">Buy Bow (grátis)</button>
+      <button class="sm" data-test-give="crossbow">Buy Crossbow (grátis)</button>
+      <button class="sm" data-test-ammo="100">+100 munição</button>
+    </div>`;
 
-  $("#refill-on").addEventListener("change", (e) => {
-    p.config.refillAmmo = e.target.checked;
-    toast(p.config.refillAmmo ? "Refill automático ativado." : "Refill automático desativado.");
-  });
-  const tgt = $("#refill-target");
-  tgt.addEventListener("change", () => {
-    p.config.refillTarget = Math.max(1, Math.min(9999, parseInt(tgt.value, 10) || 100));
-    tgt.value = p.config.refillTarget;
-  });
   $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
     const [key, slug] = b.dataset.refillPick.split(":");
     const field = key === "arrow" ? "refillArrow" : "refillBolt";
     p.config[field] = p.config[field] === slug ? "" : slug;
     // seleciona a munição escolhida como ammo ativa
     if (p.config[field]) {
-      p.equip.ammo = { item: slug, count: p.bag[slug] || 0 };
+      p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
       toast(`Munição selecionada: <b>${GAMEDATA.items[slug].n}</b>`);
     }
     renderAll();
   }));
-  $("#refill-now").addEventListener("click", () => {
-    const target = p.config.refillTarget || 100;
-    let bought = 0, cost = 0;
-    for (const field of ["refillArrow", "refillBolt"]) {
-      const slug = p.config[field];
-      if (!slug) continue;
-      const r = refillAmmo(p, slug, target);
-      bought += r.bought; cost += r.cost;
+
+  // atalhos de teste: entregam a arma/munição de graça
+  $$("#helper-refill [data-test-give]").forEach((b) => b.addEventListener("click", () => {
+    const slug = b.dataset.testGive;
+    const old = p.equip.weapon;
+    if (old && old.item !== slug && !addItem(p, old.item, 1)) {
+      toast("Mochila cheia para guardar a arma atual.");
+      return;
     }
-    if (!bought) { toast("Nada para comprar (sem seleção, já cheio ou sem gold)."); return; }
-    addLog("buy", `Refill: comprou ${bought}x munição por <span class="gold-txt">${fmtFull(cost)} gp</span>`);
-    toast(`Refill: <b>${bought}</b> unidades por ${fmtFull(cost)} gp`);
+    p.equip.weapon = { item: slug, count: 1 };
+    addLog("info", `[teste] Recebeu <b>${itemName(slug)}</b> e equipou.`);
+    toast(`[teste] <b>${itemName(slug)}</b> equipado.`);
     renderAll();
-  });
+  }));
+  $$("#helper-refill [data-test-ammo]").forEach((b) => b.addEventListener("click", () => {
+    const n = parseInt(b.dataset.testAmmo, 10) || 100;
+    const slug = (p.equip.ammo && p.equip.ammo.item) || p.config.refillArrow ||
+                 p.config.refillBolt || "arrow";
+    addAmmo(p, slug, n);
+    if (!p.equip.ammo || !p.equip.ammo.item)
+      p.equip.ammo = { item: slug, count: ammoCount(p, slug) };
+    addLog("info", `[teste] +${n}x <b>${itemName(slug)}</b>.`);
+    toast(`[teste] +${n}x ${itemName(slug)}`);
+    renderAll();
+  }));
 }
 
 /* ---------------------------------------------------------- minimizar painéis */

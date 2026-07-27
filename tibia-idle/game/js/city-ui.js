@@ -380,7 +380,7 @@ function npcTrain(p) {
   const skillTxt = st.skill === "magic" ? "Magic Level (65 mana por hit)" :
     st.skill ? SKILL_NAMES[st.skill] : "aguardando equipamento";
   const weapon = p.equip.weapon ? itemName(p.equip.weapon.item) : "nenhuma";
-  const ammo = p.equip.ammo ? `${itemName(p.equip.ammo.item)} (${p.bag[p.equip.ammo.item] || 0})` : "nenhuma";
+  const ammo = p.equip.ammo ? `${itemName(p.equip.ammo.item)} (${ammoCount(p, p.equip.ammo.item)})` : "nenhuma";
 
   return goldLine(p) + `
     <div class="panel-inset mb8" style="padding:8px">
