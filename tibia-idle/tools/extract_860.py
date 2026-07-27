@@ -31,6 +31,8 @@ SRC = os.environ.get("TIBIA860", "/tmp/newassets/extracted")
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "game", "assets"))
 ITEMS_XML = os.environ.get("ITEMS_XML", "/tmp/newassets/items.xml")
+CANARY_XML = os.environ.get("CANARY_XML",
+                            os.path.join(HERE, "data", "canary-items.xml"))
 
 for sub in ("outfit", "mob", "item"):
     os.makedirs(os.path.join(OUT, sub), exist_ok=True)
@@ -174,66 +176,90 @@ def export_mobs():
 
 # ------------------------------------------------------------ itens
 def load_name_to_id():
-    """server id -> nome, a partir do items.xml novo."""
+    """nome -> client id, a partir do items.xml do Canary (15.x).
+
+    Essa e a peca que faltava: no 15.x o id do items.xml do Canary e o
+    MESMO client id que indexa o DAT, entao o mapeamento nome->sprite
+    fica exato. O items.xml antigo (8.60) usava server ids e por isso
+    trocava os icones (arrow virava tigela, spear virava botas).
+    """
     out = {}
-    try:
-        xml = open(ITEMS_XML, encoding="iso-8859-1").read()
-    except OSError:
-        return out
-    for m in re.finditer(r'<item id="(\d+)"[^>]*name="([^"]+)"', xml):
-        n = m.group(2).strip().lower()
-        if n not in out:
-            out[n] = int(m.group(1))
+    for caminho in (CANARY_XML, ITEMS_XML):
+        if not caminho or not os.path.exists(caminho):
+            continue
+        try:
+            xml = open(caminho, encoding="iso-8859-1").read()
+        except OSError:
+            continue
+        for m in re.finditer(r'<item id="(\d+)"[^>]*name="([^"]+)"', xml):
+            n = m.group(2).strip().lower()
+            if n not in out:
+                out[n] = int(m.group(1))
+        if out:
+            print("  %d nomes de item lidos de %s"
+                  % (len(out), os.path.basename(caminho)))
+            break
     return out
 
 
 NEW_IDS = load_name_to_id()
 
-# Client ids que mudaram do 7.4 para o 15.x e que o items.xml nao resolve
-# sozinho (as municoes foram renumeradas na faixa 24xxx).
+# nomes que o jogo usa e diferem um pouco do Canary
+ALIASES = {
+    "mana-fluid": "mana fluid",
+    "health-potion": "health potion",
+    "gold-coin": "gold coin",
+    "platinum-coin": "platinum coin",
+    "crystal-coin": "crystal coin",
+}
+
+# itens inventados pelo jogo, que nao existem no Tibia
+SKIP = {"mystic-dust"}
+
+# Itens que o Canary nao nomeia (varinhas antigas, itens renomeados no 15.x).
+# Os ids abaixo sao os client ids classicos, conferidos um a um no DAT.
 OVERRIDE_IDS = {
-    # municoes: os ids 24xxx do items.xml sao as PILHAS grandes (2x2 tiles).
-    # O icone unitario, que e o que o inventario precisa, fica em server-40.
-    "arrow": 2504,
-    "bolt": 2503,
-    "poison-arrow": 2505,
-    "burst-arrow": 2506,
-    "power-bolt": 2507,
-    "infernal-bolt": 6529,
-    "spear": 2389,
-    "ancient-amulet": 2142,
-    "golden-legs": 2470,
-    "hoe": 2552,
-    "pick": 2553,
-    "present": 1990,
-    "scythe": 2550,
-    "shovel": 2554,
-    "small-amethyst": 2150,
-    "small-axe": 2559,
-    "small-emerald": 2149,
-    "strange-helmet": 2479,
-    "talon": 2151,
-    "white-pearl": 2143,
-    "mana-fluid": 7590,
-    "health-potion": 7618,
+    "antidote-rune": 3153,
+    "paralyze-rune": 3165,
+    "soft-boots": 3549,
+    "traper-boots": 3550,
+    "cowl": 3391,
+    "daramanian-mace": 3327,
+    "daramanian-waraxe": 3328,
+    "moldy-cheese": 3110,
+    "spy-report": 2836,
+    "mana-fluid": 2874,
+    "elven-wand": 3068,
+    "conjurer-wand": 3069,
+    "ritual-wand": 3070,
+    "golden-wand": 3071,
+    "wand-of-might": 3072,
+    "wooden-wand": 3073,
+    "blue-spell-wand": 3074,
+    "green-spell-wand": 3075,
+    "red-spell-wand": 3076,
+    "yellow-spell-wand": 3077,
 }
 
 
 def item_id_for(slug, name, old_id):
-    """Escolhe o client id que realmente tem sprite no 8.60.
-
-    O items.xml lista SERVER ids; o dat indexa por CLIENT id. Na faixa
-    classica do Tibia a diferenca costuma ser de 40 (server 2142 =
-    client 2102), entao esse deslocamento entra como ultimo fallback.
-    """
-    xml_id = NEW_IDS.get(name) or NEW_IDS.get(slug.replace("-", " "))
-    candidatos = [OVERRIDE_IDS.get(slug), old_id, xml_id]
-    if xml_id:
-        candidatos.append(xml_id - 40)
-    if old_id:
-        candidatos.append(old_id - 40)
+    """Escolhe o client id do 15.x que tem o icone certo."""
+    if slug in SKIP:
+        return None, None
+    candidatos = [OVERRIDE_IDS.get(slug)]
+    for n in (ALIASES.get(slug), name, slug.replace("-", " ")):
+        if n and n in NEW_IDS:
+            candidatos.append(NEW_IDS[n])
+    candidatos.append(old_id)
     for cid in candidatos:
         if not cid or cid < 100:
+            continue
+        obj = dat.item(cid)
+        if obj is None or not obj.groups:
+            continue
+        g = obj.groups[0]
+        # icone de inventario e 1x1; ids maiores sao pilhas/decoracao de mapa
+        if g.width > 1 or g.height > 1:
             continue
         img = render_item_860(dat, spr, cid)
         if img is not None and img.getbbox():
