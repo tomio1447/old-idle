@@ -417,6 +417,51 @@ function consumeAmmoCharge(c, p) {
   return true;
 }
 
+/* ---------------------------------------------------------- condicoes
+ * Veneno em turnos, como no Tibia: a cada turno o alvo perde HP fixo.
+ * Reaplicar renova a duracao e mantem o maior dano por turno. */
+const POISON_TURN_MS = 2000;
+
+function applyPoison(mob, dmg, turns) {
+  if (!mob || mob.hp <= 0) return;
+  const cur = mob.poison;
+  if (cur) {
+    cur.dmg = Math.max(cur.dmg, dmg);
+    cur.turns = Math.max(cur.turns, turns);
+  } else {
+    mob.poison = { dmg: dmg, turns: turns, acc: 0 };
+  }
+}
+
+/* Aplica o dano de veneno de todos os monstros envenenados */
+function tickPoison(c, p, dt) {
+  for (const m of c.mobs) {
+    const po = m.poison;
+    if (!po || m.hp <= 0) continue;
+    po.acc += dt;
+    while (po.acc >= POISON_TURN_MS && po.turns > 0 && m.hp > 0) {
+      po.acc -= POISON_TURN_MS;
+      po.turns--;
+      const dmg = Math.max(1, po.dmg);
+      m.hp -= dmg;
+      c.stats.damage += dmg;
+      c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y,
+                      screen: true, el: "earth", poison: true });
+    }
+    if (po.turns <= 0) delete m.poison;
+  }
+}
+
+/* Municao ativa (null quando a arma nao usa municao) */
+function activeAmmoItem(p) {
+  const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  if (!wp || wp.t !== "distance" || wp.inf) return null;
+  const a = p.equip.ammo;
+  if (!a || !a.item) return null;
+  const it = GAMEDATA.items[a.item];
+  return it && it.s === "ammo" ? it : null;
+}
+
 /* Executa um ataque do jogador no alvo */
 function playerAttack(c, p, target) {
   const d = playerDamage(p);
@@ -435,29 +480,58 @@ function playerAttack(c, p, target) {
     return 0;
   }
 
-  // chance de errar para distancia
-  if (isDist && Math.random() > hitChance(effSkill(p, "dist"))) {
+  const ammo = isDist ? activeAmmoItem(p) : null;
+
+  // chance de errar para distancia. Burst arrow explode de qualquer jeito:
+  // no Tibia ela nunca "erra", a explosao acontece onde a flecha cai.
+  if (isDist && !(ammo && ammo.noMiss) &&
+      Math.random() > hitChance(effSkill(p, "dist"))) {
     c.events.push({ t: "miss", x: target.x, y: target.y });
     addSkillTries(p, "dist", combatSkillGain(c, 1));
     return 0;
   }
 
-  let raw = d.min + Math.random() * (d.max - d.min);
-  // armadura do monstro reduz o dano fisico, mas nunca zera o golpe:
-  // a reducao e limitada a 55% para nao travar melee em bicho blindado
-  if (!isMagic) {
-    const red = Math.min(raw * 0.55,
-                         target.def.armor * (0.3 + Math.random() * 0.4));
-    raw -= red;
-  }
-  raw = Math.max(1, Math.floor(raw));
+  const element = ammo && ammo.el ? ammo.el : d.element;
+  const rollDamage = () => {
+    let v = d.min + Math.random() * (d.max - d.min);
+    if (!isMagic) {
+      const red = Math.min(v * 0.55,
+                           target.def.armor * (0.3 + Math.random() * 0.4));
+      v -= red;
+    }
+    return Math.max(1, Math.floor(v));
+  };
 
+  let raw = rollDamage();
   target.hp -= raw;
   c.stats.damage += raw;
   if (c.player) c.player.attackAnim = 180;
   c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
                   sx: pos.x, sy: pos.y, screen: true,
-                  projectile: isDist || isMagic, el: d.element, crit: false });
+                  projectile: isDist || isMagic, el: element, crit: false });
+
+  if (ammo) {
+    // poison arrow: envenena o alvo por alguns turnos
+    if (ammo.poison) {
+      applyPoison(target, ammo.poison.dmg, ammo.poison.turns);
+      c.events.push({ t: "poisoned", x: target.x, y: target.y,
+                      name: target.def.name });
+    }
+    // burst arrow: explode em area 3x3 ao redor do alvo
+    if (ammo.area) {
+      const R = 0.13 * (ammo.area + 0.5);      // raio equivalente a 3x3 SQM
+      c.events.push({ t: "burst", x: target.x, y: target.y });
+      for (const m of c.mobs) {
+        if (m === target || m.hp <= 0) continue;
+        if (pointDistance(m, target) > R) continue;
+        const splash = Math.max(1, Math.floor(rollDamage() * 0.75));
+        m.hp -= splash;
+        c.stats.damage += splash;
+        c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y,
+                        screen: true, el: element });
+      }
+    }
+  }
 
   // ganho de skill
   if (isMagic) {
@@ -854,6 +928,9 @@ function combatTick(c, p, dt, now) {
 
   // movimentação: player aproxima/kita e monstros procuram distância de ataque
   updateCombatMovement(c, p, dt);
+
+  // veneno das poison arrows continua drenando o alvo entre os golpes
+  tickPoison(c, p, dt);
 
   // cura e mana
   tryHeal(c, p, now);

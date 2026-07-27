@@ -496,6 +496,10 @@ function openItemDetails(slug, count) {
   add("Preço de compra", it.buy ? `${fmtFull(it.buy)} gp` : null);
   add("Preço de venda", it.sell ? `${fmtFull(it.sell)} gp` : null);
   if (count && it.sell) add("Valor total", `${fmtFull(it.sell * count)} gp`);
+  if (it.el && it.el !== "physical") add("Elemento", (ELEMENTS[it.el] || {}).name || it.el);
+  if (it.poison) add("Veneno", `${it.poison.dmg} de dano por ${it.poison.turns} turnos`);
+  if (it.area) add("Área", "Explode em 3x3 ao redor do alvo");
+  if (it.noMiss) add("Precisão", "Nunca erra");
   if (it.inf) add("Especial", "Munição infinita");
   if (it.th) add("Especial", "Duas mãos");
 
@@ -954,6 +958,8 @@ function renderRefill(p) {
               <div class="tiny dim">
                 <span class="charge-highlight">TEM ${fmtFull(have)}</span>
                 ${it.atk ? `· atk ${it.atk}` : ""}
+                ${it.poison ? `· <span style="color:#8ac83c">veneno ${it.poison.dmg}x${it.poison.turns}</span>` : ""}
+                ${it.area ? `· <span style="color:#ff8a3c">área 3x3</span>` : ""}
               </div>
             </div>
             <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}">
@@ -970,12 +976,13 @@ function renderRefill(p) {
 
   el.innerHTML = `
     <div class="tiny dim mb8">
-      Munição é reposta apenas por <b>conjure</b> na academia e por <b>loot</b>.
-      Sem munição o personagem não ataca à distância.
+      Sem munição, cada tiro compra 1 unidade descontando do gold.
+      Sem gold e sem munição o personagem não ataca à distância.
+      Conjure na academia e loot também repõem.
       ${infinite ? `<b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
     </div>
     ${sel && !infinite && selCount <= 0
-      ? `<div class="tiny mb8" style="color:#ff9090">Sem <b>${itemName(sel)}</b>: conjure mais na academia.</div>`
+      ? `<div class="tiny mb8" style="color:#ff9090">Sem <b>${itemName(sel)}</b>: cada tiro será comprado por ${fmtFull(ammoPrice(sel))} gp.</div>`
       : ""}
     ${group("Arrows", "arrow")}
     ${group("Bolts", "bolt")}

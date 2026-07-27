@@ -743,6 +743,14 @@ function drainEvents() {
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
         break;
+      case "poisoned":
+        r.addEffect(ex(e), ey(e), "hit-by-poison");
+        addLog("info", `<b>${e.name}</b> foi envenenado.`);
+        break;
+      case "burst":
+        r.addEffect(ex(e), ey(e), "explosion-area");
+        r.shake = Math.max(r.shake || 0, 5);
+        break;
       case "say":
         // o personagem fala a magia/supply, como no client do Tibia
         r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");

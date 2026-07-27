@@ -190,7 +190,7 @@ function playerDamage(p) {
     const atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
     const d = distanceDamage(effSkill(p, "dist"), atk, 1.0);
     return { min: Math.floor(d.max * 0.2), max: d.max,
-             element: "physical", type: "distance" };
+             element: (ammo && ammo.el) || "physical", type: "distance" };
   }
   const sk = weaponSkill(p);
   const atk = it ? (it.atk || 0) : 7;    // punho = attack 7
