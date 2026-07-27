@@ -20,6 +20,16 @@ function CityWalker() {
   this.keys = {};          // teclas pressionadas
 }
 
+/* Multiplicador de velocidade da montaria.
+ * O canary da speed 10 na maioria das mounts, sobre um baseSpeed de 110,
+ * entao a conta e a mesma do servidor: (110 + bonus) / 110. */
+function walkerSpeedMul() {
+  if (typeof G === "undefined" || !G.p) return 1;
+  if (typeof mountSpeedBonus !== "function") return 1;
+  const b = mountSpeedBonus(G.p);
+  return b ? (110 + b) / 110 : 1;
+}
+
 /* Centro do tile em pixels */
 function tileCenter(tx, ty) {
   return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
@@ -137,7 +147,7 @@ CityWalker.prototype.stepByKeys = function (dt) {
   this.path.length = 0;
   this.target = null;
   const len = Math.hypot(dx, dy) || 1;
-  const step = this.speed * (dt / 1000);
+  const step = this.speed * walkerSpeedMul() * (dt / 1000);
   const nx = this.px + (dx / len) * step;
   const ny = this.py + (dy / len) * step;
 
@@ -174,7 +184,7 @@ CityWalker.prototype.update = function (dt) {
   const next = this.path[0];
   const dx = next.x - this.px, dy = next.y - this.py;
   const dist = Math.hypot(dx, dy);
-  const step = this.speed * (dt / 1000);
+  const step = this.speed * walkerSpeedMul() * (dt / 1000);
 
   if (Math.abs(dx) > Math.abs(dy)) this.dir = dx > 0 ? "e" : "w";
   else if (dy !== 0) this.dir = dy > 0 ? "s" : "n";

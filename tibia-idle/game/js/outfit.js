@@ -145,9 +145,21 @@ const OutfitRenderer = {
     }
   },
 
-  /* Sprite do jogador pronto para desenhar; cai no PNG antigo se preciso */
+  /* Sprite do jogador pronto para desenhar; cai no PNG antigo se preciso.
+   *
+   * Ordem de tentativa:
+   *   1. catalogo novo (252 outfits com addon e montaria) — so quando o
+   *      jogador escolheu um visual de la, porque esse catalogo so tem a
+   *      direcao sul e perderia a animacao de andar;
+   *   2. sprites classicos por direcao/frame, que continuam sendo o padrao.
+   */
   forPlayer(p, dir, frame) {
     const o = playerOutfit(p);
+    if (p.outfit && p.outfit.appearance &&
+        typeof AppearanceRenderer !== "undefined") {
+      const cv = AppearanceRenderer.forPlayer(p, dir, frame);
+      if (cv) return cv;
+    }
     const suf = frame ? `${dir}${frame}` : dir;
     const cv = this.get(o.name, suf, o.colors);
     if (cv) return cv;
@@ -157,6 +169,11 @@ const OutfitRenderer = {
   /* Data URL de uma prévia (usada na lista de personagens) */
   preview(p, dir) {
     const o = playerOutfit(p);
+    if (p.outfit && p.outfit.appearance &&
+        typeof AppearanceRenderer !== "undefined") {
+      const nv = AppearanceRenderer.preview(p);
+      if (nv) { try { return nv.toDataURL(); } catch (e) { /* segue */ } }
+    }
     const cv = this.get(o.name, dir || "s", o.colors);
     if (cv) { try { return cv.toDataURL(); } catch (e) { return null; } }
     return null;

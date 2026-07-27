@@ -151,7 +151,10 @@ function spawnWave(c, p) {
 function attackInterval(c, p) {
   let base = 2000;
   const g = gearStats(p);
-  if (c.buffs.haste && c.buffs.haste > 0) base *= 0.8;
+  // `c` pode vir vazio quando a Cyclopedia consulta a velocidade fora de
+  // uma cacada; sem a guarda isso quebrava a aba de combate
+  const bf = c && c.buffs;
+  if (bf && bf.haste && bf.haste > 0) base *= 0.8;
   base -= Math.min(400, g.speed * 4);
   return Math.max(800, base);
 }
@@ -605,6 +608,17 @@ function applyResist(mob, element, dano) {
   return Math.max(pc >= 100 ? 0 : 1, Math.floor(dano * escala));
 }
 
+/* Bonus de dano dos charms da Cyclopedia, por elemento.
+ * Aplicado ANTES da resistencia, como no servidor: o charm aumenta o golpe
+ * e o monstro resiste ao total. */
+function applyCharmDamage(p, element, dano) {
+  if (typeof charmTotals !== "function") return dano;
+  const t = charmTotals(p);
+  const pc = t.dano[element] || 0;
+  if (!pc) return dano;
+  return Math.floor(dano * (1 + pc / 100));
+}
+
 /* Executa um ataque do jogador no alvo */
 function playerAttack(c, p, target) {
   const d = playerDamage(p);
@@ -642,7 +656,9 @@ function playerAttack(c, p, target) {
                            target.def.armor * (0.3 + Math.random() * 0.4));
       v -= red;
     }
-    return applyResist(target, element, Math.max(1, Math.floor(v)));
+    // charm da Cyclopedia aumenta o golpe antes da resistencia do monstro
+    v = applyCharmDamage(p, element, Math.max(1, Math.floor(v)));
+    return applyResist(target, element, Math.max(1, v));
   };
 
   let raw = rollDamage();
@@ -659,6 +675,14 @@ function playerAttack(c, p, target) {
       const mx = maxStats(p);
       p.mp = Math.min(mx.mp, p.mp + Math.max(1, Math.floor(raw * bf.manaOnHit)));
     }
+  }
+
+  // ---- charms defensivos/utilitarios da Cyclopedia
+  const ch = typeof charmTotals === "function" ? charmTotals(p) : null;
+  if (ch && ch.vampirismo) {
+    const mx = maxStats(p);
+    p.hp = Math.min(mx.hp, p.hp + Math.max(1,
+      Math.floor(raw * ch.vampirismo / 100)));
   }
 
   // ---- imbuements do 15.x
@@ -798,6 +822,7 @@ function tryCastSpell(c, p, target, now) {
     if (typeof buffTotals === "function") {
       dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
     }
+    dmg = applyCharmDamage(p, elemento, dmg);
     dmg = applyResist(t, elemento, dmg);
     t.hp -= dmg;
     c.stats.damage += dmg;
@@ -1058,6 +1083,12 @@ function mobAttack(c, p, mob) {
     c.events.push({ t: "miss", x: pl.x, y: pl.y, dazzle: true });
     return 0;
   }
+  // charm Dodge: esquiva total do golpe
+  const chm = typeof charmTotals === "function" ? charmTotals(p) : null;
+  if (chm && chm.esquiva && Math.random() * 100 < chm.esquiva) {
+    c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+    return 0;
+  }
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
@@ -1077,6 +1108,12 @@ function mobAttack(c, p, mob) {
                     missile: monsterMissile(mob) });
     addSkillTries(p, "shield", combatSkillGain(c, 1));
     return 0;
+  }
+  // charm Parry: devolve parte do dano ao agressor
+  if (chm && chm.reflete) {
+    const volta = Math.max(1, Math.floor(raw * chm.reflete / 100));
+    mob.hp -= volta;
+    c.stats.damage += volta;
   }
   p.hp -= raw;
   // buffs: reduz o dano recebido (Protector, Virtue of Sustain)
@@ -1285,9 +1322,15 @@ function combatTick(c, p, dt, now) {
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
     if (m.boss) c.bossDefeated = true;
+    // bestiario da Cyclopedia: cada abate conta e pode render charm points
+    let charmGanho = 0;
+    if (typeof bestiaryKill === "function") {
+      charmGanho = bestiaryKill(p, m.slug, 1);
+    }
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
-                    exp: exp, loot: loot, x: m.x, y: m.y, screen: true });
+                    exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
+                    charm: charmGanho });
   }
   c.mobs = alive;
 

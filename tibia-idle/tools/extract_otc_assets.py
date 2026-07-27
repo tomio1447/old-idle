@@ -96,6 +96,15 @@ def main():
     copiar_dir(os.path.join(IMG, "vocations", "monk"),
                os.path.join(GAME, "assets", "ui", "monk"))
 
+    print("Icones das abas do Cyclopedia:")
+    copiar_dir(os.path.join(IMG, "cyclopedia"),
+               os.path.join(GAME, "assets", "ui", "cyclopedia"))
+
+    print("Icones das categorias de personagem:")
+    copiar_dir(os.path.join(OTC, "modules", "game_cyclopedia", "images",
+                            "character_icons"),
+               os.path.join(GAME, "assets", "ui", "cyclopedia", "character"))
+
     print("Slots de inventario:")
     copiar_dir(os.path.join(OTC, "data", "images", "game", "slots"),
                os.path.join(GAME, "assets", "ui", "slots"))

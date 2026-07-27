@@ -1108,6 +1108,7 @@ function startGame(p) {
 
 function bindControls() {
   const p = G.p;
+  $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
   $("#btn-city").addEventListener("click", () => {
     if (G.inCity && !G.combat && !G.training) { toast("Você já está na cidade"); return; }
     goToCity();
@@ -1395,6 +1396,7 @@ function openCharacterModal() {
           </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
       </div>
       <button class="full mb8" id="char-outfit">👕 Change Outfit</button>
+      <button class="full mb8" id="char-appearance">🐴 Aparências (addons e montarias)</button>
       <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
       <div id="char-new-box" class="panel-inset" style="display:none;padding:8px">
         <div class="field"><label>Nome</label><input id="new-char-name" maxlength="20" autocomplete="off"></div>
@@ -1412,6 +1414,12 @@ function openCharacterModal() {
   paintCharPortraits(chars);
   $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
   $("#char-outfit").addEventListener("click", () => openOutfitModal());
+  // atalho direto para a aba de aparencias da Cyclopedia, onde ficam os
+  // 252 visuais, os addons e as 236 montarias
+  $("#char-appearance").addEventListener("click", () => {
+    CYCLO.sub = "appearance";
+    openCyclopedia("character");
+  });
   $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
     const id = b.dataset.loadChar;
     const roster = readRoster();

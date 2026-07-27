@@ -611,3 +611,64 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   pointer-events: none;
 }
 .cooldown-bar .cd-vazio { font-size: 9px; color: #6b6455; padding-left: 2px; }
+
+/* ------------------------------------------------- Cyclopedia
+ * Layout do cliente: coluna de abas a esquerda, conteudo a direita. */
+.modal-bg .modal.wide, .modal-bg.wide .modal { width: min(940px, 97vw); }
+.cyclo-wrap { display: flex; gap: 8px; align-items: stretch; min-height: 420px; }
+.cyclo-tabs {
+  display: flex; flex-direction: column; gap: 2px; flex: none; width: 132px;
+  border-right: 1px solid var(--border, #0d0b08); padding-right: 6px;
+}
+.cyclo-tab {
+  display: flex; align-items: center; gap: 6px; padding: 5px 6px;
+  font-size: 11px; color: #a49b84; cursor: pointer;
+  border: 1px solid transparent; background: #14120e;
+}
+.cyclo-tab:hover { background: #26221a; }
+.cyclo-tab.active {
+  background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37);
+}
+.cyclo-tab.indisponivel { opacity: .5; }
+.cyclo-tab img { width: 18px; height: 18px; image-rendering: pixelated; }
+.cyclo-content { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
+.cyclo-subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.cyclo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cyclo-vazio {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; text-align: center; padding: 40px 20px; height: 100%;
+}
+.cyclo-vazio img { width: 40px; height: 40px; image-rendering: pixelated; }
+.cyclo-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.cyclo-cell {
+  position: relative; width: 40px; text-align: center;
+  background: #14120e; border: 1px solid var(--border-in, #3a3428); padding: 2px;
+}
+.cyclo-cell img { width: 32px; height: 32px; image-rendering: pixelated; }
+.cyclo-qtd {
+  position: absolute; right: 1px; bottom: 1px; font-size: 9px;
+  color: #ffe680; text-shadow: 0 0 2px #000;
+}
+
+/* grade de aparencias e do bestiario */
+.app-grid {
+  display: grid; gap: 5px;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.app-card {
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 4px; text-align: center; cursor: pointer; overflow: hidden;
+}
+.app-card:hover { background: #26221a; border-color: #6b6455; }
+.app-card.ativo { border-color: var(--gold, #d4af37); background: #35301f; }
+.app-card.bloq { opacity: .62; }
+.app-img {
+  height: 52px; display: flex; align-items: flex-end; justify-content: center;
+}
+.app-img img { max-width: 48px; max-height: 52px; image-rendering: pixelated; }
+.app-card canvas { image-rendering: pixelated; }
+
+/* barra de progresso do bestiario */
+.best-bar { height: 3px; background: #0d0b08; margin-top: 3px; }
+.best-bar.big { height: 7px; }
+.best-bar div { height: 100%; background: var(--gold, #d4af37); }
