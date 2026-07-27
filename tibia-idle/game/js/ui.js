@@ -1090,95 +1090,57 @@ function renderRefill(p) {
     return;
   }
 
-  const cfg = p.config;
-  const group = (title, key) => {
-    const list = REFILL_AMMO[key];
-    const selected = cfg[key === "arrow" ? "refillArrow" : "refillBolt"];
-    return `
-      <div class="small dim mt8 mb4">${title}</div>
-      <div class="list" style="max-height:150px">
-        ${list.map((slug) => {
-          const it = GAMEDATA.items[slug];
-          if (!it) return "";
-          const sel = selected === slug;
-          const ok = p.equip.quiver && p.level >= (it.lvl || 1);
-          return `<div class="helper-supply-row ${sel ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
-            <img src="assets/item/${(AMMO_DEFS[slug] && AMMO_DEFS[slug].sprite) || slug}.png" alt="${it.n}">
-            <div style="flex:1;min-width:0">
-              <div class="small">${it.n}</div>
-              <div class="tiny dim">
-                <span class="charge-highlight">${fmtFull(ammoPrice(slug))} gp/tiro</span>
-                ${it.atk ? `· atk ${it.atk}` : ""}
-                ${it.lvl ? `· lvl ${it.lvl}` : ""}
-                ${it.el && it.el !== "physical" && ELEMENTS[it.el]
-                  ? `· <span style="color:${ELEMENTS[it.el].color}">${ELEMENTS[it.el].name}</span>` : ""}
-                ${(AMMO_DEFS[slug] && AMMO_DEFS[slug].desc)
-                  ? `· <span style="color:#ff8a3c">${AMMO_DEFS[slug].desc}</span>` : ""}
-              </div>
-              ${!ok && p.level < (it.lvl || 1)
-                ? `<div class="tiny" style="color:#ff9090">requer nível ${it.lvl}</div>` : ""}
-            </div>
-            <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}" ${ok ? "" : "disabled"}>
-              ${sel ? "EQUIPADA" : "EQUIPAR"}</button>
-          </div>`;
-        }).join("")}
-      </div>`;
-  };
-
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   const infinite = wp && wp.inf;
   const sel = p.equip.ammo && p.equip.ammo.item ? p.equip.ammo.item : null;
+  const auto = !!p.config.ammoAuto;
+  const q = p.equip.quiver ? QUIVER_DEFS[p.equip.quiver.item] : null;
 
+  // A lista completa saiu daqui e virou um modal com abas (openAmmoPicker).
+  // Aqui fica so o resumo do que esta equipado, que e o que o jogador
+  // precisa ver de relance durante a cacada.
   el.innerHTML = `
     <div class="tiny dim mb8">
-      Munição de paladin fica equipada no quiver e <b>não é consumida</b>.
-      Cada tiro desconta o custo em gold. Sem gold, o personagem não ataca à distância.
-      ${p.equip.quiver ? `<b style="color:#9ce84a">Quiver equipado: ${itemName(p.equip.quiver.item)}</b>` : `<b style="color:#ff9090">Equipe um quiver para usar munição.</b>`}
+      Munição de paladin fica no quiver e <b>não é consumida</b>: cada tiro
+      desconta o custo em gold. Sem gold, o personagem não ataca à distância.
       ${infinite ? `<br><b style="color:#9ce84a">A ${wp.n} equipada é infinita e não gasta munição.</b>` : ""}
     </div>
-    ${sel && !infinite
-      ? `<div class="tiny mb8" style="color:#ffe680">Munição atual: <b>${itemName(sel)}</b> · ${fmtFull(ammoPrice(sel))} gp/tiro.</div>`
-      : ""}
-    ${group("Arrows", "arrow")}
-    ${group("Bolts", "bolt")}
-    <div class="small dim mt8 mb4">Quivers (${Object.keys(QUIVER_DEFS).length})</div>
-    <div class="list" style="max-height:210px">
-      ${Object.keys(QUIVER_DEFS).map((slug) => {
-        const q = QUIVER_DEFS[slug];
-        const it = GAMEDATA.items[slug];
-        if (!it) return "";
-        const usando = p.equip.quiver && p.equip.quiver.item === slug;
-        const tem = (p.bag && p.bag[slug]) || usando;
-        // quiver avancado e item de paladino no canary
-        const ok = p.level >= (q.lvl || 1);
-        const extras = [];
-        if (q.shotDmg) {
-          extras.push(`<span style="color:#ffe680">perfect shot +${q.shotDmg} a ${q.shotRange} SQM</span>`);
-        }
-        if (q.prot) {
-          for (const e in q.prot) {
-            extras.push(`<span style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">+${q.prot[e]}% ${e}</span>`);
-          }
-        }
-        if (q.mag) extras.push(`+${q.mag} magic level`);
-        return `<div class="helper-supply-row ${usando ? "selected" : ""}"
-                     style="opacity:${ok ? 1 : .45}">
-          <img src="assets/item/${slug}.png" alt="${q.n}">
-          <div style="flex:1;min-width:0">
-            <div class="small">${q.n}
-              <span class="tiny dim">· ${q.cap} espaços</span></div>
-            <div class="tiny dim">
-              ${q.lvl > 1 ? `nv ${q.lvl} · ` : ""}
-              <span class="gold-txt">${fmtFull(q.buy)} gp</span>
-              ${extras.length ? " · " + extras.join(" · ") : ""}
-            </div>
-            ${!ok ? `<div class="tiny" style="color:#ff9090">requer nível ${q.lvl}</div>` : ""}
-          </div>
-          <button class="sm ${usando ? "primary" : ""}" data-quiver-buy="${slug}"
-            ${ok ? "" : "disabled"}>${usando ? "EQUIPADO" : (tem ? "EQUIPAR" : "COMPRAR")}</button>
-        </div>`;
-      }).join("")}
+
+    <div class="quiver-head">
+      <div class="quiver-slot">
+        ${q ? `<img src="assets/item/${p.equip.quiver.item}.png" alt="">`
+            : `<img src="assets/ui/slots/right-hand.png" alt="" style="opacity:.45">`}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="small">${q ? q.n : "Nenhum quiver equipado"}
+          ${q ? `<span class="tiny dim">· ${q.cap} espaços</span>` : ""}</div>
+        <div class="tiny dim">
+          ${auto
+            ? `Munição <b style="color:#9ce84a">automática</b>${sel ? ` · usando <b>${itemName(sel)}</b>` : ""}`
+            : (sel ? `Atirando <b>${itemName(sel)}</b> ·
+                      <span class="gold-txt">${fmtFull(ammoPrice(sel))} gp por tiro</span>`
+                   : `<span style="color:#ff9090">Nenhuma munição escolhida</span>`)}
+        </div>
+        ${q && q.shotDmg
+          ? `<div class="tiny" style="color:#ffe680">Perfect shot: +${q.shotDmg} de dano e acerto garantido a ${q.shotRange} SQM</div>`
+          : ""}
+      </div>
+      <button class="sm primary" id="abrir-ammo">Escolher</button>
     </div>
+
+    <div class="row wrap mb8" style="gap:4px">
+      <button class="sm" data-ammo-open="arrow">Flechas</button>
+      <button class="sm" data-ammo-open="bolt">Bolts</button>
+      <button class="sm" data-ammo-open="elemental">Elementais</button>
+      <button class="sm" data-ammo-open="especial">Especiais</button>
+      <button class="sm" data-ammo-open="quiver">Quivers</button>
+    </div>
+
+    <div class="tiny dim">
+      Os quivers <b>jungle</b>, <b>candy-coated</b>, <b>eldritch</b>,
+      <b>naga</b> e <b>alicorn</b> não estão à venda: são drop de boss.
+    </div>
+
     <div class="small dim mt8 mb4">Testes</div>
     <div class="row wrap" style="gap:4px">
       <button class="sm" data-test-give="bow">Buy Bow (grátis)</button>
@@ -1186,42 +1148,13 @@ function renderRefill(p) {
       <button class="sm" data-test-give="quiver">Buy Quiver (grátis)</button>
     </div>`;
 
-  // compra/equipa o quiver escolhido
-  $$("#helper-refill [data-quiver-buy]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const slug = b.dataset.quiverBuy;
-      const q = QUIVER_DEFS[slug];
-      const jaEquipado = p.equip.quiver && p.equip.quiver.item === slug;
-      if (jaEquipado) return;
-      const naBag = p.bag && p.bag[slug];
-      if (!naBag) {
-        if (p.gold < q.buy) { toast("Gold insuficiente."); return; }
-        spendGold(p, q.buy);
-        toast(`<b>${q.n}</b> comprado por <span class="gold-txt">${fmtFull(q.buy)} gp</span>`);
-      } else {
-        removeItem(p, slug, 1);
-        toast(`<b>${q.n}</b> equipado.`);
-      }
-      // devolve o quiver anterior para a mochila
-      if (p.equip.quiver) addItem(p, p.equip.quiver.item, 1);
-      p.equip.quiver = { item: slug, count: 1 };
-      save();
-      renderAll();
-    }));
-
-  $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
-    const slug = b.dataset.refillPick.split(":")[1];
-    const already = p.equip.ammo && p.equip.ammo.item === slug;
-    // slot unico: escolher arrow desequipa bolt e vice-versa
-    if (already) {
-      setActiveAmmo(p, null);
-      toast("Munição desequipada.");
-    } else {
-      setActiveAmmo(p, slug);
-      toast(`Munição no quiver: <b>${GAMEDATA.items[slug].n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
-    }
-    renderAll();
-  }));
+  const abrir = (cat) => {
+    if (cat) AMMO_MODAL.cat = cat;
+    openAmmoPicker();
+  };
+  $("#abrir-ammo").addEventListener("click", () => abrir("todas"));
+  $$("#helper-refill [data-ammo-open]").forEach((b) =>
+    b.addEventListener("click", () => abrir(b.dataset.ammoOpen)));
 
   // atalhos de teste: entregam arma/quiver de graça
   $$("#helper-refill [data-test-give]").forEach((b) => b.addEventListener("click", () => {
@@ -1547,4 +1480,269 @@ function renderCooldownBar(p) {
   } else if (!vazio && aviso) {
     aviso.remove();
   }
+}
+
+/* ============================================================ munições
+ *
+ * Modal no mesmo formato do seletor de cura do baiakidle: abas clicaveis por
+ * categoria, busca por nome, filtro de "so liberadas" e uma opcao automatica
+ * no topo. A lista antiga era uma coluna unica com as 22 municoes, o que
+ * obrigava a rolar muito para achar a bolt certa.
+ *
+ * As categorias sao por familia de municao, nao por arma: quem usa bow so
+ * enxerga flechas de qualquer jeito (a checagem de compatibilidade vive em
+ * ammoCompatibleWithWeapon), mas separar por efeito ajuda a escolher.
+ */
+const AMMO_CATS = [
+  { id: "todas", nome: "Todas" },
+  { id: "arrow", nome: "Flechas" },
+  { id: "bolt", nome: "Bolts" },
+  { id: "elemental", nome: "Elementais" },
+  { id: "especial", nome: "Especiais" },
+  { id: "quiver", nome: "Quivers" },
+];
+
+const AMMO_MODAL = { cat: "todas", busca: "", soLiberadas: false };
+
+/* Em que categorias uma munição entra */
+function ammoInCat(slug, cat) {
+  const a = AMMO_DEFS[slug];
+  if (!a) return false;
+  if (cat === "todas") return true;
+  if (cat === "arrow" || cat === "bolt") return a.kind === cat;
+  if (cat === "elemental") return !!a.el && a.el !== "physical";
+  if (cat === "especial") return !!(a.area || a.noMiss || a.poison);
+  return false;
+}
+
+/* A munição pode ser usada agora? */
+function ammoUsable(p, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return false;
+  if (!p.equip.quiver) return false;
+  if (p.level < (it.lvl || 1)) return false;
+  if (typeof ammoCompatibleWithWeapon === "function" &&
+      !ammoCompatibleWithWeapon(it, p.equip.weapon)) return false;
+  return true;
+}
+
+/* Melhor munição por custo-benefício, usada pelo modo automático */
+function bestAmmoFor(p) {
+  let melhor = null, melhorNota = -1;
+  for (const slug in AMMO_DEFS) {
+    if (!ammoUsable(p, slug)) continue;
+    const a = AMMO_DEFS[slug];
+    const nota = (a.atk || 0) / (a.shotCost || 1);
+    if (nota > melhorNota) { melhorNota = nota; melhor = slug; }
+  }
+  return melhor;
+}
+
+function openAmmoPicker() {
+  const p = G.p;
+  if (!p) return;
+  AMMO_MODAL.busca = "";
+  desenhaAmmoPicker();
+  $("#modal").classList.add("show");
+}
+
+function desenhaAmmoPicker() {
+  const p = G.p;
+  const cat = AMMO_MODAL.cat;
+  const busca = (AMMO_MODAL.busca || "").toLowerCase();
+  const atual = p.equip.ammo && p.equip.ammo.item ? p.equip.ammo.item : null;
+  const auto = !!p.config.ammoAuto;
+
+  const linhaAmmo = (slug) => {
+    const a = AMMO_DEFS[slug];
+    const it = GAMEDATA.items[slug];
+    if (!a || !it) return "";
+    const ok = ammoUsable(p, slug);
+    const sel = !auto && atual === slug;
+    const motivo = !p.equip.quiver ? "equipe um quiver"
+      : (p.level < (it.lvl || 1) ? "nível " + it.lvl
+      : (typeof ammoCompatibleWithWeapon === "function" &&
+         !ammoCompatibleWithWeapon(it, p.equip.weapon)
+         ? (a.kind === "bolt" ? "crossbow" : "bow") : ""));
+    return `<div class="pick-row ${sel ? "selected" : ""}"
+                 style="opacity:${ok ? 1 : .5}">
+      <img src="assets/item/${slug}.png" alt="${a.n}">
+      <div style="flex:1;min-width:0">
+        <div class="small">${a.n}</div>
+        <div class="tiny dim">
+          atk ${a.atk} · <span class="gold-txt">${a.shotCost} gp/tiro</span>
+          ${a.lvl > 1 ? ` · lvl ${a.lvl}` : ""}
+          ${a.el && a.el !== "physical" && ELEMENTS[a.el]
+            ? ` · <span style="color:${ELEMENTS[a.el].color}">${ELEMENTS[a.el].name}</span>` : ""}
+        </div>
+        ${a.desc ? `<div class="tiny" style="color:#ff8a3c">${a.desc}</div>` : ""}
+        ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
+      </div>
+      <button class="sm ${sel ? "primary" : ""}" data-pick-ammo="${slug}"
+        ${ok ? "" : "disabled"}>${sel ? "Usando" : "Usar"}</button>
+    </div>`;
+  };
+
+  const linhaQuiver = (slug) => {
+    const q = QUIVER_DEFS[slug];
+    if (!q) return "";
+    const usando = p.equip.quiver && p.equip.quiver.item === slug;
+    const naBag = p.bag && p.bag[slug];
+    const ok = p.level >= (q.lvl || 1);
+    const extras = [];
+    if (q.shotDmg) extras.push(`<span style="color:#ffe680">perfect shot +${q.shotDmg} a ${q.shotRange} SQM</span>`);
+    if (q.prot) {
+      for (const e in q.prot) {
+        extras.push(`<span style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">+${q.prot[e]}% ${e}</span>`);
+      }
+    }
+    if (q.mag) extras.push(`+${q.mag} magic level`);
+    // quiver de boss nao tem botao de compra: so aparece quando cai
+    const origem = q.drop
+      ? `<span style="color:#c07cff">${typeof quiverDropSource === "function"
+           ? quiverDropSource(slug) : "drop de boss"}</span>`
+      : `<span class="gold-txt">${fmtFull(q.buy)} gp</span>`;
+    let acao;
+    if (usando) acao = `<button class="sm primary" disabled>Equipado</button>`;
+    else if (naBag) acao = `<button class="sm" data-pick-quiver="${slug}" ${ok ? "" : "disabled"}>Equipar</button>`;
+    else if (q.drop) acao = `<span class="tiny dim" style="white-space:nowrap">não obtido</span>`;
+    else acao = `<button class="sm" data-pick-quiver="${slug}" ${ok ? "" : "disabled"}>Comprar</button>`;
+    return `<div class="pick-row ${usando ? "selected" : ""}"
+                 style="opacity:${ok ? 1 : .5}">
+      <img src="assets/item/${slug}.png" alt="${q.n}">
+      <div style="flex:1;min-width:0">
+        <div class="small">${q.n}
+          <span class="tiny dim">· ${q.cap} espaços</span></div>
+        <div class="tiny dim">
+          ${q.lvl > 1 ? `nv ${q.lvl} · ` : ""}${origem}
+          ${extras.length ? " · " + extras.join(" · ") : ""}
+        </div>
+        ${!ok ? `<div class="tiny" style="color:#ff9090">requer nível ${q.lvl}</div>` : ""}
+      </div>
+      ${acao}
+    </div>`;
+  };
+
+  let itens;
+  if (cat === "quiver") {
+    itens = Object.keys(QUIVER_DEFS)
+      .filter((s) => !busca || QUIVER_DEFS[s].n.toLowerCase().indexOf(busca) !== -1)
+      .filter((s) => !AMMO_MODAL.soLiberadas || p.level >= (QUIVER_DEFS[s].lvl || 1))
+      .sort((a, b) => (QUIVER_DEFS[a].lvl || 1) - (QUIVER_DEFS[b].lvl || 1))
+      .map(linhaQuiver);
+  } else {
+    itens = Object.keys(AMMO_DEFS)
+      .filter((s) => ammoInCat(s, cat))
+      .filter((s) => !busca || AMMO_DEFS[s].n.toLowerCase().indexOf(busca) !== -1)
+      .filter((s) => !AMMO_MODAL.soLiberadas || ammoUsable(p, s))
+      .sort((a, b) => AMMO_DEFS[a].atk - AMMO_DEFS[b].atk)
+      .map(linhaAmmo);
+  }
+
+  const conta = (c) => c === "quiver"
+    ? Object.keys(QUIVER_DEFS).length
+    : Object.keys(AMMO_DEFS).filter((s) => ammoInCat(s, c)).length;
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">Munição — escolher
+      <span style="flex:1"></span>
+      <button class="sm" id="ammo-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="pick-tabs">
+        ${AMMO_CATS.map((c) => `<div class="pick-tab ${cat === c.id ? "active" : ""}"
+          data-ammo-cat="${c.id}">${c.nome} <span class="dim">${conta(c.id)}</span></div>`).join("")}
+      </div>
+      <div class="row mb8" style="gap:8px;align-items:center">
+        <input id="ammo-busca" placeholder="Buscar munição (nome)..."
+          value="${AMMO_MODAL.busca}" style="flex:1;padding:6px;
+          background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <label class="toggle tiny" style="white-space:nowrap">
+          <input type="checkbox" id="ammo-so-lib" ${AMMO_MODAL.soLiberadas ? "checked" : ""}>
+          Só liberadas</label>
+      </div>
+      ${cat !== "quiver" ? `
+        <div class="pick-row ${auto ? "selected" : ""}">
+          <div style="flex:1;min-width:0">
+            <div class="small">Munição automática</div>
+            <div class="tiny dim">usa a de melhor custo-benefício disponível</div>
+          </div>
+          <button class="sm ${auto ? "primary" : ""}" id="ammo-auto-row">
+            ${auto ? "Usando" : "Usar"}</button>
+        </div>` : ""}
+      <div class="list" style="max-height:330px">
+        ${itens.join("") || `<div class="dim tiny" style="padding:10px">Nada nesta categoria.</div>`}
+      </div>
+      <div class="row mt8" style="gap:6px;align-items:center">
+        <span class="tiny dim" style="flex:1">
+          ${auto ? "Munição automática (melhor disponível)"
+                 : (atual ? `Atual: <b>${itemName(atual)}</b> · ${ammoPrice(atual)} gp/tiro`
+                          : "Nenhuma munição escolhida")}
+        </span>
+        <button class="sm ${auto ? "primary" : ""}" id="ammo-auto">Automática</button>
+        <button class="sm" id="ammo-fechar">Fechar</button>
+      </div>
+    </div>`;
+
+  const fechar = () => $("#modal").classList.remove("show");
+  $("#ammo-close").addEventListener("click", fechar);
+  $("#ammo-fechar").addEventListener("click", fechar);
+
+  $$("#modal-body [data-ammo-cat]").forEach((t) =>
+    t.addEventListener("click", () => {
+      AMMO_MODAL.cat = t.dataset.ammoCat;
+      desenhaAmmoPicker();
+    }));
+
+  const inp = $("#ammo-busca");
+  if (inp) inp.addEventListener("input", () => {
+    AMMO_MODAL.busca = inp.value;
+    desenhaAmmoPicker();
+    const n = $("#ammo-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  const chk = $("#ammo-so-lib");
+  if (chk) chk.addEventListener("change", () => {
+    AMMO_MODAL.soLiberadas = chk.checked;
+    desenhaAmmoPicker();
+  });
+
+  const ligarAuto = () => {
+    p.config.ammoAuto = true;
+    const b = bestAmmoFor(p);
+    if (b) setActiveAmmo(p, b);
+    toast(b ? `Automática: <b>${itemName(b)}</b>` : "Automática ligada.");
+    save(); renderAll(); desenhaAmmoPicker();
+  };
+  const btnAuto = $("#ammo-auto");
+  if (btnAuto) btnAuto.addEventListener("click", ligarAuto);
+  const rowAuto = $("#ammo-auto-row");
+  if (rowAuto) rowAuto.addEventListener("click", ligarAuto);
+
+  $$("#modal-body [data-pick-ammo]").forEach((b) =>
+    b.addEventListener("click", () => {
+      p.config.ammoAuto = false;
+      setActiveAmmo(p, b.dataset.pickAmmo);
+      toast(`Munição: <b>${itemName(b.dataset.pickAmmo)}</b>`);
+      save(); renderAll(); desenhaAmmoPicker();
+    }));
+
+  $$("#modal-body [data-pick-quiver]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const slug = b.dataset.pickQuiver;
+      const q = QUIVER_DEFS[slug];
+      const naBag = p.bag && p.bag[slug];
+      if (!naBag) {
+        if (q.drop) { toast("Esse quiver só cai de boss."); return; }
+        if (p.gold < q.buy) { toast("Gold insuficiente."); return; }
+        spendGold(p, q.buy);
+        toast(`<b>${q.n}</b> comprado por <span class="gold-txt">${fmtFull(q.buy)} gp</span>`);
+      } else {
+        removeItem(p, slug, 1);
+        toast(`<b>${q.n}</b> equipado.`);
+      }
+      if (p.equip.quiver) addItem(p, p.equip.quiver.item, 1);
+      p.equip.quiver = { item: slug, count: 1 };
+      save(); renderAll(); desenhaAmmoPicker();
+    }));
 }

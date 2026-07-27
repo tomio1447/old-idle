@@ -38,6 +38,14 @@ AMMO_IDS = [
 
 QUIVER_IDS = [35562, 35848, 35849, 35524, 45644, 36666, 39160, 39150]
 
+# Quivers que NAO ficam a venda: sao recompensa de boss, como no Tibia, onde
+# eldritch/naga/alicorn vem de conteudo de fim de jogo e nao de NPC. Os tres
+# basicos (quiver, blue, red) continuam comprando por 400 gp no shops.lua.
+SO_DROP = {
+    "jungle quiver", "candy-coated quiver", "eldritch quiver",
+    "naga quiver", "alicorn quiver",
+}
+
 # custo por tiro. Onde o shops.lua tem preco de NPC os valores batem; as
 # municoes sem NPC (burst, simple, infernal) usam a tabela do jogo.
 CUSTO = {
@@ -171,6 +179,10 @@ def main():
             e["prot"] = prot
         if a.get("magiclevelpoints"):
             e["mag"] = int(a["magiclevelpoints"])
+        if nome in SO_DROP:
+            # sem preco: a UI esconde da loja e mostra como drop de boss
+            e["drop"] = True
+            e.pop("preco", None)
         quivers[e["id"]] = e
 
     dados = {"ammo": ammo, "quivers": quivers}
@@ -193,8 +205,9 @@ def main():
                  v.get("el", ""), " " + v.get("desc", "")))
     print("quivers: %d" % len(quivers))
     for v in sorted(quivers.values(), key=lambda x: x["lvl"]):
-        print("   %-20s lvl %-4s %2d slots %s%s"
-              % (v["nome"], v["lvl"] or "-", v["slots"],
+        origem = "DROP DE BOSS" if v.get("drop") else ("%d gp" % v["preco"])
+        print("   %-20s lvl %-4s %2d slots %-14s %s%s"
+              % (v["nome"], v["lvl"] or "-", v["slots"], origem,
                  ("perfect +%d a %d SQM " % (v["shotDmg"], v["shotRange"]))
                  if v.get("shotDmg") else "", v.get("prot", "")))
 

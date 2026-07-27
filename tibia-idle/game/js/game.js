@@ -483,9 +483,30 @@ const BOSS_DEFS = {
       { item: "mace", chance: 10, max: 1 },
       { item: "katana", chance: 10, max: 1 },
       { item: "leather-boots", chance: 10, max: 1 },
+      // quiver de boss: nao existe na loja, so cai aqui
+      { item: "jungle-quiver", chance: 4, max: 1 },
     ],
   },
 };
+
+/* Quivers que so vem de boss (QUIVER_DEFS[x].drop). Cada um fica ligado ao
+ * boss que o entrega, para o painel dizer onde consegui-lo em vez de so
+ * mostrar "indisponivel". Enquanto o jogo tiver poucos bosses, os de nivel
+ * mais alto ficam anotados como conteudo futuro. */
+const QUIVER_DROPS = {
+  "jungle-quiver": { boss: "the-monster", nome: "The Monster" },
+  "candy-coated-quiver": { boss: null, nome: "boss de nível 200" },
+  "eldritch-quiver": { boss: null, nome: "boss de nível 250" },
+  "naga-quiver": { boss: null, nome: "boss de nível 250" },
+  "alicorn-quiver": { boss: null, nome: "boss de nível 400" },
+};
+
+/* Onde conseguir um quiver de drop (texto curto para a UI) */
+function quiverDropSource(slug) {
+  const d = QUIVER_DROPS[slug];
+  if (!d) return "";
+  return d.boss ? "cai de " + d.nome : "drop de " + d.nome;
+}
 
 function bossState(p, id) {
   p.bosses = p.bosses || {};

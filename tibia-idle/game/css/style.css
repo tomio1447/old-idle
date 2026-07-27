@@ -672,3 +672,33 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .best-bar { height: 3px; background: #0d0b08; margin-top: 3px; }
 .best-bar.big { height: 7px; }
 .best-bar div { height: 100%; background: var(--gold, #d4af37); }
+
+/* ------------------------------------------- seletor em modal (munição)
+ * Mesmo formato do seletor de cura do baiakidle: abas no topo, busca e
+ * lista rolavel. Usado pelo openAmmoPicker. */
+.pick-tabs {
+  display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--border, #0d0b08);
+}
+.pick-tab {
+  padding: 5px 10px; font-size: 11px; cursor: pointer;
+  color: #a49b84; background: #14120e;
+  border: 1px solid transparent; border-bottom: none;
+}
+.pick-tab:hover { background: #26221a; }
+.pick-tab.active {
+  background: #35301f; color: #ffe680;
+  border-color: var(--gold, #d4af37);
+}
+.pick-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px; border-bottom: 1px solid rgba(0,0,0,.25);
+}
+.pick-row:hover { background: rgba(255,255,255,.04); }
+.pick-row.selected {
+  background: rgba(212,175,55,.10);
+  outline: 1px solid var(--gold, #d4af37); outline-offset: -1px;
+}
+.pick-row img {
+  width: 32px; height: 32px; flex: none; image-rendering: pixelated;
+}

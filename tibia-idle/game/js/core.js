@@ -298,7 +298,11 @@ const QUIVER_DEFS = {};
     const q = d.quivers[slug];
     QUIVER_DEFS[slug] = {
       n: q.nome, cap: q.slots, lvl: q.lvl || 1, id: q.itemId,
-      buy: q.preco, sell: Math.floor(q.preco / 8),
+      // `drop: true` = nao esta a venda, so cai de boss. Sem preco de
+      // compra, a loja esconde e o painel mostra a origem.
+      drop: !!q.drop,
+      buy: q.drop ? 0 : (q.preco || 400),
+      sell: q.drop ? 0 : Math.floor((q.preco || 400) / 8),
       // perfect shot: dano extra numa distancia EXATA, como no servidor
       shotDmg: q.shotDmg || 0, shotRange: q.shotRange || 0,
       prot: q.prot || null, mag: q.mag || 0,
@@ -336,7 +340,7 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
     const q = QUIVER_DEFS[slug];
     GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, {
       n: q.n, s: "quiver", t: "quiver", cap: q.cap,
-      lvl: q.lvl > 1 ? q.lvl : undefined,
+      lvl: q.lvl > 1 ? q.lvl : undefined, drop: q.drop || undefined,
       shotDmg: q.shotDmg || 0, shotRange: q.shotRange || 0,
       prot: q.prot || undefined, mag: q.mag || 0,
       sell: q.sell, buy: q.buy, w: 18,

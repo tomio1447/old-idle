@@ -631,7 +631,9 @@ function autoEquip(p) {
       (typeof ammoCompatibleWithWeapon !== "function" ||
        ammoCompatibleWithWeapon(atual, p.equip.weapon)) &&
       p.level >= (atual.lvl || 1);
-    if (!serve) {
+    // no modo automatico o jogador delegou a escolha, entao reavaliamos
+    // sempre (subiu de nivel = pode ter liberado municao melhor)
+    if (!serve || p.config.ammoAuto) {
       // Escolhe a municao com melhor custo-beneficio, nao a de maior ataque.
       // Pegar so o maior atk fazia o auto-equip trocar para burst arrow
       // (15 gp/tiro) sozinho e drenar o gold do jogador em pouco tempo.
