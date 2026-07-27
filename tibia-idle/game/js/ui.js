@@ -1110,8 +1110,13 @@ function renderRefill(p) {
                 <span class="charge-highlight">${fmtFull(ammoPrice(slug))} gp/tiro</span>
                 ${it.atk ? `· atk ${it.atk}` : ""}
                 ${it.lvl ? `· lvl ${it.lvl}` : ""}
-                ${it.area ? `· <span style="color:#ff8a3c">área 3x3</span>` : ""}
+                ${it.el && it.el !== "physical" && ELEMENTS[it.el]
+                  ? `· <span style="color:${ELEMENTS[it.el].color}">${ELEMENTS[it.el].name}</span>` : ""}
+                ${(AMMO_DEFS[slug] && AMMO_DEFS[slug].desc)
+                  ? `· <span style="color:#ff8a3c">${AMMO_DEFS[slug].desc}</span>` : ""}
               </div>
+              ${!ok && p.level < (it.lvl || 1)
+                ? `<div class="tiny" style="color:#ff9090">requer nível ${it.lvl}</div>` : ""}
             </div>
             <button class="sm ${sel ? "primary" : ""}" data-refill-pick="${key}:${slug}" ${ok ? "" : "disabled"}>
               ${sel ? "EQUIPADA" : "EQUIPAR"}</button>
@@ -1136,12 +1141,73 @@ function renderRefill(p) {
       : ""}
     ${group("Arrows", "arrow")}
     ${group("Bolts", "bolt")}
+    <div class="small dim mt8 mb4">Quivers (${Object.keys(QUIVER_DEFS).length})</div>
+    <div class="list" style="max-height:210px">
+      ${Object.keys(QUIVER_DEFS).map((slug) => {
+        const q = QUIVER_DEFS[slug];
+        const it = GAMEDATA.items[slug];
+        if (!it) return "";
+        const usando = p.equip.quiver && p.equip.quiver.item === slug;
+        const tem = (p.bag && p.bag[slug]) || usando;
+        // quiver avancado e item de paladino no canary
+        const ok = p.level >= (q.lvl || 1);
+        const extras = [];
+        if (q.shotDmg) {
+          extras.push(`<span style="color:#ffe680">perfect shot +${q.shotDmg} a ${q.shotRange} SQM</span>`);
+        }
+        if (q.prot) {
+          for (const e in q.prot) {
+            extras.push(`<span style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">+${q.prot[e]}% ${e}</span>`);
+          }
+        }
+        if (q.mag) extras.push(`+${q.mag} magic level`);
+        return `<div class="helper-supply-row ${usando ? "selected" : ""}"
+                     style="opacity:${ok ? 1 : .45}">
+          <img src="assets/item/${slug}.png" alt="${q.n}">
+          <div style="flex:1;min-width:0">
+            <div class="small">${q.n}
+              <span class="tiny dim">· ${q.cap} espaços</span></div>
+            <div class="tiny dim">
+              ${q.lvl > 1 ? `nv ${q.lvl} · ` : ""}
+              <span class="gold-txt">${fmtFull(q.buy)} gp</span>
+              ${extras.length ? " · " + extras.join(" · ") : ""}
+            </div>
+            ${!ok ? `<div class="tiny" style="color:#ff9090">requer nível ${q.lvl}</div>` : ""}
+          </div>
+          <button class="sm ${usando ? "primary" : ""}" data-quiver-buy="${slug}"
+            ${ok ? "" : "disabled"}>${usando ? "EQUIPADO" : (tem ? "EQUIPAR" : "COMPRAR")}</button>
+        </div>`;
+      }).join("")}
+    </div>
     <div class="small dim mt8 mb4">Testes</div>
     <div class="row wrap" style="gap:4px">
       <button class="sm" data-test-give="bow">Buy Bow (grátis)</button>
       <button class="sm" data-test-give="crossbow">Buy Crossbow (grátis)</button>
       <button class="sm" data-test-give="quiver">Buy Quiver (grátis)</button>
     </div>`;
+
+  // compra/equipa o quiver escolhido
+  $$("#helper-refill [data-quiver-buy]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const slug = b.dataset.quiverBuy;
+      const q = QUIVER_DEFS[slug];
+      const jaEquipado = p.equip.quiver && p.equip.quiver.item === slug;
+      if (jaEquipado) return;
+      const naBag = p.bag && p.bag[slug];
+      if (!naBag) {
+        if (p.gold < q.buy) { toast("Gold insuficiente."); return; }
+        spendGold(p, q.buy);
+        toast(`<b>${q.n}</b> comprado por <span class="gold-txt">${fmtFull(q.buy)} gp</span>`);
+      } else {
+        removeItem(p, slug, 1);
+        toast(`<b>${q.n}</b> equipado.`);
+      }
+      // devolve o quiver anterior para a mochila
+      if (p.equip.quiver) addItem(p, p.equip.quiver.item, 1);
+      p.equip.quiver = { item: slug, count: 1 };
+      save();
+      renderAll();
+    }));
 
   $$("#helper-refill [data-refill-pick]").forEach((b) => b.addEventListener("click", () => {
     const slug = b.dataset.refillPick.split(":")[1];

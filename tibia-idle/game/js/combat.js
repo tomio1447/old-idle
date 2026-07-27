@@ -663,9 +663,24 @@ function playerAttack(c, p, target) {
 
   const ammo = isDist ? activeAmmoItem(p) : null;
 
+  // Perfect shot do quiver: quando o alvo esta EXATAMENTE na distancia que o
+  // quiver configura, o tiro ganha dano fixo e nao pode errar. E a regra de
+  // src/items/weapons/weapons.cpp, onde chance vira 100 se damageX/Y != 0.
+  // Fora dessa distancia exata nao ha bonus nenhum.
+  let perfeito = 0;
+  if (isDist && c.player) {
+    const q = p.equip.quiver ? GAMEDATA.items[p.equip.quiver.item] : null;
+    if (q && q.shotDmg) {
+      // pointDistance devolve fracao da tela; ~0.085 por SQM
+      const sqm = Math.round(pointDistance(c.player, target) / 0.085);
+      if (sqm === q.shotRange) perfeito = q.shotDmg;
+    }
+  }
+
   // chance de errar para distancia. Burst arrow explode de qualquer jeito:
   // no Tibia ela nunca "erra", a explosao acontece onde a flecha cai.
-  if (isDist && !(ammo && ammo.noMiss) &&
+  // Perfect shot tambem ignora a rolagem de acerto.
+  if (isDist && !perfeito && !(ammo && ammo.noMiss) &&
       Math.random() > hitChance(effSkill(p, "dist"))) {
     c.events.push({ t: "miss", x: target.x, y: target.y });
     addSkillTries(p, "dist", combatSkillGain(c, 1));
@@ -686,6 +701,8 @@ function playerAttack(c, p, target) {
   };
 
   let raw = rollDamage();
+  // dano extra do perfect shot, somado depois da resistencia
+  if (perfeito) raw += perfeito;
 
   // ---- buffs de vocacao (Virtudes, Protector)
   const bf = typeof buffTotals === "function" ? buffTotals(p) : null;

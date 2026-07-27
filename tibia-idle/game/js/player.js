@@ -384,8 +384,11 @@ function migrateAmmoToCounter(p) {
       delete p.bag[slug];
     }
   }
-  if (p.equip.ammo && p.equip.ammo.item)
-    p.equip.ammo.count = ammoCount(p, p.equip.ammo.item);
+  // A municao nao e mais estocada: o slot guarda apenas qual esta escolhida
+  // e o custo sai em gold a cada tiro. Gravar aqui a contagem antiga deixava
+  // count 0 em saves migrados, e o auto-equip trocava a municao do jogador
+  // por outra achando que a dele tinha acabado.
+  if (p.equip.ammo && p.equip.ammo.item) p.equip.ammo.count = Infinity;
   return p.ammo;
 }
 
@@ -616,19 +619,34 @@ function autoEquip(p) {
     addItem(p, p.equip.shield.item, 1);
     delete p.equip.shield;
   }
-  // municao para paladin: o contador p.ammo guarda as unidades; o slot ammo
-  // guarda qual municao esta selecionada para o consumo em combate.
-  if (w && w.t === "distance") {
-    let bestAmmo = null, bestAtk = -1;
-    for (const slug in (p.ammo || {})) {
-      const it = GAMEDATA.items[slug];
-      if (!it || it.s !== "ammo" || ammoCount(p, slug) <= 0) continue;
-      if ((it.atk || 0) > bestAtk) { bestAtk = it.atk || 0; bestAmmo = slug; }
-    }
-    if (bestAmmo && (!p.equip.ammo || p.equip.ammo.item !== bestAmmo)) {
-      setActiveAmmo(p, bestAmmo);
-    } else if (p.equip.ammo) {
-      p.equip.ammo.count = ammoCount(p, p.equip.ammo.item);
+  // Municao para paladin. A municao nao e mais estocada: cada tiro cobra
+  // gold, entao nao existe "melhor municao disponivel no contador". O
+  // auto-equip so garante que EXISTA alguma municao valida selecionada —
+  // trocar a escolha do jogador aqui zerava a selecao dele a cada 15s e,
+  // pior, gravava count 0, o que fazia o ataque a distancia sair sem dano.
+  if (w && w.t === "distance" && !w.inf && p.equip.quiver) {
+    const atual = p.equip.ammo && p.equip.ammo.item
+      ? GAMEDATA.items[p.equip.ammo.item] : null;
+    const serve = atual && atual.s === "ammo" &&
+      (typeof ammoCompatibleWithWeapon !== "function" ||
+       ammoCompatibleWithWeapon(atual, p.equip.weapon)) &&
+      p.level >= (atual.lvl || 1);
+    if (!serve) {
+      // Escolhe a municao com melhor custo-beneficio, nao a de maior ataque.
+      // Pegar so o maior atk fazia o auto-equip trocar para burst arrow
+      // (15 gp/tiro) sozinho e drenar o gold do jogador em pouco tempo.
+      let melhor = null, melhorNota = -1;
+      for (const slug in GAMEDATA.items) {
+        const it = GAMEDATA.items[slug];
+        if (!it || it.s !== "ammo") continue;
+        if (p.level < (it.lvl || 1)) continue;
+        if (typeof ammoCompatibleWithWeapon === "function" &&
+            !ammoCompatibleWithWeapon(it, p.equip.weapon)) continue;
+        const custo = it.shotCost || it.buy || 1;
+        const nota = (it.atk || 0) / custo;
+        if (nota > melhorNota) { melhorNota = nota; melhor = slug; }
+      }
+      if (melhor) setActiveAmmo(p, melhor);
     }
   }
   return changes;

@@ -1253,11 +1253,17 @@ function giveStarterKit(p) {
   p.gold = Math.max(0, p.gold || 0);
   autoEquip(p);
   if (p.voc === "paladin") {
-    // paladino sai de bow: o quiver ja vem com simple arrow selecionada
-    if (!p.equip.ammo) setActiveAmmo(p, "simple-arrow");
+    // o quiver de Dawnport ocupa o slot proprio; sem ele o paladino nao
+    // consegue atirar, entao garantimos que esteja equipado
+    if (!p.equip.quiver && GAMEDATA.items["quiver"]) {
+      if (p.bag && p.bag["quiver"]) removeItem(p, "quiver", 1);
+      p.equip.quiver = { item: "quiver", count: 1 };
+    }
     if (!p.equip.weapon && GAMEDATA.items["bow"]) {
       p.equip.weapon = { item: "bow", count: 1 };
     }
+    // simple arrow ativa por padrao: e a municao que vem no kit
+    if (!p.equip.ammo) setActiveAmmo(p, "simple-arrow");
   }
   return p;
 }

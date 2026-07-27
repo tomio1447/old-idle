@@ -260,7 +260,11 @@ function giveStartingItems(p) {
       if (typeof addAmmo === "function") addAmmo(p, slug, it.qtd);
       continue;
     }
-    const slot = SLOT_CANARY[it.slot || ""];
+    // o quiver do Dawnport vai para o slot proprio, nao para o de escudo:
+    // ele e o container de municao e convive com um escudo de verdade
+    const base = GAMEDATA.items[slug];
+    const slot = (base && base.t === "quiver")
+      ? "quiver" : SLOT_CANARY[it.slot || ""];
     if (slot && !p.equip[slot]) {
       p.equip[slot] = { item: slug, count: 1 };
       continue;
@@ -317,8 +321,6 @@ const START_EXTRA_ITEMS = {
   "spellbook-of-the-novice": { n: "spellbook of the novice", s: "shield",
                                t: "shield", def: 8, sell: 100, buy: 100,
                                w: 14.0 },
-  "quiver": { n: "quiver", s: "shield", t: "shield", def: 0,
-              sell: 60, buy: 60, w: 17.0 },
   "simple-arrow": { n: "simple arrow", s: "ammo", t: "ammo", atk: 20,
                     sell: 1, buy: 1, w: 0.6, el: "physical" },
 };
