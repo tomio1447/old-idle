@@ -1144,6 +1144,16 @@ function startGame(p) {
 function bindControls() {
   const p = G.p;
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
+  // painel de testes: so liga o botao se admin.js estiver carregado, para o
+  // jogo continuar de pe se o arquivo for removido numa build de producao
+  const btnAdmin = $("#btn-admin");
+  if (btnAdmin) {
+    if (typeof openAdmin === "function") {
+      btnAdmin.addEventListener("click", () => openAdmin());
+    } else {
+      btnAdmin.style.display = "none";
+    }
+  }
   $("#btn-city").addEventListener("click", () => {
     if (G.inCity && !G.combat && !G.training) { toast("Você já está na cidade"); return; }
     goToCity();

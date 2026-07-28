@@ -778,3 +778,60 @@ div.item-sprite { background-repeat: no-repeat; }
   color: #d4af37; flex: none;
 }
 .item-row .badge-anim { font-size: 9px; color: #7ec8ff; flex: none; }
+
+/* ------------------------------------------------------- painel admin
+ * Ferramenta de testes: layout denso de proposito, o objetivo e caber muita
+ * acao numa tela so, nao ficar bonito. */
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
+.admin-tab {
+  padding: 5px 10px; font-size: 11px; cursor: pointer;
+  background: #14120e; color: #a49b84; border: 1px solid #2a2620;
+}
+.admin-tab:hover { background: #26221a; }
+.admin-tab.active {
+  background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37);
+}
+.admin-content { max-height: 62vh; overflow-y: auto; }
+.admin-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+.admin-card {
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 8px;
+}
+.admin-card-t {
+  font-size: 11px; color: #d4af37; margin-bottom: 6px;
+  border-bottom: 1px solid #2a2620; padding-bottom: 4px;
+}
+.admin-card.admin-danger { border-color: #6a3a2a; }
+.admin-card.admin-danger .admin-card-t { color: #c86a4a; }
+.admin-quick { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.admin-in {
+  padding: 4px 6px; background: #0f0d0a; color: #c8c0a8;
+  border: 1px solid #2a2620; font-size: 11px; font-family: inherit;
+}
+.admin-chk {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #a49b84; cursor: pointer; margin: 3px 0;
+}
+.admin-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.admin-tbl th {
+  text-align: left; color: #8a8270; font-weight: normal;
+  border-bottom: 1px solid #2a2620; padding: 3px 4px;
+}
+.admin-tbl td { padding: 3px 4px; border-bottom: 1px solid #1c1913; }
+.admin-tbl td .sm { padding: 2px 6px; font-size: 10px; }
+.admin-itens { max-height: 46vh; overflow-y: auto; }
+.admin-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 6px; background: #14120e; border: 1px solid transparent;
+  margin-bottom: 2px;
+}
+.admin-item:hover { background: #26221a; }
+.admin-item-n { flex: 1; min-width: 0; }
+.admin-item .sm { padding: 2px 7px; font-size: 10px; flex: none; }
+.admin-log {
+  margin-top: 8px; padding: 6px 8px; background: #0f0d0a;
+  border: 1px solid #2a2620; min-height: 26px; color: #9ce84a;
+}
