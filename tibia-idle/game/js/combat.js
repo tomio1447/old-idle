@@ -939,23 +939,65 @@ function tryUseRune(c, p, target, now) {
   if (!best) return false;
   const s = SUPPLIES[best];
   if (!consumeSupplyCharge(c, p, best)) return false;
-  c.runeCd = now + 2000;
+  // cooldown proprio da runa (o Canary declara em rune:cooldown), nao um
+  // 2000 fixo para todas
+  c.runeCd = now + (s.cd || 2000);
 
-  const pw = supplyPower(s, p.level);
-  const dmg = applyResist(target, s.element,
-                          Math.floor(pw[0] + Math.random() * (pw[1] - pw[0])));
-  target.hp -= dmg;
-  c.stats.damage += dmg;
+  // Alvos: as runas de area do Canary cobrem uma GRADE (avalanche e great
+  // fireball pegam 37 SQMs). Como a cena da caçada tem poucos monstros, o
+  // que limita e quem esta dentro do raio, medido a partir do alvo — e o
+  // mesmo criterio do servidor, que monta a lista de tiles em volta.
+  const alvos = [target];
+  if (s.area && s.area.raio > 0) {
+    // 0.13 por SQM e a escala usada no resto do combate (burst arrow, cleave)
+    const R = 0.13 * s.area.raio;
+    for (const m of c.mobs) {
+      if (m === target || m.hp <= 0) continue;
+      if (pointDistance(m, target) <= R) alvos.push(m);
+    }
+  }
+
+  const missile = s.missile || ELEMENT_MISSILE[s.element] || "energy";
+  let total = 0;
+  for (const alvo of alvos) {
+    let dmg = 0;
+    if (s.f) {
+      // formula real do .lua: (level/5) + (magicLevel * K) + C
+      const pw = supplyPowerFor(p, best);
+      dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
+      // charms e resistencia do monstro, na mesma ordem do ataque normal
+      if (typeof applyCharmDamage === "function") {
+        dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
+      }
+      dmg = applyResist(alvo, s.element, Math.max(1, dmg));
+      alvo.hp -= dmg;
+      c.stats.damage += dmg;
+      total += dmg;
+    }
+    // conditions (soulfire queima, poison bomb envenena): o dano vem no
+    // tempo, entao a runa pode nem ter dano direto
+    if (s.cond && typeof applyCondition === "function") {
+      applyCondition(alvo, s.cond.tipo, s.cond.dano || 1, s.cond.golpes || 5);
+      c.events.push({ t: "poisoned", x: alvo.x, y: alvo.y,
+                      name: alvo.def ? alvo.def.name : "" });
+    }
+    c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
+                    sx: c.player ? c.player.x : 0.18,
+                    sy: c.player ? c.player.y : 0.62,
+                    screen: true,
+                    // so o primeiro alvo mostra o projetil: a runa e
+                    // arremessada uma vez e explode em area
+                    projectile: alvo === target,
+                    el: s.element, rune: s.name,
+                    fx: s.fx || null, missile: missile });
+  }
+  if (s.area && alvos.length > 1) {
+    c.events.push({ t: "burst", x: target.x, y: target.y, fx: s.fx || null });
+  }
+
   if (c.player) c.player.attackAnim = 180;
-  c.events.push({ t: "hit", dmg: dmg, x: target.x, y: target.y,
-                  sx: c.player ? c.player.x : 0.18,
-                  sy: c.player ? c.player.y : 0.62,
-                  screen: true, projectile: true,
-                  el: s.element, rune: s.name,
-                  missile: s.tier >= 4 ? "sudden-death"
-                                       : (ELEMENT_MISSILE[s.element] || "energy") });
   c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
-  return true;
+  return total > 0 || !!s.cond;
 }
 
 /* Cura: spell primeiro, depois runa/pocao */

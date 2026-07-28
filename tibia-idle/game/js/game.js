@@ -730,8 +730,11 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
-        r.addFloater(x, y, "-" + fmt(e.dmg), col, e.dmg > 200);
-        r.addEffect(x, y, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
+        if (e.dmg > 0) r.addFloater(x, y, "-" + fmt(e.dmg), col, e.dmg > 200);
+        // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
+        // stones...). Sem isso toda runa mostrava so o efeito generico do
+        // elemento e a sudden death parecia igual a um golpe de death comum.
+        r.addEffect(x, y, e.fx || (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         break;
       }
       case "miss":
@@ -808,7 +811,9 @@ function drainEvents() {
         addLog("info", `<b>${e.name}</b> foi envenenado.`);
         break;
       case "burst":
-        r.addEffect(ex(e), ey(e), "explosion-area");
+        // a runa de area usa o proprio efeito (ice area na avalanche, fire
+        // area na great fireball); a burst arrow continua na explosao
+        r.addEffect(ex(e), ey(e), e.fx || "explosion-area");
         r.shake = Math.max(r.shake || 0, 5);
         break;
       case "say":

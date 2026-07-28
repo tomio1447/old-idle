@@ -136,6 +136,25 @@ const SUPPLIES = {};
       scale: 0,
       vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
     };
+    // RUNEDATA vem de tools/import_runes.py, que le os .lua das runas do
+    // Canary. E a unica fonte da formula de dano, do efeito visual, do
+    // projetil e da AREA de verdade (grade resolvida em SQMs) — nada disso
+    // existe no items.xml, que era a fonte antiga.
+    const rd = (typeof window !== "undefined" && window.RUNEDATA)
+      ? window.RUNEDATA[id] : null;
+    if (rd) {
+      if (rd.f) s.f = rd.f;
+      if (rd.element) s.element = rd.element;
+      if (rd.area) s.area = rd.area;         // objeto {sqm, raio, w, h}
+      if (rd.fx) s.fx = rd.fx;               // efeito no impacto
+      if (rd.missile) s.missile = rd.missile;
+      if (rd.cond) s.cond = rd.cond;         // soulfire/poison bomb: dano no tempo
+      if (rd.cargas) s.cargas = rd.cargas;
+      if (rd.cd) s.cd = rd.cd;
+      if (rd.lvl) s.lvl = rd.lvl;
+      if (rd.ml !== undefined) s.ml = rd.ml;
+      if (rd.needTarget) s.needTarget = 1;
+    }
     s.price = derivarPreco(e);
     s.tier = Math.round((e.lvl || 1) / 12);
     SUPPLIES[id] = s;
