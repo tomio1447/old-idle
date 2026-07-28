@@ -1,0 +1,212 @@
+/* ============================================
+   GLOBAL-IDLE - Identidade Visual
+   Tema: Cinza Escuro Profissional
+   ============================================ */
+
+:root {
+  --gi-bg: #1f2228;
+  --gi-panel: #282c34;
+  --gi-border: #3a3f4a;
+  --gi-accent: #5c6bc0;
+  --gi-gold: #c9a227;
+  --gi-text: #d1d5db;
+  --gi-dim: #6b7280;
+  --gi-success: #4ade80;
+  --gi-danger: #f87171;
+}
+
+/* Reset de cores base */
+body {
+  background: var(--gi-bg);
+  color: var(--gi-text);
+}
+
+/* Painéis */
+.panel {
+  background: var(--gi-panel);
+  border: 1px solid var(--gi-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.panel-title {
+  background: linear-gradient(#32363f, #282c34);
+  border-bottom: 1px solid var(--gi-border);
+  color: var(--gi-gold);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px 6px 0 0;
+}
+
+/* Topbar */
+.topbar {
+  background: #282c34;
+  border-bottom: 1px solid var(--gi-border);
+}
+
+/* Botões */
+button.primary,
+button.primary.sm {
+  background: linear-gradient(#5c6bc0, #4752a3);
+  border: 1px solid #7c8fe6;
+  color: white;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+button.primary:hover {
+  background: linear-gradient(#6b7dd1, #525db8);
+  border-color: #8fa0f0;
+  transform: translateY(-1px);
+}
+
+button.sm {
+  background: #3a3f4a;
+  border: 1px solid var(--gi-border);
+  color: var(--gi-text);
+}
+
+button.sm:hover {
+  background: #4a5060;
+}
+
+/* Barras */
+.bar {
+  background: #1a1d24;
+  border: 1px solid #3a3f4a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar .fill.hp { background: linear-gradient(#4ade80, #22c55e); }
+.bar .fill.mp { background: linear-gradient(#60a5fa, #3b82f6); }
+.bar .fill.exp { background: linear-gradient(#fbbf24, #f59e0b); }
+.bar .fill.sta { background: linear-gradient(#fb923c, #f97316); }
+.bar .fill.skl { background: linear-gradient(#a78bfa, #8b5cf6); }
+
+/* Hunt cards */
+.hunt-card {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+  transition: all 0.2s ease;
+}
+
+.hunt-card:hover {
+  border-color: var(--gi-accent);
+  transform: translateY(-2px);
+}
+
+.hunt-card.active {
+  border-color: var(--gi-gold);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2);
+}
+
+/* Inputs */
+input, select {
+  background: #1a1d24;
+  border: 1px solid var(--gi-border);
+  color: var(--gi-text);
+  border-radius: 4px;
+}
+
+input:focus, select:focus {
+  border-color: var(--gi-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(92, 107, 192, 0.2);
+}
+
+/* Tabelas e listas */
+.list {
+  background: #1a1d24;
+}
+
+.inv-item, .slot {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+}
+
+.inv-item:hover, .slot:hover {
+  border-color: var(--gi-accent);
+}
+
+/* Tooltip */
+#tooltip {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+  color: var(--gi-text);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+/* Toast */
+.toast {
+  background: #282c34;
+  border: 1px solid var(--gi-accent);
+  color: var(--gi-text);
+}
+
+/* Voc cards */
+.voc-card {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+  transition: all 0.2s ease;
+}
+
+.voc-card.sel {
+  border-color: var(--gi-gold);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.3);
+}
+
+.voc-card:hover {
+  border-color: var(--gi-accent);
+}
+
+/* Tabs */
+.tab {
+  color: var(--gi-dim);
+}
+
+.tab.active {
+  color: var(--gi-gold);
+  border-bottom: 2px solid var(--gi-gold);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1d24;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a5060;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5c6bc0;
+}
+
+/* Texto e ícones */
+.gold-txt {
+  color: var(--gi-gold) !important;
+}
+
+.dim {
+  color: var(--gi-dim) !important;
+}
+
+/* Modal */
+.modal {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+}
+
+/* Logo */
+.logo {
+  color: var(--gi-gold);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
