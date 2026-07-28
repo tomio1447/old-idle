@@ -48,9 +48,43 @@ function supplyRefPower(e) {
   return 40 * (e.cargas || 1);
 }
 
+/* Precos de NPC do TibiaWiki (tibiawiki.com.br), por carga/unidade.
+ *
+ * Antes o preco era derivado do poder da potion/runa, o que dava numeros
+ * coerentes entre si mas nenhum deles batia com o jogo real. Agora sao os
+ * valores que os NPCs cobram no Tibia global — conferidos na wiki: Sudden
+ * Death 162 gp e Ultimate Healing 175 gp, por exemplo.
+ */
+const PRECO_WIKI = {
+  // runas (por carga)
+  "lightest-missile-rune": 5, "lightest-magic-missile-rune": 5,
+  "light-stone-shower-rune": 5, "light-magic-missile-rune": 12,
+  "poison-field-rune": 21, "fire-field-rune": 28, "antidote-rune": 65,
+  "intense-healing-rune": 95, "convince-creature-rune": 80,
+  "destroy-field-rune": 15, "energy-field-rune": 38,
+  "desintegrate-rune": 26, "stalagmite-rune": 12,
+  "ultimate-healing-rune": 175, "heavy-magic-missile-rune": 25,
+  "poison-bomb-rune": 85, "animate-dead-rune": 375, "chameleon-rune": 210,
+  "firebomb-rune": 235, "fireball-rune": 30, "holy-missile-rune": 16,
+  "soulfire-rune": 46, "wild-growth-rune": 160, "icicle-rune": 30,
+  "stone-shower-rune": 37, "thunderstorm-rune": 37, "poison-wall-rune": 52,
+  "avalanche-rune": 57, "great-fireball-rune": 57, "explosion-rune": 31,
+  "magic-wall-rune": 116, "fire-wall-rune": 61, "energybomb-rune": 203,
+  "energy-wall-rune": 85, "sudden-death-rune": 162, "paralyze-rune": 700,
+  // potions (por unidade)
+  "small-health-potion": 20, "health-potion": 45, "mana-potion": 50,
+  "strong-health-potion": 100, "strong-mana-potion": 80,
+  "great-health-potion": 190, "great-mana-potion": 120,
+  "great-spirit-potion": 190, "ultimate-health-potion": 310,
+  "ultimate-mana-potion": 438, "ultimate-spirit-potion": 322,
+  "supreme-health-potion": 625,
+};
+
 function derivarPreco(e) {
+  const oficial = PRECO_WIKI[e.id];
+  if (oficial) return oficial;
+  // item sem preco de NPC na wiki: estima pelo poder, para nao ficar de graca
   const pw = supplyRefPower(e);
-  // preco por carga; runa com muitas cargas custa mais o pacote inteiro
   const base = Math.max(12, Math.round(pw * 0.55));
   return Math.round(base / 5) * 5;
 }
@@ -263,8 +297,9 @@ function giveStartingItems(p) {
     // o quiver do Dawnport vai para o slot proprio, nao para o de escudo:
     // ele e o container de municao e convive com um escudo de verdade
     const base = GAMEDATA.items[slug];
+    // a aljava ocupa a mao secundaria, o mesmo slot do escudo
     const slot = (base && base.t === "quiver")
-      ? "quiver" : SLOT_CANARY[it.slot || ""];
+      ? "shield" : SLOT_CANARY[it.slot || ""];
     if (slot && !p.equip[slot]) {
       p.equip[slot] = { item: slug, count: 1 };
       continue;

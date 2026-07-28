@@ -3,8 +3,37 @@
  */
 "use strict";
 
+/* Slots do inventario, na ordem do cliente.
+ *
+ * `quiver` nao existe como campo separado no Tibia: a aljava ocupa a mao
+ * secundaria (right-hand), o mesmo lugar do escudo — por isso paladino que
+ * usa arco abre mao do escudo. Aqui o slot `shield` aceita os dois, e o
+ * quiver so entra nele quando a vocacao e paladin.
+ *
+ * `extra` e o Extra Slot do 15.x: o campo inferior direito do inventario,
+ * lido como a cintura do personagem, onde entram ferramentas bonus que dao
+ * resistencia elemental.
+ */
 const SLOTS = ["helmet", "amulet", "backpack", "armor", "weapon", "shield",
-               "legs", "boots", "ring", "quiver", "ammo"];
+               "legs", "boots", "ring", "extra", "ammo"];
+
+/* O quiver equipado, se houver.
+ *
+ * A aljava mora no slot de escudo (right-hand), como no Tibia: o paladino
+ * que carrega quiver abre mao do escudo. Toda a base de codigo consulta esta
+ * funcao em vez de olhar p.equip.quiver, que era um slot inventado.
+ */
+function equippedQuiver(p) {
+  const e = p && p.equip && p.equip.shield;
+  if (!e) return null;
+  const it = GAMEDATA.items[e.item];
+  return it && it.t === "quiver" ? e : null;
+}
+
+/* Só paladino usa aljava — a vocacao do item no items.xml do canary */
+function canUseQuiver(p) {
+  return p && p.voc === "paladin";
+}
 
 const SKILL_NAMES = {
   fist: "Punho", sword: "Espada", axe: "Machado", club: "Clava",
@@ -525,7 +554,7 @@ function distanceWeaponPower(p, slug) {
   if (!it || it.t !== "distance") return 0;
   if (it.inf) return it.atk || 0;              // spear: autossuficiente
 
-  if (!p.equip.quiver) return 0;
+  if (!equippedQuiver(p)) return 0;
   let best = 0;
   for (const ammoSlug in GAMEDATA.items) {
     const am = GAMEDATA.items[ammoSlug];
@@ -597,6 +626,9 @@ function autoEquip(p) {
       if (!it || it.s !== slot) continue;
       if (it.lvl && p.level < it.lvl) continue;
       if (it.vocs && it.vocs.indexOf(p.voc) === -1) continue;
+      // aljava e item de paladino e disputa a mao secundaria com o escudo:
+      // o auto-equip nao pode trocar o escudo de um knight por um quiver
+      if (it.t === "quiver" && !canUseQuiver(p)) continue;
       // não troca a arma de distância equipada por uma spear só porque a
       // munição acabou: as regras de arrow continuam valendo e o jogador
       // fica sem atacar, em vez de virar arremessador sem avisar.
@@ -624,7 +656,7 @@ function autoEquip(p) {
   // auto-equip so garante que EXISTA alguma municao valida selecionada —
   // trocar a escolha do jogador aqui zerava a selecao dele a cada 15s e,
   // pior, gravava count 0, o que fazia o ataque a distancia sair sem dano.
-  if (w && w.t === "distance" && !w.inf && p.equip.quiver) {
+  if (w && w.t === "distance" && !w.inf && equippedQuiver(p)) {
     const atual = p.equip.ammo && p.equip.ammo.item
       ? GAMEDATA.items[p.equip.ammo.item] : null;
     const serve = atual && atual.s === "ammo" &&

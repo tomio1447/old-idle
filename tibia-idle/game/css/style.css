@@ -702,3 +702,45 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .pick-row img {
   width: 32px; height: 32px; flex: none; image-rendering: pixelated;
 }
+
+/* ------------------------------------------- catalogo de itens (Cyclopedia)
+ * Tres colunas no formato do baiakidle: categorias, lista e detalhe. */
+.item-browser {
+  display: grid; grid-template-columns: 190px 1fr 200px; gap: 8px;
+  min-height: 380px;
+}
+.item-cats {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 420px; overflow-y: auto;
+}
+.item-cat {
+  padding: 6px 8px; font-size: 11px; cursor: pointer;
+  background: #14120e; color: #a49b84;
+  border: 1px solid transparent;
+}
+.item-cat:hover { background: #26221a; }
+.item-cat.active {
+  background: #35301f; color: #ffe680;
+  border-color: var(--gold, #d4af37);
+}
+.item-list {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 420px; overflow-y: auto;
+}
+.item-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 6px; cursor: pointer;
+  background: #14120e; border: 1px solid transparent;
+}
+.item-row:hover { background: #26221a; }
+.item-row.active {
+  background: #35301f; border-color: var(--gold, #d4af37);
+}
+.item-row img {
+  width: 26px; height: 26px; flex: none; image-rendering: pixelated;
+}
+.item-row .small { flex: 1; min-width: 0; }
+.item-detail {
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 8px; max-height: 420px; overflow-y: auto;
+}

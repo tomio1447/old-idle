@@ -411,7 +411,7 @@ function consumeAmmoCharge(c, p) {
   const weapon = p.equip.weapon || null;
   const wp = weapon ? GAMEDATA.items[weapon.item] : null;
   if (wp && wp.inf) return true;
-  if (!p.equip.quiver) {
+  if (!equippedQuiver(p)) {
     if (c && c.events) c.events.push({ t: "no-ammo", name: "quiver" });
     return false;
   }
@@ -573,7 +573,7 @@ function applyMonsterCondition(c, p, mob) {
 /* Municao ativa (null quando a arma nao usa municao) */
 function activeAmmoItem(p) {
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
-  if (!wp || wp.t !== "distance" || wp.inf || !p.equip.quiver) return null;
+  if (!wp || wp.t !== "distance" || wp.inf || !equippedQuiver(p)) return null;
   const a = p.equip.ammo;
   if (!a || !a.item) return null;
   const it = GAMEDATA.items[a.item];
@@ -669,7 +669,8 @@ function playerAttack(c, p, target) {
   // Fora dessa distancia exata nao ha bonus nenhum.
   let perfeito = 0;
   if (isDist && c.player) {
-    const q = p.equip.quiver ? GAMEDATA.items[p.equip.quiver.item] : null;
+    const eq = equippedQuiver(p);
+    const q = eq ? GAMEDATA.items[eq.item] : null;
     if (q && q.shotDmg) {
       // pointDistance devolve fracao da tela; ~0.085 por SQM
       const sqm = Math.round(pointDistance(c.player, target) / 0.085);

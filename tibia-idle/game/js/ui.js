@@ -201,13 +201,16 @@ function renderSkills(p) {
 const SLOT_LABELS = {
   helmet: "elmo", amulet: "colar", backpack: "bolsa", armor: "corpo",
   weapon: "arma", shield: "escudo", legs: "pernas", boots: "botas",
-  ring: "anel", quiver: "quiver", ammo: "muni",
+  ring: "anel", extra: "extra", ammo: "muni",
 };
+/* Layout do inventario do Tibia. A mao secundaria (shield) aceita escudo OU
+ * quiver — nao existe campo separado para aljava. O Extra Slot fica no canto
+ * inferior direito, abaixo da mao secundaria, como no cliente. */
 const SLOT_ORDER = [
   null, "helmet", null,
   "amulet", "armor", "backpack",
   "weapon", "legs", "shield",
-  "ring", "boots", "quiver",
+  "ring", "boots", "extra",
   null, null, "ammo",
 ];
 
@@ -232,7 +235,9 @@ function renderEquip(p) {
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
       const extra = slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` :
-        slot === "quiver" ? `Quiver equipado. Munição: ${p.equip.ammo ? itemName(p.equip.ammo.item) + " · " + fmtFull(ammoPrice(p.equip.ammo.item)) + " gp/tiro" : "nenhuma"}` :
+        slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver"
+          ? `Aljava na mão secundária. Munição: ${p.equip.ammo ? itemName(p.equip.ammo.item) + " · " + fmtFull(ammoPrice(p.equip.ammo.item)) + " gp/tiro" : "nenhuma"}` :
+        slot === "extra" ? "Extra Slot: ferramentas bônus com resistência elemental" :
         slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro` :
         "Clique para desequipar";
       showTip(itemTip(slug, extra));
@@ -245,7 +250,10 @@ function renderEquip(p) {
       if (!addItem(G.p, slug, 1)) {
         toast("Mochila cheia."); return;
       }
-      if (slot === "quiver") setActiveAmmo(G.p, null);
+      // tirar a aljava tambem desequipa a municao
+      if (slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver") {
+        setActiveAmmo(G.p, null);
+      }
       delete G.p.equip[slot];
       hideTip();
       renderAll();
@@ -383,7 +391,7 @@ function equipFromBag(p, slug) {
   if (!it || !it.s) return false;
   if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
   if (it.s === "ammo") {
-    if (!p.equip.quiver) { toast("Equipe um quiver antes de selecionar munição."); return false; }
+    if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
     setActiveAmmo(p, slug);
     toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     return true;
@@ -1094,7 +1102,8 @@ function renderRefill(p) {
   const infinite = wp && wp.inf;
   const sel = p.equip.ammo && p.equip.ammo.item ? p.equip.ammo.item : null;
   const auto = !!p.config.ammoAuto;
-  const q = p.equip.quiver ? QUIVER_DEFS[p.equip.quiver.item] : null;
+  const eqQ = equippedQuiver(p);
+  const q = eqQ ? QUIVER_DEFS[eqQ.item] : null;
 
   // A lista completa saiu daqui e virou um modal com abas (openAmmoPicker).
   // Aqui fica so o resumo do que esta equipado, que e o que o jogador
@@ -1108,7 +1117,7 @@ function renderRefill(p) {
 
     <div class="quiver-head">
       <div class="quiver-slot">
-        ${q ? `<img src="assets/item/${p.equip.quiver.item}.png" alt="">`
+        ${q ? `<img src="assets/item/${eqQ.item}.png" alt="">`
             : `<img src="assets/ui/slots/right-hand.png" alt="" style="opacity:.45">`}
       </div>
       <div style="flex:1;min-width:0">
@@ -1160,12 +1169,12 @@ function renderRefill(p) {
   $$("#helper-refill [data-test-give]").forEach((b) => b.addEventListener("click", () => {
     const slug = b.dataset.testGive;
     if (slug === "quiver") {
-      const old = p.equip.quiver;
+      const old = equippedQuiver(p);
       if (old && old.item !== slug && !addItem(p, old.item, 1)) {
         toast("Mochila cheia para guardar o quiver atual.");
         return;
       }
-      p.equip.quiver = { item: slug, count: 1 };
+      p.equip.shield = { item: slug, count: 1 };
     } else {
       const old = p.equip.weapon;
       if (old && old.item !== slug && !addItem(p, old.item, 1)) {
@@ -1519,7 +1528,7 @@ function ammoInCat(slug, cat) {
 function ammoUsable(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it) return false;
-  if (!p.equip.quiver) return false;
+  if (!equippedQuiver(p)) return false;
   if (p.level < (it.lvl || 1)) return false;
   if (typeof ammoCompatibleWithWeapon === "function" &&
       !ammoCompatibleWithWeapon(it, p.equip.weapon)) return false;
@@ -1559,7 +1568,7 @@ function desenhaAmmoPicker() {
     if (!a || !it) return "";
     const ok = ammoUsable(p, slug);
     const sel = !auto && atual === slug;
-    const motivo = !p.equip.quiver ? "equipe um quiver"
+    const motivo = !equippedQuiver(p) ? "equipe um quiver"
       : (p.level < (it.lvl || 1) ? "nível " + it.lvl
       : (typeof ammoCompatibleWithWeapon === "function" &&
          !ammoCompatibleWithWeapon(it, p.equip.weapon)
@@ -1586,7 +1595,8 @@ function desenhaAmmoPicker() {
   const linhaQuiver = (slug) => {
     const q = QUIVER_DEFS[slug];
     if (!q) return "";
-    const usando = p.equip.quiver && p.equip.quiver.item === slug;
+    const eqq = equippedQuiver(p);
+    const usando = eqq && eqq.item === slug;
     const naBag = p.bag && p.bag[slug];
     const ok = p.level >= (q.lvl || 1);
     const extras = [];
@@ -1635,7 +1645,10 @@ function desenhaAmmoPicker() {
       .filter((s) => ammoInCat(s, cat))
       .filter((s) => !busca || AMMO_DEFS[s].n.toLowerCase().indexOf(busca) !== -1)
       .filter((s) => !AMMO_MODAL.soLiberadas || ammoUsable(p, s))
-      .sort((a, b) => AMMO_DEFS[a].atk - AMMO_DEFS[b].atk)
+      // ordena por nivel exigido e, dentro do mesmo nivel, por ataque —
+      // igual as listas de magia e potion, para o jogador ler a progressao
+      .sort((a, b) => ((AMMO_DEFS[a].lvl || 1) - (AMMO_DEFS[b].lvl || 1)) ||
+                      (AMMO_DEFS[a].atk - AMMO_DEFS[b].atk))
       .map(linhaAmmo);
   }
 
@@ -1741,8 +1754,9 @@ function desenhaAmmoPicker() {
         removeItem(p, slug, 1);
         toast(`<b>${q.n}</b> equipado.`);
       }
-      if (p.equip.quiver) addItem(p, p.equip.quiver.item, 1);
-      p.equip.quiver = { item: slug, count: 1 };
+      // devolve o que estava na mao secundaria (escudo ou quiver antigo)
+      if (p.equip.shield) addItem(p, p.equip.shield.item, 1);
+      p.equip.shield = { item: slug, count: 1 };
       save(); renderAll(); desenhaAmmoPicker();
     }));
 }

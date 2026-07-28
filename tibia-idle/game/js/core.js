@@ -339,7 +339,10 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
   for (const slug in QUIVER_DEFS) {
     const q = QUIVER_DEFS[slug];
     GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, {
-      n: q.n, s: "quiver", t: "quiver", cap: q.cap,
+      // s = slot de inventario, t = tipo do item. A aljava entra no slot da
+      // mao secundaria (shield), como no Tibia, mas continua sendo tipo
+      // "quiver" para as regras de municao e de vocacao.
+      n: q.n, s: "shield", t: "quiver", cap: q.cap, vocs: ["paladin"],
       lvl: q.lvl > 1 ? q.lvl : undefined, drop: q.drop || undefined,
       shotDmg: q.shotDmg || 0, shotRange: q.shotRange || 0,
       prot: q.prot || undefined, mag: q.mag || 0,

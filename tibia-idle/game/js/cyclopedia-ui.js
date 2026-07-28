@@ -644,37 +644,115 @@ function renderCycloCharms(p, el) {
 
 /* ----------------------------------------------------------------- itens */
 
+/* ----------------------------------------------------------------- itens
+ *
+ * Catalogo no formato do baiakidle: coluna de categorias a esquerda com a
+ * contagem, lista no meio e o detalhe do item selecionado a direita. Antes
+ * era uma grade unica de 160 itens sem separacao, impossivel de navegar.
+ *
+ * As categorias seguem a taxonomia do TibiaWiki (Armas corpo a corpo,
+ * Distancia, Wands & Rods, Escudos, Aljavas, Extra Slot...), casada com os
+ * campos `s` (slot) e `t` (tipo) que o jogo ja guarda em cada item.
+ */
+const ITEM_CATS = [
+  { id: "melee", nome: "Armas (corpo a corpo)",
+    match: (it) => it.s === "weapon" &&
+      ["sword", "axe", "club"].indexOf(it.t) !== -1 },
+  { id: "dist", nome: "Armas (distância)",
+    match: (it) => it.s === "weapon" && it.t === "distance" },
+  { id: "wand", nome: "Wands & Rods",
+    match: (it) => it.s === "weapon" && it.t === "magic" },
+  { id: "shield", nome: "Escudos",
+    match: (it) => it.s === "shield" && it.t === "shield" },
+  { id: "quiver", nome: "Aljavas",
+    match: (it) => it.t === "quiver" },
+  { id: "ammo", nome: "Munição",
+    match: (it) => it.s === "ammo" },
+  { id: "helmet", nome: "Elmos",
+    match: (it) => it.s === "helmet" },
+  { id: "armor", nome: "Armaduras",
+    match: (it) => it.s === "armor" },
+  { id: "legs", nome: "Calças",
+    match: (it) => it.s === "legs" },
+  { id: "boots", nome: "Botas",
+    match: (it) => it.s === "boots" },
+  { id: "amulet", nome: "Amuletos",
+    match: (it) => it.s === "amulet" },
+  { id: "ring", nome: "Anéis",
+    match: (it) => it.s === "ring" },
+  { id: "extra", nome: "Extra Slot",
+    match: (it) => it.s === "extra" },
+  { id: "supply", nome: "Suprimentos",
+    match: (it) => it.t === "supply" },
+  { id: "loot", nome: "Despojos",
+    match: (it) => it.t === "loot" },
+];
+
+/* Ordena por nivel exigido e depois por poder, para a lista mostrar a
+ * progressao em vez da ordem alfabetica */
+function itemSortKey(it) {
+  const poder = (it.atk || 0) + (it.arm || 0) + (it.def || 0) +
+                (it.mdmg || 0) + (it.mag || 0) * 5;
+  return [(it.lvl || 0), poder];
+}
+
 function renderCycloItems(p, el) {
+  const cat = CYCLO.itemCat || "melee";
   const busca = (CYCLO.busca || "").toLowerCase();
-  let ids = Object.keys(GAMEDATA.items);
+  const def = ITEM_CATS.find((c) => c.id === cat) || ITEM_CATS[0];
+
+  const conta = (c) => Object.keys(GAMEDATA.items)
+    .filter((i) => c.match(GAMEDATA.items[i])).length;
+
+  let ids = Object.keys(GAMEDATA.items).filter((i) => def.match(GAMEDATA.items[i]));
   if (busca) {
     ids = ids.filter((i) =>
       (GAMEDATA.items[i].n || "").toLowerCase().indexOf(busca) !== -1);
   }
-  ids.sort((a, b) => (GAMEDATA.items[a].n || a)
-    .localeCompare(GAMEDATA.items[b].n || b));
-  const mostrar = ids.slice(0, 160);
+  ids.sort((a, b) => {
+    const ka = itemSortKey(GAMEDATA.items[a]);
+    const kb = itemSortKey(GAMEDATA.items[b]);
+    return (ka[0] - kb[0]) || (ka[1] - kb[1]) ||
+           (GAMEDATA.items[a].n || a).localeCompare(GAMEDATA.items[b].n || b);
+  });
+
+  const sel = CYCLO.itemSel && GAMEDATA.items[CYCLO.itemSel]
+    ? CYCLO.itemSel : null;
+
   el.innerHTML = `
     <div class="row mb8" style="gap:6px;align-items:center">
-      <div class="tiny dim">${ids.length} itens conhecidos</div>
-      <span style="flex:1"></span>
-      <input id="cyclo-busca-item" placeholder="buscar item…"
+      <input id="cyclo-busca-item" placeholder="Buscar item…"
         value="${CYCLO.busca || ""}"
-        style="width:150px;padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        style="flex:1;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      <span class="tiny dim">${ids.length} itens</span>
     </div>
-    <div class="app-grid">
-      ${mostrar.map((i) => {
-        const it = GAMEDATA.items[i];
-        return `<div class="app-card" title="${it.n}">
-          <div class="app-img"><img src="assets/item/${i}.png" alt="" loading="lazy"></div>
-          <div class="tiny">${it.n}</div>
-          <div class="tiny dim">${it.sell ? fmtFull(it.sell) + " gp" : ""}</div>
-        </div>`;
-      }).join("")}
-    </div>
-    ${ids.length > mostrar.length
-      ? `<div class="tiny dim mt4">Mostrando ${mostrar.length}. Use a busca.</div>`
-      : ""}`;
+    <div class="item-browser">
+      <div class="item-cats">
+        ${ITEM_CATS.map((c) => {
+          const n = conta(c);
+          if (!n) return "";
+          return `<div class="item-cat ${cat === c.id ? "active" : ""}"
+            data-item-cat="${c.id}">${c.nome} <span class="dim">(${n})</span></div>`;
+        }).join("")}
+      </div>
+      <div class="item-list">
+        ${ids.map((i) => {
+          const it = GAMEDATA.items[i];
+          return `<div class="item-row ${sel === i ? "active" : ""}"
+                       data-item-pick="${i}">
+            <img src="assets/item/${i}.png" alt="" loading="lazy">
+            <span class="small">${it.n}</span>
+            ${it.lvl ? `<span class="tiny dim">nv ${it.lvl}</span>` : ""}
+          </div>`;
+        }).join("") || `<div class="dim tiny" style="padding:10px">Nada aqui.</div>`}
+      </div>
+      <div class="item-detail">
+        ${sel ? detalheItem(p, sel)
+              : `<div class="dim tiny" style="padding:20px;text-align:center">
+                   Selecione um item para ver os detalhes.</div>`}
+      </div>
+    </div>`;
+
   const inp = $("#cyclo-busca-item");
   if (inp) inp.addEventListener("input", () => {
     CYCLO.busca = inp.value;
@@ -682,4 +760,60 @@ function renderCycloItems(p, el) {
     const n = $("#cyclo-busca-item");
     if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
+  $$("#cyclo-content [data-item-cat]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.itemCat = b.dataset.itemCat;
+      CYCLO.itemSel = null;
+      renderCycloItems(p, el);
+    }));
+  $$("#cyclo-content [data-item-pick]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.itemSel = b.dataset.itemPick;
+      renderCycloItems(p, el);
+    }));
+}
+
+/* Painel de detalhe do item selecionado */
+function detalheItem(p, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return "";
+  const linha = (k, v) => v
+    ? `<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`
+    : "";
+  const el = it.el && ELEMENTS[it.el] ? ELEMENTS[it.el] : null;
+  const q = it.t === "quiver" ? QUIVER_DEFS[slug] : null;
+  const equipado = SLOTS.some((s) => p.equip[s] && p.equip[s].item === slug);
+  const naBag = (p.bag && p.bag[slug]) || 0;
+
+  return `
+    <div style="text-align:center;padding:8px 0">
+      <img src="assets/item/${slug}.png" alt=""
+           style="width:48px;height:48px;image-rendering:pixelated">
+      <div class="small mt4" style="color:#d4af37">${it.n}</div>
+      ${equipado ? `<div class="tiny" style="color:#9ce84a">equipado</div>`
+                 : (naBag ? `<div class="tiny dim">${naBag} na mochila</div>` : "")}
+    </div>
+    ${linha("Nível", it.lvl || "")}
+    ${linha("Ataque", it.atk || "")}
+    ${linha("Dano mágico", it.mdmg || "")}
+    ${linha("Defesa", it.def || "")}
+    ${linha("Armadura", it.arm || "")}
+    ${linha("Magic level", it.mag ? "+" + it.mag : "")}
+    ${linha("Elemento", el ? `<span style="color:${el.color}">${el.name}</span>` : "")}
+    ${linha("Peso", it.w ? it.w.toFixed(2) + " oz" : "")}
+    ${it.s === "ammo"
+      ? linha("Custo por tiro", `<span class="gold-txt">${it.shotCost || it.buy || 0} gp</span>`)
+      : linha("Compra", it.buy ? `<span class="gold-txt">${fmtFull(it.buy)} gp</span>` : "")}
+    ${linha("Venda", it.sell ? `<span class="gold-txt">${fmtFull(it.sell)} gp</span>` : "")}
+    ${q ? `
+      ${linha("Espaços", q.cap)}
+      ${q.shotDmg ? linha("Perfect shot",
+        `<span style="color:#ffe680">+${q.shotDmg} a ${q.shotRange} SQM</span>`) : ""}
+      ${q.prot ? Object.keys(q.prot).map((e) => linha(
+        "Resistência", `<span style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">+${q.prot[e]}% ${e}</span>`)).join("") : ""}
+      ${q.drop ? `<div class="tiny mt4" style="color:#c07cff">${
+        typeof quiverDropSource === "function" ? quiverDropSource(slug) : "drop de boss"}</div>` : ""}
+    ` : ""}
+    ${it.imbSlots ? linha("Slots de imbuement", it.imbSlots) : ""}
+    ${it.vocs ? linha("Vocação", it.vocs.join(", ")) : ""}`;
 }

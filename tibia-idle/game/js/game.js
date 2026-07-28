@@ -106,6 +106,20 @@ function load() {
 }
 
 function normalizePlayer(p) {
+  // Migracao: o quiver tinha um slot proprio inventado. No Tibia ele ocupa a
+  // mao secundaria, entao saves antigos precisam mover o item para `shield`
+  // e apagar o campo obsoleto, senao o personagem fica com dois quivers.
+  if (p.equip && p.equip.quiver) {
+    if (!p.equip.shield ||
+        (GAMEDATA.items[p.equip.shield.item] || {}).t === "quiver") {
+      p.equip.shield = p.equip.quiver;
+    } else {
+      // ja tinha escudo de verdade: o quiver volta para a mochila
+      p.bag = p.bag || {};
+      p.bag[p.equip.quiver.item] = (p.bag[p.equip.quiver.item] || 0) + 1;
+    }
+    delete p.equip.quiver;
+  }
   p.config = Object.assign({
     healAt: 90,
     healSpellAt: 90,
@@ -1276,9 +1290,11 @@ function giveStarterKit(p) {
   if (p.voc === "paladin") {
     // o quiver de Dawnport ocupa o slot proprio; sem ele o paladino nao
     // consegue atirar, entao garantimos que esteja equipado
-    if (!p.equip.quiver && GAMEDATA.items["quiver"]) {
+    if (!equippedQuiver(p) && GAMEDATA.items["quiver"]) {
       if (p.bag && p.bag["quiver"]) removeItem(p, "quiver", 1);
-      p.equip.quiver = { item: "quiver", count: 1 };
+      // o quiver vai para a mao secundaria, devolvendo o escudo se houver
+      if (p.equip.shield) addItem(p, p.equip.shield.item, 1);
+      p.equip.shield = { item: "quiver", count: 1 };
     }
     if (!p.equip.weapon && GAMEDATA.items["bow"]) {
       p.equip.weapon = { item: "bow", count: 1 };
