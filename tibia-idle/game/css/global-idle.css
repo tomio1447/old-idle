@@ -1,6 +1,6 @@
 /* ============================================
-   GLOBAL-IDLE - Identidade Visual
-   Tema: Cinza Escuro Profissional
+   GLOBAL-IDLE - Identidade Visual v2
+   Tema: Cinza Escuro Profissional + Acentos Azul/Dourado
    ============================================ */
 
 :root {
@@ -13,20 +13,23 @@
   --gi-dim: #6b7280;
   --gi-success: #4ade80;
   --gi-danger: #f87171;
+  --gi-hover: #3b3f4a;
 }
 
-/* Reset de cores base */
+/* ==================== BASE ==================== */
 body {
   background: var(--gi-bg);
   color: var(--gi-text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Painéis */
+/* ==================== PAINÉIS ==================== */
 .panel {
   background: var(--gi-panel);
   border: 1px solid var(--gi-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
 .panel-title {
@@ -34,48 +37,72 @@ body {
   border-bottom: 1px solid var(--gi-border);
   color: var(--gi-gold);
   font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 6px 6px 0 0;
+  font-size: 13px;
+  padding: 10px 14px;
+  letter-spacing: 0.5px;
 }
 
-/* Topbar */
+/* ==================== TOPBAR ==================== */
 .topbar {
   background: #282c34;
-  border-bottom: 1px solid var(--gi-border);
+  border-bottom: 2px solid var(--gi-border);
+  padding: 8px 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 
-/* Botões */
-button.primary,
-button.primary.sm {
+.logo {
+  color: var(--gi-gold);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 18px;
+}
+
+/* ==================== BOTÕES ==================== */
+button.primary {
   background: linear-gradient(#5c6bc0, #4752a3);
   border: 1px solid #7c8fe6;
   color: white;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(92, 107, 192, 0.3);
 }
 
 button.primary:hover {
   background: linear-gradient(#6b7dd1, #525db8);
   border-color: #8fa0f0;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(92, 107, 192, 0.4);
 }
 
 button.sm {
   background: #3a3f4a;
   border: 1px solid var(--gi-border);
   color: var(--gi-text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.15s ease;
 }
 
 button.sm:hover {
-  background: #4a5060;
+  background: var(--gi-hover);
+  border-color: var(--gi-accent);
 }
 
-/* Barras */
+/* ==================== BARRAS ==================== */
 .bar {
   background: #1a1d24;
   border: 1px solid #3a3f4a;
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.bar .fill {
+  transition: width 0.3s ease;
+  position: relative;
 }
 
 .bar .fill.hp { background: linear-gradient(#4ade80, #22c55e); }
@@ -84,29 +111,48 @@ button.sm:hover {
 .bar .fill.sta { background: linear-gradient(#fb923c, #f97316); }
 .bar .fill.skl { background: linear-gradient(#a78bfa, #8b5cf6); }
 
-/* Hunt cards */
+/* ==================== HUNT CARDS ==================== */
 .hunt-card {
   background: #282c34;
   border: 1px solid var(--gi-border);
-  transition: all 0.2s ease;
+  border-radius: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 6px;
 }
 
 .hunt-card:hover {
   border-color: var(--gi-accent);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(92, 107, 192, 0.2);
 }
 
 .hunt-card.active {
   border-color: var(--gi-gold);
-  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.2);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.25);
 }
 
-/* Inputs */
+/* ==================== INVENTÁRIO ==================== */
+.inv-item, .slot {
+  background: #282c34;
+  border: 1px solid var(--gi-border);
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.inv-item:hover, .slot:hover {
+  border-color: var(--gi-accent);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(92, 107, 192, 0.3);
+}
+
+/* ==================== INPUTS ==================== */
 input, select {
   background: #1a1d24;
   border: 1px solid var(--gi-border);
   color: var(--gi-text);
-  border-radius: 4px;
+  border-radius: 5px;
+  padding: 6px 10px;
+  transition: all 0.2s ease;
 }
 
 input:focus, select:focus {
@@ -115,62 +161,61 @@ input:focus, select:focus {
   box-shadow: 0 0 0 3px rgba(92, 107, 192, 0.2);
 }
 
-/* Tabelas e listas */
-.list {
-  background: #1a1d24;
-}
-
-.inv-item, .slot {
-  background: #282c34;
-  border: 1px solid var(--gi-border);
-}
-
-.inv-item:hover, .slot:hover {
-  border-color: var(--gi-accent);
-}
-
-/* Tooltip */
+/* ==================== TOOLTIP ==================== */
 #tooltip {
   background: #282c34;
   border: 1px solid var(--gi-border);
   color: var(--gi-text);
+  border-radius: 6px;
+  padding: 10px 14px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  font-size: 13px;
 }
 
-/* Toast */
+/* ==================== TOAST ==================== */
 .toast {
   background: #282c34;
   border: 1px solid var(--gi-accent);
   color: var(--gi-text);
+  border-radius: 6px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
-/* Voc cards */
+/* ==================== VOC CARDS ==================== */
 .voc-card {
   background: #282c34;
   border: 1px solid var(--gi-border);
+  border-radius: 8px;
+  padding: 12px;
   transition: all 0.2s ease;
 }
 
 .voc-card.sel {
   border-color: var(--gi-gold);
-  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.3);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.3);
 }
 
 .voc-card:hover {
   border-color: var(--gi-accent);
+  transform: translateY(-3px);
 }
 
-/* Tabs */
+/* ==================== TABS ==================== */
 .tab {
   color: var(--gi-dim);
+  padding: 8px 16px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 
 .tab.active {
   color: var(--gi-gold);
-  border-bottom: 2px solid var(--gi-gold);
+  border-bottom-color: var(--gi-gold);
 }
 
-/* Scrollbars */
+/* ==================== SCROLLBAR ==================== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -178,6 +223,7 @@ input:focus, select:focus {
 
 ::-webkit-scrollbar-track {
   background: #1a1d24;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -186,27 +232,39 @@ input:focus, select:focus {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5c6bc0;
+  background: var(--gi-accent);
 }
 
-/* Texto e ícones */
+/* ==================== TEXTO ==================== */
 .gold-txt {
   color: var(--gi-gold) !important;
+  font-weight: 600;
 }
 
 .dim {
   color: var(--gi-dim) !important;
 }
 
-/* Modal */
+/* ==================== MODAL ==================== */
 .modal {
   background: #282c34;
   border: 1px solid var(--gi-border);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
 }
 
-/* Logo */
-.logo {
-  color: var(--gi-gold);
-  font-weight: 700;
-  letter-spacing: 1px;
+/* ==================== EFEITOS ESPECIAIS ==================== */
+.panel:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+}
+
+button.primary:active {
+  transform: scale(0.98);
+}
+
+/* ==================== RESPONSIVIDADE ==================== */
+@media (max-width: 1200px) {
+  .panel {
+    border-radius: 6px;
+  }
 }
