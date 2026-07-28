@@ -56,6 +56,10 @@ function shopCatalog(p) {
     const it = GAMEDATA.items[slug];
     if (!it.s || it.s === "ammo") continue;
     if (it.t === "loot") continue;
+    // Item que nenhum NPC do Tibia vende nao entra na loja: no Canary
+    // (appearances.dat) so 304 dos 1328 equipamentos tem npcsaledata. O
+    // resto e drop, quest ou recompensa e precisa ser conquistado.
+    if (typeof itemNaLoja === "function" && !itemNaLoja(it)) continue;
     // so vende itens ate um pouco acima do nivel do jogador
     const req = it.lvl || 1;
     if (req > p.level + 15) continue;

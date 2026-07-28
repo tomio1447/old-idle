@@ -744,3 +744,33 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: #14120e; border: 1px solid var(--border-in, #3a3428);
   padding: 8px; max-height: 420px; overflow-y: auto;
 }
+
+/* ------------------------------------------------ sprites animadas de item
+ * A tira <slug>_anim.png tem os N frames lado a lado; deslocar o
+ * background em passos anima sem JS e com uma requisicao so. */
+@keyframes item-anim { to { background-position-x: -100%; } }
+.item-sprite { image-rendering: pixelated; flex: none; }
+div.item-sprite { background-repeat: no-repeat; }
+
+/* ---------------------------------------------- filtros do catalogo de itens */
+.item-filtros {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  margin-bottom: 6px;
+}
+.item-filtro {
+  padding: 3px 8px; font-size: 10px; cursor: pointer;
+  background: #14120e; color: #a49b84; border: 1px solid #2a2620;
+}
+.item-filtro:hover { background: #26221a; }
+.item-filtro.active {
+  background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37);
+}
+.item-filtros .sep { width: 1px; height: 16px; background: #2a2620; margin: 0 4px; }
+.item-filtros label { font-size: 10px; color: #a49b84; display: flex;
+  align-items: center; gap: 3px; cursor: pointer; }
+.item-filtros input[type=range] { width: 90px; }
+.item-row .badge-cls {
+  font-size: 9px; padding: 0 3px; border: 1px solid #6a5a2a;
+  color: #d4af37; flex: none;
+}
+.item-row .badge-anim { font-size: 9px; color: #7ec8ff; flex: none; }

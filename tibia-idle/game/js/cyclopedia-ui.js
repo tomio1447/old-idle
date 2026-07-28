@@ -655,36 +655,47 @@ function renderCycloCharms(p, el) {
  * campos `s` (slot) e `t` (tipo) que o jogo ja guarda em cada item.
  */
 const ITEM_CATS = [
-  { id: "melee", nome: "Armas (corpo a corpo)",
-    match: (it) => it.s === "weapon" &&
-      ["sword", "axe", "club"].indexOf(it.t) !== -1 },
-  { id: "dist", nome: "Armas (distância)",
+  // armas, na mesma ordem do mercado do Tibia
+  { id: "sword", nome: "Espadas", grupo: "Armas",
+    match: (it) => it.t === "sword" },
+  { id: "axe", nome: "Machados", grupo: "Armas",
+    match: (it) => it.t === "axe" },
+  { id: "club", nome: "Clavas", grupo: "Armas",
+    match: (it) => it.t === "club" },
+  { id: "distance", nome: "Distância", grupo: "Armas",
     match: (it) => it.s === "weapon" && it.t === "distance" },
-  { id: "wand", nome: "Wands & Rods",
-    match: (it) => it.s === "weapon" && it.t === "magic" },
-  { id: "shield", nome: "Escudos",
+  { id: "wand", nome: "Wands & Rods", grupo: "Armas",
+    match: (it) => it.s === "weapon" && (it.t === "magic" || it.cat === "wand") },
+  { id: "fist", nome: "Punho (Monk)", grupo: "Armas",
+    match: (it) => it.t === "fist" },
+  // defesa
+  { id: "shield", nome: "Escudos", grupo: "Defesa",
     match: (it) => it.s === "shield" && it.t === "shield" },
-  { id: "quiver", nome: "Aljavas",
+  { id: "spellbook", nome: "Spellbooks", grupo: "Defesa",
+    match: (it) => it.t === "spellbook" },
+  { id: "quiver", nome: "Aljavas", grupo: "Defesa",
     match: (it) => it.t === "quiver" },
-  { id: "ammo", nome: "Munição",
+  { id: "ammo", nome: "Munição", grupo: "Defesa",
     match: (it) => it.s === "ammo" },
-  { id: "helmet", nome: "Elmos",
+  // vestimenta
+  { id: "helmet", nome: "Elmos", grupo: "Vestimenta",
     match: (it) => it.s === "helmet" },
-  { id: "armor", nome: "Armaduras",
+  { id: "armor", nome: "Armaduras", grupo: "Vestimenta",
     match: (it) => it.s === "armor" },
-  { id: "legs", nome: "Calças",
+  { id: "legs", nome: "Calças", grupo: "Vestimenta",
     match: (it) => it.s === "legs" },
-  { id: "boots", nome: "Botas",
+  { id: "boots", nome: "Botas", grupo: "Vestimenta",
     match: (it) => it.s === "boots" },
-  { id: "amulet", nome: "Amuletos",
+  { id: "amulet", nome: "Amuletos", grupo: "Vestimenta",
     match: (it) => it.s === "amulet" },
-  { id: "ring", nome: "Anéis",
+  { id: "ring", nome: "Anéis", grupo: "Vestimenta",
     match: (it) => it.s === "ring" },
-  { id: "extra", nome: "Extra Slot",
+  { id: "extra", nome: "Extra Slot", grupo: "Vestimenta",
     match: (it) => it.s === "extra" },
-  { id: "supply", nome: "Suprimentos",
+  // resto
+  { id: "supply", nome: "Suprimentos", grupo: "Outros",
     match: (it) => it.t === "supply" },
-  { id: "loot", nome: "Despojos",
+  { id: "loot", nome: "Despojos", grupo: "Outros",
     match: (it) => it.t === "loot" },
 ];
 
@@ -692,23 +703,62 @@ const ITEM_CATS = [
  * progressao em vez da ordem alfabetica */
 function itemSortKey(it) {
   const poder = (it.atk || 0) + (it.arm || 0) + (it.def || 0) +
-                (it.mdmg || 0) + (it.mag || 0) * 5;
+                (it.elDmg || 0) + (it.mdmg || 0) + (it.mag || 0) * 5;
   return [(it.lvl || 0), poder];
 }
 
+/* Vocacoes disponiveis no filtro. `todas` mostra tudo, incluindo o que a
+ * vocacao do jogador nao pode usar. */
+const ITEM_VOCS = [
+  { id: "", nome: "Todas" },
+  { id: "mine", nome: "Minha" },
+  { id: "knight", nome: "Knight" },
+  { id: "paladin", nome: "Paladin" },
+  { id: "druid", nome: "Druid" },
+  { id: "sorcerer", nome: "Sorcerer" },
+  { id: "monk", nome: "Monk" },
+];
+
+/* Aplica os filtros de vocacao, nivel, origem e busca a uma lista de slugs.
+ *
+ * O filtro de vocacao trata "sem restricao" como liberado para todos: no
+ * items.xml a maioria dos itens simplesmente nao declara vocacao, e escondê-los
+ * ao filtrar por Knight deixaria a lista quase vazia.
+ */
+function filtraItens(p, ids) {
+  const f = CYCLO.itemFiltro || {};
+  const busca = (CYCLO.busca || "").trim().toLowerCase();
+  return ids.filter((i) => {
+    const it = GAMEDATA.items[i];
+    if (!it) return false;
+    if (busca && (it.n || "").toLowerCase().indexOf(busca) === -1) return false;
+    if (f.voc) {
+      const alvo = f.voc === "mine" ? p.voc : f.voc;
+      if (it.vocs && it.vocs.indexOf(alvo) === -1) return false;
+    }
+    if (f.lvlMax && (it.lvl || 0) > f.lvlMax) return false;
+    if (f.usavel && !itemLiberado(p, it)) return false;
+    if (f.origem === "loja" && !itemNaLoja(it)) return false;
+    if (f.origem === "drop" && itemNaLoja(it)) return false;
+    if (f.anim && !itemAnimado(it)) return false;
+    if (f.cls && (it.cls || 0) !== f.cls) return false;
+    return true;
+  });
+}
+
 function renderCycloItems(p, el) {
-  const cat = CYCLO.itemCat || "melee";
-  const busca = (CYCLO.busca || "").toLowerCase();
+  const cat = CYCLO.itemCat || "sword";
   const def = ITEM_CATS.find((c) => c.id === cat) || ITEM_CATS[0];
+  // chave propria: CYCLO.filtro ja e uma STRING usada pelo bestiario e pela
+  // aba de aparencias; escrever um objeto ali quebrava as duas
+  if (!CYCLO.itemFiltro) CYCLO.itemFiltro = { voc: "", lvlMax: 0, origem: "" };
+  const f = CYCLO.itemFiltro;
 
-  const conta = (c) => Object.keys(GAMEDATA.items)
-    .filter((i) => c.match(GAMEDATA.items[i])).length;
+  const daCat = (c) => Object.keys(GAMEDATA.items)
+    .filter((i) => c.match(GAMEDATA.items[i]));
 
-  let ids = Object.keys(GAMEDATA.items).filter((i) => def.match(GAMEDATA.items[i]));
-  if (busca) {
-    ids = ids.filter((i) =>
-      (GAMEDATA.items[i].n || "").toLowerCase().indexOf(busca) !== -1);
-  }
+  const brutos = daCat(def);
+  let ids = filtraItens(p, brutos);
   ids.sort((a, b) => {
     const ka = itemSortKey(GAMEDATA.items[a]);
     const kb = itemSortKey(GAMEDATA.items[b]);
@@ -719,32 +769,70 @@ function renderCycloItems(p, el) {
   const sel = CYCLO.itemSel && GAMEDATA.items[CYCLO.itemSel]
     ? CYCLO.itemSel : null;
 
+  // maior nivel da categoria, para calibrar o slider
+  let maxLvl = 0;
+  for (const i of brutos) maxLvl = Math.max(maxLvl, GAMEDATA.items[i].lvl || 0);
+  maxLvl = Math.ceil(maxLvl / 25) * 25 || 100;
+
+  const btn = (chave, valor, texto, ativo) =>
+    `<div class="item-filtro ${ativo ? "active" : ""}"
+      data-filtro="${chave}" data-valor="${valor}">${texto}</div>`;
+
+  // as categorias sao agrupadas (Armas / Defesa / Vestimenta / Outros) para
+  // a coluna nao virar uma lista corrida de 19 linhas
+  let grupoAtual = "";
+  const colunaCats = ITEM_CATS.map((c) => {
+    const n = daCat(c).length;
+    if (!n) return "";
+    let cab = "";
+    if (c.grupo !== grupoAtual) {
+      grupoAtual = c.grupo;
+      cab = `<div class="tiny dim" style="padding:6px 4px 2px">${c.grupo}</div>`;
+    }
+    return cab + `<div class="item-cat ${cat === c.id ? "active" : ""}"
+      data-item-cat="${c.id}">${c.nome} <span class="dim">(${n})</span></div>`;
+  }).join("");
+
   el.innerHTML = `
     <div class="row mb8" style="gap:6px;align-items:center">
       <input id="cyclo-busca-item" placeholder="Buscar item…"
         value="${CYCLO.busca || ""}"
         style="flex:1;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      <span class="tiny dim">${ids.length} itens</span>
+      <span class="tiny dim">${ids.length} de ${brutos.length}</span>
+    </div>
+    <div class="item-filtros">
+      ${ITEM_VOCS.map((v) =>
+        btn("voc", v.id, v.nome, (f.voc || "") === v.id)).join("")}
+      <span class="sep"></span>
+      ${btn("origem", "", "Todos", !f.origem)}
+      ${btn("origem", "loja", "Loja", f.origem === "loja")}
+      ${btn("origem", "drop", "Drop", f.origem === "drop")}
+      <span class="sep"></span>
+      ${btn("usavel", "1", "Só usáveis", !!f.usavel)}
+      ${btn("anim", "1", "Animados", !!f.anim)}
+      <span class="sep"></span>
+      <label>nv ≤ <input id="cyclo-lvl" type="range" min="0" max="${maxLvl}"
+        step="5" value="${f.lvlMax || maxLvl}">
+        <b style="color:#ffe680" id="cyclo-lvl-val">${f.lvlMax || "∞"}</b></label>
+      ${(f.voc || f.origem || f.usavel || f.anim || f.lvlMax)
+        ? `<div class="item-filtro" id="cyclo-limpar"
+             style="color:#c86a4a">✕ limpar</div>` : ""}
     </div>
     <div class="item-browser">
-      <div class="item-cats">
-        ${ITEM_CATS.map((c) => {
-          const n = conta(c);
-          if (!n) return "";
-          return `<div class="item-cat ${cat === c.id ? "active" : ""}"
-            data-item-cat="${c.id}">${c.nome} <span class="dim">(${n})</span></div>`;
-        }).join("")}
-      </div>
+      <div class="item-cats">${colunaCats}</div>
       <div class="item-list">
         ${ids.map((i) => {
           const it = GAMEDATA.items[i];
+          const bloq = !itemLiberado(p, it);
           return `<div class="item-row ${sel === i ? "active" : ""}"
-                       data-item-pick="${i}">
-            <img src="assets/item/${i}.png" alt="" loading="lazy">
+                       data-item-pick="${i}" style="${bloq ? "opacity:.55" : ""}">
+            ${itemImg(i, 26)}
             <span class="small">${it.n}</span>
+            ${it.af ? `<span class="badge-anim" title="sprite animada">▸</span>` : ""}
+            ${it.cls ? `<span class="badge-cls" title="classificação ${it.cls}">C${it.cls}</span>` : ""}
             ${it.lvl ? `<span class="tiny dim">nv ${it.lvl}</span>` : ""}
           </div>`;
-        }).join("") || `<div class="dim tiny" style="padding:10px">Nada aqui.</div>`}
+        }).join("") || `<div class="dim tiny" style="padding:10px">Nada com esses filtros.</div>`}
       </div>
       <div class="item-detail">
         ${sel ? detalheItem(p, sel)
@@ -760,10 +848,35 @@ function renderCycloItems(p, el) {
     const n = $("#cyclo-busca-item");
     if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
+  const lim = $("#cyclo-limpar");
+  if (lim) lim.addEventListener("click", () => {
+    CYCLO.itemFiltro = { voc: "", lvlMax: 0, origem: "" };
+    renderCycloItems(p, el);
+  });
+  const sl = $("#cyclo-lvl");
+  if (sl) sl.addEventListener("input", () => {
+    const v = parseInt(sl.value, 10);
+    f.lvlMax = v >= maxLvl ? 0 : v;
+    const lbl = $("#cyclo-lvl-val");
+    if (lbl) lbl.textContent = f.lvlMax || "∞";
+    clearTimeout(CYCLO._lvlTimer);
+    // redesenha com atraso: arrastar o slider redesenharia a lista a cada
+    // pixel e travaria a aba com 170 itens
+    CYCLO._lvlTimer = setTimeout(() => renderCycloItems(p, el), 180);
+  });
+  $$("#cyclo-content [data-filtro]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const k = b.dataset.filtro, v = b.dataset.valor;
+      if (k === "usavel" || k === "anim") f[k] = f[k] ? 0 : 1;
+      else f[k] = f[k] === v ? "" : v;
+      CYCLO.itemSel = null;
+      renderCycloItems(p, el);
+    }));
   $$("#cyclo-content [data-item-cat]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.itemCat = b.dataset.itemCat;
       CYCLO.itemSel = null;
+      f.lvlMax = 0;
       renderCycloItems(p, el);
     }));
   $$("#cyclo-content [data-item-pick]").forEach((b) =>
@@ -773,7 +886,12 @@ function renderCycloItems(p, el) {
     }));
 }
 
-/* Painel de detalhe do item selecionado */
+/* Painel de detalhe do item selecionado.
+ *
+ * Mostra tudo que veio do Canary: classificacao da forja, augments,
+ * resistencias por elemento, leech, bonus de skill e o preco de NPC real
+ * (que e so informativo — a economia do jogo usa `sell`/`buy`).
+ */
 function detalheItem(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it) return "";
@@ -784,27 +902,64 @@ function detalheItem(p, slug) {
   const q = it.t === "quiver" ? QUIVER_DEFS[slug] : null;
   const equipado = SLOTS.some((s) => p.equip[s] && p.equip[s].item === slug);
   const naBag = (p.bag && p.bag[slug]) || 0;
+  const liberado = itemLiberado(p, it);
+
+  const skills = ["sword", "axe", "club", "dist", "shield", "fist"]
+    .filter((s) => it[s])
+    .map((s) => `+${it[s]} ${s}`).join(", ");
+
+  const res = it.res ? Object.keys(it.res).map((e) => {
+    const cor = (ELEMENTS[e] || {}).color || "#ccc";
+    const nome = (ELEMENTS[e] || {}).name || e;
+    return `<span style="color:${cor}">${it.res[e] > 0 ? "+" : ""}${it.res[e]}% ${nome}</span>`;
+  }).join(" · ") : "";
+
+  const aug = it.aug ? it.aug.map((a) =>
+    `<div class="tiny" style="color:#9ce84a">▸ ${a.s}: ${a.k} ${
+      a.k === "cooldown" ? "-" + a.v + "s" : "+" + a.v + "%"}</div>`).join("") : "";
 
   return `
     <div style="text-align:center;padding:8px 0">
-      <img src="assets/item/${slug}.png" alt=""
-           style="width:48px;height:48px;image-rendering:pixelated">
+      <div style="display:flex;justify-content:center">${itemImg(slug, 48)}</div>
       <div class="small mt4" style="color:#d4af37">${it.n}</div>
       ${equipado ? `<div class="tiny" style="color:#9ce84a">equipado</div>`
                  : (naBag ? `<div class="tiny dim">${naBag} na mochila</div>` : "")}
+      ${!liberado ? `<div class="tiny" style="color:#c86a4a">não pode usar ainda</div>` : ""}
     </div>
     ${linha("Nível", it.lvl || "")}
+    ${linha("Vocação", it.vocs ? it.vocs.join(", ") : "")}
     ${linha("Ataque", it.atk || "")}
-    ${linha("Dano mágico", it.mdmg || "")}
-    ${linha("Defesa", it.def || "")}
+    ${linha("Dano elemental", it.elDmg && el
+      ? `<span style="color:${el.color}">${it.elDmg} ${el.name}</span>` : "")}
+    ${linha("Dano mágico", it.mdmg
+      ? (it.dmgMin ? `${it.dmgMin}–${it.dmgMax}` : it.mdmg) : "")}
+    ${linha("Mana por tiro", it.manaCost || "")}
+    ${linha("Defesa", it.def ? it.def + (it.extraDef ? ` (+${it.extraDef})` : "") : "")}
     ${linha("Armadura", it.arm || "")}
     ${linha("Magic level", it.mag ? "+" + it.mag : "")}
-    ${linha("Elemento", el ? `<span style="color:${el.color}">${el.name}</span>` : "")}
+    ${linha("Skills", skills)}
+    ${linha("Elemento", !it.elDmg && el
+      ? `<span style="color:${el.color}">${el.name}</span>` : "")}
+    ${linha("Resistências", res)}
+    ${linha("Life leech", it.lifeLeech ? it.lifeLeech + "%" : "")}
+    ${linha("Mana leech", it.manaLeech ? it.manaLeech + "%" : "")}
+    ${linha("Regen. vida", it.hpreg || "")}
+    ${linha("Regen. mana", it.mpreg || "")}
+    ${linha("Velocidade", it.spd ? "+" + it.spd : "")}
+    ${linha("Duas mãos", it.th ? "sim" : "")}
     ${linha("Peso", it.w ? it.w.toFixed(2) + " oz" : "")}
     ${it.s === "ammo"
       ? linha("Custo por tiro", `<span class="gold-txt">${it.shotCost || it.buy || 0} gp</span>`)
       : linha("Compra", it.buy ? `<span class="gold-txt">${fmtFull(it.buy)} gp</span>` : "")}
     ${linha("Venda", it.sell ? `<span class="gold-txt">${fmtFull(it.sell)} gp</span>` : "")}
+    ${linha("Preço NPC (Tibia)", it.npcBuy
+      ? `<span class="dim">${fmtFull(it.npcBuy)} gp</span>` : "")}
+    ${it.cls ? linha("Classificação",
+      `<span style="color:#d4af37">${it.cls}</span>
+       <span class="tiny dim">(forja: até tier ${it.cls * 2 + 2})</span>`) : ""}
+    ${it.af ? linha("Sprite", `<span style="color:#7ec8ff">animada, ${it.af} frames</span>`) : ""}
+    ${aug ? `<div class="stat-row" style="display:block">
+      <div class="k mb4">Augments</div>${aug}</div>` : ""}
     ${q ? `
       ${linha("Espaços", q.cap)}
       ${q.shotDmg ? linha("Perfect shot",
@@ -815,5 +970,6 @@ function detalheItem(p, slug) {
         typeof quiverDropSource === "function" ? quiverDropSource(slug) : "drop de boss"}</div>` : ""}
     ` : ""}
     ${it.imbSlots ? linha("Slots de imbuement", it.imbSlots) : ""}
-    ${it.vocs ? linha("Vocação", it.vocs.join(", ")) : ""}`;
+    ${!itemNaLoja(it) && it.s
+      ? `<div class="tiny mt4" style="color:#c07cff">só por drop ou quest</div>` : ""}`;
 }
