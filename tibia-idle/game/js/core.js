@@ -162,14 +162,21 @@ function regenRate(voc, hasLifeRing) {
 }
 
 /* Stats maximos derivados do nivel */
+/* Vida e mana do nivel 1, antes dos ganhos por nivel.
+ * O personagem nascia com 150/0, o que deixava qualquer vocacao sem lancar
+ * uma unica magia no comeco — inclusive o Monk, que depende de mana para
+ * subir magic level. */
+const START_HP = 185;
+const START_MP = 5;
+
 function baseStats(voc, level) {
   const v = VOCATIONS[voc];
   // rookgaard: 5/5/10 por nivel ate o 8
   const rookLvls = Math.min(level - 1, 7);
   const vocLvls = Math.max(0, level - 1 - rookLvls);
   return {
-    hp: 150 + rookLvls * 5 + vocLvls * v.hpGain,
-    mp: 0 + rookLvls * 5 + vocLvls * v.mpGain,
+    hp: START_HP + rookLvls * 5 + vocLvls * v.hpGain,
+    mp: START_MP + rookLvls * 5 + vocLvls * v.mpGain,
     cap: 400 + rookLvls * 10 + vocLvls * v.capGain,
   };
 }
@@ -238,6 +245,11 @@ const SPELLS = {};
  * seria perdida ao reimportar. As decisoes de design do jogo (que e idle e
  * progride mais rapido que o Tibia) moram aqui e sobrevivem a reimportacao.
  * Cada entrada precisa dizer POR QUE diverge do servidor. */
+/* Custo de mana das magias de nivel 1.
+ * Com 5 de mana inicial, o custo original (3 a 18) travava o personagem
+ * novo: ele nao conseguia lancar nem a primeira magia da vocacao. */
+const SPELL_MANA_NIVEL1 = 2;
+
 const SPELL_OVERRIDES = {
   // o jogador pediu Exura Gran cedo no paladin: no idle o char passa pouco
   // tempo entre 14 e 20 e ficaria sem cura media nesse intervalo
@@ -248,6 +260,13 @@ const SPELL_OVERRIDES = {
   for (const id in SPELL_OVERRIDES) {
     if (!SPELLS[id]) continue;
     Object.assign(SPELLS[id], SPELL_OVERRIDES[id]);
+  }
+  // toda magia de nivel 1 cabe na mana inicial do personagem
+  for (const id in SPELLS) {
+    const s = SPELLS[id];
+    if ((s.lvl || 1) <= 1 && s.mana > SPELL_MANA_NIVEL1) {
+      s.mana = SPELL_MANA_NIVEL1;
+    }
   }
 })();
 

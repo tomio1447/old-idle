@@ -10,7 +10,7 @@ const PLAYER_SCALE = 1.8;
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "3";
+const ASSET_VERSION = "4";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -44,6 +44,12 @@ const Sprites = {
     return img;
   },
   mob(slug, dir) { return this.get(`assets/mob/${slug}_${dir || "s"}.png`); },
+  /* Frame de caminhada do monstro. frame 1 e 2 sao os passos exportados do
+   * grupo de animacao do DAT; qualquer outro valor cai na pose parada. */
+  mobWalk(slug, dir, frame) {
+    if (!frame) return this.mob(slug, dir);
+    return this.get(`assets/mob/${slug}_${dir || "s"}${frame}.png`);
+  },
   item(slug) { return this.get(`assets/item/${slug}.png`); },
   outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
   ground(scene) { return this.get(`assets/ground/${scene}.png`); },
@@ -791,7 +797,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
   if (combat && !combat.dead) {
     const mobs = combat.mobs.slice().sort((a, b) => a.y - b.y);
     for (const m of mobs) {
-      const img = Sprites.mob(m.slug, m.dir || "w");
+      // alterna os dois frames de passo enquanto o monstro esta vivo. Os
+      // sprites de animacao existem no DAT desde sempre, mas o extrator so
+      // gravava a pose parada — por isso a tela de caca parecia congelada.
+      const passo = 1 + (Math.floor(Date.now() / 260 + m.x * 17) % 2);
+      const anim = Sprites.mobWalk(m.slug, m.dir || "w", passo);
+      // se o frame de passo nao existir (404 deixa naturalWidth em 0), cai
+      // na pose parada em vez de sumir com o monstro da tela
+      const img = (anim && anim.complete && anim.naturalWidth)
+        ? anim : Sprites.mob(m.slug, m.dir || "w");
       const mx = m.x * W;
       const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
       if (img && img.complete && img.naturalWidth) {

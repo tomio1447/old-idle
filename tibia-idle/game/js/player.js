@@ -148,7 +148,8 @@ function maxStats(p) {
 function gearStats(p) {
   const g = { armor: 0, defense: 0, attack: 0, magicDamage: 0, mag: 0,
               prot: 0, hpreg: 0, mpreg: 0, speed: 0, weight: 0,
-              melee: 0, sword: 0, axe: 0, club: 0, shield: 0, dist: 0 };
+              melee: 0, sword: 0, axe: 0, club: 0, shield: 0, dist: 0,
+              fist: 0 };
   for (const s of SLOTS) {
     const e = p.equip[s];
     if (!e) continue;
@@ -172,6 +173,7 @@ function gearStats(p) {
     g.axe += it.axe || 0;
     g.club += it.club || 0;
     g.shield += it.shield || 0;
+    g.fist += it.fist || 0;
   }
   // bonus de skill vindos dos imbuements (15.x)
   if (typeof imbTotals === "function") {
@@ -196,6 +198,9 @@ function effSkill(p, which) {
   else if (which === "club") v += g.club + g.melee;
   else if (which === "shield") v += g.shield;
   else if (which === "dist") v += g.dist;
+  // punho tambem recebe bonus de equipamento: as armas de monk trazem
+  // skillfist no items.xml (a jo staff da +1)
+  else if (which === "fist") v += g.fist + g.melee;
   return v;
 }
 
@@ -222,6 +227,8 @@ function weaponSkill(p) {
   if (it.t === "club") return "club";
   if (it.t === "distance") return "dist";
   if (it.t === "magic") return "magic";
+  // "fist" e o weaponType das armas de monk (jo staff, katar, sai...):
+  // elas contam como punho, e nao como clava
   return "fist";
 }
 

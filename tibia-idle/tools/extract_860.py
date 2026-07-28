@@ -151,7 +151,20 @@ HUMANOID_COLORS = {
 
 
 def export_mobs():
+    """Exporta cada monstro parado e tambem os frames de caminhada.
+
+    O DAT 8.60 traz DOIS frame groups por criatura: o grupo 0 e a pose
+    parada (1 frame) e o grupo 1 e a animacao de andar (2 frames na maioria).
+    A versao anterior so gravava o grupo 0, entao o monstro aparecia estatico
+    na tela de caca por mais que os arquivos tivessem a animacao.
+
+    Saida por direcao:
+        <nome>_<dir>.png    parado (grupo 0)
+        <nome>_<dir>1.png   passo 1 (grupo 1, frame 0)
+        <nome>_<dir>2.png   passo 2 (grupo 1, frame 1)
+    """
     ok = miss = 0
+    total_frames = 0
     for name, lt in MONSTER_LOOKTYPES.items():
         obj = dat.outfit(lt)
         if obj is None or not obj.groups:
@@ -161,6 +174,10 @@ def export_mobs():
         colors = HUMANOID_COLORS.get(name)
         if obj.groups[0].layers > 1 and colors is None:
             colors = (78, 68, 58, 76)
+        # grupo de caminhada quando existe; senao o proprio grupo parado,
+        # que em alguns monstros ja traz varios frames de animacao
+        andando = 1 if len(obj.groups) > 1 else 0
+        g_and = obj.groups[andando]
         wrote = False
         for tag, direction in DIRS:
             img = render_outfit_860(dat, spr, lt, direction=direction,
@@ -169,9 +186,19 @@ def export_mobs():
                 continue
             img.crop(img.getbbox()).save("%s/mob/%s_%s.png" % (OUT, name, tag))
             wrote = True
+            total_frames += 1
+            # ate 2 frames de passo por direcao: e o que o render alterna
+            for i in range(min(2, max(1, g_and.anim))):
+                fr = render_outfit_860(dat, spr, lt, direction=direction,
+                                       frame=i, colors=colors, group=andando)
+                if fr is None or not fr.getbbox():
+                    continue
+                fr.crop(fr.getbbox()).save(
+                    "%s/mob/%s_%s%d.png" % (OUT, name, tag, i + 1))
+                total_frames += 1
         ok += wrote
         miss += (not wrote)
-    print("  monstros: %d ok, %d sem sprite" % (ok, miss))
+    print("  monstros: %d ok, %d sem sprite, %d PNGs" % (ok, miss, total_frames))
 
 
 # ------------------------------------------------------------ itens

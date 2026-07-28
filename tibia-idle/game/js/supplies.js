@@ -350,9 +350,12 @@ const START_EXTRA_ITEMS = {
   "chiller": { n: "the chiller", s: "weapon", t: "magic", mdmg: 8, mag: 0,
                sell: 500, buy: 500, w: 15.0, range: 3, el: "ice",
                voc: ["druid"] },
-  "simple-jo-staff": { n: "simple jo staff", s: "weapon", t: "club",
+  // weaponType "fist" no items.xml do canary: a jo staff treina PUNHO, nao
+  // clava. Estava como club, entao o monk nao subia fist e o dano saia pela
+  // skill errada.
+  "simple-jo-staff": { n: "simple jo staff", s: "weapon", t: "fist",
                        atk: 10, def: 6, sell: 200, buy: 200, w: 17.0,
-                       voc: ["monk"] },
+                       fist: 1, vocs: ["monk"] },
   "spellbook-of-the-novice": { n: "spellbook of the novice", s: "shield",
                                t: "shield", def: 8, sell: 100, buy: 100,
                                w: 14.0 },
