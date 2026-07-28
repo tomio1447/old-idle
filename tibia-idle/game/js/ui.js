@@ -28,9 +28,9 @@ function itemName(slug) {
   const it = GAMEDATA.items[slug];
   return it ? it.n : slug;
 }
-function itemImg(slug, cls) {
-  return `<img src="assets/item/${slug}.png" class="${cls || ""}" alt="">`;
-}
+/* itemImg vive em weapons.js: ele sabe desenhar as sprites animadas.
+ * A versao que existia aqui sobrescrevia a de la (ui.js carrega depois) e
+ * era a causa de TODOS os itens animados aparecerem estaticos. */
 
 /* ------------------------------------------------------------ toasts */
 function toast(msg, kind) {

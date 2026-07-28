@@ -748,7 +748,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 /* ------------------------------------------------ sprites animadas de item
  * A tira <slug>_anim.png tem os N frames lado a lado; deslocar o
  * background em passos anima sem JS e com uma requisicao so. */
-@keyframes item-anim { to { background-position-x: -100%; } }
+/* A tira anda do frame 0 ate o ultimo. Antes usava -100%, que em CSS e 100%
+ * da LARGURA DO ELEMENTO (um frame so) e nao da tira inteira: com steps(N) o
+ * item ficava parado no primeiro quadro. --anim-w e a largura total da tira,
+ * passada inline por estiloAnim(). */
+@keyframes item-anim { to { background-position-x: calc(0px - var(--anim-w)); } }
 .item-sprite { image-rendering: pixelated; flex: none; }
 div.item-sprite { background-repeat: no-repeat; }
 

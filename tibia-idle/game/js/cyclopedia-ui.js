@@ -957,7 +957,6 @@ function detalheItem(p, slug) {
     ${it.cls ? linha("Classificação",
       `<span style="color:#d4af37">${it.cls}</span>
        <span class="tiny dim">(forja: até tier ${it.cls * 2 + 2})</span>`) : ""}
-    ${it.af ? linha("Sprite", `<span style="color:#7ec8ff">animada, ${it.af} frames</span>`) : ""}
     ${aug ? `<div class="stat-row" style="display:block">
       <div class="k mb4">Augments</div>${aug}</div>` : ""}
     ${q ? `

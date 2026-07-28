@@ -28,6 +28,14 @@ SRC = os.environ.get("ASSETS860", "/home/user/assets860/ex")
 GAME = os.path.normpath(os.path.join(HERE, "..", "game"))
 MAX_FRAMES = 8          # tiras maiores que isso viram peso morto no disco
 
+# Mesmo mapa de WD_ALIAS em game/js/weapons.js: itens que ja existiam no jogo
+# com outra grafia. A sprite precisa ser gravada TAMBEM no slug antigo, senao
+# o item mesclado continua exibindo a arte velha do 7.4.
+ALIAS = {
+    "broadsword": "broad-sword",
+    "bunnyslippers": "bunny-slippers",
+}
+
 
 def recorta_comum(frames):
     """Recorta todos os frames pela MESMA caixa (a uniao das caixas).
@@ -84,7 +92,9 @@ def main():
             falta += 1
             it.pop("af", None)
             continue
-        frames[0].save(os.path.join(destino, slug + ".png"))
+        nomes = [slug] + ([ALIAS[slug]] if slug in ALIAS else [])
+        for nm in nomes:
+            frames[0].save(os.path.join(destino, nm + ".png"))
         artes.add(frames[0].tobytes())
         ok += 1
         # so vira tira se os frames forem realmente diferentes entre si:
@@ -95,7 +105,8 @@ def main():
             tira = Image.new("RGBA", (w * len(frames), h), (0, 0, 0, 0))
             for i, f in enumerate(frames):
                 tira.paste(f, (i * w, 0))
-            tira.save(os.path.join(destino, slug + "_anim.png"))
+            for nm in nomes:
+                tira.save(os.path.join(destino, nm + "_anim.png"))
             it["af"] = len(frames)
             it["aw"] = w
             it["ah"] = h
@@ -104,9 +115,10 @@ def main():
             it.pop("af", None)
             it.pop("aw", None)
             it.pop("ah", None)
-            p = os.path.join(destino, slug + "_anim.png")
-            if os.path.exists(p):
-                os.remove(p)
+            for nm in nomes:
+                p = os.path.join(destino, nm + "_anim.png")
+                if os.path.exists(p):
+                    os.remove(p)
 
     # regrava o json/js porque o campo `af` so e confiavel depois de conferir
     # se os frames sao mesmo diferentes

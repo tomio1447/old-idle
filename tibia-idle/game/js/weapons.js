@@ -18,6 +18,23 @@
  */
 "use strict";
 
+/* Itens que ja existiam no jogo com uma grafia e vieram do Canary com outra.
+ * Sem esse mapa a mesma arma aparece duas vezes no catalogo: uma como
+ * "broad sword" (escrita a mao) e outra como "broadsword" (nome oficial do
+ * items.xml). O slug do Canary e absorvido pelo slug antigo, que e o que o
+ * loot dos monstros e os saves ja referenciam.
+ * chave = slug do Canary, valor = slug que o jogo ja usava */
+const WD_ALIAS = {
+  "broadsword": "broad-sword",
+  "bunnyslippers": "bunny-slippers",
+};
+
+/* Slugs mortos do catalogo antigo que hoje sao a MESMA coisa que um item
+ * vindo do Canary, mas com outra grafia. Ficam duas linhas identicas na
+ * Cyclopedia se nao forem removidos. Nada aponta para eles: nao estao em
+ * loot de monstro nem em receita. */
+const WD_MORTOS = ["energy-bomb-rune"];
+
 /* Campos que o importador do Canary controla. O que nao esta aqui e
  * preservado do item antigo quando o novo nao define. */
 const WD_CAMPOS_CANARY = [
@@ -48,24 +65,40 @@ function estiloAnim(slug, it, tam) {
   const esc = px / Math.max(it.aw || 32, it.ah || 32);
   const w = Math.round((it.aw || 32) * esc);
   const h = Math.round((it.ah || 32) * esc);
-  const dur = (it.af * 0.12).toFixed(2);
-  return `width:${w}px;height:${h}px;` +
+  const dur = (it.af * 0.15).toFixed(2);
+  const total = w * it.af;
+  // --anim-w e lido pelo @keyframes item-anim: sem ele o CSS so conseguiria
+  // deslocar em % da largura do elemento (um frame), nao da tira inteira
+  return `--anim-w:${total}px;width:${w}px;height:${h}px;` +
     `background-image:url(assets/item/${slug}_anim.png?v=${
       typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1"});` +
-    `background-size:${w * it.af}px ${h}px;image-rendering:pixelated;` +
+    `background-size:${total}px ${h}px;background-position:0 0;` +
+    `image-rendering:pixelated;` +
     `animation:item-anim ${dur}s steps(${it.af}) infinite;`;
 }
 
-/* <img> ou <div> animado, conforme o item */
+/* <img> ou <div> animado, conforme o item.
+ *
+ * Aceita as DUAS assinaturas que a base de codigo usa:
+ *   itemImg(slug)          -> inventario/bag/loot, tamanho natural (32px)
+ *   itemImg(slug, "cls")   -> chamada antiga do ui.js, 2o arg e uma classe
+ *   itemImg(slug, 26)      -> Cyclopedia, 2o arg e o tamanho em pixels
+ * Isso importa porque existia uma segunda itemImg em ui.js que sobrescrevia
+ * esta (ui.js carrega depois) e deixava todo item animado estatico.
+ */
 function itemImg(slug, tam, cls) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
+  // 2o argumento como string = classe CSS (assinatura antiga do ui.js)
+  if (typeof tam === "string") { cls = tam; tam = 0; }
   const px = tam || 32;
   if (itemAnimado(it)) {
     return `<div class="item-sprite ${cls || ""}" title="${it.n || slug}"
       style="${estiloAnim(slug, it, px)}"></div>`;
   }
+  // sem tamanho explicito o CSS de cada tela manda (.inv-item img etc.)
+  const dim = tam ? `width:${px}px;height:${px}px` : "";
   return `<img class="item-sprite ${cls || ""}" src="assets/item/${slug}.png"
-    alt="" loading="lazy" style="width:${px}px;height:${px}px">`;
+    alt="" loading="lazy" style="${dim}">`;
 }
 
 /* A vocacao pode usar o item? (nivel + restricao de vocacao) */
@@ -81,8 +114,10 @@ function itemLiberado(p, it) {
 function fundirWeaponData() {
   if (typeof WEAPONDATA === "undefined" || typeof GAMEDATA === "undefined") return 0;
   let novos = 0;
-  for (const slug in WEAPONDATA.items) {
-    const novo = WEAPONDATA.items[slug];
+  for (const slugCanary in WEAPONDATA.items) {
+    const novo = WEAPONDATA.items[slugCanary];
+    // grafia diferente da que o jogo ja usava: cai no slug antigo
+    const slug = WD_ALIAS[slugCanary] || slugCanary;
     const velho = GAMEDATA.items[slug];
     if (!velho) {
       GAMEDATA.items[slug] = Object.assign({}, novo);
@@ -104,6 +139,8 @@ function fundirWeaponData() {
     if (!fim.sell) fim.sell = novo.sell;
     GAMEDATA.items[slug] = fim;
   }
+  // remove os slugs mortos que viraram duplicata visual de um item do Canary
+  for (const slug of WD_MORTOS) delete GAMEDATA.items[slug];
   // itens antigos que nao vieram do Canary continuam vendaveis na loja como
   // antes (o campo `shop` so passa a mandar em quem o Canary conhece)
   for (const slug in GAMEDATA.items) {
