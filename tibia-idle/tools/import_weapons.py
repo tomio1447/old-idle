@@ -171,9 +171,19 @@ def le_appearances():
     try:
         import app_pb2
     except ImportError:
-        print("  ! app_pb2 nao encontrado em %s, seguindo sem classification"
-              % PB)
-        return {}
+        # Aborta em vez de seguir sem os dados. A versao anterior so imprimia
+        # um aviso e continuava, e como /tmp e limpo entre sessoes isso gerou
+        # um weapons.json com classification zerada em TODOS os 1322 itens --
+        # falha silenciosa que so apareceu quando um teste quebrou.
+        raise SystemExit(
+            "ERRO: app_pb2 nao encontrado em %s.\n"
+            "  A classification (forja) e os precos de NPC vem do\n"
+            "  appearances.dat, que precisa do protobuf compilado:\n"
+            "    pip install grpcio-tools\n"
+            "    curl -o /tmp/app.proto https://raw.githubusercontent.com/"
+            "opentibiabr/canary/main/src/protobuf/appearances.proto\n"
+            "    cd /tmp && mkdir -p pb && python3 -m grpc_tools.protoc "
+            "-I. --python_out=pb app.proto" % PB)
     a = app_pb2.Appearances()
     with open(APPEAR, "rb") as fh:
         a.ParseFromString(fh.read())
@@ -246,7 +256,12 @@ def converte(cru, extra, frames, cfg):
         d["atk"] = atk
     for src, dst in (("defense", "def"), ("extradef", "extraDef"),
                      ("armor", "arm"), ("range", "range"),
-                     ("hitchance", "hit"), ("charges", "charges")):
+                     ("hitchance", "hit"), ("charges", "charges"),
+                     # mantra: "armadura elemental" do Monk (15.10). Reduz um
+                     # valor FIXO de dano de fogo/gelo/energia/terra, nao um
+                     # percentual, e so conta nos slots que o servidor lista
+                     # em Player::getMantra()
+                     ("mantra", "mantra")):
         v = num(cru.get(src))
         if v:
             d[dst] = v

@@ -4314,6 +4314,7 @@
    "id": 50274,
    "imbSlots": 1,
    "lvl": 70,
+   "mantra": 4,
    "n": "coned hat of enlightenment",
    "npcBuy": 70000,
    "npcSell": 700,
@@ -5103,6 +5104,7 @@
    "id": 50190,
    "imbSlots": 2,
    "lvl": 180,
+   "mantra": 8,
    "n": "dark vision bandana",
    "prot": 0,
    "res": {
@@ -5239,6 +5241,7 @@
    "imbSlots": 1,
    "lvl": 230,
    "mag": 1,
+   "mantra": 16,
    "n": "death oyoroi",
    "prot": 0,
    "res": {
@@ -5429,6 +5432,7 @@
    "imbSlots": 2,
    "lvl": 300,
    "mag": 1,
+   "mantra": 10,
    "n": "demon mengu",
    "prot": 2,
    "res": {
@@ -8413,6 +8417,7 @@
    "id": 50279,
    "lvl": 200,
    "mag": 1,
+   "mantra": 14,
    "n": "energy robe",
    "npcBuy": 100,
    "prot": 0,
@@ -8612,6 +8617,7 @@
    "imbSlots": 2,
    "lvl": 400,
    "mag": 2,
+   "mantra": 10,
    "n": "ethereal coned hat",
    "prot": 4,
    "res": {
@@ -10404,6 +10410,7 @@
    "imbSlots": 2,
    "lvl": 800,
    "mag": 2,
+   "mantra": 17,
    "n": "genesis serenity armor",
    "prot": 4,
    "res": {
@@ -10438,6 +10445,7 @@
    "id": 51299,
    "lvl": 800,
    "mag": 3,
+   "mantra": 11,
    "n": "genesis serenity legs",
    "prot": 5,
    "res": {
@@ -10461,6 +10469,7 @@
    "id": 50275,
    "lvl": 75,
    "mag": 1,
+   "mantra": 12,
    "n": "ghazbaran oyoroi",
    "prot": 0,
    "res": {
@@ -11257,6 +11266,7 @@
    "id": 50276,
    "imbSlots": 1,
    "lvl": 150,
+   "mantra": 14,
    "n": "gnomish cuirass",
    "prot": 2,
    "res": {
@@ -12194,6 +12204,7 @@
    "fist": 1,
    "id": 50195,
    "lvl": 8,
+   "mantra": 2,
    "n": "harmony amulet",
    "npcBuy": 1000,
    "s": "amulet",
@@ -12676,6 +12687,7 @@
    "fist": 4,
    "id": 50280,
    "lvl": 200,
+   "mantra": 14,
    "n": "ice robe",
    "npcBuy": 100,
    "prot": 0,
@@ -13729,6 +13741,7 @@
    "id": 50193,
    "imbSlots": 1,
    "lvl": 35,
+   "mantra": 6,
    "n": "jade conical hat",
    "prot": 0,
    "res": {
@@ -13788,6 +13801,7 @@
    "imbSlots": 1,
    "lvl": 210,
    "mag": 1,
+   "mantra": 6,
    "n": "jade legs",
    "prot": 0,
    "res": {
@@ -13944,6 +13958,7 @@
    "fist": 1,
    "id": 50186,
    "lvl": 130,
+   "mantra": 5,
    "n": "jungle survivor legs",
    "prot": 0,
    "res": {
@@ -14171,6 +14186,7 @@
    "fist": 4,
    "id": 50277,
    "lvl": 200,
+   "mantra": 14,
    "n": "leaf robe",
    "npcBuy": 100,
    "prot": 0,
@@ -14311,6 +14327,7 @@
    "fist": 1,
    "id": 50269,
    "lvl": 40,
+   "mantra": 3,
    "n": "legs of enlightenment",
    "npcBuy": 40000,
    "npcSell": 400,
@@ -14335,6 +14352,7 @@
    "fist": 1,
    "id": 50187,
    "lvl": 80,
+   "mantra": 5,
    "n": "legs of wisdom",
    "prot": 0,
    "res": {
@@ -14431,6 +14449,7 @@
    "drop": 1,
    "fist": 1,
    "id": 50194,
+   "mantra": 2,
    "n": "light bandana",
    "s": "helmet",
    "sell": 144,
@@ -15244,6 +15263,7 @@
    "fist": 4,
    "id": 50278,
    "lvl": 200,
+   "mantra": 14,
    "n": "magma robe",
    "npcBuy": 100,
    "prot": 0,
@@ -15525,6 +15545,7 @@
    "imbSlots": 2,
    "lvl": 300,
    "mag": 1,
+   "mantra": 17,
    "n": "merudri battle mail",
    "prot": 0,
    "res": {
@@ -15544,6 +15565,7 @@
    "drop": 1,
    "id": 50156,
    "lvl": 220,
+   "mantra": 2,
    "n": "merudri brooch",
    "s": "amulet",
    "sell": 2,
@@ -15569,6 +15591,7 @@
    "id": 50261,
    "imbSlots": 1,
    "lvl": 125,
+   "mantra": 13,
    "n": "merudri nanbando",
    "s": "armor",
    "sell": 336,
@@ -15586,6 +15609,7 @@
    "fist": 2,
    "id": 50263,
    "lvl": 100,
+   "mantra": 13,
    "n": "merudri scale mail",
    "prot": 0,
    "res": {
@@ -15805,6 +15829,7 @@
    "drop": 1,
    "fist": 1,
    "id": 50258,
+   "mantra": 9,
    "n": "monk robe",
    "s": "armor",
    "sell": 336,
@@ -16000,6 +16025,7 @@
    "id": 50184,
    "lvl": 300,
    "mag": 1,
+   "mantra": 8,
    "n": "mutant hide trousers",
    "prot": 2,
    "res": {
@@ -16326,6 +16352,7 @@
    "imbSlots": 2,
    "lvl": 270,
    "mag": 2,
+   "mantra": 15,
    "n": "naga tanko",
    "prot": 2,
    "res": {
@@ -16622,6 +16649,7 @@
    "id": 51261,
    "imbSlots": 2,
    "lvl": 230,
+   "mantra": 8,
    "n": "norcferatu bonehood",
    "prot": 2,
    "res": {
@@ -16686,6 +16714,7 @@
    "fist": 2,
    "id": 51267,
    "lvl": 230,
+   "mantra": 6,
    "n": "norcferatu fleshguards",
    "prot": 0,
    "res": {
@@ -18198,6 +18227,7 @@
    "cls": 1,
    "fist": 1,
    "id": 50257,
+   "mantra": 7,
    "n": "plain monk robe",
    "npcBuy": 450,
    "npcSell": 1,
@@ -19373,6 +19403,7 @@
    "imbSlots": 1,
    "lvl": 150,
    "mag": 1,
+   "mantra": 15,
    "n": "robe of enlightenment",
    "npcBuy": 150000,
    "npcSell": 150,
@@ -20411,6 +20442,7 @@
    "id": 50146,
    "lvl": 500,
    "mag": 2,
+   "mantra": 10,
    "n": "sanguine trousers",
    "prot": 4,
    "res": {
@@ -21794,6 +21826,7 @@
    "imbSlots": 2,
    "lvl": 400,
    "mag": 2,
+   "mantra": 19,
    "n": "soulgarb",
    "prot": 4,
    "res": {
@@ -22968,6 +23001,7 @@
    "id": 50255,
    "imbSlots": 2,
    "lvl": 250,
+   "mantra": 16,
    "n": "stoic iks robe",
    "prot": 2,
    "res": {
@@ -26122,6 +26156,7 @@
    "fist": 1,
    "id": 50259,
    "lvl": 50,
+   "mantra": 11,
    "n": "zaoan monk robe",
    "s": "armor",
    "sell": 336,

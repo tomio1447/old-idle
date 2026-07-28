@@ -201,6 +201,11 @@ function effSkill(p, which) {
   // punho tambem recebe bonus de equipamento: as armas de monk trazem
   // skillfist no items.xml (a jo staff da +1)
   else if (which === "fist") v += g.fist + g.melee;
+  // Virtue of Justice e PERCENTUAL sobre o total, entao entra depois de
+  // somar o equipamento (SKILL_FISTPERCENT do Canary trabalha assim)
+  if (which === "fist" && typeof virtudeFistBonus === "function") {
+    v = Math.floor(v * virtudeFistBonus(p));
+  }
   return v;
 }
 
@@ -589,6 +594,11 @@ function itemScore(p, slug) {
   s += (it.hpreg || 0) * 12;
   s += (it.mpreg || 0) * (isMagic ? 15 : 6);
   s += (it.spd || 0) * 1.5;
+  // Mantra so serve para o Monk, mas para ele vale MUITO: alem de abater
+  // dano elemental fixo, vira dano de punho com os santuarios da quest.
+  // Sem este peso o auto-equip preferia uma armadura de +2 de armor a uma
+  // robe de monge com 19 de mantra.
+  if (it.mantra) s += voc === "monk" ? it.mantra * 14 : 0;
 
   if (it.s === "quiver") {
     s += 100 + (it.cap || 0) * 3 + (it.dist || 0) * 20;

@@ -835,3 +835,24 @@ div.item-sprite { background-repeat: no-repeat; }
   margin-top: 8px; padding: 6px 8px; background: #0f0d0a;
   border: 1px solid #2a2620; min-height: 26px; color: #9ce84a;
 }
+
+/* ------------------------------------------------------- Monk: Mantra e Harmony
+ * A faixa fica logo abaixo das barras do personagem, so para o Monk. */
+.monk-bar {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  margin: 4px 0;
+}
+.monk-harm { display: flex; align-items: center; gap: 3px; }
+.monk-harm .harm {
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1px solid #4a463e; background: #14120e;
+}
+/* ponto aceso: o brilho e o que denuncia de longe quanta harmonia ha */
+.monk-harm .harm.on {
+  background: #ffe680; border-color: #d4af37;
+  box-shadow: 0 0 4px rgba(212, 175, 55, .8);
+}
+.monk-harm b { font-size: 10px; color: #ffe680; margin-left: 2px; }
+.cond.monk-mantra { border-color: #7ec8ff; color: #7ec8ff; }
+.cond.monk-atk { border-color: #ff8a3c; color: #ff8a3c; }
+.cond.monk-serene { border-color: #9ce84a; color: #9ce84a; }

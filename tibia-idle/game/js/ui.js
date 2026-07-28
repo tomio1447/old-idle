@@ -138,6 +138,36 @@ function renderStats(p) {
     box.style.display = partes.length ? "" : "none";
   }
 
+  // faixa exclusiva do Monk: harmonia, mantra e o estado sereno
+  const mbox = $("#monk-bar");
+  if (mbox) {
+    const st = typeof monkStatus === "function" ? monkStatus(p) : null;
+    if (!st) {
+      mbox.style.display = "none";
+    } else {
+      mbox.style.display = "";
+      // as 5 bolinhas de harmonia sao o feedback mais importante: o jogador
+      // precisa saber quando vale a pena soltar o spender
+      const pontos = [];
+      for (let i = 1; i <= st.harmonyMax; i++) {
+        pontos.push(`<span class="harm ${i <= st.harmony ? "on" : ""}"></span>`);
+      }
+      mbox.innerHTML = `
+        <span class="monk-harm" title="Harmony: cada ponto DOBRA o bônus do próximo spender">
+          ${pontos.join("")}
+          <b>${st.bonus > 0 ? "+" + st.bonus + "%" : ""}</b>
+        </span>
+        ${st.mantra ? `<span class="cond monk-mantra"
+          title="Mantra: abate ${st.mantra} de todo dano de fogo, gelo, energia e terra">
+          🛡 Mantra ${st.mantra}</span>` : ""}
+        ${st.atkBonus ? `<span class="cond monk-atk"
+          title="Santuários da quest: o mantra soma ${st.atkBonus} ao golpe de punho">
+          ✊ +${st.atkBonus}</span>` : ""}
+        ${st.sereno ? `<span class="cond monk-serene"
+          title="Sereno: virtudes e bônus de punho valem em dobro">☯ Sereno</span>` : ""}`;
+    }
+  }
+
   const max = maxStats(p);
   const g = gearStats(p);
   const dmg = playerDamage(p);
@@ -160,6 +190,8 @@ function renderStats(p) {
     ["Armadura", def.armor],
     ["Defesa", def.defense],
     ["Proteção", def.protection + "%"],
+    ...(typeof mantraTotal === "function" && mantraTotal(p)
+      ? [["Mantra", mantraTotal(p) + " (elemental)"]] : []),
     ["Capacidade", fmt(max.cap - carriedWeight(p)) + " / " + fmt(max.cap)],
     ["Mortes", p.deaths],
     ["Kills totais", fmtFull(p.totalKills)],

@@ -705,6 +705,14 @@ function playerAttack(c, p, target) {
   // dano extra do perfect shot, somado depois da resistencia
   if (perfeito) raw += perfeito;
 
+  // ---- Monk: o mantra vira dano no golpe de punho (perk Ascetic /
+  // santuarios da quest). So no auto-ataque corpo a corpo, como no
+  // combat.cpp: o servidor testa damage.origin == ORIGIN_FIST.
+  if (!isDist && !isMagic && typeof mantraAtaqueBonus === "function") {
+    const extra = mantraAtaqueBonus(p, c);
+    if (extra > 0) raw += extra;
+  }
+
   // ---- buffs de vocacao (Virtudes, Protector)
   const bf = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bf) {
@@ -858,8 +866,23 @@ function tryCastSpell(c, p, target, now) {
   const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
   const targets = nAlvos > 1 ? c.mobs.slice(0, nAlvos) : [target];
   const elemento = s.element || "energy";
+
+  // Ciclo builder/spender do Monk. O spender precisa LER a harmonia antes de
+  // gastar, senao o bonus sairia sempre 1x: gastaHarmony() zera o contador e
+  // devolve quanto havia, e o multiplicador e calculado com esse valor.
+  let monkMult = 1;
+  const kind = typeof monkSpellKind === "function" ? monkSpellKind(id) : null;
+  if (kind === "spender") {
+    monkMult = harmonyBonus(p, c);
+    const gastou = gastaHarmony(p, c);
+    if (gastou > 0) {
+      c.events.push({ t: "harmony", spent: gastou, screen: true });
+    }
+  }
+
   for (const t of targets) {
     let dmg = rollSpell(p, s);
+    if (monkMult !== 1) dmg = Math.floor(dmg * monkMult);
     // buff de vocacao (Virtude, Protector) tambem afeta magia
     if (typeof buffTotals === "function") {
       dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
@@ -879,6 +902,13 @@ function tryCastSpell(c, p, target, now) {
                     el: elemento, spell: s.name,
                     missile: ELEMENT_MISSILE[elemento] || "energy" });
   }
+  // builder gera a harmonia DEPOIS do golpe, como o postCastSpell do servidor
+  if (kind === "builder") {
+    const antes = typeof harmonyAtual === "function" ? harmonyAtual(p) : 0;
+    const agora = ganhaHarmony(p, c);
+    if (agora !== antes) c.events.push({ t: "harmony", gained: 1, screen: true });
+  }
+
   if (c.player) c.player.attackAnim = 220;
   c.events.push({ t: "cast", name: s.name, area: nAlvos > 1,
                   x: target.x, y: target.y, screen: true });
@@ -1157,7 +1187,11 @@ function mobAttack(c, p, mob) {
     mob.hp -= volta;
     c.stats.damage += volta;
   }
-  p.hp -= raw;
+  // ATENCAO A ORDEM: o `p.hp -= raw` ficava AQUI, antes das reducoes abaixo.
+  // O resultado e que Protector e protecao de imbuement mudavam so o numero
+  // exibido no log — a vida perdida continuava sendo o dano cheio. Agora
+  // todas as reducoes acontecem primeiro e o desconto vem por ultimo.
+
   // buffs: reduz o dano recebido (Protector, Virtue of Sustain)
   const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bfd && bfd.dmgReceived !== 1)
@@ -1168,6 +1202,26 @@ function mobAttack(c, p, mob) {
     const prot = imbProtection(p, mob.def.element);
     if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
   }
+
+  // Mantra do Monk: armadura elemental de valor FIXO, aplicada por ultimo
+  // como no applyMantraAbsorb() do servidor. Diferente das outras reducoes,
+  // pode zerar o golpe — e o que torna o Monk forte contra chip damage.
+  if (typeof mantraAbsorve === "function") {
+    const antesMantra = raw;
+    raw = mantraAbsorve(p, raw, mob.def.element);
+    if (raw <= 0) {
+      c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+                      screen: true, mantra: true,
+                      projectile: monsterAttackRange(mob) > 0.16,
+                      missile: monsterMissile(mob) });
+      addSkillTries(p, "shield", combatSkillGain(c, 1));
+      return 0;
+    }
+    if (raw < antesMantra) c.stats.mantraAbsorvido =
+      (c.stats.mantraAbsorvido || 0) + (antesMantra - raw);
+  }
+
+  p.hp -= raw;
   c.stats.taken += raw;
   applyMonsterCondition(c, p, mob);
   addSkillTries(p, "shield", combatSkillGain(c, 1));

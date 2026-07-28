@@ -941,6 +941,9 @@ function detalheItem(p, slug) {
     ${linha("Elemento", !it.elDmg && el
       ? `<span style="color:${el.color}">${el.name}</span>` : "")}
     ${linha("Resistências", res)}
+    ${linha("Mantra", it.mantra
+      ? `<span style="color:#7ec8ff">${it.mantra}</span>
+         <span class="tiny dim">(abate dano elemental)</span>` : "")}
     ${linha("Life leech", it.lifeLeech ? it.lifeLeech + "%" : "")}
     ${linha("Mana leech", it.manaLeech ? it.manaLeech + "%" : "")}
     ${linha("Regen. vida", it.hpreg || "")}

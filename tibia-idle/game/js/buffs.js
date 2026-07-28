@@ -15,26 +15,30 @@
 
 const BUFFS = {
   // ---- Monk: as tres Virtudes (utura tio / utito virtu / utori virtu)
+  /* As tres Virtudes nao tem duracao no Tibia: sao POSTURAS que ficam
+   * ligadas ate o Monk trocar. O `dur` alto emula isso sem mexer no
+   * expirador de buffs. Os efeitos reais moram em monk.js, porque dependem
+   * do estado sereno — aqui ficam so os que o motor de buffs ja sabia
+   * aplicar. */
   "utura-tio": {
     id: "virtue-sustain", nome: "Virtue of Sustain", grupo: "virtue",
-    voc: "monk", dur: 60000,
-    // sustentacao: recebe menos dano e regenera ao acertar
-    dmgReceived: 0.85, lifeOnHit: 0.06,
-    desc: "Recebe 15% menos dano e recupera vida ao golpear.",
+    voc: "monk", dur: 3600000,
+    // sustain e postura de CURA: virtudeCuraBonus() da +35% (70% sereno)
+    // em toda cura do Monk. Nao reduz dano recebido no servidor.
+    desc: "Toda cura do Monk aumenta 35% (70% se sereno).",
   },
   "utito-virtu": {
     id: "virtue-justice", nome: "Virtue of Justice", grupo: "virtue",
-    voc: "monk", dur: 60000,
-    // justica: mais dano, menos defesa
-    dmgDealt: 1.25, dmgReceived: 1.10,
-    desc: "Causa 25% mais dano, mas recebe 10% a mais.",
+    voc: "monk", dur: 3600000,
+    // fist +15% / +30% sereno, aplicado em effSkill via virtudeFistBonus
+    desc: "Fist fighting +15% (30% se sereno).",
   },
   "utori-virtu": {
     id: "virtue-harmony", nome: "Virtue of Harmony", grupo: "virtue",
-    voc: "monk", dur: 60000,
-    // harmonia: equilibrio, recupera mana ao acertar
-    dmgDealt: 1.10, manaOnHit: 0.05, shieldPercent: 20,
-    desc: "Dano e defesa equilibrados, com ganho de mana ao golpear.",
+    voc: "monk", dur: 3600000,
+    // +4 pontos no bonus base de harmony (+8 sereno) e devolve 1 harmony
+    // ao usar spender; ambos tratados em monk.js
+    desc: "Bônus base de Harmony +4 (+8 sereno) e devolve 1 ponto ao gastar.",
   },
 
   // ---- Knight: Protector (utamo tempo) — valores do protector.lua

@@ -193,6 +193,30 @@ function renderAdminChar(p, el) {
           ${Object.keys(p.conditions || {}).length || "nenhuma"}</div>
       </div>
 
+      ${isMonk(p) ? `
+      <div class="admin-card">
+        <div class="admin-card-t">☯ Monk</div>
+        <div class="stat-row"><span class="k">Mantra do equip</span>
+          <span class="v">${mantraTotal(p)}</span></div>
+        <div class="stat-row"><span class="k">Harmony</span>
+          <span class="v">${harmonyAtual(p)} / 5
+            (${Math.round((harmonyBonus(p) - 1) * 100)}%)</span></div>
+        <div class="stat-row"><span class="k">Sereno</span>
+          <span class="v">${monkSereno(p) ? "sim" : "não"}</span></div>
+        <div class="admin-quick">
+          ${[0, 1, 3, 5].map((n) =>
+            `<button class="sm" data-harm="${n}">harmony ${n}</button>`).join("")}
+        </div>
+        <div class="admin-quick">
+          ${[0, 1, 2, 3].map((n) =>
+            `<button class="sm ${(p.monkShrines || 0) === n ? "primary" : ""}"
+              data-shrine="${n}">${n} santuário${n === 1 ? "" : "s"}</button>`).join("")}
+        </div>
+        <div class="tiny dim mt4">
+          Santuários somam o mantra ao golpe de punho (100% cada).
+        </div>
+      </div>` : ""}
+
       <div class="admin-card admin-danger">
         <div class="admin-card-t">Zona de risco</div>
         <div class="admin-quick">
@@ -266,6 +290,17 @@ function renderAdminChar(p, el) {
     p.conditions = {};
     adminAplicar("condições curadas");
   });
+
+  $$("#admin-content [data-harm]").forEach((b) =>
+    b.addEventListener("click", () => {
+      p.harmony = parseInt(b.dataset.harm, 10);
+      adminAplicar(`harmony → ${p.harmony}`);
+    }));
+  $$("#admin-content [data-shrine]").forEach((b) =>
+    b.addEventListener("click", () => {
+      p.monkShrines = parseInt(b.dataset.shrine, 10);
+      adminAplicar(`santuários → ${p.monkShrines}`);
+    }));
 
   $("#adm-reset-skills").addEventListener("click", () => {
     for (const k in p.skills) p.skills[k] = 10;
