@@ -268,3 +268,27 @@ button.primary:active {
     border-radius: 6px;
   }
 }
+
+/* ==================== LOGIN ESPECÍFICO ==================== */
+#login .box.panel {
+  background: #282c34;
+  border: 2px solid #3a3f4a;
+}
+
+#login .panel-title {
+  font-size: 22px;
+  padding: 16px;
+  background: linear-gradient(#32363f, #282c34);
+}
+
+/* ==================== HUNT INFO ==================== */
+#hunt-info {
+  background: #1a1d24;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+/* ==================== RISCO ==================== */
+.risk.low { color: #4ade80; }
+.risk.mid { color: #fbbf24; }
+.risk.high { color: #f87171; }
