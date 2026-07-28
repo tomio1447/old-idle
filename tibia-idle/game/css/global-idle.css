@@ -1,0 +1,263 @@
+/* ============================================================
+   Global-Idle — Identidade Visual v1
+   Tema: acizentado profissional com acentos azul e dourado.
+   Sobrescreve as cores marrons do style.css padrão.
+   ============================================================ */
+
+:root {
+  --gi-bg: #181a1f;
+  --gi-bg-light: #1f2228;
+  --gi-panel: #23262d;
+  --gi-panel-dark: #1b1e24;
+  --gi-panel-light: #2f333c;
+  --gi-border: #3a3f4a;
+  --gi-border-in: #13151a;
+  --gi-border-out: #4b5160;
+  --gi-text: #d1d5db;
+  --gi-text-bright: #f3f4f6;
+  --gi-dim: #9ca3af;
+  --gi-accent: #5c6bc0;
+  --gi-accent-light: #7986cb;
+  --gi-gold: #c9a227;
+  --gi-gold-light: #e3b93a;
+  --gi-danger: #f87171;
+  --gi-success: #4ade80;
+
+  /* Redefine as variáveis usadas pelo style.css */
+  --bg: var(--gi-bg);
+  --panel: var(--gi-panel);
+  --panel-dark: var(--gi-panel-dark);
+  --panel-light: var(--gi-panel-light);
+  --border-out: var(--gi-border-out);
+  --border-in: var(--gi-border-in);
+  --text: var(--gi-text);
+  --text-bright: var(--gi-text-bright);
+  --gold: var(--gi-gold);
+  --hp: #ef4444;
+  --mp: #60a5fa;
+  --exp: #fbbf24;
+  --green: var(--gi-success);
+  --red: var(--gi-danger);
+}
+
+/* -------------------------- base */
+body {
+  background: var(--gi-bg);
+  color: var(--gi-text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-image: none;
+}
+
+#app { background: var(--gi-bg); }
+
+/* -------------------------- login */
+#login {
+  background: radial-gradient(ellipse at center, #1f2228 0%, #121418 75%);
+}
+
+#login .box {
+  border-radius: 10px;
+  border-color: var(--gi-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+}
+
+/* -------------------------- painéis */
+.panel {
+  background: var(--gi-panel);
+  border: 1px solid var(--gi-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .45);
+}
+
+.panel-inset {
+  background: var(--gi-panel-dark);
+  border-color: var(--gi-border-in) var(--gi-border-out) var(--gi-border-out) var(--gi-border-in);
+  border-radius: 6px;
+}
+
+.panel-title {
+  background: linear-gradient(180deg, #2f333c, #25282f);
+  color: var(--gi-gold-light);
+  border-bottom: 1px solid var(--gi-border);
+}
+
+/* -------------------------- topbar / cena */
+.topbar {
+  background: linear-gradient(180deg, #25282f, #1b1e24);
+  border-bottom: 2px solid var(--gi-border);
+}
+
+#scene {
+  background: #101318;
+  border-color: var(--gi-border-in) var(--gi-border-out) var(--gi-border-out) var(--gi-border-in);
+  border-radius: 6px;
+}
+
+/* -------------------------- botões */
+button, .btn {
+  background: linear-gradient(180deg, #3a3f4a, #2a2e36);
+  border-color: var(--gi-border-out) var(--gi-border-in) var(--gi-border-in) var(--gi-border-out);
+  color: var(--gi-text-bright);
+  border-radius: 5px;
+  text-shadow: none;
+}
+
+button:hover:not(:disabled) { background: linear-gradient(180deg, #454b58, #333842); }
+button:active:not(:disabled) { border-color: var(--gi-border-in) var(--gi-border-out) var(--gi-border-out) var(--gi-border-in); }
+
+button.primary {
+  background: linear-gradient(180deg, #5c6bc0, #4652a3);
+  border-color: #7c8fe6 #3a4166 #3a4166 #7c8fe6;
+  color: #fff;
+}
+button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #6b7dd1, #525db8); }
+
+button.danger {
+  background: linear-gradient(180deg, #c54b4b, #8a2c2c);
+  border-color: #f87171 #5a2222 #5a2222 #f87171;
+  color: #ffe4e4;
+}
+
+/* -------------------------- abas */
+.tabs { border-bottom-color: var(--gi-border); }
+
+.tab {
+  background: var(--gi-panel-dark);
+  border-color: var(--gi-border);
+  color: var(--gi-dim);
+  border-radius: 5px 5px 0 0;
+}
+
+.tab.active { background: var(--gi-panel); color: var(--gi-gold); }
+.tab:hover { color: var(--gi-text-bright); }
+
+/* -------------------------- cards de caçada */
+.hunt-card {
+  background: var(--gi-panel-dark);
+  border-color: var(--gi-border);
+  border-radius: 6px;
+}
+
+.hunt-card:hover { background: #2c3038; border-color: var(--gi-accent); }
+.hunt-card.active { background: #333842; border-color: var(--gi-gold); }
+.hunt-card .nm { color: var(--gi-text-bright); }
+.hunt-card .meta { color: var(--gi-dim); }
+
+.risk.low  { background: #1e3a2e; color: #6ee7b7; }
+.risk.mid  { background: #423a1f; color: #fde68a; }
+.risk.high { background: #451c1c; color: #fca5a5; }
+
+/* -------------------------- inventário / slots */
+.inv-item, .slot {
+  background: #1b1e24;
+  border-color: var(--gi-border);
+  border-radius: 4px;
+}
+
+.inv-item:hover, .slot:hover { border-color: var(--gi-accent); }
+.inv-item.empty { background: #15171c; opacity: .5; }
+
+/* -------------------------- tooltip / toasts */
+#tooltip {
+  background: #1b1e24;
+  border-color: var(--gi-gold);
+  color: var(--gi-text);
+  border-radius: 6px;
+}
+#tooltip .tt-name { color: var(--gi-gold); }
+#tooltip .tt-stat { color: var(--gi-success); }
+#tooltip .tt-req { color: #fb923c; }
+#tooltip .tt-sell { color: var(--gi-text); }
+
+.toast {
+  background: #1b1e24;
+  border-color: var(--gi-accent);
+  color: var(--gi-text);
+  border-radius: 6px;
+}
+.toast.level { border-color: var(--gi-gold); color: var(--gi-gold-light); }
+.toast.death { border-color: var(--gi-danger); color: #fca5a5; }
+.toast.rare { border-color: #a78bfa; color: #c4b5fd; }
+
+/* -------------------------- cidade / NPCs */
+.npc-quick .npc-btn {
+  background: var(--gi-panel-dark);
+  border-color: var(--gi-border);
+  border-radius: 5px;
+}
+.npc-quick .npc-btn:hover { background: #2c3038; border-color: var(--gi-gold); }
+.npc-quick .npc-btn .nb { color: var(--gi-dim); }
+.npc-quick .npc-btn:hover .nb { color: var(--gi-gold); }
+
+.npc-greet {
+  color: var(--gi-text);
+  background: rgba(0, 0, 0, .18);
+  border-left-color: var(--gi-gold);
+}
+
+.shop-row.clickable:hover { background: #2c3038; }
+
+/* -------------------------- criação de personagem */
+.voc-card {
+  background: var(--gi-panel-dark);
+  border-color: var(--gi-border);
+  border-radius: 8px;
+}
+.voc-card:hover { border-color: var(--gi-accent); }
+.voc-card.sel { border-color: var(--gi-gold); background: #2c3038; }
+.voc-card .vn { color: var(--gi-text-bright); }
+.voc-card .vd { color: var(--gi-dim); }
+
+.field label { color: var(--gi-dim); }
+.field input, .field select {
+  background: #15171c;
+  color: var(--gi-text-bright);
+  border-color: var(--gi-border-in) var(--gi-border-out) var(--gi-border-out) var(--gi-border-in);
+}
+.field input:focus, .field select:focus { outline-color: var(--gi-accent); }
+
+/* -------------------------- logo e texto */
+.logo {
+  color: var(--gi-gold);
+  text-shadow: 1px 1px 0 #000, 0 0 12px rgba(201, 162, 39, .25);
+}
+
+.gold-txt { color: var(--gi-gold); }
+.dim { color: var(--gi-dim); }
+
+/* -------------------------- barras */
+.bar {
+  background: #15171c;
+  border-color: var(--gi-border);
+}
+.bar .fill.hp { background: linear-gradient(180deg, #f87171, #dc2626); }
+.bar .fill.mp { background: linear-gradient(180deg, #60a5fa, #2563eb); }
+.bar .fill.exp { background: linear-gradient(180deg, #fbbf24, #d97706); }
+.bar .fill.sta { background: linear-gradient(180deg, #fb923c, #ea580c); }
+.bar .fill.skl { background: linear-gradient(180deg, #a78bfa, #7c3aed); }
+
+/* -------------------------- listas e scrollbars */
+.list::-webkit-scrollbar-track { background: #15171c; }
+.list::-webkit-scrollbar-thumb { background: var(--gi-border); border-color: var(--gi-border-in); }
+
+/* -------------------------- estatísticas */
+.stat-row .k { color: #9ca3af; }
+.stat-row .v { color: var(--gi-text-bright); }
+
+/* -------------------------- log */
+.log-line .time { color: var(--gi-dim); }
+.log-line.exp   { color: var(--gi-success); }
+.log-line.loot  { color: var(--gi-gold); }
+.log-line.level { color: var(--gi-gold-light); }
+.log-line.skill { color: #93c5fd; }
+.log-line.death { color: var(--gi-danger); }
+.log-line.info  { color: var(--gi-text); }
+.log-line.sell  { color: #d1d5db; }
+
+/* -------------------------- modal */
+.modal-bg { background: rgba(10, 11, 14, .86); }
+.modal-bg .modal { border-radius: 8px; }
+
+/* -------------------------- links */
+a { color: var(--gi-accent-light); }
+a:hover { color: #aab6f7; }
