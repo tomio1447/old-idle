@@ -365,6 +365,34 @@ button.full { width: 100%; }
 #tooltip .tt-stat { color: #9ce84a; }
 #tooltip .tt-req { color: #ff9a6a; }
 #tooltip .tt-sell { color: #c8a860; }
+/* o tooltip ficou mais denso (ataque elemental, skills, augments,
+ * imbuements), entao precisa de mais largura que os 240px originais */
+#tooltip { max-width: 300px; }
+#tooltip .tt-sub {
+  color: #8a8270; font-size: 9px; text-transform: uppercase;
+  letter-spacing: .5px; margin-top: 5px;
+  border-top: 1px solid #2a2620; padding-top: 4px;
+}
+#tooltip .tt-aug { color: #9ce84a; }
+#tooltip .tt-imb-row { display: flex; gap: 4px; margin: 4px 0 2px; }
+/* um quadrado por slot: tracejado quando vazio, com o icone do client
+ * quando preenchido */
+#tooltip .imb-slot {
+  width: 30px; height: 30px; position: relative; flex: none;
+  border: 1px solid #3a3428; background: #14120e;
+  display: flex; align-items: center; justify-content: center;
+}
+#tooltip .imb-slot.vazio { border-style: dashed; border-color: #4a463e; }
+#tooltip .imb-slot.expirado { opacity: .4; border-color: #6a3a2a; }
+#tooltip .imb-slot img {
+  width: 26px; height: 26px; image-rendering: pixelated;
+}
+#tooltip .imb-tempo {
+  position: absolute; bottom: -1px; right: 0; font-size: 7px;
+  line-height: 1; color: #c8c0a8; background: rgba(0,0,0,.75);
+  padding: 1px 2px;
+}
+#tooltip .imb-tempo.urgente, #tooltip .imb-urgente { color: #ff8a6a; }
 
 /* ---------------------------------------------------------- modal */
 .modal-bg {

@@ -47,6 +47,78 @@ const IMB_VALOR = {
   cap:        [100, 200, 300],
 };
 
+/* Nome oficial e iconId de cada categoria, do imbuements.xml do Canary.
+ * O iconId indexa assets/imbuement/<id>.png, extraido do client 15.x. */
+const IMB_ICONE = {
+  0:  { nome: "Elemental",   icon: 13 },   // o sub troca o icone (ver abaixo)
+  1:  { nome: "Vampirism",   icon: 46 },
+  2:  { nome: "Void",        icon: 49 },
+  3:  { nome: "Strike",      icon: 1 },
+  4:  { nome: "Lich Shroud", icon: 25 },
+  5:  { nome: "Snake Skin",  icon: 28 },
+  6:  { nome: "Dragon Hide", icon: 34 },
+  7:  { nome: "Quara Scale", icon: 40 },
+  8:  { nome: "Cloud Fabric",icon: 31 },
+  9:  { nome: "Demon Presence", icon: 37 },
+  10: { nome: "Swiftness",   icon: 73 },
+  11: { nome: "Chop",        icon: 52 },
+  12: { nome: "Slash",       icon: 70 },
+  13: { nome: "Bash",        icon: 55 },
+  14: { nome: "Blockade",    icon: 67 },
+  15: { nome: "Precision",   icon: 58 },
+  16: { nome: "Epiphany",    icon: 64 },
+  17: { nome: "Featherweight", icon: 76 },
+  18: { nome: "Punch",       icon: 61 },
+  19: { nome: "Vibrancy",    icon: 79 },
+};
+
+/* O imbuement de dano elemental tem um nome e um icone POR ELEMENTO --
+ * Scorch e fogo, Frost e gelo, e assim por diante. */
+const IMB_ELEM_ICONE = {
+  fire:   { nome: "Scorch",    icon: 13 },
+  earth:  { nome: "Venom",     icon: 7 },
+  ice:    { nome: "Frost",     icon: 19 },
+  energy: { nome: "Electrify", icon: 10 },
+  death:  { nome: "Reap",      icon: 4 },
+  holy:   { nome: "Blaze",     icon: 22 },
+};
+
+/* Nome e icone de um imbuement aplicado */
+function imbVisual(im) {
+  if (!im) return { nome: "?", icon: 0 };
+  if (im.cat === 0 && im.sub && IMB_ELEM_ICONE[im.sub]) {
+    return IMB_ELEM_ICONE[im.sub];
+  }
+  return IMB_ICONE[im.cat] || { nome: (IMB_CATEGORIA[im.cat] || {}).nome || "?",
+                                icon: 0 };
+}
+
+/* Duracao de um imbuement, em ms. O Canary usa 72000 SEGUNDOS (20 horas)
+ * para as tres bases. */
+const IMB_DURACAO_MS = 72000 * 1000;
+
+/* Quanto falta, em ms. Imbuement sem `ate` (save antigo) conta como cheio,
+ * para nao expirar de surpresa o que o jogador ja tinha. */
+function imbRestante(im, agora) {
+  if (!im) return 0;
+  if (!im.ate) return IMB_DURACAO_MS;
+  return Math.max(0, im.ate - (agora || Date.now()));
+}
+
+function imbExpirado(im, agora) {
+  return im && im.ate ? imbRestante(im, agora) <= 0 : false;
+}
+
+/* "19h 42m" / "42m" / "3m" — formato curto para o tooltip */
+function imbTempoTexto(ms) {
+  if (ms <= 0) return "expirado";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+  if (m > 0) return m + "m";
+  return Math.max(1, Math.floor(ms / 1000)) + "s";
+}
+
 const IMB_TIER_NOME = ["Basic", "Intricate", "Powerful"];
 const IMB_PRECO = [5000, 30000, 200000];
 
@@ -80,7 +152,9 @@ function imbAdd(p, slot, cat, tier, sub) {
     return { ok: false, msg: `Faltam ${fmtFull(preco - p.gold)} gp.` };
   p.gold -= preco;
   p.imbuements = p.imbuements || {};
-  p.imbuements[imbKey(slot)] = lista.concat([{ cat: cat, tier: tier, sub: sub }]);
+  // `ate` marca quando o imbuement vence. O Canary da 20h por base.
+  p.imbuements[imbKey(slot)] = lista.concat([
+    { cat: cat, tier: tier, sub: sub, ate: Date.now() + IMB_DURACAO_MS }]);
   const c = IMB_CATEGORIA[cat];
   return { ok: true, msg: `${c.nome} ${IMB_TIER_NOME[tier]} aplicado.`,
            cost: preco };
@@ -109,6 +183,8 @@ function imbTotals(p) {
     for (const im of imbOf(p, slot)) {
       const c = IMB_CATEGORIA[im.cat];
       if (!c) continue;
+      // imbuement vencido nao da mais bonus (o item volta ao normal)
+      if (imbExpirado(im)) continue;
       const vals = IMB_VALOR[c.attr];
       if (!vals) continue;
       const v = vals[Math.min(im.tier, vals.length - 1)];

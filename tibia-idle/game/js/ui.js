@@ -67,34 +67,145 @@ function showTip(html) {
 }
 function hideTip() { tooltip.el.style.display = "none"; }
 
-function itemTip(slug, extra) {
+/* Tooltip completo de um item.
+ *
+ * Mostra na ordem do client: ataque (fisico + elemento), bonus de skill,
+ * mantra, resistencias, augments e os slots de imbuement. O slot vazio
+ * aparece como um quadrado tracejado; o preenchido mostra o icone oficial,
+ * o nome do imbuement e quanto tempo falta.
+ *
+ * `slot` e opcional: so quando o item esta EQUIPADO da para saber quais
+ * imbuements ele carrega, porque eles moram em p.imbuements["equip:<slot>"].
+ */
+function itemTip(slug, extra, slot) {
   const it = GAMEDATA.items[slug];
   if (!it) return slug;
+  const p = G.p;
   let h = `<div class="tt-name">${it.n}</div>`;
+
+  // ---- ataque: fisico e a parte convertida em elemento
   const st = [];
-  if (it.atk) st.push("Ataque " + it.atk);
+  if (it.atk || it.elDmg) {
+    const el = it.el && typeof ELEMENTS !== "undefined" ? ELEMENTS[it.el] : null;
+    let linha = "Ataque " + (it.atk || 0);
+    if (it.elDmg && el) {
+      linha += ` <span style="color:${el.color}">+ ${it.elDmg} ${el.name}</span>`;
+    }
+    st.push(linha);
+  }
   if (it.s === "ammo") st.push((it.ammoKind === "bolt" ? "Bolt (besta)" : "Flecha (arco)") + " · " + fmtFull(ammoPrice(slug)) + " gp/tiro");
   if (it.cap) st.push("Capacidade quiver " + it.cap);
-  if (it.def) st.push("Defesa " + it.def);
+  if (it.def) st.push("Defesa " + it.def + (it.extraDef ? ` (+${it.extraDef})` : ""));
   if (it.arm) st.push("Armadura " + it.arm);
-  if (it.mdmg) st.push("Dano mágico " + it.mdmg);
-  if (it.mag) st.push("magic level +" + it.mag);
+  if (it.mdmg) st.push("Dano mágico " + (it.dmgMin ? `${it.dmgMin}–${it.dmgMax}` : it.mdmg));
+
+  // ---- bonus de skill do proprio item
+  const skills = [];
+  for (const [campo, nome] of [["sword", "Espada"], ["axe", "Machado"],
+       ["club", "Clava"], ["dist", "Distância"], ["shield", "Escudo"],
+       ["fist", "Punho"], ["melee", "Melee"], ["mag", "Magic level"]]) {
+    if (it[campo]) skills.push(`${nome} +${it[campo]}`);
+  }
+  if (skills.length) st.push(skills.join(" · "));
+
+  // ---- mantra: a armadura elemental do Monk
+  if (it.mantra) {
+    st.push(`<span style="color:#7ec8ff">Mantra ${it.mantra}</span>`);
+  }
+  // ---- elemental bond: o elemento que a arma impoe as magias
+  if (it.bond && typeof ELEMENTS !== "undefined" && ELEMENTS[it.bond]) {
+    const eb = ELEMENTS[it.bond];
+    st.push(`Elemental Bond: <span style="color:${eb.color}">${eb.name}</span>`);
+  }
+
   if (it.prot) st.push("Proteção " + it.prot + "%");
+  // resistencias por elemento, cada uma na sua cor
+  if (it.res) {
+    const rs = Object.keys(it.res).map((e) => {
+      const d = typeof ELEMENTS !== "undefined" ? ELEMENTS[e] : null;
+      return `<span style="color:${d ? d.color : "#ccc"}">${
+        it.res[e] > 0 ? "+" : ""}${it.res[e]}% ${d ? d.name : e}</span>`;
+    });
+    st.push(rs.join(" · "));
+  }
+  if (it.lifeLeech) st.push(`Life leech ${it.lifeLeech}%`);
+  if (it.manaLeech) st.push(`Mana leech ${it.manaLeech}%`);
   if (it.hpreg) st.push("Regen. vida +" + it.hpreg);
   if (it.mpreg) st.push("Regen. mana +" + it.mpreg);
   if (it.spd) st.push("Velocidade +" + it.spd);
-  if (it.melee) st.push("Melee +" + it.melee);
-  if (it.sword) st.push("Sword +" + it.sword);
-  if (it.axe) st.push("Axe +" + it.axe);
-  if (it.club) st.push("Club +" + it.club);
-  if (it.shield) st.push("Shielding +" + it.shield);
   if (it.th) st.push("Duas mãos");
   if (st.length) h += `<div class="tt-stat">${st.join("<br>")}</div>`;
+
+  // ---- augments: bonus por magia especifica
+  if (it.aug && it.aug.length) {
+    h += `<div class="tt-aug"><div class="tt-sub">Augments</div>` +
+      it.aug.map((a) => `<div class="tiny" style="color:#9ce84a">▸ ${a.s}: ${
+        a.k === "cooldown" ? "-" + a.v + "s" : "+" + a.v + "%"} ${
+        a.k === "cooldown" ? "" : a.k}</div>`).join("") + `</div>`;
+  }
+
+  // ---- imbuements: um quadrado por slot
+  if (it.imbSlots) {
+    h += imbSlotsTip(p, slug, slot, it.imbSlots);
+  }
+
+  if (it.cls) h += `<div class="tt-req">Classificação ${it.cls}</div>`;
   if (it.lvl) h += `<div class="tt-req">Requer nível ${it.lvl}</div>`;
   if (it.vocs) h += `<div class="tt-req">Vocação: ${it.vocs.join(", ")}</div>`;
+  if (it.w) h += `<div class="tt-req">Peso ${it.w.toFixed(2)} oz</div>`;
   if (it.sell) h += `<div class="tt-sell">Vende por ${fmtFull(it.sell)} gp</div>`;
   if (extra) h += `<div class="dim tiny mt4">${extra}</div>`;
   return h;
+}
+
+/* Os quadradinhos de imbuement do tooltip.
+ *
+ * Vazio = moldura tracejada. Preenchido = icone oficial do client, nome e
+ * tempo restante. O tempo fica vermelho na ultima hora, para o jogador
+ * perceber que precisa renovar. */
+function imbSlotsTip(p, slug, slot, total) {
+  const lista = (p && slot && typeof imbOf === "function") ? imbOf(p, slot) : [];
+  const agora = Date.now();
+  let h = `<div class="tt-imb"><div class="tt-sub">Imbuements (${
+    lista.length}/${total})</div><div class="tt-imb-row">`;
+  for (let i = 0; i < total; i++) {
+    const im = lista[i];
+    if (!im) {
+      h += `<div class="imb-slot vazio" title="Slot de imbuement vazio"></div>`;
+      continue;
+    }
+    const v = typeof imbVisual === "function" ? imbVisual(im)
+      : { nome: "?", icon: 0 };
+    const restante = typeof imbRestante === "function"
+      ? imbRestante(im, agora) : 0;
+    const venceu = restante <= 0;
+    const urgente = !venceu && restante < 3600000;   // menos de 1h
+    const tempo = typeof imbTempoTexto === "function"
+      ? imbTempoTexto(restante) : "";
+    h += `<div class="imb-slot ${venceu ? "expirado" : ""}"
+      title="${v.nome} ${IMB_TIER_NOME[im.tier] || ""}">
+      <img src="assets/imbuement/${v.icon}.png" alt="">
+      <span class="imb-tempo ${urgente ? "urgente" : ""}">${tempo}</span>
+    </div>`;
+  }
+  h += `</div>`;
+  // detalhe textual de cada imbuement aplicado
+  for (const im of lista) {
+    const v = typeof imbVisual === "function" ? imbVisual(im) : { nome: "?" };
+    const c = IMB_CATEGORIA[im.cat];
+    const vals = c && typeof IMB_VALOR !== "undefined" ? IMB_VALOR[c.attr] : null;
+    const val = vals ? vals[Math.min(im.tier, vals.length - 1)] : null;
+    const restante = typeof imbRestante === "function" ? imbRestante(im) : 0;
+    h += `<div class="tiny ${restante <= 0 ? "dim" : ""}">
+      ${v.nome} ${IMB_TIER_NOME[im.tier] || ""}${
+      val !== null ? ` · +${val}${c.attr.indexOf("prot") === 0 ||
+        c.attr === "elemental" || c.attr === "lifeLeech" ||
+        c.attr === "manaLeech" || c.attr === "crit" ? "%" : ""}` : ""}
+      · <span class="${restante > 0 && restante < 3600000 ? "imb-urgente" : "dim"}">${
+        typeof imbTempoTexto === "function" ? imbTempoTexto(restante) : ""}</span>
+    </div>`;
+  }
+  return h + `</div>`;
 }
 
 /* ------------------------------------------------------------ log */
@@ -289,7 +400,8 @@ function renderEquip(p) {
         slot === "extra" ? "Extra Slot: ferramentas bônus com resistência elemental" :
         slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro` :
         "Clique para desequipar";
-      showTip(itemTip(slug, extra));
+      // passa o slot: e por ele que imbOf() encontra os imbuements do item
+      showTip(itemTip(slug, extra, slot));
     });
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
