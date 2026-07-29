@@ -25,9 +25,17 @@ function CityWalker() {
  * entao a conta e a mesma do servidor: (110 + bonus) / 110. */
 function walkerSpeedMul() {
   if (typeof G === "undefined" || !G.p) return 1;
-  if (typeof mountSpeedBonus !== "function") return 1;
-  const b = mountSpeedBonus(G.p);
-  return b ? (110 + b) / 110 : 1;
+  // A cidade usa a MESMA velocidade da caçada: 110 + (nivel-1) + equip +
+  // montaria + haste. Antes so a montaria contava aqui, entao o personagem
+  // andava na cidade como se fosse nivel 1 mesmo estando no 500.
+  if (typeof playerSpeed !== "function") {
+    if (typeof mountSpeedBonus !== "function") return 1;
+    const b = mountSpeedBonus(G.p);
+    return b ? (110 + b) / 110 : 1;
+  }
+  // razao contra o baseSpeed de um char nivel 1, para 1.0 continuar sendo a
+  // velocidade de referencia do sprite
+  return playerSpeed(G.p) / 110;
 }
 
 /* Centro do tile em pixels */

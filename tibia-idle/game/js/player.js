@@ -114,6 +114,7 @@ function newPlayer(name, voc, sex) {
       shooterType: "auto",
       shooterSpell: "",
       shooterRune: "",
+      autoHaste: true,      // lanca utani hur/gran hur sozinho na caçada
       autoEquip: true,
       spellAttack: true,
       autoRetreat: true,    // recua em vez de morrer quando acabam os supplies

@@ -1,0 +1,4 @@
+/* Gerado por tools/import_haste.py: as magias que mudam a
+ * velocidade, com a formula do ConditionSpeed do Canary
+ * (o ganho escala com o baseSpeed, ou seja, com o nivel). */
+window.HASTEDATA = {"utamo-tempo-san":{"cd":10000,"lvl":55,"mana":400,"maxa":1.8,"maxb":72.0,"mina":1.8,"minb":72.0,"nome":"Swift Foot","paralyze":0,"vocs":["paladin",","],"words":"utamo tempo san"},"utani-gran-hur":{"cd":2000,"dur":22000,"lvl":20,"mana":100,"maxa":1.7,"maxb":40.0,"mina":1.7,"minb":40.0,"nome":"Strong Haste","paralyze":0,"vocs":["druid",",","sorcerer","monk"],"words":"utani gran hur"},"utani-hur":{"cd":2000,"dur":30000,"lvl":14,"mana":60,"maxa":1.3,"maxb":40.0,"mina":1.3,"minb":40.0,"nome":"Haste","paralyze":0,"vocs":["druid",",","knight","paladin","sorcerer","monk"],"words":"utani hur"},"utani-tempo-hur":{"cd":2000,"dur":5000,"lvl":25,"mana":100,"maxa":1.9,"maxb":40.0,"mina":1.9,"minb":40.0,"nome":"Charge","paralyze":0,"vocs":["knight",","],"words":"utani tempo hur"}};

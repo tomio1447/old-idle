@@ -1251,6 +1251,45 @@ function tryHeal(c, p, now) {
 
 /* Mantem o buff de vocacao ativo (Virtude do Monk, Protector do Knight,
  * Divine Dazzle do Paladin). O jogador escolhe qual no Helper. */
+/* Lanca a magia de velocidade quando ela nao esta ativa.
+ *
+ * Fica separada do tryBuff porque este so aceita UM buff (o escolhido em
+ * p.config.buff, que e a Virtude do monk ou o Protector do knight). Haste
+ * nao deve competir por esse slot: no Tibia o jogador mantem as duas coisas
+ * ao mesmo tempo. Escolhe sempre a mais forte que couber na mana.
+ */
+function tryHaste(c, p, now) {
+  if (typeof HASTEDATA === "undefined") return false;
+  if (p.config && p.config.autoHaste === false) return false;
+  if ((c.hasteCd || 0) > now) return false;
+  // ja tem uma ativa? nao gasta mana de novo
+  if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
+
+  let melhor = null, ganho = 0;
+  for (const id of (typeof hastesDisponiveis === "function"
+                    ? hastesDisponiveis(p) : [])) {
+    const sp = SPELLS[id];
+    if (!sp) continue;
+    if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) continue;
+    if (p.level < (sp.lvl || 1) || p.mp < sp.mana) continue;
+    if (!cdReady(p, id, now)) continue;
+    const d = hasteDelta(p, id);
+    if (d > ganho) { ganho = d; melhor = id; }
+  }
+  if (!melhor) return false;
+
+  const sp = SPELLS[melhor];
+  p.mp -= sp.mana;
+  addManaSpent(p, combatManaSkillGain(c, sp.mana));
+  cdStart(p, melhor, sp, now);
+  if (!p.buffs) p.buffs = {};
+  p.buffs[melhor] = now + (HASTEDATA[melhor].dur || 30000);
+  c.hasteCd = now + 2000;
+  c.events.push({ t: "say", text: spellWords(melhor, sp) });
+  c.events.push({ t: "buff", nome: HASTEDATA[melhor].nome || sp.name });
+  return true;
+}
+
 function tryBuff(c, p, now) {
   if (typeof BUFFS === "undefined") return false;
   const chave = p.config && p.config.buff;
@@ -1592,6 +1631,7 @@ function combatTick(c, p, dt, now) {
 
   // buff de vocacao: mantem a Virtude / Protector sempre ativos
   tryBuff(c, p, now);
+  tryHaste(c, p, now);
 
   // cura de conditions (exana) antes da cura de HP
   tryCureCondition(c, p, now);

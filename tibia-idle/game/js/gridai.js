@@ -151,11 +151,12 @@ function playerThinkStep(c, p, alvo, occ, now) {
     return false;
   }
 
-  // velocidade do jogador: base 110 do Canary + bonus de equip/montaria
-  let spd = 110;
-  if (typeof gearStats === "function") spd += (gearStats(p).speed || 0);
-  if (typeof mountSpeedBonus === "function") spd += (mountSpeedBonus(p) || 0);
-  pl.speedPts = spd;
+  // Velocidade pelo modelo do Canary: 110 + (nivel-1) + equip + montaria +
+  // haste. Antes era 110 fixo, entao o NIVEL nao contava e um char 500
+  // andava igual a um char 1.
+  pl.speedPts = typeof playerSpeed === "function"
+    ? playerSpeed(p, now)
+    : 110 + (typeof gearStats === "function" ? (gearStats(p).speed || 0) : 0);
 
   const ok = beginStep(pl, dir, occ, dist <= 1);
   pl.nextStepAt = now + (ok ? pl.stepDur : 150);

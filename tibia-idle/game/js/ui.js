@@ -196,6 +196,19 @@ function renderStats(p) {
     ["Proteção", def.protection + "%"],
     ...(typeof mantraTotal === "function" && mantraTotal(p)
       ? [["Mantra", mantraTotal(p) + " (elemental)"]] : []),
+    ...(typeof playerSpeedBreakdown === "function"
+      ? [["Velocidade", (function () {
+          const v = playerSpeedBreakdown(p);
+          // as parcelas explicam de onde vem cada ponto; sem isso o jogador
+          // nao tem como saber que o nivel entra na conta
+          const partes = [];
+          if (v.nivel) partes.push(`nv +${v.nivel}`);
+          if (v.equip) partes.push(`equip +${v.equip}`);
+          if (v.mount) partes.push(`mont +${v.mount}`);
+          if (v.haste) partes.push(`<span style="color:#7ec8ff">haste +${v.haste}</span>`);
+          return `<b>${v.total}</b>${partes.length
+            ? ` <span class="tiny dim">(${partes.join(" · ")})</span>` : ""}`;
+        })()]] : []),
     ["Capacidade", fmt(max.cap - carriedWeight(p)) + " / " + fmt(max.cap)],
     ["Mortes", p.deaths],
     ["Kills totais", fmtFull(p.totalKills)],
