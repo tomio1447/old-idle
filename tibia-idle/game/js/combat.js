@@ -958,7 +958,16 @@ function castSpellById(c, p, target, now, id) {
   const usaMonk = md && typeof monkSpellTargets === "function";
 
   let targets;
-  if (usaMonk) {
+  // matriz real da area (o leque do sweeping, a onda, o feixe). Quando a
+  // matriz existe ela manda: o raio circular so vale de fallback.
+  const nomeArea = typeof areaNameOf === "function" ? areaNameOf("spell", id) : null;
+  const porMatriz = nomeArea && typeof areaMobs === "function"
+    ? areaMobs(c, nomeArea, c.player, target) : null;
+  if (porMatriz) {
+    // o alvo apontado entra sempre, mesmo que a matriz nao o cubra por
+    // arredondamento de direcao
+    targets = porMatriz.indexOf(target) === -1 ? [target].concat(porMatriz) : porMatriz;
+  } else if (usaMonk) {
     targets = monkSpellTargets(p, id, c, target);
   } else {
     const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
@@ -971,6 +980,10 @@ function castSpellById(c, p, target, now, id) {
   }
   const fxMagia = (md && md.fx && typeof monkFx === "function")
     ? monkFx(p, md.fx) : null;
+  // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
+  // nao so onde havia monstro. Era esse o bug de "a magia so pinta o alvo".
+  const areaTiles = nomeArea && typeof areaCells === "function"
+    ? areaCells(nomeArea, c.player, target) : [];
 
   // Ciclo builder/spender do Monk. O spender precisa LER a harmonia antes de
   // gastar, senao o bonus sairia sempre 1x: gastaHarmony() zera o contador e
@@ -1024,6 +1037,11 @@ function castSpellById(c, p, target, now, id) {
                     chain: md && md.chain && idx > 0 ? 1 : 0,
                     missile: ELEMENT_MISSILE[elemento] || "energy" });
   });
+  if (areaTiles.length > 1) {
+    c.events.push({ t: "areafx", cells: areaTiles, screen: true,
+                    fx: fxMagia || (ELEMENTS[elemento] || ELEMENTS.physical).fx,
+                    el: elemento });
+  }
   if (md && md.chain && targets.length > 1) {
     c.events.push({ t: "chain", n: targets.length, x: target.x, y: target.y,
                     screen: true, fx: md.chainFx || "white-energy-spark" });
@@ -1092,7 +1110,14 @@ function tryUseRune(c, p, target, now, forcada) {
   // que limita e quem esta dentro do raio, medido a partir do alvo — e o
   // mesmo criterio do servidor, que monta a lista de tiles em volta.
   const alvos = [target];
-  if (s.area && s.area.raio > 0) {
+  const nomeAreaR = typeof areaNameOf === "function" ? areaNameOf("rune", best) : null;
+  const porMatrizR = nomeAreaR && typeof areaMobs === "function"
+    ? areaMobs(c, nomeAreaR, c.player, target) : null;
+  const tilesR = nomeAreaR && typeof areaCells === "function"
+    ? areaCells(nomeAreaR, c.player, target) : [];
+  if (porMatrizR) {
+    for (const m of porMatrizR) if (m !== target) alvos.push(m);
+  } else if (s.area && s.area.raio > 0) {
     // 0.13 por SQM e a escala usada no resto do combate (burst arrow, cleave)
     const R = s.area.raio;                   // raio ja vem em SQM do lua
     for (const m of c.mobs) {
@@ -1135,7 +1160,11 @@ function tryUseRune(c, p, target, now, forcada) {
                     el: s.element, rune: s.name,
                     fx: s.fx || null, missile: missile });
   }
-  if (s.area && alvos.length > 1) {
+  if (tilesR.length > 1) {
+    c.events.push({ t: "areafx", cells: tilesR, screen: true,
+                    fx: s.fx || (ELEMENTS[s.element] || ELEMENTS.physical).fx,
+                    el: s.element });
+  } else if (s.area && alvos.length > 1) {
     c.events.push({ t: "burst", x: target.x, y: target.y, fx: s.fx || null });
   }
 

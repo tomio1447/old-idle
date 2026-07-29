@@ -167,7 +167,10 @@ Renderer.prototype.addEffect = function (x, y, name) {
   const n = FX_FRAMES[name];
   this.effects.push({ x: x, y: y, name: name, t: 0,
                       frames: n, dur: Math.max(300, Math.min(700, n * 55)) });
-  if (this.effects.length > 20) this.effects.shift();
+  // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
+  // as primeiras eram descartadas antes de aparecer. 120 cabe a maior
+  // matriz do jogo com folga e ainda protege contra vazamento.
+  if (this.effects.length > 120) this.effects.shift();
 };
 
 Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {

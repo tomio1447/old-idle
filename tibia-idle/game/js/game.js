@@ -819,6 +819,18 @@ function drainEvents() {
         r.addEffect(ex(e), ey(e), e.fx || "explosion-area");
         r.shake = Math.max(r.shake || 0, 5);
         break;
+      case "areafx": {
+        // pinta o efeito em TODAS as casas cobertas pela matriz, nao so onde
+        // havia monstro. Sem isso a magia de area parecia acertar um alvo so.
+        for (const cel of (e.cells || [])) {
+          const pos = typeof cellToScreen === "function"
+            ? cellToScreen(cel.cx, cel.cy) : null;
+          if (!pos) continue;
+          r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
+        }
+        r.shake = Math.max(r.shake || 0, 4);
+        break;
+      }
       case "chain":
         // faisca do salto em cadeia (CONST_ME_WHITE_ENERGY_SPARK do Canary)
         r.addEffect(ex(e), ey(e), e.fx || "white-energy-spark");

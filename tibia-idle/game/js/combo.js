@@ -168,9 +168,16 @@ function comboEscolhe(c, p, alvo, now) {
   for (const entrada of lista) {
     if (!entrada) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
-    // requisito de alvos: so dispara se o pack for grande o bastante
+    // Requisito de alvos: so dispara se o pack for grande o bastante.
+    // Usa a MATRIZ real da area quando ela existe, para o "4+" contar
+    // exatamente quem o golpe vai acertar -- inclusive o formato do leque.
     if (entrada.min > 1) {
-      const n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
+      let n = null;
+      if (typeof areaNameOf === "function" && typeof areaCount === "function") {
+        const nome = areaNameOf(entrada.kind, entrada.id);
+        if (nome && c && c.player) n = areaCount(c, nome, c.player, alvo);
+      }
+      if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
       if (n < entrada.min) continue;
     }
     return { kind: entrada.kind, id: entrada.id, entrada: entrada };

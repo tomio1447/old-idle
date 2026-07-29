@@ -222,7 +222,11 @@ const SPELLS = {};
       mana: d.mana || 0, cd: Math.max(1000, d.cd || 2000), lvl: d.lvl || 1,
       ml: d.ml || 0, soul: d.soul || 0,
       vocs: d.vocs || [], icon: d.icon,
-      element: d.element, area: !!d.area, alvos: d.alvos,
+      // `area` guarda o NOME da matriz (AREA_BEAM5, AREA_WAVE4...), que e o
+      // que area.js precisa para resolver o formato real. Antes virava
+      // boolean com `!!d.area` e o nome se perdia, entao toda magia de area
+      // caia no fallback circular.
+      element: d.element, area: d.area || false, alvos: d.alvos,
       range: d.range, needTarget: !!d.needTarget, needWeapon: !!d.needWeapon,
       premium: !!d.premium, group: d.group, chain: d.chain,
       cond: d.cond, dispel: d.dispel, regen: d.regen, monk: d.monk,

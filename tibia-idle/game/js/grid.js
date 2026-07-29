@@ -214,10 +214,86 @@ function advanceStep(ent, dt) {
   return false;
 }
 
-/* Escolhe a direcao que mais aproxima de (gx,gy), preferindo reto a
- * diagonal quando o custo compensa. Substitui o A* completo: numa arena de
- * 21x13 sem paredes internas, greedy com desempate chega ao mesmo lugar. */
+/* A* de verdade, no lugar do greedy.
+ *
+ * O greedy anterior tentava a direcao boa e alguns desvios laterais; num
+ * corredor em U ele batia na parede de corpos e travava, porque nenhum dos
+ * candidatos aproximava do alvo. O A* enxerga o caminho inteiro e contorna.
+ *
+ * Custos: reto = 1, diagonal = 3 (WALK_DIAGONAL_EXTRA_COST do Canary), o que
+ * reproduz a preferencia do servidor por andar reto. A heuristica e a
+ * distancia de Chebyshev, admissivel para esses custos.
+ *
+ * O teto de 400 nos evita e generoso para uma grade de 21x13 (273 celulas) e
+ * garante que o pior caso nao pese no tick.
+ */
+function findPathGrid(ent, gx, gy, occ, maxNos) {
+  const inicio = ent.cx + ":" + ent.cy;
+  if (ent.cx === gx && ent.cy === gy) return null;
+
+  const abertos = [{ cx: ent.cx, cy: ent.cy, g: 0,
+                     f: Math.max(Math.abs(gx - ent.cx), Math.abs(gy - ent.cy)) }];
+  const veioDe = new Map();
+  const custo = new Map([[inicio, 0]]);
+  const fechados = new Set();
+  let nos = 0;
+  const teto = maxNos || 400;
+
+  while (abertos.length && nos < teto) {
+    // fila de prioridade simples: a grade e pequena, um scan linear e mais
+    // barato que manter um heap
+    let melhor = 0;
+    for (let i = 1; i < abertos.length; i++) {
+      if (abertos[i].f < abertos[melhor].f) melhor = i;
+    }
+    const atual = abertos.splice(melhor, 1)[0];
+    const chave = atual.cx + ":" + atual.cy;
+    if (fechados.has(chave)) continue;
+    fechados.add(chave);
+    nos++;
+
+    if (atual.cx === gx && atual.cy === gy) {
+      // reconstroi ate o primeiro passo saindo da origem
+      let cur = chave;
+      let passo = null;
+      while (veioDe.has(cur)) {
+        const ant = veioDe.get(cur);
+        if (ant.chave === inicio) { passo = ant.dir; break; }
+        cur = ant.chave;
+      }
+      return passo;
+    }
+
+    for (const d of DIRS) {
+      const nx = atual.cx + d.dx, ny = atual.cy + d.dy;
+      const nk = nx + ":" + ny;
+      if (fechados.has(nk)) continue;
+      // o destino pode estar ocupado (e o alvo): aceita como chegada
+      const ehDestino = nx === gx && ny === gy;
+      if (!ehDestino && !cellFree(occ, nx, ny)) continue;
+      if (!inBounds(nx, ny)) continue;
+      const g = atual.g + (d.diag ? WALK_DIAGONAL_EXTRA_COST : 1);
+      if (custo.has(nk) && custo.get(nk) <= g) continue;
+      custo.set(nk, g);
+      veioDe.set(nk, { chave: chave, dir: d });
+      const h = Math.max(Math.abs(gx - nx), Math.abs(gy - ny));
+      abertos.push({ cx: nx, cy: ny, g: g, f: g + h });
+    }
+  }
+  return null;
+}
+
+/* Escolhe a direcao que mais aproxima de (gx,gy).
+ *
+ * Tenta o A* primeiro; se ele nao achar caminho (alvo cercado, teto de nos
+ * estourado) cai no greedy, que ao menos aproxima. */
 function stepToward(ent, gx, gy, occ) {
+  const viaAStar = findPathGrid(ent, gx, gy, occ);
+  if (viaAStar) return viaAStar;
+  return stepTowardGreedy(ent, gx, gy, occ);
+}
+
+function stepTowardGreedy(ent, gx, gy, occ) {
   const dx = gx - ent.cx, dy = gy - ent.cy;
   if (dx === 0 && dy === 0) return null;
   const sx = Math.sign(dx), sy = Math.sign(dy);
