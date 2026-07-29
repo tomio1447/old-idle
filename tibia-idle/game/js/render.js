@@ -27,11 +27,27 @@ function spriteScale(W, img, tiles) {
   return Math.max(0.5, alvo / maior);
 }
 
+/* Escala do jeito que o Tibia faz de verdade.
+ *
+ * O client nao redimensiona a arte para "caber" no tile: um sprite mede 32px
+ * e um SQM mede 32px, entao a escala e sempre a MESMA para todo mundo
+ * (tile/32). Uma criatura grande usa uma arte de 64px e naturalmente ocupa
+ * dois tiles, transbordando para cima e para a esquerda — e assim que um
+ * dragao parece maior que um rato.
+ *
+ * O spriteScale() antigo dividia pelo maior lado do recorte, ou seja, cada
+ * sprite ganhava uma escala diferente: recorte apertado virava sprite
+ * gigante e recorte folgado virava sprite miuda. Era isso que deixava tudo
+ * "fora de escala" comparado ao baiak-idle. */
+const TIBIA_SPRITE = 32;
+
+function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
+
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "8";
+const ASSET_VERSION = "9";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -202,31 +218,58 @@ Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {
   if (this.projectiles.length > 30) this.projectiles.shift();
 };
 
-function drawNameText(ctx, x, y, name) {
-  ctx.font = "bold 10px Verdana";
+/* Nome no estilo do client: texto pequeno com contorno preto, SEM caixa.
+ * A moldura escura atras do nome era invencao nossa e nao existe no Tibia —
+ * la o nome e desenhado direto sobre o mapa, so com outline para continuar
+ * legivel em cima de qualquer chao. */
+function drawNameText(ctx, x, y, name, cor) {
+  ctx.font = "bold 9px Verdana";
   ctx.textAlign = "center";
-  const tw = ctx.measureText(name).width + 10;
-  ctx.fillStyle = "rgba(0,0,0,.78)";
-  ctx.fillRect(x - tw / 2, y - 10, tw, 13);
-  ctx.strokeStyle = "rgba(120,110,90,.55)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x - tw / 2, y - 10, tw, 13);
-  ctx.fillStyle = "#f0e8c8";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.strokeText(name, x, y);
+  ctx.fillStyle = cor || "#ffffff";
   ctx.fillText(name, x, y);
 }
 
+/* Barra de vida do Tibia: 27x4 com 1px de borda preta.
+ *
+ * O client usa largura FIXA (nao acompanha o tamanho da criatura) e a cor
+ * muda em degraus conforme a faixa de vida — nao ha gradiente nem barra
+ * proporcional ao sprite. */
+const TIBIA_BAR_W = 27;
+const TIBIA_BAR_H = 4;
+
+/* Degraus de cor do client: >60 verde, >30 amarelo, >8 laranja/vermelho. */
+function tibiaHpColor(pct) {
+  const p = pct * 100;
+  if (p > 60) return "#00c000";
+  if (p > 30) return "#c0c000";
+  if (p > 8) return "#c07800";
+  if (p > 3) return "#c00000";
+  return "#600000";
+}
+
+function drawTibiaBar(ctx, x, y, pct, cor) {
+  const w = TIBIA_BAR_W, h = TIBIA_BAR_H;
+  const bx = Math.round(x - w / 2), by = Math.round(y);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+  ctx.fillStyle = cor;
+  ctx.fillRect(bx, by, Math.round(w * Math.max(0, Math.min(1, pct))), h);
+}
+
 function drawNameBars(ctx, x, y, name, hpPct, mpPct) {
-  drawNameText(ctx, x, y, name);
-  const w = 74, h = 4;
-  const bx = x - w / 2;
-  const hpY = y + 6, mpY = y + 12;
-  ctx.fillStyle = "#050505";
-  ctx.fillRect(bx - 1, hpY - 1, w + 2, h + 2);
-  ctx.fillRect(bx - 1, mpY - 1, w + 2, h + 2);
-  ctx.fillStyle = hpPct > 0.5 ? "#37d747" : hpPct > 0.25 ? "#e8c84a" : "#e04040";
-  ctx.fillRect(bx, hpY, w * Math.max(0, Math.min(1, hpPct)), h);
-  ctx.fillStyle = "#3c66ff";
-  ctx.fillRect(bx, mpY, w * Math.max(0, Math.min(1, mpPct)), h);
+  // ordem do client: barra de vida logo acima da criatura e o nome acima
+  // dela. A mana so aparece para o proprio jogador (o Tibia nao mostra mana
+  // de terceiros), entao fica numa terceira linha, mais fina.
+  const hpY = y + 2;
+  drawNameText(ctx, x, y - 3, name, "#ffffff");
+  drawTibiaBar(ctx, x, hpY, hpPct, tibiaHpColor(hpPct));
+  if (mpPct !== undefined && mpPct !== null) {
+    drawTibiaBar(ctx, x, hpY + TIBIA_BAR_H + 2, mpPct, "#3c66ff");
+  }
 }
 
 function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
@@ -710,7 +753,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     if (!img || !img.complete || !img.naturalWidth) continue;
     const fw = img.naturalWidth / e.frames;
     const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
-    const sc = 2;
+    // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
+    // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
+    // parecia solta do grid.
+    const sc = tibiaScale(W);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
                   e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
                   fw * sc, img.naturalHeight * sc);
@@ -783,7 +829,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = Math.min(1, c.life / 1200) * 0.5;
     const img = Sprites.mob(c.slug, "s");
     if (img && img.complete && img.naturalWidth) {
-      const sc = 2;
+      // o cadaver e a mesma sprite do bicho achatada: precisa da escala do
+      // tile, senao fica maior que a criatura viva que acabou de morrer
+      const sc = tibiaScale(W);
       ctx.save();
       ctx.translate(c.x * W, c.y * H);
       ctx.scale(1, 0.4);
@@ -801,9 +849,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
                                         pl.moving ? (pl.frame || 1) : 0);
   const bob = pl.moving ? 0 : Math.sin(Date.now() / 340) * 2;
   if (spriteReady(pimg)) {
-    // o jogador tambem ocupa 1 SQM, igual as criaturas comuns
-    const sc = spriteScale(W, { naturalWidth: spriteW(pimg),
-                                naturalHeight: spriteH(pimg) }, 1);
+    // escala unica do client (tile/32): a sprite mantem o tamanho nativo em
+    // SQMs, sem ser esticada para preencher o tile
+    const sc = tibiaScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = (pl.attackAnim || 0) > 0 ? (pl.dir === "w" ? -5 : pl.dir === "e" ? 5 : 0) : 0;
     // sombra
@@ -840,10 +888,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const mx = m.x * W;
       const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
       if (img && img.complete && img.naturalWidth) {
-        // quantos SQMs a criatura ocupa: no Tibia so os bichos grandes
-        // passam de 1 tile. O HP e a aproximacao que temos do porte.
-        const tiles = m.def.hp > 1500 ? 1.6 : m.def.hp > 500 ? 1.3 : 1.0;
-        const sc = spriteScale(W, img, tiles);
+        // mesma escala do jogador: o porte da criatura vem do tamanho da
+        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs), nao de um chute pelo HP
+        const sc = tibiaScale(W);
         const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
         const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
@@ -851,8 +898,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.ellipse(mx, my + h * 0.42, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
         if (combat.mobs[0] === m) {
-          drawTargetSquare(ctx, mx - w * 0.43, my - h * 0.48,
-                           w * 0.86, h * 0.92);
+          // o quadro de alvo do client marca o SQM, nao a arte: fica do
+          // tamanho do tile, centrado no pe da criatura
+          const t = tilePx(W);
+          drawTargetSquare(ctx, mx - t / 2, my + h / 2 - t, t, t);
         }
         if (m.influenced) {
           ctx.save();
@@ -863,22 +912,17 @@ Renderer.prototype.draw = function (combat, player, dt) {
           ctx.restore();
         }
         ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
-        // barra de vida
-        const bw = Math.max(30, w * 0.75), bh = 4;
-        const bx = mx - bw / 2, by = my - h / 2 - 9;
-        ctx.fillStyle = "#000";
-        ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+        // barra de vida: largura fixa de 27px como no client, e nao
+        // proporcional ao sprite (um dragao nao tem barra maior que um rato)
         const pct = Math.max(0, m.hp / m.maxHp);
-        ctx.fillStyle = pct > 0.5 ? "#4ec84e" : pct > 0.25 ? "#e8c84a" : "#e04040";
-        ctx.fillRect(bx, by, bw * pct, bh);
-        // nome + range visual quando está chegando perto
-        ctx.font = m.influenced ? "bold 18px Verdana" : "9px Verdana";
-        ctx.textAlign = "center";
-        ctx.fillStyle = "rgba(0,0,0,.9)";
-        const mobName = typeof displayMonsterName === "function" ? displayMonsterName(m.def.name) : String(m.def.name || "").replace(/^Influenced\s+/i, "");
-        ctx.fillText(mobName, mx + 1, by - 4);
-        ctx.fillStyle = m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#d8d0b8";
-        ctx.fillText(mobName, mx, by - 5);
+        const by = my - h / 2 - 9;
+        drawTibiaBar(ctx, mx, by, pct, tibiaHpColor(pct));
+        // nome logo acima da barra, com contorno preto como no client
+        const mobName = typeof displayMonsterName === "function"
+          ? displayMonsterName(m.def.name)
+          : String(m.def.name || "").replace(/^Influenced\s+/i, "");
+        drawNameText(ctx, mx, by - 4, mobName,
+                     m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#ff5252");
       }
     }
   }
@@ -895,7 +939,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     // sprite real do Tibia, já desenhado na direção do voo
     const img = p.missile ? Sprites.missile(p.missile, p.dir) : null;
     if (img && img.complete && img.naturalWidth) {
-      const sc = 1.6;
+      // o projetil e uma sprite de 32px como qualquer outra: usa a escala
+      // do tile em vez do 1.6 fixo, senao a flecha fica maior que o monstro
+      const sc = tibiaScale(W);
       const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
       ctx.drawImage(img, hx - w / 2, hy - h / 2, w, h);
     } else {
@@ -923,7 +969,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (!img || !img.complete || !img.naturalWidth) continue;
     const fw = img.naturalWidth / e.frames;
     const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
-    const sc = 2;
+    // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
+    // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
+    // parecia solta do grid.
+    const sc = tibiaScale(W);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
                   e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
                   fw * sc, img.naturalHeight * sc);

@@ -1,0 +1,227 @@
+"""
+Reextrai outfits e montarias como SPRITESHEETS alinhados (4 direcoes x N frames).
+
+Por que refazer: o extract_appearances.py antigo gravava so a direcao sul
+(DIRECAO_SUL = 2) e recortava CADA camada com o seu proprio getbbox(). Isso
+causava os tres bugs visuais reclamados:
+
+  1. personagem "travado": nao existia PNG das direcoes n/e/w, entao o
+     AppearanceRenderer recebia `dir` e nao tinha o que fazer com ele;
+  2. addon e montaria "fora de esquadro": o recorte por camada muda de
+     origem (o chapeu do addon 1 comeca em outro x que o corpo), entao
+     compor as camadas alinhando pelo pe desalinhava tudo no eixo x;
+  3. escala errada: com o recorte variando por direcao (medi o looktype 335
+     comecando em x=6 no sul e x=19 no oeste), escalar pelo maior lado do
+     recorte fazia a criatura mudar de tamanho ao virar.
+
+A correcao: renderizar sempre o canvas inteiro de 64x64 (o frame group da
+outfit e 2x2 tiles) e recortar UMA vez so, com uma caixa compartilhada por
+todas as direcoes, frames e camadas da mesma outfit. Assim as camadas ficam
+sempre no mesmo referencial e o deslocamento vira um dado (ox/oy) que o
+renderizador soma de volta.
+
+Layout do sheet: coluna = frame (0 = parado, resto = passos), linha =
+direcao na ordem do client (0 = norte, 1 = leste, 2 = sul, 3 = oeste).
+
+Uso: python3 extract_appearance_sheets.py [dir_com_Tibia.dat] [dir_do_game]
+"""
+import json
+import os
+import sys
+
+from PIL import Image
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from tibia_assets_860 import Dat860, Spr860, render_group_860  # noqa: E402
+
+SRC = sys.argv[1] if len(sys.argv) > 1 else "/home/user/assets860/ex"
+GAME = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "game")
+
+# ordem das direcoes igual a do client: o indice e o proprio xp do frame group
+DIRS = 4
+# 1 pose parada + 3 passos. O grupo de caminhada costuma ter 8 frames; pegar
+# 3 espacados da a leitura do passo sem triplicar o tamanho do arquivo.
+WALK_COLS = 3
+COLS = 1 + WALK_COLS
+CELL = 64          # 2x2 tiles de 32px, o tamanho do frame group de criatura
+
+
+def frames_de_caminhada(anim):
+    """Escolhe WALK_COLS frames espacados dentro do ciclo de caminhada."""
+    if anim <= 1:
+        return [0] * WALK_COLS
+    return [min(anim - 1, (i + 1) * anim // (WALK_COLS + 1))
+            for i in range(WALK_COLS)]
+
+
+def montar_sheet(spr, obj, yp, layer):
+    """Desenha o grid (direcao x frame) de uma camada num canvas unico.
+
+    Devolve None quando a camada nao existe (addon ausente, mascara de um
+    looktype de uma camada so). Nunca recorta: o recorte e feito depois, com
+    a caixa compartilhada, para as camadas continuarem alinhadas entre si.
+    """
+    g_idle = obj.groups[0]
+    g_walk = obj.groups[1] if len(obj.groups) > 1 else obj.groups[0]
+    if layer >= g_idle.layers:
+        return None
+    if yp >= g_idle.py:
+        return None
+
+    sheet = Image.new("RGBA", (CELL * COLS, CELL * DIRS), (0, 0, 0, 0))
+    passos = frames_de_caminhada(g_walk.anim)
+    vazio = True
+    for d in range(DIRS):
+        for col in range(COLS):
+            if col == 0:
+                g, fr = g_idle, 0
+            else:
+                g, fr = g_walk, passos[col - 1]
+            # px pode ser menor que 4 em visuais que nao viram (raro): o
+            # modulo evita estourar o indice e repete a unica direcao
+            xp = d % max(1, g.px)
+            yy = min(yp, g.py - 1)
+            ly = min(layer, g.layers - 1)
+            img = render_group_860(spr, g, frame=fr, xp=xp, yp=yy, layer=ly)
+            if img is None:
+                continue
+            if img.getbbox():
+                vazio = False
+            sheet.alpha_composite(img, (col * CELL, d * CELL))
+    return None if vazio else sheet
+
+
+def caixa_das_celulas(sheets):
+    """Uniao dos bbox de cada celula, em coordenadas DE CELULA (0..64).
+
+    A caixa precisa ser a mesma para toda celula: se cada direcao usasse a
+    sua, o personagem "pularia" de posicao ao virar. Uso so as camadas base
+    (a mascara nunca passa da base) e considero todas as celulas de todas as
+    camadas, senao o addon poderia ser cortado.
+    """
+    x0, y0, x1, y1 = CELL, CELL, 0, 0
+    achou = False
+    for sh in sheets:
+        if sh is None:
+            continue
+        for d in range(DIRS):
+            for col in range(COLS):
+                cel = sh.crop((col * CELL, d * CELL,
+                               col * CELL + CELL, d * CELL + CELL))
+                b = cel.getbbox()
+                if not b:
+                    continue
+                achou = True
+                x0 = min(x0, b[0]); y0 = min(y0, b[1])
+                x1 = max(x1, b[2]); y1 = max(y1, b[3])
+    if not achou:
+        return None
+    return (x0, y0, x1, y1)
+
+
+def recortar(sheet, box):
+    """Aplica a mesma caixa em todas as celulas, remontando o sheet menor."""
+    x0, y0, x1, y1 = box
+    cw, ch = x1 - x0, y1 - y0
+    out = Image.new("RGBA", (cw * COLS, ch * DIRS), (0, 0, 0, 0))
+    for d in range(DIRS):
+        for col in range(COLS):
+            cel = sheet.crop((col * CELL + x0, d * CELL + y0,
+                              col * CELL + x1, d * CELL + y1))
+            out.paste(cel, (col * cw, d * ch))
+    return out
+
+
+def exportar(dat, spr, looktype, destino, nome, addons=True):
+    """Grava os sheets de um looktype. Devolve os metadados de geometria."""
+    obj = dat.outfit(looktype)
+    if obj is None or not obj.groups:
+        return None
+
+    camadas = []                       # (sufixo, sheet_base, sheet_mask)
+    n_yp = min(3, obj.groups[0].py) if addons else 1
+    for yp in range(n_yp):
+        base = montar_sheet(spr, obj, yp, 0)
+        if base is None:
+            continue
+        mask = montar_sheet(spr, obj, yp, 1)
+        camadas.append(("" if yp == 0 else "-a%d" % yp, base, mask))
+    if not camadas:
+        return None
+
+    box = caixa_das_celulas([b for _, b, _ in camadas])
+    if box is None:
+        return None
+
+    for suf, base, mask in camadas:
+        recortar(base, box).save(
+            os.path.join(destino, "%s%s.base.png" % (nome, suf)),
+            optimize=True)
+        if mask is not None:
+            recortar(mask, box).save(
+                os.path.join(destino, "%s%s.mask.png" % (nome, suf)),
+                optimize=True)
+
+    x0, y0, x1, y1 = box
+    return {
+        "cw": x1 - x0, "ch": y1 - y0,      # tamanho da celula ja recortada
+        "ox": x0, "oy": y0,                # onde a celula comeca no 64x64
+        "cols": COLS, "rows": DIRS,
+        # deslocamento do DAT: o client desenha a sprite subtraindo isso
+        "dx": obj.props.get("dispX", 0), "dy": obj.props.get("dispY", 0),
+        "addons": max(0, len(camadas) - 1),
+    }
+
+
+def main():
+    dat = Dat860(os.path.join(SRC, "Tibia.dat"))
+    spr = Spr860(os.path.join(SRC, "Tibia.spr"))
+
+    dir_out = os.path.join(GAME, "assets", "appearance", "outfit")
+    dir_mnt = os.path.join(GAME, "assets", "appearance", "mount")
+    os.makedirs(dir_out, exist_ok=True)
+    os.makedirs(dir_mnt, exist_ok=True)
+
+    # reaproveita o catalogo ja montado (id, nome, sexo, premium): so a
+    # parte grafica esta sendo refeita, os dados de loja continuam valendo
+    js = open(os.path.join(GAME, "js", "appearancedata.js")).read()
+    velho = json.loads(js[js.index("{"):js.rindex("}") + 1])
+
+    outfits, mounts = [], []
+    for o in velho["outfits"]:
+        meta = exportar(dat, spr, o["looktype"], dir_out, o["id"])
+        if not meta:
+            continue
+        novo = dict(o)
+        novo["addons"] = meta.pop("addons")
+        novo.update(meta)
+        outfits.append(novo)
+
+    for m in velho["mounts"]:
+        meta = exportar(dat, spr, m["looktype"], dir_mnt, m["id"],
+                        addons=False)
+        if not meta:
+            continue
+        novo = dict(m)
+        meta.pop("addons", None)
+        novo.update(meta)
+        mounts.append(novo)
+
+    dados = {"outfits": outfits, "mounts": mounts}
+    saida = os.path.join(GAME, "js", "appearancedata.js")
+    with open(saida, "w") as f:
+        f.write("/* Gerado por tools/extract_appearance_sheets.py\n"
+                " * Spritesheet por visual: coluna = frame (0 parado),\n"
+                " * linha = direcao (0 N, 1 E, 2 S, 3 O). A celula e sempre\n"
+                " * cw x ch e nasce num canvas de 64x64 na posicao ox/oy —\n"
+                " * o renderizador precisa desses valores para ancorar a\n"
+                " * sprite no SQM certo. */\n")
+        f.write("window.APPEARANCES = " + json.dumps(dados) + ";\n")
+
+    json.dump(dados, open(os.path.join(GAME, "data", "appearances.json"), "w"))
+    print("outfits", len(outfits), "mounts", len(mounts))
+
+
+if __name__ == "__main__":
+    main()

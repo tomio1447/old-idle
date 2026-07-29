@@ -190,18 +190,53 @@ function mountSpeedBonus(p) {
 
 /* ------------------------------------------------------- renderizacao */
 
-/* Compoe base + addons + cores num canvas. Devolve null enquanto carrega. */
+/* Ordem das direcoes dentro do spritesheet, igual a do client (o indice e a
+ * linha do sheet). O resto do jogo fala em "n"/"e"/"s"/"w". */
+const APP_DIR_ROW = { n: 0, e: 1, s: 2, w: 3 };
+
+function appDirRow(dir) {
+  const r = APP_DIR_ROW[dir];
+  return r === undefined ? 2 : r;      // sem direcao conhecida: sul
+}
+
+/* Compoe base + addons + cores num canvas. Devolve null enquanto carrega.
+ *
+ * Cada visual e um spritesheet de 4 linhas (direcoes) x 4 colunas (parado +
+ * 3 passos), com a celula sempre do mesmo tamanho (cw x ch vindos do
+ * appearancedata). Antes existia um PNG unico por outfit, so da direcao sul
+ * e recortado por camada — por isso o personagem nao virava e o addon saia
+ * deslocado do corpo. Aqui recortamos a celula (dir, frame) do sheet e todas
+ * as camadas usam exatamente a mesma celula, entao ficam alinhadas. */
 const AppearanceRenderer = {
   cache: {},
 
-  key(id, addons, colors) { return id + "|" + addons + "|" + colors.join(","); },
+  key(id, addons, colors, dir, frame) {
+    return id + "|" + addons + "|" + colors.join(",") + "|" + dir + "|" + frame;
+  },
+
+  /* Recorta uma celula do sheet ja colorida. */
+  celula(img, mask, meta, col, linha, colors) {
+    const cw = meta.cw, ch = meta.ch;
+    const cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    cx.drawImage(img, col * cw, linha * ch, cw, ch, 0, 0, cw, ch);
+    if (!mask || !mask.complete || !mask.naturalWidth) return cv;
+    const mc = document.createElement("canvas");
+    mc.width = cw; mc.height = ch;
+    const mx = mc.getContext("2d", { willReadFrequently: true });
+    mx.drawImage(mask, col * cw, linha * ch, cw, ch, 0, 0, cw, ch);
+    return tingir(cv, cx, mx, cw, ch, colors);
+  },
 
   /* Canvas da outfit do catalogo novo, com os addons ligados */
-  outfit(id, addons, colors) {
+  outfit(id, addons, colors, dir, frame) {
     const o = APP_OUTFIT[id];
-    if (!o) return null;
+    if (!o || !o.cw) return null;
     addons = Math.max(0, Math.min(3, addons | 0));
-    const k = this.key(id, addons, colors);
+    const linha = appDirRow(dir);
+    const col = Math.max(0, Math.min((o.cols || 4) - 1, frame | 0));
+    const k = this.key(id, addons, colors, linha, col);
     if (this.cache[k] !== undefined) return this.cache[k];
 
     const camadas = [""];
@@ -224,107 +259,104 @@ const AppearanceRenderer = {
     }
     if (!imgs.length) { this.cache[k] = null; return null; }
 
-    // o canvas tem o tamanho da maior camada: os overlays podem ser
-    // menores (so o chapeu, por exemplo) e sao alinhados pela base
-    let w = 0, h = 0;
-    for (const [b] of imgs) {
-      w = Math.max(w, b.naturalWidth);
-      h = Math.max(h, b.naturalHeight);
-    }
+    // a celula tem tamanho fixo: as camadas de addon foram exportadas com a
+    // mesma caixa do corpo, entao basta empilhar na origem (0,0)
     const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
+    cv.width = o.cw; cv.height = o.ch;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-
     for (const [base, mask] of imgs) {
-      const tmp = colorize(base, mask, colors);
-      if (tmp) cx.drawImage(tmp, 0, h - tmp.height);   // alinha pelo pe
+      const tmp = this.celula(base, mask, o, col, linha, colors);
+      if (tmp) cx.drawImage(tmp, 0, 0);
     }
     this.cache[k] = cv;
     return cv;
   },
 
   /* Canvas da montaria (sem cor de outfit: o bicho tem cor propria) */
-  mount(id) {
-    const k = "mount|" + id;
+  mount(id, dir, frame) {
+    const m = APP_MOUNT[id];
+    if (!m || !m.cw) return null;
+    const linha = appDirRow(dir);
+    const col = Math.max(0, Math.min((m.cols || 4) - 1, frame | 0));
+    const k = "mount|" + id + "|" + linha + "|" + col;
     if (this.cache[k] !== undefined) return this.cache[k];
     const base = Sprites.get(`assets/appearance/mount/${id}.base.png`);
     if (!base) { this.cache[k] = null; return null; }
     if (!base.complete) return null;
     if (!base.naturalWidth) { this.cache[k] = null; return null; }
     const cv = document.createElement("canvas");
-    cv.width = base.naturalWidth; cv.height = base.naturalHeight;
-    cv.getContext("2d").drawImage(base, 0, 0);
+    cv.width = m.cw; cv.height = m.ch;
+    cv.getContext("2d").drawImage(base, col * m.cw, linha * m.ch, m.cw, m.ch,
+                                  0, 0, m.cw, m.ch);
     this.cache[k] = cv;
     return cv;
   },
 
-  /* Sprite para o jogo: monta o personagem (com addons) sobre a montaria.
-   * Os PNGs do catalogo so tem a direcao sul, entao o mesmo desenho serve
-   * para todas as direcoes — e o preco de ter 252 visuais sem explodir o
-   * numero de arquivos. */
+  /* Sprite para o jogo: monta o personagem (com addons) sobre a montaria,
+   * na direcao e no frame de caminhada pedidos. */
   forPlayer(p, dir, frame) {
     const o = currentAppearance(p);
     if (!o) return null;
     const cores = (p.outfit && p.outfit.colors) ||
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
-    const corpo = this.outfit(o.id, (p.outfit && p.outfit.addons) || 0, cores);
+    const addons = (p.outfit && p.outfit.addons) || 0;
+    const corpo = this.outfit(o.id, addons, cores, dir, frame);
     if (!corpo) return null;
     const mnt = currentMount(p);
     if (!mnt) return corpo;
-    const bicho = this.mount(mnt.id);
+    const bicho = this.mount(mnt.id, dir, frame);
     if (!bicho) return corpo;
-    const k = "jogo|" + o.id + "|" + ((p.outfit && p.outfit.addons) || 0) +
-              "|" + cores.join(",") + "|" + mnt.id;
+    const linha = appDirRow(dir);
+    const col = Math.max(0, Math.min(3, frame | 0));
+    const k = "jogo|" + o.id + "|" + addons + "|" + cores.join(",") +
+              "|" + mnt.id + "|" + linha + "|" + col;
     if (this.cache[k] !== undefined) return this.cache[k];
+    this.cache[k] = this.montar(corpo, bicho, o, mnt);
+    return this.cache[k];
+  },
+
+  /* Junta personagem + montaria respeitando o deslocamento do DAT.
+   *
+   * No client o personagem montado e desenhado subindo dispX/dispY da
+   * outfit: e por isso que o cavaleiro senta na sela em vez de flutuar
+   * acima ou afundar no bicho. O codigo antigo usava um "+8" fixo, o que
+   * desalinhava toda montaria com altura diferente. */
+  montar(corpo, bicho, o, mnt) {
+    const subir = o.dy || 0;
     const w = Math.max(corpo.width, bicho.width);
-    const h = Math.max(corpo.height, bicho.height) + 8;
+    const h = Math.max(bicho.height, corpo.height + subir);
     const cv = document.createElement("canvas");
     cv.width = w; cv.height = h;
     const cx = cv.getContext("2d");
+    // o bicho encosta no chao; o personagem sobe o deslocamento da outfit
     cx.drawImage(bicho, (w - bicho.width) / 2, h - bicho.height);
-    cx.drawImage(corpo, (w - corpo.width) / 2, h - corpo.height - 8);
-    this.cache[k] = cv;
+    cx.drawImage(corpo, (w - corpo.width) / 2, h - corpo.height - subir);
     return cv;
   },
 
-  /* Prévia completa (montaria + personagem) para as telas de selecao */
-  preview(p) {
+  /* Prévia (montaria + personagem) para as telas de selecao */
+  preview(p, dir) {
     const o = currentAppearance(p);
     if (!o) return null;
     const cores = (p.outfit && p.outfit.colors) ||
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
-    const corpo = this.outfit(o.id, (p.outfit && p.outfit.addons) || 0, cores);
+    const corpo = this.outfit(o.id, (p.outfit && p.outfit.addons) || 0,
+                              cores, dir || "s", 0);
     if (!corpo) return null;
     const mnt = currentMount(p);
-    const bicho = mnt ? this.mount(mnt.id) : null;
+    const bicho = mnt ? this.mount(mnt.id, dir || "s", 0) : null;
     if (!bicho) return corpo;
-    const w = Math.max(corpo.width, bicho.width);
-    const h = Math.max(corpo.height, bicho.height) + 8;
-    const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
-    const cx = cv.getContext("2d");
-    // o bicho embaixo, o personagem por cima e um pouco acima
-    cx.drawImage(bicho, (w - bicho.width) / 2, h - bicho.height);
-    cx.drawImage(corpo, (w - corpo.width) / 2, h - corpo.height - 8);
-    return cv;
+    return this.montar(corpo, bicho, o, mnt);
   },
 };
 
-/* Aplica as cores da paleta usando a mascara. Extraido do OutfitRenderer
- * para poder colorir cada camada de addon separadamente. */
-function colorize(base, mask, colors) {
-  if (!base || !base.naturalWidth) return null;
-  const w = base.naturalWidth, h = base.naturalHeight;
-  const cv = document.createElement("canvas");
-  cv.width = w; cv.height = h;
-  const cx = cv.getContext("2d", { willReadFrequently: true });
-  cx.drawImage(base, 0, 0);
-  if (!mask || !mask.complete || !mask.naturalWidth) return cv;
-
-  const mc = document.createElement("canvas");
-  mc.width = w; mc.height = h;
-  const mx = mc.getContext("2d", { willReadFrequently: true });
-  mx.drawImage(mask, 0, 0);
+/* Multiplica os pixels do canvas pela cor da paleta indicada na mascara.
+ *
+ * A mascara marca as quatro regiões tingiveis com cores puras: amarelo =
+ * cabeca, vermelho = corpo, verde = pernas, azul = pes. Separado em funcao
+ * propria porque agora tingimos CELULAS do spritesheet (uma direcao/frame de
+ * cada vez), nao a imagem inteira. */
+function tingir(cv, cx, mx, w, h, colors) {
   const bd = cx.getImageData(0, 0, w, h);
   const md = mx.getImageData(0, 0, w, h);
   const cols = colors.map((i) => hexToRgb(paletteColor(i)));
@@ -344,6 +376,23 @@ function colorize(base, mask, colors) {
   }
   cx.putImageData(bd, 0, 0);
   return cv;
+}
+
+/* Aplica as cores da paleta usando a mascara, na imagem inteira. */
+function colorize(base, mask, colors) {
+  if (!base || !base.naturalWidth) return null;
+  const w = base.naturalWidth, h = base.naturalHeight;
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(base, 0, 0);
+  if (!mask || !mask.complete || !mask.naturalWidth) return cv;
+
+  const mc = document.createElement("canvas");
+  mc.width = w; mc.height = h;
+  const mx = mc.getContext("2d", { willReadFrequently: true });
+  mx.drawImage(mask, 0, 0);
+  return tingir(cv, cx, mx, w, h, colors);
 }
 
 /* Catalogo filtrado, para as telas de loja e customizacao */
