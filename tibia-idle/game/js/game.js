@@ -180,6 +180,9 @@ function normalizePlayer(p) {
   p.buffs = p.buffs || {};
   // Monk: harmonia acumulada e santuarios da quest "The Way of the Monk".
   // Saves feitos antes do sistema de Mantra nao tem esses campos.
+  // barra de combo: cria a estrutura e migra a config antiga do shooter
+  if (typeof ensureCombo === "function") ensureCombo(p);
+  if (typeof migrateComboFromShooter === "function") migrateComboFromShooter(p);
   p.harmony = Math.max(0, Math.min(5, p.harmony || 0));
   p.monkShrines = Math.max(0, Math.min(3, p.monkShrines || 0));
   if (!p.config.dummy) p.config.dummy = "exercise";

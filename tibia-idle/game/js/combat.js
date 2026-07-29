@@ -867,6 +867,21 @@ function playerAttack(c, p, target) {
  * marcar varias e o motor usa a de maior dano fora de cooldown). */
 function tryCastSpell(c, p, target, now) {
   if (!p.config.spellAttack) return false;
+
+  // Barra de COMBO: quando o jogador montou uma rotacao, ela manda em tudo.
+  // A ordem dos slots e a prioridade e cada slot pode exigir um numero
+  // minimo de alvos, entao a escolha ja considera o tamanho do pack.
+  if (typeof comboAtivo === "function" && comboAtivo(p)) {
+    const escolha = comboEscolhe(c, p, target, now);
+    if (!escolha) return false;
+    // o slot escolhido pode ser uma RUNA: nesse caso o disparo sai por
+    // tryUseRune, que sabe cobrar carga e desenhar o projetil da runa
+    if (escolha.kind === "rune") {
+      return tryUseRune(c, p, target, now, escolha.id);
+    }
+    return castSpellById(c, p, target, now, escolha.id);
+  }
+
   const escolhidas = p.config.attackSpells;   // lista marcada no Helper
   const usaLista = Array.isArray(escolhidas) && escolhidas.length > 0;
 
@@ -903,7 +918,18 @@ function tryCastSpell(c, p, target, now) {
     avail.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
     selected = avail[0];
   }
-  const [id, s] = selected;
+  const [id] = selected;
+  return castSpellById(c, p, target, now, id);
+}
+
+/* Lanca UMA magia especifica, ja escolhida.
+ *
+ * Separado de tryCastSpell porque agora existem dois caminhos de escolha: a
+ * barra de combo (ordem do jogador) e a selecao automatica antiga. O que
+ * acontece DEPOIS de escolher e identico, entao mora aqui. */
+function castSpellById(c, p, target, now, id) {
+  const s = SPELLS[id];
+  if (!s) return false;
 
   // agora que a magia esta escolhida, o alcance dela e que manda.
   // MONKSPELLS traz o spell:range() do .lua (Mystic Repulse alcanca 7).
@@ -1019,15 +1045,28 @@ function tryCastSpell(c, p, target, now) {
 }
 
 /* Usa runa de ataque se configurado */
-function tryUseRune(c, p, target, now) {
-  if (!p.config.useRunes) return false;
+function tryUseRune(c, p, target, now, forcada) {
+  // `forcada` vem da barra de combo: o slot ja decidiu qual runa usar, entao
+  // pula a escolha automatica abaixo.
+  if (!forcada && typeof comboAtivo === "function" && comboAtivo(p)) {
+    // com combo montado quem dispara runa e o tryCastSpell, para respeitar a
+    // ordem dos slots. Sem esta guarda a runa saia duas vezes por tick.
+    return false;
+  }
+  if (!p.config.useRunes && !forcada) return false;
   if (c.runeCd > now) return false;
   if (c.player && c.player.cx !== undefined && target.cx !== undefined
       && typeof sqmDistance === "function") {
     if (sqmDistance(c.player, target) > 6) return false;   // runa: 6 SQM
   } else if (c.player && pointDistance(c.player, target) > runeRange()) return false;
   let best = null;
-  if (p.config.shooterType === "rune" && p.config.shooterRune) {
+  if (forcada) {
+    const sf = SUPPLIES[forcada];
+    if (!sf || sf.type !== "attack") return false;
+    if (!Object.prototype.hasOwnProperty.call(p.supplies, forcada)) p.supplies[forcada] = 0;
+    if (!canRechargeSupply(p, forcada)) return false;
+    best = forcada;
+  } else if (p.config.shooterType === "rune" && p.config.shooterRune) {
     const s = SUPPLIES[p.config.shooterRune];
     if (s && s.type === "attack") {
       if (!Object.prototype.hasOwnProperty.call(p.supplies, p.config.shooterRune))

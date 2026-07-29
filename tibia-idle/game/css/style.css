@@ -856,3 +856,42 @@ div.item-sprite { background-repeat: no-repeat; }
 .cond.monk-mantra { border-color: #7ec8ff; color: #7ec8ff; }
 .cond.monk-atk { border-color: #ff8a3c; color: #ff8a3c; }
 .cond.monk-serene { border-color: #9ce84a; color: #9ce84a; }
+
+/* ------------------------------------------------------- barra de COMBO
+ * Seis caixas em linha; a ordem e a prioridade da rotacao. */
+.combo-bar {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+}
+.combo-slot {
+  position: relative; cursor: pointer; text-align: center;
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 6px 4px 5px; min-height: 96px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.combo-slot:hover { background: #26221a; border-color: var(--gold, #d4af37); }
+.combo-slot.vazio { border-style: dashed; opacity: .7; justify-content: center; }
+.combo-num {
+  position: absolute; top: 2px; left: 3px; font-size: 9px;
+  color: #8a8270;
+}
+.combo-x {
+  position: absolute; top: 1px; right: 1px; font-size: 9px; line-height: 1;
+  padding: 1px 3px; background: transparent; color: #8a8270;
+  border: none; cursor: pointer;
+}
+.combo-x:hover { color: #c86a4a; }
+.combo-add { font-size: 20px; color: #4a463e; line-height: 1; }
+.combo-art { height: 34px; display: flex; align-items: center; }
+.combo-art img { width: 32px; height: 32px; image-rendering: pixelated; }
+.combo-nome {
+  line-height: 1.1; max-height: 2.2em; overflow: hidden;
+  word-break: break-word;
+}
+.combo-alvos { margin-top: auto; }
+.combo-min {
+  background: #0f0d0a; color: #ffe680; border: 1px solid #3a3428;
+  font-size: 10px; padding: 1px 2px; font-family: inherit; cursor: pointer;
+}
+@media (max-width: 1100px) {
+  .combo-bar { grid-template-columns: repeat(3, 1fr); }
+}

@@ -106,7 +106,12 @@ function newPlayer(name, voc, sex) {
       autoConjure: null,
       attackMode: "chase",  // chase | stand | kiting
       kiteDistance: 3,       // SQMs de distância no modo kiting (1-5)
-      shooterType: "auto",  // auto | spell | rune
+      // Barra de combo: a rotacao de ataque. Cada slot e
+      // {kind:"spell"|"rune", id, min} e a ORDEM e a prioridade.
+      combo: [],
+      comboMigrado: 1,      // char novo ja nasce sem config de shooter
+      // legado: mantidos so para saves antigos migrarem (ver combo.js)
+      shooterType: "auto",
       shooterSpell: "",
       shooterRune: "",
       autoEquip: true,

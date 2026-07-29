@@ -866,7 +866,7 @@ function renderBuffPicker(p) {
 function renderHelper(p) {
   const healEl = $("#helper-heal");
   const atkEl = $("#helper-attack");
-  const shooterEl = $("#helper-shooter");
+  const comboEl = $("#helper-combo");
   if (healEl) {
     const heals = Object.keys(SPELLS).filter((id) => {
       const s = SPELLS[id];
@@ -1022,85 +1022,7 @@ function renderHelper(p) {
       kd.value = p.config.kiteDistance;
     });
   }
-  if (shooterEl) {
-    const attackSpells = Object.keys(SPELLS).filter((id) => {
-      const s = SPELLS[id];
-      return s.type === "attack" && s.vocs.indexOf(p.voc) !== -1;
-    }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
-    // as 20 runas de ataque do canary, ordenadas por nivel; cada uma exige
-    // nivel E magic level, como no servidor
-    const attackRunes = typeof suppliesOf === "function"
-      ? suppliesOf(p, "attack").map((x) => x[0])
-      : Object.keys(SUPPLIES).filter((k) => SUPPLIES[k].type === "attack");
-    shooterEl.innerHTML = `
-      <div class="row wrap mb8" style="gap:6px">
-        ${[["auto", "Auto"], ["spell", "Magia"], ["rune", "Runa"]].map(([id, label]) =>
-          `<button class="sm ${p.config.shooterType === id ? "primary" : ""}" data-shooter-type="${id}">${label}</button>`).join("")}
-      </div>
-      <div class="small dim mb4">Magias ofensivas</div>
-      <div class="list" style="max-height:130px">${attackSpells.map((id) => {
-        const s = SPELLS[id];
-        const ok = typeof spellUnlocked === "function"
-          ? spellUnlocked(p, s) : p.level >= s.lvl;
-        const faixa = ok && typeof spellRangeText === "function"
-          ? spellRangeText(p, s) : "";
-        const el = s.element && typeof ELEMENTS !== "undefined" && ELEMENTS[s.element]
-          ? ELEMENTS[s.element] : null;
-        return `<div class="shop-row" style="opacity:${ok ? 1 : .45}">
-          ${spellIcon(s)}
-          <div style="flex:1;min-width:0">
-            <div class="small">${s.name}
-              ${faixa ? `<span style="color:${el ? el.color : "#ff9a4a"}">· ${faixa}</span>` : ""}</div>
-            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl}${s.area ? " · área" : ""}</div>
-          </div>
-          <button class="sm ${p.config.shooterSpell === id && p.config.shooterType === "spell" ? "primary" : ""}" data-shooter-spell="${id}" ${ok ? "" : "disabled"}>Usar</button>
-        </div>`;
-      }).join("") || `<div class="dim tiny">Nenhuma magia ofensiva.</div>`}</div>
-      <div class="small dim mt8 mb4">Runas ofensivas (${attackRunes.length})</div>
-      <div class="list" style="max-height:220px">${attackRunes.map((slug) => {
-        const s = SUPPLIES[slug];
-        const ok = typeof supplyAllowed === "function"
-          ? supplyAllowed(p, slug) : p.level >= (s.lvl || 1);
-        const motivo = !ok && typeof supplyBlockReason === "function"
-          ? supplyBlockReason(p, slug) : "";
-        // dano calculado com a formula real da runa neste personagem
-        const pw = typeof supplyPowerFor === "function"
-          ? supplyPowerFor(p, slug) : supplyPower(s, p.level);
-        const el = s.element && typeof ELEMENTS !== "undefined"
-          ? ELEMENTS[s.element] : null;
-        const usando = p.config.shooterRune === slug &&
-                       p.config.shooterType === "rune";
-        return `<div class="shop-row ${usando ? "selected" : ""}"
-                     style="opacity:${ok ? 1 : .45}">
-          <img src="assets/item/${s.sprite}.png">
-          <div style="flex:1;min-width:0">
-            <div class="small">${s.name}
-              ${pw[1] ? `<span style="color:${el ? el.color : "#ff9a4a"}">· ${pw[0]}-${pw[1]}</span>` : ""}</div>
-            <div class="tiny dim">
-              <span class="charge-highlight">CARGAS ${p.supplies[slug] || 0}</span>
-              · ${fmtFull(supplyPrice(s, p.level))} gp
-              · nv ${s.lvl || 1}${s.ml ? " · ml " + s.ml : ""}
-              ${s.area ? " · área" : ""}
-            </div>
-            ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
-          </div>
-          <button class="sm ${usando ? "primary" : ""}" data-shooter-rune="${slug}"
-            ${ok ? "" : "disabled"}>${usando ? "USANDO" : "USAR"}</button>
-        </div>`;
-      }).join("")}</div>`;
-    $$("#helper-shooter [data-shooter-type]").forEach((b) => b.addEventListener("click", () => {
-      p.config.shooterType = b.dataset.shooterType;
-      renderHelper(p);
-    }));
-    $$("#helper-shooter [data-shooter-spell]").forEach((b) => b.addEventListener("click", () => {
-      p.config.shooterType = "spell"; p.config.shooterSpell = b.dataset.shooterSpell; renderHelper(p);
-    }));
-    $$("#helper-shooter [data-shooter-rune]").forEach((b) => b.addEventListener("click", () => {
-      p.config.shooterType = "rune"; p.config.shooterRune = b.dataset.shooterRune;
-      if (!Object.prototype.hasOwnProperty.call(p.supplies, p.config.shooterRune)) p.supplies[p.config.shooterRune] = 0;
-      renderHelper(p);
-    }));
-  }
+  if (comboEl) renderComboBar(p, comboEl);
   renderRefill(p);
 }
 
@@ -1795,4 +1717,291 @@ function desenhaAmmoPicker() {
       p.equip.shield = { item: slug, count: 1 };
       save(); renderAll(); desenhaAmmoPicker();
     }));
+}
+
+/* ============================================================ barra de COMBO
+ *
+ * Seis caixas em sequencia. Clicar numa caixa abre o modal de escolha; o
+ * seletor "N+" que aparece nas de area define o minimo de alvos para o slot
+ * disparar. A ordem das caixas e a prioridade da rotacao.
+ */
+const COMBO_MODAL = { slot: 0, cat: "todas", busca: "" };
+
+const COMBO_CATS = [
+  { id: "todas", nome: "Todas" },
+  { id: "ataque", nome: "Ataque" },
+  { id: "area", nome: "Área" },
+  { id: "runas", nome: "Runas" },
+];
+
+function renderComboBar(p, el) {
+  const combo = ensureCombo(p);
+  const usados = combo.filter((x) => x).length;
+
+  el.innerHTML = `
+    <div class="row mb8" style="gap:6px;align-items:center">
+      <div class="small">Rotação de combate</div>
+      <span class="tiny dim">${usados}/${COMBO_SLOTS} slots · a ordem é a prioridade</span>
+      <span class="spacer" style="flex:1"></span>
+      ${usados ? `<button class="sm" id="combo-limpar-tudo">Limpar tudo</button>` : ""}
+    </div>
+    <div class="combo-bar">
+      ${combo.map((entrada, i) => desenhaComboSlot(p, entrada, i)).join("")}
+    </div>
+    <div class="tiny dim mt8">
+      O motor percorre os slots de cima para baixo e usa o primeiro que
+      estiver pronto. Slots de área só disparam com o número de alvos pedido.
+    </div>`;
+
+  $$("#helper-combo [data-combo-slot]").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      if (ev.target.closest("[data-combo-min]") ||
+          ev.target.closest("[data-combo-clear]")) return;
+      openComboPicker(parseInt(b.dataset.comboSlot, 10));
+    }));
+  $$("#helper-combo [data-combo-min]").forEach((sel) =>
+    sel.addEventListener("change", () => {
+      const i = parseInt(sel.dataset.comboMin, 10);
+      if (combo[i]) combo[i].min = parseInt(sel.value, 10) || 1;
+      save();
+      renderComboBar(p, el);
+    }));
+  $$("#helper-combo [data-combo-clear]").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      combo[parseInt(b.dataset.comboClear, 10)] = null;
+      save();
+      renderComboBar(p, el);
+    }));
+  const lt = $("#combo-limpar-tudo");
+  if (lt) lt.addEventListener("click", () => {
+    for (let i = 0; i < combo.length; i++) combo[i] = null;
+    save();
+    renderComboBar(p, el);
+  });
+}
+
+function desenhaComboSlot(p, entrada, i) {
+  const num = `<span class="combo-num">${i + 1}</span>`;
+  if (!entrada) {
+    return `<div class="combo-slot vazio" data-combo-slot="${i}">
+      ${num}
+      <div class="combo-add">+</div>
+      <div class="tiny dim">vazio</div>
+    </div>`;
+  }
+  const info = comboInfo(entrada);
+  if (!info) {
+    return `<div class="combo-slot vazio" data-combo-slot="${i}">
+      ${num}<div class="tiny dim">indisponível</div></div>`;
+  }
+  const arte = info.img
+    ? `<img src="${info.img}" alt="">`
+    : (typeof spellIcon === "function" && info.icon != null
+       ? spellIcon({ icon: info.icon, name: info.nome }) : "");
+
+  // o seletor de alvos so faz sentido em area/chain
+  const seletor = info.area
+    ? `<select class="combo-min" data-combo-min="${i}" title="Alvos mínimos">
+         ${[1, 2, 3, 4, 5, 6].map((n) =>
+           `<option value="${n}" ${entrada.min === n ? "selected" : ""}>${
+             n === 1 ? "1" : n + "+"}</option>`).join("")}
+       </select>`
+    : `<span class="tiny dim">alvo único</span>`;
+
+  return `<div class="combo-slot" data-combo-slot="${i}">
+    ${num}
+    <button class="combo-x" data-combo-clear="${i}" title="Remover">✕</button>
+    <div class="combo-art">${arte}</div>
+    <div class="combo-nome small">${info.nome}</div>
+    <div class="tiny dim">${info.tipo}${info.lvl ? " · nv " + info.lvl : ""}</div>
+    <div class="combo-alvos">${seletor}</div>
+  </div>`;
+}
+
+/* ------------------------------------------------- modal de escolha */
+
+function openComboPicker(slot) {
+  const p = G.p;
+  if (!p) return;
+  COMBO_MODAL.slot = slot;
+  COMBO_MODAL.busca = "";
+  COMBO_MODAL.cat = "todas";
+  desenhaComboPicker();
+  $("#modal").classList.add("show");
+}
+
+/* Junta magias de ataque e runas numa lista so, ja filtrada pela vocacao */
+function comboOpcoes(p) {
+  const out = [];
+  for (const id in SPELLS) {
+    const s = SPELLS[id];
+    if (s.type !== "attack") continue;
+    if (s.vocs.indexOf(p.voc) === -1) continue;
+    out.push({ kind: "spell", id: id, s: s, lvl: s.lvl || 1,
+               area: !!s.area });
+  }
+  const runas = typeof suppliesOf === "function"
+    ? suppliesOf(p, "attack").map((x) => x[0])
+    : Object.keys(SUPPLIES).filter((k) => SUPPLIES[k].type === "attack");
+  for (const slug of runas) {
+    const s = SUPPLIES[slug];
+    if (!s) continue;
+    out.push({ kind: "rune", id: slug, s: s, lvl: s.lvl || 1,
+               area: !!(s.area && s.area.raio) });
+  }
+  out.sort((a, b) => a.lvl - b.lvl);
+  return out;
+}
+
+function desenhaComboPicker() {
+  const p = G.p;
+  const slot = COMBO_MODAL.slot;
+  const combo = ensureCombo(p);
+  const atual = combo[slot];
+  const busca = (COMBO_MODAL.busca || "").toLowerCase();
+  const soLiberadas = !!COMBO_MODAL.soLiberadas;
+
+  let itens = comboOpcoes(p);
+  if (COMBO_MODAL.cat === "ataque") itens = itens.filter((o) => o.kind === "spell" && !o.area);
+  else if (COMBO_MODAL.cat === "area") itens = itens.filter((o) => o.area);
+  else if (COMBO_MODAL.cat === "runas") itens = itens.filter((o) => o.kind === "rune");
+  if (busca) {
+    itens = itens.filter((o) => {
+      const nome = (o.kind === "rune" ? o.s.name : o.s.name).toLowerCase();
+      const pal = (o.s.words || "").toLowerCase();
+      return nome.indexOf(busca) !== -1 || pal.indexOf(busca) !== -1;
+    });
+  }
+  const liberado = (o) => o.kind === "rune"
+    ? (typeof supplyAllowed === "function" ? supplyAllowed(p, o.id) : p.level >= o.lvl)
+    : (typeof spellUnlocked === "function" ? spellUnlocked(p, o.s) : p.level >= o.lvl);
+  if (soLiberadas) itens = itens.filter(liberado);
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">⚔ Rotação — slot ${slot + 1} (ordem = prioridade)
+      <span style="flex:1"></span>
+      <button class="sm" id="combo-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="row wrap mb8" style="gap:4px">
+        ${COMBO_CATS.map((c) => `<button class="sm ${
+          COMBO_MODAL.cat === c.id ? "primary" : ""}"
+          data-combo-cat="${c.id}">${c.nome}</button>`).join("")}
+      </div>
+      <div class="row mb8" style="gap:6px;align-items:center">
+        <input id="combo-busca" placeholder="Buscar por nome ou palavra (ex.: exura, fireball)…"
+          value="${COMBO_MODAL.busca || ""}"
+          style="flex:1;padding:6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <label class="tiny dim" style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="combo-so-liberadas" ${soLiberadas ? "checked" : ""}>
+          Só liberadas</label>
+      </div>
+      <div class="list" style="max-height:46vh">
+        ${itens.map((o) => linhaComboPicker(p, o, atual, liberado(o))).join("")
+          || `<div class="dim tiny" style="padding:10px">Nada com esse filtro.</div>`}
+      </div>
+      <div class="row mt8" style="gap:6px;align-items:center">
+        <span class="tiny dim">Limpar este slot</span>
+        <span style="flex:1"></span>
+        <button class="sm" id="combo-slot-limpar">Limpar</button>
+        <button class="sm primary" id="combo-fechar">Fechar</button>
+      </div>
+    </div>`;
+
+  const fechar = () => $("#modal").classList.remove("show");
+  $("#combo-close").addEventListener("click", fechar);
+  $("#combo-fechar").addEventListener("click", fechar);
+  $("#combo-slot-limpar").addEventListener("click", () => {
+    combo[slot] = null;
+    save();
+    desenhaComboPicker();
+    renderHelper(p);
+  });
+  const inp = $("#combo-busca");
+  inp.addEventListener("input", () => {
+    COMBO_MODAL.busca = inp.value;
+    desenhaComboPicker();
+    const n = $("#combo-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $("#combo-so-liberadas").addEventListener("change", (e) => {
+    COMBO_MODAL.soLiberadas = e.target.checked;
+    desenhaComboPicker();
+  });
+  $$("#modal-body [data-combo-cat]").forEach((b) =>
+    b.addEventListener("click", () => {
+      COMBO_MODAL.cat = b.dataset.comboCat;
+      desenhaComboPicker();
+    }));
+  $$("#modal-body [data-combo-pick]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const kind = b.dataset.comboKind;
+      const id = b.dataset.comboPick;
+      const antigo = combo[slot];
+      // mantem o minimo que o jogador ja tinha ajustado, se for a mesma entrada
+      const min = (antigo && antigo.id === id) ? antigo.min : 1;
+      combo[slot] = { kind: kind, id: id, min: min };
+      // runa escolhida precisa existir no mapa de supplies para poder recarregar
+      if (kind === "rune" &&
+          !Object.prototype.hasOwnProperty.call(p.supplies, id)) p.supplies[id] = 0;
+      save();
+      desenhaComboPicker();
+      renderHelper(p);
+    }));
+  $$("#modal-body [data-combo-minsel]").forEach((sel) =>
+    sel.addEventListener("change", () => {
+      if (combo[slot]) combo[slot].min = parseInt(sel.value, 10) || 1;
+      save();
+      renderHelper(p);
+    }));
+}
+
+function linhaComboPicker(p, o, atual, ok) {
+  const usando = atual && atual.kind === o.kind && atual.id === o.id;
+  const s = o.s;
+  const el = s.element && typeof ELEMENTS !== "undefined" && ELEMENTS[s.element]
+    ? ELEMENTS[s.element] : null;
+
+  let arte, detalhe;
+  if (o.kind === "rune") {
+    const pw = typeof supplyPowerFor === "function"
+      ? supplyPowerFor(p, o.id) : [0, 0];
+    arte = `<img src="assets/item/${s.sprite}.png" alt="">`;
+    detalhe = `lvl ${o.lvl}${s.ml ? " · ml " + s.ml : ""} · ${
+      fmtFull(supplyPrice(s, p.level))}g/uso · cd ${
+      Math.round((s.cd || 2000) / 1000)}s · Runa${o.area ? " · Área" : ""}`;
+    if (pw[1]) detalhe = `<span style="color:${el ? el.color : "#ff9a4a"}">${
+      pw[0]}-${pw[1]}</span> · ` + detalhe;
+  } else {
+    arte = typeof spellIcon === "function" ? spellIcon(s) : "";
+    const faixa = ok && typeof spellRangeText === "function"
+      ? spellRangeText(p, s) : "";
+    detalhe = `lvl ${o.lvl} · ${s.mana} mana · cd ${
+      Math.round((s.cd || 2000) / 1000)}s${o.area ? " · Área" : ""}`;
+    if (faixa) detalhe = `<span style="color:${el ? el.color : "#ff9a4a"}">${
+      faixa}</span> · ` + detalhe;
+  }
+
+  // o seletor de alvos aparece na propria linha quando a entrada esta em uso
+  const seletor = (usando && o.area)
+    ? `<select class="combo-min" data-combo-minsel="1">
+         ${[1, 2, 3, 4, 5, 6].map((n) =>
+           `<option value="${n}" ${atual.min === n ? "selected" : ""}>${
+             n === 1 ? "1" : n + "+"}</option>`).join("")}
+       </select>` : "";
+
+  return `<div class="shop-row ${usando ? "selected" : ""}"
+               style="opacity:${ok ? 1 : .45}">
+    ${arte}
+    <div style="flex:1;min-width:0">
+      <div class="small">${s.name}</div>
+      ${s.words ? `<div class="tiny dim"><b>${s.words}</b></div>` : ""}
+      <div class="tiny dim">${detalhe}</div>
+    </div>
+    ${seletor}
+    <button class="sm ${usando ? "primary" : ""}" data-combo-pick="${o.id}"
+      data-combo-kind="${o.kind}" ${ok ? "" : "disabled"}>${
+      usando ? "Em uso" : "Usar"}</button>
+  </div>`;
 }
