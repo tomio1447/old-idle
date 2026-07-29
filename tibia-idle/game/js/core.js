@@ -239,6 +239,19 @@ const SPELLS = {};
     // power e uma nota relativa usada so para ordenar/escolher a "melhor"
     // magia no auto-cast; deriva do custo de mana quando nao ha formula
     s.power = powerFromFormula(d);
+    // Efeito visual proprio da magia (SPELLFX, de import_spell_effects.py).
+    // Antes a animacao saia so do ELEMENTO, entao toda magia de fogo mostrava
+    // a mesma labareda: exevo gran mas flam (FIREAREA, explosao larga) ficava
+    // igual a exori flam (HITBYFIRE, estouro pontual). O servidor declara o
+    // efeito magia a magia em COMBAT_PARAM_EFFECT, e e isso que usamos aqui.
+    if (typeof SPELLFX !== "undefined" && SPELLFX) {
+      const fxd = (d.words && SPELLFX.words[d.words.toLowerCase()]) ||
+                  (d.name && SPELLFX.names[d.name.toLowerCase()]) || null;
+      if (fxd) {
+        if (fxd.fx) s.fx = fxd.fx;
+        if (fxd.miss) s.missile = fxd.miss;
+      }
+    }
     SPELLS[id] = s;
   }
 })();

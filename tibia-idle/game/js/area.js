@@ -98,6 +98,53 @@ function areaCells(nome, origem, alvo, spellId) {
   return out;
 }
 
+/* Celulas cobertas por uma matriz de area CRUA, centrada no alvo.
+ *
+ * As municoes do Canary (burst arrow, diamond arrow) trazem a propria
+ * createCombatArea no script da arma, no formato "3 = casa do alvo, 1 = casa
+ * atingida". Diferente das magias, essa area nao gira com a direcao: a
+ * flecha cai no alvo e explode em volta dele. Por isso a matriz e lida
+ * direto, sem passar pelas rotacoes do AREADATA.
+ *
+ * Precisa ser uma matriz de verdade e nao um raio: a diamond arrow e um 5x5
+ * SEM os quatro cantos, o que nenhum raio circular representa.
+ */
+function matrixCells(matriz, alvo) {
+  if (!matriz || !matriz.length || !alvo || alvo.cx === undefined) return [];
+  // acha o centro (valor 3); se o script nao marcar, usa o meio da matriz
+  let cr = -1, cc = -1;
+  for (let r = 0; r < matriz.length; r++) {
+    for (let col = 0; col < matriz[r].length; col++) {
+      if (matriz[r][col] === 3) { cr = r; cc = col; }
+    }
+  }
+  if (cr < 0) {
+    cr = (matriz.length - 1) / 2;
+    cc = (matriz[0].length - 1) / 2;
+  }
+  const out = [];
+  for (let r = 0; r < matriz.length; r++) {
+    for (let col = 0; col < matriz[r].length; col++) {
+      if (!matriz[r][col]) continue;          // 0 = fora da area
+      const cx = alvo.cx + (col - cc);
+      const cy = alvo.cy + (r - cr);
+      if (typeof inBounds === "function" && !inBounds(cx, cy)) continue;
+      out.push({ cx: cx, cy: cy });
+    }
+  }
+  return out;
+}
+
+/* Monstros vivos dentro de uma matriz de municao. null = nao da para saber. */
+function matrixMobs(c, matriz, alvo) {
+  if (!c || !c.mobs || !alvo || alvo.cx === undefined) return null;
+  const cells = matrixCells(matriz, alvo);
+  if (!cells.length) return null;
+  const chaves = new Set(cells.map((q) => q.cx + ":" + q.cy));
+  return c.mobs.filter((m) => m.hp > 0 && m.cx !== undefined &&
+                              chaves.has(m.cx + ":" + m.cy));
+}
+
 /* Monstros vivos dentro da area. E a lista que leva dano. */
 function areaMobs(c, nome, origem, alvo, spellId) {
   // A matriz so vale se TODO mundo tem celula. Cenas antigas (treino, testes

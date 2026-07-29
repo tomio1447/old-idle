@@ -115,7 +115,6 @@ function newPlayer(name, voc, sex) {
       shooterSpell: "",
       shooterRune: "",
       autoHaste: true,      // lanca utani hur/gran hur sozinho na caçada
-      autoEquip: true,
       spellAttack: true,
       autoRetreat: true,    // recua em vez de morrer quando acabam os supplies
       barMode: "bars",      // bars | arcs
@@ -180,6 +179,10 @@ function gearStats(p) {
     g.club += it.club || 0;
     g.shield += it.shield || 0;
     g.fist += it.fist || 0;
+    // skilldist do items.xml. Estava faltando: todas as outras skills eram
+    // somadas aqui e a distancia so recebia bonus de imbuement, entao arco,
+    // besta e equipamento de paladino com skilldist nao davam nada.
+    g.dist += it.dist || 0;
   }
   // bonus de skill vindos dos imbuements (15.x)
   if (typeof imbTotals === "function") {

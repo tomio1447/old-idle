@@ -828,13 +828,33 @@ function playerAttack(c, p, target) {
       c.events.push({ t: "poisoned", x: target.x, y: target.y,
                       name: target.def.name });
     }
-    // burst arrow: explode em area 3x3 ao redor do alvo
-    if (ammo.area) {
-      const R = ammo.area;                     // raio em SQM (3x3 = raio 1)
+    // Municao com area: a matriz vem do script da arma no Canary (burst
+    // arrow = 3x3 cheio, diamond arrow = 5x5 SEM os cantos). Antes isso era
+    // um raio circular unico lido de `ammo.area`, que nao consegue desenhar
+    // a cruz da diamond — e a diamond arrow nem existia no catalogo, entao
+    // nunca explodia coisa nenhuma.
+    const matriz = ammo.areaMatrix;
+    let atingidos = null;
+    if (matriz && typeof matrixMobs === "function") {
+      atingidos = matrixMobs(c, matriz, target);
+    }
+    if (!atingidos && ammo.area) {
+      // fallback do formato antigo (raio em SQM), para municao sem matriz
+      const R = ammo.area;
+      atingidos = c.mobs.filter((m) => m.hp > 0 && sqmDist(m, target) <= R);
+    }
+    if (atingidos) {
       c.events.push({ t: "burst", x: target.x, y: target.y });
-      for (const m of c.mobs) {
+      // pinta o efeito em TODA celula da area, nao so onde ha monstro
+      if (matriz && typeof matrixCells === "function") {
+        const cells = matrixCells(matriz, target);
+        if (cells.length > 1) {
+          c.events.push({ t: "areafx", cells: cells, screen: true,
+                          fx: ammo.areaFx || "explosion-area", el: element });
+        }
+      }
+      for (const m of atingidos) {
         if (m === target || m.hp <= 0) continue;
-        if (sqmDist(m, target) > R) continue;
         const splash = Math.max(1, Math.floor(rollDamage() * 0.75));
         m.hp -= splash;
         c.stats.damage += splash;
@@ -994,8 +1014,14 @@ function castSpellById(c, p, target, now, id) {
   if (typeof monkSpellElement === "function") {
     elemento = monkSpellElement(p, s, elemento);
   }
+  // Efeito visual: o Monk manda primeiro (o Elemental Bond troca a cor do
+  // golpe), depois o efeito proprio da magia vindo do Canary (s.fx) e so
+  // entao o fallback por elemento. Sem o s.fx toda magia do mesmo elemento
+  // usava a mesma animacao.
   const fxMagia = (md && md.fx && typeof monkFx === "function")
-    ? monkFx(p, md.fx) : null;
+    ? monkFx(p, md.fx) : (s.fx || null);
+  // projetil declarado na magia (COMBAT_PARAM_DISTANCEEFFECT)
+  const missMagia = s.missile || ELEMENT_MISSILE[elemento] || "energy";
   // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
   // nao so onde havia monstro. Era esse o bug de "a magia so pinta o alvo".
   const areaTiles = nomeArea && typeof areaCells === "function"
@@ -1051,7 +1077,7 @@ function castSpellById(c, p, target, now, id) {
                     projectile: idx === 0 || !!(md && md.chain),
                     el: elemento, spell: s.name, fx: fxMagia,
                     chain: md && md.chain && idx > 0 ? 1 : 0,
-                    missile: ELEMENT_MISSILE[elemento] || "energy" });
+                    missile: missMagia });
   });
   if (areaTiles.length > 1) {
     c.events.push({ t: "areafx", cells: areaTiles, screen: true,
@@ -1663,11 +1689,19 @@ function combatTick(c, p, dt, now) {
   c.playerAtkCd -= dt;
   if (c.playerAtkCd <= 0 && c.mobs.length) {
     const target = c.mobs[0];
-    let acted = false;
     // prioridade: runa > spell > arma, respeitando alcance
-    acted = tryUseRune(c, p, target, now) ||
-             tryCastSpell(c, p, target, now) ||
-             !!playerAttack(c, p, target);
+    let acted = tryUseRune(c, p, target, now) ||
+                tryCastSpell(c, p, target, now);
+    if (!acted) {
+      // playerAttack devolve o dano causado, e 0 quando o golpe SAIU mas
+      // errou (rolagem de acerto da distancia, sem municao). Isso e um turno
+      // gasto: so `false` — alvo fora de alcance — significa que nao houve
+      // ataque. Com o `!!` que estava aqui o 0 virava false e o cooldown
+      // caia para 250ms, entao o arqueiro que errava reatirava quase 8x mais
+      // rapido que o intervalo da arma e nunca parava para curar.
+      const r = playerAttack(c, p, target);
+      acted = r !== false;
+    }
     c.playerAtkCd = acted ? attackInterval(c, p) : 250;
   }
 

@@ -138,7 +138,6 @@ function normalizePlayer(p) {
     shooterSpell: "",
     shooterRune: "",
     missionCollapsed: false,
-    autoEquip: true,
     spellAttack: true,
     autoRetreat: true,
     barMode: "bars",
@@ -1006,12 +1005,6 @@ function loop(ts) {
     G.sellTimer += dt;
     if (G.sellTimer > 15000) {
       G.sellTimer = 0;
-      if (G.p.config.autoEquip) {
-        const ch = autoEquip(G.p);
-        for (const c of ch)
-          addLog("info", `Equipou <b>${itemName(c.item)}</b>`);
-        if (ch.length) renderEquip(G.p);
-      }
       const spent = autoRestock(G.p);
       if (spent > 0) {
         addLog("sell", `Repôs supplies por <span class="gold-txt">${fmtFull(spent)} gp</span>`);
@@ -1238,12 +1231,6 @@ function bindControls() {
   });
   window.addEventListener("blur", () => { G.walker.keys = {}; });
   initPanelCollapse();
-  $("#btn-equip").addEventListener("click", () => {
-    const ch = autoEquip(p);
-    if (!ch.length) { toast("Já está com o melhor equipamento"); return; }
-    for (const c of ch) addLog("info", `Equipou <b>${itemName(c.item)}</b>`);
-    renderAll();
-  });
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-pouch-sell-all").addEventListener("click", () => {
     const r = sellAllPouch(p);
@@ -1265,9 +1252,6 @@ function bindControls() {
   });
   $("#cfg-runes").addEventListener("change", (e) => {
     p.config.useRunes = e.target.checked;
-  });
-  $("#cfg-equip").addEventListener("change", (e) => {
-    p.config.autoEquip = e.target.checked;
   });
   $("#cfg-spell").addEventListener("change", (e) => {
     p.config.spellAttack = e.target.checked;
@@ -1295,7 +1279,6 @@ function bindControls() {
   $("#heal-at").value = p.config.healAt;
   $("#heal-at-val").textContent = p.config.healAt + "%";
   $("#cfg-runes").checked = p.config.useRunes;
-  $("#cfg-equip").checked = p.config.autoEquip;
   $("#cfg-spell").checked = p.config.spellAttack;
   $("#bar-mode").value = p.config.barMode || "bars";
   $("#loot-filter").value = p.config.lootFilter;
@@ -1325,6 +1308,9 @@ function giveStarterKit(p) {
     addItem(p, "wooden-shield", 1);
   }
   p.gold = Math.max(0, p.gold || 0);
+  // Unico lugar que ainda equipa sozinho: o kit inicial. O auto-equip
+  // periodico foi removido (o jogador troca o que quiser na mao), mas nascer
+  // com a mochila cheia e nenhum item vestido nao ajuda ninguem.
   autoEquip(p);
   if (p.voc === "paladin") {
     // o quiver de Dawnport ocupa o slot proprio; sem ele o paladino nao

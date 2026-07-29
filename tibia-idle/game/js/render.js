@@ -118,6 +118,10 @@ const FX_FRAMES = {
   "stones": 8, "stun": 9, "teleport": 8, "watercreature": 16,
   "whirlwind-green": 8, "whirlwind-pink": 8, "whirlwind-white": 8,
   "white-energy-spark": 6, "yellow-energy": 10, "yellow-rings": 7,
+  // efeitos que algumas magias pedem e nao estavam no extrator antigo
+  // (extraidos por tools/extract_fx_faltantes.py)
+  "energy-hit": 10, "carniphila": 8, "holy-area": 11,
+  "whirlwind-blow-white": 8,
 };
 
 /* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */
@@ -876,17 +880,20 @@ Renderer.prototype.draw = function (combat, player, dt) {
   if (combat && !combat.dead) {
     const mobs = combat.mobs.slice().sort((a, b) => a.y - b.y);
     for (const m of mobs) {
-      // alterna os dois frames de passo enquanto o monstro esta vivo. Os
-      // sprites de animacao existem no DAT desde sempre, mas o extrator so
-      // gravava a pose parada — por isso a tela de caca parecia congelada.
-      const passo = 1 + (Math.floor(Date.now() / 260 + m.x * 17) % 2);
-      const anim = Sprites.mobWalk(m.slug, m.dir || "w", passo);
+      // O frame vem do passo em andamento (advanceStep mantem ent.frame em
+      // 0 parado e 1|2 durante o deslocamento). Antes era derivado de
+      // Date.now(), ou seja, o bicho "pedalava" no lugar mesmo sem andar.
+      const passo = m.moving ? (m.frame || 1) : 0;
+      const anim = passo ? Sprites.mobWalk(m.slug, m.dir || "w", passo) : null;
       // se o frame de passo nao existir (404 deixa naturalWidth em 0), cai
       // na pose parada em vez de sumir com o monstro da tela
       const img = (anim && anim.complete && anim.naturalWidth)
         ? anim : Sprites.mob(m.slug, m.dir || "w");
       const mx = m.x * W;
-      const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
+      // sem oscilacao senoidal: no Tibia a criatura parada fica imovel no
+      // SQM. O balanco daqui somava ao pedalar dos frames e dava a impressao
+      // de que o bicho nunca sossegava.
+      const my = m.y * H;
       if (img && img.complete && img.naturalWidth) {
         // mesma escala do jogador: o porte da criatura vem do tamanho da
         // arte no DAT (32px = 1 SQM, 64px = 2 SQMs), nao de um chute pelo HP

@@ -595,7 +595,6 @@ function bindNpc(id, type) {
       if (!r.ok) { toast(r.msg); return; }
       toast(`Comprou <b>${itemName(slug)}</b>`);
       addLog("sell", `Comprou <b>${itemName(slug)}</b> por ${fmtFull(b.dataset.price)} gp`);
-      if (p.config.autoEquip) autoEquip(p);
       hideTip();
       refreshNpc(id);
     }));
