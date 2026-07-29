@@ -6,6 +6,27 @@
 /* escala do sprite do jogador na cena de caca (monstro comum usa 2.0) */
 const PLAYER_SCALE = 1.8;
 
+/* ---------------------------------------------------- escala por SQM
+ *
+ * O canvas tem exatamente GRID_W (21) SQMs de largura, entao um tile vale
+ * W/21 pixels. As escalas eram numeros fixos (2.0, 2.2, 2.6 conforme o HP
+ * do monstro) sem nenhuma relacao com isso: em tela larga a criatura ficava
+ * menor que o tile, em tela estreita transbordava por cima dos vizinhos.
+ *
+ * spriteScale() devolve a escala que faz a sprite caber EXATAMENTE em N
+ * tiles, e nunca deixa passar disso. No Tibia uma criatura ocupa 1 SQM (as
+ * grandes, 2), e a arte de 32px e desenhada dentro dele.
+ */
+function tilePx(W) { return W / (typeof GRID_W !== "undefined" ? GRID_W : 21); }
+
+function spriteScale(W, img, tiles) {
+  if (!img || !img.naturalWidth) return 1;
+  const alvo = tilePx(W) * (tiles || 1);
+  const maior = Math.max(img.naturalWidth, img.naturalHeight);
+  // teto no tamanho do tile: a arte nunca invade o SQM do vizinho
+  return Math.max(0.5, alvo / maior);
+}
+
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
@@ -780,7 +801,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
                                         pl.moving ? (pl.frame || 1) : 0);
   const bob = pl.moving ? 0 : Math.sin(Date.now() / 340) * 2;
   if (spriteReady(pimg)) {
-    const sc = PLAYER_SCALE;
+    // o jogador tambem ocupa 1 SQM, igual as criaturas comuns
+    const sc = spriteScale(W, { naturalWidth: spriteW(pimg),
+                                naturalHeight: spriteH(pimg) }, 1);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = (pl.attackAnim || 0) > 0 ? (pl.dir === "w" ? -5 : pl.dir === "e" ? 5 : 0) : 0;
     // sombra
@@ -817,7 +840,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const mx = m.x * W;
       const my = m.y * H + Math.sin(Date.now() / 400 + m.x * 9) * 2;
       if (img && img.complete && img.naturalWidth) {
-        const sc = m.def.hp > 1500 ? 2.6 : m.def.hp > 500 ? 2.2 : 2.0;
+        // quantos SQMs a criatura ocupa: no Tibia so os bichos grandes
+        // passam de 1 tile. O HP e a aproximacao que temos do porte.
+        const tiles = m.def.hp > 1500 ? 1.6 : m.def.hp > 500 ? 1.3 : 1.0;
+        const sc = spriteScale(W, img, tiles);
         const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
         const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";

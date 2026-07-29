@@ -606,9 +606,20 @@ function itemScore(p, slug) {
   // robe de monge com 19 de mantra.
   if (it.mantra) s += voc === "monk" ? it.mantra * 14 : 0;
 
-  if (it.s === "quiver") {
-    s += 100 + (it.cap || 0) * 3 + (it.dist || 0) * 20;
-    if (!isDist) s -= 80;
+  // Aljava: o teste era `it.s === "quiver"`, que NUNCA e verdade -- desde
+  // que a aljava passou a ocupar a mao secundaria ela tem s:"shield" e
+  // t:"quiver". Com isso o bonus nunca entrava, itemScore devolvia 0 e
+  // qualquer escudo caido no loot (brass shield = 96) tomava o slot do
+  // paladino no meio da caçada. Era essa a causa do "quiver desequipa
+  // sozinho".
+  if (it.t === "quiver") {
+    if (isDist) {
+      // para o paladino a aljava e o que alimenta o arco: tem que vencer
+      // qualquer escudo, senao ele para de atirar
+      s += 400 + (it.cap || 0) * 3 + (it.dist || 0) * 20;
+    } else {
+      s -= 80;          // as outras vocacoes nao tem uso para ela
+    }
   }
 
   if (it.s === "weapon") {
@@ -668,11 +679,24 @@ function autoEquip(p) {
       changes.push({ slot: slot, item: best });
     }
   }
-  // arma de duas maos remove o escudo
+  // Arma de duas maos remove o ESCUDO -- mas nao a aljava.
+  //
+  // Causa raiz do "quiver desequipa sozinho": no Tibia a aljava ocupa a mao
+  // secundaria (o mesmo slot do escudo), e TODA arma de distancia e marcada
+  // como two-handed no items.xml (bow, crossbow, royal crossbow...). A regra
+  // generica de "th remove shield" apagava a propria aljava do paladino a
+  // cada auto-equip, deixando o personagem sem municao.
+  //
+  // No servidor as duas convivem: o que a arma de duas maos impede e um
+  // ESCUDO/spellbook, nao a aljava que alimenta a arma.
   const w = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   if (w && w.th && p.equip.shield) {
-    addItem(p, p.equip.shield.item, 1);
-    delete p.equip.shield;
+    const sec = GAMEDATA.items[p.equip.shield.item];
+    const ehQuiver = sec && sec.t === "quiver";
+    if (!ehQuiver) {
+      addItem(p, p.equip.shield.item, 1);
+      delete p.equip.shield;
+    }
   }
   // Municao para paladin. A municao nao e mais estocada: cada tiro cobra
   // gold, entao nao existe "melhor municao disponivel no contador". O

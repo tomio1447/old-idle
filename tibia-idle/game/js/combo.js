@@ -175,7 +175,10 @@ function comboEscolhe(c, p, alvo, now) {
       let n = null;
       if (typeof areaNameOf === "function" && typeof areaCount === "function") {
         const nome = areaNameOf(entrada.kind, entrada.id);
-        if (nome && c && c.player) n = areaCount(c, nome, c.player, alvo);
+        if (nome && c && c.player) {
+          n = areaCount(c, nome, c.player, alvo,
+                        entrada.kind === "spell" ? entrada.id : null);
+        }
       }
       if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
       if (n < entrada.min) continue;

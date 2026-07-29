@@ -938,7 +938,13 @@ function castSpellById(c, p, target, now, id) {
     const md0 = (typeof MONKSPELLS !== "undefined") ? MONKSPELLS[id] : null;
     const alc = (md0 && md0.range) ? Math.min(7, md0.range)
               : (s.range && s.range > 1 ? Math.min(7, s.range) : 5);
-    if (sqmDistance(c.player, target) > alc) return false;
+    // Magia selfTarget explode em volta de QUEM LANCA, entao a distancia
+    // ate o alvo nao a impede: o Divine Caldera de um paladino cercado sai
+    // mesmo com o alvo apontado longe. Exigir alcance aqui simplesmente
+    // engolia a magia (retornava false sem gastar mana nem avisar).
+    const ehSelf = (typeof SPELLTARGET !== "undefined" && SPELLTARGET[id])
+      ? !!SPELLTARGET[id].self : false;
+    if (!ehSelf && sqmDistance(c.player, target) > alc) return false;
   }
 
   p.mp -= s.mana;
@@ -962,11 +968,21 @@ function castSpellById(c, p, target, now, id) {
   // matriz existe ela manda: o raio circular so vale de fallback.
   const nomeArea = typeof areaNameOf === "function" ? areaNameOf("spell", id) : null;
   const porMatriz = nomeArea && typeof areaMobs === "function"
-    ? areaMobs(c, nomeArea, c.player, target) : null;
+    ? areaMobs(c, nomeArea, c.player, target, id) : null;
   if (porMatriz) {
-    // o alvo apontado entra sempre, mesmo que a matriz nao o cubra por
-    // arredondamento de direcao
-    targets = porMatriz.indexOf(target) === -1 ? [target].concat(porMatriz) : porMatriz;
+    // Numa magia selfTarget quem manda e a MATRIZ, nada mais: o Divine
+    // Caldera explode em volta do conjurador e nao tem por que acertar um
+    // alvo apontado a 10 SQM. Forcar o alvo aqui (como se fazia para
+    // corrigir arredondamento de direcao) fazia a magia bater em quem
+    // estava visivelmente fora do circulo.
+    const soMatriz = (typeof SPELLTARGET !== "undefined" && SPELLTARGET[id])
+      ? !!SPELLTARGET[id].self : false;
+    if (soMatriz) {
+      targets = porMatriz;
+    } else {
+      targets = porMatriz.indexOf(target) === -1
+        ? [target].concat(porMatriz) : porMatriz;
+    }
   } else if (usaMonk) {
     targets = monkSpellTargets(p, id, c, target);
   } else {
@@ -983,7 +999,7 @@ function castSpellById(c, p, target, now, id) {
   // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
   // nao so onde havia monstro. Era esse o bug de "a magia so pinta o alvo".
   const areaTiles = nomeArea && typeof areaCells === "function"
-    ? areaCells(nomeArea, c.player, target) : [];
+    ? areaCells(nomeArea, c.player, target, id) : [];
 
   // Ciclo builder/spender do Monk. O spender precisa LER a harmonia antes de
   // gastar, senao o bonus sairia sempre 1x: gastaHarmony() zera o contador e

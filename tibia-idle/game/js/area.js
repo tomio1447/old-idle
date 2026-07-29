@@ -31,11 +31,24 @@ const AREADATA_MAP = (typeof window !== "undefined" && window.AREADATA)
  * Detectado pelo desenho: se nenhuma casa fica "atras" do centro no eixo
  * vertical da matriz original, o efeito so se projeta para frente -- e um
  * cone/onda/feixe saindo de quem lanca. */
-function areaSaiDoConjurador(nome) {
+function areaSaiDoConjurador(nome, spellId) {
+  // 1) A FONTE DE VERDADE e o spell:isSelfTarget() do .lua. Divine Caldera
+  //    (exevo mas san) e Hell's Core usam AREA_CIRCLE3X3/5X5 -- circulos
+  //    simetricos que a heuristica abaixo classificaria como "no alvo",
+  //    quando na verdade explodem em volta de QUEM LANCA.
+  if (spellId && typeof SPELLTARGET !== "undefined") {
+    const st = SPELLTARGET[spellId];
+    if (st) {
+      if (st.self) return true;
+      // magia que exige alvo selecionado nasce NO alvo
+      if (st.needTarget) return false;
+    }
+  }
   const a = AREADATA_MAP[nome];
   if (!a) return false;
   if (AREA_ANCORA_ALVO[nome]) return false;
-  // conta casas atras do centro (dy > 0 na matriz apontada para o norte)
+  // 2) fallback pelo desenho: se nenhuma casa fica atras do centro, o
+  //    efeito so se projeta para frente e portanto sai do conjurador
   let atras = 0;
   for (const [, dy] of a.n) if (dy > 0) atras++;
   return atras === 0;
@@ -65,12 +78,12 @@ function areaDir(origem, alvo) {
  * comportamento antigo (raio). Assim uma matriz nova no Canary nao quebra
  * o jogo -- ela so nao ganha o formato exato ate ser importada.
  */
-function areaCells(nome, origem, alvo) {
+function areaCells(nome, origem, alvo, spellId) {
   const a = AREADATA_MAP[nome];
   if (!a || !origem || !alvo) return [];
   const dir = areaDir(origem, alvo);
   const offs = a[dir] || a.n;
-  const base = areaSaiDoConjurador(nome) ? origem : alvo;
+  const base = areaSaiDoConjurador(nome, spellId) ? origem : alvo;
   const out = [];
   const vistos = new Set();
   for (const [dx, dy] of offs) {
@@ -86,7 +99,7 @@ function areaCells(nome, origem, alvo) {
 }
 
 /* Monstros vivos dentro da area. E a lista que leva dano. */
-function areaMobs(c, nome, origem, alvo) {
+function areaMobs(c, nome, origem, alvo, spellId) {
   // A matriz so vale se TODO mundo tem celula. Cenas antigas (treino, testes
   // que montam mob na mao) usam so x/y de tela; nesses casos devolver uma
   // lista vazia faria o combate achar que a area nao pegou ninguem, em vez
@@ -97,7 +110,7 @@ function areaMobs(c, nome, origem, alvo) {
   const semCelula = c.mobs.some((m) => m.hp > 0 && m.cx === undefined);
   if (semCelula) return null;
 
-  const cells = areaCells(nome, origem, alvo);
+  const cells = areaCells(nome, origem, alvo, spellId);
   if (!cells.length) return null;             // area desconhecida
   const chaves = new Set(cells.map((q) => q.cx + ":" + q.cy));
   const out = [];
@@ -109,8 +122,8 @@ function areaMobs(c, nome, origem, alvo) {
 }
 
 /* Quantos monstros a area pegaria — usado pelo requisito "N+" do combo. */
-function areaCount(c, nome, origem, alvo) {
-  const l = areaMobs(c, nome, origem, alvo);
+function areaCount(c, nome, origem, alvo, spellId) {
+  const l = areaMobs(c, nome, origem, alvo, spellId);
   return l === null ? null : Math.max(1, l.length);
 }
 
