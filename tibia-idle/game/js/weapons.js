@@ -43,7 +43,7 @@ const WD_CAMPOS_CANARY = [
   "sword", "axe", "club", "dist", "shield", "fist", "mag",
   "lifeLeech", "manaLeech", "cls", "aug", "cat", "id",
   "af", "aw", "ah", "npcBuy", "npcSell", "range", "hit", "charges",
-  "mantra",
+  "mantra", "bond",
 ];
 
 /* Um item so entra na loja se o Canary conhece um NPC que o vende.

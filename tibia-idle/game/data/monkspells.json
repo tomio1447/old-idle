@@ -1,0 +1,433 @@
+{
+ "exana-pox": {
+  "cd": 6000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 10,
+  "mana": 30,
+  "nome": "Cure Poison",
+  "words": "exana pox"
+ },
+ "exani-hur": {
+  "cd": 2000,
+  "gcd": 2000,
+  "lvl": 12,
+  "mana": 50,
+  "nome": "Levitate",
+  "words": "exani hur"
+ },
+ "exani-tera": {
+  "cd": 2000,
+  "gcd": 2000,
+  "lvl": 9,
+  "mana": 20,
+  "nome": "Magic Rope",
+  "words": "exani tera"
+ },
+ "exiva": {
+  "cd": 2000,
+  "gcd": 2000,
+  "lvl": 8,
+  "mana": 20,
+  "nome": "Find Person",
+  "words": "exiva"
+ },
+ "exiva-moe-res": {
+  "cd": 2000,
+  "gcd": 2000,
+  "lvl": 25,
+  "mana": 20,
+  "nome": "Find Fiend",
+  "words": "exiva moe res"
+ },
+ "exori-amp-pug": {
+  "cd": 20000,
+  "element": "physical",
+  "fx": "blow-white",
+  "fxRaw": "CONST_ME_BLOW_WHITE",
+  "gcd": 2000,
+  "lvl": 30,
+  "mana": 150,
+  "monk": "builder",
+  "nome": "Mystic Repulse",
+  "pow": 72.0,
+  "range": 7,
+  "words": "exori amp pug"
+ },
+ "exori-gran-mas-nia": {
+  "cd": 24000,
+  "chain": {
+   "alvos": 6,
+   "dist": 2
+  },
+  "chainFx": "blow-white",
+  "element": "physical",
+  "gcd": 2000,
+  "lvl": 0,
+  "mana": 425,
+  "monk": "spender",
+  "nome": "Spiritual Outburst",
+  "pow": 42.0,
+  "words": "exori gran mas nia"
+ },
+ "exori-gran-mas-pug": {
+  "area": {
+   "raio": 3,
+   "sqm": 14
+  },
+  "areaNome": "AREA_GREATER_FLURRY_OF_BLOWS",
+  "cd": 16000,
+  "element": "physical",
+  "fx": "whirlwind-white",
+  "fxRaw": "CONST_ME_WHIRLWIND_BLOW_WHITE",
+  "gcd": 2000,
+  "lvl": 90,
+  "mana": 300,
+  "monk": "builder",
+  "nome": "Greater Flurry of Blows",
+  "pow": 100.0,
+  "words": "exori gran mas pug"
+ },
+ "exori-gran-nia": {
+  "cd": 24000,
+  "element": "physical",
+  "fx": "claw-white",
+  "fxRaw": "CONST_ME_CLAW_WHITE",
+  "gcd": 2000,
+  "lvl": 125,
+  "mana": 210,
+  "monk": "spender",
+  "nome": "Devastating Knockout",
+  "pow": 62.0,
+  "range": 1,
+  "words": "exori gran nia"
+ },
+ "exori-gran-pug": {
+  "cd": 60000,
+  "element": "physical",
+  "fx": "hit-area",
+  "fxRaw": "CONST_ME_HITAREA",
+  "gcd": 2000,
+  "lvl": 110,
+  "mana": 325,
+  "monk": "builder",
+  "nome": "Forceful Uppercut",
+  "pow": 130.0,
+  "range": 1,
+  "words": "exori gran pug"
+ },
+ "exori-infir-nia": {
+  "cd": 8000,
+  "element": "physical",
+  "fx": "claw-white",
+  "fxRaw": "CONST_ME_CLAW_WHITE",
+  "gcd": 2000,
+  "lvl": 0,
+  "mana": 3,
+  "monk": "spender",
+  "nome": "Tiger Clash",
+  "pow": 15.0,
+  "range": 1,
+  "words": "exori infir nia"
+ },
+ "exori-infir-pug": {
+  "cd": 2000,
+  "element": "physical",
+  "fx": "hit-area",
+  "fxRaw": "CONST_ME_HITAREA",
+  "gcd": 2000,
+  "lvl": 0,
+  "mana": 3,
+  "monk": "builder",
+  "nome": "Swift Jab",
+  "pow": 12.0,
+  "range": 1,
+  "words": "exori infir pug"
+ },
+ "exori-mas-nia": {
+  "area": {
+   "raio": 2,
+   "sqm": 12
+  },
+  "areaNome": "AREA_SWEEPING_CENTER",
+  "cd": 8000,
+  "element": "physical",
+  "fx": "blow-white",
+  "fxRaw": "CONST_ME_BLOW_WHITE",
+  "gcd": 2000,
+  "lvl": 60,
+  "mana": 210,
+  "monk": "spender",
+  "nome": "Sweeping Takedown",
+  "pow": 48.0,
+  "powBorda": 0.75,
+  "range": 1,
+  "words": "exori mas nia"
+ },
+ "exori-mas-pug": {
+  "area": {
+   "raio": 2,
+   "sqm": 9
+  },
+  "areaNome": "AREA_FLURRY_OF_BLOWS",
+  "cd": 4000,
+  "element": "physical",
+  "fx": "whirlwind-white",
+  "fxRaw": "CONST_ME_WHIRLWIND_BLOW_WHITE",
+  "gcd": 2000,
+  "lvl": 35,
+  "mana": 110,
+  "monk": "builder",
+  "nome": "Flurry of Blows",
+  "pow": 65.0,
+  "words": "exori mas pug"
+ },
+ "exori-mas-res": {
+  "area": {
+   "raio": 12,
+   "sqm": 51
+  },
+  "areaNome": "AREA_BALANCED_BRAWL",
+  "cd": 10000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 175,
+  "mana": 80,
+  "nome": "Balanced Brawl",
+  "words": "exori mas res"
+ },
+ "exori-med-pug": {
+  "cd": 4000,
+  "chain": {
+   "alvos": 3,
+   "dist": 3
+  },
+  "chainFx": "white-energy-spark",
+  "element": "physical",
+  "gcd": 2000,
+  "lvl": 70,
+  "mana": 180,
+  "monk": "builder",
+  "nome": "Chained Penance",
+  "pow": 74.0,
+  "words": "exori med pug"
+ },
+ "exori-nia": {
+  "cd": 8000,
+  "element": "physical",
+  "fx": "claw-white",
+  "fxRaw": "CONST_ME_CLAW_WHITE",
+  "gcd": 2000,
+  "lvl": 18,
+  "mana": 50,
+  "monk": "spender",
+  "nome": "Greater Tiger Clash",
+  "pow": 44.0,
+  "range": 1,
+  "words": "exori nia"
+ },
+ "exori-pug": {
+  "cd": 4000,
+  "element": "physical",
+  "fx": "hit-area",
+  "fxRaw": "CONST_ME_HITAREA",
+  "gcd": 2000,
+  "lvl": 14,
+  "mana": 30,
+  "monk": "builder",
+  "nome": "Double Jab",
+  "pow": 50.0,
+  "range": 1,
+  "words": "exori pug"
+ },
+ "exura": {
+  "cd": 1000,
+  "element": "healing",
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 8,
+  "mana": 20,
+  "nome": "Light Healing",
+  "words": "exura"
+ },
+ "exura-gran": {
+  "cd": 1000,
+  "element": "healing",
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 20,
+  "mana": 70,
+  "nome": "Intense Healing",
+  "words": "exura gran"
+ },
+ "exura-gran-tio": {
+  "cd": 1000,
+  "element": "healing",
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 80,
+  "mana": 210,
+  "nome": "Spirit Mend",
+  "words": "exura gran tio"
+ },
+ "exura-infir": {
+  "cd": 1000,
+  "element": "healing",
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 1,
+  "mana": 6,
+  "nome": "Magic Patch",
+  "words": "exura infir"
+ },
+ "exura-mas-nia": {
+  "cd": 8000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 1000,
+  "lvl": 150,
+  "mana": 250,
+  "monk": "spender",
+  "nome": "Mass Spirit Mend",
+  "words": "exura mas nia"
+ },
+ "exura-tio-sio": {
+  "cd": 2000,
+  "element": "healing",
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 1000,
+  "lvl": 18,
+  "mana": 120,
+  "nome": "Restore Balance",
+  "range": 7,
+  "words": "exura tio sio"
+ },
+ "utamo-tio": {
+  "cd": 600,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 150,
+  "mana": 500,
+  "nome": "Focus Serenity",
+  "words": "utamo tio"
+ },
+ "utani-gran-hur": {
+  "cd": 2000,
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 2000,
+  "lvl": 20,
+  "mana": 100,
+  "nome": "Strong Haste",
+  "words": "utani gran hur"
+ },
+ "utani-hur": {
+  "cd": 2000,
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 2000,
+  "lvl": 14,
+  "mana": 60,
+  "nome": "Haste",
+  "words": "utani hur"
+ },
+ "uteta-res-tio": {
+  "cd": 120,
+  "gcd": 2000,
+  "lvl": 300,
+  "mana": 1200,
+  "nome": "Avatar of Balance",
+  "words": "uteta res tio"
+ },
+ "uteta-tio": {
+  "cd": 50000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 150,
+  "mana": 110,
+  "nome": "Mentor Other",
+  "range": 7,
+  "words": "uteta tio"
+ },
+ "utevo-gran-lux": {
+  "cd": 2000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 13,
+  "mana": 60,
+  "nome": "Great Light",
+  "words": "utevo gran lux"
+ },
+ "utevo-lux": {
+  "cd": 2000,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 8,
+  "mana": 20,
+  "nome": "Light",
+  "words": "utevo lux"
+ },
+ "utevo-nia": {
+  "cd": 120,
+  "fx": "magic-blue",
+  "fxRaw": "CONST_ME_MAGIC_BLUE",
+  "gcd": 2000,
+  "lvl": 275,
+  "mana": 500,
+  "nome": "Focus Harmony",
+  "words": "utevo nia"
+ },
+ "utito-virtu": {
+  "cd": 10000,
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 2000,
+  "lvl": 20,
+  "mana": 210,
+  "nome": "Virtue of Justice",
+  "words": "utito virtu"
+ },
+ "utori-kor": {
+  "cd": 30000,
+  "element": "physical",
+  "fx": "draw-blood",
+  "fxRaw": "CONST_ME_DRAWBLOOD",
+  "gcd": 2000,
+  "lvl": 40,
+  "mana": 30,
+  "nome": "Inflict Wound",
+  "range": 1,
+  "words": "utori kor"
+ },
+ "utori-virtu": {
+  "cd": 10000,
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 2000,
+  "lvl": 20,
+  "mana": 210,
+  "nome": "Virtue of Harmony",
+  "words": "utori virtu"
+ },
+ "utura-tio": {
+  "cd": 10000,
+  "fx": "magic-green",
+  "fxRaw": "CONST_ME_MAGIC_GREEN",
+  "gcd": 2000,
+  "lvl": 20,
+  "mana": 210,
+  "nome": "Virtue of Sustain",
+  "words": "utura tio"
+ }
+}

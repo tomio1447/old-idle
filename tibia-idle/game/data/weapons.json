@@ -1776,6 +1776,7 @@
     }
    ],
    "aw": 32,
+   "bond": "physical",
    "cat": "fist",
    "cls": 4,
    "def": 20,
@@ -2410,6 +2411,7 @@
   },
   "bambus-jo": {
    "atk": 42,
+   "bond": "earth",
    "cat": "fist",
    "cls": 4,
    "def": 19,
@@ -3949,6 +3951,7 @@
   },
   "cobra-bo": {
    "atk": 44,
+   "bond": "earth",
    "cat": "fist",
    "cls": 4,
    "def": 20,
@@ -4700,6 +4703,7 @@
   },
   "crude-umbral-katar": {
    "atk": 41,
+   "bond": "physical",
    "cat": "fist",
    "cls": 2,
    "def": 16,
@@ -5588,6 +5592,7 @@
      "v": 14
     }
    ],
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 18,
@@ -5809,6 +5814,7 @@
   },
   "drachaku": {
    "atk": 33,
+   "bond": "energy",
    "cat": "fist",
    "cls": 2,
    "def": 15,
@@ -6115,6 +6121,7 @@
   },
   "draining-inferniarch-claws": {
    "atk": 45,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -7341,6 +7348,7 @@
    "ah": 32,
    "atk": 44,
    "aw": 32,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 20,
@@ -9022,6 +9030,7 @@
   },
   "falcon-sai": {
    "atk": 45,
+   "bond": "physical",
    "cat": "fist",
    "cls": 4,
    "def": 20,
@@ -9988,6 +9997,7 @@
      "v": 8
     }
    ],
+   "bond": "energy",
    "cat": "fist",
    "cls": 1,
    "def": 14,
@@ -10593,6 +10603,7 @@
    "ah": 32,
    "atk": 44,
    "aw": 32,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 20,
@@ -11609,6 +11620,7 @@
     }
    ],
    "aw": 32,
+   "bond": "earth",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -13487,6 +13499,7 @@
   },
   "inferniarch-claws": {
    "atk": 45,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -13862,6 +13875,7 @@
      "v": 10
     }
    ],
+   "bond": "energy",
    "cat": "fist",
    "cls": 1,
    "def": 12,
@@ -14626,6 +14640,7 @@
   },
   "lion-claws": {
    "atk": 45,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 19,
@@ -16268,6 +16283,7 @@
   },
   "naga-katar": {
    "atk": 44,
+   "bond": "earth",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -16926,6 +16942,7 @@
   },
   "nunchaku": {
    "atk": 32,
+   "bond": "earth",
    "cat": "fist",
    "cls": 1,
    "def": 15,
@@ -16950,6 +16967,7 @@
    "ah": 20,
    "atk": 42,
    "aw": 32,
+   "bond": "physical",
    "cat": "fist",
    "cls": 2,
    "def": 17,
@@ -16977,6 +16995,7 @@
      "v": 12
     }
    ],
+   "bond": "physical",
    "cat": "fist",
    "cls": 1,
    "def": 15,
@@ -17721,6 +17740,7 @@
   },
   "pair-of-iron-fists": {
    "atk": 23,
+   "bond": "physical",
    "cat": "fist",
    "cls": 2,
    "def": 14,
@@ -17740,6 +17760,7 @@
   },
   "pair-of-monk-fists": {
    "atk": 22,
+   "bond": "physical",
    "cat": "fist",
    "cls": 1,
    "def": 14,
@@ -18970,6 +18991,7 @@
   },
   "rending-inferniarch-claws": {
    "atk": 45,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -19804,6 +19826,7 @@
      "v": 16
     }
    ],
+   "bond": "earth",
    "cat": "fist",
    "cls": 1,
    "def": 16,
@@ -19825,6 +19848,7 @@
   },
   "sais": {
    "atk": 38,
+   "bond": "energy",
    "cat": "fist",
    "cls": 1,
    "def": 16,
@@ -20057,6 +20081,7 @@
     }
    ],
    "aw": 32,
+   "bond": "earth",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -21092,6 +21117,7 @@
   },
   "simple-jo-staff": {
    "atk": 10,
+   "bond": "energy",
    "cat": "fist",
    "cls": 1,
    "def": 6,
@@ -21209,6 +21235,7 @@
   },
   "siphoning-inferniarch-claws": {
    "atk": 45,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -21878,6 +21905,7 @@
    "ah": 29,
    "atk": 46,
    "aw": 31,
+   "bond": "energy",
    "cat": "fist",
    "cls": 4,
    "def": 21,
@@ -24027,6 +24055,7 @@
   },
   "traditional-sai": {
    "atk": 28,
+   "bond": "physical",
    "cat": "fist",
    "cls": 2,
    "def": 15,
@@ -24064,6 +24093,7 @@
      "v": 4
     }
    ],
+   "bond": "energy",
    "cat": "fist",
    "def": 18,
    "drop": 1,
@@ -24369,6 +24399,7 @@
   },
   "umbral-katar": {
    "atk": 42,
+   "bond": "physical",
    "cat": "fist",
    "cls": 3,
    "def": 17,
@@ -24509,6 +24540,7 @@
   },
   "umbral-master-katar": {
    "atk": 43,
+   "bond": "physical",
    "cat": "fist",
    "cls": 4,
    "def": 18,

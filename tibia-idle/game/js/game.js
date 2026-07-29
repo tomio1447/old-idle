@@ -816,6 +816,11 @@ function drainEvents() {
         r.addEffect(ex(e), ey(e), e.fx || "explosion-area");
         r.shake = Math.max(r.shake || 0, 5);
         break;
+      case "chain":
+        // faisca do salto em cadeia (CONST_ME_WHITE_ENERGY_SPARK do Canary)
+        r.addEffect(ex(e), ey(e), e.fx || "white-energy-spark");
+        addLog("info", `Corrente atingiu <b>${e.n}</b> alvos.`);
+        break;
       case "say":
         // o personagem fala a magia/supply, como no client do Tibia
         r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");

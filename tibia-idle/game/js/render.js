@@ -10,7 +10,7 @@ const PLAYER_SCALE = 1.8;
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "7";
+const ASSET_VERSION = "8";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -65,17 +65,22 @@ const Sprites = {
 };
 
 const FX_FRAMES = {
-  "big-clouds": 14, "block-hit": 3, "bubbles": 15, "draw-blood": 4,
-  "energy-area": 8, "energy-damage": 10, "explosion-area": 6,
-  "explosion-hit": 6, "fire-area": 8, "fire-attack": 8, "green-rings": 7,
-  "groundshaker": 7, "hearts": 8, "hit-area": 8, "hit-by-fire": 5,
-  "hit-by-poison": 4, "holy-damage": 5, "ice-area": 9, "ice-attack": 8,
-  "ice-tornado": 9, "lose-energy": 4, "magic-blue": 5, "magic-green": 5,
-  "magic-red": 5, "mort-area": 8, "poff": 4, "poison-area": 4,
-  "purple-energy": 10, "sleep": 8, "small-clouds": 6, "small-plants": 11,
-  "sound-blue": 10, "sound-green": 10, "sound-purple": 10, "sound-red": 10,
-  "sound-white": 10, "sound-yellow": 10, "stones": 8, "stun": 9,
-  "teleport": 8, "watercreature": 16, "yellow-energy": 10, "yellow-rings": 7,
+  "big-clouds": 14, "block-hit": 3, "blow-blue": 11, "blow-green": 11,
+  "blow-pink": 11, "blow-white": 10, "bubbles": 15, "claw-green": 8,
+  "claw-pink": 8, "claw-white": 8, "draw-blood": 4, "energy-area": 8,
+  "energy-damage": 10, "explosion-area": 6, "explosion-hit": 6,
+  "fire-area": 8, "fire-attack": 8, "green-rings": 7, "groundshaker": 7,
+  "hearts": 8, "hit-area": 8, "hit-by-fire": 5, "hit-by-poison": 4,
+  "holy-damage": 5, "ice-area": 9, "ice-attack": 8, "ice-tornado": 9,
+  "lose-energy": 4, "magic-blue": 5, "magic-green": 5, "magic-red": 5,
+  "mort-area": 8, "outburst-green": 15, "outburst-pink": 15,
+  "outburst-white": 15, "poff": 4, "poison-area": 4, "pulse-green": 11,
+  "pulse-pink": 11, "pulse-white": 11, "purple-energy": 10, "sleep": 8,
+  "small-clouds": 6, "small-plants": 11, "sound-blue": 10, "sound-green": 10,
+  "sound-purple": 10, "sound-red": 10, "sound-white": 10, "sound-yellow": 10,
+  "stones": 8, "stun": 9, "teleport": 8, "watercreature": 16,
+  "whirlwind-green": 8, "whirlwind-pink": 8, "whirlwind-white": 8,
+  "white-energy-spark": 6, "yellow-energy": 10, "yellow-rings": 7,
 };
 
 /* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */

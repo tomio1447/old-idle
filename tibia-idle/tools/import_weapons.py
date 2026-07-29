@@ -357,6 +357,13 @@ def converte(cru, extra, frames, cfg):
              d.get("mpreg", 0) * 120 + d.get("spd", 0) * 10)
     d["sell"] = max(2, int(poder * 1.6))
 
+    # Elemental Bond: o elemento que a arma de punho impoe as MAGIAS do Monk.
+    # E texto (energy/earth/physical), nao numero, entao fica fora do laco de
+    # atributos numericos acima.
+    bond = (cru.get("elementalbond") or "").strip().lower()
+    if bond in ("energy", "earth", "physical"):
+        d["bond"] = bond
+
     n = frames.get(cru["id"])
     if n:
         d["af"] = n           # a sprite tem animacao: N frames na tira

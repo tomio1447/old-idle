@@ -941,6 +941,9 @@ function detalheItem(p, slug) {
     ${linha("Elemento", !it.elDmg && el
       ? `<span style="color:${el.color}">${el.name}</span>` : "")}
     ${linha("Resistências", res)}
+    ${linha("Elemental Bond", it.bond && ELEMENTS[it.bond]
+      ? `<span style="color:${ELEMENTS[it.bond].color}">${ELEMENTS[it.bond].name}</span>
+         <span class="tiny dim">(elemento das magias)</span>` : "")}
     ${linha("Mantra", it.mantra
       ? `<span style="color:#7ec8ff">${it.mantra}</span>
          <span class="tiny dim">(abate dano elemental)</span>` : "")}

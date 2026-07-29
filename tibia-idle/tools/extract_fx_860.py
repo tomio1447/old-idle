@@ -102,6 +102,16 @@ EFFECTS = {
     "small-clouds": 39, "holy-damage": 40, "big-clouds": 41,
     "ice-area": 42, "ice-tornado": 43, "ice-attack": 44, "stones": 45,
     "small-plants": 46, "purple-energy": 48, "yellow-energy": 49,
+    # ---- efeitos do Monk (15.10). Os ids vem do enum CONST_ME_* do Canary
+    # (src/utils/utils_definitions.hpp). Cada golpe tem variantes de cor que
+    # o elemental bond da arma seleciona: branco = physical, verde = earth,
+    # azul = ice, rosa = fire.
+    "white-energy-spark": 180,
+    "whirlwind-white": 276, "whirlwind-green": 277, "whirlwind-pink": 278,
+    "pulse-white": 279, "pulse-green": 280, "pulse-pink": 281,
+    "claw-white": 282, "claw-green": 283, "claw-pink": 284,
+    "blow-white": 285, "blow-green": 286, "blow-blue": 287, "blow-pink": 288,
+    "outburst-white": 289, "outburst-green": 290, "outburst-pink": 291,
 }
 
 

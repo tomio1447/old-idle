@@ -863,9 +863,31 @@ function tryCastSpell(c, p, target, now) {
   cdStart(p, id, s, now);
   c.spellCd[id] = now + s.cd;   // mantido: testes antigos leem esse mapa
 
-  const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
-  const targets = nAlvos > 1 ? c.mobs.slice(0, nAlvos) : [target];
-  const elemento = s.element || "energy";
+  // Alvos e elemento.
+  //
+  // Monk tem regras proprias em tres pontos e por isso desvia daqui:
+  //   * a lista de alvos sai de monkSpellTargets(), que sabe fazer CHAIN
+  //     (saltar para o vizinho mais proximo) alem de area;
+  //   * o elemento vem do Elemental Bond da arma, que SUBSTITUI o tipo de
+  //     dano declarado no script;
+  //   * o efeito visual muda de cor conforme esse bond.
+  const md = (typeof MONKSPELLS !== "undefined") ? MONKSPELLS[id] : null;
+  const usaMonk = md && typeof monkSpellTargets === "function";
+
+  let targets;
+  if (usaMonk) {
+    targets = monkSpellTargets(p, id, c, target);
+  } else {
+    const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
+    targets = nAlvos > 1 ? c.mobs.slice(0, nAlvos) : [target];
+  }
+
+  let elemento = s.element || "energy";
+  if (typeof monkSpellElement === "function") {
+    elemento = monkSpellElement(p, s, elemento);
+  }
+  const fxMagia = (md && md.fx && typeof monkFx === "function")
+    ? monkFx(p, md.fx) : null;
 
   // Ciclo builder/spender do Monk. O spender precisa LER a harmonia antes de
   // gastar, senao o bonus sairia sempre 1x: gastaHarmony() zera o contador e
@@ -880,8 +902,21 @@ function tryCastSpell(c, p, target, now) {
     }
   }
 
-  for (const t of targets) {
-    let dmg = rollSpell(p, s);
+  // faixa de dano do Monk: BASE_POWER * (fist/100) * (attack/10) + flat.
+  // Calculada uma vez fora do laco porque nao muda entre alvos.
+  const faixaMonk = (md && typeof monkSpellDamage === "function")
+    ? monkSpellDamage(p, id) : null;
+
+  targets.forEach((t, idx) => {
+    let dmg;
+    if (faixaMonk) {
+      dmg = faixaMonk.min +
+            Math.floor(Math.random() * (faixaMonk.max - faixaMonk.min + 1));
+      // sweeping takedown bate 75% fora do quadrado central
+      if (md.powBorda && idx > 0) dmg = Math.floor(dmg * md.powBorda);
+    } else {
+      dmg = rollSpell(p, s);
+    }
     if (monkMult !== 1) dmg = Math.floor(dmg * monkMult);
     // buff de vocacao (Virtude, Protector) tambem afeta magia
     if (typeof buffTotals === "function") {
@@ -898,9 +933,17 @@ function tryCastSpell(c, p, target, now) {
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
                     sx: c.player ? c.player.x : 0.18,
                     sy: c.player ? c.player.y : 0.62,
-                    screen: true, projectile: true,
-                    el: elemento, spell: s.name,
+                    screen: true,
+                    // no chain o projetil sai do alvo ANTERIOR, nao do
+                    // jogador: e o golpe saltando de inimigo em inimigo
+                    projectile: idx === 0 || !!(md && md.chain),
+                    el: elemento, spell: s.name, fx: fxMagia,
+                    chain: md && md.chain && idx > 0 ? 1 : 0,
                     missile: ELEMENT_MISSILE[elemento] || "energy" });
+  });
+  if (md && md.chain && targets.length > 1) {
+    c.events.push({ t: "chain", n: targets.length, x: target.x, y: target.y,
+                    screen: true, fx: md.chainFx || "white-energy-spark" });
   }
   // builder gera a harmonia DEPOIS do golpe, como o postCastSpell do servidor
   if (kind === "builder") {
@@ -910,7 +953,9 @@ function tryCastSpell(c, p, target, now) {
   }
 
   if (c.player) c.player.attackAnim = 220;
-  c.events.push({ t: "cast", name: s.name, area: nAlvos > 1,
+  // `nAlvos` era uma variavel do ramo antigo, que agora vive dentro do else.
+  // O que o evento precisa saber e apenas se o golpe pegou mais de um alvo.
+  c.events.push({ t: "cast", name: s.name, area: targets.length > 1,
                   x: target.x, y: target.y, screen: true });
   c.events.push({ t: "say", text: spellWords(id, s) });
   return true;

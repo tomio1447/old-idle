@@ -163,6 +163,10 @@ function renderStats(p) {
         ${st.atkBonus ? `<span class="cond monk-atk"
           title="Santuários da quest: o mantra soma ${st.atkBonus} ao golpe de punho">
           ✊ +${st.atkBonus}</span>` : ""}
+        ${st.bond && ELEMENTS[st.bond] ? `<span class="cond monk-bond"
+          style="border-color:${ELEMENTS[st.bond].color};color:${ELEMENTS[st.bond].color}"
+          title="Elemental Bond da arma: as magias do Monk causam dano de ${ELEMENTS[st.bond].name}">
+          ⚡ ${ELEMENTS[st.bond].name}</span>` : ""}
         ${st.sereno ? `<span class="cond monk-serene"
           title="Sereno: virtudes e bônus de punho valem em dobro">☯ Sereno</span>` : ""}`;
     }

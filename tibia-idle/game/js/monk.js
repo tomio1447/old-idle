@@ -224,6 +224,145 @@ function mantraAtaqueBonus(p, c) {
   return monkSereno(p, c) ? bonus : Math.floor(bonus / 2);
 }
 
+/* ------------------------------------------------------- elemental bond */
+
+/* Elemental Bond: o elemento que a ARMA de punho impoe as magias do Monk.
+ *
+ * No Canary (Combat::getCombatDamage) a regra e uma substituicao, nao um
+ * bonus: se o Monk tem arma com bond, o tipo de dano da magia PASSA A SER o
+ * do bond, seja qual for o COMBAT_PARAM_TYPE do script. E o jeito do Monk
+ * escolher contra que resistencia vai bater, trocando de arma.
+ *
+ * So vale para magia -- o parse do items.xml aceita apenas energy, earth e
+ * physical, e o auto-ataque continua fisico.
+ */
+function elementalBond(p) {
+  if (!isMonk(p)) return null;
+  const w = p.equip && p.equip.weapon;
+  if (!w) return null;
+  const it = GAMEDATA.items[w.item];
+  return (it && it.bond) || null;
+}
+
+/* Elemento final de uma magia do Monk, com o bond aplicado.
+ * Cura nunca e convertida (o servidor exclui COMBAT_HEALING). */
+function monkSpellElement(p, s, padrao) {
+  const base = padrao || (s && s.element) || "physical";
+  if (!isMonk(p)) return base;
+  if (s && s.type === "heal") return base;
+  return elementalBond(p) || base;
+}
+
+/* Variante colorida do efeito conforme o bond.
+ *
+ * monkEffectByElementalBond() do servidor desloca o id do efeito: branco e
+ * physical, +1 verde (earth), +2 rosa (fire). O blow tem uma variante a
+ * mais (azul para ice) e por isso a ordem dele e diferente. Aqui a mesma
+ * regra vale sobre o NOME do sprite, que ja foi extraido em todas as cores.
+ */
+const MONK_FX_CORES = {
+  "claw-white":      { earth: "claw-green", fire: "claw-pink" },
+  "whirlwind-white": { earth: "whirlwind-green", fire: "whirlwind-pink" },
+  "pulse-white":     { earth: "pulse-green", fire: "pulse-pink" },
+  "outburst-white":  { earth: "outburst-green", fire: "outburst-pink" },
+  "blow-white":      { earth: "blow-green", ice: "blow-blue", fire: "blow-pink" },
+};
+
+function monkFx(p, fx) {
+  if (!fx || !isMonk(p)) return fx;
+  const tabela = MONK_FX_CORES[fx];
+  if (!tabela) return fx;
+  const bond = elementalBond(p);
+  return (bond && tabela[bond]) || fx;
+}
+
+/* --------------------------------------------------- magias do Monk */
+
+const MONKSPELLS = (typeof window !== "undefined" && window.MONKSPELLDATA)
+  ? window.MONKSPELLDATA : {};
+
+/* Bonus plano por nivel: Player::calculateFlatDamageHealing().
+ *
+ * O fator comeca em 1/5 e cai a cada faixa (500, +600, +700...), o que
+ * segura o crescimento em nivel alto. Reproduzido igual porque ele entra
+ * somado em TODAS as formulas de magia do Monk.
+ */
+function flatDamageHealing(level) {
+  let agregado = 0;
+  let baseline = 0;
+  let fator = 1 / 5;
+  let limite = 500;
+  let passo = 600;
+  let tier = 1;
+  while (level >= limite) {
+    baseline = limite;
+    fator = 1 / (5 + tier);
+    agregado += limite * (1 / (5 + tier - 1));
+    tier++;
+    limite += passo;
+    passo += 100;
+  }
+  return Math.ceil(agregado + (level - baseline) * fator);
+}
+
+/* Faixa de dano de uma magia do Monk.
+ *
+ *   dano = BASE_POWER * (skill/100) * (attack/10) + flatDamageHealing
+ *   min  = dano - dano/10      max = dano + dano/10
+ *
+ * Repare que NAO entra magic level: as magias de ataque do Monk escalam com
+ * fist fighting e com o ataque da arma, diferente de druid e sorcerer.
+ */
+function monkSpellDamage(p, id) {
+  const md = MONKSPELLS[id];
+  if (!md || !md.pow) return null;
+  const skill = typeof effSkill === "function" ? effSkill(p, "fist") : 10;
+  const atk = typeof spellAttackValue === "function" ? spellAttackValue(p) : 7;
+  const base = md.pow * (skill / 100) * (atk / 10) + flatDamageHealing(p.level || 1);
+  return { min: Math.floor(base - base / 10), max: Math.floor(base + base / 10) };
+}
+
+/* Alvos que a magia atinge, respeitando area e chain.
+ *
+ * Chain nao e area: o golpe SALTA de um alvo para o mais proximo ainda nao
+ * atingido, ate acabar os saltos. E por isso que o Chained Penance pega 3
+ * inimigos espalhados que uma area de mesmo tamanho nao pegaria.
+ * Espelha o pickChainTargets() do servidor.
+ */
+function monkSpellTargets(p, id, c, alvo) {
+  const md = MONKSPELLS[id];
+  const saida = [alvo];
+  if (!md || !c || !c.mobs) return saida;
+
+  if (md.chain) {
+    const passo = 0.13 * md.chain.dist;   // mesma escala de SQM do combate
+    const vistos = new Set([alvo]);
+    let atual = alvo;
+    while (saida.length < md.chain.alvos) {
+      let perto = null, menor = Infinity;
+      for (const m of c.mobs) {
+        if (m.hp <= 0 || vistos.has(m)) continue;
+        const d = pointDistance(m, atual);
+        if (d <= passo && d < menor) { menor = d; perto = m; }
+      }
+      if (!perto) break;                  // sem vizinho no alcance: para
+      saida.push(perto);
+      vistos.add(perto);
+      atual = perto;                      // o proximo salto parte daqui
+    }
+    return saida;
+  }
+
+  if (md.area && md.area.raio > 0) {
+    const R = 0.13 * md.area.raio;
+    for (const m of c.mobs) {
+      if (m === alvo || m.hp <= 0) continue;
+      if (pointDistance(m, alvo) <= R) saida.push(m);
+    }
+  }
+  return saida;
+}
+
 /* Resumo para a interface mostrar tudo de uma vez */
 function monkStatus(p, c) {
   if (!isMonk(p)) return null;
@@ -237,6 +376,7 @@ function monkStatus(p, c) {
     sereno: monkSereno(p, c),
     shrines: Math.max(0, Math.min(3, p.monkShrines || 0)),
     atkBonus: mantraAtaqueBonus(p, c),
+    bond: elementalBond(p),
     virtude: (p.buffs && (p.buffs["utura-tio"] ? "utura-tio"
       : p.buffs["utito-virtu"] ? "utito-virtu"
       : p.buffs["utori-virtu"] ? "utori-virtu" : null)) || null,
