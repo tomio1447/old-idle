@@ -51,8 +51,11 @@ function newCombat(player, huntId, instanceMode) {
     regenMp: 0,
     buffs: {},
     player: {
-      x: 0.18, y: 0.62, dir: "e", moving: false,
-      frame: 0, walkT: 0, attackAnim: 0,
+      // celula inicial: canto esquerdo da arena. x/y sao derivados dela e
+      // servem so para o render -- a verdade e (cx, cy).
+      cx: 3, cy: 6,
+      x: (3 + 0.5) / 21, y: (6 + 0.5) / 13, dir: "e", moving: false,
+      frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
     },
     stats: {
       startedAt: Date.now(), kills: 0, exp: 0, gold: 0, damage: 0,
@@ -143,7 +146,23 @@ function spawnWave(c, p) {
       spawnAt: Date.now(),
     });
   }
-  resolveSQMOccupancy(c);
+  // Coloca cada monstro numa CELULA livre. Antes o spawn era em float
+  // aleatorio e o resolveSQMOccupancy empurrava depois quem colidisse -- o
+  // que deixava bichos empilhados no primeiro frame.
+  if (typeof placeFree === "function") {
+    if (c.player) ensureCell(c.player);
+    const occ = buildOccupancy(c, null);
+    for (const m of c.mobs) {
+      if (m.cx !== undefined) continue;
+      // nascem pela direita da arena, como na cena antiga
+      const cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
+      const cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+      placeFree(m, occ, Math.min(GRID_W - 1, cx), cy);
+      m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
+    }
+  } else {
+    resolveSQMOccupancy(c);
+  }
   c.wave++;
 }
 
@@ -157,6 +176,19 @@ function attackInterval(c, p) {
   if (bf && bf.haste && bf.haste > 0) base *= 0.8;
   base -= Math.min(400, g.speed * 4);
   return Math.max(800, base);
+}
+
+/* Distancia em SQM com fallback para o modo antigo.
+ * Enquanto houver entidade sem celula (cena de treino, testes antigos), a
+ * conta de tela continua valendo. */
+function sqmDist(a, b) {
+  if (typeof sqmDistance === "function" &&
+      a && b && a.cx !== undefined && b.cx !== undefined) {
+    return sqmDistance(a, b);
+  }
+  const dx = ((a.x || 0) - (b.x || 0)) * COMBAT_GRID_W;
+  const dy = ((a.y || 0) - (b.y || 0)) * COMBAT_GRID_H;
+  return Math.max(Math.abs(dx), Math.abs(dy));
 }
 
 function pointDistance(a, b) {
@@ -649,7 +681,12 @@ function playerAttack(c, p, target) {
   const isMagic = d.type === "magic";
   const isDist = d.type === "distance";
   const pos = c.player || { x: 0.18, y: 0.62 };
-  if (pointDistance(pos, target) > playerAttackRange(p)) {
+  // Alcance em SQM (Chebyshev), nao em fracao de tela. Antes "1 SQM" valia
+  // distancias diferentes no eixo X e no Y, porque a grade e 21x13.
+  if (typeof sqmDistance === "function" && c.player && c.player.cx !== undefined
+      && target.cx !== undefined
+      ? sqmDistance(c.player, target) > playerRangeSQM(p)
+      : pointDistance(pos, target) > playerAttackRange(p)) {
     c.events.push({ t: "range", x: target.x, y: target.y, screen: true });
     return false;
   }
@@ -672,8 +709,13 @@ function playerAttack(c, p, target) {
     const eq = equippedQuiver(p);
     const q = eq ? GAMEDATA.items[eq.item] : null;
     if (q && q.shotDmg) {
-      // pointDistance devolve fracao da tela; ~0.085 por SQM
-      const sqm = Math.round(pointDistance(c.player, target) / 0.085);
+      // distancia real em SQM (Chebyshev). Antes era uma divisao por 0.085
+      // que so acertava no eixo X: a grade e 21x13, entao o mesmo valor de
+      // tela valia SQMs diferentes na horizontal e na vertical.
+      const sqm = (typeof sqmDistance === "function" && c.player.cx !== undefined
+                   && target.cx !== undefined)
+        ? sqmDistance(c.player, target)
+        : Math.round(pointDistance(c.player, target) / 0.085);
       if (sqm === q.shotRange) perfeito = q.shotDmg;
     }
   }
@@ -767,10 +809,9 @@ function playerAttack(c, p, target) {
   // Cleave (15.x): certas armas atingem alvos adjacentes por 50% do dano
   const wpItem = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   if (wpItem && wpItem.cleave && !isDist && !isMagic) {
-    const R = 0.16;
     for (const m of c.mobs) {
       if (m === target || m.hp <= 0) continue;
-      if (pointDistance(m, target) > R) continue;
+      if (sqmDist(m, target) > 1) continue;   // so os 8 tiles vizinhos
       const corte = Math.max(1, Math.floor(rollDamage() * 0.5));
       m.hp -= corte;
       c.stats.damage += corte;
@@ -789,11 +830,11 @@ function playerAttack(c, p, target) {
     }
     // burst arrow: explode em area 3x3 ao redor do alvo
     if (ammo.area) {
-      const R = 0.13 * (ammo.area + 0.5);      // raio equivalente a 3x3 SQM
+      const R = ammo.area;                     // raio em SQM (3x3 = raio 1)
       c.events.push({ t: "burst", x: target.x, y: target.y });
       for (const m of c.mobs) {
         if (m === target || m.hp <= 0) continue;
-        if (pointDistance(m, target) > R) continue;
+        if (sqmDist(m, target) > R) continue;
         const splash = Math.max(1, Math.floor(rollDamage() * 0.75));
         m.hp -= splash;
         c.stats.damage += splash;
@@ -845,7 +886,13 @@ function tryCastSpell(c, p, target, now) {
     avail.push([id, s]);
   }
   if (!avail.length) return false;
-  if (c.player && pointDistance(c.player, target) > spellRange()) return false;
+  // Alcance: 5 SQM e o padrao de magia. A checagem por magia especifica
+  // acontece depois de escolher qual sera lancada -- aqui so descarta o caso
+  // de o alvo estar longe de QUALQUER magia.
+  if (c.player && c.player.cx !== undefined && target.cx !== undefined
+      && typeof sqmDistance === "function") {
+    if (sqmDistance(c.player, target) > 7) return false;
+  } else if (c.player && pointDistance(c.player, target) > spellRange()) return false;
   // compatibilidade com a config antiga de shooter unico
   let selected = null;
   if (!usaLista && p.config.shooterType === "spell" && p.config.shooterSpell)
@@ -857,6 +904,16 @@ function tryCastSpell(c, p, target, now) {
     selected = avail[0];
   }
   const [id, s] = selected;
+
+  // agora que a magia esta escolhida, o alcance dela e que manda.
+  // MONKSPELLS traz o spell:range() do .lua (Mystic Repulse alcanca 7).
+  if (c.player && c.player.cx !== undefined && target.cx !== undefined
+      && typeof sqmDistance === "function") {
+    const md0 = (typeof MONKSPELLS !== "undefined") ? MONKSPELLS[id] : null;
+    const alc = (md0 && md0.range) ? Math.min(7, md0.range)
+              : (s.range && s.range > 1 ? Math.min(7, s.range) : 5);
+    if (sqmDistance(c.player, target) > alc) return false;
+  }
 
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
@@ -965,7 +1022,10 @@ function tryCastSpell(c, p, target, now) {
 function tryUseRune(c, p, target, now) {
   if (!p.config.useRunes) return false;
   if (c.runeCd > now) return false;
-  if (c.player && pointDistance(c.player, target) > runeRange()) return false;
+  if (c.player && c.player.cx !== undefined && target.cx !== undefined
+      && typeof sqmDistance === "function") {
+    if (sqmDistance(c.player, target) > 6) return false;   // runa: 6 SQM
+  } else if (c.player && pointDistance(c.player, target) > runeRange()) return false;
   let best = null;
   if (p.config.shooterType === "rune" && p.config.shooterRune) {
     const s = SUPPLIES[p.config.shooterRune];
@@ -995,10 +1055,10 @@ function tryUseRune(c, p, target, now) {
   const alvos = [target];
   if (s.area && s.area.raio > 0) {
     // 0.13 por SQM e a escala usada no resto do combate (burst arrow, cleave)
-    const R = 0.13 * s.area.raio;
+    const R = s.area.raio;                   // raio ja vem em SQM do lua
     for (const m of c.mobs) {
       if (m === target || m.hp <= 0) continue;
-      if (pointDistance(m, target) <= R) alvos.push(m);
+      if (sqmDist(m, target) <= R) alvos.push(m);
     }
   }
 
@@ -1234,7 +1294,11 @@ function tryMana(c, p) {
 /* Monstro ataca o jogador */
 function mobAttack(c, p, mob) {
   const pl = c.player || { x: 0.18, y: 0.62 };
-  if (pointDistance(pl, mob) > monsterAttackRange(mob)) return false;
+  // o monstro so bate se o alvo estiver dentro do alcance EM SQM. Melee = 1,
+  // e a diagonal conta como colado (Chebyshev), igual ao canUseAttack().
+  if (typeof sqmDistance === "function" && pl.cx !== undefined && mob.cx !== undefined) {
+    if (sqmDistance(pl, mob) > monsterRangeSQM(mob)) return false;
+  } else if (pointDistance(pl, mob) > monsterAttackRange(mob)) return false;
 
   // Divine Dazzle (exana amp res): o alvo ofuscado erra golpes
   const bfm = typeof buffTotals === "function" ? buffTotals(p) : null;
@@ -1450,7 +1514,10 @@ function combatTick(c, p, dt, now) {
   }
 
   // movimentação: player aproxima/kita e monstros procuram distância de ataque
-  updateCombatMovement(c, p, dt);
+  // motor de movimento em SQM (grid.js + gridai.js). O antigo continua no
+  // arquivo como fallback caso os modulos novos nao carreguem.
+  if (typeof updateGridMovement === "function") updateGridMovement(c, p, dt, now);
+  else updateCombatMovement(c, p, dt);
 
   // conditions (veneno, fogo, energia, sangramento, maldicao) drenando
   tickConditions(c, p, dt);

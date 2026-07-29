@@ -335,14 +335,14 @@ function monkSpellTargets(p, id, c, alvo) {
   if (!md || !c || !c.mobs) return saida;
 
   if (md.chain) {
-    const passo = 0.13 * md.chain.dist;   // mesma escala de SQM do combate
+    const passo = md.chain.dist;          // distancia do salto, em SQM
     const vistos = new Set([alvo]);
     let atual = alvo;
     while (saida.length < md.chain.alvos) {
       let perto = null, menor = Infinity;
       for (const m of c.mobs) {
         if (m.hp <= 0 || vistos.has(m)) continue;
-        const d = pointDistance(m, atual);
+        const d = sqmDist(m, atual);
         if (d <= passo && d < menor) { menor = d; perto = m; }
       }
       if (!perto) break;                  // sem vizinho no alcance: para
@@ -354,10 +354,10 @@ function monkSpellTargets(p, id, c, alvo) {
   }
 
   if (md.area && md.area.raio > 0) {
-    const R = 0.13 * md.area.raio;
+    const R = md.area.raio;               // raio ja vem em SQM
     for (const m of c.mobs) {
       if (m === alvo || m.hp <= 0) continue;
-      if (pointDistance(m, alvo) <= R) saida.push(m);
+      if (sqmDist(m, alvo) <= R) saida.push(m);
     }
   }
   return saida;
