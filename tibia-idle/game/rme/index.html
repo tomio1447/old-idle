@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>OTI RME — editor de mapas .otbm</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="rme.css">
+</head>
+<body>
+<header id="top">
+  <b class="logo">OTI RME</b>
+  <input id="map-name" value="meu_mapa" spellcheck="false" title="Nome do arquivo .otbm">
+  <label>W <input id="map-w" type="number" value="21" min="8" max="64"></label>
+  <label>H <input id="map-h" type="number" value="13" min="8" max="40"></label>
+  <button id="btn-resize" title="Aplica o tamanho (conteúdo fora da área é removido)">Redefinir</button>
+  <span class="sep"></span>
+  <button id="btn-zoom-out" title="Zoom -">−</button>
+  <span id="zoom-label">2.0x</span>
+  <button id="btn-zoom-in" title="Zoom +">+</button>
+  <label class="chk"><input id="tgl-grid" type="checkbox" checked> grade</label>
+  <label class="chk"><input id="tgl-block" type="checkbox"> colisão</label>
+  <span class="sep"></span>
+  <button id="btn-undo" title="Desfazer (Ctrl+Z)">↶ Desfazer</button>
+  <button id="btn-clear" title="Apaga todo o mapa">Limpar</button>
+  <span class="spacer"></span>
+  <button id="btn-check" title="Lista os ids do mapa que o jogo ainda NÃO tem sprite">Verificar sprites</button>
+  <button id="btn-save" class="primary" title="Valida zonas e baixa o .otbm">Baixar .otbm</button>
+</header>
+
+<main>
+  <aside id="side">
+    <div class="tools">
+      <div class="tool-group" id="grp-layer">
+        <div class="grp-title">Camada</div>
+        <button data-layer="g" class="sel">Chão</button>
+        <button data-layer="i">Itens</button>
+        <button data-layer="z">Zonas</button>
+      </div>
+      <div class="tool-group" id="grp-tool">
+        <div class="grp-title">Ferramenta</div>
+        <button data-tool="pen" class="sel">✏️ pincel</button>
+        <button data-tool="rect">▭ retângulo</button>
+        <button data-tool="erase">⌫ borracha</button>
+        <button data-tool="pick">💧 conta-gotas</button>
+      </div>
+      <div class="tool-group" id="grp-zone">
+        <div class="grp-title">Zona</div>
+        <button data-zone="s" class="sel">S — jogador</button>
+        <button data-zone="m">G — monstros</button>
+      </div>
+      <div class="tool-group">
+        <div class="grp-title">Pincel</div>
+        <select id="brush-size">
+          <option value="1" selected>1 x 1</option>
+          <option value="2">2 x 2</option>
+          <option value="3">3 x 3</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="pal-head">
+      <input id="pal-search" placeholder="buscar por nome ou id..." spellcheck="false">
+      <select id="pal-filter">
+        <option value="all">todos os itens</option>
+        <option value="gw" selected>chão andável</option>
+        <option value="gb">chão bloqueado</option>
+        <option value="wall">bloqueadores (paredes)</option>
+        <option value="deco">decoração (sem colisão)</option>
+      </select>
+    </div>
+    <div id="pal-list"><div id="pal-inner"></div></div>
+    <div id="pal-foot">carregando catálogo...</div>
+  </aside>
+
+  <section id="stage">
+    <div id="canvas-wrap"><canvas id="cv"></canvas></div>
+    <div id="status">pronto</div>
+    <div id="cellinfo">
+      <div id="sel-item">nenhum item selecionado</div>
+      <div id="cell-detail">—</div>
+    </div>
+  </section>
+</main>
+
+<div id="modal-bg" class="modal-bg"><div class="modal">
+  <div class="modal-title"><span id="modal-title">Verificar sprites</span>
+    <button id="modal-close">✕</button></div>
+  <div class="modal-body" id="modal-body"></div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="sm" id="modal-ok">Entendi</button>
+  </div>
+</div></div>
+
+<script src="data/catalog.js"></script>
+<script src="data/known_tiles.js"></script>
+<script src="../js/otbm.js"></script>
+<script src="rme.js"></script>
+</body>
+</html>

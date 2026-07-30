@@ -58,6 +58,7 @@ function openAdmin(aba) {
     <div class="panel-title">🛠 Painel Admin
       <span class="tiny dim" style="margin-left:8px">modo de testes</span>
       <span style="flex:1"></span>
+      <button class="sm" id="admin-rme" title="Abre o editor de mapas .otbm em outra aba">🗺 OPEN RME</button>
       <button class="sm" id="admin-close">✕</button>
     </div>
     <div class="panel-body">
@@ -69,6 +70,9 @@ function openAdmin(aba) {
   $("#admin-close").addEventListener("click", () => {
     $("#modal").classList.remove("show", "wide");
   });
+  // editor de mapas: pagina propria (game/rme/), mesma pasta do jogo
+  $("#admin-rme").addEventListener("click", () =>
+    window.open("rme/index.html", "_blank"));
   renderAdminTabs();
   renderAdminContent();
 }

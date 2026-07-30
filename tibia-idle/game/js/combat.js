@@ -30,9 +30,13 @@ function newCombat(player, huntId, instanceMode) {
   const pvp = mode === "pvp";
   /* mapa fechado da hunt (huntmapdata.js): paredes/agua bloqueiam o grid */
   const huntMap = (typeof HUNTMAPS !== "undefined" && hunt.mapa) ? HUNTMAPS[hunt.mapa] : null;
-  /* spawn do jogador: marcador "S" do mapa; sem mapa, canto esquerdo */
+  /* spawn do jogador: spawn vindo do .otbm; senao marcador "S" do mapa
+   * ascii; sem mapa, canto esquerdo */
   let spx = 3, spy = 6;
-  if (huntMap) {
+  if (huntMap && huntMap.spawn) {
+    spx = huntMap.spawn.x;
+    spy = huntMap.spawn.y;
+  } else if (huntMap) {
     let achou = false;
     for (let y = 0; y < huntMap.rows.length && !achou; y++)
       for (let x = 0; x < huntMap.rows[y].length; x++)
@@ -170,12 +174,20 @@ function spawnWave(c, p) {
   if (typeof placeFree === "function") {
     if (c.player) ensureCell(c.player);
     const occ = buildOccupancy(c, null);
+    // zona G do mapa (.otbm ou ascii): quando existe, os monstros nascem
+    // DENTRO dela; sem zona, nascem pela direita da arena como sempre.
+    const zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
+      ? c.huntMap.mob : null;
     for (const m of c.mobs) {
       if (m.cx !== undefined) continue;
-      // nascem pela direita da arena, como na cena antiga
-      const cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
-      const cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
-      placeFree(m, occ, Math.min(GRID_W - 1, cx), cy);
+      if (zona) {
+        const z = zona[Math.floor(Math.random() * zona.length)];
+        placeFree(m, occ, z.x, z.y);
+      } else {
+        const cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
+        const cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+        placeFree(m, occ, Math.min(GRID_W - 1, cx), cy);
+      }
       m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
     }
   } else {

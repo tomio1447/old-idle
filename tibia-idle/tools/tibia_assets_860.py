@@ -19,7 +19,7 @@ Uso:
 import struct
 from PIL import Image
 
-# atributos do 8.60+ (numeracao moderna)
+# atributos do 8.60+ (numeracao moderna, OTCv8/OTClient)
 ATTR_GROUND = 0
 ATTR_WRITABLE = 8
 ATTR_WRITABLE_ONCE = 9
@@ -32,6 +32,18 @@ ATTR_CLOTH = 32
 ATTR_MARKET = 33
 ATTR_USABLE = 34
 ATTR_LAST = 255
+
+# flags sem payload extra — so registramos o NOME no set (usado pelo
+# catalogo do editor de mapas para colisao/categorizacao; thingtype.cpp)
+ATTR_SIMPLES = {
+    1: "GroundBorder", 2: "OnBottom", 3: "OnTop", 4: "Container",
+    5: "Stackable", 6: "ForceUse", 7: "MultiUse", 10: "FluidContainer",
+    11: "Splash", 12: "NotWalkable", 13: "NotMoveable",
+    14: "BlockProjectile", 15: "NotPathable", 16: "Pickupable",
+    17: "Hangable", 18: "HookSouth", 19: "HookEast", 20: "Rotatable",
+    22: "DontHide", 23: "Translucent", 26: "LyingCorpse",
+    27: "AnimateAlways", 30: "FullGround", 31: "IgnoreLook",
+}
 
 
 class Reader:
@@ -196,6 +208,8 @@ class Dat860:
                 p.u16()             # required level
             elif flag == ATTR_USABLE:
                 p.u16()
+            elif flag in ATTR_SIMPLES:
+                obj.flags.add(ATTR_SIMPLES[flag])
 
     def item(self, cid):
         return self.objects.get(cid)

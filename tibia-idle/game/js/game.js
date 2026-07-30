@@ -730,11 +730,15 @@ function startHunt(id, instanceMode) {
   G.p.hunt = id;
   G.p.instanceMode = instanceMode;
   G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
-  G.combat = newCombat(G.p, id, instanceMode);
-  spawnWave(G.combat, G.p);
-  addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
-  toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
-  renderAll();
+  // hunt com arena .otbm: carrega (fetch) e converte o mapa antes de
+  // montar o combate; hunts em ascii respondem na hora (otbmhunt.js)
+  huntMapFromOtbmAsync(hu, () => {
+    G.combat = newCombat(G.p, id, instanceMode);
+    spawnWave(G.combat, G.p);
+    addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
+    toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
+    renderAll();
+  });
 }
 
 function stopHunt() {
@@ -1297,8 +1301,11 @@ function startGame(p) {
 
   if (p.hunt && GAMEDATA.hunts[p.hunt]) {
     p.instanceMode = p.instanceMode || "non-pvp";
-    G.combat = newCombat(p, p.hunt, p.instanceMode);
-    spawnWave(G.combat, p);
+    // mesma regra do startHunt: hunt .otbm carrega o mapa antes do combate
+    huntMapFromOtbmAsync(GAMEDATA.hunts[p.hunt], () => {
+      G.combat = newCombat(p, p.hunt, p.instanceMode);
+      spawnWave(G.combat, p);
+    });
     G.inCity = false;
   } else {
     G.inCity = true;   // sem caçada ativa, o char fica na cidade

@@ -1,0 +1,586 @@
+/*
+ * rme.js — editor de mapas do tibia idle ("OTI RME").
+ *
+ * O mapa e um objeto {w, h, cells: {"x,y": {g, items[]}}, spawn, mob[]} no
+ * MESMO modelo do js/otbm.js — salvar e so OTBM.write(map). A lista de
+ * itens (paleta) vem de data/catalog.js (build_rme_catalog.py: TODOS os
+ * itens do .dat 8.60 com sprite), desenhada a partir dos atlases
+ * data/atlas_<N>.png — pixel oficial, igualzinho ao que o jogo desenha.
+ *
+ * Zonas: S = spawn do jogador (uma unica celula), G = area de monstros
+ * (conjunto de celulas). gravadas na descricao do .otbm (linha OTIDLE).
+ */
+"use strict";
+
+const CATALOG = window.RME_CATALOG;
+const KNOWN = window.RME_KNOWN_TILES || [];
+
+/* tabela id -> {w, b, g, page, idx, name} */
+const ITEMS = new Map();
+const SLUG_RE = /[^a-z0-9_.-]+/g;
+for (const [id, w, b, g, page, idx] of CATALOG.entries) {
+  ITEMS.set(id, { id, w, b, g, page, idx,
+                  name: CATALOG.names[id] || ("item " + id) });
+}
+function itemName(id) {
+  const it = ITEMS.get(id);
+  return it ? it.name : "item " + id;
+}
+
+/* ------------------------------------------------------------ estado */
+const state = {
+  w: 21, h: 13,
+  cells: {},            // "x,y" -> {g: 0, items: []}
+  spawn: null,          // {x, y}
+  mob: new Set(),       // "x,y"
+  layer: "g",           // g chao | i itens | z zonas
+  tool: "pen",          // pen | rect | erase | pick
+  zone: "s",            // s jogador | m monstros
+  brush: 1,
+  selId: 106,           // grass
+  zoom: 2,
+  showGrid: true,
+  showBlock: false,
+  undo: [],
+  painting: false,
+  rectStart: null,
+  rectNow: null,
+  hover: null,
+};
+
+/* ------------------------------------------------------------ atlas */
+const atlases = [];
+function loadAtlases(cb) {
+  let left = CATALOG.pages;
+  for (let i = 0; i < CATALOG.pages; i++) {
+    const img = new Image();
+    img.src = "data/atlas_" + i + ".png";
+    img.onload = () => { if (--left === 0) cb(); };
+    img.onerror = () => { if (--left === 0) cb(); };
+    atlases.push(img);
+  }
+}
+function drawItem32(ctx, id, dx, dy, size) {
+  const it = ITEMS.get(id);
+  if (!it) return;
+  const img = atlases[it.page];
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const cx = it.idx % CATALOG.cols;
+  const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
+  ctx.drawImage(img, cx * 32, cy * 32, 32, 32, dx, dy, size, size);
+}
+
+/* ------------------------------------------------------------ canvas */
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+
+function cellPx() { return 32 * state.zoom; }
+function resizeCanvas() {
+  cv.width = state.w * cellPx();
+  cv.height = state.h * cellPx();
+}
+
+function cellBlocked(x, y) {
+  const c = state.cells[x + "," + y];
+  if (!c || !c.g) return true;
+  const g = ITEMS.get(c.g);
+  if (!g || !g.w) return true;
+  for (const id of c.items) {
+    const it = ITEMS.get(id);
+    if (it && it.b) return true;
+  }
+  return false;
+}
+
+function render() {
+  const S = cellPx();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // fundo xadrez (celulas vazias)
+  for (let y = 0; y < state.h; y++) {
+    for (let x = 0; x < state.w; x++) {
+      if ((x + y) % 2) { ctx.fillStyle = "#14120e"; }
+      else { ctx.fillStyle = "#0d0c0a"; }
+      ctx.fillRect(x * S, y * S, S, S);
+      const c = state.cells[x + "," + y];
+      if (!c) continue;
+      if (c.g) drawItem32(ctx, c.g, x * S, y * S, S);
+      for (let i = 0; i < c.items.length; i++)
+        drawItem32(ctx, c.items[i], x * S, y * S, S);
+    }
+  }
+  // colisao
+  if (state.showBlock) {
+    ctx.fillStyle = "rgba(220,40,40,.24)";
+    for (let y = 0; y < state.h; y++)
+      for (let x = 0; x < state.w; x++)
+        if (cellBlocked(x, y)) ctx.fillRect(x * S, y * S, S, S);
+  }
+  // zonas
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (state.spawn) {
+    zoneCell(state.spawn.x, state.spawn.y, "S", "#6ab0ff");
+  }
+  for (const key of state.mob) {
+    const [x, y] = key.split(",").map(Number);
+    zoneCell(x, y, "G", "#ff7a7a");
+  }
+  // retangulo em curso
+  if (state.rectStart && state.rectNow) {
+    const [x0, y0, x1, y1] = rectBounds(state.rectStart, state.rectNow);
+    ctx.strokeStyle = "rgba(255,215,94,.9)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x0 * S + 1, y0 * S + 1, (x1 - x0 + 1) * S - 2,
+                   (y1 - y0 + 1) * S - 2);
+  }
+  // grade
+  if (state.showGrid) {
+    ctx.strokeStyle = "rgba(255,255,255,.07)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= state.w; x++) {
+      ctx.beginPath(); ctx.moveTo(x * S + .5, 0); ctx.lineTo(x * S + .5, cv.height); ctx.stroke();
+    }
+    for (let y = 0; y <= state.h; y++) {
+      ctx.beginPath(); ctx.moveTo(0, y * S + .5); ctx.lineTo(cv.width, y * S + .5); ctx.stroke();
+    }
+  }
+  // hover
+  if (state.hover) {
+    ctx.strokeStyle = "rgba(255,255,255,.5)";
+    ctx.lineWidth = 1;
+    for (let dy = 0; dy < state.brush; dy++)
+      for (let dx = 0; dx < state.brush; dx++) {
+        const hx = state.hover.x + dx, hy = state.hover.y + dy;
+        if (hx < state.w && hy < state.h)
+          ctx.strokeRect(hx * S + .5, hy * S + .5, S - 1, S - 1);
+      }
+  }
+}
+function zoneCell(x, y, letra, cor) {
+  const S = cellPx();
+  ctx.strokeStyle = cor;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x * S + 2, y * S + 2, S - 4, S - 4);
+  ctx.fillStyle = cor;
+  ctx.font = `bold ${Math.max(11, S * 0.42)}px Arial`;
+  ctx.fillText(letra, x * S + S / 2, y * S + S / 2);
+}
+function rectBounds(a, b) {
+  return [Math.min(a.x, b.x), Math.min(a.y, b.y),
+          Math.max(a.x, b.x), Math.max(a.y, b.y)];
+}
+
+/* ------------------------------------------------------------ edicao */
+function cellAt(x, y, create) {
+  const k = x + "," + y;
+  if (!state.cells[k] && create) state.cells[k] = { g: 0, items: [] };
+  return state.cells[k];
+}
+
+function pushUndo() {
+  state.undo.push(JSON.stringify({
+    cells: state.cells, spawn: state.spawn, mob: [...state.mob],
+  }));
+  if (state.undo.length > 40) state.undo.shift();
+}
+function undo() {
+  const snap = state.undo.pop();
+  if (!snap) return;
+  const d = JSON.parse(snap);
+  state.cells = d.cells;
+  state.spawn = d.spawn;
+  state.mob = new Set(d.mob);
+  render();
+  status("desfeito");
+}
+
+function applyPaint(x, y) {
+  for (let dy = 0; dy < state.brush; dy++) {
+    for (let dx = 0; dx < state.brush; dx++) {
+      const px = x + dx, py = y + dy;
+      if (px < 0 || py < 0 || px >= state.w || py >= state.h) continue;
+      if (state.layer === "z") {
+        const k = px + "," + py;
+        if (state.zone === "s") state.spawn = { x: px, y: py };
+        else if (state.mob.has(k)) { /* mantem */ }
+        else state.mob.add(k);
+        continue;
+      }
+      const c = cellAt(px, py, true);
+      if (state.layer === "g") c.g = state.selId;
+      else if (c.items[c.items.length - 1] !== state.selId)
+        c.items.push(state.selId);
+    }
+  }
+}
+function applyErase(x, y) {
+  for (let dy = 0; dy < state.brush; dy++) {
+    for (let dx = 0; dx < state.brush; dx++) {
+      const px = x + dx, py = y + dy;
+      if (px < 0 || py < 0 || px >= state.w || py >= state.h) continue;
+      if (state.layer === "z") {
+        const k = px + "," + py;
+        if (state.spawn && state.spawn.x === px && state.spawn.y === py)
+          state.spawn = null;
+        state.mob.delete(k);
+        continue;
+      }
+      const c = cellAt(px, py, false);
+      if (!c) continue;
+      if (state.layer === "g") c.g = 0;
+      else c.items.pop();
+      if (!c.g && !c.items.length) delete state.cells[px + "," + py];
+    }
+  }
+}
+function applyRect(a, b) {
+  const [x0, y0, x1, y1] = rectBounds(a, b);
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) applyPaint(x, y);
+}
+
+function canvasCell(e) {
+  const r = cv.getBoundingClientRect();
+  const S = cellPx();
+  return {
+    x: Math.floor((e.clientX - r.left) / S),
+    y: Math.floor((e.clientY - r.top) / S),
+  };
+}
+
+cv.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const c = canvasCell(e);
+  if (c.x < 0 || c.y < 0 || c.x >= state.w || c.y >= state.h) return;
+  if (state.tool === "pick") {
+    const cell = cellAt(c.x, c.y, false);
+    if (cell) {
+      const id = state.layer === "i"
+        ? (cell.items[cell.items.length - 1] || cell.g) : cell.g;
+      if (id) { selectItem(id); status(`pegou ${id} (${itemName(id)})`); }
+    } else status("celula vazia");
+    return;
+  }
+  cv.setPointerCapture(e.pointerId);
+  state.painting = true;
+  pushUndo();
+  if (state.tool === "rect") {
+    state.rectStart = c; state.rectNow = c;
+  } else if (state.tool === "erase") {
+    applyErase(c.x, c.y);
+  } else {
+    applyPaint(c.x, c.y);
+  }
+  render();
+});
+cv.addEventListener("pointermove", (e) => {
+  const c = canvasCell(e);
+  state.hover = c;
+  if (state.painting) {
+    if (state.tool === "rect") state.rectNow = c;
+    else if (state.tool === "erase") applyErase(c.x, c.y);
+    else applyPaint(c.x, c.y);
+  }
+  render();
+  showCellInfo(c);
+});
+cv.addEventListener("pointerup", (e) => {
+  if (state.painting && state.tool === "rect" && state.rectStart && state.rectNow) {
+    applyRect(state.rectStart, state.rectNow);
+  }
+  state.painting = false;
+  state.rectStart = state.rectNow = null;
+  render();
+});
+cv.addEventListener("pointerleave", () => {
+  state.hover = null;
+  render();
+});
+cv.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+    undo();
+  }
+});
+
+/* ------------------------------------------------------------ status */
+const statusEl = document.getElementById("status");
+function status(t) { statusEl.textContent = t; }
+function fmtFlags(id) {
+  const it = ITEMS.get(id);
+  if (!it) return "?";
+  if (it.g) return it.w ? "chão andável" : "chão bloqueado";
+  return it.b ? "bloqueia" : "decoração";
+}
+function showCellInfo(c) {
+  const el = document.getElementById("cell-detail");
+  if (!c || c.x < 0 || c.y < 0 || c.x >= state.w || c.y >= state.h) {
+    el.textContent = "—";
+    return;
+  }
+  const cell = cellAt(c.x, c.y, false);
+  const partes = [`(${c.x},${c.y})`];
+  if (state.spawn && state.spawn.x === c.x && state.spawn.y === c.y) partes.push("<b>S jogador</b>");
+  if (state.mob.has(c.x + "," + c.y)) partes.push("<b>G monstros</b>");
+  if (!cell) partes.push('<span class="bad">vazio — bloqueia</span>');
+  else {
+    partes.push(`chão <b>${cell.g || "—"}</b>`);
+    if (cell.items.length) partes.push(`itens <b>${cell.items.join(", ")}</b>`);
+    partes.push(cellBlocked(c.x, c.y) ? '<span class="bad">bloqueada</span>' : "andável");
+  }
+  el.innerHTML = partes.join(" · ");
+}
+
+/* ------------------------------------------------------------ paleta */
+const palList = document.getElementById("pal-list");
+const palInner = document.getElementById("pal-inner");
+const ROW_H = 36;
+let palFiltrada = [];
+const ROWS_POOL = [];
+
+function filtrarPalette() {
+  const q = document.getElementById("pal-search").value.trim().toLowerCase();
+  const f = document.getElementById("pal-filter").value;
+  palFiltrada = [];
+  for (const [id, w, b, g, page, idx] of CATALOG.entries) {
+    if (f === "gw" && !(g && w)) continue;
+    if (f === "gb" && !(g && !w)) continue;
+    if (f === "wall" && !(!g && b)) continue;
+    if (f === "deco" && !(!g && !b)) continue;
+    if (q) {
+      const nm = (CATALOG.names[id] || "").toLowerCase();
+      if (!nm.includes(q) && String(id).indexOf(q) !== 0) continue;
+    }
+    palFiltrada.push(id);
+    if (q && palFiltrada.length >= 2000) break;  // busca limitada
+  }
+  palInner.style.height = palFiltrada.length * ROW_H + "px";
+  document.getElementById("pal-foot").textContent =
+    palFiltrada.length.toLocaleString("pt-BR") + " itens (" +
+    CATALOG.entries.length.toLocaleString("pt-BR") + " no catálogo)";
+  renderPalRows();
+}
+
+function palRowEl(i) {
+  let el = ROWS_POOL[i];
+  if (el) return el;
+  el = document.createElement("div");
+  el.className = "pal-row";
+  el.innerHTML = `<span class="pal-icon"></span>
+    <div class="pal-meta"><div class="pal-name"></div><div class="pal-flags"></div></div>`;
+  el.addEventListener("click", () => selectItem(+el.dataset.id));
+  ROWS_POOL.push(el);
+  return el;
+}
+function renderPalRows() {
+  const top = palList.scrollTop;
+  const h = palList.clientHeight || 400;
+  const i0 = Math.max(0, Math.floor(top / ROW_H) - 2);
+  const i1 = Math.min(palFiltrada.length, Math.ceil((top + h) / ROW_H) + 2);
+  // remove sobras
+  while (palInner.firstChild) palInner.removeChild(palInner.firstChild);
+  for (let i = i0; i < i1; i++) {
+    const id = palFiltrada[i];
+    const it = ITEMS.get(id);
+    const el = palRowEl(i - i0);
+    el.style.top = i * ROW_H + "px";
+    el.style.position = "absolute";
+    el.dataset.id = id;
+    el.classList.toggle("sel", id === state.selId);
+    el.querySelector(".pal-name").textContent = `${id} · ${it.name}`;
+    el.querySelector(".pal-flags").innerHTML =
+      it.g ? (it.w ? '<span class="w">chão</span>' : '<span class="b">chão trava</span>')
+           : (it.b ? '<span class="b">parede</span>' : "deco");
+    const ic = el.querySelector(".pal-icon");
+    const cx = it.idx % CATALOG.cols;
+    const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
+    ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
+    ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
+    if (!el.parentNode) palInner.appendChild(el);
+  }
+}
+palList.addEventListener("scroll", renderPalRows);
+
+function selectItem(id) {
+  if (!ITEMS.has(id)) return;
+  state.selId = id;
+  const it = ITEMS.get(id);
+  document.getElementById("sel-item").innerHTML =
+    `selecionado: <b>${id}</b> · ${it.name} <span class="dim">(${fmtFlags(id)})</span>`;
+  // troca a camada se fizer sentido: piso na camada chao, resto em itens
+  if (state.layer !== "z") setLayer(it.g && state.layer === "g" ? "g" :
+                                    it.g ? "g" : "i");
+  renderPalRows();
+}
+
+/* ------------------------------------------------------------ toolbar */
+function setLayer(l) {
+  state.layer = l;
+  document.querySelectorAll("#grp-layer button").forEach((b) =>
+    b.classList.toggle("sel", b.dataset.layer === l));
+}
+document.querySelectorAll("#grp-layer button").forEach((b) =>
+  b.addEventListener("click", () => setLayer(b.dataset.layer)));
+document.querySelectorAll("#grp-tool button").forEach((b) =>
+  b.addEventListener("click", () => {
+    state.tool = b.dataset.tool;
+    document.querySelectorAll("#grp-tool button").forEach((x) =>
+      x.classList.toggle("sel", x === b));
+  }));
+document.querySelectorAll("#grp-zone button").forEach((b) =>
+  b.addEventListener("click", () => {
+    state.zone = b.dataset.zone;
+    document.querySelectorAll("#grp-zone button").forEach((x) =>
+      x.classList.toggle("sel", x === b));
+  }));
+document.getElementById("brush-size").addEventListener("change", (e) => {
+  state.brush = +e.target.value;
+});
+document.getElementById("tgl-grid").addEventListener("change", (e) => {
+  state.showGrid = e.target.checked; render();
+});
+document.getElementById("tgl-block").addEventListener("change", (e) => {
+  state.showBlock = e.target.checked; render();
+});
+document.getElementById("btn-zoom-in").addEventListener("click", () => setZoom(state.zoom * 1.25));
+document.getElementById("btn-zoom-out").addEventListener("click", () => setZoom(state.zoom / 1.25));
+function setZoom(z) {
+  state.zoom = Math.max(0.5, Math.min(4, z));
+  document.getElementById("zoom-label").textContent = state.zoom.toFixed(1) + "x";
+  resizeCanvas();
+  render();
+}
+document.getElementById("btn-undo").addEventListener("click", undo);
+document.getElementById("btn-clear").addEventListener("click", () => {
+  if (!confirm("Apagar o mapa inteiro?")) return;
+  pushUndo();
+  state.cells = {};
+  state.spawn = null;
+  state.mob.clear();
+  render();
+  status("mapa limpo");
+});
+document.getElementById("btn-resize").addEventListener("click", () => {
+  const w = Math.max(8, Math.min(64, +document.getElementById("map-w").value || 21));
+  const h = Math.max(8, Math.min(40, +document.getElementById("map-h").value || 13));
+  if (w === state.w && h === state.h) return;
+  if (!confirm(`Redimensionar para ${w}×${h}? O conteúdo fora da nova área é removido.`)) return;
+  pushUndo();
+  state.w = w; state.h = h;
+  for (const k of Object.keys(state.cells)) {
+    const [x, y] = k.split(",").map(Number);
+    if (x >= w || y >= h) delete state.cells[k];
+  }
+  for (const k of [...state.mob]) {
+    const [x, y] = k.split(",").map(Number);
+    if (x >= w || y >= h) state.mob.delete(k);
+  }
+  if (state.spawn && (state.spawn.x >= w || state.spawn.y >= h)) state.spawn = null;
+  resizeCanvas();
+  render();
+  status(`tamanho ${w}×${h}`);
+});
+document.getElementById("pal-search").addEventListener("input", filtrarPalette);
+document.getElementById("pal-filter").addEventListener("change", filtrarPalette);
+
+/* ------------------------------------------------------------ salvar */
+function mapModel() {
+  return {
+    name: (document.getElementById("map-name").value.trim() || "mapa")
+      .toLowerCase().replace(SLUG_RE, "_").replace(/^_+|_+$/g, "") || "mapa",
+    w: state.w, h: state.h,
+    cells: state.cells,
+    spawn: state.spawn,
+    mob: [...state.mob].map((k) => {
+      const [x, y] = k.split(",").map(Number);
+      return { x, y };
+    }),
+  };
+}
+function validarParaSalvar(m) {
+  const erros = [];
+  let pintadas = 0;
+  for (const k in m.cells) {
+    const c = m.cells[k];
+    if (c.g || (c.items && c.items.length)) pintadas++;
+  }
+  if (!pintadas) erros.push("o mapa está vazio");
+  if (!m.spawn) erros.push("marque o spawn do jogador (camada Zonas, ferramenta S)");
+  if (!m.mob.length) erros.push("marque ao menos 1 célula da zona de monstros (G)");
+  if (m.spawn && cellBlocked(m.spawn.x, m.spawn.y))
+    erros.push("o spawn do jogador está numa célula bloqueada");
+  return erros;
+}
+
+document.getElementById("btn-save").addEventListener("click", () => {
+  const m = mapModel();
+  const erros = validarParaSalvar(m);
+  if (erros.length) {
+    openModal("Não dá para salvar",
+      "<p>Resolva antes:</p><ul><li>" + erros.join("</li><li>") + "</li></ul>");
+    return;
+  }
+  const buf = OTBM.write(m);
+  const blob = new Blob([buf], { type: "application/octet-stream" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = m.name + ".otbm";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status(`baixado ${m.name}.otbm (${(buf.byteLength / 1024).toFixed(1)} KB)`);
+  // avisa das sprites que o jogo ainda nao tem
+  const lidos = OTBM.read(buf);
+  const falta = OTBM.missingTiles(lidos, KNOWN);
+  setTimeout(() => avisarFaltantes(falta, m.name), 250);
+});
+
+function avisarFaltantes(falta, nome) {
+  if (!falta.length) {
+    status(`baixado ${nome}.otbm — todas as sprites já existem no jogo`);
+    return;
+  }
+  openModal("Sprites que o jogo ainda NÃO tem",
+    `<p>O mapa usa <b>${falta.length}</b> id(s) sem PNG em
+     <code>game/assets/tiles/</code> (eles apareceriam como buracos).
+     Depois de copiar <code>${nome}.otbm</code> para
+     <code>game/maps/</code>, rode:</p>
+     <p><code>python3 tools/import_otbm_sprites.py game/maps/${nome}.otbm</code></p>
+     <p>Ele extrai os PNGs do client 8.60 automaticamente.</p>
+     <div class="id-list">` +
+    falta.map((id) => `<span class="id-chip">${id} · ${itemName(id)}</span>`).join("") +
+    `</div>`);
+}
+
+document.getElementById("btn-check").addEventListener("click", () => {
+  const m = mapModel();
+  const falta = OTBM.missingTiles(
+    { cells: m.cells }, KNOWN);
+  if (!falta.length)
+    openModal("Verificar sprites",
+      "<p>Todos os ids usados no mapa já existem em " +
+      "<code>game/assets/tiles/</code>. Pode salvar tranquilo.</p>");
+  else avisarFaltantes(falta, m.name);
+});
+
+/* ------------------------------------------------------------ modal */
+function openModal(title, html) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").innerHTML = html;
+  document.getElementById("modal-bg").classList.add("show");
+}
+function closeModal() {
+  document.getElementById("modal-bg").classList.remove("show");
+}
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("modal-ok").addEventListener("click", closeModal);
+
+/* ------------------------------------------------------------ boot */
+loadAtlases(() => {
+  resizeCanvas();
+  filtrarPalette();
+  selectItem(106);
+  render();
+  status(`catálogo: ${CATALOG.entries.length.toLocaleString("pt-BR")} itens · ` +
+         `${KNOWN.length} sprites já existem no jogo`);
+});
