@@ -684,10 +684,34 @@ function playerMissile(p, element) {
   return ELEMENT_MISSILE[element] || "arrow";
 }
 
+/* CONST_ANI_WEAPONTYPE (brutal_strike.lua, annihilation.lua,
+ * whirlwind_throw.lua, executioners_throw.lua): o client arremessa uma
+ * copia giratoria da ARMA de melee equipada — whirlwind-sword/axe/club. */
+function weaponMissile(p) {
+  const wp = p && p.equip && p.equip.weapon
+    ? GAMEDATA.items[p.equip.weapon.item] : null;
+  const cat = wp && wp.cat;
+  if (cat === "axe" || cat === "club" || cat === "sword")
+    return "whirlwind-" + cat;
+  return "whirlwind-sword";        // punho/desarmado: espada generica
+}
+
 /* Projetil de um monstro que ataca a distancia. Arqueiros atiram flecha,
  * casters cospem o elemento e o resto arremessa pedra. */
 function monsterMissile(mob) {
   const def = mob.def || {};
+  // 1) O servidor declara o arremessavel de cada habilidade no shootEffect
+  //    (CONST_ANI_*) do .lua, e o importador guardou em skills[].miss. ESSA
+  //    e a sprite certa: o behemoth atira large-rock, nao a pedrinha
+  //    generica. Vale a habilidade a distancia de MAIOR dano — o arremesso
+  //    "basico" do bicho (o boulder throw do behemoth, nao um buff).
+  let base = null;
+  for (const sk of def.skills || []) {
+    if (!sk.miss || (sk.range || 1) <= 1) continue;
+    if (!base || (sk.max || 0) > (base.max || 0)) base = sk;
+  }
+  if (base) return base.miss;
+  // 2) Monstro sem habilidades importadas: heuristicas antigas.
   if (!def.ranged) return null;
   const slug = mob.slug || "";
   if (/archer|scout|spearman|hunter/.test(slug))
@@ -1247,8 +1271,16 @@ function castSpellById(c, p, target, now, id) {
   // usava a mesma animacao.
   const fxMagia = (md && md.fx && typeof monkFx === "function")
     ? monkFx(p, md.fx) : (s.fx || null);
-  // projetil declarado na magia (COMBAT_PARAM_DISTANCEEFFECT)
-  const missMagia = s.missile || ELEMENT_MISSILE[elemento] || "energy";
+  // Projetil (COMBAT_PARAM_DISTANCEEFFECT do .lua): magia de mana sai com
+  // o missil do elemento (strikes & cia); magia de skill do knight NAO tem
+  // distance effect — berserk/fierce berserk/groundshaker/front sweep nao
+  // declaram nenhum nos .lua, entao o golpe acontece no SQM atingido sem
+  // nada voando ate o alvo (antes caia o "small-stone" do fallback fisico
+  // e a animacao parecia "voar"). "$weapon" = CONST_ANI_WEAPONTYPE.
+  const modoMagia = !s.f || s.f.modo !== "skill";
+  let missMagia = s.missile || null;
+  if (missMagia === "$weapon") missMagia = weaponMissile(p);
+  if (!missMagia && modoMagia && !md) missMagia = ELEMENT_MISSILE[elemento] || "energy";
   // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
   // nao so onde havia monstro. Era esse o bug de "a magia so pinta o alvo".
   const areaTiles = nomeArea && typeof areaCells === "function"
@@ -1347,7 +1379,7 @@ function castSpellById(c, p, target, now, id) {
       c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
-                      projectile: idx === 0 || !!ehChain,
+                      projectile: (idx === 0 || !!ehChain) && !!missMagia,
                       el: elemento, spell: s.name, fx: fxMagia,
                       race: t.def && t.def.race, crit: critSt,
                       chain: ehChain && idx > 0 ? 1 : 0,
@@ -1383,8 +1415,9 @@ function castSpellById(c, p, target, now, id) {
                     sy: c.player ? c.player.y : 0.62,
                     screen: true,
                     // no chain o projetil sai do alvo ANTERIOR, nao do
-                    // jogador: e o golpe saltando de inimigo em inimigo
-                    projectile: idx === 0 || !!ehChain,
+                    // jogador: e o golpe saltando de inimigo em inimigo.
+                    // Sem DISTANCEEFFECT na magia (modo skill), nada voa.
+                    projectile: (idx === 0 || !!ehChain) && !!missMagia,
                     el: elemento, spell: s.name, fx: fxMagia,
                     crit: critSt,
                     chain: ehChain && idx > 0 ? 1 : 0,
@@ -1650,25 +1683,29 @@ function tryHeal(c, p, now) {
  * Fica separada do tryBuff porque este so aceita UM buff (o escolhido em
  * p.config.buff, que e a Virtude do monk ou o Protector do knight). Haste
  * nao deve competir por esse slot: no Tibia o jogador mantem as duas coisas
- * ao mesmo tempo.
- *
- * So lanca a magia que o jogador escolheu em p.config.hasteSpell no Helper.
- * Sem selecao, nao lanca nada sozinho.
+ * ao mesmo tempo. Escolhe sempre a mais forte que couber na mana.
  */
 function tryHaste(c, p, now) {
   if (typeof HASTEDATA === "undefined") return false;
-  const melhor = p.config && p.config.hasteSpell;
-  if (!melhor || !HASTEDATA[melhor]) return false;
+  if (p.config && p.config.autoHaste === false) return false;
   if ((c.hasteCd || 0) > now) return false;
   // ja tem uma ativa? nao gasta mana de novo
   if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
 
-  const sp = SPELLS[melhor];
-  if (!sp) return false;
-  if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) return false;
-  if (p.level < (sp.lvl || 1) || p.mp < sp.mana) return false;
-  if (!cdReady(p, melhor, now)) return false;
+  let melhor = null, ganho = 0;
+  for (const id of (typeof hastesDisponiveis === "function"
+                    ? hastesDisponiveis(p) : [])) {
+    const sp = SPELLS[id];
+    if (!sp) continue;
+    if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) continue;
+    if (p.level < (sp.lvl || 1) || p.mp < sp.mana) continue;
+    if (!cdReady(p, id, now)) continue;
+    const d = hasteDelta(p, id);
+    if (d > ganho) { ganho = d; melhor = id; }
+  }
+  if (!melhor) return false;
 
+  const sp = SPELLS[melhor];
   p.mp -= sp.mana;
   addManaSpent(p, combatManaSkillGain(c, sp.mana));
   cdStart(p, melhor, sp, now);

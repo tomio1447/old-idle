@@ -181,6 +181,15 @@ const FX_FRAMES = {
   // (extraidos por tools/extract_fx_faltantes.py)
   "energy-hit": 10, "carniphila": 8, "holy-area": 11,
   "whirlwind-blow-white": 8,
+  // ---- efeitos classicos que so existiam como slug nas skills dos
+  // monstros do Canary (caiam no fallback draw-blood). GIFs oficiais da
+  // TibiaWiki (fandom) -> tira horizontal, mesmo formato dos demais:
+  "big-plants": 18,    // Large Plant Effect (CONST_ME_BIGPLANTS), 96px
+  "giant-ice": 13,     // Ice Explosion Effect (CONST_ME_GIANTICE), 64px
+  "plant-attack": 13,  // Plant Effect (CONST_ME_PLANTATTACK), 64px
+  "water-splash": 10,  // Water Splash Effect (CONST_ME_WATERSPLASH), 64px
+  "green-smoke": 7,    // Green Smoke Effect (tibiawiki.com.br)
+  "purple-smoke": 7,   // Purple Smoke Effect (tibiawiki.com.br)
   // ---- Update 15.25.3a4a52 (Vocation Balancing): efeitos Effect_318 a
   // Effect_349 extraidos da tibiawiki (GIF animado -> tira horizontal).
   // O mapeamento para as magias foi feito pelo aspecto visual do efeito:
@@ -477,7 +486,8 @@ function drawBossBar(ctx, W, combat) {
   ctx.strokeRect(x, y + 17, bw, bh);
   ctx.font = "bold 13px Verdana";
   ctx.textAlign = "center";
-  ctx.fillStyle = "#ffe680";
+  // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
+  ctx.fillStyle = tibiaHpColor(pct);
   ctx.fillText(boss.def.name, W / 2, y + 11);
   ctx.font = "bold 10px Verdana";
   ctx.fillStyle = "#fff";
@@ -1061,12 +1071,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
         const pct = Math.max(0, m.hp / m.maxHp);
         const by = my - h / 2 - 9;
         drawTibiaBar(ctx, mx, by, pct, tibiaHpColor(pct));
-        // nome logo acima da barra, com contorno preto como no client
+        // nome logo acima da barra, com contorno preto como no client.
+        // A cor do TEXTO acompanha os degraus da barra de vida
+        // (tibiaHpColor): verde/amarelo/laranja/vermelho dizem o estado do
+        // bicho de longe, sem mirar a barra. O influenced continua
+        // reconhecivel pelo brilho azul no sprite (m.influenced, acima).
         const mobName = typeof displayMonsterName === "function"
           ? displayMonsterName(m.def.name)
           : String(m.def.name || "").replace(/^Influenced\s+/i, "");
-        drawNameText(ctx, mx, by - 4, mobName,
-                     m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#ff5252");
+        drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
         // fala da criatura (monster.voices do Canary), acima do nome
         drawCreatureSpeech(ctx, m, mx, by - 4, dt);
       }
