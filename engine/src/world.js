@@ -195,16 +195,23 @@ World.prototype.handleCombat = function(source) {
   // Get the unmitigated damage
   let unmitigatedDamage = damage - defense;
 
-  // If the attacker has a distance weapon equipped
+  // If the attacker is using a distance weapon, fire the projectile first.
+  // Throwing weapons (spears, stones, stars, knives, etc.) are distance weapons
+  // that carry their own shootType and do NOT require separate ammunition.
+  let usesAmmo = source.isAmmunitionEquipped();
+
   if(source.isDistanceWeaponEquipped()) {
 
-    // No ammunition?
-    if(!source.isAmmunitionEquipped()) {
+    // Bow/crossbow-style distance weapons need proper ammo in the quiver.
+    if(!usesAmmo) {
+      source.sendCancelMessage("There is not enough ammunition.");
       return;
     }
 
     this.handleDistanceCombat(source, target);
 
+    // Projectile is on its way; damage is applied when it lands.
+    return;
   }
 
   // If there is no damage send a block poff effect
@@ -226,14 +233,31 @@ World.prototype.handleDistanceCombat = function(source, target) {
   
   /*
    * Function World.handleDistanceCombat
-   * Handles the distance combat
+   * Handles the distance combat: consumes the ammunition/throwing weapon,
+   * plays the projectile animation, and applies damage to the target.
    */
 
-  // Consume the ammunition
+  // Consume the ammunition (or the throwing weapon itself)
   let ammo = source.consumeAmmunition();
 
-  // Write a distance effect
+  // Write a distance effect (projectile animation)
   this.sendDistanceEffect(source.position, target.position, ammo.getShootType());
+
+  // Apply damage when the projectile hits the target.
+  // Reuse the same damage/block calculation that melee combat uses.
+  let damage = source.calculateDamage();
+  let defense = target.calculateDefense();
+  let unmitigatedDamage = damage - defense;
+
+  if(unmitigatedDamage < 0) {
+    return this.sendMagicEffect(target.position, CONST.EFFECT.MAGIC.POFF);
+  }
+
+  if(unmitigatedDamage === 0) {
+    return this.sendMagicEffect(target.position, CONST.EFFECT.MAGIC.BLOCKHIT);
+  }
+
+  this.__damageEntity(source, target, unmitigatedDamage, CONST.COLOR.RED);
 
 }
 

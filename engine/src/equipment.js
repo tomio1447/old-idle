@@ -266,30 +266,49 @@ Equipment.prototype.getMaximumAddCount = function(player, thing, index) {
 
 }
 
+Equipment.prototype.getDistanceWeapon = function() {
+
+  /*
+   * Public Function Equipment.getDistanceWeapon
+   * Returns the equipped distance weapon (if any). Distance weapons are
+   * wielded in the weapon hand (HAND_LEFT in this engine's slot layout).
+   */
+
+  return this.peekIndex(this.SLOTS.HAND_LEFT);
+
+}
+
 Equipment.prototype.isAmmunitionEquipped = function() {
 
   /*
    * Public Function Equipment.isAmmunitionEquipped
-   * Returns true if the player has ammunition equipped
+   * Returns true if the player has the correct ammunition equipped for the
+   * currently wielded distance weapon. Throwing weapons (spears, throwing
+   * stars/knives, small stones, etc.) are distance weapons that are thrown
+   * themselves and therefore do NOT require separate ammunition in the quiver.
    */
 
-  // Take a look at the quiver
+  let weapon = this.getDistanceWeapon();
+
+  // No distance weapon equipped at all
+  if(weapon === null || !weapon.isDistanceWeapon()) {
+    return false;
+  }
+
+  // Throwing-style distance weapons have their own shootType and no ammoType:
+  // the weapon itself is the projectile.
+  if(weapon.getAttribute("ammoType") === null) {
+    return true;
+  }
+
+  // Bow/crossbow-style distance weapons need matching ammunition in the quiver.
   let ammunition = this.peekIndex(this.SLOTS.QUIVER);
 
-  // If nothing is equipped there is no ammunition
   if(ammunition === null) {
     return false;
   }
 
-  // Confirm the ammunition of the right type
-  let weapon = this.peekIndex(this.SLOTS.HAND_LEFT);
-
-  // Weapon does not match ammunition type
-  if(!weapon.isRightAmmunition(ammunition)) {
-    return false;
-  }
-
-  return true;
+  return weapon.isRightAmmunition(ammunition);
 
 }
 
@@ -297,17 +316,15 @@ Equipment.prototype.isDistanceWeaponEquipped = function() {
 
   /*
    * Public Function Equipment.isDistanceWeaponEquipped
-   * Returns true if distance weapon equipped
+   * Returns true if a distance weapon is equipped in the weapon hand
    */
 
-  // Take a look at the weapon in the left hand slot
-  let thing = this.peekIndex(this.SLOTS.HAND_LEFT);
+  let thing = this.getDistanceWeapon();
 
   if(thing === null) {
     return false;
   }
 
-  // Check whether is thing is a distance weapon
   return thing.isDistanceWeapon();
 
 }

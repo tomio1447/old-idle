@@ -439,10 +439,23 @@ Player.prototype.consumeAmmunition = function() {
 
   /*
    * Function Player.consumeAmmunition
-   * Consumes a single piece of ammunition
+   * Consumes a single piece of ammunition (or the throwing weapon itself).
+   *
+   * - Bow/crossbow-style distance weapons require ammo in the quiver slot
+   *   (arrows/bolts) and consume one of those.
+   * - Throwing weapons (spears, throwing stars/knives, small stones, etc.)
+   *   are held in the weapon hand and are themselves the projectile, so we
+   *   consume one from the weapon hand instead.
    */
 
-  return this.containerManager.equipment.removeIndex(Equipment.prototype.SLOTS.QUIVER, 1);
+  let equipment = this.containerManager.equipment;
+  let weapon = equipment.getDistanceWeapon();
+
+  if(weapon !== null && weapon.isDistanceWeapon() && weapon.getAttribute("ammoType") === null) {
+    return equipment.removeIndex(Equipment.prototype.SLOTS.HAND_LEFT, 1);
+  }
+
+  return equipment.removeIndex(Equipment.prototype.SLOTS.QUIVER, 1);
 
 }
 
