@@ -644,14 +644,17 @@ function activeAmmoItem(p) {
 /* Missile (projetil) que cada municao/elemento usa, pelos nomes do
  * CONST_ANI_* do Canary. */
 const AMMO_MISSILE = {
-  "arrow": "arrow", "simple-arrow": "arrow", "flash-arrow": "arrow",
-  "shiver-arrow": "arrow", "flaming-arrow": "arrow", "earth-arrow": "arrow",
-  "envenomed-arrow": "poison-arrow", "sniper-arrow": "arrow", "tarsal-arrow": "arrow",
-  "diamond-arrow": "arrow", "onyx-arrow": "arrow", "crystalline-arrow": "arrow",
+  "arrow": "arrow", "simple-arrow": "arrow", "flash-arrow": "flash-arrow",
+  "shiver-arrow": "shiver-arrow",
+  // slug oficial e "flaming-arrow" mas o sprite importado ficou com o nome
+  // "flamming-arrow" (2 m); mapeia pro arquivo que existe de fato.
+  "flaming-arrow": "flamming-arrow", "earth-arrow": "earth-arrow",
+  "envenomed-arrow": "poison-arrow", "sniper-arrow": "sniper-arrow", "tarsal-arrow": "arrow",
+  "diamond-arrow": "diamond-arrow", "onyx-arrow": "onyx-arrow", "crystalline-arrow": "arrow",
   "poison-arrow": "poison-arrow", "burst-arrow": "burst-arrow",
-  "bolt": "bolt", "piercing-bolt": "bolt", "vortex-bolt": "bolt",
+  "bolt": "bolt", "piercing-bolt": "piercing-bolt", "vortex-bolt": "bolt",
   "power-bolt": "power-bolt", "drill-bolt": "bolt", "prismatic-bolt": "bolt",
-  "infernal-bolt": "infernal-bolt", "spectral-bolt": "bolt",
+  "infernal-bolt": "infernal-bolt", "spectral-bolt": "spectral-bolt",
   "spear": "spear", "royal-spear": "royal-spear", "hunting-spear": "hunting-spear",
 };
 
