@@ -398,8 +398,19 @@ Canvas.prototype.__drawCharacter = function(spriteBuffer, spriteBufferMount, out
    * a color mask for each
    */
 
-  // We have to offset characters of size 64 by 16 pixels
-  position = new Position(position.x - offset, position.y - offset);
+  // Outfit/monster sprites can be larger than a single 32x32 tile (e.g., 2x2
+  // tall monsters, mounted characters). Center the multi-tile sprite on the
+  // creature's tile by shifting by (width - 1)/2 horizontally and
+  // (height - 1) vertically so the feet stay on the tile instead of floating.
+  // For 1x1 sprites this is zero offset; for 2x2 outfits it becomes (0.5, 1)
+  // tile (16x32 px), which matches Tibia's rendering convention.
+  let xOffset = (characterGroup.width  - 1) * 0.5;
+  let yOffset = (characterGroup.height - 1);
+
+  position = new Position(
+    position.x - xOffset * (size / 32),
+    position.y - yOffset * (size / 32)
+  );
 
   // Go over the width and height of the sprite
   for(let x = 0; x < characterGroup.width; x++) {
