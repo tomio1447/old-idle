@@ -81,6 +81,9 @@ function spellsByType(voc) {
 /* Skill que a magia usa: o canary aplica a skill da arma equipada.
  * Monk sem arma usa fist; knight usa sword/axe/club; paladin usa dist. */
 function spellSkillFor(p, s) {
+  // Update 15.25: as magias de escudo do knight (Shield Bash/Slam)
+  // escalam com SHIELDING, nao com a skill da arma.
+  if (s && s.shieldSpell) return "shield";
   if (typeof weaponSkill !== "function") return "fist";
   const sk = weaponSkill(p);
   // magias de arremesso do paladin (exori con / exori san) usam distance
@@ -90,8 +93,22 @@ function spellSkillFor(p, s) {
   return sk === "magic" ? "fist" : sk;
 }
 
-/* Attack do item equipado, usado nas formulas de skill do canary */
-function spellAttackValue(p) {
+/* Attack do item equipado, usado nas formulas de skill do canary.
+ *
+ * Update 15.25: o "attack value" de TODOS os personagens subiu 20%, o que
+ * no cliente e um multiplicador sobre o ataque da arma/municao. Para as
+ * magias de escudo (Shield Bash/Slam), o valor base e a DEFESA do escudo
+ * — que no mesmo update ganhou +30% (ou +60% num spellbook, mas spellbook
+ * nao casta Shield Bash). */
+function spellAttackValue(p, s) {
+  // magias de escudo: a base de dano e o DEFESA do escudo equipado
+  if (s && s.shieldSpell) {
+    const e = p.equip && p.equip.shield;
+    const it = e && typeof GAMEDATA !== "undefined"
+      ? GAMEDATA.items[e.item] : null;
+    if (!it || it.t === "quiver") return 1;   // sem escudo: bate com 1
+    return Math.floor((it.def || 1) * 1.3);   // +30% defence dos shields
+  }
   const w = p.equip && p.equip.weapon;
   if (!w) return 7;                          // punho vale attack 7 no canary
   const it = (typeof upgradedStats === "function")
@@ -102,14 +119,15 @@ function spellAttackValue(p) {
     const ammo = it.inf ? null
       : (p.equip.ammo && typeof GAMEDATA !== "undefined"
          ? GAMEDATA.items[p.equip.ammo.item] : null);
-    return (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0) || 7;
+    // +20% attack value (15.25) sobre arma + municao
+    return Math.floor(((it.atk || 0) + (ammo ? (ammo.atk || 0) : 0)) * 1.2) || 7;
   }
   // O dano elemental da arma conta no ataque das magias de skill: o
   // COMBAT_FORMULA_SKILL do servidor chama getWeaponDamage, que soma
   // physicalAttack + elementalAttack. Sem isso um knight com naga sword
   // (atk 8, elDmg 44) lancava exori como se tivesse ataque 8.
   const elDmg = (it.el && it.el !== "physical") ? (it.elDmg || 0) : 0;
-  return (it.atk || 0) + elDmg || 7;
+  return Math.floor(((it.atk || 0) + elDmg) * 1.2) || 7;  // +20% (15.25)
 }
 
 /* Elemento secundario que a arma equipada adiciona as magias de skill.
@@ -138,13 +156,25 @@ function spellValues(p, s) {
   const level = p.level || 1;
   let lo, hi;
   if (f.modo === "magic") {
-    const ml = typeof effMagic === "function" ? effMagic(p) : (p.ml || 0);
+    let ml = typeof effMagic === "function" ? effMagic(p) : (p.ml || 0);
+    // 15.25: stances que concedem ML extra (Divine Defiance = ML sagrado/
+    // cura a partir da distance; Elemental Synthesis = ML gelo/terra)
+    if (typeof stanceMLBonus === "function") ml = stanceMLBonus(p, s, ml);
+    // 15.25: "Curas escalam melhor com Magic Level e Shielding" (secao
+    // Knights). O coeficiente exato do servidor nao foi divulgado no
+    // boletim: adotamos Shielding/4 como ML adicional, o que mantem a
+    // proporcao com os base powers oficiais (15/70/225/500) sem inflar
+    // — fica o registro para troca quando o valor oficial aparecer.
+    if (s.type === "heal" && p.voc === "knight" &&
+        typeof effSkill === "function") {
+      ml += Math.floor(effSkill(p, "shield") / 4);
+    }
     lo = (f.lvlMin || 0) * level + (f.mlMin || 0) * ml + (f.flatMin || 0);
     hi = (f.lvlMax || 0) * level + (f.mlMax || 0) * ml + (f.flatMax || 0);
   } else {
     const skill = typeof effSkill === "function"
       ? effSkill(p, spellSkillFor(p, s)) : (p.skills ? p.skills.fist : 10);
-    const atk = spellAttackValue(p);
+    const atk = spellAttackValue(p, s);
     const sa = skill * atk;
     lo = (f.saMin || 0) * sa + (f.skMin || 0) * skill + (f.atMin || 0) * atk +
          (f.lvlMin || 0) * level + (f.flatMin || 0);

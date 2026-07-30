@@ -331,6 +331,12 @@ const SPELLS = {};
       range: d.range, needTarget: !!d.needTarget, needWeapon: !!d.needWeapon,
       premium: !!d.premium, group: d.group, chain: d.chain,
       cond: d.cond, dispel: d.dispel, regen: d.regen, monk: d.monk,
+      // Update 15.25.3a4a52: campos novos das magias do Vocation
+      // Balancing — magia de escudo, debuff do proximo auto attack,
+      // re-strike 1s depois e marcador de stance. Sem copiar aqui eles
+      // se perdiam na conversao SPELLDATA -> SPELLS.
+      shieldSpell: d.shieldSpell, weakNext: d.weakNext, echo: d.echo,
+      stance: d.stance,
       f: d.f, sid: d.sid,
       // grupos de cooldown: {idDoGrupo: duracaoMs}. Lancar a magia trava o
       // grupo inteiro, e nao so ela — igual ao servidor.
@@ -458,11 +464,9 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
       n: "health potion", s: null, t: "supply", sell: 45, buy: 45, w: 2.0,
     };
   }
-  if (!GAMEDATA.items["mana-fluid"]) {
-    GAMEDATA.items["mana-fluid"] = {
-      n: "mana fluid", s: null, t: "supply", sell: 80, buy: 80, w: 2.0,
-    };
-  }
+  // mana fluid foi removido do jogo (ver supplies.js); se um save antigo ainda
+  // referenciar o item, normalizePlayer migra para mana-potion no load.
+  if (GAMEDATA.items["mana-fluid"]) delete GAMEDATA.items["mana-fluid"];
   for (const slug in AMMO_DEFS) {
     const a = AMMO_DEFS[slug];
     GAMEDATA.items[slug] = Object.assign({}, GAMEDATA.items[slug] || {}, {

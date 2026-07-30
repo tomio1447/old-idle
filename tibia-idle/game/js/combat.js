@@ -47,6 +47,11 @@ function newCombat(player, huntId, instanceMode) {
     spellCd: {},
     runeCd: 0,
     healCd: 0,
+    // cooldown das POTIONS do 15.x: beber qualquer potion trava TODAS as
+    // potions por 1s (e o cooldown compartilhado do cliente oficial — por
+    // isso health e mana nao podem entrar no mesmo segundo). Runas tem o
+    // cooldown proprio (runeCd) e nao participam.
+    potionCd: 0,
     regenHp: 0,
     regenMp: 0,
     buffs: {},
@@ -63,6 +68,7 @@ function newCombat(player, huntId, instanceMode) {
       time: 0,
     },
     events: [],       // eventos visuais para a UI
+    delayedHits: [],  // re-strikes agendados (Death Echo / Spiritual Outburst 15.25)
     dead: false,
     deadUntil: 0,
   };
@@ -652,6 +658,11 @@ const AMMO_MISSILE = {
   "envenomed-arrow": "poison-arrow", "sniper-arrow": "sniper-arrow", "tarsal-arrow": "arrow",
   "diamond-arrow": "diamond-arrow", "onyx-arrow": "onyx-arrow", "crystalline-arrow": "arrow",
   "poison-arrow": "poison-arrow", "burst-arrow": "burst-arrow",
+  // flechas AoE do 15.25: nao tem sprite de projetil proprio no cliente —
+  // voam como flecha comum e explodem com o areaFx do elemento
+  "shatterstorm-arrow": "arrow", "firestorm-arrow": "arrow",
+  "terrastorm-arrow": "arrow", "froststorm-arrow": "arrow",
+  "thunderstorm-arrow": "arrow",
   "bolt": "bolt", "piercing-bolt": "piercing-bolt", "vortex-bolt": "bolt",
   "power-bolt": "power-bolt", "drill-bolt": "bolt", "prismatic-bolt": "bolt",
   "infernal-bolt": "infernal-bolt", "spectral-bolt": "spectral-bolt",
@@ -686,11 +697,21 @@ function monsterMissile(mob) {
 }
 
 /* Aplica a resistencia elemental do monstro (dados do Canary).
- * percent > 0 = toma MENOS dano; negativo = fraqueza. 100 = imune. */
+ * percent > 0 = toma MENOS dano; negativo = fraqueza. 100 = imune.
+ *
+ * 15.25: Expose Weakness (crippling stance do Sorcerer) concede 8% de
+ * elemental pierce contra o alvo marcado — "atacantes recebem 8%
+ * elemental pierce contra o alvo". Implementado como -8 pontos na
+ * resistencia do monstro enquanto a marca durar (so dano elemental —
+ * fisico nao e elemento). */
 function applyResist(mob, element, dano) {
   const r = mob.def && mob.def.resist;
   if (!r || !element) return dano;
-  const pc = r[element];
+  let pc = r[element];
+  if (!pc && element !== "physical" &&
+      !(mob.exposeUntil && mob.exposeUntil > Date.now())) return dano;
+  if (element !== "physical" && mob.exposeUntil && mob.exposeUntil > Date.now())
+    pc = (pc || 0) - 8;
   if (!pc) return dano;
   const escala = Math.max(0, 1 - pc / 100);
   return Math.max(pc >= 100 ? 0 : 1, Math.floor(dano * escala));
@@ -792,21 +813,40 @@ function playerAttack(c, p, target) {
   }
 
   const element = ammo && ammo.el ? ammo.el : d.element;
-  const rollDamage = () => {
+  const rollDamage = (alvoPrincipal) => {
     let v = d.min + Math.random() * (d.max - d.min);
     if (!isMagic) {
-      const red = Math.min(v * 0.55,
-                           target.def.armor * (0.3 + Math.random() * 0.4));
+      // Mitigation dos MONSTROS foi aumentada no 15.25 ("Mitigation foi
+      // ajustada... Mitigation dos monstros foi aumentada"): o redutor de
+      // armadura sobe de 30-70% para 45-95% e o teto de 55% para 62%.
+      const red = Math.min(v * 0.62,
+                           target.def.armor * (0.45 + Math.random() * 0.5));
       v -= red;
     }
-    // charm da Cyclopedia aumenta o golpe antes da resistencia do monstro
-    v = applyCharmDamage(p, element, Math.max(1, Math.floor(v)));
+    // charm da Cyclopedia aumenta o golpe antes da resistencia — mas desde
+    // o 15.25 os auto attacks so ativam charms no ALVO PRINCIPAL, entao o
+    // bonus nao vale para cleave nem para a area da municao.
+    v = Math.max(1, Math.floor(v));
+    if (alvoPrincipal) v = applyCharmDamage(p, element, v);
     return applyResist(target, element, Math.max(1, v));
   };
 
-  let raw = rollDamage();
+  let raw = rollDamage(true);
   // dano extra do perfect shot, somado depois da resistencia
   if (perfeito) raw += perfeito;
+
+  // ---- multiplicadores de stance/haste do 15.25: Protector (-15% dano
+  // causado) e a nova Swift Foot, que agora permite atacar mas reduz 30%
+  if (raw > 0) {
+    if (typeof stanceTotals === "function") {
+      const dst = stanceTotals(p).dmgDealt;
+      if (dst !== 1) raw = Math.max(1, Math.floor(raw * dst));
+    }
+    if (typeof swiftFootMul === "function") {
+      const swf = swiftFootMul(p);
+      if (swf !== 1) raw = Math.max(1, Math.floor(raw * swf));
+    }
+  }
 
   // ---- Monk: o mantra vira dano no golpe de punho (perk Ascetic /
   // santuarios da quest). So no auto-ataque corpo a corpo, como no
@@ -908,6 +948,18 @@ function playerAttack(c, p, target) {
                       missile: isDist ? playerMissile(p, element)
                                       : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
     }
+    // 15.25: as crippling stances do Sorcerer aplicam Sap Strength /
+    // Expose Weakness em qualquer golpe que acerte (auto attack incluso)
+    if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, target);
+    // 15.25: wands e rods passam a GERAR mana em vez de consumir. A
+    // pagina oficial diz apenas "restauram uma pequena quantidade, quanto
+    // maior o poder, maior a quantidade": atamos 2% do dano causado.
+    if (isMagic) {
+      const mw = Math.max(1, Math.floor(raw * 0.02));
+      p.mp = Math.min(maxStats(p).mp, p.mp + mw);
+      c.events.push({ t: "mana-wisp", amount: mw,
+                      x: pos.x, y: pos.y, screen: true });
+    }
   } else if (errou) {
     // o projetil ainda voa, mas cai na casa desviada
     c.events.push({ t: "miss", x: target.x, y: target.y });
@@ -919,9 +971,11 @@ function playerAttack(c, p, target) {
     for (const m of c.mobs) {
       if (m === target || m.hp <= 0) continue;
       if (sqmDist(m, target) > 1) continue;   // so os 8 tiles vizinhos
-      const corte = Math.max(1, Math.floor(rollDamage() * 0.5));
+      const corte = Math.max(1, Math.floor(rollDamage(false) * 0.5));
       m.hp -= corte;
       c.stats.damage += corte;
+      // crippling stance tambem marca quem tomou o respingo
+      if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
       c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y,
                       screen: true, el: element });
     }
@@ -974,9 +1028,11 @@ function playerAttack(c, p, target) {
         // Rolagem CHEIA em cada alvo. O 0.75 que estava aqui era invencao
         // nossa: no Canary a municao de area executa a mesma formula em
         // todas as casas cobertas, sem desconto por ser respingo.
-        const splash = Math.max(1, Math.floor(rollDamage()));
+        const splash = Math.max(1, Math.floor(rollDamage(false)));
         m.hp -= splash;
         c.stats.damage += splash;
+        // crippling stance tambem marca quem estava na area da flecha
+        if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
         c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y,
                         screen: true, el: element });
       }
@@ -1036,6 +1092,12 @@ function tryCastSpell(c, p, target, now) {
     if (!cdReady(p, id, now)) continue;
     // magia que exige arma (exori, exori min...) nao sai de maos vazias
     if (s.needWeapon && !(p.equip && p.equip.weapon)) continue;
+    // magia de ESCUDO do knight (15.25) nao sai sem escudo na secundaria
+    if (s.shieldSpell) {
+      const ess = p.equip && p.equip.shield;
+      const iss = ess ? GAMEDATA.items[ess.item] : null;
+      if (!iss || iss.t === "quiver") continue;
+    }
     if (usaLista && escolhidas.indexOf(id) === -1) continue;
     avail.push([id, s]);
   }
@@ -1069,6 +1131,18 @@ function tryCastSpell(c, p, target, now) {
 function castSpellById(c, p, target, now, id) {
   const s = SPELLS[id];
   if (!s) return false;
+  // stances nao sao magias de ataque: ligam/desligam pela aba ATAQUE do
+  // Helper (toggleStance). Sem o guard uma stance esquecida na rotacao
+  // sairia como se fosse golpe.
+  if (s.stance) return false;
+
+  // 15.25: Shield Bash/Slam precisam de um ESCUDO na mao secundaria (a
+  // aljava do paladin nao conta). Sem escudo a magia simplesmente nao sai.
+  if (s.shieldSpell) {
+    const esh = p.equip && p.equip.shield;
+    const ish = esh ? GAMEDATA.items[esh.item] : null;
+    if (!ish || ish.t === "quiver") return false;
+  }
 
   // agora que a magia esta escolhida, o alcance dela e que manda.
   // MONKSPELLS traz o spell:range() do .lua (Mystic Repulse alcanca 7).
@@ -1124,14 +1198,48 @@ function castSpellById(c, p, target, now, id) {
     }
   } else if (usaMonk) {
     targets = monkSpellTargets(p, id, c, target);
+  } else if (s.chain && s.chain > 1) {
+    // Chain generica do 15.25 (nova Lightning, Forked Glacier/Thorns):
+    // a magia acerta o alvo e ate N-1 alvos ADICIONAIS, saltando sempre
+    // para o inimigo mais proximo do ultimo atingido — a mesma regra da
+    // chain do Monk, so que sem janela de distancia (o boletim descreve
+    // apenas "alvos adicionais proximos").
+    const vistos = new Set([target]);
+    const lista = [target];
+    let atual = target;
+    while (lista.length < s.chain) {
+      let perto = null, menor = Infinity;
+      for (const m of c.mobs) {
+        if (m.hp <= 0 || vistos.has(m)) continue;
+        const dd = sqmDist(m, atual);
+        if (dd < menor) { menor = dd; perto = m; }
+      }
+      if (!perto) break;
+      lista.push(perto);
+      vistos.add(perto);
+      atual = perto;
+    }
+    targets = lista;
   } else {
     const nAlvos = typeof spellTargets === "function" ? spellTargets(s) : (s.area ? 4 : 1);
     targets = nAlvos > 1 ? c.mobs.slice(0, nAlvos) : [target];
   }
+  // a magia encadeia (monk ou generica)? guia o visual do projetil, que
+  // sai do alvo ANTERIOR em vez do jogador, e o evento de raio em cadeia.
+  const ehChain = (md && md.chain) || (s.chain && s.chain > 1);
+  // fracao do re-strike do 15.25: Death Echo tem 0.5 na propria magia e o
+  // Spiritual Outburst do Monk ganhou o mesmo no MONKSPELLDATA
+  const echoFrac = s.echo || (md && md.echo) || 0;
 
   let elemento = s.element || "energy";
   if (typeof monkSpellElement === "function") {
     elemento = monkSpellElement(p, s, elemento);
+  }
+  // stance elemental do Sorcerer (15.25): a conversao e um gatilho UNICO
+  // por conjuracao — se a magia anterior era do elemento da stance, esta
+  // sai convertida; se esta for do elemento, arma a proxima (stances.js)
+  if (typeof stanceConvert === "function") {
+    elemento = stanceConvert(p, elemento);
   }
   // Efeito visual: o Monk manda primeiro (o Elemental Bond troca a cor do
   // golpe), depois o efeito proprio da magia vindo do Canary (s.fx) e so
@@ -1184,6 +1292,30 @@ function castSpellById(c, p, target, now, id) {
     if (typeof buffTotals === "function") {
       dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
     }
+    // ---- efeitos de stance do 15.25 sobre a magia:
+    //   - Protector: -15% de dano causado (mesmo multiplicador do ataque);
+    //   - Master of Flames: +4% base power nas magias de fogo;
+    //   - Master of Thunder: +4% de chance de CRITICO (150%) em energia;
+    //   - Master of Decay: 10% de chance de +30% de dano extra em morte.
+    // O critico do update sai com o efeito "CRIT!" (ver drainEvents).
+    let critSt = false;
+    if (typeof stanceTotals === "function") {
+      const stT = stanceTotals(p);
+      if (stT.dmgDealt !== 1) dmg = Math.floor(dmg * stT.dmgDealt);
+      const pEl = stT.elemPct[elemento] || 0;
+      if (pEl) dmg = Math.max(1, Math.floor(dmg * (1 + pEl / 100)));
+      const crCh = stT.elemCrit[elemento] || 0;
+      const crDg = stT.elemCritDmg[elemento] || 0;
+      if (crCh && Math.random() < crCh / 100) {
+        dmg = Math.floor(dmg * 1.5);
+        critSt = true;
+      } else if (crDg && Math.random() < 0.10) {
+        dmg = Math.max(1, Math.floor(dmg * (1 + crDg / 100)));
+        critSt = true;
+      }
+    }
+    // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
+    if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
     dmg = applyCharmDamage(p, elemento, dmg);
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
@@ -1203,18 +1335,28 @@ function castSpellById(c, p, target, now, id) {
       if (s.cond && typeof applyCondition === "function") {
         applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
       }
+      // 15.25, por alvo: crippling stance marca o alvo; a magia de escudo
+      // enfraquece o proximo auto attack; o eco re-bate em 1s
+      if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, t, now);
+      if (s.weakNext) t.weakNextUntil = now + 10000;
+      if (echoFrac) {
+        c.delayedHits.push({ at: now + 1000, mobId: t.id,
+          dmg: Math.max(1, Math.floor((fisFinal + eleFinal) * echoFrac)),
+          el: elemento, fx: fxMagia });
+      }
       c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
-                      projectile: idx === 0 || !!(md && md.chain),
+                      projectile: idx === 0 || !!ehChain,
                       el: elemento, spell: s.name, fx: fxMagia,
-                      race: t.def && t.def.race,
-                      chain: md && md.chain && idx > 0 ? 1 : 0,
+                      race: t.def && t.def.race, crit: critSt,
+                      chain: ehChain && idx > 0 ? 1 : 0,
                       missile: missMagia });
       c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
-                      projectile: false, el: armaEl.el, dual: 1 });
+                      projectile: false, el: armaEl.el, dual: 1,
+                      crit: critSt });
       return;
     }
     dmg = applyResist(t, elemento, dmg);
@@ -1224,15 +1366,28 @@ function castSpellById(c, p, target, now, id) {
     if (s.cond && typeof applyCondition === "function") {
       applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
     }
+    // 15.25, por alvo: crippling stance (Sap Strength / Expose Weakness),
+    // weakNext do Shield Bash/Slam ("reduz em 50% o dano do proximo
+    // ataque automatico do alvo realizado em ate 10 segundos") e o eco —
+    // "apos 1 segundo a mesma area e atingida novamente por 50% do dano
+    // inicial" (Death Echo / Spiritual Outburst).
+    if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, t, now);
+    if (s.weakNext) t.weakNextUntil = now + 10000;
+    if (echoFrac) {
+      c.delayedHits.push({ at: now + 1000, mobId: t.id,
+        dmg: Math.max(1, Math.floor(dmg * echoFrac)),
+        el: elemento, fx: fxMagia });
+    }
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
                     sx: c.player ? c.player.x : 0.18,
                     sy: c.player ? c.player.y : 0.62,
                     screen: true,
                     // no chain o projetil sai do alvo ANTERIOR, nao do
                     // jogador: e o golpe saltando de inimigo em inimigo
-                    projectile: idx === 0 || !!(md && md.chain),
+                    projectile: idx === 0 || !!ehChain,
                     el: elemento, spell: s.name, fx: fxMagia,
-                    chain: md && md.chain && idx > 0 ? 1 : 0,
+                    crit: critSt,
+                    chain: ehChain && idx > 0 ? 1 : 0,
                     missile: missMagia });
   });
   if (areaTiles.length > 1) {
@@ -1240,9 +1395,10 @@ function castSpellById(c, p, target, now, id) {
                     fx: fxMagia || (ELEMENTS[elemento] || ELEMENTS.physical).fx,
                     el: elemento });
   }
-  if (md && md.chain && targets.length > 1) {
+  if (ehChain && targets.length > 1) {
     c.events.push({ t: "chain", n: targets.length, x: target.x, y: target.y,
-                    screen: true, fx: md.chainFx || "white-energy-spark" });
+                    screen: true,
+                    fx: (md && md.chainFx) || "white-energy-spark" });
   }
   // builder gera a harmonia DEPOIS do golpe, como o postCastSpell do servidor
   if (kind === "builder") {
@@ -1341,6 +1497,9 @@ function tryUseRune(c, p, target, now, forcada) {
       c.stats.damage += dmg;
       total += dmg;
     }
+    // crippling stances do Sorcerer (15.25): "spells, runes e auto
+    // attacks aplicam Sap Strength / Expose Weakness"
+    if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, alvo, now);
     // conditions (soulfire queima, poison bomb envenena): o dano vem no
     // tempo, entao a runa pode nem ter dano direto
     if (s.cond && typeof applyCondition === "function") {
@@ -1371,17 +1530,23 @@ function tryUseRune(c, p, target, now, forcada) {
   return total > 0 || !!s.cond;
 }
 
-/* Cura: spell primeiro, depois runa/pocao */
+/* Cura: spell primeiro, depois runa/pocao.
+ *
+ * Cooldowns do 15.x, como no cliente oficial:
+ *   - magia de cura: trava por 1s o caminho de MAGIA (healCd) — e o grupo
+ *     Healing — alem do cooldown proprio da spell;
+ *   - potion: trava por 1s TODAS as potions (potionCd), mas NAO trava
+ *     magia: no Tibia da para beber a potion e soltar exura no mesmo segundo.
+ */
 function tryHeal(c, p, now) {
   const max = maxStats(p);
   const pct = (p.hp / max.hp) * 100;
   const spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
   const itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
   if (pct > Math.max(spellAt, itemAt)) return false;
-  if (c.healCd > now) return false;
 
   // 1. magia de cura: usa apenas se o HP estiver no limite configurado para spell.
-  if (pct <= spellAt) {
+  if (pct <= spellAt && !(c.healCd > now)) {
     const heals = [];
     const selectedHealSpell = p.config.healSpell;
     if (selectedHealSpell) {
@@ -1406,7 +1571,14 @@ function tryHeal(c, p, now) {
         heals.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
       }
       const [idCura, s] = heals[0];
-      const amount = Math.max(1, rollSpell(p, s));
+      let amount = Math.max(1, rollSpell(p, s));
+      // stances 15.25: Sharpshooter ativa reduz 25% a cura CONJURADA do
+      // paladin; Shared Conservation soma 10% de autocura
+      if (typeof stanceTotals === "function") {
+        const stH = stanceTotals(p);
+        if (stH.healMul !== 1) amount = Math.max(1, Math.floor(amount * stH.healMul));
+        if (stH.healSelf) amount = Math.max(1, Math.floor(amount * (1 + stH.healSelf)));
+      }
       cdStart(p, idCura, s, now);
       p.mp -= s.mana;
       addManaSpent(p, combatManaSkillGain(c, s.mana));
@@ -1417,8 +1589,9 @@ function tryHeal(c, p, now) {
       return true;
     }
   }
-  // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item.
-  if (p.config.useRunes && pct <= itemAt) {
+  // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item
+  //    e se as potions nao estiverem no cooldown compartilhado de 1s.
+  if (p.config.useRunes && pct <= itemAt && !(c.potionCd > now)) {
     let best = null;
     const selectedHealSupply = p.config.healSupply;
     if (selectedHealSupply) {
@@ -1436,11 +1609,34 @@ function tryHeal(c, p, now) {
       const s = SUPPLIES[best];
       if (!consumeSupplyCharge(c, p, best)) return false;
       const pw = supplyPower(s, p.level);
-      const amount = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
+      // potion de HP que tambem da mana (spirit/great spirit) restaura os
+      // dois no mesmo gole — no canary potions.lua as spirit fazem as duas
+      // rolagens. Antes a mana extra era ignorada pelo motor.
+      let manaAmount = 0;
+      if (s.mana) {
+        manaAmount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
+        p.mp = Math.min(max.mp, p.mp + manaAmount);
+      }
+      let amount = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
+      // Shared Conservation (15.25): +10% de autocura vale tambem para
+      // potion/runa usada em si mesmo
+      if (typeof stanceTotals === "function" && stanceTotals(p).healSelf) {
+        amount = Math.max(1, Math.floor(amount * (1 + stanceTotals(p).healSelf)));
+      }
       p.hp = Math.min(max.hp, p.hp + amount);
-      c.healCd = now + 1000;
-      c.events.push({ t: "heal", amount: amount, rune: s.name });
-      c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
+      // potion trava TODAS as potions por 1s; runa de cura (UH/IH) nao bebe,
+      // entao usa o cooldown de runa e mantem o healCd antigo
+      if (s.kind === "rune") c.healCd = now + 1000;
+      else c.potionCd = now + 1000;
+      c.events.push({ t: "heal", amount: amount, rune: s.name,
+                      mana: manaAmount, supply: best, drunk: s.kind !== "rune" });
+      // o famoso "Aahhh..." do Tibia: beber potion NAO fala o nome do item;
+      // runa continua anunciando o nome (el e uma conjuracao, nao um gole)
+      if (s.kind === "rune") {
+        c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
+      } else {
+        c.events.push({ t: "say", text: "Aahhh...", supply: true, drunk: 1 });
+      }
       return true;
     }
   }
@@ -1570,8 +1766,16 @@ function autoRestock() {
   return 0;
 }
 
-/* Repoe mana com cogumelos */
-function tryMana(c, p) {
+/* Repoe mana com potions.
+ *
+ * Antes esta funcao nao tinha cooldown NENHUM: como combate roda em ticks
+ * de 100ms, uma mana potion era bebida a cada tick enquanto a mana estivesse
+ * abaixo do limite — 10 goles por segundo. No Tibia a potion trava todas as
+ * potions por 1s (o mesmo potionCd da cura de item), entao uma mana potion
+ * por segundo e o maximo. */
+function tryMana(c, p, now) {
+  now = now || Date.now();
+  if (c.potionCd > now) return false;
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
@@ -1581,12 +1785,26 @@ function tryMana(c, p) {
   else for (const slug in p.supplies) candidates.push(slug);
   for (const slug of candidates) {
     const s = SUPPLIES[slug];
-    if (!s || s.type !== "mana" || !canRechargeSupply(p, slug)) continue;
+    // potions spirit tem cura+mana: elas so entram aqui quando o jogador as
+    // escolheu explicitamente como fonte de mana (senao o motor bebia a
+    // spirit cara como se fosse mana potion comum)
+    if (!s || !(s.type === "mana" || (s.both && p.config.manaSupply === slug))) continue;
+    if (!canRechargeSupply(p, slug)) continue;
     if (!consumeSupplyCharge(c, p, slug)) continue;
     const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
     p.mp = Math.min(max.mp, p.mp + amount);
-    c.events.push({ t: "mana", amount: amount });
-    c.events.push({ t: "say", text: s.name.toLowerCase(), supply: true });
+    // spirit tambem cura HP no mesmo gole
+    let healAmount = 0;
+    if (s.both && s.heal) {
+      healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
+      p.hp = Math.min(max.hp, p.hp + healAmount);
+    }
+    c.potionCd = now + 1000;   // cooldown compartilhado das potions (1s)
+    c.events.push({ t: "mana", amount: amount, supply: slug,
+                    heal: healAmount, drunk: 1 });
+    // o gole do Tibia: "Aahhh..." — nunca o nome da potion
+    c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
+                    supply: true, drunk: 1 });
     return true;
   }
   return false;
@@ -1641,8 +1859,38 @@ function mobAttack(c, p, mob) {
     c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
     return 0;
   }
+  // Divine Defiance (stance do Paladin, 15.25): 12% de esquiva contra
+  // inimigos NAO adjacentes. Golpe corpo-a-corpo ignora a esquiva.
+  if (typeof stanceTotals === "function" &&
+      typeof sqmDistance === "function" &&
+      pl.cx !== undefined && mob.cx !== undefined) {
+    const dod = stanceTotals(p).dodgeRanged;
+    if (dod && sqmDistance(pl, mob) > 1 && Math.random() < dod) {
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+      return 0;
+    }
+  }
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
+  const agora = Date.now();
+  // Shield Bash/Slam (15.25): o proximo auto attack do alvo em ate 10s
+  // sai pela METADE. O debuff e consumido neste golpe.
+  if (mob.weakNextUntil) {
+    if (mob.weakNextUntil > agora) raw = Math.floor(raw * 0.5);
+    delete mob.weakNextUntil;
+  }
+  // Sap Strength (crippling stance do Sorcerer, 15.25): o alvo marcado
+  // causa 10% menos dano.
+  if (mob.sapStrUntil && mob.sapStrUntil > agora) {
+    raw = Math.floor(raw * 0.9);
+  }
+  // The Way of the Monk expandido (15.25): cada santuario da quest reduz
+  // em 2% o dano de MELEE auto attacks recebidos. No oficial sao 10
+  // santuarios (teto de 20%); o jogo tem 3, entao o teto aqui e 6%.
+  if (p.monkShrines && monsterAttackRange(mob) <= 0.16) {
+    const rs = Math.min(0.20, p.monkShrines * 0.02);
+    if (rs > 0) raw = Math.floor(raw * (1 - rs));
+  }
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
   raw = raw * (1 - Math.min(0.7, def.protection / 100));
   raw = Math.max(0, Math.floor(raw));
@@ -1677,6 +1925,13 @@ function mobAttack(c, p, mob) {
   if (bfd && bfd.dmgReceived !== 1)
     raw = Math.max(1, Math.floor(raw * bfd.dmgReceived));
 
+  // stances do 15.25: Blood Rage AUMENTA o dano recebido em 15% e o
+  // Protector reduz 15% — multiplicador proprio, separado dos buffs
+  if (typeof stanceTotals === "function") {
+    const stD = stanceTotals(p).dmgReceived;
+    if (stD !== 1) raw = Math.max(1, Math.floor(raw * stD));
+  }
+
   // protecao elemental vinda dos imbuements
   if (typeof imbProtection === "function") {
     const prot = imbProtection(p, mob.def.element);
@@ -1699,6 +1954,27 @@ function mobAttack(c, p, mob) {
     }
     if (raw < antesMantra) c.stats.mantraAbsorvido =
       (c.stats.mantraAbsorvido || 0) + (antesMantra - raw);
+  }
+
+  // Mana Buffer (15.25, so Sorcerer/Druid): diante de um golpe LETAL o
+  // dano excedente sai da MANA, nao da vida — 8 de mana por ponto de vida
+  // evitado, mais uma taxa extra de 25% da mana maxima que so pode ser
+  // cobrada uma vez a cada 2 segundos (boletim oficial do update). Se a
+  // mana nao cobrir, o personagem morre normalmente.
+  if ((p.voc === "sorcerer" || p.voc === "druid") && raw >= p.hp && p.hp > 0) {
+    const excesso = raw - p.hp + 1;              // o necessario para zerar
+    const taxa = (agora - (p.manaBufferAt || 0) >= 2000)
+      ? Math.floor(maxStats(p).mp * 0.25) : 0;
+    const custo = excesso * 8 + taxa;
+    if (p.mp >= custo) {
+      p.mp -= custo;
+      p.hp = 1;                                  // sobrevive no limite
+      if (taxa) p.manaBufferAt = agora;
+      c.events.push({ t: "manabuffer", vida: excesso, mana: custo,
+                      x: pl.x, y: pl.y, screen: true,
+                      sx: mob.x, sy: mob.y });
+      return 0;   // golpe absorvido: nada sai da vida nem dos stats
+    }
   }
 
   p.hp -= raw;
@@ -1860,7 +2136,7 @@ function combatTick(c, p, dt, now) {
 
   // cura e mana
   tryHeal(c, p, now);
-  tryMana(c, p);
+  tryMana(c, p, now);
 
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
   // voltando ao templo/cidade pelo fluxo normal de morte.
@@ -1893,6 +2169,25 @@ function combatTick(c, p, dt, now) {
       m.atkCd = acted === false ? 300 : (m.def.attackSpeed || 2000);
     }
     monsterThinkYell(m, dt);
+  }
+
+  // Re-strikes do 15.25 (Death Echo / Spiritual Outburst): 1 segundo apos
+  // o primeiro impacto, o MESMO alvo recebe a fracao do dano inicial.
+  // Alvo morto ou fora de cena simplesmente perde o eco.
+  if (c.delayedHits && c.delayedHits.length) {
+    const pend = [];
+    for (const h of c.delayedHits) {
+      if (h.at > now) { pend.push(h); continue; }
+      const mob = c.mobs.find((m) => m.id === h.mobId);
+      if (mob && mob.hp > 0) {
+        const dmg = Math.max(1, h.dmg);
+        mob.hp -= dmg;
+        c.stats.damage += dmg;
+        c.events.push({ t: "hit", dmg: dmg, x: mob.x, y: mob.y,
+                        screen: true, el: h.el, fx: h.fx || "death-echo" });
+      }
+    }
+    c.delayedHits = pend;
   }
 
   // morte do jogador

@@ -76,8 +76,60 @@ const PRECO_WIKI = {
   "strong-health-potion": 100, "strong-mana-potion": 80,
   "great-health-potion": 190, "great-mana-potion": 120,
   "great-spirit-potion": 190, "ultimate-health-potion": 310,
-  "ultimate-mana-potion": 438, "ultimate-spirit-potion": 322,
-  "supreme-health-potion": 625,
+  "ultimate-mana-potion": 438, "supreme-health-potion": 625,
+  // update 15.25.3a4a52 (balanceamento de vocacoes):
+  // - ultimate spirit potion subiu de 322 para 488 gp nos NPCs
+  // - superior mana potion (nova): 254 gp
+  // - distilled custam 50% a mais que a versao normal (254*1.5=381, 488*1.5=732)
+  "ultimate-spirit-potion": 488,
+  "superior-mana-potion": 254,
+  "distilled-superior-mana-potion": 381,
+  "distilled-ultimate-mana-potion": 732,
+};
+
+/* Potions introduzidas pelo update 15.25.3a4a52 (16/jun/2026). O Canary do
+ * repositorio e anterior ao update, entao SUPPLYDATA nao as traz — os dados
+ * abaixo vem do tibiawiki.com.br:
+ *
+ *   superior mana potion           240-360 mana, nv 100, sorcerer/druid/paladin/monk
+ *   distilled superior mana potion mesmo efeito, TODAS as vocacoes, nv 100
+ *   distilled ultimate mana potion mesmo efeito da ultimate mana (425-575),
+ *                                  TODAS as vocacoes, nv 200
+ *
+ * O itemId oficial nao consta no items.xml do Canary (posterior a ele), por
+ * isso fica 0 — o campo so e usado para mapear o kit de Dawnport.
+ */
+const POTIONS_1525 = {
+  // ATENCAO: o campo `id` precisa existir — o derivarPreco consulta o
+  // PRECO_WIKI por ele (sem `id` a potion nova caia no preco estimado).
+  "superior-mana-potion": {
+    id: "superior-mana-potion", itemId: 0, nome: "superior mana potion",
+    lvl: 100, vocs: ["sorcerer", "druid", "paladin", "monk"],
+    mp: [240, 360], tipo: "mp",
+  },
+  "distilled-superior-mana-potion": {
+    id: "distilled-superior-mana-potion", itemId: 0,
+    nome: "distilled superior mana potion", lvl: 100,
+    vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
+    mp: [240, 360], tipo: "mp",
+  },
+  "distilled-ultimate-mana-potion": {
+    id: "distilled-ultimate-mana-potion", itemId: 0,
+    nome: "distilled ultimate mana potion", lvl: 200,
+    vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
+    mp: [425, 575], tipo: "mp",
+  },
+};
+
+/* Ajustes do update 15.25.3a4a52 nas potions que ja existiam:
+ *
+ *   great mana potion -> passou a ser de TODAS as vocacoes (knight incluido)
+ *   great health potion / supreme / ultimate health -> sem mudanca de faixa
+ */
+const POTIONS_1525_AJUSTES = {
+  "great-mana-potion": {
+    vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
+  },
 };
 
 function derivarPreco(e) {
@@ -99,9 +151,13 @@ function tituloSupply(n) {
 const SUPPLIES = {};
 
 (function montarSupplies() {
-  // ---- potions
-  for (const id in SUPPLYDATA_RAW.potions) {
-    const e = SUPPLYDATA_RAW.potions[id];
+  // ---- potions (canary + as novas do update 15.25.3a4a52)
+  const potions = Object.assign({}, SUPPLYDATA_RAW.potions, POTIONS_1525);
+  for (const id in POTIONS_1525_AJUSTES) {
+    if (potions[id]) Object.assign(potions[id], POTIONS_1525_AJUSTES[id]);
+  }
+  for (const id in potions) {
+    const e = potions[id];
     const s = {
       name: tituloSupply(e.nome), sprite: id, itemId: e.itemId,
       lvl: e.lvl || 1, vocs: e.vocs || [],
@@ -171,13 +227,13 @@ const SUPPLIES = {};
     type: "food", tier: 1, lvl: 1, kind: "food",
     vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
   };
-  // mana fluid continua existindo: e o consumivel barato do inicio e varias
-  // configuracoes salvas de jogador ainda apontam para ele
-  SUPPLIES["mana-fluid"] = {
-    name: "Mana Fluid", sprite: "mana-fluid", price: 80,
-    mana: [75, 125], scale: 0.8, type: "mana", tier: 2, lvl: 1,
-    vocs: ["sorcerer", "druid", "paladin", "knight", "monk"], kind: "fluid",
-  };
+  /*
+   * MANA FLUID — REMOVIDO (pedido do jogador, alinhado ao update):
+   * o consumivel deixou de existir no jogo. Saves antigos que ainda tenham
+   * cargas ou a config apontando para ele sao migrados no load
+   * (game.js/normalizePlayer): cargas viram mana-potion e a selecao
+   * passa para a mana-potion.
+   */
 })();
 
 /* ------------------------------------------------------------- consultas */
