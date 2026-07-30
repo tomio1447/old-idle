@@ -164,7 +164,8 @@ function playerThinkStep(c, p, alvo, occ, now) {
 }
 
 /* Alcance do jogador em SQM, derivado do tipo de dano.
- * Melee = 1 (inclui diagonal, por Chebyshev), distancia = 6, magia = 5. */
+ * Melee = 1 (inclui diagonal, por Chebyshev), distancia = 6, magia = 6
+ * (o 15.25 aumentou o alcance das wands e rods: "recebem maior alcance"). */
 function playerRangeSQM(p) {
   if (typeof playerDamage !== "function") return 1;
   const d = playerDamage(p);
@@ -173,7 +174,7 @@ function playerRangeSQM(p) {
       ? GAMEDATA.items[p.equip.weapon.item] : null;
     return (w && w.range) ? Math.min(7, w.range) : 6;
   }
-  if (d.type === "magic") return 5;
+  if (d.type === "magic") return 6;   // 15.25: wands/rods alcancam mais
   return 1;
 }
 

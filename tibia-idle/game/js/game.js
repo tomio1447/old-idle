@@ -127,7 +127,7 @@ function normalizePlayer(p) {
     manaAt: 50,
     healSpell: "",
     healSupply: "",
-    manaSupply: "mana-fluid",
+    manaSupply: "mana-potion",
     useRunes: true,
     autoRestock: false,
     manaTrain: null,
@@ -154,8 +154,25 @@ function normalizePlayer(p) {
   if (p.voc === "paladin" && !p.config.refillArrow && !p.config.refillBolt)
     p.config.refillArrow = "arrow";
   p.supplies = p.supplies || {};
-  if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) p.supplies["mana-fluid"] = 0;
-  if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-fluid";
+  // Migracao do update 15.25.3a4a52: mana fluid foi REMOVIDO do jogo.
+  // Cargas guardadas viram mana-potion (mesma faixa de restauracao) e a
+  // selecao do Helper passa a apontar para ela.
+  if (Object.prototype.hasOwnProperty.call(p.supplies, "mana-fluid")) {
+    const q = p.supplies["mana-fluid"] || 0;
+    if (q > 0) {
+      p.supplies["mana-potion"] = (p.supplies["mana-potion"] || 0) + q;
+    }
+    delete p.supplies["mana-fluid"];
+  }
+  if (p.config.manaSupply === "mana-fluid") p.config.manaSupply = "mana-potion";
+  if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-potion")) p.supplies["mana-potion"] = 0;
+  if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-potion";
+  // Saves antigos que selecionaram algo que deixou de existir nao podem
+  // quebrar o motor de cura/mana.
+  if (p.config.manaSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.manaSupply])
+    p.config.manaSupply = "";
+  if (p.config.healSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.healSupply])
+    p.config.healSupply = "";
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.lootPouch = p.lootPouch || {};
@@ -171,12 +188,60 @@ function normalizePlayer(p) {
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
+  // ultima instancia escolhida no modal da hunt (pre-selecao de UI)
+  p.lastInstanceChoice = p.lastInstanceChoice || null;
   p.ammo = p.ammo || {};
   p.upgrades = p.upgrades || {};
   p.imbuements = p.imbuements || {};
   p.dummies = p.dummies || {};
   p.conditions = p.conditions || {};
   p.buffs = p.buffs || {};
+  // Stances do update 15.25.3a4a52: posturas permanentes salvas junto ao
+  // personagem (persistem apos logout, como no oficial).
+  p.stances = p.stances || {};
+  // Migracao: antes do 15.25 o Protector (utamo-tempo) era um BUFF
+  // relancado pelo Helper. Vira stance ativa no save antigo.
+  if (p.config.buff === "utamo-tempo") {
+    p.stances["utamo-tempo"] = true;
+    p.config.buff = null;
+  }
+  // Migracao: a Sharpshooter antiga (utito tempo san) foi SUBSTITUIDA
+  // pela stance utori con. Se o jogador a usava como magia de suporte
+  // recorrente, a stance equivalente ja nasce ligada.
+  const mencionavaSharpshooter =
+    p.config.buff === "utito-tempo-san" ||
+    p.config.shooterSpell === "utito-tempo-san" ||
+    (Array.isArray(p.config.attackSpells) &&
+     p.config.attackSpells.indexOf("utito-tempo-san") !== -1) ||
+    (Array.isArray(p.config.combo) && p.config.combo.some(
+      (x) => x && x.kind === "spell" && x.id === "utito-tempo-san"));
+  if (p.config.buff === "utito-tempo-san") p.config.buff = null;
+  if (p.config.shooterSpell === "utito-tempo-san") p.config.shooterSpell = "";
+  if (mencionavaSharpshooter && p.voc === "paladin" && p.level >= 20) {
+    p.stances["utori-con"] = true;
+  }
+  // Magias removidas/substituidas pelo update saem das listas ofensivas
+  // (combo e selecao antiga do Helper), senao o motor tenta lancar
+  // fantasma. Stances nunca devem figurar como magia de rotacao.
+  const REMOVIDAS_1525 = {
+    "utito-tempo-san": 1,   // virou stance utori con
+    "uteta-tio": 1,         // Mentor Other removida pelo update
+  };
+  if (Array.isArray(p.config.attackSpells)) {
+    p.config.attackSpells = p.config.attackSpells.filter(
+      (id) => !REMOVIDAS_1525[id] &&
+              !(typeof SPELLS !== "undefined" && SPELLS[id] && SPELLS[id].stance));
+  }
+  if (Array.isArray(p.config.combo)) {
+    for (let i = 0; i < p.config.combo.length; i++) {
+      const slot = p.config.combo[i];
+      if (slot && slot.kind === "spell" &&
+          (REMOVIDAS_1525[slot.id] ||
+           (typeof SPELLS !== "undefined" && SPELLS[slot.id] && SPELLS[slot.id].stance))) {
+        p.config.combo[i] = null;
+      }
+    }
+  }
   // Monk: harmonia acumulada e santuarios da quest "The Way of the Monk".
   // Saves feitos antes do sistema de Mantra nao tem esses campos.
   // barra de combo: cria a estrutura e migra a config antiga do shooter
@@ -626,19 +691,24 @@ function startBoss(id) {
 function openInstanceModal(id) {
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  // lembra a ultima instancia escolhida e destaca no modal — facilita
+  // repetir a mesma hunt sem ler os dois blocos de novo
+  const ultima = G.p && G.p.lastInstanceChoice;
   $("#modal-body").innerHTML = `
     <div class="panel-title">Escolha a instância — ${hu.name}</div>
     <div class="panel-body">
       <div class="shop-row" style="align-items:flex-start">
         <div style="flex:1">
-          <div class="small" style="color:#9ce84a">Instância non-pvp</div>
+          <div class="small" style="color:#9ce84a">Instância non-pvp
+            ${ultima === "non-pvp" ? `<span class="tiny dim">· última escolha</span>` : ""}</div>
           <div class="tiny dim">Ninguém pode te raidar. EXP, loot e skills normais.</div>
         </div>
         <button class="primary sm" data-instance="non-pvp">Entrar</button>
       </div>
       <div class="shop-row" style="align-items:flex-start">
         <div style="flex:1">
-          <div class="small" style="color:#ff9a6a">Instância pvp</div>
+          <div class="small" style="color:#ff9a6a">Instância pvp
+            ${ultima === "pvp" ? `<span class="tiny dim">· última escolha</span>` : ""}</div>
           <div class="tiny dim">Outros jogadores reais poderão te raidar e matar no online. EXP, loot e skills +25%. +0,5% de chance de monstro Influenced.</div>
         </div>
         <button class="danger sm" data-instance="pvp">Entrar</button>
@@ -662,6 +732,7 @@ function startHunt(id, instanceMode) {
   G.inCity = false;
   G.p.hunt = id;
   G.p.instanceMode = instanceMode;
+  G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
   G.combat = newCombat(G.p, id, instanceMode);
   spawnWave(G.combat, G.p);
   addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
@@ -749,6 +820,36 @@ function drainEvents() {
         // elemento e a sudden death parecia igual a um golpe de death comum.
         r.addEffect(x, y, e.fx || (raca ? raca.fx
                     : (ELEMENTS[e.el] || ELEMENTS.physical).fx));
+        // critico das stances do Sorcerer (15.25): o sprite "CRIT!" do
+        // update pisca em cima do alvo
+        if (e.crit) r.addEffect(x, y - 0.06, "crit-text");
+        break;
+      }
+      case "stance":
+        // ativacao de stance: o sprite da postura explode no jogador
+        r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, e.fx || "magic-blue");
+        addLog("skill", `Stance ativada: <b>${e.nome}</b>`);
+        break;
+      case "stance-off":
+        addLog("skill", `Stance desativada: <b>${e.nome}</b>`);
+        break;
+      case "manabuffer": {
+        // Mana Buffer do 15.25: o golpe letal sai da mana em vez da vida
+        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
+        r.addFloater(px, py - 0.09, "-" + fmt(e.mana) + " mana", "#6a8aff");
+        r.addFloater(px, py - 0.02, "mana buffer!", "#9ac0e8");
+        r.addEffect(px, py, "magic-blue");
+        r.playerFlash = 90;
+        addLog("skill", `Mana Buffer absorveu <b>${fmtFull(e.vida)}</b> de dano por <b>${fmtFull(e.mana)}</b> mana.`);
+        renderStats(G.p);
+        break;
+      }
+      case "mana-wisp": {
+        // as wands/rods do 15.25 devolvem mana a cada ataque
+        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
+        if (e.amount > 0)
+          r.addFloater(px + 0.03, py - 0.14, "+" + fmt(e.amount) + " mana", "#6a8aff");
+        r.addEffect(px, py, "mana-wisp");
         break;
       }
       case "miss":
@@ -774,12 +875,23 @@ function drainEvents() {
       case "heal": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
+        // potion de spirit tambem restaura mana no mesmo gole
+        if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana) + " mana", "#6a8aff");
         r.addEffect(px, c.player ? c.player.y : 0.6, "green-rings");
+        // a potion correspondente brilha no Helper
+        if (e.supply && typeof helperSupplyFlash === "function")
+          helperSupplyFlash(e.supply, "heal");
         break;
       }
       case "mana": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount) + " mana", "#6a8aff");
+        // spirit potion bebida como mana tambem mostra a cura
+        if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.heal), "#7ae87a");
+        // faisca azul do gole de mana (como o CONST_ME_MAGIC_BLUE do client)
+        r.addEffect(px, c.player ? c.player.y : 0.6, "magic-blue");
+        if (e.supply && typeof helperSupplyFlash === "function")
+          helperSupplyFlash(e.supply, "mana");
         break;
       }
       case "supply-buy":

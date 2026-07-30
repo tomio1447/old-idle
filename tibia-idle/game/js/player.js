@@ -82,7 +82,7 @@ function newPlayer(name, voc, sex) {
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
     lootConfig: { noCollect: [], noSell: [] },
-    supplies: { "mana-fluid": 0 }, // slug -> count/carga selecionada
+    supplies: { "mana-potion": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
     stamina: 42 * 3600,     // segundos (42h cheio)
     deaths: 0,
@@ -96,10 +96,10 @@ function newPlayer(name, voc, sex) {
       healAt: 90,           // legado: % geral de cura
       healSpellAt: 90,      // % de HP para usar magia de cura
       healItemAt: 60,       // % de HP para usar item/runa/potion de cura
-      manaAt: 50,           // % de mana para usar mana fluids
+      manaAt: 50,           // % de mana para usar potions de mana
       healSpell: "",        // magia de cura selecionada pelo Helper
       healSupply: "",       // runa/potion de cura selecionada pelo Helper
-      manaSupply: "mana-fluid", // item de mana selecionado pelo Helper
+      manaSupply: "mana-potion", // item de mana selecionado pelo Helper
       useRunes: true,
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana
@@ -164,7 +164,14 @@ function gearStats(p) {
     const it = typeof upgradedStats === "function"
       ? upgradedStats(p, "equip:" + s, e.item) : base;
     g.armor += it.arm || 0;
-    g.defense += it.def || 0;
+    // Update 15.25: defence value dos SHIELDS +30% e dos SPELLBOOKS +60%.
+    // O multiplicador so vale para o item vestido na mao secundaria (shield
+    // slot) e nao conta para a aljava do paladin.
+    if (s === "shield" && it.def && it.t !== "quiver") {
+      g.defense += Math.floor(it.def * (it.mag ? 1.6 : 1.3));
+    } else {
+      g.defense += it.def || 0;
+    }
     g.attack += it.atk || 0;
     g.magicDamage += it.mdmg || 0;
     g.mag += it.mag || 0;
@@ -215,6 +222,20 @@ function effSkill(p, which) {
   if (which === "fist" && typeof virtudeFistBonus === "function") {
     v = Math.floor(v * virtudeFistBonus(p));
   }
+  // Stances do 15.25, tambem percentuais sobre o TOTAL da skill:
+  //   Blood Rage   -> +25% melee (fist/axe/club/sword)
+  //   Sharpshooter -> +32% distance (conta equipamentos e buffs)
+  if (typeof stanceTotals === "function") {
+    const st = stanceTotals(p);
+    if (st.meleePct &&
+        (which === "sword" || which === "axe" || which === "club" ||
+         which === "fist")) {
+      v = Math.floor(v * (1 + st.meleePct / 100));
+    }
+    if (st.distPct && which === "dist") {
+      v = Math.floor(v * (1 + st.distPct / 100));
+    }
+  }
   return v;
 }
 
@@ -260,7 +281,8 @@ function playerDamage(p) {
   if (it && it.t === "distance") {
     // armas de munição infinita (spear) usam só o próprio ataque
     const ammo = it.inf ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
-    const atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
+    let atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
+    atk = Math.floor(atk * 1.2);            // +20% attack value (15.25)
     // municao elemental corta o dano pela metade contra monstro (o resto
     // vira dano do elemento), como no getWeaponDamage do servidor
     const el = (ammo && ammo.el) || "physical";
@@ -269,7 +291,8 @@ function playerDamage(p) {
     return { min: d.min, max: d.max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
-  const fis = it ? (it.atk || 0) : 7;         // punho = attack 7 no canary
+  // +20% attack value (15.25) sobre o ataque da arma
+  const fis = it ? Math.floor((it.atk || 0) * 1.2) : 7;         // punho = attack 7 no canary
   // Arma elemental (naga sword, fire sword, ice rapier...) soma o elDmg ao
   // ataque ANTES de rolar: e o `totalAttack` do Weapon::getCombatDamage.
   // Antes o elDmg era ignorado aqui, entao uma naga sword (atk 8, elDmg 44)
@@ -295,12 +318,20 @@ function playerDefense(p) {
     armor: g.armor,
     defense: g.defense,
     shielding: (function () {
+      // Blood Rage (15.25): ZERA a capacidade de bloquear — so a armadura
+      // continua reduzindo o dano, como diz a pagina oficial da magia.
+      if (typeof stanceTotals === "function" && stanceTotals(p).noBlock)
+        return 0;
       let sh = effSkill(p, "shield");
       // Protector e Virtue of Harmony aumentam o shielding em %
+      let pc = 0;
       if (typeof buffTotals === "function") {
         const b = buffTotals(p);
-        if (b.shieldPercent) sh = Math.floor(sh * (1 + b.shieldPercent / 100));
+        pc += b.shieldPercent || 0;
       }
+      // stance Protector: +30% Shielding (15.25)
+      if (typeof stanceTotals === "function") pc += stanceTotals(p).shieldPct;
+      if (pc) sh = Math.floor(sh * (1 + pc / 100));
       return sh;
     })(),
     protection: g.prot,

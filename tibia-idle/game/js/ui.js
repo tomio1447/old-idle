@@ -37,6 +37,25 @@ function itemName(slug) {
  * A versao que existia aqui sobrescrevia a de la (ui.js carrega depois) e
  * era a causa de TODOS os itens animados aparecerem estaticos. */
 
+/* Brilho do item de potion/runa no Helper quando ela e consumida.
+ *
+ * O evento "heal"/"mana" do combate chega pelo drainEvents e chama aqui:
+ * a linha do supply correspondente pisca (verde = cura, azul = mana) por
+ * ~900ms. Fora de combate a funcao simplesmente nao acha a linha e some
+ * sem erro. O reflow forçado reinicia a animacao quando dois goles saem
+ * quase juntos (spirit potion cura HP e mana no mesmo segundo). */
+function helperSupplyFlash(slug, kind) {
+  if (!slug) return;
+  const row = document.querySelector(
+    `.helper-supply-row[data-supply-slug="${slug}"]`);
+  if (!row) return;
+  const cls = kind === "mana" ? "flash-mana" : "flash-heal";
+  row.classList.remove("flash-heal", "flash-mana");
+  void row.offsetWidth;              // reinicia a animacao CSS
+  row.classList.add(cls);
+  setTimeout(() => row.classList.remove(cls), 950);
+}
+
 /* ------------------------------------------------------------ toasts */
 function toast(msg, kind) {
   const el = document.createElement("div");
@@ -570,25 +589,9 @@ function equipFromBag(p, slug) {
     return false;
   }
   p.equip[it.s] = { item: slug, count: 1 };
-  // Arma de duas maos remove o ESCUDO -- mas nao a aljava, que alimenta o
-  // proprio ataque a distancia (toda arma de distancia e "th" no items.xml).
-  if (it.s === "weapon" && it.th && p.equip.shield) {
-    const sec = GAMEDATA.items[p.equip.shield.item];
-    if (!(sec && sec.t === "quiver")) {
-      if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
-      else toast("Sem espaço para guardar o escudo.");
-    }
-  }
-  // Regra simetrica: um escudo (nao aljava) nao pode entrar com uma arma de
-  // duas maos ja equipada. Sem isso o jogador conseguia equipar os dois ao
-  // clicar direto no escudo, ja que so o caminho "equipar arma" checava a
-  // regra.
-  if (it.s === "shield" && it.t !== "quiver" && p.equip.weapon) {
-    const wp = GAMEDATA.items[p.equip.weapon.item];
-    if (wp && wp.th) {
-      if (addItem(p, p.equip.weapon.item, 1)) delete p.equip.weapon;
-      else toast("Sem espaço para guardar a arma de duas mãos.");
-    }
+  if (it.th && p.equip.shield) {
+    if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
+    else toast("Sem espaço para guardar o escudo.");
   }
   return true;
 }
@@ -979,34 +982,65 @@ function spellIcon(s, cls) {
     alt="${s.name || ""}" title="${s.name || ""}">`;
 }
 
-/* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle) */
+/* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle)
+ * e, desde o 15.25, das STANCES da vocacao (posturas permanentes). */
 function renderBuffPicker(p) {
-  if (typeof availableBuffs !== "function") return "";
-  const lista = availableBuffs(p);
-  if (!lista.length) return "";
-  const ativos = typeof buffTotals === "function" ? buffTotals(p).lista : [];
-  const agora = Date.now();
-  return `
-    <div class="small dim mt8 mb4">Buff de vocação</div>
-    <div class="list" style="max-height:150px">
-      ${lista.map(({ chave, buff, spell }) => {
-        const sel = p.config.buff === chave;
-        const at = ativos.find((x) => x.chave === chave);
-        const resta = at ? Math.max(0, Math.ceil((at.ate - agora) / 1000)) : 0;
-        return `<div class="shop-row ${sel ? "selected" : ""}">
-          ${spell ? spellIcon(spell) : ""}
-          <div style="flex:1;min-width:0">
-            <div class="small">${buff.nome}
-              ${resta ? `<span style="color:#9ce84a">· ${resta}s</span>` : ""}</div>
-            <div class="tiny dim">${spell ? `<b>${spell.words || chave}</b> · ${spell.mana} mana · nv ${spell.lvl}` : ""}</div>
-            <div class="tiny dim">${buff.desc}</div>
-          </div>
-          <button class="sm ${sel ? "primary" : ""}" data-buff="${chave}">
-            ${sel ? "ATIVO" : "USAR"}</button>
-        </div>`;
-      }).join("")}
-    </div>
-    <div class="tiny dim mt4">O buff é relançado sozinho enquanto estiver selecionado.</div>`;
+  let html = "";
+  if (typeof availableBuffs === "function") {
+    const lista = availableBuffs(p);
+    if (lista.length) {
+      const ativos = typeof buffTotals === "function" ? buffTotals(p).lista : [];
+      const agora = Date.now();
+      html += `
+        <div class="small dim mt8 mb4">Buff de vocação</div>
+        <div class="list" style="max-height:150px">
+          ${lista.map(({ chave, buff, spell }) => {
+            const sel = p.config.buff === chave;
+            const at = ativos.find((x) => x.chave === chave);
+            const resta = at ? Math.max(0, Math.ceil((at.ate - agora) / 1000)) : 0;
+            return `<div class="shop-row ${sel ? "selected" : ""}">
+              ${spell ? spellIcon(spell) : ""}
+              <div style="flex:1;min-width:0">
+                <div class="small">${buff.nome}
+                  ${resta ? `<span style="color:#9ce84a">· ${resta}s</span>` : ""}</div>
+                <div class="tiny dim">${spell ? `<b>${spell.words || chave}</b> · ${spell.mana} mana · nv ${spell.lvl}` : ""}</div>
+                <div class="tiny dim">${buff.desc}</div>
+              </div>
+              <button class="sm ${sel ? "primary" : ""}" data-buff="${chave}">
+                ${sel ? "ATIVO" : "USAR"}</button>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="tiny dim mt4">O buff é relançado sozinho enquanto estiver selecionado.</div>`;
+    }
+  }
+  // Stances do 15.25: ligar paga a mana UMA vez e a postura fica ativa ate
+  // trocar ou desligar — sobrevive a logout (guardada em p.stances).
+  if (typeof stanceList === "function") {
+    const sts = stanceList(p);
+    if (sts.length) {
+      html += `
+        <div class="small dim mt8 mb4">Stance (postura)</div>
+        <div class="list" style="max-height:190px">
+          ${sts.map(({ id, st, spell, livre }) => {
+            const on = stanceAtiva(p, id);
+            return `<div class="shop-row ${on ? "selected" : ""}" style="opacity:${livre ? 1 : .45}">
+              ${spellIcon(spell)}
+              <div style="flex:1;min-width:0">
+                <div class="small">${st.nome}
+                  ${on ? `<span style="color:#9ce84a">· ATIVA</span>` : ""}</div>
+                <div class="tiny dim"><b>${spell.words || id}</b> · ${spell.mana} mana · nv ${spell.lvl}</div>
+                <div class="tiny dim">${st.desc}</div>
+              </div>
+              <button class="sm ${on ? "primary" : ""}" data-stance="${id}" ${livre ? "" : "disabled"}>
+                ${on ? "DESLIGAR" : "ATIVAR"}</button>
+            </div>`;
+          }).join("")}
+        </div>
+        <div class="tiny dim mt4">Stances ficam ativas até você trocar ou desligar — continuam valendo mesmo após relogar.</div>`;
+    }
+  }
+  return html;
 }
 
 function renderHelper(p) {
@@ -1026,7 +1060,7 @@ function renderHelper(p) {
       : Object.keys(SUPPLIES).filter((k) => SUPPLIES[k].type === "heal"));
     const manaSup = (typeof suppliesOf === "function"
       ? suppliesOf(p, "mana").map((x) => x[0])
-      : ["mana-fluid"]);
+      : ["mana-potion"]);
 
     const supplyRow = (slug) => {
       const s = SUPPLIES[slug]; if (!s) return "";
@@ -1046,6 +1080,7 @@ function renderHelper(p) {
       if (s.mana) valores.push(`<span style="color:#6a8aff">mana ${s.mana[0]}-${s.mana[1]}</span>`);
       if (!valores.length) valores.push(`${ehMana ? "mana" : "hp"} ${pw[0]}-${pw[1]}`);
       return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}"
+                   data-supply-slug="${slug}"
                    style="opacity:${liberado ? 1 : .45}">
         <img src="assets/item/${s.sprite}.png" alt="${s.name}">
         <div style="flex:1;min-width:0">
@@ -1128,7 +1163,7 @@ function renderHelper(p) {
       if (!Object.prototype.hasOwnProperty.call(p.supplies, slug)) p.supplies[slug] = 0;
       if (s.type === "mana") {
         p.config.manaSupply = p.config.manaSupply === slug ? "" : slug;
-        toast(p.config.manaSupply ? `Mana selecionada: <b>${s.name}</b>` : "Mana Fluid desativado");
+        toast(p.config.manaSupply ? `Mana selecionada: <b>${s.name}</b>` : "Potion de mana desativada");
       } else {
         p.config.healSupply = slug;
         toast(`Cura selecionada: <b>${s.name}</b>`);
@@ -1158,6 +1193,19 @@ function renderHelper(p) {
                           : "Buff desativado.");
       renderHelper(p);
     }));
+    // stances do 15.25: toggle direto no personagem (custa mana; persiste)
+    $$("#helper-attack [data-stance]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.stance;
+      if (typeof toggleStance !== "function") return;
+      if (toggleStance(p, id, G.combat)) {
+        const st = STANCES[id];
+        toast(stanceAtiva(p, id)
+              ? `Stance ativa: <b>${st ? st.nome : id}</b>`
+              : `Stance desligada: <b>${st ? st.nome : id}</b>`);
+        if (typeof renderStats === "function") renderStats(p);
+      }
+      renderHelper(p);
+    }));
     $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
       p.config.attackMode = b.dataset.attackMode;
       renderHelper(p);
@@ -1176,7 +1224,10 @@ function renderHelper(p) {
 const REFILL_AMMO = {
   arrow: ["flash-arrow", "shiver-arrow", "flaming-arrow", "earth-arrow", "simple-arrow",
           "poison-arrow", "arrow", "envenomed-arrow", "burst-arrow", "sniper-arrow",
-          "tarsal-arrow", "diamond-arrow", "onyx-arrow", "crystalline-arrow"],
+          "tarsal-arrow", "diamond-arrow", "onyx-arrow", "crystalline-arrow",
+          // flechas AoE do 15.25 (13 sqm)
+          "shatterstorm-arrow", "firestorm-arrow", "terrastorm-arrow",
+          "froststorm-arrow", "thunderstorm-arrow"],
   bolt: ["bolt", "piercing-bolt", "vortex-bolt", "power-bolt", "drill-bolt",
          "prismatic-bolt", "infernal-bolt", "spectral-bolt"],
 };
@@ -1410,13 +1461,17 @@ function renderNpcQuick() {
     }));
 }
 
-/* Painel "Magias": o grimorio completo da vocacao.
+/* Painel "Magias": o grimorio completo da vocacao — SOMENTE LEITURA.
  *
  * Mostra TODAS as magias que a vocacao tem no 15.x (nao so as ofensivas),
  * agrupadas por tipo, com o icone oficial, as palavras, o custo e — o mais
  * util — a faixa de dano/cura JA CALCULADA para o personagem atual usando a
- * formula do canary. Marcar uma magia de ataque a coloca na rotacao do
- * auto-cast; sem nenhuma marcada o motor usa a de maior dano. */
+ * formula do canary.
+ *
+ * Nao ha mais botao USAR aqui: quem manda na rotacao e a aba COMBO, onde o
+ * jogador monta os slots na ordem de prioridade. Esta aba serve apenas para
+ * o jogador consultar o que ele tem disponivel (como o spellbook do client,
+ * que tambem nao conjura nada). */
 function renderSpells(p) {
   const box = $("#helper-spells");
   if (!box) return;
@@ -1424,8 +1479,13 @@ function renderSpells(p) {
 
   const grupos = spellsByType(p.voc);
   const filtro = (p.config.spellFilter || "all");
-  const marcadas = p.config.attackSpells || (p.config.attackSpells = []);
   const somenteDisponiveis = !!p.config.spellOnlyReady;
+  // spells presentes na barra de COMBO: so para exibir o selo "na rotação"
+  const combo = typeof ensureCombo === "function" ? ensureCombo(p) : [];
+  const noCombo = {};
+  for (const entrada of combo) {
+    if (entrada && entrada.kind === "spell") noCombo[entrada.id] = true;
+  }
 
   const ordem = ["attack", "heal", "cure", "support", "conjure", "summon"];
   const contagem = ordem.reduce((acc, t) => {
@@ -1438,19 +1498,19 @@ function renderSpells(p) {
   const linha = (s) => {
     const ok = spellUnlocked(p, s);
     const id = s.id;
-    const marc = marcadas.indexOf(id) !== -1;
+    const marc = !!noCombo[id];
     const faixa = ok ? spellRangeText(p, s) : "";
-    const podeMarcar = s.type === "attack";
     return `<div class="spell-row ${marc ? "selected" : ""}" style="opacity:${ok ? 1 : .4}">
       ${spellIcon(s)}
       <div style="flex:1;min-width:0">
         <div class="small">${s.name}
+          ${s.stance ? `<span class="tiny" style="color:#d4af37">· stance</span>` : ""}
           ${faixa ? `<span style="color:${s.type === "heal" ? "#7ae87a" : "#ff9a4a"}">· ${faixa}</span>` : ""}</div>
         <div class="tiny dim"><b>${s.words}</b> · ${s.mana} mana · nv ${s.lvl}${s.ml ? " · ml " + s.ml : ""} · cd ${Math.round(s.cd / 1000)}s</div>
-        <div class="tiny dim">${spellDesc(s)}</div>
+        <div class="tiny dim">${s.stance ? "Postura do 15.25 — ative/desligue na aba ATAQUE." : spellDesc(s)}</div>
       </div>
-      ${podeMarcar
-        ? `<button class="sm ${marc ? "primary" : ""}" data-spell-toggle="${id}" ${ok ? "" : "disabled"}>${marc ? "USANDO" : "USAR"}</button>`
+      ${marc
+        ? `<span class="tiny" style="white-space:nowrap;color:#9ce84a">na rotação</span>`
         : `<span class="tiny dim" style="white-space:nowrap">${ok ? "aprendida" : "nv " + s.lvl}</span>`}
     </div>`;
   };
@@ -1467,7 +1527,9 @@ function renderSpells(p) {
     <div class="tiny dim mb8">
       <b style="color:#d4af37">${liberadas}</b> de <b>${total}</b> magias de
       ${VOCATIONS[p.voc].name} liberadas no nível ${p.level}.
-      Valores calculados com a fórmula real do Canary para este personagem.
+      Valores calculados com a fórmula real do Canary para este personagem.<br>
+      Esta aba é só consulta: as magias de ataque entram em combate pela aba
+      <b style="color:#9ce84a">COMBO</b> (e a cura pela aba <b>HEAL</b>).
     </div>
     <div class="row wrap mb4" style="gap:4px">
       ${[["all", "Todas"]].concat(ordem.filter((t) => contagem[t])
@@ -1490,23 +1552,8 @@ function renderSpells(p) {
     p.config.spellOnlyReady = chk.checked;
     renderSpells(p);
   });
-  $$("#helper-spells [data-spell-toggle]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const id = b.dataset.spellToggle;
-      const i = marcadas.indexOf(id);
-      if (i === -1) {
-        marcadas.push(id);
-        // marcar magia no grimorio ja liga o auto-cast, senao nada acontece
-        p.config.spellAttack = true;
-        const cb = $("#cfg-spell");
-        if (cb) cb.checked = true;
-        toast(`Magia adicionada: <b>${SPELLS[id].name}</b>`);
-      } else {
-        marcadas.splice(i, 1);
-        toast(`Magia removida: <b>${SPELLS[id].name}</b>`);
-      }
-      renderSpells(p);
-    }));
+  // sem handler de USAR: a aba Magias e somente leitura. A escolha das
+  // magias de ataque acontece na barra de COMBO (openComboPicker).
 }
 
 /* ------------------------------------------------- barra de cooldown */

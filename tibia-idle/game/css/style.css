@@ -244,6 +244,45 @@ canvas { image-rendering: pixelated; }
   background: rgba(80, 65, 18, .35);
   outline: 1px solid rgba(212,175,55,.32);
 }
+/* A potion ATIVA brilha de leve o tempo todo: o jogador enxerga de relance
+ * qual frasco o Helper esta bebendo (pedido: "effects delas brilharem no
+ * helper"). */
+.helper-supply-row.selected img {
+  filter: drop-shadow(0 0 5px rgba(255, 230, 128, .9))
+          drop-shadow(0 0 2px rgba(255, 230, 128, .7));
+  animation: supply-idle-glow 2.6s ease-in-out infinite;
+}
+@keyframes supply-idle-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 230, 128, .55)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(255, 230, 128, 1)); }
+}
+/* O FLASH de uso: quando o motor bebe a potion, a linha dela pisca na cor
+ * do efeito (verde = cura, azul = mana), imitando o brilho do gole no
+ * cliente oficial. */
+.helper-supply-row.flash-heal {
+  animation: supply-flash-heal .9s ease-out;
+}
+.helper-supply-row.flash-heal img { animation: supply-flash-img .9s ease-out; }
+@keyframes supply-flash-heal {
+  0%   { background: rgba(64, 200, 80, .55); outline: 1px solid #7ae87a; }
+  100% { background: transparent; }
+}
+.helper-supply-row.flash-mana {
+  animation: supply-flash-mana .9s ease-out;
+}
+.helper-supply-row.flash-mana img { animation: supply-flash-imgm .9s ease-out; }
+@keyframes supply-flash-mana {
+  0%   { background: rgba(80, 120, 255, .55); outline: 1px solid #6a8aff; }
+  100% { background: transparent; }
+}
+@keyframes supply-flash-img {
+  0% { transform: scale(1.45); filter: drop-shadow(0 0 10px #7ae87a); }
+  100% { transform: scale(1); }
+}
+@keyframes supply-flash-imgm {
+  0% { transform: scale(1.45); filter: drop-shadow(0 0 10px #6a8aff); }
+  100% { transform: scale(1); }
+}
 .helper-supply-row.disabled {
   background: rgba(80, 20, 20, .22);
   outline: 1px solid rgba(176,74,74,.22);

@@ -15,6 +15,9 @@ const ADMIN = {
   aba: "char",
   busca: "",
   itemCat: "sword",
+  mobBusca: "",
+  mobBoss: false,
+  mobMult: 10,
   logs: [],
 };
 
@@ -24,6 +27,7 @@ const ADMIN_TABS = [
   { id: "skills", nome: "📊 Skills" },
   { id: "items", nome: "🎒 Itens" },
   { id: "equip", nome: "🛡 Equipamento" },
+  { id: "mobs", nome: "👹 Invocar" },
   { id: "world", nome: "🌍 Mundo" },
 ];
 
@@ -98,6 +102,7 @@ function renderAdminContent() {
   const fn = {
     char: renderAdminChar, skills: renderAdminSkills,
     items: renderAdminItems, equip: renderAdminEquip,
+    mobs: renderAdminMobs,
     world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
@@ -604,6 +609,162 @@ function renderAdminEquip(p, el) {
   };
   $("#adm-best-all").addEventListener("click", () => equiparTudo(true));
   $("#adm-best-any").addEventListener("click", () => equiparTudo(false));
+}
+
+/* -------------------------------------------------------- aba: invocar
+ *
+ * Injeta monstros e bosses direto no combate em andamento, para testar
+ * cenas de caça sem precisar viajar para a hunt certa. O monstro entra no
+ * mesmo array que o spawnWave usa (c.mobs), com celula propria na grade —
+ * assim movimento, loot e bestiario funcionam como num spawn normal.
+ *
+ * O modo "boss" aplica o multiplicador do applyBossMultiplier (o mesmo das
+ * boss fights do jogo) e marca a entrada com boss=true, o que liga o loot
+ * de boss e o registro na Bosstiary.
+ */
+
+/* Coloca UM monstro dentro do combate ativo. Devolve true se entrou. */
+function adminSummon(c, slug, asBoss, mult) {
+  const base = (typeof GAMEDATA !== "undefined") ? GAMEDATA.monsters[slug] : null;
+  if (!c || !base) return false;
+  const def = Object.assign({}, base);
+  if (asBoss) {
+    const m = applyBossMultiplier(base, mult || 10);
+    def.hp = m.hp; def.exp = m.exp; def.damage = m.damage; def.armor = m.armor;
+    def.boss = true;
+    def.name = base.name;
+  }
+  c.mobs.push({
+    slug: slug, def: def,
+    boss: !!asBoss,
+    hp: def.hp, maxHp: def.hp,
+    atkCd: 500,
+    id: "adm-" + Math.random().toString(36).slice(2, 8),
+    x: 0.80 + Math.random() * 0.14,
+    y: 0.32 + Math.random() * 0.38,
+    dir: "w",
+    moving: false,
+    attackAnim: 0,
+    speed: 0.000045 + Math.random() * 0.000025,
+    spawnAt: Date.now(),
+  });
+  const mob = c.mobs[c.mobs.length - 1];
+  // celula real na grade, igual ao spawnWave: sem isso o bicho nasce
+  // empilhado em cima dos outros e o movimento em SQM o ignora
+  if (typeof placeFree === "function") {
+    if (c.player) ensureCell(c.player);
+    const occ = buildOccupancy(c, null);
+    const cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
+    const cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+    placeFree(mob, occ, Math.min(GRID_W - 1, cx), cy);
+    mob.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(mob) : 100;
+  } else {
+    resolveSQMOccupancy(c);
+  }
+  return true;
+}
+
+function renderAdminMobs(p, el) {
+  const c = G.combat;
+  const busca = (ADMIN.mobBusca || "").trim().toLowerCase();
+
+  if (!c) {
+    el.innerHTML = `
+      <div class="admin-card">
+        <div class="admin-card-t">Invocar monstros</div>
+        <div class="tiny dim">
+          Nenhum combate em andamento. Entre em uma área de caça (ou boss)
+          e volte aqui: o monstro invocado nasce dentro da arena atual.
+        </div>
+      </div>`;
+    return;
+  }
+
+  let ids = Object.keys(GAMEDATA.monsters);
+  if (busca) {
+    ids = ids.filter((i) =>
+      (GAMEDATA.monsters[i].name || i).toLowerCase().indexOf(busca) !== -1);
+  }
+  ids.sort((a, b) => (GAMEDATA.monsters[a].hp || 0) - (GAMEDATA.monsters[b].hp || 0));
+  const mostra = ids.slice(0, 200);
+
+  el.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-t">Arena atual</div>
+      <div class="stat-row"><span class="k">Combate</span>
+        <span class="v">${c.boss ? "boss" : (c.hunt ? c.hunt.name : c.huntId)}</span></div>
+      <div class="stat-row"><span class="k">Monstros vivos</span>
+        <span class="v">${c.mobs.length}</span></div>
+      <div class="admin-quick">
+        <button class="sm" id="adm-mob-clear">Limpar arena</button>
+      </div>
+      <div class="tiny dim mt4">
+        Limpar remove todos os monstros vivos (o respawn da hunt traz os
+        próximos normalmente).
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-t">Invocar monstro</div>
+      <div class="row mb8" style="gap:6px;align-items:center">
+        <input id="adm-mob-busca" placeholder="Buscar monstro…" value="${ADMIN.mobBusca || ""}"
+               class="admin-in" style="flex:1">
+        <label class="admin-chk" style="white-space:nowrap">
+          <input type="checkbox" id="adm-mob-boss" ${ADMIN.mobBoss ? "checked" : ""}>
+          como boss</label>
+        <input type="number" id="adm-mob-mult" value="${ADMIN.mobMult || 10}" min="2" max="100"
+               class="admin-in" style="width:64px" title="Multiplicador de boss">
+      </div>
+      <div class="admin-itens">
+        ${mostra.map((i) => {
+          const m = GAMEDATA.monsters[i];
+          const mult = ADMIN.mobBoss ? (ADMIN.mobMult || 10) : 1;
+          return `<div class="admin-item">
+            ${typeof mobImg === "function" ? mobImg(i, 28) : ""}
+            <div class="admin-item-n">
+              <div class="small">${m.name}</div>
+              <div class="tiny dim">hp ${fmtFull(Math.floor(m.hp * mult))} ·
+                exp ${fmtFull(Math.floor((m.exp || 0) * mult))} ·
+                dano ${fmtFull(Math.floor((m.damage || 0) * mult))}</div>
+            </div>
+            <button class="sm primary" data-summon="${i}">invocar</button>
+          </div>`;
+        }).join("") || `<div class="dim tiny" style="padding:10px">Nada encontrado.</div>`}
+      </div>
+      ${ids.length > 200 ? `<div class="tiny dim mt4">Mostrando 200 de ${ids.length} — refine a busca.</div>` : ""}
+    </div>`;
+
+  $("#adm-mob-clear").addEventListener("click", () => {
+    c.mobs = [];
+    resolveSQMOccupancy(c);
+    adminAplicar("arena limpa");
+  });
+  const inp = $("#adm-mob-busca");
+  inp.addEventListener("input", () => {
+    ADMIN.mobBusca = inp.value;
+    renderAdminMobs(p, el);
+    const n = $("#adm-mob-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $("#adm-mob-boss").addEventListener("change", (e) => {
+    ADMIN.mobBoss = e.target.checked;
+    renderAdminMobs(p, el);
+  });
+  $("#adm-mob-mult").addEventListener("change", (e) => {
+    ADMIN.mobMult = Math.max(2, Math.min(100, parseInt(e.target.value, 10) || 10));
+    renderAdminMobs(p, el);
+  });
+  $$("#admin-content [data-summon]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const slug = b.dataset.summon;
+      if (!adminSummon(c, slug, ADMIN.mobBoss, ADMIN.mobMult)) {
+        toast("Falha ao invocar.", "bad");
+        return;
+      }
+      const nome = GAMEDATA.monsters[slug].name;
+      adminAplicar(`${ADMIN.mobBoss ? "boss " : ""}${nome} invocado ` +
+        `(${c.mobs.length} na arena)`);
+    }));
 }
 
 /* ---------------------------------------------------------- aba: mundo */

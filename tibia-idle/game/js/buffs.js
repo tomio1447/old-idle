@@ -41,13 +41,10 @@ const BUFFS = {
     desc: "Bônus base de Harmony +4 (+8 sereno) e devolve 1 ponto ao gastar.",
   },
 
-  // ---- Knight: Protector (utamo tempo) — valores do protector.lua
-  "utamo-tempo": {
-    id: "protector", nome: "Protector", grupo: "focus",
-    voc: "knight", dur: 13000,
-    shieldPercent: 220, dmgDealt: 0.65, dmgReceived: 0.85,
-    desc: "Shielding +220%, causa 65% do dano e recebe 85%.",
-  },
+  // ---- Knight: Protector e Blood Rage SAIRAM daqui no update 15.25:
+  // viraram STANCES (postura permanente) com valores novos. Os efeitos
+  // moram em js/stances.js. Saves antigos que ativavam o buff utamo-tempo
+  // migram para a stance em normalizePlayer (game.js).
 
   // ---- Paladin: Divine Dazzle (exana amp res)
   "exana-amp-res": {

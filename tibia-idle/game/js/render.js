@@ -181,6 +181,30 @@ const FX_FRAMES = {
   // (extraidos por tools/extract_fx_faltantes.py)
   "energy-hit": 10, "carniphila": 8, "holy-area": 11,
   "whirlwind-blow-white": 8,
+  // ---- Update 15.25.3a4a52 (Vocation Balancing): efeitos Effect_318 a
+  // Effect_349 extraidos da tibiawiki (GIF animado -> tira horizontal).
+  // O mapeamento para as magias foi feito pelo aspecto visual do efeito:
+  "stance-blood-rage": 11,      // civel vermelho (Effect 334)
+  "stance-protector": 11,       // escudo branco (Effect 318)
+  "stance-sharpshooter": 12,    // corte teal (Effect 320)
+  "stance-divine-defiance": 11, // gesto sagrado (Effect 327)
+  "stance-master-flames": 11,   // anel de fogo (Effect 329)
+  "stance-master-thunder": 8,   // raio rosa (Effect 333)
+  "stance-master-decay": 11,    // civel roxo (Effect 335)
+  "stance-sapped-strength": 8,  // anel escuro (Effect 347)
+  "stance-exposed-weakness": 8, // anel roxo (Effect 348)
+  "stance-shared-conservation": 11, // gesto verde (Effect 328)
+  "stance-elemental-synthesis": 11, // gesto brasa (Effect 326)
+  "bash-shield": 12,            // corte de fogo (Effect 319)
+  "slam-shield": 8,             // golpe laranja (Effect 323)
+  "barrage-divine": 11,         // explosao branca (Effect 330)
+  "barrage-ethereal": 9,        // redemoinho escuro (Effect 331)
+  "forked-glacier": 13,         // garra eletrica (Effect 324)
+  "forked-thorns": 19,          // rajada terrosa (Effect 325)
+  "death-echo": 9,              // fantasma roxo (Effect 332)
+  "fist-thousand": 8,           // corte sombrio (Effect 321)
+  "crit-text": 14,              // "CRIT!" (Effect 341)
+  "mana-wisp": 14,              // vivacidades de mana (Effect 337)
 };
 
 /* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */
