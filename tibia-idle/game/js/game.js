@@ -863,10 +863,25 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col);
-        r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
+        // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
+        // demon, mort area do lich...) — sem, cai o generico do elemento
+        r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6,
+                    e.fx || (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         r.playerFlash = 90;
         break;
       }
+      case "mobheal":
+        // cura defensiva do proprio monstro (bloco defenses do .lua)
+        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmt(e.heal), "#7ae87a");
+        r.addEffect(ex(e), ey(e), e.fx || "magic-green");
+        break;
+      case "effect":
+        // animacao pura (debuff de stat de monstro nao implementado como
+        // mecanica — entra so o efeito oficial da habilidade)
+        if (e.projectile && r.addProjectile)
+          r.addProjectile(e.sx, e.sy, ex(e), ey(e), "#ffffff", e.missile);
+        r.addEffect(ex(e), ey(e), e.fx || "magic-blue");
+        break;
       case "block":
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8", e.missile);

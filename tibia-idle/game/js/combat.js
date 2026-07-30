@@ -1876,6 +1876,233 @@ function monsterThinkYell(mob, dt) {
   }
 }
 
+/* ================================================================== skills *
+ * Habilidades do monstro, do .lua da criatura (MONSTERDATA.skills e
+ * defSkills — o tools/import_monsters.py le os blocos attacks/defenses).
+ *
+ * A cada turno de ataque (attackSpeed do bicho) rolamos a lista NA ORDEM
+ * do .lua, como o Monster::doAttacking do servidor: a primeira habilidade
+ * pronta (intervalo proprio decorrido) que passar na chance entra em cena;
+ * se nenhuma sair, cai o corpo-a-corpo. Cada habilidade tem relogio
+ * proprio — o spell:interval — guardado em mob.skillCds.
+ *
+ * O que cada campo significa (espelha os parametros do spell:... do lua):
+ *   el     elemento (CombatType)
+ *   min/max faixa de dano, ou de cura nas defensivas
+ *   int    intervalo proprio (spell:interval)
+ *   ch     chance por turno (spell:chance)
+ *   range  alcance do arremesso (spell:range)
+ *   radius raio da explosao (spell:radius): sem `alvo` explode NO MONSTRO
+ *          (a GFB do demon), com `alvo` explode NO JOGADOR
+ *   length onda que sai do monstro na direcao do alvo (spell:length/spread)
+ *   fx     efeito no impacto (COMBAT_PARAM_EFFECT)
+ *   miss   arremessavel (COMBAT_PARAM_DISTANCEEFFECT)
+ *   n      nome da condition/efeito (texto do spell:name)
+ *
+ * Removido a pedido do jogador:
+ *   - "invisible": nao existe mais invisibilidade no jogo, entao o utana
+ *     vid dos monstros (warlock, stalker...) nunca e usado;
+ *   - fuga com hp baixo (runHealth/runAt): ver gridai.js.
+ * Sem correspondente num idle solo (habilidade ignorada, documentado):
+ *   - summon/challenge/outfit: o import nao guarda quem seria invocado e
+ *     a arena segue o proprio respawn;
+ *   - debuffs de stat (speed/drunk): o conditions do jogador cobre so
+ *     dano no tempo — a habilidade entra so com a animacao oficial.
+ * ===================================================================== */
+
+/* Alcance da habilidade em SQM (o canUseAttack compara Chebyshev). */
+function mobSkillRangeSQM(sk) {
+  if ((sk.range || 0) > 0) return Math.min(7, sk.range);
+  if (sk.length) return sk.length;                    // onda
+  if (sk.radius && !sk.alvo) return sk.radius;        // explosao propria
+  return 1;                                           // sem dado: colado
+}
+
+/* Faixa min/max do dado do .lua (dano ou cura). */
+function mobSkillRoll(sk) {
+  const mn = sk.min || 0, mx = sk.max === undefined ? mn : sk.max;
+  return mn + Math.floor(Math.random() * (mx - mn + 1));
+}
+
+/* Celulas de uma explosao de raio r (Chebyshev, centrada). */
+function skillRadiusCells(cx0, cy0, r) {
+  const out = [];
+  for (let dx = -r; dx <= r; dx++)
+    for (let dy = -r; dy <= r; dy++)
+      out.push({ cx: (cx0 | 0) + dx, cy: (cy0 | 0) + dy });
+  return out;
+}
+
+/* Celulas de uma onda: linha saindo do monstro em direcao ao alvo. */
+function skillWaveCells(mob, pl, len) {
+  const out = [];
+  const dx = Math.sign((pl.cx | 0) - (mob.cx | 0));
+  const dy = Math.sign((pl.cy | 0) - (mob.cy | 0));
+  if (!dx && !dy) return [{ cx: mob.cx | 0, cy: mob.cy | 0 }];
+  for (let i = 1; i <= len; i++)
+    out.push({ cx: (mob.cx | 0) + dx * i, cy: (mob.cy | 0) + dy * i });
+  return out;
+}
+
+/* A animacao oficial da habilidade (area, onda ou impacto), sem dano. */
+function mobSkillFx(c, mob, pl, sk) {
+  const el = sk.el || "physical";
+  const fx = sk.fx || (ELEMENTS[el] || ELEMENTS.physical).fx;
+  if (sk.length) {
+    // onda nasce no monstro e varre os SQMs ate o alvo
+    c.events.push({ t: "areafx", cells: skillWaveCells(mob, pl, sk.length),
+                    fx: fx, screen: true });
+    return;
+  }
+  if (sk.radius) {
+    // com alcance+alvo a explosao cai NO JOGADOR; senao, no proprio monstro
+    const centro = sk.alvo && (sk.range || 1) > 1 ? pl : mob;
+    c.events.push({ t: "areafx",
+                    cells: skillRadiusCells(centro.cx, centro.cy, sk.radius),
+                    fx: fx, screen: true });
+    return;
+  }
+  const noAlvo = !!sk.alvo || (sk.range || 1) > 1;
+  const onde = noAlvo ? pl : mob;
+  c.events.push({ t: "effect", x: onde.x, y: onde.y, fx: fx, screen: true,
+                  projectile: noAlvo, sx: mob.x, sy: mob.y,
+                  missile: sk.miss || ELEMENT_MISSILE[el] || null });
+}
+
+/* O dano da habilidade. O corpo-a-corpo passa por armor/defense/shielding
+ * (meleeCombat do servidor); o dano de SPELL nao passa — o Combat executa
+ * com block type None e o que segura o dano sao as RESISTENCIAS:
+ * protection geral, protecao elemental de imbuement, redutores "dano
+ * recebido" (Virtue/Protector/stances), a bolha do utamo vita, a Mantra
+ * elementar do Monk e, no golpe letal, o Mana Buffer do 15.25 — na mesma
+ * ordem em que o auto attack os aplica. */
+function mobSkillHit(c, p, mob, sk, dmg) {
+  const pl = c.player;
+  const agora = Date.now();
+  let raw = dmg;
+  // Sap Strength (15.25): monstro marcado causa 10% menos — vale para todo
+  // dano causado, nao so o auto attack (o debuff marca o ALVO, nao o golpe)
+  if (mob.sapStrUntil && mob.sapStrUntil > agora) raw = Math.floor(raw * 0.9);
+  const def0 = playerDefense(p);
+  raw = raw * (1 - Math.min(0.7, def0.protection / 100));
+  if (typeof imbProtection === "function") {
+    const prot = imbProtection(p, sk.el);
+    if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
+  }
+  const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
+  if (bfd && bfd.dmgReceived !== 1)
+    raw = Math.max(1, Math.floor(raw * bfd.dmgReceived));
+  if (typeof stanceTotals === "function") {
+    const stD = stanceTotals(p).dmgReceived;
+    if (stD !== 1) raw = Math.max(1, Math.floor(raw * stD));
+  }
+  raw = Math.max(1, Math.floor(raw));
+  if (c.buffs.shield && c.buffs.shield > 0) {
+    const absorbed = Math.min(raw, c.buffs.shield);
+    c.buffs.shield -= absorbed;
+    raw -= absorbed;
+  }
+  if (raw > 0 && typeof mantraAbsorve === "function") {
+    raw = mantraAbsorve(p, raw, sk.el);
+  }
+  if (raw > 0) {
+    if ((p.voc === "sorcerer" || p.voc === "druid") && raw >= p.hp && p.hp > 0) {
+      const excesso = raw - p.hp + 1;
+      const taxa = (agora - (p.manaBufferAt || 0) >= 2000)
+        ? Math.floor(maxStats(p).mp * 0.25) : 0;
+      const custo = excesso * 8 + taxa;
+      if (p.mp >= custo) {
+        p.mp -= custo;
+        p.hp = 1;
+        if (taxa) p.manaBufferAt = agora;
+        c.events.push({ t: "manabuffer", vida: excesso, mana: custo,
+                        x: pl.x, y: pl.y, screen: true, sx: mob.x, sy: mob.y });
+        return 0;
+      }
+    }
+  }
+  const bolt = !sk.radius && ((sk.range || 1) > 1 || !!sk.length);
+  const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
+  if (raw <= 0) {
+    c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+                    screen: true, mantra: true,
+                    projectile: bolt, missile: miss });
+    return 0;
+  }
+  p.hp -= raw;
+  c.stats.taken += raw;
+  c.events.push({ t: "taken", dmg: raw, el: sk.el || "physical",
+                  x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
+                  // COMBAT_PARAM_EFFECT do .lua (fire-area, mort area,
+                  // ice attack...) em vez do generico do elemento
+                  fx: sk.fx || null,
+                  projectile: bolt, missile: miss });
+  return raw;
+}
+
+/* Rola a lista de habilidades do monstro (defensivas antes, na ordem do
+ * servidor; depois ofensivas na ordem do .lua). Devolve true quando uma
+ * habilidade entrou em cena — o corpo-a-corpo so roda se nada sair. */
+function mobCastSkill(c, p, mob, now) {
+  if (mob.hp <= 0 || p.hp <= 0) return false;
+  const def = mob.def || {};
+  const skills = def.skills || [];
+  const defS = def.defSkills || [];
+  if (!skills.length && !defS.length) return false;
+  const pl = c.player;
+  if (!pl) return false;
+  const dist = (pl.cx !== undefined && mob.cx !== undefined &&
+                typeof sqmDistance === "function")
+    ? sqmDistance(mob, pl) : 1;
+  if (!mob.skillCds) mob.skillCds = {};
+
+  // ---- defensivas (o bloco defenses do .lua): cura propria.
+  for (let i = 0; i < defS.length; i++) {
+    const sk = defS[i];
+    const key = "d" + i;
+    if ((mob.skillCds[key] || 0) > now) continue;
+    if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
+    if (sk.n === "healing") {
+      if (mob.maxHp && mob.hp >= mob.maxHp) continue;   // vida cheia
+      const cura = Math.max(0, mobSkillRoll(sk));
+      if (!cura) continue;
+      mob.hp = Math.min(mob.maxHp || (mob.hp + cura), mob.hp + cura);
+      mob.skillCds[key] = now + (sk.int || 2000);
+      c.events.push({ t: "mobheal", x: mob.x, y: mob.y, heal: cura,
+                      fx: sk.fx || "magic-green", screen: true });
+      return true;
+    }
+    // "speed" proprio: o import nao guarda duracao/magnitude do buff, e
+    // inventar valor aqui quebraria a regra dos dados oficiais — ignorado.
+  }
+
+  // ---- ofensivas, na ordem do .lua.
+  for (let i = 0; i < skills.length; i++) {
+    const sk = skills[i];
+    const key = "s" + i;
+    if ((mob.skillCds[key] || 0) > now) continue;
+    const nomeFx = sk.n || "";
+    // removido a pedido: invisibilidade (warlock, stalker, ferumbras...)
+    if (/invisib/i.test(nomeFx)) continue;
+    // sem correspondente no idle solo: ver o cabecalho do bloco
+    if (/summon|challenge|outfit/i.test(nomeFx)) continue;
+    if (dist > mobSkillRangeSQM(sk)) continue;
+    if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
+    mob.skillCds[key] = now + (sk.int || 2000);
+    mob.attackAnim = 220;
+    // debuff puro (faixa zerada): entra so a animacao oficial — o sistema
+    // de conditions do jogador cobre dano no tempo, nao reducao de stat
+    if (!((sk.max || 0) > 0)) {
+      mobSkillFx(c, mob, pl, sk);
+      return true;
+    }
+    mobSkillFx(c, mob, pl, sk);
+    mobSkillHit(c, p, mob, sk, Math.max(0, mobSkillRoll(sk)));
+    return true;
+  }
+  return false;
+}
+
 function mobAttack(c, p, mob) {
   const pl = c.player || { x: 0.18, y: 0.62 };
   // o monstro so bate se o alvo estiver dentro do alcance EM SQM. Melee = 1,
@@ -2198,11 +2425,14 @@ function combatTick(c, p, dt, now) {
     c.playerAtkCd = acted ? attackInterval(c, p) : 250;
   }
 
-  // monstros atacam
+  // monstros agem: primeiro a habilidade do .lua da criatura (Monster::
+  // doAttacking), e so se nenhuma entrar em cena cai o corpo-a-corpo
   for (const m of c.mobs) {
     m.atkCd -= dt;
     if (m.atkCd <= 0) {
-      const acted = mobAttack(c, p, m);
+      const acted = (typeof mobCastSkill === "function" &&
+                     mobCastSkill(c, p, m, now)) ||
+                    mobAttack(c, p, m);
       m.atkCd = acted === false ? 300 : (m.def.attackSpeed || 2000);
     }
     monsterThinkYell(m, dt);

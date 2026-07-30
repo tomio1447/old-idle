@@ -3,14 +3,20 @@
  *
  * A ordem de decisao do Monster::onThink e:
  *   1. sem alvo               -> passo aleatorio de vez em quando
- *   2. fugindo (runHealth)    -> getDistanceStep(flee = true)
- *   3. longe demais           -> anda em direcao ao alvo
- *   4. perto demais (dist)    -> recua para manter targetDistance
- *   5. na distancia certa     -> danca, salvo se cair no staticAttackChance
+ *   2. longe demais           -> anda em direcao ao alvo
+ *   3. perto demais (dist)    -> recua para manter targetDistance
+ *   4. na distancia certa     -> danca, salvo se cair no staticAttackChance
  *
  * O staticAttackChance e a peca que da personalidade: 90 significa que em
  * 90% dos ticks o bicho fica parado batendo, e em 10% ele se desloca. Um
  * demon (70) se mexe mais que um rat (90).
+ *
+ * REMOVIDO a pedido do jogador: a FUGA com hp baixo (runHealth/runAt).
+ * Monstros nunca fogem — e o item 2 do onThink do Canary some daqui. De
+ * quebra isso aposenta um bug de traducao: o runAt do MONSTERDATA vem em
+ * hp ABSOLUTO (behemoth 300, dragon lord 300...) e era comparado com o hp
+ * PERCENTUAL, entao qualquer valor > 100 fazia o bicho "fugir" de hp cheio.
+ * Os campos runHealth/runAt continuam nos dados como referencia, inertes.
  */
 "use strict";
 
@@ -35,16 +41,6 @@ function monsterTargetDistance(mob) {
 function monsterStaticChance(mob) {
   const mi = moveInfo(mob.slug);
   return mi.staticAttack === undefined ? 90 : mi.staticAttack;
-}
-
-/* O monstro esta fugindo? runHealth do Canary e um valor ABSOLUTO de hp,
- * nao percentual. O jogo tinha `runAt` em percentual, entao os dois valem. */
-function monsterFleeing(mob) {
-  const mi = moveInfo(mob.slug);
-  if (mi.runHealth && mob.hp > 0 && mob.hp <= mi.runHealth) return true;
-  const pct = mob.def && mob.def.runAt;
-  if (pct && mob.maxHp) return (mob.hp / mob.maxHp) * 100 <= pct;
-  return false;
 }
 
 /* Velocidade base do monstro, em pontos de speed do Canary */
@@ -82,17 +78,14 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   if (!alvo) {
     // sem alvo: vagueia devagar
     if (Math.random() < 0.25) dir = randomStep(mob, occ);
-  } else if (monsterFleeing(mob)) {
-    // 2. fugindo: sempre tenta se afastar
-    dir = stepAway(mob, alvo, occ);
   } else if (dist > td) {
-    // 3. longe: aproxima
+    // 2. longe: aproxima
     dir = stepToward(mob, alvo.cx, alvo.cy, occ);
   } else if (dist < td) {
-    // 4. perto demais para um atirador: recua
+    // 3. perto demais para um atirador: recua
     dir = stepAway(mob, alvo, occ);
   } else {
-    // 5. na distancia certa: danca, se o dado deixar
+    // 4. na distancia certa: danca, se o dado deixar
     if (Math.random() * 100 >= monsterStaticChance(mob)) {
       dir = danceStep(mob, alvo, occ, td > 1);
     }
