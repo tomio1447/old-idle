@@ -1120,6 +1120,19 @@ function loop(ts) {
       combatTick(G.combat, G.p, TICK, Date.now());
       G.tickAcc -= TICK;
     }
+
+    // Movimento a cada FRAME, nao a cada tick de 100ms (como o combatTick
+    // fazia). No Canary o servidor so marca o INICIO do passo no beat de
+    // 50ms; a animacao do trajeto e o client que interpola na taxa da
+    // tela. A decisao (playerThinkStep/monsterThinkStep) continua trancada
+    // pelo stepDur/nextStepAt — o que muda e que a posicao desenhada agora
+    // segue o dt real do frame, dando fluidez de 60fps. O motor antigo
+    // fica de fallback caso grid.js/gridai.js nao carreguem.
+    if (typeof updateGridMovement === "function") {
+      updateGridMovement(G.combat, G.p, dt, Date.now());
+    } else if (typeof updateCombatMovement === "function") {
+      updateCombatMovement(G.combat, G.p, dt);
+    }
     drainEvents();
     if (G.combat && G.combat.dead && Date.now() >= G.combat.deadUntil) {
       addLog("death", "Você acordou no templo de Thais.");

@@ -206,14 +206,25 @@ const FX_FRAMES = {
   "stance-elemental-synthesis": 11, // gesto brasa (Effect 326)
   "bash-shield": 12,            // corte de fogo (Effect 319)
   "slam-shield": 8,             // golpe laranja (Effect 323)
-  "barrage-divine": 11,         // explosao branca (Effect 330)
-  "barrage-ethereal": 9,        // redemoinho escuro (Effect 331)
+  // Barrages do 15.25 com o efeito OFICIAL (a numeracao Effect_3xx era
+  // chute pelo visual): as cenas da TibiaWiki de Divine/Ethereal Barrage
+  // mostram uma chuva de lancas caindo do ceu do tile em toda a area (21
+  // sqm) — Divine_Barrage_Effect.gif / Ethereal_Barrage_Effect.gif do
+  // fandom, tira de 12 quadros a 64px.
+  "barrage-divine": 12,         // chuva sagrada (Divine_Barrage_Effect)
+  "barrage-ethereal": 12,       // chuva eteria (Ethereal_Barrage_Effect)
+  // Impacto em area da Diamond Arrow: a nota oficial do item registra
+  // "[Blue Electricity Effects] appears on the damage area". O areaFx
+  // importado pelo elemento fisico caiu no "energy-hit" antigo — sprite em
+  // assets/fx/blue-electricity.png (Blue_Electricity_Effect.gif do fandom,
+  // 18 quadros de 32px).
   "forked-glacier": 13,         // garra eletrica (Effect 324)
   "forked-thorns": 19,          // rajada terrosa (Effect 325)
   "death-echo": 9,              // fantasma roxo (Effect 332)
   "fist-thousand": 8,           // corte sombrio (Effect 321)
   "crit-text": 14,              // "CRIT!" (Effect 341)
   "mana-wisp": 14,              // vivacidades de mana (Effect 337)
+  "blue-electricity": 18,       // Blue Electricity Effect (diamond arrow)
 };
 
 /* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */

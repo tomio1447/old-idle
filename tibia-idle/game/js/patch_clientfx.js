@@ -69,4 +69,21 @@
       W.RUNEDATA["explosion-rune"].fx = "explosion-area";
     }
   }
+
+  // 4) Diamond Arrow: o efeito oficial do impacto em area e o Blue
+  //    Electricity Effect — a nota da pagina do item na TibiaWiki diz
+  //    "[Blue Electricity Effects] appears on the damage area". O
+  //    importador de municao derivou o areaFx do elemento fisico e caiu
+  //    no "energy-hit" antigo (raios azuis genericos). Corrigido aqui para
+  //    nao tocar o ammodata.js gerado: o ammo.js funde AMMODATA depois
+  //    deste patch, entao o slug novo chega ao GAMEDATA.items sozinho.
+  if (W.AMMODATA && W.AMMODATA["diamond-arrow"]) {
+    W.AMMODATA["diamond-arrow"].areaFx = "blue-electricity";
+    // o projetil ja voa com a sprite oficial (diamond-arrow_*, extraida
+    // do client); nada a trocar aqui.
+  }
+  if (W.GAMEDATA && W.GAMEDATA.items && W.GAMEDATA.items["diamond-arrow"]) {
+    // cinto e suspensorio para quem consulta o item antes da fusao
+    W.GAMEDATA.items["diamond-arrow"].areaFx = "blue-electricity";
+  }
 })();

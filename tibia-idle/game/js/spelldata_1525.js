@@ -359,7 +359,13 @@
     const W = SPELLFX.words;
     W["exori ico scu"] = { fx: "bash-shield" };
     W["exori scu"] = { fx: "slam-shield" };
-    W["exori dir san"] = { fx: "barrage-divine", miss: "holy" };
+    // Barrages: as cenas oficiais da TibiaWiki mostram o efeito caindo em
+    // TODA a area como uma chuva de lancas vinda do ceu do tile — NAO ha
+    // projetil voando do paladino (igual a divine caldera). O miss "holy"
+    // que a dir san tinha era invencao. E o sprite e o oficial
+    // (Divine_Barrage_Effect / Ethereal_Barrage_Effect), nao mais o chute
+    // dos Effect_3xx pelo visual.
+    W["exori dir san"] = { fx: "barrage-divine" };
     W["exori dir moe"] = { fx: "barrage-ethereal" };
     W["exevo fur frigo"] = { fx: "forked-glacier", miss: "ice" };
     W["exevo fur tera"] = { fx: "forked-thorns", miss: "earth" };

@@ -258,8 +258,10 @@ function baseStats(voc, level) {
   };
 }
 
-/* Velocidade de ataque em ms segundo a arma */
-const ATTACK_SPEED = { melee: 2000, distance: 2000, magic: 2000 };
+/* Velocidade de ataque em ms segundo a arma. Base 1.2s a pedido do
+ * jogador (Canary: 2s fixos); o valor vivo do combate sai de
+ * attackInterval() no combat.js. */
+const ATTACK_SPEED = { melee: 1200, distance: 1200, magic: 1200 };
 
 /* Elementos e seus icones/cores */
 /* Cor e efeito do dano FISICO por raca da criatura.

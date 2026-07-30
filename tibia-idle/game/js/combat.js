@@ -172,9 +172,15 @@ function spawnWave(c, p) {
   c.wave++;
 }
 
-/* Velocidade de ataque do jogador em ms */
+/* Velocidade de ataque do jogador em ms.
+ *
+ * Base de 1 ataque a cada 1.2s, a pedido do jogador. O Canary segue o
+ * Tibia atual: 2s fixos para toda arma desde a unificacao dos speeds
+ * (weapons em .lua nao declaram attackSpeed proprio). O idle anda no dobro
+ * do ritmo oficial para a cena nao ficar parada — os multiplicadores de
+ * haste/equip e o piso de 800ms continuam os mesmos de antes. */
 function attackInterval(c, p) {
-  let base = 2000;
+  let base = 1200;
   const g = gearStats(p);
   // `c` pode vir vazio quando a Cyclopedia consulta a velocidade fora de
   // uma cacada; sem a guarda isso quebrava a aba de combate
@@ -2382,11 +2388,12 @@ function combatTick(c, p, dt, now) {
     }
   }
 
-  // movimentação: player aproxima/kita e monstros procuram distância de ataque
-  // motor de movimento em SQM (grid.js + gridai.js). O antigo continua no
-  // arquivo como fallback caso os modulos novos nao carreguem.
-  if (typeof updateGridMovement === "function") updateGridMovement(c, p, dt, now);
-  else updateCombatMovement(c, p, dt);
+  // movimentação: NAO roda mais no tick. O passo em SQM (grid.js +
+  // gridai.js) e avancado a cada FRAME no loop do game.js, como no client
+  // do Tibia: o servidor so alinha o INICIO dos passos no beat de 50ms,
+  // mas a animacao do trajeto acompanha os frames da tela. Rodando no tick
+  // de 100ms, as criaturas so mudavam de posicao 10x por segundo e a cena
+  // andava "aos trancos".
 
   // conditions (veneno, fogo, energia, sangramento, maldicao) drenando
   tickConditions(c, p, dt);
