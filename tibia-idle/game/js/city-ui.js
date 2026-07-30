@@ -545,7 +545,7 @@ function npcTravel(p) {
     const est = huntEstimate(p, hu);
     const risk = huntRisk(p, hu);
     const mobs = hu.monsters.slice(0, 3).map(
-      (m) => `<img src="assets/mob/${m}_s.png" style="width:22px;height:22px">`).join("");
+      (m) => mobImg(m, 22)).join("");
     return `<div class="shop-row ${locked ? "" : "clickable"}"
         data-travel="${locked ? "" : id}" style="opacity:${locked ? .4 : 1}">
       <div class="row" style="gap:1px;width:70px;flex:none">${mobs}</div>

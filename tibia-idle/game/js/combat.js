@@ -755,6 +755,14 @@ function playerAttack(c, p, target) {
     if (extra > 0) raw += extra;
   }
 
+  // ---- bonus do Bosstiary: o nivel da dano extra contra bosses. E o que o
+  // sistema faz no jogo original — subir o nivel precisa valer alguma coisa.
+  if (target.def && target.def.boss &&
+      typeof bosstiaryDamageBonus === "function") {
+    const mul = bosstiaryDamageBonus(p);
+    if (mul !== 1) raw = Math.max(1, Math.floor(raw * mul));
+  }
+
   // ---- buffs de vocacao (Virtudes, Protector)
   const bf = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bf) {
@@ -1735,10 +1743,15 @@ function combatTick(c, p, dt, now) {
     if (typeof bestiaryKill === "function") {
       charmGanho = bestiaryKill(p, m.slug, 1);
     }
+    // bosstiary: boss abatido rende boss points, que sobem o nivel
+    let bossGanho = 0;
+    if (m.def && m.def.boss && typeof bosstiaryKill === "function") {
+      bossGanho = bosstiaryKill(p, m.slug, 1);
+    }
     const loot = rollLoot(c, p, m);
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
-                    charm: charmGanho });
+                    charm: charmGanho, bossPts: bossGanho });
   }
   c.mobs = alive;
 

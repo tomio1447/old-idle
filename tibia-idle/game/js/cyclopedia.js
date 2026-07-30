@@ -44,14 +44,43 @@ const BEST_CLASSES = {
   slime: "Slimes", magical: "Mágicos", extra: "Outros",
 };
 
-/* Quantos kills para completar cada estagio do bestiario.
- * O canary usa marcos por dificuldade; aqui uma escala unica e previsivel. */
+/* Estagios do bestiario. Os marcos de kills NAO sao mais fixos: cada
+ * monstro traz os proprios em best.toKill/u1/u2 (vindos do Canary), porque
+ * la um rat completa em 5 abates e um dragon lord em 2500. A escala unica
+ * de 1/25/100/250 que existia aqui tornava o rat interminavel e o boss
+ * trivial. Os valores abaixo sao so o fallback de quem nao tem ficha. */
 const BEST_ESTAGIOS = [
   { nome: "Descoberto", kills: 1, revela: ["hp", "exp"] },
   { nome: "Iniciado", kills: 25, revela: ["dano", "armadura", "loot"] },
   { nome: "Experiente", kills: 100, revela: ["resistencias", "velocidade"] },
   { nome: "Completo", kills: 250, revela: ["tudo"] },
 ];
+
+/* Marcos reais de um monstro: [descoberto, iniciado, experiente, completo].
+ *
+ * O Canary da tres numeros por criatura — FirstUnlock, SecondUnlock e
+ * toKill. O primeiro estagio e sempre 1 abate (basta ver o bicho morrer). */
+function bestiaryMarcos(slug) {
+  const m = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+    ? GAMEDATA.monsters[slug] : null;
+  const b = m && m.best;
+  if (!b || !b.toKill) return BEST_ESTAGIOS.map((e) => e.kills);
+  const total = b.toKill;
+  // u1/u2 podem vir maiores que o total em algumas fichas: ordena e limita
+  const u1 = Math.max(1, Math.min(b.u1 || Math.ceil(total / 10), total));
+  const u2 = Math.max(u1, Math.min(b.u2 || Math.ceil(total / 2), total));
+  return [1, u1, u2, total];
+}
+
+/* Charm points que o monstro paga ao completar o bestiario. O Canary define
+ * por criatura (CharmsPoints); dividimos entre os estagios. */
+function bestiaryCharms(slug) {
+  const m = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+    ? GAMEDATA.monsters[slug] : null;
+  const total = (m && m.best && m.best.charm) || 25;
+  // 0 no primeiro estagio (so descobriu), o resto crescendo ate o total
+  return [0, Math.round(total * 0.2), Math.round(total * 0.4), total];
+}
 
 /* Charm points ganhos ao chegar em cada estagio */
 const BEST_CHARM_POINTS = [0, 5, 15, 25];
@@ -96,14 +125,15 @@ function bestiaryKill(p, slug, n) {
   const antes = p.bestiary[slug] || 0;
   const depois = antes + (n || 1);
   p.bestiary[slug] = depois;
+  const marcos = bestiaryMarcos(slug);
+  const pontos = bestiaryCharms(slug);
   let ganhos = 0;
-  for (let i = 0; i < BEST_ESTAGIOS.length; i++) {
-    const e = BEST_ESTAGIOS[i];
+  for (let i = 0; i < marcos.length; i++) {
     const chave = slug + ":" + i;
     // credita uma unica vez por estagio, mesmo recarregando o jogo
-    if (depois >= e.kills && !p.charmsPagos[chave]) {
+    if (depois >= marcos[i] && !p.charmsPagos[chave]) {
       p.charmsPagos[chave] = 1;
-      ganhos += BEST_CHARM_POINTS[i];
+      ganhos += pontos[i];
     }
   }
   if (ganhos) p.charmPoints += ganhos;
@@ -114,9 +144,10 @@ function bestiaryKill(p, slug, n) {
 function bestiaryStage(p, slug) {
   ensureCyclopedia(p);
   const k = p.bestiary[slug] || 0;
+  const marcos = bestiaryMarcos(slug);
   let st = 0;
-  for (let i = 0; i < BEST_ESTAGIOS.length; i++) {
-    if (k >= BEST_ESTAGIOS[i].kills) st = i + 1;
+  for (let i = 0; i < marcos.length; i++) {
+    if (k >= marcos[i]) st = i + 1;
   }
   return st;
 }
@@ -124,14 +155,17 @@ function bestiaryStage(p, slug) {
 function bestiaryProgress(p, slug) {
   ensureCyclopedia(p);
   const kills = p.bestiary[slug] || 0;
+  const marcos = bestiaryMarcos(slug);
   const st = bestiaryStage(p, slug);
-  const prox = BEST_ESTAGIOS[Math.min(st, BEST_ESTAGIOS.length - 1)];
-  const alvo = st >= BEST_ESTAGIOS.length ? prox.kills : prox.kills;
+  const completo = st >= marcos.length;
+  // a barra mede a distancia ate o PROXIMO marco, nao ate o total
+  const alvo = completo ? marcos[marcos.length - 1] : marcos[st];
   return {
     kills: kills, estagio: st, alvo: alvo,
+    total: marcos[marcos.length - 1],
     nome: st === 0 ? "Desconhecido" : BEST_ESTAGIOS[st - 1].nome,
-    completo: st >= BEST_ESTAGIOS.length,
-    pct: Math.min(1, kills / alvo),
+    completo: completo,
+    pct: Math.min(1, kills / Math.max(1, alvo)),
   };
 }
 

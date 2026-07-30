@@ -923,3 +923,9 @@ div.item-sprite { background-repeat: no-repeat; }
 @media (max-width: 1100px) {
   .combo-bar { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Miniatura de criatura recortada do spritesheet. Cada monstro virou um
+   arquivo unico (3 poses x 4 direcoes), e <img> nao recorta — por isso as
+   telas usam uma div com background-position no lugar da tag de imagem. */
+.mob-img { background-repeat: no-repeat; display: inline-block;
+           vertical-align: middle; }

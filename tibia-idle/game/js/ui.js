@@ -431,7 +431,7 @@ function renderHunts(p) {
     const active = cur === id;
     const risk = huntRisk(p, hu);
     const mobs = hu.monsters.slice(0, 3).map(
-      (m) => `<img src="assets/mob/${m}_s.png" alt="">`).join("");
+      (m) => mobImg(m, 26)).join("");
     h += `<div class="hunt-card ${active ? "active" : ""} ${locked ? "locked" : ""}"
             data-hunt="${id}">
       <div class="mobs">${mobs}</div>

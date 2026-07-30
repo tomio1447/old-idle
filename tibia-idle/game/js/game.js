@@ -555,7 +555,7 @@ function renderBosses(p) {
     const b = BOSS_DEFS[id];
     const r = bossReadyInfo(p, b);
     return `<div class="npc-btn boss-btn ${r.ok ? "" : "locked"}" data-boss-info="${id}" title="${b.name} — ${r.left ? "Cooldown" : r.reason}">
-      <img src="assets/mob/${b.sprite}_s.png" alt="">
+      ${mobImg(b.sprite, 32)}
       <div class="nb">${b.name.split(" ")[0]}</div>
     </div>`;
   }).join("")}</div>`;
@@ -572,7 +572,7 @@ function openBossModal(id) {
   const st = bossState(G.p, id);
   $("#modal-body").innerHTML = `
     <div class="panel-title">
-      <img src="assets/mob/${boss.sprite}_s.png" style="height:24px;image-rendering:pixelated">
+      ${mobImg(boss.sprite, 24)}
       ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
       <span style="flex:1"></span><button class="sm" id="boss-close">✕</button>
     </div>
@@ -751,7 +751,6 @@ function drainEvents() {
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmt(e.dmg), col);
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
-        r.shake = Math.min(9, 2 + e.dmg / 30);
         r.playerFlash = 90;
         break;
       }
@@ -816,7 +815,6 @@ function drainEvents() {
         // a runa de area usa o proprio efeito (ice area na avalanche, fire
         // area na great fireball); a burst arrow continua na explosao
         r.addEffect(ex(e), ey(e), e.fx || "explosion-area");
-        r.shake = Math.max(r.shake || 0, 5);
         break;
       case "areafx": {
         // pinta o efeito em TODAS as casas cobertas pela matriz, nao so onde
@@ -827,7 +825,6 @@ function drainEvents() {
           if (!pos) continue;
           r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
         }
-        r.shake = Math.max(r.shake || 0, 4);
         break;
       }
       case "chain":
@@ -874,7 +871,6 @@ function drainEvents() {
         addLog("death", `Você morreu! Perdeu ${fmtFull(e.exp)} xp e ${fmtFull(e.gold)} gp.` +
           (e.blessed ? " <span style='color:#9ce84a'>A bênção protegeu você.</span>" : ""));
         toast("Você morreu!", "death");
-        r.shake = 16;
         break;
 
     }

@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "9";
+const ASSET_VERSION = "10";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -70,6 +70,38 @@ if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") 
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
 
+/* Linha do spritesheet por direcao, na ordem do client (igual a das outfits) */
+const MOB_DIR_ROW = { n: 0, e: 1, s: 2, w: 3 };
+
+/* HTML de uma celula do sheet para as telas (bestiario, lista de caca...).
+ *
+ * As telas montavam <img src="assets/mob/<slug>_s.png">, mas os quadros
+ * soltos deixaram de existir quando cada criatura virou um sheet unico.
+ * Como <img> nao recorta, usamos uma div com background-position: o mesmo
+ * arquivo serve a tela e o canvas, sem duplicar arte.
+ */
+function mobImg(slug, tam, extra) {
+  const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
+    ? MOBSHEETS[slug] : null;
+  const px = tam || 32;
+  if (!meta) {
+    // criatura sem sheet: espaco vazio, para o grid da tela nao quebrar
+    return `<div class="mob-img" style="width:${px}px;height:${px}px;
+            ${extra || ""}"></div>`;
+  }
+  // a celula do sul e a linha 2; escala para caber na caixa pedida
+  const k = Math.min(px / meta.cw, px / meta.ch);
+  const w = meta.cw * k, h = meta.ch * k;
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  return `<div class="mob-img" style="width:${w.toFixed(1)}px;
+      height:${h.toFixed(1)}px;
+      background-image:url('assets/mob/${slug}.png?v=${v}');
+      background-size:${(meta.cw * meta.cols * k).toFixed(1)}px ${
+        (meta.ch * meta.rows * k).toFixed(1)}px;
+      background-position:0 -${(2 * h).toFixed(1)}px;
+      image-rendering:pixelated;${extra || ""}"></div>`;
+}
+
 const Sprites = {
   cache: {},
   get(path) {
@@ -80,12 +112,39 @@ const Sprites = {
     this.cache[path] = img;
     return img;
   },
-  mob(slug, dir) { return this.get(`assets/mob/${slug}_${dir || "s"}.png`); },
-  /* Frame de caminhada do monstro. frame 1 e 2 sao os passos exportados do
-   * grupo de animacao do DAT; qualquer outro valor cai na pose parada. */
+  /* Recorta a celula (direcao, pose) do spritesheet da criatura.
+   *
+   * Cada monstro virou UM arquivo (3 poses x 4 direcoes) em vez de 12 PNGs
+   * soltos: com 1566 criaturas eram 18.760 arquivos, o que estourava o teto
+   * do workspace e abria uma requisicao por quadro. O recorte e cacheado,
+   * entao o custo existe uma vez por celula usada.
+   */
+  mobCache: {},
+  mobCell(slug, dir, pose) {
+    const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
+      ? MOBSHEETS[slug] : null;
+    if (!meta) return null;
+    const linha = MOB_DIR_ROW[dir] === undefined ? 2 : MOB_DIR_ROW[dir];
+    const col = Math.max(0, Math.min((meta.cols || 3) - 1, pose | 0));
+    const k = slug + "|" + linha + "|" + col;
+    if (this.mobCache[k] !== undefined) return this.mobCache[k];
+    const sheet = this.get(`assets/mob/${slug}.png`);
+    // enquanto o sheet carrega devolvemos null SEM cachear, senao a
+    // criatura ficaria invisivel pelo resto da sessao
+    if (!sheet || !sheet.complete) return null;
+    if (!sheet.naturalWidth) { this.mobCache[k] = null; return null; }
+    const cv = document.createElement("canvas");
+    cv.width = meta.cw; cv.height = meta.ch;
+    cv.getContext("2d").drawImage(sheet, col * meta.cw, linha * meta.ch,
+                                  meta.cw, meta.ch, 0, 0, meta.cw, meta.ch);
+    this.mobCache[k] = cv;
+    return cv;
+  },
+  mob(slug, dir) { return this.mobCell(slug, dir || "s", 0); },
+  /* Frame de caminhada do monstro. pose 1 e 2 sao os passos do grupo de
+   * animacao do DAT; qualquer outro valor cai na pose parada. */
   mobWalk(slug, dir, frame) {
-    if (!frame) return this.mob(slug, dir);
-    return this.get(`assets/mob/${slug}_${dir || "s"}${frame}.png`);
+    return this.mobCell(slug, dir || "s", frame || 0);
   },
   item(slug) { return this.get(`assets/item/${slug}.png`); },
   outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
@@ -141,7 +200,6 @@ function Renderer(canvas) {
   this.effects = [];        // animacoes de efeito
   this.projectiles = [];    // projeteis/distance shots
   this.corpses = [];
-  this.shake = 0;
   this.playerFlash = 0;
   this.scale = 2;
 }
@@ -819,11 +877,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
   drawBossBar(ctx, W, combat);
 
   ctx.save();
-  if (this.shake > 0) {
-    ctx.translate((Math.random() - 0.5) * this.shake,
-                  (Math.random() - 0.5) * this.shake);
-    this.shake = Math.max(0, this.shake - dt * 0.02);
-  }
+  // Vibracao de camera removida a pedido: o translate aleatorio daqui
+  // sacudia o mapa inteiro a cada golpe recebido, explosao e morte. O Tibia
+  // nao move a camera por dano, e num jogo idle (tela aberta por horas) o
+  // tremor constante cansa a vista.
 
   // --- corpses
   for (let i = this.corpses.length - 1; i >= 0; i--) {
@@ -832,15 +889,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (c.life <= 0) { this.corpses.splice(i, 1); continue; }
     ctx.globalAlpha = Math.min(1, c.life / 1200) * 0.5;
     const img = Sprites.mob(c.slug, "s");
-    if (img && img.complete && img.naturalWidth) {
+    if (spriteReady(img)) {
       // o cadaver e a mesma sprite do bicho achatada: precisa da escala do
       // tile, senao fica maior que a criatura viva que acabou de morrer
       const sc = tibiaScale(W);
+      const iw = spriteW(img), ih = spriteH(img);
       ctx.save();
       ctx.translate(c.x * W, c.y * H);
       ctx.scale(1, 0.4);
-      ctx.drawImage(img, -img.naturalWidth * sc / 2, -img.naturalHeight * sc / 2,
-                    img.naturalWidth * sc, img.naturalHeight * sc);
+      ctx.drawImage(img, -iw * sc / 2, -ih * sc / 2, iw * sc, ih * sc);
       ctx.restore();
     }
     ctx.globalAlpha = 1;
@@ -885,20 +942,19 @@ Renderer.prototype.draw = function (combat, player, dt) {
       // Date.now(), ou seja, o bicho "pedalava" no lugar mesmo sem andar.
       const passo = m.moving ? (m.frame || 1) : 0;
       const anim = passo ? Sprites.mobWalk(m.slug, m.dir || "w", passo) : null;
-      // se o frame de passo nao existir (404 deixa naturalWidth em 0), cai
-      // na pose parada em vez de sumir com o monstro da tela
-      const img = (anim && anim.complete && anim.naturalWidth)
-        ? anim : Sprites.mob(m.slug, m.dir || "w");
+      // se o passo nao existir, cai na pose parada em vez de sumir com o
+      // monstro. spriteReady trata tanto <img> quanto o canvas do sheet.
+      const img = spriteReady(anim) ? anim : Sprites.mob(m.slug, m.dir || "w");
       const mx = m.x * W;
       // sem oscilacao senoidal: no Tibia a criatura parada fica imovel no
       // SQM. O balanco daqui somava ao pedalar dos frames e dava a impressao
       // de que o bicho nunca sossegava.
       const my = m.y * H;
-      if (img && img.complete && img.naturalWidth) {
+      if (spriteReady(img)) {
         // mesma escala do jogador: o porte da criatura vem do tamanho da
         // arte no DAT (32px = 1 SQM, 64px = 2 SQMs), nao de um chute pelo HP
         const sc = tibiaScale(W);
-        const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+        const w = spriteW(img) * sc, h = spriteH(img) * sc;
         const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();

@@ -461,6 +461,17 @@ function renderCycloBestiary(p, el) {
     return cycloBestiaryDetail(p, el, CYCLO.sel);
   }
 
+  // Paginacao. Com os 1655 monstros do Canary, desenhar a grade inteira de
+  // uma vez cria 1655 cards e a mesma quantidade de backgrounds recortados —
+  // o suficiente para travar a aba do navegador. Antes eram 91 cards e o
+  // problema nao aparecia.
+  const POR_PAGINA = 60;
+  const totalPags = Math.max(1, Math.ceil(ls.length / POR_PAGINA));
+  if (CYCLO.pag === undefined) CYCLO.pag = 0;
+  CYCLO.pag = Math.max(0, Math.min(totalPags - 1, CYCLO.pag));
+  const pagina = ls.slice(CYCLO.pag * POR_PAGINA,
+                          (CYCLO.pag + 1) * POR_PAGINA);
+
   el.innerHTML = `
     <div class="row mb8" style="gap:6px;align-items:center">
       <div class="tiny dim">
@@ -476,25 +487,39 @@ function renderCycloBestiary(p, el) {
           data-best-filtro="${f}">${t}</button>`).join("")}
     </div>
     <div class="app-grid">
-      ${ls.map((s) => {
+      ${pagina.map((s) => {
         const m = GAMEDATA.monsters[s];
         const pr = bestiaryProgress(p, s);
         const visto = pr.estagio > 0;
         return `<div class="app-card ${visto ? "" : "bloq"}" data-best="${s}">
           <div class="app-img">
-            <img src="assets/mob/${s}_s.png" alt="" loading="lazy"
-                 style="${visto ? "" : "filter:brightness(0)"}">
+            ${mobImg(s, 48, visto ? "" : "filter:brightness(0);")}
           </div>
           <div class="tiny">${visto ? m.name : "???"}</div>
           <div class="tiny dim">${pr.kills} mortes</div>
           <div class="best-bar"><div style="width:${(pr.pct * 100).toFixed(0)}%"></div></div>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhum monstro nesse filtro.</div>`}
-    </div>`;
+    </div>
+    ${totalPags > 1 ? `<div class="row mt8" style="gap:6px;align-items:center">
+      <button class="sm" data-best-pag="${CYCLO.pag - 1}"
+        ${CYCLO.pag === 0 ? "disabled" : ""}>‹ Anterior</button>
+      <div class="tiny dim">Página ${CYCLO.pag + 1} de ${totalPags}
+        · ${ls.length} criaturas</div>
+      <button class="sm" data-best-pag="${CYCLO.pag + 1}"
+        ${CYCLO.pag >= totalPags - 1 ? "disabled" : ""}>Próxima ›</button>
+    </div>` : ""}`;
+
+  el.querySelectorAll("[data-best-pag]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.pag = parseInt(b.dataset.bestPag, 10);
+      renderCycloBestiary(p, el);
+    }));
 
   const inp = $("#cyclo-busca");
   if (inp) inp.addEventListener("input", () => {
     CYCLO.busca = inp.value;
+    CYCLO.pag = 0;              // filtrar volta para a primeira pagina
     renderCycloBestiary(p, el);
     const n = $("#cyclo-busca");
     if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
@@ -502,6 +527,7 @@ function renderCycloBestiary(p, el) {
   $$("#cyclo-content [data-best-filtro]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.filtro = b.dataset.bestFiltro;
+      CYCLO.pag = 0;
       renderCycloBestiary(p, el);
     }));
   $$("#cyclo-content [data-best]").forEach((c) =>
@@ -528,8 +554,7 @@ function cycloBestiaryDetail(p, el, slug) {
     <div class="cyclo-cols">
       <div>
         <div class="app-img" style="width:64px;height:64px;margin-bottom:8px">
-          <img src="assets/mob/${slug}_s.png" alt=""
-               style="${pr.estagio > 0 ? "" : "filter:brightness(0)"}">
+          ${mobImg(slug, 64, pr.estagio > 0 ? "" : "filter:brightness(0);")}
         </div>
         ${linhaStat("Vida", ver("hp", fmtFull(m.hp)))}
         ${linhaStat("Experiência", ver("exp", fmtFull(m.exp)))}
@@ -558,10 +583,10 @@ function cycloBestiaryDetail(p, el, slug) {
                     ${m.resist[e] > 0 ? "+" : ""}${m.resist[e]}%</span>
                 </div>`).join("")
              : `<div class="tiny dim">Nenhuma resistência.</div>`)
-          : `<div class="tiny dim">Mate ${BEST_ESTAGIOS[2].kills} para revelar.</div>`}
+          : `<div class="tiny dim">Mate ${bestiaryMarcos(slug)[2]} para revelar.</div>`}
         <div class="small dim mt8 mb4">Loot</div>
         ${bestiaryReveals(p, slug, "loot")
-          ? (m.loot || []).map((l) => `
+          ? (m.loot || []).filter((l) => l.item).map((l) => `
               <div class="stat-row">
                 <span class="k">
                   <img src="assets/item/${l.item}.png"
@@ -569,7 +594,7 @@ function cycloBestiaryDetail(p, el, slug) {
                   ${itemName(l.item)}</span>
                 <span class="v">${l.chance}%${l.max > 1 ? " ·até " + l.max : ""}</span>
               </div>`).join("") || `<div class="tiny dim">Sem loot.</div>`
-          : `<div class="tiny dim">Mate ${BEST_ESTAGIOS[1].kills} para revelar.</div>`}
+          : `<div class="tiny dim">Mate ${bestiaryMarcos(slug)[1]} para revelar.</div>`}
       </div>
     </div>`;
   $("#best-voltar").addEventListener("click", () => {
@@ -581,30 +606,79 @@ function cycloBestiaryDetail(p, el, slug) {
 /* ------------------------------------------------------------ bosstiário */
 
 function renderCycloBosstiary(p, el) {
-  const bosses = Object.keys(BOSS_DEFS);
+  ensureBosstiary(p);
+  const cat = CYCLO.bossFiltro || "todos";
+  const ls = bosstiaryList(cat);
+  const rs = bosstiarySummary(p);
+
+  // mesma paginacao do bestiario: 353 bosses de uma vez travam a aba
+  const POR_PAGINA = 60;
+  const totalPags = Math.max(1, Math.ceil(ls.length / POR_PAGINA));
+  if (CYCLO.bossPag === undefined) CYCLO.bossPag = 0;
+  CYCLO.bossPag = Math.max(0, Math.min(totalPags - 1, CYCLO.bossPag));
+  const pagina = ls.slice(CYCLO.bossPag * POR_PAGINA,
+                          (CYCLO.bossPag + 1) * POR_PAGINA);
+
   el.innerHTML = `
-    <div class="tiny dim mb8">
-      Bosses derrotados aparecem aqui com o loot e o tempo de espera.
-      O jogo tem <b>${bosses.length}</b> boss${bosses.length > 1 ? "es" : ""} no momento.
+    <div class="best-head">
+      <div>
+        <div class="small">Nível do Bosstiário
+          <b class="gold-txt">${rs.nivel}</b></div>
+        <div class="tiny dim">${fmtFull(rs.pontos)} pontos ·
+          faltam ${fmtFull(Math.max(0, rs.prox.faltam))} para o ${rs.prox.nivel}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="tiny dim">Dano contra bosses</div>
+        <div class="small" style="color:#9ce84a">
+          +${Math.round((rs.bonus - 1) * 100)}%</div>
+      </div>
     </div>
-    ${bosses.map((id) => {
-      const b = BOSS_DEFS[id];
-      const st = bossState(p, id);
-      const info = bossReadyInfo(p, b);
-      return `<div class="shop-row">
-        <img src="assets/mob/${b.sprite}_s.png" alt="">
-        <div style="flex:1;min-width:0">
-          <div class="small">${b.name}
-            <span class="tiny dim">· ${b.title}</span></div>
-          <div class="tiny dim">Vitórias: <b>${st.kills || 0}</b> ·
-            ${info.ok ? `<span style="color:#9ce84a">Disponível</span>`
-                      : `<span style="color:#ff9090">${info.reason}${
-                          info.left ? " (" + Math.ceil(info.left / 60000) + " min)" : ""}</span>`}
+    <div class="tiny dim mb8">
+      ${rs.descobertos} de ${rs.total} bosses encontrados ·
+      ${rs.completos} completos
+    </div>
+    <div class="app-filters mb8">
+      ${["todos", "bane", "archfoe", "nemesis"].map((f) => `
+        <button class="sm ${cat === f ? "on" : ""}" data-boss-filtro="${f}">
+          ${f === "todos" ? "Todos" : BOSS_CATS[f].nome}</button>`).join("")}
+    </div>
+    <div class="app-grid">
+      ${pagina.map((slug) => {
+        const m = GAMEDATA.monsters[slug];
+        const pr = bosstiaryProgress(p, slug);
+        const visto = pr.kills > 0;
+        return `<div class="app-card ${visto ? "" : "bloq"}" data-boss-ficha="${slug}">
+          <div class="app-img">
+            ${mobImg(slug, 48, visto ? "" : "filter:brightness(0);")}
           </div>
-          <div class="tiny dim">Loot: ${bossLootText(b).slice(0, 4).join(", ")}…</div>
-        </div>
-      </div>`;
-    }).join("")}`;
+          <div class="tiny">${visto ? m.name : "???"}</div>
+          <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}</div>
+          <div class="tiny dim">${pr.kills} / ${pr.alvo}</div>
+          <div class="best-bar"><div style="width:${(pr.pct * 100).toFixed(0)}%
+            ;background:${pr.cat.cor}"></div></div>
+        </div>`;
+      }).join("")}
+    </div>
+    ${totalPags > 1 ? `<div class="row mt8" style="gap:6px;align-items:center">
+      <button class="sm" data-boss-pag="${CYCLO.bossPag - 1}"
+        ${CYCLO.bossPag === 0 ? "disabled" : ""}>‹ Anterior</button>
+      <div class="tiny dim">Página ${CYCLO.bossPag + 1} de ${totalPags}
+        · ${ls.length} bosses</div>
+      <button class="sm" data-boss-pag="${CYCLO.bossPag + 1}"
+        ${CYCLO.bossPag >= totalPags - 1 ? "disabled" : ""}>Próxima ›</button>
+    </div>` : ""}`;
+
+  el.querySelectorAll("[data-boss-filtro]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.bossFiltro = b.dataset.bossFiltro;
+      CYCLO.bossPag = 0;        // trocar de categoria volta ao inicio
+      renderCycloBosstiary(p, el);
+    }));
+  el.querySelectorAll("[data-boss-pag]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.bossPag = parseInt(b.dataset.bossPag, 10);
+      renderCycloBosstiary(p, el);
+    }));
 }
 
 /* ---------------------------------------------------------------- charms */
@@ -614,7 +688,7 @@ function renderCycloCharms(p, el) {
   el.innerHTML = `
     <div class="tiny dim mb8">
       Charm points vêm do bestiário: cada estágio de um monstro rende pontos
-      (${BEST_CHARM_POINTS.slice(1).join(" / ")}).
+      (o total varia por criatura: o Canary define os pontos de cada uma).
       Você tem <b class="gold-txt">${fmtFull(pts)}</b>.
     </div>
     ${Object.keys(CHARMS).map((id) => {
