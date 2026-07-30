@@ -982,8 +982,8 @@ function spellIcon(s, cls) {
     alt="${s.name || ""}" title="${s.name || ""}">`;
 }
 
-/* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle)
- * e, desde o 15.25, das STANCES da vocacao (posturas permanentes). */
+/* Seletor do buff de vocacao (Virtudes do Monk, Protector, Divine Dazzle).
+ * As stances do 15.25 moram no renderStancePicker, no topo da aba Ataque. */
 function renderBuffPicker(p) {
   let html = "";
   if (typeof availableBuffs === "function") {
@@ -1014,32 +1014,85 @@ function renderBuffPicker(p) {
         <div class="tiny dim mt4">O buff é relançado sozinho enquanto estiver selecionado.</div>`;
     }
   }
-  // Stances do 15.25: ligar paga a mana UMA vez e a postura fica ativa ate
-  // trocar ou desligar — sobrevive a logout (guardada em p.stances).
-  if (typeof stanceList === "function") {
-    const sts = stanceList(p);
-    if (sts.length) {
-      html += `
-        <div class="small dim mt8 mb4">Stance (postura)</div>
-        <div class="list" style="max-height:190px">
-          ${sts.map(({ id, st, spell, livre }) => {
-            const on = stanceAtiva(p, id);
-            return `<div class="shop-row ${on ? "selected" : ""}" style="opacity:${livre ? 1 : .45}">
-              ${spellIcon(spell)}
-              <div style="flex:1;min-width:0">
-                <div class="small">${st.nome}
-                  ${on ? `<span style="color:#9ce84a">· ATIVA</span>` : ""}</div>
-                <div class="tiny dim"><b>${spell.words || id}</b> · ${spell.mana} mana · nv ${spell.lvl}</div>
-                <div class="tiny dim">${st.desc}</div>
-              </div>
-              <button class="sm ${on ? "primary" : ""}" data-stance="${id}" ${livre ? "" : "disabled"}>
-                ${on ? "DESLIGAR" : "ATIVAR"}</button>
-            </div>`;
-          }).join("")}
-        </div>
-        <div class="tiny dim mt4">Stances ficam ativas até você trocar ou desligar — continuam valendo mesmo após relogar.</div>`;
-    }
+  return html;
+}
+
+/* Seletor de STANCES (posturas do 15.25), com um bloco proprio no TOPO da
+ * aba Ataque — antes ficava embutido no meio do renderBuffPicker, abaixo
+ * do buff de vocacao e do kiting, e para o Sorcerer as cinco posturas
+ * vinham misturadas numa lista so.
+ *
+ * O Sorcerer tem DOIS grupos que se combinam (regra oficial da pagina de
+ * Stances do TibiaWiki):
+ *   - sorcelem (Master of Flames/Thunder/Decay): UMA stance elemental por
+ *     vez, e ela que "atua o elemento" — converte a proxima magia
+ *     nao-relacionada para o tipo dela;
+ *   - sorcrip (Aura of Sapped Strength / Exposed Weakness): UMA aura
+ *     crippling por vez, e pode ficar ligada JUNTO com a elemental.
+ * As secoes aparecem separadas e com o elemento colorido, para o jogador
+ * ver exatamente o que esta ativando. O status em cima mostra o que esta
+ * ligado agora — incluindo se a conversao do elemento esta ARMADA. */
+function renderStancePicker(p) {
+  if (typeof stanceList !== "function") return "";
+  const sts = stanceList(p);
+  if (!sts.length) return "";
+
+  const GRUPO_NOME = {
+    sorcelem: "Stance elemental — ativa o elemento",
+    sorcrip: "Aura crippling — pode combinar com a elemental",
+  };
+  const elNome = (el) => (typeof ELEMENTS !== "undefined" && ELEMENTS[el])
+    ? ELEMENTS[el].name : el;
+  const elCor = (el) => (typeof ELEMENTS !== "undefined" && ELEMENTS[el])
+    ? ELEMENTS[el].color : "#d4af37";
+
+  const porGrupo = {};
+  const ordem = [];
+  for (const x of sts) {
+    const g = x.st.grupo || "geral";
+    if (!porGrupo[g]) { porGrupo[g] = []; ordem.push(g); }
+    porGrupo[g].push(x);
   }
+  const ativos = sts.filter((x) => stanceAtiva(p, x.id));
+
+  let html = `<div class="small dim mb4">Stance (postura do 15.25)</div>`;
+  if (ativos.length) {
+    const conv = (typeof stanceTotals === "function")
+      ? stanceTotals(p).convert : null;
+    html += `<div class="tiny mb4" style="color:#9ce84a">✔ Ativa(s): `
+      + `<b>${ativos.map((x) => x.st.nome).join(" + ")}</b>`
+      + (conv ? ` — conversão de `
+        + `<span style="color:${elCor(conv)}">${elNome(conv).toLowerCase()}</span>`
+        + (p.stanceConv ? ` armada` : ` (conjure uma magia de ${elNome(conv).toLowerCase()} para armar)`)
+        : "")
+      + `</div>`;
+  }
+  for (const g of ordem) {
+    if (ordem.length > 1 || GRUPO_NOME[g]) {
+      html += `<div class="tiny dim mt8 mb4">${GRUPO_NOME[g] || "Postura"}</div>`;
+    }
+    html += `<div class="list" style="max-height:190px">`;
+    for (const { id, st, spell, livre } of porGrupo[g]) {
+      const on = stanceAtiva(p, id);
+      const elTag = st.elemento
+        ? ` · <span style="color:${elCor(st.elemento)}">${elNome(st.elemento)}</span>` : "";
+      html += `<div class="shop-row ${on ? "selected" : ""}" style="opacity:${livre ? 1 : .45}">
+        ${spellIcon(spell)}
+        <div style="flex:1;min-width:0">
+          <div class="small">${st.nome}${elTag}
+            ${on ? `<span style="color:#9ce84a"> · ATIVA</span>` : ""}</div>
+          <div class="tiny dim"><b>${spell.words || id}</b> · ${spell.mana} mana · nv ${spell.lvl}</div>
+          <div class="tiny dim">${st.desc}</div>
+        </div>
+        <button class="sm ${on ? "primary" : ""}" data-stance="${id}" ${livre ? "" : "disabled"}>
+          ${on ? "DESLIGAR" : "ATIVAR"}</button>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  html += `<div class="tiny dim mt4">Ativar paga a mana UMA vez e a postura fica ligada até trocar ou desligar — vale mesmo depois de relogar.`
+    + (porGrupo.sorcelem ? ` O Sorcerer mantém 1 elemental + 1 aura crippling ao mesmo tempo.` : "")
+    + `</div>`;
   return html;
 }
 
@@ -1206,7 +1259,8 @@ function renderHelper(p) {
   if (atkEl) {
     const mode = p.config.attackMode || "chase";
     atkEl.innerHTML = `
-      <div class="small dim mb4">Ataque Mode</div>
+      ${renderStancePicker(p)}
+      <div class="small dim mt8 mb4">Ataque Mode</div>
       <div class="row wrap" style="gap:6px">
         ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"]].map(([id, label]) =>
           `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}">${label}</button>`).join("")}
@@ -1244,6 +1298,13 @@ function renderHelper(p) {
               ? `Stance ativa: <b>${st ? st.nome : id}</b>`
               : `Stance desligada: <b>${st ? st.nome : id}</b>`);
         if (typeof renderStats === "function") renderStats(p);
+      } else if (typeof cdRemaining === "function") {
+        // Falhou por cooldown compartilhado (o grupo da postura travado por
+        // outra magia). Antes o clique morria em silencio: o jogador
+        // apertava ATIVAR, nada acontecia e parecia que a postura nao
+        // ativava. Agora mostra quanto falta para destravar.
+        const r = cdRemaining(p, id);
+        if (r > 0) toast(`Postura em recarga: aguarde <b>${Math.ceil(r / 1000)}s</b>.`);
       }
       renderHelper(p);
     }));
