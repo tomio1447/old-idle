@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "10";
+const ASSET_VERSION = "11";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -228,35 +228,90 @@ Renderer.prototype.addFloater = function (x, y, text, color, big) {
   if (this.floaters.length > 60) this.floaters.shift();
 };
 
-/* Fala do personagem (magias e supplies), estilo client do Tibia:
- * texto amarelo acima da cabeca, some sozinho. */
-Renderer.prototype.addSpeech = function (text, color) {
-  this.speech = this.speech || [];
-  // empurra as falas antigas para cima, como no client original
-  for (const sp of this.speech) sp.slot = (sp.slot || 0) + 1;
-  this.speech.push({ text: text, color: color || "#ffe680",
-                     life: 3000, max: 3000, slot: 0 });
-  if (this.speech.length > 4) this.speech.shift();
+/* Fala de criatura, no modelo do internalCreatureSay do Canary.
+ *
+ * O servidor distingue tipos de fala (utils_definitions.hpp):
+ *   TALKTYPE_SAY (1)            jogador falando normal
+ *   TALKTYPE_SPELL_USE (9)      as palavras magicas
+ *   TALKTYPE_MONSTER_SAY (36)   fala comum de monstro
+ *   TALKTYPE_MONSTER_YELL (37)  grito, que o client mostra em CAIXA ALTA
+ *
+ * Antes havia uma unica fila global presa ao jogador: o monstro nao tinha
+ * como falar e tudo saia amarelo acima do personagem. Agora cada criatura
+ * carrega a propria fila e o texto e desenhado sobre ela.
+ */
+const TALK = {
+  SAY: 1, SPELL: 9, MONSTER_SAY: 36, MONSTER_YELL: 37,
 };
 
-Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
-  if (!this.speech || !this.speech.length) return;
+/* Cor por tipo, seguindo o client: amarelo para o jogador, laranja para o
+ * grito de monstro e branco-cinza para a fala comum de monstro. */
+const TALK_COR = {
+  1: "#ffe680", 9: "#ffe680", 36: "#c8c8c8", 37: "#ff8a3c",
+};
+
+/* Duracao da fala na tela. O client mantem por alguns segundos; grito dura
+ * um pouco mais, por ser evento raro e chamativo. */
+function talkDuracao(tipo) {
+  return tipo === TALK.MONSTER_YELL ? 4000 : 3000;
+}
+
+/* Empilha uma fala num dono qualquer (jogador ou monstro).
+ * `dono` e o objeto da criatura; guardamos a fila nele mesmo para a fala
+ * acompanhar quem falou enquanto a criatura anda. */
+function creatureSay(dono, texto, tipo) {
+  if (!dono || !texto) return;
+  tipo = tipo || TALK.SAY;
+  dono.speech = dono.speech || [];
+  // empurra as falas antigas para cima, como no client
+  for (const sp of dono.speech) sp.slot = (sp.slot || 0) + 1;
+  const dur = talkDuracao(tipo);
+  dono.speech.push({
+    // o client mostra o grito em caixa alta
+    text: tipo === TALK.MONSTER_YELL ? String(texto).toUpperCase() : texto,
+    tipo: tipo, color: TALK_COR[tipo] || "#ffe680",
+    life: dur, max: dur, slot: 0,
+  });
+  if (dono.speech.length > 4) dono.speech.shift();
+}
+
+/* Desenha e envelhece a fila de falas de uma criatura. */
+function drawCreatureSpeech(ctx, dono, x, y, dt) {
+  if (!dono || !dono.speech || !dono.speech.length) return;
   ctx.textAlign = "center";
-  ctx.font = "bold 11px Verdana";
-  for (let i = this.speech.length - 1; i >= 0; i--) {
-    const sp = this.speech[i];
+  ctx.lineJoin = "round";
+  for (let i = dono.speech.length - 1; i >= 0; i--) {
+    const sp = dono.speech[i];
     sp.life -= dt;
-    if (sp.life <= 0) { this.speech.splice(i, 1); continue; }
+    if (sp.life <= 0) { dono.speech.splice(i, 1); continue; }
+    // o grito e maior, como no client
+    ctx.font = (sp.tipo === TALK.MONSTER_YELL ? "bold 12px" : "bold 10px") +
+               " Verdana";
     const a = Math.min(1, sp.life / 700);
     const ty = y - 34 - (sp.slot || 0) * 13;
     ctx.globalAlpha = a;
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.strokeStyle = "rgba(0,0,0,.9)";
     ctx.strokeText(sp.text, x, ty);
     ctx.fillStyle = sp.color;
     ctx.fillText(sp.text, x, ty);
     ctx.globalAlpha = 1;
   }
+}
+
+/* Compatibilidade: a fala do jogador continua entrando pelo renderer, mas
+ * agora e so um atalho para a fila do proprio jogador. */
+Renderer.prototype.addSpeech = function (text, color, tipo) {
+  this.playerTalk = this.playerTalk || {};
+  creatureSay(this.playerTalk, text, tipo || TALK.SPELL);
+  if (color) {
+    const ls = this.playerTalk.speech;
+    ls[ls.length - 1].color = color;
+  }
+};
+
+Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
+  drawCreatureSpeech(ctx, this.playerTalk, x, y, dt);
 };
 
 Renderer.prototype.addEffect = function (x, y, name) {
@@ -986,6 +1041,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
           : String(m.def.name || "").replace(/^Influenced\s+/i, "");
         drawNameText(ctx, mx, by - 4, mobName,
                      m.influenced ? "#7ad2ff" : m.raider ? "#ff9a6a" : "#ff5252");
+        // fala da criatura (monster.voices do Canary), acima do nome
+        drawCreatureSpeech(ctx, m, mx, by - 4, dt);
       }
     }
   }

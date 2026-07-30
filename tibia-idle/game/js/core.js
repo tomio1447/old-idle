@@ -122,10 +122,71 @@ function meleeDamage(skill, attack, factor) {
   return { min: 0, max: Math.max(1, max) };
 }
 
-/* Dano de arma de distancia */
-function distanceDamage(skill, attack, factor) {
-  const max = Math.floor((skill + 4) * attack * 0.085 * factor);
-  return { min: 0, max: Math.max(1, max) };
+/* Dano de arma de distancia — WeaponDistance::getWeaponDamage do Canary.
+ *
+ *   minValue = level / 5
+ *   maxValue = round(0.09 * attackFactor * attackSkill * attackValue + min)
+ *
+ * O `attackValue` ja vem somado (flecha + arco). Quando a municao tem
+ * elemento e o alvo NAO e jogador, o servidor divide os dois valores por 2:
+ * metade do golpe vira dano elemental, entao o fisico cai pela metade.
+ *
+ * O `attackFactor` depende do fight mode (1.0 attack, 0.75 balanced, 0.5
+ * defense). O jogo nao tem seletor de postura, entao fica 1.0.
+ *
+ * A formula antiga era `(skill + 4) * attack * 0.085 * factor` com min 0:
+ * ignorava o nivel, tinha o coeficiente errado e podia dar dano zero.
+ */
+function distanceDamage(skill, attack, factor, level, temElemento) {
+  const f = factor === undefined ? 1.0 : factor;
+  let min = Math.floor((level || 1) / 5);
+  let max = Math.round(0.09 * f * skill * attack + min);
+  if (temElemento) { max = Math.floor(max / 2); min = Math.floor(min / 2); }
+  return { min: Math.max(0, min), max: Math.max(1, max) };
+}
+
+/* Tabela de chance de acerto de arma de distancia (weapons.cpp).
+ *
+ * A chance depende da DISTANCIA ate o alvo e do teto de skill daquela
+ * faixa — nao e uma curva unica. `maxHit` e o maxHitChance do item: 100 nas
+ * municoes especiais, 90 para municao comum e 75 para arremesso de uma mao.
+ *
+ * Devolve a chance em porcentagem (0-100).
+ */
+function hitChanceDistance(skill, distancia, maxHit) {
+  const d = Math.max(1, Math.round(distancia));
+  const m = Math.min.bind(Math);
+  if (maxHit === 100) {
+    switch (d) {
+      case 1: case 5: return m(skill, 73) * 1.35 + 1;
+      case 2: return m(skill, 30) * 3.20 + 4;
+      case 3: return m(skill, 48) * 2.05 + 2;
+      case 4: return m(skill, 65) * 1.50 + 2;
+      case 6: return m(skill, 87) * 1.20 - 4;
+      case 7: return m(skill, 90) * 1.10 + 1;
+      default: return maxHit;
+    }
+  }
+  if (maxHit === 75) {
+    switch (d) {
+      case 1: case 5: return m(skill, 74) + 1;
+      case 2: return m(skill, 28) * 2.40 + 8;
+      case 3: return m(skill, 45) * 1.55 + 6;
+      case 4: return m(skill, 58) * 1.25 + 3;
+      case 6: return m(skill, 90) * 0.80 + 3;
+      case 7: return m(skill, 104) * 0.70 + 2;
+      default: return maxHit;
+    }
+  }
+  // 90: municao de duas maos, o caso mais comum
+  switch (d) {
+    case 1: case 5: return m(skill, 74) * 1.20 + 1;
+    case 2: return m(skill, 28) * 3.20;
+    case 3: return m(skill, 45) * 2;
+    case 4: return m(skill, 58) * 1.55;
+    case 6: case 7: return m(skill, 90);
+    default: return 90;
+  }
 }
 
 /* Dano magico (strike) — escala com magic level e nivel */

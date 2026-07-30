@@ -140,9 +140,14 @@ def main():
             "el": ELEM_POR_NOME.get(nome.lower(), "physical"),
             "w": float(attrs.get("weight", 0) or 0) / 100.0,
         }
-        if attrs.get("maxhitchance") == "100":
-            # maxhitchance 100 e o "nunca erra" do servidor
-            reg["noMiss"] = 1
+        # maxHitChance escolhe QUAL tabela de acerto o weapons.cpp usa
+        # (75 arremesso de uma mao, 90 municao comum, 100 especial), entao
+        # precisa do valor e nao so do "nunca erra".
+        mh = attrs.get("maxhitchance")
+        if mh and mh.isdigit():
+            reg["hit"] = int(mh)
+            if int(mh) >= 100:
+                reg["noMiss"] = 1
         sc = scripts.get(iid)
         if sc:
             if sc.get("area"):

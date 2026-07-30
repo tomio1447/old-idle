@@ -153,6 +153,19 @@ const OutfitRenderer = {
    *      direcao sul e perderia a animacao de andar;
    *   2. sprites classicos por direcao/frame, que continuam sendo o padrao.
    */
+  /* Quantos quadros de caminhada a outfit atual tem (sem contar o parado).
+   * Fica aqui e nao no walker porque so o renderizador sabe qual catalogo
+   * esta em uso: o novo (spritesheet com ate 8 quadros) ou o classico, que
+   * so tem dois PNGs por direcao. */
+  frameCount(p) {
+    if (p && p.outfit && p.outfit.appearance &&
+        typeof APP_OUTFIT !== "undefined") {
+      const o = APP_OUTFIT[p.outfit.appearance];
+      if (o && o.cols) return Math.max(1, o.cols - 1);
+    }
+    return 2;                       // sprites classicos: _dir1 e _dir2
+  },
+
   forPlayer(p, dir, frame) {
     const o = playerOutfit(p);
     if (p.outfit && p.outfit.appearance &&
@@ -179,3 +192,10 @@ const OutfitRenderer = {
     return null;
   },
 };
+
+/* Atalho global: o walker precisa saber o tamanho do ciclo de caminhada
+ * para percorrer todos os quadros em vez de alternar entre dois. */
+function walkFrameCount(p) {
+  return (typeof OutfitRenderer !== "undefined" && OutfitRenderer.frameCount)
+    ? OutfitRenderer.frameCount(p) : 2;
+}

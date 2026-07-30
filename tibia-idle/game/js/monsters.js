@@ -30,6 +30,8 @@ const MD_CAMPOS = [
   "mitigation", "resist", "skills", "defSkills", "looktype", "race",
   "raceId", "targetDistance", "staticAttack", "runAt", "ranged",
   "imune", "loot", "best", "grupo", "boss", "passivo",
+  // falas do monster.voices, consumidas pelo monsterThinkYell
+  "voices",
 ];
 
 /* O monstro pode entrar numa caçada? Depende de existir sheet para ele.

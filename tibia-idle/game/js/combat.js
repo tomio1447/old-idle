@@ -603,6 +603,35 @@ function applyMonsterCondition(c, p, mob) {
 }
 
 /* Municao ativa (null quando a arma nao usa municao) */
+/* Casa vizinha para onde o tiro perdido cai.
+ *
+ * Porte do bloco `destList` de WeaponDistance::useWeapon: o servidor
+ * embaralha as 9 posicoes do 3x3 em volta do alvo e fica com a primeira que
+ * tenha chao e nao seja bloqueada. Aqui devolvemos um alvo "fantasma" com
+ * celula propria, que serve de centro para a area da municao.
+ */
+function tileVizinho(c, target) {
+  if (target.cx === undefined) return target;
+  const volta = [
+    [-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0],
+    [1, 0], [-1, 1], [0, 1], [1, 1],
+  ];
+  // embaralha, como o std::ranges::shuffle do servidor
+  for (let i = volta.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = volta[i]; volta[i] = volta[j]; volta[j] = t;
+  }
+  for (const [dx, dy] of volta) {
+    const cx = target.cx + dx, cy = target.cy + dy;
+    if (typeof inBounds === "function" && !inBounds(cx, cy)) continue;
+    const s = (typeof cellToScreen === "function")
+      ? cellToScreen(cx, cy) : { x: target.x, y: target.y };
+    // objeto so de posicao: nao e criatura, so o ponto onde a flecha caiu
+    return { cx: cx, cy: cy, x: s.x, y: s.y, fantasma: true };
+  }
+  return target;
+}
+
 function activeAmmoItem(p) {
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
   if (!wp || wp.t !== "distance" || wp.inf || !equippedQuiver(p)) return null;
@@ -720,11 +749,40 @@ function playerAttack(c, p, target) {
     }
   }
 
-  // chance de errar para distancia. Burst arrow explode de qualquer jeito:
-  // no Tibia ela nunca "erra", a explosao acontece onde a flecha cai.
-  // Perfect shot tambem ignora a rolagem de acerto.
-  if (isDist && !perfeito && !(ammo && ammo.noMiss) &&
-      Math.random() > hitChance(effSkill(p, "dist"))) {
+  // Rolagem de acerto da distancia, com a tabela real do weapons.cpp: a
+  // chance depende da DISTANCIA e do maxHitChance da municao, e nao de uma
+  // curva unica de skill como antes.
+  //
+  // O que muda de comportamento: errar NAO cancela o disparo. No servidor o
+  // tiro que erra e resolvido numa casa vizinha ao alvo (o bloco `destList`
+  // de useWeapon). Para municao com area isso e o que garante que a
+  // explosao aconteca de qualquer jeito, so que centrada no lugar errado —
+  // era esta a queixa de a diamond arrow nao causar o dano em area.
+  let alvoTiro = target;         // onde a flecha realmente cai
+  let errou = false;
+  // maxHitChance 100 e o "nunca erra" do servidor: burst, diamond, sniper e
+  // spectral entram aqui e pulam a rolagem inteira.
+  const nuncaErra = !!(ammo && ammo.noMiss);
+  if (isDist && !perfeito && !nuncaErra) {
+    const maxHit = (ammo && ammo.hit) ? ammo.hit : 90;
+    // A tabela do weapons.cpp e indexada por SQM inteiro. O sqmDist cai num
+    // valor fracionario quando a criatura nao tem celula (cena de treino e
+    // testes antigos, que so usam coordenada de tela); arredondar para cima
+    // com minimo 1 mantem esse caminho valendo em vez de virar distancia 0.
+    const sqm = Math.max(1, Math.ceil(sqmDist(c.player || pos, target)));
+    const chance = (typeof hitChanceDistance === "function")
+      ? hitChanceDistance(effSkill(p, "dist"), sqm, maxHit)
+      : 90;
+    if (chance < Math.floor(Math.random() * 100) + 1) {
+      errou = true;
+      // desvia para uma casa vizinha, como o destList do servidor
+      alvoTiro = tileVizinho(c, target);
+    }
+  }
+
+  // Sem area o tiro perdido simplesmente nao acerta ninguem. Com area, o
+  // disparo continua e explode na casa desviada.
+  if (errou && !(ammo && (ammo.areaMatrix || ammo.area))) {
     c.events.push({ t: "miss", x: target.x, y: target.y });
     addSkillTries(p, "dist", combatSkillGain(c, 1));
     return 0;
@@ -805,14 +863,24 @@ function playerAttack(c, p, target) {
     }
   }
 
-  target.hp -= raw;
-  c.stats.damage += raw;
+  // Tiro perdido nao acerta o alvo: o dano direto e descartado e so a area
+  // (resolvida mais abaixo, na casa desviada) continua valendo. Sem isto o
+  // "erro" ainda causaria dano cheio no alvo e nao seria erro nenhum.
+  if (errou) raw = 0;
+
   if (c.player) c.player.attackAnim = 180;
-  c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
-                  sx: pos.x, sy: pos.y, screen: true,
-                  projectile: isDist || isMagic, el: element, crit: critou,
-                  missile: isDist ? playerMissile(p, element)
-                                  : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+  if (raw > 0) {
+    target.hp -= raw;
+    c.stats.damage += raw;
+    c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
+                    sx: pos.x, sy: pos.y, screen: true,
+                    projectile: isDist || isMagic, el: element, crit: critou,
+                    missile: isDist ? playerMissile(p, element)
+                                    : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+  } else if (errou) {
+    // o projetil ainda voa, mas cai na casa desviada
+    c.events.push({ t: "miss", x: target.x, y: target.y });
+  }
 
   // Cleave (15.x): certas armas atingem alvos adjacentes por 50% do dano
   const wpItem = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
@@ -841,29 +909,41 @@ function playerAttack(c, p, target) {
     // um raio circular unico lido de `ammo.area`, que nao consegue desenhar
     // a cruz da diamond — e a diamond arrow nem existia no catalogo, entao
     // nunca explodia coisa nenhuma.
+    // A area explode onde a FLECHA CAIU. Num tiro certeiro isso e o proprio
+    // alvo; num tiro perdido e a casa vizinha sorteada, e por isso a
+    // explosao acontece mesmo quando o disparo erra.
+    const centro = alvoTiro || target;
     const matriz = ammo.areaMatrix;
     let atingidos = null;
     if (matriz && typeof matrixMobs === "function") {
-      atingidos = matrixMobs(c, matriz, target);
+      atingidos = matrixMobs(c, matriz, centro);
     }
     if (!atingidos && ammo.area) {
-      // fallback do formato antigo (raio em SQM), para municao sem matriz
-      const R = ammo.area;
-      atingidos = c.mobs.filter((m) => m.hp > 0 && sqmDist(m, target) <= R);
+      // Fallback para quem nao tem celula (cena de treino, testes antigos):
+      // o matrixMobs devolve null nesses casos porque depende de cx/cy.
+      // `area` guarda o LADO do quadrado (3 = 3x3, 5 = 5x5), entao o raio e
+      // metade disso. Tratar o lado como raio dobrava o tamanho da explosao.
+      const R = Math.max(1, Math.floor(ammo.area / 2));
+      atingidos = c.mobs.filter((m) => m.hp > 0 && sqmDist(m, centro) <= R);
     }
     if (atingidos) {
-      c.events.push({ t: "burst", x: target.x, y: target.y });
+      c.events.push({ t: "burst", x: centro.x, y: centro.y });
       // pinta o efeito em TODA celula da area, nao so onde ha monstro
       if (matriz && typeof matrixCells === "function") {
-        const cells = matrixCells(matriz, target);
+        const cells = matrixCells(matriz, centro);
         if (cells.length > 1) {
           c.events.push({ t: "areafx", cells: cells, screen: true,
                           fx: ammo.areaFx || "explosion-area", el: element });
         }
       }
       for (const m of atingidos) {
-        if (m === target || m.hp <= 0) continue;
-        const splash = Math.max(1, Math.floor(rollDamage() * 0.75));
+        // o alvo principal ja levou o golpe direto; nao conta duas vezes
+        if (m === target && !errou) continue;
+        if (m.hp <= 0) continue;
+        // Rolagem CHEIA em cada alvo. O 0.75 que estava aqui era invencao
+        // nossa: no Canary a municao de area executa a mesma formula em
+        // todas as casas cobertas, sem desconto por ser respingo.
+        const splash = Math.max(1, Math.floor(rollDamage()));
         m.hp -= splash;
         c.stats.damage += splash;
         c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y,
@@ -1449,6 +1529,34 @@ function tryMana(c, p) {
 }
 
 /* Monstro ataca o jogador */
+/* Fala periodica do monstro, portada do Monster::onThinkYell do Canary.
+ *
+ * O servidor acumula o tempo desde a ultima checagem em yellTicks; quando
+ * passa de yellSpeedTicks (o `interval` do monster.voices), zera o contador
+ * e faz UMA rolagem de yellChance. Passando, sorteia uma fala do vetor e a
+ * envia como TALKTYPE_MONSTER_YELL (`yell = true`) ou TALKTYPE_MONSTER_SAY.
+ *
+ * Detalhe que importa: o contador zera mesmo quando a rolagem falha, entao
+ * a criatura nao "acumula" chance ao longo do tempo.
+ */
+function monsterThinkYell(mob, dt) {
+  const v = mob.def && mob.def.voices;
+  if (!v || !v.list || !v.list.length) return;
+  const intervalo = v.int || 5000;
+  if (!intervalo) return;
+  mob.yellTicks = (mob.yellTicks || 0) + dt;
+  if (mob.yellTicks < intervalo) return;
+  mob.yellTicks = 0;
+  // uniform_random(1, 100) <= chance
+  if ((v.ch || 0) < Math.floor(Math.random() * 100) + 1) return;
+  const fala = v.list[Math.floor(Math.random() * v.list.length)];
+  if (!fala) return;
+  if (typeof creatureSay === "function") {
+    creatureSay(mob, fala.t,
+                fala.y ? TALK.MONSTER_YELL : TALK.MONSTER_SAY);
+  }
+}
+
 function mobAttack(c, p, mob) {
   const pl = c.player || { x: 0.18, y: 0.62 };
   // o monstro so bate se o alvo estiver dentro do alcance EM SQM. Melee = 1,
@@ -1720,6 +1828,7 @@ function combatTick(c, p, dt, now) {
       const acted = mobAttack(c, p, m);
       m.atkCd = acted === false ? 300 : (m.def.attackSpeed || 2000);
     }
+    monsterThinkYell(m, dt);
   }
 
   // morte do jogador

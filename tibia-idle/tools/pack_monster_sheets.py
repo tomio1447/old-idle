@@ -32,7 +32,11 @@ GAME = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "game")
 
 DIRS = ("n", "e", "s", "w")      # linha do sheet, na ordem do client
-COLS = 3                          # parado + 2 passos
+# Teto de colunas. O numero REAL de poses varia por criatura (o DAT traz de
+# 1 a 12 quadros de caminhada), entao cada sheet usa so as colunas que aquela
+# criatura tem e grava isso em `cols`. Fixar 3 aqui, como antes, jogava fora
+# os 6 quadros extras das 640 criaturas de 8 quadros.
+MAX_COLS = 13                     # 1 parado + ate 12 passos
 
 
 def main():
@@ -52,7 +56,7 @@ def main():
         if d not in DIRS:
             continue
         pose = int(suf[1:]) if len(suf) > 1 and suf[1:].isdigit() else 0
-        if pose >= COLS:
+        if pose >= MAX_COLS:
             continue
         porSlug.setdefault(slug, {})[(d, pose)] = a
 
@@ -72,9 +76,11 @@ def main():
         if not cw or not ch:
             continue
 
-        sheet = Image.new("RGBA", (cw * COLS, ch * len(DIRS)), (0, 0, 0, 0))
+        # quantas poses ESTA criatura tem: a maior encontrada + 1
+        cols = max(k[1] for k in quadros) + 1
+        sheet = Image.new("RGBA", (cw * cols, ch * len(DIRS)), (0, 0, 0, 0))
         for li, d in enumerate(DIRS):
-            for col in range(COLS):
+            for col in range(cols):
                 im = imgs.get((d, col))
                 if im is None:
                     # sem esse passo: repete a pose parada para a animacao
@@ -85,7 +91,7 @@ def main():
                 sheet.paste(im, (col * cw, li * ch))
 
         sheet.save(os.path.join(dest, slug + ".png"), optimize=True)
-        meta[slug] = {"cw": cw, "ch": ch, "cols": COLS, "rows": len(DIRS)}
+        meta[slug] = {"cw": cw, "ch": ch, "cols": cols, "rows": len(DIRS)}
         usados.extend(quadros.values())
         feitos += 1
 

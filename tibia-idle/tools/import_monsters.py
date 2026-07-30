@@ -325,6 +325,33 @@ def parse_imunidades(txt):
     return out
 
 
+def parse_voices(txt):
+    """Falas da criatura (monster.voices).
+
+    No servidor isso vira onThinkYell: a cada `interval` ms roda uma rolagem
+    de `chance`% e, passando, sorteia UMA fala do vetor. `yell = true` sai
+    como TALKTYPE_MONSTER_YELL (o cliente mostra em laranja e em caixa alta)
+    e o resto como TALKTYPE_MONSTER_SAY.
+    """
+    b = bloco(txt, "voices")
+    if not b:
+        return None
+    reg = {
+        "int": int(num(b, "interval", 5000) or 5000),
+        "ch": int(num(b, "chance", 10) or 10),
+        "list": [],
+    }
+    for ln in linhas_de_tabela(b):
+        t = re.search(r'text\s*=\s*"((?:[^"\\]|\\.)*)"', ln)
+        if not t:
+            continue
+        fala = {"t": t.group(1).replace('\\"', '"')}
+        if re.search(r"yell\s*=\s*true", ln):
+            fala["y"] = 1
+        reg["list"].append(fala)
+    return reg if reg["list"] else None
+
+
 def parse_bestiary(txt):
     b = bloco(txt, "Bestiary")
     if not b:
@@ -433,6 +460,9 @@ def parse_arquivo(caminho):
     best = parse_bestiary(txt)
     if best:
         m["best"] = best
+    voices = parse_voices(txt)
+    if voices:
+        m["voices"] = voices
 
     return slug(nome), m
 
@@ -495,8 +525,10 @@ def main():
     comBest = sum(1 for m in todos.values() if m.get("best"))
     bosses = sum(1 for m in todos.values() if m.get("boss"))
     print("monstros:", len(todos), "| ignorados:", ignorados)
+    comVoz = sum(1 for m in todos.values() if m.get("voices"))
     print("com habilidade:", comSkill, "| com loot:", comLoot,
-          "| com bestiario:", comBest, "| bosses:", bosses)
+          "| com bestiario:", comBest, "| bosses:", bosses,
+          "| com falas:", comVoz)
     print("tamanho:", round(os.path.getsize(js) / 1024 / 1024, 1), "MB")
 
 

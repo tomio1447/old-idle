@@ -182,6 +182,13 @@ function updateGridMovement(c, p, dt, now) {
   if (!c.player) return;
   now = now || Date.now();
   ensureCell(c.player);
+  // O jogador nao esta em MOBSHEETS (usa o catalogo de outfits), entao o
+  // ensureCell nao consegue descobrir sozinho o tamanho do ciclo. Sem isto o
+  // advanceStep cairia no padrao de 2 quadros e a caminhada ficaria picotada
+  // justamente nas outfits de 8 quadros.
+  if (typeof walkFrameCount === "function") {
+    c.player.walkFrames = walkFrameCount(p);
+  }
 
   c.player.attackAnim = Math.max(0, (c.player.attackAnim || 0) - dt);
   for (const m of c.mobs) {

@@ -172,7 +172,11 @@ CityWalker.prototype.stepByKeys = function (dt) {
   this.stepT += dt;
   if (this.stepT > 170) {
     this.stepT = 0;
-    this.frame = this.frame === 1 ? 2 : 1;
+    // percorre o ciclo inteiro da outfit. O numero de quadros varia por
+    // visual (204 das 252 outfits tem 8 no DAT); alternar entre 1 e 2, como
+    // antes, usava so o comeco do ciclo e deixava a caminhada picotada.
+    const n = walkFrameCount(this.player);
+    this.frame = this.frame >= n ? 1 : (this.frame || 0) + 1;
   }
   return true;
 };
@@ -215,7 +219,11 @@ CityWalker.prototype.update = function (dt) {
   this.stepT += dt;
   if (this.stepT > 170) {
     this.stepT = 0;
-    this.frame = this.frame === 1 ? 2 : 1;
+    // percorre o ciclo inteiro da outfit. O numero de quadros varia por
+    // visual (204 das 252 outfits tem 8 no DAT); alternar entre 1 e 2, como
+    // antes, usava so o comeco do ciclo e deixava a caminhada picotada.
+    const n = walkFrameCount(this.player);
+    this.frame = this.frame >= n ? 1 : (this.frame || 0) + 1;
   }
   return null;
 };

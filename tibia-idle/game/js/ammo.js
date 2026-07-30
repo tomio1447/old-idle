@@ -15,7 +15,9 @@
  * antigo escrito a mao. Preco e sprite ficam de fora porque a economia do
  * jogo ja esta calibrada em cima dos valores atuais. */
 const AMMO_CAMPOS = ["atk", "el", "ammoKind", "noMiss", "areaMatrix", "lvl",
-                     "w"];
+                     "w",
+                     // maxHitChance: escolhe a tabela de acerto do weapons.cpp
+                     "hit", "areaFx"];
 
 function fundirAmmoData() {
   if (typeof AMMODATA === "undefined" || typeof GAMEDATA === "undefined") {

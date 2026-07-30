@@ -40,19 +40,19 @@ GAME = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
 
 # ordem das direcoes igual a do client: o indice e o proprio xp do frame group
 DIRS = 4
-# 1 pose parada + 3 passos. O grupo de caminhada costuma ter 8 frames; pegar
-# 3 espacados da a leitura do passo sem triplicar o tamanho do arquivo.
-WALK_COLS = 3
-COLS = 1 + WALK_COLS
+# Todos os quadros de caminhada, e nao uma amostra. Medindo o DAT: 204 das
+# 252 outfits e 224 das 236 montarias tem 8 quadros. O extrator antigo pegava
+# 3 espacados "para nao triplicar o arquivo", o que jogava fora 5 quadros e
+# deixava o personagem andando picotado perto do que o client mostra.
+MAX_WALK = 12
 CELL = 64          # 2x2 tiles de 32px, o tamanho do frame group de criatura
 
 
 def frames_de_caminhada(anim):
-    """Escolhe WALK_COLS frames espacados dentro do ciclo de caminhada."""
+    """Todos os quadros do ciclo, ate o teto de MAX_WALK."""
     if anim <= 1:
-        return [0] * WALK_COLS
-    return [min(anim - 1, (i + 1) * anim // (WALK_COLS + 1))
-            for i in range(WALK_COLS)]
+        return [0]
+    return list(range(min(anim, MAX_WALK)))
 
 
 def montar_sheet(spr, obj, yp, layer):
@@ -69,11 +69,12 @@ def montar_sheet(spr, obj, yp, layer):
     if yp >= g_idle.py:
         return None
 
-    sheet = Image.new("RGBA", (CELL * COLS, CELL * DIRS), (0, 0, 0, 0))
     passos = frames_de_caminhada(g_walk.anim)
+    cols = 1 + len(passos)
+    sheet = Image.new("RGBA", (CELL * cols, CELL * DIRS), (0, 0, 0, 0))
     vazio = True
     for d in range(DIRS):
-        for col in range(COLS):
+        for col in range(cols):
             if col == 0:
                 g, fr = g_idle, 0
             else:
@@ -105,8 +106,10 @@ def caixa_das_celulas(sheets):
     for sh in sheets:
         if sh is None:
             continue
+        # o numero de colunas varia por visual: le da largura do sheet
+        cols = sh.width // CELL
         for d in range(DIRS):
-            for col in range(COLS):
+            for col in range(cols):
                 cel = sh.crop((col * CELL, d * CELL,
                                col * CELL + CELL, d * CELL + CELL))
                 b = cel.getbbox()
@@ -124,9 +127,10 @@ def recortar(sheet, box):
     """Aplica a mesma caixa em todas as celulas, remontando o sheet menor."""
     x0, y0, x1, y1 = box
     cw, ch = x1 - x0, y1 - y0
-    out = Image.new("RGBA", (cw * COLS, ch * DIRS), (0, 0, 0, 0))
+    cols = sheet.width // CELL
+    out = Image.new("RGBA", (cw * cols, ch * DIRS), (0, 0, 0, 0))
     for d in range(DIRS):
-        for col in range(COLS):
+        for col in range(cols):
             cel = sheet.crop((col * CELL + x0, d * CELL + y0,
                               col * CELL + x1, d * CELL + y1))
             out.paste(cel, (col * cw, d * ch))
@@ -167,7 +171,7 @@ def exportar(dat, spr, looktype, destino, nome, addons=True):
     return {
         "cw": x1 - x0, "ch": y1 - y0,      # tamanho da celula ja recortada
         "ox": x0, "oy": y0,                # onde a celula comeca no 64x64
-        "cols": COLS, "rows": DIRS,
+        "cols": camadas[0][1].width // CELL, "rows": DIRS,
         # deslocamento do DAT: o client desenha a sprite subtraindo isso
         "dx": obj.props.get("dispX", 0), "dy": obj.props.get("dispY", 0),
         "addons": max(0, len(camadas) - 1),

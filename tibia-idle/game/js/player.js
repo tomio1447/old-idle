@@ -261,9 +261,12 @@ function playerDamage(p) {
     // armas de munição infinita (spear) usam só o próprio ataque
     const ammo = it.inf ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
     const atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
-    const d = distanceDamage(effSkill(p, "dist"), atk, 1.0);
-    return { min: Math.floor(d.max * 0.2), max: d.max,
-             element: (ammo && ammo.el) || "physical", type: "distance" };
+    // municao elemental corta o dano pela metade contra monstro (o resto
+    // vira dano do elemento), como no getWeaponDamage do servidor
+    const el = (ammo && ammo.el) || "physical";
+    const temEl = !!(ammo && ammo.el && ammo.el !== "physical");
+    const d = distanceDamage(effSkill(p, "dist"), atk, 1.0, p.level, temEl);
+    return { min: d.min, max: d.max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
   const atk = it ? (it.atk || 0) : 7;    // punho = attack 7

@@ -143,6 +143,14 @@ function ensureCell(ent) {
     ent.sx = s.x; ent.sy = s.y;   // origem da interpolacao
   }
   if (ent.sx === undefined) { ent.sx = ent.x; ent.sy = ent.y; }
+  // Quantos quadros de caminhada esta criatura tem. Vem do sheet
+  // (MOBSHEETS[slug].cols conta a pose parada, por isso o -1). Sem isso o
+  // advanceStep usaria 2 para todo mundo e as criaturas de 8 quadros
+  // andariam picotado.
+  if (ent.walkFrames === undefined && ent.slug &&
+      typeof MOBSHEETS !== "undefined" && MOBSHEETS && MOBSHEETS[ent.slug]) {
+    ent.walkFrames = Math.max(1, (MOBSHEETS[ent.slug].cols || 3) - 1);
+  }
   return ent;
 }
 
@@ -202,8 +210,12 @@ function advanceStep(ent, dt) {
   const p = Math.min(1, ent.stepT / Math.max(1, ent.stepDur));
   ent.x = ent.sx + (ent.tx - ent.sx) * p;
   ent.y = ent.sy + (ent.ty - ent.sy) * p;
-  // dois quadros de passo alternando ao longo do trajeto
-  ent.frame = 1 + (p < 0.5 ? 0 : 1);
+  // Distribui o ciclo de caminhada ao longo do trajeto. O numero de quadros
+  // varia por criatura (o DAT 8.60 traz de 1 a 12; 640 monstros tem 8) e
+  // vive em ent.walkFrames, preenchido pelo render a partir do sheet. Antes
+  // era fixo em dois quadros, entao quem tinha 8 andava picotado.
+  const n = Math.max(1, ent.walkFrames || 2);
+  ent.frame = 1 + Math.min(n - 1, Math.floor(p * n));
   if (p >= 1) {
     ent.moving = false;
     ent.x = ent.tx; ent.y = ent.ty;

@@ -34,7 +34,13 @@ GAME = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
 
 # (sufixo do arquivo, xp do frame group) na ordem do client
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
-PASSOS = 2          # quantos frames de caminhada o render alterna
+
+# Teto de quadros de caminhada por criatura. O DAT 8.60 traz de 1 a 12
+# quadros: medindo os 1648 monstros, 839 tem 2 quadros e 640 tem 8. O
+# extrator antigo gravava PASSOS = 2 fixo, entao as criaturas de 8 quadros
+# perdiam 6 e andavam "picotado". 12 cobre inclusive o glooth bomb, que e o
+# unico com o ciclo completo.
+MAX_PASSOS = 12
 
 
 def quadros_da_criatura(spr, obj):
@@ -53,7 +59,7 @@ def quadros_da_criatura(spr, obj):
                                xp=xp % max(1, g_idle.px), yp=0, layer=0)
         if img is not None:
             out[(tag, 0)] = img
-        for i in range(min(PASSOS, max(1, g_walk.anim))):
+        for i in range(min(MAX_PASSOS, max(1, g_walk.anim))):
             fr = render_group_860(spr, g_walk, frame=i,
                                   xp=xp % max(1, g_walk.px), yp=0, layer=0)
             if fr is not None:
