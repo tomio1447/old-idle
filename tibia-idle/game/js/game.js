@@ -1196,6 +1196,8 @@ function loop(ts) {
     G.hudAcc = 0;
     renderStats(G.p);
     renderTopbar(G.p);
+    // selo da postura ativa no canto superior esquerdo da cena
+    if (typeof renderStanceBadge === "function") renderStanceBadge(G.p);
   }
 
   // autosave a cada 20s
@@ -1220,6 +1222,7 @@ function renderAll() {
   renderBosses(p);
   renderTopbar(p);
   renderHuntInfo();
+  if (typeof renderStanceBadge === "function") renderStanceBadge(p);
 }
 
 function renderHuntInfo() {

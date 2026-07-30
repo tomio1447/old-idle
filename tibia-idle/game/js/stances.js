@@ -61,19 +61,19 @@ const STANCES = {
     voc: "sorcerer", nome: "Master of Flames", grupo: "sorcelem",
     fx: "stance-master-flames", elemento: "fire",
     elemPct: 4, convert: "fire",
-    desc: "+4% base em magias de fogo · próxima magia não-fogo vira fogo",
+    desc: "+4% base · todas as magias viram FOGO enquanto ativa",
   },
   "uteta-vis": {
     voc: "sorcerer", nome: "Master of Thunder", grupo: "sorcelem",
     fx: "stance-master-thunder", elemento: "energy",
     elemCrit: 4, convert: "energy",
-    desc: "+4% crítico em magias de energia · próxima não-energia vira energia",
+    desc: "+4% crítico · todas as magias viram ENERGIA enquanto ativa",
   },
   "uteta-mort": {
     voc: "sorcerer", nome: "Master of Decay", grupo: "sorcelem",
     fx: "stance-master-decay", elemento: "death",
     elemCritDmg: 30, convert: "death",
-    desc: "+30% dano crítico em magias de morte · próxima não-death vira morte",
+    desc: "+30% dano crítico · todas as magias viram MORTE enquanto ativa",
   },
 
   // ---- Sorcerer crippling (grupo "crip")
@@ -242,25 +242,21 @@ function stanceMLBonus(p, s, ml) {
 }
 
 /* Resolve o elemento EFETIVO de uma magia conjurada sob uma stance de
- * elemento do Sorcerer. Tem que ser chamado UMA vez por conjuracao — nao
- * por alvo — porque a conversao e um gatilho de disparo unico:
- *   - se a magia anterior era do elemento da stance, ESTA sai convertida
- *     (consome o gatilho guardado em p.stanceConv);
- *   - se esta e do elemento da stance, a PROXIMA magia nao-relacionada
- *     saira convertida ("apos usar uma magia de fogo, a proxima magia que
- *     nao seja de fogo e convertida para fire damage" — boletim oficial).
- * Os bonus de dano (+4% base, +4% crit, +30% crit dmg) nao moram aqui:
- * sao lidos alvo a alvo pelo combat.js via stanceTotals(). */
+ * elemento do Sorcerer.
+ *
+ * DESVIO DO GLOBAL, A PEDIDO DO JOGADOR: no Tibia oficial a conversao e um
+ * gatilho por conjuracao (conjurou fogo -> a proxima nao-fogo converte).
+ * Aqui a regra e mais direta: enquanto uma Master of X estiver ATIVA, TODA
+ * magia sai convertida para o elemento X. Os bonus de dano (+4% base,
+ * +4% crit, +30% crit dmg) continuam lidos alvo a alvo pelo combat.js via
+ * stanceTotals() — e na pratica passam a valer para tudo, ja que toda
+ * magia sai com o elemento da stance. */
 function stanceConvert(p, elemento) {
   const t = stanceTotals(p);
   if (!t || !t.convert) return elemento;
-  if (p.stanceConv && elemento !== p.stanceConv) {
-    elemento = p.stanceConv;
-    delete p.stanceConv;
-  } else if (elemento === t.convert) {
-    p.stanceConv = t.convert;
-  }
-  return elemento;
+  // curas e suporte nao levam tipo ofensivo; a conversao so interessa a
+  // dano, entao a troca aqui e segura mesmo para exura/utani
+  return t.convert;
 }
 
 /* Marca o alvo com os debuffs crippling do Sorcerer (10 s por golpe,

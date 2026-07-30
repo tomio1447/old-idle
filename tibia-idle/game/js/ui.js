@@ -1061,9 +1061,8 @@ function renderStancePicker(p) {
       ? stanceTotals(p).convert : null;
     html += `<div class="tiny mb4" style="color:#9ce84a">✔ Ativa(s): `
       + `<b>${ativos.map((x) => x.st.nome).join(" + ")}</b>`
-      + (conv ? ` — conversão de `
+      + (conv ? ` — toda magia sai como `
         + `<span style="color:${elCor(conv)}">${elNome(conv).toLowerCase()}</span>`
-        + (p.stanceConv ? ` armada` : ` (conjure uma magia de ${elNome(conv).toLowerCase()} para armar)`)
         : "")
       + `</div>`;
   }
@@ -1091,9 +1090,49 @@ function renderStancePicker(p) {
     html += `</div>`;
   }
   html += `<div class="tiny dim mt4">Ativar paga a mana UMA vez e a postura fica ligada até trocar ou desligar — vale mesmo depois de relogar.`
-    + (porGrupo.sorcelem ? ` O Sorcerer mantém 1 elemental + 1 aura crippling ao mesmo tempo.` : "")
+    + (porGrupo.sorcelem ? ` O Sorcerer mantém 1 elemental + 1 aura crippling ao mesmo tempo, e a elemental converte TODAS as magias para o elemento dela (regra da casa, diferente do global).` : "")
     + `</div>`;
   return html;
+}
+
+/* Selo da postura ativa: um quadrado (ou dois, para o Sorcerer com
+ * elemental+crippling) no canto superior esquerdo da cena, como a area de
+ * icones de condicao do cliente oficial. Borda na cor do elemento quando a
+ * postura e uma Master of X. */
+function stanceBadgesHtml(p) {
+  if (!p || !p.stances || typeof STANCES === "undefined") return "";
+  const ativos = [];
+  for (const id in p.stances) {
+    if (STANCES[id]) ativos.push(id);
+  }
+  if (!ativos.length) return "";
+  // elemento primeiro, crippling/outras depois (ordem otc do cliente)
+  ativos.sort((a, b) => {
+    const ea = STANCES[a].elemento ? 0 : 1, eb = STANCES[b].elemento ? 0 : 1;
+    if (ea !== eb) return ea - eb;
+    return (SPELLS[a] ? SPELLS[a].icon : 999) - (SPELLS[b] ? SPELLS[b].icon : 999);
+  });
+  return ativos.map((id) => {
+    const st = STANCES[id];
+    const sp = (typeof SPELLS !== "undefined") ? SPELLS[id] : null;
+    const cor = st.elemento && typeof ELEMENTS !== "undefined" && ELEMENTS[st.elemento]
+      ? ELEMENTS[st.elemento].color : "#d4af37";
+    const nomeEl = st.elemento && typeof ELEMENTS !== "undefined" && ELEMENTS[st.elemento]
+      ? ` (${ELEMENTS[st.elemento].name})` : "";
+    return `<div class="stance-sq" style="border-color:${cor}"
+             title="${st.nome}${nomeEl} — ${st.desc}">
+      ${sp && sp.icon != null
+        ? `<img src="assets/spell/otc/${sp.icon}.png" alt="${st.nome}">` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderStanceBadge(p) {
+  const el = $("#stance-badge");
+  if (!el) return;
+  const h = stanceBadgesHtml(p);
+  el.innerHTML = h;
+  el.style.display = h ? "flex" : "none";
 }
 
 /* Seletor da magia de velocidade (haste). Sem selecao, o personagem nao
@@ -1298,6 +1337,7 @@ function renderHelper(p) {
               ? `Stance ativa: <b>${st ? st.nome : id}</b>`
               : `Stance desligada: <b>${st ? st.nome : id}</b>`);
         if (typeof renderStats === "function") renderStats(p);
+        if (typeof renderStanceBadge === "function") renderStanceBadge(p);
       } else if (typeof cdRemaining === "function") {
         // Falhou por cooldown compartilhado (o grupo da postura travado por
         // outra magia). Antes o clique morria em silencio: o jogador
