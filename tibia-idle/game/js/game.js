@@ -743,7 +743,7 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
-        if (e.dmg > 0) r.addFloater(x, y, "-" + fmt(e.dmg), col, e.dmg > 200);
+        if (e.dmg > 0) r.addFloater(x, y, "-" + fmtDmg(e.dmg), col, e.dmg > 200);
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
@@ -761,7 +761,7 @@ function drainEvents() {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
-        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmt(e.dmg), col);
+        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col);
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6, (ELEMENTS[e.el] || ELEMENTS.physical).fx);
         r.playerFlash = 90;
         break;
@@ -937,7 +937,7 @@ function drainAcademyEvents() {
     const kind = e.type || e.t;
     switch (kind) {
       case "hit":
-        if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmt(e.dmg), "#d8d8d8", e.dmg > 80);
+        if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
         r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
         r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
         // O Treiner revida para gerar shielding: explosão de fogo visual no player.

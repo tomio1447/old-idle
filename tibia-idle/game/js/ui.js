@@ -16,6 +16,11 @@ function fmt(n) {
 function fmtFull(n) {
   return Math.floor(n || 0).toLocaleString("pt-BR");
 }
+/* Numero de dano na tela: o client original mostra o valor inteiro puro
+ * (ex: 1500), sem abreviar em "1.5k" nem separador de milhar. */
+function fmtDmg(n) {
+  return String(Math.floor(n || 0));
+}
 function fmtTime(sec) {
   sec = Math.max(0, Math.floor(sec));
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60),
