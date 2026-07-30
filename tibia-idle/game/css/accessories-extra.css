@@ -1,0 +1,6 @@
+/* Ajustes dos recursos adicionados no helper */
+.combo-slot[draggable="true"] { cursor: grab; }
+.combo-slot.dragging { opacity: .45; cursor: grabbing; }
+.combo-slot.drop-here { outline: 2px solid #d4af37; box-shadow: 0 0 10px rgba(212,175,55,.45); }
+.txt-red { color: #ff9090; }
+.mt10 { margin-top: 10px; }

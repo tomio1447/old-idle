@@ -247,6 +247,8 @@ function normalizePlayer(p) {
   // barra de combo: cria a estrutura e migra a config antiga do shooter
   if (typeof ensureCombo === "function") ensureCombo(p);
   if (typeof migrateComboFromShooter === "function") migrateComboFromShooter(p);
+  // helper de rings/amulets e Magic Shield (saves antigos nascem desligados)
+  if (typeof ensureAccessoryConfig === "function") ensureAccessoryConfig(p);
   p.harmony = Math.max(0, Math.min(5, p.harmony || 0));
   p.monkShrines = Math.max(0, Math.min(3, p.monkShrines || 0));
   if (!p.config.dummy) p.config.dummy = "exercise";
@@ -843,6 +845,18 @@ function drainEvents() {
         r.playerFlash = 90;
         addLog("skill", `Mana Buffer absorveu <b>${fmtFull(e.vida)}</b> de dano por <b>${fmtFull(e.mana)}</b> mana.`);
         renderStats(G.p);
+        break;
+      }
+      case "magic-shield-on": {
+        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
+        r.addFloater(px, py - 0.10, "Magic Shield", "#7ec8ff");
+        r.addEffect(px, py, "magic-blue");
+        break;
+      }
+      case "magic-shield": {
+        const px = e.screen ? (e.x || 0.13) : 0.13, py = e.screen ? (e.y || 0.6) : 0.6;
+        r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " mana", "#6a8aff");
+        r.addEffect(px, py, "magic-blue");
         break;
       }
       case "mana-wisp": {

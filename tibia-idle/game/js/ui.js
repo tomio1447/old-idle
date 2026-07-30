@@ -177,6 +177,7 @@ function itemTip(slug, extra, slot) {
   if (it.lvl) h += `<div class="tt-req">Requer nível ${it.lvl}</div>`;
   if (it.vocs) h += `<div class="tt-req">Vocação: ${it.vocs.join(", ")}</div>`;
   if (it.w) h += `<div class="tt-req">Peso ${it.w.toFixed(2)} oz</div>`;
+  if (it.desc) h += `<div class="tiny dim mt4">${it.desc}</div>`;
   if (it.sell) h += `<div class="tt-sell">Vende por ${fmtFull(it.sell)} gp</div>`;
   if (extra) h += `<div class="dim tiny mt4">${extra}</div>`;
   return h;
@@ -256,6 +257,10 @@ function renderStats(p) {
         partes.push(`<span class="cond" style="border-color:${d.cor};color:${d.cor}"
           title="${d.nome}">${d.nome} ${c.turns}</span>`);
       }
+    }
+    if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, Date.now())) {
+      const src = typeof magicShieldSource === "function" ? magicShieldSource(p, Date.now()) : "Magic Shield";
+      partes.push(`<span class="cond buff" style="border-color:#6a8aff;color:#7ec8ff" title="${src}">Magic Shield</span>`);
     }
     if (typeof buffTotals === "function") {
       const agora = Date.now();
@@ -409,8 +414,13 @@ function renderEquip(p) {
   }
   $("#equip").innerHTML = h;
   $$("#equip .slot").forEach((el) => {
+    const slotDrop = el.dataset.slot;
+    if (typeof bindDrop === "function") {
+      bindDrop(el, (payload) => typeof moveItemToEquip === "function" && moveItemToEquip(G.p, payload, slotDrop));
+    }
     const slug = el.dataset.item;
     if (!slug) return;
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop });
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
       const extra = slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` :
@@ -534,23 +544,17 @@ function renderInventory(p) {
       Bag padrão: ${bagUsedSlots(p)} / ${slots} slots
     </div>${cells.join("")}`;
   const invBox = $("#inv");
-  invBox.addEventListener("dragover", (e) => {
-    if (e.dataTransfer && e.dataTransfer.types.includes("text/loot-pouch")) e.preventDefault();
-  });
-  invBox.addEventListener("drop", (e) => {
-    const slug = e.dataTransfer ? e.dataTransfer.getData("text/loot-pouch") : "";
-    if (!slug) return;
-    e.preventDefault();
-    const count = G.p.lootPouch && G.p.lootPouch[slug] ? G.p.lootPouch[slug] : 0;
-    if (count <= 0) return;
-    if (!addItem(G.p, slug, count)) { toast("Mochila cheia."); return; }
-    removeLootPouch(G.p, slug, count);
-    addLog("info", `Moveu <b>${itemName(slug)}</b> do Loot Pouch para a mochila.`);
-    hideTip();
-    renderAll();
-  });
+  if (typeof bindDrop === "function" && !invBox.dataset.dropBound) {
+    invBox.dataset.dropBound = "1";
+    bindDrop(invBox, (payload) => {
+      const ok = typeof moveItemToBag === "function" && moveItemToBag(G.p, payload);
+      if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
+      return ok;
+    });
+  }
   $$("#inv .inv-item[data-item]").forEach((el) => {
     const slug = el.dataset.item;
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "bag", slug: slug });
     el.addEventListener("mouseenter", () =>
       showTip(itemTip(slug, `${p.bag[slug]}x · Clique para opções`)));
     el.addEventListener("mouseleave", hideTip);
@@ -569,7 +573,11 @@ function renderInventory(p) {
 function equipFromBag(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
-  if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (typeof canEquipItem === "function") {
+    const chk = canEquipItem(p, slug, it.s);
+    if (!chk.ok) { toast(chk.msg, ""); return false; }
+  } else if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "bag", it.s);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
     setActiveAmmo(p, slug);
@@ -751,7 +759,11 @@ function openItemDetails(slug, count) {
 function equipFromPouch(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
-  if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (typeof canEquipItem === "function") {
+    const chk = canEquipItem(p, slug, it.s);
+    if (!chk.ok) { toast(chk.msg, ""); return false; }
+  } else if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "pouch", it.s);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
     setActiveAmmo(p, slug);
@@ -800,6 +812,14 @@ function renderLootPouch(p) {
   const box = $("#lootpouch");
   if (!box) return;
   p.lootPouch = p.lootPouch || {};
+  if (typeof bindDrop === "function" && !box.dataset.dropBound) {
+    box.dataset.dropBound = "1";
+    bindDrop(box, (payload) => {
+      const ok = typeof moveItemToPouch === "function" && moveItemToPouch(G.p, payload);
+      if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a Loot Pouch.`);
+      return ok;
+    });
+  }
   const entries = Object.keys(p.lootPouch)
     .filter((slug) => (p.lootPouch[slug] || 0) > 0 && GAMEDATA.items[slug])
     .sort((a, b) => (GAMEDATA.items[b].sell || 0) * p.lootPouch[b] -
@@ -820,6 +840,7 @@ function renderLootPouch(p) {
 
   $$("#lootpouch [data-pouch-item]").forEach((el) => {
     const slug = el.dataset.pouchItem;
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "pouch", slug: slug });
     const it = GAMEDATA.items[slug];
     el.addEventListener("mouseenter", () => {
       const noSell = isNoSell(p, slug), noCollect = isNoCollect(p, slug);
@@ -1195,6 +1216,8 @@ function renderHastePicker(p) {
 
 function renderHelper(p) {
   const healEl = $("#helper-heal");
+  const magicEl = $("#helper-magic-shield");
+  const equipHelperEl = $("#helper-equipment");
   const atkEl = $("#helper-attack");
   const comboEl = $("#helper-combo");
   if (healEl) {
@@ -1320,6 +1343,14 @@ function renderHelper(p) {
       }
       renderHelper(p);
     }));
+  }
+  if (magicEl && typeof renderMagicShieldHelper === "function") {
+    magicEl.innerHTML = renderMagicShieldHelper(p);
+    if (typeof bindMagicShieldHelper === "function") bindMagicShieldHelper(p);
+  }
+  if (equipHelperEl && typeof renderEquipmentHelper === "function") {
+    equipHelperEl.innerHTML = renderEquipmentHelper(p);
+    if (typeof bindEquipmentHelper === "function") bindEquipmentHelper(p);
   }
   if (atkEl) {
     const mode = p.config.attackMode || "chase";
@@ -2114,12 +2145,38 @@ function renderComboBar(p, el) {
       estiver pronto. Slots de área só disparam com o número de alvos pedido.
     </div>`;
 
-  $$("#helper-combo [data-combo-slot]").forEach((b) =>
+  $$("#helper-combo [data-combo-slot]").forEach((b) => {
     b.addEventListener("click", (ev) => {
       if (ev.target.closest("[data-combo-min]") ||
           ev.target.closest("[data-combo-clear]")) return;
       openComboPicker(parseInt(b.dataset.comboSlot, 10));
-    }));
+    });
+    // Reordenação por arrastar-e-soltar para todas as vocações: arraste um
+    // slot para outro e a sequência troca de posição.
+    b.addEventListener("dragstart", (ev) => {
+      if (ev.target.closest("select") || ev.target.closest("button")) { ev.preventDefault(); return; }
+      ev.dataTransfer.setData("text/combo-slot", b.dataset.comboSlot);
+      ev.dataTransfer.effectAllowed = "move";
+      b.classList.add("dragging");
+    });
+    b.addEventListener("dragend", () => b.classList.remove("dragging"));
+    b.addEventListener("dragover", (ev) => {
+      if (ev.dataTransfer && Array.from(ev.dataTransfer.types).includes("text/combo-slot")) {
+        ev.preventDefault(); b.classList.add("drop-here");
+      }
+    });
+    b.addEventListener("dragleave", () => b.classList.remove("drop-here"));
+    b.addEventListener("drop", (ev) => {
+      const from = ev.dataTransfer ? parseInt(ev.dataTransfer.getData("text/combo-slot"), 10) : NaN;
+      const to = parseInt(b.dataset.comboSlot, 10);
+      b.classList.remove("drop-here");
+      if (isNaN(from) || from === to) return;
+      ev.preventDefault();
+      const tmp = combo[from]; combo[from] = combo[to]; combo[to] = tmp;
+      save();
+      renderComboBar(p, el);
+    });
+  });
   $$("#helper-combo [data-combo-min]").forEach((sel) =>
     sel.addEventListener("change", () => {
       const i = parseInt(sel.dataset.comboMin, 10);
@@ -2145,7 +2202,7 @@ function renderComboBar(p, el) {
 function desenhaComboSlot(p, entrada, i) {
   const num = `<span class="combo-num">${i + 1}</span>`;
   if (!entrada) {
-    return `<div class="combo-slot vazio" data-combo-slot="${i}">
+return `<div class="combo-slot vazio" data-combo-slot="${i}" draggable="true">
       ${num}
       <div class="combo-add">+</div>
       <div class="tiny dim">vazio</div>
@@ -2153,7 +2210,7 @@ function desenhaComboSlot(p, entrada, i) {
   }
   const info = comboInfo(entrada);
   if (!info) {
-    return `<div class="combo-slot vazio" data-combo-slot="${i}">
+    return `<div class="combo-slot vazio" data-combo-slot="${i}" draggable="true">
       ${num}<div class="tiny dim">indisponível</div></div>`;
   }
   const arte = info.img
@@ -2170,7 +2227,7 @@ function desenhaComboSlot(p, entrada, i) {
        </select>`
     : `<span class="tiny dim">alvo único</span>`;
 
-  return `<div class="combo-slot" data-combo-slot="${i}">
+  return `<div class="combo-slot" data-combo-slot="${i}" draggable="true">
     ${num}
     <button class="combo-x" data-combo-clear="${i}" title="Remover">✕</button>
     <div class="combo-art">${arte}</div>

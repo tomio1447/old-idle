@@ -26,6 +26,7 @@ const ADMIN_TABS = [
   { id: "char", nome: "👤 Personagem" },
   { id: "skills", nome: "📊 Skills" },
   { id: "items", nome: "🎒 Itens" },
+  { id: "imb", nome: "✨ Imbuements" },
   { id: "equip", nome: "🛡 Equipamento" },
   { id: "mobs", nome: "👹 Invocar" },
   { id: "world", nome: "🌍 Mundo" },
@@ -105,7 +106,7 @@ function renderAdminContent() {
   const p = G.p;
   const fn = {
     char: renderAdminChar, skills: renderAdminSkills,
-    items: renderAdminItems, equip: renderAdminEquip,
+    items: renderAdminItems, imb: renderAdminImbuements, equip: renderAdminEquip,
     mobs: renderAdminMobs,
     world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
@@ -517,6 +518,96 @@ function adminEquipar(p, slug) {
   if (p.bag && p.bag[slug]) removeItem(p, slug, 1);
   p.equip[slot] = { item: slug, count: 1 };
   adminAplicar(`equipou ${it.n} em ${slot}`);
+}
+
+/* ----------------------------------------------------- aba: imbuements */
+
+function adminImbMaterials() {
+  if (typeof IMBDATA === "undefined" || !IMBDATA.mats) return [];
+  const used = {};
+  for (const key in IMBDATA.imbs) {
+    const g = IMBDATA.imbs[key];
+    for (const tier in g.tiers) {
+      for (const pair of (g.tiers[tier].items || [])) {
+        const id = pair[0], cnt = pair[1];
+        if (!used[id]) used[id] = { id: id, name: IMBDATA.mats[id] || ("item " + id), max: 0, imbs: [] };
+        used[id].max = Math.max(used[id].max, cnt || 1);
+        if (used[id].imbs.indexOf(g.name) === -1) used[id].imbs.push(g.name);
+      }
+    }
+  }
+  return Object.keys(used).map((id) => used[id]).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderAdminImbuements(p, el) {
+  const busca = (ADMIN.busca || "").trim().toLowerCase();
+  let mats = adminImbMaterials();
+  if (busca) mats = mats.filter((m) => m.name.toLowerCase().indexOf(busca) !== -1 || String(m.id).indexOf(busca) !== -1);
+  const mostra = mats.slice(0, 220);
+  const totalHave = adminImbMaterials().reduce((n, m) => n + ((p.lootPouch || {})["mat-" + m.id] || 0), 0);
+
+  el.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-t">Materiais de imbuement</div>
+      <div class="row mb8" style="gap:6px;align-items:center">
+        <input id="adm-imb-busca" placeholder="Buscar material ou id…" value="${ADMIN.busca || ""}"
+               class="admin-in" style="flex:1">
+        <span class="tiny dim">${mats.length} materiais · ${fmtFull(totalHave)} no pouch</span>
+      </div>
+      <div class="admin-quick mb8">
+        <button class="sm primary" id="adm-imb-basic">Kit Basic (+25 cada)</button>
+        <button class="sm" id="adm-imb-powerful">Kit Powerful (+100 cada)</button>
+        <button class="sm" id="adm-imb-clear">Remover materiais</button>
+      </div>
+      <div class="tiny dim mb8">Os materiais entram direto na <b>Loot Pouch</b>, onde a janela de Imbuement procura por eles.</div>
+      <div class="admin-itens">
+        ${mostra.map((m) => {
+          const slug = "mat-" + m.id;
+          const have = (p.lootPouch || {})[slug] || 0;
+          return `<div class="admin-item">
+            <img src="assets/item/${slug}.png" style="width:28px;height:28px;image-rendering:pixelated" alt="">
+            <div class="admin-item-n">
+              <div class="small">${m.name}</div>
+              <div class="tiny dim">id ${m.id} · em uso: ${m.imbs.slice(0, 3).join(", ")}${m.imbs.length > 3 ? "…" : ""}</div>
+            </div>
+            ${have ? `<span class="tiny gold-txt">${have}</span>` : ""}
+            <button class="sm" data-imb-give="${m.id}" data-n="${m.max || 25}">+req</button>
+            <button class="sm" data-imb-give="${m.id}" data-n="25">+25</button>
+            <button class="sm primary" data-imb-give="${m.id}" data-n="100">+100</button>
+          </div>`;
+        }).join("") || `<div class="dim tiny" style="padding:10px">Nada encontrado.</div>`}
+      </div>
+    </div>`;
+
+  const inp = $("#adm-imb-busca");
+  inp.addEventListener("input", () => {
+    ADMIN.busca = inp.value;
+    renderAdminImbuements(p, el);
+    const n = $("#adm-imb-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $$("#admin-content [data-imb-give]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.imbGive;
+      const n = parseInt(b.dataset.n, 10) || 1;
+      addLootPouch(p, "mat-" + id, n);
+      adminAplicar(`+${n} ${IMBDATA.mats[id] || ("material " + id)} na Loot Pouch`);
+    }));
+  $("#adm-imb-basic").addEventListener("click", () => {
+    let n = 0;
+    for (const m of adminImbMaterials()) { addLootPouch(p, "mat-" + m.id, 25); n++; }
+    adminAplicar(`kit Basic: +25 em ${n} materiais`);
+  });
+  $("#adm-imb-powerful").addEventListener("click", () => {
+    let n = 0;
+    for (const m of adminImbMaterials()) { addLootPouch(p, "mat-" + m.id, 100); n++; }
+    adminAplicar(`kit Powerful: +100 em ${n} materiais`);
+  });
+  $("#adm-imb-clear").addEventListener("click", () => {
+    if (!confirm("Remover todos os materiais de imbuement da Loot Pouch?")) return;
+    for (const m of adminImbMaterials()) delete p.lootPouch["mat-" + m.id];
+    adminAplicar("materiais de imbuement removidos");
+  });
 }
 
 /* ---------------------------------------------------- aba: equipamento */

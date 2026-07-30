@@ -602,7 +602,15 @@ function tickConditions(c, p, dt) {
       while (co.acc >= CONDITION_TURN_MS && co.turns > 0 && p.hp > 0) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
-        const dmg = Math.max(1, co.dmg);
+        let dmg = Math.max(1, co.dmg);
+        if (typeof applyMagicShieldAbsorb === "function") {
+          dmg = applyMagicShieldAbsorb(c, p, dmg, {
+            el: def.el,
+            x: c.player ? c.player.x : 0.13,
+            y: c.player ? c.player.y : 0.6,
+          });
+        }
+        if (dmg <= 0) continue;
         p.hp -= dmg;
         c.stats.taken += dmg;
         c.events.push({ t: "taken", dmg: dmg, el: def.el, condition: tipo,
@@ -2057,6 +2065,12 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   if (raw > 0 && typeof mantraAbsorve === "function") {
     raw = mantraAbsorve(p, raw, sk.el);
   }
+  if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
+    raw = applyMagicShieldAbsorb(c, p, raw, {
+      el: sk.el || "physical",
+      x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+    });
+  }
   if (raw > 0) {
     if ((p.voc === "sorcerer" || p.voc === "druid") && raw >= p.hp && p.hp > 0) {
       const excesso = raw - p.hp + 1;
@@ -2272,6 +2286,15 @@ function mobAttack(c, p, mob) {
       (c.stats.mantraAbsorvido || 0) + (antesMantra - raw);
   }
 
+  // Magic Shield / Energy Ring: absorve dano com mana antes de chegar na vida.
+  if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
+    raw = applyMagicShieldAbsorb(c, p, raw, {
+      el: mob.def.element,
+      x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
+    });
+    if (raw <= 0) return 0;
+  }
+
   // Mana Buffer (15.25, so Sorcerer/Druid): diante de um golpe LETAL o
   // dano excedente sai da MANA, nao da vida — 8 de mana por ponto de vida
   // evitado, mais uma taxa extra de 25% da mana maxima que so pode ser
@@ -2452,6 +2475,10 @@ function combatTick(c, p, dt, now) {
   // cura e mana
   tryHeal(c, p, now);
   tryMana(c, p, now);
+
+  // helper de equipamento e magic shield do painel Helper
+  if (typeof tryAccessoryHelper === "function") tryAccessoryHelper(c, p, now);
+  if (typeof tryMagicShield === "function") tryMagicShield(c, p, now);
 
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
   // voltando ao templo/cidade pelo fluxo normal de morte.

@@ -7,6 +7,7 @@
 <link rel="icon" href="assets/item/gold-coin.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/global-idle.css">
+<link rel="stylesheet" href="css/accessories-extra.css">
 </head>
 <body>
 
@@ -177,6 +178,8 @@
       <div class="panel" data-collapse="helper">
         <div class="tabs">
           <div class="tab active" data-group="mid" data-panel="heal">Helper: Cura</div>
+          <div class="tab" data-group="mid" data-panel="magic-shield">Escudo mágico</div>
+          <div class="tab" data-group="mid" data-panel="equipment">Equipamento</div>
           <div class="tab" data-group="mid" data-panel="atk">Ataque</div>
           <div class="tab" data-group="mid" data-panel="combo">Combo</div>
           <div class="tab" data-group="mid" data-panel="spells">Magias</div>
@@ -186,6 +189,14 @@
 
         <div class="panel-body" data-panel-group="mid" data-panel="heal">
           <div id="helper-heal"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="magic-shield" style="display:none">
+          <div id="helper-magic-shield"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="equipment" style="display:none">
+          <div id="helper-equipment"></div>
         </div>
 
         <div class="panel-body" data-panel-group="mid" data-panel="atk" style="display:none">
@@ -318,6 +329,7 @@
 <script src="js/appearance.js"></script>
 <script src="js/imbuement.js"></script>
 <script src="js/player.js"></script>
+<script src="js/accessories.js"></script>
 <script src="js/combat.js"></script>
 <script src="js/city.js"></script>
 <script src="js/citymap.js"></script>
