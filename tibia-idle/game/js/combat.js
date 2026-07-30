@@ -1454,29 +1454,25 @@ function tryHeal(c, p, now) {
  * Fica separada do tryBuff porque este so aceita UM buff (o escolhido em
  * p.config.buff, que e a Virtude do monk ou o Protector do knight). Haste
  * nao deve competir por esse slot: no Tibia o jogador mantem as duas coisas
- * ao mesmo tempo. Escolhe sempre a mais forte que couber na mana.
+ * ao mesmo tempo.
+ *
+ * So lanca a magia que o jogador escolheu em p.config.hasteSpell no Helper.
+ * Sem selecao, nao lanca nada sozinho.
  */
 function tryHaste(c, p, now) {
   if (typeof HASTEDATA === "undefined") return false;
-  if (p.config && p.config.autoHaste === false) return false;
+  const melhor = p.config && p.config.hasteSpell;
+  if (!melhor || !HASTEDATA[melhor]) return false;
   if ((c.hasteCd || 0) > now) return false;
   // ja tem uma ativa? nao gasta mana de novo
   if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
 
-  let melhor = null, ganho = 0;
-  for (const id of (typeof hastesDisponiveis === "function"
-                    ? hastesDisponiveis(p) : [])) {
-    const sp = SPELLS[id];
-    if (!sp) continue;
-    if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) continue;
-    if (p.level < (sp.lvl || 1) || p.mp < sp.mana) continue;
-    if (!cdReady(p, id, now)) continue;
-    const d = hasteDelta(p, id);
-    if (d > ganho) { ganho = d; melhor = id; }
-  }
-  if (!melhor) return false;
-
   const sp = SPELLS[melhor];
+  if (!sp) return false;
+  if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) return false;
+  if (p.level < (sp.lvl || 1) || p.mp < sp.mana) return false;
+  if (!cdReady(p, melhor, now)) return false;
+
   p.mp -= sp.mana;
   addManaSpent(p, combatManaSkillGain(c, sp.mana));
   cdStart(p, melhor, sp, now);

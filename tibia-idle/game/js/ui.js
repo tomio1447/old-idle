@@ -1009,6 +1009,38 @@ function renderBuffPicker(p) {
     <div class="tiny dim mt4">O buff é relançado sozinho enquanto estiver selecionado.</div>`;
 }
 
+/* Seletor da magia de velocidade (haste). Sem selecao, o personagem nao
+ * lanca nada sozinho -- so quando o jogador escolhe explicitamente aqui. */
+function renderHastePicker(p) {
+  if (typeof hastesDisponiveis !== "function") return "";
+  const lista = hastesDisponiveis(p);
+  if (!lista.length) return "";
+  const ativa = typeof hasteAtiva === "function" ? hasteAtiva(p, Date.now()) : null;
+  return `
+    <div class="small dim mt8 mb4">Magia de velocidade</div>
+    <div class="list" style="max-height:150px">
+      ${lista.map((id) => {
+        const sp = SPELLS[id];
+        if (!sp) return "";
+        const sel = p.config.hasteSpell === id;
+        const ok = p.level >= (sp.lvl || 1);
+        const resta = ativa && ativa.id === id
+          ? Math.max(0, Math.ceil((ativa.ate - Date.now()) / 1000)) : 0;
+        return `<div class="shop-row ${sel ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
+          ${spellIcon(sp)}
+          <div style="flex:1;min-width:0">
+            <div class="small">${HASTEDATA[id].nome || sp.name}
+              ${resta ? `<span style="color:#9ce84a">· ${resta}s</span>` : ""}</div>
+            <div class="tiny dim"><b>${sp.words || id}</b> · ${sp.mana} mana · nv ${sp.lvl} · cd ${Math.round(sp.cd / 1000)}s</div>
+          </div>
+          <button class="sm ${sel ? "primary" : ""}" data-haste="${id}" ${ok ? "" : "disabled"}>
+            ${sel ? "ATIVA" : "USAR"}</button>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="tiny dim mt4">A magia selecionada e relançada sozinha quando expira. Sem seleção, o personagem não usa velocidade sozinho.</div>`;
+}
+
 function renderHelper(p) {
   const healEl = $("#helper-heal");
   const atkEl = $("#helper-attack");
@@ -1150,12 +1182,21 @@ function renderHelper(p) {
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="tiny dim mt8">Kiting faz o personagem manter de 1 a 5 SQMs do monstro targetado. Stand mantém parado. Chase aproxima.</div>
-      ${renderBuffPicker(p)}`;
+      ${renderBuffPicker(p)}
+      ${renderHastePicker(p)}`;
     $$("#helper-attack [data-buff]").forEach((b) => b.addEventListener("click", () => {
       const k = b.dataset.buff;
       p.config.buff = p.config.buff === k ? null : k;
       toast(p.config.buff ? `Buff selecionado: <b>${BUFFS[k].nome}</b>`
                           : "Buff desativado.");
+      renderHelper(p);
+    }));
+    $$("#helper-attack [data-haste]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.haste;
+      p.config.hasteSpell = p.config.hasteSpell === k ? "" : k;
+      toast(p.config.hasteSpell
+        ? `Velocidade selecionada: <b>${HASTEDATA[k].nome}</b>`
+        : "Velocidade desativada.");
       renderHelper(p);
     }));
     $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
