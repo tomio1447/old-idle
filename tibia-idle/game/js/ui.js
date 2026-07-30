@@ -745,6 +745,30 @@ function openItemDetails(slug, count) {
   $("#details-close").addEventListener("click", () => $("#modal").classList.remove("show"));
 }
 
+/* Equipa um item direto da loot pouch (todo drop cai nela agora). O item
+ * antigo volta para a pouch tambem — ela nao enche, entao a troca nunca
+ * falha, ao contrario da troca via mochila. */
+function equipFromPouch(p, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !it.s) return false;
+  if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  if (it.s === "ammo") {
+    if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
+    setActiveAmmo(p, slug);
+    toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
+    return true;
+  }
+  const old = p.equip[it.s];
+  removeLootPouch(p, slug, 1);
+  if (old) addLootPouch(p, old.item, 1);
+  p.equip[it.s] = { item: slug, count: 1 };
+  if (it.th && p.equip.shield) {
+    addLootPouch(p, p.equip.shield.item, 1);
+    delete p.equip.shield;
+  }
+  return true;
+}
+
 /* Vende um item específico do Loot Pouch */
 function sellPouchItem(p, slug) {
   const it = GAMEDATA.items[slug];
@@ -833,6 +857,13 @@ function openPouchItemMenu(p, slug, x, y) {
       label: "Detalhes",
       action: () => openItemDetails(slug, count),
     },
+    // equipavel? equipa direto da pouch (o antigo volta para a pouch)
+    ...(it.s ? [{
+      label: "Equipar",
+      hint: it.s,
+      disabled: !!(it.lvl && p.level < it.lvl),
+      action: () => { if (equipFromPouch(p, slug)) renderAll(); },
+    }] : []),
     {
       label: "Mover para backpack",
       action: () => {

@@ -288,13 +288,18 @@ function fisicoPorRaca(raca) {
   return RACE_FISICO[raca] || RACE_FISICO.blood;
 }
 
+/* Paleta oficial de texto de dano do client (game.cpp do TFS/Canary):
+ *  physical RED · fire ORANGE · energy ELECTRICPURPLE · earth LIGHTGREEN
+ *  ice SKYBLUE · holy YELLOW · death DARKRED. O death era ROXO aqui
+ *  (#8a5aa8, batendo com energy) — corrigido para o vermelho escuro
+ *  oficial e o sprite "mort-area" (a nuvem preta de caveiras). */
 const ELEMENTS = {
   physical: { name: "Físico", color: "#d8d8d8", fx: "draw-blood" },
   fire:     { name: "Fogo",   color: "#ff8a3c", fx: "hit-by-fire" },
   ice:      { name: "Gelo",   color: "#7ec8ff", fx: "ice-attack" },
   energy:   { name: "Energia",color: "#c07cff", fx: "energy-damage" },
   earth:    { name: "Terra",  color: "#8ac83c", fx: "hit-by-poison" },
-  death:    { name: "Morte",  color: "#8a5aa8", fx: "mort-area" },
+  death:    { name: "Morte",  color: "#8b0000", fx: "mort-area" },
   holy:     { name: "Sagrado",color: "#ffe680", fx: "holy-damage" },
 };
 

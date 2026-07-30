@@ -357,8 +357,9 @@ function computeOffline(p) {
   if (VOCATIONS[p.voc].weapon === "magic")
     addManaSpent(p, Math.floor(kills * 40 * skillMul));
 
-  // loot vai para supplies, loot pouch ou bag respeitando slots.
-  // moedas (platinum/crystal) são convertidas direto em gold.
+  // loot vai para supplies, loot pouch ou municao — TODO item (equipamento
+  // incluso) cai na pouch, regra da casa. Moedas (platinum/crystal) são
+  // convertidas direto em gold.
   for (const slug in loot) {
     if (currencyValue(slug)) gold += creditCurrency(p, slug, loot[slug]);
     else if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
@@ -456,8 +457,10 @@ function rewardText(reward) {
 
 function grantMissionReward(p, reward) {
   if (!reward) return true;
+  // recompensas (equipamento incluso) caem na loot pouch, regra da casa:
+  // ela nao tem limite, entao nao existe mais "mochila cheia" em missao.
   for (const r of reward.items || []) {
-    if (!addItem(p, r.slug, r.count || 1)) return false;
+    addLootPouch(p, r.slug, r.count || 1);
   }
   for (const r of reward.supplies || [])
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.count || 1);
@@ -471,10 +474,7 @@ function tryCompleteMissionRewards(p, huntId) {
   const st = missionState(p, huntId);
   for (const task of def.tasks) {
     if ((st.progress[task.monster] || 0) >= task.target && !st.claimed[task.monster]) {
-      if (!grantMissionReward(p, task.reward)) {
-        toast("Mochila cheia para receber recompensa da missão.", "death");
-        return;
-      }
+      grantMissionReward(p, task.reward);
       st.claimed[task.monster] = true;
       addLog("level", `Missão: matou ${task.target}x <b>${GAMEDATA.monsters[task.monster] ? GAMEDATA.monsters[task.monster].name : task.monster}</b>. Recompensa: ${rewardText(task.reward)}.`);
       toast(`Missão concluída: <b>${rewardText(task.reward)}</b>`, "level");
@@ -482,10 +482,7 @@ function tryCompleteMissionRewards(p, huntId) {
   }
   const all = def.tasks.every((t) => st.claimed[t.monster]);
   if (all && !st.completeClaimed) {
-    if (!grantMissionReward(p, def.completeReward)) {
-      toast("Mochila cheia para recompensa final da missão.", "death");
-      return;
-    }
+    grantMissionReward(p, def.completeReward);
     st.completeClaimed = true;
     addLog("level", `Missão de <b>${GAMEDATA.hunts[huntId].name}</b> completa. Recompensa final: ${rewardText(def.completeReward)}.`);
     toast(`Missão completa! <b>${rewardText(def.completeReward)}</b>`, "level");

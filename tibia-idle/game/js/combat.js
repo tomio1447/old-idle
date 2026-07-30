@@ -1301,8 +1301,16 @@ function castSpellById(c, p, target, now, id) {
   // golpe), depois o efeito proprio da magia vindo do Canary (s.fx) e so
   // entao o fallback por elemento. Sem o s.fx toda magia do mesmo elemento
   // usava a mesma animacao.
+  //
+  // Conversao elemental (Master of Flames/Thunder/Decay): quando a stance
+  // troca o elemento da magia, a sprite TAMBEM precisa trocar — dano de
+  // MORTE nao pode explodir laranja (bug visto com exevo gran mas flam
+  // sob Master of Decay). s.fx/s.missile valem so para o elemento
+  // ORIGINAL, entao a magia convertida cai no efeito/projetil generico do
+  // elemento novo (ELEMENTS/ELEMENT_MISSILE no fallback do evento/render).
+  const converteuEl = !md && elemento !== (s.element || "energy");
   const fxMagia = (md && md.fx && typeof monkFx === "function")
-    ? monkFx(p, md.fx) : (s.fx || null);
+    ? monkFx(p, md.fx) : (converteuEl ? null : (s.fx || null));
   // Projetil (COMBAT_PARAM_DISTANCEEFFECT do .lua): magia de mana sai com
   // o missil do elemento (strikes & cia); magia de skill do knight NAO tem
   // distance effect — berserk/fierce berserk/groundshaker/front sweep nao
@@ -1310,7 +1318,7 @@ function castSpellById(c, p, target, now, id) {
   // nada voando ate o alvo (antes caia o "small-stone" do fallback fisico
   // e a animacao parecia "voar"). "$weapon" = CONST_ANI_WEAPONTYPE.
   const modoMagia = !s.f || s.f.modo !== "skill";
-  let missMagia = s.missile || null;
+  let missMagia = converteuEl ? null : (s.missile || null);
   if (missMagia === "$weapon") missMagia = weaponMissile(p);
   if (!missMagia && modoMagia && !md) missMagia = ELEMENT_MISSILE[elemento] || "energy";
   // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
@@ -2321,14 +2329,12 @@ function rollLoot(c, p, mob) {
     } else if (it.s === "ammo") {
       // munição lootada vai para o contador, sem ocupar slot
       addAmmo(p, l.item, count);
-    } else if (shouldGoLootPouch(l.item)) {
+    } else {
+      // REGRA DA CASA (a pedido do jogador): TODO drop cai na loot pouch,
+      // ate equipamento. Antes o equipamento ia para a mochila, ela
+      // enchia e o loot se perdia; a pouch nao tem limite e o sell all
+      // dela ja respeita os itens marcados como "nao vender".
       addLootPouch(p, l.item, count);
-    } else if (!addItem(p, l.item, count)) {
-      if (!c.bagFullWarned) {
-        c.events.push({ t: "bag-full" });
-        c.bagFullWarned = true;
-      }
-      continue;
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });

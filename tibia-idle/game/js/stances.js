@@ -17,8 +17,29 @@
  *     remove o efeito da outra;
  *   - os efeitos de Master of X convertem a proxima magia fora do
  *     elemento depois de conjurar uma magia do elemento.
+ *
+ * REGRA DA CASA (a pedido do jogador): cooldown INDEPENDENTE. No oficial
+ * as posturas dividem o grupo Foco com as UEs — soltar um exevo gran mas
+ * flam/vis (40s de grupo) trancava a postura, e ativar a postura trancava
+ * a UE por 10s. Aqui a postura trava apenas ELA MESMA (p.cd[id], entao o
+ * icone continua aparecendo na barra de cooldown) e nenhum grupo de magia
+ * e tocado — nem UE trava postura, nem postura trava UE.
  */
 "use strict";
+
+/* Prontidao/inicio do cooldown proprio da postura, sem tocar os grupos de
+ * magia (ver header). */
+function stanceCdReady(p, id, now) {
+  if (typeof cdInit === "function") cdInit(p);
+  const e = p.cd && p.cd[id];
+  return !e || e.ate <= (now || Date.now());
+}
+function stanceCdStart(p, id, s, now) {
+  if (typeof cdInit === "function") cdInit(p);
+  now = now || Date.now();
+  const dur = (s && s.cd) || 2000;
+  p.cd[id] = { ate: now + dur, dur: dur };
+}
 
 const STANCES = {
   // ---- Knight (grupo unico "knight")
@@ -131,7 +152,9 @@ function stanceAtiva(p, id) {
 }
 
 /* Liga/desliga uma stance. Devolve true se o estado mudou.
- * Respeita mana, nivel, cooldown proprio e a exclusividade por grupo.
+ * Respeita mana, nivel, o cooldown INDEPENDENTE da propria postura
+ * (stanceCdReady — grupos de magia sao ignorados, regra da casa) e a
+ * exclusividade por grupo.
  * `ctx` e o combat em andamento (para os eventos visuais); pode ser null. */
 function toggleStance(p, id, ctx, now) {
   const st = STANCES[id];
@@ -161,11 +184,11 @@ function toggleStance(p, id, ctx, now) {
     }
     return false;
   }
-  if (typeof cdReady === "function" && !cdReady(p, id, now)) return false;
+  if (!stanceCdReady(p, id, now)) return false;
 
   p.mp -= s.mana;
   if (typeof addManaSpent === "function") addManaSpent(p, s.mana);
-  if (typeof cdStart === "function") cdStart(p, id, s, now);
+  stanceCdStart(p, id, s, now);
 
   // exclusividade: uma por grupo. Sorcerer = 1 ele + 1 crip.
   for (const k in STANCES) {

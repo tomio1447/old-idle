@@ -592,10 +592,14 @@ function creditCurrency(p, slug, count) {
   return total;
 }
 
+/* REGRA DA CASA (a pedido do jogador): TODO item coletavel vai para a
+ * loot pouch — inclusive equipamento. A mochila fica so para o que o
+ * jogador compra/separa na mao; moedas viram gold na hora e supplies tem
+ * contador proprio (ambos tratados antes nos caminhos de loot). */
 function shouldGoLootPouch(slug) {
   const it = GAMEDATA.items[slug];
   if (!it || currencyValue(slug) || SUPPLIES[slug]) return false;
-  return !it.s;
+  return true;
 }
 
 function addLootPouch(p, slug, count) {
