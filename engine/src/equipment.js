@@ -248,6 +248,13 @@ Equipment.prototype.getMaximumAddCount = function(player, thing, index) {
     return 0;
   }
 
+  // Two-handed weapons take both hands: block them if a shield or another
+  // weapon is already equipped, and block equipping a shield/weapon in the
+  // other hand while a two-handed weapon is wielded.
+  if(this.__conflictsWithTwoHanded(thing, index)) {
+    return 0;
+  }
+
   // Take a look at the item in the slot
   let currentItem = this.peekIndex(index);
 
@@ -263,6 +270,58 @@ Equipment.prototype.getMaximumAddCount = function(player, thing, index) {
 
   // Not able to add: another item is occupying the slot
   return 0;
+
+}
+
+Equipment.prototype.__conflictsWithTwoHanded = function(thing, index) {
+
+  /*
+   * Function Equipment.__conflictsWithTwoHanded
+   * Returns true when trying to add `thing` to `index` would conflict with
+   * a two-handed weapon being equipped, or when `thing` itself is a
+   * two-handed weapon and the other hand is not free.
+   */
+
+  let rightHand = this.peekIndex(this.SLOTS.HAND_RIGHT);
+  let leftHand  = this.peekIndex(this.SLOTS.HAND_LEFT);
+
+  // Trying to equip a two-handed weapon: the off-hand must be empty
+  if(this.isTwoHandedWeapon(thing)) {
+    if(index === this.SLOTS.HAND_LEFT && rightHand !== null) {
+      return true;
+    }
+  }
+
+  // Trying to put something in the shield/off-hand while a two-handed
+  // weapon is already equipped in the weapon hand
+  if(index === this.SLOTS.HAND_RIGHT && this.isTwoHandedWeapon(leftHand)) {
+    return true;
+  }
+
+  return false;
+
+}
+
+Equipment.prototype.isTwoHandedWeapon = function(thing) {
+
+  /*
+   * Public Function Equipment.isTwoHandedWeapon
+   * Returns true when the thing is a melee or distance weapon that requires
+   * both hands (i.e., it is a weapon with slotType "two-handed").
+   */
+
+  if(thing === null) {
+    return false;
+  }
+
+  let weaponType = thing.getAttribute("weaponType");
+
+  let isWeapon = thing.isDistanceWeapon() ||
+                 weaponType === "sword" ||
+                 weaponType === "axe" ||
+                 weaponType === "club";
+
+  return isWeapon && thing.getAttribute("slotType") === "two-handed";
 
 }
 
@@ -502,23 +561,39 @@ Equipment.prototype.__isRightType = function(item, slot) {
 
   /*
    * Function Equipment.__isRightType
-   * Returns true if the item matches the slot type
+   * Returns true if the item matches the slot type.
+   *
+   * Slot layout in this engine:
+   *   HAND_RIGHT (index 4) -> shield hand
+   *   HAND_LEFT  (index 5) -> weapon hand (one-handed or two-handed weapons,
+   *                           distance weapons, and wands/rods)
+   *   QUIVER     (index 9) -> ammunition
    */
 
   // Get the prototype
   let proto = item.getPrototype();
+  let weaponType = proto.properties.weaponType;
 
   switch(slot) {
     case this.SLOTS.HELMET: return proto.properties.slotType === "head";
     case this.SLOTS.ARMOR: return proto.properties.slotType === "body";
     case this.SLOTS.LEGS: return proto.properties.slotType === "legs";
     case this.SLOTS.BOOTS: return proto.properties.slotType === "feet";
-    case this.SLOTS.HAND_RIGHT: return proto.properties.weaponType === "shield";	
-    case this.SLOTS.HAND_LEFT: return proto.properties.weaponType === "sword" || proto.properties.weaponType === "distance";
+    case this.SLOTS.HAND_RIGHT:
+      // Shield slot: shields only
+      return weaponType === "shield";
+    case this.SLOTS.HAND_LEFT:
+      // Weapon slot: accepts all one-handed melee weapons (sword/axe/club),
+      // two-handed melee weapons, distance weapons and wands/rods.
+      return weaponType === "sword" ||
+             weaponType === "axe" ||
+             weaponType === "club" ||
+             weaponType === "distance" ||
+             weaponType === "wand";
     case this.SLOTS.BACKPACK: return proto.properties.slotType === "backpack";
     case this.SLOTS.NECKLACE: return proto.properties.slotType === "necklace";
     case this.SLOTS.RING: return proto.properties.slotType === "ring";
-    case this.SLOTS.QUIVER: return proto.properties.weaponType === "ammunition";
+    case this.SLOTS.QUIVER: return weaponType === "ammunition";
     default: return false;
   }
 
