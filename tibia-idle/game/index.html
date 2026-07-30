@@ -73,6 +73,10 @@
     <div class="row small"><span class="dim">Sessão</span>
       <b id="session">0s</b></div>
     <span class="spacer"></span>
+    <button class="sm" id="btn-imbue" title="Abrir janela de imbuement">
+      <img src="assets/ui/imbuement-machine.png" alt="">
+      <span>IMBUEMENTS</span>
+    </button>
     <button class="sm" id="btn-switch">Trocar personagem</button>
     <button class="sm" id="btn-cyclo">📖 Cyclopedia</button>
     <button class="sm" id="btn-admin" title="Painel de testes">🛠 Admin</button>
@@ -290,6 +294,7 @@
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
 <script src="js/spelldata_1525.js"></script>
 <script src="js/tiledata.js"></script>
+<script src="js/imbuementdata.js"></script>
 <script src="js/patch_clientfx.js"></script>
 <script src="js/huntmapdata.js"></script>
 <script src="js/weapons.js"></script>
@@ -318,10 +323,14 @@
 <script src="js/render.js"></script>
 <script src="js/city-render.js"></script>
 <script src="js/monsters.js"></script>
+<!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
+     GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
+<script src="js/patch_imbuement.js"></script>
 <script src="js/cyclopedia.js"></script>
 <script src="js/bosstiary.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/cyclopedia-ui.js"></script>
+<script src="js/imbuement-ui.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/city-ui.js"></script>
 <script src="js/game.js"></script>

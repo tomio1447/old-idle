@@ -207,7 +207,7 @@ function imbSlotsTip(p, slug, slot, total) {
     const tempo = typeof imbTempoTexto === "function"
       ? imbTempoTexto(restante) : "";
     h += `<div class="imb-slot ${venceu ? "expirado" : ""}"
-      title="${v.nome} ${IMB_TIER_NOME[im.tier] || ""}">
+      title="${v.nome} ${IMB_TIER_NOME[(im.tier || 1) - 1] || ""}">
       <img src="assets/imbuement/${v.icon}.png" alt="">
       <span class="imb-tempo ${urgente ? "urgente" : ""}">${tempo}</span>
     </div>`;
@@ -216,15 +216,10 @@ function imbSlotsTip(p, slug, slot, total) {
   // detalhe textual de cada imbuement aplicado
   for (const im of lista) {
     const v = typeof imbVisual === "function" ? imbVisual(im) : { nome: "?" };
-    const c = IMB_CATEGORIA[im.cat];
-    const vals = c && typeof IMB_VALOR !== "undefined" ? IMB_VALOR[c.attr] : null;
-    const val = vals ? vals[Math.min(im.tier, vals.length - 1)] : null;
+    const efeito = typeof imbEfeitoTexto === "function" ? imbEfeitoTexto(im) : "";
     const restante = typeof imbRestante === "function" ? imbRestante(im) : 0;
     h += `<div class="tiny ${restante <= 0 ? "dim" : ""}">
-      ${v.nome} ${IMB_TIER_NOME[im.tier] || ""}${
-      val !== null ? ` · +${val}${c.attr.indexOf("prot") === 0 ||
-        c.attr === "elemental" || c.attr === "lifeLeech" ||
-        c.attr === "manaLeech" || c.attr === "crit" ? "%" : ""}` : ""}
+      ${v.nome} ${IMB_TIER_NOME[(im.tier || 1) - 1] || ""}${efeito ? ` · ${efeito}` : ""}
       · <span class="${restante > 0 && restante < 3600000 ? "imb-urgente" : "dim"}">${
         typeof imbTempoTexto === "function" ? imbTempoTexto(restante) : ""}</span>
     </div>`;

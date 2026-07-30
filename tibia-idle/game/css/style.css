@@ -984,3 +984,72 @@ div.item-sprite { background-repeat: no-repeat; }
    telas usam uma div com background-position no lugar da tag de imagem. */
 .mob-img { background-repeat: no-repeat; display: inline-block;
            vertical-align: middle; }
+
+/* ---------------------------------------------------------- imbuement */
+#btn-imbue {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: 0; padding: 1px 6px; line-height: 1;
+}
+#btn-imbue img { width: 26px; height: 26px; image-rendering: pixelated; }
+#btn-imbue span { font-size: 7.5px; letter-spacing: .6px; font-weight: 700;
+  color: #e8d9a8; margin-top: -1px; }
+
+.imb-grid {
+  display: grid; grid-template-columns: 190px 1fr 240px; gap: 10px;
+  min-height: 280px;
+}
+.imb-col-left, .imb-col-center, .imb-col-right {
+  background: rgba(0,0,0,.25); border: 1px solid rgba(150,130,80,.25);
+  border-radius: 6px; padding: 6px; overflow-y: auto; max-height: 56vh;
+}
+.imb-eqlist { display: flex; flex-direction: column; gap: 4px; }
+.imb-eq {
+  display: flex; align-items: center; gap: 6px; padding: 4px;
+  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.imb-eq:hover { background: rgba(255,255,255,.05); }
+.imb-eq.sel { border-color: #d8b45a; background: rgba(216,180,90,.08); }
+.imb-eq-meta { display: flex; flex-direction: column; font-size: 11px; }
+.imb-ativa { margin-top: 8px; border-top: 1px solid rgba(150,130,80,.25);
+  padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.imb-ativa-row { display: flex; align-items: center; gap: 6px; }
+.imb-ativa-meta { flex: 1; display: flex; flex-direction: column;
+  font-size: 11px; line-height: 1.15; }
+.imb-remove { color: #e88; }
+
+.imb-cat { font-size: 10px; font-weight: 700; letter-spacing: .8px;
+  color: #d8c47a; text-transform: uppercase; margin: 8px 0 3px; }
+.imb-cat:first-child { margin-top: 0; }
+.imb-row {
+  display: flex; align-items: center; gap: 6px; padding: 3px 4px;
+  border-radius: 5px; cursor: pointer; font-size: 12px;
+  border: 1px solid transparent;
+}
+.imb-row:hover { background: rgba(255,255,255,.05); }
+.imb-row.sel { border-color: #d8b45a; background: rgba(216,180,90,.08); }
+
+.imb-tiers { display: flex; gap: 4px; margin: 8px 0; }
+.imb-tier {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 4px 2px; font-size: 11px; border-radius: 5px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(150,130,80,.25);
+  color: #e8dcb8; cursor: pointer;
+}
+.imb-tier.sel { border-color: #d8b45a; background: rgba(216,180,90,.14);
+  color: #ffe680; }
+.imb-eff { margin: 4px 0 8px; color: #b8f0a0; }
+.imb-mats { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+.imb-mat {
+  display: flex; align-items: center; gap: 3px; padding: 2px 4px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(150,130,80,.25);
+  border-radius: 5px; font-size: 11px; cursor: help;
+}
+.txt-red { color: #ff7a7a; }
+.txt-good { color: #9ce84a; }
+button.wide { width: 100%; margin-top: 6px; }
+button[disabled] { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 900px) {
+  .imb-grid { grid-template-columns: 1fr; min-height: 0; }
+  .imb-col-left, .imb-col-center, .imb-col-right { max-height: none; }
+}

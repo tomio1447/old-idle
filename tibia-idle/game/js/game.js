@@ -1122,6 +1122,8 @@ function loop(ts) {
       combatTick(G.combat, G.p, TICK, Date.now());
       G.tickAcc -= TICK;
     }
+    // Relogio dos imbuements: 20h de TEMPO DE COMBATE (ver imbuement.js).
+    if (typeof imbTickAll === "function") imbTickAll(G.p, dt);
 
     // Movimento a cada FRAME, nao a cada tick de 100ms (como o combatTick
     // fazia). No Canary o servidor so marca o INICIO do passo no beat de
@@ -1319,6 +1321,8 @@ function startGame(p) {
 function bindControls() {
   const p = G.p;
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
+  const btnImb = $("#btn-imbue");
+  if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   const btnAdmin = $("#btn-admin");

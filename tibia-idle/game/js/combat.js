@@ -932,7 +932,8 @@ function playerAttack(c, p, target) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
   let critou = false;
   if (imb) {
-    if (imb.crit && Math.random() < 0.10) {        // 10% de chance de critico
+    // Strike: +X% de dano critico com 10% de chance fixa (XML do canary)
+    if (imb.crit && Math.random() < (imb.critChance || 10) / 100) {
       raw = Math.floor(raw * (1 + imb.crit / 100));
       critou = true;
     }
@@ -948,6 +949,17 @@ function playerAttack(c, p, target) {
     }
   }
 
+  // Imbuement de dano elemental (Scorch/Venom/Frost/Electrify/Reap):
+  // converte X% do golpe FISICO no elemento escolhido. Vale para melee e
+  // distance (como o secondary damage das armas — mesma mecanica), nao
+  // vale para magias e nao se acumula com arma elemental (essa ja reparte).
+  let imbEl = null, imbProp = 1;
+  if (imb && imb.elemental && imb.elementalType &&
+      !d.elemento2 && element === "physical" && !errou && !isMagic) {
+    imbEl = imb.elementalType;
+    imbProp = 1 - Math.min(100, imb.elemental) / 100;
+  }
+
   // Tiro perdido nao acerta o alvo: o dano direto e descartado e so a area
   // (resolvida mais abaixo, na casa desviada) continua valendo. Sem isto o
   // "erro" ainda causaria dano cheio no alvo e nao seria erro nenhum.
@@ -960,10 +972,12 @@ function playerAttack(c, p, target) {
     // naga sword (atk 8, elDmg 44) entrega ~15% fisico e ~85% gelo do MESMO
     // valor rolado — nao dois golpes somados. Cada parte sofre a resistencia
     // do seu proprio elemento e aparece como um numero separado na tela.
-    const parte2 = (d.elemento2 && d.propFisica !== undefined && !errou)
-      ? d.elemento2 : null;
+    const convEl = d.elemento2 ? d.elemento2 : imbEl;
+    const convProp = (d.elemento2 && d.propFisica !== undefined)
+      ? d.propFisica : imbProp;
+    const parte2 = (convEl && !errou) ? convEl : null;
     if (parte2) {
-      const fisBruto = Math.max(1, Math.round(raw * d.propFisica));
+      const fisBruto = Math.max(1, Math.round(raw * convProp));
       const elemBruto = Math.max(1, raw - fisBruto);
       // a resistencia ja foi aplicada com o elemento fisico no rollDamage,
       // entao aqui so a parte elemental precisa ser reavaliada
