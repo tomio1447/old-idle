@@ -104,7 +104,26 @@ function spellAttackValue(p) {
          ? GAMEDATA.items[p.equip.ammo.item] : null);
     return (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0) || 7;
   }
-  return it.atk || 7;
+  // O dano elemental da arma conta no ataque das magias de skill: o
+  // COMBAT_FORMULA_SKILL do servidor chama getWeaponDamage, que soma
+  // physicalAttack + elementalAttack. Sem isso um knight com naga sword
+  // (atk 8, elDmg 44) lancava exori como se tivesse ataque 8.
+  const elDmg = (it.el && it.el !== "physical") ? (it.elDmg || 0) : 0;
+  return (it.atk || 0) + elDmg || 7;
+}
+
+/* Elemento secundario que a arma equipada adiciona as magias de skill.
+ * No combat.cpp, damage.secondary vem de weapon->getElementType(). */
+function spellWeaponElement(p) {
+  const w = p.equip && p.equip.weapon;
+  if (!w) return null;
+  const it = (typeof upgradedStats === "function")
+    ? upgradedStats(p, "equip:weapon", w.item)
+    : (typeof GAMEDATA !== "undefined" ? GAMEDATA.items[w.item] : null);
+  if (!it || !it.el || it.el === "physical" || !it.elDmg) return null;
+  const fis = it.atk || 0;
+  const total = fis + it.elDmg;
+  return { el: it.el, propFisica: total > 0 ? fis / total : 1 };
 }
 
 /* Avalia a formula do canary e devolve {min, max} ja em valores positivos */

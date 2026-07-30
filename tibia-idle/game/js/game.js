@@ -727,8 +727,19 @@ function drainEvents() {
   for (const e of c.events) {
     switch (e.t) {
       case "hit": {
-        const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
-        const x = ex(e), y = ey(e);
+        // Dano fisico tem cor e efeito conforme a RACA do alvo (o switch de
+        // COMBAT_PHYSICALDAMAGE do servidor): bicho de sangue mostra numero
+        // vermelho e respingo de sangue, morto-vivo mostra cinza. Os demais
+        // elementos tem cor propria e nao dependem da raca.
+        const raca = (e.el === "physical" || !e.el)
+          ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
+          : null;
+        const col = raca ? raca.color
+                         : (ELEMENTS[e.el] || ELEMENTS.physical).color;
+        // `dual` marca a parte elemental de uma arma que bate nos dois
+        // tipos: desloca o numero para o lado para nao ficar por cima do
+        // numero fisico, ja que os dois saem no mesmo instante e tile.
+        const x = ex(e) + (e.dual ? 0.022 : 0), y = ey(e);
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
@@ -736,7 +747,8 @@ function drainEvents() {
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
-        r.addEffect(x, y, e.fx || (ELEMENTS[e.el] || ELEMENTS.physical).fx);
+        r.addEffect(x, y, e.fx || (raca ? raca.fx
+                    : (ELEMENTS[e.el] || ELEMENTS.physical).fx));
         break;
       }
       case "miss":

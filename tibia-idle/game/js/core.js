@@ -116,10 +116,26 @@ function mlCost(level, factor) {
 
 /* --------------------------------------------------------- combate */
 
-/* Dano de arma melee do Tibia: skill e attack do item */
-function meleeDamage(skill, attack, factor) {
-  const max = Math.floor((skill + 4) * attack * 0.085 * factor);
-  return { min: 0, max: Math.max(1, max) };
+/* Dano de arma corpo a corpo — Weapons::getMaxWeaponDamage do Canary:
+ *
+ *   max = round(0.085 * attackFactor * attackValue * attackSkill + level/5)
+ *   min = level / 5      (0 quando a arma nao tem ataque fisico)
+ *
+ * O `attackValue` ja vem somado: ataque fisico + dano elemental da arma. Uma
+ * naga sword tem atk 8 e elDmg 44 (gelo), entao o golpe rola sobre 52 e
+ * depois e repartido entre os dois tipos — nao sobre 8.
+ *
+ * A formula antiga era `(skill + 4) * attack * 0.085` com min 0: usava
+ * `skill + 4` em vez do skill puro e ignorava o nivel, que no servidor entra
+ * tanto no teto quanto no piso.
+ */
+function meleeDamage(skill, attack, factor, level) {
+  const f = factor === undefined ? 1.0 : factor;
+  const lv = level || 1;
+  const max = attack > 0
+    ? Math.round(0.085 * f * attack * skill + Math.floor(lv / 5)) : 0;
+  const min = attack > 0 ? Math.floor(lv / 5) : 0;
+  return { min: min, max: Math.max(1, max) };
 }
 
 /* Dano de arma de distancia — WeaponDistance::getWeaponDamage do Canary.
@@ -246,6 +262,30 @@ function baseStats(voc, level) {
 const ATTACK_SPEED = { melee: 2000, distance: 2000, magic: 2000 };
 
 /* Elementos e seus icones/cores */
+/* Cor e efeito do dano FISICO por raca da criatura.
+ *
+ * Porte do switch de COMBAT_PHYSICALDAMAGE em Game::combatChangeHealth: no
+ * Tibia o golpe fisico nao tem uma cor unica — ela vem do que a criatura
+ * "sangra". Bicho de sangue (886 dos 1648 monstros) mostra numero VERMELHO
+ * com respingo de sangue, morto-vivo mostra cinza, criatura de veneno mostra
+ * verde, e assim por diante. O jogo usava cinza para todos.
+ */
+const RACE_FISICO = {
+  blood: { color: "#c00000", fx: "draw-blood" },
+  venom: { color: "#5ac85a", fx: "hit-by-poison" },
+  undead: { color: "#c8c8c8", fx: "hit-area" },
+  ink: { color: "#c8c8c8", fx: "hit-area" },
+  fire: { color: "#ff8a3c", fx: "draw-blood" },
+  energy: { color: "#c07cff", fx: "energy-hit" },
+  candy: { color: "#8a1a1a", fx: "hit-area" },
+  chocolate: { color: "#c8c8c8", fx: "hit-area" },
+};
+
+/* Cor/efeito do dano fisico levando a raca do alvo em conta. */
+function fisicoPorRaca(raca) {
+  return RACE_FISICO[raca] || RACE_FISICO.blood;
+}
+
 const ELEMENTS = {
   physical: { name: "Físico", color: "#d8d8d8", fx: "draw-blood" },
   fire:     { name: "Fogo",   color: "#ff8a3c", fx: "hit-by-fire" },

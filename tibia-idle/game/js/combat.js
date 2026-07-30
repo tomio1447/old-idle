@@ -870,13 +870,41 @@ function playerAttack(c, p, target) {
 
   if (c.player) c.player.attackAnim = 180;
   if (raw > 0) {
-    target.hp -= raw;
-    c.stats.damage += raw;
-    c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
-                    sx: pos.x, sy: pos.y, screen: true,
-                    projectile: isDist || isMagic, el: element, crit: critou,
-                    missile: isDist ? playerMissile(p, element)
-                                    : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+    // Arma elemental: o golpe se divide em dois tipos de dano, como o
+    // Weapon::getCombatDamage do servidor faz com primary/secondary. Uma
+    // naga sword (atk 8, elDmg 44) entrega ~15% fisico e ~85% gelo do MESMO
+    // valor rolado — nao dois golpes somados. Cada parte sofre a resistencia
+    // do seu proprio elemento e aparece como um numero separado na tela.
+    const parte2 = (d.elemento2 && d.propFisica !== undefined && !errou)
+      ? d.elemento2 : null;
+    if (parte2) {
+      const fisBruto = Math.max(1, Math.round(raw * d.propFisica));
+      const elemBruto = Math.max(1, raw - fisBruto);
+      // a resistencia ja foi aplicada com o elemento fisico no rollDamage,
+      // entao aqui so a parte elemental precisa ser reavaliada
+      const elemFinal = Math.max(1,
+        applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto)));
+      target.hp -= fisBruto + elemFinal;
+      c.stats.damage += fisBruto + elemFinal;
+      // dano fisico: numero vermelho e efeito de sangue
+      c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y,
+                      sx: pos.x, sy: pos.y, screen: true,
+                      projectile: false, el: "physical", crit: critou,
+                      race: target.def && target.def.race });
+      // dano elemental: cor e animacao do elemento (gelo = azul + ice-attack)
+      c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y,
+                      sx: pos.x, sy: pos.y, screen: true,
+                      projectile: false, el: parte2, dual: 1 });
+    } else {
+      target.hp -= raw;
+      c.stats.damage += raw;
+      c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
+                      sx: pos.x, sy: pos.y, screen: true,
+                      projectile: isDist || isMagic, el: element, crit: critou,
+                      race: target.def && target.def.race,
+                      missile: isDist ? playerMissile(p, element)
+                                      : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+    }
   } else if (errou) {
     // o projetil ainda voa, mas cai na casa desviada
     c.events.push({ t: "miss", x: target.x, y: target.y });
@@ -1133,6 +1161,11 @@ function castSpellById(c, p, target, now, id) {
   const faixaMonk = (md && typeof monkSpellDamage === "function")
     ? monkSpellDamage(p, id) : null;
 
+  // Elemento que a arma equipada acrescenta as magias de skill (knight com
+  // naga sword, fire sword...). Resolvido uma vez fora do laco.
+  const armaElemento = (typeof spellWeaponElement === "function")
+    ? spellWeaponElement(p) : null;
+
   targets.forEach((t, idx) => {
     let dmg;
     if (faixaMonk) {
@@ -1149,6 +1182,38 @@ function castSpellById(c, p, target, now, id) {
       dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
     }
     dmg = applyCharmDamage(p, elemento, dmg);
+    // Magia de skill com arma elemental: o servidor manda o golpe em duas
+    // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
+    // do weapon->getElementType), entao um knight de naga sword ve exori
+    // sair como fisico + gelo. So vale para as magias que usam a ARMA:
+    // magia de mana (modo "magic") nao carrega elemento de arma.
+    const armaEl = (s.f && s.f.modo !== "magic" && !faixaMonk)
+      ? armaElemento : null;
+    if (armaEl) {
+      const fis = Math.max(1, Math.round(dmg * armaEl.propFisica));
+      const ele = Math.max(1, dmg - fis);
+      const fisFinal = applyResist(t, elemento, fis);
+      const eleFinal = Math.max(1,
+        applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele)));
+      t.hp -= fisFinal + eleFinal;
+      c.stats.damage += fisFinal + eleFinal;
+      if (s.cond && typeof applyCondition === "function") {
+        applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
+      }
+      c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y,
+                      sx: c.player ? c.player.x : 0.18,
+                      sy: c.player ? c.player.y : 0.62, screen: true,
+                      projectile: idx === 0 || !!(md && md.chain),
+                      el: elemento, spell: s.name, fx: fxMagia,
+                      race: t.def && t.def.race,
+                      chain: md && md.chain && idx > 0 ? 1 : 0,
+                      missile: missMagia });
+      c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y,
+                      sx: c.player ? c.player.x : 0.18,
+                      sy: c.player ? c.player.y : 0.62, screen: true,
+                      projectile: false, el: armaEl.el, dual: 1 });
+      return;
+    }
     dmg = applyResist(t, elemento, dmg);
     t.hp -= dmg;
     c.stats.damage += dmg;

@@ -269,10 +269,23 @@ function playerDamage(p) {
     return { min: d.min, max: d.max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
-  const atk = it ? (it.atk || 0) : 7;    // punho = attack 7
-  const d = meleeDamage(effSkill(p, sk), atk, 1.0);
-  return { min: Math.floor(d.max * 0.15), max: d.max,
-           element: "physical", type: "melee" };
+  const fis = it ? (it.atk || 0) : 7;         // punho = attack 7 no canary
+  // Arma elemental (naga sword, fire sword, ice rapier...) soma o elDmg ao
+  // ataque ANTES de rolar: e o `totalAttack` do Weapon::getCombatDamage.
+  // Antes o elDmg era ignorado aqui, entao uma naga sword (atk 8, elDmg 44)
+  // batia como se tivesse ataque 8 e o gelo simplesmente sumia.
+  const elDmg = (it && it.el && it.el !== "physical") ? (it.elDmg || 0) : 0;
+  const total = fis + elDmg;
+  const d = meleeDamage(effSkill(p, sk), total, 1.0, p.level);
+  const r = { min: d.min, max: d.max, element: "physical", type: "melee" };
+  if (elDmg > 0) {
+    // proporcao do golpe que fica em cada tipo. O servidor reparte o MESMO
+    // valor rolado: primary = realDamage * (fisico/total) e secondary o
+    // resto, entao os dois numeros sempre somam o golpe cheio.
+    r.elemento2 = it.el;
+    r.propFisica = total > 0 ? fis / total : 1;
+  }
+  return r;
 }
 
 /* Defesa total do jogador */
