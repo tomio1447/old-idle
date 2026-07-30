@@ -46,9 +46,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   ctx.fillStyle = "#0f0e0c";
   ctx.fillRect(0, 0, W, H);
 
-  // ---- chao: tiles 32x32 dedicados (grama, pedra, marmore...)
-  const pave = CitySprites.tile("floor-pave");
-  const grass = CitySprites.tile("floor-grass");
+  // ---- chao: tiles oficiais 32x32 por regiao (grama, rua calcada, terra)
   const x0 = Math.max(0, Math.floor(camX / TS));
   const y0 = Math.max(0, Math.floor(camY / TS));
   const x1 = Math.min(MAP_W, Math.ceil((camX + W) / TS));
@@ -57,12 +55,24 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   for (let ty = y0; ty < y1; ty++) {
     for (let tx = x0; tx < x1; tx++) {
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      const isGrass = CITY.grass[ty * MAP_W + tx];
-      const src = isGrass ? grass : pave;
-      if (src && src.complete && src.naturalWidth) {
-        ctx.drawImage(src, sx, sy, TS + 1, TS + 1);
-      } else {
-        ctx.fillStyle = isGrass ? "#3c6b28" : "#6a6a68";
+      const gid = CITY.ground[ty * MAP_W + tx];
+      if (!TileSprites.draw(ctx, gid, sx, sy, TS)) {
+        ctx.fillStyle = gid === 103 ? "#6b4f31" :
+          gid === 106 ? "#3c6b28" : "#b8a878";
+        ctx.fillRect(sx, sy, TS + 1, TS + 1);
+      }
+    }
+  }
+
+  // ---- muralha perimetral: a cidade e um local FECHADO, com portoes de
+  // arco oficiais ao norte e ao sul (o grid bloqueia a borda inteira)
+  for (let ty = y0; ty < y1; ty++) {
+    for (let tx = x0; tx < x1; tx++) {
+      const wid = CITY.wall[ty * MAP_W + tx];
+      if (!wid) continue;
+      const sx = tx * TS - camX, sy = ty * TS - camY;
+      if (!TileSprites.drawDeco(ctx, wid, sx, sy, TS)) {
+        ctx.fillStyle = "#c9b87a";
         ctx.fillRect(sx, sy, TS + 1, TS + 1);
       }
     }
@@ -80,85 +90,85 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     const bw = b.w * TS, bh = b.h * TS;
     const marble = b.wall === "marble";
 
-    // piso interno do predio, com tiles reais
-    const floor = CitySprites.tile(marble ? "floor-marble" : "floor-wood");
+    // piso interno com tiles oficiais (marmore branco 409 / madeira 419).
+    // O non-marble leva uma sombra leve para separar do sandstone da parede.
+    const floorIds = marble ? [409] : [419];
     for (let ty = b.y; ty < b.y + b.h; ty++) {
       for (let tx = b.x; tx < b.x + b.w; tx++) {
         const sx = tx * TS - camX, sy = ty * TS - camY;
-        if (floor && floor.complete && floor.naturalWidth)
-          ctx.drawImage(floor, sx, sy, TS + 1, TS + 1);
-        else {
+        if (!TileSprites.draw(ctx, tileVariant(floorIds, tx, ty), sx, sy, TS)) {
           ctx.fillStyle = marble ? "#cfc9b4" : "#8a6a52";
+          ctx.fillRect(sx, sy, TS + 1, TS + 1);
+        }
+        if (!marble) {
+          ctx.fillStyle = "rgba(30,16,8,.22)";
           ctx.fillRect(sx, sy, TS + 1, TS + 1);
         }
       }
     }
 
-    // paredes: tiles de pedra/marmore em todo o perimetro
-    const wallImg = CitySprites.tile(marble ? "wall-marble-h" : "wall-brick-h");
+    // paredes: blocos oficiais completos — predios comuns usam sandstone
+    // wall (478); os de marmore usam dark marble (965-970, variacao por
+    // celula). Fileira de cima recebe o telhado, entao parede vai da
+    // segunda fileira ate a base.
+    const wallIds = marble ? [965, 966, 967, 968, 969, 970] : [478];
     const drawWall = (tx, ty) => {
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      if (wallImg && wallImg.complete && wallImg.naturalWidth)
-        drawTileSprite(ctx, wallImg, sx, sy, S);
-      else {
-        ctx.fillStyle = marble ? "#a9a390" : "#6a4a38";
+      if (!TileSprites.draw(ctx, tileVariant(wallIds, tx, ty), sx, sy, TS)) {
+        ctx.fillStyle = marble ? "#4a4640" : "#c9b87a";
         ctx.fillRect(sx, sy, TS + 1, TS + 1);
       }
     };
-    for (let tx = b.x; tx < b.x + b.w; tx++) {
-      drawWall(tx, b.y);                 // parede de tras
-    }
-    for (let ty = b.y + 1; ty < b.y + b.h; ty++) {
-      drawWall(b.x, ty);                 // lateral esquerda
-      drawWall(b.x + b.w - 1, ty);       // lateral direita
-    }
+    for (let ty = b.y + 1; ty < b.y + b.h; ty++)
+      for (let tx = b.x; tx < b.x + b.w; tx++) drawWall(tx, ty);
 
-    // telhado: faixa superior cobrindo as duas primeiras fileiras
-    const roofH = Math.min(bh * 0.5, 2 * TS);
-    const rg = ctx.createLinearGradient(0, by - 6, 0, by + roofH);
-    if (b.roof === "wood") {
-      rg.addColorStop(0, "#9a6b3e"); rg.addColorStop(1, "#5e3f24");
-    } else {
+    // predios de marmore: topo plano de marmore branco (409)
+    if (marble)
+      for (let tx = b.x; tx < b.x + b.w; tx++) {
+        const sx = tx * TS - camX, sy = b.y * TS - camY;
+        if (!TileSprites.draw(ctx, 409, sx, sy, TS)) {
+          ctx.fillStyle = "#d9d3bf"; ctx.fillRect(sx, sy, TS + 1, TS + 1);
+        }
+      }
+
+    // telhado dos predios comuns: os tiles de roof do client (5033/5034)
+    // sao so a cumeeira, entao o telhado em si e uma faixa procedural de
+    // telhas cobrindo a primeira fileira (DESIGN — como ja era antes).
+    if (!marble) {
+      const rg = ctx.createLinearGradient(0, by - 4, 0, by + TS);
       rg.addColorStop(0, "#c25444"); rg.addColorStop(1, "#7a2f24");
+      ctx.fillStyle = rg;
+      ctx.fillRect(bx - 4, by - 4, bw + 8, TS + 6);
+      ctx.strokeStyle = "rgba(0,0,0,.22)";
+      ctx.lineWidth = 1;
+      for (let ly = by; ly < by + TS + 2; ly += 7) {
+        ctx.beginPath(); ctx.moveTo(bx - 4, ly); ctx.lineTo(bx + bw + 4, ly);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(0,0,0,.3)";
+      ctx.fillRect(bx - 4, by + TS + 2, bw + 8, 4);
     }
-    ctx.fillStyle = rg;
-    ctx.fillRect(bx - 4, by - 6, bw + 8, roofH);
-    ctx.strokeStyle = "rgba(0,0,0,.22)";
-    ctx.lineWidth = 1;
-    for (let ly = by - 2; ly < by + roofH; ly += 8) {
-      ctx.beginPath(); ctx.moveTo(bx - 4, ly); ctx.lineTo(bx + bw + 4, ly);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(0,0,0,.3)";
-    ctx.fillRect(bx - 4, by + roofH, bw + 8, 4);
     ctx.strokeStyle = "rgba(0,0,0,.5)";
     ctx.lineWidth = 2;
     ctx.strokeRect(bx, by, bw, bh);
 
-    // fachada: janelas e porta com sprites reais
-    const win = CitySprites.tile(marble ? "window-marble" : "window-brick");
+    // fachada: janelas e porta oficiais (frame de porta 1646; janela de
+    // pedra 1489 / com vidro 1488, suspensas no meio do tile da fachada)
+    const winId = marble ? 1488 : 1489;
     const fy = (b.y + b.h - 1) * TS - camY;
     for (let tx = b.x; tx < b.x + b.w; tx++) {
       const sx = tx * TS - camX;
       const rel = tx - b.x;
       if (rel === b.door) {
-        // porta desenhada como vao escuro com moldura
+        // vao escuro da entrada + frame oficial por cima
         ctx.fillStyle = "#2b1d12";
-        ctx.fillRect(sx + TS * 0.15, fy + TS * 0.1, TS * 0.7, TS * 0.9);
-        ctx.strokeStyle = "#c9a24a";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(sx + TS * 0.15, fy + TS * 0.1, TS * 0.7, TS * 0.9);
-        ctx.fillStyle = "#d8b45a";
-        ctx.beginPath();
-        ctx.arc(sx + TS * 0.72, fy + TS * 0.55, 2.2, 0, 7);
-        ctx.fill();
+        ctx.fillRect(sx + TS * 0.12, fy + TS * 0.08, TS * 0.76, TS * 0.92);
+        TileSprites.drawDeco(ctx, 1646, sx, fy, TS);
       } else if (b.windows && rel % 2 === 1) {
-        if (win && win.complete && win.naturalWidth) {
-          drawTileSprite(ctx, win, sx, fy, S);
-        } else {
-          ctx.fillStyle = "#3a4a5a";
-          ctx.fillRect(sx + TS * 0.2, fy + TS * 0.25, TS * 0.6, TS * 0.5);
-        }
+        // fundo do vao para o vidro da janela oficial se destacar
+        ctx.fillStyle = "#26313d";
+        ctx.fillRect(sx + TS * 0.3, fy + TS * 0.34, TS * 0.4, TS * 0.4);
+        TileSprites.drawDeco(ctx, winId, sx, fy - TS * 0.3, TS);
       }
     }
     // placa com o nome do estabelecimento
@@ -178,11 +188,12 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     }
   }
 
-  // ---- decoracao
-  for (const [name, tx, ty] of DECOR) {
+  // ---- decoracao: numero = tile oficial; texto = PNG legado assets/city
+  for (const [spr, tx, ty] of DECOR) {
     const sx = tx * TS - camX, sy = ty * TS - camY;
     if (sx < -TS * 2 || sx > W + TS || sy < -TS * 2 || sy > H + TS) continue;
-    drawTileSprite(ctx, CitySprites.tile(name), sx, sy, S);
+    if (typeof spr === "number") TileSprites.drawDeco(ctx, spr, sx, sy, TS);
+    else drawTileSprite(ctx, CitySprites.tile(spr), sx, sy, S);
   }
 
   // ---- NPCs
@@ -275,15 +286,21 @@ Renderer.prototype.drawMiniMap = function (ctx, W, H, walker) {
   ctx.lineWidth = 1;
   ctx.strokeRect(ox - 2, oy - 2, mw + 4, mh + 4);
 
-  // chao e grama
+  // grama (id 106 no ground oficial) pintada de verde escuro
   for (let ty = 0; ty < MAP_H; ty++) {
     for (let tx = 0; tx < MAP_W; tx++) {
-      const g = CITY.grass[ty * MAP_W + tx];
-      if (!g) continue;
+      const gid = CITY.ground[ty * MAP_W + tx];
+      if (gid !== 106) continue;
       ctx.fillStyle = "#2e4420";
       ctx.fillRect(ox + tx * sx, oy + ty * sy, sx + 0.5, sy + 0.5);
     }
   }
+  // muralha perimetral
+  ctx.fillStyle = "#8a8578";
+  ctx.fillRect(ox, oy, mw, sy + 0.5);
+  ctx.fillRect(ox, oy + mh - sy, mw, sy + 0.5);
+  ctx.fillRect(ox, oy, sx + 0.5, mh);
+  ctx.fillRect(ox + mw - sx, oy, sx + 0.5, mh);
   // predios
   for (const b of BUILDINGS) {
     ctx.fillStyle = b.wall === "marble" ? "#b9b3a0" : "#7a4a3a";

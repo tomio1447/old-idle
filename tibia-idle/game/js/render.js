@@ -952,7 +952,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const scene = hunt ? hunt.scene : "cave";
 
   // --- chao/mapa tileado
-  if (scene === "sewer") {
+  if (combat.huntMap && typeof drawTileCharMap === "function") {
+    /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais */
+    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H);
+  } else if (scene === "sewer") {
     drawRookgaardSewer(ctx, W, H);
   } else if (hunt && combat.huntId === "spiders") {
     drawSpiderCave(ctx, W, H);

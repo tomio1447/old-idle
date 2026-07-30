@@ -979,7 +979,9 @@ function drainEvents() {
       case "kill": {
         const x = ex(e), y = ey(e);
         r.addCorpse(x, y, e.mob);
-        r.addFloater(x, y - 0.06, "+" + fmt(e.exp) + " xp", "#9ce84a");
+        // XP na tela exatamente como o cliente oficial: valor cheio
+        // (nunca abreviado para "1.2k"), numero BRANCO e inteiro
+        r.addFloater(x, y - 0.06, "+" + fmtDmg(e.exp) + " xp", "#ffffff");
         r.addEffect(x, y, "poff");
         addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(e.exp)} xp</span>`);
         if (e.loot && e.loot.length) {

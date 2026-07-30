@@ -28,9 +28,20 @@ function newCombat(player, huntId, instanceMode) {
   const hunt = GAMEDATA.hunts[huntId];
   const mode = instanceMode || player.instanceMode || "non-pvp";
   const pvp = mode === "pvp";
+  /* mapa fechado da hunt (huntmapdata.js): paredes/agua bloqueiam o grid */
+  const huntMap = (typeof HUNTMAPS !== "undefined" && hunt.mapa) ? HUNTMAPS[hunt.mapa] : null;
+  /* spawn do jogador: marcador "S" do mapa; sem mapa, canto esquerdo */
+  let spx = 3, spy = 6;
+  if (huntMap) {
+    let achou = false;
+    for (let y = 0; y < huntMap.rows.length && !achou; y++)
+      for (let x = 0; x < huntMap.rows[y].length; x++)
+        if (huntMap.rows[y][x] === "S") { spx = x; spy = y; achou = true; break; }
+  }
   return {
     huntId: huntId,
     hunt: hunt,
+    huntMap: huntMap,
     instanceMode: mode,
     pvp: pvp,
     expMul: pvp ? 1.25 : 1,
@@ -56,10 +67,11 @@ function newCombat(player, huntId, instanceMode) {
     regenMp: 0,
     buffs: {},
     player: {
-      // celula inicial: canto esquerdo da arena. x/y sao derivados dela e
-      // servem so para o render -- a verdade e (cx, cy).
-      cx: 3, cy: 6,
-      x: (3 + 0.5) / 21, y: (6 + 0.5) / 13, dir: "e", moving: false,
+      // celula inicial: marcador "S" do mapa (ou canto esquerdo sem mapa).
+      // x/y sao derivados dela e servem so para o render -- a verdade e
+      // (cx, cy).
+      cx: spx, cy: spy,
+      x: (spx + 0.5) / 21, y: (spy + 0.5) / 13, dir: "e", moving: false,
       frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
     },
     stats: {

@@ -101,8 +101,25 @@ function dirTo(from, to) {
 
 /* Mapa das celulas ocupadas. No Tibia duas criaturas nao dividem tile --
  * essa e a regra que faz o "corpo" existir e a hitbox ser real. */
+/* Celulas fixas bloqueadas pelo mapa da hunt (paredes/agua do HUNTMAPS).
+ * Cacheado no combate — o mapa nao muda durante a luta. */
+function mapBlockKeys(c) {
+  if (!c._mapBlockKeys) {
+    const keys = [];
+    if (c.huntMap && typeof huntMapBlocked === "function")
+      for (let y = 0; y < c.huntMap.rows.length; y++)
+        for (let x = 0; x < c.huntMap.rows[y].length; x++)
+          if (huntMapBlocked(c.huntMap, x, y)) keys.push(x + ":" + y);
+    c._mapBlockKeys = keys;
+  }
+  return c._mapBlockKeys;
+}
+
 function buildOccupancy(c, ignorar) {
   const occ = new Map();
+  /* o mapa entra como ocupacao fixa: spawn, passo, dance e A* passam a
+   * respeitar paredes/agua sem precisar mudar nenhuma chamada. */
+  for (const k of mapBlockKeys(c)) occ.set(k, true);
   if (c.player && c.player !== ignorar) {
     occ.set(c.player.cx + ":" + c.player.cy, c.player);
   }
