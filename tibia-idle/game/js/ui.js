@@ -570,9 +570,25 @@ function equipFromBag(p, slug) {
     return false;
   }
   p.equip[it.s] = { item: slug, count: 1 };
-  if (it.th && p.equip.shield) {
-    if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
-    else toast("Sem espaço para guardar o escudo.");
+  // Arma de duas maos remove o ESCUDO -- mas nao a aljava, que alimenta o
+  // proprio ataque a distancia (toda arma de distancia e "th" no items.xml).
+  if (it.s === "weapon" && it.th && p.equip.shield) {
+    const sec = GAMEDATA.items[p.equip.shield.item];
+    if (!(sec && sec.t === "quiver")) {
+      if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
+      else toast("Sem espaço para guardar o escudo.");
+    }
+  }
+  // Regra simetrica: um escudo (nao aljava) nao pode entrar com uma arma de
+  // duas maos ja equipada. Sem isso o jogador conseguia equipar os dois ao
+  // clicar direto no escudo, ja que so o caminho "equipar arma" checava a
+  // regra.
+  if (it.s === "shield" && it.t !== "quiver" && p.equip.weapon) {
+    const wp = GAMEDATA.items[p.equip.weapon.item];
+    if (wp && wp.th) {
+      if (addItem(p, p.equip.weapon.item, 1)) delete p.equip.weapon;
+      else toast("Sem espaço para guardar a arma de duas mãos.");
+    }
   }
   return true;
 }
