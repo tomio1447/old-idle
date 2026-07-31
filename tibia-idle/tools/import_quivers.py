@@ -67,10 +67,6 @@ ELEMENTO = {
     "flash arrow": "energy", "shiver arrow": "ice",
     "flaming arrow": "fire", "earth arrow": "earth",
     "poison arrow": "earth", "envenomed arrow": "earth",
-    "onyx arrow": "death", "crystalline arrow": "ice",
-    "tarsal arrow": "earth", "prismatic bolt": "holy",
-    "infernal bolt": "fire", "spectral bolt": "death",
-    "vortex bolt": "energy",
 }
 
 # efeitos confirmados nos weapons/scripts do canary
@@ -99,7 +95,10 @@ def ler_items():
     e slot DENTRO do <attribute key="script"> — entao a leitura desce a
     arvore, senao o nivel exigido se perde.
     """
-    raiz = ET.parse(os.path.join(CAN, "data", "items", "items.xml")).getroot()
+    xml_path = os.path.join(CAN, "data", "items", "items.xml")
+    if not os.path.exists(xml_path):
+        xml_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "canary-items.xml")
+    raiz = ET.parse(xml_path).getroot()
     out = {}
     for el in raiz.iter("item"):
         iid = el.get("id")

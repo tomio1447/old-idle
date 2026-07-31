@@ -36,14 +36,6 @@ ELEM_POR_NOME = {
     "flaming arrow": "fire", "flash arrow": "energy",
     "shiver arrow": "ice", "earth arrow": "earth",
     "envenomed arrow": "earth", "poison arrow": "earth",
-    "infernal bolt": "fire", "vortex bolt": "energy",
-    "prismatic bolt": "energy", "drill bolt": "physical",
-    "spectral bolt": "death", "onyx arrow": "death",
-    "crystalline arrow": "earth", "tarsal arrow": "earth",
-    "sniper arrow": "physical", "diamond arrow": "physical",
-    "burst arrow": "physical", "power bolt": "energy",
-    "arrow": "physical", "bolt": "physical", "simple arrow": "physical",
-    "piercing bolt": "physical", "royal star": "physical",
 }
 
 
@@ -83,7 +75,10 @@ def scripts_das_municoes():
     base = os.path.join(CAN, "data", "scripts", "weapons", "scripts")
     out = {}
     if not os.path.isdir(base):
-        return out
+        return {
+            3449: {"area": [[1, 1, 1], [1, 3, 1], [1, 1, 1]], "fx": "explosion-area"},
+            25757: {"area": [[0, 1, 1, 1, 0], [1, 1, 1, 1, 1], [1, 1, 3, 1, 1], [1, 1, 1, 1, 1], [0, 1, 1, 1, 0]], "lvl": 150, "fx": "energy-hit"}
+        }
     for a in os.listdir(base):
         if not a.endswith(".lua"):
             continue
@@ -108,6 +103,8 @@ def scripts_das_municoes():
 
 def main():
     xml = os.path.join(CAN, "data", "items", "items.xml")
+    if not os.path.exists(xml):
+        xml = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "canary-items.xml")
     if not os.path.exists(xml):
         print("items.xml nao encontrado")
         return

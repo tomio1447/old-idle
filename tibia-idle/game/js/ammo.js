@@ -42,6 +42,7 @@ function fundirAmmoData() {
     for (const k of AMMO_CAMPOS) {
       if (novo[k] !== undefined) velho[k] = novo[k];
     }
+    velho.el = novo.el || "physical";
   }
   return novos;
 }
