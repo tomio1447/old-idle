@@ -1,150 +1,212 @@
 /*
- * forgedata.js — Sistema de Exaltation Forge (Canary).
+ * forgedata.js — dados da Exaltation Forge
  *
- * Dados oficiais portados do protocolo do opentibiabr/canary:
- *   - classificacao (cls 1-4) determina o tier maximo
- *   - custos em gold, dust e exalted core por tier
- *   - chance de sucesso por tier
- *   - efeitos de forja por slot (Onslaught, Dodge, Momentum,
- *     Transcendence, Amplification)
- *   - sistema de dusts: fusao, conversao para exalted core
- *   - influencer / fiendish (substitui o influenced antigo)
+ * Referência principal: Exaltation System / Tibia Duality (link enviado pelo
+ * usuário). Este arquivo foi refeito para seguir a regra oficial do sistema:
+ *   - apenas helmet, armor e weapon podem receber tier;
+ *   - classificação 1->1, 2->2, 3->3, 4->10;
+ *   - efeitos oficiais: Ruse, Momentum e Onslaught;
+ *   - recursos oficiais: Dust, Slivers e Exalted Cores;
+ *   - operações oficiais: Fusion e Transfer.
+ *
+ * Observação importante de arquitetura:
+ * o inventário atual do Idle ainda não é totalmente "instance based"; por isso
+ * a lógica da Forge trabalha por slug e impõe algumas travas para evitar corromper
+ * tiers quando houver cópias excedentes do mesmo item.
  */
 "use strict";
 
-/* ---------- Mapa de tier maximo por classificacao ----------
- * Regra do Canary:
- *   cls 1 -> tier 3
- *   cls 2 -> tier 5
- *   cls 3 -> tier 7
- *   cls 4 -> tier 10  */
-window.FORGE_MAX_TIER = { 1: 3, 2: 5, 3: 7, 4: 10 };
+window.FORGE_MAX_TIER = { 1: 1, 2: 2, 3: 3, 4: 10 };
+window.FORGE_SLOTS = ["armor", "helmet", "weapon"];
 
-/* Tier do item (0 = nao forjado, 1-10 = forjado).
- * Guardado como p.forge[slug] = tier (1-10). */
-
-/* ---------- Dusts (pos da forja) ----------
- * 4 tipos, do mais comum ao mais raro.
- * Dusts dropam de monstros fiendish/influenced. */
-window.FORGE_DUSTS = {
-  "dust-basic": {
-    id: "dust-basic", name: "Basic Dust", tier: 1,
-    sprite: "dust-basic", sell: 50,
-    desc: "Po basico da forja. Dropa de criaturas influenced."
-  },
-  "dust-refined": {
-    id: "dust-refined", name: "Refined Dust", tier: 2,
-    sprite: "dust-refined", sell: 200,
-    desc: "Po refinado. 10 basic dust = 1 refined."
-  },
-  "dust-pristine": {
-    id: "dust-pristine", name: "Pristine Dust", tier: 3,
-    sprite: "dust-pristine", sell: 1000,
-    desc: "Po imaculado. 10 refined dust = 1 pristine."
-  },
-  "dust-exalted": {
-    id: "dust-exalted", name: "Exalted Dust", tier: 4,
-    sprite: "dust-exalted", sell: 5000,
-    desc: "Po exaltado. 10 pristine dust = 1 exalted."
-  },
-};
-
-/* Fusao: N dusts de um tier produzem 1 do tier seguinte */
-window.FORGE_FUSION = {
-  "dust-basic":    { from: "dust-basic",    to: "dust-refined",  need: 10, cost: 0 },
-  "dust-refined":  { from: "dust-refined",  to: "dust-pristine", need: 10, cost: 0 },
-  "dust-pristine": { from: "dust-pristine", to: "dust-exalted",  need: 10, cost: 0 },
-};
-
-/* ---------- Exalted Core ----------
- * 1 Exalted Core = 10 Exalted Dust (conversao apenas no sentido dust->core).
- * Cores sao usados nos tiers 7+ da forja junto com dust. */
-window.EXALTED_CORE = {
-  id: "exalted-core", name: "Exalted Core",
-  sprite: "exalted-core", sell: 50000,
-  costDust: 10,  // 10 exalted dust = 1 core
-  desc: "Nucleo exaltado. 10 Exalted Dust = 1 Core. Usado em tiers altos da forja."
-};
-
-/* ---------- Custos da forja por tier (Canary) ---------- */
-window.FORGE_COSTS = {
-  1:  { gold: 50000,   dust: [{ type: "dust-basic",    qty: 5 }],   cores: 0, pct: 95, downgrade: false, break: false },
-  2:  { gold: 100000,  dust: [{ type: "dust-basic",    qty: 10 }],  cores: 0, pct: 90, downgrade: false, break: false },
-  3:  { gold: 200000,  dust: [{ type: "dust-refined",  qty: 5 }],   cores: 0, pct: 85, downgrade: false, break: false },
-  4:  { gold: 400000,  dust: [{ type: "dust-refined",  qty: 10 }],  cores: 0, pct: 80, downgrade: true,  break: false },
-  5:  { gold: 800000,  dust: [{ type: "dust-pristine", qty: 5 }],   cores: 0, pct: 75, downgrade: true,  break: false },
-  6:  { gold: 1500000, dust: [{ type: "dust-pristine", qty: 10 }],  cores: 0, pct: 70, downgrade: true,  break: false },
-  7:  { gold: 3000000, dust: [{ type: "dust-exalted",  qty: 5 }],   cores: 1, pct: 65, downgrade: true,  break: false },
-  8:  { gold: 5000000, dust: [{ type: "dust-exalted",  qty: 10 }],  cores: 2, pct: 55, downgrade: true,  break: false },
-  9:  { gold: 8000000, dust: [{ type: "dust-exalted",  qty: 15 }],  cores: 3, pct: 45, downgrade: true,  break: true },
-  10: { gold: 12000000,dust: [{ type: "dust-exalted",  qty: 20 }],  cores: 5, pct: 35, downgrade: true,  break: true },
-};
-
-/* ---------- Efeitos da forja por slot (Exaltation Forge) ---------- */
-window.FORGE_EFFECTS = {
-  helmet: {
-    id: "onslaught", name: "Onslaught",
-    desc: "Aumenta o dano critico extra em {pct}%.",
-    perTier: function(tier) { return tier * 2; },
-    fmt: function(v) { return "+" + v + "% dano critico extra"; }
-  },
+window.FORGE_PROC_CHANCES = {
   armor: {
-    id: "dodge", name: "Dodge",
-    desc: "Chance de {pct}% de esquivar completamente de um ataque.",
-    perTier: function(tier) { return Math.round(tier * 0.8 * 10) / 10; },
-    fmt: function(v) { return v.toFixed(1) + "% de esquiva"; }
+    1: 0.50, 2: 1.03, 3: 1.62, 4: 2.28, 5: 3.00,
+    6: 3.78, 7: 4.62, 8: 5.52, 9: 6.48, 10: 7.51,
   },
-  legs: {
-    id: "momentum", name: "Momentum",
-    desc: "Reduz o cooldown das magias em {pct}%.",
-    perTier: function(tier) { return tier; },
-    fmt: function(v) { return "-" + v + "% cooldown de magias"; }
+  helmet: {
+    1: 2.00, 2: 4.05, 3: 6.20, 4: 8.45, 5: 10.80,
+    6: 13.25, 7: 15.80, 8: 18.45, 9: 21.20, 10: 24.05,
   },
   weapon: {
-    id: "transcendence", name: "Transcendence",
-    desc: "Avatar: ao ativar, transforma-se em um avatar supremo por 15s. " +
-          "Durante o avatar: +{pct}% dano, +{pct2}% velocidade e imunidade a CC. " +
-          "Cooldown: 180s.",
-    perTier: function(tier) { return tier * 3; },
-    perTier2: function(tier) { return tier * 5; },
-    fmt: function(v) { return "Avatar: +" + v + "% dano, +" + (v * 5 / 3).toFixed(0) + "% vel (15s, cd 180s)"; }
-  },
-  boots: {
-    id: "amplification", name: "Amplification",
-    desc: "Aumenta a cura recebida em {pct}%.",
-    perTier: function(tier) { return Math.round(tier * 1.5 * 10) / 10; },
-    fmt: function(v) { return "+" + v.toFixed(1) + "% cura recebida"; }
+    1: 0.50, 2: 1.05, 3: 1.70, 4: 2.45, 5: 3.30,
+    6: 4.25, 7: 5.30, 8: 6.45, 9: 7.70, 10: 9.05,
   },
 };
 
-/* ---------- Slots que podem ser forjados ---------- */
-window.FORGE_SLOTS = ["helmet", "armor", "legs", "weapon", "boots"];
+window.FORGE_EFFECTS = {
+  armor: {
+    id: "ruse",
+    name: "Ruse",
+    desc: "Chance de suavizar totalmente um ataque recebido.",
+    effectDesc: "Ao ativar, evita o golpe recebido.",
+    procChance: function(tier) { return FORGE_PROC_CHANCES.armor[tier] || 0; },
+    fmt: function(tier) {
+      return (FORGE_PROC_CHANCES.armor[tier] || 0).toFixed(2) + "% de chance de ativar Ruse";
+    },
+  },
+  helmet: {
+    id: "momentum",
+    name: "Momentum",
+    desc: "Ao usar spell/potion em combate, pode reduzir todos os cooldowns em 2s.",
+    effectDesc: "Quando ativa, reduz todos os cooldowns de magia em 2 segundos.",
+    procChance: function(tier) { return FORGE_PROC_CHANCES.helmet[tier] || 0; },
+    fmt: function(tier) {
+      return (FORGE_PROC_CHANCES.helmet[tier] || 0).toFixed(2) + "% de chance de ativar Momentum";
+    },
+  },
+  weapon: {
+    id: "onslaught",
+    name: "Onslaught",
+    desc: "Ao atacar, pode causar 60% de dano extra, independente do crítico.",
+    effectDesc: "Quando ativa, o ataque causa +60% de dano.",
+    procChance: function(tier) { return FORGE_PROC_CHANCES.weapon[tier] || 0; },
+    fmt: function(tier) {
+      return (FORGE_PROC_CHANCES.weapon[tier] || 0).toFixed(2) + "% de chance de ativar Onslaught";
+    },
+  },
+};
 
-/* Retorna o efeito de forja para um slot */
+window.FORGE_RESOURCES = {
+  dust: { id: "dust", name: "Dust" },
+  slivers: { id: "slivers", name: "Slivers" },
+  exaltedCore: { id: "exalted-core", name: "Exalted Core" },
+};
+
+window.FORGE_CONVERGENCE = {
+  dustToSlivers: { dust: 60, slivers: 3 },
+  sliversToCore: { slivers: 50, cores: 1 },
+};
+
+window.FORGE_FUSION = {
+  dustCost: 100,
+  successPct: 50,
+  successPctCore: 65,
+  failPenaltyProtectPct: 50,
+};
+
+window.FORGE_TRANSFER = {
+  dustCost: 100,
+  coreCost: 1,
+};
+
+/*
+ * Custos em gold por classificação e tier atual.
+ * Ex.: FUSION_COST[class][0] = custo para 0 -> 1.
+ */
+window.FORGE_FUSION_COST = {
+  1: { 0: 25000 },
+  2: { 0: 750000, 1: 5000000 },
+  3: { 0: 4000000, 1: 10000000, 2: 20000000 },
+  4: {
+    0: 8000000,
+    1: 20000000,
+    2: 40000000,
+    3: 65000000,
+    4: 100000000,
+    5: 250000000,
+    6: 750000000,
+    7: 2500000000,
+    8: 8000000000,
+    9: 15000000000,
+  },
+};
+
+/*
+ * Custos da transferência por tier do item doador.
+ * Ex.: TRANSFER_COST[class][2] = custo para transferir um T2 e gerar T1.
+ */
+window.FORGE_TRANSFER_COST = {
+  2: { 2: 5000000 },
+  3: { 2: 10000000, 3: 20000000 },
+  4: {
+    2: 20000000,
+    3: 40000000,
+    4: 65000000,
+    5: 100000000,
+    6: 250000000,
+    7: 750000000,
+    8: 2500000000,
+    9: 8000000000,
+    10: 15000000000,
+  },
+};
+
 function forgeEffectForSlot(slot, tier) {
-  const ef = FORGE_EFFECTS[slot];
+  var ef = FORGE_EFFECTS[slot];
   if (!ef || !tier) return null;
-  return { id: ef.id, name: ef.name,
-           text: ef.fmt(ef.perTier(tier)),
-           pct: ef.perTier(tier) };
+  return {
+    id: ef.id,
+    name: ef.name,
+    chance: ef.procChance(tier),
+    text: ef.fmt(tier),
+    desc: ef.effectDesc,
+  };
 }
 
-/* Slots que podem receber forja */
-function forgeEquipables(p) {
-  const out = [];
-  for (const slot of FORGE_SLOTS) {
-    const e = p.equip[slot];
-    if (!e) continue;
-    const it = GAMEDATA.items[e.item];
-    if (!it) continue;
-    const cls = it.cls || 0;
-    if (cls < 1) continue;
-    const maxTier = FORGE_MAX_TIER[cls] || 3;
-    const currentTier = (p.forge && p.forge[e.item]) || 0;
-    out.push({ slot, item: e.item, cls, maxTier, currentTier, it });
+function forgeItemClass(slug) {
+  var it = GAMEDATA.items[slug];
+  return it ? (it.cls || 0) : 0;
+}
+
+function forgeItemSlot(slug) {
+  var it = GAMEDATA.items[slug];
+  return it ? (it.s || null) : null;
+}
+
+function forgeIsEligibleItem(slug) {
+  var it = GAMEDATA.items[slug];
+  if (!it) return false;
+  if (!it.cls || !FORGE_MAX_TIER[it.cls]) return false;
+  return FORGE_SLOTS.indexOf(it.s) >= 0;
+}
+
+function forgeMaxTierForSlug(slug) {
+  var cls = forgeItemClass(slug);
+  return FORGE_MAX_TIER[cls] || 0;
+}
+
+function forgeFusionGoldCost(slug, currentTier) {
+  var cls = forgeItemClass(slug);
+  var row = FORGE_FUSION_COST[cls] || null;
+  return row && row[currentTier] ? row[currentTier] : 0;
+}
+
+function forgeTransferGoldCost(slug, donorTier) {
+  var cls = forgeItemClass(slug);
+  var row = FORGE_TRANSFER_COST[cls] || null;
+  return row && row[donorTier] ? row[donorTier] : 0;
+}
+
+/*
+ * Itens aptos na mochila.
+ * O sistema oficial da Forge trabalha com os itens na backpack; o depot fica
+ * separado e sem acoplamento.
+ */
+function forgeBagItems(p) {
+  var out = [];
+  var bag = p && p.bag ? p.bag : {};
+  for (var slug in bag) {
+    if (!bag[slug] || !forgeIsEligibleItem(slug)) continue;
+    var it = GAMEDATA.items[slug];
+    out.push({
+      slug: slug,
+      item: slug,
+      count: bag[slug],
+      cls: it.cls || 0,
+      slot: it.s,
+      maxTier: forgeMaxTierForSlug(slug),
+      currentTier: p && p.forge ? (p.forge[slug] || 0) : 0,
+      it: it,
+    });
   }
+  out.sort(function(a, b) {
+    if (a.cls !== b.cls) return a.cls - b.cls;
+    if (a.slot !== b.slot) return a.slot < b.slot ? -1 : 1;
+    return a.it.n < b.it.n ? -1 : 1;
+  });
   return out;
 }
 
-window.FORGE_UI = { slot: null, targetTier: 1 };
+window.FORGE_UI = { mode: "fusion", slug: null, targetSlug: null, useCore: false };
 window.DEPOT_UI = { tab: "depot" };

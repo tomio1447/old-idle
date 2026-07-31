@@ -1,359 +1,504 @@
 /*
- * forge.js — Sistema de Exaltation Forge + Depot + Avatar (Canary).
+ * forge.js — Exaltation Forge + Depot (refactor)
  *
- * Forja: tenta subir o tier de um item com cls >= 1.
- * Regras do Canary:
- *   - cls 1 -> max tier 3, cls 2 -> 5, cls 3 -> 7, cls 4 -> 10
- *   - custo: gold + dusts + exalted cores (tier 7+)
- *   - sucesso: chance por tier, falha pode causar downgrade ou break
- *   - resultado vai para a Exaltation Box dentro do Depot
+ * Refeito para separar responsabilidades:
+ *   - Forge cuida de fusion/transfer e dos efeitos oficiais.
+ *   - Depot cuida apenas de armazenar/retirar/equipar itens.
+ *   - Exaltation Box antiga vira apenas compatibilidade de saves legados.
  *
- * Depot: 30 slots para guardar equipamentos. Exaltation Box dentro
- * do depot recebe os itens forjados.
- *
- * Avatar (Transcendence): ativado em combate, buff temporario.
+ * Limitação assumida explicitamente:
+ * o inventário base do Idle ainda agrupa itens por slug na mochila. Para não
+ * corromper tiers quando houver várias cópias do mesmo item, a Forge bloqueia
+ * alguns cenários que exigiriam inventário totalmente instanciado.
  */
 "use strict";
 
-/* ---------- Inicializacao ---------- */
 function ensureForge(p) {
-  p.forge = p.forge || {};         // slug -> tier
-  p.dusts = p.dusts || {};         // "dust-basic" -> qty, etc
-  p.exaltedCores = p.exaltedCores || 0;
-  p.depot = p.depot || [];         // array de slugs (ate 30)
-  p.exaltationBox = p.exaltationBox || []; // array de slugs (itens forjados)
-  p.depotNotification = p.depotNotification || 0; // contador de notificacao
+  p.forge = p.forge || {};
+  p.depot = Array.isArray(p.depot) ? p.depot : [];
+  p.exaltationBox = Array.isArray(p.exaltationBox) ? p.exaltationBox : [];
+  p.depotNotification = Number(p.depotNotification || 0);
+  p.exaltedCores = Number(p.exaltedCores || 0);
+  p.slivers = Number(p.slivers || 0);
+  if (typeof p.dust !== "number") p.dust = forgeMigrateLegacyDust(p);
+  if (!p._forgeMeta) p._forgeMeta = { lastMomentumRollAt: 0 };
 }
 
-/* ---------- Forja ---------- */
+function forgeMigrateLegacyDust(p) {
+  var dust = 0;
+  var old = p && p.dusts ? p.dusts : null;
+  if (!old) return 0;
+  /*
+   * Migração conservadora do sistema antigo por camadas de dust.
+   * 1 refined ~= 10 basic, 1 pristine ~= 100 basic, 1 exalted ~= 1000 basic.
+   */
+  dust += Number(old["dust-basic"] || 0);
+  dust += Number(old["dust-refined"] || 0) * 10;
+  dust += Number(old["dust-pristine"] || 0) * 100;
+  dust += Number(old["dust-exalted"] || 0) * 1000;
+  return dust;
+}
 
-/* Verifica se pode forjar o item para o proximo tier */
+function forgeItemTier(p, slug) {
+  ensureForge(p);
+  return p.forge[slug] || 0;
+}
+
+function forgeSetItemTier(p, slug, tier) {
+  ensureForge(p);
+  tier = Number(tier || 0);
+  if (tier > 0) p.forge[slug] = tier;
+  else delete p.forge[slug];
+}
+
+function forgeBagCount(p, slug) {
+  return p && p.bag && p.bag[slug] ? p.bag[slug] : 0;
+}
+
+function forgeDepotCount(p, slug) {
+  ensureForge(p);
+  var n = 0;
+  for (var i = 0; i < p.depot.length; i++) {
+    if (forgeStoredSlug(p.depot[i]) === slug) n++;
+  }
+  return n;
+}
+
+function forgeExaCount(p, slug) {
+  ensureForge(p);
+  var n = 0;
+  for (var i = 0; i < p.exaltationBox.length; i++) {
+    if (forgeStoredSlug(p.exaltationBox[i]) === slug) n++;
+  }
+  return n;
+}
+
+function forgeStoredSlug(entry) {
+  if (!entry) return null;
+  return typeof entry === "string" ? entry : (entry.slug || entry.item || null);
+}
+
+function forgeEntryLabel(slug) {
+  return (typeof itemName === "function") ? itemName(slug) : ((GAMEDATA.items[slug] && GAMEDATA.items[slug].n) || slug);
+}
+
+function forgeHasImbuementOnEquippedSlug(p, slug) {
+  if (!p || !p.equip || !p.imbuements) return false;
+  for (var i = 0; i < SLOTS.length; i++) {
+    var slot = SLOTS[i];
+    var eq = p.equip[slot];
+    if (!eq || eq.item !== slug) continue;
+    var key = "equip:" + slot;
+    if (p.imbuements[key] && p.imbuements[key].length) return true;
+  }
+  return false;
+}
+
+function forgeItemSummary(p, slug) {
+  ensureForge(p);
+  var it = GAMEDATA.items[slug];
+  if (!it || !forgeIsEligibleItem(slug)) return null;
+  return {
+    slug: slug,
+    item: slug,
+    name: forgeEntryLabel(slug),
+    cls: it.cls || 0,
+    slot: it.s,
+    maxTier: forgeMaxTierForSlug(slug),
+    tier: forgeItemTier(p, slug),
+    bagCount: forgeBagCount(p, slug),
+    depotCount: forgeDepotCount(p, slug),
+    exaltationCount: forgeExaCount(p, slug),
+    hasImbue: forgeHasImbuementOnEquippedSlug(p, slug),
+  };
+}
+
 function forgeCanUpgrade(p, slug) {
-  const it = GAMEDATA.items[slug];
-  if (!it) return { ok: false, msg: "Item desconhecido." };
-  const cls = it.cls || 0;
-  if (cls < 1) return { ok: false, msg: "Este item nao tem classificacao para forja." };
-  const maxTier = FORGE_MAX_TIER[cls] || 3;
-  ensureForge(p);
-  const current = p.forge[slug] || 0;
-  if (current >= maxTier) return { ok: false, msg: "Tier maximo (T" + maxTier + ") atingido." };
-  const next = current + 1;
-  const cost = FORGE_COSTS[next];
-  if (!cost) return { ok: false, msg: "Custo nao definido para tier " + next + "." };
-
-  // Verifica gold
-  if (p.gold < cost.gold) return { ok: false, msg: "Faltam " + fmtFull(cost.gold - p.gold) + " gp." };
-
-  // Verifica dusts
-  for (const d of cost.dust) {
-    const have = p.dusts[d.type] || 0;
-    if (have < d.qty) return { ok: false, msg: "Faltam " + (d.qty - have) + " " + FORGE_DUSTS[d.type].name + "." };
-  }
-
-  // Verifica exalted cores
-  if (cost.cores > p.exaltedCores) return { ok: false, msg: "Faltam " + (cost.cores - p.exaltedCores) + " Exalted Cores." };
-
-  return { ok: true, current: current, next: next, cost: cost };
+  /* Compat legado: hoje o "upgrade" é a FUSION. */
+  return forgeCanFuse(p, slug, false);
 }
 
-/* Tenta forjar. Retorna resultado. O item equipado e desequipado,
- * forjado e o resultado vai para a Exaltation Box. */
-function forgeAttempt(p, slug) {
-  const check = forgeCanUpgrade(p, slug);
-  if (!check.ok) return check;
-
-  const cost = check.cost;
-  const next = check.next;
-
-  // Consome recursos
-  p.gold -= cost.gold;
-  for (const d of cost.dust) p.dusts[d.type] -= d.qty;
-  p.exaltedCores -= cost.cores;
-
-  // Roll
-  const roll = Math.random() * 100;
-  const success = roll < cost.pct;
-
+function forgeCanFuse(p, slug, useCore) {
   ensureForge(p);
-  let resultItem = slug;
-  let resultTier = next;
-  let resultMsg = "";
+  var info = forgeItemSummary(p, slug);
+  if (!info) return { ok: false, msg: "Item não pode ser usado na Exaltation Forge." };
+  if (info.hasImbue) return { ok: false, msg: "Remova os imbuements do item equipado antes de forjar." };
+  if (info.bagCount < 2) return { ok: false, msg: "A fusão precisa de 2 itens iguais na mochila." };
+  if (info.bagCount > 2) return { ok: false, msg: "Refactor de item instanciado ainda pendente: deixe exatamente 2 cópias na mochila para fundir este item." };
+  if (info.tier >= info.maxTier) return { ok: false, msg: "Tier máximo (T" + info.maxTier + ") atingido." };
 
-  if (success) {
-    // Sucesso: tier sobe
-    resultMsg = "Forja bem-sucedida! " + itemName(slug) + " agora e T" + next + ".";
-    p.forge[slug] = next;
-  } else if (cost.break) {
-    // Item quebrado: destruido
-    resultMsg = "A forja FALHOU e o item foi DESTRUIDO!";
-    resultItem = null;
-    resultTier = 0;
-    delete p.forge[slug];
-  } else if (cost.downgrade && check.current > 0) {
-    // Downgrade: perde 1 tier
-    resultMsg = "A forja FALHOU! " + itemName(slug) + " perdeu 1 tier (agora T" + check.current + ").";
-    p.forge[slug] = Math.max(0, check.current - 1);
-    if (p.forge[slug] <= 0) delete p.forge[slug];
-  } else {
-    // Falha sem downgrade
-    resultMsg = "A forja FALHOU! Os materiais foram consumidos mas o item permanece T" + check.current + ".";
-  }
-
-  // Remove dos equipamentos (se equipado)
-  for (const slot of SLOTS) {
-    if (p.equip[slot] && p.equip[slot].item === slug) {
-      delete p.equip[slot];
-      break;
-    }
-  }
-
-  // Coloca na Exaltation Box
-  if (resultItem) {
-    if (!p.exaltationBox) p.exaltationBox = [];
-    // Remove do depot se estava la
-    const di = p.depot.indexOf(resultItem);
-    if (di >= 0) p.depot.splice(di, 1);
-    // Remove da bag se estava la
-    if (p.bag && p.bag[resultItem]) { delete p.bag[resultItem]; }
-    // Adiciona na exaltation box
-    p.exaltationBox.push(resultItem);
-  }
-
-  // Notificacao
-  p.depotNotification = (p.depotNotification || 0) + 1;
+  var gold = forgeFusionGoldCost(slug, info.tier);
+  if (!gold) return { ok: false, msg: "Custo de fusão não definido para este tier/classificação." };
+  if (p.gold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - p.gold) + " gp." };
+  if ((p.dust || 0) < FORGE_FUSION.dustCost) return { ok: false, msg: "Faltam " + (FORGE_FUSION.dustCost - (p.dust || 0)) + " Dust." };
+  if (useCore && (p.exaltedCores || 0) < 1) return { ok: false, msg: "Falta 1 Exalted Core." };
 
   return {
     ok: true,
-    success: success,
-    tier: success ? next : check.current,
-    msg: resultMsg + " (" + cost.pct + "% de chance, roll: " + Math.round(roll) + ")",
-    cost: cost.gold,
-    broken: !resultItem,
-    downgraded: !success && cost.downgrade && check.current > 0 && !cost.break,
+    info: info,
+    current: info.tier,
+    next: info.tier + 1,
+    gold: gold,
+    dust: FORGE_FUSION.dustCost,
+    useCore: !!useCore,
+    successPct: useCore ? FORGE_FUSION.successPctCore : FORGE_FUSION.successPct,
   };
+}
+
+function forgeFuse(p, slug, useCore) {
+  var chk = forgeCanFuse(p, slug, useCore);
+  if (!chk.ok) return chk;
+
+  p.gold -= chk.gold;
+  p.dust -= chk.dust;
+  if (chk.useCore) p.exaltedCores -= 1;
+
+  /* Consome o item sacrificado. O outro continua na mochila e recebe o resultado. */
+  removeItem(p, slug, 1);
+
+  var roll = Math.random() * 100;
+  var success = roll < chk.successPct;
+  if (success) {
+    forgeSetItemTier(p, slug, chk.next);
+    return {
+      ok: true,
+      success: true,
+      tier: chk.next,
+      msg: "Fusão bem-sucedida! " + forgeEntryLabel(slug) + " agora é T" + chk.next + ". (" + chk.successPct + "% / roll " + Math.round(roll) + ")",
+    };
+  }
+
+  /* Falha oficial:
+   * - em T0, um item quebra; com core a perda cai para 50%;
+   * - em T1+, o item restante pode perder 1 tier; com core a perda cai para 50%.
+   */
+  if (chk.current <= 0) {
+    var saved = chk.useCore && Math.random() < (FORGE_FUSION.failPenaltyProtectPct / 100);
+    if (saved) addItem(p, slug, 1);
+    return {
+      ok: true,
+      success: false,
+      tier: 0,
+      msg: saved
+        ? "A fusão falhou, mas o Exalted Core protegeu a perda do segundo item."
+        : "A fusão falhou e o item sacrificado foi perdido.",
+    };
+  }
+
+  var protectedTier = chk.useCore && Math.random() < (FORGE_FUSION.failPenaltyProtectPct / 100);
+  if (!protectedTier) forgeSetItemTier(p, slug, chk.current - 1);
+  return {
+    ok: true,
+    success: false,
+    tier: protectedTier ? chk.current : Math.max(0, chk.current - 1),
+    msg: protectedTier
+      ? "A fusão falhou, mas o Exalted Core evitou a perda de tier."
+      : (forgeEntryLabel(slug) + " perdeu 1 tier e agora está em T" + Math.max(0, chk.current - 1) + "."),
+  };
+}
+
+function forgeAttempt(p, slug) {
+  /* Compat legado para chamadas antigas da UI. */
+  return forgeFuse(p, slug, false);
+}
+
+function forgeTransferTargets(p, donorSlug) {
+  ensureForge(p);
+  var donor = forgeItemSummary(p, donorSlug);
+  if (!donor || donor.tier < 2) return [];
+  var out = [];
+  var bag = forgeBagItems(p);
+  for (var i = 0; i < bag.length; i++) {
+    var e = bag[i];
+    if (e.slug === donorSlug) continue;
+    if (e.cls !== donor.cls) continue;
+    if (e.currentTier > 0) continue;
+    if (e.count !== 1) continue;
+    out.push(e);
+  }
+  return out;
+}
+
+function forgeCanTransfer(p, donorSlug, targetSlug) {
+  ensureForge(p);
+  var donor = forgeItemSummary(p, donorSlug);
+  var target = forgeItemSummary(p, targetSlug);
+  if (!donor || !target) return { ok: false, msg: "Selecione um item doador e um alvo válidos." };
+  if (donor.hasImbue || target.hasImbue) return { ok: false, msg: "Itens equipados com imbuement não podem participar da transferência." };
+  if (donor.slug === target.slug) return { ok: false, msg: "A transferência precisa de dois itens diferentes." };
+  if (donor.cls !== target.cls) return { ok: false, msg: "Os itens precisam ter a mesma classificação." };
+  if (donor.tier < 2) return { ok: false, msg: "O item doador precisa ser no mínimo T2." };
+  if (target.tier > 0) return { ok: false, msg: "O item alvo precisa estar sem tier." };
+  if (donor.bagCount !== 1) return { ok: false, msg: "Deixe exatamente 1 cópia do item doador na mochila." };
+  if (target.bagCount !== 1) return { ok: false, msg: "Deixe exatamente 1 cópia do item alvo na mochila." };
+
+  var gold = forgeTransferGoldCost(donorSlug, donor.tier);
+  if (!gold) return { ok: false, msg: "Custo de transferência não definido para este item." };
+  if (p.gold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - p.gold) + " gp." };
+  if ((p.dust || 0) < FORGE_TRANSFER.dustCost) return { ok: false, msg: "Faltam " + (FORGE_TRANSFER.dustCost - (p.dust || 0)) + " Dust." };
+  if ((p.exaltedCores || 0) < FORGE_TRANSFER.coreCost) return { ok: false, msg: "Falta 1 Exalted Core." };
+
+  return {
+    ok: true,
+    donor: donor,
+    target: target,
+    resultTier: donor.tier - 1,
+    gold: gold,
+    dust: FORGE_TRANSFER.dustCost,
+    cores: FORGE_TRANSFER.coreCost,
+  };
+}
+
+function forgeTransfer(p, donorSlug, targetSlug) {
+  var chk = forgeCanTransfer(p, donorSlug, targetSlug);
+  if (!chk.ok) return chk;
+
+  p.gold -= chk.gold;
+  p.dust -= chk.dust;
+  p.exaltedCores -= chk.cores;
+  removeItem(p, donorSlug, 1);
+  forgeSetItemTier(p, donorSlug, 0);
+  forgeSetItemTier(p, targetSlug, chk.resultTier);
+
+  return {
+    ok: true,
+    tier: chk.resultTier,
+    msg: "Transferência concluída! " + forgeEntryLabel(targetSlug) + " recebeu T" + chk.resultTier + ".",
+  };
+}
+
+function forgeConvergenceDustToSlivers(p) {
+  ensureForge(p);
+  if ((p.dust || 0) < FORGE_CONVERGENCE.dustToSlivers.dust) {
+    return { ok: false, msg: "Precisa de " + FORGE_CONVERGENCE.dustToSlivers.dust + " Dust." };
+  }
+  p.dust -= FORGE_CONVERGENCE.dustToSlivers.dust;
+  p.slivers += FORGE_CONVERGENCE.dustToSlivers.slivers;
+  return { ok: true, msg: "+" + FORGE_CONVERGENCE.dustToSlivers.slivers + " Slivers criados." };
+}
+
+function forgeConvergenceSliversToCore(p) {
+  ensureForge(p);
+  if ((p.slivers || 0) < FORGE_CONVERGENCE.sliversToCore.slivers) {
+    return { ok: false, msg: "Precisa de " + FORGE_CONVERGENCE.sliversToCore.slivers + " Slivers." };
+  }
+  p.slivers -= FORGE_CONVERGENCE.sliversToCore.slivers;
+  p.exaltedCores += FORGE_CONVERGENCE.sliversToCore.cores;
+  return { ok: true, msg: "+1 Exalted Core criado." };
+}
+
+/* Compat com o sistema antigo. */
+function dustFuse(p) {
+  return forgeConvergenceDustToSlivers(p);
+}
+
+function dustToCore(p) {
+  return forgeConvergenceSliversToCore(p);
 }
 
 /* ---------- Depot ---------- */
 
-/* Move um item equipado para o depot (max 30 slots) */
 function depotStore(p, slug) {
   ensureForge(p);
   if (p.depot.length >= 30) return { ok: false, msg: "Depot cheio (30 slots)." };
 
-  // Remove dos equipamentos
-  for (const slot of SLOTS) {
+  if (forgeBagCount(p, slug) > 0) {
+    removeItem(p, slug, 1);
+    p.depot.push(slug);
+    return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };
+  }
+
+  for (var i = 0; i < SLOTS.length; i++) {
+    var slot = SLOTS[i];
     if (p.equip[slot] && p.equip[slot].item === slug) {
       delete p.equip[slot];
-      break;
+      p.depot.push(slug);
+      return { ok: true, msg: forgeEntryLabel(slug) + " guardado no Depot." };
     }
   }
-  // Remove da bag
-  if (p.bag && p.bag[slug]) { delete p.bag[slug]; }
 
-  p.depot.push(slug);
-  return { ok: true, msg: itemName(slug) + " guardado no Depot." };
+  return { ok: false, msg: "Item não encontrado na mochila nem equipado." };
 }
 
-/* Retira um item do depot para a mochila */
 function depotRetrieve(p, slug) {
   ensureForge(p);
-  const idx = p.depot.indexOf(slug);
-  if (idx < 0) return { ok: false, msg: "Item nao esta no depot." };
+  var idx = p.depot.indexOf(slug);
+  if (idx < 0) return { ok: false, msg: "Item não está no depot." };
   if (!addItem(p, slug, 1)) return { ok: false, msg: "Mochila cheia." };
   p.depot.splice(idx, 1);
-  return { ok: true, msg: itemName(slug) + " retirado do Depot." };
+  return { ok: true, msg: forgeEntryLabel(slug) + " retirado do Depot." };
 }
 
-/* Retira da Exaltation Box */
-function exaltationRetrieve(p, slug) {
-  ensureForge(p);
-  const idx = (p.exaltationBox || []).indexOf(slug);
-  if (idx < 0) return { ok: false, msg: "Item nao esta na Exaltation Box." };
-  if (!addItem(p, slug, 1)) return { ok: false, msg: "Mochila cheia." };
-  p.exaltationBox.splice(idx, 1);
-  return { ok: true, msg: itemName(slug) + " retirado da Exaltation Box." };
-}
-
-/* Equipa direto do depot */
 function depotEquip(p, slug) {
   ensureForge(p);
-  const it = GAMEDATA.items[slug];
-  if (!it || !it.s) return { ok: false, msg: "Item nao pode ser equipado." };
+  var it = GAMEDATA.items[slug];
+  if (!it || !it.s) return { ok: false, msg: "Item não pode ser equipado." };
   if (typeof canEquipItem === "function") {
-    const chk = canEquipItem(p, slug, it.s);
+    var chk = canEquipItem(p, slug, it.s);
     if (!chk.ok) return { ok: false, msg: chk.msg };
   }
-  // Remove do depot
-  const idx = p.depot.indexOf(slug);
-  if (idx < 0) return { ok: false, msg: "Item nao esta no depot." };
+
+  var idx = p.depot.indexOf(slug);
+  if (idx < 0) return { ok: false, msg: "Item não está no depot." };
   p.depot.splice(idx, 1);
-  // Guarda o que estava no slot
-  const old = p.equip[it.s];
-  if (old) p.depot.push(old.item);
+
+  var old = p.equip[it.s];
+  if (old) {
+    if (p.depot.length >= 30) {
+      p.depot.splice(idx, 0, slug);
+      return { ok: false, msg: "Depot cheio para guardar o item antigo." };
+    }
+    p.depot.push(old.item);
+  }
+
   p.equip[it.s] = { item: slug, count: 1 };
   if (it.th && p.equip.shield) {
+    if (p.depot.length >= 30) {
+      delete p.equip[it.s];
+      p.equip[it.s] = old;
+      p.depot.splice(p.depot.indexOf(old.item), 1);
+      p.depot.splice(idx, 0, slug);
+      return { ok: false, msg: "Depot cheio para guardar o escudo removido." };
+    }
     p.depot.push(p.equip.shield.item);
     delete p.equip.shield;
   }
-  return { ok: true, msg: itemName(slug) + " equipado." };
+
+  return { ok: true, msg: forgeEntryLabel(slug) + " equipado." };
 }
 
-/* Equipa direto da Exaltation Box */
+/* ---------- Exaltation Box legada ---------- */
+
+function exaltationRetrieve(p, slug) {
+  ensureForge(p);
+  var idx = -1;
+  for (var i = 0; i < p.exaltationBox.length; i++) {
+    if (forgeStoredSlug(p.exaltationBox[i]) === slug) { idx = i; break; }
+  }
+  if (idx < 0) return { ok: false, msg: "Item não está na Exaltation Box legada." };
+  if (!addItem(p, slug, 1)) return { ok: false, msg: "Mochila cheia." };
+  p.exaltationBox.splice(idx, 1);
+  return { ok: true, msg: forgeEntryLabel(slug) + " retirado da Exaltation Box legada." };
+}
+
 function exaltationEquip(p, slug) {
   ensureForge(p);
-  const it = GAMEDATA.items[slug];
-  if (!it || !it.s) return { ok: false, msg: "Item nao pode ser equipado." };
+  var it = GAMEDATA.items[slug];
+  if (!it || !it.s) return { ok: false, msg: "Item não pode ser equipado." };
   if (typeof canEquipItem === "function") {
-    const chk = canEquipItem(p, slug, it.s);
+    var chk = canEquipItem(p, slug, it.s);
     if (!chk.ok) return { ok: false, msg: chk.msg };
   }
-  const idx = (p.exaltationBox || []).indexOf(slug);
-  if (idx < 0) return { ok: false, msg: "Item nao esta na Exaltation Box." };
+  var idx = -1;
+  for (var i = 0; i < p.exaltationBox.length; i++) {
+    if (forgeStoredSlug(p.exaltationBox[i]) === slug) { idx = i; break; }
+  }
+  if (idx < 0) return { ok: false, msg: "Item não está na Exaltation Box legada." };
   p.exaltationBox.splice(idx, 1);
-  const old = p.equip[it.s];
-  if (old) p.exaltationBox.push(old.item);
+  var old = p.equip[it.s];
+  if (old) {
+    if (!addItem(p, old.item, 1)) {
+      p.exaltationBox.splice(idx, 0, slug);
+      return { ok: false, msg: "Mochila cheia para receber o item antigo." };
+    }
+  }
   p.equip[it.s] = { item: slug, count: 1 };
   if (it.th && p.equip.shield) {
-    p.exaltationBox.push(p.equip.shield.item);
+    if (!addItem(p, p.equip.shield.item, 1)) {
+      p.equip[it.s] = old || undefined;
+      p.exaltationBox.splice(idx, 0, slug);
+      return { ok: false, msg: "Mochila cheia para receber o escudo antigo." };
+    }
     delete p.equip.shield;
   }
-  // Limpa notificacao ao interagir
-  p.depotNotification = 0;
-  return { ok: true, msg: itemName(slug) + " equipado da Exaltation Box." };
+  return { ok: true, msg: forgeEntryLabel(slug) + " equipado da Exaltation Box legada." };
 }
 
-/* ---------- Dust Fusion ---------- */
+/* ---------- Efeitos oficiais ---------- */
 
-/* Fusiona N dusts inferiores em 1 superior */
-function dustFuse(p, fromSlug) {
+function forgeProcChanceForEquipped(p, slot) {
   ensureForge(p);
-  const rule = FORGE_FUSION[fromSlug];
-  if (!rule) return { ok: false, msg: "Fusao nao disponivel para " + fromSlug + "." };
-  const have = p.dusts[fromSlug] || 0;
-  if (have < rule.need) return { ok: false, msg: "Precisa de " + rule.need + " " + FORGE_DUSTS[fromSlug].name + " (tem " + have + ")." };
-  p.dusts[fromSlug] -= rule.need;
-  p.dusts[rule.to] = (p.dusts[rule.to] || 0) + 1;
-  return { ok: true, msg: "1 " + FORGE_DUSTS[rule.to].name + " criado de " + rule.need + " " + FORGE_DUSTS[fromSlug].name + "." };
+  var eq = p.equip && p.equip[slot];
+  if (!eq) return 0;
+  var tier = forgeItemTier(p, eq.item);
+  if (!tier) return 0;
+  var ef = FORGE_EFFECTS[slot];
+  return ef ? ef.procChance(tier) : 0;
 }
 
-/* Converte Exalted Dust em Exalted Core */
-function dustToCore(p) {
-  ensureForge(p);
-  const need = EXALTED_CORE.costDust;
-  const have = p.dusts["dust-exalted"] || 0;
-  if (have < need) return { ok: false, msg: "Precisa de " + need + " Exalted Dust (tem " + have + ")." };
-  p.dusts["dust-exalted"] -= need;
-  p.exaltedCores = (p.exaltedCores || 0) + 1;
-  return { ok: true, msg: "1 Exalted Core criado de " + need + " Exalted Dust." };
+function forgeTryRuse(p) {
+  var chance = forgeProcChanceForEquipped(p, "armor");
+  if (!chance) return null;
+  if (Math.random() * 100 >= chance) return null;
+  return { ok: true, chance: chance };
 }
 
-/* ---------- Avatar (Transcendence) ---------- */
-
-/* Estado do avatar por personagem */
-function ensureAvatar(p) {
-  p._avatar = p._avatar || { active: false, started: 0, duration: 15000, cooldown: 180000, lastUsed: 0 };
+function forgeTryOnslaught(p) {
+  var chance = forgeProcChanceForEquipped(p, "weapon");
+  if (!chance) return null;
+  if (Math.random() * 100 >= chance) return null;
+  return { ok: true, chance: chance, multiplier: 1.6 };
 }
 
-/* Tenta ativar o avatar. So pode se weapon estiver forjada. */
-function avatarActivate(p) {
-  ensureAvatar(p);
-  const av = p._avatar;
-  const now = Date.now();
-  // Cooldown
-  if (now - av.lastUsed < av.cooldown) {
-    const rem = Math.ceil((av.cooldown - (now - av.lastUsed)) / 1000);
-    return { ok: false, msg: "Avatar em recarga: " + rem + "s restantes." };
+function forgeReduceAllCooldowns(p, amountMs, now) {
+  now = now || Date.now();
+  if (typeof cdInit === "function") cdInit(p);
+  if (p.cd) {
+    for (var id in p.cd) {
+      if (!p.cd[id] || !p.cd[id].ate) continue;
+      p.cd[id].ate = Math.max(now, p.cd[id].ate - amountMs);
+    }
   }
-  // Precisa ter weapon forjada
-  const w = p.equip.weapon;
-  if (!w) return { ok: false, msg: "Equipe uma arma forjada para usar o Avatar." };
-  const tier = (p.forge && p.forge[w.item]) || 0;
-  if (tier <= 0) return { ok: false, msg: "A arma precisa estar forjada (Transcendence)." };
-  // Ativa
-  av.active = true;
-  av.started = now;
-  av.lastUsed = now;
-  // Buff: +tier*3% dano, +tier*5% velocidade
-  const ef = FORGE_EFFECTS.weapon;
-  const dmgBonus = ef.perTier(tier);
-  const spdBonus = ef.perTier2(tier);
-  av.dmgBonus = dmgBonus;
-  av.spdBonus = spdBonus;
-  return { ok: true, dmg: dmgBonus, spd: spdBonus, msg: "AVATAR ATIVADO! +" + dmgBonus + "% dano, +" + spdBonus + "% vel por 15s!" };
-}
-
-/* Tick do avatar: desativa quando expira */
-function avatarTick(p, dt) {
-  ensureAvatar(p);
-  const av = p._avatar;
-  if (!av.active) return;
-  if (Date.now() - av.started >= av.duration) {
-    av.active = false;
-    if (typeof addLog === "function") addLog("info", "<b style='color:#d4af37'>Avatar expirou.</b>");
+  if (p.gcd) {
+    for (var g in p.gcd) {
+      if (!p.gcd[g] || !p.gcd[g].ate) continue;
+      p.gcd[g].ate = Math.max(now, p.gcd[g].ate - amountMs);
+    }
   }
 }
 
-/* Bonus de dano do avatar (chamado pelo combate) */
-function avatarDmgBonus(p) {
-  ensureAvatar(p);
-  return p._avatar.active ? (p._avatar.dmgBonus || 0) : 0;
+function forgeTryMomentum(p, now) {
+  ensureForge(p);
+  now = now || Date.now();
+  var chance = forgeProcChanceForEquipped(p, "helmet");
+  if (!chance) return null;
+  var meta = p._forgeMeta || (p._forgeMeta = { lastMomentumRollAt: 0 });
+  if (now - (meta.lastMomentumRollAt || 0) < 2000) return null;
+  meta.lastMomentumRollAt = now;
+  if (Math.random() * 100 >= chance) return null;
+  forgeReduceAllCooldowns(p, 2000, now);
+  return { ok: true, chance: chance, reduced: 2000 };
 }
 
-/* Bonus de velocidade do avatar */
-function avatarSpdBonus(p) {
-  ensureAvatar(p);
-  return p._avatar.active ? (p._avatar.spdBonus || 0) : 0;
-}
-
-/* Avatar ativo? */
-function avatarActive(p) {
-  ensureAvatar(p);
-  return p._avatar.active;
-}
-
-/* ---------- Forge Totals (efeitos agregados dos itens equipados) ---------- */
 function forgeTotals(p) {
   ensureForge(p);
-  const t = {
-    onslaught: 0,   // +% crit extra damage
-    dodge: 0,       // % dodge chance
-    momentum: 0,    // % cooldown reduction
-    amplification: 0, // % heal amp
-    avatarWeapon: false,
-    avatarTier: 0,
+  return {
+    ruse: forgeProcChanceForEquipped(p, "armor"),
+    momentum: forgeProcChanceForEquipped(p, "helmet"),
+    onslaught: forgeProcChanceForEquipped(p, "weapon"),
   };
-  for (const slot of FORGE_SLOTS) {
-    const e = p.equip[slot];
-    if (!e) continue;
-    const tier = p.forge[e.item] || 0;
-    if (!tier) continue;
-    const ef = FORGE_EFFECTS[slot];
-    if (!ef) continue;
-    if (slot === "helmet") t.onslaught += ef.perTier(tier);
-    else if (slot === "armor") t.dodge += ef.perTier(tier);
-    else if (slot === "legs") t.momentum += ef.perTier(tier);
-    else if (slot === "weapon") { t.avatarWeapon = true; t.avatarTier = tier; }
-    else if (slot === "boots") t.amplification += ef.perTier(tier);
-  }
-  return t;
 }
 
-/* ---------- Tier display helper ---------- */
-
-/* Texto do tier para exibicao: "T3" ou "" */
 function forgeTierText(slug) {
   if (!G.p || !G.p.forge) return "";
-  const tier = G.p.forge[slug] || 0;
-  return tier > 0 ? "T" + tier : "";
+  var tier = G.p.forge[slug] || 0;
+  return tier > 0 ? ("T" + tier) : "";
 }
 
-/* Classe CSS do tier para borda */
 function forgeTierClass(slug) {
   if (!G.p || !G.p.forge) return "";
-  const tier = G.p.forge[slug] || 0;
+  var tier = G.p.forge[slug] || 0;
   if (tier >= 9) return "tier-legendary";
   if (tier >= 7) return "tier-epic";
   if (tier >= 5) return "tier-rare";
   if (tier >= 1) return "tier-forged";
   return "";
 }
+
+/* ---------- Avatar legado (mantido como no-op/compat) ---------- */
+function ensureAvatar(p) { return p; }
+function avatarActivate() { return { ok: false, msg: "Avatar/Transcendence foi removido da Forge oficial." }; }
+function avatarTick() {}
+function avatarDmgBonus() { return 0; }
+function avatarSpdBonus() { return 0; }
+function avatarActive() { return false; }

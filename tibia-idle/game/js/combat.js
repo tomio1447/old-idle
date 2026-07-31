@@ -969,6 +969,13 @@ function playerAttack(c, p, target) {
     }
   }
 
+  // Exaltation Forge oficial: Onslaught (arma) = +60% de dano quando ativa.
+  const forgeOnslaught = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  if (forgeOnslaught) {
+    raw = Math.max(1, Math.floor(raw * forgeOnslaught.multiplier));
+    critou = true;
+  }
+
   // Imbuement de dano elemental (Scorch/Venom/Frost/Electrify/Reap):
   // converte X% do golpe FISICO no elemento escolhido. Vale para melee e
   // distance (como o secondary damage das armas — mesma mecanica), nao
@@ -1240,6 +1247,10 @@ function castSpellById(c, p, target, now, id) {
   addManaSpent(p, combatManaSkillGain(c, s.mana));
   cdStart(p, id, s, now);
   c.spellCd[id] = now + s.cd;   // mantido: testes antigos leem esse mapa
+  if (typeof forgeTryMomentum === "function") {
+    const momentum = forgeTryMomentum(p, now);
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+  }
 
   // Alvos e elemento.
   //
@@ -1368,6 +1379,7 @@ function castSpellById(c, p, target, now, id) {
   // naga sword, fire sword...). Resolvido uma vez fora do laco.
   const armaElemento = (typeof spellWeaponElement === "function")
     ? spellWeaponElement(p) : null;
+  const forgeOnslaughtSpell = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
 
   targets.forEach((t, idx) => {
     let dmg;
@@ -1408,6 +1420,10 @@ function castSpellById(c, p, target, now, id) {
     }
     // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
+    if (forgeOnslaughtSpell) {
+      dmg = Math.max(1, Math.floor(dmg * forgeOnslaughtSpell.multiplier));
+      critSt = true;
+    }
     dmg = applyCharmDamage(p, elemento, dmg);
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
@@ -1673,6 +1689,10 @@ function tryHeal(c, p, now) {
         if (stH.healSelf) amount = Math.max(1, Math.floor(amount * (1 + stH.healSelf)));
       }
       cdStart(p, idCura, s, now);
+      if (typeof forgeTryMomentum === "function") {
+        const momentum = forgeTryMomentum(p, now);
+        if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+      }
       p.mp -= s.mana;
       addManaSpent(p, combatManaSkillGain(c, s.mana));
       p.hp = Math.min(max.hp, p.hp + amount);
@@ -1721,6 +1741,10 @@ function tryHeal(c, p, now) {
       // entao usa o cooldown de runa e mantem o healCd antigo
       if (s.kind === "rune") c.healCd = now + 1000;
       else c.potionCd = now + 1000;
+      if (typeof forgeTryMomentum === "function") {
+        const momentum = forgeTryMomentum(p, now);
+        if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+      }
       c.events.push({ t: "heal", amount: amount, rune: s.name,
                       mana: manaAmount, supply: best, drunk: s.kind !== "rune" });
       // o famoso "Aahhh..." do Tibia: beber potion NAO fala o nome do item;
@@ -1769,6 +1793,10 @@ function tryHaste(c, p, now) {
   p.mp -= sp.mana;
   addManaSpent(p, combatManaSkillGain(c, sp.mana));
   cdStart(p, melhor, sp, now);
+  if (typeof forgeTryMomentum === "function") {
+    const momentum = forgeTryMomentum(p, now);
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+  }
   if (!p.buffs) p.buffs = {};
   p.buffs[melhor] = now + (HASTEDATA[melhor].dur || 30000);
   c.hasteCd = now + 2000;
@@ -1791,6 +1819,10 @@ function tryBuff(c, p, now) {
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
   cdStart(p, chave, s, now);
+  if (typeof forgeTryMomentum === "function") {
+    const momentum = forgeTryMomentum(p, now);
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+  }
   applyBuff(p, chave, now);
   c.buffCd = now + Math.max(1000, s.cd || 2000);
   c.events.push({ t: "say", text: spellWords(chave, s) });
@@ -1817,6 +1849,10 @@ function tryCureCondition(c, p, now) {
     p.mp -= s.mana;
     addManaSpent(p, combatManaSkillGain(c, s.mana));
     cdStart(p, def.cure, s, now);
+    if (typeof forgeTryMomentum === "function") {
+      const momentum = forgeTryMomentum(p, now);
+      if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    }
     clearCondition(p, tipo);
     c.cureCd = now + 1000;
     c.events.push({ t: "say", text: spellWords(def.cure, s) });
@@ -1897,6 +1933,10 @@ function tryMana(c, p, now) {
       p.hp = Math.min(max.hp, p.hp + healAmount);
     }
     c.potionCd = now + 1000;   // cooldown compartilhado das potions (1s)
+    if (typeof forgeTryMomentum === "function") {
+      const momentum = forgeTryMomentum(p, now);
+      if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
+    }
     c.events.push({ t: "mana", amount: amount, supply: slug,
                     heal: healAmount, drunk: 1 });
     // o gole do Tibia: "Aahhh..." — nunca o nome da potion
@@ -2188,6 +2228,14 @@ function mobAttack(c, p, mob) {
   if (chm && chm.esquiva && Math.random() * 100 < chm.esquiva) {
     c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
     return 0;
+  }
+  // Exaltation Forge oficial: Ruse (armor)
+  if (typeof forgeTryRuse === "function") {
+    const ruse = forgeTryRuse(p);
+    if (ruse) {
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, ruse: true });
+      return 0;
+    }
   }
   // Divine Defiance (stance do Paladin, 15.25): 12% de esquiva contra
   // inimigos NAO adjacentes. Golpe corpo-a-corpo ignora a esquiva.
