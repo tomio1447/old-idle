@@ -64,12 +64,51 @@ const HUNTMAPS = {
       [428, 4, 6],                            // escada da entrada (ao lado do S)
     ],
   },
+
+  /* Amazon Camp (Amazon + Valkyrie) — acampamento florestal fechado com
+   * árvores ao redor, paliçadas de madeira e tendas no centro.
+   * S = spawn do jogador, G = zona das amazons/valkyries. */
+  "amazon-camp": {
+    nome: "Amazon Camp",
+    rows: [
+      "#####################",
+      "#...................#",
+      "#.T..T...+++...T..T.#",
+      "#........+^+........#",
+      "#........+++........#",
+      "#...T...........T...#",
+      "#..S..T......G..T...#",
+      "#...T.....*.....T...#",
+      "#........+++........#",
+      "#........+^+........#",
+      "#.T..T...+++...T..T.#",
+      "#...................#",
+      "#####################",
+    ],
+    leg: {
+      ".": { v: [293, 106] },
+      "S": { v: [293] },
+      "G": { v: [293] },
+      "#": { v: [7761, 2704], bloc: true },
+      "T": { v: [2704], bloc: true },
+      "+": { v: [4487, 4465], bloc: true },
+      "^": { v: [293], g: [171], bloc: true },
+      "*": { v: [293], g: [398], bloc: true },
+    },
+    deco: [
+      [9997, 8, 5],  [9997, 12, 5],           // caixas perto das tendas
+      [3674, 10, 8],                          // tocha do acampamento
+      [2921, 6, 6],  [2921, 14, 6],           // detalhes de capim
+    ],
+  },
 };
 
 /* Liga o mapa a hunt — patch de dados, sem tocar no gamedata.js gerado.
  * "rats" e a hunt "Esgoto de Rookgaard" (cena sewer). */
 if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts.rats)
   GAMEDATA.hunts.rats.mapa = "rook-sewer";
+if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts["amazon-camp"])
+  GAMEDATA.hunts["amazon-camp"].mapa = "amazon-camp";
 
 /* Consulta de colisao do mapa (usada pelo grid.js) */
 function huntMapBlocked(map, cx, cy) {

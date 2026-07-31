@@ -30,6 +30,7 @@ if (typeof GAMEDATA !== "undefined") {
   for (const slug of ["amazon", "valkyrie"]) {
     const m = GAMEDATA.monsters[slug];
     if (!m || !m.loot) continue;
+    m.jogavel = true;
     for (const l of m.loot) {
       if (l.item === "protective-charm") l.item = "mat-11444";
     }
@@ -41,4 +42,14 @@ if (typeof GAMEDATA !== "undefined") {
     avgHp: 150, avgExp: 73, avgDamage: 58, avgArmor: 11, avgGold: 3.1,
     respawn: 0.8, pack: 3, otbm: "amazon_camp",
   };
+
+  // Garante a ordenação crescente por nível para que o Amazon Camp (nv 20)
+  // apareça no lugar certo na lista de caçadas (entre nv 18 e nv 24).
+  const sortedHunts = {};
+  Object.keys(GAMEDATA.hunts)
+    .sort((a, b) => (GAMEDATA.hunts[a].level || 0) - (GAMEDATA.hunts[b].level || 0))
+    .forEach((k) => {
+      sortedHunts[k] = GAMEDATA.hunts[k];
+    });
+  GAMEDATA.hunts = sortedHunts;
 }

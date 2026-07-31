@@ -1,7 +1,9 @@
 """Empacota os JSONs em um unico arquivo JS para funcionar sem servidor (file://)."""
 import json
+import os
 
-DATA = "/home/user/tibia-idle/game/data"
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.normpath(os.path.join(HERE, "..", "game", "data"))
 items = json.load(open("%s/items.json" % DATA))
 monsters = json.load(open("%s/monsters.json" % DATA))
 hunts = json.load(open("%s/hunts.json" % DATA))
@@ -25,8 +27,7 @@ out = "window.GAMEDATA = %s;\n" % json.dumps(
     {"items": slim_items, "monsters": monsters, "hunts": hunts},
     separators=(",", ":"), ensure_ascii=False)
 
-path = "/home/user/tibia-idle/game/js/gamedata.js"
-import os
+path = os.path.normpath(os.path.join(HERE, "..", "game", "js", "gamedata.js"))
 os.makedirs(os.path.dirname(path), exist_ok=True)
 open(path, "w", encoding="utf-8").write(out)
 print("bytes:", len(out), "| itens", len(slim_items),

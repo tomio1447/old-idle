@@ -95,6 +95,23 @@
   "respawn": 0.8,
   "pack": 3
  },
+ "amazon-camp": {
+  "name": "Amazon Camp",
+  "level": 20,
+  "monsters": [
+   "amazon",
+   "valkyrie"
+  ],
+  "color": "#5a7a3a",
+  "scene": "forest",
+  "avgHp": 150,
+  "avgExp": 72,
+  "avgDamage": 58,
+  "avgArmor": 11,
+  "avgGold": 9.4,
+  "respawn": 0.8,
+  "pack": 3
+ },
  "skeletons": {
   "name": "Cripta Antiga",
   "level": 24,

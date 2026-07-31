@@ -1374,6 +1374,113 @@
   ],
   "attackSpeed": 2000
  },
+ "amazon": {
+  "name": "Amazon",
+  "hp": 110,
+  "exp": 60,
+  "damage": 45,
+  "armor": 10,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 20
+   },
+   {
+    "item": "dagger",
+    "chance": 80,
+    "max": 1
+   },
+   {
+    "item": "skull",
+    "chance": 80,
+    "max": 2
+   },
+   {
+    "item": "brown-bread",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "sabre",
+    "chance": 23,
+    "max": 1
+   },
+   {
+    "item": "torch",
+    "chance": 1,
+    "max": 1
+   },
+   {
+    "item": "crystal-necklace",
+    "chance": 0.26,
+    "max": 1
+   },
+   {
+    "item": "small-ruby",
+    "chance": 0.13,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
+ "valkyrie": {
+  "name": "Valkyrie",
+  "hp": 190,
+  "exp": 85,
+  "damage": 70,
+  "armor": 12,
+  "element": "physical",
+  "loot": [
+   {
+    "item": "spear",
+    "chance": 55,
+    "max": 3
+   },
+   {
+    "item": "gold-coin",
+    "chance": 80,
+    "max": 25
+   },
+   {
+    "item": "meat",
+    "chance": 30,
+    "max": 1
+   },
+   {
+    "item": "chain-armor",
+    "chance": 10,
+    "max": 1
+   },
+   {
+    "item": "protection-amulet",
+    "chance": 1.1,
+    "max": 1
+   },
+   {
+    "item": "plate-armor",
+    "chance": 0.83,
+    "max": 1
+   },
+   {
+    "item": "skull",
+    "chance": 0.76,
+    "max": 1
+   },
+   {
+    "item": "double-axe",
+    "chance": 0.43,
+    "max": 1
+   },
+   {
+    "item": "small-diamond",
+    "chance": 0.13,
+    "max": 1
+   }
+  ],
+  "attackSpeed": 2000
+ },
  "monk": {
   "name": "Monk",
   "hp": 240,

@@ -2,8 +2,9 @@
 import json
 import os
 
-DATA = "/home/user/tibia-idle/game/data"
-ASSETS = "/home/user/tibia-idle/game/assets"
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.normpath(os.path.join(HERE, "..", "game", "data"))
+ASSETS = os.path.normpath(os.path.join(HERE, "..", "game", "assets"))
 man = json.load(open("%s/manifest.json" % ASSETS))
 ITEMS = json.load(open("%s/items.json" % DATA))
 
@@ -61,6 +62,8 @@ M = [
     ("larva",        "Larva",           170,   130,    48,  12, "earth"),
     ("cobra",        "Cobra",           100,    75,    38,   8, "earth"),
     ("witch",        "Witch",           300,   340,    75,  15, "earth"),
+    ("amazon",       "Amazon",          110,    60,    45,  10, "physical"),
+    ("valkyrie",     "Valkyrie",        190,    85,    70,  12, "physical"),
     ("monk",         "Monk",            240,   200,    62,  20, "holy"),
     ("priestess",    "Priestess",       290,   350,    78,  14, "death"),
     ("bonelord",     "Bonelord",        260,   260,    68,  20, "energy"),
@@ -170,6 +173,18 @@ LOOT = {
                   ("elven-amulet", 4, 1), ("elven-brooch", 3, 1)],
     "elf-arcanist": [("gold-coin", 80, 60), ("elven-wand", 6, 1),
                      ("elven-amulet", 6, 1), ("blue-robe", 2, 1)],
+    "amazon": [("gold-coin", 80, 20), ("dagger", 80, 1), ("skull", 80, 2),
+               ("brown-bread", 30, 1), ("sabre", 23, 1),
+               ("girlish-hair-decoration", 10, 1), ("mat-11444", 5.2, 1),
+               ("torch", 1, 1), ("crystal-necklace", 0.26, 1),
+               ("small-ruby", 0.13, 1)],
+    "valkyrie": [("spear", 55, 3), ("gold-coin", 80, 25), ("meat", 30, 1),
+                 ("chain-armor", 10, 1), ("red-apple", 7.5, 2),
+                 ("girlish-hair-decoration", 5.9, 1), ("hunting-spear", 5.15, 1),
+                 ("mat-11444", 3.2, 1), ("protection-amulet", 1.1, 1),
+                 ("plate-armor", 0.83, 1), ("skull", 0.76, 1),
+                 ("health-potion", 0.5, 1), ("double-axe", 0.43, 1),
+                 ("small-diamond", 0.13, 1)],
     "mummy": [("gold-coin", 80, 60), ("bone", 30, 1), ("silver-brooch", 6, 1),
               ("strange-talisman", 5, 1), ("silver-necklace", 4, 1)],
     "demon-skeleton": [("gold-coin", 80, 70), ("bone", 30, 1),

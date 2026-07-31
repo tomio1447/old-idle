@@ -1,7 +1,9 @@
 """Gera game/data/hunts.json — areas de caca progressivas estilo Baiak Idle."""
 import json
+import os
 
-DATA = "/home/user/tibia-idle/game/data"
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.normpath(os.path.join(HERE, "..", "game", "data"))
 MON = json.load(open("%s/monsters.json" % DATA))
 
 # id, nome, level minimo, monstros, cor tematica, cenario
@@ -17,6 +19,8 @@ HUNTS = [
     ("orcs", "Fortaleza Orc", 18,
      ["orc", "orc-spearman", "orc-warrior", "orc-shaman", "war-wolf"],
      "#6b4a3a", "fortress"),
+    ("amazon-camp", "Amazon Camp", 20,
+     ["amazon", "valkyrie"], "#5a7a3a", "forest"),
     ("skeletons", "Cripta Antiga", 24,
      ["skeleton", "ghoul", "crypt-shambler", "gazer"], "#5a5a6b", "crypt"),
     ("minotaurs", "Labirinto Minotauro", 30,
