@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "11";
+const ASSET_VERSION = "12";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -223,6 +223,7 @@ const FX_FRAMES = {
   "death-echo": 9,              // fantasma roxo (Effect 332)
   "fist-thousand": 8,           // corte sombrio (Effect 321)
   "crit-text": 14,              // "CRIT!" (Effect 341)
+  "fatal-text": 4,              // "FATAL!" / Onslaught Effect
   "mana-wisp": 14,              // vivacidades de mana (Effect 337)
   "blue-electricity": 18,       // Blue Electricity Effect (diamond arrow)
 };
@@ -1094,9 +1095,30 @@ Renderer.prototype.draw = function (combat, player, dt) {
           ? displayMonsterName(m.def.name)
           : String(m.def.name || "").replace(/^Influenced\s+/i, "");
         drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
-        if (m.fiendish || m.influenced) {
-          const tag = m.fiendish ? "FIENDISH" : ("INFLUENCED " + (m.sinisterStacks || 1));
-          drawNameText(ctx, mx, by + 7, tag, m.fiendish ? "#d79cff" : "#66c7ff");
+        if (m.fiendish) {
+          drawNameText(ctx, mx, by + 7, "FIENDISH", "#d79cff");
+        } else if (m.influenced) {
+          // O client mostra a influência como o ícone de poeira + quantidade
+          // de stacks, sem escrever "INFLUENCED 3" em cima da criatura.
+          const stacks = String(m.sinisterStacks || 1);
+          const dust = Sprites.item("mystic-dust");
+          if (dust && dust.complete && dust.naturalWidth) {
+            const iw = 13, ih = 12;
+            const tx = mx - 9, ty = by + 1;
+            ctx.save();
+            ctx.drawImage(dust, tx - iw, ty - 5, iw, ih);
+            ctx.font = "10px monospace";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "#000";
+            ctx.fillStyle = "#66c7ff";
+            ctx.strokeText(stacks, tx + 1, ty + 1);
+            ctx.fillText(stacks, tx + 1, ty + 1);
+            ctx.restore();
+          } else {
+            drawNameText(ctx, mx, by + 7, "✦ " + stacks, "#66c7ff");
+          }
         }
         // fala da criatura (monster.voices do Canary), acima do nome
         drawCreatureSpeech(ctx, m, mx, by - 4, dt);

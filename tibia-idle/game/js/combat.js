@@ -957,6 +957,7 @@ function playerAttack(c, p, target) {
   // ---- imbuements do 15.x + forja
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
   let critou = false;
+  let fatalou = false;
   let extraPct = 0;
   if (imb) {
     // Strike: +X% de dano critico com 10% de chance fixa (XML do canary)
@@ -970,7 +971,7 @@ function playerAttack(c, p, target) {
   const forgeOnslaught = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
   if (forgeOnslaught) {
     extraPct += (forgeOnslaught.bonusPct || 60);
-    critou = true;
+    fatalou = true;
   }
 
   // Transcendence (avatar): todos os ataques viram críticos com +15% extra.
@@ -1042,7 +1043,7 @@ function playerAttack(c, p, target) {
       // dano fisico: numero vermelho e efeito de sangue
       c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y,
                       sx: pos.x, sy: pos.y, screen: true,
-                      projectile: false, el: "physical", crit: critou,
+                      projectile: false, el: "physical", crit: critou, fatal: fatalou,
                       race: target.def && target.def.race });
       // dano elemental: cor e animacao do elemento (gelo = azul + ice-attack)
       c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y,
@@ -1053,7 +1054,7 @@ function playerAttack(c, p, target) {
       c.stats.damage += raw;
       c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
                       sx: pos.x, sy: pos.y, screen: true,
-                      projectile: isDist || isMagic, el: element, crit: critou,
+                      projectile: isDist || isMagic, el: element, crit: critou, fatal: fatalou,
                       race: target.def && target.def.race,
                       missile: isDist ? playerMissile(p, element)
                                       : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
@@ -1437,6 +1438,7 @@ function castSpellById(c, p, target, now, id) {
     //   - Master of Decay: 10% de chance de +30% de dano extra em morte.
     // O critico do update sai com o efeito "CRIT!" (ver drainEvents).
     let critSt = false;
+    let fatalSpell = false;
     let extraSpellPct = 0;
     if (typeof stanceTotals === "function") {
       const stT = stanceTotals(p);
@@ -1457,7 +1459,7 @@ function castSpellById(c, p, target, now, id) {
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
     if (forgeOnslaughtSpell) {
       extraSpellPct += (forgeOnslaughtSpell.bonusPct || 60);
-      critSt = true;
+      fatalSpell = true;
     }
     const transcendSpellPct = (typeof forgeTranscendenceDamagePct === "function")
       ? forgeTranscendenceDamagePct(p, now) : 0;
@@ -1499,14 +1501,14 @@ function castSpellById(c, p, target, now, id) {
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: (idx === 0 || !!ehChain) && !!missMagia,
                       el: elemento, spell: s.name, fx: fxMagia,
-                      race: t.def && t.def.race, crit: critSt,
+                      race: t.def && t.def.race, crit: critSt, fatal: fatalSpell,
                       chain: ehChain && idx > 0 ? 1 : 0,
                       missile: missMagia });
       c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: false, el: armaEl.el, dual: 1,
-                      crit: critSt });
+                      crit: critSt, fatal: fatalSpell });
       return;
     }
     dmg = applyResist(t, elemento, dmg);
@@ -1537,7 +1539,7 @@ function castSpellById(c, p, target, now, id) {
                     // Sem DISTANCEEFFECT na magia (modo skill), nada voa.
                     projectile: (idx === 0 || !!ehChain) && !!missMagia,
                     el: elemento, spell: s.name, fx: fxMagia,
-                    crit: critSt,
+                    crit: critSt, fatal: fatalSpell,
                     chain: ehChain && idx > 0 ? 1 : 0,
                     missile: missMagia });
   });
@@ -1649,9 +1651,10 @@ function tryUseRune(c, p, target, now, forcada) {
       dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
       let extraRunePct = 0;
       let runeCrit = false;
+      let runeFatal = false;
       if (forgeOnslaughtRune) {
         extraRunePct += (forgeOnslaughtRune.bonusPct || 60);
-        runeCrit = true;
+        runeFatal = true;
       }
       if (transcendRunePct > 0) {
         extraRunePct += transcendRunePct;
@@ -1672,7 +1675,7 @@ function tryUseRune(c, p, target, now, forcada) {
                       screen: true,
                       projectile: alvo === target,
                       el: s.element, rune: s.name,
-                      crit: runeCrit,
+                      crit: runeCrit, fatal: runeFatal,
                       fx: s.fx || null, missile: missile });
     }
     // crippling stances do Sorcerer (15.25): "spells, runes e auto

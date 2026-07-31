@@ -17,6 +17,7 @@ function forgeOpenModal(html, wide2) {
   var body = forgeModalBody();
   if (!modal || !body) return;
   body.innerHTML = html;
+  if (modal) modal.classList.toggle("forge-modal-shell", String(html || "").indexOf("forge-client") !== -1);
   if (wide2) {
     document.body.classList.add("modal-wide2", "wide");
     document.body.dataset.modalWide2 = "1";
@@ -31,7 +32,7 @@ function forgeOpenModal(html, wide2) {
 function forgeCloseModal() {
   var modal = forgeModalRoot();
   if (!modal) return;
-  modal.classList.remove("show", "wide");
+  modal.classList.remove("show", "wide", "forge-modal-shell");
   document.body.classList.remove("modal-wide2", "wide");
   document.body.dataset.modalWide2 = "";
 }
@@ -39,122 +40,205 @@ function forgeCloseModal() {
 function forgeResourceSummaryHtml(p) {
   ensureForge(p);
   var cap = p.dustLimit || 100;
-  return '<div class="row small" style="gap:8px;flex-wrap:wrap">'
-    + '<span class="imb-mat"><b>Dust</b> ' + fmtFull(p.dust || 0) + ' / ' + fmtFull(cap) + '</span>'
-    + '<span class="imb-mat"><b>Slivers</b> ' + fmtFull(p.slivers || 0) + '</span>'
-    + '<span class="imb-mat"><b>Exalted Cores</b> ' + fmtFull(p.exaltedCores || 0) + '</span>'
+  return '<div class="forge-client-res-inline">'
+    + '<span><b>Dust</b> ' + fmtFull(p.dust || 0) + '/' + fmtFull(cap) + '</span>'
+    + '<span><b>Slivers</b> ' + fmtFull(p.slivers || 0) + '</span>'
+    + '<span><b>Exalted Cores</b> ' + fmtFull(p.exaltedCores || 0) + '</span>'
     + '</div>';
 }
 
-function renderForgeItemList(p) {
+function forgeClientTabHtml() {
+  var tabs = [
+    { id: 'fusion', label: 'Fusion', cls: 'fusion' },
+    { id: 'transfer', label: 'Transfer', cls: 'transfer' },
+    { id: 'conversion', label: 'Conversion', cls: 'conversion' },
+    { id: 'history', label: 'History', cls: 'history' },
+  ];
+  var html = '<div class="forge-client-tabs">';
+  for (var i = 0; i < tabs.length; i++) {
+    var t = tabs[i];
+    html += '<button class="forge-client-tab' + (FORGE_UI.mode === t.id ? ' active' : '')
+      + '" data-forge-mode="' + t.id + '">'
+      + '<span class="forge-client-tab-icon ' + t.cls + '"></span>'
+      + '<span>' + t.label + '</span></button>';
+  }
+  return html + '</div>';
+}
+
+function forgeClientItemTile(slug, count, cls, attrs, size) {
+  if (!slug) return '<div class="forge-client-slot empty ' + (cls || '') + '" ' + (attrs || '') + '></div>';
+  var badge = count ? '<span class="forge-client-count">' + count + '</span>' : '';
+  return '<div class="forge-client-slot ' + (cls || '') + '" ' + (attrs || '') + '>'
+    + itemImg(slug, size || 34) + badge + '</div>';
+}
+
+function forgeClientItemListHtml(p) {
   var items = forgeBagItems(p);
   if (!items.length) {
-    return '<div class="small dim">Nenhum item elegível na mochila.<br>Coloque o equipamento na backpack para usar a Forge.</div>';
+    FORGE_UI.slug = null;
+    return '<div class="forge-client-empty">No eligible items in backpack.</div>';
   }
   if (!FORGE_UI.slug || !items.some(function(e) { return e.ref === FORGE_UI.slug; })) {
     FORGE_UI.slug = items[0].ref;
   }
-  var html = '<div class="imb-eqlist">';
+  var html = '<div class="forge-client-item-grid">';
   for (var i = 0; i < items.length; i++) {
     var e = items[i];
-    var sel = e.ref === FORGE_UI.slug ? ' sel' : '';
-    html += '<div class="imb-eq' + sel + '" data-forge-ref="' + e.ref + '">'
-      + itemImg(e.slug, 30)
-      + '<div class="imb-eq-meta"><b>' + e.it.n + '</b>'
-      + '<span class="tiny dim">' + e.slot + ' · cls ' + e.cls + ' · instância · ' + (e.currentTier ? ('T' + e.currentTier) : 'sem tier') + ' / T' + e.maxTier + '</span>'
-      + '</div></div>';
+    var same = forgeBagInstanceRefs(p, e.slug, e.currentTier).length;
+    html += forgeClientItemTile(e.slug, same > 1 ? same : '', e.ref === FORGE_UI.slug ? 'sel' : '',
+      'data-forge-ref="' + e.ref + '" title="' + e.it.n + ' - ' + (e.currentTier ? ('T' + e.currentTier) : 'T0') + '"', 34);
   }
-  html += '</div>';
-  return html;
+  return html + '</div>';
 }
 
-function renderForgeModeTabs() {
-  return '<div class="tabs">'
-    + '<div class="tab' + (FORGE_UI.mode === 'fusion' ? ' active' : '') + '" id="forge-mode-fusion">Fusion</div>'
-    + '<div class="tab' + (FORGE_UI.mode === 'transfer' ? ' active' : '') + '" id="forge-mode-transfer">Transferência</div>'
+function forgeClientTierPreview(info) {
+  var next = info ? Math.min((info.tier || 0) + 1, info.maxTier || 0) : 0;
+  return '<div class="forge-client-tier-preview">'
+    + '<div class="forge-client-shadow"></div>'
+    + '<span class="forge-client-tier-badge">' + (next || '') + '</span>'
     + '</div>';
 }
 
-function renderForgeFusionPanel(p, slug) {
-  var info = forgeItemSummary(p, slug);
-  if (!info) return '<div class="small dim">Selecione um item válido.</div>';
-  var effect = forgeEffectForSlot(info.slot, Math.min(info.tier + 1, info.maxTier), p);
-  var useCore = !!FORGE_UI.useCore;
-  var chk = forgeCanFuse(p, slug, useCore);
-  var gold = forgeFusionGoldCost(info.slug, info.tier);
-  var next = info.tier + 1;
-  var chance = useCore ? FORGE_FUSION.successPctCore : FORGE_FUSION.successPct;
-  var canUpgrade = next <= info.maxTier;
-  var coreTxt = useCore ? 'ON' : 'OFF';
-  var notes = '';
-  if (info.bagCount > 2) {
-    notes += '<div class="tiny txt-red mt4">Como o inventário ainda agrupa itens por slug, esta fusão exige exatamente 2 cópias na mochila.</div>';
-  }
-  if (info.hasImbue) {
-    notes += '<div class="tiny txt-red mt4">Remova imbuements do item equipado antes de forjar este slug.</div>';
-  }
-  return ''
-    + '<div class="imb-cat">Fusion</div>'
-    + '<div class="row" style="gap:8px;align-items:flex-start">'
-    +   '<div class="forge-tier-big">T' + (canUpgrade ? next : info.maxTier) + '</div>'
-    +   '<div>'
-    +     '<b>' + info.name + '</b>'
-    +     '<div class="tiny dim">Atual: ' + (info.tier ? ('T' + info.tier) : 'sem tier') + ' · Máximo: T' + info.maxTier + '</div>'
-    +     '<div class="tiny imb-eff mt4">' + (effect ? ('Próximo efeito: <b>' + effect.text + '</b><br><span class="dim">' + effect.desc + '</span>') : 'Sem efeito disponível.') + '</div>'
-    +   '</div>'
-    + '</div>'
-    + '<div class="imb-cat">Regras</div>'
-    + '<div class="small">2 itens idênticos e do mesmo tier. 100 Dust por tentativa. O Exalted Core é opcional e aumenta a chance de sucesso de 50% para 65%.</div>'
-    + '<div class="row mt8" style="gap:6px;flex-wrap:wrap">'
-    +   '<button class="sm' + (useCore ? ' primary' : '') + '" id="forge-toggle-core">Exalted Core: ' + coreTxt + '</button>'
-    +   '<span class="imb-mat">Chance <b>' + chance + '%</b></span>'
-    +   '<span class="imb-mat">Gold <b class="gold-txt">' + fmtFull(gold) + ' gp</b></span>'
-    +   '<span class="imb-mat">Dust <b>' + FORGE_FUSION.dustCost + '</b></span>'
-    +   '<span class="imb-mat">Cópias <b>' + info.bagCount + '/2</b></span>'
-    + '</div>'
-    + (useCore ? '<div class="tiny dim mt4">Na falha, o Exalted Core reduz para 50% a penalidade do item remanescente.</div>' : '<div class="tiny dim mt4">Na falha sem core: item T0 perde a cópia sacrificada; item com tier pode perder 1 tier.</div>')
-    + notes
-    + (chk.ok
-    ? '<button class="primary wide" id="forge-fuse-apply">FUNDIR</button>'
-    : '<div class="tiny txt-red mt8">' + chk.msg + '</div><button class="primary wide" id="forge-fuse-apply" disabled>FUNDIR</button>');
+function forgeClientCostValue(value, cls) {
+  return '<span class="forge-client-cost ' + (cls || '') + '">' + value + '</span>';
 }
 
-function renderForgeTransferPanel(p, donorSlug) {
-  var donor = forgeItemSummary(p, donorSlug);
-  if (!donor) return '<div class="small dim">Selecione um item doador.</div>';
-  var targets = forgeTransferTargets(p, donorSlug);
+function renderForgeFusionPanel(p, ref) {
+  var info = ref ? forgeItemSummary(p, ref) : null;
+  var useCore = !!FORGE_UI.useCore;
+  var chk = info ? forgeCanFuse(p, ref, useCore) : { ok: false, msg: 'Select an item for fusion.' };
+  var gold = info ? forgeFusionGoldCost(info.slug, info.tier) : 0;
+  var sameTier = info ? forgeBagInstanceRefs(p, info.slug, info.tier).length : 0;
+  var dustOk = (p.dust || 0) >= FORGE_FUSION.dustCost;
+  var coreOk = (p.exaltedCores || 0) >= 1;
+  var canUpgrade = info && (info.tier || 0) < (info.maxTier || 0);
+  var effect = info && canUpgrade ? forgeEffectForSlot(info.slot, info.tier + 1, p) : null;
+  var success = useCore ? FORGE_FUSION.successPctCore : FORGE_FUSION.successPct;
+  var tierLoss = useCore ? FORGE_FUSION.failPenaltyProtectPct : 100;
+
+  return ''
+    + '<div class="forge-client-section-title">Select Item For Fusion</div>'
+    + '<div class="forge-client-select-row">'
+    +   '<div class="forge-client-item-list">' + forgeClientItemListHtml(p) + '</div>'
+    +   '<div class="forge-client-arrows"><span></span><span></span><span></span></div>'
+    +   forgeClientTierPreview(info)
+    + '</div>'
+    + '<div class="forge-client-section-title">Further Items Needed For Fusion</div>'
+    + '<div class="forge-client-further">'
+    +   '<div class="forge-client-need-icons">'
+    +     forgeClientItemTile(info ? info.slug : null, info ? (sameTier + '/2') : '', sameTier >= 2 ? 'ok' : 'bad', '', 38)
+    +     forgeClientItemTile('mystic-dust', info ? ((p.dust || 0) + '/' + FORGE_FUSION.dustCost) : '', dustOk ? 'ok' : 'bad', '', 34)
+    +   '</div>'
+    +   '<div class="forge-client-rates">'
+    +     '<div class="forge-client-rate-row"><span>Success Rate:</span><b class="red">' + success + '%</b></div>'
+    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Improve to 65% <span>1</span></button>'
+    +     '<div class="forge-client-rate-row"><span>Tier Loss:</span><b class="red">' + tierLoss + '%</b></div>'
+    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Reduce to 50% <span>1</span></button>'
+    +   '</div>'
+    +   '<div class="forge-client-arrows one"><span></span></div>'
+    +   '<div class="forge-client-result-box">'
+    +     '<div class="forge-client-ghost-icons">'
+    +       forgeClientItemTile(info ? info.slug : null, '', '', '', 30)
+    +       forgeClientItemTile(info ? info.slug : null, '', '', '', 30)
+    +     '</div>'
+    +     forgeClientCostValue(fmtFull(gold), 'red')
+    +     '<button class="forge-client-action" id="forge-fuse-apply"' + (chk.ok ? '' : ' disabled') + '>Fuse</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-desc">'
+    +   '<p>The aim of a fusion is to increase the tier of an item. <span class="info-dot">i</span></p>'
+    +   '<p>The classification of an item defines its maximum tier. <span class="info-dot">i</span></p>'
+    +   '<p>If two items are fused, you can spend exaltation cores. <span class="info-dot">i</span></p>'
+    +   '<p>Items with a tier grant unique bonuses. <span class="info-dot">i</span></p>'
+    +   (effect ? '<p class="forge-client-effect">Next: ' + effect.text + '</p>' : '')
+    +   (!chk.ok ? '<p class="forge-client-warning">' + chk.msg + '</p>' : '')
+    + '</div>';
+}
+
+function renderForgeTransferPanel(p, donorRef) {
+  var donor = donorRef ? forgeItemSummary(p, donorRef) : null;
+  var targets = donor ? forgeTransferTargets(p, donorRef) : [];
   if (!FORGE_UI.targetSlug || !targets.some(function(t) { return t.ref === FORGE_UI.targetSlug; })) {
     FORGE_UI.targetSlug = targets.length ? targets[0].ref : null;
   }
   var targetInfo = FORGE_UI.targetSlug ? forgeItemSummary(p, FORGE_UI.targetSlug) : null;
-  var chk = targetInfo ? forgeCanTransfer(p, donorSlug, FORGE_UI.targetSlug) : { ok: false, msg: 'Nenhum alvo válido disponível.' };
+  var chk = targetInfo ? forgeCanTransfer(p, donorRef, FORGE_UI.targetSlug) : { ok: false, msg: 'No valid target available.' };
   var gold = donor ? forgeTransferGoldCost(donor.slug, donor.tier) : 0;
-  var list = '<div class="imb-cat">Alvos válidos</div>';
-  if (!targets.length) {
-    list += '<div class="small dim">Nenhum alvo elegível. O item alvo precisa ter a mesma classificação, estar sem tier e existir como 1 única cópia na mochila.</div>';
+  var htmlTargets = '<div class="forge-client-target-grid">';
+  for (var i = 0; i < targets.length; i++) {
+    var t = targets[i];
+    htmlTargets += forgeClientItemTile(t.slug, '', FORGE_UI.targetSlug === t.ref ? 'sel' : '',
+      'data-transfer-target="' + t.ref + '" title="' + t.it.n + '"', 34);
+  }
+  htmlTargets += targets.length ? '</div>' : '<div class="forge-client-empty">No target item without tier.</div>';
+  return ''
+    + '<div class="forge-client-section-title">Select Item For Transfer</div>'
+    + '<div class="forge-client-select-row transfer">'
+    +   '<div class="forge-client-item-list">' + forgeClientItemListHtml(p) + '</div>'
+    +   '<div class="forge-client-arrows"><span></span><span></span><span></span></div>'
+    +   '<div class="forge-client-item-list targets">' + htmlTargets + '</div>'
+    + '</div>'
+    + '<div class="forge-client-section-title">Further Items Needed For Transfer</div>'
+    + '<div class="forge-client-further transfer">'
+    +   '<div class="forge-client-need-icons">'
+    +     forgeClientItemTile('mystic-dust', (p.dust || 0) + '/' + FORGE_TRANSFER.dustCost, (p.dust || 0) >= FORGE_TRANSFER.dustCost ? 'ok' : 'bad', '', 34)
+    +     '<div class="forge-client-core-icon"><span>1</span></div>'
+    +   '</div>'
+    +   '<div class="forge-client-rates wide">'
+    +     '<div class="forge-client-rate-row"><span>Donor:</span><b>' + (donor ? donor.name + ' T' + donor.tier : '-') + '</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Target:</span><b>' + (targetInfo ? targetInfo.name : '-') + '</b></div>'
+    +     '<div class="forge-client-rate-row"><span>Result Tier:</span><b class="red">T' + (donor ? Math.max(0, donor.tier - 1) : 0) + '</b></div>'
+    +   '</div>'
+    +   '<div class="forge-client-result-box">'
+    +     forgeClientCostValue(fmtFull(gold), 'red')
+    +     '<button class="forge-client-action" id="forge-transfer-apply"' + (chk.ok ? '' : ' disabled') + '>Transfer</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="forge-client-desc">'
+    +   '<p>Transfer moves a tier from the donor to a clean item of the same classification.</p>'
+    +   '<p>The target receives donor tier minus one.</p>'
+    +   (!chk.ok ? '<p class="forge-client-warning">' + chk.msg + '</p>' : '')
+    + '</div>';
+}
+
+function renderForgeConversionPanel(p) {
+  var capCost = typeof forgeDustLimitCost === 'function' ? forgeDustLimitCost(p) : 0;
+  var canCap = capCost > 0 && (p.dust || 0) >= capCost;
+  var canDust = (p.dust || 0) >= FORGE_CONVERGENCE.dustToSlivers.dust;
+  var canCore = (p.slivers || 0) >= FORGE_CONVERGENCE.sliversToCore.slivers;
+  return ''
+    + '<div class="forge-client-section-title">Conversion of Dust and Slivers</div>'
+    + '<div class="forge-client-conversion">'
+    +   '<div class="forge-client-conv-row"><div><b>Increase Dust Limit</b><span>Spend Dust to raise the cap by 1.</span></div>'
+    +     '<button class="forge-client-action" id="forge-inc-cap"' + (canCap ? '' : ' disabled') + '>' + (capCost ? capCost + ' Dust' : 'Maximum') + '</button></div>'
+    +   '<div class="forge-client-conv-row"><div><b>Dust to Slivers</b><span>Convert forge Dust into Slivers.</span></div>'
+    +     '<button class="forge-client-action" id="forge-conv-dust"' + (canDust ? '' : ' disabled') + '>' + FORGE_CONVERGENCE.dustToSlivers.dust + ' → ' + FORGE_CONVERGENCE.dustToSlivers.slivers + '</button></div>'
+    +   '<div class="forge-client-conv-row"><div><b>Slivers to Exalted Core</b><span>Create one Exalted Core.</span></div>'
+    +     '<button class="forge-client-action" id="forge-conv-core"' + (canCore ? '' : ' disabled') + '>' + FORGE_CONVERGENCE.sliversToCore.slivers + ' → 1</button></div>'
+    + '</div>'
+    + '<div class="forge-client-desc"><p>Influenced and Fiendish creatures generate Dust automatically. Fiendish creatures can also grant Slivers.</p></div>';
+}
+
+function forgeRememberHistory(p, msg) {
+  if (!p || !msg) return;
+  p.forgeHistory = Array.isArray(p.forgeHistory) ? p.forgeHistory : [];
+  p.forgeHistory.unshift({ at: Date.now(), msg: msg });
+  if (p.forgeHistory.length > 30) p.forgeHistory.length = 30;
+}
+
+function renderForgeHistoryPanel(p) {
+  var rows = Array.isArray(p.forgeHistory) ? p.forgeHistory : [];
+  var html = '<div class="forge-client-section-title">Your Exaltation Forge History</div>'
+    + '<div class="forge-client-history">';
+  if (!rows.length) {
+    html += '<div class="forge-client-empty">No forge history yet.</div>';
   } else {
-    for (var i = 0; i < targets.length; i++) {
-      var t = targets[i];
-      list += '<div class="imb-row' + (FORGE_UI.targetSlug === t.ref ? ' sel' : '') + '" data-transfer-target="' + t.ref + '">'
-        + itemImg(t.slug, 28)
-        + '<span><b>' + t.it.n + '</b><br><span class="tiny dim">cls ' + t.cls + ' · sem tier · ' + t.count + 'x</span></span>'
-        + '</div>';
+    for (var i = 0; i < rows.length; i++) {
+      var d = new Date(rows[i].at || Date.now());
+      html += '<div class="forge-client-history-row"><span>' + d.toLocaleTimeString() + '</span><b>' + rows[i].msg + '</b></div>';
     }
   }
-  return ''
-    + '<div class="imb-cat">Transferência</div>'
-    + '<div class="small">O item doador precisa ser no mínimo T2. O alvo precisa estar sem tier e ter a mesma classificação. O alvo recebe o tier do doador menos 1.</div>'
-    + '<div class="row mt8" style="gap:6px;flex-wrap:wrap">'
-    +   '<span class="imb-mat">Doador <b>' + donor.name + ' T' + donor.tier + '</b></span>'
-    +   '<span class="imb-mat">Resultado <b>T' + Math.max(0, donor.tier - 1) + '</b></span>'
-    +   '<span class="imb-mat">Gold <b class="gold-txt">' + fmtFull(gold) + ' gp</b></span>'
-    +   '<span class="imb-mat">Dust <b>' + FORGE_TRANSFER.dustCost + '</b></span>'
-    +   '<span class="imb-mat">Core <b>' + FORGE_TRANSFER.coreCost + '</b></span>'
-    + '</div>'
-    + list
-    + (chk.ok
-      ? '<button class="primary wide" id="forge-transfer-apply">TRANSFERIR</button>'
-      : '<div class="tiny txt-red mt8">' + chk.msg + '</div><button class="primary wide" id="forge-transfer-apply" disabled>TRANSFERIR</button>');
+  return html + '</div>';
 }
 
 function renderForgeModal() {
@@ -163,23 +247,24 @@ function renderForgeModal() {
   ensureForge(p);
   var bag = forgeBagItems(p);
   if (!FORGE_UI.slug && bag.length) FORGE_UI.slug = bag[0].ref;
-  var right = '';
-  if (FORGE_UI.mode === 'transfer') right = renderForgeTransferPanel(p, FORGE_UI.slug);
-  else right = renderForgeFusionPanel(p, FORGE_UI.slug);
-  return ''
-    + '<div class="panel-title">Exaltation Forge <span class="spacer"></span><span class="tiny dim">Fusion / Transfer / Convergence</span></div>'
-    + '<div class="panel-body">'
-    +   forgeResourceSummaryHtml(p)
-    +   '<div class="tiny dim mt4">Somente itens na mochila entram na Forge. O Depot foi desacoplado deste fluxo.</div>'
-    +   '<div class="imb-grid mt8">'
-    +     '<div class="imb-col-left">' + renderForgeItemList(p) + '</div>'
-    +     '<div class="imb-col-center">' + renderForgeModeTabs() + '</div>'
-    +     '<div class="imb-col-right">' + right + '</div>'
-    +   '</div>'
-    +   '<div class="row" style="justify-content:flex-end;margin-top:6px;gap:8px">'
-    +     '<button class="sm" id="forge-dust-btn">Resources</button>'
-    +     '<button class="sm" id="forge-close">Fechar</button>'
-    +   '</div>'
+  if (!FORGE_UI.mode) FORGE_UI.mode = 'fusion';
+  var content = '';
+  if (FORGE_UI.mode === 'transfer') content = renderForgeTransferPanel(p, FORGE_UI.slug);
+  else if (FORGE_UI.mode === 'conversion') content = renderForgeConversionPanel(p);
+  else if (FORGE_UI.mode === 'history') content = renderForgeHistoryPanel(p);
+  else content = renderForgeFusionPanel(p, FORGE_UI.slug);
+
+  return '<div class="forge-client">'
+    + '<div class="forge-client-title">Exaltation Forge</div>'
+    + forgeClientTabHtml()
+    + '<div class="forge-client-main">' + content + '</div>'
+    + '<div class="forge-client-footer">'
+    +   '<div class="forge-client-wallet gold"><span>' + fmtFull(p.gold || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet dust"><span>' + fmtFull(p.dust || 0) + '/' + fmtFull(p.dustLimit || 100) + '</span></div>'
+    +   '<div class="forge-client-wallet slivers"><span>' + fmtFull(p.slivers || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet cores"><span>' + fmtFull(p.exaltedCores || 0) + '</span></div>'
+    +   '<button class="forge-client-close" id="forge-close">Close</button>'
+    + '</div>'
     + '</div>';
 }
 
@@ -187,13 +272,21 @@ function openForgeModal() {
   var p = G.p;
   if (!p) return;
   ensureForge(p);
-  forgeOpenModal(renderForgeModal(), true);
+  forgeOpenModal(renderForgeModal(), false);
   bindForgeModal();
 }
 
 function bindForgeModal() {
   var body = forgeModalBody();
   if (!body) return;
+
+  body.querySelectorAll('[data-forge-mode]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      FORGE_UI.mode = el.dataset.forgeMode;
+      if (FORGE_UI.mode !== 'transfer') FORGE_UI.targetSlug = null;
+      openForgeModal();
+    });
+  });
 
   body.querySelectorAll('[data-forge-ref]').forEach(function(el) {
     el.addEventListener('click', function() {
@@ -203,19 +296,6 @@ function bindForgeModal() {
     });
   });
 
-  var modeFusion = body.querySelector('#forge-mode-fusion');
-  if (modeFusion) modeFusion.addEventListener('click', function() {
-    FORGE_UI.mode = 'fusion';
-    FORGE_UI.targetSlug = null;
-    openForgeModal();
-  });
-
-  var modeTransfer = body.querySelector('#forge-mode-transfer');
-  if (modeTransfer) modeTransfer.addEventListener('click', function() {
-    FORGE_UI.mode = 'transfer';
-    openForgeModal();
-  });
-
   body.querySelectorAll('[data-transfer-target]').forEach(function(el) {
     el.addEventListener('click', function() {
       FORGE_UI.targetSlug = el.dataset.transferTarget;
@@ -223,15 +303,17 @@ function bindForgeModal() {
     });
   });
 
-  var toggleCore = body.querySelector('#forge-toggle-core');
-  if (toggleCore) toggleCore.addEventListener('click', function() {
-    FORGE_UI.useCore = !FORGE_UI.useCore;
-    openForgeModal();
+  body.querySelectorAll('[data-forge-core]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      FORGE_UI.useCore = !FORGE_UI.useCore;
+      openForgeModal();
+    });
   });
 
   var fuseBtn = body.querySelector('#forge-fuse-apply');
   if (fuseBtn) fuseBtn.addEventListener('click', function() {
     var r = forgeFuse(G.p, FORGE_UI.slug, !!FORGE_UI.useCore);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
     if (typeof toast === 'function') toast(r.msg, r.ok && r.success !== false ? 'ok' : (r.ok ? '' : 'err'));
     if (typeof renderAll === 'function') renderAll();
     openForgeModal();
@@ -240,75 +322,44 @@ function bindForgeModal() {
   var transferBtn = body.querySelector('#forge-transfer-apply');
   if (transferBtn) transferBtn.addEventListener('click', function() {
     var r = forgeTransfer(G.p, FORGE_UI.slug, FORGE_UI.targetSlug);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
     if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
     if (typeof renderAll === 'function') renderAll();
     openForgeModal();
   });
 
-  var dustBtn = body.querySelector('#forge-dust-btn');
-  if (dustBtn) dustBtn.addEventListener('click', function() { openDustModal(); });
+  var incCap = body.querySelector('#forge-inc-cap');
+  if (incCap) incCap.addEventListener('click', function() {
+    var r = forgeIncreaseDustLimit(G.p);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
+    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof renderAll === 'function') renderAll();
+    openForgeModal();
+  });
+  var convDust = body.querySelector('#forge-conv-dust');
+  if (convDust) convDust.addEventListener('click', function() {
+    var r = forgeConvergenceDustToSlivers(G.p);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
+    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof renderAll === 'function') renderAll();
+    openForgeModal();
+  });
+  var convCore = body.querySelector('#forge-conv-core');
+  if (convCore) convCore.addEventListener('click', function() {
+    var r = forgeConvergenceSliversToCore(G.p);
+    if (r.ok) forgeRememberHistory(G.p, r.msg);
+    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof renderAll === 'function') renderAll();
+    openForgeModal();
+  });
 
   var close = body.querySelector('#forge-close');
   if (close) close.addEventListener('click', forgeCloseModal);
 }
 
 /* ========== Resources / Convergence ========== */
-function renderDustModal() {
-  var p = G.p;
-  ensureForge(p);
-  var canDust = (p.dust || 0) >= FORGE_CONVERGENCE.dustToSlivers.dust;
-  var canCore = (p.slivers || 0) >= FORGE_CONVERGENCE.sliversToCore.slivers;
-  var capCost = typeof forgeDustLimitCost === 'function' ? forgeDustLimitCost(p) : 0;
-  var canCap = capCost > 0 && (p.dust || 0) >= capCost;
-  return ''
-    + '<div class="panel-title">Resources & Convergence</div>'
-    + '<div class="panel-body">'
-    +   forgeResourceSummaryHtml(p)
-    +   '<div class="shop-row mt8"><span class="small">Increase Dust Limit</span>'
-    +     '<button class="sm' + (canCap ? ' primary' : '') + '" id="forge-inc-cap"' + (canCap ? '' : ' disabled') + '>'
-    +       (capCost ? ('+' + 1 + ' limit por ' + capCost + ' Dust') : 'Limite máximo atingido')
-    +     '</button></div>'
-    +   '<div class="shop-row mt8"><span class="small">Dust → Slivers</span>'
-    +     '<button class="sm' + (canDust ? ' primary' : '') + '" id="forge-conv-dust"' + (canDust ? '' : ' disabled') + '>'
-    +       FORGE_CONVERGENCE.dustToSlivers.dust + ' Dust → ' + FORGE_CONVERGENCE.dustToSlivers.slivers + ' Slivers'
-    +     '</button></div>'
-    +   '<div class="shop-row"><span class="small">Slivers → Exalted Core</span>'
-    +     '<button class="sm' + (canCore ? ' primary' : '') + '" id="forge-conv-core"' + (canCore ? '' : ' disabled') + '>'
-    +       FORGE_CONVERGENCE.sliversToCore.slivers + ' Slivers → 1 Core'
-    +     '</button></div>'
-    +   '<div class="tiny dim mt8">Influenced/Fiendish geram Dust automaticamente. Slivers vêm de Fiendish e de conversão.</div>'
-    +   '<button class="sm mt8" id="dust-close">Fechar</button>'
-    + '</div>';
-}
-
-function openDustModal() {
-  forgeOpenModal(renderDustModal(), false);
-  var body = forgeModalBody();
-  if (!body) return;
-  var incCap = body.querySelector('#forge-inc-cap');
-  if (incCap) incCap.addEventListener('click', function() {
-    var r = forgeIncreaseDustLimit(G.p);
-    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
-    if (typeof renderAll === 'function') renderAll();
-    openDustModal();
-  });
-  var convDust = body.querySelector('#forge-conv-dust');
-  if (convDust) convDust.addEventListener('click', function() {
-    var r = forgeConvergenceDustToSlivers(G.p);
-    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
-    if (typeof renderAll === 'function') renderAll();
-    openDustModal();
-  });
-  var convCore = body.querySelector('#forge-conv-core');
-  if (convCore) convCore.addEventListener('click', function() {
-    var r = forgeConvergenceSliversToCore(G.p);
-    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
-    if (typeof renderAll === 'function') renderAll();
-    openDustModal();
-  });
-  var close = body.querySelector('#dust-close');
-  if (close) close.addEventListener('click', forgeCloseModal);
-}
+function renderDustModal() { return renderForgeModal(); }
+function openDustModal() { FORGE_UI.mode = 'conversion'; openForgeModal(); }
 
 /* ========== DEPOT ========== */
 function renderDepotStoreList(p) {
