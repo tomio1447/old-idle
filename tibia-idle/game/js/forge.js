@@ -740,3 +740,8 @@ function forgeTierClass(slug) {
   if (!G.p) return "";
   return forgeTierClassForValue(forgeItemTier(G.p, slug) || 0);
 }
+
+/* Exposto para render.js mostrar o glow do Avatar Stage 3 (Transcendence) */
+if (typeof window !== "undefined") {
+  window.avatarActive = avatarActive;
+}
