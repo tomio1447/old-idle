@@ -1240,6 +1240,8 @@ function renderAll() {
   renderNpcQuick();
   renderBosses(p);
   renderTopbar(p);
+  var db = $("#depot-badge");
+  if (db) { var n = p.depotNotification || 0; db.textContent = n > 0 ? n : ""; db.style.display = n > 0 ? "" : "none"; }
   renderHuntInfo();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
 }
@@ -1341,6 +1343,10 @@ function bindControls() {
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
   const btnImb = $("#btn-imbue");
   if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
+  const btnForge = $("#btn-forge");
+  if (btnForge) btnForge.addEventListener("click", () => { if (typeof openForgeModal === "function") openForgeModal(); });
+  const btnDepot = $("#btn-depot");
+  if (btnDepot) btnDepot.addEventListener("click", () => { if (typeof openDepotModal === "function") openDepotModal(); });
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   const btnAdmin = $("#btn-admin");

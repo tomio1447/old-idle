@@ -174,6 +174,8 @@ function itemTip(slug, extra, slot) {
   }
 
   if (it.cls) h += `<div class="tt-req">Classificação ${it.cls}</div>`;
+  var ftier = (G.p && G.p.forge && G.p.forge[slug]) || 0;
+  if (ftier) h += `<div class="tt-req" style="color:#ffe680">Forja: Tier ${ftier}</div>`;
   if (it.lvl) h += `<div class="tt-req">Requer nível ${it.lvl}</div>`;
   if (it.vocs) h += `<div class="tt-req">Vocação: ${it.vocs.join(", ")}</div>`;
   if (it.w) h += `<div class="tt-req">Peso ${it.w.toFixed(2)} oz</div>`;
@@ -405,8 +407,8 @@ function renderEquip(p) {
     const e = p.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
-      h += `<div class="slot ${itemClsBorder(e.item)}" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
+      h += `<div class="slot ${itemClsBorder(e.item)} ${forgeTierClass(e.item)}" data-slot="${slot}" data-item="${e.item}">
+        ${itemImg(e.item)}${(G.p && G.p.forge && G.p.forge[e.item]) ? `<span class="cnt" style="color:#ffe680">T${G.p.forge[e.item]}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
