@@ -2472,13 +2472,14 @@ function combatTick(c, p, dt, now) {
   // cura de conditions (exana) antes da cura de HP
   tryCureCondition(c, p, now);
 
+  // helper de equipamento e magic shield do painel Helper (antes da cura de HP,
+  // para equipar o anel emergencial no instante em que a vida cai abaixo do threshold)
+  if (typeof tryAccessoryHelper === "function") tryAccessoryHelper(c, p, now);
+  if (typeof tryMagicShield === "function") tryMagicShield(c, p, now);
+
   // cura e mana
   tryHeal(c, p, now);
   tryMana(c, p, now);
-
-  // helper de equipamento e magic shield do painel Helper
-  if (typeof tryAccessoryHelper === "function") tryAccessoryHelper(c, p, now);
-  if (typeof tryMagicShield === "function") tryMagicShield(c, p, now);
 
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
   // voltando ao templo/cidade pelo fluxo normal de morte.

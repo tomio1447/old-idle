@@ -315,7 +315,7 @@ function renderEquipmentHelper(p) {
       ${[["amulet", "Amuleto"], ["ring", "Anel"]].map(([id, nome]) =>
         `<button class="sm ${slot === id ? "primary" : ""}" data-helper-equip-slot="${id}">${nome}</button>`).join("")}
       <span style="flex:1"></span>
-      <label class="toggle tiny"><input type="checkbox" id="helper-equip-enabled" ${cfg.enabled ? "" : "checked"}> INATIVO</label>
+      <label class="toggle tiny"><input type="checkbox" id="helper-equip-enabled" ${cfg.enabled ? "checked" : ""}> Ativo</label>
     </div>
     <div class="panel-inset" style="padding:10px">
       <div class="small" style="color:#d4af37;font-weight:bold;margin-bottom:8px">${slot === "amulet" ? "Amuleto" : "Anel"}</div>
@@ -349,7 +349,7 @@ function bindEquipmentHelper(p) {
   const slot = HELPER_EQUIP_UI.slot || "amulet";
   const cfg = p.config.equipHelper[slot];
   const enabled = document.getElementById("helper-equip-enabled");
-  if (enabled) enabled.addEventListener("change", () => { cfg.enabled = !enabled.checked; if (typeof save === "function") save(); rer(); });
+  if (enabled) enabled.addEventListener("change", () => { cfg.enabled = enabled.checked; if (typeof save === "function") save(); rer(); });
   const em = document.getElementById("helper-equip-emergency");
   if (em) em.addEventListener("change", () => { cfg.emergency = em.value; if (typeof save === "function") save(); rer(); });
   const no = document.getElementById("helper-equip-normal");
@@ -500,7 +500,7 @@ function bindMagicShieldHelper(p) {
     const rh = p.config.equipHelper.ring;
     rh.enabled = true;
     rh.emergency = "energy-ring";
-    if (!rh.equipBelow) rh.equipBelow = cfg.hpBelow;
+    rh.equipBelow = cfg.hpBelow || 50;
     if (typeof toast === "function") toast("Energy Ring definido como anel emergencial.");
     if (typeof save === "function") save();
     rer();

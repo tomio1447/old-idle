@@ -29,6 +29,17 @@ const WD_ALIAS = {
   "bunnyslippers": "bunny-slippers",
 };
 
+const WD_PLASMA_STATS = {
+  "ring-of-blue-plasma":     { dist: 4, mag: 1, prot: 3, res: { physical: 3 } },
+  "ring-of-green-plasma":    { mag: 2, prot: 3, res: { physical: 3 } },
+  "ring-of-orange-plasma":   { fist: 4, prot: 3, res: { physical: 3 } },
+  "ring-of-red-plasma":      { sword: 4, axe: 4, club: 4, prot: 3, res: { physical: 3 } },
+  "collar-of-blue-plasma":   { dist: 4, mag: 2, prot: 5, res: { physical: 5 } },
+  "collar-of-green-plasma":  { mag: 3, prot: 5, res: { physical: 5 } },
+  "collar-of-orange-plasma": { fist: 4, mag: 2, prot: 5, res: { physical: 5 } },
+  "collar-of-red-plasma":    { sword: 4, axe: 4, club: 4, prot: 5, res: { physical: 5 } },
+};
+
 /* Slugs mortos do catalogo antigo que hoje sao a MESMA coisa que um item
  * vindo do Canary, mas com outra grafia. Ficam duas linhas identicas na
  * Cyclopedia se nao forem removidos. Nada aponta para eles: nao estao em
@@ -157,6 +168,11 @@ function fundirWeaponData() {
   for (const slug in GAMEDATA.items) {
     const it = GAMEDATA.items[slug];
     if (!it.cat && !it.drop && it.s) it.shop = 1;
+  }
+  for (const slug in WD_PLASMA_STATS) {
+    if (GAMEDATA.items[slug]) {
+      Object.assign(GAMEDATA.items[slug], WD_PLASMA_STATS[slug]);
+    }
   }
   return novos;
 }
