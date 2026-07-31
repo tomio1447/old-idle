@@ -1412,9 +1412,9 @@ function castSpellById(c, p, target, now, id) {
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
     // do weapon->getElementType), entao um knight de naga sword ve exori
-    // sair como fisico + gelo. So vale para as magias que usam a ARMA:
-    // magia de mana (modo "magic") nao carrega elemento de arma.
-    const armaEl = (s.f && s.f.modo !== "magic" && !faixaMonk)
+    // sair como fisico + gelo. So vale para as magias de melee que usam a ARMA:
+    // magias de mana (modo "magic") e magias de paladino nao carregam elemento de arma.
+    const armaEl = (s.f && s.f.modo !== "magic" && !faixaMonk && (!s.vocs || !s.vocs.includes("paladin")))
       ? armaElemento : null;
     if (armaEl) {
       const fis = Math.max(1, Math.round(dmg * armaEl.propFisica));

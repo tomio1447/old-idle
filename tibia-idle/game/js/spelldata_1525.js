@@ -216,9 +216,9 @@
     // ---- Paladin: os dois barrages tem o tamanho da diamond arrow
     // (21 sqm, 5x5 sem os cantos) e 3 modos de mira (no idle o motor
     // mira no alvo, que e o modo padrao).
-    "exori-dir-san": {
-      id: "exori-dir-san", sid: 300, name: "Divine Barrage",
-      words: "exori dir san", type: "attack", lvl: 70, mana: 175,
+    "exevo-dir-san": {
+      id: "exevo-dir-san", sid: 300, name: "Divine Barrage",
+      words: "exevo dir san", type: "attack", lvl: 70, mana: 175,
       soul: 0, ml: 0, icon: 193, vocs: ["paladin"], cd: 4000,
       grupos: { "1": 2000 }, gcd: 2000, premium: true, needTarget: true,
       param: false, group: "attack", element: "holy",
@@ -227,9 +227,9 @@
            lvlMax: 0.2, mlMax: 6, flatMax: 168 },
       aggr: true,
     },
-    "exori-dir-moe": {
-      id: "exori-dir-moe", sid: 301, name: "Ethereal Barrage",
-      words: "exori dir moe", type: "attack", lvl: 60, mana: 135,
+    "exevo-dir-moe": {
+      id: "exevo-dir-moe", sid: 301, name: "Ethereal Barrage",
+      words: "exevo dir moe", type: "attack", lvl: 60, mana: 135,
       soul: 0, ml: 0, icon: 194, vocs: ["paladin"], cd: 4000,
       grupos: { "1": 2000 }, gcd: 2000, premium: true, needTarget: true,
       param: false, group: "attack", element: "physical",
@@ -350,6 +350,8 @@
     },
   };
   for (const id in NOVAS) SD[id] = NOVAS[id];
+  SD["exori-dir-san"] = SD["exevo-dir-san"];
+  SD["exori-dir-moe"] = SD["exevo-dir-moe"];
 
   /* ---------------------------------- dados anexos (fx, mira, area) */
 
@@ -365,7 +367,9 @@
     // que a dir san tinha era invencao. E o sprite e o oficial
     // (Divine_Barrage_Effect / Ethereal_Barrage_Effect), nao mais o chute
     // dos Effect_3xx pelo visual.
+    W["exevo dir san"] = { fx: "barrage-divine" };
     W["exori dir san"] = { fx: "barrage-divine" };
+    W["exevo dir moe"] = { fx: "barrage-ethereal" };
     W["exori dir moe"] = { fx: "barrage-ethereal" };
     W["exevo fur frigo"] = { fx: "forked-glacier", miss: "ice" };
     W["exevo fur tera"] = { fx: "forked-thorns", miss: "earth" };
@@ -395,12 +399,14 @@
     // cairia na AREA_ANCORA_ALVO e centraria no alvo clicado
     T["exori-scu"] = { areaNome: "AREA_SQUARE1X1", self: 1,
                        nome: "Shield Slam", words: "exori scu" };
-    T["exori-dir-san"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
+    T["exevo-dir-san"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
                            needTarget: 1, nome: "Divine Barrage",
-                           range: 5, words: "exori dir san" };
-    T["exori-dir-moe"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
+                           range: 5, words: "exevo dir san" };
+    T["exori-dir-san"] = T["exevo-dir-san"];
+    T["exevo-dir-moe"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
                            needTarget: 1, nome: "Ethereal Barrage",
-                           range: 5, words: "exori dir moe" };
+                           range: 5, words: "exevo dir moe" };
+    T["exori-dir-moe"] = T["exevo-dir-moe"];
     T["exevo-fur-frigo"] = { blockWalls: 1, needTarget: 1,
                              nome: "Forked Glacier", range: 5,
                              words: "exevo fur frigo" };
