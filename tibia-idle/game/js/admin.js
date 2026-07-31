@@ -18,6 +18,9 @@ const ADMIN = {
   mobBusca: "",
   mobBoss: false,
   mobMult: 10,
+  forgeBusca: "",
+  forgeMobBusca: "",
+  forgeStacks: 5,
   logs: [],
 };
 
@@ -28,6 +31,7 @@ const ADMIN_TABS = [
   { id: "items", nome: "🎒 Itens" },
   { id: "imb", nome: "✨ Imbuements" },
   { id: "equip", nome: "🛡 Equipamento" },
+  { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
   { id: "world", nome: "🌍 Mundo" },
 ];
@@ -107,7 +111,7 @@ function renderAdminContent() {
   const fn = {
     char: renderAdminChar, skills: renderAdminSkills,
     items: renderAdminItems, imb: renderAdminImbuements, equip: renderAdminEquip,
-    mobs: renderAdminMobs,
+    forge: renderAdminForge, mobs: renderAdminMobs,
     world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
@@ -520,6 +524,333 @@ function adminEquipar(p, slug) {
   adminAplicar(`equipou ${it.n} em ${slot}`);
 }
 
+
+/* ---------------------------------------------------------- aba: FORJE */
+
+function adminClampInt(value, min, max) {
+  let n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) n = min;
+  if (max !== undefined) n = Math.min(max, n);
+  return Math.max(min, n);
+}
+
+function adminForgeLocLabel(loc) {
+  loc = String(loc || "");
+  if (loc === "bag") return "mochila";
+  if (loc.indexOf("equip:") === 0) return "equipado: " + loc.slice(6);
+  return loc || "inventário";
+}
+
+function adminForgeInventoryInstances(p) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  if (typeof ensureForge === "function") ensureForge(p);
+  const out = [];
+  const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
+  for (const inst of insts) {
+    if (!inst || !inst.slug) continue;
+    const loc = String(inst.loc || "");
+    if (loc !== "bag" && loc.indexOf("equip:") !== 0) continue;
+    if (typeof forgeIsEligibleItem === "function" && !forgeIsEligibleItem(inst.slug)) continue;
+    const it = GAMEDATA.items[inst.slug];
+    if (!it) continue;
+    const maxTier = typeof forgeMaxTierForSlug === "function" ? forgeMaxTierForSlug(inst.slug) : 0;
+    if (!maxTier) continue;
+    out.push({
+      id: inst.id,
+      inst: inst,
+      slug: inst.slug,
+      it: it,
+      name: it.n || inst.slug,
+      tier: typeof itemInstanceTier === "function" ? itemInstanceTier(inst) : (inst.tier || 0),
+      maxTier: maxTier,
+      cls: it.cls || 0,
+      slot: it.s || "?",
+      loc: loc,
+      locLabel: adminForgeLocLabel(loc),
+    });
+  }
+  out.sort((a, b) => {
+    const la = a.loc.indexOf("equip:") === 0 ? 0 : 1;
+    const lb = b.loc.indexOf("equip:") === 0 ? 0 : 1;
+    return la - lb || a.slot.localeCompare(b.slot) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  });
+  return out;
+}
+
+function adminSetForgeItemTier(p, instId, tier) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  const inst = typeof findItemInstance === "function" ? findItemInstance(p, instId) : null;
+  if (!inst) return { ok: false, msg: "Item não encontrado no inventário." };
+  if (typeof forgeIsEligibleItem === "function" && !forgeIsEligibleItem(inst.slug)) {
+    return { ok: false, msg: "Item não é elegível para tier da Forge." };
+  }
+  const maxTier = typeof forgeMaxTierForSlug === "function" ? forgeMaxTierForSlug(inst.slug) : 0;
+  tier = adminClampInt(tier, 0, maxTier);
+  if (typeof forgeSetItemTier === "function") forgeSetItemTier(p, inst.id, tier);
+  else inst.tier = tier;
+  const it = GAMEDATA.items[inst.slug];
+  return { ok: true, tier: tier, msg: `${it ? it.n : inst.slug} → ${tier ? "T" + tier : "sem tier"}` };
+}
+
+function adminApplyForgeMonsterVariant(def, variant, stacks) {
+  variant = variant === "fiendish" || variant === "influenced" ? variant : "";
+  const out = { influenced: false, fiendish: false, stacks: 0 };
+  if (!variant || !def) return out;
+
+  const s = variant === "fiendish" ? 15 : adminClampInt(stacks, 1, 5);
+  const hp = Number(def.hp || 1);
+  const exp = Number(def.exp || 0);
+  const damage = Number(def.damage || 1);
+  const armor = Number(def.armor || 0);
+  const statMul = 1.35 + (s * 0.15);
+  def.name = typeof displayMonsterName === "function"
+    ? displayMonsterName(def.name)
+    : String(def.name || "").replace(/^Influenced\s+/i, "").replace(/^Fiendish\s+/i, "");
+  def.hp = Math.max(1, Math.floor(hp * statMul));
+  def.exp = Math.floor(exp * (1 + s * 0.25));
+  def.damage = Math.max(1, Math.floor(damage * (1 + s * 0.08)));
+  def.armor = Math.floor(armor * (1 + s * 0.05));
+
+  out.influenced = variant === "influenced";
+  out.fiendish = variant === "fiendish";
+  out.stacks = s;
+  return out;
+}
+
+function adminForgeMonsterPreview(base, variant, stacks) {
+  const def = Object.assign({}, base || {});
+  const flags = adminApplyForgeMonsterVariant(def, variant, stacks);
+  return Object.assign({ def: def }, flags);
+}
+
+function renderAdminForge(p, el) {
+  if (typeof ensureForge === "function") ensureForge(p);
+  const dustLimit = p.dustLimit || 100;
+  const busca = (ADMIN.forgeBusca || "").trim().toLowerCase();
+  const allItems = adminForgeInventoryInstances(p);
+  let items = allItems;
+  if (busca) {
+    items = items.filter((e) => {
+      const hay = `${e.name} ${e.slug} ${e.slot} ${e.locLabel} T${e.tier}`.toLowerCase();
+      return hay.indexOf(busca) !== -1;
+    });
+  }
+  const mostraItems = items.slice(0, 120);
+
+  const c = G.combat;
+  const mobBusca = (ADMIN.forgeMobBusca || "").trim().toLowerCase();
+  let mobIds = Object.keys(GAMEDATA.monsters || {});
+  if (mobBusca) {
+    mobIds = mobIds.filter((i) =>
+      (GAMEDATA.monsters[i].name || i).toLowerCase().indexOf(mobBusca) !== -1);
+  }
+  mobIds.sort((a, b) => (GAMEDATA.monsters[a].hp || 0) - (GAMEDATA.monsters[b].hp || 0));
+  const mostraMobs = mobIds.slice(0, 120);
+  const stacks = adminClampInt(ADMIN.forgeStacks || 5, 1, 5);
+  ADMIN.forgeStacks = stacks;
+
+  el.innerHTML = `
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <div class="admin-card-t">Recursos da Forge</div>
+        <div class="stat-row"><span class="k">Dust</span>
+          <span class="v">${fmtFull(p.dust || 0)} / ${fmtFull(dustLimit)}</span></div>
+        <div class="stat-row"><span class="k">Slivers</span>
+          <span class="v">${fmtFull(p.slivers || 0)}</span></div>
+        <div class="stat-row"><span class="k">Exalted Cores</span>
+          <span class="v">${fmtFull(p.exaltedCores || 0)}</span></div>
+        <div class="row mt8" style="gap:6px;align-items:center;flex-wrap:wrap">
+          <label class="tiny dim">Dust</label>
+          <input type="number" id="adm-forge-dust" value="${p.dust || 0}" min="0"
+                 class="admin-in" style="width:90px">
+          <label class="tiny dim">Limite</label>
+          <input type="number" id="adm-forge-limit" value="${dustLimit}" min="100" max="325"
+                 class="admin-in" style="width:90px">
+          <button class="sm primary" id="adm-forge-res-apply">Aplicar</button>
+        </div>
+        <div class="row mt8" style="gap:6px;align-items:center;flex-wrap:wrap">
+          <label class="tiny dim">Slivers</label>
+          <input type="number" id="adm-forge-slivers" value="${p.slivers || 0}" min="0"
+                 class="admin-in" style="width:90px">
+          <label class="tiny dim">Cores</label>
+          <input type="number" id="adm-forge-cores" value="${p.exaltedCores || 0}" min="0"
+                 class="admin-in" style="width:90px">
+        </div>
+        <div class="admin-quick">
+          <button class="sm" id="adm-forge-dust-zero">zerar dust</button>
+          <button class="sm" id="adm-forge-dust-full">encher dust</button>
+          <button class="sm" id="adm-forge-dust-plus">+100 dust</button>
+        </div>
+        <div class="tiny dim mt4">O limite segue a regra oficial atual da Forge: 100 até 325.</div>
+      </div>
+
+      <div class="admin-card" style="grid-column:1/-1">
+        <div class="admin-card-t">Tier dos itens no inventário</div>
+        <div class="row mb8" style="gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="adm-forge-busca" placeholder="Buscar item, slot ou local…" value="${ADMIN.forgeBusca || ""}"
+                 class="admin-in" style="flex:1;min-width:220px">
+          <span class="tiny dim">${items.length} de ${allItems.length} itens elegíveis</span>
+          <input type="number" id="adm-forge-all-tier" value="0" min="0" max="10"
+                 class="admin-in" style="width:62px" title="Tier para aplicar em todos da lista">
+          <button class="sm" id="adm-forge-all-apply">Aplicar tier na lista</button>
+          <button class="sm" id="adm-forge-all-zero">Zerar lista</button>
+        </div>
+        <div class="tiny dim mb8">
+          Mostra equipamentos da mochila e os equipados. Cada item físico é uma instância separada.
+        </div>
+        <div class="admin-itens">
+          ${mostraItems.map((e) => {
+            const opts = Array.from({ length: e.maxTier + 1 }, (_, n) =>
+              `<option value="${n}" ${n === e.tier ? "selected" : ""}>${n ? "T" + n : "T0"}</option>`).join("");
+            return `<div class="admin-item">
+              ${itemImg(e.slug, 28)}
+              <div class="admin-item-n">
+                <div class="small">${e.name}</div>
+                <div class="tiny dim">${e.locLabel} · ${e.slot} · cls ${e.cls} · atual ${e.tier ? "T" + e.tier : "sem tier"} · máx T${e.maxTier}</div>
+              </div>
+              <span class="tiny gold-txt">${e.tier ? "T" + e.tier : "T0"}</span>
+              <select class="admin-in adm-forge-tier" data-inst-id="${e.id}" style="width:68px">${opts}</select>
+              <button class="sm primary" data-forge-tier-set="${e.id}">ok</button>
+              <button class="sm" data-forge-tier-max="${e.id}">T${e.maxTier}</button>
+            </div>`;
+          }).join("") || `<div class="dim tiny" style="padding:10px">Nenhum item elegível no inventário.</div>`}
+        </div>
+        ${items.length > 120 ? `<div class="tiny dim mt4">Mostrando 120 de ${items.length} — refine a busca.</div>` : ""}
+      </div>
+
+      <div class="admin-card" style="grid-column:1/-1">
+        <div class="admin-card-t">Invocar monstros Influenced / Fiendish</div>
+        ${!c ? `
+          <div class="tiny dim">
+            Nenhum combate em andamento. Entre em uma hunt ou boss e volte aqui para invocar monstros especiais na arena atual.
+          </div>` : `
+          <div class="stat-row"><span class="k">Arena atual</span>
+            <span class="v">${c.boss ? "boss" : (c.hunt ? c.hunt.name : c.huntId)}</span></div>
+          <div class="stat-row"><span class="k">Monstros vivos</span>
+            <span class="v">${c.mobs.length}</span></div>
+          <div class="row mb8" style="gap:6px;align-items:center;flex-wrap:wrap">
+            <input id="adm-forge-mob-busca" placeholder="Buscar monstro…" value="${ADMIN.forgeMobBusca || ""}"
+                   class="admin-in" style="flex:1;min-width:220px">
+            <label class="tiny dim">Stacks influenced</label>
+            <input type="number" id="adm-forge-stacks" value="${stacks}" min="1" max="5"
+                   class="admin-in" style="width:62px">
+            <button class="sm" id="adm-forge-clear-special">Remover especiais</button>
+          </div>
+          <div class="admin-itens">
+            ${mostraMobs.map((i) => {
+              const m = GAMEDATA.monsters[i];
+              const inf = adminForgeMonsterPreview(m, "influenced", stacks).def;
+              const fie = adminForgeMonsterPreview(m, "fiendish", stacks).def;
+              return `<div class="admin-item">
+                ${typeof mobImg === "function" ? mobImg(i, 28) : ""}
+                <div class="admin-item-n">
+                  <div class="small">${m.name}</div>
+                  <div class="tiny dim">base hp ${fmtFull(m.hp || 0)} · inf${stacks} hp ${fmtFull(inf.hp || 0)} · fiendish hp ${fmtFull(fie.hp || 0)}</div>
+                </div>
+                <button class="sm" data-forge-summon="${i}" data-variant="influenced">Influenced</button>
+                <button class="sm primary" data-forge-summon="${i}" data-variant="fiendish">Fiendish</button>
+              </div>`;
+            }).join("") || `<div class="dim tiny" style="padding:10px">Nada encontrado.</div>`}
+          </div>
+          ${mobIds.length > 120 ? `<div class="tiny dim mt4">Mostrando 120 de ${mobIds.length} — refine a busca.</div>` : ""}`}
+      </div>
+
+    </div>`;
+
+  const dustInp = $("#adm-forge-dust");
+  const limitInp = $("#adm-forge-limit");
+  const sliverInp = $("#adm-forge-slivers");
+  const coreInp = $("#adm-forge-cores");
+  const applyResources = () => {
+    const limit = adminClampInt(limitInp ? limitInp.value : p.dustLimit, 100, 325);
+    p.dustLimit = limit;
+    p.dust = adminClampInt(dustInp ? dustInp.value : p.dust, 0, limit);
+    p.slivers = adminClampInt(sliverInp ? sliverInp.value : p.slivers, 0);
+    p.exaltedCores = adminClampInt(coreInp ? coreInp.value : p.exaltedCores, 0);
+    adminAplicar(`Forge: dust ${p.dust}/${p.dustLimit}, slivers ${p.slivers}, cores ${p.exaltedCores}`);
+  };
+  const resBtn = $("#adm-forge-res-apply");
+  if (resBtn) resBtn.addEventListener("click", applyResources);
+  if ($("#adm-forge-dust-zero")) $("#adm-forge-dust-zero").addEventListener("click", () => {
+    p.dust = 0;
+    adminAplicar("Dust zerado");
+  });
+  if ($("#adm-forge-dust-full")) $("#adm-forge-dust-full").addEventListener("click", () => {
+    p.dust = p.dustLimit || 100;
+    adminAplicar(`Dust preenchido (${p.dust}/${p.dustLimit})`);
+  });
+  if ($("#adm-forge-dust-plus")) $("#adm-forge-dust-plus").addEventListener("click", () => {
+    p.dust = Math.min(p.dustLimit || 100, (p.dust || 0) + 100);
+    adminAplicar(`Dust → ${p.dust}/${p.dustLimit}`);
+  });
+
+  const buscaInp = $("#adm-forge-busca");
+  if (buscaInp) buscaInp.addEventListener("input", () => {
+    ADMIN.forgeBusca = buscaInp.value;
+    renderAdminForge(p, el);
+    const n = $("#adm-forge-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+
+  $$("#admin-content [data-forge-tier-set]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const sel = $(`.adm-forge-tier[data-inst-id="${b.dataset.forgeTierSet}"]`);
+      const r = adminSetForgeItemTier(p, b.dataset.forgeTierSet, sel ? sel.value : 0);
+      adminAplicar(r.msg);
+    }));
+  $$("#admin-content [data-forge-tier-max]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const inst = typeof findItemInstance === "function" ? findItemInstance(p, b.dataset.forgeTierMax) : null;
+      const maxTier = inst && typeof forgeMaxTierForSlug === "function" ? forgeMaxTierForSlug(inst.slug) : 0;
+      const r = adminSetForgeItemTier(p, b.dataset.forgeTierMax, maxTier);
+      adminAplicar(r.msg);
+    }));
+  if ($("#adm-forge-all-apply")) $("#adm-forge-all-apply").addEventListener("click", () => {
+    const tier = adminClampInt($("#adm-forge-all-tier").value, 0, 10);
+    let n = 0;
+    for (const e of items) { adminSetForgeItemTier(p, e.id, tier); n++; }
+    adminAplicar(`${n} item(ns) da lista ajustados para até T${tier}`);
+  });
+  if ($("#adm-forge-all-zero")) $("#adm-forge-all-zero").addEventListener("click", () => {
+    let n = 0;
+    for (const e of items) { adminSetForgeItemTier(p, e.id, 0); n++; }
+    adminAplicar(`${n} item(ns) da lista ficaram sem tier`);
+  });
+
+  const mobInp = $("#adm-forge-mob-busca");
+  if (mobInp) mobInp.addEventListener("input", () => {
+    ADMIN.forgeMobBusca = mobInp.value;
+    renderAdminForge(p, el);
+    const n = $("#adm-forge-mob-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  const stackInp = $("#adm-forge-stacks");
+  if (stackInp) stackInp.addEventListener("change", () => {
+    ADMIN.forgeStacks = adminClampInt(stackInp.value, 1, 5);
+    renderAdminForge(p, el);
+  });
+  if ($("#adm-forge-clear-special")) $("#adm-forge-clear-special").addEventListener("click", () => {
+    if (!G.combat) return;
+    const before = G.combat.mobs.length;
+    G.combat.mobs = G.combat.mobs.filter((m) => !(m && (m.influenced || m.fiendish)));
+    if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(G.combat);
+    adminAplicar(`${before - G.combat.mobs.length} monstro(s) especiais removidos`);
+  });
+  $$("#admin-content [data-forge-summon]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const slug = b.dataset.forgeSummon;
+      const variant = b.dataset.variant;
+      const stackValue = adminClampInt(ADMIN.forgeStacks || 5, 1, 5);
+      if (!adminSummon(G.combat, slug, false, 1, variant, stackValue)) {
+        toast("Falha ao invocar.", "bad");
+        return;
+      }
+      const nome = GAMEDATA.monsters[slug].name;
+      adminAplicar(`${variant === "fiendish" ? "Fiendish" : "Influenced"} ${nome} invocado (${G.combat.mobs.length} na arena)`);
+    }));
+}
+
 /* ----------------------------------------------------- aba: imbuements */
 
 function adminImbMaterials() {
@@ -719,7 +1050,7 @@ function renderAdminEquip(p, el) {
  */
 
 /* Coloca UM monstro dentro do combate ativo. Devolve true se entrou. */
-function adminSummon(c, slug, asBoss, mult) {
+function adminSummon(c, slug, asBoss, mult, variant, stacks) {
   const base = (typeof GAMEDATA !== "undefined") ? GAMEDATA.monsters[slug] : null;
   if (!c || !base) return false;
   const def = Object.assign({}, base);
@@ -729,9 +1060,13 @@ function adminSummon(c, slug, asBoss, mult) {
     def.boss = true;
     def.name = base.name;
   }
+  const special = adminApplyForgeMonsterVariant(def, variant, stacks);
   c.mobs.push({
     slug: slug, def: def,
     boss: !!asBoss,
+    influenced: special.influenced,
+    fiendish: special.fiendish,
+    sinisterStacks: special.stacks,
     hp: def.hp, maxHp: def.hp,
     atkCd: 500,
     id: "adm-" + Math.random().toString(36).slice(2, 8),
