@@ -3,6 +3,9 @@
  */
 "use strict";
 
+// DEBUG temporário: contador de hits FATAL na tela
+window.FATAL_DEBUG_COUNT = 0;
+
 const SAVE_KEY = "tibia-idle-save-v1";
 const CHARACTERS_KEY = "tibia-idle-characters-v1";
 const ACTIVE_CHARACTER_KEY = "tibia-idle-active-character-v1";
@@ -671,6 +674,7 @@ function openBossModal(id) {
 }
 
 function startBoss(id) {
+  window.FATAL_DEBUG_COUNT = 0;
   const boss = BOSS_DEFS[id];
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
@@ -726,6 +730,7 @@ function openInstanceModal(id) {
 }
 
 function startHunt(id, instanceMode) {
+  window.FATAL_DEBUG_COUNT = 0;
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
   if (!instanceMode) { openInstanceModal(id); return; }
@@ -828,6 +833,11 @@ function drainEvents() {
         // critico das stances do Sorcerer (15.25): o sprite "CRIT!" do
         // update pisca em cima do alvo
         if (e.crit) r.addEffect(x, y - 0.06, "crit-text");
+        // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial
+        if (e.fatal) {
+          r.addEffect(x, y - 0.10, "fatal-text");
+          window.FATAL_DEBUG_COUNT = (window.FATAL_DEBUG_COUNT || 0) + 1;
+        }
         break;
       }
       case "stance":

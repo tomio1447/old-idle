@@ -1199,6 +1199,17 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
+  // --- DEBUG: contador de hits FATAL (temporário)
+  const fatalCount = (typeof window !== "undefined" && window.FATAL_DEBUG_COUNT) || 0;
+  if (fatalCount > 0) {
+    ctx.textAlign = "left";
+    ctx.font = "bold 14px Verdana";
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.strokeText("FATAL: " + fatalCount, 12, 64);
+    ctx.fillStyle = "#ff4a4a";
+    ctx.fillText("FATAL: " + fatalCount, 12, 64);
+  }
+
   // --- tela de morte
   if (combat && combat.dead) {
     ctx.fillStyle = "rgba(70,0,0,.55)";
