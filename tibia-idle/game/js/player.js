@@ -275,8 +275,13 @@ function playerDamage(p) {
   const voc = VOCATIONS[p.voc];
 
   if (it && it.t === "magic") {
-    const d = magicDamage(p.level, effMagic(p), it.mdmg || 10);
-    return { min: d.min, max: d.max, element: "energy", type: "magic" };
+    // Canary WeaponWand::getWeaponDamage: dano base do item (fromDamage a
+    // toDamage em items.xml) + level/5, mantendo o elemento real da wand/rod
+    // em vez de forçar energy e escalar com ml (magicDamage).
+    const lvBonus = Math.floor((p.level || 1) / 5);
+    const min = (it.dmgMin !== undefined ? it.dmgMin : (it.mdmg || 10)) + lvBonus;
+    const max = (it.dmgMax !== undefined ? it.dmgMax : (it.mdmg || 10)) + lvBonus;
+    return { min: min, max: Math.max(min, max), element: it.el || "energy", type: "magic" };
   }
   if (it && it.t === "distance") {
     // armas de munição infinita (spear) usam só o próprio ataque
