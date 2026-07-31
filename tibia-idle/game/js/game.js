@@ -3,8 +3,8 @@
  */
 "use strict";
 
-// DEBUG temporário: contador de hits FATAL na tela
-window.FATAL_DEBUG_COUNT = 0;
+// DEBUG temporário: contadores de procs da Exaltation Forge na tela
+window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
 
 const SAVE_KEY = "tibia-idle-save-v1";
 const CHARACTERS_KEY = "tibia-idle-characters-v1";
@@ -674,7 +674,7 @@ function openBossModal(id) {
 }
 
 function startBoss(id) {
-  window.FATAL_DEBUG_COUNT = 0;
+  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
@@ -730,7 +730,7 @@ function openInstanceModal(id) {
 }
 
 function startHunt(id, instanceMode) {
-  window.FATAL_DEBUG_COUNT = 0;
+  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
   if (!instanceMode) { openInstanceModal(id); return; }
@@ -835,8 +835,11 @@ function drainEvents() {
         if (e.crit) r.addEffect(x, y - 0.06, "crit-text");
         // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial
         if (e.fatal) {
-          r.addEffect(x, y - 0.10, "fatal-text");
-          window.FATAL_DEBUG_COUNT = (window.FATAL_DEBUG_COUNT || 0) + 1;
+          // mais tempo de exibição para o efeito FATAL ser visível
+          r.addEffect(x, y - 0.10, "fatal-text", 1200);
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          fdc.fatal = (fdc.fatal || 0) + 1;
+          window.FORGE_DEBUG_COUNT = fdc;
         }
         break;
       }
@@ -879,9 +882,19 @@ function drainEvents() {
         r.addEffect(px, py, "mana-wisp");
         break;
       }
-      case "miss":
-        r.addFloater(ex(e), ey(e), "errou", "#a0a0a0");
+      case "miss": {
+        // Ruse (armor): evitou completamente um ataque
+        if (e.ruse) {
+          r.addFloater(ex(e), ey(e), "RUSE!", "#66c7ff");
+          r.addEffect(ex(e), ey(e), "magic-blue", 1000);
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          fdc.ruse = (fdc.ruse || 0) + 1;
+          window.FORGE_DEBUG_COUNT = fdc;
+        } else {
+          r.addFloater(ex(e), ey(e), "errou", "#a0a0a0");
+        }
         break;
+      }
       case "dust": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         if (e.dust) r.addFloater(px, py, "+" + fmt(e.dust) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
@@ -977,9 +990,19 @@ function drainEvents() {
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
         break;
-      case "buff":
+      case "buff": {
         addLog("skill", `Buff ativo: <b>${e.nome}</b>`);
+        // Momentum (helmet): redução de cooldowns
+        if (e.nome === "Momentum") {
+          const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
+          r.addFloater(px, py - 0.16, "MOMENTUM!", "#ffe680");
+          r.addEffect(px, py, "mana-wisp", 1000);
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          fdc.momentum = (fdc.momentum || 0) + 1;
+          window.FORGE_DEBUG_COUNT = fdc;
+        }
         break;
+      }
       case "poisoned":
         r.addEffect(ex(e), ey(e), "hit-by-poison");
         addLog("info", `<b>${e.name}</b> foi envenenado.`);

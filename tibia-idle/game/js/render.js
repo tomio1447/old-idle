@@ -359,13 +359,13 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
   drawCreatureSpeech(ctx, this.playerTalk, x, y, dt);
 };
 
-Renderer.prototype.addEffect = function (x, y, name) {
+Renderer.prototype.addEffect = function (x, y, name, customDurMs) {
   if (!FX_FRAMES[name]) name = "draw-blood";
   // os efeitos do 15.x tem de 3 a 16 quadros; ~55ms por quadro mantem a
   // animacao fluida sem esticar demais os efeitos longos
   const n = FX_FRAMES[name];
   this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: n, dur: Math.max(300, Math.min(700, n * 55)) });
+                      frames: n, dur: customDurMs || Math.max(300, Math.min(700, n * 55)) });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
   // as primeiras eram descartadas antes de aparecer. 120 cabe a maior
   // matriz do jogo com folga e ainda protege contra vazamento.
@@ -1199,15 +1199,27 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // --- DEBUG: contador de hits FATAL (temporário)
-  const fatalCount = (typeof window !== "undefined" && window.FATAL_DEBUG_COUNT) || 0;
-  if (fatalCount > 0) {
+  // --- DEBUG: contadores de procs da Exaltation Forge (temporário)
+  const forgeCounts = (typeof window !== "undefined" && window.FORGE_DEBUG_COUNT) || null;
+  if (forgeCounts) {
     ctx.textAlign = "left";
     ctx.font = "bold 14px Verdana";
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
-    ctx.strokeText("FATAL: " + fatalCount, 12, 64);
-    ctx.fillStyle = "#ff4a4a";
-    ctx.fillText("FATAL: " + fatalCount, 12, 64);
+    ctx.lineWidth = 3;
+    const lines = [
+      { label: "FATAL", n: forgeCounts.fatal || 0, color: "#ff4a4a" },
+      { label: "MOMENTUM", n: forgeCounts.momentum || 0, color: "#ffe680" },
+      { label: "RUSE", n: forgeCounts.ruse || 0, color: "#66c7ff" },
+    ];
+    let y = 64;
+    for (const ln of lines) {
+      if (ln.n <= 0) continue;
+      const txt = `${ln.label}: ${ln.n}`;
+      ctx.strokeStyle = "#000";
+      ctx.strokeText(txt, 12, y);
+      ctx.fillStyle = ln.color;
+      ctx.fillText(txt, 12, y);
+      y += 20;
+    }
   }
 
   // --- tela de morte
