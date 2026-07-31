@@ -1071,11 +1071,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
           const t = tilePx(W);
           drawTargetSquare(ctx, mx - t / 2, my + h / 2 - t, t, t);
         }
-        if (m.influenced) {
+        if (m.fiendish || m.influenced) {
           ctx.save();
-          ctx.shadowColor = "#39a8ff";
-          ctx.shadowBlur = 18;
-          ctx.globalAlpha = 0.9;
+          ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
+          ctx.shadowBlur = m.fiendish ? 22 : 18;
+          ctx.globalAlpha = 0.92;
           ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
           ctx.restore();
         }
@@ -1094,6 +1094,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
           ? displayMonsterName(m.def.name)
           : String(m.def.name || "").replace(/^Influenced\s+/i, "");
         drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
+        if (m.fiendish || m.influenced) {
+          const tag = m.fiendish ? "FIENDISH" : ("INFLUENCED " + (m.sinisterStacks || 1));
+          drawNameText(ctx, mx, by + 7, tag, m.fiendish ? "#d79cff" : "#66c7ff");
+        }
         // fala da criatura (monster.voices do Canary), acima do nome
         drawCreatureSpeech(ctx, m, mx, by - 4, dt);
       }

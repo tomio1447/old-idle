@@ -407,8 +407,10 @@ function renderEquip(p) {
     const e = p.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
-      h += `<div class="slot ${itemClsBorder(e.item)} ${forgeTierClass(e.item)}" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${(G.p && G.p.forge && G.p.forge[e.item]) ? `<span class="cnt" style="color:#ffe680">T${G.p.forge[e.item]}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
+      const tierTxt = typeof forgeTierTextForEntry === "function" ? forgeTierTextForEntry(e) : forgeTierText(e.item);
+      const tierCls = typeof forgeTierClassForEntry === "function" ? forgeTierClassForEntry(e) : forgeTierClass(e.item);
+      h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}" data-slot="${slot}" data-item="${e.item}">
+        ${itemImg(e.item)}${tierTxt ? `<span class="cnt" style="color:#ffe680">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
@@ -422,7 +424,7 @@ function renderEquip(p) {
     }
     const slug = el.dataset.item;
     if (!slug) return;
-    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop });
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop, instId: p.equip[slotDrop] && p.equip[slotDrop].instId ? p.equip[slotDrop].instId : null });
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
       const extra = slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` :
@@ -439,14 +441,17 @@ function renderEquip(p) {
       const slot = el.dataset.slot;
       if (slot === "backpack") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
       if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
-      if (!addItem(G.p, slug, 1)) {
-        toast("Mochila cheia."); return;
+      if (typeof unequipToContainer === "function") {
+        if (!unequipToContainer(G.p, slot, "bag")) return;
+      } else {
+        if (!addItem(G.p, slug, 1)) {
+          toast("Mochila cheia."); return;
+        }
+        if (slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver") {
+          setActiveAmmo(G.p, null);
+        }
+        delete G.p.equip[slot];
       }
-      // tirar a aljava tambem desequipa a municao
-      if (slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver") {
-        setActiveAmmo(G.p, null);
-      }
-      delete G.p.equip[slot];
       hideTip();
       renderAll();
     });
@@ -524,18 +529,33 @@ function huntEstimate(p, hu) {
 }
 
 function renderInventory(p) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
   const slots = bagSlots(p);
-  const entries = Object.keys(p.bag).filter((slug) => (p.bag[slug] || 0) > 0).sort((a, b) => {
-    const A = GAMEDATA.items[a], B = GAMEDATA.items[b];
-    return (B ? B.sell || 0 : 0) - (A ? A.sell || 0 : 0);
-  });
+  const instanced = (p.itemInstances || [])
+    .filter((inst) => inst && inst.loc === "bag")
+    .sort((a, b) => {
+      const A = GAMEDATA.items[a.slug], B = GAMEDATA.items[b.slug];
+      const ds = (B ? B.sell || 0 : 0) - (A ? A.sell || 0 : 0);
+      if (ds) return ds;
+      return itemInstanceTier(b) - itemInstanceTier(a);
+    })
+    .map((inst) => ({ slug: inst.slug, instId: inst.id, tier: itemInstanceTier(inst), count: 1, instanced: true }));
+  const stacked = Object.keys(p.bag)
+    .filter((slug) => (p.bag[slug] || 0) > 0 && !(typeof itemUsesInstances === "function" && itemUsesInstances(slug)))
+    .sort((a, b) => {
+      const A = GAMEDATA.items[a], B = GAMEDATA.items[b];
+      return (B ? B.sell || 0 : 0) - (A ? A.sell || 0 : 0);
+    })
+    .map((slug) => ({ slug: slug, count: p.bag[slug], instanced: false }));
+  const entries = instanced.concat(stacked);
   const displaySlots = Math.max(slots, entries.length);
   const cells = [];
   for (let i = 0; i < displaySlots; i++) {
-    const slug = entries[i];
-    if (slug) {
-      cells.push(`<div class="inv-item ${itemClsBorder(slug)}" data-item="${slug}">${itemImg(slug)}
-        ${p.bag[slug] > 1 ? `<span class="cnt">${p.bag[slug]}</span>` : ""}
+    const e = entries[i];
+    if (e) {
+      const tierCls = e.tier && typeof forgeTierClassForValue === "function" ? forgeTierClassForValue(e.tier) : "";
+      cells.push(`<div class="inv-item ${itemClsBorder(e.slug)} ${tierCls}" data-item="${e.slug}"${e.instId ? ` data-inst="${e.instId}"` : ""}>${itemImg(e.slug)}
+        ${e.tier ? `<span class="cnt" style="color:#ffe680">T${e.tier}</span>` : (e.count > 1 ? `<span class="cnt">${e.count}</span>` : "")}
       </div>`);
     } else {
       cells.push(`<div class="inv-item empty" title="Slot vazio"></div>`);
@@ -556,15 +576,20 @@ function renderInventory(p) {
   }
   $$("#inv .inv-item[data-item]").forEach((el) => {
     const slug = el.dataset.item;
-    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "bag", slug: slug });
-    el.addEventListener("mouseenter", () =>
-      showTip(itemTip(slug, `${p.bag[slug]}x · Clique para opções`)));
+    const instId = el.dataset.inst || null;
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "bag", slug: slug, instId: instId });
+    el.addEventListener("mouseenter", () => {
+      const extra = instId
+        ? `${typeof forgeTierTextForInstance === "function" ? (forgeTierTextForInstance(instId) || "sem tier") : "item"} · Clique para opções`
+        : `${p.bag[slug]}x · Clique para opções`;
+      showTip(itemTip(slug, extra));
+    });
     el.addEventListener("mouseleave", hideTip);
     const openMenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
       hideTip();
-      openBagItemMenu(p, slug, e.clientX, e.clientY);
+      openBagItemMenu(p, slug, e.clientX, e.clientY, null, instId);
     };
     el.addEventListener("click", openMenu);
     el.addEventListener("contextmenu", openMenu);
@@ -572,40 +597,81 @@ function renderInventory(p) {
 }
 
 /* Equipa um item da mochila. Retorna true se equipou. */
-function equipFromBag(p, slug) {
+function equipFromBag(p, slug, instId) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
   if (typeof canEquipItem === "function") {
     const chk = canEquipItem(p, slug, it.s);
     if (!chk.ok) { toast(chk.msg, ""); return false; }
   } else if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
-  if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "bag", it.s);
+  if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "bag", it.s, instId);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
     setActiveAmmo(p, slug);
     toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     return true;
   }
+
+  let takenInst = null;
   const old = p.equip[it.s];
-  removeItem(p, slug, 1);
-  if (old && !addItem(p, old.item, 1)) {
-    addItem(p, slug, 1);
-    toast("Mochila cheia.");
-    return false;
+  if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
+    takenInst = takeBagItemInstance(p, slug, { instId: instId, highestTier: true });
+    if (!takenInst) return false;
+  } else {
+    removeItem(p, slug, 1);
   }
-  p.equip[it.s] = { item: slug, count: 1 };
+
+  if (old) {
+    if (old.instId && typeof takeEquippedItemInstance === "function") {
+      const oldInst = takeEquippedItemInstance(p, it.s);
+      if (!putBagItemInstance(p, oldInst)) {
+        if (takenInst) putBagItemInstance(p, takenInst); else addItem(p, slug, 1);
+        equipEntryInstance(p, it.s, oldInst);
+        toast("Mochila cheia.");
+        return false;
+      }
+    } else if (!addItem(p, old.item, 1)) {
+      if (takenInst) putBagItemInstance(p, takenInst); else addItem(p, slug, 1);
+      toast("Mochila cheia.");
+      return false;
+    }
+  }
+
+  if (takenInst) equipEntryInstance(p, it.s, takenInst);
+  else p.equip[it.s] = { item: slug, count: 1 };
+
   if (it.th && p.equip.shield) {
-    if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
-    else toast("Sem espaço para guardar o escudo.");
+    const shieldEntry = p.equip.shield;
+    if (shieldEntry.instId && typeof takeEquippedItemInstance === "function") {
+      const shInst = takeEquippedItemInstance(p, "shield");
+      if (!putBagItemInstance(p, shInst)) {
+        equipEntryInstance(p, "shield", shInst);
+        toast("Sem espaço para guardar o escudo.");
+      }
+    } else {
+      if (addItem(p, p.equip.shield.item, 1)) delete p.equip.shield;
+      else toast("Sem espaço para guardar o escudo.");
+    }
   }
   return true;
 }
 
 /* Vende um item da mochila (unica via de venda manual fora da Loot Pouch) */
-function sellBagItem(p, slug) {
+function sellBagItem(p, slug, instId) {
   const it = GAMEDATA.items[slug];
   const count = p.bag[slug] || 0;
-  if (!it || count <= 0) return 0;
+  if (!it) return 0;
+  if (instId && typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
+    const inst = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
+    if (!inst) return 0;
+    const valueOne = it.sell || 0;
+    if (valueOne <= 0) { putBagItemInstance(p, inst); toast("Esse item não possui valor de venda."); return 0; }
+    p.gold += valueOne;
+    deleteItemInstance(p, inst.id);
+    addLog("sell", `Vendeu <b>${it.n}</b>${inst.tier ? ` T${inst.tier}` : ""} por <span class="gold-txt">${fmtFull(valueOne)} gp</span>`);
+    return valueOne;
+  }
+  if (count <= 0) return 0;
   if (currencyValue(slug)) {
     const g = creditCurrency(p, slug, count);
     delete p.bag[slug];
@@ -621,10 +687,11 @@ function sellBagItem(p, slug) {
 }
 
 /* Menu de opções de um item da mochila */
-function openBagItemMenu(p, slug, x, y, after) {
+function openBagItemMenu(p, slug, x, y, after, instId) {
   const it = GAMEDATA.items[slug];
   if (!it) return;
-  const count = p.bag[slug] || 0;
+  const count = instId ? 1 : (p.bag[slug] || 0);
+  const inst = instId && typeof findItemInstance === "function" ? findItemInstance(p, instId) : null;
   const value = (it.sell || 0) * count;
   const refresh = () => { if (after) after(); else renderAll(); };
   const opts = [{ label: "Detalhes", action: () => openItemDetails(slug, count) }];
@@ -632,22 +699,33 @@ function openBagItemMenu(p, slug, x, y, after) {
   if (it.s) {
     opts.push({
       label: it.s === "ammo" ? "Selecionar munição" : "Equipar",
-      action: () => { if (equipFromBag(p, slug)) refresh(); },
+      action: () => { if (equipFromBag(p, slug, instId)) refresh(); },
     });
   }
   // moedas viram gold direto; o resto só é vendido pela Loot Pouch
   if (currencyValue(slug)) {
     opts.push({
       label: `Converter em gold · ${fmtFull(currencyValue(slug) * count)} gp`,
-      action: () => { if (sellBagItem(p, slug) > 0) refresh(); },
+      action: () => { if (sellBagItem(p, slug, instId) > 0) refresh(); },
     });
   } else {
     opts.push({
       label: "Mover para Loot Pouch",
       hint: value > 0 ? `${fmtFull(value)} gp` : "",
       action: () => {
-        addLootPouch(p, slug, count);
-        delete p.bag[slug];
+        if (instId && inst && inst.tier > 0) {
+          toast("Itens tierados precisam ficar em bag/depot/equip. Não mova para a Loot Pouch.");
+          return;
+        }
+        if (instId && typeof takeBagItemInstance === "function") {
+          const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
+          if (!taken) return;
+          deleteItemInstance(p, taken.id);
+          addLootPouch(p, slug, 1);
+        } else {
+          addLootPouch(p, slug, count);
+          delete p.bag[slug];
+        }
         addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
         refresh();
       },
@@ -658,12 +736,18 @@ function openBagItemMenu(p, slug, x, y, after) {
     danger: true,
     action: () => {
       if (!confirm(`Destruir ${count}x ${it.n}? Isso não pode ser desfeito.`)) return;
-      delete p.bag[slug];
+      if (instId && typeof takeBagItemInstance === "function") {
+        const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
+        if (!taken) return;
+        deleteItemInstance(p, taken.id);
+      } else {
+        delete p.bag[slug];
+      }
       addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
       refresh();
     },
   });
-  showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, opts);
+  showContextMenu(x, y, `${it.n} <span class="dim">${inst ? (forgeTierTextForInstance(inst.id) || "1x") : (count + "x")}</span>`, opts);
 }
 
 /* ---------------------------------------------------------- context menu */
@@ -1621,6 +1705,13 @@ function renderTopbar(p) {
   $("#gold").textContent = fmtFull(p.gold);
   const cityBtn = $("#btn-city");
   if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
+  const forgeBtn = $("#btn-forge");
+  if (forgeBtn) {
+    const atCap = typeof p.dust === "number" && typeof p.dustLimit === "number" && p.dust >= p.dustLimit;
+    forgeBtn.style.color = atCap ? "#ffe680" : "";
+    forgeBtn.style.borderColor = atCap ? "#d4af37" : "";
+    forgeBtn.title = atCap ? `Dust no limite (${p.dust}/${p.dustLimit})` : "Abrir Exaltation Forge";
+  }
   const c = G.combat;
   if (G.training) {
     $("#xph").textContent = "treino";

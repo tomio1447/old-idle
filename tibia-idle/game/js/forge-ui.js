@@ -38,8 +38,9 @@ function forgeCloseModal() {
 
 function forgeResourceSummaryHtml(p) {
   ensureForge(p);
+  var cap = p.dustLimit || 100;
   return '<div class="row small" style="gap:8px;flex-wrap:wrap">'
-    + '<span class="imb-mat"><b>Dust</b> ' + fmtFull(p.dust || 0) + '</span>'
+    + '<span class="imb-mat"><b>Dust</b> ' + fmtFull(p.dust || 0) + ' / ' + fmtFull(cap) + '</span>'
     + '<span class="imb-mat"><b>Slivers</b> ' + fmtFull(p.slivers || 0) + '</span>'
     + '<span class="imb-mat"><b>Exalted Cores</b> ' + fmtFull(p.exaltedCores || 0) + '</span>'
     + '</div>';
@@ -50,17 +51,17 @@ function renderForgeItemList(p) {
   if (!items.length) {
     return '<div class="small dim">Nenhum item elegível na mochila.<br>Coloque o equipamento na backpack para usar a Forge.</div>';
   }
-  if (!FORGE_UI.slug || !items.some(function(e) { return e.slug === FORGE_UI.slug; })) {
-    FORGE_UI.slug = items[0].slug;
+  if (!FORGE_UI.slug || !items.some(function(e) { return e.ref === FORGE_UI.slug; })) {
+    FORGE_UI.slug = items[0].ref;
   }
   var html = '<div class="imb-eqlist">';
   for (var i = 0; i < items.length; i++) {
     var e = items[i];
-    var sel = e.slug === FORGE_UI.slug ? ' sel' : '';
-    html += '<div class="imb-eq' + sel + '" data-forge-slug="' + e.slug + '">'
+    var sel = e.ref === FORGE_UI.slug ? ' sel' : '';
+    html += '<div class="imb-eq' + sel + '" data-forge-ref="' + e.ref + '">'
       + itemImg(e.slug, 30)
       + '<div class="imb-eq-meta"><b>' + e.it.n + '</b>'
-      + '<span class="tiny dim">' + e.slot + ' · cls ' + e.cls + ' · ' + e.count + 'x na mochila · ' + (e.currentTier ? ('T' + e.currentTier) : 'sem tier') + ' / T' + e.maxTier + '</span>'
+      + '<span class="tiny dim">' + e.slot + ' · cls ' + e.cls + ' · instância · ' + (e.currentTier ? ('T' + e.currentTier) : 'sem tier') + ' / T' + e.maxTier + '</span>'
       + '</div></div>';
   }
   html += '</div>';
@@ -77,10 +78,10 @@ function renderForgeModeTabs() {
 function renderForgeFusionPanel(p, slug) {
   var info = forgeItemSummary(p, slug);
   if (!info) return '<div class="small dim">Selecione um item válido.</div>';
-  var effect = forgeEffectForSlot(info.slot, Math.min(info.tier + 1, info.maxTier));
+  var effect = forgeEffectForSlot(info.slot, Math.min(info.tier + 1, info.maxTier), p);
   var useCore = !!FORGE_UI.useCore;
   var chk = forgeCanFuse(p, slug, useCore);
-  var gold = forgeFusionGoldCost(slug, info.tier);
+  var gold = forgeFusionGoldCost(info.slug, info.tier);
   var next = info.tier + 1;
   var chance = useCore ? FORGE_FUSION.successPctCore : FORGE_FUSION.successPct;
   var canUpgrade = next <= info.maxTier;
@@ -122,19 +123,19 @@ function renderForgeTransferPanel(p, donorSlug) {
   var donor = forgeItemSummary(p, donorSlug);
   if (!donor) return '<div class="small dim">Selecione um item doador.</div>';
   var targets = forgeTransferTargets(p, donorSlug);
-  if (!FORGE_UI.targetSlug || !targets.some(function(t) { return t.slug === FORGE_UI.targetSlug; })) {
-    FORGE_UI.targetSlug = targets.length ? targets[0].slug : null;
+  if (!FORGE_UI.targetSlug || !targets.some(function(t) { return t.ref === FORGE_UI.targetSlug; })) {
+    FORGE_UI.targetSlug = targets.length ? targets[0].ref : null;
   }
   var targetInfo = FORGE_UI.targetSlug ? forgeItemSummary(p, FORGE_UI.targetSlug) : null;
   var chk = targetInfo ? forgeCanTransfer(p, donorSlug, FORGE_UI.targetSlug) : { ok: false, msg: 'Nenhum alvo válido disponível.' };
-  var gold = donor ? forgeTransferGoldCost(donorSlug, donor.tier) : 0;
+  var gold = donor ? forgeTransferGoldCost(donor.slug, donor.tier) : 0;
   var list = '<div class="imb-cat">Alvos válidos</div>';
   if (!targets.length) {
     list += '<div class="small dim">Nenhum alvo elegível. O item alvo precisa ter a mesma classificação, estar sem tier e existir como 1 única cópia na mochila.</div>';
   } else {
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      list += '<div class="imb-row' + (FORGE_UI.targetSlug === t.slug ? ' sel' : '') + '" data-transfer-target="' + t.slug + '">'
+      list += '<div class="imb-row' + (FORGE_UI.targetSlug === t.ref ? ' sel' : '') + '" data-transfer-target="' + t.ref + '">'
         + itemImg(t.slug, 28)
         + '<span><b>' + t.it.n + '</b><br><span class="tiny dim">cls ' + t.cls + ' · sem tier · ' + t.count + 'x</span></span>'
         + '</div>';
@@ -161,7 +162,7 @@ function renderForgeModal() {
   if (!p) return '';
   ensureForge(p);
   var bag = forgeBagItems(p);
-  if (!FORGE_UI.slug && bag.length) FORGE_UI.slug = bag[0].slug;
+  if (!FORGE_UI.slug && bag.length) FORGE_UI.slug = bag[0].ref;
   var right = '';
   if (FORGE_UI.mode === 'transfer') right = renderForgeTransferPanel(p, FORGE_UI.slug);
   else right = renderForgeFusionPanel(p, FORGE_UI.slug);
@@ -194,9 +195,9 @@ function bindForgeModal() {
   var body = forgeModalBody();
   if (!body) return;
 
-  body.querySelectorAll('[data-forge-slug]').forEach(function(el) {
+  body.querySelectorAll('[data-forge-ref]').forEach(function(el) {
     el.addEventListener('click', function() {
-      FORGE_UI.slug = el.dataset.forgeSlug;
+      FORGE_UI.slug = el.dataset.forgeRef;
       if (FORGE_UI.mode !== 'transfer') FORGE_UI.targetSlug = null;
       openForgeModal();
     });
@@ -257,10 +258,16 @@ function renderDustModal() {
   ensureForge(p);
   var canDust = (p.dust || 0) >= FORGE_CONVERGENCE.dustToSlivers.dust;
   var canCore = (p.slivers || 0) >= FORGE_CONVERGENCE.sliversToCore.slivers;
+  var capCost = typeof forgeDustLimitCost === 'function' ? forgeDustLimitCost(p) : 0;
+  var canCap = capCost > 0 && (p.dust || 0) >= capCost;
   return ''
     + '<div class="panel-title">Resources & Convergence</div>'
     + '<div class="panel-body">'
     +   forgeResourceSummaryHtml(p)
+    +   '<div class="shop-row mt8"><span class="small">Increase Dust Limit</span>'
+    +     '<button class="sm' + (canCap ? ' primary' : '') + '" id="forge-inc-cap"' + (canCap ? '' : ' disabled') + '>'
+    +       (capCost ? ('+' + 1 + ' limit por ' + capCost + ' Dust') : 'Limite máximo atingido')
+    +     '</button></div>'
     +   '<div class="shop-row mt8"><span class="small">Dust → Slivers</span>'
     +     '<button class="sm' + (canDust ? ' primary' : '') + '" id="forge-conv-dust"' + (canDust ? '' : ' disabled') + '>'
     +       FORGE_CONVERGENCE.dustToSlivers.dust + ' Dust → ' + FORGE_CONVERGENCE.dustToSlivers.slivers + ' Slivers'
@@ -269,7 +276,7 @@ function renderDustModal() {
     +     '<button class="sm' + (canCore ? ' primary' : '') + '" id="forge-conv-core"' + (canCore ? '' : ' disabled') + '>'
     +       FORGE_CONVERGENCE.sliversToCore.slivers + ' Slivers → 1 Core'
     +     '</button></div>'
-    +   '<div class="tiny dim mt8">Influenced/Fiendish geram Dust; Slivers convertem em Exalted Cores.</div>'
+    +   '<div class="tiny dim mt8">Influenced/Fiendish geram Dust automaticamente. Slivers vêm de Fiendish e de conversão.</div>'
     +   '<button class="sm mt8" id="dust-close">Fechar</button>'
     + '</div>';
 }
@@ -278,6 +285,13 @@ function openDustModal() {
   forgeOpenModal(renderDustModal(), false);
   var body = forgeModalBody();
   if (!body) return;
+  var incCap = body.querySelector('#forge-inc-cap');
+  if (incCap) incCap.addEventListener('click', function() {
+    var r = forgeIncreaseDustLimit(G.p);
+    if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+    if (typeof renderAll === 'function') renderAll();
+    openDustModal();
+  });
   var convDust = body.querySelector('#forge-conv-dust');
   if (convDust) convDust.addEventListener('click', function() {
     var r = forgeConvergenceDustToSlivers(G.p);
@@ -300,20 +314,29 @@ function openDustModal() {
 function renderDepotStoreList(p) {
   var rows = '';
   var equipables = [];
+  if (typeof ensureItemInstances === 'function') ensureItemInstances(p);
+  var insts = p && p.itemInstances ? p.itemInstances : [];
+  for (var i = 0; i < insts.length; i++) {
+    var inst = insts[i];
+    if (!inst || inst.loc !== 'bag') continue;
+    var itInst = GAMEDATA.items[inst.slug];
+    if (!itInst || !itInst.s) continue;
+    equipables.push({ ref: inst.id, slug: inst.slug, count: 1, tier: inst.tier || 0, it: itInst });
+  }
   var bag = p && p.bag ? p.bag : {};
   for (var slug in bag) {
-    if (!bag[slug]) continue;
+    if (!bag[slug] || (typeof itemUsesInstances === 'function' && itemUsesInstances(slug))) continue;
     var it = GAMEDATA.items[slug];
     if (!it || !it.s) continue;
-    equipables.push({ slug: slug, count: bag[slug], it: it });
+    equipables.push({ ref: slug, slug: slug, count: bag[slug], tier: 0, it: it });
   }
   equipables.sort(function(a, b) { return a.it.n < b.it.n ? -1 : 1; });
   if (!equipables.length) return '<div class="tiny dim mt8">Nenhum equipamento na mochila para guardar.</div>';
-  for (var i = 0; i < equipables.length && i < 12; i++) {
-    var e = equipables[i];
+  for (var j = 0; j < equipables.length && j < 12; j++) {
+    var e = equipables[j];
     rows += '<div class="shop-row">'
-      + '<span class="small">' + e.it.n + ' <span class="dim">x' + e.count + '</span></span>'
-      + '<button class="sm" data-depot-store="' + e.slug + '">Guardar 1x</button>'
+      + '<span class="small">' + e.it.n + ' <span class="dim">' + (e.tier ? ('T' + e.tier) : ('x' + e.count)) + '</span></span>'
+      + '<button class="sm" data-depot-store="' + e.ref + '">Guardar 1x</button>'
       + '</div>';
   }
   return '<div class="imb-cat">Guardar no Depot</div>' + rows;
@@ -323,8 +346,10 @@ function renderDepotGrid(p) {
   var total = 30;
   var html = '<div class="inv-grid">';
   for (var i = 0; i < total; i++) {
-    var slug = forgeStoredSlug(p.depot[i]);
-    if (slug) html += '<div class="inv-item" data-depot-slug="' + slug + '">' + itemImg(slug) + '</div>';
+    var ref = p.depot[i];
+    var slug = forgeStoredSlug(p, ref);
+    var tierTxt = typeof forgeTierTextForInstance === 'function' ? forgeTierTextForInstance(ref) : '';
+    if (slug) html += '<div class="inv-item" data-depot-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="cnt" style="color:#ffe680">' + tierTxt + '</span>' : '') + '</div>';
     else html += '<div class="inv-item empty" title="Slot vazio"></div>';
   }
   html += '</div>';
@@ -336,8 +361,10 @@ function renderLegacyExaGrid(p) {
   if (!eb.length) return '<div class="tiny dim">Nenhum item legado na Exaltation Box.</div>';
   var html = '<div class="inv-grid">';
   for (var i = 0; i < eb.length; i++) {
-    var slug = forgeStoredSlug(eb[i]);
-    html += '<div class="inv-item" data-exa-slug="' + slug + '">' + itemImg(slug) + (p.forge && p.forge[slug] ? '<span class="cnt" style="color:#ffe680">T' + p.forge[slug] + '</span>' : '') + '</div>';
+    var ref = eb[i];
+    var slug = forgeStoredSlug(p, ref);
+    var tierTxt = typeof forgeTierTextForInstance === 'function' ? forgeTierTextForInstance(ref) : '';
+    html += '<div class="inv-item" data-exa-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="cnt" style="color:#ffe680">' + tierTxt + '</span>' : '') + '</div>';
   }
   html += '</div><div class="tiny dim mt4">Caixa legada de saves antigos. A Forge nova não envia itens para cá.</div>';
   return html;
@@ -389,32 +416,32 @@ function bindDepotModal() {
     });
   });
 
-  body.querySelectorAll('[data-depot-slug]').forEach(function(el) {
+  body.querySelectorAll('[data-depot-ref]').forEach(function(el) {
     el.addEventListener('click', function() {
-      openDepotItemMenu(G.p, el.dataset.depotSlug, el);
+      openDepotItemMenu(G.p, el.dataset.depotRef, el);
     });
     el.addEventListener('contextmenu', function(ev) {
       ev.preventDefault();
-      openDepotItemMenu(G.p, el.dataset.depotSlug, el);
+      openDepotItemMenu(G.p, el.dataset.depotRef, el);
     });
     el.addEventListener('mouseenter', function() {
-      if (typeof showTip === 'function') showTip(itemTip(el.dataset.depotSlug, 'Clique para opções'));
+      if (typeof showTip === 'function') showTip(itemTip(forgeStoredSlug(G.p, el.dataset.depotRef), 'Clique para opções'));
     });
     el.addEventListener('mouseleave', function() {
       if (typeof hideTip === 'function') hideTip();
     });
   });
 
-  body.querySelectorAll('[data-exa-slug]').forEach(function(el) {
+  body.querySelectorAll('[data-exa-ref]').forEach(function(el) {
     el.addEventListener('click', function() {
-      openLegacyExaItemMenu(G.p, el.dataset.exaSlug, el);
+      openLegacyExaItemMenu(G.p, el.dataset.exaRef, el);
     });
     el.addEventListener('contextmenu', function(ev) {
       ev.preventDefault();
-      openLegacyExaItemMenu(G.p, el.dataset.exaSlug, el);
+      openLegacyExaItemMenu(G.p, el.dataset.exaRef, el);
     });
     el.addEventListener('mouseenter', function() {
-      if (typeof showTip === 'function') showTip(itemTip(el.dataset.exaSlug, 'Item legado da antiga Exaltation Box'));
+      if (typeof showTip === 'function') showTip(itemTip(forgeStoredSlug(G.p, el.dataset.exaRef), 'Item legado da antiga Exaltation Box'));
     });
     el.addEventListener('mouseleave', function() {
       if (typeof hideTip === 'function') hideTip();
@@ -425,18 +452,19 @@ function bindDepotModal() {
   if (close) close.addEventListener('click', forgeCloseModal);
 }
 
-function openDepotItemMenu(p, slug, el) {
+function openDepotItemMenu(p, ref, el) {
+  var slug = forgeStoredSlug(p, ref);
   var it = GAMEDATA.items[slug];
   if (!it) return;
   var opts = [
     { label: 'Equipar', action: function() {
-      var r = depotEquip(p, slug);
+      var r = depotEquip(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
     }},
     { label: 'Retirar para mochila', action: function() {
-      var r = depotRetrieve(p, slug);
+      var r = depotRetrieve(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
@@ -448,18 +476,19 @@ function openDepotItemMenu(p, slug, el) {
   }
 }
 
-function openLegacyExaItemMenu(p, slug, el) {
+function openLegacyExaItemMenu(p, ref, el) {
+  var slug = forgeStoredSlug(p, ref);
   var it = GAMEDATA.items[slug];
   if (!it) return;
   var opts = [
     { label: 'Equipar', action: function() {
-      var r = exaltationEquip(p, slug);
+      var r = exaltationEquip(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
     }},
     { label: 'Retirar para mochila', action: function() {
-      var r = exaltationRetrieve(p, slug);
+      var r = exaltationRetrieve(p, ref);
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();

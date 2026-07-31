@@ -100,12 +100,25 @@ function canEquipItem(p, slug, targetSlot) {
 
 function stashEquippedItem(p, entry, preferred) {
   if (!entry || !entry.item) return true;
+  if (entry.instId && typeof takeEquippedItemInstance === "function") {
+    const slot = (entry._slot || entry.slot || entry.s || "");
+    const inst = slot ? takeEquippedItemInstance(p, slot) : null;
+    if (inst) {
+      if (preferred === "bag") return putBagItemInstance(p, inst);
+      if (inst.tier > 0) {
+        if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
+        return false;
+      }
+      deleteItemInstance(p, inst.id);
+      return typeof addLootPouch === "function" ? addLootPouch(p, inst.slug, 1) : false;
+    }
+  }
   if (preferred === "bag" && typeof addItem === "function" && addItem(p, entry.item, 1)) return true;
   if (typeof addLootPouch === "function") return addLootPouch(p, entry.item, 1);
   return typeof addItem === "function" ? addItem(p, entry.item, 1) : false;
 }
 
-function equipItemFromContainer(p, slug, source, targetSlot) {
+function equipItemFromContainer(p, slug, source, targetSlot, instId) {
   const chk = canEquipItem(p, slug, targetSlot);
   if (!chk.ok) { if (typeof toast === "function") toast(chk.msg, "bad"); return false; }
   const it = GAMEDATA.items[slug];
@@ -117,25 +130,54 @@ function equipItemFromContainer(p, slug, source, targetSlot) {
     return true;
   }
 
+  let takenInst = null;
   if (source === "bag") {
-    if (!removeItem(p, slug, 1)) return false;
+    if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
+      takenInst = takeBagItemInstance(p, slug, { instId: instId, highestTier: true });
+      if (!takenInst) return false;
+    } else if (!removeItem(p, slug, 1)) return false;
   } else if (source === "pouch") {
     if (!removeLootPouch(p, slug, 1)) return false;
   } else if (source === "equip") {
-    // Arrastar um item equipado para o próprio slot não faz nada.
-    if (targetSlot === source.slot || targetSlot === slot) return true;
+    return true;
   }
 
   const old = p.equip[slot];
-  p.equip[slot] = { item: slug, count: 1 };
+  let oldInst = null;
+  if (old && old.item !== slug) {
+    if (old.instId && typeof takeEquippedItemInstance === "function") {
+      oldInst = takeEquippedItemInstance(p, slot);
+      if (source === "bag") {
+        if (!putBagItemInstance(p, oldInst)) {
+          if (takenInst) putBagItemInstance(p, takenInst); else if (source === "bag") addItem(p, slug, 1);
+          equipEntryInstance(p, slot, oldInst);
+          return false;
+        }
+      } else {
+        if (oldInst.tier > 0) {
+          if (takenInst) putBagItemInstance(p, takenInst); else if (source === "bag") addItem(p, slug, 1);
+          equipEntryInstance(p, slot, oldInst);
+          if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
+          return false;
+        }
+        deleteItemInstance(p, oldInst.id);
+        addLootPouch(p, oldInst.slug, 1);
+      }
+    } else if (!stashEquippedItem(p, Object.assign({ _slot: slot }, old), source === "bag" ? "bag" : "pouch")) {
+      if (takenInst) putBagItemInstance(p, takenInst); else if (source === "bag") addItem(p, slug, 1);
+      return false;
+    }
+  }
 
-  if (old && old.item !== slug) stashEquippedItem(p, old, source === "bag" ? "bag" : "pouch");
+  if (takenInst) equipEntryInstance(p, slot, takenInst);
+  else p.equip[slot] = { item: slug, count: 1 };
 
   // Arma de duas mãos remove escudo/spellbook, mas mantém quiver (Tibia global).
   if (slot === "weapon" && it.th && p.equip.shield) {
     const sh = GAMEDATA.items[p.equip.shield.item];
     if (sh && sh.t !== "quiver") {
-      stashEquippedItem(p, p.equip.shield, source === "bag" ? "bag" : "pouch");
+      const shEntry = Object.assign({ _slot: "shield" }, p.equip.shield);
+      if (!stashEquippedItem(p, shEntry, source === "bag" ? "bag" : "pouch")) return false;
       delete p.equip.shield;
     }
   }
@@ -148,13 +190,34 @@ function unequipToContainer(p, slot, dest) {
   if (slot === "ammo") { if (typeof setActiveAmmo === "function") setActiveAmmo(p, null); return true; }
   const e = p.equip[slot];
   let ok = false;
-  if (dest === "bag") ok = addItem(p, e.item, 1);
-  else ok = addLootPouch(p, e.item, 1);
-  if (!ok) { if (typeof toast === "function") toast("Mochila cheia.", "bad"); return false; }
+  if (e.instId && typeof takeEquippedItemInstance === "function") {
+    const inst = takeEquippedItemInstance(p, slot);
+    if (!inst) return false;
+    if (dest === "bag") ok = putBagItemInstance(p, inst);
+    else {
+      if (inst.tier > 0) {
+        if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
+        equipEntryInstance(p, slot, inst);
+        return false;
+      }
+      deleteItemInstance(p, inst.id);
+      ok = addLootPouch(p, inst.slug, 1);
+    }
+    if (!ok) {
+      if (dest === "bag") equipEntryInstance(p, slot, inst);
+      else { p.itemInstances.push(inst); equipEntryInstance(p, slot, inst); }
+      if (typeof toast === "function") toast("Mochila cheia.", "bad");
+      return false;
+    }
+  } else {
+    if (dest === "bag") ok = addItem(p, e.item, 1);
+    else ok = addLootPouch(p, e.item, 1);
+    if (!ok) { if (typeof toast === "function") toast("Mochila cheia.", "bad"); return false; }
+    delete p.equip[slot];
+  }
   if (slot === "shield" && (GAMEDATA.items[e.item] || {}).t === "quiver") {
     if (typeof setActiveAmmo === "function") setActiveAmmo(p, null);
   }
-  delete p.equip[slot];
   return true;
 }
 
@@ -174,6 +237,18 @@ function moveItemToBag(p, payload) {
 function moveItemToPouch(p, payload) {
   if (!payload) return false;
   if (payload.source === "bag") {
+    if (payload.instId && typeof itemUsesInstances === "function" && itemUsesInstances(payload.slug)) {
+      const inst = takeBagItemInstance(p, payload.slug, { instId: payload.instId, highestTier: false });
+      if (!inst) return false;
+      if (inst.tier > 0) {
+        putBagItemInstance(p, inst);
+        if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
+        return false;
+      }
+      deleteItemInstance(p, inst.id);
+      addLootPouch(p, payload.slug, 1);
+      return true;
+    }
     const count = p.bag && p.bag[payload.slug] ? p.bag[payload.slug] : 0;
     if (count <= 0) return false;
     addLootPouch(p, payload.slug, count);
@@ -187,7 +262,7 @@ function moveItemToPouch(p, payload) {
 function moveItemToEquip(p, payload, slot) {
   if (!payload) return false;
   if (payload.source === "equip") return false;
-  return equipItemFromContainer(p, payload.slug, payload.source, slot);
+  return equipItemFromContainer(p, payload.slug, payload.source, slot, payload.instId);
 }
 
 /* ------------------------------------------------------------- drag/drop */

@@ -72,8 +72,9 @@ function newPlayer(name, voc, sex) {
     blessed: false,
     promoted: false,
     promotedAt: null,
-    equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count}
-    bag: {},                // slug -> count
+    equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count, instId?}
+    bag: {},                // slug -> count (espelho agregado para não-equipáveis e instâncias em bag)
+    itemInstances: [],      // itens não-stackáveis/equipáveis rastreados por instância
     ammo: {},               // slug -> unidades (munição não ocupa slot)
     upgrades: {},           // chave do item -> tier de refino do ferreiro
     imbuements: {},         // "equip:<slot>" -> [{cat, tier, sub}]
@@ -494,18 +495,196 @@ function migrateAmmoToCounter(p) {
   return p.ammo;
 }
 
+function itemUsesInstances(slug) {
+  const it = GAMEDATA.items[slug];
+  return !!(it && it.s && it.s !== "ammo");
+}
+
+function nextItemInstanceId(p) {
+  p._itemInstSeq = (p._itemInstSeq || 0) + 1;
+  return "it-" + p._itemInstSeq.toString(36) + "-" + Date.now().toString(36);
+}
+
+function itemInstanceTier(inst) {
+  return inst && inst.tier ? inst.tier : 0;
+}
+
+function findItemInstance(p, id) {
+  ensureItemInstances(p);
+  for (const inst of (p.itemInstances || [])) if (inst.id === id) return inst;
+  return null;
+}
+
+function syncBagCountsFromInstances(p) {
+  p.bag = p.bag || {};
+  const nextBag = {};
+  for (const slug in p.bag) {
+    if (!p.bag[slug] || itemUsesInstances(slug)) continue;
+    nextBag[slug] = p.bag[slug];
+  }
+  for (const inst of (p.itemInstances || [])) {
+    if (!inst || inst.loc !== "bag") continue;
+    nextBag[inst.slug] = (nextBag[inst.slug] || 0) + 1;
+  }
+  p.bag = nextBag;
+}
+
+function ensureItemInstances(p) {
+  p.bag = p.bag || {};
+  p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
+  p.depot = Array.isArray(p.depot) ? p.depot : [];
+  p.exaltationBox = Array.isArray(p.exaltationBox) ? p.exaltationBox : [];
+  p.equip = p.equip || {};
+
+  if (p._itemInstancesVersion === 2) {
+    for (const inst of p.itemInstances) {
+      if (!inst.id) inst.id = nextItemInstanceId(p);
+      if (inst.tier === undefined) inst.tier = 0;
+    }
+    syncBagCountsFromInstances(p);
+    return p.itemInstances;
+  }
+
+  const usedLegacyTier = {};
+  const claimLegacyTier = (slug) => {
+    if (!p.forge || !p.forge[slug] || usedLegacyTier[slug]) return 0;
+    usedLegacyTier[slug] = true;
+    return p.forge[slug] || 0;
+  };
+  const createInst = (slug, loc, tier) => {
+    const inst = { id: nextItemInstanceId(p), slug: slug, loc: loc, tier: tier || 0 };
+    p.itemInstances.push(inst);
+    return inst;
+  };
+
+  for (const slot in p.equip) {
+    const e = p.equip[slot];
+    if (!e || !e.item || !itemUsesInstances(e.item)) continue;
+    if (e.instId && findItemInstance(p, e.instId)) continue;
+    const inst = createInst(e.item, "equip:" + slot, claimLegacyTier(e.item));
+    e.instId = inst.id;
+  }
+
+  const nextBag = {};
+  for (const slug in p.bag) {
+    const count = p.bag[slug] || 0;
+    if (!count) continue;
+    if (!itemUsesInstances(slug)) {
+      nextBag[slug] = count;
+      continue;
+    }
+    let tierGiven = false;
+    for (let i = 0; i < count; i++) {
+      const tier = (!tierGiven ? claimLegacyTier(slug) : 0);
+      createInst(slug, "bag", tier);
+      if (tier > 0) tierGiven = true;
+    }
+  }
+  p.bag = nextBag;
+
+  p.depot = p.depot.map((entry) => {
+    const slug = typeof entry === "string" ? entry : ((entry && (entry.slug || entry.item)) || null);
+    if (!slug || !itemUsesInstances(slug)) return slug;
+    return createInst(slug, "depot", claimLegacyTier(slug)).id;
+  }).filter(Boolean);
+
+  p.exaltationBox = p.exaltationBox.map((entry) => {
+    const slug = typeof entry === "string" ? entry : ((entry && (entry.slug || entry.item)) || null);
+    if (!slug || !itemUsesInstances(slug)) return slug;
+    return createInst(slug, "exaltationBox", claimLegacyTier(slug)).id;
+  }).filter(Boolean);
+
+  p._itemInstancesVersion = 2;
+  syncBagCountsFromInstances(p);
+  return p.itemInstances;
+}
+
+function bagItemInstances(p, slug) {
+  ensureItemInstances(p);
+  return (p.itemInstances || []).filter((inst) => inst && inst.loc === "bag" && (!slug || inst.slug === slug));
+}
+
+function takeBagItemInstance(p, slug, options) {
+  ensureItemInstances(p);
+  options = options || {};
+  let items = bagItemInstances(p, slug);
+  if (options.instId) items = items.filter((inst) => inst.id === options.instId);
+  if (!items.length) return null;
+  items.sort((a, b) => {
+    const ta = itemInstanceTier(a), tb = itemInstanceTier(b);
+    return options.highestTier ? (tb - ta) : (ta - tb);
+  });
+  const chosen = items[0];
+  chosen.loc = null;
+  syncBagCountsFromInstances(p);
+  return chosen;
+}
+
+function putBagItemInstance(p, inst) {
+  if (!inst) return false;
+  ensureItemInstances(p);
+  if (!hasBagSpace(p, inst.slug)) return false;
+  inst.loc = "bag";
+  syncBagCountsFromInstances(p);
+  return true;
+}
+
+function deleteItemInstance(p, instId) {
+  ensureItemInstances(p);
+  const idx = (p.itemInstances || []).findIndex((inst) => inst && inst.id === instId);
+  if (idx < 0) return false;
+  p.itemInstances.splice(idx, 1);
+  syncBagCountsFromInstances(p);
+  return true;
+}
+
+function equipEntryInstance(p, slot, inst) {
+  if (!inst) return false;
+  inst.loc = "equip:" + slot;
+  p.equip[slot] = { item: inst.slug, count: 1, instId: inst.id };
+  syncBagCountsFromInstances(p);
+  return true;
+}
+
+function takeEquippedItemInstance(p, slot) {
+  ensureItemInstances(p);
+  const e = p.equip && p.equip[slot];
+  if (!e || !e.item || !itemUsesInstances(e.item)) return null;
+  let inst = e.instId ? findItemInstance(p, e.instId) : null;
+  if (!inst) {
+    inst = { id: nextItemInstanceId(p), slug: e.item, loc: null, tier: (p.forge && p.forge[e.item]) || 0 };
+    p.itemInstances.push(inst);
+  }
+  inst.loc = null;
+  delete p.equip[slot];
+  syncBagCountsFromInstances(p);
+  return inst;
+}
+
 function bagUsedSlots(p) {
-  return Object.keys(p.bag || {}).filter((slug) => (p.bag[slug] || 0) > 0).length;
+  ensureItemInstances(p);
+  let used = (p.itemInstances || []).filter((inst) => inst && inst.loc === "bag").length;
+  used += Object.keys(p.bag || {}).filter((slug) => (p.bag[slug] || 0) > 0 && !itemUsesInstances(slug)).length;
+  return used;
 }
 
 function hasBagSpace(p, slug) {
-  if (!p.bag) p.bag = {};
+  ensureItemInstances(p);
+  if (itemUsesInstances(slug)) return bagUsedSlots(p) < bagSlots(p);
   return !!p.bag[slug] || bagUsedSlots(p) < bagSlots(p);
 }
 
 function addItem(p, slug, count) {
   count = count || 1;
-  if (!p.bag) p.bag = {};
+  ensureItemInstances(p);
+  if (itemUsesInstances(slug)) {
+    if (bagUsedSlots(p) + count > bagSlots(p)) return false;
+    for (let i = 0; i < count; i++) {
+      p.itemInstances.push({ id: nextItemInstanceId(p), slug: slug, loc: "bag", tier: 0 });
+    }
+    syncBagCountsFromInstances(p);
+    return true;
+  }
   if (!hasBagSpace(p, slug)) return false;
   p.bag[slug] = (p.bag[slug] || 0) + count;
   return true;
@@ -513,6 +692,17 @@ function addItem(p, slug, count) {
 
 function removeItem(p, slug, count) {
   count = count || 1;
+  ensureItemInstances(p);
+  if (itemUsesInstances(slug)) {
+    if (bagItemInstances(p, slug).length < count) return false;
+    for (let i = 0; i < count; i++) {
+      const inst = takeBagItemInstance(p, slug, { highestTier: false });
+      if (!inst) return false;
+      deleteItemInstance(p, inst.id);
+    }
+    syncBagCountsFromInstances(p);
+    return true;
+  }
   if (!p.bag[slug]) return false;
   p.bag[slug] -= count;
   if (p.bag[slug] <= 0) delete p.bag[slug];
@@ -732,9 +922,20 @@ function autoEquip(p) {
     }
     if (best && (!p.equip[slot] || p.equip[slot].item !== best)) {
       // devolve o antigo pra bag
-      if (p.equip[slot]) addItem(p, p.equip[slot].item, 1);
-      removeItem(p, best, 1);
-      p.equip[slot] = { item: best, count: 1 };
+      if (p.equip[slot]) {
+        if (p.equip[slot].instId) {
+          const oldInst = takeEquippedItemInstance(p, slot);
+          if (!putBagItemInstance(p, oldInst)) continue;
+        } else addItem(p, p.equip[slot].item, 1);
+      }
+      if (itemUsesInstances(best)) {
+        const bestInst = takeBagItemInstance(p, best, { highestTier: true });
+        if (!bestInst) continue;
+        equipEntryInstance(p, slot, bestInst);
+      } else {
+        removeItem(p, best, 1);
+        p.equip[slot] = { item: best, count: 1 };
+      }
       changes.push({ slot: slot, item: best });
     }
   }
@@ -753,8 +954,13 @@ function autoEquip(p) {
     const sec = GAMEDATA.items[p.equip.shield.item];
     const ehQuiver = sec && sec.t === "quiver";
     if (!ehQuiver) {
-      addItem(p, p.equip.shield.item, 1);
-      delete p.equip.shield;
+      if (p.equip.shield.instId) {
+        const shInst = takeEquippedItemInstance(p, "shield");
+        putBagItemInstance(p, shInst);
+      } else {
+        addItem(p, p.equip.shield.item, 1);
+        delete p.equip.shield;
+      }
     }
   }
   // Municao para paladin. A municao nao e mais estocada: cada tiro cobra

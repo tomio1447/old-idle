@@ -7,11 +7,13 @@
 const TICK = 100;   // ms por tick de simulacao
 const COMBAT_GRID_W = 21;
 const COMBAT_GRID_H = 13;
-const INFLUENCED_BASE_CHANCE = 0.005;
-const INFLUENCED_PVP_BONUS = 0.005;
+const INFLUENCED_BASE_CHANCE = 0.004;
+const INFLUENCED_PVP_BONUS = 0.004;
+const FIENDISH_BASE_CHANCE = 0.0012;
+const FIENDISH_PVP_BONUS = 0.0008;
 
 function displayMonsterName(name) {
-  return String(name || "").replace(/^Influenced\s+/i, "");
+  return String(name || "").replace(/^Influenced\s+/i, "").replace(/^Fiendish\s+/i, "");
 }
 
 function applyBossMultiplier(base, mult) {
@@ -52,6 +54,7 @@ function newCombat(player, huntId, instanceMode) {
     lootMul: pvp ? 1.25 : 1,
     skillMul: pvp ? 1.25 : 1,
     influencedChance: INFLUENCED_BASE_CHANCE + (pvp ? INFLUENCED_PVP_BONUS : 0),
+    fiendishChance: FIENDISH_BASE_CHANCE + (pvp ? FIENDISH_PVP_BONUS : 0),
     // RAID será feito por jogadores reais no online. Não simular NPC/Player Raider aqui.
     raidEnabled: false,
     raidCd: Infinity,
@@ -142,20 +145,23 @@ function spawnWave(c, p) {
     const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
     const base = GAMEDATA.monsters[slug];
     if (!base) break;
-    const influenced = Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE);
+    const fiendish = Math.random() < (c.fiendishChance || FIENDISH_BASE_CHANCE);
+    const influenced = !fiendish && (Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE));
+    const stacks = fiendish ? 15 : (influenced ? (1 + Math.floor(Math.random() * 5)) : 0);
     const m = Object.assign({}, base);
     m.name = displayMonsterName(base.name);
-    if (influenced) {
-      // Mantém somente o nome original; o destaque visual indica que é influenced.
-      // 300% a mais de XP base = 4x a experiência original.
-      m.hp = Math.floor(base.hp * 2);
-      m.exp = Math.floor((base.exp || 0) * 4);
-      m.damage = Math.floor(base.damage * 1.2);
-      m.armor = Math.floor(base.armor * 1.2);
+    if (fiendish || influenced) {
+      const mult = 1.35 + (stacks * 0.15);
+      m.hp = Math.floor(base.hp * mult);
+      m.exp = Math.floor((base.exp || 0) * (1 + stacks * 0.25));
+      m.damage = Math.floor((base.damage || 1) * (1 + stacks * 0.08));
+      m.armor = Math.floor((base.armor || 0) * (1 + stacks * 0.05));
     }
     c.mobs.push({
       slug: slug, def: m,
       influenced: influenced,
+      fiendish: fiendish,
+      sinisterStacks: stacks,
       hp: m.hp, maxHp: m.hp,
       atkCd: 400 + Math.random() * 1200,
       id: Math.random().toString(36).slice(2, 8),
@@ -948,15 +954,36 @@ function playerAttack(c, p, target) {
       Math.floor(raw * ch.vampirismo / 100)));
   }
 
-  // ---- imbuements do 15.x
+  // ---- imbuements do 15.x + forja
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
   let critou = false;
+  let extraPct = 0;
   if (imb) {
     // Strike: +X% de dano critico com 10% de chance fixa (XML do canary)
     if (imb.crit && Math.random() < (imb.critChance || 10) / 100) {
-      raw = Math.floor(raw * (1 + imb.crit / 100));
+      extraPct += (imb.crit || 0);
       critou = true;
     }
+  }
+
+  // Exaltation Forge oficial: Onslaught soma +60% ao bônus do golpe.
+  const forgeOnslaught = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  if (forgeOnslaught) {
+    extraPct += (forgeOnslaught.bonusPct || 60);
+    critou = true;
+  }
+
+  // Transcendence (avatar): todos os ataques viram críticos com +15% extra.
+  const transcendencePct = (typeof forgeTranscendenceDamagePct === "function")
+    ? forgeTranscendenceDamagePct(p, Date.now()) : 0;
+  if (transcendencePct > 0) {
+    extraPct += transcendencePct;
+    critou = true;
+  }
+
+  if (extraPct > 0) raw = Math.max(1, Math.floor(raw * (1 + extraPct / 100)));
+
+  if (imb) {
     if (imb.lifeLeech) {
       const max = maxStats(p);
       const cura = Math.max(1, Math.floor(raw * imb.lifeLeech / 100));
@@ -967,13 +994,6 @@ function playerAttack(c, p, target) {
       const mana = Math.max(1, Math.floor(raw * imb.manaLeech / 100));
       p.mp = Math.min(max.mp, p.mp + mana);
     }
-  }
-
-  // Exaltation Forge oficial: Onslaught (arma) = +60% de dano quando ativa.
-  const forgeOnslaught = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
-  if (forgeOnslaught) {
-    raw = Math.max(1, Math.floor(raw * forgeOnslaught.multiplier));
-    critou = true;
   }
 
   // Imbuement de dano elemental (Scorch/Venom/Frost/Electrify/Reap):
@@ -993,6 +1013,13 @@ function playerAttack(c, p, target) {
   if (errou) raw = 0;
 
   if (c.player) c.player.attackAnim = 180;
+  if (typeof forgeRegisterOffensiveAction === "function") {
+    forgeRegisterOffensiveAction(p, Date.now());
+    if (typeof forgeTryTranscendence === "function") {
+      const tr = forgeTryTranscendence(p, Date.now());
+      if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+    }
+  }
   if (raw > 0) {
     // Arma elemental: o golpe se divide em dois tipos de dano, como o
     // Weapon::getCombatDamage do servidor faz com primary/secondary. Uma
@@ -1251,6 +1278,13 @@ function castSpellById(c, p, target, now, id) {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
   }
+  if (s.aggr || s.type === "attack") {
+    if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
+    if (typeof forgeTryTranscendence === "function") {
+      const tr = forgeTryTranscendence(p, now);
+      if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+    }
+  }
 
   // Alvos e elemento.
   //
@@ -1403,6 +1437,7 @@ function castSpellById(c, p, target, now, id) {
     //   - Master of Decay: 10% de chance de +30% de dano extra em morte.
     // O critico do update sai com o efeito "CRIT!" (ver drainEvents).
     let critSt = false;
+    let extraSpellPct = 0;
     if (typeof stanceTotals === "function") {
       const stT = stanceTotals(p);
       if (stT.dmgDealt !== 1) dmg = Math.floor(dmg * stT.dmgDealt);
@@ -1411,19 +1446,26 @@ function castSpellById(c, p, target, now, id) {
       const crCh = stT.elemCrit[elemento] || 0;
       const crDg = stT.elemCritDmg[elemento] || 0;
       if (crCh && Math.random() < crCh / 100) {
-        dmg = Math.floor(dmg * 1.5);
+        extraSpellPct += 50;
         critSt = true;
       } else if (crDg && Math.random() < 0.10) {
-        dmg = Math.max(1, Math.floor(dmg * (1 + crDg / 100)));
+        extraSpellPct += crDg;
         critSt = true;
       }
     }
     // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
     if (forgeOnslaughtSpell) {
-      dmg = Math.max(1, Math.floor(dmg * forgeOnslaughtSpell.multiplier));
+      extraSpellPct += (forgeOnslaughtSpell.bonusPct || 60);
       critSt = true;
     }
+    const transcendSpellPct = (typeof forgeTranscendenceDamagePct === "function")
+      ? forgeTranscendenceDamagePct(p, now) : 0;
+    if (transcendSpellPct > 0) {
+      extraSpellPct += transcendSpellPct;
+      critSt = true;
+    }
+    if (extraSpellPct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraSpellPct / 100)));
     dmg = applyCharmDamage(p, elemento, dmg);
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
@@ -1567,6 +1609,14 @@ function tryUseRune(c, p, target, now, forcada) {
   // cooldown proprio da runa (o Canary declara em rune:cooldown), nao um
   // 2000 fixo para todas
   c.runeCd = now + (s.cd || 2000);
+  if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
+  if (typeof forgeTryTranscendence === "function") {
+    const tr = forgeTryTranscendence(p, now);
+    if (tr) c.events.push({ t: "buff", nome: "Transcendence" });
+  }
+  const forgeOnslaughtRune = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  const transcendRunePct = (typeof forgeTranscendenceDamagePct === "function")
+    ? forgeTranscendenceDamagePct(p, now) : 0;
 
   // Alvos: as runas de area do Canary cobrem uma GRADE (avalanche e great
   // fireball pegam 37 SQMs). Como a cena da caçada tem poucos monstros, o
@@ -1597,6 +1647,17 @@ function tryUseRune(c, p, target, now, forcada) {
       // formula real do .lua: (level/5) + (magicLevel * K) + C
       const pw = supplyPowerFor(p, best);
       dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
+      let extraRunePct = 0;
+      let runeCrit = false;
+      if (forgeOnslaughtRune) {
+        extraRunePct += (forgeOnslaughtRune.bonusPct || 60);
+        runeCrit = true;
+      }
+      if (transcendRunePct > 0) {
+        extraRunePct += transcendRunePct;
+        runeCrit = true;
+      }
+      if (extraRunePct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraRunePct / 100)));
       // charms e resistencia do monstro, na mesma ordem do ataque normal
       if (typeof applyCharmDamage === "function") {
         dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
@@ -1605,6 +1666,14 @@ function tryUseRune(c, p, target, now, forcada) {
       alvo.hp -= dmg;
       c.stats.damage += dmg;
       total += dmg;
+      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
+                      sx: c.player ? c.player.x : 0.18,
+                      sy: c.player ? c.player.y : 0.62,
+                      screen: true,
+                      projectile: alvo === target,
+                      el: s.element, rune: s.name,
+                      crit: runeCrit,
+                      fx: s.fx || null, missile: missile });
     }
     // crippling stances do Sorcerer (15.25): "spells, runes e auto
     // attacks aplicam Sap Strength / Expose Weakness"
@@ -1616,15 +1685,17 @@ function tryUseRune(c, p, target, now, forcada) {
       c.events.push({ t: "poisoned", x: alvo.x, y: alvo.y,
                       name: alvo.def ? alvo.def.name : "" });
     }
-    c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
-                    sx: c.player ? c.player.x : 0.18,
-                    sy: c.player ? c.player.y : 0.62,
-                    screen: true,
-                    // so o primeiro alvo mostra o projetil: a runa e
-                    // arremessada uma vez e explode em area
-                    projectile: alvo === target,
-                    el: s.element, rune: s.name,
-                    fx: s.fx || null, missile: missile });
+    if (!s.f) {
+      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
+                      sx: c.player ? c.player.x : 0.18,
+                      sy: c.player ? c.player.y : 0.62,
+                      screen: true,
+                      // so o primeiro alvo mostra o projetil: a runa e
+                      // arremessada uma vez e explode em area
+                      projectile: alvo === target,
+                      el: s.element, rune: s.name,
+                      fx: s.fx || null, missile: missile });
+    }
   }
   if (tilesR.length > 1) {
     c.events.push({ t: "areafx", cells: tilesR, screen: true,
@@ -2096,6 +2167,10 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     const stD = stanceTotals(p).dmgReceived;
     if (stD !== 1) raw = Math.max(1, Math.floor(raw * stD));
   }
+  if (typeof forgeIncomingDamageMul === "function") {
+    const trMul = forgeIncomingDamageMul(p, agora);
+    if (trMul !== 1) raw = Math.max(1, Math.floor(raw * trMul));
+  }
   raw = Math.max(1, Math.floor(raw));
   if (c.buffs.shield && c.buffs.shield > 0) {
     const absorbed = Math.min(raw, c.buffs.shield);
@@ -2309,6 +2384,10 @@ function mobAttack(c, p, mob) {
     const stD = stanceTotals(p).dmgReceived;
     if (stD !== 1) raw = Math.max(1, Math.floor(raw * stD));
   }
+  if (typeof forgeIncomingDamageMul === "function") {
+    const trMul = forgeIncomingDamageMul(p, agora);
+    if (trMul !== 1) raw = Math.max(1, Math.floor(raw * trMul));
+  }
 
   // protecao elemental vinda dos imbuements
   if (typeof imbProtection === "function") {
@@ -2381,8 +2460,7 @@ function rollLoot(c, p, mob) {
   for (const l of mob.def.loot) {
     if (Math.random() * 100 > l.chance) continue;
     let count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
-    if (mob.influenced) count *= 2;
-    else if ((c.lootMul || 1) > 1) {
+    if ((c.lootMul || 1) > 1) {
       const boosted = count * c.lootMul;
       count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
     }
@@ -2399,7 +2477,6 @@ function rollLoot(c, p, mob) {
       p.gold += g;
       c.stats.gold += g;
     } else if (currencyValue(l.item)) {
-      // platinum/crystal coin: vendidos na hora e somados ao balance
       const g = creditCurrency(p, l.item, count);
       c.stats.gold += g;
       c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
@@ -2410,23 +2487,35 @@ function rollLoot(c, p, mob) {
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (it.s === "ammo") {
-      // munição lootada vai para o contador, sem ocupar slot
       addAmmo(p, l.item, count);
     } else {
-      // REGRA DA CASA (a pedido do jogador): TODO drop cai na loot pouch,
-      // ate equipamento. Antes o equipamento ia para a mochila, ela
-      // enchia e o loot se perdia; a pouch nao tem limite e o sell all
-      // dela ja respeita os itens marcados como "nao vender".
       addLootPouch(p, l.item, count);
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
   }
-  if (mob.influenced && !isNoCollect(p, "mystic-dust")) {
-    const dust = 1 + Math.floor(Math.random() * 4);
-    addLootPouch(p, "mystic-dust", dust);
-    c.stats.loot["mystic-dust"] = (c.stats.loot["mystic-dust"] || 0) + dust;
-    got.push({ item: "mystic-dust", count: dust });
+  if (mob.influenced || mob.fiendish) {
+    let dustRoll = 0;
+    const stacks = mob.fiendish ? 15 : Math.max(1, mob.sinisterStacks || 1);
+    for (let i = 0; i < stacks; i++) dustRoll += 1 + Math.floor(Math.random() * 3);
+    if (typeof forgeGainDust === "function") {
+      const dg = forgeGainDust(p, dustRoll);
+      if (dg.gained > 0) {
+        c.stats.loot["dust"] = (c.stats.loot["dust"] || 0) + dg.gained;
+        got.push({ item: "dust", count: dg.gained });
+      }
+      if (dg.gained > 0 || dg.overflow > 0) {
+        c.events.push({ t: "dust", dust: dg.gained, overflow: dg.overflow, fiendish: !!mob.fiendish });
+      }
+    }
+    if (mob.fiendish) {
+      const stars = mob.def && mob.def.best ? (mob.def.best.stars || 3) : 3;
+      const slivers = Math.max(1, Math.floor(1 + Math.random() * Math.max(1, stars)));
+      p.slivers = (p.slivers || 0) + slivers;
+      c.stats.loot["slivers"] = (c.stats.loot["slivers"] || 0) + slivers;
+      got.push({ item: "slivers", count: slivers });
+      c.events.push({ t: "dust", dust: 0, slivers: slivers, fiendish: true });
+    }
   }
   return got;
 }

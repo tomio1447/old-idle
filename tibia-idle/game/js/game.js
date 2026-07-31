@@ -175,6 +175,7 @@ function normalizePlayer(p) {
     p.config.healSupply = "";
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
+  p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   p.lootPouch = p.lootPouch || {};
   p.lootConfig = p.lootConfig || { noCollect: [], noSell: [] };
   p.lootConfig.noCollect = p.lootConfig.noCollect || [];
@@ -196,6 +197,7 @@ function normalizePlayer(p) {
   p.dummies = p.dummies || {};
   p.conditions = p.conditions || {};
   p.buffs = p.buffs || {};
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
   // Stances do update 15.25.3a4a52: posturas permanentes salvas junto ao
   // personagem (persistem apos logout, como no oficial).
   p.stances = p.stances || {};
@@ -870,6 +872,13 @@ function drainEvents() {
       case "miss":
         r.addFloater(ex(e), ey(e), "errou", "#a0a0a0");
         break;
+      case "dust": {
+        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
+        if (e.dust) r.addFloater(px, py, "+" + fmt(e.dust) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
+        if (e.slivers) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.slivers) + " slivers", "#ffe680");
+        if (e.overflow) addLog("info", `Dust no limite: <b>${fmtFull(e.overflow)}</b> perdido.`);
+        break;
+      }
       case "range":
         r.addFloater(ex(e), ey(e), "fora de alcance", "#c8c0a8");
         break;
@@ -1128,6 +1137,7 @@ function loop(ts) {
   // a barra de cooldown anda sozinha, dentro ou fora da hunt — no Tibia o
   // cooldown nao pausa ao voltar para a cidade
   if (typeof renderCooldownBar === "function") renderCooldownBar(G.p);
+  if (typeof avatarTick === "function") avatarTick(G.p, Date.now());
 
   if (!G.paused && G.combat) {
     const before = G.p.level;
