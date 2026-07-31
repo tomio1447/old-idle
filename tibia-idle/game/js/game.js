@@ -384,7 +384,7 @@ function showOfflineModal(r) {
     .sort((a, b) => (GAMEDATA.items[b] ? GAMEDATA.items[b].sell || 0 : 0) -
                     (GAMEDATA.items[a] ? GAMEDATA.items[a].sell || 0 : 0))
     .slice(0, 24)
-    .map((s) => `<div class="inv-item" title="${itemName(s)}">
+    .map((s) => `<div class="inv-item ${itemClsBorder(s)}" title="${itemName(s)}">
         ${itemImg(s)}<span class="cnt">${r.loot[s]}</span></div>`).join("");
   const supRows = Object.keys(r.supplies).map((s) =>
     `<div class="stat-row"><span class="k">${SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)}</span>

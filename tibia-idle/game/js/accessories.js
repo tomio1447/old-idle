@@ -307,7 +307,7 @@ function renderEquipmentHelper(p) {
   const cfg = p.config.equipHelper[slot];
   const counts = accessoryAvailableCounts(p, slot);
   const pouchIcons = Object.keys(counts).slice(0, 12).map((slug) =>
-    `<div class="inv-item" style="width:34px;height:34px;cursor:default" title="${itemName(slug)} · ${counts[slug]}x">
+    `<div class="inv-item ${itemClsBorder(slug)}" style="width:34px;height:34px;cursor:default" title="${itemName(slug)} · ${counts[slug]}x">
       ${itemImg(slug)}${counts[slug] > 1 ? `<span class="cnt">${counts[slug]}</span>` : ""}</div>`).join("");
 
   return `

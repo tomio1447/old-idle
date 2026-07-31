@@ -405,7 +405,7 @@ function renderEquip(p) {
     const e = p.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
-      h += `<div class="slot" data-slot="${slot}" data-item="${e.item}">
+      h += `<div class="slot ${itemClsBorder(e.item)}" data-slot="${slot}" data-item="${e.item}">
         ${itemImg(e.item)}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
@@ -532,7 +532,7 @@ function renderInventory(p) {
   for (let i = 0; i < displaySlots; i++) {
     const slug = entries[i];
     if (slug) {
-      cells.push(`<div class="inv-item" data-item="${slug}">${itemImg(slug)}
+      cells.push(`<div class="inv-item ${itemClsBorder(slug)}" data-item="${slug}">${itemImg(slug)}
         ${p.bag[slug] > 1 ? `<span class="cnt">${p.bag[slug]}</span>` : ""}
       </div>`);
     } else {
@@ -739,7 +739,7 @@ function openItemDetails(slug, count) {
     </div>
     <div class="panel-body">
       <div class="row mb8" style="gap:10px;align-items:center">
-        <div class="inv-item" style="cursor:default">${itemImg(slug)}</div>
+        <div class="inv-item ${itemClsBorder(slug)}" style="cursor:default">${itemImg(slug)}</div>
         <div>
           <div style="color:#d4af37;font-weight:bold">${it.n}</div>
           <div class="tiny dim">${slug}</div>
@@ -834,7 +834,7 @@ function renderLootPouch(p) {
   box.innerHTML = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
       Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · clique no item para as opções
     </div>` + entries.map((slug) =>
-    `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""}" data-pouch-item="${slug}" draggable="true">
+    `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""} ${itemClsBorder(slug)}" data-pouch-item="${slug}" draggable="true">
       ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
     </div>`).join("");
 

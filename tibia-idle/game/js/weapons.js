@@ -87,18 +87,28 @@ function estiloAnim(slug, it, tam) {
  * Isso importa porque existia uma segunda itemImg em ui.js que sobrescrevia
  * esta (ui.js carrega depois) e deixava todo item animado estatico.
  */
+
+/* Retorna a classe CSS de borda conforme a classificacao do item:
+ * cls 4 -> amarelo, cls 3 -> roxo, cls 2 -> azul, cls 1 ou sem -> vazio */
+function itemClsBorder(slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
+  return (it.cls && it.cls >= 2) ? "cls-" + it.cls : "";
+}
 function itemImg(slug, tam, cls) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
   // 2o argumento como string = classe CSS (assinatura antiga do ui.js)
   if (typeof tam === "string") { cls = tam; tam = 0; }
+  // classe de classificacao (forja): cls-2 azul, cls-3 roxo, cls-4 amarelo
+  const clsBorder = (it.cls && it.cls >= 2) ? `cls-${it.cls}` : "";
+  const clsAll = [cls, clsBorder].filter(Boolean).join(" ");
   const px = tam || 32;
   if (itemAnimado(it)) {
-    return `<div class="item-sprite ${cls || ""}" title="${it.n || slug}"
+    return `<div class="item-sprite ${clsAll}" title="${it.n || slug}"
       style="${estiloAnim(slug, it, px)}"></div>`;
   }
   // sem tamanho explicito o CSS de cada tela manda (.inv-item img etc.)
   const dim = tam ? `width:${px}px;height:${px}px` : "";
-  return `<img class="item-sprite ${cls || ""}" src="assets/item/${slug}.png"
+  return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png"
     alt="" loading="lazy" style="${dim}">`;
 }
 

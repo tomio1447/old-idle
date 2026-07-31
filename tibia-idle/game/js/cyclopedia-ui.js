@@ -224,7 +224,7 @@ function cycloItems(p, el) {
       ${slots.map((s) => {
         const e = p.equip[s];
         const it = GAMEDATA.items[e.item];
-        return `<div class="cyclo-cell" title="${it ? it.n : e.item}">
+        return `<div class="cyclo-cell ${itemClsBorder(e.item)}" title="${it ? it.n : e.item}">
           <img src="assets/item/${e.item}.png" alt="">
           <div class="tiny dim">${s}</div>
         </div>`;
@@ -235,7 +235,7 @@ function cycloItems(p, el) {
       ${bag.map((slug) => {
         const it = GAMEDATA.items[slug];
         const n = p.bag[slug];
-        return `<div class="cyclo-cell" title="${it ? it.n : slug}">
+        return `<div class="cyclo-cell ${itemClsBorder(slug)}" title="${it ? it.n : slug}">
           <img src="assets/item/${slug}.png" alt="">
           ${n > 1 ? `<span class="cyclo-qtd">${n}</span>` : ""}
         </div>`;
@@ -898,7 +898,7 @@ function renderCycloItems(p, el) {
         ${ids.map((i) => {
           const it = GAMEDATA.items[i];
           const bloq = !itemLiberado(p, it);
-          return `<div class="item-row ${sel === i ? "active" : ""}"
+          return `<div class="item-row ${sel === i ? "active" : ""} ${itemClsBorder(i)}"
                        data-item-pick="${i}" style="${bloq ? "opacity:.55" : ""}">
             ${itemImg(i, 26)}
             <span class="small">${it.n}</span>
