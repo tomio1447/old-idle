@@ -212,6 +212,7 @@ function normalizePlayer(p) {
   p.conditions = p.conditions || {};
   p.buffs = p.buffs || {};
   if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  if (typeof ensurePrey === "function") ensurePrey(p);
   // Stances do update 15.25.3a4a52: posturas permanentes salvas junto ao
   // personagem (persistem apos logout, como no oficial).
   p.stances = p.stances || {};
@@ -1294,6 +1295,10 @@ function loop(ts) {
   // autosave a cada 20s
   G.saveTimer += dt;
   if (G.saveTimer > 20000) { G.saveTimer = 0; save(); }
+  // Prey: o timer de 2h decrementa enquanto o personagem está caçando
+  if (G.combat && typeof preyTick === "function") {
+    preyTick(G.p, dt);
+  }
 }
 
 /* ------------------------------------------------------------ render */
@@ -1317,6 +1322,7 @@ function renderAll() {
   if (db) { var n = p.depotNotification || 0; db.textContent = n > 0 ? n : ""; db.style.display = n > 0 ? "" : "none"; }
   renderHuntInfo();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
+  if (typeof renderPreyButton === "function") renderPreyButton(p);
 }
 
 function renderHuntInfo() {
@@ -1422,6 +1428,7 @@ function bindControls() {
   if (btnDepot) btnDepot.addEventListener("click", () => { if (typeof openDepotModal === "function") openDepotModal(); });
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
+  if (typeof bindPreyButton === "function") bindPreyButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
     if (typeof openAdmin === "function") {

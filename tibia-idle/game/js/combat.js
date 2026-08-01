@@ -2465,6 +2465,15 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     if (typeof applyPlayerMitigation === "function") {
       raw = applyPlayerMitigation(p, tipoEl, raw);
     }
+    // Prey de DEFESA (TibiaWiki/Prey_System): −12~30% do dano recebido da
+    // criatura alvo; o tempo da prey gasta um pouco extra a cada hit.
+    if (raw > 0 && typeof preyDefenseBonus === "function") {
+      const pDef = preyDefenseBonus(p, mob.slug);
+      if (pDef > 0) {
+        raw = Math.max(1, Math.floor(raw * (1 - pDef / 100)));
+        if (typeof preyDefenseTickOnHit === "function") preyDefenseTickOnHit(p, mob.slug);
+      }
+    }
 
 
 
@@ -2678,6 +2687,14 @@ function mobAttack(c, p, mob) {
   }
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
   raw = raw * (1 - Math.min(0.7, def.protection / 100));
+  // Prey de DEFESA: também reduz o auto attack da criatura alvo
+  if (raw > 0 && typeof preyDefenseBonus === "function") {
+    const pDef = preyDefenseBonus(p, mob.slug);
+    if (pDef > 0) {
+      raw = Math.max(1, Math.floor(raw * (1 - pDef / 100)));
+      if (typeof preyDefenseTickOnHit === "function") preyDefenseTickOnHit(p, mob.slug);
+    }
+  }
   // Mitigation do jogador: reduz todos os tipos comuns por % (o auto attack
   // do mob é físico — TibiaWiki/Mitigation).
   if (typeof applyPlayerMitigation === "function") {
@@ -2830,6 +2847,39 @@ function rollLoot(c, p, mob) {
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
+  }
+  // Prey de LOOT (TibiaWiki/Prey_System): com bônus de X%, há X% de chance
+  // de o monstro gerar OUTRO conjunto de loot (como se matasse dois).
+  if (typeof preyLootChance === "function") {
+    const pLoot = preyLootChance(p, mob.slug);
+    if (pLoot > 0 && Math.random() * 100 < pLoot) {
+      for (const l of mob.def.loot) {
+        if (Math.random() * 100 > l.chance) continue;
+        const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+        const it = GAMEDATA.items[l.item];
+        if (!it) continue;
+        if (!mob.boss && isNoCollect(p, l.item)) continue;
+        if (l.item === "gold-coin") {
+          const g = Math.floor(count * goldStage(c.hunt.level));
+          p.gold += g; c.stats.gold += g;
+        } else if (currencyValue(l.item)) {
+          const g = creditCurrency(p, l.item, count);
+          c.stats.gold += g;
+          c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
+          got.push({ item: l.item, count: count });
+        } else if (mob.boss) {
+          addLootPouch(p, l.item, count);
+        } else if (SUPPLIES[l.item]) {
+          p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
+        } else if (it.s === "ammo") {
+          addAmmo(p, l.item, count);
+        } else {
+          addLootPouch(p, l.item, count);
+        }
+        c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
+        got.push({ item: l.item, count: count });
+      }
+    }
   }
   if (mob.influenced || mob.fiendish) {
     let dustRoll = 0;

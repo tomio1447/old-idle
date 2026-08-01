@@ -1475,3 +1475,62 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   .forge-client-footer { flex-wrap: wrap; }
   .forge-client-wallet { min-width: 70px; }
 }
+
+/* ============================ Sistema de Prey ============================ */
+.prey-btn-gif {
+  width: 18px; height: 18px;
+  vertical-align: -3px; margin-right: 4px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 3px rgba(255,214,90,.6));
+}
+#btn-prey img.prey-btn-gif { display: inline-block; }
+
+.prey-wallet {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 6px 8px; margin-bottom: 8px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 4px; font-size: 12px;
+}
+.prey-slot {
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25);
+  border-radius: 6px; padding: 8px; margin-bottom: 10px;
+}
+.prey-slot.active { border-color: rgba(255,214,90,.45); }
+.prey-slot.locked { opacity: .55; }
+.prey-slot-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.prey-timer { font-size: 12px; font-weight: bold; flex: 1; }
+.prey-selected {
+  display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;
+  margin: 6px 0;
+}
+.prey-creature-card {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(255,214,90,.5);
+  background: rgba(255,214,90,.08);
+  padding: 6px 10px; border-radius: 6px;
+}
+.prey-bonus-card {
+  border: 1px solid; padding: 6px 12px; border-radius: 6px;
+  display: flex; flex-direction: column; justify-content: center;
+  background: rgba(0,0,0,.3); font-size: 13px;
+}
+.prey-stars { font-size: 11px; letter-spacing: 1px; }
+.prey-list-title { margin: 6px 0 4px; }
+.prey-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.prey-creature {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 4px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.25); border-radius: 6px; cursor: pointer;
+  text-align: center; font-size: 10px; line-height: 1.15;
+  transition: border-color .15s, background .15s;
+}
+.prey-creature:hover { border-color: rgba(255,214,90,.55); background: rgba(255,214,90,.07); }
+.prey-creature.sel { border-color: #ffd65a; background: rgba(255,214,90,.14); }
+.prey-help { color: #8a8272; }
