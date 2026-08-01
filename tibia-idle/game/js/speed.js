@@ -34,8 +34,10 @@
  */
 "use strict";
 
-/* Todas as vocacoes do vocations.xml usam 110 */
-const VOC_BASE_SPEED = 110;
+/* Todas as vocações usam a mesma base fixa. O jogador NÃO escala mais a
+ * velocidade com o nível: a base é 200 e só os modificadores (equipamento,
+ * montaria e magias de movimento) a melhoram. */
+const VOC_BASE_SPEED = 200;
 
 /* Player::PLAYER_MIN_SPEED. O paralyze nao consegue baixar disso. */
 const PLAYER_MIN_SPEED = 10;
@@ -43,10 +45,9 @@ const PLAYER_MIN_SPEED = 10;
 const HASTEDATA_MAP = (typeof window !== "undefined" && window.HASTEDATA)
   ? window.HASTEDATA : {};
 
-/* baseSpeed do jogador: 110 + (nivel - 1), como no updateBaseSpeed(). */
+/* baseSpeed do jogador: FIXA em 200 (não escala com o nível). */
 function playerBaseSpeed(p) {
-  const lvl = Math.max(1, (p && p.level) || 1);
-  return VOC_BASE_SPEED + (lvl - 1);
+  return VOC_BASE_SPEED;
 }
 
 /* Delta de velocidade de uma magia de haste PARA ESTE personagem.
@@ -113,7 +114,7 @@ function playerSpeedBreakdown(p, agora) {
   const haste = speedBuffDelta(p, agora);
   return {
     base: base,
-    nivel: base - VOC_BASE_SPEED,     // quanto o nivel contribuiu
+    nivel: 0,                          // velocidade fixa: nível não contribui
     equip: equip,
     mount: mount,
     haste: haste,

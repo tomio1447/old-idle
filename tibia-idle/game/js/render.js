@@ -284,9 +284,10 @@ Renderer.prototype.addFloater = function (x, y, text, color, big) {
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
-    // hits/range sobem devagar, como no client: legível e sem sumir rápido.
-    vy: -0.005 - Math.random() * 0.004,
-    vx: (Math.random() - 0.5) * 0.008,
+    // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
+    // lateral (vx = 0) e com velocidade vertical constante.
+    vy: -0.007,
+    vx: 0,
   });
   if (this.floaters.length > 60) this.floaters.shift();
 };
@@ -1032,13 +1033,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const px = pl.x, py = pl.y;
   const pimg = OutfitRenderer.forPlayer(player, pl.dir || "e",
                                         pl.moving ? (pl.frame || 1) : 0);
-  const bob = pl.moving ? 0 : Math.sin(Date.now() / 340) * 2;
+  // Sem flutuação (bob senoidal) e sem animação de ataque no personagem:
+  // a sprite fica parada no chão, como no client.
+  const bob = 0;
   if (spriteReady(pimg)) {
     // escala unica do client (tile/32): a sprite mantem o tamanho nativo em
     // SQMs, sem ser esticada para preencher o tile
     const sc = tibiaScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
-    const atkPush = (pl.attackAnim || 0) > 0 ? (pl.dir === "w" ? -5 : pl.dir === "e" ? 5 : 0) : 0;
+    const atkPush = 0;
     // sombra
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
@@ -1148,37 +1151,39 @@ Renderer.prototype.draw = function (combat, player, dt) {
           }
         }
         drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
+        // Marca de Fiendish/Influenced na LATERAL DIREITA da sprite (como o
+        // client): ícone oficial + número de poeiras/stacks, longe da barra
+        // de HP e do nome.
+        const markX = Math.round(mx + w / 2 + 4);
+        const markY = Math.round(my - h / 2 + h * 0.38);
         if (m.fiendish) {
-          // Ícone oficial de Fiendish + tag, grupo centralizado no SQM
-          const tag = "FIENDISH";
-          ctx.font = "bold 9px Verdana";
-          const tw = ctx.measureText(tag).width;
-          const isz = 12, gap = 2;
-          const startX = Math.round(mx - (tw + gap + isz) / 2);
-          drawWikiIcon(ctx, "fiendish-creature", startX, by - 4, isz);
-          drawNameText(ctx, startX + isz + gap + tw / 2, by + 7, tag, "#d79cff");
+          const num = String(m.sinisterStacks || 15);
+          drawWikiIcon(ctx, "fiendish-creature", markX, markY - 12, 12);
+          ctx.font = "bold 10px monospace";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "#000";
+          ctx.fillStyle = "#d79cff";
+          ctx.strokeText(num, markX + 14, markY - 6);
+          ctx.fillText(num, markX + 14, markY - 6);
         } else if (m.influenced) {
-          // O client mostra a influência como o ícone de criatura
-          // influenciada (TibiaWiki) + quantidade de stacks, sem escrever
-          // "INFLUENCED 3" em cima da criatura.
           const stacks = String(m.sinisterStacks || 1);
           const ic = wikiIcon("influenced-creature");
           if (ic && ic.complete && ic.naturalWidth) {
-            const isz = 12;
-            const tx = mx - 9, ty = by + 1;
             ctx.save();
-            ctx.drawImage(ic, tx - isz, ty - 5, isz, isz);
-            ctx.font = "10px monospace";
+            ctx.drawImage(ic, markX, markY - 12, 12, 12);
+            ctx.font = "bold 10px monospace";
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";
             ctx.lineWidth = 3;
             ctx.strokeStyle = "#000";
             ctx.fillStyle = "#66c7ff";
-            ctx.strokeText(stacks, tx + 1, ty + 1);
-            ctx.fillText(stacks, tx + 1, ty + 1);
+            ctx.strokeText(stacks, markX + 14, markY - 6);
+            ctx.fillText(stacks, markX + 14, markY - 6);
             ctx.restore();
           } else {
-            drawNameText(ctx, mx, by + 7, "✦ " + stacks, "#66c7ff");
+            drawNameText(ctx, markX + 8, markY, "✦ " + stacks, "#66c7ff");
           }
         }
         // fala da criatura (monster.voices do Canary), acima do nome

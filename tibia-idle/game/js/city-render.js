@@ -238,7 +238,8 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   const psx = walker.px * S - camX, psy = walker.py * S - camY;
   if (spriteReady(pimg)) {
     const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
-    const bob = walker.moving ? 0 : Math.sin(Date.now() / 340) * 1.5;
+    // Sem flutuação: a sprite fica parada no chão, como no client.
+    const bob = 0;
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath();
     ctx.ellipse(psx, psy + h * 0.38, w * 0.3, h * 0.1, 0, 0, 7);

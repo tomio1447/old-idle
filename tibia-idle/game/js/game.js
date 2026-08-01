@@ -952,11 +952,11 @@ function drainEvents() {
       case "heal": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
-        // Critical Heal (Vocation Adjustments 2026): efeito oficial da
-        // TibiaWiki + texto "CRITICAL HEAL!" em vermelho sobre a cura
+        // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
+        // oficial (critical-heal-effect) em cima do personagem que casta.
+        // O vermelho é exclusivo do dano crítico em monstros.
         if (e.crit) {
           r.addEffect(px, py, "critical-heal-effect", 800);
-          r.addFloater(px, py - 0.13, "CRITICAL HEAL!", "#ff4a4a", true);
         }
         // potion de spirit tambem restaura mana no mesmo gole
         if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana) + " mana", "#6a8aff");
