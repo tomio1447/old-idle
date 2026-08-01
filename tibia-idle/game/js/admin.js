@@ -27,6 +27,7 @@ const ADMIN = {
 /* Abas do painel */
 const ADMIN_TABS = [
   { id: "char", nome: "👤 Personagem" },
+  { id: "coins", nome: "🪙 Coins" },
   { id: "skills", nome: "📊 Skills" },
   { id: "items", nome: "🎒 Itens" },
   { id: "imb", nome: "✨ Imbuements" },
@@ -109,13 +110,69 @@ function renderAdminContent() {
   if (!el) return;
   const p = G.p;
   const fn = {
-    char: renderAdminChar, skills: renderAdminSkills,
+    char: renderAdminChar, coins: renderAdminCoins,
+    skills: renderAdminSkills,
     items: renderAdminItems, imb: renderAdminImbuements, equip: renderAdminEquip,
     forge: renderAdminForge, mobs: renderAdminMobs,
     world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
   renderAdminLog();
+}
+
+/* -------------------------------------------------------- aba: coins */
+
+/* Tibia Coins — moeda premium da CONTA (vale para todos os personagens,
+ * como no client oficial). */
+function renderAdminCoins(p, el) {
+  const saldo = accountCoins();
+  el.innerHTML = `
+    <div class="admin-grid">
+
+      <div class="admin-card">
+        <div class="admin-card-t">Tibia Coins — saldo da conta</div>
+        <div class="stat-row"><span class="k">Saldo atual</span>
+          <span class="v">
+            <img src="${COINS_GIF}" class="coin-gif" style="width:22px;height:22px;vertical-align:middle" alt="Tibia Coins">
+            <b class="coin-txt" style="font-size:15px" id="adm-coins-n">${fmtFull(saldo)}</b>
+          </span></div>
+        <div class="tiny dim mt4">
+          Os Tibia Coins ficam na <b>conta</b> e valem para todos os
+          personagens do save — como no client oficial.<br>
+          No Tibia: 250 TC = 30 dias de Premium Time.
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-t">Adicionar Tibia Coins</div>
+        <div class="row" style="gap:6px;align-items:center">
+          <input type="number" id="adm-coins" value="250" min="0"
+                 class="admin-in" style="width:130px">
+          <button class="sm primary" id="adm-coins-set">Adicionar</button>
+        </div>
+        <div class="admin-quick">
+          ${[25, 250, 1000, 2500, 10000].map((n) =>
+            `<button class="sm" data-coins="${n}">+${fmt(n)}</button>`).join("")}
+          <button class="sm" data-coins="0">zerar</button>
+        </div>
+      </div>
+
+    </div>`;
+
+  $("#adm-coins-set").addEventListener("click", () => {
+    const n = parseInt($("#adm-coins").value, 10);
+    if (!Number.isFinite(n) || n <= 0) { toast("Valor inválido"); return; }
+    const total = accountAddCoins(n);
+    adminAplicar(`+${fmtFull(n)} Tibia Coins na conta (saldo: ${fmtFull(total)})`);
+  });
+  $$("#admin-content [data-coins]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const n = parseInt(b.dataset.coins, 10);
+      const total = n > 0 ? accountAddCoins(n) : accountSetCoins(0);
+      adminAplicar(n > 0
+        ? `+${fmtFull(n)} Tibia Coins na conta (saldo: ${fmtFull(total)})`
+        : "Tibia Coins zerados");
+    }));
 }
 
 /* ------------------------------------------------------ aba: personagem */

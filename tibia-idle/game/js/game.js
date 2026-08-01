@@ -1319,6 +1319,7 @@ function renderAll() {
   renderNpcQuick();
   renderBosses(p);
   renderTopbar(p);
+  if (typeof renderCoinBalance === "function") renderCoinBalance();
   var db = $("#depot-badge");
   if (db) { var n = p.depotNotification || 0; db.textContent = n > 0 ? n : ""; db.style.display = n > 0 ? "" : "none"; }
   renderHuntInfo();

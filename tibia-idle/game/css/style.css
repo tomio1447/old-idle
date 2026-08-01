@@ -1597,3 +1597,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .party-analyser-row span:first-child { flex: 1; }
 
+
+/* ============================ Tibia Coins ============================ */
+#tibia-coins { cursor: default; }
+.coin-gif { width: 18px; height: 18px; image-rendering: pixelated; }
+.coin-txt { color: #d4af37; font-weight: bold; text-shadow: 0 1px 0 rgba(0,0,0,.4); }
