@@ -1,0 +1,235 @@
+/* tibia-theme.css — Tema "cinza rajado" do cliente original do Tibia.
+ *
+ * Sobrescreve o visual escuro/café do jogo com o cinza-pedra clássico do
+ * C++ client: painéis cinza com textura rajada (veios), bordas em relevo
+ * 3D (clara em cima/esquerda, escura embaixo/direita) e cabeçalhos com o
+ * gradiente azul oficial. Carregado DEPOIS de css/style.css.
+ */
+
+:root {
+  --bg: #4a4a4a;
+  --panel: #8e8e8e;
+  --panel-dark: #6f6f6f;
+  --panel-light: #a8a8a8;
+  --border-out: #d6d6d6;
+  --border-in: #3a3a3a;
+  --text: #1d1d1d;
+  --text-bright: #000000;
+  --gold: #8a6d1a;
+  --hp: #c81e1e;
+  --mp: #3050c8;
+  --exp: #3a8a10;
+  --green: #2f8a2f;
+  --red: #b02020;
+}
+
+body {
+  background: #3a3a3a;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 2px, transparent 2px 4px);
+  color: var(--text);
+}
+
+/* -------------------------------------------------- painéis (pedra rajada) */
+.panel {
+  background-color: #8e8e8e;
+  background-image:
+    repeating-linear-gradient(115deg, rgba(255,255,255,.10) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(25deg, rgba(0,0,0,.06) 0 3px, transparent 3px 9px),
+    linear-gradient(180deg, #969696, #838383);
+  border: 2px solid;
+  border-color: var(--border-out) var(--border-in) var(--border-in) var(--border-out);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.35), inset -1px -1px 0 rgba(0,0,0,.3);
+}
+.panel-inset {
+  background-color: #7d7d7d;
+  background-image:
+    repeating-linear-gradient(115deg, rgba(255,255,255,.06) 0 2px, transparent 2px 8px),
+    repeating-linear-gradient(25deg, rgba(0,0,0,.05) 0 3px, transparent 3px 10px);
+  border: 2px solid;
+  border-color: var(--border-in) var(--border-out) var(--border-out) var(--border-in);
+}
+/* cabeçalho: gradiente azul oficial do Tibia */
+.panel-title {
+  background: linear-gradient(180deg, #12306b 0%, #1d4a94 45%, #2a5fb0 100%);
+  border-bottom: 1px solid #0a1a3a;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 rgba(0,0,20,.9);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.panel-body { color: var(--text); }
+
+/* -------------------------------------------------- topbar */
+.topbar {
+  background: linear-gradient(180deg, #7f7f7f, #5f5f5f);
+  border-bottom: 2px solid var(--border-in);
+}
+.logo {
+  color: #ffd65a;
+  text-shadow: 1px 1px 0 #000, 0 0 10px rgba(255,214,90,.3);
+}
+.topbar button { color: #1d1d1d; text-shadow: none; }
+
+/* -------------------------------------------------- botões (bevel 3D) */
+button, .btn {
+  background: linear-gradient(180deg, #b4b4b4, #8a8a8a);
+  border: 2px solid;
+  border-color: #e0e0e0 #4a4a4a #4a4a4a #e0e0e0;
+  color: #101010;
+  text-shadow: none;
+}
+button:hover:not(:disabled) { background: linear-gradient(180deg, #c2c2c2, #989898); }
+button:active:not(:disabled) {
+  border-color: #4a4a4a #e0e0e0 #e0e0e0 #4a4a4a;
+  padding: 6px 11px 4px 13px;
+}
+button.primary {
+  background: linear-gradient(180deg, #1d4a94, #12306b);
+  border-color: #4a7ec8 #0a1a3a #0a1a3a #4a7ec8;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 rgba(0,0,20,.8);
+}
+button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #2a5fb0, #1d4a94); }
+button.danger {
+  background: linear-gradient(180deg, #a03030, #701818);
+  border-color: #d06060 #3a0a0a #3a0a0a #d06060;
+  color: #ffe0e0;
+  text-shadow: 1px 1px 0 rgba(0,0,0,.6);
+}
+
+/* -------------------------------------------------- campos */
+.field label { color: #2a2a2a; }
+.field input, .field select,
+input[type="number"], input[type="text"], select, textarea {
+  background: #d8d8d8; color: #101010;
+  border: 2px solid; border-color: #5a5a5a #e8e8e8 #e8e8e8 #5a5a5a;
+}
+.admin-in {
+  background: #d8d8d8; color: #101010;
+  border: 1px solid #5a5a5a;
+}
+.admin-chk { color: #2a2a2a; }
+
+/* -------------------------------------------------- textos utilitários */
+.dim { color: #4a4a4a; }
+.stat-row .k { color: #3a3a3a; }
+.stat-row .v { color: #101010; }
+.gold-txt { color: #7a5f14; }
+.small, .tiny { color: inherit; }
+
+/* -------------------------------------------------- listas / linhas */
+.list { color: var(--text); }
+.list::-webkit-scrollbar-track { background: #6f6f6f; }
+.list::-webkit-scrollbar-thumb { background: #b0b0b0; border: 1px solid #3a3a3a; }
+
+.helper-supply-row, .shop-row, .hunt-card, .boss-card, .item-row,
+.party-member, .party-invite, .admin-item, .mission-box {
+  background: rgba(0,0,0,.10);
+  border-color: rgba(0,0,0,.18);
+}
+.helper-supply-row:hover, .shop-row:hover, .item-row:hover {
+  background: rgba(255,255,255,.22);
+}
+.helper-supply-row.selected, .shop-row.selected {
+  background: rgba(40,80,160,.30);
+  border-color: #1d4a94;
+}
+.hunt-card:hover { background: rgba(255,255,255,.22); border-color: #7a5f14; }
+.hunt-card.active { background: rgba(40,80,160,.35); border-color: #1d4a94; box-shadow: inset 0 0 0 1px rgba(30,80,160,.5); }
+.voc-card { background: rgba(0,0,0,.08); border-color: rgba(0,0,0,.2); }
+.voc-card:hover { border-color: #5a5a5a; }
+.voc-card.sel { border-color: #1d4a94; background: rgba(40,80,160,.3); }
+.voc-card .vd { color: #3a3a3a; }
+
+/* -------------------------------------------------- slots / inventário */
+.slot {
+  background: #9c9c9c center/32px 32px no-repeat;
+  border: 2px solid;
+  border-color: #dcdcdc #4a4a4a #4a4a4a #dcdcdc;
+}
+.slot:hover { border-color: #7a5f14; }
+.slot.empty::after { color: #4a4a4a; }
+.inv-item {
+  background: rgba(0,0,0,.12);
+  border: 1px solid rgba(0,0,0,.25);
+}
+.inv-item.empty { background: rgba(0,0,0,.15); opacity: .5; }
+
+/* -------------------------------------------------- log */
+.log-line .time { color: #4a4a4a; }
+.log-line.info { color: #2a2a2a; }
+.log-line.loot { color: #7a5f14; }
+.log-line.sell { color: #6a5512; }
+.log-line.exp { color: #3a8a10; }
+
+/* -------------------------------------------------- tooltip / toast / modal */
+#tooltip {
+  background: #d0d0d0;
+  border: 2px solid;
+  border-color: #f0f0f0 #3a3a3a #3a3a3a #f0f0f0;
+  color: #101010;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+#tooltip .tt-name { color: #12306b; }
+#tooltip .tt-stat { color: #1d4a94; }
+#tooltip .tt-req { color: #8a3010; }
+#tooltip .tt-sell { color: #6a5512; }
+#tooltip .tt-sub { color: #3a3a3a; border-top-color: #6a6a6a; }
+#tooltip .imb-slot { border-color: #6a6a6a; background: #b0b0b0; }
+#tooltip .imb-tempo { color: #101010; background: rgba(255,255,255,.8); }
+
+.toast {
+  background: #c8c8c8;
+  border: 2px solid; border-color: #f0f0f0 #3a3a3a #3a3a3a #f0f0f0;
+  color: #101010;
+}
+.toast.level { border-color: #1d4a94; color: #12306b; }
+.toast.death { border-color: #b02020; color: #8a1010; }
+.toast.rare { border-color: #6a3ab0; color: #4a1a8a; }
+
+.modal-bg { background: rgba(0,0,0,.75); }
+
+/* -------------------------------------------------- login */
+#login {
+  background: radial-gradient(ellipse at center, #5f5f5f 0%, #2a2a2a 75%);
+}
+#login .panel { box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+
+/* -------------------------------------------------- barras (mantém leitura) */
+.bar { background: #3a3a3a; border: 1px solid #1a1a1a; }
+.mission-progressbar { background: #3a3a3a; border: 1px solid #1a1a1a; }
+
+/* -------------------------------------------------- misc que usava fundo escuro */
+.charge-highlight { background: rgba(255,255,255,.25); }
+.scene-overlay, .hunt-tag { background: rgba(0,0,0,.55); color: #fff; }
+.stance-badge { color: #101010; }
+.prey-bonus-card { background: rgba(0,0,0,.12); }
+.dia-row-val, .dia-total { color: #101010; }
+#damage-analyser .dia-sub, .dia-sub { color: #3a3a3a; }
+.as-body { background: #6f6f6f; }
+.as-btn { background: #8a8a8a; border-color: #5a5a5a; }
+.as-btn:hover { background: #9c9c9c; }
+.as-btn.on { background: linear-gradient(180deg, #b4b4b4, #9a9a9a); }
+.as-head { background: linear-gradient(180deg, #7d7d7d, #636363); }
+.as-bar { background: linear-gradient(180deg, #8a8a8a, #6f6f6f); color: #101010; }
+
+/* -------------------------------------------------- abas admin / cards */
+.admin-tab {
+  background: #9c9c9c; color: #1a1a1a; border: 1px solid #6a6a6a;
+}
+.admin-tab:hover { background: #b0b0b0; }
+.admin-tab.active {
+  background: linear-gradient(180deg, #1d4a94, #12306b);
+  color: #ffffff; border-color: #2a5fb0;
+}
+.admin-card {
+  background: rgba(0,0,0,.10);
+  border: 1px solid rgba(0,0,0,.22);
+}
+.admin-card-t { color: #101010; }
+.admin-tbl th { color: #2a2a2a; border-bottom-color: #5a5a5a; }
+.admin-tbl td { border-bottom-color: rgba(0,0,0,.15); }
+
+/* -------------------------------------------------- combo / rotação */
+.combo-slot { background: #9c9c9c; border-color: #6a6a6a; }
+.combo-slot.dragover { border-color: #1d4a94; }
