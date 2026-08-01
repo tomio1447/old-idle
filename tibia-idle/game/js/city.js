@@ -398,13 +398,29 @@ function academyStatus(p) {
            msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
 }
 
-function newAcademyTraining(p, mode, weapon) {
+function newAcademyTraining(p, mode, weapon, huntMap) {
   const st = academyStatus(p);
   // modo "dummy": treina a skill da exercise weapon escolhida e consome
   // 1 carga por golpe; modo "online" (padrão): treina com o equipamento.
   let skill = st.skill;
   if (mode === "dummy" && weapon && EXERCISE_WEAPONS && EXERCISE_WEAPONS[weapon]) {
     skill = EXERCISE_WEAPONS[weapon].skill;
+  }
+  // Mapa .otbm da sala de exercise weapons (opcional): player spawna no
+  // marcador do mapa e o dummy fica na célula `mob` (onde o editor marcou).
+  let playerPos = null, dummyPos = null;
+  if (huntMap) {
+    if (huntMap.spawn) {
+      playerPos = cellCenter(huntMap.spawn);
+    } else {
+      // fallback: procura o marcador "S" no grid
+      for (let y = 0; y < huntMap.rows.length && !playerPos; y++)
+        for (let x = 0; x < huntMap.rows[y].length && !playerPos; x++)
+          if (huntMap.rows[y][x] === "S") playerPos = cellCenter({ x, y });
+    }
+    if (huntMap.mob && huntMap.mob.length) {
+      dummyPos = cellCenter(huntMap.mob[0]);
+    }
   }
   return {
     startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
@@ -413,6 +429,11 @@ function newAcademyTraining(p, mode, weapon) {
     training: true,
     mode: mode || "online",
     weapon: weapon || null,
+    huntMap: huntMap || null,
+    playerPos: playerPos,
+    dummyPos: dummyPos,
+    proj: null,           // arma voando: { t, dur, from, to, weapon }
+    projHitFx: false,
     lungeT: 0,            // animação do golpe (ms restantes)
     skill: skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
     stats: { hits: 0, damage: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
@@ -577,8 +598,20 @@ function academyTrainingTick(t, p, dt, now) {
   t.events.push({ type: "hit", skill: t.skill, dmg: dmg, mode: t.mode,
                   weapon: t.weapon,
                   skillUp: skillUp, shieldUp: shieldUp });
-  // animação do golpe (usada pelo drawAcademy no modo dummy)
-  t.lungeT = 180;
+  // Animação do golpe no modo dummy: a exercise weapon VOIA do player até
+  // o dummy (como no client — a arma é arremessada a cada golpe). O
+  // personagem fica parado; `proj` carrega a trajetória para o drawAcademy.
+  if (t.mode === "dummy" && t.playerPos && t.dummyPos) {
+    t.proj = {
+      t: 0, dur: 300,
+      from: { x: t.playerPos.x, y: t.playerPos.y },
+      to: { x: t.dummyPos.x, y: t.dummyPos.y },
+      weapon: t.weapon,
+    };
+    t.projHitFx = false;
+  } else {
+    t.lungeT = 180;
+  }
   t.hitCd = academyAttackDelay(t, p);
 }
 

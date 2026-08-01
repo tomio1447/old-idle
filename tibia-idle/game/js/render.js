@@ -805,70 +805,77 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.clearRect(0, 0, W, H);
 
   const isDummy = training.mode === "dummy";
+  const temMapa = !!(training.huntMap && training.huntMap.rows);
 
-  const gr = Sprites.ground("temple") || Sprites.ground("city");
-  if (gr && gr.complete && gr.naturalWidth) {
-    const s = 2;
-    const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
-    for (let y = 0; y < H; y += th)
-      for (let x = 0; x < W; x += tw)
-        ctx.drawImage(gr, x, y, tw, th);
+  if (temMapa) {
+    // --- Mapa .otbm da sala de exercise weapons (commit 0553abd): desenha
+    // o grid oficial do mapa com as paredes/chão do editor.
+    drawTileCharMap(ctx, training.huntMap, W, H, GRID_W, GRID_H);
   } else {
-    ctx.fillStyle = "#1d2018";
+    const gr = Sprites.ground("temple") || Sprites.ground("city");
+    if (gr && gr.complete && gr.naturalWidth) {
+      const s = 2;
+      const tw = gr.naturalWidth * s, th = gr.naturalHeight * s;
+      for (let y = 0; y < H; y += th)
+        for (let x = 0; x < W; x += tw)
+          ctx.drawImage(gr, x, y, tw, th);
+    } else {
+      ctx.fillStyle = "#1d2018";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.fillStyle = "rgba(0,0,0,.55)";
     ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(40,80,40,.32)";
+    ctx.fillRect(0, H * 0.68, W, H * 0.32);
+
+    const drawObj = (path, x, y, sc, alpha) => {
+      const img = Sprites.get(path);
+      if (!img || !img.complete || !img.naturalWidth) return;
+      ctx.save();
+      ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+      const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+      ctx.drawImage(img, x * W - w / 2, y * H - h, w, h);
+      ctx.restore();
+    };
+
+    // Sala de treino estilo OTServer: paredes, tochas, racks, barris e caixas.
+    ctx.fillStyle = "rgba(28,22,16,.88)";
+    ctx.fillRect(0, 0, W, H * 0.18);
+    ctx.fillStyle = "rgba(58,45,32,.75)";
+    ctx.fillRect(0, H * 0.16, W, 8);
+    for (let x = 0.05; x < 1; x += 0.12)
+      drawObj("assets/city/wall-brick-h.png", x, 0.19, 1.6, 0.9);
+    drawObj("assets/city/torch-wall.png", 0.09, 0.25, 1.8);
+    drawObj("assets/city/torch-wall.png", 0.91, 0.25, 1.8);
+    drawObj("assets/city/pillar.png", 0.06, 0.73, 1.9, 0.9);
+    drawObj("assets/city/pillar.png", 0.94, 0.73, 1.9, 0.9);
+    drawObj("assets/city/barrel.png", 0.14, 0.86, 1.7);
+    drawObj("assets/city/crate.png", 0.20, 0.87, 1.7);
+    drawObj("assets/city/box.png", 0.86, 0.86, 1.7);
+    drawObj("assets/city/table.png", 0.49, 0.89, 1.6, 0.85);
+    drawObj("assets/city/chair.png", 0.43, 0.88, 1.4, 0.8);
+    drawObj("assets/city/sign.png", 0.50, 0.24, 1.5);
+    // Rack de armas do lado esquerdo.
+    ctx.fillStyle = "rgba(80,55,28,.9)";
+    ctx.fillRect(W * 0.315, H * 0.25, 12, H * 0.34);
+    ctx.fillRect(W * 0.285, H * 0.30, 70, 8);
+    ctx.fillRect(W * 0.285, H * 0.44, 70, 8);
+    drawObj("assets/item/sword.png", 0.30, 0.48, 1.35);
+    drawObj("assets/item/axe.png", 0.34, 0.48, 1.35);
+    drawObj("assets/item/club.png", 0.38, 0.48, 1.35);
+    drawObj("assets/item/brass-shield.png", 0.34, 0.62, 1.25);
+    // Marcadores das baias de treino.
+    ctx.strokeStyle = "rgba(156,232,74,.35)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(W * 0.22, H * 0.47, W * 0.18, H * 0.24);
+    ctx.strokeRect(W * 0.60, H * 0.47, W * 0.18, H * 0.24);
   }
-
-  ctx.fillStyle = "rgba(0,0,0,.55)";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(40,80,40,.32)";
-  ctx.fillRect(0, H * 0.68, W, H * 0.32);
-
-  const drawObj = (path, x, y, sc, alpha) => {
-    const img = Sprites.get(path);
-    if (!img || !img.complete || !img.naturalWidth) return;
-    ctx.save();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-    const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
-    ctx.drawImage(img, x * W - w / 2, y * H - h, w, h);
-    ctx.restore();
-  };
-
-  // Sala de treino estilo OTServer: paredes, tochas, racks, barris e caixas.
-  ctx.fillStyle = "rgba(28,22,16,.88)";
-  ctx.fillRect(0, 0, W, H * 0.18);
-  ctx.fillStyle = "rgba(58,45,32,.75)";
-  ctx.fillRect(0, H * 0.16, W, 8);
-  for (let x = 0.05; x < 1; x += 0.12)
-    drawObj("assets/city/wall-brick-h.png", x, 0.19, 1.6, 0.9);
-  drawObj("assets/city/torch-wall.png", 0.09, 0.25, 1.8);
-  drawObj("assets/city/torch-wall.png", 0.91, 0.25, 1.8);
-  drawObj("assets/city/pillar.png", 0.06, 0.73, 1.9, 0.9);
-  drawObj("assets/city/pillar.png", 0.94, 0.73, 1.9, 0.9);
-  drawObj("assets/city/barrel.png", 0.14, 0.86, 1.7);
-  drawObj("assets/city/crate.png", 0.20, 0.87, 1.7);
-  drawObj("assets/city/box.png", 0.86, 0.86, 1.7);
-  drawObj("assets/city/table.png", 0.49, 0.89, 1.6, 0.85);
-  drawObj("assets/city/chair.png", 0.43, 0.88, 1.4, 0.8);
-  drawObj("assets/city/sign.png", 0.50, 0.24, 1.5);
-  // Rack de armas do lado esquerdo.
-  ctx.fillStyle = "rgba(80,55,28,.9)";
-  ctx.fillRect(W * 0.315, H * 0.25, 12, H * 0.34);
-  ctx.fillRect(W * 0.285, H * 0.30, 70, 8);
-  ctx.fillRect(W * 0.285, H * 0.44, 70, 8);
-  drawObj("assets/item/sword.png", 0.30, 0.48, 1.35);
-  drawObj("assets/item/axe.png", 0.34, 0.48, 1.35);
-  drawObj("assets/item/club.png", 0.38, 0.48, 1.35);
-  drawObj("assets/item/brass-shield.png", 0.34, 0.62, 1.25);
-  // Marcadores das baias de treino.
-  ctx.strokeStyle = "rgba(156,232,74,.35)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(W * 0.22, H * 0.47, W * 0.18, H * 0.24);
-  ctx.strokeRect(W * 0.60, H * 0.47, W * 0.18, H * 0.24);
 
   ctx.textAlign = "left";
   ctx.font = "bold 14px Verdana";
   ctx.fillStyle = "#9ce84a";
-  ctx.fillText(isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone", 12, 24);
+  ctx.fillText(temMapa ? "Sala de Exercise Weapons" : (isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone"), 12, 24);
   ctx.font = "10px Verdana";
   ctx.fillStyle = "#c8c0a8";
   if (isDummy) {
@@ -879,21 +886,29 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 
   const pimg = OutfitRenderer.forPlayer(player, "e", 0);
-  const pxBase = W * 0.28, py = H * 0.64;
+  // Posição do player: com mapa .otbm ele fica PARADO no spawn do mapa;
+  // sem mapa usa a baia procedural (com lunge ao golpear).
+  let px, py;
+  if (training.playerPos) {
+    px = training.playerPos.x * W;
+    py = training.playerPos.y * H;
+  } else {
+    px = W * 0.28;
+    py = H * 0.64;
+  }
   // Animação do golpe no modo dummy (como no client/baiakidle):
   //  - SEM flutuação: o personagem fica colado no chão (sem bob senoidal);
-  //  - durante o golpe (~180ms) ele alterna os frames de caminhada 1/2 da
-  //    outfit (o "swing" do braço) e avança um passo fixo em direção ao
-  //    dummy — sem o "quicar" sinusoidal antigo que parecia flutuação.
+  //  - no mapa .otbm a ARMA VOA do player até o dummy (training.proj);
+  //  - sem mapa (fallback): alterna frames de caminhada 1/2 + passo fixo.
   let lunge = 0;
   let atkFrame = 0;
-  if (training.mode === "dummy" && training.lungeT > 0) {
+  if (!training.playerPos && training.mode === "dummy" && training.lungeT > 0) {
     const prog = 1 - training.lungeT / 180;
     lunge = W * 0.02;                       // avanço fixo durante o golpe
     atkFrame = (Math.floor(prog * 6) % 2) + 1;  // alterna frames 1 e 2
     training.lungeT -= dt;
   }
-  const px = pxBase + lunge;
+  const pxF = px + lunge;
   const pimgAtk = (atkFrame && spriteReady(pimg))
     ? (OutfitRenderer.forPlayer(player, "e", atkFrame) || pimg) : pimg;
   if (spriteReady(pimgAtk)) {
@@ -902,22 +917,32 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // SEM bob: sprite fixa no chão, como no client
     const top = py - h / 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
-    ctx.drawImage(pimgAtk, px - w / 2, top, w, h);
-    drawPlayerStatus(ctx, px, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
-    this.drawSpeech(ctx, px, top - 14, dt);
+    ctx.beginPath(); ctx.ellipse(pxF, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    ctx.drawImage(pimgAtk, pxF - w / 2, top, w, h);
+    drawPlayerStatus(ctx, pxF, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
+    this.drawSpeech(ctx, pxF, top - 14, dt);
   }
 
-  const tx = W * 0.70, ty = H * 0.62;
+  // Posição do dummy: com mapa .otbm usa a célula `mob` marcada no editor;
+  // sem mapa usa a baia procedural à direita.
+  let tx = W * 0.70, ty = H * 0.62;
+  if (training.dummyPos) {
+    tx = training.dummyPos.x * W;
+    ty = training.dummyPos.y * H;
+  }
   if (isDummy) {
     // --- Ferumbras Exercise Dummy: sprite oficial (TibiaWiki), estátua
     // do Ferumbras sobre a base de pedra, com barra e cargas.
     const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
+    // no mapa .otbm o dummy ocupa 1 sqm (escala pelo tile); sem mapa usa
+    // o tamanho da baia procedural
+    const tile = tilePx(W);
+    const scDummy = temMapa ? (tile * 0.85) / 64 : 1.5;
     const dw = 64, dh = 64;
-    const dbx = tx - dw / 2, dby = ty - dh + 8;
-    drawTargetSquare(ctx, dbx, dby, dw, dh);
+    const dbx = tx - (dw * scDummy) / 2, dby = ty - dh * scDummy + 8;
+    drawTargetSquare(ctx, dbx, dby, dw * scDummy, dh * scDummy);
     if (dimg && dimg.complete && dimg.naturalWidth) {
-      const sc = 1.5;
+      const sc = scDummy;
       const w = dimg.naturalWidth * sc, h = dimg.naturalHeight * sc;
       ctx.fillStyle = "rgba(0,0,0,.4)";
       ctx.beginPath(); ctx.ellipse(tx, ty + 12, w * 0.36, 9, 0, 0, 7); ctx.fill();
@@ -975,6 +1000,37 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.fillRect(tx - 42, ty - 55, 84, 7);
     ctx.fillStyle = "#4ec84e";
     ctx.fillRect(tx - 41, ty - 54, 82, 5);
+  }
+
+  // --- Arma voando (modo dummy com mapa .otbm): a exercise weapon é
+  // arremessada do player até o dummy a cada golpe, como no client.
+  if (training.proj) {
+    const pr = training.proj;
+    pr.t += dt;
+    const p = Math.min(1, pr.t / pr.dur);
+    const ex = (pr.from.x + (pr.to.x - pr.from.x) * p) * W;
+    const ey = (pr.from.y + (pr.to.y - pr.from.y) * p) * H;
+    const icon = (EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif";
+    const wimg = Sprites.get("assets/ui/training/" + icon);
+    if (wimg && wimg.complete && wimg.naturalWidth) {
+      const ts = tilePx(W);
+      const ws = ts * 0.75, hs = ts * 0.75;
+      ctx.save();
+      // giro suave enquanto voa + sombra no chão
+      ctx.translate(ex, ey - hs * 0.3);
+      ctx.rotate(Math.sin(p * Math.PI * 3) * 0.5);
+      ctx.drawImage(wimg, -ws / 2, -hs / 2, ws, hs);
+      ctx.restore();
+      ctx.fillStyle = "rgba(0,0,0,.3)";
+      ctx.beginPath(); ctx.ellipse(ex, ey + hs * 0.35, ws * 0.25, 4, 0, 0, 7); ctx.fill();
+    }
+    // impacto no dummy quando a arma chega (uma vez por golpe)
+    if (p >= 1 && !pr.hitFx) {
+      pr.hitFx = true;
+      this.addEffect(pr.to.x, pr.to.y, "block-hit");
+      // some o proj no próximo frame
+      training.proj = null;
+    }
   }
 
   ctx.textAlign = "left";

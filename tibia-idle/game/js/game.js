@@ -1168,11 +1168,14 @@ function drainAcademyEvents() {
     switch (kind) {
       case "hit":
         if (e.mode === "dummy") {
-          // Exercise Dummy: o dano sai NO dummy (direita) e o efeito é o
-          // impacto do golpe; sem "treiner hit" no player.
-          if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
-          r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
-          r.addEffect(0.70, 0.60, e.skill === "magic" ? "magic-blue" : "block-hit");
+          // Exercise Dummy: o dano sai NO dummy e o efeito é o impacto do
+          // golpe; sem "treiner hit" no player. Com mapa .otbm, as posições
+          // vêm do training (playerPos/dummyPos); sem mapa usa a baia fixa.
+          const dp = t.dummyPos || { x: 0.70, y: 0.60 };
+          const pp = t.playerPos || { x: 0.28, y: 0.62 };
+          if (e.dmg > 0) r.addFloater(dp.x, dp.y - 0.07, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
+          r.addFloater(dp.x - 0.02, dp.y - 0.16, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
+          r.addEffect(dp.x, dp.y, e.skill === "magic" ? "magic-blue" : "block-hit");
           renderSkills(G.p);
           renderStats(G.p);
           renderTopbar(G.p);

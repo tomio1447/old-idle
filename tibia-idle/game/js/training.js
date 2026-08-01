@@ -82,8 +82,33 @@ function trainingStaminaRate(t) {
   return (t && t.mode === "dummy") ? (1 / 3) : 1.0;
 }
 
-/* Inicia o treino com exercise weapon num Exercise Dummy.
- * Consome 1 carga por golpe; sem cargas, o treino para. */
+/* Nome do mapa .otbm da sala de exercise weapons (commit 0553abd). */
+const TRAINING_MAP_OTBM = "sala de exercise weapons";
+
+/* Overlay de loading curto ao entrar na sala (some quando o mapa chega). */
+function showTrainingLoading() {
+  let el = document.getElementById("training-loading");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "training-loading";
+    el.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;" +
+      "align-items:center;justify-content:center;background:rgba(0,0,0,.72);" +
+      "font:bold 16px Verdana;color:#ffe680;letter-spacing:.05em;";
+    document.body.appendChild(el);
+  }
+  el.style.display = "flex";
+  el.innerHTML = "⏳ Carregando sala de exercise weapons...";
+}
+
+function hideTrainingLoading() {
+  const el = document.getElementById("training-loading");
+  if (el) el.style.display = "none";
+}
+
+/* Inicia o treino com exercise weapon no Ferumbras Exercise Dummy.
+ * Consome 1 carga por golpe; sem cargas, o treino para.
+ * O mapa .otbm da sala é carregado de forma assíncrona (loading curto);
+ * se falhar, cai no cenário procedural (comportamento anterior). */
 function startDummyTraining(p, weaponId) {
   if (!EXERCISE_WEAPONS[weaponId]) return { ok: false, msg: "Escolha uma exercise weapon." };
   ensureTraining(p);
@@ -92,14 +117,36 @@ function startDummyTraining(p, weaponId) {
   }
   if (G.combat) stopHunt();
   if (G.training) stopAcademy(false);
-  G.training = newAcademyTraining(p, "dummy", weaponId);
-  G.inCity = false;
-  G.p.hunt = null;
-  G.combat = null;
+  showTrainingLoading();
   const w = EXERCISE_WEAPONS[weaponId];
-  addLog("info", `Treino com <b>${w.name}</b> no Exercise Dummy (regen de stamina 3:1).`);
-  toast(`Exercise Dummy: <b>${w.name}</b> ativa`, "level");
-  renderAll();
+
+  const entrar = (huntMap) => {
+    hideTrainingLoading();
+    G.training = newAcademyTraining(p, "dummy", weaponId, huntMap || null);
+    G.inCity = false;
+    G.p.hunt = null;
+    G.combat = null;
+    addLog("info", `Treino com <b>${w.name}</b> no Ferumbras Exercise Dummy (regen de stamina 3:1).`);
+    toast(`Ferumbras Dummy: <b>${w.name}</b> ativa`, "level");
+    renderAll();
+  };
+
+  // carrega o mapa .otbm da sala (fetch + cache) com loading curto
+  const pseudo = { otbm: TRAINING_MAP_OTBM };
+  if (typeof huntMapFromOtbmAsync === "function") {
+    let pronto = false;
+    const t0 = Date.now();
+    const fallback = setTimeout(() => { if (!pronto) entrar(null); }, 4000);
+    huntMapFromOtbmAsync(pseudo, () => {
+      pronto = true;
+      clearTimeout(fallback);
+      const key = "otbm:" + TRAINING_MAP_OTBM;
+      const hm = (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) ? HUNTMAPS[key] : null;
+      entrar(hm);
+    });
+  } else {
+    entrar(null);
+  }
   return { ok: true, msg: "" };
 }
 
