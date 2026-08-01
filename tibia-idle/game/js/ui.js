@@ -452,7 +452,10 @@ function renderEquip(p) {
       const cnt = slot === "ammo" ? "∞" : e.count;
       const tierTxt = typeof forgeTierTextForEntry === "function" ? forgeTierTextForEntry(e) : forgeTierText(e.item);
       const tierCls = typeof forgeTierClassForEntry === "function" ? forgeTierClassForEntry(e) : forgeTierClass(e.item);
-      h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}" data-slot="${slot}" data-item="${e.item}">
+      // anel/amuleto equipado: sprite brilha (classe .acc-glow) — o brilho
+      // indica que os atributos do item estão ativos no personagem
+      const glow = (slot === "ring" || slot === "amulet") ? " acc-glow" : "";
+      h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
         ${itemImg(e.item)}${tierTxt ? `<span class="cnt" style="color:#ffe680">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {

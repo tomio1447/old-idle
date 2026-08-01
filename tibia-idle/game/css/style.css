@@ -1617,3 +1617,24 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .tr-w-icon { width: 30px; height: 30px; image-rendering: pixelated; }
 .tr-buy { white-space: nowrap; }
 .tr-buy img { width: 14px; height: 14px; vertical-align: -2px; image-rendering: pixelated; }
+
+/* ==================== Anéis e Amuletos (TibiaWiki) ==================== */
+/* Sprite brilhando quando equipado: anel/amuleto no slot ganham um pulso
+ * dourado indicando que os atributos estão ativos. */
+.slot.acc-glow {
+  border-color: #ffd65a;
+  box-shadow: 0 0 6px rgba(255, 214, 90, .55), inset 0 0 6px rgba(255, 214, 90, .25);
+  animation: acc-glow-pulse 2.2s ease-in-out infinite;
+}
+.slot.acc-glow img {
+  filter: drop-shadow(0 0 3px rgba(255, 214, 90, .9));
+  animation: acc-glow-sprite 2.2s ease-in-out infinite;
+}
+@keyframes acc-glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(255,214,90,.4), inset 0 0 5px rgba(255,214,90,.18); }
+  50%      { box-shadow: 0 0 12px rgba(255,214,90,.8), inset 0 0 9px rgba(255,214,90,.4); }
+}
+@keyframes acc-glow-sprite {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,214,90,.6)) brightness(1); }
+  50%      { filter: drop-shadow(0 0 6px rgba(255,214,90,1)) brightness(1.25); }
+}

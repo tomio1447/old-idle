@@ -859,6 +859,31 @@ function applyPlayerMitigation(p, element, dano) {
   return Math.max(1, Math.floor(dano * (1 - mit / 100)));
 }
 
+/* Resistência por ELEMENTO do jogador (TibiaWiki: Anéis / Amuletos e
+ * Colares). Soma o `res[element]` de TODOS os equipamentos (anel, amuleto,
+ * armadura, escudo etc.). Proteção positiva reduz o dano; negativa (fraqueza,
+ * ex.: terra amulet -10% fogo) aumenta. */
+function playerResistPct(p, element) {
+  if (!p || !p.equip || typeof GAMEDATA === "undefined") return 0;
+  let total = 0;
+  for (const s in p.equip) {
+    const e = p.equip[s];
+    if (!e || !e.item) continue;
+    const it = GAMEDATA.items[e.item];
+    if (!it || !it.res) continue;
+    total += Number(it.res[element]) || 0;
+  }
+  return total;
+}
+
+/* Aplica a resistência por elemento do jogador ao dano recebido. */
+function applyPlayerResist(p, element, dano) {
+  if (element === "agony") return dano;   // true damage: nunca reduz
+  const pc = (typeof playerResistPct === "function") ? playerResistPct(p, element) : 0;
+  if (!pc) return dano;
+  return Math.max(1, Math.floor(dano * (1 - pc / 100)));
+}
+
 /* ====================================================== Elemental Pierce
  * TibiaWiki/Elemental_Pierce (Winter Update 2025): aumenta a sensibilidade
  * do inimigo por uma porcentagem. Regras:
@@ -2483,6 +2508,12 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     if (typeof applyPlayerMitigation === "function") {
       raw = applyPlayerMitigation(p, tipoEl, raw);
     }
+    // Resistência por ELEMENTO dos anéis/amuletos/equipamentos (TibiaWiki:
+    // proteção física +80% do stone skin amulet, +20% terra do terra amulet
+    // etc.). Aplica após a mitigation, como no client.
+    if (raw > 0 && typeof applyPlayerResist === "function") {
+      raw = applyPlayerResist(p, tipoEl, raw);
+    }
     // Prey de DEFESA (TibiaWiki/Prey_System): −12~30% do dano recebido da
     // criatura alvo; o tempo da prey gasta um pouco extra a cada hit.
     if (raw > 0 && typeof preyDefenseBonus === "function") {
@@ -2717,6 +2748,11 @@ function mobAttack(c, p, mob) {
   // do mob é físico — TibiaWiki/Mitigation).
   if (typeof applyPlayerMitigation === "function") {
     raw = applyPlayerMitigation(p, "physical", raw);
+  }
+  // Resistência física dos anéis/amuletos (ex.: stone skin amulet +80%,
+  // might ring +20%, protection amulet +6%).
+  if (raw > 0 && typeof applyPlayerResist === "function") {
+    raw = applyPlayerResist(p, "physical", raw);
   }
   raw = Math.max(0, Math.floor(raw));
 
