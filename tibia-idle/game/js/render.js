@@ -804,6 +804,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   const W = this.c.width, H = this.c.height;
   ctx.clearRect(0, 0, W, H);
 
+  const isDummy = training.mode === "dummy";
+
   const gr = Sprites.ground("temple") || Sprites.ground("city");
   if (gr && gr.complete && gr.naturalWidth) {
     const s = 2;
@@ -866,13 +868,27 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.textAlign = "left";
   ctx.font = "bold 14px Verdana";
   ctx.fillStyle = "#9ce84a";
-  ctx.fillText("Academia Safezone", 12, 24);
+  ctx.fillText(isDummy ? "Exercise Dummy Safezone" : "Academia Safezone", 12, 24);
   ctx.font = "10px Verdana";
   ctx.fillStyle = "#c8c0a8";
-  ctx.fillText("Treiner padrão · +200% ticks/hit · conjure disponível", 12, 40);
+  if (isDummy) {
+    const w = training.weapon ? (EXERCISE_WEAPONS[training.weapon] || {}).name : "—";
+    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12, 40);
+  } else {
+    ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12, 40);
+  }
 
   const pimg = OutfitRenderer.forPlayer(player, "e", 0);
-  const px = W * 0.28, py = H * 0.64;
+  const pxBase = W * 0.28, py = H * 0.64;
+  // animação do golpe no modo dummy: o player avança em direção ao dummy
+  // (lunge) por ~180ms a cada hit, igual ao atkPush dos mobs no combate.
+  let lunge = 0;
+  if (training.mode === "dummy" && training.lungeT > 0) {
+    const prog = 1 - training.lungeT / 180;
+    lunge = Math.sin(prog * Math.PI) * W * 0.045;
+    training.lungeT -= dt;
+  }
+  const px = pxBase + lunge;
   if (spriteReady(pimg)) {
     const sc = PLAYER_SCALE + 0.1;
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
@@ -884,36 +900,84 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     this.drawSpeech(ctx, px, top - 14, dt);
   }
 
-  const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
   const tx = W * 0.70, ty = H * 0.62;
-  let trainerBox = { x: tx - 22, y: ty - 52, w: 44, h: 74 };
-  if (trainer && trainer.complete && trainer.naturalWidth) {
-    const sc = 2.4;
-    const w = trainer.naturalWidth * sc, h = trainer.naturalHeight * sc;
-    trainerBox = { x: tx - w * 0.43, y: ty - h * 0.48,
-                   w: w * 0.86, h: h * 0.92 };
-    ctx.fillStyle = "rgba(0,0,0,.45)";
-    ctx.beginPath(); ctx.ellipse(tx, ty + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
-    drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
-    ctx.drawImage(trainer, tx - w / 2, ty - h / 2, w, h);
+  if (isDummy) {
+    // --- Exercise Dummy (Skill Trainer): poste de madeira com saco.
+    const dw = 52, dh = 86;
+    const dbx = tx - dw / 2, dby = ty - dh + 8;
+    drawTargetSquare(ctx, dbx, dby, dw, dh);
+    // poste
+    ctx.fillStyle = "#6b4a26";
+    ctx.fillRect(tx - 4, ty - 40, 8, 46);
+    ctx.fillStyle = "#54381c";
+    ctx.fillRect(tx - 4, ty + 2, 8, 4);
+    // saco (pano)
+    ctx.fillStyle = "#8a6a3a";
+    ctx.beginPath();
+    ctx.ellipse(tx, ty - 46, 26, 32, 0, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = "#9c7a48";
+    ctx.beginPath();
+    ctx.ellipse(tx, ty - 52, 18, 22, 0, 0, 7);
+    ctx.fill();
+    // costura do saco
+    ctx.strokeStyle = "#6b4a26";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - 78); ctx.lineTo(tx, ty - 26);
+    ctx.stroke();
+    // sombra
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    ctx.beginPath(); ctx.ellipse(tx, ty + 10, 30, 8, 0, 0, 7); ctx.fill();
+
+    ctx.textAlign = "center";
+    ctx.font = "bold 12px Verdana";
+    ctx.fillStyle = "rgba(0,0,0,.85)";
+    ctx.fillText("Exercise Dummy", tx + 1, ty - 90);
+    ctx.fillStyle = "#ffe680";
+    ctx.fillText("Exercise Dummy", tx, ty - 91);
+
+    // barra do dummy + cargas da exercise weapon
+    ctx.fillStyle = "#000";
+    ctx.fillRect(tx - 46, ty - 108, 92, 8);
+    ctx.fillStyle = "#4ec84e";
+    ctx.fillRect(tx - 45, ty - 107, 90, 6);
+    const cargas = (player.exercise && training.weapon)
+      ? (player.exercise[training.weapon] || 0) : 0;
+    ctx.font = "10px Verdana";
+    ctx.fillStyle = "#c8c0a8";
+    ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 113);
   } else {
-    drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
-    ctx.fillStyle = "#7b5a2a";
-    ctx.fillRect(tx - 18, ty - 52, 36, 70);
+    const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
+    let trainerBox = { x: tx - 22, y: ty - 52, w: 44, h: 74 };
+    if (trainer && trainer.complete && trainer.naturalWidth) {
+      const sc = 2.4;
+      const w = trainer.naturalWidth * sc, h = trainer.naturalHeight * sc;
+      trainerBox = { x: tx - w * 0.43, y: ty - h * 0.48,
+                     w: w * 0.86, h: h * 0.92 };
+      ctx.fillStyle = "rgba(0,0,0,.45)";
+      ctx.beginPath(); ctx.ellipse(tx, ty + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+      drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
+      ctx.drawImage(trainer, tx - w / 2, ty - h / 2, w, h);
+    } else {
+      drawTargetSquare(ctx, trainerBox.x, trainerBox.y, trainerBox.w, trainerBox.h);
+      ctx.fillStyle = "#7b5a2a";
+      ctx.fillRect(tx - 18, ty - 52, 36, 70);
+    }
+
+    ctx.textAlign = "center";
+    ctx.font = "bold 12px Verdana";
+    ctx.fillStyle = "rgba(0,0,0,.85)";
+    ctx.fillText("Treiner", tx + 1, ty - 64);
+    ctx.fillStyle = "#ffe680";
+    ctx.fillText("Treiner", tx, ty - 65);
+
+    // barra do Treiner: nunca morre
+    ctx.fillStyle = "#000";
+    ctx.fillRect(tx - 42, ty - 55, 84, 7);
+    ctx.fillStyle = "#4ec84e";
+    ctx.fillRect(tx - 41, ty - 54, 82, 5);
   }
-
-  ctx.textAlign = "center";
-  ctx.font = "bold 12px Verdana";
-  ctx.fillStyle = "rgba(0,0,0,.85)";
-  ctx.fillText("Treiner", tx + 1, ty - 64);
-  ctx.fillStyle = "#ffe680";
-  ctx.fillText("Treiner", tx, ty - 65);
-
-  // barra do Treiner: nunca morre
-  ctx.fillStyle = "#000";
-  ctx.fillRect(tx - 42, ty - 55, 84, 7);
-  ctx.fillStyle = "#4ec84e";
-  ctx.fillRect(tx - 41, ty - 54, 82, 5);
 
   ctx.textAlign = "left";
   ctx.font = "11px Verdana";

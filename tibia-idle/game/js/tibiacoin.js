@@ -52,6 +52,16 @@ function accountSetCoins(n) {
   return acc.coins;
 }
 
+/* Gasta coins da conta (não deixa ficar negativo; retorna o novo saldo). */
+function accountSpendCoins(n) {
+  n = Math.max(0, Math.floor(Number(n) || 0));
+  if (!n) return accountCoins();
+  const acc = accountLoad();
+  acc.coins = Math.max(0, acc.coins - n);
+  accountSave(acc);
+  return acc.coins;
+}
+
 /* Atualiza o número de Tibia Coins na topbar. */
 function renderCoinBalance() {
   const n = $("#tibia-coins-n");

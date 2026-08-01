@@ -398,14 +398,23 @@ function academyStatus(p) {
            msg: "Treinando " + (SKILL_NAMES[skill] || skill) };
 }
 
-function newAcademyTraining(p) {
+function newAcademyTraining(p, mode, weapon) {
   const st = academyStatus(p);
+  // modo "dummy": treina a skill da exercise weapon escolhida e consome
+  // 1 carga por golpe; modo "online" (padrão): treina com o equipamento.
+  let skill = st.skill;
+  if (mode === "dummy" && weapon && EXERCISE_WEAPONS && EXERCISE_WEAPONS[weapon]) {
+    skill = EXERCISE_WEAPONS[weapon].skill;
+  }
   return {
     startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
     // marca o contexto como treino: consumeAmmoCharge e o gasto de supply
     // olham essa flag para nao cobrar arrows/bolts/runas no dummy
     training: true,
-    skill: st.skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
+    mode: mode || "online",
+    weapon: weapon || null,
+    lungeT: 0,            // animação do golpe (ms restantes)
+    skill: skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
     stats: { hits: 0, damage: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
              supplyUsed: {}, supplyBought: {}, supplyCost: 0 },
     events: [],
@@ -506,8 +515,13 @@ function academyTrainingTick(t, p, dt, now) {
   if (t.hitCd > 0) return;
 
   const st = academyStatus(p);
-  t.skill = st.skill;
-  if (!st.ok) {
+  // no modo dummy a skill vem da exercise weapon (não do equipamento)
+  if (t.mode === "dummy" && t.weapon && EXERCISE_WEAPONS && EXERCISE_WEAPONS[t.weapon]) {
+    t.skill = EXERCISE_WEAPONS[t.weapon].skill;
+  } else {
+    t.skill = st.skill;
+  }
+  if (!st.ok && t.mode !== "dummy") {
     if (now - t.lastMsg > 3000) {
       t.events.push({ type: "msg", msg: st.msg });
       t.lastMsg = now;
@@ -516,15 +530,31 @@ function academyTrainingTick(t, p, dt, now) {
     return;
   }
 
+  // dummy: consome 1 carga por golpe; sem cargas o treino para
+  if (t.mode === "dummy" && t.weapon) {
+    ensureTraining(p);
+    if ((p.exercise[t.weapon] || 0) <= 0) {
+      const w = EXERCISE_WEAPONS[t.weapon];
+      t.events.push({ type: "msg", msg: `${w ? w.name : "Exercise weapon"} sem cargas — treino encerrado.` });
+      if (typeof stopAcademy === "function") stopAcademy(false);
+      return;
+    }
+    p.exercise[t.weapon] -= 1;
+    if (p.exercise[t.weapon] < 0) p.exercise[t.weapon] = 0;
+  }
+
   let skillUp = false;
   let dmg = 0;
   const rate = dummyRate(p);
-  if (st.skill === "magic") {
+  if (t.skill === "magic") {
     // magia: o servidor conta mana spent, sem exigir mana do jogador
     const ganho = Math.floor(EXERCISE_MANA * rate);
     t.stats.manaSpent += ganho;
     skillUp = addManaSpent(p, ganho);
-  } else if (st.skill === "dist") {
+  } else if (t.skill === "shield") {
+    // exercise shield: só shielding (o próprio golpe de escudo)
+    skillUp = addSkillTries(p, "shield", EXERCISE_TRIES * rate);
+  } else if (t.skill === "dist") {
     // sem exigir municao: o treino aqui nao consome arrows
     const d = playerDamage(p);
     dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.85));
@@ -534,17 +564,21 @@ function academyTrainingTick(t, p, dt, now) {
       const d = playerDamage(p);
       dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.9));
     }
-    skillUp = addSkillTries(p, st.skill, EXERCISE_TRIES * rate);
+    skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
   }
 
-  const shieldUp = addSkillTries(p, "shield", EXERCISE_TRIES * rate);
+  const shieldUp = t.skill === "shield" ? false
+    : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
   t.hits++;
   t.stats.hits++;
   t.stats.damage += dmg;
   if (skillUp) t.stats.skillUps++;
   if (shieldUp) t.stats.shieldUps++;
-  t.events.push({ type: "hit", skill: st.skill, dmg: dmg,
+  t.events.push({ type: "hit", skill: t.skill, dmg: dmg, mode: t.mode,
+                  weapon: t.weapon,
                   skillUp: skillUp, shieldUp: shieldUp });
+  // animação do golpe (usada pelo drawAcademy no modo dummy)
+  t.lungeT = 180;
   t.hitCd = academyAttackDelay(t, p);
 }
 

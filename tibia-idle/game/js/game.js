@@ -1167,17 +1167,30 @@ function drainAcademyEvents() {
     const kind = e.type || e.t;
     switch (kind) {
       case "hit":
-        if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
-        r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
-        r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
-        // O Treiner revida para gerar shielding: explosão de fogo visual no player.
-        r.addEffect(0.28, 0.60, "fire-area");
-        r.addFloater(0.28, 0.48, "treiner hit", "#ff8a3c");
-        renderSkills(G.p);
-        renderStats(G.p);
-        renderTopbar(G.p);
-        if (e.skillUp) addLog("skill", `<b>${SKILL_NAMES[e.skill] || e.skill}</b> subiu batendo no Treiner.`);
-        if (e.shieldUp) addLog("skill", "<b>Shielding</b> subiu treinando no Treiner.");
+        if (e.mode === "dummy") {
+          // Exercise Dummy: o dano sai NO dummy (direita) e o efeito é o
+          // impacto do golpe; sem "treiner hit" no player.
+          if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
+          r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
+          r.addEffect(0.70, 0.60, e.skill === "magic" ? "magic-blue" : "block-hit");
+          renderSkills(G.p);
+          renderStats(G.p);
+          renderTopbar(G.p);
+          if (e.skillUp) addLog("skill", `<b>${SKILL_NAMES[e.skill] || e.skill}</b> subiu no Exercise Dummy.`);
+          if (e.shieldUp) addLog("skill", "<b>Shielding</b> subiu no Exercise Dummy.");
+        } else {
+          if (e.dmg > 0) r.addFloater(0.70, 0.45, "-" + fmtDmg(e.dmg), "#d8d8d8", e.dmg > 80);
+          r.addFloater(0.68, 0.38, "+tick " + (SKILL_NAMES[e.skill] || e.skill), "#9ce84a", e.skillUp);
+          r.addEffect(0.68, 0.58, e.skill === "magic" ? "magic-blue" : "block-hit");
+          // O Treiner revida para gerar shielding: explosão de fogo visual no player.
+          r.addEffect(0.28, 0.60, "fire-area");
+          r.addFloater(0.28, 0.48, "treiner hit", "#ff8a3c");
+          renderSkills(G.p);
+          renderStats(G.p);
+          renderTopbar(G.p);
+          if (e.skillUp) addLog("skill", `<b>${SKILL_NAMES[e.skill] || e.skill}</b> subiu batendo no Treiner.`);
+          if (e.shieldUp) addLog("skill", "<b>Shielding</b> subiu treinando no Treiner.");
+        }
         break;
       case "msg":
         addLog("info", e.msg);
@@ -1272,7 +1285,12 @@ function loop(ts) {
   if (!G.paused && G.training) {
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     regenInCity(G.p, dt);
-    academyTrainingTick(G.training, G.p, dt, Date.now());
+    // regen de stamina por modo de treino: dummy 3:1, online 1:1
+    const tr = G.training;
+    const staRate = (typeof trainingStaminaRate === "function")
+      ? trainingStaminaRate(tr) : (tr && tr.mode === "dummy" ? 1 / 3 : 1.0);
+    G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * staRate);
+    academyTrainingTick(tr, G.p, dt, Date.now());
     drainAcademyEvents();
     if (JSON.stringify(G.p.skills) + G.p.ml !== beforeSkills) {
       renderSkills(G.p);
@@ -1446,6 +1464,7 @@ function bindControls() {
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
   if (typeof bindPartyButton === "function") bindPartyButton();
+  if (typeof bindTrainingButton === "function") bindTrainingButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
     if (typeof openAdmin === "function") {
