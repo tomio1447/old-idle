@@ -1112,19 +1112,47 @@ Renderer.prototype.draw = function (combat, player, dt) {
         const mobName = typeof displayMonsterName === "function"
           ? displayMonsterName(m.def.name)
           : String(m.def.name || "").replace(/^Influenced\s+/i, "");
+        // --- Ícones de condição da TibiaWiki ao lado do nome, como o
+        // client oficial: Sap Strength / Expose Weakness (crippling
+        // stances do Sorcerer) e Chivalrous Challenge / Divine Dazzle
+        // (m.challengedUntil, reservado para uso futuro).
+        const agoraIcon = Date.now();
+        const condIcons = [];
+        if (m.sapStrUntil && m.sapStrUntil > agoraIcon) condIcons.push("sap-strength");
+        if (m.exposeUntil && m.exposeUntil > agoraIcon) condIcons.push("expose-weakness");
+        if (m.challengedUntil && m.challengedUntil > agoraIcon) condIcons.push("challenged");
+        if (condIcons.length) {
+          ctx.font = "bold 9px Verdana";
+          const tw = ctx.measureText(mobName).width;
+          const isz = 12, gap = 2;
+          const rowW = condIcons.length * (isz + gap) - gap;
+          let ix = Math.round(mx - tw / 2 - 4 - rowW);
+          const iy = Math.round(by - 13); // centro vertical da linha do nome
+          for (const slug of condIcons) {
+            if (drawWikiIcon(ctx, slug, ix, iy, isz)) ix += isz + gap;
+          }
+        }
         drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
         if (m.fiendish) {
-          drawNameText(ctx, mx, by + 7, "FIENDISH", "#d79cff");
+          // Ícone oficial de Fiendish + tag, grupo centralizado no SQM
+          const tag = "FIENDISH";
+          ctx.font = "bold 9px Verdana";
+          const tw = ctx.measureText(tag).width;
+          const isz = 12, gap = 2;
+          const startX = Math.round(mx - (tw + gap + isz) / 2);
+          drawWikiIcon(ctx, "fiendish-creature", startX, by - 4, isz);
+          drawNameText(ctx, startX + isz + gap + tw / 2, by + 7, tag, "#d79cff");
         } else if (m.influenced) {
-          // O client mostra a influência como o ícone de poeira + quantidade
-          // de stacks, sem escrever "INFLUENCED 3" em cima da criatura.
+          // O client mostra a influência como o ícone de criatura
+          // influenciada (TibiaWiki) + quantidade de stacks, sem escrever
+          // "INFLUENCED 3" em cima da criatura.
           const stacks = String(m.sinisterStacks || 1);
-          const dust = Sprites.item("mystic-dust");
-          if (dust && dust.complete && dust.naturalWidth) {
-            const iw = 13, ih = 12;
+          const ic = wikiIcon("influenced-creature");
+          if (ic && ic.complete && ic.naturalWidth) {
+            const isz = 12;
             const tx = mx - 9, ty = by + 1;
             ctx.save();
-            ctx.drawImage(dust, tx - iw, ty - 5, iw, ih);
+            ctx.drawImage(ic, tx - isz, ty - 5, isz, isz);
             ctx.font = "10px monospace";
             ctx.textAlign = "left";
             ctx.textBaseline = "middle";

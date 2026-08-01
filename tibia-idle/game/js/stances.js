@@ -101,6 +101,7 @@ const STANCES = {
   "exori-kor-tempo": {
     voc: "sorcerer", nome: "Aura of Sapped Strength", grupo: "sorcrip",
     fx: "stance-sapped-strength",
+    iconWiki: "sap-strength", // ícone oficial TibiaWiki (icondata.js)
     // ataques/magias/runas aplicam Sap Strength: o alvo causa 10% menos dano
     sapStr: 0.10,
     desc: "seus golpes enfraquecem: alvo causa 10% menos dano",
@@ -108,6 +109,7 @@ const STANCES = {
   "exori-moe-tempo": {
     voc: "sorcerer", nome: "Aura of Exposed Weakness", grupo: "sorcrip",
     fx: "stance-exposed-weakness",
+    iconWiki: "expose-weakness", // ícone oficial TibiaWiki (icondata.js)
     // ataques/magias/runas aplicam Expose Weakness: 8% elemental pierce
     expose: 8,
     desc: "seus golpes expõem: +8% de dano elemental no alvo",

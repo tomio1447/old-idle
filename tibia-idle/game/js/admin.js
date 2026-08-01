@@ -748,8 +748,8 @@ function renderAdminForge(p, el) {
                   <div class="small">${m.name}</div>
                   <div class="tiny dim">base hp ${fmtFull(m.hp || 0)} · inf${stacks} hp ${fmtFull(inf.hp || 0)} · fiendish hp ${fmtFull(fie.hp || 0)}</div>
                 </div>
-                <button class="sm" data-forge-summon="${i}" data-variant="influenced">Influenced</button>
-                <button class="sm primary" data-forge-summon="${i}" data-variant="fiendish">Fiendish</button>
+                <button class="sm" data-forge-summon="${i}" data-variant="influenced"><img src="assets/ui/icons/influenced-creature.png" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px">Influenced</button>
+                <button class="sm primary" data-forge-summon="${i}" data-variant="fiendish"><img src="assets/ui/icons/fiendish-creature.png" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px">Fiendish</button>
               </div>`;
             }).join("") || `<div class="dim tiny" style="padding:10px">Nada encontrado.</div>`}
           </div>

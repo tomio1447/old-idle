@@ -1254,8 +1254,10 @@ function stanceBadgesHtml(p) {
       ? ` (${ELEMENTS[st.elemento].name})` : "";
     return `<div class="stance-sq" style="border-color:${cor}"
              title="${st.nome}${nomeEl} — ${st.desc}">
-      ${sp && sp.icon != null
-        ? `<img src="assets/spell/otc/${sp.icon}.png" alt="${st.nome}">` : ""}
+      ${st.iconWiki && typeof WIKI_ICONS !== "undefined" && WIKI_ICONS[st.iconWiki]
+        ? `<img src="${WIKI_ICONS[st.iconWiki].path}" alt="${st.nome}">`
+        : (sp && sp.icon != null
+          ? `<img src="assets/spell/otc/${sp.icon}.png" alt="${st.nome}">` : "")}
     </div>`;
   }).join("");
 }
