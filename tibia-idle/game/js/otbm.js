@@ -339,40 +339,9 @@
    *   - o spawn do jogador vira o marcador "S" que o newCombat procura;
    *   - a zona de monstros vai em `mob` (spawnWave a usa quando existe).
    */
-  /* Tiles 15.x -> 8.60: o editor salva ids de aparência do client atual
-   * (53xxx-54xxx), mas o jogo desenha a paleta 8.60 (assets/tiles/).
-   * Tradução dos ids da "sala de exercise weapons.otbm" para os tiles
-   * 8.60 equivalentes — chão de pedra, parede de pedra, pilar e tocha.
-   * Valor 0 = item removido (o dummy é desenhado por cima da célula). */
-  var TILE_15_860 = {
-    // chão
-    "53882": 481, "53910": 481, "53873": 481, "53884": 481,
-    "53481": 481, "53482": 481, "53484": 481, "53485": 481, "53486": 481,
-    "53487": 481, "53488": 481, "53489": 481,
-    "42765": 417,   // pódio do dummy -> tiled floor
-    // parede / fundo externo
-    "54565": 5647, "53885": 5647, "53886": 5647, "53887": 5647,
-    "53888": 5647, "53893": 5647, "53894": 5647, "53895": 5647,
-    "53896": 5647, "54665": 5647,
-    // pilares / cantos do pódio
-    "53262": 2152, "53263": 2152, "53264": 2152, "53265": 2152,
-    "53270": 2152, "53271": 2152, "53272": 2152, "53273": 2152,
-    "54115": 2152,
-    // marcações centrais do pódio (onde ficam o spawn e o dummy): são
-    // decoração ANDÁVEL — removidas para não bloquear o player/dummy
-    "53310": 0, "53311": 0, "53312": 0, "53313": 0,
-    "53314": 0, "53315": 0, "53316": 0, "53317": 0,
-    // tochas
-    "54268": 2921, "54269": 2921, "54270": 2921,
-    // decoração removida (dummy desenhado por cima)
-    "53586": 0, "28559": 0, "54687": 0,
-    "53878": 0, "53502": 0, "53503": 0, "53505": 0, "53508": 0,
-  };
-  function convId(id) {
-    var n = TILE_15_860[id];
-    return n === undefined ? id : n;
-  }
-
+  /* Os tiles 15.x do mapa agora têm sprites reais em assets/tiles/
+   * (extraídos dos atlases do editor RME) e flags reais no tileflags.js —
+   * nada a converter: o mapa renderiza EXATAMENTE como desenhado no editor. */
   function huntMapFromOtbm(map, tileflags) {
     tileflags = tileflags || {};
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
@@ -397,10 +366,9 @@
           row += VOID;
           continue;
         }
-        // converte os ids 15.x para a paleta 8.60 (se aplicável)
-        var gid = cell.g ? convId(cell.g) : 0;
-        var items = (cell.items || []).map(convId)
-          .filter(function (id) { return id > 0; });
+        // ids originais do editor (15.x) — sprites reais em assets/tiles/
+        var gid = cell.g || 0;
+        var items = cell.items || [];
         var bloc = 0;
         var gwalk = gid && tileflags[gid] ? tileflags[gid][0] : 0;
         if (!gwalk) bloc = 1;

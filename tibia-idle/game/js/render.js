@@ -931,26 +931,27 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ty = training.dummyPos.y * H;
   }
   if (isDummy) {
-    // --- Ferumbras Exercise Dummy: sprite oficial (TibiaWiki), estátua
-    // do Ferumbras sobre a base de pedra, com barra e cargas.
-    const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
-    // no mapa .otbm o dummy ocupa 1 sqm (escala pelo tile); sem mapa usa
-    // o tamanho da baia procedural
+    // --- Ferumbras Exercise Dummy.
+    // Com mapa .otbm o dummy JÁ ESTÁ no mapa (os itens 28559+53586+54687
+    // que o editor desenhou formam a estátua + base) — nada a sobrepor.
+    // Sem mapa (fallback) desenha o GIF oficial da TibiaWiki.
     const tile = tilePx(W);
-    const scDummy = temMapa ? (tile * 0.85) / 64 : 1.5;
     const dw = 64, dh = 64;
-    const dbx = tx - (dw * scDummy) / 2, dby = ty - dh * scDummy + 8;
-    drawTargetSquare(ctx, dbx, dby, dw * scDummy, dh * scDummy);
-    if (dimg && dimg.complete && dimg.naturalWidth) {
-      const sc = scDummy;
-      const w = dimg.naturalWidth * sc, h = dimg.naturalHeight * sc;
-      ctx.fillStyle = "rgba(0,0,0,.4)";
-      ctx.beginPath(); ctx.ellipse(tx, ty + 12, w * 0.36, 9, 0, 0, 7); ctx.fill();
-      ctx.drawImage(dimg, tx - w / 2, ty - h + 10, w, h);
-    } else {
-      // fallback: silhueta
-      ctx.fillStyle = "rgba(0,0,0,.5)";
-      ctx.fillRect(tx - 20, ty - 52, 40, 58);
+    if (!temMapa) {
+      const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
+      const scDummy = 1.5;
+      const dbx = tx - (dw * scDummy) / 2, dby = ty - dh * scDummy + 8;
+      drawTargetSquare(ctx, dbx, dby, dw * scDummy, dh * scDummy);
+      if (dimg && dimg.complete && dimg.naturalWidth) {
+        const sc = scDummy;
+        const w = dimg.naturalWidth * sc, h = dimg.naturalHeight * sc;
+        ctx.fillStyle = "rgba(0,0,0,.4)";
+        ctx.beginPath(); ctx.ellipse(tx, ty + 12, w * 0.36, 9, 0, 0, 7); ctx.fill();
+        ctx.drawImage(dimg, tx - w / 2, ty - h + 10, w, h);
+      } else {
+        ctx.fillStyle = "rgba(0,0,0,.5)";
+        ctx.fillRect(tx - 20, ty - 52, 40, 58);
+      }
     }
 
     ctx.textAlign = "center";
