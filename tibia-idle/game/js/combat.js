@@ -954,6 +954,9 @@ function playerAttack(c, p, target) {
       Math.floor(raw * ch.vampirismo / 100)));
   }
 
+  // ---- imbuements do 15.x (usado abaixo: leech, elemental, strike)
+  const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
+
   // ---- crítico do golpe (Summer Update 2025): 5% intrínseco + Strike
   // imbuement, com 10% de dano extra intrínseco. O roll é o MESMO do
   // Critical Heal (funções playerCritChancePct/playerCritExtraPct).
