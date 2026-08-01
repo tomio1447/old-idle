@@ -886,7 +886,7 @@ function drainEvents() {
         // Ruse (armor): evitou completamente um ataque
         if (e.ruse) {
           r.addFloater(ex(e), ey(e), "RUSE!", "#66c7ff");
-          r.addEffect(ex(e), ey(e), "magic-blue", 1000);
+          r.addEffect(ex(e), ey(e), "ruse-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
           fdc.ruse = (fdc.ruse || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
@@ -996,7 +996,7 @@ function drainEvents() {
         if (e.nome === "Momentum") {
           const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
           r.addFloater(px, py - 0.16, "MOMENTUM!", "#ffe680");
-          r.addEffect(px, py, "mana-wisp", 1000);
+          r.addEffect(px, py, "momentum-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.momentum = (fdc.momentum || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
@@ -1005,7 +1005,7 @@ function drainEvents() {
         if (e.nome === "Transcendence") {
           const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
           r.addFloater(px, py - 0.20, "AVATAR!", "#c78cff");
-          r.addEffect(px, py, "yellow-energy", 1200);
+          r.addEffect(px, py, "avatar-effect", 1200);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.transcendence = (fdc.transcendence || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;

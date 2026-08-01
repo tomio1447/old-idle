@@ -359,22 +359,22 @@
   // (mapeamento visual em render.js, FX_FRAMES).
   if (typeof SPELLFX !== "undefined" && SPELLFX && SPELLFX.words) {
     const W = SPELLFX.words;
-    W["exori ico scu"] = { fx: "bash-shield" };
-    W["exori scu"] = { fx: "slam-shield" };
+    W["exori ico scu"] = { fx: "shield-bash-effect" };
+    W["exori scu"] = { fx: "shield-bash-effect" };
     // Barrages: as cenas oficiais da TibiaWiki mostram o efeito caindo em
     // TODA a area como uma chuva de lancas vinda do ceu do tile — NAO ha
     // projetil voando do paladino (igual a divine caldera). O miss "holy"
     // que a dir san tinha era invencao. E o sprite e o oficial
     // (Divine_Barrage_Effect / Ethereal_Barrage_Effect), nao mais o chute
     // dos Effect_3xx pelo visual.
-    W["exevo dir san"] = { fx: "barrage-divine" };
-    W["exori dir san"] = { fx: "barrage-divine" };
-    W["exevo dir moe"] = { fx: "barrage-ethereal" };
-    W["exori dir moe"] = { fx: "barrage-ethereal" };
-    W["exevo fur frigo"] = { fx: "forked-glacier", miss: "ice" };
-    W["exevo fur tera"] = { fx: "forked-thorns", miss: "earth" };
-    W["exevo mort ora"] = { fx: "death-echo", miss: "death" };
-    W["exori mas amp pug"] = { fx: "fist-thousand" };
+    W["exevo dir san"] = { fx: "divine-barrage-effect" };
+    W["exori dir san"] = { fx: "divine-barrage-effect" };
+    W["exevo dir moe"] = { fx: "ethereal-barrage-effect" };
+    W["exori dir moe"] = { fx: "ethereal-barrage-effect" };
+    W["exevo fur frigo"] = { fx: "forked-glacier-effect", miss: "ice" };
+    W["exevo fur tera"] = { fx: "forked-thorns-effect", miss: "earth" };
+    W["exevo mort ora"] = { fx: "death-echo-effect", miss: "death" };
+    W["exori mas amp pug"] = { fx: "thousand-fist-effect" };
     W["utito tempo"] = { fx: "stance-blood-rage" };
     W["utamo tempo"] = { fx: "stance-protector" };
     W["utori con"] = { fx: "stance-sharpshooter" };
@@ -489,7 +489,7 @@
     // Thousand Fist Blows: builder novo. Base power 62, alvo + area ao
     // redor. O efeito usa o sprite do update (fist-thousand).
     MD["exori-mas-amp-pug"] = {
-      cd: 12000, element: "physical", fx: "fist-thousand",
+      cd: 12000, element: "physical", fx: "thousand-fist-effect",
       fxRaw: "EFFECT_321_1525", gcd: 2000, lvl: 120, mana: 145,
       monk: "builder", nome: "Thousand Fist Blows", pow: 62, range: 1,
       area: { raio: 1, sqm: 9 }, words: "exori mas amp pug",

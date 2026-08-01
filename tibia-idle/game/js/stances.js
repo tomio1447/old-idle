@@ -282,6 +282,71 @@ function stanceConvert(p, elemento) {
   return t.convert;
 }
 
+function sorcererElementalStance(p) {
+  if (!p || !p.stances) return null;
+  for (const id of ["uteta-flam", "uteta-vis", "uteta-mort"]) {
+    if (p.stances[id]) return STANCES[id] || null;
+  }
+  return null;
+}
+
+function spellLooksLikeFire(s, originalElement, baseFx) {
+  const words = String((s && s.words) || "").toLowerCase();
+  const name = String((s && s.name) || "").toLowerCase();
+  return originalElement === "fire" ||
+    baseFx === "fire-area" || baseFx === "fire-attack" ||
+    baseFx === "hit-by-fire" || baseFx === "fire-effect" ||
+    baseFx === "fireball-effect" || baseFx === "flame-effect" ||
+    words.indexOf("flam") >= 0 || name.indexOf("fire") >= 0 ||
+    name.indexOf("flame") >= 0 || name.indexOf("hell") >= 0;
+}
+
+function spellLooksLikeDeathEcho(s, baseFx) {
+  const words = String((s && s.words) || "").toLowerCase();
+  const name = String((s && s.name) || "").toLowerCase();
+  return baseFx === "death-echo-effect" || baseFx === "death-echo" ||
+    words === "exevo mort ora" || name.indexOf("death echo") >= 0;
+}
+
+/* Visual das stances elementais do Master Sorcerer.
+ *
+ * O cliente 15.25 nao usa só a sprite generica do elemento convertido. Algumas
+ * combinações de postura + magia recebem sprites proprias na TibiaWiki:
+ *   - Master of Decay + magia de fogo/wave -> Fire Effect (Black)
+ *   - Master of Thunder + magia de fogo/wave -> Fire Effect (Purple)
+ *   - Master of Flames + Death Echo -> Death Echo Effect (Orange)
+ *   - Master of Thunder + Death Echo -> Death Echo Effect (Purple)
+ *
+ * Como no idle a regra da casa converte toda magia enquanto a postura esta
+ * ativa, damos tambem um fallback tematico para qualquer magia convertida pela
+ * postura: fogo normal, eletricidade roxa ou black fire para morte. */
+function stanceDamageFx(p, s, originalElement, effectiveElement, baseFx) {
+  const st = sorcererElementalStance(p);
+  if (!st || p.voc !== "sorcerer") return baseFx;
+
+  const converted = effectiveElement !== originalElement;
+  const fireLike = spellLooksLikeFire(s, originalElement, baseFx);
+  const deathEcho = spellLooksLikeDeathEcho(s, baseFx);
+
+  if (deathEcho) {
+    if (st.elemento === "fire") return "death-echo-effect-orange";
+    if (st.elemento === "energy") return "death-echo-effect-purple";
+    return baseFx || "death-echo-effect";
+  }
+
+  if (fireLike) {
+    if (st.elemento === "death") return "fire-effect-black";
+    if (st.elemento === "energy") return "fire-effect-purple";
+    if (st.elemento === "fire") return baseFx || "fire-effect";
+  }
+
+  if (!converted) return baseFx;
+  if (st.elemento === "death") return "fire-effect-black";
+  if (st.elemento === "energy") return "purple-electricity-effect";
+  if (st.elemento === "fire") return "fire-effect";
+  return baseFx;
+}
+
 /* Marca o alvo com os debuffs crippling do Sorcerer (10 s por golpe,
  * valor do cooldown natural desses efeitos nas magias originais). */
 function stanceApplyDebuffs(p, mob, now) {

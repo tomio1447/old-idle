@@ -1353,7 +1353,8 @@ function castSpellById(c, p, target, now, id) {
   // Spiritual Outburst do Monk ganhou o mesmo no MONKSPELLDATA
   const echoFrac = s.echo || (md && md.echo) || 0;
 
-  let elemento = s.element || "energy";
+  const originalElement = s.element || "energy";
+  let elemento = originalElement;
   if (typeof monkSpellElement === "function") {
     elemento = monkSpellElement(p, s, elemento);
   }
@@ -1374,9 +1375,12 @@ function castSpellById(c, p, target, now, id) {
   // sob Master of Decay). s.fx/s.missile valem so para o elemento
   // ORIGINAL, entao a magia convertida cai no efeito/projetil generico do
   // elemento novo (ELEMENTS/ELEMENT_MISSILE no fallback do evento/render).
-  const converteuEl = !md && elemento !== (s.element || "energy");
-  const fxMagia = (md && md.fx && typeof monkFx === "function")
+  const converteuEl = !md && elemento !== originalElement;
+  let fxMagia = (md && md.fx && typeof monkFx === "function")
     ? monkFx(p, md.fx) : (converteuEl ? null : (s.fx || null));
+  if (!md && typeof stanceDamageFx === "function") {
+    fxMagia = stanceDamageFx(p, s, originalElement, elemento, fxMagia);
+  }
   // Projetil (COMBAT_PARAM_DISTANCEEFFECT do .lua): magia de mana sai com
   // o missil do elemento (strikes & cia); magia de skill do knight NAO tem
   // distance effect — berserk/fierce berserk/groundshaker/front sweep nao

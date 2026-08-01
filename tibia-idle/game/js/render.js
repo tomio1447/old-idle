@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "12";
+const ASSET_VERSION = "13";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -102,6 +102,20 @@ function mobImg(slug, tam, extra) {
       image-rendering:pixelated;${extra || ""}"></div>`;
 }
 
+
+function fxClientMeta(name) {
+  const aliases = (typeof window !== "undefined" && window.FX_OFFICIAL_ALIASES) || {};
+  const all = (typeof window !== "undefined" && window.CLIENT_EFFECTS) || {};
+  const key = aliases[name] || name;
+  return all[key] || null;
+}
+
+function fxFrameCount(name) {
+  const meta = fxClientMeta(name);
+  if (meta && meta.frames) return meta.frames;
+  return FX_FRAMES[name] || 0;
+}
+
 const Sprites = {
   cache: {},
   get(path) {
@@ -149,7 +163,11 @@ const Sprites = {
   item(slug) { return this.get(`assets/item/${slug}.png`); },
   outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
   ground(scene) { return this.get(`assets/ground/${scene}.png`); },
-  fx(name) { return this.get(`assets/fx/${name}.png`); },
+  fx(name) {
+    const meta = fxClientMeta(name);
+    if (meta && meta.path) return this.get(meta.path);
+    return this.get(`assets/fx/${name}.png`);
+  },
   missile(name, dir) { return this.get(`assets/missile/${name}_${dir || "e"}.png`); },
   npc(name, dir) { return this.get(`assets/npc/${name}_${dir || "s"}.png`); },
   deco(name) { return this.get(`assets/npc/deco-${name}.png`); },
@@ -360,12 +378,12 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
 };
 
 Renderer.prototype.addEffect = function (x, y, name, customDurMs) {
-  if (!FX_FRAMES[name]) name = "draw-blood";
-  // os efeitos do 15.x tem de 3 a 16 quadros; ~55ms por quadro mantem a
-  // animacao fluida sem esticar demais os efeitos longos
-  const n = FX_FRAMES[name];
+  let n = fxFrameCount(name);
+  if (!n) { name = "draw-blood"; n = fxFrameCount(name) || 4; }
+  // Os efeitos oficiais importados da TibiaWiki têm durações diferentes;
+  // quando não há duração customizada, usa ~55ms por quadro com teto seguro.
   this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: n, dur: customDurMs || Math.max(300, Math.min(700, n * 55)) });
+                      frames: n, dur: customDurMs || Math.max(300, Math.min(900, n * 55)) });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
   // as primeiras eram descartadas antes de aparecer. 120 cabe a maior
   // matriz do jogo com folga e ainda protege contra vazamento.
@@ -1032,8 +1050,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       this.playerFlash -= dt;
     }
     // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
-    const avatarActive = (typeof window !== "undefined" && window.avatarActive && player) ? window.avatarActive(player, Date.now()) : false;
-    if (avatarActive) {
+    const avatarActiveNow = (typeof window !== "undefined" && window.avatarActive && player) ? window.avatarActive(player, Date.now()) : false;
+    if (avatarActiveNow) {
       const AVATAR_GLOW = {
         knight: "#ff7a3a", paladin: "#ffe680",
         sorcerer: "#c78cff", druid: "#7ae87a",
@@ -1047,7 +1065,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const drawX = px * W - w / 2 + atkPush;
     const drawY = py * H - h / 2 + bob;
     ctx.drawImage(pimg, drawX, drawY, w, h);
-    if (avatarActive) ctx.restore();
+    if (avatarActiveNow) ctx.restore();
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px * W, drawY - 14, dt);
