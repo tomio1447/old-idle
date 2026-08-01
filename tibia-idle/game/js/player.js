@@ -497,7 +497,13 @@ function migrateAmmoToCounter(p) {
 
 function itemUsesInstances(slug) {
   const it = GAMEDATA.items[slug];
-  return !!(it && it.s && it.s !== "ammo");
+  if (!it || !it.s || it.s === "ammo") return false;
+  // Arremessáveis (assassin star, throwing star, viper star, leaf star,
+  // royal spear, small stone...) são MUNIÇÃO no Tibia: empilham na bag
+  // (1 slot por tipo, contagem na stack). Itens de verdade (armas com
+  // imbuement slot, armaduras etc.) continuam por instância.
+  if (it.t === "distance" && !it.imbSlots) return false;
+  return true;
 }
 
 function nextItemInstanceId(p) {
@@ -522,11 +528,17 @@ function syncBagCountsFromInstances(p) {
     if (!p.bag[slug] || itemUsesInstances(slug)) continue;
     nextBag[slug] = p.bag[slug];
   }
+  // Instâncias de itens que NÃO usam mais instância (arremessáveis viraram
+  // empilháveis) são convertidas em quantidade na bag; as demais continuam
+  // como instância (e entram na contagem de exibição).
+  const rest = [];
   for (const inst of (p.itemInstances || [])) {
-    if (!inst || inst.loc !== "bag") continue;
+    if (!inst || inst.loc !== "bag") { rest.push(inst); continue; }
     nextBag[inst.slug] = (nextBag[inst.slug] || 0) + 1;
+    if (itemUsesInstances(inst.slug)) rest.push(inst);
   }
   p.bag = nextBag;
+  p.itemInstances = rest;
 }
 
 function ensureItemInstances(p) {

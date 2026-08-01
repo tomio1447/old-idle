@@ -344,9 +344,11 @@ function renderStats(p) {
   $("#p-level").textContent = p.level;
   $("#p-voc").textContent = vocationName(p);
 
-  setBar("#bar-hp", p.hp / max.hp, `${fmt(p.hp)} / ${fmt(max.hp)}`);
+  // Barra de vida/mana com o valor CHEIO (10150, não "10.1k") — como o
+  // client oficial mostra o número inteiro no tooltip da barra.
+  setBar("#bar-hp", p.hp / max.hp, `${Math.floor(p.hp)} / ${Math.floor(max.hp)}`);
   setBar("#bar-mp", max.mp ? p.mp / max.mp : 0,
-         `${fmt(p.mp)} / ${fmt(max.mp)}`);
+         max.mp ? `${Math.floor(p.mp)} / ${Math.floor(max.mp)}` : "");
   setBar("#bar-exp", expProgress(p) / 100, expProgress(p).toFixed(1) + "%");
   setBar("#bar-sta", p.stamina / (42 * 3600), fmtTime(p.stamina));
 
@@ -720,11 +722,26 @@ function renderInventory(p) {
       cells.push(`<div class="inv-item empty" title="Slot vazio"></div>`);
     }
   }
+  const sellVal = typeof bagSellableValue === "function" ? bagSellableValue(p) : 0;
   $("#inv").innerHTML = `
-    <div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
-      Bag padrão: ${bagUsedSlots(p)} / ${slots} slots
+    <div class="inv-head" style="grid-column:1/-1;margin:0 0 3px 2px;display:flex;align-items:center;gap:6px;justify-content:space-between">
+      <span class="tiny dim">Bag padrão: ${bagUsedSlots(p)} / ${slots} slots</span>
+      <button class="sm ${sellVal > 0 ? "danger" : ""}" id="btn-bag-sell-all" ${sellVal > 0 ? "" : "disabled"}
+        title="Vende tudo que tem valor (respeita 'Não vender'; itens tierados ficam)">
+        Vender tudo${sellVal > 0 ? ` · ${fmtFull(sellVal)} gp` : ""}
+      </button>
     </div>${cells.join("")}`;
   const invBox = $("#inv");
+  // delegação no container: o botão é recriado a cada render, então um
+  // listener direto nele morreria junto com o elemento antigo
+  if (!invBox.dataset.sellBound) {
+    invBox.dataset.sellBound = "1";
+    invBox.addEventListener("click", (e) => {
+      if (e.target && e.target.closest && e.target.closest("#btn-bag-sell-all")) {
+        if (typeof sellAllBag === "function") sellAllBag(G.p);
+      }
+    });
+  }
   if (typeof bindDrop === "function" && !invBox.dataset.dropBound) {
     invBox.dataset.dropBound = "1";
     bindDrop(invBox, (payload) => {
@@ -1051,6 +1068,69 @@ function sellAllPouch(p) {
     kinds++;
   }
   return { gold: total, kinds: kinds };
+}
+
+/* Valor total vendável da mochila (para o hint do botão). */
+function bagSellableValue(p) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  let total = 0;
+  for (const slug of Object.keys(p.bag || {})) {
+    const it = GAMEDATA.items[slug];
+    const count = p.bag[slug] || 0;
+    if (!it || count <= 0 || typeof itemUsesInstances === "function" && itemUsesInstances(slug)) continue;
+    if (typeof isNoSell === "function" && isNoSell(p, slug)) continue;
+    total += (it.sell || 0) * count;
+  }
+  for (const inst of (p.itemInstances || [])) {
+    if (!inst || inst.loc !== "bag") continue;
+    const it = GAMEDATA.items[inst.slug];
+    if (!it || (it.sell || 0) <= 0) continue;
+    if (inst.tier > 0) continue;                 // item tierado não é vendido
+    if (typeof isNoSell === "function" && isNoSell(p, inst.slug)) continue;
+    total += it.sell || 0;
+  }
+  return total;
+}
+
+/* Botão provisório "Vender tudo" da mochila: vende tudo que tem valor
+ * (empilhado E por instância), respeitando a marca "Não vender" e nunca
+ * vendendo item tierado. Itens sem valor continuam na bag. */
+function sellAllBag(p) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  let total = 0, kinds = 0, guardados = 0;
+  for (const slug of Object.keys(p.bag || {})) {
+    const it = GAMEDATA.items[slug];
+    const count = p.bag[slug] || 0;
+    if (!it || count <= 0 || typeof itemUsesInstances === "function" && itemUsesInstances(slug)) continue;
+    if ((it.sell || 0) <= 0) { guardados++; continue; }
+    if (typeof isNoSell === "function" && isNoSell(p, slug)) { guardados++; continue; }
+    total += (it.sell || 0) * count;
+    delete p.bag[slug];
+    kinds++;
+  }
+  const rest = [];
+  for (const inst of (p.itemInstances || [])) {
+    if (!inst || inst.loc !== "bag") { rest.push(inst); continue; }
+    const it = GAMEDATA.items[inst.slug];
+    if (!it || (it.sell || 0) <= 0 || inst.tier > 0 ||
+        (typeof isNoSell === "function" && isNoSell(p, inst.slug))) {
+      rest.push(inst);
+      guardados++;
+      continue;
+    }
+    total += it.sell || 0;
+    kinds++;
+  }
+  p.itemInstances = rest;
+  if (total > 0) {
+    p.gold += total;
+    addLog("sell", `Vendeu tudo da mochila por <span class="gold-txt">${fmtFull(total)} gp</span> (${kinds} tipos).`);
+    toast(`Vendeu tudo da mochila: <b>+${fmtFull(total)} gp</b>`);
+  } else {
+    toast(guardados ? "Nada vendável na mochila (itens sem valor/tierados ficam)." : "Mochila vazia ou sem itens vendáveis.", "bad");
+  }
+  renderAll();
+  return total;
 }
 
 function renderLootPouch(p) {
