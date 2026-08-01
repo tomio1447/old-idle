@@ -954,17 +954,16 @@ function playerAttack(c, p, target) {
       Math.floor(raw * ch.vampirismo / 100)));
   }
 
-  // ---- imbuements do 15.x + forja
-  const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
+  // ---- crítico do golpe (Summer Update 2025): 5% intrínseco + Strike
+  // imbuement, com 10% de dano extra intrínseco. O roll é o MESMO do
+  // Critical Heal (funções playerCritChancePct/playerCritExtraPct).
   let critou = false;
   let fatalou = false;
   let extraPct = 0;
-  if (imb) {
-    // Strike: +X% de dano critico com 10% de chance fixa (XML do canary)
-    if (imb.crit && Math.random() < (imb.critChance || 10) / 100) {
-      extraPct += (imb.crit || 0);
-      critou = true;
-    }
+  const critRoll = typeof rollPlayerCrit === "function" ? rollPlayerCrit(p) : { crit: false, extraPct: 0 };
+  if (critRoll.crit) {
+    extraPct += critRoll.extraPct;
+    critou = true;
   }
 
   // Exaltation Forge oficial: Onslaught soma +60% ao bônus do golpe.
@@ -1459,6 +1458,15 @@ function castSpellById(c, p, target, now, id) {
         critSt = true;
       }
     }
+    // Crítico intrínseco (Summer Update 2025): 5%/10% também vale para
+    // magias — rola quando a stance não deu crítico.
+    if (!critSt && typeof rollPlayerCrit === "function") {
+      const critSpell = rollPlayerCrit(p);
+      if (critSpell.crit) {
+        extraSpellPct += critSpell.extraPct;
+        critSt = true;
+      }
+    }
     // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
     if (forgeOnslaughtSpell) {
@@ -1717,6 +1725,69 @@ function tryUseRune(c, p, target, now, forcada) {
   return total > 0 || !!s.cond;
 }
 
+/* ====================================================== Critical Heal (2026)
+ * Vocation Adjustments 2026: Druids com o perk "Blessing of the Grove"
+ * (Revelation Perk) podem curar além do normal — a cura usa a MESMA chance
+ * de Critical Hit e o MESMO dano crítico extra do personagem para melhorar
+ * o valor curado.
+ * https://tibia.fandom.com/wiki/Critical_Heal
+ */
+
+/* Fontes de crítico do personagem (Critical Hit — Summer Update 2025):
+ * todo personagem tem 5% de chance intrínseca de 10% de dano extra; o
+ * Strike imbuement soma a chance fixa de 10% e o bônus de dano.
+ * https://tibia.fandom.com/wiki/Critical_Hit
+ */
+function playerCritChancePct(p) {
+  const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
+  return 5 + ((imb && imb.critChance) ? imb.critChance : 0);
+}
+
+function playerCritExtraPct(p) {
+  const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
+  return 10 + ((imb && imb.crit) ? imb.crit : 0);
+}
+
+/* Rola o crítico do golpe: { crit, extraPct }. */
+function rollPlayerCrit(p) {
+  const chance = playerCritChancePct(p);
+  if (chance <= 0 || Math.random() * 100 >= chance) return { crit: false, extraPct: 0 };
+  return { crit: true, extraPct: playerCritExtraPct(p) };
+}
+
+/* O critical heal é exclusivo do Druid (Blessing of the Grove). O toggle
+ * p.config.criticalHeal permite desligar no Helper, se um dia houver o
+ * sistema de perks; por padrão nasce ligado para o Druid. */
+function criticalHealEnabled(p) {
+  return !!(p && p.voc === "druid" && (!p.config || p.config.criticalHeal !== false));
+}
+
+/* Chance de critical heal em %: a MESMA do critical hit (5% intrínseca +
+ * Strike imbuement). */
+function criticalHealChancePct(p) {
+  return playerCritChancePct(p);
+}
+
+/* Dano crítico extra em % usado no critical heal: as mesmas fontes do
+ * golpe crítico (10% intrínseco + Strike) + Transcendence ativa. */
+function criticalHealExtraPct(p) {
+  let extra = playerCritExtraPct(p);
+  if (typeof forgeTranscendenceDamagePct === "function") {
+    extra += forgeTranscendenceDamagePct(p, Date.now());
+  }
+  return extra;
+}
+
+/* Rola o critical heal: { crit, extraPct }. Retorna crit=false quando o
+ * personagem não pode (não é druid), a chance é 0 ou o roll falhou. */
+function tryCriticalHeal(p) {
+  if (!criticalHealEnabled(p)) return { crit: false, extraPct: 0 };
+  const chance = criticalHealChancePct(p);
+  if (chance <= 0) return { crit: false, extraPct: 0 };
+  if (Math.random() * 100 >= chance) return { crit: false, extraPct: 0 };
+  return { crit: true, extraPct: criticalHealExtraPct(p) };
+}
+
 /* Cura: spell primeiro, depois runa/pocao.
  *
  * Cooldowns do 15.x, como no cliente oficial:
@@ -1766,6 +1837,14 @@ function tryHeal(c, p, now) {
         if (stH.healMul !== 1) amount = Math.max(1, Math.floor(amount * stH.healMul));
         if (stH.healSelf) amount = Math.max(1, Math.floor(amount * (1 + stH.healSelf)));
       }
+      // Critical Heal (Vocation Adjustments 2026): o Druid com Blessing of
+      // the Grove usa a chance de Critical Hit e o dano crítico extra do
+      // personagem para curar além do normal.
+      let ch = { crit: false, extraPct: 0 };
+      if (typeof tryCriticalHeal === "function") ch = tryCriticalHeal(p);
+      if (ch.crit && ch.extraPct > 0) {
+        amount = Math.max(1, Math.floor(amount * (1 + ch.extraPct / 100)));
+      }
       cdStart(p, idCura, s, now);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
@@ -1775,7 +1854,7 @@ function tryHeal(c, p, now) {
       addManaSpent(p, combatManaSkillGain(c, s.mana));
       p.hp = Math.min(max.hp, p.hp + amount);
       c.healCd = now + 1000;
-      c.events.push({ t: "heal", amount: amount, spell: s.name });
+      c.events.push({ t: "heal", amount: amount, spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
       c.events.push({ t: "say", text: spellWords(selectedHealSpell || heals[0][0], s) });
       return true;
     }
@@ -1814,6 +1893,16 @@ function tryHeal(c, p, now) {
       if (typeof stanceTotals === "function" && stanceTotals(p).healSelf) {
         amount = Math.max(1, Math.floor(amount * (1 + stanceTotals(p).healSelf)));
       }
+      // Critical Heal (2026): a runa de cura (UH/IH) e uma magia de cura
+      // conjurada — o Druid com Blessing of the Grove critica ela também.
+      // Potions NÃO críticam (como no oficial).
+      let chR = { crit: false, extraPct: 0 };
+      if (s.kind === "rune" && typeof tryCriticalHeal === "function") {
+        chR = tryCriticalHeal(p);
+        if (chR.crit && chR.extraPct > 0) {
+          amount = Math.max(1, Math.floor(amount * (1 + chR.extraPct / 100)));
+        }
+      }
       p.hp = Math.min(max.hp, p.hp + amount);
       // potion trava TODAS as potions por 1s; runa de cura (UH/IH) nao bebe,
       // entao usa o cooldown de runa e mantem o healCd antigo
@@ -1824,7 +1913,8 @@ function tryHeal(c, p, now) {
         if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
       }
       c.events.push({ t: "heal", amount: amount, rune: s.name,
-                      mana: manaAmount, supply: best, drunk: s.kind !== "rune" });
+                      mana: manaAmount, supply: best, drunk: s.kind !== "rune",
+                      crit: chR.crit, critExtraPct: chR.extraPct });
       // o famoso "Aahhh..." do Tibia: beber potion NAO fala o nome do item;
       // runa continua anunciando o nome (el e uma conjuracao, nao um gole)
       if (s.kind === "rune") {

@@ -841,9 +841,12 @@ function drainEvents() {
         // elemento e a sudden death parecia igual a um golpe de death comum.
         r.addEffect(x, y, e.fx || (raca ? raca.fx
                     : (ELEMENTS[e.el] || ELEMENTS.physical).fx));
-        // critico das stances do Sorcerer (15.25): o sprite "CRIT!" do
-        // update pisca em cima do alvo
-        if (e.crit) r.addEffect(x, y - 0.06, "crit-text");
+        // critico: o texto "CRIT!" (agora VERMELHO, como no client) pisca em
+        // cima do alvo junto com o efeito oficial Critical Hit Effect
+        if (e.crit) {
+          r.addEffect(x, y - 0.06, "crit-text");
+          r.addEffect(x, y, "critical-hit-effect", 700);
+        }
         // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial
         if (e.fatal) {
           // mais tempo de exibição para o efeito FATAL ser visível
@@ -948,6 +951,12 @@ function drainEvents() {
       case "heal": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
+        // Critical Heal (Vocation Adjustments 2026): efeito oficial da
+        // TibiaWiki + texto "CRITICAL HEAL!" em vermelho sobre a cura
+        if (e.crit) {
+          r.addEffect(px, py, "critical-heal-effect", 800);
+          r.addFloater(px, py - 0.13, "CRITICAL HEAL!", "#ff4a4a", true);
+        }
         // potion de spirit tambem restaura mana no mesmo gole
         if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana) + " mana", "#6a8aff");
         r.addEffect(px, c.player ? c.player.y : 0.6, "green-rings");
