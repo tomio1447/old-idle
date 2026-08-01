@@ -3069,7 +3069,27 @@ function combatTick(c, p, dt, now) {
     if (m.hp > 0) { alive.push(m); continue; }
     // recompensa
     const staminaMul = p.stamina > 39 * 3600 ? 1.5 : p.stamina > 0 ? 1.0 : 0.5;
-    const exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
+    let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
+    // Prey de EXP (TibiaWiki/Prey_System): +13~40% de experiência
+    if (typeof preyExpBonus === "function") {
+      const pExp = preyExpBonus(p, m.slug);
+      if (pExp > 0) exp = Math.floor(exp * (1 + pExp / 100));
+    }
+    // Party — Shared Experience (TibiaWiki/Party): Exp = M * S / P * C.
+    // O exp calculado já é o M*C do líder (stamina/prey); cada membro do
+    // party recebe M*S/P aplicado de verdade no save dele (com level-up).
+    const partyShare = (typeof partyShareExp === "function") ? partyShareExp(p, exp) : null;
+    if (partyShare) {
+      exp = partyShare.leaderExp;
+      for (const mem of partyShare.members) {
+        const ups = (typeof partyApplyToMember === "function")
+          ? partyApplyToMember(mem.id, mem.exp) : 0;
+        if (typeof partyRecordKill === "function") {
+          partyRecordKill(p, mem.id, mem.exp, 0, ups);
+        }
+      }
+      if (typeof partyRecordKill === "function") partyRecordKill(p, null, exp, 0, 0);
+    }
     addExp(p, exp);
     c.stats.exp += exp;
     c.stats.kills++;
@@ -3087,6 +3107,9 @@ function combatTick(c, p, dt, now) {
       bossGanho = bosstiaryKill(p, m.slug, 1);
     }
     const loot = rollLoot(c, p, m);
+    if (typeof partyRecordKill === "function" && partyShare) {
+      partyRecordKill(p, null, 0, loot.length, 0);
+    }
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
                     charm: charmGanho, bossPts: bossGanho });

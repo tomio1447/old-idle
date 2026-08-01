@@ -1534,3 +1534,52 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .prey-creature:hover { border-color: rgba(255,214,90,.55); background: rgba(255,214,90,.07); }
 .prey-creature.sel { border-color: #ffd65a; background: rgba(255,214,90,.14); }
 .prey-help { color: #8a8272; }
+
+/* ============================ Sistema de Party ============================ */
+#btn-party { position: relative; }
+#party-badge {
+  background: rgba(0,0,0,.5); border-radius: 3px; padding: 0 3px;
+}
+.party-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 8px; margin-bottom: 6px;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 4px;
+}
+.party-members { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.party-member {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 8px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.22); border-radius: 4px; font-size: 12px;
+}
+.party-member-voc {
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  background: rgba(255,214,90,.15); color: #ffd65a;
+}
+.party-exp { color: #9ce84a; font-weight: bold; }
+.party-invite-title { margin: 6px 0 4px; }
+.party-invite-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 5px; margin-bottom: 8px;
+}
+.party-invite {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 4px 8px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.2); border-radius: 4px; font-size: 11px;
+}
+.party-share {
+  padding: 8px; margin: 6px 0;
+  border: 1px solid rgba(255,255,255,.12); border-radius: 5px;
+  background: rgba(0,0,0,.25);
+}
+.party-analyser {
+  margin-top: 8px; padding: 8px;
+  border: 1px solid rgba(255,255,255,.12); border-radius: 5px;
+  background: rgba(0,0,0,.25);
+}
+.party-analyser-table { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.party-analyser-row {
+  display: flex; gap: 12px; padding: 3px 6px; font-size: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.party-analyser-row span:first-child { flex: 1; }

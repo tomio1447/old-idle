@@ -213,6 +213,7 @@ function normalizePlayer(p) {
   p.buffs = p.buffs || {};
   if (typeof ensureItemInstances === "function") ensureItemInstances(p);
   if (typeof ensurePrey === "function") ensurePrey(p);
+  if (typeof ensureParty === "function") ensureParty(p);
   // Stances do update 15.25.3a4a52: posturas permanentes salvas junto ao
   // personagem (persistem apos logout, como no oficial).
   p.stances = p.stances || {};
@@ -1323,6 +1324,7 @@ function renderAll() {
   renderHuntInfo();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
+  if (typeof renderPartyButton === "function") renderPartyButton(p);
 }
 
 function renderHuntInfo() {
@@ -1429,6 +1431,7 @@ function bindControls() {
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
+  if (typeof bindPartyButton === "function") bindPartyButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
     if (typeof openAdmin === "function") {
