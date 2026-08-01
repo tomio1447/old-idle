@@ -20340,7 +20340,7 @@
     },
     {
      "k": "critical extra damage",
-     "s": "fierce beserk",
+     "s": "fierce berserk",
      "v": 8
     }
    ],
@@ -26252,6 +26252,876 @@
    "sell": 1113,
    "t": "sword",
    "w": 49.0
+  },
+  "crypt-slicer": {
+   "n": "crypt slicer",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 58,
+   "def": 33,
+   "sword": 4,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 450,
+   "vocs": [
+    "knight"
+   ],
+   "w": 80.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "earth": 10
+   },
+   "id": 51309,
+   "s": "weapon"
+  },
+  "crypt-splitter": {
+   "n": "crypt splitter",
+   "cat": "axe",
+   "t": "axe",
+   "atk": 58,
+   "def": 33,
+   "axe": 4,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 450,
+   "vocs": [
+    "knight"
+   ],
+   "w": 80.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "energy": 10
+   },
+   "id": 51310,
+   "s": "weapon"
+  },
+  "crypt-breaker": {
+   "n": "crypt breaker",
+   "cat": "club",
+   "t": "club",
+   "atk": 58,
+   "def": 33,
+   "club": 4,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 450,
+   "vocs": [
+    "knight"
+   ],
+   "w": 85.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "fire": 10
+   },
+   "id": 51311,
+   "s": "weapon"
+  },
+  "crypt-strike": {
+   "n": "crypt strike",
+   "cat": "fist",
+   "t": "fist",
+   "atk": 45,
+   "def": 20,
+   "fist": 4,
+   "mag": 1,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 450,
+   "vocs": [
+    "monk"
+   ],
+   "w": 68.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "physical": 8
+   },
+   "id": 51312,
+   "s": "weapon"
+  },
+  "crypt-spine": {
+   "n": "crypt spine",
+   "cat": "distance",
+   "t": "distance",
+   "atk": 7,
+   "dist": 3,
+   "hit": 100,
+   "range": 7,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 450,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 44.0,
+   "res": {
+    "ice": 5
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "holy": 2
+   },
+   "id": 51313,
+   "s": "weapon"
+  },
+  "crypt-jaw": {
+   "n": "crypt jaw",
+   "cat": "rod",
+   "t": "magic",
+   "el": "earth",
+   "mdmg": 105,
+   "dmgMin": 95,
+   "dmgMax": 115,
+   "mag": 4,
+   "manaCost": 20,
+   "range": 5,
+   "imbSlots": 2,
+   "lvl": 450,
+   "vocs": [
+    "druid"
+   ],
+   "w": 20.0,
+   "res": {
+    "energy": 6
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "earth": 10
+   },
+   "id": 51314,
+   "s": "weapon"
+  },
+  "crypt-bile": {
+   "n": "crypt bile",
+   "cat": "wand",
+   "t": "magic",
+   "el": "fire",
+   "mdmg": 105,
+   "dmgMin": 95,
+   "dmgMax": 115,
+   "mag": 4,
+   "manaCost": 20,
+   "range": 5,
+   "imbSlots": 2,
+   "lvl": 450,
+   "vocs": [
+    "sorcerer"
+   ],
+   "w": 20.0,
+   "res": {
+    "fire": 6
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 8000,
+   "pierce": {
+    "fire": 10
+   },
+   "id": 51315,
+   "s": "weapon"
+  },
+  "moonsilver-epee": {
+   "n": "moonsilver epee",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 50,
+   "def": 33,
+   "extraDef": 3,
+   "sword": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 61.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "earth": 4
+   },
+   "id": 51316,
+   "s": "weapon"
+  },
+  "moonsilver-axe": {
+   "n": "moonsilver axe",
+   "cat": "axe",
+   "t": "axe",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 50,
+   "def": 33,
+   "extraDef": 3,
+   "axe": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 75.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "earth": 4
+   },
+   "id": 51317,
+   "s": "weapon"
+  },
+  "moonsilver-crusher": {
+   "n": "moonsilver crusher",
+   "cat": "club",
+   "t": "club",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 50,
+   "def": 33,
+   "club": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 69.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "earth": 4
+   },
+   "id": 51318,
+   "s": "weapon"
+  },
+  "moonsilver-claymore": {
+   "n": "moonsilver claymore",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 54,
+   "def": 36,
+   "sword": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 87.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "fire": 5
+   },
+   "id": 51319,
+   "s": "weapon"
+  },
+  "moonsilver-chopper": {
+   "n": "moonsilver chopper",
+   "cat": "axe",
+   "t": "axe",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 54,
+   "def": 36,
+   "axe": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 89.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "fire": 5
+   },
+   "id": 51320,
+   "s": "weapon"
+  },
+  "moonsilver-mace": {
+   "n": "moonsilver mace",
+   "cat": "club",
+   "t": "club",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 54,
+   "def": 36,
+   "club": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 93.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "fire": 5
+   },
+   "id": 51321,
+   "s": "weapon"
+  },
+  "moonsilver-katar": {
+   "n": "moonsilver katar",
+   "cat": "fist",
+   "t": "fist",
+   "atk": 46,
+   "def": 22,
+   "fist": 6,
+   "mag": 2,
+   "th": 1,
+   "bond": "energy",
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "monk"
+   ],
+   "w": 72.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "energy": 4
+   },
+   "id": 51322,
+   "s": "weapon"
+  },
+  "moonsilver-bow": {
+   "n": "moonsilver bow",
+   "cat": "distance",
+   "t": "distance",
+   "atk": 7,
+   "dist": 5,
+   "hit": 100,
+   "range": 7,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 51.0,
+   "res": {
+    "fire": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "fire": 3
+   },
+   "id": 51323,
+   "s": "weapon"
+  },
+  "moonsilver-crossbow": {
+   "n": "moonsilver crossbow",
+   "cat": "distance",
+   "t": "distance",
+   "atk": 7,
+   "dist": 5,
+   "hit": 100,
+   "range": 7,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 55.0,
+   "res": {
+    "holy": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "holy": 3
+   },
+   "id": 51324,
+   "s": "weapon"
+  },
+  "moonsilver-channeler": {
+   "n": "moonsilver channeler",
+   "cat": "wand",
+   "t": "magic",
+   "el": "death",
+   "mdmg": 115,
+   "dmgMin": 105,
+   "dmgMax": 125,
+   "mag": 6,
+   "manaCost": 22,
+   "range": 5,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "sorcerer"
+   ],
+   "w": 23.5,
+   "res": {
+    "energy": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "energy": 3
+   },
+   "id": 51325,
+   "s": "weapon"
+  },
+  "moonsilver-sceptre": {
+   "n": "moonsilver sceptre",
+   "cat": "rod",
+   "t": "magic",
+   "el": "ice",
+   "mdmg": 115,
+   "dmgMin": 105,
+   "dmgMax": 125,
+   "mag": 6,
+   "manaCost": 22,
+   "range": 5,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "druid"
+   ],
+   "w": 28.0,
+   "res": {
+    "earth": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 50000,
+   "pierce": {
+    "earth": 3
+   },
+   "id": 51326,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-epee": {
+   "n": "stellar moonsilver epee",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 55,
+   "def": 34,
+   "extraDef": 3,
+   "sword": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 62.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "earth": 5
+   },
+   "id": 51327,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-axe": {
+   "n": "stellar moonsilver axe",
+   "cat": "axe",
+   "t": "axe",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 55,
+   "def": 34,
+   "extraDef": 3,
+   "axe": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 76.5,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "earth": 5
+   },
+   "id": 51328,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-crusher": {
+   "n": "stellar moonsilver crusher",
+   "cat": "club",
+   "t": "club",
+   "atk": 6,
+   "el": "earth",
+   "elDmg": 55,
+   "def": 34,
+   "club": 6,
+   "imbSlots": 2,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 70.5,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "earth": 5
+   },
+   "id": 51329,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-claymore": {
+   "n": "stellar moonsilver claymore",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 60,
+   "def": 37,
+   "sword": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 89.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "fire": 6
+   },
+   "id": 51330,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-chopper": {
+   "n": "stellar moonsilver chopper",
+   "cat": "axe",
+   "t": "axe",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 60,
+   "def": 37,
+   "axe": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 91.7,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "fire": 6
+   },
+   "id": 51331,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-mace": {
+   "n": "stellar moonsilver mace",
+   "cat": "club",
+   "t": "club",
+   "atk": 6,
+   "el": "fire",
+   "elDmg": 60,
+   "def": 37,
+   "club": 6,
+   "th": 1,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "knight"
+   ],
+   "w": 95.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "fire": 6
+   },
+   "id": 51332,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-katar": {
+   "n": "stellar moonsilver katar",
+   "cat": "fist",
+   "t": "fist",
+   "atk": 48,
+   "def": 23,
+   "fist": 6,
+   "mag": 2,
+   "th": 1,
+   "bond": "energy",
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "monk"
+   ],
+   "w": 73.0,
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "energy": 5
+   },
+   "id": 51333,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-bow": {
+   "n": "stellar moonsilver bow",
+   "cat": "distance",
+   "t": "distance",
+   "atk": 7,
+   "dist": 5,
+   "hit": 100,
+   "range": 7,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 52.0,
+   "res": {
+    "fire": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "fire": 4
+   },
+   "id": 51334,
+   "s": "weapon"
+  },
+  "stellar-moonsilver-crossbow": {
+   "n": "stellar moonsilver crossbow",
+   "cat": "distance",
+   "t": "distance",
+   "atk": 7,
+   "dist": 5,
+   "hit": 100,
+   "range": 7,
+   "imbSlots": 3,
+   "lvl": 1000,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 56.0,
+   "res": {
+    "holy": 7
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 100000,
+   "pierce": {
+    "holy": 4
+   },
+   "id": 51335,
+   "s": "weapon"
+  },
+  "moonsilver-battle-visor": {
+   "n": "moonsilver battle visor",
+   "cat": "helmet",
+   "s": "helmet",
+   "t": "armor",
+   "arm": 14,
+   "sword": 4,
+   "axe": 4,
+   "club": 4,
+   "mag": 1,
+   "lvl": 800,
+   "vocs": [
+    "knight"
+   ],
+   "w": 14.5,
+   "res": {
+    "physical": 8,
+    "fire": 10
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 40000,
+   "aug": [
+    {
+     "k": "critical extra damage",
+     "s": "Groundshaker",
+     "v": 12
+    }
+   ],
+   "id": 51336
+  },
+  "moonsilver-nimbus-hat": {
+   "n": "moonsilver nimbus hat",
+   "cat": "helmet",
+   "s": "helmet",
+   "t": "armor",
+   "arm": 10,
+   "mag": 4,
+   "lvl": 800,
+   "vocs": [
+    "sorcerer"
+   ],
+   "w": 13.0,
+   "res": {
+    "physical": 3,
+    "ice": 8
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 40000,
+   "aug": [
+    {
+     "k": "critical extra damage",
+     "s": "Death Echo",
+     "v": 8
+    }
+   ],
+   "id": 51337
+  },
+  "moonsilver-spirit-mask": {
+   "n": "moonsilver spirit mask",
+   "cat": "helmet",
+   "s": "helmet",
+   "t": "armor",
+   "arm": 10,
+   "mag": 4,
+   "lvl": 800,
+   "vocs": [
+    "druid"
+   ],
+   "w": 38.0,
+   "res": {
+    "physical": 3,
+    "energy": 8
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 40000,
+   "aug": [
+    {
+     "k": "critical extra damage",
+     "s": "Forked Glacier",
+     "v": 8
+    }
+   ],
+   "id": 51338
+  },
+  "moonsilver-strike-helm": {
+   "n": "moonsilver strike helm",
+   "cat": "helmet",
+   "s": "helmet",
+   "t": "armor",
+   "arm": 8,
+   "mantra": 13,
+   "fist": 4,
+   "mag": 3,
+   "lvl": 800,
+   "vocs": [
+    "monk"
+   ],
+   "w": 41.0,
+   "res": {
+    "physical": 5,
+    "earth": 8
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 40000,
+   "aug": [
+    {
+     "k": "critical extra damage",
+     "s": "Thousand Fist Blows",
+     "v": 12
+    },
+    {
+     "k": "base healing",
+     "s": "Restore Balance",
+     "v": 10
+    }
+   ],
+   "id": 51339
+  },
+  "moonsilver-trail-hood": {
+   "n": "moonsilver trail hood",
+   "cat": "helmet",
+   "s": "helmet",
+   "t": "armor",
+   "arm": 12,
+   "dist": 4,
+   "mag": 2,
+   "lvl": 800,
+   "vocs": [
+    "paladin"
+   ],
+   "w": 12.0,
+   "res": {
+    "physical": 6,
+    "earth": 10
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 40000,
+   "aug": [
+    {
+     "k": "critical extra damage",
+     "s": "Divine Barrage",
+     "v": 8
+    }
+   ],
+   "id": 51340
+  },
+  "ink-blade": {
+   "n": "ink blade",
+   "cat": "sword",
+   "t": "sword",
+   "atk": 6,
+   "el": "energy",
+   "elDmg": 50,
+   "def": 30,
+   "sword": 3,
+   "imbSlots": 2,
+   "lvl": 800,
+   "vocs": [
+    "knight"
+   ],
+   "w": 3.5,
+   "res": {
+    "energy": 2
+   },
+   "cls": 4,
+   "drop": 1,
+   "sell": 25000,
+   "aug": [
+    {
+     "k": "cooldown",
+     "s": "Summon Knight Familiar",
+     "v": 300000
+    }
+   ],
+   "id": 51341,
+   "s": "weapon"
   }
  }
 }

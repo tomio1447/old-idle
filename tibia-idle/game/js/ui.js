@@ -147,6 +147,15 @@ function itemTip(slug, extra, slot, instId) {
   }
 
   if (it.prot) st.push("Proteção " + it.prot + "%");
+  // Elemental Pierce (TibiaWiki): aumenta a sensibilidade do alvo
+  if (it.pierce) {
+    const ps = Object.keys(it.pierce).map((e) => {
+      const d = typeof ELEMENTS !== "undefined" ? ELEMENTS[e] : null;
+      return `<span style="color:#7ec8ff">${it.pierce[e]}% ${
+        d ? d.name : e} pierce</span>`;
+    });
+    st.push(ps.join(" · "));
+  }
   // resistencias por elemento, cada uma na sua cor e com o ícone oficial
   // do tipo de dano (TibiaWiki/Damage)
   if (it.res) {
@@ -166,12 +175,12 @@ function itemTip(slug, extra, slot, instId) {
   if (it.th) st.push("Duas mãos");
   if (st.length) h += `<div class="tt-stat">${st.join("<br>")}</div>`;
 
-  // ---- augments: bonus por magia especifica
+  // ---- augments: bonus por magia especifica (TibiaWiki/Augments)
   if (it.aug && it.aug.length) {
     h += `<div class="tt-aug"><div class="tt-sub">Augments</div>` +
-      it.aug.map((a) => `<div class="tiny" style="color:#9ce84a">▸ ${a.s}: ${
-        a.k === "cooldown" ? "-" + a.v + "s" : "+" + a.v + "%"} ${
-        a.k === "cooldown" ? "" : a.k}</div>`).join("") + `</div>`;
+      it.aug.map((a) => `<div class="tiny" style="color:#9ce84a">▸ ${
+        typeof augmentLabel === "function" ? augmentLabel(a) : (a.s + " +" + a.v + "% " + (a.k || ""))
+      }</div>`).join("") + `</div>`;
   }
 
   // ---- imbuements: um quadrado por slot

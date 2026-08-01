@@ -989,8 +989,9 @@ function detalheItem(p, slug) {
   }).join(" · ") : "";
 
   const aug = it.aug ? it.aug.map((a) =>
-    `<div class="tiny" style="color:#9ce84a">▸ ${a.s}: ${a.k} ${
-      a.k === "cooldown" ? "-" + a.v + "s" : "+" + a.v + "%"}</div>`).join("") : "";
+    `<div class="tiny" style="color:#9ce84a">▸ ${
+      typeof augmentLabel === "function" ? augmentLabel(a) : (a.s + " +" + a.v + "% " + (a.k || ""))
+    }</div>`).join("") : "";
 
   return `
     <div style="text-align:center;padding:8px 0">

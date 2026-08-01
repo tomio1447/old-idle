@@ -778,6 +778,27 @@ function monsterMissile(mob) {
  * elemental pierce contra o alvo". Implementado como -8 pontos na
  * resistencia do monstro enquanto a marca durar (so dano elemental —
  * fisico nao e elemento). */
+/* Life/mana leech de Augments (TibiaWiki/Augments): aplica o leech extra
+ * da spell sobre o dano causado, curando/recarregando o personagem. */
+function augmentApplyLeech(c, p, aug, dano) {
+  if (!aug || !p) return;
+  const max = typeof maxStats === "function" ? maxStats(p) : null;
+  if (aug.lifeLeech > 0) {
+    const cura = Math.max(1, Math.floor(dano * aug.lifeLeech / 100));
+    if (max) p.hp = Math.min(max.hp, p.hp + cura);
+    else p.hp = (p.hp || 0) + cura;
+    if (c) c.stats.healed = (c.stats.healed || 0) + cura;
+  }
+  if (aug.manaLeech > 0) {
+    const mana = Math.max(1, Math.floor(dano * aug.manaLeech / 100));
+    if (max) p.mp = Math.min(max.mp, p.mp + mana);
+    else p.mp = (p.mp || 0) + mana;
+  }
+}
+
+
+
+
 /* ====================================================== Mitigation
  * TibiaWiki/Mitigation: propriedade defensiva que reduz TODOS os tipos de
  * dano comuns (Physical, Earth, Ice, Fire, Energy, Holy e Death) por uma
@@ -838,7 +859,48 @@ function applyPlayerMitigation(p, element, dano) {
   return Math.max(1, Math.floor(dano * (1 - mit / 100)));
 }
 
-function applyResist(mob, element, dano) {
+/* ====================================================== Elemental Pierce
+ * TibiaWiki/Elemental_Pierce (Winter Update 2025): aumenta a sensibilidade
+ * do inimigo por uma porcentagem. Regras:
+ *   - o aumento é METADE acima de sensibilidade 100% (arredondado p/ cima);
+ *   - sensibilidade 0% nunca aumenta;
+ *   - no máximo, DOBRA a sensibilidade;
+ *   - não afeta dano de Charms.
+ * "Sensibilidade" = resistência NEGATIVA do alvo (pc < 0).
+ */
+
+/* Soma o Elemental Pierce dos itens equipados para um elemento (%). */
+function playerPiercePct(p, element) {
+  if (!p || !p.equip || typeof GAMEDATA === "undefined") return 0;
+  let total = 0;
+  for (const slot in p.equip) {
+    const e = p.equip[slot];
+    if (!e || !e.item) continue;
+    const it = GAMEDATA.items[e.item];
+    if (!it || !it.pierce) continue;
+    total += Number(it.pierce[element]) || 0;
+  }
+  return total;
+}
+
+/* Aplica o pierce a um valor de RESISTÊNCIA (pc). Retorna a nova resist. */
+function applyPierceToResist(pc, piercePct) {
+  if (!piercePct || piercePct <= 0) return pc;
+  const sens = -(pc || 0);
+  // sensibilidade 0% (ou resistência >= 0) nunca aumenta
+  if (sens <= 0) return pc;
+  let novo;
+  if (sens > 100) {
+    novo = sens + Math.ceil(piercePct / 2);
+  } else {
+    const extra = sens + piercePct;
+    novo = extra > 100 ? 100 + Math.ceil((extra - 100) / 2) : extra;
+  }
+  novo = Math.min(novo, 2 * sens);   // no máximo dobra
+  return -novo;
+}
+
+function applyResist(mob, element, dano, piercePct) {
   // Agony é "true damage": não pode ser mitigado nem reduzido por
   // resistência (TibiaWiki: "Can not be mitigated or reduced").
   if (element === "agony") return Math.max(1, Math.floor(dano));
@@ -854,6 +916,9 @@ function applyResist(mob, element, dano) {
       !(mob.exposeUntil && mob.exposeUntil > Date.now())) return dano;
   if (element !== "physical" && mob.exposeUntil && mob.exposeUntil > Date.now())
     pc = (pc || 0) - 8;
+  // Elemental Pierce (TibiaWiki): aumenta a sensibilidade (resist negativa)
+  // do alvo antes do cálculo — mesmas regras do Expose Weakness.
+  if (piercePct && piercePct > 0) pc = applyPierceToResist(pc, piercePct);
   if (!pc) return dano;
   const escala = Math.max(0, 1 - pc / 100);
   return Math.max(pc >= 100 ? 0 : 1, Math.floor(dano * escala));
@@ -974,7 +1039,7 @@ function playerAttack(c, p, target) {
     // bonus nao vale para cleave nem para a area da municao.
     v = Math.max(1, Math.floor(v));
     if (alvoPrincipal) v = applyCharmDamage(p, element, v);
-    v = applyResist(target, element, Math.max(1, v));
+    v = applyResist(target, element, Math.max(1, v), playerPiercePct(p, element));
     // Mitigation do monstro reduz TODOS os tipos comuns (TibiaWiki).
     // O perfect shot é somado FORA deste roll — por isso ele bypassa a
     // mitigation (regra oficial).
@@ -1121,7 +1186,8 @@ function playerAttack(c, p, target) {
       // a resistencia ja foi aplicada com o elemento fisico no rollDamage,
       // entao aqui so a parte elemental precisa ser reavaliada
       const elemFinal = Math.max(1,
-        applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto)));
+        applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto),
+                         playerPiercePct(p, parte2)));
       target.hp -= fisBruto + elemFinal;
       c.stats.damage += fisBruto + elemFinal;
       // dano fisico: numero vermelho e efeito de sangue
@@ -1357,8 +1423,14 @@ function castSpellById(c, p, target, now, id) {
 
   p.mp -= s.mana;
   addManaSpent(p, combatManaSkillGain(c, s.mana));
-  cdStart(p, id, s, now);
-  c.spellCd[id] = now + s.cd;   // mantido: testes antigos leem esse mapa
+  // Augments (TibiaWiki): modificadores de magia vindos dos itens equipados.
+  // O bônus de dano/cura é aplicado SOMENTE sobre o dano/cura base da spell.
+  const aug = (typeof augmentTotals === "function") ? augmentTotals(p, id) : null;
+  // Augment "cooldown" (TibiaWiki): reduz o cooldown da spell (ms).
+  const cdReal = Math.max(1000, (s.cd || 2000) - ((aug && aug.cdReduction) || 0));
+  cdStart(p, id, (cdReal !== (s.cd || 2000))
+    ? Object.assign({}, s, { cd: cdReal }) : s, now);
+  c.spellCd[id] = now + cdReal;   // mantido: testes antigos leem esse mapa
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
@@ -1514,6 +1586,11 @@ function castSpellById(c, p, target, now, id) {
     } else {
       dmg = rollSpell(p, s);
     }
+    // Augment "base damage" (Impact): +% sobre o dano base, antes de
+    // stances/forja/crítico (regra oficial confirmada em 17/05/2024).
+    if (aug && aug.baseDmg > 0) {
+      dmg = Math.max(1, Math.floor(dmg * (1 + aug.baseDmg / 100)));
+    }
     if (monkMult !== 1) dmg = Math.floor(dmg * monkMult);
     // buff de vocacao (Virtude, Protector) tambem afeta magia
     if (typeof buffTotals === "function") {
@@ -1552,6 +1629,16 @@ function castSpellById(c, p, target, now, id) {
         critSt = true;
       }
     }
+    // Augments de crítico (TibiaWiki): "critical extra damage" aumenta o
+    // dano crítico DA spell; "critical hit chance" pode conceder crítico à
+    // spell mesmo sem outra fonte de chance.
+    if (aug) {
+      if (!critSt && aug.critChance > 0 &&
+          Math.random() * 100 < aug.critChance) {
+        critSt = true;
+      }
+      if (critSt && aug.critDmg > 0) extraSpellPct += aug.critDmg;
+    }
     // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
     if (forgeOnslaughtSpell) {
@@ -1577,12 +1664,17 @@ function castSpellById(c, p, target, now, id) {
       const fis = Math.max(1, Math.round(dmg * armaEl.propFisica));
       const ele = Math.max(1, dmg - fis);
       const fisFinal = applyMonsterMitigation(t, elemento,
-        applyResist(t, elemento, fis));
+        applyResist(t, elemento, fis, playerPiercePct(p, elemento)));
       const eleFinal = Math.max(1,
         applyMonsterMitigation(t, armaEl.el,
-          applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele))));
+          applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele),
+                      playerPiercePct(p, armaEl.el))));
       t.hp -= fisFinal + eleFinal;
       c.stats.damage += fisFinal + eleFinal;
+      // Augments de life/mana leech (TibiaWiki): leech extra da spell.
+      if (aug && (aug.lifeLeech > 0 || aug.manaLeech > 0)) {
+        augmentApplyLeech(c, p, aug, fisFinal + eleFinal);
+      }
       if (s.cond && typeof applyCondition === "function") {
         applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
       }
@@ -1610,9 +1702,13 @@ function castSpellById(c, p, target, now, id) {
                       crit: critSt, fatal: fatalSpell });
       return;
     }
-    dmg = applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg));
+    dmg = applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento)));
     t.hp -= dmg;
     c.stats.damage += dmg;
+    // Augments de life/mana leech (TibiaWiki): leech extra da spell.
+    if (aug && (aug.lifeLeech > 0 || aug.manaLeech > 0)) {
+      augmentApplyLeech(c, p, aug, dmg);
+    }
     // magias que aplicam condition (Ignite, Envenom, Curse...)
     if (s.cond && typeof applyCondition === "function") {
       applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
@@ -1765,7 +1861,7 @@ function tryUseRune(c, p, target, now, forcada) {
         dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
       }
       dmg = applyMonsterMitigation(alvo, s.element,
-        applyResist(alvo, s.element, Math.max(1, dmg)));
+        applyResist(alvo, s.element, Math.max(1, dmg), playerPiercePct(p, s.element)));
       alvo.hp -= dmg;
       c.stats.damage += dmg;
       total += dmg;
@@ -1918,6 +2014,14 @@ function tryHeal(c, p, now) {
       }
       const [idCura, s] = heals[0];
       let amount = Math.max(1, rollSpell(p, s));
+      // Augment "base healing" (TibiaWiki): +% sobre a cura base da spell,
+      // antes de stances/crítico (regra oficial de 17/05/2024).
+      if (typeof augmentTotals === "function") {
+        const augCura = augmentTotals(p, idCura);
+        if (augCura.baseHeal > 0) {
+          amount = Math.max(1, Math.floor(amount * (1 + augCura.baseHeal / 100)));
+        }
+      }
       // stances 15.25: Sharpshooter ativa reduz 25% a cura CONJURADA do
       // paladin; Shared Conservation soma 10% de autocura
       if (typeof stanceTotals === "function") {
@@ -2362,6 +2466,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
       raw = applyPlayerMitigation(p, tipoEl, raw);
     }
 
+
+
   }
   const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bfd && bfd.dmgReceived !== 1)
@@ -2383,6 +2489,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   // Agony (true damage): nem o mantra do Monk reduz.
   if (raw > 0 && !ehAgony && typeof mantraAbsorve === "function") {
     raw = mantraAbsorve(p, raw, tipoEl, c);
+
+
 
   }
   if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
