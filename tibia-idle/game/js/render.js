@@ -868,7 +868,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.textAlign = "left";
   ctx.font = "bold 14px Verdana";
   ctx.fillStyle = "#9ce84a";
-  ctx.fillText(isDummy ? "Exercise Dummy Safezone" : "Academia Safezone", 12, 24);
+  ctx.fillText(isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone", 12, 24);
   ctx.font = "10px Verdana";
   ctx.fillStyle = "#c8c0a8";
   if (isDummy) {
@@ -880,62 +880,60 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 
   const pimg = OutfitRenderer.forPlayer(player, "e", 0);
   const pxBase = W * 0.28, py = H * 0.64;
-  // animação do golpe no modo dummy: o player avança em direção ao dummy
-  // (lunge) por ~180ms a cada hit, igual ao atkPush dos mobs no combate.
+  // Animação do golpe no modo dummy (como no client/baiakidle):
+  //  - SEM flutuação: o personagem fica colado no chão (sem bob senoidal);
+  //  - durante o golpe (~180ms) ele alterna os frames de caminhada 1/2 da
+  //    outfit (o "swing" do braço) e avança um passo fixo em direção ao
+  //    dummy — sem o "quicar" sinusoidal antigo que parecia flutuação.
   let lunge = 0;
+  let atkFrame = 0;
   if (training.mode === "dummy" && training.lungeT > 0) {
     const prog = 1 - training.lungeT / 180;
-    lunge = Math.sin(prog * Math.PI) * W * 0.045;
+    lunge = W * 0.02;                       // avanço fixo durante o golpe
+    atkFrame = (Math.floor(prog * 6) % 2) + 1;  // alterna frames 1 e 2
     training.lungeT -= dt;
   }
   const px = pxBase + lunge;
-  if (spriteReady(pimg)) {
+  const pimgAtk = (atkFrame && spriteReady(pimg))
+    ? (OutfitRenderer.forPlayer(player, "e", atkFrame) || pimg) : pimg;
+  if (spriteReady(pimgAtk)) {
     const sc = PLAYER_SCALE + 0.1;
-    const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
-    const top = py - h / 2 + Math.sin(Date.now() / 340) * 2;
+    const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
+    // SEM bob: sprite fixa no chão, como no client
+    const top = py - h / 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath(); ctx.ellipse(px, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
-    ctx.drawImage(pimg, px - w / 2, top, w, h);
+    ctx.drawImage(pimgAtk, px - w / 2, top, w, h);
     drawPlayerStatus(ctx, px, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px, top - 14, dt);
   }
 
   const tx = W * 0.70, ty = H * 0.62;
   if (isDummy) {
-    // --- Exercise Dummy (Skill Trainer): poste de madeira com saco.
-    const dw = 52, dh = 86;
+    // --- Ferumbras Exercise Dummy: sprite oficial (TibiaWiki), estátua
+    // do Ferumbras sobre a base de pedra, com barra e cargas.
+    const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
+    const dw = 64, dh = 64;
     const dbx = tx - dw / 2, dby = ty - dh + 8;
     drawTargetSquare(ctx, dbx, dby, dw, dh);
-    // poste
-    ctx.fillStyle = "#6b4a26";
-    ctx.fillRect(tx - 4, ty - 40, 8, 46);
-    ctx.fillStyle = "#54381c";
-    ctx.fillRect(tx - 4, ty + 2, 8, 4);
-    // saco (pano)
-    ctx.fillStyle = "#8a6a3a";
-    ctx.beginPath();
-    ctx.ellipse(tx, ty - 46, 26, 32, 0, 0, 7);
-    ctx.fill();
-    ctx.fillStyle = "#9c7a48";
-    ctx.beginPath();
-    ctx.ellipse(tx, ty - 52, 18, 22, 0, 0, 7);
-    ctx.fill();
-    // costura do saco
-    ctx.strokeStyle = "#6b4a26";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(tx, ty - 78); ctx.lineTo(tx, ty - 26);
-    ctx.stroke();
-    // sombra
-    ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath(); ctx.ellipse(tx, ty + 10, 30, 8, 0, 0, 7); ctx.fill();
+    if (dimg && dimg.complete && dimg.naturalWidth) {
+      const sc = 1.5;
+      const w = dimg.naturalWidth * sc, h = dimg.naturalHeight * sc;
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.beginPath(); ctx.ellipse(tx, ty + 12, w * 0.36, 9, 0, 0, 7); ctx.fill();
+      ctx.drawImage(dimg, tx - w / 2, ty - h + 10, w, h);
+    } else {
+      // fallback: silhueta
+      ctx.fillStyle = "rgba(0,0,0,.5)";
+      ctx.fillRect(tx - 20, ty - 52, 40, 58);
+    }
 
     ctx.textAlign = "center";
     ctx.font = "bold 12px Verdana";
     ctx.fillStyle = "rgba(0,0,0,.85)";
-    ctx.fillText("Exercise Dummy", tx + 1, ty - 90);
+    ctx.fillText("Ferumbras Exercise Dummy", tx + 1, ty - 90);
     ctx.fillStyle = "#ffe680";
-    ctx.fillText("Exercise Dummy", tx, ty - 91);
+    ctx.fillText("Ferumbras Exercise Dummy", tx, ty - 91);
 
     // barra do dummy + cargas da exercise weapon
     ctx.fillStyle = "#000";

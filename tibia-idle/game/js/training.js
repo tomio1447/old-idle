@@ -15,10 +15,10 @@
 
 const TRAINING_ICON_PATH = "assets/ui/training/";
 
-/* As 7 exercise weapons oficiais. `skill` é a skill treinada no dummy:
+/* As 8 exercise weapons oficiais. `skill` é a skill treinada no dummy:
  * sword/axe/club -> melee, bow -> distance, rod/wand -> magic level
- * (mana spent), shield -> shielding. Preço/cargas seguem o pedido:
- * 25 Tibia Coins = 5000 cargas. */
+ * (mana spent), shield -> shielding, wraps -> fist (monk). Preço/cargas
+ * seguem o pedido: 25 Tibia Coins = 5000 cargas. */
 const EXERCISE_WEAPONS = {
   "exercise-sword": { name: "Exercise Sword", skill: "sword",
                       tc: 25, charges: 5000, icon: "exercise-sword.gif" },
@@ -34,6 +34,8 @@ const EXERCISE_WEAPONS = {
                       tc: 25, charges: 5000, icon: "exercise-wand.gif" },
   "exercise-shield": { name: "Exercise Shield", skill: "shield",
                       tc: 25, charges: 5000, icon: "exercise-shield.gif" },
+  "exercise-wraps": { name: "Exercise Wraps", skill: "fist",
+                      tc: 25, charges: 5000, icon: "exercise-wraps.gif" },
 };
 
 /* Garante o estado das exercise weapons no save: p.exercise[id] = cargas */
