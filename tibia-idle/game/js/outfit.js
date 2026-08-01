@@ -167,6 +167,19 @@ const OutfitRenderer = {
   },
 
   forPlayer(p, dir, frame) {
+    // Transcendence (Avatar Stage 3): o avatar oficial da vocação sobrepõe
+    // QUALQUER visual — inclusive o outfit clássico padrão (quando
+    // p.outfit.appearance está vazio o AppearanceRenderer era pulado e o
+    // avatar nunca era aplicado). activeAvatarAppearance() devolve o avatar
+    // enquanto p._avatar.active estiver dentro da janela de 7s.
+    if (typeof activeAvatarAppearance === "function" &&
+        typeof AppearanceRenderer !== "undefined") {
+      const avatar = activeAvatarAppearance(p);
+      if (avatar) {
+        const cv = AppearanceRenderer.forPlayer(p, dir, frame);
+        if (cv) return cv;
+      }
+    }
     const o = playerOutfit(p);
     if (p.outfit && p.outfit.appearance &&
         typeof AppearanceRenderer !== "undefined") {

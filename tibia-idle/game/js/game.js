@@ -4,7 +4,7 @@
 "use strict";
 
 // DEBUG temporário: contadores de procs da Exaltation Forge na tela
-window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
+window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
 
 const SAVE_KEY = "tibia-idle-save-v1";
 const CHARACTERS_KEY = "tibia-idle-characters-v1";
@@ -674,7 +674,7 @@ function openBossModal(id) {
 }
 
 function startBoss(id) {
-  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
+  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
@@ -730,7 +730,7 @@ function openInstanceModal(id) {
 }
 
 function startHunt(id, instanceMode) {
-  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0 };
+  window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
   if (!instanceMode) { openInstanceModal(id); return; }
@@ -837,7 +837,7 @@ function drainEvents() {
         if (e.fatal) {
           // mais tempo de exibição para o efeito FATAL ser visível
           r.addEffect(x, y - 0.10, "fatal-text", 1200);
-          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.fatal = (fdc.fatal || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         }
@@ -887,7 +887,7 @@ function drainEvents() {
         if (e.ruse) {
           r.addFloater(ex(e), ey(e), "RUSE!", "#66c7ff");
           r.addEffect(ex(e), ey(e), "ruse-effect", 1000);
-          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.ruse = (fdc.ruse || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else {
@@ -997,7 +997,7 @@ function drainEvents() {
           const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
           r.addFloater(px, py - 0.16, "MOMENTUM!", "#ffe680");
           r.addEffect(px, py, "momentum-effect", 1000);
-          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0 };
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.momentum = (fdc.momentum || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else if (e.nome === "Transcendence") {
@@ -1006,6 +1006,9 @@ function drainEvents() {
           const avatarFx = (typeof CLIENT_EFFECTS !== "undefined" && CLIENT_EFFECTS["avatar-effect"])
             ? "avatar-effect" : "magic-blue";
           r.addEffect(px, py, avatarFx, 1100);
+          const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
+          fdc.transcendence = (fdc.transcendence || 0) + 1;
+          window.FORGE_DEBUG_COUNT = fdc;
         }
         break;
       }

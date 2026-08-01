@@ -1051,7 +1051,22 @@ Renderer.prototype.draw = function (combat, player, dt) {
     }
     const drawX = px * W - w / 2 + atkPush;
     const drawY = py * H - h / 2 + bob;
+    // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
+    const avatarGlowOn = (typeof window !== "undefined" && window.avatarActive &&
+                          player && player.voc && window.avatarActive(player, Date.now()));
+    if (avatarGlowOn) {
+      const AVATAR_GLOW = {
+        knight: "#ff7a3a", paladin: "#ffe680",
+        sorcerer: "#c78cff", druid: "#7ae87a",
+        monk: "#66c7ff",
+      };
+      ctx.save();
+      ctx.shadowColor = AVATAR_GLOW[player.voc] || "#c78cff";
+      ctx.shadowBlur = 22;
+      ctx.globalAlpha = 0.92;
+    }
     ctx.drawImage(pimg, drawX, drawY, w, h);
+    if (avatarGlowOn) ctx.restore();
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px * W, drawY - 14, dt);
@@ -1255,6 +1270,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       { label: "FATAL", n: forgeCounts.fatal || 0, color: "#ff4a4a" },
       { label: "MOMENTUM", n: forgeCounts.momentum || 0, color: "#ffe680" },
       { label: "RUSE", n: forgeCounts.ruse || 0, color: "#66c7ff" },
+      { label: "AVATAR", n: forgeCounts.transcendence || 0, color: "#c78cff" },
     ];
     let y = 64;
     for (const ln of lines) {
