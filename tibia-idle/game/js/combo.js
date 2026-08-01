@@ -42,6 +42,12 @@ function ensureCombo(p) {
       c[i] = null;
       continue;
     }
+    // Update 15.25: Divine/Ethereal Barrage mudaram de id no SPELLDATA
+    // (exori-dir-* -> exevo-dir-*) — migra saves com o id antigo.
+    if (s.kind === "spell") {
+      if (s.id === "exori-dir-san") s.id = "exevo-dir-san";
+      else if (s.id === "exori-dir-moe") s.id = "exevo-dir-moe";
+    }
     s.min = Math.max(1, Math.min(9, parseInt(s.min, 10) || 1));
   }
   return c;

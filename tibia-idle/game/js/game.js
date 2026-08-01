@@ -816,8 +816,15 @@ function drainEvents() {
   const c = G.combat;
   if (!c) return;
   const r = G.renderer;
-  const ex = (e) => e.screen ? (e.x || 0.5) : 0.42 + (e.x || 0.5) * 0.5;
-  const ey = (e) => e.y || 0.5;
+  // Posição normalizada (0-1) de um evento: os eventos carregam a posição
+  // REAL da entidade no canvas (player ou mob, que andam pelo grid do
+  // mapa). A fórmula antiga (0.42 + x*0.5) era do campo fixo e deslocava
+  // os floaters para a direita — dodge/ruse saíam longe do personagem e o
+  // dano em mobs próximos também ficava torto.
+  const ex = (e) => (e.x !== undefined && e.x !== null)
+    ? e.x : (c.player ? c.player.x : 0.5);
+  const ey = (e) => (e.y !== undefined && e.y !== null)
+    ? e.y : (c.player ? c.player.y : 0.5);
   for (const e of c.events) {
     switch (e.t) {
       case "hit": {
@@ -899,15 +906,19 @@ function drainEvents() {
         break;
       }
       case "miss": {
-        // Ruse (armor): evitou completamente um ataque
+        // Ruse (armor): evitou completamente um ataque.
+        // Os floaters sobem NO SQM da entidade (player ou mob alvo) — a
+        // posição vem do evento; o pequeno offset em y coloca o texto
+        // sobre a cabeça, como os demais números.
+        const mx = ex(e), my = ey(e) - 0.06;
         if (e.ruse) {
-          r.addFloater(ex(e), ey(e), "RUSE!", "#66c7ff");
-          r.addEffect(ex(e), ey(e), "ruse-effect", 1000);
+          r.addFloater(mx, my, "RUSE!", "#66c7ff");
+          r.addEffect(mx, ey(e), "ruse-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.ruse = (fdc.ruse || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else {
-          r.addFloater(ex(e), ey(e), "errou", "#a0a0a0");
+          r.addFloater(mx, my, "errou", "#a0a0a0");
         }
         break;
       }
@@ -919,7 +930,9 @@ function drainEvents() {
         break;
       }
       case "range":
-        r.addFloater(ex(e), ey(e), "fora de alcance", "#c8c0a8");
+        // "fora de alcance" saía solto no meio da tela (a fórmula antiga
+        // de posição deslocava tudo para a direita). Removido: a falha de
+        // alcance fica só no log, sem poluir a cena.
         break;
       case "taken": {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;

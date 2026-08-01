@@ -350,8 +350,15 @@
     },
   };
   for (const id in NOVAS) SD[id] = NOVAS[id];
-  SD["exori-dir-san"] = SD["exevo-dir-san"];
-  SD["exori-dir-moe"] = SD["exevo-dir-moe"];
+  // As magias novas dos Barrages entraram com o id do update
+  // (exevo-dir-san/exevo-dir-moe), mas o import do Canary JÁ trazia as
+  // mesmas magias com sid 300/301 sob os ids exori-dir-san/exori-dir-moe.
+  // Sobrescrever as chaves antigas com a referência nova fazia o grimório
+  // listar cada Barrage DUAS VEZES (e duplicava em qualquer iteração do
+  // SPELLDATA). Fica só o id novo; saves com o id antigo são migrados no
+  // ensureCombo (combo.js).
+  delete SD["exori-dir-san"];
+  delete SD["exori-dir-moe"];
 
   /* ---------------------------------- dados anexos (fx, mira, area) */
 
@@ -368,9 +375,7 @@
     // (Divine_Barrage_Effect / Ethereal_Barrage_Effect), nao mais o chute
     // dos Effect_3xx pelo visual.
     W["exevo dir san"] = { fx: "divine-barrage-effect" };
-    W["exori dir san"] = { fx: "divine-barrage-effect" };
     W["exevo dir moe"] = { fx: "ethereal-barrage-effect" };
-    W["exori dir moe"] = { fx: "ethereal-barrage-effect" };
     W["exevo fur frigo"] = { fx: "forked-glacier-effect", miss: "ice" };
     W["exevo fur tera"] = { fx: "forked-thorns-effect", miss: "earth" };
     W["exevo mort ora"] = { fx: "death-echo-effect", miss: "death" };
@@ -402,11 +407,9 @@
     T["exevo-dir-san"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
                            needTarget: 1, nome: "Divine Barrage",
                            range: 5, words: "exevo dir san" };
-    T["exori-dir-san"] = T["exevo-dir-san"];
     T["exevo-dir-moe"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
                            needTarget: 1, nome: "Ethereal Barrage",
                            range: 5, words: "exevo dir moe" };
-    T["exori-dir-moe"] = T["exevo-dir-moe"];
     T["exevo-fur-frigo"] = { blockWalls: 1, needTarget: 1,
                              nome: "Forked Glacier", range: 5,
                              words: "exevo fur frigo" };

@@ -947,7 +947,8 @@ function playerAttack(c, p, target) {
       && target.cx !== undefined
       ? sqmDistance(c.player, target) > playerRangeSQM(p)
       : pointDistance(pos, target) > playerAttackRange(p)) {
-    c.events.push({ t: "range", x: target.x, y: target.y, screen: true });
+    // (o antigo evento "range" mostrava "fora de alcance" na tela — foi
+    // removido; a falha fica silenciosa no log de quem chamou)
     return false;
   }
 
