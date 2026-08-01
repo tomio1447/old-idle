@@ -539,6 +539,10 @@ const CONDITIONS = {
   // congelamento nao tem exana proprio no Tibia: passa com o tempo
   freezing:{ nome: "Congelado",    el: "ice",    fx: "ice-attack",
              cor: "#7ec8ff", cure: null },
+  // Agony (TibiaWiki): dano verdadeiro que não pode ser curado nem
+  // protegido — só esperar acabar.
+  agony:   { nome: "Agony",        el: "agony",  fx: "draw-blood",
+             cor: "#9a6a3a", cure: null },
 };
 
 /* Aplica (ou renova) uma condition num alvo — monstro ou jogador. */
@@ -609,7 +613,9 @@ function tickConditions(c, p, dt) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
         let dmg = Math.max(1, co.dmg);
-        if (typeof applyMagicShieldAbsorb === "function") {
+        // Agony: true damage — o Magic Shield NÃO protege contra ele
+        // (TibiaWiki: "can not be cured or protected against").
+        if (def.el !== "agony" && typeof applyMagicShieldAbsorb === "function") {
           dmg = applyMagicShieldAbsorb(c, p, dmg, {
             el: def.el,
             x: c.player ? c.player.x : 0.13,
@@ -773,8 +779,16 @@ function monsterMissile(mob) {
  * resistencia do monstro enquanto a marca durar (so dano elemental —
  * fisico nao e elemento). */
 function applyResist(mob, element, dano) {
-  const r = mob.def && mob.def.resist;
+  // Agony é "true damage": não pode ser mitigado nem reduzido por
+  // resistência (TibiaWiki: "Can not be mitigated or reduced").
+  if (element === "agony") return Math.max(1, Math.floor(dano));
+  const def = mob && mob.def;
+  const r = def && def.resist;
   if (!r || !element) return dano;
+  // Imunidade declarada no array `imune` (ex.: "physical", "fire") zera o
+  // golpe, como os mobs imunes a físico do client (Ghost, Pirate Ghost,
+  // Spectre, Phantasm, Dipthrah...).
+  if (Array.isArray(def.imune) && def.imune.indexOf(element) !== -1) return 0;
   let pc = r[element];
   if (!pc && element !== "physical" &&
       !(mob.exposeUntil && mob.exposeUntil > Date.now())) return dano;
@@ -883,7 +897,8 @@ function playerAttack(c, p, target) {
   const element = ammo && ammo.el ? ammo.el : d.element;
   const rollDamage = (alvoPrincipal) => {
     let v = d.min + Math.random() * (d.max - d.min);
-    if (!isMagic) {
+    // Agony é true damage: a Armor do alvo não reduz (TibiaWiki).
+    if (!isMagic && element !== "agony") {
       // Mitigation dos MONSTROS foi aumentada no 15.25 ("Mitigation foi
       // ajustada... Mitigation dos monstros foi aumentada"): o redutor de
       // armadura sobe de 30-70% para 45-95% e o teto de 55% para 62%.
@@ -2251,14 +2266,26 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   const pl = c.player;
   const agora = Date.now();
   let raw = dmg;
+  // Tipos especiais de dano (TibiaWiki/Damage):
+  //  - "mana drain": ataca a MANA (cor azul), não é reduzido por armor;
+  //  - "life drain": remove HP (cor vermelha) e transfere ao atacante;
+  //  - "agony": true damage, não pode ser mitigado nem reduzido.
+  const nomeSk = String(sk.n || sk.name || "").toLowerCase();
+  const ehManaDrain = /mana\s*drain|manadrain/i.test(nomeSk);
+  const ehLifeDrain = /life\s*drain|lifedrain/i.test(nomeSk);
+  const ehAgony = sk.el === "agony" || /agony/i.test(nomeSk);
+  const tipoEl = ehManaDrain ? "manadrain" : ehLifeDrain ? "lifedrain" : (sk.el || "physical");
   // Sap Strength (15.25): monstro marcado causa 10% menos — vale para todo
   // dano causado, nao so o auto attack (o debuff marca o ALVO, nao o golpe)
   if (mob.sapStrUntil && mob.sapStrUntil > agora) raw = Math.floor(raw * 0.9);
   const def0 = playerDefense(p);
-  raw = raw * (1 - Math.min(0.7, def0.protection / 100));
-  if (typeof imbProtection === "function") {
-    const prot = imbProtection(p, sk.el);
-    if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
+  // Agony ignora TODAS as reduções (armor, proteção %, imbuement, mantra).
+  if (!ehAgony) {
+    raw = raw * (1 - Math.min(0.7, def0.protection / 100));
+    if (typeof imbProtection === "function") {
+      const prot = imbProtection(p, tipoEl);
+      if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
+    }
   }
   const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bfd && bfd.dmgReceived !== 1)
@@ -2277,12 +2304,13 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     c.buffs.shield -= absorbed;
     raw -= absorbed;
   }
-  if (raw > 0 && typeof mantraAbsorve === "function") {
-    raw = mantraAbsorve(p, raw, sk.el);
+  // Agony (true damage): nem o mantra do Monk reduz.
+  if (raw > 0 && !ehAgony && typeof mantraAbsorve === "function") {
+    raw = mantraAbsorve(p, raw, tipoEl);
   }
   if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
     raw = applyMagicShieldAbsorb(c, p, raw, {
-      el: sk.el || "physical",
+      el: tipoEl,
       x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
     });
   }
@@ -2310,9 +2338,28 @@ function mobSkillHit(c, p, mob, sk, dmg) {
                     projectile: bolt, missile: miss });
     return 0;
   }
+  if (ehManaDrain) {
+    // Mana Drain (TibiaWiki): perde MANA em vez de vida — cor azul.
+    const mx = maxStats(p);
+    const drenado = Math.min(p.mp, raw);
+    p.mp = Math.max(0, p.mp - drenado);
+    c.stats.taken += drenado;
+    c.events.push({ t: "taken", dmg: drenado, el: "manadrain",
+                    x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
+                    fx: sk.fx || null, projectile: bolt, missile: miss });
+    if (drenado > 0 && mob.hp > 0) {
+      // transferência: o dreno alimenta o atacante
+      mob.hp = Math.min(mob.def.hp || mob.maxHp, mob.hp + Math.floor(drenado / 2));
+    }
+    return drenado;
+  }
   p.hp -= raw;
   c.stats.taken += raw;
-  c.events.push({ t: "taken", dmg: raw, el: sk.el || "physical",
+  if (ehLifeDrain && mob.hp > 0) {
+    // Life Drain: remove HP e transfere ao atacante (cura o mob).
+    mob.hp = Math.min(mob.def.hp || mob.maxHp, mob.hp + raw);
+  }
+  c.events.push({ t: "taken", dmg: raw, el: tipoEl,
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
                   // COMBAT_PARAM_EFFECT do .lua (fire-area, mort area,
                   // ice attack...) em vez do generico do elemento

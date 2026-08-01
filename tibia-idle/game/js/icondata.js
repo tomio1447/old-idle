@@ -176,6 +176,34 @@ window.WIKI_CONDITION_ICONS = {
   "cond-within-resting-area": { nome: "Within Resting Area", tipo: "neutral", desc: "Em área de descanso sem bônus ativo." },
 };
 
+/* ------------------------------------------------------------------ *
+ * Ícones de Damage Types (TibiaWiki/Damage#Damage_Colors).
+ * Mapeia o elemento do jogo → ícone oficial (assets/ui/damage/*.png e
+ * os ícones de condição já existentes em assets/ui/conditions/*.png).
+ */
+window.WIKI_DAMAGE_ICONS = {
+  physical: "damage/physical.png",
+  fire:     "conditions/cond-burning.png",
+  earth:    "conditions/cond-poisoned.png",
+  energy:   "conditions/cond-electrified.png",
+  ice:      "conditions/cond-freezing.png",
+  death:    "conditions/cond-cursed.png",
+  holy:     "damage/holy.png",
+  drown:    "conditions/cond-drowning.png",
+  manadrain: "damage/mana-drain.png",
+  lifedrain: "damage/life-drain.png",
+  agony:    "damage/agony.png",
+};
+
+/* <img> pequena do ícone de dano de um elemento (ou null). */
+function dmgIconImg(el, size) {
+  if (typeof WIKI_DAMAGE_ICONS === "undefined") return "";
+  const p = WIKI_DAMAGE_ICONS[el];
+  if (!p) return "";
+  const sz = size || 10;
+  return `<img src="assets/ui/${p}" alt="" style="width:${sz}px;height:${sz}px;vertical-align:-1px;margin-right:3px">`;
+}
+
 /* Cache de <img> por slug — evita recriar Image a cada frame. */
 const WIKI_ICON_CACHE = {};
 

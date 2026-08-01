@@ -143,11 +143,13 @@ function itemTip(slug, extra, slot, instId) {
   }
 
   if (it.prot) st.push("Proteção " + it.prot + "%");
-  // resistencias por elemento, cada uma na sua cor
+  // resistencias por elemento, cada uma na sua cor e com o ícone oficial
+  // do tipo de dano (TibiaWiki/Damage)
   if (it.res) {
     const rs = Object.keys(it.res).map((e) => {
       const d = typeof ELEMENTS !== "undefined" ? ELEMENTS[e] : null;
       return `<span style="color:${d ? d.color : "#ccc"}">${
+        typeof dmgIconImg === "function" ? dmgIconImg(e, 10) : ""}${
         it.res[e] > 0 ? "+" : ""}${it.res[e]}% ${d ? d.name : e}</span>`;
     });
     st.push(rs.join(" · "));
