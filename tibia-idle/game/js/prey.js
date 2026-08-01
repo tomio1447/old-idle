@@ -58,10 +58,15 @@ function ensurePrey(p) {
                     rerollAt: 0, selected: null });
   }
   pr.wildcards = Math.max(0, Number(pr.wildcards) || 0);
+  const agora = Date.now();
   for (const s of pr.slots) {
-    if (!s.selected) continue;
     // limpa preys expiradas
-    if (s.selected.until && s.selected.until <= Date.now()) s.selected = null;
+    if (s.selected && s.selected.until && s.selected.until <= agora) s.selected = null;
+    // Como no client: todo slot desbloqueado já nasce com a lista de 9
+    // criaturas pronta (3 low, 3 mid, 3 high).
+    if (s.unlocked && (!s.creatures || !s.creatures.length)) {
+      s.creatures = preyRerollList(p, pr.slots.indexOf(s));
+    }
   }
   return pr;
 }
@@ -74,40 +79,67 @@ function preyFaixaDe(mob) {
   return "high";
 }
 
-/* Gera 9 criaturas aleatórias para o slot (3 low, 3 mid, 3 high),
- * sem repetir criatura entre slots. */
+/* Pool de criaturas para a prey — o BESTIÁRIO COMPLETO do Canary
+ * (window.MONSTERDATA, 1600+ criaturas), como o client usa. Se por alguma
+ * razão o MONSTERDATA não estiver carregado, cai nos monstros das hunts. */
+function preyMonsterPool() {
+  const slugs = [];
+  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA) {
+    for (const slug in MONSTERDATA) {
+      const mob = MONSTERDATA[slug];
+      if (!mob || !mob.name) continue;
+      // só criaturas com sprite de combate (MOBSHEETS) aparecem na janela
+      if (typeof MOBSHEETS !== "undefined" && MOBSHEETS &&
+          !MOBSHEETS[slug]) continue;
+      slugs.push(slug);
+    }
+    if (slugs.length) return slugs;
+  }
+  // fallback: monstros das hunts
+  const seen = new Set();
+  for (const huntId in (typeof GAMEDATA !== "undefined" ? GAMEDATA.hunts : {})) {
+    const hu = GAMEDATA.hunts[huntId];
+    for (const slug of (hu.monsters || [])) {
+      if (!seen.has(slug)) { seen.add(slug); slugs.push(slug); }
+    }
+  }
+  return slugs;
+}
+
+/* Gera 9 criaturas aleatórias para o slot (3 low, 3 mid, 3 high) do pool
+ * completo do Canary, sem repetir criatura entre slots.
+ * Não chama ensurePrey (evita recursão: ensurePrey usa esta função). */
 function preyRerollList(p, slotIdx) {
-  ensurePrey(p);
-  const pr = p.prey;
+  const pr = p.prey || (p.prey = { slots: [], wildcards: 0 });
   const usadas = new Set();
   for (const s of pr.slots) {
     for (const c of (s.creatures || [])) usadas.add(c);
     if (s.selected && s.selected.creature) usadas.add(s.selected.creature);
   }
   const pool = { low: [], mid: [], high: [] };
-  const seen = new Set();
-  for (const huntId in (typeof GAMEDATA !== "undefined" ? GAMEDATA.hunts : {})) {
-    const hu = GAMEDATA.hunts[huntId];
-    for (const slug of (hu.monsters || [])) {
-      if (seen.has(slug) || usadas.has(slug)) continue;
-      seen.add(slug);
-      const mob = (typeof MONSTERDATA !== "undefined") ? MONSTERDATA[slug] : null;
-      if (!mob) continue;
-      pool[preyFaixaDe(mob)].push(slug);
+  for (const slug of preyMonsterPool()) {
+    if (usadas.has(slug)) continue;
+    const mob = (typeof MONSTERDATA !== "undefined") ? MONSTERDATA[slug] : null;
+    if (!mob) continue;
+    pool[preyFaixaDe(mob)].push(slug);
+  }
+  // embaralha cada faixa
+  for (const f of ["low", "mid", "high"]) {
+    for (let i = pool[f].length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[f][i]; pool[f][i] = pool[f][j]; pool[f][j] = tmp;
     }
   }
   const lista = [];
   for (const faixa of ["low", "mid", "high"]) {
-    const arr = pool[faixa];
-    for (let i = 0; i < 3 && arr.length; i++) {
-      const idx = Math.floor(Math.random() * arr.length);
-      lista.push(arr.splice(idx, 1)[0]);
+    for (let i = 0; i < 3 && pool[faixa].length; i++) {
+      lista.push(pool[faixa].pop());
     }
   }
-  // se faltou alguma faixa (poucas criaturas), completa com o pool todo
+  // se faltou alguma faixa (poucas criaturas), completa com o resto
   const resto = pool.low.concat(pool.mid, pool.high);
   while (lista.length < PREY_LIST_SIZE && resto.length) {
-    lista.push(resto.splice(Math.floor(Math.random() * resto.length), 1)[0]);
+    lista.push(resto.pop());
   }
   return lista.slice(0, PREY_LIST_SIZE);
 }

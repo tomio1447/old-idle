@@ -206,6 +206,26 @@ function gearStats(p) {
   return g;
 }
 
+/* Leech FIXO dos itens equipados (TibiaWiki/Siphoning e /Draining):
+ * armas "Siphoning Inferniarch" concedem 10% de Mana Leech permanente e
+ * armas "Draining Inferniarch" concedem 29% de Life Leech permanente,
+ * como atributo próprio do item (sem precisar de imbuement).
+ * Soma o atributo `lifeLeech`/`manaLeech` de todos os equipamentos.
+ */
+function equipmentLeechTotals(p) {
+  const t = { lifeLeech: 0, manaLeech: 0 };
+  if (!p || !p.equip || typeof GAMEDATA === "undefined") return t;
+  for (const s of SLOTS) {
+    const e = p.equip[s];
+    if (!e || !e.item) continue;
+    const it = GAMEDATA.items[e.item];
+    if (!it) continue;
+    t.lifeLeech += it.lifeLeech || 0;
+    t.manaLeech += it.manaLeech || 0;
+  }
+  return t;
+}
+
 /* Skill efetiva (base + bonus do equip) */
 function effSkill(p, which) {
   const g = gearStats(p);

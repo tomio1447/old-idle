@@ -1145,6 +1145,23 @@ function playerAttack(c, p, target) {
       p.mp = Math.min(max.mp, p.mp + mana);
     }
   }
+  // Leech FIXO dos itens equipados (TibiaWiki/Siphoning e /Draining):
+  // as armas Siphoning Inferniarch concedem 10% de Mana Leech permanente e
+  // as Draining Inferniarch concedem 29% de Life Leech permanente (atributo
+  // do Doomforge, sem imbuement). Somado ao leech dos imbuements.
+  if (typeof equipmentLeechTotals === "function") {
+    const eqLeech = equipmentLeechTotals(p);
+    if (eqLeech.lifeLeech) {
+      const max = maxStats(p);
+      const cura = Math.max(1, Math.floor(raw * eqLeech.lifeLeech / 100));
+      p.hp = Math.min(max.hp, p.hp + cura);
+    }
+    if (eqLeech.manaLeech) {
+      const max = maxStats(p);
+      const mana = Math.max(1, Math.floor(raw * eqLeech.manaLeech / 100));
+      p.mp = Math.min(max.mp, p.mp + mana);
+    }
+  }
 
   // Imbuement de dano elemental (Scorch/Venom/Frost/Electrify/Reap):
   // converte X% do golpe FISICO no elemento escolhido. Vale para melee e

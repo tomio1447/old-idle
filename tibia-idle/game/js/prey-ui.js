@@ -1,6 +1,7 @@
-/* prey-ui.js — Interface do Sistema de Prey
+/* prey-ui.js — Interface do Sistema de Prey (layout do client global)
  * Botão ao lado da FORGE (cartinha de exp brilhando) + janela com 3 slots,
- * lista de 9 criaturas, seleção de bônus, reroll e wildcards.
+ * cada um com a grade 3x3 de criaturas (sprite + nome), bônus rolado com
+ * estrelas, timer de 2h, reroll (grátis 20h / pago) e Prey Wildcard.
  */
 "use strict";
 
@@ -50,7 +51,7 @@ function preyStarsHtml(step) {
   const n = Math.min(10, (step || 0) + 1);
   let h = "";
   for (let i = 0; i < 10; i++) {
-    h += `<span style="color:${i < n ? "#ffd65a" : "#4a4a4a"}">★</span>`;
+    h += `<span style="color:${i < n ? "#ffd65a" : "#3a3a3a"}">★</span>`;
   }
   return h;
 }
@@ -74,33 +75,38 @@ function openPreyModal() {
 function renderPreyModal(p) {
   const box = $("#prey-content");
   if (!box) return;
-  ensurePrey(p);
+  ensurePrey(p);   // garante que slots desbloqueados já têm as 9 criaturas
   const agora = Date.now();
   let h = `<div class="prey-wallet">
-      <span>🃏 Wildcards: <b style="color:#ffd65a">${p.prey.wildcards}</b></span>
-      <span class="dim tiny">Timer de 2h por prey · reroll grátis a cada 20h</span>
-    </div>`;
+      <span>🃏 Prey Wildcards: <b style="color:#ffd65a">${p.prey.wildcards}</b></span>
+      <span class="dim tiny">Escolha uma criatura e receba um bônus por 2h · reroll grátis a cada 20h</span>
+    </div>
+    <div class="prey-slots">`;
+
   for (let i = 0; i < PREY_SLOT_COUNT; i++) {
     const slot = p.prey.slots[i];
     if (!slot.unlocked) {
       h += `<div class="prey-slot locked">
-        <div class="prey-slot-head">🐾 Prey Slot ${i + 1} — <span class="dim">bloqueado</span>
+        <div class="prey-slot-head">
+          <b>🐾 Prey Slot ${i + 1}</b>
+          <span class="dim">bloqueado</span>
+          <span style="flex:1"></span>
           <button class="sm" id="prey-buy-${i}">Comprar (${fmtFull(PREY_PERMANENT_SLOT_COST)} gp)</button>
         </div>
+        <div class="prey-locked-msg tiny dim">Desbloqueie para caçar com bônus.</div>
       </div>`;
       continue;
     }
     const sel = slot.selected;
     const ativa = sel && sel.until > agora;
     const b = ativa ? PREY_BONUSES[sel.bonus] : null;
+    const custoReroll = slot.rerollAt > agora;
     h += `<div class="prey-slot ${ativa ? "active" : ""}">
       <div class="prey-slot-head">
         <b>🐾 Prey Slot ${i + 1}</b>
-        <span class="prey-timer" style="color:${b ? b.cor : "#8a8272"}">
-          ${ativa ? `${b.nome} ${preyBonusValue(sel.bonus, sel.step)}% · ${preyTempoRestante(sel)}` : "sem prey ativa"}
-        </span>
-        <button class="sm" id="prey-reroll-${i}" ${slot.creatures && slot.creatures.length ? "" : "disabled"}>
-          Reroll${slot.rerollAt > agora ? ` · ${fmtFull(preyRerollCost(p))} gp` : " (grátis)"}
+        <span style="flex:1"></span>
+        <button class="sm" id="prey-reroll-${i}">
+          ${custoReroll ? `↻ Reroll · ${fmtFull(preyRerollCost(p))} gp` : "↻ Reroll (grátis)"}
         </button>
         <button class="sm" id="prey-wildcard-${i}" ${ativa && p.prey.wildcards > 0 ? "" : "disabled"}
           title="Prey Wildcard: melhora o bônus (+1 passo) e pode trocar o tipo">🃏 Wildcard</button>
@@ -108,26 +114,29 @@ function renderPreyModal(p) {
       ${ativa ? `<div class="prey-selected">
         <div class="prey-creature-card">
           ${typeof mobImg === "function" ? mobImg(sel.creature, 40) : ""}
-          <div><b>${preyMonsterName(sel.creature)}</b>
-          <div class="tiny dim">${Object.keys(GAMEDATA.hunts || {}).find((x) => (GAMEDATA.hunts[x].monsters || []).includes(sel.creature)) ? "disponível nas caçadas" : ""}</div></div>
+          <div>
+            <b>${preyMonsterName(sel.creature)}</b>
+            <div class="tiny" style="color:${b.cor}">${b.nome} +${preyBonusValue(sel.bonus, sel.step)}% · ${preyTempoRestante(sel)}</div>
+          </div>
         </div>
         <div class="prey-bonus-card" style="border-color:${b.cor};color:${b.cor}">
-          <b>${b.nome} +${preyBonusValue(sel.bonus, sel.step)}%</b>
+          <b>${b.nome}</b>
           <div class="prey-stars">${preyStarsHtml(sel.step)}</div>
+          <span class="tiny">+${preyBonusValue(sel.bonus, sel.step)}%</span>
         </div>
-      </div>` : ""}
-      ${slot.creatures && slot.creatures.length ? `<div class="prey-list-title tiny dim">Escolha uma criatura (${slot.creatures.length}):</div>
+      </div>` : `<div class="prey-select-hint tiny dim">Selecione uma criatura:</div>`}
       <div class="prey-grid">` + slot.creatures.map((slug) => {
         const it = sel && sel.creature === slug;
         return `<div class="prey-creature ${it ? "sel" : ""}" data-prey-slot="${i}" data-prey-creature="${slug}">
-          ${typeof mobImg === "function" ? mobImg(slug, 34) : ""}
+          ${typeof mobImg === "function" ? mobImg(slug, 36) : ""}
           <span class="tiny">${preyMonsterName(slug)}</span>
         </div>`;
-      }).join("") + `</div>` : `<div class="dim tiny">Clique em Reroll para gerar a lista.</div>`}
+      }).join("") + `</div>
     </div>`;
   }
+  h += `</div>`;
   h += `<div class="prey-help tiny dim mt4">
-    Bônus: Dano +7~25% · Defesa −12~30% do dano recebido · Exp +13~40% · Loot +13~40% (chance de loot duplo).
+    Bônus: Dano +7~25% · Defesa −12~30% · Exp +13~40% · Loot +13~40% (chance de loot duplo).
     Defense gasta tempo extra ao tomar dano. Wildcards melhoram o bônus.
   </div>`;
   box.innerHTML = h;
