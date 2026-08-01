@@ -301,7 +301,7 @@ function npcSell(p) {
 
 /* ---------------------------------------------------------- ferreiro */
 function npcUpgrade(p) {
-  const dust = (p.lootPouch && p.lootPouch[UPGRADE_MATERIAL]) || 0;
+  const dust = p.dust || 0;
   const list = [];
   for (const slot of UPGRADE_SLOTS) {
     const e = p.equip[slot];
@@ -333,7 +333,7 @@ function npcUpgrade(p) {
           <span class="tiny dim">· ${entry.source === "equip" ? "equipado" : "mochila"}</span></div>
         <div class="tiny dim">${bits.join(" · ") || "sem atributos"}</div>
         <div class="tiny dim">${maxed ? `<span style="color:#9ce84a">nível máximo</span>`
-          : `${fmtFull(cost.gold)} gp · ${cost.dust}x poeira · ${cost.chance}% sucesso`}</div>
+          : `${fmtFull(cost.gold)} gp · ${cost.dust}x Dust · ${cost.chance}% sucesso`}</div>
       </div>
       <button class="sm ${check.ok ? "primary" : ""}" data-upgrade="${key}|${entry.slug}"
         ${check.ok ? "" : "disabled"}>${maxed ? "MAX" : `+${tier + 1}`}</button>
@@ -342,7 +342,7 @@ function npcUpgrade(p) {
 
   return goldLine(p) + `
     <div class="row mb8" style="justify-content:space-between">
-      <span class="small dim">Poeira mística</span>
+      <span class="small dim"><img src="assets/item/dust.gif" style="width:14px;height:14px;vertical-align:-3px;margin-right:4px">Dust (Forja)</span>
       <b style="color:#b060ff">${fmtFull(dust)}</b>
     </div>
     <div class="list mb8" style="max-height:330px">
@@ -351,7 +351,7 @@ function npcUpgrade(p) {
     <div class="tiny dim">
       Cada upgrade soma <b>+6%</b> nos atributos do item. Até <b>+3</b> o sucesso é garantido;
       a partir do <b>+4</b> a forja pode falhar e consumir o material — o item nunca é destruído.
-      A poeira mística vem de monstros influenciados.
+      O Dust vem de monstros influenciados e fiendish.
     </div>`;
 }
 

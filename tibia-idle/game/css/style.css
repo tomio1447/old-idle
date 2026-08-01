@@ -654,6 +654,51 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 }
 .cond-bar .cond.buff { border-color: #9ce84a; color: #9ce84a; }
 
+/* Barra de status estilo Tibia: ícones de condições especiais logo abaixo
+ * dos equipamentos, como o client oficial. Hover mostra nome + descrição. */
+.status-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  margin-top: 8px; padding: 5px 6px;
+  background: rgba(0,0,0,.38);
+  border: 1px solid var(--border-in, rgba(255,255,255,.1));
+  border-radius: 4px;
+  min-height: 26px;
+}
+.status-bar:empty { display: none; }
+.status-bar .sb-label {
+  font-size: 9px; color: #8a8272; text-transform: uppercase;
+  letter-spacing: .06em; margin-right: 2px;
+}
+.status-bar .sb-ico {
+  position: relative;
+  width: 20px; height: 20px; display: inline-flex;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 3px; cursor: help;
+}
+.status-bar .sb-ico img {
+  width: 16px; height: 16px; image-rendering: pixelated;
+  display: block;
+}
+.status-bar .sb-ico.harmful { border-color: #c04848; }
+.status-bar .sb-ico.positive { border-color: #7ec86a; }
+.status-bar .sb-ico.neutral { border-color: #8a8272; }
+.status-bar .sb-ico .sb-tempo {
+  position: absolute; right: -4px; bottom: -4px;
+  font-size: 8px; line-height: 1; padding: 1px 2px;
+  background: #000; color: #fff; border: 1px solid rgba(255,255,255,.25);
+  border-radius: 2px; font-weight: bold;
+}
+/* avatar (Transcendence) sem ícone oficial: selo com glow da vocação */
+.status-bar .sb-avatar {
+  width: 20px; height: 20px; display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 11px; font-weight: bold; border-radius: 50%;
+  border: 1px solid currentColor; cursor: help;
+  background: rgba(0,0,0,.5);
+}
+
 /* linha do grimorio de magias (aba Magias do helper) */
 .spell-row {
   display: flex; align-items: center; gap: 7px;
@@ -1168,7 +1213,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   width: 27px; height: 27px; flex: none; position: relative;
   filter: drop-shadow(1px 1px 0 #000);
 }
-.forge-client-tab-icon.fusion { background: url(../assets/item/mystic-dust.png) center/22px 22px no-repeat; }
+.forge-client-tab-icon.fusion { background: url(../assets/item/dust.gif) center/22px 22px no-repeat; }
 .forge-client-tab-icon.transfer::before {
   content: ""; position: absolute; left: 1px; top: 5px; width: 19px; height: 10px;
   border-left: 5px solid #37bde8; border-bottom: 5px solid #37bde8;
@@ -1413,7 +1458,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .forge-client-wallet.dust::after {
   width: 14px; height: 14px; border: 0;
-  background: url(../assets/item/mystic-dust.png) center/contain no-repeat;
+  background: url(../assets/item/dust.gif) center/contain no-repeat;
 }
 .forge-client-wallet.slivers::after {
   width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;

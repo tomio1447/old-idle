@@ -461,10 +461,22 @@ const QUIVER_DEFS = {};
 })();
 
 if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
-  if (!GAMEDATA.items["mystic-dust"]) {
-    GAMEDATA.items["mystic-dust"] = {
-      n: "poeira mistica", s: null, t: "loot", sell: 0, w: 0.1,
-    };
+  // Recursos da Exaltation Forge (Canary/TibiaWiki): Dust, Sliver e
+  // Exalted Core. O Dust é um recurso preso ao personagem (p.dust, como no
+  // servidor) — o item aqui existe só para nome/ícone nas telas da forja.
+  // Os slivers e exalted cores são itens dropáveis no Tibia; aqui o jogo
+  // os conta como recurso (p.slivers / p.exaltedCores).
+  const forgeResources = {
+    "dust":         { n: "Dust",         w: 0.1, sell: 0 },
+    "sliver":       { n: "Sliver",       w: 0.1, sell: 0 },
+    "exalted-core": { n: "Exalted Core", w: 2.6, sell: 0 },
+  };
+  for (const slug in forgeResources) {
+    if (!GAMEDATA.items[slug]) {
+      GAMEDATA.items[slug] = Object.assign({
+        s: null, t: "resource", sell: 0, w: 0.1,
+      }, forgeResources[slug]);
+    }
   }
   if (!GAMEDATA.items["health-potion"]) {
     GAMEDATA.items["health-potion"] = {

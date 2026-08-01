@@ -101,7 +101,7 @@ function hideTip() { tooltip.el.style.display = "none"; }
  * `slot` e opcional: so quando o item esta EQUIPADO da para saber quais
  * imbuements ele carrega, porque eles moram em p.imbuements["equip:<slot>"].
  */
-function itemTip(slug, extra, slot) {
+function itemTip(slug, extra, slot, instId) {
   const it = GAMEDATA.items[slug];
   if (!it) return slug;
   const p = G.p;
@@ -173,9 +173,35 @@ function itemTip(slug, extra, slot) {
     h += imbSlotsTip(p, slug, slot, it.imbSlots);
   }
 
-  if (it.cls) h += `<div class="tt-req">Classificação ${it.cls}</div>`;
-  var ftier = (G.p && G.p.forge && G.p.forge[slug]) || 0;
-  if (ftier) h += `<div class="tt-req" style="color:#ffe680">Forja: Tier ${ftier}</div>`;
+  if (it.cls) h += `<div class="tt-req">Classificação ${it.cls}${
+    typeof FORGE_MAX_TIER !== "undefined" && FORGE_MAX_TIER[it.cls]
+      ? ` · máx T${FORGE_MAX_TIER[it.cls]}` : ""}</div>`;
+
+  // ---- Forja: tier do item (instância primeiro, legado p.forge depois) e o
+  // bônus real que ele está dando ao personagem, ex.: "Transcendence: +0,28%"
+  let ftier = 0;
+  let fInst = null;
+  const insts = (p && p.itemInstances) || [];
+  if (instId) {
+    fInst = insts.find((i) => i.id === instId) || null;
+  } else if (slot && p && p.equip && p.equip[slot] && p.equip[slot].instId) {
+    fInst = insts.find((i) => i.id === p.equip[slot].instId) || null;
+  }
+  if (fInst && typeof itemInstanceTier === "function") {
+    ftier = itemInstanceTier(fInst) || 0;
+  } else if (p && p.forge && p.forge[slug]) {
+    ftier = p.forge[slug] || 0;   // saves antigos / itens empilhados
+  }
+  if (ftier) {
+    h += `<div class="tt-req" style="color:#ffe680">Forja: Tier ${ftier}</div>`;
+    if (it.s && typeof forgeEffectForSlot === "function") {
+      const ef = forgeEffectForSlot(it.s, ftier, p);
+      if (ef && ef.chance > 0) {
+        h += `<div class="tt-req" style="color:#d4af37">${ef.name}: +${
+          ef.chance.toFixed(2).replace(".", ",")}%</div>`;
+      }
+    }
+  }
   if (it.lvl) h += `<div class="tt-req">Requer nível ${it.lvl}</div>`;
   if (it.vocs) h += `<div class="tt-req">Vocação: ${it.vocs.join(", ")}</div>`;
   if (it.w) h += `<div class="tt-req">Peso ${it.w.toFixed(2)} oz</div>`;
@@ -434,7 +460,8 @@ function renderEquip(p) {
         slot === "ammo" ? `Munição no quiver · ${fmtFull(ammoPrice(slug))} gp/tiro` :
         "Clique para desequipar";
       // passa o slot: e por ele que imbOf() encontra os imbuements do item
-      showTip(itemTip(slug, extra, slot));
+      // (e o instId resolve o tier da instância para o bônus da forja)
+      showTip(itemTip(slug, extra, slot, p.equip[slot] && p.equip[slot].instId));
     });
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
@@ -455,6 +482,138 @@ function renderEquip(p) {
       hideTip();
       renderAll();
     });
+  });
+}
+
+/* ------------------------------------------------------------ status bar
+ * Barra de status estilo Tibia: ícones de condições especiais logo abaixo
+ * dos equipamentos (como o client oficial, que mostra os ícones de
+ * condição sob o inventário). Passar o mouse mostra o tooltip com nome,
+ * descrição e tempo restante.
+ *
+ * Fonte dos ícones: TibiaWiki "Special Conditions" + "Icons"
+ * (assets/ui/conditions/*.png, registrados em icondata.js).
+ */
+function renderStatusBar(p) {
+  const box = $("#status-bar");
+  if (!box) return;
+  const agora = Date.now();
+  const itens = [];
+
+  // 1) conditions de dano no tempo (poison, fire, energy, bleed, cursed, freezing)
+  if (p.conditions && typeof conditionList === "function") {
+    for (const t of conditionList(p)) {
+      const d = (typeof WIKI_CONDITIONS !== "undefined") ? WIKI_CONDITIONS[t] : null;
+      const c = p.conditions[t];
+      if (!d) continue;
+      itens.push({
+        icon: d.icon, nome: d.nome, desc: d.desc, tipo: d.tipo || "harmful",
+        tempo: c && c.turns ? c.turns + " turno" + (c.turns > 1 ? "s" : "") : "",
+      });
+    }
+  }
+
+  // 2) magic shield (energia do utamo vita / Energy Ring)
+  if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, agora)) {
+    const src = typeof magicShieldSource === "function" ? magicShieldSource(p, agora) : "Magic Shield";
+    const meta = (typeof WIKI_CONDITION_ICONS !== "undefined")
+      ? WIKI_CONDITION_ICONS["cond-magic-shield"] : null;
+    itens.push({
+      icon: "cond-magic-shield", nome: "Magic Shield", tipo: "neutral",
+      desc: meta ? meta.desc : "O personagem perde mana em vez de vida quando é ferido.",
+      tempo: src,
+    });
+  }
+
+  // 3) haste ativa
+  if (typeof hasteAtiva === "function") {
+    const hs = hasteAtiva(p, agora);
+    if (hs) {
+      const meta = (typeof WIKI_CONDITION_ICONS !== "undefined")
+        ? WIKI_CONDITION_ICONS["cond-haste"] : null;
+      itens.push({
+        icon: "cond-haste", nome: "Haste — " + hs.nome, tipo: "positive",
+        desc: meta ? meta.desc : "Faz o personagem se mover mais rápido.",
+        tempo: Math.max(0, Math.ceil((hs.ate - agora) / 1000)) + "s",
+      });
+    }
+  }
+
+  // 4) buffs gerais (virtudes do Monk, Divine Dazzle...)
+  if (typeof buffTotals === "function") {
+    const bt = buffTotals(p, agora);
+    for (const b of bt.lista) {
+      const def = (typeof BUFFS !== "undefined" && BUFFS[b.chave]) ? BUFFS[b.chave] : null;
+      itens.push({
+        icon: "cond-strengthened", nome: b.nome, tipo: "positive",
+        desc: (def && def.desc) ? def.desc : "Bônus de skill ativo por um período.",
+        tempo: Math.max(0, Math.ceil((b.ate - agora) / 1000)) + "s",
+      });
+    }
+  }
+
+  // 5) stances ativas (badge de postura com o ícone oficial quando houver)
+  if (p.stances && typeof STANCES !== "undefined") {
+    for (const id in p.stances) {
+      const st = STANCES[id];
+      if (!st) continue;
+      let img = null;
+      if (st.iconWiki && typeof WIKI_ICONS !== "undefined" && WIKI_ICONS[st.iconWiki]) {
+        img = WIKI_ICONS[st.iconWiki].path;
+      } else if (typeof SPELLS !== "undefined" && SPELLS[id] && SPELLS[id].icon != null) {
+        img = "assets/spell/otc/" + SPELLS[id].icon + ".png";
+      }
+      itens.push({
+        img: img, nome: st.nome, desc: st.desc, tipo: "neutral",
+        tempo: "postura ativa",
+      });
+    }
+  }
+
+  // 6) Avatar Stage 3 (Transcendence ativo)
+  if (typeof avatarActive === "function" && avatarActive(p, agora)) {
+    const av = p._avatar || {};
+    const resta = Math.max(0, Math.ceil((av.started + av.duration - agora) / 1000));
+    itens.push({
+      avatar: true, nome: "Avatar Stage 3", tipo: "positive",
+      desc: "Transcendence: -15% dano recebido e todos os ataques críticos com +15% de dano extra.",
+      tempo: resta + "s",
+    });
+  }
+
+  if (!itens.length) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+
+  let h = '<span class="sb-label">Status</span>';
+  for (const it of itens) {
+    if (it.avatar) {
+      const cor = { knight: "#ff7a3a", paladin: "#ffe680", sorcerer: "#c78cff",
+                    druid: "#7ae87a", monk: "#66c7ff" }[p.voc] || "#c78cff";
+      h += `<span class="sb-avatar" style="color:${cor}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">◈</span>`;
+      continue;
+    }
+    const img = it.img
+      ? `<img src="${it.img}" alt="">`
+      : `<img src="assets/ui/conditions/${it.icon}.png" alt="">`;
+    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}${it.tempo ? `<span class="sb-tempo">${it.tempo}</span>` : ""}</span>`;
+  }
+  box.innerHTML = h;
+  box.style.display = "flex";
+
+  // tooltip custom (mesmo sistema dos itens): nome + descrição + tempo
+  $$("#status-bar .sb-ico, #status-bar .sb-avatar").forEach((el) => {
+    el.addEventListener("mouseenter", () => {
+      const nome = el.dataset.nome || "";
+      const desc = el.dataset.desc || "";
+      const tempo = el.dataset.tempo || "";
+      showTip(`<div class="tt-name">${nome}</div>` +
+        (desc ? `<div class="tiny dim mt4" style="max-width:230px">${desc}</div>` : "") +
+        (tempo ? `<div class="tiny mt4" style="color:#ffe680">${tempo}</div>` : ""));
+    });
+    el.addEventListener("mouseleave", hideTip);
   });
 }
 
@@ -582,7 +741,7 @@ function renderInventory(p) {
       const extra = instId
         ? `${typeof forgeTierTextForInstance === "function" ? (forgeTierTextForInstance(instId) || "sem tier") : "item"} · Clique para opções`
         : `${p.bag[slug]}x · Clique para opções`;
-      showTip(itemTip(slug, extra));
+      showTip(itemTip(slug, extra, null, instId));
     });
     el.addEventListener("mouseleave", hideTip);
     const openMenu = (e) => {

@@ -148,6 +148,17 @@ function normalizePlayer(p) {
     refillArrow: "",
     refillBolt: "",
   }, p.config || {});
+  // Migracao: o "mystic-dust" verde (poeira mistica criada antes do Canary)
+  // foi removido. Saves antigos convertem o que tinham na lootPouch/mochila
+  // para o Dust da Exaltation Forge (p.dust), respeitando o dustLimit.
+  if (p.lootPouch && p.lootPouch["mystic-dust"]) {
+    p.dust = Math.min(p.dustLimit || 100, (p.dust || 0) + p.lootPouch["mystic-dust"]);
+    delete p.lootPouch["mystic-dust"];
+  }
+  if (p.bag && p.bag["mystic-dust"]) {
+    p.dust = Math.min(p.dustLimit || 100, (p.dust || 0) + p.bag["mystic-dust"]);
+    delete p.bag["mystic-dust"];
+  }
   p.config.autoRestock = false;
   p.config.healSpellAt = Math.max(1, Math.min(99, parseInt(p.config.healSpellAt === undefined ? p.config.healAt : p.config.healSpellAt, 10) || 90));
   p.config.healItemAt = Math.max(1, Math.min(99, parseInt(p.config.healItemAt === undefined ? p.config.healAt : p.config.healItemAt, 10) || 60));
@@ -1282,6 +1293,7 @@ function renderAll() {
   renderStats(p);
   renderSkills(p);
   renderEquip(p);
+  if (typeof renderStatusBar === "function") renderStatusBar(p);
   renderHunts(p);
   renderInventory(p);
   renderLootPouch(p);

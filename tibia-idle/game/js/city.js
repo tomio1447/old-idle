@@ -18,7 +18,7 @@ const NPCS = {
   },
   blacksmith: {
     name: "Grimwald", role: "Ferreiro — Upgrades", sprite: "blacksmith",
-    greet: "Traga seu equipamento e poeira mística que eu forjo algo melhor.",
+    greet: "Traga seu equipamento e Dust da Forja que eu forjo algo melhor.",
     type: "upgrade",
   },
   banker: {
@@ -193,9 +193,9 @@ function runManaTrainTick(p) {
 
 /* ------------------------------------------------------------ ferreiro: upgrades
  * Upgrade por tiers: cada nivel soma atributos ao item e custa gold +
- * poeira mistica. A partir do tier 4 pode falhar, consumindo o material
- * mas nunca destruindo o item. */
-const UPGRADE_MATERIAL = "mystic-dust";
+ * Dust da Exaltation Forge (o recurso p.dust; a poeira mística verde
+ * criada antes do Canary foi removida). A partir do tier 4 pode falhar,
+ * consumindo o material mas nunca destruindo o item. */
 const UPGRADE_MAX_TIER = 10;
 const UPGRADE_SLOTS = ["weapon", "armor", "helmet", "legs", "shield", "boots"];
 
@@ -217,7 +217,7 @@ function upgradeCost(p, slug, tier) {
   const next = (tier || 0) + 1;
   return {
     gold: Math.floor(base * Math.pow(1.65, next - 1)),
-    dust: next,                                   // 1 poeira no +1, 2 no +2...
+    dust: next,                                   // 1 Dust no +1, 2 no +2...
     chance: next <= 3 ? 100 : Math.max(35, 100 - (next - 3) * 11),
   };
 }
@@ -248,9 +248,9 @@ function canUpgrade(p, key, slug) {
   const cost = upgradeCost(p, slug, tier);
   if (p.gold < cost.gold)
     return { ok: false, msg: `Faltam ${fmtFull(cost.gold - p.gold)} gp.`, cost: cost };
-  const dust = (p.lootPouch && p.lootPouch[UPGRADE_MATERIAL]) || 0;
+  const dust = p.dust || 0;
   if (dust < cost.dust)
-    return { ok: false, msg: `Precisa de ${cost.dust}x poeira mística (tem ${dust}).`, cost: cost };
+    return { ok: false, msg: `Precisa de ${cost.dust}x Dust (Forja) (tem ${dust}).`, cost: cost };
   return { ok: true, msg: "", cost: cost };
 }
 
@@ -259,7 +259,7 @@ function applyUpgrade(p, key, slug) {
   if (!check.ok) return check;
   const cost = check.cost;
   p.gold -= cost.gold;
-  removeLootPouch(p, UPGRADE_MATERIAL, cost.dust);
+  p.dust = Math.max(0, (p.dust || 0) - cost.dust);
   p.upgrades = p.upgrades || {};
 
   const roll = Math.random() * 100;

@@ -111,6 +111,71 @@ window.WIKI_ICONS = {
   },
 };
 
+/* ------------------------------------------------------------------ *
+ * Ícones de Special Conditions (TibiaWiki) — barra de status do jogo.
+ * Fonte: https://tibia.fandom.com/wiki/Special_Conditions
+ * Arquivos em assets/ui/conditions/<slug>.png (convertidos para PNG RGBA).
+ *
+ * WIKI_CONDITIONS mapeia o TIPO de condição usado pelo jogo
+ * (p.conditions / combat.js CONDITIONS) para o ícone oficial, com nome,
+ * tipo (harmful/positive/neutral) e descrição em pt-BR para o tooltip.
+ */
+window.WIKI_CONDITIONS = {
+  poison: {
+    icon: "cond-poisoned", nome: "Envenenado", tipo: "harmful",
+    desc: "Causa dano de terra ao longo do tempo. Pode ser curado com exana pox (Antidote) ou passa sozinho.",
+  },
+  fire: {
+    icon: "cond-burning", nome: "Queimando", tipo: "harmful",
+    desc: "Causa dano de fogo ao longo do tempo. Pode ser curado com exana flam (Cure Burning) ou passa sozinho.",
+  },
+  energy: {
+    icon: "cond-electrified", nome: "Eletrificado", tipo: "harmful",
+    desc: "Causa dano de energia ao longo do tempo. Pode ser curado com exana vis (Cure Electrification) ou passa sozinho.",
+  },
+  bleed: {
+    icon: "cond-bleed", nome: "Sangrando", tipo: "harmful",
+    desc: "Causa dano físico ao longo do tempo. Pode ser curado com exana kor (Cure Bleeding) ou passa sozinho.",
+  },
+  cursed: {
+    icon: "cond-cursed", nome: "Amaldiçoado", tipo: "harmful",
+    desc: "Causa dano de morte ao longo do tempo. Pode ser curado com exana mort (Cure Curse) ou passa sozinho.",
+  },
+  freezing: {
+    icon: "cond-freezing", nome: "Congelado", tipo: "harmful",
+    desc: "Causa dano de gelo ao longo do tempo. Não tem cura própria: passa sozinho com o tempo.",
+  },
+};
+
+/* Registro completo dos ícones de condição disponíveis (inclui os que o
+ * jogo ainda não aplica, mas ficam prontos para uso futuro). */
+window.WIKI_CONDITION_ICONS = {
+  "cond-agony": { nome: "Agony", tipo: "harmful", desc: "Causa dano de Agony ao longo do tempo. Não pode ser curado nem protegido — só esperar acabar." },
+  "cond-bleed": { nome: "Bleeding", tipo: "harmful", desc: "Causa dano físico ao longo do tempo." },
+  "cond-burning": { nome: "Burning", tipo: "harmful", desc: "Causa dano de fogo ao longo do tempo." },
+  "cond-cursed": { nome: "Cursed", tipo: "harmful", desc: "Causa dano de morte ao longo do tempo." },
+  "cond-dazzled": { nome: "Dazzled", tipo: "harmful", desc: "Causa dano sagrado ao longo do tempo." },
+  "cond-drowning": { nome: "Drowning", tipo: "harmful", desc: "Causa dano de afogamento ao longo do tempo." },
+  "cond-drunk": { nome: "Drunk", tipo: "negative", desc: "O personagem às vezes anda numa direção diferente da pretendida. Passa sozinho." },
+  "cond-electrified": { nome: "Electrified", tipo: "harmful", desc: "Causa dano de energia ao longo do tempo." },
+  "cond-feared": { nome: "Feared", tipo: "negative", desc: "O personagem foge da criatura que aplicou o efeito e não pode usar magias nem itens." },
+  "cond-freezing": { nome: "Freezing", tipo: "harmful", desc: "Causa dano de gelo ao longo do tempo." },
+  "cond-haste": { nome: "Haste", tipo: "positive", desc: "Faz o personagem se mover mais rápido enquanto dura." },
+  "cond-hexed": { nome: "Hexed", tipo: "negative", desc: "Enfraquece o personagem." },
+  "cond-hungry": { nome: "Hungry", tipo: "neutral", desc: "O personagem ainda pode comer alguma comida." },
+  "cond-logout-block": { nome: "Logout Block", tipo: "neutral", desc: "Bloqueio de logout causado por lutar: impede de deslogar até passar." },
+  "cond-magic-shield": { nome: "Magic Shield", tipo: "neutral", desc: "O personagem perde mana em vez de vida quando é ferido." },
+  "cond-poisoned": { nome: "Poisoned", tipo: "harmful", desc: "Causa dano de terra ao longo do tempo." },
+  "cond-powerless": { nome: "Powerless", tipo: "negative", desc: "Impede de conjurar magias de ataque e usar runas ofensivas." },
+  "cond-protection-zone-block": { nome: "Protection Zone Block", tipo: "neutral", desc: "Atacou outro jogador: não pode deslogar nem entrar em zona de proteção." },
+  "cond-rooted": { nome: "Rooted", tipo: "negative", desc: "Impede de se mover por 3 segundos." },
+  "cond-slowed": { nome: "Slowed", tipo: "negative", desc: "O personagem se move muito mais devagar." },
+  "cond-strengthened": { nome: "Strengthened", tipo: "positive", desc: "Uma ou várias skills do personagem foram aumentadas por um período." },
+  "cond-within-protection-zone": { nome: "Within Protection Zone", tipo: "positive", desc: "Dentro de uma zona de proteção: não pode atacar nem ser atacado." },
+  "cond-within-active-resting-area": { nome: "Within Active Resting Area", tipo: "positive", desc: "Em área de descanso com bônus ativo." },
+  "cond-within-resting-area": { nome: "Within Resting Area", tipo: "neutral", desc: "Em área de descanso sem bônus ativo." },
+};
+
 /* Cache de <img> por slug — evita recriar Image a cada frame. */
 const WIKI_ICON_CACHE = {};
 

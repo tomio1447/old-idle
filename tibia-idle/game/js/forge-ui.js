@@ -41,9 +41,9 @@ function forgeResourceSummaryHtml(p) {
   ensureForge(p);
   var cap = p.dustLimit || 100;
   return '<div class="forge-client-res-inline">'
-    + '<span><b>Dust</b> ' + fmtFull(p.dust || 0) + '/' + fmtFull(cap) + '</span>'
-    + '<span><b>Slivers</b> ' + fmtFull(p.slivers || 0) + '</span>'
-    + '<span><b>Exalted Cores</b> ' + fmtFull(p.exaltedCores || 0) + '</span>'
+    + '<span>' + forgeResourceImg('dust', 14) + '<b>Dust</b> ' + fmtFull(p.dust || 0) + '/' + fmtFull(cap) + '</span>'
+    + '<span>' + forgeResourceImg('sliver', 14) + '<b>Slivers</b> ' + fmtFull(p.slivers || 0) + '</span>'
+    + '<span>' + forgeResourceImg('exalted-core', 14) + '<b>Exalted Cores</b> ' + fmtFull(p.exaltedCores || 0) + '</span>'
     + '</div>';
 }
 
@@ -70,6 +70,25 @@ function forgeClientItemTile(slug, count, cls, attrs, size) {
   var badge = count ? '<span class="forge-client-count">' + count + '</span>' : '';
   return '<div class="forge-client-slot ' + (cls || '') + '" ' + (attrs || '') + '>'
     + itemImg(slug, size || 34) + badge + '</div>';
+}
+
+/* Tile de RECURSO da forja com o sprite OFICIAL animado da TibiaWiki
+ * (Dust.gif / Sliver.gif / Exalted_Core.gif) — a versão estática PNG do
+ * mystic-dust foi removida com a chegada do Canary. */
+function forgeClientResourceTile(slug, count, cls, size) {
+  var sz = size || 34;
+  var badge = count ? '<span class="forge-client-count">' + count + '</span>' : '';
+  return '<div class="forge-client-slot ' + (cls || '') + '" title="' +
+    ((GAMEDATA.items[slug] && GAMEDATA.items[slug].n) || slug) + '">'
+    + '<img class="item-sprite" src="assets/item/' + slug + '.gif" alt="" '
+    + 'style="width:' + sz + 'px;height:' + sz + 'px">' + badge + '</div>';
+}
+
+/* <img> pequeno do recurso para as linhas de conversão/carteira. */
+function forgeResourceImg(slug, size) {
+  var sz = size || 14;
+  return '<img class="item-sprite" src="assets/item/' + slug + '.gif" alt="" '
+    + 'style="width:' + sz + 'px;height:' + sz + 'px;vertical-align:-3px;margin-right:4px">';
 }
 
 function forgeClientItemListHtml(p) {
@@ -127,13 +146,13 @@ function renderForgeFusionPanel(p, ref) {
     + '<div class="forge-client-further">'
     +   '<div class="forge-client-need-icons">'
     +     forgeClientItemTile(info ? info.slug : null, info ? (sameTier + '/2') : '', sameTier >= 2 ? 'ok' : 'bad', '', 38)
-    +     forgeClientItemTile('mystic-dust', info ? ((p.dust || 0) + '/' + FORGE_FUSION.dustCost) : '', dustOk ? 'ok' : 'bad', '', 34)
+    +     forgeClientResourceTile('dust', info ? ((p.dust || 0) + '/' + FORGE_FUSION.dustCost) : '', dustOk ? 'ok' : 'bad', 34)
     +   '</div>'
     +   '<div class="forge-client-rates">'
     +     '<div class="forge-client-rate-row"><span>Success Rate:</span><b class="red">' + success + '%</b></div>'
-    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Improve to 65% <span>1</span></button>'
+    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Improve to 65% ' + forgeResourceImg('exalted-core', 12) + '<span>1</span></button>'
     +     '<div class="forge-client-rate-row"><span>Tier Loss:</span><b class="red">' + tierLoss + '%</b></div>'
-    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Reduce to 50% <span>1</span></button>'
+    +     '<button class="forge-client-mini-btn' + (useCore ? ' active' : '') + '" data-forge-core="1">Reduce to 50% ' + forgeResourceImg('exalted-core', 12) + '<span>1</span></button>'
     +   '</div>'
     +   '<div class="forge-client-arrows one"><span></span></div>'
     +   '<div class="forge-client-result-box">'
@@ -181,8 +200,8 @@ function renderForgeTransferPanel(p, donorRef) {
     + '<div class="forge-client-section-title">Further Items Needed For Transfer</div>'
     + '<div class="forge-client-further transfer">'
     +   '<div class="forge-client-need-icons">'
-    +     forgeClientItemTile('mystic-dust', (p.dust || 0) + '/' + FORGE_TRANSFER.dustCost, (p.dust || 0) >= FORGE_TRANSFER.dustCost ? 'ok' : 'bad', '', 34)
-    +     '<div class="forge-client-core-icon"><span>1</span></div>'
+    +     forgeClientResourceTile('dust', (p.dust || 0) + '/' + FORGE_TRANSFER.dustCost, (p.dust || 0) >= FORGE_TRANSFER.dustCost ? 'ok' : 'bad', 34)
+    +     forgeClientResourceTile('exalted-core', '1', (p.exaltedCores || 0) >= 1 ? 'ok' : 'bad', 34)
     +   '</div>'
     +   '<div class="forge-client-rates wide">'
     +     '<div class="forge-client-rate-row"><span>Donor:</span><b>' + (donor ? donor.name + ' T' + donor.tier : '-') + '</b></div>'
@@ -212,9 +231,9 @@ function renderForgeConversionPanel(p) {
     +   '<div class="forge-client-conv-row"><div><b>Increase Dust Limit</b><span>Spend Dust to raise the cap by 1.</span></div>'
     +     '<button class="forge-client-action" id="forge-inc-cap"' + (canCap ? '' : ' disabled') + '>' + (capCost ? capCost + ' Dust' : 'Maximum') + '</button></div>'
     +   '<div class="forge-client-conv-row"><div><b>Dust to Slivers</b><span>Convert forge Dust into Slivers.</span></div>'
-    +     '<button class="forge-client-action" id="forge-conv-dust"' + (canDust ? '' : ' disabled') + '>' + FORGE_CONVERGENCE.dustToSlivers.dust + ' → ' + FORGE_CONVERGENCE.dustToSlivers.slivers + '</button></div>'
+    +     '<button class="forge-client-action" id="forge-conv-dust"' + (canDust ? '' : ' disabled') + '>' + forgeResourceImg('dust', 14) + FORGE_CONVERGENCE.dustToSlivers.dust + ' → ' + forgeResourceImg('sliver', 14) + FORGE_CONVERGENCE.dustToSlivers.slivers + '</button></div>'
     +   '<div class="forge-client-conv-row"><div><b>Slivers to Exalted Core</b><span>Create one Exalted Core.</span></div>'
-    +     '<button class="forge-client-action" id="forge-conv-core"' + (canCore ? '' : ' disabled') + '>' + FORGE_CONVERGENCE.sliversToCore.slivers + ' → 1</button></div>'
+    +     '<button class="forge-client-action" id="forge-conv-core"' + (canCore ? '' : ' disabled') + '>' + forgeResourceImg('sliver', 14) + FORGE_CONVERGENCE.sliversToCore.slivers + ' → ' + forgeResourceImg('exalted-core', 14) + '1</button></div>'
     + '</div>'
     + '<div class="forge-client-desc"><p>Influenced and Fiendish creatures generate Dust automatically. Fiendish creatures can also grant Slivers.</p></div>';
 }
