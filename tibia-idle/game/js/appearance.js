@@ -28,6 +28,30 @@ const APP_MOUNT = {};
   for (const m of APPEARANCE_DATA.mounts) APP_MOUNT[m.id] = m;
 })();
 
+
+/* ------------------------------------------------------------ avatars
+ * Transcendence ativa o Avatar Stage 3. O outfit normal do jogador nao e
+ * alterado no save: durante a janela ativa, o renderer substitui a aparencia
+ * pelo avatar oficial da vocacao e, quando avatarActive() expira, volta a
+ * desenhar o outfit normal automaticamente. */
+function activeAvatarAppearance(p) {
+  if (!p) return null;
+  const byVoc = (typeof AVATAR_OUTFIT_BY_VOC !== "undefined")
+    ? AVATAR_OUTFIT_BY_VOC : null;
+  if (!byVoc) return null;
+  let ativo = !!(p._avatar && p._avatar.active);
+  if (ativo && typeof avatarActive === "function") ativo = avatarActive(p);
+  else if (ativo && p._avatar.started && p._avatar.duration) {
+    if (Date.now() - p._avatar.started >= p._avatar.duration) {
+      p._avatar.active = false;
+      ativo = false;
+    }
+  }
+  if (!ativo) return null;
+  const id = byVoc[p.voc] || null;
+  return id ? (APP_OUTFIT[id] || null) : null;
+}
+
 /* ------------------------------------------------------------ economia
  * Precos em gold. A ideia e que o visual seja uma recompensa de progressao:
  * a outfit basica custa pouco, cada addon custa mais que a outfit inteira e
@@ -252,6 +276,12 @@ const AppearanceRenderer = {
       if (!base) continue;                      // camada inexistente: ignora
       if (!base.complete) return null;
       if (!base.naturalWidth) continue;         // 404: segue sem ela
+      if (o.sexo === "avatar") {
+        // Avatares oficiais ja vem prontos do client 15.x e nao usam mascara
+        // de cor/addon; evitar pedir arquivo .mask.png inexistente.
+        imgs.push([base, null]);
+        continue;
+      }
       const mask = Sprites.get(
         `assets/appearance/outfit/${id}${suf}.mask.png`);
       if (mask && !mask.complete) return null;
@@ -295,6 +325,12 @@ const AppearanceRenderer = {
   /* Sprite para o jogo: monta o personagem (com addons) sobre a montaria,
    * na direcao e no frame de caminhada pedidos. */
   forPlayer(p, dir, frame) {
+    const avatar = activeAvatarAppearance(p);
+    if (avatar) {
+      // Avatar oficial nao usa as cores/addons/montaria do jogador.
+      return this.outfit(avatar.id, 0, [0, 0, 0, 0], dir, frame);
+    }
+
     const o = currentAppearance(p);
     if (!o) return null;
     const cores = (p.outfit && p.outfit.colors) ||

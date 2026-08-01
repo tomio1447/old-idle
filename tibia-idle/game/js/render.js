@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "13";
+const ASSET_VERSION = "14";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1049,23 +1049,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.filter = "brightness(2.2) saturate(0.4)";
       this.playerFlash -= dt;
     }
-    // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
-    const avatarActiveNow = (typeof window !== "undefined" && window.avatarActive && player) ? window.avatarActive(player, Date.now()) : false;
-    if (avatarActiveNow) {
-      const AVATAR_GLOW = {
-        knight: "#ff7a3a", paladin: "#ffe680",
-        sorcerer: "#c78cff", druid: "#7ae87a",
-        monk: "#66c7ff",
-      };
-      ctx.save();
-      ctx.shadowColor = AVATAR_GLOW[player.voc] || "#c78cff";
-      ctx.shadowBlur = 22;
-      ctx.globalAlpha = 0.92;
-    }
     const drawX = px * W - w / 2 + atkPush;
     const drawY = py * H - h / 2 + bob;
     ctx.drawImage(pimg, drawX, drawY, w, h);
-    if (avatarActiveNow) ctx.restore();
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px * W, drawY - 14, dt);
@@ -1241,7 +1227,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
       { label: "FATAL", n: forgeCounts.fatal || 0, color: "#ff4a4a" },
       { label: "MOMENTUM", n: forgeCounts.momentum || 0, color: "#ffe680" },
       { label: "RUSE", n: forgeCounts.ruse || 0, color: "#66c7ff" },
-      { label: "AVATAR", n: forgeCounts.transcendence || 0, color: "#c78cff" },
     ];
     let y = 64;
     for (const ln of lines) {
