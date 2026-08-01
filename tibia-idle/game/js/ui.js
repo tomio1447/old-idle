@@ -119,6 +119,10 @@ function itemTip(slug, extra, slot, instId) {
   }
   if (it.s === "ammo") st.push((it.ammoKind === "bolt" ? "Bolt (besta)" : "Flecha (arco)") + " · " + fmtFull(ammoPrice(slug)) + " gp/tiro");
   if (it.cap) st.push("Capacidade quiver " + it.cap);
+  // Perfect Shot (TibiaWiki): dano extra fixo a uma distância EXATA
+  if (it.shotDmg) {
+    st.push(`<span style="color:#ffe680">Perfect shot: +${it.shotDmg} de dano a ${it.shotRange} SQM</span>`);
+  }
   if (it.def) st.push("Defesa " + it.def + (it.extraDef ? ` (+${it.extraDef})` : ""));
   if (it.arm) st.push("Armadura " + it.arm);
   if (it.mdmg) st.push("Dano mágico " + (it.dmgMin ? `${it.dmgMin}–${it.dmgMax}` : it.mdmg));

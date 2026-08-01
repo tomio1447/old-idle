@@ -778,6 +778,66 @@ function monsterMissile(mob) {
  * elemental pierce contra o alvo". Implementado como -8 pontos na
  * resistencia do monstro enquanto a marca durar (so dano elemental —
  * fisico nao e elemento). */
+/* ====================================================== Mitigation
+ * TibiaWiki/Mitigation: propriedade defensiva que reduz TODOS os tipos de
+ * dano comuns (Physical, Earth, Ice, Fire, Energy, Holy e Death) por uma
+ * porcentagem. Agony (true damage) e DOT de condições NÃO são reduzidos.
+ * Os valores das criaturas vêm do Bestiary (campo `mitigation` do Canary,
+ * em %: ~0.01 a ~5.4 no jogo; ver List_of_Creatures_by_Mitigation_Value).
+ */
+
+/* % de mitigation da criatura (0 se não tiver). */
+function monsterMitigationPct(mob) {
+  const mit = mob && mob.def ? mob.def.mitigation : 0;
+  return (mit && mit > 0) ? mit : 0;
+}
+
+/* Aplica a mitigation da criatura a um golpe (todos os tipos comuns;
+ * agony e dano no tempo não passam por aqui). */
+function applyMonsterMitigation(mob, element, dano) {
+  const mit = monsterMitigationPct(mob);
+  if (!mit || element === "agony") return dano;
+  return Math.max(1, Math.floor(dano * (1 - mit / 100)));
+}
+
+/* Mitigation do JOGADOR (TibiaWiki/Mitigation): calculada de
+ *   - a skill de Shielding;
+ *   - a Defense do escudo/spellbook (ou da ARMA quando two-handed ou
+ *     one-handed sem escudo — com penalidade para two-handed);
+ * Fórmula aproximada (o client não divulga a exata): shielding*0.04 +
+ * def*0.2, teto 25%. Reduz todos os tipos comuns no dano recebido. */
+function playerMitigationPct(p) {
+  const e = p.equip || {};
+  const shield = e.shield ? GAMEDATA.items[e.shield.item] : null;
+  const weapon = e.weapon ? GAMEDATA.items[e.weapon.item] : null;
+  const temEscudo = !!(shield && (shield.t === "shield" || shield.t === "spellbook"));
+  const duasMaos = !!(weapon && weapon.th);
+  let defEquip = 0;
+  if (temEscudo) {
+    defEquip = shield.def || 0;
+  } else if (weapon) {
+    // arma cobre a defesa quando não há escudo — two-handed vale menos
+    defEquip = (weapon.def || 0) * (duasMaos ? 0.6 : 1);
+  }
+  // shielding: usa playerDefense quando o personagem está completo (tem
+  // skills); senão cai no valor cru da skill para players parciais.
+  let sh = 0;
+  if (p && p.skills && typeof effSkill === "function") {
+    sh = effSkill(p, "shield") || 0;
+  } else if (p && p.skills) {
+    sh = p.skills.shield || 0;
+  }
+  return Math.min(25, Math.max(0, sh * 0.04 + defEquip * 0.2));
+}
+
+/* Aplica a mitigation do jogador ao dano recebido (tipos comuns apenas). */
+function applyPlayerMitigation(p, element, dano) {
+  if (element === "agony") return dano;
+  const mit = (typeof playerMitigationPct === "function") ? playerMitigationPct(p) : 0;
+  if (mit <= 0) return dano;
+  return Math.max(1, Math.floor(dano * (1 - mit / 100)));
+}
+
 function applyResist(mob, element, dano) {
   // Agony é "true damage": não pode ser mitigado nem reduzido por
   // resistência (TibiaWiki: "Can not be mitigated or reduced").
@@ -835,15 +895,18 @@ function playerAttack(c, p, target) {
 
   const ammo = isDist ? activeAmmoItem(p) : null;
 
-  // Perfect shot do quiver: quando o alvo esta EXATAMENTE na distancia que o
-  // quiver configura, o tiro ganha dano fixo e nao pode errar. E a regra de
-  // src/items/weapons/weapons.cpp, onde chance vira 100 se damageX/Y != 0.
-  // Fora dessa distancia exata nao ha bonus nenhum.
+  // Perfect Shot (TibiaWiki/Perfect_Shot): quando o alvo esta EXATAMENTE na
+  // distancia que o equipamento configura, o golpe ganha dano fixo e nao
+  // pode errar. Fonte: quivers (paladinos, ex.: eldritch +20 @4) e wands
+  // (sorcerers, ex.: eldritch wand +65 @4). Fora dessa distancia exata nao
+  // ha bonus nenhum. So vale para o ALVO PRINCIPAL (area/cleave nao somam).
   let perfeito = 0;
-  if (isDist && c.player) {
-    const eq = equippedQuiver(p);
+  if ((isDist || isMagic) && c.player) {
+    const eq = isDist ? equippedQuiver(p) : null;
     const q = eq ? GAMEDATA.items[eq.item] : null;
-    if (q && q.shotDmg) {
+    const arma = p.equip && p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+    const src = (q && q.shotDmg) ? q : ((arma && arma.shotDmg) ? arma : null);
+    if (src && src.shotDmg) {
       // distancia real em SQM (Chebyshev). Antes era uma divisao por 0.085
       // que so acertava no eixo X: a grade e 21x13, entao o mesmo valor de
       // tela valia SQMs diferentes na horizontal e na vertical.
@@ -851,7 +914,7 @@ function playerAttack(c, p, target) {
                    && target.cx !== undefined)
         ? sqmDistance(c.player, target)
         : Math.round(pointDistance(c.player, target) / 0.085);
-      if (sqm === q.shotRange) perfeito = q.shotDmg;
+      if (sqm === src.shotRange) perfeito = src.shotDmg;
     }
   }
 
@@ -911,7 +974,11 @@ function playerAttack(c, p, target) {
     // bonus nao vale para cleave nem para a area da municao.
     v = Math.max(1, Math.floor(v));
     if (alvoPrincipal) v = applyCharmDamage(p, element, v);
-    return applyResist(target, element, Math.max(1, v));
+    v = applyResist(target, element, Math.max(1, v));
+    // Mitigation do monstro reduz TODOS os tipos comuns (TibiaWiki).
+    // O perfect shot é somado FORA deste roll — por isso ele bypassa a
+    // mitigation (regra oficial).
+    return applyMonsterMitigation(target, element, v);
   };
 
   let raw = rollDamage(true);
@@ -1509,9 +1576,11 @@ function castSpellById(c, p, target, now, id) {
     if (armaEl) {
       const fis = Math.max(1, Math.round(dmg * armaEl.propFisica));
       const ele = Math.max(1, dmg - fis);
-      const fisFinal = applyResist(t, elemento, fis);
+      const fisFinal = applyMonsterMitigation(t, elemento,
+        applyResist(t, elemento, fis));
       const eleFinal = Math.max(1,
-        applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele)));
+        applyMonsterMitigation(t, armaEl.el,
+          applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele))));
       t.hp -= fisFinal + eleFinal;
       c.stats.damage += fisFinal + eleFinal;
       if (s.cond && typeof applyCondition === "function") {
@@ -1541,7 +1610,7 @@ function castSpellById(c, p, target, now, id) {
                       crit: critSt, fatal: fatalSpell });
       return;
     }
-    dmg = applyResist(t, elemento, dmg);
+    dmg = applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg));
     t.hp -= dmg;
     c.stats.damage += dmg;
     // magias que aplicam condition (Ignite, Envenom, Curse...)
@@ -1695,7 +1764,8 @@ function tryUseRune(c, p, target, now, forcada) {
       if (typeof applyCharmDamage === "function") {
         dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
       }
-      dmg = applyResist(alvo, s.element, Math.max(1, dmg));
+      dmg = applyMonsterMitigation(alvo, s.element,
+        applyResist(alvo, s.element, Math.max(1, dmg)));
       alvo.hp -= dmg;
       c.stats.damage += dmg;
       total += dmg;
@@ -2286,6 +2356,12 @@ function mobSkillHit(c, p, mob, sk, dmg) {
       const prot = imbProtection(p, tipoEl);
       if (prot > 0) raw = Math.max(1, Math.floor(raw * (1 - prot / 100)));
     }
+    // Mitigation do jogador: reduz TODOS os tipos comuns por % (shielding +
+    // def do escudo/spellbook/arma — TibiaWiki/Mitigation).
+    if (typeof applyPlayerMitigation === "function") {
+      raw = applyPlayerMitigation(p, tipoEl, raw);
+    }
+
   }
   const bfd = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bfd && bfd.dmgReceived !== 1)
@@ -2306,7 +2382,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   }
   // Agony (true damage): nem o mantra do Monk reduz.
   if (raw > 0 && !ehAgony && typeof mantraAbsorve === "function") {
-    raw = mantraAbsorve(p, raw, tipoEl);
+    raw = mantraAbsorve(p, raw, tipoEl, c);
+
   }
   if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
     raw = applyMagicShieldAbsorb(c, p, raw, {
@@ -2493,6 +2570,11 @@ function mobAttack(c, p, mob) {
   }
   raw = mitigate(raw, def.armor, def.defense, def.shielding);
   raw = raw * (1 - Math.min(0.7, def.protection / 100));
+  // Mitigation do jogador: reduz todos os tipos comuns por % (o auto attack
+  // do mob é físico — TibiaWiki/Mitigation).
+  if (typeof applyPlayerMitigation === "function") {
+    raw = applyPlayerMitigation(p, "physical", raw);
+  }
   raw = Math.max(0, Math.floor(raw));
 
   if (c.buffs.shield && c.buffs.shield > 0) {
@@ -2547,7 +2629,7 @@ function mobAttack(c, p, mob) {
   // pode zerar o golpe — e o que torna o Monk forte contra chip damage.
   if (typeof mantraAbsorve === "function") {
     const antesMantra = raw;
-    raw = mantraAbsorve(p, raw, mob.def.element);
+    raw = mantraAbsorve(p, raw, mob.def.element, c);
     if (raw <= 0) {
       c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                       screen: true, mantra: true,

@@ -91,11 +91,14 @@ function mantraTotal(p) {
  * 260 — quem tem mantra alto fica praticamente imune a chip damage elemental,
  * que e exatamente a intencao do sistema.
  */
-function mantraAbsorve(p, dano, elemento) {
+function mantraAbsorve(p, dano, elemento, c) {
   if (!isMonk(p)) return dano;
   if (MANTRA_ELEMENTOS.indexOf(elemento) === -1) return dano;
-  const m = mantraTotal(p);
+  let m = mantraTotal(p);
   if (m <= 0) return dano;
+  // TibiaWiki/Mantra: o valor total do mantra DOBRA quando o Monk está na
+  // forma Serene (e neste jogo solo o Monk está sempre sereno).
+  if (typeof monkSereno === "function" && monkSereno(p, c)) m *= 2;
   return Math.max(0, dano - m);
 }
 

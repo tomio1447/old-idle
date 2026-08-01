@@ -495,6 +495,17 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items) {
       n: "health potion", s: null, t: "supply", sell: 45, buy: 45, w: 2.0,
     };
   }
+  // Perfect Shot em WANDS (TibiaWiki/Perfect_Shot): Eldritch Wand e Gilded
+  // Eldritch Wand dão +65 de dano extra a exatamente 4 SQMs (sorcerers).
+  const WAND_PERFECT_SHOT = {
+    "eldritch-wand":        { shotDmg: 65, shotRange: 4 },
+    "gilded-eldritch-wand": { shotDmg: 65, shotRange: 4 },
+  };
+  for (const slug in WAND_PERFECT_SHOT) {
+    if (GAMEDATA.items[slug]) {
+      Object.assign(GAMEDATA.items[slug], WAND_PERFECT_SHOT[slug]);
+    }
+  }
   // mana fluid foi removido do jogo (ver supplies.js); se um save antigo ainda
   // referenciar o item, normalizePlayer migra para mana-potion no load.
   if (GAMEDATA.items["mana-fluid"]) delete GAMEDATA.items["mana-fluid"];

@@ -193,6 +193,8 @@ window.WIKI_DAMAGE_ICONS = {
   manadrain: "damage/mana-drain.png",
   lifedrain: "damage/life-drain.png",
   agony:    "damage/agony.png",
+  mitigation: "damage/mitigation.png",  // ícone do sistema de Mitigation
+
 };
 
 /* <img> pequena do ícone de dano de um elemento (ou null). */
