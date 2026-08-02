@@ -1254,8 +1254,24 @@ function loop(ts) {
     }
     drainEvents();
     if (G.combat && G.combat.dead && Date.now() >= G.combat.deadUntil) {
-      addLog("death", "Você acordou no templo de Thais.");
-      stopHunt();
+      // Revive: jogador renasce no mesmo ponto que morreu
+      const c = G.combat;
+      const p = G.p;
+      const max = maxStats(p);
+      p.hp = max.hp; p.mp = max.mp;
+      // Restaura posição do corpse
+      if (c.deathPos && c.player) {
+        c.player.x = c.deathPos.x;
+        c.player.y = c.deathPos.y;
+        c.player.dir = c.deathPos.dir || "e";
+        c.player.moving = false;
+      }
+      c.mobs = [];
+      c.dead = false;
+      c.deathPos = null;
+      addLog("info", "Você renasceu no local da morte.");
+      toast("Renasceu!", "level");
+      renderAll();
       return;
     }
 

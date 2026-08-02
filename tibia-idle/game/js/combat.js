@@ -1470,7 +1470,12 @@ function castSpellById(c, p, target, now, id) {
   // O bônus de dano/cura é aplicado SOMENTE sobre o dano/cura base da spell.
   const aug = (typeof augmentTotals === "function") ? augmentTotals(p, id) : null;
   // Augment "cooldown" (TibiaWiki): reduz o cooldown da spell (ms).
-  const cdReal = Math.max(1000, (s.cd || 2000) - ((aug && aug.cdReduction) || 0));
+  let cdReal = Math.max(1000, (s.cd || 2000) - ((aug && aug.cdReduction) || 0));
+  // VIP: 30% menos cooldown em Gift of Life e Avatar
+  if (typeof vipWheelCooldown === "function" && vipWheelCooldown() < 1) {
+    const isWheelSpell = id === "utura-tio" || id.startsWith("uteta-res-");
+    if (isWheelSpell) cdReal = Math.max(1000, Math.floor(cdReal * vipWheelCooldown()));
+  }
   cdStart(p, id, (cdReal !== (s.cd || 2000))
     ? Object.assign({}, s, { cd: cdReal }) : s, now);
   c.spellCd[id] = now + cdReal;   // mantido: testes antigos leem esse mapa
@@ -1967,7 +1972,9 @@ function tryUseRune(c, p, target, now, forcada) {
  */
 function playerCritChancePct(p) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
-  return 5 + ((imb && imb.critChance) ? imb.critChance : 0);
+  const base = 5 + ((imb && imb.critChance) ? imb.critChance : 0);
+  // VIP: +3% chance de crítico
+  return base + (typeof vipCritBonus === "function" ? vipCritBonus() * 100 : 0);
 }
 
 function playerCritExtraPct(p) {
@@ -2970,29 +2977,30 @@ function rollLoot(c, p, mob) {
   return got;
 }
 
-/* Morte do jogador: perde exp, skills e volta ao templo */
+/* Morte do jogador: perde exp, skills e renasce no local */
 function playerDeath(c, p) {
   p.deaths++;
   c.stats.deaths++;
   // a bencao do templo reduz muito a perda e e consumida na morte
-  const blessed = !!p.blessed;
-  const expRate = blessed ? 0.015 : 0.07;
-  const goldRate = blessed ? 0.02 : 0.1;
+  // Full Bless (7 bênçãos VIP): perda ainda menor
+  const blessCount = p.blessed === true ? 1 : (p.blessed || 0);
+  const blessed = blessCount > 0;
+  const fullBless = blessCount >= 7;
+  const expRate = fullBless ? 0.005 : blessed ? 0.015 : 0.07;
+  const goldRate = fullBless ? 0.01 : blessed ? 0.02 : 0.1;
   if (blessed) p.blessed = false;
   const lostExp = Math.floor(p.exp * expRate);
   p.exp = Math.max(0, p.exp - lostExp);
   while (p.level > 1 && p.exp < expForLevel(p.level)) p.level--;
   const lostGold = Math.floor(p.gold * goldRate);
   spendGold(p, lostGold);
-  const max = maxStats(p);
-  p.hp = max.hp; p.mp = max.mp;
-  if (c.player) {
-    c.player.x = 0.18; c.player.y = 0.62;
-    c.player.dir = "e"; c.player.moving = false;
-  }
-  c.mobs = [];
+  // Guarda posição da morte para o corpse
+  const deathX = c.player ? c.player.x : 0.18;
+  const deathY = c.player ? c.player.y : 0.62;
+  const deathDir = c.player ? c.player.dir : "e";
   c.dead = true;
-  c.deadUntil = Date.now() + (c.boss ? 2500 : 10000);   // boss volta mais rápido para a cidade
+  c.deadUntil = Date.now() + reviveTime();   // 30s normal, 15s VIP
+  c.deathPos = { x: deathX, y: deathY, dir: deathDir };
   c.events.push({ t: "death", exp: lostExp, gold: lostGold, blessed: blessed });
   return { exp: lostExp, gold: lostGold };
 }
@@ -3024,6 +3032,15 @@ function combatTick(c, p, dt, now) {
   while (c.regenMp >= mpEvery) {
     c.regenMp -= mpEvery;
     p.mp = Math.min(max.mp, p.mp + 2 + Math.floor(p.level / 15));
+  }
+  // VIP: regeneração extra (+10 HP e +20 MP a cada 3s)
+  if (typeof vipRegenHp === "function" && vipRegenHp() > 0) {
+    c.vipRegenAcc = (c.vipRegenAcc || 0) + dt;
+    if (c.vipRegenAcc >= 3000) {
+      c.vipRegenAcc -= 3000;
+      p.hp = Math.min(max.hp, p.hp + vipRegenHp());
+      p.mp = Math.min(max.mp, p.mp + vipRegenMp());
+    }
   }
 
   // buffs decaem
@@ -3137,6 +3154,10 @@ function combatTick(c, p, dt, now) {
     if (typeof preyExpBonus === "function") {
       const pExp = preyExpBonus(p, m.slug);
       if (pExp > 0) exp = Math.floor(exp * (1 + pExp / 100));
+    }
+    // VIP: bônus de +10% EXP
+    if (typeof vipExpBonus === "function" && vipExpBonus() > 1) {
+      exp = Math.floor(exp * vipExpBonus());
     }
     // Party — Shared Experience (TibiaWiki/Party): Exp = M * S / P * C.
     // O exp calculado já é o M*C do líder (stamina/prey); cada membro do

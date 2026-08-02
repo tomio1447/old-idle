@@ -48,6 +48,12 @@ const NPCS = {
   },
 };
 
+const EXERCISE_FX = {
+  "exercise-sword": { missile: "assets/missile/whirlwind-sword_e.png", fx: "hit-area" },
+  "exercise-axe":   { missile: "assets/missile/whirlwind-axe_e.png",   fx: "hit-area" },
+  "exercise-club":  { missile: "assets/missile/whirlwind-club_e.png",  fx: "hit-area" },
+};
+
 /* Catalogo da loja de equipamentos, por faixa de nivel.
  * Precos derivam do valor de venda do item (markup de 4x). */
 function shopCatalog(p) {
@@ -307,7 +313,9 @@ function dummyRate(p) {
 /* Intervalo entre golpes, como no servidor: baseAttackSpeed / rate */
 function exerciseInterval(p) {
   const base = (VOCATIONS[p.voc] && VOCATIONS[p.voc].attackSpeed) || 2000;
-  return Math.max(200, base / RATE_EXERCISE_SPEED);
+  // VIP: +10% velocidade de exercise
+  const vipSpeed = (typeof vipExerciseSpeed === "function") ? vipExerciseSpeed() : 1.0;
+  return Math.max(200, base / RATE_EXERCISE_SPEED / vipSpeed);
 }
 
 const ACADEMY_MAGE_HIT_MANA = 65;
@@ -441,18 +449,6 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
     events: [],
   };
 }
-
-/* Animação de impacto / míssil de cada exercise weapon no dummy */
-const EXERCISE_FX = {
-  "exercise-sword": { missile: "assets/missile/whirlwind-sword_e.png", fx: "hit-area" },
-  "exercise-axe":   { missile: "assets/missile/whirlwind-axe_e.png",   fx: "hit-area" },
-  "exercise-club":  { missile: "assets/missile/whirlwind-club_e.png",  fx: "hit-area" },
-  "exercise-bow":   { missile: "assets/missile/arrow_e.png", fx: "hit-area" },
-  "exercise-rod":   { missile: "assets/missile/ice_e.png",  fx: "ice-attack" },
-  "exercise-wand":  { missile: "assets/missile/fire_e.png", fx: "fire-attack" },
-  "exercise-shield":{ missile: "weapon", fx: "block-hit" },
-  "exercise-wraps": { missile: "weapon", fx: "claw-white" },
-};
 
 function academyAttackDelay(t, p) {
   // baseAttackSpeed / rateExerciseTrainingSpeed, como no servidor
@@ -661,6 +657,10 @@ function buyBlessing(p) {
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
   spendGold(p, price);
   p.blessed = true;
+  // VIP: Full Bless — recebe todas as 7 bênçãos (representado como 7x proteção)
+  if (typeof vipFullBless === "function" && vipFullBless()) {
+    p.blessed = 7;   // 7 bênçãos completas
+  }
   return { ok: true, msg: "Você foi abençoado! A próxima morte custará muito menos." };
 }
 

@@ -1407,20 +1407,50 @@ Renderer.prototype.draw = function (combat, player, dt) {
     }
   }
 
-  // --- tela de morte
+  // --- tela de morte (corpse + contador)
   if (combat && combat.dead) {
-    ctx.fillStyle = "rgba(70,0,0,.55)";
+    const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
+    const px = dp.x * W, py = dp.y * H;
+    // Desenha corpse do jogador (sprite semi-transparente)
+    const pimg = OutfitRenderer.forPlayer(player, dp.dir || "e", 0);
+    if (spriteReady(pimg)) {
+      const sc = tibiaScale(W);
+      const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
+      ctx.globalAlpha = 0.45;
+      ctx.save();
+      // Rotaciona o corpse (deitado)
+      ctx.translate(px, py - h * 0.2);
+      ctx.rotate(Math.PI / 2 * (dp.dir === "w" ? -1 : 1) * 0.15);
+      ctx.drawImage(pimg, -w / 2, -h / 2, w, h);
+      ctx.restore();
+      ctx.globalAlpha = 1.0;
+      // Sombra no chão
+      ctx.fillStyle = "rgba(0,0,0,.3)";
+      ctx.beginPath();
+      ctx.ellipse(px, py + h * 0.35, w * 0.4, h * 0.12, 0, 0, 7);
+      ctx.fill();
+    }
+    // Escurecimento da tela
+    ctx.fillStyle = "rgba(70,0,0,.35)";
     ctx.fillRect(0, 0, W, H);
-    ctx.font = "bold 22px Verdana";
-    ctx.fillStyle = "#ff6060";
-    ctx.textAlign = "center";
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 4;
-    ctx.strokeText("VOCÊ MORREU", W / 2, H / 2 - 6);
-    ctx.fillText("VOCÊ MORREU", W / 2, H / 2 - 6);
+    // Contador acima do corpse
     const left = Math.max(0, Math.ceil((combat.deadUntil - Date.now()) / 1000));
+    ctx.font = "bold 16px Verdana";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    const labelY = py - (spriteReady(pimg) ? spriteH(pimg) * tibiaScale(W) * 0.5 + 24 : 40);
+    ctx.strokeText(left + "s", px, labelY);
+    ctx.fillStyle = left <= 5 ? "#ff6060" : "#ffe680";
+    ctx.fillText(left + "s", px, labelY);
+    // Texto "VOCÊ MORREU" centralizado
+    ctx.font = "bold 22px Verdana";
+    ctx.strokeText("VOCÊ MORREU", W / 2, H / 2 - 6);
+    ctx.fillStyle = "#ff6060";
+    ctx.fillText("VOCÊ MORREU", W / 2, H / 2 - 6);
+    // Subtexto
     ctx.font = "12px Verdana";
     ctx.fillStyle = "#e8b0b0";
-    ctx.fillText("Voltando ao templo em " + left + "s", W / 2, H / 2 + 16);
+    ctx.fillText("Renascer em " + left + "s" + (isVip() ? " (VIP)" : ""), W / 2, H / 2 + 16);
   }
 
   // --- sem hunt
