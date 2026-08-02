@@ -25,7 +25,7 @@
   "Ferumbras Exercise Dummy".
 
 ### 4. Exercise Wraps adicionado (faltava o do Monk)
-- Nova exercise weapon **Exercise Wraps** (GIF oficial 32×32 da wiki) —
+- Nova exercise weapon **Exercise Wraps** (GIF oficial 64×64 animado (upscaling nearest-neighbor da TibiaWiki)) —
   treina **fist fighting** (punho), a skill do Monk.
 - A lista do modal agora tem **8 exercise weapons** (Sword, Axe, Club, Bow,
   Rod, Wand, Shield, Wraps), todas com compra de 5000 cargas por 25 TC.

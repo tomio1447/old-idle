@@ -13,7 +13,7 @@
 - Abre o modal do Sistema de Treino com **2 abas**.
 
 ### Aba 1 — 🎯 Treino com Dummy (Exercise Dummy)
-- Lista as **7 exercise weapons oficiais** (GIFs 32×32 da TibiaWiki):
+- Lista as **7 exercise weapons oficiais** (GIFs 64×64 animados (5 frames, upscaling nearest-neighbor da TibiaWiki)):
   Exercise Sword, Axe, Club, Bow, Rod, Wand e Shield.
 - Cada linha mostra: ícone, nome, **skill treinada** (Sword/Axe/Club →
   melee; Bow → distance; Rod/Wand → Magic Level; Shield → shielding) e o
@@ -53,7 +53,7 @@
 | Arquivo | Mudança |
 | --- | --- |
 | `assets/ui/training/skill-trainer-all.gif` | **novo** — GIF oficial do Skill Trainer (All) (64×64) |
-| `assets/ui/training/exercise-*.gif` (7) | **novos** — GIFs oficiais das exercise weapons (32×32) |
+| `assets/ui/training/exercise-*.gif` (7) | **novos** — GIFs das exercise weapons (64×64 animados, upscaling nearest-neighbor da TibiaWiki) |
 | `js/training.js` | **novo** — `EXERCISE_WEAPONS`, cargas (`ensureTraining`), compra com TC (`buyExerciseCharges`), `startDummyTraining`, `startOnlineTraining`, `trainingStaminaRate` |
 | `js/training-ui.js` | **novo** — botão TREINO + modal 2 abas (dummy/online) |
 | `js/tibiacoin.js` | `accountSpendCoins(n)` (gastar TC da conta) |

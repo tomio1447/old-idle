@@ -9,7 +9,7 @@
  *     custo, com regen de stamina 1:1.
  *
  * O GIF do botão é o oficial do Skill Trainer (All) da TibiaWiki; os GIFs
- * das exercise weapons também são os oficiais (32x32).
+ * das exercise weapons também são os oficiais (64x64 animadas, 5 frames cada, upscaling nearest-neighbor da TibiaWiki).
  */
 "use strict";
 
