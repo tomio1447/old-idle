@@ -483,7 +483,7 @@ function renderEquip(p) {
       // indica que os atributos do item estão ativos no personagem
       const glow = (slot === "ring" || slot === "amulet") ? " acc-glow" : "";
       h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${tierTxt ? `<span class="cnt" style="color:#ffe680">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
+        ${itemImg(e.item)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
@@ -763,7 +763,7 @@ function renderInventory(p) {
     if (e) {
       const tierCls = e.tier && typeof forgeTierClassForValue === "function" ? forgeTierClassForValue(e.tier) : "";
       cells.push(`<div class="inv-item ${itemClsBorder(e.slug)} ${tierCls}" data-item="${e.slug}"${e.instId ? ` data-inst="${e.instId}"` : ""}>${itemImg(e.slug)}
-        ${e.tier ? `<span class="cnt" style="color:#ffe680">T${e.tier}</span>` : (e.count > 1 ? `<span class="cnt">${e.count}</span>` : "")}
+        ${e.tier ? `<span class="tier-badge ${tierCls}">T${e.tier}</span>` : (e.count > 1 ? `<span class="cnt">${e.count}</span>` : "")}
       </div>`);
     } else {
       cells.push(`<div class="inv-item empty" title="Slot vazio"></div>`);

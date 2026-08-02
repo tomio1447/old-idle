@@ -112,9 +112,13 @@ function forgeClientItemListHtml(p) {
 
 function forgeClientTierPreview(info) {
   var next = info ? Math.min((info.tier || 0) + 1, info.maxTier || 0) : 0;
+  var itemSlug = info ? info.slug : null;
+  var tierClass = next ? forgeTierClassForValue(next) : '';
   return '<div class="forge-client-tier-preview">'
-    + '<div class="forge-client-shadow"></div>'
-    + '<span class="forge-client-tier-badge">' + (next || '') + '</span>'
+    + '<div class="forge-client-equip-slot ' + tierClass + '">'
+    + (itemSlug ? itemImg(itemSlug, 38) : '')
+    + '</div>'
+    + (next ? '<span class="forge-client-tier-badge">' + next + '</span>' : '')
     + '</div>';
 }
 
@@ -278,10 +282,10 @@ function renderForgeModal() {
     + forgeClientTabHtml()
     + '<div class="forge-client-main">' + content + '</div>'
     + '<div class="forge-client-footer">'
-    +   '<div class="forge-client-wallet gold"><span>' + fmtFull(p.gold || 0) + '</span></div>'
-    +   '<div class="forge-client-wallet dust"><span>' + fmtFull(p.dust || 0) + '/' + fmtFull(p.dustLimit || 100) + '</span></div>'
-    +   '<div class="forge-client-wallet slivers"><span>' + fmtFull(p.slivers || 0) + '</span></div>'
-    +   '<div class="forge-client-wallet cores"><span>' + fmtFull(p.exaltedCores || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet gold"><img class="forge-wallet-icon" src="assets/item/gold-coin.png" alt=""><span>' + fmtFull(p.gold || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet dust"><img class="forge-wallet-icon" src="assets/item/dust.gif" alt=""><span>' + fmtFull(p.dust || 0) + '/' + fmtFull(p.dustLimit || 100) + '</span></div>'
+    +   '<div class="forge-client-wallet slivers"><img class="forge-wallet-icon" src="assets/item/sliver.gif" alt=""><span>' + fmtFull(p.slivers || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet cores"><img class="forge-wallet-icon" src="assets/item/exalted-core.gif" alt=""><span>' + fmtFull(p.exaltedCores || 0) + '</span></div>'
     +   '<button class="forge-client-close" id="forge-close">Close</button>'
     + '</div>'
     + '</div>';
@@ -419,7 +423,7 @@ function renderDepotGrid(p) {
     var ref = p.depot[i];
     var slug = forgeStoredSlug(p, ref);
     var tierTxt = typeof forgeTierTextForInstance === 'function' ? forgeTierTextForInstance(ref) : '';
-    if (slug) html += '<div class="inv-item" data-depot-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="cnt" style="color:#ffe680">' + tierTxt + '</span>' : '') + '</div>';
+    if (slug) html += '<div class="inv-item" data-depot-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="tier-badge ' + (typeof forgeTierClassForValue === 'function' ? forgeTierClassForValue(typeof forgeItemTier === 'function' ? forgeItemTier(G.p, ref) : 0) : '') + '">' + tierTxt + '</span>' : '') + '</div>';
     else html += '<div class="inv-item empty" title="Slot vazio"></div>';
   }
   html += '</div>';
@@ -434,7 +438,7 @@ function renderLegacyExaGrid(p) {
     var ref = eb[i];
     var slug = forgeStoredSlug(p, ref);
     var tierTxt = typeof forgeTierTextForInstance === 'function' ? forgeTierTextForInstance(ref) : '';
-    html += '<div class="inv-item" data-exa-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="cnt" style="color:#ffe680">' + tierTxt + '</span>' : '') + '</div>';
+    html += '<div class="inv-item" data-exa-ref="' + ref + '">' + itemImg(slug) + (tierTxt ? '<span class="tier-badge ' + (typeof forgeTierClassForValue === 'function' ? forgeTierClassForValue(typeof forgeItemTier === 'function' ? forgeItemTier(G.p, ref) : 0) : '') + '">' + tierTxt + '</span>' : '') + '</div>';
   }
   html += '</div><div class="tiny dim mt4">Caixa legada de saves antigos. A Forge nova não envia itens para cá.</div>';
   return html;

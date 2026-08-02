@@ -1145,12 +1145,30 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .tier-epic { box-shadow: inset 0 0 5px rgba(180,100,255,.5) !important; }
 .tier-legendary { box-shadow: inset 0 0 6px rgba(255,140,40,.6) !important; }
 
+/* Tier badge on equipment and inventory items — same style as forge modal */
+.tier-badge {
+  position: absolute;
+  bottom: 0; right: 0;
+  min-width: 14px; height: 14px; line-height: 12px;
+  background: #ff8a00; color: #fff;
+  border: 1px solid #2c1400;
+  text-align: center;
+  font-weight: bold;
+  font-size: 9px;
+  text-shadow: 1px 1px #000;
+  padding: 0 2px;
+  z-index: 2;
+}
+.tier-badge.tier-legendary { background: #ff5500; }
+.tier-badge.tier-epic { background: #b060ff; border-color: #3a1a5a; }
+.tier-badge.tier-rare { background: #4a8aff; border-color: #1a2a5a; }
+
 /* ========== CLIENT-LIKE EXALTATION FORGE MODAL ========== */
 .modal.forge-modal-shell {
   width: min(520px, 98vw) !important;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   overflow: visible;
 }
 .forge-client {
@@ -1253,7 +1271,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
     repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, rgba(0,0,0,.04) 1px 4px), #393937;
   padding: 8px;
 }
-.forge-client-select-row.transfer { grid-template-columns: 172px 60px 1fr; }
+.forge-client-select-row.transfer { grid-template-columns: 1fr 60px 1fr; }
 .forge-client-item-list {
   position: relative;
   min-height: 80px;
@@ -1309,11 +1327,24 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   position: relative;
   display: flex; align-items: center; justify-content: center;
 }
+.forge-client-equip-slot {
+  width: 58px; height: 58px;
+  display: flex; align-items: center; justify-content: center;
+  background: #2a2a29;
+  border: 2px solid;
+  border-color: #171717 #686868 #686868 #171717;
+  opacity: .45;
+  filter: grayscale(.6) brightness(.7);
+}
+.forge-client-equip-slot img {
+  max-width: 38px; max-height: 38px;
+}
 .forge-client-shadow {
   width: 58px; height: 58px;
   background: #020202;
   border-radius: 45% 55% 38% 40%;
   box-shadow: 7px 3px 0 #000, -4px 4px 0 #000;
+  display: none;
 }
 .forge-client-tier-badge {
   position: absolute;
@@ -1452,20 +1483,18 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .forge-client-wallet::after {
   content: "";
-  width: 11px; height: 11px; flex: none;
-  border: 1px solid #101010;
-  background: #d1a22c;
+  display: none;
 }
-.forge-client-wallet.dust::after {
-  width: 14px; height: 14px; border: 0;
-  background: url(../assets/item/dust.gif) center/contain no-repeat;
+.forge-wallet-icon {
+  width: 14px; height: 14px; flex: none;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  margin-right: 2px;
 }
-.forge-client-wallet.slivers::after {
-  width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
-  border-bottom: 12px solid #6bdfff; background: none;
-}
+.forge-client-wallet.dust::after,
+.forge-client-wallet.slivers::after,
 .forge-client-wallet.cores::after {
-  width: 12px; height: 12px; border-radius: 50%; background: #6bdfff;
+  display: none;
 }
 .forge-client-close { margin-left: auto; min-width: 44px; font-size: 10px; }
 @media (max-width: 540px) {
