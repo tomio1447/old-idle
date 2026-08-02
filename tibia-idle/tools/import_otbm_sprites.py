@@ -135,7 +135,14 @@ def ids_do_otbm(path):
 
 
 def recorte32(img):
+    """Recorta a sprite para 32x32 ancorado no canto superior esquerdo.
+    Itens maiores que 32x32 (2x2, 2x1 etc.) são salvos no tamanho original
+    para preservar a arte completa — o TileSprites.draw() do jogo já faz o
+    ancoramento correto no canvas."""
     if img.size == (32, 32):
+        return img
+    # Se a sprite é maior que 32x32 (item 2x2, 2x1, etc.), preserva
+    if img.size[0] > 32 or img.size[1] > 32:
         return img
     base = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
     base.alpha_composite(img, (0, 0))

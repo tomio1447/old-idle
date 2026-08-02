@@ -45,7 +45,11 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   OTBM_HUNT_CACHE[hunt.otbm] = "loading";
-  fetch("maps/" + encodeURIComponent(hunt.otbm) + ".otbm")
+  // Cache-busting: evita que o navegador use um .otbm antigo após o
+  // usuário editar e salvar o mapa no RME. O timestamp garante que
+  // cada reload busca a versão mais recente do servidor.
+  var _otbmV = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  fetch("maps/" + encodeURIComponent(hunt.otbm) + ".otbm?v=" + _otbmV)
     .then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.arrayBuffer();

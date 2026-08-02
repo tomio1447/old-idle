@@ -15,7 +15,8 @@ const TileSprites = {
   get(id) {
     if (this.cache[id] !== undefined) return this.cache[id];
     const img = new Image();
-    img.src = "assets/tiles/" + id + ".png";
+    const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+    img.src = "assets/tiles/" + id + ".png?v=" + v;
     img.onerror = () => { this.cache[id] = null; };
     this.cache[id] = img;
     return img;
