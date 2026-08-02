@@ -6,9 +6,10 @@ Gera o catalogo de itens do editor de mapas (game/rme/) a partir do client
        (items.xml do Canary quando existe, senao "item N" documentado como
        N/A), flags de andavel/bloqueio lidas do proprio .dat
        (numeracao OTCv8 do thingtype.cpp).
+       Agora tambem inclui dimensoes (tw, th) em tiles para cada item.
   game/rme/data/atlas_<N>.png  -> folhas com o sprite 32x32 de cada item
-       (mesmo recorte superior-esquerdo de extract_tiles.py, ou seja, o
-       editor mostra exatamente o pixel que o jogo vai desenhar).
+       (recorte superior-esquerdo — usado apenas como fallback quando
+       o PNG externo nao carrega; a fonte principal e assets/tiles/).
   game/rme/data/known_tiles.js -> ids que ja existem em game/assets/tiles
        (a ferramenta "verificar sprites" compara contra isso; regenerado
        tambem por import_otbm_sprites.py).
@@ -58,7 +59,7 @@ def recorte32(img):
     base.alpha_composite(img, (0, 0))
     return base
 
-entries = []   # [id, walk, block, ground, page, idx]
+entries = []   # [id, walk, block, ground, page, idx, tw, th]
 flags_rt = {}  # id -> [walk, block] (runtime)
 page = Image.new("RGBA", (COLS * 32, ROWS_PER_PAGE * 32), (0, 0, 0, 0))
 page_i = 0
@@ -78,6 +79,9 @@ for cid in range(100, dat.item_count + 1):
         w = 0
         b = 1 if "NotWalkable" in f else 0
         g = 0
+    # Dimensoes em tiles (1x1, 2x2, 2x1, 1x2, etc.)
+    tw = obj.groups[0].width if obj.groups else 1
+    th = obj.groups[0].height if obj.groups else 1
     img = render_item_860(dat, spr, cid)
     if img is None or not img.getbbox():
         sem_sprite += 1
@@ -98,7 +102,7 @@ for cid in range(100, dat.item_count + 1):
         cy = 0
         page = Image.new("RGBA", (COLS * 32, ROWS_PER_PAGE * 32), (0, 0, 0, 0))
     page.paste(recorte32(img), (cx * 32, cy * 32), recorte32(img))
-    entries.append([cid, w, b, g, page_i, idx])
+    entries.append([cid, w, b, g, page_i, idx, tw, th])
     idx += 1
 
 if idx:
@@ -119,8 +123,9 @@ catalog = {
 with open(os.path.join(RME_DATA, "catalog.js"), "w") as f:
     f.write("/* catalog.js — GERADO por tools/build_rme_catalog.py.\n")
     f.write(" * Paleta completa do .dat 8.60 para o editor de mapas:\n")
-    f.write(" * entries = [id, walk, block, ground, page, idx]; nomes do\n")
-    f.write(" * items.xml do Canary quando existem (senao 'item N').\n")
+    f.write(" * entries = [id, walk, block, ground, page, idx, tw, th];\n")
+    f.write(" * tw/th = largura/altura em tiles (1x1, 2x2, etc.).\n")
+    f.write(" * nomes do items.xml do Canary quando existem (senao 'item N').\n")
     f.write(" * flags walk/block vem do proprio .dat (thingtype.cpp OTCv8). */\n")
     f.write("window.RME_CATALOG = ")
     f.write(json.dumps(catalog, separators=(",", ":")))

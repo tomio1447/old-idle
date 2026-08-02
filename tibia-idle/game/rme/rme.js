@@ -16,11 +16,12 @@ const CATALOG = window.RME_CATALOG;
 const KNOWN = window.RME_KNOWN_TILES || [];
 const KNOWN_SET = new Set(KNOWN);
 
-/* tabela id -> {w, b, g, page, idx, name} */
+/* tabela id -> {w, b, g, page, idx, tw, th, name} */
 const ITEMS = new Map();
 const SLUG_RE = /[^a-z0-9_.-]+/g;
-for (const [id, w, b, g, page, idx] of CATALOG.entries) {
-  ITEMS.set(id, { id, w, b, g, page, idx,
+for (const entry of CATALOG.entries) {
+  const [id, w, b, g, page, idx, tw, th] = entry;
+  ITEMS.set(id, { id, w, b, g, page, idx, tw: tw || 1, th: th || 1,
                   name: CATALOG.names[id] || ("item " + id) });
 }
 function itemName(id) {
@@ -88,6 +89,8 @@ function drawItem32(ctx, id, dx, dy, size) {
       const scale = size / 32;
       const w = img2.naturalWidth * scale;
       const h = img2.naturalHeight * scale;
+      /* Ancoragem bottom-right: item 2x2 estende 1 tile acima e 1 à esquerda.
+       * Usa tw/th do catálogo para saber o tamanho real em tiles. */
       ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
       return;
     }
@@ -96,6 +99,7 @@ function drawItem32(ctx, id, dx, dy, size) {
     ctx.fillRect(dx, dy, size, size);
     return;
   }
+  /* Fallback: atlas 32x32 (apenas para itens sem PNG externo) */
   const img = atlases[it.page];
   if (!img || !img.complete || !img.naturalWidth) return;
   const cx = it.idx % CATALOG.cols;
@@ -108,9 +112,14 @@ const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
 
 function cellPx() { return 32 * state.zoom; }
+/* Padding extra para itens grandes (2x2, 2x1, etc.) não cortarem nas bordas.
+ * No Tibia, o tile de referência é o inferior-direito, então um item 2x2
+ * estende 1 tile acima e 1 à esquerda. */
+const PAD = 1;  // 1 tile de padding em cada direção
 function resizeCanvas() {
-  cv.width = state.w * cellPx();
-  cv.height = state.h * cellPx();
+  const S = cellPx();
+  cv.width = (state.w + PAD * 2) * S;
+  cv.height = (state.h + PAD * 2) * S;
 }
 
 function cellBlocked(x, y) {
@@ -127,18 +136,19 @@ function cellBlocked(x, y) {
 
 function render() {
   const S = cellPx();
+  const PS = PAD * S;  // padding em pixels
   ctx.clearRect(0, 0, cv.width, cv.height);
-  // fundo xadrez (celulas vazias)
+  // fundo xadrez (celulas vazias) — com offset de padding
   for (let y = 0; y < state.h; y++) {
     for (let x = 0; x < state.w; x++) {
       if ((x + y) % 2) { ctx.fillStyle = "#14120e"; }
       else { ctx.fillStyle = "#0d0c0a"; }
-      ctx.fillRect(x * S, y * S, S, S);
+      ctx.fillRect(PS + x * S, PS + y * S, S, S);
       const c = state.cells[x + "," + y];
       if (!c) continue;
-      if (c.g) drawItem32(ctx, c.g, x * S, y * S, S);
+      if (c.g) drawItem32(ctx, c.g, PS + x * S, PS + y * S, S);
       for (let i = 0; i < c.items.length; i++)
-        drawItem32(ctx, c.items[i], x * S, y * S, S);
+        drawItem32(ctx, c.items[i], PS + x * S, PS + y * S, S);
     }
   }
   // colisao
@@ -146,7 +156,7 @@ function render() {
     ctx.fillStyle = "rgba(220,40,40,.24)";
     for (let y = 0; y < state.h; y++)
       for (let x = 0; x < state.w; x++)
-        if (cellBlocked(x, y)) ctx.fillRect(x * S, y * S, S, S);
+        if (cellBlocked(x, y)) ctx.fillRect(PS + x * S, PS + y * S, S, S);
   }
   // zonas
   ctx.textAlign = "center";
@@ -163,7 +173,7 @@ function render() {
     const [x0, y0, x1, y1] = rectBounds(state.rectStart, state.rectNow);
     ctx.strokeStyle = "rgba(255,215,94,.9)";
     ctx.lineWidth = 2;
-    ctx.strokeRect(x0 * S + 1, y0 * S + 1, (x1 - x0 + 1) * S - 2,
+    ctx.strokeRect(PS + x0 * S + 1, PS + y0 * S + 1, (x1 - x0 + 1) * S - 2,
                    (y1 - y0 + 1) * S - 2);
   }
   // grade
@@ -171,10 +181,10 @@ function render() {
     ctx.strokeStyle = "rgba(255,255,255,.07)";
     ctx.lineWidth = 1;
     for (let x = 0; x <= state.w; x++) {
-      ctx.beginPath(); ctx.moveTo(x * S + .5, 0); ctx.lineTo(x * S + .5, cv.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(PS + x * S + .5, 0); ctx.lineTo(PS + x * S + .5, cv.height); ctx.stroke();
     }
     for (let y = 0; y <= state.h; y++) {
-      ctx.beginPath(); ctx.moveTo(0, y * S + .5); ctx.lineTo(cv.width, y * S + .5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, PS + y * S + .5); ctx.lineTo(cv.width, PS + y * S + .5); ctx.stroke();
     }
   }
   // drag preview
@@ -187,12 +197,12 @@ function render() {
       const sx = state.dragStart.x + ox;
       const sy = state.dragStart.y + oy;
       ctx.fillStyle = "rgba(0,0,0,.55)";
-      ctx.fillRect(sx * S, sy * S, S, S);
+      ctx.fillRect(PS + sx * S, PS + sy * S, S, S);
       // borda tracejada na origem
       ctx.setLineDash([4, 4]);
       ctx.strokeStyle = "rgba(255,215,94,.6)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(sx * S + .5, sy * S + .5, S - 1, S - 1);
+      ctx.strokeRect(PS + sx * S + .5, PS + sy * S + .5, S - 1, S - 1);
       ctx.setLineDash([]);
     }
     // desenha células na nova posição (semi-transparente)
@@ -203,8 +213,8 @@ function render() {
       const ny = state.dragStart.y + oy + ddy;
       if (nx < 0 || ny < 0 || nx >= state.w || ny >= state.h) continue;
       if (!data.cell) continue;
-      if (data.cell.g) drawItem32(ctx, data.cell.g, nx * S, ny * S, S);
-      for (const id of data.cell.items) drawItem32(ctx, id, nx * S, ny * S, S);
+      if (data.cell.g) drawItem32(ctx, data.cell.g, PS + nx * S, PS + ny * S, S);
+      for (const id of data.cell.items) drawItem32(ctx, id, PS + nx * S, PS + ny * S, S);
     }
     ctx.globalAlpha = 1.0;
     // borda de destaque na área de destino
@@ -222,7 +232,7 @@ function render() {
       const minY = Math.min(...allNy), maxY = Math.max(...allNy);
       ctx.strokeStyle = "rgba(106,176,255,.9)";
       ctx.lineWidth = 2;
-      ctx.strokeRect(minX * S + 1, minY * S + 1,
+      ctx.strokeRect(PS + minX * S + 1, PS + minY * S + 1,
                      (maxX - minX + 1) * S - 2, (maxY - minY + 1) * S - 2);
     }
   }
@@ -234,18 +244,19 @@ function render() {
       for (let dx = 0; dx < state.brush; dx++) {
         const hx = state.hover.x + dx, hy = state.hover.y + dy;
         if (hx < state.w && hy < state.h)
-          ctx.strokeRect(hx * S + .5, hy * S + .5, S - 1, S - 1);
+          ctx.strokeRect(PS + hx * S + .5, PS + hy * S + .5, S - 1, S - 1);
       }
   }
 }
 function zoneCell(x, y, letra, cor) {
   const S = cellPx();
+  const PS = PAD * S;
   ctx.strokeStyle = cor;
   ctx.lineWidth = 2;
-  ctx.strokeRect(x * S + 2, y * S + 2, S - 4, S - 4);
+  ctx.strokeRect(PS + x * S + 2, PS + y * S + 2, S - 4, S - 4);
   ctx.fillStyle = cor;
   ctx.font = `bold ${Math.max(11, S * 0.42)}px Arial`;
-  ctx.fillText(letra, x * S + S / 2, y * S + S / 2);
+  ctx.fillText(letra, PS + x * S + S / 2, PS + y * S + S / 2);
 }
 function rectBounds(a, b) {
   return [Math.min(a.x, b.x), Math.min(a.y, b.y),
@@ -324,9 +335,10 @@ function applyRect(a, b) {
 function canvasCell(e) {
   const r = cv.getBoundingClientRect();
   const S = cellPx();
+  const PS = PAD * S;
   return {
-    x: Math.floor((e.clientX - r.left) / S),
-    y: Math.floor((e.clientY - r.top) / S),
+    x: Math.floor((e.clientX - r.left - PS) / S),
+    y: Math.floor((e.clientY - r.top - PS) / S),
   };
 }
 
@@ -534,7 +546,8 @@ function filtrarPalette() {
   const q = document.getElementById("pal-search").value.trim().toLowerCase();
   const f = document.getElementById("pal-filter").value;
   palFiltrada = [];
-  for (const [id, w, b, g, page, idx] of CATALOG.entries) {
+  for (const entry of CATALOG.entries) {
+    const id = entry[0], w = entry[1], b = entry[2], g = entry[3];
     if (f === "gw" && !(g && w)) continue;
     if (f === "gb" && !(g && !w)) continue;
     if (f === "wall" && !(!g && b)) continue;
@@ -580,9 +593,11 @@ function renderPalRows() {
     el.dataset.id = id;
     el.classList.toggle("sel", id === state.selId);
     el.querySelector(".pal-name").textContent = `${id} · ${it.name}`;
+    const tw = it.tw || 1, th = it.th || 1;
+    const sizeStr = (tw > 1 || th > 1) ? ` <span class="b">${tw}×${th}</span>` : "";
     el.querySelector(".pal-flags").innerHTML =
-      it.g ? (it.w ? '<span class="w">chão</span>' : '<span class="b">chão trava</span>')
-           : (it.b ? '<span class="b">parede</span>' : "deco");
+      it.g ? (it.w ? '<span class="w">chão</span>' : '<span class="b">chão trava</span>') + sizeStr
+           : (it.b ? '<span class="b">parede</span>' : "deco") + sizeStr;
     const ic = el.querySelector(".pal-icon");
     // Se tem PNG em assets/tiles/, usa ele; senao usa o atlas
     if (KNOWN_SET.has(id)) {

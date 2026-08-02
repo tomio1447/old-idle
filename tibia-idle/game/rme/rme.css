@@ -46,7 +46,8 @@ main { display: flex; height: calc(100vh - 41px); }
 .pal-row:hover { background: rgba(255,255,255,.05); }
 .pal-row.sel { border-left-color: #d8b45a; background: rgba(216,180,90,.1); }
 .pal-icon { width: 32px; height: 32px; flex: none;
-  background-repeat: no-repeat; image-rendering: pixelated; }
+  background-repeat: no-repeat; image-rendering: pixelated;
+  background-position: center; background-size: contain; }
 .pal-meta { min-width: 0; }
 .pal-name { font-size: 11px; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; }
