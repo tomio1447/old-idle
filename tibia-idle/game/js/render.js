@@ -820,13 +820,13 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
         for (let x = 0; x < W; x += tw)
           ctx.drawImage(gr, x, y, tw, th);
     } else {
-      ctx.fillStyle = "#1d2018";
+      ctx.fillStyle = "#1a1a1e";
       ctx.fillRect(0, 0, W, H);
     }
 
     ctx.fillStyle = "rgba(0,0,0,.55)";
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(40,80,40,.32)";
+    ctx.fillStyle = "rgba(50,50,55,.35)";
     ctx.fillRect(0, H * 0.68, W, H * 0.32);
 
     const drawObj = (path, x, y, sc, alpha) => {
@@ -839,10 +839,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
       ctx.restore();
     };
 
-    // Sala de treino estilo OTServer: paredes, tochas, racks, barris e caixas.
-    ctx.fillStyle = "rgba(28,22,16,.88)";
+    // Sala de treino — tema cinza escuro
+    ctx.fillStyle = "rgba(30,30,34,.90)";
     ctx.fillRect(0, 0, W, H * 0.18);
-    ctx.fillStyle = "rgba(58,45,32,.75)";
+    ctx.fillStyle = "rgba(50,50,55,.80)";
     ctx.fillRect(0, H * 0.16, W, 8);
     for (let x = 0.05; x < 1; x += 0.12)
       drawObj("assets/city/wall-brick-h.png", x, 0.19, 1.6, 0.9);
@@ -874,10 +874,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 
   ctx.textAlign = "left";
   ctx.font = "bold 14px Verdana";
-  ctx.fillStyle = "#9ce84a";
+  ctx.fillStyle = "#d8d8dc";
   ctx.fillText(temMapa ? "Sala de Exercise Weapons" : (isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone"), 12, 24);
   ctx.font = "10px Verdana";
-  ctx.fillStyle = "#c8c0a8";
+  ctx.fillStyle = "#999";
   if (isDummy) {
     const w = training.weapon ? (EXERCISE_WEAPONS[training.weapon] || {}).name : "—";
     ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12, 40);
@@ -958,14 +958,14 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.font = "bold 12px Verdana";
     ctx.fillStyle = "rgba(0,0,0,.85)";
     ctx.fillText("Ferumbras Exercise Dummy", tx + 1, ty - 90);
-    ctx.fillStyle = "#ffe680";
+    ctx.fillStyle = "#d8d8dc";
     ctx.fillText("Ferumbras Exercise Dummy", tx, ty - 91);
 
     // cargas da exercise weapon (sem barra de HP — o dummy não leva dano)
     const cargas = (player.exercise && training.weapon)
       ? (player.exercise[training.weapon] || 0) : 0;
     ctx.font = "10px Verdana";
-    ctx.fillStyle = "#c8c0a8";
+    ctx.fillStyle = "#999";
     ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 105);
   } else {
     const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
@@ -989,7 +989,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.font = "bold 12px Verdana";
     ctx.fillStyle = "rgba(0,0,0,.85)";
     ctx.fillText("Treiner", tx + 1, ty - 64);
-    ctx.fillStyle = "#ffe680";
+    ctx.fillStyle = "#d8d8dc";
     ctx.fillText("Treiner", tx, ty - 65);
 
     // barra do Treiner: nunca morre
@@ -1035,11 +1035,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 
   ctx.textAlign = "left";
   ctx.font = "11px Verdana";
-  ctx.fillStyle = "rgba(0,0,0,.72)";
+  ctx.fillStyle = "rgba(20,20,24,.80)";
   ctx.fillRect(12, H - 58, 250, 44);
-  ctx.strokeStyle = "rgba(156,232,74,.45)";
+  ctx.strokeStyle = "rgba(100,100,110,.45)";
   ctx.strokeRect(12, H - 58, 250, 44);
-  ctx.fillStyle = "#c8c0a8";
+  ctx.fillStyle = "#b0b0b8";
   const sk = training.skill ? (SKILL_NAMES[training.skill] || training.skill) : "—";
   ctx.fillText("Skill: " + sk, 22, H - 38);
   ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ativo", 22, H - 22);

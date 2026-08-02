@@ -63,7 +63,7 @@ function loadAtlases(cb) {
 }
 const externalTiles = {};
 /* Cache de PNGs em assets/tiles/ — itens que o atlas 32x32 nao cobre
- * (exercice dummies 64x64, monstros, etc). Carrega sob demanda e reusa. */
+ * (exercise dummies 64x64, monstros, etc). Carrega sob demanda e reusa. */
 function loadExternalTile(id) {
   if (externalTiles[id] !== undefined) return externalTiles[id];
   const img = new Image();
@@ -88,7 +88,10 @@ function drawItem32(ctx, id, dx, dy, size) {
       ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
       return;
     }
-    /* Imagem ainda nao carregou — desenha do atlas enquanto espera */
+    /* Imagem ainda nao carregou — desenha placeholder e pede re-render */
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.fillRect(dx, dy, size, size);
+    return;
   }
   const img = atlases[it.page];
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -692,11 +695,13 @@ function autoSaveLoad() {
   status("mapa restaurado do auto-save");
 }
 
-// Hook: agenda auto-save a cada edição
+// Hook: agenda auto-save a cada edição (delegado ao wrapper, sem redefinir função)
 const _origApplyPaint = applyPaint;
 const _origApplyErase = applyErase;
-function applyPaint(x, y) { _origApplyPaint(x, y); autoSaveSchedule(); }
-function applyErase(x, y) { _origApplyErase(x, y); autoSaveSchedule(); }
+// Não usamos `function applyPaint` de novo — hoisting causaria recursão infinita.
+// Em vez disso, sobrescrevemos a variável no escopo do módulo:
+applyPaint = function(x, y) { _origApplyPaint(x, y); autoSaveSchedule(); };
+applyErase = function(x, y) { _origApplyErase(x, y); autoSaveSchedule(); };
 
 // Ctrl+S salva manualmente (download + auto-save)
 window.addEventListener("keydown", (e) => {
