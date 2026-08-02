@@ -444,9 +444,9 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
 
 /* Animação de impacto / míssil de cada exercise weapon no dummy */
 const EXERCISE_FX = {
-  "exercise-sword": { missile: "weapon", fx: "hit-area" },
-  "exercise-axe":   { missile: "weapon", fx: "hit-area" },
-  "exercise-club":  { missile: "weapon", fx: "hit-area" },
+  "exercise-sword": { missile: "assets/missile/whirlwind-sword_e.png", fx: "hit-area" },
+  "exercise-axe":   { missile: "assets/missile/whirlwind-axe_e.png",   fx: "hit-area" },
+  "exercise-club":  { missile: "assets/missile/whirlwind-club_e.png",  fx: "hit-area" },
   "exercise-bow":   { missile: "assets/missile/arrow_e.png", fx: "hit-area" },
   "exercise-rod":   { missile: "assets/missile/ice_e.png",  fx: "ice-attack" },
   "exercise-wand":  { missile: "assets/missile/fire_e.png", fx: "fire-attack" },
