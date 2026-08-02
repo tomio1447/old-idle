@@ -24,7 +24,15 @@ const TileSprites = {
   draw(ctx, id, sx, sy, size) {
     const img = this.get(id);
     if (img && img.complete && img.naturalWidth) {
-      ctx.drawImage(img, sx, sy, size + 1, size + 1);
+      const scale = size / 32;
+      const w = img.naturalWidth * scale;
+      const h = img.naturalHeight * scale;
+      // Ancorar pelo bottom-right (ou top-left)?
+      // No Tibia sprites maiores q 32x32 geralmente espalham pra cima e pra esquerda.
+      // Entao sx e sy sao a celula base (32x32 do chao).
+      const dx = sx - (w - size);
+      const dy = sy - (h - size);
+      ctx.drawImage(img, dx, dy, w + (scale>1?0:1), h + (scale>1?0:1));
       return true;
     }
     return false;

@@ -60,9 +60,26 @@ function loadAtlases(cb) {
     atlases.push(img);
   }
 }
+const externalTiles = {};
 function drawItem32(ctx, id, dx, dy, size) {
   const it = ITEMS.get(id);
   if (!it) return;
+  // If it's a known large item (like ferumbras dummy), load directly from assets
+  if (id === 31215 || id === 31216) {
+    if (externalTiles[id] === undefined) {
+      externalTiles[id] = new Image();
+      externalTiles[id].src = `../assets/tiles/${id}.png`;
+    }
+    const img2 = externalTiles[id];
+    if (img2.complete && img2.naturalWidth) {
+      const scale = size / 32;
+      const w = img2.naturalWidth * scale;
+      const h = img2.naturalHeight * scale;
+      ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
+      return;
+    }
+  }
+
   const img = atlases[it.page];
   if (!img || !img.complete || !img.naturalWidth) return;
   const cx = it.idx % CATALOG.cols;
@@ -583,4 +600,35 @@ loadAtlases(() => {
   render();
   status(`catálogo: ${CATALOG.entries.length.toLocaleString("pt-BR")} itens · ` +
          `${KNOWN.length} sprites já existem no jogo`);
+});
+
+
+/* ------------------------------------------------------------ Abrir Mapa */
+document.getElementById("btn-open-map").addEventListener("click", () => {
+  document.getElementById("file-open-map").click();
+});
+
+document.getElementById("file-open-map").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const mapData = OTBM.read(ev.target.result);
+      state.w = mapData.w || 21;
+      state.h = mapData.h || 13;
+      document.getElementById("map-w").value = state.w;
+      document.getElementById("map-h").value = state.h;
+      if(mapData.name) document.getElementById("map-name").value = mapData.name;
+      state.cells = mapData.cells || {};
+      state.spawn = mapData.spawn;
+      state.mob = new Set(mapData.mob ? mapData.mob.map(m => m.x + "," + m.y) : []);
+      resizeCanvas();
+      render();
+      e.target.value = "";
+    } catch(err) {
+      alert("Erro ao abrir .otbm: " + err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
 });
