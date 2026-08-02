@@ -14,6 +14,7 @@
 
 const CATALOG = window.RME_CATALOG;
 const KNOWN = window.RME_KNOWN_TILES || [];
+const KNOWN_SET = new Set(KNOWN);
 
 /* tabela id -> {w, b, g, page, idx, name} */
 const ITEMS = new Map();
@@ -61,16 +62,25 @@ function loadAtlases(cb) {
   }
 }
 const externalTiles = {};
+/* Cache de PNGs em assets/tiles/ — itens que o atlas 32x32 nao cobre
+ * (exercice dummies 64x64, monstros, etc). Carrega sob demanda e reusa. */
+function loadExternalTile(id) {
+  if (externalTiles[id] !== undefined) return externalTiles[id];
+  const img = new Image();
+  img.src = `../assets/tiles/${id}.png`;
+  externalTiles[id] = img;
+  img.onload = () => render();   // redesenha quando a imagem chega
+  return img;
+}
 function drawItem32(ctx, id, dx, dy, size) {
   const it = ITEMS.get(id);
   if (!it) return;
-  // If it's a known large item (like ferumbras dummy), load directly from assets
-  if (id === 31215 || id === 31216) {
-    if (externalTiles[id] === undefined) {
-      externalTiles[id] = new Image();
-      externalTiles[id].src = `../assets/tiles/${id}.png`;
-    }
-    const img2 = externalTiles[id];
+  /* Se existe PNG em assets/tiles/ (incluindo itens 64x64 como exercise dummies),
+   * carrega e desenha a sprite completa no tamanho certo, ancorada no canto
+   * inferior direito (convencao do client: item 2x2 ocupa 2 tiles a partir
+   * do canto superior esquerdo do tile de referencia). */
+  if (KNOWN_SET.has(id)) {
+    const img2 = loadExternalTile(id);
     if (img2.complete && img2.naturalWidth) {
       const scale = size / 32;
       const w = img2.naturalWidth * scale;
@@ -78,8 +88,8 @@ function drawItem32(ctx, id, dx, dy, size) {
       ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
       return;
     }
+    /* Imagem ainda nao carregou — desenha do atlas enquanto espera */
   }
-
   const img = atlases[it.page];
   if (!img || !img.complete || !img.naturalWidth) return;
   const cx = it.idx % CATALOG.cols;
@@ -410,10 +420,18 @@ function renderPalRows() {
       it.g ? (it.w ? '<span class="w">chão</span>' : '<span class="b">chão trava</span>')
            : (it.b ? '<span class="b">parede</span>' : "deco");
     const ic = el.querySelector(".pal-icon");
-    const cx = it.idx % CATALOG.cols;
-    const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
-    ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
-    ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
+    // Se tem PNG em assets/tiles/, usa ele; senao usa o atlas
+    if (KNOWN_SET.has(id)) {
+      ic.style.backgroundImage = `url(../assets/tiles/${id}.png)`;
+      ic.style.backgroundPosition = "center";
+      ic.style.backgroundSize = "contain";
+    } else {
+      const cx = it.idx % CATALOG.cols;
+      const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
+      ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
+      ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
+      ic.style.backgroundSize = "";
+    }
     if (!el.parentNode) palInner.appendChild(el);
   }
 }
@@ -600,6 +618,8 @@ loadAtlases(() => {
   render();
   status(`catálogo: ${CATALOG.entries.length.toLocaleString("pt-BR")} itens · ` +
          `${KNOWN.length} sprites já existem no jogo`);
+  // Auto-save: carrega o último mapa salvo no localStorage
+  autoSaveLoad();
 });
 
 
@@ -631,4 +651,58 @@ document.getElementById("file-open-map").addEventListener("change", (e) => {
     }
   };
   reader.readAsArrayBuffer(file);
+});
+
+/* ------------------------------------------------------------ Auto-Save */
+const AUTO_SAVE_KEY = "oti_rme_autosave";
+const AUTO_SAVE_MS = 3000;  // salva a cada 3s de inatividade
+let autoSaveTimer = null;
+
+function autoSaveGet() {
+  try { return JSON.parse(localStorage.getItem(AUTO_SAVE_KEY)); } catch { return null; }
+}
+function autoSaveNow() {
+  const m = mapModel();
+  const data = { ...m, cells: state.cells, spawn: state.spawn,
+                 mob: [...state.mob], ts: Date.now() };
+  try { localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(data)); } catch {}
+  status("💾 auto-salvo");
+}
+function autoSaveSchedule() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(autoSaveNow, AUTO_SAVE_MS);
+}
+function autoSaveLoad() {
+  const saved = autoSaveGet();
+  if (!saved || !saved.cells) return;
+  // Pergunta se quer restaurar
+  const ago = Math.round((Date.now() - (saved.ts || 0)) / 1000);
+  const timeStr = ago < 60 ? `${ago}s` : `${Math.round(ago/60)}min`;
+  if (!confirm(`Restaurar mapa auto-salvo (${timeStr} atrás, "${saved.name || "mapa"}")?`)) return;
+  state.w = saved.w || 21;
+  state.h = saved.h || 13;
+  document.getElementById("map-w").value = state.w;
+  document.getElementById("map-h").value = state.h;
+  if (saved.name) document.getElementById("map-name").value = saved.name;
+  state.cells = saved.cells;
+  state.spawn = saved.spawn;
+  state.mob = new Set(saved.mob ? saved.mob.map(m => m.x + "," + m.y) : []);
+  resizeCanvas();
+  render();
+  status("mapa restaurado do auto-save");
+}
+
+// Hook: agenda auto-save a cada edição
+const _origApplyPaint = applyPaint;
+const _origApplyErase = applyErase;
+function applyPaint(x, y) { _origApplyPaint(x, y); autoSaveSchedule(); }
+function applyErase(x, y) { _origApplyErase(x, y); autoSaveSchedule(); }
+
+// Ctrl+S salva manualmente (download + auto-save)
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    autoSaveNow();
+    document.getElementById("btn-save").click();
+  }
 });
