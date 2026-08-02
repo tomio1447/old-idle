@@ -126,7 +126,7 @@ canvas { image-rendering: pixelated; }
   transition: width .18s linear;
   background-size: 100% 100%;
 }
-.bar .fill.hp  { background: linear-gradient(180deg, #ff5555, #a01010); }
+/* HP bar: cor dinâmica via JS (hpBarColor) — não definir background fixo aqui */
 .bar .fill.mp  { background: linear-gradient(180deg, #6a8aff, #1f30a0); }
 .bar .fill.exp { background: linear-gradient(180deg, #9ce84a, #4a8a10); }
 .bar .fill.sta { background: linear-gradient(180deg, #ffd24a, #a07510); }

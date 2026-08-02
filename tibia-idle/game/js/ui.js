@@ -405,6 +405,33 @@ function setBar(sel, pct, label) {
     Math.max(0, Math.min(100, pct * 100)) + "%";
   const l = el.querySelector(".label");
   if (l) l.textContent = label;
+  // HP bar: cor dinâmica conforme % (verde > amarelo > laranja > vermelho)
+  const fill = el.querySelector(".fill");
+  if (fill && fill.classList.contains("hp")) {
+    const hpColor = hpBarColor(pct);
+    fill.style.background = hpColor.grad;
+    l.style.color = hpColor.text;
+  }
+}
+
+/* Cor da barra de HP conforme % — igual ao Tibia real */
+function hpBarColor(pct) {
+  if (pct > 0.6)  return {
+    grad: "linear-gradient(180deg, #4ade80, #16a34a)",
+    text: "#4ade80",
+  };
+  if (pct > 0.3)  return {
+    grad: "linear-gradient(180deg, #facc15, #ca8a04)",
+    text: "#facc15",
+  };
+  if (pct > 0.1)  return {
+    grad: "linear-gradient(180deg, #fb923c, #ea580c)",
+    text: "#fb923c",
+  };
+  return {
+    grad: "linear-gradient(180deg, #f87171, #dc2626)",
+    text: "#f87171",
+  };
 }
 
 function renderSkills(p) {
