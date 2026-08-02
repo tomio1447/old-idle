@@ -1011,8 +1011,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     const p = Math.min(1, pr.t / pr.dur);
     const ex = (pr.from.x + (pr.to.x - pr.from.x) * p) * W;
     const ey = (pr.from.y + (pr.to.y - pr.from.y) * p) * H;
-    const icon = (EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif";
-    const wimg = Sprites.get("assets/ui/training/" + icon);
+    const isWeaponIcon = !pr.missile || pr.missile === "weapon";
+    const icon = isWeaponIcon
+      ? ("assets/ui/training/" + ((EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif"))
+      : pr.missile;
+    const wimg = Sprites.get(icon);
     if (wimg && wimg.complete && wimg.naturalWidth) {
       const ts = tilePx(W);
       const ws = ts * 0.75, hs = ts * 0.75;
@@ -1028,7 +1031,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // impacto no dummy quando a arma chega (uma vez por golpe)
     if (p >= 1 && !pr.hitFx) {
       pr.hitFx = true;
-      this.addEffect(pr.to.x, pr.to.y, "block-hit");
+      this.addEffect(pr.to.x, pr.to.y, pr.fx || "block-hit");
       // some o proj no próximo frame
       training.proj = null;
     }

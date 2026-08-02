@@ -442,6 +442,18 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
   };
 }
 
+/* Animação de impacto / míssil de cada exercise weapon no dummy */
+const EXERCISE_FX = {
+  "exercise-sword": { missile: "weapon", fx: "hit-area" },
+  "exercise-axe":   { missile: "weapon", fx: "hit-area" },
+  "exercise-club":  { missile: "weapon", fx: "hit-area" },
+  "exercise-bow":   { missile: "assets/missile/arrow_e.png", fx: "hit-area" },
+  "exercise-rod":   { missile: "assets/missile/ice_e.png",  fx: "ice-attack" },
+  "exercise-wand":  { missile: "assets/missile/fire_e.png", fx: "fire-attack" },
+  "exercise-shield":{ missile: "weapon", fx: "block-hit" },
+  "exercise-wraps": { missile: "weapon", fx: "claw-white" },
+};
+
 function academyAttackDelay(t, p) {
   // baseAttackSpeed / rateExerciseTrainingSpeed, como no servidor
   const base = p ? exerciseInterval(p) : 2000;
@@ -602,11 +614,14 @@ function academyTrainingTick(t, p, dt, now) {
   // o dummy (como no client — a arma é arremessada a cada golpe). O
   // personagem fica parado; `proj` carrega a trajetória para o drawAcademy.
   if (t.mode === "dummy" && t.playerPos && t.dummyPos) {
+    const ef = EXERCISE_FX[t.weapon] || { missile: "weapon", fx: "block-hit" };
     t.proj = {
       t: 0, dur: 300,
       from: { x: t.playerPos.x, y: t.playerPos.y },
       to: { x: t.dummyPos.x, y: t.dummyPos.y },
       weapon: t.weapon,
+      missile: ef.missile,
+      fx: ef.fx,
     };
     t.projHitFx = false;
   } else {
