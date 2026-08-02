@@ -29,7 +29,7 @@ main { display: flex; height: calc(100vh - 41px); }
 
 #side { width: 292px; display: flex; flex-direction: column;
   border-right: 1px solid #3a3a40; background: #1e1e22; }
-.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
   padding: 8px; border-bottom: 1px solid #2e2e32; }
 .tool-group { display: flex; flex-direction: column; gap: 3px; }
 .tool-group button { text-align: left; font-size: 11px; padding: 3px 6px; }

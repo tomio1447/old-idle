@@ -35,7 +35,7 @@ const state = {
   spawn: null,          // {x, y}
   mob: new Set(),       // "x,y"
   layer: "g",           // g chao | i itens | z zonas
-  tool: "pen",          // pen | rect | erase | pick
+  tool: "pen",          // pen | rect | erase | pick | move
   zone: "s",            // s jogador | m monstros
   brush: 1,
   selId: 106,           // grass
@@ -44,6 +44,9 @@ const state = {
   showBlock: false,
   undo: [],
   painting: false,
+  dragStart: null,      // {x, y} — célula onde começou o arrasto
+  dragData: null,       // Map "dx,dy" -> {cell, spawn, mob} — dados das células arrastadas
+  dragOffset: null,     // {dx, dy} — deslocamento atual do arrasto
   rectStart: null,
   rectNow: null,
   hover: null,
@@ -174,6 +177,55 @@ function render() {
       ctx.beginPath(); ctx.moveTo(0, y * S + .5); ctx.lineTo(cv.width, y * S + .5); ctx.stroke();
     }
   }
+  // drag preview
+  if (state.dragStart && state.dragData && state.dragOffset) {
+    const ddx = state.dragOffset.dx;
+    const ddy = state.dragOffset.dy;
+    // escurece posições originais
+    for (const [key, data] of state.dragData) {
+      const [ox, oy] = key.split(",").map(Number);
+      const sx = state.dragStart.x + ox;
+      const sy = state.dragStart.y + oy;
+      ctx.fillStyle = "rgba(0,0,0,.55)";
+      ctx.fillRect(sx * S, sy * S, S, S);
+      // borda tracejada na origem
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(255,215,94,.6)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx * S + .5, sy * S + .5, S - 1, S - 1);
+      ctx.setLineDash([]);
+    }
+    // desenha células na nova posição (semi-transparente)
+    ctx.globalAlpha = 0.75;
+    for (const [key, data] of state.dragData) {
+      const [ox, oy] = key.split(",").map(Number);
+      const nx = state.dragStart.x + ox + ddx;
+      const ny = state.dragStart.y + oy + ddy;
+      if (nx < 0 || ny < 0 || nx >= state.w || ny >= state.h) continue;
+      if (!data.cell) continue;
+      if (data.cell.g) drawItem32(ctx, data.cell.g, nx * S, ny * S, S);
+      for (const id of data.cell.items) drawItem32(ctx, id, nx * S, ny * S, S);
+    }
+    ctx.globalAlpha = 1.0;
+    // borda de destaque na área de destino
+    const allNx = [], allNy = [];
+    for (const [key, data] of state.dragData) {
+      const [ox, oy] = key.split(",").map(Number);
+      const nx = state.dragStart.x + ox + ddx;
+      const ny = state.dragStart.y + oy + ddy;
+      if (nx >= 0 && ny >= 0 && nx < state.w && ny < state.h) {
+        allNx.push(nx); allNy.push(ny);
+      }
+    }
+    if (allNx.length) {
+      const minX = Math.min(...allNx), maxX = Math.max(...allNx);
+      const minY = Math.min(...allNy), maxY = Math.max(...allNy);
+      ctx.strokeStyle = "rgba(106,176,255,.9)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(minX * S + 1, minY * S + 1,
+                     (maxX - minX + 1) * S - 2, (maxY - minY + 1) * S - 2);
+    }
+  }
   // hover
   if (state.hover) {
     ctx.strokeStyle = "rgba(255,255,255,.5)";
@@ -291,6 +343,28 @@ cv.addEventListener("pointerdown", (e) => {
     } else status("celula vazia");
     return;
   }
+  if (state.tool === "move") {
+    /* Inicia o arrasto: captura as células sob o pincel */
+    state.dragStart = c;
+    state.dragData = new Map();
+    state.dragOffset = { dx: 0, dy: 0 };
+    for (let dy = 0; dy < state.brush; dy++) {
+      for (let dx = 0; dx < state.brush; dx++) {
+        const px = c.x + dx, py = c.y + dy;
+        if (px < 0 || py < 0 || px >= state.w || py >= state.h) continue;
+        const cell = cellAt(px, py, false);
+        state.dragData.set(dx + "," + dy, {
+          cell: cell ? JSON.parse(JSON.stringify(cell)) : null,
+          spawn: state.spawn && state.spawn.x === px && state.spawn.y === py,
+          mob: state.mob.has(px + "," + py),
+        });
+      }
+    }
+    pushUndo();
+    cv.style.cursor = "grabbing";
+    render();
+    return;
+  }
   cv.setPointerCapture(e.pointerId);
   state.painting = true;
   pushUndo();
@@ -306,6 +380,15 @@ cv.addEventListener("pointerdown", (e) => {
 cv.addEventListener("pointermove", (e) => {
   const c = canvasCell(e);
   state.hover = c;
+  if (state.tool === "move" && state.dragStart) {
+    state.dragOffset = {
+      dx: c.x - state.dragStart.x,
+      dy: c.y - state.dragStart.y,
+    };
+    render();
+    showCellInfo(c);
+    return;
+  }
   if (state.painting) {
     if (state.tool === "rect") state.rectNow = c;
     else if (state.tool === "erase") applyErase(c.x, c.y);
@@ -315,6 +398,75 @@ cv.addEventListener("pointermove", (e) => {
   showCellInfo(c);
 });
 cv.addEventListener("pointerup", (e) => {
+  if (state.tool === "move" && state.dragStart) {
+    const ddx = state.dragOffset.dx;
+    const ddy = state.dragOffset.dy;
+    if (ddx !== 0 || ddy !== 0) {
+      /* Salva o conteúdo que estava no destino (para swap) */
+      const destCells = new Map();
+      for (const [key, data] of state.dragData) {
+        const [ox, oy] = key.split(",").map(Number);
+        const nx = state.dragStart.x + ox + ddx;
+        const ny = state.dragStart.y + oy + ddy;
+        if (nx < 0 || ny < 0 || nx >= state.w || ny >= state.h) continue;
+        const dKey = nx + "," + ny;
+        if (!destCells.has(dKey)) {
+          const dc = cellAt(nx, ny, false);
+          destCells.set(dKey, {
+            cell: dc ? JSON.parse(JSON.stringify(dc)) : null,
+            spawn: state.spawn && state.spawn.x === nx && state.spawn.y === ny,
+            mob: state.mob.has(nx + "," + ny),
+          });
+        }
+      }
+      /* Limpa posições originais */
+      for (const [key, data] of state.dragData) {
+        const [ox, oy] = key.split(",").map(Number);
+        const sx = state.dragStart.x + ox;
+        const sy = state.dragStart.y + oy;
+        delete state.cells[sx + "," + sy];
+        if (data.spawn) state.spawn = null;
+        if (data.mob) state.mob.delete(sx + "," + sy);
+      }
+      /* Coloca o conteúdo arrastado no destino */
+      for (const [key, data] of state.dragData) {
+        const [ox, oy] = key.split(",").map(Number);
+        const nx = state.dragStart.x + ox + ddx;
+        const ny = state.dragStart.y + oy + ddy;
+        if (nx < 0 || ny < 0 || nx >= state.w || ny >= state.h) continue;
+        if (data.cell) state.cells[nx + "," + ny] = data.cell;
+        if (data.spawn) state.spawn = { x: nx, y: ny };
+        if (data.mob) state.mob.add(nx + "," + ny);
+      }
+      /* Coloca o conteúdo do destino nas posições originais (swap) */
+      let i = 0;
+      for (const [key, data] of state.dragData) {
+        const [ox, oy] = key.split(",").map(Number);
+        const nx = state.dragStart.x + ox + ddx;
+        const ny = state.dragStart.y + oy + ddy;
+        const dKey = nx + "," + ny;
+        const dest = destCells.get(dKey);
+        if (!dest) continue;
+        const sx = state.dragStart.x + ox;
+        const sy = state.dragStart.y + oy;
+        if (sx < 0 || sy < 0 || sx >= state.w || sy >= state.h) continue;
+        /* Não sobrescreve se a origem já recebeu conteúdo do arrasto */
+        if (!state.cells[sx + "," + sy] && dest.cell) {
+          state.cells[sx + "," + sy] = dest.cell;
+        }
+        if (dest.spawn) state.spawn = { x: sx, y: sy };
+        if (dest.mob) state.mob.add(sx + "," + sy);
+      }
+      status(`movido ${state.dragData.size} SQM (${ddx > 0 ? "+" : ""}${ddx}, ${ddy > 0 ? "+" : ""}${ddy})`);
+    }
+    state.dragStart = null;
+    state.dragData = null;
+    state.dragOffset = null;
+    cv.style.cursor = "grab";
+    render();
+    autoSaveSchedule();
+    return;
+  }
   if (state.painting && state.tool === "rect" && state.rectStart && state.rectNow) {
     applyRect(state.rectStart, state.rectNow);
   }
@@ -324,6 +476,15 @@ cv.addEventListener("pointerup", (e) => {
 });
 cv.addEventListener("pointerleave", () => {
   state.hover = null;
+  /* Se estava arrastando, cancela o move sem aplicar */
+  if (state.dragStart) {
+    state.dragStart = null;
+    state.dragData = null;
+    state.dragOffset = null;
+    cv.style.cursor = "grab";
+    /* Desfaz o undo que foi empilhado no pointerdown do move */
+    state.undo.pop();
+  }
   render();
 });
 cv.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -465,6 +626,7 @@ document.querySelectorAll("#grp-tool button").forEach((b) =>
     state.tool = b.dataset.tool;
     document.querySelectorAll("#grp-tool button").forEach((x) =>
       x.classList.toggle("sel", x === b));
+    cv.style.cursor = state.tool === "move" ? "grab" : "crosshair";
   }));
 document.querySelectorAll("#grp-zone button").forEach((b) =>
   b.addEventListener("click", () => {
