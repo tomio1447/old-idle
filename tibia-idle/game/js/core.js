@@ -74,21 +74,19 @@ function expForLevel(lvl) {
   return Math.floor((50 / 3) * (lvl * lvl * lvl - 6 * lvl * lvl + 17 * lvl - 12));
 }
 
-/* Stages de experiencia (estilo servidor Baiak): multiplica a XP por nivel.
- * Alto no comeco para tirar o char de Rookgaard rapido, suave depois. */
-const EXP_STAGES = [
-  { max: 8, mul: 6 },
-  { max: 20, mul: 4 },
-  { max: 50, mul: 3 },
-  { max: 100, mul: 2.2 },
-  { max: 200, mul: 1.7 },
-  { max: 350, mul: 1.4 },
-  { max: Infinity, mul: 1.2 },
-];
-
+/* Stages de experiencia do servidor (rates.js).
+ * Os rates do servidor são aplicados diretamente: rate 80x significa que
+ * o jogador ganha 80x mais XP do que o Tibia oficial. */
 function expStage(level) {
-  for (const s of EXP_STAGES) if (level <= s.max) return s.mul;
-  return 25;
+  if (typeof serverExpRate === "function") return serverExpRate(level);
+  // fallback: stages antigos
+  const _fallback = [
+    { max: 8, mul: 6 }, { max: 20, mul: 4 }, { max: 50, mul: 3 },
+    { max: 100, mul: 2.2 }, { max: 200, mul: 1.7 }, { max: 350, mul: 1.4 },
+    { max: Infinity, mul: 1.2 },
+  ];
+  for (const s of _fallback) if (level <= s.max) return s.mul;
+  return 1.2;
 }
 
 /* Multiplicador de ouro conforme o nivel da area (economia escalada).

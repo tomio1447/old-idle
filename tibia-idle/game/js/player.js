@@ -390,7 +390,13 @@ function addSkillTries(p, which, tries) {
                  which === "fist" ? voc.fist : voc.melee;
   const base = isShield ? 100 : isDist ? 30 : which === "fist" ? 50 : 50;
 
-  p.skillTries[which] = (p.skillTries[which] || 0) + tries;
+  // Rate de skill do servidor: divide o custo pelo rate
+  const currentSkill = p.skills[which] || 10;
+  const skillRate = (typeof serverSkillRate === "function")
+    ? serverSkillRate(currentSkill) : 1;
+  const effectiveTries = Math.floor(tries * skillRate);
+
+  p.skillTries[which] = (p.skillTries[which] || 0) + effectiveTries;
   let up = false;
   let need = skillCost(p.skills[which], base, factor);
   while (p.skillTries[which] >= need) {
@@ -417,7 +423,12 @@ function skillProgress(p, which) {
 /* Gasto de mana sobe magic level */
 function addManaSpent(p, mana) {
   const voc = VOCATIONS[p.voc];
-  p.manaSpent += mana;
+  // Rate de magic do servidor: divide o custo pelo rate
+  const magicRate = (typeof serverMagicRate === "function")
+    ? serverMagicRate(p.ml) : 1;
+  const effectiveMana = Math.floor(mana * magicRate);
+
+  p.manaSpent += effectiveMana;
   let up = false;
   let need = mlCost(p.ml, voc.magicFactor);
   while (p.manaSpent >= need) {

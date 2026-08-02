@@ -122,8 +122,11 @@ function ensureCyclopedia(p) {
 /* Registra um abate no bestiario e credita charm points por estagio novo */
 function bestiaryKill(p, slug, n) {
   ensureCyclopedia(p);
+  // Rate de bestiário do servidor: kills contam 2x
+  const bestRate = (typeof SERVER_BESTIARY_RATE !== "undefined") ? SERVER_BESTIARY_RATE : 1;
+  const kills = Math.floor((n || 1) * bestRate);
   const antes = p.bestiary[slug] || 0;
-  const depois = antes + (n || 1);
+  const depois = antes + kills;
   p.bestiary[slug] = depois;
   const marcos = bestiaryMarcos(slug);
   const pontos = bestiaryCharms(slug);

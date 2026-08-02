@@ -699,8 +699,10 @@ function huntEstimate(p, hu) {
   const effHp = hu.avgHp + hu.avgArmor * 3;
   const ttk = Math.max(0.6, effHp / Math.max(1, dps));
   const killsPerHour = 3600 / (ttk + (hu.respawn || 0.8));
+  // Rate de experiência do servidor aplicado na estimativa
+  const expRate = (typeof expStage === "function") ? expStage(p.level) : 1;
   return {
-    exp: killsPerHour * hu.avgExp,
+    exp: killsPerHour * hu.avgExp * expRate,
     gold: killsPerHour * hu.avgGold * 1.6,
     kills: killsPerHour,
     ttk: ttk,

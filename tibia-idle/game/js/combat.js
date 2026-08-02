@@ -2865,9 +2865,18 @@ function mobAttack(c, p, mob) {
 /* Gera o loot de um monstro morto */
 function rollLoot(c, p, mob) {
   const got = [];
+  // Rate de loot do servidor: multiplica a chance de drop
+  const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
   for (const l of mob.def.loot) {
-    if (Math.random() * 100 > l.chance) continue;
+    // Chance efetiva = chance base * lootRate (cap 100%)
+    const effectiveChance = Math.min(100, l.chance * lootRate);
+    if (Math.random() * 100 > effectiveChance) continue;
     let count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+    // Rate de loot também multiplica a quantidade
+    if (lootRate > 1) {
+      const boosted = count * lootRate;
+      count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
+    }
     if ((c.lootMul || 1) > 1) {
       const boosted = count * c.lootMul;
       count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
