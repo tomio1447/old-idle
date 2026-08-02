@@ -912,7 +912,9 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   const pimgAtk = (atkFrame && spriteReady(pimg))
     ? (OutfitRenderer.forPlayer(player, "e", atkFrame) || pimg) : pimg;
   if (spriteReady(pimgAtk)) {
-    const sc = PLAYER_SCALE + 0.1;
+    // mesma escala do combate: tibiaScale(W) = tilePx / 32, assim o
+    // personagem tem o MESMO tamanho na sala de treino e nas hunts
+    const sc = tibiaScale(W);
     const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
     // SEM bob: sprite fixa no chão, como no client
     const top = py - h / 2;
@@ -940,8 +942,6 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     if (!temMapa) {
       const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
       const scDummy = 1.5;
-      const dbx = tx - (dw * scDummy) / 2, dby = ty - dh * scDummy + 8;
-      drawTargetSquare(ctx, dbx, dby, dw * scDummy, dh * scDummy);
       if (dimg && dimg.complete && dimg.naturalWidth) {
         const sc = scDummy;
         const w = dimg.naturalWidth * sc, h = dimg.naturalHeight * sc;
@@ -961,16 +961,12 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.fillStyle = "#ffe680";
     ctx.fillText("Ferumbras Exercise Dummy", tx, ty - 91);
 
-    // barra do dummy + cargas da exercise weapon
-    ctx.fillStyle = "#000";
-    ctx.fillRect(tx - 46, ty - 108, 92, 8);
-    ctx.fillStyle = "#4ec84e";
-    ctx.fillRect(tx - 45, ty - 107, 90, 6);
+    // cargas da exercise weapon (sem barra de HP — o dummy não leva dano)
     const cargas = (player.exercise && training.weapon)
       ? (player.exercise[training.weapon] || 0) : 0;
     ctx.font = "10px Verdana";
     ctx.fillStyle = "#c8c0a8";
-    ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 113);
+    ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 105);
   } else {
     const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
     let trainerBox = { x: tx - 22, y: ty - 52, w: 44, h: 74 };
@@ -1046,7 +1042,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "#c8c0a8";
   const sk = training.skill ? (SKILL_NAMES[training.skill] || training.skill) : "—";
   ctx.fillText("Skill: " + sk, 22, H - 38);
-  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Dano: " + fmtFull(training.stats.damage || 0) + " · Shielding ativo", 22, H - 22);
+  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ativo", 22, H - 22);
 
   // efeitos/números flutuantes
   for (let i = this.effects.length - 1; i >= 0; i--) {
