@@ -45,10 +45,11 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   OTBM_HUNT_CACHE[hunt.otbm] = "loading";
-  // Cache-busting: evita que o navegador use um .otbm antigo após o
-  // usuário editar e salvar o mapa no RME. O timestamp garante que
-  // cada reload busca a versão mais recente do servidor.
-  var _otbmV = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  // Cache-busting: usa Date.now() para que CADA fetch bypass o cache HTTP
+  // do navegador. Assim, ao editar o mapa no RME e dar F5, a versão
+  // mais recente é sempre baixada. Para forçar reload sem F5, use
+  // window.reloadMaps() ou Ctrl+Shift+R.
+  var _otbmV = Date.now();
   fetch("maps/" + encodeURIComponent(hunt.otbm) + ".otbm?v=" + _otbmV)
     .then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -73,3 +74,50 @@ function huntMapFromOtbmAsync(hunt, done) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { huntMapFromOtbmAsync };
 }
+
+/* ------------------------------------------------------------ Injector: reload manual de mapas */
+/**
+ * Limpa o cache de mapas .otbm e recarrega todos os mapas das hunts ativas.
+ * Use: window.reloadMaps()  ou  Ctrl+Shift+R
+ *
+ * Se o jogador está em uma hunt com .otbm, o combate é reiniciado com o
+ * mapa atualizado. Se está na cidade, só limpa o cache (a próxima hunt
+ * já vai buscar o mapa novo).
+ */
+window.reloadMaps = function reloadMaps() {
+  // Limpa cache de huntmaps OTBM
+  const otbmKeys = Object.keys(HUNTMAPS).filter(k => k.startsWith("otbm:"));
+  for (const k of otbmKeys) delete HUNTMAPS[k];
+  // Limpa cache de loading/estado
+  for (const k of Object.keys(OTBM_HUNT_CACHE)) delete OTBM_HUNT_CACHE[k];
+  // Limpa cache de sprites de tile
+  if (typeof TileSprites !== "undefined" && TileSprites.cache) TileSprites.cache = {};
+
+  // Se o jogador está em hunt com .otbm, reinicia o combate com mapa atualizado
+  const p = (typeof G !== "undefined" && G.p) ? G.p : null;
+  if (p && p.hunt && G.inCity === false) {
+    const hu = (typeof GAMEDATA !== "undefined") ? GAMEDATA.hunts[p.hunt] : null;
+    if (hu && hu.otbm) {
+      console.log("[injector] recarregando mapa .otbm:", hu.otbm);
+      huntMapFromOtbmAsync(hu, () => {
+        G.combat = newCombat(p, p.hunt, p.instanceMode);
+        spawnWave(G.combat, p);
+        if (typeof renderAll === "function") renderAll();
+        if (typeof toast === "function") toast("🗺️ Mapa atualizado!");
+        console.log("[injector] mapa recarregado com sucesso");
+      });
+      return;
+    }
+  }
+  console.log("[injector] cache de mapas limpo. Próxima hunt usará o mapa atualizado.");
+  if (typeof toast === "function") toast("🗺️ Cache de mapas limpo!");
+};
+
+// Atalho Ctrl+Shift+R para recarregar mapas manualmente
+window.addEventListener("keydown", function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "r") {
+    e.preventDefault();
+    e.stopPropagation();
+    window.reloadMaps();
+  }
+});
