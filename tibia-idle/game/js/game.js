@@ -1218,9 +1218,35 @@ function drainAcademyEvents() {
 }
 
 /* ------------------------------------------------------------ loop */
+/* Quando a aba fica inativa, o browser pausa requestAnimationFrame.
+ * Ao voltar, o delta (ts - G.last) seria enorme e o tickAcc engoliria
+ * dezenas de ticks de uma vez, causando o "travamento" que o jogador
+ * percebe. A solução: resetar o acumulador ao retomar a aba e ignorar
+ * o frame gigante que o browser entrega na volta. */
+let _wasHidden = false;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    _wasHidden = true;
+  } else {
+    /* Ao voltar: reseta o timestamp para que o próximo frame
+     * tenha dt ≈ 0 (não acumula ticks atrasados) e zera o
+     * acumulador para não disparar o while(tickAcc >= TICK). */
+    G.last = performance.now();
+    G.tickAcc = 0;
+    _wasHidden = false;
+  }
+});
+
 function loop(ts) {
   requestAnimationFrame(loop);
   if (!G.p) return;
+  /* Se estávamos com a aba escondida, descarta o frame de retorno
+   * (ts pode ser segundos depois do G.last) e reinicia o relógio. */
+  if (_wasHidden) {
+    G.last = ts;
+    G.tickAcc = 0;
+    _wasHidden = false;
+  }
   const dt = Math.min(250, ts - G.last || 16);
   G.last = ts;
 
@@ -1438,6 +1464,19 @@ function startGame(p) {
   G.renderer.resize();
   G.walker = new CityWalker();
 
+  // Migração: garante exercise weapon charges grátis para personagens antigos
+  if (typeof ensureTraining === "function") {
+    ensureTraining(p);
+    const freeWeapon = p.voc === "knight" ? "exercise-sword"
+      : p.voc === "paladin" ? "exercise-bow"
+      : p.voc === "sorcerer" ? "exercise-wand"
+      : p.voc === "druid" ? "exercise-rod"
+      : p.voc === "monk" ? "exercise-wraps"
+      : "exercise-sword";
+    if (!p.exercise[freeWeapon]) p.exercise[freeWeapon] = 5000;
+    if (!p.exercise["exercise-shield"]) p.exercise["exercise-shield"] = 5000;
+  }
+
   $("#login").style.display = "none";
   $("#app").classList.add("ready");
 
@@ -1639,6 +1678,27 @@ function giveStarterKit(p) {
     }
     // simple arrow ativa por padrao: e a municao que vem no kit
     if (!p.equip.ammo) setActiveAmmo(p, "simple-arrow");
+  }
+  // Kit de treino: 5000 cargas gratis da exercise weapon da vocação
+  // + 25 Tibia Coins para comprar mais cargas
+  if (typeof ensureTraining === "function") {
+    ensureTraining(p);
+    const freeWeapon = p.voc === "knight" ? "exercise-sword"
+      : p.voc === "paladin" ? "exercise-bow"
+      : p.voc === "sorcerer" ? "exercise-wand"
+      : p.voc === "druid" ? "exercise-rod"
+      : p.voc === "monk" ? "exercise-wraps"
+      : "exercise-sword";
+    if (p.exercise[freeWeapon] === undefined || p.exercise[freeWeapon] === 0) {
+      p.exercise[freeWeapon] = 5000;
+    }
+    // Também dá 5000 cargas de exercise shield para todos
+    if (p.exercise["exercise-shield"] === undefined || p.exercise["exercise-shield"] === 0) {
+      p.exercise["exercise-shield"] = 5000;
+    }
+  }
+  if (typeof accountAddCoins === "function") {
+    accountAddCoins(25);
   }
   return p;
 }
