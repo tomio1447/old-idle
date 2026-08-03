@@ -1548,18 +1548,53 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap;
   margin: 4px 0 8px;
 }
-.prey-creature-card {
-  display: flex; align-items: center; gap: 8px;
-  border: 1px solid rgba(255,214,90,.5);
-  background: rgba(255,214,90,.08);
-  padding: 5px 8px; border-radius: 6px; font-size: 12px;
+/* Card da criatura + bônus no estilo do cliente (CreatureAndBonus) */
+.prey-creature-bonus {
+  display: flex; gap: 10px; align-items: stretch;
+  margin: 4px 0 8px;
 }
-.prey-bonus-card {
-  border: 1px solid; padding: 5px 10px; border-radius: 6px;
-  display: flex; flex-direction: column; justify-content: center;
-  background: rgba(0,0,0,.3); font-size: 13px;
+.prey-preview-creature {
+  flex: none; width: 96px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.3);
+  border-radius: 6px; padding: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.prey-stars { font-size: 10px; letter-spacing: 1px; }
+.prey-preview-creature .mob-img, .prey-preview-creature img {
+  image-rendering: pixelated;
+}
+.prey-preview-name {
+  font-size: 9px; text-align: center; margin-top: 2px; line-height: 1.1;
+  max-width: 88px;
+}
+.prey-bonus-box {
+  flex: 1; min-width: 0;
+  border: 1px solid; border-radius: 6px; padding: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: rgba(0,0,0,.3);
+}
+.prey-big-icon { width: 34px; height: auto; image-rendering: pixelated; }
+.prey-bonus-name { font-weight: bold; font-size: 12px; }
+.prey-bonus-value { font-weight: bold; font-size: 13px; color: #fff; }
+/* Estrelas reais em grade 5x2 */
+.prey-stars-grid {
+  display: grid; grid-template-columns: repeat(5, 10px); gap: 1px;
+  justify-content: center; margin: 2px 0;
+}
+.prey-star { width: 9px; height: 10px; image-rendering: pixelated; }
+/* Barra de tempo restante (estilo do cliente) */
+.prey-timer-bar {
+  position: relative; height: 16px; border-radius: 3px; overflow: hidden;
+  background: rgba(0,0,0,.5); border: 1px solid #C28400; margin: 2px 0 8px;
+}
+.prey-timer-fill {
+  height: 100%; background: linear-gradient(180deg,#e8a23c,#C28400);
+  transition: width .5s linear;
+}
+.prey-timer-bar span {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000;
+}
 /* grade 3x3 de criaturas */
 .prey-grid {
   display: grid; grid-template-columns: repeat(3, 1fr);
@@ -1576,6 +1611,57 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .prey-creature:hover { border-color: rgba(255,214,90,.55); background: rgba(255,214,90,.07); }
 .prey-creature.sel { border-color: #ffd65a; background: rgba(255,214,90,.14); }
 .prey-help { color: #8a8272; }
+.prey-wc-icon { width: 12px; height: 12px; vertical-align: -2px; image-rendering: pixelated; }
+.prey-creature-sprite { height: 44px; display: flex; align-items: center; justify-content: center; }
+.prey-creature-sprite .mob-img, .prey-creature-sprite img { image-rendering: pixelated; }
+
+/* ---- Botões OFICIAIS de imagem (replicam o layout do otclient) ---- */
+.prey-actions {
+  display: flex; align-items: flex-end; justify-content: center; gap: 6px;
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1);
+}
+.prey-official-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; user-select: none;
+}
+.prey-official-btn .prey-btn-img {
+  image-rendering: pixelated;
+  transition: filter .12s, transform .12s;
+}
+.prey-official-btn:hover .prey-btn-img { filter: brightness(1.2); }
+.prey-official-btn:active .prey-btn-img { transform: translateY(1px); }
+.prey-official-btn .prey-btn-label {
+  font-size: 9px; color: #ffd65a; text-shadow: 1px 1px 0 #000;
+  white-space: nowrap;
+}
+/* Reroll (60x92) */
+.prey-reroll-btn .prey-btn-img { width: 58px; height: 90px; }
+/* Choose (46x73) */
+.prey-choose-btn .prey-btn-img { width: 44px; height: 70px; }
+/* Select (64x64) */
+.prey-select-btn .prey-btn-img { width: 64px; height: 64px; }
+/* Bonus Reroll (40x55) */
+.prey-bonusreroll-btn .prey-btn-img { width: 38px; height: 52px; }
+
+/* Slot bloqueado: painel estilo LockedPreyPanel com botões de loja */
+.prey-locked-head {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 6px;
+}
+.prey-locked-creature {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.prey-locked-title { font-weight: bold; font-size: 12px; }
+.prey-store-buttons {
+  display: flex; flex-direction: column; gap: 4px; margin: 6px 0;
+}
+.prey-store-btn { cursor: pointer; display: flex; justify-content: center; }
+.prey-store-img {
+  image-rendering: pixelated; width: 195px; height: 64px;
+  transition: filter .12s;
+}
+.prey-store-btn:hover .prey-store-img { filter: brightness(1.15); }
+.prey-store-btn:active .prey-store-img { filter: brightness(.9); }
 
 /* ============================ Sistema de Party ============================ */
 #btn-party { position: relative; }
