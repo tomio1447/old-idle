@@ -835,8 +835,13 @@ function drainEvents() {
         const raca = (e.el === "physical" || !e.el)
           ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
           : null;
-        const col = raca ? raca.color
-                         : (ELEMENTS[e.el] || ELEMENTS.physical).color;
+        // Exori (golpe de skill fisico do Knight): o numero do dano fisico
+        // sai VERMELHO VIVO (cor do elemento), como os demais golpes fisicos,
+        // e nao a cor da raca do alvo (que vinha em vermelho escuro).
+        const col = e.exori
+          ? (ELEMENTS.physical || ELEMENTS.physical).color
+          : (raca ? raca.color
+                  : (ELEMENTS[e.el] || ELEMENTS.physical).color);
         // `dual` marca a parte elemental de uma arma que bate nos dois
         // tipos: desloca o numero para o lado para nao ficar por cima do
         // numero fisico, ja que os dois saem no mesmo instante e tile.
@@ -848,12 +853,14 @@ function drainEvents() {
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
-        r.addEffect(x, y, e.fx || (raca ? raca.fx
-                    : (ELEMENTS[e.el] || ELEMENTS.physical).fx));
-        // critico: o texto "CRIT!" (agora VERMELHO, como no client) pisca em
-        // cima do alvo junto com o efeito oficial Critical Hit Effect
+        // Exori usa o estouro CINZA "hit-area" (nao o draw-blood vermelho).
+        r.addEffect(x, y, e.fx || (e.exori ? "hit-area"
+                    : (raca ? raca.fx
+                       : (ELEMENTS[e.el] || ELEMENTS.physical).fx)));
+        // critico: uma UNICA animacao — o efeito oficial Critical Hit Effect
+        // (estouro vermelho sobre o alvo). O texto "CRIT!" (crit-text) era
+        // disparado junto e ficavam DUAS animacoes sobrepostas; removido.
         if (e.crit) {
-          r.addEffect(x, y - 0.06, "crit-text");
           r.addEffect(x, y, "critical-hit-effect", 700);
         }
         // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial

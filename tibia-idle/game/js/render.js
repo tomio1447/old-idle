@@ -441,13 +441,25 @@ function drawTibiaBar(ctx, x, y, pct, cor) {
   ctx.fillRect(bx, by, Math.round(w * Math.max(0, Math.min(1, pct))), h);
 }
 
+/* Cor da barra de HP do personagem na cena — MESMO padrao da healthbar do
+ * HUD (hpBarColor, em ui.js): verde > amarelo > laranja > vermelho. Antes o
+ * personagem usava tibiaHpColor (paleta diferente/apagada em relacao a barra
+ * de vida da interface), por isso parecia sem a cor certa. */
+function playerHpBarColor(pct) {
+  if (typeof hpBarColor === "function") return hpBarColor(pct).text;
+  if (pct > 0.6) return "#4ade80";
+  if (pct > 0.3) return "#facc15";
+  if (pct > 0.1) return "#fb923c";
+  return "#f87171";
+}
+
 function drawNameBars(ctx, x, y, name, hpPct, mpPct) {
   // ordem do client: barra de vida logo acima da criatura e o nome acima
   // dela. A mana so aparece para o proprio jogador (o Tibia nao mostra mana
   // de terceiros), entao fica numa terceira linha, mais fina.
   const hpY = y + 2;
   drawNameText(ctx, x, y - 3, name, "#ffffff");
-  drawTibiaBar(ctx, x, hpY, hpPct, tibiaHpColor(hpPct));
+  drawTibiaBar(ctx, x, hpY, hpPct, playerHpBarColor(hpPct));
   if (mpPct !== undefined && mpPct !== null) {
     drawTibiaBar(ctx, x, hpY + TIBIA_BAR_H + 2, mpPct, "#3c66ff");
   }
@@ -461,7 +473,8 @@ function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
   // HP à esquerda
   ctx.strokeStyle = "rgba(0,0,0,.78)";
   ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * 0.72, Math.PI * 1.28); ctx.stroke();
-  ctx.strokeStyle = hpPct > 0.5 ? "#37d747" : hpPct > 0.25 ? "#e8c84a" : "#e04040";
+  // mesma paleta da healthbar do HUD (verde > amarelo > laranja > vermelho)
+  ctx.strokeStyle = playerHpBarColor(hpPct);
   ctx.beginPath(); ctx.arc(x, y, radius, Math.PI * 1.28, Math.PI * (1.28 - 0.56 * Math.max(0, Math.min(1, hpPct))), true); ctx.stroke();
   // Mana à direita
   ctx.strokeStyle = "rgba(0,0,0,.78)";
@@ -1090,7 +1103,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const scene = hunt ? hunt.scene : "cave";
 
   // --- chao/mapa tileado
-  if (combat.huntMap && typeof drawTileCharMap === "function") {
+  // `combat` pode ser null numa transicao de hunt (stopHunt/startHunt em
+  // andamento) — protege o acesso a huntMap para nao estourar o render.
+  if (combat && combat.huntMap && typeof drawTileCharMap === "function") {
     /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais */
     drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H);
   } else if (scene === "sewer") {
@@ -1160,10 +1175,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const sc = tibiaScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = 0;
-    // sombra
+    // Ancoragem do pe no SQM: a sprite e desenhada com a BASE encostada na
+    // borda inferior do tile (o pe do personagem "pisa" no chao do SQM), nao
+    // centrada. Uma sprite de 64px (2 SQMs) fica com o corpo 1.5 tiles acima
+    // do chao; antes o centro no tile afundava o personagem meio tile no chao.
+    const tile = tilePx(W);
+    const top = py * H + tile / 2 - h;
+    // sombra sob os pes
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
-    ctx.ellipse(px * W, py * H + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7);
+    ctx.ellipse(px * W, py * H + tile / 2, w * 0.34, h * 0.1, 0, 0, 7);
     ctx.fill();
     if (this.playerFlash > 0) {
       ctx.save();
@@ -1171,7 +1192,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       this.playerFlash -= dt;
     }
     const drawX = px * W - w / 2 + atkPush;
-    const drawY = py * H - h / 2 + bob;
+    const drawY = top + bob;
     // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
     const avatarGlowOn = (typeof window !== "undefined" && window.avatarActive &&
                           player && player.voc && window.avatarActive(player, Date.now()));
@@ -1215,30 +1236,35 @@ Renderer.prototype.draw = function (combat, player, dt) {
         // arte no DAT (32px = 1 SQM, 64px = 2 SQMs), nao de um chute pelo HP
         const sc = tibiaScale(W);
         const w = spriteW(img) * sc, h = spriteH(img) * sc;
+        // Ancoragem do pe no SQM: a base da sprite encosta na borda inferior
+        // do tile (o bicho "pisa" no chao), em vez de ficar centrada. Bicho de
+        // 64px (2 SQMs) fica com o corpo acima do tile — antes afundava meio
+        // tile no chao. A barra/nome acompanham o topo da sprite.
+        const tile = tilePx(W);
+        const top = my + tile / 2 - h;
         const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();
-        ctx.ellipse(mx, my + h * 0.42, w * 0.32, h * 0.09, 0, 0, 7);
+        ctx.ellipse(mx, my + tile / 2, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
         if (combat.mobs[0] === m) {
-          // o quadro de alvo do client marca o SQM, nao a arte: fica do
-          // tamanho do tile, centrado no pe da criatura
-          const t = tilePx(W);
-          drawTargetSquare(ctx, mx - t / 2, my + h / 2 - t, t, t);
+          // o quadro de alvo do client marca o SQM exato, nao a arte: fica
+          // exatamente nos limites do tile onde a criatura esta
+          drawTargetSquare(ctx, mx - tile / 2, my - tile / 2, tile, tile);
         }
         if (m.fiendish || m.influenced) {
           ctx.save();
           ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
           ctx.shadowBlur = m.fiendish ? 22 : 18;
           ctx.globalAlpha = 0.92;
-          ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
+          ctx.drawImage(img, mx - w / 2 + atkPush, top, w, h);
           ctx.restore();
         }
-        ctx.drawImage(img, mx - w / 2 + atkPush, my - h / 2, w, h);
+        ctx.drawImage(img, mx - w / 2 + atkPush, top, w, h);
         // barra de vida: largura fixa de 27px como no client, e nao
         // proporcional ao sprite (um dragao nao tem barra maior que um rato)
         const pct = Math.max(0, m.hp / m.maxHp);
-        const by = my - h / 2 - 9;
+        const by = top - 9;
         drawTibiaBar(ctx, mx, by, pct, tibiaHpColor(pct));
         // nome logo acima da barra, com contorno preto como no client.
         // A cor do TEXTO acompanha os degraus da barra de vida
@@ -1273,7 +1299,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
         // client): ícone oficial + número de poeiras/stacks, longe da barra
         // de HP e do nome.
         const markX = Math.round(mx + w / 2 + 4);
-        const markY = Math.round(my - h / 2 + h * 0.38);
+        const markY = Math.round(top + h * 0.38);
         if (m.fiendish) {
           const num = String(m.sinisterStacks || 15);
           drawWikiIcon(ctx, "fiendish-creature", markX, markY - 12, 12);

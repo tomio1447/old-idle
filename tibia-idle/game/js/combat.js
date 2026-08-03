@@ -7,6 +7,16 @@
 const TICK = 100;   // ms por tick de simulacao
 const COMBAT_GRID_W = 21;
 const COMBAT_GRID_H = 13;
+
+/* Spells "exori" do Knight: golpe de skill FISICO (Berserk, Fierce Berserk,
+ * Front Sweep, Groundshaker, Whirlwind Throw, Brutal Strike, Annihilation,
+ * Ethereal Spear, Strong Ethereal Spear, Executioner's Throw). O numero de
+ * dano delas deve sair VERMELHO VIVO (cor do elemento fisico) e nao a cor da
+ * raca do alvo — e o estouro usa o cinza "hit-area". O drainEvents (game.js)
+ * le a flag `exori` para aplicar essas cores. */
+const KNIGHT_EXORI = new Set(["exori", "exori-gran", "exori-min", "exori-mas",
+  "exori-hur", "exori-ico", "exori-gran-ico", "exori-con", "exori-gran-con",
+  "exori-amp-kor"]);
 const INFLUENCED_BASE_CHANCE = 0.004;
 const INFLUENCED_PVP_BONUS = 0.004;
 const FIENDISH_BASE_CHANCE = 0.0012;
@@ -1559,6 +1569,9 @@ function castSpellById(c, p, target, now, id) {
 
   const originalElement = s.element || "energy";
   let elemento = originalElement;
+  // golpe de skill fisico do Knight (exori): numero vermelho vivo + estouro
+  // cinza (o drainEvents em game.js le a flag)
+  const ehExori = KNIGHT_EXORI.has(id);
   if (typeof monkSpellElement === "function") {
     elemento = monkSpellElement(p, s, elemento);
   }
@@ -1742,6 +1755,7 @@ function castSpellById(c, p, target, now, id) {
                       el: elemento, spell: s.name, fx: fxMagia,
                       race: t.def && t.def.race, crit: critSt, fatal: fatalSpell,
                       chain: ehChain && idx > 0 ? 1 : 0,
+                      exori: ehExori ? 1 : 0,
                       missile: missMagia });
       c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y,
                       sx: c.player ? c.player.x : 0.18,
@@ -1784,6 +1798,7 @@ function castSpellById(c, p, target, now, id) {
                     el: elemento, spell: s.name, fx: fxMagia,
                     crit: critSt, fatal: fatalSpell,
                     chain: ehChain && idx > 0 ? 1 : 0,
+                    exori: ehExori ? 1 : 0,
                     missile: missMagia });
   });
   if (areaTiles.length > 1) {

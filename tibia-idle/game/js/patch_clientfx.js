@@ -82,6 +82,16 @@
     // o projetil ja voa com a sprite oficial (diamond-arrow_*, extraida
     // do client); nada a trocar aqui.
   }
+
+  // 5) Exori (golpes de skill do Knight): o estouro padrao do golpe fisico
+  //    do knight e o cinza "hit-area" — todos os exori ja tem esse fx, mas o
+  //    Executioner's Throw (exori amp kor) nao declarava COMBAT_PARAM_EFFECT
+  //    e caia no fallback draw-blood (VERMELHO). Corrigido para o cinza,
+  //    consistente com os demais exori.
+  if (W.SPELLFX && W.SPELLFX.words) {
+    const exw = W.SPELLFX.words;
+    if (exw["exori amp kor"]) exw["exori amp kor"].fx = "hit-area";
+  }
   if (W.GAMEDATA && W.GAMEDATA.items && W.GAMEDATA.items["diamond-arrow"]) {
     // cinto e suspensorio para quem consulta o item antes da fusao
     W.GAMEDATA.items["diamond-arrow"].areaFx = "blue-electricity";
