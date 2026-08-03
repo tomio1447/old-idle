@@ -498,8 +498,9 @@ input:focus, textarea:focus, select:focus {
 .modal-bg {
   position: fixed; inset: 0; z-index: 150;
   background: rgba(0,0,0,.85);
-  display: flex; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
 }
+.modal-bg.show { display: flex; }
 .modal-bg .modal {
   background: var(--otc-panel);
   border: 1px solid var(--otc-border-out);
