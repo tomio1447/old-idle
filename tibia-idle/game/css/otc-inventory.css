@@ -1,0 +1,1067 @@
+/* ============================================================
+   game-inventory.css — Visual OTClient: game_inventory + game_interface
+   Replicação dos módulos:
+     - inventory.otui: paperdoll, slots, combat modes, soul/cap
+     - gameinterface.otui: side panels, action bars, map frame
+   ============================================================ */
+
+/* ---------------------------------------------------
+   EQUIPMENT PANEL (inventory.otui — PhantomMiniWindow)
+   Layout: amuleto-esquerda, elmo-topo, bolsa-direita,
+   arma-esquerda, corpo-centro, escudo-direita,
+   anel-esquerda, pernas-centro, bota-centro, tools-direita
+   --------------------------------------------------- */
+
+#equip {
+  display: grid;
+  grid-template-areas:
+    ".      helmet .      backpack"
+    "amulet helmet .      backpack"
+    "amulet armor  shield shield"
+    "weapon armor  shield shield"
+    "weapon legs   .      tools"
+    "ring   legs   .      tools"
+    "ring   boots  .      ."
+    ".      boots  .      .";
+  grid-template-columns: 38px 38px 10px 38px;
+  grid-template-rows: 8px 38px 38px 38px 38px 38px 38px auto;
+  gap: 3px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+/* Cada slot individual com seu grid-area */
+.slot[data-slot="helmet"]  { grid-area: helmet; }
+.slot[data-slot="amulet"]  { grid-area: amulet; }
+.slot[data-slot="backpack"]{ grid-area: backpack; }
+.slot[data-slot="armor"]   { grid-area: armor; }
+.slot[data-slot="weapon"]  { grid-area: weapon; }
+.slot[data-slot="shield"]  { grid-area: shield; width:38px !important; }
+.slot[data-slot="legs"]    { grid-area: legs; }
+.slot[data-slot="boots"]   { grid-area: boots; }
+.slot[data-slot="ring"]    { grid-area: ring; }
+.slot[data-slot="extra"]   { grid-area: tools; }
+.slot[data-slot="ammo"]    { grid-area: tools; }
+
+/* Slot styling — OTClient MainInventoryItem */
+#equip .slot {
+  width: 38px;
+  height: 38px;
+  background: #1b1e24;
+  border: 2px solid #3a3f4a;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  image-rendering: pixelated;
+  transition: border-color .15s;
+}
+
+#equip .slot:hover {
+  border-color: #d4af37;
+}
+
+#equip .slot.empty {
+  background: #111318;
+  border-color: #252830;
+  opacity: .55;
+}
+
+#equip .slot.empty::after {
+  content: attr(data-label);
+  font-size: 7px;
+  color: #555;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+}
+
+#equip .slot img,
+#equip .slot canvas {
+  max-width: 30px;
+  max-height: 30px;
+  image-rendering: pixelated;
+}
+
+/* Tier badge */
+#equip .tier-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 8px;
+  background: #1a1a1a;
+  color: #d4af37;
+  padding: 0 2px;
+  border-radius: 2px;
+  border: 1px solid #d4af37;
+}
+
+/* Count badge */
+#equip .cnt {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 8px;
+  background: rgba(0,0,0,.8);
+  color: #fff;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Glow for ring/amulet */
+#equip .slot.acc-glow {
+  box-shadow: 0 0 8px rgba(212, 175, 55, .3);
+}
+
+/* ---------------------------------------------------
+   SOUL + CAPACITY bars (inventory.otui)
+   --------------------------------------------------- */
+#soul-cap-panel {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.soul-cap-box {
+  flex: 1;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  padding: 2px 4px;
+  text-align: center;
+}
+
+.soul-cap-box .sc-label {
+  font-size: 8px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.soul-cap-box .sc-value {
+  font-size: 10px;
+  font-weight: bold;
+  color: #c0c0c0;
+  font-family: 'Courier New', monospace;
+}
+
+/* ---------------------------------------------------
+   COMBAT MODE BOXES (inventory.otui — Stand/Chase/Attack/Balanced/Defense)
+   --------------------------------------------------- */
+#combat-mode-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0 4px;
+  justify-content: center;
+}
+
+.combat-mode-btn {
+  width: 28px;
+  height: 28px;
+  background: #1b1e24;
+  border: 1px solid #3a3f4a;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all .15s;
+}
+
+.combat-mode-btn:hover {
+  border-color: #d4af37;
+  color: #c0c0c0;
+}
+
+.combat-mode-btn.active {
+  border-color: #d4af37;
+  background: #2f3520;
+  color: #ffe680;
+}
+
+/* Postura — Stand / Follow */
+#posture-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0 4px;
+  justify-content: center;
+}
+
+.posture-btn {
+  width: 24px;
+  height: 24px;
+  background: #1b1e24;
+  border: 1px solid #3a3f4a;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  transition: all .15s;
+}
+
+.posture-btn:hover {
+  border-color: #d4af37;
+  color: #c0c0c0;
+}
+
+.posture-btn.active {
+  border-color: #d4af37;
+  background: #2f3520;
+  color: #ffe680;
+}
+
+/* Stop button */
+#combat-stop-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 3px;
+  font-size: 10px;
+  background: #2a1a1a;
+  border: 1px solid #5a2a2a;
+  color: #f87171;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+#combat-stop-btn:hover {
+  background: #3a2020;
+  border-color: #c54b4b;
+}
+
+/* ---------------------------------------------------
+   STATUS BAR (status icons below equipment)
+   --------------------------------------------------- */
+#status-bar {
+  margin-top: 4px;
+  padding: 4px 6px;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+#status-bar .sb-label {
+  font-size: 8px;
+  color: #555;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+#status-bar .sb-ico {
+  width: 18px;
+  height: 18px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+}
+
+#status-bar .sb-ico img {
+  max-width: 14px;
+  max-height: 14px;
+}
+
+#status-bar .sb-tempo {
+  position: absolute;
+  bottom: -1px;
+  right: 1px;
+  font-size: 6px;
+  color: #ffe680;
+  background: rgba(0,0,0,.7);
+  padding: 0 1px;
+  border-radius: 1px;
+}
+
+#status-bar .sb-ico.positive { border-color: #2a5a2a; }
+#status-bar .sb-ico.harmful  { border-color: #5a2a2a; }
+#status-bar .sb-ico.neutral  { border-color: #d4af37; }
+
+/* ---------------------------------------------------
+   STANCE BADGE (canto da cena, como o OTClient)
+   --------------------------------------------------- */
+.stance-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+  display: flex;
+  gap: 3px;
+}
+
+.stance-sq {
+  width: 22px;
+  height: 22px;
+  background: #111318;
+  border: 2px solid #3a3f4a;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stance-sq img {
+  max-width: 16px;
+  max-height: 16px;
+}
+
+/* ---------------------------------------------------
+   COOLDOWN BAR (gameinterface.otui — bottom)
+   --------------------------------------------------- */
+.cooldown-bar {
+  background: #12151a;
+  border: 1px solid #252830;
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 24px;
+}
+
+.cd-groups {
+  display: flex;
+  gap: 2px;
+}
+
+.cd-slot {
+  width: 20px;
+  height: 20px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cd-slot img {
+  max-width: 16px;
+  max-height: 16px;
+  opacity: .5;
+}
+
+.cd-slot.on {
+  border-color: #d4af37;
+}
+
+.cd-slot.on img {
+  opacity: 1;
+}
+
+.cd-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,.7);
+  transition: height .15s;
+}
+
+.cd-sep {
+  width: 1px;
+  height: 18px;
+  background: #2a2d34;
+}
+
+.cd-spells {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  font-size: 8px;
+  color: #666;
+}
+
+.cd-spells .cd-slot.spell {
+  width: 22px;
+  height: 22px;
+}
+
+.cd-spells .cd-slot .cd-num {
+  position: absolute;
+  font-size: 7px;
+  color: #fff;
+  text-shadow: 0 0 2px #000;
+  pointer-events: none;
+}
+
+.cd-vazio {
+  font-size: 9px;
+  color: #444;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------
+   PANEL styles — closer to gameinterface.otui
+   --------------------------------------------------- */
+.panel {
+  background: #1a1d24;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+}
+
+.panel-title {
+  background: linear-gradient(180deg, #25282f, #1e2127);
+  color: #d4af37;
+  border-bottom: 1px solid #2a2d34;
+  font-size: 11px;
+  padding: 4px 8px;
+  font-weight: bold;
+  letter-spacing: .3px;
+}
+
+.panel-body {
+  padding: 5px;
+}
+
+.panel-inset {
+  background: #12151a;
+  border: 1px solid #1f2228;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------
+   TOPBAR — gameinterface.otui GameTopPanel
+   --------------------------------------------------- */
+.topbar {
+  background: linear-gradient(180deg, #1e2127, #15181c);
+  border-bottom: 2px solid #2a2d34;
+  padding: 3px 8px;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.topbar .logo {
+  color: #d4af37;
+  font-weight: bold;
+  font-size: 13px;
+  text-shadow: 0 0 8px rgba(212,175,55,.2);
+}
+
+.topbar button.sm {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: #1b1e24;
+  border: 1px solid #3a3f4a;
+  color: #9ca3af;
+  border-radius: 3px;
+}
+
+.topbar button.sm:hover {
+  background: #25282f;
+  color: #d4af37;
+  border-color: #d4af37;
+}
+
+.topbar button.primary {
+  background: #2a3520;
+  border-color: #5a8a2a;
+  color: #9ce84a;
+}
+
+.topbar button.primary:hover {
+  background: #354528;
+  border-color: #7ae87a;
+}
+
+/* ---------------------------------------------------
+   LOG — gameinterface Bottom panel
+   --------------------------------------------------- */
+#log {
+  font-size: 10px;
+  line-height: 1.5;
+  background: #111318;
+  padding: 3px 5px;
+  border-radius: 3px;
+}
+
+.log-line {
+  padding: 1px 0;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+
+.log-line .time {
+  color: #555;
+  margin-right: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+}
+
+/* ---------------------------------------------------
+   HUNT CARDS
+   --------------------------------------------------- */
+.hunt-card {
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  transition: border-color .15s;
+}
+
+.hunt-card:hover {
+  border-color: #5c6bc0;
+}
+
+.hunt-card.active {
+  border-color: #d4af37;
+  background: #252820;
+}
+
+/* ---------------------------------------------------
+   SCENE (canvas wrapper)
+   --------------------------------------------------- */
+#scene-wrap {
+  position: relative;
+  background: #0d0f14;
+  border: 2px solid #1f2228;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#scene {
+  display: block;
+  width: 100%;
+}
+
+/* ---------------------------------------------------
+   MISSION BOX overlay
+   --------------------------------------------------- */
+.mission-box {
+  position: absolute;
+  bottom: 10px;
+  left: 6px;
+  z-index: 6;
+  background: rgba(0,0,0,.85);
+  border: 1px solid #3a3f4a;
+  border-radius: 4px;
+  padding: 5px 8px;
+  max-width: 280px;
+  font-size: 10px;
+}
+
+/* ---------------------------------------------------
+   MONK BAR
+   --------------------------------------------------- */
+.monk-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 3px 0;
+  font-size: 10px;
+}
+
+.monk-harm {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.monk-harm .harm {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3a3f4a;
+  transition: background .3s;
+}
+
+.monk-harm .harm.on {
+  background: #ffd65a;
+  box-shadow: 0 0 4px rgba(255,214,90,.5);
+}
+
+/* ---------------------------------------------------
+   CONDITION BAR
+   --------------------------------------------------- */
+.cond-bar {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 3px 0;
+}
+
+.cond {
+  font-size: 9px;
+  padding: 1px 4px;
+  border: 1px solid;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------
+   Slots & Inventory Grids
+   --------------------------------------------------- */
+.inv-grid, .slot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 38px);
+  gap: 3px;
+  justify-content: center;
+}
+
+.inv-item {
+  width: 38px;
+  height: 38px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: border-color .12s;
+}
+
+.inv-item:hover {
+  border-color: #5c6bc0;
+}
+
+.inv-item img, .inv-item canvas {
+  max-width: 30px;
+  max-height: 30px;
+  image-rendering: pixelated;
+}
+
+.inv-item .cnt {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 8px;
+  background: rgba(0,0,0,.8);
+  color: #fff;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------
+   NPC QUICK
+   --------------------------------------------------- */
+.npc-quick {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.npc-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 44px;
+  transition: border-color .15s;
+}
+
+.npc-btn:hover {
+  border-color: #d4af37;
+}
+
+.npc-btn img {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+}
+
+.npc-btn .nb {
+  font-size: 8px;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.npc-btn:hover .nb {
+  color: #d4af37;
+}
+
+/* ---------------------------------------------------
+   SKILLS panel
+   --------------------------------------------------- */
+#skills .mb4 {
+  margin-bottom: 4px;
+}
+
+#skills .row.small {
+  font-size: 10px;
+}
+
+/* ---------------------------------------------------
+   STAT ROWS
+   --------------------------------------------------- */
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 10px;
+}
+
+.stat-row .k { color: #666; }
+.stat-row .v { color: #c0c0c0; font-weight: bold; }
+
+/* ---------------------------------------------------
+   BARS
+   --------------------------------------------------- */
+.bar {
+  height: 10px;
+  background: #0d0f14;
+  border: 1px solid #1f2228;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.bar .fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .3s;
+}
+
+.bar .label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #fff;
+  text-shadow: 0 0 2px #000;
+  pointer-events: none;
+}
+
+.bar .fill.hp { background: var(--hp); }
+.bar .fill.mp { background: var(--mp); }
+.bar .fill.exp { background: var(--exp); }
+.bar .fill.sta { background: #fb923c; }
+.bar .fill.skl { background: #a78bfa; }
+
+/* ---------------------------------------------------
+   TABS
+   --------------------------------------------------- */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #2a2d34;
+  gap: 1px;
+}
+
+.tab {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: #15171c;
+  border: 1px solid #1f2228;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  color: #666;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #1a1d24;
+  color: #d4af37;
+  border-color: #2a2d34;
+}
+
+.tab:hover {
+  color: #c0c0c0;
+}
+
+/* ---------------------------------------------------
+   TOOLTIP
+   --------------------------------------------------- */
+#tooltip {
+  position: fixed;
+  z-index: 100;
+  background: #1a1d24;
+  border: 1px solid #d4af37;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 10px;
+  max-width: 260px;
+  pointer-events: none;
+}
+
+#tooltip .tt-name {
+  color: #d4af37;
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+
+#tooltip .tt-stat {
+  color: #9ce84a;
+  line-height: 1.5;
+}
+
+#tooltip .tt-req {
+  color: #fb923c;
+  font-size: 9px;
+}
+
+#tooltip .tt-sell {
+  color: #c0c0c0;
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------
+   TOASTS
+   --------------------------------------------------- */
+#toasts {
+  position: fixed;
+  top: 40px;
+  right: 10px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toast {
+  background: #1a1d24;
+  border: 1px solid #5c6bc0;
+  color: #c0c0c0;
+  font-size: 11px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+
+.toast.level { border-color: #d4af37; color: #ffe680; }
+.toast.death { border-color: #f87171; color: #fca5a5; }
+.toast.rare  { border-color: #a78bfa; color: #c4b5fd; }
+
+/* ---------------------------------------------------
+   MODAL
+   --------------------------------------------------- */
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0,0,0,.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-bg .modal {
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* ---------------------------------------------------
+   SCROLLBARS
+   --------------------------------------------------- */
+.list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.list::-webkit-scrollbar-track {
+  background: #0d0f14;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background: #2a2d34;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------
+   PREY styles
+   --------------------------------------------------- */
+.prey-slots {
+  display: flex;
+  gap: 8px;
+}
+
+.prey-slot {
+  flex: 1;
+  background: #12151a;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.prey-slot.locked {
+  opacity: .6;
+}
+
+.prey-slot-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.prey-creature-bonus {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.prey-preview-creature {
+  text-align: center;
+}
+
+.prey-preview-name {
+  font-size: 9px;
+  color: #c0c0c0;
+  margin-top: 2px;
+}
+
+.prey-bonus-box {
+  flex: 1;
+  background: #1b1e24;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 4px;
+  text-align: center;
+}
+
+.prey-big-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+}
+
+.prey-bonus-name {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.prey-stars-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 10px);
+  grid-template-rows: 10px 10px;
+  gap: 1px;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.prey-star {
+  width: 9px;
+  height: 10px;
+}
+
+.prey-bonus-value {
+  font-size: 11px;
+  font-weight: bold;
+  color: #ffe680;
+  margin-top: 2px;
+}
+
+.prey-timer-bar {
+  height: 8px;
+  background: #0d0f14;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  margin: 4px 0;
+  font-size: 8px;
+}
+
+.prey-timer-fill {
+  height: 100%;
+  background: #C28400;
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.prey-timer-bar span {
+  position: absolute;
+  right: 3px;
+  top: 0;
+  color: #fff;
+  font-size: 7px;
+}
+
+.prey-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+
+.prey-creature {
+  text-align: center;
+  padding: 3px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+
+.prey-creature:hover {
+  border-color: #5c6bc0;
+}
+
+.prey-creature.sel {
+  border-color: #d4af37;
+  background: #252820;
+}
+
+.prey-creature-sprite {
+  margin: 0 auto;
+}
+
+.prey-actions {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.prey-official-btn {
+  cursor: pointer;
+  padding: 2px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color .15s;
+}
+
+.prey-official-btn:hover {
+  border-color: #d4af37;
+}
+
+.prey-btn-img {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.prey-btn-label {
+  font-size: 7px;
+  color: #666;
+  margin-top: 1px;
+}
+
+.prey-wallet {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.prey-wc-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
