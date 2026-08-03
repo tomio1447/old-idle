@@ -1,0 +1,187 @@
+/* ============================================================
+   otc-hud.css — HUD visual do OTClient (health circle, combat modes, states, battle)
+   healthcircle/ + combatmodes/ + states/ + battle/ + creatureicons/
+   ============================================================ */
+
+/* ─────────────────────────────────── HEALTH CIRCLE (healthcircle/) ───── */
+.health-circle-wrap {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; position: relative; width: 118px; height: 60px;
+}
+.health-circle-wrap .hc-arc {
+  position: absolute;
+  width: 100%; height: 100%;
+}
+.health-circle-wrap .hc-left,
+.health-circle-wrap .hc-right {
+  width: 52px; height: 52px; position: absolute;
+}
+.health-circle-wrap .hc-left  { left: 0; }
+.health-circle-wrap .hc-right { right: 0; }
+.health-circle-wrap .hc-bottom {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  height: 8px; border-radius: 4px; width: 100px;
+}
+.health-circle-wrap .hc-fill-left,
+.health-circle-wrap .hc-fill-right {
+  width: 52px; height: 52px; position: absolute; top: 0;
+  border-radius: 50%;
+  clip: rect(0, 52px, 52px, 26px);
+}
+.health-circle-wrap .hc-fill-left  { left: 0; }
+.health-circle-wrap .hc-fill-right { right: 0; clip: rect(0, 26px, 52px, 0); }
+.health-circle-wrap .hc-fill-inner {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 6px solid; border-color: transparent;
+  box-sizing: border-box; position: absolute; top: 0;
+}
+.health-circle-wrap .hc-fill-left  .hc-fill-inner { left: 0; }
+.health-circle-wrap .hc-fill-right .hc-fill-inner { right: 0; }
+
+/* HUD quick stats */
+.hud-quick { display: flex; gap: 4px; align-items: center; padding: 2px 6px; font-size: 10px; }
+.hud-quick .hq-hp { color: #c0c0c0; font-weight: bold; }
+.hud-quick .hq-hp .val { font-size: 12px; }
+.hud-quick .hq-mp { color: #60a5fa; }
+.hud-quick .hq-mp .val { font-size: 10px; }
+
+/* ─────────────────────────────────── COMBAT MODES (combatmodes/) ─────── */
+.combat-modes-strip {
+  display: flex; gap: 2px; padding: 3px 4px;
+  background: #12151a; border: 1px solid #2a2d34; border-radius: 3px;
+}
+.combat-mode-icon {
+  width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; border: 2px solid transparent;
+  font-size: 16px; transition: all .12s;
+}
+.combat-mode-icon:hover { border-color: #d4af37; }
+.combat-mode-icon.active { border-color: #d4af37; background: rgba(212,175,55,.15); }
+.combat-mode-icon.pvp-dove  { color: #fff; }     /* White Dove */
+.combat-mode-icon.pvp-hand  { color: #ffe680; }   /* White Hand */
+.combat-mode-icon.pvp-yellow{ color: #fbbf24; }   /* Yellow Hand */
+.combat-mode-icon.pvp-fist  { color: #f87171; }   /* Red Fist */
+
+/* ─────────────────────────────────── COMBAT FIGHT MODES ─────────────── */
+.fight-mode-strip {
+  display: flex; gap: 2px; padding: 3px 4px;
+}
+.fight-mode-btn {
+  width: 22px; height: 22px; cursor: pointer;
+  border-radius: 3px; border: 1px solid #2a2d34;
+  background: #1b1e24; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; color: #666;
+  transition: all .12s;
+}
+.fight-mode-btn:hover { border-color: #d4af37; color: #c0c0c0; }
+.fight-mode-btn.active { border-color: #d4af37; background: #252820; color: #d4af37; }
+
+/* Chase / Stand */
+.chase-mode-strip {
+  display: flex; gap: 2px; padding: 3px 4px;
+}
+.chase-mode-btn {
+  width: 22px; height: 22px; cursor: pointer;
+  border-radius: 3px; border: 1px solid #2a2d34;
+  background: #1b1e24; display: flex; align-items: center;
+  justify-content: center; font-size: 11px; color: #666;
+  transition: all .12s;
+}
+.chase-mode-btn:hover { border-color: #d4af37; }
+.chase-mode-btn.active { border-color: #d4af37; background: #252820; }
+
+/* Safe Fight */
+.safe-fight-btn {
+  width: 28px; height: 28px; cursor: pointer;
+  border-radius: 3px; border: 1px solid #2a2d34;
+  background: #1b1e24; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; color: #666;
+  transition: all .12s;
+}
+.safe-fight-btn:hover { border-color: #d4af37; }
+.safe-fight-btn.on { border-color: #4ade80; background: #1a2e1a; color: #4ade80; }
+
+/* ─────────────────────────────────── PLAYER STATES (states/) ────────── */
+.player-state-strip {
+  display: flex; gap: 4px; flex-wrap: wrap; padding: 2px 0;
+}
+.player-state-icon {
+  width: 18px; height: 18px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.player-state-icon img {
+  max-width: 16px; max-height: 16px; image-rendering: pixelated;
+}
+.player-state-icon .psi-timer {
+  position: absolute; bottom: -2px; right: -2px;
+  font-size: 6px; background: rgba(0,0,0,.8); color: #ffe680;
+  padding: 0 1px; border-radius: 1px;
+}
+
+/* ─────────────────────────────────── BATTLE LIST ICONS ──────────────── */
+.battle-icon {
+  width: 16px; height: 16px; display: inline-block;
+  image-rendering: pixelated; vertical-align: middle;
+}
+.battle-icon.knight  { filter: hue-rotate(0deg); }
+.battle-icon.paladin { filter: hue-rotate(45deg); }
+.battle-icon.sorcerer{ filter: hue-rotate(270deg); }
+.battle-icon.druid   { filter: hue-rotate(120deg); }
+.battle-icon.monk    { filter: hue-rotate(200deg); }
+.battle-icon.monster { filter: grayscale(1); }
+.battle-icon.npc     { filter: sepia(1) brightness(.8); }
+
+/* ─────────────────────────────────── CREATURE ICONS ─────────────────── */
+.creature-icon-strip {
+  display: flex; gap: 2px; flex-wrap: wrap;
+}
+.creature-icon {
+  width: 14px; height: 14px;
+  image-rendering: pixelated;
+}
+
+/* Skull icons */
+.skull-icon {
+  width: 14px; height: 14px; display: inline-block;
+  image-rendering: pixelated; vertical-align: middle;
+}
+.skull-icon.yellow { color: #fbbf24; }
+.skull-icon.green  { color: #4ade80; }
+.skull-icon.white  { color: #fff; }
+.skull-icon.red    { color: #f87171; }
+.skull-icon.black  { color: #333; }
+.skull-icon.orange { color: #f97316; }
+
+/* Party shield icon */
+.shield-icon {
+  width: 12px; height: 12px; display: inline-block;
+  image-rendering: pixelated; vertical-align: middle;
+}
+
+/* Emblem icon */
+.emblem-icon {
+  width: 12px; height: 12px; display: inline-block;
+  image-rendering: pixelated; vertical-align: middle;
+}
+
+/* ─────────────────────────────────── HUD PANEL LAYOUT ───────────────── */
+.hud-panel {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 4px; background: #0d0f14;
+  border: 1px solid #1f2228; border-radius: 4px;
+}
+
+.hud-row {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ─────────────────────────────────── Crosshair ─────────────────────── */
+.crosshair {
+  position: absolute; pointer-events: none; z-index: 100;
+  width: 32px; height: 32px;
+  background: url('assets/ui/crosshair.png') center/contain no-repeat;
+  image-rendering: pixelated;
+  transform: translate(-50%,-50%);
+}
