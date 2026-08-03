@@ -14,7 +14,14 @@ function wheelColorCss(c) {
   return { green: "#4ade80", red: "#f87171", blue: "#60a5fa", purple: "#c084fc" }[c];
 }
 
-/* Caminho SVG das conexoes (linhas entre nos adjacentes). */
+/* Fundo da wheel por vocacao (assets/wheel/vocations/backdrop_skillwheel_<voc>.png).
+ * Mapeamento do otclient (wheelclass.lua): knight/paladin/sorcerer/druid/monk. */
+function wheelBackgroundImg(voc) {
+  var map = { knight: "knight", paladin: "paladin", sorcerer: "sorcerer",
+              druid: "druid", monk: "monk" };
+  var v = map[voc] || "knight";
+  return "assets/wheel/vocations/backdrop_skillwheel_" + v + ".png";
+}
 function wheelSvgConnections() {
   var lines = [], seen = {};
   for (var id in WHEEL_CONNECTED) {
@@ -39,7 +46,9 @@ function wheelSlotLabel(spec, voc) {
   if (spec.mana) parts.push("+" + WHEEL_MP[voc] + " Mana/pt");
   if (spec.cap) parts.push("+" + WHEEL_CAP[voc] + " Cap/pt");
   if (spec.mit) parts.push("+3% Mitig/pt");
-  if (spec.leech) parts.push("+" + Math.round(WHEEL_LEECH[spec.leech] * 100) + "% " + (spec.leech === "life" ? "Life" : "Mana") + " leech (max)");
+  // leech: o valor ja e a porcentagem real (0.75 = 0.75%, 0.25 = 0.25%)
+  if (spec.leech) parts.push("+" + wheelPct(WHEEL_LEECH[spec.leech]) + " " +
+    (spec.leech === "life" ? "Life" : "Mana") + " leech (max)");
   if (spec.skill) parts.push("+" + (WHEEL_SKILL[voc] === "distance" ? "Dist" : WHEEL_SKILL[voc]) + " (max)");
   if (spec.spell) {
     var sid = spec.spell[voc];
@@ -48,6 +57,12 @@ function wheelSlotLabel(spec, voc) {
   }
   if (spec.instant && spec.instant[voc]) parts.push(spec.instant[voc] + " (max)");
   return parts.join(" · ");
+}
+
+/* Formata um valor de porcentagem que ja vem em % (0.75 -> "0,75%"). */
+function wheelPct(v) {
+  var n = Math.round(v * 100) / 100;
+  return String(n).replace(".", ",") + "%";
 }
 
 /* HTML de um no interativo da roda. */
@@ -111,8 +126,9 @@ function wheelSummaryHtml(p) {
   if (t.distance) rows.push(["Skill Distância", "+" + t.distance]);
   if (t.magic) rows.push(["Magic Level", "+" + t.magic]);
   if (t.fist) rows.push(["Skill Punho", "+" + t.fist]);
-  rows.push(["Life leech", "+" + Math.round(t.lifeLeech * 100) + "%"]);
-  rows.push(["Mana leech", "+" + Math.round(t.manaLeech * 100) + "%"]);
+  // leech: t.lifeLeech/manaLeech ja sao a porcentagem real (0.75 = 0.75%)
+  rows.push(["Life leech", "+" + wheelPct(t.lifeLeech)]);
+  rows.push(["Mana leech", "+" + wheelPct(t.manaLeech)]);
   rows.push(["Dano (Revelation)", "+" + t.damagePct + "%"]);
   rows.push(["Cura (Revelation)", "+" + t.healPct + "%"]);
 
@@ -210,7 +226,7 @@ function renderWheelModal(p) {
     '</div>' +
     '<div class="wheel-body">' +
       '<div class="wheel-stage">' +
-        '<img class="wheel-bg" src="assets/wheel/backdrop_skillwheel.png?v=1" alt="">' +
+        '<img class="wheel-bg" src="' + wheelBackgroundImg(p.voc) + '?v=1" alt="">' +
         wheelSvgConnections() +
         nodesHtml +
       '</div>' +

@@ -13,8 +13,11 @@ do Tibia**, usando os assets e o layout extraídos do **otclient do OpenTibiaBR*
 
 ## Layout visual (do cliente oficial)
 
-- **Fundo**: `assets/wheel/backdrop_skillwheel.png` (522×522) — a arte oficial
-  da roda com os 4 quadrantes coloridos.
+- **Fundo por vocação**: `assets/wheel/vocations/backdrop_skillwheel_<voc>.png`
+  (522×522) — a arte oficial de cada vocação (Knight/Paladin/Sorcerer/Druid/
+  Monk), como no planner oficial do Tibia. O fundo troca conforme a vocação do
+  personagem (mapeamento do otclient `wheelclass.lua`:
+  knight/paladin/sorcerer/druid/monk).
 - **Posições dos 36 nós**: calculadas com a **mesma fórmula do otclient**
   (`buttons.lua` + `geometry.lua`):
   ```
@@ -37,6 +40,16 @@ Um nó só pode receber pontos se existir um **caminho dele até uma raiz** (nó
 Raízes (`GREEN_50`, `RED_50`, `BLUE_50`, `PURPLE_50`) são sempre selecionáveis
 a partir do nível 50.
 
+## Correção do bonus de Life/Mana Leech
+
+**Bug:** o display mostrava `Math.round(0.75 * 100)` = **75%** de life leech,
+mas o valor realmente aplicado no combate é `raw * 0.75 / 100` = **0.75%**.
+
+**Correção (`wheel-ui.js`):** o display agora mostra o valor de leech **como a
+porcentagem real** (0.75% life, 0.25% mana), via helper `wheelPct()`. Aplicado
+no rótulo de cada nó (`wheelSlotLabel`) e no resumo de bônus (`wheelSummaryHtml`).
+A lógica de combate não mudou — o leech aplicado sempre foi 0.75%/0.25%.
+
 ## Lógica (do Canary, mantida)
 
 - Pontos: `(nível − 50) × 1` + promotion scrolls (compra com ouro).
@@ -48,7 +61,8 @@ a partir do nível 50.
 
 | Arquivo | Mudança |
 | --- | --- |
-| `assets/wheel/backdrop_skillwheel.png` | **novo** — fundo oficial da roda |
+| `assets/wheel/backdrop_skillwheel.png` | **novo** — fundo oficial da roda (fallback) |
+| `assets/wheel/vocations/backdrop_skillwheel_{knight,paladin,sorcerer,druid,monk}.png` | **novos** — fundos oficiais por vocação |
 | `assets/wheel/border/<quad>/{1..9}.png` | **novo** — 36 imagens de borda/conexão do cliente |
 | `js/wheeldata.js` | **novo** — 36 nós com posição exata (`WHEEL_POS`), conexões (`WHEEL_CONNECTED`), bônus |
 | `js/wheel.js` | **novo** — lógica + regra de desbloqueio por caminho até a raiz |
