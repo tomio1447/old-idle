@@ -1,0 +1,484 @@
+/**
+ * forge-imbuement-otc.css — Forge + Imbuement OTClient visual update
+ *
+ * Covers both modules:
+ *   game_forge   — Fusion / Transfer / Conversion / History tabs
+ *   game_imbuing  — Shrine UI: item/scroll selection, imbue/clear, timers
+ */
+
+/* ═══════════════════════════════════════════════ FORGE ═══════════════ */
+
+.forge-window {
+  width: 490px;
+  max-width: 95vw;
+  background: #1a1d24;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.forge-tabs {
+  display: flex;
+  gap: 0;
+  background: #12151a;
+  border-bottom: 1px solid #2a2d34;
+}
+
+.forge-tab {
+  padding: 6px 14px;
+  font-size: 10px;
+  color: #666;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: all .15s;
+  border-right: 1px solid #1f2228;
+}
+
+.forge-tab:hover { color: #c0c0c0; background: #1b1e24; }
+.forge-tab.active { color: #d4af37; background: #1a1d24; border-bottom: 2px solid #d4af37; }
+
+.forge-body {
+  padding: 10px;
+  font-size: 10px;
+  color: #c0c0c0;
+  min-height: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* -- tier strip badges -- */
+.forge-tier-strip {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+  font-size: 7px;
+  color: #000;
+  text-align: center;
+  line-height: 10px;
+  font-weight: bold;
+}
+
+.forge-tier-1  { background: #9d9d9d; }
+.forge-tier-2  { background: #4ade80; }
+.forge-tier-3  { background: #60a5fa; }
+.forge-tier-4  { background: #c084fc; }
+.forge-tier-5  { background: #fbbf24; }
+.forge-tier-6  { background: #f97316; }
+.forge-tier-7  { background: #ef4444; }
+.forge-tier-8  { background: #ec4899; }
+.forge-tier-9  { background: #14b8a6; }
+.forge-tier-10 { background: #ffd65a; }
+
+/* -- item slot (34x34 selection / 64x64 preview) -- */
+.forge-item-slot {
+  width: 38px; height: 38px;
+  background: #1b1e24;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+
+.forge-item-slot:hover { border-color: #d4af37; }
+.forge-item-slot img, .forge-item-slot canvas {
+  max-width: 30px; max-height: 30px;
+  image-rendering: pixelated;
+}
+
+.forge-item-slot .forge-item-count {
+  position: absolute; right: 2px; bottom: 1px;
+  font-size: 8px; color: #c0c0c0; background: rgba(0,0,0,.7);
+  padding: 0 2px; border-radius: 2px;
+}
+
+/* -- fusion: drag source/target + arrows -- */
+.forge-fusion-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+
+.forge-arrow {
+  font-size: 18px; color: #d4af37; flex-shrink: 0;
+}
+
+.forge-convergence-tag {
+  font-size: 8px; color: #c084fc;
+  background: rgba(192,132,252,.15);
+  padding: 1px 5px; border-radius: 2px;
+  border: 1px solid rgba(192,132,252,.3);
+}
+
+/* -- fusion options (success rate / tier loss) -- */
+.forge-fusion-options {
+  background: #12151a;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-top: 6px;
+}
+
+.forge-fusion-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0;
+  font-size: 10px;
+}
+
+.forge-fusion-option .ffo-label { color: #888; width: 100px; }
+.forge-fusion-option .ffo-value { color: #fff; }
+.forge-fusion-option .ffo-cost { color: #c084fc; margin-left: auto; }
+
+/* -- perform button -- */
+.forge-perform-btn {
+  margin-top: 10px;
+  padding: 8px;
+  background: linear-gradient(180deg, #c084fc, #7c3aed);
+  border: 1px solid #a78bfa;
+  color: #fff;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.forge-perform-btn:hover { background: linear-gradient(180deg, #d8b4fe, #8b5cf6); }
+.forge-perform-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* -- transfer: donor/receiver -- */
+.forge-transfer-row {
+  display: flex; gap: 6px; align-items: center;
+}
+
+.forge-transfer-pool {
+  display: flex; gap: 3px; flex-wrap: wrap;
+  background: #12151a;
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  padding: 4px;
+  min-height: 44px;
+  flex: 1;
+  max-height: 90px;
+  overflow-y: auto;
+}
+
+.forge-transfer-pool .forge-item-slot { width: 34px; height: 34px; }
+
+/* -- conversion columns -- */
+.forge-conversion-cols {
+  display: flex; gap: 8px;
+}
+
+.forge-conversion-col {
+  flex: 1;
+  background: #12151a;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  padding: 10px;
+  text-align: center;
+}
+
+.forge-conversion-col .fcc-header {
+  font-size: 10px; color: #d4af37; font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.forge-conversion-col .fcc-icon {
+  width: 40px; height: 40px; margin: 0 auto 6px;
+}
+
+.forge-conversion-col .fcc-cost {
+  font-size: 10px; color: #c084fc; margin: 4px 0;
+}
+
+.forge-conversion-col .fcc-arrow {
+  font-size: 20px; color: #d4af37; margin: 6px 0;
+}
+
+.forge-conversion-col .fcc-result {
+  font-size: 11px; color: #fff; font-weight: bold;
+}
+
+/* -- history table -- */
+.forge-history-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 9px;
+}
+
+.forge-history-table th {
+  background: #12151a; color: #888;
+  padding: 4px 6px; text-align: left;
+  border-bottom: 1px solid #2a2d34;
+  font-weight: normal;
+}
+
+.forge-history-table td {
+  padding: 3px 6px; color: #c0c0c0;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+
+.forge-history-table tr:nth-child(odd) td { background: rgba(255,255,255,.02); }
+
+.forge-history-pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; margin-top: 8px; font-size: 10px; color: #888;
+}
+
+.forge-history-pagination button {
+  padding: 2px 8px; font-size: 10px;
+}
+
+/* -- result modal -- */
+.forge-result {
+  text-align: center; padding: 12px;
+}
+
+.forge-result .fr-title {
+  font-size: 12px; color: #d4af37; font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.forge-result .fr-label {
+  font-size: 10px; color: #c0c0c0; margin-bottom: 6px;
+}
+
+.forge-result .fr-label-result {
+  font-size: 11px; color: #4ade80; font-weight: bold;
+}
+
+.forge-result .fr-bonus {
+  font-size: 10px; color: #c084fc; margin-top: 6px;
+}
+
+/* -- resources bar (gold + dust + slivers + cores) -- */
+.forge-resources {
+  display: flex; gap: 6px; align-items: center;
+  margin-bottom: 8px; padding: 4px 8px;
+  background: #12151a; border: 1px solid #2a2d34;
+  border-radius: 3px; font-size: 10px;
+}
+
+.forge-resource {
+  display: flex; align-items: center; gap: 3px;
+  padding: 2px 6px; border-radius: 2px;
+  background: #1b1e24; border: 1px solid #2a2d34;
+  font-size: 9px;
+}
+
+.forge-resource .fr-icon { width: 14px; height: 14px; }
+.forge-resource .fr-value { color: #fff; font-weight: bold; }
+
+.forge-resource.dust  { border-color: rgba(102,199,255,.4); }
+.forge-resource.sliver { border-color: rgba(212,175,55,.4); }
+.forge-resource.core  { border-color: rgba(192,132,252,.4); }
+.forge-resource.gold  { border-color: rgba(255,214,90,.4); }
+
+/* ════════════════════════════════════════ IMBUEMENT ═══════════════ */
+
+.imbue-window {
+  width: 520px;
+  max-width: 95vw;
+  background: #1a1d24;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.imbue-header {
+  background: linear-gradient(180deg, #25282f, #1e2127);
+  border-bottom: 1px solid #2a2d34;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #d4af37;
+}
+
+.imbue-body {
+  padding: 10px;
+  font-size: 10px;
+  color: #c0c0c0;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+/* -- item + scroll selection (two columns) -- */
+.imbue-select-row {
+  display: flex; gap: 10px;
+}
+
+.imbue-select-col {
+  flex: 1;
+  background: #12151a;
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.imbue-select-col .isc-header {
+  font-size: 10px; color: #888; margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+
+.imbue-select-col .isc-slot {
+  width: 48px; height: 48px;
+  background: #1b1e24; border: 1px solid #3a3f4a;
+  border-radius: 3px; margin: 0 auto 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: border-color .15s;
+}
+
+.imbue-select-col .isc-slot:hover { border-color: #d4af37; }
+.imbue-select-col .isc-slot img, .imbue-select-col .isc-slot canvas {
+  max-width: 40px; max-height: 40px;
+  image-rendering: pixelated;
+}
+
+/* -- imbuement slots (the 3 slot squares on the item) -- */
+.imbue-slots-row {
+  display: flex; gap: 6px; justify-content: center;
+  margin: 8px 0;
+}
+
+.imbue-slot {
+  width: 40px; height: 40px;
+  background: #1b1e24;
+  border: 2px dashed #2a2d34;
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.imbue-slot.filled {
+  border-style: solid;
+  border-color: #d4af37;
+}
+
+.imbue-slot.filled:hover { border-color: #ffe680; }
+.imbue-slot.empty:hover { border-color: #5c6bc0; }
+
+.imbue-slot img { max-width: 30px; max-height: 30px; }
+
+.imbue-slot .imbue-timer {
+  position: absolute; bottom: -1px; right: 1px;
+  font-size: 6px; color: #fff; background: rgba(0,0,0,.7);
+  padding: 0 1px; border-radius: 1px;
+}
+
+.imbue-slot .imbue-timer.urgent { color: #f87171; }
+
+/* -- imbuement list (available scrolls) -- */
+.imbue-scroll-list {
+  max-height: 180px; overflow-y: auto;
+}
+
+.imbue-scroll-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,.03);
+  cursor: pointer; transition: background .12s;
+}
+
+.imbue-scroll-row:hover { background: rgba(255,255,255,.03); }
+.imbue-scroll-row.selected { background: rgba(212,175,55,.08); border-color: rgba(212,175,55,.3); }
+
+.imbue-scroll-row .isr-icon { width: 28px; height: 28px; flex-shrink: 0; }
+.imbue-scroll-row .isr-name { flex: 1; font-size: 10px; }
+.imbue-scroll-row .isr-tier { font-size: 9px; color: #d4af37; }
+.imbue-scroll-row .isr-cost { font-size: 9px; color: #888; }
+
+/* -- imbuement actions -- */
+.imbue-actions {
+  display: flex; gap: 6px; margin-top: 10px;
+}
+
+.imbue-actions button {
+  flex: 1; padding: 6px;
+  border-radius: 3px; font-size: 10px; font-weight: bold;
+  cursor: pointer; transition: all .15s;
+}
+
+.imbue-btn-imbue {
+  background: linear-gradient(180deg, #d4af37, #a67c00);
+  border: 1px solid #ffe680;
+  color: #1a1a1a;
+}
+
+.imbue-btn-imbue:hover { filter: brightness(1.15); }
+.imbue-btn-imbue:disabled { opacity: .4; cursor: not-allowed; }
+
+.imbue-btn-clear {
+  background: #2a1a1a;
+  border: 1px solid #5a2a2a;
+  color: #f87171;
+}
+
+.imbue-btn-clear:hover { background: #3a2020; }
+.imbue-btn-clear:disabled { opacity: .4; cursor: not-allowed; }
+
+/* -- cost summary -- */
+.imbue-cost-summary {
+  display: flex; gap: 6px; align-items: center;
+  padding: 4px 8px; margin-top: 6px;
+  background: #12151a; border: 1px solid #2a2d34;
+  border-radius: 3px; font-size: 9px;
+}
+
+.imbue-cost-item {
+  display: flex; align-items: center; gap: 2px;
+  padding: 1px 4px; border-radius: 2px;
+  background: rgba(255,255,255,.04);
+}
+
+.imbue-cost-item .ici-icon { width: 12px; height: 12px; }
+.imbue-cost-item .ici-value { color: #fff; }
+.imbue-cost-item .ici-value.enough { color: #4ade80; }
+.imbue-cost-item .ici-value.missing { color: #f87171; }
+
+/* -- progress bar for imbuement timer -- */
+.imbue-progress {
+  height: 6px; background: #0d0f14;
+  border-radius: 3px; overflow: hidden; margin-top: 4px;
+}
+
+.imbue-progress .imbue-progress-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #d4af37, #ffe680);
+  transition: width 1s linear;
+}
+
+/* -- confirmation dialog -- */
+.imbue-confirm {
+  background: #12151a; border: 1px solid #d4af37;
+  border-radius: 4px; padding: 10px; text-align: center;
+}
+
+.imbue-confirm .ic-title { font-size: 11px; color: #d4af37; margin-bottom: 6px; }
+.imbue-confirm .ic-body { font-size: 10px; color: #c0c0c0; margin-bottom: 8px; }
+
+.imbue-confirm-actions {
+  display: flex; gap: 6px; justify-content: center;
+}
+
+.imbue-confirm-actions button {
+  padding: 4px 16px; font-size: 10px; border-radius: 3px;
+}
+
+/* scrollbar */
+.forge-body::-webkit-scrollbar,
+.imbue-body::-webkit-scrollbar,
+.imbue-scroll-list::-webkit-scrollbar { width: 5px; }
+.forge-body::-webkit-scrollbar-track,
+.imbue-body::-webkit-scrollbar-track,
+.imbue-scroll-list::-webkit-scrollbar-track { background: #0d0f14; }
+.forge-body::-webkit-scrollbar-thumb,
+.imbue-body::-webkit-scrollbar-thumb,
+.imbue-scroll-list::-webkit-scrollbar-thumb { background: #2a2d34; border-radius: 3px; }
