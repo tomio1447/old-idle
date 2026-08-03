@@ -86,11 +86,10 @@ function drawItem32(ctx, id, dx, dy, size) {
   if (KNOWN_SET.has(id)) {
     const img2 = loadExternalTile(id);
     if (img2.complete && img2.naturalWidth) {
-      const scale = size / 32;
-      const w = img2.naturalWidth * scale;
-      const h = img2.naturalHeight * scale;
-      /* Ancoragem bottom-right: item 2x2 estende 1 tile acima e 1 à esquerda.
-       * Usa tw/th do catálogo para saber o tamanho real em tiles. */
+      /* Desenha a sprite ocupando exatamente tw x th células, sem forçar
+       * escala de 32x32 — isso corrige sprites 62x62 e tamanhos irregulares. */
+      const w = it.tw * size;
+      const h = it.th * size;
       ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
       return;
     }
