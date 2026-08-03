@@ -490,6 +490,9 @@ function renderEquip(p) {
     }
   }
   $("#equip").innerHTML = h;
+
+  // Soul + Capacity + Combat/Posture bars (inventory.otui)
+  OTC_bars(G.p);
   $$("#equip .slot").forEach((el) => {
     const slotDrop = el.dataset.slot;
     if (typeof bindDrop === "function") {
@@ -541,6 +544,19 @@ function renderEquip(p) {
  * Fonte dos ícones: TibiaWiki "Special Conditions" + "Icons"
  * (assets/ui/conditions/*.png, registrados em icondata.js).
  */
+
+/* ── Soul/Cap + Combat/Posture bars ── */
+function OTC_bars(p) {
+  const max = maxStats(p);
+  const sp = $("#soul-cap-panel");
+  if (sp) sp.innerHTML = `<div class="soul-cap-box"><div class="sc-label">Soul</div><div class="sc-value">${p.soul||200}</div></div><div class="soul-cap-box"><div class="sc-label">Cap</div><div class="sc-value">${Math.floor(carriedWeight(p))} / ${Math.floor(max.cap)}</div></div>`;
+  const cm = $("#combat-mode-bar");
+  if (cm) cm.innerHTML = [["attack","⚔","Full Attack"],["balanced","⚖","Balanced"],["defense","🛡","Full Defense"]].map(([id,ico,tt])=>`<div class="combat-mode-btn active" data-cmode="${id}" title="${tt}">${ico}</div>`).join("");
+  const mode = p.config.attackMode||"chase";
+  const pb = $("#posture-bar");
+  if (pb) pb.innerHTML = [["stand","⏸","Stand"],["chase","👣","Chase"]].map(([id,ico,tt])=>`<div class="posture-btn ${id===mode?"active":""}" data-posture="${id}" title="${tt}">${ico}</div>`).join("");
+}
+
 function renderStatusBar(p) {
   const box = $("#status-bar");
   if (!box) return;
@@ -1365,7 +1381,7 @@ function renderSupplies(p) {
     const have = p.supplies[slug] || 0;
     h += `<div class="row" style="justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.25)">
       <div class="row" style="gap:5px;min-width:0">
-        <img src="assets/item/${s.sprite}.png" style="width:22px;height:22px" alt="">
+        <img src="assets/item/${s.sprite}.png" style="max-width:22px;max-height:22px;object-fit:contain;image-rendering:pixelated" alt="">
         <div style="min-width:0">
           <div class="tiny" style="color:#c8c0a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
           <div class="tiny dim">${fmtFull(supplyPrice(s, p.level))} gp/carga · cargas ${have}</div>
