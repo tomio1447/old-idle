@@ -203,7 +203,7 @@ function dmgIconImg(el, size) {
   const p = WIKI_DAMAGE_ICONS[el];
   if (!p) return "";
   const sz = size || 10;
-  return `<img src="assets/ui/${p}" alt="" style="max-width:${sz}px;max-height:${sz}px;object-fit:contain;vertical-align:-1px;margin-right:3px">`;
+  return `<img src="assets/ui/${p}" alt="" style="width:${sz}px;height:${sz}px;vertical-align:-1px;margin-right:3px">`;
 }
 
 /* Cache de <img> por slug — evita recriar Image a cada frame. */

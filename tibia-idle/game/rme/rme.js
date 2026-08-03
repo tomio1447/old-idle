@@ -43,7 +43,6 @@ const state = {
   zoom: 2,
   showGrid: true,
   showBlock: false,
-  autoBorders: true,    // bordas automaticas ao colocar chao
   undo: [],
   painting: false,
   dragStart: null,      // {x, y} — célula onde começou o arrasto
@@ -286,70 +285,6 @@ function undo() {
   state.mob = new Set(d.mob);
   render();
   status("desfeito");
-}
-
-/* ------------------------------------------------------------ bordas automaticas
- * Quando um chao (ground) e colocado, verifica as 8 celulas vizinhas.
- * Se o vizinho tem um chao DIFERENTE (ou sem chao), coloca a borda
- * correspondente no layer de itens da celula atual. Se o vizinho tambem
- * e diferente, coloca a borda do vizinho no lado dele.
- * Inspirado no Remere's Map Editor: torna o mapa visualmente imersivo
- * sem ter que posicionar bordas manualmente.
- */
-const BORDERS = (typeof window !== "undefined" && window.RME_BORDERS) || {};
-const BORDER_TILES = (typeof window !== "undefined" && window.RME_BORDER_TILES) || new Set();
-const GROUND_SPEED = (typeof window !== "undefined" && window.RME_GROUND_SPEED) || {};
-
-/* Retorna o "grupo" de chao para um ground_id.
- * Chaos do mesmo tipo (grama, areia, agua, etc.) compartilham a borda
- * e nao devem gerar borda entre si. */
-function groundGroup(gid) {
-  if (!gid) return -1;
-  // Se tem a mesma borda mapeada, sao do mesmo grupo
-  if (BORDERS[gid]) return BORDERS[gid];
-  // Se tem a mesma velocidade, provavelmente mesmo tipo
-  if (GROUND_SPEED[gid] !== undefined) return GROUND_SPEED[gid];
-  return gid; // fallback: cada chao e seu proprio grupo
-}
-
-/* Remove bordas automaticas de uma celula. */
-function removeAutoBorders(cell) {
-  if (!cell || !cell.items) return;
-  cell.items = cell.items.filter(id => !BORDER_TILES.has(id));
-}
-
-/* Gera bordas automaticas para uma celula e seus vizinhos.
- * Chamada depois de applyPaint/applyErase. */
-function applyAutoBorders(cx, cy) {
-  if (!state.autoBorders || state.layer !== "g") return;
-  // Verifica a celula central e todas as 8 vizinhas
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const x = cx + dx, y = cy + dy;
-      if (x < 0 || y < 0 || x >= state.w || y >= state.h) continue;
-      const cell = cellAt(x, y, false);
-      if (!cell || !cell.g) continue;
-      const myGroup = groundGroup(cell.g);
-      const myBorder = BORDERS[cell.g];
-      // Remove bordas automaticas existentes desta celula
-      removeAutoBorders(cell);
-      // Verifica os 4 vizinhos ortogonais (N, S, E, W)
-      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-      for (const [ddx, ddy] of dirs) {
-        const nx = x + ddx, ny = y + ddy;
-        if (nx < 0 || ny < 0 || nx >= state.w || ny >= state.h) continue;
-        const ncell = cellAt(nx, ny, false);
-        const nGroup = (ncell && ncell.g) ? groundGroup(ncell.g) : -1;
-        // Se o vizinho tem chao diferente (ou sem chao), coloca borda
-        if (nGroup !== myGroup && myBorder) {
-          // Evita duplicar borda
-          if (!cell.items.includes(myBorder)) {
-            cell.items.push(myBorder);
-          }
-        }
-      }
-    }
-  }
 }
 
 function applyPaint(x, y) {
@@ -723,16 +658,6 @@ document.getElementById("tgl-grid").addEventListener("change", (e) => {
 document.getElementById("tgl-block").addEventListener("change", (e) => {
   state.showBlock = e.target.checked; render();
 });
-document.getElementById("tgl-borders").addEventListener("change", (e) => {
-  state.autoBorders = e.target.checked;
-  if (state.autoBorders) {
-    // Regenera bordas em todo o mapa
-    for (let y = 0; y < state.h; y++)
-      for (let x = 0; x < state.w; x++)
-        applyAutoBorders(x, y);
-    render();
-  }
-});
 document.getElementById("btn-zoom-in").addEventListener("click", () => setZoom(state.zoom * 1.25));
 document.getElementById("btn-zoom-out").addEventListener("click", () => setZoom(state.zoom / 1.25));
 function setZoom(z) {
@@ -952,8 +877,8 @@ const _origApplyPaint = applyPaint;
 const _origApplyErase = applyErase;
 // Não usamos `function applyPaint` de novo — hoisting causaria recursão infinita.
 // Em vez disso, sobrescrevemos a variável no escopo do módulo:
-applyPaint = function(x, y) { _origApplyPaint(x, y); applyAutoBorders(x, y); autoSaveSchedule(); };
-applyErase = function(x, y) { _origApplyErase(x, y); applyAutoBorders(x, y); autoSaveSchedule(); };
+applyPaint = function(x, y) { _origApplyPaint(x, y); autoSaveSchedule(); };
+applyErase = function(x, y) { _origApplyErase(x, y); autoSaveSchedule(); };
 
 // Ctrl+S salva manualmente (download + auto-save)
 window.addEventListener("keydown", (e) => {

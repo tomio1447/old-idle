@@ -85,9 +85,9 @@ function mobImg(slug, tam, extra) {
     ? MOBSHEETS[slug] : null;
   const px = tam || 32;
   if (!meta) {
-    // criatura sem sheet: espaço vazio com aspect ratio preservado
+    // criatura sem sheet: espaco vazio, para o grid da tela nao quebrar
     return `<div class="mob-img" style="width:${px}px;height:${px}px;
-            object-fit:contain;${extra || ""}"></div>`;
+            ${extra || ""}"></div>`;
   }
   // a celula do sul e a linha 2; escala para caber na caixa pedida
   const k = Math.min(px / meta.cw, px / meta.ch);
@@ -1007,8 +1007,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     const p = Math.min(1, pr.t / pr.dur);
     const ex = (pr.from.x + (pr.to.x - pr.from.x) * p) * W;
     const ey = (pr.from.y + (pr.to.y - pr.from.y) * p) * H;
-    const icon = (EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif";
-    const wimg = Sprites.get("assets/ui/training/" + icon);
+    const isWeaponIcon = !pr.missile || pr.missile === "weapon";
+    const icon = isWeaponIcon
+      ? ("assets/ui/training/" + ((EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif"))
+      : pr.missile;
+    const wimg = Sprites.get(icon);
     if (wimg && wimg.complete && wimg.naturalWidth) {
       const ts = tilePx(W);
       const ws = ts * 0.75, hs = ts * 0.75;
@@ -1022,9 +1025,9 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
       ctx.beginPath(); ctx.ellipse(ex, ey + hs * 0.35, ws * 0.25, 4, 0, 0, 7); ctx.fill();
     }
     // impacto no dummy quando a arma chega (uma vez por golpe)
-    // sem efeito visual de "block-hit" — o dummy não reage
     if (p >= 1 && !pr.hitFx) {
       pr.hitFx = true;
+      this.addEffect(pr.to.x, pr.to.y, pr.fx || "block-hit");
       // some o proj no próximo frame
       training.proj = null;
     }
