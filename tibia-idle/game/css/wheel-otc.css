@@ -1,0 +1,100 @@
+/**
+ * wheel-otc.css — Wheel of Destiny (OTClient game_wheel module)
+ *
+ * Layout matching wheel.otui:
+ *   1000×645 window, 3 menu tabs (Wheel/Gem/Fragment),
+ *   money/fragment resource panel, summary toggle, preset bar.
+ */
+.wheel-window { width: 100%; max-width: 720px; background: #1a1d24; border: 1px solid #2a2d34; border-radius: 4px; overflow: hidden; }
+.wheel-menu-tabs { display: flex; gap: 0; background: #12151a; border-bottom: 1px solid #2a2d34; }
+.wheel-menu-tab { flex: 1; padding: 8px 12px; font-size: 11px; color: #666; text-align: center; cursor: pointer; border: none; background: transparent; transition: all .15s; font-weight: bold; }
+.wheel-menu-tab:hover { color: #c0c0c0; background: #1b1e24; }
+.wheel-menu-tab.active { color: #d4af37; background: #1a1d24; border-bottom: 2px solid #d4af37; }
+
+/* ── PRESET / TAB BAR ── */
+.wheel-preset-bar { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: #12151a; border-bottom: 1px solid #2a2d34; font-size: 10px; }
+.wheel-preset-btn { padding: 3px 10px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; color: #888; cursor: pointer; font-size: 9px; }
+.wheel-preset-btn:hover { border-color: #d4af37; color: #d4af37; }
+.wheel-preset-btn.active { background: #252820; border-color: #d4af37; color: #d4af37; }
+.wheel-preset-name { color: #c0c0c0; font-style: italic; margin-left: auto; }
+
+/* ── WHEEL BODY ── */
+.wheel-body { display: flex; gap: 10px; padding: 10px; }
+.wheel-canvas-area { position: relative; flex-shrink: 0; width: 522px; height: 522px; }
+.wheel-stage-img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
+.wheel-svg-links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.wheel-svg-links line { stroke: rgba(255,255,255,.12); stroke-width: 2; }
+
+/* ── NODES ── */
+.wheel-node {
+  position: absolute; transform: translate(-50%,-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: bold; color: #fff; cursor: pointer;
+  border: 3px solid; z-index: 2;
+  text-shadow: 1px 1px 0 #000, 0 0 4px #000;
+  transition: transform .12s, box-shadow .12s;
+}
+.wheel-node .wn-pts { line-height: 1; }
+.wheel-node .wn-max { font-size: 7px; color: #111; line-height: 1; }
+.wheel-node.w-green  { border-color: #4ade80; background: radial-gradient(circle,#16a34a55,#064e3b88); }
+.wheel-node.w-red    { border-color: #f87171; background: radial-gradient(circle,#dc262655,#7f1d1d88); }
+.wheel-node.w-blue   { border-color: #60a5fa; background: radial-gradient(circle,#2563eb55,#1e3a8a88); }
+.wheel-node.w-purple { border-color: #c084fc; background: radial-gradient(circle,#9333ea55,#581c8788); }
+.wheel-node.full.w-green  { border-color:#4ade80; background: radial-gradient(circle,#4ade80,#15803d); }
+.wheel-node.full.w-red    { border-color:#f87171; background: radial-gradient(circle,#f87171,#b91c1c); }
+.wheel-node.full.w-blue   { border-color:#60a5fa; background: radial-gradient(circle,#60a5fa,#1d4ed8); }
+.wheel-node.full.w-purple { border-color:#c084fc; background: radial-gradient(circle,#c084fc,#7e22ce); }
+.wheel-node.locked { opacity: .35; cursor: not-allowed; }
+.wheel-node.can:hover { transform: translate(-50%,-50%) scale(1.2); border-color:#ffe680; box-shadow: 0 0 14px #ffe68044; }
+
+/* ── RIGHT PANEL (summary) ── */
+.wheel-right { flex: 1; min-width: 0; max-height: 522px; overflow-y: auto; font-size: 10px; }
+.wheel-sec { margin-bottom: 8px; }
+.wheel-sec-title { color: #d4af37; font-weight: bold; font-size: 10px; padding: 3px 0; border-bottom: 1px solid #2a2d34; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.wheel-stats .stat-row { padding: 1px 0; }
+.wheel-stats .stat-row .k { color: #888; }
+.wheel-stats .stat-row .v { color: #9ce84a; font-weight: bold; }
+
+/* ── MONEY PANEL (bottom) ── */
+.wheel-money-bar { display: flex; gap: 8px; align-items: center; padding: 4px 10px; background: #12151a; border-top: 1px solid #2a2d34; font-size: 10px; }
+.wheel-money-item { display: flex; align-items: center; gap: 4px; padding: 2px 8px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; color: #c0c0c0; }
+.wheel-money-item img, .wheel-money-item .wm-icon { width: 14px; height: 14px; }
+.wheel-actions-bar { display: flex; gap: 4px; margin-left: auto; }
+.wheel-actions-bar button { font-size: 9px; padding: 2px 8px; }
+
+/* ── TOP INFO ── */
+.wheel-top-info { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 10px; background: #12151a; border-bottom: 1px solid #2a2d34; }
+.wheel-avail { padding: 2px 8px; background: #1b1e24; border: 1px solid #d4af37; border-radius: 3px; color: #ffe680; font-weight: bold; }
+.wheel-legend { display: flex; gap: 10px; font-size: 9px; }
+.wheel-legend .wl-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+
+/* ── GEM ATELIER ── */
+.wheel-gem-panel { padding: 10px; }
+.wheel-gem-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.wheel-gem-card { background: #1b1e24; border: 1px solid #2a2d34; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all .15s; }
+.wheel-gem-card:hover { border-color: #d4af37; }
+.wheel-gem-card.equipped { border-color: #d4af37; background: #252820; }
+.wheel-gem-card .wgc-icon { width: 32px; height: 32px; margin: 0 auto 3px; }
+.wheel-gem-card .wgc-name { font-size: 8px; color: #888; }
+
+/* ── FRAGMENT PANEL ── */
+.wheel-frag-panel { padding: 10px; }
+.wheel-frag-list { display: flex; flex-direction: column; gap: 4px; max-height: 400px; overflow-y: auto; }
+.wheel-frag-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 3px; font-size: 10px; cursor: pointer; }
+.wheel-frag-row:hover { border-color: #d4af37; }
+.wheel-frag-row .wfr-icon { width: 24px; height: 24px; }
+.wheel-frag-row .wfr-name { flex: 1; color: #c0c0c0; }
+.wheel-frag-row .wfr-cost { color: #888; }
+
+/* Summary toggle */
+.wheel-summary-toggle { display: flex; justify-content: center; padding: 4px; }
+.wheel-summary-toggle button { font-size: 9px; padding: 2px 10px; }
+
+/* Scroll */
+.wheel-right::-webkit-scrollbar, .wheel-frag-list::-webkit-scrollbar { width: 5px; }
+.wheel-right::-webkit-scrollbar-track, .wheel-frag-list::-webkit-scrollbar-track { background: #0d0f14; }
+.wheel-right::-webkit-scrollbar-thumb, .wheel-frag-list::-webkit-scrollbar-thumb { background: #2a2d34; border-radius: 3px; }
+
+/* Gift of Life badge */
+.wheel-gift-badge { display: inline-block; padding: 1px 5px; background: #2a5a2a; border: 1px solid #4ade80; border-radius: 2px; color: #4ade80; font-size: 8px; margin-left: 4px; }
