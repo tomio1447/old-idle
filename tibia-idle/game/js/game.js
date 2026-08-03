@@ -1406,6 +1406,11 @@ function renderAll() {
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
+  // OTClient HUD: health circle, combat modes, player states
+  if (typeof renderHudPanel === "function") renderHudPanel(p);
+  if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
+  if (typeof renderPlayerStates === "function") renderPlayerStates(p);
+  if (typeof renderTopBarStats === "function") renderTopBarStats(p);
 }
 
 function renderHuntInfo() {
@@ -1486,6 +1491,9 @@ function startGame(p) {
 
   $("#login").style.display = "none";
   $("#app").classList.add("ready");
+  // modulelib lifecycle + background hide
+  window.dispatchEvent(new Event("bg-game-start"));
+  if (typeof moduleLifecycleStart === "function") moduleLifecycleStart();
 
   const off = computeOffline(p);
   p.lastSeen = Date.now();

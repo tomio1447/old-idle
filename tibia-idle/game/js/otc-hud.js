@@ -1,0 +1,372 @@
+/**
+ * otc-hud.js — Complete OTClient HUD systems
+ *
+ * Implements: Health Circle (healthcircle/), Combat Modes (combatmodes/),
+ * Player States (states/), Battle Icons (battle/), Skulls (skulls/),
+ * Shields (shields/), Emblems (emblems/), Crosshair (crosshair/),
+ * Creature Icons (creatureicons/)
+ */
+"use strict";
+
+// ═══════════════════════ HEALTH CIRCLE ═══════════════════════
+/** Draws OTClient-style HP/Mana arcs on a canvas. */
+function drawHealthCircle(ctx, x, y, radius, hpPct, mpPct, shieldActive, lineWidth) {
+  lineWidth = lineWidth || 6;
+  const r = radius || 26;
+
+  // Background rings
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+
+  // HP ring (left side: top to bottom)
+  ctx.beginPath();
+  ctx.arc(x, y, r, Math.PI * 0.72, Math.PI * 1.28);
+  ctx.strokeStyle = 'rgba(0,0,0,.7)';
+  ctx.stroke();
+
+  // HP fill (clockwise from left-bottom upward)
+  const hpAngle = Math.PI * 0.28 + (Math.PI * 1.0 * Math.min(1, Math.max(0, hpPct || 0)));
+  ctx.beginPath();
+  ctx.arc(x, y, r, Math.PI * 1.28, hpAngle, true);
+  ctx.strokeStyle = hpBarColorForCircle(hpPct);
+  ctx.shadowColor = hpBarColorForCircle(hpPct);
+  ctx.shadowBlur = 4;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // MP ring (right side: bottom to top)
+  ctx.beginPath();
+  ctx.arc(x, y, r, Math.PI * -0.28, Math.PI * 0.28);
+  ctx.strokeStyle = 'rgba(0,0,0,.7)';
+  ctx.stroke();
+
+  const mpAngle = Math.PI * -0.28 + (Math.PI * 0.56 * Math.min(1, Math.max(0, mpPct || 0)));
+  ctx.beginPath();
+  ctx.arc(x, y, r, Math.PI * -0.28, mpAngle);
+  ctx.strokeStyle = shieldActive ? '#c084fc' : '#60a5fa';
+  ctx.shadowColor = shieldActive ? '#c084fc' : '#60a5fa';
+  ctx.shadowBlur = 3;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Bottom bar
+  const barW = r * 2 + 10, barH = 6;
+  const bx = x - barW / 2, by = y + r - 2;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+  ctx.fillStyle = '#c0c0c0';
+  ctx.fillRect(bx, by, barW * Math.min(1, Math.max(0, hpPct || 0)), barH);
+
+  // If shield active, draw extra ring outside
+  if (shieldActive) {
+    ctx.beginPath();
+    ctx.arc(x, y, r + lineWidth + 2, Math.PI * -0.28, Math.PI * 0.28);
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#c084fc';
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = lineWidth;
+  }
+}
+
+function hpBarColorForCircle(pct) {
+  if (pct > 0.6) return '#4ade80';
+  if (pct > 0.3) return '#facc15';
+  if (pct > 0.1) return '#fb923c';
+  return '#f87171';
+}
+
+// ═══════════════════════ COMBAT MODES ═══════════════════════
+function renderCombatModesStrip(p) {
+  const el = document.getElementById('combat-modes-strip');
+  if (!el) return;
+  const cfg = p.config || {};
+  const fightMode = cfg.fightMode || 'attack';
+  const chaseMode = cfg.attackMode || 'chase';
+  const pvpMode = cfg.pvpMode || 'dove';
+  const safeFight = cfg.safeFight || false;
+
+  // PVP mode icons
+  const pvpIcons = [
+    ['dove', '🕊', 'White Dove — never attack'],  // PVPWhiteDove
+    ['hand', '🤍', 'White Hand — defend only'],   // PVPWhiteHand
+    ['yellow', '💛', 'Yellow Hand — attack'],     // PVPYellowHand
+    ['fist', '👊', 'Red Fist — attack freely'],   // PVPRedFist
+  ];
+
+  // Fight mode icons (Offensive=1, Balanced=2, Defensive=3)
+  const fightIcons = [
+    ['attack', '⚔', 'Full Attack'],
+    ['balanced', '⚖', 'Balanced'],
+    ['defense', '🛡', 'Full Defense'],
+  ];
+
+  // Chase icons
+  const chaseIcons = [
+    ['stand', '⏸', 'Stand'],    // DontChase
+    ['chase', '👣', 'Chase'],   // ChaseOpponent
+  ];
+
+  let h = '<div class="hud-row">';
+
+  // PvP modes
+  h += '<div class="combat-modes-strip">';
+  for (const [id, icon, tt] of pvpIcons) {
+    h += `<div class="combat-mode-icon pvp-${id} ${pvpMode===id?'active':''}" data-pvp="${id}" title="${tt}">${icon}</div>`;
+  }
+  h += '</div>';
+
+  // Fight modes
+  h += '<div class="fight-mode-strip">';
+  for (const [id, icon, tt] of fightIcons) {
+    h += `<div class="fight-mode-btn ${fightMode===id?'active':''}" data-fight="${id}" title="${tt}">${icon}</div>`;
+  }
+  h += '</div>';
+
+  // Chase modes
+  h += '<div class="chase-mode-strip">';
+  for (const [id, icon, tt] of chaseIcons) {
+    h += `<div class="chase-mode-btn ${chaseMode===id?'active':''}" data-chase="${id}" title="${tt}">${icon}</div>`;
+  }
+  h += '</div>';
+
+  // Safe Fight
+  h += `<div class="safe-fight-btn ${safeFight?'on':''}" data-safefight title="Safe Fight — never attack players">🛡</div>`;
+
+  h += '</div>';
+  el.innerHTML = h;
+
+  // Bindings
+  el.querySelectorAll('[data-pvp]').forEach(b => b.addEventListener('click', () => {
+    cfg.pvpMode = b.dataset.pvp; renderCombatModesStrip(p);
+  }));
+  el.querySelectorAll('[data-fight]').forEach(b => b.addEventListener('click', () => {
+    cfg.fightMode = b.dataset.fight; renderCombatModesStrip(p);
+  }));
+  el.querySelectorAll('[data-chase]').forEach(b => b.addEventListener('click', () => {
+    cfg.attackMode = b.dataset.chase;
+    if (typeof renderHelper === 'function') renderHelper(p);
+    renderCombatModesStrip(p);
+  }));
+  const sf = el.querySelector('[data-safefight]');
+  if (sf) sf.addEventListener('click', () => {
+    cfg.safeFight = !cfg.safeFight; renderCombatModesStrip(p);
+  });
+}
+
+// ═══════════════════════ PLAYER STATES ═══════════════════════
+/** Renders state icons from player-state-flags.png positions */
+function renderPlayerStates(p) {
+  const el = document.getElementById('player-states-strip');
+  if (!el) return;
+  const agora = Date.now();
+  const icons = [];
+
+  // Poison
+  if (hasCondition && hasCondition(p, 'poison')) {
+    const co = p.conditions.poison;
+    icons.push({ icon: 'poison', timer: co ? co.turns + 't' : '', color: '#8ac83c' });
+  }
+  // Fire
+  if (hasCondition && hasCondition(p, 'fire')) {
+    const co = p.conditions.fire;
+    icons.push({ icon: 'fire', timer: co ? co.turns + 't' : '', color: '#ff8a3c' });
+  }
+  // Energy
+  if (hasCondition && hasCondition(p, 'energy')) {
+    const co = p.conditions.energy;
+    icons.push({ icon: 'energy', timer: co ? co.turns + 't' : '', color: '#c07cff' });
+  }
+  // Bleed
+  if (hasCondition && hasCondition(p, 'bleed')) {
+    const co = p.conditions.bleed;
+    icons.push({ icon: 'bleed', timer: co ? co.turns + 't' : '', color: '#d84040' });
+  }
+  // Magic Shield
+  if (typeof isMagicShieldActive === 'function' && isMagicShieldActive(p, agora)) {
+    icons.push({ icon: 'magic-shield', timer: '', color: '#7ec8ff' });
+  }
+  // Haste
+  if (typeof hasteAtiva === 'function') {
+    const hs = hasteAtiva(p, agora);
+    if (hs) icons.push({ icon: 'haste', timer: Math.ceil((hs.ate - agora) / 1000) + 's', color: '#ffe680' });
+  }
+  // Buffs
+  if (typeof buffTotals === 'function') {
+    for (const b of buffTotals(p, agora).lista) {
+      icons.push({ icon: 'strengthened', timer: Math.ceil((b.ate - agora) / 1000) + 's', color: '#9ce84a' });
+    }
+  }
+
+  // Use the existing condition icons from assets/ui/conditions/
+  let h = '<div class="player-state-strip">';
+  for (const s of icons) {
+    h += `<div class="player-state-icon" title="${s.icon}" style="border-color:${s.color}">
+      <img src="assets/ui/conditions/cond-${s.icon}.png" alt="${s.icon}">`;
+    if (s.timer) h += `<span class="psi-timer">${s.timer}</span>`;
+    h += `</div>`;
+  }
+  h += '</div>';
+  el.innerHTML = h || '';
+}
+
+// ═══════════════════════ SKULL ICONS ═══════════════════════
+const SKULL_SYMBOLS = {
+  none:   '·',
+  yellow: '⚠',
+  green:  '✓',
+  white:  '◻',
+  red:    '☠',
+  black:  '✠',
+  orange: '⚡',
+};
+
+const SKULL_COLORS = {
+  none: '#888', yellow: '#fbbf24', green: '#4ade80', white: '#fff',
+  red: '#f87171', black: '#333', orange: '#f97316',
+};
+
+function skullIcon(skull, size) {
+  size = size || 12;
+  return `<span class="skull-icon" style="color:${SKULL_COLORS[skull] || '#888'};font-size:${size}px;font-weight:bold" title="Skull: ${skull}">${SKULL_SYMBOLS[skull] || '·'}</span>`;
+}
+
+// ═══════════════════════ SHIELD ICONS ═══════════════════════
+const SHIELD_SYMBOLS = {
+  none: '·', whiteyellow: '👤', whiteblue: '👤', blue: '🔷', yellow: '🔶',
+  bluesharedexp: '💠', yellowsharedexp: '🔸',
+  bluenoshared: '🔹', yellownoshared: '🔸',
+  gray: '⬜',
+};
+
+function shieldIcon(shield, size) {
+  size = size || 12;
+  return `<span class="shield-icon" style="font-size:${size}px" title="Party: ${shield || 'none'}">${SHIELD_SYMBOLS[shield] || '·'}</span>`;
+}
+
+// ═══════════════════════ EMBLEM ICONS ═══════════════════════
+const EMBLEM_SYMBOLS = {none:'·', green:'🟢', red:'🔴', blue:'🔵', member:'👥', other:'⬜'};
+
+function emblemIcon(emblem, size) {
+  size = size || 12;
+  return `<span class="emblem-icon" style="font-size:${size}px" title="Emblem: ${emblem || 'none'}">${EMBLEM_SYMBOLS[emblem] || '·'}</span>`;
+}
+
+// ═══════════════════════ BATTLE LIST ICONS ═══════════════════════
+const BATTLE_VOC_ICON = {
+  knight: '🛡', paladin: '🏹', sorcerer: '🔥', druid: '🌿', monk: '☯',
+  monster: '👹', npc: '💬', player: '👤', summon: '✦',
+};
+
+function battleVocIcon(voc, size) {
+  size = size || 14;
+  return `<span class="battle-icon" style="font-size:${size}px" title="${voc}">${BATTLE_VOC_ICON[voc] || '·'}</span>`;
+}
+
+// ═══════════════════════ CROSSHAIR ═══════════════════════
+function initCrosshair() {
+  const el = document.createElement('div');
+  el.className = 'crosshair';
+  el.id = 'crosshair';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+
+  document.addEventListener('mousemove', (e) => {
+    el.style.left = e.clientX + 'px';
+    el.style.top = e.clientY + 'px';
+  });
+
+  // Show on right-click hold (combat mode), hide otherwise
+  document.addEventListener('contextmenu', (e) => {
+    el.style.display = 'block';
+  });
+  document.addEventListener('mouseup', () => {
+    if (document.pointerLockElement === null) el.style.display = 'none';
+  });
+}
+
+// ═══════════════════════ HUD PANEL (right side stats) ═══════════════════════
+function renderHudPanel(p) {
+  const el = document.getElementById('hud-panel');
+  if (!el) return;
+  const max = maxStats(p);
+  const hpPct = max.hp ? p.hp / max.hp : 0;
+  const mpPct = max.mp ? p.mp / max.mp : 0;
+  const shieldActive = typeof isMagicShieldActive === 'function' && isMagicShieldActive(p, Date.now());
+
+  // Build HTML
+  let h = '<div class="hud-quick">';
+  // HP
+  h += `<span class="hq-hp"><span class="val">${Math.floor(p.hp)}</span>`;
+  if (shieldActive) h += ' <span style="font-size:8px;color:#c084fc">⚡</span>';
+  h += `</span>`;
+  // MP
+  h += `<span class="hq-mp"><span class="val">${Math.floor(p.mp)}</span></span>`;
+  // Level
+  h += `<span style="color:#ffe680;font-weight:bold;font-size:11px;margin-left:auto">Lv ${p.level}</span>`;
+  h += '</div>';
+
+  // Health Circle canvas
+  h += '<div class="health-circle-wrap" style="position:relative;width:80px;height:80px;margin:0 auto">';
+  h += '<canvas id="hc-canvas" width="80" height="80" style="position:absolute;inset:0"></canvas>';
+  h += '</div>';
+
+  el.innerHTML = h;
+
+  // Draw on canvas
+  setTimeout(() => {
+    const cv = document.getElementById('hc-canvas');
+    if (cv) {
+      const ctx = cv.getContext('2d');
+      drawHealthCircle(ctx, 40, 40, 26, hpPct, mpPct, shieldActive, 5);
+    }
+  }, 10);
+}
+
+// ═══════════════════════ TOP BAR STATS ═══════════════════════
+function renderTopBarStats(p) {
+  const el = document.getElementById('topbar-stats');
+  if (!el) return;
+  const max = maxStats(p);
+  const hpPct = max.hp ? p.hp / max.hp : 0;
+  const mpPct = max.mp ? p.mp / max.mp : 0;
+  const expPct = typeof expProgress === 'function' ? expProgress(p) / 100 : 0;
+
+  // HP bar
+  let h = '<div class="hud-row" style="gap:4px;font-size:10px">';
+  h += '<span style="color:#f87171;width:20px">HP</span>';
+  h += `<div class="bar" style="flex:1;max-width:140px;height:8px;margin:0"><div class="fill hp" style="width:${Math.round(hpPct*100)}%"></div></div>`;
+  h += `<span style="color:#c0c0c0;font-size:9px">${Math.floor(p.hp)}</span>`;
+
+  // MP bar
+  h += '<span style="color:#60a5fa;width:20px;margin-left:8px">MP</span>';
+  h += `<div class="bar" style="flex:1;max-width:140px;height:8px;margin:0"><div class="fill mp" style="width:${Math.round(mpPct*100)}%"></div></div>`;
+  h += `<span style="color:#c0c0c0;font-size:9px">${Math.floor(p.mp)}</span>`;
+
+  // EXP bar
+  h += '<span style="color:#fbbf24;width:20px;margin-left:8px">XP</span>';
+  h += `<div class="bar" style="flex:1;max-width:140px;height:8px;margin:0"><div class="fill exp" style="width:${Math.round(expPct*100)}%"></div></div>`;
+  h += '<span style="color:#c0c0c0;font-size:9px">' + Math.round(expPct * 100) + '%</span>';
+
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+// ═══════════════════════ INIT ═══════════════════════
+function initOtcHud() {
+  initCrosshair();
+}
+
+if (typeof document !== 'undefined' && document.readyState !== 'loading') initOtcHud();
+else if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', initOtcHud);
+
+if (typeof window !== 'undefined') {
+  window.OtcHud = {
+    drawHealthCircle, renderCombatModesStrip, renderPlayerStates,
+    renderHudPanel, renderTopBarStats,
+    skullIcon, shieldIcon, emblemIcon, battleVocIcon,
+    SKULL_SYMBOLS, SKULL_COLORS, SHIELD_SYMBOLS, EMBLEM_SYMBOLS, BATTLE_VOC_ICON,
+  };
+}

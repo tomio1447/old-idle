@@ -8,9 +8,14 @@
   <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/global-idle.css">
 <link rel="stylesheet" href="css/accessories-extra.css">
-  <link rel="stylesheet" href="css/tibia-theme.css">
+  <link rel="stylesheet" href="css/otc-theme.css">
+  <link rel="stylesheet" href="css/wheel-otc.css">
+  <link rel="stylesheet" href="css/otc-hud.css">
 </head>
 <body>
+
+<!-- =============================================== CLIENT BACKGROUND -->
+<div id="client-version-label"></div>
 
 <!-- =============================================== LOGIN -->
 <div id="login">
@@ -136,6 +141,9 @@
         <div class="panel-title">Equipamento</div>
         <div class="panel-body">
           <div class="equip-grid" id="equip"></div>
+          <div id="soul-cap-panel"></div>
+          <div id="combat-mode-bar"></div>
+          <div id="posture-bar"></div>
           <div class="status-bar" id="status-bar"></div>
         </div>
       </div>
@@ -178,6 +186,10 @@
         <canvas id="scene"></canvas>
         <div id="stance-badge" class="stance-badge"></div>
         <div id="mission-box" class="mission-box" style="display:none"></div>
+        <div id="hud-panel" class="hud-panel" style="position:absolute;top:4px;right:4px;z-index:5;width:160px"></div>
+        <div id="combat-modes-strip" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:5"></div>
+        <div id="player-states-strip" style="position:absolute;bottom:30px;left:4px;z-index:5"></div>
+        <div id="topbar-stats" style="position:absolute;top:4px;left:4px;z-index:5;max-width:340px"></div>
       </div>
 
       <!-- barra de cooldown, no mesmo formato do cliente oficial:
@@ -305,6 +317,9 @@
 <div class="modal-bg" id="modal"><div class="modal panel" id="modal-body"></div></div>
 
 <script src="js/gamedata.js"></script>
+<script src="js/gamelib-const.js"></script>
+<script src="js/modulelib.js"></script>
+<script src="js/client-background.js"></script>
 <script src="js/canarydata.js"></script>
 <script src="js/spelldata.js"></script>
 <script src="js/appearancedata.js"></script>
@@ -371,6 +386,7 @@
 <script src="js/cyclopedia.js"></script>
 <script src="js/bosstiary.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/otc-hud.js"></script>
 <script src="js/cyclopedia-ui.js"></script>
 <script src="js/forgedata.js"></script>
 <script src="js/forge.js"></script>
