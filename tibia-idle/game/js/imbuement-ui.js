@@ -189,7 +189,7 @@ function renderImbueModal(p) {
   }
 
   return `<div class="panel-title">
-      <img src="assets/ui/imbuement-machine.png" style="width:20px;height:20px" alt="">
+      <img src="assets/ui/imbuement-machine.png" style="max-width:20px;max-height:20px;object-fit:contain" alt="">
       Imbuement <span class="spacer"></span><span class="tiny dim">até 20h em combate</span>
     </div>
     <div class="imb-grid">

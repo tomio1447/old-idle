@@ -1365,7 +1365,7 @@ function renderSupplies(p) {
     const have = p.supplies[slug] || 0;
     h += `<div class="row" style="justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.25)">
       <div class="row" style="gap:5px;min-width:0">
-        <img src="assets/item/${s.sprite}.png" style="width:22px;height:22px" alt="">
+        <img src="assets/item/${s.sprite}.png" style="max-width:22px;max-height:22px;object-fit:contain" alt="">
         <div style="min-width:0">
           <div class="tiny" style="color:#c8c0a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.name}</div>
           <div class="tiny dim">${fmtFull(supplyPrice(s, p.level))} gp/carga · cargas ${have}</div>

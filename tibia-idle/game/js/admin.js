@@ -133,7 +133,7 @@ function renderAdminCoins(p, el) {
         <div class="admin-card-t">Tibia Coins — saldo da conta</div>
         <div class="stat-row"><span class="k">Saldo atual</span>
           <span class="v">
-            <img src="${COINS_GIF}" class="coin-gif" style="width:22px;height:22px;vertical-align:middle" alt="Tibia Coins">
+            <img src="${COINS_GIF}" class="coin-gif" style="max-width:22px;max-height:22px;object-fit:contain;vertical-align:middle" alt="Tibia Coins">
             <b class="coin-txt" style="font-size:15px" id="adm-coins-n">${fmtFull(saldo)}</b>
           </span></div>
         <div class="tiny dim mt4">
@@ -805,8 +805,8 @@ function renderAdminForge(p, el) {
                   <div class="small">${m.name}</div>
                   <div class="tiny dim">base hp ${fmtFull(m.hp || 0)} · inf${stacks} hp ${fmtFull(inf.hp || 0)} · fiendish hp ${fmtFull(fie.hp || 0)}</div>
                 </div>
-                <button class="sm" data-forge-summon="${i}" data-variant="influenced"><img src="assets/ui/icons/influenced-creature.png" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px">Influenced</button>
-                <button class="sm primary" data-forge-summon="${i}" data-variant="fiendish"><img src="assets/ui/icons/fiendish-creature.png" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px">Fiendish</button>
+                <button class="sm" data-forge-summon="${i}" data-variant="influenced"><img src="assets/ui/icons/influenced-creature.png" style="max-width:12px;max-height:12px;object-fit:contain;vertical-align:-2px;margin-right:3px">Influenced</button>
+                <button class="sm primary" data-forge-summon="${i}" data-variant="fiendish"><img src="assets/ui/icons/fiendish-creature.png" style="max-width:12px;max-height:12px;object-fit:contain;vertical-align:-2px;margin-right:3px">Fiendish</button>
               </div>`;
             }).join("") || `<div class="dim tiny" style="padding:10px">Nada encontrado.</div>`}
           </div>
@@ -953,7 +953,7 @@ function renderAdminImbuements(p, el) {
           const slug = "mat-" + m.id;
           const have = (p.lootPouch || {})[slug] || 0;
           return `<div class="admin-item">
-            <img src="assets/item/${slug}.png" style="width:28px;height:28px;image-rendering:pixelated" alt="">
+            <img src="assets/item/${slug}.png" style="max-width:28px;max-height:28px;image-rendering:pixelated;object-fit:contain" alt="">
             <div class="admin-item-n">
               <div class="small">${m.name}</div>
               <div class="tiny dim">id ${m.id} · em uso: ${m.imbs.slice(0, 3).join(", ")}${m.imbs.length > 3 ? "…" : ""}</div>

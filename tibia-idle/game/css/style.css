@@ -165,7 +165,7 @@ canvas { image-rendering: pixelated; }
   display: flex; align-items: center; justify-content: center;
 }
 .slot:hover { border-color: var(--gold); }
-.slot img { max-width: 34px; max-height: 34px; }
+.slot img { max-width: 34px; max-height: 34px; object-fit: contain; }
 .slot .cnt {
   position: absolute; right: 1px; bottom: 0;
   font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000;
@@ -419,7 +419,7 @@ button.full { width: 100%; }
 .inv-item.cls-4:hover, .slot.cls-4:hover, .item-row.cls-4:hover { border-color: #d4af37 #8a6a2a #8a6a2a #d4af37 !important; }
 .inv-item.cls-3:hover, .slot.cls-3:hover, .item-row.cls-3:hover { border-color: #b870d8 #5a2a7a #5a2a7a #b870d8 !important; }
 .inv-item.cls-2:hover, .slot.cls-2:hover, .item-row.cls-2:hover { border-color: #6a8ad8 #2a3a7a #2a3a7a #6a8ad8 !important; }
-.inv-item img { max-width: 32px; max-height: 32px; }
+.inv-item img { max-width: 32px; max-height: 32px; object-fit: contain; }
 .inv-item .cnt {
   position: absolute; right: 1px; bottom: 0; font-size: 9px;
   color: #fff; text-shadow: 1px 1px 0 #000;
@@ -1505,7 +1505,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   .forge-client-wallet { min-width: 70px; }
 }
 
-/* ============================ Sistema de Prey ============================ */
+/* ============================ Sistema de Prey (client 15.x style) ============================ */
 .prey-btn-gif {
   width: 18px; height: 18px;
   vertical-align: -3px; margin-right: 4px;
@@ -1514,68 +1514,280 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 #btn-prey img.prey-btn-gif { display: inline-block; }
 
-
-.prey-wallet {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 8px; padding: 6px 8px; margin-bottom: 8px;
-  background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08);
-  border-radius: 4px; font-size: 12px;
+/* ---- Prey client shell (same pattern as forge-client) ---- */
+.prey-client {
+  width: 720px;
+  max-width: calc(100vw - 26px);
+  color: #d8d8d8;
+  font-family: Verdana, Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.15;
+  padding: 10px 10px 12px;
+  position: relative;
+  border: 2px solid;
+  border-color: #686868 #171717 #171717 #686868;
+  box-shadow: inset 0 0 0 1px #3d3d3d, 0 0 0 1px #050505;
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,.035) 1px 3px),
+    linear-gradient(180deg, #4b4b49 0%, #30302f 100%);
+  image-rendering: pixelated;
 }
-/* 3 slots lado a lado, como o client */
-.prey-slots {
+.prey-client * { box-sizing: border-box; }
+.prey-client-title {
+  position: absolute;
+  top: 2px; left: 50%; transform: translateX(-50%);
+  padding: 0 4px;
+  color: #dcdcdc;
+  background: #494949;
+  text-shadow: 1px 1px #000;
+  letter-spacing: .3px;
+  z-index: 2;
+}
+
+/* ---- 3 slots lado a lado ---- */
+.prey-client-slots {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  margin-top: 17px;
 }
-@media (max-width: 1100px) { .prey-slots { grid-template-columns: 1fr; } }
-.prey-slot {
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(0,0,0,.28);
-  border-radius: 8px; padding: 8px;
-  display: flex; flex-direction: column;
+@media (max-width: 780px) {
+  .prey-client { width: calc(100vw - 26px); }
+  .prey-client-slots { grid-template-columns: 1fr; }
 }
-.prey-slot.active { border-color: rgba(255,214,90,.55); box-shadow: 0 0 8px rgba(255,214,90,.12); }
-.prey-slot.locked { opacity: .6; }
-.prey-slot-head {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  margin-bottom: 6px; font-size: 12px;
+
+/* ---- Slot panel (each of the 3) ---- */
+.prey-slot-panel {
+  border: 2px solid;
+  border-color: #161616 #686868 #686868 #161616;
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 1px, rgba(0,0,0,.04) 1px 4px), #393937;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
 }
-.prey-slot-head .sm { font-size: 10px; padding: 2px 6px; }
-.prey-timer { font-size: 12px; font-weight: bold; flex: 1; }
-.prey-locked-msg { padding: 12px 4px; text-align: center; }
-.prey-select-hint { margin: 2px 0 6px; }
-.prey-selected {
-  display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap;
-  margin: 4px 0 8px;
+.prey-slot-panel.locked {
+  opacity: .65;
 }
-.prey-creature-card {
-  display: flex; align-items: center; gap: 8px;
-  border: 1px solid rgba(255,214,90,.5);
-  background: rgba(255,214,90,.08);
-  padding: 5px 8px; border-radius: 6px; font-size: 12px;
+.prey-slot-panel.active {
+  border-color: #b09a4a #5a4a1a #5a4a1a #b09a4a;
+  box-shadow: inset 0 0 6px rgba(212,175,55,.25);
 }
-.prey-bonus-card {
-  border: 1px solid; padding: 5px 10px; border-radius: 6px;
-  display: flex; flex-direction: column; justify-content: center;
-  background: rgba(0,0,0,.3); font-size: 13px;
+.prey-slot-title {
+  text-align: center;
+  color: #d4d4d4;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px #000;
+  padding: 2px 0 6px;
 }
-.prey-stars { font-size: 10px; letter-spacing: 1px; }
-/* grade 3x3 de criaturas */
-.prey-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 5px; margin-top: auto;
+
+/* ---- Locked slot ---- */
+.prey-locked-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px;
 }
-.prey-creature {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 5px 2px; border: 1px solid rgba(255,255,255,.1);
-  background: rgba(0,0,0,.25); border-radius: 6px; cursor: pointer;
-  text-align: center; font-size: 9px; line-height: 1.15;
-  min-height: 64px; justify-content: center;
+.prey-inactive-big {
+  width: 64px; height: auto;
+  image-rendering: pixelated;
+  opacity: .5;
+  object-fit: contain;
+}
+.prey-locked-msg {
+  color: #b7b7b7;
+  text-align: center;
+  font-size: 10px;
+}
+
+/* ---- Active slot: creature + bonus ---- */
+.prey-creature-bonus {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  min-height: 120px;
+}
+.prey-creature-box {
+  width: 120px; height: 120px;
+  border: 2px solid;
+  border-color: #171717 #686868 #686868 #171717;
+  background: #2a2a29;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+}
+.prey-creature-box img {
+  max-width: 100px; max-height: 100px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.prey-bonus-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid;
+  border-color: #161616 #626262 #626262 #161616;
+  background: #30302e;
+}
+.prey-bonus-icon {
+  width: 32px; height: 32px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.prey-bonus-icon.big {
+  width: 48px; height: 80px;
+  object-fit: contain;
+}
+.prey-bonus-stars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  justify-content: center;
+  max-width: 110px;
+}
+.prey-star {
+  width: 9px; height: 10px;
+  image-rendering: pixelated;
+}
+.prey-bonus-value {
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 1px 1px #000;
+}
+
+/* ---- Time bar ---- */
+.prey-time-bar {
+  height: 18px;
+  position: relative;
+  background: #1a1000;
+  border: 1px solid #000;
+  margin: 4px 0;
+  overflow: hidden;
+}
+.prey-time-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #e8a820, #c28400);
+  transition: width .5s linear;
+}
+.prey-time-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: #fff; text-shadow: 1px 1px 0 #000;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+/* ---- Actions row ---- */
+.prey-actions-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.prey-client-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  height: 20px;
+  color: #eee;
+  text-shadow: 1px 1px #000;
+  border: 1px solid;
+  border-color: #888 #1a1a1a #1a1a1a #888;
+  background: linear-gradient(#5a5a58, #3d3d3b);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 6px;
+  flex: 1;
+}
+.prey-client-action:disabled { opacity: .45; cursor: not-allowed; }
+.prey-client-action:hover:not(:disabled) { background: linear-gradient(#6b6b68, #4a4a47); }
+.prey-btn-img {
+  width: 16px; height: 24px;
+  image-rendering: pixelated;
+  flex: none;
+  object-fit: contain;
+}
+
+/* ---- Inactive slot: 3x3 creature grid ---- */
+.prey-creature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  flex: 1;
+  align-content: flex-start;
+}
+.prey-creature-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid #3a3a38;
+  background: #2a2a29;
+  padding: 4px 2px;
+  cursor: pointer;
+  min-height: 56px;
   transition: border-color .15s, background .15s;
 }
-.prey-creature:hover { border-color: rgba(255,214,90,.55); background: rgba(255,214,90,.07); }
-.prey-creature.sel { border-color: #ffd65a; background: rgba(255,214,90,.14); }
-.prey-help { color: #8a8272; }
+.prey-creature-cell:hover {
+  border-color: #ffd65a;
+  background: #46402c;
+}
+.prey-creature-cell img {
+  max-width: 36px; max-height: 36px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.prey-creature-name {
+  font-size: 8px;
+  color: #c8c0a8;
+  text-align: center;
+  line-height: 1.1;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Footer ---- */
+.prey-client-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.prey-client-wallet {
+  height: 22px;
+  min-width: 78px;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 3px;
+  padding: 0 5px;
+  border: 2px solid;
+  border-color: #161616 #686868 #686868 #161616;
+  background: #242423;
+  color: #fff;
+  text-shadow: 1px 1px #000;
+  font-size: 11px;
+}
+.prey-wallet-icon {
+  width: 14px; height: 14px; flex: none;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  margin-right: 2px;
+  object-fit: contain;
+}
 
 /* ============================ Sistema de Party ============================ */
 #btn-party { position: relative; }

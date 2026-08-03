@@ -342,7 +342,7 @@ function npcUpgrade(p) {
 
   return goldLine(p) + `
     <div class="row mb8" style="justify-content:space-between">
-      <span class="small dim"><img src="assets/item/dust.gif" style="width:14px;height:14px;vertical-align:-3px;margin-right:4px">Dust (Forja)</span>
+      <span class="small dim"><img src="assets/item/dust.gif" style="max-width:14px;max-height:14px;object-fit:contain;vertical-align:-3px;margin-right:4px">Dust (Forja)</span>
       <b style="color:#b060ff">${fmtFull(dust)}</b>
     </div>
     <div class="list mb8" style="max-height:330px">
