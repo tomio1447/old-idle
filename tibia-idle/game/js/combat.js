@@ -858,7 +858,7 @@ function playerMitigationPct(p) {
   } else if (p && p.skills) {
     sh = p.skills.shield || 0;
   }
-  // Wheel of Destiny: mitigação extra dos nos (0.03 por ponto, em %)
+  // Wheel of Destiny: mitigacao extra dos nos (0.03 por ponto, em %)
   let wheelMit = 0;
   if (typeof wheelTotals === "function" && p.wheel) {
     wheelMit = wheelTotals(p).mitigation * 100;
@@ -1747,15 +1747,12 @@ function castSpellById(c, p, target, now, id) {
       critSt = true;
     }
     if (extraSpellPct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraSpellPct / 100)));
-    // Wheel of Destiny: bonus de dano % da magia (upgrade da wheel) + o bonus
-    // global de dano (revelation dos estagios)
+    // Wheel of Destiny: bonus de dano % da magia (upgrade da wheel) + critico
     if (typeof wheelApplySpellBoost === "function" && p.wheel) {
       const wb = wheelApplySpellBoost(p, id);
       if (wb.damagePct) dmg = Math.max(1, Math.floor(dmg * (1 + wb.damagePct / 100)));
-      // crítico extra da magia pela wheel
       if (wb.critChance > 0 && !critSt && Math.random() * 100 < wb.critChance) {
         critSt = true;
-        extraSpellPct = Math.max(extraSpellPct, wb.critDamage || 0);
         dmg = Math.max(1, Math.floor(dmg * (1 + (wb.critDamage || 0) / 100)));
       }
     }
@@ -3068,10 +3065,8 @@ function rollLoot(c, p, mob) {
 
 /* Morte do jogador: perde exp, skills e renasce no local */
 function playerDeath(c, p) {
-  // Wheel of Destiny — Gift of Life (estágio VERDE): ao morrer, o jogador com
-  // o estágio verde desbloqueado revive no local com vida cheia, sem perder
-  // XP/ouro, uma vez a cada 2 horas (como a magia do jogo). O respawn acontece
-  // "no lugar" — o combate continua com a mesma onda.
+  // Wheel of Destiny — Gift of Life (estágio VERDE): revive no local, sem
+  // perder XP/ouro, 1 vez a cada 2h (como a magia do jogo).
   if (typeof wheelStage === "function" && p.wheel && wheelStage(p, "green") >= 1) {
     const agora = Date.now();
     const GIFT_CD = 2 * 3600 * 1000;

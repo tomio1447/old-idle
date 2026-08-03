@@ -150,10 +150,7 @@ function maxStats(p) {
   // Wheel of Destiny: bonus de HP/Mana/Capacidade dos nos da wheel
   let w = null;
   if (typeof wheelTotals === "function" && p.wheel) w = wheelTotals(p);
-  if (w) {
-    bonusHp += w.hp;
-    bonusMp += w.mp;
-  }
+  if (w) { bonusHp += w.hp; bonusMp += w.mp; }
   const cap = b.cap + (w ? w.cap : 0);
   return { hp: b.hp + bonusHp, mp: b.mp + bonusMp, cap: cap };
 }
@@ -273,7 +270,6 @@ function effSkill(p, which) {
 }
 
 function effMagic(p) {
-  // Wheel of Destiny: bonus de magic level (nos de skill 'magic')
   const wheelMag = (typeof wheelMagicBonus === "function" && p.wheel) ? wheelMagicBonus(p) : 0;
   return p.ml + gearStats(p).mag + wheelMag;
 }

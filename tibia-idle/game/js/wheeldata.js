@@ -1,117 +1,49 @@
 /* =========================================================================
  * wheeldata.js — dados da Wheel of Destiny (Roda do Destino)
  *
- * Portado fielmente do Canary (src/io/io_wheel.cpp, wheel_definitions.hpp,
- * player_wheel.cpp). A wheel tem 36 nos em 4 cores (verde, vermelho, azul,
- * roxo). Cada no tem um custo maximo em pontos (50/75/100/150/200), um minimo
- * de pontos totais para liberar e bonus por vocacao.
+ * Portado fielmente do Canary (io_wheel.cpp / wheel_definitions.hpp) para a
+ * LOGICA e do otclient oficial (buttons.lua / wheelnode.lua / geometry.lua)
+ * para o LAYOUT VISUAL e as CONEXOES dos 36 nos.
  *
- * Pontos: (nivel - 50) * 1 ponto por nivel + pontos de promotion scrolls.
- * Stages: cada cor soma os pontos dos nos dela; nos limiares 250/500/1000
- * concede o estagio 1/2/3 (revelation: +dano% e +cura% de {4,4}/{9,9}/{20,20})
- * e a habilidade de estagio da vocacao.
+ * Layout: 4 quadrantes de cores (verde=superior-esq, vermelho=superior-dir,
+ * azul=inferior-esq, roxo=inferior-dir). Cada no tem posicao pixel exata na
+ * roda de 522x522 (centro 261,261), calculada com a MESMA formula do cliente:
+ *   ang = (slice + 0.5) * 360 / totalSlice
+ *   x   = 261 + radius * cos(ang)   |   y = 261 + radius * sin(ang)
+ * com raios 261/215/160/106/53.
  * ========================================================================= */
 "use strict";
 
-/* Bonus de STAT por ponto, constante por vocacao (io_wheel.cpp):
- * health/mana/capacity por slot usam estes multiplicadores. */
+/* Bonus de STAT por ponto, constante por vocacao (io_wheel.cpp) */
 const WHEEL_HP =  { knight: 3, paladin: 2, sorcerer: 1, druid: 1, monk: 2 };
 const WHEEL_MP =  { knight: 1, paladin: 3, sorcerer: 6, druid: 6, monk: 2 };
 const WHEEL_CAP = { knight: 5, paladin: 4, sorcerer: 2, druid: 2, monk: 5 };
-// skill concedida (+1) ao MAXIMIZAR um no de skill (por vocacao)
 const WHEEL_SKILL = { knight: "melee", paladin: "distance", sorcerer: "magic", druid: "magic", monk: "fist" };
-// leech concedido ao MAXIMIZAR um no de leech
 const WHEEL_LEECH = { life: 0.75, mana: 0.25 };
-// mitigation por ponto (MITIGATION_INCREASE do io_wheel.cpp)
 const WHEEL_MIT_PER_POINT = 0.03;
 
 /* Configuracao de pontos (player_wheel.cpp / configmanager) */
 const WHEEL_CONFIG = {
-  minLevel: 50,                 // nivel minimo para desbloquear a wheel
-  pointsPerLevel: 1,            // 1 ponto por nivel acima de 50
-  minTotalBySlotCost: { 50: 50, 75: 50, 100: 125, 150: 225, 200: 375 },
-  // promotion scrolls (wheel_scrolls.lua): { itemId, nome, pontos }
+  minLevel: 50,
+  pointsPerLevel: 1,
+  // pontos TOTAIS minimos para comecar um no (canary canSelectSlot)
+  minTotalBySlotCost: { 50: 0, 75: 50, 100: 125, 150: 225, 200: 375 },
   scrolls: [
-    { id: 43946, nome: "Abridged", pontos: 3, item: "abridged promotion scroll" },
-    { id: 43947, nome: "Basic",    pontos: 5, item: "basic promotion scroll" },
-    { id: 43948, nome: "Revised",  pontos: 9, item: "revised promotion scroll" },
-    { id: 43949, nome: "Extended", pontos: 13, item: "extended promotion scroll" },
-    { id: 43950, nome: "Advanced", pontos: 20, item: "advanced promotion scroll" },
+    { id: 43946, nome: "Abridged", pontos: 3, item: "Abridged promotion scroll" },
+    { id: 43947, nome: "Basic",    pontos: 5, item: "Basic promotion scroll" },
+    { id: 43948, nome: "Revised",  pontos: 9, item: "Revised promotion scroll" },
+    { id: 43949, nome: "Extended", pontos: 13, item: "Extended promotion scroll" },
+    { id: 43950, nome: "Advanced", pontos: 20, item: "Advanced promotion scroll" },
   ],
-  stageThresholds: [250, 500, 1000],   // pontos por cor para estagio 1/2/3
-  revelation: [                       // {dano%, cura%} por estagio (io_wheel.hpp)
+  stageThresholds: [250, 500, 1000],
+  revelation: [
     { damage: 4, healing: 4 },
     { damage: 9, healing: 9 },
     { damage: 20, healing: 20 },
   ],
 };
 
-/* ------------------------------------------------------------------
- * Os 36 nos.
- * Campos:
- *   hp/mana/cap/mit  -> bonus por ponto (usa as tabelas de vocacao);
- *   skill:true       -> ao MAXIMIZAR, +1 na skill da vocacao (WHEEL_SKILL);
- *   leech:'life'|'mana' -> ao MAXIMIZAR, concede leech (WHEEL_LEECH);
- *   spell:{voc:id}   -> ao MAXIMIZAR, desbloqueia a magia da wheel;
- *   instant:{voc:nm} -> ao MAXIMIZAR, desbloqueia a habilidade instantanea.
- *   min              -> pontos totais minimos para comecar a alocar no no.
- * ------------------------------------------------------------------ */
-const WHEEL_SLOTS = {
-  // ============================= VERDE =============================
-  GREEN_200: { color: "green", max: 200, min: 375, hp: true, mana: true,
-    instant: { knight: "Battle Instinct", paladin: "Positional Tactics", sorcerer: "Runic Mastery", druid: "Healing Link", monk: "Guiding Presence" } },
-  GREEN_TOP_150: { color: "green", max: 150, min: 225, mit: true, leech: "mana" },
-  GREEN_TOP_100: { color: "green", max: 100, min: 125, hp: true },
-  GREEN_MIDDLE_100: { color: "green", max: 100, min: 125, hp: true,
-    spell: { knight: "exori-mas", paladin: "exori-gran-con", sorcerer: "utamo-vita", druid: "exura-gran-mas-res", monk: "exura-mas-nia" } },
-  GREEN_BOTTOM_100: { color: "green", max: 100, min: 125, hp: true,
-    spell: { knight: "exura-gran-ico", paladin: "utamo-tempo-san", sorcerer: "exevo-vis-hur", druid: "exevo-tera-hur", monk: "exori-med-pug" } },
-  GREEN_BOTTOM_150: { color: "green", max: 150, min: 225, mit: true },
-  GREEN_TOP_75: { color: "green", max: 75, min: 50, mana: true, leech: "life" },
-  GREEN_BOTTOM_75: { color: "green", max: 75, min: 50, mana: true, skill: true },
-  GREEN_50: { color: "green", max: 50, min: 0, cap: true },
-  // ============================= VERMELHO =============================
-  RED_200: { color: "red", max: 200, min: 375, hp: true, mana: true,
-    spell: { knight: "exori-min", paladin: "utito-tempo-san", sorcerer: "__focus__", druid: "exevo-gran-frigo-hur", monk: "exori-mas-nia" } },
-  RED_TOP_150: { color: "red", max: 150, min: 225, hp: true },
-  RED_TOP_100: { color: "red", max: 100, min: 125, mana: true, skill: true },
-  RED_MIDDLE_100: { color: "red", max: 100, min: 125, mana: true,
-    spell: { knight: "exeta-amp-res", paladin: "exana-amp-res", sorcerer: "exori-kor", druid: "exura-gran-sio", monk: "exori-amp-pug" } },
-  RED_BOTTOM_100: { color: "red", max: 100, min: 125, mana: true },
-  RED_BOTTOM_150: { color: "red", max: 150, min: 225, hp: true, leech: "mana" },
-  RED_TOP_75: { color: "red", max: 75, min: 50, cap: true },
-  RED_BOTTOM_75: { color: "red", max: 75, min: 50, cap: true, leech: "life" },
-  RED_50: { color: "red", max: 50, min: 0, mit: true,
-    spell: { knight: "exori-gran", paladin: "exevo-mas-san", sorcerer: "exevo-gran-flam-hur", druid: "exura-sio", monk: "exori-mas-pug" } },
-  // ============================= AZUL =============================
-  BLUE_200: { color: "blue", max: 200, min: 375, hp: true, mana: true,
-    spell: { knight: "exori-gran", paladin: "exevo-mas-san", sorcerer: "exevo-gran-flam-hur", druid: "exura-sio", monk: "exori-mas-pug" } },
-  BLUE_TOP_150: { color: "blue", max: 150, min: 225, cap: true, leech: "life" },
-  BLUE_TOP_100: { color: "blue", max: 100, min: 125, mit: true },
-  BLUE_MIDDLE_100: { color: "blue", max: 100, min: 125, mit: true,
-    spell: { knight: "exeta-amp-res", paladin: "exana-amp-res", sorcerer: "exori-kor", druid: "exura-gran-sio", monk: "exori-amp-pug" } },
-  BLUE_BOTTOM_100: { color: "blue", max: 100, min: 125, mit: true, skill: true },
-  BLUE_BOTTOM_150: { color: "blue", max: 150, min: 225, cap: true },
-  BLUE_TOP_75: { color: "blue", max: 75, min: 50, hp: true, leech: "mana" },
-  BLUE_BOTTOM_75: { color: "blue", max: 75, min: 50, hp: true },
-  BLUE_50: { color: "blue", max: 50, min: 0, mana: true,
-    spell: { knight: "exori-min", paladin: "utito-tempo-san", sorcerer: "__focus__", druid: "exevo-gran-frigo-hur", monk: "exori-mas-nia" } },
-  // ============================= ROXO =============================
-  PURPLE_200: { color: "purple", max: 200, min: 375, hp: true, mana: true,
-    instant: { knight: "Battle Healing", paladin: "Ballistic Mastery", sorcerer: "Focus Mastery", druid: "Runic Mastery", monk: "Sanctuary" } },
-  PURPLE_TOP_150: { color: "purple", max: 150, min: 225, mana: true },
-  PURPLE_TOP_100: { color: "purple", max: 100, min: 125, cap: true,
-    spell: { knight: "exori-mas", paladin: "exori-gran-con", sorcerer: "utamo-vita", druid: "exura-gran-mas-res", monk: "exura-mas-nia" } },
-  PURPLE_MIDDLE_100: { color: "purple", max: 100, min: 125, cap: true,
-    spell: { knight: "exura-gran-ico", paladin: "utamo-tempo-san", sorcerer: "exevo-vis-hur", druid: "exevo-tera-hur", monk: "exori-med-pug" } },
-  PURPLE_BOTTOM_100: { color: "purple", max: 100, min: 125, cap: true },
-  PURPLE_BOTTOM_150: { color: "purple", max: 150, min: 225, mana: true, leech: "life" },
-  PURPLE_TOP_75: { color: "purple", max: 75, min: 50, mit: true, skill: true },
-  PURPLE_BOTTOM_75: { color: "purple", max: 75, min: 50, mit: true, leech: "mana" },
-  PURPLE_50: { color: "purple", max: 50, min: 0, hp: true },
-};
-
-/* Cores: ordem e rotulo para o UI */
+/* Cores: rotulo e CSS */
 const WHEEL_COLORS = {
   green:  { nome: "Verde",  cls: "green" },
   red:    { nome: "Vermelho", cls: "red" },
@@ -119,19 +51,170 @@ const WHEEL_COLORS = {
   purple: { nome: "Roxo",   cls: "purple" },
 };
 
-/* Habilidade de ESTAGIO por cor e vocacao (apply*StageBonus do canary) */
-const WHEEL_STAGE_ABILITY = {
-  green:  { knight: "Gift of Life", paladin: "Gift of Life", sorcerer: "Gift of Life", druid: "Gift of Life", monk: "Gift of Life" },
-  red:    { knight: "Executioner's Throw", paladin: "Divine Grenade", sorcerer: "Beam Mastery", druid: "Blessing of the Grove", monk: "Spiritual Outburst" },
-  purple: { knight: "Avatar of Steel", paladin: "Avatar of Light", sorcerer: "Avatar of Storm", druid: "Avatar of Nature", monk: "Avatar of Balance" },
-  blue:   { knight: "Combat Mastery", paladin: "Divine Empowerment", sorcerer: "Drain Body", druid: "Twin Burst", monk: "Ascetic" },
+/* Posicao pixel exata de cada no na roda 522x522 (centro 261,261) */
+const WHEEL_POS = {
+  "GREEN_200":[76.4,76.4],"GREEN_TOP_150":[178.7,62.4],"GREEN_TOP_100":[219.6,106.5],
+  "GREEN_BOTTOM_150":[62.4,178.7],"GREEN_MIDDLE_100":[147.9,147.9],"GREEN_TOP_75":[220.4,163.1],
+  "GREEN_BOTTOM_100":[106.5,219.6],"GREEN_BOTTOM_75":[163.1,220.4],"GREEN_50":[223.5,223.5],
+  "RED_TOP_100":[302.4,106.5],"RED_TOP_150":[343.3,62.4],"RED_200":[445.6,76.4],
+  "RED_TOP_75":[301.6,163.1],"RED_MIDDLE_100":[374.1,147.9],"RED_BOTTOM_150":[459.6,178.7],
+  "RED_50":[298.5,223.5],"RED_BOTTOM_75":[358.9,220.4],"RED_BOTTOM_100":[415.5,219.6],
+  "BLUE_TOP_100":[106.5,302.4],"BLUE_TOP_75":[163.1,301.6],"BLUE_50":[223.5,298.5],
+  "BLUE_TOP_150":[62.4,343.3],"BLUE_MIDDLE_100":[147.9,374.1],"BLUE_BOTTOM_75":[220.4,358.9],
+  "BLUE_200":[76.4,445.6],"BLUE_BOTTOM_150":[178.7,459.6],"BLUE_BOTTOM_100":[219.6,415.5],
+  "PURPLE_50":[298.5,298.5],"PURPLE_TOP_75":[358.9,301.6],"PURPLE_BOTTOM_75":[301.6,358.9],
+  "PURPLE_TOP_100":[415.5,302.4],
+  "PURPLE_MIDDLE_100":[374.1,374.1],"PURPLE_TOP_150":[459.6,343.3],"PURPLE_BOTTOM_100":[302.4,415.5],
+  "PURPLE_BOTTOM_150":[343.3,459.6],"PURPLE_200":[445.6,445.6],
 };
 
-/* =========================================================================
- * Upgrade de magias da wheel (grades 1 e 2) — portado de io_wheel.cpp.
- * Cada vocacao tem 5 magias "da wheel"; ao MAXIMIZAR o no de spell daquela
- * magia voce ganha o grade 1 (ou 2) com estes bonus.
- * ========================================================================= */
+/* Conexoes de ADJACENCIA do cliente (wheelnode.lua `connecteds`): para cada
+ * no, os vizinhos que podem destrava-lo. A regra do cliente: um no so pode
+ * receber pontos se existir um CAMINHO dele ate uma raiz (no _50) passando
+ * por nos totalmente maximizados. */
+const WHEEL_CONNECTED = {
+  // raizes (50): sempre selecionaveis
+  "GREEN_50": [], "RED_50": [], "BLUE_50": [], "PURPLE_50": [],
+  // verde
+  "GREEN_TOP_75": ["GREEN_BOTTOM_75","GREEN_50","RED_TOP_75","GREEN_TOP_100","GREEN_MIDDLE_100"],
+  "GREEN_BOTTOM_75": ["GREEN_TOP_75","GREEN_50","BLUE_TOP_75","GREEN_MIDDLE_100","GREEN_BOTTOM_100"],
+  "GREEN_TOP_100": ["GREEN_MIDDLE_100","GREEN_TOP_75","RED_TOP_100","GREEN_TOP_150"],
+  "GREEN_MIDDLE_100": ["GREEN_BOTTOM_75","GREEN_TOP_75","GREEN_BOTTOM_100","GREEN_TOP_100","GREEN_BOTTOM_150","GREEN_TOP_150"],
+  "GREEN_BOTTOM_100": ["GREEN_MIDDLE_100","GREEN_BOTTOM_75","BLUE_TOP_100","GREEN_BOTTOM_150"],
+  "GREEN_TOP_150": ["GREEN_TOP_100","GREEN_MIDDLE_100","GREEN_BOTTOM_150","GREEN_200"],
+  "GREEN_BOTTOM_150": ["GREEN_MIDDLE_100","GREEN_BOTTOM_100","GREEN_TOP_150","GREEN_200"],
+  "GREEN_200": ["GREEN_TOP_150","GREEN_BOTTOM_150"],
+  // vermelho
+  "RED_TOP_75": ["GREEN_TOP_75","RED_50","RED_BOTTOM_75","RED_TOP_100","RED_MIDDLE_100"],
+  "RED_BOTTOM_75": ["RED_TOP_75","RED_50","PURPLE_TOP_75","RED_MIDDLE_100","RED_BOTTOM_100"],
+  "RED_TOP_100": ["GREEN_TOP_100","RED_TOP_75","RED_MIDDLE_100","RED_TOP_150"],
+  "RED_MIDDLE_100": ["RED_TOP_75","RED_BOTTOM_75","RED_TOP_100","RED_BOTTOM_100","RED_TOP_150","RED_BOTTOM_150"],
+  "RED_BOTTOM_100": ["RED_BOTTOM_75","RED_MIDDLE_100","PURPLE_TOP_100","RED_BOTTOM_150"],
+  "RED_TOP_150": ["RED_TOP_100","RED_MIDDLE_100","RED_BOTTOM_150","RED_200"],
+  "RED_BOTTOM_150": ["RED_MIDDLE_100","RED_BOTTOM_100","RED_TOP_150","RED_200"],
+  "RED_200": ["RED_TOP_150","RED_BOTTOM_150"],
+  // azul
+  "BLUE_TOP_75": ["BLUE_50","GREEN_BOTTOM_75","BLUE_BOTTOM_75","BLUE_TOP_100","BLUE_MIDDLE_100"],
+  "BLUE_BOTTOM_75": ["BLUE_50","PURPLE_BOTTOM_75","BLUE_TOP_75","BLUE_MIDDLE_100","BLUE_BOTTOM_100"],
+  "BLUE_TOP_100": ["GREEN_BOTTOM_100","BLUE_TOP_75","BLUE_MIDDLE_100","BLUE_TOP_150"],
+  "BLUE_MIDDLE_100": ["BLUE_BOTTOM_75","BLUE_TOP_75","BLUE_TOP_100","BLUE_BOTTOM_100","BLUE_TOP_150","BLUE_BOTTOM_150"],
+  "BLUE_BOTTOM_100": ["BLUE_BOTTOM_75","PURPLE_BOTTOM_100","BLUE_MIDDLE_100","BLUE_BOTTOM_150"],
+  "BLUE_TOP_150": ["BLUE_TOP_100","BLUE_MIDDLE_100","BLUE_BOTTOM_150","BLUE_200"],
+  "BLUE_BOTTOM_150": ["BLUE_MIDDLE_100","BLUE_BOTTOM_100","BLUE_TOP_150","BLUE_200"],
+  "BLUE_200": ["BLUE_TOP_150","BLUE_BOTTOM_150"],
+  // roxo
+  "PURPLE_TOP_75": ["PURPLE_50","PURPLE_BOTTOM_75","RED_BOTTOM_75","PURPLE_TOP_100","PURPLE_MIDDLE_100"],
+  "PURPLE_BOTTOM_75": ["PURPLE_50","PURPLE_TOP_75","BLUE_BOTTOM_75","PURPLE_MIDDLE_100","PURPLE_BOTTOM_100"],
+  "PURPLE_TOP_100": ["PURPLE_TOP_75","RED_BOTTOM_100","PURPLE_MIDDLE_100","PURPLE_TOP_150"],
+  "PURPLE_MIDDLE_100": ["PURPLE_TOP_75","PURPLE_BOTTOM_75","PURPLE_TOP_100","PURPLE_BOTTOM_100","PURPLE_TOP_150","PURPLE_BOTTOM_150"],
+  "PURPLE_BOTTOM_100": ["PURPLE_BOTTOM_75","BLUE_BOTTOM_100","PURPLE_MIDDLE_100","PURPLE_BOTTOM_150"],
+  "PURPLE_TOP_150": ["PURPLE_TOP_100","PURPLE_MIDDLE_100","PURPLE_BOTTOM_150","PURPLE_200"],
+  "PURPLE_BOTTOM_150": ["PURPLE_MIDDLE_100","PURPLE_BOTTOM_100","PURPLE_TOP_150","PURPLE_200"],
+  "PURPLE_200": ["PURPLE_TOP_150","PURPLE_BOTTOM_150"],
+};
+
+/* ------------------------------------------------------------------
+ * Os 36 nos. Campos:
+ *   color, max (custo max em pontos), pos (WHEEL_POS)
+ *   hp/mana/cap/mit -> bonus por ponto
+ *   skill:true      -> ao MAXIMIZAR, +1 na skill da vocacao
+ *   leech           -> ao MAXIMIZAR, concede leech
+ *   spell:{voc:id}  -> ao MAXIMIZAR, desbloqueia a magia da wheel
+ *   instant:{voc:nm}-> ao MAXIMIZAR, desbloqueia habilidade instantanea
+ *   border          -> imagem de borda do cliente (assets/wheel/border/...)
+ * ------------------------------------------------------------------ */
+const WHEEL_SLOTS = {
+  // ============================= VERDE =============================
+  "GREEN_50":      { color:"green", max:50, min:0,   cap:true,
+                     border:["top_left",1] },
+  "GREEN_TOP_75":  { color:"green", max:75, min:50,  mana:true, leech:"life",
+                     border:["top_left",3] },
+  "GREEN_BOTTOM_75":{ color:"green", max:75, min:50, mana:true, skill:true,
+                     border:["top_left",2] },
+  "GREEN_TOP_100": { color:"green", max:100, min:125, hp:true,
+                     border:["top_left",6] },
+  "GREEN_MIDDLE_100":{ color:"green", max:100, min:125, hp:true,
+                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"utamo-vita", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
+                     border:["top_left",5] },
+  "GREEN_BOTTOM_100":{ color:"green", max:100, min:125, hp:true,
+                     spell:{ knight:"exura-gran-ico", paladin:"utamo-tempo-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
+                     border:["top_left",4] },
+  "GREEN_TOP_150": { color:"green", max:150, min:225, mit:true, leech:"mana",
+                     border:["top_left",8] },
+  "GREEN_BOTTOM_150":{ color:"green", max:150, min:225, mit:true,
+                     border:["top_left",7] },
+  "GREEN_200":     { color:"green", max:200, min:375, hp:true, mana:true,
+                     instant:{ knight:"Battle Instinct", paladin:"Positional Tactics", sorcerer:"Runic Mastery", druid:"Healing Link", monk:"Guiding Presence" },
+                     border:["top_left",9] },
+  // ============================= VERMELHO =============================
+  "RED_50":        { color:"red", max:50, min:0,   mit:true,
+                     spell:{ knight:"exori-gran", paladin:"exevo-mas-san", sorcerer:"exevo-gran-flam-hur", druid:"exura-sio", monk:"exori-mas-pug" },
+                     border:["top_right",1] },
+  "RED_TOP_75":    { color:"red", max:75, min:50,  cap:true,
+                     border:["top_right",3] },
+  "RED_BOTTOM_75": { color:"red", max:75, min:50,  cap:true, leech:"life",
+                     border:["top_right",2] },
+  "RED_TOP_100":   { color:"red", max:100, min:125, mana:true, skill:true,
+                     border:["top_right",6] },
+  "RED_MIDDLE_100":{ color:"red", max:100, min:125, mana:true,
+                     spell:{ knight:"exeta-amp-res", paladin:"exana-amp-res", sorcerer:"exori-kor", druid:"exura-gran-sio", monk:"exori-amp-pug" },
+                     border:["top_right",5] },
+  "RED_BOTTOM_100":{ color:"red", max:100, min:125, mana:true,
+                     border:["top_right",4] },
+  "RED_TOP_150":   { color:"red", max:150, min:225, hp:true,
+                     border:["top_right",8] },
+  "RED_BOTTOM_150":{ color:"red", max:150, min:225, hp:true, leech:"mana",
+                     border:["top_right",7] },
+  "RED_200":       { color:"red", max:200, min:375, hp:true, mana:true,
+                     spell:{ knight:"exori-min", paladin:"utito-tempo-san", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-nia" },
+                     border:["top_right",9] },
+  // ============================= AZUL =============================
+  "BLUE_50":       { color:"blue", max:50, min:0,   mana:true,
+                     spell:{ knight:"exori-min", paladin:"utito-tempo-san", sorcerer:"__focus__", druid:"exevo-gran-frigo-hur", monk:"exori-mas-nia" },
+                     border:["bottom_left",1] },
+  "BLUE_TOP_75":   { color:"blue", max:75, min:50,  hp:true, leech:"mana",
+                     border:["bottom_left",2] },
+  "BLUE_BOTTOM_75":{ color:"blue", max:75, min:50,  hp:true,
+                     border:["bottom_left",3] },
+  "BLUE_TOP_100":  { color:"blue", max:100, min:125, mit:true,
+                     border:["bottom_left",4] },
+  "BLUE_MIDDLE_100":{ color:"blue", max:100, min:125, mit:true,
+                     spell:{ knight:"exeta-amp-res", paladin:"exana-amp-res", sorcerer:"exori-kor", druid:"exura-gran-sio", monk:"exori-amp-pug" },
+                     border:["bottom_left",5] },
+  "BLUE_BOTTOM_100":{ color:"blue", max:100, min:125, mit:true, skill:true,
+                     border:["bottom_left",6] },
+  "BLUE_TOP_150":  { color:"blue", max:150, min:225, cap:true, leech:"life",
+                     border:["bottom_left",8] },
+  "BLUE_BOTTOM_150":{ color:"blue", max:150, min:225, cap:true,
+                     border:["bottom_left",7] },
+  "BLUE_200":      { color:"blue", max:200, min:375, hp:true, mana:true,
+                     spell:{ knight:"exori-gran", paladin:"exevo-mas-san", sorcerer:"exevo-gran-flam-hur", druid:"exura-sio", monk:"exori-mas-pug" },
+                     border:["bottom_left",9] },
+  // ============================= ROXO =============================
+  "PURPLE_50":     { color:"purple", max:50, min:0,   hp:true,
+                     border:["bottom_right",1] },
+  "PURPLE_TOP_75": { color:"purple", max:75, min:50,  mit:true, skill:true,
+                     border:["bottom_right",3] },
+  "PURPLE_BOTTOM_75":{ color:"purple", max:75, min:50, mit:true, leech:"mana",
+                     border:["bottom_right",2] },
+  "PURPLE_TOP_100":{ color:"purple", max:100, min:125, cap:true,
+                     spell:{ knight:"exori-mas", paladin:"exori-gran-con", sorcerer:"utamo-vita", druid:"exura-gran-mas-res", monk:"exura-mas-nia" },
+                     border:["bottom_right",6] },
+  "PURPLE_MIDDLE_100":{ color:"purple", max:100, min:125, cap:true,
+                     spell:{ knight:"exura-gran-ico", paladin:"utamo-tempo-san", sorcerer:"exevo-vis-hur", druid:"exevo-tera-hur", monk:"exori-med-pug" },
+                     border:["bottom_right",5] },
+  "PURPLE_BOTTOM_100":{ color:"purple", max:100, min:125, cap:true,
+                     border:["bottom_right",4] },
+  "PURPLE_TOP_150":{ color:"purple", max:150, min:225, mana:true,
+                     border:["bottom_right",8] },
+  "PURPLE_BOTTOM_150":{ color:"purple", max:150, min:225, mana:true, leech:"life",
+                     border:["bottom_right",7] },
+  "PURPLE_200":    { color:"purple", max:200, min:375, hp:true, mana:true,
+                     instant:{ knight:"Battle Healing", paladin:"Ballistic Mastery", sorcerer:"Focus Mastery", druid:"Runic Mastery", monk:"Sanctuary" },
+                     border:["bottom_right",9] },
+};
+
+/* Upgrade de magias da wheel (grades 1 e 2) — portado de io_wheel.cpp */
 const WHEEL_SPELL_UPGRADES = {
   knight: [
     { name: "exori-min",  spell: "Front Sweep",              g1: { lifeLeech: 5 },                         g2: { damage: 14 } },
@@ -170,8 +253,19 @@ const WHEEL_SPELL_UPGRADES = {
   ],
 };
 
+/* Habilidade de ESTAGIO por cor e vocacao */
+const WHEEL_STAGE_ABILITY = {
+  green:  { knight: "Gift of Life", paladin: "Gift of Life", sorcerer: "Gift of Life", druid: "Gift of Life", monk: "Gift of Life" },
+  red:    { knight: "Executioner's Throw", paladin: "Divine Grenade", sorcerer: "Beam Mastery", druid: "Blessing of the Grove", monk: "Spiritual Outburst" },
+  purple: { knight: "Avatar of Steel", paladin: "Avatar of Light", sorcerer: "Avatar of Storm", druid: "Avatar of Nature", monk: "Avatar of Balance" },
+  blue:   { knight: "Combat Mastery", paladin: "Divine Empowerment", sorcerer: "Drain Body", druid: "Twin Burst", monk: "Ascetic" },
+};
+
+/* Raizes (nos de entrada) */
+const WHEEL_ROOTS = ["GREEN_50", "RED_50", "BLUE_50", "PURPLE_50"];
+
 if (typeof module !== "undefined") {
-  module.exports = { WHEEL_SLOTS, WHEEL_CONFIG, WHEEL_HP, WHEEL_MP, WHEEL_CAP,
-    WHEEL_SKILL, WHEEL_LEECH, WHEEL_MIT_PER_POINT, WHEEL_COLORS,
-    WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES };
+  module.exports = { WHEEL_SLOTS, WHEEL_POS, WHEEL_CONNECTED, WHEEL_ROOTS,
+    WHEEL_CONFIG, WHEEL_HP, WHEEL_MP, WHEEL_CAP, WHEEL_SKILL, WHEEL_LEECH,
+    WHEEL_MIT_PER_POINT, WHEEL_COLORS, WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES };
 }

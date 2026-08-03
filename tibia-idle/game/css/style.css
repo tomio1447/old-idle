@@ -1678,3 +1678,24 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .wheel-sections { display: flex; flex-direction: column; gap: 10px; }
 .wheel-sec { background: rgba(0,0,0,.35); border: 1px solid #1c1913; border-radius: 6px; padding: 8px; }
 .wheel-sec-title { font-weight: bold; font-size: 11px; color: #d4af37; margin-bottom: 4px; letter-spacing: .4px; }
+
+/* ---- Wheel of Destiny: layout do modal e da roda visual ---- */
+.wheel-modal { display: flex; flex-direction: column; gap: 10px; }
+.wheel-top { padding: 2px 2px 8px; }
+.wheel-avail { font-size: 13px; margin-bottom: 4px; }
+.wheel-avail b { color: #ffe680; }
+.wheel-legend { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 11px; margin-bottom: 4px; color: #c8c0a8; }
+.wheel-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+.wheel-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.wheel-stage { position: relative; flex: none; }
+.wheel-stage .wheel-bg { display: block; width: 522px; height: 522px; image-rendering: pixelated; }
+.wheel-right { flex: 1; min-width: 280px; max-width: 400px; display: flex; flex-direction: column; gap: 10px; max-height: 522px; overflow-y: auto; padding-right: 4px; }
+.wheel-sections { display: flex; flex-direction: column; gap: 10px; }
+.wheel-sec { background: rgba(0,0,0,.35); border: 1px solid #1c1913; border-radius: 6px; padding: 8px; }
+.wheel-sec-title { font-weight: bold; font-size: 11px; color: #d4af37; margin-bottom: 4px; letter-spacing: .4px; }
+@media (max-width: 980px) {
+  .wheel-stage .wheel-bg { width: 420px; height: 420px; }
+}
+@media (max-width: 760px) {
+  .wheel-stage .wheel-bg { width: 320px; height: 320px; }
+}
