@@ -1,0 +1,31 @@
+{
+  "creatureStatistics": {
+    "name": "Poison Spider",
+    "health": 26,
+    "mana": 0,
+    "maxMana": 0,
+    "maxHealth": 26,
+    "attack": 15,
+    "attackSlowness": 40,
+    "defense": 5,
+    "slowness": 20,
+    "outfit": {
+      "id": 38
+    }
+  },
+  "experience": 22,
+  "corpse": 4264,
+  "behaviour": {
+    "type": "HOSTILE",
+    "fleeHealth": 0,
+    "openDoors": false
+  },
+  "loot": [
+    {
+      "id": 2148,
+      "probability": 1,
+      "min": 0,
+      "max": 4
+    }
+  ]
+}

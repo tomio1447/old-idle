@@ -104,9 +104,13 @@ const HUNTMAPS = {
 };
 
 /* Liga o mapa a hunt — patch de dados, sem tocar no gamedata.js gerado.
- * "rats" e a hunt "Esgoto de Rookgaard" (cena sewer). */
-if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts.rats)
+ * "rats" e a hunt "Esgoto de Rookgaard" (cena sewer).
+ * Usa o .otbm gerado pelo build_rookgaard_sewers.py (mapa real com
+ * tiles do DAT 8.60). Se o .otbm falhar, cai no "rook-sewer" textual. */
+if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts.rats) {
   GAMEDATA.hunts.rats.mapa = "rook-sewer";
+  GAMEDATA.hunts.rats.otbm = "rookgaard_sewers";
+}
 if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts["amazon-camp"])
   GAMEDATA.hunts["amazon-camp"].mapa = "amazon-camp";
 
