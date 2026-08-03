@@ -1,0 +1,692 @@
+/* ============================================================
+   otc-complete.css — OTClient Estética COMPLETA
+   Fielmente baseada em data/styles/*.otui + data/images/ui/
+   ============================================================
+   Cobre TODOS os widgets OTClient: Windows, Panels, Buttons, Bars,
+   Slots, Tabs, Scrollbars, Checkboxes, Separators, Tooltips, Forms.
+
+   TABELA DE ESTILOS OTCLIENT → CSS:
+   10-windows.otui    → .otc-window, .otc-mainwindow
+   10-panels.otui     → .otc-panel, .otc-panel-flat
+   10-buttons.otui    → .otc-btn, .otc-btn-qt, .otc-btn-small
+   10-progressbars.otui → .bar (HP/MP/XP/stamina)
+   10-scrollbars.otui → ::-webkit-scrollbar
+   10-labels.otui     → .otc-label
+   10-checkboxes.otui → .otc-check
+   10-separators.otui → hr, .otc-sep
+   inventory.otui     → .slot, .inv-item
+   ============================================================ */
+
+/* ═══════════════════ ROOT: CORES DO OTCLIENT ═══════════════ */
+:root {
+  --otc-bg:        #0d0e12;
+  --otc-panel:     #1a1c22;
+  --otc-panel-2:   #1e2128;
+  --otc-dark:      #111318;
+  --otc-dark-2:    #15171c;
+  --otc-border:    #2a2d34;
+  --otc-border-in: #1a1c20;
+  --otc-border-out:#3a3d46;
+  --otc-text:      #c0c0c0;
+  --otc-text-dim:  #888888;
+  --otc-text-bright:#dfdfdf;
+  --otc-gold:      #d4af37;
+  --otc-gold-bright:#ffe680;
+  --otc-white:     #ffffff;
+  --otc-red:       #f55e5e;
+  --otc-green:     #44AD25;
+  --otc-blue:      #9f9dfd;
+  --otc-hp:        #00c000;
+  --otc-mp:        #4444ff;
+  --otc-exp:       #fbbf24;
+
+  /* OTCLIENT WINDOW BORDER */
+  --win-border:   6px;
+  --win-border-top:27px;
+}
+
+/* ═══════════════════ BASE ═══════════════════ */
+html, body {
+  background: var(--otc-bg);
+  color: var(--otc-text);
+  font-family: Verdana, 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  image-rendering: auto;
+  margin: 0; padding: 0;
+}
+#app { background: var(--otc-bg); }
+
+/* ═══════════════════ 10-WINDOWS.otui ═══════════════════ */
+/* Window < UIWindow — image-source: /images/ui/window, border:6+27top */
+.otc-window {
+  background: var(--otc-panel);
+  border: 1px solid var(--otc-border-out);
+  border-top: 27px solid var(--otc-dark);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 4px var(--otc-panel),
+              0 4px 20px rgba(0,0,0,.55);
+  padding: 10px;
+  position: relative;
+  color: var(--otc-text-bright);
+}
+.otc-window::before {
+  content: '';
+  position: absolute; top: -24px; left: 6px; right: 6px;
+  height: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* MainWindow < Window — anchors.centerIn: parent */
+.otc-mainwindow {
+  composes: otc-window;
+  max-width: 95vw; max-height: 90vh;
+  overflow: auto;
+}
+
+/* HeadlessWindow — image-border:5, padding:5 (sem title bar) */
+.otc-headless {
+  background: var(--otc-panel);
+  border: 5px solid var(--otc-border);
+  padding: 5px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+
+/* ═══════════════════ PANELS (10-panels.otui) ═════════════ */
+/* Panel < UIWidget — phantom, auto-focus */
+.otc-panel {
+  background: var(--otc-panel);
+  border: 1px solid var(--otc-border-in);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px var(--otc-border-out);
+  padding: 6px;
+}
+
+/* FlatPanel */
+.otc-panel-flat {
+  background: var(--otc-panel-2);
+  border: 1px solid var(--otc-border);
+  padding: 4px;
+}
+
+/* LightFlatPanel */
+.otc-panel-light {
+  background: #252830;
+  border: 1px solid var(--otc-border-out);
+  padding: 4px;
+}
+
+/* QtPanel — 2pixel_up_frame_borderimage_dark */
+.otc-panel-qt {
+  background: var(--otc-dark);
+  border: 2px solid;
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
+  padding: 10px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
+}
+
+/* ═══════════════════ PANEL TITLE (OTClient window title) ══════ */
+.panel-title {
+  background: linear-gradient(180deg, #2a2d36, #1e2028);
+  color: var(--otc-text-bright);
+  font-weight: bold;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--otc-border-in);
+  letter-spacing: 0.3px;
+  text-shadow: 1px 1px 0 rgba(0,0,0,.5);
+  display: flex; align-items: center;
+}
+
+/* ═══════════════════ BUTTONS (10-buttons.otui) ═════════════ */
+/* Button < UIButton — 43x20, image-source: /images/ui/buttons */
+button, .btn, .otc-btn {
+  font-family: Verdana, sans-serif;
+  font-size: 10px;
+  color: var(--otc-text-bright);
+  background: linear-gradient(180deg, #3a3e48 0%, #262932 100%);
+  border: 1px solid;
+  border-color: #555 #222 #222 #555;
+  border-radius: 0;
+  padding: 2px 10px;
+  cursor: pointer;
+  text-shadow: none;
+  min-height: 20px;
+  transition: none;
+}
+button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #484d58 0%, #333842 100%);
+  border-color: #777 #333 #333 #777;
+}
+button:active:not(:disabled),
+button.primary:active:not(:disabled),
+button.danger:active:not(:disabled) {
+  background: linear-gradient(180deg, #1a1c22 0%, #2a2d36 100%);
+  border-color: #222 #555 #555 #222;
+  padding: 3px 9px 1px 11px;
+}
+
+/* QtButton — 106x23, image-clip: 0 0 22 23 */
+.otc-btn-qt {
+  padding: 4px 12px;
+  font-size: 11px;
+  background: linear-gradient(180deg, #4a4e58, #2e323c);
+  border-color: #666 #2a2a2a #2a2a2a #666;
+  color: #b9b9b9;
+}
+.otc-btn-qt:active { color: var(--otc-white); }
+
+/* SmallButton — 106x20 */
+.otc-btn-sm, button.sm {
+  font-size: 9px;
+  padding: 1px 6px;
+  min-height: 16px;
+  background: linear-gradient(180deg, #3a3e48, #262932);
+}
+
+/* primary */
+button.primary, .otc-btn-primary {
+  background: linear-gradient(180deg, #5c6bc0, #3d4898);
+  border-color: #7c8fe6 #2a3570 #2a3570 #7c8fe6;
+  color: #fff;
+  font-weight: bold;
+}
+button.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #6b7dd1, #4b56b0);
+}
+
+/* danger */
+button.danger, .otc-btn-danger {
+  background: linear-gradient(180deg, #a04040, #6a2020);
+  border-color: #cc7070 #441818 #441818 #cc7070;
+  color: #fcc;
+}
+button.danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #c05050, #803030);
+}
+
+/* disabled */
+button:disabled {
+  color: rgba(223,223,223,.5);
+  opacity: .7;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════ BARS (10-progressbars.otui) ═══════════ */
+/* ProgressBar < UIProgressBar — height:16, image-source:progressbar */
+.bar {
+  height: 12px;
+  background: #0a0a0c;
+  border: 1px solid;
+  border-color: #222 #444 #444 #222;
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 3px;
+}
+.bar .fill {
+  height: 100%;
+  border-radius: 0;
+  transition: width .25s ease-out;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15);
+}
+.bar .label {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; color: #fff; text-shadow: 1px 1px 0 #000;
+  pointer-events: none; font-family: Verdana, sans-serif;
+}
+
+/* HealthBar — green background */
+.bar .fill.hp {
+  background: linear-gradient(180deg, #00e040 0%, #008020 100%);
+}
+/* ManaBar — blue */
+.bar .fill.mp {
+  background: linear-gradient(180deg, #6666ff 0%, #2222cc 100%);
+}
+/* EXP */
+.bar .fill.exp {
+  background: linear-gradient(180deg, #ffe040 0%, #cc8800 100%);
+}
+/* Stamina */
+.bar .fill.sta {
+  background: linear-gradient(180deg, #ff9940 0%, #cc4400 100%);
+}
+/* Skill */
+.bar .fill.skl {
+  background: linear-gradient(180deg, #c0a0ff 0%, #6633cc 100%);
+}
+
+/* HP dynamic bar color (OTClient LifeProgressBar) */
+.bar .fill.hp.green  { background: linear-gradient(180deg, #00e040, #008020); }
+.bar .fill.hp.yellow { background: linear-gradient(180deg, #e6c832, #c87800); }
+.bar .fill.hp.orange { background: linear-gradient(180deg, #f36500, #a04000); }
+.bar .fill.hp.red    { background: linear-gradient(180deg, #f55e5e, #a02020); }
+
+/* ═══════════════════ EQUIPMENT SLOTS (inventory.otui) ══════ */
+/* MainInventoryItem — 38x38, image-source: /images/ui/containerslot */
+#equip .slot, .slot {
+  width: 38px; height: 38px;
+  background: #1b1e24;
+  border: 2px solid;
+  border-color: #4a4e58 #1a1c20 #1a1c20 #4a4e58;
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; cursor: pointer;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
+}
+#equip .slot:hover, .slot:hover {
+  border-color: #c0a040 #3a3010 #3a3010 #c0a040;
+}
+#equip .slot.empty {
+  background: #0e1014;
+  border-color: #2a2d34 #1a1c20 #1a1c20 #2a2d34;
+  opacity: .55;
+}
+#equip .slot.empty::after {
+  content: attr(data-label);
+  font-size: 7px; color: #555;
+  text-transform: uppercase; text-align: center;
+  line-height: 1.1;
+}
+
+/* Inventory grid items (same style as equipment) */
+.inv-item {
+  width: 38px; height: 38px;
+  background: #1b1e24;
+  border: 1px solid;
+  border-color: #3a3e46 #1a1c20 #1a1c20 #3a3e46;
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; cursor: pointer;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.2);
+}
+.inv-item:hover {
+  border-color: #c0a040 #3a3010 #3a3010 #c0a040;
+}
+
+/* ═══════════════════ PANEL INSET ═══════════════════ */
+.panel-inset {
+  background: var(--otc-dark-2);
+  border: 1px solid;
+  border-color: #1a1c20 #2a2d34 #2a2d34 #1a1c20;
+  padding: 4px;
+}
+
+/* ═══════════════════ SCROLLBARS (10-scrollbars.otui) ══════ */
+/* VerticalScrollBar — 12x39, image-clip: 24 0 12 74 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track {
+  background: #0a0a0c;
+  border: 1px solid #1a1c20;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4a4e58, #2a2d36);
+  border: 1px solid;
+  border-color: #5a5e68 #2a2d36 #2a2d36 #5a5e68;
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #5a5e68, #3a3e46);
+}
+::-webkit-scrollbar-button {
+  display: block; width: 10px; height: 10px;
+  background: #2a2d36;
+  border: 1px solid #3a3e46;
+}
+::-webkit-scrollbar-corner { background: #0a0a0c; }
+
+/* list container scroll */
+.list::-webkit-scrollbar { width: 8px; }
+.list::-webkit-scrollbar-track { background: #0a0a0c; }
+.list::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3a3e48, #22252e); }
+
+/* ═══════════════════ TABS (20-tabbars.otui) ═══════════════ */
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--otc-border);
+  background: var(--otc-dark);
+  padding: 2px 2px 0;
+}
+.tab {
+  padding: 4px 10px;
+  font-size: 10px;
+  background: #1a1c22;
+  border: 1px solid #2a2d34;
+  border-bottom: none;
+  border-radius: 0;
+  color: var(--otc-text-dim);
+  cursor: pointer;
+  margin-right: 1px;
+}
+.tab:hover { color: var(--otc-text); background: #22252e; }
+.tab.active {
+  background: var(--otc-panel);
+  color: var(--otc-text-bright);
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-panel) var(--otc-border-in);
+  margin-bottom: -1px;
+}
+
+/* ═══════════════════ TOPBAR ═══════════════════ */
+.topbar {
+  background: linear-gradient(180deg, #20232a 0%, #15171c 100%);
+  border-bottom: 1px solid var(--otc-border);
+  padding: 3px 6px;
+  gap: 6px;
+  font-size: 10px;
+  font-family: Verdana, sans-serif;
+}
+.topbar .logo {
+  color: var(--otc-gold-bright);
+  font-weight: bold;
+  font-size: 12px;
+  text-shadow: 1px 1px 0 rgba(0,0,0,.6);
+}
+
+/* ═══════════════════ SCENE ═══════════════════ */
+#scene-wrap {
+  position: relative;
+  background: #000;
+  border: 1px solid;
+  border-color: #2a2d34 #111 #111 #2a2d34;
+  overflow: hidden;
+}
+#scene { display: block; width: 100%; }
+
+/* ═══════════════════ STAT ROWS ═══════════════════ */
+.stat-row {
+  display: flex; justify-content: space-between;
+  padding: 2px 0;
+  font-size: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.stat-row .k { color: var(--otc-text-dim); }
+.stat-row .v { color: var(--otc-text); font-weight: bold; }
+
+/* ═══════════════════ SEPARATORS (10-separators.otui) ══════ */
+hr, .otc-sep {
+  border: none;
+  border-top: 1px solid;
+  border-color: #1a1c20 #3a3e46 #3a3e46 #1a1c20;
+  margin: 4px 0;
+  height: 1px;
+}
+
+/* ═══════════════════ CHECKBOXES (10-checkboxes.otui) ═════ */
+.otc-check {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--otc-text);
+  cursor: pointer;
+}
+.otc-check input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: #1a1c22;
+  border: 1px solid;
+  border-color: #3a3e46 #1a1c20 #1a1c20 #3a3e46;
+  cursor: pointer; position: relative;
+}
+.otc-check input[type="checkbox"]:checked::after {
+  content: '✓'; position: absolute;
+  top: -2px; left: 2px; font-size: 12px;
+  color: var(--otc-gold); font-weight: bold;
+}
+
+/* ═══════════════════ LABELS (10-labels.otui) ═════════════ */
+.otc-label {
+  font-size: 10px; color: var(--otc-text-dim);
+  font-family: Verdana, sans-serif;
+}
+.otc-label-bright { color: var(--otc-text-bright); }
+
+/* ═══════════════════ INPUTS / TEXT EDITS (10-textedits.otui) ══ */
+input[type="text"], input[type="number"], input[type="search"],
+textarea, select, .otc-input {
+  background: #0a0a0c;
+  color: var(--otc-text-bright);
+  border: 1px solid;
+  border-color: #1a1c20 #3a3e46 #3a3e46 #1a1c20;
+  padding: 3px 5px;
+  font-family: Verdana, sans-serif;
+  font-size: 10px;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #5c6bc0;
+}
+
+/* ═══════════════════ TOOLTIP ═══════════════════ */
+#tooltip {
+  position: fixed; z-index: 100;
+  background: #1a1c22;
+  border: 2px solid;
+  border-color: #c0a040 #3a3010 #3a3010 #c0a040;
+  padding: 5px 8px;
+  font-size: 10px; max-width: 260px;
+  pointer-events: none;
+  box-shadow: 2px 2px 8px rgba(0,0,0,.6);
+  color: var(--otc-text);
+}
+#tooltip .tt-name {
+  color: var(--otc-gold); font-weight: bold; margin-bottom: 3px;
+}
+#tooltip .tt-stat { color: var(--otc-green); }
+#tooltip .tt-req { color: #f36500; font-size: 9px; }
+#tooltip .tt-sell { color: var(--otc-text); }
+
+/* ═══════════════════ TOASTS ═══════════════════ */
+#toasts {
+  position: fixed; top: 35px; right: 8px; z-index: 200;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.toast {
+  background: #1a1c22;
+  border: 2px solid;
+  border-color: #5c6bc0 #2a3570 #2a3570 #5c6bc0;
+  color: var(--otc-text);
+  font-size: 10px; padding: 5px 10px;
+  box-shadow: 2px 2px 8px rgba(0,0,0,.5);
+}
+.toast.level { border-color: #c0a040 #5a4010 #5a4010 #c0a040; color: var(--otc-gold-bright); }
+.toast.death { border-color: #f55e5e #6a2020 #6a2020 #f55e5e; color: #fcc; }
+.toast.rare  { border-color: #c084fc #5a1a8a #5a1a8a #c084fc; color: #e0c0ff; }
+
+/* ═══════════════════ MODAL ═══════════════════ */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(0,0,0,.85);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-bg .modal {
+  background: var(--otc-panel);
+  border: 1px solid var(--otc-border-out);
+  border-top: 27px solid var(--otc-dark);
+  box-shadow: inset 0 0 0 4px var(--otc-panel), 0 8px 40px rgba(0,0,0,.6);
+  max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  padding: 8px;
+  position: relative;
+}
+.modal-bg .modal::before {
+  content: '';
+  position: absolute; top: -24px; left: 6px; right: 6px; height: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), transparent);
+  pointer-events: none;
+}
+
+/* ═══════════════════ CONTEXT MENU ═══════════════════ */
+.ctx-menu {
+  position: fixed; z-index: 250;
+  background: var(--otc-panel);
+  border: 2px solid;
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
+  box-shadow: 3px 3px 10px rgba(0,0,0,.6);
+  min-width: 140px; font-size: 10px;
+}
+.ctx-title {
+  padding: 3px 8px;
+  background: linear-gradient(180deg, #2a2d36, #1a1c22);
+  color: var(--otc-gold); font-weight: bold;
+  border-bottom: 1px solid var(--otc-border);
+}
+.ctx-item {
+  padding: 4px 10px; cursor: pointer; color: var(--otc-text);
+}
+.ctx-item:hover { background: #2a2d36; color: var(--otc-white); }
+.ctx-item.danger { color: var(--otc-red); }
+.ctx-item.disabled { color: #555; cursor: default; }
+.ctx-hint { float: right; color: var(--otc-text-dim); font-size: 9px; }
+
+/* ═══════════════════ LOG LINES ═══════════════════ */
+#log {
+  font-size: 10px; line-height: 1.5;
+  background: #0a0a0c; padding: 3px 5px;
+  border: 1px solid var(--otc-border-in);
+}
+.log-line { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,.02); }
+.log-line .time { color: #555; margin-right: 6px; font-family: monospace; font-size: 9px; }
+.log-line.exp  { color: var(--otc-green); }
+.log-line.loot { color: var(--otc-gold); }
+.log-line.death{ color: var(--otc-red); }
+.log-line.level{ color: var(--otc-gold-bright); }
+.log-line.skill{ color: #9f9dfd; }
+.log-line.say  { color: var(--otc-text-dim); }
+
+/* ═══════════════════ HUNT CARDS ═══════════════════ */
+.hunt-card {
+  background: var(--otc-panel-2);
+  border: 1px solid;
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
+  padding: 5px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.hunt-card:hover { border-color: #5c6bc0; }
+.hunt-card.active { border-color: var(--otc-gold); background: #252820; }
+.hunt-card .nm { color: var(--otc-text-bright); font-weight: bold; font-size: 11px; }
+.hunt-card .meta { color: var(--otc-text-dim); font-size: 9px; }
+.risk { padding: 1px 6px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+.risk.low  { background: #1e3a2e; color: #6ee7b7; border: 1px solid #2a5a3a; }
+.risk.mid  { background: #423a1f; color: #fde68a; border: 1px solid #6a5a2a; }
+.risk.high { background: #451c1c; color: #fca5a5; border: 1px solid #6a2a2a; }
+
+/* ═══════════════════ NPC QUICK ═══════════════════ */
+.npc-quick { display: flex; gap: 4px; flex-wrap: wrap; }
+.npc-btn {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 4px;
+  background: var(--otc-dark-2);
+  border: 1px solid;
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
+  cursor: pointer; min-width: 44px;
+  transition: border-color .15s;
+}
+.npc-btn:hover { border-color: var(--otc-gold); }
+.npc-btn img { width: 26px; height: 26px; image-rendering: pixelated; }
+.npc-btn .nb { font-size: 7px; color: var(--otc-text-dim); text-transform: uppercase; margin-top: 2px; }
+.npc-btn:hover .nb { color: var(--otc-gold); }
+
+/* ═══════════════════ GOLD / GREEN / RED TEXT ═══════════════ */
+.gold-txt { color: var(--otc-gold); }
+.txt-good { color: var(--otc-green); }
+.txt-red  { color: var(--otc-red); }
+.dim      { color: var(--otc-text-dim); }
+.small    { font-size: 10px; }
+.tiny     { font-size: 9px; }
+.bold     { font-weight: bold; }
+
+/* ═══════════════════ COOLDOWN BAR ═══════════════ */
+.cooldown-bar {
+  background: var(--otc-dark);
+  border: 1px solid var(--otc-border);
+  padding: 3px 5px; margin-top: 3px;
+  display: flex; gap: 4px; align-items: center; min-height: 22px;
+}
+.cd-groups { display: flex; gap: 1px; }
+.cd-slot {
+  width: 20px; height: 20px;
+  background: var(--otc-dark-2);
+  border: 1px solid var(--otc-border);
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.cd-slot.on { border-color: var(--otc-gold); }
+.cd-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.7);
+}
+.cd-sep { width: 1px; height: 16px; background: var(--otc-border); }
+
+/* ═══════════════════ CONDITION / MONK BAR ═══════════════ */
+.cond-bar { display: flex; gap: 3px; flex-wrap: wrap; padding: 3px 0; }
+.cond {
+  font-size: 8px; padding: 1px 5px;
+  border: 1px solid; font-weight: bold;
+}
+.monk-bar { display: flex; gap: 4px; flex-wrap: wrap; padding: 3px 0; font-size: 10px; }
+.monk-harm { display: flex; align-items: center; gap: 2px; }
+.harm { width: 8px; height: 8px; border-radius: 50%; background: #3a3f4a; }
+.harm.on { background: #ffd65a; box-shadow: 0 0 4px rgba(255,214,90,.5); }
+
+/* ═══════════════════ SOUL + CAP ═══════════════════ */
+#soul-cap-panel { display: flex; gap: 3px; margin-top: 3px; }
+.soul-cap-box {
+  flex: 1;
+  background: var(--otc-dark-2);
+  border: 1px solid;
+  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
+  padding: 2px 4px; text-align: center;
+}
+.soul-cap-box .sc-label {
+  font-size: 7px; color: var(--otc-text-dim); text-transform: uppercase; letter-spacing: .3px;
+}
+.soul-cap-box .sc-value {
+  font-size: 10px; font-weight: bold; color: var(--otc-text);
+  font-family: 'Courier New', monospace;
+}
+
+/* ═══════════════════ STANCE BADGE ═══════════════ */
+.stance-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 5;
+  display: flex; gap: 2px;
+}
+.stance-sq {
+  width: 22px; height: 22px;
+  background: #111318;
+  border: 1px solid var(--otc-border);
+  display: flex; align-items: center; justify-content: center;
+}
+.stance-sq img { max-width: 16px; max-height: 16px; }
+
+/* ═══════════════════ MISSION BOX ═══════════════ */
+.mission-box {
+  position: absolute; bottom: 8px; left: 4px; z-index: 6;
+  background: rgba(0,0,0,.85);
+  border: 1px solid var(--otc-border);
+  padding: 4px 6px; max-width: 280px; font-size: 10px;
+}
+
+/* ═══════════════════ SHOP ROW ═══════════════ */
+.shop-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+  cursor: pointer;
+}
+.shop-row:hover { background: rgba(255,255,255,.03); }
+.shop-row.selected { background: rgba(212,175,55,.06); border-color: rgba(212,175,55,.15); }
+.shop-row .spell-icon { width: 24px; height: 24px; image-rendering: pixelated; }
+
+/* ═══════════════════ MISC ═══════════════════ */
+.spacer { flex: 1; }
+.row { display: flex; align-items: center; gap: 4px; }
+.wrap { flex-wrap: wrap; }
+.center { text-align: center; }
+.mt4 { margin-top: 4px; }
+.mt8 { margin-top: 8px; }
+.mb4 { margin-bottom: 4px; }
+.mb8 { margin-bottom: 8px; }
+.full { width: 100%; }
+.wide { max-width: 720px; }
