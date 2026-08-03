@@ -1520,6 +1520,8 @@ function bindControls() {
   if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
   const btnForge = $("#btn-forge");
   if (btnForge) btnForge.addEventListener("click", () => { if (typeof openForgeModal === "function") openForgeModal(); });
+  const btnWheel = $("#btn-wheel");
+  if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
   const btnDepot = $("#btn-depot");
   if (btnDepot) btnDepot.addEventListener("click", () => { if (typeof openDepotModal === "function") openDepotModal(); });
   // painel de testes: so liga o botao se admin.js estiver carregado, para o

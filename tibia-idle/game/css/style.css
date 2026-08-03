@@ -1667,3 +1667,14 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   0%, 100% { filter: drop-shadow(0 0 2px rgba(255,214,90,.6)) brightness(1); }
   50%      { filter: drop-shadow(0 0 6px rgba(255,214,90,1)) brightness(1.25); }
 }
+
+/* ==================== Wheel of Destiny (Roda do Destino) ==================== */
+.wheel-modal { display: flex; flex-direction: column; gap: 10px; }
+.wheel-top { padding: 2px 2px 8px; }
+.wheel-avail { font-size: 13px; margin-bottom: 4px; }
+.wheel-avail b { color: #ffe680; }
+.wheel-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.wheel-right { flex: 1; min-width: 280px; max-width: 420px; display: flex; flex-direction: column; gap: 10px; max-height: 470px; overflow-y: auto; padding-right: 4px; }
+.wheel-sections { display: flex; flex-direction: column; gap: 10px; }
+.wheel-sec { background: rgba(0,0,0,.35); border: 1px solid #1c1913; border-radius: 6px; padding: 8px; }
+.wheel-sec-title { font-weight: bold; font-size: 11px; color: #d4af37; margin-bottom: 4px; letter-spacing: .4px; }

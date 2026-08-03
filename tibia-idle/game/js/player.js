@@ -147,7 +147,15 @@ function maxStats(p) {
     if (it.hp) bonusHp += it.hp;
     if (it.mp) bonusMp += it.mp;
   }
-  return { hp: b.hp + bonusHp, mp: b.mp + bonusMp, cap: b.cap };
+  // Wheel of Destiny: bonus de HP/Mana/Capacidade dos nos da wheel
+  let w = null;
+  if (typeof wheelTotals === "function" && p.wheel) w = wheelTotals(p);
+  if (w) {
+    bonusHp += w.hp;
+    bonusMp += w.mp;
+  }
+  const cap = b.cap + (w ? w.cap : 0);
+  return { hp: b.hp + bonusHp, mp: b.mp + bonusMp, cap: cap };
 }
 
 /* Soma dos atributos do equipamento */
@@ -238,6 +246,10 @@ function effSkill(p, which) {
   // punho tambem recebe bonus de equipamento: as armas de monk trazem
   // skillfist no items.xml (a jo staff da +1)
   else if (which === "fist") v += g.fist + g.melee;
+  // Wheel of Destiny: bonus de skill (melee/distance/fist) dos nos da wheel
+  if (typeof wheelSkillBonus === "function" && p.wheel) {
+    v += wheelSkillBonus(p, which);
+  }
   // Virtue of Justice e PERCENTUAL sobre o total, entao entra depois de
   // somar o equipamento (SKILL_FISTPERCENT do Canary trabalha assim)
   if (which === "fist" && typeof virtudeFistBonus === "function") {
@@ -261,7 +273,9 @@ function effSkill(p, which) {
 }
 
 function effMagic(p) {
-  return p.ml + gearStats(p).mag;
+  // Wheel of Destiny: bonus de magic level (nos de skill 'magic')
+  const wheelMag = (typeof wheelMagicBonus === "function" && p.wheel) ? wheelMagicBonus(p) : 0;
+  return p.ml + gearStats(p).mag + wheelMag;
 }
 
 /* Qual skill a arma equipada usa */

@@ -858,7 +858,12 @@ function playerMitigationPct(p) {
   } else if (p && p.skills) {
     sh = p.skills.shield || 0;
   }
-  return Math.min(25, Math.max(0, sh * 0.04 + defEquip * 0.2));
+  // Wheel of Destiny: mitigação extra dos nos (0.03 por ponto, em %)
+  let wheelMit = 0;
+  if (typeof wheelTotals === "function" && p.wheel) {
+    wheelMit = wheelTotals(p).mitigation * 100;
+  }
+  return Math.min(50, Math.max(0, sh * 0.04 + defEquip * 0.2 + wheelMit));
 }
 
 /* Aplica a mitigation do jogador ao dano recebido (tipos comuns apenas). */
@@ -1168,6 +1173,10 @@ function playerAttack(c, p, target) {
   }
 
   if (extraPct > 0) raw = Math.max(1, Math.floor(raw * (1 + extraPct / 100)));
+  // Wheel of Destiny: bonus de dano % (revelation dos estagios)
+  if (typeof wheelDamageMul === "function" && p.wheel) {
+    raw = Math.max(1, Math.floor(raw * wheelDamageMul(p)));
+  }
 
   if (imb) {
     if (imb.lifeLeech) {
@@ -1195,6 +1204,20 @@ function playerAttack(c, p, target) {
     if (eqLeech.manaLeech) {
       const max = maxStats(p);
       const mana = Math.max(1, Math.floor(raw * eqLeech.manaLeech / 100));
+      p.mp = Math.min(max.mp, p.mp + mana);
+    }
+  }
+  // Wheel of Destiny: life/mana leech dos nos da wheel
+  if (typeof wheelLeechTotals === "function" && p.wheel) {
+    const wl = wheelLeechTotals(p);
+    if (wl.lifeLeech) {
+      const max = maxStats(p);
+      const cura = Math.max(1, Math.floor(raw * wl.lifeLeech / 100));
+      p.hp = Math.min(max.hp, p.hp + cura);
+    }
+    if (wl.manaLeech) {
+      const max = maxStats(p);
+      const mana = Math.max(1, Math.floor(raw * wl.manaLeech / 100));
       p.mp = Math.min(max.mp, p.mp + mana);
     }
   }
@@ -1474,13 +1497,24 @@ function castSpellById(c, p, target, now, id) {
     if (!ehSelf && sqmDistance(c.player, target) > alc) return false;
   }
 
-  p.mp -= s.mana;
-  addManaSpent(p, combatManaSkillGain(c, s.mana));
+  // Wheel of Destiny: reducao de custo de mana (%) da magia (upgrade da wheel)
+  let wheelManaCost = s.mana;
+  if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+    const _wb = wheelApplySpellBoost(p, id);
+    if (_wb.manaPct) wheelManaCost = Math.max(0, Math.round(s.mana * (1 - _wb.manaPct / 100)));
+  }
+  p.mp -= wheelManaCost;
+  addManaSpent(p, combatManaSkillGain(c, wheelManaCost));
   // Augments (TibiaWiki): modificadores de magia vindos dos itens equipados.
   // O bônus de dano/cura é aplicado SOMENTE sobre o dano/cura base da spell.
   const aug = (typeof augmentTotals === "function") ? augmentTotals(p, id) : null;
   // Augment "cooldown" (TibiaWiki): reduz o cooldown da spell (ms).
   let cdReal = Math.max(1000, (s.cd || 2000) - ((aug && aug.cdReduction) || 0));
+  // Wheel of Destiny: reducao de cooldown (ms) da magia (upgrade da wheel)
+  if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+    const _wcd = wheelApplySpellBoost(p, id);
+    if (_wcd.cooldownMs) cdReal = Math.max(1000, cdReal - _wcd.cooldownMs);
+  }
   // VIP: 30% menos cooldown em Gift of Life e Avatar
   if (typeof vipWheelCooldown === "function" && vipWheelCooldown() < 1) {
     const isWheelSpell = id === "utura-tio" || id.startsWith("uteta-res-");
@@ -1713,6 +1747,21 @@ function castSpellById(c, p, target, now, id) {
       critSt = true;
     }
     if (extraSpellPct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraSpellPct / 100)));
+    // Wheel of Destiny: bonus de dano % da magia (upgrade da wheel) + o bonus
+    // global de dano (revelation dos estagios)
+    if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+      const wb = wheelApplySpellBoost(p, id);
+      if (wb.damagePct) dmg = Math.max(1, Math.floor(dmg * (1 + wb.damagePct / 100)));
+      // crítico extra da magia pela wheel
+      if (wb.critChance > 0 && !critSt && Math.random() * 100 < wb.critChance) {
+        critSt = true;
+        extraSpellPct = Math.max(extraSpellPct, wb.critDamage || 0);
+        dmg = Math.max(1, Math.floor(dmg * (1 + (wb.critDamage || 0) / 100)));
+      }
+    }
+    if (typeof wheelDamageMul === "function" && p.wheel) {
+      dmg = Math.max(1, Math.floor(dmg * wheelDamageMul(p)));
+    }
     dmg = applyCharmDamage(p, elemento, dmg);
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
@@ -1770,6 +1819,13 @@ function castSpellById(c, p, target, now, id) {
     // Augments de life/mana leech (TibiaWiki): leech extra da spell.
     if (aug && (aug.lifeLeech > 0 || aug.manaLeech > 0)) {
       augmentApplyLeech(c, p, aug, dmg);
+    }
+    // Wheel of Destiny: life/mana leech extra da magia (upgrade da wheel)
+    if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+      const wb = wheelApplySpellBoost(p, id);
+      if (wb.lifeLeech || wb.manaLeech) {
+        augmentApplyLeech(c, p, { lifeLeech: wb.lifeLeech, manaLeech: wb.manaLeech }, dmg);
+      }
     }
     // magias que aplicam condition (Ignite, Envenom, Curse...)
     if (s.cond && typeof applyCondition === "function") {
@@ -2102,13 +2158,27 @@ function tryHeal(c, p, now) {
       if (ch.crit && ch.extraPct > 0) {
         amount = Math.max(1, Math.floor(amount * (1 + ch.extraPct / 100)));
       }
+      // Wheel of Destiny: cura % da magia (upgrade da wheel) + cura global
+      if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+        const _wh = wheelApplySpellBoost(p, idCura);
+        if (_wh.healPct) amount = Math.max(1, Math.floor(amount * (1 + _wh.healPct / 100)));
+      }
+      if (typeof wheelHealMul === "function" && p.wheel) {
+        amount = Math.max(1, Math.floor(amount * wheelHealMul(p)));
+      }
+      // Wheel of Destiny: reducao de custo de mana (%) da cura
+      let _curaMana = s.mana;
+      if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+        const _wm = wheelApplySpellBoost(p, idCura);
+        if (_wm.manaPct) _curaMana = Math.max(0, Math.round(s.mana * (1 - _wm.manaPct / 100)));
+      }
       cdStart(p, idCura, s, now);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
         if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
       }
-      p.mp -= s.mana;
-      addManaSpent(p, combatManaSkillGain(c, s.mana));
+      p.mp -= _curaMana;
+      addManaSpent(p, combatManaSkillGain(c, _curaMana));
       p.hp = Math.min(max.hp, p.hp + amount);
       c.healCd = now + 1000;
       c.events.push({ t: "heal", amount: amount, spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
@@ -2159,6 +2229,10 @@ function tryHeal(c, p, now) {
         if (chR.crit && chR.extraPct > 0) {
           amount = Math.max(1, Math.floor(amount * (1 + chR.extraPct / 100)));
         }
+      }
+      // Wheel of Destiny: cura global (revelation)
+      if (typeof wheelHealMul === "function" && p.wheel) {
+        amount = Math.max(1, Math.floor(amount * wheelHealMul(p)));
       }
       p.hp = Math.min(max.hp, p.hp + amount);
       // potion trava TODAS as potions por 1s; runa de cura (UH/IH) nao bebe,
@@ -2994,6 +3068,23 @@ function rollLoot(c, p, mob) {
 
 /* Morte do jogador: perde exp, skills e renasce no local */
 function playerDeath(c, p) {
+  // Wheel of Destiny — Gift of Life (estágio VERDE): ao morrer, o jogador com
+  // o estágio verde desbloqueado revive no local com vida cheia, sem perder
+  // XP/ouro, uma vez a cada 2 horas (como a magia do jogo). O respawn acontece
+  // "no lugar" — o combate continua com a mesma onda.
+  if (typeof wheelStage === "function" && p.wheel && wheelStage(p, "green") >= 1) {
+    const agora = Date.now();
+    const GIFT_CD = 2 * 3600 * 1000;
+    if (!p.wheel.giftOfLifeAt || (agora - p.wheel.giftOfLifeAt) >= GIFT_CD) {
+      p.wheel.giftOfLifeAt = agora;
+      const max = maxStats(p);
+      p.hp = max.hp; p.mp = max.mp;
+      c.events.push({ t: "heal", amount: max.hp, spell: "Gift of Life" });
+      if (typeof addLog === "function") addLog("skill", "Gift of Life salvou você de <b>morrer</b>! (cooldown de 2h)");
+      return { exp: 0, gold: 0, giftOfLife: true };
+    }
+  }
+
   p.deaths++;
   c.stats.deaths++;
   // a bencao do templo reduz muito a perda e e consumida na morte
