@@ -35,27 +35,80 @@
         </div>
       </div>
 
-      <div class="field">
-        <label>Nome do personagem</label>
-        <input id="char-name" maxlength="20" placeholder="Ex: Bubble" autocomplete="off">
-      </div>
-
-      <div class="field">
-        <label>Sexo</label>
-        <div class="row">
-          <button data-sex="male" class="primary sm">Masculino</button>
-          <button data-sex="female" class="sm">Feminino</button>
+      <!-- MODO ONLINE (conta) — visível quando accountApiConfigured() -->
+      <div id="account-login" style="display:none">
+        <div class="tabs mb4">
+          <div class="tab active" id="acc-tab-login" data-acc-tab="login">Entrar</div>
+          <div class="tab" id="acc-tab-register" data-acc-tab="register">Criar conta</div>
         </div>
+
+        <div id="acc-panel-login">
+          <div class="field">
+            <label>Login</label>
+            <input id="acc-login" maxlength="32" placeholder="login" autocomplete="username">
+          </div>
+          <div class="field">
+            <label>Senha</label>
+            <input id="acc-password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
+          </div>
+          <button class="primary full mt8" id="acc-btn-login">Entrar</button>
+        </div>
+
+        <div id="acc-panel-register" style="display:none">
+          <div class="field">
+            <label>Novo login</label>
+            <input id="acc-new-login" maxlength="32" placeholder="escolha um login" autocomplete="username">
+          </div>
+          <div class="field">
+            <label>Nova senha</label>
+            <input id="acc-new-password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password">
+          </div>
+          <button class="primary full mt8" id="acc-btn-register">Criar conta</button>
+        </div>
+
+        <div id="acc-char-picker" style="display:none">
+          <div class="small dim mb4">Escolha o personagem</div>
+          <div class="list mb4" id="acc-char-list" style="max-height:150px"></div>
+          <div class="small dim mb4">ou crie um novo</div>
+          <div class="row mb4">
+            <input id="acc-char-name" maxlength="20" placeholder="Nome do personagem" style="flex:1;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+          </div>
+          <div class="row mb4">
+            <button data-sex="male" class="primary sm acc-sex">Masculino</button>
+            <button data-sex="female" class="sm acc-sex">Feminino</button>
+            <span style="flex:1"></span>
+            <span class="tiny dim" id="acc-char-coins"></span>
+          </div>
+          <div class="voc-grid mb4" id="acc-voc-grid"></div>
+          <button class="primary full" id="acc-btn-create-char">Criar personagem e caçar</button>
+        </div>
+        <div class="tiny dim center mt8" id="acc-msg"></div>
       </div>
 
-      <div class="field">
-        <label>Vocação</label>
-        <div class="voc-grid" id="voc-grid"></div>
-      </div>
+      <!-- MODO LOCAL (sem conta) — visível quando offline -->
+      <div id="local-login">
+        <div class="field">
+          <label>Nome do personagem</label>
+          <input id="char-name" maxlength="20" placeholder="Ex: Bubble" autocomplete="off">
+        </div>
 
-      <button class="primary full mt8" id="btn-create">Criar personagem e caçar</button>
-      <div class="tiny dim center mt8">
-        Identidade visual Global-Idle · progresso salvo no seu navegador
+        <div class="field">
+          <label>Sexo</label>
+          <div class="row">
+            <button data-sex="male" class="primary sm">Masculino</button>
+            <button data-sex="female" class="sm">Feminino</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Vocação</label>
+          <div class="voc-grid" id="voc-grid"></div>
+        </div>
+
+        <button class="primary full mt8" id="btn-create">Criar personagem e caçar</button>
+        <div class="tiny dim center mt8">
+          Identidade visual Global-Idle · progresso salvo no seu navegador
+        </div>
       </div>
     </div>
   </div>
@@ -83,6 +136,10 @@
     <div class="row small"><span class="dim">Sessão</span>
       <b id="session">0s</b></div>
     <span class="spacer"></span>
+    <button class="sm" id="btn-market" title="Market — equipamentos e itens de imbuement (preços do Canary), venda de Tibia Coins">
+      <img src="assets/ui/market/market.png" alt="" style="width:18px;height:18px;image-rendering:pixelated;vertical-align:middle">
+      <span>MARKET</span>
+    </button>
     <button class="sm" id="btn-forge" title="Abrir Exaltation Forge">⚒ FORGE</button>
     <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)">☸ WHEEL</button>
     <button class="sm" id="btn-training" title="Sistema de Treino — Exercise Dummy (25 TC por 5000 cargas) ou Treinador Online">
@@ -400,6 +457,9 @@
 <script src="js/wheel.js"></script>
 <script src="js/wheel-ui.js"></script>
 <script src="js/tibiacoin.js"></script>
+<script src="js/account-client.js"></script>
+<script src="js/marketdata.js"></script>
+<script src="js/market-ui.js"></script>
 <script src="js/training.js"></script>
 <script src="js/training-ui.js"></script>
 <script src="js/accessorydata.js"></script>

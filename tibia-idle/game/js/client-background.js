@@ -6,8 +6,31 @@
 const BG={el:null,versionLabel:null,particlesEl:null,_loopId:null,_toggle:true,LOOP_MS:5000,PARTICLE_COUNT:28,PARTICLE_DUR_MS:9000,
 init(){this._buildDOM();this.versionLabel=document.getElementById("client-version-label");if(this.versionLabel)this.versionLabel.textContent="Global-Idle v1.0 · "+new Date().toISOString().slice(0,10);if(!this._isGameActive())setTimeout(()=>{if(this.versionLabel)this.versionLabel.classList.add("show")},400);this._hookGameLifecycle();this._startEffectLoop()},
 terminate(){this._stopEffectLoop();if(this.el)this.el.remove();if(this.versionLabel)this.versionLabel.remove();if(this.particlesEl)this.particlesEl.remove();this.el=this.versionLabel=this.particlesEl=null},
-hide(){if(this.el)this.el.style.display="none";if(this.versionLabel)this.versionLabel.classList.remove("show");this._stopEffectLoop()},
-show(){if(this.el)this.el.style.display="";setTimeout(()=>{if(this.versionLabel)this.versionLabel.classList.add("show")},400);this._startEffectLoop()},
+hide(){
+  // esconde TUDO do fundo de login (bg, overlay escuro, grid e partículas).
+  // Antes so o <div id="login-bg"> sumia e o #login-overlay (gradiente
+  // preto de ate 55%) + .bg-grid + #bg-particles ficavam na tela com
+  // z-index acima da UI — era o "filtro" que deixava UI/letras/equips
+  // escuros durante o jogo.
+  ["login-bg","login-overlay","bg-particles"].forEach((id)=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display="none";
+  });
+  const grid=document.querySelector(".bg-grid");
+  if(grid)grid.style.display="none";
+  if(this.versionLabel)this.versionLabel.classList.remove("show");
+  this._stopEffectLoop();
+},
+show(){
+  ["login-bg","login-overlay","bg-particles"].forEach((id)=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display="";
+  });
+  const grid=document.querySelector(".bg-grid");
+  if(grid)grid.style.display="";
+  setTimeout(()=>{if(this.versionLabel)this.versionLabel.classList.add("show")},400);
+  this._startEffectLoop();
+},
 _buildDOM(){const bg=document.createElement("div");bg.id="login-bg";const grid=document.createElement("div");grid.className="bg-grid";const particles=document.createElement("div");particles.id="bg-particles";const overlay=document.createElement("div");overlay.id="login-overlay";document.body.prepend(overlay);document.body.prepend(particles);document.body.prepend(grid);document.body.prepend(bg);this.el=bg;this.particlesEl=particles},
 _startEffectLoop(){this._stopEffectLoop();this._spawnWave();this._loopId=setInterval(()=>this._spawnWave(),this.LOOP_MS)},
 _stopEffectLoop(){if(this._loopId){clearInterval(this._loopId);this._loopId=null}},

@@ -541,17 +541,19 @@ function npcInn(p) {
 function npcTravel(p) {
   const rows = Object.keys(GAMEDATA.hunts).map((id) => {
     const hu = GAMEDATA.hunts[id];
-    const locked = p.level < hu.level;
     const est = huntEstimate(p, hu);
     const risk = huntRisk(p, hu);
     const mobs = hu.monsters.slice(0, 3).map(
       (m) => mobImg(m, 22)).join("");
-    return `<div class="shop-row ${locked ? "" : "clickable"}"
-        data-travel="${locked ? "" : id}" style="opacity:${locked ? .4 : 1}">
+    const aviso = risk.cls === "high"
+      ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
+    return `<div class="shop-row clickable"
+        data-travel="${id}">
       <div class="row" style="gap:1px;width:70px;flex:none">${mobs}</div>
       <div style="flex:1;min-width:0">
         <div class="small">${hu.name}</div>
         <div class="tiny dim">nv ${hu.level} · ${fmt(est.exp)} xp/h · ${fmt(est.gold)} gp/h</div>
+        ${aviso}
       </div>
       <span class="risk ${risk.cls}">${risk.txt}</span>
     </div>`;

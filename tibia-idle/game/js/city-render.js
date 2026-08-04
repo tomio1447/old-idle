@@ -270,59 +270,11 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 13, 39);
   ctx.fillStyle = "#c8c0a8";
   ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 12, 38);
-
-  // ---- minimapa
-  this.drawMiniMap(ctx, W, H, walker);
 };
 
-/* Minimapa no canto superior direito */
-Renderer.prototype.drawMiniMap = function (ctx, W, H, walker) {
-  const mw = 118, mh = 84, pad = 10;
-  const ox = W - mw - pad, oy = pad;
-  const sx = mw / MAP_W, sy = mh / MAP_H;
-
-  ctx.fillStyle = "rgba(10,9,7,.82)";
-  ctx.fillRect(ox - 2, oy - 2, mw + 4, mh + 4);
-  ctx.strokeStyle = "rgba(150,130,80,.75)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(ox - 2, oy - 2, mw + 4, mh + 4);
-
-  // grama (id 106 no ground oficial) pintada de verde escuro
-  for (let ty = 0; ty < MAP_H; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
-      const gid = CITY.ground[ty * MAP_W + tx];
-      if (gid !== 106) continue;
-      ctx.fillStyle = "#2e4420";
-      ctx.fillRect(ox + tx * sx, oy + ty * sy, sx + 0.5, sy + 0.5);
-    }
-  }
-  // muralha perimetral
-  ctx.fillStyle = "#8a8578";
-  ctx.fillRect(ox, oy, mw, sy + 0.5);
-  ctx.fillRect(ox, oy + mh - sy, mw, sy + 0.5);
-  ctx.fillRect(ox, oy, sx + 0.5, mh);
-  ctx.fillRect(ox + mw - sx, oy, sx + 0.5, mh);
-  // predios
-  for (const b of BUILDINGS) {
-    ctx.fillStyle = b.wall === "marble" ? "#b9b3a0" : "#7a4a3a";
-    ctx.fillRect(ox + b.x * sx, oy + b.y * sy, b.w * sx, b.h * sy);
-  }
-  // NPCs
-  for (const id in POI) {
-    const p = POI[id];
-    ctx.fillStyle = "#ffd24a";
-    ctx.fillRect(ox + p.tx * sx - 1, oy + p.ty * sy - 1, 2.5, 2.5);
-  }
-  // jogador
-  const ptx = walker.px / TILE, pty = walker.py / TILE;
-  ctx.fillStyle = "#4ec8ff";
-  ctx.beginPath();
-  ctx.arc(ox + ptx * sx, oy + pty * sy, 2.6, 0, 7);
-  ctx.fill();
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-};
+/* Minimapa no canto superior direito — REMOVIDO a pedido do jogador:
+ * era um bloco com a planta da cidade que ele nao conseguiu identificar
+ * nem achar utilidade, e poluia o topo da tela na cidade. */
 
 /* Converte coordenada do canvas -> pixel do mundo */
 Renderer.prototype.screenToWorld = function (mx, my) {

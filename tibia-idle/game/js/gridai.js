@@ -29,12 +29,21 @@ function moveInfo(slug) {
 }
 
 /* Distancia que o monstro QUER manter do alvo.
- * 1 = melee, cola. >1 = atirador, recua para atirar de longe. */
+ * 1 = melee, cola. >1 = atirador, recua para atirar de longe.
+ *
+ * O Canary traz targetDistance de ate 7 (yellow-butterfly, wisp...), e no
+ * idle isso fazia o ranged "recuar demais": ele atravessava o mapa inteiro
+ * fugindo do player. Mantemos o ranged RANGED (mecanica do jogo — o player
+ * usa Exeta Amp Res / magias para forcar melee), mas com um TETO de 3 SQM:
+ * distancia de atirador classica, sem o bicho correr ate a borda. */
+const MAX_TARGET_DISTANCE = 3;
 function monsterTargetDistance(mob) {
   const mi = moveInfo(mob.slug);
-  if (mi.targetDistance) return mi.targetDistance;
+  if (mi.targetDistance) {
+    return Math.min(MAX_TARGET_DISTANCE, mi.targetDistance);
+  }
   // fallback para monstro sem dado: usa a flag ranged que o jogo ja tinha
-  return mob.def && mob.def.ranged ? 4 : 1;
+  return mob.def && mob.def.ranged ? 3 : 1;
 }
 
 /* Chance (0-100) de ficar parado em vez de dancar */

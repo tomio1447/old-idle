@@ -8,6 +8,12 @@ const TICK = 100;   // ms por tick de simulacao
 const COMBAT_GRID_W = 21;
 const COMBAT_GRID_H = 13;
 
+/* Animacao de spawn dos monstros: o teleporte "pisca" 3x no ponto antes de
+ * o bicho nascer (pedido do jogador). SPAWN_BLINK_MS e o intervalo entre
+ * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma. */
+const SPAWN_BLINK_MS = 300;
+const SPAWN_BLINKS = 3;
+
 /* Spells "exori" do Knight: golpe de skill FISICO (Berserk, Fierce Berserk,
  * Front Sweep, Groundshaker, Whirlwind Throw, Brutal Strike, Annihilation,
  * Ethereal Spear, Strong Ethereal Spear, Executioner's Throw). O numero de
@@ -70,6 +76,7 @@ function newCombat(player, huntId, instanceMode) {
     raidCd: Infinity,
     raidMode: pvp ? "real-player" : "none",
     mobs: [],
+    pendingSpawns: [],   // fila de spawn com animacao de teleporte (3 piscadas)
     wave: 0,
     playerAtkCd: 0,
     spellCd: {},
@@ -151,7 +158,17 @@ function notifyRealPlayerRaidPending(c) {
 
 function spawnWave(c, p) {
   const pack = c.hunt.pack || 3;
-  while (c.mobs.length < pack) {
+  // Celulas G ja escolhidas nesta wave (para dois mobs da fila nao cairem
+  // na mesma posicao designada — o occ e reconstruido a cada iteracao e
+  // nao ve os pendingSpawns, que ainda nao estao em c.mobs). Reseta quando
+  // a fila anterior ja nasceu (wave completa): as celulas voltam a ficar
+  // disponiveis para a proxima leva.
+  if (!c._spawnTaken || !(c.pendingSpawns && c.pendingSpawns.length))
+    c._spawnTaken = {};
+  // Conta também os que estão "piscando" (fila de spawn) para não encher a
+  // arena além do pack enquanto a animação de teleporte roda. A condição
+  // le a fila a cada iteracao (naFila cresce a cada push).
+  while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < pack) {
     const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
     const base = GAMEDATA.monsters[slug];
     if (!base) break;
@@ -167,7 +184,7 @@ function spawnWave(c, p) {
       m.damage = Math.floor((base.damage || 1) * (1 + stacks * 0.08));
       m.armor = Math.floor((base.armor || 0) * (1 + stacks * 0.05));
     }
-    c.mobs.push({
+    const mob = {
       slug: slug, def: m,
       influenced: influenced,
       fiendish: fiendish,
@@ -175,41 +192,113 @@ function spawnWave(c, p) {
       hp: m.hp, maxHp: m.hp,
       atkCd: 400 + Math.random() * 1200,
       id: Math.random().toString(36).slice(2, 8),
-      x: 0.80 + Math.random() * 0.16,
-      y: 0.30 + Math.random() * 0.42,
       dir: "w",
       moving: false,
       attackAnim: 0,
       speed: 0.000045 + Math.random() * 0.000025,
       spawnAt: Date.now(),
+    };
+    // --- ponto de respawn (posicao designada no RME) ---
+    // A zona G do .otbm marca EXATAMENTE onde o editor quer os monstros.
+    // Cada spawn sorteia uma celula G LIVRE e nasce nela (sem desviar),
+    // reservando a celula para o proximo nao nascer em cima. So quando a
+    // zona inteira esta ocupada e que cai no fallback (celula livre mais
+    // proxima / canto da arena).
+    let cx, cy;
+    if (typeof placeFree === "function") {
+      if (c.player) ensureCell(c.player);
+      const occ = buildOccupancy(c, null);
+      const zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
+        ? c.huntMap.mob : null;
+      if (zona && zona.length) {
+        // células G livres (respeita a posicao designada + ocupacao atual
+        // + celulas ja escolhidas nesta wave)
+        const livres = zona.filter((z) =>
+          cellFree(occ, z.x, z.y) && !c._spawnTaken[z.x + ":" + z.y]);
+        if (livres.length) {
+          const z = livres[Math.floor(Math.random() * livres.length)];
+          cx = z.x; cy = z.y;
+          c._spawnTaken[cx + ":" + cy] = true;
+        } else {
+          // zona lotada: nasce na livre mais proxima de uma celula G
+          const z = zona[Math.floor(Math.random() * zona.length)];
+          const ent = { cx: undefined, cy: undefined };
+          placeFree(ent, occ, z.x, z.y);
+          cx = ent.cx; cy = ent.cy;
+        }
+      } else {
+        // arena sem zona: qualquer celula livre (evita o canto fixo)
+        const livres = [];
+        for (let yy = 0; yy < GRID_H; yy++)
+          for (let xx = 0; xx < GRID_W; xx++)
+            if (cellFree(occ, xx, yy)) livres.push([xx, yy]);
+        let alvo = livres[Math.floor(Math.random() * livres.length)] || [17, 5];
+        const ent = { cx: undefined, cy: undefined };
+        placeFree(ent, occ, alvo[0], alvo[1]);
+        cx = ent.cx; cy = ent.cy;
+      }
+      // reserva a celula para o proximo da fila nao nascer em cima
+      if (cx !== undefined && cy !== undefined) occ.set(cx + ":" + cy, true);
+    } else {
+      // fallback (sem grid): float como antes
+      cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
+      cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+      mob.x = 0.80 + Math.random() * 0.16;
+      mob.y = 0.30 + Math.random() * 0.42;
+    }
+    // ultima rede: arena lotada -> canto direito (comportamento antigo)
+    if (cx === undefined || cy === undefined) {
+      cx = Math.min(GRID_W - 1, Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5));
+      cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+    }
+    c.pendingSpawns = c.pendingSpawns || [];
+    c.pendingSpawns.push({
+      mob: mob,
+      cx: cx, cy: cy,
+      startedAt: Date.now(),
+      blink: 0,
+      done: false,
     });
   }
-  // Coloca cada monstro numa CELULA livre. Antes o spawn era em float
-  // aleatorio e o resolveSQMOccupancy empurrava depois quem colidisse -- o
-  // que deixava bichos empilhados no primeiro frame.
-  if (typeof placeFree === "function") {
-    if (c.player) ensureCell(c.player);
-    const occ = buildOccupancy(c, null);
-    // zona G do mapa (.otbm ou ascii): quando existe, os monstros nascem
-    // DENTRO dela; sem zona, nascem pela direita da arena como sempre.
-    const zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
-      ? c.huntMap.mob : null;
-    for (const m of c.mobs) {
-      if (m.cx !== undefined) continue;
-      if (zona) {
-        const z = zona[Math.floor(Math.random() * zona.length)];
-        placeFree(m, occ, z.x, z.y);
-      } else {
-        const cx = Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5);
-        const cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
-        placeFree(m, occ, Math.min(GRID_W - 1, cx), cy);
-      }
-      m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
-    }
-  } else {
-    resolveSQMOccupancy(c);
-  }
   c.wave++;
+}
+
+/* Processa a fila de spawn: a cada SPAWN_BLINK_MS o teleporte "pisca" no
+ * ponto (evento spawn-blink -> renderer mostra o efeito). Depois de
+ * SPAWN_BLINKS piscadas o monstro nasce de verdade. */
+function tickSpawnQueue(c) {
+  if (!c.pendingSpawns || !c.pendingSpawns.length) return;
+  const now = Date.now();
+  for (const sp of c.pendingSpawns) {
+    const b = Math.floor((now - sp.startedAt) / SPAWN_BLINK_MS);
+    if (b > sp.blink) {
+      sp.blink = Math.min(SPAWN_BLINKS, b);
+      if (sp.blink <= SPAWN_BLINKS) {
+        const s = (typeof cellToScreen === "function")
+          ? cellToScreen(sp.cx, sp.cy) : null;
+        c.events.push({
+          t: "spawn-blink",
+          x: s ? s.x : (sp.cx + 0.5) / GRID_W,
+          y: s ? s.y : (sp.cy + 0.5) / GRID_H,
+          blink: sp.blink,
+        });
+      }
+    }
+    if (b >= SPAWN_BLINKS && !sp.done) {
+      sp.done = true;
+      const m = sp.mob;
+      m.cx = sp.cx; m.cy = sp.cy;
+      const s = (typeof cellToScreen === "function")
+        ? cellToScreen(sp.cx, sp.cy) : null;
+      if (s) { m.x = s.x; m.y = s.y; m.sx = s.x; m.sy = s.y; }
+      else { m.x = (sp.cx + 0.5) / GRID_W; m.y = (sp.cy + 0.5) / GRID_H; }
+      m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
+      m.spawnAt = Date.now();
+      c.mobs.push(m);
+      c.events.push({ t: "spawn", slug: m.slug, x: m.x, y: m.y });
+    }
+  }
+  c.pendingSpawns = c.pendingSpawns.filter((sp) => !sp.done);
 }
 
 /* Velocidade de ataque do jogador em ms.
@@ -651,6 +740,24 @@ function tickPoison(c, p, dt) { tickConditions(c, p, dt); }
 /* O monstro aplica a condition dele ao acertar (dados do Canary). */
 function applyMonsterCondition(c, p, mob) {
   const def = mob.def || {};
+  // condition do golpe corpo-a-corpo importada do Canary (ex.: veneno da
+  // aranha, escorpiao, cobra) — o parser antigo perdia essa info e o bicho
+  // mordia sem nunca envenenar
+  if (def.meleeCond && def.meleeCond.tipo) {
+    const mc = def.meleeCond;
+    const tipo = mc.tipo === "poison" ? "poison"
+      : mc.tipo === "fire" ? "fire"
+      : mc.tipo === "energy" ? "energy"
+      : mc.tipo === "bleed" ? "bleed"
+      : mc.tipo === "freezing" ? "freezing"
+      : null;
+    if (tipo && typeof CONDITIONS !== "undefined" && CONDITIONS[tipo]) {
+      const dmg = mc.dano || Math.max(1, Math.round((def.damage || 10) * 0.08));
+      applyCondition(p, tipo, dmg, 4);
+      c.events.push({ t: "player-condition", tipo: tipo });
+      return;
+    }
+  }
   // veneno vem do campo `poison` importado do Canary
   if (def.poison) {
     applyCondition(p, "poison", def.poison.dmg, def.poison.turns);
@@ -2264,41 +2371,40 @@ function tryHeal(c, p, now) {
  * Fica separada do tryBuff porque este so aceita UM buff (o escolhido em
  * p.config.buff, que e a Virtude do monk ou o Protector do knight). Haste
  * nao deve competir por esse slot: no Tibia o jogador mantem as duas coisas
- * ao mesmo tempo. Escolhe sempre a mais forte que couber na mana.
+ * ao mesmo tempo. SO lanca a magia escolhida em p.config.hasteSpell no
+ * helper (sem selecao, o personagem nao usa velocidade sozinho).
  */
 function tryHaste(c, p, now) {
   if (typeof HASTEDATA === "undefined") return false;
   if (p.config && p.config.autoHaste === false) return false;
+  // SO usa velocidade quando o jogador escolheu uma magia no helper
+  // (p.config.hasteSpell). Antes o tryHaste pegava a MELHOR haste
+  // disponivel sozinho e o paladin lancava utamo tempo san / Swift Foot
+  // sem ter configurado nada — a UI dizia "sem seleção não usa", mas o
+  // codigo nao respeitava.
+  const escolhida = p.config && p.config.hasteSpell;
+  if (!escolhida || !SPELLS[escolhida]) return false;
   if ((c.hasteCd || 0) > now) return false;
   // ja tem uma ativa? nao gasta mana de novo
   if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
 
-  let melhor = null, ganho = 0;
-  for (const id of (typeof hastesDisponiveis === "function"
-                    ? hastesDisponiveis(p) : [])) {
-    const sp = SPELLS[id];
-    if (!sp) continue;
-    if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) continue;
-    if (p.level < (sp.lvl || 1) || p.mp < sp.mana) continue;
-    if (!cdReady(p, id, now)) continue;
-    const d = hasteDelta(p, id);
-    if (d > ganho) { ganho = d; melhor = id; }
-  }
-  if (!melhor) return false;
+  const sp = SPELLS[escolhida];
+  if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) return false;
+  if (p.level < (sp.lvl || 1) || p.mp < sp.mana) return false;
+  if (!cdReady(p, escolhida, now)) return false;
 
-  const sp = SPELLS[melhor];
   p.mp -= sp.mana;
   addManaSpent(p, combatManaSkillGain(c, sp.mana));
-  cdStart(p, melhor, sp, now);
+  cdStart(p, escolhida, sp, now);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
   }
   if (!p.buffs) p.buffs = {};
-  p.buffs[melhor] = now + (HASTEDATA[melhor].dur || 30000);
+  p.buffs[escolhida] = now + (HASTEDATA[escolhida].dur || 30000);
   c.hasteCd = now + 2000;
-  c.events.push({ t: "say", text: spellWords(melhor, sp) });
-  c.events.push({ t: "buff", nome: HASTEDATA[melhor].nome || sp.name });
+  c.events.push({ t: "say", text: spellWords(escolhida, sp) });
+  c.events.push({ t: "buff", nome: HASTEDATA[escolhida].nome || sp.name });
   return true;
 }
 
@@ -2509,11 +2615,25 @@ function monsterThinkYell(mob, dt) {
  *     dano no tempo — a habilidade entra so com a animacao oficial.
  * ===================================================================== */
 
-/* Alcance da habilidade em SQM (o canUseAttack compara Chebyshev). */
+/* Alcance da habilidade em SQM (o canUseAttack compara Chebyshev).
+ *
+ * Regra do Canary (Monster::canUseSpell): `range == 0` (ausente no .lua)
+ * significa SEM limite de distancia — o basic_attack/auto attack de muitos
+ * monstros nao declara range e acerta de qualquer distancia. Antes o jogo
+ * tratava range ausente como 1 e o bicho so "atacava de colado", o que
+ * parecia magia bugada.
+ *
+ *  - range explicito > 0  -> usa o range (teto 7, alcance do grid)
+ *  - range ausente        -> 99 (sem limite)
+ *  - length (onda)        -> comprimento da onda
+ *  - radius (explosao)    -> raio (o dano da explosao centrada no mob so
+ *                            acerta dentro do raio — checado no mobSkillHit)
+ */
 function mobSkillRangeSQM(sk) {
   if ((sk.range || 0) > 0) return Math.min(7, sk.range);
   if (sk.length) return sk.length;                    // onda
-  if (sk.radius && !sk.alvo) return sk.radius;        // explosao propria
+  if (sk.range === undefined || sk.range === null) return 99;  // sem limite
+  if (sk.radius) return Math.max(1, sk.radius);       // explosao (propria ou no alvo)
   return 1;                                           // sem dado: colado
 }
 
@@ -2669,6 +2789,23 @@ function mobSkillHit(c, p, mob, sk, dmg) {
       }
     }
   }
+  // Explosao CENTRADA NO MONSTRO (radius sem `alvo`): o dano so entra se o
+  // player estiver dentro do raio — antes a magia "explodia no bicho" e o
+  // dano caia no player a qualquer distancia (parecia bugado).
+  if (sk.radius && !sk.alvo && typeof sqmDistance === "function" &&
+      pl.cx !== undefined && mob.cx !== undefined) {
+    if (sqmDistance(mob, pl) > sk.radius) return 0;
+  }
+
+  // condition aplicada pela magia (veneno/fogo/energia do *field e das
+  // magias `condition` do .lua) — drena no tempo depois do impacto
+  if (sk.cond && typeof CONDITIONS !== "undefined" && CONDITIONS[sk.cond]) {
+    const dmgCond = sk.condDano ||
+      Math.max(1, Math.round(raw * 0.25));
+    applyCondition(p, sk.cond, dmgCond, 4);
+    c.events.push({ t: "player-condition", tipo: sk.cond });
+  }
+
   const bolt = !sk.radius && ((sk.range || 1) > 1 || !!sk.length);
   const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
   if (raw <= 0) {
@@ -2708,8 +2845,19 @@ function mobSkillHit(c, p, mob, sk, dmg) {
 }
 
 /* Rola a lista de habilidades do monstro (defensivas antes, na ordem do
- * servidor; depois ofensivas na ordem do .lua). Devolve true quando uma
- * habilidade entrou em cena — o corpo-a-corpo so roda se nada sair. */
+ * servidor; depois ofensivas na ordem do .lua).
+ *
+ * IMPORTANTE — fiel ao Canary (Monster::commitCombatIntention): o servidor
+ * NÃO para na primeira magia que passar na chance. Ele percorre TODAS as
+ * attackSpells do .lua e cada uma rola a própria chance de forma
+ * independente — todas as que passarem castam no mesmo turno. O basic
+ * attack (chance=100) sempre passa, mas NÃO bloqueia as magias especiais
+ * (era esse o bug: o jogo dava return na primeira skill e o naga-warrior,
+ * makara etc. nunca usavam as magias).
+ *
+ * Devolve true quando QUALQUER habilidade entrou em cena — o corpo-a-corpo
+ * (mobAttack) só roda se nenhuma skill da lista passar (monstros sem basic
+ * attack ch=100 na lista). */
 function mobCastSkill(c, p, mob, now) {
   if (mob.hp <= 0 || p.hp <= 0) return false;
   const def = mob.def || {};
@@ -2722,8 +2870,10 @@ function mobCastSkill(c, p, mob, now) {
                 typeof sqmDistance === "function")
     ? sqmDistance(mob, pl) : 1;
   if (!mob.skillCds) mob.skillCds = {};
+  let usou = false;
 
   // ---- defensivas (o bloco defenses do .lua): cura propria.
+  // Uma cura por turno (a primeira que passar) — suficiente para o idle.
   for (let i = 0; i < defS.length; i++) {
     const sk = defS[i];
     const key = "d" + i;
@@ -2737,13 +2887,14 @@ function mobCastSkill(c, p, mob, now) {
       mob.skillCds[key] = now + (sk.int || 2000);
       c.events.push({ t: "mobheal", x: mob.x, y: mob.y, heal: cura,
                       fx: sk.fx || "magic-green", screen: true });
-      return true;
+      usou = true;
     }
     // "speed" proprio: o import nao guarda duracao/magnitude do buff, e
     // inventar valor aqui quebraria a regra dos dados oficiais — ignorado.
   }
 
-  // ---- ofensivas, na ordem do .lua.
+  // ---- ofensivas, na ordem do .lua. TODAS as que passarem na chance
+  // castam (sem return no meio) — ver comentario do cabecalho.
   for (let i = 0; i < skills.length; i++) {
     const sk = skills[i];
     const key = "s" + i;
@@ -2752,22 +2903,41 @@ function mobCastSkill(c, p, mob, now) {
     // removido a pedido: invisibilidade (warlock, stalker, ferumbras...)
     if (/invisib/i.test(nomeFx)) continue;
     // sem correspondente no idle solo: ver o cabecalho do bloco
-    if (/summon|challenge|outfit/i.test(nomeFx)) continue;
+    if (/summon|challenge|outfit|skill reducer|cancel invisib/i.test(nomeFx)) continue;
+    // magias de nome com efeito implicito (o parser so pega o nome, sem
+    // dano nem cond): "djinn electrify" eletrifica, "paralyze" congela o
+    // passo. Sem correspondente (drunk, speed) entra so a animacao.
+    if (!sk.cond && !sk.campo && !((sk.max || 0) > 0)) {
+      if (/electrif/i.test(nomeFx)) sk.cond = "energy";
+      else if (/paralyz/i.test(nomeFx)) sk.cond = "freezing";
+    }
     if (dist > mobSkillRangeSQM(sk)) continue;
     if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
     mob.skillCds[key] = now + (sk.int || 2000);
     mob.attackAnim = 220;
-    // debuff puro (faixa zerada): entra so a animacao oficial — o sistema
-    // de conditions do jogador cobre dano no tempo, nao reducao de stat
+    // magia sem dano direto (faixa zerada): entra a animacao oficial e,
+    // quando a magia carrega um efeito no tempo (campo de fogo/veneno do
+    // *field, ou as magias `condition` do .lua), aplica a condition
+    // correspondente — antes essas magias "não faziam nada" e pareciam
+    // bugadas
     if (!((sk.max || 0) > 0)) {
       mobSkillFx(c, mob, pl, sk);
-      return true;
+      const tipoEfeito = sk.campo || sk.cond;
+      if (tipoEfeito && typeof CONDITIONS !== "undefined" &&
+          CONDITIONS[tipoEfeito]) {
+        const danoC = sk.condDano ||
+          Math.max(1, Math.round((mob.def.damage || 10) * 0.1));
+        applyCondition(p, tipoEfeito, danoC, 4);
+        c.events.push({ t: "player-condition", tipo: tipoEfeito });
+      }
+      usou = true;
+      continue;
     }
     mobSkillFx(c, mob, pl, sk);
     mobSkillHit(c, p, mob, sk, Math.max(0, mobSkillRoll(sk)));
-    return true;
+    usou = true;
   }
-  return false;
+  return usou;
 }
 
 function mobAttack(c, p, mob) {
@@ -3151,10 +3321,12 @@ function combatTick(c, p, dt, now) {
   if (c.buffs.haste > 0) c.buffs.haste -= dt;
 
   // spawn
-  if (!c.mobs.length) {
+  if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
     if (c.boss) return;
     spawnWave(c, p);
   }
+  // fila de spawn: teleporte piscando 3x antes do monstro nascer
+  if (c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c);
   if (c.raidEnabled) {
     c.raidCd -= dt;
     if (c.raidCd <= 0) {

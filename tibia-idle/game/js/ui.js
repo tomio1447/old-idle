@@ -703,17 +703,22 @@ function renderHunts(p) {
   let h = "";
   for (const id in GAMEDATA.hunts) {
     const hu = GAMEDATA.hunts[id];
-    const locked = p.level < hu.level;
     const active = cur === id;
     const risk = huntRisk(p, hu);
+    // Sem trava de level: todas as areas ficam acessiveis. O que indica o
+    // "nivel sugerido" e o aviso de local nao recomendado (risk alto) e a
+    // linha de nivel no card.
+    const aviso = risk.cls === "high"
+      ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
     const mobs = hu.monsters.slice(0, 3).map(
       (m) => mobImg(m, 26)).join("");
-    h += `<div class="hunt-card ${active ? "active" : ""} ${locked ? "locked" : ""}"
+    h += `<div class="hunt-card ${active ? "active" : ""}"
             data-hunt="${id}">
       <div class="mobs">${mobs}</div>
       <div class="info">
         <div class="nm">${hu.name}</div>
         <div class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</div>
+        ${aviso}
       </div>
       <span class="risk ${risk.cls}">${risk.txt}</span>
     </div>`;
@@ -722,11 +727,6 @@ function renderHunts(p) {
   $$("#hunts .hunt-card").forEach((el) => {
     el.addEventListener("click", () => {
       const id = el.dataset.hunt;
-      const hu = GAMEDATA.hunts[id];
-      if (G.p.level < hu.level) {
-        toast(`Precisa do nível <b>${hu.level}</b> para ${hu.name}`, "");
-        return;
-      }
       openHuntInfoModal(id);
     });
   });
@@ -794,6 +794,7 @@ function openHuntInfoModal(id) {
       <button class="sm" id="huntinfo-close">✕</button>
     </div>
     <div class="panel-body">
+      ${risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
       <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
         <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
         <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>

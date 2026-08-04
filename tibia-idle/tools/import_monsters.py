@@ -206,9 +206,16 @@ def parse_loot(txt):
 
 
 def parse_ataques(txt):
-    """Habilidades ofensivas: melee vira o dano base, o resto vira skill."""
+    """Habilidades ofensivas: melee vira o dano base, o resto vira skill.
+
+    Retorna (melee, skills, melee_cond): melee_cond e a condition que o
+    golpe corpo-a-corpo aplica (ex.: veneno da aranha) — o Canary declara
+    `condition = { type = CONDITION_POISON, totalDamage = N }` dentro do
+    proprio ataque melee, e sem isso o bicho mordia mas nunca envenenava.
+    """
     b = bloco(txt, "attacks")
     melee = 0
+    melee_cond = None
     skills = []
     for ln in linhas_de_tabela(b):
         nome = re.search(r'name\s*=\s*"([^"]+)"', ln)
@@ -217,6 +224,9 @@ def parse_ataques(txt):
         maxd = abs(num(ln, "maxDamage", 0) or 0)
         if nome == "melee":
             melee = max(melee, int(maxd))
+            cond = _condicao(ln)
+            if cond:
+                melee_cond = cond
             continue
         tp = re.search(r"type\s*=\s*COMBAT_([A-Z]+)", ln)
         el = COMBAT.get(tp.group(1), "physical") if tp else "physical"
@@ -249,17 +259,53 @@ def parse_ataques(txt):
             hab["miss"] = ANI[mi.group(1)]
         if re.search(r"target\s*=\s*true", ln):
             hab["alvo"] = 1
-        # condicoes aplicadas pelo golpe (veneno, fogo, dreno)
-        cond = re.search(r"condition\s*=\s*\{([^}]*)\}", ln)
-        if cond:
-            ctp = re.search(r"type\s*=\s*CONDITION_([A-Z]+)", cond.group(1))
+
+        # campos de chao (*field): firefield/poisonfield/energyfield criam um
+        # campo que queima/envenena/eletrifica no tempo — no idle vira a
+        # condition correspondente (o parser antigo deixava a magia "sem
+        # efeito nenhum", que era o que parecia bugado).
+        campo = re.search(r'name\s*=\s*"([a-z]*)field"', ln)
+        if campo:
+            nome_campo = campo.group(1)
+            mapa = {"fire": "fire", "poison": "poison", "energy": "energy"}
+            if nome_campo in mapa:
+                hab["campo"] = mapa[nome_campo]
+        elif nome == "condition":
+            # magia de condition pura (ex.: priestess): aplica a condition
+            # correspondente ao tipo no alvo, com o dano do proprio ataque
+            ctp = re.search(r"type\s*=\s*CONDITION_([A-Z]+)", ln)
             if ctp:
                 hab["cond"] = ctp.group(1).lower()
-                ct = num(cond.group(1), "totalDamage")
-                if ct:
-                    hab["condDano"] = int(abs(ct))
+                if maxd > 0:
+                    hab["condDano"] = int(maxd)
+
+        # conditions aplicadas pelo golpe (veneno, fogo, dreno)
+        cond = _condicao(ln)
+        if cond:
+            hab["cond"] = cond["tipo"]
+            if cond.get("dano") and not hab.get("condDano"):
+                hab["condDano"] = cond["dano"]
+
         skills.append(hab)
-    return melee, skills
+    return melee, skills, melee_cond
+
+
+def _condicao(ln):
+    """Extrai `condition = { type = CONDITION_X, totalDamage = N, ... }`
+    de uma linha de ataque. Devolve {tipo, dano} ou None."""
+    cond = re.search(r"condition\s*=\s*\{([^}]*)\}", ln)
+    if not cond:
+        return None
+    ctp = re.search(r"type\s*=\s*CONDITION_([A-Z]+)", cond.group(1))
+    if not ctp:
+        return None
+    tipo = ctp.group(1).lower()
+    # totalDamage (canary) -> dano por turno do jogo (4 turnos)
+    td = num(cond.group(1), "totalDamage")
+    if td:
+        dano = max(1, int(round(abs(td) / 4.0)))
+        return {"tipo": tipo, "dano": dano, "total": int(abs(td))}
+    return {"tipo": tipo}
 
 
 def parse_defesas(txt):
@@ -399,7 +445,7 @@ def parse_arquivo(caminho):
         return None, None
 
     flags = bloco(txt, "flags") or ""
-    melee, skills = parse_ataques(txt)
+    melee, skills, melee_cond = parse_ataques(txt)
     defesas = parse_defesas(txt)
     elements = parse_elements(txt)
 
@@ -415,6 +461,8 @@ def parse_arquivo(caminho):
         "element": elemento_principal(skills, melee),
         "attackSpeed": 2000,
     }
+    if melee_cond:
+        m["meleeCond"] = melee_cond
     if defesas.get("mitigation"):
         m["mitigation"] = defesas["mitigation"]
     if elements:

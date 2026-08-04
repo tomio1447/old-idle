@@ -22,8 +22,8 @@
   --panel-light: #4a463e;
   --border-out: #6b6455;
   --border-in: #17150f;
-  --text: #c8c0a8;
-  --text-bright: #efe6c8;
+  --text: #e8e2d0;
+  --text-bright: #f7f2e2;
   --gold: #d4af37;
   --hp: #c81e1e;
   --mp: #3050c8;
@@ -76,7 +76,7 @@ canvas { image-rendering: pixelated; }
 
 /* ---------------------------------------------------------- layout */
 #app { display: none; }
-#app.ready { display: block; }
+#app.ready { display: block; position: relative; z-index: 4; }
 
 .topbar {
   background: linear-gradient(180deg, #2e2a24, #191713);
@@ -230,6 +230,13 @@ canvas { image-rendering: pixelated; }
   box-shadow: 0 4px 18px rgba(0,0,0,.75);
   color: var(--text); font-size: 10px;
 }
+.mission-box.collapsed {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  width: auto;
+}
+
 .mission-head {
   display:flex; align-items:center; gap:6px; padding:5px 7px;
   color:#ffe680; font-weight:bold; cursor:pointer;
@@ -519,7 +526,7 @@ button.full { width: 100%; }
 
 /* ---------------------------------------------------------- misc */
 .gold-txt { color: var(--gold); font-weight: bold; }
-.dim { color: #7a7260; }
+.dim { color: #a89f8a; }
 .center { text-align: center; }
 .row { display: flex; gap: 6px; align-items: center; }
 .row.wrap { flex-wrap: wrap; }
@@ -1162,7 +1169,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 /* Tier badge on equipment and inventory items — same style as forge modal */
 .tier-badge {
   position: absolute;
-  bottom: 0; right: 0;
+  top: 0; right: 0;
   min-width: 14px; height: 14px; line-height: 12px;
   background: #ff8a00; color: #fff;
   border: 1px solid #2c1400;
@@ -1347,8 +1354,6 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   background: #2a2a29;
   border: 2px solid;
   border-color: #171717 #686868 #686868 #171717;
-  opacity: .45;
-  filter: grayscale(.6) brightness(.7);
 }
 .forge-client-equip-slot img {
   max-width: 38px; max-height: 38px;
@@ -1362,7 +1367,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 }
 .forge-client-tier-badge {
   position: absolute;
-  top: 16px; right: 42px;
+  top: 0; right: 0;
   min-width: 16px; height: 16px; line-height: 14px;
   background: #ff8a00; color: #fff;
   border: 1px solid #2c1400;
@@ -2072,3 +2077,10 @@ a:hover { color: #aab6f7; }
 .combo-slot.drop-here { outline: 2px solid #d4af37; box-shadow: 0 0 10px rgba(212,175,55,.45); }
 .txt-red { color: #ff9090; }
 .mt10 { margin-top: 10px; }
+
+/* ========== MARKET ========== */
+#modal-body .market-coins .coin-gif { image-rendering: pixelated; }
+#modal-body [data-market-buy], #modal-body [data-coins-sell], #modal-body [data-coins-buy] {
+  white-space: nowrap;
+}
+#modal-body .shop-row img.item-sprite { image-rendering: pixelated; }

@@ -111,6 +111,12 @@ const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
 
 function cellPx() { return 32 * state.zoom; }
+function padPx() { return PAD * cellPx(); }
+/* Exposto para o rme-anim.js (animacao das sprites no editor). */
+window.__rmeState = state;
+window.__rmeCellPx = cellPx;
+window.__rmePadPx = padPx;
+window.__rmeAfterRender = window.__rmeAfterRender || function () {};
 /* Padding extra para itens grandes (2x2, 2x1, etc.) não cortarem nas bordas.
  * No Tibia, o tile de referência é o inferior-direito, então um item 2x2
  * estende 1 tile acima e 1 à esquerda. */
@@ -246,6 +252,9 @@ function render() {
           ctx.strokeRect(PS + hx * S + .5, PS + hy * S + .5, S - 1, S - 1);
       }
   }
+  // animacao das sprites (agua, lava, fogo, cristais...) por cima do mapa
+  if (typeof window.__rmeAfterRender === "function")
+    window.__rmeAfterRender();
 }
 function zoneCell(x, y, letra, cor) {
   const S = cellPx();

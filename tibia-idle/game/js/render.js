@@ -542,14 +542,12 @@ function drawBossBar(ctx, W, combat) {
 function drawRookgaardSewer(ctx, W, H) {
   const cols = 21, rows = 13;
   const tw = W / cols, th = H / rows;
-  const tile = (x, y, fill, stroke) => {
+  // Sem stroke por celula: o contorno de cada SQM deixava o chao com cara
+  // de "grade" (celulas visiveis). A variacao de cor entre tiles ja da o
+  // relevo; as bordas reais (muros, agua) sao desenhadas a parte.
+  const tile = (x, y, fill) => {
     ctx.fillStyle = fill;
     ctx.fillRect(x * tw, y * th, tw + 1, th + 1);
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x * tw + 0.5, y * th + 0.5, tw, th);
-    }
   };
 
   const map = [
@@ -573,13 +571,13 @@ function drawRookgaardSewer(ctx, W, H) {
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const c = map[y][x];
-      if (c === "#") tile(x, y, "#1a1a18", "#080808");
+      if (c === "#") tile(x, y, "#1a1a18");
       else if (c === "~") {
         const g = ctx.createLinearGradient(0, y * th, 0, (y + 1) * th);
         g.addColorStop(0, "#244629"); g.addColorStop(0.5, "#13311f"); g.addColorStop(1, "#081d14");
-        tile(x, y, g, "#06110c");
-      } else if (c === "=") tile(x, y, "#66543d", "#2b2115");
-      else tile(x, y, "#333633", "#1b1e1b");
+        tile(x, y, g);
+      } else if (c === "=") tile(x, y, "#66543d");
+      else tile(x, y, "#333633");
 
       // pedras rachadas / sujeira no piso
       if (c === "." && (x + y) % 3 === 0) {
@@ -652,14 +650,10 @@ function drawRookgaardSewer(ctx, W, H) {
 function drawSpiderCave(ctx, W, H) {
   const cols = 21, rows = 13;
   const tw = W / cols, th = H / rows;
-  const tile = (x, y, fill, stroke) => {
+  // Sem stroke por celula — mesma correcao do esgoto: sem "grade" de SQM.
+  const tile = (x, y, fill) => {
     ctx.fillStyle = fill;
     ctx.fillRect(x * tw, y * th, tw + 1, th + 1);
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x * tw + 0.5, y * th + 0.5, tw, th);
-    }
   };
 
   // # rocha  . chão de terra  , terra clara  ~ poça de veneno
@@ -687,17 +681,17 @@ function drawSpiderCave(ctx, W, H) {
     for (let x = 0; x < cols; x++) {
       const c = map[y][x];
       if (c === "#") {
-        tile(x, y, "#241f1a", "#0d0b09");
+        tile(x, y, "#241f1a");
       } else if (c === "~") {
         const g = ctx.createLinearGradient(0, y * th, 0, (y + 1) * th);
         g.addColorStop(0, "#3f5c22"); g.addColorStop(0.5, "#28401a"); g.addColorStop(1, "#152811");
-        tile(x, y, g, "#0d1a0a");
+        tile(x, y, g);
       } else if (c === "=") {
-        tile(x, y, "#5a4526", "#241a0e");
+        tile(x, y, "#5a4526");
       } else if (c === ",") {
-        tile(x, y, "#443a2e", "#2a231b");
+        tile(x, y, "#443a2e");
       } else {
-        tile(x, y, "#37302a", "#231e19");
+        tile(x, y, "#37302a");
       }
 
       // relevo da rocha

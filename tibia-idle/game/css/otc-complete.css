@@ -668,6 +668,10 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid var(--otc-border);
   padding: 4px 6px; max-width: 280px; font-size: 10px;
 }
+.mission-box.collapsed {
+  background: transparent;
+  border-color: transparent;
+}
 
 /* ═══════════════════ SHOP ROW ═══════════════ */
 .shop-row {

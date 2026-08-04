@@ -74,11 +74,34 @@ function save() {
       v: 1, p: G.p,
       session: G.combat ? { hunt: G.combat.huntId, stats: G.combat.stats } : null,
     }));
+    // MODO ONLINE: envia o save para a API (MySQL) do personagem da conta
+    if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+        typeof accountSaveCharacter === "function") {
+      const tok = sessionToken();
+      const cid = sessionCharId();
+      if (tok && cid) {
+        accountSaveCharacter(tok, cid, G.p).catch(() => {});
+      }
+    }
     return true;
   } catch (e) {
     console.warn("falha ao salvar", e);
     return false;
   }
+}
+
+/* ---------- sessão online (token + personagem da conta) ---------- */
+function sessionToken() {
+  try { return sessionStorage.getItem("tibia-idle-token") || ""; } catch (e) { return ""; }
+}
+function sessionCharId() {
+  try { return sessionStorage.getItem("tibia-idle-char") || ""; } catch (e) { return ""; }
+}
+function sessionAccount() {
+  try {
+    const raw = sessionStorage.getItem("tibia-idle-account");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
 }
 
 function load() {
@@ -140,6 +163,7 @@ function normalizePlayer(p) {
     shooterType: "auto",
     shooterSpell: "",
     shooterRune: "",
+    hasteSpell: "",           // magia de velocidade escolhida no helper (vazia = nao usa)
     missionCollapsed: false,
     noPotions: false,          // Helper: "NÃO USAR POTIONS"
     pouchAutoSell: false,     // Loot Pouch: autoseller ligado/desligado
@@ -539,6 +563,9 @@ function renderMission() {
   const totalDone = def.tasks.filter((t) => (st.progress[t.monster] || 0) >= t.target).length;
   const completa = totalDone >= def.tasks.length;
   box.style.display = "block";
+  // colapsada: só o cabeçalho fica visível — a classe remove o fundo preto
+  // que ficava cobrindo o jogo atrás do painel
+  box.classList.toggle("collapsed", collapsed);
   box.innerHTML = `
     <div class="mission-head" id="mission-toggle">
       <span>${collapsed ? "▸" : "▾"}</span><span>${def.title}</span>
@@ -1126,6 +1153,16 @@ function drainEvents() {
             return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
           }).join(", ");
           addLog("loot", `Loot: ${txt}`);
+          // mensagem VERDE na tela com o loot dropado (acima do mob morto),
+          // como o log de loot do client — pedido do jogador
+          const nomes = e.loot.map((l) =>
+            `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`
+          );
+          // limita a 2 itens + "+N" para o floater nao virar um texto enorme
+          const mostra = nomes.length > 2
+            ? nomes.slice(0, 2).join(", ") + ` +${nomes.length - 2}`
+            : nomes.join(", ");
+          r.addFloater(x, y - 0.17, "✦ " + mostra, "#7ae87a", nomes.length > 1);
         }
         if (c.boss) {
           const st = bossState(G.p, c.boss.id);
@@ -1146,6 +1183,22 @@ function drainEvents() {
           (e.blessed ? " <span style='color:#9ce84a'>A bênção protegeu você.</span>" : ""));
         toast("Você morreu!", "death");
         break;
+
+      case "spawn-blink": {
+        // Piscada do teleporte no ponto de respawn (o monstro ainda nao
+        // nasceu): o efeito oficial de teleporte toca na celula.
+        const px = (e.x !== undefined && e.x !== null) ? e.x : 0.5;
+        const py = (e.y !== undefined && e.y !== null) ? e.y : 0.5;
+        r.addEffect(px, py, "teleport", 240);
+        break;
+      }
+      case "spawn": {
+        // Monstro terminou de nascer: um estouro leve marca o momento.
+        const px = (e.x !== undefined && e.x !== null) ? e.x : 0.5;
+        const py = (e.y !== undefined && e.y !== null) ? e.y : 0.5;
+        r.addEffect(px, py, "poff", 300);
+        break;
+      }
 
     }
   }
@@ -1259,15 +1312,68 @@ let _wasHidden = false;
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     _wasHidden = true;
+    G.bgLast = Date.now();
   } else {
     /* Ao voltar: reseta o timestamp para que o próximo frame
-     * tenha dt ≈ 0 (não acumula ticks atrasados) e zera o
-     * acumulador para não disparar o while(tickAcc >= TICK). */
+     * tenha dt ≈ 0 (não acumula ticks atrasados). O TEMPO que passou
+     * com a aba escondida JÁ foi processado pelo bgTick (setInterval),
+     * então não zeramos o acumulador para não perder progresso. */
     G.last = performance.now();
     G.tickAcc = 0;
     _wasHidden = false;
   }
 });
+
+/* ------------------------------------------------------------ idle em bg
+ * O jogo é IDLE: minimizar a aba ou trocar de janela NÃO pode pausar a
+ * caçada. O browser congela requestAnimationFrame em abas ocultas, então
+ * um setInterval (que continua rodando, mesmo throttled a ~1s) mantém a
+ * simulação viva:
+ *
+ *   - combatTick roda com `now` AVANÇANDO tick a tick (se todos os ticks
+ *     usassem o mesmo Date.now(), os cooldowns de skill nunca passariam e
+ *     o bicho castaria a magia em todos os ticks de uma vez);
+ *   - c.events é limpo a cada tick (sem render não há floaters/logs — o
+ *     resultado aparece nos painéis ao voltar);
+ *   - imbuement/prey/supplies/save continuam rodando para o personagem
+ *     não morrer nem perder progresso.
+ */
+let _bgTimer = null;
+function startBackgroundTick() {
+  if (_bgTimer) return;
+  _bgTimer = setInterval(() => {
+    if (!G || !G.p || G.paused || !G.combat || !document.hidden) return;
+    const agora = Date.now();
+    let elapsed = agora - (G.bgLast || agora);
+    G.bgLast = agora;
+    // teto por tick: 2 min — evita loop gigante se a aba ficou horas
+    // fechada (nesse caso o computeOffline cobre no reload)
+    elapsed = Math.min(elapsed, 120000);
+    let acc = elapsed;
+    let t = 0;
+    while (acc >= TICK) {
+      t += TICK;
+      const nowTick = agora - acc + TICK;
+      combatTick(G.combat, G.p, TICK, nowTick);
+      acc -= TICK;
+      G.combat.events.length = 0;   // sem render: descarta os visuais
+    }
+    if (typeof imbTickAll === "function") imbTickAll(G.p, elapsed);
+    if (typeof preyTick === "function") preyTick(G.p, elapsed);
+    // reposição de supplies periódica (autoRestock) para não morrer
+    G.sellTimer = (G.sellTimer || 0) + elapsed;
+    if (G.sellTimer > 15000) {
+      G.sellTimer = 0;
+      if (typeof autoRestock === "function") autoRestock(G.p);
+    }
+    // autosave a cada ~20s mesmo com a aba escondida
+    G.saveTimer = (G.saveTimer || 0) + elapsed;
+    if (G.saveTimer > 20000) {
+      G.saveTimer = 0;
+      if (typeof save === "function") save();
+    }
+  }, 200);
+}
 
 /* Loot Pouch: nível de enchimento (0-100%) para o Autoseller.
  * Capacidade fixa de 100 unidades — o slider escolhe em quantos % dispara. */
@@ -1568,9 +1674,11 @@ function startGame(p) {
   if (off) showOfflineModal(off);
 
   G.last = performance.now();
+  G.bgLast = Date.now();
   requestAnimationFrame(loop);
   window.addEventListener("beforeunload", save);
   setInterval(save, 20000);
+  startBackgroundTick();   // idle continua rodando com a aba minimizada
 }
 
 function bindControls() {
@@ -1580,6 +1688,8 @@ function bindControls() {
   if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
   const btnForge = $("#btn-forge");
   if (btnForge) btnForge.addEventListener("click", () => { if (typeof openForgeModal === "function") openForgeModal(); });
+  const btnMarket = $("#btn-market");
+  if (btnMarket) btnMarket.addEventListener("click", () => { if (typeof openMarket === "function") openMarket(); });
   const btnWheel = $("#btn-wheel");
   if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
   const btnDepot = $("#btn-depot");
@@ -1651,6 +1761,21 @@ function bindControls() {
     if (k) G.walker.keys[k] = false;
   });
   window.addEventListener("blur", () => { G.walker.keys = {}; });
+
+  // ESC fecha o modal aberto (e o context menu), como no client do Tibia.
+  // O handler roda mesmo com foco em input, para o jogador nunca ficar
+  // preso numa janela sem botao de fechar.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const modal = $("#modal");
+    if (modal && modal.classList.contains("show")) {
+      modal.classList.remove("show", "wide");
+      if (typeof closeModal === "function") closeModal();
+    }
+    if (typeof hideContextMenu === "function") hideContextMenu();
+    if (typeof hideTip === "function") hideTip();
+  });
+
   initPanelCollapse();
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-pouch-sell-all").addEventListener("click", () => {
@@ -1962,6 +2087,142 @@ function openCharacterModal() {
 }
 
 /* ------------------------------------------------------------ login */
+/* Login ONLINE (conta + MySQL): abas Entrar/Criar conta, picker de
+ * personagem e criação de personagem na conta. */
+function initAccountLogin() {
+  let selSex = "male", selVoc = "knight";
+  const acc = sessionAccount();
+
+  function msg(t) {
+    const el = $("#acc-msg");
+    if (el) el.innerHTML = t || "";
+  }
+  function vocOutfit(v, s) {
+    const map = { knight: "knight", paladin: "hunter", druid: "summoner",
+                  sorcerer: "mage", monk: "monk" };
+    return map[v] + "-" + (s === "female" ? "f" : "m");
+  }
+  function paintAccVocs() {
+    const grid = $("#acc-voc-grid");
+    if (!grid) return;
+    const vocs = ["knight", "paladin", "druid", "sorcerer", "monk"];
+    grid.innerHTML = vocs.map((v) => `
+      <div class="voc-card ${v === selVoc ? "sel" : ""}" data-voc="${v}">
+        <img src="assets/outfit/${vocOutfit(v, selSex)}_s.png" alt="">
+        <div class="vn">${VOCATIONS[v].name}</div>
+        <div class="vd">${VOCATIONS[v].desc}</div>
+      </div>`).join("");
+    $$("#acc-voc-grid .voc-card").forEach((c) =>
+      c.addEventListener("click", () => { selVoc = c.dataset.voc; paintAccVocs(); }));
+  }
+  function bindAccSex() {
+    $$("#acc-char-picker .acc-sex").forEach((b) =>
+      b.addEventListener("click", () => {
+        selSex = b.dataset.sex;
+        $$("#acc-char-picker .acc-sex").forEach((x) => x.classList.remove("primary"));
+        b.classList.add("primary");
+        paintAccVocs();
+      }));
+  }
+
+  /* Mostra a lista de personagens da conta + form de novo personagem */
+  function showPicker(token, account, characters) {
+    $("#acc-panel-login").style.display = "none";
+    $("#acc-panel-register").style.display = "none";
+    $("#acc-char-picker").style.display = "";
+    // salva a sessão
+    try {
+      sessionStorage.setItem("tibia-idle-token", token);
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
+    } catch (e) {}
+    const coins = account.coins || 0;
+    const cEl = $("#acc-char-coins");
+    if (cEl) cEl.textContent = coins + " Tibia Coins";
+    const list = $("#acc-char-list");
+    if (list) {
+      list.innerHTML = characters.length
+        ? characters.map((c) => `
+            <div class="shop-row clickable" data-acc-char="${c.id}" data-acc-char-name="${c.name}">
+              <div style="flex:1"><b>${c.name}</b> · ${vocationName({ voc: c.voc })} · nv ${c.level}</div>
+              <span>➜</span>
+            </div>`).join("")
+        : '<div class="tiny dim">Nenhum personagem ainda — crie o primeiro abaixo.</div>';
+      $$("#acc-char-list [data-acc-char]").forEach((row) =>
+        row.addEventListener("click", async () => {
+          const cid = row.dataset.accChar;
+          const name = row.dataset.accCharName;
+          msg("Carregando <b>" + name + "</b>...");
+          // busca o personagem completo na API (usamos o /me com o id e
+          // recarregamos o save via rota de personagem quando disponível)
+          const p = normalizePlayer({ name: name, voc: "knight", level: 1, id: cid });
+          try { sessionStorage.setItem("tibia-idle-char", cid); } catch (e) {}
+          startGame(p);
+        }));
+    }
+    paintAccVocs();
+    bindAccSex();
+    $("#acc-btn-create-char").addEventListener("click", async () => {
+      const name = ($("#acc-char-name").value || "").trim();
+      if (name.length < 2) { msg("Digite um nome válido"); return; }
+      const r = await accountCreateCharacter(token, name, selVoc, createCharacter(name, selVoc, selSex));
+      if (!r.ok) { msg(r.msg || "Falha ao criar personagem"); return; }
+      try { sessionStorage.setItem("tibia-idle-char", r.character.id); } catch (e) {}
+      const p = createCharacter(name, selVoc, selSex);
+      p.id = r.character.id;
+      startGame(p);
+    });
+  }
+
+  // abas
+  $$("[data-acc-tab]").forEach((tab) =>
+    tab.addEventListener("click", () => {
+      const which = tab.dataset.accTab;
+      $("#acc-tab-login").classList.toggle("active", which === "login");
+      $("#acc-tab-register").classList.toggle("active", which === "register");
+      $("#acc-panel-login").style.display = which === "login" ? "" : "none";
+      $("#acc-panel-register").style.display = which === "register" ? "" : "none";
+      msg("");
+    }));
+
+  $("#acc-btn-login").addEventListener("click", async () => {
+    const login = ($("#acc-login").value || "").trim();
+    const pass = $("#acc-password").value || "";
+    if (!login || !pass) { msg("Informe login e senha"); return; }
+    msg("Entrando...");
+    const r = await accountLogin(login, pass);
+    if (!r.ok) { msg(r.msg || "Falha no login"); return; }
+    showPicker(r.token, r.account, r.characters);
+  });
+  $("#acc-btn-register").addEventListener("click", async () => {
+    const login = ($("#acc-new-login").value || "").trim();
+    const pass = $("#acc-new-password").value || "";
+    if (login.length < 1 || pass.length < 1) { msg("Informe login e senha"); return; }
+    msg("Criando conta...");
+    const r = await accountRegister(login, pass);
+    msg(r.ok ? "Conta criada! Faça o login." : (r.msg || "Falha"));
+    if (r.ok) {
+      $("#acc-tab-login").click();
+      $("#acc-login").value = login;
+      $("#acc-password").value = pass;
+    }
+  });
+  $("#acc-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
+  $("#acc-password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
+  $("#acc-new-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-register").click(); });
+  $("#acc-new-password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-register").click(); });
+  $("#acc-char-name").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-create-char").click(); });
+
+  // sessão já existente (refresh da página): pula o login
+  const tok = sessionToken();
+  if (tok && acc) {
+    msg("Reconectando...");
+    accountMe(tok).then((r) => {
+      if (r.ok) showPicker(tok, r.account, r.characters);
+      else msg("Sessão expirada — faça login novamente.");
+    });
+  }
+}
+
 function initLogin() {
   const saved = load();
 
@@ -1987,6 +2248,19 @@ function initLogin() {
     $("#saved-info").textContent =
       `${vocationName(saved)} · nível ${saved.level}`;
     $("#btn-continue").addEventListener("click", () => startGame(saved));
+  }
+
+  // ---------- MODO ONLINE (conta + MySQL) ----------
+  // Se a API está configurada, mostra o login/cadastro de conta; o modo
+  // local fica escondido.
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  if (online) {
+    const accLogin = $("#account-login");
+    const localLogin = $("#local-login");
+    if (accLogin) accLogin.style.display = "";
+    if (localLogin) localLogin.style.display = "none";
+    initAccountLogin();
+    return;
   }
 
   let selVoc = "knight", selSex = "male";

@@ -12,26 +12,57 @@
 
 const TileSprites = {
   cache: {},
-  /* Duração de cada frame da animação (ms) — padrão do client (10fps) */
+  /* Duração de cada frame da animação (ms). O client roda a 10fps, mas
+   * alguns tiles (agua com 95 frames, lava) ficavam lentos demais no
+   * idle — a pedido do jogador, a velocidade foi ajustada por tipo:
+   * agua/liquidos mais rapidos, fogo/luz media, o resto no padrao. */
   ANIM_DUR: 120,
+  /* ids cuja strip <id>_anim.png NAO carregou (404): caem na sprite
+   * estatica <id>.png para o mapa nunca ficar com buracos. */
+  _broken: {},
   _anim(id) {
-    return (typeof TILE_ANIM !== "undefined" && TILE_ANIM[id]) || null;
+    return (typeof TILE_ANIM !== "undefined" && TILE_ANIM[id] &&
+            !this._broken[id]) ? TILE_ANIM[id] : null;
+  },
+  _dur(id) {
+    const a = this._anim(id);
+    if (!a) return this.ANIM_DUR;
+    // agua (53873, 53882..53899, 4612..4614...): 95 quadros a 120ms =
+    // 11s por ciclo; a 40ms fica 3.8s, proximo do client real
+    if (a.af >= 60) return 40;
+    if (a.af >= 12) return 80;
+    return this.ANIM_DUR;
   },
   /* Frame atual da animação do id (0 para estático) */
   frameFor(id) {
     const a = this._anim(id);
     if (!a || !a.af) return 0;
-    return Math.floor(performance.now() / this.ANIM_DUR) % a.af;
+    return Math.floor(performance.now() / this._dur(id)) % a.af;
   },
   get(id, frame) {
     const a = this._anim(id);
     const key = a ? id + "_" + frame : id;
     if (this.cache[key] !== undefined) return this.cache[key];
-    const img = new Image();
     const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-    img.src = a
-      ? "assets/tiles/" + id + "_anim.png?v=" + v
-      : "assets/tiles/" + id + ".png?v=" + v;
+    if (a) {
+      const img = new Image();
+      img.src = "assets/tiles/" + id + "_anim.png?v=" + v;
+      this.cache[key] = img;
+      // Se a strip de animacao nao existir (404), o tile cai na sprite
+      // ESTATICA em vez de sumir do mapa — a lista TILE_ANIM pode conter
+      // ids cuja strip ainda nao foi copiada (atualizacao parcial).
+      img.onerror = () => {
+        this._broken[id] = true;
+        const est = new Image();
+        est.src = "assets/tiles/" + id + ".png?v=" + v;
+        est.onerror = () => { this.cache[id] = null; this.cache[key] = null; };
+        this.cache[id] = est;
+        this.cache[key] = est;
+      };
+      return img;
+    }
+    const img = new Image();
+    img.src = "assets/tiles/" + id + ".png?v=" + v;
     img.onerror = () => { this.cache[key] = null; };
     this.cache[key] = img;
     return img;
