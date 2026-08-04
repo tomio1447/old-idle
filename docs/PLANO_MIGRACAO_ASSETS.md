@@ -1,3 +1,22 @@
+# 🟢 STATUS 2026-08-03 — PIPELINE IMPLEMENTADO E VALIDADO
+
+A migracao de assets 15.x (.dat/.spr formato 8.60 + items.xml Canary)
+**esta implementada e rodando** — veja `docs/MIGRACAO_15X_PIPELINE.md`.
+Resumo do que mudou nesta rodada:
+
+* `tools/extract_860.py` (v2) — matching por nome canonico do gamedata,
+  normalizacao (apostrofos/espacos), fuzzy auditado, `mat-<id>`, tiras
+  `_anim`, gravacao de `cid` + `af/aw/ah` no gamedata.js.
+* `tools/migracao_15x.py` — orquestra tudo em 1 comando.
+* `tools/consolidate_css.py` — 3 CSS base -> `css/layout.css`.
+* `css/otc-complete.css` — corrigido `.modal-bg` (display:none) — era o
+  bug do clique no personagem.
+* `js/gamedata.js` — 868/870 itens com sprite 15.x real, 117 animados,
+  824 enriquecidos com atributos do Canary.
+* RME web: catalogo 43.155 itens + tileflags.js regenerados do mesmo .dat.
+
+--------------------------------------------------------------------------------
+
 # Plano de Migração Global-Idle — Assets 15.x + Canary
 
 ## Objetivo

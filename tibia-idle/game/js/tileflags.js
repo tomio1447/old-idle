@@ -1,4 +1,4 @@
-/* tileflags.js â€” GERADO por tools/build_rme_catalog.py.
+/* tileflags.js — GERADO por tools/build_rme_catalog.py.
  * [walk, block] por item id, lidos do .dat 8.60 (thingtype.cpp).
  * Colisao das hunts .otbm: celula bloqueada quando o chao nao e
  * andavel ou algum item empilhado bloqueia. */

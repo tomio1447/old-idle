@@ -1,4 +1,4 @@
-/* catalog.js â€” GERADO por tools/build_rme_catalog.py.
+/* catalog.js — GERADO por tools/build_rme_catalog.py.
  * Paleta completa do .dat 8.60 para o editor de mapas:
  * entries = [id, walk, block, ground, page, idx, tw, th];
  * tw/th = largura/altura em tiles (1x1, 2x2, etc.).

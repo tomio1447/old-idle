@@ -30,7 +30,16 @@ def run():
 
         # inicia uma hunt
         pg.click('.hunt-card[data-hunt="rats"]')
-        pg.wait_for_timeout(14000)
+        # desde a atualização de instâncias, é preciso escolher non-pvp
+        pg.wait_for_timeout(400)
+        pg.click('#modal-body [data-instance="non-pvp"]')
+        # primeiro kill pode levar ~15-30s no nível 1 (dagger); espera com
+        # polling em vez de tempo fixo
+        for _ in range(12):
+            pg.wait_for_timeout(5000)
+            if pg.evaluate("G.combat && G.combat.stats.kills > 0"):
+                break
+        pg.wait_for_timeout(2000)
         pg.screenshot(path="/home/user/tibia-idle/tools/shot-hunt.png")
 
         state = pg.evaluate("""() => ({
@@ -58,7 +67,7 @@ def run():
               .forEach(s => addItem(G.p, s, 1));
             autoEquip(G.p);
             const m = maxStats(G.p); G.p.hp = m.hp; G.p.mp = m.mp;
-            startHunt('undead');
+            startHunt('undead', 'non-pvp');
         }""")
         pg.wait_for_timeout(1000)
         # roda 20 min simulados de uma vez
@@ -67,7 +76,7 @@ def run():
             for (let i = 0; i < 12000; i++) {
                 combatTick(G.combat, G.p, 100, t0 + i * 100);
                 G.combat.events.length = 0;
-                if (i % 150 === 0) { autoSell(G.p); autoRestock(G.p); }
+                if (i % 150 === 0) { sellAllPouch(G.p); autoRestock(G.p); }
             }
         }""")
         pg.wait_for_timeout(500)
