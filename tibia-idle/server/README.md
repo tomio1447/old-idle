@@ -71,11 +71,20 @@ Guarda contas (login/senha bcrypt, Tibia Coins, role) e personagens
 **Regras do Party (multiplayer, convites assíncronos + follow):**
 - O LÍDER só pode CONVIDAR estando em Safe Zone (cidade) ou Área de Treino
   (academia / sala de exercise weapons) — validado no servidor
+- CONVIDADO também só ACEITA em cidade/treino: a zona de cada personagem é
+  gravada pelo reporte de zona (qualquer membro reporta a própria)
 - Convites ficam PENDENTES no servidor (inbox): o jogador pode trocar de
   personagem da conta, abrir o menu de Party e aceitar de lá
+- MEMBROS de party NÃO podem entrar em hunt/boss (só o líder escolhe e leva
+  a party junto via FOLLOW) — bloqueado no cliente + servidor
 - FOLLOW: quando o líder muda de mapa, os membros vão juntos. Se ele entra
   numa hunt (instância non-pvp/pvp) ou sala de boss, os membros recebem um
   NONCE de uso único com o destino e são teleportados para a MESMA instância
+- BOSS: antes de gerar o follow, o servidor valida os REQUISITOS de TODOS
+  os membros (cooldown de 16h + missão, ex.: Timira 25/25/25) — se alguém
+  não puder, o boss não inicia
+- O state da party inclui hp/mp/maxHp/maxMp/zona por membro (snapshots
+  enviados no save do personagem) — usado pelo painel de party estilo OTC
 - Segurança: nonce consumido atomicamente (sem replay), conta errada não
   aceita convite, membro não reporta zona, 1 party por personagem
 

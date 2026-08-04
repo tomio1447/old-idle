@@ -82,11 +82,24 @@ async function accountCreateCharacter(token, name, voc, data) {
 
 async function accountSaveCharacter(token, charId, p) {
   const data = JSON.stringify(p || {});
+  // snapshots de vida/mana para o painel de party (barras dos membros)
+  let maxHp = 0, maxMp = 0;
+  try {
+    if (typeof maxStats === "function" && p) {
+      const m = maxStats(p);
+      maxHp = m.hp || 0;
+      maxMp = m.mp || 0;
+    }
+  } catch (e) { /* segue */ }
   const r = await _api("PUT", "/api/characters/" + charId, {
     token,
     voc: p.voc || "none",
     level: p.level || 1,
     data,
+    hp: (p && p.hp) || 0,
+    mp: (p && p.mp) || 0,
+    maxHp,
+    maxMp,
   });
   return r.data.ok;
 }

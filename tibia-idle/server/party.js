@@ -74,10 +74,28 @@ function newNonce() {
   return crypto.randomBytes(16).toString("hex");
 }
 
+/* Pega o snapshot de vida/mana de um personagem (gravado pelo save do
+ * cliente) + zona atual — para o painel de party do OTC. */
+async function charSnapshot(db, charId) {
+  const c = await db.findCharacter(Number(charId));
+  if (!c) return null;
+  return {
+    id: Number(c.id),
+    account_id: c.account_id ? Number(c.account_id) : null,
+    name: c.name,
+    voc: c.voc,
+    level: c.level,
+    zone: c.zone || "unknown",
+    hp: Number(c.hp) || 0,
+    mp: Number(c.mp) || 0,
+    maxHp: Number(c.max_hp) || 0,
+    maxMp: Number(c.max_mp) || 0,
+  };
+}
+
 /* Monta o estado público da party para um personagem. */
 async function partyStateFor(db, party, charId) {
   const members = await db.partyMembers(party.id);
-  const leader = await db.findCharacter(party.leader_id);
   const isLeader = Number(party.leader_id) === Number(charId);
   const isMember = members.some((m) => Number(m.id) === Number(charId));
   // follow pendente APENAS para membros (o líder não se segue)
@@ -85,23 +103,24 @@ async function partyStateFor(db, party, charId) {
   if (!isLeader && isMember) {
     follow = await db.partyFollow(party.id, charId);
   }
+  const leaderSnap = await charSnapshot(db, party.leader_id);
+  const memberSnaps = [];
+  for (const m of members) {
+    const s = await charSnapshot(db, m.id);
+    if (s) memberSnaps.push(s);
+  }
   return {
     ok: true,
     state: {
       id: party.id,
       isLeader,
-      leader: {
-        id: party.leader_id,
-        name: party.leader_name || (leader ? leader.name : "?"),
-        zone: party.leader_zone,
+      leader: Object.assign({
         hunt: party.leader_hunt,
         instance: party.leader_instance,
         otbm: party.leader_otbm,
         boss: party.leader_boss,
-      },
-      members: members.map((m) => ({
-        id: m.id, name: m.name, voc: m.voc, level: m.level,
-      })),
+      }, leaderSnap || { id: party.leader_id, name: party.leader_name || "?", voc: "none", level: 1, zone: party.leader_zone }),
+      members: memberSnaps,
       follow: follow ? {
         nonce: follow.nonce,
         hunt: follow.hunt,
@@ -216,7 +235,9 @@ async function partyInbox(db, token) {
 }
 
 /* POST /api/party/accept — aceita um convite pendente. O personagem
- * convidado precisa pertencer à conta autenticada. */
+ * convidado precisa pertencer à conta autenticada E estar em Safe Zone
+ * (cidade) ou Área de Treino — regra do dono: jogadores em party só
+ * circulam em cidade/treino, e é nessas condições que aceitam convite. */
 async function partyAccept(db, body) {
   const { account, error } = await authChar(db, body.token, null);
   if (error) return error;
@@ -233,6 +254,17 @@ async function partyAccept(db, body) {
   const invitee = await db.findCharacter(inv.invitee_id);
   if (!invitee || invitee.account_id !== account.id) {
     return { code: 403, body: { ok: false, msg: "Convite não pertence à sua conta" } };
+  }
+  // REGRA: só aceita convite em Safe Zone (cidade) ou Área de Treino
+  const invZone = invitee.zone || "unknown";
+  if (ZONES_CONVIDAR.indexOf(invZone) === -1) {
+    return {
+      code: 403,
+      body: {
+        ok: false,
+        msg: "Para aceitar um convite de party você precisa estar na Cidade (safe zone) ou na Área de Treino",
+      },
+    };
   }
   // a party ainda existe? (o líder pode ter dissolvido)
   const party = await db.partyFindByLeader(inv.leader_id);
@@ -316,24 +348,86 @@ async function partyState(db, token, charId) {
   return { code: 200, body: await partyStateFor(db, party, char.id) };
 }
 
-/* POST /api/party/zone — o LÍDER reporta a transição de mapa.
- *   body: { token, char_id, zone, hunt?, instance?, otbm?, boss? }
- * Ao entrar em hunt/boss, gera um follow (nonce por membro) com o destino.
- * Quem não é líder é ignorado (não dá para forçar o teleporte). */
+/* Pega o `p` (save) de um personagem a partir do data JSON. */
+function charPlayerData(c) {
+  if (!c || !c.data) return {};
+  try {
+    const d = typeof c.data === "string" ? JSON.parse(c.data) : c.data;
+    return d || {};
+  } catch (e) { return {}; }
+}
+
+/* Requisitos do boss (cooldown + missão) para TODOS da party (líder +
+ * membros). `opts` vem do cliente: { boss, cooldownMs, mission,
+ * missionTargets }. Retorna { ok, failName } — failName = quem não pode. */
+async function bossRequirementsOk(db, party, opts) {
+  if (!opts || !opts.boss) return { ok: true };
+  const cooldownMs = Number(opts.cooldownMs) || 0;
+  const mission = opts.mission || null;
+  const targets = opts.missionTargets || null;
+  const now = Date.now();
+
+  const checar = async (charId, nome) => {
+    const c = await db.findCharacter(charId);
+    const p = charPlayerData(c);
+    // cooldown do boss (p.bosses[id].lastFight + cooldown)
+    if (cooldownMs > 0) {
+      const b = p.bosses && p.bosses[opts.boss];
+      const lastFight = (b && b.lastFight) || 0;
+      if (lastFight && lastFight + cooldownMs > now) {
+        return nome + " está em cooldown do boss";
+      }
+    }
+    // missão (kill counts): p.missions[mission].progress[monster] >= target
+    if (mission && targets) {
+      const st = p.missions && p.missions[mission];
+      for (const mon of Object.keys(targets)) {
+        const cur = (st && st.progress && st.progress[mon]) || 0;
+        if (cur < targets[mon]) {
+          return nome + " não completou a missão do boss (" + mon + " " + cur + "/" + targets[mon] + ")";
+        }
+      }
+    }
+    return null;
+  };
+
+  const failLider = await checar(party.leader_id, party.leader_name || "Líder");
+  if (failLider) return { ok: false, failName: failLider };
+  const members = await db.partyMembers(party.id);
+  for (const m of members) {
+    const c = await db.findCharacter(m.id);
+    const fail = await checar(m.id, c ? c.name : "Membro");
+    if (fail) return { ok: false, failName: fail };
+  }
+  return { ok: true };
+}
+
+/* POST /api/party/zone — reporta transição de mapa.
+ *   body: { token, char_id, zone, hunt?, instance?, otbm?, boss?,
+ *           cooldownMs?, mission?, missionTargets? }
+ * - QUALQUER personagem da party reporta a SUA zona (gravada no character
+ *   para o painel + regra de aceite); só o LÍDER muda a zona da party.
+ * - Ao entrar em hunt/boss, gera um follow (nonce por membro) com destino.
+ * - BOSS: antes de gerar o follow, valida os REQUISITOS (cooldown + missão)
+ *   de TODOS os membros — se alguém não puder, o boss não inicia. */
 async function partyReportZone(db, body) {
   const { char, error } = await authChar(db, body.token, body.char_id);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
-  const party = await partyOf(db, char.id);
-  if (!party || Number(party.leader_id) !== Number(char.id)) {
-    // não é líder: no-op silencioso (membro não controla a zona da party)
-    return { code: 200, body: { ok: true, ignored: true } };
-  }
 
   const zone = String(body.zone || "").toLowerCase();
   if (["city", "training", "hunt", "boss"].indexOf(zone) === -1) {
     return { code: 400, body: { ok: false, msg: "Zona inválida" } };
   }
+  // grava a zona do personagem (qualquer membro reporta a própria)
+  await db.setCharacterZone(char.id, zone);
+
+  const party = await partyOf(db, char.id);
+  if (!party || Number(party.leader_id) !== Number(char.id)) {
+    // não é líder: registra a própria zona e termina (não controla a party)
+    return { code: 200, body: { ok: true, ignored: true } };
+  }
+
   // máquina de estados: salto impossível é rejeitado
   const legais = ZONE_LEGAL[party.leader_zone] || ZONE_LEGAL.unknown;
   if (legais.indexOf(zone) === -1) {
@@ -347,6 +441,20 @@ async function partyReportZone(db, body) {
   }
   if (zone === "boss" && !body.boss) {
     return { code: 400, body: { ok: false, msg: "boss obrigatório" } };
+  }
+
+  // BOSS: todos da party precisam ter cooldown disponível + missão completa
+  if (zone === "boss") {
+    const reqs = await bossRequirementsOk(db, party, body);
+    if (!reqs.ok) {
+      return {
+        code: 403,
+        body: {
+          ok: false,
+          msg: "Nem todos podem enfrentar o boss: " + reqs.failName,
+        },
+      };
+    }
   }
 
   // monta o follow (por membro) quando o líder entra em hunt/boss

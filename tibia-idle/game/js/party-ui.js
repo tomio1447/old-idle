@@ -46,12 +46,143 @@ function partyVocName(voc) {
     ? VOCATIONS[voc].name : voc;
 }
 
+/* ------------------------------------------------------------------ */
+/* PAINEL DE PARTY (OTC) — canto superior direito da tela do jogo      */
+/* ------------------------------------------------------------------ */
+
+/* Ícone pequeno da outfit do membro: sprite de vocação (como o seletor
+ * de vocação usa) — assets/outfit/<voc>-m_s.png. */
+function partyOutfitIcon(voc, sex) {
+  const map = { knight: "knight", paladin: "hunter", druid: "summoner",
+                sorcerer: "mage", monk: "monk" };
+  const o = map[voc] || "citizen";
+  const s = sex === "female" ? "f" : "m";
+  return `assets/outfit/${o}-${s}_s.png`;
+}
+
+/* Troca para um personagem da party (mesma função do "Trocar personagem"). */
+function partySwitchToChar(id) {
+  try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
+  try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
+  try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
+  location.reload();
+}
+
+/* Estado de colapso do painel (persiste na sessão). */
+let PARTY_PANEL_OPEN = true;
+
+/* Renderiza o painel de party (OTC). Em modo online usa o estado do
+ * servidor (com hp/mp/zona de cada membro); em modo local usa o roster. */
+function renderPartyPanel(p) {
+  const panel = $("#party-panel");
+  if (!panel) return;
+  const body = $("#party-panel-body");
+  if (!body) return;
+  const count = $("#party-panel-count");
+  const arrow = $("#party-panel-arrow");
+
+  // membros: [ { id, name, voc, level, zone?, hp?, mp?, maxHp?, maxMp?, sex?, account_id? } ]
+  let membros = [];
+  let isOnline = false;
+
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || null;
+    if (!st) { panel.style.display = "none"; return; }
+    isOnline = true;
+    membros = [st.leader].concat(st.members || []);
+    panel.style.display = "";
+  } else {
+    ensureParty(p);
+    const pt = p.party;
+    if (!pt.members.length) { panel.style.display = "none"; return; }
+    // líder = o personagem atual
+    membros = [{ id: characterId(p), name: p.name, voc: p.voc, level: p.level,
+                 sex: p.sex, hp: p.hp, mp: p.mp, maxHp: maxStats(p).hp,
+                 maxMp: maxStats(p).mp, _leader: true }];
+    const chars = typeof getCharacters === "function" ? getCharacters() : [];
+    for (const m of pt.members) {
+      const c = chars.find((x) => (x.id || characterId(x)) === m.id);
+      if (!c) continue;
+      const mc = maxStats(c);
+      membros.push({ id: m.id, name: c.name, voc: c.voc, level: c.level,
+                     sex: c.sex, hp: c.hp || 0, mp: c.mp || 0,
+                     maxHp: mc.hp, maxMp: mc.mp });
+    }
+    panel.style.display = "";
+  }
+
+  if (count) count.textContent = String(Math.max(0, membros.length - 1));
+  if (arrow) arrow.textContent = PARTY_PANEL_OPEN ? "▾" : "▸";
+  body.classList.toggle("collapsed", !PARTY_PANEL_OPEN);
+
+  if (membros.length === 1) {
+    body.innerHTML = `<div class="party-panel-empty">Você está sem party.<br>
+      Abra o menu 👥 PARTY para criar/convidar.</div>`;
+    return;
+  }
+
+  // qual conta é a atual (modo online): só dá pra trocar p/ chars da conta
+  const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+  const currentId = characterId(p);
+
+  const barra = (hp, mp, maxHp, maxMp) => {
+    const h = maxHp > 0 ? Math.max(0, Math.min(100, hp * 100 / maxHp)) : 0;
+    const m = maxMp > 0 ? Math.max(0, Math.min(100, mp * 100 / maxMp)) : 0;
+    return `<div class="party-pbar"><div class="fill hp" style="width:${h}%"></div>
+        <span class="val">${fmtFull(Math.floor(hp))}/${fmtFull(maxHp)}</span></div>
+      <div class="party-pbar"><div class="fill mp" style="width:${m}%"></div>
+        <span class="val">${fmtFull(Math.floor(mp))}/${fmtFull(maxMp)}</span></div>`;
+  };
+
+  const zonaIcon = (z) => ({
+    city: "🏛", training: "🎯", hunt: "⚔️", boss: "💀", unknown: "❔",
+  }[z] || "");
+
+  body.innerHTML = membros.map((m) => {
+    const isCurrent = Number(m.id) === Number(currentId);
+    const isLeader = m._leader || (isOnline && Number(m.id) === Number(p._partyOnline && p._partyOnline.leader && p._partyOnline.leader.id));
+    const myAccount = !isOnline || !m.account_id || (acc && Number(acc.id) === Number(m.account_id));
+    const clickable = !isCurrent && myAccount;
+    return `<div class="party-member-row ${clickable ? "" : "no-switch"}"
+        data-party-char="${m.id}" data-switch="${clickable ? 1 : 0}"
+        title="${clickable ? "Trocar para " + m.name : (isCurrent ? "Personagem atual" : "Membro de outra conta")}">
+      <div class="ppm-outfit">
+        <img src="${partyOutfitIcon(m.voc, m.sex)}" alt="">
+      </div>
+      <div class="ppm-info">
+        <div class="ppm-name ${isLeader ? "leader" : ""}">${m.name}
+          ${isCurrent ? '<span class="tiny dim"> (você)</span>' : ""}</div>
+        <div class="ppm-meta">nv ${m.level} · ${partyVocName(m.voc)}
+          <span class="ppm-zone" title="zona">${zonaIcon(m.zone)}</span></div>
+        ${barra(m.hp, m.mp, m.maxHp, m.maxMp)}
+      </div>
+    </div>`;
+  }).join("");
+
+  // toggle abrir/fechar
+  const head = $("#party-panel-head");
+  if (head && !head._bound) {
+    head._bound = true;
+    head.addEventListener("click", () => {
+      PARTY_PANEL_OPEN = !PARTY_PANEL_OPEN;
+      renderPartyPanel(G.p);
+    });
+  }
+  // clique no membro = trocar personagem (mesma função do "Trocar personagem")
+  $$("#party-panel-body [data-party-char]").forEach((el) =>
+    el.addEventListener("click", () => {
+      if (el.dataset.switch !== "1") return;
+      partySwitchToChar(el.dataset.partyChar);
+    }));
+}
+
 function openPartyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
   ensureParty(p);
   $("#modal-body").innerHTML = `<div class="panel-title">👥 Party
       <span style="flex:1"></span>
+      <button class="sm" id="party-analyser-btn" title="Party Hunt Analyser completo">📊 Analyser</button>
       <button class="sm" id="party-close">✕</button>
     </div>
     <div class="panel-body"><div id="party-content"></div></div>`;
@@ -59,6 +190,8 @@ function openPartyModal() {
   $("#party-close").addEventListener("click", () => {
     $("#modal").classList.remove("show", "wide");
   });
+  const anal = $("#party-analyser-btn");
+  if (anal) anal.addEventListener("click", () => openPartyAnalyserModal());
   renderPartyModal(p);
   // modo online: busca estado + inbox do servidor (assíncrono) e re-renderiza
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
@@ -144,10 +277,12 @@ function renderPartyModal(p, online) {
       <div class="tiny dim">Fórmula (wiki): Exp = M × S ÷ P × C · o XP dos membros é aplicado de verdade no save deles.</div>
     </div>`;
 
-  // ---- Party Hunt Analyser
-  const s = pt.session;
+  // ---- Party Hunt Analyser (sessão unificada local/online)
+  const s = (typeof partyAnalyserSession === "function") ? partyAnalyserSession(p) : null;
   h += `<div class="party-analyser">
-      <div class="panel-title" style="font-size:13px">📊 Party Hunt Analyser</div>`;
+      <div class="panel-title" style="font-size:13px">📊 Party Hunt Analyser
+        <span style="flex:1"></span>
+        <button class="sm" data-analyser-full="1">Abrir completo</button></div>`;
   if (s) {
     const dur = Math.max(0, Math.round((s.endedAt || Date.now()) - s.startedAt) / 1000);
     const mm = Math.floor(dur / 60), ss = Math.floor(dur % 60);
@@ -208,6 +343,66 @@ function renderPartyModal(p, online) {
     toast(pt.shareExp ? "Experiência compartilhada ATIVA." : "Compartilhamento desativado.");
     renderPartyModal(p);
   });
+  // botão "Abrir completo" do Analyser (modal completo)
+  const analFull = $("#party-content [data-analyser-full]");
+  if (analFull) analFull.addEventListener("click", () => openPartyAnalyserModal());
+}
+
+/* ------------------------------------------------------------------ */
+/* ANALYZER (modal completo do Party Hunt Analyser)                    */
+/* ------------------------------------------------------------------ */
+
+/* Abre o modal completo do Analyser: duração, kills, exp, loot e a
+ * tabela por membro (como o analisador de caçada do OTC). */
+function openPartyAnalyserModal() {
+  const p = G.p;
+  if (!p) { toast("Crie um personagem primeiro"); return; }
+  const s = (typeof partyAnalyserSession === "function") ? partyAnalyserSession(p) : null;
+  const box = $("#modal-body");
+  box.innerHTML = `<div class="panel-title">📊 Party Hunt Analyser
+      <span style="flex:1"></span>
+      <button class="sm" id="analyser-close">✕</button>
+    </div>
+    <div class="panel-body"><div id="analyser-content"></div></div>`;
+  $("#modal").classList.add("show", "wide");
+  $("#analyser-close").addEventListener("click", () => $("#modal").classList.remove("show", "wide"));
+
+  const content = $("#analyser-content");
+  if (!s) {
+    content.innerHTML = `<div class="dim small center" style="padding:14px">
+      Nenhuma caçada registrada. Inicie uma caçada com o party para o
+      Analyser começar a coletar os dados.</div>`;
+    return;
+  }
+  const dur = Math.max(0, Math.round((s.endedAt || Date.now()) - s.startedAt) / 1000);
+  const mm = Math.floor(dur / 60), ss = Math.floor(dur % 60);
+  const kills = s.kills || 0;
+  const exp = s.exp || 0;
+  const loot = s.loot || 0;
+  const rows = Object.keys(s.byMember || {}).map((id) => {
+    const b = s.byMember[id];
+    return `<div class="party-analyser-row">
+      <span><b>${b.name || (id === "leader" ? p.name : "membro")}</b></span>
+      <span>${fmtFull(b.exp)} xp</span>
+      <span>${fmtFull(b.kills)} kills</span>
+      <span>${fmtFull(b.loot)} loot</span>
+      ${b.levelUps ? `<span style="color:#9ce84a">↑${b.levelUps} lvl</span>` : ""}
+    </div>`;
+  }).join("") || `<div class="dim small center">Sem dados por membro ainda.</div>`;
+
+  content.innerHTML = `
+    <div class="panel-inset mb8" style="padding:8px">
+      <div class="stat-row"><span class="k">Hunt</span><span class="v">${s.huntId ? ((GAMEDATA.hunts[s.huntId] || {}).name || s.huntId) : "—"}</span></div>
+      <div class="stat-row"><span class="k">Duração</span><span class="v">${mm}m ${ss}s</span></div>
+      <div class="stat-row"><span class="k">Kills</span><span class="v">${fmtFull(kills)}</span></div>
+      <div class="stat-row"><span class="k">Exp total</span><span class="v" style="color:#9ce84a">${fmtFull(exp)}</span></div>
+      <div class="stat-row"><span class="k">Itens de loot</span><span class="v">${fmtFull(loot)}</span></div>
+      <div class="stat-row"><span class="k">Exp/h</span><span class="v">${fmtFull(Math.round(exp * 3600 / Math.max(1, dur)))}</span></div>
+      <div class="stat-row"><span class="k">Kills/h</span><span class="v">${fmtFull(Math.round(kills * 3600 / Math.max(1, dur)))}</span></div>
+    </div>
+    <div class="party-analyser-table">${rows}</div>
+    <div class="tiny dim mt8">Dados da sessão atual de caçada do party
+      (resetam ao sair/voltar para a cidade).</div>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -342,6 +537,11 @@ function bindPartyOnline(p, st, inbox) {
 
   $$("#party-content [data-party-accept]").forEach((el) =>
     el.addEventListener("click", async () => {
+      // REGRA: só aceita convite em Safe Zone (cidade) ou Área de Treino
+      if (typeof partyCanInviteNow === "function" && !partyCanInviteNow()) {
+        toast("Para aceitar um convite você precisa estar na Cidade ou na Área de Treino.", "bad");
+        return;
+      }
       const r = await accountPartyAccept(el.dataset.partyAccept);
       toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "level" : "bad");
       if (r.ok) { recarregar(); renderAll(); }

@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS characters (
   voc        VARCHAR(24)  NOT NULL DEFAULT 'none',
   level      INT UNSIGNED NOT NULL DEFAULT 1,
   data       MEDIUMTEXT   NOT NULL,          -- save completo do personagem
+  zone       VARCHAR(16)  NOT NULL DEFAULT 'unknown',  -- cidade/treino/hunt/boss (party)
+  hp         INT UNSIGNED NOT NULL DEFAULT 0,          -- snapshot de vida (party)
+  mp         INT UNSIGNED NOT NULL DEFAULT 0,          -- snapshot de mana (party)
+  max_hp     INT UNSIGNED NOT NULL DEFAULT 0,          -- vida máxima (party)
+  max_mp     INT UNSIGNED NOT NULL DEFAULT 0,          -- mana máxima (party)
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 ON UPDATE CURRENT_TIMESTAMP,
@@ -60,6 +65,14 @@ CREATE TABLE IF NOT EXISTS characters (
   UNIQUE KEY uq_characters_name (name),
   INDEX idx_characters_account (account_id)
 ) ENGINE=InnoDB;
+
+-- migração de instalações antigas (colunas novas)
+ALTER TABLE characters
+  ADD COLUMN zone VARCHAR(16) NOT NULL DEFAULT 'unknown',
+  ADD COLUMN hp INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN mp INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN max_hp INT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN max_mp INT UNSIGNED NOT NULL DEFAULT 0;
 
 -- ------------------------------------------------------------
 -- Conta de ADMINISTRADOR: login = 1, senha = 1

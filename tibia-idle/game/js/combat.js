@@ -115,6 +115,8 @@ function newBossCombat(player, boss) {
   const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"];
   // Boss com stats DIRETOS do Canary (hp/exp/damage/armor/defense definidos
   // no BOSS_DEFS) não passa pelo multiplicador — usa os valores oficiais.
+  // Loot: se o BOSS_DEFS não define o próprio, usa o loot real do monstro
+  // base (merge do canary — ex.: Timira usa o loot oficial do .lua).
   const def = Object.assign({}, base, {
     name: boss.name,
     hp: boss.hp || applyBossMultiplier(base, boss.mult || 10).hp,
@@ -122,7 +124,7 @@ function newBossCombat(player, boss) {
     damage: boss.damage || applyBossMultiplier(base, boss.mult || 10).damage,
     armor: boss.armor || applyBossMultiplier(base, boss.mult || 10).armor,
     defense: boss.defense || base.defense || 0,
-    loot: boss.loot || [],
+    loot: (boss.loot && boss.loot.length) ? boss.loot : (base.loot || []),
     attackSpeed: boss.attackSpeed || base.attackSpeed || 2000,
   });
   c.boss = boss;

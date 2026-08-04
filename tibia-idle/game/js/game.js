@@ -470,6 +470,19 @@ const MISSION_DEFS = {
     ],
     completeReward: { supplies: [{ slug: "health-potion", count: 10 }], gold: 500 },
   },
+  // Missão da Timira the Many-Headed: matar 25 Naga Archer, 25 Naga Warrior
+  // e 25 Makara no mapa das Nagas. Completar a missão LIBERA o cooldown do
+  // boss (bossState("timira-the-many-headed").lastFight = 0) — para matá-la
+  // de novo é preciso refazer a missão (o kill do boss zera o progresso).
+  "marapur-nagas": {
+    title: "Missão: Timira the Many-Headed",
+    tasks: [
+      { monster: "naga-archer", target: 25, reward: { supplies: [{ slug: "strong-health-potion", count: 5 }] } },
+      { monster: "naga-warrior", target: 25, reward: { supplies: [{ slug: "strong-mana-potion", count: 5 }] } },
+      { monster: "makara", target: 25, reward: { supplies: [{ slug: "ultimate-health-potion", count: 2 }] } },
+    ],
+    completeReward: { gold: 5000, items: [{ slug: "small-diamond", count: 2 }] },
+  },
 };
 
 function missionForHunt(id) {
@@ -533,6 +546,17 @@ function tryCompleteMissionRewards(p, huntId) {
     st.completeClaimed = true;
     addLog("level", `Missão de <b>${GAMEDATA.hunts[huntId].name}</b> completa. Recompensa final: ${rewardText(def.completeReward)}.`);
     toast(`Missão completa! <b>${rewardText(def.completeReward)}</b>`, "level");
+  }
+  // Timira: completar a missão das Nagas LIBERA o cooldown do boss — pode
+  // matá-la de novo sem esperar as 16h (a missão precisa ser refeita, pois
+  // o kill do boss zera o progresso — ver startBoss).
+  if (huntId === "marapur-nagas" && all) {
+    const tim = bossState(p, "timira-the-many-headed");
+    if (tim.lastFight) {
+      tim.lastFight = 0;
+      addLog("level", "Timira the Many-Headed liberada! O cooldown foi zerado pela missão completa.");
+      toast("Timira liberada! Missão completa zerou o cooldown.", "level");
+    }
   }
 }
 
@@ -644,6 +668,31 @@ const BOSS_DEFS = {
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
+  // Timira the Many-Headed — boss das Nagas (Canary 15.x): 75.000 HP,
+  // 45.500 exp, mitigação 2.07, resist 10% em energy/fire/ice/death.
+  // Requisito: missão do mapa das Nagas (25 naga archer + 25 naga warrior +
+  // 25 makara). Ao completar a missão o cooldown de 16h é ZERADO; ao matá-la
+  // a missão volta a zero (precisa refazer para liberar de novo).
+  "timira-the-many-headed": {
+    id: "timira-the-many-headed",
+    name: "Timira the Many-Headed",
+    title: "Boss das Nagas (Marapur)",
+    hunt: "marapur-nagas",
+    baseMonster: "timira-the-many-headed",
+    sprite: "timira-the-many-headed",
+    hp: 75000,
+    exp: 45500,
+    damage: 600,
+    armor: 82,
+    defense: 60,
+    speed: 0.00007,
+    requirement: {
+      mission: "marapur-nagas",
+      text: "Matar 25 Naga Archer, 25 Naga Warrior e 25 Makara no mapa das Nagas",
+    },
+    cooldown: BOSS_COOLDOWN,
+    // loot: usa o do canary (merge do monsterdata na baseMonster)
+  },
   "ferumbras-mortal-shell": {
     id: "ferumbras-mortal-shell",
     name: "Ferumbras Mortal Shell",
@@ -663,6 +712,7 @@ const BOSS_DEFS = {
     loot: [
       { item: "gold-coin", chance: 100, max: 100 },
       { item: "platinum-coin", chance: 100, max: 25 },
+      { item: "silver-token", chance: 100, max: 3 },
       { item: "small-sapphire", chance: 10, max: 10 },
       { item: "small-emerald", chance: 10, max: 10 },
       { item: "small-amethyst", chance: 10, max: 10 },
@@ -710,6 +760,7 @@ const BOSS_DEFS = {
       { item: "ferumbras-amulet", chance: 0.8, max: 1 },
       { item: "death-gaze", chance: 0.1, max: 1 },
       { item: "ferumbras-hat", chance: 0.1, max: 1 },
+      { item: "gold-ingot", chance: 0.8, max: 1 },
     ],
   },
 };
@@ -831,20 +882,48 @@ function startBoss(id) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  // PARTY: membros (não líder) não podem entrar em boss — só o líder escolhe
+  // e leva a party (desde que TODOS tenham os requisitos, validado no server).
+  if (typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
+    toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe o boss.", "bad");
+    return;
+  }
   const ready = bossReadyInfo(G.p, boss);
   if (!ready.ok) { toast(ready.reason); return; }
   if (G.training) stopAcademy(false);
   if (G.combat) stopHunt();
   const st = bossState(G.p, id);
   st.lastFight = Date.now();
+  // Timira: ao entrar no boss a missão das Nagas volta a zero — para matá-la
+  // de novo é preciso refazer os 25/25/25 (completar a missão zera o CD).
+  if (id === "timira-the-many-headed") {
+    const mst = missionState(G.p, "marapur-nagas");
+    mst.progress = {};
+    mst.claimed = {};
+    mst.completeClaimed = false;
+  }
   G.p.hunt = null;
   G.p.instanceMode = "boss";
   G.combat = newBossCombat(G.p, boss);
   G.inCity = false;
   addLog("death", `Você entrou no boss <b>${boss.name}</b>. Cooldown iniciado: 16h.`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
-  // PARTY: líder entrou numa sala de boss -> membros são teleportados
-  if (typeof partyReportZone === "function") partyReportZone({ zone: "boss", boss: id });
+  // PARTY: líder entrou numa sala de boss -> o SERVIDOR valida os
+  // requisitos (cooldown + missão) de TODOS os membros antes do follow.
+  // Se alguém não puder, a party não entra (o servidor recusa o report).
+  if (typeof partyReportZone === "function") {
+    const info = { zone: "boss", boss: id, cooldownMs: boss.cooldown || 0 };
+    // requisitos de missão (ex.: Timira -> 25 nagas) para validar membros
+    if (boss.requirement && boss.requirement.mission) {
+      info.mission = boss.requirement.mission;
+      const mdef = missionForHunt(boss.requirement.mission);
+      if (mdef && mdef.tasks) {
+        info.missionTargets = {};
+        for (const t of mdef.tasks) info.missionTargets[t.monster] = t.target;
+      }
+    }
+    partyReportZone(info);
+  }
   renderAll();
 }
 
@@ -893,6 +972,12 @@ function startHunt(id, instanceMode) {
   const min = hu.minLevel || (hu.cat === "ferumbras-ascendant" ? 250 : 0);
   if (min && G.p && G.p.level < min) {
     toast(`Área bloqueada: requer nível ${min}+.`, "bad");
+    return;
+  }
+  // PARTY: membros (não líder) não podem entrar em hunt — só cidade/treino.
+  // O líder escolhe a hunt e leva a party junto (follow).
+  if (typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
+    toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe a hunt.", "bad");
     return;
   }
   if (!instanceMode) { openInstanceModal(id); return; }
@@ -1667,6 +1752,8 @@ function renderAll() {
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
+  // painel de party estilo OTC (canto superior direito da tela do jogo)
+  if (typeof renderPartyPanel === "function") renderPartyPanel(p);
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
   // removido — level e mana já têm as barras fixas do painel do personagem)
   if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);

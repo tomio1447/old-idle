@@ -129,10 +129,22 @@ function partyLeave(p) {
 
 /* ---------- Party Hunt Analyser (sessão da caçada) ---------- */
 
+/* Sessão do Analyser. Funciona nos DOIS modos: local (p.party.session,
+ * como antes) e ONLINE (p._partySession — a party vive no servidor, mas o
+ * Analyser é uma sessão local de caçada). */
+function partyAnalyserSession(p) {
+  if (!p) return null;
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return p._partySession || null;
+  }
+  ensureParty(p);
+  return p.party.session || null;
+}
+
 /* (Re)inicia a sessão ao entrar numa hunt. */
 function partyStartSession(p, huntId) {
-  ensureParty(p);
-  p.party.session = {
+  if (!p) return;
+  const s = {
     huntId: huntId || null,
     startedAt: Date.now(),
     endedAt: null,
@@ -141,14 +153,21 @@ function partyStartSession(p, huntId) {
     loot: 0,
     byMember: {},
   };
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    p._partySession = s;
+  } else {
+    ensureParty(p);
+    p.party.session = s;
+  }
 }
 
 /* Registra um kill: exp distribuída e loot, por membro. `memberId` null =
  * o líder. */
 function partyRecordKill(p, memberId, exp, lootCount, levelUps) {
-  ensureParty(p);
-  if (!p.party.session) partyStartSession(p, p.hunt || null);
-  const s = p.party.session;
+  if (!p) return;
+  let s = partyAnalyserSession(p);
+  if (!s) { partyStartSession(p, p.hunt || null); s = partyAnalyserSession(p); }
+  if (!s) return;
   s.kills = (s.kills || 0) + 1;
   s.exp = (s.exp || 0) + (exp || 0);
   s.loot = (s.loot || 0) + (lootCount || 0);
@@ -158,7 +177,8 @@ function partyRecordKill(p, memberId, exp, lootCount, levelUps) {
   b.kills += 1;
   b.loot += lootCount || 0;
   b.levelUps += levelUps || 0;
-  if (memberId) {
+  if (memberId && !(typeof partyOnlineMode === "function" && partyOnlineMode())) {
+    ensureParty(p);
     const m = p.party.members.find((x) => x.id === memberId);
     if (m) {
       m.expGained = (m.expGained || 0) + (exp || 0);
@@ -170,7 +190,7 @@ function partyRecordKill(p, memberId, exp, lootCount, levelUps) {
 
 /* Duração da sessão em ms. */
 function partySessionDuration(p) {
-  const s = p.party.session;
+  const s = partyAnalyserSession(p);
   if (!s) return 0;
   return (s.endedAt || Date.now()) - s.startedAt;
 }
@@ -222,9 +242,32 @@ function partyCanInviteNow() {
   return z.zone === "city" || z.zone === "training";
 }
 
+/* Estado online da party (servidor) espelhado no personagem. */
+function partyOnlineState() {
+  return (typeof G !== "undefined" && G && G.p) ? (G.p._partyOnline || null) : null;
+}
+
+/* O personagem atual é o LÍDER da party online? */
+function partyIsLeader() {
+  const st = partyOnlineState();
+  return !!(st && st.isLeader);
+}
+
+/* O personagem atual é MEMBRO (não líder) de uma party online? */
+function partyIsMember() {
+  const st = partyOnlineState();
+  return !!(st && !st.isLeader);
+}
+
+/* Jogadores em party NÃO podem entrar em hunt/boss — só cidade ou área de
+ * treino (regra do dono). Líder pode (ele leva a party junto). */
+function partyBlocksHunt() {
+  return partyOnlineMode() && partyIsMember();
+}
+
 /* Reporta a zona atual para o servidor (chamado a cada transição de mapa
- * nos hooks do game.js e no início do jogo). Só o líder altera o estado;
- * membros são ignorados pelo servidor (no-op). */
+ * nos hooks do game.js e no início do jogo). Só o líder altera o estado da
+ * party; membros só registram a própria zona (servidor). */
 async function partyReportZone(zoneInfo) {
   if (!partyOnlineMode()) return;
   try {
@@ -246,6 +289,7 @@ async function partySync() {
       G.p._partyOnline = st;
       if (!st) G.p._partyInvites = G.p._partyInvites || 0;
       if (typeof renderPartyButton === "function") renderPartyButton(G.p);
+      if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
     }
     // inbox (badge ✉) a cada 3 polls (~18s) — mantém leve
     PARTY_POLL_N += 1;
@@ -254,6 +298,7 @@ async function partySync() {
       if (inbox.ok && G && G.p) {
         G.p._partyInvites = (inbox.invites || []).length;
         if (typeof renderPartyButton === "function") renderPartyButton(G.p);
+        if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
       }
     }
     // FOLLOW: líder entrou em hunt/boss -> teleporta o membro junto

@@ -107,6 +107,12 @@ function check(cond, msg) {
   r = await api("POST", "/api/party/accept", { token: a3.token, invite_id: inviteId });
   check(r.code === 403, "conta errada não aceita convite");
 
+  console.log("== 8b. aceitar em zona proibida (hunt) -> 403 ==");
+  await api("POST", "/api/party/zone", { token: a2.token, char_id: c2.id, zone: "hunt", hunt: "rats" });
+  r = await api("POST", "/api/party/accept", { token: a2.token, invite_id: inviteId });
+  check(r.code === 403, "aceite bloqueado fora de cidade/treino (nova regra)");
+  await api("POST", "/api/party/zone", { token: a2.token, char_id: c2.id, zone: "city" });
+
   console.log("== 9. aceitar o convite do char c2 (depois de trocar de char) ==");
   r = await api("POST", "/api/party/accept", { token: a2.token, invite_id: inviteId });
   check(r.code === 200, "convite aceito com o personagem convidado");
@@ -117,6 +123,7 @@ function check(cond, msg) {
   const partyId = r.data.state.id;
 
   console.log("== 10. aceitar o 2º convite (mesma conta, outro char) ==");
+  await api("POST", "/api/party/zone", { token: a2.token, char_id: c2b.id, zone: "city" });
   r = await api("POST", "/api/party/accept", { token: a2.token, invite_id: inviteId2 });
   check(r.code === 200, "2º char da conta também entrou");
 

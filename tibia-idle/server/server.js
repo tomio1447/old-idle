@@ -129,7 +129,14 @@ async function saveCharacter(db, body, id) {
   const voc = body.voc || c.voc;
   const level = body.level || c.level;
   const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data || {});
-  await db.updateCharacter(id, voc, level, data);
+  // snapshots de vida/mana (o cliente manda hp/mp/maxHp/maxMp a cada save) —
+  // usados pelo painel de party para mostrar as barras dos membros
+  await db.updateCharacter(id, voc, level, data, {
+    hp: Math.max(0, Math.floor(Number(body.hp) || 0)),
+    mp: Math.max(0, Math.floor(Number(body.mp) || 0)),
+    max_hp: Math.max(0, Math.floor(Number(body.maxHp) || 0)),
+    max_mp: Math.max(0, Math.floor(Number(body.maxMp) || 0)),
+  });
   return { code: 200, body: { ok: true } };
 }
 

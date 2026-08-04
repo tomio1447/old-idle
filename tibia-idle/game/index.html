@@ -239,6 +239,18 @@
         <canvas id="scene"></canvas>
         <div id="stance-badge" class="stance-badge"></div>
         <div id="mission-box" class="mission-box" style="display:none"></div>
+        <!-- PARTY (OTC): painel fixo no canto superior direito da tela do
+             jogo — lista os personagens da party com level, outfit, HP e
+             mana; clicar num membro da sua conta troca de personagem. -->
+        <div id="party-panel" class="party-panel" style="display:none">
+          <div class="party-panel-head" id="party-panel-head">
+            <span>👥 PARTY</span>
+            <span class="spacer" style="flex:1"></span>
+            <span class="party-panel-count" id="party-panel-count"></span>
+            <span class="party-panel-arrow" id="party-panel-arrow">▾</span>
+          </div>
+          <div class="party-panel-body" id="party-panel-body"></div>
+        </div>
         <div id="combat-modes-strip" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);z-index:5"></div>
         <div id="player-states-strip" style="position:absolute;bottom:30px;left:4px;z-index:5"></div>
         <div id="topbar-stats" style="position:absolute;top:4px;left:4px;z-index:5;max-width:340px"></div>

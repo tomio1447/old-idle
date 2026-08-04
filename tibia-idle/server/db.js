@@ -83,20 +83,33 @@ JsonStore.prototype.findCharacter = function (id) {
 };
 JsonStore.prototype.createCharacter = function (accountId, name, voc, level, data) {
   const c = { id: this._nextId(this.characters), account_id: Number(accountId),
-              name, voc, level, data,
+              name, voc, level, data, zone: "unknown",
+              hp: 0, mp: 0, max_hp: 0, max_mp: 0,
               created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   this.characters.push(c);
   this._save();
   return c;
 };
-JsonStore.prototype.updateCharacter = function (id, voc, level, data) {
+JsonStore.prototype.updateCharacter = function (id, voc, level, data, extra) {
   const c = this.findCharacter(id);
   if (c) {
     c.voc = voc; c.level = level; c.data = data;
+    if (extra) {
+      if (extra.zone !== undefined) c.zone = extra.zone;
+      if (extra.hp !== undefined) c.hp = extra.hp;
+      if (extra.mp !== undefined) c.mp = extra.mp;
+      if (extra.max_hp !== undefined) c.max_hp = extra.max_hp;
+      if (extra.max_mp !== undefined) c.max_mp = extra.max_mp;
+    }
     c.updated_at = new Date().toISOString();
     this._save();
   }
   return c;
+};
+JsonStore.prototype.setCharacterZone = function (id, zone) {
+  const c = this.findCharacter(id);
+  if (c) { c.zone = zone; this._save(); return c; }
+  return null;
 };
 JsonStore.prototype._marketSeq = 1;
 JsonStore.prototype._nextOfferId = function () {
@@ -419,10 +432,24 @@ async function MysqlStore() {
         [Number(accountId), name, voc, level, data]);
       return { id: r.insertId, account_id: Number(accountId), name, voc, level, data };
     },
-    async updateCharacter(id, voc, level, data) {
+    async updateCharacter(id, voc, level, data, extra) {
+      extra = extra || {};
       await this.run(
-        "UPDATE characters SET voc = ?, level = ?, data = ? WHERE id = ?",
-        [voc, level, data, Number(id)]);
+        `UPDATE characters SET voc = ?, level = ?, data = ?,
+           zone = ?, hp = ?, mp = ?, max_hp = ?, max_mp = ?
+         WHERE id = ?`,
+        [voc, level, data,
+         extra.zone !== undefined ? extra.zone : "unknown",
+         extra.hp !== undefined ? extra.hp : 0,
+         extra.mp !== undefined ? extra.mp : 0,
+         extra.max_hp !== undefined ? extra.max_hp : 0,
+         extra.max_mp !== undefined ? extra.max_mp : 0,
+         Number(id)]);
+      return this.findCharacter(id);
+    },
+    async setCharacterZone(id, zone) {
+      await this.run("UPDATE characters SET zone = ? WHERE id = ?",
+        [zone, Number(id)]);
       return this.findCharacter(id);
     },
     async findAccountByToken(token) {
@@ -698,11 +725,26 @@ async function ensureSchema(pool) {
     voc VARCHAR(24) NOT NULL DEFAULT 'none',
     level INT UNSIGNED NOT NULL DEFAULT 1,
     data MEDIUMTEXT NOT NULL,
+    zone VARCHAR(16) NOT NULL DEFAULT 'unknown',
+    hp INT UNSIGNED NOT NULL DEFAULT 0,
+    mp INT UNSIGNED NOT NULL DEFAULT 0,
+    max_hp INT UNSIGNED NOT NULL DEFAULT 0,
+    max_mp INT UNSIGNED NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_characters_name (name)
   ) ENGINE=InnoDB`);
+  // colunas novas (migração de instalações antigas)
+  for (const col of [
+    "ADD COLUMN zone VARCHAR(16) NOT NULL DEFAULT 'unknown'",
+    "ADD COLUMN hp INT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN mp INT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN max_hp INT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN max_mp INT UNSIGNED NOT NULL DEFAULT 0",
+  ]) {
+    try { await pool.query("ALTER TABLE characters " + col); } catch (e) { /* já existe */ }
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS parties (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     leader_id INT UNSIGNED NOT NULL,
