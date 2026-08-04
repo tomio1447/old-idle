@@ -545,16 +545,34 @@ function renderEquip(p) {
  * (assets/ui/conditions/*.png, registrados em icondata.js).
  */
 
-/* ── Soul/Cap + Combat/Posture bars ── */
+/* ── Soul/Cap + Combat/Posture bars ──
+ * Sincronizadas com o modo REAL (fightMode/attackMode do config) e
+ * clicáveis — mesma lógica do strip do otc-hud. */
 function OTC_bars(p) {
   const max = maxStats(p);
   const sp = $("#soul-cap-panel");
   if (sp) sp.innerHTML = `<div class="soul-cap-box"><div class="sc-label">Soul</div><div class="sc-value">${p.soul||200}</div></div><div class="soul-cap-box"><div class="sc-label">Cap</div><div class="sc-value">${Math.floor(carriedWeight(p))} / ${Math.floor(max.cap)}</div></div>`;
+  const fight = p.config.fightMode||"attack";
   const cm = $("#combat-mode-bar");
-  if (cm) cm.innerHTML = [["attack","⚔","Full Attack"],["balanced","⚖","Balanced"],["defense","🛡","Full Defense"]].map(([id,ico,tt])=>`<div class="combat-mode-btn active" data-cmode="${id}" title="${tt}">${ico}</div>`).join("");
+  if (cm) {
+    cm.innerHTML = [["attack","⚔","Full Attack"],["balanced","⚖","Balanced"],["defense","🛡","Full Defense"]].map(([id,ico,tt])=>`<div class="combat-mode-btn ${id===fight?"active":""}" data-cmode="${id}" title="${tt}">${ico}</div>`).join("");
+    cm.querySelectorAll("[data-cmode]").forEach((b) => b.addEventListener("click", () => {
+      p.config.fightMode = b.dataset.cmode;
+      if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
+      renderEquip(p);
+    }));
+  }
   const mode = p.config.attackMode||"chase";
   const pb = $("#posture-bar");
-  if (pb) pb.innerHTML = [["stand","⏸","Stand"],["chase","👣","Chase"]].map(([id,ico,tt])=>`<div class="posture-btn ${id===mode?"active":""}" data-posture="${id}" title="${tt}">${ico}</div>`).join("");
+  if (pb) {
+    pb.innerHTML = [["stand","⏸","Stand"],["chase","👣","Chase"]].map(([id,ico,tt])=>`<div class="posture-btn ${id===mode?"active":""}" data-posture="${id}" title="${tt}">${ico}</div>`).join("");
+    pb.querySelectorAll("[data-posture]").forEach((b) => b.addEventListener("click", () => {
+      p.config.attackMode = b.dataset.posture;
+      if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
+      if (typeof renderHelper === "function") renderHelper(p);
+      renderEquip(p);
+    }));
+  }
 }
 
 function renderStatusBar(p) {
@@ -1200,6 +1218,7 @@ function renderLootPouch(p) {
   const box = $("#lootpouch");
   if (!box) return;
   p.lootPouch = p.lootPouch || {};
+  p.config = p.config || {};
   if (typeof bindDrop === "function" && !box.dataset.dropBound) {
     box.dataset.dropBound = "1";
     bindDrop(box, (payload) => {
@@ -1215,11 +1234,35 @@ function renderLootPouch(p) {
   const sellBtn = $("#btn-pouch-sell-all");
   if (sellBtn) sellBtn.disabled = !entries.some((s) =>
     !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0);
+  // Autoseller: vende TUDO automaticamente quando a pouch atingir X%.
+  // Respeita as regras do seller (lista "NÃO VENDER" e itens sem valor).
+  const asOn = !!p.config.pouchAutoSell;
+  const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
+  const asFill = pouchFillPct(p);
+  const asBox = `
+    <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
+        <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller</span>
+        <span class="tiny dim">pouch ${asFill}% / vende em ${asPct}%</span>
+        <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
+      </div>
+      <div class="row mt4" style="align-items:center;gap:6px">
+        <input type="range" id="pouch-autosell-pct" min="10" max="100" step="5" value="${asPct}"
+          style="flex:1" ${asOn ? "" : "disabled"}>
+        <span class="tiny" style="width:34px;text-align:right;color:#d4af37">${asPct}%</span>
+      </div>
+      <div class="tiny dim mt4">Quando a Loot Pouch atingir ${asPct}% da capacidade, tudo é vendido automaticamente (respeita "NÃO VENDER").</div>
+    </div>`;
+  const btnAs = $("#btn-pouch-autosell");
+  if (btnAs && !btnAs._bound) {
+    btnAs._bound = true;
+  }
   if (!entries.length) {
-    box.innerHTML = `<div class="dim small center" style="grid-column:1/-1;padding:10px">Loot Pouch vazia</div>`;
+    box.innerHTML = asBox + `<div class="dim small center" style="grid-column:1/-1;padding:10px">Loot Pouch vazia</div>`;
+    bindPouchAutoseller(p);
     return;
   }
-  box.innerHTML = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
+  box.innerHTML = asBox + `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
       Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · clique no item para as opções
     </div>` + entries.map((slug) =>
     `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""} ${itemClsBorder(slug)}" data-pouch-item="${slug}" draggable="true">
@@ -1250,6 +1293,36 @@ function renderLootPouch(p) {
     el.addEventListener("click", openMenu);
     el.addEventListener("contextmenu", openMenu);
   });
+  bindPouchAutoseller(p);
+}
+
+/* Liga o toggle + slider do Autoseller da Loot Pouch. */
+function bindPouchAutoseller(p) {
+  const btn = $("#btn-pouch-autosell");
+  const slider = $("#pouch-autosell-pct");
+  if (btn && !btn._bound) {
+    btn._bound = true;
+    btn.addEventListener("click", () => {
+      p.config.pouchAutoSell = !p.config.pouchAutoSell;
+      toast(p.config.pouchAutoSell
+        ? `Autoseller LIGADO — vende tudo com a pouch em ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct}%`
+        : "Autoseller desligado");
+      renderLootPouch(p);
+    });
+  }
+  if (slider && !slider._bound) {
+    slider._bound = true;
+    slider.addEventListener("input", () => {
+      p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;
+      // atualiza o rótulo sem re-renderizar (evita perder o arrasto)
+      const label = slider.parentElement && slider.parentElement.querySelector("span.tiny");
+      if (label) label.textContent = p.config.pouchAutoSellPct + "%";
+    });
+    slider.addEventListener("change", () => {
+      p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;
+      renderLootPouch(p);
+    });
+  }
 }
 
 /* Menu de opções de um item do Loot Pouch */
@@ -1690,15 +1763,21 @@ function renderHelper(p) {
         <input id="helper-heal-item-at" type="number" min="1" max="99" value="${p.config.healItemAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
+      <div class="row mt8 mb4" style="justify-content:space-between;align-items:center">
+        <span class="small ${p.config.noPotions ? "" : "dim"}" style="${p.config.noPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions</span>
+        <button class="sm ${p.config.noPotions ? "danger" : ""}" id="helper-no-potions" title="Desliga todas as potions (HP e mana) — o personagem passa a usar só magias">
+          ${p.config.noPotions ? "ATIVADO — reativar" : "NÃO USAR POTIONS"}
+        </button>
+      </div>
       <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
-      <div class="list" style="max-height:210px">${healSup.map(supplyRow).join("")}</div>
+      <div class="list" style="max-height:210px;${p.config.noPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map(supplyRow).join("")}</div>
       <div class="mt8">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
-      <div class="list" style="max-height:210px">${manaSup.map(supplyRow).join("")}</div>`;
+      <div class="list" style="max-height:210px;${p.config.noPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map(supplyRow).join("")}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -1719,6 +1798,14 @@ function renderHelper(p) {
       toast(`Spell de cura selecionada: <b>${SPELLS[p.config.healSpell].name}</b>`);
       renderHelper(p);
     }));
+    const noPotBtn = $("#helper-no-potions");
+    if (noPotBtn) noPotBtn.addEventListener("click", () => {
+      p.config.noPotions = !p.config.noPotions;
+      toast(p.config.noPotions
+        ? "Potions desativadas — o personagem passa a usar só magias"
+        : "Potions reativadas");
+      renderHelper(p);
+    });
     $$("#helper-heal [data-use-supply]").forEach((b) => b.addEventListener("click", () => {
       const slug = b.dataset.useSupply;
       const s = SUPPLIES[slug];

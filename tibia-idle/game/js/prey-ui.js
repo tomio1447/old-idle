@@ -147,14 +147,17 @@ function openPreyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
   ensurePrey(p);
-  $("#modal-body").innerHTML = `<div class="panel-title">🐾 Sistema de Prey
+  // Janela estilo OTClient: título na faixa superior do modal (border-top)
+  // e conteúdo com fundo de painel próprio — legível e fiel ao client.
+  $("#modal-body").innerHTML = `<div class="otc-win-title">🐾 Prey
       <span style="flex:1"></span>
-      <button class="sm" id="prey-close">✕</button>
+      <span class="tiny dim" id="prey-hint">bônus por 2h · reroll grátis a cada 20h</span>
+      <button class="otc-win-x" id="prey-close" title="Fechar">✕</button>
     </div>
-    <div class="panel-body"><div id="prey-content"></div></div>`;
-  $("#modal").classList.add("show", "wide");
+    <div class="otc-win-body"><div id="prey-content"></div></div>`;
+  $("#modal").classList.add("show", "wide", "modal-otc");
   $("#prey-close").addEventListener("click", () => {
-    $("#modal").classList.remove("show", "wide");
+    $("#modal").classList.remove("show", "wide", "modal-otc");
   });
   renderPreyModal(p);
 }

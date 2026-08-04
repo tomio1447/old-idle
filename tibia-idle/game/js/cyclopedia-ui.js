@@ -33,8 +33,9 @@ function openCyclopedia(aba) {
     </div>`;
   $("#modal").classList.add("show");
   $("#modal").classList.add("wide");
+  $("#modal").classList.add("modal-cyclo");
   $("#cyclo-close").addEventListener("click", () => {
-    $("#modal").classList.remove("show", "wide");
+    $("#modal").classList.remove("show", "wide", "modal-cyclo");
   });
   renderCycloTabs();
   renderCycloContent();

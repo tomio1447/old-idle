@@ -193,7 +193,10 @@ function renderForgeTransferPanel(p, donorRef) {
     htmlTargets += forgeClientItemTile(t.slug, '', FORGE_UI.targetSlug === t.ref ? 'sel' : '',
       'data-transfer-target="' + t.ref + '" title="' + t.it.n + '"', 34);
   }
-  htmlTargets += targets.length ? '</div>' : '<div class="forge-client-empty">No target item without tier.</div>';
+  // FIX: quando não há alvo, o target-grid precisa fechar — antes o </div>
+  // faltava e o painel "Further Items" caía DENTRO do select-row (grade
+  // 60px), estourando a janela da transfer.
+  htmlTargets += targets.length ? '</div>' : '<div class="forge-client-empty">No target item without tier.</div></div>';
   return ''
     + '<div class="forge-client-section-title">Select Item For Transfer</div>'
     + '<div class="forge-client-select-row transfer">'

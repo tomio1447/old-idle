@@ -690,4 +690,145 @@ input:focus, textarea:focus, select:focus {
 .mb4 { margin-bottom: 4px; }
 .mb8 { margin-bottom: 8px; }
 .full { width: 100%; }
-.wide { max-width: 720px; }
+.wide:not(.modal-bg) { max-width: 720px; }
+
+/* ════════════════════════════════════════════════════════════════
+   AJUSTES E FIXES (2026-08-03)
+   Janelas OTC, modais, forja, missões, quiver, munição e autoseller
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Janela OTClient: título na faixa superior + corpo do painel ── */
+.otc-win-title {
+  position: absolute; top: -25px; left: 10px; right: 10px;
+  height: 23px; display: flex; align-items: center; gap: 6px;
+  color: #fff; font-weight: bold; font-size: 12px;
+  letter-spacing: .5px; text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+.otc-win-title button, .otc-win-title .sm { pointer-events: auto; }
+.otc-win-x {
+  pointer-events: auto;
+  width: 20px; height: 18px; line-height: 16px; text-align: center;
+  color: #fff; background: rgba(255,255,255,.08); border: 1px solid #000;
+  border-radius: 2px; cursor: pointer; font-size: 11px;
+}
+.otc-win-x:hover { background: rgba(255,80,80,.45); }
+.otc-win-body {
+  background: var(--otc-panel-2, #1e2128);
+  border: 1px solid var(--otc-border-out, #3a3d46);
+  border-radius: 0 0 4px 4px;
+  padding: 10px;
+  max-height: 78vh; overflow-y: auto;
+}
+
+/* ── Prey: modal largo estilo OTC ── */
+.modal-bg.modal-otc .modal { width: min(1000px, 97vw); }
+.modal-bg.modal-otc .otc-win-body { font-size: 12px; color: var(--otc-text-bright); }
+.modal-bg.modal-otc .prey-slot { background: rgba(0,0,0,.28); }
+.modal-bg.modal-otc .prey-slot-head { font-size: 12px; }
+
+/* ── Cyclopedia: modal bem maior (cabe tudo sem cortar) ── */
+.modal-bg.modal-cyclo .modal { width: min(1180px, 98vw); }
+.modal-bg.modal-cyclo .cyclo-wrap { min-height: 74vh; }
+.modal-bg.modal-cyclo .cyclo-content { max-height: 74vh; }
+.modal-bg.modal-cyclo .cyclo-tabs { width: 150px; }
+
+/* ── Forja: sem o fundo do modal OTC em volta (janela própria) ──
+ * O #modal recebe a classe forge-modal-shell (é o próprio overlay);
+ * o #modal-body (classe .modal) é o painel interno que precisa ficar
+ * transparente para o .forge-client aparecer como janela única. */
+.modal-bg.forge-modal-shell {
+  background: rgba(0,0,0,.88);
+  padding: 10px;
+}
+.modal-bg.forge-modal-shell .modal {
+  width: auto !important;
+  max-width: 98vw;
+  max-height: none;
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible;
+}
+.modal-bg.forge-modal-shell .modal::before { display: none; }
+.forge-client { width: 560px; }
+.forge-client-res-inline {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding: 4px 6px; margin-bottom: 4px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08); border-radius: 3px;
+  font-size: 11px; color: #d8d8d8;
+}
+.forge-client-res-inline img { image-rendering: pixelated; }
+
+/* Forja — Transfer: itens da grade nunca estouram o modal */
+.forge-client-select-row > *,
+.forge-client-further > * { min-width: 0; }
+.forge-client-rate-row { min-width: 0; gap: 4px; }
+.forge-client-rate-row b {
+  display: inline-block; max-width: 100%;
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+}
+.forge-client-further.transfer { grid-template-columns: 96px 1fr 118px; }
+.forge-client-item-list { overflow-x: hidden; }
+.forge-client-desc p { overflow-wrap: anywhere; }
+
+/* ── Missões: botão FINALIZAR no cabeçalho ── */
+.mission-head #mission-finish {
+  font-size: 9px; padding: 2px 8px; line-height: 14px;
+  background: linear-gradient(180deg, #7ae87a, #2e7d2e);
+  color: #04120a; font-weight: bold; border: 1px solid #0a2b12;
+  border-radius: 3px; cursor: pointer; flex: none;
+}
+.mission-head #mission-finish:hover { filter: brightness(1.15); }
+
+/* ── Painel de munição do paladino (quiver) ── */
+.quiver-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px; margin-bottom: 8px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 3px;
+}
+.quiver-slot {
+  width: 42px; height: 42px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: #1b1915; border: 2px solid;
+  border-color: #16140f #5a5348 #5a5348 #16140f;
+}
+.quiver-slot img { max-width: 36px; max-height: 36px; object-fit: contain; image-rendering: pixelated; }
+
+/* ── Barras de combate/postura do paperdoll (OTC_bars) ── */
+.combat-mode-bar, #combat-mode-bar { display: flex; gap: 3px; margin-top: 4px; }
+.combat-mode-btn, .posture-btn {
+  flex: 1; padding: 3px 0; text-align: center; cursor: pointer;
+  font-size: 12px; line-height: 1;
+  background: #23262d; color: #c8c8c8;
+  border: 1px solid #3a3f4a; border-radius: 3px;
+}
+.combat-mode-btn:hover, .posture-btn:hover { background: #2f333c; }
+.combat-mode-btn.active, .posture-btn.active {
+  background: linear-gradient(180deg, #d4af37, #8a6a2a);
+  color: #14100a; font-weight: bold; border-color: #5a4a1a;
+}
+.posture-bar, #posture-bar { display: flex; gap: 3px; margin-top: 3px; }
+
+/* ── Munição/flechas: nunca distorcer (object-fit contain) ── */
+.item-row img { object-fit: contain; }
+.shop-row img { object-fit: contain; }
+
+/* ── Loot Pouch: painel do Autoseller ── */
+.pouch-autoseller {
+  margin: 0 0 6px; padding: 6px 8px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 4px;
+}
+.pouch-autoseller.on {
+  background: rgba(60,140,60,.12);
+  border-color: rgba(120,220,120,.45);
+}
+.pouch-autoseller input[type="range"] {
+  accent-color: #d4af37; cursor: pointer;
+}
+.pouch-autoseller input[type="range"]:disabled { opacity: .4; cursor: default; }

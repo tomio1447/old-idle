@@ -121,6 +121,9 @@ function newPlayer(name, voc, sex) {
       barMode: "bars",      // bars | arcs
       lootFilter: "all",    // all | valuable | equip
       missionCollapsed: false,
+      noPotions: false,
+      pouchAutoSell: false,
+      pouchAutoSellPct: 80,
       refillArrow: "",      // arrow selecionada
       refillBolt: "",       // bolt selecionada
     },

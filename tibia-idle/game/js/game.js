@@ -141,6 +141,9 @@ function normalizePlayer(p) {
     shooterSpell: "",
     shooterRune: "",
     missionCollapsed: false,
+    noPotions: false,          // Helper: "NÃO USAR POTIONS"
+    pouchAutoSell: false,     // Loot Pouch: autoseller ligado/desligado
+    pouchAutoSellPct: 80,     // Loot Pouch: % de enchimento p/ vender tudo
     spellAttack: true,
     autoRetreat: true,
     barMode: "bars",
@@ -528,14 +531,19 @@ function renderMission() {
   const huntId = G.combat.huntId;
   const def = missionForHunt(huntId);
   if (!def) { box.style.display = "none"; return; }
+  // missão já finalizada: some de vez da tela
+  G.p.missionsDone = G.p.missionsDone || {};
+  if (G.p.missionsDone[huntId]) { box.style.display = "none"; return; }
   const st = missionState(G.p, huntId);
   const collapsed = !!G.p.config.missionCollapsed;
   const totalDone = def.tasks.filter((t) => (st.progress[t.monster] || 0) >= t.target).length;
+  const completa = totalDone >= def.tasks.length;
   box.style.display = "block";
   box.innerHTML = `
     <div class="mission-head" id="mission-toggle">
       <span>${collapsed ? "▸" : "▾"}</span><span>${def.title}</span>
       <span class="spacer"></span><span>${totalDone}/${def.tasks.length}</span>
+      ${completa ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão e remover do painel">FINALIZAR</button>` : ""}
     </div>
     ${collapsed ? "" : `<div class="mission-body">
       ${def.tasks.map((t) => {
@@ -549,11 +557,28 @@ function renderMission() {
         </div>`;
       }).join("")}
       <div class="mission-reward">Final: ${rewardText(def.completeReward)}</div>
+      ${completa ? `<div class="mission-reward" style="color:#9ce84a;margin-top:6px">✅ Missão completa! Clique em FINALIZAR para removê-la do painel.</div>` : ""}
     </div>`}`;
-  $("#mission-toggle").addEventListener("click", () => {
-    G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
-    renderMission();
-  });
+  // Delegação de eventos no CONTAINER (uma vez só): o clique continua
+  // funcionando mesmo quando renderAll() re-renderiza o conteúdo durante
+  // a caçada (cada kill recria o HTML interno — antes o listener morria
+  // junto e o minimizar parava de responder).
+  if (!box._missionBound) {
+    box._missionBound = true;
+    box.addEventListener("click", (e) => {
+      // FINALIZAR vem ANTES do toggle: o botão fica dentro do cabeçalho
+      // (que é o #mission-toggle), então a checagem precisa ser primeiro
+      if (e.target.closest && e.target.closest("#mission-finish")) {
+        G.p.missionsDone = G.p.missionsDone || {};
+        G.p.missionsDone[huntId] = true;
+        addLog("info", `Missão <b>${def.title}</b> finalizada.`);
+        renderMission();
+      } else if (e.target.closest && e.target.closest("#mission-toggle")) {
+        G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
+        renderMission();
+      }
+    });
+  }
 }
 
 function isMissionComplete(p, huntId) {
@@ -1244,6 +1269,15 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+/* Loot Pouch: nível de enchimento (0-100%) para o Autoseller.
+ * Capacidade fixa de 100 unidades — o slider escolhe em quantos % dispara. */
+function pouchFillPct(p) {
+  const cap = 100;
+  let units = 0;
+  for (const slug in (p.lootPouch || {})) units += p.lootPouch[slug] || 0;
+  return Math.min(100, Math.round((units / cap) * 100));
+}
+
 function loop(ts) {
   requestAnimationFrame(loop);
   if (!G.p) return;
@@ -1286,6 +1320,24 @@ function loop(ts) {
       updateCombatMovement(G.combat, G.p, dt);
     }
     drainEvents();
+    // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido no
+    // painel, vende TUDO automaticamente (respeitando "Não vender" e itens
+    // sem valor). Checagem espaçada (2s) para não rodar a cada frame.
+    if (G.p && G.p.config && G.p.config.pouchAutoSell &&
+        typeof sellAllPouch === "function") {
+      G._pouchTick = (G._pouchTick || 0) + dt;
+      if (G._pouchTick >= 2000) {
+        G._pouchTick = 0;
+        const pct = pouchFillPct(G.p);
+        if (pct >= (G.p.config.pouchAutoSellPct || 80)) {
+          const r = sellAllPouch(G.p);
+          if (r.kinds) {
+            addLog("sell", `Autoseller: Loot Pouch em <b>${pct}%</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
+            if (typeof renderLootPouch === "function") renderLootPouch(G.p);
+          }
+        }
+      }
+    }
     if (G.combat && G.combat.dead && Date.now() >= G.combat.deadUntil) {
       // Revive: jogador renasce no mesmo ponto que morreu
       const c = G.combat;
