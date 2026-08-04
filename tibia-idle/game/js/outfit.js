@@ -13,7 +13,8 @@
 /* paleta oficial de outfit do Tibia (96 cores) */
 const OUTFIT_PALETTE = ["#ffffff","#ffd4bf","#ffe9bf","#ffffbf","#e9ffbf","#d4ffbf","#bfffbf","#bfffd4","#bfffe9","#bfffff","#bfe9ff","#bfd4ff","#bfbfff","#d4bfff","#e9bfff","#ffbfff","#ffbfe9","#ffbfd4","#ffbfbf","#dadada","#bf9f8f","#bfaf8f","#bfbf8f","#afbf8f","#9fbf8f","#8fbf8f","#8fbf9f","#8fbfaf","#8fbfbf","#8fafbf","#8f9fbf","#8f8fbf","#9f8fbf","#af8fbf","#bf8fbf","#bf8faf","#bf8f9f","#bf8f8f","#b6b6b6","#bf7f5f","#bfaf8f","#bfbf5f","#9fbf5f","#7fbf5f","#5fbf5f","#5fbf7f","#5fbf9f","#5fbfbf","#5f9fbf","#5f7fbf","#5f5fbf","#7f5fbf","#9f5fbf","#bf5fbf","#bf5f9f","#bf5f7f","#bf5f5f","#919191","#bf6a3f","#bf943f","#bfbf3f","#94bf3f","#6abf3f","#3fbf3f","#3fbf6a","#3fbf94","#3fbfbf","#3f94bf","#3f6abf","#3f3fbf","#6a3fbf","#943fbf","#bf3fbf","#bf3f94","#bf3f6a","#bf3f3f","#6d6d6d","#bf5500","#bfaa00","#bfbf00","#aabf00","#55bf00","#00bf00","#00bf55","#00bfaa","#00bfbf","#00aabf","#0055bf","#0000bf","#5500bf","#aa00bf","#bf00bf","#bf00aa","#bf0055","#bf0000","#484848"];
 
-/* cores padrão por vocação (head, body, legs, feet) — as clássicas do 7.4 */
+/* cores padrão por vocação (head, body, legs, feet) — as clássicas do
+ * client (paleta do Canary 15.x, ver tools/colorize_monsters_canary.py) */
 const DEFAULT_OUTFIT_COLORS = {
   knight:   [95, 116, 116, 95],
   paladin:  [78, 68, 58, 76],

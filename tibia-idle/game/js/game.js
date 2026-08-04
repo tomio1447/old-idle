@@ -892,20 +892,16 @@ function drainEvents() {
   for (const e of c.events) {
     switch (e.t) {
       case "hit": {
-        // Dano fisico tem cor e efeito conforme a RACA do alvo (o switch de
-        // COMBAT_PHYSICALDAMAGE do servidor): bicho de sangue mostra numero
-        // vermelho e respingo de sangue, morto-vivo mostra cinza. Os demais
-        // elementos tem cor propria e nao dependem da raca.
+        // Cor do NUMERO de dano: o fisico e sempre CINZA (cor nativa do
+        // Tibia no game window), independente da raca do alvo. A raca ainda
+        // define o EFEITO (respingo de sangue, poeira, etc.) — mas o numero
+        // nao muda mais para vermelho escuro em criatura de sangue.
         const raca = (e.el === "physical" || !e.el)
           ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
           : null;
-        // Exori (golpe de skill fisico do Knight): o numero do dano fisico
-        // sai VERMELHO VIVO (cor do elemento), como os demais golpes fisicos,
-        // e nao a cor da raca do alvo (que vinha em vermelho escuro).
-        const col = e.exori
-          ? "#c8c8c8"   // exori: dano CINZA (o vermelho vivo era do elemento físico)
-          : (raca ? raca.color
-                  : (ELEMENTS[e.el] || ELEMENTS.physical).color);
+        const col = (e.el === "physical" || !e.el)
+          ? (ELEMENTS.physical.color)   // dano fisico: CINZA nativo
+          : (ELEMENTS[e.el] || ELEMENTS.physical).color;
         // `dual` marca a parte elemental de uma arma que bate nos dois
         // tipos: desloca o numero para o lado para nao ficar por cima do
         // numero fisico, ja que os dois saem no mesmo instante e tile.

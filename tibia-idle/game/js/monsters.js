@@ -2,9 +2,10 @@
  * monsters.js — funde o catalogo de monstros do Canary em GAMEDATA.monsters.
  *
  * Os 91 monstros do jogo vinham de tools/build_monsters.py, uma tabela
- * escrita a mao com stats "aproximados do Tibia 7.4": HP, exp, dano e
- * armadura eram estimativas, o loot era uma lista curta inventada e nenhum
- * bicho tinha habilidade — todos apenas batiam de perto.
+ * escrita a mao com stats aproximados: HP, exp, dano e armadura eram
+ * estimativas, o loot era uma lista curta inventada e nenhum bicho tinha
+ * habilidade — todos apenas batiam de perto. (Agora o catalogo vem do
+ * Canary 15.x via tools/import_monsters.py.)
  *
  * MONSTERDATA (tools/import_monsters.py) traz os 1655 monstros que o
  * servidor executa de verdade, com habilidades, defesas, resistencias, loot

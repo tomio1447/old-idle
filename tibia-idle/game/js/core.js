@@ -1,6 +1,6 @@
 /*
  * core.js — regras do Tibia Idle (formulas de XP, vocacao, combate e loot)
- * Baseado nas formulas reais do Tibia 7.4.
+ * Formulas baseadas no 15.x / Canary (ver tools/import_* e CANARYDATA).
  */
 "use strict";
 
@@ -287,20 +287,20 @@ function fisicoPorRaca(raca) {
 }
 
 /* Paleta oficial de texto de dano do client (game.cpp do TFS/Canary):
- *  physical RED · fire ORANGE · energy ELECTRICPURPLE · earth LIGHTGREEN
+ *  physical GRAY · fire ORANGE · energy ELECTRICPURPLE · earth LIGHTGREEN
  *  ice SKYBLUE · holy YELLOW · death DARKRED. O death era ROXO aqui
  *  (#8a5aa8, batendo com energy) — corrigido para o vermelho escuro
  *  oficial e o sprite "mort-area" (a nuvem preta de caveiras). */
 /* Cores e efeitos por tipo de dano — tabela oficial da TibiaWiki
  * (https://tibia.fandom.com/wiki/Damage#Damage_Colors):
- *   Físico = Vermelho | Terra = Verde | Fogo = Laranja | Energia = Roxo
+ *   Físico = Cinza | Terra = Verde | Fogo = Laranja | Energia = Roxo
  *   Gelo = Azul-mar | Morte = Vermelho-escuro | Sagrado = Amarelo
  *   Afogamento = Ciano | Mana Drain = Azul | Life Drain = Vermelho
  *   Agony = Marrom (true damage: não pode ser mitigado nem reduzido).
  * `armorReduces` documenta o que a Armor reduz (só físico); `trueDamage`
  * marca o Agony, que ignora todas as reduções. */
 const ELEMENTS = {
-  physical: { name: "Físico", color: "#ff3c3c", fx: "draw-blood", armorReduces: true },
+  physical: { name: "Físico", color: "#a0a0a0", fx: "draw-blood", armorReduces: true },
   fire:     { name: "Fogo",   color: "#ff8a3c", fx: "hit-by-fire" },
   ice:      { name: "Gelo",   color: "#7ec8ff", fx: "ice-attack" },
   energy:   { name: "Energia",color: "#c07cff", fx: "energy-damage" },

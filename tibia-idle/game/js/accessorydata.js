@@ -66,20 +66,17 @@
       invis: 1,
     },
     "crystal-ring": {
-      desc: "Anel de cristal (magic level +1).",
-      mag: 1,
+      desc: "Anel de cristal (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "star-ring": {
       desc: "Anel estrela (regeneração mais rápida).",
       hpreg: 5, mpreg: 6,
     },
     "gold-ring": {
-      desc: "Anel de ouro (regeneração leve).",
-      hpreg: 1, mpreg: 1,
+      desc: "Anel de ouro (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "wedding-ring": {
-      desc: "Aliança de casamento (regeneração leve).",
-      hpreg: 1,
+      desc: "Aliança de casamento (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "butterfly-ring": {
       desc: "Anel borboleta (arm 2, proteção morte +3%).",
@@ -125,12 +122,10 @@
       charges: 200, res: { manadrain: 30 }, lvl: 80,
     },
     "ring-of-the-sky": {
-      desc: "Anel do céu (magic level +2, regen de mana +4).",
-      mag: 2, mpreg: 4,
+      desc: "Anel do céu (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "ring-of-wishes": {
-      desc: "Anel dos desejos (magic level +3, regen +3/+3).",
-      mag: 3, hpreg: 3, mpreg: 3,
+      desc: "Anel dos desejos (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "ring-of-ending": {
       desc: "Anel do fim (item de quest).",
@@ -176,8 +171,7 @@
       charges: 5, res: { physical: 80, death: 80 },
     },
     "ancient-amulet": {
-      desc: "Amuleto antigo (magic level +1, proteção +10%).",
-      mag: 1, prot: 10,
+      desc: "Amuleto antigo (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "bronze-amulet": {
       desc: "Amuleto de bronze (proteção mana drain +20%). 200 cargas.",
@@ -188,8 +182,7 @@
       charges: 200, res: { earth: 10 },
     },
     "golden-amulet": {
-      desc: "Amuleto dourado (proteção +20%).",
-      prot: 20,
+      desc: "Amuleto dourado (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "platinum-amulet": {
       desc: "Amuleto de platina (arm 2).",
@@ -208,8 +201,7 @@
       prot: 16,
     },
     "starlight-amulet": {
-      desc: "Amuleto de luz estelar (arm 3, magic level +4, proteção +12%).",
-      arm: 3, mag: 4, prot: 12,
+      desc: "Amuleto de luz estelar (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "elven-amulet": {
       desc: "Amuleto élfico (proteção +5% em todos os elementos). 50 cargas.",
@@ -218,12 +210,10 @@
              holy: 5, death: 5 },
     },
     "crystal-necklace": {
-      desc: "Colar de cristal (proteção +12%).",
-      prot: 12,
+      desc: "Colar de cristal (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "ruby-necklace": {
-      desc: "Colar de rubi (proteção +14%).",
-      prot: 14,
+      desc: "Colar de rubi (item decorativo — sem atributos, como no items.xml do Canary).",
     },
     "dragon-necklace": {
       desc: "Colar de dragão (proteção fogo +8%). 200 cargas.",
