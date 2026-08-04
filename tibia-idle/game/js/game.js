@@ -864,7 +864,7 @@ function drainEvents() {
         // sai VERMELHO VIVO (cor do elemento), como os demais golpes fisicos,
         // e nao a cor da raca do alvo (que vinha em vermelho escuro).
         const col = e.exori
-          ? (ELEMENTS.physical || ELEMENTS.physical).color
+          ? "#c8c8c8"   // exori: dano CINZA (o vermelho vivo era do elemento físico)
           : (raca ? raca.color
                   : (ELEMENTS[e.el] || ELEMENTS.physical).color);
         // `dual` marca a parte elemental de uma arma que bate nos dois

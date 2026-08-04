@@ -12,28 +12,50 @@
 
 const TileSprites = {
   cache: {},
-  get(id) {
-    if (this.cache[id] !== undefined) return this.cache[id];
+  /* Duração de cada frame da animação (ms) — padrão do client (10fps) */
+  ANIM_DUR: 120,
+  _anim(id) {
+    return (typeof TILE_ANIM !== "undefined" && TILE_ANIM[id]) || null;
+  },
+  /* Frame atual da animação do id (0 para estático) */
+  frameFor(id) {
+    const a = this._anim(id);
+    if (!a || !a.af) return 0;
+    return Math.floor(performance.now() / this.ANIM_DUR) % a.af;
+  },
+  get(id, frame) {
+    const a = this._anim(id);
+    const key = a ? id + "_" + frame : id;
+    if (this.cache[key] !== undefined) return this.cache[key];
     const img = new Image();
     const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-    img.src = "assets/tiles/" + id + ".png?v=" + v;
-    img.onerror = () => { this.cache[id] = null; };
-    this.cache[id] = img;
+    img.src = a
+      ? "assets/tiles/" + id + "_anim.png?v=" + v
+      : "assets/tiles/" + id + ".png?v=" + v;
+    img.onerror = () => { this.cache[key] = null; };
+    this.cache[key] = img;
     return img;
   },
   /* desenha o tile esticado num quadrado size x size (chao) */
   draw(ctx, id, sx, sy, size) {
-    const img = this.get(id);
+    const a = this._anim(id);
+    const fr = a ? this.frameFor(id) : 0;
+    const img = this.get(id, fr);
     if (img && img.complete && img.naturalWidth) {
       const scale = size / 32;
-      const w = img.naturalWidth * scale;
-      const h = img.naturalHeight * scale;
+      const w = (a ? a.aw : img.naturalWidth) * scale;
+      const h = (a ? a.ah : img.naturalHeight) * scale;
       // Ancorar pelo bottom-right (ou top-left)?
       // No Tibia sprites maiores q 32x32 geralmente espalham pra cima e pra esquerda.
       // Entao sx e sy sao a celula base (32x32 do chao).
       const dx = sx - (w - size);
       const dy = sy - (h - size);
-      ctx.drawImage(img, dx, dy, w + (scale>1?0:1), h + (scale>1?0:1));
+      if (a) {
+        // recorta o frame atual dentro da strip <id>_anim.png
+        ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
+      } else {
+        ctx.drawImage(img, dx, dy, w + (scale>1?0:1), h + (scale>1?0:1));
+      }
       return true;
     }
     return false;
@@ -41,11 +63,19 @@ const TileSprites = {
   /* desenha item alinhado pela base do tile — deco maior que 32px "sobe",
    * como o client oficial ancora objetos empilhaveis */
   drawDeco(ctx, id, sx, sy, size) {
-    const img = this.get(id);
+    const a = this._anim(id);
+    const fr = a ? this.frameFor(id) : 0;
+    const img = this.get(id, fr);
     if (!img || !img.complete || !img.naturalWidth) return false;
     const k = size / 32;
-    const w = img.naturalWidth * k, h = img.naturalHeight * k;
-    ctx.drawImage(img, sx + (size - w) / 2, sy + size - h, w, h);
+    const w = (a ? a.aw : img.naturalWidth) * k;
+    const h = (a ? a.ah : img.naturalHeight) * k;
+    if (a) {
+      ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah,
+                    sx + (size - w) / 2, sy + size - h, w, h);
+    } else {
+      ctx.drawImage(img, sx + (size - w) / 2, sy + size - h, w, h);
+    }
     return true;
   },
 };

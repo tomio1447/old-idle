@@ -12,6 +12,9 @@ Orquestra todo o pipeline de migracao para os assets 15.x-with-8.60:
                              (colisao do runtime) a partir do MESMO .dat
   4. consolidate_css.py      regera css/layout.css (mescla dos 3 CSS base)
                              e garante que o index.html aponta para ele
+  5. extract_tile_anims.py   strips <id>_anim.png dos tiles do mapa (itens
+                             do RME/OTBM com animacao no dat) + tileanimdata.js
+                             — o mapa fica animado (tocas, agua, fogo...)
 
 Pre-requisitos (uma unica vez):
   * Baixe de https://github.com/Levi999x/15.x-with-8.60 :
@@ -28,6 +31,7 @@ Uso:
 
     python3 migracao_15x.py --skip-extract --skip-import   # so RME + CSS
     python3 migracao_15x.py --skip-rme --skip-css          # so sprites+itens
+    python3 migracao_15x.py --skip-tile-anims              # pula anim. de tiles
 
 Saidas:
   * tibia-idle/game/assets/...            PNGs reais 15.x (mesmos nomes)
@@ -79,6 +83,7 @@ def main():
     ap.add_argument("--skip-import", action="store_true")
     ap.add_argument("--skip-rme", action="store_true")
     ap.add_argument("--skip-css", action="store_true")
+    ap.add_argument("--skip-tile-anims", action="store_true")
     a = ap.parse_args()
 
     if not a.skip_extract and not a.tibia860:
@@ -125,6 +130,15 @@ def main():
         run(("[4/4] Consolidando CSS base -> css/layout.css",
              "consolidate_css.py"), env)
         resumo.append("CSS: layout.css consolidado (3 arquivos -> 1)")
+
+    if not a.skip_tile_anims:
+        if not a.tibia860:
+            print("\n[5/5] ATENCAO: sem --tibia860 — pulando animacao de tiles.")
+        else:
+            run(("[5/5] Gerando animacoes dos tiles do mapa (RME/OTBM) -> "
+                 "assets/tiles/*_anim.png + tileanimdata.js",
+                 "extract_tile_anims.py"), env)
+            resumo.append("tiles: *_anim.png + tileanimdata.js (mapa animado)")
 
     print("\n" + "=" * 72)
     print("MIGRACAO CONCLUIDA")

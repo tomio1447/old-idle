@@ -19,7 +19,7 @@ window.FX_OFFICIAL_ALIASES = {
   "fist-thousand": "thousand-fist-effect",
   "forked-glacier": "forked-glacier-effect",
   "forked-thorns": "forked-thorns-effect",
-  "hit-area": "attack-effect-red",
+  "hit-area": "explosion-hit-white",   // exori: estouro CINZA (era vermelho)
   "hit-by-fire": "bloody-fire-effect",
   "holy-damage": "holy-effect",
   "ice-area": "ice-crystal-effect",
