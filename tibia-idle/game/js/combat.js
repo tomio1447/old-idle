@@ -113,13 +113,15 @@ function newCombat(player, huntId, instanceMode) {
 function newBossCombat(player, boss) {
   const c = newCombat(player, boss.hunt || "rats", "non-pvp");
   const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"];
-  const mult = applyBossMultiplier(base, boss.mult || 10);
+  // Boss com stats DIRETOS do Canary (hp/exp/damage/armor/defense definidos
+  // no BOSS_DEFS) não passa pelo multiplicador — usa os valores oficiais.
   const def = Object.assign({}, base, {
     name: boss.name,
-    hp: mult.hp,
-    exp: boss.exp || mult.exp,
-    damage: mult.damage,
-    armor: mult.armor,
+    hp: boss.hp || applyBossMultiplier(base, boss.mult || 10).hp,
+    exp: boss.exp || applyBossMultiplier(base, boss.mult || 10).exp,
+    damage: boss.damage || applyBossMultiplier(base, boss.mult || 10).damage,
+    armor: boss.armor || applyBossMultiplier(base, boss.mult || 10).armor,
+    defense: boss.defense || base.defense || 0,
     loot: boss.loot || [],
     attackSpeed: boss.attackSpeed || base.attackSpeed || 2000,
   });

@@ -38,13 +38,18 @@ CAN = sys.argv[1] if len(sys.argv) > 1 else "/tmp/can"
 GAME = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "game")
 
-# COMBAT_* -> elemento do jogo
+# COMBAT_* -> elemento do jogo.
+# IMPORTANTE: cada COMBAT_* tem o SEU elemento — LIFEDRAIN não é death,
+# MANADRAIN não é energy e DROWNDAMAGE não é ice (o mapeamento antigo
+# juntava os três e fazia monstros como vexclaw/demon virarem imunes a
+# gelo: o drown 100 virava "ice 100" e a fraqueza real a gelo (-5/-12)
+# era perdida).
 COMBAT = {
     "PHYSICALDAMAGE": "physical", "ENERGYDAMAGE": "energy",
     "EARTHDAMAGE": "earth", "FIREDAMAGE": "fire", "ICEDAMAGE": "ice",
     "HOLYDAMAGE": "holy", "DEATHDAMAGE": "death",
-    "LIFEDRAIN": "death", "MANADRAIN": "energy",
-    "DROWNDAMAGE": "ice", "HEALING": "healing",
+    "LIFEDRAIN": "lifedrain", "MANADRAIN": "manadrain",
+    "DROWNDAMAGE": "drown", "HEALING": "healing",
 }
 
 # CONST_ME_* -> sheet em assets/fx (mesmo mapa do import_spell_effects)
@@ -353,8 +358,10 @@ def parse_elements(txt):
         el = COMBAT.get(tp.group(1))
         if not el or el == "healing":
             continue
-        # varios COMBAT_* caem no mesmo elemento (LIFEDRAIN -> death);
-        # fica o de maior valor absoluto, que e o que domina na pratica
+        # cada COMBAT_* tem o seu elemento (lifedrain/manadrain/drown são
+        # separados) — se dois COMBAT_* distintos caírem no mesmo elemento
+        # (ex.: ENERGYDAMAGE e MANADRAIN antigamente), fica o de maior
+        # valor absoluto, que é o que domina na prática
         if el in out and abs(out[el]) >= abs(int(pc)):
             continue
         out[el] = int(pc)

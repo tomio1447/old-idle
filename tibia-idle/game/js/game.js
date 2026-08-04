@@ -641,6 +641,77 @@ const BOSS_DEFS = {
       { item: "jungle-quiver", chance: 4, max: 1 },
     ],
   },
+  // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
+  // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
+  // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
+  "ferumbras-mortal-shell": {
+    id: "ferumbras-mortal-shell",
+    name: "Ferumbras Mortal Shell",
+    title: "Boss da Ferumbras Ascendant",
+    hunt: "dt-seal",
+    baseMonster: "demon",
+    sprite: "demon",
+    // stats DIRETOS do canary (newBossCombat usa hp/exp quando presentes)
+    hp: 300000,
+    exp: 2000000,
+    damage: 500,
+    armor: 100,
+    defense: 120,
+    speed: 0.00009,
+    requirement: { level: 250, text: "Requer nível 250+ (Ferumbras Ascendant)" },
+    cooldown: BOSS_COOLDOWN,
+    loot: [
+      { item: "gold-coin", chance: 100, max: 100 },
+      { item: "platinum-coin", chance: 100, max: 25 },
+      { item: "small-sapphire", chance: 10, max: 10 },
+      { item: "small-emerald", chance: 10, max: 10 },
+      { item: "small-amethyst", chance: 10, max: 10 },
+      { item: "small-diamond", chance: 10, max: 10 },
+      { item: "small-topaz", chance: 10, max: 10 },
+      { item: "white-pearl", chance: 10, max: 5 },
+      { item: "black-pearl", chance: 10, max: 5 },
+      { item: "red-gem", chance: 1, max: 1 },
+      { item: "blue-gem", chance: 0.8, max: 1 },
+      { item: "green-gem", chance: 4, max: 1 },
+      { item: "emerald-bangle", chance: 1, max: 1 },
+      { item: "rift-tapestry", chance: 3, max: 1 },
+      { item: "golden-armor", chance: 0.8, max: 1 },
+      { item: "magic-plate-armor", chance: 0.4, max: 1 },
+      { item: "demon-shield", chance: 0.8, max: 1 },
+      { item: "phoenix-shield", chance: 0.8, max: 1 },
+      { item: "mastermind-shield", chance: 0.6, max: 1 },
+      { item: "great-shield", chance: 0.1, max: 1 },
+      { item: "great-axe", chance: 0.7, max: 1 },
+      { item: "demonrage-sword", chance: 0.8, max: 1 },
+      { item: "chaos-mace", chance: 0.8, max: 1 },
+      { item: "bloody-edge", chance: 0.8, max: 1 },
+      { item: "nightmare-blade", chance: 0.6, max: 1 },
+      { item: "abyss-hammer", chance: 0.8, max: 1 },
+      { item: "jade-hammer", chance: 0.8, max: 1 },
+      { item: "havoc-blade", chance: 0.8, max: 1 },
+      { item: "impaler", chance: 0.8, max: 1 },
+      { item: "berserker", chance: 0.8, max: 1 },
+      { item: "skullcrusher", chance: 0.3, max: 1 },
+      { item: "divine-plate", chance: 0.8, max: 1 },
+      { item: "velvet-mantle", chance: 0.3, max: 1 },
+      { item: "greenwood-coat", chance: 0.4, max: 1 },
+      { item: "lightning-legs", chance: 0.8, max: 1 },
+      { item: "glacier-kilt", chance: 0.8, max: 1 },
+      { item: "magma-legs", chance: 0.8, max: 1 },
+      { item: "emerald-sword", chance: 0.4, max: 1 },
+      { item: "rift-bow", chance: 0.5, max: 1 },
+      { item: "rift-crossbow", chance: 0.5, max: 1 },
+      { item: "demonwing-axe", chance: 0.3, max: 1 },
+      { item: "obsidian-truncheon", chance: 0.4, max: 1 },
+      { item: "ornamented-axe", chance: 0.4, max: 1 },
+      { item: "queen-s-sceptre", chance: 0.8, max: 1 },
+      { item: "boots-of-homecoming", chance: 0.8, max: 1 },
+      { item: "ferumbras-staff", chance: 0.8, max: 1 },
+      { item: "ferumbras-amulet", chance: 0.8, max: 1 },
+      { item: "death-gaze", chance: 0.1, max: 1 },
+      { item: "ferumbras-hat", chance: 0.1, max: 1 },
+    ],
+  },
 };
 
 /* Quivers que so vem de boss (QUIVER_DEFS[x].drop). Cada um fica ligado ao
@@ -669,8 +740,12 @@ function bossState(p, id) {
 }
 
 function bossReadyInfo(p, boss) {
-  const reqOk = !boss.requirement || !boss.requirement.mission || isMissionComplete(p, boss.requirement.mission);
-  if (!reqOk) return { ok: false, reason: boss.requirement.text, left: 0 };
+  if (boss.requirement) {
+    if (boss.requirement.level && p.level < boss.requirement.level)
+      return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
+    if (boss.requirement.mission && !isMissionComplete(p, boss.requirement.mission))
+      return { ok: false, reason: boss.requirement.text, left: 0 };
+  }
   const st = bossState(p, boss.id);
   const left = Math.max(0, (st.lastFight || 0) + boss.cooldown - Date.now());
   if (left > 0) return { ok: false, reason: "Cooldown", left: left };
@@ -697,12 +772,26 @@ function renderBosses(p) {
     btn.addEventListener("click", () => openBossModal(btn.dataset.bossInfo)));
 }
 
+/* Stats do boss: diretos (hp/exp/damage/armor no BOSS_DEFS, como o
+ * Ferumbras Mortal Shell) ou escalados do monstro base pelo mult. */
+function bossStats(boss) {
+  const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite] ||
+    GAMEDATA.monsters["cave-rat"];
+  const mult = applyBossMultiplier(base, boss.mult || 10);
+  return {
+    hp: boss.hp || mult.hp,
+    exp: boss.exp || mult.exp,
+    damage: boss.damage || mult.damage,
+    armor: boss.armor || mult.armor,
+    defense: boss.defense || base.defense || 0,
+  };
+}
+
 function openBossModal(id) {
   const boss = BOSS_DEFS[id];
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
-  const base = GAMEDATA.monsters[boss.baseMonster];
-  const mult = applyBossMultiplier(base, boss.mult || 10);
+  const stats = bossStats(boss);
   const st = bossState(G.p, id);
   $("#modal-body").innerHTML = `
     <div class="panel-title">
@@ -718,12 +807,12 @@ function openBossModal(id) {
         <div class="stat-row"><span class="k">Vitórias</span><span class="v">${fmtFull(st.kills || 0)}</span></div>
       </div>
       <div class="panel-inset mb8" style="padding:8px">
-        <div class="stat-row"><span class="k">Sprite</span><span class="v">Cave Rat</span></div>
-        <div class="stat-row"><span class="k">Vida</span><span class="v">${fmtFull(mult.hp)}</span></div>
-        <div class="stat-row"><span class="k">Dano</span><span class="v">${fmtFull(mult.damage)}</span></div>
-        <div class="stat-row"><span class="k">Defesa</span><span class="v">${fmtFull(mult.armor)}</span></div>
+        <div class="stat-row"><span class="k">Sprite</span><span class="v">${boss.baseMonster || "—"}</span></div>
+        <div class="stat-row"><span class="k">Vida</span><span class="v">${fmtFull(stats.hp)}</span></div>
+        <div class="stat-row"><span class="k">Dano</span><span class="v">${fmtFull(stats.damage)}</span></div>
+        <div class="stat-row"><span class="k">Defesa</span><span class="v">${fmtFull(stats.armor)}</span></div>
       </div>
-      <div class="small dim mb4">Drops — 10% cada</div>
+      <div class="small dim mb4">Drops — chance oficial do Canary</div>
       <div class="list mb8" style="max-height:180px">
         ${bossLootText(boss).map((line) => `<div class="stat-row"><span class="k">${line}</span></div>`).join("")}
       </div>
@@ -800,6 +889,12 @@ function startHunt(id, instanceMode) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  // Trava de nível das áreas especiais (ex.: Ferumbras Ascendant = 250+)
+  const min = hu.minLevel || (hu.cat === "ferumbras-ascendant" ? 250 : 0);
+  if (min && G.p && G.p.level < min) {
+    toast(`Área bloqueada: requer nível ${min}+.`, "bad");
+    return;
+  }
   if (!instanceMode) { openInstanceModal(id); return; }
   if (G.training) stopAcademy(false);
   G.inCity = false;

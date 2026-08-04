@@ -668,20 +668,24 @@ function renderStatusBar(p) {
 
 function renderHunts(p) {
   const cur = p.hunt;
-  let h = "";
-  for (const id in GAMEDATA.hunts) {
-    const hu = GAMEDATA.hunts[id];
+  // Subcategorias das áreas de caça (a aba Ferumbras Ascendant exige nível)
+  const HUNT_CATS = {
+    "iniciante":          { nome: "🌱 Iniciante" },
+    "aventureiro":        { nome: "⚔️ Aventureiro" },
+    "heroi":              { nome: "🛡️ Herói" },
+    "lenda":              { nome: "🐉 Lenda" },
+    "ferumbras-ascendant":{ nome: "🔥 Ferumbras Ascendant", minLevel: 250 },
+    "outras":             { nome: "🗺️ Outras" },
+  };
+  const catDe = (id) => GAMEDATA.hunts[id].cat || "outras";
+
+  const card = (id, hu) => {
     const active = cur === id;
     const risk = huntRisk(p, hu);
-    // Sem trava de level: todas as areas ficam acessiveis. O que indica o
-    // "nivel sugerido" e o aviso de local nao recomendado (risk alto) e a
-    // linha de nivel no card.
     const aviso = risk.cls === "high"
       ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
-    const mobs = hu.monsters.slice(0, 3).map(
-      (m) => mobImg(m, 26)).join("");
-    h += `<div class="hunt-card ${active ? "active" : ""}"
-            data-hunt="${id}">
+    const mobs = hu.monsters.slice(0, 3).map((m) => mobImg(m, 26)).join("");
+    return `<div class="hunt-card ${active ? "active" : ""}" data-hunt="${id}">
       <div class="mobs">${mobs}</div>
       <div class="info">
         <div class="nm">${hu.name}</div>
@@ -690,9 +694,51 @@ function renderHunts(p) {
       </div>
       <span class="risk ${risk.cls}">${risk.txt}</span>
     </div>`;
+  };
+
+  // agrupa por categoria na ordem definida
+  const grupos = {};
+  for (const id in GAMEDATA.hunts) {
+    const c = catDe(id);
+    (grupos[c] = grupos[c] || []).push(id);
   }
+
+  let h = "";
+  for (const cat in HUNT_CATS) {
+    const ids = grupos[cat];
+    if (!ids || !ids.length) continue;
+    const conf = HUNT_CATS[cat];
+    const bloqueada = conf.minLevel && p.level < conf.minLevel;
+    h += `<div class="hunt-cat-title ${bloqueada ? "locked" : ""}">${conf.nome}
+      ${conf.minLevel ? `<span class="tiny dim">· nível ${conf.minLevel}+</span>` : ""}
+      ${bloqueada ? `<span class="tiny" style="color:#ff9a6a">🔒 bloqueada até o nível ${conf.minLevel}</span>` : ""}
+    </div>`;
+    if (bloqueada) {
+      // mostra os cards desfocados e sem clique
+      h += `<div class="hunts-group locked">` + ids.map((id) => {
+        const hu = GAMEDATA.hunts[id];
+        return `<div class="hunt-card locked" title="Requer nível ${conf.minLevel}">
+          <div class="mobs">${hu.monsters.slice(0, 3).map((m) => mobImg(m, 26)).join("")}</div>
+          <div class="info">
+            <div class="nm">🔒 ${hu.name}</div>
+            <div class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</div>
+          </div>
+          <span class="risk high">bloqueada</span>
+        </div>`;
+      }).join("") + `</div>`;
+      continue;
+    }
+    h += `<div class="hunts-group">` + ids.map((id) => card(id, GAMEDATA.hunts[id])).join("") + `</div>`;
+  }
+  // categorias não listadas (fim)
+  for (const cat in grupos) {
+    if (HUNT_CATS[cat]) continue;
+    h += `<div class="hunt-cat-title">${cat}</div>` +
+      `<div class="hunts-group">` + grupos[cat].map((id) => card(id, GAMEDATA.hunts[id])).join("") + `</div>`;
+  }
+
   $("#hunts").innerHTML = h;
-  $$("#hunts .hunt-card").forEach((el) => {
+  $$("#hunts .hunt-card:not(.locked)").forEach((el) => {
     el.addEventListener("click", () => {
       const id = el.dataset.hunt;
       openHuntInfoModal(id);
