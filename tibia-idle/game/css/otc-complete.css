@@ -832,3 +832,42 @@ input:focus, textarea:focus, select:focus {
   accent-color: #d4af37; cursor: pointer;
 }
 .pouch-autoseller input[type="range"]:disabled { opacity: .4; cursor: default; }
+
+/* ════════════════════════════════════════════════════════════════
+   MODAL DE INFORMAÇÕES DA HUNT (monstros, drops, defesas, ataques)
+   ════════════════════════════════════════════════════════════════ */
+.hunt-monsters { display: flex; flex-direction: column; gap: 6px; }
+.hunt-monster {
+  border: 1px solid var(--otc-border-out, #3a3d46);
+  background: var(--otc-panel-2, #1e2128);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+.hunt-monster-head { display: flex; align-items: center; gap: 8px; }
+.hunt-monster-stats {
+  flex: none; text-align: right;
+  display: grid; grid-template-columns: auto auto; gap: 1px 10px;
+  font-size: 10px;
+}
+.hunt-monster-stats .k { color: var(--otc-text-dim, #888); }
+.hunt-monster-stats b { color: var(--otc-text-bright, #dfdfdf); }
+.hunt-resist {
+  display: flex; flex-wrap: wrap; gap: 3px 10px;
+  margin-top: 4px; padding-top: 4px;
+  border-top: 1px dashed rgba(255,255,255,.08);
+}
+.hunt-loot {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 8px; margin-top: 4px;
+}
+.hunt-drop {
+  display: flex; align-items: center; gap: 5px;
+  padding: 1px 2px; min-width: 0;
+}
+.hunt-drop img { image-rendering: pixelated; flex: none; }
+.huntinfo-summary {
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  border-radius: 4px; padding: 5px 8px;
+  align-items: center;
+}

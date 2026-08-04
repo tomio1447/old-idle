@@ -163,14 +163,26 @@ MONSTER_LOOKTYPES = {
     "pirate-corsair": 98, "mimic": 92, "pig": 60, "sheep": 14,
     "black-sheep": 13, "dog": 32, "butterfly": 10, "beholder": 17,
     "dwarf-miner": 69, "amazon": 137, "valkyrie": 139, "swamp-thing": 51,
+    # Nagas 15.x (Marapur) — looktypes reais do client 15.x
+    "naga-warrior": 1539, "naga-archer": 1537, "corrupt-naga": 1538,
+    "rogue-naga": 1543,
 }
 
 HUMANOID_COLORS = {
     "witch": (114, 86, 86, 0), "monk": (95, 95, 95, 95),
     "priestess": (114, 86, 86, 0), "hero": (0, 132, 132, 114),
     "black-knight": (0, 0, 0, 0), "necromancer": (0, 86, 86, 0),
-    "amazon": (113, 39, 113, 115), "valkyrie": (95, 113, 39, 115),
+    # Amazon classica 8.60: cabelo escuro + vestido vermelho (antes saia
+    # roxo/azul porque os indices caíam noutra faixa da paleta)
+    "amazon": (95, 88, 49, 95),
+    # Valkyrie classica 8.60: cabelo loiro + armadura prata/azul
+    "valkyrie": (86, 38, 40, 76),
     "pirate-marauder": (95, 76, 76, 114),
+    # Nagas 15.x (Marapur): escamas verdes/azuis por variante
+    "naga-warrior": (40, 58, 78, 76),   # escamas azul-esverdeadas + metal
+    "naga-archer": (44, 63, 82, 76),    # arqueira: tons mais claros
+    "corrupt-naga": (58, 40, 76, 76),   # corrompida: roxo/energia
+    "rogue-naga": (30, 76, 58, 76),     # rogue: verde escuro
 }
 
 

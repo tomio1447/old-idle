@@ -28,9 +28,11 @@ def run():
         assert pg.is_visible("#app"), "app nao ficou visivel"
         pg.screenshot(path="/home/user/tibia-idle/tools/shot-city.png")
 
-        # inicia uma hunt
+        # inicia uma hunt: o card abre o modal de informações (monstros,
+        # drops, defesas) e o botão "Caçar" segue para a escolha de instância
         pg.click('.hunt-card[data-hunt="rats"]')
-        # desde a atualização de instâncias, é preciso escolher non-pvp
+        pg.wait_for_timeout(400)
+        pg.click('#huntinfo-go')
         pg.wait_for_timeout(400)
         pg.click('#modal-body [data-instance="non-pvp"]')
         # primeiro kill pode levar ~15-30s no nível 1 (dagger); espera com
@@ -75,6 +77,12 @@ def run():
             const t0 = Date.now();
             for (let i = 0; i < 12000; i++) {
                 combatTick(G.combat, G.p, 100, t0 + i * 100);
+                // movimento junto (como o loop real): o player caminha até
+                // o alvo durante a simulação — sem isso ele fica parado a
+                // 2 SQMs do mob e nunca ataca (0 kills, exp 0)
+                if (typeof updateGridMovement === "function") {
+                    updateGridMovement(G.combat, G.p, 100, t0 + i * 100);
+                }
                 G.combat.events.length = 0;
                 if (i % 150 === 0) { sellAllPouch(G.p); autoRestock(G.p); }
             }

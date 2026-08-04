@@ -727,9 +727,91 @@ function renderHunts(p) {
         toast(`Precisa do nível <b>${hu.level}</b> para ${hu.name}`, "");
         return;
       }
-      startHunt(id);
+      openHuntInfoModal(id);
     });
   });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * Modal de informações da hunt: monstros com ATRIBUTOS, RESISTÊNCIAS
+ * e DROPS (chance + quantidade), e o botão para caçar.
+ * ──────────────────────────────────────────────────────────────── */
+function openHuntInfoModal(id) {
+  const p = G.p;
+  const hu = GAMEDATA.hunts[id];
+  if (!hu || !p) return;
+  const risk = huntRisk(p, hu);
+  const modo = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
+
+  const monsterCard = (slug) => {
+    const m = GAMEDATA.monsters[slug];
+    if (!m) return "";
+    const elName = (m.element || "physical");
+    const elLabel = (ELEMENTS[elName] || ELEMENTS.physical).name;
+    const elColor = (ELEMENTS[elName] || ELEMENTS.physical).color;
+    // resistências (mapa de elemento -> cor)
+    const resistHtml = Object.entries(m.resist || {})
+      .map(([el, v]) => {
+        const base = ELEMENTS[el] || ELEMENTS.physical;
+        const cor = v > 0 ? "#7ae87a" : v < 0 ? "#ff9090" : "#c8c0a8";
+        return `<span class="tiny" style="color:${cor}" title="${base.name}: ${v > 0 ? "+" : ""}${v}%">${base.name} ${v > 0 ? "+" : ""}${v}%</span>`;
+      }).join(" · ");
+    // drops: item + chance + qtd máx
+    const lootHtml = (m.loot || []).filter((l) => GAMEDATA.items[l.item]).slice(0, 8).map((l) => {
+      const it = GAMEDATA.items[l.item];
+      return `<div class="hunt-drop">
+        ${itemImg(l.item, 18)}
+        <span class="tiny" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it ? it.n : l.item}</span>
+        <span class="tiny dim">${l.chance}%${l.max > 1 ? " · até " + l.max : ""}</span>
+      </div>`;
+    }).join("") || `<div class="tiny dim">— sem drops —</div>`;
+
+    return `<div class="hunt-monster">
+      <div class="hunt-monster-head">
+        ${mobImg(slug, 40)}
+        <div style="flex:1;min-width:0">
+          <div class="small" style="font-weight:bold;color:var(--text-bright,#efe6c8)">${m.name}</div>
+          <div class="tiny dim">${elLabel} <span style="color:${elColor}">●</span></div>
+        </div>
+        <div class="hunt-monster-stats">
+          <div class="tiny"><span class="k">HP</span> <b>${fmt(m.hp)}</b></div>
+          <div class="tiny"><span class="k">EXP</span> <b style="color:#9ce84a">${fmt(m.exp)}</b></div>
+          <div class="tiny"><span class="k">ATK</span> <b style="color:#ff9a6a">${fmt(m.damage)}</b></div>
+          <div class="tiny"><span class="k">ARM</span> <b>${m.armor || 0}</b></div>
+          ${m.defense ? `<div class="tiny"><span class="k">DEF</span> <b>${m.defense}</b></div>` : ""}
+        </div>
+      </div>
+      ${resistHtml ? `<div class="hunt-resist">${resistHtml}</div>` : ""}
+      <div class="hunt-loot">${lootHtml}</div>
+    </div>`;
+  };
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">${hu.name}
+      <span class="tiny dim" style="margin-left:6px">nv ${hu.level}</span>
+      <span style="flex:1"></span>
+      <span class="risk ${risk.cls}" style="margin-right:6px">${risk.txt}</span>
+      <button class="sm" id="huntinfo-close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
+        <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
+        <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>
+        <span class="tiny dim">Pack: <b>${hu.pack || 3}</b> criaturas</span>
+        <span class="tiny dim">Respawn: <b>${hu.respawn || 0.8}s</b></span>
+      </div>
+      <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
+      <div class="row mt8" style="gap:6px;justify-content:flex-end">
+        <button class="sm" id="huntinfo-cancel">Cancelar</button>
+        <button class="primary sm" id="huntinfo-go">⚔ Caçar em ${hu.name}</button>
+      </div>
+    </div>`;
+
+  const close = () => $("#modal").classList.remove("show", "wide");
+  $("#huntinfo-close").addEventListener("click", close);
+  $("#huntinfo-cancel").addEventListener("click", close);
+  $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
+  $("#modal").classList.add("show", "wide");
 }
 
 /* Avalia o risco de uma hunt para o personagem */
