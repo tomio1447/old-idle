@@ -3,48 +3,6 @@
    healthcircle/ + combatmodes/ + states/ + battle/ + creatureicons/
    ============================================================ */
 
-/* ─────────────────────────────────── HEALTH CIRCLE (healthcircle/) ───── */
-.health-circle-wrap {
-  display: flex; align-items: center; justify-content: center;
-  gap: 0; position: relative; width: 118px; height: 60px;
-}
-.health-circle-wrap .hc-arc {
-  position: absolute;
-  width: 100%; height: 100%;
-}
-.health-circle-wrap .hc-left,
-.health-circle-wrap .hc-right {
-  width: 52px; height: 52px; position: absolute;
-}
-.health-circle-wrap .hc-left  { left: 0; }
-.health-circle-wrap .hc-right { right: 0; }
-.health-circle-wrap .hc-bottom {
-  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-  height: 8px; border-radius: 4px; width: 100px;
-}
-.health-circle-wrap .hc-fill-left,
-.health-circle-wrap .hc-fill-right {
-  width: 52px; height: 52px; position: absolute; top: 0;
-  border-radius: 50%;
-  clip: rect(0, 52px, 52px, 26px);
-}
-.health-circle-wrap .hc-fill-left  { left: 0; }
-.health-circle-wrap .hc-fill-right { right: 0; clip: rect(0, 26px, 52px, 0); }
-.health-circle-wrap .hc-fill-inner {
-  width: 52px; height: 52px; border-radius: 50%;
-  border: 6px solid; border-color: transparent;
-  box-sizing: border-box; position: absolute; top: 0;
-}
-.health-circle-wrap .hc-fill-left  .hc-fill-inner { left: 0; }
-.health-circle-wrap .hc-fill-right .hc-fill-inner { right: 0; }
-
-/* HUD quick stats */
-.hud-quick { display: flex; gap: 4px; align-items: center; padding: 2px 6px; font-size: 10px; }
-.hud-quick .hq-hp { color: #c0c0c0; font-weight: bold; }
-.hud-quick .hq-hp .val { font-size: 12px; }
-.hud-quick .hq-mp { color: #60a5fa; }
-.hud-quick .hq-mp .val { font-size: 10px; }
-
 /* ─────────────────────────────────── COMBAT MODES (combatmodes/) ─────── */
 .combat-modes-strip {
   display: flex; gap: 2px; padding: 3px 4px;
@@ -165,13 +123,7 @@
   image-rendering: pixelated; vertical-align: middle;
 }
 
-/* ─────────────────────────────────── HUD PANEL LAYOUT ───────────────── */
-.hud-panel {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 4px; background: #0d0f14;
-  border: 1px solid #1f2228; border-radius: 4px;
-}
-
+/* ─────────────────────────────────── HUD ROW (strips) ───────────────── */
 .hud-row {
   display: flex; align-items: center; gap: 6px;
   flex-wrap: wrap;

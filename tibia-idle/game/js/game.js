@@ -1576,8 +1576,8 @@ function renderAll() {
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
-  // OTClient HUD: health circle, combat modes, player states
-  if (typeof renderHudPanel === "function") renderHudPanel(p);
+  // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
+  // removido — level e mana já têm as barras fixas do painel do personagem)
   if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
   if (typeof renderPlayerStates === "function") renderPlayerStates(p);
   if (typeof renderTopBarStats === "function") renderTopBarStats(p);

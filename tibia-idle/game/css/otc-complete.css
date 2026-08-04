@@ -631,23 +631,6 @@ input:focus, textarea:focus, select:focus {
 .harm { width: 8px; height: 8px; border-radius: 50%; background: #3a3f4a; }
 .harm.on { background: #ffd65a; box-shadow: 0 0 4px rgba(255,214,90,.5); }
 
-/* ═══════════════════ SOUL + CAP ═══════════════════ */
-#soul-cap-panel { display: flex; gap: 3px; margin-top: 3px; }
-.soul-cap-box {
-  flex: 1;
-  background: var(--otc-dark-2);
-  border: 1px solid;
-  border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
-  padding: 2px 4px; text-align: center;
-}
-.soul-cap-box .sc-label {
-  font-size: 7px; color: var(--otc-text-dim); text-transform: uppercase; letter-spacing: .3px;
-}
-.soul-cap-box .sc-value {
-  font-size: 10px; font-weight: bold; color: var(--otc-text);
-  font-family: 'Courier New', monospace;
-}
-
 /* ═══════════════════ STANCE BADGE ═══════════════ */
 .stance-badge {
   position: absolute; top: 6px; left: 6px; z-index: 5;
@@ -802,21 +785,6 @@ input:focus, textarea:focus, select:focus {
   border-color: #16140f #5a5348 #5a5348 #16140f;
 }
 .quiver-slot img { max-width: 36px; max-height: 36px; object-fit: contain; image-rendering: pixelated; }
-
-/* ── Barras de combate/postura do paperdoll (OTC_bars) ── */
-.combat-mode-bar, #combat-mode-bar { display: flex; gap: 3px; margin-top: 4px; }
-.combat-mode-btn, .posture-btn {
-  flex: 1; padding: 3px 0; text-align: center; cursor: pointer;
-  font-size: 12px; line-height: 1;
-  background: #23262d; color: #c8c8c8;
-  border: 1px solid #3a3f4a; border-radius: 3px;
-}
-.combat-mode-btn:hover, .posture-btn:hover { background: #2f333c; }
-.combat-mode-btn.active, .posture-btn.active {
-  background: linear-gradient(180deg, #d4af37, #8a6a2a);
-  color: #14100a; font-weight: bold; border-color: #5a4a1a;
-}
-.posture-bar, #posture-bar { display: flex; gap: 3px; margin-top: 3px; }
 
 /* ── Munição/flechas: nunca distorcer (object-fit contain) ── */
 .item-row img { object-fit: contain; }

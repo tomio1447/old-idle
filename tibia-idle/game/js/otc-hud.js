@@ -8,76 +8,6 @@
  */
 "use strict";
 
-// ═══════════════════════ HEALTH CIRCLE ═══════════════════════
-/** Draws OTClient-style HP/Mana arcs on a canvas. */
-function drawHealthCircle(ctx, x, y, radius, hpPct, mpPct, shieldActive, lineWidth) {
-  lineWidth = lineWidth || 6;
-  const r = radius || 26;
-
-  // Background rings
-  ctx.lineWidth = lineWidth;
-  ctx.lineCap = 'round';
-
-  // HP ring (left side: top to bottom)
-  ctx.beginPath();
-  ctx.arc(x, y, r, Math.PI * 0.72, Math.PI * 1.28);
-  ctx.strokeStyle = 'rgba(0,0,0,.7)';
-  ctx.stroke();
-
-  // HP fill (clockwise from left-bottom upward)
-  const hpAngle = Math.PI * 0.28 + (Math.PI * 1.0 * Math.min(1, Math.max(0, hpPct || 0)));
-  ctx.beginPath();
-  ctx.arc(x, y, r, Math.PI * 1.28, hpAngle, true);
-  ctx.strokeStyle = hpBarColorForCircle(hpPct);
-  ctx.shadowColor = hpBarColorForCircle(hpPct);
-  ctx.shadowBlur = 4;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // MP ring (right side: bottom to top)
-  ctx.beginPath();
-  ctx.arc(x, y, r, Math.PI * -0.28, Math.PI * 0.28);
-  ctx.strokeStyle = 'rgba(0,0,0,.7)';
-  ctx.stroke();
-
-  const mpAngle = Math.PI * -0.28 + (Math.PI * 0.56 * Math.min(1, Math.max(0, mpPct || 0)));
-  ctx.beginPath();
-  ctx.arc(x, y, r, Math.PI * -0.28, mpAngle);
-  ctx.strokeStyle = shieldActive ? '#c084fc' : '#60a5fa';
-  ctx.shadowColor = shieldActive ? '#c084fc' : '#60a5fa';
-  ctx.shadowBlur = 3;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // Bottom bar
-  const barW = r * 2 + 10, barH = 6;
-  const bx = x - barW / 2, by = y + r - 2;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
-  ctx.fillStyle = '#c0c0c0';
-  ctx.fillRect(bx, by, barW * Math.min(1, Math.max(0, hpPct || 0)), barH);
-
-  // If shield active, draw extra ring outside
-  if (shieldActive) {
-    ctx.beginPath();
-    ctx.arc(x, y, r + lineWidth + 2, Math.PI * -0.28, Math.PI * 0.28);
-    ctx.strokeStyle = '#c084fc';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = '#c084fc';
-    ctx.shadowBlur = 6;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = lineWidth;
-  }
-}
-
-function hpBarColorForCircle(pct) {
-  if (pct > 0.6) return '#4ade80';
-  if (pct > 0.3) return '#facc15';
-  if (pct > 0.1) return '#fb923c';
-  return '#f87171';
-}
-
 // ═══════════════════════ COMBAT MODES ═══════════════════════
 function renderCombatModesStrip(p) {
   const el = document.getElementById('combat-modes-strip');
@@ -287,44 +217,6 @@ function initCrosshair() {
   });
 }
 
-// ═══════════════════════ HUD PANEL (right side stats) ═══════════════════════
-function renderHudPanel(p) {
-  const el = document.getElementById('hud-panel');
-  if (!el) return;
-  const max = maxStats(p);
-  const hpPct = max.hp ? p.hp / max.hp : 0;
-  const mpPct = max.mp ? p.mp / max.mp : 0;
-  const shieldActive = typeof isMagicShieldActive === 'function' && isMagicShieldActive(p, Date.now());
-
-  // Build HTML
-  let h = '<div class="hud-quick">';
-  // HP
-  h += `<span class="hq-hp"><span class="val">${Math.floor(p.hp)}</span>`;
-  if (shieldActive) h += ' <span style="font-size:8px;color:#c084fc">⚡</span>';
-  h += `</span>`;
-  // MP
-  h += `<span class="hq-mp"><span class="val">${Math.floor(p.mp)}</span></span>`;
-  // Level
-  h += `<span style="color:#ffe680;font-weight:bold;font-size:11px;margin-left:auto">Lv ${p.level}</span>`;
-  h += '</div>';
-
-  // Health Circle canvas
-  h += '<div class="health-circle-wrap" style="position:relative;width:80px;height:80px;margin:0 auto">';
-  h += '<canvas id="hc-canvas" width="80" height="80" style="position:absolute;inset:0"></canvas>';
-  h += '</div>';
-
-  el.innerHTML = h;
-
-  // Draw on canvas
-  setTimeout(() => {
-    const cv = document.getElementById('hc-canvas');
-    if (cv) {
-      const ctx = cv.getContext('2d');
-      drawHealthCircle(ctx, 40, 40, 26, hpPct, mpPct, shieldActive, 5);
-    }
-  }, 10);
-}
-
 // ═══════════════════════ TOP BAR STATS ═══════════════════════
 function renderTopBarStats(p) {
   const el = document.getElementById('topbar-stats');
@@ -364,8 +256,8 @@ else if (typeof document !== 'undefined') document.addEventListener('DOMContentL
 
 if (typeof window !== 'undefined') {
   window.OtcHud = {
-    drawHealthCircle, renderCombatModesStrip, renderPlayerStates,
-    renderHudPanel, renderTopBarStats,
+    renderCombatModesStrip, renderPlayerStates,
+    renderTopBarStats,
     skullIcon, shieldIcon, emblemIcon, battleVocIcon,
     SKULL_SYMBOLS, SKULL_COLORS, SHIELD_SYMBOLS, EMBLEM_SYMBOLS, BATTLE_VOC_ICON,
   };

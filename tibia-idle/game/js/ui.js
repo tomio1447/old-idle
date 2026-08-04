@@ -491,8 +491,6 @@ function renderEquip(p) {
   }
   $("#equip").innerHTML = h;
 
-  // Soul + Capacity + Combat/Posture bars (inventory.otui)
-  OTC_bars(G.p);
   $$("#equip .slot").forEach((el) => {
     const slotDrop = el.dataset.slot;
     if (typeof bindDrop === "function") {
@@ -544,36 +542,6 @@ function renderEquip(p) {
  * Fonte dos ícones: TibiaWiki "Special Conditions" + "Icons"
  * (assets/ui/conditions/*.png, registrados em icondata.js).
  */
-
-/* ── Soul/Cap + Combat/Posture bars ──
- * Sincronizadas com o modo REAL (fightMode/attackMode do config) e
- * clicáveis — mesma lógica do strip do otc-hud. */
-function OTC_bars(p) {
-  const max = maxStats(p);
-  const sp = $("#soul-cap-panel");
-  if (sp) sp.innerHTML = `<div class="soul-cap-box"><div class="sc-label">Soul</div><div class="sc-value">${p.soul||200}</div></div><div class="soul-cap-box"><div class="sc-label">Cap</div><div class="sc-value">${Math.floor(carriedWeight(p))} / ${Math.floor(max.cap)}</div></div>`;
-  const fight = p.config.fightMode||"attack";
-  const cm = $("#combat-mode-bar");
-  if (cm) {
-    cm.innerHTML = [["attack","⚔","Full Attack"],["balanced","⚖","Balanced"],["defense","🛡","Full Defense"]].map(([id,ico,tt])=>`<div class="combat-mode-btn ${id===fight?"active":""}" data-cmode="${id}" title="${tt}">${ico}</div>`).join("");
-    cm.querySelectorAll("[data-cmode]").forEach((b) => b.addEventListener("click", () => {
-      p.config.fightMode = b.dataset.cmode;
-      if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
-      renderEquip(p);
-    }));
-  }
-  const mode = p.config.attackMode||"chase";
-  const pb = $("#posture-bar");
-  if (pb) {
-    pb.innerHTML = [["stand","⏸","Stand"],["chase","👣","Chase"]].map(([id,ico,tt])=>`<div class="posture-btn ${id===mode?"active":""}" data-posture="${id}" title="${tt}">${ico}</div>`).join("");
-    pb.querySelectorAll("[data-posture]").forEach((b) => b.addEventListener("click", () => {
-      p.config.attackMode = b.dataset.posture;
-      if (typeof renderCombatModesStrip === "function") renderCombatModesStrip(p);
-      if (typeof renderHelper === "function") renderHelper(p);
-      renderEquip(p);
-    }));
-  }
-}
 
 function renderStatusBar(p) {
   const box = $("#status-bar");
