@@ -53,7 +53,19 @@ Guarda contas (login/senha bcrypt, Tibia Coins, role) e personagens
 | GET | `/api/market/mine` | Bearer token | Minhas ofertas |
 | POST | `/api/market/buy` | `{ token, offer_id, buyer_name }` | Compra oferta (item ou TC) |
 | DELETE | `/api/market/offers/:id` | `{ token }` | Cancela oferta (devolve item/TC) |
-| POST | `/api/market/claim` | `{ token }` | Coleta gold de vendas pendente |
+| POST | `/api/market/claim` | `{ token }` | (legado) nada pendente — vendas caem no banco |
+| POST | `/api/market/deposit` | `{ token, amount }` | Deposita gold no banco do market |
+| POST | `/api/market/withdraw` | `{ token, amount }` | Saca gold do banco do market |
+| GET | `/api/market/bank` | Bearer token | Saldo do banco do market |
+
+**Regras do Market (guia oficial do Tibia 4.3.3):**
+- Fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco
+- Ofertas duram 30 dias (fixo); item volta ao depot, dinheiro volta ao banco
+- Vendedor usa itens do DEPOT; comprado vai para o DEPOT/inbox
+- Buy offers (oferta de compra) e sell offers (oferta de venda)
+- MATCH AUTOMATICO: criar oferta casa com contra-oferta compatível na hora
+- Oferta anônima (opcional) e aviso 25% acima/abaixo da média
+- Preço médio por item (market_stats) alimentado a cada venda
 
 ## Sem MySQL (desenvolvimento)
 

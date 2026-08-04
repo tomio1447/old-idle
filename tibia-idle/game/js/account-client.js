@@ -140,3 +140,21 @@ async function marketClaimGold(token) {
   const r = await _api("POST", "/api/market/claim", { token });
   return r.data.ok ? { ok: true, gold: r.data.gold || 0 } : { ok: false, msg: r.data.msg };
 }
+
+/* Deposita gold do personagem no banco do market. */
+async function marketDeposit(token, amount) {
+  const r = await _api("POST", "/api/market/deposit", { token, amount });
+  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
+}
+
+/* Saca gold do banco do market para o personagem. */
+async function marketWithdraw(token, amount) {
+  const r = await _api("POST", "/api/market/withdraw", { token, amount });
+  return r.data.ok ? { ok: true, bank: r.data.bank, amount: r.data.amount } : { ok: false, msg: r.data.msg };
+}
+
+/* Saldo do banco do market. */
+async function marketBank(token) {
+  const r = await _api("GET", "/api/market/bank", null, token);
+  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
+}

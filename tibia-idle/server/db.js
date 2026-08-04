@@ -108,8 +108,10 @@ JsonStore.prototype.marketOffers = function (filter) {
   return this.market.filter((o) => {
     if (o.status !== "active") return false;
     if (filter.kind && o.kind !== filter.kind) return false;
-    if (filter.tier && o.tier !== Number(filter.tier)) return false;
+    if (filter.tier !== undefined && filter.tier !== "" &&
+        o.tier !== Number(filter.tier)) return false;
     if (filter.seller && o.seller_id !== Number(filter.seller)) return false;
+    if (filter.slug && o.slug !== filter.slug) return false;
     if (o.expires_at && new Date(o.expires_at).getTime() < now) {
       o.status = "expired";
       this._save();
@@ -139,13 +141,42 @@ JsonStore.prototype.addAccountMarketGold = function (accountId, amount) {
   const a = this.findAccountById(accountId);
   if (a) { a.market_gold = (a.market_gold || 0) + Math.max(0, amount); this._save(); }
 };
-JsonStore.prototype.claimMarketGold = function (accountId) {
+JsonStore.prototype.payMarketFee = function (accountId, amount) {
   const a = this.findAccountById(accountId);
-  if (!a) return 0;
-  const g = a.market_gold || 0;
-  a.market_gold = 0;
+  if (!a || (a.market_gold || 0) < amount) return false;
+  a.market_gold = (a.market_gold || 0) - amount;
   this._save();
-  return g;
+  return true;
+};
+JsonStore.prototype.refundMarketFee = function (accountId, amount) {
+  const a = this.findAccountById(accountId);
+  if (!a) return;
+  a.market_gold = (a.market_gold || 0) + amount;
+  this._save();
+};
+JsonStore.prototype.payMarketGold = function (accountId, amount) {
+  return this.payMarketFee(accountId, amount);
+};
+JsonStore.prototype.claimMarketGold = function (accountId) {
+  // As vendas caem DIRETO no banco (market_gold). Nada pendente para
+  // "coletar" — o saque e feito pela rota /api/market/withdraw.
+  return 0;
+};
+JsonStore.prototype.recordSale = function (slug, tier, price) {
+  this.marketStats = this.marketStats || {};
+  const key = slug + ":" + (tier || 0);
+  const s = this.marketStats[key] || { count: 0, total: 0, last_price: 0 };
+  s.count += 1;
+  s.total += price;
+  s.last_price = price;
+  this.marketStats[key] = s;
+  this._save();
+};
+JsonStore.prototype.itemStats = function (slug, tier) {
+  this.marketStats = this.marketStats || {};
+  const s = this.marketStats[slug + ":" + (tier || 0)];
+  if (!s) return null;
+  return { count: s.count, avg: Math.round(s.total / Math.max(1, s.count)), last: s.last_price };
 };
 
 /* Wrapper MySQL (mysql2/promise) — mesma API do JsonStore */
@@ -268,15 +299,48 @@ async function MysqlStore() {
       await this.run("UPDATE accounts SET market_gold = market_gold + ? WHERE id = ?",
         [Math.max(0, amount), Number(accountId)]);
     },
+    async payMarketFee(accountId, amount) {
+      // fee sai do market_gold (banco do jogador); retorna false se insuficiente
+      const r = await this.run(
+        "UPDATE accounts SET market_gold = market_gold - ? WHERE id = ? AND market_gold >= ?",
+        [amount, Number(accountId), amount]);
+      return r.affectedRows > 0;
+    },
+    async refundMarketFee(accountId, amount) {
+      await this.run("UPDATE accounts SET market_gold = market_gold + ? WHERE id = ?",
+        [amount, Number(accountId)]);
+    },
+    async payMarketGold(accountId, amount) {
+      const r = await this.run(
+        "UPDATE accounts SET market_gold = market_gold - ? WHERE id = ? AND market_gold >= ?",
+        [amount, Number(accountId), amount]);
+      return r.affectedRows > 0;
+    },
     async claimMarketGold(accountId) {
+      // vendas caem direto no banco; saque via /withdraw
+      return 0;
+    },
+
+    // ---- MARKET STATS (preço médio por item/tier) ----
+    async recordSale(slug, tier, price) {
+      await this.run(
+        `INSERT INTO market_stats (slug, tier, count, total, last_price)
+         VALUES (?, ?, 1, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           count = count + 1, total = total + ?, last_price = ?`,
+        [slug, tier || 0, price, price, price, price]);
+    },
+    async itemStats(slug, tier) {
       const rows = await this.query(
-        "UPDATE accounts SET market_gold = 0 WHERE id = ? RETURNING market_gold",
-        [Number(accountId)]);
-      if (rows && rows[0]) return rows[0].market_gold || 0;
-      // fallback (sem RETURNING): lê antes e zera depois
-      const g = await this.accountMarketGold(accountId);
-      await this.run("UPDATE accounts SET market_gold = 0 WHERE id = ?", [Number(accountId)]);
-      return g;
+        "SELECT * FROM market_stats WHERE slug = ? AND tier = ?",
+        [slug, tier || 0]);
+      if (!rows[0]) return null;
+      const s = rows[0];
+      return {
+        count: s.count,
+        avg: Math.round(s.total / Math.max(1, s.count)),
+        last: s.last_price,
+      };
     },
   };
   return db;

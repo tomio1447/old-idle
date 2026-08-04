@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS market_offers (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   seller_id   INT UNSIGNED NOT NULL,
   seller_name VARCHAR(32)  NOT NULL,           -- personagem que vende
-  kind        ENUM('item','coins') NOT NULL DEFAULT 'item',
+  kind        ENUM('item','coins','buy') NOT NULL DEFAULT 'item',
   slug        VARCHAR(64)  DEFAULT NULL,       -- item vendido (kind=item)
   tier        INT UNSIGNED NOT NULL DEFAULT 0, -- tier da forja do item
   data        MEDIUMTEXT   DEFAULT NULL,       -- extras (imbuements etc.)
@@ -101,3 +101,19 @@ CREATE TABLE IF NOT EXISTS market_offers (
 -- Saldo do market pendente de coleta (gold de vendas de outro jogador
 -- comprou enquanto o vendedor estava offline). TC vai direto em accounts.coins.
 ALTER TABLE accounts ADD COLUMN market_gold INT UNSIGNED NOT NULL DEFAULT 0;
+
+-- ------------------------------------------------------------
+-- MARKET STATS (preco medio por item — atualizado a cada venda)
+-- Usado pelo aviso de oferta injusta (25% acima/abaixo da media)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS market_stats (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug       VARCHAR(64)  NOT NULL,
+  tier       INT UNSIGNED NOT NULL DEFAULT 0,
+  count      INT UNSIGNED NOT NULL DEFAULT 0,    -- vendas registradas
+  total      BIGINT UNSIGNED NOT NULL DEFAULT 0, -- soma dos precos
+  last_price INT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_stats_item (slug, tier)
+) ENGINE=InnoDB;

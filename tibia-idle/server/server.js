@@ -143,37 +143,111 @@ async function coins(db, body) {
 
 /* ------------------------------ MARKET P2P ------------------------------ */
 
-/* Cria uma oferta de venda (item ou Tibia Coins). */
+/* ====================== REGRAS OFICIAIS DO MARKET ======================
+ * (manual do Tibia, secao 4.3.3 The Market)
+ *  - fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco;
+ *  - ofertas duram 30 dias (item volta pro depot/inbox, dinheiro pro banco);
+ *  - vendedor usa itens do DEPOT; comprador recebe no depot/inbox;
+ *  - buy offers: quem quer comprar deixa oferta com o preço que paga;
+ *  - MATCH AUTOMATICO: ao criar oferta, se existir contra-oferta compativel
+ *    (sell <= buy) a venda acontece na hora;
+ *  - preco medio por item (market_stats) p/ avisar oferta injusta (25%).
+ * ====================================================================== */
+
+/* Fee de 2% (mín 20, máx 1.000.000) */
+function marketFee(price) {
+  return Math.max(20, Math.min(1000000, Math.round(price * 0.02)));
+}
+
+/* Cria uma oferta (venda de item/TC, ou COMPRA de item). */
 async function marketCreate(db, body, charName) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  const kind = body.kind === "coins" ? "coins" : "item";
+  const kind = body.kind === "coins" ? "coins" : body.kind === "buy" ? "buy" : "item";
   const price = Math.floor(Number(body.price) || 0);
   if (price <= 0) return { code: 400, body: { ok: false, msg: "Preço inválido" } };
+  if (price > 999999999999) return { code: 400, body: { ok: false, msg: "Preço acima do máximo" } };
+  const fee = marketFee(price);
+  const qty = Math.max(1, Math.floor(Number(body.qty) || 1));
+  if (qty > 64000) return { code: 400, body: { ok: false, msg: "Máximo 64.000 itens por oferta" } };
+  // limite de 100 ofertas ativas por personagem
+  const minhas = await db.sellerOffers(acc.id);
+  const ativas = minhas.filter((o) => o.status === "active").length;
+  if (ativas >= 100) return { code: 400, body: { ok: false, msg: "Máximo de 100 ofertas ativas" } };
+
+  // ---- fee (2%) pago do banco (market_gold) ----
+  const feePago = await db.payMarketFee(acc.id, fee);
+  if (!feePago) return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco para a taxa (2%)" } };
+
+  // ---- pagamentos/travas conforme o tipo ----
   if (kind === "coins") {
-    const qty = Math.floor(Number(body.qty) || 0);
-    if (qty <= 0 || qty > (acc.coins || 0))
+    if (qty > (acc.coins || 0)) {
+      await db.refundMarketFee(acc.id, fee);
       return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
-    // trava os TC na oferta
+    }
     await db.updateCoins(acc.id, (acc.coins || 0) - qty);
+  } else if (kind === "buy") {
+    // oferta de COMPRA: trava o dinheiro (preco x qtd) no banco
+    const total = price * qty;
+    const ok = await db.payMarketGold(acc.id, total);
+    if (!ok) {
+      await db.refundMarketFee(acc.id, fee);
+      return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco para a oferta" } };
+    }
+    if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
   } else {
     if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
   }
-  const days = Math.min(30, Math.max(1, Math.floor(Number(body.days) || 7)));
-  const expires = new Date(Date.now() + days * 86400000).toISOString();
+
+  // duração fixa: 30 dias (regra oficial)
+  const expires = new Date(Date.now() + 30 * 86400000).toISOString();
   const offer = await db.createMarketOffer({
     seller_id: acc.id,
     seller_name: charName || acc.login,
     kind,
-    slug: kind === "item" ? body.slug : null,
+    slug: (kind === "item" || kind === "buy") ? body.slug : null,
     tier: Math.max(0, Math.floor(Number(body.tier) || 0)),
-    data: kind === "item" ? (body.data || null) : null,
-    qty: kind === "coins" ? Math.floor(Number(body.qty) || 1) : 1,
+    data: (kind === "item" || kind === "buy") ? (body.data || null) : null,
+    qty,
     price,
     price_tc: body.price_tc ? 1 : 0,
     expires_at: expires,
   });
-  return { code: 201, body: { ok: true, offer } };
+
+  // ---- MATCH AUTOMATICO: casa com contra-oferta existente ----
+  const matched = await marketTryMatch(db, offer, acc, charName);
+  return { code: 201, body: { ok: true, offer, fee, matched } };
+}
+
+/* Tenta casar uma oferta nova com contra-ofertas ativas.
+ * sell (preço P) casa com buy (preço >= P); buy casa com sell (preço <= P). */
+async function marketTryMatch(db, nova, acc, charName) {
+  const slug = nova.slug, tier = nova.tier || 0;
+  if (!slug) return null;   // TC nao casa automatico por enquanto
+  const isSell = nova.kind === "item";
+  const alvos = await db.marketOffers({ slug, tier });
+  const contra = alvos.filter((o) =>
+    o.id !== nova.id && o.seller_id !== acc.id &&
+    (isSell ? o.kind === "buy" && o.price >= nova.price
+            : o.kind === "item" && o.price <= nova.price));
+  if (!contra.length) return null;
+  const melhor = contra.sort((a, b) => (isSell ? b.price - a.price : a.price - b.price))[0];
+  // executa a venda: qtd = min(qtds)
+  const q = Math.min(melhor.qty, nova.qty);
+  const valor = melhor.price * q;
+  await db.updateMarketOffer(melhor.id, { status: "sold", buyer_id: acc.id, bought_at: new Date().toISOString() });
+  await db.updateMarketOffer(nova.id, { status: "sold", qty: nova.qty - q, bought_at: new Date().toISOString() });
+  // registra a venda nas stats
+  await db.recordSale(slug, tier, melhor.price);
+  if (isSell) {
+    // vendedor (nova) recebe no banco; comprador (melhor) recebe o item
+    await db.addAccountMarketGold(acc.id, valor);
+    return { mode: "sell-matched", qty: q, price: melhor.price, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+  } else {
+    // comprador (nova) recebe o item; vendedor (melhor) recebe no banco
+    await db.addAccountMarketGold(melhor.seller_id, valor);
+    return { mode: "buy-matched", qty: q, price: melhor.price, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+  }
 }
 
 /* Lista ofertas ativas (market P2P). */
@@ -184,7 +258,17 @@ async function marketList(db, q) {
   if (q.get("seller")) filter.seller = q.get("seller");
   if (q.get("slug")) filter.slug = q.get("slug");
   const offers = await db.marketOffers(filter);
-  return { code: 200, body: { ok: true, offers } };
+  // inclui o preço médio de cada item (stats) para o cliente avisar
+  // ofertas 25% acima/abaixo da média
+  const withStats = [];
+  for (const o of offers) {
+    if (o.kind === "item" || o.kind === "buy") {
+      const st = await db.itemStats(o.slug, o.tier || 0);
+      if (st) o.stats = st;
+    }
+    withStats.push(o);
+  }
+  return { code: 200, body: { ok: true, offers: withStats } };
 }
 
 /* Minhas ofertas. */
@@ -195,53 +279,82 @@ async function marketMine(db, token) {
   return { code: 200, body: { ok: true, offers } };
 }
 
-/* Compra uma oferta (P2P). */
-async function marketBuy(db, body, buyerName) {
+/* Compra/aceita uma oferta (P2P).
+ * - oferta kind=item: o comprador paga e recebe o item;
+ * - oferta kind=buy: o comprador é quem QUER comprar — quem aceita vende
+ *   (vendedor entrega item e recebe o dinheiro da oferta);
+ * - oferta kind=coins: compra de TC por gold.
+ */
+async function marketBuy(db, body, actorName) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const offer = await db.findMarketOffer(Number(body.offer_id));
   if (!offer || offer.status !== "active")
     return { code: 404, body: { ok: false, msg: "Oferta não encontrada ou expirada" } };
   if (offer.seller_id === acc.id)
-    return { code: 400, body: { ok: false, msg: "Não pode comprar a própria oferta" } };
+    return { code: 400, body: { ok: false, msg: "Não pode negociar a própria oferta" } };
   if (offer.expires_at && new Date(offer.expires_at).getTime() < Date.now())
     return { code: 410, body: { ok: false, msg: "Oferta expirada" } };
 
-  // cobra o comprador (gold vai para o saldo do vendedor; TC direto na conta)
+  const qty = Math.min(offer.qty, Math.max(1, Math.floor(Number(body.qty) || offer.qty)));
+  const valor = offer.price * qty;
+
+  if (offer.kind === "buy") {
+    // -------- ACEITAR OFERTA DE COMPRA: quem aceita VENDE -------
+    // o dinheiro da oferta já está travado no banco do comprador (seller_id)
+    // -> credita ao vendedor (actor) e "entrega" o item
+    await db.addAccountMarketGold(acc.id, valor);
+    await db.recordSale(offer.slug, offer.tier || 0, offer.price);
+    await db.updateMarketOffer(offer.id, {
+      status: "sold", qty: offer.qty - qty,
+      buyer_id: acc.id, bought_at: new Date().toISOString(),
+    });
+    return {
+      code: 200,
+      body: {
+        ok: true,
+        action: "sell-to-buyoffer",
+        item: { slug: offer.slug, tier: offer.tier, data: offer.data, qty },
+        price: offer.price,
+        total: valor,
+        buyer_name: offer.seller_name,
+      },
+    };
+  }
+
+  // -------- COMPRA NORMAL (sell offer / TC) -------
   if (offer.price_tc) {
-    if ((acc.coins || 0) < offer.price)
+    if ((acc.coins || 0) < valor)
       return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
-    await db.updateCoins(acc.id, (acc.coins || 0) - offer.price);
-    // TC do comprador -> conta do vendedor
+    await db.updateCoins(acc.id, (acc.coins || 0) - valor);
     const seller = await db.findAccountById(offer.seller_id);
-    if (seller) await db.updateCoins(seller.id, (seller.coins || 0) + offer.price);
+    if (seller) await db.updateCoins(seller.id, (seller.coins || 0) + valor);
   } else {
-    // gold: o cliente já validou o gold do personagem; o servidor credita
-    // o saldo do market do vendedor (coletado no claim)
-    await db.addAccountMarketGold(offer.seller_id, offer.price);
-    // oferta de TC comprada com gold: credita TC DIRETO na conta do
-    // comprador (não depende do cliente)
-    if (offer.kind === "coins" && offer.qty > 0) {
-      await db.updateCoins(acc.id, (acc.coins || 0) + offer.qty);
+    // gold: usa o banco (market_gold) do comprador
+    const ok = await db.payMarketGold(acc.id, valor);
+    if (!ok) return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco" } };
+    await db.addAccountMarketGold(offer.seller_id, valor);
+    if (offer.kind === "coins" && qty > 0) {
+      await db.updateCoins(acc.id, (acc.coins || 0) + qty);
     }
+    if (offer.kind === "item") await db.recordSale(offer.slug, offer.tier || 0, offer.price);
   }
 
   await db.updateMarketOffer(offer.id, {
-    status: "sold",
-    buyer_id: acc.id,
-    bought_at: new Date().toISOString(),
+    status: "sold", qty: offer.qty - qty,
+    buyer_id: acc.id, bought_at: new Date().toISOString(),
   });
   return {
     code: 200,
     body: {
       ok: true,
-      // o que o comprador recebe (item ou TC)
       item: offer.kind === "item"
-        ? { slug: offer.slug, tier: offer.tier, data: offer.data, qty: offer.qty }
+        ? { slug: offer.slug, tier: offer.tier, data: offer.data, qty }
         : null,
-      coins: offer.kind === "coins" ? offer.qty : 0,
+      coins: offer.kind === "coins" ? qty : 0,
       seller_name: offer.seller_name,
       price: offer.price,
+      total: valor,
       price_tc: !!offer.price_tc,
     },
   };
@@ -257,10 +370,22 @@ async function marketCancel(db, body, id) {
   if (offer.status !== "active")
     return { code: 400, body: { ok: false, msg: "Oferta já finalizada" } };
   await db.updateMarketOffer(offer.id, { status: "cancelled" });
+  // devolve o que estava travado:
+  //  - oferta de venda de TC: TC de volta pra conta
+  //  - oferta de COMPRA (buy): dinheiro de volta pro banco (market_gold)
   if (offer.kind === "coins") {
     await db.updateCoins(acc.id, (acc.coins || 0) + offer.qty);
+  } else if (offer.kind === "buy") {
+    await db.addAccountMarketGold(acc.id, offer.price * offer.qty);
   }
-  return { code: 200, body: { ok: true, refundCoins: offer.kind === "coins" ? offer.qty : 0 } };
+  return {
+    code: 200,
+    body: {
+      ok: true,
+      refundCoins: offer.kind === "coins" ? offer.qty : 0,
+      refundGold: offer.kind === "buy" ? offer.price * offer.qty : 0,
+    },
+  };
 }
 
 /* Coleta o gold pendente de vendas do market (ao entrar no jogo). */
@@ -269,6 +394,42 @@ async function marketClaim(db, token) {
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const gold = await db.claimMarketGold(acc.id);
   return { code: 200, body: { ok: true, gold } };
+}
+
+/* Depósito no banco do market (o cliente debita do p.gold do personagem).
+ * body: { token, amount } */
+async function marketDeposit(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
+  if (amount <= 0) return { code: 400, body: { ok: false, msg: "Valor inválido" } };
+  await db.addAccountMarketGold(acc.id, amount);
+  const gold = await db.accountMarketGold(acc.id);
+  return { code: 200, body: { ok: true, bank: gold } };
+}
+
+/* Saque do banco do market (o cliente credita no p.gold).
+ * body: { token, amount } */
+async function marketWithdraw(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
+  if (amount <= 0) return { code: 400, body: { ok: false, msg: "Valor inválido" } };
+  const tem = await db.accountMarketGold(acc.id);
+  if (tem < amount) return { code: 400, body: { ok: false, msg: "Saldo insuficiente no banco" } };
+  // desconta do banco (market_gold) sem passar pelo claim (claim zera tudo)
+  const ok = await db.payMarketGold(acc.id, amount);
+  if (!ok) return { code: 400, body: { ok: false, msg: "Saldo insuficiente no banco" } };
+  const gold = await db.accountMarketGold(acc.id);
+  return { code: 200, body: { ok: true, bank: gold, amount } };
+}
+
+/* Saldo do banco do market. */
+async function marketBank(db, token) {
+  const acc = await db.findAccountByToken(token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const gold = await db.accountMarketGold(acc.id);
+  return { code: 200, body: { ok: true, bank: gold } };
 }
 
 /* ------------------------- storage (sessions) -------------------------
@@ -385,6 +546,21 @@ async function main() {
       if (req.method === "POST" && url === "/api/market/claim") {
         const body = await readBody(req);
         const r = await marketClaim(db, body.token);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/market/deposit") {
+        const body = await readBody(req);
+        const r = await marketDeposit(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/market/withdraw") {
+        const body = await readBody(req);
+        const r = await marketWithdraw(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/market/bank") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const r = await marketBank(db, token);
         return send(res, r.code, r.body);
       }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
