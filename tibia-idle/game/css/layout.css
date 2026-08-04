@@ -42,7 +42,13 @@ body {
   font: 12px/1.45 Verdana, Geneva, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
-  -webkit-font-smoothing: none;
+  /* Anti-aliasing GRAYSCALE: sem subpixel (ClearType). O subpixel renderiza
+     as bordas das letras com franjas coloridas (vermelho de um lado, azul do
+     outro) — parecia "spray vermelho" por cima dos textos em telas Windows.
+     `antialiased` força AA cinza em todos os navegadores (Chrome/Edge/FF). */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
 }
 
 img { image-rendering: pixelated; }

@@ -892,9 +892,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12, 40);
   }
 
-  const pimg = OutfitRenderer.forPlayer(player, "e", 0);
-  // Posição do player: com mapa .otbm ele fica PARADO no spawn do mapa;
-  // sem mapa usa a baia procedural (com lunge ao golpear).
+  const pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);
+  // Posição do player: com mapa .otbm ele fica no spawn do mapa; sem mapa
+  // usa a baia procedural. playerPos/dummyPos sempre existem no modo dummy
+  // (o fallback tem posições fixas), então a animação sempre mira o dummy.
   let px, py;
   if (training.playerPos) {
     px = training.playerPos.x * W;
@@ -903,33 +904,57 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     px = W * 0.28;
     py = H * 0.64;
   }
-  // Animação do golpe no modo dummy (como no client/baiakidle):
+  // Animação do golpe (como no client/baiakidle):
   //  - SEM flutuação: o personagem fica colado no chão (sem bob senoidal);
-  //  - no mapa .otbm a ARMA VOA do player até o dummy (training.proj);
-  //  - sem mapa (fallback): alterna frames de caminhada 1/2 + passo fixo.
-  let lunge = 0;
-  let atkFrame = 0;
-  if (!training.playerPos && training.mode === "dummy" && training.lungeT > 0) {
-    const prog = 1 - training.lungeT / 180;
-    lunge = W * 0.02;                       // avanço fixo durante o golpe
+  //  - o personagem ENCARA o dummy e avança um passo na direção dele
+  //    (lunge) enquanto a exercise weapon é usada (proj voando até lá);
+  //  - alterna frames de caminhada 1/2 durante o gesto.
+  let lungeX = 0, lungeY = 0, atkFrame = 0;
+  if (training.mode === "dummy" && training.lungeT > 0) {
+    const prog = 1 - training.lungeT / 230;
+    const mag = W * 0.02 * ((training.proj && training.proj.lunge) || 1);
+    const alvo = (training.proj && training.proj.to) ||
+      (training.dummyPos || { x: 0.70, y: 0.62 });
+    const dx = alvo.x - ((training.playerPos || { x: 0.28 }).x);
+    const dy = alvo.y - ((training.playerPos || { y: 0.64 }).y);
+    const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy));
+    lungeX = (dx / len) * mag;
+    lungeY = (dy / len) * mag;
     atkFrame = (Math.floor(prog * 6) % 2) + 1;  // alterna frames 1 e 2
     training.lungeT -= dt;
   }
-  const pxF = px + lunge;
+  const pxF = px + lungeX, pyF = py + lungeY;
   const pimgAtk = (atkFrame && spriteReady(pimg))
-    ? (OutfitRenderer.forPlayer(player, "e", atkFrame) || pimg) : pimg;
+    ? (OutfitRenderer.forPlayer(player, training.facing || "e", atkFrame) || pimg) : pimg;
   if (spriteReady(pimgAtk)) {
     // mesma escala do combate: tibiaScale(W) = tilePx / 32, assim o
     // personagem tem o MESMO tamanho na sala de treino e nas hunts
     const sc = tibiaScale(W);
     const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
     // SEM bob: sprite fixa no chão, como no client
-    const top = py - h / 2;
+    const top = pyF - h / 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath(); ctx.ellipse(pxF, py + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(pxF, pyF + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
     ctx.drawImage(pimgAtk, pxF - w / 2, top, w, h);
-    drawPlayerStatus(ctx, pxF, top - 14, py, player, player.config.barMode, Math.max(26, w * 0.42));
+    drawPlayerStatus(ctx, pxF, top - 14, pyF, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, pxF, top - 14, dt);
+
+    // Exercise Shield: durante o gesto de usar a arma no dummy, o escudo
+    // fica erguido na frente do personagem (como o uso no client).
+    if (training.mode === "dummy" && training.lungeT > 0 &&
+        training.weapon === "exercise-shield" && !(training.proj && training.proj.missile)) {
+      const simg = Sprites.get("assets/ui/training/exercise-shield.gif");
+      if (simg && simg.complete && simg.naturalWidth) {
+        const ts = tilePx(W);
+        const ws = ts * 0.85, hs = ts * 0.85;
+        const sdx = (training.facing === "w") ? -0.5 : ((training.facing === "e") ? 0.45 : 0);
+        const sdy = (training.facing === "n") ? -0.7 : 0.15;
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.drawImage(simg, pxF + sdx * ws - ws / 2, pyF + sdy * ws - hs / 2, ws, hs);
+        ctx.restore();
+      }
+    }
   }
 
   // Posição do dummy: com mapa .otbm usa a célula `mob` marcada no editor;
@@ -1006,31 +1031,72 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.fillRect(tx - 41, ty - 54, 82, 5);
   }
 
-  // --- Arma voando (modo dummy com mapa .otbm): a exercise weapon é
-  // arremessada do player até o dummy a cada golpe, como no client.
+  // --- Exercise weapon sendo USADA no dummy (useitemid onitemid): o
+  // projétil voa do player até o dummy a cada golpe, com a sprite certa
+  // para a arma e a direção do voo:
+  //   melee  -> whirlwind (espada/machado/maca girando) — sprite 8 direções
+  //   ranged -> flecha
+  //   cast   -> projétil mágico (gelo pro cajado, energia pra varinha)
+  //   shield/fist -> sem projétil: o efeito do golpe sai no dummy
+  // Enquanto a ação acontece, o dummy fica marcado com o quadrado de alvo
+  // amarelo do client (useitemid onitemid).
   if (training.proj) {
     const pr = training.proj;
     pr.t += dt;
     const p = Math.min(1, pr.t / pr.dur);
     const ex = (pr.from.x + (pr.to.x - pr.from.x) * p) * W;
     const ey = (pr.from.y + (pr.to.y - pr.from.y) * p) * H;
-    const isWeaponIcon = !pr.missile || pr.missile === "weapon";
-    const icon = isWeaponIcon
-      ? ("assets/ui/training/" + ((EXERCISE_WEAPONS[pr.weapon] || {}).icon || "exercise-sword.gif"))
-      : pr.missile;
-    const wimg = Sprites.get(icon);
-    if (wimg && wimg.complete && wimg.naturalWidth) {
-      const ts = tilePx(W);
-      const ws = ts * 0.75, hs = ts * 0.75;
-      ctx.save();
-      // giro suave enquanto voa + sombra no chão
-      ctx.translate(ex, ey - hs * 0.3);
-      ctx.rotate(Math.sin(p * Math.PI * 3) * 0.5);
-      ctx.drawImage(wimg, -ws / 2, -hs / 2, ws, hs);
-      ctx.restore();
-      ctx.fillStyle = "rgba(0,0,0,.3)";
-      ctx.beginPath(); ctx.ellipse(ex, ey + hs * 0.35, ws * 0.25, 4, 0, 0, 7); ctx.fill();
+
+    // quadrado de alvo no dummy enquanto a arma está sendo usada
+    const tsAlvo = tilePx(W);
+    ctx.strokeStyle = "rgba(255, 225, 90, .95)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(tx - tsAlvo * 0.42, ty - tsAlvo * 0.52,
+                   tsAlvo * 0.84, tsAlvo * 1.0);
+
+    const hasMissile = !!pr.missile && pr.missile !== "weapon";
+    if (hasMissile) {
+      // sprite oficial do projetil na direção do voo (como no combate)
+      const mimg = Sprites.missile(pr.missile, pr.dir || missileDir(pr.from.x, pr.from.y, pr.to.x, pr.to.y));
+      if (mimg && mimg.complete && mimg.naturalWidth) {
+        const sc = tibiaScale(W);
+        const mw = mimg.naturalWidth * sc, mh = mimg.naturalHeight * sc;
+        // melee: a arma gira enquanto voa (whirlwind); ranged/cast voam reto
+        ctx.save();
+        ctx.translate(ex, ey - mh * 0.25);
+        if (pr.kind === "melee") ctx.rotate(Math.sin(p * Math.PI * 3) * 0.9);
+        ctx.drawImage(mimg, -mw / 2, -mh / 2, mw, mh);
+        ctx.restore();
+        ctx.fillStyle = "rgba(0,0,0,.3)";
+        ctx.beginPath(); ctx.ellipse(ex, ey + mh * 0.3, mw * 0.22, 4, 0, 0, 7); ctx.fill();
+      } else {
+        // fallback: risco luminoso
+        ctx.strokeStyle = "#ffe680";
+        ctx.globalAlpha = 0.35 + (1 - p) * 0.45;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo((pr.from.x + (pr.to.x - pr.from.x) * Math.max(0, p - 0.18)) * W,
+                   (pr.from.y + (pr.to.y - pr.from.y) * Math.max(0, p - 0.18)) * H);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.fillStyle = "#ffe680";
+        ctx.beginPath(); ctx.arc(ex, ey, 3, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    } else if (pr.kind === "fist") {
+      // soco: um rastro curto de impacto indo até o dummy
+      const fpx = (pr.from.x + (pr.to.x - pr.from.x) * Math.max(0, p - 0.25)) * W;
+      const fpy = (pr.from.y + (pr.to.y - pr.from.y) * Math.max(0, p - 0.25)) * H;
+      ctx.strokeStyle = "rgba(255, 220, 120, .5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(fpx, fpy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
     }
+    // shield: sem projétil — o escudo fica erguido na frente do personagem
+    // (desenhado junto ao player) e o bash-shield sai no dummy na chegada.
+
     // impacto no dummy quando a arma chega (uma vez por golpe)
     if (p >= 1 && !pr.hitFx) {
       pr.hitFx = true;

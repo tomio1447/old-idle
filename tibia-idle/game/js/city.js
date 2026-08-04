@@ -48,11 +48,37 @@ const NPCS = {
   },
 };
 
+/* Visual de cada exercise weapon ao ser USADA no dummy — simula o
+ * useitemid onitemid do client (usar o item da arma no item dummy):
+ *   - melee  (espada/machado/maca): a arma gira voando até o dummy + impacto;
+ *   - ranged (arco): flecha voa na direção do dummy;
+ *   - cast   (cajado/varinha): projétil mágico (gelo / energia);
+ *   - shield (escudo): golpe de escudo no dummy (sem projétil — o escudo
+ *     fica erguido na frente do personagem e o bash acontece no dummy);
+ *   - fist   (wraps): soco no dummy (sem projétil — o corpo avança).
+ * `lunge` escala o avanço do personagem durante o gesto; `missile` é o
+ * nome base do projetil (sem direção — o client escolhe a sprite pelos 8
+ * ângulos, como no combate). */
 const EXERCISE_FX = {
-  "exercise-sword": { missile: "assets/missile/whirlwind-sword_e.png", fx: "hit-area" },
-  "exercise-axe":   { missile: "assets/missile/whirlwind-axe_e.png",   fx: "hit-area" },
-  "exercise-club":  { missile: "assets/missile/whirlwind-club_e.png",  fx: "hit-area" },
+  "exercise-sword": { kind: "melee",  missile: "whirlwind-sword", fx: "hit-area",      lunge: 1.0 },
+  "exercise-axe":   { kind: "melee",  missile: "whirlwind-axe",   fx: "hit-area",      lunge: 1.0 },
+  "exercise-club":  { kind: "melee",  missile: "whirlwind-club",  fx: "hit-area",      lunge: 1.0 },
+  "exercise-bow":   { kind: "ranged", missile: "arrow",           fx: "hit-area",      lunge: 0.25 },
+  "exercise-rod":   { kind: "cast",   missile: "small-ice",       fx: "ice-attack",    lunge: 0.25 },
+  "exercise-wand":  { kind: "cast",   missile: "energy",          fx: "energy-hit",    lunge: 0.25 },
+  "exercise-shield":{ kind: "shield", missile: null,              fx: "bash-shield",   lunge: 0.55 },
+  "exercise-wraps": { kind: "fist",   missile: null,              fx: "fist-thousand", lunge: 1.35 },
 };
+
+/* Direção cardinal (n/e/s/w) de um deslocamento — usada para o personagem
+ * encarar o dummy durante o uso da exercise weapon. */
+function dirFromDelta(dx, dy) {
+  const ang = Math.atan2(dy, dx);
+  if (ang >= -Math.PI / 4 && ang <= Math.PI / 4) return "e";
+  if (ang > Math.PI / 4 && ang <= 3 * Math.PI / 4) return "s";
+  if (ang < -3 * Math.PI / 4 || ang > 3 * Math.PI / 4) return "w";
+  return "n";
+}
 
 /* Catalogo da loja de equipamentos, por faixa de nivel.
  * Precos derivam do valor de venda do item (markup de 4x). */
@@ -430,6 +456,10 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
       dummyPos = cellCenter(huntMap.mob[0]);
     }
   }
+  // Fallback (mapa .otbm indisponível): posições fixas da sala procedural —
+  // assim a animação SEMPRE mira no dummy, com ou sem mapa.
+  if (!playerPos) playerPos = { x: 0.28, y: 0.64 };
+  if (!dummyPos) dummyPos = { x: 0.70, y: 0.62 };
   return {
     startedAt: Date.now(), time: 0, hitCd: 500, hits: 0,
     // marca o contexto como treino: consumeAmmoCharge e o gasto de supply
@@ -440,9 +470,10 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
     huntMap: huntMap || null,
     playerPos: playerPos,
     dummyPos: dummyPos,
-    proj: null,           // arma voando: { t, dur, from, to, weapon }
+    proj: null,           // arma voando: { t, dur, from, to, weapon, kind, missile, fx, lunge, dir }
     projHitFx: false,
     lungeT: 0,            // animação do golpe (ms restantes)
+    facing: "e",          // direção que o personagem encara (n/e/s/w)
     skill: skill, lastMsg: 0, hasteUntil: 0, lightUntil: 0,
     stats: { hits: 0, damage: 0, skillUps: 0, shieldUps: 0, manaSpent: 0,
              supplyUsed: {}, supplyBought: {}, supplyCost: 0 },
@@ -606,20 +637,32 @@ function academyTrainingTick(t, p, dt, now) {
   t.events.push({ type: "hit", skill: t.skill, dmg: dmg, mode: t.mode,
                   weapon: t.weapon,
                   skillUp: skillUp, shieldUp: shieldUp });
-  // Animação do golpe no modo dummy: a exercise weapon VOIA do player até
-  // o dummy (como no client — a arma é arremessada a cada golpe). O
-  // personagem fica parado; `proj` carrega a trajetória para o drawAcademy.
+  // Animação do golpe no modo dummy: o personagem MIRA no dummy e a
+  // exercise weapon é "usada" nele (simula o useitemid onitemid do client —
+  // usar o item da arma no item dummy). Cada arma tem o próprio visual:
+  // golpe melee girando, flecha, projétil mágico, escudo erguido ou soco.
   if (t.mode === "dummy" && t.playerPos && t.dummyPos) {
-    const ef = EXERCISE_FX[t.weapon] || { missile: "weapon", fx: "block-hit" };
+    const ef = EXERCISE_FX[t.weapon] ||
+      { kind: "melee", missile: "whirlwind-sword", fx: "block-hit", lunge: 1 };
+    // direção que o personagem deve encarar durante o gesto
+    const ddx = t.dummyPos.x - t.playerPos.x;
+    const ddy = t.dummyPos.y - t.playerPos.y;
+    t.facing = dirFromDelta(ddx, ddy);
     t.proj = {
-      t: 0, dur: 300,
+      t: 0,
+      dur: (ef.kind === "ranged" || ef.kind === "cast") ? 340 : 260,
       from: { x: t.playerPos.x, y: t.playerPos.y },
       to: { x: t.dummyPos.x, y: t.dummyPos.y },
       weapon: t.weapon,
+      kind: ef.kind,
       missile: ef.missile,
       fx: ef.fx,
+      lunge: ef.lunge || 1,
+      dir: missileDir ? missileDir(t.playerPos.x, t.playerPos.y,
+                                  t.dummyPos.x, t.dummyPos.y) : "e",
     };
     t.projHitFx = false;
+    t.lungeT = 230;      // o personagem faz o gesto enquanto a arma vai
   } else {
     t.lungeT = 180;
   }
