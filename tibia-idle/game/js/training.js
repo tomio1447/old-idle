@@ -128,6 +128,8 @@ function startDummyTraining(p, weaponId) {
     G.combat = null;
     addLog("info", `Treino com <b>${w.name}</b> no Ferumbras Exercise Dummy (regen de stamina 3:1).`);
     toast(`Ferumbras Dummy: <b>${w.name}</b> ativa`, "level");
+    // PARTY: sala de exercise weapons conta como Área de Treino (pode convidar)
+    if (typeof partyReportZone === "function") partyReportZone({ zone: "training", training: "dummy" });
     renderAll();
   };
 

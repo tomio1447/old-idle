@@ -754,6 +754,8 @@ function startBoss(id) {
   G.inCity = false;
   addLog("death", `Você entrou no boss <b>${boss.name}</b>. Cooldown iniciado: 16h.`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
+  // PARTY: líder entrou numa sala de boss -> membros são teleportados
+  if (typeof partyReportZone === "function") partyReportZone({ zone: "boss", boss: id });
   renderAll();
 }
 
@@ -811,6 +813,10 @@ function startHunt(id, instanceMode) {
     spawnWave(G.combat, G.p);
     addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
     toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
+    // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
+    if (typeof partyReportZone === "function") {
+      partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+    }
     renderAll();
   });
 }
@@ -824,6 +830,8 @@ function stopHunt() {
   // ao chegar na cidade o char descansa: cura completa
   const m = maxStats(G.p);
   G.p.hp = m.hp; G.p.mp = m.mp;
+  // PARTY: líder voltou para a safe zone -> limpa follows pendentes
+  if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
   renderAll();
 }
 
@@ -843,6 +851,8 @@ function startAcademy() {
   G.combat = null;
   addLog("info", "Teleportado para a <b style='color:#9ce84a'>Academia Safezone</b>.");
   toast("Academia Safezone: Treiner ativo", "level");
+  // PARTY: Área de Treino é zona permitida para convidar
+  if (typeof partyReportZone === "function") partyReportZone({ zone: "training", training: "academy" });
   renderAll();
   openAcademyConjureModal(false);
 }
@@ -860,6 +870,8 @@ function stopAcademy(log) {
     toast("Voltou para a cidade");
   }
   G.activeNpc = null;
+  // PARTY: líder voltou para a safe zone
+  if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
   renderAll();
 }
 
@@ -1679,6 +1691,12 @@ function startGame(p) {
   window.addEventListener("beforeunload", save);
   setInterval(save, 20000);
   startBackgroundTick();   // idle continua rodando com a aba minimizada
+
+  // PARTY online: polling leve (convites + follow) + reporta a zona inicial
+  if (typeof partyStartPolling === "function") partyStartPolling();
+  if (typeof partyReportZone === "function" && typeof partyCurrentZone === "function") {
+    setTimeout(() => partyReportZone(partyCurrentZone()), 1500);
+  }
 }
 
 function bindControls() {

@@ -158,3 +158,61 @@ async function marketBank(token) {
   const r = await _api("GET", "/api/market/bank", null, token);
   return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
 }
+
+/* ------------------------------ PARTY (multiplayer) ------------------------------
+ * Convites assíncronos + follow. API crua (accountParty*) — os wrappers de
+ * alto nível vivem em js/party.js (partyOnlineCreate/Invite/Leave etc.).
+ * Todas usam o token da sessão (sessionStorage["tibia-idle-token"]) e o
+ * char_id do personagem ativo (sessionStorage["tibia-idle-char"]).
+ * OBS: os nomes NÃO podem colidir com as funções locais de party.js
+ * (partyLeave, partyAddMember...), por isso o prefixo accountParty. */
+
+async function accountPartyCreate(charId) {
+  const r = await _api("POST", "/api/party/create", { token: sessionToken(), char_id: charId });
+  return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyInvite(charId, inviteeName) {
+  const r = await _api("POST", "/api/party/invite", { token: sessionToken(), char_id: charId, invitee_name: inviteeName });
+  return r.data.ok ? { ok: true, invite: r.data.invite } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyInbox() {
+  const r = await _api("GET", "/api/party/inbox", null, sessionToken());
+  return r.data.ok ? { ok: true, invites: r.data.invites || [] } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyAccept(inviteId) {
+  const r = await _api("POST", "/api/party/accept", { token: sessionToken(), invite_id: inviteId });
+  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyDecline(inviteId) {
+  const r = await _api("POST", "/api/party/decline", { token: sessionToken(), invite_id: inviteId });
+  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyLeave(charId) {
+  const r = await _api("POST", "/api/party/leave", { token: sessionToken(), char_id: charId });
+  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyKick(charId, memberId) {
+  const r = await _api("POST", "/api/party/kick", { token: sessionToken(), char_id: charId, member_id: memberId });
+  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyState(charId) {
+  const r = await _api("GET", "/api/party/state?char_id=" + encodeURIComponent(charId), null, sessionToken());
+  return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyReportZone(charId, zoneInfo) {
+  const r = await _api("POST", "/api/party/zone", Object.assign({ token: sessionToken(), char_id: charId }, zoneInfo));
+  return r.data.ok ? { ok: true } : { ok: false, msg: r.data.msg };
+}
+
+async function accountPartyFollow(charId, nonce) {
+  const r = await _api("POST", "/api/party/follow", { token: sessionToken(), char_id: charId, nonce });
+  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+}

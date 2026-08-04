@@ -57,6 +57,27 @@ Guarda contas (login/senha bcrypt, Tibia Coins, role) e personagens
 | POST | `/api/market/deposit` | `{ token, amount }` | Deposita gold no banco do market |
 | POST | `/api/market/withdraw` | `{ token, amount }` | Saca gold do banco do market |
 | GET | `/api/market/bank` | Bearer token | Saldo do banco do market |
+| POST | `/api/party/create` | `{ token, char_id }` | Cria a party (char vira líder) |
+| POST | `/api/party/invite` | `{ token, char_id, invitee_name }` | Líder convida por nome (só em cidade/treino) |
+| GET | `/api/party/inbox` | Bearer token | Convites PENDENTES de todos os chars da conta |
+| POST | `/api/party/accept` | `{ token, invite_id }` | Aceita um convite pendente |
+| POST | `/api/party/decline` | `{ token, invite_id }` | Recusa um convite |
+| POST | `/api/party/leave` | `{ token, char_id }` | Sai da party (líder dissolve) |
+| POST | `/api/party/kick` | `{ token, char_id, member_id }` | Líder remove um membro |
+| GET | `/api/party/state?char_id=` | Bearer token | Estado da party + follow pendente |
+| POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
+| POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
+
+**Regras do Party (multiplayer, convites assíncronos + follow):**
+- O LÍDER só pode CONVIDAR estando em Safe Zone (cidade) ou Área de Treino
+  (academia / sala de exercise weapons) — validado no servidor
+- Convites ficam PENDENTES no servidor (inbox): o jogador pode trocar de
+  personagem da conta, abrir o menu de Party e aceitar de lá
+- FOLLOW: quando o líder muda de mapa, os membros vão juntos. Se ele entra
+  numa hunt (instância non-pvp/pvp) ou sala de boss, os membros recebem um
+  NONCE de uso único com o destino e são teleportados para a MESMA instância
+- Segurança: nonce consumido atomicamente (sem replay), conta errada não
+  aceita convite, membro não reporta zona, 1 party por personagem
 
 **Regras do Market (guia oficial do Tibia 4.3.3):**
 - Fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco

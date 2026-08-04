@@ -174,3 +174,169 @@ function partySessionDuration(p) {
   if (!s) return 0;
   return (s.endedAt || Date.now()) - s.startedAt;
 }
+
+/* ======================================================================
+ * PARTY ONLINE (multiplayer) — convites assíncronos + follow
+ * ======================================================================
+ * Quando o jogo está no modo conta (ACCOUNT_API_URL + token + char),
+ * a party deixa de ser só do roster local e passa a ser uma party REAL
+ * no servidor:
+ *   - o estado é espelhado via GET /api/party/state (polling leve);
+ *   - o líder reporta a zona dele a cada transição de mapa
+ *     (POST /api/party/zone) — só assim ele pode convidar (cidade/treino)
+ *     e os membros recebem o follow;
+ *   - convites ficam PENDENTES no servidor (inbox): o jogador pode
+ *     trocar de personagem, abrir o menu de Party e aceitar de lá;
+ *   - FOLLOW: quando o líder entra numa hunt/boss, o servidor entrega um
+ *     nonce de uso único para cada membro; o membro aplica o teleporte
+ *     localmente (startHunt/startBoss) e CONFIRMA no servidor.
+ * ====================================================================== */
+
+let PARTY_POLL_TIMER = null;
+let PARTY_POLL_MS = 6000;         // polling leve (idle game)
+let PARTY_SYNCING = false;        // evita reentrância no poll
+let PARTY_POLL_N = 0;             // contador p/ buscar inbox a cada N polls
+
+/* O modo online de party exige: API configurada + sessão com token e char. */
+function partyOnlineMode() {
+  try {
+    return typeof accountApiConfigured === "function" && accountApiConfigured() &&
+           !!sessionToken() && !!sessionCharId();
+  } catch (e) { return false; }
+}
+
+/* Zona atual do personagem, derivada do estado do jogo (G). */
+function partyCurrentZone() {
+  if (typeof G === "undefined" || !G || !G.p) return { zone: "unknown" };
+  if (G.training) return { zone: "training", training: G.training.mode || "academy" };
+  if (G.combat && G.combat.boss) return { zone: "boss", boss: G.combat.boss.id };
+  if (G.p.hunt) return { zone: "hunt", hunt: G.p.hunt, instance: G.p.instanceMode || "non-pvp" };
+  if (G.inCity) return { zone: "city" };
+  return { zone: "unknown" };
+}
+
+/* Regra de convite: o LÍDER precisa estar em Safe Zone (cidade) ou
+ * Área de Treino. Usada para habilitar/desabilitar o botão na UI. */
+function partyCanInviteNow() {
+  const z = partyCurrentZone();
+  return z.zone === "city" || z.zone === "training";
+}
+
+/* Reporta a zona atual para o servidor (chamado a cada transição de mapa
+ * nos hooks do game.js e no início do jogo). Só o líder altera o estado;
+ * membros são ignorados pelo servidor (no-op). */
+async function partyReportZone(zoneInfo) {
+  if (!partyOnlineMode()) return;
+  try {
+    await accountPartyReportZone(Number(sessionCharId()), zoneInfo);
+  } catch (e) { /* offline/erro de rede: segue o jogo */ }
+}
+
+/* Poll do estado da party: espelha no save (para a UI) e aplica o
+ * FOLLOW pendente quando o líder mudou de mapa. */
+async function partySync() {
+  if (!partyOnlineMode() || PARTY_SYNCING) return;
+  PARTY_SYNCING = true;
+  try {
+    const r = await accountPartyState(Number(sessionCharId()));
+    if (!r.ok) return;
+    const st = r.state;
+    // espelha no personagem para a UI/badge
+    if (G && G.p) {
+      G.p._partyOnline = st;
+      if (!st) G.p._partyInvites = G.p._partyInvites || 0;
+      if (typeof renderPartyButton === "function") renderPartyButton(G.p);
+    }
+    // inbox (badge ✉) a cada 3 polls (~18s) — mantém leve
+    PARTY_POLL_N += 1;
+    if (PARTY_POLL_N % 3 === 0) {
+      const inbox = await partyFetchInbox();
+      if (inbox.ok && G && G.p) {
+        G.p._partyInvites = (inbox.invites || []).length;
+        if (typeof renderPartyButton === "function") renderPartyButton(G.p);
+      }
+    }
+    // FOLLOW: líder entrou em hunt/boss -> teleporta o membro junto
+    if (st && st.follow && st.follow.nonce && !st.isLeader) {
+      await partyApplyFollow(st.follow);
+    }
+  } catch (e) { /* rede */ } finally {
+    PARTY_SYNCING = false;
+  }
+}
+
+/* Nonces de follow já aplicados (anti-duplicação): mesmo que o poll traga o
+ * mesmo follow 2x (ou a confirmação falhe na rede e o poll repita), o
+ * teleporte só acontece UMA vez por nonce. Limpo após 30s (o servidor
+ * também consome o nonce, então a janela dupla é inofensiva). */
+const PARTY_FOLLOW_USED = {};
+const PARTY_FOLLOW_USED_TTL = 30000;
+
+/* Aplica o follow: teleporta o membro para a MESMA instância/local do
+ * líder e confirma no servidor (consome o nonce de uso único). */
+async function partyApplyFollow(f) {
+  if (!f || !f.nonce) return;
+  const now = Date.now();
+  for (const k in PARTY_FOLLOW_USED) {
+    if (now - PARTY_FOLLOW_USED[k] > PARTY_FOLLOW_USED_TTL) delete PARTY_FOLLOW_USED[k];
+  }
+  if (PARTY_FOLLOW_USED[f.nonce]) return;   // já aplicado (replay de poll)
+  PARTY_FOLLOW_USED[f.nonce] = now;
+  try {
+    if (typeof addLog === "function") {
+      addLog("party", `O líder entrou em um novo local — seguindo para a MESMA instância...`);
+    }
+    if (f.boss) {
+      // sala de boss: o membro é teleportado para o mesmo boss
+      if (typeof startBoss === "function") startBoss(f.boss);
+      else if (typeof toast === "function") toast("Líder entrou no boss (instância indisponível aqui)");
+    } else if (f.hunt) {
+      // local de caça: mesma hunt + MESMA instância (non-pvp/pvp)
+      if (typeof startHunt === "function") {
+        startHunt(f.hunt, f.instance || "non-pvp");
+        if (typeof toast === "function") toast(`Seguindo o líder para <b>${f.hunt}</b>...`, "level");
+      }
+    }
+    // confirma o teleporte no servidor (consome o nonce)
+    await accountPartyFollow(Number(sessionCharId()), f.nonce);
+  } catch (e) { /* rede */ }
+}
+
+/* Inicia o polling da party (chamado no startGame quando online). */
+function partyStartPolling() {
+  partyStopPolling();
+  if (!partyOnlineMode()) return;
+  PARTY_POLL_TIMER = setInterval(() => { partySync(); }, PARTY_POLL_MS);
+  // primeira sincronização imediata (sem esperar o primeiro intervalo)
+  partySync();
+}
+
+function partyStopPolling() {
+  if (PARTY_POLL_TIMER) { clearInterval(PARTY_POLL_TIMER); PARTY_POLL_TIMER = null; }
+}
+
+/* Busca a inbox (convites pendentes de todos os chars da conta). */
+async function partyFetchInbox() {
+  if (!partyOnlineMode()) return { ok: true, invites: [] };
+  try {
+    return await accountPartyInbox();
+  } catch (e) { return { ok: true, invites: [] }; }
+}
+
+/* Cria a party online (char atual vira líder). */
+async function partyOnlineCreate() {
+  if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
+  return await accountPartyCreate(Number(sessionCharId()));
+}
+
+/* Convidar por nome (online). O SERVIDOR valida a zona do líder. */
+async function partyOnlineInvite(name) {
+  if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
+  return await accountPartyInvite(Number(sessionCharId()), name);
+}
+
+/* Sair da party online. */
+async function partyOnlineLeave() {
+  if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
+  return await accountPartyLeave(Number(sessionCharId()));
+}

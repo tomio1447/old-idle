@@ -117,3 +117,69 @@ CREATE TABLE IF NOT EXISTS market_stats (
                 ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_stats_item (slug, tier)
 ) ENGINE=InnoDB;
+
+-- ============================================================
+-- PARTY (multiplayer, convites assíncronos + follow)
+-- ============================================================
+-- Uma party tem um LÍDER (um personagem) e até 4 membros convidados.
+-- O líder só pode CONVIDAR estando em Safe Zone (cidade) ou Área de
+-- Treino (academia / sala de exercise weapons) — validado em
+-- parties.leader_zone.
+--
+-- Follow: quando o líder muda de mapa (hunt/boss), o servidor gera um
+-- NONCE por membro (party_members.follow_*) — token de uso único que o
+-- cliente do membro consome ao confirmar o teleporte. Isso impede
+-- teleporte indevido (o membro só vai onde o líder realmente foi, e só
+-- uma vez por transição) e replay (o nonce é consumido na confirmação).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS parties (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  leader_id      INT UNSIGNED NOT NULL,           -- personagem líder
+  leader_name    VARCHAR(32)  NOT NULL,
+  -- zona atual do líder (validada nas transições de mapa):
+  leader_zone    ENUM('unknown','city','training','hunt','boss')
+                 NOT NULL DEFAULT 'unknown',
+  leader_hunt    VARCHAR(64)  DEFAULT NULL,       -- hunt onde o líder está
+  leader_instance VARCHAR(24) DEFAULT NULL,       -- instância (non-pvp/pvp)
+  leader_otbm    VARCHAR(64)  DEFAULT NULL,       -- mapa .otbm da hunt
+  leader_boss    VARCHAR(64)  DEFAULT NULL,       -- boss onde o líder está
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                   ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_parties_leader (leader_id),       -- 1 party por líder
+  INDEX idx_parties_zone (leader_zone)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS party_members (
+  party_id      INT UNSIGNED NOT NULL,
+  character_id  INT UNSIGNED NOT NULL,
+  joined_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- follow pendente PARA ESTE MEMBRO (nonce de uso único). Quando o líder
+  -- entra em hunt/boss, o servidor preenche aqui o destino + nonce; o
+  -- membro (online agora ou quando logar) consome com POST /api/party/follow.
+  follow_nonce   VARCHAR(64) DEFAULT NULL,
+  follow_hunt    VARCHAR(64) DEFAULT NULL,
+  follow_instance VARCHAR(24) DEFAULT NULL,
+  follow_otbm    VARCHAR(64) DEFAULT NULL,
+  follow_boss    VARCHAR(64) DEFAULT NULL,
+  follow_at      TIMESTAMP NULL,
+  PRIMARY KEY (party_id, character_id),
+  UNIQUE KEY uq_member_character (character_id),  -- 1 party por personagem
+  INDEX idx_members_party (party_id)
+) ENGINE=InnoDB;
+
+-- Convites PENDENTES (inbox assíncrono): o convidado pode trocar para o
+-- personagem, abrir a interface de Party e aceitar de lá. Um personagem
+-- só pode ter 1 convite pendente por vez (UNIQUE invitee_id+status).
+CREATE TABLE IF NOT EXISTS party_invites (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  party_id   INT UNSIGNED NOT NULL,
+  leader_id  INT UNSIGNED NOT NULL,               -- personagem que convidou
+  invitee_id INT UNSIGNED NOT NULL,               -- personagem convidado
+  status     ENUM('pending','accepted','declined','expired','cancelled')
+             NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NULL,                      -- validade do convite
+  UNIQUE KEY uq_invite_pending (invitee_id, status),
+  INDEX idx_invites_party (party_id, status)
+) ENGINE=InnoDB;

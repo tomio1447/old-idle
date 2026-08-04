@@ -21,6 +21,7 @@ const http = require("http");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
+const party = require("./party");   // lógica de PARTY multiplayer
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -561,6 +562,58 @@ async function main() {
       if (req.method === "GET" && url === "/api/market/bank") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const r = await marketBank(db, token);
+        return send(res, r.code, r.body);
+      }
+      // ---- PARTY (multiplayer: convites assíncronos + follow) ----
+      if (req.method === "POST" && url === "/api/party/create") {
+        const body = await readBody(req);
+        const r = await party.partyCreate(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/invite") {
+        const body = await readBody(req);
+        const r = await party.partyInvite(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/party/inbox") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const r = await party.partyInbox(db, token);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/accept") {
+        const body = await readBody(req);
+        const r = await party.partyAccept(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/decline") {
+        const body = await readBody(req);
+        const r = await party.partyDecline(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/leave") {
+        const body = await readBody(req);
+        const r = await party.partyLeave(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/kick") {
+        const body = await readBody(req);
+        const r = await party.partyKick(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/party/state") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await party.partyState(db, token, q.get("char_id"));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/zone") {
+        const body = await readBody(req);
+        const r = await party.partyReportZone(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/party/follow") {
+        const body = await readBody(req);
+        const r = await party.partyFollow(db, body);
         return send(res, r.code, r.body);
       }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
