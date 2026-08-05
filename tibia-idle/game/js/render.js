@@ -59,17 +59,18 @@ function creatureTileOrigin(centerX, centerY, width, height, tile) {
 /* Alguns outfits extraídos do DAT vieram somente com a máscara em escala
  * cinza. O client oficial colore a aparência na composição; aplicamos a
  * mesma etapa após desenhar a máscara, sem adulterar transparência/frames. */
-const MONSTER_TINT = { "rage-squid": "#e04420", "squid-warden": "#2689df" };
+/* A textura do DAT inclui preto opaco fora da silhueta. Usar composição
+ * source-atop pintava esse fundo e criava o quadrado/borrão vermelho ou azul.
+ * Filtro de cor preserva o preto e só colore os tons cinza da criatura. */
+const MONSTER_TINT = {
+  "rage-squid": "sepia(1) saturate(8) hue-rotate(330deg) brightness(.82)",
+  "squid-warden": "sepia(1) saturate(7) hue-rotate(165deg) brightness(.9)",
+};
 function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
-  ctx.drawImage(img, x, y, w, h);
   const tint = MONSTER_TINT[slug];
-  if (!tint) return;
-  ctx.save();
-  ctx.globalCompositeOperation = "source-atop";
-  ctx.globalAlpha = 0.76;
-  ctx.fillStyle = tint;
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
+  if (tint) { ctx.save(); ctx.filter = tint; }
+  ctx.drawImage(img, x, y, w, h);
+  if (tint) ctx.restore();
 }
 
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
