@@ -1106,15 +1106,19 @@ function drainEvents() {
   for (const e of c.events) {
     switch (e.t) {
       case "hit": {
-        // Cor do NUMERO de dano: o fisico e sempre CINZA (cor nativa do
-        // Tibia no game window), independente da raca do alvo. A raca ainda
-        // define o EFEITO (respingo de sangue, poeira, etc.) — mas o numero
-        // nao muda mais para vermelho escuro em criatura de sangue.
-        const raca = (e.el === "physical" || !e.el)
+        // Cor do NUMERO de dano: fisico em VERMELHO contra criaturas de
+        // SANGUE e contra PLAYERS (como o Tibia clássico) — a raca define a
+        // cor (blood = vermelho) e o efeito. As demais racas seguem o esquema
+        // antigo (veneno verde, morto-vivo cinza etc.).
+        const ehFisico = (e.el === "physical" || !e.el);
+        const raca = ehFisico
           ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
           : null;
-        const col = (e.el === "physical" || !e.el)
-          ? (ELEMENTS.physical.color)   // dano fisico: CINZA nativo
+        // blood (e sem raca conhecida) -> VERMELHO; players -> VERMELHO
+        const vermelho = (ehFisico && raca && raca.color === "#c00000") ||
+                         (ehFisico && e.race === "player");
+        const col = ehFisico
+          ? (vermelho ? "#c00000" : (raca ? raca.color : ELEMENTS.physical.color))
           : (ELEMENTS[e.el] || ELEMENTS.physical).color;
         // `dual` marca a parte elemental de uma arma que bate nos dois
         // tipos: desloca o numero para o lado para nao ficar por cima do

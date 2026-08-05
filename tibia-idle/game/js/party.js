@@ -279,8 +279,8 @@ function partyInviteMember(p, memberId) {
     return { ok: false, msg: "Para convidar você precisa estar na Cidade ou na Área de Treino." };
   let d = partyLocalData();
   if (!d) return { ok: false, msg: "Crie a party primeiro (botão Criar party)." };
-  if (d.members.length >= 3)
-    return { ok: false, msg: "Party cheio (máx. 4 personagens no total)." };
+  if (d.members.length >= 4)
+    return { ok: false, msg: "Party cheio (máx. 5 personagens no total)." };
   const chars = typeof getCharacters === "function" ? getCharacters() : [];
   const c = chars.find((x) => String(x.id || characterId(x)) === String(memberId));
   if (!c) return { ok: false, msg: "Personagem não encontrado." };
@@ -313,10 +313,10 @@ function partyAcceptInvite(p, inviteId) {
     return { ok: false, msg: "Este convite não é para este personagem." };
   if (typeof partyCanInviteNow === "function" && !partyCanInviteNow())
     return { ok: false, msg: "Para aceitar um convite você precisa estar na Cidade ou na Área de Treino." };
-  if (d.members.length >= 3) {
+  if (d.members.length >= 4) {
     inv.status = "declined";
     partyLocalWrite(d);
-    return { ok: false, msg: "Party cheia (máx. 4 personagens no total)." };
+    return { ok: false, msg: "Party cheia (máx. 5 personagens no total)." };
   }
   d.members.push({
     id: String(inv.toId), name: inv.toName, voc: p.voc, level: p.level,

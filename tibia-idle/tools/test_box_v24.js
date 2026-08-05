@@ -85,27 +85,29 @@ setTimeout(() => {
       };
       partyInviteMember(lider, String(characterId(sorc))); aceitar(sorc);
       partyInviteMember(lider, String(characterId(pala))); aceitar(pala);
+      partyInviteMember(lider, String(characterId(drui))); aceitar(drui);
       G.p = lider;
-      // convida o druid (4º) — fica pendente e o LÍDER vê
-      const invD = partyInviteMember(lider, String(characterId(drui)));
-      if (!invD.ok) fail("convite do 4º falhou: " + invD.msg);
+      // convida o quinto (5º) — fica pendente e o LÍDER vê
+      const invD = partyInviteMember(lider, String(characterId(quint)));
+      if (!invD.ok) fail("convite do 5º falhou: " + invD.msg);
       const env = partyPendingInvitesAll();
-      if (env.length !== 1 || env[0].toName !== drui.name) fail("líder deveria ver o convite pendente do druid");
+      if (env.length !== 1 || env[0].toName !== quint.name) fail("líder deveria ver o convite pendente do quinto");
       // cancela e re-envia
       const canc = partyCancelInvite(lider, env[0].id);
       if (!canc.ok) fail("cancelar convite falhou: " + canc.msg);
       if (partyPendingInvitesAll().length !== 0) fail("convite deveria ter sido cancelado");
-      // druid volta a aparecer na lista
+      // quinto volta a aparecer na lista
       const dispo = partyAvailableMembers(lider).map(d => d.name);
-      if (dispo.indexOf(drui.name) === -1) fail("druid deveria voltar à lista após cancelar");
-      partyInviteMember(lider, String(characterId(drui))); aceitar(drui);
-      if (partyLocalData().members.length !== 3) fail("deveria ter 3 membros (4 no total), veio " + partyLocalData().members.length);
-      // 5º personagem: bloqueado
+      if (dispo.indexOf(quint.name) === -1) fail("quinto deveria voltar à lista após cancelar");
+      partyInviteMember(lider, String(characterId(quint))); aceitar(quint);
+      if (partyLocalData().members.length !== 4) fail("deveria ter 4 membros (5 no total), veio " + partyLocalData().members.length);
+      // 6º personagem: bloqueado
+      const sexto = createCharacter("SextoP5", "sorcerer", "male");
       G.p = lider;
-      const invQ = partyInviteMember(lider, String(characterId(quint)));
-      if (invQ.ok) fail("5º personagem NÃO deveria entrar (limite 4)");
-      if (!/4 personagens/.test(invQ.msg || "")) fail("msg do limite errada: " + invQ.msg);
-      ok.push("party: limite 4 (líder + 3), convites pendentes visíveis e canceláveis no líder");
+      const invQ = partyInviteMember(lider, String(characterId(sexto)));
+      if (invQ.ok) fail("6º personagem NÃO deveria entrar (limite 5)");
+      if (!/5 personagens/.test(invQ.msg || "")) fail("msg do limite errada: " + invQ.msg);
+      ok.push("party: limite 5 (líder + 4), convites pendentes visíveis e canceláveis no líder");
       localStorage.clear();
       // limpa a party p/ os próximos testes
       const lider2 = createCharacter("LiderBox", "knight", "male");
@@ -211,7 +213,7 @@ setTimeout(() => {
       console.log("  - " + ok.join("\\n  - "));
     `, vctx);
     if (errors.length) throw new Error(errors.join(" | "));
-    console.log("V24 OK — avalanche fix, party limite 4 + convites, exeta res (5s/todos) e modo BOX validados");
+    console.log("V31 OK — avalanche fix, party limite 5 + convites, exeta res (5s/todos) e modo BOX validados");
     process.exit(0);
   } catch (e) {
     console.log("ERRO:", e.message);

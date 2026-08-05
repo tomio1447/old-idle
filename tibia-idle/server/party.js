@@ -31,8 +31,8 @@ const crypto = require("crypto");
 /* Zonas onde o LÍDER pode convidar (regra oficial do pedido). */
 const ZONES_CONVIDAR = ["city", "training"];
 
-/* Máximo de pessoas na party (líder + 3 = 4 no total — pedido do dono). */
-const PARTY_MAX_MEMBERS = 4;
+/* Máximo de pessoas na party (líder + 4 = 5 no total — pedido do dono). */
+const PARTY_MAX_MEMBERS = 5;
 
 /* Validade do convite (ms): 7 dias. */
 const INVITE_TTL_MS = 7 * 24 * 3600 * 1000;

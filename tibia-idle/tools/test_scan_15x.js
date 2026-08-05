@@ -36,10 +36,10 @@ if (!/physical: \{ name: "Físico", color: "#a0a0a0"/.test(cs))
   errors.push("ELEMENTS.physical não é cinza (#a0a0a0)");
 
 const gjs = fs.readFileSync(path.join(GAME, "js", "game.js"), "utf8");
-// o handler "hit" deve usar ELEMENTS.physical.color para físico (não raça)
-if (!/\(e\.el === "physical" \|\| !e\.el\)\s*\n\s*\? \(ELEMENTS\.physical\.color\)/.test(gjs) &&
-    !/\(e\.el === "physical" \|\| !e\.el\)\s*\?\s*\(ELEMENTS\.physical\.color\)/.test(gjs))
-  errors.push("game.js hit: dano físico não usa ELEMENTS.physical.color");
+// o handler "hit" pinta físico em VERMELHO (#c00000) para raça blood e
+// player, e usa a cor da raça nas demais (v31) — já não é cinza fixo
+if (!/vermelho \? "#c00000"/.test(gjs))
+  errors.push("game.js hit: dano físico deveria pintar vermelho para blood/player (v31)");
 
 // ---- 3) sem vestígios 7.4 no runtime ----
 const files = ["core.js", "monsters.js", "outfit.js"];
@@ -57,5 +57,5 @@ if (errors.length) {
   for (const e of errors) console.log("  - " + e);
   process.exit(1);
 }
-console.log("SCAN 15.X OK — itens limpos, dano físico cinza, sem vestígios 7.4 no runtime");
+console.log("SCAN 15.X OK — itens limpos, dano físico vermelho em sangue/player, sem vestígios 7.4 no runtime");
 process.exit(0);

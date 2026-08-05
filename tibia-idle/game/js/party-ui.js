@@ -341,7 +341,7 @@ function renderPartyModal(p, online) {
         ${souLider ? `<button class="sm" data-party-remove="${m.id}">Remover</button>` : ""}
       </div>`).join("") + `</div>`;
   } else if (souLider) {
-    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR. (party máx. 4)</div>`;
+    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR. (party máx. 5)</div>`;
   } else if (souMembro) {
     h += `<div class="dim small center" style="padding:8px">Você é membro do party de <b>${liderChar ? liderChar.name : (ld ? ld.leaderName : "")}</b>.</div>`;
   }
