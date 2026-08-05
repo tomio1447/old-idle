@@ -115,7 +115,7 @@ canvas { image-rendering: pixelated; }
 
 /* ---------------------------------------------------------- barras */
 .bar {
-  height: 14px; position: relative;
+  height: 9px; position: relative;   /* v32: barras menores (era 14px) */
   background: #100e0b;
   border: 1px solid #000;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
@@ -134,7 +134,7 @@ canvas { image-rendering: pixelated; }
 .bar .label {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; color: #fff; text-shadow: 1px 1px 0 #000, 0 0 3px #000;
+  font-size: 8px; color: #fff; text-shadow: 1px 1px 0 #000, 0 0 3px #000;
   font-weight: bold;
   pointer-events: none;
 }
@@ -183,6 +183,8 @@ canvas { image-rendering: pixelated; }
   background: #000;
   border: 2px solid;
   border-color: var(--border-in) var(--border-out) var(--border-out) var(--border-in);
+  /* v27+: canvas da cena em DPR 2x — o downscale 2:1 fica suave (auto) */
+  image-rendering: auto;
 }
 /* Selo da postura (stance) ativa: quadrado no canto superior esquerdo da
  * cena — mesma ideia da area de icones de condicao do cliente oficial.
@@ -397,9 +399,9 @@ button.full { width: 100%; }
 .tab:hover { color: var(--text-bright); }
 
 /* ---------------------------------------------------------- inventario */
-.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, 38px); gap: 3px; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, 32px); gap: 2px; }  /* v32 */
 .inv-item {
-  width: 38px; height: 38px; position: relative;
+  width: 32px; height: 32px; position: relative;  /* v32 */
   background: #1b1915;
   border: 1px solid #4a463e;
   display: flex; align-items: center; justify-content: center;

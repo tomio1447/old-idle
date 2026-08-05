@@ -73,7 +73,10 @@ setTimeout(() => {
 
     // ---------- 4) CSS do #scene: sem pixelated ----------
     const css = fs.readFileSync(path.join(GAME, "css/layout.css"), "utf8");
-    if (!/#scene \{ image-rendering: auto; \}/.test(css)) throw new Error("#scene deveria usar image-rendering:auto");
+    // o #scene tem image-rendering:auto dentro do seu bloco (o otc-complete
+    // sobrescreve display/width mas NÃO o image-rendering)
+    const mScene = css.match(/#scene \{[^}]*image-rendering: auto[^}]*\}/);
+    if (!mScene) throw new Error("#scene deveria usar image-rendering:auto");
     console.log("  - css: #scene com image-rendering:auto (smooth na escala)");
 
     if (errors.length) throw new Error(errors.join(" | "));
