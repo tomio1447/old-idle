@@ -3585,7 +3585,46 @@ function mobEhDebuffer(m) {
   return sk.some((s) => s && (s.cond || s.condDano || s.n === "condition" || s.miss));
 }
 
-/* v39+v41: alvo INTELIGENTE do aliado no party combat. Prioridade:
+/* v42: preço de UM item de loot — GAMEDATA.items[slug].sell (valor de
+ * venda real) com fallback para o MARKETDATA e moedas fixas. */
+function lootItemPrice(slug) {
+  if (slug === "gold-coin") return 1;
+  if (slug === "platinum-coin") return 100;
+  if (slug === "crystal-coin") return 10000;
+  const g = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
+  if (g && g.sell) return g.sell;
+  const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items) ? MARKETDATA.items[slug] : null;
+  if (md && md.price) return md.price;
+  return 0;
+}
+
+/* v42: valor ESPERADO do loot de um mob (chance% * max * preço) — o
+ * quanto ele "paga" em média por kill. Usado pela prioridade de loot. */
+function mobLootValue(m) {
+  const loot = m && m.def && m.def.loot;
+  if (!Array.isArray(loot)) return 0;
+  let v = 0;
+  for (const l of loot) {
+    const preco = lootItemPrice(l.item);
+    if (!preco) continue;
+    v += (l.chance || 0) * (l.max || 1) * preco / 100;
+  }
+  return v;
+}
+
+/* v42: o mob tem ITEM RARO no loot? (preço de venda >= 300 e chance < 50%
+ * — não é ouro/consumível comum). Prioridade de loot mira esses primeiro. */
+function mobLootRaro(m) {
+  const loot = m && m.def && m.def.loot;
+  if (!Array.isArray(loot)) return false;
+  for (const l of loot) {
+    const preco = lootItemPrice(l.item);
+    if (preco >= 300 && (l.chance || 100) < 50) return true;
+  }
+  return false;
+}
+
+/* v39+v41+v42: alvo INTELIGENTE do aliado no party combat. Prioridade:
  * 1) mob SOLTO (a mais de 2 SQM do knight — não está na box): são os
  *    ranged/escapados que o knight NÃO tanka — derrubar logo evita dano;
  * 2) HEALER na box (cura os outros — prolonga a luta);
@@ -3619,6 +3658,22 @@ function partyAllyTarget(c, ent) {
     if (debuffs.length) {
       debuffs.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));
       return debuffs[0];
+    }
+    // v42: PRIORIDADE DE LOOT — com p.config.lootPriority ligado, o aliado
+    // mira o mob de loot mais valioso (item raro primeiro, senão o maior
+    // valor esperado) em vez do sniper puro.
+    const cfgP = ent && ent.p && ent.p.config;
+    if (cfgP && cfgP.lootPriority) {
+      const raros = vivos.filter(mobLootRaro);
+      if (raros.length) {
+        raros.sort((a, b) => mobLootValue(b) - mobLootValue(a));
+        return raros[0];
+      }
+      const comValor = vivos.filter((m) => mobLootValue(m) > 0);
+      if (comValor.length) {
+        comValor.sort((a, b) => mobLootValue(b) - mobLootValue(a));
+        return comValor[0];
+      }
     }
   }
   vivos.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));

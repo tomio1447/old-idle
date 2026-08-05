@@ -144,6 +144,18 @@ function playerThinkStep(c, p, alvo, occ, now) {
   if (fm === "box") return boxThinkStep(c, pl, alvo, occ, now);
   if (fm === "safe") return safeThinkStep(c, pl, alvo, occ, now);
 
+  // v42: AGRESSIVIDADE POR RISCO no jogador ativo (fora da formação — o
+  // knight na box não foge por pack grande, quem cuida dele é a formação).
+  if (boxRiscoFoge(c, Object.assign({}, pl, { p: p }), p.config || {})) {
+    const dirR = boxRiscoFleeDir(c, pl, occ);
+    if (dirR) {
+      pl.speedPts = typeof playerSpeed === "function" ? playerSpeed(p, now) : 110;
+      const okR = beginStep(pl, dirR, occ, true);
+      pl.nextStepAt = now + (okR ? pl.stepDur : 400);
+      return okR;
+    }
+  }
+
   // v33: remoção do Chase/Stand — o personagem SEMPRE fica em STAND: parado
   // encarando o alvo; só anda quando o alvo sai do alcance (persegue para
   // manter o ataque). Kiting continua (distância escolhida pelo jogador).
@@ -372,6 +384,59 @@ function boxSobPressao(c, ent, n) {
   return false;
 }
 
+/* v42: centro do PACK de mobs vivos (média das células) — o ponto de onde
+ * o personagem foge quando o risco configurado manda recuar. */
+function boxPackCentroid(c) {
+  let sx = 0, sy = 0, n = 0;
+  for (const m of (c && c.mobs) || []) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    sx += m.cx; sy += m.cy; n++;
+  }
+  if (!n) return null;
+  return { cx: Math.round(sx / n), cy: Math.round(sy / n) };
+}
+
+/* v42: AGRESSIVIDADE POR RISCO — o personagem deve RECUAR agora?
+ *  - maxPackSize > 0 e mobs vivos > maxPackSize  → não encara pack grande;
+ *  - fleeBelowHp > 0 e HP% < fleeBelowHp e mobs colados >= fleeMobCount
+ *    (default 3) → recua antes de morrer.
+ * O KNIGHT na formação (box/safe) não foge por pack grande (é o tanque da
+ * box) — só recua por HP baixo. `cfg` é o config do personagem. */
+function boxRiscoFoge(c, ent, cfg) {
+  if (!cfg || !c || !c.mobs || !ent || ent.cx === undefined) return false;
+  const vivos = c.mobs.filter((m) => m.hp > 0 && m.cx !== undefined);
+  const maxPack = parseInt(cfg.maxPackSize, 10) || 0;
+  const ehFormacao = !!cfg.attackMode && (cfg.attackMode === "box" || cfg.attackMode === "safe");
+  if (maxPack > 0 && !ehFormacao && vivos.length > maxPack) return true;
+  const fleeHp = parseInt(cfg.fleeBelowHp, 10) || 0;
+  if (fleeHp > 0) {
+    // % de HP: usa ent.maxHp (as entidades do party combat carregam) ou o
+    // maxStats com try/catch (personagem mínimo de teste não tem vocação).
+    let pct = 100;
+    if (ent.maxHp) pct = ((ent.p && ent.p.hp) / ent.maxHp) * 100;
+    else if (typeof maxStats === "function") {
+      try {
+        const mx = maxStats(ent.p || {});
+        if (mx && mx.hp) pct = ((ent.p && ent.p.hp) / mx.hp) * 100;
+      } catch (e) { /* personagem sem voc: não foge por HP */ }
+    }
+    if (pct < fleeHp) {
+      const nCol = vivos.filter((m) => sqmDistance(m, ent) <= 2).length;
+      if (nCol >= (parseInt(cfg.fleeMobCount, 10) || 3)) return true;
+    }
+  }
+  return false;
+}
+
+/* Passo de fuga do RISCO: vai para o vizinho livre mais longe do centro do
+ * pack (ou do mob mais próximo, se não der para calcular o centro). */
+function boxRiscoFleeDir(c, ent, occ) {
+  const centro = boxPackCentroid(c);
+  const from = centro || boxThreatened(c, ent, 3);
+  if (!from) return null;
+  return boxFleeDir(ent, from, occ);
+}
+
 /* Primeiro mob vivo a distância Chebyshev <= thresh da entidade (só para
  * não-knights). Devolve o mob ou null. */
 function boxThreatened(c, ent, thresh) {
@@ -564,6 +629,20 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   if (ent.moving) return false;
   if (ent.nextStepAt && now < ent.nextStepAt) return false;
 
+  // v42: AGRESSIVIDADE POR RISCO — o config pode mandar recuar de pack
+  // grande / HP baixo com mobs colados. Foge do centro do pack ANTES de
+  // qualquer formação.
+  const cfgEnt = (ent.p && ent.p.config) || {};
+  if (boxRiscoFoge(c, ent, cfgEnt)) {
+    const dirR = boxRiscoFleeDir(c, ent, occ);
+    if (dirR) {
+      ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+      const okR = beginStep(ent, dirR, occ, true);
+      ent.nextStepAt = now + (okR ? ent.stepDur : 400);
+      return okR;
+    }
+  }
+
   // v39: DANGER — mob colado no personagem (não-knight): foge 1 passo
   // ANTES de qualquer lógica de formação. O knight recasta exeta e retoma
   // o aggro; o mago/RP não fica parado tomando hit.
@@ -692,6 +771,17 @@ function allyThinkStep(c, ent, alvo, occ, now) {
   ensureCell(ent);
   if (ent.moving) return;
   if (ent.nextStepAt && now < ent.nextStepAt) return;
+  // v42: AGRESSIVIDADE POR RISCO — também vale fora do modo BOX
+  const cfgEnt = (ent.p && ent.p.config) || {};
+  if (boxRiscoFoge(c, ent, cfgEnt)) {
+    const dirR = boxRiscoFleeDir(c, ent, occ);
+    if (dirR) {
+      ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+      const okR = beginStep(ent, dirR, occ, true);
+      ent.nextStepAt = now + (okR ? ent.stepDur : 400);
+      return;
+    }
+  }
   // v39: DANGER — mob colado também foge fora do modo BOX (chase/follow)
   const threat = boxThreatened(c, ent, 1);
   if (threat) {

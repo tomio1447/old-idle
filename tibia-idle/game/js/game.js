@@ -174,6 +174,15 @@ function normalizePlayer(p) {
     lootFilter: "all",
     refillArrow: "",
     refillBolt: "",
+    // v42 — AGRESSIVIDADE POR RISCO + PRIORIDADE DE LOOT (IA):
+    //   maxPackSize: 0 = sem limite (0 desliga); >0 recua de pack maior
+    //   fleeBelowHp: 0 = desligado; % de HP que dispara o recuo (com
+    //     fleeMobCount+ mobs colados)
+    //   lootPriority: true = o aliado mira o mob de loot mais valioso
+    maxPackSize: 0,
+    fleeBelowHp: 0,
+    fleeMobCount: 3,
+    lootPriority: false,
   }, p.config || {});
   // Migracao: o "mystic-dust" verde (poeira mistica criada antes do Canary)
   // foi removido. Saves antigos convertem o que tinham na lootPouch/mochila
