@@ -987,10 +987,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // personagem tem o MESMO tamanho na sala de treino e nas hunts
     const sc = tibiaScale(W);
     const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
-    // SEM bob: sprite fixa no chão, como no client
-    const top = pyF - h / 2;
+    // Pé no centro do SQM: a base da sprite coincide com o centro do tile,
+    // e não o centro geométrico da imagem (que a deixava abaixo do chão).
+    const top = pyF - h;
     ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath(); ctx.ellipse(pxF, pyF + h * 0.42, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(pxF, pyF, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
     ctx.drawImage(pimgAtk, pxF - w / 2, top, w, h);
     drawPlayerStatus(ctx, pxF, top - 14, pyF, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, pxF, top - 14, dt);
@@ -1291,12 +1292,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const sc = creatureScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = 0;
-    // Personagem projetado no MEIO do SQM (pedido do dono): a sprite fica
-    // centralizada horizontal E verticalmente no tile. Antes a base era
-    // ancorada na borda inferior do SQM e o personagem parecia "afundado"
-    // no canto inferior do tile.
+    // Pé no centro do SQM: a coordenada da grade é o centro do piso. A
+    // sprite é desenhada para cima a partir dela, como no client Tibia.
     const tile = tilePx(W);
-    const top = py * H - h / 2;
+    const top = py * H - h;
     // sombra sob os pés, no centro do SQM
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
@@ -1350,8 +1349,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const sc = creatureScale(W);   // v33: aliados 1.18x
       const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
       const tile = tilePx(W);
-      // aliados também centralizados no SQM (mesma regra do personagem ativo)
-      const top = ent.y * H - h2 / 2;
+      // Todos os aliados usam a mesma âncora: pé no centro do SQM.
+      const top = ent.y * H - h2;
       ctx.save();
       if (knocked) ctx.globalAlpha = 0.35;
       // sombra sob os pés, no centro do SQM
@@ -1410,12 +1409,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
         // arte no DAT (32px = 1 SQM, 64px = 2 SQMs). v33: 1.18x maior
         const sc = creatureScale(W);
         const w = spriteW(img) * sc, h = spriteH(img) * sc;
-        // Regra única de ancoragem para toda criatura: o centro geométrico
-        // da sprite coincide com o centro do SQM. A âncora antiga nos pés
-        // deslocava os monstros meio tile para baixo e o push de ataque os
-        // tirava do quadrado ao conjurar/atacar.
+        // Regra única de ancoragem: o PÉ da sprite coincide com o centro
+        // do SQM do chão. Centralizar a imagem inteira deslocava os pés para
+        // baixo; a arte agora cresce para cima a partir do tile correto.
         const tile = tilePx(W);
-        const top = my - h / 2;
+        const top = my - h;
         const atkPush = 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();
