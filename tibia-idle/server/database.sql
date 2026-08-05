@@ -131,6 +131,28 @@ CREATE TABLE IF NOT EXISTS market_stats (
   UNIQUE KEY uq_stats_item (slug, tier)
 ) ENGINE=InnoDB;
 
+-- ------------------------------------------------------------
+-- MARKET HISTORY (histórico de transações — os últimos 600 trades)
+-- Registrado a cada venda/compra concluída. Alimenta a aba Histórico
+-- do Market (guia 4.3.3) e o ranking de negociadores.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS market_history (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  seller_id   INT UNSIGNED NOT NULL,
+  seller_name VARCHAR(32)  NOT NULL,
+  buyer_id    INT UNSIGNED DEFAULT NULL,
+  buyer_name  VARCHAR(32)  DEFAULT NULL,
+  kind        ENUM('item','coins','buy') NOT NULL DEFAULT 'item',
+  slug        VARCHAR(64)  DEFAULT NULL,
+  tier        INT UNSIGNED NOT NULL DEFAULT 0,
+  qty         INT UNSIGNED NOT NULL DEFAULT 1,
+  price       INT UNSIGNED NOT NULL,
+  price_tc    TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_history_created (created_at),
+  INDEX idx_history_item (slug, created_at)
+) ENGINE=InnoDB;
+
 -- ============================================================
 -- PARTY (multiplayer, convites assíncronos + follow)
 -- ============================================================

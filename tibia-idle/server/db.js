@@ -37,6 +37,16 @@ function JsonStore() {
     this.parties = [];
     this.invites = [];
   }
+  // market (stats + histórico) persiste em data/market.json
+  const marketData = this._load("market.json", null);
+  if (marketData && typeof marketData === "object") {
+    this.marketStats = marketData.marketStats || {};
+    this.marketHistoryArr = Array.isArray(marketData.marketHistoryArr)
+      ? marketData.marketHistoryArr : [];
+  } else {
+    this.marketStats = {};
+    this.marketHistoryArr = [];
+  }
   this._save();
 }
 JsonStore.prototype._load = function (file, dft) {
@@ -49,6 +59,9 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.accounts, null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "characters.json"),
     JSON.stringify(this.characters, null, 1));
+  fs.writeFileSync(path.join(DATA_DIR, "market.json"),
+    JSON.stringify({ marketStats: this.marketStats || {},
+                     marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
 };
 JsonStore.prototype._nextId = function (arr) {
   return arr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
@@ -200,6 +213,38 @@ JsonStore.prototype.itemStats = function (slug, tier) {
   const s = this.marketStats[slug + ":" + (tier || 0)];
   if (!s) return null;
   return { count: s.count, avg: Math.round(s.total / Math.max(1, s.count)), last: s.last_price };
+};
+JsonStore.prototype.addMarketHistory = function (rec) {
+  this.marketHistoryArr = this.marketHistoryArr || [];
+  this.marketHistoryArr.unshift({
+    id: this.marketHistoryArr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1,
+    seller_id: rec.seller_id, seller_name: rec.seller_name || "",
+    buyer_id: rec.buyer_id || null, buyer_name: rec.buyer_name || "",
+    kind: rec.kind || "item", slug: rec.slug || null, tier: rec.tier || 0,
+    qty: rec.qty || 1, price: rec.price || 0, price_tc: rec.price_tc ? 1 : 0,
+    created_at: new Date().toISOString(),
+  });
+  if (this.marketHistoryArr.length > 600) this.marketHistoryArr.length = 600;
+  this._save();
+};
+JsonStore.prototype.marketHistory = function (limit) {
+  this.marketHistoryArr = this.marketHistoryArr || [];
+  return this.marketHistoryArr.slice(0, Math.min(600, Math.max(1, Number(limit) || 100)));
+};
+JsonStore.prototype.rankings = function (by, limit) {
+  limit = Math.min(100, Math.max(1, Number(limit) || 50));
+  const chars = Object.keys(this.characters || {}).map((k) => this.characters[k]);
+  let rows = chars.map((c) => {
+    let kills = 0;
+    try {
+      const d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {});
+      kills = Math.floor(d.totalKills || 0);
+    } catch (e) { /* sem data */ }
+    return { id: c.id, name: c.name, voc: c.voc, level: c.level, totalKills: kills };
+  });
+  if (by === "kills") rows.sort((a, b) => (b.totalKills - a.totalKills) || (b.level - a.level));
+  else rows.sort((a, b) => (b.level - a.level));
+  return rows.slice(0, limit);
 };
 
 /* ------------------------------ PARTY ------------------------------ */
@@ -555,6 +600,39 @@ async function MysqlStore() {
         avg: Math.round(s.total / Math.max(1, s.count)),
         last: s.last_price,
       };
+    },
+
+    // ---- MARKET HISTORY (histórico de trades) ----
+    async addMarketHistory(rec) {
+      await this.run(
+        `INSERT INTO market_history
+          (seller_id, seller_name, buyer_id, buyer_name, kind, slug, tier, qty, price, price_tc)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [rec.seller_id, rec.seller_name || "", rec.buyer_id || null,
+         rec.buyer_name || "", rec.kind || "item", rec.slug || null,
+         rec.tier || 0, rec.qty || 1, rec.price || 0, rec.price_tc ? 1 : 0]);
+    },
+    async marketHistory(limit) {
+      limit = Math.min(600, Math.max(1, Number(limit) || 100));
+      return this.query(
+        "SELECT * FROM market_history ORDER BY id DESC LIMIT ?", [limit]);
+    },
+
+    // ---- RANKINGS (leaderboard) ----
+    /* Top personagens por nível (default) ou por total de kills
+     * (JSON_EXTRACT do save). Retorna name, voc, level, totalKills. */
+    async rankings(by, limit) {
+      limit = Math.min(100, Math.max(1, Number(limit) || 50));
+      if (by === "kills") {
+        return this.query(
+          `SELECT id, name, voc, level,
+                  COALESCE(JSON_EXTRACT(data, '$.totalKills'), 0) AS totalKills
+           FROM characters ORDER BY totalKills DESC, level DESC LIMIT ?`,
+          [limit]);
+      }
+      return this.query(
+        "SELECT id, name, voc, level FROM characters ORDER BY level DESC, updated_at ASC LIMIT ?",
+        [limit]);
     },
 
     // ---- PARTY (multiplayer) ----

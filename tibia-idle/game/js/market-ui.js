@@ -12,7 +12,7 @@
  */
 "use strict";
 
-let _mTab = "buy";        // buy | sell | mine | coins
+let _mTab = "buy";        // buy | sell | mine | coins | history
 let _mQ = "";
 let _mCat = "";
 let _mTier = "";
@@ -50,7 +50,9 @@ function marketItemCat(slug) {
 }
 
 function marketOnline() {
-  return typeof accountApiConfigured === "function" && accountApiConfigured();
+  // v36: o Market SEMPRE abre — com a API configurada usa o servidor P2P;
+  // sem API usa o modo LOCAL (market-local.js, ofertas no localStorage).
+  return true;
 }
 
 function openMarket() {
@@ -212,7 +214,10 @@ function renderMarket() {
   }
 
   const tok = sessionToken();
-  if (!tok) {
+  // v36: no modo LOCAL (sem API) o token não é exigido — o market usa o
+  // personagem atual como conta. Com API, o login continua obrigatório.
+  const modoLocal = typeof accountApiConfigured === "function" && !accountApiConfigured();
+  if (!tok && !modoLocal) {
     $("#modal-body").innerHTML = `
       <div class="panel-title"><b>Market (P2P)</b><span style="flex:1"></span>
         <button class="sm" id="market-close">✕</button></div>
@@ -241,6 +246,7 @@ function renderMarket() {
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
         <button class="sm ${_mTab === "coins" ? "primary" : ""}" data-mtab="coins">🪙 Tibia Coins</button>
+        <button class="sm ${_mTab === "history" ? "primary" : ""}" data-mtab="history">🧾 Histórico</button>
         <span style="flex:1"></span>
         <button class="sm" id="m-bank-toggle" title="Depositar/sacar gold do banco">🏦 Banco</button>
       </div>
@@ -256,6 +262,7 @@ function renderMarket() {
   if (_mTab === "buy") renderMarketBuy(body, p);
   else if (_mTab === "sell") renderMarketSell(body, p);
   else if (_mTab === "mine") renderMarketMine(body, p);
+  else if (_mTab === "history") renderMarketHistory(body, p);
   else renderMarketCoins(body, p);
 
   modal.classList.add("show", "wide");
@@ -723,4 +730,49 @@ function renderMarketBank() {
     renderMarketBank();
   });
   $("#m-bank-back").addEventListener("click", () => renderMarket());
+}
+
+/* ---------------------------------------------------------- HISTÓRICO */
+/* Busca o histórico de trades (últimos 600): com API usa o servidor
+ * (GET /api/market/history); no modo local lê do localStorage. */
+async function marketHistoryFetcher(limit) {
+  if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
+    try {
+      const r = await _api("GET", "/api/market/history?limit=" + (limit || 100), null, sessionToken());
+      return r.data.ok ? { ok: true, history: r.data.history || [] } : { ok: false, msg: r.data.msg };
+    } catch (e) { return { ok: false, msg: "Falha ao buscar histórico" }; }
+  }
+  // modo local: lê do localStorage (market-local.js)
+  try {
+    const raw = localStorage.getItem("tibia-idle-market-local-v1");
+    const d = raw ? JSON.parse(raw) : null;
+    return { ok: true, history: (d && d.history) || [] };
+  } catch (e) { return { ok: true, history: [] }; }
+}
+
+function renderMarketHistory(body, p) {
+  body.innerHTML = '<div class="tiny dim">Carregando histórico...</div>';
+  marketHistoryFetcher(200).then((r) => {
+    if (!r.ok) { body.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
+    const hist = r.history || [];
+    if (!hist.length) {
+      body.innerHTML = '<div class="tiny dim">Nenhuma transação ainda — compre ou venda no Market.</div>';
+      return;
+    }
+    body.innerHTML = `<div class="small dim mb4">Últimas ${hist.length} transações (guia 4.3.3)</div>
+      <div class="list" style="max-height:440px">` + hist.map((h) => {
+      const nome = h.kind === "coins"
+        ? (h.qty + " Tibia Coins")
+        : itemName(h.slug || "?") + (h.tier ? " T" + h.tier : "");
+      const preco = h.price_tc ? "🪙 " + fmtFull(h.price) : fmtFull(h.price) + " gp";
+      const quando = h.created_at ? new Date(h.created_at).toLocaleString() : "";
+      return `<div class="shop-row">
+        <div style="flex:1;min-width:0">
+          <div class="small">${nome} <span class="dim">× ${h.qty}</span></div>
+          <div class="tiny dim">${h.seller_name || "?"} → ${h.buyer_name || "?"} · ${quando}</div>
+        </div>
+        <span class="tiny" style="color:#ffe680">${preco}</span>
+      </div>`;
+    }).join("") + `</div>`;
+  });
 }

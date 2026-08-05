@@ -313,6 +313,13 @@ async function marketBuy(db, body, actorName) {
     // -> credita ao vendedor (actor) e "entrega" o item
     await db.addAccountMarketGold(acc.id, valor);
     await db.recordSale(offer.slug, offer.tier || 0, offer.price);
+    // histórico de trade (v36: DB expandida)
+    await db.addMarketHistory({
+      seller_id: acc.id, seller_name: actorName,
+      buyer_id: offer.seller_id, buyer_name: offer.seller_name,
+      kind: "item", slug: offer.slug, tier: offer.tier || 0,
+      qty, price: valor, price_tc: 0,
+    });
     await db.updateMarketOffer(offer.id, {
       status: "sold", qty: offer.qty - qty,
       buyer_id: acc.id, bought_at: new Date().toISOString(),
@@ -352,6 +359,13 @@ async function marketBuy(db, body, actorName) {
     status: "sold", qty: offer.qty - qty,
     buyer_id: acc.id, bought_at: new Date().toISOString(),
   });
+  // histórico de trade (v36: DB expandida)
+  await db.addMarketHistory({
+    seller_id: offer.seller_id, seller_name: offer.seller_name,
+    buyer_id: acc.id, buyer_name: actorName,
+    kind: offer.kind, slug: offer.slug, tier: offer.tier || 0,
+    qty, price: valor, price_tc: !!offer.price_tc,
+  });
   return {
     code: 200,
     body: {
@@ -366,6 +380,20 @@ async function marketBuy(db, body, actorName) {
       price_tc: !!offer.price_tc,
     },
   };
+}
+
+/* Histórico de trades (últimos 600). */
+async function marketHistory(db, token, limit) {
+  const acc = await db.findAccountByToken(token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const rows = await db.marketHistory(limit);
+  return { code: 200, body: { ok: true, history: rows } };
+}
+
+/* Rankings (top personagens por nível ou kills). */
+async function rankings(db, by, limit) {
+  const rows = await db.rankings(by, limit);
+  return { code: 200, body: { ok: true, rankings: rows } };
 }
 
 /* Cancela uma oferta (só o dono); devolve item/TC. */
@@ -569,6 +597,18 @@ async function main() {
       if (req.method === "GET" && url === "/api/market/bank") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const r = await marketBank(db, token);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/market/history") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await marketHistory(db, token, Number(q.get("limit")) || 100);
+        return send(res, r.code, r.body);
+      }
+      // ---- RANKINGS (DB expandida) ----
+      if (req.method === "GET" && url === "/api/rankings") {
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await rankings(db, q.get("by") || "level", Number(q.get("limit")) || 50);
         return send(res, r.code, r.body);
       }
       // ---- PARTY (multiplayer: convites assíncronos + follow) ----
