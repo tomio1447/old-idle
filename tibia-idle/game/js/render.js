@@ -1201,7 +1201,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.kind === "damage" ? "3px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.font = (f.kind === "damage" ? "6px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
     ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
@@ -1364,16 +1364,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const atkPush2 = 0;
       ctx.drawImage(img, ent.x * W - w2 / 2 + atkPush2, top, w2, h2);
       ctx.restore();
-      // nome + barra de vida compacta (como nos monstros)
-      const pct = Math.max(0, Math.min(1, pp.hp / (maxStats(pp).hp || 1)));
-      drawTibiaBar(ctx, ent.x * W, top - 9, pct, knocked ? "#7a7a7a" : "#6ec9ff");
-      ctx.font = "10px Tahoma, sans-serif";
-      ctx.textAlign = "center";
-      ctx.strokeStyle = "rgba(0,0,0,.85)";
-      ctx.lineWidth = 3;
-      ctx.strokeText(ent.name + (knocked ? " (inconsciente)" : ""), ent.x * W, top - 15);
-      ctx.fillStyle = knocked ? "#9a9a9a" : "#d8ecff";
-      ctx.fillText(ent.name + (knocked ? " (inconsciente)" : ""), ent.x * W, top - 15);
+      // Todo membro da party mostra HP E mana na cena. Antes os aliados
+      // desenhavam somente a vida, enquanto o personagem controlado tinha
+      // as duas barras — agora usam o mesmo componente de status.
+      const allyMax = maxStats(pp);
+      const hpPct = Math.max(0, Math.min(1, pp.hp / (allyMax.hp || 1)));
+      const mpPct = Math.max(0, Math.min(1, (Number(pp.mp) || 0) / (allyMax.mp || 1)));
+      drawNameBars(ctx, ent.x * W, top - 15,
+        ent.name + (knocked ? " (inconsciente)" : ""), hpPct, mpPct);
       // quadro de alvo azul no aliado ATIVO é desenhado no bloco do player;
       // aqui marca quem está sendo controlado com um leve contorno dourado
       if (!knocked) {
@@ -1587,7 +1585,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.kind === "damage" ? "3px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.font = (f.kind === "damage" ? "6px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
     ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
