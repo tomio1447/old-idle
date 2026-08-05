@@ -937,9 +937,20 @@ function openInstanceModal(id) {
   // lembra a ultima instancia escolhida e destaca no modal — facilita
   // repetir a mesma hunt sem ler os dois blocos de novo
   const ultima = G.p && G.p.lastInstanceChoice;
+  const modo = (G.p && G.p.config && G.p.config.attackMode) || "chase";
+  const modos = [["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"],
+                 ["box", "BOX"], ["safe", "SAFE"]];
   $("#modal-body").innerHTML = `
     <div class="panel-title">Escolha a instância — ${hu.name}</div>
     <div class="panel-body">
+      <div class="small mb4" style="color:#d4af37;font-weight:bold">🎯 Modo de Hunt</div>
+      <div class="row wrap mb8" style="gap:6px">
+        ${modos.map(([mid, label]) =>
+          `<button class="sm ${modo === mid ? "primary" : ""}" data-hunt-mode="${mid}" title="${
+            mid === "box" ? "Formação tática por vocação (knight no melhor spot, RP nas retas, magos na área)"
+            : mid === "safe" ? "Fica nos cantos da tela, longe da box, mas no range das spells"
+            : ""}">${label}</button>`).join("")}
+      </div>
       <div class="shop-row" style="align-items:flex-start">
         <div style="flex:1">
           <div class="small" style="color:#9ce84a">Instância non-pvp
@@ -959,6 +970,12 @@ function openInstanceModal(id) {
       <button class="full mt8" id="instance-cancel">Cancelar</button>
     </div>`;
   $("#modal").classList.add("show");
+  // MODO DE HUNT: escolhido aqui vale para a hunt inteira (party inclusa)
+  $$("#modal-body [data-hunt-mode]").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (G.p && G.p.config) G.p.config.attackMode = b.dataset.huntMode;
+      openInstanceModal(id);   // re-renderiza destacando o escolhido
+    }));
   $$("#modal-body [data-instance]").forEach((b) =>
     b.addEventListener("click", () => {
       $("#modal").classList.remove("show");

@@ -127,11 +127,13 @@ function playerThinkStep(c, p, alvo, occ, now) {
   if (!alvo) return false;
 
   const modo = (p.config && p.config.attackMode) || "chase";
-  // MODO BOX: segue a formação tática (knight no centro, RP nas retas a
-  // 2 SQM, magos na posição de área) — igual aos aliados.
-  if (modo === "box") {
-    return boxThinkStep(c, pl, alvo, occ, now);
-  }
+  // MODO BOX / SAFE: segue a formação tática (knight no melhor spot do
+  // centro, RP nas retas a 2 SQM, magos na posição de área — ou SAFE nos
+  // cantos da tela). O modo de hunt pode vir do modal de instância
+  // (c.huntMode) e vale para a party inteira.
+  const fm = formationMode(c, { p: p });
+  if (fm === "box") return boxThinkStep(c, pl, alvo, occ, now);
+  if (fm === "safe") return safeThinkStep(c, pl, alvo, occ, now);
   if (modo === "stand") {
     pl.dir = dirTo(pl, alvo);
     pl.nextStepAt = now + 200;
@@ -186,16 +188,19 @@ function playerRangeSQM(p) {
 }
 
 /* ======================================================================
- * MODO BOX — posicionamento tático por vocação (party combat, 4 membros)
+ * MODO BOX / SAFE — posicionamento tático por vocação (party combat)
  * ======================================================================
- * Novo modo de ataque "box" (Helper → Ataque). Cada vocação tem a função
- * dela na formação:
- *   - KNIGHT: fica no MEIO da sala (spawn/centro do mapa), parado,
- *     tankando, batendo e castando exeta res + exeta amp res;
- *   - PALADIN (RP): fica a 2 SQM do knight, SEMPRE nas RETAS (N/S/L/O,
- *     nunca diagonais), na reta que pega mais alvos, batendo de longe;
- *   - DRUID/SORCERER/MONK: se posiciona (reta ou diagonal, 1-2 SQM do
- *     centro) para atingir o MÁXIMO de alvos com as magias de área (raio 3).
+ * Novos modos de ataque (Helper → Ataque → Modo de Hunt):
+ *   - BOX: cada vocação assume a posição dela na formação —
+ *       KNIGHT: faz uma CHECAGEM de células (x/y) ao redor do centro e
+ *         para no MELHOR SPOT (mais mobs no alcance do exeta/bate), parado
+ *         tankando e castando exeta res + exeta amp res;
+ *       PALADIN (RP): a 2 SQM do knight, SEMPRE nas RETAS (nunca
+ *         diagonais), na reta que pega mais alvos;
+ *       DRUID/SORCERER/MONK: na célula que atinge o MÁXIMO de alvos com as
+ *         magias de área (raio 3);
+ *   - SAFE: o personagem vai para os CANTOS da tela, LONGE da box, mas
+ *     ainda dentro do alcance das spells (raio 7) — farma do canto.
  * ====================================================================== */
 
 /* Centro da "sala" do BOX: spawn do mapa (onde o knight fica) ou centro. */
@@ -232,6 +237,39 @@ function boxCellLivre(cx, cy, occ) {
   return true;
 }
 
+/* MODO DE HUNT ativo para uma entidade: "box", "safe" ou "" (nenhum).
+ * O modo pode vir do config do personagem OU do modo escolhido no modal de
+ * instância da hunt (c.huntMode) — vale para a party inteira. */
+function formationMode(c, ent) {
+  const m = ent && ent.p && ent.p.config ? ent.p.config.attackMode : "";
+  if (m === "box" || m === "safe") return m;
+  if (c && c.huntMode && (c.huntMode === "box" || c.huntMode === "safe")) {
+    return c.huntMode;
+  }
+  return "";
+}
+
+/* MELHOR SPOT do KNIGHT (BOX): checagem de células x/y ao redor do centro.
+ * O knight não para cegamente no centro: varre um grid 7x7 e escolhe a
+ * célula livre com MAIS mobs no alcance do exeta (7 SQM) e do melee (1),
+ * com leve preferência por ficar central. Reavaliada a cada ~1s. */
+function boxKnightSpot(c, occ, base) {
+  base = base || boxCenter(c);
+  let melhor = null, melhorScore = -1;
+  for (let dy = -3; dy <= 3; dy++) {
+    for (let dx = -3; dx <= 3; dx++) {
+      const cx = base.cx + dx, cy = base.cy + dy;
+      if (!boxCellLivre(cx, cy, occ)) continue;
+      // mobs no alcance do exeta amp res (7 SQM) + melee (1 SQM) — peso
+      const n7 = boxCountMobs(c, cx, cy, 7);
+      const n1 = boxCountMobs(c, cx, cy, 1);
+      const score = n7 * 100 + n1 * 50 - (Math.abs(dx) + Math.abs(dy));
+      if (score > melhorScore) { melhorScore = score; melhor = { cx, cy }; }
+    }
+  }
+  return melhor || { cx: base.cx, cy: base.cy };
+}
+
 /* Posição-alvo do BOX por vocação. Reavaliada a cada ~1s. */
 function boxTargetCell(c, ent, occ) {
   const p = ent && ent.p;
@@ -242,7 +280,9 @@ function boxTargetCell(c, ent, occ) {
   const base = knight || centro;
 
   if (voc === "knight" || voc === "elite knight") {
-    return { cx: base.cx, cy: base.cy };
+    // KNIGHT: checagem x/y de células p/ achar o melhor spot (não só o
+    // centro) — mais mobs no alcance, preferindo ficar central
+    return boxKnightSpot(c, occ, base);
   }
 
   // PALADIN: RETAS a 2 SQM do knight (nunca diagonais), na reta com mais
@@ -290,17 +330,54 @@ function boxTargetCell(c, ent, occ) {
   return melhor;
 }
 
-/* Passo do modo BOX: vai para a posição da formação e FICA parado lá
- * atacando (knight no centro, RP nas retas, magos na posição de área).
- * Reavalia a posição a cada ~1s (os mobs andam, a melhor célula muda). */
-function boxThinkStep(c, ent, alvo, occ, now) {
+/* Posição-alvo do modo SAFE: um dos CANTOS da tela, LONGE da box, mas
+ * ainda dentro do alcance das spells (raio 7). Escolhe o canto livre com
+ * MAIS mobs no range; empate → o mais longe da box (mais seguro). */
+function safeTargetCell(c, ent, occ) {
+  const GW = (typeof GRID_W !== "undefined") ? GRID_W : 21;
+  const GH = (typeof GRID_H !== "undefined") ? GRID_H : 13;
+  const centro = boxCenter(c);
+  const cantos = [
+    { cx: 2, cy: 2 }, { cx: GW - 3, cy: 2 },
+    { cx: 2, cy: GH - 3 }, { cx: GW - 3, cy: GH - 3 },
+  ];
+  let melhor = null, melhorN = -1, melhorDist = -1;
+  for (const q of cantos) {
+    if (!boxCellLivre(q.cx, q.cy, occ)) continue;
+    const n = boxCountMobs(c, q.cx, q.cy, 7);   // range das spells/runas
+    const dist = Math.max(Math.abs(q.cx - centro.cx), Math.abs(q.cy - centro.cy));
+    if (n > melhorN || (n === melhorN && dist > melhorDist)) {
+      melhorN = n; melhorDist = dist; melhor = q;
+    }
+  }
+  if (!melhor) {
+    // todos os cantos ocupados: acha a célula livre mais perto de um canto
+    for (let r = 1; r <= 4; r++) {
+      for (const q of cantos) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const cx = q.cx + dx, cy = q.cy + dy;
+            if (boxCellLivre(cx, cy, occ)) return { cx, cy };
+          }
+        }
+      }
+    }
+    return { cx: 2, cy: 2 };
+  }
+  return melhor;
+}
+
+/* Passo genérico de formação: vai para a posição do alvo e FICA parado lá
+ * atacando. Reavalia a cada ~1s (os mobs andam, o melhor spot muda). */
+function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   if (!ent) return false;
   ensureCell(ent);
   if (ent.moving) return false;
   if (ent.nextStepAt && now < ent.nextStepAt) return false;
   if (!ent._boxAt || now - ent._boxAt > 1000) {
     ent._boxAt = now;
-    ent._boxTarget = boxTargetCell(c, ent, occ);
+    ent._boxTarget = targetFn(c, ent, occ);
   }
   const alvoCel = ent._boxTarget;
   if (!alvoCel) return false;
@@ -320,6 +397,16 @@ function boxThinkStep(c, ent, alvo, occ, now) {
   const ok = beginStep(ent, dir, occ, false);
   ent.nextStepAt = now + (ok ? ent.stepDur : 250);
   return ok;
+}
+
+/* Passo do modo BOX. */
+function boxThinkStep(c, ent, alvo, occ, now) {
+  return formationThinkStep(c, ent, alvo, occ, now, boxTargetCell);
+}
+
+/* Passo do modo SAFE. */
+function safeThinkStep(c, ent, alvo, occ, now) {
+  return formationThinkStep(c, ent, alvo, occ, now, safeTargetCell);
 }
 
 /* Tick de movimento de toda a cena. Substitui updateCombatMovement. */
@@ -359,13 +446,16 @@ function updateGridMovement(c, p, dt, now) {
   playerThinkStep(c, p, alvo, occ, now);
 
   // PARTY COMBAT: os aliados andam sozinhos até o alvo (cada um com o
-  // alcance da própria arma) — ou seguem a formação BOX — e os MONSTROS
-  // perseguem o alvo que escolheram (o mais próximo).
+  // alcance da própria arma) — ou seguem a formação BOX/SAFE — e os
+  // MONSTROS perseguem o alvo que escolheram (o mais próximo).
   if (c.players && c.players.length > 1) {
     for (const ent of c.players) {
       if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
-      if (ent.p.config && ent.p.config.attackMode === "box") {
+      const fm = formationMode(c, ent);
+      if (fm === "box") {
         boxThinkStep(c, ent, alvo, occ, now);
+      } else if (fm === "safe") {
+        safeThinkStep(c, ent, alvo, occ, now);
       } else {
         allyThinkStep(c, ent, alvo, occ, now);
       }

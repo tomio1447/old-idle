@@ -109,6 +109,11 @@ function newCombat(player, huntId, instanceMode) {
     deadUntil: 0,
     players: null,    // PARTY COMBAT: todas as entidades na MESMA instância
   };
+  // MODO DE HUNT (box/safe): escolhido no modal de instância ou no Helper
+  // — vale para a party inteira (os aliados seguem c.huntMode)
+  if (player.config && (player.config.attackMode === "box" || player.config.attackMode === "safe")) {
+    out.huntMode = player.config.attackMode;
+  }
   // PARTY COMBAT: o líder leva TODOS os membros para a mesma instância
   maybeLoadPartyCombat(out, player, spx, spy);
   return out;
@@ -2562,8 +2567,10 @@ function tryChallenge(c, p, now) {
   if (p.voc !== "knight" && p.voc !== "elite knight") return false;
   const cfg = p.config || {};
   // MODO BOX: o knight na formação SEMPRE casta os dois (exeta res + amp
-  // res) — faz parte da função dele na box (pedido do dono).
-  const boxForca = cfg.attackMode === "box";
+  // res) — faz parte da função dele na box (pedido do dono). O modo pode
+  // vir do modal de instância (c.huntMode).
+  const boxForca = cfg.attackMode === "box" ||
+    (typeof formationMode === "function" && formationMode(c, { p: p }) === "box");
   const useAmp = !!cfg.exetaAmpRes || boxForca;
   const useRes = !!cfg.exetaRes || boxForca;
   if (!useAmp && !useRes) return false;

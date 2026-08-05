@@ -163,9 +163,10 @@ setTimeout(() => {
 
       // ---------- 4) MODO BOX: posições por vocação ----------
       {
-        // knight: centro da sala
+        // knight: melhor spot via checagem x/y — perto do centro (v26)
         const tKn = boxTargetCell(cBox, cBox.players[0], null);
-        if (tKn.cx !== centro.cx || tKn.cy !== centro.cy) fail("knight BOX deveria ir ao centro");
+        const distKn = Math.max(Math.abs(tKn.cx - centro.cx), Math.abs(tKn.cy - centro.cy));
+        if (distKn > 2) fail("knight BOX deveria ficar perto do centro (spot x/y), veio " + JSON.stringify(tKn) + " dist " + distKn);
         // RP: 2 SQM nas RETAS (nunca diagonal)
         const entRP = cBox.players.find(e => e.p && e.p.voc === "paladin");
         entRP.cx = centro.cx + 5; entRP.cy = centro.cy + 3;   // longe

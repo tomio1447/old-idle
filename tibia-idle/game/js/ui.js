@@ -1956,7 +1956,7 @@ function renderHelper(p) {
       <div class="small dim mt8 mb4">⚔ Challenge do Knight (marca inimigos — dano deles −20% por 10s)</div>
       <div class="row wrap" style="gap:6px">
         <button class="sm ${exetaResOn ? "primary" : ""}" data-exeta="res" ${p.level >= 20 ? "" : "disabled"}
-          title="Exeta Res (Challenge): marca 1 inimigo. Nível 20.">
+          title="Exeta Res (Challenge): marca TODOS. Nível 20. cd 5s.">
           ${exetaResOn ? "✓ " : ""}Exeta Res ${p.level >= 20 ? "" : "· nv 20"}</button>
         <button class="sm ${exetaAmpOn ? "primary" : ""}" data-exeta="amp-res" ${p.level >= 150 ? "" : "disabled"}
           title="Exeta Amp Res (Chivalrous Challenge): marca TODOS ao alcance (7 SQM). Nível 150. Animação oficial no cast.">
@@ -1964,13 +1964,18 @@ function renderHelper(p) {
       </div>
       <div class="tiny dim mt4">Os dois podem ficar <b>ligados juntos</b>: o Amp Res tem prioridade e o Res
         cobre quando ele está em recarga. O monstro marcado causa 20% menos dano.</div>` : "";
+    // MODO DE HUNT: fica NO ALTO da aba Ataque (acima das stances/buffs) —
+    // o mesmo seletor aparece no topo do modal de instância da hunt.
+    const modos = [["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"],
+                   ["box", "BOX"], ["safe", "SAFE"]];
     atkEl.innerHTML = `
-      ${renderStancePicker(p)}
-      ${challengeHtml}
-      <div class="small dim mt8 mb4">Ataque Mode</div>
+      <div class="small mb4" style="color:#d4af37;font-weight:bold">🎯 Modo de Hunt</div>
       <div class="row wrap" style="gap:6px">
-        ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"], ["box", "BOX"]].map(([id, label]) =>
-          `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}">${label}</button>`).join("")}
+        ${modos.map(([id, label]) =>
+          `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}" title="${
+            id === "box" ? "Formação tática por vocação (knight no melhor spot, RP nas retas, magos na área)"
+            : id === "safe" ? "Fica nos cantos da tela, longe da box, mas no range das spells"
+            : ""}">${label}</button>`).join("")}
       </div>
       <div class="mt8" style="max-width:180px;${mode === "kiting" ? "" : "display:none"}">
         <label class="small dim">Distância do Kiting (SQM)</label>
@@ -1978,9 +1983,12 @@ function renderHelper(p) {
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="tiny dim mt8">Kiting mantém de 1 a 5 SQMs do monstro. Stand fica parado. Chase aproxima.
-        <b>BOX</b> (party de 4): cada vocação assume a posição dela — Knight no meio da sala tankando (casta
-        exeta res + amp res), RP a 2 SQMs do knight nas retas, Druid/Sorcerer/Monk na posição que atinge o
-        máximo de alvos com as magias de área.</div>
+        <b>BOX</b> (party de 4): cada vocação assume a posição dela — Knight faz checagem de células x/y e para
+        no MELHOR spot do meio da sala tankando (casta exeta res + amp res), RP a 2 SQMs do knight nas retas,
+        Druid/Sorcerer/Monk na posição que atinge o máximo de alvos com as magias de área.
+        <b>SAFE</b>: o personagem vai para os CANTOS da tela, longe da box, mas ainda no range das spells.</div>
+      ${renderStancePicker(p)}
+      ${challengeHtml}
       ${renderBuffPicker(p)}
       ${renderHastePicker(p)}`;
     $$("#helper-attack [data-buff]").forEach((b) => b.addEventListener("click", () => {
