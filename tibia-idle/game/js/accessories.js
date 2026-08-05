@@ -646,7 +646,8 @@ function tryMagicShield(c, p, now) {
   if (typeof addManaSpent === "function") addManaSpent(p, combatManaSkillGain(c, s.mana));
   if (typeof cdStart === "function") cdStart(p, MAGIC_SHIELD_SPELL_ID, s, now);
   p.magicShieldUntil = now + MAGIC_SHIELD_DURATION_MS;
-  c.magicShieldCd = now + 1000;
+  if (typeof entCdSet === "function") entCdSet(c, p, "magicShieldCd", now + 1000);
+  else c.magicShieldCd = now + 1000;
   if (c.events) {
     c.events.push({ t: "say", text: s.words || "utamo vita" });
     c.events.push({ t: "magic-shield-on", x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });

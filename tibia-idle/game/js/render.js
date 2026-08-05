@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "20";
+const ASSET_VERSION = "21";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -493,6 +493,38 @@ function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
   const mpPct = max.mp ? player.mp / max.mp : 0;
   if (mode === "arcs") drawStatusArcs(ctx, x, centerY, player.name, hpPct, mpPct, radius || 34);
   else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct);
+}
+
+/* Tag de PARTY ao lado do nome (como o OTC/Canary): estrela amarela no
+ * líder, círculo azul nos membros. Desenho vetorial, sem sprite. */
+function drawPartyTagIcon(ctx, cx, cy, isLeader) {
+  ctx.save();
+  if (isLeader) {
+    const s = 9;
+    ctx.fillStyle = "#ffd65a";
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = (i % 2 === 0) ? s : s * 0.45;
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const x2 = cx + Math.cos(a) * r, y2 = cy + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    const s = 8;
+    ctx.fillStyle = "#6ec9ff";
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, s * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawTargetSquare(ctx, x, y, w, h) {
@@ -1275,6 +1307,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px * W, drawY - 14, dt);
+    // Tag de PARTY (OTC/Canary) ao lado do nome: estrela amarela no líder,
+    // círculo azul nos membros — igual ao client oficial.
+    if (combat && combat.players && combat.players.length > 1) {
+      const ehLider = (typeof partyIsLeaderLocal === "function" && partyIsLeaderLocal(player)) ||
+                      !!(player._partyOnline && player._partyOnline.isLeader);
+      const nmW = ctx.measureText(player.name).width;
+      drawPartyTagIcon(ctx, px * W - nmW / 2 - 8, drawY - 20, ehLider);
+    }
   }
 
   // --- aliados do PARTY COMBAT (todos os membros na mesma instância) ---
@@ -1318,6 +1358,12 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.lineWidth = 1.5;
         ctx.strokeRect(ent.x * W - tile / 2 + 1, ent.y * H - tile / 2 + 1, tile - 2, tile - 2);
       }
+      // Tag de PARTY ao lado do nome (membro = círculo azul) + fala do
+      // aliado (magia/potion) acima do nome, como nos monstros
+      const nmTag = ent.name + (knocked ? " (inconsciente)" : "");
+      const nmW2 = ctx.measureText(nmTag).width;
+      drawPartyTagIcon(ctx, ent.x * W - nmW2 / 2 - 8, top - 19, false);
+      drawCreatureSpeech(ctx, ent, ent.x * W, top - 4, dt);
     }
   }
 

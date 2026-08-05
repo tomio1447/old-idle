@@ -2035,7 +2035,7 @@ function tryUseRune(c, p, target, now, forcada) {
     return false;
   }
   if (!p.config.useRunes && !forcada) return false;
-  if (c.runeCd > now) return false;
+  if (entCd(c, p, "runeCd") > now) return false;
   if (c.player && c.player.cx !== undefined && target.cx !== undefined
       && typeof sqmDistance === "function") {
     if (sqmDistance(c.player, target) > 6) return false;   // runa: 6 SQM
@@ -2066,7 +2066,7 @@ function tryUseRune(c, p, target, now, forcada) {
   if (!consumeSupplyCharge(c, p, best)) return false;
   // cooldown proprio da runa (o Canary declara em rune:cooldown), nao um
   // 2000 fixo para todas
-  c.runeCd = now + (s.cd || 2000);
+  entCdSet(c, p, "runeCd", now + (s.cd || 2000));
   if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
   if (typeof forgeTryTranscendence === "function") {
     const tr = forgeTryTranscendence(p, now);
@@ -2252,7 +2252,7 @@ function tryHeal(c, p, now) {
   if (pct > Math.max(spellAt, itemAt)) return false;
 
   // 1. magia de cura: usa apenas se o HP estiver no limite configurado para spell.
-  if (pct <= spellAt && !(c.healCd > now)) {
+  if (pct <= spellAt && !(entCd(c, p, "healCd") > now)) {
     const heals = [];
     const selectedHealSpell = p.config.healSpell;
     if (selectedHealSpell) {
@@ -2323,7 +2323,7 @@ function tryHeal(c, p, now) {
       p.mp -= _curaMana;
       addManaSpent(p, combatManaSkillGain(c, _curaMana));
       p.hp = Math.min(max.hp, p.hp + amount);
-      c.healCd = now + 1000;
+      entCdSet(c, p, "healCd", now + 1000);
       c.events.push({ t: "heal", amount: amount, spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
       c.events.push({ t: "say", text: spellWords(selectedHealSpell || heals[0][0], s) });
       return true;
@@ -2332,7 +2332,7 @@ function tryHeal(c, p, now) {
   // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item
   //    e se as potions nao estiverem no cooldown compartilhado de 1s.
   //    "NÃO USAR POTIONS" (helper) desliga este bloco inteiro.
-  if (!p.config.noPotions && p.config.useRunes && pct <= itemAt && !(c.potionCd > now)) {
+  if (!p.config.noPotions && p.config.useRunes && pct <= itemAt && !(entCd(c, p, "potionCd") > now)) {
     let best = null;
     const selectedHealSupply = p.config.healSupply;
     if (selectedHealSupply) {
@@ -2381,8 +2381,8 @@ function tryHeal(c, p, now) {
       p.hp = Math.min(max.hp, p.hp + amount);
       // potion trava TODAS as potions por 1s; runa de cura (UH/IH) nao bebe,
       // entao usa o cooldown de runa e mantem o healCd antigo
-      if (s.kind === "rune") c.healCd = now + 1000;
-      else c.potionCd = now + 1000;
+      if (s.kind === "rune") entCdSet(c, p, "healCd", now + 1000);
+      else entCdSet(c, p, "potionCd", now + 1000);
       if (typeof forgeTryMomentum === "function") {
         const momentum = forgeTryMomentum(p, now);
         if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
@@ -2423,7 +2423,7 @@ function tryHaste(c, p, now) {
   // codigo nao respeitava.
   const escolhida = p.config && p.config.hasteSpell;
   if (!escolhida || !SPELLS[escolhida]) return false;
-  if ((c.hasteCd || 0) > now) return false;
+  if (entCd(c, p, "hasteCd") > now) return false;
   // ja tem uma ativa? nao gasta mana de novo
   if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
 
@@ -2441,7 +2441,7 @@ function tryHaste(c, p, now) {
   }
   if (!p.buffs) p.buffs = {};
   p.buffs[escolhida] = now + (HASTEDATA[escolhida].dur || 30000);
-  c.hasteCd = now + 2000;
+  entCdSet(c, p, "hasteCd", now + 2000);
   c.events.push({ t: "say", text: spellWords(escolhida, sp) });
   c.events.push({ t: "buff", nome: HASTEDATA[escolhida].nome || sp.name });
   return true;
@@ -2452,7 +2452,7 @@ function tryBuff(c, p, now) {
   const chave = p.config && p.config.buff;
   if (!chave || !BUFFS[chave]) return false;
   if (hasBuff(p, chave, now)) return false;
-  if ((c.buffCd || 0) > now) return false;
+  if (entCd(c, p, "buffCd") > now) return false;
   const s = SPELLS[chave];
   if (!s) return false;
   if (s.vocs && s.vocs.indexOf(p.voc) === -1) return false;
@@ -2466,7 +2466,7 @@ function tryBuff(c, p, now) {
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
   }
   applyBuff(p, chave, now);
-  c.buffCd = now + Math.max(1000, s.cd || 2000);
+  entCdSet(c, p, "buffCd", now + Math.max(1000, s.cd || 2000));
   c.events.push({ t: "say", text: spellWords(chave, s) });
   c.events.push({ t: "buff", nome: BUFFS[chave].nome });
   return true;
@@ -2478,7 +2478,7 @@ const CURE_ORDEM = ["cursed", "fire", "energy", "bleed", "poison", "freezing"];
 
 function tryCureCondition(c, p, now) {
   if (!p.conditions) return false;
-  if ((c.cureCd || 0) > now) return false;
+  if (entCd(c, p, "cureCd") > now) return false;
   for (const tipo of CURE_ORDEM) {
     if (!p.conditions[tipo]) continue;
     const def = CONDITIONS[tipo];
@@ -2496,7 +2496,7 @@ function tryCureCondition(c, p, now) {
       if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
     }
     clearCondition(p, tipo);
-    c.cureCd = now + 1000;
+    entCdSet(c, p, "cureCd", now + 1000);
     c.events.push({ t: "say", text: spellWords(def.cure, s) });
     c.events.push({ t: "cured", tipo: tipo, nome: def.nome });
     return true;
@@ -2606,7 +2606,7 @@ function doChallengeCast(c, p, now, id, s) {
 
 function tryMana(c, p, now) {
   now = now || Date.now();
-  if (c.potionCd > now) return false;
+  if (entCd(c, p, "potionCd") > now) return false;
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
@@ -2632,7 +2632,7 @@ function tryMana(c, p, now) {
       healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
       p.hp = Math.min(max.hp, p.hp + healAmount);
     }
-    c.potionCd = now + 1000;   // cooldown compartilhado das potions (1s)
+    entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
     if (typeof forgeTryMomentum === "function") {
       const momentum = forgeTryMomentum(p, now);
       if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
@@ -3444,10 +3444,51 @@ function rollLoot(c, p, mob) {
  * PARTY COMBAT — aliados na mesma instância
  * ====================================================================== */
 
+/* Entidade viva do party combat de um personagem (null = fora de party). */
+function entByPlayer(c, p) {
+  if (!c || !p) return null;
+  if (c.players && c.players.length > 1) {
+    const id = String(p.id || "");
+    for (const e of c.players) {
+      if (e.p === p || String(e.id) === id) return e;
+    }
+  }
+  return null;
+}
+
+/* Cooldowns do HELPER POR PERSONAGEM (party combat): o líder e cada membro
+ * têm o próprio healCd/potionCd/runeCd/cureCd/buffCd/hasteCd/magicShieldCd —
+ * um aliado bebendo potion não trava a potion do outro. Sem party, cai no
+ * campo antigo do combate (c.healCd etc.) e nada muda. */
+function entCd(c, p, key) {
+  const ent = entByPlayer(c, p);
+  if (ent && ent[key] !== undefined) return ent[key];
+  return c[key] || 0;
+}
+function entCdSet(c, p, key, val) {
+  const ent = entByPlayer(c, p);
+  if (ent) ent[key] = val;
+  else c[key] = val;
+}
+
+/* Posição do ator de um evento (c.player no momento do push — para aliados
+ * o c.player é temporariamente o aliado, então x/y já saem certos). */
+function actorPos(c, p) {
+  const pl = c.player || { x: 0.13, y: 0.6 };
+  const ent = entByPlayer(c, p);
+  return {
+    x: pl.x, y: pl.y,
+    whoId: ent ? String(ent.id) : null,
+    who: (p && p.name) ? p.name : "",
+  };
+}
+
 /* Tick dos aliados (membros da party que NÃO são o personagem ativo):
- * cada um ataca o alvo atual com a arma dele e usa o HEAL FRIEND próprio
- * (Druid/Monk curam a party com a configuração de cada personagem). */
+ * roda o HELPER COMPLETO de cada um com a configuração DELE — cura (spell
+ * + potion), mana, cura de condition, anel/amuleto emergencial, magic
+ * shield, buff/haste, exeta (knight) e ataque (runa → spell → arma). */
 function partyTickAllies(c, now, dt) {
+  if (!c || !c.players || c.players.length < 2) return;
   for (const ent of c.players) {
     if (ent === c.player || !ent.p) continue;
     // aliado caiu: agenda o renascimento no local (reviveAt) — o loop do
@@ -3464,37 +3505,53 @@ function partyTickAllies(c, now, dt) {
       }
       continue;
     }
-    // cura de aliado (exura sio / gran sio / gran mas res / tio sio) — o
-    // config de cada personagem decide se ele cura e quando
-    if (typeof tryHealFriend === "function") {
-      try { tryHealFriend(c, ent.p, now); } catch (e) { /* magia falha: segue */ }
-    }
-    // ataque básico com a arma do aliado
+    partyHelperTick(c, ent, now, dt);
+  }
+}
+
+/* HELPER INDIVIDUAL de um personagem do party combat. Troca o c.player
+ * para o aliado durante o tick (as funções do helper usam c.player para
+ * posição/alcance) e anexa whoId/posição aos eventos gerados, para o
+ * drainEvents desenhar no lugar certo (e o log no nome certo). */
+function partyHelperTick(c, ent, now, dt) {
+  const p = ent.p;
+  if (!p) return;
+  const n0 = c.events.length;
+  const prev = c.player;
+  c.player = ent;
+  try {
+    // ---- helper completo com o config DELE (cada personagem controla
+    // individualmente o próprio auto-hunt) ----
+    if (typeof tryCureCondition === "function") { try { tryCureCondition(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryAccessoryHelper === "function") { try { tryAccessoryHelper(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryMagicShield === "function") { try { tryMagicShield(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { /* segue */ } }
+    // HEAL FRIEND (Druid/Monk): cura os aliados com a config do próprio
+    if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryMana === "function") { try { tryMana(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryChallenge === "function") { try { tryChallenge(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryBuff === "function") { try { tryBuff(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryHaste === "function") { try { tryHaste(c, p, now); } catch (e) { /* segue */ } }
+    // ---- ataque com a arma/magias DELE: runa > spell > ataque básico ----
     ent.atkCd -= dt;
-    if (ent.atkCd > 0 || !c.mobs.length) continue;
-    ent.atkCd = 2000;
-    const alvo = c.mobs[0];
-    if (!alvo || alvo.hp <= 0) continue;
-    const range = (typeof partyAllyRangeSQM === "function")
-      ? partyAllyRangeSQM(ent) : 1;
-    if (typeof sqmDistance === "function" && ent.cx !== undefined &&
-        alvo.cx !== undefined && sqmDistance(ent, alvo) > range) continue;
-    const d = (typeof playerDamage === "function")
-      ? playerDamage(ent.p) : { min: 5, max: 10, element: "physical" };
-    const el = d.element || "physical";
-    let raw = d.min + Math.floor(Math.random() * (Math.max(1, d.max - d.min) + 1));
-    if (typeof applyMonsterMitigation === "function" &&
-        typeof applyResist === "function") {
-      raw = applyMonsterMitigation(alvo, el, applyResist(alvo, el, Math.max(1, raw), 0));
+    if (ent.atkCd <= 0 && c.mobs.length) {
+      const alvo = c.mobs[0];
+      let acted = false;
+      if (typeof tryUseRune === "function") { try { acted = tryUseRune(c, p, alvo, now); } catch (e) { /* segue */ } }
+      if (!acted && typeof tryCastSpell === "function") { try { acted = tryCastSpell(c, p, alvo, now); } catch (e) { /* segue */ } }
+      if (!acted && typeof playerAttack === "function") {
+        try { const r = playerAttack(c, p, alvo); acted = r !== false; } catch (e) { /* segue */ }
+      }
+      ent.atkCd = acted ? ((typeof attackInterval === "function") ? attackInterval(c, p) : 2000) : 250;
     }
-    raw = Math.max(1, Math.floor(raw));
-    alvo.hp -= raw;
-    c.stats.damage += raw;
-    ent.attackAnim = 220;
-    if (c.events) {
-      c.events.push({ t: "hit", dmg: raw, x: alvo.x, y: alvo.y,
-                      sx: ent.x, sy: ent.y, screen: true, el: el,
-                      ally: ent.id, allyName: ent.name });
+  } finally {
+    c.player = prev;
+    // anexa whoId/posição aos eventos gerados pelo aliado para o drain
+    // desenhar no lugar certo e logar o nome certo
+    for (let i = n0; i < c.events.length; i++) {
+      const ev = c.events[i];
+      if (ev.whoId === undefined) { ev.whoId = String(ent.id); ev.who = ent.name; }
+      if (ev.x === undefined && ev.screen) { ev.x = ent.x; ev.y = ent.y; }
     }
   }
 }

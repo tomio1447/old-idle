@@ -1236,7 +1236,8 @@ function drainEvents() {
         break;
       }
       case "heal": {
-        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
+        const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
         r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
         // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
         // oficial (critical-heal-effect) em cima do personagem que casta.
@@ -1253,7 +1254,8 @@ function drainEvents() {
         break;
       }
       case "mana": {
-        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
+        const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
         r.addFloater(px, py, "+" + fmt(e.amount) + " mana", "#6a8aff");
         // spirit potion bebida como mana tambem mostra a cura
         if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.heal), "#7ae87a");
@@ -1300,7 +1302,8 @@ function drainEvents() {
       case "challenge": {
         // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
         // marcados focam o knight e causam 20% menos dano por 10s.
-        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
+        const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
         const ehAmp = e.id === "exeta-amp-res" || /chivalrous/i.test(e.spell || "");
         // Exeta Amp Res: animação oficial (CONST_ME_CHIVALRIOUS_CHALLENGE,
         // anel de energia roxo/azul do DAT 15.x). Exeta Res: magic blue do
@@ -1314,14 +1317,16 @@ function drainEvents() {
         addLog("skill", `Buff ativo: <b>${e.nome}</b>`);
         // Momentum (helmet): redução de cooldowns
         if (e.nome === "Momentum") {
-          const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
+          const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+          const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
           r.addFloater(px, py - 0.16, "MOMENTUM!", "#ffe680");
           r.addEffect(px, py, "momentum-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.momentum = (fdc.momentum || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else if (e.nome === "Transcendence") {
-          const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
+          const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+          const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
           r.addFloater(px, py - 0.18, "AVATAR!", "#d79cff");
           const avatarFx = (typeof CLIENT_EFFECTS !== "undefined" && CLIENT_EFFECTS["avatar-effect"])
             ? "avatar-effect" : "magic-blue";
@@ -1357,11 +1362,22 @@ function drainEvents() {
         r.addEffect(ex(e), ey(e), e.fx || "white-energy-spark");
         addLog("info", `Corrente atingiu <b>${e.n}</b> alvos.`);
         break;
-      case "say":
-        // o personagem fala a magia/supply, como no client do Tibia
-        r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");
-        addLog("say", `<b>${G.p.name}</b>: ${e.text}`);
+      case "say": {
+        // o personagem fala a magia/supply, como no client do Tibia.
+        // Aliados do party combat falam no próprio lugar (bolha + log).
+        const saidor = (e.whoId && c && c.players)
+          ? c.players.find((x) => String(x.id) === String(e.whoId)) : null;
+        if (saidor) {
+          if (typeof creatureSay === "function") {
+            creatureSay(saidor, e.text, e.supply ? TALK.SAY : TALK.SPELL);
+          }
+          addLog("say", `<b>${saidor.name}</b>: ${e.text}`);
+        } else {
+          r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");
+          addLog("say", `<b>${G.p.name}</b>: ${e.text}`);
+        }
         break;
+      }
       case "kill": {
         const x = ex(e), y = ey(e);
         r.addCorpse(x, y, e.mob);

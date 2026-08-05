@@ -743,8 +743,13 @@ function tryHealFriend(c, p, now) {
   p.mp -= custo;
   if (typeof addManaSpent === "function") addManaSpent(p, custo);
   if (typeof cdStart === "function") cdStart(p, spellId, s, now);
-  if (c.healCd === undefined) c.healCd = 0;
-  c.healCd = Math.max(c.healCd || 0, now + 1000);
+  // cooldown de cura POR PERSONAGEM (party combat): cada aliado tem o seu
+  if (typeof entCdSet === "function" && typeof entCd === "function") {
+    entCdSet(c, p, "healCd", Math.max(entCd(c, p, "healCd") || 0, now + 1000));
+  } else {
+    if (c.healCd === undefined) c.healCd = 0;
+    c.healCd = Math.max(c.healCd || 0, now + 1000);
+  }
 
   // aplica a cura (mass cura todos os feridos; single cura o mais ferido)
   const alvosCura = ehMass ? feridos : [feridos.sort((a, b) =>
