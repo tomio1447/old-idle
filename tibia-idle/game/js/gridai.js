@@ -250,28 +250,59 @@ function formationMode(c, ent) {
   return "";
 }
 
-/* MELHOR SPOT do KNIGHT (BOX): checagem de células x/y ao redor do centro.
- * O knight não para cegamente no centro: varre um grid 7x7 e escolhe a
- * célula livre com MAIS mobs no alcance do exeta (7 SQM) e do melee (1),
- * com leve preferência por ficar central. Reavaliada a cada ~1s. */
+/* Pontuação tática da posição do knight. Além de concentrar a box, a
+ * adjacência livre é importante: cada tile livre é um monstro que ele pode
+ * segurar sem bloquear a linha das waves dos aliados. */
+function knightBoxScore(c, cell, occ, base) {
+  const n7 = boxCountMobs(c, cell.cx, cell.cy, 7);
+  const n1 = boxCountMobs(c, cell.cx, cell.cy, 1);
+  let livres = 0;
+  for (const d of DIRS) if (boxCellLivre(cell.cx + d.dx, cell.cy + d.dy, occ)) livres++;
+  return n7 * 100 + n1 * 65 + livres * 35 -
+    (Math.abs(cell.cx - base.cx) + Math.abs(cell.cy - base.cy));
+}
+
+/* MELHOR SPOT do KNIGHT (BOX): varre a sala e privilegia concentração de
+ * mobs E os oito tiles ao redor disponíveis para tankar a box inteira. */
 function boxKnightSpot(c, occ, base) {
   base = base || boxCenter(c);
-  let melhor = null, melhorScore = -1;
-  for (let dy = -3; dy <= 3; dy++) {
-    for (let dx = -3; dx <= 3; dx++) {
-      const cx = base.cx + dx, cy = base.cy + dy;
-      if (!boxCellLivre(cx, cy, occ)) continue;
-      // mobs no alcance do exeta amp res (7 SQM) + melee (1 SQM) — peso
-      const n7 = boxCountMobs(c, cx, cy, 7);
-      const n1 = boxCountMobs(c, cx, cy, 1);
-      const score = n7 * 100 + n1 * 50 - (Math.abs(dx) + Math.abs(dy));
-      if (score > melhorScore) { melhorScore = score; melhor = { cx, cy }; }
-    }
+  let melhor = null, melhorScore = -Infinity;
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    const cell = { cx: base.cx + dx, cy: base.cy + dy };
+    if (occ && !boxCellLivre(cell.cx, cell.cy, occ)) continue;
+    const score = knightBoxScore(c, cell, occ, base);
+    if (score > melhorScore) { melhorScore = score; melhor = cell; }
   }
   return melhor || { cx: base.cx, cy: base.cy };
 }
 
-/* Posição-alvo do BOX por vocação. Reavaliada a cada ~1s. */
+function adjacentMobs(c, cell) { return boxCountMobs(c, cell.cx, cell.cy, 1); }
+
+/* Conta alvos no corredor da wave que sai do caster em direção ao knight.
+ * A largura de 3 SQMs representa a faixa das waves; isso diferencia uma
+ * posição que só "vê" mobs de outra que realmente atravessa a box. */
+function waveLineHits(c, from, knight) {
+  if (!knight) return 0;
+  const horizontal = from.cx !== knight.cx;
+  const sign = horizontal ? Math.sign(knight.cx - from.cx) : Math.sign(knight.cy - from.cy);
+  let hits = 0;
+  for (const m of c.mobs || []) {
+    if (m.hp <= 0) continue;
+    const forward = horizontal ? (m.cx - from.cx) * sign : (m.cy - from.cy) * sign;
+    const lateral = horizontal ? Math.abs(m.cy - from.cy) : Math.abs(m.cx - from.cx);
+    if (forward >= 1 && forward <= 7 && lateral <= 1) hits++;
+  }
+  return hits;
+}
+
+function mageBoxScore(c, cell, knight) {
+  // Segurança vem antes de dano: uma wave ótima não vale um mage cercado.
+  return boxCountMobs(c, cell.cx, cell.cy, 3) * 10 +
+    waveLineHits(c, cell, knight) * 28 - adjacentMobs(c, cell) * 80;
+}
+
+/* Posição-alvo do BOX por vocação. Knight tanque central; RP em reta a 2;
+ * mages/monk em reta a 3, escolhendo a linha que corta a maior parte da box. */
 function boxTargetCell(c, ent, occ) {
   const p = ent && ent.p;
   if (!p) return null;
@@ -279,63 +310,34 @@ function boxTargetCell(c, ent, occ) {
   const centro = boxCenter(c);
   const knight = boxKnightEnt(c);
   const base = knight || centro;
+  if (voc === "knight" || voc === "elite knight") return boxKnightSpot(c, occ, base);
 
-  if (voc === "knight" || voc === "elite knight") {
-    // KNIGHT: checagem x/y de células p/ achar o melhor spot (não só o
-    // centro) — mais mobs no alcance, preferindo ficar central
-    return boxKnightSpot(c, occ, base);
-  }
-
-  // PALADIN: RETAS a 2 SQM do knight (nunca diagonais), na reta com mais
-  // mobs à frente (raio do ataque de distância).
-  if (voc === "paladin" || voc === "royal paladin") {
-    const retas = [
-      { cx: base.cx, cy: base.cy - 2 },
-      { cx: base.cx, cy: base.cy + 2 },
-      { cx: base.cx - 2, cy: base.cy },
-      { cx: base.cx + 2, cy: base.cy },
-    ];
-    let melhor = null, melhorN = -1;
-    for (const r of retas) {
-      if (!boxCellLivre(r.cx, r.cy, occ)) continue;
-      const n = boxCountMobs(c, r.cx, r.cy, 6);
-      if (n > melhorN) { melhorN = n; melhor = r; }
-    }
-    if (!melhor) {
-      melhor = retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) ||
-               { cx: base.cx + 2, cy: base.cy };
-    }
-    return melhor;
-  }
-
-  // DRUID/SORCERER/MONK: RETAS a 3 SQM do knight (nunca diagonais), na reta
-  // que maximiza mobs dentro do raio de área (3 SQM — as magias 3x3 do
-  // Canary). Ficam parados a 3 SQMs do tanque.
-  let melhor = null, melhorN = -1;
-  const retas3 = [
-    { cx: base.cx + 3, cy: base.cy }, { cx: base.cx - 3, cy: base.cy },
-    { cx: base.cx, cy: base.cy + 3 }, { cx: base.cx, cy: base.cy - 3 },
+  const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 : 3;
+  const retas = [
+    { cx: base.cx + distancia, cy: base.cy }, { cx: base.cx - distancia, cy: base.cy },
+    { cx: base.cx, cy: base.cy + distancia }, { cx: base.cx, cy: base.cy - distancia },
   ];
-  for (const r of retas3) {
+  let melhor = null, scoreMelhor = -Infinity;
+  for (const r of retas) {
     if (!boxCellLivre(r.cx, r.cy, occ)) continue;
-    const n = boxCountMobs(c, r.cx, r.cy, 3);
-    if (n > melhorN) { melhorN = n; melhor = r; }
+    const score = distancia === 2
+      ? boxCountMobs(c, r.cx, r.cy, 6) * 12 - adjacentMobs(c, r) * 35
+      : mageBoxScore(c, r, base);
+    if (score > scoreMelhor) { scoreMelhor = score; melhor = r; }
   }
-  if (!melhor) {
-    // sem reta livre: procura perto (2-3 SQM) mantendo reta sempre que
-    // possível; último caso, perto do knight numa reta
-    for (const r of retas3) {
-      if (boxCellLivre(r.cx, r.cy, occ)) { melhor = r; break; }
-    }
-    if (!melhor) {
-      const retas2 = [
-        { cx: base.cx + 2, cy: base.cy }, { cx: base.cx - 2, cy: base.cy },
-        { cx: base.cx, cy: base.cy + 2 }, { cx: base.cx, cy: base.cy - 2 },
-      ];
-      melhor = retas2.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
-    }
-  }
-  return melhor;
+  return melhor || retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
+}
+
+/* Score comparável usado pela histerese: só abandonamos um bom tile quando
+ * o novo é materialmente melhor, em vez de correr atrás de cada mob. */
+function boxTargetScore(c, ent, cell, occ) {
+  if (!cell || !ent || !ent.p) return -Infinity;
+  const knight = boxKnightEnt(c), base = knight || boxCenter(c);
+  const voc = ent.p.voc;
+  if (voc === "knight" || voc === "elite knight") return knightBoxScore(c, cell, occ, base);
+  if (voc === "paladin" || voc === "royal paladin")
+    return boxCountMobs(c, cell.cx, cell.cy, 6) * 12 - adjacentMobs(c, cell) * 35;
+  return mageBoxScore(c, cell, base);
 }
 
 /* Posição-alvo do modo SAFE: um dos CANTOS da tela, LONGE da box, mas
@@ -389,7 +391,17 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
     // melhor tile atual nunca era elegível e a formação se reposicionava sem
     // motivo a cada reavaliação.
     const planningOcc = buildOccupancy(c, ent);
-    ent._boxTarget = targetFn(c, ent, planningOcc);
+    // Reservas evitam que dois aliados escolham a mesma excelente reta antes
+    // de qualquer um chegar nela. A reserva é só planejamento, não atributo.
+    if (!c._formationReservations) c._formationReservations = new Map();
+    c._formationReservations.delete(ent);
+    c._formationReservations.forEach((cell) => planningOcc.set(cell.cx + ":" + cell.cy, true));
+    const candidato = targetFn(c, ent, planningOcc);
+    const novoScore = targetFn === boxTargetCell ? boxTargetScore(c, ent, candidato, planningOcc) : 0;
+    const atualScore = targetFn === boxTargetCell ? boxTargetScore(c, ent, ent._boxTarget, planningOcc) : -Infinity;
+    // Histerese de 20%: estabilidade é preferível a uma melhoria marginal.
+    if (!ent._boxTarget || novoScore >= atualScore * 1.20) ent._boxTarget = candidato;
+    if (ent._boxTarget) c._formationReservations.set(ent, ent._boxTarget);
   }
   const alvoCel = ent._boxTarget;
   if (!alvoCel) return false;
