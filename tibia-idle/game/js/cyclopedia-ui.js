@@ -250,6 +250,10 @@ function cycloAppearance(p, el) {
   const filtro = CYCLO.filtro || "all";
   const atual = currentAppearance(p);
   const mnt = currentMount(p);
+  // parte do outfit sendo colorida (Cabeça/Corpo/Pernas/Pés) — v28
+  const parte = CYCLO.appPart || (CYCLO.appPart = 0);
+  const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
+  const corAtual = (p.outfit && p.outfit.colors) ? p.outfit.colors[parte] : 0;
 
   const lista = modo === "outfit"
     ? appearanceCatalog(p, filtro)
@@ -336,7 +340,26 @@ function cycloAppearance(p, el) {
     </div>
     <div class="tiny dim mb4">${lista.length} ${modo === "outfit" ? "visuais" : "montarias"}
       · clique para ${modo === "outfit" ? "vestir" : "montar"} ou comprar</div>
-    <div class="app-grid">${lista.map(modo === "outfit" ? cardOutfit : cardMount).join("")}</div>`;
+    <div class="app-grid">${lista.map(modo === "outfit" ? cardOutfit : cardMount).join("")}</div>
+
+    <!-- v28 — Cores do outfit: paleta completa do Tibia (96 cores) para
+         colorir cada parte do visual direto na Cyclopedia -->
+    <div class="panel-inset mt10" style="padding:10px">
+      <div class="small mb4" style="color:#d4af37;font-weight:bold">🎨 Cores do outfit</div>
+      <div class="tiny dim mb4">Escolha a parte e clique numa cor da paleta oficial do Tibia
+        (aplica na hora na prévia e nos visuais).</div>
+      <div class="row wrap mb4" style="gap:4px">
+        ${PARTS.map(([n, i]) =>
+          `<button class="sm ${parte === i ? "primary" : ""}" data-app-part="${i}">${n}</button>`).join("")}
+      </div>
+      <div class="outfit-palette">
+        ${OUTFIT_PALETTE.map((c, i) =>
+          `<span class="swatch ${corAtual === i ? "sel" : ""}" data-app-cor="${i}"
+            style="background:${c}" title="cor ${i}"></span>`).join("")}
+      </div>
+      <div class="tiny dim mt4">Cor atual da parte: <b style="color:#d4af37">${corAtual}</b>
+        · <span style="color:${OUTFIT_PALETTE[corAtual] || "#fff"}">${OUTFIT_PALETTE[corAtual] || ""}</span></div>
+    </div>`;
 
   /* Troca o PNG neutro de cada card pelo canvas colorido.
    * Feito em lotes com requestAnimationFrame: colorir 127 sprites de uma vez
@@ -379,6 +402,22 @@ function cycloAppearance(p, el) {
   };
   desenhar();
 
+  // v28 — cores do outfit: seleciona a parte e aplica a cor da paleta
+  $$("#cyclo-content [data-app-part]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.appPart = +b.dataset.appPart;
+      cycloAppearance(p, el);
+    }));
+  $$("#cyclo-content [data-app-cor]").forEach((s) =>
+    s.addEventListener("click", () => {
+      ensureOutfit(p);
+      const i = +s.dataset.appCor;
+      p.outfit.colors[CYCLO.appPart || 0] = i;
+      save();
+      // re-renderiza a aba: prévia + cards com as novas cores
+      cycloAppearance(p, el);
+      renderAll();
+    }));
   $$("#cyclo-content [data-app-modo]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.appModo = b.dataset.appModo;
