@@ -472,24 +472,22 @@ const SLOT_LABELS = {
   weapon: "arma", shield: "escudo", legs: "pernas", boots: "botas",
   ring: "anel", extra: "extra", ammo: "muni",
 };
-/* Layout do inventario do Tibia (reordenado como na print do baiak-idle):
- * a primeira linha junta AMULET, HELMET e BACKPACK; depois WEAPON, ARMOR e
- * SHIELD; LEGS, RING e BOOTS; e o EXTRA no canto. O slot AMMO (munição) só
- * aparece para RP (paladino) — para as outras vocações a grade fica 3x4
- * sem a fileira extra de munição. */
+/* Layout do inventário no padrão solicitado:
+ *   colar | helmet | bag
+ *   arma  | armor  | shield
+ *   ring  | legs   | extra slot
+ *         | boots  | ammo */
 const SLOT_ORDER = [
   "amulet", "helmet", "backpack",
   "weapon", "armor", "shield",
-  "legs", "ring", "boots",
-  null, "extra", null,
+  "ring", "legs", "extra",
+  null, "boots", "ammo",
 ];
 
 function renderEquip(p) {
   let h = "";
-  const ehRP = p.voc === "paladin" || p.voc === "royal paladin";
   for (const slot of SLOT_ORDER) {
     if (!slot) { h += `<div></div>`; continue; }
-    if (slot === "ammo") continue;   // o ammo é renderizado na fileira do RP
     const e = p.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
@@ -512,17 +510,7 @@ function renderEquip(p) {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
     }
   }
-  // fileira de MUNIÇÃO (arrow/bolt): APENAS para RP — o quiver/munição é
-  // exclusivo de paladino
-  if (ehRP) {
-    const ammo = p.equip.ammo;
-    if (ammo) {
-      h += `<div class="slot ${itemClsBorder(ammo.item)}" data-slot="ammo" data-item="${ammo.item}">
-        ${itemImg(ammo.item)}<span class="cnt">∞</span></div>`;
-    } else {
-      h += `<div class="slot empty" data-slot="ammo" data-label="muni"></div>`;
-    }
-  }
+
   $("#equip").innerHTML = h;
 
   $$("#equip .slot").forEach((el) => {

@@ -6,6 +6,8 @@ const vm = require("vm");
 const root = path.join(__dirname, "..", "game", "js");
 const ctx = vm.createContext({ console, Math, Map, Set, window: { MONSTERMOVES: {} }, MOBSHEETS: {} });
 vm.runInContext(fs.readFileSync(path.join(root, "grid.js"), "utf8"), ctx, { filename: "grid.js" });
+vm.runInContext(fs.readFileSync(path.join(root, "areadata.js"), "utf8"), ctx, { filename: "areadata.js" });
+vm.runInContext(fs.readFileSync(path.join(root, "area.js"), "utf8"), ctx, { filename: "area.js" });
 vm.runInContext(fs.readFileSync(path.join(root, "gridai.js"), "utf8"), ctx, { filename: "gridai.js" });
 
 vm.runInContext(`
@@ -48,7 +50,15 @@ vm.runInContext(`
   const ra = c2._formationReservations.get(a), rb = c2._formationReservations.get(b);
   if (!ra || !rb || ra.cx === rb.cx && ra.cy === rb.cy) fail("Reserva não separou posições da formação.");
 
-  // 5. Movimento de monstro é deliberadamente mais estático (mínimo 95%).
+  // 5. Toda WAVE projetada começa no SQM à frente, nunca no conjurador.
+  const caster = { cx: 10, cy: 6 }, front = { cx: 11, cy: 6 };
+  for (const wave of ["AREA_WAVE4", "AREA_WAVE5", "AREA_WAVE7", "AREA_SQUAREWAVE5"]) {
+    const cells = areaCells(wave, caster, { cx: 17, cy: 6 });
+    if (cells.some(q => q.cx === caster.cx && q.cy === caster.cy)) fail(wave + " atinge o caster.");
+    if (!cells.some(q => q.cx === front.cx && q.cy === front.cy)) fail(wave + " não começa à frente.");
+  }
+
+  // 6. Movimento de monstro é deliberadamente mais estático (mínimo 95%).
   if (monsterStaticChance({ slug: "rat", def: {} }) < 95) fail("Monstro ainda se move demais.");
   console.log("OK: IA tática — segurança, wave, adjacência, reservas e estabilidade.");
 `, ctx);
