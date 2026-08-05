@@ -2561,8 +2561,11 @@ function tryChallenge(c, p, now) {
   // só knight (e elite knight)
   if (p.voc !== "knight" && p.voc !== "elite knight") return false;
   const cfg = p.config || {};
-  const useAmp = !!cfg.exetaAmpRes;
-  const useRes = !!cfg.exetaRes;
+  // MODO BOX: o knight na formação SEMPRE casta os dois (exeta res + amp
+  // res) — faz parte da função dele na box (pedido do dono).
+  const boxForca = cfg.attackMode === "box";
+  const useAmp = !!cfg.exetaAmpRes || boxForca;
+  const useRes = !!cfg.exetaRes || boxForca;
   if (!useAmp && !useRes) return false;
   const ids = useAmp ? ["exeta-amp-res", useRes ? "exeta-res" : null]
                      : ["exeta-res"];
@@ -2587,9 +2590,9 @@ function doChallengeCast(c, p, now, id, s) {
     const d = (pl.cx !== undefined && m.cx !== undefined &&
                typeof sqmDistance === "function")
       ? sqmDistance(pl, m) : 1;
-    if (d > (s.range || (amp ? 7 : 1))) continue;
-    // exeta res marca SÓ o primeiro (o alvo mais próximo)
-    if (!amp && marcou >= 1) continue;
+    if (d > (s.range || 7)) continue;
+    // pedido do dono (v24): o exeta RES também pega TODOS os monstros ao
+    // alcance (antes marcava só 1)
     m.challengedUntil = now + 10000;   // 10s de Challenge
     marcou++;
   }

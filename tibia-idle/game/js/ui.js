@@ -1969,15 +1969,18 @@ function renderHelper(p) {
       ${challengeHtml}
       <div class="small dim mt8 mb4">Ataque Mode</div>
       <div class="row wrap" style="gap:6px">
-        ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"]].map(([id, label]) =>
+        ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"], ["box", "BOX"]].map(([id, label]) =>
           `<button class="sm ${mode === id ? "primary" : ""}" data-attack-mode="${id}">${label}</button>`).join("")}
       </div>
-      <div class="mt8" style="max-width:180px">
+      <div class="mt8" style="max-width:180px;${mode === "kiting" ? "" : "display:none"}">
         <label class="small dim">Distância do Kiting (SQM)</label>
         <input id="kite-distance" type="number" min="1" max="5" value="${p.config.kiteDistance || 3}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
-      <div class="tiny dim mt8">Kiting faz o personagem manter de 1 a 5 SQMs do monstro targetado. Stand mantém parado. Chase aproxima.</div>
+      <div class="tiny dim mt8">Kiting mantém de 1 a 5 SQMs do monstro. Stand fica parado. Chase aproxima.
+        <b>BOX</b> (party de 4): cada vocação assume a posição dela — Knight no meio da sala tankando (casta
+        exeta res + amp res), RP a 2 SQMs do knight nas retas, Druid/Sorcerer/Monk na posição que atinge o
+        máximo de alvos com as magias de área.</div>
       ${renderBuffPicker(p)}
       ${renderHastePicker(p)}`;
     $$("#helper-attack [data-buff]").forEach((b) => b.addEventListener("click", () => {

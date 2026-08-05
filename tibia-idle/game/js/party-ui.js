@@ -341,7 +341,7 @@ function renderPartyModal(p, online) {
         ${souLider ? `<button class="sm" data-party-remove="${m.id}">Remover</button>` : ""}
       </div>`).join("") + `</div>`;
   } else if (souLider) {
-    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR.</div>`;
+    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR. (party máx. 4)</div>`;
   } else if (souMembro) {
     h += `<div class="dim small center" style="padding:8px">Você é membro do party de <b>${liderChar ? liderChar.name : (ld ? ld.leaderName : "")}</b>.</div>`;
   }
@@ -364,6 +364,22 @@ function renderPartyModal(p, online) {
           ? "Você está em zona segura — pode aceitar."
           : "⚠️ Para aceitar o convite você precisa estar na <b>Cidade</b> ou na <b>Área de Treino</b>."}
       </div>`;
+  }
+
+  // ---- convites ENVIADOS (aguardando aceite) — o líder vê quem falta
+  if (souLider && typeof partyPendingInvitesAll === "function") {
+    const enviados = partyPendingInvitesAll();
+    if (enviados.length) {
+      h += `<div class="party-invite-title tiny dim mt4">Convites enviados (aguardando aceite ${enviados.length}):</div>
+        <div class="party-invite-grid">` + enviados.map((i) => `
+          <div class="party-invite">
+            <b>${i.toName}</b>
+            <span class="tiny dim">troque para ele e aceite no menu Party</span>
+            <div class="row" style="gap:4px;margin-top:4px">
+              <button class="sm" data-party-cancel="${i.id}">Cancelar convite</button>
+            </div>
+          </div>`).join("") + `</div>`;
+    }
   }
 
   // ---- convidar (só o líder, só em cidade/treino)
@@ -466,6 +482,14 @@ function renderPartyModal(p, online) {
     el.addEventListener("click", () => {
       const r = partyDeclineInvite(p, el.dataset.partyDecline);
       toast(r && r.msg ? r.msg : "Convite recusado.", r && r.ok ? "" : "bad");
+      renderPartyModal(p);
+    });
+  });
+  $$("#party-content [data-party-cancel]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const r = (typeof partyCancelInvite === "function")
+        ? partyCancelInvite(p, el.dataset.partyCancel) : { ok: false, msg: "Sem função." };
+      toast(r && r.msg ? r.msg : "Falha.", r && r.ok ? "" : "bad");
       renderPartyModal(p);
     });
   });

@@ -73,11 +73,11 @@ setTimeout(() => {
         const antes = kn.mp;
         tryChallenge(c, kn, Date.now());
         if (kn.mp !== antes) fail("sem toggle, exeta não deveria castar");
-        // só exeta res: marca 1
+        // só exeta res: marca TODOS (mudança da v24 — cd 5s, pega todos)
         kn.config.exetaRes = true;
         tryChallenge(c, kn, Date.now());
         const marcados = c.mobs.filter((m) => m.challengedUntil).length;
-        if (marcados !== 1) fail("exeta res deveria marcar 1 inimigo, marcou " + marcados);
+        if (marcados !== 4) fail("exeta res deveria marcar TODOS (4), marcou " + marcados);
         // os DOIS ligados: amp res marca TODOS (prioridade). Passa 3s para
         // o grupo de cooldown compartilhado (grupos "3") destravar.
         kn.config.exetaAmpRes = true;
@@ -87,7 +87,7 @@ setTimeout(() => {
         if (marcados2 !== 4) fail("exeta amp res deveria marcar TODOS (4), marcou " + marcados2);
         const ev = c.events.filter((e) => e.t === "challenge").pop();
         if (!ev || ev.id !== "exeta-amp-res") fail("evento challenge deveria carregar id exeta-amp-res");
-        ok.push("exeta res (1 alvo) + exeta amp res (todos) com os dois ligados");
+        ok.push("exeta res (todos, cd 5s) + exeta amp res (todos) com os dois ligados");
       }
 
       // ---------- 3) ANIMAÇÃO do exeta amp res registrada ----------

@@ -157,6 +157,13 @@
     SD["exeta-amp-res"].range = 7;
     SD["exeta-amp-res"].alvos = 9;
   }
+  // Challenge (pedido do dono, v24): o exeta RES tem cd de 5s e pega TODOS
+  // os monstros ao alcance 7 (antes marcava 1 e tinha cd 2s). O grupo "3"
+  // continua 2s para o Amp Res poder entrar no meio.
+  if (SD["exeta-res"]) {
+    SD["exeta-res"].cd = 5000;
+    SD["exeta-res"].range = 7;
+  }
 
   // Divine Dazzle: alcance aumentado para 7
   if (SD["exana-amp-res"]) SD["exana-amp-res"].range = 7;

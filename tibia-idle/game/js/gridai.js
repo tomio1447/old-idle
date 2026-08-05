@@ -127,6 +127,11 @@ function playerThinkStep(c, p, alvo, occ, now) {
   if (!alvo) return false;
 
   const modo = (p.config && p.config.attackMode) || "chase";
+  // MODO BOX: segue a formação tática (knight no centro, RP nas retas a
+  // 2 SQM, magos na posição de área) — igual aos aliados.
+  if (modo === "box") {
+    return boxThinkStep(c, pl, alvo, occ, now);
+  }
   if (modo === "stand") {
     pl.dir = dirTo(pl, alvo);
     pl.nextStepAt = now + 200;
@@ -180,6 +185,143 @@ function playerRangeSQM(p) {
   return 1;
 }
 
+/* ======================================================================
+ * MODO BOX — posicionamento tático por vocação (party combat, 4 membros)
+ * ======================================================================
+ * Novo modo de ataque "box" (Helper → Ataque). Cada vocação tem a função
+ * dela na formação:
+ *   - KNIGHT: fica no MEIO da sala (spawn/centro do mapa), parado,
+ *     tankando, batendo e castando exeta res + exeta amp res;
+ *   - PALADIN (RP): fica a 2 SQM do knight, SEMPRE nas RETAS (N/S/L/O,
+ *     nunca diagonais), na reta que pega mais alvos, batendo de longe;
+ *   - DRUID/SORCERER/MONK: se posiciona (reta ou diagonal, 1-2 SQM do
+ *     centro) para atingir o MÁXIMO de alvos com as magias de área (raio 3).
+ * ====================================================================== */
+
+/* Centro da "sala" do BOX: spawn do mapa (onde o knight fica) ou centro. */
+function boxCenter(c) {
+  if (c && c.huntMap && c.huntMap.spawn) {
+    return { cx: c.huntMap.spawn.x, cy: c.huntMap.spawn.y };
+  }
+  const GW = (typeof GRID_W !== "undefined") ? GRID_W : 21;
+  const GH = (typeof GRID_H !== "undefined") ? GRID_H : 13;
+  return { cx: Math.floor(GW / 2), cy: Math.floor(GH / 2) };
+}
+
+/* A entidade knight da party (referência da formação). */
+function boxKnightEnt(c) {
+  if (!c || !c.players) return null;
+  return c.players.find((e) => e.p && e.p.hp > 0 &&
+    (e.p.voc === "knight" || e.p.voc === "elite knight")) || null;
+}
+
+/* Quantos mobs vivos estão a distância Chebyshev <= r de (cx, cy). */
+function boxCountMobs(c, cx, cy, r) {
+  let n = 0;
+  for (const m of (c && c.mobs) || []) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    if (Math.max(Math.abs(m.cx - cx), Math.abs(m.cy - cy)) <= r) n++;
+  }
+  return n;
+}
+
+/* Célula livre (bounds + sem ocupação). */
+function boxCellLivre(cx, cy, occ) {
+  if (typeof inBounds === "function" && !inBounds(cx, cy)) return false;
+  if (occ && occ.has(cx + ":" + cy)) return false;
+  return true;
+}
+
+/* Posição-alvo do BOX por vocação. Reavaliada a cada ~1s. */
+function boxTargetCell(c, ent, occ) {
+  const p = ent && ent.p;
+  if (!p) return null;
+  const voc = p.voc;
+  const centro = boxCenter(c);
+  const knight = boxKnightEnt(c);
+  const base = knight || centro;
+
+  if (voc === "knight" || voc === "elite knight") {
+    return { cx: base.cx, cy: base.cy };
+  }
+
+  // PALADIN: RETAS a 2 SQM do knight (nunca diagonais), na reta com mais
+  // mobs à frente (raio do ataque de distância).
+  if (voc === "paladin" || voc === "royal paladin") {
+    const retas = [
+      { cx: base.cx, cy: base.cy - 2 },
+      { cx: base.cx, cy: base.cy + 2 },
+      { cx: base.cx - 2, cy: base.cy },
+      { cx: base.cx + 2, cy: base.cy },
+    ];
+    let melhor = null, melhorN = -1;
+    for (const r of retas) {
+      if (!boxCellLivre(r.cx, r.cy, occ)) continue;
+      const n = boxCountMobs(c, r.cx, r.cy, 6);
+      if (n > melhorN) { melhorN = n; melhor = r; }
+    }
+    if (!melhor) {
+      melhor = retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) ||
+               { cx: base.cx + 2, cy: base.cy };
+    }
+    return melhor;
+  }
+
+  // DRUID/SORCERER/MONK: célula (reta ou diagonal, 1-2 SQM do centro) que
+  // maximiza mobs dentro do raio de área (3 SQM — as magias 3x3 do Canary).
+  let melhor = null, melhorN = -1;
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      if (!dx && !dy) continue;
+      const cx = base.cx + dx, cy = base.cy + dy;
+      if (!boxCellLivre(cx, cy, occ)) continue;
+      const n = boxCountMobs(c, cx, cy, 3);
+      if (n > melhorN) { melhorN = n; melhor = { cx, cy }; }
+    }
+  }
+  if (!melhor) {
+    // sem mobs: fica perto do knight, numa reta (como o RP)
+    const retas = [
+      { cx: base.cx + 2, cy: base.cy }, { cx: base.cx, cy: base.cy + 2 },
+      { cx: base.cx - 2, cy: base.cy }, { cx: base.cx, cy: base.cy - 2 },
+    ];
+    melhor = retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
+  }
+  return melhor;
+}
+
+/* Passo do modo BOX: vai para a posição da formação e FICA parado lá
+ * atacando (knight no centro, RP nas retas, magos na posição de área).
+ * Reavalia a posição a cada ~1s (os mobs andam, a melhor célula muda). */
+function boxThinkStep(c, ent, alvo, occ, now) {
+  if (!ent) return false;
+  ensureCell(ent);
+  if (ent.moving) return false;
+  if (ent.nextStepAt && now < ent.nextStepAt) return false;
+  if (!ent._boxAt || now - ent._boxAt > 1000) {
+    ent._boxAt = now;
+    ent._boxTarget = boxTargetCell(c, ent, occ);
+  }
+  const alvoCel = ent._boxTarget;
+  if (!alvoCel) return false;
+  if (ent.cx === alvoCel.cx && ent.cy === alvoCel.cy) {
+    // parado na posição: encara o alvo de ataque e espera
+    if (alvo) ent.dir = dirTo(ent, alvo);
+    ent.nextStepAt = now + 250;
+    return false;
+  }
+  const dir = stepToward(ent, alvoCel.cx, alvoCel.cy, occ);
+  if (!dir) {
+    if (alvo) ent.dir = dirTo(ent, alvo);
+    ent.nextStepAt = now + 250;
+    return false;
+  }
+  ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+  const ok = beginStep(ent, dir, occ, false);
+  ent.nextStepAt = now + (ok ? ent.stepDur : 250);
+  return ok;
+}
+
 /* Tick de movimento de toda a cena. Substitui updateCombatMovement. */
 function updateGridMovement(c, p, dt, now) {
   if (!c.player) return;
@@ -212,15 +354,21 @@ function updateGridMovement(c, p, dt, now) {
   const vivos = c.mobs.filter((m) => m.hp > 0);
   const alvo = vivos.length ? vivos[0] : null;
 
+  // MODO BOX: o personagem ATIVO também segue a formação (o playerThinkStep
+  // delega para o boxThinkStep quando attackMode === "box").
   playerThinkStep(c, p, alvo, occ, now);
 
   // PARTY COMBAT: os aliados andam sozinhos até o alvo (cada um com o
-  // alcance da própria arma) e os MONSTROS perseguem o alvo que escolheram
-  // (o mais próximo), não só o personagem ativo.
+  // alcance da própria arma) — ou seguem a formação BOX — e os MONSTROS
+  // perseguem o alvo que escolheram (o mais próximo).
   if (c.players && c.players.length > 1) {
     for (const ent of c.players) {
       if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
-      allyThinkStep(c, ent, alvo, occ, now);
+      if (ent.p.config && ent.p.config.attackMode === "box") {
+        boxThinkStep(c, ent, alvo, occ, now);
+      } else {
+        allyThinkStep(c, ent, alvo, occ, now);
+      }
     }
   }
   for (const m of vivos) {

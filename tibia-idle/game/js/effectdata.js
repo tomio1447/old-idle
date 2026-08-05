@@ -22,7 +22,11 @@ window.FX_OFFICIAL_ALIASES = {
   "hit-area": "explosion-hit-white",   // exori: estouro CINZA (era vermelho)
   "hit-by-fire": "bloody-fire-effect",
   "holy-damage": "holy-effect",
-  "ice-area": "ice-crystal-effect",
+  // AVALANCHE FIX: "ice-area" NÃO pode apontar para o ice-crystal-effect da
+  // wiki — o cristal tem 69 quadros de 32px e o meta só 23, então a
+  // avalanche desenhava o frame rasgado no chão (fw = 2208/23 = 96px).
+  // Removido o alias: "ice-area" volta ao assets/fx/ice-area.png oficial do
+  // DAT (CONST_ME_ICEAREA, 9 quadros de 32px) — a poça/área de gelo correta.
   "ice-attack": "icicle-effect",
   "magic-blue": "blue-sparkles-effect",
   "magic-green": "green-sparkles-effect",

@@ -31,8 +31,8 @@ const crypto = require("crypto");
 /* Zonas onde o LÍDER pode convidar (regra oficial do pedido). */
 const ZONES_CONVIDAR = ["city", "training"];
 
-/* Máximo de pessoas na party (líder + 4). */
-const PARTY_MAX_MEMBERS = 5;
+/* Máximo de pessoas na party (líder + 3 = 4 no total — pedido do dono). */
+const PARTY_MAX_MEMBERS = 4;
 
 /* Validade do convite (ms): 7 dias. */
 const INVITE_TTL_MS = 7 * 24 * 3600 * 1000;
@@ -189,10 +189,10 @@ async function partyInvite(db, body) {
   if (targetParty) {
     return { code: 409, body: { ok: false, msg: target.name + " já está em uma party" } };
   }
-  // limite de membros (líder + 4)
+  // limite de membros (líder + 3 = 4 no total)
   const members = await db.partyMembers(party.id);
-  if (members.length + 1 > PARTY_MAX_MEMBERS - 1) {
-    return { code: 400, body: { ok: false, msg: "Party cheia (máx. " + PARTY_MAX_MEMBERS + ")" } };
+  if (members.length >= PARTY_MAX_MEMBERS - 1) {
+    return { code: 400, body: { ok: false, msg: "Party cheia (máx. " + PARTY_MAX_MEMBERS + " personagens)" } };
   }
   // um convite pendente por convidado (inbox não pode acumular spam)
   const pendente = await db.pendingInviteFor(target.id);
@@ -298,11 +298,11 @@ async function partyAccept(db, body) {
     await db.inviteUpdate(inv.id, { status: "declined" });
     return { code: 409, body: { ok: false, msg: "Você já está em outra party" } };
   }
-  // party cheia?
+  // party cheia? (líder + 3 = 4 no total)
   const members = await db.partyMembers(party.id);
-  if (members.length + 1 > PARTY_MAX_MEMBERS - 1) {
+  if (members.length >= PARTY_MAX_MEMBERS - 1) {
     await db.inviteUpdate(inv.id, { status: "declined" });
-    return { code: 400, body: { ok: false, msg: "Party cheia" } };
+    return { code: 400, body: { ok: false, msg: "Party cheia (máx. " + PARTY_MAX_MEMBERS + " personagens)" } };
   }
   await db.partyAddMember(party.id, invitee.id);
   await db.inviteUpdate(inv.id, { status: "accepted" });

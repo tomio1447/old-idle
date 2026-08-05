@@ -234,6 +234,29 @@ function partyAvailableMembers(p) {
   return out;
 }
 
+/* Convites PENDENTES de TODOS os personagens da party local — o líder usa
+ * para ver quem ainda não aceitou (e cancelar se quiser). */
+function partyPendingInvitesAll() {
+  const d = partyLocalData();
+  if (!d) return [];
+  return d.invites.filter((i) => i.status === "pending");
+}
+
+/* CANCELAR convite (só o líder; o convidado usa Recusar). */
+function partyCancelInvite(p, inviteId) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return partyDeclineInvite(p, inviteId);
+  }
+  if (!partyIsLeaderLocal(p)) return { ok: false, msg: "Só o líder pode cancelar convites." };
+  const d = partyLocalData();
+  if (!d) return { ok: false, msg: "Sem party." };
+  const inv = d.invites.find((i) => i.id === Number(inviteId) && i.status === "pending");
+  if (!inv) return { ok: false, msg: "Convite não encontrado." };
+  inv.status = "cancelled";
+  partyLocalWrite(d);
+  return { ok: true, msg: "Convite cancelado — o personagem volta a aparecer na lista." };
+}
+
 /* Convites PENDENTES para o personagem atual (local). */
 function partyPendingInvites(p) {
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) return [];
@@ -256,8 +279,8 @@ function partyInviteMember(p, memberId) {
     return { ok: false, msg: "Para convidar você precisa estar na Cidade ou na Área de Treino." };
   let d = partyLocalData();
   if (!d) return { ok: false, msg: "Crie a party primeiro (botão Criar party)." };
-  if (d.members.length >= 4)
-    return { ok: false, msg: "Party cheio (máx. 5 no total)." };
+  if (d.members.length >= 3)
+    return { ok: false, msg: "Party cheio (máx. 4 personagens no total)." };
   const chars = typeof getCharacters === "function" ? getCharacters() : [];
   const c = chars.find((x) => String(x.id || characterId(x)) === String(memberId));
   if (!c) return { ok: false, msg: "Personagem não encontrado." };
@@ -290,10 +313,10 @@ function partyAcceptInvite(p, inviteId) {
     return { ok: false, msg: "Este convite não é para este personagem." };
   if (typeof partyCanInviteNow === "function" && !partyCanInviteNow())
     return { ok: false, msg: "Para aceitar um convite você precisa estar na Cidade ou na Área de Treino." };
-  if (d.members.length >= 4) {
+  if (d.members.length >= 3) {
     inv.status = "declined";
     partyLocalWrite(d);
-    return { ok: false, msg: "Party cheia." };
+    return { ok: false, msg: "Party cheia (máx. 4 personagens no total)." };
   }
   d.members.push({
     id: String(inv.toId), name: inv.toName, voc: p.voc, level: p.level,
