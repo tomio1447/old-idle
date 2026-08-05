@@ -46,10 +46,17 @@ function monsterTargetDistance(mob) {
   return mob.def && mob.def.ranged ? 3 : 1;
 }
 
+/* v37: monstros ficam mais PARADOS antes de se mover — o tempo de espera
+ * entre passos quando o bicho está parado subiu de 200ms para 600ms, e a
+ * chance de ficar parado em vez de "dançar" subiu de 90% para 96% (piso de
+ * 90% mesmo nos dados do Canary). Menos agitação na cena. */
+const MOB_STAND_MS = 600;
+
 /* Chance (0-100) de ficar parado em vez de dancar */
 function monsterStaticChance(mob) {
   const mi = moveInfo(mob.slug);
-  return mi.staticAttack === undefined ? 90 : mi.staticAttack;
+  const base = mi.staticAttack === undefined ? 96 : mi.staticAttack;
+  return Math.max(90, base);
 }
 
 /* Velocidade base do monstro, em pontos de speed do Canary */
@@ -85,8 +92,8 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   let dir = null;
 
   if (!alvo) {
-    // sem alvo: vagueia devagar
-    if (Math.random() < 0.25) dir = randomStep(mob, occ);
+    // sem alvo: vagueia devagar (v37: bem mais raro)
+    if (Math.random() < 0.10) dir = randomStep(mob, occ);
   } else if (dist > td) {
     // 2. longe: aproxima
     dir = stepToward(mob, alvo.cx, alvo.cy, occ);
@@ -101,9 +108,9 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   }
 
   if (!dir) {
-    // parado: encara o alvo e espera o proximo tick
+    // parado: encara o alvo e espera (v37: 600ms antes de se mover de novo)
     if (alvo) mob.dir = dirTo(mob, alvo);
-    mob.nextStepAt = now + 200;
+    mob.nextStepAt = now + MOB_STAND_MS;
     return false;
   }
 
@@ -112,7 +119,7 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   if (ok) {
     mob.nextStepAt = now + mob.stepDur;
   } else {
-    mob.nextStepAt = now + 200;
+    mob.nextStepAt = now + MOB_STAND_MS;
   }
   return ok;
 }

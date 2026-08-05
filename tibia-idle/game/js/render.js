@@ -52,7 +52,7 @@ function creatureScale(W) { return tibiaScale(W) * 1.18; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "34";
+const ASSET_VERSION = "35";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -298,13 +298,17 @@ Renderer.prototype.resize = function () {
   }
 };
 
-Renderer.prototype.addFloater = function (x, y, text, color, big, small) {
-  const life = big ? 2400 : 1900;
+Renderer.prototype.addFloater = function (x, y, text, color, big, small, dur, mid) {
+  // v37: tempos de exibição reduzidos — dano 1,5s (fonte 3) e cura HP/mana
+  // 1,2s (fonte 2) — menos poluição visual no combate. `dur` opcional
+  // sobrescreve o default (2,4s big / 1,9s normal).
+  const life = dur || (big ? 2400 : 1900);
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
-    small: !!small,   // numeros de cura/dano com tamanho reduzido (v27)
+    small: !!small,   // fonte 1: textos bem pequenos (v27)
+    mid: !!mid,       // fonte 2: cura HP/mana (v37)
     // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
     // lateral (vx = 0) e com velocidade vertical constante.
     vy: -0.007,
@@ -1195,10 +1199,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     const p = 1 - f.life / f.max;
     const alpha = f.life < 300 ? f.life / 300 : 1;
     ctx.globalAlpha = alpha;
-    // numero de dano do tamanho do client original: menor e fino, nao um
-    // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
-    // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
+    // v37: escala de 3 fontes — fonte 3 (dano, bold 12px), fonte 2 (cura
+    // HP/mana, 9px), fonte 1 (small 5px) / normal 11px. O dano é o maior e
+    // a cura fica menor — hierarquia clara e menos poluição visual.
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : (f.mid ? "9px" : "11px"))) + " Verdana";
     ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
@@ -1582,7 +1586,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
+    // v37: escala de 3 fontes — fonte 3 (dano, bold 12px), fonte 2 (cura
+    // HP/mana, 9px), fonte 1 (small 5px) / normal 11px.
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : (f.mid ? "9px" : "11px"))) + " Verdana";
     ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);

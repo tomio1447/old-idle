@@ -64,12 +64,15 @@ setTimeout(() => {
     if (!/addLog\("loot", `Loot: \$\{txt\}`\)/.test(gsrc)) throw new Error("log do loot no painel deveria permanecer");
     console.log("  - loot: toast rare e floater verde removidos (só o log do painel)");
 
-    // ---------- 3) floaters de cura/dano com metade do tamanho ----------
-    if (!/f\.small \? "5px"/.test(rsrc)) throw new Error("fonte small de cura/dano deveria ser 5px (v33)");
-    // os handlers de dano/cura passam small=true
-    const hits = (gsrc.match(/false, true\);  \/\/ small \(v27\)/g) || []).length;
-    if (hits < 4) throw new Error("poucos floaters de cura/dano marcados como small (" + hits + ")");
-    console.log("  - floaters de cura/dano: fonte 6px (metade) em " + hits + " pontos");
+    // ---------- 3) floaters com escala de 3 fontes (v37) ----------
+    if (!/f\.small \? "5px"/.test(rsrc)) throw new Error("fonte 1 (small 5px) deveria existir");
+    if (!/f\.mid \? "9px"/.test(rsrc)) throw new Error("fonte 2 (cura 9px) deveria existir (v37)");
+    // dano = fonte 3 (bold 12px, 1,5s) · cura = fonte 2 (9px, 1,2s)
+    const danos = (gsrc.match(/true, false, 1500\);/g) || []).length;
+    const curas = (gsrc.match(/false, false, 1200, true\);/g) || []).length;
+    if (danos < 2) throw new Error("poucos floaters de dano na fonte 3 (" + danos + ")");
+    if (curas < 4) throw new Error("poucos floaters de cura na fonte 2 (" + curas + ")");
+    console.log("  - floaters: dano fonte 3 em " + danos + " pontos · cura fonte 2 em " + curas + " pontos");
 
     // ---------- 4) CSS do #scene: sem pixelated ----------
     const css = fs.readFileSync(path.join(GAME, "css/layout.css"), "utf8");
