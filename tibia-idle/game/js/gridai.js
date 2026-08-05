@@ -134,6 +134,9 @@ function playerThinkStep(c, p, alvo, occ, now) {
   if (!alvo) return false;
 
   const modo = (p.config && p.config.attackMode) || "chase";
+  // v39: expõe a vocação na entidade do jogador (c.player não tem .p no
+  // solo) — o DANGER (fuga de mob colado) precisa saber se é knight.
+  pl.voc = p.voc;
   // MODO BOX / SAFE: segue a formação tática (knight no melhor spot do
   // centro, RP nas retas a 2 SQM, magos a 3 SQM reta — ou SAFE nos cantos
   // da tela). O modo de hunt pode vir do modal de instância (c.huntMode).
@@ -344,6 +347,40 @@ function boxLaneOcupada(c, cx, cy) {
   return false;
 }
 
+/* v39: DANGER — mob solto chegou perto de um personagem NÃO-knight.
+ * O knight recasta exeta (agora inteligente) e retoma o aggro; até lá o
+ * personagem foge. O knight nunca foge (é o tanque da box). */
+function entEhKnight(ent) {
+  const voc = (ent && (ent.voc || (ent.p && ent.p.voc))) || "";
+  return voc === "knight" || voc === "elite knight";
+}
+
+/* Primeiro mob vivo a distância Chebyshev <= thresh da entidade (só para
+ * não-knights). Devolve o mob ou null. */
+function boxThreatened(c, ent, thresh) {
+  if (!c || !c.mobs || !ent || ent.cx === undefined) return null;
+  if (entEhKnight(ent)) return null;
+  for (const m of c.mobs) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    if (typeof sqmDistance === "function" &&
+        sqmDistance(ent, m) <= (thresh || 1)) return m;
+  }
+  return null;
+}
+
+/* Direção de fuga: entre as 8 vizinhas livres, a que fica MAIS longe do
+ * mob ameaçador (o knight recasta exeta e retoma). */
+function boxFleeDir(ent, mob, occ) {
+  let best = null, bestScore = -Infinity;
+  for (const d of DIRS) {
+    const nx = ent.cx + d.dx, ny = ent.cy + d.dy;
+    if (!cellFree(occ, nx, ny)) continue;
+    const dm = Math.max(Math.abs(nx - mob.cx), Math.abs(ny - mob.cy));
+    if (dm > bestScore) { bestScore = dm; best = d; }
+  }
+  return best;
+}
+
 /* Posição-alvo do BOX por vocação. Reavaliada a cada ~1,5s (com histerese
  * no formationThinkStep). Retorna {cx, cy, score} — o score alimenta a
  * histerese anti-oscilação. */
@@ -475,6 +512,20 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   if (ent.moving) return false;
   if (ent.nextStepAt && now < ent.nextStepAt) return false;
 
+  // v39: DANGER — mob colado no personagem (não-knight): foge 1 passo
+  // ANTES de qualquer lógica de formação. O knight recasta exeta e retoma
+  // o aggro; o mago/RP não fica parado tomando hit.
+  const threat = boxThreatened(c, ent, 1);
+  if (threat) {
+    const dirF = boxFleeDir(ent, threat, occ);
+    if (dirF) {
+      ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+      const okF = beginStep(ent, dirF, occ, true);
+      ent.nextStepAt = now + (okF ? ent.stepDur : 400);
+      return okF;
+    }
+  }
+
   if (!ent._boxAt || now - ent._boxAt > 1500) {
     ent._boxAt = now;
     const novo = targetFn(c, ent, occ);
@@ -589,6 +640,17 @@ function allyThinkStep(c, ent, alvo, occ, now) {
   ensureCell(ent);
   if (ent.moving) return;
   if (ent.nextStepAt && now < ent.nextStepAt) return;
+  // v39: DANGER — mob colado também foge fora do modo BOX (chase/follow)
+  const threat = boxThreatened(c, ent, 1);
+  if (threat) {
+    const dirF = boxFleeDir(ent, threat, occ);
+    if (dirF) {
+      ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+      const okF = beginStep(ent, dirF, occ, true);
+      ent.nextStepAt = now + (okF ? ent.stepDur : 400);
+      return;
+    }
+  }
   const alcance = (typeof partyAllyRangeSQM === "function")
     ? partyAllyRangeSQM(ent) : 1;
   const dist = sqmDistance(ent, alvo);

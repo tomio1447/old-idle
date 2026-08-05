@@ -2598,6 +2598,11 @@ function doChallengeCast(c, p, now, id, s) {
                typeof sqmDistance === "function")
       ? sqmDistance(pl, m) : 1;
     if (d > (s.range || 7)) continue;
+    // v39: exeta INTELIGENTE — só marca quem NÃO está mais desafiado.
+    // Antes recastava no cooldown mesmo com TODO mundo marcado (gastava
+    // mana e spammava "EXETA RES!" sem efeito). O recast no mob que
+    // escapou/expirou continua imediato.
+    if (m.challengedUntil && m.challengedUntil > now) continue;
     // pedido do dono (v24): o exeta RES também pega TODOS os monstros ao
     // alcance (antes marcava só 1)
     m.challengedUntil = now + 10000;   // 10s de Challenge
@@ -3528,6 +3533,35 @@ function partyTickAllies(c, now, dt) {
   }
 }
 
+/* v39: alvo INTELIGENTE do aliado no party combat.
+ * 1) mob SOLTO (a mais de 2 SQM do knight — não está na box): prioridade.
+ *    São os ranged/escapados que o knight NÃO tanka — derrubar logo evita
+ *    dano nos magos;
+ * 2) senão, SNIPER: o mob vivo com MENOR % de HP — derruba a box mais
+ *    rápido (em vez de todo mundo atacar o primeiro da fila).
+ * O KNIGHT (tank) continua atacando o mais PRÓXIMO (não persegue longe —
+ * sair da box quebra a formação). */
+function partyAllyTarget(c, ent) {
+  if (!c || !c.mobs) return null;
+  const vivos = c.mobs.filter((m) => m.hp > 0 && m.cx !== undefined);
+  if (!vivos.length) return null;
+  const ehKnight = ent && (ent.voc === "knight" || ent.voc === "elite knight");
+  if (ehKnight) {
+    vivos.sort((a, b) => sqmDistance(a, ent) - sqmDistance(b, ent));
+    return vivos[0];
+  }
+  const knight = (typeof boxKnightEnt === "function") ? boxKnightEnt(c) : null;
+  if (knight) {
+    const soltos = vivos.filter((m) => sqmDistance(m, knight) > 2);
+    if (soltos.length) {
+      soltos.sort((a, b) => sqmDistance(a, ent) - sqmDistance(b, ent));
+      return soltos[0];
+    }
+  }
+  vivos.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));
+  return vivos[0];
+}
+
 /* HELPER INDIVIDUAL de um personagem do party combat. Troca o c.player
  * para o aliado durante o tick (as funções do helper usam c.player para
  * posição/alcance) e anexa whoId/posição aos eventos gerados, para o
@@ -3552,16 +3586,23 @@ function partyHelperTick(c, ent, now, dt) {
     if (typeof tryBuff === "function") { try { tryBuff(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryHaste === "function") { try { tryHaste(c, p, now); } catch (e) { /* segue */ } }
     // ---- ataque com a arma/magias DELE: runa > spell > ataque básico ----
+    // v39: alvo INTELIGENTE — partyAllyTarget: prioriza mob SOLTO (fora da
+    // box) e senão o de MENOR HP (sniper). Antes todos batiam no c.mobs[0]
+    // (o primeiro da fila), deixando a box demorar pra cair.
     ent.atkCd -= dt;
     if (ent.atkCd <= 0 && c.mobs.length) {
-      const alvo = c.mobs[0];
-      let acted = false;
-      if (typeof tryUseRune === "function") { try { acted = tryUseRune(c, p, alvo, now); } catch (e) { /* segue */ } }
-      if (!acted && typeof tryCastSpell === "function") { try { acted = tryCastSpell(c, p, alvo, now); } catch (e) { /* segue */ } }
-      if (!acted && typeof playerAttack === "function") {
-        try { const r = playerAttack(c, p, alvo); acted = r !== false; } catch (e) { /* segue */ }
+      const alvo = (typeof partyAllyTarget === "function")
+        ? partyAllyTarget(c, ent) : c.mobs[0];
+      if (!alvo) { ent.atkCd = 250; }
+      else {
+        let acted = false;
+        if (typeof tryUseRune === "function") { try { acted = tryUseRune(c, p, alvo, now); } catch (e) { /* segue */ } }
+        if (!acted && typeof tryCastSpell === "function") { try { acted = tryCastSpell(c, p, alvo, now); } catch (e) { /* segue */ } }
+        if (!acted && typeof playerAttack === "function") {
+          try { const r = playerAttack(c, p, alvo); acted = r !== false; } catch (e) { /* segue */ }
+        }
+        ent.atkCd = acted ? ((typeof attackInterval === "function") ? attackInterval(c, p) : 2000) : 250;
       }
-      ent.atkCd = acted ? ((typeof attackInterval === "function") ? attackInterval(c, p) : 2000) : 250;
     }
   } finally {
     c.player = prev;
