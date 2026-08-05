@@ -2255,8 +2255,16 @@ function tryCriticalHeal(p) {
 function tryHeal(c, p, now) {
   const max = maxStats(p);
   const pct = (p.hp / max.hp) * 100;
-  const spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
-  const itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
+  let spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
+  let itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
+  // v41: POTIONS INTELIGENTES — sob pressão (4+ mobs colados, a box cheia)
+  // o helper bebe/casta a cura ANTES do threshold configurado (+15 pts):
+  // esperar 50% com 8 mobs batendo é tarde demais.
+  if (typeof boxSobPressao === "function" &&
+      boxSobPressao(c, c.player || { cx: 0, cy: 0 }, 4)) {
+    spellAt = Math.min(95, spellAt + 15);
+    itemAt = Math.min(95, itemAt + 15);
+  }
   if (pct > Math.max(spellAt, itemAt)) return false;
 
   // 1. magia de cura: usa apenas se o HP estiver no limite configurado para spell.
@@ -2595,12 +2603,34 @@ function doChallengeCast(c, p, now, id, s) {
   const amp = id === "exeta-amp-res";
   const pl = c.player || { x: 0.18, y: 0.62 };
   let marcou = 0;
+  // v41: EXETA PREVENTIVO — no modo box, mob DESMARCADO que já está
+  // colado num aliado (a <= 2 SQM de um não-knight) é marcado mesmo fora
+  // do alcance normal (raio estendido 9): o knight "grita" para o mob que
+  // está chegando nos magos ANTES de ele dar dano. O resto segue o raio
+  // da spell (7).
+  const ehBox = (typeof formationMode === "function") &&
+    formationMode(c, { p: p }) === "box";
   for (const m of c.mobs) {
     if (m.hp <= 0) continue;
     const d = (pl.cx !== undefined && m.cx !== undefined &&
                typeof sqmDistance === "function")
       ? sqmDistance(pl, m) : 1;
-    if (d > (s.range || 7)) continue;
+    let alc = s.range || 7;
+    if (ehBox && d > alc) {
+      // mob ameaçando aliado: procura um aliado NÃO-knight a <= 2 SQM
+      let ameaca = false;
+      if (c && c.players && c.players.length > 1) {
+        for (const e of c.players) {
+          if (e === pl || !e.p || e.p.hp <= 0) continue;
+          const v = e.p.voc || "";
+          if (v === "knight" || v === "elite knight") continue;
+          if (m.cx !== undefined && e.cx !== undefined &&
+              sqmDistance(m, e) <= 2) { ameaca = true; break; }
+        }
+      }
+      if (ameaca) alc = 9;
+    }
+    if (d > alc) continue;
     // v39: exeta INTELIGENTE — só marca quem NÃO está mais desafiado.
     // Antes recastava no cooldown mesmo com TODO mundo marcado (gastava
     // mana e spammava "EXETA RES!" sem efeito). O recast no mob que
@@ -3536,12 +3566,31 @@ function partyTickAllies(c, now, dt) {
   }
 }
 
-/* v39: alvo INTELIGENTE do aliado no party combat.
- * 1) mob SOLTO (a mais de 2 SQM do knight — não está na box): prioridade.
- *    São os ranged/escapados que o knight NÃO tanka — derrubar logo evita
- *    dano nos magos;
- * 2) senão, SNIPER: o mob vivo com MENOR % de HP — derruba a box mais
- *    rápido (em vez de todo mundo atacar o primeiro da fila).
+/* v41: o mob é HEALER? (defSkills com "healing" — cura os outros da box e
+ * prolonga a luta — prioridade alta para derrubar rápido). */
+function mobEhHealer(m) {
+  const ds = m && m.def && m.def.defSkills;
+  if (!Array.isArray(ds)) return false;
+  return ds.some((d) => d && d.n === "healing");
+}
+
+/* v41: o mob aplica DEBUFF/condição? (meleeCond, cond/condDano ou skill
+ * nomeada "condition" — envenena/paralisa/cega, prioridade média). */
+function mobEhDebuffer(m) {
+  const def = m && m.def;
+  if (!def) return false;
+  if (def.meleeCond) return true;
+  const sk = def.skills;
+  if (!Array.isArray(sk)) return false;
+  return sk.some((s) => s && (s.cond || s.condDano || s.n === "condition" || s.miss));
+}
+
+/* v39+v41: alvo INTELIGENTE do aliado no party combat. Prioridade:
+ * 1) mob SOLTO (a mais de 2 SQM do knight — não está na box): são os
+ *    ranged/escapados que o knight NÃO tanka — derrubar logo evita dano;
+ * 2) HEALER na box (cura os outros — prolonga a luta);
+ * 3) DEBUFFER na box (aplica condição — envenena/paralisa);
+ * 4) SNIPER: o mob vivo com MENOR % de HP (derruba a box mais rápido).
  * O KNIGHT (tank) continua atacando o mais PRÓXIMO (não persegue longe —
  * sair da box quebra a formação). */
 function partyAllyTarget(c, ent) {
@@ -3559,6 +3608,17 @@ function partyAllyTarget(c, ent) {
     if (soltos.length) {
       soltos.sort((a, b) => sqmDistance(a, ent) - sqmDistance(b, ent));
       return soltos[0];
+    }
+    // na box: healer > debuffer > sniper
+    const healers = vivos.filter(mobEhHealer);
+    if (healers.length) {
+      healers.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));
+      return healers[0];
+    }
+    const debuffs = vivos.filter(mobEhDebuffer);
+    if (debuffs.length) {
+      debuffs.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));
+      return debuffs[0];
     }
   }
   vivos.sort((a, b) => (a.hp / Math.max(1, a.maxHp)) - (b.hp / Math.max(1, b.maxHp)));

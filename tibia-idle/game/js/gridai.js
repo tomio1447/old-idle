@@ -357,6 +357,21 @@ function entEhKnight(ent) {
   return voc === "knight" || voc === "elite knight";
 }
 
+/* v41: POTIONS INTELIGENTES — o personagem está SOB PRESSÃO quando há `n`
+ * ou mais mobs vivos colados (a <= 2 SQM) nele. Sob pressão o helper bebe a
+ * potion/casta a cura ANTES do threshold normal (o dano de uma box cheia
+ * derruba rápido — esperar 50% de HP é tarde demais). */
+function boxSobPressao(c, ent, n) {
+  if (!c || !c.mobs || !ent || ent.cx === undefined) return false;
+  let qtd = 0;
+  for (const m of c.mobs) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    if (typeof sqmDistance === "function" &&
+        sqmDistance(ent, m) <= 2 && ++qtd >= (n || 4)) return true;
+  }
+  return false;
+}
+
 /* Primeiro mob vivo a distância Chebyshev <= thresh da entidade (só para
  * não-knights). Devolve o mob ou null. */
 function boxThreatened(c, ent, thresh) {
