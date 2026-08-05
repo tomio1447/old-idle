@@ -1222,6 +1222,12 @@ function drainEvents() {
         const py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount) + " → " + e.target, "#7ae87a");
         r.addEffect(px, c.player ? c.player.y : 0.6, e.mass ? "holy-damage" : "green-rings");
+        // Critical Heal do Druid (10% base): efeito azul oficial em cima
+        // do personagem que casta + texto CRITICAL!
+        if (e.crit) {
+          r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
+          r.addEffect(px, c.player ? c.player.y : 0.6, "critical-heal-effect", 800);
+        }
         if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmt(e.amount)} hp)`);
         else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmt(e.amount)} hp)`);
         break;
@@ -1288,6 +1294,15 @@ function drainEvents() {
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
         break;
+      case "challenge": {
+        // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
+        // marcados focam o knight e causam 20% menos dano por 10s.
+        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
+        r.addFloater(px, py - 0.16, "EXETA AMP RES!", "#ffd65a");
+        r.addEffect(px, py, "magic-blue");
+        addLog("party", `<b style="color:#ffd65a">${e.spell || "Challenge"}</b> marcou <b>${e.count}</b> inimigo(s) — dano deles reduzido 20%`);
+        break;
+      }
       case "buff": {
         addLog("skill", `Buff ativo: <b>${e.nome}</b>`);
         // Momentum (helmet): redução de cooldowns

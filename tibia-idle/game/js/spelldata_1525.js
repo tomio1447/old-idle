@@ -114,10 +114,34 @@
   // Front Sweep: base 72 -> 80
   escala("exori-min", 80 / 72);
 
-  // Nature's Embrace: base healing 650 -> 2000, level 300 -> 275
+  // Nature's Embrace: base healing 650 -> 2000, level 300 -> 275, cd 60s -> 15s
   if (SD["exura-gran-sio"]) {
     escala("exura-gran-sio", 2000 / 650);
     SD["exura-gran-sio"].lvl = 275;
+    SD["exura-gran-sio"].cd = 15000;
+  }
+
+  // Exura Gran Tio Sio (Restore Friend, druid): cura forte de aliado com
+  // cd de 30s. Não existe no SPELLDATA base (é magia nova do update) —
+  // cria aqui como patch de runtime, mesma fórmula de cura do Nature's
+  // Embrace (cura ~2000) e com o efeito/ícone do Restore Balance.
+  if (!SD["exura-gran-tio-sio"]) {
+    SD["exura-gran-tio-sio"] = {
+      id: "exura-gran-tio-sio",
+      name: "Restore Friend",
+      words: "exura gran tio sio",
+      type: "heal",
+      vocs: ["druid"],
+      mana: 500,
+      lvl: 275,
+      cd: 30000,
+      needTarget: true,
+      range: 7,
+      premium: true,
+      icon: (SD["exura-tio-sio"] && SD["exura-tio-sio"].icon) || 96,
+    };
+  } else {
+    SD["exura-gran-tio-sio"].cd = 30000;
   }
 
   // Strong Ice Wave: cd 8s -> 4s, area aumentada (SHORTWAVE3 -> WAVE7,

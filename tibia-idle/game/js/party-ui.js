@@ -372,7 +372,7 @@ function healFriendSpells(p) {
   if (!p) return ids;
   const éDruid = p.voc === "druid" || p.voc === "elder druid";
   const éMonk = p.voc === "monk" || p.voc === "exalted monk";
-  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res");
+  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-gran-tio-sio");
   if (éMonk) ids.push("exura-tio-sio");
   return ids.filter((id) => SPELLS[id] && p.level >= (SPELLS[id].lvl || 1));
 }

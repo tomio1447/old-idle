@@ -1343,6 +1343,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         if (m.sapStrUntil && m.sapStrUntil > agoraIcon) condIcons.push("sap-strength");
         if (m.exposeUntil && m.exposeUntil > agoraIcon) condIcons.push("expose-weakness");
         if (m.challengedUntil && m.challengedUntil > agoraIcon) condIcons.push("challenged");
+        // Ícone de TIPO DE ATAQUE do monstro (OTC): ranged (🏹 flecha) se o
+        // bicho ataca à distância, melee (⚔ espadas) se é corpo-a-corpo.
+        condIcons.push((typeof monsterAttackRange === "function" &&
+                       monsterAttackRange(m) > 0.16) ? "range-atk" : "melee-atk");
         if (condIcons.length) {
           ctx.font = "bold 9px Verdana";
           const tw = ctx.measureText(mobName).width;

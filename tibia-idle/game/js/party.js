@@ -455,7 +455,17 @@ function tryHealFriend(c, p, now) {
   const ehMass = /gran[\s-]*mas[\s-]*res/i.test(spellId);
   if (ehMass && feridos.length < 2) return;
 
-  const amount = Math.max(1, typeof rollSpell === "function" ? rollSpell(p, s) : (s.heal ? s.heal[1] : 100));
+  // Cura base da magia + CRITICAL HEAL do Druid (10% de chance base):
+  // quando o crit acerta, a cura sobe pelo % de dano crítico extra.
+  let amount = Math.max(1, typeof rollSpell === "function" ? rollSpell(p, s) : (s.heal ? s.heal[1] : 100));
+  let critHeal = false;
+  if (typeof tryCriticalHeal === "function") {
+    const ch = tryCriticalHeal(p);
+    if (ch.crit && ch.extraPct > 0) {
+      amount = Math.max(1, Math.floor(amount * (1 + ch.extraPct / 100)));
+      critHeal = true;
+    }
+  }
   let custo = s.mana;
   if (typeof wheelApplySpellBoost === "function" && p.wheel) {
     const _wm = wheelApplySpellBoost(p, spellId);
@@ -476,7 +486,8 @@ function tryHealFriend(c, p, now) {
     partyApplyFriendHeal(p, alvo, amount);
     if (c.events) {
       c.events.push({ t: "heal-friend", amount: amount, target: alvo.name,
-                      spell: s.name, mass: ehMass, x: (c.player ? c.player.x : 0.5),
+                      spell: s.name, mass: ehMass, crit: critHeal,
+                      x: (c.player ? c.player.x : 0.5),
                       y: (c.player ? c.player.y : 0.5), screen: true });
     }
   }

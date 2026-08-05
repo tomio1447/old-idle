@@ -2175,10 +2175,11 @@ function criticalHealEnabled(p) {
   return !!(p && p.voc === "druid" && (!p.config || p.config.criticalHeal !== false));
 }
 
-/* Chance de critical heal em %: a MESMA do critical hit (5% intrínseca +
- * Strike imbuement). */
+/* Chance de critical heal em %: 10% BASE para o Druid (pedido do dono) +
+ * Strike imbuement (que soma à chance de crit hit). */
 function criticalHealChancePct(p) {
-  return playerCritChancePct(p);
+  // 10% base do druid + o bônus do Strike (imbutido no crit hit chance).
+  return 10 + Math.max(0, playerCritChancePct(p) - 5);
 }
 
 /* Dano crítico extra em % usado no critical heal: as mesmas fontes do
@@ -2513,6 +2514,44 @@ function autoRestock() {
  * abaixo do limite — 10 goles por segundo. No Tibia a potion trava todas as
  * potions por 1s (o mesmo potionCd da cura de item), entao uma mana potion
  * por segundo e o maximo. */
+/* EXETA AMP RES / EXETA RES (Chivalrous Challenge / Challenge) do Knight.
+ * Marca os monstros ao alcance para focarem o knight e, como o Challenge do
+ * Tibia, os marcados causam 20% MENOS dano a ele. Exeta res marca 1; exeta
+ * amp res marca TODOS ao alcance (7 SQM) — e é auto-cast quando o knight
+ * está em combate. */
+function tryChallenge(c, p, now) {
+  now = now || Date.now();
+  if (!c || !c.mobs || !c.mobs.length) return false;
+  // só knight (e elite knight)
+  if (p.voc !== "knight" && p.voc !== "elite knight") return false;
+  const id = "exeta-amp-res";   // marca TODOS (versão forte)
+  const s = (typeof SPELLS !== "undefined") ? SPELLS[id] : null;
+  if (!s || p.level < s.lvl || p.mp < s.mana) return false;
+  if (!cdReady(p, id, now)) return false;
+
+  // marca os mobs ao alcance (7 SQM do exeta amp res)
+  const pl = c.player || { x: 0.18, y: 0.62 };
+  let marcou = 0;
+  for (const m of c.mobs) {
+    if (m.hp <= 0) continue;
+    const d = (pl.cx !== undefined && m.cx !== undefined &&
+               typeof sqmDistance === "function")
+      ? sqmDistance(pl, m) : 1;
+    if (d > (s.range || 7)) continue;
+    m.challengedUntil = now + 10000;   // 10s de Challenge
+    marcou++;
+  }
+  if (!marcou) return false;
+
+  p.mp -= s.mana;
+  if (typeof addManaSpent === "function") addManaSpent(p, s.mana);
+  cdStart(p, id, s, now);
+  c.events.push({ t: "challenge", x: pl.x, y: pl.y, screen: true,
+                  count: marcou, spell: s.name });
+  c.events.push({ t: "say", text: s.words || "exeta amp res" });
+  return true;
+}
+
 function tryMana(c, p, now) {
   now = now || Date.now();
   if (c.potionCd > now) return false;
@@ -2986,6 +3025,11 @@ function mobAttack(c, p, mob) {
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   const agora = Date.now();
+  // Exeta (Challenge / Chivalrous Challenge) do Knight: monstro marcado
+  // causa 20% MENOS dano ao knight enquanto o Challenge durar.
+  if (mob.challengedUntil && mob.challengedUntil > agora) {
+    raw = Math.floor(raw * 0.8);
+  }
   // Shield Bash/Slam (15.25): o proximo auto attack do alvo em ate 10s
   // sai pela METADE. O debuff e consumido neste golpe.
   if (mob.weakNextUntil) {
@@ -3368,6 +3412,13 @@ function combatTick(c, p, dt, now) {
   // cura os aliados adjacentes quando 2+ membros estão com HP baixo.
   if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
   tryMana(c, p, now);
+
+  // EXETA AMP RES (Chivalrous Challenge, knight): marca os monstros para
+  // focarem o knight. Neste idle single-player o player já é o único alvo,
+  // então o efeito mecânico é o do Challenge do Tibia: os monstros marcados
+  // causam 20% MENOS dano ao knight (e o exeta amp res marca TODOS ao
+  // alcance de 7 SQM). Auto-cast com o cooldown da magia.
+  if (typeof tryChallenge === "function") tryChallenge(c, p, now);
 
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
   // voltando ao templo/cidade pelo fluxo normal de morte.

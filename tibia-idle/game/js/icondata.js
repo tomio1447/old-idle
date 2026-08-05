@@ -228,9 +228,65 @@ function wikiIconReady(slug) {
 }
 
 /* Desenha o ícone em (x, y) com `size` px (canto superior esquerdo) se
- * já carregou. Retorna true se desenhou — útil para fallbacks em texto. */
+ * já carregou. Retorna true se desenhou — útil para fallbacks em texto.
+ * Os slugs "melee-atk" e "range-atk" são ícones VETORIAIS desenhados em
+ * canvas (sem sprite): espadas cruzadas = melee, flecha = ranged — como o
+ * indicador de tipo de ataque do OTC client. */
 function drawWikiIcon(ctx, slug, x, y, size) {
+  if (slug === "melee-atk" || slug === "range-atk") {
+    return drawAtkTypeIcon(ctx, slug, x, y, size);
+  }
   if (!wikiIconReady(slug)) return false;
   ctx.drawImage(wikiIcon(slug), x, y, size, size);
+  return true;
+}
+
+/* Ícone vetorial do tipo de ataque (OTC): ⚔ espadas p/ melee, 🏹 flecha
+ * p/ ranged. Desenha com linhas/arcos para não depender de sprite. */
+function drawAtkTypeIcon(ctx, slug, x, y, size) {
+  const c = size / 2;
+  const s = size * 0.45;
+  ctx.save();
+  if (slug === "melee-atk") {
+    // duas espadas cruzadas
+    ctx.strokeStyle = "#d4d4d4";
+    ctx.lineWidth = Math.max(1.5, size * 0.14);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x + c - s, y + c - s); ctx.lineTo(x + c + s, y + c + s);
+    ctx.moveTo(x + c + s, y + c - s); ctx.lineTo(x + c - s, y + c + s);
+    ctx.stroke();
+    // guardas (cruzetas)
+    ctx.strokeStyle = "#b8b8b8";
+    ctx.lineWidth = Math.max(1, size * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(x + c - s * 0.6, y + c - s * 0.4); ctx.lineTo(x + c - s * 0.2, y + c - s * 0.8);
+    ctx.moveTo(x + c + s * 0.6, y + c + s * 0.4); ctx.lineTo(x + c + s * 0.2, y + c + s * 0.8);
+    ctx.stroke();
+  } else {
+    // flecha apontando para cima-direita
+    ctx.strokeStyle = "#7ec8ff";
+    ctx.lineWidth = Math.max(1.5, size * 0.14);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x + c - s * 0.9, y + c + s * 0.9); ctx.lineTo(x + c + s * 0.9, y + c - s * 0.9);
+    ctx.stroke();
+    // pena (cauda)
+    ctx.strokeStyle = "#5a8ac8";
+    ctx.lineWidth = Math.max(1, size * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(x + c - s * 0.9, y + c + s * 0.9); ctx.lineTo(x + c - s * 0.3, y + c + s * 0.3);
+    ctx.stroke();
+    // ponta (triângulo)
+    ctx.fillStyle = "#7ec8ff";
+    ctx.beginPath();
+    const p = s * 1.1;
+    ctx.moveTo(x + c + p, y + c - p);
+    ctx.lineTo(x + c + p - s * 0.5, y + c - p + s * 0.3);
+    ctx.lineTo(x + c + p - s * 0.3, y + c - p + s * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
   return true;
 }
