@@ -1,8 +1,8 @@
 /* Teste da v27 — Upgrade visual (120fps + antialiasing) + loot limpo +
  * números de cura/dano com metade do tamanho.
  *
- * 1) RENDERER: imageSmoothingEnabled=true e imageSmoothingQuality="high" no
- *    constructor e no resize; resize escala por devicePixelRatio (máx 2);
+ * 1) RENDERER: imageSmoothingEnabled=false (nearest — pixel art nítido) e
+ *    resize escala por devicePixelRatio (máx 2);
  * 2) LOOT: o case "kill" NÃO tem toast de "loot raro" nem floater verde
  *    "✦ ..." subindo na tela (só o log do painel);
  * 3) FLOATERS de cura/dano: usam a flag small (fonte 6px = metade de 11px).
@@ -52,10 +52,10 @@ setTimeout(() => {
   try {
     // ---------- 1) RENDERER: antialiasing + DPR ----------
     const rsrc = fs.readFileSync(path.join(GAME, "js/render.js"), "utf8");
-    if (!/imageSmoothingEnabled = true/.test(rsrc)) throw new Error("imageSmoothingEnabled deveria ser true");
-    if (!/imageSmoothingQuality = "high"/.test(rsrc)) throw new Error("imageSmoothingQuality deveria ser high");
-    if (!/devicePixelRatio/.test(rsrc)) throw new Error("resize deveria usar devicePixelRatio");
-    console.log("  - renderer: antialiasing high + DPR 2x (120fps suave, sem serrilhado)");
+    if (!/imageSmoothingEnabled = false/.test(rsrc)) throw new Error("imageSmoothingEnabled deveria ser false (pixel art nítido)");
+    if (/imageSmoothingEnabled = true/.test(rsrc)) throw new Error("smoothing true (blur) não deveria existir");
+    if (!/devicePixelRatio/.test(rsrc)) throw new Error("resize deveria usar devicePixelRatio (DPR 2x)");
+    console.log("  - renderer: DPR 2x + desenho nearest (nítido, sem serrilhado e sem embaçado)");
 
     // ---------- 2) LOOT: sem toast rare, sem floater verde ----------
     const gsrc = fs.readFileSync(path.join(GAME, "js/game.js"), "utf8");
@@ -77,7 +77,7 @@ setTimeout(() => {
     console.log("  - css: #scene com image-rendering:auto (smooth na escala)");
 
     if (errors.length) throw new Error(errors.join(" | "));
-    console.log("V27 OK — visual suave (DPR 2x + antialiasing), loot sem flutuantes e números de cura/dano pela metade");
+    console.log("V29 OK — visual nítido (DPR 2x + nearest, sem blur), loot sem flutuantes e números de cura/dano pela metade");
     process.exit(0);
   } catch (e) {
     console.log("ERRO:", e.message);

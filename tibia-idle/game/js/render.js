@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "26";
+const ASSET_VERSION = "27";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -261,11 +261,14 @@ function missileDir(sx, sy, tx, ty) {
 function Renderer(canvas) {
   this.c = canvas;
   this.ctx = canvas.getContext("2d");
-  // Upgrade visual (v27): anti-aliasing LIGADO — remove o serrilhado das
-  // sprites escaladas no canvas (antes imageSmoothingEnabled=false deixava
-  // as bordas "serrilhadas" como se rodasse a 30fps).
-  this.ctx.imageSmoothingEnabled = true;
-  try { this.ctx.imageSmoothingQuality = "high"; } catch (e) { /* navegador sem suporte */ }
+  // Upgrade visual (v29): renderiza em devicePixelRatio (máx. 2x) para o
+  // canvas ter o DOBRO de resolução do CSS, e desenha com
+  // imageSmoothingEnabled=false (nearest) — pixel art NÍTIDO, sem o blur
+  // que o bilinear da v27 causava. O navegador faz o downscale 2:1 do
+  // canvas para o tamanho CSS (#scene image-rendering:auto), então o
+  // resultado é nítido E sem serrilhado (o serrilhado antigo vinha do
+  // canvas 1x esticado pelo CSS).
+  this.ctx.imageSmoothingEnabled = false;
   this.floaters = [];       // numeros de dano
   this.effects = [];        // animacoes de efeito
   this.projectiles = [];    // projeteis/distance shots
@@ -278,20 +281,15 @@ Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
   // câmera reduzida e com mais visão: 21 × 13 SQMs.
   const h = Math.round(w * (13 / 21));
-  // Upgrade visual (v27): renderiza em devicePixelRatio (máx. 2x) — o
-  // canvas interno fica com resolução maior que o CSS e o navegador faz o
-  // downscale suave (image-rendering:auto no #scene), matando o serrilhado
-  // da esticada 1x. O loop roda em requestAnimationFrame, ou seja, na taxa
-  // do display (60/120/144Hz) — com o DPR 2x + smoothing a cena fica
-  // nítida e fluida, sem o aspecto de 30fps.
+  // Canvas em DPR (máx. 2x) + desenho nearest: nítido e sem serrilhado.
+  // O loop roda em requestAnimationFrame — na taxa do display (60/120/144Hz).
   const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
   const nw = Math.max(1, Math.round(w * dpr));
   const nh = Math.max(1, Math.round(h * dpr));
   if (this.c.width !== nw || this.c.height !== nh) {
     this.c.width = nw;
     this.c.height = nh;
-    this.ctx.imageSmoothingEnabled = true;
-    try { this.ctx.imageSmoothingQuality = "high"; } catch (e) { /* sem suporte */ }
+    this.ctx.imageSmoothingEnabled = false;
   }
 };
 
