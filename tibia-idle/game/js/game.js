@@ -947,8 +947,8 @@ function openInstanceModal(id) {
   // repetir a mesma hunt sem ler os dois blocos de novo
   const ultima = G.p && G.p.lastInstanceChoice;
   const modo = (G.p && G.p.config && G.p.config.attackMode) || "chase";
-  const modos = [["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"],
-                 ["box", "BOX"], ["safe", "SAFE"]];
+  // v33: sem Chase/Stand — sempre STAND
+  const modos = [["kiting", "Kiting"], ["box", "BOX"], ["safe", "SAFE"]];
   $("#modal-body").innerHTML = `
     <div class="panel-title">Escolha a instância — ${hu.name}</div>
     <div class="panel-body">

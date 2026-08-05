@@ -43,11 +43,16 @@ const TIBIA_SPRITE = 32;
 
 function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
 
+/* v33: escala das SPRITES de criaturas (jogador, aliados, monstros) um
+ * pouco MAIOR que o tile nativo (1.18x) — o pedido foi aumentar o tamanho
+ * das sprites. Efeitos/projéteis continuam no tibiaScale normal. */
+function creatureScale(W) { return tibiaScale(W) * 1.18; }
+
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "30";
+const ASSET_VERSION = "31";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1193,7 +1198,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "6px" : "11px")) + " Verdana";
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
     ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
@@ -1279,9 +1284,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // a sprite fica parada no chão, como no client.
   const bob = 0;
   if (spriteReady(pimg)) {
-    // escala unica do client (tile/32): a sprite mantem o tamanho nativo em
-    // SQMs, sem ser esticada para preencher o tile
-    const sc = tibiaScale(W);
+    // v33: escala das criaturas 1.18x maior (pedido do dono)
+    const sc = creatureScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = 0;
     // Personagem projetado no MEIO do SQM (pedido do dono): a sprite fica
@@ -1340,7 +1344,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const img = OutfitRenderer.forPlayer(pp, ent.dir || "e",
                                            ent.moving ? (ent.frame || 1) : 0);
       if (!spriteReady(img)) continue;
-      const sc = tibiaScale(W);
+      const sc = creatureScale(W);   // v33: aliados 1.18x
       const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
       const tile = tilePx(W);
       // aliados também centralizados no SQM (mesma regra do personagem ativo)
@@ -1400,8 +1404,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const my = m.y * H;
       if (spriteReady(img)) {
         // mesma escala do jogador: o porte da criatura vem do tamanho da
-        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs), nao de um chute pelo HP
-        const sc = tibiaScale(W);
+        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs). v33: 1.18x maior
+        const sc = creatureScale(W);
         const w = spriteW(img) * sc, h = spriteH(img) * sc;
         // Ancoragem do pe no SQM: a base da sprite encosta na borda inferior
         // do tile (o bicho "pisa" no chao), em vez de ficar centrada. Bicho de
@@ -1578,7 +1582,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "6px" : "11px")) + " Verdana";
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
     ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
@@ -1618,7 +1622,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     // Desenha corpse do jogador (sprite semi-transparente)
     const pimg = OutfitRenderer.forPlayer(player, dp.dir || "e", 0);
     if (spriteReady(pimg)) {
-      const sc = tibiaScale(W);
+      const sc = creatureScale(W);   // v33
       const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
       ctx.globalAlpha = 0.45;
       ctx.save();

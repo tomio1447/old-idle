@@ -65,7 +65,7 @@ setTimeout(() => {
     console.log("  - loot: toast rare e floater verde removidos (só o log do painel)");
 
     // ---------- 3) floaters de cura/dano com metade do tamanho ----------
-    if (!/f\.small \? "6px" : "11px"/.test(rsrc)) throw new Error("fonte small de cura/dano deveria ser 6px (metade de 11)");
+    if (!/f\.small \? "5px"/.test(rsrc)) throw new Error("fonte small de cura/dano deveria ser 5px (v33)");
     // os handlers de dano/cura passam small=true
     const hits = (gsrc.match(/false, true\);  \/\/ small \(v27\)/g) || []).length;
     if (hits < 4) throw new Error("poucos floaters de cura/dano marcados como small (" + hits + ")");

@@ -128,18 +128,15 @@ function playerThinkStep(c, p, alvo, occ, now) {
 
   const modo = (p.config && p.config.attackMode) || "chase";
   // MODO BOX / SAFE: segue a formação tática (knight no melhor spot do
-  // centro, RP nas retas a 2 SQM, magos na posição de área — ou SAFE nos
-  // cantos da tela). O modo de hunt pode vir do modal de instância
-  // (c.huntMode) e vale para a party inteira.
+  // centro, RP nas retas a 2 SQM, magos a 3 SQM reta — ou SAFE nos cantos
+  // da tela). O modo de hunt pode vir do modal de instância (c.huntMode).
   const fm = formationMode(c, { p: p });
   if (fm === "box") return boxThinkStep(c, pl, alvo, occ, now);
   if (fm === "safe") return safeThinkStep(c, pl, alvo, occ, now);
-  if (modo === "stand") {
-    pl.dir = dirTo(pl, alvo);
-    pl.nextStepAt = now + 200;
-    return false;
-  }
 
+  // v33: remoção do Chase/Stand — o personagem SEMPRE fica em STAND: parado
+  // encarando o alvo; só anda quando o alvo sai do alcance (persegue para
+  // manter o ataque). Kiting continua (distância escolhida pelo jogador).
   const alcance = playerRangeSQM(p);
   const dist = sqmDistance(pl, alvo);
   let dir = null;
@@ -151,6 +148,7 @@ function playerThinkStep(c, p, alvo, occ, now) {
     if (dist < querido) dir = stepAway(pl, alvo, occ);
     else if (dist > querido) dir = stepToward(pl, alvo.cx, alvo.cy, occ);
   } else if (dist > alcance) {
+    // stand: persegue o alvo apenas quando ele sai do alcance do ataque
     dir = stepToward(pl, alvo.cx, alvo.cy, occ);
   }
 
@@ -307,25 +305,32 @@ function boxTargetCell(c, ent, occ) {
     return melhor;
   }
 
-  // DRUID/SORCERER/MONK: célula (reta ou diagonal, 1-2 SQM do centro) que
-  // maximiza mobs dentro do raio de área (3 SQM — as magias 3x3 do Canary).
+  // DRUID/SORCERER/MONK: RETAS a 3 SQM do knight (nunca diagonais), na reta
+  // que maximiza mobs dentro do raio de área (3 SQM — as magias 3x3 do
+  // Canary). Ficam parados a 3 SQMs do tanque.
   let melhor = null, melhorN = -1;
-  for (let dy = -2; dy <= 2; dy++) {
-    for (let dx = -2; dx <= 2; dx++) {
-      if (!dx && !dy) continue;
-      const cx = base.cx + dx, cy = base.cy + dy;
-      if (!boxCellLivre(cx, cy, occ)) continue;
-      const n = boxCountMobs(c, cx, cy, 3);
-      if (n > melhorN) { melhorN = n; melhor = { cx, cy }; }
-    }
+  const retas3 = [
+    { cx: base.cx + 3, cy: base.cy }, { cx: base.cx - 3, cy: base.cy },
+    { cx: base.cx, cy: base.cy + 3 }, { cx: base.cx, cy: base.cy - 3 },
+  ];
+  for (const r of retas3) {
+    if (!boxCellLivre(r.cx, r.cy, occ)) continue;
+    const n = boxCountMobs(c, r.cx, r.cy, 3);
+    if (n > melhorN) { melhorN = n; melhor = r; }
   }
   if (!melhor) {
-    // sem mobs: fica perto do knight, numa reta (como o RP)
-    const retas = [
-      { cx: base.cx + 2, cy: base.cy }, { cx: base.cx, cy: base.cy + 2 },
-      { cx: base.cx - 2, cy: base.cy }, { cx: base.cx, cy: base.cy - 2 },
-    ];
-    melhor = retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
+    // sem reta livre: procura perto (2-3 SQM) mantendo reta sempre que
+    // possível; último caso, perto do knight numa reta
+    for (const r of retas3) {
+      if (boxCellLivre(r.cx, r.cy, occ)) { melhor = r; break; }
+    }
+    if (!melhor) {
+      const retas2 = [
+        { cx: base.cx + 2, cy: base.cy }, { cx: base.cx - 2, cy: base.cy },
+        { cx: base.cx, cy: base.cy + 2 }, { cx: base.cx, cy: base.cy - 2 },
+      ];
+      melhor = retas2.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
+    }
   }
   return melhor;
 }

@@ -102,9 +102,10 @@ setTimeout(() => {
       const topEsperado = py * H - 0; // h varia; validamos pela RELAÇÃO: topo + h/2 == centro
       // captura o drawImage do personagem: a última imagem com altura h tal que
       // (drawY + h/2) fique no centro do SQM
-      // sprite do personagem: 32x64 * escala (tile/32)
-      const pwE = 32 * scSpr, phE = 64 * scSpr;
-      const playerDraw = draws.filter((d) => Math.abs(d.w - pwE) < 4 && Math.abs(d.h - phE) < 4).pop();
+      // sprite do personagem: 32x64 * escala (tile/32) * 1.18 (creatureScale v33)
+      const scCriatura = scSpr * 1.18;
+      const pwE = 32 * scCriatura, phE = 64 * scCriatura;
+      const playerDraw = draws.filter((d) => Math.abs(d.w - pwE) < 6 && Math.abs(d.h - phE) < 6).pop();
       if (!playerDraw) fail("nenhum drawImage do personagem capturado");
       const centroSQM = py * H;
       const centroSprite = playerDraw.y + playerDraw.h / 2;

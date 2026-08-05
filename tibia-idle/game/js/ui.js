@@ -1980,8 +1980,8 @@ function renderHelper(p) {
         cobre quando ele está em recarga. O monstro marcado causa 20% menos dano.</div>` : "";
     // MODO DE HUNT: fica NO ALTO da aba Ataque (acima das stances/buffs) —
     // o mesmo seletor aparece no topo do modal de instância da hunt.
-    const modos = [["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"],
-                   ["box", "BOX"], ["safe", "SAFE"]];
+    // v33: sem Chase/Stand — sempre STAND (parado, persegue só p/ atacar)
+    const modos = [["kiting", "Kiting"], ["box", "BOX"], ["safe", "SAFE"]];
     atkEl.innerHTML = `
       <div class="small mb4" style="color:#d4af37;font-weight:bold">🎯 Modo de Hunt</div>
       <div class="row wrap" style="gap:6px">
