@@ -805,8 +805,17 @@ function bossReadyInfo(p, boss) {
   return { ok: true, reason: "Disponível", left: 0 };
 }
 
+/* Loot real do boss: o BOSS_DEFS pode não ter `loot` (ex.: a Timira usa o
+ * loot do monstro base). Antes isso quebrava o modal (boss.loot.map de
+ * undefined) — por isso a Timira não abria. */
+function bossLootReal(boss) {
+  if (boss.loot && boss.loot.length) return boss.loot;
+  const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"];
+  return (base && base.loot) || [];
+}
+
 function bossLootText(boss) {
-  return boss.loot.map((l) =>
+  return bossLootReal(boss).map((l) =>
     `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`);
 }
 
@@ -844,8 +853,10 @@ function openBossModal(id) {
   const boss = BOSS_DEFS[id];
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
-  const stats = bossStats(boss);
   const st = bossState(G.p, id);
+  // Drops do boss: sprites lado a lado (como o baiak-idle.com), simples e
+  // sem poluição — nome + sprite + chance.
+  const drops = bossLootReal(boss);
   $("#modal-body").innerHTML = `
     <div class="panel-title">
       ${mobImg(boss.sprite, 24)}
@@ -854,23 +865,21 @@ function openBossModal(id) {
     </div>
     <div class="panel-body">
       <div class="panel-inset mb8" style="padding:8px">
-        <div class="stat-row"><span class="k">Requisito</span><span class="v">${boss.requirement.text}</span></div>
+        <div class="stat-row"><span class="k">Requisito</span><span class="v">${boss.requirement ? boss.requirement.text : "—"}</span></div>
         <div class="stat-row"><span class="k">Disponibilidade</span><span class="v" style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.left ? fmtTime(ready.left / 1000) : ready.reason}</span></div>
-        <div class="stat-row"><span class="k">Cooldown</span><span class="v">1 combate a cada 16h</span></div>
         <div class="stat-row"><span class="k">Vitórias</span><span class="v">${fmtFull(st.kills || 0)}</span></div>
       </div>
-      <div class="panel-inset mb8" style="padding:8px">
-        <div class="stat-row"><span class="k">Sprite</span><span class="v">${boss.baseMonster || "—"}</span></div>
-        <div class="stat-row"><span class="k">Vida</span><span class="v">${fmtFull(stats.hp)}</span></div>
-        <div class="stat-row"><span class="k">Dano</span><span class="v">${fmtFull(stats.damage)}</span></div>
-        <div class="stat-row"><span class="k">Defesa</span><span class="v">${fmtFull(stats.armor)}</span></div>
-      </div>
       <div class="small dim mb4">Drops — chance oficial do Canary</div>
-      <div class="list mb8" style="max-height:180px">
-        ${bossLootText(boss).map((line) => `<div class="stat-row"><span class="k">${line}</span></div>`).join("")}
+      <div class="reward-grid mb8">
+        ${drops.map((l) => `
+          <div class="reward-item" title="${itemName(l.item)} — ${l.chance}%${l.max > 1 ? " · até " + l.max + "x" : ""}">
+            ${itemImg(l.item)}
+            <div class="tiny dim reward-name">${itemName(l.item)}</div>
+            <div class="tiny" style="color:#ffd65a">${l.chance}%${l.max > 1 ? " · " + l.max + "x" : ""}</div>
+          </div>`).join("")}
       </div>
       <button class="danger full" id="boss-fight" ${ready.ok ? "" : "disabled"}>FIGHT</button>
-      <div class="tiny dim mt8">Ao terminar a luta, vencendo ou morrendo, você será teleportado para a cidade. O loot do boss vai para o Loot Pouch.</div>
+      <div class="tiny dim mt8">Ao terminar a luta, vencendo ou morrendo, você será teleportado para a cidade. O loot do boss vai para o 🎁 Reward Chest.</div>
     </div>`;
   $("#modal").classList.add("show");
   $("#boss-close").addEventListener("click", () => $("#modal").classList.remove("show"));
@@ -1859,6 +1868,8 @@ function renderAll() {
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
+  // Reward Chest: badge do botão (nº de itens de boss)
+  if (typeof renderRewardButton === "function") renderRewardButton(p);
   // painel de party estilo OTC (canto superior direito da tela do jogo)
   if (typeof renderPartyPanel === "function") renderPartyPanel(p);
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
@@ -1997,6 +2008,8 @@ function bindControls() {
   if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
   const btnDepot = $("#btn-depot");
   if (btnDepot) btnDepot.addEventListener("click", () => { if (typeof openDepotModal === "function") openDepotModal(); });
+  // Reward Chest (drops de boss) — botão ao lado do MARKET
+  if (typeof bindRewardButton === "function") bindRewardButton();
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();

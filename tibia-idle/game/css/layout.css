@@ -764,6 +764,20 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: var(--panel-dark); padding: 4px;
   border: 1px solid var(--border-in);
 }
+
+/* Reward Chest — grade de itens com sprites lado a lado */
+.reward-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+.reward-item {
+  background: var(--panel-dark); border: 1px solid var(--border-in);
+  border-radius: 4px; padding: 6px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.reward-item img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+.reward-count { font-weight: bold; color: #ffd65a; }
+.reward-name { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .outfit-palette .swatch {
   width: 100%; aspect-ratio: 1; cursor: pointer;
   border: 1px solid rgba(0,0,0,.55);

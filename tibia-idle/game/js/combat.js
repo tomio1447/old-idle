@@ -3385,7 +3385,10 @@ function rollLoot(c, p, mob) {
       got.push({ item: l.item, count: count });
       continue;
     } else if (mob.boss) {
-      addLootPouch(p, l.item, count);
+      // REWARD CHEST: todo drop de boss vai para o baú de recompensas
+      // (separado da Loot Pouch comum)
+      if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count);
+      else addLootPouch(p, l.item, count);
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (it.s === "ammo") {
@@ -3416,7 +3419,8 @@ function rollLoot(c, p, mob) {
           c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
           got.push({ item: l.item, count: count });
         } else if (mob.boss) {
-          addLootPouch(p, l.item, count);
+          if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count);
+          else addLootPouch(p, l.item, count);
         } else if (SUPPLIES[l.item]) {
           p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
         } else if (it.s === "ammo") {
