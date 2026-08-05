@@ -69,8 +69,10 @@ function newCombat(player, huntId, instanceMode) {
     expMul: pvp ? 1.25 : 1,
     lootMul: pvp ? 1.25 : 1,
     skillMul: pvp ? 1.25 : 1,
-    influencedChance: INFLUENCED_BASE_CHANCE + (pvp ? INFLUENCED_PVP_BONUS : 0),
-    fiendishChance: FIENDISH_BASE_CHANCE + (pvp ? FIENDISH_PVP_BONUS : 0),
+    // Hunts Hardcore podem multiplicar ambas as chances sem alterar as
+    // tabelas globais de criaturas/hunts normais.
+    influencedChance: (INFLUENCED_BASE_CHANCE + (pvp ? INFLUENCED_PVP_BONUS : 0)) * (hunt.influencedMul || 1),
+    fiendishChance: (FIENDISH_BASE_CHANCE + (pvp ? FIENDISH_PVP_BONUS : 0)) * (hunt.fiendishMul || 1),
     // RAID será feito por jogadores reais no online. Não simular NPC/Player Raider aqui.
     raidEnabled: false,
     raidCd: Infinity,
@@ -193,7 +195,10 @@ function notifyRealPlayerRaidPending(c) {
 }
 
 function spawnWave(c, p) {
-  const pack = c.hunt.pack || 3;
+  // Hardcore sorteia uma nova box completa a cada respawn: 10–12 mobs.
+  const pack = (c.hunt.packMin && c.hunt.packMax)
+    ? c.hunt.packMin + Math.floor(Math.random() * (c.hunt.packMax - c.hunt.packMin + 1))
+    : (c.hunt.pack || 3);
   // Celulas G ja escolhidas nesta wave (para dois mobs da fila nao cairem
   // na mesma posicao designada — o occ e reconstruido a cada iteracao e
   // nao ve os pendingSpawns, que ainda nao estao em c.mobs). Reseta quando
