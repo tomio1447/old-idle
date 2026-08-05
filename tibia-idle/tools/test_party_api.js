@@ -153,10 +153,18 @@ function check(cond, msg) {
   r = await api("GET", "/api/party/state?char_id=" + c2.id, null, a2.token);
   check(!(r.data.state && r.data.state.follow), "follow consumido não aparece mais");
 
-  console.log("== 15. líder volta pra cidade -> follows pendentes limpos ==");
+  console.log("== 15. líder volta pra cidade -> follow de RETORNO gerado p/ membros ==");
   await api("POST", "/api/party/zone", { token: a1.token, char_id: c1.id, zone: "city" });
   r = await api("GET", "/api/party/state?char_id=" + c2b.id, null, a2.token);
-  check(!(r.data.state && r.data.state.follow), "follow do 2º membro limpo na safe zone");
+  const fb = r.data.state && r.data.state.follow;
+  check(!!fb && fb.returnHome === true, "follow de retorno (returnHome) gerado ao voltar p/ cidade");
+  // consome o follow de retorno (membro volta p/ cidade)
+  if (fb && fb.nonce) {
+    r = await api("POST", "/api/party/follow", { token: a2.token, char_id: c2b.id, nonce: fb.nonce });
+    check(r.code === 200, "follow de retorno consumido");
+  }
+  r = await api("GET", "/api/party/state?char_id=" + c2b.id, null, a2.token);
+  check(!(r.data.state && r.data.state.follow), "follow limpo após consumir o retorno");
 
   console.log("== 16. kick e sair ==");
   r = await api("POST", "/api/party/kick", { token: a1.token, char_id: c1.id, member_id: c2.id });

@@ -159,6 +159,20 @@ function renderPartyPanel(p) {
     </div>`;
   }).join("");
 
+  // botão LEAVE HUNT: visível quando a party está numa hunt/boss — o líder
+  // sai (todos voltam via follow de retorno) ou o membro sai sozinho
+  if (typeof partyInInstance === "function" && partyInInstance()) {
+    body.innerHTML += `<div style="padding:4px">
+      <button class="sm danger full" id="party-leave-hunt">LEAVE HUNT</button>
+      <div class="tiny dim center" style="margin-top:2px">A instância fica ativa enquanto o líder caçar.</div>
+    </div>`;
+    const lh = $("#party-leave-hunt");
+    if (lh) lh.addEventListener("click", async () => {
+      if (typeof partyLeaveHunt === "function") await partyLeaveHunt();
+      renderPartyPanel(G.p);
+    });
+  }
+
   // toggle abrir/fechar
   const head = $("#party-panel-head");
   if (head && !head._bound) {

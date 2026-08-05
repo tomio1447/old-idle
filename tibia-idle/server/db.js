@@ -206,14 +206,15 @@ JsonStore.prototype.itemStats = function (slug, tier) {
 
 /* Storage JSON: parties vivem em memoria + data/parties.json (para os
  * convites sobreviverem a reinicios do servidor durante dev/teste). */
-JsonStore.prototype._partySeq = 1;
+/* IDs de party/convite SEMPRE acima do maior existente — o seq em memória
+ * reseta no restart e causaria COLISÃO com ids de parties/invites antigos
+ * persistidos em data/parties.json (bug: após reiniciar, uma party nova
+ * pegava o id de uma antiga e o state vinha com os membros errados). */
 JsonStore.prototype._nextPartyId = function () {
-  this._partySeq += 1;
-  return this._partySeq;
+  return (this.parties || []).reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
 };
 JsonStore.prototype._nextInviteId = function () {
-  this._inviteSeq = (this._inviteSeq || 1) + 1;
-  return this._inviteSeq;
+  return (this.invites || []).reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
 };
 JsonStore.prototype._partySave = function () {
   try {

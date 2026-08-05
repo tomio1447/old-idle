@@ -699,7 +699,9 @@ const BOSS_DEFS = {
     title: "Boss da Ferumbras Ascendant",
     hunt: "dt-seal",
     baseMonster: "demon",
-    sprite: "demon",
+    // looktype 229 do Canary = a forma do Ferumbras (não é um demon):
+    // sprite própria extraída do DAT 15.x (assets/mob/ferumbras-mortal-shell.png)
+    sprite: "ferumbras-mortal-shell",
     // stats DIRETOS do canary (newBossCombat usa hp/exp quando presentes)
     hp: 300000,
     exp: 2000000,
@@ -878,13 +880,14 @@ function openBossModal(id) {
   });
 }
 
-function startBoss(id) {
+function startBoss(id, force) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
-  // PARTY: membros (não líder) não podem entrar em boss — só o líder escolhe
-  // e leva a party (desde que TODOS tenham os requisitos, validado no server).
-  if (typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
+  // PARTY: membros (não líder) não podem entrar em boss por conta própria —
+  // só o líder escolhe e leva a party (requisitos validados no server).
+  // `force = true` é o FOLLOW (membro teleportado para a sala do líder).
+  if (!force && typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
     toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe o boss.", "bad");
     return;
   }
@@ -964,7 +967,7 @@ function openInstanceModal(id) {
   $("#instance-cancel").addEventListener("click", () => $("#modal").classList.remove("show"));
 }
 
-function startHunt(id, instanceMode) {
+function startHunt(id, instanceMode, force) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
@@ -974,9 +977,11 @@ function startHunt(id, instanceMode) {
     toast(`Área bloqueada: requer nível ${min}+.`, "bad");
     return;
   }
-  // PARTY: membros (não líder) não podem entrar em hunt — só cidade/treino.
-  // O líder escolhe a hunt e leva a party junto (follow).
-  if (typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
+  // PARTY: membros (não líder) não podem entrar em hunt por conta própria —
+  // só cidade/treino. O líder escolhe a hunt e leva a party junto (follow).
+  // `force = true` é o FOLLOW (o membro é teleportado pelo servidor para a
+  // MESMA instância do líder — não é escolha dele).
+  if (!force && typeof partyBlocksHunt === "function" && partyBlocksHunt()) {
     toast("Membros de party só podem estar na Cidade ou Área de Treino. O líder escolhe a hunt.", "bad");
     return;
   }

@@ -213,7 +213,7 @@ function partySessionDuration(p) {
  * ====================================================================== */
 
 let PARTY_POLL_TIMER = null;
-let PARTY_POLL_MS = 6000;         // polling leve (idle game)
+let PARTY_POLL_MS = 3000;         // polling leve (idle game)
 let PARTY_SYNCING = false;        // evita reentrância no poll
 let PARTY_POLL_N = 0;             // contador p/ buscar inbox a cada N polls
 
@@ -328,23 +328,65 @@ async function partyApplyFollow(f) {
   if (PARTY_FOLLOW_USED[f.nonce]) return;   // já aplicado (replay de poll)
   PARTY_FOLLOW_USED[f.nonce] = now;
   try {
+    if (f.returnHome) {
+      // líder saiu da hunt/boss -> membro volta para a cidade (instância
+      // fica ativa só enquanto o líder estiver nela)
+      if (typeof addLog === "function") {
+        addLog("party", `O líder saiu do local de caça — voltando para a Cidade...`);
+      }
+      if (typeof stopHunt === "function") {
+        if (G && (G.combat || G.training)) stopHunt();
+        else if (G) { G.inCity = true; }
+      }
+      if (typeof toast === "function") toast("A party saiu da caçada — de volta à cidade.");
+      await accountPartyFollow(Number(sessionCharId()), f.nonce);
+      if (typeof renderAll === "function") renderAll();
+      return;
+    }
     if (typeof addLog === "function") {
       addLog("party", `O líder entrou em um novo local — seguindo para a MESMA instância...`);
     }
     if (f.boss) {
-      // sala de boss: o membro é teleportado para o mesmo boss
-      if (typeof startBoss === "function") startBoss(f.boss);
+      // sala de boss: o membro é teleportado para o mesmo boss (force=true)
+      if (typeof startBoss === "function") startBoss(f.boss, true);
       else if (typeof toast === "function") toast("Líder entrou no boss (instância indisponível aqui)");
     } else if (f.hunt) {
-      // local de caça: mesma hunt + MESMA instância (non-pvp/pvp)
+      // local de caça: mesma hunt + MESMA instância (non-pvp/pvp).
+      // `force=true`: o membro é teleportado pelo follow — ignora a regra
+      // que bloqueia membro de entrar em hunt por conta própria.
       if (typeof startHunt === "function") {
-        startHunt(f.hunt, f.instance || "non-pvp");
+        startHunt(f.hunt, f.instance || "non-pvp", true);
         if (typeof toast === "function") toast(`Seguindo o líder para <b>${f.hunt}</b>...`, "level");
       }
     }
     // confirma o teleporte no servidor (consome o nonce)
     await accountPartyFollow(Number(sessionCharId()), f.nonce);
   } catch (e) { /* rede */ }
+}
+
+/* A party está numa hunt/boss (líder está caçando)? */
+function partyInInstance() {
+  const st = partyOnlineState();
+  if (!st) return false;
+  return st.leader && (st.leader.zone === "hunt" || st.leader.zone === "boss");
+}
+
+/* Botão LEAVE HUNT: o LÍDER sai da instância (todos voltam via follow de
+ * retorno); um MEMBRO sai sozinho (volta para a cidade). */
+async function partyLeaveHunt() {
+  if (!partyOnlineMode()) return;
+  if (typeof stopHunt === "function" && G && (G.combat || G.training)) {
+    stopHunt();
+  } else if (G) {
+    G.inCity = true;
+    if (typeof renderAll === "function") renderAll();
+  }
+  // reporta a zona city (líder: gera recall dos membros; membro: sai)
+  try {
+    await accountPartyReportZone(Number(sessionCharId()), { zone: "city" });
+  } catch (e) { /* rede */ }
+  if (typeof toast === "function") toast("Você saiu da caçada.");
+  if (typeof partySync === "function") partySync();
 }
 
 /* Inicia o polling da party (chamado no startGame quando online). */

@@ -102,6 +102,12 @@ async function partyStateFor(db, party, charId) {
   let follow = null;
   if (!isLeader && isMember) {
     follow = await db.partyFollow(party.id, charId);
+    // follow de RETORNO (líder saiu da hunt/boss): o marcador
+    // '__RETURN_HOME__' vira returnHome:true com boss:null
+    if (follow && follow.boss === "__RETURN_HOME__") {
+      follow = { nonce: follow.nonce, hunt: null, instance: null,
+                 otbm: null, boss: null, returnHome: true };
+    }
   }
   const leaderSnap = await charSnapshot(db, party.leader_id);
   const memberSnaps = [];
@@ -127,6 +133,8 @@ async function partyStateFor(db, party, charId) {
         instance: follow.instance,
         otbm: follow.otbm,
         boss: follow.boss,
+        // follow de RETORNO (líder saiu da instância): true = voltar p/ cidade
+        returnHome: !!follow.returnHome,
       } : null,
       shareExp: false,
     },
@@ -271,6 +279,18 @@ async function partyAccept(db, body) {
   if (!party) {
     await db.inviteUpdate(inv.id, { status: "cancelled" });
     return { code: 410, body: { ok: false, msg: "A party foi dissolvida" } };
+  }
+  // REGRA: o LÍDER também precisa estar em Safe Zone (cidade) ou Área de
+  // Treino para o convite ser aceito — se ele estiver numa hunt, ninguém
+  // pode entrar na party (regra do dono).
+  if (ZONES_CONVIDAR.indexOf(party.leader_zone) === -1) {
+    return {
+      code: 403,
+      body: {
+        ok: false,
+        msg: "O líder está fora da Cidade/Área de Treino — não é possível aceitar o convite agora",
+      },
+    };
   }
   // membro não pode estar em outra party
   const other = await partyOf(db, invitee.id);
@@ -457,7 +477,12 @@ async function partyReportZone(db, body) {
     }
   }
 
-  // monta o follow (por membro) quando o líder entra em hunt/boss
+  // monta o follow (por membro):
+  //  - líder ENTRA em hunt/boss -> todos os membros vão para a MESMA
+  //    instância (nonce por membro, já existente);
+  //  - líder SAI da hunt/boss (volta p/ cidade/treino) -> gera um follow de
+  //    RETORNO (returnHome) para cada membro: a instância fica ativa só
+  //    enquanto o líder estiver nela — ao sair, TODOS voltam para a cidade.
   let follows = [];
   if (zone === "hunt" || zone === "boss") {
     const members = await db.partyMembers(party.id);
@@ -468,6 +493,17 @@ async function partyReportZone(db, body) {
       boss: zone === "boss" ? String(body.boss) : null,
     };
     follows = members.map((m) => Object.assign({ character_id: Number(m.id), nonce: newNonce() }, f));
+  } else if ((party.leader_zone === "hunt" || party.leader_zone === "boss") &&
+             (zone === "city" || zone === "training")) {
+    // líder saiu da instância -> recall de todos os membros. Usa o campo
+    // boss como marcador '__RETURN_HOME__' (o partyStateFor converte para
+    // returnHome:true e boss:null antes de devolver ao cliente).
+    const members = await db.partyMembers(party.id);
+    follows = members.map((m) => ({
+      character_id: Number(m.id),
+      nonce: newNonce(),
+      boss: "__RETURN_HOME__",
+    }));
   }
 
   await db.partySetZone(party.id, zone, {
