@@ -289,8 +289,11 @@
 
         <div class="panel-body" data-panel-group="mid" data-panel="heal">
           <div id="helper-heal"></div>
-          <!-- HEAL FRIEND (Druid/Monk): cura os aliados da party, como no baiak-idle -->
-          <div id="helper-heal-friend" style="display:none;margin-top:8px;border-top:1px solid rgba(212,175,55,.25);padding-top:8px"></div>
+        </div>
+        <!-- Cura de aliados é isolada para Druid/Monk; nunca mistura as
+             magias exura sio com a configuração de autocura. -->
+        <div class="panel-body" data-panel-group="mid" data-panel="heal-friend" style="display:none">
+          <div id="helper-heal-friend-panel"></div>
         </div>
 
         <div class="panel-body" data-panel-group="mid" data-panel="magic-shield" style="display:none">

@@ -1818,9 +1818,13 @@ function renderHelper(p) {
   if (typeof renderHealFriend === "function") renderHealFriend(p);
   const comboEl = $("#helper-combo");
   if (healEl) {
+    // A aba Cura contém somente autocura. Spells de aliado (exura sio,
+    // Restore Friend, Mass Healing) vivem exclusivamente em Curar aliado.
+    const friendHealIds = new Set(typeof healFriendSpells === "function"
+      ? healFriendSpells(p) : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-gran-tio-sio", "exura-tio-sio"]);
     const heals = Object.keys(SPELLS).filter((id) => {
       const s = SPELLS[id];
-      return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1;
+      return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 && !friendHealIds.has(id);
     }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
     // potions da vocacao, com nivel e cura reais do canary. suppliesOf ja
     // esconde o que a vocacao nunca podera beber (knight nao usa ultimate
