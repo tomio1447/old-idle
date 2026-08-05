@@ -56,6 +56,22 @@ function creatureTileOrigin(centerX, centerY, width, height, tile) {
   return { x: centerX - width / 2, y: centerY + tile / 2 - height };
 }
 
+/* Alguns outfits extraídos do DAT vieram somente com a máscara em escala
+ * cinza. O client oficial colore a aparência na composição; aplicamos a
+ * mesma etapa após desenhar a máscara, sem adulterar transparência/frames. */
+const MONSTER_TINT = { "rage-squid": "#e04420", "squid-warden": "#2689df" };
+function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
+  ctx.drawImage(img, x, y, w, h);
+  const tint = MONSTER_TINT[slug];
+  if (!tint) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.globalAlpha = 0.76;
+  ctx.fillStyle = tint;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
@@ -106,8 +122,10 @@ function mobImg(slug, tam, extra) {
   const k = Math.min(px / meta.cw, px / meta.ch);
   const w = meta.cw * k, h = meta.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  const tint = slug === "rage-squid" ? "filter:sepia(1) saturate(7) hue-rotate(335deg);" :
+               slug === "squid-warden" ? "filter:sepia(1) saturate(6) hue-rotate(165deg);" : "";
   return `<div class="mob-img" style="width:${w.toFixed(1)}px;
-      height:${h.toFixed(1)}px;
+      height:${h.toFixed(1)}px;${tint}
       background-image:url('assets/mob/${slug}.png?v=${v}');
       background-size:${(meta.cw * meta.cols * k).toFixed(1)}px ${
         (meta.ch * meta.rows * k).toFixed(1)}px;
@@ -1439,10 +1457,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
           ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
           ctx.shadowBlur = m.fiendish ? 22 : 18;
           ctx.globalAlpha = 0.92;
-          ctx.drawImage(img, origin.x + atkPush, top, w, h);
+          drawMonsterSprite(ctx, img, origin.x + atkPush, top, w, h, m.slug);
           ctx.restore();
         }
-        ctx.drawImage(img, origin.x + atkPush, top, w, h);
+        drawMonsterSprite(ctx, img, origin.x + atkPush, top, w, h, m.slug);
         // barra de vida: largura fixa de 27px como no client, e nao
         // proporcional ao sprite (um dragao nao tem barra maior que um rato)
         const pct = Math.max(0, m.hp / m.maxHp);

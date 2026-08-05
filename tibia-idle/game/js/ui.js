@@ -795,7 +795,7 @@ function openHuntInfoModal(id) {
       }).join(" · ");
     // drops: TODOS os itens do loot do Canary (item + chance + qtd máx).
     // Antes cortava em 8 e escondia drops raros como os rift da DT Seal.
-    const lootHtml = (m.loot || []).filter((l) => GAMEDATA.items[l.item]).map((l) => {
+    const lootHtml = (m.loot || []).map((l) => {
       const it = GAMEDATA.items[l.item];
       return `<div class="hunt-drop">
         ${itemImg(l.item, 18)}
