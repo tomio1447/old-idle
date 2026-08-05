@@ -43,10 +43,18 @@ const TIBIA_SPRITE = 32;
 
 function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
 
-/* v33: escala das SPRITES de criaturas (jogador, aliados, monstros) um
- * pouco MAIOR que o tile nativo (1.18x) — o pedido foi aumentar o tamanho
- * das sprites. Efeitos/projéteis continuam no tibiaScale normal. */
-function creatureScale(W) { return tibiaScale(W) * 1.18; }
+/* O OTClient/Canary desenha outfit na escala nativa do tile: 32 px de arte
+ * para 1 SQM. Escalar 1.18x fazia um outfit de 1 tile invadir o tile abaixo
+ * e mascarava a âncora real usada pelo client. */
+function creatureScale(W) { return tibiaScale(W); }
+
+/* Conversão da nossa coordenada (CENTRO do SQM) para a origem de desenho
+ * do OTClient (canto superior esquerdo da sprite). Para 1x1: top-left do
+ * tile; para 2x2: desloca meio tile à esquerda e um tile para cima — mesma
+ * regra do client: x=(width-1)/2 e y=(height-1). */
+function creatureTileOrigin(centerX, centerY, width, height, tile) {
+  return { x: centerX - width / 2, y: centerY + tile / 2 - height };
+}
 
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
@@ -1288,25 +1296,26 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // a sprite fica parada no chão, como no client.
   const bob = 0;
   if (spriteReady(pimg)) {
-    // v33: escala das criaturas 1.18x maior (pedido do dono)
+    // escala nativa OTClient: 32px por SQM
     const sc = creatureScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = 0;
-    // Pé no centro do SQM: a coordenada da grade é o centro do piso. A
-    // sprite é desenhada para cima a partir dela, como no client Tibia.
+    // Âncora OTClient: sprite 1x1 começa no canto superior do tile;
+    // sprites maiores expandem para cima/esquerda a partir dele.
     const tile = tilePx(W);
-    const top = py * H - h;
-    // sombra sob os pés, no centro do SQM
+    const origin = creatureTileOrigin(px * W, py * H, w, h, tile);
+    const top = origin.y;
+    // sombra na base do tile, como no client
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
-    ctx.ellipse(px * W, py * H, w * 0.34, h * 0.1, 0, 0, 7);
+    ctx.ellipse(px * W, py * H + tile / 2, w * 0.34, h * 0.1, 0, 0, 7);
     ctx.fill();
     if (this.playerFlash > 0) {
       ctx.save();
       ctx.filter = "brightness(2.2) saturate(0.4)";
       this.playerFlash -= dt;
     }
-    const drawX = px * W - w / 2 + atkPush;
+    const drawX = origin.x + atkPush;
     const drawY = top + bob;
     // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
     const avatarGlowOn = (typeof window !== "undefined" && window.avatarActive &&
@@ -1346,22 +1355,23 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const img = OutfitRenderer.forPlayer(pp, ent.dir || "e",
                                            ent.moving ? (ent.frame || 1) : 0);
       if (!spriteReady(img)) continue;
-      const sc = creatureScale(W);   // v33: aliados 1.18x
+      const sc = creatureScale(W);   // escala nativa OTClient
       const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
       const tile = tilePx(W);
-      // Todos os aliados usam a mesma âncora: pé no centro do SQM.
-      const top = ent.y * H - h2;
+      // Mesma origem OTClient do personagem controlado.
+      const origin = creatureTileOrigin(ent.x * W, ent.y * H, w2, h2, tile);
+      const top = origin.y;
       ctx.save();
       if (knocked) ctx.globalAlpha = 0.35;
       // sombra sob os pés, no centro do SQM
       ctx.fillStyle = "rgba(0,0,0,.35)";
       ctx.beginPath();
-      ctx.ellipse(ent.x * W, ent.y * H, w2 * 0.34, h2 * 0.1, 0, 0, 7);
+      ctx.ellipse(ent.x * W, ent.y * H + tile / 2, w2 * 0.34, h2 * 0.1, 0, 0, 7);
       ctx.fill();
       // Nenhum deslocamento no ataque: aliados que conjuram também devem
       // permanecer exatamente no centro do SQM, como o personagem ativo.
       const atkPush2 = 0;
-      ctx.drawImage(img, ent.x * W - w2 / 2 + atkPush2, top, w2, h2);
+      ctx.drawImage(img, origin.x + atkPush2, top, w2, h2);
       ctx.restore();
       // Todo membro da party mostra HP E mana na cena. Antes os aliados
       // desenhavam somente a vida, enquanto o personagem controlado tinha
@@ -1406,18 +1416,18 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const my = m.y * H;
       if (spriteReady(img)) {
         // mesma escala do jogador: o porte da criatura vem do tamanho da
-        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs). v33: 1.18x maior
+        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs).
         const sc = creatureScale(W);
         const w = spriteW(img) * sc, h = spriteH(img) * sc;
-        // Regra única de ancoragem: o PÉ da sprite coincide com o centro
-        // do SQM do chão. Centralizar a imagem inteira deslocava os pés para
-        // baixo; a arte agora cresce para cima a partir do tile correto.
+        // A mesma origem OTClient para monstros e players; evita que cada
+        // tipo de criatura tenha uma regra visual diferente.
         const tile = tilePx(W);
-        const top = my - h;
+        const origin = creatureTileOrigin(mx, my, w, h, tile);
+        const top = origin.y;
         const atkPush = 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();
-        ctx.ellipse(mx, my, w * 0.32, h * 0.09, 0, 0, 7);
+        ctx.ellipse(mx, my + tile / 2, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
         if (combat.mobs[0] === m) {
           // o quadro de alvo do client marca o SQM exato, nao a arte: fica
@@ -1429,10 +1439,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
           ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
           ctx.shadowBlur = m.fiendish ? 22 : 18;
           ctx.globalAlpha = 0.92;
-          ctx.drawImage(img, mx - w / 2 + atkPush, top, w, h);
+          ctx.drawImage(img, origin.x + atkPush, top, w, h);
           ctx.restore();
         }
-        ctx.drawImage(img, mx - w / 2 + atkPush, top, w, h);
+        ctx.drawImage(img, origin.x + atkPush, top, w, h);
         // barra de vida: largura fixa de 27px como no client, e nao
         // proporcional ao sprite (um dragao nao tem barra maior que um rato)
         const pct = Math.max(0, m.hp / m.maxHp);
@@ -1623,7 +1633,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     // Desenha corpse do jogador (sprite semi-transparente)
     const pimg = OutfitRenderer.forPlayer(player, dp.dir || "e", 0);
     if (spriteReady(pimg)) {
-      const sc = creatureScale(W);   // v33
+      const sc = creatureScale(W);   // escala nativa OTClient
       const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
       ctx.globalAlpha = 0.45;
       ctx.save();
