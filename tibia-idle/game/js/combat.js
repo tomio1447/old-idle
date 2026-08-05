@@ -3363,6 +3363,10 @@ function combatTick(c, p, dt, now) {
 
   // cura e mana
   tryHeal(c, p, now);
+  // HEAL FRIEND (Druid/Monk): cura os aliados da party — exura sio / exura
+  // gran sio curam o membro mais ferido; exura gran mas res (Mass Healing)
+  // cura os aliados adjacentes quando 2+ membros estão com HP baixo.
+  if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
   tryMana(c, p, now);
 
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
@@ -3388,15 +3392,20 @@ function combatTick(c, p, dt, now) {
     c.playerAtkCd = acted ? attackInterval(c, p) : 250;
   }
 
-  // monstros agem: primeiro a habilidade do .lua da criatura (Monster::
-  // doAttacking), e so se nenhuma entrar em cena cai o corpo-a-corpo
+  // monstros agem: no Canary (Monster::commitCombatIntention) o ataque
+  // BÁSICO (melee, chance 100 no .lua) roda SEMPRE e as skills rolam a
+  // própria chance ADICIONAL no mesmo turno — cada attack da lista é
+  // independente. Antes o código fazia `skills || melee`, então quando
+  // qualquer skill passava o dano físico básico NUNCA saía (os monstros
+  // pareciam não causar dano físico, só as magias).
   for (const m of c.mobs) {
     m.atkCd -= dt;
     if (m.atkCd <= 0) {
-      const acted = (typeof mobCastSkill === "function" &&
-                     mobCastSkill(c, p, m, now)) ||
-                    mobAttack(c, p, m);
-      m.atkCd = acted === false ? 300 : (m.def.attackSpeed || 2000);
+      // 1) skills do .lua (cada uma rola a própria chance)
+      if (typeof mobCastSkill === "function") mobCastSkill(c, p, m, now);
+      // 2) melee (ataque básico) — roda SEMPRE que o monstro tem dano base
+      if ((m.def && (m.def.damage || 0) > 0)) mobAttack(c, p, m);
+      m.atkCd = (m.def && m.def.attackSpeed) || 2000;
     }
     monsterThinkYell(m, dt);
   }

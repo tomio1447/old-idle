@@ -1215,6 +1215,17 @@ function drainEvents() {
           r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8", e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
         break;
+      case "heal-friend": {
+        // HEAL FRIEND: cura aplicada em um aliado da party (exura sio /
+        // gran sio / gran mas res). Mostra o +HP sobre o personagem.
+        const px = c.player ? c.player.x : 0.13;
+        const py = c.player ? c.player.y - 0.12 : 0.5;
+        r.addFloater(px, py, "+" + fmt(e.amount) + " → " + e.target, "#7ae87a");
+        r.addEffect(px, c.player ? c.player.y : 0.6, e.mass ? "holy-damage" : "green-rings");
+        if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmt(e.amount)} hp)`);
+        else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmt(e.amount)} hp)`);
+        break;
+      }
       case "heal": {
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
         r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");

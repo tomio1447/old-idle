@@ -364,6 +364,128 @@ async function partyApplyFollow(f) {
   } catch (e) { /* rede */ }
 }
 
+/* ======================================================================
+ * HEAL FRIEND (Druid/Monk) — curar os aliados da party
+ * ======================================================================
+ * Igual ao baiak-idle: o helper tem uma aba HEAL FRIEND que puxa os
+ * membros da party (com HP deles) e o Druid/Monk cura:
+ *   - exura sio        (Heal Friend, druid): cura 1 aliado;
+ *   - exura gran sio   (Nature's Embrace, druid, cd 60s): cura forte 1;
+ *   - exura gran mas res (Mass Healing, druid): cura TODOS os aliados
+ *     adjacentes quando 2+ membros estão com HP abaixo do % configurado;
+ *   - exura tio sio    (Restore Balance, monk): cura 1 aliado à distância.
+ * A cura aplica de verdade no membro: modo local atualiza o save do
+ * roster; modo online atualiza o estado espelhado (o save do membro, que
+ * roda no próprio cliente, sincroniza o HP real no servidor).
+ * ====================================================================== */
+
+/* Lista os aliados (membros da party) com HP — fonte: state online
+ * (hp/maxHp do servidor) ou roster local (p.party.members). */
+function partyHealTargets(p) {
+  if (!p) return [];
+  const out = [];
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || null;
+    if (st) {
+      for (const m of [st.leader].concat(st.members || [])) {
+        if (Number(m.id) === Number(characterId(p))) continue;   // não cura a si
+        out.push({ id: m.id, name: m.name, voc: m.voc,
+                   hp: m.hp || 0, maxHp: m.maxHp || 0 });
+      }
+    }
+  } else {
+    ensureParty(p);
+    const chars = typeof getCharacters === "function" ? getCharacters() : [];
+    for (const m of p.party.members || []) {
+      const c = chars.find((x) => (x.id || characterId(x)) === m.id);
+      if (!c) continue;
+      const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
+      out.push({ id: m.id, name: c.name, voc: c.voc,
+                 hp: c.hp || 0, maxHp: mx.hp || 1 });
+    }
+  }
+  return out;
+}
+
+/* Aplica a cura no membro (save local ou estado online espelhado). */
+function partyApplyFriendHeal(p, member, amount) {
+  if (!member) return;
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || null;
+    if (!st) return;
+    // espelha no estado local (o painel reflete na hora; o save do membro
+    // sincroniza o HP real no servidor quando ele salvar)
+    const alvo = (Number(st.leader.id) === Number(member.id)) ? st.leader
+      : st.members.find((m) => Number(m.id) === Number(member.id));
+    if (alvo && alvo.maxHp) alvo.hp = Math.min(alvo.maxHp, (alvo.hp || 0) + amount);
+  } else {
+    // modo local: atualiza o save do membro no roster
+    const chars = typeof getCharacters === "function" ? getCharacters() : [];
+    const c = chars.find((x) => (x.id || characterId(x)) === member.id);
+    if (!c) return;
+    const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
+    c.hp = Math.min(mx.hp || c.hp, (c.hp || 0) + amount);
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(c);
+  }
+}
+
+/* O tick de HEAL FRIEND: roda junto do tryHeal no combate. */
+function tryHealFriend(c, p, now) {
+  if (!c || !p) return;
+  const cfg = p.config || {};
+  const spellId = cfg.healFriendSpell;
+  if (!spellId) return;
+  // só Druid/Monk (as magias de aliado são deles)
+  const s = (typeof SPELLS !== "undefined") ? SPELLS[spellId] : null;
+  if (!s || s.type !== "heal") return;
+  if (!s.vocs || s.vocs.indexOf(p.voc) === -1) return;
+  if (p.level < s.lvl || p.mp < s.mana) return;
+  if (typeof cdReady === "function" && !cdReady(p, spellId, now)) return;
+
+  const gatilhoPct = cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt;
+  const alvos = partyHealTargets(p);
+  // quem está com HP abaixo do % (e não morreu)
+  const feridos = alvos.filter((m) => m.maxHp > 0 &&
+    ((m.hp || 0) / m.maxHp) * 100 < gatilhoPct);
+  if (!feridos.length) return;
+
+  // Mass Healing (exura gran mas res): só dispara com 2+ membros feridos e
+  // cuida dos ALIADOS ADJACENTES (alcance da magia — área 3x3). Os membros
+  // da party são considerados adjacentes quando estão na mesma instância.
+  const ehMass = /gran[\s-]*mas[\s-]*res/i.test(spellId);
+  if (ehMass && feridos.length < 2) return;
+
+  const amount = Math.max(1, typeof rollSpell === "function" ? rollSpell(p, s) : (s.heal ? s.heal[1] : 100));
+  let custo = s.mana;
+  if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+    const _wm = wheelApplySpellBoost(p, spellId);
+    if (_wm && _wm.manaPct) custo = Math.max(0, Math.round(s.mana * (1 - _wm.manaPct / 100)));
+  }
+  p.mp -= custo;
+  if (typeof addManaSpent === "function") addManaSpent(p, custo);
+  if (typeof cdStart === "function") cdStart(p, spellId, s, now);
+  if (c.healCd === undefined) c.healCd = 0;
+  c.healCd = Math.max(c.healCd || 0, now + 1000);
+
+  // aplica a cura (mass cura todos os feridos; single cura o mais ferido)
+  const alvosCura = ehMass ? feridos : [feridos.sort((a, b) =>
+    ((a.hp || 0) / a.maxHp) - ((b.hp || 0) / b.maxHp))[0]];
+
+  // animação/efeito em cada alvo + atualização do HP
+  for (const alvo of alvosCura) {
+    partyApplyFriendHeal(p, alvo, amount);
+    if (c.events) {
+      c.events.push({ t: "heal-friend", amount: amount, target: alvo.name,
+                      spell: s.name, mass: ehMass, x: (c.player ? c.player.x : 0.5),
+                      y: (c.player ? c.player.y : 0.5), screen: true });
+    }
+  }
+  if (c.events) {
+    c.events.push({ t: "say", text: (s.words || spellId) });
+  }
+  return true;
+}
+
 /* A party está numa hunt/boss (líder está caçando)? */
 function partyInInstance() {
   const st = partyOnlineState();

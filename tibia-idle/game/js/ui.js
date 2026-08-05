@@ -1780,6 +1780,8 @@ function renderHelper(p) {
   const magicEl = $("#helper-magic-shield");
   const equipHelperEl = $("#helper-equipment");
   const atkEl = $("#helper-attack");
+  // HEAL FRIEND (Druid/Monk) — dentro da aba Cura, como no baiak-idle
+  if (typeof renderHealFriend === "function") renderHealFriend(p);
   const comboEl = $("#helper-combo");
   if (healEl) {
     const heals = Object.keys(SPELLS).filter((id) => {

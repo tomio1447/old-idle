@@ -363,6 +363,110 @@ function renderPartyModal(p, online) {
 }
 
 /* ------------------------------------------------------------------ */
+/* HEAL FRIEND (Druid/Monk) — aba dentro do Helper: Cura               */
+/* ------------------------------------------------------------------ */
+
+/* Magias de cura de ALIADO disponíveis (Druid/Monk). */
+function healFriendSpells(p) {
+  const ids = [];
+  if (!p) return ids;
+  const éDruid = p.voc === "druid" || p.voc === "elder druid";
+  const éMonk = p.voc === "monk" || p.voc === "exalted monk";
+  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res");
+  if (éMonk) ids.push("exura-tio-sio");
+  return ids.filter((id) => SPELLS[id] && p.level >= (SPELLS[id].lvl || 1));
+}
+
+/* Renderiza a aba HEAL FRIEND dentro do Helper: Cura (só Druid/Monk). */
+function renderHealFriend(p) {
+  const box = $("#helper-heal-friend");
+  if (!box || !p) return;
+  const éDruid = p.voc === "druid" || p.voc === "elder druid";
+  const éMonk = p.voc === "monk" || p.voc === "exalted monk";
+  if (!éDruid && !éMonk) { box.style.display = "none"; return; }
+  box.style.display = "";
+
+  const cfg = p.config;
+  if (cfg.healFriendAt === undefined) cfg.healFriendAt = 70;
+  const selecionada = cfg.healFriendSpell || "";
+  const alvos = (typeof partyHealTargets === "function") ? partyHealTargets(p) : [];
+
+  let h = `<div class="small dim mb4" style="color:#9ce84a;font-weight:bold">❤️ HEAL FRIEND — curar aliados da party</div>`;
+
+  // seleção de magia de aliado
+  const spells = healFriendSpells(p);
+  if (!spells.length) {
+    h += `<div class="tiny dim">As magias de cura de aliado desbloqueiam com o nível.</div>`;
+    box.innerHTML = h;
+    return;
+  }
+  h += `<div class="small dim mb4">Magia de aliado:</div>
+    <div class="list" style="max-height:110px">` + spells.map((id) => {
+      const s = SPELLS[id];
+      const sel = selecionada === id;
+      const mass = /gran mas res/i.test(id);
+      const faixa = typeof spellRangeText === "function" ? spellRangeText(p, s) : "";
+      return `<div class="shop-row ${sel ? "selected" : ""}" style="cursor:pointer" data-heal-friend-spell="${id}">
+        ${spellIcon(s)}
+        <div style="flex:1;min-width:0">
+          <div class="small">${s.name}
+            ${faixa ? `<span style="color:#7ae87a">· ${faixa} hp</span>` : ""}</div>
+          <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl} · cd ${Math.round((s.cd||1000)/1000)}s
+            ${mass ? `<span style="color:#ffd65a">· mass (2+ aliados feridos)</span>` : ""}</div>
+        </div>
+        <button class="sm ${sel ? "primary" : ""}">${sel ? "ATIVA" : "Usar"}</button>
+      </div>`;
+    }).join("") + `</div>`;
+
+  // % gatilho
+  h += `<div class="mt8">
+      <label class="small dim">Curar aliado quando HP abaixo de (%)</label>
+      <input id="helper-heal-friend-at" type="number" min="1" max="99" value="${cfg.healFriendAt}"
+        style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+    </div>`;
+
+  // lista de aliados da party com HP
+  h += `<div class="small dim mt8 mb4">Aliados na party (${alvos.length}):</div>`;
+  if (!alvos.length) {
+    h += `<div class="tiny dim">Nenhum aliado na party — convide membros para curá-los.</div>`;
+  } else {
+    h += alvos.map((m) => {
+      const pct = m.maxHp > 0 ? Math.round((m.hp || 0) * 100 / m.maxHp) : 0;
+      const ferido = m.maxHp > 0 && pct < cfg.healFriendAt;
+      return `<div class="party-member-row" style="cursor:default">
+        <div class="ppm-outfit"><img src="${partyOutfitIcon(m.voc, null)}" alt=""></div>
+        <div class="ppm-info">
+          <div class="ppm-name">${m.name}</div>
+          <div class="ppm-meta">nv ${m.level || "?"} · ${partyVocName(m.voc)}</div>
+          <div class="party-pbar"><div class="fill hp" style="width:${Math.max(0,Math.min(100,pct))}%"></div>
+            <span class="val">${fmtFull(Math.floor(m.hp||0))}/${fmtFull(m.maxHp||0)}</span></div>
+        </div>
+        <span class="tiny" style="color:${ferido ? "#ff9090" : "#9ce84a"}">${ferido ? "ferido" : "ok"}</span>
+      </div>`;
+    }).join("");
+  }
+  h += `<div class="tiny dim mt4">A cura aplica de verdade nos aliados (save deles). A Mass Healing
+    (exura gran mas res) só dispara com <b>2+ aliados feridos</b> ao alcance.</div>`;
+  box.innerHTML = h;
+
+  // handlers
+  $$("#helper-heal-friend [data-heal-friend-spell]").forEach((el) =>
+    el.addEventListener("click", () => {
+      const id = el.dataset.healFriendSpell;
+      cfg.healFriendSpell = (cfg.healFriendSpell === id) ? "" : id;
+      toast(cfg.healFriendSpell
+        ? `HEAL FRIEND: ${SPELLS[cfg.healFriendSpell].name} ativa.`
+        : "HEAL FRIEND desativado.");
+      renderHealFriend(p);
+    }));
+  const at = $("#helper-heal-friend-at");
+  if (at) at.addEventListener("change", () => {
+    cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
+    renderHealFriend(p);
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* ANALYZER (modal completo do Party Hunt Analyser)                    */
 /* ------------------------------------------------------------------ */
 

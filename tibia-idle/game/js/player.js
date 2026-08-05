@@ -331,7 +331,10 @@ function playerDamage(p) {
   }
   const sk = weaponSkill(p);
   // +20% attack value (15.25) sobre o ataque da arma
-  const fis = it ? Math.floor((it.atk || 0) * 1.2) : 7;         // punho = attack 7 no canary
+  let fis = it ? Math.floor((it.atk || 0) * 1.2) : 7;         // punho = attack 7 no canary
+  // KNIGHT: dano base +30% (pedido do dono do jogo) — multiplica o ataque
+  // da arma antes da rolagem, então vale para o dano físico de melee.
+  if (p.voc === "knight") fis = Math.floor(fis * 1.3);
   // Arma elemental (naga sword, fire sword, ice rapier...) soma o elDmg ao
   // ataque ANTES de rolar: e o `totalAttack` do Weapon::getCombatDamage.
   // Antes o elDmg era ignorado aqui, entao uma naga sword (atk 8, elDmg 44)
