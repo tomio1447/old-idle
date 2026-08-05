@@ -2610,6 +2610,11 @@ function doChallengeCast(c, p, now, id, s) {
 function tryMana(c, p, now) {
   now = now || Date.now();
   if (entCd(c, p, "potionCd") > now) return false;
+  // MAGIC SHIELD ATIVO (utamo vita 12.55+): o escudo tem POOL própria e a
+  // regra oficial diz que ela NÃO recarrega com potions — só recastando a
+  // spell. Com o escudo ativo o mage não bebe mana potion (e no energy ring
+  // clássico a mana ia toda para o dano, então também não adianta beber).
+  if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, now)) return false;
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;

@@ -12,7 +12,9 @@
 
 const ITEM_DRAG_TYPE = "application/x-tibia-idle-item";
 const MAGIC_SHIELD_SPELL_ID = "utamo-vita";
-const MAGIC_SHIELD_DURATION_MS = 200 * 1000; // 3m20s, duração clássica do utamo vita
+// Duração oficial (Update 12.55): 60s (antes era 200s). O shield moderno
+// absorve uma CAPACIDADE limitada de dano baseada em level/magic level.
+const MAGIC_SHIELD_DURATION_MS = 60 * 1000;
 
 const HELPER_EQUIP_UI = { slot: "amulet" };
 
@@ -614,13 +616,30 @@ function energyRingEquipped(p) {
 
 function isMagicShieldActive(p, now) {
   now = now || Date.now();
-  return energyRingEquipped(p) || ((p.magicShieldUntil || 0) > now);
+  if (energyRingEquipped(p)) return true;
+  // utamo vita (12.55+): ativo enquanto durar E a capacidade do shield não
+  // esgotou — quando a pool zera, o shield QUEBRA (mesmo com mana cheia)
+  return ((p.magicShieldUntil || 0) > now) && (p.magicShieldPool || 0) > 0;
 }
 
 function magicShieldSource(p, now) {
   if (energyRingEquipped(p)) return "Energy Ring";
-  if ((p.magicShieldUntil || 0) > (now || Date.now())) return "Magic Shield";
+  if ((p.magicShieldUntil || 0) > (now || Date.now()) && (p.magicShieldPool || 0) > 0)
+    return "Magic Shield";
   return "";
+}
+
+/* Capacidade do Magic Shield (Update 12.55, TibiaWiki):
+ *   Cap = 7*M + 7.6*L + max(300, 0.4*L)
+ * onde L = level e M = magic level (equipamentos e boosts inclusos). Este é
+ * o "bônus de defesa que o mage ganha na mana": o shield absorve até esse
+ * total de dano antes de quebrar, independente da mana do personagem. */
+function magicShieldCapacity(p) {
+  const L = Math.max(1, p.level || 1);
+  const M = (typeof effMagic === "function")
+    ? Math.max(0, effMagic(p) || 0)
+    : Math.max(0, p.ml || 0);
+  return Math.max(1, Math.floor(7 * M + 7.6 * L + Math.max(300, 0.4 * L)));
 }
 
 function magicShieldSpellAllowed(p) {
@@ -633,7 +652,6 @@ function tryMagicShield(c, p, now) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   if (!cfg.enabled || !cfg.useSpell) return false;
-  if (isMagicShieldActive(p, now)) return false;
   const s = SPELLS[MAGIC_SHIELD_SPELL_ID];
   if (!s || !magicShieldSpellAllowed(p)) return false;
   const max = maxStats(p);
@@ -642,15 +660,28 @@ function tryMagicShield(c, p, now) {
   if (hpPct > cfg.hpBelow || mpPct < cfg.mpAbove) return false;
   if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
   if (typeof cdReady === "function" && !cdReady(p, MAGIC_SHIELD_SPELL_ID, now)) return false;
+  // 12.55+: recast com o escudo ATIVO renova a capacidade (oficial) — o
+  // auto-cast só renova quando a pool está gasta (<50%) para não drenar
+  // mana à toa. Escudo inativo: casta normal.
+  if (isMagicShieldActive(p, now)) {
+    const cap = p.magicShieldCap || magicShieldCapacity(p);
+    if ((p.magicShieldPool || 0) >= cap * 0.5) return false;
+  }
   p.mp -= s.mana;
   if (typeof addManaSpent === "function") addManaSpent(p, combatManaSkillGain(c, s.mana));
   if (typeof cdStart === "function") cdStart(p, MAGIC_SHIELD_SPELL_ID, s, now);
+  // 12.55+: o shield ganha uma CAPACIDADE (level/ml) e dura 60s. Recastar
+  // com o shield ativo renova a capacidade (oficial) — o auto-cast espera
+  // o shield quebrar para recastar.
+  p.magicShieldCap = magicShieldCapacity(p);
+  p.magicShieldPool = p.magicShieldCap;
   p.magicShieldUntil = now + MAGIC_SHIELD_DURATION_MS;
   if (typeof entCdSet === "function") entCdSet(c, p, "magicShieldCd", now + 1000);
   else c.magicShieldCd = now + 1000;
   if (c.events) {
     c.events.push({ t: "say", text: s.words || "utamo vita" });
-    c.events.push({ t: "magic-shield-on", x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });
+    c.events.push({ t: "magic-shield-on", cap: p.magicShieldCap,
+      x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });
   }
   return true;
 }
@@ -658,17 +689,39 @@ function tryMagicShield(c, p, now) {
 function applyMagicShieldAbsorb(c, p, raw, meta) {
   raw = Math.max(0, Math.floor(raw || 0));
   if (raw <= 0 || !isMagicShieldActive(p, Date.now())) return raw;
-  const mana = Math.min(Math.max(0, Math.floor(p.mp || 0)), raw);
-  if (mana <= 0) return raw;
-  p.mp -= mana;
-  const rest = raw - mana;
-  if (c && c.stats) c.stats.magicShieldAbsorbed = (c.stats.magicShieldAbsorbed || 0) + mana;
-  if (c && c.events) {
-    c.events.push({ t: "magic-shield", mana: mana, rest: rest,
-      x: meta && meta.x, y: meta && meta.y, sx: meta && meta.sx, sy: meta && meta.sy,
-      el: meta && meta.el, screen: true, source: magicShieldSource(p) });
+  // Energy Ring (Monk/RP): mana shield CLÁSSICO — o dano drena a mana do
+  // personagem até ela zerar.
+  if (energyRingEquipped(p)) {
+    const mana = Math.min(Math.max(0, Math.floor(p.mp || 0)), raw);
+    if (mana <= 0) return raw;
+    p.mp -= mana;
+    const rest = raw - mana;
+    if (c && c.stats) c.stats.magicShieldAbsorbed = (c.stats.magicShieldAbsorbed || 0) + mana;
+    if (c && c.events) {
+      c.events.push({ t: "magic-shield", mana: mana, rest: rest,
+        x: meta && meta.x, y: meta && meta.y, sx: meta && meta.sx, sy: meta && meta.sy,
+        el: meta && meta.el, screen: true, source: "Energy Ring" });
+    }
+    if (p.mp <= 0 && p.magicShieldUntil) p.magicShieldUntil = 0;
+    return rest;
   }
-  if (p.mp <= 0 && p.magicShieldUntil) p.magicShieldUntil = 0;
+  // utamo vita (12.55+): o dano drena a POOL do shield (capacidade por
+  // level/ml). A mana do personagem NÃO é consumida — o shield quebra
+  // quando a pool esgota (oficial).
+  const pool = Math.max(0, Math.floor(p.magicShieldPool || 0));
+  if (pool <= 0) return raw;
+  const absorvido = Math.min(pool, raw);
+  p.magicShieldPool = pool - absorvido;
+  const rest = raw - absorvido;
+  if (c && c.stats) c.stats.magicShieldAbsorbed = (c.stats.magicShieldAbsorbed || 0) + absorvido;
+  if (c && c.events) {
+    c.events.push({ t: "magic-shield", mana: absorvido, rest: rest,
+      pool: p.magicShieldPool, cap: p.magicShieldCap || 0,
+      x: meta && meta.x, y: meta && meta.y, sx: meta && meta.sx, sy: meta && meta.sy,
+      el: meta && meta.el, screen: true, source: "Magic Shield" });
+  }
+  // pool zerou: o shield QUEBRA (mesmo com mana cheia e tempo restante)
+  if (p.magicShieldPool <= 0) p.magicShieldUntil = 0;
   return rest;
 }
 
@@ -701,7 +754,9 @@ function renderMagicShieldHelper(p) {
         <label class="toggle tiny"><input type="checkbox" id="ms-enabled" ${cfg.enabled ? "" : "checked"}> INATIVO</label>
       </div>
       <div class="stat-row mt8"><span class="k">Estado</span><span class="v" style="color:${active ? "#7ec8ff" : "#888"}">${active ? "ATIVO · " + src : "inativo"}</span></div>
-      ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>` : ""}
+      ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>
+        <div class="stat-row"><span class="k">Escudo</span><span class="v" style="color:#7ec8ff">⚡ ${fmtFull(p.magicShieldPool || 0)} / ${fmtFull(p.magicShieldCap || 0)}</span></div>
+        <div class="tiny dim">Capacidade = 7×ML + 7,6×nível + bônus (oficial 12.55). Quebra quando zera — potions de mana não recarregam o escudo.</div>` : ""}
       ${spellOk ? `<label class="toggle mt8"><input type="checkbox" id="ms-use-spell" ${cfg.useSpell ? "checked" : ""}>
         Usar spell <b>${s ? s.words : "utamo vita"}</b></label>` : ""}
       <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px">

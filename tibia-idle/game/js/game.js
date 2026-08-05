@@ -1142,14 +1142,26 @@ function drainEvents() {
       }
       case "magic-shield-on": {
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
-        r.addFloater(px, py - 0.10, "Magic Shield", "#7ec8ff");
+        // 12.55+: mostra a capacidade do escudo (o "bônus" que o mage ganha
+        // na mana) no cast
+        r.addFloater(px, py - 0.10, e.cap ? "Magic Shield · ⚡" + fmt(e.cap) : "Magic Shield", "#7ec8ff");
         r.addEffect(px, py, "magic-blue");
         break;
       }
       case "magic-shield": {
         const px = e.screen ? (e.x || 0.13) : 0.13, py = e.screen ? (e.y || 0.6) : 0.6;
-        r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " mana", "#6a8aff");
+        // Energy Ring (clássico): drena mana do personagem. utamo vita
+        // (12.55+): drena a POOL do escudo — mostra o restante.
+        if (e.source === "Magic Shield" && e.pool !== undefined) {
+          r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " · escudo ⚡" + fmt(e.pool), "#7ec8ff");
+        } else {
+          r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " mana", "#6a8aff");
+        }
         r.addEffect(px, py, "magic-blue");
+        // escudo quebrou (pool zerou): aviso
+        if (e.source === "Magic Shield" && e.pool === 0) {
+          addLog("death", "<b style='color:#7ec8ff'>Magic Shield</b> quebrou — a capacidade esgotou.");
+        }
         break;
       }
       case "mana-wisp": {
