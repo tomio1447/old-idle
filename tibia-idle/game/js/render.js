@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "17";
+const ASSET_VERSION = "18";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1272,6 +1272,49 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (this.playerFlash > 0) ctx.restore();
     drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
     this.drawSpeech(ctx, px * W, drawY - 14, dt);
+  }
+
+  // --- aliados do PARTY COMBAT (todos os membros na mesma instância) ---
+  if (combat && combat.players && combat.players.length > 1) {
+    const allies = combat.players.filter((e) => e !== combat.player && e.p);
+    for (const ent of allies) {
+      const pp = ent.p;
+      const knocked = pp.hp <= 0;
+      const img = OutfitRenderer.forPlayer(pp, ent.dir || "e",
+                                           ent.moving ? (ent.frame || 1) : 0);
+      if (!spriteReady(img)) continue;
+      const sc = tibiaScale(W);
+      const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
+      const tile = tilePx(W);
+      const top = ent.y * H + tile / 2 - h2;
+      ctx.save();
+      if (knocked) ctx.globalAlpha = 0.35;
+      // sombra sob os pés
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+      ctx.beginPath();
+      ctx.ellipse(ent.x * W, ent.y * H + tile / 2, w2 * 0.34, h2 * 0.1, 0, 0, 7);
+      ctx.fill();
+      const atkPush2 = (ent.attackAnim || 0) > 0 ? (ent.dir === "w" ? -5 : ent.dir === "e" ? 5 : 0) : 0;
+      ctx.drawImage(img, ent.x * W - w2 / 2 + atkPush2, top, w2, h2);
+      ctx.restore();
+      // nome + barra de vida compacta (como nos monstros)
+      const pct = Math.max(0, Math.min(1, pp.hp / (maxStats(pp).hp || 1)));
+      drawTibiaBar(ctx, ent.x * W, top - 9, pct, knocked ? "#7a7a7a" : "#6ec9ff");
+      ctx.font = "10px Tahoma, sans-serif";
+      ctx.textAlign = "center";
+      ctx.strokeStyle = "rgba(0,0,0,.85)";
+      ctx.lineWidth = 3;
+      ctx.strokeText(ent.name + (knocked ? " (inconsciente)" : ""), ent.x * W, top - 15);
+      ctx.fillStyle = knocked ? "#9a9a9a" : "#d8ecff";
+      ctx.fillText(ent.name + (knocked ? " (inconsciente)" : ""), ent.x * W, top - 15);
+      // quadro de alvo azul no aliado ATIVO é desenhado no bloco do player;
+      // aqui marca quem está sendo controlado com um leve contorno dourado
+      if (!knocked) {
+        ctx.strokeStyle = "rgba(214,175,55,.9)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(ent.x * W - tile / 2 + 1, ent.y * H - tile / 2 + 1, tile - 2, tile - 2);
+      }
+    }
   }
 
   // --- monstros

@@ -29,12 +29,22 @@ function renderPartyButton(p) {
     badge.style.display = "none";
     return;
   }
-  // modo local (roster do save)
+  // modo local (roster do save): badge = convites pendentes (✉) ou membros
+  if (typeof partyPendingInvites === "function") {
+    const inv = partyPendingInvites(p).length;
+    if (inv > 0) {
+      badge.textContent = "✉" + inv;
+      badge.style.display = "";
+      btn.title = "Party — " + inv + " convite(s) pendente(s) — abra o menu Party para aceitar";
+      return;
+    }
+  }
   ensureParty(p);
   const n = p.party.members.length;
   if (n > 0) {
     badge.textContent = n;
     badge.style.display = "";
+    btn.title = "Party — " + n + " membro(s)";
   } else {
     badge.textContent = "";
     badge.style.display = "none";
@@ -94,19 +104,41 @@ function renderPartyPanel(p) {
   } else {
     ensureParty(p);
     const pt = p.party;
-    if (!pt.members.length) { panel.style.display = "none"; return; }
-    // líder = o personagem atual
-    membros = [{ id: characterId(p), name: p.name, voc: p.voc, level: p.level,
-                 sex: p.sex, hp: p.hp, mp: p.mp, maxHp: maxStats(p).hp,
-                 maxMp: maxStats(p).mp, _leader: true }];
+    // A party local é do storage COMPARTILHADO: o líder é FIXO no
+    // personagem que criou — trocar de personagem não move a liderança.
+    const ld = (typeof partyLocalData === "function") ? partyLocalData() : null;
+    if (!pt.members.length && !ld) { panel.style.display = "none"; return; }
     const chars = typeof getCharacters === "function" ? getCharacters() : [];
-    for (const m of pt.members) {
-      const c = chars.find((x) => (x.id || characterId(x)) === m.id);
-      if (!c) continue;
+    const lider = chars.find((x) => String(x.id || characterId(x)) === String(ld ? ld.leaderId : characterId(p)));
+    if (!lider) { panel.style.display = "none"; return; }
+    const lc = maxStats(lider);
+    // durante o PARTY COMBAT o HP vivo vem das entidades em cena
+    let live = null;
+    if (typeof G !== "undefined" && G && G.combat &&
+        Array.isArray(G.combat.players) && G.combat.players.length > 1) {
+      live = {};
+      for (const e of G.combat.players) live[String(e.id)] = e;
+    }
+    const statsDe = (c) => {
+      const ent = live ? live[String(c.id || characterId(c))] : null;
       const mc = maxStats(c);
-      membros.push({ id: m.id, name: c.name, voc: c.voc, level: c.level,
-                     sex: c.sex, hp: c.hp || 0, mp: c.mp || 0,
-                     maxHp: mc.hp, maxMp: mc.mp });
+      return {
+        hp: ent ? Math.max(0, ent.p.hp || 0) : (c.hp || 0),
+        mp: ent ? Math.max(0, ent.p.mp || 0) : (c.mp || 0),
+        maxHp: mc.hp, maxMp: mc.mp,
+      };
+    };
+    const ls = statsDe(lider);
+    membros = [{ id: lider.id, name: lider.name, voc: lider.voc, level: lider.level,
+                 sex: lider.sex, hp: ls.hp, mp: ls.mp, maxHp: ls.maxHp,
+                 maxMp: ls.maxMp, _leader: true }];
+    for (const m of (ld ? ld.members : pt.members)) {
+      const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
+      if (!c) continue;
+      const ms = statsDe(c);
+      membros.push({ id: c.id, name: c.name, voc: c.voc, level: c.level,
+                     sex: c.sex, hp: ms.hp, mp: ms.mp,
+                     maxHp: ms.maxHp, maxMp: ms.maxMp });
     }
     panel.style.display = "";
   }
@@ -182,10 +214,19 @@ function renderPartyPanel(p) {
       renderPartyPanel(G.p);
     });
   }
-  // clique no membro = trocar personagem (mesma função do "Trocar personagem")
+  // clique no membro = trocar personagem. Durante o PARTY COMBAT (todos na
+  // mesma instância) a troca é imediata, sem recarregar a página — o
+  // jogador controla todos os personagens da party.
   $$("#party-panel-body [data-party-char]").forEach((el) =>
     el.addEventListener("click", () => {
       if (el.dataset.switch !== "1") return;
+      const inCombat = typeof G !== "undefined" && G && G.combat &&
+        Array.isArray(G.combat.players) && G.combat.players.length > 1 &&
+        G.combat.players.some((e) => String(e.id) === String(el.dataset.partyChar));
+      if (inCombat && typeof partyCombatSwitchTo === "function") {
+        partyCombatSwitchTo(el.dataset.partyChar);
+        return;
+      }
       partySwitchToChar(el.dataset.partyChar);
     }));
 }
@@ -243,14 +284,50 @@ function renderPartyModal(p, online) {
     return;
   }
   // ---- modo local (roster do save) ----
+  const ld0 = (typeof partyLocalData === "function") ? partyLocalData() : null;
+  if (!ld0) {
+    // sem party local ainda: criar transforma o personagem atual em líder
+    box.innerHTML = `<div class="party-header"><b>👥 Party</b>
+        <span class="tiny dim">personagens do seu save</span></div>
+      <div class="dim small center" style="padding:10px">
+        Você não está em nenhuma party. Crie uma para convidar os outros
+        personagens do seu save — eles precisam ACEITAR o convite.</div>
+      <button class="primary full mt8" id="party-create-local">Criar party</button>
+      <div class="tiny dim mt4">Ao criar, <b>${p.name}</b> vira o líder da party.
+        O líder é fixo: trocar de personagem não move a liderança.</div>`;
+    const cr = $("#party-create-local");
+    if (cr) cr.addEventListener("click", () => {
+      try {
+        localStorage.setItem("tibia-idle-party-local-v1", JSON.stringify({
+          leaderId: String(p.id || characterId(p)),
+          leaderName: p.name,
+          members: [], invites: [],
+          shareExp: false, session: null,
+        }));
+      } catch (e) { /* storage */ }
+      toast("Party criada! Você é o líder.");
+      renderPartyModal(p);
+      renderAll();
+    });
+    return;
+  }
+  // ---- modo local (roster do save) ----
   ensureParty(p);
   const pt = p.party;
+  const ld = ld0;
   const shareCheck = partyCanShare(p);
+  const souLider = (typeof partyIsLeaderLocal === "function") && partyIsLeaderLocal(p);
+  const souMembro = (typeof partyIsMemberLocal === "function") && partyIsMemberLocal(p);
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const liderChar = ld ? chars.find((x) => String(x.id || characterId(x)) === String(ld.leaderId)) : p;
+  const podeConvidar = (typeof partyCanInviteNow === "function") && partyCanInviteNow();
 
-  // ---- membros
+  // ---- membros (líder fixo no criador)
   let h = `<div class="party-header">
-      <b>Líder: ${p.name} <span class="dim">(${partyVocName(p.voc)} · nv ${p.level})</span></b>
-      <button class="sm" id="party-leave" ${pt.members.length ? "" : "disabled"}>Sair do party</button>
+      <b>Líder: ${liderChar ? liderChar.name : (ld ? ld.leaderName : p.name)}
+        ${liderChar ? `<span class="dim">(${partyVocName(liderChar.voc)} · nv ${liderChar.level})</span>` : ""}</b>
+      <button class="sm" id="party-leave" ${(ld || pt.members.length) ? "" : "disabled"}>
+        ${souLider ? "Dissolver party" : (souMembro ? "Sair do party" : "Sair do party")}</button>
     </div>`;
 
   if (pt.members.length) {
@@ -261,21 +338,53 @@ function renderPartyModal(p, online) {
         <span class="dim">nv ${m.level}</span>
         <span class="party-exp">+${fmtFull(m.expGained || 0)} xp</span>
         ${m.levelUps ? `<span style="color:#9ce84a">↑${m.levelUps} lvl</span>` : ""}
-        <button class="sm" data-party-remove="${m.id}">Remover</button>
+        ${souLider ? `<button class="sm" data-party-remove="${m.id}">Remover</button>` : ""}
       </div>`).join("") + `</div>`;
-  } else {
-    h += `<div class="dim small center" style="padding:8px">Nenhum membro. Convide personagens do seu save.</div>`;
+  } else if (souLider) {
+    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR.</div>`;
+  } else if (souMembro) {
+    h += `<div class="dim small center" style="padding:8px">Você é membro do party de <b>${liderChar ? liderChar.name : (ld ? ld.leaderName : "")}</b>.</div>`;
   }
 
-  // ---- convites (roster)
-  const disponiveis = partyAvailableMembers(p);
-  if (disponiveis.length) {
-    h += `<div class="party-invite-title tiny dim mt4">Convidar do seu save (${disponiveis.length}):</div>
-      <div class="party-invite-grid">` + disponiveis.map((c) => `
+  // ---- convites PENDENTES para o personagem ATUAL (aceitar aqui)
+  const pendentes = (typeof partyPendingInvites === "function") ? partyPendingInvites(p) : [];
+  if (pendentes.length) {
+    h += `<div class="party-invite-title tiny dim mt4">Convites pendentes (${pendentes.length}):</div>
+      <div class="party-invite-grid">` + pendentes.map((i) => `
+        <div class="party-invite">
+          <b>${i.fromName}</b>
+          <span class="dim tiny">te convidou para a party</span>
+          <div class="row" style="gap:4px;margin-top:4px">
+            <button class="sm primary" data-party-accept="${i.id}">Aceitar</button>
+            <button class="sm" data-party-decline="${i.id}">Recusar</button>
+          </div>
+        </div>`).join("") + `</div>
+      <div class="tiny ${podeConvidar ? "dim" : ""}" style="color:${podeConvidar ? "" : "#ff9a6a"}">
+        ${podeConvidar
+          ? "Você está em zona segura — pode aceitar."
+          : "⚠️ Para aceitar o convite você precisa estar na <b>Cidade</b> ou na <b>Área de Treino</b>."}
+      </div>`;
+  }
+
+  // ---- convidar (só o líder, só em cidade/treino)
+  if (souLider) {
+    const disponiveis = partyAvailableMembers(p);
+    h += `<div class="party-invite-title tiny dim mt4">Convidar do seu save (${disponiveis.length}):</div>`;
+    if (disponiveis.length) {
+      h += `<div class="party-invite-grid">` + disponiveis.map((c) => `
         <div class="party-invite">
           <b>${c.name}</b> <span class="dim">${partyVocName(c.voc)} nv ${c.level}</span>
-          <button class="sm" data-party-invite="${c.id}">Convidar</button>
+          <button class="sm" data-party-invite="${c.id}" ${podeConvidar ? "" : "disabled"}>Convidar</button>
         </div>`).join("") + `</div>`;
+    } else {
+      h += `<div class="dim small center" style="padding:6px">Ninguém disponível (todos já convidados ou no party).</div>`;
+    }
+    h += `<div class="tiny ${podeConvidar ? "dim" : ""}" style="color:${podeConvidar ? "" : "#ff9a6a"}">
+        ${podeConvidar
+          ? "Você está em zona segura — pode convidar."
+          : "⚠️ O líder só pode convidar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
+      </div>
+      <div class="tiny dim">O convite fica PENDENTE: troque para o personagem convidado e aceite pelo menu Party.</div>`;
   }
 
   // ---- compartilhar exp
@@ -289,6 +398,7 @@ function renderPartyModal(p, online) {
       ${!pt.members.length ? `<div class="tiny dim">Adicione membros para compartilhar.</div>` : ""}
       <div class="tiny" style="color:${shareCheck.ok ? "#9ce84a" : "#ff9a6a"}">${shareCheck.msg}</div>
       <div class="tiny dim">Fórmula (wiki): Exp = M × S ÷ P × C · o XP dos membros é aplicado de verdade no save deles.</div>
+      <div class="tiny dim mt4">⭐ Ao caçar com o líder, TODOS os membros vão para a MESMA instância — clique neles no painel para controlar cada um.</div>
     </div>`;
 
   // ---- Party Hunt Analyser (sessão unificada local/online)
@@ -324,25 +434,39 @@ function renderPartyModal(p, online) {
   // handlers
   const leave = $("#party-leave");
   if (leave) leave.addEventListener("click", () => {
-    partyLeave(p);
-    toast("Você saiu do party.");
+    const r = partyLeave(p);
+    toast(r && r.msg ? r.msg : "Você saiu do party.", r && r.ok ? "" : "bad");
     renderPartyModal(p);
     renderAll();
   });
   $$("#party-content [data-party-remove]").forEach((el) => {
     el.addEventListener("click", () => {
-      partyRemoveMember(p, el.dataset.partyRemove);
-      toast("Membro removido.");
+      const r = partyRemoveMember(p, el.dataset.partyRemove);
+      toast(r && r.msg ? r.msg : "Membro removido.", r && r.ok ? "" : "bad");
       renderPartyModal(p);
       renderAll();
     });
   });
   $$("#party-content [data-party-invite]").forEach((el) => {
     el.addEventListener("click", () => {
-      const r = partyAddMember(p, el.dataset.partyInvite);
-      toast(r.ok ? "Convidado para o party!" : r.msg, r.ok ? "" : "bad");
+      const r = partyInviteMember(p, el.dataset.partyInvite);
+      toast(r && r.msg ? r.msg : (r.ok ? "Convidado!" : "Falha"), r && r.ok ? "level" : "bad");
+      renderPartyModal(p);
+    });
+  });
+  $$("#party-content [data-party-accept]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const r = partyAcceptInvite(p, el.dataset.partyAccept);
+      toast(r && r.msg ? r.msg : (r.ok ? "Entrou no party!" : "Falha"), r && r.ok ? "level" : "bad");
       renderPartyModal(p);
       renderAll();
+    });
+  });
+  $$("#party-content [data-party-decline]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const r = partyDeclineInvite(p, el.dataset.partyDecline);
+      toast(r && r.msg ? r.msg : "Convite recusado.", r && r.ok ? "" : "bad");
+      renderPartyModal(p);
     });
   });
   const share = $("#party-share-exp");
@@ -353,6 +477,9 @@ function renderPartyModal(p, online) {
       share.checked = false;
       return;
     }
+    // grava o share na party compartilhada
+    const d = partyLocalData();
+    if (d) { d.shareExp = share.checked; partyLocalWrite(d); }
     pt.shareExp = share.checked;
     toast(pt.shareExp ? "Experiência compartilhada ATIVA." : "Compartilhamento desativado.");
     renderPartyModal(p);

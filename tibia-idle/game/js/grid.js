@@ -123,6 +123,14 @@ function buildOccupancy(c, ignorar) {
   if (c.player && c.player !== ignorar) {
     occ.set(c.player.cx + ":" + c.player.cy, c.player);
   }
+  /* PARTY COMBAT: os aliados também ocupam tile (duas criaturas não
+   * dividem SQM) — monstros e aliados desviam uns dos outros. */
+  if (c.players && c.players.length > 1) {
+    for (const e of c.players) {
+      if (e === ignorar || !e.p || e.p.hp <= 0) continue;
+      if (e.cx !== undefined && e.cy !== undefined) occ.set(e.cx + ":" + e.cy, e);
+    }
+  }
   for (const m of c.mobs) {
     if (m === ignorar || m.hp <= 0) continue;
     occ.set(m.cx + ":" + m.cy, m);

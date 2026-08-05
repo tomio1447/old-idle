@@ -1007,6 +1007,9 @@ function startHunt(id, instanceMode, force) {
 }
 
 function stopHunt() {
+  // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
+  // (hp/mana/exp de cada um vão para o roster)
+  if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
   G.p.hunt = null;
   G.p.instanceMode = null;
   G.combat = null;
@@ -1683,6 +1686,34 @@ function loop(ts) {
       toast("Renasceu!", "level");
       renderAll();
       return;
+    }
+
+    // PARTY COMBAT: aliados INCONSCIENTES renascem no local depois do
+    // tempo (reviveAt) — a instância continua ativa enquanto alguém vivo
+    // estiver nela
+    if (G.combat && G.combat.players && G.combat.players.length > 1 &&
+        !G.combat.dead) {
+      for (const ent of G.combat.players) {
+        if (ent.p && ent.p.hp <= 0 && ent.reviveAt &&
+            Date.now() >= ent.reviveAt) {
+          const mx = maxStats(ent.p);
+          ent.p.hp = mx.hp;
+          ent.p.mp = mx.mp;
+          if (ent.deathPos) {
+            ent.x = ent.deathPos.x;
+            ent.y = ent.deathPos.y;
+            ent.dir = ent.deathPos.dir || "e";
+            ent.cx = undefined;
+            ent.cy = undefined;
+            if (typeof ensureCell === "function") ensureCell(ent);
+          }
+          ent.reviveAt = 0;
+          ent.deathPos = null;
+          addLog("party", `<b style="color:#9ce84a">${ent.name}</b> renasceu no local da morte.`);
+          if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+          if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
+        }
+      }
     }
 
     if (G.p.level > before) {

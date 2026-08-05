@@ -81,14 +81,20 @@ setTimeout(() => {
       d.mp = 10000;
       d.config.healFriendSpell = "exura-gran-mas-res";
       d.config.healFriendAt = 70;
-      ensureParty(d);
       const a1 = createCharacter("Aliado1", "knight", "male"); a1.id = "a1";
       const a2 = createCharacter("Aliado2", "paladin", "male"); a2.id = "a2";
       const mx1 = maxStats(a1), mx2 = maxStats(a2);
       a1.hp = Math.floor(mx1.hp * 0.2); a2.hp = Math.floor(mx2.hp * 0.3);
       saveCharacterToRoster(a1); saveCharacterToRoster(a2);
-      d.party.members.push({ id: "a1", name: "Aliado1", voc: "knight", level: 300, expGained: 0, kills: 0, levelUps: 0 });
-      d.party.members.push({ id: "a2", name: "Aliado2", voc: "paladin", level: 300, expGained: 0, kills: 0, levelUps: 0 });
+      // party LOCAL compartilhada (storage): líder = d, membros = a1/a2
+      localStorage.setItem("tibia-idle-party-local-v1", JSON.stringify({
+        leaderId: String(characterId(d)), leaderName: d.name,
+        members: [
+          { id: "a1", name: "Aliado1", voc: "knight", level: 300, expGained: 0, kills: 0, levelUps: 0 },
+          { id: "a2", name: "Aliado2", voc: "paladin", level: 300, expGained: 0, kills: 0, levelUps: 0 },
+        ],
+        invites: [], shareExp: false, session: null,
+      }));
       G.p = d;
       const c2 = { events: [], player: { x: 0.5, y: 0.5 } };
       tryHealFriend(c2, d, Date.now());
@@ -102,12 +108,15 @@ setTimeout(() => {
       d2.level = 100; d2.mp = 10000;
       d2.config.healFriendSpell = "exura-sio";
       d2.config.healFriendAt = 70;
-      ensureParty(d2);
       const a3 = createCharacter("Aliado3", "knight", "male"); a3.id = "a3";
       const mx3 = maxStats(a3);
       a3.hp = Math.floor(mx3.hp * 0.2);
       saveCharacterToRoster(a3);
-      d2.party.members.push({ id: "a3", name: "Aliado3", voc: "knight", level: 100, expGained: 0, kills: 0, levelUps: 0 });
+      localStorage.setItem("tibia-idle-party-local-v1", JSON.stringify({
+        leaderId: String(characterId(d2)), leaderName: d2.name,
+        members: [{ id: "a3", name: "Aliado3", voc: "knight", level: 100, expGained: 0, kills: 0, levelUps: 0 }],
+        invites: [], shareExp: false, session: null,
+      }));
       G.p = d2;
       const c3 = { events: [], player: { x: 0.5, y: 0.5 } };
       tryHealFriend(c3, d2, Date.now());

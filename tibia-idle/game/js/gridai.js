@@ -201,6 +201,11 @@ function updateGridMovement(c, p, dt, now) {
 
   // interpola quem esta no meio de um passo
   advanceStep(c.player, dt);
+  if (c.players && c.players.length > 1) {
+    for (const e of c.players) {
+      if (e !== c.player && e.p && e.p.hp > 0) advanceStep(e, dt);
+    }
+  }
   for (const m of c.mobs) advanceStep(m, dt);
 
   const occ = buildOccupancy(c);
@@ -208,5 +213,46 @@ function updateGridMovement(c, p, dt, now) {
   const alvo = vivos.length ? vivos[0] : null;
 
   playerThinkStep(c, p, alvo, occ, now);
-  for (const m of vivos) monsterThinkStep(c, m, c.player, occ, now);
+
+  // PARTY COMBAT: os aliados andam sozinhos até o alvo (cada um com o
+  // alcance da própria arma) e os MONSTROS perseguem o alvo que escolheram
+  // (o mais próximo), não só o personagem ativo.
+  if (c.players && c.players.length > 1) {
+    for (const ent of c.players) {
+      if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
+      allyThinkStep(c, ent, alvo, occ, now);
+    }
+  }
+  for (const m of vivos) {
+    const alvoMob = (m.target && m.target.p && m.target.p.hp > 0)
+      ? m.target : c.player;
+    monsterThinkStep(c, m, alvoMob, occ, now);
+  }
+}
+
+/* Passo de um ALIADO do party combat: persegue o alvo até o alcance da
+ * arma dele e fica parado atacando (como o playerThinkStep em modo chase,
+ * sem configurações de kiting/stand). */
+function allyThinkStep(c, ent, alvo, occ, now) {
+  if (!ent || !alvo) return;
+  ensureCell(ent);
+  if (ent.moving) return;
+  if (ent.nextStepAt && now < ent.nextStepAt) return;
+  const alcance = (typeof partyAllyRangeSQM === "function")
+    ? partyAllyRangeSQM(ent) : 1;
+  const dist = sqmDistance(ent, alvo);
+  if (dist <= alcance) {
+    ent.dir = dirTo(ent, alvo);
+    ent.nextStepAt = now + 250;
+    return;
+  }
+  const dir = stepToward(ent, alvo.cx, alvo.cy, occ);
+  if (!dir) {
+    ent.dir = dirTo(ent, alvo);
+    ent.nextStepAt = now + 200;
+    return;
+  }
+  ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
+  const ok = beginStep(ent, dir, occ, false);
+  ent.nextStepAt = now + (ok ? ent.stepDur : 200);
 }

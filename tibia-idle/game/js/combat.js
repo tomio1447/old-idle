@@ -60,7 +60,7 @@ function newCombat(player, huntId, instanceMode) {
       for (let x = 0; x < huntMap.rows[y].length; x++)
         if (huntMap.rows[y][x] === "S") { spx = x; spy = y; achou = true; break; }
   }
-  return {
+  const out = {
     huntId: huntId,
     hunt: hunt,
     huntMap: huntMap,
@@ -107,7 +107,34 @@ function newCombat(player, huntId, instanceMode) {
     delayedHits: [],  // re-strikes agendados (Death Echo / Spiritual Outburst 15.25)
     dead: false,
     deadUntil: 0,
+    players: null,    // PARTY COMBAT: todas as entidades na MESMA instância
   };
+  // PARTY COMBAT: o líder leva TODOS os membros para a mesma instância
+  maybeLoadPartyCombat(out, player, spx, spy);
+  return out;
+}
+
+/* PARTY COMBAT: quando o LÍDER entra numa hunt, carrega TODOS os membros
+ * da party local para a mesma instância (c.players). O jogador controla
+ * todos — o ativo (c.player) é o líder por padrão e pode ser trocado pelo
+ * painel OTC sem recarregar. */
+function maybeLoadPartyCombat(c, player, spx, spy) {
+  try {
+    if (typeof partyOnlineMode === "function" && partyOnlineMode()) return;
+    if (typeof partyIsLeaderLocal !== "function" || !partyIsLeaderLocal(player)) return;
+    if (typeof partyCombatLoad !== "function") return;
+    const ents = partyCombatLoad(player);
+    if (!ents || ents.length < 2) return;
+    c.players = ents;
+    // o líder (ativo) é o save REAL em uso — mutações refletem na hora
+    c.players[0].p = player;
+    c.players[0].id = player.id || c.players[0].id;
+    c.player = c.players[0];
+    if (typeof partyCombatPlace === "function") partyCombatPlace(c, spx, spy);
+    if (typeof addLog === "function") {
+      addLog("party", `<b style="color:#9ce84a">Party na mesma instância!</b> ${c.players.length} personagens na arena — clique neles no painel para controlar cada um.`);
+    }
+  } catch (e) { /* sem party: segue normal */ }
 }
 
 function newBossCombat(player, boss) {
@@ -2686,24 +2713,101 @@ function mobSkillRoll(sk) {
   return mn + Math.floor(Math.random() * (mx - mn + 1));
 }
 
-/* Celulas de uma explosao de raio r (Chebyshev, centrada). */
+/* Matriz oficial do Canary (AreaCombat::setupArea(radius)): o valor de cada
+ * celula e a "distancia" ao centro num grid 13x13. A explosao de raio r
+ * cobre as celulas com valor 1..r — o CIRCULO do servidor (diamante com
+ * cantos cortados). Antes o jogo pintava um QUADRADO cheio (Chebyshev), e
+ * era isso que deixava a death explosion do grimeleech e cia "quadrada". */
+const SKILL_RADIUS_GRID = [
+  [0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 8, 8, 7, 8, 8, 0, 0, 0, 0],
+  [0, 0, 0, 8, 7, 6, 6, 6, 7, 8, 0, 0, 0],
+  [0, 0, 8, 7, 6, 5, 5, 5, 6, 7, 8, 0, 0],
+  [0, 8, 7, 6, 5, 4, 4, 4, 5, 6, 7, 8, 0],
+  [0, 8, 6, 5, 4, 3, 2, 3, 4, 5, 6, 8, 0],
+  [8, 7, 6, 5, 4, 2, 1, 2, 4, 5, 6, 7, 8],
+  [0, 8, 6, 5, 4, 3, 2, 3, 4, 5, 6, 8, 0],
+  [0, 8, 7, 6, 5, 4, 4, 4, 5, 6, 7, 8, 0],
+  [0, 0, 8, 7, 6, 5, 5, 5, 6, 7, 8, 0, 0],
+  [0, 0, 0, 8, 7, 6, 6, 6, 7, 8, 0, 0, 0],
+  [0, 0, 0, 0, 8, 8, 7, 8, 8, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0],
+];
+
+function skillRadiusValue(dx, dy) {
+  const row = SKILL_RADIUS_GRID[dy + 6];
+  if (!row) return 0;
+  return row[dx + 6] || 0;
+}
+
+/* Celulas de uma explosao de raio r: o circulo oficial do Canary
+ * (diamante com cantos cortados), centrado em (cx0, cy0). */
 function skillRadiusCells(cx0, cy0, r) {
   const out = [];
-  for (let dx = -r; dx <= r; dx++)
-    for (let dy = -r; dy <= r; dy++)
-      out.push({ cx: (cx0 | 0) + dx, cy: (cy0 | 0) + dy });
+  r = Math.max(0, r | 0);
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx < -6 || dx > 6 || dy < -6 || dy > 6) continue;
+      const v = skillRadiusValue(dx, dy);
+      if (v > 0 && v <= r) out.push({ cx: (cx0 | 0) + dx, cy: (cy0 | 0) + dy });
+    }
   return out;
 }
 
-/* Celulas de uma onda: linha saindo do monstro em direcao ao alvo. */
-function skillWaveCells(mob, pl, len) {
+/* A celula (px, py) esta dentro da explosao de raio r centrada em (cx0, cy0)?
+ * Usado para o DANO: no servidor a explosao so acerta quem esta numa celula
+ * coberta pelo formato — antes o dano usava Chebyshev (quadrado). */
+function skillRadiusHas(cx0, cy0, r, px, py) {
+  const dx = (px | 0) - (cx0 | 0);
+  const dy = (py | 0) - (cy0 | 0);
+  if (dx < -6 || dx > 6 || dy < -6 || dy > 6) return false;
+  const v = skillRadiusValue(dx, dy);
+  return v > 0 && v <= (r | 0);
+}
+
+/* Direcao cardinal da onda (getPrimaryDirection do Canary): eixo dominante.
+ * Antes a onda saia numa linha DIAGONAL na direcao do alvo; no Tibia onda
+ * so existe reta (N/S/L/O) — o caster vira e a onda varre o eixo. */
+function skillWaveDir(mob, pl) {
+  const dx = (pl.cx | 0) - (mob.cx | 0);
+  const dy = (pl.cy | 0) - (mob.cy | 0);
+  if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
+  return dy >= 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
+}
+
+/* Celulas de uma onda: a RETA oficial do Canary (AreaCombat::setupArea(
+ * length, spread)). A boca abre com o spread: as `spread` primeiras casas
+ * tem a largura cheia e a cada `spread` casas a boca encolhe 1 de cada
+ * lado, terminando na ponta unica no ultimo SQM. */
+function skillWaveCells(mob, pl, len, spread) {
   const out = [];
-  const dx = Math.sign((pl.cx | 0) - (mob.cx | 0));
-  const dy = Math.sign((pl.cy | 0) - (mob.cy | 0));
-  if (!dx && !dy) return [{ cx: mob.cx | 0, cy: mob.cy | 0 }];
-  for (let i = 1; i <= len; i++)
-    out.push({ cx: (mob.cx | 0) + dx * i, cy: (mob.cy | 0) + dy * i });
+  len = Math.max(1, len | 0);
+  spread = spread | 0;
+  const d = skillWaveDir(mob, pl);
+  const cols = spread > 0 ? Math.floor((len - (len % spread)) / spread) * 2 + 1 : 1;
+  const centro = Math.floor(cols / 2);
+  let colSpread = cols;
+  for (let y = 1; y <= len; y++) {
+    const minOff = cols - colSpread - centro;
+    const maxOff = colSpread - 1 - centro;
+    for (let h = minOff; h <= maxOff; h++) {
+      out.push({
+        cx: (mob.cx | 0) + d.dx * y + (d.dy !== 0 ? h : 0),
+        cy: (mob.cy | 0) + d.dy * y + (d.dx !== 0 ? h : 0),
+      });
+    }
+    if (spread > 0 && y % spread === 0) colSpread--;
+  }
   return out;
+}
+
+/* O alvo esta numa celula coberta pela onda reta? (dano fiel ao servidor:
+ * so acerta quem a onda realmente cruza). */
+function skillWaveHas(mob, pl, len, spread, px, py) {
+  const cells = skillWaveCells(mob, pl, len, spread);
+  const k = (px | 0) + ":" + (py | 0);
+  for (const q of cells) if (q.cx + ":" + q.cy === k) return true;
+  return false;
 }
 
 /* A animacao oficial da habilidade (area, onda ou impacto), sem dano. */
@@ -2711,8 +2815,10 @@ function mobSkillFx(c, mob, pl, sk) {
   const el = sk.el || "physical";
   const fx = sk.fx || (ELEMENTS[el] || ELEMENTS.physical).fx;
   if (sk.length) {
-    // onda nasce no monstro e varre os SQMs ate o alvo
-    c.events.push({ t: "areafx", cells: skillWaveCells(mob, pl, sk.length),
+    // onda RETA (N/S/L/O) saindo do monstro, com a boca do spread — o
+    // formato oficial do Canary (AreaCombat::setupArea(length, spread))
+    c.events.push({ t: "areafx",
+                    cells: skillWaveCells(mob, pl, sk.length, sk.spread || 0),
                     fx: fx, screen: true });
     return;
   }
@@ -2739,7 +2845,12 @@ function mobSkillFx(c, mob, pl, sk) {
  * elementar do Monk e, no golpe letal, o Mana Buffer do 15.25 — na mesma
  * ordem em que o auto attack os aplica. */
 function mobSkillHit(c, p, mob, sk, dmg) {
-  const pl = c.player;
+  // PARTY COMBAT: o dano da skill vai para a entidade que o monstro está
+  // atacando (m.target) — rebate o save dela em `p` para as resistências.
+  const tgt = (mob.target && mob.target.p && mob.target.p.hp > 0)
+    ? mob.target : (c.player || null);
+  const pl = tgt || c.player;
+  if (tgt && tgt.p) p = tgt.p;
   const agora = Date.now();
   let raw = dmg;
   // Tipos especiais de dano (TibiaWiki/Damage):
@@ -2833,11 +2944,19 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     }
   }
   // Explosao CENTRADA NO MONSTRO (radius sem `alvo`): o dano so entra se o
-  // player estiver dentro do raio — antes a magia "explodia no bicho" e o
-  // dano caia no player a qualquer distancia (parecia bugado).
-  if (sk.radius && !sk.alvo && typeof sqmDistance === "function" &&
+  // player estiver dentro do FORMATO OFICIAL (circulo do Canary, diamante
+  // com cantos cortados) — antes usava sqmDistance (Chebyshev), que e um
+  // QUADRADO cheio e deixava a death explosion do grimeleech "quadrada".
+  if (sk.radius && !sk.alvo && typeof skillRadiusHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (sqmDistance(mob, pl) > sk.radius) return 0;
+    if (!skillRadiusHas(mob.cx, mob.cy, sk.radius, pl.cx, pl.cy)) return 0;
+  }
+  // ONDA: o dano so entra se o alvo estiver numa celula coberta pela onda
+  // RETA (a onda vai no eixo dominante; quem esta na diagonal fora dela
+  // nao leva dano, como no servidor).
+  if (sk.length && typeof skillWaveHas === "function" &&
+      pl.cx !== undefined && mob.cx !== undefined) {
+    if (!skillWaveHas(mob, pl, sk.length, sk.spread || 0, pl.cx, pl.cy)) return 0;
   }
 
   // condition aplicada pela magia (veneno/fogo/energia do *field e das
@@ -2874,6 +2993,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   }
   p.hp -= raw;
   c.stats.taken += raw;
+  if (tgt) tgt.taken = (tgt.taken || 0) + raw;
   if (ehLifeDrain && mob.hp > 0) {
     // Life Drain: remove HP e transfere ao atacante (cura o mob).
     mob.hp = Math.min(mob.def.hp || mob.maxHp, mob.hp + raw);
@@ -2902,12 +3022,17 @@ function mobSkillHit(c, p, mob, sk, dmg) {
  * (mobAttack) só roda se nenhuma skill da lista passar (monstros sem basic
  * attack ch=100 na lista). */
 function mobCastSkill(c, p, mob, now) {
+  // PARTY COMBAT: o monstro ataca a entidade mais próxima (m.target), não
+  // só o personagem ativo — todos na mesma instância levam dano de verdade.
+  const tgt = (mob.target && mob.target.p && mob.target.p.hp > 0)
+    ? mob.target : (c.player || null);
+  if (tgt && tgt.p) p = tgt.p;
   if (mob.hp <= 0 || p.hp <= 0) return false;
   const def = mob.def || {};
   const skills = def.skills || [];
   const defS = def.defSkills || [];
   if (!skills.length && !defS.length) return false;
-  const pl = c.player;
+  const pl = tgt || c.player;
   if (!pl) return false;
   const dist = (pl.cx !== undefined && mob.cx !== undefined &&
                 typeof sqmDistance === "function")
@@ -2984,7 +3109,12 @@ function mobCastSkill(c, p, mob, now) {
 }
 
 function mobAttack(c, p, mob) {
-  const pl = c.player || { x: 0.18, y: 0.62 };
+  // PARTY COMBAT: o melee acerta quem o monstro está perseguindo (m.target)
+  // — o alvo mais próximo entre líder + membros da mesma instância.
+  const tgt = (mob.target && mob.target.p && mob.target.p.hp > 0)
+    ? mob.target : null;
+  const pl = tgt || c.player || { x: 0.18, y: 0.62 };
+  if (tgt && tgt.p) p = tgt.p;
   // o monstro so bate se o alvo estiver dentro do alcance EM SQM. Melee = 1,
   // e a diagonal conta como colado (Chebyshev), igual ao canUseAttack().
   if (typeof sqmDistance === "function" && pl.cx !== undefined && mob.cx !== undefined) {
@@ -3167,6 +3297,7 @@ function mobAttack(c, p, mob) {
 
   p.hp -= raw;
   c.stats.taken += raw;
+  if (tgt) tgt.taken = (tgt.taken || 0) + raw;
   applyMonsterCondition(c, p, mob);
   addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
@@ -3282,6 +3413,92 @@ function rollLoot(c, p, mob) {
     }
   }
   return got;
+}
+
+/* ======================================================================
+ * PARTY COMBAT — aliados na mesma instância
+ * ====================================================================== */
+
+/* Tick dos aliados (membros da party que NÃO são o personagem ativo):
+ * cada um ataca o alvo atual com a arma dele e usa o HEAL FRIEND próprio
+ * (Druid/Monk curam a party com a configuração de cada personagem). */
+function partyTickAllies(c, now, dt) {
+  for (const ent of c.players) {
+    if (ent === c.player || !ent.p) continue;
+    // aliado caiu: agenda o renascimento no local (reviveAt) — o loop do
+    // game.js revive quando o tempo chega
+    if (ent.p.hp <= 0) {
+      if (!ent.reviveAt) {
+        ent.reviveAt = now + ((typeof reviveTime === "function") ? reviveTime() : 30000);
+        ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+        ent.p.deaths = (ent.p.deaths || 0) + 1;
+        if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+        if (typeof addLog === "function") {
+          addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round((typeof reviveTime === "function" ? reviveTime() : 30000) / 1000)}s.`);
+        }
+      }
+      continue;
+    }
+    // cura de aliado (exura sio / gran sio / gran mas res / tio sio) — o
+    // config de cada personagem decide se ele cura e quando
+    if (typeof tryHealFriend === "function") {
+      try { tryHealFriend(c, ent.p, now); } catch (e) { /* magia falha: segue */ }
+    }
+    // ataque básico com a arma do aliado
+    ent.atkCd -= dt;
+    if (ent.atkCd > 0 || !c.mobs.length) continue;
+    ent.atkCd = 2000;
+    const alvo = c.mobs[0];
+    if (!alvo || alvo.hp <= 0) continue;
+    const range = (typeof partyAllyRangeSQM === "function")
+      ? partyAllyRangeSQM(ent) : 1;
+    if (typeof sqmDistance === "function" && ent.cx !== undefined &&
+        alvo.cx !== undefined && sqmDistance(ent, alvo) > range) continue;
+    const d = (typeof playerDamage === "function")
+      ? playerDamage(ent.p) : { min: 5, max: 10, element: "physical" };
+    const el = d.element || "physical";
+    let raw = d.min + Math.floor(Math.random() * (Math.max(1, d.max - d.min) + 1));
+    if (typeof applyMonsterMitigation === "function" &&
+        typeof applyResist === "function") {
+      raw = applyMonsterMitigation(alvo, el, applyResist(alvo, el, Math.max(1, raw), 0));
+    }
+    raw = Math.max(1, Math.floor(raw));
+    alvo.hp -= raw;
+    c.stats.damage += raw;
+    ent.attackAnim = 220;
+    if (c.events) {
+      c.events.push({ t: "hit", dmg: raw, x: alvo.x, y: alvo.y,
+                      sx: ent.x, sy: ent.y, screen: true, el: el,
+                      ally: ent.id, allyName: ent.name });
+    }
+  }
+}
+
+/* Personagem da party caiu (hp <= 0): vira INCONSCIENTE (revive no local
+ * depois de reviveTime) e o controle passa para o próximo membro vivo. */
+function partyHandleDown(c, fallenP) {
+  const ent = c.players.find((e) => e.p === fallenP) || c.player;
+  if (ent) {
+    if (!ent.reviveAt) {
+      ent.reviveAt = Date.now() + ((typeof reviveTime === "function") ? reviveTime() : 30000);
+      ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+      ent.p.hp = 0;
+      c.stats.deaths++;
+      ent.p.deaths = (ent.p.deaths || 0) + 1;
+      if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+      if (typeof addLog === "function") {
+        addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round(ent.reviveAt / 1000 - Date.now() / 1000)}s.`);
+      }
+    }
+  }
+  // troca o controle para o próximo vivo
+  const proximo = c.players.find((e) => e !== ent && e.p && e.p.hp > 0);
+  if (proximo && typeof partyCombatSwitchTo === "function") {
+    if (typeof addLog === "function") {
+      addLog("party", `Controlando agora: <b>${proximo.name}</b> (${fallenP.name} inconsciente).`);
+    }
+    partyCombatSwitchTo(proximo.id);
+  }
 }
 
 /* Morte do jogador: perde exp, skills e renasce no local */
@@ -3423,7 +3640,7 @@ function combatTick(c, p, dt, now) {
   // Sem recuo automático: se ficar sem cura, o HP zera e o personagem morre,
   // voltando ao templo/cidade pelo fluxo normal de morte.
 
-  // ataque do jogador
+  // ataque do jogador (personagem ATIVO)
   c.playerAtkCd -= dt;
   if (c.playerAtkCd <= 0 && c.mobs.length) {
     const target = c.mobs[0];
@@ -3443,6 +3660,13 @@ function combatTick(c, p, dt, now) {
     c.playerAtkCd = acted ? attackInterval(c, p) : 250;
   }
 
+  // PARTY COMBAT: os ALIADOS (membros na mesma instância) lutam sozinhos —
+  // atacam com a arma deles e o Druid/Monk cura a party (HEAL FRIEND).
+  if (c.players && c.players.length > 1 &&
+      typeof partyTickAllies === "function") {
+    partyTickAllies(c, now, dt);
+  }
+
   // monstros agem: no Canary (Monster::commitCombatIntention) o ataque
   // BÁSICO (melee, chance 100 no .lua) roda SEMPRE e as skills rolam a
   // própria chance ADICIONAL no mesmo turno — cada attack da lista é
@@ -3452,10 +3676,13 @@ function combatTick(c, p, dt, now) {
   for (const m of c.mobs) {
     m.atkCd -= dt;
     if (m.atkCd <= 0) {
+      // PARTY COMBAT: escolhe o alvo (mais próximo entre líder + membros)
+      if (typeof partyNearestTarget === "function") m.target = partyNearestTarget(c, m);
+      const pp = (m.target && m.target.p) ? m.target.p : p;
       // 1) skills do .lua (cada uma rola a própria chance)
-      if (typeof mobCastSkill === "function") mobCastSkill(c, p, m, now);
+      if (typeof mobCastSkill === "function") mobCastSkill(c, pp, m, now);
       // 2) melee (ataque básico) — roda SEMPRE que o monstro tem dano base
-      if ((m.def && (m.def.damage || 0) > 0)) mobAttack(c, p, m);
+      if ((m.def && (m.def.damage || 0) > 0)) mobAttack(c, pp, m);
       m.atkCd = (m.def && m.def.attackSpeed) || 2000;
     }
     monsterThinkYell(m, dt);
@@ -3480,8 +3707,20 @@ function combatTick(c, p, dt, now) {
     c.delayedHits = pend;
   }
 
-  // morte do jogador
-  if (p.hp <= 0) { playerDeath(c, p); return; }
+  // morte do jogador. PARTY COMBAT: o personagem que caiu vira
+  // INCONSCIENTE e renasce no local depois de um tempo; o controle passa
+  // para o próximo membro vivo. Só quando TODOS caem é que vale a morte
+  // normal (perda + revive da instância inteira).
+  if (p.hp <= 0) {
+    if (c.players && c.players.length > 1 &&
+        typeof partyHandleDown === "function") {
+      partyHandleDown(c, p);
+      const vivos = c.players.some((e) => e.p && e.p.hp > 0);
+      if (!vivos) { playerDeath(c, p); return; }
+    } else {
+      playerDeath(c, p); return;
+    }
+  }
 
   // monstros mortos
   const alive = [];
@@ -3508,6 +3747,11 @@ function combatTick(c, p, dt, now) {
       for (const mem of partyShare.members) {
         const ups = (typeof partyApplyToMember === "function")
           ? partyApplyToMember(mem.id, mem.exp) : 0;
+        // PARTY COMBAT: o membro em cena (entidade viva) também ganha o XP
+        // na hora — o save do roster é cópia e não refletiria o level-up
+        if (typeof partyApplyToMemberLive === "function") {
+          partyApplyToMemberLive(mem.id, mem.exp);
+        }
         if (typeof partyRecordKill === "function") {
           partyRecordKill(p, mem.id, mem.exp, 0, ups);
         }

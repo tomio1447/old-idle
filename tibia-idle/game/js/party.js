@@ -1,7 +1,14 @@
 /* party.js — Sistema de Party (TibiaWiki/Party + Canary)
  *
- * - Criação de party com personagens do próprio roster (os outros chars
- *   salvos viram membros e ganham XP de verdade no save);
+ * - A party LOCAL (sem servidor) vive num storage compartilhado do navegador
+ *   (tibia-idle-party-local-v1) e vale para TODOS os personagens do roster:
+ *   o LÍDER é fixo no personagem que criou a party (trocar de personagem
+ *   NÃO move a liderança);
+ * - CONVITES ficam PENDENTES: o líder convida (só na Cidade / Área de
+ *   Treino) e o jogador troca para o personagem convidado para ACEITAR de
+ *   lá (também só em cidade/treino);
+ * - Ao entrar numa hunt/boss com o LÍDER, TODOS os membros da party vão
+ *   para a MESMA instância (party combat) e o jogador controla todos;
  * - Shared Experience com a fórmula oficial:
  *       Exp = M * S / P * C
  *     M = exp base do monstro · S = bônus de vocações · P = nº de membros
@@ -13,6 +20,99 @@
  */
 "use strict";
 
+/* ----------------------------------------------------------------------
+ * PARTY LOCAL (roster do navegador, sem servidor)
+ * ----------------------------------------------------------------------
+ * A party vive no localStorage compartilhado: qualquer personagem do save
+ * enxerga a MESMA party (líder + membros + convites pendentes). Antes a
+ * party morava dentro do save do personagem — trocar de char "movia" o
+ * líder e o convidado entrava na hora. */
+const PARTY_LOCAL_KEY = "tibia-idle-party-local-v1";
+
+function partyLocalRead() {
+  try {
+    const raw = localStorage.getItem(PARTY_LOCAL_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !d.leaderId) return null;
+    d.members = Array.isArray(d.members) ? d.members : [];
+    d.invites = Array.isArray(d.invites) ? d.invites : [];
+    return d;
+  } catch (e) { return null; }
+}
+
+function partyLocalWrite(d) {
+  try { localStorage.setItem(PARTY_LOCAL_KEY, JSON.stringify(d)); } catch (e) {}
+}
+
+/* Dados da party local (null = sem party). Migra partys antigas que
+ * moravam no save do personagem para o storage compartilhado.
+ *
+ * ATENÇÃO: NÃO pode chamar getCharacters()/normalizePlayer() aqui — o
+ * normalizePlayer chama ensureParty() que chama partyLocalData() de novo
+ * (recursão infinita). A migração lê o roster CRU do localStorage. */
+function partyLocalData() {
+  const cur = partyLocalRead();
+  if (cur) return cur;
+  try {
+    const raw = typeof localStorage !== "undefined"
+      ? localStorage.getItem(CHARACTERS_KEY) : null;
+    const roster = raw ? JSON.parse(raw) : {};
+    for (const id of Object.keys(roster)) {
+      const c = roster[id] && roster[id].p;
+      if (c && c.party && Array.isArray(c.party.members) && c.party.members.length) {
+        const d = {
+          leaderId: String(id),
+          leaderName: c.name,
+          members: c.party.members.map((m) => ({
+            id: String(m.id), name: m.name, voc: m.voc, level: m.level,
+            expGained: m.expGained || 0, kills: m.kills || 0, levelUps: m.levelUps || 0,
+          })),
+          invites: [],
+          shareExp: !!c.party.shareExp,
+          session: c.party.session || null,
+        };
+        partyLocalWrite(d);
+        return d;
+      }
+    }
+  } catch (e) { /* sem save antigo */ }
+  return null;
+}
+
+/* Ids (string) de todos na party local: líder + membros. */
+function partyLocalMemberIds(d) {
+  const ids = [];
+  if (!d) return ids;
+  ids.push(String(d.leaderId));
+  for (const m of d.members) ids.push(String(m.id));
+  return ids;
+}
+
+/* O personagem atual participa da party local (líder ou membro)? */
+function partyLocalInvolved(p) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return false;
+  const d = partyLocalData();
+  if (!d || !p) return false;
+  return partyLocalMemberIds(d).indexOf(String(p.id || characterId(p))) !== -1;
+}
+
+/* O personagem atual é o LÍDER da party local? (fixo em quem criou) */
+function partyIsLeaderLocal(p) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return false;
+  const d = partyLocalData();
+  return !!(d && p && String(p.id || characterId(p)) === String(d.leaderId));
+}
+
+/* O personagem atual é MEMBRO (não líder) de uma party local? */
+function partyIsMemberLocal(p) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return false;
+  const d = partyLocalData();
+  if (!d || !p) return false;
+  const id = String(p.id || characterId(p));
+  return id !== String(d.leaderId) && d.members.some((m) => String(m.id) === id);
+}
+
 function ensureParty(p) {
   if (!p) return null;
   p.party = p.party || {};
@@ -20,6 +120,23 @@ function ensureParty(p) {
   pt.members = Array.isArray(pt.members) ? pt.members : [];
   pt.shareExp = !!pt.shareExp;
   pt.session = pt.session || null;
+  // modo local: a party vem do storage compartilhado (líder fixo). Se o
+  // personagem atual não participa, o espelho fica vazio.
+  if (typeof partyOnlineMode === "function" && !partyOnlineMode()) {
+    const d = partyLocalData();
+    const id = String(p.id || characterId(p));
+    if (d && partyLocalMemberIds(d).indexOf(id) !== -1) {
+      pt.members = d.members.map((m) => Object.assign({}, m));
+      pt.shareExp = !!d.shareExp;
+      pt.session = d.session || null;
+      pt.leaderId = String(d.leaderId);
+      pt.leaderName = d.leaderName;
+    } else {
+      pt.members = [];
+      pt.shareExp = false;
+      pt.session = null;
+    }
+  }
   return pt;
 }
 
@@ -65,7 +182,9 @@ function partyShareExp(p, exp) {
            members: p.party.members.map((m) => ({ id: m.id, exp: parte })) };
 }
 
-/* Aplica experiência a um membro do roster (level-up incluso). */
+/* Aplica experiência a um membro do roster (level-up incluso). Em party
+ * combat o mesmo exp é aplicado na entidade viva (c.players) — ver
+ * partyApplyToMemberLive. */
 function partyApplyToMember(memberId, exp) {
   try {
     const roster = readRoster();
@@ -81,64 +200,170 @@ function partyApplyToMember(memberId, exp) {
   } catch (err) { return 0; }
 }
 
-/* Personagens do roster que podem entrar no party (não é o líder, não está
- * no party, não está em outro party... como é single, só checa os dois). */
+/* Aplica o exp também na ENTIDADE viva do party combat (o save do roster é
+ * uma cópia; sem isso o membro em cena não via o level-up na hora). */
+function partyApplyToMemberLive(memberId, exp) {
+  try {
+    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return 0;
+    const ent = G.combat.players.find((e) => String(e.p && (e.p.id || characterId(e.p))) === String(memberId));
+    if (!ent || !ent.p) return 0;
+    const antes = ent.p.level;
+    if (typeof addExp === "function") addExp(ent.p, exp);
+    else ent.p.exp = (ent.p.exp || 0) + exp;
+    return Math.max(0, ent.p.level - antes);
+  } catch (e) { return 0; }
+}
+
+/* Personagens do roster que podem ser CONVIDADOS: não estão na party e não
+ * têm convite pendente. */
 function partyAvailableMembers(p) {
-  ensureParty(p);
-  const noParty = new Set(p.party.members.map((m) => m.id));
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return [];
+  const d = partyLocalData();
+  const noParty = new Set(partyLocalMemberIds(d));
+  const pendentes = new Set();
+  for (const i of (d && d.invites) || []) {
+    if (i.status === "pending") pendentes.add(String(i.toId));
+  }
   const out = [];
   const chars = typeof getCharacters === "function" ? getCharacters() : [];
   for (const c of chars) {
-    const id = c.id || characterId(c);
-    if (id === (p.id || characterId(p))) continue;
-    if (noParty.has(id)) continue;
+    const id = String(c.id || characterId(c));
+    if (noParty.has(id) || pendentes.has(id)) continue;
     out.push({ id: id, name: c.name, voc: c.voc, level: c.level });
   }
   return out;
 }
 
-/* Convidar um personagem do roster. */
-function partyAddMember(p, memberId) {
-  ensureParty(p);
-  if (p.party.members.length >= 4)
+/* Convites PENDENTES para o personagem atual (local). */
+function partyPendingInvites(p) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return [];
+  const d = partyLocalData();
+  if (!d || !p) return [];
+  const id = String(p.id || characterId(p));
+  return d.invites.filter((i) => i.status === "pending" && String(i.toId) === id);
+}
+
+/* CONVIDAR (local): o convite fica PENDENTE — o jogador troca para o
+ * personagem convidado e aceita de lá. Só o líder convida e só em
+ * Cidade/Área de Treino (regra do dono). */
+function partyInviteMember(p, memberId) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return { ok: false, msg: "Use o modo online para convidar por nome." };
+  }
+  if (!partyIsLeaderLocal(p))
+    return { ok: false, msg: "Só o líder da party pode convidar." };
+  if (typeof partyCanInviteNow === "function" && !partyCanInviteNow())
+    return { ok: false, msg: "Para convidar você precisa estar na Cidade ou na Área de Treino." };
+  let d = partyLocalData();
+  if (!d) return { ok: false, msg: "Crie a party primeiro (botão Criar party)." };
+  if (d.members.length >= 4)
     return { ok: false, msg: "Party cheio (máx. 5 no total)." };
   const chars = typeof getCharacters === "function" ? getCharacters() : [];
-  const c = chars.find((x) => (x.id || characterId(x)) === memberId);
+  const c = chars.find((x) => String(x.id || characterId(x)) === String(memberId));
   if (!c) return { ok: false, msg: "Personagem não encontrado." };
-  if (p.party.members.some((m) => m.id === memberId))
+  if (partyLocalMemberIds(d).indexOf(String(memberId)) !== -1)
     return { ok: false, msg: "Já está no party." };
-  p.party.members.push({
-    id: memberId, name: c.name, voc: c.voc, level: c.level,
+  if (d.invites.some((i) => i.status === "pending" && String(i.toId) === String(memberId)))
+    return { ok: false, msg: "Convite pendente — troque para o personagem e aceite." };
+  d.invites.push({
+    id: d.invites.reduce((m, i) => Math.max(m, i.id || 0), 0) + 1,
+    fromId: String(p.id || characterId(p)), fromName: p.name,
+    toId: String(memberId), toName: c.name,
+    status: "pending", createdAt: Date.now(),
+  });
+  partyLocalWrite(d);
+  return { ok: true, msg: "Convite enviado! Troque para o personagem e aceite pelo menu Party." };
+}
+
+/* ACEITAR (local): o personagem convidado aceita o convite. Só em
+ * Cidade/Área de Treino. */
+function partyAcceptInvite(p, inviteId) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return accountPartyAccept ? accountPartyAccept(inviteId) : { ok: false };
+  }
+  let d = partyLocalData();
+  if (!d) return { ok: false, msg: "A party não existe mais." };
+  const id = String(p.id || characterId(p));
+  const inv = d.invites.find((i) => i.id === Number(inviteId) && i.status === "pending");
+  if (!inv) return { ok: false, msg: "Convite não encontrado ou já respondido." };
+  if (String(inv.toId) !== id)
+    return { ok: false, msg: "Este convite não é para este personagem." };
+  if (typeof partyCanInviteNow === "function" && !partyCanInviteNow())
+    return { ok: false, msg: "Para aceitar um convite você precisa estar na Cidade ou na Área de Treino." };
+  if (d.members.length >= 4) {
+    inv.status = "declined";
+    partyLocalWrite(d);
+    return { ok: false, msg: "Party cheia." };
+  }
+  d.members.push({
+    id: String(inv.toId), name: inv.toName, voc: p.voc, level: p.level,
     expGained: 0, kills: 0, levelUps: 0,
   });
-  return { ok: true };
+  inv.status = "accepted";
+  partyLocalWrite(d);
+  return { ok: true, msg: "Você entrou na party de " + d.leaderName + "!" };
 }
 
+/* RECUSAR (local). */
+function partyDeclineInvite(p, inviteId) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return accountPartyDecline ? accountPartyDecline(inviteId) : { ok: false };
+  }
+  const d = partyLocalData();
+  if (!d) return { ok: false, msg: "Party não existe mais." };
+  const inv = d.invites.find((i) => i.id === Number(inviteId) && i.status === "pending");
+  if (!inv) return { ok: false, msg: "Convite não encontrado." };
+  inv.status = "declined";
+  partyLocalWrite(d);
+  return { ok: true, msg: "Convite recusado." };
+}
+
+/* Remover membro (só o líder; local grava no storage compartilhado). */
 function partyRemoveMember(p, memberId) {
-  ensureParty(p);
-  p.party.members = p.party.members.filter((m) => m.id !== memberId);
-  if (!p.party.members.length) p.party.shareExp = false;
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return accountPartyKick ? accountPartyKick(Number(p && p.id), Number(memberId)) : { ok: false };
+  }
+  if (!partyIsLeaderLocal(p)) return { ok: false, msg: "Só o líder pode remover membros." };
+  const d = partyLocalData();
+  if (!d) return { ok: false, msg: "Sem party." };
+  d.members = d.members.filter((m) => String(m.id) !== String(memberId));
+  if (!d.members.length) d.shareExp = false;
+  partyLocalWrite(d);
   return { ok: true };
 }
 
+/* Sair/dissolver: líder dissolve (convites pendentes cancelados); membro
+ * sai. Quem não participa não pode sair. */
 function partyLeave(p) {
-  ensureParty(p);
-  p.party = { members: [], shareExp: false, session: null };
-  return { ok: true };
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    return partyOnlineLeave();
+  }
+  const d = partyLocalData();
+  if (!d) return { ok: false, msg: "Sem party." };
+  const id = String(p.id || characterId(p));
+  if (String(d.leaderId) === id) {
+    localStorage.removeItem(PARTY_LOCAL_KEY);
+    return { ok: true, msg: "Party dissolvida." };
+  }
+  if (!d.members.some((m) => String(m.id) === id))
+    return { ok: false, msg: "Você não está em uma party." };
+  d.members = d.members.filter((m) => String(m.id) !== id);
+  partyLocalWrite(d);
+  return { ok: true, msg: "Você saiu da party." };
 }
 
 /* ---------- Party Hunt Analyser (sessão da caçada) ---------- */
 
-/* Sessão do Analyser. Funciona nos DOIS modos: local (p.party.session,
- * como antes) e ONLINE (p._partySession — a party vive no servidor, mas o
+/* Sessão do Analyser. Funciona nos DOIS modos: local (storage compartilhado
+ * da party) e ONLINE (p._partySession — a party vive no servidor, mas o
  * Analyser é uma sessão local de caçada). */
 function partyAnalyserSession(p) {
   if (!p) return null;
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
     return p._partySession || null;
   }
-  ensureParty(p);
-  return p.party.session || null;
+  const d = partyLocalData();
+  return (d && d.session) || null;
 }
 
 /* (Re)inicia a sessão ao entrar numa hunt. */
@@ -156,8 +381,10 @@ function partyStartSession(p, huntId) {
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
     p._partySession = s;
   } else {
-    ensureParty(p);
-    p.party.session = s;
+    const d = partyLocalData();
+    if (!d) return;
+    d.session = s;
+    partyLocalWrite(d);
   }
 }
 
@@ -178,12 +405,15 @@ function partyRecordKill(p, memberId, exp, lootCount, levelUps) {
   b.loot += lootCount || 0;
   b.levelUps += levelUps || 0;
   if (memberId && !(typeof partyOnlineMode === "function" && partyOnlineMode())) {
-    ensureParty(p);
-    const m = p.party.members.find((x) => x.id === memberId);
-    if (m) {
-      m.expGained = (m.expGained || 0) + (exp || 0);
-      m.kills = (m.kills || 0) + 1;
-      m.levelUps = (m.levelUps || 0) + (levelUps || 0);
+    const d = partyLocalData();
+    if (d) {
+      const m = d.members.find((x) => String(x.id) === String(memberId));
+      if (m) {
+        m.expGained = (m.expGained || 0) + (exp || 0);
+        m.kills = (m.kills || 0) + 1;
+        m.levelUps = (m.levelUps || 0) + (levelUps || 0);
+      }
+      partyLocalWrite(d);
     }
   }
 }
@@ -260,9 +490,18 @@ function partyIsMember() {
 }
 
 /* Jogadores em party NÃO podem entrar em hunt/boss — só cidade ou área de
- * treino (regra do dono). Líder pode (ele leva a party junto). */
+ * treino (regra do dono). Líder pode (ele leva a party junto). Vale nos
+ * dois modos: online (membros via servidor) e local (membros do roster). */
 function partyBlocksHunt() {
-  return partyOnlineMode() && partyIsMember();
+  const p = (typeof G !== "undefined" && G) ? G.p : null;
+  if (partyOnlineMode()) return partyIsMember();
+  return partyIsMemberLocal(p);
+}
+
+/* O personagem atual é o LÍDER da party (local ou online)? */
+function partyIsLeaderAny(p) {
+  if (partyOnlineMode()) return partyIsLeader();
+  return partyIsLeaderLocal(p);
 }
 
 /* Reporta a zona atual para o servidor (chamado a cada transição de mapa
@@ -380,7 +619,8 @@ async function partyApplyFollow(f) {
  * ====================================================================== */
 
 /* Lista os aliados (membros da party) com HP — fonte: state online
- * (hp/maxHp do servidor) ou roster local (p.party.members). */
+ * (hp/maxHp do servidor), ENTIDADES VIVAS do party combat (mesma instância)
+ * ou roster local (p.party.members). */
 function partyHealTargets(p) {
   if (!p) return [];
   const out = [];
@@ -393,21 +633,38 @@ function partyHealTargets(p) {
                    hp: m.hp || 0, maxHp: m.maxHp || 0 });
       }
     }
-  } else {
-    ensureParty(p);
-    const chars = typeof getCharacters === "function" ? getCharacters() : [];
-    for (const m of p.party.members || []) {
-      const c = chars.find((x) => (x.id || characterId(x)) === m.id);
-      if (!c) continue;
-      const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
-      out.push({ id: m.id, name: c.name, voc: c.voc,
-                 hp: c.hp || 0, maxHp: mx.hp || 1 });
+    return out;
+  }
+  // party combat ativo: o HP VIVO vem das entidades em cena (o roster é
+  // cópia e não acompanha o combate em tempo real)
+  if (typeof G !== "undefined" && G && G.combat &&
+      Array.isArray(G.combat.players) && G.combat.players.length > 1) {
+    const me = String(p.id || characterId(p));
+    for (const ent of G.combat.players) {
+      const pp = ent.p;
+      if (!pp || String(pp.id || characterId(pp)) === me) continue;
+      const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1 };
+      out.push({ id: pp.id, name: pp.name, voc: pp.voc,
+                 hp: Math.max(0, pp.hp || 0), maxHp: mx.hp || 1 });
     }
+    return out;
+  }
+  const d = partyLocalData();
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const me = String(p.id || characterId(p));
+  for (const id of partyLocalMemberIds(d)) {
+    if (id === me) continue;
+    const c = chars.find((x) => String(x.id || characterId(x)) === id);
+    if (!c) continue;
+    const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
+    out.push({ id: c.id, name: c.name, voc: c.voc,
+               hp: c.hp || 0, maxHp: mx.hp || 1 });
   }
   return out;
 }
 
-/* Aplica a cura no membro (save local ou estado online espelhado). */
+/* Aplica a cura no membro (entidade viva do party combat, save local ou
+ * estado online espelhado). */
 function partyApplyFriendHeal(p, member, amount) {
   if (!member) return;
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
@@ -418,15 +675,27 @@ function partyApplyFriendHeal(p, member, amount) {
     const alvo = (Number(st.leader.id) === Number(member.id)) ? st.leader
       : st.members.find((m) => Number(m.id) === Number(member.id));
     if (alvo && alvo.maxHp) alvo.hp = Math.min(alvo.maxHp, (alvo.hp || 0) + amount);
-  } else {
-    // modo local: atualiza o save do membro no roster
-    const chars = typeof getCharacters === "function" ? getCharacters() : [];
-    const c = chars.find((x) => (x.id || characterId(x)) === member.id);
-    if (!c) return;
-    const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
-    c.hp = Math.min(mx.hp || c.hp, (c.hp || 0) + amount);
-    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(c);
+    return;
   }
+  // party combat: cura a entidade VIVA (a barra do painel muda na hora)
+  if (typeof G !== "undefined" && G && G.combat &&
+      Array.isArray(G.combat.players) && G.combat.players.length > 1) {
+    const ent = G.combat.players.find((e) =>
+      String(e.p && (e.p.id || characterId(e.p))) === String(member.id));
+    if (ent && ent.p) {
+      const mx = typeof maxStats === "function" ? maxStats(ent.p) : { hp: 1 };
+      ent.p.hp = Math.min(mx.hp || ent.p.hp, (ent.p.hp || 0) + amount);
+      if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+    }
+    return;
+  }
+  // modo local fora de combate: atualiza o save do membro no roster
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const c = chars.find((x) => (x.id || characterId(x)) === member.id);
+  if (!c) return;
+  const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
+  c.hp = Math.min(mx.hp || c.hp, (c.hp || 0) + amount);
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(c);
 }
 
 /* O tick de HEAL FRIEND: roda junto do tryHeal no combate. */
@@ -497,27 +766,35 @@ function tryHealFriend(c, p, now) {
   return true;
 }
 
-/* A party está numa hunt/boss (líder está caçando)? */
+/* A party está numa hunt/boss (líder está caçando)? No ONLINE o estado
+ * vem do servidor; no PARTY COMBAT local basta o líder estar numa instância
+ * com os membros em cena (c.players). */
 function partyInInstance() {
-  const st = partyOnlineState();
-  if (!st) return false;
-  return st.leader && (st.leader.zone === "hunt" || st.leader.zone === "boss");
+  if (partyOnlineMode()) {
+    const st = partyOnlineState();
+    return !!(st && st.leader && (st.leader.zone === "hunt" || st.leader.zone === "boss"));
+  }
+  return !!(typeof G !== "undefined" && G && G.combat &&
+            Array.isArray(G.combat.players) && G.combat.players.length > 1 &&
+            (G.combat.huntId || G.combat.boss));
 }
 
 /* Botão LEAVE HUNT: o LÍDER sai da instância (todos voltam via follow de
- * retorno); um MEMBRO sai sozinho (volta para a cidade). */
+ * retorno no online; no party combat local todos os saves são gravados);
+ * um MEMBRO sai sozinho (volta para a cidade). */
 async function partyLeaveHunt() {
-  if (!partyOnlineMode()) return;
   if (typeof stopHunt === "function" && G && (G.combat || G.training)) {
     stopHunt();
   } else if (G) {
     G.inCity = true;
     if (typeof renderAll === "function") renderAll();
   }
-  // reporta a zona city (líder: gera recall dos membros; membro: sai)
-  try {
-    await accountPartyReportZone(Number(sessionCharId()), { zone: "city" });
-  } catch (e) { /* rede */ }
+  if (partyOnlineMode()) {
+    // reporta a zona city (líder: gera recall dos membros; membro: sai)
+    try {
+      await accountPartyReportZone(Number(sessionCharId()), { zone: "city" });
+    } catch (e) { /* rede */ }
+  }
   if (typeof toast === "function") toast("Você saiu da caçada.");
   if (typeof partySync === "function") partySync();
 }
@@ -559,4 +836,154 @@ async function partyOnlineInvite(name) {
 async function partyOnlineLeave() {
   if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
   return await accountPartyLeave(Number(sessionCharId()));
+}
+
+/* ======================================================================
+ * PARTY COMBAT — todos os personagens da party na MESMA instância
+ * ======================================================================
+ * Quando o LÍDER entra numa hunt/boss (modo local), todos os membros da
+ * party são carregados do roster para a mesma arena (c.players). O jogador
+ * controla TODOS: clica no membro no painel OTC para alternar quem está
+ * ativo (quem usa as magias/potions da UI). Os aliados lutam sozinhos:
+ * atacam o alvo atual com a arma deles e o Druid/Monk cura a party (HEAL
+ * FRIEND) com a configuração de cada um.
+ * ====================================================================== */
+
+/* Quantos membros o party combat vai carregar (0 = sem party). */
+function partyCombatCount() {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return 0;
+  const d = partyLocalData();
+  if (!d) return 0;
+  return d.members.length;
+}
+
+/* Carrega as entidades do party combat. `player` = personagem ativo (o
+ * líder). Devolve o array completo (líder + membros) ou null sem party. */
+function partyCombatLoad(player) {
+  const d = partyLocalData();
+  if (!d) return null;
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const me = String(player.id || characterId(player));
+  const entidades = [];
+  const seen = new Set();
+  const mkEnt = (c, isLeader) => {
+    if (!c || seen.has(String(c.id || characterId(c)))) return;
+    seen.add(String(c.id || characterId(c)));
+    const pp = normalizePlayer(c);
+    pp.id = c.id || characterId(c);
+    const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1, mp: 1 };
+    entidades.push({
+      p: pp, id: pp.id, name: pp.name, voc: pp.voc, sex: pp.sex,
+      cx: 0, cy: 0, x: 0, y: 0, dir: "e", moving: false, frame: 0,
+      walkT: 0, attackAnim: 0, atkCd: 500 + Math.random() * 900,
+      speedPts: 110 + Math.min(200, (pp.level || 1)),
+      maxHp: mx.hp, maxMp: mx.mp,
+      reviveAt: 0, deathPos: null, isLeader: !!isLeader,
+      taken: 0,
+    });
+  };
+  // líder primeiro (ativa por padrão)
+  const lider = chars.find((c) => String(c.id || characterId(c)) === me);
+  mkEnt(lider, true);
+  // membros na ordem do party
+  for (const m of d.members) {
+    const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
+    if (c) mkEnt(c, false);
+  }
+  return entidades.length > 1 ? entidades : null;
+}
+
+/* Posiciona as entidades do party combat ao redor do líder (spawn da hunt).
+ * Respeita paredes/água do mapa (huntMapBlocked) — aliado não nasce dentro
+ * de parede em corredor estreito. */
+function partyCombatPlace(c, spawnCx, spawnCy) {
+  if (!c || !c.players) return;
+  const occ = new Map([[spawnCx + ":" + spawnCy, true]]);
+  const offs = [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+  const bloqueado = (cx, cy) => {
+    if (typeof huntMapBlocked === "function" && c.huntMap && huntMapBlocked(c.huntMap, cx, cy)) return true;
+    if (typeof inBounds === "function" && !inBounds(cx, cy)) return true;
+    return occ.has(cx + ":" + cy);
+  };
+  c.players.forEach((ent, i) => {
+    if (i === 0) {
+      ent.cx = spawnCx; ent.cy = spawnCy;
+    } else {
+      const o = offs[(i - 1) % offs.length];
+      let cx = spawnCx + o[0], cy = spawnCy + o[1];
+      if (bloqueado(cx, cy)) {
+        // tenta as 8 vizinhas livres; senão fica junto do líder
+        let achou = false;
+        for (const o2 of offs) {
+          const nx = spawnCx + o2[0], ny = spawnCy + o2[1];
+          if (!bloqueado(nx, ny)) { cx = nx; cy = ny; achou = true; break; }
+        }
+        if (!achou) { cx = spawnCx; cy = spawnCy; }
+      }
+      ent.cx = cx; ent.cy = cy;
+      occ.set(cx + ":" + cy, true);
+    }
+    const s = typeof cellToScreen === "function" ? cellToScreen(ent.cx, ent.cy) : { x: 0.13, y: 0.62 };
+    ent.x = s.x; ent.y = s.y; ent.sx = s.x; ent.sy = s.y;
+  });
+}
+
+/* Entidade viva mais próxima de um monstro (alvo do ataque). */
+function partyNearestTarget(c, mob) {
+  if (!c.players || c.players.length < 2) return c.player || null;
+  let best = null, bestD = Infinity;
+  for (const ent of c.players) {
+    if (!ent.p || ent.p.hp <= 0) continue;
+    let d;
+    if (typeof sqmDistance === "function" &&
+        ent.cx !== undefined && mob.cx !== undefined) {
+      d = sqmDistance(ent, mob);
+    } else {
+      // sem celula (boss antigo): distância de tela como fallback
+      d = Math.max(Math.abs((ent.x || 0) - (mob.x || 0)),
+                   Math.abs((ent.y || 0) - (mob.y || 0)));
+    }
+    if (d < bestD) { bestD = d; best = ent; }
+  }
+  return best || c.player || null;
+}
+
+/* Troca o personagem ATIVO durante o party combat (sem recarregar). */
+function partyCombatSwitchTo(id) {
+  try {
+    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return false;
+    const c = G.combat;
+    const ent = c.players.find((e) => String(e.id) === String(id));
+    if (!ent || !ent.p) return false;
+    if (ent.p.hp <= 0) {
+      if (typeof toast === "function") toast(ent.name + " está inconsciente — espere ele renascer.", "bad");
+      return false;
+    }
+    // salva o personagem anterior antes de trocar o controle
+    if (typeof saveCharacterToRoster === "function" && G.p) saveCharacterToRoster(G.p);
+    c.player = ent;
+    G.p = ent.p;
+    if (typeof renderAll === "function") renderAll();
+    if (typeof toast === "function") toast("Controlando: " + ent.name);
+    return true;
+  } catch (e) { return false; }
+}
+
+/* Salva TODOS os personagens do party combat no roster (hp/mana/exp). */
+function partyCombatSaveAll() {
+  try {
+    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return;
+    for (const ent of G.combat.players) {
+      if (ent.p && typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+    }
+  } catch (e) { /* não bloqueia */ }
+}
+
+/* Alcance de ataque de um aliado (mesma regra do jogador). */
+function partyAllyRangeSQM(ent) {
+  try {
+    if (typeof playerRangeSQM === "function") return playerRangeSQM(ent.p);
+  } catch (e) { /* fallback */ }
+  const d = (typeof playerDamage === "function") ? playerDamage(ent.p) : { type: "melee" };
+  return d.type === "distance" ? 6 : d.type === "magic" ? 6 : 1;
 }
