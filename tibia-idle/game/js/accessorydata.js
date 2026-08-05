@@ -20,50 +20,62 @@
   const PATCHES = {
     /* ------------------------------- anéis básicos de vila (loja) */
     "life-ring": {
-      desc: "Anel da vida (regeneração mais rápida).",
+      desc: "Anel da vida (regeneração mais rápida). 400 cargas por tempo (20 min).",
       hpreg: 6, mpreg: 2,
+      charges: 400, chargeMode: "time",
     },
     "time-ring": {
-      desc: "Anel do tempo (velocidade +30).",
+      desc: "Anel do tempo (velocidade +30). 200 cargas por tempo (10 min).",
       spd: 30,
+      charges: 200, chargeMode: "time",
     },
     "energy-ring": {
-      desc: "Anel de energia (Magic Shield: dano consome mana antes da vida).",
+      desc: "Anel de energia (Magic Shield: dano consome mana antes da vida). 200 cargas por tempo (10 min).",
       manaShield: 1, magicShield: 1,
+      charges: 200, chargeMode: "time",
+      // Regra do dono: só Monk e Royal Paladin equipam energy ring.
+      vocs: ["monk", "exalted monk", "paladin", "royal paladin"],
     },
     "might-ring": {
-      desc: "Anel do poder (proteção +20% em todos os elementos). 20 cargas.",
-      charges: 20,
+      desc: "Anel do poder (proteção +20% em todos os elementos). 20 cargas POR GOLPE recebido.",
+      charges: 20, chargeMode: "hits",
       res: { physical: 20, fire: 20, earth: 20, energy: 20, ice: 20,
              holy: 20, death: 20 },
     },
     "sword-ring": {
-      desc: "Anel de espada (espada +4).",
+      desc: "Anel de espada (espada +4). 600 cargas por tempo (30 min).",
       sword: 4,
+      charges: 600, chargeMode: "time",
     },
     "axe-ring": {
-      desc: "Anel de machado (machado +4).",
+      desc: "Anel de machado (machado +4). 600 cargas por tempo (30 min).",
       axe: 4,
+      charges: 600, chargeMode: "time",
     },
     "club-ring": {
-      desc: "Anel de clava (clava +4).",
+      desc: "Anel de clava (clava +4). 600 cargas por tempo (30 min).",
       club: 4,
+      charges: 600, chargeMode: "time",
     },
     "dwarven-ring": {
-      desc: "Anel anão (bebe muito sem cair: resiste a bebidas).",
+      desc: "Anel anão (bebe muito sem cair: resiste a bebidas). 1200 cargas por tempo (60 min).",
       hpreg: 3,
+      charges: 1200, chargeMode: "time",
     },
     "ring-of-healing": {
-      desc: "Anel da cura (regeneração mais rápida).",
+      desc: "Anel da cura (regeneração mais rápida). 160 cargas por tempo (8 min).",
       hpreg: 8, mpreg: 10,
+      charges: 160, chargeMode: "time",
     },
     "power-ring": {
-      desc: "Anel de poder (punho +4).",
+      desc: "Anel de poder (punho +4). 600 cargas por tempo (30 min).",
       fist: 4,
+      charges: 600, chargeMode: "time",
     },
     "stealth-ring": {
-      desc: "Anel da invisibilidade (invisível por 10 minutos).",
+      desc: "Anel da invisibilidade (invisível por 10 minutos). 200 cargas por tempo.",
       invis: 1,
+      charges: 200, chargeMode: "time",
     },
     "crystal-ring": {
       desc: "Anel de cristal (item decorativo — sem atributos, como no items.xml do Canary).",
@@ -460,6 +472,20 @@
     if (!IT[slug]) {
       const d = NOVOS[slug];
       IT[slug] = Object.assign({ drop: 1, shop: 0, n: d.n }, d);
+    }
+  }
+
+  /* Sistema de CARGAS (pedido do dono):
+   *  - qualquer anel/amuleto com `charges` consome por TEMPO enquanto
+   *    equipado (1 carga a cada 3s — 200 cargas = 10 min, como o time ring);
+   *  - exceção: `chargeMode: "hits"` consome 1 carga POR GOLPE recebido
+   *    (o might ring de 20 cargas);
+   *  - quando zera, o item QUEBRA (sai do slot e não volta pra mochila). */
+  for (const slug in IT) {
+    const it = IT[slug];
+    if (it && (it.s === "ring" || it.s === "amulet") && it.charges &&
+        !it.chargeMode) {
+      it.chargeMode = "time";
     }
   }
 })();

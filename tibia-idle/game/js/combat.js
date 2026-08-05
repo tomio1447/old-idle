@@ -1029,12 +1029,19 @@ function playerResistPct(p, element) {
   return total;
 }
 
-/* Aplica a resistência por elemento do jogador ao dano recebido. */
+/* Aplica a resistência por elemento do jogador ao dano recebido.
+ * CARGAS POR GOLPE: itens com chargeMode "hits" (o might ring de 20 cargas)
+ * gastam 1 carga a cada golpe recebido. A carga é descontada DEPOIS da
+ * redução — o último golpe (20º) ainda é absorvido e só então o anel
+ * quebra, como no Tibia. */
 function applyPlayerResist(p, element, dano) {
   if (element === "agony") return dano;   // true damage: nunca reduz
   const pc = (typeof playerResistPct === "function") ? playerResistPct(p, element) : 0;
-  if (!pc) return dano;
-  return Math.max(1, Math.floor(dano * (1 - pc / 100)));
+  const reduzido = pc ? Math.max(1, Math.floor(dano * (1 - pc / 100))) : dano;
+  if (dano > 0 && p && p.equip && typeof consumeAccessoryHitCharge === "function") {
+    try { consumeAccessoryHitCharge(p); } catch (e) { /* não bloqueia o dano */ }
+  }
+  return reduzido;
 }
 
 /* ====================================================== Elemental Pierce
@@ -2543,20 +2550,36 @@ function autoRestock() {
  * por segundo e o maximo. */
 /* EXETA AMP RES / EXETA RES (Chivalrous Challenge / Challenge) do Knight.
  * Marca os monstros ao alcance para focarem o knight e, como o Challenge do
- * Tibia, os marcados causam 20% MENOS dano a ele. Exeta res marca 1; exeta
- * amp res marca TODOS ao alcance (7 SQM) — e é auto-cast quando o knight
- * está em combate. */
+ * Tibia, os marcados causam 20% MENOS dano a ele. Exeta res marca 1 (o mais
+ * próximo); exeta amp res marca TODOS ao alcance (7 SQM). Os dois são
+ * ligados/desligados na aba Ataque do Helper (p.config.exetaRes /
+ * p.config.exetaAmpRes) e PODEM ficar ligados juntos — o amp res tem
+ * prioridade e o exeta res cobre quando ele está em cooldown. */
 function tryChallenge(c, p, now) {
   now = now || Date.now();
   if (!c || !c.mobs || !c.mobs.length) return false;
   // só knight (e elite knight)
   if (p.voc !== "knight" && p.voc !== "elite knight") return false;
-  const id = "exeta-amp-res";   // marca TODOS (versão forte)
-  const s = (typeof SPELLS !== "undefined") ? SPELLS[id] : null;
-  if (!s || p.level < s.lvl || p.mp < s.mana) return false;
-  if (!cdReady(p, id, now)) return false;
+  const cfg = p.config || {};
+  const useAmp = !!cfg.exetaAmpRes;
+  const useRes = !!cfg.exetaRes;
+  if (!useAmp && !useRes) return false;
+  const ids = useAmp ? ["exeta-amp-res", useRes ? "exeta-res" : null]
+                     : ["exeta-res"];
+  for (const id of ids) {
+    if (!id) continue;
+    const s = (typeof SPELLS !== "undefined") ? SPELLS[id] : null;
+    if (!s || p.level < s.lvl || p.mp < s.mana) continue;
+    if (typeof cdReady === "function" && !cdReady(p, id, now)) continue;
+    if (doChallengeCast(c, p, now, id, s)) return true;
+  }
+  return false;
+}
 
-  // marca os mobs ao alcance (7 SQM do exeta amp res)
+/* Casta a spell de challenge escolhida (exeta res = 1 alvo; exeta amp res =
+ * TODOS ao alcance) e emite os eventos com o efeito oficial de cada uma. */
+function doChallengeCast(c, p, now, id, s) {
+  const amp = id === "exeta-amp-res";
   const pl = c.player || { x: 0.18, y: 0.62 };
   let marcou = 0;
   for (const m of c.mobs) {
@@ -2564,7 +2587,9 @@ function tryChallenge(c, p, now) {
     const d = (pl.cx !== undefined && m.cx !== undefined &&
                typeof sqmDistance === "function")
       ? sqmDistance(pl, m) : 1;
-    if (d > (s.range || 7)) continue;
+    if (d > (s.range || (amp ? 7 : 1))) continue;
+    // exeta res marca SÓ o primeiro (o alvo mais próximo)
+    if (!amp && marcou >= 1) continue;
     m.challengedUntil = now + 10000;   // 10s de Challenge
     marcou++;
   }
@@ -2572,10 +2597,10 @@ function tryChallenge(c, p, now) {
 
   p.mp -= s.mana;
   if (typeof addManaSpent === "function") addManaSpent(p, s.mana);
-  cdStart(p, id, s, now);
+  if (typeof cdStart === "function") cdStart(p, id, s, now);
   c.events.push({ t: "challenge", x: pl.x, y: pl.y, screen: true,
-                  count: marcou, spell: s.name });
-  c.events.push({ t: "say", text: s.words || "exeta amp res" });
+                  count: marcou, spell: s.name, id: id });
+  c.events.push({ t: "say", text: s.words || (amp ? "exeta amp res" : "exeta res") });
   return true;
 }
 

@@ -24,13 +24,141 @@ function patchAccessoryItems() {
     er.manaShield = 1;
     er.magicShield = 1;
     delete er.shield;
-    // No global o Energy Ring não é restrito por vocação. A regra antiga
-    // bloqueava Monk e causava justamente o problema reportado.
-    delete er.vocs;
+    // Regra do dono: KNIGHT NÃO pode equipar energy ring — só Monk e RP
+    // (royal paladin). A restrição vive no accessorydata (vocs); aqui só
+    // garante que o item não fique sem ela (saves/patches antigos).
+    er.vocs = ["monk", "exalted monk", "paladin", "royal paladin"];
+    if (!er.charges) er.charges = 200;
+    if (!er.chargeMode) er.chargeMode = "time";
     if (!er.desc) er.desc = "Magic Shield: dano recebido consome mana antes da vida.";
   }
 }
 patchAccessoryItems();
+
+/* ----------------------------------------------------------------------
+ * SISTEMA DE CARGAS de anéis/amuletos (pedido do dono)
+ * ----------------------------------------------------------------------
+ * - `chargeMode: "time"`  -> 1 carga a cada 3s ENQUANTO EQUIPADO (o time
+ *   ring de 200 cargas dura 10 min; anéis de 30 min têm 600, etc.);
+ * - `chargeMode: "hits"`  -> 1 carga POR GOLPE recebido (o might ring de
+ *   20 cargas absorve 20 golpes);
+ * - carga zera -> o item QUEBRA (some do slot, não volta para a mochila).
+ * O saldo parcial fica no personagem (p.ringCharges[slug]) para a troca
+ * normal/emergencial do Helper não "recarregar" o anel de graça.
+ * ---------------------------------------------------------------------- */
+
+function accessoryChargesLedger(p) {
+  if (!p.ringCharges || typeof p.ringCharges !== "object") p.ringCharges = {};
+  return p.ringCharges;
+}
+
+function accessoryDef(p, slug) {
+  return (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
+}
+
+/* Cargas iniciais ao equipar: o saldo da última instância daquele slug
+ * (p.ringCharges) ou a carga cheia do item. */
+function accessoryChargesOnEquip(p, slug) {
+  const it = accessoryDef(p, slug);
+  if (!it || !it.charges) return null;
+  const ledger = accessoryChargesLedger(p);
+  const resto = parseInt(ledger[slug], 10);
+  return (resto > 0) ? Math.min(resto, it.charges) : it.charges;
+}
+
+/* Guarda o saldo ao desequipar (troca do Helper/unequip manual). */
+function rememberAccessoryCharges(p, slug, charges) {
+  if (!slug || charges === undefined || charges === null) return;
+  const ledger = accessoryChargesLedger(p);
+  if (parseInt(charges, 10) > 0) ledger[slug] = parseInt(charges, 10);
+  else delete ledger[slug];
+}
+
+/* Drena 1 carga por golpe recebido (might ring). Chamado do applyPlayerResist. */
+function consumeAccessoryHitCharge(p) {
+  if (!p || !p.equip) return;
+  for (const slot of ["ring", "amulet"]) {
+    const e = p.equip[slot];
+    if (!e || !e.item) continue;
+    const it = accessoryDef(p, e.item);
+    if (!it || it.chargeMode !== "hits" || !it.charges) continue;
+    if (accessoryConsumeCharge(p, slot)) break;
+  }
+}
+
+/* Desconta uma carga do item equipado no slot. Devolve true se consumiu. */
+function accessoryConsumeCharge(p, slot) {
+  const e = p.equip && p.equip[slot];
+  if (!e || !e.item) return false;
+  const it = accessoryDef(p, e.item);
+  if (!it || !it.charges) return false;
+  if (e.charges === undefined) e.charges = it.charges;
+  if (e.maxCharges === undefined) e.maxCharges = it.charges;
+  e.charges = Math.max(0, parseInt(e.charges, 10) - 1);
+  if (e.charges <= 0) {
+    accessoryBreak(p, slot);
+    return true;
+  }
+  return true;
+}
+
+/* O item quebrou (cargas zeraram): sai do slot e some. */
+function accessoryBreak(p, slot) {
+  const e = p.equip && p.equip[slot];
+  if (!e || !e.item) return;
+  const it = accessoryDef(p, e.item);
+  const nome = it && it.n ? it.n : e.item;
+  const ledger = accessoryChargesLedger(p);
+  delete ledger[e.item];
+  delete p.equip[slot];
+  if (typeof addLog === "function") {
+    addLog("info", `<b style="color:#ff9090">${nome[0].toUpperCase() + nome.slice(1)} quebrou!</b> (cargas esgotadas)`);
+  }
+  if (typeof toast === "function") toast(`${nome[0].toUpperCase() + nome.slice(1)} quebrou — cargas esgotadas.`, "bad");
+  // o Helper de equipamento tenta repor o item configurado na hora
+  if (typeof tryAccessoryHelper === "function") {
+    try { tryAccessoryHelper(null, p, Date.now()); } catch (err) { /* segue */ }
+  }
+  if (typeof save === "function") save();
+}
+
+/* Tick de cargas por TEMPO (chamado do loop principal e do bg tick):
+ * 1 carga a cada 3s para cada anel/amuleto equipado com cargas. */
+function tickAccessoryCharges(p, dt) {
+  if (!p || !p.equip || !dt) return;
+  for (const slot of ["ring", "amulet"]) {
+    const e = p.equip[slot];
+    if (!e || !e.item) continue;
+    const it = accessoryDef(p, e.item);
+    if (!it || !it.charges || it.chargeMode !== "time") continue;
+    if (e.charges === undefined) e.charges = it.charges;
+    if (e.maxCharges === undefined) e.maxCharges = it.charges;
+    e._chargeAcc = (e._chargeAcc || 0) + dt;
+    const CHG_MS = 3000;   // 1 carga / 3s -> 200 cargas = 10 min (time ring)
+    while (e._chargeAcc >= CHG_MS) {
+      e._chargeAcc -= CHG_MS;
+      e.charges = Math.max(0, parseInt(e.charges, 10) - 1);
+      if (e.charges <= 0) {
+        accessoryBreak(p, slot);
+        break;
+      }
+    }
+  }
+}
+
+/* Cargas atuais do item equipado (para a UI). */
+function accessoryChargesNow(p, slot) {
+  const e = p.equip && p.equip[slot];
+  if (!e || !e.item) return null;
+  const it = accessoryDef(p, e.item);
+  if (!it || !it.charges) return null;
+  return {
+    now: e.charges === undefined ? it.charges : e.charges,
+    max: e.maxCharges || it.charges,
+    mode: it.chargeMode || "time",
+    slug: e.item,
+  };
+}
 
 function ensureAccessoryConfig(p) {
   if (!p.config) p.config = {};
@@ -100,6 +228,10 @@ function canEquipItem(p, slug, targetSlot) {
 
 function stashEquippedItem(p, entry, preferred) {
   if (!entry || !entry.item) return true;
+  // sistema de cargas: guarda o saldo antes de devolver o item à mochila
+  if (entry.charges !== undefined) {
+    rememberAccessoryCharges(p, entry.item, entry.charges);
+  }
   if (entry.instId && typeof takeEquippedItemInstance === "function") {
     const slot = (entry._slot || entry.slot || entry.s || "");
     const inst = slot ? takeEquippedItemInstance(p, slot) : null;
@@ -172,6 +304,15 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
   if (takenInst) equipEntryInstance(p, slot, takenInst);
   else p.equip[slot] = { item: slug, count: 1 };
 
+  // sistema de cargas: anel/amuleto equipa com o saldo da última instância
+  // (ou cheio) e o contador passa a drenar por tempo/golpe. Vale também
+  // para itens que usam instância (o equipEntryInstance não carrega cargas).
+  const cc = accessoryChargesOnEquip(p, p.equip[slot].item);
+  if (cc !== null && p.equip[slot].charges === undefined) {
+    p.equip[slot].charges = cc;
+    p.equip[slot].maxCharges = it.charges || cc;
+  }
+
   // Arma de duas mãos remove escudo/spellbook, mas mantém quiver (Tibia global).
   if (slot === "weapon" && it.th && p.equip.shield) {
     const sh = GAMEDATA.items[p.equip.shield.item];
@@ -189,6 +330,8 @@ function unequipToContainer(p, slot, dest) {
   if (slot === "backpack") { if (typeof toast === "function") toast("A bag padrão não pode ser removida."); return false; }
   if (slot === "ammo") { if (typeof setActiveAmmo === "function") setActiveAmmo(p, null); return true; }
   const e = p.equip[slot];
+  // sistema de cargas: guarda o saldo antes de devolver o item à mochila
+  if (e.charges !== undefined) rememberAccessoryCharges(p, e.item, e.charges);
   let ok = false;
   if (e.instId && typeof takeEquippedItemInstance === "function") {
     const inst = takeEquippedItemInstance(p, slot);
@@ -394,6 +537,18 @@ function renderEquipmentHelper(p) {
     </div>
     <div class="panel-inset" style="padding:10px">
       <div class="small" style="color:#d4af37;font-weight:bold;margin-bottom:8px">${slot === "amulet" ? "Amuleto" : "Anel"}</div>
+      ${(() => {
+        const cg = accessoryChargesNow(p, slot);
+        const eqNome = p.equip && p.equip[slot] && p.equip[slot].item
+          ? itemName(p.equip[slot].item) : "";
+        if (cg) {
+          const modo = cg.mode === "hits" ? "por golpe recebido" : "por tempo (1 a cada 3s)";
+          return `<div class="tiny mb4">Equipado: <b>${eqNome}</b>
+            · <span class="charge-highlight" style="color:#ffe680">⚡ ${cg.now}/${cg.max} cargas</span>
+            <span class="dim">(${modo})</span></div>`;
+        }
+        return eqNome ? `<div class="tiny mb4">Equipado: <b>${eqNome}</b></div>` : "";
+      })()}
       <div class="row" style="gap:12px;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div class="tiny" style="color:#ff9090;font-weight:bold">EMERGENCIAL</div>
@@ -446,8 +601,15 @@ function bindEquipmentHelper(p) {
 }
 
 /* --------------------------------------------------------- magic shield */
+/* Regra do dono: só Monk e Royal Paladin (RP) podem usar energy ring. */
+function energyRingAllowed(p) {
+  if (!p) return false;
+  return ["monk", "exalted monk", "paladin", "royal paladin"].indexOf(p.voc) !== -1;
+}
+
 function energyRingEquipped(p) {
-  return !!(p && p.equip && p.equip.ring && p.equip.ring.item === "energy-ring");
+  return !!(p && energyRingAllowed(p) && p.equip && p.equip.ring &&
+            p.equip.ring.item === "energy-ring");
 }
 
 function isMagicShieldActive(p, now) {
@@ -510,6 +672,12 @@ function applyMagicShieldAbsorb(c, p, raw, meta) {
 }
 
 function renderMagicShieldHelper(p) {
+  // Knight (e elite knight) NÃO têm a aba de Escudo Mágico: não podem
+  // equipar energy ring (só Monk/RP) nem conjurar utamo vita.
+  if (p.voc === "knight" || p.voc === "elite knight") {
+    return `<div class="dim small center" style="padding:10px">
+      Knights não usam Magic Shield — energy ring é exclusivo de Monk e Royal Paladin.</div>`;
+  }
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const now = Date.now();
@@ -517,8 +685,11 @@ function renderMagicShieldHelper(p) {
   const src = magicShieldSource(p, now);
   const spellOk = magicShieldSpellAllowed(p);
   const s = SPELLS[MAGIC_SHIELD_SPELL_ID];
-  const ringCfg = p.config.equipHelper.ring;
-  const hasEnergy = (p.bag && p.bag["energy-ring"]) || (p.lootPouch && p.lootPouch["energy-ring"]) || energyRingEquipped(p);
+  const podeEnergy = energyRingAllowed(p);
+  const hasEnergy = podeEnergy && ((p.bag && p.bag["energy-ring"]) ||
+                     (p.lootPouch && p.lootPouch["energy-ring"]) || energyRingEquipped(p));
+  const eq = p.equip && p.equip.ring && p.equip.ring.item === "energy-ring"
+    ? accessoryChargesNow(p, "ring") : null;
   return `
     <div class="panel-inset" style="padding:10px">
       <div class="row" style="gap:8px;align-items:center">
@@ -530,8 +701,8 @@ function renderMagicShieldHelper(p) {
       </div>
       <div class="stat-row mt8"><span class="k">Estado</span><span class="v" style="color:${active ? "#7ec8ff" : "#888"}">${active ? "ATIVO · " + src : "inativo"}</span></div>
       ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>` : ""}
-      <label class="toggle mt8"><input type="checkbox" id="ms-use-spell" ${cfg.useSpell ? "checked" : ""} ${spellOk ? "" : "disabled"}>
-        Usar spell <b>${s ? s.words : "utamo vita"}</b>${spellOk ? "" : " <span class='dim'>(sua vocação não usa esta spell)</span>"}</label>
+      ${spellOk ? `<label class="toggle mt8"><input type="checkbox" id="ms-use-spell" ${cfg.useSpell ? "checked" : ""}>
+        Usar spell <b>${s ? s.words : "utamo vita"}</b></label>` : ""}
       <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px">
         <div style="flex:1">
           <label class="small dim">Ativar com HP abaixo de (%)</label>
@@ -544,17 +715,19 @@ function renderMagicShieldHelper(p) {
             style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
         </div>
       </div>
-      <div class="small dim mt10 mb4">Energy Ring</div>
+      ${podeEnergy ? `
+      <div class="small dim mt10 mb4">Energy Ring ${eq ? `<span style="color:#7ec8ff">· ⚡ ${eq.now}/${eq.max} cargas</span>` : ""}</div>
       <div class="shop-row ${energyRingEquipped(p) ? "selected" : ""}" style="opacity:${hasEnergy ? 1 : .55}">
         ${itemImg("energy-ring")}
         <div style="flex:1;min-width:0">
           <div class="small">Energy Ring ${energyRingEquipped(p) ? "· equipado" : ""}</div>
-          <div class="tiny dim">Funciona para Monk e Royal Paladin como no global: dano vai para mana.</div>
+          <div class="tiny dim">Monk e Royal Paladin: dano vai para mana. Consome 1 carga a cada 3s (10 min no total).</div>
           <div class="tiny ${hasEnergy ? "dim" : "txt-red"}">${hasEnergy ? "Disponível na mochila/pouch ou equipado." : "Você ainda não possui energy ring."}</div>
         </div>
         <button class="sm" id="ms-set-energy" ${hasEnergy ? "" : "disabled"}>Usar como emergencial</button>
       </div>
-      <div class="tiny dim mt8">Dica: para ring automático, configure o Energy Ring como emergencial na aba <b>Equipamento</b> e escolha um anel padrão para restaurar.</div>
+      <div class="tiny dim mt8">Dica: para ring automático, configure o Energy Ring como emergencial na aba <b>Equipamento</b> e escolha um anel padrão para restaurar.</div>` : `
+      <div class="tiny dim mt10">Sua vocação não pode equipar <b>Energy Ring</b> (exclusivo de Monk e Royal Paladin).</div>`}
     </div>`;
 }
 

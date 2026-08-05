@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "18";
+const ASSET_VERSION = "19";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -195,6 +195,9 @@ const FX_FRAMES = {
   "stones": 8, "stun": 9, "teleport": 8, "watercreature": 16,
   "whirlwind-green": 8, "whirlwind-pink": 8, "whirlwind-white": 8,
   "white-energy-spark": 6, "yellow-energy": 10, "yellow-rings": 7,
+  // Exeta Amp Res (Chivalrous Challenge, CONST_ME_CHIVALRIOUS_CHALLENGE=219)
+  // — anel de energia roxo/azul extraído do DAT 15.x (8 quadros)
+  "chivalrous-challenge": 8,
   // efeitos que algumas magias pedem e nao estavam no extrator antigo
   // (extraidos por tools/extract_fx_faltantes.py)
   "energy-hit": 10, "carniphila": 8, "holy-area": 11,

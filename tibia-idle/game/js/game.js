@@ -1301,8 +1301,12 @@ function drainEvents() {
         // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
         // marcados focam o knight e causam 20% menos dano por 10s.
         const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y : 0.6;
-        r.addFloater(px, py - 0.16, "EXETA AMP RES!", "#ffd65a");
-        r.addEffect(px, py, "magic-blue");
+        const ehAmp = e.id === "exeta-amp-res" || /chivalrous/i.test(e.spell || "");
+        // Exeta Amp Res: animação oficial (CONST_ME_CHIVALRIOUS_CHALLENGE,
+        // anel de energia roxo/azul do DAT 15.x). Exeta Res: magic blue do
+        // challenge.lua do Canary.
+        r.addFloater(px, py - 0.16, ehAmp ? "EXETA AMP RES!" : "EXETA RES!", "#ffd65a");
+        r.addEffect(px, py, ehAmp ? "chivalrous-challenge" : "magic-blue");
         addLog("party", `<b style="color:#ffd65a">${e.spell || "Challenge"}</b> marcou <b>${e.count}</b> inimigo(s) — dano deles reduzido 20%`);
         break;
       }
@@ -1580,6 +1584,8 @@ function startBackgroundTick() {
       acc -= TICK;
       G.combat.events.length = 0;   // sem render: descarta os visuais
     }
+    // cargas por tempo dos anéis/amuletos continuam com a aba escondida
+    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, elapsed);
     if (typeof imbTickAll === "function") imbTickAll(G.p, elapsed);
     if (typeof preyTick === "function") preyTick(G.p, elapsed);
     // reposição de supplies periódica (autoRestock) para não morrer
@@ -1647,6 +1653,8 @@ function loop(ts) {
     } else if (typeof updateCombatMovement === "function") {
       updateCombatMovement(G.combat, G.p, dt);
     }
+    // CARGAS de anéis/amuletos por TEMPO (time ring: 1 carga/3s equipado)
+    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
     drainEvents();
     // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido no
     // painel, vende TUDO automaticamente (respeitando "Não vender" e itens

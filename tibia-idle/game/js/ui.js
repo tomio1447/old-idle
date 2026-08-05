@@ -173,6 +173,19 @@ function itemTip(slug, extra, slot, instId) {
   if (it.mpreg) st.push("Regen. mana +" + it.mpreg);
   if (it.spd) st.push("Velocidade +" + it.spd);
   if (it.th) st.push("Duas mãos");
+  // Cargas de anéis/amuletos: por tempo (time ring = 10 min) ou por golpe
+  // (might ring = 20 golpes). Se equipado, mostra o saldo atual.
+  if (it.charges && (it.s === "ring" || it.s === "amulet")) {
+    const modo = it.chargeMode === "hits"
+      ? "1 carga por golpe recebido" : "1 carga a cada 3s enquanto equipado";
+    let linha = `⚡ ${it.charges} cargas · ${modo}`;
+    if (p && p.equip && slot && p.equip[slot] && p.equip[slot].item === slug &&
+        typeof accessoryChargesNow === "function") {
+      const cg = accessoryChargesNow(p, slot);
+      if (cg) linha = `⚡ ${cg.now}/${cg.max} cargas (equipado) · ${modo}`;
+    }
+    st.push(`<span style="color:#ffe680">${linha}</span>`);
+  }
   if (st.length) h += `<div class="tt-stat">${st.join("<br>")}</div>`;
 
   // ---- augments: bonus por magia especifica (TibiaWiki/Augments)
@@ -1780,6 +1793,11 @@ function renderHelper(p) {
   const magicEl = $("#helper-magic-shield");
   const equipHelperEl = $("#helper-equipment");
   const atkEl = $("#helper-attack");
+  // ESCUDO MÁGICO: knights não usam — não podem equipar energy ring (só
+  // Monk/RP) nem conjurar utamo vita. A aba some para knight/elite knight.
+  const ehKnight = p.voc === "knight" || p.voc === "elite knight";
+  const tabMS = document.querySelector('[data-panel="magic-shield"]');
+  if (tabMS) tabMS.style.display = ehKnight ? "none" : "";
   // HEAL FRIEND (Druid/Monk) — dentro da aba Cura, como no baiak-idle
   if (typeof renderHealFriend === "function") renderHealFriend(p);
   const comboEl = $("#helper-combo");
@@ -1931,8 +1949,24 @@ function renderHelper(p) {
   }
   if (atkEl) {
     const mode = p.config.attackMode || "chase";
+    const ehKnightAtk = p.voc === "knight" || p.voc === "elite knight";
+    const exetaResOn = !!p.config.exetaRes;
+    const exetaAmpOn = !!p.config.exetaAmpRes;
+    const challengeHtml = ehKnightAtk ? `
+      <div class="small dim mt8 mb4">⚔ Challenge do Knight (marca inimigos — dano deles −20% por 10s)</div>
+      <div class="row wrap" style="gap:6px">
+        <button class="sm ${exetaResOn ? "primary" : ""}" data-exeta="res" ${p.level >= 20 ? "" : "disabled"}
+          title="Exeta Res (Challenge): marca 1 inimigo. Nível 20.">
+          ${exetaResOn ? "✓ " : ""}Exeta Res ${p.level >= 20 ? "" : "· nv 20"}</button>
+        <button class="sm ${exetaAmpOn ? "primary" : ""}" data-exeta="amp-res" ${p.level >= 150 ? "" : "disabled"}
+          title="Exeta Amp Res (Chivalrous Challenge): marca TODOS ao alcance (7 SQM). Nível 150. Animação oficial no cast.">
+          ${exetaAmpOn ? "✓ " : ""}Exeta Amp Res ${p.level >= 150 ? "" : "· nv 150"}</button>
+      </div>
+      <div class="tiny dim mt4">Os dois podem ficar <b>ligados juntos</b>: o Amp Res tem prioridade e o Res
+        cobre quando ele está em recarga. O monstro marcado causa 20% menos dano.</div>` : "";
     atkEl.innerHTML = `
       ${renderStancePicker(p)}
+      ${challengeHtml}
       <div class="small dim mt8 mb4">Ataque Mode</div>
       <div class="row wrap" style="gap:6px">
         ${[["chase", "Chase"], ["stand", "Stand"], ["kiting", "Kiting"]].map(([id, label]) =>
@@ -1984,6 +2018,23 @@ function renderHelper(p) {
     }));
     $$("#helper-attack [data-attack-mode]").forEach((b) => b.addEventListener("click", () => {
       p.config.attackMode = b.dataset.attackMode;
+      renderHelper(p);
+    }));
+    // Challenge do Knight: exeta res / exeta amp res — toggles independentes
+    // (podem ficar os dois ligados)
+    $$("#helper-attack [data-exeta]").forEach((b) => b.addEventListener("click", () => {
+      const qual = b.dataset.exeta;
+      if (qual === "amp-res") {
+        p.config.exetaAmpRes = !p.config.exetaAmpRes;
+        toast(p.config.exetaAmpRes
+          ? "Exeta Amp Res ATIVO — marca todos os inimigos ao alcance (7 SQM)."
+          : "Exeta Amp Res desativado.");
+      } else {
+        p.config.exetaRes = !p.config.exetaRes;
+        toast(p.config.exetaRes
+          ? "Exeta Res ATIVO — marca 1 inimigo (Challenge)."
+          : "Exeta Res desativado.");
+      }
       renderHelper(p);
     }));
     const kd = $("#kite-distance");
