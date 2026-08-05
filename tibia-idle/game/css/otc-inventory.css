@@ -960,3 +960,14 @@
   height: 16px;
   vertical-align: middle;
 }
+
+/* Projeção da arma de duas mãos no slot secundário: é somente uma sombra de
+   inventário, sem data-slot e portanto sem qualquer efeito de equipamento. */
+#equip .slot.two-hand-shadow {
+  cursor: default;
+  opacity: .32;
+  filter: grayscale(1);
+  border-color: #302c25;
+  box-shadow: inset 0 0 8px rgba(0,0,0,.75);
+}
+#equip .slot.two-hand-shadow img { opacity: .75; }

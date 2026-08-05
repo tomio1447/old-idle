@@ -49,7 +49,10 @@ function monsterTargetDistance(mob) {
 /* Chance (0-100) de ficar parado em vez de dancar */
 function monsterStaticChance(mob) {
   const mi = moveInfo(mob.slug);
-  return mi.staticAttack === undefined ? 90 : mi.staticAttack;
+  // O idle roda em ticks curtos: usar o valor cru do Canary deixava a
+  // "dança" visualmente muito mais frequente que no servidor. Acrescentamos
+  // uma margem conservadora e mantemos ao menos 95% de pausa entre passos.
+  return Math.min(99, Math.max(95, (mi.staticAttack === undefined ? 90 : mi.staticAttack) + 7));
 }
 
 /* Velocidade base do monstro, em pontos de speed do Canary */
@@ -103,7 +106,7 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   if (!dir) {
     // parado: encara o alvo e espera o proximo tick
     if (alvo) mob.dir = dirTo(mob, alvo);
-    mob.nextStepAt = now + 200;
+    mob.nextStepAt = now + 450;
     return false;
   }
 
@@ -380,9 +383,13 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   ensureCell(ent);
   if (ent.moving) return false;
   if (ent.nextStepAt && now < ent.nextStepAt) return false;
-  if (!ent._boxAt || now - ent._boxAt > 1000) {
+  if (!ent._boxAt || now - ent._boxAt > 1800) {
     ent._boxAt = now;
-    ent._boxTarget = targetFn(c, ent, occ);
+    // A própria célula não pode ser tratada como bloqueada. Sem isso o
+    // melhor tile atual nunca era elegível e a formação se reposicionava sem
+    // motivo a cada reavaliação.
+    const planningOcc = buildOccupancy(c, ent);
+    ent._boxTarget = targetFn(c, ent, planningOcc);
   }
   const alvoCel = ent._boxTarget;
   if (!alvoCel) return false;

@@ -306,7 +306,7 @@ const ELEMENTS = {
   energy:   { name: "Energia",color: "#c07cff", fx: "energy-damage" },
   earth:    { name: "Terra",  color: "#8ac83c", fx: "hit-by-poison" },
   death:    { name: "Morte",  color: "#8b0000", fx: "mort-area" },
-  holy:     { name: "Sagrado",color: "#ffe680", fx: "holy-damage" },
+  holy:     { name: "Sagrado",color: "#ffd000", fx: "holy-damage" },
   drown:    { name: "Afogamento", color: "#3ad6d6", fx: "water-splash-effect" },
   manadrain:{ name: "Mana Drain", color: "#3c66ff", fx: "mana-wisp" },
   lifedrain:{ name: "Life Drain", color: "#c03030", fx: "draw-blood" },

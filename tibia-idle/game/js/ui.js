@@ -473,13 +473,13 @@ const SLOT_LABELS = {
   ring: "anel", extra: "extra", ammo: "muni",
 };
 /* Layout do inventario do Tibia (reordenado como na print do baiak-idle):
- * a primeira linha junta AMULET, HELMET e BACKPACK; depois ARMOR, WEAPON e
+ * a primeira linha junta AMULET, HELMET e BACKPACK; depois WEAPON, ARMOR e
  * SHIELD; LEGS, RING e BOOTS; e o EXTRA no canto. O slot AMMO (munição) só
  * aparece para RP (paladino) — para as outras vocações a grade fica 3x4
  * sem a fileira extra de munição. */
 const SLOT_ORDER = [
   "amulet", "helmet", "backpack",
-  "armor", "weapon", "shield",
+  "weapon", "armor", "shield",
   "legs", "ring", "boots",
   null, "extra", null,
 ];
@@ -501,6 +501,13 @@ function renderEquip(p) {
       h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
         ${itemImg(e.item)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
       </div>`;
+    } else if (slot === "shield" && p.equip.weapon &&
+               (p.voc === "knight" || p.voc === "elite knight" || p.voc === "monk") &&
+               (GAMEDATA.items[p.equip.weapon.item] || {}).th) {
+      // Armas de duas mãos ocupam a mão secundária apenas VISUALMENTE. Não
+      // criamos p.equip.shield: logo nenhum atributo/imbuement é aplicado.
+      const weapon = p.equip.weapon.item;
+      h += `<div class="slot two-hand-shadow" data-label="duas mãos" title="Arma de duas mãos — visual no escudo">${itemImg(weapon)}</div>`;
     } else {
       h += `<div class="slot empty" data-slot="${slot}" data-label="${SLOT_LABELS[slot]}"></div>`;
     }

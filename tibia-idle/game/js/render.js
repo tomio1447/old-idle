@@ -298,13 +298,16 @@ Renderer.prototype.resize = function () {
   }
 };
 
-Renderer.prototype.addFloater = function (x, y, text, color, big, small) {
-  const life = big ? 2400 : 1900;
+/* kind: damage = 3px / 1,5 s; restore = 2px / 1,2 s.  Keeping those
+ * values here avoids each combat event inventing its own visual timing. */
+Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
+  const life = kind === "damage" ? 1500 : (kind === "restore" ? 1200 : (big ? 2400 : 1900));
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
     small: !!small,   // numeros de cura/dano com tamanho reduzido (v27)
+    kind: kind || "",
     // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
     // lateral (vx = 0) e com velocidade vertical constante.
     vy: -0.007,
@@ -1198,8 +1201,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
-    ctx.lineWidth = f.small ? 1.5 : 2;
+    ctx.font = (f.kind === "damage" ? "3px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1582,8 +1585,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.big ? "bold 12px" : (f.small ? "5px" : "11px")) + " Verdana";  // v33: dano/cura ainda menores
-    ctx.lineWidth = f.small ? 1.5 : 2;
+    ctx.font = (f.kind === "damage" ? "3px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
