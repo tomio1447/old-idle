@@ -52,7 +52,11 @@ body {
 }
 
 img { image-rendering: pixelated; }
+/* v27 — upgrade visual: o canvas da cena usa antialiasing (image-rendering
+ * auto + DPR 2x) para eliminar o serrilhado. Os demais canvases/ícones de
+ * pixel art continuam pixelated. */
 canvas { image-rendering: pixelated; }
+#scene { image-rendering: auto; }
 
 /* ---------------------------------------------------------- molduras */
 .panel {

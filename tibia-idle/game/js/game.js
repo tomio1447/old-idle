@@ -1114,7 +1114,7 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
-        if (e.dmg > 0) r.addFloater(x, y, "-" + fmtDmg(e.dmg), col, e.dmg > 200);
+        if (e.dmg > 0) r.addFloater(x, y, "-" + fmtDmg(e.dmg), col, e.dmg > 200, true);  // small (v27)
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
@@ -1222,7 +1222,7 @@ function drainEvents() {
         const col = (ELEMENTS[e.el] || ELEMENTS.physical).color;
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
-        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col);
+        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col, false, true);  // small (v27)
         // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
         // demon, mort area do lich...) — sem, cai o generico do elemento
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6,
@@ -1232,7 +1232,7 @@ function drainEvents() {
       }
       case "mobheal":
         // cura defensiva do proprio monstro (bloco defenses do .lua)
-        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmt(e.heal), "#7ae87a");
+        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmt(e.heal), "#7ae87a", false, true);  // small (v27)
         r.addEffect(ex(e), ey(e), e.fx || "magic-green");
         break;
       case "effect":
@@ -1267,7 +1267,7 @@ function drainEvents() {
       case "heal": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a");
+        r.addFloater(px, py, "+" + fmt(e.amount), "#7ae87a", false, true);  // small (v27)
         // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
         // oficial (critical-heal-effect) em cima do personagem que casta.
         // O vermelho é exclusivo do dano crítico em monstros.
@@ -1275,7 +1275,7 @@ function drainEvents() {
           r.addEffect(px, py, "critical-heal-effect", 800);
         }
         // potion de spirit tambem restaura mana no mesmo gole
-        if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana) + " mana", "#6a8aff");
+        if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana) + " mana", "#6a8aff", false, true);  // small (v27)
         r.addEffect(px, c.player ? c.player.y : 0.6, "green-rings");
         // a potion correspondente brilha no Helper
         if (e.supply && typeof helperSupplyFlash === "function")
@@ -1285,7 +1285,7 @@ function drainEvents() {
       case "mana": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmt(e.amount) + " mana", "#6a8aff");
+        r.addFloater(px, py, "+" + fmt(e.amount) + " mana", "#6a8aff", false, true);  // small (v27)
         // spirit potion bebida como mana tambem mostra a cura
         if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.heal), "#7ae87a");
         // faisca azul do gole de mana (como o CONST_ME_MAGIC_BLUE do client)
@@ -1416,24 +1416,16 @@ function drainEvents() {
         r.addEffect(x, y, "poff");
         addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(e.exp)} xp</span>`);
         if (e.loot && e.loot.length) {
+          // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
+          // esquerda) e sem a mensagem verde que sobe na tela. O loot fica
+          // apenas no log do painel (abaixo).
           const txt = e.loot.map((l) => {
             const it = GAMEDATA.items[l.item];
             const rare = it && (it.sell || 0) >= 500;
             const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
-            if (rare) toast(`Loot raro: <b>${itemName(l.item)}</b>`, "rare");
             return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
           }).join(", ");
           addLog("loot", `Loot: ${txt}`);
-          // mensagem VERDE na tela com o loot dropado (acima do mob morto),
-          // como o log de loot do client — pedido do jogador
-          const nomes = e.loot.map((l) =>
-            `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`
-          );
-          // limita a 2 itens + "+N" para o floater nao virar um texto enorme
-          const mostra = nomes.length > 2
-            ? nomes.slice(0, 2).join(", ") + ` +${nomes.length - 2}`
-            : nomes.join(", ");
-          r.addFloater(x, y - 0.17, "✦ " + mostra, "#7ae87a", nomes.length > 1);
         }
         if (c.boss) {
           const st = bossState(G.p, c.boss.id);

@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "24";
+const ASSET_VERSION = "25";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -261,7 +261,11 @@ function missileDir(sx, sy, tx, ty) {
 function Renderer(canvas) {
   this.c = canvas;
   this.ctx = canvas.getContext("2d");
-  this.ctx.imageSmoothingEnabled = false;
+  // Upgrade visual (v27): anti-aliasing LIGADO — remove o serrilhado das
+  // sprites escaladas no canvas (antes imageSmoothingEnabled=false deixava
+  // as bordas "serrilhadas" como se rodasse a 30fps).
+  this.ctx.imageSmoothingEnabled = true;
+  try { this.ctx.imageSmoothingQuality = "high"; } catch (e) { /* navegador sem suporte */ }
   this.floaters = [];       // numeros de dano
   this.effects = [];        // animacoes de efeito
   this.projectiles = [];    // projeteis/distance shots
@@ -274,19 +278,30 @@ Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
   // câmera reduzida e com mais visão: 21 × 13 SQMs.
   const h = Math.round(w * (13 / 21));
-  if (this.c.width !== w || this.c.height !== h) {
-    this.c.width = w;
-    this.c.height = h;
-    this.ctx.imageSmoothingEnabled = false;
+  // Upgrade visual (v27): renderiza em devicePixelRatio (máx. 2x) — o
+  // canvas interno fica com resolução maior que o CSS e o navegador faz o
+  // downscale suave (image-rendering:auto no #scene), matando o serrilhado
+  // da esticada 1x. O loop roda em requestAnimationFrame, ou seja, na taxa
+  // do display (60/120/144Hz) — com o DPR 2x + smoothing a cena fica
+  // nítida e fluida, sem o aspecto de 30fps.
+  const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+  const nw = Math.max(1, Math.round(w * dpr));
+  const nh = Math.max(1, Math.round(h * dpr));
+  if (this.c.width !== nw || this.c.height !== nh) {
+    this.c.width = nw;
+    this.c.height = nh;
+    this.ctx.imageSmoothingEnabled = true;
+    try { this.ctx.imageSmoothingQuality = "high"; } catch (e) { /* sem suporte */ }
   }
 };
 
-Renderer.prototype.addFloater = function (x, y, text, color, big) {
+Renderer.prototype.addFloater = function (x, y, text, color, big, small) {
   const life = big ? 2400 : 1900;
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
+    small: !!small,   // numeros de cura/dano com tamanho reduzido (v27)
     // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
     // lateral (vx = 0) e com velocidade vertical constante.
     vy: -0.007,
@@ -1178,9 +1193,10 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     const alpha = f.life < 300 ? f.life / 300 : 1;
     ctx.globalAlpha = alpha;
     // numero de dano do tamanho do client original: menor e fino, nao um
-    // texto "gordo" tomando conta da tela
-    ctx.font = (f.big ? "bold 12px" : "11px") + " Verdana";
-    ctx.lineWidth = 2;
+    // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
+    // (small) saem com METADE do tamanho — menos poluição visual no idle.
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "6px" : "11px")) + " Verdana";
+    ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1564,8 +1580,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.big ? "bold 12px" : "11px") + " Verdana";
-    ctx.lineWidth = 2;
+    ctx.font = (f.big ? "bold 12px" : (f.small ? "6px" : "11px")) + " Verdana";
+    ctx.lineWidth = f.small ? 1.5 : 2;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
