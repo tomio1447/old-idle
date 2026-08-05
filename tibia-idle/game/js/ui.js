@@ -1808,7 +1808,13 @@ function renderHelper(p) {
   const ehKnight = p.voc === "knight" || p.voc === "elite knight";
   const tabMS = document.querySelector('[data-panel="magic-shield"]');
   if (tabMS) tabMS.style.display = ehKnight ? "none" : "";
-  // HEAL FRIEND (Druid/Monk) — dentro da aba Cura, como no baiak-idle
+  // HEAL FRIEND tem aba própria e só aparece para Druid/Monk.
+  const canHealFriend = p.voc === "druid" || p.voc === "elder druid" ||
+    p.voc === "monk" || p.voc === "exalted monk";
+  const friendTab = document.querySelector('[data-panel="heal-friend"]');
+  const friendPanel = document.querySelector('[data-panel-group="mid"][data-panel="heal-friend"]');
+  if (friendTab) friendTab.style.display = canHealFriend ? "" : "none";
+  if (!canHealFriend && friendPanel) friendPanel.style.display = "none";
   if (typeof renderHealFriend === "function") renderHealFriend(p);
   const comboEl = $("#helper-combo");
   if (healEl) {

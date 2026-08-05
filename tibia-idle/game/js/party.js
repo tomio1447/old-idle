@@ -733,12 +733,20 @@ function tryHealFriend(c, p, now) {
   if (!s.vocs || s.vocs.indexOf(p.voc) === -1) return;
   if (p.level < s.lvl || p.mp < s.mana) return;
   if (typeof cdReady === "function" && !cdReady(p, spellId, now)) return;
+  // Heal Friend usa o mesmo canal Healing da autocura: nunca pode furar
+  // spell/gcd usando um aliado como alvo.
+  if (typeof entCd === "function" && entCd(c, p, "healCd") > now) return;
 
   const gatilhoPct = cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt;
+  const alvoCfg = cfg.healFriendTargets || {};
   const alvos = partyHealTargets(p);
-  // quem está com HP abaixo do % (e não morreu)
-  const feridos = alvos.filter((m) => m.maxHp > 0 &&
-    ((m.hp || 0) / m.maxHp) * 100 < gatilhoPct);
+  // Só os aliados marcados no Helper entram na fila. Config antiga sem
+  // registro continua habilitada, para preservar o comportamento anterior.
+  const feridos = alvos.filter((m) => {
+    const regra = alvoCfg[String(m.id)];
+    const enabled = !regra || regra.enabled !== false;
+    return enabled && m.maxHp > 0 && ((m.hp || 0) / m.maxHp) * 100 < gatilhoPct;
+  });
   if (!feridos.length) return;
 
   // Mass Healing (exura gran mas res): só dispara com 2+ membros feridos e
@@ -775,8 +783,14 @@ function tryHealFriend(c, p, now) {
   }
 
   // aplica a cura (mass cura todos os feridos; single cura o mais ferido)
-  const alvosCura = ehMass ? feridos : [feridos.sort((a, b) =>
-    ((a.hp || 0) / a.maxHp) - ((b.hp || 0) / b.maxHp))[0]];
+  // Single target: prioridade menor vence; empate usa o aliado mais ferido.
+  // Mass mantém todos os aliados selecionados e feridos dentro da área.
+  const ordenados = feridos.slice().sort((a, b) => {
+    const pa = (alvoCfg[String(a.id)] || {}).priority || 99;
+    const pb = (alvoCfg[String(b.id)] || {}).priority || 99;
+    return pa - pb || ((a.hp || 0) / a.maxHp) - ((b.hp || 0) / b.maxHp);
+  });
+  const alvosCura = ehMass ? ordenados : [ordenados[0]];
 
   // animação/efeito em cada alvo + atualização do HP
   for (const alvo of alvosCura) {

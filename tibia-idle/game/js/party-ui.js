@@ -530,7 +530,7 @@ function healFriendSpells(p) {
 
 /* Renderiza a aba HEAL FRIEND dentro do Helper: Cura (só Druid/Monk). */
 function renderHealFriend(p) {
-  const box = $("#helper-heal-friend");
+  const box = $("#helper-heal-friend-panel");
   if (!box || !p) return;
   const éDruid = p.voc === "druid" || p.voc === "elder druid";
   const éMonk = p.voc === "monk" || p.voc === "exalted monk";
@@ -541,6 +541,13 @@ function renderHealFriend(p) {
   if (cfg.healFriendAt === undefined) cfg.healFriendAt = 70;
   const selecionada = cfg.healFriendSpell || "";
   const alvos = (typeof partyHealTargets === "function") ? partyHealTargets(p) : [];
+  // Cada aliado pode ser ligado/desligado e recebe uma prioridade. Mantemos
+  // os alvos existentes habilitados por padrão para não quebrar configs antigas.
+  if (!cfg.healFriendTargets) cfg.healFriendTargets = {};
+  alvos.forEach((m, i) => {
+    const key = String(m.id);
+    if (!cfg.healFriendTargets[key]) cfg.healFriendTargets[key] = { enabled: true, priority: i + 1 };
+  });
 
   let h = `<div class="small dim mb4" style="color:#9ce84a;font-weight:bold">❤️ HEAL FRIEND — curar aliados da party</div>`;
 
@@ -584,7 +591,9 @@ function renderHealFriend(p) {
     h += alvos.map((m) => {
       const pct = m.maxHp > 0 ? Math.round((m.hp || 0) * 100 / m.maxHp) : 0;
       const ferido = m.maxHp > 0 && pct < cfg.healFriendAt;
+      const targetCfg = cfg.healFriendTargets[String(m.id)] || { enabled: true, priority: 1 };
       return `<div class="party-member-row" style="cursor:default">
+        <label class="tiny" title="Incluir este aliado no Heal Friend"><input type="checkbox" data-heal-target-enabled="${m.id}" ${targetCfg.enabled ? "checked" : ""}> curar</label>
         <div class="ppm-outfit"><img src="${partyOutfitIcon(m.voc, null)}" alt=""></div>
         <div class="ppm-info">
           <div class="ppm-name">${m.name}</div>
@@ -592,6 +601,7 @@ function renderHealFriend(p) {
           <div class="party-pbar"><div class="fill hp" style="width:${Math.max(0,Math.min(100,pct))}%"></div>
             <span class="val">${fmtFull(Math.floor(m.hp||0))}/${fmtFull(m.maxHp||0)}</span></div>
         </div>
+        <label class="tiny dim">prio <input type="number" min="1" max="99" value="${targetCfg.priority}" data-heal-target-priority="${m.id}" style="width:38px"></label>
         <span class="tiny" style="color:${ferido ? "#ff9090" : "#9ce84a"}">${ferido ? "ferido" : "ok"}</span>
       </div>`;
     }).join("");
@@ -601,7 +611,7 @@ function renderHealFriend(p) {
   box.innerHTML = h;
 
   // handlers
-  $$("#helper-heal-friend [data-heal-friend-spell]").forEach((el) =>
+  $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
     el.addEventListener("click", () => {
       const id = el.dataset.healFriendSpell;
       cfg.healFriendSpell = (cfg.healFriendSpell === id) ? "" : id;
@@ -615,6 +625,17 @@ function renderHealFriend(p) {
     cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
     renderHealFriend(p);
   });
+  $$("#helper-heal-friend-panel [data-heal-target-enabled]").forEach((el) => el.addEventListener("change", () => {
+    const key = String(el.dataset.healTargetEnabled);
+    cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { priority: 1 };
+    cfg.healFriendTargets[key].enabled = el.checked;
+  }));
+  $$("#helper-heal-friend-panel [data-heal-target-priority]").forEach((el) => el.addEventListener("change", () => {
+    const key = String(el.dataset.healTargetPriority);
+    cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { enabled: true };
+    cfg.healFriendTargets[key].priority = Math.max(1, Math.min(99, parseInt(el.value, 10) || 1));
+    el.value = cfg.healFriendTargets[key].priority;
+  }));
 }
 
 /* ------------------------------------------------------------------ */
