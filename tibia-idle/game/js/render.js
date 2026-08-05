@@ -47,7 +47,7 @@ function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "19";
+const ASSET_VERSION = "20";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1238,16 +1238,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const sc = tibiaScale(W);
     const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
     const atkPush = 0;
-    // Ancoragem do pe no SQM: a sprite e desenhada com a BASE encostada na
-    // borda inferior do tile (o pe do personagem "pisa" no chao do SQM), nao
-    // centrada. Uma sprite de 64px (2 SQMs) fica com o corpo 1.5 tiles acima
-    // do chao; antes o centro no tile afundava o personagem meio tile no chao.
+    // Personagem projetado no MEIO do SQM (pedido do dono): a sprite fica
+    // centralizada horizontal E verticalmente no tile. Antes a base era
+    // ancorada na borda inferior do SQM e o personagem parecia "afundado"
+    // no canto inferior do tile.
     const tile = tilePx(W);
-    const top = py * H + tile / 2 - h;
-    // sombra sob os pes
+    const top = py * H - h / 2;
+    // sombra sob os pés, no centro do SQM
     ctx.fillStyle = "rgba(0,0,0,.35)";
     ctx.beginPath();
-    ctx.ellipse(px * W, py * H + tile / 2, w * 0.34, h * 0.1, 0, 0, 7);
+    ctx.ellipse(px * W, py * H, w * 0.34, h * 0.1, 0, 0, 7);
     ctx.fill();
     if (this.playerFlash > 0) {
       ctx.save();
@@ -1289,13 +1289,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const sc = tibiaScale(W);
       const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
       const tile = tilePx(W);
-      const top = ent.y * H + tile / 2 - h2;
+      // aliados também centralizados no SQM (mesma regra do personagem ativo)
+      const top = ent.y * H - h2 / 2;
       ctx.save();
       if (knocked) ctx.globalAlpha = 0.35;
-      // sombra sob os pés
+      // sombra sob os pés, no centro do SQM
       ctx.fillStyle = "rgba(0,0,0,.35)";
       ctx.beginPath();
-      ctx.ellipse(ent.x * W, ent.y * H + tile / 2, w2 * 0.34, h2 * 0.1, 0, 0, 7);
+      ctx.ellipse(ent.x * W, ent.y * H, w2 * 0.34, h2 * 0.1, 0, 0, 7);
       ctx.fill();
       const atkPush2 = (ent.attackAnim || 0) > 0 ? (ent.dir === "w" ? -5 : ent.dir === "e" ? 5 : 0) : 0;
       ctx.drawImage(img, ent.x * W - w2 / 2 + atkPush2, top, w2, h2);
@@ -1389,14 +1390,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         if (m.sapStrUntil && m.sapStrUntil > agoraIcon) condIcons.push("sap-strength");
         if (m.exposeUntil && m.exposeUntil > agoraIcon) condIcons.push("expose-weakness");
         if (m.challengedUntil && m.challengedUntil > agoraIcon) condIcons.push("challenged");
-        // Ícone de TIPO DE ATAQUE do monstro (OTC): ranged (🏹 flecha) se o
-        // bicho ataca à distância, melee (⚔ espadas) se é corpo-a-corpo.
-        condIcons.push((typeof monsterAttackRange === "function" &&
-                       monsterAttackRange(m) > 0.16) ? "range-atk" : "melee-atk");
         if (condIcons.length) {
           ctx.font = "bold 9px Verdana";
           const tw = ctx.measureText(mobName).width;
-          const isz = 12, gap = 2;
+          const isz = 10, gap = 2;
           const rowW = condIcons.length * (isz + gap) - gap;
           let ix = Math.round(mx - tw / 2 - 4 - rowW);
           const iy = Math.round(by - 13); // centro vertical da linha do nome
@@ -1405,6 +1402,17 @@ Renderer.prototype.draw = function (combat, player, dt) {
           }
         }
         drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
+        // Ícone de TIPO DE ATAQUE (OTC): ranged (🏹 flecha) ou melee (⚔
+        // espadas) — MENOR (9px) e na lateral DIREITA da sprite, no meio
+        // dela, logo abaixo do nome (pedido do dono: antes ficava grudado
+        // no lado esquerdo do nome com 12px).
+        if (typeof monsterAttackRange === "function") {
+          const isRange = monsterAttackRange(m) > 0.16;
+          const iszAtk = 9;
+          const atkX = Math.round(mx + w / 2 + 3);
+          const atkY = Math.round(top + h * 0.35);
+          drawWikiIcon(ctx, isRange ? "range-atk" : "melee-atk", atkX, atkY, iszAtk);
+        }
         // Marca de Fiendish/Influenced na LATERAL DIREITA da sprite (como o
         // client): ícone oficial + número de poeiras/stacks, longe da barra
         // de HP e do nome.
