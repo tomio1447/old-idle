@@ -164,10 +164,27 @@ function comboPronta(c, p, entrada, alvo, now) {
   return true;
 }
 
+/* v40: alvo DINÂMICO do combo — entre os mobs vivos, escolhe o que a área
+ * da entrada pega MAIS alvos (o centro do maior cluster). Devolve o mob
+ * escolhido ou o alvo original se nenhum for melhor. */
+function comboMelhorAlvo(c, entrada, alvo) {
+  if (!c || !c.mobs || !entrada) return alvo;
+  const raio = comboRaio(entrada);
+  let melhor = alvo, melhorN = -1;
+  for (const m of c.mobs) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    const n = comboAlvosNoRaio(c, m, raio);
+    if (n > melhorN) { melhorN = n; melhor = m; }
+  }
+  return melhorN > 0 ? melhor : alvo;
+}
+
 /* Escolhe a proxima acao do combo.
  *
- * Devolve { kind, id, entrada } ou null. A ordem dos slots E a prioridade —
- * nao ha ordenacao por dano aqui, de proposito: quem manda e o jogador.
+ * Devolve { kind, id, entrada, alvo } ou null. A ordem dos slots E a
+ * prioridade — nao ha ordenacao por dano aqui, de proposito: quem manda e
+ * o jogador. O `alvo` do retorno é o alvo DINÂMICO (v40): para magias de
+ * área, o mob que maximiza o pack — o combat.js usa ele no cast.
  */
 function comboEscolhe(c, p, alvo, now) {
   const lista = ensureCombo(p);
@@ -178,18 +195,22 @@ function comboEscolhe(c, p, alvo, now) {
     // Usa a MATRIZ real da area quando ela existe, para o "4+" contar
     // exatamente quem o golpe vai acertar -- inclusive o formato do leque.
     if (entrada.min > 1) {
+      // v40: em vez de contar no alvo que veio (mobs[0] ou o alvo do
+      // partyAllyTarget), escolhe o mob que MAXIMIZA o pack da área.
+      const alvoDin = comboMelhorAlvo(c, entrada, alvo);
       let n = null;
       if (typeof areaNameOf === "function" && typeof areaCount === "function") {
         const nome = areaNameOf(entrada.kind, entrada.id);
         if (nome && c && c.player) {
-          n = areaCount(c, nome, c.player, alvo,
+          n = areaCount(c, nome, c.player, alvoDin,
                         entrada.kind === "spell" ? entrada.id : null);
         }
       }
-      if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
+      if (n === null) n = comboAlvosNoRaio(c, alvoDin, comboRaio(entrada));
       if (n < entrada.min) continue;
+      alvo = alvoDin;
     }
-    return { kind: entrada.kind, id: entrada.id, entrada: entrada };
+    return { kind: entrada.kind, id: entrada.id, entrada: entrada, alvo: alvo };
   }
   return null;
 }

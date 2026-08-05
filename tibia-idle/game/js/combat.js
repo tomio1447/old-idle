@@ -1556,12 +1556,15 @@ function tryCastSpell(c, p, target, now) {
   if (typeof comboAtivo === "function" && comboAtivo(p)) {
     const escolha = comboEscolhe(c, p, target, now);
     if (!escolha) return false;
+    // v40: o combo pode escolher um ALVO DINÂMICO (o mob que maximiza o
+    // pack da área) — usa ele no cast em vez do target original.
+    const tgt = (escolha.alvo && escolha.alvo.cx !== undefined) ? escolha.alvo : target;
     // o slot escolhido pode ser uma RUNA: nesse caso o disparo sai por
     // tryUseRune, que sabe cobrar carga e desenhar o projetil da runa
     if (escolha.kind === "rune") {
-      return tryUseRune(c, p, target, now, escolha.id);
+      return tryUseRune(c, p, tgt, now, escolha.id);
     }
-    return castSpellById(c, p, target, now, escolha.id);
+    return castSpellById(c, p, tgt, now, escolha.id);
   }
 
   const escolhidas = p.config.attackSpells;   // lista marcada no Helper

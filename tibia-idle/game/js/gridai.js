@@ -152,11 +152,13 @@ function playerThinkStep(c, p, alvo, occ, now) {
   let dir = null;
 
   if (modo === "kiting" && alcance > 1) {
-    // mantem a distancia escolhida pelo jogador, dentro do alcance da arma
+    // v40: kiting em RETA — foge/aproxima ao longo do eixo dominante (a
+    // linha da wave), em vez do stepAway diagonal que tirava o caster da
+    // linha e a wave não pegava o pack.
     const querido = Math.max(1, Math.min(alcance,
       parseInt(p.config.kiteDistance, 10) || 3));
-    if (dist < querido) dir = stepAway(pl, alvo, occ);
-    else if (dist > querido) dir = stepToward(pl, alvo.cx, alvo.cy, occ);
+    if (dist < querido) dir = stepKiteLine(pl, alvo, occ, true);
+    else if (dist > querido) dir = stepKiteLine(pl, alvo, occ, false);
   } else if (dist > alcance) {
     // stand: persegue o alvo apenas quando ele sai do alcance do ataque
     dir = stepToward(pl, alvo.cx, alvo.cy, occ);
@@ -381,6 +383,42 @@ function boxFleeDir(ent, mob, occ) {
   return best;
 }
 
+/* v40: passo de kiting em RETA — mantém o personagem no MESMO EIXO do alvo
+ * (a linha da wave). O stepAway antigo fugia em DIAGONAL, o caster saía da
+ * linha e a wave (que é reta, eixo dominante do skillWaveDir) não pegava o
+ * pack. Agora foge/aproxima ao longo do eixo dominante — a wave varre o
+ * caminho enquanto ele corre. `away` = afastando (dist < querido). */
+function stepKiteLine(pl, alvo, occ, away) {
+  const dx = alvo.cx - pl.cx, dy = alvo.cy - pl.cy;
+  const eixoX = Math.abs(dx) >= Math.abs(dy);
+  const sx = away ? (dx >= 0 ? -1 : 1) : (dx >= 0 ? 1 : -1);
+  const sy = away ? (dy >= 0 ? -1 : 1) : (dy >= 0 ? 1 : -1);
+  const cand = eixoX
+    ? [{ dx: sx, dy: 0, diag: false }, { dx: sx, dy: 1, diag: true }, { dx: sx, dy: -1, diag: true }]
+    : [{ dx: 0, dy: sy, diag: false }, { dx: 1, dy: sy, diag: true }, { dx: -1, dy: sy, diag: true }];
+  for (const cd of cand) {
+    if (cellFree(occ, pl.cx + cd.dx, pl.cy + cd.dy)) {
+      return DIRS.find((d) => d.dx === cd.dx && d.dy === cd.dy) || null;
+    }
+  }
+  return away ? stepAway(pl, alvo, occ) : stepToward(pl, alvo.cx, alvo.cy, occ);
+}
+
+/* v40: base SINCRONIZADA da formação — o mago/RP se alinha com o spot que
+ * o KNIGHT ESCOLHEU (o _boxTarget dele, já com histerese) em vez de onde
+ * ele está AGORA. O knight processa primeiro no updateGridMovement, então
+ * o spot decidido existe na maioria dos frames; se ainda não decidiu,
+ * calcula o spot previsto com boxKnightSpot (a mesma conta que o knight
+ * vai fazer). Resultado: as retas dos magos já nascem alinhadas com a box
+ * final do knight, sem "corrigir" depois que ele se move. */
+function boxSincBase(c, occ, centro) {
+  const knight = boxKnightEnt(c);
+  if (knight && knight._boxTarget && knight._boxTarget.cx !== undefined) {
+    return knight._boxTarget;
+  }
+  return boxKnightSpot(c, occ, centro);
+}
+
 /* Posição-alvo do BOX por vocação. Reavaliada a cada ~1,5s (com histerese
  * no formationThinkStep). Retorna {cx, cy, score} — o score alimenta a
  * histerese anti-oscilação. */
@@ -389,8 +427,7 @@ function boxTargetCell(c, ent, occ) {
   if (!p) return null;
   const voc = p.voc;
   const centro = boxCenter(c);
-  const knight = boxKnightEnt(c);
-  const base = knight || centro;
+  const base = boxSincBase(c, occ, centro);
 
   if (voc === "knight" || voc === "elite knight") {
     // v38: KNIGHT procura a melhor posição da SALA — varre tudo e escolhe

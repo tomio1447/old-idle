@@ -116,6 +116,10 @@ setTimeout(() => {
             hp: 100, maxHp: 100, id: "w" + my,
             cx: centro.cx, cy: my, x: 0.4, y: 0.4, dir: "w", moving: false, attackAnim: 0 });
         }
+        // v40: posição SINCRONIZADA — o mago se alinha com o spot que o
+        // knight ESCOLHEU (_boxTarget). Pina a decisão do knight no centro
+        // (o mesmo comportamento do jogo após o primeiro think dele).
+        c.player._boxTarget = { cx: centro.cx, cy: centro.cy, score: 1 };
         const tDru = boxTargetCell(c, entDru, new Map());
         // deve escolher o NORTE (10,3): wave vertical pega os 3 mobs da box
         if (tDru.cx !== centro.cx || tDru.cy !== centro.cy - 3) {

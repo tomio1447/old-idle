@@ -165,6 +165,10 @@ setTimeout(() => {
 
       // ---------- 4) MODO BOX: posições por vocação ----------
       {
+        // v40: posição SINCRONIZADA — o RP/mago se alinha com o spot que o
+        // knight ESCOLHEU (_boxTarget). Pina a decisão do knight no centro
+        // (o mesmo comportamento do jogo após o primeiro think dele).
+        cBox.player._boxTarget = { cx: centro.cx, cy: centro.cy, score: 1 };
         // knight: melhor spot via checagem x/y — perto do centro (v26)
         const tKn = boxTargetCell(cBox, cBox.players[0], null);
         const distKn = Math.max(Math.abs(tKn.cx - centro.cx), Math.abs(tKn.cy - centro.cy));
