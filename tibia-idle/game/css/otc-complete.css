@@ -499,6 +499,8 @@ input:focus, textarea:focus, select:focus {
   position: fixed; inset: 0; z-index: 150;
   background: rgba(0,0,0,.85);
   display: none; align-items: center; justify-content: center;
+  /* v34: modal alto (party) — rola em vez de cortar o topo */
+  overflow-y: auto;
 }
 .modal-bg.show { display: flex; }
 .modal-bg .modal {
@@ -509,6 +511,8 @@ input:focus, textarea:focus, select:focus {
   max-width: 95vw; max-height: 85vh; overflow-y: auto;
   padding: 8px;
   position: relative;
+  /* v34: centraliza quando cabe, rola quando estoura */
+  margin: auto;
 }
 .modal-bg .modal::before {
   content: '';

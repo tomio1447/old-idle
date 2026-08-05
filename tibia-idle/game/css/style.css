@@ -480,9 +480,11 @@ button.full { width: 100%; }
   position: fixed; inset: 0; background: rgba(0,0,0,.82);
   display: none; align-items: center; justify-content: center; z-index: 200;
   padding: 16px;
+  /* v34: modal alto (party) — rola em vez de cortar o topo */
+  overflow-y: auto;
 }
 .modal-bg.show { display: flex; }
-.modal { width: min(560px, 96vw); max-height: 90vh; overflow-y: auto; }
+.modal { width: min(560px, 96vw); max-height: 90vh; overflow-y: auto; margin: auto; }
 
 /* ---------------------------------------------------------- login */
 #login {
