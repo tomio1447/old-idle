@@ -1359,7 +1359,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.beginPath();
       ctx.ellipse(ent.x * W, ent.y * H, w2 * 0.34, h2 * 0.1, 0, 0, 7);
       ctx.fill();
-      const atkPush2 = (ent.attackAnim || 0) > 0 ? (ent.dir === "w" ? -5 : ent.dir === "e" ? 5 : 0) : 0;
+      // Nenhum deslocamento no ataque: aliados que conjuram também devem
+      // permanecer exatamente no centro do SQM, como o personagem ativo.
+      const atkPush2 = 0;
       ctx.drawImage(img, ent.x * W - w2 / 2 + atkPush2, top, w2, h2);
       ctx.restore();
       // nome + barra de vida compacta (como nos monstros)
@@ -1410,16 +1412,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
         // arte no DAT (32px = 1 SQM, 64px = 2 SQMs). v33: 1.18x maior
         const sc = creatureScale(W);
         const w = spriteW(img) * sc, h = spriteH(img) * sc;
-        // Ancoragem do pe no SQM: a base da sprite encosta na borda inferior
-        // do tile (o bicho "pisa" no chao), em vez de ficar centrada. Bicho de
-        // 64px (2 SQMs) fica com o corpo acima do tile — antes afundava meio
-        // tile no chao. A barra/nome acompanham o topo da sprite.
+        // Regra única de ancoragem para toda criatura: o centro geométrico
+        // da sprite coincide com o centro do SQM. A âncora antiga nos pés
+        // deslocava os monstros meio tile para baixo e o push de ataque os
+        // tirava do quadrado ao conjurar/atacar.
         const tile = tilePx(W);
-        const top = my + tile / 2 - h;
-        const atkPush = (m.attackAnim || 0) > 0 ? (m.dir === "w" ? -5 : m.dir === "e" ? 5 : 0) : 0;
+        const top = my - h / 2;
+        const atkPush = 0;
         ctx.fillStyle = "rgba(0,0,0,.35)";
         ctx.beginPath();
-        ctx.ellipse(mx, my + tile / 2, w * 0.32, h * 0.09, 0, 0, 7);
+        ctx.ellipse(mx, my, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
         if (combat.mobs[0] === m) {
           // o quadro de alvo do client marca o SQM exato, nao a arte: fica
