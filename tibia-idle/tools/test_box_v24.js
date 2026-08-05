@@ -186,28 +186,32 @@ setTimeout(() => {
         const nAlvo = boxCountMobs(cBox, tSor.cx, tSor.cy, 3);
         if (nAlvo < 4) fail("mago BOX deveria achar posição com os 4 mobs no raio 3, achou " + nAlvo + " em " + JSON.stringify(tSor));
         ok.push("modo BOX: knight no centro, RP a 2 SQM nas retas, mago na posição de área");
-        // boxThinkStep move o RP até a formação (recalcula o alvo livre)
+        // boxThinkStep move o RP até a formação (recalcula o alvo livre).
+        // v38 (anti-oscilação): ao chegar na reta o RP FICA PARADO — não
+        // fica mais alternando entre retas iguais para sempre.
         entRP.p.config = Object.assign({ attackMode: "box" }, entRP.p.config || {});
         let passos = 0;
         let tBox = Date.now();
-        let ultPos = "";
+        let paradoConsec = 0;
         while (passos < 60) {
           tBox += 1200;   // espera o nextStepAt passar (passo real de ~1.1s)
           // no jogo o updateGridMovement roda advanceStep antes do think
           let guarda = 0;
           while (entRP.moving && guarda < 5) { advanceStep(entRP, 5000); guarda++; }
           const occ = buildOccupancy(cBox);
+          const antes = entRP.cx + "," + entRP.cy;
           boxThinkStep(cBox, entRP, cBox.mobs[0], occ, tBox);
           const pos = entRP.cx + "," + entRP.cy;
-          if (pos === ultPos) { fail("RP travou em " + pos); }
-          ultPos = pos;
+          paradoConsec = (pos === antes) ? paradoConsec + 1 : 0;
+          if (paradoConsec >= 3) break;   // chegou na formação e ficou
           passos++;
         }
         const dxF = Math.abs(entRP.cx - centro.cx), dyF = Math.abs(entRP.cy - centro.cy);
         const distF = Math.max(dxF, dyF);
         if (distF !== 2) fail("RP deveria terminar a 2 SQM do knight, veio " + entRP.cx + "," + entRP.cy + " (dist " + distF + ")");
         if (dxF !== 0 && dyF !== 0) fail("RP NÃO pode terminar na diagonal: " + entRP.cx + "," + entRP.cy);
-        ok.push("boxThinkStep move o aliado até a formação (2 SQM, reta)");
+        if (paradoConsec < 3) fail("RP deveria FICAR parado na formação (anti-oscilação v38), paradoConsec=" + paradoConsec);
+        ok.push("boxThinkStep move o aliado até a formação (2 SQM, reta) e FICA parado (v38)");
       }
 
       console.log("  - " + ok.join("\\n  - "));

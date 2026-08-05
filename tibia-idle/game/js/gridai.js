@@ -254,28 +254,99 @@ function formationMode(c, ent) {
   return "";
 }
 
-/* MELHOR SPOT do KNIGHT (BOX): checagem de células x/y ao redor do centro.
- * O knight não para cegamente no centro: varre um grid 7x7 e escolhe a
- * célula livre com MAIS mobs no alcance do exeta (7 SQM) e do melee (1),
- * com leve preferência por ficar central. Reavaliada a cada ~1s. */
+/* Quantas das 8 adjacências de (cx,cy) estão DENTRO do mapa e livres.
+ * O knight precisa da volta TODA livre para os 8 monstros do box chegarem
+ * e ele tankar os 8 lados (v38). */
+function boxAdjFreeCount(cx, cy, occ) {
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      if (boxCellLivre(cx + dx, cy + dy, occ)) n++;
+    }
+  }
+  return n;
+}
+
+/* Espaço para os magos: as 4 retas cardeais. Uma reta só conta se TODAS as
+ * células até 3 SQM (1, 2 e 3) estão no mapa e livres — é o corredor que o
+ * mago usa para chegar e a linha da wave dele até a box (v38). */
+function boxMageLanesCount(c, cx, cy, occ) {
+  let n = 0;
+  const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+  for (const [dx, dy] of dirs) {
+    let ok = true;
+    for (let s = 1; s <= 3; s++) {
+      if (!boxCellLivre(cx + dx * s, cy + dy * s, occ)) { ok = false; break; }
+    }
+    if (ok) n++;
+  }
+  return n;
+}
+
+/* MELHOR SPOT do KNIGHT (BOX), v38: varre a SALA INTEIRA (não só 7x7) e
+ * escolhe a célula livre com, em ordem de prioridade:
+ *   1. MAIS adjacências livres (8 = box perfeita: tanka os 8 lados);
+ *   2. MAIS corredores livres para os magos (retas a 3 SQM desimpedidas);
+ *   3. MAIS mobs no alcance do exeta amp res (7 SQM) e do melee (1 SQM);
+ *   4. mais perto do centro da sala (espaço para as waves dos dois lados).
+ * Células com menos de 5 adjacências livres nem são consideradas (o knight
+ * encostado em parede não tanka box). Retorna {cx, cy, score}. */
 function boxKnightSpot(c, occ, base) {
   base = base || boxCenter(c);
+  const GW = (typeof GRID_W !== "undefined") ? GRID_W : 21;
+  const GH = (typeof GRID_H !== "undefined") ? GRID_H : 13;
   let melhor = null, melhorScore = -1;
-  for (let dy = -3; dy <= 3; dy++) {
-    for (let dx = -3; dx <= 3; dx++) {
-      const cx = base.cx + dx, cy = base.cy + dy;
+  for (let cy = 0; cy < GH; cy++) {
+    for (let cx = 0; cx < GW; cx++) {
       if (!boxCellLivre(cx, cy, occ)) continue;
-      // mobs no alcance do exeta amp res (7 SQM) + melee (1 SQM) — peso
+      const adj = boxAdjFreeCount(cx, cy, occ);
+      if (adj < 5) continue;   // sem espaço mínimo p/ tankar box, descarta
+      const lanes = boxMageLanesCount(c, cx, cy, occ);
       const n7 = boxCountMobs(c, cx, cy, 7);
       const n1 = boxCountMobs(c, cx, cy, 1);
-      const score = n7 * 100 + n1 * 50 - (Math.abs(dx) + Math.abs(dy));
+      const dist = Math.max(Math.abs(cx - base.cx), Math.abs(cy - base.cy));
+      const score = adj * 300 + lanes * 120 + n7 * 100 + n1 * 60 - dist * 3;
       if (score > melhorScore) { melhorScore = score; melhor = { cx, cy }; }
     }
   }
-  return melhor || { cx: base.cx, cy: base.cy };
+  if (!melhor) return { cx: base.cx, cy: base.cy, score: 0 };
+  return { cx: melhor.cx, cy: melhor.cy, score: melhorScore };
 }
 
-/* Posição-alvo do BOX por vocação. Reavaliada a cada ~1s. */
+/* Conta mobs vivos que a WAVE RETA do caster pegaria mirando a box (v38).
+ * Reusa skillWaveCells — a MESMA geometria oficial do Canary usada no dano
+ * real (AreaCombat::setupArea(length, spread)) — com o caster no tile
+ * candidato e o alvo no centro/knight: a wave sai na reta e cruza a box. */
+function boxCountWaveMobs(c, fromCx, fromCy, toCx, toCy) {
+  if (typeof skillWaveCells !== "function") {
+    return boxCountMobs(c, fromCx, fromCy, 3);
+  }
+  const cells = skillWaveCells({ cx: fromCx, cy: fromCy },
+                               { cx: toCx, cy: toCy }, 7, 2);
+  let n = 0;
+  for (const m of (c && c.mobs) || []) {
+    if (m.hp <= 0 || m.cx === undefined || m.cy === undefined) continue;
+    const k = m.cx + ":" + m.cy;
+    for (const q of cells) if (q.cx + ":" + q.cy === k) { n++; break; }
+  }
+  return n;
+}
+
+/* Outro aliado vivo já está na célula? Usado para DISTRIBUIR os magos em
+ * retas diferentes (cobrir a box por lados opostos) em vez de empilhar. */
+function boxLaneOcupada(c, cx, cy) {
+  if (!c || !c.players) return false;
+  for (const e of c.players) {
+    if (!e.p || e.p.hp <= 0) continue;
+    if (e.cx === cx && e.cy === cy) return true;
+  }
+  return false;
+}
+
+/* Posição-alvo do BOX por vocação. Reavaliada a cada ~1,5s (com histerese
+ * no formationThinkStep). Retorna {cx, cy, score} — o score alimenta a
+ * histerese anti-oscilação. */
 function boxTargetCell(c, ent, occ) {
   const p = ent && ent.p;
   if (!p) return null;
@@ -285,9 +356,9 @@ function boxTargetCell(c, ent, occ) {
   const base = knight || centro;
 
   if (voc === "knight" || voc === "elite knight") {
-    // KNIGHT: checagem x/y de células p/ achar o melhor spot (não só o
-    // centro) — mais mobs no alcance, preferindo ficar central
-    return boxKnightSpot(c, occ, base);
+    // v38: KNIGHT procura a melhor posição da SALA — varre tudo e escolhe
+    // o spot com adjacência livre (tankar 8) + corredores para os magos.
+    return boxKnightSpot(c, occ, centro);
   }
 
   // PALADIN: RETAS a 2 SQM do knight (nunca diagonais), na reta com mais
@@ -308,22 +379,28 @@ function boxTargetCell(c, ent, occ) {
     if (!melhor) {
       melhor = retas.find((r) => boxCellLivre(r.cx, r.cy, occ)) ||
                { cx: base.cx + 2, cy: base.cy };
+      melhorN = 0;
     }
-    return melhor;
+    return { cx: melhor.cx, cy: melhor.cy, score: melhorN };
   }
 
-  // DRUID/SORCERER/MONK: RETAS a 3 SQM do knight (nunca diagonais), na reta
-  // que maximiza mobs dentro do raio de área (3 SQM — as magias 3x3 do
-  // Canary). Ficam parados a 3 SQMs do tanque.
-  let melhor = null, melhorN = -1;
+  // DRUID/SORCERER/MONK: RETAS a 3 SQM do knight (nunca diagonais). v38:
+  // a reta escolhida é a que a WAVE RETA do mago (mirando a box) pega MAIS
+  // mobs — peso 10 — + mobs no raio das magias de área (3 SQM) — peso 1.
+  // Ficam parados a 3 SQMs do tanque, alinhados com a box.
+  let melhor = null, melhorScore = -1;
   const retas3 = [
     { cx: base.cx + 3, cy: base.cy }, { cx: base.cx - 3, cy: base.cy },
     { cx: base.cx, cy: base.cy + 3 }, { cx: base.cx, cy: base.cy - 3 },
   ];
   for (const r of retas3) {
     if (!boxCellLivre(r.cx, r.cy, occ)) continue;
-    const n = boxCountMobs(c, r.cx, r.cy, 3);
-    if (n > melhorN) { melhorN = n; melhor = r; }
+    const nWave = boxCountWaveMobs(c, r.cx, r.cy, base.cx, base.cy);
+    const nArea = boxCountMobs(c, r.cx, r.cy, 3);
+    let score = nWave * 10 + nArea;
+    // distribui os magos: reta já ocupada por outro aliado perde um pouco
+    if (boxLaneOcupada(c, r.cx, r.cy)) score -= 40;
+    if (score > melhorScore) { melhorScore = score; melhor = r; }
   }
   if (!melhor) {
     // sem reta livre: procura perto (2-3 SQM) mantendo reta sempre que
@@ -338,8 +415,9 @@ function boxTargetCell(c, ent, occ) {
       ];
       melhor = retas2.find((r) => boxCellLivre(r.cx, r.cy, occ)) || base;
     }
+    melhorScore = 0;
   }
-  return melhor;
+  return { cx: melhor.cx, cy: melhor.cy, score: melhorScore };
 }
 
 /* Posição-alvo do modo SAFE: um dos CANTOS da tela, LONGE da box, mas
@@ -370,26 +448,48 @@ function safeTargetCell(c, ent, occ) {
           for (let dx = -r; dx <= r; dx++) {
             if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
             const cx = q.cx + dx, cy = q.cy + dy;
-            if (boxCellLivre(cx, cy, occ)) return { cx, cy };
+            if (boxCellLivre(cx, cy, occ)) return { cx, cy, score: 0 };
           }
         }
       }
     }
-    return { cx: 2, cy: 2 };
+    return { cx: 2, cy: 2, score: 0 };
   }
-  return melhor;
+  return { cx: melhor.cx, cy: melhor.cy, score: melhorN * 1000 + melhorDist };
 }
 
 /* Passo genérico de formação: vai para a posição do alvo e FICA parado lá
- * atacando. Reavalia a cada ~1s (os mobs andam, o melhor spot muda). */
+ * atacando. Reavalia a cada ~1,5s (os mobs andam, o melhor spot muda).
+ *
+ * v38 (anti-oscilação — "não correr sem motivo"):
+ *   - reavaliação a cada 1500ms (antes 1000);
+ *   - HISTERESE: só troca de destino se o novo tiver score > 20% do atual
+ *     (ou se o atual ficou ocupado). O melhor spot muda a cada tick dos
+ *     mobs; sem histerese o personagem corria atrás da célula "melhor" e
+ *     ficava andando de um lado pro outro sem parar;
+ *   - caminho bloqueado (stepToward falha): espera 500ms antes de tentar
+ *     de novo, em vez de "dançar" na frente do bloqueio. */
 function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   if (!ent) return false;
   ensureCell(ent);
   if (ent.moving) return false;
   if (ent.nextStepAt && now < ent.nextStepAt) return false;
-  if (!ent._boxAt || now - ent._boxAt > 1000) {
+
+  if (!ent._boxAt || now - ent._boxAt > 1500) {
     ent._boxAt = now;
-    ent._boxTarget = targetFn(c, ent, occ);
+    const novo = targetFn(c, ent, occ);
+    if (novo) {
+      const atual = ent._boxTarget;
+      // o alvo atual é válido se a célula dele está livre OU o personagem
+      // já ESTÁ nela (o occ inclui o próprio personagem — sem isso ele
+      // "via a célula ocupada por ele mesmo" e trocava de reta para sempre)
+      const naCelula = atual && ent.cx === atual.cx && ent.cy === atual.cy;
+      const atualOk = atual && (naCelula || boxCellLivre(atual.cx, atual.cy, occ));
+      if (!atualOk || (novo.score || 0) > (ent._boxScore || 0) * 1.2) {
+        ent._boxTarget = novo;
+        ent._boxScore = novo.score || 0;
+      }
+    }
   }
   const alvoCel = ent._boxTarget;
   if (!alvoCel) return false;
@@ -401,13 +501,14 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   }
   const dir = stepToward(ent, alvoCel.cx, alvoCel.cy, occ);
   if (!dir) {
+    // caminho bloqueado: espera mais antes de tentar de novo
     if (alvo) ent.dir = dirTo(ent, alvo);
-    ent.nextStepAt = now + 250;
+    ent.nextStepAt = now + 500;
     return false;
   }
   ent.speedPts = 110 + Math.min(200, (ent.p && ent.p.level) || 1);
   const ok = beginStep(ent, dir, occ, false);
-  ent.nextStepAt = now + (ok ? ent.stepDur : 250);
+  ent.nextStepAt = now + (ok ? ent.stepDur : 500);
   return ok;
 }
 
