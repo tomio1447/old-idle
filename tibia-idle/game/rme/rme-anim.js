@@ -37,7 +37,7 @@
 
   /* ------------------------------------------------------------ paleta */
   /* Desenha o frame atual da strip num canvas 32x32 (icone da paleta). */
-  function palIconCanvas(id) {
+  function palIconCanvas(id, forcedFrame) {
     const a = meta(id);
     const img = stripImg(id);
     if (!a || !img || !img.complete || !img.naturalWidth) return null;
@@ -45,7 +45,7 @@
     cv.width = 32; cv.height = 32;
     const ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
-    const fr = Math.floor(performance.now() / ANIM_DUR) % a.af;
+    const fr = forcedFrame === undefined ? Math.floor(performance.now() / ANIM_DUR) % a.af : forcedFrame % a.af;
     // conteudo dentro do tile, ancorado na base (como o client)
     const k = 32 / 32;
     const w = a.aw * k, h = a.ah * k;
@@ -57,17 +57,37 @@
   /* Paleta viva: a cada frame, os .pal-icon de ids animados ganham o frame
    * atual (via canvas -> dataURL). So roda quando a paleta esta visivel. */
   let palRunning = false;
+  let lastPaletteFrame = -1;
+  let forcePaletteFrame = true;
+  const palFrameUrl = new Map();
+  function paletteUrl(id, fr) {
+    const key = id + ":" + fr;
+    if (palFrameUrl.has(key)) return palFrameUrl.get(key);
+    const cv = palIconCanvas(id, fr);
+    if (!cv) return null;
+    const url = "url(" + cv.toDataURL() + ")";
+    palFrameUrl.set(key, url);
+    return url;
+  }
   function tickPalette() {
     const list = document.getElementById("pal-list");
     if (!list || list.offsetParent === null) { palRunning = false; return; }
-    const icons = list.querySelectorAll(".pal-icon[data-anim]");
     const now = Math.floor(performance.now() / ANIM_DUR);
-    for (const ic of icons) {
-      const id = ic.dataset.anim;
-      const fr = now % meta(id).af;
-      if (ic.dataset.fr === String(fr)) continue;
-      const cv = palIconCanvas(id);
-      if (cv) { ic.style.backgroundImage = "url(" + cv.toDataURL() + ")"; ic.dataset.fr = fr; }
+    // Não percorre a paleta inteira a cada frame do browser. Só troca no
+    // frame real da animação (120ms) ou após uma linha virtual ser reciclada.
+    if (now !== lastPaletteFrame || forcePaletteFrame) {
+      lastPaletteFrame = now;
+      forcePaletteFrame = false;
+      const icons = list.querySelectorAll(".pal-icon[data-anim]");
+      for (const ic of icons) {
+        const id = ic.dataset.anim;
+        const a = meta(id);
+        if (!a) { delete ic.dataset.anim; delete ic.dataset.fr; continue; }
+        const fr = now % a.af;
+        if (ic.dataset.fr === String(fr)) continue;
+        const url = paletteUrl(id, fr);
+        if (url) { ic.style.backgroundImage = url; ic.dataset.fr = fr; }
+      }
     }
     requestAnimationFrame(tickPalette);
   }
@@ -76,6 +96,8 @@
     palRunning = true;
     requestAnimationFrame(tickPalette);
   }
+  // Chamado pelo virtual scroller depois de trocar os elementos reciclados.
+  window.__rmeRefreshPaletteAnims = () => { forcePaletteFrame = true; ensurePaletteLoop(); };
 
   /* ------------------------------------------------------------ canvas */
   /* Depois de um render() do rme.js, pinta as strips animadas por cima das

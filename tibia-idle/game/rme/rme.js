@@ -607,6 +607,11 @@ function renderPalRows() {
       it.g ? (it.w ? '<span class="w">chão</span>' : '<span class="b">chão trava</span>') + sizeStr
            : (it.b ? '<span class="b">parede</span>' : "deco") + sizeStr;
     const ic = el.querySelector(".pal-icon");
+    // A linha é reciclada pela virtualização: limpe o estado da animação do
+    // item anterior. Sem isso um sprite animado continuava tentando pintar
+    // em cima do próximo item quando a paleta era rolada muito rápido.
+    delete ic.dataset.anim;
+    delete ic.dataset.fr;
     // Se tem PNG em assets/tiles/, usa ele; senao usa o atlas
     if (KNOWN_SET.has(id)) {
       ic.style.backgroundImage = `url(../assets/tiles/${id}.png)`;
@@ -621,8 +626,15 @@ function renderPalRows() {
     }
     if (!el.parentNode) palInner.appendChild(el);
   }
+  // Solicita uma atualização única das animações para as linhas recém
+  // recicladas; não força trabalho a cada evento bruto de scroll.
+  if (typeof window.__rmeRefreshPaletteAnims === "function") window.__rmeRefreshPaletteAnims();
 }
-palList.addEventListener("scroll", renderPalRows);
+let palScrollRaf = 0;
+palList.addEventListener("scroll", () => {
+  if (palScrollRaf) return;
+  palScrollRaf = requestAnimationFrame(() => { palScrollRaf = 0; renderPalRows(); });
+}, { passive: true });
 
 function selectItem(id) {
   if (!ITEMS.has(id)) return;
