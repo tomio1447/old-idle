@@ -1201,7 +1201,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.kind === "damage" ? "6px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.font = (f.kind === "damage" ? "12px" : (f.kind === "restore" ? "12px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
     ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
@@ -1585,7 +1585,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.kind === "damage" ? "6px" : (f.kind === "restore" ? "2px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.font = (f.kind === "damage" ? "12px" : (f.kind === "restore" ? "12px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
     ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
