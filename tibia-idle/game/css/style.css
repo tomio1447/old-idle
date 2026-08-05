@@ -1794,3 +1794,121 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 @media (max-width: 760px) {
   .wheel-stage .wheel-bg { width: 320px; height: 320px; }
 }
+
+/* ===================== RESTAURADO (v35): blocos que o consolidate perdeu ===================== */
+/* ═══════════════════ PAINEL DE PARTY (OTC) ═══════════════════
+ * Fica no canto superior direito da tela do jogo (dentro do canvas).
+ * Lista os personagens da party com level, outfit pequeno, HP e mana —
+ * como o módulo de party do OTClient. Clicar num membro da sua conta
+ * troca de personagem. */
+.party-panel {
+  position: absolute;
+  top: 4px; right: 4px;
+  z-index: 20;
+  width: 200px;
+  background: rgba(13, 15, 20, .92);
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+  font-size: 10px;
+  color: #c8c8c8;
+  user-select: none;
+}
+.party-panel-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px;
+  background: linear-gradient(180deg, #23262d, #17191f);
+  border-bottom: 1px solid #2a2d34;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--gold, #d4af37);
+  letter-spacing: .4px;
+}
+.party-panel-head:hover { background: linear-gradient(180deg, #2b2f38, #1b1e24); }
+.party-panel-count {
+  font-size: 9px; font-weight: normal;
+  background: #2a2d34; border-radius: 8px; padding: 0 6px;
+  color: #9ce84a;
+}
+.party-panel-arrow { font-size: 9px; color: #8a8270; }
+.party-panel-body {
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.party-panel-body.collapsed { display: none; }
+.party-member-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 5px;
+  border-bottom: 1px solid rgba(42, 45, 52, .6);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.party-member-row:hover { background: rgba(212, 175, 55, .08); }
+.party-member-row:last-child { border-bottom: none; }
+.party-member-row .ppm-outfit {
+  width: 34px; height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid #2a2d34;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.party-member-row .ppm-outfit img { max-width: 32px; max-height: 32px; object-fit: contain; image-rendering: pixelated; }
+.party-member-row .ppm-info { flex: 1; min-width: 0; }
+.party-member-row .ppm-name {
+  font-weight: bold; color: #e8e2d0;
+  font-size: 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.party-member-row .ppm-name.leader::after {
+  content: " ♛"; color: var(--gold, #d4af37);
+}
+.party-member-row .ppm-meta { font-size: 8px; color: #8a8270; }
+.party-member-row .ppm-zone { font-size: 8px; margin-left: 2px; }
+.party-pbar {
+  height: 4px; border-radius: 2px;
+  background: #000;
+  margin-top: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.party-pbar .fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.party-pbar .fill.hp { background: linear-gradient(180deg, #4ade80, #22a04a); }
+.party-pbar .fill.mp { background: linear-gradient(180deg, #60a5fa, #3b6fd4); }
+.party-pbar .val {
+  position: absolute; inset: 0;
+  font-size: 7px; line-height: 4px;
+  text-align: center; color: #fff;
+  text-shadow: 0 0 2px #000;
+}
+.party-panel-empty {
+  padding: 8px; text-align: center; color: #8a8270; font-size: 9px;
+}
+/* subcategorias das áreas de caça */
+
+.hunt-cat-title {
+  font-size: 10px; font-weight: bold; color: var(--gold, #d4af37);
+  letter-spacing: .4px; text-transform: uppercase;
+  margin: 8px 0 4px; padding-bottom: 2px;
+  border-bottom: 1px solid rgba(212,175,55,.25);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.hunt-cat-title:first-child { margin-top: 0; }
+.hunt-cat-title.locked { color: #8a8270; border-bottom-color: rgba(138,130,112,.25); }
+.hunts-group.locked { filter: grayscale(.8); }
+.hunt-card .mobs { display: flex; gap: 1px; width: 68px; flex: none; }
+.hunt-card .mobs img { width: 22px; height: 22px; object-fit: contain; }
+.hunt-card .info { flex: 1; min-width: 0; }
+.hunt-card .nm { color: var(--text-bright); font-size: 11px; font-weight: bold;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hunt-card .meta { font-size: 9px; color: #8a8270; }
+.risk { font-size: 9px; padding: 1px 5px; border-radius: 2px; font-weight: bold; }
+.risk.low  { background: #1e4a1e; color: #7ae87a; }
+.risk.mid  { background: #4a4210; color: #e8d24a; }
+.risk.high { background: #4a1a1a; color: #ff7a7a; }
+
