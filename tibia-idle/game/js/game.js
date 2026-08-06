@@ -1187,7 +1187,8 @@ function drainEvents() {
         // Energy Ring (clássico): drena mana do personagem. utamo vita
         // (12.55+): drena a POOL do escudo — mostra o restante.
         if (e.source === "Magic Shield" && e.pool !== undefined) {
-          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana) + " · escudo ⚡" + fmt(e.pool), "#7ec8ff");
+          // Absorção do Utamo Vita: número puro roxo, sem texto extra.
+          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana), "#a64dff");
         } else {
           r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
         }
@@ -1264,7 +1265,7 @@ function drainEvents() {
       case "block":
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8", e.missile);
-        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
+        if (!e.magicShield) r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
         break;
       case "heal-friend": {
         // HEAL FRIEND: cura aplicada em um aliado da party (exura sio /

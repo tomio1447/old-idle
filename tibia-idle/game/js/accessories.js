@@ -183,7 +183,7 @@ function ensureAccessoryConfig(p) {
   p.config.magicShield = {
     mode: ["off", "always", "hp"].includes(mode) ? mode : "off",
     enabled: mode !== "off",
-    useSpell: ms.useSpell !== undefined ? !!ms.useSpell : true,
+    useSpell: true, // modos novos sempre usam a spell; legado não bloqueia o Helper
     hpBelow: Math.max(1, Math.min(99, parseInt(ms.hpBelow, 10) || 45)),
     mpAbove: Math.max(0, Math.min(100, parseInt(ms.mpAbove, 10) || 15)),
     recastBelow: Math.max(1, Math.min(99, parseInt(ms.recastBelow, 10) || 70)),
@@ -658,7 +658,7 @@ function tryMagicShield(c, p, now) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const mode = cfg.mode || (cfg.enabled ? "hp" : "off");
-  if (mode === "off" || !cfg.useSpell) return false;
+  if (mode === "off") return false;
   const s = SPELLS[MAGIC_SHIELD_SPELL_ID];
   if (!s || !magicShieldSpellAllowed(p)) return false;
   const max = maxStats(p);
