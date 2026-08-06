@@ -104,7 +104,12 @@ function drawItem32(ctx, id, dx, dy, size) {
   if (!img || !img.complete || !img.naturalWidth) return;
   const cx = it.idx % CATALOG.cols;
   const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
-  ctx.drawImage(img, cx * 32, cy * 32, 32, 32, dx, dy, size, size);
+  // Itens multi-tile ocupam vários quadrados consecutivos no atlas. Recorta
+  // a área completa e ancora a base no tile de referência, como o OTClient.
+  const sw = 32 * (it.tw || 1), sh = 32 * (it.th || 1);
+  const dw = size * (it.tw || 1), dh = size * (it.th || 1);
+  ctx.drawImage(img, cx * 32, cy * 32, sw, sh,
+                dx - (dw - size), dy - (dh - size), dw, dh);
 }
 
 /* ------------------------------------------------------------ canvas */
@@ -618,11 +623,12 @@ function renderPalRows() {
     // lista em branco. PNG externo fica reservado ao canvas do mapa.
     const cx = it.idx % CATALOG.cols;
     const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
+    // A miniatura mostra o sprite INTEIRO: um 2x2 é reduzido para caber no
+    // ícone, em vez de exibir apenas seu quadrante superior esquerdo.
+    const scale = 32 / Math.max(it.tw || 1, it.th || 1);
     ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
-    ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
-    // Não use `contain`: ele reduz o atlas inteiro a 32px e deixa o ícone
-    // aparentemente vazio. Mantém as dimensões nativas da página do atlas.
-    ic.style.backgroundSize = `${CATALOG.cols * 32}px ${CATALOG.rowsPerPage * 32}px`;
+    ic.style.backgroundPosition = `-${cx * 32 * scale}px -${cy * 32 * scale}px`;
+    ic.style.backgroundSize = `${CATALOG.cols * 32 * scale}px ${CATALOG.rowsPerPage * 32 * scale}px`;
     if (!el.parentNode) palInner.appendChild(el);
   }
   // Solicita uma atualização única das animações para as linhas recém
