@@ -801,8 +801,8 @@ function bindMagicShieldHelper(p) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const rer = () => { const el = document.getElementById("helper-magic-shield"); if (el) { el.innerHTML = renderMagicShieldHelper(p); bindMagicShieldHelper(p); } };
-  document.querySelectorAll('#helper-magic-shield input[name="ms-mode"]').forEach((el) => el.addEventListener("change", () => {
-    cfg.mode = el.value; cfg.enabled = cfg.mode !== "off";
+  document.querySelectorAll('#helper-magic-shield [data-ms-mode]').forEach((el) => el.addEventListener("click", () => {
+    cfg.mode = el.dataset.msMode; cfg.enabled = cfg.mode !== "off";
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); rer();
   }));
   const hp = document.getElementById("ms-hp");

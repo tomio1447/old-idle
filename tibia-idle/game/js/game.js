@@ -1176,7 +1176,10 @@ function drainEvents() {
         // 12.55+: mostra a capacidade do escudo (o "bônus" que o mage ganha
         // na mana) no cast
         r.addFloater(px, py - 0.10, e.cap ? "Magic Shield · ⚡" + fmt(e.cap) : "Magic Shield", "#7ec8ff");
+        // O cast mantém o brilho azul oficial e adiciona o pulso roxo
+        // persistente usado pelo OTC para diferenciar o Mana Shield.
         r.addEffect(px, py, "magic-blue");
+        r.addEffect(px, py, "purple-energy", 800);
         break;
       }
       case "magic-shield": {
