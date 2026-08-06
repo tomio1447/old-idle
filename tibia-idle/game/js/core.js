@@ -300,11 +300,11 @@ function fisicoPorRaca(raca) {
  * `armorReduces` documenta o que a Armor reduz (só físico); `trueDamage`
  * marca o Agony, que ignora todas as reduções. */
 const ELEMENTS = {
-  physical: { name: "Físico", color: "#a0a0a0", fx: "draw-blood", armorReduces: true },
+  physical: { name: "Físico", color: "#ff6b6b", fx: "draw-blood", armorReduces: true },
   fire:     { name: "Fogo",   color: "#ff8a3c", fx: "hit-by-fire" },
-  ice:      { name: "Gelo",   color: "#7ec8ff", fx: "ice-attack" },
+  ice:      { name: "Gelo",   color: "#73cfff", fx: "ice-attack" },
   energy:   { name: "Energia",color: "#c07cff", fx: "energy-damage" },
-  earth:    { name: "Terra",  color: "#8ac83c", fx: "hit-by-poison" },
+  earth:    { name: "Terra",  color: "#9dff70", fx: "hit-by-poison" },
   death:    { name: "Morte",  color: "#8b0000", fx: "mort-area" },
   holy:     { name: "Sagrado",color: "#ffd000", fx: "holy-damage" },
   drown:    { name: "Afogamento", color: "#3ad6d6", fx: "water-splash-effect" },

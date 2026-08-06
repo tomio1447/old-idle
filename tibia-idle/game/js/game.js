@@ -1239,7 +1239,7 @@ function drainEvents() {
         // O dano físico RECEBIDO por player usa sangue vermelho no client.
         // A cor cinza é exclusiva de físico sem sangue (pedra/constructos).
         const col = e.el === "physical" || !e.el
-          ? "#d02020" : (ELEMENTS[e.el] || ELEMENTS.physical).color;
+          ? "#ff6b6b" : (ELEMENTS[e.el] || ELEMENTS.physical).color;
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col, false, true, "damage");
