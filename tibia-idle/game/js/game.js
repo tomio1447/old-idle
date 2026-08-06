@@ -1725,6 +1725,12 @@ function loop(ts) {
     // CARGAS de anéis/amuletos por TEMPO (time ring: 1 carga/3s equipado)
     if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
     drainEvents();
+    // HP/MP da party são entidades vivas; atualiza o painel em tempo real
+    // mesmo quando outro membro está selecionado.
+    if (G.combat.players && G.combat.players.length > 1 && typeof renderPartyPanel === "function") {
+      G._partyHudAt = (G._partyHudAt || 0) + dt;
+      if (G._partyHudAt >= 120) { G._partyHudAt = 0; renderPartyPanel(G.p); }
+    }
     // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido no
     // painel, vende TUDO automaticamente (respeitando "Não vender" e itens
     // sem valor). Checagem espaçada (2s) para não rodar a cada frame.

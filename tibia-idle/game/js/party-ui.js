@@ -117,7 +117,7 @@ function renderPartyPanel(p) {
     if (typeof G !== "undefined" && G && G.combat &&
         Array.isArray(G.combat.players) && G.combat.players.length > 1) {
       live = {};
-      for (const e of G.combat.players) live[String(e.id)] = e;
+      for (const e of G.combat.players) live[String((e.p && (e.p.id || characterId(e.p))) || e.id)] = e;
     }
     const statsDe = (c) => {
       const ent = live ? live[String(c.id || characterId(c))] : null;

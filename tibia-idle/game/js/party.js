@@ -730,7 +730,7 @@ function tryHealFriend(c, p, now) {
   // Migra a configuração antiga (uma spell) para o modelo independente.
   if (!cfg.healFriendSpells) cfg.healFriendSpells = {};
   for (const id of ids) if (!cfg.healFriendSpells[id]) {
-    cfg.healFriendSpells[id] = { enabled: cfg.healFriendSpell === id,
+    cfg.healFriendSpells[id] = { enabled: cfg.healFriendSpell === id || id === "exura-sio",
       at: cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt, minTargets: 2 };
   }
   const targetCfg = cfg.healFriendTargets || {};
