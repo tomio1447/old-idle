@@ -101,7 +101,14 @@ for cid in range(100, dat.item_count + 1):
         cx = 0
         cy = 0
         page = Image.new("RGBA", (COLS * 32, ROWS_PER_PAGE * 32), (0, 0, 0, 0))
-    page.paste(recorte32(img), (cx * 32, cy * 32), recorte32(img))
+    # O atlas continua leve (miniatura 32px), mas itens 2x2/maiores ganham
+    # PNG composto próprio para o RME desenhar os 64x64 reais.
+    thumb = recorte32(img)
+    page.paste(thumb, (cx * 32, cy * 32), thumb)
+    if tw > 1 or th > 1:
+        full = Image.new("RGBA", (tw * 32, th * 32), (0, 0, 0, 0))
+        full.alpha_composite(img, (0, 0))
+        full.save(os.path.join(TILES_DIR, "%d.png" % cid))
     entries.append([cid, w, b, g, page_i, idx, tw, th])
     idx += 1
 

@@ -104,12 +104,10 @@ function drawItem32(ctx, id, dx, dy, size) {
   if (!img || !img.complete || !img.naturalWidth) return;
   const cx = it.idx % CATALOG.cols;
   const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
-  // Itens multi-tile ocupam vários quadrados consecutivos no atlas. Recorta
-  // a área completa e ancora a base no tile de referência, como o OTClient.
-  const sw = 32 * (it.tw || 1), sh = 32 * (it.th || 1);
-  const dw = size * (it.tw || 1), dh = size * (it.th || 1);
-  ctx.drawImage(img, cx * 32, cy * 32, sw, sh,
-                dx - (dw - size), dy - (dh - size), dw, dh);
+  // O atlas guarda somente a miniatura 32x32 de cada appearance. A sprite
+  // 64x64 real vem de assets/tiles/<id>.png (quando extraída). Nunca leia
+  // as células seguintes do atlas: elas pertencem a OUTROS itens.
+  ctx.drawImage(img, cx * 32, cy * 32, 32, 32, dx, dy, size, size);
 }
 
 /* ------------------------------------------------------------ canvas */
@@ -623,12 +621,11 @@ function renderPalRows() {
     // lista em branco. PNG externo fica reservado ao canvas do mapa.
     const cx = it.idx % CATALOG.cols;
     const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
-    // A miniatura mostra o sprite INTEIRO: um 2x2 é reduzido para caber no
-    // ícone, em vez de exibir apenas seu quadrante superior esquerdo.
-    const scale = 32 / Math.max(it.tw || 1, it.th || 1);
+    // Sem PNG completo, mostra a miniatura do atlas sem inventar os outros
+    // quadrantes (o badge 2×2 avisa que a extração completa é necessária).
     ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
-    ic.style.backgroundPosition = `-${cx * 32 * scale}px -${cy * 32 * scale}px`;
-    ic.style.backgroundSize = `${CATALOG.cols * 32 * scale}px ${CATALOG.rowsPerPage * 32 * scale}px`;
+    ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
+    ic.style.backgroundSize = `${CATALOG.cols * 32}px ${CATALOG.rowsPerPage * 32}px`;
     if (!el.parentNode) palInner.appendChild(el);
   }
   // Solicita uma atualização única das animações para as linhas recém
