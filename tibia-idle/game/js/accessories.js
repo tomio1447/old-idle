@@ -647,7 +647,9 @@ function magicShieldCapacity(p) {
 function magicShieldSpellAllowed(p) {
   const s = typeof SPELLS !== "undefined" ? SPELLS[MAGIC_SHIELD_SPELL_ID] : null;
   if (!s) return false;
-  return !s.vocs || s.vocs.indexOf(p.voc) !== -1;
+  if (!s.vocs) return true;
+  const voc = String(p.voc || "").replace(/^elder\s+/i, "");
+  return s.vocs.indexOf(p.voc) !== -1 || s.vocs.indexOf(voc) !== -1;
 }
 
 function tryMagicShield(c, p, now) {

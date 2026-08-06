@@ -2611,6 +2611,9 @@ function doChallengeCast(c, p, now, id, s) {
     // alcance (antes marcava só 1)
     m.challengedUntil = now + 10000;   // 10s de Challenge
     if (amp && monsterTargetDistance(m) > 1) m.forceMeleeUntil = now + 10000;
+    // A animação do Chivalrous Challenge é aplicada em CADA alvo marcado.
+    if (c.events) c.events.push({ t: "challenge-target", x: m.x, y: m.y,
+      screen: true, amp: amp });
     marcou++;
   }
   if (!marcou) return false;

@@ -1352,6 +1352,9 @@ function drainEvents() {
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
         break;
+      case "challenge-target":
+        r.addEffect(e.x, e.y, e.amp ? "chivalrous-challenge" : "magic-blue");
+        break;
       case "challenge": {
         // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
         // marcados focam o knight e causam 20% menos dano por 10s.
@@ -1361,7 +1364,7 @@ function drainEvents() {
         // Exeta Amp Res: animação oficial (CONST_ME_CHIVALRIOUS_CHALLENGE,
         // anel de energia roxo/azul do DAT 15.x). Exeta Res: magic blue do
         // challenge.lua do Canary.
-        r.addEffect(px, py, ehAmp ? "chivalrous-challenge" : "magic-blue");
+        if (!ehAmp) r.addEffect(px, py, "magic-blue");
         addLog("party", `<b style="color:#ffd65a">${e.spell || "Challenge"}</b> marcou <b>${e.count}</b> inimigo(s) — dano deles reduzido 20%`);
         break;
       }
