@@ -523,7 +523,7 @@ function healFriendSpells(p) {
   if (!p) return ids;
   const éDruid = p.voc === "druid" || p.voc === "elder druid";
   const éMonk = p.voc === "monk" || p.voc === "exalted monk";
-  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-gran-tio-sio");
+  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res");
   if (éMonk) ids.push("exura-tio-sio");
   return ids.filter((id) => SPELLS[id] && p.level >= (SPELLS[id].lvl || 1));
 }
@@ -554,7 +554,7 @@ function renderHealFriend(p) {
 
   // seleção de magia de aliado
   const spells = healFriendSpells(p);
-  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) cfg.healFriendSpells[id] = { enabled: selecionada === id, at: cfg.healFriendAt || 70, minTargets: 2 }; });
+  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) cfg.healFriendSpells[id] = { enabled: (selecionada === id) || id === "exura-sio", at: cfg.healFriendAt || 70, minTargets: 2 }; });
   if (!spells.length) {
     h += `<div class="tiny dim">As magias de cura de aliado desbloqueiam com o nível.</div>`;
     box.innerHTML = h;
@@ -617,11 +617,11 @@ function renderHealFriend(p) {
 
   // handlers
   $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendSpell].enabled = el.checked; }));
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendSpell].enabled = el.checked; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-at]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); }));
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-min]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendMin].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2)); }));
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendMin].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   const at = $("#helper-heal-friend-at");
   if (at) at.addEventListener("change", () => {
     cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
