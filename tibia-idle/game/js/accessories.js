@@ -179,8 +179,10 @@ function ensureAccessoryConfig(p) {
     }
   });
   const ms = p.config.magicShield || {};
+  const mode = ms.mode || (ms.enabled ? "hp" : "off");
   p.config.magicShield = {
-    enabled: !!ms.enabled,
+    mode: ["off", "always", "hp"].includes(mode) ? mode : "off",
+    enabled: mode !== "off",
     useSpell: ms.useSpell !== undefined ? !!ms.useSpell : true,
     hpBelow: Math.max(1, Math.min(99, parseInt(ms.hpBelow, 10) || 45)),
     mpAbove: Math.max(0, Math.min(100, parseInt(ms.mpAbove, 10) || 15)),
@@ -651,13 +653,15 @@ function magicShieldSpellAllowed(p) {
 function tryMagicShield(c, p, now) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
-  if (!cfg.enabled || !cfg.useSpell) return false;
+  const mode = cfg.mode || (cfg.enabled ? "hp" : "off");
+  if (mode === "off" || !cfg.useSpell) return false;
   const s = SPELLS[MAGIC_SHIELD_SPELL_ID];
   if (!s || !magicShieldSpellAllowed(p)) return false;
   const max = maxStats(p);
   const hpPct = max.hp ? (p.hp / max.hp) * 100 : 100;
   const mpPct = max.mp ? (p.mp / max.mp) * 100 : 0;
-  if (hpPct > cfg.hpBelow || mpPct < cfg.mpAbove) return false;
+  if (mpPct < cfg.mpAbove) return false;
+  if (mode === "hp" && hpPct > cfg.hpBelow) return false;
   if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
   if (typeof cdReady === "function" && !cdReady(p, MAGIC_SHIELD_SPELL_ID, now)) return false;
   // 12.55+: recast com o escudo ATIVO renova a capacidade (oficial) — o
@@ -751,15 +755,16 @@ function renderMagicShieldHelper(p) {
           <div class="small" style="color:#7ec8ff;font-weight:bold">Magic Shield</div>
           <div class="tiny dim">Dano recebido consome mana antes da vida enquanto ativo.</div>
         </div>
-        <label class="toggle tiny"><input type="checkbox" id="ms-enabled" ${cfg.enabled ? "checked" : ""}> ATIVAR</label>
+        <span class="tiny dim">${cfg.mode === "always" ? "sempre ativo" : cfg.mode === "hp" ? "por HP" : "não usar"}</span>
       </div>
       <div class="stat-row mt8"><span class="k">Estado</span><span class="v" style="color:${active ? "#7ec8ff" : "#888"}">${active ? "ATIVO · " + src : "inativo"}</span></div>
       ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>
         <div class="stat-row"><span class="k">Escudo</span><span class="v" style="color:#7ec8ff">⚡ ${fmtFull(p.magicShieldPool || 0)} / ${fmtFull(p.magicShieldCap || 0)}</span></div>
         <div class="tiny dim">Capacidade = 7×ML + 7,6×nível + bônus (oficial 12.55). Quebra quando zera — potions de mana não recarregam o escudo.</div>` : ""}
-      ${spellOk ? `<label class="toggle mt8"><input type="checkbox" id="ms-use-spell" ${cfg.useSpell ? "checked" : ""}>
-        Usar spell <b>${s ? s.words : "utamo vita"}</b></label>` : ""}
-      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px">
+      ${spellOk ? `<div class="mt8 small"><label class="toggle"><input type="radio" name="ms-mode" value="off" ${cfg.mode === "off" ? "checked" : ""}> NÃO USAR</label>
+        <label class="toggle"><input type="radio" name="ms-mode" value="always" ${cfg.mode === "always" ? "checked" : ""}> SEMPRE ATIVO</label>
+        <label class="toggle"><input type="radio" name="ms-mode" value="hp" ${cfg.mode === "hp" ? "checked" : ""}> USAR COM % DE HP</label></div>` : ""}
+      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;${cfg.mode === "hp" ? "" : "opacity:.45;pointer-events:none"}">
         <div style="flex:1">
           <label class="small dim">Ativar com HP abaixo de (%)</label>
           <input id="ms-hp" type="number" min="1" max="99" value="${cfg.hpBelow}"
@@ -791,10 +796,10 @@ function bindMagicShieldHelper(p) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const rer = () => { const el = document.getElementById("helper-magic-shield"); if (el) { el.innerHTML = renderMagicShieldHelper(p); bindMagicShieldHelper(p); } };
-  const en = document.getElementById("ms-enabled");
-  if (en) en.addEventListener("change", () => { cfg.enabled = en.checked; if (typeof save === "function") save(); rer(); });
-  const us = document.getElementById("ms-use-spell");
-  if (us) us.addEventListener("change", () => { cfg.useSpell = us.checked; if (typeof save === "function") save(); rer(); });
+  body.querySelectorAll('input[name="ms-mode"]').forEach((el) => el.addEventListener("change", () => {
+    cfg.mode = el.value; cfg.enabled = cfg.mode !== "off";
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); rer();
+  }));
   const hp = document.getElementById("ms-hp");
   if (hp) hp.addEventListener("change", () => { cfg.hpBelow = Math.max(1, Math.min(99, parseInt(hp.value, 10) || 45)); if (typeof save === "function") save(); rer(); });
   const mp = document.getElementById("ms-mp");
