@@ -110,6 +110,14 @@ if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") 
 
 /* Linha do spritesheet por direcao, na ordem do client (igual a das outfits) */
 const MOB_DIR_ROW = { n: 0, e: 1, s: 2, w: 3 };
+/* Monstros 15x têm frames de idle no sheet. Mesmo parados, livros,
+ * squids e criaturas animadas avançam seus frames sem alterar posição/SQM. */
+function monsterIdleFrame(slug, now) {
+  const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS) ? MOBSHEETS[slug] : null;
+  const n = meta ? Math.max(1, meta.cols || 1) : 1;
+  if (n <= 1) return 0;
+  return Math.floor((now || Date.now()) / 180) % n;
+}
 
 /* HTML de uma celula do sheet para as telas (bestiario, lista de caca...).
  *
@@ -1434,10 +1442,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
       // O frame vem do passo em andamento (advanceStep mantem ent.frame em
       // 0 parado e 1|2 durante o deslocamento). Antes era derivado de
       // Date.now(), ou seja, o bicho "pedalava" no lugar mesmo sem andar.
-      const passo = m.moving ? (m.frame || 1) : 0;
+      const passo = m.moving ? (m.frame || 1) : monsterIdleFrame(m.slug, Date.now());
       const anim = passo ? Sprites.mobWalk(m.slug, m.dir || "w", passo) : null;
-      // se o passo nao existir, cai na pose parada em vez de sumir com o
-      // monstro. spriteReady trata tanto <img> quanto o canvas do sheet.
+      // se o frame não existir, cai na pose base em vez de sumir.
       const img = spriteReady(anim) ? anim : Sprites.mob(m.slug, m.dir || "w");
       const mx = m.x * W;
       // sem oscilacao senoidal: no Tibia a criatura parada fica imovel no
