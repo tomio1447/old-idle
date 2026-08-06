@@ -540,21 +540,23 @@ function renderHealFriend(p) {
   const cfg = p.config;
   if (cfg.healFriendAt === undefined) cfg.healFriendAt = 70;
   const selecionada = cfg.healFriendSpell || "";
-  if (!cfg.healFriendSpells) cfg.healFriendSpells = {};
+  let healCfgDirty = false;
+  if (!cfg.healFriendSpells) { cfg.healFriendSpells = {}; healCfgDirty = true; }
   const alvos = (typeof partyHealTargets === "function") ? partyHealTargets(p) : [];
   // Cada aliado pode ser ligado/desligado e recebe uma prioridade. Mantemos
   // os alvos existentes habilitados por padrão para não quebrar configs antigas.
   if (!cfg.healFriendTargets) cfg.healFriendTargets = {};
   alvos.forEach((m, i) => {
     const key = String(m.id);
-    if (!cfg.healFriendTargets[key]) cfg.healFriendTargets[key] = { enabled: true, priority: i + 1 };
+    if (!cfg.healFriendTargets[key]) { cfg.healFriendTargets[key] = { enabled: true, priority: i + 1 }; healCfgDirty = true; }
   });
 
   let h = `<div class="small dim mb4" style="color:#9ce84a;font-weight:bold">❤️ HEAL FRIEND — curar aliados da party</div>`;
 
   // seleção de magia de aliado
   const spells = healFriendSpells(p);
-  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) cfg.healFriendSpells[id] = { enabled: (selecionada === id) || id === "exura-sio", at: cfg.healFriendAt || 70, minTargets: 2 }; });
+  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) { cfg.healFriendSpells[id] = { enabled: (selecionada === id) || id === "exura-sio", at: cfg.healFriendAt || 70, minTargets: 2 }; healCfgDirty = true; } });
+  if (healCfgDirty && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   if (!spells.length) {
     h += `<div class="tiny dim">As magias de cura de aliado desbloqueiam com o nível.</div>`;
     box.innerHTML = h;
@@ -625,18 +627,21 @@ function renderHealFriend(p) {
   const at = $("#helper-heal-friend-at");
   if (at) at.addEventListener("change", () => {
     cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
     renderHealFriend(p);
   });
   $$("#helper-heal-friend-panel [data-heal-target-enabled]").forEach((el) => el.addEventListener("change", () => {
     const key = String(el.dataset.healTargetEnabled);
     cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { priority: 1 };
     cfg.healFriendTargets[key].enabled = el.checked;
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   }));
   $$("#helper-heal-friend-panel [data-heal-target-priority]").forEach((el) => el.addEventListener("change", () => {
     const key = String(el.dataset.healTargetPriority);
     cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { enabled: true };
     cfg.healFriendTargets[key].priority = Math.max(1, Math.min(99, parseInt(el.value, 10) || 1));
     el.value = cfg.healFriendTargets[key].priority;
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   }));
 }
 
