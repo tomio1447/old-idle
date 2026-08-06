@@ -3565,11 +3565,11 @@ function partyHelperTick(c, ent, now, dt) {
     // individualmente o próprio auto-hunt) ----
     if (typeof tryCureCondition === "function") { try { tryCureCondition(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryAccessoryHelper === "function") { try { tryAccessoryHelper(c, p, now); } catch (e) { /* segue */ } }
-    if (typeof tryMagicShield === "function") { try { tryMagicShield(c, p, now); } catch (e) { /* segue */ } }
-    if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { /* segue */ } }
-    // HEAL FRIEND (Druid/Monk): cura os aliados com a config do próprio
-    if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { /* segue */ } }
-    if (typeof tryMana === "function") { try { tryMana(c, p, now); } catch (e) { /* segue */ } }
+    if (typeof tryMagicShield === "function") { try { tryMagicShield(c, p, now); } catch (e) { console.error("MagicShield helper", e); } }
+    // Prioridade de party: cura o aliado antes de gastar o grupo Healing na autocura.
+    if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { console.error("HealFriend helper", e); } }
+    if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { console.error("Heal helper", e); } }
+    if (typeof tryMana === "function") { try { tryMana(c, p, now); } catch (e) { console.error("Mana helper", e); } }
     if (typeof tryChallenge === "function") { try { tryChallenge(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryBuff === "function") { try { tryBuff(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryHaste === "function") { try { tryHaste(c, p, now); } catch (e) { /* segue */ } }
@@ -3745,12 +3745,10 @@ function combatTick(c, p, dt, now) {
   if (typeof tryAccessoryHelper === "function") tryAccessoryHelper(c, p, now);
   if (typeof tryMagicShield === "function") tryMagicShield(c, p, now);
 
-  // cura e mana
-  tryHeal(c, p, now);
-  // HEAL FRIEND (Druid/Monk): cura os aliados da party — exura sio / exura
-  // gran sio curam o membro mais ferido; exura gran mas res (Mass Healing)
-  // cura os aliados adjacentes quando 2+ membros estão com HP baixo.
+  // Heal Friend vem antes da autocura: o grupo Healing é compartilhado e
+  // uma autocura do Druid não pode roubar o único cast do aliado ferido.
   if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
+  tryHeal(c, p, now);
   tryMana(c, p, now);
 
   // EXETA AMP RES (Chivalrous Challenge, knight): marca os monstros para
