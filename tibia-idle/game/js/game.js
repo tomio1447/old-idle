@@ -1275,6 +1275,14 @@ function drainEvents() {
           r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
           r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), "critical-heal-effect", 800);
         }
+        // Confirmação visível no PRÓPRIO aliado curado. Assim a party vê
+        // exatamente quem recebeu exura sio "Nome", sem liberar as falas
+        // automáticas dos demais aliados durante o combate.
+        const healedEnt = e.targetId && c.players
+          ? c.players.find((x) => String(x.id) === String(e.targetId)) : null;
+        if (healedEnt && typeof creatureSay === "function" && e.words) {
+          creatureSay(healedEnt, e.words, TALK.SPELL);
+        }
         if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmtFull(e.amount)} hp)`);
         else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmtFull(e.amount)} hp)`);
         break;

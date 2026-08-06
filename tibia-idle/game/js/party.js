@@ -769,8 +769,11 @@ function tryHealFriend(c, p, now) {
   for (const target of targets) {
     partyApplyFriendHeal(p, target, amount);
     const targetEnt = c.players && c.players.find((e) => String(e.id) === String(target.id));
-    if (c.events) c.events.push({ t:"heal-friend", amount, target:target.name, spell:picked.spell.name,
-      mass:isMass, crit, x:targetEnt ? targetEnt.x : c.player.x, y:targetEnt ? targetEnt.y : c.player.y, screen:true, fx:isMass ? "magic-green" : "green-rings" });
+    const wordsForTarget = isMass ? spellWords(picked.id, picked.spell)
+      : `${spellWords(picked.id, picked.spell)} "${String(target.name || "").replace(/"/g, "")}"`;
+    if (c.events) c.events.push({ t:"heal-friend", amount, target:target.name, targetId:target.id,
+      words:wordsForTarget, spell:picked.spell.name, mass:isMass, crit,
+      x:targetEnt ? targetEnt.x : c.player.x, y:targetEnt ? targetEnt.y : c.player.y, screen:true, fx:isMass ? "magic-green" : "green-rings" });
   }
   if (isMass && c.events) c.events.push({ t:"effect", x:c.player.x, y:c.player.y, screen:true, fx:"magic-green" });
   if (c.events) {
