@@ -751,7 +751,7 @@ function renderMagicShieldHelper(p) {
           <div class="small" style="color:#7ec8ff;font-weight:bold">Magic Shield</div>
           <div class="tiny dim">Dano recebido consome mana antes da vida enquanto ativo.</div>
         </div>
-        <label class="toggle tiny"><input type="checkbox" id="ms-enabled" ${cfg.enabled ? "" : "checked"}> INATIVO</label>
+        <label class="toggle tiny"><input type="checkbox" id="ms-enabled" ${cfg.enabled ? "checked" : ""}> ATIVAR</label>
       </div>
       <div class="stat-row mt8"><span class="k">Estado</span><span class="v" style="color:${active ? "#7ec8ff" : "#888"}">${active ? "ATIVO · " + src : "inativo"}</span></div>
       ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>
@@ -792,7 +792,7 @@ function bindMagicShieldHelper(p) {
   const cfg = p.config.magicShield;
   const rer = () => { const el = document.getElementById("helper-magic-shield"); if (el) { el.innerHTML = renderMagicShieldHelper(p); bindMagicShieldHelper(p); } };
   const en = document.getElementById("ms-enabled");
-  if (en) en.addEventListener("change", () => { cfg.enabled = !en.checked; if (typeof save === "function") save(); rer(); });
+  if (en) en.addEventListener("change", () => { cfg.enabled = en.checked; if (typeof save === "function") save(); rer(); });
   const us = document.getElementById("ms-use-spell");
   if (us) us.addEventListener("change", () => { cfg.useSpell = us.checked; if (typeof save === "function") save(); rer(); });
   const hp = document.getElementById("ms-hp");
