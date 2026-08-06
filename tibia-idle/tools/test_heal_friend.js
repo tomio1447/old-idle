@@ -16,7 +16,8 @@ ctx.partyHealTargets = () => [{ id:'knight-1', name:'Tomio', hp:400, maxHp:1000 
 ctx.partyApplyFriendHeal = (p, target, amount) => { target.hp += amount; ctx.applied = { target, amount }; };
 const p = { id:'druid-1', voc:'druid', level:100, mp:1000, config:{ healFriendSpells:{ 'exura-sio':{ enabled:true, at:70, minTargets:2 } }, healFriendTargets:{ 'knight-1':{ enabled:true, priority:1 } } } };
 const targetEnt = { id:'knight-1', p:{ id:'knight-1', hp:400 }, x:.4, y:.5 };
-const c = { players:[{ id:'druid-1', p }, targetEnt], player:{ id:'druid-1', x:.5, y:.5 }, events:[] };
+// Druid não está selecionado: o alvo ativo é o knight. A cura precisa continuar.
+const c = { players:[{ id:'druid-1', p }, targetEnt], player:targetEnt, events:[] };
 if (!ctx.tryHealFriend(c,p,Date.now())) throw Error('Exura Sio não foi usada apesar de alvo abaixo do limiar');
 if (!ctx.applied || ctx.applied.amount !== 600) throw Error('Cura não foi aplicada ao alvo');
 if (!c.events.some(e => e.t==='heal-friend' && e.targetId==='knight-1')) throw Error('Evento visual do Heal Friend ausente');
