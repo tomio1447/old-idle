@@ -120,7 +120,7 @@ function buildOccupancy(c, ignorar) {
   /* o mapa entra como ocupacao fixa: spawn, passo, dance e A* passam a
    * respeitar paredes/agua sem precisar mudar nenhuma chamada. */
   for (const k of mapBlockKeys(c)) occ.set(k, true);
-  if (c.player && c.player !== ignorar) {
+  if (c.player && c.player !== ignorar && (!c.player.p || c.player.p.hp > 0)) {
     occ.set(c.player.cx + ":" + c.player.cy, c.player);
   }
   /* PARTY COMBAT: os aliados também ocupam tile (duas criaturas não

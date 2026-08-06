@@ -489,8 +489,12 @@ function updateGridMovement(c, p, dt, now) {
     }
   }
   for (const m of vivos) {
-    const alvoMob = (m.target && m.target.p && m.target.p.hp > 0)
-      ? m.target : c.player;
+    // Target morto não mantém vaga nem atenção: escolhe instantaneamente o
+    // membro vivo mais próximo, inclusive quando o personagem ativo caiu.
+    const alvoMob = (typeof partyNearestTarget === "function")
+      ? partyNearestTarget(c, m)
+      : ((m.target && m.target.p && m.target.p.hp > 0) ? m.target : c.player);
+    m.target = alvoMob;
     monsterThinkStep(c, m, alvoMob, occ, now);
   }
 }

@@ -1557,6 +1557,8 @@ function playerAttack(c, p, target) {
  * marcar varias e o motor usa a de maior dano fora de cooldown). */
 function tryCastSpell(c, p, target, now) {
   if (!p.config.spellAttack) return false;
+  // Mesma exaustão das runas ofensivas: não alterna SD → spell no ciclo seguinte.
+  if (entCd(c, p, "offensiveCd") > now) return false;
 
   // Barra de COMBO: quando o jogador montou uma rotacao, ela manda em tudo.
   // A ordem dos slots e a prioridade e cada slot pode exigir um numero
