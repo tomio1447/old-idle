@@ -1841,7 +1841,10 @@ function loop(ts) {
   G.renderer.resize();
   if (G.training) {
     G.renderer.drawAcademy(G.training, G.p, dt);
-  } else if (G.inCity && !G.combat) {
+  } else if (!G.combat) {
+    // Recupera saves que ficaram sem instância e com inCity=false após troca
+    // de branch/reload: a ausência de combate sempre deve renderizar Thais.
+    G.inCity = true;
     // na cidade a stamina e a mana regeneram devagar (treino online)
     G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * 0.35);
     regenInCity(G.p, dt);
