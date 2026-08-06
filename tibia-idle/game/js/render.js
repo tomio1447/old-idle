@@ -511,16 +511,19 @@ function playerHpBarColor(pct) {
   return "#f87171";
 }
 
-function drawNameBars(ctx, x, y, name, hpPct, mpPct) {
+function drawNameBars(ctx, x, y, name, hpPct, mpPct, shieldPct) {
   // ordem do client: barra de vida logo acima da criatura e o nome acima
   // dela. A mana so aparece para o proprio jogador (o Tibia nao mostra mana
   // de terceiros), entao fica numa terceira linha, mais fina.
   const hpY = y + 2;
   drawNameText(ctx, x, y - 3, name, "#ffffff");
   drawTibiaBar(ctx, x, hpY, hpPct, playerHpBarColor(hpPct));
-  if (mpPct !== undefined && mpPct !== null) {
-    drawTibiaBar(ctx, x, hpY + TIBIA_BAR_H + 2, mpPct, "#3c66ff");
+  let nextY = hpY + TIBIA_BAR_H + 2;
+  if (shieldPct !== undefined && shieldPct !== null && shieldPct > 0) {
+    drawTibiaBar(ctx, x, nextY, shieldPct, "#a64dff");
+    nextY += TIBIA_BAR_H + 2;
   }
+  if (mpPct !== undefined && mpPct !== null) drawTibiaBar(ctx, x, nextY, mpPct, "#3c66ff");
 }
 
 function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
@@ -546,8 +549,10 @@ function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
   const max = maxStats(player);
   const hpPct = max.hp ? player.hp / max.hp : 0;
   const mpPct = max.mp ? player.mp / max.mp : 0;
+  const shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(player, Date.now()))
+    ? Math.max(0, Math.min(1, (player.magicShieldPool || 0) / (player.magicShieldCap || 1))) : 0;
   if (mode === "arcs") drawStatusArcs(ctx, x, centerY, player.name, hpPct, mpPct, radius || 34);
-  else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct);
+  else drawNameBars(ctx, x, yTop, player.name, hpPct, mpPct, shieldPct);
 }
 
 /* Tag de PARTY ao lado do nome (como o OTC/Canary): estrela amarela no
@@ -1405,8 +1410,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const allyMax = maxStats(pp);
       const hpPct = Math.max(0, Math.min(1, pp.hp / (allyMax.hp || 1)));
       const mpPct = Math.max(0, Math.min(1, (Number(pp.mp) || 0) / (allyMax.mp || 1)));
+      const shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(pp, Date.now()))
+        ? Math.max(0, Math.min(1, (pp.magicShieldPool || 0) / (pp.magicShieldCap || 1))) : 0;
       drawNameBars(ctx, ent.x * W, top - 15,
-        ent.name + (knocked ? " (inconsciente)" : ""), hpPct, mpPct);
+        ent.name + (knocked ? " (inconsciente)" : ""), hpPct, mpPct, shieldPct);
       // quadro de alvo azul no aliado ATIVO é desenhado no bloco do player;
       // aqui marca quem está sendo controlado com um leve contorno dourado
       if (!knocked) {

@@ -171,7 +171,12 @@ function comboPronta(c, p, entrada, alvo, now) {
  */
 function comboEscolhe(c, p, alvo, now) {
   const lista = ensureCombo(p);
+  // Em multi-target, não gasta SD/strikes únicos se há spell de área
+  // configurada para aproveitar a box. Só cai no alvo único quando resta 1 mob.
+  const multi = c && c.mobs ? c.mobs.filter((m) => m.hp > 0).length > 1 : false;
+  const hasArea = lista.some((x) => x && x.min > 1);
   for (const entrada of lista) {
+    if (multi && hasArea && entrada.min <= 1) continue;
     if (!entrada) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
     // Requisito de alvos: so dispara se o pack for grande o bastante.
