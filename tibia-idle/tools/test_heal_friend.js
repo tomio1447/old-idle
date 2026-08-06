@@ -23,3 +23,6 @@ if (!ctx.applied || ctx.applied.amount !== 600) throw Error('Cura não foi aplic
 if (!c.events.some(e => e.t==='heal-friend' && e.targetId==='knight-1')) throw Error('Evento visual do Heal Friend ausente');
 if (!c.events.some(e => e.t==='say' && e.text === 'exura sio "Tomio"')) throw Error('Fala parametrizada ausente');
 console.log('OK: Heal Friend — seleção, aplicação, evento e fala validados.');
+const combatSource = fs.readFileSync(__dirname + '/../game/js/combat.js', 'utf8');
+if (!combatSource.includes('p.config.healFriendPriority === "self"')) throw Error('Prioridade self/friend ausente no combate');
+console.log('OK: prioridade auto cura vs Exura Sio configurável.');

@@ -3566,9 +3566,13 @@ function partyHelperTick(c, ent, now, dt) {
     if (typeof tryCureCondition === "function") { try { tryCureCondition(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryAccessoryHelper === "function") { try { tryAccessoryHelper(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryMagicShield === "function") { try { tryMagicShield(c, p, now); } catch (e) { console.error("MagicShield helper", e); } }
-    // Prioridade de party: cura o aliado antes de gastar o grupo Healing na autocura.
-    if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { console.error("HealFriend helper", e); } }
-    if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { console.error("Heal helper", e); } }
+    if (p.config.healFriendPriority === "self") {
+      if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { console.error("Heal helper", e); } }
+      if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { console.error("HealFriend helper", e); } }
+    } else {
+      if (typeof tryHealFriend === "function") { try { tryHealFriend(c, p, now); } catch (e) { console.error("HealFriend helper", e); } }
+      if (typeof tryHeal === "function") { try { tryHeal(c, p, now); } catch (e) { console.error("Heal helper", e); } }
+    }
     if (typeof tryMana === "function") { try { tryMana(c, p, now); } catch (e) { console.error("Mana helper", e); } }
     if (typeof tryChallenge === "function") { try { tryChallenge(c, p, now); } catch (e) { /* segue */ } }
     if (typeof tryBuff === "function") { try { tryBuff(c, p, now); } catch (e) { /* segue */ } }
@@ -3745,10 +3749,15 @@ function combatTick(c, p, dt, now) {
   if (typeof tryAccessoryHelper === "function") tryAccessoryHelper(c, p, now);
   if (typeof tryMagicShield === "function") tryMagicShield(c, p, now);
 
-  // Heal Friend vem antes da autocura: o grupo Healing é compartilhado e
-  // uma autocura do Druid não pode roubar o único cast do aliado ferido.
-  if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
-  tryHeal(c, p, now);
+  // O jogador escolhe quem recebe primeiro o grupo Healing: ele próprio
+  // ou o aliado do Exura Sio. Sem escolha, aliado é o padrão idle.
+  if (p.config.healFriendPriority === "self") {
+    tryHeal(c, p, now);
+    if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
+  } else {
+    if (typeof tryHealFriend === "function") tryHealFriend(c, p, now);
+    tryHeal(c, p, now);
+  }
   tryMana(c, p, now);
 
   // EXETA AMP RES (Chivalrous Challenge, knight): marca os monstros para

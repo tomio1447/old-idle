@@ -551,7 +551,10 @@ function renderHealFriend(p) {
     if (!cfg.healFriendTargets[key]) { cfg.healFriendTargets[key] = { enabled: true, priority: i + 1 }; healCfgDirty = true; }
   });
 
-  let h = `<div class="small dim mb4" style="color:#9ce84a;font-weight:bold">❤️ HEAL FRIEND — curar aliados da party</div>`;
+  if (!cfg.healFriendPriority) cfg.healFriendPriority = "friend";
+  let h = `<div class="small dim mb4" style="color:#9ce84a;font-weight:bold">❤️ HEAL FRIEND — curar aliados da party</div>
+    <div class="mt6 mb8"><label class="small dim">Prioridade do grupo Healing</label>
+      <select id="helper-heal-priority" style="width:100%"><option value="friend" ${cfg.healFriendPriority === "friend" ? "selected" : ""}>Priorizar Exura Sio / aliados</option><option value="self" ${cfg.healFriendPriority === "self" ? "selected" : ""}>Priorizar auto cura</option></select></div>`;
 
   // seleção de magia de aliado
   const spells = healFriendSpells(p);
@@ -618,6 +621,8 @@ function renderHealFriend(p) {
   box.innerHTML = h;
 
   // handlers
+  const priority = $("#helper-heal-priority");
+  if (priority) priority.addEventListener("change", () => { cfg.healFriendPriority = priority.value; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); });
   $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
     el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendSpell].enabled = el.checked; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-at]").forEach((el) =>
