@@ -2296,9 +2296,6 @@ function openOutfitModal() {
     $("#outfit-preview").innerHTML = url
       ? `<img src="${url}" alt="">`
       : `<div class="tiny dim">carregando…</div>`;
-    $("#outfit-name").textContent = (OUTFIT_TYPES.find((t) => t.id === draft.type) || {}).name || draft.type;
-    $$("#outfit-types [data-otype]").forEach((b) =>
-      b.classList.toggle("primary", b.dataset.otype === draft.type));
     $$("#outfit-parts [data-opart]").forEach((b) =>
       b.classList.toggle("primary", +b.dataset.opart === part));
     $$("#outfit-palette [data-ocolor]").forEach((s) =>
@@ -2320,12 +2317,7 @@ function openOutfitModal() {
           </div>
         </div>
         <div style="flex:1;min-width:0">
-          <div class="small dim mb4">Outfit</div>
-          <div class="row wrap mb4" id="outfit-types" style="gap:4px">
-            ${OUTFIT_TYPES.map((t) =>
-              `<button class="sm" data-otype="${t.id}">${t.name}</button>`).join("")}
-          </div>
-          <div class="tiny dim">Atual: <b id="outfit-name" style="color:#d4af37"></b></div>
+          <div class="tiny dim">Visual 15x: use o Wardrobe abaixo.</div>
           <div class="small dim mt8 mb4">Parte a colorir</div>
           <div class="row wrap" id="outfit-parts" style="gap:4px">
             ${PARTS.map(([n, i]) =>
@@ -2347,11 +2339,9 @@ function openOutfitModal() {
     </div>`;
   $("#modal").classList.add("show", "wide");
   // A antiga tela Aparências da Cyclopedia passa a viver dentro do Change Outfit.
+  if (typeof CYCLO !== "undefined") { CYCLO.appModo = "outfit"; CYCLO.filtro = "all"; }
   if (typeof cycloAppearance === "function") cycloAppearance(p, $("#cyclo-content"));
 
-  $$("#outfit-types [data-otype]").forEach((b) => b.addEventListener("click", () => {
-    draft.type = b.dataset.otype; render();
-  }));
   $$("#outfit-parts [data-opart]").forEach((b) => b.addEventListener("click", () => {
     part = +b.dataset.opart; render();
   }));
@@ -2365,7 +2355,7 @@ function openOutfitModal() {
   $("#outfit-close").addEventListener("click", close);
   $("#outfit-cancel").addEventListener("click", close);
   $("#outfit-save").addEventListener("click", () => {
-    p.outfit = { type: draft.type, colors: draft.colors.slice() };
+    p.outfit = Object.assign({}, p.outfit || {}, { type: draft.type, colors: draft.colors.slice() });
     save();
     toast("Outfit atualizado!");
     renderAll();
@@ -2414,12 +2404,6 @@ function openCharacterModal() {
   paintCharPortraits(chars);
   $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
   $("#char-outfit").addEventListener("click", () => openOutfitModal());
-  // atalho direto para a aba de aparencias da Cyclopedia, onde ficam os
-  // 252 visuais, os addons e as 236 montarias
-  $("#char-appearance").addEventListener("click", () => {
-    CYCLO.sub = "appearance";
-    openCyclopedia("character");
-  });
   $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
     const id = b.dataset.loadChar;
     const roster = readRoster();
