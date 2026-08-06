@@ -20,3 +20,9 @@ if (!combo.includes('entCd(c, p, "offensiveCd") > now')) fail('Combo ignora offe
 for (const needle of ['entCd(c, p, "potionCd") > now', 'entCdSet(c, p, "potionCd", now + 1000)', 'entCdSet(c, p, "runeCd", now + (s.cd || 2000))'])
   if (!combat.includes(needle)) fail('Contrato potion/runa ausente: '+needle);
 console.log('OK: spells/grupos, runas, potions e combo respeitam cooldowns.');
+// Combo pode conter slots vazios; multi-target não pode tentar ler .min deles.
+const comboCode = fs.readFileSync(root + 'combo.js', 'utf8');
+const comboCtx = { window:{}, SPELLS:{}, SUPPLIES:{} }; comboCtx.window=comboCtx;
+vm.createContext(comboCtx); vm.runInContext(comboCode, comboCtx, { filename:'combo.js' });
+comboCtx.comboEscolhe({ mobs:[{hp:1},{hp:1}] }, { config:{ combo:[null] } }, {}, Date.now());
+console.log('OK: slots nulos do combo não interrompem o loop.');

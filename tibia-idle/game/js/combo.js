@@ -179,8 +179,8 @@ function comboEscolhe(c, p, alvo, now) {
   const multi = c && c.mobs ? c.mobs.filter((m) => m.hp > 0).length > 1 : false;
   const hasArea = lista.some((x) => x && x.min > 1);
   for (const entrada of lista) {
-    if (multi && hasArea && entrada.min <= 1) continue;
     if (!entrada) continue;
+    if (multi && hasArea && entrada.min <= 1) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
     // Requisito de alvos: so dispara se o pack for grande o bastante.
     // Usa a MATRIZ real da area quando ela existe, para o "4+" contar
