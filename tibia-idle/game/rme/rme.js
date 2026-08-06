@@ -74,6 +74,9 @@ function loadExternalTile(id) {
   img.src = `../assets/tiles/${id}.png`;
   externalTiles[id] = img;
   img.onload = () => render();   // redesenha quando a imagem chega
+  // known_tiles pode listar arquivos ainda não exportados. Ao receber 404,
+  // volta para o atlas em vez de deixar a maioria da paleta vazia.
+  img.onerror = () => { externalTiles[id] = null; render(); };
   return img;
 }
 function drawItem32(ctx, id, dx, dy, size) {
@@ -85,7 +88,7 @@ function drawItem32(ctx, id, dx, dy, size) {
    * do canto superior esquerdo do tile de referencia). */
   if (KNOWN_SET.has(id)) {
     const img2 = loadExternalTile(id);
-    if (img2.complete && img2.naturalWidth) {
+    if (img2 && img2.complete && img2.naturalWidth) {
       /* Desenha a sprite ocupando exatamente tw x th células, sem forçar
        * escala de 32x32 — isso corrige sprites 62x62 e tamanhos irregulares. */
       const w = it.tw * size;
@@ -93,10 +96,8 @@ function drawItem32(ctx, id, dx, dy, size) {
       ctx.drawImage(img2, dx - (w - size), dy - (h - size), w, h);
       return;
     }
-    /* Imagem ainda nao carregou — desenha placeholder e pede re-render */
-    ctx.fillStyle = "rgba(255,255,255,.06)";
-    ctx.fillRect(dx, dy, size, size);
-    return;
+    /* Enquanto carrega, mostra placeholder; após 404 cai no atlas. */
+    if (img2) { ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.fillRect(dx, dy, size, size); return; }
   }
   /* Fallback: atlas 32x32 (apenas para itens sem PNG externo) */
   const img = atlases[it.page];
@@ -612,18 +613,14 @@ function renderPalRows() {
     // em cima do próximo item quando a paleta era rolada muito rápido.
     delete ic.dataset.anim;
     delete ic.dataset.fr;
-    // Se tem PNG em assets/tiles/, usa ele; senao usa o atlas
-    if (KNOWN_SET.has(id)) {
-      ic.style.backgroundImage = `url(../assets/tiles/${id}.png)`;
-      ic.style.backgroundPosition = "center";
-      ic.style.backgroundSize = "contain";
-    } else {
-      const cx = it.idx % CATALOG.cols;
-      const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
-      ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
-      ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
-      ic.style.backgroundSize = "";
-    }
+    // A paleta usa sempre o atlas completo: known_tiles contém ids do DAT
+    // que ainda não possuem PNG individual e apontá-los direto deixava a
+    // lista em branco. PNG externo fica reservado ao canvas do mapa.
+    const cx = it.idx % CATALOG.cols;
+    const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
+    ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
+    ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
+    ic.style.backgroundSize = "";
     if (!el.parentNode) palInner.appendChild(el);
   }
   // Solicita uma atualização única das animações para as linhas recém

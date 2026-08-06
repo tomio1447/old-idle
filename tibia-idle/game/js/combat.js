@@ -2342,7 +2342,7 @@ function tryHeal(c, p, now) {
   // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item
   //    e se as potions nao estiverem no cooldown compartilhado de 1s.
   //    "NÃO USAR POTIONS" (helper) desliga este bloco inteiro.
-  if (!p.config.noPotions && p.config.useRunes && pct <= itemAt && !(entCd(c, p, "potionCd") > now)) {
+  if (!p.config.noHealthPotions && p.config.useRunes && pct <= itemAt && !(entCd(c, p, "potionCd") > now)) {
     let best = null;
     const selectedHealSupply = p.config.healSupply;
     if (selectedHealSupply) {
@@ -2632,7 +2632,7 @@ function tryMana(c, p, now) {
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
   // "NÃO USAR POTIONS" (helper) desliga potions de mana também
-  if (p.config.noPotions) return false;
+  if (p.config.noManaPotions) return false;
   if (p.config.manaSupply === "") return false;
   const candidates = [];
   if (p.config.manaSupply) candidates.push(p.config.manaSupply);

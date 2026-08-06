@@ -1902,20 +1902,21 @@ function renderHelper(p) {
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="row mt8 mb4" style="justify-content:space-between;align-items:center">
-        <span class="small ${p.config.noPotions ? "" : "dim"}" style="${p.config.noPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions</span>
-        <button class="sm ${p.config.noPotions ? "danger" : ""}" id="helper-no-potions" title="Desliga todas as potions (HP e mana) — o personagem passa a usar só magias">
-          ${p.config.noPotions ? "ATIVADO — reativar" : "NÃO USAR POTIONS"}
+        <span class="small ${p.config.noHealthPotions ? "" : "dim"}" style="${p.config.noHealthPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions</span>
+        <button class="sm ${p.config.noHealthPotions ? "danger" : ""}" id="helper-no-potions" title="Desliga todas as potions (HP e mana) — o personagem passa a usar só magias">
+          ${p.config.noHealthPotions ? "HP OFF — reativar" : "NÃO USAR POTIONS HP"}
         </button>
       </div>
       <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map(supplyRow).join("")}</div>
+      <div class="list" style="max-height:210px;${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map(supplyRow).join("")}</div>
       <div class="mt8">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
+      <div class="row mt8 mb4" style="justify-content:space-between"><span class="small ${p.config.noManaPotions ? "" : "dim"}" style="${p.config.noManaPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions de mana</span><button class="sm ${p.config.noManaPotions ? "danger" : ""}" id="helper-no-mana-potions">${p.config.noManaPotions ? "MANA OFF — reativar" : "NÃO USAR POTIONS MANA"}</button></div>
       <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map(supplyRow).join("")}</div>`;
+      <div class="list" style="max-height:210px;${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map(supplyRow).join("")}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -1938,12 +1939,14 @@ function renderHelper(p) {
     }));
     const noPotBtn = $("#helper-no-potions");
     if (noPotBtn) noPotBtn.addEventListener("click", () => {
-      p.config.noPotions = !p.config.noPotions;
-      toast(p.config.noPotions
+      p.config.noHealthPotions = !p.config.noHealthPotions;
+      toast(p.config.noHealthPotions
         ? "Potions desativadas — o personagem passa a usar só magias"
         : "Potions reativadas");
       renderHelper(p);
     });
+    const noManaBtn = $("#helper-no-mana-potions");
+    if (noManaBtn) noManaBtn.addEventListener("click", () => { p.config.noManaPotions = !p.config.noManaPotions; renderHelper(p); });
     $$("#helper-heal [data-use-supply]").forEach((b) => b.addEventListener("click", () => {
       const slug = b.dataset.useSupply;
       const s = SUPPLIES[slug];
