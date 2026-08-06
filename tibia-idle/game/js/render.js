@@ -1322,7 +1322,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const pl = combat && combat.player ? combat.player : { x: 0.13, y: 0.62, dir: "e", moving: false, frame: 0 };
   const px = pl.x, py = pl.y;
   const pimg = OutfitRenderer.forPlayer(player, pl.dir || "e",
-                                        pl.moving ? (pl.frame || 1) : 0);
+                                        pl.moving ? (pl.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(player, Date.now()) : 0));
   // Sem flutuação (bob senoidal) e sem animação de ataque no personagem:
   // a sprite fica parada no chão, como no client.
   const bob = 0;
@@ -1383,7 +1383,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const pp = ent.p;
       const knocked = pp.hp <= 0;
       const img = OutfitRenderer.forPlayer(pp, ent.dir || "e",
-                                           ent.moving ? (ent.frame || 1) : 0);
+                                           ent.moving ? (ent.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(pp, Date.now()) : 0));
       if (!spriteReady(img)) continue;
       const sc = creatureScale(W);   // escala nativa OTClient
       const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;

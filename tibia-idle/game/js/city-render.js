@@ -234,7 +234,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   }
 
   // ---- jogador
-  const pimg = OutfitRenderer.forPlayer(player, walker.dir, walker.frame);
+  const pimg = OutfitRenderer.forPlayer(player, walker.dir, walker.moving ? walker.frame : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(player, Date.now()) : 0));
   const psx = walker.px * S - camX, psy = walker.py * S - camY;
   if (spriteReady(pimg)) {
     const w = spriteW(pimg) * S, h = spriteH(pimg) * S;

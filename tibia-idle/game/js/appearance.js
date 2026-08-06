@@ -29,6 +29,15 @@ const APP_MOUNT = {};
 })();
 
 
+/* Frame parado 15x: appearances com 5/9 frames possuem animação idle no
+ * próprio DAT. Outfits clássicas de 3 frames permanecem na pose 0 para não
+ * simular caminhada quando paradas. */
+function appearanceIdleFrame(p, now) {
+  const a = activeAvatarAppearance(p) || currentAppearance(p);
+  if (!a || (a.cols || 0) <= 3) return 0;
+  return Math.floor((now || Date.now()) / 180) % a.cols;
+}
+
 /* ------------------------------------------------------------ avatars
  * Transcendence ativa o Avatar Stage 3. O outfit normal do jogador nao e
  * alterado no save: durante a janela ativa, o renderer substitui a aparencia
