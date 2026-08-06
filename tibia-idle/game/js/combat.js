@@ -1684,6 +1684,7 @@ function castSpellById(c, p, target, now, id) {
   cdStart(p, id, (cdReal !== (s.cd || 2000))
     ? Object.assign({}, s, { cd: cdReal }) : s, now);
   c.spellCd[id] = now + cdReal;   // mantido: testes antigos leem esse mapa
+  if (s.aggr || s.type === "attack") entCdSet(c, p, "offensiveCd", now + 1000);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
@@ -2052,6 +2053,7 @@ function tryUseRune(c, p, target, now, forcada) {
   }
   if (!p.config.useRunes && !forcada) return false;
   if (entCd(c, p, "runeCd") > now) return false;
+  if (entCd(c, p, "offensiveCd") > now) return false;
   if (c.player && c.player.cx !== undefined && target.cx !== undefined
       && typeof sqmDistance === "function") {
     if (sqmDistance(c.player, target) > 6) return false;   // runa: 6 SQM
@@ -2083,6 +2085,7 @@ function tryUseRune(c, p, target, now, forcada) {
   // cooldown proprio da runa (o Canary declara em rune:cooldown), nao um
   // 2000 fixo para todas
   entCdSet(c, p, "runeCd", now + (s.cd || 2000));
+  entCdSet(c, p, "offensiveCd", now + 1000);
   if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
   if (typeof forgeTryTranscendence === "function") {
     const tr = forgeTryTranscendence(p, now);
