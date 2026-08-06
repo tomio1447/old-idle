@@ -653,7 +653,7 @@ function renderStatusBar(p) {
     const img = it.img
       ? `<img src="${it.img}" alt="">`
       : `<img src="assets/ui/conditions/${it.icon}.png" alt="">`;
-    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}${it.tempo ? `<span class="sb-tempo">${it.tempo}</span>` : ""}</span>`;
+    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}</span>`;
   }
   box.innerHTML = h;
   box.style.display = "flex";
