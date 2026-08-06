@@ -15,3 +15,12 @@
  GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',monsters:['mirror-image','many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition'],avgHp:27000,avgExp:22000,avgDamage:950,avgArmor:85,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e'};
  window.soulwarOpenBag=function(p){const pool=['soul-bastion','soulbleeder','soulcrusher','soulmaimer','soulshredder'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p&&p.lootPouch){p.lootPouch[item]=(p.lootPouch[item]||0)+1;return item;}return null;};
 })();
+/* Mirror Image do Canary: no primeiro dano revela a Apparition da vocação
+   que a atacou, preservando posição e vida restante proporcional. */
+window.soulwarMirrorTransform=function(c,m,p){
+ if(!m||m.slug!=='mirror-image'||m._mirrorDone)return;
+ const map={knight:'knight-s-apparition',paladin:'paladin-s-apparition',sorcerer:'sorcerer-s-apparition',druid:'druid-s-apparition',monk:'monk-s-apparition'};
+ const slug=map[p&&p.voc]||'many-faces', def=GAMEDATA.monsters[slug]; if(!def)return;
+ const pct=m.maxHp?m.hp/m.maxHp:1; m.slug=slug;m.def=Object.assign({},def);m.maxHp=def.hp;m.hp=Math.max(1,Math.floor(def.hp*pct));m._mirrorDone=true;
+ if(c&&c.events)c.events.push({t:'effect',x:m.x,y:m.y,screen:true,fx:'magic-blue'});
+};

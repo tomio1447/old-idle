@@ -1147,6 +1147,9 @@ function playerAttack(c, p, target) {
     return false;
   }
 
+  // Mirror Image revela a Apparition correspondente à vocação que iniciou o ataque.
+  if (target && target.slug === "mirror-image" && typeof soulwarMirrorTransform === "function") soulwarMirrorTransform(c, target, p);
+
   // Distância usa cargas de ammo. Se acabou, compra 1 carga no uso;
   // se não houver gold, o ataque não sai.
   if (isDist && !consumeAmmoCharge(c, p)) {
