@@ -87,10 +87,14 @@ function imbExpirado(im) {
 /* Tick global: desconta dt de TODOS os imbuements do jogador. Chamado pelo
  * game loop apenas enquanto houver combate ativo. */
 function imbTickAll(p, dt) {
-  if (!p || !p.imbuements) return;
-  for (const k of Object.keys(p.imbuements))
+  if (!p || !p.imbuements || !p.equip) return;
+  for (const k of Object.keys(p.imbuements)) {
+    // A chave é equip:<slot>. Se o item saiu daquele slot, o relógio para.
+    const slot = k.indexOf("equip:") === 0 ? k.slice(6) : null;
+    if (!slot || !p.equip[slot]) continue;
     for (const im of p.imbuements[k])
       if (imbRestante(im) > 0) im.rest = Math.max(0, imbRestante(im) - dt);
+  }
 }
 function imbTempoTexto(ms) {
   if (ms <= 0) return "expirado";

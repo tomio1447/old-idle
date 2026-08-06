@@ -1694,7 +1694,12 @@ function loop(ts) {
       G.tickAcc -= TICK;
     }
     // Relogio dos imbuements: 20h de TEMPO DE COMBATE (ver imbuement.js).
-    if (typeof imbTickAll === "function") imbTickAll(G.p, dt);
+    if (typeof imbTickAll === "function") {
+      // Cada membro da party consome apenas os imbuements dos itens que ELE
+      // tem equipados; não há relógio compartilhado entre personagens.
+      const ents = G.combat.players && G.combat.players.length > 1 ? G.combat.players : [{ p: G.p }];
+      for (const ent of ents) if (ent.p) imbTickAll(ent.p, dt);
+    }
 
     // Movimento a cada FRAME, nao a cada tick de 100ms (como o combatTick
     // fazia). No Canary o servidor so marca o INICIO do passo no beat de

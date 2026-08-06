@@ -97,22 +97,20 @@ function renderImbueModal(p) {
         <span class="tiny dim">${GAMEDATA.items[e.item].n} · ${e.slots} slot${e.slots > 1 ? "s" : ""}</span>
       </div></div>`;
   }
-  left += `</div><div class="imb-ativa">`;
+  left += `</div><div class="imb-ativa"><div class="tiny dim mb4">Slots de imbuement</div>`;
   const ativos = imbOf(p, cur.slot);
-  if (!ativos.length) {
-    left += `<div class="tiny dim" style="padding:4px 2px">Nenhum imbuement neste item.</div>`;
+  // Sempre desenha a quantidade exata de quadrados que o item possui.
+  // Slots sem imbuement ficam vazios em vez de desaparecerem.
+  left += `<div class="imb-slot-grid">`;
+  for (let i = 0; i < cur.slots; i++) {
+    const im = ativos[i];
+    if (!im) { left += `<div class="imb-modal-slot vazio" title="Slot vazio"></div>`; continue; }
+    const v = imbVisual(im), rest = imbTempoTexto(imbRestante(im));
+    left += `<div class="imb-modal-slot ${rest === "expirado" ? "expirado" : ""}" title="${v.nome} ${IMB_TIER_NOME[im.tier - 1]} · ${rest}">
+      ${imbIconeHtml(v.icon, 24)}<button class="imb-remove" data-slot="${cur.slot}" data-idx="${i}">✕</button></div>`;
   }
-  ativos.forEach((im, i) => {
-    const v = imbVisual(im);
-    const rest = imbTempoTexto(imbRestante(im));
-    left += `<div class="imb-ativa-row">
-      ${imbIconeHtml(v.icon, 22)}
-      <div class="imb-ativa-meta"><b>${v.nome} ${IMB_TIER_NOME[im.tier - 1]}</b>
-        <span class="tiny ${rest === "expirado" ? "txt-red" : "dim"}">${rest}</span></div>
-      <button class="imb-remove sm" data-slot="${cur.slot}" data-idx="${i}"
-        title="Remove por ${fmtFull(IMBDATA.bases[1].remove)} gp">✕</button>
-    </div>`;
-  });
+  left += `</div>`;
+  ativos.forEach((im) => { const v=imbVisual(im), rest=imbTempoTexto(imbRestante(im)); left += `<div class="tiny dim">${v.nome}: ${rest}</div>`; });
   left += `</div>`;
 
   // ------ centro: lista por categoria (filtrada pelo slot)
