@@ -665,6 +665,7 @@ const BOSS_DEFS = {
       { item: "jungle-quiver", chance: 4, max: 1 },
     ],
   },
+  "goshnar-s-greed": { id:"goshnar-s-greed", name:"Goshnar's Greed", title:"Boss de Dark Thais", hunt:"dark-thais", baseMonster:"many-faces", sprite:"goshnar-s-greed", hp:550000, exp:350000, damage:1800, armor:120, defense:110, cooldown:BOSS_COOLDOWN, requirement:{level:550,text:"Requer nível 550+ (Dark Thais)"}, loot:[{item:"bag-you-desire",chance:10,max:1},{item:"crystal-coin",chance:100,max:20}] },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
