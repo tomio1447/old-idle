@@ -13,7 +13,7 @@ const p = {}; ctx.cdStart(p,'a',ctx.SPELLS.a,1000);
 if (ctx.cdReady(p,'a',1001) || ctx.cdReady(p,'b',1001)) fail('Grupo de spell não bloqueou corretamente');
 if (!ctx.cdReady(p,'support',1001)) fail('Grupo independente foi bloqueado indevidamente');
 // Regressões de runtime: spell/rune e combo consultam a mesma exaustão.
-for (const needle of ['entCd(c, p, "offensiveCd") > now', 'entCdSet(c, p, "offensiveCd", now + 1000)'])
+for (const needle of ['entCd(c, p, "offensiveCd") > now', 'entCdSet(c, p, "offensiveCd", now + 2000)'])
   if (!combat.includes(needle)) fail('Cooldown ofensivo ausente: '+needle);
 if (!combo.includes('entCd(c, p, "offensiveCd") > now')) fail('Combo ignora offensiveCd');
 // HP e mana usam o mesmo potionCd; rune tem cd próprio.

@@ -1686,7 +1686,7 @@ function castSpellById(c, p, target, now, id) {
   cdStart(p, id, (cdReal !== (s.cd || 2000))
     ? Object.assign({}, s, { cd: cdReal }) : s, now);
   c.spellCd[id] = now + cdReal;   // mantido: testes antigos leem esse mapa
-  if (s.aggr || s.type === "attack") entCdSet(c, p, "offensiveCd", now + 1000);
+  if (s.aggr || s.type === "attack") entCdSet(c, p, "offensiveCd", now + 2000);
   if (typeof forgeTryMomentum === "function") {
     const momentum = forgeTryMomentum(p, now);
     if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
@@ -2087,7 +2087,7 @@ function tryUseRune(c, p, target, now, forcada) {
   // cooldown proprio da runa (o Canary declara em rune:cooldown), nao um
   // 2000 fixo para todas
   entCdSet(c, p, "runeCd", now + (s.cd || 2000));
-  entCdSet(c, p, "offensiveCd", now + 1000);
+  entCdSet(c, p, "offensiveCd", now + 2000);
   if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
   if (typeof forgeTryTranscendence === "function") {
     const tr = forgeTryTranscendence(p, now);
@@ -3850,7 +3850,7 @@ function combatTick(c, p, dt, now) {
   for (const m of c.mobs) {
     if (m.hp > 0) { alive.push(m); continue; }
     // recompensa
-    const staminaMul = p.stamina > 39 * 3600 ? 1.5 : p.stamina > 0 ? 1.0 : 0.5;
+    const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
     // Prey de EXP (TibiaWiki/Prey_System): +13~40% de experiência
     if (typeof preyExpBonus === "function") {
