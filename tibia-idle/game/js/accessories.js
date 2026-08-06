@@ -766,9 +766,9 @@ function renderMagicShieldHelper(p) {
       ${active && !energyRingEquipped(p) ? `<div class="stat-row"><span class="k">Tempo</span><span class="v">${fmtTime(((p.magicShieldUntil || now) - now) / 1000)}</span></div>
         <div class="stat-row"><span class="k">Escudo</span><span class="v" style="color:#7ec8ff">⚡ ${fmtFull(p.magicShieldPool || 0)} / ${fmtFull(p.magicShieldCap || 0)}</span></div>
         <div class="tiny dim">Capacidade = 7×ML + 7,6×nível + bônus (oficial 12.55). Quebra quando zera — potions de mana não recarregam o escudo.</div>` : ""}
-      ${spellOk ? `<div class="mt8 small"><label class="toggle"><input type="radio" name="ms-mode" value="off" ${cfg.mode === "off" ? "checked" : ""}> NÃO USAR</label>
-        <label class="toggle"><input type="radio" name="ms-mode" value="always" ${cfg.mode === "always" ? "checked" : ""}> SEMPRE ATIVO</label>
-        <label class="toggle"><input type="radio" name="ms-mode" value="hp" ${cfg.mode === "hp" ? "checked" : ""}> USAR COM % DE HP</label></div>` : ""}
+      ${spellOk ? `<div class="row wrap mt8" style="gap:6px"><button class="sm ${cfg.mode === "off" ? "primary" : ""}" data-ms-mode="off">NÃO USAR</button>
+        <button class="sm ${cfg.mode === "always" ? "primary" : ""}" data-ms-mode="always">SEMPRE ATIVO</button>
+        <button class="sm ${cfg.mode === "hp" ? "primary" : ""}" data-ms-mode="hp">USAR COM % DE HP</button></div>` : ""}
       <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;${cfg.mode === "hp" ? "" : "opacity:.45;pointer-events:none"}">
         <div style="flex:1">
           <label class="small dim">Ativar com HP abaixo de (%)</label>
