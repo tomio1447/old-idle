@@ -623,23 +623,7 @@ function renderStatusBar(p) {
     }
   }
 
-  // 5) stances ativas (badge de postura com o ícone oficial quando houver)
-  if (p.stances && typeof STANCES !== "undefined") {
-    for (const id in p.stances) {
-      const st = STANCES[id];
-      if (!st) continue;
-      let img = null;
-      if (st.iconWiki && typeof WIKI_ICONS !== "undefined" && WIKI_ICONS[st.iconWiki]) {
-        img = WIKI_ICONS[st.iconWiki].path;
-      } else if (typeof SPELLS !== "undefined" && SPELLS[id] && SPELLS[id].icon != null) {
-        img = "assets/spell/otc/" + SPELLS[id].icon + ".png";
-      }
-      itens.push({
-        img: img, nome: st.nome, desc: st.desc, tipo: "neutral",
-        tempo: "postura ativa",
-      });
-    }
-  }
+  // Stances ficam somente no selo discreto da cena; não duplicamos texto/tempo sobre as conditions.
 
   // 6) Avatar Stage 3 (Transcendence ativo)
   if (typeof avatarActive === "function" && avatarActive(p, agora)) {
