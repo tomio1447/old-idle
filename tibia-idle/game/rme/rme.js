@@ -620,7 +620,9 @@ function renderPalRows() {
     const cy = Math.floor(it.idx / CATALOG.cols) % CATALOG.rowsPerPage;
     ic.style.backgroundImage = `url(data/atlas_${it.page}.png)`;
     ic.style.backgroundPosition = `-${cx * 32}px -${cy * 32}px`;
-    ic.style.backgroundSize = "";
+    // Não use `contain`: ele reduz o atlas inteiro a 32px e deixa o ícone
+    // aparentemente vazio. Mantém as dimensões nativas da página do atlas.
+    ic.style.backgroundSize = `${CATALOG.cols * 32}px ${CATALOG.rowsPerPage * 32}px`;
     if (!el.parentNode) palInner.appendChild(el);
   }
   // Solicita uma atualização única das animações para as linhas recém
