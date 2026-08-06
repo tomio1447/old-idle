@@ -3355,6 +3355,13 @@ function mobAttack(c, p, mob) {
 
 /* Gera o loot de um monstro morto */
 function rollLoot(c, p, mob) {
+  // Party combat: a Loot Pouch do líder é o destino ÚNICO de todo loot,
+  // mesmo quando o membro ativo/quem deu o último hit é outro personagem.
+  // Equipamentos, imbuements e Forge continuam calculados pelo `p` atacante
+  // nos seus respectivos ataques; só a propriedade do drop muda aqui.
+  if (c && c.players && c.players.length > 1 && c.players[0] && c.players[0].p) {
+    p = c.players[0].p;
+  }
   const got = [];
   // Rate de loot do servidor: multiplica a chance de drop
   const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
