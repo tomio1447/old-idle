@@ -1263,15 +1263,15 @@ function drainEvents() {
       case "heal-friend": {
         // HEAL FRIEND: cura aplicada em um aliado da party (exura sio /
         // gran sio / gran mas res). Mostra o +HP sobre o personagem.
-        const px = c.player ? c.player.x : 0.13;
-        const py = c.player ? c.player.y - 0.12 : 0.5;
+        const px = e.screen ? e.x : (c.player ? c.player.x : 0.13);
+        const py = e.screen ? e.y - 0.12 : (c.player ? c.player.y - 0.12 : 0.5);
         r.addFloater(px, py, "+" + fmt(e.amount), "#00e65a", false, true, "restore");
-        r.addEffect(px, c.player ? c.player.y : 0.6, e.mass ? "holy-damage" : "green-rings");
+        r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), e.mass ? "magic-green" : "green-rings");
         // Critical Heal do Druid (10% base): efeito azul oficial em cima
         // do personagem que casta + texto CRITICAL!
         if (e.crit) {
           r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
-          r.addEffect(px, c.player ? c.player.y : 0.6, "critical-heal-effect", 800);
+          r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), "critical-heal-effect", 800);
         }
         if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmt(e.amount)} hp)`);
         else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmt(e.amount)} hp)`);

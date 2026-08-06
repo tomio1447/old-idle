@@ -38,6 +38,9 @@ function moveInfo(slug) {
  * distancia de atirador classica, sem o bicho correr ate a borda. */
 const MAX_TARGET_DISTANCE = 3;
 function monsterTargetDistance(mob) {
+  // Exeta Amp Res força criaturas ranged a encostar no knight enquanto o
+  // challenge estiver ativo, como o forceTarget do Canary.
+  if (mob.forceMeleeUntil && mob.forceMeleeUntil > Date.now()) return 1;
   const mi = moveInfo(mob.slug);
   if (mi.targetDistance) {
     return Math.min(MAX_TARGET_DISTANCE, mi.targetDistance);

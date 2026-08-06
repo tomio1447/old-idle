@@ -723,92 +723,59 @@ function partyApplyFriendHeal(p, member, amount) {
 
 /* O tick de HEAL FRIEND: roda junto do tryHeal no combate. */
 function tryHealFriend(c, p, now) {
-  if (!c || !p) return;
+  if (!c || !p) return false;
   const cfg = p.config || {};
-  const spellId = cfg.healFriendSpell;
-  if (!spellId) return;
-  // só Druid/Monk (as magias de aliado são deles)
-  const s = (typeof SPELLS !== "undefined") ? SPELLS[spellId] : null;
-  if (!s || s.type !== "heal") return;
-  if (!s.vocs || s.vocs.indexOf(p.voc) === -1) return;
-  if (p.level < s.lvl || p.mp < s.mana) return;
-  if (typeof cdReady === "function" && !cdReady(p, spellId, now)) return;
-  // Heal Friend usa o mesmo canal Healing da autocura: nunca pode furar
-  // spell/gcd usando um aliado como alvo.
-  if (typeof entCd === "function" && entCd(c, p, "healCd") > now) return;
-
-  const gatilhoPct = cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt;
-  const alvoCfg = cfg.healFriendTargets || {};
-  const alvos = partyHealTargets(p);
-  // Só os aliados marcados no Helper entram na fila. Config antiga sem
-  // registro continua habilitada, para preservar o comportamento anterior.
-  const feridos = alvos.filter((m) => {
-    const regra = alvoCfg[String(m.id)];
-    const enabled = !regra || regra.enabled !== false;
-    return enabled && m.maxHp > 0 && ((m.hp || 0) / m.maxHp) * 100 < gatilhoPct;
+  const ids = typeof healFriendSpells === "function" ? healFriendSpells(p) : [];
+  if (!ids.length) return false;
+  // Migra a configuração antiga (uma spell) para o modelo independente.
+  if (!cfg.healFriendSpells) cfg.healFriendSpells = {};
+  for (const id of ids) if (!cfg.healFriendSpells[id]) {
+    cfg.healFriendSpells[id] = { enabled: cfg.healFriendSpell === id,
+      at: cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt, minTargets: 2 };
+  }
+  const targetCfg = cfg.healFriendTargets || {};
+  const all = partyHealTargets(p).filter((m) => {
+    const r = targetCfg[String(m.id)]; return !r || r.enabled !== false;
   });
-  if (!feridos.length) return;
-
-  // Mass Healing (exura gran mas res): só dispara com 2+ membros feridos e
-  // cuida dos ALIADOS ADJACENTES (alcance da magia — área 3x3). Os membros
-  // da party são considerados adjacentes quando estão na mesma instância.
-  const ehMass = /gran[\s-]*mas[\s-]*res/i.test(spellId);
-  if (ehMass && feridos.length < 2) return;
-
-  // Cura base da magia + CRITICAL HEAL do Druid (10% de chance base):
-  // quando o crit acerta, a cura sobe pelo % de dano crítico extra.
-  let amount = Math.max(1, typeof rollSpell === "function" ? rollSpell(p, s) : (s.heal ? s.heal[1] : 100));
-  let critHeal = false;
-  if (typeof tryCriticalHeal === "function") {
-    const ch = tryCriticalHeal(p);
-    if (ch.crit && ch.extraPct > 0) {
-      amount = Math.max(1, Math.floor(amount * (1 + ch.extraPct / 100)));
-      critHeal = true;
-    }
-  }
-  let custo = s.mana;
-  if (typeof wheelApplySpellBoost === "function" && p.wheel) {
-    const _wm = wheelApplySpellBoost(p, spellId);
-    if (_wm && _wm.manaPct) custo = Math.max(0, Math.round(s.mana * (1 - _wm.manaPct / 100)));
-  }
-  p.mp -= custo;
-  if (typeof addManaSpent === "function") addManaSpent(p, custo);
-  if (typeof cdStart === "function") cdStart(p, spellId, s, now);
-  // cooldown de cura POR PERSONAGEM (party combat): cada aliado tem o seu
-  if (typeof entCdSet === "function" && typeof entCd === "function") {
-    entCdSet(c, p, "healCd", Math.max(entCd(c, p, "healCd") || 0, now + 1000));
-  } else {
-    if (c.healCd === undefined) c.healCd = 0;
-    c.healCd = Math.max(c.healCd || 0, now + 1000);
-  }
-
-  // aplica a cura (mass cura todos os feridos; single cura o mais ferido)
-  // Single target: prioridade menor vence; empate usa o aliado mais ferido.
-  // Mass mantém todos os aliados selecionados e feridos dentro da área.
-  const ordenados = feridos.slice().sort((a, b) => {
-    const pa = (alvoCfg[String(a.id)] || {}).priority || 99;
-    const pb = (alvoCfg[String(b.id)] || {}).priority || 99;
+  const ordered = (list) => list.slice().sort((a, b) => {
+    const pa = (targetCfg[String(a.id)] || {}).priority || 99;
+    const pb = (targetCfg[String(b.id)] || {}).priority || 99;
     return pa - pb || ((a.hp || 0) / a.maxHp) - ((b.hp || 0) / b.maxHp);
   });
-  const alvosCura = ehMass ? ordenados : [ordenados[0]];
-
-  // animação/efeito em cada alvo + atualização do HP
-  for (const alvo of alvosCura) {
-    partyApplyFriendHeal(p, alvo, amount);
-    if (c.events) {
-      c.events.push({ t: "heal-friend", amount: amount, target: alvo.name,
-                      spell: s.name, mass: ehMass, crit: critHeal,
-                      x: (c.player ? c.player.x : 0.5),
-                      y: (c.player ? c.player.y : 0.5), screen: true });
+  // Mass primeiro quando há pessoas suficientes; nos single-targets Gran Sio
+  // é avaliado antes do Sio e portanto salva o aliado mais baixo quando livre.
+  const preference = ["exura-gran-mas-res", "exura-gran-sio", "exura-sio", "exura-gran-tio-sio", "exura-tio-sio"];
+  let picked = null, targets = null, isMass = false;
+  for (const id of preference) {
+    if (!ids.includes(id)) continue;
+    const rule = cfg.healFriendSpells[id];
+    const spell = SPELLS[id];
+    if (!rule || !rule.enabled || !spell || p.mp < spell.mana || !cdReady(p, id, now)) continue;
+    if (typeof entCd === "function" && entCd(c, p, "healCd") > now) continue;
+    const hurt = ordered(all.filter((m) => m.maxHp > 0 && ((m.hp || 0) / m.maxHp) * 100 < (rule.at || 70)));
+    const mass = id === "exura-gran-mas-res";
+    if (mass ? hurt.length >= (rule.minTargets || 2) : hurt.length) {
+      picked = { id, spell, rule }; targets = mass ? hurt : [hurt[0]]; isMass = mass; break;
     }
   }
+  if (!picked) return false;
+  let amount = Math.max(1, rollSpell(p, picked.spell));
+  let crit = false;
+  if (typeof tryCriticalHeal === "function") { const ch = tryCriticalHeal(p); if (ch.crit) { amount = Math.floor(amount * (1 + ch.extraPct / 100)); crit = true; } }
+  p.mp -= picked.spell.mana;
+  if (typeof addManaSpent === "function") addManaSpent(p, picked.spell.mana);
+  cdStart(p, picked.id, picked.spell, now);
+  if (typeof entCdSet === "function") entCdSet(c, p, "healCd", now + 1000); else c.healCd = now + 1000;
+  for (const target of targets) {
+    partyApplyFriendHeal(p, target, amount);
+    const targetEnt = c.players && c.players.find((e) => String(e.id) === String(target.id));
+    if (c.events) c.events.push({ t:"heal-friend", amount, target:target.name, spell:picked.spell.name,
+      mass:isMass, crit, x:targetEnt ? targetEnt.x : c.player.x, y:targetEnt ? targetEnt.y : c.player.y, screen:true, fx:isMass ? "magic-green" : "green-rings" });
+  }
+  if (isMass && c.events) c.events.push({ t:"effect", x:c.player.x, y:c.player.y, screen:true, fx:"magic-green" });
   if (c.events) {
-    // No Canary, Heal Friend é spell parametrizada: a fala leva o nome do
-    // alvo entre aspas, por exemplo: exura sio "Ekazera". Magias em massa
-    // não recebem parâmetro porque atingem a área ao redor do conjurador.
-    const alvoFala = !ehMass && alvosCura[0] ? String(alvosCura[0].name || "").replace(/"/g, "") : "";
-    const palavras = typeof spellWords === "function" ? spellWords(spellId, s) : (s.words || spellId);
-    c.events.push({ t: "say", text: alvoFala ? `${palavras} "${alvoFala}"` : palavras });
+    const name = !isMass && targets[0] ? String(targets[0].name).replace(/"/g, "") : "";
+    c.events.push({ t:"say", text:name ? `${spellWords(picked.id, picked.spell)} "${name}"` : spellWords(picked.id, picked.spell) });
   }
   return true;
 }

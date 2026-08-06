@@ -2606,6 +2606,7 @@ function doChallengeCast(c, p, now, id, s) {
     // pedido do dono (v24): o exeta RES também pega TODOS os monstros ao
     // alcance (antes marcava só 1)
     m.challengedUntil = now + 10000;   // 10s de Challenge
+    if (amp && monsterTargetDistance(m) > 1) m.forceMeleeUntil = now + 10000;
     marcou++;
   }
   if (!marcou) return false;

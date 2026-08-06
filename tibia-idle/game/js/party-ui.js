@@ -540,6 +540,7 @@ function renderHealFriend(p) {
   const cfg = p.config;
   if (cfg.healFriendAt === undefined) cfg.healFriendAt = 70;
   const selecionada = cfg.healFriendSpell || "";
+  if (!cfg.healFriendSpells) cfg.healFriendSpells = {};
   const alvos = (typeof partyHealTargets === "function") ? partyHealTargets(p) : [];
   // Cada aliado pode ser ligado/desligado e recebe uma prioridade. Mantemos
   // os alvos existentes habilitados por padrão para não quebrar configs antigas.
@@ -553,6 +554,7 @@ function renderHealFriend(p) {
 
   // seleção de magia de aliado
   const spells = healFriendSpells(p);
+  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) cfg.healFriendSpells[id] = { enabled: selecionada === id, at: cfg.healFriendAt || 70, minTargets: 2 }; });
   if (!spells.length) {
     h += `<div class="tiny dim">As magias de cura de aliado desbloqueiam com o nível.</div>`;
     box.innerHTML = h;
@@ -561,7 +563,8 @@ function renderHealFriend(p) {
   h += `<div class="small dim mb4">Magia de aliado:</div>
     <div class="list" style="max-height:110px">` + spells.map((id) => {
       const s = SPELLS[id];
-      const sel = selecionada === id;
+      const rule = cfg.healFriendSpells[id];
+      const sel = !!rule.enabled;
       const mass = /gran mas res/i.test(id);
       const faixa = typeof spellRangeText === "function" ? spellRangeText(p, s) : "";
       return `<div class="shop-row ${sel ? "selected" : ""}" style="cursor:pointer" data-heal-friend-spell="${id}">
@@ -572,7 +575,9 @@ function renderHealFriend(p) {
           <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl} · cd ${Math.round((s.cd||1000)/1000)}s
             ${mass ? `<span style="color:#ffd65a">· mass (2+ aliados feridos)</span>` : ""}</div>
         </div>
-        <button class="sm ${sel ? "primary" : ""}">${sel ? "ATIVA" : "Usar"}</button>
+        <label class="tiny"><input type="checkbox" data-heal-friend-spell="${id}" ${sel ? "checked" : ""}> ativa</label>
+        <label class="tiny dim">HP% <input type="number" min="1" max="99" value="${rule.at}" data-heal-friend-at="${id}" style="width:38px"></label>
+        ${mass ? `<label class="tiny dim">aliados <input type="number" min="2" max="8" value="${rule.minTargets || 2}" data-heal-friend-min="${id}" style="width:34px"></label>` : ""}
       </div>`;
     }).join("") + `</div>`;
 
@@ -612,14 +617,11 @@ function renderHealFriend(p) {
 
   // handlers
   $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
-    el.addEventListener("click", () => {
-      const id = el.dataset.healFriendSpell;
-      cfg.healFriendSpell = (cfg.healFriendSpell === id) ? "" : id;
-      toast(cfg.healFriendSpell
-        ? `HEAL FRIEND: ${SPELLS[cfg.healFriendSpell].name} ativa.`
-        : "HEAL FRIEND desativado.");
-      renderHealFriend(p);
-    }));
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendSpell].enabled = el.checked; }));
+  $$("#helper-heal-friend-panel [data-heal-friend-at]").forEach((el) =>
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); }));
+  $$("#helper-heal-friend-panel [data-heal-friend-min]").forEach((el) =>
+    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendMin].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2)); }));
   const at = $("#helper-heal-friend-at");
   if (at) at.addEventListener("change", () => {
     cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
