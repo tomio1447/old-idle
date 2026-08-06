@@ -648,7 +648,9 @@ function magicShieldSpellAllowed(p) {
   const s = typeof SPELLS !== "undefined" ? SPELLS[MAGIC_SHIELD_SPELL_ID] : null;
   if (!s) return false;
   if (!s.vocs) return true;
-  const voc = String(p.voc || "").replace(/^elder\s+/i, "");
+  // Promotions usam nomes diferentes nos saves, mas compartilham a spell
+  // base do Canary: Master Sorcerer→sorcerer e Elder Druid→druid.
+  const voc = String(p.voc || "").replace(/^(elder|master)\s+/i, "");
   return s.vocs.indexOf(p.voc) !== -1 || s.vocs.indexOf(voc) !== -1;
 }
 
@@ -662,8 +664,9 @@ function tryMagicShield(c, p, now) {
   const max = maxStats(p);
   const hpPct = max.hp ? (p.hp / max.hp) * 100 : 100;
   const mpPct = max.mp ? (p.mp / max.mp) * 100 : 0;
-  if (mpPct < cfg.mpAbove) return false;
-  if (mode === "hp" && hpPct > cfg.hpBelow) return false;
+  // Sempre ativo só exige mana para o próprio cast. A porcentagem de mana
+  // é um gatilho adicional exclusivo do modo por HP.
+  if (mode === "hp" && (mpPct < cfg.mpAbove || hpPct > cfg.hpBelow)) return false;
   if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
   if (typeof cdReady === "function" && !cdReady(p, MAGIC_SHIELD_SPELL_ID, now)) return false;
   // 12.55+: recast com o escudo ATIVO renova a capacidade (oficial) — o
