@@ -722,65 +722,66 @@ function partyApplyFriendHeal(p, member, amount) {
 }
 
 /* O tick de HEAL FRIEND: roda junto do tryHeal no combate. */
+/* Heal Friend independente do painel: roda para qualquer Druid/Monk vivo,
+ * selecionado ou não. A configuração é persistida em p.config.healFriend. */
+function healFriendConfig(p) {
+  const cfg = p.config || (p.config = {});
+  const old = cfg.healFriend || {};
+  const voc = String(p.voc || '').toLowerCase();
+  const druid = /druid/.test(voc), monk = /monk/.test(voc);
+  const ids = druid ? ['exura-sio','exura-gran-sio','exura-gran-mas-res'] :
+    monk ? ['exura-tio-sio'] : [];
+  old.priority = old.priority === 'self' ? 'self' : 'friend';
+  // UI legado ainda edita estes dois mapas; eles são a fonte de verdade para não perder cliques.
+  old.targets = cfg.healFriendTargets || old.targets || {};
+  old.spells = cfg.healFriendSpells || old.spells || {};
+  for (const id of ids) if (!old.spells[id]) old.spells[id] = {
+    enabled: id === 'exura-sio' || id === 'exura-tio-sio',
+    hpBelow: cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt,
+    minTargets: 2,
+  };
+  for (const id of ids) { const r=old.spells[id]; if(r && r.hpBelow===undefined) r.hpBelow=r.at===undefined?70:r.at; }
+  cfg.healFriend = old;
+  return { cfg: old, ids: ids };
+}
 function tryHealFriend(c, p, now) {
-  if (!c || !p) return false;
-  const cfg = p.config || {};
-  const ids = typeof healFriendSpells === "function" ? healFriendSpells(p) : [];
-  if (!ids.length) return false;
-  // Migra a configuração antiga (uma spell) para o modelo independente.
-  if (!cfg.healFriendSpells) cfg.healFriendSpells = {};
-  for (const id of ids) if (!cfg.healFriendSpells[id]) {
-    cfg.healFriendSpells[id] = { enabled: cfg.healFriendSpell === id || id === "exura-sio",
-      at: cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt, minTargets: 2 };
-  }
-  const targetCfg = cfg.healFriendTargets || {};
-  const all = partyHealTargets(p).filter((m) => {
-    const r = targetCfg[String(m.id)]; return !r || r.enabled !== false;
+  if (!c || !p || p.hp <= 0) return false;
+  const setup = healFriendConfig(p), cfg = setup.cfg;
+  if (!setup.ids.length) return false;
+  const targets = partyHealTargets(p).filter((t) => {
+    const r = cfg.targets[String(t.id)]; return t.maxHp > 0 && (!r || r.enabled !== false);
   });
-  const ordered = (list) => list.slice().sort((a, b) => {
-    const pa = (targetCfg[String(a.id)] || {}).priority || 99;
-    const pb = (targetCfg[String(b.id)] || {}).priority || 99;
-    return pa - pb || ((a.hp || 0) / a.maxHp) - ((b.hp || 0) / b.maxHp);
-  });
-  // Mass primeiro quando há pessoas suficientes; nos single-targets Gran Sio
-  // é avaliado antes do Sio e portanto salva o aliado mais baixo quando livre.
-  const preference = ["exura-gran-mas-res", "exura-gran-sio", "exura-sio", "exura-gran-tio-sio", "exura-tio-sio"];
-  let picked = null, targets = null, isMass = false;
-  for (const id of preference) {
-    if (!ids.includes(id)) continue;
-    const rule = cfg.healFriendSpells[id];
-    const spell = SPELLS[id];
-    if (!rule || !rule.enabled || !spell || p.mp < spell.mana || !cdReady(p, id, now)) continue;
-    if (typeof entCd === "function" && entCd(c, p, "healCd") > now) continue;
-    const hurt = ordered(all.filter((m) => m.maxHp > 0 && ((m.hp || 0) / m.maxHp) * 100 < (rule.at || 70)));
-    const mass = id === "exura-gran-mas-res";
-    if (mass ? hurt.length >= (rule.minTargets || 2) : hurt.length) {
-      picked = { id, spell, rule }; targets = mass ? hurt : [hurt[0]]; isMass = mass; break;
+  if (!targets.length || entCd(c, p, 'healCd') > now) return false;
+  const sort = (a,b) => {
+    const pa=(cfg.targets[String(a.id)]||{}).priority||99, pb=(cfg.targets[String(b.id)]||{}).priority||99;
+    return pa-pb || (a.hp/a.maxHp)-(b.hp/b.maxHp);
+  };
+  // Mass first only when configured count is met; Gran Sio then Sio for low HP.
+  const order = ['exura-gran-mas-res','exura-gran-sio','exura-sio','exura-tio-sio'];
+  for (const id of order) {
+    if (!setup.ids.includes(id)) continue;
+    const rule=cfg.spells[id], spell=SPELLS[id];
+    if (!rule || !rule.enabled || !spell || p.level < spell.lvl || p.mp < spell.mana || !cdReady(p,id,now)) continue;
+    const hurt=targets.filter((t)=>t.hp/t.maxHp*100 < rule.hpBelow).sort(sort);
+    const mass=id==='exura-gran-mas-res';
+    if (!hurt.length || (mass && hurt.length < (rule.minTargets||2))) continue;
+    const healed=mass?hurt:[hurt[0]];
+    let amount=Math.max(1,rollSpell(p,spell)), crit=false;
+    const ch=typeof tryCriticalHeal==='function'?tryCriticalHeal(p):{crit:false,extraPct:0};
+    if(ch.crit && ch.extraPct){amount=Math.floor(amount*(1+ch.extraPct/100));crit=true;}
+    p.mp-=spell.mana; cdStart(p,id,spell,now); entCdSet(c,p,'healCd',now+1000);
+    for(const target of healed){
+      partyApplyFriendHeal(p,target,amount);
+      const ent=c.players&&c.players.find((e)=>String(e.p&&(e.p.id||characterId(e.p)))===String(target.id));
+      const words=mass?spell.words:`${spell.words} "${String(target.name).replace(/"/g,'')}"`;
+      c.events.push({t:'heal-friend',amount,target:target.name,targetId:target.id,words,spell:spell.name,mass,crit,
+        x:ent?ent.x:c.player.x,y:ent?ent.y:c.player.y,screen:true,fx:mass?'magic-green':'green-rings'});
     }
+    c.events.push({t:'say',text:mass?spell.words:`${spell.words} "${String(healed[0].name).replace(/"/g,'')}"`});
+    if(typeof saveCharacterToRoster==='function') saveCharacterToRoster(p);
+    return true;
   }
-  if (!picked) return false;
-  let amount = Math.max(1, rollSpell(p, picked.spell));
-  let crit = false;
-  if (typeof tryCriticalHeal === "function") { const ch = tryCriticalHeal(p); if (ch.crit) { amount = Math.floor(amount * (1 + ch.extraPct / 100)); crit = true; } }
-  p.mp -= picked.spell.mana;
-  if (typeof addManaSpent === "function") addManaSpent(p, picked.spell.mana);
-  cdStart(p, picked.id, picked.spell, now);
-  if (typeof entCdSet === "function") entCdSet(c, p, "healCd", now + 1000); else c.healCd = now + 1000;
-  for (const target of targets) {
-    partyApplyFriendHeal(p, target, amount);
-    const targetEnt = c.players && c.players.find((e) => String(e.id) === String(target.id));
-    const wordsForTarget = isMass ? spellWords(picked.id, picked.spell)
-      : `${spellWords(picked.id, picked.spell)} "${String(target.name || "").replace(/"/g, "")}"`;
-    if (c.events) c.events.push({ t:"heal-friend", amount, target:target.name, targetId:target.id,
-      words:wordsForTarget, spell:picked.spell.name, mass:isMass, crit,
-      x:targetEnt ? targetEnt.x : c.player.x, y:targetEnt ? targetEnt.y : c.player.y, screen:true, fx:isMass ? "magic-green" : "green-rings" });
-  }
-  if (isMass && c.events) c.events.push({ t:"effect", x:c.player.x, y:c.player.y, screen:true, fx:"magic-green" });
-  if (c.events) {
-    const name = !isMass && targets[0] ? String(targets[0].name).replace(/"/g, "") : "";
-    c.events.push({ t:"say", text:name ? `${spellWords(picked.id, picked.spell)} "${name}"` : spellWords(picked.id, picked.spell) });
-  }
-  return true;
+  return false;
 }
 
 /* A party está numa hunt/boss (líder está caçando)? No ONLINE o estado
