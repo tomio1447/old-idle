@@ -1241,8 +1241,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.kind === "damage" ? "12px" : (f.kind === "restore" ? "12px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
-    ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
+    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1372,8 +1372,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (combat && combat.players && combat.players.length > 1) {
       const ehLider = (typeof partyIsLeaderLocal === "function" && partyIsLeaderLocal(player)) ||
                       !!(player._partyOnline && player._partyOnline.isLeader);
-      const nmW = ctx.measureText(player.name).width;
-      drawPartyTagIcon(ctx, px * W - nmW / 2 - 8, drawY - 20, ehLider);
+
     }
   }
 
@@ -1423,9 +1422,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       }
       // Tag de PARTY ao lado do nome (membro = círculo azul) + fala do
       // aliado (magia/potion) acima do nome, como nos monstros
-      const nmTag = ent.name + (knocked ? " (inconsciente)" : "");
-      const nmW2 = ctx.measureText(nmTag).width;
-      drawPartyTagIcon(ctx, ent.x * W - nmW2 / 2 - 8, top - 19, false);
+
       drawCreatureSpeech(ctx, ent, ent.x * W, top - 4, dt);
     }
   }
@@ -1621,8 +1618,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.kind === "damage" ? "12px" : (f.kind === "restore" ? "12px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
-    ctx.lineWidth = f.kind ? 1 : (f.small ? 1.5 : 2);
+    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
