@@ -648,10 +648,12 @@ function magicShieldSpellAllowed(p) {
   const s = typeof SPELLS !== "undefined" ? SPELLS[MAGIC_SHIELD_SPELL_ID] : null;
   if (!s) return false;
   if (!s.vocs) return true;
-  // Promotions usam nomes diferentes nos saves, mas compartilham a spell
-  // base do Canary: Master Sorcerer→sorcerer e Elder Druid→druid.
-  const voc = String(p.voc || "").replace(/^(elder|master)\s+/i, "");
-  return s.vocs.indexOf(p.voc) !== -1 || s.vocs.indexOf(voc) !== -1;
+  // Aceita todos os nomes/promotions de Sorcerer e Druid usados em saves.
+  // O Canary registra só as vocações-base na spell, mas o idle pode guardar
+  // master sorcerer, sorcerer, elder druid ou druid.
+  const voc = String(p.voc || "").toLowerCase();
+  if (/sorcerer|druid/.test(voc)) return true;
+  return s.vocs.indexOf(p.voc) !== -1;
 }
 
 function tryMagicShield(c, p, now) {

@@ -142,6 +142,9 @@ function comboInfo(entrada) {
 /* A entrada esta pronta para ser usada agora? */
 function comboPronta(c, p, entrada, alvo, now) {
   if (!entrada) return false;
+  // Combo respeita a mesma exaustão global de toda ação ofensiva,
+  // inclusive Avalanche e outras runas de área.
+  if (typeof entCd === "function" && entCd(c, p, "offensiveCd") > now) return false;
 
   if (entrada.kind === "spell") {
     const s = SPELLS[entrada.id];
