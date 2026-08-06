@@ -803,7 +803,12 @@ function tryHealFriend(c, p, now) {
     }
   }
   if (c.events) {
-    c.events.push({ t: "say", text: (s.words || spellId) });
+    // No Canary, Heal Friend é spell parametrizada: a fala leva o nome do
+    // alvo entre aspas, por exemplo: exura sio "Ekazera". Magias em massa
+    // não recebem parâmetro porque atingem a área ao redor do conjurador.
+    const alvoFala = !ehMass && alvosCura[0] ? String(alvosCura[0].name || "").replace(/"/g, "") : "";
+    const palavras = typeof spellWords === "function" ? spellWords(spellId, s) : (s.words || spellId);
+    c.events.push({ t: "say", text: alvoFala ? `${palavras} "${alvoFala}"` : palavras });
   }
   return true;
 }
