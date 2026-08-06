@@ -1209,7 +1209,6 @@ function drainEvents() {
         // sobre a cabeça, como os demais números.
         const mx = ex(e), my = ey(e) - 0.06;
         if (e.ruse) {
-          r.addFloater(mx, my, "RUSE!", "#66c7ff");
           r.addEffect(mx, ey(e), "ruse-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.ruse = (fdc.ruse || 0) + 1;
@@ -1353,7 +1352,6 @@ function drainEvents() {
         // Exeta Amp Res: animação oficial (CONST_ME_CHIVALRIOUS_CHALLENGE,
         // anel de energia roxo/azul do DAT 15.x). Exeta Res: magic blue do
         // challenge.lua do Canary.
-        r.addFloater(px, py - 0.16, ehAmp ? "EXETA AMP RES!" : "EXETA RES!", "#ffd65a");
         r.addEffect(px, py, ehAmp ? "chivalrous-challenge" : "magic-blue");
         addLog("party", `<b style="color:#ffd65a">${e.spell || "Challenge"}</b> marcou <b>${e.count}</b> inimigo(s) — dano deles reduzido 20%`);
         break;
@@ -1364,7 +1362,6 @@ function drainEvents() {
         if (e.nome === "Momentum") {
           const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
           const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
-          r.addFloater(px, py - 0.16, "MOMENTUM!", "#ffe680");
           r.addEffect(px, py, "momentum-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.momentum = (fdc.momentum || 0) + 1;
