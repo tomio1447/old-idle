@@ -2276,16 +2276,8 @@ function tryHeal(c, p, now) {
       if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
           p.level >= s.lvl && p.mp >= s.mana &&
           cdReady(p, selectedHealSpell, now)) heals.push([selectedHealSpell, s]);
-    } else {
-      for (const id in SPELLS) {
-        const s = SPELLS[id];
-        if (s.type !== "heal") continue;
-        if (s.vocs.indexOf(p.voc) === -1) continue;
-        if (p.level < s.lvl || p.mp < s.mana) continue;
-        if (!cdReady(p, id, now)) continue;
-        heals.push([id, s]);
-      }
-    }
+    } // sem spell selecionada: não faz fallback automático
+
     if (heals.length) {
       // sem selecao manual: usa a cura que mais restaura NESTE personagem,
       // calculada pela formula do canary e nao por um peso fixo
@@ -2493,6 +2485,9 @@ function tryBuff(c, p, now) {
 const CURE_ORDEM = ["cursed", "fire", "energy", "bleed", "poison", "freezing"];
 
 function tryCureCondition(c, p, now) {
+  // Exana só é automática quando o jogador habilitar explicitamente essa
+  // automação; sem isso nenhuma magia não marcada no Helper é conjurada.
+  if (!p.config || !p.config.autoCure) return false;
   if (!p.conditions) return false;
   if (entCd(c, p, "cureCd") > now) return false;
   for (const tipo of CURE_ORDEM) {

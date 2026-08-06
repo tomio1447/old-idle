@@ -562,7 +562,10 @@ function forgeProcChanceForEquipped(p, slot) {
   ensureForge(p);
   var eq = p.equip && p.equip[slot];
   if (!eq) return 0;
-  var tier = forgeItemTier(p, eq.instId || eq.item);
+  // Procs só leem o tier da INSTÂNCIA equipada. Isso bloqueia tiers
+  // legados por slug (p.forge) de vazarem para outro item/personagem.
+  if (!eq.instId) return 0;
+  var tier = forgeItemTier(p, eq.instId);
   if (!tier) return 0;
   var base = forgeBaseChanceForSlotTier(slot, tier);
   if (!base) return 0;
