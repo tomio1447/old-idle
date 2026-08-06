@@ -2199,3 +2199,4 @@ a:hover { color: #aab6f7; }
 .combo-slot.drop-here { outline: 2px solid #d4af37; box-shadow: 0 0 10px rgba(212,175,55,.45); }
 .txt-red { color: #ff9090; }
 .mt10 { margin-top: 10px; }
+.party-analyser-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 8px}.pa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.pa-grid>div{background:#171719;border:1px solid #3f3f43;padding:7px;color:#aaa}.pa-grid b{display:block;color:#ffe680;font-size:14px}.pa-grid small{color:#75caff}.pa-table{width:100%;border-collapse:collapse;font-size:11px}.pa-table th{color:#ffe680;text-align:left;background:#191919}.pa-table td,.pa-table th{padding:5px;border-bottom:1px solid #333}.pa-line{display:flex;gap:7px;align-items:center;padding:3px;border-bottom:1px solid #303034}.pa-line span{flex:1}.pa-list-title{color:#ffe680;margin-bottom:5px}

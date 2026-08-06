@@ -648,53 +648,31 @@ function renderHealFriend(p) {
  * tabela por membro (como o analisador de caçada do OTC). */
 function openPartyAnalyserModal() {
   const p = G.p;
-  if (!p) { toast("Crie um personagem primeiro"); return; }
-  const s = (typeof partyAnalyserSession === "function") ? partyAnalyserSession(p) : null;
+  if (!p) return;
+  const s = partyAnalyserSession(p);
   const box = $("#modal-body");
-  box.innerHTML = `<div class="panel-title">📊 Party Hunt Analyser
-      <span style="flex:1"></span>
-      <button class="sm" id="analyser-close">✕</button>
-    </div>
-    <div class="panel-body"><div id="analyser-content"></div></div>`;
+  box.innerHTML = `<div class="panel-title">📊 Party Hunt Analyser <span class="tiny dim">OTC-style</span><span style="flex:1"></span><button class="sm" id="analyser-close">✕</button></div>
+    <div class="party-analyser-tabs">
+      <button class="sm primary" data-pa-tab="summary">📈 Hunting</button><button class="sm" data-pa-tab="members">👥 Members</button><button class="sm" data-pa-tab="loot">🎒 Loot</button><button class="sm" data-pa-tab="supply">🧪 Supplies</button><button class="sm" data-pa-tab="impact">⚔ Impact</button>
+    </div><div class="panel-body" id="analyser-content"></div>`;
   $("#modal").classList.add("show", "wide");
-  $("#analyser-close").addEventListener("click", () => $("#modal").classList.remove("show", "wide"));
-
-  const content = $("#analyser-content");
-  if (!s) {
-    content.innerHTML = `<div class="dim small center" style="padding:14px">
-      Nenhuma caçada registrada. Inicie uma caçada com o party para o
-      Analyser começar a coletar os dados.</div>`;
-    return;
-  }
-  const dur = Math.max(0, Math.round((s.endedAt || Date.now()) - s.startedAt) / 1000);
-  const mm = Math.floor(dur / 60), ss = Math.floor(dur % 60);
-  const kills = s.kills || 0;
-  const exp = s.exp || 0;
-  const loot = s.loot || 0;
-  const rows = Object.keys(s.byMember || {}).map((id) => {
-    const b = s.byMember[id];
-    return `<div class="party-analyser-row">
-      <span><b>${b.name || (id === "leader" ? p.name : "membro")}</b></span>
-      <span>${fmtFull(b.exp)} xp</span>
-      <span>${fmtFull(b.kills)} kills</span>
-      <span>${fmtFull(b.loot)} loot</span>
-      ${b.levelUps ? `<span style="color:#9ce84a">↑${b.levelUps} lvl</span>` : ""}
-    </div>`;
-  }).join("") || `<div class="dim small center">Sem dados por membro ainda.</div>`;
-
-  content.innerHTML = `
-    <div class="panel-inset mb8" style="padding:8px">
-      <div class="stat-row"><span class="k">Hunt</span><span class="v">${s.huntId ? ((GAMEDATA.hunts[s.huntId] || {}).name || s.huntId) : "—"}</span></div>
-      <div class="stat-row"><span class="k">Duração</span><span class="v">${mm}m ${ss}s</span></div>
-      <div class="stat-row"><span class="k">Kills</span><span class="v">${fmtFull(kills)}</span></div>
-      <div class="stat-row"><span class="k">Exp total</span><span class="v" style="color:#9ce84a">${fmtFull(exp)}</span></div>
-      <div class="stat-row"><span class="k">Itens de loot</span><span class="v">${fmtFull(loot)}</span></div>
-      <div class="stat-row"><span class="k">Exp/h</span><span class="v">${fmtFull(Math.round(exp * 3600 / Math.max(1, dur)))}</span></div>
-      <div class="stat-row"><span class="k">Kills/h</span><span class="v">${fmtFull(Math.round(kills * 3600 / Math.max(1, dur)))}</span></div>
-    </div>
-    <div class="party-analyser-table">${rows}</div>
-    <div class="tiny dim mt8">Dados da sessão atual de caçada do party
-      (resetam ao sair/voltar para a cidade).</div>`;
+  $("#analyser-close").onclick=()=>$("#modal").classList.remove("show", "wide");
+  const duration = s ? Math.max(1, Math.floor(((s.endedAt || Date.now()) - s.startedAt) / 1000)) : 1;
+  const c = G.combat, st = (c && c.stats) || {};
+  const n = (v) => fmtFull(Math.round(v || 0));
+  const rate = (v) => n((v || 0) * 3600 / duration);
+  const renderTab = (tab) => {
+    const out=$("#analyser-content"); if (!s) { out.innerHTML='<div class="dim center" style="padding:18px">Inicie uma caçada em party para começar a análise.</div>'; return; }
+    const members=Object.entries(s.byMember||{}).map(([id,b])=>`<tr><td>${b.name|| (id==='leader'?p.name:'Membro')}</td><td>${n(b.exp)} <span class="dim">(${rate(b.exp)}/h)</span></td><td>${n(b.kills)}</td><td>${n(b.loot)}</td><td>${b.levelUps?'↑'+b.levelUps:'—'}</td></tr>`).join('')||'<tr><td colspan="5" class="dim">Aguardando kills.</td></tr>';
+    const loot=Object.entries(st.loot||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum loot ainda.</div>';
+    const supplies=Object.entries(st.supplyUsed||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum supply usado.</div>';
+    if(tab==='summary') out.innerHTML=`<div class="pa-grid"><div>⏱ Duração<b>${Math.floor(duration/60)}m ${duration%60}s</b></div><div>☠ Kills<b>${n(s.kills)}</b></div><div>✨ XP<b>${n(s.exp)}</b><small>${rate(s.exp)}/h</small></div><div>🪙 Gold<b>${n(st.gold)}</b><small>${rate(st.gold)}/h</small></div></div><div class="panel-inset mt8">Hunt: <b>${(GAMEDATA.hunts[s.huntId]||{}).name||s.huntId||'—'}</b> · Kills/h: <b>${rate(s.kills)}</b></div>`;
+    else if(tab==='members') out.innerHTML=`<table class="pa-table"><thead><tr><th>Membro</th><th>XP</th><th>Kills</th><th>Loot</th><th>Level</th></tr></thead><tbody>${members}</tbody></table>`;
+    else if(tab==='loot') out.innerHTML=`<div class="pa-list-title">🎒 Loot obtido · ${n(st.gold)} gp</div>${loot}`;
+    else if(tab==='supply') out.innerHTML=`<div class="pa-list-title">🧪 Supplies · custo ${n(st.supplyCost)} gp</div>${supplies}`;
+    else out.innerHTML=`<div class="pa-grid"><div>⚔ Dano causado<b>${n(st.damage)}</b><small>${rate(st.damage)}/h</small></div><div>🛡 Dano recebido<b>${n(st.taken)}</b><small>${rate(st.taken)}/h</small></div><div>💚 Cura<b>${n(st.healed)}</b></div><div>☠ Mortes<b>${n(st.deaths)}</b></div></div>`;
+  };
+  $$("[data-pa-tab]").forEach(b=>b.onclick=()=>{ $$('[data-pa-tab]').forEach(x=>x.classList.remove('primary')); b.classList.add('primary'); renderTab(b.dataset.paTab); }); renderTab('summary');
 }
 
 /* ------------------------------------------------------------------ */
