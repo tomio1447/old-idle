@@ -67,6 +67,12 @@ const MONSTER_TINT = {
   "rage-squid": "sepia(1) saturate(15) hue-rotate(300deg) brightness(.60) contrast(1.45)",
   // Squid Warden mantém a leitura fria azul-escura da seção de gelo.
   "squid-warden": "sepia(1) saturate(10) hue-rotate(160deg) brightness(.72) contrast(1.3)",
+  // Apparitions Soul War: cores da vocação, preservando preto/sombras.
+  "knight-s-apparition": "sepia(1) saturate(12) hue-rotate(305deg) brightness(.68) contrast(1.35)",
+  "paladin-s-apparition": "sepia(1) saturate(11) hue-rotate(8deg) brightness(.9) contrast(1.25)",
+  "sorcerer-s-apparition": "sepia(1) saturate(12) hue-rotate(245deg) brightness(.72) contrast(1.3)",
+  "druid-s-apparition": "sepia(1) saturate(12) hue-rotate(75deg) brightness(.72) contrast(1.3)",
+  "monk-s-apparition": "sepia(1) saturate(11) hue-rotate(150deg) brightness(.78) contrast(1.3)",
 };
 function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
   const tint = MONSTER_TINT[slug];
@@ -125,8 +131,7 @@ function mobImg(slug, tam, extra) {
   const k = Math.min(px / meta.cw, px / meta.ch);
   const w = meta.cw * k, h = meta.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-  const tint = slug === "rage-squid" ? "filter:sepia(1) saturate(15) hue-rotate(300deg) brightness(.60) contrast(1.45);" :
-               slug === "squid-warden" ? "filter:sepia(1) saturate(10) hue-rotate(160deg) brightness(.72) contrast(1.3);" : "";
+  const tint = MONSTER_TINT[slug] ? `filter:${MONSTER_TINT[slug]};` : "";
   return `<div class="mob-img" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;${tint}
       background-image:url('assets/mob/${slug}.png?v=${v}');
