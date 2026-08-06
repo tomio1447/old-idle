@@ -1571,6 +1571,9 @@ function tryCastSpell(c, p, target, now) {
 
   const escolhidas = p.config.attackSpells;   // lista marcada no Helper
   const usaLista = Array.isArray(escolhidas) && escolhidas.length > 0;
+  // Sem seleção explícita, não escolhe "a melhor" magia sozinho.
+  // O antigo fallback era justamente o módulo Configurar forçando spells.
+  if (!usaLista && !(p.config.shooterType === "spell" && p.config.shooterSpell)) return false;
 
   const avail = [];
   for (const id in SPELLS) {
@@ -2636,7 +2639,7 @@ function tryMana(c, p, now) {
   if (p.config.manaSupply === "") return false;
   const candidates = [];
   if (p.config.manaSupply) candidates.push(p.config.manaSupply);
-  else for (const slug in p.supplies) candidates.push(slug);
+  // Sem potion selecionada no Helper, não consome mana potion.
   for (const slug of candidates) {
     const s = SUPPLIES[slug];
     // potions spirit tem cura+mana: elas so entram aqui quando o jogador as

@@ -1162,7 +1162,7 @@ function drainEvents() {
       case "manabuffer": {
         // Mana Buffer do 15.25: o golpe letal sai da mana em vez da vida
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
-        r.addFloater(px, py - 0.09, "-" + fmt(e.mana) + " mana", "#6a8aff");
+        r.addFloater(px, py - 0.09, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
         r.addFloater(px, py - 0.02, "mana buffer!", "#9ac0e8");
         r.addEffect(px, py, "magic-blue");
         r.playerFlash = 90;
@@ -1183,9 +1183,9 @@ function drainEvents() {
         // Energy Ring (clássico): drena mana do personagem. utamo vita
         // (12.55+): drena a POOL do escudo — mostra o restante.
         if (e.source === "Magic Shield" && e.pool !== undefined) {
-          r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " · escudo ⚡" + fmt(e.pool), "#7ec8ff");
+          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana) + " · escudo ⚡" + fmt(e.pool), "#7ec8ff");
         } else {
-          r.addFloater(px, py - 0.10, "-" + fmt(e.mana) + " mana", "#6a8aff");
+          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
         }
         r.addEffect(px, py, "magic-blue");
         // escudo quebrou (pool zerou): aviso
@@ -1198,7 +1198,7 @@ function drainEvents() {
         // as wands/rods do 15.25 devolvem mana a cada ataque
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
         if (e.amount > 0)
-          r.addFloater(px + 0.03, py - 0.14, "+" + fmt(e.amount), "#168cff", false, true, "restore");
+          r.addFloater(px + 0.03, py - 0.14, "+" + fmtFull(e.amount), "#168cff", false, true, "restore");
         r.addEffect(px, py, "mana-wisp");
         break;
       }
@@ -1247,7 +1247,7 @@ function drainEvents() {
       }
       case "mobheal":
         // cura defensiva do proprio monstro (bloco defenses do .lua)
-        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmt(e.heal), "#00e65a", false, true, "restore");
+        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmtFull(e.heal), "#00e65a", false, true, "restore");
         r.addEffect(ex(e), ey(e), e.fx || "magic-green");
         break;
       case "effect":
@@ -1267,7 +1267,7 @@ function drainEvents() {
         // gran sio / gran mas res). Mostra o +HP sobre o personagem.
         const px = e.screen ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.screen ? e.y - 0.12 : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmt(e.amount), "#00e65a", false, true, "restore");
+        r.addFloater(px, py, "+" + fmtFull(e.amount), "#00e65a", false, true, "restore");
         r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), e.mass ? "magic-green" : "green-rings");
         // Critical Heal do Druid (10% base): efeito azul oficial em cima
         // do personagem que casta + texto CRITICAL!
@@ -1275,14 +1275,14 @@ function drainEvents() {
           r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
           r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), "critical-heal-effect", 800);
         }
-        if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmt(e.amount)} hp)`);
-        else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmt(e.amount)} hp)`);
+        if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmtFull(e.amount)} hp)`);
+        else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmtFull(e.amount)} hp)`);
         break;
       }
       case "heal": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmt(e.amount), "#00e65a", false, true, "restore");
+        r.addFloater(px, py, "+" + fmtFull(e.amount), "#00e65a", false, true, "restore");
         // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
         // oficial (critical-heal-effect) em cima do personagem que casta.
         // O vermelho é exclusivo do dano crítico em monstros.
@@ -1290,7 +1290,7 @@ function drainEvents() {
           r.addEffect(px, py, "critical-heal-effect", 800);
         }
         // potion de spirit tambem restaura mana no mesmo gole
-        if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.mana), "#168cff", false, true, "restore");
+        if (e.mana) r.addFloater(px + 0.03, py + 0.04, "+" + fmtFull(e.mana), "#168cff", false, true, "restore");
         r.addEffect(px, c.player ? c.player.y : 0.6, "green-rings");
         // a potion correspondente brilha no Helper
         if (e.supply && typeof helperSupplyFlash === "function")
@@ -1300,9 +1300,9 @@ function drainEvents() {
       case "mana": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmt(e.amount), "#168cff", false, true, "restore");
+        r.addFloater(px, py, "+" + fmtFull(e.amount), "#168cff", false, true, "restore");
         // spirit potion bebida como mana tambem mostra a cura
-        if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.heal), "#00e65a", false, true, "restore");
+        if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmtFull(e.heal), "#00e65a", false, true, "restore");
         // faisca azul do gole de mana (como o CONST_ME_MAGIC_BLUE do client)
         r.addEffect(px, c.player ? c.player.y : 0.6, "magic-blue");
         if (e.supply && typeof helperSupplyFlash === "function")
