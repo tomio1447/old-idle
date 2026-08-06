@@ -1912,3 +1912,9 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .risk.mid  { background: #4a4210; color: #e8d24a; }
 .risk.high { background: #4a1a1a; color: #ff7a7a; }
 
+/* OTC Analytics Selector */
+#otc-analysers { padding: 4px; display:flex; flex-direction:column; gap:3px; }
+.otc-analyser-btn { width:100%; min-height:23px; color:#ddd; font-size:11px; text-align:center;
+ background:linear-gradient(#3a3a3e,#242428); border:1px solid #555; box-shadow:inset 0 0 0 1px #171719; }
+.otc-analyser-btn:hover { color:#ffe680; border-color:#a8873c; }
+.otc-analyser-result { line-height:1.75; min-width:260px; }

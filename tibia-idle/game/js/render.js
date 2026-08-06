@@ -1448,11 +1448,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ctx.beginPath();
         ctx.ellipse(mx, my + tile / 2, w * 0.32, h * 0.09, 0, 0, 7);
         ctx.fill();
-        if (combat.mobs[0] === m) {
-          // o quadro de alvo do client marca o SQM exato, nao a arte: fica
-          // exatamente nos limites do tile onde a criatura esta
-          drawTargetSquare(ctx, mx - tile / 2, my - tile / 2, tile, tile);
-        }
         if (m.fiendish || m.influenced) {
           ctx.save();
           ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
