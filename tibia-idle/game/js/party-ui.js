@@ -62,12 +62,14 @@ function partyVocName(voc) {
 
 /* Ícone pequeno da outfit do membro: sprite de vocação (como o seletor
  * de vocação usa) — assets/outfit/<voc>-m_s.png. */
-function partyOutfitIcon(voc, sex) {
-  const map = { knight: "knight", paladin: "hunter", druid: "summoner",
-                sorcerer: "mage", monk: "monk" };
+function partyOutfitIcon(member, sex) {
+  const voc = typeof member === "object" ? member.voc : member;
+  const outfit = typeof member === "object" && member.outfit ? member.outfit : null;
+  // A party acompanha a aparência escolhida; fallback é a roupa clássica.
+  if (outfit && outfit.appearance) return `assets/appearance/outfit/${outfit.appearance}.base.png`;
+  const map = { knight: "knight", paladin: "hunter", druid: "summoner", sorcerer: "mage", monk: "monk" };
   const o = map[voc] || "citizen";
-  const s = sex === "female" ? "f" : "m";
-  return `assets/outfit/${o}-${s}_s.png`;
+  return `assets/outfit/${o}-${sex === "female" ? "f" : "m"}_s.png`;
 }
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
@@ -130,14 +132,14 @@ function renderPartyPanel(p) {
     };
     const ls = statsDe(lider);
     membros = [{ id: lider.id, name: lider.name, voc: lider.voc, level: lider.level,
-                 sex: lider.sex, hp: ls.hp, mp: ls.mp, maxHp: ls.maxHp,
+                 sex: lider.sex, outfit: lider.outfit, hp: ls.hp, mp: ls.mp, maxHp: ls.maxHp,
                  maxMp: ls.maxMp, _leader: true }];
     for (const m of (ld ? ld.members : pt.members)) {
       const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
       if (!c) continue;
       const ms = statsDe(c);
       membros.push({ id: c.id, name: c.name, voc: c.voc, level: c.level,
-                     sex: c.sex, hp: ms.hp, mp: ms.mp,
+                     sex: c.sex, outfit: c.outfit, hp: ms.hp, mp: ms.mp,
                      maxHp: ms.maxHp, maxMp: ms.maxMp });
     }
     panel.style.display = "";
@@ -179,7 +181,7 @@ function renderPartyPanel(p) {
         data-party-char="${m.id}" data-switch="${clickable ? 1 : 0}"
         title="${clickable ? "Trocar para " + m.name : (isCurrent ? "Personagem atual" : "Membro de outra conta")}">
       <div class="ppm-outfit">
-        <img src="${partyOutfitIcon(m.voc, m.sex)}" alt="">
+        <img src="${partyOutfitIcon(m, m.sex)}" alt="">
       </div>
       <div class="ppm-info">
         <div class="ppm-name ${isLeader ? "leader" : ""}">${m.name}

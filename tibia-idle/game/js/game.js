@@ -2338,12 +2338,16 @@ function openOutfitModal() {
         ${OUTFIT_PALETTE.map((c, i) =>
           `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
       </div>
-      <div class="row" style="gap:6px">
+      <div class="small dim mt8 mb4">Wardrobe — outfits, addons e montarias</div>
+      <div id="cyclo-content" class="outfit-wardrobe" style="max-height:330px;overflow:auto"></div>
+      <div class="row" style="gap:6px;margin-top:8px">
         <button class="primary" style="flex:1" id="outfit-save">Salvar outfit</button>
         <button style="flex:none" id="outfit-cancel">Cancelar</button>
       </div>
     </div>`;
-  $("#modal").classList.add("show");
+  $("#modal").classList.add("show", "wide");
+  // A antiga tela Aparências da Cyclopedia passa a viver dentro do Change Outfit.
+  if (typeof cycloAppearance === "function") cycloAppearance(p, $("#cyclo-content"));
 
   $$("#outfit-types [data-otype]").forEach((b) => b.addEventListener("click", () => {
     draft.type = b.dataset.otype; render();
@@ -2393,7 +2397,6 @@ function openCharacterModal() {
           </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
       </div>
       <button class="full mb8" id="char-outfit">👕 Change Outfit</button>
-      <button class="full mb8" id="char-appearance">🐴 Aparências (addons e montarias)</button>
       <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
       <div id="char-new-box" class="panel-inset" style="display:none;padding:8px">
         <div class="field"><label>Nome</label><input id="new-char-name" maxlength="20" autocomplete="off"></div>
