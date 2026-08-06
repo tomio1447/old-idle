@@ -796,7 +796,7 @@ function bindMagicShieldHelper(p) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const rer = () => { const el = document.getElementById("helper-magic-shield"); if (el) { el.innerHTML = renderMagicShieldHelper(p); bindMagicShieldHelper(p); } };
-  body.querySelectorAll('input[name="ms-mode"]').forEach((el) => el.addEventListener("change", () => {
+  document.querySelectorAll('#helper-magic-shield input[name="ms-mode"]').forEach((el) => el.addEventListener("change", () => {
     cfg.mode = el.value; cfg.enabled = cfg.mode !== "off";
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); rer();
   }));
