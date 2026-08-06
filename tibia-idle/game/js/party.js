@@ -667,7 +667,7 @@ function partyHealTargets(p) {
       const pp = ent.p;
       if (!pp || String(pp.id || characterId(pp)) === me) continue;
       const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1 };
-      out.push({ id: pp.id, name: pp.name, voc: pp.voc,
+      out.push({ id: pp.id || characterId(pp), name: pp.name, voc: pp.voc,
                  hp: Math.max(0, pp.hp || 0), maxHp: mx.hp || 1 });
     }
     return out;
@@ -680,7 +680,7 @@ function partyHealTargets(p) {
     const c = chars.find((x) => String(x.id || characterId(x)) === id);
     if (!c) continue;
     const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
-    out.push({ id: c.id, name: c.name, voc: c.voc,
+    out.push({ id: c.id || characterId(c), name: c.name, voc: c.voc,
                hp: c.hp || 0, maxHp: mx.hp || 1 });
   }
   return out;

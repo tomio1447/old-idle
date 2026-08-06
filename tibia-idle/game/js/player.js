@@ -126,6 +126,8 @@ function newPlayer(name, voc, sex) {
       pouchAutoSellPct: 80,
       refillArrow: "",      // arrow selecionada
       refillBolt: "",       // bolt selecionada
+      healFriendSpells: {},
+      healFriendTargets: {},
     },
     missions: {},
     bosses: {},
