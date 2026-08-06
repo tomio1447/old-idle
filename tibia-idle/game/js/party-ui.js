@@ -588,12 +588,7 @@ function renderHealFriend(p) {
       </div>`;
     }).join("") + `</div>`;
 
-  // % gatilho
-  h += `<div class="mt8">
-      <label class="small dim">Curar aliado quando HP abaixo de (%)</label>
-      <input id="helper-heal-friend-at" type="number" min="1" max="99" value="${cfg.healFriendAt}"
-        style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-    </div>`;
+
 
   // lista de aliados da party com HP
   h += `<div class="small dim mt8 mb4">Aliados na party (${alvos.length}):</div>`;
@@ -602,11 +597,11 @@ function renderHealFriend(p) {
   } else {
     h += alvos.map((m) => {
       const pct = m.maxHp > 0 ? Math.round((m.hp || 0) * 100 / m.maxHp) : 0;
-      const ferido = m.maxHp > 0 && pct < cfg.healFriendAt;
+      const ferido = m.maxHp > 0 && Object.values(cfg.healFriendSpells || {}).some((r) => r.enabled && pct < (r.at || r.hpBelow || 70));
       const targetCfg = cfg.healFriendTargets[String(m.id)] || { enabled: true, priority: 1 };
       return `<div class="party-member-row" style="cursor:default">
         <label class="tiny" title="Incluir este aliado no Heal Friend"><input type="checkbox" data-heal-target-enabled="${m.id}" ${targetCfg.enabled ? "checked" : ""}> curar</label>
-        <div class="ppm-outfit"><img src="${partyOutfitIcon(m.voc, null)}" alt=""></div>
+        <div class="ppm-outfit"><img src="${partyOutfitIcon(m, m.sex)}" alt=""></div>
         <div class="ppm-info">
           <div class="ppm-name">${m.name}</div>
           <div class="ppm-meta">nv ${m.level || "?"} · ${partyVocName(m.voc)}</div>
@@ -631,12 +626,6 @@ function renderHealFriend(p) {
     el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-min]").forEach((el) =>
     el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendMin].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
-  const at = $("#helper-heal-friend-at");
-  if (at) at.addEventListener("change", () => {
-    cfg.healFriendAt = Math.max(1, Math.min(99, parseInt(at.value, 10) || 70));
-    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
-    renderHealFriend(p);
-  });
   $$("#helper-heal-friend-panel [data-heal-target-enabled]").forEach((el) => el.addEventListener("change", () => {
     const key = String(el.dataset.healTargetEnabled);
     cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { priority: 1 };

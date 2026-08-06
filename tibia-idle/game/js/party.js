@@ -652,8 +652,8 @@ function partyHealTargets(p) {
     if (st) {
       for (const m of [st.leader].concat(st.members || [])) {
         if (Number(m.id) === Number(characterId(p))) continue;   // não cura a si
-        out.push({ id: m.id, name: m.name, voc: m.voc,
-                   hp: m.hp || 0, maxHp: m.maxHp || 0 });
+        out.push({ id: m.id, name: m.name, voc: m.voc, level: m.level || 1,
+                   sex: m.sex, outfit: m.outfit, hp: m.hp || 0, maxHp: m.maxHp || 0 });
       }
     }
     return out;
@@ -668,6 +668,7 @@ function partyHealTargets(p) {
       if (!pp || String(pp.id || characterId(pp)) === me) continue;
       const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1 };
       out.push({ id: pp.id || characterId(pp), name: pp.name, voc: pp.voc,
+                 level: pp.level || 1, sex: pp.sex, outfit: pp.outfit,
                  hp: Math.max(0, pp.hp || 0), maxHp: mx.hp || 1 });
     }
     return out;
@@ -681,6 +682,7 @@ function partyHealTargets(p) {
     if (!c) continue;
     const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
     out.push({ id: c.id || characterId(c), name: c.name, voc: c.voc,
+               level: c.level || 1, sex: c.sex, outfit: c.outfit,
                hp: c.hp || 0, maxHp: mx.hp || 1 });
   }
   return out;
