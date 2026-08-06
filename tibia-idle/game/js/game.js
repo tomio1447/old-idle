@@ -1413,6 +1413,11 @@ function drainEvents() {
         const saidor = (e.whoId && c && c.players)
           ? c.players.find((x) => String(x.id) === String(e.whoId)) : null;
         if (saidor) {
+          // A cena só mostra palavras mágicas do personagem selecionado.
+          // Aliados continuam aplicando spell/efeito/cura normalmente, mas
+          // não enchem a tela nem o log com falas automáticas.
+          const selecionado = c && c.player && String(c.player.id) === String(saidor.id);
+          if (!selecionado) break;
           if (typeof creatureSay === "function") {
             creatureSay(saidor, e.text, e.supply ? TALK.SAY : TALK.SPELL);
           }
