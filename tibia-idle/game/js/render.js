@@ -1618,30 +1618,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // --- DEBUG: contadores de procs da Exaltation Forge (temporário)
-  const forgeCounts = (typeof window !== "undefined" && window.FORGE_DEBUG_COUNT) || null;
-  if (forgeCounts) {
-    ctx.textAlign = "left";
-    ctx.font = "bold 14px Verdana";
-    ctx.lineWidth = 3;
-    const lines = [
-      { label: "FATAL", n: forgeCounts.fatal || 0, color: "#ff4a4a" },
-      { label: "MOMENTUM", n: forgeCounts.momentum || 0, color: "#ffe680" },
-      { label: "RUSE", n: forgeCounts.ruse || 0, color: "#66c7ff" },
-      { label: "AVATAR", n: forgeCounts.transcendence || 0, color: "#c78cff" },
-    ];
-    let y = 64;
-    for (const ln of lines) {
-      if (ln.n <= 0) continue;
-      const txt = `${ln.label}: ${ln.n}`;
-      ctx.strokeStyle = "#000";
-      ctx.strokeText(txt, 12, y);
-      ctx.fillStyle = ln.color;
-      ctx.fillText(txt, 12, y);
-      y += 20;
-    }
-  }
-
   // --- tela de morte (corpse + contador)
   if (combat && combat.dead) {
     const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
