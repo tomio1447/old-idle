@@ -122,6 +122,16 @@ CANARY_COLORS = {
     # --- misc hunts
     "hunter":        (113, 114, 39, 115),
     "wild-warrior":  (113, 39, 113, 115),
+    # Soul War: appearances que usam o mesmo sistema de máscara/paleta.
+    "knight-s-apparition": (95, 116, 116, 95),
+    "paladin-s-apparition": (78, 68, 58, 76),
+    "sorcerer-s-apparition": (86, 50, 50, 86),
+    "druid-s-apparition": (79, 78, 78, 76),
+    "monk-s-apparition": (94, 88, 88, 94),
+    # Rage/Squid compartilham a appearance base; as cores finais recebem
+    # o acabamento específico no renderer (cérebro/partes por região).
+    "rage-squid": (95, 78, 78, 78),
+    "squid-warden": (90, 89, 89, 89),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -138,7 +148,9 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "orc-rider", "orc-leader", "orc-warlord", "minotaur",
                "minotaur-archer", "minotaur-guard", "minotaur-mage",
                "pirate-marauder", "pirate-cutthroat", "pirate-buccaneer",
-               "pirate-corsair"}
+               "pirate-corsair", "knight-s-apparition", "paladin-s-apparition",
+               "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
+               "rage-squid", "squid-warden"}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 
