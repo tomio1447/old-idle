@@ -1914,7 +1914,6 @@ function renderAll() {
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
   // removido — level e mana já têm as barras fixas do painel do personagem)
   if (typeof renderPlayerStates === "function") renderPlayerStates(p);
-  if (typeof renderTopBarStats === "function") renderTopBarStats(p);
 }
 
 function renderHuntInfo() {
