@@ -134,7 +134,7 @@ function playerThinkStep(c, p, alvo, occ, now) {
 
   const modo = (p.config && p.config.attackMode) || "chase";
   // MODO BOX / SAFE: segue a formação tática (knight no melhor spot do
-  // centro, RP nas retas a 2 SQM, magos a 3 SQM reta — ou SAFE nos cantos
+  // centro, RP nas retas a 2 SQM, ED/MS a 4 SQM reta — ou SAFE nos cantos
   // da tela). O modo de hunt pode vir do modal de instância (c.huntMode).
   const fm = formationMode(c, { p: p });
   if (fm === "box") return boxThinkStep(c, pl, alvo, occ, now);
@@ -315,7 +315,9 @@ function boxTargetCell(c, ent, occ) {
   const base = knight || centro;
   if (voc === "knight" || voc === "elite knight") return boxKnightSpot(c, occ, base);
 
-  const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 : 3;
+  // ED/MS ficam a 4 SQMs para abrir a linha das waves; RP mantém 2 e Monk 3.
+  const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 :
+    ((voc === "druid" || voc === "elder druid" || voc === "sorcerer" || voc === "master sorcerer") ? 4 : 3);
   const retas = [
     { cx: base.cx + distancia, cy: base.cy }, { cx: base.cx - distancia, cy: base.cy },
     { cx: base.cx, cy: base.cy + distancia }, { cx: base.cx, cy: base.cy - distancia },

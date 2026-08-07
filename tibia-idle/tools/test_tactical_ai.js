@@ -34,11 +34,11 @@ vm.runInContext(`
   const unsafe = mageBoxScore(c, { cx: 9, cy: 6 }, knight);
   if (safe <= unsafe) fail("Mage não priorizou distância segura da box.");
 
-  // 3. Posição do mage permanece numa reta a 3 SQMs do knight.
+  // 3. Posição do ED/MS permanece numa reta a 4 SQMs do knight.
   const pos = boxTargetCell(c, mage, new Map());
   const d = Math.max(Math.abs(pos.cx - knight.cx), Math.abs(pos.cy - knight.cy));
-  if (d !== 3 || (pos.cx !== knight.cx && pos.cy !== knight.cy))
-    fail("Mage saiu da reta de 3 SQMs: " + JSON.stringify(pos));
+  if (d !== 4 || (pos.cx !== knight.cx && pos.cy !== knight.cy))
+    fail("Mage saiu da reta de 4 SQMs: " + JSON.stringify(pos));
 
   // 4. Reserva bloqueia a mesma posição para o próximo membro planejar.
   const c2 = { players: [], mobs: [], _formationReservations: new Map() };
