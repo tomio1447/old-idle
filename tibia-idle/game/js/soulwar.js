@@ -15,7 +15,7 @@
  M['many-faces']=ap('Many Faces',42000,32000,'death','mort-area');
  M['mirror-image']=ap('Mirror Image',35000,27000,'death','magic-blue');
  GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',monsters:['mirror-image','many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition'],avgHp:27000,avgExp:22000,avgDamage:950,avgArmor:85,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e'};
- window.soulwarOpenBag=function(p){const pool=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p&&p.lootPouch){p.lootPouch[item]=(p.lootPouch[item]||0)+1;return item;}return null;};
+ window.soulwarOpenBag=function(p){const pool=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p){p.depot=p.depot||[];p.depot.push(item);return item;}return null;};
 })();
 /* Mirror Image do Canary: no primeiro dano revela a Apparition da vocação
    que a atacou, preservando posição e vida restante proporcional. */

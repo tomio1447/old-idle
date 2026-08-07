@@ -1444,6 +1444,18 @@ function openPouchItemMenu(p, slug, x, y) {
       label: "Detalhes",
       action: () => openItemDetails(slug, count),
     },
+    ...(slug === "bag-you-desire" ? [{
+      label: "Abrir",
+      hint: "item Soul War aleatório → Depot",
+      action: () => {
+        const item = typeof soulwarOpenBag === "function" ? soulwarOpenBag(p) : null;
+        if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
+        removeLootPouch(p, slug, 1);
+        addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
+        toast(`Bag aberta: <b>${itemName(item)}</b> foi para o Depot.`);
+        renderAll();
+      },
+    }] : []),
     // equipavel? equipa direto da pouch (o antigo volta para a pouch)
     ...(it.s ? [{
       label: "Equipar",
