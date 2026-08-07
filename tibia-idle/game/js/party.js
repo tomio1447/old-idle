@@ -688,6 +688,15 @@ function partyHealTargets(p) {
   return out;
 }
 
+/* Localiza a entidade viva por id e, como fallback seguro de saves antigos,
+ * por nome. Isso evita que o Heal Friend cure uma cópia do roster. */
+function partyLiveEntity(c, member) {
+  if (!c || !c.players || !member) return null;
+  const id = String(member.id || "");
+  return c.players.find((e) => String(e.p && (e.p.id || characterId(e.p))) === id) ||
+    c.players.find((e) => e.p && String(e.p.name) === String(member.name));
+}
+
 /* Aplica a cura no membro (entidade viva do party combat, save local ou
  * estado online espelhado). */
 function partyApplyFriendHeal(p, member, amount) {
@@ -705,8 +714,7 @@ function partyApplyFriendHeal(p, member, amount) {
   // party combat: cura a entidade VIVA (a barra do painel muda na hora)
   if (typeof G !== "undefined" && G && G.combat &&
       Array.isArray(G.combat.players) && G.combat.players.length > 1) {
-    const ent = G.combat.players.find((e) =>
-      String(e.p && (e.p.id || characterId(e.p))) === String(member.id));
+    const ent = partyLiveEntity(G.combat, member);
     if (ent && ent.p) {
       const mx = typeof maxStats === "function" ? maxStats(ent.p) : { hp: 1 };
       ent.p.hp = Math.min(mx.hp || ent.p.hp, (ent.p.hp || 0) + amount);
@@ -774,7 +782,7 @@ function tryHealFriend(c, p, now) {
     p.mp-=spell.mana; cdStart(p,id,spell,now); entCdSet(c,p,'healCd',now+1000);
     for(const target of healed){
       partyApplyFriendHeal(p,target,amount);
-      const ent=c.players&&c.players.find((e)=>String(e.p&&(e.p.id||characterId(e.p)))===String(target.id));
+      const ent=partyLiveEntity(c, target);
       const words=mass?spell.words:`${spell.words} "${String(target.name).replace(/"/g,'')}"`;
       c.events.push({t:'heal-friend',amount,target:target.name,targetId:target.id,words,spell:spell.name,mass,crit,
         x:ent?ent.x:c.player.x,y:ent?ent.y:c.player.y,screen:true,fx:mass?'magic-green':'green-rings'});
