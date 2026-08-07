@@ -2287,20 +2287,12 @@ function openOutfitModal() {
   const draft = { type: p.outfit.type, colors: p.outfit.colors.slice() };
   const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
   let part = 0;
-  let dir = "s";
-
   const render = () => {
-    const fake = { sex: p.sex, voc: p.voc, outfit: draft };
-    const o = playerOutfit(fake);
-    const url = OutfitRenderer.preview(fake, dir);
-    $("#outfit-preview").innerHTML = url
-      ? `<img src="${url}" alt="">`
-      : `<div class="tiny dim">carregando…</div>`;
-    $$("#outfit-parts [data-opart]").forEach((b) =>
-      b.classList.toggle("primary", +b.dataset.opart === part));
-    $$("#outfit-palette [data-ocolor]").forEach((s) =>
-      s.classList.toggle("sel", +s.dataset.ocolor === draft.colors[part]));
-    if (!url) setTimeout(render, 120);
+    $$("#outfit-parts [data-opart]").forEach((b) => b.classList.toggle("primary", +b.dataset.opart === part));
+    $$("#outfit-palette [data-ocolor]").forEach((s) => s.classList.toggle("sel", +s.dataset.ocolor === draft.colors[part]));
+    // O único preview agora é o 15x do Wardrobe abaixo.
+    const ward = $("#cyclo-content");
+    if (ward && typeof cycloAppearance === "function") cycloAppearance(p, ward);
   };
 
   $("#modal-body").innerHTML = `
@@ -2309,7 +2301,6 @@ function openOutfitModal() {
     </div>
     <div class="panel-body">
       <div class="outfit-color-editor mb8">
-        <div id="outfit-preview" class="outfit-preview"></div>
         <div style="min-width:0;flex:1">
           <div class="small dim mb4">Cores do visual</div>
           <div class="row wrap mb4" id="outfit-parts" style="gap:4px">
@@ -2318,8 +2309,8 @@ function openOutfitModal() {
           <div id="outfit-palette" class="outfit-palette outfit-palette-compact">
         ${OUTFIT_PALETTE.map((c, i) =>
           `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
-          </div>
         </div>
+      </div>
       </div>
       <div class="small dim mt8 mb4">Wardrobe — outfits, addons e montarias</div>
       <div id="cyclo-content" class="outfit-wardrobe" style="max-height:330px;overflow:auto"></div>
