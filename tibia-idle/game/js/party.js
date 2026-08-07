@@ -342,6 +342,19 @@ function partyDeclineInvite(p, inviteId) {
   return { ok: true, msg: "Convite recusado." };
 }
 
+/* Limpa o espelho legado p.party no roster para uma party removida não
+ * ressuscitar na migração quando PARTY_LOCAL_KEY for apagada. */
+function partyClearLegacyMirrors(ids) {
+  try {
+    const roster = readRoster();
+    for (const id of ids || Object.keys(roster)) {
+      const entry = roster[id];
+      if (entry && entry.p && entry.p.party) { entry.p.party = { members: [], shareExp: false, session: null }; }
+    }
+    writeRoster(roster);
+  } catch (e) {}
+}
+
 /* Remover membro (só o líder; local grava no storage compartilhado). */
 function partyRemoveMember(p, memberId) {
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
@@ -352,6 +365,7 @@ function partyRemoveMember(p, memberId) {
   if (!d) return { ok: false, msg: "Sem party." };
   d.members = d.members.filter((m) => String(m.id) !== String(memberId));
   if (!d.members.length) d.shareExp = false;
+  partyClearLegacyMirrors([String(memberId)]);
   partyLocalWrite(d);
   return { ok: true };
 }
@@ -366,12 +380,16 @@ function partyLeave(p) {
   if (!d) return { ok: false, msg: "Sem party." };
   const id = String(p.id || characterId(p));
   if (String(d.leaderId) === id) {
+    partyClearLegacyMirrors([String(d.leaderId)].concat(d.members.map((m) => String(m.id))));
     localStorage.removeItem(PARTY_LOCAL_KEY);
+    p.party = { members: [], shareExp: false, session: null };
     return { ok: true, msg: "Party dissolvida." };
   }
   if (!d.members.some((m) => String(m.id) === id))
     return { ok: false, msg: "Você não está em uma party." };
   d.members = d.members.filter((m) => String(m.id) !== id);
+  partyClearLegacyMirrors([id]);
+  p.party = { members: [], shareExp: false, session: null };
   partyLocalWrite(d);
   return { ok: true, msg: "Você saiu da party." };
 }
