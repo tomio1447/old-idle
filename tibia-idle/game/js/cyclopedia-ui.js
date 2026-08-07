@@ -374,6 +374,10 @@ function cycloAppearance(p, el) {
     if (!box) return;
     if (!cv) { box.innerHTML = `<div class="tiny dim">carregando…</div>`;
                setTimeout(desenhar, 140); return; }
+    // Canvas da preview precisa receber tamanho CSS; sem isso outfits sem
+    // addon podiam ficar em 1:1 minúsculo/transparente no quadro do modal.
+    cv.style.width = "76px"; cv.style.height = "76px";
+    cv.style.imageRendering = "pixelated";
     box.innerHTML = "";
     box.appendChild(cv);
   };
