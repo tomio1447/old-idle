@@ -1284,7 +1284,7 @@ function drainEvents() {
         // exatamente quem recebeu exura sio "Nome", sem liberar as falas
         // automáticas dos demais aliados durante o combate.
         const healedEnt = e.targetId && c.players
-          ? c.players.find((x) => String(x.id) === String(e.targetId)) : null;
+          ? c.players.find((x) => String((x.p && (x.p.id || characterId(x.p))) || x.id) === String(e.targetId)) : null;
         if (healedEnt && typeof creatureSay === "function" && e.words) {
           creatureSay(healedEnt, e.words, TALK.SPELL);
         }
