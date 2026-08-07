@@ -1972,6 +1972,22 @@ function renderHuntInfo() {
 }
 
 /* ------------------------------------------------------------ boot */
+/* Ao abrir o jogo, a sessão de combate nunca é retomada: todos os personagens
+ * locais retornam ao templo de Thais com HP/MP completos. */
+function resetRosterToTemple() {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return;
+  const roster = readRoster();
+  for (const id of Object.keys(roster)) {
+    const raw = roster[id] && roster[id].p;
+    if (!raw) continue;
+    const char = normalizePlayer(raw);
+    const mx = maxStats(char);
+    char.hp = mx.hp; char.mp = mx.mp;
+    char.hunt = null; char.instanceMode = null;
+    roster[id] = { v: 1, p: char };
+  }
+  writeRoster(roster);
+}
 function startGame(p) {
   // Todos os módulos JS já foram carregados pelo index; aqui aguardamos os
   // assets essenciais para entrar sem sprites/modais piscando vazios.
@@ -2011,7 +2027,7 @@ function startGameReady(p) {
   const off = computeOffline(p);
   p.lastSeen = Date.now();
 
-  if (p.hunt && GAMEDATA.hunts[p.hunt]) {
+  if (false && p.hunt && GAMEDATA.hunts[p.hunt]) {
     p.instanceMode = p.instanceMode || "non-pvp";
     // mesma regra do startHunt: hunt .otbm carrega o mapa antes do combate
     huntMapFromOtbmAsync(GAMEDATA.hunts[p.hunt], () => {
