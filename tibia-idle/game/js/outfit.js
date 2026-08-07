@@ -182,8 +182,9 @@ const OutfitRenderer = {
       }
     }
     const o = playerOutfit(p);
-    if (p.outfit && p.outfit.appearance &&
-        typeof AppearanceRenderer !== "undefined") {
+    // Todo personagem usa primeiro a composição 15x. currentAppearance()
+    // garante a visual inicial por sexo mesmo para saves antigos sem campo appearance.
+    if (typeof AppearanceRenderer !== "undefined") {
       const cv = AppearanceRenderer.forPlayer(p, dir, frame);
       if (cv) return cv;
     }
@@ -196,9 +197,8 @@ const OutfitRenderer = {
   /* Data URL de uma prévia (usada na lista de personagens) */
   preview(p, dir) {
     const o = playerOutfit(p);
-    if (p.outfit && p.outfit.appearance &&
-        typeof AppearanceRenderer !== "undefined") {
-      const nv = AppearanceRenderer.preview(p);
+    if (typeof AppearanceRenderer !== "undefined") {
+      const nv = AppearanceRenderer.preview(p, dir || "s");
       if (nv) { try { return nv.toDataURL(); } catch (e) { /* segue */ } }
     }
     const cv = this.get(o.name, dir || "s", o.colors);
