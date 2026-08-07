@@ -244,7 +244,8 @@ function partyPendingInvitesAll() {
 
 /* CANCELAR convite (só o líder; o convidado usa Recusar). */
 function partyCancelInvite(p, inviteId) {
-  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode() &&
+      !(typeof G !== "undefined" && G && G.combat && Array.isArray(G.combat.players) && G.combat.players.length > 1)) {
     return partyDeclineInvite(p, inviteId);
   }
   if (!partyIsLeaderLocal(p)) return { ok: false, msg: "Só o líder pode cancelar convites." };
@@ -701,7 +702,8 @@ function partyLiveEntity(c, member) {
  * estado online espelhado). */
 function partyApplyFriendHeal(c, p, member, amount) {
   if (!member) return;
-  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+  if (typeof partyOnlineMode === "function" && partyOnlineMode() &&
+      !(c && Array.isArray(c.players) && c.players.length > 1)) {
     const st = p._partyOnline || null;
     if (!st) return;
     // espelha no estado local (o painel reflete na hora; o save do membro
