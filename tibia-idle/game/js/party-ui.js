@@ -67,6 +67,13 @@ function partyOutfitHtml(member) {
   // sheet .base branco/preto inteiro como se fosse uma miniatura.
   return `<div class="party-outfit-preview" data-party-preview="${member.id}"></div>`;
 }
+// Compatibilidade do cartão Heal Friend: a preview completa é aplicada no
+// painel OTC; aqui usa a sprite clássica segura para não interromper o Helper.
+function partyOutfitIcon(member, sex) {
+  const voc = typeof member === "object" ? member.voc : member;
+  const map = { knight:"knight", paladin:"hunter", druid:"summoner", sorcerer:"mage", monk:"monk" };
+  return `assets/outfit/${map[voc] || "citizen"}-${sex === "female" ? "f" : "m"}_s.png`;
+}
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
 function partySwitchToChar(id) {
