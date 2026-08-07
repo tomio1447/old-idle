@@ -680,8 +680,8 @@ function renderHunts(p) {
     "aventureiro":        { nome: "⚔️ Aventureiro" },
     "heroi":              { nome: "🛡️ Herói" },
     "lenda":              { nome: "🐉 Lenda" },
-    "ferumbras-ascendant":{ nome: "🔥 Ferumbras Ascendant", minLevel: 250 },
-    "hardcore":           { nome: "☠️ HARDCORE", minLevel: 400 },
+    "ferumbras-ascendant":{ nome: "🔥 Ferumbras Ascendant" },
+    "hardcore":           { nome: "☠️ HARDCORE" },
     "outras":             { nome: "🗺️ Outras" },
   };
   const catDe = (id) => GAMEDATA.hunts[id].cat || "outras";

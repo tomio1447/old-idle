@@ -998,12 +998,7 @@ function startHunt(id, instanceMode, force) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
-  // Trava de nível das áreas especiais (ex.: Ferumbras Ascendant = 250+)
-  const min = hu.minLevel || (hu.cat === "ferumbras-ascendant" ? 250 : 0);
-  if (min && G.p && G.p.level < min) {
-    toast(`Área bloqueada: requer nível ${min}+.`, "bad");
-    return;
-  }
+  // Hunts sem requisito de nível (modo de testes/progressão livre).
   // PARTY: membros (não líder) não podem entrar em hunt por conta própria —
   // só cidade/treino. O líder escolhe a hunt e leva a party junto (follow).
   // `force = true` é o FOLLOW (o membro é teleportado pelo servidor para a
