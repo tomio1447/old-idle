@@ -2206,3 +2206,5 @@ a:hover { color: #aab6f7; }
 .outfit-color-editor { display:flex; gap:10px; align-items:flex-start; }
 .outfit-palette-compact { grid-template-columns:repeat(16, 18px); gap:1px; width:max-content; padding:3px; }
 .outfit-palette-compact .swatch { width:18px; height:18px; aspect-ratio:auto; }
+
+#game-loading{position:fixed;inset:0;z-index:9999;background:rgba(8,10,14,.92);align-items:center;justify-content:center}.gl-box{width:min(360px,85vw);padding:22px;background:#20242c;border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 8px 35px #000}.gl-text{font-size:12px;color:#d8d8dc;margin:14px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}

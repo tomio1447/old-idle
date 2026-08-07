@@ -1973,6 +1973,16 @@ function renderHuntInfo() {
 
 /* ------------------------------------------------------------ boot */
 function startGame(p) {
+  // Todos os módulos JS já foram carregados pelo index; aqui aguardamos os
+  // assets essenciais para entrar sem sprites/modais piscando vazios.
+  if (typeof showGameLoading === "function" && typeof preloadGameAssets === "function") {
+    showGameLoading(true, "Preparando módulos e recursos...", 0);
+    return preloadGameAssets(p).then(() => { showGameLoading(false); startGameReady(p); });
+  }
+  return startGameReady(p);
+}
+
+function startGameReady(p) {
   p = normalizePlayer(p);
   G.p = p;
   G.renderer = new Renderer($("#scene"));
