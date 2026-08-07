@@ -56,6 +56,29 @@ function creatureTileOrigin(centerX, centerY, width, height, tile) {
   return { x: centerX - width / 2, y: centerY + tile / 2 - height };
 }
 
+/* Fila única de profundidade. Esta estrutura será a fonte de ordenação para
+ * players, aliados e monstros, substituindo os três loops independentes. */
+function buildRenderEntities(combat, player) {
+  const out = [];
+  if (!combat) return out;
+  if (combat.player && player) out.push({ kind: "player", ent: combat.player, p: player,
+    footY: combat.player.y || 0, id: "active" });
+  if (combat.players && combat.players.length > 1) {
+    for (const ent of combat.players) {
+      if (ent === combat.player || !ent.p || ent.p.hp <= 0) continue;
+      out.push({ kind: "ally", ent: ent, p: ent.p, footY: ent.y || 0, id: String(ent.id) });
+    }
+  }
+  for (const mob of combat.mobs || []) {
+    if (mob.hp <= 0) continue;
+    out.push({ kind: "monster", ent: mob, p: null, footY: mob.y || 0, id: String(mob.id) });
+  }
+  // Empate estável: monstros primeiro, players depois; quem está mais abaixo
+  // sempre cobre quem está acima, como o tile renderer do OTC.
+  const order = { monster: 0, ally: 1, player: 2 };
+  return out.sort((a, b) => a.footY - b.footY || order[a.kind] - order[b.kind]);
+}
+
 /* Alguns outfits extraídos do DAT vieram somente com a máscara em escala
  * cinza. O client oficial colore a aparência na composição; aplicamos a
  * mesma etapa após desenhar a máscara, sem adulterar transparência/frames. */
@@ -1330,224 +1353,61 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // --- player
-  const pl = combat && combat.player ? combat.player : { x: 0.13, y: 0.62, dir: "e", moving: false, frame: 0 };
-  const px = pl.x, py = pl.y;
-  const pimg = OutfitRenderer.forPlayer(player, pl.dir || "e",
-                                        pl.moving ? (pl.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(player, Date.now()) : 0));
-  // Sem flutuação (bob senoidal) e sem animação de ataque no personagem:
-  // a sprite fica parada no chão, como no client.
-  const bob = 0;
-  if (spriteReady(pimg)) {
-    // escala nativa OTClient: 32px por SQM
-    const sc = creatureScale(W);
-    const w = spriteW(pimg) * sc, h = spriteH(pimg) * sc;
-    const atkPush = 0;
-    // Âncora OTClient: sprite 1x1 começa no canto superior do tile;
-    // sprites maiores expandem para cima/esquerda a partir dele.
-    const tile = tilePx(W);
-    const origin = creatureTileOrigin(px * W, py * H, w, h, tile);
-    const top = origin.y;
-    if (this.playerFlash > 0) {
-      ctx.save();
-      ctx.filter = "brightness(2.2) saturate(0.4)";
-      this.playerFlash -= dt;
+  // --- entidades: uma única fila ordenada pela posição dos pés (OTC).
+  const depthEntities = buildRenderEntities(combat, player);
+  const entityInfo = [];
+  for (const e of depthEntities) {
+    const ent = e.ent;
+    let img = null, w = 0, h = 0, name = '', hpPct = 0, mpPct = null, shieldPct = 0;
+    if (e.kind === "monster") {
+      const frame = ent.moving ? (ent.frame || 1) : monsterIdleFrame(ent.slug, Date.now());
+      const walk = frame ? Sprites.mobWalk(ent.slug, ent.dir || "w", frame) : null;
+      img = spriteReady(walk) ? walk : Sprites.mob(ent.slug, ent.dir || "w");
+      name = typeof displayMonsterName === "function" ? displayMonsterName(ent.def.name) : ent.def.name;
+      hpPct = Math.max(0, ent.hp / ent.maxHp);
+    } else {
+      const frame = ent.moving ? (ent.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(e.p, Date.now()) : 0);
+      img = OutfitRenderer.forPlayer(e.p, ent.dir || "e", frame);
+      name = e.p.name;
+      const mx = maxStats(e.p);
+      hpPct = Math.max(0, e.p.hp / (mx.hp || 1));
+      mpPct = Math.max(0, (e.p.mp || 0) / (mx.mp || 1));
+      shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(e.p, Date.now()))
+        ? Math.max(0, Math.min(1, (e.p.magicShieldPool || 0) / (e.p.magicShieldCap || 1))) : 0;
     }
-    const drawX = origin.x + atkPush;
-    const drawY = top + bob;
-    // Avatar Stage 3 (Transcendence) ativo: glow colorido por vocação
-    const avatarGlowOn = (typeof window !== "undefined" && window.avatarActive &&
-                          player && player.voc && window.avatarActive(player, Date.now()));
-    if (avatarGlowOn) {
-      const AVATAR_GLOW = {
-        knight: "#ff7a3a", paladin: "#ffe680",
-        sorcerer: "#c78cff", druid: "#7ae87a",
-        monk: "#66c7ff",
-      };
-      ctx.save();
-      ctx.shadowColor = AVATAR_GLOW[player.voc] || "#c78cff";
-      ctx.shadowBlur = 22;
-      ctx.globalAlpha = 0.92;
+    if (!spriteReady(img)) continue;
+    const sc = creatureScale(W); w = spriteW(img) * sc; h = spriteH(img) * sc;
+    const cx = ent.x * W, cy = ent.y * H, tile = tilePx(W);
+    const origin = creatureTileOrigin(cx, cy, w, h, tile);
+    if (e.kind === "monster" && (ent.fiendish || ent.influenced)) {
+      ctx.save(); ctx.shadowColor = ent.fiendish ? '#c14bff' : '#39a8ff'; ctx.shadowBlur = ent.fiendish ? 22 : 18;
+      ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
     }
-    ctx.drawImage(pimg, drawX, drawY, w, h);
-    if (avatarGlowOn) ctx.restore();
-    if (this.playerFlash > 0) ctx.restore();
-    drawPlayerStatus(ctx, px * W, drawY - 14, py * H, player, player.config.barMode, Math.max(26, w * 0.42));
-    this.drawSpeech(ctx, px * W, drawY - 14, dt);
-    // Tag de PARTY (OTC/Canary) ao lado do nome: estrela amarela no líder,
-    // círculo azul nos membros — igual ao client oficial.
-    if (combat && combat.players && combat.players.length > 1) {
-      const ehLider = (typeof partyIsLeaderLocal === "function" && partyIsLeaderLocal(player)) ||
-                      !!(player._partyOnline && player._partyOnline.isLeader);
-
-    }
+    if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
+    else ctx.drawImage(img, origin.x, origin.y, w, h);
+    entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
 
-  // --- aliados do PARTY COMBAT (todos os membros na mesma instância) ---
-  if (combat && combat.players && combat.players.length > 1) {
-    const allies = combat.players.filter((e) => e !== combat.player && e.p);
-    for (const ent of allies) {
-      const pp = ent.p;
-      const knocked = pp.hp <= 0;
-      const img = OutfitRenderer.forPlayer(pp, ent.dir || "e",
-                                           ent.moving ? (ent.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(pp, Date.now()) : 0));
-      if (!spriteReady(img)) continue;
-      const sc = creatureScale(W);   // escala nativa OTClient
-      const w2 = spriteW(img) * sc, h2 = spriteH(img) * sc;
-      const tile = tilePx(W);
-      // Mesma origem OTClient do personagem controlado.
-      const origin = creatureTileOrigin(ent.x * W, ent.y * H, w2, h2, tile);
-      const top = origin.y;
-      ctx.save();
-      if (knocked) ctx.globalAlpha = 0.35;
-      // Nenhum deslocamento no ataque: aliados que conjuram também devem
-      // permanecer exatamente no centro do SQM, como o personagem ativo.
-      const atkPush2 = 0;
-      ctx.drawImage(img, origin.x + atkPush2, top, w2, h2);
-      ctx.restore();
-      // Todo membro da party mostra HP E mana na cena. Antes os aliados
-      // desenhavam somente a vida, enquanto o personagem controlado tinha
-      // as duas barras — agora usam o mesmo componente de status.
-      const allyMax = maxStats(pp);
-      const hpPct = Math.max(0, Math.min(1, pp.hp / (allyMax.hp || 1)));
-      const mpPct = Math.max(0, Math.min(1, (Number(pp.mp) || 0) / (allyMax.mp || 1)));
-      const shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(pp, Date.now()))
-        ? Math.max(0, Math.min(1, (pp.magicShieldPool || 0) / (pp.magicShieldCap || 1))) : 0;
-      drawNameBars(ctx, ent.x * W, top - 15,
-        ent.name + (knocked ? " (inconsciente)" : ""), hpPct, mpPct, shieldPct);
-      // quadro de alvo azul no aliado ATIVO é desenhado no bloco do player;
-      // aqui marca quem está sendo controlado com um leve contorno dourado
-      if (!knocked) {
-        ctx.strokeStyle = "rgba(214,175,55,.9)";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(ent.x * W - tile / 2 + 1, ent.y * H - tile / 2 + 1, tile - 2, tile - 2);
-      }
-      // Tag de PARTY ao lado do nome (membro = círculo azul) + fala do
-      // aliado (magia/potion) acima do nome, como nos monstros
-
-      drawCreatureSpeech(ctx, ent, ent.x * W, top - 4, dt);
+  // --- informações: segunda passagem, sempre acima de TODAS as sprites.
+  const occupiedLabels = [];
+  for (const info of entityInfo) {
+    let y = info.top - 15;
+    // Empilha apenas labels que cruzam horizontalmente e verticalmente.
+    for (const prev of occupiedLabels) {
+      if (Math.abs(prev.x - info.cx) < 42 && Math.abs(prev.y - y) < 20) y = prev.y - 20;
     }
-  }
-
-  // --- monstros
-  if (combat && !combat.dead) {
-    const mobs = combat.mobs.slice().sort((a, b) => a.y - b.y);
-    for (const m of mobs) {
-      // O frame vem do passo em andamento (advanceStep mantem ent.frame em
-      // 0 parado e 1|2 durante o deslocamento). Antes era derivado de
-      // Date.now(), ou seja, o bicho "pedalava" no lugar mesmo sem andar.
-      const passo = m.moving ? (m.frame || 1) : monsterIdleFrame(m.slug, Date.now());
-      const anim = passo ? Sprites.mobWalk(m.slug, m.dir || "w", passo) : null;
-      // se o frame não existir, cai na pose base em vez de sumir.
-      const img = spriteReady(anim) ? anim : Sprites.mob(m.slug, m.dir || "w");
-      const mx = m.x * W;
-      // sem oscilacao senoidal: no Tibia a criatura parada fica imovel no
-      // SQM. O balanco daqui somava ao pedalar dos frames e dava a impressao
-      // de que o bicho nunca sossegava.
-      const my = m.y * H;
-      if (spriteReady(img)) {
-        // mesma escala do jogador: o porte da criatura vem do tamanho da
-        // arte no DAT (32px = 1 SQM, 64px = 2 SQMs).
-        const sc = creatureScale(W);
-        const w = spriteW(img) * sc, h = spriteH(img) * sc;
-        // A mesma origem OTClient para monstros e players; evita que cada
-        // tipo de criatura tenha uma regra visual diferente.
-        const tile = tilePx(W);
-        const origin = creatureTileOrigin(mx, my, w, h, tile);
-        const top = origin.y;
-        const atkPush = 0;
-        if (m.fiendish || m.influenced) {
-          ctx.save();
-          ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
-          ctx.shadowBlur = m.fiendish ? 22 : 18;
-          ctx.globalAlpha = 0.92;
-          drawMonsterSprite(ctx, img, origin.x + atkPush, top, w, h, m.slug);
-          ctx.restore();
-        }
-        drawMonsterSprite(ctx, img, origin.x + atkPush, top, w, h, m.slug);
-        // barra de vida: largura fixa de 27px como no client, e nao
-        // proporcional ao sprite (um dragao nao tem barra maior que um rato)
-        const pct = Math.max(0, m.hp / m.maxHp);
-        const by = top - 9;
-        drawTibiaBar(ctx, mx, by, pct, tibiaHpColor(pct));
-        // nome logo acima da barra, com contorno preto como no client.
-        // A cor do TEXTO acompanha os degraus da barra de vida
-        // (tibiaHpColor): verde/amarelo/laranja/vermelho dizem o estado do
-        // bicho de longe, sem mirar a barra. O influenced continua
-        // reconhecivel pelo brilho azul no sprite (m.influenced, acima).
-        const mobName = typeof displayMonsterName === "function"
-          ? displayMonsterName(m.def.name)
-          : String(m.def.name || "").replace(/^Influenced\s+/i, "");
-        // --- Ícones de condição da TibiaWiki ao lado do nome, como o
-        // client oficial: Sap Strength / Expose Weakness (crippling
-        // stances do Sorcerer) e Chivalrous Challenge / Divine Dazzle
-        // (m.challengedUntil, reservado para uso futuro).
-        const agoraIcon = Date.now();
-        const condIcons = [];
-        if (m.sapStrUntil && m.sapStrUntil > agoraIcon) condIcons.push("sap-strength");
-        if (m.exposeUntil && m.exposeUntil > agoraIcon) condIcons.push("expose-weakness");
-        if (m.challengedUntil && m.challengedUntil > agoraIcon) condIcons.push("challenged");
-        if (condIcons.length) {
-          ctx.font = "bold 9px Verdana";
-          const tw = ctx.measureText(mobName).width;
-          const isz = 10, gap = 2;
-          const rowW = condIcons.length * (isz + gap) - gap;
-          let ix = Math.round(mx - tw / 2 - 4 - rowW);
-          const iy = Math.round(by - 13); // centro vertical da linha do nome
-          for (const slug of condIcons) {
-            if (drawWikiIcon(ctx, slug, ix, iy, isz)) ix += isz + gap;
-          }
-        }
-        drawNameText(ctx, mx, by - 4, mobName, tibiaHpColor(pct));
-        // Ícone de TIPO DE ATAQUE (OTC): ranged (🏹 flecha) ou melee (⚔
-        // espadas) — MENOR (9px) e na lateral DIREITA da sprite, no meio
-        // dela, logo abaixo do nome (pedido do dono: antes ficava grudado
-        // no lado esquerdo do nome com 12px).
-        if (typeof monsterAttackRange === "function" && monsterAttackRange(m) > 0.16) {
-          const iszAtk = 9;
-          const atkX = Math.round(mx + w / 2 + 3);
-          const atkY = Math.round(top + h * 0.35);
-          drawWikiIcon(ctx, "range-atk", atkX, atkY, iszAtk);
-        }
-        // Marca de Fiendish/Influenced na LATERAL DIREITA da sprite (como o
-        // client): ícone oficial + número de poeiras/stacks, longe da barra
-        // de HP e do nome.
-        const markX = Math.round(mx + w / 2 + 4);
-        const markY = Math.round(top + h * 0.38);
-        if (m.fiendish) {
-          const num = String(m.sinisterStacks || 15);
-          drawWikiIcon(ctx, "fiendish-creature", markX, markY - 12, 12);
-          ctx.font = "bold 10px monospace";
-          ctx.textAlign = "left";
-          ctx.textBaseline = "middle";
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = "#000";
-          ctx.fillStyle = "#d79cff";
-          ctx.strokeText(num, markX + 14, markY - 6);
-          ctx.fillText(num, markX + 14, markY - 6);
-        } else if (m.influenced) {
-          const stacks = String(m.sinisterStacks || 1);
-          const ic = wikiIcon("influenced-creature");
-          if (ic && ic.complete && ic.naturalWidth) {
-            ctx.save();
-            ctx.drawImage(ic, markX, markY - 12, 12, 12);
-            ctx.font = "bold 10px monospace";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = "#000";
-            ctx.fillStyle = "#66c7ff";
-            ctx.strokeText(stacks, markX + 14, markY - 6);
-            ctx.fillText(stacks, markX + 14, markY - 6);
-            ctx.restore();
-          } else {
-            drawNameText(ctx, markX + 8, markY, "✦ " + stacks, "#66c7ff");
-          }
-        }
-        // fala da criatura (monster.voices do Canary), acima do nome
-        drawCreatureSpeech(ctx, m, mx, by - 4, dt);
-      }
+    occupiedLabels.push({ x:info.cx, y:y });
+    if (info.e.kind === 'monster') {
+      drawTibiaBar(ctx, info.cx, y + 8, info.hpPct, tibiaHpColor(info.hpPct));
+      drawNameText(ctx, info.cx, y + 2, info.name, tibiaHpColor(info.hpPct));
+      if (typeof monsterAttackRange === 'function' && monsterAttackRange(info.ent) > .16)
+        drawWikiIcon(ctx, 'range-atk', Math.round(info.cx + info.w/2 + 3), Math.round(info.top + info.h*.35), 9);
+    } else {
+      drawNameBars(ctx, info.cx, y, info.name, info.hpPct, info.mpPct, info.shieldPct);
     }
+    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, dt);
+    else if (info.e.kind === 'player') this.drawSpeech(ctx, info.cx, y, dt);
+    else drawCreatureSpeech(ctx, info.ent, info.cx, y, dt);
   }
 
   // --- projeteis / ataques a distancia
