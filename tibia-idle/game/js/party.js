@@ -687,7 +687,7 @@ function partyHealTargets(p) {
       if (!pp || String(pp.id || characterId(pp)) === me) continue;
       const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1 };
       out.push({ id: pp.id || characterId(pp), name: pp.name, voc: pp.voc,
-                 level: pp.level || 1, sex: pp.sex, outfit: pp.outfit,
+                 level: pp.level || 1, sex: pp.sex, outfit: pp.outfit, colors: pp.outfit && pp.outfit.colors,
                  hp: Math.max(0, pp.hp || 0), maxHp: mx.hp || 1 });
     }
     return out;

@@ -459,6 +459,13 @@ function renderPartyModal(p, online) {
   h += `</div>`;
 
   box.innerHTML = h;
+  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
+  for (const m of alvos) {
+    const host = box.querySelector(`[data-party-preview="${m.id}"]`);
+    if (!host || typeof AppearanceRenderer === "undefined") continue;
+    const cv = AppearanceRenderer.preview(m, "s");
+    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
+  }
 
   // handlers
   const leave = $("#party-leave");
@@ -582,7 +589,8 @@ function renderHealFriend(p) {
     <div class="list" style="max-height:110px">` + spells.map((id) => {
       const s = SPELLS[id];
       const rule = cfg.healFriendSpells[id];
-      const sel = !!rule.enabled;
+      // Exura Sio é o módulo base do Druid: permanece ativo entre trocas.
+      const sel = id === "exura-sio" && /druid/i.test(p.voc) ? true : !!rule.enabled;
       const mass = /gran mas res/i.test(id);
       const faixa = typeof spellRangeText === "function" ? spellRangeText(p, s) : "";
       return `<div class="shop-row ${sel ? "selected" : ""}" style="cursor:pointer" data-heal-friend-spell="${id}">
@@ -612,7 +620,7 @@ function renderHealFriend(p) {
       const targetCfg = cfg.healFriendTargets[String(m.id)] || { enabled: true, priority: 1 };
       return `<div class="party-member-row" style="cursor:default">
         <label class="tiny" title="Incluir este aliado no Heal Friend"><input type="checkbox" data-heal-target-enabled="${m.id}" ${targetCfg.enabled ? "checked" : ""}> curar</label>
-        <div class="ppm-outfit"><img src="${partyOutfitIcon(m, m.sex)}" alt=""></div>
+        <div class="ppm-outfit">${partyOutfitHtml(m)}</div>
         <div class="ppm-info">
           <div class="ppm-name">${m.name}</div>
           <div class="ppm-meta">nv ${m.level || "?"} · ${partyVocName(m.voc)}</div>
@@ -627,12 +635,19 @@ function renderHealFriend(p) {
   h += `<div class="tiny dim mt4">A cura aplica de verdade nos aliados (save deles). A Mass Healing
     (exura gran mas res) só dispara com <b>2+ aliados feridos</b> ao alcance.</div>`;
   box.innerHTML = h;
+  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
+  for (const m of alvos) {
+    const host = box.querySelector(`[data-party-preview="${m.id}"]`);
+    if (!host || typeof AppearanceRenderer === "undefined") continue;
+    const cv = AppearanceRenderer.preview(m, "s");
+    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
+  }
 
   // handlers
   const priority = $("#helper-heal-priority");
   if (priority) priority.addEventListener("change", () => { cfg.healFriendPriority = priority.value; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); });
   $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendSpell].enabled = el.checked; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
+    el.addEventListener("change", () => { const id=el.dataset.healFriendSpell; cfg.healFriendSpells[id].enabled = id === "exura-sio" && /druid/i.test(p.voc) ? true : el.checked; el.checked=cfg.healFriendSpells[id].enabled; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-at]").forEach((el) =>
     el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
   $$("#helper-heal-friend-panel [data-heal-friend-min]").forEach((el) =>
