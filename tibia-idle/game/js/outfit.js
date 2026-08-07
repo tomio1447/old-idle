@@ -186,7 +186,9 @@ const OutfitRenderer = {
     // garante a visual inicial por sexo mesmo para saves antigos sem campo appearance.
     if (typeof AppearanceRenderer !== "undefined") {
       const cv = AppearanceRenderer.forPlayer(p, dir, frame);
+      // null significa assets 15x ainda carregando: não caia no renderer 7.4.
       if (cv) return cv;
+      return null;
     }
     const suf = frame ? `${dir}${frame}` : dir;
     const cv = this.get(o.name, suf, o.colors);
@@ -199,7 +201,8 @@ const OutfitRenderer = {
     const o = playerOutfit(p);
     if (typeof AppearanceRenderer !== "undefined") {
       const nv = AppearanceRenderer.preview(p, dir || "s");
-      if (nv) { try { return nv.toDataURL(); } catch (e) { /* segue */ } }
+      if (nv) { try { return nv.toDataURL(); } catch (e) { return null; } }
+      return null;
     }
     const cv = this.get(o.name, dir || "s", o.colors);
     if (cv) { try { return cv.toDataURL(); } catch (e) { return null; } }
