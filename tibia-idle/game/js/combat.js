@@ -2278,7 +2278,9 @@ function tryHeal(c, p, now) {
     const selectedHealSpell = p.config.healSpell;
     if (selectedHealSpell) {
       const s = SPELLS[selectedHealSpell];
-      if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+      const friendOnly = typeof healFriendSpells === "function" && healFriendSpells(p).includes(selectedHealSpell);
+      // Exura Sio/Gran Sio são spells de alvo: nunca entram na autocura.
+      if (!friendOnly && s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
           p.level >= s.lvl && p.mp >= s.mana &&
           cdReady(p, selectedHealSpell, now)) heals.push([selectedHealSpell, s]);
     } // sem spell selecionada: não faz fallback automático

@@ -1805,7 +1805,7 @@ function renderHelper(p) {
     // A aba Cura contém somente autocura. Spells de aliado (exura sio,
     // Restore Friend, Mass Healing) vivem exclusivamente em Curar aliado.
     const friendHealIds = new Set(typeof healFriendSpells === "function"
-      ? healFriendSpells(p) : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-gran-tio-sio", "exura-tio-sio"]);
+      ? healFriendSpells(p) : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-tio-sio"]);
     const heals = Object.keys(SPELLS).filter((id) => {
       const s = SPELLS[id];
       return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 && !friendHealIds.has(id);
