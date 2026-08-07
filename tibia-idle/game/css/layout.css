@@ -2203,3 +2203,6 @@ a:hover { color: #aab6f7; }
 .imb-slot-grid{display:flex;gap:5px;flex-wrap:wrap}.imb-modal-slot{width:38px;height:38px;border:1px solid #a88a38;background:#151510;display:flex;align-items:center;justify-content:center;position:relative}.imb-modal-slot.vazio{border-style:dashed;border-color:#59554a;background:#10100e}.imb-modal-slot.expirado{opacity:.45;border-color:#9b3d32}.imb-modal-slot .imb-remove{position:absolute;right:-5px;top:-6px;padding:0;width:14px;height:14px;font-size:10px;border-radius:50%;color:#ffaaa0;background:#401b18}
 .party-outfit-preview { width:32px;height:32px;overflow:hidden;display:flex;align-items:center;justify-content:center; }
 .party-outfit-preview canvas,.party-outfit-preview img { max-width:32px;max-height:32px;image-rendering:pixelated; }
+.outfit-color-editor { display:flex; gap:10px; align-items:flex-start; }
+.outfit-palette-compact { grid-template-columns:repeat(16, 18px); gap:1px; width:max-content; padding:3px; }
+.outfit-palette-compact .swatch { width:18px; height:18px; aspect-ratio:auto; }

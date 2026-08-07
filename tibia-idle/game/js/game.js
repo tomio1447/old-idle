@@ -2308,27 +2308,18 @@ function openOutfitModal() {
       <span style="flex:1"></span><button class="sm" id="outfit-close">✕</button>
     </div>
     <div class="panel-body">
-      <div class="row mb8" style="gap:12px;align-items:flex-start">
-        <div>
-          <div id="outfit-preview" class="outfit-preview"></div>
-          <div class="row mt4" style="gap:3px;justify-content:center">
-            ${[["n", "↑"], ["w", "←"], ["s", "↓"], ["e", "→"]].map(([d, a]) =>
-              `<button class="sm" data-odir="${d}">${a}</button>`).join("")}
+      <div class="outfit-color-editor mb8">
+        <div id="outfit-preview" class="outfit-preview"></div>
+        <div style="min-width:0;flex:1">
+          <div class="small dim mb4">Cores do visual</div>
+          <div class="row wrap mb4" id="outfit-parts" style="gap:4px">
+            ${PARTS.map(([n, i]) => `<button class="sm" data-opart="${i}">${n}</button>`).join("")}
           </div>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="tiny dim">Visual 15x: use o Wardrobe abaixo.</div>
-          <div class="small dim mt8 mb4">Parte a colorir</div>
-          <div class="row wrap" id="outfit-parts" style="gap:4px">
-            ${PARTS.map(([n, i]) =>
-              `<button class="sm" data-opart="${i}">${n}</button>`).join("")}
-          </div>
-        </div>
-      </div>
-      <div class="small dim mb4">Cor</div>
-      <div id="outfit-palette" class="outfit-palette mb8">
+          <div id="outfit-palette" class="outfit-palette outfit-palette-compact">
         ${OUTFIT_PALETTE.map((c, i) =>
           `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
+          </div>
+        </div>
       </div>
       <div class="small dim mt8 mb4">Wardrobe — outfits, addons e montarias</div>
       <div id="cyclo-content" class="outfit-wardrobe" style="max-height:330px;overflow:auto"></div>
@@ -2347,9 +2338,6 @@ function openOutfitModal() {
   }));
   $$("#outfit-palette [data-ocolor]").forEach((s) => s.addEventListener("click", () => {
     draft.colors[part] = +s.dataset.ocolor; render();
-  }));
-  $$("#modal-body [data-odir]").forEach((b) => b.addEventListener("click", () => {
-    dir = b.dataset.odir; render();
   }));
   const close = () => openCharacterModal();
   $("#outfit-close").addEventListener("click", close);
