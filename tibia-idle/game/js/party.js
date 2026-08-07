@@ -699,7 +699,7 @@ function partyLiveEntity(c, member) {
 
 /* Aplica a cura no membro (entidade viva do party combat, save local ou
  * estado online espelhado). */
-function partyApplyFriendHeal(p, member, amount) {
+function partyApplyFriendHeal(c, p, member, amount) {
   if (!member) return;
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
     const st = p._partyOnline || null;
@@ -712,9 +712,8 @@ function partyApplyFriendHeal(p, member, amount) {
     return;
   }
   // party combat: cura a entidade VIVA (a barra do painel muda na hora)
-  if (typeof G !== "undefined" && G && G.combat &&
-      Array.isArray(G.combat.players) && G.combat.players.length > 1) {
-    const ent = partyLiveEntity(G.combat, member);
+  if (c && Array.isArray(c.players) && c.players.length > 1) {
+    const ent = partyLiveEntity(c, member);
     if (ent && ent.p) {
       const mx = typeof maxStats === "function" ? maxStats(ent.p) : { hp: 1 };
       ent.p.hp = Math.min(mx.hp || ent.p.hp, (ent.p.hp || 0) + amount);
@@ -724,11 +723,11 @@ function partyApplyFriendHeal(p, member, amount) {
   }
   // modo local fora de combate: atualiza o save do membro no roster
   const chars = typeof getCharacters === "function" ? getCharacters() : [];
-  const c = chars.find((x) => (x.id || characterId(x)) === member.id);
-  if (!c) return;
-  const mx = typeof maxStats === "function" ? maxStats(c) : { hp: 1 };
-  c.hp = Math.min(mx.hp || c.hp, (c.hp || 0) + amount);
-  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(c);
+  const char = chars.find((x) => (x.id || characterId(x)) === member.id);
+  if (!char) return;
+  const mx = typeof maxStats === "function" ? maxStats(char) : { hp: 1 };
+  char.hp = Math.min(mx.hp || char.hp, (char.hp || 0) + amount);
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(char);
 }
 
 /* O tick de HEAL FRIEND: roda junto do tryHeal no combate. */
@@ -781,7 +780,7 @@ function tryHealFriend(c, p, now) {
     if(ch.crit && ch.extraPct){amount=Math.floor(amount*(1+ch.extraPct/100));crit=true;}
     p.mp-=spell.mana; cdStart(p,id,spell,now); entCdSet(c,p,'healCd',now+1000);
     for(const target of healed){
-      partyApplyFriendHeal(p,target,amount);
+      partyApplyFriendHeal(c,p,target,amount);
       const ent=partyLiveEntity(c, target);
       const words=mass?spell.words:`${spell.words} "${String(target.name).replace(/"/g,'')}"`;
       c.events.push({t:'heal-friend',amount,target:target.name,targetId:target.id,words,spell:spell.name,mass,crit,
