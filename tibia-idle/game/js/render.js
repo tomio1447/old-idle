@@ -68,11 +68,6 @@ const MONSTER_TINT = {
   // Squid Warden mantém a leitura fria azul-escura da seção de gelo.
   "squid-warden": "sepia(1) saturate(10) hue-rotate(160deg) brightness(.72) contrast(1.3)",
   // Apparitions Soul War: cores da vocação, preservando preto/sombras.
-  "knight-s-apparition": "sepia(1) saturate(12) hue-rotate(305deg) brightness(.68) contrast(1.35)",
-  "paladin-s-apparition": "sepia(1) saturate(11) hue-rotate(8deg) brightness(.9) contrast(1.25)",
-  "sorcerer-s-apparition": "sepia(1) saturate(12) hue-rotate(245deg) brightness(.72) contrast(1.3)",
-  "druid-s-apparition": "sepia(1) saturate(12) hue-rotate(75deg) brightness(.72) contrast(1.3)",
-  "monk-s-apparition": "sepia(1) saturate(11) hue-rotate(150deg) brightness(.78) contrast(1.3)",
 };
 const APPARITION_OUTFIT = {
   "knight-s-apparition": { id:"knight-m", voc:"knight", colors:[95,116,116,95] },
