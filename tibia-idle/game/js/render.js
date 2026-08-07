@@ -74,6 +74,19 @@ const MONSTER_TINT = {
   "druid-s-apparition": "sepia(1) saturate(12) hue-rotate(75deg) brightness(.72) contrast(1.3)",
   "monk-s-apparition": "sepia(1) saturate(11) hue-rotate(150deg) brightness(.78) contrast(1.3)",
 };
+const APPARITION_OUTFIT = {
+  "knight-s-apparition": { id:"knight-m", voc:"knight", colors:[95,116,116,95] },
+  "paladin-s-apparition": { id:"hunter-m", voc:"paladin", colors:[78,68,58,76] },
+  "sorcerer-s-apparition": { id:"mage-m", voc:"sorcerer", colors:[86,50,50,86] },
+  "druid-s-apparition": { id:"summoner-m", voc:"druid", colors:[79,78,78,76] },
+  "monk-s-apparition": { id:"monk-m", voc:"monk", colors:[94,88,88,94] },
+};
+function apparitionSprite(slug, dir, frame) {
+  const a = APPARITION_OUTFIT[slug];
+  if (!a || typeof AppearanceRenderer === "undefined") return null;
+  return AppearanceRenderer.forPlayer({ voc:a.voc, sex:"male", outfit:{ appearance:a.id, colors:a.colors, addons:0 } }, dir, frame);
+}
+
 function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
   if (slug === "rage-squid") {
     // Referência TibiaWiki: tentáculos/corpo amarelos e cérebro vermelho.
@@ -1444,7 +1457,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const passo = m.moving ? (m.frame || 1) : monsterIdleFrame(m.slug, Date.now());
       const anim = passo ? Sprites.mobWalk(m.slug, m.dir || "w", passo) : null;
       // se o frame não existir, cai na pose base em vez de sumir.
-      const img = spriteReady(anim) ? anim : Sprites.mob(m.slug, m.dir || "w");
+      const appImg = apparitionSprite(m.slug, m.dir || "w", passo);
+      const img = spriteReady(appImg) ? appImg : (spriteReady(anim) ? anim : Sprites.mob(m.slug, m.dir || "w"));
       const mx = m.x * W;
       // sem oscilacao senoidal: no Tibia a criatura parada fica imovel no
       // SQM. O balanco daqui somava ao pedalar dos frames e dava a impressao
