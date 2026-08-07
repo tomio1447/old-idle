@@ -589,8 +589,7 @@ function renderHealFriend(p) {
     <div class="list" style="max-height:110px">` + spells.map((id) => {
       const s = SPELLS[id];
       const rule = cfg.healFriendSpells[id];
-      // Exura Sio é o módulo base do Druid: permanece ativo entre trocas.
-      const sel = id === "exura-sio" && /druid/i.test(p.voc) ? true : !!rule.enabled;
+      const sel = !!rule.enabled;
       const mass = /gran mas res/i.test(id);
       const faixa = typeof spellRangeText === "function" ? spellRangeText(p, s) : "";
       return `<div class="shop-row ${sel ? "selected" : ""}" style="cursor:pointer" data-heal-friend-spell="${id}">
@@ -646,12 +645,23 @@ function renderHealFriend(p) {
   // handlers
   const priority = $("#helper-heal-priority");
   if (priority) priority.addEventListener("change", () => { cfg.healFriendPriority = priority.value; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); });
-  $$("#helper-heal-friend-panel [data-heal-friend-spell]").forEach((el) =>
-    el.addEventListener("change", () => { const id=el.dataset.healFriendSpell; cfg.healFriendSpells[id].enabled = id === "exura-sio" && /druid/i.test(p.voc) ? true : el.checked; el.checked=cfg.healFriendSpells[id].enabled; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
-  $$("#helper-heal-friend-panel [data-heal-friend-at]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendAt].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
-  $$("#helper-heal-friend-panel [data-heal-friend-min]").forEach((el) =>
-    el.addEventListener("change", () => { cfg.healFriendSpells[el.dataset.healFriendMin].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2)); if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p); }));
+  // Delegação única: os controles sobrevivem a re-renderizações e não
+  // dependem do label/card pai para ativar a checkbox.
+  box.onchange = (ev) => {
+    const el = ev.target;
+    if (el.dataset.healFriendSpell) {
+      const id = el.dataset.healFriendSpell;
+      cfg.healFriendSpells[id].enabled = !!el.checked;
+    } else if (el.dataset.healFriendAt) {
+      const id = el.dataset.healFriendAt;
+      cfg.healFriendSpells[id].at = Math.max(1, Math.min(99, parseInt(el.value, 10) || 70));
+    } else if (el.dataset.healFriendMin) {
+      const id = el.dataset.healFriendMin;
+      cfg.healFriendSpells[id].minTargets = Math.max(2, Math.min(8, parseInt(el.value, 10) || 2));
+    } else return;
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+    renderHealFriend(p);
+  };
   $$("#helper-heal-friend-panel [data-heal-target-enabled]").forEach((el) => el.addEventListener("change", () => {
     const key = String(el.dataset.healTargetEnabled);
     cfg.healFriendTargets[key] = cfg.healFriendTargets[key] || { priority: 1 };
