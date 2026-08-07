@@ -75,6 +75,15 @@ const MONSTER_TINT = {
   "monk-s-apparition": "sepia(1) saturate(11) hue-rotate(150deg) brightness(.78) contrast(1.3)",
 };
 function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
+  if (slug === "rage-squid") {
+    // Referência TibiaWiki: tentáculos/corpo amarelos e cérebro vermelho.
+    ctx.save(); ctx.filter = "sepia(1) saturate(13) hue-rotate(8deg) brightness(.86) contrast(1.35)";
+    ctx.drawImage(img, x, y, w, h); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(x + w*.17, y, w*.66, h*.48); ctx.clip();
+    ctx.filter = "sepia(1) saturate(16) hue-rotate(300deg) brightness(.65) contrast(1.45)";
+    ctx.drawImage(img, x, y, w, h); ctx.restore();
+    return;
+  }
   const tint = MONSTER_TINT[slug];
   if (tint) { ctx.save(); ctx.filter = tint; }
   ctx.drawImage(img, x, y, w, h);
@@ -1344,11 +1353,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const tile = tilePx(W);
     const origin = creatureTileOrigin(px * W, py * H, w, h, tile);
     const top = origin.y;
-    // sombra na base do tile, como no client
-    ctx.fillStyle = "rgba(0,0,0,.35)";
-    ctx.beginPath();
-    ctx.ellipse(px * W, py * H + tile / 2, w * 0.34, h * 0.1, 0, 0, 7);
-    ctx.fill();
     if (this.playerFlash > 0) {
       ctx.save();
       ctx.filter = "brightness(2.2) saturate(0.4)";
@@ -1401,11 +1405,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
       const top = origin.y;
       ctx.save();
       if (knocked) ctx.globalAlpha = 0.35;
-      // sombra sob os pés, no centro do SQM
-      ctx.fillStyle = "rgba(0,0,0,.35)";
-      ctx.beginPath();
-      ctx.ellipse(ent.x * W, ent.y * H + tile / 2, w2 * 0.34, h2 * 0.1, 0, 0, 7);
-      ctx.fill();
       // Nenhum deslocamento no ataque: aliados que conjuram também devem
       // permanecer exatamente no centro do SQM, como o personagem ativo.
       const atkPush2 = 0;
@@ -1462,10 +1461,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
         const origin = creatureTileOrigin(mx, my, w, h, tile);
         const top = origin.y;
         const atkPush = 0;
-        ctx.fillStyle = "rgba(0,0,0,.35)";
-        ctx.beginPath();
-        ctx.ellipse(mx, my + tile / 2, w * 0.32, h * 0.09, 0, 0, 7);
-        ctx.fill();
         if (m.fiendish || m.influenced) {
           ctx.save();
           ctx.shadowColor = m.fiendish ? "#c14bff" : "#39a8ff";
