@@ -3159,7 +3159,17 @@ function mobCastSkill(c, p, mob, now) {
       continue;
     }
     mobSkillFx(c, mob, pl, sk);
-    mobSkillHit(c, p, mob, sk, Math.max(0, mobSkillRoll(sk)));
+    const rawSkill = Math.max(0, mobSkillRoll(sk));
+    if (sk.chain && c.players && c.players.length > 1) {
+      const original = mob.target;
+      const base = pl.p ? pl : c.players.find((e) => e.p === p);
+      const victims = [base].concat(c.players.filter((e) => e !== base && e.p && e.p.hp > 0)
+        .filter((e) => typeof sqmDistance !== "function" || sqmDistance(e, base) <= (sk.range || 7))
+        .slice(0, Math.max(0, sk.chain - 1)));
+      for (const ent of victims) { if (!ent || !ent.p) continue; mob.target = ent; mobSkillHit(c, ent.p, mob, sk, rawSkill); }
+      mob.target = original;
+      c.events.push({ t:'chain', n:victims.length, x:pl.x, y:pl.y, screen:true, fx:sk.fx || 'ice-attack' });
+    } else mobSkillHit(c, p, mob, sk, rawSkill);
     usou = true;
   }
   return usou;
