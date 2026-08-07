@@ -30,6 +30,7 @@ const ADMIN_TABS = [
   { id: "coins", nome: "🪙 Coins" },
   { id: "skills", nome: "📊 Skills" },
   { id: "items", nome: "🎒 Itens" },
+  { id: "loot", nome: "💰 Despojos" },
   { id: "imb", nome: "✨ Imbuements" },
   { id: "equip", nome: "🛡 Equipamento" },
   { id: "forge", nome: "⚒ FORJE" },
@@ -112,7 +113,7 @@ function renderAdminContent() {
   const fn = {
     char: renderAdminChar, coins: renderAdminCoins,
     skills: renderAdminSkills,
-    items: renderAdminItems, imb: renderAdminImbuements, equip: renderAdminEquip,
+    items: renderAdminItems, loot: renderAdminLoot, imb: renderAdminImbuements, equip: renderAdminEquip,
     forge: renderAdminForge, mobs: renderAdminMobs,
     world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
@@ -476,6 +477,16 @@ function renderAdminSkills(p, el) {
 function adminCats() {
   if (typeof ITEM_CATS !== "undefined") return ITEM_CATS;
   return [{ id: "all", nome: "Todos", match: () => true }];
+}
+
+function renderAdminLoot(p, el) {
+  const bag = typeof GAMEDATA !== "undefined" && GAMEDATA.items['bag-you-desire'];
+  el.innerHTML = `<div class="admin-card"><div class="admin-card-t">Despojos Soul War</div>
+    <div class="small">Bag You Desire · chance de teste 10%</div>
+    <div class="admin-quick"><button class="sm primary" id="adm-bag-desire" ${bag ? '' : 'disabled'}>Adicionar Bag You Desire</button></div>
+    <div class="tiny dim mt4">Abra a bag pela Loot Pouch para receber um item aleatório Soul War no Depot.</div></div>`;
+  const b = $('#adm-bag-desire');
+  if (b) b.addEventListener('click', () => { p.lootPouch = p.lootPouch || {}; p.lootPouch['bag-you-desire'] = (p.lootPouch['bag-you-desire'] || 0) + 1; adminAplicar('Bag You Desire adicionada'); });
 }
 
 function renderAdminItems(p, el) {
