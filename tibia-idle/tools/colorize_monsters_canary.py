@@ -123,11 +123,11 @@ CANARY_COLORS = {
     "hunter":        (113, 114, 39, 115),
     "wild-warrior":  (113, 39, 113, 115),
     # Soul War: appearances que usam o mesmo sistema de máscara/paleta.
-    "knight-s-apparition": (95, 116, 116, 95),
-    "paladin-s-apparition": (78, 68, 58, 76),
-    "sorcerer-s-apparition": (86, 50, 50, 86),
-    "druid-s-apparition": (79, 78, 78, 76),
-    "monk-s-apparition": (94, 88, 88, 94),
+    "knight-s-apparition": (19, 76, 74, 114),
+    "paladin-s-apparition": (57, 42, 114, 114),
+    "sorcerer-s-apparition": (95, 114, 52, 76),
+    "druid-s-apparition": (114, 48, 114, 95),
+    "monk-s-apparition": (114, 48, 114, 95),
     # Rage/Squid compartilham a appearance base; as cores finais recebem
     # o acabamento específico no renderer (cérebro/partes por região).
     "rage-squid": (95, 78, 78, 78),
