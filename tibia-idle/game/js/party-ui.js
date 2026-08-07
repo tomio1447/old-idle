@@ -62,14 +62,10 @@ function partyVocName(voc) {
 
 /* Ícone pequeno da outfit do membro: sprite de vocação (como o seletor
  * de vocação usa) — assets/outfit/<voc>-m_s.png. */
-function partyOutfitIcon(member, sex) {
-  const voc = typeof member === "object" ? member.voc : member;
-  const outfit = typeof member === "object" && member.outfit ? member.outfit : null;
-  // A party acompanha a aparência escolhida; fallback é a roupa clássica.
-  if (outfit && outfit.appearance) return `assets/appearance/outfit/${outfit.appearance}.base.png`;
-  const map = { knight: "knight", paladin: "hunter", druid: "summoner", sorcerer: "mage", monk: "monk" };
-  const o = map[voc] || "citizen";
-  return `assets/outfit/${o}-${sex === "female" ? "f" : "m"}_s.png`;
+function partyOutfitHtml(member) {
+  // Canvas colorido é preenchido após o painel montar; evita mostrar o
+  // sheet .base branco/preto inteiro como se fosse uma miniatura.
+  return `<div class="party-outfit-preview" data-party-preview="${member.id}"></div>`;
 }
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
@@ -132,14 +128,14 @@ function renderPartyPanel(p) {
     };
     const ls = statsDe(lider);
     membros = [{ id: lider.id, name: lider.name, voc: lider.voc, level: lider.level,
-                 sex: lider.sex, outfit: lider.outfit, hp: ls.hp, mp: ls.mp, maxHp: ls.maxHp,
+                 sex: lider.sex, outfit: lider.outfit, _p: lider, hp: ls.hp, mp: ls.mp, maxHp: ls.maxHp,
                  maxMp: ls.maxMp, _leader: true }];
     for (const m of (ld ? ld.members : pt.members)) {
       const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
       if (!c) continue;
       const ms = statsDe(c);
       membros.push({ id: c.id, name: c.name, voc: c.voc, level: c.level,
-                     sex: c.sex, outfit: c.outfit, hp: ms.hp, mp: ms.mp,
+                     sex: c.sex, outfit: c.outfit, _p: c, hp: ms.hp, mp: ms.mp,
                      maxHp: ms.maxHp, maxMp: ms.maxMp });
     }
     panel.style.display = "";
@@ -180,9 +176,7 @@ function renderPartyPanel(p) {
     return `<div class="party-member-row ${clickable ? "" : "no-switch"}"
         data-party-char="${m.id}" data-switch="${clickable ? 1 : 0}"
         title="${clickable ? "Trocar para " + m.name : (isCurrent ? "Personagem atual" : "Membro de outra conta")}">
-      <div class="ppm-outfit">
-        <img src="${partyOutfitIcon(m, m.sex)}" alt="">
-      </div>
+      <div class="ppm-outfit">${partyOutfitHtml(m)}</div>
       <div class="ppm-info">
         <div class="ppm-name ${isLeader ? "leader" : ""}">${m.name}
           ${isCurrent ? '<span class="tiny dim"> (você)</span>' : ""}</div>
@@ -192,6 +186,16 @@ function renderPartyPanel(p) {
       </div>
     </div>`;
   }).join("");
+
+  // Aplica a composição 15x com cores/addons/montaria à miniatura da party.
+  for (const m of membros) {
+    const host = body.querySelector(`[data-party-preview="${m.id}"]`);
+    if (!host) continue;
+    const source = m._p || m;
+    const cv = (typeof AppearanceRenderer !== "undefined") ? AppearanceRenderer.preview(source, "s") : null;
+    if (cv) { host.innerHTML = ""; cv.style.width = "32px"; cv.style.height = "32px"; host.appendChild(cv); }
+    else host.innerHTML = `<img src="assets/outfit/citizen-${m.sex === "female" ? "f" : "m"}_s.png" alt="">`;
+  }
 
   // botão LEAVE HUNT: visível quando a party está numa hunt/boss — o líder
   // sai (todos voltam via follow de retorno) ou o membro sai sozinho
