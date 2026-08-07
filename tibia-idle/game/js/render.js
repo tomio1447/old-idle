@@ -1508,12 +1508,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
         // espadas) — MENOR (9px) e na lateral DIREITA da sprite, no meio
         // dela, logo abaixo do nome (pedido do dono: antes ficava grudado
         // no lado esquerdo do nome com 12px).
-        if (typeof monsterAttackRange === "function") {
-          const isRange = monsterAttackRange(m) > 0.16;
+        if (typeof monsterAttackRange === "function" && monsterAttackRange(m) > 0.16) {
           const iszAtk = 9;
           const atkX = Math.round(mx + w / 2 + 3);
           const atkY = Math.round(top + h * 0.35);
-          drawWikiIcon(ctx, isRange ? "range-atk" : "melee-atk", atkX, atkY, iszAtk);
+          drawWikiIcon(ctx, "range-atk", atkX, atkY, iszAtk);
         }
         // Marca de Fiendish/Influenced na LATERAL DIREITA da sprite (como o
         // client): ícone oficial + número de poeiras/stacks, longe da barra
