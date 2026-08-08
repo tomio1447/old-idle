@@ -3702,7 +3702,8 @@ function playerDeath(c, p) {
   const deathY = c.player ? c.player.y : 0.62;
   const deathDir = c.player ? c.player.dir : "e";
   c.dead = true;
-  c.deadUntil = Date.now() + reviveTime();   // 30s normal, 15s VIP
+  c.deadAt = Date.now();
+  c.deadUntil = c.deadAt + reviveTime();   // 30s normal, 15s VIP
   c.deathPos = { x: deathX, y: deathY, dir: deathDir };
   c.events.push({ t: "death", exp: lostExp, gold: lostGold, blessed: blessed });
   return { exp: lostExp, gold: lostGold };
