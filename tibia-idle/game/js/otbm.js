@@ -439,7 +439,7 @@
     // O grid físico do combate é 21×13 (COMBAT_GRID_W/H). Mapas menores
     // são centralizados nessa moldura; não force 24×15, que cria void fora
     // do grid e desloca mapas do RME.
-    var targetW = Math.max(21, map.w), targetH = Math.max(13, map.h);
+    var targetW = Math.max(24, map.w), targetH = Math.max(15, map.h);
     var padX = Math.max(0, Math.min(targetW - map.w,
       Math.floor((targetW - map.w) / 2) + (Number(map.idleOffsetX) || 0)));
     var padY = Math.max(0, Math.min(targetH - map.h,
