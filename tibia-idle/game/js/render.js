@@ -537,8 +537,11 @@ function drawNameBars(ctx, x, y, name, hpPct, mpPct, shieldPct) {
   // dela. A mana so aparece para o proprio jogador (o Tibia nao mostra mana
   // de terceiros), entao fica numa terceira linha, mais fina.
   const hpY = y + 2;
-  drawNameText(ctx, x, y - 3, name, "#ffffff");
-  drawTibiaBar(ctx, x, hpY, hpPct, playerHpBarColor(hpPct));
+  // Nome segue exatamente a cor dinâmica da própria barra de HP, tal como
+  // os monstros. Não manter branco para player/party.
+  const hpColor = playerHpBarColor(hpPct);
+  drawNameText(ctx, x, y - 3, name, hpColor);
+  drawTibiaBar(ctx, x, hpY, hpPct, hpColor);
   let nextY = hpY + TIBIA_BAR_H + 2;
   if (shieldPct !== undefined && shieldPct !== null && shieldPct > 0) {
     drawTibiaBar(ctx, x, nextY, shieldPct, "#a64dff");
