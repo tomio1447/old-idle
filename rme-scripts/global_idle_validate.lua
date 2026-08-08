@@ -4,7 +4,7 @@
 -- @Version: 1.0.0
 --
 -- Copy this file to Canary's Map Editor/scripts and restart the editor.
--- The Global-Idle runtime uses a fixed 24x15 SQM viewport at Z=2.
+-- The Global-Idle runtime uses a fixed 21x13 SQM viewport at Z=2.
 
 if not app.hasMap() then
   print("[Global-Idle] No map open.")
@@ -12,17 +12,17 @@ if not app.hasMap() then
 end
 
 local dlg = Dialog({ title = "Global-Idle Map Validator", width = 420 })
-dlg:label({ text = "Validates a fixed 24 x 15 Global-Idle arena." })
+dlg:label({ text = "Validates a fixed 21 x 13 Global-Idle arena." })
 dlg:separator()
 dlg:number({ id = "x", label = "Top-left X:", value = 1000, min = 0, max = 65535 })
 dlg:number({ id = "y", label = "Top-left Y:", value = 1000, min = 0, max = 65535 })
 dlg:number({ id = "z", label = "Floor Z:", value = 2, min = 0, max = 15 })
 dlg:separator()
-dlg:button({ id = "go", text = "Validate 24 x 15", focus = true, onclick = function(d) d:close() end })
+dlg:button({ id = "go", text = "Validate 21 x 13", focus = true, onclick = function(d) d:close() end })
 dlg:show()
 
 local x0, y0, z = math.floor(dlg.data.x), math.floor(dlg.data.y), math.floor(dlg.data.z)
-local W, H = 24, 15
+local W, H = 21, 13
 local map = app.map
 local missingGround, emptyTiles, multiNearEdge = {}, {}, {}
 
@@ -50,7 +50,7 @@ print(string.format("[Global-Idle] SQMs without ground: %d", #missingGround))
 if #emptyTiles > 0 then print("[Global-Idle] Empty: " .. table.concat(emptyTiles, " | ")) end
 if #missingGround > 0 then print("[Global-Idle] No ground: " .. table.concat(missingGround, " | ")) end
 if #emptyTiles == 0 and #missingGround == 0 then
-  print("[Global-Idle] OK: fixed 24x15 area has ground on every SQM.")
+  print("[Global-Idle] OK: fixed 21x13 area has ground on every SQM.")
 else
   print("[Global-Idle] FAILED: check coordinates above before exporting.")
 end
