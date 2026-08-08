@@ -815,7 +815,6 @@ input:focus, textarea:focus, select:focus {
 /* ════════════════════════════════════════════════════════════════
    MODAL DE INFORMAÇÕES DA HUNT (monstros, drops, defesas, ataques)
    ════════════════════════════════════════════════════════════════ */
-.hunt-monsters { display: flex; flex-direction: column; gap: 6px; }
 .hunt-monster {
   border: 1px solid var(--otc-border-out, #3a3d46);
   background: var(--otc-panel-2, #1e2128);
