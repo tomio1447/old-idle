@@ -434,11 +434,20 @@
     }
     var VOID = " ";
     legenda[VOID] = { v: [], bloc: true };
+    // Padrão visual Global-Idle: toda hunt ocupa 24×15 na viewport. Quando
+    // o recorte RME é menor (ex.: sala interna 21×12), ele é centralizado
+    // numa moldura bloqueada — sem pedir ao mapper para preencher bordas com
+    // montanhas/terreno artificial.
+    var targetW = Math.max(24, map.w), targetH = Math.max(15, map.h);
+    var padX = Math.floor((targetW - map.w) / 2);
+    var padY = Math.floor((targetH - map.h) / 2);
     var rows = [];
-    for (var y = 0; y < map.h; y++) {
+    for (var y = 0; y < targetH; y++) {
       var row = "";
-      for (var x = 0; x < map.w; x++) {
-        var cell = map.cells[x + "," + y];
+      for (var x = 0; x < targetW; x++) {
+        var sourceX = x - padX, sourceY = y - padY;
+        var cell = (sourceX < 0 || sourceY < 0 || sourceX >= map.w || sourceY >= map.h)
+          ? null : map.cells[sourceX + "," + sourceY];
         if (!cell || (!cell.g && !(cell.items && cell.items.length))) {
           row += VOID;
           continue;
@@ -470,9 +479,9 @@
                 leg: legenda,
                 nome: map.name || "Mapa .otbm",
                 otbm: true };
-    if (map.spawn) out.spawn = { x: map.spawn.x, y: map.spawn.y };
+    if (map.spawn) out.spawn = { x: map.spawn.x + padX, y: map.spawn.y + padY };
     if (map.mob && map.mob.length) {
-      out.mob = map.mob.map(function (c) { return { x: c.x, y: c.y }; });
+      out.mob = map.mob.map(function (c) { return { x: c.x + padX, y: c.y + padY }; });
       out.mobSet = {};
       for (var i = 0; i < out.mob.length; i++)
         out.mobSet[out.mob[i].x + ":" + out.mob[i].y] = true;
