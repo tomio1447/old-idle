@@ -785,8 +785,8 @@ function openHuntInfoModal(id) {
     return `<div class="hunt-best-card">
       <div class="hunt-best-sprite">${mobImg(slug, 58)}</div>
       <div class="hunt-best-name">${m.name}</div>
-      <div class="hunt-best-stat"><span>HP</span><b>${fmt(m.hp)}</b></div>
-      <div class="hunt-best-stat"><span>Exp</span><b>${fmt(m.exp)}</b></div>
+      <div class="hunt-best-stat"><span>HP</span><b>${fmtFull(m.hp)}</b></div>
+      <div class="hunt-best-stat"><span>Exp</span><b>${fmtFull(m.exp)}</b></div>
       <div class="hunt-best-title">RESISTÊNCIAS</div>
       <div class="hunt-best-resists">${resistHtml}</div>
       <div class="hunt-best-loot">${lootHtml}</div>
