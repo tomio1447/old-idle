@@ -47,11 +47,13 @@
     { el: "fire", min: 750, max: 950, int: 3000, ch: 16, length: 4, spread: 2, fx: "fire-wave" },
   ], withLoot([{ chance: 18, max: 2, item: "flask-of-demonic-blood" }, { chance: 7, max: 1, item: "red-gem" }, { chance: 1.5, max: 1, item: "fire-sword" }]), { fire: 100, ice: -10, earth: 20 });
 
+  // Loot oficial Canary: rage_squid.lua (chance 100000 = 100%). Itens sem
+  // cadastro local ficam fora até serem importados, sem substituir drops.
   mobs["rage-squid"] = book("Rage Squid", 17000, 16300, 650, 78, "fire", [
     { el: "fire", min: 600, max: 750, int: 2000, ch: 28, range: 6, fx: "fire-attack", miss: "fire" },
     { el: "fire", min: 850, max: 1200, int: 3000, ch: 20, radius: 2, fx: "fire-area" },
     { el: "fire", min: 400, max: 500, int: 2500, ch: 18, length: 5, spread: 2, fx: "fire-wave" },
-  ], withLoot([{ chance: 24, max: 3, item: "ultimate-health-potion" }, { chance: 8, max: 1, item: "small-ruby" }, { chance: 2, max: 1, item: "wand-of-inferno" }]), { fire: 100, ice: -5, earth: 20 });
+  ], [{ chance:10,max:3,item:"great-spirit-potion"},{chance:10,max:6,item:"fire-mushroom"},{chance:90,max:5,item:"small-amethyst"},{chance:100,max:6,item:"platinum-coin"},{chance:10,max:3,item:"ultimate-health-potion"},{chance:90,max:5,item:"small-topaz"},{chance:90,max:5,item:"small-emerald"},{chance:9.8,max:5,item:"red-gem"},{chance:66,max:5,item:"orb"},{chance:6.333,max:1,item:"purple-tome"},{chance:10,max:3,item:"great-mana-potion"},{chance:4.3,max:1,item:"demonic-essence"},{chance:90,max:5,item:"small-ruby"},{chance:8.99,max:1,item:"talon"},{chance:4.99,max:1,item:"might-ring"},{chance:6.99,max:1,item:"devil-helmet"},{chance:.4,max:1,item:"demonrage-sword"},{chance:.25,max:1,item:"giant-sword"},{chance:.25,max:1,item:"demon-shield"},{chance:.15,max:1,item:"magic-plate-armor"},{chance:.35,max:1,item:"platinum-amulet"},{chance:.3,max:1,item:"wand-of-everblazing"},{chance:.5,max:1,item:"fire-axe"}], { fire: 100, ice: -15 });
 
   mobs["energetic-book"] = book("Energetic Book", 18500, 12034, 1000, 80, "energy", [
     { el: "energy", min: 660, max: 800, int: 2000, ch: 28, range: 6, fx: "energy-hit", miss: "energy" },
@@ -77,11 +79,12 @@
     { el: "physical", min: 995, max: 1180, int: 3200, ch: 15, length: 4, spread: 2, fx: "hit-area" },
   ], withLoot([{ chance: 34, max: 5, item: "meat" }, { chance: 10, max: 1, item: "big-bone" }, { chance: 7, max: 1, item: "ruby-necklace" }, { chance: 4, max: 1, item: "spellbook-of-warding" }]), { fire: 10, energy: 10, earth: 10 });
 
-  mobs["squid-warden"] = book("Squid Warden", 16500, 14800, 800, 80, "ice", [
+  // Loot oficial Canary: squid_warden.lua; maxCount preservado sem rate em quantidade.
+  mobs["squid-warden"] = book("Squid Warden", 16500, 14800, 800, 78, "ice", [
     { el: "ice", min: 600, max: 850, int: 2000, ch: 28, radius: 2, fx: "ice-area" },
     { el: "ice", min: 800, max: 1100, int: 2600, ch: 22, radius: 2, fx: "ice-area" },
     { el: "ice", min: 700, max: 900, int: 2400, ch: 20, range: 6, fx: "ice-attack", miss: "ice" },
-  ], withLoot([{ chance: 26, max: 5, item: "small-sapphire" }, { chance: 8, max: 1, item: "glacier-mask" }, { chance: 5, max: 1, item: "diamond-sceptre" }, { chance: 3, max: 1, item: "ice-rapier" }]), { ice: 100, fire: -10, energy: 10 });
+  ], [{chance:11,max:57,item:"platinum-coin"},{chance:.8,max:4,item:"small-sapphire"},{chance:20,max:1,item:"ice-cube"},{chance:20,max:1,item:"inkwell"},{chance:10.003,max:4,item:"ultimate-health-potion"},{chance:10.003,max:4,item:"ultimate-mana-potion"},{chance:.5,max:1,item:"ice-rapier"},{chance:.4,max:1,item:"glacier-mask"},{chance:.3,max:1,item:"crystal-sword"},{chance:.15,max:1,item:"glacier-robe"},{chance:.15,max:1,item:"glacier-kilt"}], { ice: 100, fire: -15 });
 
   const hunt = (name, level, monsters, color, avgHp, avgExp, avgDamage, avgArmor, avgGold) => ({
     name, level, minLevel: level, monsters, color, scene: "library",
