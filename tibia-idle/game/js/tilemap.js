@@ -111,6 +111,23 @@ const TileSprites = {
   },
 };
 
+/* Arte raster exportada pelo RME para mapas com objetos modernos multi-SQM.
+ * O .otbm continua sendo a fonte de colisão/spawn; a arte é opcional e só
+ * substitui o desenho por tiles quando a hunt declarar `mapImage`. */
+const HuntMapArt = {
+  cache: {},
+  get(name) {
+    if (!name) return null;
+    if (this.cache[name] !== undefined) return this.cache[name];
+    const img = new Image();
+    const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+    img.src = "assets/maps/" + name + ".png?v=" + v;
+    img.onerror = () => { this.cache[name] = null; };
+    this.cache[name] = img;
+    return img;
+  },
+};
+
 /* hash deterministico por celula — sempre a mesma variante de chao */
 function tileVariant(ids, cx, cy) {
   return ids[(cx * 31 + cy * 17) % ids.length];
@@ -121,6 +138,17 @@ function drawTileCharMap(ctx, map, W, H, cols, rows) {
   const tw = W / cols, th = H / rows;
   ctx.fillStyle = "#060806";
   ctx.fillRect(0, 0, W, H);
+  const art = map && map.mapImage ? HuntMapArt.get(map.mapImage) : null;
+  if (art && art.complete && art.naturalWidth) {
+    // A imagem vem do RME sem UI: fidelidade visual total para objetos
+    // modernos; criaturas/efeitos ainda são desenhados depois normalmente.
+    // `contain`, e não stretch: o PNG exportado pelo RME mantém pixel art,
+    // enquadramento e objetos multi-SQM exatamente como o mapper conferiu.
+    const scale = Math.min(W / art.naturalWidth, H / art.naturalHeight);
+    const dw = Math.round(art.naturalWidth * scale), dh = Math.round(art.naturalHeight * scale);
+    ctx.drawImage(art, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
+    return;
+  }
   // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
   // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
   // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.

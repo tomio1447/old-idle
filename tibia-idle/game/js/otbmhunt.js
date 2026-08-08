@@ -63,6 +63,9 @@ function huntMapFromOtbmAsync(hunt, done) {
       mapa.idleOffsetY = Number(hunt.otbmOffsetY) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
+      // Opcional: PNG limpo exportado pelo RME para preservar objetos modernos
+      // multi-SQM. O OTBM ainda define toda a física da instância.
+      if (hunt.mapImage) hm.mapImage = hunt.mapImage;
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;
       hunt.mapa = key;
       OTBM_HUNT_CACHE[hunt.otbm] = key;
