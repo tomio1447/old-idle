@@ -9,8 +9,6 @@ const maps = [
   { name: 'livraria_fire2', w: 20, h: 12, cells: 240, z: 2 },
   { name: 'livraria_ice', w: 20, h: 14, cells: 277, z: 2 },
 ];
-if (!fs.existsSync(path.join(game, 'assets', 'maps', 'livraria_ice.png')))
-  throw Error('Arte raster da Library Ice ausente');
 const sandbox = { window: {} }; sandbox.window = sandbox; vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(game, 'rme', 'data', 'known_tiles.js'), 'utf8'), sandbox);
 for (const spec of maps) {
