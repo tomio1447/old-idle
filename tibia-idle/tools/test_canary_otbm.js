@@ -21,6 +21,8 @@ for (const spec of maps) {
   const runtimeMap = OTBM.huntMapFromOtbm(map, {});
   if (runtimeMap.rows.length !== 15 || runtimeMap.rows.some(row => row.length !== 24))
     throw Error(spec.name + ': moldura runtime Global-Idle deve ser fixa em 24×15');
+  if (runtimeMap.leg[' '].v !== undefined)
+    throw Error(spec.name + ': void não pode ter lista de sprites vazia (tiles/undefined.png)');
   const listed = OTBM.missingTiles(map, sandbox.RME_KNOWN_TILES);
   if (listed.length) throw Error(spec.name + ': IDs ausentes no catálogo RME: ' + listed.join(', '));
   const used = new Set();

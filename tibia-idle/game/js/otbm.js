@@ -433,7 +433,9 @@
       return c;
     }
     var VOID = " ";
-    legenda[VOID] = { v: [], bloc: true };
+    // Void da moldura 24×15: bloqueia movimentação, mas não possui sprite.
+    // Não use `v: []`: array vazio é truthy e gerava tiles/undefined.png.
+    legenda[VOID] = { bloc: true };
     // Padrão visual Global-Idle: toda hunt ocupa 24×15 na viewport. Quando
     // o recorte RME é menor (ex.: sala interna 21×12), ele é centralizado
     // numa moldura bloqueada — sem pedir ao mapper para preencher bordas com
