@@ -8,5 +8,5 @@ if (ground < 0 || objects < 0 || ground >= objects) throw Error('Tile renderer d
 const beforeObjects = src.slice(ground, objects);
 const objectsBlock = src.slice(objects, src.indexOf('Terceira passagem:', objects));
 if (!/L\.v\.length/.test(beforeObjects)) throw Error('Passagem de floor deve ignorar lista vazia');
-if (!/for \(const id of L\.g\)/.test(objectsBlock)) throw Error('Passagem de objetos OTBM ausente');
+if (!/for \(const id of L\.g\) TileSprites\.drawDeco/.test(objectsBlock)) throw Error('Objetos OTBM devem usar âncora drawDeco');
 console.log('OK: tilemap usa passes floor → objetos → decoração; sprites multi-SQM não são cortados por pisos.');
