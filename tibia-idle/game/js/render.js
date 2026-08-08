@@ -345,10 +345,16 @@ Renderer.prototype.resize = function () {
   }
 };
 
-/* kind: damage = 3px / 1,5 s; restore = 2px / 1,2 s.  Keeping those
- * values here avoids each combat event inventing its own visual timing. */
+/* Textos de combate no idle não devem acumular como um battle log. Todos
+ * sobem e desaparecem progressivamente em no máximo 2 segundos. */
+const FLOATER_MAX_LIFE = 2000;
+function floaterAlpha(p) {
+  // Fade contínuo desde o primeiro frame (mais rápido no final), em vez de
+  // permanecer opaco até os últimos 300 ms e poluir a cena.
+  return Math.max(0, Math.pow(1 - p, 1.35));
+}
 Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
-  const life = kind === "damage" ? 1500 : (kind === "restore" ? 1200 : (big ? 2400 : 1900));
+  const life = kind === "damage" ? 1300 : (kind === "restore" ? 1150 : (big ? FLOATER_MAX_LIFE : 1500));
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
@@ -360,7 +366,8 @@ Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
     vy: -0.007,
     vx: 0,
   });
-  if (this.floaters.length > 60) this.floaters.shift();
+  // Limite curto evita mural de números em party/box com dano em área.
+  if (this.floaters.length > 28) this.floaters.shift();
 };
 
 /* Fala de criatura, no modelo do internalCreatureSay do Canary.
@@ -385,10 +392,10 @@ const TALK_COR = {
   1: "#ffe680", 9: "#ffe680", 36: "#c8c8c8", 37: "#ff8a3c",
 };
 
-/* Duracao da fala na tela. O client mantem por alguns segundos; grito dura
- * um pouco mais, por ser evento raro e chamativo. */
+/* Palavras mágicas e falas de combate também são texto flutuante: em idle
+ * desaparecem durante a subida e nunca ficam mais de 2 segundos na tela. */
 function talkDuracao(tipo) {
-  return tipo === TALK.MONSTER_YELL ? 4000 : 3000;
+  return tipo === TALK.MONSTER_YELL ? 2000 : 1600;
 }
 
 /* Empilha uma fala num dono qualquer (jogador ou monstro).
@@ -407,7 +414,7 @@ function creatureSay(dono, texto, tipo) {
     tipo: tipo, color: TALK_COR[tipo] || "#ffe680",
     life: dur, max: dur, slot: 0,
   });
-  if (dono.speech.length > 4) dono.speech.shift();
+  if (dono.speech.length > 2) dono.speech.shift();
 }
 
 /* Desenha e envelhece a fila de falas de uma criatura. */
@@ -422,8 +429,9 @@ function drawCreatureSpeech(ctx, dono, x, y, dt) {
     // o grito e maior, como no client
     ctx.font = (sp.tipo === TALK.MONSTER_YELL ? "bold 12px" : "bold 10px") +
                " Verdana";
-    const a = Math.min(1, sp.life / 700);
-    const ty = y - 34 - (sp.slot || 0) * 13;
+    const p = 1 - sp.life / sp.max;
+    const a = Math.max(0, Math.pow(1 - p, 1.35));
+    const ty = y - 34 - (sp.slot || 0) * 13 - p * 10;
     ctx.globalAlpha = a;
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(0,0,0,.9)";
@@ -1249,7 +1257,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     f.life -= dt;
     if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
     const p = 1 - f.life / f.max;
-    const alpha = f.life < 300 ? f.life / 300 : 1;
+    const alpha = floaterAlpha(p);
     ctx.globalAlpha = alpha;
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
@@ -1296,12 +1304,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     }
   }
 
-  // vinheta
-  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.95);
-  vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(1, "rgba(0,0,0,.72)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
+  // Iluminação/vinheta dinâmica desativada: o OTC/Canary aplica luz por
+  // criatura e por tile. Sem esse sistema completo, a vinheta escurecia
+  // artificialmente as bordas e escondia detalhes do mapa idle.
   drawBossBar(ctx, W, combat);
 
   ctx.save();
@@ -1448,7 +1453,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     f.life -= dt;
     if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
     const p = 1 - f.life / f.max;
-    const alpha = f.life < 300 ? f.life / 300 : 1;
+    const alpha = floaterAlpha(p);
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
