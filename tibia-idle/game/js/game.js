@@ -1669,13 +1669,14 @@ function startBackgroundTick() {
   }, 200);
 }
 
-/* Loot Pouch: nível de enchimento (0-100%) para o Autoseller.
- * Capacidade fixa de 100 unidades — o slider escolhe em quantos % dispara. */
+/* Loot Pouch: autoseller mede os 50 slots de stacks, não a quantidade
+ * total de unidades. Dez mil gold-runes do mesmo tipo ocupam um slot. */
 function pouchFillPct(p) {
-  const cap = 100;
-  let units = 0;
-  for (const slug in (p.lootPouch || {})) units += p.lootPouch[slug] || 0;
-  return Math.min(100, Math.round((units / cap) * 100));
+  const cap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
+  const used = typeof lootPouchSlotsUsed === "function"
+    ? lootPouchSlotsUsed(p)
+    : Object.keys((p && p.lootPouch) || {}).filter((s) => p.lootPouch[s] > 0).length;
+  return Math.min(100, Math.round((used / cap) * 100));
 }
 
 function loop(ts) {

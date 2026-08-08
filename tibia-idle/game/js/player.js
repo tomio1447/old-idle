@@ -858,9 +858,20 @@ function shouldGoLootPouch(slug) {
   return true;
 }
 
+// Pouch OTC: 50 tipos de item (stacks) no máximo; a quantidade dentro de
+// cada stack não consome slots extras.
+const LOOT_POUCH_MAX_SLOTS = 50;
+function lootPouchSlotsUsed(p) {
+  return Object.keys((p && p.lootPouch) || {}).filter((slug) =>
+    p.lootPouch[slug] > 0 && typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]).length;
+}
+function lootPouchSlotsFree(p) { return Math.max(0, LOOT_POUCH_MAX_SLOTS - lootPouchSlotsUsed(p)); }
+
 function addLootPouch(p, slug, count) {
   count = count || 1;
   p.lootPouch = p.lootPouch || {};
+  // Stack existente sempre aceita mais unidades; um tipo novo exige slot.
+  if (!p.lootPouch[slug] && lootPouchSlotsUsed(p) >= LOOT_POUCH_MAX_SLOTS) return false;
   p.lootPouch[slug] = (p.lootPouch[slug] || 0) + count;
   return true;
 }
