@@ -6,8 +6,8 @@ const path = require('path');
 const vm = require('vm');
 const game = path.join(__dirname, '..', 'game');
 const OTBM = require(path.join(game, 'js', 'otbm.js'));
-const source = path.join(game, 'beta-maps', 'livraria_fire.otbm');
-const runtime = path.join(game, 'maps', 'livraria_fire.otbm');
+const source = path.join(game, 'beta-maps', 'livraria_fire2.otbm');
+const runtime = path.join(game, 'maps', 'livraria_fire2.otbm');
 if (!fs.existsSync(source) || !fs.existsSync(runtime)) throw Error('Mapa fonte/runtime livraria_fire ausente');
 const map = OTBM.read(fs.readFileSync(source));
 if (map.z !== 2 || map.w !== 24 || map.h !== 15 || Object.keys(map.cells).length !== 360)
