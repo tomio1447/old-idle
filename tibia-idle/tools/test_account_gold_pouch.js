@@ -1,0 +1,2 @@
+const fs=require('fs'),path=require('path');const g=path.join(__dirname,'..','game','js');const coin=fs.readFileSync(path.join(g,'tibiacoin.js'),'utf8'),game=fs.readFileSync(path.join(g,'game.js'),'utf8'),p=fs.readFileSync(path.join(g,'player.js'),'utf8');
+for(const [s,r] of [[coin,/function accountGold/],[coin,/function bindAccountGold/],[game,/acc\.goldMigrated/],[game,/bindAccountGold\(p\)/],[p,/itemUsesInstances\(slug\)\) \? count : 1/]])if(!r.test(s))throw Error('regra ausente '+r);console.log('OK: gold por conta e equipment ocupa slots individuais na Pouch.');

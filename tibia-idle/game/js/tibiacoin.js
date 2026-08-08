@@ -18,9 +18,10 @@ function accountLoad() {
     if (raw) acc = JSON.parse(raw);
   } catch (e) { acc = null; }
   if (!acc || typeof acc !== "object" || typeof acc.coins !== "number") {
-    acc = { v: 1, coins: 0 };
+    acc = { v: 1, coins: 0, gold: 0, goldMigrated: false };
   }
   acc.coins = Math.max(0, Math.floor(acc.coins) || 0);
+  acc.gold = Math.max(0, Math.floor(acc.gold) || 0);
   return acc;
 }
 
@@ -31,6 +32,23 @@ function accountSave(acc) {
 /* Saldo total de Tibia Coins da conta. */
 function accountCoins() {
   return accountLoad().coins;
+}
+
+// Gold também pertence à conta, tal como Tibia Coins.
+function accountGold() { return accountLoad().gold; }
+function accountSetGold(n) {
+  const acc = accountLoad(); acc.gold = Math.max(0, Math.floor(Number(n) || 0)); accountSave(acc); return acc.gold;
+}
+function accountAddGold(n) { return accountSetGold(accountGold() + Math.max(0, Math.floor(Number(n) || 0))); }
+function accountSpendGold(n) {
+  n = Math.max(0, Math.floor(Number(n) || 0));
+  const have = accountGold(); if (have < n) return false; accountSetGold(have - n); return true;
+}
+function bindAccountGold(p) {
+  if (!p || p._accountGoldBound || typeof Object.defineProperty !== "function") return;
+  Object.defineProperty(p, "gold", { enumerable: true, configurable: true,
+    get: () => accountGold(), set: (v) => accountSetGold(v) });
+  p._accountGoldBound = true;
 }
 
 /* Adiciona coins à conta (só valores positivos; retorna o novo saldo). */
