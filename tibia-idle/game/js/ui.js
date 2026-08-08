@@ -1344,11 +1344,13 @@ function renderLootPouch(p) {
   const asOn = !!p.config.pouchAutoSell;
   const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
   const asFill = pouchFillPct(p);
+  const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
+  const pouchCap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
         <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller</span>
-        <span class="tiny dim">pouch ${asFill}% / vende em ${asPct}%</span>
+        <span class="tiny dim">slots ${pouchSlots}/${pouchCap} · ${asFill}% / vende em ${asPct}%</span>
         <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
       </div>
       <div class="row mt4" style="align-items:center;gap:6px">
