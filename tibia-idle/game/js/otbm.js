@@ -228,11 +228,88 @@
     return s;
   }
 
+  /* Canary's Map Editor 4 salva o OTBM moderno: cabeçalho u32 (sem
+   * "OTBM" ASCII), nós MAP_HEADER/MAP_DATA/TILE_AREA/TILE/ITEM =
+   * 0/2/4/5/6. Mantemos o leitor legado abaixo e normalizamos este formato
+   * para o mesmo {cells,w,h,z} que o runtime já consome. */
+  function readCanaryV4(data) {
+    var r = new Rdr(data), floors = {}, desc = "";
+    // Nos arquivos atuais a versão é o u32 inicial (bytes 0..3); o nó
+    // raiz começa imediatamente no byte 4.
+    r.i = 4;
+
+    function cellAt(z, x, y) {
+      var f = floors[z] || (floors[z] = {}), k = x + "," + y;
+      return f[k] || (f[k] = { x: x, y: y, g: 0, items: [] });
+    }
+    function skipAttr(id, ctx) {
+      if (id === 1 || id === 2 || id === 7 || id === 11 || id === 13) {
+        var len = r.u16(), a = [];
+        for (var n = 0; n < len; n++) a.push(r.u8());
+        if (id === 1 && !desc) desc = bytesToStr(a);
+      } else if (id === 3 || id === 12 || id === 16 || id === 22) r.u32();
+      else if (id === 23 || id === 24) { var pathLen = r.u16(); for (var p = 0; p < pathLen; p++) r.u8(); }
+      else if (id === 4 || id === 5) r.u16();
+      else if (id === 9) { var ground = r.u16(); if (ctx && !ctx.g) ctx.g = ground; }
+      else if (id === 8) { r.u16(); r.u16(); r.u8(); }
+      else if (id === 14 || id === 15) r.u8();
+      else throw new Error("atributo Canary OTBM desconhecido: " + id);
+    }
+    function node(ctx, depth) {
+      if (depth > 64) throw new Error("OTBM Canary muito profundo");
+      var type = r.u8(), child = ctx, x, y, z, item;
+      if (type === 0) { // MAP_HEADER: versão, width, height, versions OTB
+        r.u32(); r.u16(); r.u16(); r.u32(); r.u32();
+      } else if (type === 4) { // TILE_AREA
+        x = r.u16(); y = r.u16(); z = r.u8(); child = { x: x, y: y, z: z, cell: null };
+      } else if (type === 5) { // TILE, offsets dentro da área
+        x = r.u8(); y = r.u8();
+        if (ctx) child = { x: ctx.x + x, y: ctx.y + y, z: ctx.z,
+                           cell: cellAt(ctx.z, ctx.x + x, ctx.y + y) };
+      } else if (type === 6) { // ITEM
+        item = r.u16();
+        if (ctx && ctx.cell) ctx.cell.items.push(item);
+      }
+      while (true) {
+        var next = r.peek();
+        if (next === undefined) throw new Error("fim prematuro do OTBM Canary");
+        if (next === NODE_END) { r.take(); return; }
+        if (next === NODE_START) { r.take(); node(child, depth + 1); continue; }
+        r.take();
+        // O header e TILE_AREA não possuem attrs depois dos campos fixos.
+        if (type === 0 || type === 4) throw new Error("dados inesperados no nó Canary " + type);
+        skipAttr(next, child && child.cell);
+      }
+    }
+    if (r.peek() !== NODE_START) throw new Error(".otbm Canary sem nó raiz");
+    r.take(); node(null, 0);
+
+    var bestZ = null, bestCount = -1;
+    Object.keys(floors).forEach(function (z) {
+      var n = Object.keys(floors[z]).length;
+      if (n > bestCount) { bestCount = n; bestZ = +z; }
+    });
+    if (bestZ === null) throw new Error("OTBM Canary não possui tiles");
+    var source = floors[bestZ], minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    Object.keys(source).forEach(function (k) { var c = source[k]; minX = Math.min(minX,c.x); minY = Math.min(minY,c.y); maxX = Math.max(maxX,c.x); maxY = Math.max(maxY,c.y); });
+    var map = { w: maxX-minX+1, h: maxY-minY+1, z: bestZ,
+                name: "Canary map (z " + bestZ + ")", spawn: null, mob: [], cells: {}, desc: desc,
+                sourceBounds: { minX:minX, minY:minY, maxX:maxX, maxY:maxY } };
+    Object.keys(source).forEach(function (k) {
+      var c=source[k], lx=c.x-minX, ly=c.y-minY;
+      map.cells[lx+","+ly] = { g:c.g, items:c.items };
+    });
+    return map;
+  }
+
   function read(data) {
     var d = new Uint8Array(data);
+    // O RME/Canary 4 usa cabeçalho u32 zero em vez da assinatura ASCII.
+    if (d.length >= 5 && d[0] === 0 && d[1] === 0 && d[2] === 0 && d[3] === 0)
+      return readCanaryV4(data);
     if (d.length < 8 || d[0] !== 0x4F || d[1] !== 0x54 ||
         d[2] !== 0x42 || d[3] !== 0x4D)
-      throw new Error("nao e um .otbm (magic OTBM ausente)");
+      throw new Error("nao e um .otbm reconhecido");
     var r = new Rdr(data);
     r.i = 4;
     r.u32(); // versao (escapada nao se aplica ao header)
