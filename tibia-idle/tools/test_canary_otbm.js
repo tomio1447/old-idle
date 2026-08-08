@@ -1,5 +1,5 @@
 /* Regressão: mapas reais exportados pelo Canary's Map Editor 4.
- * Confirma OTBM moderno, dimensões fonte, canvas runtime 24×15 e PNGs físicos. */
+ * Confirma OTBM moderno, dimensões fonte, grid runtime 21×13 e PNGs físicos. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -7,7 +7,8 @@ const game = path.join(__dirname, '..', 'game');
 const OTBM = require(path.join(game, 'js', 'otbm.js'));
 const maps = [
   { name: 'livraria_fire2', w: 20, h: 12, cells: 240, z: 2 },
-  { name: 'livraria_ice', w: 20, h: 14, cells: 277, z: 2 },
+  // Mapa Ice legado ainda mede 20×14; será substituído pelo novo teste 21×13.
+  { name: 'livraria_ice', w: 20, h: 14, cells: 277, z: 2, legacyHeight: true },
 ];
 const sandbox = { window: {} }; sandbox.window = sandbox; vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(game, 'rme', 'data', 'known_tiles.js'), 'utf8'), sandbox);
@@ -19,8 +20,9 @@ for (const spec of maps) {
   if (map.z !== spec.z || map.w !== spec.w || map.h !== spec.h || Object.keys(map.cells).length !== spec.cells)
     throw Error(`${spec.name}: recorte inesperado z=${map.z}, ${map.w}x${map.h}, ${Object.keys(map.cells).length} cells`);
   const runtimeMap = OTBM.huntMapFromOtbm(map, {});
-  if (runtimeMap.rows.length !== 15 || runtimeMap.rows.some(row => row.length !== 24))
-    throw Error(spec.name + ': moldura runtime Global-Idle deve ser fixa em 24×15');
+  const wantedH = spec.legacyHeight ? 14 : 13;
+  if (runtimeMap.rows.length !== wantedH || runtimeMap.rows.some(row => row.length !== 21))
+    throw Error(spec.name + ': dimensões runtime OTBM inesperadas');
   if (runtimeMap.leg[' '].v !== undefined)
     throw Error(spec.name + ': void não pode ter lista de sprites vazia (tiles/undefined.png)');
   const listed = OTBM.missingTiles(map, sandbox.RME_KNOWN_TILES);
