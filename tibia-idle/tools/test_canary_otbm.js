@@ -14,6 +14,10 @@ if (map.z !== 2 || map.w !== 24 || map.h !== 15 || Object.keys(map.cells).length
   throw Error(`Recorte Canary inesperado: z=${map.z}, ${map.w}x${map.h}, ${Object.keys(map.cells).length} cells`);
 const sandbox = { window: {} }; sandbox.window = sandbox; vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(game, 'rme', 'data', 'known_tiles.js'), 'utf8'), sandbox);
-const missing = OTBM.missingTiles(map, sandbox.RME_KNOWN_TILES);
-if (missing.length) throw Error('Sprites ausentes no mapa Canary: ' + missing.join(', '));
-console.log(`OK: OTBM Canary v4 lido (${map.w}x${map.h}, z ${map.z}, ${Object.keys(map.cells).length} tiles) sem sprites ausentes.`);
+const listed = OTBM.missingTiles(map, sandbox.RME_KNOWN_TILES);
+if (listed.length) throw Error('IDs do mapa ausentes no catálogo RME: ' + listed.join(', '));
+const used = new Set();
+Object.values(map.cells).forEach(c => { if (c.g) used.add(c.g); (c.items || []).forEach(id => used.add(id)); });
+const missing = [...used].filter(id => !fs.existsSync(path.join(game, 'assets', 'tiles', `${id}.png`)));
+if (missing.length) throw Error('PNGs físicos ausentes no mapa Canary: ' + missing.join(', '));
+console.log(`OK: OTBM Canary v4 lido (${map.w}x${map.h}, z ${map.z}, ${Object.keys(map.cells).length} tiles) com ${used.size} sprites físicos.`);
