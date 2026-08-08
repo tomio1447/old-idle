@@ -61,7 +61,9 @@ function creatureTileOrigin(centerX, centerY, width, height, tile) {
 function buildRenderEntities(combat, player) {
   const out = [];
   if (!combat) return out;
-  if (combat.player && player) out.push({ kind: "player", ent: combat.player, p: player,
+  // Jogador inconsciente não é criatura ativa: some da fila e deixa apenas
+  // o corpse oficial/contador até o revive.
+  if (combat.player && player && player.hp > 0 && (!combat.player.p || combat.player.p.hp > 0)) out.push({ kind: "player", ent: combat.player, p: player,
     footY: combat.player.y || 0, id: "active" });
   if (combat.players && combat.players.length > 1) {
     for (const ent of combat.players) {
@@ -1275,6 +1277,29 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 };
 
+/* Corpse de player conforme Player::getLookCorpse() do Canary. */
+function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt) {
+  if (!ent || !p || !until) return;
+  const px = (ent.x || 0) * W, py = (ent.y || 0) * H;
+  const sex = String(p.sex || p.gender || "").toLowerCase();
+  const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
+  const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
+  const ts = tilePx(W);
+  if (corpse && corpse.complete && corpse.naturalWidth) {
+    const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
+    ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
+  }
+  const now = Date.now(), left = Math.max(0, Math.ceil((until - now) / 1000));
+  const total = Math.max(1, until - (startedAt || now));
+  const elapsed = Math.max(0, Math.min(1, 1 - (until - now) / total));
+  ctx.font = "bold 16px Verdana"; ctx.textAlign = "center";
+  ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+  const ly = py - ts * .85 - elapsed * ts * .7;
+  ctx.strokeText(left + "s", px, ly); ctx.fillStyle = "#ff3b30"; ctx.fillText(left + "s", px, ly);
+  ctx.globalAlpha = 1;
+}
+
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
@@ -1467,6 +1492,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.fillStyle = f.color;
     ctx.fillText(f.text, fx, fy);
     ctx.globalAlpha = 1;
+  }
+
+  // Membros inconscientes da party: não renderizam outfit/IA; ficam como
+  // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
+  if (combat && !combat.dead && combat.players) {
+    for (const ent of combat.players) {
+      if (!ent || !ent.p || ent.p.hp > 0 || !ent.reviveAt) continue;
+      const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
+      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt);
+    }
   }
 
   // --- morte do player: corpse oficial Canary e contador de respawn.

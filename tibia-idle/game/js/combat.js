@@ -3573,6 +3573,7 @@ function partyTickAllies(c, now, dt) {
     // game.js revive quando o tempo chega
     if (ent.p.hp <= 0) {
       if (!ent.reviveAt) {
+        ent.downedAt = now;
         ent.reviveAt = now + ((typeof reviveTime === "function") ? reviveTime() : 30000);
         ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
         ent.p.deaths = (ent.p.deaths || 0) + 1;
@@ -3644,7 +3645,8 @@ function partyHandleDown(c, fallenP) {
   const ent = c.players.find((e) => e.p === fallenP) || c.player;
   if (ent) {
     if (!ent.reviveAt) {
-      ent.reviveAt = Date.now() + ((typeof reviveTime === "function") ? reviveTime() : 30000);
+      ent.downedAt = Date.now();
+      ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
       ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       ent.p.hp = 0;
       c.stats.deaths++;
