@@ -439,8 +439,10 @@
     // numa moldura bloqueada — sem pedir ao mapper para preencher bordas com
     // montanhas/terreno artificial.
     var targetW = Math.max(24, map.w), targetH = Math.max(15, map.h);
-    var padX = Math.floor((targetW - map.w) / 2);
-    var padY = Math.floor((targetH - map.h) / 2);
+    var padX = Math.max(0, Math.min(targetW - map.w,
+      Math.floor((targetW - map.w) / 2) + (Number(map.idleOffsetX) || 0)));
+    var padY = Math.max(0, Math.min(targetH - map.h,
+      Math.floor((targetH - map.h) / 2) + (Number(map.idleOffsetY) || 0)));
     var rows = [];
     for (var y = 0; y < targetH; y++) {
       var row = "";
