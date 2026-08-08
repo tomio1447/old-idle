@@ -767,44 +767,29 @@ function openHuntInfoModal(id) {
   const monsterCard = (slug) => {
     const m = GAMEDATA.monsters[slug];
     if (!m) return "";
-    const elName = (m.element || "physical");
-    const elLabel = (ELEMENTS[elName] || ELEMENTS.physical).name;
-    const elColor = (ELEMENTS[elName] || ELEMENTS.physical).color;
-    // resistências (mapa de elemento -> cor)
-    const resistHtml = Object.entries(m.resist || {})
-      .map(([el, v]) => {
-        const base = ELEMENTS[el] || ELEMENTS.physical;
-        const cor = v > 0 ? "#7ae87a" : v < 0 ? "#ff9090" : "#c8c0a8";
-        return `<span class="tiny" style="color:${cor}" title="${base.name}: ${v > 0 ? "+" : ""}${v}%">${base.name} ${v > 0 ? "+" : ""}${v}%</span>`;
-      }).join(" · ");
-    // drops: TODOS os itens do loot do Canary (item + chance + qtd máx).
-    // Antes cortava em 8 e escondia drops raros como os rift da DT Seal.
+    const elements = ["physical", "earth", "energy", "fire", "ice", "holy", "death"];
+    const resistHtml = elements.map((el) => {
+      const v = (m.resist && m.resist[el]) || 0;
+      const base = ELEMENTS[el] || ELEMENTS.physical;
+      // resistência positiva preenche em verde; fraqueza fica curta/vermelha.
+      const width = Math.max(8, Math.min(100, 50 + v / 2));
+      const col = v < 0 ? "#e85b52" : (v >= 100 ? "#37d45b" : "#80d64a");
+      return `<div class="hunt-best-res" title="${base.name}: ${v > 0 ? "+" : ""}${v}%">
+        <span>${base.icon || "◆"}</span><i><b style="width:${width}%;background:${col}"></b></i></div>`;
+    }).join("");
     const lootHtml = (m.loot || []).map((l) => {
       const it = GAMEDATA.items[l.item];
-      return `<div class="hunt-drop">
-        ${itemImg(l.item, 18)}
-        <span class="tiny" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it ? it.n : l.item}</span>
-        <span class="tiny dim">${l.chance}%${l.max > 1 ? " · até " + l.max : ""}</span>
-      </div>`;
-    }).join("") || `<div class="tiny dim">— sem drops —</div>`;
-
-    return `<div class="hunt-monster">
-      <div class="hunt-monster-head">
-        ${mobImg(slug, 40)}
-        <div style="flex:1;min-width:0">
-          <div class="small" style="font-weight:bold;color:var(--text-bright,#efe6c8)">${m.name}</div>
-          <div class="tiny dim">${elLabel} <span style="color:${elColor}">●</span></div>
-        </div>
-        <div class="hunt-monster-stats">
-          <div class="tiny"><span class="k">HP</span> <b>${fmt(m.hp)}</b></div>
-          <div class="tiny"><span class="k">EXP</span> <b style="color:#9ce84a">${fmt(m.exp)}</b></div>
-          <div class="tiny"><span class="k">ATK</span> <b style="color:#ff9a6a">${fmt(m.damage)}</b></div>
-          <div class="tiny"><span class="k">ARM</span> <b>${m.armor || 0}</b></div>
-          ${m.defense ? `<div class="tiny"><span class="k">DEF</span> <b>${m.defense}</b></div>` : ""}
-        </div>
-      </div>
-      ${resistHtml ? `<div class="hunt-resist">${resistHtml}</div>` : ""}
-      <div class="hunt-loot">${lootHtml}</div>
+      const label = `${it ? it.n : l.item} · ${l.chance}% chance${l.max > 1 ? ` · até ${l.max}` : ""}`;
+      return `<div class="hunt-loot-slot" title="${label}">${itemImg(l.item, 28)}</div>`;
+    }).join("") || `<span class="tiny dim">—</span>`;
+    return `<div class="hunt-best-card">
+      <div class="hunt-best-sprite">${mobImg(slug, 58)}</div>
+      <div class="hunt-best-name">${m.name}</div>
+      <div class="hunt-best-stat"><span>HP</span><b>${fmt(m.hp)}</b></div>
+      <div class="hunt-best-stat"><span>Exp</span><b>${fmt(m.exp)}</b></div>
+      <div class="hunt-best-title">RESISTÊNCIAS</div>
+      <div class="hunt-best-resists">${resistHtml}</div>
+      <div class="hunt-best-loot">${lootHtml}</div>
     </div>`;
   };
 
