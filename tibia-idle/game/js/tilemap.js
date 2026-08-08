@@ -140,7 +140,10 @@ function drawTileCharMap(ctx, map, W, H, cols, rows) {
     for (let x = 0; x < cols && x < row.length; x++) {
       const L = map.leg[row[x]];
       if (!L || !L.g) continue;
-      for (const id of L.g) TileSprites.draw(ctx, id, x * tw, y * th, tw);
+      // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
+      // decoração/base do SQM, não âncora de ground. Isso preserva a
+      // sobreposição natural de objetos multi-SQM do client.
+      for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw);
     }
   }
   // Terceira passagem: decoração explícita acima das camadas OTBM.
