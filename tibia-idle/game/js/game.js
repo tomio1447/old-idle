@@ -2418,11 +2418,19 @@ function openCharacterModal() {
   $("#char-outfit").addEventListener("click", () => openOutfitModal());
   $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
     const id = b.dataset.loadChar;
+    // Party em hunt: a entidade já existe nesta instância. Nunca recarregue
+    // para a cidade, pois isso criava uma cópia do membro ainda em combate.
+    if (G.combat && G.combat.players && G.combat.players.some((e) => String(e.id) === String(id))) {
+      if (typeof partyCombatSwitchTo === "function" && partyCombatSwitchTo(id)) {
+        $("#modal").classList.remove("show");
+        renderAll();
+      }
+      return;
+    }
     const roster = readRoster();
     if (!roster[id] || !roster[id].p) { toast("Personagem não encontrado."); return; }
-    save();                                   // salva o char atual antes de sair
+    save();
     localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
-    // marca para entrar direto no personagem escolhido após o reload
     sessionStorage.setItem(AUTOLOGIN_KEY, id);
     location.reload();
   }));

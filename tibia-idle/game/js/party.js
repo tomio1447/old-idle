@@ -1010,10 +1010,19 @@ function partyCombatSwitchTo(id) {
       if (typeof toast === "function") toast(ent.name + " está inconsciente — espere ele renascer.", "bad");
       return false;
     }
-    // salva o personagem anterior antes de trocar o controle
-    if (typeof saveCharacterToRoster === "function" && G.p) saveCharacterToRoster(G.p);
+    // Persiste TODOS antes da troca: HP/MP/posição da instância não ficam
+    // presos ao personagem anterior quando o jogador alterna o controle.
+    if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
+    else if (typeof saveCharacterToRoster === "function" && G.p) saveCharacterToRoster(G.p);
     c.player = ent;
     G.p = ent.p;
+    // A escolha ativa também precisa acompanhar a entidade ativa; sem isto,
+    // um reload posterior voltava para o personagem antigo/cidade.
+    try {
+      localStorage.setItem(ACTIVE_CHARACTER_KEY, String(ent.id));
+      sessionStorage.setItem(AUTOLOGIN_KEY, String(ent.id));
+    } catch (e) { /* storage indisponível: instância continua válida */ }
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
     if (typeof renderAll === "function") renderAll();
     if (typeof toast === "function") toast("Controlando: " + ent.name);
     return true;
