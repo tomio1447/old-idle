@@ -94,7 +94,7 @@
   Object.assign(GAMEDATA.hunts, {
     // Recorte editável salvo em beta-maps/livraria_fire.otbm e copiado para
     // maps/ no build. O loader OTBM normaliza o andar Z=2 para a arena idle.
-    "library-fire": Object.assign(hunt("Secret Library — Fire Section", 400, ["burning-book", "rage-squid", "biting-book"], "#b64425", 15167, 12567, 783, 75, 95), { otbm: "livraria_fire" }),
+    "library-fire": Object.assign(hunt("Secret Library — Fire Section", 400, ["burning-book", "rage-squid", "biting-book"], "#b64425", 15167, 12567, 783, 75, 95), { otbm: "livraria_fire2" }),
     "library-energy": hunt("Secret Library — Energy Section", 425, ["energetic-book", "biting-book"], "#7353d0", 14500, 11000, 825, 73, 92),
     "library-ice": hunt("Secret Library — Ice Section", 450, ["icecold-book", "squid-warden", "biting-book"], "#3c9ec4", 14667, 12833, 717, 77, 98),
     "library-earth": hunt("Secret Library — Earth Section", 475, ["cursed-book", "biting-book"], "#4c9b52", 13000, 11350, 625, 73, 88),
