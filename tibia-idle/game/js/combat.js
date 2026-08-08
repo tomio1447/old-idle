@@ -3413,18 +3413,11 @@ function rollLoot(c, p, mob) {
   const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
   for (const l of mob.def.loot) {
     // Chance efetiva = chance base * lootRate (cap 100%)
-    const effectiveChance = Math.min(100, l.chance * lootRate);
+    const effectiveChance = Math.min(100, l.chance * lootRate * (c.lootMul || 1));
     if (Math.random() * 100 > effectiveChance) continue;
-    let count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
-    // Rate de loot também multiplica a quantidade
-    if (lootRate > 1) {
-      const boosted = count * lootRate;
-      count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
-    }
-    if ((c.lootMul || 1) > 1) {
-      const boosted = count * c.lootMul;
-      count = Math.max(1, Math.floor(boosted) + (Math.random() < boosted % 1 ? 1 : 0));
-    }
+    // Multiplicadores aumentam SOMENTE a chance. A quantidade respeita o
+    // max original do Canary; não multiplicar aqui evita 15 blank runes.
+    const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
     if (!mob.boss && isNoCollect(p, l.item)) continue;
