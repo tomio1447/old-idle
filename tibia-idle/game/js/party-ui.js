@@ -77,6 +77,14 @@ function partyOutfitIcon(member, sex) {
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
 function partySwitchToChar(id) {
+  // Em party combat, trocar personagem é trocar o controle para a entidade
+  // viva já presente na hunt — recarregar levaria o membro a Thais e o
+  // duplicaria na instância.
+  if (typeof G !== "undefined" && G.combat && G.combat.players &&
+      G.combat.players.some((e) => String(e.id) === String(id)) &&
+      typeof partyCombatSwitchTo === "function") {
+    return partyCombatSwitchTo(id);
+  }
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
   try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}

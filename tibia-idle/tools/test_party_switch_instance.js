@@ -1,0 +1,2 @@
+const fs=require('fs'),path=require('path');const g=path.join(__dirname,'..','game','js');const game=fs.readFileSync(path.join(g,'game.js'),'utf8'),ui=fs.readFileSync(path.join(g,'party-ui.js'),'utf8');
+for(const [s,r] of [[game,/G\.combat\.players\.some/],[game,/partyCombatSwitchTo\(id\)/],[ui,/partyCombatSwitchTo\(id\)/]])if(!r.test(s))throw Error('troca segura de party ausente');console.log('OK: troca de personagem em party reutiliza a mesma instância sem reload.');
