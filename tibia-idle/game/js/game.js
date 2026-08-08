@@ -107,6 +107,16 @@ function sessionAccount() {
 function load() {
   try {
     const roster = readRoster();
+    // Migração única: soma o gold de todos os personagens locais e passa a
+    // carteira para a conta. Depois p.gold vira um accessor compartilhado.
+    if (typeof accountLoad === "function") {
+      const acc = accountLoad();
+      if (!acc.goldMigrated) {
+        let total = acc.gold || 0;
+        for (const id of Object.keys(roster)) { const raw = roster[id] && roster[id].p; if (raw) { total += Math.max(0, Math.floor(raw.gold || 0)); raw.gold = 0; } }
+        acc.gold = total; acc.goldMigrated = true; accountSave(acc); writeRoster(roster);
+      }
+    }
     const active = localStorage.getItem(ACTIVE_CHARACTER_KEY);
     if (active && roster[active] && roster[active].p) {
       const p = normalizePlayer(roster[active].p);
@@ -224,6 +234,7 @@ function normalizePlayer(p) {
   p.equip = p.equip || {};
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
+  if (typeof bindAccountGold === "function") bindAccountGold(p);
   p.bank = p.bank || 0;
   p.promoted = !!p.promoted;
   p.promotedAt = p.promotedAt || null;

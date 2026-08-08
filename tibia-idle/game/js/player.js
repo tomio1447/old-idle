@@ -862,16 +862,23 @@ function shouldGoLootPouch(slug) {
 // cada stack não consome slots extras.
 const LOOT_POUCH_MAX_SLOTS = 50;
 function lootPouchSlotsUsed(p) {
-  return Object.keys((p && p.lootPouch) || {}).filter((slug) =>
-    p.lootPouch[slug] > 0 && typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]).length;
+  let slots = 0;
+  for (const slug of Object.keys((p && p.lootPouch) || {})) {
+    const count = p.lootPouch[slug] || 0;
+    if (!count || typeof GAMEDATA === "undefined" || !GAMEDATA.items[slug]) continue;
+    // Equipamentos/itens de instância não empilham: cada unidade usa slot.
+    slots += (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) ? count : 1;
+  }
+  return slots;
 }
 function lootPouchSlotsFree(p) { return Math.max(0, LOOT_POUCH_MAX_SLOTS - lootPouchSlotsUsed(p)); }
 
 function addLootPouch(p, slug, count) {
   count = count || 1;
   p.lootPouch = p.lootPouch || {};
-  // Stack existente sempre aceita mais unidades; um tipo novo exige slot.
-  if (!p.lootPouch[slug] && lootPouchSlotsUsed(p) >= LOOT_POUCH_MAX_SLOTS) return false;
+  const unique = typeof itemUsesInstances === "function" && itemUsesInstances(slug);
+  const needed = unique ? count : (p.lootPouch[slug] ? 0 : 1);
+  if (lootPouchSlotsUsed(p) + needed > LOOT_POUCH_MAX_SLOTS) return false;
   p.lootPouch[slug] = (p.lootPouch[slug] || 0) + count;
   return true;
 }
