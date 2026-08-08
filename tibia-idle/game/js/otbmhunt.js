@@ -57,6 +57,10 @@ function huntMapFromOtbmAsync(hunt, done) {
     })
     .then((buf) => {
       const mapa = OTBM.read(buf);
+      // Alguns itens 2×2 da borda extrapolam visualmente seu SQM. O offset
+      // é metadado da hunt (não altera o .otbm editável nem a colisão).
+      mapa.idleOffsetX = Number(hunt.otbmOffsetX) || 0;
+      mapa.idleOffsetY = Number(hunt.otbmOffsetY) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;
