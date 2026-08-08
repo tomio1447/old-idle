@@ -1793,6 +1793,7 @@ function loop(ts) {
             if (typeof ensureCell === "function") ensureCell(ent);
           }
           ent.reviveAt = 0;
+          ent.downedAt = 0;
           ent.deathPos = null;
           addLog("party", `<b style="color:#9ce84a">${ent.name}</b> renasceu no local da morte.`);
           if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);

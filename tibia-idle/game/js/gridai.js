@@ -458,23 +458,25 @@ function safeThinkStep(c, ent, alvo, occ, now) {
 function updateGridMovement(c, p, dt, now) {
   if (!c.player) return;
   now = now || Date.now();
-  ensureCell(c.player);
-  // O jogador nao esta em MOBSHEETS (usa o catalogo de outfits), entao o
-  // ensureCell nao consegue descobrir sozinho o tamanho do ciclo. Sem isto o
-  // advanceStep cairia no padrao de 2 quadros e a caminhada ficaria picotada
-  // justamente nas outfits de 8 quadros.
-  if (typeof walkFrameCount === "function") {
-    c.player.walkFrames = walkFrameCount(p);
+  const activeAlive = (!c.player.p || c.player.p.hp > 0) && (!p || p.hp > 0);
+  if (activeAlive) {
+    ensureCell(c.player);
+    // O jogador nao esta em MOBSHEETS (usa o catalogo de outfits), entao o
+    // ensureCell nao consegue descobrir sozinho o tamanho do ciclo.
+    if (typeof walkFrameCount === "function") c.player.walkFrames = walkFrameCount(p);
+    c.player.attackAnim = Math.max(0, (c.player.attackAnim || 0) - dt);
+  } else {
+    // Morto não recebe AI, passo/interpolação nem permanece como "fantasma".
+    c.player.moving = false;
+    c.player.stepT = 0;
   }
-
-  c.player.attackAnim = Math.max(0, (c.player.attackAnim || 0) - dt);
   for (const m of c.mobs) {
     m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt);
     ensureCell(m);
   }
 
-  // interpola quem esta no meio de um passo
-  advanceStep(c.player, dt);
+  // Interpola somente entidade viva; corpse permanece imóvel no SQM da morte.
+  if (activeAlive) advanceStep(c.player, dt);
   if (c.players && c.players.length > 1) {
     for (const e of c.players) {
       if (e !== c.player && e.p && e.p.hp > 0) advanceStep(e, dt);
@@ -488,7 +490,7 @@ function updateGridMovement(c, p, dt, now) {
 
   // MODO BOX: o personagem ATIVO também segue a formação (o playerThinkStep
   // delega para o boxThinkStep quando attackMode === "box").
-  playerThinkStep(c, p, alvo, occ, now);
+  if (activeAlive) playerThinkStep(c, p, alvo, occ, now);
 
   // PARTY COMBAT: os aliados andam sozinhos até o alvo (cada um com o
   // alcance da própria arma) — ou seguem a formação BOX/SAFE — e os
