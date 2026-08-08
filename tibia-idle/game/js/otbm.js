@@ -452,7 +452,10 @@
         for (var j = 0; j < items.length; j++) {
           if (tileflags[items[j]] && tileflags[items[j]][1]) { bloc = 1; break; }
         }
-        var entry = { v: gid ? [gid] : [] };
+        // Não crie `v: []`: arrays vazios são truthy em JS e o renderer
+        // chamava tileVariant([]), pedindo assets/tiles/undefined.png.
+        var entry = {};
+        if (gid) entry.v = [gid];
         if (items.length) entry.g = items.slice();
         if (bloc) entry.bloc = true;
         row += charDa([gid, items.join("."), bloc].join("|"), entry);
