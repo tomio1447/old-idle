@@ -74,6 +74,22 @@ function monsterRangeSQM(mob) {
   return 1;
 }
 
+/* Escolhe o alvo vivo mais próximo que o monstro consegue alcançar. O
+ * Canary não mantém target inalcançável: se uma parede/corredor fecha a rota,
+ * retoma o alvo mais próximo com caminho em vez de ficar parado. */
+function monsterReachableTarget(c, mob, occ, preferred) {
+  const candidates = (c.players && c.players.length ? c.players : [c.player])
+    .filter((e) => e && (!e.p || e.p.hp > 0) && e.cx !== undefined && e.cy !== undefined);
+  candidates.sort((a, b) => sqmDistance(mob, a) - sqmDistance(mob, b));
+  const range = monsterRangeSQM(mob);
+  for (const ent of candidates) {
+    if (sqmDistance(mob, ent) <= range) return ent;
+    // findPathGrid aceita a célula ocupada pelo alvo como destino.
+    if (typeof findPathGrid === "function" && findPathGrid(mob, ent.cx, ent.cy, occ)) return ent;
+  }
+  return preferred || candidates[0] || null;
+}
+
 /* Decide e executa o passo de UM monstro. Devolve true se andou. */
 function monsterThinkStep(c, mob, alvo, occ, now) {
   ensureCell(mob);
@@ -493,9 +509,10 @@ function updateGridMovement(c, p, dt, now) {
   for (const m of vivos) {
     // Target morto não mantém vaga nem atenção: escolhe instantaneamente o
     // membro vivo mais próximo, inclusive quando o personagem ativo caiu.
-    const alvoMob = (typeof partyNearestTarget === "function")
+    const preferred = (typeof partyNearestTarget === "function")
       ? partyNearestTarget(c, m)
       : ((m.target && m.target.p && m.target.p.hp > 0) ? m.target : c.player);
+    const alvoMob = monsterReachableTarget(c, m, occ, preferred);
     m.target = alvoMob;
     monsterThinkStep(c, m, alvoMob, occ, now);
   }
