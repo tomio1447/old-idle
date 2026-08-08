@@ -10,7 +10,7 @@ const source = path.join(game, 'beta-maps', 'livraria_fire2.otbm');
 const runtime = path.join(game, 'maps', 'livraria_fire2.otbm');
 if (!fs.existsSync(source) || !fs.existsSync(runtime)) throw Error('Mapa fonte/runtime livraria_fire ausente');
 const map = OTBM.read(fs.readFileSync(source));
-if (map.z !== 2 || map.w !== 21 || map.h !== 12 || Object.keys(map.cells).length !== 252)
+if (map.z !== 2 || map.w !== 20 || map.h !== 12 || Object.keys(map.cells).length !== 240)
   throw Error(`Recorte Canary inesperado: z=${map.z}, ${map.w}x${map.h}, ${Object.keys(map.cells).length} cells`);
 const runtimeMap = OTBM.huntMapFromOtbm(map, {});
 if (runtimeMap.rows.length !== 15 || runtimeMap.rows.some(row => row.length !== 24))
