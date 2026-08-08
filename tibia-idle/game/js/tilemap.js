@@ -142,7 +142,11 @@ function drawTileCharMap(ctx, map, W, H, cols, rows) {
   if (art && art.complete && art.naturalWidth) {
     // A imagem vem do RME sem UI: fidelidade visual total para objetos
     // modernos; criaturas/efeitos ainda são desenhados depois normalmente.
-    ctx.drawImage(art, 0, 0, W, H);
+    // `contain`, e não stretch: o PNG exportado pelo RME mantém pixel art,
+    // enquadramento e objetos multi-SQM exatamente como o mapper conferiu.
+    const scale = Math.min(W / art.naturalWidth, H / art.naturalHeight);
+    const dw = Math.round(art.naturalWidth * scale), dh = Math.round(art.naturalHeight * scale);
+    ctx.drawImage(art, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
     return;
   }
   // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
