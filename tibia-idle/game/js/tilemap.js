@@ -121,16 +121,29 @@ function drawTileCharMap(ctx, map, W, H, cols, rows) {
   const tw = W / cols, th = H / rows;
   ctx.fillStyle = "#060806";
   ctx.fillRect(0, 0, W, H);
+  // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
+  // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
+  // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.
+  // Primeira passagem: todos os pisos, sempre atrás de objetos grandes.
   for (let y = 0; y < rows && y < map.rows.length; y++) {
     const row = map.rows[y];
     for (let x = 0; x < cols && x < row.length; x++) {
       const L = map.leg[row[x]];
-      if (!L) continue;
-      const sx = x * tw, sy = y * th;
-      if (L.v) TileSprites.draw(ctx, tileVariant(L.v, x, y), sx, sy, tw);
-      if (L.g) for (const id of L.g) TileSprites.draw(ctx, id, sx, sy, tw);
+      if (!L || !L.v || !L.v.length) continue;
+      TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
     }
   }
+  // Segunda passagem: paredes, móveis e objetos 2×2/1×2. Nenhum piso pode
+  // mais apagar suas partes que avançam sobre SQMs vizinhos.
+  for (let y = 0; y < rows && y < map.rows.length; y++) {
+    const row = map.rows[y];
+    for (let x = 0; x < cols && x < row.length; x++) {
+      const L = map.leg[row[x]];
+      if (!L || !L.g) continue;
+      for (const id of L.g) TileSprites.draw(ctx, id, x * tw, y * th, tw);
+    }
+  }
+  // Terceira passagem: decoração explícita acima das camadas OTBM.
   for (const d of map.deco || [])
     TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw);
 }
