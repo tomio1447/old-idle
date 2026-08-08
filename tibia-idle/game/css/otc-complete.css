@@ -497,7 +497,10 @@ input:focus, textarea:focus, select:focus {
 /* ═══════════════════ MODAL ═══════════════════ */
 .modal-bg {
   position: fixed; inset: 0; z-index: 150;
-  background: rgba(0,0,0,.85);
+  /* Background próprio e opaco para o modal — separado do background
+     Summer 2026 do body, para não deixar a foto vazando por trás. */
+  background: rgba(6,7,9,.94);
+  backdrop-filter: blur(3px);
   display: none; align-items: center; justify-content: center;
   /* v34: modal alto (party) — rola em vez de cortar o topo */
   overflow-y: auto;
