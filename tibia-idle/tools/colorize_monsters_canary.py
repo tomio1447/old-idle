@@ -128,10 +128,11 @@ CANARY_COLORS = {
     "sorcerer-s-apparition": (95, 114, 52, 76),
     "druid-s-apparition": (114, 48, 114, 95),
     "monk-s-apparition": (114, 48, 114, 95),
-    # Rage/Squid compartilham a appearance base; as cores finais recebem
-    # o acabamento específico no renderer (cérebro/partes por região).
-    "rage-squid": (95, 78, 78, 78),
-    "squid-warden": (90, 89, 89, 89),
+    # Rage Squid / Squid Warden compartilham looktype 1059. As quatro cores
+    # abaixo são as definidas pelo Canary; a máscara do DAT separa cérebro,
+    # corpo e tentáculos. Não aplicar filtro CSS no renderer.
+    "rage-squid": (94, 78, 79, 57),
+    "squid-warden": (9, 21, 3, 57),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -276,12 +277,9 @@ def main():
         print("  ok:", slug, "looktype", lt, "cores", colors,
               "cw", cw, "ch", ch)
 
-    # mantem a geometria dos demais sheets (nunca regride a 9 colunas)
-    for slug, m in list(meta.items()):
-        if m.get("cols", 3) > 3:
-            meta[slug] = {"cw": m["cw"], "ch": m["ch"], "cols": 3,
-                          "rows": m.get("rows", 4)}
-
+    # Não reduza sheets existentes a três colunas. Alguns outfits do cliente
+    # têm 4, 5, 7 ou 9 frames por direção; o catálogo precisa preservar a
+    # geometria verdadeira para o recorte do canvas e das miniaturas.
     json.dump(meta, open(meta_path, "w"))
     with open(js_path, "w") as f:
         f.write("/* Gerado por tools/colorize_monsters_canary.py\n"

@@ -79,40 +79,19 @@ function buildRenderEntities(combat, player) {
   return out.sort((a, b) => a.footY - b.footY || order[a.kind] - order[b.kind]);
 }
 
-/* Alguns outfits extraídos do DAT vieram somente com a máscara em escala
- * cinza. O client oficial colore a aparência na composição; aplicamos a
- * mesma etapa após desenhar a máscara, sem adulterar transparência/frames. */
-/* A textura do DAT inclui preto opaco fora da silhueta. Usar composição
- * source-atop pintava esse fundo e criava o quadrado/borrão vermelho ou azul.
- * Filtro de cor preserva o preto e só colore os tons cinza da criatura. */
-const MONSTER_TINT = {
-  // Rage Squid usa o vermelho escuro/preto do Burning Book, não laranja.
-  "rage-squid": "sepia(1) saturate(15) hue-rotate(300deg) brightness(.60) contrast(1.45)",
-  // Squid Warden mantém a leitura fria azul-escura da seção de gelo.
-  "squid-warden": "sepia(1) saturate(10) hue-rotate(160deg) brightness(.72) contrast(1.3)",
-  // Apparitions Soul War: cores da vocação, preservando preto/sombras.
-};
-function drawMonsterSprite(ctx, img, x, y, w, h, slug) {
-  if (slug === "rage-squid") {
-    // Referência TibiaWiki: tentáculos/corpo amarelos e cérebro vermelho.
-    ctx.save(); ctx.filter = "sepia(1) saturate(13) hue-rotate(8deg) brightness(.86) contrast(1.35)";
-    ctx.drawImage(img, x, y, w, h); ctx.restore();
-    ctx.save(); ctx.beginPath(); ctx.rect(x + w*.17, y, w*.66, h*.48); ctx.clip();
-    ctx.filter = "sepia(1) saturate(16) hue-rotate(300deg) brightness(.65) contrast(1.45)";
-    ctx.drawImage(img, x, y, w, h); ctx.restore();
-    return;
-  }
-  const tint = MONSTER_TINT[slug];
-  if (tint) { ctx.save(); ctx.filter = tint; }
+/* A paleta de cada criatura é composta na importação a partir da máscara do
+ * DAT e dos lookHead/lookBody/lookLegs/lookFeet do Canary. Não use filtros
+ * CSS/canvas: eles tingem sombras e transparências e descaracterizam a arte
+ * oficial (em especial Rage Squid e Squid Warden). */
+function drawMonsterSprite(ctx, img, x, y, w, h) {
   ctx.drawImage(img, x, y, w, h);
-  if (tint) ctx.restore();
 }
 
 /* Versao dos assets. O navegador cacheia PNG de forma agressiva, entao
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "34";
+const ASSET_VERSION = "35";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -166,9 +145,8 @@ function mobImg(slug, tam, extra) {
   const k = Math.min(px / meta.cw, px / meta.ch);
   const w = meta.cw * k, h = meta.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-  const tint = MONSTER_TINT[slug] ? `filter:${MONSTER_TINT[slug]};` : "";
   return `<div class="mob-img" style="width:${w.toFixed(1)}px;
-      height:${h.toFixed(1)}px;${tint}
+      height:${h.toFixed(1)}px;
       background-image:url('assets/mob/${slug}.png?v=${v}');
       background-size:${(meta.cw * meta.cols * k).toFixed(1)}px ${
         (meta.ch * meta.rows * k).toFixed(1)}px;
