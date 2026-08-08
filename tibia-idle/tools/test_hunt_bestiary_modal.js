@@ -1,0 +1,2 @@
+const fs=require('fs'),path=require('path');const root=path.join(__dirname,'..','game');const js=fs.readFileSync(path.join(root,'js','ui.js'),'utf8'),css=fs.readFileSync(path.join(root,'css','style.css'),'utf8');
+for(const x of ['hunt-best-card','hunt-best-resists','hunt-loot-slot','chance${l.max'])if(!js.includes(x))throw Error('modal bestiary ausente: '+x);for(const x of ['.hunt-best-card','.hunt-loot-slot'])if(!css.includes(x))throw Error('CSS bestiary ausente: '+x);console.log('OK: modal de hunt usa cards, resistências e loot em slots com chance.');
