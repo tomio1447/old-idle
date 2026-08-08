@@ -9,4 +9,5 @@ const beforeObjects = src.slice(ground, objects);
 const objectsBlock = src.slice(objects, src.indexOf('Terceira passagem:', objects));
 if (!/L\.v\.length/.test(beforeObjects)) throw Error('Passagem de floor deve ignorar lista vazia');
 if (!/for \(const id of L\.g\)/.test(objectsBlock)) throw Error('Passagem de objetos OTBM ausente');
-console.log('OK: tilemap usa passes floor → objetos → decoração; sprites multi-SQM não são cortados por pisos.');
+if (!/const HuntMapArt/.test(src) || !/assets\/maps\//.test(src)) throw Error('Suporte a arte raster exportada pelo RME ausente');
+console.log('OK: tilemap usa passes floor → objetos → decoração e aceita arte raster do RME.');
