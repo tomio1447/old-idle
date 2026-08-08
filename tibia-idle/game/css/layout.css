@@ -513,7 +513,9 @@ button.full { width: 100%; }
 #login {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
   padding: 20px;
-  background: radial-gradient(ellipse at center, #1a1712 0%, #060505 75%);
+  /* Semi-transparente: deixa o background Summer 2026 do body aparecer,
+     com um vinheta escura por cima para manter a legibilidade do formulário. */
+  background: radial-gradient(ellipse at center, rgba(26,23,18,.55) 0%, rgba(6,5,5,.85) 75%);
 }
 #login .box { width: min(470px, 96vw); }
 .field { margin-bottom: 10px; }
@@ -1991,7 +1993,7 @@ body {
 
 /* -------------------------- login */
 #login {
-  background: radial-gradient(ellipse at center, #1f2228 0%, #121418 75%);
+  background: radial-gradient(ellipse at center, rgba(31,34,40,.55) 0%, rgba(18,20,24,.85) 75%);
 }
 
 #login .box {

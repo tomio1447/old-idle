@@ -331,9 +331,8 @@ function boxTargetCell(c, ent, occ) {
   const base = knight || centro;
   if (voc === "knight" || voc === "elite knight") return boxKnightSpot(c, occ, base);
 
-  // ED/MS ficam a 4 SQMs para abrir a linha das waves; RP mantém 2 e Monk 3.
-  const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 :
-    ((voc === "druid" || voc === "elder druid" || voc === "sorcerer" || voc === "master sorcerer") ? 4 : 3);
+  // RP mantém 2 SQM do knight; Mages (ED/MS) e Monk ficam a 3.
+  const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 : 3;
   const retas = [
     { cx: base.cx + distancia, cy: base.cy }, { cx: base.cx - distancia, cy: base.cy },
     { cx: base.cx, cy: base.cy + distancia }, { cx: base.cx, cy: base.cy - distancia },
