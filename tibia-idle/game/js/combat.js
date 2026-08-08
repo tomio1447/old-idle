@@ -42,6 +42,25 @@ function applyBossMultiplier(base, mult) {
   };
 }
 
+/* Spawn para mapas OTBM sem marcador: busca a célula livre mais próxima do
+ * centro visível. Evita o antigo (3,6), que podia cair em uma parede após
+ * centralizar um recorte do RME dentro da moldura 24×15. */
+function huntMapCenterSpawn(map) {
+  const maxY = Math.min(GRID_H, map && map.rows ? map.rows.length : GRID_H);
+  const maxX = Math.min(GRID_W, map && map.rows && map.rows[0] ? map.rows[0].length : GRID_W);
+  const cx = Math.max(0, Math.floor((maxX - 1) / 2));
+  const cy = Math.max(0, Math.floor((maxY - 1) / 2));
+  if (!map || typeof huntMapBlocked !== "function") return { x: cx, y: cy };
+  for (let r = 0; r <= Math.max(maxX, maxY); r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const x = cx + dx, y = cy + dy;
+      if (x >= 0 && y >= 0 && x < maxX && y < maxY && !huntMapBlocked(map, x, y)) return { x, y };
+    }
+  }
+  return { x: cx, y: cy };
+}
+
 function newCombat(player, huntId, instanceMode) {
   const hunt = GAMEDATA.hunts[huntId];
   const mode = instanceMode || player.instanceMode || "non-pvp";
@@ -59,6 +78,8 @@ function newCombat(player, huntId, instanceMode) {
     for (let y = 0; y < huntMap.rows.length && !achou; y++)
       for (let x = 0; x < huntMap.rows[y].length; x++)
         if (huntMap.rows[y][x] === "S") { spx = x; spy = y; achou = true; break; }
+    // Mapas Canary/RME não usam o marcador ASCII S: começam no centro livre.
+    if (!achou && huntMap.otbm) { const pos = huntMapCenterSpawn(huntMap); spx = pos.x; spy = pos.y; }
   }
   const out = {
     huntId: huntId,
@@ -249,8 +270,12 @@ function spawnWave(c, p) {
     if (typeof placeFree === "function") {
       if (c.player) ensureCell(c.player);
       const occ = buildOccupancy(c, null);
+      const leader = (c.players && c.players.length ? c.players[0] : c.player);
+      const lx = leader && leader.cx !== undefined ? leader.cx : Math.floor(GRID_W / 2);
+      const ly = leader && leader.cy !== undefined ? leader.cy : Math.floor(GRID_H / 2);
+      const withinLeaderRange = (x, y) => Math.abs(x - lx) <= 10 && Math.abs(y - ly) <= 10;
       const zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
-        ? c.huntMap.mob : null;
+        ? c.huntMap.mob.filter((z) => withinLeaderRange(z.x, z.y)) : null;
       if (zona && zona.length) {
         // células G livres (respeita a posicao designada + ocupacao atual
         // + celulas ja escolhidas nesta wave)
@@ -270,9 +295,9 @@ function spawnWave(c, p) {
       } else {
         // arena sem zona: qualquer celula livre (evita o canto fixo)
         const livres = [];
-        for (let yy = 0; yy < GRID_H; yy++)
-          for (let xx = 0; xx < GRID_W; xx++)
-            if (cellFree(occ, xx, yy)) livres.push([xx, yy]);
+        for (let yy = Math.max(0, ly - 10); yy <= Math.min(GRID_H - 1, ly + 10); yy++)
+          for (let xx = Math.max(0, lx - 10); xx <= Math.min(GRID_W - 1, lx + 10); xx++)
+            if (withinLeaderRange(xx, yy) && cellFree(occ, xx, yy)) livres.push([xx, yy]);
         let alvo = livres[Math.floor(Math.random() * livres.length)] || [17, 5];
         const ent = { cx: undefined, cy: undefined };
         placeFree(ent, occ, alvo[0], alvo[1]);

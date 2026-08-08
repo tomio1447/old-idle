@@ -945,33 +945,37 @@ function partyCombatLoad(player) {
  * de parede em corredor estreito. */
 function partyCombatPlace(c, spawnCx, spawnCy) {
   if (!c || !c.players) return;
-  const occ = new Map([[spawnCx + ":" + spawnCy, true]]);
-  const offs = [[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-  const bloqueado = (cx, cy) => {
-    if (typeof huntMapBlocked === "function" && c.huntMap && huntMapBlocked(c.huntMap, cx, cy)) return true;
-    if (typeof inBounds === "function" && !inBounds(cx, cy)) return true;
-    return occ.has(cx + ":" + cy);
+  const offs = [0, -1, 1, -2, 2, -3, 3, -4, 4];
+  const free = (cx, cy) => {
+    if (typeof huntMapBlocked === "function" && c.huntMap && huntMapBlocked(c.huntMap, cx, cy)) return false;
+    if (typeof inBounds === "function" && !inBounds(cx, cy)) return false;
+    return true;
   };
-  c.players.forEach((ent, i) => {
-    if (i === 0) {
-      ent.cx = spawnCx; ent.cy = spawnCy;
-    } else {
-      const o = offs[(i - 1) % offs.length];
-      let cx = spawnCx + o[0], cy = spawnCy + o[1];
-      if (bloqueado(cx, cy)) {
-        // tenta as 8 vizinhas livres; senão fica junto do líder
-        let achou = false;
-        for (const o2 of offs) {
-          const nx = spawnCx + o2[0], ny = spawnCy + o2[1];
-          if (!bloqueado(nx, ny)) { cx = nx; cy = ny; achou = true; break; }
-        }
-        if (!achou) { cx = spawnCx; cy = spawnCy; }
+  // Prioridade: fileira X atravessando o centro. Testa linhas próximas caso
+  // a linha central esteja atravessada por uma parede/estante do mapa RME.
+  const rows = [spawnCy, spawnCy - 1, spawnCy + 1, spawnCy - 2, spawnCy + 2, spawnCy - 3, spawnCy + 3];
+  let line = null;
+  for (const y of rows) {
+    const pos = c.players.map((_, i) => ({ x: spawnCx + offs[i], y }));
+    if (pos.every((p, i) => free(p.x, p.y) && !pos.slice(0, i).some(q => q.x === p.x && q.y === p.y))) { line = pos; break; }
+  }
+  if (!line) {
+    // Última defesa: mantém cada personagem em célula livre, sem nascer em parede.
+    line = c.players.map((_, i) => ({ x: spawnCx + (offs[i] || 0), y: spawnCy }));
+    for (const p of line) {
+      if (free(p.x, p.y)) continue;
+      let found = null;
+      for (let r = 1; r <= 5 && !found; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const x = spawnCx + dx, y = spawnCy + dy;
+        if (!found && Math.max(Math.abs(dx), Math.abs(dy)) === r && free(x, y)) found = { x, y };
       }
-      ent.cx = cx; ent.cy = cy;
-      occ.set(cx + ":" + cy, true);
+      if (found) Object.assign(p, found);
     }
-    const s = typeof cellToScreen === "function" ? cellToScreen(ent.cx, ent.cy) : { x: 0.13, y: 0.62 };
-    ent.x = s.x; ent.y = s.y; ent.sx = s.x; ent.sy = s.y;
+  }
+  c.players.forEach((ent, i) => {
+    ent.cx = line[i].x; ent.cy = line[i].y;
+    const sc = typeof cellToScreen === "function" ? cellToScreen(ent.cx, ent.cy) : { x: 0.5, y: 0.5 };
+    ent.x = sc.x; ent.y = sc.y; ent.sx = sc.x; ent.sy = sc.y;
   });
 }
 
