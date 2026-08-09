@@ -96,17 +96,16 @@ const TileSprites = {
    *
    * Objetos MULTI-SQM da paleta 15.x (2x1, 1x2, 2x2... — sprite com
    * largura/altura multiplos exatos de 32 e maior que 1 SQM): o no do item
-   * no .otbm fica no SQM SUPERIOR-ESQUERDO do footprint, e a sprite ocupa o
-   * bloco tw x th para a direita/baixo a partir dele. Ou seja, o canto
-   * superior-esquerdo do sprite vai para (sx, sy) — sem deslocamento. Assim
-   * o objeto "enche" exatamente o seu bloco de celulas (ex.: estante 2x1
-   * grudada na parede, fogueira de parede desenhada POR CIMA da parede, sem
-   * buraco no meio). Centralizar (comportamento antigo) deslocava meia casa
-   * e parecia "partido"; ancorar no inferior-direito puxava 1 casa inteira e
-   * abria um espaco. Para multi-SQM usamos top-left = celula de referencia.
-   * Sprites legado de decoracao (tamanhos nao multiplos de 32, ex. 43x17) e
-   * itens 1x1 continuam centralizados como antes. */
-  drawDeco(ctx, id, sx, sy, size) {
+   * no .otbm fica no SQM INFERIOR-DIREITO do footprint, e a sprite ocupa o
+   * bloco tw x th estendendo 1 SQM para cima/esquerda (convencao OTBM/RME e
+   * igual ao proprio draw() do chao). Logo, para itens de CHAO, o canto
+   * superior-esquerdo do sprite vai para (sx-(w-size), sy-(h-size)).
+   * Itens em CELULA DE PAREDE (hangables — fogueiras, estantes, marcados
+   * pelo chao nao andavel do muro) ficam CENTRALIZADOS na celula do muro,
+   * "grudados/pendurados" nele, sem o deslocamento — e sem o "espaco no
+   * meio" que o deslocamento causava. Sprites legado de decoracao (tamanhos
+   * nao multiplos de 32, ex. 43x17) e itens 1x1 continuam centralizados. */
+  drawDeco(ctx, id, sx, sy, size, onWall) {
     const a = this._anim(id);
     const fr = a ? this.frameFor(id) : 0;
     const img = this.get(id, fr);
@@ -118,8 +117,14 @@ const TileSprites = {
     const h = nH * k;
     // multi-SQM: dimensoes multiplas exatas de 32 e maiores que 1 SQM
     const multi = (nW % 32 === 0 && nH % 32 === 0 && (nW > 32 || nH > 32));
-    const dx = multi ? sx : sx + (size - w) / 2;
-    const dy = multi ? sy : sy + size - h;
+    let dx, dy;
+    if (multi && !onWall) {
+      // objeto de CHAO: ancora inferior-direita -> estende p/ cima/esquerda
+      dx = sx - (w - size); dy = sy - (h - size);
+    } else {
+      // 1x1 ou item em muro (hangable): centralizado na celula
+      dx = sx + (size - w) / 2; dy = sy + size - h;
+    }
     if (a) {
       ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
     } else {
@@ -158,10 +163,16 @@ function drawTileCharMap(ctx, map, W, H, cols, rows) {
     for (let x = 0; x < cols && x < row.length; x++) {
       const L = map.leg[row[x]];
       if (!L || !L.g) continue;
+      // Célula é PAREDE? (chão não andável = muro). Itens nela são
+      // "hangables" (fogueiras, estantes) e ficam centralizados no muro.
+      const isWall = !!(L.v && L.v.some(function (id) {
+        const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+        return f && f[0] === 0;
+      }));
       // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
       // decoração/base do SQM, não âncora de ground. Isso preserva a
       // sobreposição natural de objetos multi-SQM do client.
-      for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw);
+      for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, isWall);
     }
   }
   // Terceira passagem: decoração explícita acima das camadas OTBM.
