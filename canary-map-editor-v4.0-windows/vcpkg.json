@@ -1,0 +1,23 @@
+{
+  "name": "remeres",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "asio",
+    "cpr",
+    "pugixml",
+    "glad",
+    "nlohmann-json",
+    "fmt",
+    "wxwidgets",
+    "opengl",
+    "protobuf",
+    "liblzma",
+    "spdlog",
+    "lua",
+    "sol2",
+    "sqlite3",
+    "stb",
+    "zlib"
+  ],
+  "builtin-baseline": "f3e10653cc27d62a37a3763cd84b38bca07c6075"
+}
