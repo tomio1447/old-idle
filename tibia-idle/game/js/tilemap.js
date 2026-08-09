@@ -92,20 +92,39 @@ const TileSprites = {
     return false;
   },
   /* desenha item alinhado pela base do tile — deco maior que 32px "sobe",
-   * como o client oficial ancora objetos empilhaveis */
+   * como o client oficial ancora objetos empilhaveis.
+   *
+   * Objetos MULTI-SQM da paleta 15.x (2x1, 1x2, 2x2... — sprite com
+   * largura/altura multiplos exatos de 32 e maior que 1 SQM): a CONVENCAO do
+   * OTBM/RME (ver rme.js drawItem32) e do proprio draw() acima eh que o no
+   * do item fica no SQM INFERIOR-DIREITO do footprint, e a sprite ocupa o
+   * bloco tw x th estendendo 1 SQM para cima e para a esquerda. Ou seja, o
+   * canto superior-esquerdo do sprite vai para (sx - (w-size), sy - (h-size)).
+   * Centralizar esses sprites no SQM de referencia (comportamento antigo)
+   * deslocava o objeto meia casa para a esquerda, fazendo parecer "partido"/
+   * quebrado sobreposto a SQM vizinha — esse era o bug das decoracoes
+   * (sofás, chafariz, estantes 2x2) dos mapas .otbm. Para multi-SQM usamos
+   * exatamente a mesma formula do draw()/editor. Sprites legado de decoracao
+   * (tamanhos nao multiplos de 32, ex. 43x17) e itens 1x1 continuam
+   * centralizados como antes. */
   drawDeco(ctx, id, sx, sy, size) {
     const a = this._anim(id);
     const fr = a ? this.frameFor(id) : 0;
     const img = this.get(id, fr);
     if (!img || !img.complete || !img.naturalWidth) return false;
     const k = size / 32;
-    const w = (a ? a.aw : img.naturalWidth) * k;
-    const h = (a ? a.ah : img.naturalHeight) * k;
+    const nW = (a ? a.aw : img.naturalWidth);
+    const nH = (a ? a.ah : img.naturalHeight);
+    const w = nW * k;
+    const h = nH * k;
+    // multi-SQM: dimensoes multiplas exatas de 32 e maiores que 1 SQM
+    const multi = (nW % 32 === 0 && nH % 32 === 0 && (nW > 32 || nH > 32));
+    const dx = multi ? (sx - (w - size)) : sx + (size - w) / 2;
+    const dy = multi ? (sy - (h - size)) : sy + size - h;
     if (a) {
-      ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah,
-                    sx + (size - w) / 2, sy + size - h, w, h);
+      ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
     } else {
-      ctx.drawImage(img, sx + (size - w) / 2, sy + size - h, w, h);
+      ctx.drawImage(img, dx, dy, w, h);
     }
     return true;
   },
