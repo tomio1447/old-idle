@@ -284,10 +284,12 @@
     if (r.peek() !== NODE_START) throw new Error(".otbm Canary sem nó raiz");
     r.take(); node(null, 0);
 
-    var bestZ = null, bestCount = -1;
+    // Global-Idle usa o andar Z=2 para mapas RME. Arquivos podem conter
+    // áreas auxiliares maiores em outros andares; priorize o andar validado.
+    var bestZ = Object.prototype.hasOwnProperty.call(floors, 2) ? 2 : null, bestCount = -1;
     Object.keys(floors).forEach(function (z) {
       var n = Object.keys(floors[z]).length;
-      if (n > bestCount) { bestCount = n; bestZ = +z; }
+      if (bestZ === null && n > bestCount) { bestCount = n; bestZ = +z; }
     });
     if (bestZ === null) throw new Error("OTBM Canary não possui tiles");
     var source = floors[bestZ], minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -405,6 +407,20 @@
     return map;
   }
 
+  /* Recorta um OTBM pelas coordenadas ORIGINAIS, preservando apenas a área
+   * validada pelo script RME. Tiles decorativos fora do canvas não podem
+   * aumentar colisão/viewport do Global-Idle. */
+  function crop(map, bounds) {
+    if (!map || !bounds || !map.sourceBounds) return map;
+    var ox = bounds.x - map.sourceBounds.minX, oy = bounds.y - map.sourceBounds.minY;
+    var out = Object.assign({}, map, { w: bounds.w, h: bounds.h, cells: {}, sourceBounds: bounds });
+    for (var y = 0; y < bounds.h; y++) for (var x = 0; x < bounds.w; x++) {
+      var c = map.cells[(x + ox) + "," + (y + oy)];
+      if (c) out.cells[x + "," + y] = c;
+    }
+    return out;
+  }
+
   /* -------------------------------------------------- huntMap (runtime)
    *
    * Converte o mapa lido do .otbm para o formato que o combate ja entende
@@ -513,6 +529,7 @@
     read: read,
     huntMapFromOtbm: huntMapFromOtbm,
     missingTiles: missingTiles,
+    crop: crop,
     _EscBuf: EscBuf,
   };
 

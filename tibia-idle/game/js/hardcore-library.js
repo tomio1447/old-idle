@@ -99,7 +99,7 @@
     // maps/ no build. O loader OTBM normaliza o andar Z=2 para a arena idle.
     "library-fire": Object.assign(hunt("Secret Library — Fire Section", 400, ["burning-book", "rage-squid", "biting-book"], "#b64425", 15167, 12567, 783, 75, 95), { otbm: "livraria_fire2", otbmOffsetX: -1 }),
     "library-energy": hunt("Secret Library — Energy Section", 425, ["energetic-book", "biting-book"], "#7353d0", 14500, 11000, 825, 73, 92),
-    "library-ice": Object.assign(hunt("Secret Library — Ice Section", 450, ["icecold-book", "squid-warden", "ink-blob"], "#3c9ec4", 14667, 12833, 717, 77, 98), { otbm: "livraria_ice" }),
+    "library-ice": Object.assign(hunt("Secret Library — Ice Section", 450, ["icecold-book", "squid-warden", "ink-blob"], "#3c9ec4", 14667, 12833, 717, 77, 98), { otbm: "livraria_ice", otbmBounds: { x:147, y:156, w:24, h:15, z:2 } }),
     "library-earth": hunt("Secret Library — Earth Section", 475, ["cursed-book", "biting-book"], "#4c9b52", 13000, 11350, 625, 73, 88),
   });
 })();
