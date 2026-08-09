@@ -1,0 +1,74 @@
+name: Build Global-Idle RME Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "canary-map-editor-v4.0-windows/**"
+      - ".github/workflows/build-global-idle-rme-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build RME Windows Release
+    runs-on: windows-2025
+
+    defaults:
+      run:
+        working-directory: canary-map-editor-v4.0-windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC build environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+
+      - name: Configure CMake
+        run: cmake --preset windows-release
+
+      - name: Build Release
+        run: cmake --build --preset windows-release --config RelWithDebInfo
+
+      - name: Package Global-Idle RME
+        shell: pwsh
+        run: |
+          $output = "build/windows-release/bin"
+          if (!(Test-Path $output)) {
+            throw "Build output not found: $output"
+          }
+
+          New-Item -ItemType Directory -Force -Path "release/Global-Idle-Map-Editor/scripts" | Out-Null
+          Copy-Item "$output/*" "release/Global-Idle-Map-Editor/" -Recurse -Force
+          Copy-Item "scripts/*" "release/Global-Idle-Map-Editor/scripts/" -Recurse -Force
+
+          @"
+          Global-Idle Map Editor
+
+          Scripts:
+          - Global-Idle - Validate Canvas 24x15
+
+          Canvas padrão:
+          - 24 x 15 SQMs
+          - Z = 2
+          "@ | Set-Content "release/Global-Idle-Map-Editor/README-Global-Idle.txt"
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-idle-map-editor-windows
+          path: canary-map-editor-v4.0-windows/release/Global-Idle-Map-Editor
+          if-no-files-found: error
+          retention-days: 14
