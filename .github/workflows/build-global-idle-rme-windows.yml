@@ -1,5 +1,38 @@
-name: Build Global-Idle RME Windows
+      - name: Package Global-Idle RME
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
+            Where-Object {
+              $_.FullName -notmatch "\\vcpkg_installed\\" -and
+              $_.FullName -notmatch "\\buildtrees\\"
+            } |
+            Select-Object -First 1
 
+          if (!$exe) {
+            Write-Host "Executáveis encontrados:"
+            Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
+              ForEach-Object { Write-Host $_.FullName }
+            throw "RME executable not found after build."
+          }
+
+          Write-Host "Using executable: $($exe.FullName)"
+
+          $release = "release/Global-Idle-Map-Editor"
+          New-Item -ItemType Directory -Force -Path "$release/scripts" | Out-Null
+
+          Copy-Item "$($exe.Directory.FullName)/*" "$release/" -Recurse -Force
+          Copy-Item "scripts/*" "$release/scripts/" -Recurse -Force
+
+          @"
+          Global-Idle Map Editor
+
+          Canvas padrão Global-Idle:
+          - 24 x 15 SQMs
+          - Z = 2
+
+          Scripts:
+          - Global-Idle - Validate Canvas 24x15
+          "@ | Set-Content "$release/README-Global-Idle.txt"
 on:
   workflow_dispatch:
   push:
