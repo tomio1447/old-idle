@@ -1,40 +1,8 @@
-      - name: Package Global-Idle RME
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
-            Where-Object {
-              $_.FullName -notmatch "\\vcpkg_installed\\" -and
-              $_.FullName -notmatch "\\buildtrees\\"
-            } |
-            Select-Object -First 1
+name: Build Global-Idle RME Windows
 
-          if (!$exe) {
-            Write-Host "Executáveis encontrados:"
-            Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
-              ForEach-Object { Write-Host $_.FullName }
-            throw "RME executable not found after build."
-          }
-
-          Write-Host "Using executable: $($exe.FullName)"
-
-          $release = "release/Global-Idle-Map-Editor"
-          New-Item -ItemType Directory -Force -Path "$release/scripts" | Out-Null
-
-          Copy-Item "$($exe.Directory.FullName)/*" "$release/" -Recurse -Force
-          Copy-Item "scripts/*" "$release/scripts/" -Recurse -Force
-
-          @"
-          Global-Idle Map Editor
-
-          Canvas padrão Global-Idle:
-          - 24 x 15 SQMs
-          - Z = 2
-
-          Scripts:
-          - Global-Idle - Validate Canvas 24x15
-          "@ | Set-Content "$release/README-Global-Idle.txt"
 on:
   workflow_dispatch:
+
   push:
     paths:
       - "canary-map-editor-v4.0-windows/**"
@@ -78,25 +46,40 @@ jobs:
       - name: Package Global-Idle RME
         shell: pwsh
         run: |
-          $output = "build/windows-release/bin"
-          if (!(Test-Path $output)) {
-            throw "Build output not found: $output"
+          $exe = Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
+            Where-Object {
+              $_.FullName -notmatch "\\vcpkg_installed\\" -and
+              $_.FullName -notmatch "\\buildtrees\\"
+            } |
+            Select-Object -First 1
+
+          if (!$exe) {
+            Write-Host "Executáveis encontrados:"
+            Get-ChildItem -Path "." -Recurse -Filter "*.exe" |
+              ForEach-Object { Write-Host $_.FullName }
+
+            throw "RME executable not found after build."
           }
 
-          New-Item -ItemType Directory -Force -Path "release/Global-Idle-Map-Editor/scripts" | Out-Null
-          Copy-Item "$output/*" "release/Global-Idle-Map-Editor/" -Recurse -Force
-          Copy-Item "scripts/*" "release/Global-Idle-Map-Editor/scripts/" -Recurse -Force
+          Write-Host "Using executable: $($exe.FullName)"
+
+          $release = "release/Global-Idle-Map-Editor"
+
+          New-Item -ItemType Directory -Force -Path "$release/scripts" | Out-Null
+
+          Copy-Item "$($exe.Directory.FullName)/*" "$release/" -Recurse -Force
+          Copy-Item "scripts/*" "$release/scripts/" -Recurse -Force
 
           @"
           Global-Idle Map Editor
 
-          Scripts:
-          - Global-Idle - Validate Canvas 24x15
-
-          Canvas padrão:
+          Canvas padrão Global-Idle:
           - 24 x 15 SQMs
           - Z = 2
-          "@ | Set-Content "release/Global-Idle-Map-Editor/README-Global-Idle.txt"
+
+          Scripts instalados:
+          - Global-Idle - Validate Canvas 24x15
+          "@ | Set-Content "$release/README-Global-Idle.txt"
 
       - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
