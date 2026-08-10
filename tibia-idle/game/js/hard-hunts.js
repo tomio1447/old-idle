@@ -1,0 +1,74 @@
+/* hard-hunts.js — categoria HARD e Cobra Bastion.
+ *
+ * Cobra Vizier/Scout/Assassin vêm integralmente do MONSTERDATA importado do
+ * Canary. Este patch só completa itens de loot ausentes, traduz as três
+ * magias nomeadas (cujos formatos vivem em scripts separados no Canary) e
+ * registra as hunts depois da fusão dos monstros. */
+"use strict";
+
+(function registerHardHunts() {
+  if (typeof GAMEDATA === "undefined") return;
+  const items = GAMEDATA.items;
+  const monsters = GAMEDATA.monsters;
+
+  // Itens sem ficha no recorte antigo. O Canary não declara `value` para
+  // eles; sell=1 evita inventar preço de NPC e mantém o drop utilizável.
+  const cobraLootItems = {
+    "cobra-crest":          { n: "cobra crest", cid: 31678, w: 1.70 },
+    "gemmed-figurine":      { n: "gemmed figurine", cid: 24392, w: 6.50 },
+    "red-crystal-fragment": { n: "red crystal fragment", cid: 16126, w: 0.15 },
+    "onyx-chip":            { n: "onyx chip", cid: 22193, w: 1.20 },
+    "cheesy-figurine":      { n: "cheesy figurine", cid: 17818, w: 0.75 },
+    "opal":                 { n: "opal", cid: 22194, w: 1.20 },
+  };
+  Object.keys(cobraLootItems).forEach((slug) => {
+    if (!items[slug]) items[slug] = Object.assign({ s: null, t: "loot", sell: 1 }, cobraLootItems[slug]);
+  });
+
+  // Formatos oficiais dos scripts de spell do Canary:
+  // explosion_wave.lua = centro, depois duas linhas de largura 3;
+  // wave_t.lua = centro, depois uma linha de largura 3;
+  // death_chain.lua = corrente death de 2–3 saltos.
+  const patchSkill = (slug, name, patch) => {
+    const mob = monsters[slug];
+    if (!mob) return;
+    const skill = (mob.skills || []).find((s) => String(s.n || "").toLowerCase() === name);
+    if (skill) Object.assign(skill, patch);
+  };
+  patchSkill("cobra-vizier", "explosion wave", {
+    el: "physical", fx: "explosion-hit", areaPattern: [[0], [-1, 0, 1], [-1, 0, 1]],
+  });
+  patchSkill("cobra-vizier", "death chain", {
+    el: "death", fx: "mort-area", range: 3, chain: 3,
+  });
+  patchSkill("cobra-assassin", "wave t", {
+    el: "earth", fx: "green-rings", areaPattern: [[0], [-1, 0, 1]],
+  });
+
+  // Toda hunt HARD nasce em ondas variáveis de 6–10 criaturas.
+  const harden = (hunt) => Object.assign(hunt, {
+    cat: "hard", pack: 10, packMin: 6, packMax: 10,
+  });
+  if (GAMEDATA.hunts["marapur-nagas"]) harden(GAMEDATA.hunts["marapur-nagas"]);
+  if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
+
+  GAMEDATA.hunts["cobra-bastion"] = harden({
+    name: "Cobra Bastion",
+    level: 250,
+    minLevel: 250,
+    monsters: ["cobra-vizier", "cobra-scout", "cobra-assassin"],
+    color: "#b99a52",
+    scene: "palace",
+    otbm: "cobra_bastion",
+    // Coordenadas absolutas do andar 2 informadas para a instância.
+    otbmBounds: { x: 154, y: 160, w: 10, h: 12, z: 2 },
+    otbmMobBounds: { x: 154, y: 160, w: 10, h: 12, z: 2 },
+    otbmSpawn: { x: 157, y: 165, z: 2 },
+    avgHp: 8400,
+    avgExp: 7313,
+    avgDamage: 477,
+    avgArmor: 81,
+    avgGold: 75,
+    respawn: 1.2,
+  });
+})();

@@ -18,6 +18,37 @@
 
 const OTBM_HUNT_CACHE = {};   // nome -> "loading" | chave | null(erro)
 
+/* Converte zonas absolutas informadas pela hunt para coordenadas locais do
+ * recorte OTBM. Isso permite usar coordenadas do RME/Canary sem modificar o
+ * arquivo beta nem depender dos marcadores proprietários S/G. */
+function applyHuntOtbmZones(map, hunt) {
+  if (!map || !hunt) return map;
+  const bounds = map.sourceBounds || {};
+  const ox = Number(bounds.x !== undefined ? bounds.x : bounds.minX) || 0;
+  const oy = Number(bounds.y !== undefined ? bounds.y : bounds.minY) || 0;
+  const sameFloor = (z) => z === undefined || map.z === undefined || Number(z) === Number(map.z);
+  const local = (point) => point && sameFloor(point.z)
+    ? { x: Number(point.x) - ox, y: Number(point.y) - oy } : null;
+
+  const spawn = local(hunt.otbmSpawn);
+  if (spawn && spawn.x >= 0 && spawn.y >= 0 && spawn.x < map.w && spawn.y < map.h)
+    map.spawn = spawn;
+
+  const zone = hunt.otbmMobBounds;
+  if (zone && sameFloor(zone.z)) {
+    const start = local(zone);
+    const width = Math.max(0, Math.floor(Number(zone.w) || 0));
+    const height = Math.max(0, Math.floor(Number(zone.h) || 0));
+    map.mob = [];
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const px = start.x + x, py = start.y + y;
+      if (px >= 0 && py >= 0 && px < map.w && py < map.h)
+        map.mob.push({ x: px, y: py });
+    }
+  }
+  return map;
+}
+
 /* Garante o huntMap da hunt carregado; chama done() SEMPRE (assincrono so
  * quando ainda nao tem cache). */
 function huntMapFromOtbmAsync(hunt, done) {
@@ -58,6 +89,7 @@ function huntMapFromOtbmAsync(hunt, done) {
     .then((buf) => {
       let mapa = OTBM.read(buf);
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
+      applyHuntOtbmZones(mapa, hunt);
       // Alguns itens 2×2 da borda extrapolam visualmente seu SQM. O offset
       // é metadado da hunt (não altera o .otbm editável nem a colisão).
       mapa.idleOffsetX = Number(hunt.otbmOffsetX) || 0;
@@ -77,7 +109,7 @@ function huntMapFromOtbmAsync(hunt, done) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { huntMapFromOtbmAsync };
+  module.exports = { huntMapFromOtbmAsync, applyHuntOtbmZones };
 }
 
 /* ------------------------------------------------------------ Injector: reload manual de mapas */

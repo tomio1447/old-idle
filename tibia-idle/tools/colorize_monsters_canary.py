@@ -133,6 +133,10 @@ CANARY_COLORS = {
     # corpo e tentáculos. Não aplicar filtro CSS no renderer.
     "rage-squid": (94, 78, 79, 57),
     "squid-warden": (9, 21, 3, 57),
+    # Cobra Bastion: mesmo looktype 1217, mas cores oficiais distintas.
+    "cobra-vizier":   (19, 19, 67, 78),
+    "cobra-scout":    (1, 1, 102, 78),
+    "cobra-assassin": (2, 2, 77, 19),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -151,7 +155,11 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "pirate-marauder", "pirate-cutthroat", "pirate-buccaneer",
                "pirate-corsair", "knight-s-apparition", "paladin-s-apparition",
                "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
-               "rage-squid", "squid-warden"}
+               "rage-squid", "squid-warden", "cobra-vizier", "cobra-scout",
+               "cobra-assassin"}
+
+# lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
+CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 
@@ -199,24 +207,27 @@ def compor_cor(base, mask, head, body, legs, feet):
     return out
 
 
-def gerar_sheet(dat, spr, looktype, colors):
-    """Renderiza sheet 4 direcoes x (1 parado + 2 passos) colorido.
+def gerar_sheet(dat, spr, looktype, colors, addons=0):
+    """Renderiza 4 direções × (pose parada + todos os passos), colorido.
 
-    Usa o grupo WALK do DAT (2 quadros) como passos, que e o que o jogo
-    espera (mobsheetdata cols=3). Devolve (sheet, cw, ch).
+    `addons` seleciona o lookAddons do monster.lua. O grupo WALK moderno
+    possui até oito frames; truncar em dois deixava humanoides 15x picotados.
+    Devolve (sheet, cw, ch, cols).
     """
     obj = dat.outfit(looktype)
     if obj is None or not obj.groups:
         return None
     g_idle = obj.groups[0]
     g_walk = obj.groups[1] if len(obj.groups) > 1 else obj.groups[0]
+    poses = [(g_idle, 0)] + [(g_walk, i) for i in range(max(1, g_walk.anim))]
 
-    # caixa comum para todas as celulas (sem recorte por celula)
+    # caixa comum para todas as células (sem recorte por célula)
     caixas = []
     for tag, xp in DIRS:
-        for g, fr in ((g_idle, 0), (g_walk, 0), (g_walk, 1)):
+        for g, fr in poses:
             img = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                   xp=xp % max(1, g.px), yp=0, layer=0)
+                                   xp=xp % max(1, g.px),
+                                   yp=addons % max(1, g.py), layer=0)
             if img is not None and img.getbbox():
                 caixas.append(img.getbbox())
     if not caixas:
@@ -229,20 +240,23 @@ def gerar_sheet(dat, spr, looktype, colors):
     if cw <= 0 or ch <= 0:
         return None
 
-    sheet = Image.new("RGBA", (cw * 3, ch * len(DIRS)), (0, 0, 0, 0))
+    cols = len(poses)
+    sheet = Image.new("RGBA", (cw * cols, ch * len(DIRS)), (0, 0, 0, 0))
     for li, (tag, xp) in enumerate(DIRS):
-        for ci, (g, fr) in enumerate(((g_idle, 0), (g_walk, 0), (g_walk, 1))):
+        for ci, (g, fr) in enumerate(poses):
             base = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                    xp=xp % max(1, g.px), yp=0, layer=0)
+                                    xp=xp % max(1, g.px),
+                                    yp=addons % max(1, g.py), layer=0)
             if base is None:
                 continue
             if colors:
                 mask = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                        xp=xp % max(1, g.px), yp=0, layer=1)
+                                        xp=xp % max(1, g.px),
+                                        yp=addons % max(1, g.py), layer=1)
                 base = compor_cor(base, mask, *colors)
             cel = base.crop((x0, y0, x1, y1))
             sheet.paste(cel, (ci * cw, li * ch))
-    return sheet, cw, ch
+    return sheet, cw, ch, cols
 
 
 def main():
@@ -256,25 +270,29 @@ def main():
 
     meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
 
+    # Slugs opcionais depois de SRC/GAME permitem regenerar só uma hunt.
+    only = set(sys.argv[3:])
+    targets = FORCE_REGEN & only if only else FORCE_REGEN
     feitos = 0
-    for slug in sorted(FORCE_REGEN):
+    for slug in sorted(targets):
         lt = looktypes.get(slug)
         if not lt:
             print("  sem looktype:", slug)
             continue
         colors = CANARY_COLORS.get(slug)
-        cols = None
+        rgb_colors = None
         if colors is not None:
-            cols = tuple(hex_to_rgb(PALETTE[c % len(PALETTE)]) for c in colors)
-        res = gerar_sheet(dat, spr, lt, cols)
+            rgb_colors = tuple(hex_to_rgb(PALETTE[c % len(PALETTE)]) for c in colors)
+        res = gerar_sheet(dat, spr, lt, rgb_colors, CANARY_ADDONS.get(slug, 0))
         if res is None:
             print("  falhou:", slug, "looktype", lt)
             continue
-        sheet, cw, ch = res
+        sheet, cw, ch, cols = res
         sheet.save(os.path.join(dest, slug + ".png"), optimize=True)
-        meta[slug] = {"cw": cw, "ch": ch, "cols": 3, "rows": 4}
+        meta[slug] = {"cw": cw, "ch": ch, "cols": cols, "rows": 4}
         feitos += 1
         print("  ok:", slug, "looktype", lt, "cores", colors,
+              "addon", CANARY_ADDONS.get(slug, 0), "cols", cols,
               "cw", cw, "ch", ch)
 
     # Não reduza sheets existentes a três colunas. Alguns outfits do cliente
@@ -283,7 +301,7 @@ def main():
     json.dump(meta, open(meta_path, "w"))
     with open(js_path, "w") as f:
         f.write("/* Gerado por tools/colorize_monsters_canary.py\n"
-                " * Spritesheet por criatura: coluna = pose (0 parado, 1-2\n"
+                " * Spritesheet por criatura: coluna = pose (0 parado, 1..N\n"
                 " * passos), linha = direcao (0 N, 1 E, 2 S, 3 O). */\n")
         f.write("window.MOBSHEETS = " + json.dumps(meta) + ";\n")
     print("sheets coloridos:", feitos)

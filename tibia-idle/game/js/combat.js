@@ -227,11 +227,20 @@ function notifyRealPlayerRaidPending(c) {
   c.events.push({ t: "raid-real-player" });
 }
 
+function huntWaveSize(hunt, randomValue) {
+  hunt = hunt || {};
+  const minPack = hunt.packMin || (hunt.cat === "hard" ? 6 : 0);
+  const maxPack = hunt.packMax || (hunt.cat === "hard" ? 10 : 0);
+  const roll = randomValue === undefined ? Math.random() : randomValue;
+  return (minPack && maxPack)
+    ? minPack + Math.floor(Math.max(0, Math.min(0.999999, roll)) * (maxPack - minPack + 1))
+    : (hunt.pack || 3);
+}
+
 function spawnWave(c, p) {
-  // Hardcore sorteia uma nova box completa a cada respawn: 10–12 mobs.
-  const pack = (c.hunt.packMin && c.hunt.packMax)
-    ? c.hunt.packMin + Math.floor(Math.random() * (c.hunt.packMax - c.hunt.packMin + 1))
-    : (c.hunt.pack || 3);
+  // Categoria HARD sempre usa ondas variáveis de 6–10. Hunts podem declarar
+  // outra faixa explicitamente (ex.: HARDCORE da Library usa 10–12).
+  const pack = huntWaveSize(c.hunt);
   // Celulas G ja escolhidas nesta wave (para dois mobs da fila nao cairem
   // na mesma posicao designada — o occ e reconstruido a cada iteracao e
   // nao ve os pendingSpawns, que ainda nao estao em c.mobs). Reseta quando
@@ -2805,6 +2814,7 @@ function monsterThinkYell(mob, dt) {
  */
 function mobSkillRangeSQM(sk) {
   if ((sk.range || 0) > 0) return Math.min(7, sk.range);
+  if (sk.areaPattern && sk.areaPattern.length) return sk.areaPattern.length;
   if (sk.length) return sk.length;                    // onda
   if (sk.range === undefined || sk.range === null) return 99;  // sem limite
   if (sk.radius) return Math.max(1, sk.radius);       // explosao (propria ou no alvo)
@@ -2914,10 +2924,38 @@ function skillWaveHas(mob, pl, len, spread, px, py) {
   return false;
 }
 
+/* Matriz direcional compacta para spells nomeadas do Canary. Cada linha do
+ * pattern é um passo à frente do caster e contém offsets laterais. */
+function skillPatternCells(mob, pl, pattern) {
+  const out = [];
+  const d = skillWaveDir(mob, pl);
+  for (let step = 0; step < (pattern || []).length; step++) {
+    for (const side of pattern[step]) {
+      out.push({
+        cx: (mob.cx | 0) + d.dx * (step + 1) + (d.dy !== 0 ? side : 0),
+        cy: (mob.cy | 0) + d.dy * (step + 1) + (d.dx !== 0 ? side : 0),
+      });
+    }
+  }
+  return out;
+}
+
+function skillPatternHas(mob, pl, pattern, px, py) {
+  const key = (px | 0) + ":" + (py | 0);
+  return skillPatternCells(mob, pl, pattern)
+    .some((q) => q.cx + ":" + q.cy === key);
+}
+
 /* A animacao oficial da habilidade (area, onda ou impacto), sem dano. */
 function mobSkillFx(c, mob, pl, sk) {
   const el = sk.el || "physical";
   const fx = sk.fx || (ELEMENTS[el] || ELEMENTS.physical).fx;
+  if (sk.areaPattern && sk.areaPattern.length) {
+    c.events.push({ t: "areafx",
+                    cells: skillPatternCells(mob, pl, sk.areaPattern),
+                    fx: fx, screen: true });
+    return;
+  }
   if (sk.length) {
     // onda RETA (N/S/L/O) saindo do monstro, com a boca do spread — o
     // formato oficial do Canary (AreaCombat::setupArea(length, spread))
@@ -3047,6 +3085,11 @@ function mobSkillHit(c, p, mob, sk, dmg) {
       }
     }
   }
+  // Matriz nomeada/direcional (ex.: explosion wave e wave t das Cobras).
+  if (sk.areaPattern && typeof skillPatternHas === "function" &&
+      pl.cx !== undefined && mob.cx !== undefined) {
+    if (!skillPatternHas(mob, pl, sk.areaPattern, pl.cx, pl.cy)) return 0;
+  }
   // Explosao CENTRADA NO MONSTRO (radius sem `alvo`): o dano so entra se o
   // player estiver dentro do FORMATO OFICIAL (circulo do Canary, diamante
   // com cantos cortados) — antes usava sqmDistance (Chebyshev), que e um
@@ -3072,7 +3115,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     c.events.push({ t: "player-condition", tipo: sk.cond });
   }
 
-  const bolt = !sk.radius && ((sk.range || 1) > 1 || !!sk.length);
+  const bolt = !sk.radius && !sk.areaPattern && ((sk.range || 1) > 1 || !!sk.length);
   const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,

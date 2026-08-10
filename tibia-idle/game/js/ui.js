@@ -680,6 +680,7 @@ function renderHunts(p) {
     "aventureiro":        { nome: "⚔️ Aventureiro" },
     "heroi":              { nome: "🛡️ Herói" },
     "lenda":              { nome: "🐉 Lenda" },
+    "hard":               { nome: "💀 HARD" },
     "ferumbras-ascendant":{ nome: "🔥 Ferumbras Ascendant" },
     "hardcore":           { nome: "☠️ HARDCORE" },
     "outras":             { nome: "🗺️ Outras" },
@@ -763,6 +764,7 @@ function openHuntInfoModal(id) {
   if (!hu || !p) return;
   const risk = huntRisk(p, hu);
   const modo = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
+  const packLabel = (hu.packMin && hu.packMax) ? `${hu.packMin}–${hu.packMax}` : (hu.pack || 3);
 
   const monsterCard = (slug) => {
     const m = GAMEDATA.monsters[slug];
@@ -805,7 +807,7 @@ function openHuntInfoModal(id) {
       <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
         <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
         <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>
-        <span class="tiny dim">Pack: <b>${hu.pack || 3}</b> criaturas</span>
+        <span class="tiny dim">Pack: <b>${packLabel}</b> criaturas</span>
         <span class="tiny dim">Respawn: <b>${hu.respawn || 0.8}s</b></span>
       </div>
       <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>

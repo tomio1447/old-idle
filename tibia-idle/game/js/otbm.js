@@ -448,6 +448,9 @@
    * nada a converter: o mapa renderiza EXATAMENTE como desenhado no editor. */
   function huntMapFromOtbm(map, tileflags) {
     tileflags = tileflags || {};
+    // 16249 é um marcador invisível do mapa Canary (não possui pixels no
+    // DAT). Mantê-lo na camada visual gerava requests 404 a cada recarga.
+    var hiddenItems = { 16249: true };
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
              "0123456789<>[](){}.,;:!@$%&*^_+-=?~|";
     var legenda = {}, assin = {}, pool = 0;
@@ -521,7 +524,7 @@
         }
         // ids originais do editor (15.x) — sprites reais em assets/tiles/
         var gid = cell.g || 0;
-        var items = cell.items || [];
+        var items = (cell.items || []).filter(function (id) { return !hiddenItems[id]; });
         var bloc = 0;
         var gwalk = gid && tileflags[gid] ? tileflags[gid][0] : 0;
         if (!gwalk) bloc = 1;
