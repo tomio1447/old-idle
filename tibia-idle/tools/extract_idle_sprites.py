@@ -13,20 +13,27 @@ Assim uma criatura sem idle real nunca percorre frames de caminhada enquanto
 está parada. As durações são as médias min/max declaradas pelo próprio DAT.
 
 Uso:
-  TIBIA860=/caminho/com/Tibia.dat python3 extract_idle_sprites.py
+  TIBIA860=/caminho/com/Tibia.dat \
+  CANARY_MONSTERS=/canary/data-otservbr-global/monster \
+    python3 extract_idle_sprites.py
 """
 import json
 import os
+import re
 import sys
 
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tibia_assets_860 import Dat860, Spr860, render_group_860  # noqa: E402
+from colorize_monsters_canary import (  # noqa: E402
+    CANARY_ADDONS, CANARY_COLORS, PALETTE, compor_cor, hex_to_rgb,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.normpath(os.path.join(HERE, "..", "game"))
 SRC = os.environ.get("TIBIA860", "/home/user/work/15x860_repo/extracted")
+CANARY_MONSTERS = os.environ.get("CANARY_MONSTERS", "")
 DIRS = 4
 MAX_IDLE = 16
 MAX_WALK = 12
@@ -62,6 +69,108 @@ def group_image(spr, group, frame, direction, yp=0, layer=0):
         spr, group, frame=frame,
         xp=direction % max(1, group.px),
         yp=min(yp, group.py - 1), layer=layer)
+
+
+def monster_pose(spr, group, frame, direction, addon=0, layer=0):
+    base = group_image(spr, group, frame, direction, 0, layer)
+    if addon and group.py > 1:
+        extra = group_image(spr, group, frame, direction, addon % group.py, layer)
+        if extra is not None:
+            if base is None:
+                base = extra.copy()
+            else:
+                base = base.copy()
+                base.alpha_composite(extra)
+    return base
+
+
+def infer_monster_colors(spr, obj, slug, dest, main_meta, box, addon):
+    """Recupera as quatro cores comparando o frame moving já colorido.
+
+    Isso cobre monstros cujo lookHead/lookBody/lookLegs/lookFeet não entrou no
+    JSON importado (ex.: Burning Book), sem manter uma segunda lista manual.
+    """
+    sheet_path = os.path.join(dest, slug + ".png")
+    if not os.path.exists(sheet_path) or obj.groups[0].layers < 2:
+        return None
+    cw, ch = main_meta["cw"], main_meta["ch"]
+    colored_sheet = Image.open(sheet_path).convert("RGBA")
+    if colored_sheet.width < cw or colored_sheet.height < ch * 3:
+        return None
+    colored = colored_sheet.crop((0, ch * 2, cw, ch * 3))
+    bw, bh = box[2] - box[0], box[3] - box[1]
+    sw, sh = obj.groups[0].width * 32, obj.groups[0].height * 32
+    ox = max(0, min(sw - cw, round(box[0] + (bw - cw) / 2)))
+    oy = max(0, min(sh - ch, round(box[1] + (bh - ch) / 2)))
+    base = monster_pose(spr, obj.groups[0], 0, 2, addon, 0).crop((ox, oy, ox + cw, oy + ch))
+    mask = monster_pose(spr, obj.groups[0], 0, 2, addon, 1).crop((ox, oy, ox + cw, oy + ch))
+    if base.size != colored.size or mask.size != colored.size:
+        return None
+
+    mask_colors = [(255,255,0), (255,0,0), (0,255,0), (0,0,255)]
+    palette_rgb = [hex_to_rgb(value) for value in PALETTE]
+    result = []
+    for mask_color in mask_colors:
+        samples = []
+        for y in range(ch):
+            for x in range(cw):
+                mp = mask.getpixel((x,y))
+                bp = base.getpixel((x,y))
+                cp = colored.getpixel((x,y))
+                if mp[:3] == mask_color and mp[3] and bp[3] and cp[3]:
+                    samples.append((bp[:3], cp[:3]))
+        if not samples:
+            result.append(0)
+            continue
+        if len(samples) > 160:
+            step = max(1, len(samples) // 160)
+            samples = samples[::step][:160]
+        best_index, best_error = 0, None
+        for index, candidate in enumerate(palette_rgb):
+            error = 0
+            for before, after in samples:
+                for channel in range(3):
+                    predicted = before[channel] * candidate[channel] // 255
+                    delta = predicted - after[channel]
+                    error += delta * delta
+            if best_error is None or error < best_error:
+                best_index, best_error = index, error
+        result.append(best_index)
+    return tuple(result)
+
+
+def load_canary_looks(root):
+    """Lê cores/addon oficiais diretamente dos monster.lua do Canary."""
+    looks = {}
+    if not root or not os.path.isdir(root):
+        return looks
+    keys = ("lookHead", "lookBody", "lookLegs", "lookFeet")
+    for directory, _subdirs, files in os.walk(root):
+        for name in files:
+            if not name.endswith(".lua"):
+                continue
+            text = open(os.path.join(directory, name), encoding="utf-8", errors="ignore").read()
+            block_match = re.search(r"monster\.outfit\s*=\s*\{(.*?)\}", text, re.S)
+            if not block_match:
+                continue
+            block = block_match.group(1)
+            values = []
+            valid = True
+            for key in keys:
+                match = re.search(r"\b%s\s*=\s*(\d+)" % key, block)
+                if not match:
+                    valid = False
+                    break
+                values.append(int(match.group(1)))
+            if not valid:
+                continue
+            addon_match = re.search(r"\blookAddons\s*=\s*(\d+)", block)
+            slug = os.path.splitext(name)[0].replace("_", "-").lower()
+            looks[slug] = {
+                "colors": tuple(values),
+                "addon": int(addon_match.group(1)) if addon_match else 0,
+            }
+    return looks
 
 
 def save_sheet(path, frames_by_dir, box):
@@ -124,19 +233,19 @@ def appearance_idle(dat, spr, entry, dest, addons):
             "durations": ds, "duration": sum(ds), "masks": mask_suffixes}
 
 
-def monster_walk_box(spr, obj):
+def monster_walk_box(spr, obj, addon=0):
     idle = obj.groups[0]
     moving = next((g for g in obj.groups if g.group_type == 1),
                   obj.groups[1] if len(obj.groups) > 1 else idle)
     images = []
     for direction in range(DIRS):
-        images.append(group_image(spr, idle, 0, direction, 0, 0))
+        images.append(monster_pose(spr, idle, 0, direction, addon, 0))
         for frame in range(min(MAX_WALK, max(1, moving.anim))):
-            images.append(group_image(spr, moving, frame, direction, 0, 0))
+            images.append(monster_pose(spr, moving, frame, direction, addon, 0))
     return bbox_union(images)
 
 
-def monster_idle(dat, spr, slug, looktype, dest):
+def monster_idle(dat, spr, slug, looktype, dest, main_meta, canary_look=None):
     obj = dat.outfit(looktype or 0)
     if obj is None or not obj.groups:
         return None
@@ -144,12 +253,13 @@ def monster_idle(dat, spr, slug, looktype, dest):
     if idle.group_type != 0 or idle.anim <= 1:
         return None
     frame_count = min(MAX_IDLE, idle.anim)
-    idle_frames = [[group_image(spr, idle, frame, direction, 0, 0)
-                    for frame in range(frame_count)] for direction in range(DIRS)]
-    all_idle = [im for row in idle_frames for im in row]
+    addon = canary_look["addon"] if canary_look else CANARY_ADDONS.get(slug, 0)
+    raw_idle = [[monster_pose(spr, idle, frame, direction, addon, 0)
+                 for frame in range(frame_count)] for direction in range(DIRS)]
+    all_idle = [im for row in raw_idle for im in row]
     # Inclui a caixa usada no sheet de caminhada para a troca idle/moving não
     # cortar efeitos nem mudar desnecessariamente a ancoragem do corpo.
-    walk_box = monster_walk_box(spr, obj)
+    walk_box = monster_walk_box(spr, obj, addon)
     idle_box = bbox_union(all_idle, walk_box)
     if idle_box is None:
         return None
@@ -158,14 +268,36 @@ def monster_idle(dat, spr, slug, looktype, dest):
                max(walk_box[2], idle_box[2]), max(walk_box[3], idle_box[3]))
     else:
         box = idle_box
+
+    color_indices = canary_look["colors"] if canary_look else CANARY_COLORS.get(slug)
+    if color_indices is None and idle.layers > 1:
+        color_indices = infer_monster_colors(
+            spr, obj, slug, dest, main_meta, walk_box or box, addon)
+    rgb_colors = tuple(hex_to_rgb(PALETTE[index % len(PALETTE)])
+                       for index in color_indices) if color_indices else None
+    if rgb_colors:
+        idle_frames = []
+        for direction in range(DIRS):
+            row = []
+            for frame in range(frame_count):
+                base = monster_pose(spr, idle, frame, direction, addon, 0)
+                mask = monster_pose(spr, idle, frame, direction, addon, 1)
+                row.append(compor_cor(base, mask, *rgb_colors))
+            idle_frames.append(row)
+    else:
+        idle_frames = raw_idle
+
     if not save_sheet(os.path.join(dest, slug + ".idle.png"), idle_frames, box):
         return None
     ds = durations(idle, frame_count)
-    return {"cw": box[2] - box[0], "ch": box[3] - box[1],
+    meta = {"cw": box[2] - box[0], "ch": box[3] - box[1],
             "sw": max(group.width * 32 for group in obj.groups),
             "sh": max(group.height * 32 for group in obj.groups),
             "ox": box[0], "oy": box[1],
             "frames": frame_count, "durations": ds, "duration": sum(ds)}
+    if color_indices:
+        meta["colors"] = list(color_indices)
+    return meta
 
 
 def remove_stale(directory, suffix, valid):
@@ -182,6 +314,7 @@ def main():
     appearances = json.load(open(os.path.join(GAME, "data", "appearances.json")))
     monsters = json.load(open(os.path.join(GAME, "data", "canarymonsters.json")))
     mob_sheets = json.load(open(os.path.join(GAME, "data", "mobsheets.json")))
+    canary_looks = load_canary_looks(CANARY_MONSTERS)
 
     outfit_dir = os.path.join(GAME, "assets", "appearance", "outfit")
     mount_dir = os.path.join(GAME, "assets", "appearance", "mount")
@@ -209,7 +342,8 @@ def main():
     for slug, monster in monsters.items():
         if slug not in mob_sheets:
             continue
-        meta = monster_idle(dat, spr, slug, monster.get("looktype"), mob_dir)
+        meta = monster_idle(dat, spr, slug, monster.get("looktype"), mob_dir,
+                            mob_sheets[slug], canary_looks.get(slug))
         if meta:
             data["monsters"][slug] = meta
             valid_mob.add(os.path.join(mob_dir, slug + ".idle.png"))
@@ -229,6 +363,7 @@ def main():
 
     print("idle real: %d outfits, %d mounts, %d monsters" % (
         len(data["outfits"]), len(data["mounts"]), len(data["monsters"])))
+    print("looks oficiais Canary disponíveis:", len(canary_looks))
     print("arquivos idle:", len(valid_outfit) + len(valid_mount) + len(valid_mob))
     return 0
 
