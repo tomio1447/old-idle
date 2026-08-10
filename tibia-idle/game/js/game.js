@@ -699,10 +699,6 @@ const BOSS_DEFS = {
     armor: 82,
     defense: 60,
     speed: 0.00007,
-    requirement: {
-      mission: "marapur-nagas",
-      text: "Matar 25 Naga Archer, 25 Naga Warrior e 25 Makara no mapa das Nagas",
-    },
     cooldown: BOSS_COOLDOWN,
     // loot: usa o do canary (merge do monsterdata na baseMonster)
   },
@@ -942,14 +938,6 @@ function startBoss(id, force, arenaReady) {
   if (G.combat) stopHunt();
   const st = bossState(G.p, id);
   st.lastFight = Date.now();
-  // Timira: ao entrar no boss a missão das Nagas volta a zero — para matá-la
-  // de novo é preciso refazer os 25/25/25 (completar a missão zera o CD).
-  if (id === "timira-the-many-headed") {
-    const mst = missionState(G.p, "marapur-nagas");
-    mst.progress = {};
-    mst.claimed = {};
-    mst.completeClaimed = false;
-  }
   G.p.hunt = null;
   G.p.instanceMode = "boss";
   G.combat = newBossCombat(G.p, boss);
