@@ -240,9 +240,10 @@ function ensureCell(ent) {
   // (MOBSHEETS[slug].cols conta a pose parada, por isso o -1). Sem isso o
   // advanceStep usaria 2 para todo mundo e as criaturas de 8 quadros
   // andariam picotado.
-  if (ent.walkFrames === undefined && ent.slug &&
+  if (ent.slug && ent._walkFramesSlug !== ent.slug &&
       typeof MOBSHEETS !== "undefined" && MOBSHEETS && MOBSHEETS[ent.slug]) {
     ent.walkFrames = Math.max(1, (MOBSHEETS[ent.slug].cols || 3) - 1);
+    ent._walkFramesSlug = ent.slug;
   }
   return ent;
 }

@@ -94,7 +94,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "35";
+const ASSET_VERSION = "36";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -119,13 +119,27 @@ if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") 
 
 /* Linha do spritesheet por direcao, na ordem do client (igual a das outfits) */
 const MOB_DIR_ROW = { n: 0, e: 1, s: 2, w: 3 };
-/* Monstros 15x têm frames de idle no sheet. Mesmo parados, livros,
- * squids e criaturas animadas avançam seus frames sem alterar posição/SQM. */
-function monsterIdleFrame(slug, now) {
+/* Monstros 15x têm uma pose-base na coluna 0 e os frames animados nas
+ * colunas seguintes. A rotina antiga incluía a pose-base em todo ciclo e
+ * criava pausas longas/duplicadas, fazendo Soul War e DT Seal parecerem
+ * estáticos. Com 3+ colunas percorremos continuamente apenas os frames de
+ * movimento; sheets de 2 colunas alternam base/passada. `phase` dessincroniza
+ * criaturas iguais para a box não parecer uma única imagem repetida. */
+function monsterIdleFrame(slug, now, phase) {
   const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS) ? MOBSHEETS[slug] : null;
-  const n = meta ? Math.max(1, meta.cols || 1) : 1;
-  if (n <= 1) return 0;
-  return Math.floor((now || Date.now()) / 180) % n;
+  const cols = meta ? Math.max(1, meta.cols || 1) : 1;
+  if (cols <= 1) return 0;
+  const first = cols > 2 ? 1 : 0;
+  const count = cols - first;
+  const clock = now === undefined ? Date.now() : now;
+  return first + ((Math.floor(clock / 160) + (phase || 0)) % count);
+}
+
+function monsterAnimationPhase(ent) {
+  const text = String((ent && (ent.id || ent.slug)) || "");
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) hash = ((hash * 31) + text.charCodeAt(i)) >>> 0;
+  return hash;
 }
 
 /* HTML de uma celula do sheet para as telas (bestiario, lista de caca...).
@@ -148,12 +162,16 @@ function mobImg(slug, tam, extra) {
   const k = Math.min(px / meta.cw, px / meta.ch);
   const w = meta.cw * k, h = meta.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-  return `<div class="mob-img" style="width:${w.toFixed(1)}px;
+  const animated = meta.cols > 1 ? " mob-img-animated" : "";
+  const sheetW = meta.cw * meta.cols * k;
+  return `<div class="mob-img${animated}" data-mob="${slug}" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;
       background-image:url('assets/mob/${slug}.png?v=${v}');
-      background-size:${(meta.cw * meta.cols * k).toFixed(1)}px ${
-        (meta.ch * meta.rows * k).toFixed(1)}px;
+      background-size:${sheetW.toFixed(1)}px ${(meta.ch * meta.rows * k).toFixed(1)}px;
       background-position:0 -${(2 * h).toFixed(1)}px;
+      --mob-sheet-width:${sheetW.toFixed(1)}px;
+      --mob-sheet-frames:${meta.cols};
+      --mob-sheet-duration:${Math.max(360, meta.cols * 160)}ms;
       image-rendering:pixelated;${extra || ""}"></div>`;
 }
 
@@ -1393,7 +1411,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const ent = e.ent;
     let img = null, w = 0, h = 0, name = '', hpPct = 0, mpPct = null, shieldPct = 0;
     if (e.kind === "monster") {
-      const frame = ent.moving ? (ent.frame || 1) : monsterIdleFrame(ent.slug, Date.now());
+      const frame = ent.moving ? (ent.frame || 1)
+        : monsterIdleFrame(ent.slug, Date.now(), monsterAnimationPhase(ent));
       const walk = frame ? Sprites.mobWalk(ent.slug, ent.dir || "w", frame) : null;
       img = spriteReady(walk) ? walk : Sprites.mob(ent.slug, ent.dir || "w");
       name = typeof displayMonsterName === "function" ? displayMonsterName(ent.def.name) : ent.def.name;
