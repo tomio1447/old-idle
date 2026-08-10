@@ -53,8 +53,27 @@ function creatureScale(W) { return tibiaScale(W); }
  * do OTClient (canto superior esquerdo da sprite). Para 1x1: top-left do
  * tile; para 2x2: desloca meio tile à esquerda e um tile para cima — mesma
  * regra do client: x=(width-1)/2 e y=(height-1). */
-function creatureTileOrigin(centerX, centerY, width, height, tile) {
+function creatureTileOrigin(centerX, centerY, width, height, tile, anchor, scale) {
+  if (anchor && scale) {
+    return {
+      x: centerX + tile / 2 - anchor.sw * scale + anchor.ox * scale,
+      y: centerY + tile / 2 - anchor.sh * scale + anchor.oy * scale,
+    };
+  }
   return { x: centerX - width / 2, y: centerY + tile / 2 - height };
+}
+
+function markMonsterAnchor(canvas, slug, meta) {
+  if (!canvas || !meta) return canvas;
+  const all = (typeof CREATURE_ANCHORS !== "undefined" && CREATURE_ANCHORS) || {};
+  const source = meta.sw ? meta : all[slug];
+  if (source) {
+    canvas._spriteAnchor = {
+      sw:source.sw, sh:source.sh,
+      ox:source.ox, oy:source.oy,
+    };
+  }
+  return canvas;
 }
 
 /* Fila única de profundidade. Esta estrutura será a fonte de ordenação para
@@ -164,12 +183,16 @@ function mobImg(slug, tam, extra) {
   const idle = monsterIdleMeta(slug);
   const visual = idle || meta;
   const frames = idle ? idle.frames : 1;
+  // Mesmo quando estática, a imagem principal continua sendo um sheet com
+  // `meta.cols` colunas. Reduzir o background para uma coluna comprimia
+  // todas as poses dentro do modal.
+  const sourceFrames = idle ? idle.frames : Math.max(1, meta.cols || 1);
   // a celula do sul e a linha 2; escala para caber na caixa pedida
   const k = Math.min(px / visual.cw, px / visual.ch);
   const w = visual.cw * k, h = visual.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
   const animated = idle ? " mob-img-animated" : "";
-  const sheetW = visual.cw * frames * k;
+  const sheetW = visual.cw * sourceFrames * k;
   const path = `assets/mob/${slug}${idle ? ".idle" : ""}.png?v=${v}`;
   return `<div class="mob-img${animated}" data-mob="${slug}" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;
@@ -231,6 +254,7 @@ const Sprites = {
     cv.width = meta.cw; cv.height = meta.ch;
     cv.getContext("2d").drawImage(sheet, col * meta.cw, linha * meta.ch,
                                   meta.cw, meta.ch, 0, 0, meta.cw, meta.ch);
+    markMonsterAnchor(cv, slug, meta);
     this.mobCache[k] = cv;
     return cv;
   },
@@ -250,6 +274,7 @@ const Sprites = {
     cv.getContext("2d").drawImage(sheet,
       col * meta.cw, linha * meta.ch, meta.cw, meta.ch,
       0, 0, meta.cw, meta.ch);
+    markMonsterAnchor(cv, slug, meta);
     this.mobIdleCache[key] = cv;
     return cv;
   },
@@ -1102,14 +1127,14 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // personagem tem o MESMO tamanho na sala de treino e nas hunts
     const sc = tibiaScale(W);
     const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
-    // Pé no centro do SQM: a base da sprite coincide com o centro do tile,
-    // e não o centro geométrico da imagem (que a deixava abaixo do chão).
-    const top = pyF - h;
+    const tile = tilePx(W);
+    const origin = creatureTileOrigin(pxF, pyF, w, h, tile, pimgAtk._spriteAnchor, sc);
+    const footY = pyF + tile / 2;
     ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath(); ctx.ellipse(pxF, pyF, w * 0.34, h * 0.1, 0, 0, 7); ctx.fill();
-    ctx.drawImage(pimgAtk, pxF - w / 2, top, w, h);
-    drawPlayerStatus(ctx, pxF, top - 14, pyF, player, player.config.barMode, Math.max(26, w * 0.42));
-    this.drawSpeech(ctx, pxF, top - 14, dt);
+    ctx.beginPath(); ctx.ellipse(pxF, footY, w * 0.34, Math.max(2, tile * 0.08), 0, 0, 7); ctx.fill();
+    ctx.drawImage(pimgAtk, origin.x, origin.y, w, h);
+    drawPlayerStatus(ctx, pxF, origin.y - 14, footY, player, player.config.barMode, Math.max(26, w * 0.42));
+    this.drawSpeech(ctx, pxF, origin.y - 14, dt);
 
     // Exercise Shield: durante o gesto de usar a arma no dummy, o escudo
     // fica erguido na frente do personagem (como o uso no client).
@@ -1467,7 +1492,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (!spriteReady(img)) continue;
     const sc = creatureScale(W); w = spriteW(img) * sc; h = spriteH(img) * sc;
     const cx = ent.x * W, cy = ent.y * H, tile = tilePx(W);
-    const origin = creatureTileOrigin(cx, cy, w, h, tile);
+    const origin = creatureTileOrigin(cx, cy, w, h, tile, img._spriteAnchor, sc);
     if (e.kind === "monster" && (ent.fiendish || ent.influenced)) {
       ctx.save(); ctx.shadowColor = ent.fiendish ? '#c14bff' : '#39a8ff'; ctx.shadowBlur = ent.fiendish ? 22 : 18;
       ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();

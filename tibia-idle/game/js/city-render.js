@@ -53,11 +53,12 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
   const psx = walker.px * S - camX, psy = walker.py * S - camY;
   if (spriteReady(pimg)) {
     const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
+    const origin = creatureTileOrigin(psx, psy, w, h, TS, pimg._spriteAnchor, S);
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath();
-    ctx.ellipse(psx, psy + h * 0.38, w * 0.3, h * 0.1, 0, 0, 7);
+    ctx.ellipse(psx, psy + TS / 2, w * 0.3, Math.max(2, TS * 0.08), 0, 0, 7);
     ctx.fill();
-    ctx.drawImage(pimg, psx - w / 2, psy - h / 2, w, h);
+    ctx.drawImage(pimg, origin.x, origin.y, w, h);
   }
 
   if (walker.moving) {
@@ -305,13 +306,12 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   const psx = walker.px * S - camX, psy = walker.py * S - camY;
   if (spriteReady(pimg)) {
     const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
-    // Sem flutuação: a sprite fica parada no chão, como no client.
-    const bob = 0;
+    const origin = creatureTileOrigin(psx, psy, w, h, TS, pimg._spriteAnchor, S);
     ctx.fillStyle = "rgba(0,0,0,.4)";
     ctx.beginPath();
-    ctx.ellipse(psx, psy + h * 0.38, w * 0.3, h * 0.1, 0, 0, 7);
+    ctx.ellipse(psx, psy + TS / 2, w * 0.3, Math.max(2, TS * 0.08), 0, 0, 7);
     ctx.fill();
-    ctx.drawImage(pimg, psx - w / 2, psy - h / 2 + bob, w, h);
+    ctx.drawImage(pimg, origin.x, origin.y, w, h);
   }
 
   // marcador do destino
