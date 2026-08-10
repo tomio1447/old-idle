@@ -693,7 +693,7 @@ const BOSS_DEFS = {
     id: "timira-the-many-headed",
     name: "Timira the Many-Headed",
     title: "Boss das Nagas (Marapur)",
-    hunt: "marapur-nagas",
+    hunt: "timira-room",
     baseMonster: "timira-the-many-headed",
     sprite: "timira-the-many-headed",
     hp: 75000,
@@ -1069,9 +1069,14 @@ function startHunt(id, instanceMode, force) {
   G.p.hunt = id;
   G.p.instanceMode = instanceMode;
   G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
+  const entryToken = (G.huntEntryToken || 0) + 1;
+  G.huntEntryToken = entryToken;
   // hunt com arena .otbm: carrega (fetch) e converte o mapa antes de
   // montar o combate; hunts em ascii respondem na hora (otbmhunt.js)
   huntMapFromOtbmAsync(hu, () => {
+    // Se o jogador voltou ao templo enquanto o fetch estava pendente, não
+    // recrie o combate por cima da safe zone.
+    if (G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id) return;
     G.combat = newCombat(G.p, id, instanceMode);
     spawnWave(G.combat, G.p);
     addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
@@ -1085,11 +1090,17 @@ function startHunt(id, instanceMode, force) {
 }
 
 function resetTemplePlayerPosition() {
+  if (!G.walker && typeof CityWalker === "function") G.walker = new CityWalker();
   if (G.walker && typeof G.walker.resetToSpawn === "function")
     G.walker.resetToSpawn();
+  G.hoverNpc = null;
+  G.activeNpc = null;
+  if (G.renderer) G.renderer.npcHit = [];
 }
 
 function stopHunt() {
+  // Invalida qualquer callback OTBM iniciado antes do retorno.
+  G.huntEntryToken = (G.huntEntryToken || 0) + 1;
   // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
   // (hp/mana/exp de cada um vão para o roster)
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
@@ -1112,7 +1123,9 @@ function stopHunt() {
 /* Alterna entre cidade, caçada e academia */
 function goToCity() {
   if (G.training) stopAcademy();
-  else if (G.p.hunt) stopHunt();
+  // Bosses usam G.combat, mas deixam G.p.hunt=null. Verificar só `hunt`
+  // mantinha o combate ativo e o botão parecia travado após trocar o templo.
+  else if (G.combat || G.p.hunt) stopHunt();
   else { G.inCity = true; resetTemplePlayerPosition(); renderAll(); }
 }
 
@@ -1197,16 +1210,15 @@ function drainEvents() {
         r.addEffect(x, y, e.fx || (e.exori ? "hit-area"
                     : (raca ? raca.fx
                        : (ELEMENTS[e.el] || ELEMENTS.physical).fx)));
-        // critico: uma UNICA animacao — o efeito oficial Critical Hit Effect
-        // (estouro vermelho sobre o alvo). O texto "CRIT!" (crit-text) era
-        // disparado junto e ficavam DUAS animacoes sobrepostas; removido.
+        // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
+        // Critical Hit ocupa ~37px dentro do frame 64px, contra ~53px do
+        // Onslaught; 1.45x iguala o tamanho percebido sem trocar a sprite.
         if (e.crit) {
-          r.addEffect(x, y, "critical-hit-effect", 700);
+          r.addEffect(x, y, "critical-hit-effect", 1200, 1.45);
         }
         // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial
         if (e.fatal) {
-          // mais tempo de exibição para o efeito FATAL ser visível
-          r.addEffect(x, y - 0.10, "fatal-text", 1200);
+          r.addEffect(x, y - 0.10, "fatal-text", 1200, 1);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.fatal = (fdc.fatal || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;

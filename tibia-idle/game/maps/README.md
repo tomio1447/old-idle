@@ -50,3 +50,11 @@ de NPC `(1013,1018,7)` e `(1013,1020,7)` não geram entidades; o sidecar
 `templo-npc.xml` permanece vazio e a interface do templo não publica atalhos
 de NPC. O renderer mantém o FOV de 21×13 SQMs e desenha chão, jogador e
 objetos bloqueantes na mesma ordem das hunts.
+
+## Timira's Room
+
+`timiraroom.otbm` é publicado integralmente com limites absolutos
+`(174,157,2)..(194,175,2)`; as âncoras externas não são recortadas. A arena
+lógica é `(175,159,2)..(193,175,2)`, Timira nasce em `(184,162,2)` e o player
+em `(182,170,2)`. Após o padding mínimo do conversor, o runtime fica 24×19,
+com player local `(9,13)` e boss local `(11,5)`.
