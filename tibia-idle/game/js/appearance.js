@@ -29,13 +29,43 @@ const APP_MOUNT = {};
 })();
 
 
-/* Frame parado 15x: appearances com 5/9 frames possuem animação idle no
- * próprio DAT. Outfits clássicas de 3 frames permanecem na pose 0 para não
- * simular caminhada quando paradas. */
+/* Metadados extraídos do frame group IDLE real do DAT. Os frames de
+ * caminhada continuam nos sheets principais e nunca entram nesta tabela. */
+const IDLE_ANIM_DATA = (typeof window !== "undefined" && window.IDLE_ANIMATIONS)
+  ? window.IDLE_ANIMATIONS : { outfits:{}, mounts:{}, monsters:{} };
+
+function idleAnimationMeta(kind, id) {
+  const group = IDLE_ANIM_DATA[kind] || {};
+  return id && group[id] && group[id].frames > 1 ? group[id] : null;
+}
+
+function idleAnimationFrame(meta, now, phase) {
+  if (!meta || meta.frames <= 1) return 0;
+  const ds = meta.durations && meta.durations.length === meta.frames
+    ? meta.durations : Array(meta.frames).fill(180);
+  const total = meta.duration || ds.reduce((sum, n) => sum + n, 0) || 180;
+  const parsedNow = Number(now);
+  const clock = Number.isFinite(parsedNow) ? parsedNow : Date.now();
+  let elapsed = (clock + (Number(phase) || 0)) % total;
+  if (elapsed < 0) elapsed += total;
+  for (let frame = 0; frame < ds.length; frame++) {
+    if (elapsed < ds[frame]) return frame;
+    elapsed -= ds[frame];
+  }
+  return 0;
+}
+
+/* Retorna um marcador idle somente quando a outfit/avatar OU a montaria
+ * realmente possui grupo idle animado. Sem esse marcador o renderer usa a
+ * pose 0 estática, mesmo que o sheet tenha muitos frames de caminhada. */
 function appearanceIdleFrame(p, now) {
   const a = activeAvatarAppearance(p) || currentAppearance(p);
-  if (!a || (a.cols || 0) <= 3) return 0;
-  return Math.floor((now || Date.now()) / 180) % a.cols;
+  const m = currentMount(p);
+  const outfitIdle = a && idleAnimationMeta("outfits", a.id);
+  const mountIdle = m && idleAnimationMeta("mounts", m.id);
+  if (!outfitIdle && !mountIdle) return 0;
+  const parsedNow = Number(now);
+  return { idle:true, now:Number.isFinite(parsedNow) ? parsedNow : Date.now() };
 }
 
 /* ------------------------------------------------------------ avatars
@@ -268,8 +298,16 @@ const AppearanceRenderer = {
     if (!o || !o.cw) return null;
     addons = Math.max(0, Math.min(3, addons | 0));
     const linha = appDirRow(dir);
-    const col = Math.max(0, Math.min((o.cols || 4) - 1, frame | 0));
-    const k = this.key(id, addons, colors, linha, col);
+    const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
+    const idleMeta = idleRequest ? idleAnimationMeta("outfits", id) : null;
+    const renderMeta = idleMeta || o;
+    const col = idleMeta
+      ? idleAnimationFrame(idleMeta, frame.now, 0)
+      : Math.max(0, Math.min((o.cols || 4) - 1,
+          typeof frame === "number" ? frame | 0 : 0));
+    const assetMode = idleMeta ? ".idle" : "";
+    const k = this.key(id, addons, colors, linha,
+      (idleMeta ? "idle:" : "walk:") + col);
     if (this.cache[k] !== undefined) return this.cache[k];
 
     const camadas = [""];
@@ -281,7 +319,7 @@ const AppearanceRenderer = {
     const imgs = [];
     for (const suf of camadas) {
       const base = Sprites.get(
-        `assets/appearance/outfit/${id}${suf}.base.png`);
+        `assets/appearance/outfit/${id}${suf}${assetMode}.base.png`);
       if (!base) continue;                      // camada inexistente: ignora
       if (!base.complete) return null;
       if (!base.naturalWidth) continue;         // 404: segue sem ela
@@ -291,8 +329,10 @@ const AppearanceRenderer = {
         imgs.push([base, null]);
         continue;
       }
-      const mask = Sprites.get(
-        `assets/appearance/outfit/${id}${suf}.mask.png`);
+      const hasIdleMask = !idleMeta || !Array.isArray(idleMeta.masks) ||
+        idleMeta.masks.indexOf(suf) !== -1;
+      const mask = hasIdleMask ? Sprites.get(
+        `assets/appearance/outfit/${id}${suf}${assetMode}.mask.png`) : null;
       if (mask && !mask.complete) return null;
       imgs.push([base, mask]);
     }
@@ -301,10 +341,10 @@ const AppearanceRenderer = {
     // a celula tem tamanho fixo: as camadas de addon foram exportadas com a
     // mesma caixa do corpo, entao basta empilhar na origem (0,0)
     const cv = document.createElement("canvas");
-    cv.width = o.cw; cv.height = o.ch;
+    cv.width = renderMeta.cw; cv.height = renderMeta.ch;
     const cx = cv.getContext("2d", { willReadFrequently: true });
     for (const [base, mask] of imgs) {
-      const tmp = this.celula(base, mask, o, col, linha, colors);
+      const tmp = this.celula(base, mask, renderMeta, col, linha, colors);
       if (tmp) cx.drawImage(tmp, 0, 0);
     }
     this.cache[k] = cv;
@@ -316,17 +356,25 @@ const AppearanceRenderer = {
     const m = APP_MOUNT[id];
     if (!m || !m.cw) return null;
     const linha = appDirRow(dir);
-    const col = Math.max(0, Math.min((m.cols || 4) - 1, frame | 0));
-    const k = "mount|" + id + "|" + linha + "|" + col;
+    const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
+    const idleMeta = idleRequest ? idleAnimationMeta("mounts", id) : null;
+    const renderMeta = idleMeta || m;
+    const col = idleMeta
+      ? idleAnimationFrame(idleMeta, frame.now, 0)
+      : Math.max(0, Math.min((m.cols || 4) - 1,
+          typeof frame === "number" ? frame | 0 : 0));
+    const k = "mount|" + id + "|" + linha + "|" +
+      (idleMeta ? "idle:" : "walk:") + col;
     if (this.cache[k] !== undefined) return this.cache[k];
-    const base = Sprites.get(`assets/appearance/mount/${id}.base.png`);
+    const base = Sprites.get(`assets/appearance/mount/${id}${idleMeta ? ".idle" : ""}.base.png`);
     if (!base) { this.cache[k] = null; return null; }
     if (!base.complete) return null;
     if (!base.naturalWidth) { this.cache[k] = null; return null; }
     const cv = document.createElement("canvas");
-    cv.width = m.cw; cv.height = m.ch;
-    cv.getContext("2d").drawImage(base, col * m.cw, linha * m.ch, m.cw, m.ch,
-                                  0, 0, m.cw, m.ch);
+    cv.width = renderMeta.cw; cv.height = renderMeta.ch;
+    cv.getContext("2d").drawImage(base,
+      col * renderMeta.cw, linha * renderMeta.ch,
+      renderMeta.cw, renderMeta.ch, 0, 0, renderMeta.cw, renderMeta.ch);
     this.cache[k] = cv;
     return cv;
   },
@@ -352,9 +400,18 @@ const AppearanceRenderer = {
     const bicho = this.mount(mnt.id, dir, frame);
     if (!bicho) return corpo;
     const linha = appDirRow(dir);
-    const col = Math.max(0, Math.min(3, frame | 0));
+    const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
+    let frameKey;
+    if (idleRequest) {
+      const outfitMeta = idleAnimationMeta("outfits", o.id);
+      const mountMeta = idleAnimationMeta("mounts", mnt.id);
+      frameKey = "idle:" + idleAnimationFrame(outfitMeta, frame.now, 0) + ":" +
+        idleAnimationFrame(mountMeta, frame.now, 0);
+    } else {
+      frameKey = "walk:" + (typeof frame === "number" ? frame | 0 : 0);
+    }
     const k = "jogo|" + o.id + "|" + addons + "|" + cores.join(",") +
-              "|" + mnt.id + "|" + linha + "|" + col;
+              "|" + mnt.id + "|" + linha + "|" + frameKey;
     if (this.cache[k] !== undefined) return this.cache[k];
     this.cache[k] = this.montar(corpo, bicho, o, mnt);
     return this.cache[k];

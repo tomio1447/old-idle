@@ -16,6 +16,26 @@ function preloadGameAssets(p) {
   // Aparência atual + party inicial: evita frames brancos ao entrar.
   if (p && p.outfit && p.outfit.appearance) paths.add('assets/appearance/outfit/' + p.outfit.appearance + '.base.png');
   if (p && p.outfit && p.outfit.mount) paths.add('assets/appearance/mount/' + p.outfit.mount + '.base.png');
+  // Sheets idle são separados dos frames de caminhada. Pré-carrega somente
+  // os que a aparência atual realmente possui no DAT.
+  if (p && typeof currentAppearance === 'function' && typeof idleAnimationMeta === 'function') {
+    const appearance = (typeof activeAvatarAppearance === 'function' && activeAvatarAppearance(p)) || currentAppearance(p);
+    const idle = appearance && idleAnimationMeta('outfits', appearance.id);
+    if (idle) {
+      const addons = appearance.sexo === 'avatar' ? 0 : ((p.outfit && p.outfit.addons) || 0);
+      const suffixes = [''];
+      if (addons & 1) suffixes.push('-a1');
+      if (addons & 2) suffixes.push('-a2');
+      for (const suffix of suffixes) {
+        paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.idle.base.png');
+        if (appearance.sexo !== 'avatar' && (!Array.isArray(idle.masks) || idle.masks.includes(suffix)))
+          paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.idle.mask.png');
+      }
+    }
+    const mount = typeof currentMount === 'function' ? currentMount(p) : null;
+    if (mount && idleAnimationMeta('mounts', mount.id))
+      paths.add('assets/appearance/mount/' + mount.id + '.idle.base.png');
+  }
   const hunt = p && typeof GAMEDATA !== 'undefined' && GAMEDATA.hunts && GAMEDATA.hunts[p.hunt];
   if (hunt) for (const slug of hunt.monsters || []) paths.add('assets/mob/' + slug + '.png');
   // O templo é a primeira cena exibida: carregue todos os tiles antes de

@@ -77,7 +77,8 @@ class Reader:
 
 class FrameGroup:
     __slots__ = ("width", "height", "layers", "px", "py", "pz", "anim", "sprites",
-                 "exact_size")
+                 "exact_size", "group_type", "async_anim", "loop_count",
+                 "start_phase", "durations")
 
     def __init__(self):
         self.width = 1
@@ -89,6 +90,11 @@ class FrameGroup:
         self.anim = 1
         self.sprites = []
         self.exact_size = 32
+        self.group_type = 0
+        self.async_anim = False
+        self.loop_count = 0
+        self.start_phase = 0
+        self.durations = []
 
     def sprite_id(self, frame, xp, yp, zp, layer, x, y):
         """Indice linear dentro de group.sprites, igual ao client."""
@@ -139,9 +145,10 @@ class Dat860:
             if self.frame_groups and is_outfit:
                 n_groups = p.u8()
             for _ in range(n_groups):
-                if self.frame_groups and is_outfit:
-                    p.u8()          # tipo do grupo (0=idle, 1=moving)
-                obj.groups.append(self._read_group(p))
+                group_type = p.u8() if self.frame_groups and is_outfit else 0
+                group = self._read_group(p)
+                group.group_type = group_type
+                obj.groups.append(group)
             self.objects[oid] = obj
             oid += 1
 
@@ -159,12 +166,13 @@ class Dat860:
         g.pz = p.u8()
         g.anim = p.u8()
         if self.frame_durations and g.anim > 1:
-            p.u8()                  # async
-            p.u32()                 # loop count
-            p.u8()                  # start phase
+            g.async_anim = bool(p.u8())
+            g.loop_count = p.u32()
+            g.start_phase = p.u8()
             for _ in range(g.anim):
-                p.u32()             # min duration
-                p.u32()             # max duration
+                min_duration = p.u32()
+                max_duration = p.u32()
+                g.durations.append(max(1, (min_duration + max_duration) // 2))
         n = (g.width * g.height * g.layers * g.px * g.py * g.pz * g.anim)
         if self.extended:
             g.sprites = [p.u32() for _ in range(n)]

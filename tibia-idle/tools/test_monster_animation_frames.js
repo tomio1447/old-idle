@@ -14,6 +14,7 @@ const ctx = { window: {}, console };
 ctx.window = ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(JS, 'mobsheetdata.js'), 'utf8'), ctx);
+vm.runInContext(fs.readFileSync(path.join(JS, 'idleanimdata.js'), 'utf8'), ctx);
 
 const groups = {
   'DT Seal': ['vexclaw', 'grimeleech', 'dark-torturer'],
@@ -114,18 +115,33 @@ for (const [group, slugs] of Object.entries(groups)) {
   }
 }
 
-// Carrega as funções reais do renderer sem DOM e valida o relógio visual.
+// Carrega as funções reais do renderer sem DOM. DT/Soul War têm vários
+// frames MOVING, mas nenhum grupo idle: parados devem ficar na pose 0.
+vm.runInContext(fs.readFileSync(path.join(JS, 'appearance.js'), 'utf8'), ctx);
 vm.runInContext(fs.readFileSync(path.join(JS, 'render.js'), 'utf8'), ctx);
 const dtFrames = [0, 160, 320, 480].map(t =>
   vm.runInContext(`monsterIdleFrame('dark-torturer', ${t}, 0)`, ctx));
-must(dtFrames.join(',') === '1,2,1,2', 'DT Seal não alterna continuamente os frames 1/2');
+must(dtFrames.every(f => f === 0), 'DT Seal usa caminhada enquanto está parado');
 const soulFrames = new Set(Array.from({ length: 8 }, (_, i) =>
   vm.runInContext(`monsterIdleFrame('brachiodemon', ${i * 160}, 0)`, ctx)));
-must(soulFrames.size === 8 && !soulFrames.has(0),
-  'Soul War não percorre os oito frames de movimento');
-const thumb = vm.runInContext(`mobImg('vexclaw', 32, '')`, ctx);
-must(thumb.includes('mob-img-animated') && thumb.includes('--mob-sheet-frames:9'),
-  'Miniatura da DT Seal continua estática');
+must(soulFrames.size === 1 && soulFrames.has(0),
+  'Soul War usa caminhada enquanto está parado');
+const staticThumb = vm.runInContext(`mobImg('vexclaw', 32, '')`, ctx);
+must(!staticThumb.includes('mob-img-animated') && staticThumb.includes('vexclaw.png'),
+  'Miniatura moving-only da DT Seal ainda se mexe parada');
+
+// Jellyfish possui frame group idle real e continua animada.
+const jellyMeta = ctx.IDLE_ANIMATIONS.monsters.jellyfish;
+const jellyFrames = new Set();
+let elapsed = 0;
+for (const duration of jellyMeta.durations) {
+  jellyFrames.add(vm.runInContext(`monsterIdleFrame('jellyfish', ${elapsed}, 0)`, ctx));
+  elapsed += duration;
+}
+must(jellyFrames.size === jellyMeta.frames, 'Jellyfish não percorre o idle real');
+const animatedThumb = vm.runInContext(`mobImg('jellyfish', 32, '')`, ctx);
+must(animatedThumb.includes('mob-img-animated') && animatedThumb.includes('jellyfish.idle.png'),
+  'Miniatura com idle real não usa o sheet idle');
 
 // Transformações (Mirror Image -> Apparition) devem recalcular o ciclo.
 const gridCtx = { console, MOBSHEETS: ctx.MOBSHEETS };
@@ -142,4 +158,4 @@ const css = fs.readFileSync(path.join(GAME, 'css', 'layout.css'), 'utf8');
 must(css.includes('@keyframes mob-sheet-frames') && css.includes('.mob-img-animated'),
   'CSS das miniaturas animadas ausente');
 
-console.log(`OK: ${checked} monstros de Soul War/DT Seal/Cobra Bastion/Scarlett possuem frames distintos e animação contínua.`);
+console.log(`OK: ${checked} sheets moving preservados; parado só anima com grupo idle real.`);
