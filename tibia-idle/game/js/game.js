@@ -901,10 +901,16 @@ function openBossModal(id) {
   });
 }
 
-function startBoss(id, force) {
+function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  // Boss com sala própria espera o OTBM carregar antes de criar entidades.
+  const arena = boss.hunt && GAMEDATA.hunts[boss.hunt];
+  if (!arenaReady && arena && arena.otbm && typeof huntMapFromOtbmAsync === "function") {
+    huntMapFromOtbmAsync(arena, () => startBoss(id, force, true));
+    return;
+  }
   // PARTY: membros (não líder) não podem entrar em boss por conta própria —
   // só o líder escolhe e leva a party (requisitos validados no server).
   // `force = true` é o FOLLOW (membro teleportado para a sala do líder).
@@ -1043,6 +1049,7 @@ function stopHunt() {
   // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
   // (hp/mana/exp de cada um vão para o roster)
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
+  if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
   G.p.hunt = null;
   G.p.instanceMode = null;
   G.combat = null;
@@ -1793,7 +1800,7 @@ function loop(ts) {
     if (G.combat && G.combat.players && G.combat.players.length > 1 &&
         !G.combat.dead) {
       for (const ent of G.combat.players) {
-        if (ent.p && ent.p.hp <= 0 && ent.reviveAt &&
+        if (ent.p && ent.p.hp <= 0 && !ent.permadead && ent.reviveAt &&
             Date.now() >= ent.reviveAt) {
           const mx = maxStats(ent.p);
           ent.p.hp = mx.hp;

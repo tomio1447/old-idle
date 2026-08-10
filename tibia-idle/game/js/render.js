@@ -94,7 +94,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "38";
+const ASSET_VERSION = "39";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1298,8 +1298,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 };
 
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */
-function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt) {
-  if (!ent || !p || !until) return;
+function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
+  if (!ent || !p || (!until && !permanent)) return;
   const px = (ent.x || 0) * W, py = (ent.y || 0) * H;
   const sex = String(p.sex || p.gender || "").toLowerCase();
   const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
@@ -1309,6 +1309,8 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt) {
     const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
     ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
   }
+  // Na Scarlett o corpse permanece até o fim da luta, sem contador/revive.
+  if (permanent) return;
   const now = Date.now(), left = Math.max(0, Math.ceil((until - now) / 1000));
   const total = Math.max(1, until - (startedAt || now));
   const elapsed = Math.max(0, Math.min(1, 1 - (until - now) / total));
@@ -1545,9 +1547,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
   if (combat && !combat.dead && combat.players) {
     for (const ent of combat.players) {
-      if (!ent || !ent.p || ent.p.hp > 0 || !ent.reviveAt) continue;
+      if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
       const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
-      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt);
+      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
     }
   }
 

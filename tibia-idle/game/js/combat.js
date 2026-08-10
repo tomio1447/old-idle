@@ -201,7 +201,7 @@ function newBossCombat(player, boss) {
   c.expMul = 1;
   c.lootMul = 1;
   c.skillMul = 1;
-  c.mobs = [{
+  const bossMob = {
     slug: boss.sprite || boss.baseMonster || "cave-rat",
     def: def,
     boss: true,
@@ -216,8 +216,20 @@ function newBossCombat(player, boss) {
     attackAnim: 0,
     speed: boss.speed || 0.000055,
     spawnAt: Date.now(),
-  }];
+  };
+  // Sala OTBM pode declarar a célula exata do boss na zona G.
+  if (c.huntMap && c.huntMap.mob && c.huntMap.mob.length) {
+    bossMob.cx = c.huntMap.mob[0].x;
+    bossMob.cy = c.huntMap.mob[0].y;
+    const pos = typeof cellToScreen === "function"
+      ? cellToScreen(bossMob.cx, bossMob.cy)
+      : { x:(bossMob.cx + .5) / GRID_W, y:(bossMob.cy + .5) / GRID_H };
+    bossMob.x = pos.x; bossMob.y = pos.y;
+    bossMob.sx = pos.x; bossMob.sy = pos.y;
+  }
+  c.mobs = [bossMob];
   resolveSQMOccupancy(c);
+  if (typeof scarlettBossInit === "function") scarlettBossInit(c, player);
   return c;
 }
 
@@ -783,6 +795,8 @@ function tickConditions(c, p, dt) {
   // --- monstros
   for (const m of c.mobs) {
     if (m.hp <= 0 || !m.conditions) continue;
+    if (typeof bossCanTakePlayerDamage === "function" &&
+        !bossCanTakePlayerDamage(c, m)) continue;
     for (const tipo of Object.keys(m.conditions)) {
       const co = m.conditions[tipo];
       const def = CONDITIONS[tipo];
@@ -1202,6 +1216,9 @@ function playerAttack(c, p, target) {
     // removido; a falha fica silenciosa no log de quem chamou)
     return false;
   }
+  // Boss com gate/mecânica pode rejeitar todo dano sem consumir munição.
+  if (typeof bossCanTakePlayerDamage === "function" &&
+      !bossCanTakePlayerDamage(c, target)) return 0;
 
   // Mirror Image revela a Apparition correspondente à vocação que iniciou o ataque.
   if (target && target.slug === "mirror-image" && typeof soulwarMirrorTransform === "function") soulwarMirrorTransform(c, target, p);
@@ -1691,6 +1708,9 @@ function castSpellById(c, p, target, now, id) {
   // Helper (toggleStance). Sem o guard uma stance esquecida na rotacao
   // sairia como se fosse golpe.
   if (s.stance) return false;
+  if ((s.aggr || s.type === "attack") &&
+      typeof bossCanTakePlayerDamage === "function" &&
+      !bossCanTakePlayerDamage(c, target)) return true;
 
   // 15.25: Shield Bash/Slam precisam de um ESCUDO na mao secundaria (a
   // aljava do paladin nao conta). Sem escudo a magia simplesmente nao sai.
@@ -2116,6 +2136,8 @@ function tryUseRune(c, p, target, now, forcada) {
       && typeof sqmDistance === "function") {
     if (sqmDistance(c.player, target) > 6) return false;   // runa: 6 SQM
   } else if (c.player && pointDistance(c.player, target) > runeRange()) return false;
+  if (typeof bossCanTakePlayerDamage === "function" &&
+      !bossCanTakePlayerDamage(c, target)) return true;
   let best = null;
   if (forcada) {
     const sf = SUPPLIES[forcada];
@@ -3372,7 +3394,8 @@ function mobAttack(c, p, mob) {
     return 0;
   }
   // charm Parry: devolve parte do dano ao agressor
-  if (chm && chm.reflete) {
+  if (chm && chm.reflete &&
+      (typeof bossCanTakePlayerDamage !== "function" || bossCanTakePlayerDamage(c, mob))) {
     const volta = Math.max(1, Math.floor(raw * chm.reflete / 100));
     mob.hp -= volta;
     c.stats.damage += volta;
@@ -3774,6 +3797,7 @@ function playerDeath(c, p) {
 function combatTick(c, p, dt, now) {
   c.stats.time += dt;
   p.playtime += dt;
+  if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
 
   // stamina: gasta 1s por segundo caçando
   p.stamina = Math.max(0, p.stamina - dt / 1000);
@@ -3924,7 +3948,8 @@ function combatTick(c, p, dt, now) {
     for (const h of c.delayedHits) {
       if (h.at > now) { pend.push(h); continue; }
       const mob = c.mobs.find((m) => m.id === h.mobId);
-      if (mob && mob.hp > 0) {
+      if (mob && mob.hp > 0 &&
+          (typeof bossCanTakePlayerDamage !== "function" || bossCanTakePlayerDamage(c, mob))) {
         const dmg = Math.max(1, h.dmg);
         mob.hp -= dmg;
         c.stats.damage += dmg;
@@ -3940,6 +3965,10 @@ function combatTick(c, p, dt, now) {
   // para o próximo membro vivo. Só quando TODOS caem é que vale a morte
   // normal (perda + revive da instância inteira).
   if (p.hp <= 0) {
+    if (c.boss && c.boss.noRevive && typeof bossHandlePermanentDown === "function") {
+      bossHandlePermanentDown(c, p, "dano do boss");
+      return;
+    }
     if (c.players && c.players.length > 1 &&
         typeof partyHandleDown === "function") {
       partyHandleDown(c, p);
@@ -3949,6 +3978,11 @@ function combatTick(c, p, dt, now) {
       playerDeath(c, p); return;
     }
   }
+
+  // Gates de HP do boss são aplicados antes da coleta de mortos para um hit
+  // alto não pular a mecânica nem matar Scarlett durante a imunidade.
+  if (typeof scarlettBossEnforceThreshold === "function")
+    scarlettBossEnforceThreshold(c, now);
 
   // monstros mortos
   const alive = [];

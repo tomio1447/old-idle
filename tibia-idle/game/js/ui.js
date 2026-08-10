@@ -707,6 +707,7 @@ function renderHunts(p) {
   // agrupa por categoria na ordem definida
   const grupos = {};
   for (const id in GAMEDATA.hunts) {
+    if (GAMEDATA.hunts[id].hidden) continue;
     const c = catDe(id);
     (grupos[c] = grupos[c] || []).push(id);
   }

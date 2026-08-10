@@ -1,5 +1,5 @@
-/* Regressão: monstros de Soul War/DT Seal/Cobra Bastion possuem frames reais
- * e o runtime percorre esses frames na cena e nas miniaturas da interface. */
+/* Regressão: Soul War/DT Seal/Cobra Bastion/Scarlett possuem frames reais e
+ * o runtime percorre esses frames na cena e nas miniaturas da interface. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -18,6 +18,7 @@ vm.runInContext(fs.readFileSync(path.join(JS, 'mobsheetdata.js'), 'utf8'), ctx);
 const groups = {
   'DT Seal': ['vexclaw', 'grimeleech', 'dark-torturer'],
   'Cobra Bastion': ['cobra-vizier', 'cobra-scout', 'cobra-assassin'],
+  'Scarlett': ['scarlett-etzel'],
   'Soul War': [
     'many-faces', 'knight-s-apparition', 'paladin-s-apparition',
     'sorcerer-s-apparition', 'druid-s-apparition', 'monk-s-apparition',
@@ -141,4 +142,4 @@ const css = fs.readFileSync(path.join(GAME, 'css', 'layout.css'), 'utf8');
 must(css.includes('@keyframes mob-sheet-frames') && css.includes('.mob-img-animated'),
   'CSS das miniaturas animadas ausente');
 
-console.log(`OK: ${checked} monstros de Soul War/DT Seal/Cobra Bastion possuem frames distintos e animação contínua.`);
+console.log(`OK: ${checked} monstros de Soul War/DT Seal/Cobra Bastion/Scarlett possuem frames distintos e animação contínua.`);
