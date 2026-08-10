@@ -2266,7 +2266,7 @@ function renderTopbar(p) {
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   $("#gold").textContent = fmtFull(p.gold);
   const cityBtn = $("#btn-city");
-  if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para a cidade";
+  if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para o templo";
   const forgeBtn = $("#btn-forge");
   if (forgeBtn) {
     const atCap = typeof p.dust === "number" && typeof p.dustLimit === "number" && p.dust >= p.dustLimit;

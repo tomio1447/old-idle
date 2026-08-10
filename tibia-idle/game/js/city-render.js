@@ -25,7 +25,74 @@ function drawTileSprite(ctx, img, sx, sy, scale) {
   ctx.drawImage(img, sx, sy + TILE * scale - h, w, h);
 }
 
+Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
+  const ctx = this.ctx;
+  const W = this.c.width, H = this.c.height;
+  const S = Math.min(W / (21 * TILE), H / (13 * TILE));
+  const TS = TILE * S;
+  const worldW = MAP_W * TS, worldH = MAP_H * TS;
+  let camX = walker.px * S - W / 2;
+  let camY = walker.py * S - H / 2;
+  camX = Math.max(0, Math.min(worldW - W, camX));
+  camY = Math.max(0, Math.min(worldH - H, camY));
+  if (worldW < W) camX = (worldW - W) / 2;
+  if (worldH < H) camY = (worldH - H) / 2;
+  this.camX = camX; this.camY = camY; this.scale = S;
+  this.npcHit = [];
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "ground");
+  ctx.restore();
+
+  // Player entre chão/decorações e paredes, na mesma ordem visual das hunts.
+  const pimg = OutfitRenderer.forPlayer(player, walker.dir,
+    walker.moving ? walker.frame : (typeof appearanceIdleFrame === "function"
+      ? appearanceIdleFrame(player, Date.now()) : 0));
+  const psx = walker.px * S - camX, psy = walker.py * S - camY;
+  if (spriteReady(pimg)) {
+    const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    ctx.beginPath();
+    ctx.ellipse(psx, psy + h * 0.38, w * 0.3, h * 0.1, 0, 0, 7);
+    ctx.fill();
+    ctx.drawImage(pimg, psx - w / 2, psy - h / 2, w, h);
+  }
+
+  if (walker.moving) {
+    const mx = walker.tpx * S - camX, my = walker.tpy * S - camY;
+    const t = (Date.now() % 900) / 900;
+    ctx.strokeStyle = "rgba(255,214,74," + (0.8 - t * 0.6) + ")";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(mx, my + 8, 9 + t * 10, 4 + t * 4, 0, 0, 7);
+    ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "objects");
+  ctx.restore();
+
+  ctx.textAlign = "left";
+  ctx.font = "bold 13px Verdana";
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  ctx.fillText("Templo Oficial de Thais", 13, 23);
+  ctx.fillStyle = "#ffe680";
+  ctx.fillText("Templo Oficial de Thais", 12, 22);
+  ctx.font = "10px Verdana";
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  ctx.fillText("Clique para andar · WASD/setas também", 13, 39);
+  ctx.fillStyle = "#c8c0a8";
+  ctx.fillText("Clique para andar · WASD/setas também", 12, 38);
+};
+
 Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
+  if (CITY && CITY.officialTemple) {
+    this.drawOfficialTempleMap(player, dt, walker);
+    return;
+  }
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
   // Mais visão no mapa para testes: 21 × 13 SQMs.

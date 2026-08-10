@@ -5,9 +5,12 @@
 "use strict";
 
 function CityWalker() {
-  // comeca na praca, ao sul da fonte
-  this.px = 16 * TILE;
-  this.py = 14 * TILE;
+  // O templo oficial define o player position em (1020,1021,7), convertido
+  // para a célula local durante loadOfficialTempleMap().
+  const spawn = CITY && CITY.spawn ? CITY.spawn : { x:16, y:14 };
+  const start = tileCenter(spawn.x, spawn.y);
+  this.px = start.x;
+  this.py = start.y;
   this.tpx = this.px;
   this.tpy = this.py;
   this.dir = "s";
@@ -42,6 +45,18 @@ function walkerSpeedMul() {
 function tileCenter(tx, ty) {
   return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
 }
+
+CityWalker.prototype.resetToSpawn = function () {
+  const spawn = CITY && CITY.spawn ? CITY.spawn : { x:16, y:14 };
+  const start = tileCenter(spawn.x, spawn.y);
+  this.px = this.tpx = start.x;
+  this.py = this.tpy = start.y;
+  this.path = [];
+  this.keys = {};
+  this.target = null;
+  this.moving = false;
+  this.frame = 0;
+};
 
 /* Busca em largura evitando paredes; devolve lista de tiles */
 function findPath(sx, sy, gx, gy) {

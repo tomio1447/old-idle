@@ -196,7 +196,7 @@
    * os ids que interessam (1,2) ou dados simplificados. */
   Rdr.prototype.readAttr = function (id, ctx) {
     switch (id) {
-      case 1: case 2: case 7: case 11: case 13: // str/binario com u16 len
+      case 1: case 2: case 6: case 7: case 11: case 13: // str/binario com u16 len
         var len = this.u16();
         if (id === 1 || id === 2) {
           ctx["attr" + id] = [];
@@ -254,7 +254,7 @@
       return f[k] || (f[k] = { x: x, y: y, g: 0, items: [] });
     }
     function skipAttr(id, ctx) {
-      if (id === 1 || id === 2 || id === 7 || id === 11 || id === 13) {
+      if (id === 1 || id === 2 || id === 6 || id === 7 || id === 11 || id === 13) {
         var len = r.u16(), a = [];
         for (var n = 0; n < len; n++) a.push(r.u8());
         if (id === 1 && !desc) desc = bytesToStr(a);
