@@ -324,10 +324,17 @@ function spawnWave(c, p) {
       mob.x = 0.80 + Math.random() * 0.16;
       mob.y = 0.30 + Math.random() * 0.42;
     }
-    // ultima rede: arena lotada -> canto direito (comportamento antigo)
+    // Última rede: nunca use coordenada fixa sem validar parede. Procura em
+    // toda a instância; se realmente não houver SQM livre, encerra a wave.
     if (cx === undefined || cy === undefined) {
-      cx = Math.min(GRID_W - 1, Math.floor(GRID_W * 0.72) + Math.floor(Math.random() * 5));
-      cy = 2 + Math.floor(Math.random() * (GRID_H - 4));
+      const fallbackOcc = buildOccupancy(c, null);
+      const safe = {};
+      const fx = Math.floor(GRID_W / 2), fy = Math.floor(GRID_H / 2);
+      if (placeFree(safe, fallbackOcc, fx, fy, Math.max(GRID_W, GRID_H))) {
+        cx = safe.cx; cy = safe.cy;
+      } else {
+        break;
+      }
     }
     c.pendingSpawns = c.pendingSpawns || [];
     c.pendingSpawns.push({
@@ -464,7 +471,10 @@ function nearestFreeCell(origin, occupied, prefer) {
 
 function resolveSQMOccupancy(c) {
   if (!c.player) return;
-  const occupied = new Set([cellKey(entityCell(c.player))]);
+  if (typeof ensureCell === "function") ensureCell(c.player);
+  if (typeof repairBlockedMapPosition === "function") repairBlockedMapPosition(c, c.player);
+  const occupied = new Set(typeof mapBlockKeys === "function" ? mapBlockKeys(c) : []);
+  occupied.add(cellKey(entityCell(c.player)));
   for (const m of c.mobs) {
     let cell = entityCell(m);
     if (!isCellFree(cell, occupied)) {

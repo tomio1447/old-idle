@@ -34,6 +34,7 @@ const ctx = {
   },
   huntMapBlocked(map, x, y) {
     if (!map || y < 0 || y >= map.rows.length || x < 0 || x >= map.rows[y].length) return true;
+    if (map.footprintBlocked && map.footprintBlocked[x + ':' + y]) return true;
     const entry = map.leg[map.rows[y][x]];
     return !entry || !!entry.bloc;
   },
@@ -54,6 +55,29 @@ must(!ctx.huntMapBlocked(iceMap, combat.player.cx, combat.player.cy),
 must(Math.abs(combat.player.x - (combat.player.cx + 0.5) / 24) < 1e-12 &&
      Math.abs(combat.player.y - (combat.player.cy + 0.5) / 16) < 1e-12,
   'Posição visual não foi normalizada pelo grid dinâmico');
+
+// O tile 10,2 é coberto pelo footprint 2×2 de uma parede ancorada ao lado:
+// antes ele era tratado como chão livre e monstros entravam dentro da sprite.
+must(iceMap.footprintBlocked['10:2'] &&
+     !iceMap.leg[iceMap.rows[2][10]].bloc && ctx.huntMapBlocked(iceMap, 10, 2),
+  'Footprint visual da parede não entrou na colisão');
+const intruder = { cx: 9, cy: 2, x: 9.5 / 24, y: 2.5 / 16,
+  sx: 9.5 / 24, sy: 2.5 / 16, hp: 100, maxHp: 100, moving: false };
+combat.mobs = [intruder];
+let occ = ctx.buildOccupancy(combat, intruder);
+must(!ctx.beginStep(intruder, { d: 'e', dx: 1, dy: 0, diag: false }, occ, false),
+  'Monstro conseguiu iniciar passo para dentro da parede');
+intruder.cx = 10; intruder.cy = 2;
+intruder.x = 10.5 / 24; intruder.y = 2.5 / 16;
+must(ctx.repairBlockedMapPosition(combat, intruder) &&
+     !ctx.huntMapBlocked(iceMap, intruder.cx, intruder.cy),
+  'Entidade já dentro da parede não foi resgatada');
+// Também não pode cortar diagonalmente a quina de uma parede.
+occ = new Map([['1:0', true]]);
+const corner = { cx: 0, cy: 0 };
+must(!ctx.beginStep(corner, { d: 'se', dx: 1, dy: 1, diag: true }, occ, false),
+  'Monstro cortou diagonalmente a quina da parede');
+combat.mobs = [];
 
 const iceView = vm.runInContext('centeredGridViewport(840, 520, 24, 16)', ctx);
 must(iceView.tile === 32.5 && iceView.width === 780 && iceView.height === 520,

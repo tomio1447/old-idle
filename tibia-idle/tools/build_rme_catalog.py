@@ -60,7 +60,7 @@ def recorte32(img):
     return base
 
 entries = []   # [id, walk, block, ground, page, idx, tw, th]
-flags_rt = {}  # id -> [walk, block] (runtime)
+flags_rt = {}  # id -> [walk, block, tw?, th?] (runtime)
 page = Image.new("RGBA", (COLS * 32, ROWS_PER_PAGE * 32), (0, 0, 0, 0))
 page_i = 0
 idx = 0
@@ -89,7 +89,9 @@ for cid in range(100, dat.item_count + 1):
     # registra flags de runtime mesmo para quem nao entra na paleta? nao:
     # sem sprite o jogo nao desenha, entao pinta o id invalido importado
     if w or b:
-        flags_rt[cid] = [w, b]
+        # Runtime também precisa do footprint para impedir criaturas de
+        # entrarem na parte visual de paredes/pilares multi-SQM.
+        flags_rt[cid] = [w, b, tw, th] if tw > 1 or th > 1 else [w, b]
     cx = idx % COLS
     cy = (idx // COLS) % ROWS_PER_PAGE
     if idx and idx % (COLS * ROWS_PER_PAGE) == 0:
@@ -140,9 +142,9 @@ with open(os.path.join(RME_DATA, "catalog.js"), "w") as f:
 
 # tileflags.js — colisao de runtime (ids com Ground ou NotWalkable)
 fl = "/* tileflags.js — GERADO por tools/build_rme_catalog.py.\n"
-fl += " * [walk, block] por item id, lidos do .dat 8.60 (thingtype.cpp).\n"
-fl += " * Colisao das hunts .otbm: celula bloqueada quando o chao nao e\n"
-fl += " * andavel ou algum item empilhado bloqueia. */\n"
+fl += " * [walk, block, tw?, th?] por item id, lidos do .dat 8.60.\n"
+fl += " * tw/th aparecem em sprites multi-SQM para a colisao cobrir o mesmo\n"
+fl += " * footprint visual desenhado pelo renderer OTBM. */\n"
 fl += '"use strict";\nwindow.TILEFLAGS = '
 fl += json.dumps({str(k): v for k, v in flags_rt.items()},
                  separators=(",", ":")) + ";\n"

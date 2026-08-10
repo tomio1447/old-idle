@@ -480,6 +480,34 @@
       Math.floor((targetW - map.w) / 2) + (Number(map.idleOffsetX) || 0)));
     var padY = Math.max(0, Math.min(targetH - map.h,
       Math.floor((targetH - map.h) / 2) + (Number(map.idleOffsetY) || 0)));
+
+    // Colisão do footprint visual. Um item bloqueante 2×2 é desenhado pelo
+    // renderer a partir da âncora inferior-direita, ocupando também os três
+    // SQMs acima/à esquerda. Bloquear apenas a âncora deixava monstros
+    // entrarem "dentro" da parede apesar de a sprite cobrir a célula.
+    var footprintBlocked = {};
+    Object.keys(map.cells || {}).forEach(function (key) {
+      var xy = key.split(","), sourceX = +xy[0], sourceY = +xy[1];
+      var cell = map.cells[key], gid = cell && cell.g;
+      if (!cell) return;
+      var groundFlags = gid ? tileflags[gid] : null;
+      var onWall = !!(groundFlags && groundFlags[0] === 0);
+      for (var fi = 0; fi < (cell.items || []).length; fi++) {
+        var itemFlags = tileflags[cell.items[fi]];
+        if (!itemFlags || !itemFlags[1]) continue;
+        var tw = Math.max(1, Number(itemFlags[2]) || 1);
+        var th = Math.max(1, Number(itemFlags[3]) || 1);
+        // Hangable já está preso a um chão-parede bloqueado e é centralizado
+        // pelo renderer; só objetos de chão estendem o footprint para trás.
+        if (onWall || (tw === 1 && th === 1)) continue;
+        var anchorX = sourceX + padX, anchorY = sourceY + padY;
+        for (var fy = 0; fy < th; fy++) for (var fx = 0; fx < tw; fx++) {
+          var bx = anchorX - fx, by = anchorY - fy;
+          if (bx >= 0 && by >= 0 && bx < targetW && by < targetH)
+            footprintBlocked[bx + ":" + by] = true;
+        }
+      }
+    });
     var rows = [];
     for (var y = 0; y < targetH; y++) {
       var row = "";
@@ -517,6 +545,7 @@
                 // desenhar qualquer mapa .otbm.
                 leg: legenda,
                 nome: map.name || "Mapa .otbm",
+                footprintBlocked: footprintBlocked,
                 otbm: true };
     if (map.spawn) out.spawn = { x: map.spawn.x + padX, y: map.spawn.y + padY };
     if (map.mob && map.mob.length) {

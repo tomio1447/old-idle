@@ -460,6 +460,7 @@ function updateGridMovement(c, p, dt, now) {
   const activeAlive = (!c.player.p || c.player.p.hp > 0) && (!p || p.hp > 0);
   if (activeAlive) {
     ensureCell(c.player);
+    repairBlockedMapPosition(c, c.player);
     // O jogador nao esta em MOBSHEETS (usa o catalogo de outfits), entao o
     // ensureCell nao consegue descobrir sozinho o tamanho do ciclo.
     if (typeof walkFrameCount === "function") c.player.walkFrames = walkFrameCount(p);
@@ -472,6 +473,14 @@ function updateGridMovement(c, p, dt, now) {
   for (const m of c.mobs) {
     m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt);
     ensureCell(m);
+    repairBlockedMapPosition(c, m);
+  }
+  if (c.players && c.players.length > 1) {
+    for (const e of c.players) {
+      if (!e || !e.p || e.p.hp <= 0) continue;
+      ensureCell(e);
+      repairBlockedMapPosition(c, e);
+    }
   }
 
   // Interpola somente entidade viva; corpse permanece imóvel no SQM da morte.

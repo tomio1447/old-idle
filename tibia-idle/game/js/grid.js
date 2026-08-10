@@ -170,25 +170,44 @@ function buildOccupancy(c, ignorar) {
    * respeitar paredes/agua sem precisar mudar nenhuma chamada. */
   for (const k of mapBlockKeys(c)) occ.set(k, true);
   if (c.player && c.player !== ignorar && (!c.player.p || c.player.p.hp > 0)) {
-    occ.set(c.player.cx + ":" + c.player.cy, c.player);
+    const key = c.player.cx + ":" + c.player.cy;
+    if (!occ.has(key)) occ.set(key, c.player); // nunca apaga uma parede
   }
   /* PARTY COMBAT: os aliados também ocupam tile (duas criaturas não
    * dividem SQM) — monstros e aliados desviam uns dos outros. */
   if (c.players && c.players.length > 1) {
     for (const e of c.players) {
       if (e === ignorar || !e.p || e.p.hp <= 0) continue;
-      if (e.cx !== undefined && e.cy !== undefined) occ.set(e.cx + ":" + e.cy, e);
+      if (e.cx !== undefined && e.cy !== undefined) {
+        const key = e.cx + ":" + e.cy;
+        if (!occ.has(key)) occ.set(key, e);
+      }
     }
   }
   for (const m of c.mobs) {
     if (m === ignorar || m.hp <= 0) continue;
-    occ.set(m.cx + ":" + m.cy, m);
+    const key = m.cx + ":" + m.cy;
+    if (!occ.has(key)) occ.set(key, m);
   }
   return occ;
 }
 
 function cellFree(occ, cx, cy) {
   return inBounds(cx, cy) && !occ.has(cx + ":" + cy);
+}
+
+function staticCellBlocked(occ, cx, cy) {
+  return occ.get(cx + ":" + cy) === true;
+}
+
+/* Diagonal não pode cortar a quina de uma parede. O destino livre sozinho
+ * não basta: visualmente a criatura atravessava os dois tiles ortogonais. */
+function stepCellFree(occ, cx, cy, dir) {
+  const nx = cx + dir.dx, ny = cy + dir.dy;
+  if (!cellFree(occ, nx, ny)) return false;
+  if (dir.diag && (staticCellBlocked(occ, nx, cy) ||
+                   staticCellBlocked(occ, cx, ny))) return false;
+  return true;
 }
 
 /* Converte celula -> posicao de tela (0..1), que e o que o render usa.
@@ -230,8 +249,9 @@ function ensureCell(ent) {
 
 /* Coloca a entidade numa celula livre proxima da desejada.
  * Usado no spawn: sem isso dois monstros nascem no mesmo tile. */
-function placeFree(ent, occ, cx, cy) {
-  for (let r = 0; r <= 6; r++) {
+function placeFree(ent, occ, cx, cy, maxRadius) {
+  const limit = maxRadius === undefined ? 6 : Math.max(0, maxRadius);
+  for (let r = 0; r <= limit; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -248,6 +268,25 @@ function placeFree(ent, occ, cx, cy) {
   return false;
 }
 
+/* Última barreira de segurança: saves antigos, teleporte/admin ou mudança
+ * de footprint podem deixar uma entidade numa parede já no início do tick.
+ * Reposiciona para o SQM livre mais próximo antes de qualquer interpolação. */
+function repairBlockedMapPosition(c, ent) {
+  if (!c || !ent || ent.cx === undefined || ent.cy === undefined ||
+      !c.huntMap || typeof huntMapBlocked !== "function" ||
+      !huntMapBlocked(c.huntMap, ent.cx, ent.cy)) return false;
+  const occ = buildOccupancy(c, ent);
+  const moved = placeFree(ent, occ, ent.cx, ent.cy, Math.max(GRID_W, GRID_H));
+  if (moved) {
+    ent.moving = false;
+    ent.stepT = 0;
+    ent.tx = ent.x; ent.ty = ent.y;
+    ent.sx = ent.x; ent.sy = ent.y;
+    ent.nextStepAt = 0;
+  }
+  return moved;
+}
+
 /* ------------------------------------------------------------ passo */
 
 /* Inicia um passo para a celula vizinha. O movimento na tela e so
@@ -255,7 +294,7 @@ function placeFree(ent, occ, cx, cy) {
  * "esta" no tile de destino assim que o passo comeca). */
 function beginStep(ent, dir, occ, alvoPerto) {
   const nx = ent.cx + dir.dx, ny = ent.cy + dir.dy;
-  if (!cellFree(occ, nx, ny)) return false;
+  if (!stepCellFree(occ, ent.cx, ent.cy, dir)) return false;
 
   occ.delete(ent.cx + ":" + ent.cy);
   const antes = cellToScreen(ent.cx, ent.cy);
@@ -354,10 +393,12 @@ function findPathGrid(ent, gx, gy, occ, maxNos) {
       const nx = atual.cx + d.dx, ny = atual.cy + d.dy;
       const nk = nx + ":" + ny;
       if (fechados.has(nk)) continue;
-      // o destino pode estar ocupado (e o alvo): aceita como chegada
+      // O destino pode estar ocupado pelo alvo, mas NUNCA por parede.
       const ehDestino = nx === gx && ny === gy;
-      if (!ehDestino && !cellFree(occ, nx, ny)) continue;
       if (!inBounds(nx, ny)) continue;
+      if (ehDestino ? staticCellBlocked(occ, nx, ny) : !cellFree(occ, nx, ny)) continue;
+      if (d.diag && (staticCellBlocked(occ, nx, atual.cy) ||
+                     staticCellBlocked(occ, atual.cx, ny))) continue;
       const g = atual.g + (d.diag ? WALK_DIAGONAL_EXTRA_COST : 1);
       if (custo.has(nk) && custo.get(nk) <= g) continue;
       custo.set(nk, g);
@@ -398,9 +439,8 @@ function stepTowardGreedy(ent, gx, gy, occ) {
   if (sy) { cand.push({ dx: 1, dy: sy, diag: true }); cand.push({ dx: -1, dy: sy, diag: true }); }
 
   for (const cd of cand) {
-    if (cellFree(occ, ent.cx + cd.dx, ent.cy + cd.dy)) {
-      return DIRS.find((d) => d.dx === cd.dx && d.dy === cd.dy) || null;
-    }
+    const dir = DIRS.find((d) => d.dx === cd.dx && d.dy === cd.dy) || null;
+    if (dir && stepCellFree(occ, ent.cx, ent.cy, dir)) return dir;
   }
   return null;
 }
@@ -417,9 +457,8 @@ function stepAway(ent, from, occ) {
     { dx: 0, dy: dy, diag: false },
   ];
   for (const cd of cand) {
-    if (cellFree(occ, ent.cx + cd.dx, ent.cy + cd.dy)) {
-      return DIRS.find((d) => d.dx === cd.dx && d.dy === cd.dy) || null;
-    }
+    const dir = DIRS.find((d) => d.dx === cd.dx && d.dy === cd.dy) || null;
+    if (dir && stepCellFree(occ, ent.cx, ent.cy, dir)) return dir;
   }
   return null;
 }
@@ -440,7 +479,7 @@ function danceStep(ent, alvo, occ, manterDistancia) {
     const nx = ent.cx + dir.dx, ny = ent.cy + dir.dy;
     const nd = Math.max(Math.abs(nx - alvo.cx), Math.abs(ny - alvo.cy));
     if (nd !== distAtual) return;          // tem que manter a distancia
-    if (!cellFree(occ, nx, ny)) return;
+    if (!stepCellFree(occ, ent.cx, ent.cy, dir)) return;
     opcoes.push(dir);
   };
 
@@ -460,7 +499,7 @@ function randomStep(ent, occ) {
   const ordem = [DIRS[0], DIRS[1], DIRS[2], DIRS[3]]
     .sort(() => Math.random() - 0.5);
   for (const d of ordem) {
-    if (cellFree(occ, ent.cx + d.dx, ent.cy + d.dy)) return d;
+    if (stepCellFree(occ, ent.cx, ent.cy, d)) return d;
   }
   return null;
 }

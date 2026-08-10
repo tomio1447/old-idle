@@ -117,9 +117,11 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts["amazon-
 
 /* Consulta de colisao do mapa (usada pelo grid.js) */
 function huntMapBlocked(map, cx, cy) {
-  if (!map || cy < 0 || cy >= map.rows.length) return false;
+  if (!map) return false;
+  if (cy < 0 || cy >= map.rows.length) return true;
   const row = map.rows[cy];
   if (cx < 0 || cx >= row.length) return true;
+  if (map.footprintBlocked && map.footprintBlocked[cx + ":" + cy]) return true;
   const L = map.leg[row[cx]];
   return !!(L && L.bloc);
 }
