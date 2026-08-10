@@ -162,6 +162,9 @@ def monster_idle(dat, spr, slug, looktype, dest):
         return None
     ds = durations(idle, frame_count)
     return {"cw": box[2] - box[0], "ch": box[3] - box[1],
+            "sw": max(group.width * 32 for group in obj.groups),
+            "sh": max(group.height * 32 for group in obj.groups),
+            "ox": box[0], "oy": box[1],
             "frames": frame_count, "durations": ds, "duration": sum(ds)}
 
 

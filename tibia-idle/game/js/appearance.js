@@ -262,6 +262,17 @@ function appDirRow(dir) {
   return r === undefined ? 2 : r;      // sem direcao conhecida: sul
 }
 
+function markSpriteAnchor(canvas, meta, sw, sh) {
+  if (!canvas || !meta) return canvas;
+  sw = Number(sw) || 64; sh = Number(sh) || 64;
+  canvas._spriteAnchor = {
+    sw, sh,
+    ox: meta.ox !== undefined ? Number(meta.ox) : sw - canvas.width,
+    oy: meta.oy !== undefined ? Number(meta.oy) : sh - canvas.height,
+  };
+  return canvas;
+}
+
 /* Compoe base + addons + cores num canvas. Devolve null enquanto carrega.
  *
  * Cada visual e um spritesheet de 4 linhas (direcoes) x 4 colunas (parado +
@@ -347,6 +358,7 @@ const AppearanceRenderer = {
       const tmp = this.celula(base, mask, renderMeta, col, linha, colors);
       if (tmp) cx.drawImage(tmp, 0, 0);
     }
+    markSpriteAnchor(cv, renderMeta, 64, 64);
     this.cache[k] = cv;
     return cv;
   },
@@ -375,6 +387,7 @@ const AppearanceRenderer = {
     cv.getContext("2d").drawImage(base,
       col * renderMeta.cw, linha * renderMeta.ch,
       renderMeta.cw, renderMeta.ch, 0, 0, renderMeta.cw, renderMeta.ch);
+    markSpriteAnchor(cv, renderMeta, 64, 64);
     this.cache[k] = cv;
     return cv;
   },
@@ -425,14 +438,27 @@ const AppearanceRenderer = {
    * desalinhava toda montaria com altura diferente. */
   montar(corpo, bicho, o, mnt) {
     const subir = o.dy || 0;
-    const w = Math.max(corpo.width, bicho.width);
-    const h = Math.max(bicho.height, corpo.height + subir);
+    const ca = corpo._spriteAnchor || { sw:64, sh:64, ox:64-corpo.width, oy:64-corpo.height };
+    const ma = bicho._spriteAnchor || { sw:64, sh:64, ox:64-bicho.width, oy:64-bicho.height };
+    const fullW = Math.max(ca.sw, ma.sw);
+    const fullH = Math.max(ma.sh, ca.sh + subir);
+    // Posições dos recortes dentro de um canvas lógico comum, com os dois
+    // frame groups ancorados pelo canto inferior-direito do SQM.
+    const mountX = fullW - ma.sw + ma.ox;
+    const mountY = fullH - ma.sh + ma.oy;
+    const bodyX = fullW - ca.sw + ca.ox;
+    const bodyY = fullH - ca.sh - subir + ca.oy;
+    const minX = Math.min(mountX, bodyX);
+    const minY = Math.min(mountY, bodyY);
+    const maxX = Math.max(mountX + bicho.width, bodyX + corpo.width);
+    const maxY = Math.max(mountY + bicho.height, bodyY + corpo.height);
     const cv = document.createElement("canvas");
-    cv.width = w; cv.height = h;
+    cv.width = Math.max(1, Math.ceil(maxX - minX));
+    cv.height = Math.max(1, Math.ceil(maxY - minY));
     const cx = cv.getContext("2d");
-    // o bicho encosta no chao; o personagem sobe o deslocamento da outfit
-    cx.drawImage(bicho, (w - bicho.width) / 2, h - bicho.height);
-    cx.drawImage(corpo, (w - corpo.width) / 2, h - corpo.height - subir);
+    cx.drawImage(bicho, mountX - minX, mountY - minY);
+    cx.drawImage(corpo, bodyX - minX, bodyY - minY);
+    cv._spriteAnchor = { sw:fullW, sh:fullH, ox:minX, oy:minY };
     return cv;
   },
 
