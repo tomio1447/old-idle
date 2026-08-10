@@ -226,7 +226,7 @@ function cycloItems(p, el) {
         const e = p.equip[s];
         const it = GAMEDATA.items[e.item];
         return `<div class="cyclo-cell ${itemClsBorder(e.item)}" title="${it ? it.n : e.item}">
-          <img src="assets/item/${e.item}.png" alt="">
+          ${itemImg(e.item, 32)}
           <div class="tiny dim">${s}</div>
         </div>`;
       }).join("") || `<div class="dim tiny">Nada equipado.</div>`}
@@ -237,7 +237,7 @@ function cycloItems(p, el) {
         const it = GAMEDATA.items[slug];
         const n = p.bag[slug];
         return `<div class="cyclo-cell ${itemClsBorder(slug)}" title="${it ? it.n : slug}">
-          <img src="assets/item/${slug}.png" alt="">
+          ${itemImg(slug, 32)}
           ${n > 1 ? `<span class="cyclo-qtd">${n}</span>` : ""}
         </div>`;
       }).join("") || `<div class="dim tiny">Mochila vazia.</div>`}`;
@@ -594,8 +594,7 @@ function cycloBestiaryDetail(p, el, slug) {
           ? (m.loot || []).filter((l) => l.item).map((l) => `
               <div class="stat-row">
                 <span class="k">
-                  <img src="assets/item/${l.item}.png"
-                       style="width:14px;height:14px;vertical-align:-3px"> 
+                  ${itemImg(l.item, 14)}
                   ${itemName(l.item)}</span>
                 <span class="v">${l.chance}%${l.max > 1 ? " ·até " + l.max : ""}</span>
               </div>`).join("") || `<div class="tiny dim">Sem loot.</div>`
