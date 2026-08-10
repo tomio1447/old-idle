@@ -89,7 +89,8 @@ def ids_do_canary_otbm(data, path):
     """IDs do OTBM moderno do Canary Map Editor (header u32 zero).
 
     Node ids modernos: 0 header, 2 map data, 4 tile area, 5 tile e 6 item.
-    A leitura é intencionalmente restrita ao andar z=7 do mapa importado.
+    Coleta todos os andares publicados: hunts usam normalmente z=2, enquanto
+    mapas de cidade/templo podem usar z=7.
     """
     r = Rdr(data)
     r.i = 4
@@ -104,7 +105,7 @@ def ids_do_canary_otbm(data, path):
             r.u16()
         elif aid == 9:
             ground = r.u16()
-            if ctx.get("z") == 7:
+            if ctx.get("z") is not None:
                 ids.add(ground)
         elif aid == 8:
             r.u16(); r.u16(); r.u8()
@@ -126,7 +127,7 @@ def ids_do_canary_otbm(data, path):
             r.u8(); r.u8()
         elif typ == 6:
             item = r.u16()
-            if child.get("z") == 7:
+            if child.get("z") is not None:
                 ids.add(item)
 
         while True:

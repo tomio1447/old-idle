@@ -505,13 +505,14 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
   drawCreatureSpeech(ctx, this.playerTalk, x, y, dt);
 };
 
-Renderer.prototype.addEffect = function (x, y, name, customDurMs) {
+Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
   let n = fxFrameCount(name);
   if (!n) { name = "draw-blood"; n = fxFrameCount(name) || 4; }
   // Os efeitos oficiais importados da TibiaWiki têm durações diferentes;
   // quando não há duração customizada, usa ~55ms por quadro com teto seguro.
   this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: n, dur: customDurMs || Math.max(300, Math.min(900, n * 55)) });
+                      frames: n, dur: customDurMs || Math.max(300, Math.min(900, n * 55)),
+                      scale: Math.max(0.1, Number(customScale) || 1) });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
   // as primeiras eram descartadas antes de aparecer. 120 cabe a maior
   // matriz do jogo com folga e ainda protege contra vazamento.
@@ -1300,7 +1301,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
     // parecia solta do grid.
-    const sc = tibiaScale(W);
+    const sc = tibiaScale(W) * (e.scale || 1);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
                   e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
                   fw * sc, img.naturalHeight * sc);
@@ -1553,7 +1554,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
     // parecia solta do grid.
-    const sc = tibiaScale(W);
+    const sc = tibiaScale(W) * (e.scale || 1);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
                   e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
                   fw * sc, img.naturalHeight * sc);

@@ -52,6 +52,31 @@
   if (GAMEDATA.hunts["marapur-nagas"]) harden(GAMEDATA.hunts["marapur-nagas"]);
   if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
 
+  // Sala oficial da Timira. O OTBM completo inclui as âncoras externas em
+  // (174,157,2)..(194,175,2); `otbmRoomBounds` documenta apenas a arena
+  // lógica e não recorta paredes/objetos do arquivo.
+  GAMEDATA.hunts["timira-room"] = {
+    name: "Timira's Room",
+    hidden: true,
+    level: 250,
+    minLevel: 250,
+    monsters: ["timira-the-many-headed"],
+    color: "#78bfa8",
+    scene: "palace",
+    otbm: "timiraroom",
+    otbmRoomBounds: { x:175, y:159, w:19, h:17, z:2 },
+    otbmMobBounds: { x:184, y:162, w:1, h:1, z:2 },
+    otbmSpawn: { x:182, y:170, z:2 },
+    avgHp: 75000,
+    avgExp: 45500,
+    avgDamage: 600,
+    avgArmor: 82,
+    avgGold: 100,
+    respawn: 1,
+    pack: 1,
+    cat: "boss-room",
+  };
+
   GAMEDATA.hunts["cobra-bastion"] = harden({
     name: "Cobra Bastion",
     level: 250,
