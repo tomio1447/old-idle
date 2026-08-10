@@ -139,43 +139,53 @@ function tileVariant(ids, cx, cy) {
   return ids[(cx * 31 + cy * 17) % ids.length];
 }
 
-/* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate) */
-function drawTileCharMap(ctx, map, W, H, cols, rows) {
+/* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate).
+ * mode:
+ *   'all'      -> chão + objetos (comportamento original, usado pela cidade)
+ *   'ground'   -> só o chão (desenhado ANTES das criaturas)
+ *   'objects'  -> só paredes/móveis/deco (desenhado DEPOIS das criaturas,
+ *                 para pilares/muros sobreporem monstros como no client) */
+function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
+  if (mode === undefined) mode = "all";
   const tw = W / cols, th = H / rows;
-  ctx.fillStyle = "#060806";
-  ctx.fillRect(0, 0, W, H);
-  // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
-  // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
-  // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.
-  // Primeira passagem: todos os pisos, sempre atrás de objetos grandes.
-  for (let y = 0; y < rows && y < map.rows.length; y++) {
-    const row = map.rows[y];
-    for (let x = 0; x < cols && x < row.length; x++) {
-      const L = map.leg[row[x]];
-      if (!L || !L.v || !L.v.length) continue;
-      TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
+  if (mode !== "objects") {
+    ctx.fillStyle = "#060806";
+    ctx.fillRect(0, 0, W, H);
+    // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
+    // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
+    // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.
+    // Primeira passagem: todos os pisos, sempre atrás de objetos grandes.
+    for (let y = 0; y < rows && y < map.rows.length; y++) {
+      const row = map.rows[y];
+      for (let x = 0; x < cols && x < row.length; x++) {
+        const L = map.leg[row[x]];
+        if (!L || !L.v || !L.v.length) continue;
+        TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
+      }
     }
   }
-  // Segunda passagem: paredes, móveis e objetos 2×2/1×2. Nenhum piso pode
-  // mais apagar suas partes que avançam sobre SQMs vizinhos.
-  for (let y = 0; y < rows && y < map.rows.length; y++) {
-    const row = map.rows[y];
-    for (let x = 0; x < cols && x < row.length; x++) {
-      const L = map.leg[row[x]];
-      if (!L || !L.g) continue;
-      // Célula é PAREDE? (chão não andável = muro). Itens nela são
-      // "hangables" (fogueiras, estantes) e ficam centralizados no muro.
-      const isWall = !!(L.v && L.v.some(function (id) {
-        const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
-        return f && f[0] === 0;
-      }));
-      // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
-      // decoração/base do SQM, não âncora de ground. Isso preserva a
-      // sobreposição natural de objetos multi-SQM do client.
-      for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, isWall);
+  if (mode !== "ground") {
+    // Segunda passagem: paredes, móveis e objetos 2×2/1×2. Nenhum piso pode
+    // mais apagar suas partes que avançam sobre SQMs vizinhos.
+    for (let y = 0; y < rows && y < map.rows.length; y++) {
+      const row = map.rows[y];
+      for (let x = 0; x < cols && x < row.length; x++) {
+        const L = map.leg[row[x]];
+        if (!L || !L.g) continue;
+        // Célula é PAREDE? (chão não andável = muro). Itens nela são
+        // "hangables" (fogueiras, estantes) e ficam centralizados no muro.
+        const isWall = !!(L.v && L.v.some(function (id) {
+          const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+          return f && f[0] === 0;
+        }));
+        // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
+        // decoração/base do SQM, não âncora de ground. Isso preserva a
+        // sobreposição natural de objetos multi-SQM do client.
+        for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, isWall);
+      }
     }
+    // Terceira passagem: decoração explícita acima das camadas OTBM.
+    for (const d of map.deco || [])
+      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw);
   }
-  // Terceira passagem: decoração explícita acima das camadas OTBM.
-  for (const d of map.deco || [])
-    TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw);
 }

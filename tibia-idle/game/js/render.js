@@ -1312,8 +1312,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // `combat` pode ser null numa transicao de hunt (stopHunt/startHunt em
   // andamento) — protege o acesso a huntMap para nao estourar o render.
   if (combat && combat.huntMap && typeof drawTileCharMap === "function") {
-    /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais */
-    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H);
+    /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais.
+     * Só o CHÃO aqui; paredes/pilares/objetos são desenhados DEPOIS das
+     * criaturas (abaixo) para sobreporem monstros como no client. */
+    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H, "ground");
   } else if (scene === "sewer") {
     drawRookgaardSewer(ctx, W, H);
   } else if (hunt && combat.huntId === "spiders") {
@@ -1398,6 +1400,12 @@ Renderer.prototype.draw = function (combat, player, dt) {
     else ctx.drawImage(img, origin.x, origin.y, w, h);
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
+
+  // --- objetos do mapa (paredes, pilares, móveis) POR CIMA das criaturas.
+  // No client, paredes/pilares altos cobrem criaturas que estão atrás/dentro
+  // do seu footprint; a healthbar (abaixo) fica acima de tudo.
+  if (combat && combat.huntMap && typeof drawTileCharMap === "function")
+    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H, "objects");
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
   const occupiedLabels = [];
