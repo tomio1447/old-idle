@@ -2274,19 +2274,6 @@ function renderTopbar(p) {
     forgeBtn.style.borderColor = atCap ? "#d4af37" : "";
     forgeBtn.title = atCap ? `Dust no limite (${p.dust}/${p.dustLimit})` : "Abrir Exaltation Forge";
   }
-  const c = G.combat;
-  if (G.training) {
-    $("#xph").textContent = "treino";
-    $("#gph").textContent = "0";
-    $("#session").textContent = fmtTime(G.training.time / 1000);
-    $("#kills").textContent = fmtFull(G.training.stats.hits);
-  } else if (c && c.stats.time > 3000) {
-    const hrs = c.stats.time / 3600000;
-    $("#xph").textContent = fmt(c.stats.exp / hrs);
-    $("#gph").textContent = fmt(Math.max(0, (c.stats.gold - c.stats.supplyCost) / hrs));
-    $("#session").textContent = fmtTime(c.stats.time / 1000);
-    $("#kills").textContent = fmtFull(c.stats.kills);
-  }
 }
 
 /* Atalhos para os NPCs da cidade */

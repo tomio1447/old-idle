@@ -1060,12 +1060,12 @@ div.item-sprite { background-repeat: no-repeat; }
 
 /* ---------------------------------------------------------- imbuement */
 #btn-imbue {
-  display: inline-flex; flex-direction: column; align-items: center;
-  gap: 0; padding: 1px 6px; line-height: 1;
+  display: inline-flex; flex-direction: row; align-items: center;
+  gap: 4px; padding: 1px 6px; line-height: 1;
 }
-#btn-imbue img { width: 26px; height: 26px; image-rendering: pixelated; }
-#btn-imbue span { font-size: 7.5px; letter-spacing: .6px; font-weight: 700;
-  color: #e8d9a8; margin-top: -1px; }
+#btn-imbue img { width: 20px; height: 20px; image-rendering: pixelated; flex:none; }
+#btn-imbue span { font-size: 8.5px; letter-spacing: .5px; font-weight: 700;
+  color: #e8d9a8; margin: 0; white-space: nowrap; }
 
 .imb-grid {
   display: grid; grid-template-columns: 190px 1fr 240px; gap: 10px;
@@ -1516,11 +1516,12 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 
 /* ============================ Sistema de Prey ============================ */
 .prey-btn-gif {
-  width: 18px; height: 18px;
-  vertical-align: -3px; margin-right: 4px;
+  width: 16px; height: 28px; object-fit: contain;
+  margin-right: 2px; flex: none;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 3px rgba(255,214,90,.6));
 }
+#btn-prey { display:inline-flex; align-items:center; gap:2px; white-space:nowrap; }
 #btn-prey img.prey-btn-gif { display: inline-block; }
 
 

@@ -148,8 +148,12 @@ function renderRewardButton(p) {
   const badge = document.getElementById("reward-badge");
   if (!btn || !badge) return;
   const n = rewardChestBundleList(p).length;
-  badge.textContent = n || "";
-  badge.style.display = n ? "" : "none";
+  // Reserva o espaço do badge mesmo vazio para os botões da topbar não
+  // saltarem para o lado quando uma recompensa é aberta ou recolhida.
+  badge.textContent = n || "0";
+  badge.style.display = "inline-block";
+  badge.style.visibility = n ? "visible" : "hidden";
+  badge.setAttribute("aria-hidden", n ? "false" : "true");
   btn.title = n ? `Reward Chest — ${n} boss(es) aguardando abertura`
                 : "Reward Chest — drops de boss";
 }
@@ -175,6 +179,8 @@ function openRewardChest(bundleId) {
   const itens = bundle ? rewardChestItems(p, bundle.id) : [];
   const total = itens.reduce((sum,i) => sum + i.count, 0);
   const box = $("#modal-body");
+  box.classList.remove("boss-modal-shell");
+  box.classList.add("reward-modal-shell");
 
   box.innerHTML = `<div class="reward-chest-custom">
     <div class="panel-title reward-chest-title">
@@ -208,7 +214,10 @@ function openRewardChest(bundleId) {
   </div>`;
 
   $("#modal").classList.add("show");
-  $("#reward-close").addEventListener("click", () => $("#modal").classList.remove("show"));
+  $("#reward-close").addEventListener("click", () => {
+    $("#modal").classList.remove("show");
+    box.classList.remove("reward-modal-shell");
+  });
   const back = $("#reward-back");
   if (back) back.addEventListener("click", () => openRewardChest());
   $$("#modal-body [data-reward-boss]").forEach((b) =>
