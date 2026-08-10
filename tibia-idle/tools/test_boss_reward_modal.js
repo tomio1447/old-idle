@@ -5,6 +5,8 @@ const vm = require('vm');
 const game = path.join(__dirname, '..', 'game');
 const gameJs = fs.readFileSync(path.join(game,'js','game.js'),'utf8');
 const rewardJs = fs.readFileSync(path.join(game,'js','reward-chest.js'),'utf8');
+const uiJs = fs.readFileSync(path.join(game,'js','ui.js'),'utf8');
+const forgeUiJs = fs.readFileSync(path.join(game,'js','forge-ui.js'),'utf8');
 const css = fs.readFileSync(path.join(game,'css','layout.css'),'utf8');
 const indexHtml = fs.readFileSync(path.join(game,'index.html'),'utf8');
 function must(ok,msg){ if(!ok) throw Error(msg); }
@@ -42,6 +44,27 @@ must(css.includes('#btn-imbue {') && css.includes('flex-direction: row'),
   'Ícone de Imbuements não fica ao lado do texto');
 must(rewardJs.includes('badge.style.visibility = n ? "visible" : "hidden"'),
   'Badge do Reward Chest ainda desloca a linha de botões');
+must(uiJs.includes('function bindFullItemTooltip') &&
+     uiJs.includes('showTip(itemTip(slug, extra || "", slot || null, instId || null))'),
+  'Drops não reutilizam o tooltip completo do inventário');
+must(rewardJs.includes('bindFullItemTooltip(b, slug') &&
+     rewardJs.includes('itemClsBorder(i.slug)'),
+  'Reward Chest não mantém tooltip/borda de classificação');
+must(gameJs.includes('data-boss-drop=') && gameJs.includes('itemClsBorder(l.item)') &&
+     gameJs.includes('bindFullItemTooltip(el, drop.item'),
+  'Loot do card de boss não mantém tooltip/borda de classificação');
+for (const cls of [2,3,4]) {
+  must(css.includes(`.reward-slot.cls-${cls}`) && css.includes(`.hunt-loot-slot.cls-${cls}`),
+    'Borda de classificação ausente nos drops cls-' + cls);
+}
+const coreGif = fs.readFileSync(path.join(game,'assets','item','exalted-core.gif'));
+must(coreGif.subarray(0,6).toString() === 'GIF89a' && coreGif.includes(Buffer.from('NETSCAPE2.0')),
+  'Exalted Core não é um GIF animado');
+must(indexHtml.includes('<img src="assets/item/exalted-core.gif" class="forge-btn-icon"') &&
+     !indexHtml.includes('>⚒ FORGE</button>') && forgeUiJs.includes('forge-btn-icon'),
+  'Botão FORGE não usa o Exalted Core animado');
+must(css.includes('.forge-btn-icon') && css.includes('#btn-forge { display:inline-flex'),
+  'CSS do ícone animado da Forja ausente');
 must(gameJs.includes('hunt-best-card boss-best-card') &&
      gameJs.includes('hunt-best-loot boss-best-loot') &&
      gameJs.includes('% de chance'),
@@ -82,4 +105,4 @@ must(ctx.rewardChestClaimBundle(p,'fight-2')===1 && p.lootPouch.a===6 && !p.rewa
 must(ctx.rewardChestClaimAll(p)===1 && p.lootPouch.b===3 && !ctx.rewardChestBundleList(p).length,
   'Coleta total quebrou');
 
-console.log('OK: bosses sem requisitos/cooldown; modal, topbar e Reward Chest estáveis.');
+console.log('OK: drops com tooltip completo/classificação e Forja com Exalted Core animado.');

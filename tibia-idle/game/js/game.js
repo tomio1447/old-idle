@@ -887,7 +887,9 @@ function openBossModal(id) {
   const lootHtml = drops.map((l) => {
     const name = itemName(l.item);
     const title = `${name} · ${l.chance}% de chance${l.max > 1 ? ` · até ${l.max}x` : ""}`;
-    return `<div class="hunt-loot-slot" title="${title}">${itemImg(l.item, 28)}</div>`;
+    const border = typeof itemClsBorder === "function" ? itemClsBorder(l.item) : "";
+    return `<div class="hunt-loot-slot ${border}" data-boss-drop="${l.item}"
+      aria-label="${title}">${itemImg(l.item, 28)}</div>`;
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
   const modalBox = $("#modal-body");
@@ -918,7 +920,15 @@ function openBossModal(id) {
       <div class="tiny dim mt8 center">O loot vai para o
         <img src="assets/item/reward-chest.png" class="boss-reward-inline" alt="Reward Chest"> Reward Chest.</div>
     </div>`;
+  $$("#modal-body [data-boss-drop]").forEach((el, index) => {
+    const drop = drops[index];
+    if (!drop || typeof bindFullItemTooltip !== "function") return;
+    bindFullItemTooltip(el, drop.item,
+      `Drop de ${boss.name} · ${drop.chance}% de chance${
+        drop.max > 1 ? ` · até ${drop.max}x` : ""}`);
+  });
   const closeBossModal = () => {
+    if (typeof hideTip === "function") hideTip();
     $("#modal").classList.remove("show");
     modalBox.classList.remove("boss-modal-shell");
   };

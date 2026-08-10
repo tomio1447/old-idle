@@ -599,21 +599,27 @@ button.full { width: 100%; }
 .inv-item.locked { border-color: #d4af37; box-shadow: inset 0 0 0 1px rgba(212,175,55,.35); }
 
 /* Bordas de classificação (forja) — moldura estilo Tibia 3D */
-.inv-item.cls-4, .slot.cls-4, .item-row.cls-4, .cyclo-cell.cls-4 {
+.inv-item.cls-4, .slot.cls-4, .item-row.cls-4, .cyclo-cell.cls-4,
+.reward-slot.cls-4, .hunt-loot-slot.cls-4 {
   border-color: #b09a4a #5a4a1a #5a4a1a #b09a4a !important;
   box-shadow: inset 0 0 3px rgba(212, 175, 55, .35);
 }
-.inv-item.cls-3, .slot.cls-3, .item-row.cls-3, .cyclo-cell.cls-3 {
+.inv-item.cls-3, .slot.cls-3, .item-row.cls-3, .cyclo-cell.cls-3,
+.reward-slot.cls-3, .hunt-loot-slot.cls-3 {
   border-color: #9a5ab0 #3a1a5a #3a1a5a #9a5ab0 !important;
   box-shadow: inset 0 0 3px rgba(160, 80, 200, .35);
 }
-.inv-item.cls-2, .slot.cls-2, .item-row.cls-2, .cyclo-cell.cls-2 {
+.inv-item.cls-2, .slot.cls-2, .item-row.cls-2, .cyclo-cell.cls-2,
+.reward-slot.cls-2, .hunt-loot-slot.cls-2 {
   border-color: #4a6ab0 #1a2a5a #1a2a5a #4a6ab0 !important;
   box-shadow: inset 0 0 3px rgba(60, 100, 200, .35);
 }
-.inv-item.cls-4:hover, .slot.cls-4:hover, .item-row.cls-4:hover { border-color: #d4af37 #8a6a2a #8a6a2a #d4af37 !important; }
-.inv-item.cls-3:hover, .slot.cls-3:hover, .item-row.cls-3:hover { border-color: #b870d8 #5a2a7a #5a2a7a #b870d8 !important; }
-.inv-item.cls-2:hover, .slot.cls-2:hover, .item-row.cls-2:hover { border-color: #6a8ad8 #2a3a7a #2a3a7a #6a8ad8 !important; }
+.inv-item.cls-4:hover, .slot.cls-4:hover, .item-row.cls-4:hover,
+.reward-slot.cls-4:hover, .hunt-loot-slot.cls-4:hover { border-color: #d4af37 #8a6a2a #8a6a2a #d4af37 !important; }
+.inv-item.cls-3:hover, .slot.cls-3:hover, .item-row.cls-3:hover,
+.reward-slot.cls-3:hover, .hunt-loot-slot.cls-3:hover { border-color: #b870d8 #5a2a7a #5a2a7a #b870d8 !important; }
+.inv-item.cls-2:hover, .slot.cls-2:hover, .item-row.cls-2:hover,
+.reward-slot.cls-2:hover, .hunt-loot-slot.cls-2:hover { border-color: #6a8ad8 #2a3a7a #2a3a7a #6a8ad8 !important; }
 .inv-item img { max-width: 32px; max-height: 32px; }
 .inv-item .cnt {
   position: absolute; right: 1px; bottom: 0; font-size: 9px;
@@ -1268,6 +1274,13 @@ div.item-sprite { background-repeat: no-repeat; }
 #btn-imbue img { width: 20px; height: 20px; image-rendering: pixelated; flex:none; }
 #btn-imbue span { font-size: 8.5px; letter-spacing: .5px; font-weight: 700;
   color: #e8d9a8; margin: 0; white-space: nowrap; }
+
+/* O GIF do Exalted Core mantém a animação original no botão da Forja. */
+#btn-forge { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+.forge-btn-icon {
+  width:20px; height:20px; object-fit:contain; flex:none;
+  image-rendering:pixelated; filter:drop-shadow(0 0 3px rgba(212,175,55,.55));
+}
 
 .imb-grid {
   display: grid; grid-template-columns: 190px 1fr 240px; gap: 10px;

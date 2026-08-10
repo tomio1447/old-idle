@@ -199,7 +199,7 @@ function openRewardChest(bundleId) {
         </div>
         <div class="reward-slot-grid">
           ${itens.map((i) => `<button class="reward-slot ${typeof itemClsBorder === "function" ? itemClsBorder(i.slug) : ""}"
-                    data-reward-claim="${i.slug}" title="${i.it ? i.it.n : i.slug} · ${fmtFull(i.count)}x">
+                    data-reward-claim="${i.slug}" aria-label="${i.it ? i.it.n : i.slug} · ${fmtFull(i.count)}x">
               <span class="reward-slot-art">${itemImg(i.slug)}</span>
               <b class="reward-slot-count">${fmtFull(i.count)}</b>
             </button>`).join("")}
@@ -215,25 +215,38 @@ function openRewardChest(bundleId) {
 
   $("#modal").classList.add("show");
   $("#reward-close").addEventListener("click", () => {
+    if (typeof hideTip === "function") hideTip();
     $("#modal").classList.remove("show");
     box.classList.remove("reward-modal-shell");
   });
   const back = $("#reward-back");
-  if (back) back.addEventListener("click", () => openRewardChest());
+  if (back) back.addEventListener("click", () => {
+    if (typeof hideTip === "function") hideTip();
+    openRewardChest();
+  });
   $$("#modal-body [data-reward-boss]").forEach((b) =>
     b.addEventListener("click", () => openRewardChest(b.dataset.rewardBoss)));
   const all = $("#reward-claim-all");
   if (all && bundle) all.addEventListener("click", () => {
+    if (typeof hideTip === "function") hideTip();
     const n = rewardChestClaimBundle(p, bundle.id);
     toast(`Recolhido <b>${n}</b> tipo(s) para a Loot Pouch.`);
     openRewardChest();
   });
-  $$("#modal-body [data-reward-claim]").forEach((b) =>
+  $$("#modal-body [data-reward-claim]").forEach((b) => {
+    const slug = b.dataset.rewardClaim;
+    const rewardItem = itens.find((i) => i.slug === slug);
+    if (typeof bindFullItemTooltip === "function") {
+      bindFullItemTooltip(b, slug,
+        `Reward Chest · ${fmtFull(rewardItem ? rewardItem.count : 0)}x · clique para recolher`);
+    }
     b.addEventListener("click", () => {
-      rewardChestClaimOne(p, b.dataset.rewardClaim, bundle && bundle.id);
+      if (typeof hideTip === "function") hideTip();
+      rewardChestClaimOne(p, slug, bundle && bundle.id);
       toast("Item recolhido para a Loot Pouch.");
       openRewardChest(bundle && rewardChestFindBundle(p, bundle.id) ? bundle.id : undefined);
-    }));
+    });
+  });
 }
 
 function bindRewardButton() {
