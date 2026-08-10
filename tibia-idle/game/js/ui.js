@@ -91,6 +91,17 @@ function showTip(html) {
 }
 function hideTip() { tooltip.el.style.display = "none"; }
 
+/* Liga qualquer slot de loot ao mesmo tooltip completo usado pelos itens
+ * equipados e pela mochila. `extra` acrescenta apenas o contexto do drop;
+ * atributos, requisitos, classificação, augments e imbuements vêm de
+ * itemTip(), sem uma segunda descrição simplificada para manter. */
+function bindFullItemTooltip(el, slug, extra, slot, instId) {
+  if (!el || !slug) return;
+  el.addEventListener("mouseenter", () =>
+    showTip(itemTip(slug, extra || "", slot || null, instId || null)));
+  el.addEventListener("mouseleave", hideTip);
+}
+
 /* Tooltip completo de um item.
  *
  * Mostra na ordem do client: ataque (fisico + elemento), bonus de skill,

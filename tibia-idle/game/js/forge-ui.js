@@ -578,6 +578,8 @@ function openLegacyExaItemMenu(p, ref, el) {
 }
 
 function renderForgeTopbar() {
-  return '<button class="sm" id="btn-forge" title="Exaltation Forge">FORGE</button>'
+  return '<button class="sm" id="btn-forge" title="Exaltation Forge">'
+    + '<img src="assets/item/exalted-core.gif" class="forge-btn-icon" alt="Exalted Core">'
+    + '<span>FORGE</span></button>'
     + '<button class="sm" id="btn-depot" title="Depot">DEPOT</button>';
 }
