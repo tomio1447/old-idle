@@ -35,7 +35,8 @@ const SCARLETT_TRAVEL_MS = 2200;
   GAMEDATA.hunts["scarlett-room"] = {
     name: "Scarlett's Room", hidden: true, level: 250,
     monsters: [SCARLETT_ID], scene: "palace", otbm: "scarlet_room",
-    otbmBounds: { x:174, y:160, w:20, h:13, z:2 },
+    // Usa o mapa nativo 24×16: as paredes estão ancoradas fora do retângulo
+    // interno da arena e desapareciam quando o arquivo era recortado.
     otbmSpawn: { x:176, y:169, z:2 },
     otbmMobBounds: { x:191, y:165, w:1, h:1, z:2 },
     avgHp:30000, avgExp:20000, avgDamage:1200, avgArmor:88,
@@ -52,7 +53,7 @@ const SCARLETT_TRAVEL_MS = 2200;
     hp: 30000, exp: 20000, damage: 1200, armor: 88, defense: 88,
     speed: 0.000065,
     requirement: { level:250, text:"Requer nível 250+ (Cobra Bastion)" },
-    cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 16 * 3600 * 1000,
+    cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 0,
     mechanic: "direction-qte",
     noRevive: true,
     // Sem lista própria: bossLootReal usa o loot integral do MONSTERDATA.

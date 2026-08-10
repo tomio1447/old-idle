@@ -75,32 +75,36 @@ const boss = ctx.BOSS_DEFS['scarlett-etzel'];
 const room = ctx.GAMEDATA.hunts['scarlett-room'];
 must(boss && boss.hunt === 'scarlett-room' && boss.noRevive && boss.mechanic === 'direction-qte',
   'Scarlett não foi registrada como boss QTE sem revive');
-must(room.hidden && JSON.stringify(room.otbmBounds) === JSON.stringify({x:174,y:160,w:20,h:13,z:2}) &&
+must(room.hidden && !room.otbmBounds &&
   JSON.stringify(room.otbmSpawn) === JSON.stringify({x:176,y:169,z:2}) &&
   JSON.stringify(room.otbmMobBounds) === JSON.stringify({x:191,y:165,w:1,h:1,z:2}),
   'Coordenadas da arena/spawns da Scarlett incorretas');
 
-// Mapa publicado, recorte 20×13 e posições locais/padding corretos.
+// Mapa publicado inteiro: as paredes ficam nas bordas externas 24×16.
 const beta = fs.readFileSync(path.join(game,'beta-maps','bossesroom','scarlet_room.otbm'));
 const runtime = fs.readFileSync(path.join(game,'maps','scarlet_room.otbm'));
 must(beta.equals(runtime), 'scarlet_room beta não foi publicado em maps/');
 let map = OTBM.read(runtime);
 must(map.w === 24 && map.h === 16 && map.z === 2, 'Mapa fonte Scarlett inesperado');
-map = OTBM.crop(map, room.otbmBounds);
 const zoneSrc = fs.readFileSync(path.join(js,'otbmhunt.js'),'utf8');
 const zs = zoneSrc.indexOf('function applyHuntOtbmZones');
 const ze = zoneSrc.indexOf('\n\n/* Garante', zs);
 vm.runInContext(zoneSrc.slice(zs,ze), ctx);
 ctx.applyHuntOtbmZones(map, room);
-must(map.spawn.x === 2 && map.spawn.y === 9 && map.mob[0].x === 17 && map.mob[0].y === 5,
+must(map.spawn.x === 4 && map.spawn.y === 11 && map.mob[0].x === 19 && map.mob[0].y === 7,
   'Coordenadas absolutas não viraram posições locais corretas');
 vm.runInContext(fs.readFileSync(path.join(js,'tileflags.js'),'utf8'), ctx);
 const hm = OTBM.huntMapFromOtbm(map, ctx.TILEFLAGS);
-must(hm.rows.length === 15 && hm.rows.every(r => r.length === 24), 'Arena runtime não é 24×15');
-must(hm.spawn.x === 4 && hm.spawn.y === 10 && hm.mob[0].x === 19 && hm.mob[0].y === 6,
-  'Padding alterou spawn de player/boss');
+must(hm.rows.length === 16 && hm.rows.every(r => r.length === 24), 'Arena nativa não é 24×16');
+must(hm.spawn.x === 4 && hm.spawn.y === 11 && hm.mob[0].x === 19 && hm.mob[0].y === 7,
+  'Runtime alterou spawn de player/boss');
 const blocked = p => hm.leg[hm.rows[p.y][p.x]].bloc || hm.footprintBlocked[p.x+':'+p.y];
 must(!blocked(hm.spawn) && !blocked(hm.mob[0]), 'Player ou boss nasce em tile bloqueado');
+let blockedCount = 0;
+for (let y=0; y<hm.rows.length; y++) for (let x=0; x<hm.rows[y].length; x++)
+  if (blocked({x,y})) blockedCount++;
+must(blockedCount >= 200 && Object.keys(hm.footprintBlocked).length >= 170,
+  'Paredes externas da sala não foram renderizadas/colididas');
 
 // Integração real newBossCombat: mapa, player, boss e imunidade inicial.
 ctx.HUNTMAPS = { 'otbm:scarlet_room': hm };
@@ -114,9 +118,9 @@ vm.runInContext(fs.readFileSync(path.join(js,'combat.js'),'utf8'),ctx);
 const livePlayer = { id:'solo',name:'Solo',hp:2000,mp:500,maxHp:2000,maxMp:500,
   instanceMode:'boss',config:{attackMode:'kiting'},deaths:0 };
 const live = ctx.newBossCombat(livePlayer,boss);
-must(live.gridW===24 && live.gridH===15 && live.player.cx===4 && live.player.cy===10,
+must(live.gridW===24 && live.gridH===16 && live.player.cx===4 && live.player.cy===11,
   'newBossCombat ignorou arena/spawn do player');
-must(live.mobs[0].cx===19 && live.mobs[0].cy===6 && live.scarlett.immune,
+must(live.mobs[0].cx===19 && live.mobs[0].cy===7 && live.scarlett.immune,
   'newBossCombat ignorou spawn/imunidade da Scarlett');
 
 const used = new Set();

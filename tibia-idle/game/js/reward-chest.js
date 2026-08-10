@@ -87,27 +87,37 @@ function openRewardChest() {
   if (!p) { toast("Crie um personagem primeiro"); return; }
   const itens = rewardChestItems(p);
   const box = $("#modal-body");
+  const total = itens.reduce((sum, i) => sum + i.count, 0);
   box.innerHTML = `
-    <div class="panel-title">🎁 Reward Chest
-      <span class="tiny dim" style="font-weight:normal">drops de boss</span>
-      <span style="flex:1"></span>
-      ${itens.length ? `<button class="sm" id="reward-claim-all">Recolher tudo</button>` : ""}
-      <button class="sm" id="reward-close">✕</button>
-    </div>
-    <div class="panel-body">
-      ${itens.length ? `
-        <div class="reward-grid">
-          ${itens.map((i) => `
-            <div class="reward-item" title="${i.it ? i.it.n : i.slug}">
-              ${itemImg(i.slug)}
-              <div class="reward-count">${fmtFull(i.count)}</div>
-              <div class="tiny dim reward-name">${i.it ? i.it.n : i.slug}</div>
-              <button class="sm" data-reward-claim="${i.slug}">Recolher</button>
-            </div>`).join("")}
-        </div>
-        <div class="tiny dim mt8 center">Os drops de boss vão para cá. Recolha para a Loot Pouch e venda/use como quiser.</div>`
-      : `<div class="dim small center" style="padding:16px">
-           Nenhum drop de boss ainda. Mate um boss para ganhar recompensas.</div>`}
+    <div class="reward-chest-custom">
+      <div class="panel-title reward-chest-title">
+        <span class="reward-chest-emblem">🎁</span>
+        <div><b>REWARD CHEST</b><small>Recompensas dos bosses</small></div>
+        <span class="spacer"></span>
+        <span class="reward-summary">${itens.length} tipos · ${fmtFull(total)} itens</span>
+        <button class="sm" id="reward-close">✕</button>
+      </div>
+      <div class="panel-body reward-chest-body">
+        ${itens.length ? `
+          <div class="reward-actions">
+            <span>Clique em um slot para enviar o item à Loot Pouch.</span>
+            <button class="primary sm" id="reward-claim-all">RECOLHER TUDO</button>
+          </div>
+          <div class="reward-slot-grid">
+            ${itens.map((i) => `
+              <button class="reward-slot ${typeof itemClsBorder === "function" ? itemClsBorder(i.slug) : ""}"
+                      data-reward-claim="${i.slug}"
+                      title="${i.it ? i.it.n : i.slug} · ${fmtFull(i.count)}x">
+                <span class="reward-slot-art">${itemImg(i.slug)}</span>
+                <b class="reward-slot-count">${fmtFull(i.count)}</b>
+              </button>`).join("")}
+          </div>
+          <div class="reward-footer">Itens recolhidos vão para a Loot Pouch.</div>`
+        : `<div class="reward-empty">
+             <span>🎁</span><b>Reward Chest vazio</b>
+             <small>Derrote um boss para receber recompensas.</small>
+           </div>`}
+      </div>
     </div>`;
   $("#modal").classList.add("show");
   $("#reward-close").addEventListener("click", () => $("#modal").classList.remove("show"));
