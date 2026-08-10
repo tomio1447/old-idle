@@ -60,9 +60,9 @@
     color: "#b99a52",
     scene: "palace",
     otbm: "cobra_bastion",
-    // FOV validado no RME: (147,157,2) até (168,173,2), inclusivo.
+    // FOV validado no RME: (148,156,2) até (168,173,2), inclusivo.
     // Respawns continuam em coordenadas absolutas dentro desse recorte.
-    otbmBounds: { x: 147, y: 157, w: 22, h: 17, z: 2 },
+    otbmBounds: { x: 148, y: 156, w: 21, h: 18, z: 2 },
     otbmMobBounds: { x: 154, y: 160, w: 10, h: 12, z: 2 },
     otbmSpawn: { x: 157, y: 165, z: 2 },
     avgHp: 8400,

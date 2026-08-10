@@ -94,7 +94,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "39";
+const ASSET_VERSION = "40";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -1377,7 +1377,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // Iluminação/vinheta dinâmica desativada: o OTC/Canary aplica luz por
   // criatura e por tile. Sem esse sistema completo, a vinheta escurecia
   // artificialmente as bordas e escondia detalhes do mapa idle.
-  drawBossBar(ctx, W, combat);
 
   ctx.save();
   // Vibracao de camera removida a pedido: o translate aleatorio daqui
@@ -1447,6 +1446,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // do seu footprint; a healthbar (abaixo) fica acima de tudo.
   if (combat && combat.huntMap && typeof drawTileCharMap === "function")
     drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects");
+
+  // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
+  // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
+  drawBossBar(ctx, W, combat);
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
   const occupiedLabels = [];

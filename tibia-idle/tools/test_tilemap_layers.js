@@ -28,8 +28,12 @@ if (!/drawCellItems\(true\)/.test(blockingBlock) ||
 const groundCall = render.indexOf('gridW, gridH, "ground"');
 const entityPass = render.indexOf('const entityInfo = []', groundCall);
 const objectsCall = render.indexOf('gridW, gridH, "objects"', entityPass);
+const bossBarCall = render.indexOf('drawBossBar(ctx, W, combat);', objectsCall);
+const healthBars = render.indexOf('const occupiedLabels = []', bossBarCall);
 if (groundCall < 0 || entityPass < 0 || objectsCall < 0 ||
     !(groundCall < entityPass && entityPass < objectsCall))
   throw Error('Render de combate deve manter mapa ground → criaturas → objects');
+if (bossBarCall < 0 || healthBars < 0 || !(objectsCall < bossBarCall && bossBarCall < healthBars))
+  throw Error('Z-order deve ser arena/grounds < bossbar < players healthbar');
 
-console.log('OK: tilemap usa pisos/andáveis → criaturas → paredes/pilares bloqueantes.');
+console.log('OK: z-order usa arena/grounds → criaturas/objetos → bossbar → healthbars.');
