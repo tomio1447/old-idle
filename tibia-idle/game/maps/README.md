@@ -58,3 +58,12 @@ objetos bloqueantes na mesma ordem das hunts.
 lógica é `(175,159,2)..(193,175,2)`, Timira nasce em `(184,162,2)` e o player
 em `(182,170,2)`. Após o padding mínimo do conversor, o runtime fica 24×19,
 com player local `(9,13)` e boss local `(11,5)`.
+
+## Cobra Bastion
+
+`cobra_bastion.otbm` vem integralmente do commit `f366081`: fonte e runtime
+medem 24×17, nos limites absolutos `(146,155,2)..(169,171,2)`. As zonas e o
+spawn continuam exatamente nos valores já configurados: monstros em
+`(154,160,2)` com área 10×12 e player em `(157,165,2)`. Grounds que possuem
+patterns internos no DAT (como 1128 em 4×4 e 10113 em 2×2) são escolhidos
+pela coordenada do SQM, evitando a repetição quadriculada da variante `(0,0)`.

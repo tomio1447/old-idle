@@ -359,8 +359,12 @@ def render_outfit_860(dat, spr, looktype, direction=2, frame=0, addon=0,
     return base
 
 
-def render_item_860(dat, spr, client_id, frame=0):
+def render_item_860(dat, spr, client_id, frame=0, xp=0, yp=0, zp=0):
     obj = dat.item(client_id)
     if obj is None or not obj.groups:
         return None
-    return render_group_860(spr, obj.groups[0], frame=frame % obj.groups[0].anim)
+    group = obj.groups[0]
+    return render_group_860(
+        spr, group, frame=frame % max(1, group.anim),
+        xp=xp % max(1, group.px), yp=yp % max(1, group.py),
+        zp=zp % max(1, group.pz))

@@ -123,7 +123,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     for (let tx = x0; tx < x1; tx++) {
       const sx = tx * TS - camX, sy = ty * TS - camY;
       const gid = CITY.ground[ty * MAP_W + tx];
-      if (!TileSprites.draw(ctx, gid, sx, sy, TS)) {
+      if (!TileSprites.draw(ctx, gid, sx, sy, TS, tx, ty)) {
         ctx.fillStyle = gid === 103 ? "#6b4f31" :
           gid === 106 ? "#3c6b28" : "#b8a878";
         ctx.fillRect(sx, sy, TS + 1, TS + 1);
@@ -138,7 +138,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
       const wid = CITY.wall[ty * MAP_W + tx];
       if (!wid) continue;
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      if (!TileSprites.drawDeco(ctx, wid, sx, sy, TS)) {
+      if (!TileSprites.drawDeco(ctx, wid, sx, sy, TS, false, tx, ty)) {
         ctx.fillStyle = "#c9b87a";
         ctx.fillRect(sx, sy, TS + 1, TS + 1);
       }
@@ -163,7 +163,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     for (let ty = b.y; ty < b.y + b.h; ty++) {
       for (let tx = b.x; tx < b.x + b.w; tx++) {
         const sx = tx * TS - camX, sy = ty * TS - camY;
-        if (!TileSprites.draw(ctx, tileVariant(floorIds, tx, ty), sx, sy, TS)) {
+        if (!TileSprites.draw(ctx, tileVariant(floorIds, tx, ty), sx, sy, TS, tx, ty)) {
           ctx.fillStyle = marble ? "#cfc9b4" : "#8a6a52";
           ctx.fillRect(sx, sy, TS + 1, TS + 1);
         }
@@ -181,7 +181,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     const wallIds = marble ? [965, 966, 967, 968, 969, 970] : [478];
     const drawWall = (tx, ty) => {
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      if (!TileSprites.draw(ctx, tileVariant(wallIds, tx, ty), sx, sy, TS)) {
+      if (!TileSprites.draw(ctx, tileVariant(wallIds, tx, ty), sx, sy, TS, tx, ty)) {
         ctx.fillStyle = marble ? "#4a4640" : "#c9b87a";
         ctx.fillRect(sx, sy, TS + 1, TS + 1);
       }
@@ -193,7 +193,7 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     if (marble)
       for (let tx = b.x; tx < b.x + b.w; tx++) {
         const sx = tx * TS - camX, sy = b.y * TS - camY;
-        if (!TileSprites.draw(ctx, 409, sx, sy, TS)) {
+        if (!TileSprites.draw(ctx, 409, sx, sy, TS, tx, b.y)) {
           ctx.fillStyle = "#d9d3bf"; ctx.fillRect(sx, sy, TS + 1, TS + 1);
         }
       }
