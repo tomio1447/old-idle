@@ -39,7 +39,7 @@ const SCARLETT_TRAVEL_MS = 2200;
     // interno da arena e desapareciam quando o arquivo era recortado.
     otbmSpawn: { x:176, y:169, z:2 },
     otbmMobBounds: { x:191, y:165, w:1, h:1, z:2 },
-    avgHp:30000, avgExp:20000, avgDamage:1200, avgArmor:88,
+    avgHp:130000, avgExp:20000, avgDamage:1200, avgArmor:88,
     avgGold:100, respawn:1, pack:1, cat:"boss-room",
   };
 
@@ -50,7 +50,7 @@ const SCARLETT_TRAVEL_MS = 2200;
     hunt: "scarlett-room",
     baseMonster: SCARLETT_ID,
     sprite: SCARLETT_ID,
-    hp: 30000, exp: 20000, damage: 1200, armor: 88, defense: 88,
+    hp: 130000, exp: 20000, damage: 1200, armor: 88, defense: 88,
     speed: 0.000065,
     requirement: { level:250, text:"Requer nível 250+ (Cobra Bastion)" },
     cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 0,

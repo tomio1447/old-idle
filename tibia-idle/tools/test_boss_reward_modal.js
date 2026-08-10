@@ -10,7 +10,12 @@ const indexHtml = fs.readFileSync(path.join(game,'index.html'),'utf8');
 function must(ok,msg){ if(!ok) throw Error(msg); }
 
 must(gameJs.includes('const BOSS_COOLDOWN = 0;'), 'Cooldown global dos bosses não foi zerado');
-must(!gameJs.includes('Cooldown iniciado: 16h.'), 'Log ainda anuncia cooldown de 16h');
+must(gameJs.includes('const BOSS_REQUIREMENTS_ENABLED = false;') &&
+     gameJs.includes('const BOSS_COOLDOWNS_ENABLED = false;'),
+  'Liberação temporária de requisitos/cooldowns não está ativa');
+must(!gameJs.includes('Cooldown iniciado: 16h.') && !gameJs.includes('16h por combate'),
+  'Interface ainda anuncia cooldown de boss');
+must(!gameJs.includes('<span>Requisito:'), 'Modal ainda exibe requisito de boss');
 for (const id of ['the-monster','goshnar-s-greed','timira-the-many-headed','ferumbras-mortal-shell']) {
   // Todos os bosses antigos apontam para BOSS_COOLDOWN; Scarlett usa o mesmo
   // valor em scarlett-boss.js.
@@ -28,6 +33,15 @@ must(chestPng.readUInt32BE(16)===45 && chestPng.readUInt32BE(20)===40,
 must(indexHtml.includes('<img src="assets/item/reward-chest.png" class="reward-btn-icon"') &&
      !indexHtml.includes('🎁 REWARD'),
   'Botão REWARD ainda usa emoji em vez do client id 19250');
+must(!indexHtml.includes('id="xph"') && !indexHtml.includes('id="gph"') &&
+     !indexHtml.includes('id="kills"') && !indexHtml.includes('id="session"'),
+  'Analisador XP/h, Gold/h, Kills ou Sessão ainda aparece na topbar');
+must(indexHtml.includes('assets/ui/prey/prey_bigxp.png'),
+  'Botão PREY não usa o card de bônus de EXP');
+must(css.includes('#btn-imbue {') && css.includes('flex-direction: row'),
+  'Ícone de Imbuements não fica ao lado do texto');
+must(rewardJs.includes('badge.style.visibility = n ? "visible" : "hidden"'),
+  'Badge do Reward Chest ainda desloca a linha de botões');
 must(gameJs.includes('hunt-best-card boss-best-card') &&
      gameJs.includes('hunt-best-loot boss-best-loot') &&
      gameJs.includes('% de chance'),
@@ -39,6 +53,7 @@ must(rewardJs.includes('class="reward-slot') && rewardJs.includes('class="reward
      rewardJs.includes('RECOLHER TUDO'), 'Tela de drops em slots incompleta');
 for (const cls of ['.reward-chest-custom','.reward-boss-grid','button.reward-boss-card',
                    '.reward-slot-grid','button.reward-slot','.reward-slot-count',
+                   '.modal.reward-modal-shell','.modal.boss-modal-shell',
                    '.boss-best-card','.boss-best-loot','.reward-btn-icon'])
   must(css.includes(cls), 'CSS ausente: '+cls);
 const combat=fs.readFileSync(path.join(game,'js','combat.js'),'utf8');
@@ -67,4 +82,4 @@ must(ctx.rewardChestClaimBundle(p,'fight-2')===1 && p.lootPouch.a===6 && !p.rewa
 must(ctx.rewardChestClaimAll(p)===1 && p.lootPouch.b===3 && !ctx.rewardChestBundleList(p).length,
   'Coleta total quebrou');
 
-console.log('OK: bosses sem cooldown; Reward Chest 19250 abre boss antes dos slots.');
+console.log('OK: bosses sem requisitos/cooldown; modal, topbar e Reward Chest estáveis.');

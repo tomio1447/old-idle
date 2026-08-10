@@ -561,7 +561,7 @@ function tryCompleteMissionRewards(p, huntId) {
   // Timira: completar a missão das Nagas LIBERA o cooldown do boss — pode
   // matá-la de novo sem esperar as 16h (a missão precisa ser refeita, pois
   // o kill do boss zera o progresso — ver startBoss).
-  if (huntId === "marapur-nagas" && all) {
+  if (BOSS_REQUIREMENTS_ENABLED && huntId === "marapur-nagas" && all) {
     const tim = bossState(p, "timira-the-many-headed");
     if (tim.lastFight) {
       tim.lastFight = 0;
@@ -651,7 +651,10 @@ function isMissionComplete(p, huntId) {
 }
 
 /* ------------------------------------------------------------ bosses */
-// Temporariamente todos os bosses podem ser repetidos sem cooldown.
+// Temporariamente todos os bosses ficam livres: sem requisitos e sem cooldown.
+// Os dados originais continuam nas definições para serem reativados depois.
+const BOSS_REQUIREMENTS_ENABLED = false;
+const BOSS_COOLDOWNS_ENABLED = false;
 const BOSS_COOLDOWN = 0;
 const BOSS_DEFS = {
   "the-monster": {
@@ -806,14 +809,16 @@ function bossState(p, id) {
 }
 
 function bossReadyInfo(p, boss) {
-  if (boss.requirement) {
+  if (BOSS_REQUIREMENTS_ENABLED && boss.requirement) {
     if (boss.requirement.level && p.level < boss.requirement.level)
       return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
     if (boss.requirement.mission && !isMissionComplete(p, boss.requirement.mission))
       return { ok: false, reason: boss.requirement.text, left: 0 };
   }
   const st = bossState(p, boss.id);
-  const left = Math.max(0, (st.lastFight || 0) + boss.cooldown - Date.now());
+  const left = BOSS_COOLDOWNS_ENABLED
+    ? Math.max(0, (st.lastFight || 0) + (boss.cooldown || 0) - Date.now())
+    : 0;
   if (left > 0) return { ok: false, reason: "Cooldown", left: left };
   return { ok: true, reason: "Disponível", left: 0 };
 }
@@ -885,7 +890,10 @@ function openBossModal(id) {
     return `<div class="hunt-loot-slot" title="${title}">${itemImg(l.item, 28)}</div>`;
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
-  $("#modal-body").innerHTML = `
+  const modalBox = $("#modal-body");
+  modalBox.classList.remove("reward-modal-shell");
+  modalBox.classList.add("boss-modal-shell");
+  modalBox.innerHTML = `
     <div class="panel-title">
       ${mobImg(boss.sprite, 24)}
       ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
@@ -893,8 +901,7 @@ function openBossModal(id) {
     </div>
     <div class="panel-body boss-detail-body">
       <div class="boss-detail-summary">
-        <span>Requisito: <b>${boss.requirement ? boss.requirement.text : "—"}</b></span>
-        <span>Disponibilidade: <b style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.left ? fmtTime(ready.left / 1000) : ready.reason}</b></span>
+        <span>Disponibilidade: <b style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.reason}</b></span>
         <span>Vitórias: <b>${fmtFull(st.kills || 0)}</b></span>
       </div>
       <div class="hunt-best-card boss-best-card">
@@ -911,10 +918,14 @@ function openBossModal(id) {
       <div class="tiny dim mt8 center">O loot vai para o
         <img src="assets/item/reward-chest.png" class="boss-reward-inline" alt="Reward Chest"> Reward Chest.</div>
     </div>`;
-  $("#modal").classList.add("show");
-  $("#boss-close").addEventListener("click", () => $("#modal").classList.remove("show"));
-  $("#boss-fight").addEventListener("click", () => {
+  const closeBossModal = () => {
     $("#modal").classList.remove("show");
+    modalBox.classList.remove("boss-modal-shell");
+  };
+  $("#modal").classList.add("show");
+  $("#boss-close").addEventListener("click", closeBossModal);
+  $("#boss-fight").addEventListener("click", () => {
+    closeBossModal();
     startBoss(id);
   });
 }
@@ -941,10 +952,9 @@ function startBoss(id, force, arenaReady) {
   if (G.training) stopAcademy(false);
   if (G.combat) stopHunt();
   const st = bossState(G.p, id);
-  st.lastFight = Date.now();
-  // Timira: ao entrar no boss a missão das Nagas volta a zero — para matá-la
-  // de novo é preciso refazer os 25/25/25 (completar a missão zera o CD).
-  if (id === "timira-the-many-headed") {
+  st.lastFight = BOSS_COOLDOWNS_ENABLED ? Date.now() : 0;
+  // Esta reinicialização só faz parte da regra de requisito da Timira.
+  if (BOSS_REQUIREMENTS_ENABLED && id === "timira-the-many-headed") {
     const mst = missionState(G.p, "marapur-nagas");
     mst.progress = {};
     mst.claimed = {};
@@ -954,15 +964,16 @@ function startBoss(id, force, arenaReady) {
   G.p.instanceMode = "boss";
   G.combat = newBossCombat(G.p, boss);
   G.inCity = false;
-  addLog("death", `Você entrou no boss <b>${boss.name}</b>. ${boss.cooldown ? "Cooldown iniciado: " + fmtTime(boss.cooldown / 1000) + "." : "Sem cooldown."}`);
+  addLog("death", `Você entrou no boss <b>${boss.name}</b>. Entrada liberada.`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
-  // PARTY: líder entrou numa sala de boss -> o SERVIDOR valida os
-  // requisitos (cooldown + missão) de TODOS os membros antes do follow.
-  // Se alguém não puder, a party não entra (o servidor recusa o report).
+  // PARTY: enquanto a liberação temporária estiver ativa, o servidor recebe
+  // cooldown zero e nenhum requisito de missão para todos os integrantes.
   if (typeof partyReportZone === "function") {
-    const info = { zone: "boss", boss: id, cooldownMs: boss.cooldown || 0 };
-    // requisitos de missão (ex.: Timira -> 25 nagas) para validar membros
-    if (boss.requirement && boss.requirement.mission) {
+    const info = {
+      zone: "boss", boss: id,
+      cooldownMs: BOSS_COOLDOWNS_ENABLED ? (boss.cooldown || 0) : 0,
+    };
+    if (BOSS_REQUIREMENTS_ENABLED && boss.requirement && boss.requirement.mission) {
       info.mission = boss.requirement.mission;
       const mdef = missionForHunt(boss.requirement.mission);
       if (mdef && mdef.tasks) {
@@ -1979,7 +1990,6 @@ function renderHuntInfo() {
         <b style="color:#ff9a6a">${boss.name}</b>
         <span class="risk high">boss</span>
       </div>
-      <div class="stat-row"><span class="k">Cooldown</span><span class="v">16h por combate</span></div>
       <div class="stat-row"><span class="k">Vida</span><span class="v">${mob ? Math.ceil(mob.hp) + " / " + mob.maxHp : "derrotado"}</span></div>
       <div class="stat-row"><span class="k">Sprite</span><span class="v">Cave Rat</span></div>`;
     return;

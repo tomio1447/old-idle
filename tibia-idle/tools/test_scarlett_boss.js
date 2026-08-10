@@ -75,6 +75,8 @@ const boss = ctx.BOSS_DEFS['scarlett-etzel'];
 const room = ctx.GAMEDATA.hunts['scarlett-room'];
 must(boss && boss.hunt === 'scarlett-room' && boss.noRevive && boss.mechanic === 'direction-qte',
   'Scarlett não foi registrada como boss QTE sem revive');
+must(boss.hp === 130000 && room.avgHp === 130000,
+  'HP configurado da boss Scarlett deveria ser 130000');
 must(room.hidden && !room.otbmBounds &&
   JSON.stringify(room.otbmSpawn) === JSON.stringify({x:176,y:169,z:2}) &&
   JSON.stringify(room.otbmMobBounds) === JSON.stringify({x:191,y:165,w:1,h:1,z:2}),
@@ -122,6 +124,8 @@ must(live.gridW===24 && live.gridH===16 && live.player.cx===4 && live.player.cy=
   'newBossCombat ignorou arena/spawn do player');
 must(live.mobs[0].cx===19 && live.mobs[0].cy===7 && live.scarlett.immune,
   'newBossCombat ignorou spawn/imunidade da Scarlett');
+must(live.mobs[0].maxHp===130000,
+  'newBossCombat não aplicou os 130000 HP da Scarlett');
 
 const used = new Set();
 Object.values(OTBM.read(runtime).cells).forEach(c => { if(c.g)used.add(c.g); (c.items||[]).forEach(i=>used.add(i)); });
