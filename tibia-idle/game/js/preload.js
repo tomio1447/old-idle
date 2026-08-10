@@ -18,6 +18,15 @@ function preloadGameAssets(p) {
   if (p && p.outfit && p.outfit.mount) paths.add('assets/appearance/mount/' + p.outfit.mount + '.base.png');
   const hunt = p && typeof GAMEDATA !== 'undefined' && GAMEDATA.hunts && GAMEDATA.hunts[p.hunt];
   if (hunt) for (const slug of hunt.monsters || []) paths.add('assets/mob/' + slug + '.png');
+  // O templo é a primeira cena exibida: carregue todos os tiles antes de
+  // remover o overlay para o mapa oficial não aparecer aos poucos.
+  if (typeof CITY !== 'undefined' && CITY.officialTemple && CITY.map) {
+    for (const key in CITY.map.leg) {
+      const entry = CITY.map.leg[key];
+      for (const id of (entry && entry.v) || []) paths.add('assets/tiles/' + id + '.png');
+      for (const id of (entry && entry.g) || []) paths.add('assets/tiles/' + id + '.png');
+    }
+  }
   const list = [...paths];
   if (!list.length) return Promise.resolve();
   let done = 0;

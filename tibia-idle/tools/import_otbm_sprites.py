@@ -67,7 +67,7 @@ class Rdr:
             self.u8()
 
     def attr(self, aid, ctx):
-        if aid in (1, 2, 7, 11, 13):
+        if aid in (1, 2, 6, 7, 11, 13):
             self.skip_str()
         elif aid in (3, 12, 16, 22, 23):
             self.u32()
@@ -85,9 +85,78 @@ class Rdr:
             raise ValueError("atributo OTBM desconhecido %d" % aid)
 
 
+def ids_do_canary_otbm(data, path):
+    """IDs do OTBM moderno do Canary Map Editor (header u32 zero).
+
+    Node ids modernos: 0 header, 2 map data, 4 tile area, 5 tile e 6 item.
+    A leitura é intencionalmente restrita ao andar z=7 do mapa importado.
+    """
+    r = Rdr(data)
+    r.i = 4
+    ids = set()
+
+    def attr(aid, ctx):
+        if aid in (1, 2, 6, 7, 11, 13, 23, 24):
+            r.skip_str()
+        elif aid in (3, 12, 16, 22):
+            r.u32()
+        elif aid in (4, 5):
+            r.u16()
+        elif aid == 9:
+            ground = r.u16()
+            if ctx.get("z") == 7:
+                ids.add(ground)
+        elif aid == 8:
+            r.u16(); r.u16(); r.u8()
+        elif aid in (14, 15):
+            r.u8()
+        else:
+            raise ValueError("atributo Canary OTBM desconhecido %d" % aid)
+
+    def parse(ctx, depth=0):
+        if depth > 64:
+            raise ValueError(path + ": OTBM Canary muito profundo")
+        typ = r.u8()
+        child = dict(ctx or {})
+        if typ == 0:
+            r.u32(); r.u16(); r.u16(); r.u32(); r.u32()
+        elif typ == 4:
+            child = {"x": r.u16(), "y": r.u16(), "z": r.u8()}
+        elif typ == 5:
+            r.u8(); r.u8()
+        elif typ == 6:
+            item = r.u16()
+            if child.get("z") == 7:
+                ids.add(item)
+
+        while True:
+            nxt = r.peek()
+            if nxt is None:
+                raise ValueError(path + ": fim prematuro do OTBM Canary")
+            if nxt == NODE_END:
+                r.take()
+                return
+            if nxt == NODE_START:
+                r.take()
+                parse(child, depth + 1)
+                continue
+            r.take()
+            if typ in (0, 4):
+                raise ValueError(path + ": dados inesperados no node %d" % typ)
+            attr(nxt, child)
+
+    if r.peek() != NODE_START:
+        raise ValueError(path + ": sem node raiz Canary")
+    r.take()
+    parse({})
+    return ids
+
+
 def ids_do_otbm(path):
-    """Devolve (ids_usados, area_z7): todos os item ids do arquivo."""
+    """Devolve todos os item ids usados no andar z=7 do arquivo."""
     data = open(path, "rb").read()
+    if data[:4] == b"\0\0\0\0":
+        return ids_do_canary_otbm(data, path)
     if data[:4] != b"OTBM":
         raise ValueError(path + ": magic OTBM ausente")
     r = Rdr(data)

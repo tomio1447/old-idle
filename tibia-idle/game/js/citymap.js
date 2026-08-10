@@ -9,8 +9,8 @@
 "use strict";
 
 const TILE = 32;
-const MAP_W = 34;      // largura em tiles
-const MAP_H = 24;      // altura em tiles
+let MAP_W = 34;      // fallback procedural enquanto o templo carrega
+let MAP_H = 24;
 
 /* Tipos de tile para colisao */
 const T_FLOOR = 0;     // andavel
@@ -154,7 +154,77 @@ function buildCityMap() {
   return { grid: grid, ground: ground, wall: wall, at: at };
 }
 
-const CITY = buildCityMap();
+let CITY = buildCityMap();
+
+/* Templo oficial importado pelo Canary Map Editor.
+ * Coordenadas absolutas fornecidas junto do mapa:
+ *   NPCs removidos: (1013,1018,7) e (1013,1020,7)
+ *   player position: (1020,1021,7)
+ * O OTBM/sidecar não publica NPC algum; as duas primeiras posições ficam
+ * documentadas somente para garantir que nenhuma entidade seja recriada. */
+const TEMPLE_OTBM_FILE = "maps/templo.otbm";
+const TEMPLE_PLAYER_POSITION = { x:1020, y:1021, z:7 };
+const TEMPLE_REMOVED_NPC_POSITIONS = [
+  { x:1013, y:1018, z:7 },
+  { x:1013, y:1020, z:7 },
+];
+
+function installOfficialTempleMap(source) {
+  if (!source || !source.sourceBounds)
+    throw new Error("Templo oficial sem coordenadas absolutas");
+  if (source.z !== TEMPLE_PLAYER_POSITION.z)
+    throw new Error("Andar inesperado do templo oficial: " + source.z);
+
+  const bounds = source.sourceBounds;
+  const spawn = {
+    x: TEMPLE_PLAYER_POSITION.x - bounds.minX,
+    y: TEMPLE_PLAYER_POSITION.y - bounds.minY,
+  };
+  if (spawn.x < 0 || spawn.y < 0 || spawn.x >= source.w || spawn.y >= source.h)
+    throw new Error("Player position fora do templo oficial");
+  source.spawn = spawn;
+  source.name = "Templo Oficial de Thais";
+
+  const map = OTBM.huntMapFromOtbm(source,
+    typeof TILEFLAGS !== "undefined" ? TILEFLAGS : {});
+  MAP_W = map.rows[0].length;
+  MAP_H = map.rows.length;
+  const grid = new Uint8Array(MAP_W * MAP_H);
+  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+    const entry = map.leg[map.rows[y][x]];
+    if (!entry || entry.bloc || map.footprintBlocked[x + ":" + y])
+      grid[y * MAP_W + x] = T_BLOCK;
+  }
+
+  CITY = {
+    grid: grid,
+    map: map,
+    spawn: map.spawn,
+    sourceBounds: bounds,
+    removedNpcPositions: TEMPLE_REMOVED_NPC_POSITIONS.slice(),
+    npcs: [],
+    officialTemple: true,
+  };
+  return CITY;
+}
+
+let officialTemplePromise = null;
+function loadOfficialTempleMap() {
+  if (CITY.officialTemple) return Promise.resolve(CITY);
+  if (officialTemplePromise) return officialTemplePromise;
+  officialTemplePromise = fetch(TEMPLE_OTBM_FILE)
+    .then((response) => {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.arrayBuffer();
+    })
+    .then((buffer) => installOfficialTempleMap(OTBM.read(buffer)))
+    .catch((error) => {
+      officialTemplePromise = null;
+      console.error("Falha ao carregar o templo oficial:", error);
+      throw error;
+    });
+  return officialTemplePromise;
+}
 
 function isBlocked(tx, ty) {
   if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;

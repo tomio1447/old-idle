@@ -40,3 +40,13 @@ A câmera de combate fica travada no centro geométrico da instância e nunca
 aplica zoom-out. O mundo inteiro é renderizado com SQMs na escala nativa; o
 canvas funciona como uma janela fixa de 21×13 SQMs e recorta apenas o que
 fica fora do FOV. Assim mapas grandes continuam legíveis e jogáveis.
+
+## Templo Oficial de Thais
+
+`templo.otbm` vem de `game/beta-maps/templo.otbm`, no formato moderno do
+Canary Map Editor. O mapa absoluto ocupa `(1009,1014,7)..(1038,1034,7)` e o
+jogador nasce em `(1020,1021,7)`, célula local `(11,7)`. As posições antigas
+de NPC `(1013,1018,7)` e `(1013,1020,7)` não geram entidades; o sidecar
+`templo-npc.xml` permanece vazio e a interface do templo não publica atalhos
+de NPC. O renderer mantém o FOV de 21×13 SQMs e desenha chão, jogador e
+objetos bloqueantes na mesma ordem das hunts.

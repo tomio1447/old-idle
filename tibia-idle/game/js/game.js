@@ -1074,6 +1074,11 @@ function startHunt(id, instanceMode, force) {
   });
 }
 
+function resetTemplePlayerPosition() {
+  if (G.walker && typeof G.walker.resetToSpawn === "function")
+    G.walker.resetToSpawn();
+}
+
 function stopHunt() {
   // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
   // (hp/mana/exp de cada um vão para o roster)
@@ -1084,7 +1089,8 @@ function stopHunt() {
   G.combat = null;
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
-  addLog("info", "Voltou para a <b style='color:#ffe680'>Cidade de Thais</b>.");
+  resetTemplePlayerPosition();
+  addLog("info", "Voltou para o <b style='color:#ffe680'>Templo Oficial de Thais</b>.");
   // ao chegar na cidade o char descansa: cura completa
   const m = maxStats(G.p);
   G.p.hp = m.hp; G.p.mp = m.mp;
@@ -1097,7 +1103,7 @@ function stopHunt() {
 function goToCity() {
   if (G.training) stopAcademy();
   else if (G.p.hunt) stopHunt();
-  else { G.inCity = true; renderAll(); }
+  else { G.inCity = true; resetTemplePlayerPosition(); renderAll(); }
 }
 
 function startAcademy() {
@@ -1120,13 +1126,14 @@ function stopAcademy(log) {
   G.training = null;
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
+  resetTemplePlayerPosition();
   G.combat = null;
   G.p.hunt = null;
   const m = maxStats(G.p);
   G.p.hp = m.hp;
   if (log !== false) {
-    addLog("info", "Saiu da academia e voltou para a <b style='color:#ffe680'>Cidade de Thais</b>.");
-    toast("Voltou para a cidade");
+    addLog("info", "Saiu da academia e voltou para o <b style='color:#ffe680'>Templo Oficial de Thais</b>.");
+    toast("Voltou para o templo");
   }
   G.activeNpc = null;
   // PARTY: líder voltou para a safe zone
@@ -2034,13 +2041,24 @@ function resetRosterToTemple() {
   writeRoster(roster);
 }
 function startGame(p) {
-  // Todos os módulos JS já foram carregados pelo index; aqui aguardamos os
-  // assets essenciais para entrar sem sprites/modais piscando vazios.
+  // O templo OTBM precisa estar convertido antes de criar o CityWalker para
+  // que o player nasça exatamente em (1020,1021,7).
+  const templeReady = typeof loadOfficialTempleMap === "function"
+    ? loadOfficialTempleMap() : Promise.resolve();
+  // Todos os módulos JS já foram carregados pelo index; aqui aguardamos o
+  // mapa e os assets essenciais para entrar sem sprites piscando vazios.
   if (typeof showGameLoading === "function" && typeof preloadGameAssets === "function") {
-    showGameLoading(true, "Preparando módulos e recursos...", 0);
-    return preloadGameAssets(p).then(() => { showGameLoading(false); startGameReady(p); });
+    showGameLoading(true, "Carregando o Templo Oficial de Thais...", 0);
+    return templeReady
+      .then(() => preloadGameAssets(p))
+      .then(() => { showGameLoading(false); startGameReady(p); })
+      .catch((error) => {
+        showGameLoading(false);
+        console.error(error);
+        toast("Não foi possível carregar o templo oficial.", "bad");
+      });
   }
-  return startGameReady(p);
+  return templeReady.then(() => startGameReady(p));
 }
 
 function startGameReady(p) {
@@ -2132,7 +2150,7 @@ function bindControls() {
     }
   }
   $("#btn-city").addEventListener("click", () => {
-    if (G.inCity && !G.combat && !G.training) { toast("Você já está na cidade"); return; }
+    if (G.inCity && !G.combat && !G.training) { toast("Você já está no templo"); return; }
     goToCity();
   });
 
