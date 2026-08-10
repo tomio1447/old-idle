@@ -74,9 +74,12 @@ function itemAnimado(it) {
 function estiloAnim(slug, it, tam) {
   if (!itemAnimado(it)) return "";
   const px = tam || 32;
-  const esc = px / Math.max(it.aw || 32, it.ah || 32);
-  const w = Math.round((it.aw || 32) * esc);
-  const h = Math.round((it.ah || 32) * esc);
+  // Nunca amplie a arte além do tamanho nativo do client 15x. `tam` é o
+  // limite da caixa, não um tamanho obrigatório: moedas, gemas e joias
+  // pequenas permanecem com seus poucos pixels originais.
+  const esc = Math.min(1, px / Math.max(it.aw || 32, it.ah || 32));
+  const w = Math.max(1, Math.round((it.aw || 32) * esc));
+  const h = Math.max(1, Math.round((it.ah || 32) * esc));
   const dur = (it.af * 0.15).toFixed(2);
   const total = w * it.af;
   // --anim-w e lido pelo @keyframes item-anim: sem ele o CSS so conseguiria
@@ -92,7 +95,7 @@ function estiloAnim(slug, it, tam) {
 /* <img> ou <div> animado, conforme o item.
  *
  * Aceita as DUAS assinaturas que a base de codigo usa:
- *   itemImg(slug)          -> inventario/bag/loot, tamanho natural (32px)
+ *   itemImg(slug)          -> inventário/bag/loot, tamanho nativo do PNG
  *   itemImg(slug, "cls")   -> chamada antiga do ui.js, 2o arg e uma classe
  *   itemImg(slug, 26)      -> Cyclopedia, 2o arg e o tamanho em pixels
  * Isso importa porque existia uma segunda itemImg em ui.js que sobrescrevia
@@ -117,8 +120,11 @@ function itemImg(slug, tam, cls) {
     return `<div class="item-sprite ${clsAll}" title="${it.n || slug}"
       style="${estiloAnim(slug, it, px)}"></div>`;
   }
-  // sem tamanho explicito o CSS de cada tela manda (.inv-item img etc.)
-  const dim = tam ? `width:${px}px;height:${px}px` : "";
+  // `tam` limita itens grandes, mas não amplia os pequenos. width/height
+  // automáticos preservam a proporção e o tamanho nativo do PNG 15x.
+  const dim = tam
+    ? `max-width:${px}px;max-height:${px}px;width:auto;height:auto`
+    : `width:auto;height:auto`;
   return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png"
     alt="" loading="lazy" style="${dim}">`;
 }

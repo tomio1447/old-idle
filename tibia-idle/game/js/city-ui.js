@@ -78,7 +78,7 @@ function openAcademyConjureModal(showList) {
     const sprite = r.kind === "ammo" ? r.slug :
       r.kind === "supply" && SUPPLIES[r.slug] ? SUPPLIES[r.slug].sprite : "spellbook";
     return `<div class="shop-row" style="opacity:${check.ok ? 1 : .45}">
-      ${r.kind === "support" ? `<span style="width:28px;text-align:center">✨</span>` : `<img src="assets/item/${sprite}.png">`}
+      ${r.kind === "support" ? `<span style="width:28px;text-align:center">✨</span>` : itemImg(sprite, 30)}
       <div style="flex:1;min-width:0">
         <div class="small">${r.name}</div>
         <div class="tiny dim"><b>${r.words}</b> · ${academyConjureProduct(r)} · nv ${r.level} · ML ${r.ml} · ${fmtFull(r.mana)} mana</div>
@@ -199,7 +199,7 @@ function npcShop(p) {
     const better = !cur || itemScore(p, e.slug) > itemScore(p, cur.item);
     const afford = p.gold >= e.price;
     return `<div class="shop-row" data-tip="${e.slug}">
-      <img src="assets/item/${e.slug}.png">
+      ${itemImg(e.slug, 30)}
       <div style="flex:1;min-width:0">
         <div class="small" style="color:${better ? "#9ce84a" : "#c8c0a8"}">
           ${e.item.n}${better ? " ▲" : ""}</div>
@@ -249,7 +249,7 @@ function npcSupply(p) {
                 s.type === "attack" ? `dano ${pw[0]}–${pw[1]}` :
                 s.type === "mana" ? `mana ${pw[0]}–${pw[1]}` : "comida";
     return `<div class="shop-row" style="opacity:${locked ? .4 : 1}">
-      <img src="assets/item/${s.sprite}.png">
+      ${itemImg(s.sprite, 30)}
       <div style="flex:1;min-width:0">
         <div class="small">${s.name}</div>
         <div class="tiny dim">${eff} · cargas ${have} · ${fmtFull(price)} gp/carga${locked ? ` · <span style="color:#ff9a6a">nv ${s.lvl}</span>` : ""}</div>
@@ -278,7 +278,7 @@ function npcSell(p) {
     const it = GAMEDATA.items[slug];
     const val = (it.sell || 0) * p.bag[slug];
     return `<div class="shop-row" data-tip="${slug}">
-      <img src="assets/item/${slug}.png">
+      ${itemImg(slug, 30)}
       <div style="flex:1;min-width:0">
         <div class="small">${it.n}</div>
         <div class="tiny dim">${p.bag[slug]}x · ${fmtFull(it.sell || 0)} gp cada</div>
@@ -327,7 +327,7 @@ function npcUpgrade(p) {
     if (stats.def) bits.push(`def ${stats.def}`);
     if (stats.arm) bits.push(`arm ${stats.arm}`);
     return `<div class="shop-row" data-tip="${entry.slug}" style="opacity:${check.ok || maxed ? 1 : .5}">
-      <img src="assets/item/${entry.slug}.png">
+      ${itemImg(entry.slug, 30)}
       <div style="flex:1;min-width:0">
         <div class="small">${it.n}${tier ? ` <b style="color:#d4af37">+${tier}</b>` : ""}
           <span class="tiny dim">· ${entry.source === "equip" ? "equipado" : "mochila"}</span></div>

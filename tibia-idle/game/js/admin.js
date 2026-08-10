@@ -964,7 +964,7 @@ function renderAdminImbuements(p, el) {
           const slug = "mat-" + m.id;
           const have = (p.lootPouch || {})[slug] || 0;
           return `<div class="admin-item">
-            <img src="assets/item/${slug}.png" style="width:28px;height:28px;image-rendering:pixelated" alt="">
+            <img src="assets/item/${slug}.png" style="max-width:28px;max-height:28px;width:auto;height:auto;image-rendering:pixelated" alt="">
             <div class="admin-item-n">
               <div class="small">${m.name}</div>
               <div class="tiny dim">id ${m.id} · em uso: ${m.imbs.slice(0, 3).join(", ")}${m.imbs.length > 3 ? "…" : ""}</div>
