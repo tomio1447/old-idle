@@ -60,8 +60,8 @@
     color: "#b99a52",
     scene: "palace",
     otbm: "cobra_bastion",
-    // Coordenadas absolutas do andar 2 informadas para a instância.
-    otbmBounds: { x: 154, y: 160, w: 10, h: 12, z: 2 },
+    // O mapa inteiro 24×24 é renderizado no tamanho nativo. As coordenadas
+    // abaixo delimitam apenas o respawn, sem recortar cenário ao redor.
     otbmMobBounds: { x: 154, y: 160, w: 10, h: 12, z: 2 },
     otbmSpawn: { x: 157, y: 165, z: 2 },
     avgHp: 8400,

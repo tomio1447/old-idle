@@ -38,10 +38,10 @@ const cobraHunt = hunts['cobra-bastion'];
 must(JSON.stringify(cobraHunt.monsters) ===
   JSON.stringify(['cobra-vizier', 'cobra-scout', 'cobra-assassin']),
   'Cobra Bastion não usa os três monstros solicitados');
-must(JSON.stringify(cobraHunt.otbmBounds) === JSON.stringify({ x:154,y:160,w:10,h:12,z:2 }) &&
+must(!cobraHunt.otbmBounds &&
      JSON.stringify(cobraHunt.otbmMobBounds) === JSON.stringify({ x:154,y:160,w:10,h:12,z:2 }) &&
      JSON.stringify(cobraHunt.otbmSpawn) === JSON.stringify({ x:157,y:165,z:2 }),
-  'Coordenadas RME da Cobra Bastion incorretas');
+  'Mapa nativo ou coordenadas RME da Cobra Bastion incorretos');
 
 const expected = {
   'cobra-vizier': {
@@ -117,22 +117,22 @@ must(source.equals(runtime), 'cobra_bastion beta não foi publicado em maps/');
 let map = OTBM.read(runtime);
 must(map.z === 2 && map.sourceBounds.minX === 146 && map.sourceBounds.minY === 151,
   'Fonte Canary da Cobra Bastion inesperada');
-map = OTBM.crop(map, cobraHunt.otbmBounds);
-// Reusa a função real sem executar fetch/reload do navegador.
+// Reusa a função real sem executar fetch/reload do navegador. Não aplica
+// crop: o cenário completo 24×24 precisa permanecer visível.
 const zonesSource = fs.readFileSync(path.join(js, 'otbmhunt.js'), 'utf8');
 const start = zonesSource.indexOf('function applyHuntOtbmZones');
 const end = zonesSource.indexOf('\n\n/* Garante', start);
 vm.runInContext(zonesSource.slice(start, end), ctx);
 ctx.applyHuntOtbmZones(map, cobraHunt);
-must(map.spawn.x === 3 && map.spawn.y === 5 && map.mob.length === 120,
-  'Spawn/área de respawn não foram convertidos para o recorte local');
+must(map.w === 24 && map.h === 24 && map.spawn.x === 11 && map.spawn.y === 14 && map.mob.length === 120,
+  'Mapa nativo ou zonas absolutas da Cobra Bastion foram alterados');
 
 vm.runInContext(fs.readFileSync(path.join(js, 'tileflags.js'), 'utf8'), ctx);
 const hm = OTBM.huntMapFromOtbm(map, ctx.TILEFLAGS);
-must(hm.rows.length === 15 && hm.rows.every(row => row.length === 24),
-  'Arena Cobra Bastion runtime não ficou válida');
-must(hm.spawn.x === 10 && hm.spawn.y === 6 && hm.mob.length === 120,
-  'Padding runtime alterou as zonas da Cobra Bastion');
+must(hm.rows.length === 24 && hm.rows.every(row => row.length === 24),
+  'Arena Cobra Bastion foi cortada em vez de usar os 24×24 nativos');
+must(hm.spawn.x === 11 && hm.spawn.y === 14 && hm.mob.length === 120,
+  'Runtime alterou as zonas nativas da Cobra Bastion');
 must(!hm.leg[hm.rows[hm.spawn.y][hm.spawn.x]].bloc &&
      !hm.footprintBlocked[hm.spawn.x + ':' + hm.spawn.y],
   'Player nasce em parede/objeto bloqueante');

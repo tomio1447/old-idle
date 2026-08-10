@@ -71,13 +71,22 @@ function pngRgba(file) {
   return { width, height, pixels };
 }
 
-function frameHash(image, meta, col, row) {
+function framePixels(image, meta, col, row) {
   const frame = Buffer.alloc(meta.cw * meta.ch * 4);
   for (let y = 0; y < meta.ch; y++) {
     const from = ((row * meta.ch + y) * image.width + col * meta.cw) * 4;
     image.pixels.copy(frame, y * meta.cw * 4, from, from + meta.cw * 4);
   }
-  return crypto.createHash('sha256').update(frame).digest('hex');
+  return frame;
+}
+function frameHash(image, meta, col, row) {
+  return crypto.createHash('sha256').update(framePixels(image, meta, col, row)).digest('hex');
+}
+function opaquePixels(image, meta, col, row) {
+  const frame = framePixels(image, meta, col, row);
+  let count = 0;
+  for (let i = 3; i < frame.length; i += 4) if (frame[i]) count++;
+  return count;
 }
 
 let checked = 0;
@@ -94,6 +103,12 @@ for (const [group, slugs] of Object.entries(groups)) {
     const hashes = new Set();
     for (let col = 0; col < meta.cols; col++) hashes.add(frameHash(image, meta, col, 2));
     must(hashes.size >= 2, `${group}/${slug}: todos os frames sul são idênticos`);
+    if (group === 'Cobra Bastion') {
+      // Pattern-y de addon contém só a camada adicional. Sem compor com o
+      // pattern base, Scout/Assassin ficam com torso e pernas transparentes.
+      must(opaquePixels(image, meta, 0, 2) >= 500,
+        `${group}/${slug}: addon foi renderizado sem o corpo base`);
+    }
     checked++;
   }
 }

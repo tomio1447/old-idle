@@ -221,13 +221,32 @@ def gerar_sheet(dat, spr, looktype, colors, addons=0):
     g_walk = obj.groups[1] if len(obj.groups) > 1 else obj.groups[0]
     poses = [(g_idle, 0)] + [(g_walk, i) for i in range(max(1, g_walk.anim))]
 
+    def render_pose(g, fr, xp, layer):
+        """Corpo base (pattern-y 0) + addon selecionado.
+
+        No DAT 15x os patterns 1/2 guardam SOMENTE os pixels do addon, não
+        uma outfit completa. Renderizar apenas `yp=addons` removia partes do
+        corpo de Cobra Scout/Assassin. A composição abaixo replica o client.
+        """
+        base = render_group_860(spr, g, frame=fr % max(1, g.anim),
+                                xp=xp % max(1, g.px), yp=0, layer=layer)
+        if addons and g.py > 1:
+            addon = render_group_860(spr, g, frame=fr % max(1, g.anim),
+                                     xp=xp % max(1, g.px),
+                                     yp=addons % g.py, layer=layer)
+            if addon is not None:
+                if base is None:
+                    base = addon.copy()
+                else:
+                    base = base.copy()
+                    base.alpha_composite(addon)
+        return base
+
     # caixa comum para todas as células (sem recorte por célula)
     caixas = []
     for tag, xp in DIRS:
         for g, fr in poses:
-            img = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                   xp=xp % max(1, g.px),
-                                   yp=addons % max(1, g.py), layer=0)
+            img = render_pose(g, fr, xp, 0)
             if img is not None and img.getbbox():
                 caixas.append(img.getbbox())
     if not caixas:
@@ -244,15 +263,11 @@ def gerar_sheet(dat, spr, looktype, colors, addons=0):
     sheet = Image.new("RGBA", (cw * cols, ch * len(DIRS)), (0, 0, 0, 0))
     for li, (tag, xp) in enumerate(DIRS):
         for ci, (g, fr) in enumerate(poses):
-            base = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                    xp=xp % max(1, g.px),
-                                    yp=addons % max(1, g.py), layer=0)
+            base = render_pose(g, fr, xp, 0)
             if base is None:
                 continue
             if colors:
-                mask = render_group_860(spr, g, frame=fr % max(1, g.anim),
-                                        xp=xp % max(1, g.px),
-                                        yp=addons % max(1, g.py), layer=1)
+                mask = render_pose(g, fr, xp, 1)
                 base = compor_cor(base, mask, *colors)
             cel = base.crop((x0, y0, x1, y1))
             sheet.paste(cel, (ci * cw, li * ch))
