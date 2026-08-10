@@ -142,19 +142,53 @@ function tileVariant(ids, cx, cy) {
 /* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate).
  * mode:
  *   'all'      -> chão + objetos (comportamento original, usado pela cidade)
- *   'ground'   -> só o chão (desenhado ANTES das criaturas)
- *   'objects'  -> só paredes/móveis/deco (desenhado DEPOIS das criaturas,
- *                 para pilares/muros sobreporem monstros como no client) */
+ *   'ground'   -> chão + objetos ANDÁVEIS (desenhado ANTES das criaturas)
+ *   'objects'  -> só objetos NÃO-ANDÁVEIS (desenhado DEPOIS das criaturas,
+ *                 para paredes/pilares sobreporem monstros/players como no client)
+ * Regra de z-order (igual ao client Tibia): tiles/pisos e decorações andáveis
+ * (sofás, gelo, tapetes) ficam ABAIXO das criaturas (o player anda em cima);
+ * paredes/pilares (não-andáveis) ficam ACIMA, cobrindo quem está atrás/dentro
+ * do footprint. */
 function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
   if (mode === undefined) mode = "all";
   const tw = W / cols, th = H / rows;
+  // Item explicitamente NÃO-ANDÁVEL (parede/pilar/bloqueante) em TILEFLAGS:
+  // desenhado POR CIMA das criaturas. Ausente em TILEFLAGS ou andável =>
+  // decoração andável (sofá, gelo), desenhada ABAIXO das criaturas.
+  const isBlocking = function (id) {
+    const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+    return !!(f && f[0] === 0);
+  };
+  const cellIsWall = function (L) {
+    return !!(L.v && L.v.some(function (id) {
+      const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+      return f && f[0] === 0;
+    }));
+  };
+  const drawCellItems = function (onlyBlocking) {
+    for (let y = 0; y < rows && y < map.rows.length; y++) {
+      const row = map.rows[y];
+      for (let x = 0; x < cols && x < row.length; x++) {
+        const L = map.leg[row[x]];
+        if (!L || !L.g) continue;
+        const cw = cellIsWall(L);
+        for (const id of L.g) {
+          if (isBlocking(id) !== onlyBlocking) continue;
+          TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw);
+        }
+      }
+    }
+  };
+  const drawDecoItems = function (onlyBlocking) {
+    for (const d of map.deco || []) {
+      if (isBlocking(d[0]) !== onlyBlocking) continue;
+      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false);
+    }
+  };
   if (mode !== "objects") {
     ctx.fillStyle = "#060806";
     ctx.fillRect(0, 0, W, H);
-    // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
-    // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
-    // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.
-    // Primeira passagem: todos os pisos, sempre atrás de objetos grandes.
+    // Primeira passagem: todos os pisos (sempre atrás de tudo).
     for (let y = 0; y < rows && y < map.rows.length; y++) {
       const row = map.rows[y];
       for (let x = 0; x < cols && x < row.length; x++) {
@@ -163,29 +197,12 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
         TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
       }
     }
+    // Objetos ANDÁVEIS/decorativos (sofás, gelo, tapetes): ABAIXO das criaturas.
+    if (mode === "all" || mode === "ground") { drawCellItems(false); drawDecoItems(false); }
   }
   if (mode !== "ground") {
-    // Segunda passagem: paredes, móveis e objetos 2×2/1×2. Nenhum piso pode
-    // mais apagar suas partes que avançam sobre SQMs vizinhos.
-    for (let y = 0; y < rows && y < map.rows.length; y++) {
-      const row = map.rows[y];
-      for (let x = 0; x < cols && x < row.length; x++) {
-        const L = map.leg[row[x]];
-        if (!L || !L.g) continue;
-        // Célula é PAREDE? (chão não andável = muro). Itens nela são
-        // "hangables" (fogueiras, estantes) e ficam centralizados no muro.
-        const isWall = !!(L.v && L.v.some(function (id) {
-          const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
-          return f && f[0] === 0;
-        }));
-        // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
-        // decoração/base do SQM, não âncora de ground. Isso preserva a
-        // sobreposição natural de objetos multi-SQM do client.
-        for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, isWall);
-      }
-    }
-    // Terceira passagem: decoração explícita acima das camadas OTBM.
-    for (const d of map.deco || [])
-      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw);
+    // Objetos NÃO-ANDÁVEIS (paredes, pilares, móveis bloqueantes): ACIMA das
+    // criaturas — sobrepõem monstros/players que estejam atrás/dentro do footprint.
+    if (mode === "all" || mode === "objects") { drawCellItems(true); drawDecoItems(true); }
   }
 }
