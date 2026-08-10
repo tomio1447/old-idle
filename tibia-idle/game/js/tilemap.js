@@ -92,20 +92,43 @@ const TileSprites = {
     return false;
   },
   /* desenha item alinhado pela base do tile — deco maior que 32px "sobe",
-   * como o client oficial ancora objetos empilhaveis */
-  drawDeco(ctx, id, sx, sy, size) {
+   * como o client oficial ancora objetos empilhaveis.
+   *
+   * Objetos MULTI-SQM da paleta 15.x (2x1, 1x2, 2x2... — sprite com
+   * largura/altura multiplos exatos de 32 e maior que 1 SQM): o no do item
+   * no .otbm fica no SQM INFERIOR-DIREITO do footprint, e a sprite ocupa o
+   * bloco tw x th estendendo 1 SQM para cima/esquerda (convencao OTBM/RME e
+   * igual ao proprio draw() do chao). Logo, para itens de CHAO, o canto
+   * superior-esquerdo do sprite vai para (sx-(w-size), sy-(h-size)).
+   * Itens em CELULA DE PAREDE (hangables — fogueiras, estantes, marcados
+   * pelo chao nao andavel do muro) ficam CENTRALIZADOS na celula do muro,
+   * "grudados/pendurados" nele, sem o deslocamento — e sem o "espaco no
+   * meio" que o deslocamento causava. Sprites legado de decoracao (tamanhos
+   * nao multiplos de 32, ex. 43x17) e itens 1x1 continuam centralizados. */
+  drawDeco(ctx, id, sx, sy, size, onWall) {
     const a = this._anim(id);
     const fr = a ? this.frameFor(id) : 0;
     const img = this.get(id, fr);
     if (!img || !img.complete || !img.naturalWidth) return false;
     const k = size / 32;
-    const w = (a ? a.aw : img.naturalWidth) * k;
-    const h = (a ? a.ah : img.naturalHeight) * k;
-    if (a) {
-      ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah,
-                    sx + (size - w) / 2, sy + size - h, w, h);
+    const nW = (a ? a.aw : img.naturalWidth);
+    const nH = (a ? a.ah : img.naturalHeight);
+    const w = nW * k;
+    const h = nH * k;
+    // multi-SQM: dimensoes multiplas exatas de 32 e maiores que 1 SQM
+    const multi = (nW % 32 === 0 && nH % 32 === 0 && (nW > 32 || nH > 32));
+    let dx, dy;
+    if (multi && !onWall) {
+      // objeto de CHAO: ancora inferior-direita -> estende p/ cima/esquerda
+      dx = sx - (w - size); dy = sy - (h - size);
     } else {
-      ctx.drawImage(img, sx + (size - w) / 2, sy + size - h, w, h);
+      // 1x1 ou item em muro (hangable): centralizado na celula
+      dx = sx + (size - w) / 2; dy = sy + size - h;
+    }
+    if (a) {
+      ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
+    } else {
+      ctx.drawImage(img, dx, dy, w, h);
     }
     return true;
   },
@@ -116,37 +139,70 @@ function tileVariant(ids, cx, cy) {
   return ids[(cx * 31 + cy * 17) % ids.length];
 }
 
-/* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate) */
-function drawTileCharMap(ctx, map, W, H, cols, rows) {
+/* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate).
+ * mode:
+ *   'all'      -> chão + objetos (comportamento original, usado pela cidade)
+ *   'ground'   -> chão + objetos ANDÁVEIS (desenhado ANTES das criaturas)
+ *   'objects'  -> só objetos NÃO-ANDÁVEIS (desenhado DEPOIS das criaturas,
+ *                 para paredes/pilares sobreporem monstros/players como no client)
+ * Regra de z-order (igual ao client Tibia): tiles/pisos e decorações andáveis
+ * (sofás, gelo, tapetes) ficam ABAIXO das criaturas (o player anda em cima);
+ * paredes/pilares (não-andáveis) ficam ACIMA, cobrindo quem está atrás/dentro
+ * do footprint. */
+function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
+  if (mode === undefined) mode = "all";
   const tw = W / cols, th = H / rows;
-  ctx.fillStyle = "#060806";
-  ctx.fillRect(0, 0, W, H);
-  // OTC/Canary desenha o mapa por camadas, não por SQM completo. Fazer
-  // ground + objeto em cada célula fazia o ground seguinte cobrir pedaços
-  // de paredes/cristais 2×2 e gerava um mosaico recortado no mapa Ice.
-  // Primeira passagem: todos os pisos, sempre atrás de objetos grandes.
-  for (let y = 0; y < rows && y < map.rows.length; y++) {
-    const row = map.rows[y];
-    for (let x = 0; x < cols && x < row.length; x++) {
-      const L = map.leg[row[x]];
-      if (!L || !L.v || !L.v.length) continue;
-      TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
+  // Item explicitamente NÃO-ANDÁVEL (parede/pilar/bloqueante) em TILEFLAGS:
+  // desenhado POR CIMA das criaturas. Ausente em TILEFLAGS ou andável =>
+  // decoração andável (sofá, gelo), desenhada ABAIXO das criaturas.
+  const isBlocking = function (id) {
+    const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+    return !!(f && f[0] === 0);
+  };
+  const cellIsWall = function (L) {
+    return !!(L.v && L.v.some(function (id) {
+      const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+      return f && f[0] === 0;
+    }));
+  };
+  const drawCellItems = function (onlyBlocking) {
+    for (let y = 0; y < rows && y < map.rows.length; y++) {
+      const row = map.rows[y];
+      for (let x = 0; x < cols && x < row.length; x++) {
+        const L = map.leg[row[x]];
+        if (!L || !L.g) continue;
+        const cw = cellIsWall(L);
+        for (const id of L.g) {
+          if (isBlocking(id) !== onlyBlocking) continue;
+          TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw);
+        }
+      }
     }
-  }
-  // Segunda passagem: paredes, móveis e objetos 2×2/1×2. Nenhum piso pode
-  // mais apagar suas partes que avançam sobre SQMs vizinhos.
-  for (let y = 0; y < rows && y < map.rows.length; y++) {
-    const row = map.rows[y];
-    for (let x = 0; x < cols && x < row.length; x++) {
-      const L = map.leg[row[x]];
-      if (!L || !L.g) continue;
-      // Itens OTBM (tapetes, sofás, paredes e cristais) usam âncora de
-      // decoração/base do SQM, não âncora de ground. Isso preserva a
-      // sobreposição natural de objetos multi-SQM do client.
-      for (const id of L.g) TileSprites.drawDeco(ctx, id, x * tw, y * th, tw);
+  };
+  const drawDecoItems = function (onlyBlocking) {
+    for (const d of map.deco || []) {
+      if (isBlocking(d[0]) !== onlyBlocking) continue;
+      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false);
     }
+  };
+  if (mode !== "objects") {
+    ctx.fillStyle = "#060806";
+    ctx.fillRect(0, 0, W, H);
+    // Primeira passagem: todos os pisos (sempre atrás de tudo).
+    for (let y = 0; y < rows && y < map.rows.length; y++) {
+      const row = map.rows[y];
+      for (let x = 0; x < cols && x < row.length; x++) {
+        const L = map.leg[row[x]];
+        if (!L || !L.v || !L.v.length) continue;
+        TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
+      }
+    }
+    // Objetos ANDÁVEIS/decorativos (sofás, gelo, tapetes): ABAIXO das criaturas.
+    if (mode === "all" || mode === "ground") { drawCellItems(false); drawDecoItems(false); }
   }
-  // Terceira passagem: decoração explícita acima das camadas OTBM.
-  for (const d of map.deco || [])
-    TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw);
+  if (mode !== "ground") {
+    // Objetos NÃO-ANDÁVEIS (paredes, pilares, móveis bloqueantes): ACIMA das
+    // criaturas — sobrepõem monstros/players que estejam atrás/dentro do footprint.
+    if (mode === "all" || mode === "objects") { drawCellItems(true); drawDecoItems(true); }
+  }
 }
