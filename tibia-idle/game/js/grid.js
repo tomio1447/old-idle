@@ -56,13 +56,17 @@ function resetGridSize() {
   return setGridSize(DEFAULT_GRID_W, DEFAULT_GRID_H);
 }
 
-/* Câmera fixa no centro da instância. O mapa inteiro cabe no canvas sem
- * deformar os SQMs: todos os tiles continuam quadrados e o espaço excedente
- * vira margem simétrica (letterbox). Mapas maiores apenas reduzem o zoom. */
+/* Câmera fixa no centro da instância, SEM zoom-out.
+ *
+ * O canvas sempre mostra a janela clássica de 21×13 SQMs no mesmo tamanho
+ * de tile. Mapas maiores continuam sendo renderizados integralmente no
+ * mundo, mas o próprio canvas recorta a janela visível ao redor do centro.
+ * Assim um mapa 80×50 não vira uma miniatura ilegível. */
 function centeredGridViewport(canvasWidth, canvasHeight, cols, rows) {
   cols = Math.max(1, Math.floor(Number(cols) || GRID_W));
   rows = Math.max(1, Math.floor(Number(rows) || GRID_H));
-  const tile = Math.min(canvasWidth / cols, canvasHeight / rows);
+  const tile = Math.min(canvasWidth / DEFAULT_GRID_W,
+                        canvasHeight / DEFAULT_GRID_H);
   const width = cols * tile;
   const height = rows * tile;
   return {
@@ -73,6 +77,8 @@ function centeredGridViewport(canvasWidth, canvasHeight, cols, rows) {
     tile: tile,
     cols: cols,
     rows: rows,
+    viewportWidth: canvasWidth,
+    viewportHeight: canvasHeight,
     centerX: canvasWidth / 2,
     centerY: canvasHeight / 2,
   };

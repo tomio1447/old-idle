@@ -36,7 +36,7 @@ divide mapas maiores que 256×256 em múltiplas `TILE_AREA` do formato OTBM.
 O único teto do arquivo é o campo `u16` do padrão: 65.535×65.535 SQMs (na
 prática, memória e desempenho do navegador serão o limite antes disso).
 
-A câmera de combate fica travada no centro geométrico da instância e ajusta
-o mapa inteiro ao canvas. Os SQMs permanecem quadrados; quando a proporção
-do mapa difere da tela, surgem margens simétricas em vez de cortar ou
-deformar tiles. Mapas maiores reduzem o zoom automaticamente.
+A câmera de combate fica travada no centro geométrico da instância e nunca
+aplica zoom-out. O mundo inteiro é renderizado com SQMs na escala nativa; o
+canvas funciona como uma janela fixa de 21×13 SQMs e recorta apenas o que
+fica fora do FOV. Assim mapas grandes continuam legíveis e jogáveis.

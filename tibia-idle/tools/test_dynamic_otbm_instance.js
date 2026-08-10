@@ -80,10 +80,10 @@ must(!ctx.beginStep(corner, { d: 'se', dx: 1, dy: 1, diag: true }, occ, false),
 combat.mobs = [];
 
 const iceView = vm.runInContext('centeredGridViewport(840, 520, 24, 16)', ctx);
-must(iceView.tile === 32.5 && iceView.width === 780 && iceView.height === 520,
-  'Viewport Ice não preserva SQMs quadrados');
-must(iceView.x === 30 && iceView.y === 0 && iceView.centerX === 420 && iceView.centerY === 260,
-  'Viewport Ice não está centralizado no canvas');
+must(iceView.tile === 40 && iceView.width === 960 && iceView.height === 640,
+  'Viewport Ice aplicou zoom-out nos SQMs');
+must(iceView.x === -60 && iceView.y === -60 && iceView.centerX === 420 && iceView.centerY === 260,
+  'Viewport Ice não está centralizado no FOV 21×13');
 
 // Exercita o renderer real com canvas falso: as duas camadas devem receber
 // 24×16 e a câmera precisa transladar exatamente para a margem central.
@@ -104,8 +104,8 @@ renderer.draw(combat, { hp: 0 }, 16);
 must(mapDraws.length === 2 && mapDraws.every(call => call[0] === 24 && call[1] === 16),
   'Renderer ainda cortou a Library Ice no grid legado');
 const translate = canvasOps.find(op => op[0] === 'translate');
-must(translate && translate[1] === 30 && translate[2] === 0,
-  'Renderer não aplicou a câmera central da Library Ice');
+must(translate && translate[1] === -60 && translate[2] === -60,
+  'Renderer não aplicou o FOV central sem zoom-out na Library Ice');
 must(canvasOps.filter(op => op[0] === 'save').length ===
      canvasOps.filter(op => op[0] === 'restore').length,
   'Renderer deixou estado de câmera/clip aberto');
@@ -125,9 +125,9 @@ must(large.camera.locked && large.camera.x === 40 && large.camera.y === 25,
 must(vm.runInContext('inBounds(79, 49) && !inBounds(80, 50)', ctx),
   'Bounds do mapa 80×50 foram limitados ao grid antigo');
 const largeView = vm.runInContext('centeredGridViewport(840, 520, 80, 50)', ctx);
-must(Math.abs(largeView.tile - 10.4) < 1e-12 &&
-     Math.abs(largeView.x - 4) < 1e-12 && largeView.y === 0,
-  'Câmera não ajustou mapa 80×50 ao centro do canvas');
+must(largeView.tile === 40 && largeView.width === 3200 && largeView.height === 2000 &&
+     largeView.x === -1180 && largeView.y === -740,
+  'Mapa 80×50 sofreu zoom-out em vez de usar o FOV nativo 21×13');
 
 // Sem mapa, cenas antigas continuam exatamente em 21×13.
 const plain = ctx.newCombat(player, 'plain', 'non-pvp');

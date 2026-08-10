@@ -352,8 +352,8 @@ function Renderer(canvas) {
 
 Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
-  // A janela mantém a proporção clássica 21×13. Instâncias de outras
-  // proporções são centralizadas com letterbox por centeredGridViewport().
+  // A janela mantém a proporção clássica 21×13. Hunts maiores usam essa
+  // janela como FOV fixo, sem reduzir o tamanho dos tiles.
   const h = Math.round(w * (13 / 21));
   // Canvas em DPR (máx. 2x) + desenho nearest: nítido e sem serrilhado.
   // O loop roda em requestAnimationFrame — na taxa do display (60/120/144Hz).
@@ -647,13 +647,16 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
-function drawBossBar(ctx, W, combat) {
+function drawBossBar(ctx, viewportW, combat, offsetX, offsetY) {
   if (!combat || !combat.boss || !combat.mobs.length) return;
   const boss = combat.mobs.find((m) => m.boss) || combat.mobs[0];
   if (!boss || boss.hp <= 0) return;
+  offsetX = Number(offsetX) || 0;
+  offsetY = Number(offsetY) || 0;
   const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
-  const bw = Math.min(520, W * 0.72), bh = 18;
-  const x = (W - bw) / 2, y = 10;
+  const bw = Math.min(520, viewportW * 0.72), bh = 18;
+  const center = offsetX + viewportW / 2;
+  const x = center - bw / 2, y = offsetY + 10;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.78)";
   ctx.fillRect(x - 3, y - 3, bw + 6, bh + 24);
@@ -673,10 +676,10 @@ function drawBossBar(ctx, W, combat) {
   ctx.textAlign = "center";
   // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
   ctx.fillStyle = tibiaHpColor(pct);
-  ctx.fillText(boss.def.name, W / 2, y + 11);
+  ctx.fillText(boss.def.name, center, y + 11);
   ctx.font = "bold 10px Verdana";
   ctx.fillStyle = "#fff";
-  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, W / 2, y + 31);
+  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31);
   ctx.restore();
 }
 
@@ -1335,7 +1338,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const W = view.width, H = view.height;
 
   // A câmera não segue criaturas: permanece no centro geométrico do mapa.
-  // O mapa inteiro é ajustado ao canvas com SQMs quadrados e margens iguais.
+  // O mundo inteiro é desenhado em escala nativa; o canvas recorta o FOV
+  // fixo de 21×13, sem zoom-out em hunts grandes.
   ctx.clearRect(0, 0, canvasW, canvasH);
   ctx.fillStyle = "#050605";
   ctx.fillRect(0, 0, canvasW, canvasH);
@@ -1449,7 +1453,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
   // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
-  drawBossBar(ctx, W, combat);
+  drawBossBar(ctx, canvasW, combat, -view.x, -view.y);
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
   const occupiedLabels = [];

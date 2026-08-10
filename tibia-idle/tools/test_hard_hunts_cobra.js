@@ -38,7 +38,7 @@ const cobraHunt = hunts['cobra-bastion'];
 must(JSON.stringify(cobraHunt.monsters) ===
   JSON.stringify(['cobra-vizier', 'cobra-scout', 'cobra-assassin']),
   'Cobra Bastion não usa os três monstros solicitados');
-must(JSON.stringify(cobraHunt.otbmBounds) === JSON.stringify({ x:148,y:156,w:21,h:18,z:2 }) &&
+must(!cobraHunt.otbmBounds &&
      JSON.stringify(cobraHunt.otbmMobBounds) === JSON.stringify({ x:154,y:160,w:10,h:12,z:2 }) &&
      JSON.stringify(cobraHunt.otbmSpawn) === JSON.stringify({ x:157,y:165,z:2 }),
   'FOV ou coordenadas RME da Cobra Bastion incorretos');
@@ -110,7 +110,7 @@ must(s.el === 'earth' && s.fx === 'green-rings' &&
   JSON.stringify(s.areaPattern) === JSON.stringify([[0],[-1,0,1]]),
   'Wave T do Assassin incorreta');
 
-// Mapa do commit 2e96f355 publicado no runtime, recortado e com zonas.
+// Mapa do commit 2e96f355 publicado integralmente no runtime, com zonas.
 const source = fs.readFileSync(path.join(game, 'beta-maps', 'cobra_bastion.otbm'));
 const runtime = fs.readFileSync(path.join(game, 'maps', 'cobra_bastion.otbm'));
 must(source.equals(runtime), 'cobra_bastion beta não foi publicado em maps/');
@@ -118,22 +118,21 @@ let map = OTBM.read(runtime);
 must(map.z === 2 && map.w === 22 && map.h === 20 &&
      map.sourceBounds.minX === 148 && map.sourceBounds.minY === 155,
   'Fonte Canary da Cobra Bastion inesperada');
-// Aplica o FOV inclusivo (148,156,2)–(168,173,2) antes das zonas.
-map = OTBM.crop(map, cobraHunt.otbmBounds);
+// Não aplica crop: o mapa inteiro é renderizado e o canvas limita o FOV.
 const zonesSource = fs.readFileSync(path.join(js, 'otbmhunt.js'), 'utf8');
 const start = zonesSource.indexOf('function applyHuntOtbmZones');
 const end = zonesSource.indexOf('\n\n/* Garante', start);
 vm.runInContext(zonesSource.slice(start, end), ctx);
 ctx.applyHuntOtbmZones(map, cobraHunt);
-must(map.w === 21 && map.h === 18 && map.spawn.x === 9 && map.spawn.y === 9 && map.mob.length === 120,
-  'FOV ou zonas absolutas da Cobra Bastion foram alterados');
+must(map.w === 22 && map.h === 20 && map.spawn.x === 9 && map.spawn.y === 10 && map.mob.length === 120,
+  'Mapa integral ou zonas absolutas da Cobra Bastion foram alterados');
 
 vm.runInContext(fs.readFileSync(path.join(js, 'tileflags.js'), 'utf8'), ctx);
 const hm = OTBM.huntMapFromOtbm(map, ctx.TILEFLAGS);
-must(hm.rows.length === 18 && hm.rows.every(row => row.length === 24),
-  'FOV runtime da Cobra Bastion não ficou 24×18');
-must(hm.spawn.x === 10 && hm.spawn.y === 9 && hm.mob.length === 120,
-  'Runtime alterou spawn/zonas após aplicar o FOV');
+must(hm.rows.length === 20 && hm.rows.every(row => row.length === 24),
+  'Mapa integral da Cobra Bastion não ficou 24×20');
+must(hm.spawn.x === 10 && hm.spawn.y === 10 && hm.mob.length === 120,
+  'Runtime alterou spawn/zonas do mapa integral');
 must(!hm.leg[hm.rows[hm.spawn.y][hm.spawn.x]].bloc &&
      !hm.footprintBlocked[hm.spawn.x + ':' + hm.spawn.y],
   'Player nasce em parede/objeto bloqueante');
