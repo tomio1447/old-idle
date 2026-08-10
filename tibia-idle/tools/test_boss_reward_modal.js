@@ -6,6 +6,7 @@ const game = path.join(__dirname, '..', 'game');
 const gameJs = fs.readFileSync(path.join(game,'js','game.js'),'utf8');
 const rewardJs = fs.readFileSync(path.join(game,'js','reward-chest.js'),'utf8');
 const css = fs.readFileSync(path.join(game,'css','layout.css'),'utf8');
+const indexHtml = fs.readFileSync(path.join(game,'index.html'),'utf8');
 function must(ok,msg){ if(!ok) throw Error(msg); }
 
 must(gameJs.includes('const BOSS_COOLDOWN = 0;'), 'Cooldown global dos bosses não foi zerado');
@@ -24,13 +25,21 @@ must(rewardJs.includes('const REWARD_CHEST_ITEM_ID = 19250;'),
 const chestPng=fs.readFileSync(path.join(game,'assets','item','reward-chest.png'));
 must(chestPng.readUInt32BE(16)===45 && chestPng.readUInt32BE(20)===40,
   'Sprite oficial do Reward Chest ausente/incorreta');
+must(indexHtml.includes('<img src="assets/item/reward-chest.png" class="reward-btn-icon"') &&
+     !indexHtml.includes('🎁 REWARD'),
+  'Botão REWARD ainda usa emoji em vez do client id 19250');
+must(gameJs.includes('hunt-best-card boss-best-card') &&
+     gameJs.includes('hunt-best-loot boss-best-loot') &&
+     gameJs.includes('% de chance'),
+  'Card do boss não replica o card dos monstros/tooltip de chance');
 must(rewardJs.includes('data-reward-boss') && rewardJs.includes('rewardBossCard') &&
      rewardJs.includes('Escolha o boss para abrir sua recompensa.'),
   'Primeira tela não exige clicar na imagem do boss');
 must(rewardJs.includes('class="reward-slot') && rewardJs.includes('class="reward-slot-grid"') &&
      rewardJs.includes('RECOLHER TUDO'), 'Tela de drops em slots incompleta');
 for (const cls of ['.reward-chest-custom','.reward-boss-grid','button.reward-boss-card',
-                   '.reward-slot-grid','button.reward-slot','.reward-slot-count'])
+                   '.reward-slot-grid','button.reward-slot','.reward-slot-count',
+                   '.boss-best-card','.boss-best-loot','.reward-btn-icon'])
   must(css.includes(cls), 'CSS ausente: '+cls);
 const combat=fs.readFileSync(path.join(game,'js','combat.js'),'utf8');
 must(combat.includes('rewardChestAdd(p, l.item, count, rewardSource)') &&

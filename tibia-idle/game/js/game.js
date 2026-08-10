@@ -867,32 +867,49 @@ function openBossModal(id) {
   if (!boss) return;
   const ready = bossReadyInfo(G.p, boss);
   const st = bossState(G.p, id);
-  // Drops do boss: sprites lado a lado (como o baiak-idle.com), simples e
-  // sem poluição — nome + sprite + chance.
   const drops = bossLootReal(boss);
+  const stats = bossStats(boss);
+  const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite] || {};
+  const elements = ["physical", "earth", "energy", "fire", "ice", "holy", "death"];
+  const resistHtml = elements.map((el) => {
+    const value = (base.resist && base.resist[el]) || 0;
+    const info = ELEMENTS[el] || ELEMENTS.physical;
+    const width = Math.max(8, Math.min(100, 50 + value / 2));
+    const color = value < 0 ? "#e85b52" : (value >= 100 ? "#37d45b" : "#80d64a");
+    return `<div class="hunt-best-res" title="${info.name}: ${value > 0 ? "+" : ""}${value}%">
+      <span>${info.icon || "◆"}</span><i><b style="width:${width}%;background:${color}"></b></i></div>`;
+  }).join("");
+  const lootHtml = drops.map((l) => {
+    const name = itemName(l.item);
+    const title = `${name} · ${l.chance}% de chance${l.max > 1 ? ` · até ${l.max}x` : ""}`;
+    return `<div class="hunt-loot-slot" title="${title}">${itemImg(l.item, 28)}</div>`;
+  }).join("") || `<span class="tiny dim">Sem loot.</span>`;
+
   $("#modal-body").innerHTML = `
     <div class="panel-title">
       ${mobImg(boss.sprite, 24)}
       ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
       <span style="flex:1"></span><button class="sm" id="boss-close">✕</button>
     </div>
-    <div class="panel-body">
-      <div class="panel-inset mb8" style="padding:8px">
-        <div class="stat-row"><span class="k">Requisito</span><span class="v">${boss.requirement ? boss.requirement.text : "—"}</span></div>
-        <div class="stat-row"><span class="k">Disponibilidade</span><span class="v" style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.left ? fmtTime(ready.left / 1000) : ready.reason}</span></div>
-        <div class="stat-row"><span class="k">Vitórias</span><span class="v">${fmtFull(st.kills || 0)}</span></div>
+    <div class="panel-body boss-detail-body">
+      <div class="boss-detail-summary">
+        <span>Requisito: <b>${boss.requirement ? boss.requirement.text : "—"}</b></span>
+        <span>Disponibilidade: <b style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.left ? fmtTime(ready.left / 1000) : ready.reason}</b></span>
+        <span>Vitórias: <b>${fmtFull(st.kills || 0)}</b></span>
       </div>
-      <div class="small dim mb4">Drops — chance oficial do Canary</div>
-      <div class="reward-grid mb8">
-        ${drops.map((l) => `
-          <div class="reward-item" title="${itemName(l.item)} — ${l.chance}%${l.max > 1 ? " · até " + l.max + "x" : ""}">
-            ${itemImg(l.item)}
-            <div class="tiny dim reward-name">${itemName(l.item)}</div>
-            <div class="tiny" style="color:#ffd65a">${l.chance}%${l.max > 1 ? " · " + l.max + "x" : ""}</div>
-          </div>`).join("")}
+      <div class="hunt-best-card boss-best-card">
+        <div class="hunt-best-sprite boss-best-sprite">${mobImg(boss.sprite, 76)}</div>
+        <div class="hunt-best-name">${boss.name}</div>
+        <div class="hunt-best-stat"><span>HP</span><b>${fmtFull(stats.hp)}</b></div>
+        <div class="hunt-best-stat"><span>Exp</span><b>${fmtFull(stats.exp)}</b></div>
+        <div class="hunt-best-title">RESISTÊNCIAS</div>
+        <div class="hunt-best-resists boss-best-resists">${resistHtml}</div>
+        <div class="hunt-best-title">LOOT</div>
+        <div class="hunt-best-loot boss-best-loot">${lootHtml}</div>
       </div>
-      <button class="danger full" id="boss-fight" ${ready.ok ? "" : "disabled"}>FIGHT</button>
-      <div class="tiny dim mt8">Ao terminar a luta, vencendo ou morrendo, você será teleportado para a cidade. O loot do boss vai para o 🎁 Reward Chest.</div>
+      <button class="danger full mt8" id="boss-fight" ${ready.ok ? "" : "disabled"}>FIGHT</button>
+      <div class="tiny dim mt8 center">O loot vai para o
+        <img src="assets/item/reward-chest.png" class="boss-reward-inline" alt="Reward Chest"> Reward Chest.</div>
     </div>`;
   $("#modal").classList.add("show");
   $("#boss-close").addEventListener("click", () => $("#modal").classList.remove("show"));
