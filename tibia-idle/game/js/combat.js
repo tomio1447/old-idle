@@ -3497,6 +3497,19 @@ function rollLoot(c, p, mob) {
     p = c.players[0].p;
   }
   const got = [];
+  // Cada boss gera um pacote próprio no Reward Chest. Todos os drops desta
+  // morte compartilham o mesmo bundleId para a tela inicial listar o boss.
+  let rewardSource = null;
+  if (mob.boss) {
+    const bossId = (c.boss && c.boss.id) || mob.slug;
+    if (!c.rewardBundleId)
+      c.rewardBundleId = bossId + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,7);
+    rewardSource = {
+      bundleId:c.rewardBundleId, bossId,
+      name:(c.boss && c.boss.name) || mob.def.name || bossId,
+      sprite:(c.boss && c.boss.sprite) || mob.slug,
+    };
+  }
   // Rate de loot do servidor: multiplica a chance de drop
   const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
   for (const l of mob.def.loot) {
@@ -3510,11 +3523,16 @@ function rollLoot(c, p, mob) {
     if (!it) continue;
     if (!mob.boss && isNoCollect(p, l.item)) continue;
     // filtro de loot
-    if (p.config.lootFilter === "valuable" && (it.sell || 0) < 20 &&
+    if (!mob.boss && p.config.lootFilter === "valuable" && (it.sell || 0) < 20 &&
         l.item !== "gold-coin") continue;
-    if (p.config.lootFilter === "equip" && !it.s && l.item !== "gold-coin")
+    if (!mob.boss && p.config.lootFilter === "equip" && !it.s && l.item !== "gold-coin")
       continue;
-    if (l.item === "gold-coin") {
+    if (mob.boss) {
+      // TODO drop do boss, inclusive moedas, fica selado no pacote até o
+      // jogador clicar na imagem do boss no Reward Chest.
+      if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count, rewardSource);
+      else addLootPouch(p, l.item, count);
+    } else if (l.item === "gold-coin") {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
@@ -3524,11 +3542,6 @@ function rollLoot(c, p, mob) {
       c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
       got.push({ item: l.item, count: count });
       continue;
-    } else if (mob.boss) {
-      // REWARD CHEST: todo drop de boss vai para o baú de recompensas
-      // (separado da Loot Pouch comum)
-      if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count);
-      else addLootPouch(p, l.item, count);
     } else if (SUPPLIES[l.item]) {
       p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
     } else if (it.s === "ammo") {
@@ -3550,7 +3563,10 @@ function rollLoot(c, p, mob) {
         const it = GAMEDATA.items[l.item];
         if (!it) continue;
         if (!mob.boss && isNoCollect(p, l.item)) continue;
-        if (l.item === "gold-coin") {
+        if (mob.boss) {
+          if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count, rewardSource);
+          else addLootPouch(p, l.item, count);
+        } else if (l.item === "gold-coin") {
           const g = Math.floor(count * goldStage(c.hunt.level));
           p.gold += g; c.stats.gold += g;
         } else if (currencyValue(l.item)) {
@@ -3558,9 +3574,6 @@ function rollLoot(c, p, mob) {
           c.stats.gold += g;
           c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
           got.push({ item: l.item, count: count });
-        } else if (mob.boss) {
-          if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count);
-          else addLootPouch(p, l.item, count);
         } else if (SUPPLIES[l.item]) {
           p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
         } else if (it.s === "ammo") {
