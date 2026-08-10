@@ -651,7 +651,8 @@ function isMissionComplete(p, huntId) {
 }
 
 /* ------------------------------------------------------------ bosses */
-const BOSS_COOLDOWN = 16 * 3600 * 1000;
+// Temporariamente todos os bosses podem ser repetidos sem cooldown.
+const BOSS_COOLDOWN = 0;
 const BOSS_DEFS = {
   "the-monster": {
     id: "the-monster",
@@ -936,7 +937,7 @@ function startBoss(id, force, arenaReady) {
   G.p.instanceMode = "boss";
   G.combat = newBossCombat(G.p, boss);
   G.inCity = false;
-  addLog("death", `Você entrou no boss <b>${boss.name}</b>. Cooldown iniciado: 16h.`);
+  addLog("death", `Você entrou no boss <b>${boss.name}</b>. ${boss.cooldown ? "Cooldown iniciado: " + fmtTime(boss.cooldown / 1000) + "." : "Sem cooldown."}`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
   // PARTY: líder entrou numa sala de boss -> o SERVIDOR valida os
   // requisitos (cooldown + missão) de TODOS os membros antes do follow.
