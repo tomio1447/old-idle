@@ -119,20 +119,23 @@ if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") 
 
 /* Linha do spritesheet por direcao, na ordem do client (igual a das outfits) */
 const MOB_DIR_ROW = { n: 0, e: 1, s: 2, w: 3 };
-/* Monstros 15x têm uma pose-base na coluna 0 e os frames animados nas
- * colunas seguintes. A rotina antiga incluía a pose-base em todo ciclo e
- * criava pausas longas/duplicadas, fazendo Soul War e DT Seal parecerem
- * estáticos. Com 3+ colunas percorremos continuamente apenas os frames de
- * movimento; sheets de 2 colunas alternam base/passada. `phase` dessincroniza
- * criaturas iguais para a box não parecer uma única imagem repetida. */
+/* Parado usa SOMENTE o frame group idle real do DAT. `MOBSHEETS.cols`
+ * descreve pose 0 + caminhada e, portanto, nunca pode decidir animação idle.
+ * Criaturas com apenas grupo moving ficam travadas corretamente na pose 0. */
+function monsterIdleMeta(slug) {
+  if (typeof idleAnimationMeta === "function")
+    return idleAnimationMeta("monsters", slug);
+  const all = (typeof IDLE_ANIMATIONS !== "undefined" && IDLE_ANIMATIONS.monsters) || {};
+  return all[slug] && all[slug].frames > 1 ? all[slug] : null;
+}
+
 function monsterIdleFrame(slug, now, phase) {
-  const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS) ? MOBSHEETS[slug] : null;
-  const cols = meta ? Math.max(1, meta.cols || 1) : 1;
-  if (cols <= 1) return 0;
-  const first = cols > 2 ? 1 : 0;
-  const count = cols - first;
-  const clock = now === undefined ? Date.now() : now;
-  return first + ((Math.floor(clock / 160) + (phase || 0)) % count);
+  const meta = monsterIdleMeta(slug);
+  if (!meta) return 0;
+  const offset = (phase || 0) % (meta.duration || 1);
+  return typeof idleAnimationFrame === "function"
+    ? idleAnimationFrame(meta, now === undefined ? Date.now() : now, offset)
+    : 0;
 }
 
 function monsterAnimationPhase(ent) {
@@ -158,20 +161,24 @@ function mobImg(slug, tam, extra) {
     return `<div class="mob-img" style="width:${px}px;height:${px}px;
             ${extra || ""}"></div>`;
   }
+  const idle = monsterIdleMeta(slug);
+  const visual = idle || meta;
+  const frames = idle ? idle.frames : 1;
   // a celula do sul e a linha 2; escala para caber na caixa pedida
-  const k = Math.min(px / meta.cw, px / meta.ch);
-  const w = meta.cw * k, h = meta.ch * k;
+  const k = Math.min(px / visual.cw, px / visual.ch);
+  const w = visual.cw * k, h = visual.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-  const animated = meta.cols > 1 ? " mob-img-animated" : "";
-  const sheetW = meta.cw * meta.cols * k;
+  const animated = idle ? " mob-img-animated" : "";
+  const sheetW = visual.cw * frames * k;
+  const path = `assets/mob/${slug}${idle ? ".idle" : ""}.png?v=${v}`;
   return `<div class="mob-img${animated}" data-mob="${slug}" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;
-      background-image:url('assets/mob/${slug}.png?v=${v}');
-      background-size:${sheetW.toFixed(1)}px ${(meta.ch * meta.rows * k).toFixed(1)}px;
+      background-image:url('${path}');
+      background-size:${sheetW.toFixed(1)}px ${(visual.ch * 4 * k).toFixed(1)}px;
       background-position:0 -${(2 * h).toFixed(1)}px;
       --mob-sheet-width:${sheetW.toFixed(1)}px;
-      --mob-sheet-frames:${meta.cols};
-      --mob-sheet-duration:${Math.max(360, meta.cols * 160)}ms;
+      --mob-sheet-frames:${frames};
+      --mob-sheet-duration:${idle ? idle.duration : 0}ms;
       image-rendering:pixelated;${extra || ""}"></div>`;
 }
 
@@ -225,6 +232,25 @@ const Sprites = {
     cv.getContext("2d").drawImage(sheet, col * meta.cw, linha * meta.ch,
                                   meta.cw, meta.ch, 0, 0, meta.cw, meta.ch);
     this.mobCache[k] = cv;
+    return cv;
+  },
+  mobIdleCache: {},
+  mobIdle(slug, dir, frame) {
+    const meta = monsterIdleMeta(slug);
+    if (!meta) return null;
+    const linha = MOB_DIR_ROW[dir] === undefined ? 2 : MOB_DIR_ROW[dir];
+    const col = Math.max(0, Math.min(meta.frames - 1, frame | 0));
+    const key = slug + "|" + linha + "|" + col;
+    if (this.mobIdleCache[key] !== undefined) return this.mobIdleCache[key];
+    const sheet = this.get(`assets/mob/${slug}.idle.png`);
+    if (!sheet || !sheet.complete) return null;
+    if (!sheet.naturalWidth) { this.mobIdleCache[key] = null; return null; }
+    const cv = document.createElement("canvas");
+    cv.width = meta.cw; cv.height = meta.ch;
+    cv.getContext("2d").drawImage(sheet,
+      col * meta.cw, linha * meta.ch, meta.cw, meta.ch,
+      0, 0, meta.cw, meta.ch);
+    this.mobIdleCache[key] = cv;
     return cv;
   },
   mob(slug, dir) { return this.mobCell(slug, dir || "s", 0); },
@@ -1416,10 +1442,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const ent = e.ent;
     let img = null, w = 0, h = 0, name = '', hpPct = 0, mpPct = null, shieldPct = 0;
     if (e.kind === "monster") {
-      const frame = ent.moving ? (ent.frame || 1)
-        : monsterIdleFrame(ent.slug, Date.now(), monsterAnimationPhase(ent));
-      const walk = frame ? Sprites.mobWalk(ent.slug, ent.dir || "w", frame) : null;
-      img = spriteReady(walk) ? walk : Sprites.mob(ent.slug, ent.dir || "w");
+      if (ent.moving) {
+        const walk = Sprites.mobWalk(ent.slug, ent.dir || "w", ent.frame || 1);
+        img = spriteReady(walk) ? walk : Sprites.mob(ent.slug, ent.dir || "w");
+      } else {
+        const idleMeta = monsterIdleMeta(ent.slug);
+        const idle = idleMeta ? Sprites.mobIdle(ent.slug, ent.dir || "w",
+          monsterIdleFrame(ent.slug, Date.now(), monsterAnimationPhase(ent))) : null;
+        img = spriteReady(idle) ? idle : Sprites.mob(ent.slug, ent.dir || "w");
+      }
       name = typeof displayMonsterName === "function" ? displayMonsterName(ent.def.name) : ent.def.name;
       hpPct = Math.max(0, ent.hp / ent.maxHp);
     } else {

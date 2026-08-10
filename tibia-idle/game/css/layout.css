@@ -1251,9 +1251,8 @@ div.item-sprite { background-repeat: no-repeat; }
    telas usam uma div com background-position no lugar da tag de imagem. */
 .mob-img { background-repeat: no-repeat; display: inline-block;
            vertical-align: middle; }
-/* Bestiário, prey e listas também exibem os frames do spritesheet. Antes a
-   miniatura ficava presa na coluna 0, dando a impressão de sprite estática
-   mesmo quando a cena de combate possuía todos os quadros. */
+/* Bestiário, prey e listas só animam quando existe frame group IDLE real.
+   Frames de caminhada nunca são reproduzidos por uma criatura parada. */
 .mob-img-animated {
   animation: mob-sheet-frames var(--mob-sheet-duration, 900ms)
              steps(var(--mob-sheet-frames, 3), end) infinite;

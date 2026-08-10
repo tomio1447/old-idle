@@ -159,9 +159,8 @@ const OutfitRenderer = {
    * esta em uso: o novo (spritesheet com ate 8 quadros) ou o classico, que
    * so tem dois PNGs por direcao. */
   frameCount(p) {
-    if (p && p.outfit && p.outfit.appearance &&
-        typeof APP_OUTFIT !== "undefined") {
-      const o = APP_OUTFIT[p.outfit.appearance];
+    if (p && typeof currentAppearance === "function") {
+      const o = (typeof activeAvatarAppearance === "function" && activeAvatarAppearance(p)) || currentAppearance(p);
       if (o && o.cols) return Math.max(1, o.cols - 1);
     }
     return 2;                       // sprites classicos: _dir1 e _dir2
@@ -190,10 +189,11 @@ const OutfitRenderer = {
       if (cv) return cv;
       return null;
     }
-    const suf = frame ? `${dir}${frame}` : dir;
+    const numericFrame = typeof frame === "number" ? frame : 0;
+    const suf = numericFrame ? `${dir}${numericFrame}` : dir;
     const cv = this.get(o.name, suf, o.colors);
     if (cv) return cv;
-    return Sprites.walk(o.name, dir, frame) || Sprites.outfit(o.name, dir);
+    return Sprites.walk(o.name, dir, numericFrame) || Sprites.outfit(o.name, dir);
   },
 
   /* Data URL de uma prévia (usada na lista de personagens) */
