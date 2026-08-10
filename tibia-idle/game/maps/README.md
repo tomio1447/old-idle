@@ -27,3 +27,16 @@ abre no RME, CipSoft-style tools e nosso próprio `js/otbm.js`. As zonas
 S/G viajam numa linha `OTIDLE:{...}` da descrição do mapa — se re-salvar o
 mapa PELO RME oficial, a linha pode ser perdida (limitação documentada,
 refaça as zonas no editor web nesse caso).
+
+## Dimensões das instâncias
+
+As hunts OTBM não são mais limitadas ao grid legado de 21×13. A instância
+adota automaticamente a largura e a altura reais do arquivo, e o editor web
+divide mapas maiores que 256×256 em múltiplas `TILE_AREA` do formato OTBM.
+O único teto do arquivo é o campo `u16` do padrão: 65.535×65.535 SQMs (na
+prática, memória e desempenho do navegador serão o limite antes disso).
+
+A câmera de combate fica travada no centro geométrico da instância e ajusta
+o mapa inteiro ao canvas. Os SQMs permanecem quadrados; quando a proporção
+do mapa difere da tela, surgem margens simétricas em vez de cortar ou
+deformar tiles. Mapas maiores reduzem o zoom automaticamente.

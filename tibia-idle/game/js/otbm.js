@@ -87,6 +87,8 @@
 
   /* cells: objeto "x,y" -> {g: idDoChao|0, items: [ids...]} */
   function write(map) {
+    if (!map || map.w < 1 || map.h < 1 || map.w > 65535 || map.h > 65535)
+      throw new Error("dimensões OTBM devem ficar entre 1 e 65535 SQMs");
     var out = new EscBuf();
     /* magic + versao 2 (cabecalho fixo, SEM escape) */
     out.raw(0x4F); out.raw(0x54); out.raw(0x42); out.raw(0x4D);
@@ -108,39 +110,48 @@
     out.u32(860);  // items.otb minor version
     out.u32(0);    // subversion/reservado
 
-    // TILE_AREA unica (mapas do editor tem no maximo 256x256 por design)
+    // TILE usa offsets u8, portanto mapas maiores que 256 SQMs são divididos
+    // automaticamente em várias TILE_AREA de 256×256. O formato mantém a
+    // base de cada área em u16 e suporta dimensões de até 65535×65535.
     var z = map.z === undefined ? 7 : map.z;
-    out.raw(NODE_START);
-    out.u8(NODE_TILE_AREA);
-    out.u16(0); out.u16(0); out.u8(z);
-
-    var cells = map.cells || {};
-    var keys = Object.keys(cells);
-    keys.sort(function (a, b) {
-      var pa = a.split(","), pb = b.split(",");
-      var d = (+pa[1]) - (+pb[1]);
-      return d !== 0 ? d : (+pa[0]) - (+pb[0]);
+    var cells = map.cells || {}, areas = {};
+    Object.keys(cells).forEach(function (key) {
+      var xy = key.split(","), x = +xy[0], y = +xy[1], cell = cells[key];
+      if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 ||
+          x >= map.w || y >= map.h ||
+          !cell || (!cell.g && !(cell.items && cell.items.length))) return;
+      var bx = Math.floor(x / 256) * 256, by = Math.floor(y / 256) * 256;
+      var areaKey = bx + "," + by;
+      if (!areas[areaKey]) areas[areaKey] = { x: bx, y: by, tiles: [] };
+      areas[areaKey].tiles.push({ x: x, y: y, cell: cell });
     });
-    for (var i = 0; i < keys.length; i++) {
-      var xy = keys[i].split(",");
-      var x = +xy[0], y = +xy[1];
-      var cell = cells[keys[i]];
-      if (!cell || (!cell.g && !(cell.items && cell.items.length))) continue;
+    var areaList = Object.keys(areas).map(function (key) { return areas[key]; });
+    areaList.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+
+    for (var a = 0; a < areaList.length; a++) {
+      var area = areaList[a];
+      area.tiles.sort(function (ta, tb) { return ta.y - tb.y || ta.x - tb.x; });
       out.raw(NODE_START);
-      out.u8(NODE_TILE);
-      out.u8(x); out.u8(y);
-      if (cell.g) { out.u8(9); out.u16(cell.g); }   // OTBM_ATTR_ITEM inline
-      if (cell.items) {
-        for (var j = 0; j < cell.items.length; j++) {
-          out.raw(NODE_START);
-          out.u8(NODE_ITEM);
-          out.u16(cell.items[j]);
-          out.raw(NODE_END);
+      out.u8(NODE_TILE_AREA);
+      out.u16(area.x); out.u16(area.y); out.u8(z);
+      for (var i = 0; i < area.tiles.length; i++) {
+        var tile = area.tiles[i], cell = tile.cell;
+        out.raw(NODE_START);
+        out.u8(NODE_TILE);
+        out.u8(tile.x - area.x); out.u8(tile.y - area.y);
+        if (cell.g) { out.u8(9); out.u16(cell.g); } // OTBM_ATTR_ITEM inline
+        if (cell.items) {
+          for (var j = 0; j < cell.items.length; j++) {
+            out.raw(NODE_START);
+            out.u8(NODE_ITEM);
+            out.u16(cell.items[j]);
+            out.raw(NODE_END);
+          }
         }
+        out.raw(NODE_END); // fim do TILE
       }
-      out.raw(NODE_END); // fim do TILE
+      out.raw(NODE_END);   // fim da TILE_AREA
     }
-    out.raw(NODE_END);   // fim da TILE_AREA
 
     out.raw(NODE_END);   // fim da raiz
     return out.toArrayBuffer();
@@ -440,21 +451,30 @@
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
              "0123456789<>[](){}.,;:!@$%&*^_+-=?~|";
     var legenda = {}, assin = {}, pool = 0;
+    function legendaChar(index) {
+      if (index < CH.length) return CH[index];
+      // Não recicle caracteres: em mapas ricos isso misturava pisos/colisão
+      // de assinaturas diferentes. Continue por caracteres BMP de um único
+      // code unit (row[x] segue válido), pulando a faixa de surrogates.
+      var code = 0x0100 + (index - CH.length);
+      if (code >= 0xD800) code += 0x0800;
+      if (code > 0xFFFD) throw new Error("mapa OTBM excede 63 mil combinações de tiles");
+      return String.fromCharCode(code);
+    }
     function charDa(chave, entry) {
       if (assin[chave] !== undefined) return assin[chave];
-      var c = CH[pool++];
-      if (pool > CH.length) c = CH[pool % CH.length]; // nao deve acontecer
+      var c = legendaChar(pool++);
       assin[chave] = c;
       legenda[c] = entry;
       return c;
     }
     var VOID = " ";
-    // Void da moldura 24×15: bloqueia movimentação, mas não possui sprite.
+    // Void da moldura mínima: bloqueia movimentação, mas não possui sprite.
     // Não use `v: []`: array vazio é truthy e gerava tiles/undefined.png.
     legenda[VOID] = { bloc: true };
-    // O grid físico do combate é 21×13 (COMBAT_GRID_W/H). Mapas menores
-    // são centralizados nessa moldura; não force 24×15, que cria void fora
-    // do grid e desloca mapas do RME.
+    // 24×15 preserva o enquadramento dos mapas antigos, mas não existe teto:
+    // qualquer OTBM maior mantém integralmente largura/altura e a instância
+    // dinâmica/câmera central cuidam do restante.
     var targetW = Math.max(24, map.w), targetH = Math.max(15, map.h);
     var padX = Math.max(0, Math.min(targetW - map.w,
       Math.floor((targetW - map.w) / 2) + (Number(map.idleOffsetX) || 0)));

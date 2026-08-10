@@ -24,10 +24,59 @@
  */
 "use strict";
 
-/* Tamanho da arena em SQMs. Mantido igual ao antigo para as cenas e o
- * render nao mudarem de escala. */
-const GRID_W = 21;
-const GRID_H = 13;
+/* Tamanho da arena em SQMs.
+ *
+ * 21×13 continua sendo o padrão das cenas procedurais, mas uma instância
+ * OTBM usa as dimensões reais do mapa. `let` é intencional: existe somente
+ * uma instância de combate ativa no cliente e toda a IA/camada de colisão
+ * precisa consultar o mesmo grid dinâmico. Não há teto artificial aqui; o
+ * limite prático passa a ser apenas memória/tempo do navegador. */
+const DEFAULT_GRID_W = 21;
+const DEFAULT_GRID_H = 13;
+let GRID_W = DEFAULT_GRID_W;
+let GRID_H = DEFAULT_GRID_H;
+
+function setGridSize(width, height) {
+  const w = Math.floor(Number(width));
+  const h = Math.floor(Number(height));
+  GRID_W = Number.isFinite(w) && w > 0 ? w : DEFAULT_GRID_W;
+  GRID_H = Number.isFinite(h) && h > 0 ? h : DEFAULT_GRID_H;
+  return { width: GRID_W, height: GRID_H };
+}
+
+function setGridForMap(map) {
+  if (!map || !Array.isArray(map.rows) || !map.rows.length)
+    return setGridSize(DEFAULT_GRID_W, DEFAULT_GRID_H);
+  let width = 0;
+  for (const row of map.rows) width = Math.max(width, row ? row.length : 0);
+  return setGridSize(width || DEFAULT_GRID_W, map.rows.length || DEFAULT_GRID_H);
+}
+
+function resetGridSize() {
+  return setGridSize(DEFAULT_GRID_W, DEFAULT_GRID_H);
+}
+
+/* Câmera fixa no centro da instância. O mapa inteiro cabe no canvas sem
+ * deformar os SQMs: todos os tiles continuam quadrados e o espaço excedente
+ * vira margem simétrica (letterbox). Mapas maiores apenas reduzem o zoom. */
+function centeredGridViewport(canvasWidth, canvasHeight, cols, rows) {
+  cols = Math.max(1, Math.floor(Number(cols) || GRID_W));
+  rows = Math.max(1, Math.floor(Number(rows) || GRID_H));
+  const tile = Math.min(canvasWidth / cols, canvasHeight / rows);
+  const width = cols * tile;
+  const height = rows * tile;
+  return {
+    x: (canvasWidth - width) / 2,
+    y: (canvasHeight - height) / 2,
+    width: width,
+    height: height,
+    tile: tile,
+    cols: cols,
+    rows: rows,
+    centerX: canvasWidth / 2,
+    centerY: canvasHeight / 2,
+  };
+}
 
 /* Constantes de movimento do Canary */
 const SERVER_BEAT = 50;                 // game.hpp: todo passo alinha em 50ms
@@ -261,8 +310,8 @@ function advanceStep(ent, dt) {
  * reproduz a preferencia do servidor por andar reto. A heuristica e a
  * distancia de Chebyshev, admissivel para esses custos.
  *
- * O teto de 400 nos evita e generoso para uma grade de 21x13 (273 celulas) e
- * garante que o pior caso nao pese no tick.
+ * O teto acompanha a área da instância. O antigo valor fixo de 400 fazia o
+ * A* desistir em mapas grandes mesmo quando existia caminho livre.
  */
 function findPathGrid(ent, gx, gy, occ, maxNos) {
   const inicio = ent.cx + ":" + ent.cy;
@@ -274,7 +323,7 @@ function findPathGrid(ent, gx, gy, occ, maxNos) {
   const custo = new Map([[inicio, 0]]);
   const fechados = new Set();
   let nos = 0;
-  const teto = maxNos || 400;
+  const teto = maxNos || Math.max(400, GRID_W * GRID_H);
 
   while (abertos.length && nos < teto) {
     // fila de prioridade simples: a grade e pequena, um scan linear e mais

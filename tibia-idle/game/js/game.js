@@ -1046,6 +1046,7 @@ function stopHunt() {
   G.p.hunt = null;
   G.p.instanceMode = null;
   G.combat = null;
+  if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
   addLog("info", "Voltou para a <b style='color:#ffe680'>Cidade de Thais</b>.");
   // ao chegar na cidade o char descansa: cura completa
@@ -1081,6 +1082,7 @@ function startAcademy() {
 function stopAcademy(log) {
   if (!G.training) return;
   G.training = null;
+  if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
   G.combat = null;
   G.p.hunt = null;

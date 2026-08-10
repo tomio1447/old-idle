@@ -1,6 +1,6 @@
 /* Regressão: mapas reais exportados pelo Canary's Map Editor 4.
- * Confirma que o beta foi publicado no runtime, que o recorte jogável tem
- * 24×15 SQMs e que todos os IDs usados possuem PNG físico. */
+ * Confirma que o beta foi publicado no runtime, preserva as dimensões reais
+ * da instância e garante PNG físico para todos os IDs usados. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -13,10 +13,7 @@ const maps = [
   },
   {
     name: 'livraria_ice', w: 24, h: 16, cells: 361, z: 2,
-    // Mesmo recorte configurado pela hunt "library-ice".
-    crop: { x: 147, y: 156, w: 24, h: 15, z: 2 },
-    croppedCells: 360,
-    runtimeW: 24, runtimeH: 15,
+    runtimeW: 24, runtimeH: 16,
     // Sprites introduzidas pela atualização gráfica de 83103680.
     requiredIds: [7107, 28291, 28325],
   },

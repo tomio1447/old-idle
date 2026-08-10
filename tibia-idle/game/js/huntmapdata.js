@@ -1,8 +1,9 @@
 /*
  * huntmapdata.js — mapas fechados das hunts (cenario real, com colisao).
  *
- * Cada mapa e uma grade de caracteres do tamanho exato da arena de combate
- * (GRID_W x GRID_H). A legenda liga cada caractere aos tiles oficiais
+ * Cada mapa é uma grade de caracteres; suas próprias linhas definem GRID_W
+ * e GRID_H da instância (21×13 é apenas o padrão sem mapa). A legenda liga
+ * cada caractere aos tiles oficiais
  * extraidos do client 8.60 (game/assets/tiles/<id>.png, ids confirmados no
  * items.xml do Canary) e diz se a celula BLOQUEIA movimento.
  *

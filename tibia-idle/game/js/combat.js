@@ -5,8 +5,6 @@
 "use strict";
 
 const TICK = 100;   // ms por tick de simulacao
-const COMBAT_GRID_W = 21;
-const COMBAT_GRID_H = 13;
 
 /* Animacao de spawn dos monstros: o teleporte "pisca" 3x no ponto antes de
  * o bicho nascer (pedido do jogador). SPAWN_BLINK_MS e o intervalo entre
@@ -43,8 +41,8 @@ function applyBossMultiplier(base, mult) {
 }
 
 /* Spawn para mapas OTBM sem marcador: busca a célula livre mais próxima do
- * centro visível. Evita o antigo (3,6), que podia cair em uma parede após
- * centralizar um recorte do RME dentro da moldura 24×15. */
+ * centro real da instância. Evita o antigo (3,6), que podia cair em uma
+ * parede ou fora da região central em mapas grandes. */
 function huntMapCenterSpawn(map) {
   const maxY = Math.min(GRID_H, map && map.rows ? map.rows.length : GRID_H);
   const maxX = Math.min(GRID_W, map && map.rows && map.rows[0] ? map.rows[0].length : GRID_W);
@@ -67,6 +65,9 @@ function newCombat(player, huntId, instanceMode) {
   const pvp = mode === "pvp";
   /* mapa fechado da hunt (huntmapdata.js): paredes/agua bloqueiam o grid */
   const huntMap = (typeof HUNTMAPS !== "undefined" && hunt.mapa) ? HUNTMAPS[hunt.mapa] : null;
+  // A instância adota a largura/altura REAL do mapa antes de calcular spawn,
+  // posições normalizadas, colisão ou pathfinding. Sem mapa volta a 21×13.
+  if (typeof setGridForMap === "function") setGridForMap(huntMap);
   /* spawn do jogador: spawn vindo do .otbm; senao marcador "S" do mapa
    * ascii; sem mapa, canto esquerdo */
   let spx = 3, spy = 6;
@@ -74,17 +75,28 @@ function newCombat(player, huntId, instanceMode) {
     spx = huntMap.spawn.x;
     spy = huntMap.spawn.y;
   } else if (huntMap) {
-    let achou = false;
-    for (let y = 0; y < huntMap.rows.length && !achou; y++)
-      for (let x = 0; x < huntMap.rows[y].length; x++)
-        if (huntMap.rows[y][x] === "S") { spx = x; spy = y; achou = true; break; }
-    // Mapas Canary/RME não usam o marcador ASCII S: começam no centro livre.
-    if (!achou && huntMap.otbm) { const pos = huntMapCenterSpawn(huntMap); spx = pos.x; spy = pos.y; }
+    if (huntMap.otbm) {
+      // Em OTBM os caracteres são apenas índices da legenda e um deles pode
+      // legitimamente ser "S". Nunca o confunda com marcador ASCII: sem
+      // spawn explícito, procure uma célula livre no centro real do mapa.
+      const pos = huntMapCenterSpawn(huntMap);
+      spx = pos.x; spy = pos.y;
+    } else {
+      let achou = false;
+      for (let y = 0; y < huntMap.rows.length && !achou; y++)
+        for (let x = 0; x < huntMap.rows[y].length; x++)
+          if (huntMap.rows[y][x] === "S") { spx = x; spy = y; achou = true; break; }
+    }
   }
   const out = {
     huntId: huntId,
     hunt: hunt,
     huntMap: huntMap,
+    // Dimensões imutáveis desta instância para o renderer/câmera. O grid
+    // global acompanha estes valores enquanto este combate estiver ativo.
+    gridW: GRID_W,
+    gridH: GRID_H,
+    camera: { x: GRID_W / 2, y: GRID_H / 2, locked: true },
     instanceMode: mode,
     pvp: pvp,
     expMul: pvp ? 1.25 : 1,
@@ -118,7 +130,7 @@ function newCombat(player, huntId, instanceMode) {
       // x/y sao derivados dela e servem so para o render -- a verdade e
       // (cx, cy).
       cx: spx, cy: spy,
-      x: (spx + 0.5) / 21, y: (spy + 0.5) / 13, dir: "e", moving: false,
+      x: (spx + 0.5) / GRID_W, y: (spy + 0.5) / GRID_H, dir: "e", moving: false,
       frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
     },
     stats: {
@@ -393,8 +405,8 @@ function sqmDist(a, b) {
       a && b && a.cx !== undefined && b.cx !== undefined) {
     return sqmDistance(a, b);
   }
-  const dx = ((a.x || 0) - (b.x || 0)) * COMBAT_GRID_W;
-  const dy = ((a.y || 0) - (b.y || 0)) * COMBAT_GRID_H;
+  const dx = ((a.x || 0) - (b.x || 0)) * GRID_W;
+  const dy = ((a.y || 0) - (b.y || 0)) * GRID_H;
   return Math.max(Math.abs(dx), Math.abs(dy));
 }
 
@@ -405,8 +417,8 @@ function pointDistance(a, b) {
 }
 
 function pointDistanceSQM(a, b) {
-  const dx = ((a.x || 0) - (b.x || 0)) * COMBAT_GRID_W;
-  const dy = ((a.y || 0) - (b.y || 0)) * COMBAT_GRID_H;
+  const dx = ((a.x || 0) - (b.x || 0)) * GRID_W;
+  const dy = ((a.y || 0) - (b.y || 0)) * GRID_H;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
@@ -416,8 +428,8 @@ function clamp(v, min, max) {
 
 function entityCell(ent) {
   return {
-    x: clamp(Math.floor((ent.x || 0) * COMBAT_GRID_W), 0, COMBAT_GRID_W - 1),
-    y: clamp(Math.floor((ent.y || 0) * COMBAT_GRID_H), 0, COMBAT_GRID_H - 1),
+    x: clamp(Math.floor((ent.x || 0) * GRID_W), 0, GRID_W - 1),
+    y: clamp(Math.floor((ent.y || 0) * GRID_H), 0, GRID_H - 1),
   };
 }
 
@@ -427,10 +439,10 @@ function sameSQM(a, b) {
   return ca.x === cb.x && ca.y === cb.y;
 }
 function cellCenter(cell) {
-  return { x: (cell.x + 0.5) / COMBAT_GRID_W, y: (cell.y + 0.5) / COMBAT_GRID_H };
+  return { x: (cell.x + 0.5) / GRID_W, y: (cell.y + 0.5) / GRID_H };
 }
 function isCellFree(cell, occupied) {
-  if (cell.x < 0 || cell.y < 0 || cell.x >= COMBAT_GRID_W || cell.y >= COMBAT_GRID_H) return false;
+  if (cell.x < 0 || cell.y < 0 || cell.x >= GRID_W || cell.y >= GRID_H) return false;
   return !occupied.has(cellKey(cell));
 }
 function nearestFreeCell(origin, occupied, prefer) {
@@ -537,7 +549,7 @@ function updateCombatMovement(c, p, dt) {
     if (mode === "kiting" && desired >= 0.2) {
       const kiteSQM = clamp(parseInt(p.config.kiteDistance, 10) || 3, 1, 5);
       const curSQM = pointDistanceSQM(pl, target);
-      const kiteStopNorm = kiteSQM / COMBAT_GRID_W;
+      const kiteStopNorm = kiteSQM / GRID_W;
       if (curSQM < kiteSQM) {
         const away = { x: clamp(pl.x - (target.x - pl.x) * 1.35, 0.08, 0.40),
                        y: clamp(pl.y - (target.y - pl.y) * 0.65, 0.25, 0.75) };

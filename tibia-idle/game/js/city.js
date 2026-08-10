@@ -433,6 +433,8 @@ function academyStatus(p) {
 }
 
 function newAcademyTraining(p, mode, weapon, huntMap) {
+  // Treino também pode usar OTBM; mantenha cellCenter/render no mesmo grid.
+  if (typeof setGridForMap === "function") setGridForMap(huntMap || null);
   const st = academyStatus(p);
   // modo "dummy": treina a skill da exercise weapon escolhida e consome
   // 1 carga por golpe; modo "online" (padrão): treina com o equipamento.

@@ -699,8 +699,10 @@ document.getElementById("btn-clear").addEventListener("click", () => {
   status("mapa limpo");
 });
 document.getElementById("btn-resize").addEventListener("click", () => {
-  const w = Math.max(8, Math.min(64, +document.getElementById("map-w").value || 21));
-  const h = Math.max(8, Math.min(40, +document.getElementById("map-h").value || 13));
+  // Sem o antigo teto 64×40: o writer divide mapas grandes em TILE_AREA.
+  // 65535 é apenas o limite técnico dos campos u16 do formato OTBM.
+  const w = Math.max(8, Math.min(65535, Math.floor(+document.getElementById("map-w").value || 21)));
+  const h = Math.max(8, Math.min(65535, Math.floor(+document.getElementById("map-h").value || 13)));
   if (w === state.w && h === state.h) return;
   if (!confirm(`Redimensionar para ${w}×${h}? O conteúdo fora da nova área é removido.`)) return;
   pushUndo();

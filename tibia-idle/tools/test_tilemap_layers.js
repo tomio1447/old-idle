@@ -25,9 +25,9 @@ if (!/drawCellItems\(true\)/.test(blockingBlock) ||
     !/drawDecoItems\(true\)/.test(blockingBlock))
   throw Error('Paredes/pilares devem ser desenhados na camada objects');
 
-const groundCall = render.indexOf('GRID_W, GRID_H, "ground"');
+const groundCall = render.indexOf('gridW, gridH, "ground"');
 const entityPass = render.indexOf('const entityInfo = []', groundCall);
-const objectsCall = render.indexOf('GRID_W, GRID_H, "objects"', entityPass);
+const objectsCall = render.indexOf('gridW, gridH, "objects"', entityPass);
 if (groundCall < 0 || entityPass < 0 || objectsCall < 0 ||
     !(groundCall < entityPass && entityPass < objectsCall))
   throw Error('Render de combate deve manter mapa ground → criaturas → objects');

@@ -8,8 +8,9 @@ const PLAYER_SCALE = 1.8;
 
 /* ---------------------------------------------------- escala por SQM
  *
- * O canvas tem exatamente GRID_W (21) SQMs de largura, entao um tile vale
- * W/21 pixels. As escalas eram numeros fixos (2.0, 2.2, 2.6 conforme o HP
+ * O canvas exibe GRID_W SQMs de largura (dinâmico nas instâncias OTBM),
+ * então um tile vale W/GRID_W pixels. As escalas eram números fixos
+ * (2.0, 2.2, 2.6 conforme o HP
  * do monstro) sem nenhuma relacao com isso: em tela larga a criatura ficava
  * menor que o tile, em tela estreita transbordava por cima dos vizinhos.
  *
@@ -333,7 +334,8 @@ function Renderer(canvas) {
 
 Renderer.prototype.resize = function () {
   const w = this.c.parentElement.clientWidth;
-  // câmera reduzida e com mais visão: 21 × 13 SQMs.
+  // A janela mantém a proporção clássica 21×13. Instâncias de outras
+  // proporções são centralizadas com letterbox por centeredGridViewport().
   const h = Math.round(w * (13 / 21));
   // Canvas em DPR (máx. 2x) + desenho nearest: nítido e sem serrilhado.
   // O loop roda em requestAnimationFrame — na taxa do display (60/120/144Hz).
@@ -1302,8 +1304,26 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt) {
 
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
-  const W = this.c.width, H = this.c.height;
-  ctx.clearRect(0, 0, W, H);
+  const canvasW = this.c.width, canvasH = this.c.height;
+  const gridW = combat && combat.gridW ? combat.gridW
+    : (typeof GRID_W !== "undefined" ? GRID_W : 21);
+  const gridH = combat && combat.gridH ? combat.gridH
+    : (typeof GRID_H !== "undefined" ? GRID_H : 13);
+  const view = (typeof centeredGridViewport === "function")
+    ? centeredGridViewport(canvasW, canvasH, gridW, gridH)
+    : { x: 0, y: 0, width: canvasW, height: canvasH };
+  const W = view.width, H = view.height;
+
+  // A câmera não segue criaturas: permanece no centro geométrico do mapa.
+  // O mapa inteiro é ajustado ao canvas com SQMs quadrados e margens iguais.
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.fillStyle = "#050605";
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
 
   const hunt = combat ? combat.hunt : null;
   const scene = hunt ? hunt.scene : "cave";
@@ -1315,7 +1335,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     /* mapa fechado com tiles oficiais (HUNTMAPS) — paredes reais.
      * Só o CHÃO aqui; paredes/pilares/objetos são desenhados DEPOIS das
      * criaturas (abaixo) para sobreporem monstros como no client. */
-    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H, "ground");
+    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "ground");
   } else if (scene === "sewer") {
     drawRookgaardSewer(ctx, W, H);
   } else if (hunt && combat.huntId === "spiders") {
@@ -1405,7 +1425,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // No client, paredes/pilares altos cobrem criaturas que estão atrás/dentro
   // do seu footprint; a healthbar (abaixo) fica acima de tudo.
   if (combat && combat.huntMap && typeof drawTileCharMap === "function")
-    drawTileCharMap(ctx, combat.huntMap, W, H, GRID_W, GRID_H, "objects");
+    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects");
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
   const occupiedLabels = [];
@@ -1552,6 +1572,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.textAlign = "center";
     ctx.fillText("Escolha uma caçada para começar", W / 2, H / 2);
   }
+  ctx.restore(); // câmera/clip central da instância
 };
 
 /* Retorna o id do NPC sob as coordenadas do canvas */
