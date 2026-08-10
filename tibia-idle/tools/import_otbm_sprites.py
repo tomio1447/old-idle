@@ -29,6 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.normpath(os.path.join(HERE, "..", "game"))
 TILES_DIR = os.path.join(GAME, "assets", "tiles")
 CANARY_XML = os.path.join(HERE, "data", "canary-items.xml")
+PATTERN_DATA = os.path.join(GAME, "js", "tilepatterndata.js")
 
 NODE_START = 0xFE
 NODE_END = 0xFF
@@ -219,6 +220,76 @@ def recorte32(img):
     return base
 
 
+def carregar_patterns():
+    if not os.path.exists(PATTERN_DATA):
+        return {}
+    src = open(PATTERN_DATA, encoding="utf-8").read()
+    try:
+        return json.loads(src[src.index("{"):src.rindex("}") + 1])
+    except (ValueError, json.JSONDecodeError):
+        return {}
+
+
+def extrair_patterns(dat, spr, usados):
+    """Exporta patterns X/Y do DAT para impedir repetição quadriculada.
+
+    O mesmo client id pode ter 2×2 ou 4×4 variações escolhidas pela posição
+    da célula. Guardar somente xp=0/yp=0 repete uma textura idêntica em todo
+    SQM e deixa as emendas visíveis. O strip gerado contém
+    frame -> pattern-y -> pattern-x; o runtime seleciona pela coordenada.
+    """
+    patterns = carregar_patterns()
+    gerados = 0
+    for cid in sorted(usados):
+        obj = dat.item(cid)
+        if obj is None or not obj.groups:
+            continue
+        group = obj.groups[0]
+        # Patterns posicionais pertencem a grounds/borders/paredes OnBottom.
+        # Em fluid containers e itens carregáveis, px/py representa subtipo
+        # (cor do líquido etc.), não a coordenada do mapa.
+        positional = bool({"Ground", "GroundBorder", "OnBottom"} & obj.flags)
+        if not positional or (group.px <= 1 and group.py <= 1):
+            patterns.pop(str(cid), None)
+            stale = os.path.join(TILES_DIR, "%d_pattern.png" % cid)
+            if os.path.exists(stale):
+                os.remove(stale)
+            continue
+        frames = max(1, group.anim)
+        aw, ah = group.width * 32, group.height * 32
+        total = frames * group.py * group.px
+        strip = Image.new("RGBA", (aw * total, ah), (0, 0, 0, 0))
+        visible = False
+        index = 0
+        for frame in range(frames):
+            for yp in range(group.py):
+                for xp in range(group.px):
+                    image = render_item_860(dat, spr, cid, frame=frame, xp=xp, yp=yp)
+                    if image is not None:
+                        strip.alpha_composite(image, (index * aw, 0))
+                        visible = visible or bool(image.getbbox())
+                    index += 1
+        if not visible:
+            continue
+        strip.save(os.path.join(TILES_DIR, "%d_pattern.png" % cid), optimize=True)
+        ds = list(group.durations[:frames]) if group.durations else [120] * frames
+        if len(ds) < frames:
+            ds.extend([120] * (frames - len(ds)))
+        patterns[str(cid)] = {
+            "px": group.px, "py": group.py, "af": frames,
+            "aw": aw, "ah": ah, "durations": ds,
+            "duration": sum(ds),
+        }
+        gerados += 1
+
+    with open(PATTERN_DATA, "w", encoding="utf-8") as fh:
+        fh.write("/* Gerado por tools/import_otbm_sprites.py.\n"
+                 " * Patterns X/Y reais do DAT por coordenada do mapa. */\n")
+        fh.write("window.TILE_PATTERNS = " + json.dumps(
+            patterns, separators=(",", ":")) + ";\n")
+    return gerados
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
@@ -239,12 +310,16 @@ def main():
     falta = sorted(usados - existentes)
     print("faltam sprites: %d -> %s" %
           (len(falta), falta if len(falta) <= 40 else "..."))
-    if not falta:
-        criar = []
-    else:
-        dat = Dat860(os.path.join(SRC, "Tibia.dat"))
-        spr = Spr860(os.path.join(SRC, "Tibia.spr"))
-        criar = []
+    dat_path = os.path.join(SRC, "Tibia.dat")
+    spr_path = os.path.join(SRC, "Tibia.spr")
+    dat = spr = None
+    if os.path.exists(dat_path) and os.path.exists(spr_path):
+        dat = Dat860(dat_path)
+        spr = Spr860(spr_path)
+    criar = []
+    if falta:
+        if dat is None or spr is None:
+            raise RuntimeError("Tibia.dat/Tibia.spr ausentes em " + SRC)
         for cid in falta:
             img = render_item_860(dat, spr, cid)
             if img is None or not img.getbbox():
@@ -253,6 +328,11 @@ def main():
             recorte32(img).save(os.path.join(TILES_DIR, "%d.png" % cid))
             criar.append(cid)
         print("extraidos %d sprites para %s" % (len(criar), TILES_DIR))
+
+    if dat is not None and spr is not None:
+        print("patterns X/Y extraídos:", extrair_patterns(dat, spr, usados))
+    else:
+        print("patterns X/Y ignorados: fonte DAT/SPR indisponível")
 
     # tiledata.js: completa nomes oficiais para os ids novos
     tiledata = os.path.join(GAME, "js", "tiledata.js")

@@ -7,6 +7,7 @@ const gameJs = fs.readFileSync(path.join(game,'js','game.js'),'utf8');
 const rewardJs = fs.readFileSync(path.join(game,'js','reward-chest.js'),'utf8');
 const uiJs = fs.readFileSync(path.join(game,'js','ui.js'),'utf8');
 const forgeUiJs = fs.readFileSync(path.join(game,'js','forge-ui.js'),'utf8');
+const soulwarJs = fs.readFileSync(path.join(game,'js','soulwar.js'),'utf8');
 const css = fs.readFileSync(path.join(game,'css','layout.css'),'utf8');
 const indexHtml = fs.readFileSync(path.join(game,'index.html'),'utf8');
 function must(ok,msg){ if(!ok) throw Error(msg); }
@@ -32,6 +33,13 @@ must(rewardJs.includes('const REWARD_CHEST_ITEM_ID = 19250;'),
 const chestPng=fs.readFileSync(path.join(game,'assets','item','reward-chest.png'));
 must(chestPng.readUInt32BE(16)===45 && chestPng.readUInt32BE(20)===40,
   'Sprite oficial do Reward Chest ausente/incorreta');
+const desirePng = fs.readFileSync(path.join(game,'assets','item','bag-you-desire.png'));
+const piratePng = fs.readFileSync(path.join(game,'assets','item','pirate-bag.png'));
+const desireAnim = fs.readFileSync(path.join(game,'assets','item','bag-you-desire_anim.png'));
+must(!desirePng.equals(piratePng), 'Bag You Desire ainda usa a Pirate Bag');
+must(desireAnim.readUInt32BE(16) === 240 && desireAnim.readUInt32BE(20) === 30 &&
+     soulwarJs.includes("cid:34109,af:10,aw:24,ah:30"),
+  'Sprite animada oficial da Bag You Desire está incompleta');
 must(indexHtml.includes('<img src="assets/item/reward-chest.png" class="reward-btn-icon"') &&
      !indexHtml.includes('🎁 REWARD'),
   'Botão REWARD ainda usa emoji em vez do client id 19250');

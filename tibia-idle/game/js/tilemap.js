@@ -33,6 +33,41 @@ const TileSprites = {
     if (a.af >= 12) return 80;
     return this.ANIM_DUR;
   },
+  _pattern(id) {
+    const all = (typeof TILE_PATTERNS !== "undefined" && TILE_PATTERNS) || {};
+    return all[id] || null;
+  },
+  _patternFrame(meta) {
+    if (!meta || meta.af <= 1) return 0;
+    const durations = meta.durations && meta.durations.length === meta.af
+      ? meta.durations : Array(meta.af).fill(this.ANIM_DUR);
+    const total = meta.duration || durations.reduce((sum, n) => sum + n, 0);
+    let elapsed = performance.now() % Math.max(1, total);
+    for (let frame = 0; frame < durations.length; frame++) {
+      if (elapsed < durations[frame]) return frame;
+      elapsed -= durations[frame];
+    }
+    return 0;
+  },
+  _patternSource(id, cx, cy) {
+    const meta = this._pattern(id);
+    if (!meta) return null;
+    const key = "pattern:" + id;
+    let img = this.cache[key];
+    if (img === undefined) {
+      img = new Image();
+      const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+      img.src = "assets/tiles/" + id + "_pattern.png?v=" + v;
+      img.onerror = () => { this.cache[key] = null; };
+      this.cache[key] = img;
+    }
+    if (!img || !img.complete || !img.naturalWidth) return { meta, img:null, sx:0 };
+    const px = ((Number(cx) || 0) % meta.px + meta.px) % meta.px;
+    const py = ((Number(cy) || 0) % meta.py + meta.py) % meta.py;
+    const frame = this._patternFrame(meta);
+    const index = (frame * meta.py + py) * meta.px + px;
+    return { meta, img, sx:index * meta.aw };
+  },
   /* Frame atual da animação do id (0 para estático) */
   frameFor(id) {
     const a = this._anim(id);
@@ -67,22 +102,25 @@ const TileSprites = {
     this.cache[key] = img;
     return img;
   },
-  /* desenha o tile esticado num quadrado size x size (chao) */
-  draw(ctx, id, sx, sy, size) {
-    const a = this._anim(id);
+  /* desenha o tile esticado num quadrado size x size (chao). `cx/cy`
+   * selecionam o pattern X/Y oficial do DAT para a célula. */
+  draw(ctx, id, sx, sy, size, cx, cy) {
+    const pattern = this._patternSource(id, cx, cy);
+    const a = pattern ? null : this._anim(id);
     const fr = a ? this.frameFor(id) : 0;
-    const img = this.get(id, fr);
+    const img = pattern ? pattern.img : this.get(id, fr);
     if (img && img.complete && img.naturalWidth) {
       const scale = size / 32;
-      const w = (a ? a.aw : img.naturalWidth) * scale;
-      const h = (a ? a.ah : img.naturalHeight) * scale;
-      // Ancorar pelo bottom-right (ou top-left)?
-      // No Tibia sprites maiores q 32x32 geralmente espalham pra cima e pra esquerda.
-      // Entao sx e sy sao a celula base (32x32 do chao).
+      const nativeW = pattern ? pattern.meta.aw : (a ? a.aw : img.naturalWidth);
+      const nativeH = pattern ? pattern.meta.ah : (a ? a.ah : img.naturalHeight);
+      const w = nativeW * scale;
+      const h = nativeH * scale;
+      // Sprites maiores que 32px se espalham para cima/esquerda, como no client.
       const dx = sx - (w - size);
       const dy = sy - (h - size);
-      if (a) {
-        // recorta o frame atual dentro da strip <id>_anim.png
+      if (pattern) {
+        ctx.drawImage(img, pattern.sx, 0, nativeW, nativeH, dx, dy, w, h);
+      } else if (a) {
         ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
       } else {
         ctx.drawImage(img, dx, dy, w + (scale>1?0:1), h + (scale>1?0:1));
@@ -105,14 +143,15 @@ const TileSprites = {
    * "grudados/pendurados" nele, sem o deslocamento — e sem o "espaco no
    * meio" que o deslocamento causava. Sprites legado de decoracao (tamanhos
    * nao multiplos de 32, ex. 43x17) e itens 1x1 continuam centralizados. */
-  drawDeco(ctx, id, sx, sy, size, onWall) {
-    const a = this._anim(id);
+  drawDeco(ctx, id, sx, sy, size, onWall, cx, cy) {
+    const pattern = this._patternSource(id, cx, cy);
+    const a = pattern ? null : this._anim(id);
     const fr = a ? this.frameFor(id) : 0;
-    const img = this.get(id, fr);
+    const img = pattern ? pattern.img : this.get(id, fr);
     if (!img || !img.complete || !img.naturalWidth) return false;
     const k = size / 32;
-    const nW = (a ? a.aw : img.naturalWidth);
-    const nH = (a ? a.ah : img.naturalHeight);
+    const nW = pattern ? pattern.meta.aw : (a ? a.aw : img.naturalWidth);
+    const nH = pattern ? pattern.meta.ah : (a ? a.ah : img.naturalHeight);
     const w = nW * k;
     const h = nH * k;
     // multi-SQM: dimensoes multiplas exatas de 32 e maiores que 1 SQM
@@ -125,7 +164,9 @@ const TileSprites = {
       // 1x1 ou item em muro (hangable): centralizado na celula
       dx = sx + (size - w) / 2; dy = sy + size - h;
     }
-    if (a) {
+    if (pattern) {
+      ctx.drawImage(img, pattern.sx, 0, nW, nH, dx, dy, w, h);
+    } else if (a) {
       ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
     } else {
       ctx.drawImage(img, dx, dy, w, h);
@@ -174,7 +215,7 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
         const cw = cellIsWall(L);
         for (const id of L.g) {
           if (isBlocking(id) !== onlyBlocking) continue;
-          TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw);
+          TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw, x, y);
         }
       }
     }
@@ -182,7 +223,7 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
   const drawDecoItems = function (onlyBlocking) {
     for (const d of map.deco || []) {
       if (isBlocking(d[0]) !== onlyBlocking) continue;
-      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false);
+      TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false, d[1], d[2]);
     }
   };
   if (mode !== "objects") {
@@ -194,7 +235,7 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
       for (let x = 0; x < cols && x < row.length; x++) {
         const L = map.leg[row[x]];
         if (!L || !L.v || !L.v.length) continue;
-        TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw);
+        TileSprites.draw(ctx, tileVariant(L.v, x, y), x * tw, y * th, tw, x, y);
       }
     }
     // Objetos ANDÁVEIS/decorativos (sofás, gelo, tapetes): ABAIXO das criaturas.
