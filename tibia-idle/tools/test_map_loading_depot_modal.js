@@ -1,0 +1,66 @@
+/* Regressão: loading entre mapas, ícone Depot 3497 e modais sem IDs técnicos. */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const game = path.join(__dirname, '..', 'game');
+const js = path.join(game, 'js');
+function must(ok, msg) { if (!ok) throw Error(msg); }
+
+const requested = [];
+const label = {textContent:''}, fill = {style:{}};
+const loading = {
+  style:{display:'none'},
+  querySelector(selector){ return selector === '.gl-text' ? label : fill; },
+};
+function FakeImage() {}
+Object.defineProperty(FakeImage.prototype, 'src', {
+  set(value) { requested.push(value); queueMicrotask(() => this.onload && this.onload()); },
+});
+const ctx = {
+  window:{}, console, Image:FakeImage,
+  document:{getElementById(id){ return id === 'game-loading' ? loading : null; }},
+  requestAnimationFrame(fn){ fn(); }, setTimeout(fn){ fn(); },
+  TILE_PATTERNS:{1:{px:2,py:2}}, TILE_ANIM:{2:{af:2}},
+  IDLE_ANIMATIONS:{monsters:{rat:{frames:2}}},
+  HUNTMAPS:{arena:{leg:{a:{v:[1],g:[2]}}}},
+};
+ctx.window = ctx;
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
+
+(async () => {
+  ctx.beginMapLoading('Carregando teste...');
+  must(loading.style.display === 'flex' && label.textContent === 'Carregando teste...',
+    'overlay não aparece ao iniciar troca de mapa');
+  await ctx.preloadHuntMapAssets({mapa:'arena',monsters:['rat']}, 'Preparando teste');
+  for (const asset of [
+    'assets/tiles/1.png','assets/tiles/1_pattern.png',
+    'assets/tiles/2.png','assets/tiles/2_anim.png',
+    'assets/mob/rat.png','assets/mob/rat.idle.png',
+  ]) must(requested.includes(asset), 'asset do mapa não foi pré-carregado: ' + asset);
+  must(fill.style.width === '100%', 'barra de loading não chegou a 100%');
+  ctx.finishMapLoading();
+  must(loading.style.display === 'none', 'overlay não fecha após dois frames');
+
+  const gameSrc = fs.readFileSync(path.join(js, 'game.js'), 'utf8');
+  for (const marker of [
+    'beginMapLoading(`Carregando ${boss.name}...',
+    'beginMapLoading(`Carregando ${hu.name}...',
+    'beginMapLoading("Retornando ao Templo Oficial...',
+    'beginMapLoading("Carregando academia...',
+    'preloadHuntMapAssets(arena', 'preloadHuntMapAssets(hu',
+  ]) must(gameSrc.includes(marker), 'transição sem loading: ' + marker);
+
+  const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
+  const reward = fs.readFileSync(path.join(js, 'reward-chest.js'), 'utf8');
+  const forgeUi = fs.readFileSync(path.join(js, 'forge-ui.js'), 'utf8');
+  const depotPng = fs.readFileSync(path.join(game, 'assets', 'item', 'depot-item-3497.png'));
+  must(html.includes('assets/item/depot-item-3497.png') && forgeUi.includes('depot-item-3497.png'),
+    'botão Depot não usa o item 3497');
+  must(depotPng.readUInt32BE(16) === 27 && depotPng.readUInt32BE(20) === 25,
+    'sprite oficial 3497 inválida');
+  must(!reward.includes('Client ID') && !reward.includes('Item ID'),
+    'Reward Chest ainda exibe ID técnico');
+
+  console.log('OK: loading pré-carrega mapas, Depot usa 3497 e modais ocultam IDs técnicos.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

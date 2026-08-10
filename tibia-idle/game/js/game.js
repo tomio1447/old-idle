@@ -680,7 +680,7 @@ const BOSS_DEFS = {
       { item: "jungle-quiver", chance: 4, max: 1 },
     ],
   },
-  "goshnar-s-greed": { id:"goshnar-s-greed", name:"Goshnar's Greed", title:"Boss de Dark Thais", hunt:"dark-thais", baseMonster:"many-faces", sprite:"goshnar-s-greed", hp:550000, exp:350000, damage:1800, armor:120, defense:110, cooldown:BOSS_COOLDOWN, requirement:{level:550,text:"Requer nível 550+ (Dark Thais)"}, loot:[{item:"bag-you-desire",chance:10,max:1},{item:"crystal-coin",chance:100,max:20}] },
+  "goshnar-s-greed": { id:"goshnar-s-greed", name:"Goshnar's Greed", title:"Boss de Dark Thais", hunt:"dark-thais", baseMonster:"goshnar-s-greed", sprite:"goshnar-s-greed", hp:550000, exp:350000, damage:1800, armor:120, defense:110, cooldown:BOSS_COOLDOWN, requirement:{level:550,text:"Requer nível 550+ (Dark Thais)"} },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
@@ -714,7 +714,7 @@ const BOSS_DEFS = {
     name: "Ferumbras Mortal Shell",
     title: "Boss da Ferumbras Ascendant",
     hunt: "dt-seal",
-    baseMonster: "demon",
+    baseMonster: "ferumbras-mortal-shell",
     // looktype 229 do Canary = a forma do Ferumbras (não é um demon):
     // sprite própria extraída do DAT 15.x (assets/mob/ferumbras-mortal-shell.png)
     sprite: "ferumbras-mortal-shell",
@@ -727,59 +727,7 @@ const BOSS_DEFS = {
     speed: 0.00009,
     requirement: { level: 250, text: "Requer nível 250+ (Ferumbras Ascendant)" },
     cooldown: BOSS_COOLDOWN,
-    loot: [
-      { item: "gold-coin", chance: 100, max: 100 },
-      { item: "platinum-coin", chance: 100, max: 25 },
-      { item: "silver-token", chance: 100, max: 3 },
-      { item: "small-sapphire", chance: 10, max: 10 },
-      { item: "small-emerald", chance: 10, max: 10 },
-      { item: "small-amethyst", chance: 10, max: 10 },
-      { item: "small-diamond", chance: 10, max: 10 },
-      { item: "small-topaz", chance: 10, max: 10 },
-      { item: "white-pearl", chance: 10, max: 5 },
-      { item: "black-pearl", chance: 10, max: 5 },
-      { item: "red-gem", chance: 1, max: 1 },
-      { item: "blue-gem", chance: 0.8, max: 1 },
-      { item: "green-gem", chance: 4, max: 1 },
-      { item: "emerald-bangle", chance: 1, max: 1 },
-      { item: "rift-tapestry", chance: 3, max: 1 },
-      { item: "golden-armor", chance: 0.8, max: 1 },
-      { item: "magic-plate-armor", chance: 0.4, max: 1 },
-      { item: "demon-shield", chance: 0.8, max: 1 },
-      { item: "phoenix-shield", chance: 0.8, max: 1 },
-      { item: "mastermind-shield", chance: 0.6, max: 1 },
-      { item: "great-shield", chance: 0.1, max: 1 },
-      { item: "great-axe", chance: 0.7, max: 1 },
-      { item: "demonrage-sword", chance: 0.8, max: 1 },
-      { item: "chaos-mace", chance: 0.8, max: 1 },
-      { item: "bloody-edge", chance: 0.8, max: 1 },
-      { item: "nightmare-blade", chance: 0.6, max: 1 },
-      { item: "abyss-hammer", chance: 0.8, max: 1 },
-      { item: "jade-hammer", chance: 0.8, max: 1 },
-      { item: "havoc-blade", chance: 0.8, max: 1 },
-      { item: "impaler", chance: 0.8, max: 1 },
-      { item: "berserker", chance: 0.8, max: 1 },
-      { item: "skullcrusher", chance: 0.3, max: 1 },
-      { item: "divine-plate", chance: 0.8, max: 1 },
-      { item: "velvet-mantle", chance: 0.3, max: 1 },
-      { item: "greenwood-coat", chance: 0.4, max: 1 },
-      { item: "lightning-legs", chance: 0.8, max: 1 },
-      { item: "glacier-kilt", chance: 0.8, max: 1 },
-      { item: "magma-legs", chance: 0.8, max: 1 },
-      { item: "emerald-sword", chance: 0.4, max: 1 },
-      { item: "rift-bow", chance: 0.5, max: 1 },
-      { item: "rift-crossbow", chance: 0.5, max: 1 },
-      { item: "demonwing-axe", chance: 0.3, max: 1 },
-      { item: "obsidian-truncheon", chance: 0.4, max: 1 },
-      { item: "ornamented-axe", chance: 0.4, max: 1 },
-      { item: "queen-s-sceptre", chance: 0.8, max: 1 },
-      { item: "boots-of-homecoming", chance: 0.8, max: 1 },
-      { item: "ferumbras-staff", chance: 0.8, max: 1 },
-      { item: "ferumbras-amulet", chance: 0.8, max: 1 },
-      { item: "death-gaze", chance: 0.1, max: 1 },
-      { item: "ferumbras-hat", chance: 0.1, max: 1 },
-      { item: "gold-ingot", chance: 0.8, max: 1 },
-    ],
+    // loot integral: usa as 57 entradas importadas do MONSTERDATA do servidor.
   },
 };
 
@@ -944,12 +892,6 @@ function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
-  // Boss com sala própria espera o OTBM carregar antes de criar entidades.
-  const arena = boss.hunt && GAMEDATA.hunts[boss.hunt];
-  if (!arenaReady && arena && arena.otbm && typeof huntMapFromOtbmAsync === "function") {
-    huntMapFromOtbmAsync(arena, () => startBoss(id, force, true));
-    return;
-  }
   // PARTY: membros (não líder) não podem entrar em boss por conta própria —
   // só o líder escolhe e leva a party (requisitos validados no server).
   // `force = true` é o FOLLOW (membro teleportado para a sala do líder).
@@ -959,8 +901,22 @@ function startBoss(id, force, arenaReady) {
   }
   const ready = bossReadyInfo(G.p, boss);
   if (!ready.ok) { toast(ready.reason); return; }
+
+  // Boss com sala própria espera OTBM + sprites antes de criar entidades.
+  const arena = boss.hunt && GAMEDATA.hunts[boss.hunt];
+  if (!arenaReady && arena && arena.otbm && typeof huntMapFromOtbmAsync === "function") {
+    if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${boss.name}...`);
+    huntMapFromOtbmAsync(arena, () => {
+      const assets = typeof preloadHuntMapAssets === "function"
+        ? preloadHuntMapAssets(arena, `Preparando ${boss.name}`) : Promise.resolve();
+      assets.then(() => startBoss(id, force, true));
+    });
+    return;
+  }
+  if (!arenaReady && typeof beginMapLoading === "function")
+    beginMapLoading(`Carregando ${boss.name}...`);
   if (G.training) stopAcademy(false);
-  if (G.combat) stopHunt();
+  if (G.combat) stopHunt(true);
   const st = bossState(G.p, id);
   st.lastFight = BOSS_COOLDOWNS_ENABLED ? Date.now() : 0;
   // Esta reinicialização só faz parte da regra de requisito da Timira.
@@ -994,6 +950,7 @@ function startBoss(id, force, arenaReady) {
     partyReportZone(info);
   }
   renderAll();
+  if (typeof finishMapLoading === "function") finishMapLoading();
 }
 
 /* ------------------------------------------------------------ hunt */
@@ -1071,21 +1028,28 @@ function startHunt(id, instanceMode, force) {
   G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
   const entryToken = (G.huntEntryToken || 0) + 1;
   G.huntEntryToken = entryToken;
+  if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${hu.name}...`);
   // hunt com arena .otbm: carrega (fetch) e converte o mapa antes de
   // montar o combate; hunts em ascii respondem na hora (otbmhunt.js)
   huntMapFromOtbmAsync(hu, () => {
     // Se o jogador voltou ao templo enquanto o fetch estava pendente, não
     // recrie o combate por cima da safe zone.
     if (G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id) return;
-    G.combat = newCombat(G.p, id, instanceMode);
-    spawnWave(G.combat, G.p);
-    addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
-    toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
-    // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
-    if (typeof partyReportZone === "function") {
-      partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
-    }
-    renderAll();
+    const ready = typeof preloadHuntMapAssets === "function"
+      ? preloadHuntMapAssets(hu, `Preparando ${hu.name}`) : Promise.resolve();
+    ready.then(() => {
+      if (G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id) return;
+      G.combat = newCombat(G.p, id, instanceMode);
+      spawnWave(G.combat, G.p);
+      addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
+      toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
+      // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
+      if (typeof partyReportZone === "function") {
+        partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+      }
+      renderAll();
+      if (typeof finishMapLoading === "function") finishMapLoading();
+    });
   });
 }
 
@@ -1098,7 +1062,9 @@ function resetTemplePlayerPosition() {
   if (G.renderer) G.renderer.npcHit = [];
 }
 
-function stopHunt() {
+function stopHunt(skipMapLoading) {
+  if (!skipMapLoading && typeof beginMapLoading === "function")
+    beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;
   // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
@@ -1118,6 +1084,13 @@ function stopHunt() {
   // PARTY: líder voltou para a safe zone -> limpa follows pendentes
   if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
   renderAll();
+  if (!skipMapLoading) {
+    const templeReady = typeof preloadGameAssets === "function"
+      ? preloadGameAssets(G.p, "Preparando templo") : Promise.resolve();
+    templeReady.then(() => {
+      if (typeof finishMapLoading === "function") finishMapLoading();
+    });
+  }
 }
 
 /* Alterna entre cidade, caçada e academia */
@@ -1131,7 +1104,8 @@ function goToCity() {
 
 function startAcademy() {
   if (!G.p) return;
-  if (G.combat) stopHunt();
+  if (G.combat) stopHunt(true);
+  if (typeof beginMapLoading === "function") beginMapLoading("Carregando academia...");
   G.training = newAcademyTraining(G.p);
   G.inCity = false;
   G.p.hunt = null;
@@ -1142,10 +1116,14 @@ function startAcademy() {
   if (typeof partyReportZone === "function") partyReportZone({ zone: "training", training: "academy" });
   renderAll();
   openAcademyConjureModal(false);
+  if (typeof finishMapLoading === "function") finishMapLoading();
 }
 
 function stopAcademy(log) {
   if (!G.training) return;
+  const returningToTemple = log !== false;
+  if (returningToTemple && typeof beginMapLoading === "function")
+    beginMapLoading("Retornando ao Templo Oficial...");
   G.training = null;
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
@@ -1162,6 +1140,13 @@ function stopAcademy(log) {
   // PARTY: líder voltou para a safe zone
   if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
   renderAll();
+  if (returningToTemple) {
+    const templeReady = typeof preloadGameAssets === "function"
+      ? preloadGameAssets(G.p, "Preparando templo") : Promise.resolve();
+    templeReady.then(() => {
+      if (typeof finishMapLoading === "function") finishMapLoading();
+    });
+  }
 }
 
 /* ------------------------------------------------------------ eventos */
@@ -2070,10 +2055,15 @@ function startGame(p) {
   // Todos os módulos JS já foram carregados pelo index; aqui aguardamos o
   // mapa e os assets essenciais para entrar sem sprites piscando vazios.
   if (typeof showGameLoading === "function" && typeof preloadGameAssets === "function") {
-    showGameLoading(true, "Carregando o Templo Oficial de Thais...", 0);
+    if (typeof beginMapLoading === "function") beginMapLoading("Carregando o Templo Oficial de Thais...");
+    else showGameLoading(true, "Carregando o Templo Oficial de Thais...", 0);
     return templeReady
-      .then(() => preloadGameAssets(p))
-      .then(() => { showGameLoading(false); startGameReady(p); })
+      .then(() => preloadGameAssets(p, "Preparando templo"))
+      .then(() => {
+        startGameReady(p);
+        if (typeof finishMapLoading === "function") finishMapLoading();
+        else showGameLoading(false);
+      })
       .catch((error) => {
         showGameLoading(false);
         console.error(error);
