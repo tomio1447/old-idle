@@ -533,8 +533,7 @@ function npcInn(p) {
         ${h}h · ${fmtFull(restPrice(p, h))}</button>`).join("")}
     </div>
     <div class="tiny dim mt8">
-      Acima de 39h você ganha <b style="color:#9ce84a">+50% de experiência</b>.
-      Com stamina zerada, a XP cai pela metade.</div>`;
+      Stamina temporariamente desativada: todos permanecem com <b style="color:#9ce84a">42h</b>.</div>`;
 }
 
 /* ---------------------------------------------------------- viagens */

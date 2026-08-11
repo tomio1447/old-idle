@@ -1091,9 +1091,9 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "#999";
   if (isDummy) {
     const w = training.weapon ? (EXERCISE_WEAPONS[training.weapon] || {}).name : "—";
-    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12, 40);
+    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · stamina sempre cheia", 12, 40);
   } else {
-    ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12, 40);
+    ctx.fillText("Treiner padrão · sem custo · stamina sempre cheia · conjure disponível", 12, 40);
   }
 
   const pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);

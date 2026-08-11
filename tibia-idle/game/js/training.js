@@ -3,10 +3,10 @@
  * Dois modos de treino:
  *   - DUMMY  (Exercise Dummy): consome cargas de exercise weapons
  *     compradas por Tibia Coins (25 TC = 5000 cargas). Golpes com a mesma
- *     fórmula de skill tick do Canary (7 tries / 600 mana spent por golpe)
- *     e regen de stamina 3:1.
- *   - ONLINE (Skill Trainer / Treiner): o treino antigo da academia, sem
- *     custo, com regen de stamina 1:1.
+ *     fórmula de skill tick do Canary (7 tries / 600 mana spent por golpe).
+ *   - ONLINE (Skill Trainer / Treiner): o treino antigo da academia, sem custo.
+ *
+ * A stamina está temporariamente desativada e permanece sempre em 42h.
  *
  * O GIF do botão é o oficial do Skill Trainer (All) da TibiaWiki; os GIFs
  * das exercise weapons também são os oficiais (64x64 animadas, 5 frames cada, upscaling nearest-neighbor da TibiaWiki).
@@ -76,8 +76,8 @@ function buyExerciseCharges(p, id) {
            charges: p.exercise[id] };
 }
 
-/* Taxa de regen de stamina por modo (em segundos de stamina por segundo
- * real): dummy 3:1 (1/3), online 1:1 (1.0). */
+/* API legada mantida para compatibilidade. Enquanto a stamina estiver
+ * desativada, o loop ignora esta taxa e força 42h em todos os modos. */
 function trainingStaminaRate(t) {
   return (t && t.mode === "dummy") ? (1 / 3) : 1.0;
 }
@@ -127,7 +127,7 @@ function startDummyTraining(p, weaponId) {
     G.inCity = false;
     G.p.hunt = null;
     G.combat = null;
-    addLog("info", `Treino com <b>${w.name}</b> no Ferumbras Exercise Dummy (regen de stamina 3:1).`);
+    addLog("info", `Treino com <b>${w.name}</b> no Ferumbras Exercise Dummy (stamina sempre cheia).`);
     toast(`Ferumbras Dummy: <b>${w.name}</b> ativa`, "level");
     // PARTY: sala de exercise weapons conta como Área de Treino (pode convidar)
     if (typeof partyReportZone === "function") partyReportZone({ zone: "training", training: "dummy" });

@@ -10,6 +10,8 @@ const SAVE_KEY = "tibia-idle-save-v1";
 const CHARACTERS_KEY = "tibia-idle-characters-v1";
 const ACTIVE_CHARACTER_KEY = "tibia-idle-active-character-v1";
 const AUTOLOGIN_KEY = "tibia-idle-autologin-v1";
+const INSTANCE_SESSION_KEY = "tibia-idle-active-instance-v1";
+const FULL_STAMINA_SECONDS = 42 * 3600;
 
 const G = {
   p: null,
@@ -65,14 +67,159 @@ function getCharacters() {
   }).filter(Boolean).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
 }
 
+function clearInstanceSession() {
+  try { localStorage.removeItem(INSTANCE_SESSION_KEY); } catch (e) { /* sem storage */ }
+}
+
+function combatSessionParticipants(c) {
+  if (c && c.players && c.players.length) return c.players.filter((e) => e && e.p);
+  return G.p ? [{ id:G.p.id, name:G.p.name, p:G.p }] : [];
+}
+
+/* Persiste a instância, não apenas o personagem. O mapa/efeitos são
+ * reconstruídos no reload; entidades, HP, cooldowns, waves e mecânicas do
+ * boss permanecem no snapshot. Assim fechar o navegador equivale a deixar
+ * a aba oculta, em vez de teleportar a party para a cidade. */
+function persistActiveInstance() {
+  const c=G.combat;
+  if(!c||c.instanceFinished||c.bossDefeated){clearInstanceSession();return null;}
+  const savedAt=Date.now(),participants=combatSessionParticipants(c);
+  for(const ent of participants)if(ent.p)ent.p.stamina=FULL_STAMINA_SECONDS;
+  const descriptor={
+    v:1,savedAt,kind:c.boss?"boss":"hunt",huntId:c.huntId||null,
+    bossId:c.boss&&c.boss.id?c.boss.id:null,
+    instanceMode:c.instanceMode||(G.p&&G.p.instanceMode)||"non-pvp",
+    activeCharacterId:G.p&&G.p.id?String(G.p.id):null,
+    members:participants.map((ent)=>({
+      id:String(ent.id||ent.p.id||""),p:ent.p,
+      hp:ent.p.hp,mp:ent.p.mp,
+    })),
+  };
+  try {
+    const state=JSON.parse(JSON.stringify(c,(key,value)=>{
+      if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf")return undefined;
+      if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
+      return typeof value==="function"?undefined:value;
+    }));
+    descriptor.state=state;
+  } catch(error) {
+    console.warn("[idle] snapshot compacto da instância",error);
+  }
+  try {
+    localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(descriptor));
+  } catch(error) {
+    // Quota reduzida: ainda guarda membros + identidade para recriar a arena.
+    delete descriptor.state;
+    try { localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(descriptor)); }
+    catch(e){console.warn("[idle] não foi possível persistir a instância",e);return null;}
+  }
+  // Saves dos aliados acompanham o snapshot sem trocar o personagem ativo.
+  if(participants.length>1){
+    try{
+      const roster=readRoster(),active=descriptor.activeCharacterId;
+      for(const ent of participants){
+        const id=String(ent.id||ent.p.id||"");if(!id)continue;
+        ent.p.lastSeen=savedAt;roster[id]={v:1,p:ent.p};
+      }
+      writeRoster(roster);if(active)localStorage.setItem(ACTIVE_CHARACTER_KEY,active);
+    }catch(error){console.warn("[idle] falha ao salvar party da instância",error);}
+  }
+  return descriptor;
+}
+
+function readInstanceSession() {
+  try{
+    const raw=localStorage.getItem(INSTANCE_SESSION_KEY);if(!raw)return null;
+    const session=JSON.parse(raw);
+    if(!session||session.v!==1||!session.savedAt||
+       (session.kind!=="hunt"&&session.kind!=="boss"))return null;
+    if(session.kind==="hunt"&&(!session.huntId||!GAMEDATA.hunts[session.huntId]))return null;
+    return session;
+  }catch(error){console.warn("[idle] sessão de instância inválida",error);return null;}
+}
+
+function restoreCombatSessionState(fresh,session){
+  const raw=session.state;if(!raw)return fresh;
+  const c=raw;
+  c.hunt=fresh.hunt;c.huntMap=fresh.huntMap;c.boss=fresh.boss;
+  c.events=[];c.delayedHits=c.delayedHits||[];c.pendingSpawns=c.pendingSpawns||[];
+  if(c.players&&c.players.length){
+    c.players=c.players.map((ent)=>{
+      if(ent.p)ent.p=normalizePlayer(ent.p);
+      ent.id=ent.id||(ent.p&&ent.p.id);ent.name=ent.name||(ent.p&&ent.p.name);return ent;
+    });
+    const activeId=String(session.activeCharacterId||"");
+    c.player=c.players.find((ent)=>String(ent.id)===activeId)||c.players.find((ent)=>ent.p&&ent.p.hp>0)||c.players[0];
+    if(c.player&&c.player.p)G.p=c.player.p;
+  }
+  const findTarget=(id)=>c.players&&c.players.find((ent)=>String(ent.id)===String(id));
+  const hydrateMob=(mob)=>{
+    if(!mob)return mob;
+    if(!mob.def)mob.def=(GAMEDATA.monsters&&GAMEDATA.monsters[mob.slug])||{};
+    if(mob.target&&mob.target.__targetId)mob.target=findTarget(mob.target.__targetId)||null;
+    return mob;
+  };
+  c.mobs=(c.mobs||[]).map(hydrateMob);
+  for(const pending of c.pendingSpawns)pending.mob=hydrateMob(pending.mob);
+  if(c.greed)c.greed.randomFn=Math.random;
+  if(c.scarlett)c.scarlett.raf=0;
+  return c;
+}
+
+function resumeIdleInstance(session){
+  return new Promise((resolve)=>{
+    const activeId=String(session.activeCharacterId||"");
+    const member=(session.members||[]).find((m)=>String(m.id)===activeId)||(session.members||[])[0];
+    if(member&&member.p){G.p=normalizePlayer(member.p);G.p.id=member.id||G.p.id;}
+    const boss=session.kind==="boss"&&typeof BOSS_DEFS!=="undefined"?BOSS_DEFS[session.bossId]:null;
+    const hunt=boss&&boss.hunt?GAMEDATA.hunts[boss.hunt]:GAMEDATA.hunts[session.huntId];
+    if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)){
+      clearInstanceSession();resolve({resumed:false,ended:true});return;
+    }
+    G.p.hunt=session.kind==="hunt"?session.huntId:null;
+    G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
+    G.inCity=false;
+    if(typeof beginMapLoading==="function")beginMapLoading(`Retomando ${boss?boss.name:hunt.name}...`);
+    let done=false,watchdog=null;
+    const build=()=>{
+      if(done)return;done=true;if(watchdog)clearTimeout(watchdog);
+      try{
+        const fresh=boss?newBossCombat(G.p,boss):newCombat(G.p,session.huntId,session.instanceMode);
+        if(!boss&&!session.state){
+          spawnWave(fresh,G.p);
+          for(const pending of fresh.pendingSpawns||[])pending.startedAt=session.savedAt;
+        }
+        G.combat=restoreCombatSessionState(fresh,session);
+        G.p.hunt=session.kind==="hunt"?session.huntId:null;
+        G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
+        const elapsed=Math.max(0,Date.now()-session.savedAt);
+        const result=advanceIdleInstance(elapsed,session.savedAt,{silent:true});
+        if(G.combat){persistActiveInstance();G.inCity=false;}
+        resolve({resumed:!!G.combat,ended:result.ended,elapsed});
+      }catch(error){
+        console.error("[idle] falha ao retomar instância",error);clearInstanceSession();G.combat=null;G.inCity=true;
+        resolve({resumed:false,ended:true,error});
+      }finally{if(typeof finishMapLoading==="function")finishMapLoading();}
+    };
+    watchdog=setTimeout(build,7000);
+    try{
+      if(hunt&&hunt.otbm&&typeof huntMapFromOtbmAsync==="function")huntMapFromOtbmAsync(hunt,build);
+      else setTimeout(build,0);
+    }catch(error){console.warn("[idle] mapa da instância salva falhou",error);build();}
+  });
+}
+
 function save() {
   if (!G.p) return false;
   try {
+    G.p.stamina=FULL_STAMINA_SECONDS;
     saveCharacterToRoster(G.p);
+    const activeSession=G.combat?persistActiveInstance():null;
+    if(!G.combat)clearInstanceSession();
     // mantém compatibilidade com saves antigos de 1 personagem
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 1, p: G.p,
-      session: G.combat ? { hunt: G.combat.huntId, stats: G.combat.stats } : null,
+      session: activeSession||null,
     }));
     // MODO ONLINE: envia o save para a API (MySQL) do personagem da conta
     if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
@@ -241,6 +388,8 @@ function normalizePlayer(p) {
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
+  // Stamina temporariamente desativada: todo personagem permanece em 42h.
+  p.stamina = 42 * 3600;
   // ultima instancia escolhida no modal da hunt (pre-selecao de UI)
   p.lastInstanceChoice = p.lastInstanceChoice || null;
   p.ammo = p.ammo || {};
@@ -325,6 +474,7 @@ function wipeSave() {
     else localStorage.removeItem(ACTIVE_CHARACTER_KEY);
   }
   localStorage.removeItem(SAVE_KEY);
+  clearInstanceSession();
   try { sessionStorage.removeItem(AUTOLOGIN_KEY); } catch (e) {}
   location.reload();
 }
@@ -348,8 +498,9 @@ function computeOffline(p) {
   if (risk.cls === "mid") effRate = 0.45;
   if (risk.cls === "high") effRate = 0.25;
 
-  // stamina limita o tempo de caca
-  const staminaSec = Math.min(eff / 1000, p.stamina);
+  // Stamina está temporariamente desativada e permanece sempre em 42h.
+  const staminaSec = eff / 1000;
+  p.stamina = FULL_STAMINA_SECONDS;
   const hours = staminaSec / 3600;
   if (hours <= 0) return null;
 
@@ -384,7 +535,7 @@ function computeOffline(p) {
   const beforeLevel = p.level;
   addExp(p, exp);
   p.gold += gold;
-  p.stamina = Math.max(0, p.stamina - staminaSec);
+  p.stamina = FULL_STAMINA_SECONDS;
   p.totalKills += kills;
   p.playtime += staminaSec * 1000;
 
@@ -996,6 +1147,7 @@ function startBoss(id, force, arenaReady) {
   G.p.instanceMode = "boss";
   G.combat = newBossCombat(G.p, boss);
   G.inCity = false;
+  if(typeof persistActiveInstance==="function")persistActiveInstance();
   addLog("death", `Você entrou no boss <b>${boss.name}</b>. Entrada liberada.`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
   // PARTY: enquanto a liberação temporária estiver ativa, o servidor recebe
@@ -1138,6 +1290,7 @@ function startHunt(id, instanceMode, force) {
     try {
       G.combat = newCombat(G.p, id, instanceMode);
       spawnWave(G.combat, G.p);
+      if(typeof persistActiveInstance==="function")persistActiveInstance();
       addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
       toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
       // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
@@ -1202,6 +1355,7 @@ function startHunt(id, instanceMode, force) {
             try {
               G.combat = newCombat(G.p, id, instanceMode);
               spawnWave(G.combat, G.p);
+              if(typeof persistActiveInstance==="function")persistActiveInstance();
               renderAll();
             } catch (error) {
               console.error(`[hunt] falha ao instalar OTBM tardio em ${id}:`, error);
@@ -1244,6 +1398,7 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;
+  if(typeof clearInstanceSession==="function")clearInstanceSession();
   // Checkpoint do templo: cura inclusive membros inconscientes antes de
   // persistir o roster, para ninguém permanecer morto fora da instância.
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
@@ -1887,6 +2042,83 @@ function drainAcademyEvents() {
   t.events.length = 0;
 }
 
+/* ------------------------------------------------------------ continuidade idle */
+function reviveDownedParty(c,now,silent){
+  if(!c||c.dead||!c.players||c.players.length<2)return 0;
+  // Se todos caíram, a instância termina; ninguém pode ressuscitar antes da
+  // verificação de wipe.
+  if(c.players.every((ent)=>!ent.p||ent.p.hp<=0))return 0;
+  let revived=0;
+  for(const ent of c.players){
+    if(ent.p && ent.p.hp<=0 && !ent.permadead && ent.reviveAt && now>=ent.reviveAt){
+      const mx=maxStats(ent.p);ent.p.hp=mx.hp;ent.p.mp=mx.mp;
+      if(ent.deathPos){
+        ent.x=ent.deathPos.x;ent.y=ent.deathPos.y;ent.dir=ent.deathPos.dir||"e";
+        ent.cx=undefined;ent.cy=undefined;if(typeof ensureCell==="function")ensureCell(ent);
+      }
+      ent.reviveAt=0;ent.downedAt=0;ent.deathPos=null;ent.moving=false;revived++;
+      if(!silent&&typeof addLog==="function")addLog("party",`<b style="color:#9ce84a">${ent.name}</b> renasceu no local da morte.`);
+      if(!silent&&typeof saveCharacterToRoster==="function")saveCharacterToRoster(ent.p);
+    }
+  }
+  return revived;
+}
+
+function idleInstanceEndReason(c){
+  if(!c)return null;
+  const members=combatSessionParticipants(c);
+  if(members.some((ent)=>ent.p&&Number(ent.p.stamina)<=0))return "stamina";
+  if(c.dead||members.length&&members.every((ent)=>!ent.p||ent.p.hp<=0))return "party-wipe";
+  return null;
+}
+
+function finishIdleInstance(reason,silent){
+  const c=G.combat;if(!c||c.instanceFinished)return false;
+  c.instanceFinished=true;clearInstanceSession();
+  if(!silent&&typeof addLog==="function")addLog("death",reason==="stamina"
+    ?"A stamina de um membro acabou. A instância foi encerrada."
+    :"Toda a party caiu. A instância foi encerrada.");
+  // O templo é checkpoint seguro e regenera toda a party.
+  stopHunt(!!silent);save();return true;
+}
+
+/* Avança combate por relógio real. É usado pelo timer de aba oculta e pelo
+ * catch-up de um navegador reaberto. Movimento também é simulado — apenas
+ * chamar combatTick deixava melee parado fora do alcance. */
+function advanceIdleInstance(elapsed,startAt,options){
+  options=options||{};elapsed=Math.max(0,Number(elapsed)||0);
+  if(!G.combat||!G.p||!elapsed)return {processed:0,ended:false,reason:null};
+  const maxSteps=250000;
+  const step=options.step||Math.max(TICK,Math.ceil(elapsed/maxSteps/TICK)*TICK);
+  let remaining=elapsed,cursor=Number(startAt)||Date.now()-elapsed,processed=0,reason=null;
+  G._idleCatchup=true;G._silentCombat=!!options.silent;
+  try{
+    while(G.combat&&remaining>=step){
+      cursor+=step;
+      combatTick(G.combat,G.p,step,cursor);
+      if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,step,cursor);
+      else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,step);
+      remaining-=step;processed+=step;
+      reason=idleInstanceEndReason(G.combat);
+      if(reason)break;
+      reviveDownedParty(G.combat,cursor,true);
+      G.combat.events.length=0;
+    }
+    if(G.combat){
+      const members=combatSessionParticipants(G.combat);
+      for(const ent of members){
+        if(!ent.p)continue;ent.p.stamina=FULL_STAMINA_SECONDS;
+        if(typeof tickAccessoryCharges==="function")tickAccessoryCharges(ent.p,processed);
+        if(typeof imbTickAll==="function")imbTickAll(ent.p,processed);
+      }
+      if(typeof preyTick==="function")preyTick(G.p,processed);
+      G.combat.events.length=0;
+    }
+  }finally{G._idleCatchup=false;G._silentCombat=false;}
+  if(reason)finishIdleInstance(reason,!!options.silent);
+  return {processed,ended:!!reason,reason};
+}
+
 /* ------------------------------------------------------------ loop */
 /* Quando a aba fica inativa, o browser pausa requestAnimationFrame.
  * Ao voltar, o delta (ts - G.last) seria enorme e o tickAcc engoliria
@@ -1896,16 +2128,19 @@ function drainAcademyEvents() {
 let _wasHidden = false;
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    _wasHidden = true;
-    G.bgLast = Date.now();
+    _wasHidden = true;G.bgLast = Date.now();G.bgAcc=0;
+    if(G.combat)persistActiveInstance();
   } else {
-    /* Ao voltar: reseta o timestamp para que o próximo frame
-     * tenha dt ≈ 0 (não acumula ticks atrasados). O TEMPO que passou
-     * com a aba escondida JÁ foi processado pelo bgTick (setInterval),
-     * então não zeramos o acumulador para não perder progresso. */
-    G.last = performance.now();
-    G.tickAcc = 0;
-    _wasHidden = false;
+    // Timers podem ser totalmente congelados pelo navegador/SO. Reconcilia
+    // aqui todo o intervalo ainda não processado antes de reativar o rAF.
+    const agora=Date.now();
+    if(G.combat&&G.bgLast){
+      const elapsed=Math.max(0,agora-G.bgLast)+(G.bgAcc||0);
+      const result=advanceIdleInstance(elapsed,G.bgLast-(G.bgAcc||0),{silent:true});
+      G.bgAcc=Math.max(0,elapsed-result.processed);
+      if(G.combat)persistActiveInstance();
+    }
+    G.bgLast=agora;G.last=performance.now();G.tickAcc=0;_wasHidden=false;
   }
 });
 
@@ -1928,37 +2163,16 @@ function startBackgroundTick() {
   if (_bgTimer) return;
   _bgTimer = setInterval(() => {
     if (!G || !G.p || G.paused || !G.combat || !document.hidden) return;
-    const agora = Date.now();
-    let elapsed = agora - (G.bgLast || agora);
-    G.bgLast = agora;
-    // teto por tick: 2 min — evita loop gigante se a aba ficou horas
-    // fechada (nesse caso o computeOffline cobre no reload)
-    elapsed = Math.min(elapsed, 120000);
-    let acc = elapsed;
-    let t = 0;
-    while (acc >= TICK) {
-      t += TICK;
-      const nowTick = agora - acc + TICK;
-      combatTick(G.combat, G.p, TICK, nowTick);
-      acc -= TICK;
-      G.combat.events.length = 0;   // sem render: descarta os visuais
-    }
-    // cargas por tempo dos anéis/amuletos continuam com a aba escondida
-    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, elapsed);
-    if (typeof imbTickAll === "function") imbTickAll(G.p, elapsed);
-    if (typeof preyTick === "function") preyTick(G.p, elapsed);
-    // reposição de supplies periódica (autoRestock) para não morrer
-    G.sellTimer = (G.sellTimer || 0) + elapsed;
-    if (G.sellTimer > 15000) {
-      G.sellTimer = 0;
-      if (typeof autoRestock === "function") autoRestock(G.p);
-    }
-    // autosave a cada ~20s mesmo com a aba escondida
-    G.saveTimer = (G.saveTimer || 0) + elapsed;
-    if (G.saveTimer > 20000) {
-      G.saveTimer = 0;
-      if (typeof save === "function") save();
-    }
+    const agora=Date.now(),last=G.bgLast||agora,carry=G.bgAcc||0;
+    const elapsed=Math.max(0,agora-last)+carry;
+    const result=advanceIdleInstance(elapsed,last-carry,{silent:true});
+    G.bgLast=agora;G.bgAcc=Math.max(0,elapsed-result.processed);
+    if(!G.combat)return;
+    // reposição e autosave continuam usando relógio real em background.
+    G.sellTimer=(G.sellTimer||0)+result.processed;
+    if(G.sellTimer>15000){G.sellTimer=0;if(typeof autoRestock==="function")autoRestock(G.p);}
+    G.saveTimer=(G.saveTimer||0)+result.processed;
+    if(G.saveTimer>20000){G.saveTimer=0;if(typeof save==="function")save();}
   }, 200);
 }
 
@@ -1976,6 +2190,9 @@ function pouchFillPct(p) {
 function loop(ts) {
   requestAnimationFrame(loop);
   if (!G.p) return;
+  // Alguns browsers ainda entregam rAF a 1fps em background. A simulação
+  // oculta pertence exclusivamente ao relógio idle, evitando tick duplo.
+  if(typeof document!=="undefined"&&document.hidden){G.last=ts;return;}
   /* Se estávamos com a aba escondida, descarta o frame de retorno
    * (ts pode ser segundos depois do G.last) e reinicia o relógio. */
   if (_wasHidden) {
@@ -1998,7 +2215,10 @@ function loop(ts) {
     while (G.tickAcc >= TICK) {
       combatTick(G.combat, G.p, TICK, Date.now());
       G.tickAcc -= TICK;
+      const endedBecause=idleInstanceEndReason(G.combat);
+      if(endedBecause){finishIdleInstance(endedBecause,false);return;}
     }
+    reviveDownedParty(G.combat,Date.now(),false);
     // Relogio dos imbuements: 20h de TEMPO DE COMBATE (ver imbuement.js).
     if (typeof imbTickAll === "function") {
       // Cada membro da party consome apenas os imbuements dos itens que ELE
@@ -2046,57 +2266,6 @@ function loop(ts) {
         }
       }
     }
-    if (G.combat && G.combat.dead && Date.now() >= G.combat.deadUntil) {
-      // Revive: jogador renasce no mesmo ponto que morreu
-      const c = G.combat;
-      const p = G.p;
-      const max = maxStats(p);
-      p.hp = max.hp; p.mp = max.mp;
-      // Restaura posição do corpse
-      if (c.deathPos && c.player) {
-        c.player.x = c.deathPos.x;
-        c.player.y = c.deathPos.y;
-        c.player.dir = c.deathPos.dir || "e";
-        c.player.moving = false;
-      }
-      c.mobs = [];
-      c.dead = false;
-      c.deathPos = null;
-      addLog("info", "Você renasceu no local da morte.");
-      toast("Renasceu!", "level");
-      renderAll();
-      return;
-    }
-
-    // PARTY COMBAT: aliados INCONSCIENTES renascem no local depois do
-    // tempo (reviveAt) — a instância continua ativa enquanto alguém vivo
-    // estiver nela
-    if (G.combat && G.combat.players && G.combat.players.length > 1 &&
-        !G.combat.dead) {
-      for (const ent of G.combat.players) {
-        if (ent.p && ent.p.hp <= 0 && !ent.permadead && ent.reviveAt &&
-            Date.now() >= ent.reviveAt) {
-          const mx = maxStats(ent.p);
-          ent.p.hp = mx.hp;
-          ent.p.mp = mx.mp;
-          if (ent.deathPos) {
-            ent.x = ent.deathPos.x;
-            ent.y = ent.deathPos.y;
-            ent.dir = ent.deathPos.dir || "e";
-            ent.cx = undefined;
-            ent.cy = undefined;
-            if (typeof ensureCell === "function") ensureCell(ent);
-          }
-          ent.reviveAt = 0;
-          ent.downedAt = 0;
-          ent.deathPos = null;
-          addLog("party", `<b style="color:#9ce84a">${ent.name}</b> renasceu no local da morte.`);
-          if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
-          if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
-        }
-      }
-    }
-
     if (G.p.level > before) {
       addLog("level", `Subiu para o nível <b>${G.p.level}</b>!`);
       toast(`Nível <b>${G.p.level}</b>!`, "level");
@@ -2123,11 +2292,9 @@ function loop(ts) {
   if (!G.paused && G.training) {
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     regenInCity(G.p, dt);
-    // regen de stamina por modo de treino: dummy 3:1, online 1:1
+    // Stamina temporariamente fixa em 42h também durante o treino.
     const tr = G.training;
-    const staRate = (typeof trainingStaminaRate === "function")
-      ? trainingStaminaRate(tr) : (tr && tr.mode === "dummy" ? 1 / 3 : 1.0);
-    G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * staRate);
+    G.p.stamina = FULL_STAMINA_SECONDS;
     academyTrainingTick(tr, G.p, dt, Date.now());
     drainAcademyEvents();
     if (JSON.stringify(G.p.skills) + G.p.ml !== beforeSkills) {
@@ -2143,8 +2310,8 @@ function loop(ts) {
     // Recupera saves que ficaram sem instância e com inCity=false após troca
     // de branch/reload: a ausência de combate sempre deve renderizar Thais.
     G.inCity = true;
-    // na cidade a stamina e a mana regeneram devagar (treino online)
-    G.p.stamina = Math.min(42 * 3600, G.p.stamina + (dt / 1000) * 0.35);
+    // Na cidade a stamina também permanece temporariamente cheia.
+    G.p.stamina = FULL_STAMINA_SECONDS;
     regenInCity(G.p, dt);
     tickManaTrain(G.p, dt);
     // caminhada: ao chegar num NPC, abre o dialogo dele
@@ -2330,38 +2497,40 @@ function startGameReady(p) {
   window.dispatchEvent(new Event("bg-game-start"));
   if (typeof moduleLifecycleStart === "function") moduleLifecycleStart();
 
-  const off = computeOffline(p);
-  p.lastSeen = Date.now();
-
-  if (false && p.hunt && GAMEDATA.hunts[p.hunt]) {
-    p.instanceMode = p.instanceMode || "non-pvp";
-    // mesma regra do startHunt: hunt .otbm carrega o mapa antes do combate
-    huntMapFromOtbmAsync(GAMEDATA.hunts[p.hunt], () => {
-      G.combat = newCombat(p, p.hunt, p.instanceMode);
-      spawnWave(G.combat, p);
-    });
-    G.inCity = false;
-  } else {
-    G.inCity = true;   // sem caçada ativa, o char fica na cidade
+  let instanceSession=readInstanceSession();
+  if(instanceSession&&p.id&&(instanceSession.members||[]).length&&
+     !(instanceSession.members||[]).some((m)=>String(m.id)===String(p.id))){
+    clearInstanceSession();instanceSession=null;
   }
+  // Migra saves antigos que guardavam apenas p.hunt/lastSeen.
+  if(!instanceSession&&p.hunt&&GAMEDATA.hunts[p.hunt])instanceSession={
+    v:1,savedAt:p.lastSeen||Date.now(),kind:"hunt",huntId:p.hunt,
+    instanceMode:p.instanceMode||"non-pvp",activeCharacterId:p.id,
+    members:[{id:p.id,p}],
+  };
+  const off=instanceSession?null:computeOffline(p);
+  p.lastSeen=Date.now();
 
-  renderAll();
-  bindControls();
-  addLog("info", `Bem-vindo, <b>${p.name}</b>!`);
-  if (off) showOfflineModal(off);
+  const startRuntime=(resumeResult)=>{
+    if(!instanceSession)G.inCity=true;
+    renderAll();bindControls();
+    addLog("info",`Bem-vindo, <b>${G.p.name}</b>!`);
+    if(resumeResult&&resumeResult.resumed){
+      addLog("info",`Instância retomada após <b>${fmtTime(Math.floor(resumeResult.elapsed/1000))}</b> em segundo plano.`);
+    }
+    if(off)showOfflineModal(off);
+    G.last=performance.now();G.bgLast=Date.now();G.bgAcc=0;
+    requestAnimationFrame(loop);
+    window.addEventListener("beforeunload",save);
+    window.addEventListener("pagehide",save);
+    setInterval(save,20000);startBackgroundTick();
+    if(typeof partyStartPolling==="function")partyStartPolling();
+    if(typeof partyReportZone==="function"&&typeof partyCurrentZone==="function")
+      setTimeout(()=>partyReportZone(partyCurrentZone()),1500);
+  };
 
-  G.last = performance.now();
-  G.bgLast = Date.now();
-  requestAnimationFrame(loop);
-  window.addEventListener("beforeunload", save);
-  setInterval(save, 20000);
-  startBackgroundTick();   // idle continua rodando com a aba minimizada
-
-  // PARTY online: polling leve (convites + follow) + reporta a zona inicial
-  if (typeof partyStartPolling === "function") partyStartPolling();
-  if (typeof partyReportZone === "function" && typeof partyCurrentZone === "function") {
-    setTimeout(() => partyReportZone(partyCurrentZone()), 1500);
-  }
+  if(instanceSession)resumeIdleInstance(instanceSession).then(startRuntime);
+  else startRuntime(null);
 }
 
 function bindControls() {

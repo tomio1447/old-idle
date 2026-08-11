@@ -58,6 +58,7 @@ function helperSupplyFlash(slug, kind) {
 
 /* ------------------------------------------------------------ toasts */
 function toast(msg, kind) {
+  if(typeof G!=="undefined"&&G&&G._silentCombat)return;
   const el = document.createElement("div");
   el.className = "toast " + (kind || "");
   el.innerHTML = msg;
@@ -297,6 +298,7 @@ function imbSlotsTip(p, slug, slot, total) {
 
 /* ------------------------------------------------------------ log */
 function addLog(kind, html) {
+  if(typeof G!=="undefined"&&G&&G._silentCombat)return;
   const box = $("#log");
   if (!box) return;
   const d = new Date();
