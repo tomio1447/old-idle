@@ -169,7 +169,7 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
   for (const script of ['otbm','otbmhunt','hard-hunts','tileanimdata',
     'tilepatterndata','tilemap','preload','game'])
-    must(html.includes(`js/${script}.js?v=cobra-loading-v16`),
+    must(html.includes(`js/${script}.js?v=cobra-loading-v17`),
       'script crítico sem cache-busting: ' + script);
   const reward = fs.readFileSync(path.join(js, 'reward-chest.js'), 'utf8');
   const forgeUi = fs.readFileSync(path.join(js, 'forge-ui.js'), 'utf8');

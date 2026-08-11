@@ -197,8 +197,10 @@ canvas { image-rendering: pixelated; }
   background: #000;
   border: 2px solid;
   border-color: var(--border-in) var(--border-out) var(--border-out) var(--border-in);
-  /* v27+: canvas da cena em DPR 2x — o downscale 2:1 fica suave (auto) */
-  image-rendering: auto;
+  /* DPR 2x com nearest-neighbour: sprites e textos permanecem nítidos no
+     downscale do canvas, sem o aspecto embaçado do filtro bilinear. */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 /* Scarlett Etzel — esteira direcional da boss fight. */
@@ -487,7 +489,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .boss-card.locked { opacity: .55; }
 
 /* ---------------------------------------------------------- hunts */
-#btn-hunts { display:inline-flex; align-items:center; gap:4px; }
+.catalog-tab-btn { display:inline-flex; align-items:center; gap:4px; min-height:30px; }
+#btn-hunts, #btn-bosses { display:inline-flex; align-items:center; gap:4px; }
 .hunts-demon-icon {
   display:inline-block; width:24px; height:24px; flex:0 0 24px;
   background-image:url('../assets/mob/demon.png');
@@ -500,7 +503,19 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   33%,65% { background-position:-24px -48px; }
   66%,100% { background-position:-48px -48px; }
 }
-.modal-bg .modal.hunts-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.bosses-megalomania-icon {
+  display:inline-block; width:24px; height:24px; flex:0 0 24px;
+  background-image:url('../assets/mob/goshnar-s-megalomania-green.png');
+  background-size:72px 96px; background-position:0 -48px;
+  image-rendering:pixelated; animation:hunts-demon-walk .72s steps(1,end) infinite;
+}
+.modal-bg .modal.hunts-modal-shell,
+.modal-bg .modal.bosses-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.bosses-modal-title { display:flex; align-items:center; gap:7px; }
+.bosses-modal-title #bosses-modal-close { margin-left:auto; }
+.bosses-modal-title .bosses-megalomania-icon { transform:scale(1.1); margin:0 2px; }
+#bosses-modal-list .boss-quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:8px; }
+#bosses-modal-list .boss-btn { min-height:82px; justify-content:center; }
 .hunts-modal-title { display:flex; align-items:center; gap:7px; }
 .hunts-modal-title #hunts-modal-close { margin-left:auto; }
 .hunts-modal-title .hunts-demon-icon { transform:scale(1.1); margin:0 2px; }

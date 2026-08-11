@@ -113,7 +113,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "41";
+const ASSET_VERSION = "42";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -389,9 +389,8 @@ function Renderer(canvas) {
   // canvas ter o DOBRO de resolução do CSS, e desenha com
   // imageSmoothingEnabled=false (nearest) — pixel art NÍTIDO, sem o blur
   // que o bilinear da v27 causava. O navegador faz o downscale 2:1 do
-  // canvas para o tamanho CSS (#scene image-rendering:auto), então o
-  // resultado é nítido E sem serrilhado (o serrilhado antigo vinha do
-  // canvas 1x esticado pelo CSS).
+  // canvas para o tamanho CSS com nearest-neighbour/pixelated, preservando
+  // contornos, sprites e textos sem o blur do filtro bilinear.
   this.ctx.imageSmoothingEnabled = false;
   this.floaters = [];       // numeros de dano
   this.effects = [];        // animacoes de efeito
@@ -425,6 +424,14 @@ function floaterAlpha(p) {
   // Fade contínuo desde o primeiro frame (mais rápido no final), em vez de
   // permanecer opaco até os últimos 300 ms e poluir a cena.
   return Math.max(0, Math.pow(1 - p, 1.35));
+}
+function floaterFont(f) {
+  // O canvas trabalha em DPR 2x; estes tamanhos resultam em aproximadamente
+  // 8–9px CSS e mantêm números de dano legíveis durante a subida.
+  if (f.kind === "damage" || f.kind === "restore") return "bold 16px Verdana";
+  if (f.big) return "bold 18px Verdana";
+  if (f.small) return "bold 11px Verdana";
+  return "bold 15px Verdana";
 }
 Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
   const life = kind === "damage" ? 1300 : (kind === "restore" ? 1150 : (big ? FLOATER_MAX_LIFE : 1500));
@@ -1342,8 +1349,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
-    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
+    ctx.font = floaterFont(f);
+    ctx.lineWidth = f.kind ? 3 : (f.small ? 2 : 2.5);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1600,8 +1607,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
-    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
+    ctx.font = floaterFont(f);
+    ctx.lineWidth = f.kind ? 3 : (f.small ? 2 : 2.5);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
