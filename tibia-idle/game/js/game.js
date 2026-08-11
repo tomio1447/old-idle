@@ -1067,44 +1067,42 @@ function startHunt(id, instanceMode, force) {
 
   // Hunt com arena .otbm: carrega (fetch) e converte o mapa antes de montar
   // o combate. Exceções e promises rejeitadas também convergem para a entrada.
-  // v4: Cobra usa mapa pré-compilado (HUNTMAPS já contém a chave), sem fetch.
-  // Se o watchdog já liberou a entrada por fallback, o OTBM tardio substitui
-  // silenciosamente o combate provisório (sem reabrir overlay) quando ainda
-  // estiver na mesma hunt/entryToken.
   try {
     huntMapFromOtbmAsync(hu, () => {
       if (!entryStillValid()) return;
+
+      // Se o watchdog já criou o combate com o fallback, uma leitura OTBM
+      // tardia ainda pode instalar o mapa integral — mas somente na mesma
+      // entrada/hunt. Voltar ao templo invalida entryStillValid().
       if (entryCompleted) {
-        const keyLate = hu.otbm ? ("otbm:" + hu.otbm) : null;
-        const hasIntegral = keyLate && typeof HUNTMAPS !== "undefined" && HUNTMAPS[keyLate] && HUNTMAPS[keyLate].rows;
-        if (!hasIntegral) return;
-        if (!G.combat || G.combat.huntId !== id) return;
-        // Já está no mapa integral? Evita loop se o fallback já era integral (precompilado)
-        // O fallback da Cobra nunca ocorre porque HUNTMAPS já existe; para outras hunts,
-        // compara se o combat atual já usa o mesmo rows length; se sim, não recria.
-        // Para garantir substituição quando necessário, verifica se ainda não é o integral
-        // (fallback usa grid padrão sem HUNTMAPS ou rows diferente)
-        const curMap = (typeof HUNTMAPS !== "undefined" && G.combat.huntId && GAMEDATA.hunts[G.combat.huntId]) ? HUNTMAPS[GAMEDATA.hunts[G.combat.huntId].mapa] : null;
-        const integralMap = HUNTMAPS[keyLate];
-        if (curMap === integralMap) return;
-        console.warn(`[hunt] OTBM tardio substituiu fallback por integral em ${id}`);
-        let readyLate;
+        const key = hu.otbm ? "otbm:" + hu.otbm : null;
+        const integralMap = key && typeof HUNTMAPS !== "undefined" ? HUNTMAPS[key] : null;
+        const curMap = G.combat && G.combat.huntMap;
+        if (!integralMap || !integralMap.rows || !G.combat ||
+            G.combat.huntId !== id || curMap === integralMap) return;
+
+        console.warn("[hunt] OTBM tardio substituiu fallback", id);
+        let lateReady;
         try {
-          readyLate = typeof preloadHuntMapAssets === "function"
+          lateReady = typeof preloadHuntMapAssets === "function"
             ? preloadHuntMapAssets(hu, `Preparando ${hu.name}`) : Promise.resolve();
-        } catch (e) {
-          readyLate = Promise.resolve();
+        } catch (error) {
+          console.warn("[hunt] falha síncrona no preloader tardio:", error);
+          lateReady = Promise.resolve();
         }
-        Promise.resolve(readyLate).catch(()=>{}).then(() => {
-          if (!entryStillValid()) return;
-          if (!G.combat || G.combat.huntId !== id) return;
-          G.combat = newCombat(G.p, id, instanceMode);
-          spawnWave(G.combat, G.p);
-          renderAll();
-          if (typeof finishMapLoading === "function") finishMapLoading();
-        });
+        Promise.resolve(lateReady)
+          .catch((error) => console.warn("[hunt] preloader tardio rejeitado:", error))
+          .then(() => {
+            if (!entryStillValid() || !G.combat || G.combat.huntId !== id ||
+                G.combat.huntMap === integralMap) return;
+            G.combat = newCombat(G.p, id, instanceMode);
+            spawnWave(G.combat, G.p);
+            renderAll();
+            if (typeof finishMapLoading === "function") finishMapLoading();
+          });
         return;
       }
+
       let ready;
       try {
         ready = typeof preloadHuntMapAssets === "function"

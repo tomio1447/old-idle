@@ -1,9 +1,7 @@
 /* preload.js — preparação visual antes de entrar no jogo. */
 "use strict";
 let MAP_LOADING_GENERATION = 0;
-function currentMapLoadingGeneration() {
-  return MAP_LOADING_GENERATION;
-}
+function currentMapLoadingGeneration(){return MAP_LOADING_GENERATION;}
 function showGameLoading(show, text, pct) {
   const el = document.getElementById('game-loading');
   if (!el) return;
@@ -25,11 +23,21 @@ function finishMapLoading() {
   const hide = () => {
     if (generation === MAP_LOADING_GENERATION) showGameLoading(false);
   };
-  // Um frame desenha o mapa já carregado; o segundo remove o overlay sem
-  // revelar tiles aparecendo aos poucos.
-  if (typeof requestAnimationFrame === 'function')
+  // Mantém os dois frames para uma transição suave, mas não depende deles:
+  // DevTools aberto e abas em background podem suspender rAF indefinidamente.
+  if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(() => requestAnimationFrame(hide));
-  else setTimeout(hide, 0);
+    setTimeout(hide, 120);
+  } else setTimeout(hide, 0);
+  // Última barreira para o caso observado em 184/184. Se algum scheduler ou
+  // callback deixou o overlay visível na mesma geração, force o fechamento.
+  setTimeout(() => {
+    const el = document.getElementById('game-loading');
+    if (el && el.style.display !== 'none' && generation === MAP_LOADING_GENERATION) {
+      console.warn('[preload] fallback hide forçado');
+      showGameLoading(false);
+    }
+  }, 350);
 }
 
 function preloadAssetPaths(paths, label) {
