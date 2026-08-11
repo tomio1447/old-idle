@@ -52,9 +52,9 @@
   if (GAMEDATA.hunts["marapur-nagas"]) harden(GAMEDATA.hunts["marapur-nagas"]);
   if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
 
-  // Sala oficial da Timira. O OTBM completo inclui as âncoras externas em
-  // (174,157,2)..(194,175,2); `otbmRoomBounds` documenta apenas a arena
-  // lógica e não recorta paredes/objetos do arquivo.
+  // Bossroom nova da Timira publicada em beta-maps. O OTBM ocupa
+  // (175,160,2)..(192,175,2); `otbmRoomBounds` preserva a arena lógica
+  // global definida para combate, sem recortar paredes/objetos do arquivo.
   GAMEDATA.hunts["timira-room"] = {
     name: "Timira's Room",
     hidden: true,
