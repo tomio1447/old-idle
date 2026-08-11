@@ -1046,16 +1046,25 @@ function startHunt(id, instanceMode, force) {
     }
     entryCompleted = true;
     if (entryWatchdog) clearTimeout(entryWatchdog);
-    G.combat = newCombat(G.p, id, instanceMode);
-    spawnWave(G.combat, G.p);
-    addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
-    toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
-    // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
-    if (typeof partyReportZone === "function") {
-      partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+    try {
+      G.combat = newCombat(G.p, id, instanceMode);
+      spawnWave(G.combat, G.p);
+      addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
+      toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
+      // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
+      if (typeof partyReportZone === "function") {
+        partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+      }
+      renderAll();
+    } catch (error) {
+      // O watchdog é a última barreira de acesso: um erro secundário de UI
+      // não pode manter a tela inteira bloqueada. O callback OTBM ainda pode
+      // tentar novamente quando o mapa integral terminar de carregar.
+      entryCompleted = false;
+      console.error(`[hunt] falha ao concluir entrada em ${id}:`, error);
+    } finally {
+      if (typeof finishMapLoading === "function") finishMapLoading();
     }
-    renderAll();
-    if (typeof finishMapLoading === "function") finishMapLoading();
   };
   const watchdogMs = Math.max(1, Number(
     typeof window !== "undefined" && window.HUNT_ENTRY_TIMEOUT_MS
@@ -1095,10 +1104,15 @@ function startHunt(id, instanceMode, force) {
           .then(() => {
             if (!entryStillValid() || !G.combat || G.combat.huntId !== id ||
                 G.combat.huntMap === integralMap) return;
-            G.combat = newCombat(G.p, id, instanceMode);
-            spawnWave(G.combat, G.p);
-            renderAll();
-            if (typeof finishMapLoading === "function") finishMapLoading();
+            try {
+              G.combat = newCombat(G.p, id, instanceMode);
+              spawnWave(G.combat, G.p);
+              renderAll();
+            } catch (error) {
+              console.error(`[hunt] falha ao instalar OTBM tardio em ${id}:`, error);
+            } finally {
+              if (typeof finishMapLoading === "function") finishMapLoading();
+            }
           });
         return;
       }
