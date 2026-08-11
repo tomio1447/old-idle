@@ -1069,7 +1069,40 @@ function startHunt(id, instanceMode, force) {
   // o combate. Exceções e promises rejeitadas também convergem para a entrada.
   try {
     huntMapFromOtbmAsync(hu, () => {
-      if (entryCompleted || !entryStillValid()) return;
+      if (!entryStillValid()) return;
+
+      // Se o watchdog já criou o combate com o fallback, uma leitura OTBM
+      // tardia ainda pode instalar o mapa integral — mas somente na mesma
+      // entrada/hunt. Voltar ao templo invalida entryStillValid().
+      if (entryCompleted) {
+        const key = hu.otbm ? "otbm:" + hu.otbm : null;
+        const integralMap = key && typeof HUNTMAPS !== "undefined" ? HUNTMAPS[key] : null;
+        const curMap = G.combat && G.combat.huntMap;
+        if (!integralMap || !integralMap.rows || !G.combat ||
+            G.combat.huntId !== id || curMap === integralMap) return;
+
+        console.warn("[hunt] OTBM tardio substituiu fallback", id);
+        let lateReady;
+        try {
+          lateReady = typeof preloadHuntMapAssets === "function"
+            ? preloadHuntMapAssets(hu, `Preparando ${hu.name}`) : Promise.resolve();
+        } catch (error) {
+          console.warn("[hunt] falha síncrona no preloader tardio:", error);
+          lateReady = Promise.resolve();
+        }
+        Promise.resolve(lateReady)
+          .catch((error) => console.warn("[hunt] preloader tardio rejeitado:", error))
+          .then(() => {
+            if (!entryStillValid() || !G.combat || G.combat.huntId !== id ||
+                G.combat.huntMap === integralMap) return;
+            G.combat = newCombat(G.p, id, instanceMode);
+            spawnWave(G.combat, G.p);
+            renderAll();
+            if (typeof finishMapLoading === "function") finishMapLoading();
+          });
+        return;
+      }
+
       let ready;
       try {
         ready = typeof preloadHuntMapAssets === "function"

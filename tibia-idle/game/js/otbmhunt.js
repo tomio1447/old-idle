@@ -64,16 +64,30 @@ function applyHuntOtbmZones(map, hunt) {
 /* Garante o huntMap da hunt carregado; chama done() SEMPRE (assincrono so
  * quando ainda nao tem cache). */
 function huntMapFromOtbmAsync(hunt, done) {
-  if (!hunt || !hunt.otbm || typeof OTBM === "undefined" ||
-      typeof fetch === "undefined") { done(); return; }
+  if (!hunt || !hunt.otbm) { done(); return; }
   const key = "otbm:" + hunt.otbm;
+  // Fast-path: o mapa pré-compilado da Cobra já foi registrado por
+  // cobra-bastion-map.js. Não exija nem execute fetch/OTBM.read nesse caso.
   if (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) {
     hunt.mapa = key;
     done();
     return;
   }
+  if (typeof OTBM === "undefined" || typeof fetch === "undefined") {
+    done();
+    return;
+  }
+
+  const loadingGeneration = () => typeof currentMapLoadingGeneration === "function"
+    ? currentMapLoadingGeneration()
+    : (typeof MAP_LOADING_GENERATION !== "undefined" ? MAP_LOADING_GENERATION : null);
+  const entryGen = loadingGeneration();
+  const reportGuarded = (stage, pct) => {
+    if (loadingGeneration() === entryGen) reportOtbmLoading(hunt, stage, pct);
+  };
+
   if (OTBM_HUNT_CACHE[hunt.otbm] === "loading") {
-    reportOtbmLoading(hunt, "Aguardando mapa", 3);
+    reportGuarded("Aguardando mapa", 3);
     const t0 = Date.now();
     const iv = setInterval(() => {
       if (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) {
@@ -89,7 +103,7 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   OTBM_HUNT_CACHE[hunt.otbm] = "loading";
-  reportOtbmLoading(hunt, "Baixando mapa", 5);
+  reportGuarded("Baixando mapa", 5);
   // Cache-busting: usa Date.now() para que CADA fetch bypass o cache HTTP
   // do navegador. Assim, ao editar o mapa no RME e dar F5, a versão
   // mais recente é sempre baixada. Para forçar reload sem F5, use
@@ -114,7 +128,9 @@ function huntMapFromOtbmAsync(hunt, done) {
       return r.arrayBuffer();
     })
     .then((buf) => {
-      reportOtbmLoading(hunt, "Montando mapa", 12);
+      // Mesmo stale, continue a conversão e popule HUNTMAPS silenciosamente;
+      // somente a atualização visual pertence à geração que iniciou a carga.
+      reportGuarded("Montando mapa", 12);
       let mapa = OTBM.read(buf);
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
       applyHuntOtbmZones(mapa, hunt);
