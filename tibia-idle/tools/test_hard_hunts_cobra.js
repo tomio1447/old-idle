@@ -24,7 +24,7 @@ const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
 must(uiSource.includes('"hard":               { nome: "💀 HARD" }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Categoria/range HARD não aparece na lista de hunts');
-must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v3"></script>'),
+must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v4"></script>'),
   'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
@@ -236,5 +236,41 @@ must(ctx.huntWaveSize({cat:'hard'}, 0) === 6 &&
   'Categoria HARD não sorteia entre 6 e 10');
 const seen = new Set(Array.from({length:100}, (_,i) => ctx.huntWaveSize({cat:'hard'}, i/100)));
 must([6,7,8,9,10].every(n => seen.has(n)), 'Faixa HARD não alcança todos os tamanhos 6–10');
+
+// v4: Cobra Bastion pré-compilado — elimina fetch/parse em runtime
+const prePath = path.join(js, 'cobra-bastion-map.js');
+must(fs.existsSync(prePath), 'cobra-bastion-map.js pré-compilado ausente (gerador não executado)');
+must(indexSource.includes('<script src="js/cobra-bastion-map.js?v=cobra-loading-v4"></script>'),
+  'Mapa pré-compilado não é carregado pelo index (cache bust v4)');
+const preSource = fs.readFileSync(prePath, 'utf8');
+must(preSource.includes('otbm:cobra_bastion') && preSource.includes('"rows":'),
+  'Pré-compilado não registra HUNTMAPS["otbm:cobra_bastion"]');
+// Carrega o pré-compilado num contexto limpo e compara com o OTBM oficial
+const preCtx = { window:{}, console, HUNTMAPS:{}, OTBM_HUNT_CACHE:{}, TILEFLAGS: ctx.TILEFLAGS };
+preCtx.window = preCtx;
+vm.createContext(preCtx);
+vm.runInContext(preSource, preCtx);
+const pre = preCtx.HUNTMAPS["otbm:cobra_bastion"] || preCtx.window.HUNTMAPS["otbm:cobra_bastion"] || preCtx.HUNTMAPS["cobra-bastion"];
+must(pre, 'Pré-compilado não populou HUNTMAPS');
+must(JSON.stringify(pre.rows) === JSON.stringify(hm.rows) && JSON.stringify(pre.leg) === JSON.stringify(hm.leg),
+  'Pré-compilado diverge do OTBM oficial (rows/leg diferentes)');
+must(pre.spawn.x === 11 && pre.spawn.y === 10 && pre.mob.length === 120,
+  'Pré-compilado com spawn/mobs incorretos');
+must(Object.keys(pre.footprintBlocked||{}).length === Object.keys(hm.footprintBlocked||{}).length,
+  'Pré-compilado com footprint divergente');
+// Garante que o navegador NÃO fará fetch/parse para a Cobra em runtime:
+// huntMapFromOtbmAsync deve retornar imediatamente se HUNTMAPS já contém a chave
+const otbmhuntSrc = fs.readFileSync(path.join(js, 'otbmhunt.js'), 'utf8');
+must(otbmhuntSrc.includes('HUNTMAPS[key]') && otbmhuntSrc.includes('pré-compilado'),
+  'otbmhunt.js v4 não verifica mapa pré-compilado antes do fetch');
+// Guard contra reopen: Montando mapa tardio não pode reabrir overlay após watchdog
+must(otbmhuntSrc.includes('entryGen') && otbmhuntSrc.includes('MAP_LOADING_GENERATION') && otbmhuntSrc.includes('reportGuarded'),
+  'otbmhunt.js v4 não protege Montando mapa com geração (overlay reabriria após watchdog)');
+// Se outro OTBM terminar após o watchdog, o integral deve substituir o fallback silenciosamente
+must(otbmhuntSrc.includes('HUNTMAPS[key] = hm') && otbmhuntSrc.includes('isStale'),
+  'Substituição silenciosa de fallback por integral ausente');
+// Gerador presente para futuras atualizações do OTBM
+must(fs.existsSync(path.join(__dirname, 'build_precompiled_cobra_map.js')),
+  'Gerador tools/build_precompiled_cobra_map.js ausente');
 
 console.log('OK: HARD Hunts, Cobra Bastion, 3 Cobras, loot, stats, magias, sprites e zonas validados.');

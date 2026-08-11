@@ -13,6 +13,12 @@
  *
  * Se o arquivo nao existir / falhar, cai no cenario padrao/ascii sem
  * quebrar a hunt (log de aviso no console).
+ *
+ * v4 (cobra-loading-v4): Cobra Bastion agora usa mapa PRÉ-COMPILADO
+ * (cobra-bastion-map.js) — o browser NÃO executa fetch/OTBM.read ao entrar.
+ * Conversões tardias não podem reabrir o overlay após o watchdog; se um
+ * OTBM terminar após o watchdog, o HUNTMAPS integral substitui o fallback
+ * silenciosamente (sem showGameLoading).
  */
 "use strict";
 
@@ -67,13 +73,29 @@ function huntMapFromOtbmAsync(hunt, done) {
   if (!hunt || !hunt.otbm || typeof OTBM === "undefined" ||
       typeof fetch === "undefined") { done(); return; }
   const key = "otbm:" + hunt.otbm;
+  // v4: se o mapa pré-compilado já existe (cobra_bastion), retorno síncrono
+  // sem fetch/parse — elimina a janela onde o late "Montando mapa..." reabria
+  // o overlay após o watchdog.
   if (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) {
     hunt.mapa = key;
     done();
     return;
   }
+  // Captura a geração do loading no momento da entrada. Qualquer
+  // reportOtbmLoading tardio (ex: Montando mapa após watchdog) que chegue
+  // com geração diferente é considerado stale e não pode reabrir o overlay.
+  const entryGen = (typeof currentMapLoadingGeneration === "function" ? currentMapLoadingGeneration() : (typeof MAP_LOADING_GENERATION !== "undefined" ? MAP_LOADING_GENERATION : null));
+  function reportGuarded(stage, pct) {
+    if (entryGen !== null && (typeof currentMapLoadingGeneration === "function" ? currentMapLoadingGeneration() : (typeof MAP_LOADING_GENERATION !== "undefined" ? MAP_LOADING_GENERATION : null)) !== entryGen) {
+      // stale: o watchdog já concluiu e chamou finishMapLoading (geração
+      // incrementada). Não reabra o overlay; apenas deixe o fetch terminar
+      // silenciosamente e popular HUNTMAPS para a próxima entrada.
+      return;
+    }
+    reportOtbmLoading(hunt, stage, pct);
+  }
   if (OTBM_HUNT_CACHE[hunt.otbm] === "loading") {
-    reportOtbmLoading(hunt, "Aguardando mapa", 3);
+    reportGuarded("Aguardando mapa", 3);
     const t0 = Date.now();
     const iv = setInterval(() => {
       if (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) {
@@ -89,7 +111,7 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   OTBM_HUNT_CACHE[hunt.otbm] = "loading";
-  reportOtbmLoading(hunt, "Baixando mapa", 5);
+  reportGuarded("Baixando mapa", 5);
   // Cache-busting: usa Date.now() para que CADA fetch bypass o cache HTTP
   // do navegador. Assim, ao editar o mapa no RME e dar F5, a versão
   // mais recente é sempre baixada. Para forçar reload sem F5, use
@@ -114,7 +136,10 @@ function huntMapFromOtbmAsync(hunt, done) {
       return r.arrayBuffer();
     })
     .then((buf) => {
-      reportOtbmLoading(hunt, "Montando mapa", 12);
+      // v4: guard antes de "Montando mapa" — se stale, ainda converte e
+      // popula HUNTMAPS (para substituir fallback), mas sem reabrir overlay.
+      const isStale = entryGen !== null && (typeof currentMapLoadingGeneration === "function" ? currentMapLoadingGeneration() : (typeof MAP_LOADING_GENERATION !== "undefined" ? MAP_LOADING_GENERATION : null)) !== entryGen;
+      if (!isStale) reportOtbmLoading(hunt, "Montando mapa", 12);
       let mapa = OTBM.read(buf);
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
       applyHuntOtbmZones(mapa, hunt);
@@ -127,6 +152,8 @@ function huntMapFromOtbmAsync(hunt, done) {
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;
       hunt.mapa = key;
       OTBM_HUNT_CACHE[hunt.otbm] = key;
+      // v4: se stale, não reabra overlay; apenas resolve done() — o game.js
+      // já liberou a entrada via watchdog e ignorará done() se entryCompleted.
       done();
     })
     .catch((e) => {
@@ -149,13 +176,24 @@ if (typeof module !== "undefined" && module.exports) {
  * Se o jogador está em uma hunt com .otbm, o combate é reiniciado com o
  * mapa atualizado. Se está na cidade, só limpa o cache (a próxima hunt
  * já vai buscar o mapa novo).
+ *
+ * v4: Cobra Bastion pré-compilado não é apagado por reloadMaps() a menos
+ * que o usuário force regeneração via generate_cobra_bastion_map.js — o
+ * cache em disco (maps/*.otbm) continua sendo a fonte de verdade.
  */
 window.reloadMaps = function reloadMaps() {
-  // Limpa cache de huntmaps OTBM
+  // Limpa cache de huntmaps OTBM, mas preserva o pré-compilado da Cobra
+  // (evita que um reload involuntário volte a fazer fetch na entrada).
   const otbmKeys = Object.keys(HUNTMAPS).filter(k => k.startsWith("otbm:"));
-  for (const k of otbmKeys) delete HUNTMAPS[k];
-  // Limpa cache de loading/estado
-  for (const k of Object.keys(OTBM_HUNT_CACHE)) delete OTBM_HUNT_CACHE[k];
+  for (const k of otbmKeys) {
+    if (k === "otbm:cobra_bastion" && typeof window !== "undefined" && window.COBRA_BASTION_PRECOMPILED) continue;
+    delete HUNTMAPS[k];
+  }
+  // Limpa cache de loading/estado (exceto cobra pré-compilado)
+  for (const k of Object.keys(OTBM_HUNT_CACHE)) {
+    if (k === "cobra_bastion") continue;
+    delete OTBM_HUNT_CACHE[k];
+  }
   // Limpa cache de sprites de tile
   if (typeof TileSprites !== "undefined" && TileSprites.cache) TileSprites.cache = {};
 
@@ -165,6 +203,16 @@ window.reloadMaps = function reloadMaps() {
     const hu = (typeof GAMEDATA !== "undefined") ? GAMEDATA.hunts[p.hunt] : null;
     if (hu && hu.otbm) {
       console.log("[injector] recarregando mapa .otbm:", hu.otbm);
+      // Para cobra, o mapa já está em memória; apenas recria o combate
+      if (hu.otbm === "cobra_bastion" && HUNTMAPS["otbm:cobra_bastion"]) {
+        hu.mapa = "otbm:cobra_bastion";
+        G.combat = newCombat(p, p.hunt, p.instanceMode);
+        spawnWave(G.combat, p);
+        if (typeof renderAll === "function") renderAll();
+        if (typeof toast === "function") toast("🗺️ Mapa atualizado!");
+        console.log("[injector] mapa Cobra pré-compilado reutilizado");
+        return;
+      }
       huntMapFromOtbmAsync(hu, () => {
         G.combat = newCombat(p, p.hunt, p.instanceMode);
         spawnWave(G.combat, p);
