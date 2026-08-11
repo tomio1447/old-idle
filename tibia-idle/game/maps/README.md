@@ -72,8 +72,8 @@ pela coordenada do SQM, evitando a repetição quadriculada da variante `(0,0)`.
 
 `nagas_marapur.otbm` é um mapa Canary com múltiplos andares. A hunt seleciona
 explicitamente o piso `z=7`, cuja fonte mede 23×21 nos limites
-`(1008,1008,7)..(1030,1028,7)`, e recorta somente a sala informada:
-`(1009,1009,7)..(1029,1027,7)` (21×19). O player nasce na coordenada global
-`(1027,1022,7)`, local `(18,13)` dentro da sala; o padding mínimo do conversor
-o posiciona em `(19,13)` no runtime 24×19. A sala usa 101 sprites distintos,
-incluindo os patterns posicionais extraídos do DAT 15.x/8.60.
+`(1008,1008,7)..(1030,1028,7)`, e recorta o contorno verde validado no RME:
+`(1009,1012,7)..(1027,1026,7)` (19×15). O player nasce na coordenada global
+`(1017,1019,7)`, local `(8,7)` dentro da sala; o padding mínimo do conversor
+o posiciona em `(10,7)` no runtime 24×15. Os patterns posicionais usados pelo
+mapa são extraídos do DAT 15.x/8.60.

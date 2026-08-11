@@ -55,11 +55,11 @@
     // andares auxiliares; a instância jogável é exclusivamente o piso z=7.
     otbm: "nagas_marapur",
     otbmFloor: 7,
-    otbmBounds: { x: 1009, y: 1009, w: 21, h: 19, z: 7 },
-    otbmSpawn: { x: 1027, y: 1022, z: 7 },
+    otbmBounds: { x: 1009, y: 1012, w: 19, h: 15, z: 7 },
+    otbmSpawn: { x: 1017, y: 1019, z: 7 },
     // Toda a sala é uma zona candidata; colisão/ocupação removem paredes,
     // objetos e o SQM do jogador antes de cada spawn.
-    otbmMobBounds: { x: 1009, y: 1009, w: 21, h: 19, z: 7 },
+    otbmMobBounds: { x: 1009, y: 1012, w: 19, h: 15, z: 7 },
   }));
   if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
 
