@@ -19,15 +19,14 @@
 /* URL da API de contas. Deixe '' para modo local/offline.
  * Ex.: http://127.0.0.1:3333 */
 let ACCOUNT_API_URL = "";
+const ACCOUNT_SERVER_CONFIG = (typeof window !== "undefined" &&
+  window.GLOBAL_IDLE_SERVER_CONFIG) || { online:false, testServer:false, apiUrl:"" };
 try {
   ACCOUNT_API_URL = localStorage.getItem("tibia-idle-api") || "";
 } catch (e) { ACCOUNT_API_URL = ""; }
-
-/* Para ligar o modo online, rode no console:
- *   localStorage.setItem("tibia-idle-api", "http://127.0.0.1:3333"); location.reload();
- * ou defina a URL aqui embaixo. */
-if (!ACCOUNT_API_URL) {
-  // ACCOUNT_API_URL = "http://127.0.0.1:3333";   // <- descomente p/ online
+// Quando servido pelo test server, jogo e API compartilham a mesma origem.
+if (!ACCOUNT_API_URL && ACCOUNT_SERVER_CONFIG.online) {
+  ACCOUNT_API_URL = ACCOUNT_SERVER_CONFIG.apiUrl || window.location.origin;
 }
 
 function accountApiConfigured() {
@@ -68,6 +67,13 @@ async function accountLogin(login, password) {
 async function accountMe(token) {
   const r = await _api("GET", "/api/me", null, token);
   return r.data.ok ? r.data : { ok: false };
+}
+
+async function accountLoadCharacter(token, charId) {
+  const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
+  return r.data.ok
+    ? { ok:true, character:r.data.character }
+    : { ok:false, msg:r.data.msg || "Falha ao carregar personagem" };
 }
 
 async function accountCreateCharacter(token, name, voc, data) {

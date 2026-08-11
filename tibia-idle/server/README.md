@@ -2,9 +2,33 @@
 
 Servidor de contas/personagens do Global-Idle para o jogo **online**.
 Guarda contas (login/senha bcrypt, Tibia Coins, role) e personagens
-(save completo em JSON) num banco MySQL.
+(save completo em JSON) num banco MySQL ou storage JSON local.
 
-## Como rodar (na sua máquina)
+## Test server em uma única URL
+
+O processo serve o frontend e a API na mesma porta; o navegador não acessa
+`localhost` nem precisa configurar a URL da API manualmente.
+
+```bash
+cd tibia-idle/server
+npm install
+npm run start:test
+# abra http://localhost:3333
+```
+
+No modo `TEST_SERVER=1`:
+
+- cadastro de novas contas fica liberado;
+- contas prontas: **1/1** e **2/2**;
+- as duas contas recebem role `admin`, 1.000 Tibia Coins e acesso ao módulo Admin;
+- saves, sessões, market e parties usam `server/data/` quando MySQL não estiver configurado;
+- `/api/health` informa se o test server está ativo.
+
+Em ambientes Arena/E2B, compartilhe a URL HTTPS da Live Preview da porta 3333.
+O servidor é temporário: para hospedagem permanente será necessário publicar
+a aplicação e usar um banco/disco persistente.
+
+## Como rodar com MySQL (na sua máquina)
 
 1. **Instale o MySQL** e crie o banco:
 
@@ -104,12 +128,14 @@ em `tibia-idle/server/data/` (accounts.json + characters.json) com a mesma
 API — dá para desenvolver/testar sem instalar banco. O `seed.js` também
 funciona nesse modo.
 
-## Conta de administrador
+## Contas administrativas de teste
 
-- **login:** `1`
-- **senha:** `1`
-- **role:** `admin`
-- **Tibia Coins:** 1.000 (na criação)
+| Login | Senha | Role | Tibia Coins |
+| --- | --- | --- | --- |
+| `1` | `1` | admin | 1.000 |
+| `2` | `2` | admin | 1.000 |
+
+Essas credenciais são deliberadamente fracas e só devem existir no test server.
 
 Para trocar a senha:
 

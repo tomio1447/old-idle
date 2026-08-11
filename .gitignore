@@ -5,7 +5,4 @@ engine/*.log
 node_modules/
 output/
 *.log
-node_modules/
-package.json
-package-lock.json
 tibia-idle/server/data/

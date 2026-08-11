@@ -19,7 +19,9 @@ const MYSQL_PASS = process.env.MYSQL_PASS || "";
 const MYSQL_DB   = process.env.MYSQL_DB   || "global_idle";
 const MYSQL_PORT = parseInt(process.env.MYSQL_PORT || "3306", 10);
 
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.GLOBAL_IDLE_DATA_DIR
+  ? path.resolve(process.env.GLOBAL_IDLE_DATA_DIR)
+  : path.join(__dirname, "data");
 
 /* Storage JSON local (fallback sem MySQL): dois arquivos
  * data/accounts.json e data/characters.json */
@@ -27,6 +29,7 @@ function JsonStore() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   this.accounts = this._load("accounts.json", []);
   this.characters = this._load("characters.json", []);
+  this.sessions = this._load("sessions.json", []);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
   const partyData = this._load("parties.json", null);
@@ -59,6 +62,8 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.accounts, null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "characters.json"),
     JSON.stringify(this.characters, null, 1));
+  fs.writeFileSync(path.join(DATA_DIR, "sessions.json"),
+    JSON.stringify(this.sessions || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
     JSON.stringify({ marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
@@ -71,6 +76,19 @@ JsonStore.prototype.findAccountByLogin = function (login) {
 };
 JsonStore.prototype.findAccountById = function (id) {
   return this.accounts.find((a) => a.id === Number(id)) || null;
+};
+JsonStore.prototype.findAccountByToken = function (token) {
+  const session = (this.sessions || []).find((s) => s.token === String(token));
+  return session ? this.findAccountById(session.account_id) : null;
+};
+JsonStore.prototype.createSession = function (accountId, token) {
+  this.sessions = (this.sessions || []).filter((s) => s.account_id !== Number(accountId));
+  this.sessions.push({
+    id: this._nextId(this.sessions), account_id:Number(accountId), token:String(token),
+    created_at:new Date().toISOString(),
+  });
+  this._save();
+  return token;
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
