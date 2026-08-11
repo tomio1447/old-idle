@@ -47,14 +47,14 @@ function verifyPrecompiledMap() {
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   const huntmaps = html.indexOf('src="js/huntmapdata.js"');
-  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v7"');
-  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v7"');
-  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v7"');
+  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v8"');
+  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v8"');
+  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v8"');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,
     "ordem de scripts do mapa pré-compilado incorreta");
   for (const file of ["otbm", "otbmhunt", "hard-hunts", "tileanimdata",
     "tilepatterndata", "tilemap", "preload", "game"])
-    must(html.includes(`src="js/${file}.js?v=cobra-loading-v7"`),
+    must(html.includes(`src="js/${file}.js?v=cobra-loading-v8"`),
       `${file}.js sem cache-busting v4`);
 }
 
@@ -281,6 +281,22 @@ async function verifyLateReplacementAndTempleGuard() {
        !fixture.context.G.inCity && fixture.context.G.p.hunt === "cobra-bastion" &&
        fixture.warnings.some((message) => message.includes("watchdog restaurou estado")),
     "watchdog abandonou a entrada após sincronização de party");
+
+  // Se o OTBM terminou, restaure no callback e entre imediatamente; não espere
+  // o timeout de 7s só porque a party marcou cidade durante o fetch.
+  fixture = huntFixture();
+  fixture.context.startHunt("cobra-bastion", "non-pvp");
+  fixture.context.G.inCity = true;
+  fixture.context.G.p.hunt = null;
+  fixture.context.HUNTMAPS["otbm:cobra_bastion"] = integral;
+  fixture.hunt.mapa = "otbm:cobra_bastion";
+  fixture.loaderDone()();
+  await turn();
+  await turn();
+  counts = fixture.counts();
+  must(counts.combatBuilds === 1 && fixture.context.G.combat.huntMap === integral &&
+       fixture.warnings.some((message) => message.includes("OTBM restaurou estado")),
+    "callback OTBM esperou o watchdog apesar de já estar pronto");
 
   // Token trocado significa retorno real/uma transição mais nova: não reviva.
   fixture = huntFixture();
