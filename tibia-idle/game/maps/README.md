@@ -70,10 +70,24 @@ pela coordenada do SQM, evitando a repetição quadriculada da variante `(0,0)`.
 
 ## Marapur — Nagas
 
-`nagas_marapur.otbm` é um mapa Canary com múltiplos andares. A hunt seleciona
-explicitamente o piso `z=7`, cuja fonte mede 23×21 nos limites
-`(1008,1008,7)..(1030,1028,7)`, e recorta o contorno verde validado no RME:
-`(1009,1012,7)..(1027,1026,7)` (19×15). O player nasce na coordenada global
-`(1017,1019,7)`, local `(8,7)` dentro da sala; o padding mínimo do conversor
-o posiciona em `(10,7)` no runtime 24×15. Os patterns posicionais usados pelo
-mapa são extraídos do DAT 15.x/8.60.
+`nagas_marapur.otbm` seleciona o piso `z=7` completo, 23×21 nos limites
+`(1008,1008,7)..(1030,1028,7)`. O retângulo `(1009,1012,7)..(1027,1026,7)`
+é apenas a FOV inicial informada no RME: ele não recorta nem apaga o restante
+do mapa. O mundo recebe padding para 30×30. O player nasce em
+`(1017,1019,7)`, posição `(12,15)` no runtime.
+
+## MOTA Extension
+
+`MOTA.otbm` usa integralmente o piso `z=7`, 25×20 nos limites
+`(1040,1006,7)..(1064,1025,7)`, dentro de um mundo runtime 30×30. A FOV
+informada é `(1042,1009,7)..(1062,1024,7)` e o player nasce globalmente em
+`(1051,1016,7)`, posição runtime `(13,15)`. A hunt usa Floating Savant,
+Retching Horror, Fury, Hellhound e Demon.
+
+## DT Seal
+
+`dt_seal.otbm` usa integralmente o piso `z=7`, 25×21 nos limites
+`(1006,1008,7)..(1030,1028,7)`, também em runtime 30×30. A FOV informada é
+`(1009,1010,7)..(1027,1024,7)`; o player nasce em `(1018,1018,7)`, posição
+runtime `(14,14)`. Em todos estes mapas, FOV descreve somente o que o jogador
+vê inicialmente — nunca os limites do mundo renderizado.
