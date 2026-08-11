@@ -9,3 +9,5 @@ node_modules/
 package.json
 package-lock.json
 tibia-idle/server/data/
+tibia-idle/server/.env
+tibia-idle/server/my.cnf
