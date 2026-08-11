@@ -55,6 +55,19 @@ function idleAnimationFrame(meta, now, phase) {
   return 0;
 }
 
+/* Os cinco Avatares de Transcendence são sheets especiais já animados em
+ * suas nove colunas, mas não aparecem na tabela de frame groups IDLE porque
+ * foram importados separadamente das outfits comuns. Enquanto transformado,
+ * reutilize essas colunas somente quando parado; andando continua usando o
+ * frame controlado pelo walker. */
+function avatarIdleAnimationFrame(appearance, now) {
+  if (!appearance || appearance.sexo !== "avatar") return 0;
+  const frames = Math.max(1, Number(appearance.cols) || 1);
+  const parsedNow = Number(now);
+  const clock = Number.isFinite(parsedNow) ? parsedNow : Date.now();
+  return Math.floor(Math.max(0, clock) / 100) % frames;
+}
+
 /* Retorna um marcador idle somente quando a outfit/avatar OU a montaria
  * realmente possui grupo idle animado. Sem esse marcador o renderer usa a
  * pose 0 estática, mesmo que o sheet tenha muitos frames de caminhada. */
@@ -63,9 +76,14 @@ function appearanceIdleFrame(p, now) {
   const m = currentMount(p);
   const outfitIdle = a && idleAnimationMeta("outfits", a.id);
   const mountIdle = m && idleAnimationMeta("mounts", m.id);
-  if (!outfitIdle && !mountIdle) return 0;
+  const avatarIdle = !!(a && a.sexo === "avatar" && (Number(a.cols) || 0) > 1);
+  if (!outfitIdle && !mountIdle && !avatarIdle) return 0;
   const parsedNow = Number(now);
-  return { idle:true, now:Number.isFinite(parsedNow) ? parsedNow : Date.now() };
+  return {
+    idle: true,
+    avatar: avatarIdle,
+    now: Number.isFinite(parsedNow) ? parsedNow : Date.now(),
+  };
 }
 
 /* ------------------------------------------------------------ avatars
@@ -311,14 +329,17 @@ const AppearanceRenderer = {
     const linha = appDirRow(dir);
     const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
     const idleMeta = idleRequest ? idleAnimationMeta("outfits", id) : null;
+    const avatarIdle = idleRequest && !idleMeta && o.sexo === "avatar";
     const renderMeta = idleMeta || o;
     const col = idleMeta
       ? idleAnimationFrame(idleMeta, frame.now, 0)
-      : Math.max(0, Math.min((o.cols || 4) - 1,
-          typeof frame === "number" ? frame | 0 : 0));
+      : avatarIdle
+        ? avatarIdleAnimationFrame(o, frame.now)
+        : Math.max(0, Math.min((o.cols || 4) - 1,
+            typeof frame === "number" ? frame | 0 : 0));
     const assetMode = idleMeta ? ".idle" : "";
-    const k = this.key(id, addons, colors, linha,
-      (idleMeta ? "idle:" : "walk:") + col);
+    const frameMode = idleMeta ? "idle:" : (avatarIdle ? "avatar-idle:" : "walk:");
+    const k = this.key(id, addons, colors, linha, frameMode + col);
     if (this.cache[k] !== undefined) return this.cache[k];
 
     const camadas = [""];

@@ -76,6 +76,7 @@ must(renderSrc.indexOf('if (ent.moving)') < renderSrc.indexOf('monsterIdleMeta(e
 ctx.ensureOutfit = (p) => (p.outfit = p.outfit || {});
 ctx.VOC_OUTFIT = { knight:'citizen' };
 vm.runInContext(fs.readFileSync(path.join(js, 'appearancedata.js'), 'utf8'), ctx);
+vm.runInContext(fs.readFileSync(path.join(js, 'avatardata.js'), 'utf8'), ctx);
 vm.runInContext(appearanceSrc, ctx);
 const staticPlayer = { voc:'knight', sex:'male', outfit:{appearance:'citizen-m'} };
 const idlePlayer = { voc:'knight', sex:'male', outfit:{appearance:'chaos-acolyte-m'} };
@@ -86,6 +87,26 @@ must(ctx.appearanceIdleFrame(idlePlayer, 100).idle,
   'outfit com idle real ficou estática');
 must(ctx.appearanceIdleFrame(mountedPlayer, 100).idle,
   'mount com idle real ficou estática');
+
+// Avatares de Transcendence são importados separadamente e não têm entrada
+// em IDLE_ANIMATIONS; suas nove colunas base devem continuar animando paradas.
+for (const voc of ['knight','paladin','sorcerer','druid','monk']) {
+  const avatarPlayer = { voc, sex:'male', outfit:{appearance:'citizen-m'},
+    _avatar:{active:true} };
+  const marker = ctx.appearanceIdleFrame(avatarPlayer, 150);
+  must(marker && marker.idle && marker.avatar,
+    `avatar ${voc} não recebeu marcador idle especial`);
+}
+const steel = ctx.APPEARANCES.outfits.find((entry) => entry.id === 'avatar-steel');
+must(ctx.avatarIdleAnimationFrame(steel, 50) === 0 &&
+     ctx.avatarIdleAnimationFrame(steel, 150) === 1 &&
+     ctx.avatarIdleAnimationFrame(steel, 950) === 0,
+  'loop parado do Avatar of Steel não percorre suas nove colunas');
+must(appearanceSrc.includes('avatarIdleAnimationFrame(o, frame.now)') &&
+     appearanceSrc.includes('avatar-idle:'),
+  'AppearanceRenderer não seleciona o frame idle especial do avatar');
+must(html.includes('<script src="js/appearance.js?v=avatar-idle-v1"></script>'),
+  'appearance.js do idle de avatar está sem cache-busting');
 
 // Durações variáveis do DAT são respeitadas no renderer canvas.
 const timing = { frames:3, durations:[100,300,200], duration:600 };
