@@ -1556,6 +1556,7 @@ function playerAttack(c, p, target) {
   if (wpItem && wpItem.cleave && !isDist && !isMagic) {
     for (const m of c.mobs) {
       if (m === target || m.hp <= 0) continue;
+      if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, m)) continue;
       if (sqmDist(m, target) > 1) continue;   // so os 8 tiles vizinhos
       const corte = Math.max(1, Math.floor(rollDamage(false) * 0.5));
       m.hp -= corte;
@@ -1611,6 +1612,7 @@ function playerAttack(c, p, target) {
         // o alvo principal ja levou o golpe direto; nao conta duas vezes
         if (m === target && !errou) continue;
         if (m.hp <= 0) continue;
+        if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, m)) continue;
         // Rolagem CHEIA em cada alvo. O 0.75 que estava aqui era invencao
         // nossa: no Canary a municao de area executa a mesma formula em
         // todas as casas cobertas, sem desconto por ser respingo.
@@ -1930,6 +1932,7 @@ function castSpellById(c, p, target, now, id) {
   const forgeOnslaughtSpell = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
 
   targets.forEach((t, idx) => {
+    if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, t)) return;
     let dmg;
     if (faixaMonk) {
       dmg = faixaMonk.min +
@@ -2217,6 +2220,7 @@ function tryUseRune(c, p, target, now, forcada) {
   const missile = s.missile || ELEMENT_MISSILE[s.element] || "energy";
   let total = 0;
   for (const alvo of alvos) {
+    if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, alvo)) continue;
     let dmg = 0;
     if (s.f) {
       // formula real do .lua: (level/5) + (magicLevel * K) + C
@@ -3538,7 +3542,7 @@ function rollLoot(c, p, mob) {
   }
   // Rate de loot do servidor: multiplica a chance de drop
   const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
-  for (const l of mob.def.loot) {
+  for (const l of (mob.def.loot || [])) {
     // Chance efetiva = chance base * lootRate (cap 100%)
     const effectiveChance = Math.min(100, l.chance * lootRate * (c.lootMul || 1));
     if (Math.random() * 100 > effectiveChance) continue;
