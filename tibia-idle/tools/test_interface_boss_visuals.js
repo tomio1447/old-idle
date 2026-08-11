@@ -62,7 +62,7 @@ must(renderSrc.includes('return "bold 16px Verdana"')&&
   (renderSrc.match(/ctx\.font = floaterFont\(f\)/g)||[]).length===2&&
   renderSrc.includes("ctx.lineWidth = f.kind ? 3"),
   "números flutuantes continuam pequenos ou sem contorno nítido");
-must(html.includes("css/layout.css?v=interface-sharp-v1")&&
+must(html.includes("css/layout.css?v=interface-sharp-v2")&&
   html.includes("js/render.js?v=interface-sharp-v1")&&
-  html.includes("js/combat.js?v=boss-priority-v1"),"ajustes visuais sem cache-busting");
+  html.includes("js/combat.js?v=boss-immunity-v1"),"ajustes visuais sem cache-busting");
 console.log("OK: abas HUNTS/BOSSES, cores moving, alvo prioritário, tile 33791 e visual nítido validados.");

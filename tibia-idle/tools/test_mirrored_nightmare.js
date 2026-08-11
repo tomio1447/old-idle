@@ -135,7 +135,7 @@ must(hud.includes("goshnar-taint-")||hud.includes("taint.icon"),"HUD não render
 const html=fs.readFileSync(path.join(game,"index.html"),"utf8");
 for(const script of ["icondata","otc-hud"])
  must(html.includes(`js/${script}.js?v=soulwar-taints-v1`),script+" sem cache-busting Soul War");
-must(html.includes("js/combat.js?v=boss-priority-v1"),"combat sem cache-busting Greed v2");
+must(html.includes("js/combat.js?v=boss-immunity-v1"),"combat sem cache-busting Greed v2");
 for(const script of ["grid","soulwar"])
  must(html.includes(`js/${script}.js?v=mirrored-nightmare-v1`),script+" sem cache-busting Mirrored Nightmare");
 must(html.includes("js/render.js?v=interface-sharp-v1"),"render sem cache-busting visual");

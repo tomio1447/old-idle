@@ -153,19 +153,23 @@ for (const marker of ["greedBossInit(c, player)", "greedBossTick(c, now)",
   must(combatSrc.includes(marker), "combat.js sem hook: " + marker);
 must(scarlettSrc.includes("greedBossCanTakePlayerDamage(c, target)"),
   "gate global não protege a imunidade de Goshnar");
+must((combatSrc.match(/bossCanTakePlayerDamage/g)||[]).length>=10&&
+     combatSrc.includes("for (const l of (mob.def.loot || []))"),
+  "dano secundário atravessa imunidade ou add sem loot quebra o combate");
 must(!renderSrc.includes("Greedbeasts ${combat.greed.greedbeastKills}/5"),
   "contagem de Greedbeasts ainda aparece na bossbar");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
+     css.includes('right: 8px; bottom: 8px') && css.includes('width: 210px') &&
      fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
-  "modal separado com contagem de Greedbeasts não foi criado");
-must(html.includes("js/combat.js?v=boss-priority-v1"), "combat sem cache-busting Greed v2");
+  "modal pequeno no canto inferior direito não foi configurado");
+must(html.includes("js/combat.js?v=boss-immunity-v1"), "combat sem cache-busting Greed v2");
 must(html.includes("js/render.js?v=interface-sharp-v1"), "render sem cache-busting visual");
 must(html.includes("js/soulwar.js?v=mirrored-nightmare-v1"), "soulwar sem cache-busting Mirrored Nightmare");
 must(html.includes("js/scarlett-boss.js?v=goshnar-greed-v1"),
   "gate compartilhado sem cache-busting");
-must(html.includes("css/layout.css?v=interface-sharp-v1"),
+must(html.includes("css/layout.css?v=interface-sharp-v2"),
   "CSS do modal Greedbeast sem cache-busting");
 
 console.log("OK: Goshnar's Greed — testes livres, adds sem defesa, Greedbeast 30% e vulnerabilidade de 40s.");
