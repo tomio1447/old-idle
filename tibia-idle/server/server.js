@@ -17,8 +17,11 @@
  */
 "use strict";
 
+require("dotenv").config();
 const http = require("http");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
@@ -26,6 +29,8 @@ const party = require("./party");   // lógica de PARTY multiplayer
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
+const TEST_SERVER = process.env.TEST_SERVER === "1";
+const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
 
 /* ------------------------------- helpers ------------------------------- */
 
@@ -55,6 +60,68 @@ function send(res, code, obj) {
 
 function newToken() {
   return crypto.randomBytes(32).toString("hex");
+}
+
+const MIME = {
+  ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8",
+  ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8",
+  ".png":"image/png", ".gif":"image/gif", ".jpg":"image/jpeg",
+  ".jpeg":"image/jpeg", ".webp":"image/webp", ".svg":"image/svg+xml",
+  ".otbm":"application/octet-stream", ".ogg":"audio/ogg", ".mp3":"audio/mpeg",
+};
+
+function sendText(res, code, body, type) {
+  body = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  res.writeHead(code, {
+    "Content-Type": type || "text/plain; charset=utf-8",
+    "Content-Length": body.length,
+    "Cache-Control": "no-cache",
+  });
+  res.end(body);
+}
+
+function serveStatic(req, res, pathname) {
+  let relative;
+  try { relative = decodeURIComponent(pathname || "/"); }
+  catch (e) { sendText(res, 400, "URL inválida"); return; }
+  if (relative === "/") relative = "/index.html";
+  const file = path.resolve(STATIC_DIR, relative.replace(/^\/+/, ""));
+  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) {
+    sendText(res, 403, "Acesso negado"); return;
+  }
+  fs.stat(file, (statErr, stat) => {
+    const target = !statErr && stat.isDirectory() ? path.join(file, "index.html") : file;
+    fs.readFile(target, (error, data) => {
+      if (error) { sendText(res, 404, "Arquivo não encontrado"); return; }
+      const type = MIME[path.extname(target).toLowerCase()] || "application/octet-stream";
+      if (req.method === "HEAD") {
+        res.writeHead(200, { "Content-Type":type, "Content-Length":data.length, "Cache-Control":"no-cache" });
+        res.end();
+      } else sendText(res, 200, data, type);
+    });
+  });
+}
+
+async function ensureTestAccounts(db) {
+  if (!TEST_SERVER) return;
+  for (const credential of [
+    { login:"1", password:"1" },
+    { login:"2", password:"2" },
+  ]) {
+    const hash = bcrypt.hashSync(credential.password, SALT_ROUNDS);
+    const existing = await db.findAccountByLogin(credential.login);
+    if (!existing) {
+      await db.createAccount(credential.login, hash, "admin", 1000);
+    } else if (typeof db.run === "function") {
+      await db.run("UPDATE accounts SET password_hash = ?, role = 'admin' WHERE id = ?", [hash, existing.id]);
+    } else {
+      existing.password_hash = hash;
+      existing.role = "admin";
+      existing.coins = Math.max(1000, existing.coins || 0);
+      db._save();
+    }
+  }
+  console.log("[test-server] contas liberadas: 1/1 e 2/2; Admin habilitado");
 }
 
 /* ------------------------------ rotas ------------------------------ */
@@ -119,6 +186,24 @@ async function createCharacter(db, body) {
   const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data || {});
   const c = await db.createCharacter(acc.id, name, voc, 1, data);
   return { code: 201, body: { ok: true, character: { id: c.id, name: c.name, voc: c.voc, level: c.level } } };
+}
+
+async function loadCharacter(db, token, id) {
+  const acc = await db.findAccountByToken(token);
+  if (!acc) return { code:401, body:{ok:false,msg:"Sessão inválida"} };
+  const character = await db.findCharacter(id);
+  if (!character || Number(character.account_id) !== Number(acc.id))
+    return { code:404, body:{ok:false,msg:"Personagem não encontrado"} };
+  return {
+    code:200,
+    body:{
+      ok:true,
+      character:{
+        id:character.id, name:character.name, voc:character.voc,
+        level:character.level, data:character.data,
+      },
+    },
+  };
 }
 
 async function saveCharacter(db, body, id) {
@@ -514,12 +599,22 @@ async function main() {
     };
   }
 
+  await ensureTestAccounts(db);
+
   const server = http.createServer(async (req, res) => {
     // CORS preflight
     if (req.method === "OPTIONS") { send(res, 204, {}); return; }
 
     const url = req.url.split("?")[0];
     try {
+      if (req.method === "GET" && url === "/api/health") {
+        return send(res, 200, { ok:true, testServer:TEST_SERVER, accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
+      }
+      if (req.method === "GET" && url === "/js/server-config.js") {
+        const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
+          TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin};\n`;
+        return sendText(res, 200, config, "text/javascript; charset=utf-8");
+      }
       if (req.method === "POST" && url === "/api/register") {
         const body = await readBody(req);
         const r = await register(db, body);
@@ -538,6 +633,12 @@ async function main() {
       if (req.method === "POST" && url === "/api/characters") {
         const body = await readBody(req);
         const r = await createCharacter(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url.startsWith("/api/characters/")) {
+        const id = Number(url.split("/").pop());
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const r = await loadCharacter(db, token, id);
         return send(res, r.code, r.body);
       }
       if (req.method === "PUT" && url.startsWith("/api/characters/")) {
@@ -663,6 +764,9 @@ async function main() {
         const r = await party.partyFollow(db, body);
         return send(res, r.code, r.body);
       }
+      if ((req.method === "GET" || req.method === "HEAD") && !url.startsWith("/api/")) {
+        return serveStatic(req, res, url);
+      }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
     } catch (e) {
       console.error("[server] erro:", e);
@@ -671,8 +775,10 @@ async function main() {
   });
 
   server.listen(PORT, HOST, () => {
-    console.log("[server] API de contas em http://" + HOST + ":" + PORT);
+    console.log("[server] Global-Idle em http://" + HOST + ":" + PORT);
+    console.log("[server] estáticos:", STATIC_DIR);
     console.log("[server] registre/login: POST /api/register e /api/login");
+    if (TEST_SERVER) console.log("[server] TEST SERVER ativo — Admin liberado para testers");
   });
 }
 

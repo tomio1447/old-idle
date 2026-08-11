@@ -1,0 +1,17 @@
+{
+  "name": "global-idle-test-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor único do Global-Idle: jogo estático, contas, market e party.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "start:test": "TEST_SERVER=1 MYSQL_HOST= node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.6.1",
+    "mysql2": "^3.14.3"
+  }
+}

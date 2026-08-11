@@ -2155,7 +2155,13 @@ function bindControls() {
   if (typeof bindTrainingButton === "function") bindTrainingButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
-    if (typeof openAdmin === "function") {
+    const serverCfg = (typeof window !== "undefined" &&
+      window.GLOBAL_IDLE_SERVER_CONFIG) || {};
+    const account = sessionAccount();
+    const onlineMode = typeof accountApiConfigured === "function" && accountApiConfigured();
+    const adminAllowed = !!serverCfg.testServer || !onlineMode ||
+      !!(account && account.role === "admin");
+    if (typeof openAdmin === "function" && adminAllowed) {
       btnAdmin.addEventListener("click", () => openAdmin());
     } else {
       btnAdmin.style.display = "none";
@@ -2580,9 +2586,22 @@ function initAccountLogin() {
           const cid = row.dataset.accChar;
           const name = row.dataset.accCharName;
           msg("Carregando <b>" + name + "</b>...");
-          // busca o personagem completo na API (usamos o /me com o id e
-          // recarregamos o save via rota de personagem quando disponível)
-          const p = normalizePlayer({ name: name, voc: "knight", level: 1, id: cid });
+          const loaded = typeof accountLoadCharacter === "function"
+            ? await accountLoadCharacter(token, cid) : { ok:false };
+          if (!loaded.ok || !loaded.character) {
+            msg(loaded.msg || "Não foi possível carregar o personagem.");
+            return;
+          }
+          const character = loaded.character;
+          let raw = character.data || {};
+          if (typeof raw === "string") {
+            try { raw = JSON.parse(raw); } catch (e) { raw = {}; }
+          }
+          const p = normalizePlayer(Object.assign({}, raw, {
+            id:String(character.id), name:character.name || name,
+            voc:character.voc || raw.voc || "knight",
+            level:Number(character.level) || raw.level || 1,
+          }));
           try { sessionStorage.setItem("tibia-idle-char", cid); } catch (e) {}
           startGame(p);
         }));
@@ -2652,6 +2671,20 @@ function initAccountLogin() {
 }
 
 function initLogin() {
+  // MODO ONLINE: o servidor injeta a configuração antes de account-client.js.
+  // Não carregue roster/localStorage nessa tela: a conta é a fonte de verdade.
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  if (online) {
+    const accLogin = $("#account-login");
+    const localLogin = $("#local-login");
+    const continueBox = $("#continue-box");
+    if (accLogin) accLogin.style.display = "";
+    if (localLogin) localLogin.style.display = "none";
+    if (continueBox) continueBox.style.display = "none";
+    initAccountLogin();
+    return;
+  }
+
   const saved = load();
 
   // veio de "Trocar personagem"/"Criar e entrar": entra direto, sem passar
@@ -2676,19 +2709,6 @@ function initLogin() {
     $("#saved-info").textContent =
       `${vocationName(saved)} · nível ${saved.level}`;
     $("#btn-continue").addEventListener("click", () => startGame(saved));
-  }
-
-  // ---------- MODO ONLINE (conta + MySQL) ----------
-  // Se a API está configurada, mostra o login/cadastro de conta; o modo
-  // local fica escondido.
-  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
-  if (online) {
-    const accLogin = $("#account-login");
-    const localLogin = $("#local-login");
-    if (accLogin) accLogin.style.display = "";
-    if (localLogin) localLogin.style.display = "none";
-    initAccountLogin();
-    return;
   }
 
   let selVoc = "knight", selSex = "male";
