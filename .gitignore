@@ -6,3 +6,5 @@ node_modules/
 output/
 *.log
 tibia-idle/server/data/
+tibia-idle/server/.env
+tibia-idle/server/my.cnf
