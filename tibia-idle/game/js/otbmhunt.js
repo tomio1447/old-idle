@@ -160,18 +160,29 @@ if (typeof module !== "undefined" && module.exports) {
 /* ------------------------------------------------------------ Injector: reload manual de mapas */
 /**
  * Limpa o cache de mapas .otbm e recarrega todos os mapas das hunts ativas.
- * Use: window.reloadMaps()  ou  Ctrl+Shift+R
+ * Use: window.reloadMaps() ou Ctrl+Alt+M. Ctrl+Shift+R permanece reservado
+ * ao hard refresh do navegador para que atualizações de scripts funcionem.
  *
  * Se o jogador está em uma hunt com .otbm, o combate é reiniciado com o
  * mapa atualizado. Se está na cidade, só limpa o cache (a próxima hunt
  * já vai buscar o mapa novo).
  */
 window.reloadMaps = function reloadMaps() {
-  // Limpa cache de huntmaps OTBM
+  const cobraKey = "otbm:cobra_bastion";
+  const precompiledCobra = typeof window !== "undefined"
+    ? window.COBRA_BASTION_PRECOMPILED : null;
+
+  // Limpa mapas dinâmicos, mas nunca descarte a Cobra pré-compilada. A versão
+  // anterior interceptava Ctrl+Shift+R e apagava justamente o fast-path,
+  // fazendo a Cobra voltar ao fetch/OTBM.read tardio.
   const otbmKeys = Object.keys(HUNTMAPS).filter(k => k.startsWith("otbm:"));
-  for (const k of otbmKeys) delete HUNTMAPS[k];
-  // Limpa cache de loading/estado
+  for (const k of otbmKeys) if (k !== cobraKey) delete HUNTMAPS[k];
+  if (precompiledCobra) {
+    HUNTMAPS[cobraKey] = precompiledCobra;
+    HUNTMAPS["cobra-bastion"] = precompiledCobra;
+  }
   for (const k of Object.keys(OTBM_HUNT_CACHE)) delete OTBM_HUNT_CACHE[k];
+  if (precompiledCobra) OTBM_HUNT_CACHE.cobra_bastion = cobraKey;
   // Limpa cache de sprites de tile
   if (typeof TileSprites !== "undefined" && TileSprites.cache) TileSprites.cache = {};
 
@@ -195,9 +206,9 @@ window.reloadMaps = function reloadMaps() {
   if (typeof toast === "function") toast("🗺️ Cache de mapas limpo!");
 };
 
-// Atalho Ctrl+Shift+R para recarregar mapas manualmente
+// Não capture Ctrl+Shift+R: esse é o hard refresh padrão do navegador.
 window.addEventListener("keydown", function(e) {
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "r") {
+  if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "m") {
     e.preventDefault();
     e.stopPropagation();
     window.reloadMaps();
