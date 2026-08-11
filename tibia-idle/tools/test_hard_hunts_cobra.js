@@ -116,6 +116,35 @@ for (const [slug, e] of Object.entries(expected)) {
 }
 must(spriteHashes.size === 3, 'Vizier/Scout/Assassin ainda usam a mesma aparência');
 
+// Auditoria integral do loot da MOTA Extension: toda entrada precisa de
+// ficha e sprite base; itens animados também precisam do strip requisitado.
+const motaCids={
+  'small-enchanted-ruby':676,'sample-of-monster-blood':27874,
+  'pool-of-chitinous-glue':20207,'broken-dream':20029,
+  'jalapeno-pepper':8016,'explorer-brooch':4871,'hellhound-slobber':9637,
+  'goosebump-leather':20205,'blazing-bone':16131,'fiery-heart':9636,
+  'magma-amulet':817,
+};
+const mota=hunts['mota-extension'];
+must(mota&&mota.monsters.length===5,'MOTA Extension incompleta');
+for(const slug of mota.monsters)for(const loot of ctx.GAMEDATA.monsters[slug].loot||[]){
+  const item=ctx.GAMEDATA.items[loot.item];
+  must(item,`${slug}: loot MOTA sem ficha: ${loot.item}`);
+  must(fs.existsSync(path.join(game,'assets','item',loot.item+'.png')),
+    `${slug}: loot MOTA sem sprite base: ${loot.item}`);
+  if(item.af)must(fs.existsSync(path.join(game,'assets','item',loot.item+'_anim.png')),
+    `${slug}: loot MOTA sem strip animado: ${loot.item}`);
+}
+for(const [slug,cid] of Object.entries(motaCids)){
+  const item=ctx.GAMEDATA.items[slug];
+  must(item&&(item.cid||item.id)===cid,`${slug}: CID Canary ausente/incorreto`);
+}
+must(ctx.GAMEDATA.items['small-enchanted-ruby'].af===3&&
+  ctx.GAMEDATA.items['hellhound-slobber'].af===2,
+  'frames DAT dos itens MOTA animados incorretos');
+must(!ctx.GAMEDATA.items['crystal-ring'].af&&!ctx.GAMEDATA.items['black-pearl'].af,
+  'Crystal Ring/Black Pearl ainda requisitam _anim.png inexistente');
+
 // Magias nomeadas: elementos e áreas vêm dos scripts separados do Canary.
 const skill = (slug, name) => ctx.GAMEDATA.monsters[slug].skills
   .find(s => String(s.n || '').toLowerCase() === name);

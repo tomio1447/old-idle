@@ -25,6 +25,30 @@
     if (!items[slug]) items[slug] = Object.assign({ s: null, t: "loot", sell: 1 }, cobraLootItems[slug]);
   });
 
+  // Loot usado pelas criaturas da MOTA Extension e ausente do recorte
+  // inicial. CIDs/pesos vêm do items.xml do Canary.
+  const motaLootItems = {
+    "small-enchanted-ruby": { n:"small enchanted ruby", cid:676, w:.10, af:3, aw:4, ah:5 },
+    "sample-of-monster-blood": { n:"sample of monster blood", cid:27874, w:.85 },
+    "pool-of-chitinous-glue": { n:"pool of chitinous glue", cid:20207, w:2.70 },
+    "broken-dream": { n:"broken dream", cid:20029, w:.10 },
+    "jalapeno-pepper": { n:"jalapeno pepper", cid:8016, w:.30 },
+    "explorer-brooch": { n:"explorer brooch", cid:4871, w:.90 },
+    "hellhound-slobber": { n:"hellhound slobber", cid:9637, w:.75, af:2, aw:19, ah:23 },
+    "goosebump-leather": { n:"goosebump leather", cid:20205, w:2.80 },
+    "blazing-bone": { n:"blazing bone", cid:16131, w:2.20, af:2, aw:21, ah:26 },
+    "fiery-heart": { n:"fiery heart", cid:9636, w:1.14, af:2, aw:18, ah:19 },
+    "magma-amulet": { n:"magma amulet", cid:817, w:5, s:"amulet", t:"accessory" },
+  };
+  Object.keys(motaLootItems).forEach((slug) => {
+    if (!items[slug]) items[slug] = Object.assign({s:null,t:"loot",sell:1},motaLootItems[slug]);
+  });
+  // Crystal Ring e Black Pearl usam patterns/subtipos no DAT, não frame
+  // animation. Os metadados antigos pediam _anim.png inexistente.
+  for (const slug of ["crystal-ring", "black-pearl"]) if (items[slug]) {
+    delete items[slug].af; delete items[slug].aw; delete items[slug].ah;
+  }
+
   // Formatos oficiais dos scripts de spell do Canary:
   // explosion_wave.lua = centro, depois duas linhas de largura 3;
   // wave_t.lua = centro, depois uma linha de largura 3;

@@ -131,12 +131,6 @@
       <span class="coin-txt" id="tibia-coins-n">0</span>
     </div>
     <span class="spacer"></span>
-    <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catálogo de Hunts">
-      <span class="hunts-demon-icon" aria-hidden="true"></span><span>HUNTS</span>
-    </button>
-    <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses">
-      <span class="bosses-megalomania-icon" aria-hidden="true"></span><span>BOSSES</span>
-    </button>
     <button class="sm" id="btn-market" title="Market — equipamentos e itens de imbuement (preços do Canary), venda de Tibia Coins">
       <img src="assets/ui/market/market.png" alt="" style="width:18px;height:18px;image-rendering:pixelated;vertical-align:middle">
       <span>MARKET</span>
@@ -150,10 +144,6 @@
       <span>FORGE</span>
     </button>
     <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)">☸ WHEEL</button>
-    <button class="sm" id="btn-training" title="Sistema de Treino — Exercise Dummy (25 TC por 5000 cargas) ou Treinador Online">
-      <img src="assets/ui/training/skill-trainer-all.gif" alt="" class="training-btn-gif">
-      <span>TREINO</span>
-    </button>
     <button class="sm" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura">
       <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="prey-btn-gif">
       <span>PREY</span><span id="prey-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
@@ -359,8 +349,21 @@
 
     </div>
 
-    <!-- ============================ DIREITA -->
+    <!-- ============================ ESQUERDA DA TELA -->
     <div class="col col-right">
+
+      <nav class="left-side-actions" aria-label="Acessos de caçada">
+        <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catálogo de Hunts">
+          <span class="hunts-demon-icon" aria-hidden="true"></span><span>HUNTS</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses">
+          <span class="bosses-megalomania-icon" aria-hidden="true"></span><span>BOSSES</span>
+        </button>
+        <button class="sm" id="btn-training" title="Sistema de Treino — Exercise Dummy (25 TC por 5000 cargas) ou Treinador Online">
+          <img src="assets/ui/training/skill-trainer-all.gif" alt="" class="training-btn-gif">
+          <span>TREINO</span>
+        </button>
+      </nav>
 
       <div class="panel" data-collapse="huntinfo">
         <div class="panel-title">Caçada atual</div>
