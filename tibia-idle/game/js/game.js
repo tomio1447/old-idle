@@ -945,6 +945,7 @@ function startBoss(id, force, arenaReady) {
   }
   const ready = bossReadyInfo(G.p, boss);
   if (!ready.ok) { toast(ready.reason); return; }
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada do boss");
 
   // Boss com sala própria espera OTBM + sprites antes de criar entidades.
   const arena = boss.hunt && GAMEDATA.hunts[boss.hunt];
@@ -1066,6 +1067,7 @@ function startHunt(id, instanceMode, force) {
     return;
   }
   if (!instanceMode) { openInstanceModal(id); return; }
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada da hunt");
   if (G.training) stopAcademy(false);
   G.inCity = false;
   G.p.hunt = id;
@@ -1221,8 +1223,9 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;
-  // PARTY COMBAT: salva TODOS os personagens da instância antes de sair
-  // (hp/mana/exp de cada um vão para o roster)
+  // Checkpoint do templo: cura inclusive membros inconscientes antes de
+  // persistir o roster, para ninguém permanecer morto fora da instância.
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
   if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
   if (typeof greedBossCleanup === "function" && G.combat) greedBossCleanup(G.combat);
@@ -1250,6 +1253,7 @@ function stopHunt(skipMapLoading) {
 
 /* Alterna entre cidade, caçada e academia */
 function goToCity() {
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
   if (G.training) stopAcademy();
   // Bosses usam G.combat, mas deixam G.p.hunt=null. Verificar só `hunt`
   // mantinha o combate ativo e o botão parecia travado após trocar o templo.
@@ -1259,6 +1263,7 @@ function goToCity() {
 
 function startAcademy() {
   if (!G.p) return;
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("training room");
   if (G.combat) stopHunt(true);
   if (typeof beginMapLoading === "function") beginMapLoading("Carregando academia...");
   G.training = newAcademyTraining(G.p);
@@ -1277,6 +1282,8 @@ function startAcademy() {
 function stopAcademy(log) {
   if (!G.training) return;
   const returningToTemple = log !== false;
+  if (returningToTemple && typeof partyCombatRestoreAll === "function")
+    partyCombatRestoreAll("retorno do treino");
   if (returningToTemple && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
   G.training = null;

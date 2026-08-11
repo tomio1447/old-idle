@@ -145,6 +145,8 @@ function huntMapFromOtbmAsync(hunt, done) {
       mapa.idleOffsetY = Number(hunt.otbmOffsetY) || 0;
       mapa.idleTargetWidth = Number(hunt.otbmRuntimeWidth) || 0;
       mapa.idleTargetHeight = Number(hunt.otbmRuntimeHeight) || 0;
+      mapa.idleFovWidth = Number(hunt.otbmFovWidth) || 0;
+      mapa.idleFovHeight = Number(hunt.otbmFovHeight) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;

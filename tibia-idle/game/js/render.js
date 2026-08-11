@@ -1384,8 +1384,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
     : (typeof GRID_W !== "undefined" ? GRID_W : 21);
   const gridH = combat && combat.gridH ? combat.gridH
     : (typeof GRID_H !== "undefined" ? GRID_H : 13);
+  const mapFov = combat && combat.huntMap ? combat.huntMap : null;
   const view = (typeof centeredGridViewport === "function")
-    ? centeredGridViewport(canvasW, canvasH, gridW, gridH)
+    ? centeredGridViewport(canvasW, canvasH, gridW, gridH,
+        mapFov && mapFov.fovWidth, mapFov && mapFov.fovHeight)
     : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 

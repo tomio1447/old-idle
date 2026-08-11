@@ -904,6 +904,54 @@ function partyCombatCount() {
   return d.members.length;
 }
 
+function partyRestoreCharacterFull(p) {
+  if (!p) return false;
+  const mx = typeof maxStats === "function" ? maxStats(p) :
+    { hp:Math.max(1,p.maxHp||p.hp||1), mp:Math.max(0,p.maxMp||p.mp||0) };
+  p.hp = mx.hp; p.mp = mx.mp;
+  return true;
+}
+
+/* Templo, treino e entrada de arena são checkpoints seguros: nenhum membro
+ * local pode permanecer inconsciente no roster nem reaparecer morto na nova
+ * instância. Restaura tanto entidades ao vivo quanto as cópias do roster. */
+function partyCombatRestoreAll(reason) {
+  const restored = new Set();
+  try {
+    if (typeof G !== "undefined" && G && G.combat && G.combat.players) {
+      for (const ent of G.combat.players) {
+        if (!ent || !ent.p) continue;
+        partyRestoreCharacterFull(ent.p);
+        ent.permadead = false; ent.reviveAt = 0; ent.deathPos = null;
+        ent.downedAt = 0; ent.moving = false;
+        restored.add(String(ent.id || ent.p.id || ""));
+        if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+      }
+      G.combat.dead = false; G.combat.deadUntil = 0; G.combat.deathPos = null;
+    }
+    if (typeof G !== "undefined" && G && G.p) partyRestoreCharacterFull(G.p);
+    if (typeof partyOnlineMode === "function" && partyOnlineMode()) return restored.size;
+    const data = partyLocalData();
+    const chars = typeof getCharacters === "function" ? getCharacters() : [];
+    const ids = new Set();
+    if (typeof G !== "undefined" && G && G.p)
+      ids.add(String(G.p.id || (typeof characterId === "function" ? characterId(G.p) : "")));
+    if (typeof partyLocalMemberIds === "function")
+      for (const id of partyLocalMemberIds(data)) ids.add(String(id));
+    else
+      for (const member of (data && data.members) || []) ids.add(String(member.id));
+    for (const char of chars) {
+      const id = String(char.id || (typeof characterId === "function" ? characterId(char) : ""));
+      if (!ids.has(id)) continue;
+      partyRestoreCharacterFull(char); restored.add(id);
+      if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(char);
+    }
+  } catch (error) {
+    console.warn("[party] falha ao restaurar party no checkpoint " + (reason || ""), error);
+  }
+  return restored.size;
+}
+
 /* Carrega as entidades do party combat. `player` = personagem ativo (o
  * líder). Devolve o array completo (líder + membros) ou null sem party. */
 function partyCombatLoad(player) {
@@ -919,6 +967,9 @@ function partyCombatLoad(player) {
     const pp = normalizePlayer(c);
     pp.id = c.id || characterId(c);
     const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1, mp: 1 };
+    // Última barreira: mesmo que algum fluxo esqueça o checkpoint, a entidade
+    // nunca é criada morta dentro de uma arena.
+    pp.hp = mx.hp; pp.mp = mx.mp;
     entidades.push({
       p: pp, id: pp.id, name: pp.name, voc: pp.voc, sex: pp.sex,
       cx: 0, cy: 0, x: 0, y: 0, dir: "e", moving: false, frame: 0,

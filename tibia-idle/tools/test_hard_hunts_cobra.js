@@ -24,7 +24,7 @@ const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
 must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Cobra/range HARD não aparece na sessão 250+ do modal');
-must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v15"></script>'),
+must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v16"></script>'),
   'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
