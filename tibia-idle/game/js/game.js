@@ -494,6 +494,20 @@ const MISSION_DEFS = {
     ],
     completeReward: { gold: 5000, items: [{ slug: "small-diamond", count: 2 }] },
   },
+  "dark-thais": {
+    title: "Missão: Mirrored Nightmare",
+    tasks: [
+      { monster:"many-faces", target:25, reward:{ supplies:[{slug:"ultimate-health-potion",count:3}] } },
+      { monster:"knight-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-health-potion",count:3}] } },
+      { monster:"paladin-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-spirit-potion",count:3}] } },
+      { monster:"sorcerer-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-mana-potion",count:3}] } },
+      { monster:"druid-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-mana-potion",count:3}] } },
+      { monster:"monk-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-spirit-potion",count:3}] } },
+    ],
+    // A recompensa é permanente: concluir Mirrored Nightmare libera a porta
+    // da bossroom de Goshnar's Greed.
+    completeReward: { bossAccess:"goshnar-s-greed", bossName:"Goshnar's Greed" },
+  },
 };
 
 function missionForHunt(id) {
@@ -523,6 +537,8 @@ function rewardText(reward) {
   if (reward.gold) out.push(fmtFull(reward.gold) + " gp");
   (reward.items || []).forEach((r) => out.push((r.count || 1) + "x " + itemName(r.slug)));
   (reward.supplies || []).forEach((r) => out.push((r.count || 1) + " carga(s) " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
+  if (reward.bossAccess)
+    out.push("Acesso ao boss " + (reward.bossName || reward.bossAccess));
   return out.join(" · ") || "—";
 }
 
@@ -536,6 +552,10 @@ function grantMissionReward(p, reward) {
   for (const r of reward.supplies || [])
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.count || 1);
   if (reward.gold) p.gold += reward.gold;
+  if (reward.bossAccess) {
+    p.bossAccess = p.bossAccess || {};
+    p.bossAccess[reward.bossAccess] = true;
+  }
   return true;
 }
 
@@ -680,7 +700,18 @@ const BOSS_DEFS = {
       { item: "jungle-quiver", chance: 4, max: 1 },
     ],
   },
-  "goshnar-s-greed": { id:"goshnar-s-greed", name:"Goshnar's Greed", title:"Boss de Dark Thais", hunt:"dark-thais", baseMonster:"goshnar-s-greed", sprite:"goshnar-s-greed", hp:550000, exp:350000, damage:1800, armor:120, defense:110, cooldown:BOSS_COOLDOWN, requirement:{level:550,text:"Requer nível 550+ (Dark Thais)"} },
+  "goshnar-s-greed": {
+    id:"goshnar-s-greed", name:"Goshnar's Greed",
+    title:"Boss de Mirrored Nightmare", hunt:"goshnars-greed-room",
+    baseMonster:"goshnar-s-greed", sprite:"goshnar-s-greed",
+    hp:550000, exp:350000, damage:1800, armor:120, defense:110,
+    cooldown:BOSS_COOLDOWN,
+    requirement:{
+      level:550, mission:"dark-thais", access:"goshnar-s-greed", enforced:true,
+      text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Greed",
+    },
+    mechanic:"greedbeast-vulnerability",
+  },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
@@ -757,11 +788,23 @@ function bossState(p, id) {
 }
 
 function bossReadyInfo(p, boss) {
-  if (BOSS_REQUIREMENTS_ENABLED && boss.requirement) {
+  const enforceRequirement = boss.requirement &&
+    (BOSS_REQUIREMENTS_ENABLED || boss.requirement.enforced);
+  if (enforceRequirement) {
     if (boss.requirement.level && p.level < boss.requirement.level)
       return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
     if (boss.requirement.mission && !isMissionComplete(p, boss.requirement.mission))
       return { ok: false, reason: boss.requirement.text, left: 0 };
+    if (boss.requirement.access) {
+      p.bossAccess = p.bossAccess || {};
+      // Migração para personagens que já concluíram Mirrored Nightmare antes
+      // de a recompensa de acesso existir.
+      if (!p.bossAccess[boss.requirement.access] && boss.requirement.mission &&
+          isMissionComplete(p, boss.requirement.mission))
+        p.bossAccess[boss.requirement.access] = true;
+      if (!p.bossAccess[boss.requirement.access])
+        return { ok:false, reason:boss.requirement.text, left:0 };
+    }
   }
   const st = bossState(p, boss.id);
   const left = BOSS_COOLDOWNS_ENABLED
@@ -939,7 +982,8 @@ function startBoss(id, force, arenaReady) {
       zone: "boss", boss: id,
       cooldownMs: BOSS_COOLDOWNS_ENABLED ? (boss.cooldown || 0) : 0,
     };
-    if (BOSS_REQUIREMENTS_ENABLED && boss.requirement && boss.requirement.mission) {
+    if ((BOSS_REQUIREMENTS_ENABLED || (boss.requirement && boss.requirement.enforced)) &&
+        boss.requirement && boss.requirement.mission) {
       info.mission = boss.requirement.mission;
       const mdef = missionForHunt(boss.requirement.mission);
       if (mdef && mdef.tasks) {
@@ -1180,6 +1224,7 @@ function stopHunt(skipMapLoading) {
   // (hp/mana/exp de cada um vão para o roster)
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
   if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
+  if (typeof greedBossCleanup === "function" && G.combat) greedBossCleanup(G.combat);
   G.p.hunt = null;
   G.p.instanceMode = null;
   G.combat = null;

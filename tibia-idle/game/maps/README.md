@@ -91,3 +91,12 @@ Retching Horror, Fury, Hellhound e Demon.
 `(1009,1010,7)..(1027,1024,7)`; o player nasce em `(1018,1018,7)`, posição
 runtime `(14,14)`. Em todos estes mapas, FOV descreve somente o que o jogador
 vê inicialmente — nunca os limites do mundo renderizado.
+
+## Goshnar's Greed
+
+`goshnarsgreed.otbm` vem de `beta-maps/bossesroom/`, seleciona integralmente
+o piso `z=7` de 21×18 (`1042,1008` até `1062,1025`) e o centraliza num mundo
+30×30. O player nasce em `(1052,1022,7)`, runtime `(14,20)`, e Goshnar em
+`(1052,1011,7)`, runtime `(14,9)`. A bossroom só é acessível após concluir a
+missão Mirrored Nightmare. Durante a luta aparecem até seis adds; a cada cinco
+Greedbeasts mortos, o boss perde a imunidade durante 20 segundos.

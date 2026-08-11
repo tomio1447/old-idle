@@ -230,6 +230,7 @@ function newBossCombat(player, boss) {
   c.mobs = [bossMob];
   resolveSQMOccupancy(c);
   if (typeof scarlettBossInit === "function") scarlettBossInit(c, player);
+  if (typeof greedBossInit === "function") greedBossInit(c, player);
   return c;
 }
 
@@ -3017,6 +3018,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   if (tgt && tgt.p) p = tgt.p;
   const agora = Date.now();
   let raw = dmg;
+  if (typeof greedBossOutgoingDamageMultiplier === "function")
+    raw *= greedBossOutgoingDamageMultiplier(c, mob);
   // Tipos especiais de dano (TibiaWiki/Damage):
   //  - "mana drain": ataca a MANA (cor azul), não é reduzido por armor;
   //  - "life drain": remove HP (cor vermelha) e transfere ao atacante;
@@ -3333,6 +3336,8 @@ function mobAttack(c, p, mob) {
   }
   const def = playerDefense(p);
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
+  if (typeof greedBossOutgoingDamageMultiplier === "function")
+    raw *= greedBossOutgoingDamageMultiplier(c, mob);
   const agora = Date.now();
   // Exeta (Challenge / Chivalrous Challenge) do Knight: monstro marcado
   // causa 20% MENOS dano ao knight enquanto o Challenge durar.
@@ -3811,6 +3816,7 @@ function combatTick(c, p, dt, now) {
   c.stats.time += dt;
   p.playtime += dt;
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
+  if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
 
   // stamina: gasta 1s por segundo caçando
   p.stamina = Math.max(0, p.stamina - dt / 1000);
@@ -4001,6 +4007,8 @@ function combatTick(c, p, dt, now) {
   const alive = [];
   for (const m of c.mobs) {
     if (m.hp > 0) { alive.push(m); continue; }
+    if (typeof greedBossHandleKill === "function")
+      greedBossHandleKill(c, m, now);
     // recompensa
     const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
@@ -4058,6 +4066,7 @@ function combatTick(c, p, dt, now) {
                     charm: charmGanho, bossPts: bossGanho });
   }
   c.mobs = alive;
+  if (typeof greedBossAfterDeaths === "function") greedBossAfterDeaths(c);
 
   // auto sell / equip periodicos sao chamados pelo game loop
 }

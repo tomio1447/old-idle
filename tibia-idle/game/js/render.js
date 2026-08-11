@@ -728,7 +728,14 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY) {
   ctx.textAlign = "center";
   // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
   ctx.fillStyle = tibiaHpColor(pct);
-  ctx.fillText(boss.def.name, center, y + 11);
+  let bossLabel = boss.def.name;
+  if (combat.greed) {
+    if (combat.greed.immune)
+      bossLabel += ` — IMUNE · Greedbeasts ${combat.greed.greedbeastKills}/5`;
+    else
+      bossLabel += ` — VULNERÁVEL ${Math.max(0, Math.ceil((combat.greed.vulnerableUntil - Date.now()) / 1000))}s`;
+  }
+  ctx.fillText(bossLabel, center, y + 11);
   ctx.font = "bold 10px Verdana";
   ctx.fillStyle = "#fff";
   ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31);
