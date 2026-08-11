@@ -1082,7 +1082,18 @@ function startHunt(id, instanceMode, force) {
     typeof window !== "undefined" && window.HUNT_ENTRY_TIMEOUT_MS
   ) || 7000);
   entryWatchdog = setTimeout(() => {
+    // Uma transição mais nova (templo, treino ou outra hunt) sempre vence.
+    if (G.huntEntryToken !== entryToken) return;
     console.warn(`[hunt] watchdog liberou entrada em ${id} após ${watchdogMs}ms`);
+    // Durante os 7s, sincronizações de party podem marcar G.inCity=true antes
+    // de existir G.combat. O clique ainda é a entrada atual (token igual),
+    // portanto restaure o estado solicitado em vez de abandonar a instância.
+    if (!entryStillValid()) {
+      console.warn(`[hunt] watchdog restaurou estado de entrada em ${id}`);
+      G.inCity = false;
+      G.p.hunt = id;
+      G.p.instanceMode = instanceMode;
+    }
     // Libera a tela antes de qualquer criação/renderização de combate.
     closeHuntEntryLoading(true);
     finishHuntEntry();

@@ -47,14 +47,14 @@ function verifyPrecompiledMap() {
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   const huntmaps = html.indexOf('src="js/huntmapdata.js"');
-  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v6"');
-  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v6"');
-  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v6"');
+  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v7"');
+  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v7"');
+  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v7"');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,
     "ordem de scripts do mapa pré-compilado incorreta");
   for (const file of ["otbm", "otbmhunt", "hard-hunts", "tileanimdata",
     "tilepatterndata", "tilemap", "preload", "game"])
-    must(html.includes(`src="js/${file}.js?v=cobra-loading-v6"`),
+    must(html.includes(`src="js/${file}.js?v=cobra-loading-v7"`),
       `${file}.js sem cache-busting v4`);
 }
 
@@ -268,6 +268,30 @@ async function verifyLateReplacementAndTempleGuard() {
   counts = fixture.counts();
   must(counts.combatBuilds === 1 && counts.preloads === 0,
     "callback tardio recriou combate depois da volta ao templo");
+
+  // Um sync de party pode marcar cidade antes de G.combat existir. Se o token
+  // ainda é o mesmo, o watchdog deve restaurar a entrada solicitada.
+  fixture = huntFixture();
+  fixture.context.startHunt("cobra-bastion", "non-pvp");
+  fixture.context.G.inCity = true;
+  fixture.context.G.p.hunt = null;
+  fixture.timers.find((timer) => timer.delay === 1).fn();
+  counts = fixture.counts();
+  must(counts.combatBuilds === 1 && fixture.context.G.combat &&
+       !fixture.context.G.inCity && fixture.context.G.p.hunt === "cobra-bastion" &&
+       fixture.warnings.some((message) => message.includes("watchdog restaurou estado")),
+    "watchdog abandonou a entrada após sincronização de party");
+
+  // Token trocado significa retorno real/uma transição mais nova: não reviva.
+  fixture = huntFixture();
+  fixture.context.startHunt("cobra-bastion", "non-pvp");
+  fixture.context.G.huntEntryToken++;
+  fixture.context.G.inCity = true;
+  fixture.context.G.p.hunt = null;
+  fixture.timers.find((timer) => timer.delay === 1).fn();
+  counts = fixture.counts();
+  must(counts.combatBuilds === 0 && counts.immediateHides === 0,
+    "watchdog antigo sobrepôs uma transição mais nova");
 
   // Mesmo uma exceção secundária ao criar/renderizar o combate não pode
   // impedir o watchdog de liberar o overlay.
