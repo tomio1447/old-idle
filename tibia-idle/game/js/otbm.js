@@ -243,7 +243,7 @@
    * "OTBM" ASCII), nós MAP_HEADER/MAP_DATA/TILE_AREA/TILE/ITEM =
    * 0/2/4/5/6. Mantemos o leitor legado abaixo e normalizamos este formato
    * para o mesmo {cells,w,h,z} que o runtime já consome. */
-  function readCanaryV4(data) {
+  function readCanaryV4(data, preferredZ) {
     var r = new Rdr(data), floors = {}, desc = "";
     // Nos arquivos atuais a versão é o u32 inicial (bytes 0..3); o nó
     // raiz começa imediatamente no byte 4.
@@ -295,9 +295,14 @@
     if (r.peek() !== NODE_START) throw new Error(".otbm Canary sem nó raiz");
     r.take(); node(null, 0);
 
-    // Global-Idle usa o andar Z=2 para mapas RME. Arquivos podem conter
-    // áreas auxiliares maiores em outros andares; priorize o andar validado.
-    var bestZ = Object.prototype.hasOwnProperty.call(floors, 2) ? 2 : null, bestCount = -1;
+    // Hunts antigas usam Z=2, mas mapas completos podem ter vários andares
+    // auxiliares e declarar explicitamente qual piso será instanciado.
+    preferredZ = Number(preferredZ);
+    var hasPreferred = Number.isFinite(preferredZ) &&
+      Object.prototype.hasOwnProperty.call(floors, preferredZ);
+    var bestZ = hasPreferred ? preferredZ :
+      (Object.prototype.hasOwnProperty.call(floors, 2) ? 2 : null);
+    var bestCount = -1;
     Object.keys(floors).forEach(function (z) {
       var n = Object.keys(floors[z]).length;
       if (bestZ === null && n > bestCount) { bestCount = n; bestZ = +z; }
@@ -315,11 +320,12 @@
     return map;
   }
 
-  function read(data) {
+  function read(data, options) {
     var d = new Uint8Array(data);
+    var preferredZ = options && typeof options === "object" ? options.z : options;
     // O RME/Canary 4 usa cabeçalho u32 zero em vez da assinatura ASCII.
     if (d.length >= 5 && d[0] === 0 && d[1] === 0 && d[2] === 0 && d[3] === 0)
-      return readCanaryV4(data);
+      return readCanaryV4(data, preferredZ);
     if (d.length < 8 || d[0] !== 0x4F || d[1] !== 0x54 ||
         d[2] !== 0x42 || d[3] !== 0x4D)
       throw new Error("nao e um .otbm reconhecido");

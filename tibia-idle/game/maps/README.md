@@ -67,3 +67,13 @@ spawn continuam exatamente nos valores já configurados: monstros em
 `(154,160,2)` com área 10×12 e player em `(157,165,2)`. Grounds que possuem
 patterns internos no DAT (como 1128 em 4×4 e 10113 em 2×2) são escolhidos
 pela coordenada do SQM, evitando a repetição quadriculada da variante `(0,0)`.
+
+## Marapur — Nagas
+
+`nagas_marapur.otbm` é um mapa Canary com múltiplos andares. A hunt seleciona
+explicitamente o piso `z=7`, cuja fonte mede 23×21 nos limites
+`(1008,1008,7)..(1030,1028,7)`, e recorta somente a sala informada:
+`(1009,1009,7)..(1029,1027,7)` (21×19). O player nasce na coordenada global
+`(1027,1022,7)`, local `(18,13)` dentro da sala; o padding mínimo do conversor
+o posiciona em `(19,13)` no runtime 24×19. A sala usa 101 sprites distintos,
+incluindo os patterns posicionais extraídos do DAT 15.x/8.60.

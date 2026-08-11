@@ -136,7 +136,7 @@ function huntMapFromOtbmAsync(hunt, done) {
       // Mesmo stale, continue a conversão e popule HUNTMAPS silenciosamente;
       // somente a atualização visual pertence à geração que iniciou a carga.
       reportGuarded("Montando mapa", 12);
-      let mapa = OTBM.read(buf);
+      let mapa = OTBM.read(buf, { z: hunt.otbmFloor });
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
       applyHuntOtbmZones(mapa, hunt);
       // Alguns itens 2×2 da borda extrapolam visualmente seu SQM. O offset

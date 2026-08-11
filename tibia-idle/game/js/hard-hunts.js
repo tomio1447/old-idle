@@ -49,7 +49,18 @@
   const harden = (hunt) => Object.assign(hunt, {
     cat: "hard", pack: 10, packMin: 6, packMax: 10,
   });
-  if (GAMEDATA.hunts["marapur-nagas"]) harden(GAMEDATA.hunts["marapur-nagas"]);
+  const marapurNagas = GAMEDATA.hunts["marapur-nagas"];
+  if (marapurNagas) harden(Object.assign(marapurNagas, {
+    // Sala publicada em beta-maps/nagas_marapur.otbm. O arquivo possui
+    // andares auxiliares; a instância jogável é exclusivamente o piso z=7.
+    otbm: "nagas_marapur",
+    otbmFloor: 7,
+    otbmBounds: { x: 1009, y: 1009, w: 21, h: 19, z: 7 },
+    otbmSpawn: { x: 1027, y: 1022, z: 7 },
+    // Toda a sala é uma zona candidata; colisão/ocupação removem paredes,
+    // objetos e o SQM do jogador antes de cada spawn.
+    otbmMobBounds: { x: 1009, y: 1009, w: 21, h: 19, z: 7 },
+  }));
   if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
 
   // Bossroom nova da Timira publicada em beta-maps. O OTBM ocupa
