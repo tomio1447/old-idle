@@ -99,6 +99,65 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   must(huntCtx.G.combat && huntCtx.spawned && huntCtx.rendered && huntCtx.finished,
     'watchdog não liberou a Cobra após callback OTBM pendente');
 
+  // v4: entrada na Cobra não usa fetch/OTBM.read — mapa já em HUNTMAPS
+  const preMapPath = path.join(js, 'cobra-bastion-map.js');
+  must(fs.existsSync(preMapPath), 'pré-compilado ausente para teste de entrada sem fetch');
+  const preCtx2 = { window:{ addEventListener(){}, HUNTMAPS:{}, OTBM_HUNT_CACHE:{} }, console, setInterval, clearInterval, TILEFLAGS:{} };
+  preCtx2.window = preCtx2.window;
+  preCtx2.HUNTMAPS = preCtx2.window.HUNTMAPS;
+  preCtx2.OTBM_HUNT_CACHE = preCtx2.window.OTBM_HUNT_CACHE;
+  vm.createContext(preCtx2);
+  // precisa de HUNTMAPS global antes
+  preCtx2.HUNTMAPS = {};
+  preCtx2.window.HUNTMAPS = preCtx2.HUNTMAPS;
+  vm.runInContext(fs.readFileSync(path.join(js, 'huntmapdata.js'), 'utf8'), preCtx2);
+  vm.runInContext(fs.readFileSync(preMapPath, 'utf8'), preCtx2);
+  const cobraPre = vm.runInContext('typeof HUNTMAPS !== "undefined" ? HUNTMAPS["otbm:cobra_bastion"] : null', preCtx2) || preCtx2.HUNTMAPS["otbm:cobra_bastion"] || preCtx2.window.HUNTMAPS["otbm:cobra_bastion"];
+  must(cobraPre, 'Pré-compilado não carregável em contexto isolado');
+  // Simula entrada na Cobra com mapa pré-compilado: huntMapFromOtbmAsync deve ser síncrono
+  const otbmhuntCode2 = fs.readFileSync(path.join(js, 'otbmhunt.js'), 'utf8');
+  const syncCtx = {
+    console:{warn(){}}, HUNTMAPS: {"otbm:cobra_bastion": cobraPre}, TILEFLAGS:{},
+    OTBM: null,
+    fetch: () => { throw Error('fetch não deveria ser chamado com pré-compilado'); },
+    showGameLoading: () => { throw Error('showGameLoading não deveria ser chamado para pré-compilado'); },
+    setInterval, clearInterval, Date, MAP_LOADING_GENERATION: 5,
+    window:{ addEventListener(){}, HUNTMAPS:{}, OTBM_HUNT_CACHE:{} },
+  };
+  syncCtx.window = syncCtx.window;
+  syncCtx.OTBM_HUNT_CACHE = {};
+  // OTBM dummy que deve falhar se chamado
+  let otbmReadCalled = false;
+  syncCtx.OTBM = { read: () => { otbmReadCalled = true; throw Error('OTBM.read não deve ser chamado para Cobra pré-compilada'); }, huntMapFromOtbm: () => { throw Error('não deve converter'); } };
+  vm.createContext(syncCtx);
+  vm.runInContext(otbmhuntCode2, syncCtx);
+  let cobraDone = false;
+  syncCtx.huntMapFromOtbmAsync({otbm:'cobra_bastion', name:'Cobra', mapa:null}, () => { cobraDone = true; });
+  must(cobraDone && !otbmReadCalled, 'Cobra pré-compilada fez fetch/OTBM.read em vez de retorno síncrono');
+
+  // v4: conversão tardia após watchdog não pode reabrir overlay, mas deve substituir fallback
+  const lateHunt = {otbm:'temp_late', name:'Late', mapa:null};
+  const lateCtx = {
+    console:{warn(){}}, HUNTMAPS:{}, TILEFLAGS:{}, OTBM:{ read(){ return {w:2,h:2,z:2,cells:{"0,0":{g:1}}, sourceBounds:{minX:0,minY:0}}; }, huntMapFromOtbm(m){ return {rows:["ab","cd"], leg:{a:{v:[1]},b:{v:[1]},c:{v:[1]},d:{v:[1]}}, footprintBlocked:{}}; }},
+    fetch: () => new Promise(r => setTimeout(() => r({ok:true,arrayBuffer:()=>Promise.resolve(new ArrayBuffer(8))}), 20)),
+    showGameLoading: (show,text)=>{ lateCtx.shown = text; },
+    setInterval, clearInterval, setTimeout, clearTimeout, Date, MAP_LOADING_GENERATION: 10,
+    OTBM_HUNT_CACHE:{}, window:{addEventListener(){}},
+  };
+  lateCtx.window = lateCtx.window;
+  vm.createContext(lateCtx);
+  vm.runInContext(otbmhuntCode2, lateCtx);
+  lateCtx.MAP_LOADING_GENERATION = 10;
+  let lateDone = false;
+  lateCtx.huntMapFromOtbmAsync(lateHunt, ()=>{ lateDone = true; });
+  // simula watchdog que incrementa geração antes do fetch terminar
+  lateCtx.MAP_LOADING_GENERATION = 11;
+  await new Promise(r=>setTimeout(r, 80));
+  must(lateDone, 'Callback tardio não foi chamado');
+  must(!lateCtx.shown || !lateCtx.shown.includes('Montando mapa'),
+    'Conversão tardia reabriu overlay Montando mapa após watchdog');
+  must(lateCtx.HUNTMAPS["otbm:temp_late"], 'Mapa tardio não substituiu fallback no HUNTMAPS');
+
   for (const marker of [
     'beginMapLoading(`Carregando ${boss.name}...',
     'beginMapLoading(`Carregando ${hu.name}...',
@@ -110,7 +169,7 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
   for (const script of ['otbm','otbmhunt','hard-hunts','tileanimdata',
     'tilepatterndata','tilemap','preload','game'])
-    must(html.includes(`js/${script}.js?v=cobra-loading-v3`),
+    must(html.includes(`js/${script}.js?v=cobra-loading-v4`),
       'script crítico sem cache-busting: ' + script);
   const reward = fs.readFileSync(path.join(js, 'reward-chest.js'), 'utf8');
   const forgeUi = fs.readFileSync(path.join(js, 'forge-ui.js'), 'utf8');

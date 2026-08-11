@@ -1,6 +1,9 @@
 /* preload.js — preparação visual antes de entrar no jogo. */
 "use strict";
 let MAP_LOADING_GENERATION = 0;
+function currentMapLoadingGeneration() {
+  return MAP_LOADING_GENERATION;
+}
 function showGameLoading(show, text, pct) {
   const el = document.getElementById('game-loading');
   if (!el) return;
