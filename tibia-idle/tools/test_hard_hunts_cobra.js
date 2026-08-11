@@ -182,6 +182,9 @@ must(!missing.length, 'Mapa Cobra com sprites ausentes: ' + missing.join(','));
 // Grounds com patterns X/Y usam a variação da coordenada, em vez de repetir
 // xp=0/yp=0 em todo SQM (a repetição formava o quadriculado visível).
 vm.runInContext(fs.readFileSync(path.join(js, 'tilepatterndata.js'), 'utf8'), ctx);
+for (const id of visualIds) if (ctx.TILE_PATTERNS[id])
+  must(fs.existsSync(path.join(game, 'assets', 'tiles', id + '_pattern.png')),
+    'Preloader da Cobra requisitaria pattern ausente: ' + id);
 const stonePattern = ctx.TILE_PATTERNS[1128];
 const floorPattern = ctx.TILE_PATTERNS[10113];
 must(stonePattern && stonePattern.px === 4 && stonePattern.py === 4 &&

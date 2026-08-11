@@ -19,7 +19,7 @@ Object.defineProperty(FakeImage.prototype, 'src', {
 const ctx = {
   window:{}, console, Image:FakeImage,
   document:{getElementById(id){ return id === 'game-loading' ? loading : null; }},
-  requestAnimationFrame(fn){ fn(); }, setTimeout(fn){ fn(); },
+  requestAnimationFrame(fn){ fn(); }, setTimeout, clearTimeout,
   TILE_PATTERNS:{1:{px:2,py:2}}, TILE_ANIM:{2:{af:2}},
   IDLE_ANIMATIONS:{monsters:{rat:{frames:2}}},
   HUNTMAPS:{arena:{leg:{a:{v:[1],g:[2]}}}},
@@ -32,7 +32,10 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   ctx.beginMapLoading('Carregando teste...');
   must(loading.style.display === 'flex' && label.textContent === 'Carregando teste...',
     'overlay não aparece ao iniciar troca de mapa');
-  await ctx.preloadHuntMapAssets({mapa:'arena',monsters:['rat']}, 'Preparando teste');
+  const preload = ctx.preloadHuntMapAssets({mapa:'arena',monsters:['rat']}, 'Preparando teste');
+  must(label.textContent === 'Preparando teste 0/6',
+    'preloader não informa o estágio antes da primeira imagem');
+  await preload;
   for (const asset of [
     'assets/tiles/1.png','assets/tiles/1_pattern.png',
     'assets/tiles/2.png','assets/tiles/2_anim.png',
@@ -41,6 +44,15 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   must(fill.style.width === '100%', 'barra de loading não chegou a 100%');
   ctx.finishMapLoading();
   must(loading.style.display === 'none', 'overlay não fecha após dois frames');
+
+  // Uma conexão de imagem que nunca dispara load/error não pode bloquear a
+  // Cobra Bastion nem qualquer outra troca de mapa.
+  ctx.MAP_ASSET_TIMEOUT_MS = 5;
+  ctx.Image = class { set src(value) { requested.push(value); } };
+  const started = Date.now();
+  await ctx.preloadAssetPaths(['assets/tiles/stalled.png'], 'Preparando travado');
+  must(Date.now() - started < 500 && fill.style.width === '100%',
+    'asset pendente manteve o loading aberto indefinidamente');
 
   const gameSrc = fs.readFileSync(path.join(js, 'game.js'), 'utf8');
   for (const marker of [

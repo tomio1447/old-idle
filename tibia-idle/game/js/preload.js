@@ -24,17 +24,41 @@ function finishMapLoading() {
 function preloadAssetPaths(paths, label) {
   const list = [...new Set(paths || [])];
   if (!list.length) return Promise.resolve();
+  const text = label || 'Carregando mapa';
+  // Atualiza o estágio antes do primeiro onload. Assim um asset lento não
+  // deixa a tela presa visualmente na etapa anterior (fetch do OTBM).
+  showGameLoading(true, `${text} 0/${list.length}`, 0);
+  const timeoutMs = Math.max(1, Number(
+    typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS
+  ) || 5000);
   let done = 0;
   return Promise.all(list.map((src) => new Promise((resolve) => {
     const img = new Image();
-    const finish = () => {
+    let settled = false;
+    const finish = (timedOut) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // Não permita que um evento tardio conte a mesma imagem duas vezes.
+      img.onload = null;
+      img.onerror = null;
+      // Libera também a fila de conexões: 184 assets da Cobra não podem
+      // continuar pendentes e competir com os tiles visíveis do renderer.
+      if (timedOut) {
+        try { img.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; }
+        catch (_) {}
+      }
       done++;
-      showGameLoading(true, `${label || 'Carregando mapa'} ${done}/${list.length}`,
+      showGameLoading(true, `${text} ${done}/${list.length}`,
         done / list.length * 100);
       resolve();
     };
-    img.onload = finish;
-    img.onerror = finish;
+    // Browsers podem manter Image pendente indefinidamente quando o servidor
+    // local fecha uma conexão. O asset será requisitado novamente pelo
+    // renderer, mas nunca poderá bloquear a entrada na hunt.
+    const timer = setTimeout(() => finish(true), timeoutMs);
+    img.onload = () => finish(false);
+    img.onerror = () => finish(false);
     img.src = src;
   }))).then(() => undefined);
 }
@@ -58,16 +82,23 @@ function addTileMapAssetPaths(paths, map) {
 }
 
 function preloadHuntMapAssets(hunt, label) {
-  const paths = new Set();
-  const map = hunt && hunt.mapa && typeof HUNTMAPS !== 'undefined'
-    ? HUNTMAPS[hunt.mapa] : null;
-  addTileMapAssetPaths(paths, map);
-  for (const slug of (hunt && hunt.monsters) || []) {
-    paths.add('assets/mob/' + slug + '.png');
-    if (typeof IDLE_ANIMATIONS !== 'undefined' && IDLE_ANIMATIONS.monsters &&
-        IDLE_ANIMATIONS.monsters[slug]) paths.add('assets/mob/' + slug + '.idle.png');
+  try {
+    const paths = new Set();
+    const map = hunt && hunt.mapa && typeof HUNTMAPS !== 'undefined'
+      ? HUNTMAPS[hunt.mapa] : null;
+    addTileMapAssetPaths(paths, map);
+    for (const slug of (hunt && hunt.monsters) || []) {
+      paths.add('assets/mob/' + slug + '.png');
+      if (typeof IDLE_ANIMATIONS !== 'undefined' && IDLE_ANIMATIONS.monsters &&
+          IDLE_ANIMATIONS.monsters[slug]) paths.add('assets/mob/' + slug + '.idle.png');
+    }
+    return preloadAssetPaths(paths, label || 'Preparando arena').catch((error) => {
+      console.warn('[preload] arena continuará sem esperar todos os assets:', error);
+    });
+  } catch (error) {
+    console.warn('[preload] falha ao preparar lista de assets:', error);
+    return Promise.resolve();
   }
-  return preloadAssetPaths(paths, label || 'Preparando arena');
 }
 
 function preloadGameAssets(p, label) {
