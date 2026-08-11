@@ -525,7 +525,8 @@ function computeOffline(p) {
       if (Math.random() * 100 > l.chance) continue;
       if (l.item === "gold-coin") continue;   // ja contabilizado
       if (isNoCollect(p, l.item)) continue;
-      const cnt = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+      const cnt = typeof lootStackCount === "function" ? lootStackCount(l) :
+        (l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1);
       loot[l.item] = (loot[l.item] || 0) + cnt;
     }
     if (i > 4000) break;   // limite de simulacao
@@ -659,6 +660,14 @@ const MISSION_DEFS = {
     // A recompensa é permanente: concluir Mirrored Nightmare libera a porta
     // da bossroom de Goshnar's Greed.
     completeReward: { bossAccess:"goshnar-s-greed", bossName:"Goshnar's Greed" },
+  },
+  "rotten-wasteland": {
+    title: "Missão: Goshnar's Hatred",
+    tasks: [
+      { monster:"rotten-golem", target:50,
+        reward:{ supplies:[{slug:"ultimate-health-potion",count:5}] } },
+    ],
+    completeReward:{bossAccess:"goshnar-s-hatred",bossName:"Goshnar's Hatred"},
   },
 };
 
@@ -863,6 +872,19 @@ const BOSS_DEFS = {
       text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Greed",
     },
     mechanic:"greedbeast-vulnerability",
+  },
+  "goshnar-s-hatred": {
+    id:"goshnar-s-hatred",name:"Goshnar's Hatred",
+    title:"Boss de Rotten Wasteland",hunt:"goshnars-hatred-room",
+    baseMonster:"goshnar-s-hatred",sprite:"goshnar-s-hatred",
+    hp:300000,exp:75000,damage:5000,armor:160,defense:160,
+    cooldown:BOSS_COOLDOWN,
+    requirement:{
+      mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:true,
+      text:"Elimine 50 Rotten Golems em Rotten Wasteland para liberar Goshnar's Hatred",
+    },
+    // O mapa e a mecânica próprios entram no próximo pacote.
+    mechanic:"pending-hatred-room",
   },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo

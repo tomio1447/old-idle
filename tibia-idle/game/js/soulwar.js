@@ -11,6 +11,16 @@
   'greed-s-arm':{n:"Greed's arm",cid:33924,w:1.25},
   'figurine-of-greed':{n:'figurine of Greed',cid:34021,w:.44},
   'the-skull-of-a-beast':{n:'the skull of a beast',cid:34075,w:2.3},
+  // Rotten Wasteland + Goshnar's Hatred (items.xml do Canary).
+  'roots':{n:'roots',cid:33938,w:.9},
+  'crawler-s-essence':{n:"crawler's essence",cid:33982,w:.45},
+  'mould-heart':{n:'mould heart',cid:34141,w:.75},
+  'mould-robe':{n:'mould robe',cid:34148,w:1.8},
+  'vial-of-hatred':{n:'vial of Hatred',cid:33927,w:1.1},
+  'figurine-of-hatred':{n:'figurine of hatred',cid:34020,w:.44},
+  'spectral-horseshoe':{n:'spectral horseshoe',cid:34072,w:1.2},
+  'spectral-horse-tack':{n:'spectral horse tack',cid:34074,w:.8},
+  'bracelet-of-strengthening':{n:'bracelet of strengthening',cid:34076,w:1.5},
  };
  for(const slug in serverLootItems) if(!I[slug]) I[slug]=Object.assign({s:null,t:'loot',sell:1},serverLootItems[slug]);
  const souls=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];
@@ -39,12 +49,58 @@
  M['monk-s-apparition']=apparition("Monk's Apparition",'ice',iceHoly([1080,1300],[1100,1250]));
  M['many-faces']={name:'Many Faces',hp:30000,exp:18870,damage:1300,armor:105,defense:105,mitigation:3.34,element:'ice',attackSpeed:2000,resist:{physical:0,energy:0,earth:0,fire:-5,ice:30,holy:50,death:-30},skills:[{el:'ice',min:1220,max:1400,int:4000,ch:33,range:7,fx:'ice-attack',miss:'ice'},{el:'ice',min:1000,max:1450,int:5000,ch:44,range:7,radius:5,fx:'ice-area',miss:'ice'},{el:'holy',min:1050,max:1300,int:9500,ch:59,radius:4,fx:'holy-area'},{el:'holy',min:1150,max:1300,int:10000,ch:59,range:7,chain:4,fx:'holy-damage',miss:'holy'}],loot:loot.slice()};
  GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',otbm:'mirrored_nightmare_sw',otbmFloor:7,otbmFovBounds:{x:1014,y:1013,w:19,h:15,z:7},otbmFovWidth:20,otbmFovHeight:12,otbmRuntimeWidth:30,otbmRuntimeHeight:30,otbmSpawn:{x:1018,y:1020,z:7},otbmMobBounds:{x:1016,y:1019,w:8,h:8,z:7},monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition','distorted-phantom'],avgHp:26857,avgExp:21553,avgDamage:993,avgArmor:87,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e',soulWarZone:true,soulWarZoneMonster:'many-faces'};
+
+ // Os dados gerados já vêm dos mesmos monster.lua do Canary. Estes ajustes
+ // preservam detalhes dos spells nomeados que o import genérico não infere:
+ // melee é físico; Poison Chain é earth; Extended Holy Chain é holy.
+ for(const slug of ['rotten-golem','branchy-crawler','mould-phantom'])if(M[slug])M[slug].element='physical';
+ const rottenPoison=(M['rotten-golem']&&M['rotten-golem'].skills||[]).find(s=>s.n==='poison chain');
+ if(rottenPoison)Object.assign(rottenPoison,{el:'earth',chain:3,fx:'energy-shock-green',range:7});
+ for(const slug of ['rotten-golem','branchy-crawler']){
+  const root=(M[slug]&&M[slug].skills||[]).find(s=>s.n==='root');if(root)root.fx='rooting-effect';
+ }
+ const mouldPoison=(M['mould-phantom']&&M['mould-phantom'].skills||[]).find(s=>s.n==='poison chain');
+ if(mouldPoison)Object.assign(mouldPoison,{el:'earth',chain:3,fx:'energy-shock-green',range:7});
+ const mouldHoly=(M['mould-phantom']&&M['mould-phantom'].skills||[]).find(s=>s.n==='extended holy chain');
+ if(mouldHoly)Object.assign(mouldHoly,{el:'holy',chain:3,fx:'holy-damage',range:7});
+ const hatredCloud=(M['goshnar-s-hatred']&&M['goshnar-s-hatred'].skills||[]).find(s=>s.n==='singlecloudchain');
+ if(hatredCloud)Object.assign(hatredCloud,{el:'energy',fx:'energy-area'});
+ const hatredLoot=(M['goshnar-s-hatred']&&M['goshnar-s-hatred'].loot)||[];
+ const hatredMin={'crystal-coin':70,'bullseye-potion':10,'mastermind-potion':10,
+  'transcendence-potion':10,'berserk-potion':10,'ultimate-mana-potion':50,
+  'supreme-health-potion':50,'ultimate-spirit-potion':50};
+ for(const drop of hatredLoot)if(hatredMin[drop.item])drop.min=hatredMin[drop.item];
+
+ // Mapa completo é mantido como mundo runtime 30×30. Os bounds descrevem
+ // a FOV/source do arquivo entregue, não um crop do OTBM.
+ GAMEDATA.hunts['rotten-wasteland']={
+  name:'Rotten Wasteland',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
+  otbm:'rotten_wasteland',otbmFloor:7,
+  otbmFovBounds:{x:1040,y:1012,w:21,h:15,z:7},otbmFovWidth:21,otbmFovHeight:13,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1045,y:1022,z:7},otbmMobBounds:{x:1047,y:1017,w:12,h:7,z:7},
+  monsters:['rotten-golem','branchy-crawler','mould-phantom'],
+  avgHp:27667,avgExp:18017,avgDamage:933,avgArmor:103,avgGold:170,
+  respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,
+  color:'#54652d',soulWarZone:true,soulWarZoneMonster:'rotten-golem',
+ };
+
+ // Sala técnica temporária: o OTBM e a mecânica próprios serão conectados
+ // quando forem entregues. O boss já existe, com stats/loot oficiais.
+ GAMEDATA.hunts['goshnars-hatred-room']={
+  name:"Goshnar's Hatred Room",hidden:true,level:400,minLevel:400,
+  cat:'boss-room',scene:'soulwar',monsters:['goshnar-s-hatred'],
+  avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
+  respawn:1,pack:1,
+ };
+
  // Bossroom integral: o mundo 30×30 mantém todo o piso z=7. A célula G
  // exclusiva posiciona Goshnar no norte; os adds usam as demais células
  // livres da sala e não dependem desta zona.
  GAMEDATA.hunts['goshnars-greed-room']={
   name:"Goshnar's Greed Room",hidden:true,level:550,minLevel:550,
   cat:'boss-room',scene:'soulwar',otbm:'goshnarsgreed',otbmFloor:7,
+  otbmFovBounds:{x:1042,y:1009,w:19,h:16,z:7},
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
   otbmSpawn:{x:1052,y:1022,z:7},
   otbmMobBounds:{x:1052,y:1011,w:1,h:1,z:7},

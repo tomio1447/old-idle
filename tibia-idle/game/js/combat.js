@@ -3522,6 +3522,15 @@ function mobAttack(c, p, mob) {
   return raw;
 }
 
+/* Quantidade oficial do drop. Entradas sem `min` preservam a regra antiga
+ * de 1..max; bosses como Hatred podem declarar 70..75 ou 50..100. */
+function lootStackCount(entry,randomValue){
+  const max=Math.max(1,Math.floor(Number(entry&&entry.max)||1));
+  const min=Math.max(1,Math.min(max,Math.floor(Number(entry&&entry.min)||1)));
+  const roll=randomValue===undefined?Math.random():Math.max(0,Math.min(.999999,randomValue));
+  return min+Math.floor(roll*(max-min+1));
+}
+
 /* Gera o loot de um monstro morto */
 function rollLoot(c, p, mob) {
   // Party combat: a Loot Pouch do líder é o destino ÚNICO de todo loot,
@@ -3553,7 +3562,8 @@ function rollLoot(c, p, mob) {
     if (Math.random() * 100 > effectiveChance) continue;
     // Multiplicadores aumentam SOMENTE a chance. A quantidade respeita o
     // max original do Canary; não multiplicar aqui evita 15 blank runes.
-    const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+    const count = typeof lootStackCount === "function" ? lootStackCount(l) :
+      (l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1);
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
     if (!mob.boss && isNoCollect(p, l.item)) continue;
@@ -3594,7 +3604,8 @@ function rollLoot(c, p, mob) {
     if (pLoot > 0 && Math.random() * 100 < pLoot) {
       for (const l of mob.def.loot) {
         if (Math.random() * 100 > l.chance) continue;
-        const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+        const count = typeof lootStackCount === "function" ? lootStackCount(l) :
+          (l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1);
         const it = GAMEDATA.items[l.item];
         if (!it) continue;
         if (!mob.boss && isNoCollect(p, l.item)) continue;

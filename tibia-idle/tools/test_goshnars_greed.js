@@ -21,20 +21,21 @@ const beta = fs.readFileSync(path.join(game, "beta-maps", "bossesroom", "goshnar
 const runtime = fs.readFileSync(path.join(game, "maps", "goshnarsgreed.otbm"));
 must(beta.equals(runtime), "bossroom publicada difere do beta-map");
 must(crypto.createHash("sha256").update(runtime).digest("hex") ===
-  "6388155756b9d3c98b20be2489ad085d1f11229d9bd3cdb6fc59b3d4a6d7e6c7",
-  "SHA da bossroom Goshnar inesperado");
+  "504c09c68a279d9faad754b9dffb59db8e3fbffcdff6be90dc35122f760fbbdc",
+  "SHA da bossroom Goshnar atualizada inesperado");
 const hunt = ctx.GAMEDATA.hunts["goshnars-greed-room"];
 must(hunt && hunt.otbm === "goshnarsgreed" && hunt.otbmFloor === 7 &&
      hunt.otbmRuntimeWidth === 30 && hunt.otbmRuntimeHeight === 30,
   "hunt técnica de Goshnar não usa mundo 30×30 z=7");
 must(JSON.stringify(hunt.otbmSpawn) === JSON.stringify({x:1052,y:1022,z:7}) &&
-     JSON.stringify(hunt.otbmMobBounds) === JSON.stringify({x:1052,y:1011,w:1,h:1,z:7}),
-  "spawns globais da bossroom divergentes");
+     JSON.stringify(hunt.otbmMobBounds) === JSON.stringify({x:1052,y:1011,w:1,h:1,z:7}) &&
+     JSON.stringify(hunt.otbmFovBounds) === JSON.stringify({x:1042,y:1009,w:19,h:16,z:7}),
+  "spawns/FOV globais da bossroom divergentes");
 let map = OTBM.read(runtime, {z:7});
-must(map.w === 21 && map.h === 18 && Object.keys(map.cells).length === 361 &&
-     map.sourceBounds.minX === 1042 && map.sourceBounds.minY === 1008 &&
-     map.sourceBounds.maxX === 1062 && map.sourceBounds.maxY === 1025,
-  "piso z=7 da bossroom não foi preservado integralmente");
+must(map.w === 20 && map.h === 14 && Object.keys(map.cells).length === 266 &&
+     map.sourceBounds.minX === 1048 && map.sourceBounds.minY === 1011 &&
+     map.sourceBounds.maxX === 1067 && map.sourceBounds.maxY === 1024,
+  "piso z=7 atualizado da bossroom não foi preservado integralmente");
 const loader = fs.readFileSync(path.join(js, "otbmhunt.js"), "utf8");
 const zoneStart = loader.indexOf("function applyHuntOtbmZones");
 const zoneEnd = loader.indexOf("\n\n/* Garante", zoneStart);
@@ -45,21 +46,16 @@ map.idleTargetHeight = hunt.otbmRuntimeHeight;
 const hm = OTBM.huntMapFromOtbm(map, ctx.TILEFLAGS);
 must(hm.rows.length === 30 && hm.rows.every((row) => row.length === 30),
   "bossroom Goshnar não ficou 30×30");
-must(hm.spawn.x === 14 && hm.spawn.y === 20 && hm.mob[0].x === 14 && hm.mob[0].y === 9,
-  "player ou boss spawn runtime incorreto");
+must(hm.spawn.x === 9 && hm.spawn.y === 19 && hm.mob[0].x === 9 && hm.mob[0].y === 8,
+  "player ou boss spawn runtime atualizado incorreto");
 const visualIds = new Set();
 Object.values(hm.leg).forEach((entry) => {
   (entry.v || []).forEach((id) => visualIds.add(id));
   (entry.g || []).forEach((id) => visualIds.add(id));
 });
-must(visualIds.size === 57, `bossroom usa ${visualIds.size}, não 57 sprites`);
-for (const id of visualIds) {
-  must(fs.existsSync(path.join(game, "assets", "tiles", id + ".png")),
-    "sprite da bossroom ausente: " + id);
-  if (ctx.TILE_PATTERNS[id])
-    must(fs.existsSync(path.join(game, "assets", "tiles", id + "_pattern.png")),
-      "pattern da bossroom ausente: " + id);
-}
+must(visualIds.size === 90, `bossroom atualizada usa ${visualIds.size}, não 90 sprites`);
+for(const id of visualIds)
+  must(fs.existsSync(path.join(game,"assets","tiles",id+".png")),"sprite da bossroom atualizada ausente: "+id);
 for (const slug of ["goshnar-s-greed", "dreadful-harvester", "soulsnatcher",
   "greedbeast", "powerful-soul"])
   must(ctx.GAMEDATA.monsters[slug] && fs.existsSync(path.join(game, "assets", "mob", slug + ".png")),

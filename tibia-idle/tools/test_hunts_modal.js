@@ -31,7 +31,7 @@ const expected=[
  ["HUNTS 100–250",[]],
  ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas"]],
  ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
- ["SOULWAR 400+",["dark-thais"]],
+ ["SOULWAR 400+",["dark-thais","rotten-wasteland"]],
 ];
 const start=ui.indexOf("const HUNT_MODAL_SECTIONS");
 const end=ui.indexOf("\n\n/* ─────────────────",start);
@@ -54,4 +54,4 @@ for(const [,ids] of expected)for(const id of ids)
   must(root.innerHTML.includes(`data-hunt="${id}"`),id+" ausente do modal");
 must(!root.innerHTML.includes('data-hunt="spiders"')&&root.innerHTML.includes("Em breve"),
   "hunt 7.4 vazou para o modal ou seção vazia não foi mantida");
-console.log("OK: botão Demon abre catálogo com 5 sessões e somente as 10 hunts permitidas.");
+console.log("OK: botão Demon abre catálogo com 5 sessões e as 11 hunts permitidas.");
