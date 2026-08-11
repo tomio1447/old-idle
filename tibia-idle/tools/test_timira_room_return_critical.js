@@ -101,8 +101,9 @@ must(returnCtx.G.walker.reset === 1 && returnCtx.G.p.hp === 900 && returnCtx.G.p
   'retorno não reposicionou/curou o player no templo');
 must(returnCtx.gridReset === 1 && returnCtx.rendered,
   'retorno ao templo não restaurou grid/render');
-must(gameSrc.includes('G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id'),
-  'callback OTBM pendente pode reabrir uma hunt após o retorno');
+must(gameSrc.includes('G.huntEntryToken === entryToken && !G.inCity && G.p.hunt === id') &&
+     gameSrc.includes('if (entryCompleted || !entryStillValid()) return;'),
+  'callback/watchdog OTBM pendente pode reabrir uma hunt após o retorno');
 
 // --- Crítico com a mesma duração do Fatal e escala visual compensada.
 must(gameSrc.includes('"critical-hit-effect", 1200, 1.45') &&

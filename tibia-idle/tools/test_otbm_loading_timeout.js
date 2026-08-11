@@ -7,9 +7,10 @@ function must(ok, msg) { if (!ok) throw Error(msg); }
 const game = path.join(__dirname, '..', 'game');
 const source = fs.readFileSync(path.join(game, 'js', 'otbmhunt.js'), 'utf8');
 const end = source.indexOf('\nif (typeof module');
-const warnings = [];
+const warnings = [], stages = [];
 const ctx = {
   console:{warn(...args){ warnings.push(args.join(' ')); },log(){}},
+  showGameLoading(show,text,pct){ stages.push({show,text,pct}); },
   HUNTMAPS:{}, TILEFLAGS:{},
   OTBM:{
     read(){ return {w:1,h:1,z:2,sourceBounds:{minX:0,minY:0},cells:{}}; },
@@ -33,6 +34,8 @@ vm.runInContext(source.slice(0, end), ctx);
   must(Date.now() - started < 500, 'fetch pendente bloqueou a entrada na Cobra');
   must(warnings.some(x => x.includes('timeout ao carregar OTBM')),
     'timeout OTBM não foi diagnosticado');
+  must(stages.some(x => x.text === 'Baixando mapa cobra_bastion...' && x.pct === 5),
+    'loading não informa que está aguardando o OTBM');
 
   // Depois de um timeout o cache deve permitir uma nova tentativa real.
   ctx.fetch = () => Promise.resolve({ok:true,arrayBuffer:() => Promise.resolve(new ArrayBuffer(1))});

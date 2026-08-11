@@ -1,5 +1,6 @@
 /* preload.js — preparação visual antes de entrar no jogo. */
 "use strict";
+let MAP_LOADING_GENERATION = 0;
 function showGameLoading(show, text, pct) {
   const el = document.getElementById('game-loading');
   if (!el) return;
@@ -9,11 +10,18 @@ function showGameLoading(show, text, pct) {
   if (fill) fill.style.width = Math.max(0, Math.min(100, pct || 0)) + '%';
 }
 function beginMapLoading(text) {
+  MAP_LOADING_GENERATION++;
   showGameLoading(true, text || 'Carregando mapa...', 0);
+  return MAP_LOADING_GENERATION;
 }
 
 function finishMapLoading() {
-  const hide = () => showGameLoading(false);
+  // Invalida qualquer progresso atrasado da transição anterior. Sem isso,
+  // um onload tardio pode reabrir o overlay depois de a hunt já ter iniciado.
+  const generation = ++MAP_LOADING_GENERATION;
+  const hide = () => {
+    if (generation === MAP_LOADING_GENERATION) showGameLoading(false);
+  };
   // Um frame desenha o mapa já carregado; o segundo remove o overlay sem
   // revelar tiles aparecendo aos poucos.
   if (typeof requestAnimationFrame === 'function')
@@ -25,12 +33,18 @@ function preloadAssetPaths(paths, label) {
   const list = [...new Set(paths || [])];
   if (!list.length) return Promise.resolve();
   const text = label || 'Carregando mapa';
+  const generation = MAP_LOADING_GENERATION;
+  const update = (loaded) => {
+    if (generation !== MAP_LOADING_GENERATION) return;
+    showGameLoading(true, `${text} ${loaded}/${list.length}`,
+      loaded / list.length * 100);
+  };
   // Atualiza o estágio antes do primeiro onload. Assim um asset lento não
   // deixa a tela presa visualmente na etapa anterior (fetch do OTBM).
-  showGameLoading(true, `${text} 0/${list.length}`, 0);
+  update(0);
   const timeoutMs = Math.max(1, Number(
     typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS
-  ) || 5000);
+  ) || 3000);
   let done = 0;
   return Promise.all(list.map((src) => new Promise((resolve) => {
     const img = new Image();
@@ -49,8 +63,7 @@ function preloadAssetPaths(paths, label) {
         catch (_) {}
       }
       done++;
-      showGameLoading(true, `${text} ${done}/${list.length}`,
-        done / list.length * 100);
+      update(done);
       resolve();
     };
     // Browsers podem manter Image pendente indefinidamente quando o servidor
