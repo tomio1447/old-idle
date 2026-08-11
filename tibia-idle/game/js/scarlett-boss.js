@@ -319,6 +319,15 @@ function scarlettBossEnforceThreshold(c, now) {
 }
 
 function bossCanTakePlayerDamage(c, target) {
+  if (typeof greedBossCanTakePlayerDamage === "function" &&
+      !greedBossCanTakePlayerDamage(c, target)) {
+    const nowGreed = Date.now();
+    if (c.greed && nowGreed - c.greed.lastBlockFx > 500) {
+      c.greed.lastBlockFx = nowGreed;
+      c.events.push({ t:"block", x:target.x, y:target.y, screen:true, greedImmune:true });
+    }
+    return false;
+  }
   if (!scarlettFight(c) || !target || !target.boss || !c.scarlett || !c.scarlett.immune) return true;
   const now = Date.now();
   if (now - c.scarlett.lastBlockFx > 500) {

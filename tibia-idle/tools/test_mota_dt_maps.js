@@ -107,9 +107,9 @@ must(loader.includes("mapa.idleTargetWidth = Number(hunt.otbmRuntimeWidth) || 0"
      loader.includes("mapa.idleTargetHeight = Number(hunt.otbmRuntimeHeight) || 0"),
   "loader não encaminha o tamanho 30×30 ao conversor");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-must(html.includes("js/otbm.js?v=cobra-loading-v11") &&
-     html.includes("js/otbmhunt.js?v=cobra-loading-v11") &&
-     html.includes("js/hard-hunts.js?v=cobra-loading-v11"),
+must(html.includes("js/otbm.js?v=cobra-loading-v12") &&
+     html.includes("js/otbmhunt.js?v=cobra-loading-v12") &&
+     html.includes("js/hard-hunts.js?v=cobra-loading-v12"),
   "scripts dos mundos 30×30 estão sem cache-busting v11");
 
 console.log("OK: MOTA Extension e DT Seal preservam mapas integrais 30×30; FOV não recorta o mundo.");

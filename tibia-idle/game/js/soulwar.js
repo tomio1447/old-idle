@@ -39,6 +39,19 @@
  M['monk-s-apparition']=apparition("Monk's Apparition",'ice',iceHoly([1080,1300],[1100,1250]));
  M['many-faces']={name:'Many Faces',hp:30000,exp:18870,damage:1300,armor:105,defense:105,mitigation:3.34,element:'ice',attackSpeed:2000,resist:{physical:0,energy:0,earth:0,fire:-5,ice:30,holy:50,death:-30},skills:[{el:'ice',min:1220,max:1400,int:4000,ch:33,range:7,fx:'ice-attack',miss:'ice'},{el:'ice',min:1000,max:1450,int:5000,ch:44,range:7,radius:5,fx:'ice-area',miss:'ice'},{el:'holy',min:1050,max:1300,int:9500,ch:59,radius:4,fx:'holy-area'},{el:'holy',min:1150,max:1300,int:10000,ch:59,range:7,chain:4,fx:'holy-damage',miss:'holy'}],loot:loot.slice()};
  GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition'],avgHp:27000,avgExp:22000,avgDamage:950,avgArmor:85,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e'};
+ // Bossroom integral: o mundo 30×30 mantém todo o piso z=7. A célula G
+ // exclusiva posiciona Goshnar no norte; os adds usam as demais células
+ // livres da sala e não dependem desta zona.
+ GAMEDATA.hunts['goshnars-greed-room']={
+  name:"Goshnar's Greed Room",hidden:true,level:550,minLevel:550,
+  cat:'boss-room',scene:'soulwar',otbm:'goshnarsgreed',otbmFloor:7,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1052,y:1022,z:7},
+  otbmMobBounds:{x:1052,y:1011,w:1,h:1,z:7},
+  monsters:['goshnar-s-greed','dreadful-harvester','soulsnatcher','greedbeast','powerful-soul'],
+  avgHp:300000,avgExp:150000,avgDamage:1800,avgArmor:120,avgGold:100,
+  respawn:1,pack:1,
+ };
  window.soulwarOpenBag=function(p){const pool=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p){p.depot=p.depot||[];p.depot.push(item);return item;}return null;};
 })();
 /* Mirror Image do Canary: no primeiro dano revela a Apparition da vocação
@@ -50,3 +63,109 @@ window.soulwarMirrorTransform=function(c,m,p){
  const pct=m.maxHp?m.hp/m.maxHp:1; m.slug=slug;m.def=Object.assign({},def);m.maxHp=def.hp;m.hp=Math.max(1,Math.floor(def.hp*pct));m._mirrorDone=true;
  if(c&&c.events)c.events.push({t:'effect',x:m.x,y:m.y,screen:true,fx:'magic-blue'});
 };
+
+/* ------------------------------------------------ Goshnar's Greed
+ * Mini game: o boss começa imune e a sala mantém até seis adds. Cada quinto
+ * Greedbeast morto abre uma janela de vulnerabilidade de 20 segundos. */
+const GOSHNAR_GREED_ID='goshnar-s-greed';
+const GREED_ADDS=['dreadful-harvester','soulsnatcher','greedbeast','powerful-soul'];
+const GREED_MAX_ADDS=6;
+const GREED_KILLS_TO_OPEN=5;
+const GREED_VULNERABLE_MS=20000;
+
+function greedBossFight(c){return !!(c&&c.boss&&c.boss.id===GOSHNAR_GREED_ID);}
+function greedBossMob(c){return c&&c.mobs?c.mobs.find((m)=>m&&m.boss):null;}
+function greedBossAdds(c){return (c&&c.mobs||[]).filter((m)=>m&&!m.boss&&m.hp>0);}
+function greedRandomIndex(length,randomFn){
+ const r=Math.max(0,Math.min(.999999,(randomFn||Math.random)()));
+ return Math.min(length-1,Math.floor(r*length));
+}
+function greedFreeCells(c){
+ const out=[];
+ const occ=typeof buildOccupancy==='function'?buildOccupancy(c,null):new Map();
+ const w=c.gridW||((c.huntMap&&c.huntMap.rows&&c.huntMap.rows[0]||'').length)||30;
+ const h=c.gridH||((c.huntMap&&c.huntMap.rows||[]).length)||30;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  if(c.huntMap&&typeof huntMapBlocked==='function'&&huntMapBlocked(c.huntMap,x,y))continue;
+  if(occ&&occ.has&&occ.has(x+':'+y))continue;
+  out.push({x,y});
+ }
+ return out;
+}
+function greedCreateAdd(c,slug,randomFn){
+ const def=typeof GAMEDATA!=='undefined'&&GAMEDATA.monsters&&GAMEDATA.monsters[slug];
+ const cells=greedFreeCells(c); if(!def||!cells.length)return null;
+ const cell=cells[greedRandomIndex(cells.length,randomFn)];
+ const pos=typeof cellToScreen==='function'?cellToScreen(cell.x,cell.y):
+  {x:(cell.x+.5)/(c.gridW||30),y:(cell.y+.5)/(c.gridH||30)};
+ const mob={slug,def:Object.assign({},def),hp:def.hp,maxHp:def.hp,
+  atkCd:400+(randomFn||Math.random)()*1200,
+  id:'greed-add-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),
+  cx:cell.x,cy:cell.y,x:pos.x,y:pos.y,sx:pos.x,sy:pos.y,dir:'w',
+  moving:false,attackAnim:0,speed:.000055,spawnAt:Date.now()};
+ // Adds ficam antes do boss enquanto ele está imune, para o auto-combatê-los.
+ c.mobs.unshift(mob); return mob;
+}
+function greedSortTargets(c){
+ if(!greedBossFight(c)||!c.greed)return;
+ const boss=greedBossMob(c),adds=greedBossAdds(c);
+ c.mobs=c.greed.immune?adds.concat(boss?[boss]:[]):(boss?[boss]:[]).concat(adds);
+}
+function greedFillAdds(c,randomFn){
+ if(!greedBossFight(c)||!c.greed||!c.greed.immune)return 0;
+ let made=0;
+ while(greedBossAdds(c).length<GREED_MAX_ADDS){
+  const slug=GREED_ADDS[greedRandomIndex(GREED_ADDS.length,randomFn)];
+  if(!greedCreateAdd(c,slug,randomFn))break;
+  made++;
+ }
+ greedSortTargets(c);
+ if(made&&typeof resolveSQMOccupancy==='function')resolveSQMOccupancy(c);
+ return made;
+}
+function greedBossInit(c,player,randomFn){
+ if(!greedBossFight(c))return c;
+ const now=Date.now(),boss=greedBossMob(c);
+ c.greed={immune:true,greedbeastKills:0,vulnerableUntil:0,
+  nextSpawnAt:now,lastBlockFx:0,randomFn:randomFn||Math.random};
+ if(boss)boss.greedImmune=true;
+ greedFillAdds(c,c.greed.randomFn);
+ if(typeof addLog==='function')
+  addLog('death',"Goshnar's Greed está imune. Mate <b>5 Greedbeasts</b> para abrir 20s de vulnerabilidade.");
+ return c;
+}
+function greedStartVulnerability(c,now){
+ const st=c.greed,boss=greedBossMob(c); if(!st||!boss)return false;
+ st.immune=false;st.greedbeastKills=0;st.vulnerableUntil=now+GREED_VULNERABLE_MS;
+ boss.greedImmune=false;greedSortTargets(c);
+ c.events.push({t:'effect',x:boss.x,y:boss.y,screen:true,fx:'magic-green'});
+ if(typeof addLog==='function')addLog('level',"5 Greedbeasts derrotados — Goshnar está <b>VULNERÁVEL por 20s</b>!");
+ if(typeof toast==='function')toast("Goshnar's Greed vulnerável por 20 segundos!",'level');
+ return true;
+}
+function greedBossHandleKill(c,mob,now){
+ if(!greedBossFight(c)||!c.greed||!mob||mob.slug!=='greedbeast'||!c.greed.immune)return false;
+ c.greed.greedbeastKills++;
+ if(typeof addLog==='function')addLog('info',`Greedbeasts: <b>${c.greed.greedbeastKills}/${GREED_KILLS_TO_OPEN}</b>`);
+ if(c.greed.greedbeastKills>=GREED_KILLS_TO_OPEN)return greedStartVulnerability(c,now||Date.now());
+ return true;
+}
+function greedBossAfterDeaths(c){if(greedBossFight(c))greedSortTargets(c);}
+function greedBossTick(c,now){
+ if(!greedBossFight(c)||!c.greed)return true;
+ const st=c.greed,boss=greedBossMob(c); if(!boss||boss.hp<=0)return true;
+ if(!st.immune){
+  if(now<st.vulnerableUntil){greedSortTargets(c);return true;}
+  st.immune=true;st.vulnerableUntil=0;st.nextSpawnAt=now;boss.greedImmune=true;
+  if(typeof addLog==='function')addLog('death',"A vulnerabilidade acabou — Goshnar's Greed está imune novamente.");
+ }
+ if(now>=st.nextSpawnAt){greedFillAdds(c,st.randomFn);st.nextSpawnAt=now+1500;}
+ greedSortTargets(c);return true;
+}
+function greedBossCanTakePlayerDamage(c,target){
+ return !(greedBossFight(c)&&c.greed&&c.greed.immune&&target&&target.boss);
+}
+function greedBossOutgoingDamageMultiplier(c,mob){
+ return greedBossFight(c)&&c.greed&&c.greed.immune&&mob&&mob.boss ? .7 : 1;
+}
+function greedBossCleanup(c){if(c&&c.greed)delete c.greed;}
