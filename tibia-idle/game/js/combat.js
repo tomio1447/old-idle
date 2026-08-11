@@ -205,6 +205,7 @@ function newBossCombat(player, boss) {
     slug: boss.sprite || boss.baseMonster || "cave-rat",
     def: def,
     boss: true,
+    greedImmune: boss.id === "goshnar-s-greed",
     hp: def.hp,
     maxHp: def.hp,
     atkCd: 700,

@@ -106,6 +106,8 @@ exige 25 mortes de cada criatura e concede acesso a Goshnar's Greed.
 `goshnarsgreed.otbm` vem de `beta-maps/bossesroom/`, seleciona integralmente
 o piso `z=7` de 21×18 (`1042,1008` até `1062,1025`) e o centraliza num mundo
 30×30. O player nasce em `(1052,1022,7)`, runtime `(14,20)`, e Goshnar em
-`(1052,1011,7)`, runtime `(14,9)`. A bossroom só é acessível após concluir a
-missão Mirrored Nightmare. Durante a luta aparecem até seis adds; a cada cinco
-Greedbeasts mortos, o boss perde a imunidade durante 20 segundos.
+`(1052,1011,7)`, runtime `(14,9)`. A recompensa da Mirrored Nightmare já
+registra o acesso, mas requisito e cooldown estão temporariamente desligados
+para testes. Durante a luta aparecem até seis adds sem defesa/imunidade; cada
+nascimento tem 30% de chance de ser Greedbeast. A cada cinco Greedbeasts mortos,
+o boss perde a imunidade durante 40 segundos.
