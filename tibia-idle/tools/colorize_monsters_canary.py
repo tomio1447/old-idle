@@ -137,6 +137,7 @@ CANARY_COLORS = {
     # composição o sheet moving fica cinza, embora o idle esteja colorido.
     "soulsnatcher": (0, 94, 0, 0),
     "floating-savant": (113, 94, 78, 78),
+    "fury": (94, 77, 78, 79),
     # Cobra Bastion: mesmo looktype 1217, mas cores oficiais distintas.
     "cobra-vizier":   (19, 19, 67, 78),
     "cobra-scout":    (1, 1, 102, 78),
@@ -159,12 +160,13 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "pirate-marauder", "pirate-cutthroat", "pirate-buccaneer",
                "pirate-corsair", "knight-s-apparition", "paladin-s-apparition",
                "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
-               "rage-squid", "squid-warden", "soulsnatcher", "floating-savant",
+               "rage-squid", "squid-warden", "soulsnatcher", "floating-savant", "fury",
                "cobra-vizier", "cobra-scout",
                "cobra-assassin"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
-CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1}
+CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
+                  "fury": 1}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 

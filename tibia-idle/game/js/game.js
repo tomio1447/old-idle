@@ -1333,10 +1333,49 @@ function stopAcademy(log) {
 }
 
 /* ------------------------------------------------------------ eventos */
+function normalizedCombatElement(value) {
+  const raw=String(value||"physical").trim().toLowerCase().replace(/[ _]+/g,"-");
+  const aliases={phys:"physical",melee:"physical",physicaldamage:"physical",
+    frost:"ice",electric:"energy",poison:"earth",holydamage:"holy",deathdamage:"death"};
+  return aliases[raw]||raw;
+}
+
+function combatVisualDescriptor(e) {
+  if (!e) return null;
+  let kind=null,amount=0,channel="";
+  if (e.t === "hit") { kind="damage"; amount=e.dmg||0; channel=normalizedCombatElement(e.el); }
+  else if (e.t === "taken") { kind="taken"; amount=e.dmg||0; channel=normalizedCombatElement(e.el); }
+  else if (e.t === "mobheal") { kind="heal"; amount=e.heal||0; channel="hp"; }
+  else if (e.t === "heal" || e.t === "heal-friend") { kind="heal"; amount=e.amount||0; channel="hp"; }
+  if (!kind || amount <= 0) return null;
+  const target=e.targetId?"id:"+e.targetId:
+    "xy:"+Math.round((Number(e.x)||0)*1000)+":"+Math.round((Number(e.y)||0)*1000);
+  return {key:kind+"|"+channel+"|"+target,kind,channel,amount};
+}
+
+/* Soma números equivalentes produzidos no mesmo tick. Efeitos/projéteis
+ * continuam individuais; só o texto é agregado. Assim físico permanece um
+ * número e gelo da Naga Sword + Avalanche vira um único total de gelo. */
+function aggregateCombatVisualEvents(events) {
+  const groups=new Map(),byEvent=new Map();
+  for (const event of events||[]) {
+    const d=combatVisualDescriptor(event);if(!d)continue;
+    let group=groups.get(d.key);
+    if(!group){group={first:event,total:0,count:0,kind:d.kind,channel:d.channel};groups.set(d.key,group);}
+    group.total+=d.amount;group.count++;byEvent.set(event,group);
+  }
+  return {groups,byEvent};
+}
+
 function drainEvents() {
   const c = G.combat;
   if (!c) return;
   const r = G.renderer;
+  const visualTotals=aggregateCombatVisualEvents(c.events);
+  const visualAmount=(event,fallback)=>{
+    const group=visualTotals.byEvent.get(event);
+    return !group||group.first===event?(group?group.total:fallback):0;
+  };
   // Posição normalizada (0-1) de um evento: os eventos carregam a posição
   // REAL da entidade no canvas (player ou mob, que andam pelo grid do
   // mapa). A fórmula antiga (0.42 + x*0.5) era do campo fixo e deslocava
@@ -1353,7 +1392,8 @@ function drainEvents() {
         // SANGUE e contra PLAYERS (como o Tibia clássico) — a raca define a
         // cor (blood = vermelho) e o efeito. As demais racas seguem o esquema
         // antigo (veneno verde, morto-vivo cinza etc.).
-        const ehFisico = (e.el === "physical" || !e.el);
+        const visualElement=normalizedCombatElement(e.el);
+        const ehFisico = visualElement === "physical";
         const raca = ehFisico
           ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
           : null;
@@ -1362,7 +1402,7 @@ function drainEvents() {
                          (ehFisico && e.race === "player");
         const col = ehFisico
           ? (vermelho ? "#c00000" : (raca ? raca.color : ELEMENTS.physical.color))
-          : (ELEMENTS[e.el] || ELEMENTS.physical).color;
+          : (ELEMENTS[visualElement] || ELEMENTS.physical).color;
         // `dual` marca a parte elemental de uma arma que bate nos dois
         // tipos: desloca o numero para o lado para nao ficar por cima do
         // numero fisico, ja que os dois saem no mesmo instante e tile.
@@ -1370,14 +1410,16 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
-        if (e.dmg > 0) r.addFloater(x, y, "-" + fmtDmg(e.dmg), col, e.dmg > 200, true, "damage");
+        const shownDamage=visualAmount(e,e.dmg||0);
+        const floaterX=ex(e)+(ehFisico?0:0.022);
+        if (shownDamage > 0) r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage");
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
         // Exori usa o estouro CINZA "hit-area" (nao o draw-blood vermelho).
         r.addEffect(x, y, e.fx || (e.exori ? "hit-area"
                     : (raca ? raca.fx
-                       : (ELEMENTS[e.el] || ELEMENTS.physical).fx)));
+                       : (ELEMENTS[visualElement] || ELEMENTS.physical).fx)));
         // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
         // Critical Hit ocupa ~37px dentro do frame 64px, contra ~53px do
         // Onslaught; 1.45x iguala o tamanho percebido sem trocar a sprite.
@@ -1483,7 +1525,8 @@ function drainEvents() {
           ? "#ff6b6b" : (ELEMENTS[e.el] || ELEMENTS.physical).color;
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
-        r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(e.dmg), col, false, true, "damage");
+        const shownTaken=visualAmount(e,e.dmg||0);
+        if(shownTaken>0)r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(shownTaken), col, false, true, "damage");
         // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
         // demon, mort area do lich...) — sem, cai o generico do elemento
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6,
@@ -1491,11 +1534,13 @@ function drainEvents() {
         r.playerFlash = 90;
         break;
       }
-      case "mobheal":
+      case "mobheal": {
         // cura defensiva do proprio monstro (bloco defenses do .lua)
-        r.addFloater(ex(e), ey(e) - 0.06, "+" + fmtFull(e.heal), "#00e65a", false, true, "restore");
+        const shownHeal=visualAmount(e,e.heal||0);
+        if(shownHeal>0)r.addFloater(ex(e), ey(e) - 0.06, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         r.addEffect(ex(e), ey(e), e.fx || "magic-green");
         break;
+      }
       case "effect":
         // animacao pura (debuff de stat de monstro nao implementado como
         // mecanica — entra so o efeito oficial da habilidade)
@@ -1513,7 +1558,8 @@ function drainEvents() {
         // gran sio / gran mas res). Mostra o +HP sobre o personagem.
         const px = e.screen ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.screen ? e.y - 0.12 : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmtFull(e.amount), "#00e65a", false, true, "restore");
+        const shownHeal=visualAmount(e,e.amount||0);
+        if(shownHeal>0)r.addFloater(px, py, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), e.mass ? "magic-green" : "green-rings");
         // Critical Heal do Druid (10% base): efeito azul oficial em cima
         // do personagem que casta + texto CRITICAL!
@@ -1536,7 +1582,8 @@ function drainEvents() {
       case "heal": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
         const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
-        r.addFloater(px, py, "+" + fmtFull(e.amount), "#00e65a", false, true, "restore");
+        const shownHeal=visualAmount(e,e.amount||0);
+        if(shownHeal>0)r.addFloater(px, py, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
         // oficial (critical-heal-effect) em cima do personagem que casta.
         // O vermelho é exclusivo do dano crítico em monstros.

@@ -443,7 +443,8 @@ Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
     kind: kind || "",
     // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
     // lateral (vx = 0) e com velocidade vertical constante.
-    vy: -0.007,
+    // Subida suave: mantém o valor legível perto do alvo por mais tempo.
+    vy: -0.0035,
     vx: 0,
   });
   // Limite curto evita mural de números em party/box com dano em área.

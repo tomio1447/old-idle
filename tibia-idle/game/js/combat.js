@@ -823,7 +823,7 @@ function tickConditions(c, p, dt) {
         const dmg = Math.max(1, co.dmg);
         m.hp -= dmg;
         c.stats.damage += dmg;
-        c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y,
+        c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y, targetId:m.id,
                         screen: true, el: def.el, condition: tipo });
       }
       if (co.turns <= 0) delete m.conditions[tipo];
@@ -852,6 +852,7 @@ function tickConditions(c, p, dt) {
         p.hp -= dmg;
         c.stats.taken += dmg;
         c.events.push({ t: "taken", dmg: dmg, el: def.el, condition: tipo,
+                        targetId:(p&&p.id)||(c.player&&c.player.id)||"player",
                         x: c.player ? c.player.x : 0.13,
                         y: c.player ? c.player.y : 0.6, screen: true });
       }
@@ -1516,18 +1517,18 @@ function playerAttack(c, p, target) {
       target.hp -= fisBruto + elemFinal;
       c.stats.damage += fisBruto + elemFinal;
       // dano fisico: numero vermelho e efeito de sangue
-      c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y,
+      c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: false, el: "physical", crit: critou, fatal: fatalou,
                       race: target.def && target.def.race });
       // dano elemental: cor e animacao do elemento (gelo = azul + ice-attack)
-      c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y,
+      c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: false, el: parte2, dual: 1 });
     } else {
       target.hp -= raw;
       c.stats.damage += raw;
-      c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y,
+      c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: isDist || isMagic, el: element, crit: critou, fatal: fatalou,
                       race: target.def && target.def.race,
@@ -1563,7 +1564,7 @@ function playerAttack(c, p, target) {
       c.stats.damage += corte;
       // crippling stance tambem marca quem tomou o respingo
       if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
-      c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y,
+      c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y, targetId:m.id,
                       screen: true, el: element });
     }
     c.events.push({ t: "cleave", x: target.x, y: target.y });
@@ -1621,7 +1622,7 @@ function playerAttack(c, p, target) {
         c.stats.damage += splash;
         // crippling stance tambem marca quem estava na area da flecha
         if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
-        c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y,
+        c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y, targetId:m.id,
                         screen: true, el: element });
       }
     }
@@ -2055,7 +2056,7 @@ function castSpellById(c, p, target, now, id) {
           dmg: Math.max(1, Math.floor((fisFinal + eleFinal) * echoFrac)),
           el: elemento, fx: fxMagia });
       }
-      c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y,
+      c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y, targetId:t.id,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: (idx === 0 || !!ehChain) && !!missMagia,
@@ -2064,7 +2065,7 @@ function castSpellById(c, p, target, now, id) {
                       chain: ehChain && idx > 0 ? 1 : 0,
                       exori: ehExori ? 1 : 0,
                       missile: missMagia });
-      c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y,
+      c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y, targetId:t.id,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: false, el: armaEl.el, dual: 1,
@@ -2101,7 +2102,7 @@ function castSpellById(c, p, target, now, id) {
         dmg: Math.max(1, Math.floor(dmg * echoFrac)),
         el: elemento, fx: fxMagia });
     }
-    c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y,
+    c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y, targetId:t.id,
                     sx: c.player ? c.player.x : 0.18,
                     sy: c.player ? c.player.y : 0.62,
                     screen: true,
@@ -2247,7 +2248,7 @@ function tryUseRune(c, p, target, now, forcada) {
       alvo.hp -= dmg;
       c.stats.damage += dmg;
       total += dmg;
-      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
+      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y, targetId:alvo.id,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62,
                       screen: true,
@@ -2267,7 +2268,7 @@ function tryUseRune(c, p, target, now, forcada) {
                       name: alvo.def ? alvo.def.name : "" });
     }
     if (!s.f) {
-      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y,
+      c.events.push({ t: "hit", dmg: dmg, x: alvo.x, y: alvo.y, targetId:alvo.id,
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62,
                       screen: true,
@@ -2439,7 +2440,7 @@ function tryHeal(c, p, now) {
       addManaSpent(p, combatManaSkillGain(c, _curaMana));
       p.hp = Math.min(max.hp, p.hp + amount);
       entCdSet(c, p, "healCd", now + 1000);
-      c.events.push({ t: "heal", amount: amount, spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
+      c.events.push({ t: "heal", amount: amount, targetId:p.id||"player", spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
       c.events.push({ t: "say", text: spellWords(selectedHealSpell || heals[0][0], s) });
       return true;
     }
@@ -2502,7 +2503,7 @@ function tryHeal(c, p, now) {
         const momentum = forgeTryMomentum(p, now);
         if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
       }
-      c.events.push({ t: "heal", amount: amount, rune: s.name,
+      c.events.push({ t: "heal", amount: amount, targetId:p.id||"player", rune: s.name,
                       mana: manaAmount, supply: best, drunk: s.kind !== "rune",
                       crit: chR.crit, critExtraPct: chR.extraPct });
       // o famoso "Aahhh..." do Tibia: beber potion NAO fala o nome do item;
@@ -3178,6 +3179,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     p.mp = Math.max(0, p.mp - drenado);
     c.stats.taken += drenado;
     c.events.push({ t: "taken", dmg: drenado, el: "manadrain",
+                    targetId:(tgt&&tgt.id)||(p&&p.id)||"player",
                     x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
                     fx: sk.fx || null, projectile: bolt, missile: miss });
     if (drenado > 0 && mob.hp > 0) {
@@ -3194,6 +3196,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     mob.hp = Math.min(mob.def.hp || mob.maxHp, mob.hp + raw);
   }
   c.events.push({ t: "taken", dmg: raw, el: tipoEl,
+                  targetId:(tgt&&tgt.id)||(p&&p.id)||"player",
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
                   // COMBAT_PARAM_EFFECT do .lua (fire-area, mort area,
                   // ice attack...) em vez do generico do elemento
@@ -3248,7 +3251,7 @@ function mobCastSkill(c, p, mob, now) {
       if (!cura) continue;
       mob.hp = Math.min(mob.maxHp || (mob.hp + cura), mob.hp + cura);
       mob.skillCds[key] = now + (sk.int || 2000);
-      c.events.push({ t: "mobheal", x: mob.x, y: mob.y, heal: cura,
+      c.events.push({ t: "mobheal", x: mob.x, y: mob.y, targetId:mob.id, heal: cura,
                       fx: sk.fx || "magic-green", screen: true });
       usou = true;
     }
@@ -3511,6 +3514,7 @@ function mobAttack(c, p, mob) {
   applyMonsterCondition(c, p, mob);
   addSkillTries(p, "shield", combatSkillGain(c, 1));
   c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
+                  targetId:(tgt&&tgt.id)||(p&&p.id)||"player",
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                   screen: true, projectile: monsterAttackRange(mob) > 0.16,
                   missile: monsterMissile(mob) });
@@ -3802,7 +3806,7 @@ function playerDeath(c, p) {
       p.wheel.giftOfLifeAt = agora;
       const max = maxStats(p);
       p.hp = max.hp; p.mp = max.mp;
-      c.events.push({ t: "heal", amount: max.hp, spell: "Gift of Life" });
+      c.events.push({ t: "heal", amount: max.hp, targetId:p.id||"player", spell: "Gift of Life" });
       if (typeof addLog === "function") addLog("skill", "Gift of Life salvou você de <b>morrer</b>! (cooldown de 2h)");
       return { exp: 0, gold: 0, giftOfLife: true };
     }
@@ -3998,7 +4002,7 @@ function combatTick(c, p, dt, now) {
         const dmg = Math.max(1, h.dmg);
         mob.hp -= dmg;
         c.stats.damage += dmg;
-        c.events.push({ t: "hit", dmg: dmg, x: mob.x, y: mob.y,
+        c.events.push({ t: "hit", dmg: dmg, x: mob.x, y: mob.y, targetId:mob.id,
                         screen: true, el: h.el, fx: h.fx || "death-echo" });
       }
     }
