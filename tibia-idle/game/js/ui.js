@@ -1233,6 +1233,10 @@ function sellPouchItem(p, slug) {
   const it = GAMEDATA.items[slug];
   const count = p.lootPouch[slug] || 0;
   if (!it || count <= 0) return 0;
+  if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) {
+    toast(`Itens de classificação ${it.cls} são protegidos e não podem ser vendidos pela Loot Pouch.`, "bad");
+    return 0;
+  }
   const value = (it.sell || 0) * count;
   if (value <= 0) { toast("Esse item não possui valor de venda."); return 0; }
   p.gold += value;
@@ -1242,12 +1246,13 @@ function sellPouchItem(p, slug) {
 }
 
 /* Vende tudo que estiver liberado dentro do Loot Pouch.
-   Só respeita a marca "Não vender" — o resto (inclusive equipamento de boss) é vendido. */
+   Respeita "Não vender" e nunca vende itens de classificação 3 ou 4. */
 function sellAllPouch(p) {
   let total = 0, kinds = 0;
   for (const slug of Object.keys(p.lootPouch || {})) {
     const it = GAMEDATA.items[slug];
-    if (!it || isNoSell(p, slug)) continue;      // respeita "Não vender"
+    if (!it || isNoSell(p, slug)) continue;
+    if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) continue;
     if ((it.sell || 0) <= 0) continue;
     total += sellPouchItem(p, slug);
     kinds++;
@@ -1337,7 +1342,7 @@ function renderLootPouch(p) {
                     (GAMEDATA.items[a].sell || 0) * p.lootPouch[a]);
   const sellBtn = $("#btn-pouch-sell-all");
   if (sellBtn) sellBtn.disabled = !entries.some((s) =>
-    !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0);
+    typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
   // Autoseller: vende TUDO automaticamente quando a pouch atingir X%.
   // Respeita as regras do seller (lista "NÃO VENDER" e itens sem valor).
   const asOn = !!p.config.pouchAutoSell;
@@ -1345,11 +1350,12 @@ function renderLootPouch(p) {
   const asFill = pouchFillPct(p);
   const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
   const pouchCap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
+  const pouchOverflow = Math.max(0, pouchSlots - pouchCap);
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
         <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller</span>
-        <span class="tiny dim">slots ${pouchSlots}/${pouchCap} · ${asFill}% / vende em ${asPct}%</span>
+        <span class="tiny dim">slots ${pouchSlots}/${pouchCap}${pouchOverflow ? ` · overflow seguro +${pouchOverflow}` : ""} · ${asFill}% / vende em ${asPct}%</span>
         <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
       </div>
       <div class="row mt4" style="align-items:center;gap:6px">
@@ -1357,7 +1363,7 @@ function renderLootPouch(p) {
           style="flex:1" ${asOn ? "" : "disabled"}>
         <span class="tiny" style="width:34px;text-align:right;color:#d4af37">${asPct}%</span>
       </div>
-      <div class="tiny dim mt4">Quando a Loot Pouch atingir ${asPct}% da capacidade, tudo é vendido automaticamente (respeita "NÃO VENDER").</div>
+      <div class="tiny dim mt4">Ao atingir ${asPct}%, vende apenas itens liberados; classificações 3 e 4 ficam protegidas.</div>
     </div>`;
   const btnAs = $("#btn-pouch-autosell");
   if (btnAs && !btnAs._bound) {
@@ -1369,7 +1375,7 @@ function renderLootPouch(p) {
     return;
   }
   box.innerHTML = asBox + `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
-      Auto-seller: ${entries.filter((s) => !isNoSell(p, s) && (GAMEDATA.items[s].sell || 0) > 0).length} vendável · clique no item para as opções
+      Auto-seller: ${entries.filter((s) => typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s)).length} vendável · classes 3/4 protegidas
     </div>` + entries.map((slug) =>
     `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""} ${itemClsBorder(slug)}" data-pouch-item="${slug}" draggable="true">
       ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
@@ -1381,7 +1387,9 @@ function renderLootPouch(p) {
     const it = GAMEDATA.items[slug];
     el.addEventListener("mouseenter", () => {
       const noSell = isNoSell(p, slug), noCollect = isNoCollect(p, slug);
-      const flags = [noSell ? "Não vender" : "", noCollect ? "Não coletar" : ""].filter(Boolean).join(" · ");
+      const protectedClass = typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug);
+      const flags = [protectedClass ? `Classe ${it.cls} protegida` : "",
+        noSell ? "Não vender" : "", noCollect ? "Não coletar" : ""].filter(Boolean).join(" · ");
       showTip(itemTip(slug, `${p.lootPouch[slug]}x · Clique para opções${flags ? " · " + flags : ""}`));
     });
     el.addEventListener("mouseleave", hideTip);
@@ -1411,7 +1419,7 @@ function bindPouchAutoseller(p) {
     btn.addEventListener("click", () => {
       p.config.pouchAutoSell = !p.config.pouchAutoSell;
       toast(p.config.pouchAutoSell
-        ? `Autoseller LIGADO — vende tudo com a pouch em ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct}%`
+        ? `Autoseller LIGADO — vende itens liberados em ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct}% (classes 3/4 protegidas)`
         : "Autoseller desligado");
       renderLootPouch(p);
     });
@@ -1438,7 +1446,8 @@ function openPouchItemMenu(p, slug, x, y) {
   const count = p.lootPouch[slug] || 0;
   const noSell = isNoSell(p, slug);
   const noCollect = isNoCollect(p, slug);
-  const value = (it.sell || 0) * count;
+  const protectedClass = typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug);
+  const value = protectedClass ? 0 : (it.sell || 0) * count;
 
   showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, [
     {
@@ -1484,7 +1493,11 @@ function openPouchItemMenu(p, slug, x, y) {
         renderAll();
       },
     },
-    {
+    ...(protectedClass ? [{
+      label: `Classificação ${it.cls} protegida`,
+      hint: "não pode ser vendida pela Loot Pouch",
+      disabled: true,
+    }] : [{
       label: noSell ? "Voltar a vender" : "Não vender",
       hint: "sell all",
       action: () => {
@@ -1494,10 +1507,11 @@ function openPouchItemMenu(p, slug, x, y) {
                      : `<b>${it.n}</b> será ignorado pelo sell all.`);
         renderAll();
       },
-    },
+    }]),
     {
-      label: `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
-      disabled: value <= 0,
+      label: protectedClass ? "Venda bloqueada (classe protegida)"
+        : `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
+      disabled: protectedClass || value <= 0,
       action: () => { if (sellPouchItem(p, slug) > 0) renderAll(); },
     },
     {

@@ -48,6 +48,19 @@ must(origin.x + sheets['timira-the-many-headed'].cw * scale === centerX + tile/2
      origin.y + sheets['timira-the-many-headed'].ch * scale === centerY + tile/2,
   'base da Timira não coincide com o limite do SQM');
 
+// Players usam a mesma regra: Citizen ocupa o recorte (21,21)..(64,64)
+// dentro do canvas 64x64 e termina no mesmo canto inferior-direito do SQM.
+vm.runInContext(fs.readFileSync(path.join(js, 'appearancedata.js'), 'utf8'), ctx);
+const citizen = ctx.APPEARANCES.outfits.find(o => o.id === 'citizen-m');
+const playerAnchor = {sw:64,sh:64,ox:citizen.ox,oy:citizen.oy};
+const playerOrigin = geoCtx.creatureTileOrigin(centerX,centerY,
+  citizen.cw*scale,citizen.ch*scale,tile,playerAnchor,scale);
+must(playerOrigin.x === 66.25 && playerOrigin.y === 66.25,
+  'outfit do player não preserva ox/oy do DAT');
+must(playerOrigin.x + citizen.cw*scale === centerX+tile/2 &&
+     playerOrigin.y + citizen.ch*scale === centerY+tile/2,
+  'base do player não coincide com o limite do SQM');
+
 const appearanceSrc = fs.readFileSync(path.join(js, 'appearance.js'), 'utf8');
 const citySrc = fs.readFileSync(path.join(js, 'city-render.js'), 'utf8');
 const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');

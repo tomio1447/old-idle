@@ -1732,8 +1732,9 @@ function startBackgroundTick() {
   }, 200);
 }
 
-/* Loot Pouch: autoseller mede os 50 slots de stacks, não a quantidade
- * total de unidades. Dez mil gold-runes do mesmo tipo ocupam um slot. */
+/* Loot Pouch: autoseller mede o limiar de 50 stacks, não a quantidade.
+ * A coleta pode passar desse limiar sem descartar drops; o percentual fica
+ * em 100% até que itens vendáveis sejam removidos. */
 function pouchFillPct(p) {
   const cap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
   const used = typeof lootPouchSlotsUsed === "function"
@@ -1797,9 +1798,9 @@ function loop(ts) {
       G._partyHudAt = (G._partyHudAt || 0) + dt;
       if (G._partyHudAt >= 120) { G._partyHudAt = 0; renderPartyPanel(G.p); }
     }
-    // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido no
-    // painel, vende TUDO automaticamente (respeitando "Não vender" e itens
-    // sem valor). Checagem espaçada (2s) para não rodar a cada frame.
+    // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido,
+    // vende apenas itens liberados (nunca classes 3/4, "Não vender" ou sem
+    // valor). Checagem espaçada para não rodar a cada frame.
     if (G.p && G.p.config && G.p.config.pouchAutoSell &&
         typeof sellAllPouch === "function") {
       G._pouchTick = (G._pouchTick || 0) + dt;

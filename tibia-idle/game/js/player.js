@@ -858,8 +858,8 @@ function shouldGoLootPouch(slug) {
   return true;
 }
 
-// Pouch OTC: 50 tipos de item (stacks) no máximo; a quantidade dentro de
-// cada stack não consome slots extras.
+// Os 50 slots são o LIMIAR visual/autoseller, não um bloqueio de coleta.
+// Loot nunca pode desaparecer silenciosamente quando a pouch chega a 100%.
 const LOOT_POUCH_MAX_SLOTS = 50;
 function lootPouchSlotsUsed(p) {
   let slots = 0;
@@ -874,13 +874,27 @@ function lootPouchSlotsUsed(p) {
 function lootPouchSlotsFree(p) { return Math.max(0, LOOT_POUCH_MAX_SLOTS - lootPouchSlotsUsed(p)); }
 
 function addLootPouch(p, slug, count) {
-  count = count || 1;
+  count = Math.max(1, Math.floor(Number(count) || 1));
   p.lootPouch = p.lootPouch || {};
-  const unique = typeof itemUsesInstances === "function" && itemUsesInstances(slug);
-  const needed = unique ? count : (p.lootPouch[slug] ? 0 : 1);
-  if (lootPouchSlotsUsed(p) + needed > LOOT_POUCH_MAX_SLOTS) return false;
+  // Aceita overflow acima dos 50 slots. O percentual continua em 100% e o
+  // autoseller tenta liberar itens vendáveis, mas classes protegidas e novos
+  // drops permanecem seguros na pouch.
   p.lootPouch[slug] = (p.lootPouch[slug] || 0) + count;
   return true;
+}
+
+function isProtectedPouchClass(slug) {
+  const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items
+    ? GAMEDATA.items[slug] : null;
+  return !!(item && Number(item.cls) >= 3);
+}
+
+function canSellLootPouchItem(p, slug) {
+  const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items
+    ? GAMEDATA.items[slug] : null;
+  return !!(item && (item.sell || 0) > 0 &&
+    !(typeof isNoSell === "function" && isNoSell(p, slug)) &&
+    !isProtectedPouchClass(slug));
 }
 
 function removeLootPouch(p, slug, count) {
