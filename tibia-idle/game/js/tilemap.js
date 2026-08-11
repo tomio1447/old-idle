@@ -118,12 +118,15 @@ const TileSprites = {
       // Sprites maiores que 32px se espalham para cima/esquerda, como no client.
       const dx = sx - (w - size);
       const dy = sy - (h - size);
+      // 1 pixel de bleed elimina linhas entre SQMs causadas por frações de
+      // pixel/DPR sem alterar a origem lógica da célula.
+      const drawW = w + 1, drawH = h + 1;
       if (pattern) {
-        ctx.drawImage(img, pattern.sx, 0, nativeW, nativeH, dx, dy, w, h);
+        ctx.drawImage(img, pattern.sx, 0, nativeW, nativeH, dx, dy, drawW, drawH);
       } else if (a) {
-        ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, w, h);
+        ctx.drawImage(img, fr * a.aw, 0, a.aw, a.ah, dx, dy, drawW, drawH);
       } else {
-        ctx.drawImage(img, dx, dy, w + (scale>1?0:1), h + (scale>1?0:1));
+        ctx.drawImage(img, dx, dy, drawW, drawH);
       }
       return true;
     }

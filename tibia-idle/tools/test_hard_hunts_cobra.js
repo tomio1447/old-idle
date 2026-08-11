@@ -27,6 +27,27 @@ must(uiSource.includes('"hard":               { nome: "💀 HARD" }') &&
 must(indexSource.includes('<script src="js/hard-hunts.js"></script>'),
   'Patch HARD não é carregado pelo jogo');
 
+// No test server, um personagem nível 1 ainda deve conseguir clicar na
+// categoria HARD/Cobra; o nível aparece apenas como aviso de risco.
+const renderStart=uiSource.indexOf('function renderHunts');
+const renderEnd=uiSource.indexOf('\n\n/* ─────────────────',renderStart);
+const huntsEl={innerHTML:''};
+const lowLevelUi={
+  GAMEDATA:{hunts:{'cobra-bastion':{
+    name:'Cobra Bastion',cat:'hard',level:250,hidden:false,
+    monsters:['cobra-vizier','cobra-scout','cobra-assassin'],
+    avgExp:7000,avgDamage:500,pack:10,respawn:1,
+  }}},
+  $(){return huntsEl;}, $$(){return [];},
+  huntRisk(){return {cls:'high',txt:'perigo'};},
+  mobImg(){return '';}, fmt(n){return String(n);}, openHuntInfoModal(){},
+};
+vm.createContext(lowLevelUi);vm.runInContext(uiSource.slice(renderStart,renderEnd),lowLevelUi);
+lowLevelUi.renderHunts({level:1,hunt:null});
+must(huntsEl.innerHTML.includes('data-hunt="cobra-bastion"') &&
+     !huntsEl.innerHTML.includes('hunt-card locked'),
+  'Cobra Bastion está bloqueada para conta/personagem de teste');
+
 const hunts = ctx.GAMEDATA.hunts;
 for (const id of ['marapur-nagas', 'dt-seal', 'cobra-bastion']) {
   const h = hunts[id];
