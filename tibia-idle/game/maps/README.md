@@ -98,8 +98,11 @@ vê inicialmente — nunca os limites do mundo renderizado.
 limites `(1014,1013,7)..(1032,1027,7)`, e o centraliza num mundo 30×30. O
 valor `1332` informado inicialmente era um erro de digitação; o próprio OTBM
 confirma `1032`. O player nasce em `(1018,1020,7)`, posição runtime `(9,14)`.
-A hunt contém Many Faces, as cinco Apparitions e Distorted Phantom. A missão
-exige 25 mortes de cada criatura e concede acesso a Goshnar's Greed.
+A FOV padrão 21×13 foi reduzida em 1×1 para 20×12; o mundo continua 30×30. Monstros só podem
+nascer no retângulo `(1016,1019,7)..(1023,1026,7)` (8×8), que contém 52 SQMs
+livres após a colisão. A hunt contém Many Faces, as cinco Apparitions e
+Distorted Phantom. A missão exige 25 mortes de cada criatura e concede acesso
+a Goshnar's Greed.
 
 ## Goshnar's Greed
 

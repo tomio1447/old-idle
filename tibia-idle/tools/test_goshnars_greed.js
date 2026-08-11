@@ -160,9 +160,10 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
      fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
   "modal separado com contagem de Greedbeasts não foi criado");
-for (const script of ["combat", "render", "soulwar"])
-  must(html.includes(`js/${script}.js?v=goshnar-greed-v2`),
-    script + ".js sem cache-busting v2 da mecânica");
+must(html.includes("js/combat.js?v=goshnar-greed-v2"), "combat sem cache-busting Greed v2");
+for (const script of ["render", "soulwar"])
+  must(html.includes(`js/${script}.js?v=mirrored-nightmare-v1`),
+    script + ".js sem cache-busting Mirrored Nightmare");
 must(html.includes("js/scarlett-boss.js?v=goshnar-greed-v1"),
   "gate compartilhado sem cache-busting");
 must(html.includes("css/layout.css?v=hunts-modal-v1"),

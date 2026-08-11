@@ -29,8 +29,10 @@ must(hunt.otbm==="mirrored_nightmare_sw"&&hunt.otbmFloor===7&&
   hunt.otbmRuntimeWidth===30&&hunt.otbmRuntimeHeight===30,
   "Mirrored Nightmare não usa OTBM z=7 em mundo 30×30");
 must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:1014,y:1013,w:19,h:15,z:7})&&
-  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1018,y:1020,z:7}),
-  "FOV ou playerspawn de Mirrored Nightmare divergente");
+  hunt.otbmFovWidth===20&&hunt.otbmFovHeight===12&&
+  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1018,y:1020,z:7})&&
+  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:1016,y:1019,w:8,h:8,z:7}),
+  "FOV, playerspawn ou área customizada de respawn divergente");
 let map=OTBM.read(runtime,{z:7});
 must(map.w===19&&map.h===15&&Object.keys(map.cells).length===285&&
   map.sourceBounds.minX===1014&&map.sourceBounds.minY===1013&&
@@ -40,11 +42,14 @@ const loader=fs.readFileSync(path.join(js,"otbmhunt.js"),"utf8");
 const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("\n\n/* Garante",zs);
 vm.runInContext(loader.slice(zs,ze),ctx);
 ctx.applyHuntOtbmZones(map,hunt);map.idleTargetWidth=30;map.idleTargetHeight=30;
+map.idleFovWidth=hunt.otbmFovWidth;map.idleFovHeight=hunt.otbmFovHeight;
 const hm=OTBM.huntMapFromOtbm(map,ctx.TILEFLAGS);
 must(hm.rows.length===30&&hm.rows.every(row=>row.length===30)&&
-  hm.spawn.x===9&&hm.spawn.y===14,"runtime/spawn Mirrored Nightmare incorreto");
+  hm.spawn.x===9&&hm.spawn.y===14&&hm.fovWidth===20&&hm.fovHeight===12,
+  "runtime/spawn/FOV Mirrored Nightmare incorreto");
+must(hm.mob.length===64,"área de respawn deveria conter 8×8 posições");
 const free=hm.mob.filter(p=>{const e=hm.leg[hm.rows[p.y][p.x]];return e&&!e.bloc&&!hm.footprintBlocked[p.x+":"+p.y];});
-must(free.length>=160,`Mirrored Nightmare só tem ${free.length} spawns livres`);
+must(free.length===52,`área customizada deveria ter 52 spawns livres, recebeu ${free.length}`);
 const ids=new Set();Object.values(hm.leg).forEach(e=>{(e.v||[]).forEach(id=>ids.add(id));(e.g||[]).forEach(id=>ids.add(id));});
 must(ids.size===72,`Mirrored Nightmare usa ${ids.size}, não 72 sprites`);
 for(const id of ids){must(fs.existsSync(path.join(game,"assets","tiles",id+".png")),"sprite ausente: "+id);if(ctx.TILE_PATTERNS[id])must(fs.existsSync(path.join(game,"assets","tiles",id+"_pattern.png")),"pattern ausente: "+id);}
@@ -114,6 +119,12 @@ must(ctx.soulwarGrantBossTaint(player,"goshnar-s-greed")===1&&
   ctx.soulwarGrantBossTaint(player,"goshnar-s-greed")===1,
   "boss repetido concedeu mais de uma mácula");
 
+must(loader.includes("mapa.idleFovWidth")&&loader.includes("mapa.idleFovHeight"),
+  "loader não encaminha a FOV reduzida ao runtime");
+const gridSrc=fs.readFileSync(path.join(js,"grid.js"),"utf8");
+const renderSrc=fs.readFileSync(path.join(js,"render.js"),"utf8");
+must(gridSrc.includes("fovCols, fovRows")&&renderSrc.includes("mapFov && mapFov.fovWidth"),
+  "renderer não usa FOV específica por mapa");
 const combatSrc=fs.readFileSync(path.join(js,"combat.js"),"utf8");
 for(const hook of ["soulwarTaintTick(c, p, dt, now)","soulwarTaintSpawnNearPlayer(c, p, Date.now())",
  "soulwarTaintPreventMonsterDeath(c, m, p)","soulwarTaintExpMultiplier(c, p)",
@@ -124,8 +135,9 @@ must(hud.includes("goshnar-taint-")||hud.includes("taint.icon"),"HUD não render
 const html=fs.readFileSync(path.join(game,"index.html"),"utf8");
 for(const script of ["icondata","otc-hud"])
  must(html.includes(`js/${script}.js?v=soulwar-taints-v1`),script+" sem cache-busting Soul War");
-for(const script of ["combat","soulwar"])
- must(html.includes(`js/${script}.js?v=goshnar-greed-v2`),script+" sem cache-busting Greed v2");
-must(html.includes("js/game.js?v=cobra-loading-v15"),"game.js sem cache-busting v15");
+must(html.includes("js/combat.js?v=goshnar-greed-v2"),"combat sem cache-busting Greed v2");
+for(const script of ["grid","render","soulwar"])
+ must(html.includes(`js/${script}.js?v=mirrored-nightmare-v1`),script+" sem cache-busting Mirrored Nightmare");
+must(html.includes("js/game.js?v=cobra-loading-v16"),"game.js sem cache-busting v16");
 
 console.log("OK: Mirrored Nightmare 30×30, 7 monstros/tasks e cinco Goshnar's Taints do Canary.");

@@ -559,6 +559,8 @@
                 leg: legenda,
                 nome: map.name || "Mapa .otbm",
                 footprintBlocked: footprintBlocked,
+                fovWidth: Number(map.idleFovWidth) || 0,
+                fovHeight: Number(map.idleFovHeight) || 0,
                 otbm: true };
     if (map.spawn) {
       out.spawn = { x: map.spawn.x + padX, y: map.spawn.y + padY };

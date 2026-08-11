@@ -115,6 +115,7 @@ function startDummyTraining(p, weaponId) {
   if ((p.exercise[weaponId] || 0) <= 0) {
     return { ok: false, msg: "Sem cargas. Compre 5000x por 25 Tibia Coins." };
   }
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("training room");
   if (G.combat) stopHunt();
   if (G.training) stopAcademy(false);
   showTrainingLoading();

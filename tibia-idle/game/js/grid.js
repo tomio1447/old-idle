@@ -62,11 +62,13 @@ function resetGridSize() {
  * de tile. Mapas maiores continuam sendo renderizados integralmente no
  * mundo, mas o próprio canvas recorta a janela visível ao redor do centro.
  * Assim um mapa 80×50 não vira uma miniatura ilegível. */
-function centeredGridViewport(canvasWidth, canvasHeight, cols, rows) {
+function centeredGridViewport(canvasWidth, canvasHeight, cols, rows, fovCols, fovRows) {
   cols = Math.max(1, Math.floor(Number(cols) || GRID_W));
   rows = Math.max(1, Math.floor(Number(rows) || GRID_H));
-  const tile = Math.min(canvasWidth / DEFAULT_GRID_W,
-                        canvasHeight / DEFAULT_GRID_H);
+  fovCols = Math.max(1, Math.floor(Number(fovCols) || DEFAULT_GRID_W));
+  fovRows = Math.max(1, Math.floor(Number(fovRows) || DEFAULT_GRID_H));
+  const tile = Math.min(canvasWidth / fovCols,
+                        canvasHeight / fovRows);
   const width = cols * tile;
   const height = rows * tile;
   return {
@@ -77,6 +79,8 @@ function centeredGridViewport(canvasWidth, canvasHeight, cols, rows) {
     tile: tile,
     cols: cols,
     rows: rows,
+    fovCols: fovCols,
+    fovRows: fovRows,
     viewportWidth: canvasWidth,
     viewportHeight: canvasHeight,
     centerX: canvasWidth / 2,
