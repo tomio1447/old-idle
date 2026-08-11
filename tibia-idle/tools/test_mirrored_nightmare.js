@@ -126,6 +126,6 @@ for(const script of ["icondata","otc-hud"])
  must(html.includes(`js/${script}.js?v=soulwar-taints-v1`),script+" sem cache-busting Soul War");
 for(const script of ["combat","soulwar"])
  must(html.includes(`js/${script}.js?v=goshnar-greed-v2`),script+" sem cache-busting Greed v2");
-must(html.includes("js/game.js?v=cobra-loading-v14"),"game.js sem cache-busting v13");
+must(html.includes("js/game.js?v=cobra-loading-v15"),"game.js sem cache-busting v15");
 
 console.log("OK: Mirrored Nightmare 30×30, 7 monstros/tasks e cinco Goshnar's Taints do Canary.");

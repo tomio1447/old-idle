@@ -539,26 +539,11 @@ function npcInn(p) {
 
 /* ---------------------------------------------------------- viagens */
 function npcTravel(p) {
-  const rows = Object.keys(GAMEDATA.hunts).map((id) => {
-    const hu = GAMEDATA.hunts[id];
-    const est = huntEstimate(p, hu);
-    const risk = huntRisk(p, hu);
-    const mobs = hu.monsters.slice(0, 3).map(
-      (m) => mobImg(m, 22)).join("");
-    const aviso = risk.cls === "high"
-      ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
-    return `<div class="shop-row clickable"
-        data-travel="${id}">
-      <div class="row" style="gap:1px;width:70px;flex:none">${mobs}</div>
-      <div style="flex:1;min-width:0">
-        <div class="small">${hu.name}</div>
-        <div class="tiny dim">nv ${hu.level} · ${fmt(est.exp)} xp/h · ${fmt(est.gold)} gp/h</div>
-        ${aviso}
-      </div>
-      <span class="risk ${risk.cls}">${risk.txt}</span>
-    </div>`;
-  }).join("");
-  return `<div class="list" style="max-height:380px">${rows}</div>`;
+  return `<button class="primary full" data-open-hunts-catalog>
+    <span class="hunts-demon-icon" aria-hidden="true"></span>
+    <span>Abrir catálogo de HUNTS</span>
+  </button>
+  <div class="tiny dim center mt8">Todas as áreas disponíveis ficam no catálogo único por sessão.</div>`;
 }
 
 /* ---------------------------------------------------------- binds */
@@ -725,14 +710,11 @@ function bindNpc(id, type) {
       refreshNpc(id);
     }));
 
-  // viagens
-  $$("#npc-content [data-travel]").forEach((el) => {
-    const hid = el.dataset.travel;
-    if (!hid) return;
-    el.style.cursor = "pointer";
+  // viagens: o NPC reutiliza o mesmo catálogo único do botão HUNTS.
+  $$("#npc-content [data-open-hunts-catalog]").forEach((el) => {
     el.addEventListener("click", () => {
       closeNpc();
-      startHunt(hid);
+      if (typeof openHuntsModal === "function") openHuntsModal();
     });
   });
 }

@@ -165,7 +165,7 @@ for (const script of ["combat", "render", "soulwar"])
     script + ".js sem cache-busting v2 da mecânica");
 must(html.includes("js/scarlett-boss.js?v=goshnar-greed-v1"),
   "gate compartilhado sem cache-busting");
-must(html.includes("css/layout.css?v=goshnar-greed-v2"),
+must(html.includes("css/layout.css?v=hunts-modal-v1"),
   "CSS do modal Greedbeast sem cache-busting");
 
 console.log("OK: Goshnar's Greed — testes livres, adds sem defesa, Greedbeast 30% e vulnerabilidade de 40s.");

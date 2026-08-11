@@ -2291,6 +2291,10 @@ function startGameReady(p) {
 
 function bindControls() {
   const p = G.p;
+  const btnHunts = $("#btn-hunts");
+  if (btnHunts) btnHunts.addEventListener("click", () => {
+    if (typeof openHuntsModal === "function") openHuntsModal();
+  });
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
   const btnImb = $("#btn-imbue");
   if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
@@ -2386,6 +2390,8 @@ function bindControls() {
     const modal = $("#modal");
     if (modal && modal.classList.contains("show")) {
       modal.classList.remove("show", "wide");
+      const modalBody = $("#modal-body");
+      if (modalBody) modalBody.classList.remove("hunts-modal-shell");
       if (typeof closeModal === "function") closeModal();
     }
     if (typeof hideContextMenu === "function") hideContextMenu();
