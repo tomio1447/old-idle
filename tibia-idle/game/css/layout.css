@@ -487,6 +487,31 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .boss-card.locked { opacity: .55; }
 
 /* ---------------------------------------------------------- hunts */
+#btn-hunts { display:inline-flex; align-items:center; gap:4px; }
+.hunts-demon-icon {
+  display:inline-block; width:24px; height:24px; flex:0 0 24px;
+  background-image:url('../assets/mob/demon.png');
+  background-size:72px 96px; background-position:0 -48px;
+  image-rendering:pixelated;
+  animation:hunts-demon-walk .72s steps(1,end) infinite;
+}
+@keyframes hunts-demon-walk {
+  0%,32% { background-position:0 -48px; }
+  33%,65% { background-position:-24px -48px; }
+  66%,100% { background-position:-48px -48px; }
+}
+.modal-bg .modal.hunts-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.hunts-modal-title { display:flex; align-items:center; gap:7px; }
+.hunts-modal-title #hunts-modal-close { margin-left:auto; }
+.hunts-modal-title .hunts-demon-icon { transform:scale(1.1); margin:0 2px; }
+#hunts-modal-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
+.hunt-modal-section { min-width:0; }
+.hunt-modal-section:last-child:nth-child(odd) { grid-column:1/-1; }
+.hunt-modal-section .hunts-group { display:grid; gap:4px; }
+.hunt-modal-card { width:100%; margin:0; text-align:left; }
+.hunt-modal-card .mobs { width:96px; }
+.hunt-section-empty { padding:12px; color:#8a8270; text-align:center; border:1px dashed #4b493e; background:#17191e; }
+@media (max-width:720px) { #hunts-modal-list { grid-template-columns:1fr; } .hunt-modal-section:last-child:nth-child(odd) { grid-column:auto; } }
 .hunt-card {
   display: flex; gap: 8px; align-items: center;
   padding: 6px; margin-bottom: 4px;

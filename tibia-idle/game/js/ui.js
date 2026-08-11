@@ -683,87 +683,68 @@ function renderStatusBar(p) {
   });
 }
 
-function renderHunts(p) {
-  const cur = p.hunt;
-  // Subcategorias das áreas de caça (a aba Ferumbras Ascendant exige nível)
-  const HUNT_CATS = {
-    "iniciante":          { nome: "🌱 Iniciante" },
-    "aventureiro":        { nome: "⚔️ Aventureiro" },
-    "heroi":              { nome: "🛡️ Herói" },
-    "lenda":              { nome: "🐉 Lenda" },
-    "hard":               { nome: "💀 HARD" },
-    "ferumbras-ascendant":{ nome: "🔥 Ferumbras Ascendant" },
-    "hardcore":           { nome: "☠️ HARDCORE" },
-    "outras":             { nome: "🗺️ Outras" },
-  };
-  const catDe = (id) => GAMEDATA.hunts[id].cat || "outras";
+const HUNT_MODAL_SECTIONS = [
+  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp"] },
+  { title: "HUNTS 100–250", ids: [] },
+  { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] },
+  { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
+  { title: "SOULWAR 400+", ids: ["dark-thais"] },
+];
 
-  const card = (id, hu) => {
-    const active = cur === id;
+/* Único catálogo público de hunts. As áreas 7.4 continuam no GAMEDATA para
+ * compatibilidade de saves/missões, mas não são mais exibidas na interface. */
+function renderHunts(p) {
+  const root = $("#hunts-modal-list");
+  if (!root || !p) return;
+  const cur = p.hunt;
+  const card = (id) => {
+    const hu = GAMEDATA.hunts[id];
+    if (!hu) return "";
     const risk = huntRisk(p, hu);
     const aviso = risk.cls === "high"
       ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
-    const mobs = hu.monsters.slice(0, 3).map((m) => mobImg(m, 26)).join("");
-    return `<div class="hunt-card ${active ? "active" : ""}" data-hunt="${id}">
-      <div class="mobs">${mobs}</div>
-      <div class="info">
-        <div class="nm">${hu.name}</div>
-        <div class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</div>
+    const mobs = (hu.monsters || []).slice(0, 4).map((m) => mobImg(m, 30)).join("");
+    return `<button class="hunt-card hunt-modal-card ${cur === id ? "active" : ""}" data-hunt="${id}">
+      <span class="mobs">${mobs}</span>
+      <span class="info">
+        <span class="nm">${hu.name}</span>
+        <span class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</span>
         ${aviso}
-      </div>
+      </span>
       <span class="risk ${risk.cls}">${risk.txt}</span>
-    </div>`;
+    </button>`;
   };
-
-  // agrupa por categoria na ordem definida
-  const grupos = {};
-  for (const id in GAMEDATA.hunts) {
-    if (GAMEDATA.hunts[id].hidden) continue;
-    const c = catDe(id);
-    (grupos[c] = grupos[c] || []).push(id);
-  }
-
-  let h = "";
-  for (const cat in HUNT_CATS) {
-    const ids = grupos[cat];
-    if (!ids || !ids.length) continue;
-    const conf = HUNT_CATS[cat];
-    const bloqueada = conf.minLevel && p.level < conf.minLevel;
-    h += `<div class="hunt-cat-title ${bloqueada ? "locked" : ""}">${conf.nome}
-      ${conf.minLevel ? `<span class="tiny dim">· nível ${conf.minLevel}+</span>` : ""}
-      ${bloqueada ? `<span class="tiny" style="color:#ff9a6a">🔒 bloqueada até o nível ${conf.minLevel}</span>` : ""}
-    </div>`;
-    if (bloqueada) {
-      // mostra os cards desfocados e sem clique
-      h += `<div class="hunts-group locked">` + ids.map((id) => {
-        const hu = GAMEDATA.hunts[id];
-        return `<div class="hunt-card locked" title="Requer nível ${conf.minLevel}">
-          <div class="mobs">${hu.monsters.slice(0, 3).map((m) => mobImg(m, 26)).join("")}</div>
-          <div class="info">
-            <div class="nm">🔒 ${hu.name}</div>
-            <div class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</div>
-          </div>
-          <span class="risk high">bloqueada</span>
-        </div>`;
-      }).join("") + `</div>`;
-      continue;
-    }
-    h += `<div class="hunts-group">` + ids.map((id) => card(id, GAMEDATA.hunts[id])).join("") + `</div>`;
-  }
-  // categorias não listadas (fim)
-  for (const cat in grupos) {
-    if (HUNT_CATS[cat]) continue;
-    h += `<div class="hunt-cat-title">${cat}</div>` +
-      `<div class="hunts-group">` + grupos[cat].map((id) => card(id, GAMEDATA.hunts[id])).join("") + `</div>`;
-  }
-
-  $("#hunts").innerHTML = h;
-  $$("#hunts .hunt-card:not(.locked)").forEach((el) => {
+  root.innerHTML = HUNT_MODAL_SECTIONS.map((section) => {
+    const cards = section.ids.map(card).filter(Boolean).join("");
+    return `<section class="hunt-modal-section">
+      <div class="hunt-cat-title">${section.title}</div>
+      <div class="hunts-group">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
+    </section>`;
+  }).join("");
+  $$("#hunts-modal-list [data-hunt]").forEach((el) => {
     el.addEventListener("click", () => {
-      const id = el.dataset.hunt;
-      openHuntInfoModal(id);
+      const modalBox = $("#modal-body");
+      if (modalBox) modalBox.classList.remove("hunts-modal-shell");
+      openHuntInfoModal(el.dataset.hunt);
     });
   });
+}
+
+function openHuntsModal() {
+  if (!G.p) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  body.classList.remove("boss-modal-shell", "reward-modal-shell");
+  body.classList.add("hunts-modal-shell");
+  body.innerHTML = `<div class="panel-title hunts-modal-title">
+      <span class="hunts-demon-icon" aria-hidden="true"></span>
+      <span>HUNTS</span><button class="sm" id="hunts-modal-close">Fechar</button>
+    </div><div class="panel-body" id="hunts-modal-list"></div>`;
+  modal.classList.add("show");
+  $("#hunts-modal-close").addEventListener("click", () => {
+    modal.classList.remove("show");
+    body.classList.remove("hunts-modal-shell");
+  });
+  renderHunts(G.p);
 }
 
 /* ────────────────────────────────────────────────────────────────

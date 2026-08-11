@@ -21,15 +21,15 @@ for (const file of [
 
 const uiSource = fs.readFileSync(path.join(js, 'ui.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
-must(uiSource.includes('"hard":               { nome: "💀 HARD" }') &&
+must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
-  'Categoria/range HARD não aparece na lista de hunts');
-must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v14"></script>'),
+  'Cobra/range HARD não aparece na sessão 250+ do modal');
+must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v15"></script>'),
   'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
 // categoria HARD/Cobra; o nível aparece apenas como aviso de risco.
-const renderStart=uiSource.indexOf('function renderHunts');
+const renderStart=uiSource.indexOf('const HUNT_MODAL_SECTIONS');
 const renderEnd=uiSource.indexOf('\n\n/* ─────────────────',renderStart);
 const huntsEl={innerHTML:''};
 const lowLevelUi={

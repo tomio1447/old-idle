@@ -127,11 +127,12 @@ try {
     } else {
       errors.push("spawn: pendingSpawns vazio");
     }
-    // hunt sem level lock: renderHunts nao deve travar
+    // catálogo modal sem level lock: as hunts devem continuar clicáveis.
     p.level = 1;
-    if (typeof window.renderHunts === "function") window.renderHunts(p);
-    if (window.document.querySelector("#hunts").innerHTML.indexOf("locked") !== -1)
-      errors.push("hunts: ainda usa classe locked");
+    if (typeof window.openHuntsModal === "function") window.openHuntsModal();
+    const huntList = window.document.querySelector("#hunts-modal-list");
+    if (!huntList || huntList.innerHTML.indexOf("hunt-card locked") !== -1)
+      errors.push("hunts: modal ausente ou ainda usa classe locked");
     // ESC fecha modal: o handler vive no bindControls (game.js, roda no
     // startGame). Testa a logica replicada + a presenca no codigo-fonte.
     const gameJs = fs.readFileSync(path.join(GAME, "js", "game.js"), "utf8");
