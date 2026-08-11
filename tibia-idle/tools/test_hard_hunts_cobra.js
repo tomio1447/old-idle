@@ -130,6 +130,23 @@ s = skill('cobra-assassin', 'wave t');
 must(s.el === 'earth' && s.fx === 'green-rings' &&
   JSON.stringify(s.areaPattern) === JSON.stringify([[0],[-1,0,1]]),
   'Wave T do Assassin incorreta');
+// CONST_ME_GREEN_RINGS não é Magic Green/Green Sparkles: a Wave T deve usar
+// os sete quadros clássicos de anéis verdes extraídos do client.
+const effectCtx = { window:{} };
+effectCtx.window = effectCtx;
+vm.createContext(effectCtx);
+vm.runInContext(fs.readFileSync(path.join(js, 'effectdata.js'), 'utf8'), effectCtx);
+must(!effectCtx.FX_OFFICIAL_ALIASES['green-rings'],
+  'Wave T ainda troca Green Rings por Green Sparkles');
+const effectCatalog = JSON.parse(fs.readFileSync(
+  path.join(game, 'assets', 'effects', 'effects.json'), 'utf8'));
+must(!effectCatalog.aliases['green-rings'],
+  'catálogo fonte ainda regenera o alias incorreto de Green Rings');
+const greenRings = fs.readFileSync(path.join(game, 'assets', 'fx', 'green-rings.png'));
+must(greenRings.readUInt32BE(16) === 224 && greenRings.readUInt32BE(20) === 32,
+  'strip oficial Green Rings deveria ter 7 quadros de 32px');
+must(indexSource.includes('<script src="js/effectdata.js?v=cobra-wave-t-v1"></script>'),
+  'effectdata da Wave T está sem cache-busting');
 
 // Mapa do commit f366081 publicado integralmente no runtime, com zonas.
 const source = fs.readFileSync(path.join(game, 'beta-maps', 'cobra_bastion.otbm'));
