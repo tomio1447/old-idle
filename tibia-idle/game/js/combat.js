@@ -565,6 +565,20 @@ function movePoint(ent, target, speed, dt, stopRange) {
   return pointDistance(ent, target);
 }
 
+/* Em boss fights, runas/spells/ataques do Helper focam o boss antes dos
+ * summons. A única exceção é uma fase explicitamente imune (Greed/QTE),
+ * quando os adds da mecânica precisam ser eliminados primeiro. */
+function helperPriorityTarget(c) {
+  if (!c || !c.mobs || !c.mobs.length) return null;
+  if (c.boss) {
+    const boss = c.mobs.find((mob) => mob && mob.boss && mob.hp > 0);
+    const immune = !!((c.greed && c.greed.immune) ||
+      (c.scarlett && c.scarlett.immune) || (boss && boss.greedImmune));
+    if (boss && !immune) return boss;
+  }
+  return c.mobs[0];
+}
+
 function updateCombatMovement(c, p, dt) {
   if (!c.player) return;
   const pl = c.player;
@@ -572,7 +586,7 @@ function updateCombatMovement(c, p, dt) {
   pl.moving = false;
   if (!c.mobs.length) return;
 
-  const target = c.mobs[0];
+  const target = helperPriorityTarget(c);
   const desired = playerAttackRange(p);
   const cur = pointDistance(pl, target);
   const playerSpeed = 0.000070 + Math.min(0.000035, gearStats(p).speed * 0.0000012);
@@ -3724,7 +3738,7 @@ function partyHelperTick(c, ent, now, dt) {
     // ---- ataque com a arma/magias DELE: runa > spell > ataque básico ----
     ent.atkCd -= dt;
     if (ent.atkCd <= 0 && c.mobs.length) {
-      const alvo = c.mobs[0];
+      const alvo = helperPriorityTarget(c);
       let acted = false;
       if (typeof tryUseRune === "function") { try { acted = tryUseRune(c, p, alvo, now); } catch (e) { /* segue */ } }
       if (!acted && typeof tryCastSpell === "function") { try { acted = tryCastSpell(c, p, alvo, now); } catch (e) { /* segue */ } }
@@ -3922,7 +3936,7 @@ function combatTick(c, p, dt, now) {
   // ataque do jogador (personagem ATIVO)
   c.playerAtkCd -= dt;
   if (c.playerAtkCd <= 0 && c.mobs.length) {
-    const target = c.mobs[0];
+    const target = helperPriorityTarget(c);
     // prioridade: runa > spell > arma, respeitando alcance
     let acted = tryUseRune(c, p, target, now) ||
                 tryCastSpell(c, p, target, now);

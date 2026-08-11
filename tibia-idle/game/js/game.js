@@ -830,18 +830,39 @@ function bossLootText(boss) {
 }
 
 function renderBosses(p) {
-  const el = $("#bosses");
-  if (!el) return;
+  const el = $("#bosses-modal-list");
+  if (!el || !p) return;
   el.innerHTML = `<div class="npc-quick boss-quick">${Object.keys(BOSS_DEFS).map((id) => {
     const b = BOSS_DEFS[id];
     const r = bossReadyInfo(p, b);
-    return `<div class="npc-btn boss-btn ${r.ok ? "" : "locked"}" data-boss-info="${id}" title="${b.name} — ${r.left ? "Cooldown" : r.reason}">
-      ${mobImg(b.sprite, 32)}
-      <div class="nb">${b.name.split(" ")[0]}</div>
-    </div>`;
+    return `<button class="npc-btn boss-btn ${r.ok ? "" : "locked"}" data-boss-info="${id}" title="${b.name} — ${r.left ? "Cooldown" : r.reason}">
+      ${mobImg(b.sprite, 46)}
+      <span class="nb">${b.name}</span>
+    </button>`;
   }).join("")}</div>`;
-  $$("#bosses [data-boss-info]").forEach((btn) =>
-    btn.addEventListener("click", () => openBossModal(btn.dataset.bossInfo)));
+  $$("#bosses-modal-list [data-boss-info]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const body = $("#modal-body");
+      if (body) body.classList.remove("bosses-modal-shell");
+      openBossModal(btn.dataset.bossInfo);
+    }));
+}
+
+function openBossesCatalogModal() {
+  if (!G.p) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  body.classList.remove("hunts-modal-shell", "boss-modal-shell", "reward-modal-shell");
+  body.classList.add("bosses-modal-shell");
+  body.innerHTML = `<div class="panel-title bosses-modal-title">
+      <span class="bosses-megalomania-icon" aria-hidden="true"></span>
+      <span>BOSSES</span><button class="sm" id="bosses-modal-close">Fechar</button>
+    </div><div class="panel-body" id="bosses-modal-list"></div>`;
+  modal.classList.add("show");
+  $("#bosses-modal-close").addEventListener("click", () => {
+    modal.classList.remove("show");
+    body.classList.remove("bosses-modal-shell");
+  });
+  renderBosses(G.p);
 }
 
 /* Stats do boss: diretos (hp/exp/damage/armor no BOSS_DEFS, como o
@@ -885,7 +906,7 @@ function openBossModal(id) {
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
   const modalBox = $("#modal-body");
-  modalBox.classList.remove("reward-modal-shell");
+  modalBox.classList.remove("reward-modal-shell", "bosses-modal-shell", "hunts-modal-shell");
   modalBox.classList.add("boss-modal-shell");
   modalBox.innerHTML = `
     <div class="panel-title">
@@ -2302,6 +2323,8 @@ function bindControls() {
   if (btnHunts) btnHunts.addEventListener("click", () => {
     if (typeof openHuntsModal === "function") openHuntsModal();
   });
+  const btnBosses = $("#btn-bosses");
+  if (btnBosses) btnBosses.addEventListener("click", () => openBossesCatalogModal());
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
   const btnImb = $("#btn-imbue");
   if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
@@ -2398,7 +2421,7 @@ function bindControls() {
     if (modal && modal.classList.contains("show")) {
       modal.classList.remove("show", "wide");
       const modalBody = $("#modal-body");
-      if (modalBody) modalBody.classList.remove("hunts-modal-shell");
+      if (modalBody) modalBody.classList.remove("hunts-modal-shell", "bosses-modal-shell");
       if (typeof closeModal === "function") closeModal();
     }
     if (typeof hideContextMenu === "function") hideContextMenu();

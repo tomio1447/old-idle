@@ -91,9 +91,9 @@ for (const id of visualIds) {
 must(otbmhunt.includes("OTBM.read(buf, { z: hunt.otbmFloor })"),
   "loader não encaminha otbmFloor ao parser");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-must(html.includes("js/otbm.js?v=cobra-loading-v16") &&
-     html.includes("js/otbmhunt.js?v=cobra-loading-v16") &&
-     html.includes("js/hard-hunts.js?v=cobra-loading-v16"),
+must(html.includes("js/otbm.js?v=cobra-loading-v17") &&
+     html.includes("js/otbmhunt.js?v=cobra-loading-v17") &&
+     html.includes("js/hard-hunts.js?v=cobra-loading-v17"),
   "scripts do novo mapa Marapur estão sem cache-busting v11");
 
 console.log("OK: nagas_marapur integral em mundo 30×30; FOV não recorta o mapa.");

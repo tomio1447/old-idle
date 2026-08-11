@@ -133,6 +133,10 @@ CANARY_COLORS = {
     # corpo e tentáculos. Não aplicar filtro CSS no renderer.
     "rage-squid": (94, 78, 79, 57),
     "squid-warden": (9, 21, 3, 57),
+    # Soulsnatcher e Floating Savant usam máscara de outfit também; sem esta
+    # composição o sheet moving fica cinza, embora o idle esteja colorido.
+    "soulsnatcher": (0, 94, 0, 0),
+    "floating-savant": (113, 94, 78, 78),
     # Cobra Bastion: mesmo looktype 1217, mas cores oficiais distintas.
     "cobra-vizier":   (19, 19, 67, 78),
     "cobra-scout":    (1, 1, 102, 78),
@@ -155,7 +159,8 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "pirate-marauder", "pirate-cutthroat", "pirate-buccaneer",
                "pirate-corsair", "knight-s-apparition", "paladin-s-apparition",
                "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
-               "rage-squid", "squid-warden", "cobra-vizier", "cobra-scout",
+               "rage-squid", "squid-warden", "soulsnatcher", "floating-savant",
+               "cobra-vizier", "cobra-scout",
                "cobra-assassin"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.

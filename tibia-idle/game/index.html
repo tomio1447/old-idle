@@ -8,7 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Global-Idle — caçada automática</title>
 <link rel="icon" href="assets/item/gold-coin.png">
-  <link rel="stylesheet" href="css/layout.css?v=hunts-modal-v1">
+  <link rel="stylesheet" href="css/layout.css?v=interface-sharp-v1">
   <link rel="stylesheet" href="css/otc-complete.css">
   <link rel="stylesheet" href="css/otc-hud.css">
   <link rel="stylesheet" href="css/wheel-otc.css">
@@ -131,8 +131,11 @@
       <span class="coin-txt" id="tibia-coins-n">0</span>
     </div>
     <span class="spacer"></span>
-    <button class="sm" id="btn-hunts" title="Abrir catálogo de Hunts">
+    <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catálogo de Hunts">
       <span class="hunts-demon-icon" aria-hidden="true"></span><span>HUNTS</span>
+    </button>
+    <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses">
+      <span class="bosses-megalomania-icon" aria-hidden="true"></span><span>BOSSES</span>
     </button>
     <button class="sm" id="btn-market" title="Market — equipamentos e itens de imbuement (preços do Canary), venda de Tibia Coins">
       <img src="assets/ui/market/market.png" alt="" style="width:18px;height:18px;image-rendering:pixelated;vertical-align:middle">
@@ -359,13 +362,6 @@
     <!-- ============================ DIREITA -->
     <div class="col col-right">
 
-      <div class="panel" data-collapse="bosses">
-        <div class="panel-title">BOSSES</div>
-        <div class="panel-body" style="padding:4px">
-          <div class="list" id="bosses" style="max-height:220px"></div>
-        </div>
-      </div>
-
       <div class="panel" data-collapse="huntinfo">
         <div class="panel-title">Caçada atual</div>
         <div class="panel-body" id="hunt-info"></div>
@@ -419,10 +415,10 @@
 <script src="js/rates.js"></script>
 <script src="js/vip.js"></script>
 <script src="js/huntmapdata.js"></script>
-<script src="js/cobra-bastion-map.js?v=cobra-loading-v16"></script>
+<script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>
 <script src="js/dark-thais-map.js"></script>
-<script src="js/otbm.js?v=cobra-loading-v16"></script>
-<script src="js/otbmhunt.js?v=cobra-loading-v16"></script>
+<script src="js/otbm.js?v=cobra-loading-v17"></script>
+<script src="js/otbmhunt.js?v=cobra-loading-v17"></script>
 <script src="js/weapons.js"></script>
 <script src="js/ammo.js"></script>
 <script src="js/combo.js"></script>
@@ -443,16 +439,16 @@
 <script src="js/imbuement.js"></script>
 <script src="js/player.js"></script>
 <script src="js/accessories.js"></script>
-<script src="js/combat.js?v=goshnar-greed-v2"></script>
+<script src="js/combat.js?v=boss-priority-v1"></script>
 <script src="js/city.js"></script>
 <script src="js/citymap.js"></script>
 <script src="js/walker.js"></script>
-<script src="js/tileanimdata.js?v=cobra-loading-v16"></script>
-<script src="js/tilepatterndata.js?v=cobra-loading-v16"></script>
-<script src="js/tilemap.js?v=cobra-loading-v16"></script>
+<script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
+<script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
+<script src="js/tilemap.js?v=cobra-loading-v17"></script>
 <script src="js/effectdata.js?v=cobra-wave-t-v1"></script>
 <script src="js/icondata.js?v=soulwar-taints-v1"></script>
-<script src="js/render.js?v=mirrored-nightmare-v1"></script>
+<script src="js/render.js?v=interface-sharp-v1"></script>
 <script src="js/city-render.js"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
@@ -461,7 +457,7 @@
 <script src="js/patch_amazon.js"></script>
 <!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
 <script src="js/hardcore-library.js"></script>
-<script src="js/hard-hunts.js?v=cobra-loading-v16"></script>
+<script src="js/hard-hunts.js?v=cobra-loading-v17"></script>
 <script src="js/soulwar.js?v=mirrored-nightmare-v1"></script>
 <script src="js/cyclopedia.js"></script>
 <script src="js/bosstiary.js"></script>
@@ -492,8 +488,8 @@
 <script src="js/accessorydata.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/city-ui.js?v=hunts-modal-v1"></script>
-<script src="js/preload.js?v=cobra-loading-v16"></script>
-<script src="js/game.js?v=cobra-loading-v16"></script>
+<script src="js/preload.js?v=cobra-loading-v17"></script>
+<script src="js/game.js?v=cobra-loading-v17"></script>
 <script src="js/scarlett-boss.js?v=goshnar-greed-v1"></script>
 </body>
 </html>
