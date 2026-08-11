@@ -24,8 +24,8 @@ const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
 must(uiSource.includes('"hard":               { nome: "💀 HARD" }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Categoria/range HARD não aparece na lista de hunts');
-must(indexSource.includes('<script src="js/hard-hunts.js"></script>'),
-  'Patch HARD não é carregado pelo jogo');
+must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v3"></script>'),
+  'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
 // categoria HARD/Cobra; o nível aparece apenas como aviso de risco.

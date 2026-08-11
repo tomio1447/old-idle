@@ -45,16 +45,60 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   ctx.finishMapLoading();
   must(loading.style.display === 'none', 'overlay não fecha após dois frames');
 
+  // onload atrasado de uma transição encerrada não pode reabrir o overlay.
+  let lateLoad;
+  ctx.Image = class {
+    set src(value) { requested.push(value); lateLoad = this.onload; }
+  };
+  ctx.beginMapLoading('Transição antiga');
+  const delayed = ctx.preloadAssetPaths(['assets/tiles/late.png'], 'Preparando antigo');
+  ctx.finishMapLoading();
+  lateLoad();
+  await delayed;
+  must(loading.style.display === 'none', 'asset atrasado reabriu overlay encerrado');
+
   // Uma conexão de imagem que nunca dispara load/error não pode bloquear a
   // Cobra Bastion nem qualquer outra troca de mapa.
   ctx.MAP_ASSET_TIMEOUT_MS = 5;
   ctx.Image = class { set src(value) { requested.push(value); } };
+  ctx.beginMapLoading('Transição travada');
   const started = Date.now();
   await ctx.preloadAssetPaths(['assets/tiles/stalled.png'], 'Preparando travado');
   must(Date.now() - started < 500 && fill.style.width === '100%',
     'asset pendente manteve o loading aberto indefinidamente');
+  ctx.finishMapLoading();
 
   const gameSrc = fs.readFileSync(path.join(js, 'game.js'), 'utf8');
+
+  // Mesmo se o carregador OTBM jamais chamar done(), o watchdog da própria
+  // transição precisa criar o combate e fechar o overlay.
+  const huntStart = gameSrc.indexOf('function startHunt');
+  const huntEnd = gameSrc.indexOf('\n\nfunction resetTemplePlayerPosition', huntStart);
+  const watchdogs = [];
+  const huntCtx = {
+    console:{warn(){}}, GAMEDATA:{hunts:{'cobra-bastion':{
+      name:'Cobra Bastion',otbm:'cobra_bastion',monsters:[],
+    }}},
+    G:{p:{hunt:null,config:{}},inCity:true,training:null,huntEntryToken:0},
+    partyBlocksHunt(){return false;}, beginMapLoading(){huntCtx.began=true;},
+    huntMapFromOtbmAsync(){},
+    setTimeout(fn){watchdogs.push(fn);return watchdogs.length;}, clearTimeout(){},
+    newCombat(){return {id:'cobra-combat'};},
+    spawnWave(){huntCtx.spawned=true;}, addLog(){}, toast(){},
+    partyReportZone(){huntCtx.reported=true;}, renderAll(){huntCtx.rendered=true;},
+    finishMapLoading(){huntCtx.finished=true;},
+  };
+  huntCtx.window = huntCtx;
+  huntCtx.HUNT_ENTRY_TIMEOUT_MS = 1;
+  vm.createContext(huntCtx);
+  vm.runInContext(gameSrc.slice(huntStart,huntEnd),huntCtx);
+  huntCtx.startHunt('cobra-bastion','non-pvp');
+  must(huntCtx.began && watchdogs.length === 1 && !huntCtx.G.combat,
+    'watchdog da entrada não foi armado');
+  watchdogs[0]();
+  must(huntCtx.G.combat && huntCtx.spawned && huntCtx.rendered && huntCtx.finished,
+    'watchdog não liberou a Cobra após callback OTBM pendente');
+
   for (const marker of [
     'beginMapLoading(`Carregando ${boss.name}...',
     'beginMapLoading(`Carregando ${hu.name}...',
@@ -64,6 +108,10 @@ vm.runInContext(fs.readFileSync(path.join(js, 'preload.js'), 'utf8'), ctx);
   ]) must(gameSrc.includes(marker), 'transição sem loading: ' + marker);
 
   const html = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
+  for (const script of ['otbm','otbmhunt','hard-hunts','tileanimdata',
+    'tilepatterndata','tilemap','preload','game'])
+    must(html.includes(`js/${script}.js?v=cobra-loading-v3`),
+      'script crítico sem cache-busting: ' + script);
   const reward = fs.readFileSync(path.join(js, 'reward-chest.js'), 'utf8');
   const forgeUi = fs.readFileSync(path.join(js, 'forge-ui.js'), 'utf8');
   const depotPng = fs.readFileSync(path.join(game, 'assets', 'item', 'depot-item-3497.png'));

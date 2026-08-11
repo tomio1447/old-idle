@@ -1029,28 +1029,63 @@ function startHunt(id, instanceMode, force) {
   const entryToken = (G.huntEntryToken || 0) + 1;
   G.huntEntryToken = entryToken;
   if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${hu.name}...`);
-  // hunt com arena .otbm: carrega (fetch) e converte o mapa antes de
-  // montar o combate; hunts em ascii respondem na hora (otbmhunt.js)
-  huntMapFromOtbmAsync(hu, () => {
-    // Se o jogador voltou ao templo enquanto o fetch estava pendente, não
-    // recrie o combate por cima da safe zone.
-    if (G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id) return;
-    const ready = typeof preloadHuntMapAssets === "function"
-      ? preloadHuntMapAssets(hu, `Preparando ${hu.name}`) : Promise.resolve();
-    ready.then(() => {
-      if (G.huntEntryToken !== entryToken || G.inCity || G.p.hunt !== id) return;
-      G.combat = newCombat(G.p, id, instanceMode);
-      spawnWave(G.combat, G.p);
-      addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
-      toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
-      // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
-      if (typeof partyReportZone === "function") {
-        partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+
+  // Última barreira contra overlay infinito: mesmo que um callback externo
+  // deixe de responder, a transição sempre conclui. Em rede saudável, mapa e
+  // assets terminam muito antes; em pane, o acesso tem prioridade.
+  let entryCompleted = false;
+  let entryWatchdog = null;
+  const entryStillValid = () =>
+    G.huntEntryToken === entryToken && !G.inCity && G.p.hunt === id;
+  const finishHuntEntry = () => {
+    if (entryCompleted) return;
+    if (!entryStillValid()) {
+      entryCompleted = true;
+      if (entryWatchdog) clearTimeout(entryWatchdog);
+      return;
+    }
+    entryCompleted = true;
+    if (entryWatchdog) clearTimeout(entryWatchdog);
+    G.combat = newCombat(G.p, id, instanceMode);
+    spawnWave(G.combat, G.p);
+    addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
+    toast(`Caçando em <b>${hu.name}</b> (${instanceMode})`);
+    // PARTY: líder entrou num local de caça -> membros seguem p/ MESMA instância
+    if (typeof partyReportZone === "function") {
+      partyReportZone({ zone: "hunt", hunt: id, instance: instanceMode, otbm: hu.otbm || null });
+    }
+    renderAll();
+    if (typeof finishMapLoading === "function") finishMapLoading();
+  };
+  const watchdogMs = Math.max(1, Number(
+    typeof window !== "undefined" && window.HUNT_ENTRY_TIMEOUT_MS
+  ) || 7000);
+  entryWatchdog = setTimeout(() => {
+    console.warn(`[hunt] watchdog liberou entrada em ${id} após ${watchdogMs}ms`);
+    finishHuntEntry();
+  }, watchdogMs);
+
+  // Hunt com arena .otbm: carrega (fetch) e converte o mapa antes de montar
+  // o combate. Exceções e promises rejeitadas também convergem para a entrada.
+  try {
+    huntMapFromOtbmAsync(hu, () => {
+      if (entryCompleted || !entryStillValid()) return;
+      let ready;
+      try {
+        ready = typeof preloadHuntMapAssets === "function"
+          ? preloadHuntMapAssets(hu, `Preparando ${hu.name}`) : Promise.resolve();
+      } catch (error) {
+        console.warn("[hunt] falha síncrona no preloader:", error);
+        ready = Promise.resolve();
       }
-      renderAll();
-      if (typeof finishMapLoading === "function") finishMapLoading();
+      Promise.resolve(ready)
+        .catch((error) => console.warn("[hunt] preloader rejeitado:", error))
+        .then(finishHuntEntry);
     });
-  });
+  } catch (error) {
+    console.warn("[hunt] carregador OTBM falhou antes do callback:", error);
+    finishHuntEntry();
+  }
 }
 
 function resetTemplePlayerPosition() {

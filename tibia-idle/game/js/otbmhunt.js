@@ -24,6 +24,12 @@ function otbmHuntLoadTimeoutMs() {
   ) || 6000);
 }
 
+function reportOtbmLoading(hunt, stage, pct) {
+  if (typeof showGameLoading !== "function") return;
+  const name = (hunt && hunt.name) || (hunt && hunt.otbm) || "arena";
+  showGameLoading(true, `${stage} ${name}...`, pct);
+}
+
 /* Converte zonas absolutas informadas pela hunt para coordenadas locais do
  * recorte OTBM. Isso permite usar coordenadas do RME/Canary sem modificar o
  * arquivo beta nem depender dos marcadores proprietários S/G. */
@@ -67,6 +73,7 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   if (OTBM_HUNT_CACHE[hunt.otbm] === "loading") {
+    reportOtbmLoading(hunt, "Aguardando mapa", 3);
     const t0 = Date.now();
     const iv = setInterval(() => {
       if (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) {
@@ -82,6 +89,7 @@ function huntMapFromOtbmAsync(hunt, done) {
     return;
   }
   OTBM_HUNT_CACHE[hunt.otbm] = "loading";
+  reportOtbmLoading(hunt, "Baixando mapa", 5);
   // Cache-busting: usa Date.now() para que CADA fetch bypass o cache HTTP
   // do navegador. Assim, ao editar o mapa no RME e dar F5, a versão
   // mais recente é sempre baixada. Para forçar reload sem F5, use
@@ -106,6 +114,7 @@ function huntMapFromOtbmAsync(hunt, done) {
       return r.arrayBuffer();
     })
     .then((buf) => {
+      reportOtbmLoading(hunt, "Montando mapa", 12);
       let mapa = OTBM.read(buf);
       if (hunt.otbmBounds && typeof OTBM.crop === "function") mapa = OTBM.crop(mapa, hunt.otbmBounds);
       applyHuntOtbmZones(mapa, hunt);
