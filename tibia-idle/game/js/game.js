@@ -1037,6 +1037,18 @@ function startHunt(id, instanceMode, force) {
   let entryWatchdog = null;
   const entryStillValid = () =>
     G.huntEntryToken === entryToken && !G.inCity && G.p.hunt === id;
+  const restoreHuntEntryState = (source) => {
+    // Token trocado significa uma ação real posterior (templo, treino ou
+    // outra hunt). Apenas inconsistências do MESMO clique podem ser reparadas.
+    if (G.huntEntryToken !== entryToken) return false;
+    if (!entryStillValid()) {
+      console.warn(`[hunt] ${source} restaurou estado de entrada em ${id}`);
+      G.inCity = false;
+      G.p.hunt = id;
+      G.p.instanceMode = instanceMode;
+    }
+    return true;
+  };
   const closeHuntEntryLoading = (immediate) => {
     // Token explícito: o guard do otbmhunt não depende apenas da variável
     // lexical de preload.js para saber que o watchdog já encerrou a entrada.
@@ -1048,12 +1060,9 @@ function startHunt(id, instanceMode, force) {
   };
   const finishHuntEntry = () => {
     if (entryCompleted) return;
-    if (!entryStillValid()) {
+    if (!restoreHuntEntryState("finalização")) {
       entryCompleted = true;
       if (entryWatchdog) clearTimeout(entryWatchdog);
-      // Se este ainda é o token atual, não existe uma transição mais nova cujo
-      // overlay precise ser preservado: feche o loading abandonado.
-      if (G.huntEntryToken === entryToken) closeHuntEntryLoading(true);
       return;
     }
     entryCompleted = true;
@@ -1083,17 +1092,8 @@ function startHunt(id, instanceMode, force) {
   ) || 7000);
   entryWatchdog = setTimeout(() => {
     // Uma transição mais nova (templo, treino ou outra hunt) sempre vence.
-    if (G.huntEntryToken !== entryToken) return;
+    if (!restoreHuntEntryState("watchdog")) return;
     console.warn(`[hunt] watchdog liberou entrada em ${id} após ${watchdogMs}ms`);
-    // Durante os 7s, sincronizações de party podem marcar G.inCity=true antes
-    // de existir G.combat. O clique ainda é a entrada atual (token igual),
-    // portanto restaure o estado solicitado em vez de abandonar a instância.
-    if (!entryStillValid()) {
-      console.warn(`[hunt] watchdog restaurou estado de entrada em ${id}`);
-      G.inCity = false;
-      G.p.hunt = id;
-      G.p.instanceMode = instanceMode;
-    }
     // Libera a tela antes de qualquer criação/renderização de combate.
     closeHuntEntryLoading(true);
     finishHuntEntry();
@@ -1103,7 +1103,9 @@ function startHunt(id, instanceMode, force) {
   // o combate. Exceções e promises rejeitadas também convergem para a entrada.
   try {
     huntMapFromOtbmAsync(hu, () => {
-      if (!entryStillValid()) return;
+      // Não espere o watchdog: se uma sincronização de party apenas marcou
+      // cidade durante o fetch (sem trocar o token), continue a entrada agora.
+      if (!restoreHuntEntryState("OTBM")) return;
 
       // Se o watchdog já criou o combate com o fallback, uma leitura OTBM
       // tardia ainda pode instalar o mapa integral — mas somente na mesma
@@ -1127,8 +1129,8 @@ function startHunt(id, instanceMode, force) {
         Promise.resolve(lateReady)
           .catch((error) => console.warn("[hunt] preloader tardio rejeitado:", error))
           .then(() => {
-            if (!entryStillValid() || !G.combat || G.combat.huntId !== id ||
-                G.combat.huntMap === integralMap) return;
+            if (!restoreHuntEntryState("preloader tardio") || !G.combat ||
+                G.combat.huntId !== id || G.combat.huntMap === integralMap) return;
             try {
               G.combat = newCombat(G.p, id, instanceMode);
               spawnWave(G.combat, G.p);
