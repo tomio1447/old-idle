@@ -1220,6 +1220,8 @@ function playerAttack(c, p, target) {
   // Boss com gate/mecânica pode rejeitar todo dano sem consumir munição.
   if (typeof bossCanTakePlayerDamage === "function" &&
       !bossCanTakePlayerDamage(c, target)) return 0;
+  if (typeof soulwarTaintSpawnNearPlayer === "function")
+    soulwarTaintSpawnNearPlayer(c, p, Date.now());
 
   // Mirror Image revela a Apparition correspondente à vocação que iniciou o ataque.
   if (target && target.slug === "mirror-image" && typeof soulwarMirrorTransform === "function") soulwarMirrorTransform(c, target, p);
@@ -3020,6 +3022,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   let raw = dmg;
   if (typeof greedBossOutgoingDamageMultiplier === "function")
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
+  if (typeof soulwarTaintDamageMultiplier === "function")
+    raw *= soulwarTaintDamageMultiplier(c, p);
   // Tipos especiais de dano (TibiaWiki/Damage):
   //  - "mana drain": ataca a MANA (cor azul), não é reduzido por armor;
   //  - "life drain": remove HP (cor vermelha) e transfere ao atacante;
@@ -3338,6 +3342,8 @@ function mobAttack(c, p, mob) {
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   if (typeof greedBossOutgoingDamageMultiplier === "function")
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
+  if (typeof soulwarTaintDamageMultiplier === "function")
+    raw *= soulwarTaintDamageMultiplier(c, p);
   const agora = Date.now();
   // Exeta (Challenge / Chivalrous Challenge) do Knight: monstro marcado
   // causa 20% MENOS dano ao knight enquanto o Challenge durar.
@@ -3817,6 +3823,7 @@ function combatTick(c, p, dt, now) {
   p.playtime += dt;
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
+  if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
 
   // stamina: gasta 1s por segundo caçando
   p.stamina = Math.max(0, p.stamina - dt / 1000);
@@ -4007,11 +4014,15 @@ function combatTick(c, p, dt, now) {
   const alive = [];
   for (const m of c.mobs) {
     if (m.hp > 0) { alive.push(m); continue; }
+    if (typeof soulwarTaintPreventMonsterDeath === "function" &&
+        soulwarTaintPreventMonsterDeath(c, m, p)) { alive.push(m); continue; }
     if (typeof greedBossHandleKill === "function")
       greedBossHandleKill(c, m, now);
     // recompensa
     const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
+    if (typeof soulwarTaintExpMultiplier === "function")
+      exp = Math.floor(exp * soulwarTaintExpMultiplier(c, p));
     // Prey de EXP (TibiaWiki/Prey_System): +13~40% de experiência
     if (typeof preyExpBonus === "function") {
       const pExp = preyExpBonus(p, m.slug);
@@ -4057,6 +4068,8 @@ function combatTick(c, p, dt, now) {
     if (m.def && m.def.boss && typeof bosstiaryKill === "function") {
       bossGanho = bosstiaryKill(p, m.slug, 1);
     }
+    if (m.boss && c.boss && typeof soulwarGrantBossTaint === "function")
+      soulwarGrantBossTaint(p, c.boss.id);
     const loot = rollLoot(c, p, m);
     if (typeof partyRecordKill === "function" && partyShare) {
       partyRecordKill(p, null, 0, loot.length, 0);

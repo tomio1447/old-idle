@@ -38,7 +38,7 @@
  M['druid-s-apparition']=apparition("Druid's Apparition",'ice',iceHoly([1080,1300],[1100,1250]));
  M['monk-s-apparition']=apparition("Monk's Apparition",'ice',iceHoly([1080,1300],[1100,1250]));
  M['many-faces']={name:'Many Faces',hp:30000,exp:18870,damage:1300,armor:105,defense:105,mitigation:3.34,element:'ice',attackSpeed:2000,resist:{physical:0,energy:0,earth:0,fire:-5,ice:30,holy:50,death:-30},skills:[{el:'ice',min:1220,max:1400,int:4000,ch:33,range:7,fx:'ice-attack',miss:'ice'},{el:'ice',min:1000,max:1450,int:5000,ch:44,range:7,radius:5,fx:'ice-area',miss:'ice'},{el:'holy',min:1050,max:1300,int:9500,ch:59,radius:4,fx:'holy-area'},{el:'holy',min:1150,max:1300,int:10000,ch:59,range:7,chain:4,fx:'holy-damage',miss:'holy'}],loot:loot.slice()};
- GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition'],avgHp:27000,avgExp:22000,avgDamage:950,avgArmor:85,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e'};
+ GAMEDATA.hunts['dark-thais']={name:'Dark Thais — Mirrored Nightmare',level:550,minLevel:550,cat:'hardcore',scene:'dark-thais',mapa:'dark-thais',otbm:'mirrored_nightmare_sw',otbmFloor:7,otbmFovBounds:{x:1014,y:1013,w:19,h:15,z:7},otbmRuntimeWidth:30,otbmRuntimeHeight:30,otbmSpawn:{x:1018,y:1020,z:7},otbmMobBounds:{x:1014,y:1013,w:19,h:15,z:7},monsters:['many-faces','knight-s-apparition','paladin-s-apparition','sorcerer-s-apparition','druid-s-apparition','monk-s-apparition','distorted-phantom'],avgHp:26857,avgExp:21553,avgDamage:993,avgArmor:87,avgGold:150,respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,color:'#38274e',soulWarZone:true,soulWarZoneMonster:'many-faces'};
  // Bossroom integral: o mundo 30×30 mantém todo o piso z=7. A célula G
  // exclusiva posiciona Goshnar no norte; os adds usam as demais células
  // livres da sala e não dependem desta zona.
@@ -63,6 +63,82 @@ window.soulwarMirrorTransform=function(c,m,p){
  const pct=m.maxHp?m.hp/m.maxHp:1; m.slug=slug;m.def=Object.assign({},def);m.maxHp=def.hp;m.hp=Math.max(1,Math.floor(def.hp*pct));m._mirrorDone=true;
  if(c&&c.events)c.events.push({t:'effect',x:m.x,y:m.y,screen:true,fx:'magic-blue'});
 };
+
+/* --------------------------------------------- Goshnar's Taints
+ * Port das cinco penalidades do Canary. Elas só atuam em áreas Soul War e
+ * expiram 14 dias após a primeira mácula. */
+const SOULWAR_TAINT_DURATION=14*24*60*60*1000;
+const SOULWAR_TAINTS=[
+ {id:'teleport',name:'Taint of Teleportation',icon:'goshnar-taint-1',exp:1.045},
+ {id:'spawn',name:'Taint of Duplication',icon:'goshnar-taint-2',exp:1.092},
+ {id:'damage',name:'Taint of Pain',icon:'goshnar-taint-3',exp:1.141},
+ {id:'heal',name:'Taint of Renewal',icon:'goshnar-taint-4',exp:1.192},
+ {id:'loss',name:'Taint of Loss',icon:'goshnar-taint-5',exp:1.246},
+];
+const SOULWAR_TAINT_BOSSES=['goshnar-s-malice','goshnar-s-spite','goshnar-s-greed','goshnar-s-hatred','goshnar-s-cruelty'];
+function soulwarTaintState(p){
+ if(!p)return null;p.soulWarTaints=p.soulWarTaints||{level:0,firstAt:0,bosses:{}};
+ const st=p.soulWarTaints;st.bosses=st.bosses||{};
+ if(st.firstAt&&Date.now()-st.firstAt>=SOULWAR_TAINT_DURATION){st.level=0;st.firstAt=0;st.bosses={};}
+ return st;
+}
+function soulwarTaintLevel(p){const st=soulwarTaintState(p);return st?Math.max(0,Math.min(5,st.level||0)):0;}
+function soulwarTaintInfo(p){const level=soulwarTaintLevel(p);return level?Object.assign({level},SOULWAR_TAINTS[level-1]):null;}
+function soulwarTaintTooltip(p){
+ const level=soulwarTaintLevel(p);if(!level)return '';
+ const penalties=['10% de chance de uma criatura teleportar até você','0,5% de chance de surgir outra criatura ao atacar','15% mais dano recebido','10% de chance de a criatura recuperar toda a vida ao morrer','Perda de 10% da vida e mana atuais a cada 10s'];
+ return `Máculas de Goshnar ${level}/5 · ${penalties.slice(0,level).join(' · ')} · EXP +${Math.round((SOULWAR_TAINTS[level-1].exp-1)*1000)/10}%`;
+}
+function soulwarGrantBossTaint(p,bossId){
+ if(SOULWAR_TAINT_BOSSES.indexOf(bossId)===-1)return 0;
+ const st=soulwarTaintState(p);if(st.bosses[bossId])return st.level;
+ st.bosses[bossId]=true;if(!st.firstAt)st.firstAt=Date.now();st.level=Math.min(5,(st.level||0)+1);
+ const info=SOULWAR_TAINTS[st.level-1];
+ if(typeof addLog==='function')addLog('death',`Você recebeu ${info.name} (${st.level}/5).`);
+ if(typeof toast==='function')toast(`${info.name} — mácula ${st.level}/5`,'death');
+ return st.level;
+}
+function soulwarInTaintZone(c){return !!(c&&((c.hunt&&c.hunt.soulWarZone)||(c.boss&&SOULWAR_TAINT_BOSSES.indexOf(c.boss.id)!==-1)));}
+function soulwarTaintDamageMultiplier(c,p){return soulwarInTaintZone(c)&&soulwarTaintLevel(p)>=3?1.15:1;}
+function soulwarTaintExpMultiplier(c,p){
+ if(!soulwarInTaintZone(c))return 1;const level=soulwarTaintLevel(p);
+ return level?SOULWAR_TAINTS[level-1].exp:1;
+}
+function soulwarTaintPreventMonsterDeath(c,mob,p,randomFn){
+ if(!soulwarInTaintZone(c)||soulwarTaintLevel(p)<4||!mob||mob.boss)return false;
+ if((randomFn||Math.random)()>=.10)return false;
+ mob.hp=mob.maxHp;mob.spawnAt=Date.now();
+ if(c.events)c.events.push({t:'effect',x:mob.x,y:mob.y,screen:true,fx:'magic-green'});
+ if(typeof addLog==='function')addLog('death',`${mob.def.name} restaurou toda a vida pela quarta mácula!`);
+ return true;
+}
+function soulwarTaintSpawnNearPlayer(c,p,now,randomFn){
+ if(!soulwarInTaintZone(c)||soulwarTaintLevel(p)<2)return false;
+ c.soulwarTaintSpawnCd=c.soulwarTaintSpawnCd||0;if(now<c.soulwarTaintSpawnCd||(randomFn||Math.random)()>=.005)return false;
+ const slug=(c.hunt&&c.hunt.soulWarZoneMonster)||'many-faces',def=GAMEDATA.monsters[slug];if(!def)return false;
+ const occ=typeof buildOccupancy==='function'?buildOccupancy(c,null):new Map(),ent={};
+ const px=c.player&&c.player.cx!==undefined?c.player.cx:Math.floor((c.gridW||30)/2);
+ const py=c.player&&c.player.cy!==undefined?c.player.cy:Math.floor((c.gridH||30)/2);
+ if(typeof placeFree==='function'&&!placeFree(ent,occ,px,py,3))return false;
+ const cx=ent.cx===undefined?px:ent.cx,cy=ent.cy===undefined?py:ent.cy;
+ const pos=typeof cellToScreen==='function'?cellToScreen(cx,cy):{x:(cx+.5)/(c.gridW||30),y:(cy+.5)/(c.gridH||30)};
+ const mob={slug,def:Object.assign({},def),hp:def.hp,maxHp:def.hp,atkCd:700,id:'taint-'+Date.now().toString(36),cx,cy,x:pos.x,y:pos.y,sx:pos.x,sy:pos.y,dir:'w',moving:false,attackAnim:0,speed:.000055,spawnAt:Date.now()};
+ c.mobs.push(mob);c.soulwarTaintSpawnCd=now+30000;
+ if(c.events)c.events.push({t:'effect',x:pos.x,y:pos.y,screen:true,fx:'teleport'});
+ return true;
+}
+function soulwarTaintTick(c,p,dt,now,randomFn){
+ if(!soulwarInTaintZone(c))return;
+ const level=soulwarTaintLevel(p),rnd=randomFn||Math.random;if(!level)return;
+ if(level>=1){
+  c.soulwarTeleportAcc=(c.soulwarTeleportAcc||0)+dt;
+  if(c.soulwarTeleportAcc>=2000){c.soulwarTeleportAcc=0;const mobs=(c.mobs||[]).filter(m=>!m.boss&&m.hp>0);
+   if(mobs.length&&rnd()<.10){const m=mobs[Math.floor(rnd()*mobs.length)],occ=typeof buildOccupancy==='function'?buildOccupancy(c,m):new Map(),dest={};
+    if(typeof placeFree==='function'&&placeFree(dest,occ,c.player.cx,c.player.cy,2)){m.cx=dest.cx;m.cy=dest.cy;const pos=cellToScreen(m.cx,m.cy);m.x=pos.x;m.y=pos.y;if(c.events)c.events.push({t:'effect',x:m.x,y:m.y,screen:true,fx:'teleport'});}}
+  }
+ }
+ if(level>=5){c.soulwarLossAcc=(c.soulwarLossAcc||0)+dt;if(c.soulwarLossAcc>=10000){c.soulwarLossAcc-=10000;p.hp=Math.max(0,p.hp-Math.ceil(p.hp*.10));p.mp=Math.max(0,p.mp-Math.ceil(p.mp*.10));if(c.events)c.events.push({t:'effect',x:c.player.x,y:c.player.y,screen:true,fx:'mort-area'});}}
+}
 
 /* ------------------------------------------------ Goshnar's Greed
  * Mini game: o boss começa imune e a sala mantém até seis adds. Cada quinto

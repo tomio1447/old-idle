@@ -104,7 +104,8 @@ const missionEnd = gameSrc.indexOf("\n\nfunction missionForHunt", missionStart);
 vm.runInContext(gameSrc.slice(missionStart, missionEnd) +
   "\nwindow.__MISSION_DEFS=MISSION_DEFS;", ctx);
 const mission = ctx.__MISSION_DEFS["dark-thais"];
-must(mission && mission.tasks.length === 6 &&
+must(mission && mission.tasks.length === 7 &&
+     mission.tasks.some((task) => task.monster === "distorted-phantom") &&
      mission.completeReward.bossAccess === "goshnar-s-greed",
   "Mirrored Nightmare não recompensa acesso ao boss");
 const bossStart = gameSrc.indexOf("const BOSS_DEFS = {");
@@ -132,8 +133,11 @@ must(renderSrc.includes("Greedbeasts ${combat.greed.greedbeastKills}/5") &&
      renderSrc.includes("VULNERÁVEL"),
   "bossbar não informa o progresso do mini game");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-for (const script of ["combat", "render", "soulwar", "scarlett-boss"])
+for (const script of ["render", "scarlett-boss"])
   must(html.includes(`js/${script}.js?v=goshnar-greed-v1`),
     script + ".js sem cache-busting da mecânica");
+for (const script of ["combat", "soulwar"])
+  must(html.includes(`js/${script}.js?v=soulwar-taints-v1`),
+    script + ".js sem cache-busting Soul War");
 
 console.log("OK: Goshnar's Greed — acesso Mirrored Nightmare, 6 adds, 5 Greedbeasts e vulnerabilidade de 20s.");

@@ -129,11 +129,18 @@ function renderPlayerStates(p) {
       icons.push({ icon: 'strengthened', timer: Math.ceil((b.ate - agora) / 1000) + 's', color: '#9ce84a' });
     }
   }
+  // Goshnar's Taints — ícones 22..26 extraídos do OTClient oficial.
+  if (typeof soulwarTaintInfo === 'function') {
+    const taint = soulwarTaintInfo(p);
+    if (taint) icons.push({ icon: taint.icon, timer: taint.level + '/5',
+      color: '#9b65c8', title: typeof soulwarTaintTooltip === 'function'
+        ? soulwarTaintTooltip(p) : taint.name });
+  }
 
   // Use the existing condition icons from assets/ui/conditions/
   let h = '<div class="player-state-strip">';
   for (const s of icons) {
-    h += `<div class="player-state-icon" title="${s.icon}" style="border-color:${s.color}">
+    h += `<div class="player-state-icon" title="${s.title || s.icon}" style="border-color:${s.color}">
       <img src="assets/ui/conditions/cond-${s.icon}.png" alt="${s.icon}">`;
     if (s.timer) h += `<span class="psi-timer">${s.timer}</span>`;
     h += `</div>`;
