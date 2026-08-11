@@ -1037,11 +1037,23 @@ function startHunt(id, instanceMode, force) {
   let entryWatchdog = null;
   const entryStillValid = () =>
     G.huntEntryToken === entryToken && !G.inCity && G.p.hunt === id;
+  const closeHuntEntryLoading = (immediate) => {
+    // Token explícito: o guard do otbmhunt não depende apenas da variável
+    // lexical de preload.js para saber que o watchdog já encerrou a entrada.
+    G.huntEntryCompletedToken = entryToken;
+    if (typeof finishMapLoading === "function") finishMapLoading();
+    // O watchdog deve liberar no mesmo tick, inclusive se timers/rAF estiverem
+    // throttled. O finish acima ainda invalida todos os reports atrasados.
+    if (immediate && typeof showGameLoading === "function") showGameLoading(false);
+  };
   const finishHuntEntry = () => {
     if (entryCompleted) return;
     if (!entryStillValid()) {
       entryCompleted = true;
       if (entryWatchdog) clearTimeout(entryWatchdog);
+      // Se este ainda é o token atual, não existe uma transição mais nova cujo
+      // overlay precise ser preservado: feche o loading abandonado.
+      if (G.huntEntryToken === entryToken) closeHuntEntryLoading(true);
       return;
     }
     entryCompleted = true;
@@ -1063,7 +1075,7 @@ function startHunt(id, instanceMode, force) {
       entryCompleted = false;
       console.error(`[hunt] falha ao concluir entrada em ${id}:`, error);
     } finally {
-      if (typeof finishMapLoading === "function") finishMapLoading();
+      closeHuntEntryLoading(false);
     }
   };
   const watchdogMs = Math.max(1, Number(
@@ -1071,6 +1083,8 @@ function startHunt(id, instanceMode, force) {
   ) || 7000);
   entryWatchdog = setTimeout(() => {
     console.warn(`[hunt] watchdog liberou entrada em ${id} após ${watchdogMs}ms`);
+    // Libera a tela antes de qualquer criação/renderização de combate.
+    closeHuntEntryLoading(true);
     finishHuntEntry();
   }, watchdogMs);
 
@@ -1111,7 +1125,7 @@ function startHunt(id, instanceMode, force) {
             } catch (error) {
               console.error(`[hunt] falha ao instalar OTBM tardio em ${id}:`, error);
             } finally {
-              if (typeof finishMapLoading === "function") finishMapLoading();
+              closeHuntEntryLoading(false);
             }
           });
         return;

@@ -82,8 +82,13 @@ function huntMapFromOtbmAsync(hunt, done) {
     ? currentMapLoadingGeneration()
     : (typeof MAP_LOADING_GENERATION !== "undefined" ? MAP_LOADING_GENERATION : null);
   const entryGen = loadingGeneration();
+  const huntEntryToken = typeof G !== "undefined" && G
+    ? G.huntEntryToken : null;
+  const entryWasCompleted = () => huntEntryToken !== null &&
+    typeof G !== "undefined" && G && G.huntEntryCompletedToken === huntEntryToken;
   const reportGuarded = (stage, pct) => {
-    if (loadingGeneration() === entryGen) reportOtbmLoading(hunt, stage, pct);
+    if (loadingGeneration() === entryGen && !entryWasCompleted())
+      reportOtbmLoading(hunt, stage, pct);
   };
 
   if (OTBM_HUNT_CACHE[hunt.otbm] === "loading") {

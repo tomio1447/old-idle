@@ -47,14 +47,14 @@ function verifyPrecompiledMap() {
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   const huntmaps = html.indexOf('src="js/huntmapdata.js"');
-  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v5"');
-  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v5"');
-  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v5"');
+  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v6"');
+  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v6"');
+  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v6"');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,
     "ordem de scripts do mapa pré-compilado incorreta");
   for (const file of ["otbm", "otbmhunt", "hard-hunts", "tileanimdata",
     "tilepatterndata", "tilemap", "preload", "game"])
-    must(html.includes(`src="js/${file}.js?v=cobra-loading-v5"`),
+    must(html.includes(`src="js/${file}.js?v=cobra-loading-v6"`),
       `${file}.js sem cache-busting v4`);
 }
 
@@ -196,6 +196,7 @@ function huntFixture(options = {}) {
   let combatBuilds = 0;
   let preloads = 0;
   let finishes = 0;
+  let immediateHides = 0;
   const hunt = { name: "Cobra Bastion", otbm: "cobra_bastion", monsters: [] };
   const context = {
     console: {
@@ -207,6 +208,7 @@ function huntFixture(options = {}) {
     G: { p: { hunt: null, config: {} }, inCity: true, training: null, huntEntryToken: 0 },
     partyBlocksHunt() { return false; },
     beginMapLoading() {},
+    showGameLoading(show) { if (!show) immediateHides++; },
     huntMapFromOtbmAsync(_hunt, done) { loaderDone = done; },
     setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; },
     clearTimeout() {},
@@ -229,7 +231,7 @@ function huntFixture(options = {}) {
   return {
     context, hunt, timers, warnings, errors,
     loaderDone: () => loaderDone,
-    counts: () => ({ combatBuilds, preloads, finishes }),
+    counts: () => ({ combatBuilds, preloads, finishes, immediateHides }),
   };
 }
 
@@ -247,7 +249,8 @@ async function verifyLateReplacementAndTempleGuard() {
 
   let counts = fixture.counts();
   must(fixture.context.G.combat !== fallback && fixture.context.G.combat.huntMap === integral &&
-       counts.combatBuilds === 2 && counts.preloads === 1 && counts.finishes === 2,
+       counts.combatBuilds === 2 && counts.preloads === 1 && counts.finishes === 3 &&
+       counts.immediateHides >= 1,
     "OTBM tardio não substituiu o fallback integralmente");
   must(fixture.warnings.some((message) => message.includes("[hunt] OTBM tardio substituiu fallback")),
     "substituição tardia não foi registrada no log");
@@ -272,7 +275,7 @@ async function verifyLateReplacementAndTempleGuard() {
   fixture.context.startHunt("cobra-bastion", "non-pvp");
   fixture.timers.find((timer) => timer.delay === 1).fn();
   counts = fixture.counts();
-  must(counts.finishes === 1 && fixture.errors.some((message) =>
+  must(counts.finishes === 2 && fixture.errors.some((message) =>
     message.includes("[hunt] falha ao concluir entrada")),
   "exceção durante entrada impediu o watchdog de fechar o loading");
 }
