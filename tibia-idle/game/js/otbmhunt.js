@@ -143,6 +143,8 @@ function huntMapFromOtbmAsync(hunt, done) {
       // é metadado da hunt (não altera o .otbm editável nem a colisão).
       mapa.idleOffsetX = Number(hunt.otbmOffsetX) || 0;
       mapa.idleOffsetY = Number(hunt.otbmOffsetY) || 0;
+      mapa.idleTargetWidth = Number(hunt.otbmRuntimeWidth) || 0;
+      mapa.idleTargetHeight = Number(hunt.otbmRuntimeHeight) || 0;
       const hm = OTBM.huntMapFromOtbm(mapa,
         (typeof TILEFLAGS !== "undefined") ? TILEFLAGS : {});
       if (typeof HUNTMAPS !== "undefined") HUNTMAPS[key] = hm;

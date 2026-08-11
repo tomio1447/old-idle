@@ -55,13 +55,46 @@
     // andares auxiliares; a instância jogável é exclusivamente o piso z=7.
     otbm: "nagas_marapur",
     otbmFloor: 7,
-    otbmBounds: { x: 1009, y: 1012, w: 19, h: 15, z: 7 },
+    // A FOV é apenas o trecho inicialmente visível. O piso z=7 completo
+    // continua no mundo 30×30 e não pode ser recortado por estas coordenadas.
+    otbmFovBounds: { x: 1009, y: 1012, w: 19, h: 15, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
     otbmSpawn: { x: 1017, y: 1019, z: 7 },
-    // Toda a sala é uma zona candidata; colisão/ocupação removem paredes,
-    // objetos e o SQM do jogador antes de cada spawn.
-    otbmMobBounds: { x: 1009, y: 1012, w: 19, h: 15, z: 7 },
+    otbmMobBounds: { x: 1008, y: 1008, w: 23, h: 21, z: 7 },
   }));
-  if (GAMEDATA.hunts["dt-seal"]) harden(GAMEDATA.hunts["dt-seal"]);
+  const dtSeal = GAMEDATA.hunts["dt-seal"];
+  if (dtSeal) harden(Object.assign(dtSeal, {
+    otbm: "dt_seal",
+    otbmFloor: 7,
+    otbmFovBounds: { x: 1009, y: 1010, w: 19, h: 15, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
+    otbmSpawn: { x: 1018, y: 1018, z: 7 },
+    otbmMobBounds: { x: 1006, y: 1008, w: 25, h: 21, z: 7 },
+  }));
+
+  GAMEDATA.hunts["mota-extension"] = harden({
+    name: "MOTA Extension",
+    level: 400,
+    minLevel: 400,
+    monsters: ["floating-savant", "retching-horror", "fury", "hellhound", "demon"],
+    color: "#8c6a45",
+    scene: "museum",
+    otbm: "MOTA",
+    otbmFloor: 7,
+    otbmFovBounds: { x: 1042, y: 1009, w: 21, h: 16, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
+    otbmSpawn: { x: 1051, y: 1016, z: 7 },
+    otbmMobBounds: { x: 1040, y: 1006, w: 25, h: 20, z: 7 },
+    avgHp: 6620,
+    avgExp: 5428,
+    avgDamage: 426,
+    avgArmor: 49,
+    avgGold: 110,
+    respawn: 1.1,
+  });
 
   // Bossroom nova da Timira publicada em beta-maps. O OTBM ocupa
   // (175,160,2)..(192,175,2); `otbmRoomBounds` preserva a arena lógica

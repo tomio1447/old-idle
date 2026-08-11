@@ -456,7 +456,10 @@
     tileflags = tileflags || {};
     // 16249 é um marcador invisível do mapa Canary (não possui pixels no
     // DAT). Mantê-lo na camada visual gerava requests 404 a cada recarga.
-    var hiddenItems = { 16249: true };
+    var hiddenItems = {
+      16249: true, // marcador invisível Canary já usado na Cobra
+      20661: true, // marcador sem pixels presente no novo DT Seal
+    };
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
              "0123456789<>[](){}.,;:!@$%&*^_+-=?~|";
     var legenda = {}, assin = {}, pool = 0;
@@ -484,7 +487,8 @@
     // 24×15 preserva o enquadramento dos mapas antigos, mas não existe teto:
     // qualquer OTBM maior mantém integralmente largura/altura e a instância
     // dinâmica/câmera central cuidam do restante.
-    var targetW = Math.max(24, map.w), targetH = Math.max(15, map.h);
+    var targetW = Math.max(24, map.w, Number(map.idleTargetWidth) || 0);
+    var targetH = Math.max(15, map.h, Number(map.idleTargetHeight) || 0);
     var padX = Math.max(0, Math.min(targetW - map.w,
       Math.floor((targetW - map.w) / 2) + (Number(map.idleOffsetX) || 0)));
     var padY = Math.max(0, Math.min(targetH - map.h,
@@ -556,7 +560,13 @@
                 nome: map.name || "Mapa .otbm",
                 footprintBlocked: footprintBlocked,
                 otbm: true };
-    if (map.spawn) out.spawn = { x: map.spawn.x + padX, y: map.spawn.y + padY };
+    if (map.spawn) {
+      out.spawn = { x: map.spawn.x + padX, y: map.spawn.y + padY };
+      // Coordenada explícita do RME tem prioridade sobre o footprint visual
+      // de objetos vizinhos. Sem isso, itens 2×2 podiam bloquear o player
+      // mesmo quando o chão do playerspawn era andável (caso MOTA).
+      delete footprintBlocked[out.spawn.x + ":" + out.spawn.y];
+    }
     if (map.mob && map.mob.length) {
       out.mob = map.mob.map(function (c) { return { x: c.x + padX, y: c.y + padY }; });
       out.mobSet = {};
