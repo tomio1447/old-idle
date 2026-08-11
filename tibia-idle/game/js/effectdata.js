@@ -47,7 +47,8 @@ window.FX_OFFICIAL_ALIASES = {
   "small-clouds": "cloud-effect",
   "block-hit": "block-effect",
   "bubbles": "bubbles-effect",
-  "green-rings": "green-sparkles-effect",
+  // CONST_ME_GREEN_RINGS (Wave T da Cobra Assassin) precisa usar o strip
+  // clássico assets/fx/green-rings.png. Green Sparkles é outro efeito.
   "groundshaker": "trembling-effect",
   "hearts": "hearts-effect",
   "hit-by-poison": "poison-effect-1",
