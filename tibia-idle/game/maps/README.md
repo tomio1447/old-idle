@@ -92,6 +92,15 @@ Retching Horror, Fury, Hellhound e Demon.
 runtime `(14,14)`. Em todos estes mapas, FOV descreve somente o que o jogador
 vê inicialmente — nunca os limites do mundo renderizado.
 
+## Mirrored Nightmare
+
+`mirrored_nightmare_sw.otbm` seleciona integralmente o piso `z=7`, 19×15 nos
+limites `(1014,1013,7)..(1032,1027,7)`, e o centraliza num mundo 30×30. O
+valor `1332` informado inicialmente era um erro de digitação; o próprio OTBM
+confirma `1032`. O player nasce em `(1018,1020,7)`, posição runtime `(9,14)`.
+A hunt contém Many Faces, as cinco Apparitions e Distorted Phantom. A missão
+exige 25 mortes de cada criatura e concede acesso a Goshnar's Greed.
+
 ## Goshnar's Greed
 
 `goshnarsgreed.otbm` vem de `beta-maps/bossesroom/`, seleciona integralmente

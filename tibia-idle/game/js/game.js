@@ -503,6 +503,7 @@ const MISSION_DEFS = {
       { monster:"sorcerer-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-mana-potion",count:3}] } },
       { monster:"druid-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-mana-potion",count:3}] } },
       { monster:"monk-s-apparition", target:25, reward:{ supplies:[{slug:"ultimate-spirit-potion",count:3}] } },
+      { monster:"distorted-phantom", target:25, reward:{ supplies:[{slug:"ultimate-spirit-potion",count:3}] } },
     ],
     // A recompensa é permanente: concluir Mirrored Nightmare libera a porta
     // da bossroom de Goshnar's Greed.
