@@ -1,6 +1,7 @@
 /* Regressão: sala da Timira, retorno ao templo e escala/duração do crítico. */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const vm = require('vm');
 const game = path.join(__dirname, '..', 'game');
 const js = path.join(game, 'js');
@@ -11,13 +12,16 @@ function must(ok, msg) { if (!ok) throw Error(msg); }
 const beta = fs.readFileSync(path.join(game, 'beta-maps', 'timiraroom.otbm'));
 const live = fs.readFileSync(path.join(game, 'maps', 'timiraroom.otbm'));
 must(beta.equals(live), 'timiraroom beta não foi publicado integralmente');
+must(crypto.createHash('sha256').update(live).digest('hex') ===
+  '7cbcf1ca507e28da90aba75f029b1c7de9a91ddb94d168d18f9a5153714fd4f9',
+  'timiraroom não corresponde à bossroom nova publicada na main');
 const source = OTBM.read(live);
-must(source.w === 21 && source.h === 19 && source.z === 2,
-  'dimensões/andar da Timira room inesperados');
+must(source.w === 18 && source.h === 16 && source.z === 2,
+  'dimensões/andar da nova Timira room inesperados');
 must(JSON.stringify(source.sourceBounds) === JSON.stringify({
-  minX:174,minY:157,maxX:194,maxY:175,
-}), 'âncoras absolutas da Timira room foram alteradas');
-must(Object.keys(source.cells).length === 390, 'Timira room foi recortada');
+  minX:175,minY:160,maxX:192,maxY:175,
+}), 'âncoras absolutas da nova Timira room foram alteradas');
+must(Object.keys(source.cells).length === 265, 'nova Timira room foi recortada');
 
 const ctx = { window:{}, console };
 ctx.window = ctx;
@@ -41,22 +45,30 @@ vm.runInContext(zoneSrc.slice(zs, ze), ctx);
 vm.runInContext(fs.readFileSync(path.join(js, 'tileflags.js'), 'utf8'), ctx);
 ctx.applyHuntOtbmZones(source, room);
 const runtime = OTBM.huntMapFromOtbm(source, ctx.TILEFLAGS);
-must(JSON.stringify(runtime.spawn) === JSON.stringify({x:9,y:13}),
-  'player spawn local/runtime da Timira incorreto');
-must(runtime.mob.length === 1 && JSON.stringify(runtime.mob[0]) === JSON.stringify({x:11,y:5}),
-  'boss spawn local/runtime da Timira incorreto');
+must(JSON.stringify(runtime.spawn) === JSON.stringify({x:10,y:10}),
+  'player spawn local/runtime da nova Timira incorreto');
+must(runtime.mob.length === 1 && JSON.stringify(runtime.mob[0]) === JSON.stringify({x:12,y:2}),
+  'boss spawn local/runtime da nova Timira incorreto');
 for (const point of [runtime.spawn, runtime.mob[0]]) {
   const entry = runtime.leg[runtime.rows[point.y][point.x]];
   must(entry && !entry.bloc && !runtime.footprintBlocked[point.x + ':' + point.y],
     'spawn da Timira está bloqueado');
 }
-must(runtime.rows.length === 19 && runtime.rows.every(row => row.length === 24),
-  'runtime da Timira room deveria ser 24x19 com padding mínimo');
+must(runtime.rows.length === 16 && runtime.rows.every(row => row.length === 24),
+  'runtime da nova Timira room deveria ser 24x16 com padding mínimo');
 const used = new Set();
 Object.values(source.cells).forEach(c => { if (c.g) used.add(c.g); for (const id of c.items || []) used.add(id); });
-must(used.size === 52, 'quantidade de sprites da Timira room mudou');
+must(used.size === 38, 'quantidade de sprites da nova Timira room mudou');
 for (const id of used)
   must(fs.existsSync(path.join(game, 'assets', 'tiles', id + '.png')), 'sprite ausente: ' + id);
+const patternCtx = {window:{}}; patternCtx.window = patternCtx;
+vm.createContext(patternCtx);
+vm.runInContext(fs.readFileSync(path.join(js, 'tilepatterndata.js'), 'utf8'), patternCtx);
+for (const id of used) if (patternCtx.TILE_PATTERNS[id])
+  must(fs.existsSync(path.join(game, 'assets', 'tiles', id + '_pattern.png')),
+    'strip de pattern ausente: ' + id);
+for (const id of [37930,37931,37933,37935])
+  must(used.has(id), 'sprite nova da Timira não é usada pelo OTBM: ' + id);
 
 const gameSrc = fs.readFileSync(path.join(js, 'game.js'), 'utf8');
 const timiraStart = gameSrc.indexOf('"timira-the-many-headed":');
@@ -115,4 +127,4 @@ must(renderer.effects[0].dur === renderer.effects[1].dur &&
      renderer.effects[0].scale === 1.45 && renderer.effects[1].scale === 1,
   'objetos de efeito não preservam duração/escala crítica');
 
-console.log('OK: crítico 1200ms ampliado, retorno destravado e Timira room 21x19 publicada.');
+console.log('OK: crítico 1200ms ampliado, retorno destravado e nova Timira room 18x16 publicada.');
