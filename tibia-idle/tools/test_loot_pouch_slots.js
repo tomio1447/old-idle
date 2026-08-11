@@ -1,14 +1,69 @@
-/* Loot Pouch: máximo de 50 stacks distintos; stack já existente continua. */
+/* Loot Pouch: 50 slots é limiar do autoseller, nunca descarte de loot. */
 const fs = require('fs');
 const path = require('path');
-const player = fs.readFileSync(path.join(__dirname, '..', 'game', 'js', 'player.js'), 'utf8');
-const game = fs.readFileSync(path.join(__dirname, '..', 'game', 'js', 'game.js'), 'utf8');
-const ui = fs.readFileSync(path.join(__dirname, '..', 'game', 'js', 'ui.js'), 'utf8');
-function must(rx, s, msg) { if (!rx.test(s)) throw Error(msg); }
-must(/const LOOT_POUCH_MAX_SLOTS = 50/, player, 'Capacidade de 50 slots ausente');
-must(/function lootPouchSlotsUsed/, player, 'Contagem de slots ausente');
-must(/lootPouchSlotsUsed\(p\) \+ needed > LOOT_POUCH_MAX_SLOTS/, player, 'Pouch cheia ainda aceita item');
-must(/p\.lootPouch\[slug\] = \(p\.lootPouch\[slug\] \|\| 0\) \+ count/, player, 'Stack existente não acumula');
-must(/lootPouchSlotsUsed\(p\)/, game, 'Autoseller não usa slots');
-must(/slots \$\{pouchSlots\}\/\$\{pouchCap\}/, ui, 'UI não exibe slots 50');
-console.log('OK: Loot Pouch limitada a 50 slots de stacks; cheia não coleta tipo novo.');
+const vm = require('vm');
+const game = path.join(__dirname, '..', 'game');
+const playerSrc = fs.readFileSync(path.join(game, 'js', 'player.js'), 'utf8');
+const uiSrc = fs.readFileSync(path.join(game, 'js', 'ui.js'), 'utf8');
+const combatSrc = fs.readFileSync(path.join(game, 'js', 'combat.js'), 'utf8');
+function must(ok, msg) { if (!ok) throw Error(msg); }
+
+const start = playerSrc.indexOf('const LOOT_POUCH_MAX_SLOTS');
+const end = playerSrc.indexOf('\n\n/* Poder real', start);
+const items = {};
+for (let i=0;i<55;i++) items['loot-'+i] = {n:'Loot '+i,s:null,sell:10,cls:2};
+items['class-3'] = {n:'Class 3',s:'weapon',sell:5000,cls:3};
+items['class-4'] = {n:'Class 4',s:'armor',sell:9000,cls:4};
+const ctx = {
+  GAMEDATA:{items}, SUPPLIES:{},
+  itemUsesInstances(){ return false; },
+  isNoSell(){ return false; },
+};
+vm.createContext(ctx);
+vm.runInContext(playerSrc.slice(start,end),ctx);
+const p={lootPouch:{},gold:0};
+for(let i=0;i<50;i++) must(ctx.addLootPouch(p,'loot-'+i,1),'falha antes de 50');
+must(ctx.lootPouchSlotsUsed(p)===50,'contagem de 50 slots incorreta');
+must(ctx.addLootPouch(p,'loot-50',2) && p.lootPouch['loot-50']===2,
+  'loot novo foi descartado quando a pouch chegou a 100%');
+must(ctx.lootPouchSlotsUsed(p)===51,'overflow seguro não foi contabilizado');
+must(ctx.addLootPouch(p,'class-3',1) && ctx.addLootPouch(p,'class-4',1),
+  'classes protegidas não entraram na Loot Pouch');
+must(ctx.isProtectedPouchClass('class-3') && ctx.isProtectedPouchClass('class-4') &&
+     !ctx.isProtectedPouchClass('loot-1'), 'proteção de classificação incorreta');
+
+// Executa o rollLoot real com a pouch já acima de 50 slots.
+Object.assign(ctx,{
+  isNoCollect(){return false;}, goldStage(){return 1;}, currencyValue(){return 0;},
+  creditCurrency(){return 0;}, addAmmo(){}, SERVER_LOOT_RATE:1,
+});
+const rollStart=combatSrc.indexOf('function rollLoot');
+const rollEnd=combatSrc.indexOf('\n\n/* ======================================================================\n * PARTY COMBAT',rollStart);
+vm.runInContext(combatSrc.slice(rollStart,rollEnd),ctx);
+p.config={lootFilter:'all'};p.supplies={};
+const combat={players:[],lootMul:1,stats:{gold:0,loot:{}},hunt:{level:1},events:[]};
+const mob={boss:false,slug:'rat',def:{loot:[{item:'loot-54',chance:100,max:1}]}};
+const got=ctx.rollLoot(combat,p,mob);
+must(got.length===1 && p.lootPouch['loot-54']===1,
+  'rollLoot real não enviou o drop para a pouch em overflow');
+
+const sellStart=uiSrc.indexOf('function sellPouchItem');
+const sellEnd=uiSrc.indexOf('\n\n/* Valor total vendável da mochila',sellStart);
+Object.assign(ctx,{
+  toast(){},addLog(){},fmtFull(n){return String(n);},
+  isNoSell(){return false;},
+});
+vm.runInContext(uiSrc.slice(sellStart,sellEnd),ctx);
+const before3=p.lootPouch['class-3'], before4=p.lootPouch['class-4'];
+const result=ctx.sellAllPouch(p);
+must(result.gold>0,'itens comuns não foram vendidos');
+must(p.lootPouch['class-3']===before3 && p.lootPouch['class-4']===before4,
+  'sell all vendeu item class 3/4');
+must(ctx.sellPouchItem(p,'class-3')===0 && ctx.sellPouchItem(p,'class-4')===0,
+  'venda manual aceitou item class 3/4');
+must(combatSrc.includes('addLootPouch(p, l.item, count)'),
+  'loot normal não é enviado para addLootPouch');
+must(!playerSrc.includes('lootPouchSlotsUsed(p) + needed > LOOT_POUCH_MAX_SLOTS'),
+  'bloqueio silencioso de pouch cheia ainda existe');
+
+console.log('OK: loot nunca some com 50+ slots; classes 3/4 entram e nunca são vendidas.');
