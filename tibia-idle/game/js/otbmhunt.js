@@ -18,6 +18,12 @@
 
 const OTBM_HUNT_CACHE = {};   // nome -> "loading" | chave | null(erro)
 
+function otbmHuntLoadTimeoutMs() {
+  return Math.max(1, Number(
+    typeof window !== "undefined" && window.OTBM_HUNT_TIMEOUT_MS
+  ) || 6000);
+}
+
 /* Converte zonas absolutas informadas pela hunt para coordenadas locais do
  * recorte OTBM. Isso permite usar coordenadas do RME/Canary sem modificar o
  * arquivo beta nem depender dos marcadores proprietários S/G. */
@@ -68,7 +74,7 @@ function huntMapFromOtbmAsync(hunt, done) {
         hunt.mapa = key;
         done();
       } else if (OTBM_HUNT_CACHE[hunt.otbm] !== "loading" ||
-                 Date.now() - t0 > 8000) {
+                 Date.now() - t0 > otbmHuntLoadTimeoutMs()) {
         clearInterval(iv);
         done();
       }
@@ -81,7 +87,20 @@ function huntMapFromOtbmAsync(hunt, done) {
   // mais recente é sempre baixada. Para forçar reload sem F5, use
   // window.reloadMaps() ou Ctrl+Shift+R.
   var _otbmV = Date.now();
-  fetch("maps/" + encodeURIComponent(hunt.otbm) + ".otbm?v=" + _otbmV)
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  let timeoutId;
+  const timedOut = new Promise((resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      if (controller) controller.abort();
+      reject(new Error("timeout ao carregar OTBM"));
+    }, otbmHuntLoadTimeoutMs());
+  });
+  const request = Promise.resolve().then(() => fetch(
+    "maps/" + encodeURIComponent(hunt.otbm) + ".otbm?v=" + _otbmV,
+    controller ? { signal:controller.signal } : undefined));
+  // Nem fetch pendente nem parser/arquivo inválido podem deixar o overlay e
+  // OTBM_HUNT_CACHE eternamente em "loading".
+  Promise.race([request, timedOut])
     .then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.arrayBuffer();
@@ -105,7 +124,8 @@ function huntMapFromOtbmAsync(hunt, done) {
       console.warn("[otbm] falha ao carregar maps/" + hunt.otbm + ".otbm:", e);
       OTBM_HUNT_CACHE[hunt.otbm] = null;
       done();   // fallback: hunt sem cenario (comportamento antigo)
-    });
+    })
+    .finally(() => clearTimeout(timeoutId));
 }
 
 if (typeof module !== "undefined" && module.exports) {
