@@ -14,6 +14,15 @@ const data = ctx.IDLE_ANIMATIONS;
 must(Object.keys(data.outfits).length === 42, 'quantidade de outfits idle divergente');
 must(Object.keys(data.mounts).length === 54, 'quantidade de mounts idle divergente');
 must(Object.keys(data.monsters).length === 115, 'quantidade de monstros idle divergente');
+must(JSON.stringify(data.monsters['burning-book'].colors) === JSON.stringify([79,113,78,112]),
+  'Burning Book perdeu as cores oficiais no idle');
+must(JSON.stringify(data.monsters['rage-squid'].colors) === JSON.stringify([94,78,79,57]),
+  'Rage Squid perdeu as cores oficiais no idle');
+must(JSON.stringify(data.monsters['squid-warden'].colors) === JSON.stringify([9,21,3,57]),
+  'Squid Warden perdeu as cores oficiais no idle');
+const generatorSrc = fs.readFileSync(path.join(__dirname, 'extract_idle_sprites.py'), 'utf8');
+must(generatorSrc.includes('load_canary_looks') && generatorSrc.includes('compor_cor(base, mask'),
+  'gerador idle não usa cores/máscaras do Canary');
 
 // Estes looktypes têm vários frames, mas apenas grupo MOVING: devem ficar
 // totalmente estáticos quando não estão caminhando.

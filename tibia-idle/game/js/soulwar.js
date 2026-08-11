@@ -3,6 +3,16 @@
 (function(){
  if(typeof GAMEDATA==='undefined')return; const M=GAMEDATA.monsters,I=GAMEDATA.items;
  if(!I['bag-you-desire']) I['bag-you-desire']={n:'Bag You Desire',s:'container',t:'container',sell:5000,w:18,cid:34109,af:10,aw:24,ah:30};
+ const serverLootItems={
+  'white-gem':{n:'white gem',cid:32769,w:.3},
+  'dragon-figurine':{n:'dragon figurine',cid:30053,w:6.5},
+  'supreme-health-potion':{n:'supreme health potion',cid:23375,w:3.5},
+  'ultimate-spirit-potion':{n:'ultimate spirit potion',cid:23374,w:3.1},
+  'greed-s-arm':{n:"Greed's arm",cid:33924,w:1.25},
+  'figurine-of-greed':{n:'figurine of Greed',cid:34021,w:.44},
+  'the-skull-of-a-beast':{n:'the skull of a beast',cid:34075,w:2.3},
+ };
+ for(const slug in serverLootItems) if(!I[slug]) I[slug]=Object.assign({s:null,t:'loot',sell:1},serverLootItems[slug]);
  const souls=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];
  souls.forEach((id)=>{if(!I[id])I[id]={n:id.replace(/-/g,' '),s:'misc',t:'soulwar',sell:25000,w:35};});
  const loot=[{chance:100,max:18,item:'platinum-coin'},{chance:28,max:4,item:'ultimate-health-potion'},{chance:28,max:4,item:'ultimate-mana-potion'},{chance:10,max:1,item:'bag-you-desire'}];

@@ -185,7 +185,7 @@ function openRewardChest(bundleId) {
   box.innerHTML = `<div class="reward-chest-custom">
     <div class="panel-title reward-chest-title">
       <img class="reward-title-icon" src="assets/item/reward-chest.png" alt="Reward Chest">
-      <div><b>REWARD CHEST</b><small>Client ID ${REWARD_CHEST_ITEM_ID}</small></div>
+      <div><b>REWARD CHEST</b></div>
       <span class="spacer"></span>
       ${bundle ? `<button class="sm" id="reward-back">← BOSSES</button>` : ""}
       <button class="sm" id="reward-close">✕</button>

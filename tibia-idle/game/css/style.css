@@ -1156,7 +1156,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .modal-wide2 .modal { width: min(960px, 97vw) !important; }
 
 /* ========== DEPOT NOTIFICATION ========== */
-#btn-depot { position: relative; }
+#btn-depot { position:relative; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+.depot-btn-icon { width:20px; height:20px; object-fit:contain; image-rendering:pixelated; flex:none; }
 #depot-badge {
   background: #d4af37; color: #0d0c0a; font-size: 9px;
   padding: 1px 4px; border-radius: 8px; position: absolute;
