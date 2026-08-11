@@ -47,14 +47,14 @@ function verifyPrecompiledMap() {
 function verifyIndexOrder() {
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   const huntmaps = html.indexOf('src="js/huntmapdata.js"');
-  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v8"');
-  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v8"');
-  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v8"');
+  const cobra = html.indexOf('src="js/cobra-bastion-map.js?v=cobra-loading-v9"');
+  const otbm = html.indexOf('src="js/otbm.js?v=cobra-loading-v9"');
+  const otbmhunt = html.indexOf('src="js/otbmhunt.js?v=cobra-loading-v9"');
   must(huntmaps >= 0 && cobra > huntmaps && otbm > cobra && otbmhunt > cobra,
     "ordem de scripts do mapa pré-compilado incorreta");
   for (const file of ["otbm", "otbmhunt", "hard-hunts", "tileanimdata",
     "tilepatterndata", "tilemap", "preload", "game"])
-    must(html.includes(`src="js/${file}.js?v=cobra-loading-v8"`),
+    must(html.includes(`src="js/${file}.js?v=cobra-loading-v9"`),
       `${file}.js sem cache-busting v4`);
 }
 
