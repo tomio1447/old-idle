@@ -64,20 +64,43 @@ for (const slug of ["goshnar-s-greed", "dreadful-harvester", "soulsnatcher",
   "greedbeast", "powerful-soul"])
   must(ctx.GAMEDATA.monsters[slug] && fs.existsSync(path.join(game, "assets", "mob", slug + ".png")),
     "criatura/sprite ausente: " + slug);
+// Danos, defesas e quantidade de magias importados das cinco sources Canary.
+const expectedCombat = {
+  "goshnar-s-greed": {hp:300000,damage:5000,armor:160,defense:160,skills:[["death",1500,2000],["fire",1200,2200],["physical",1300,1700]],defSkills:2},
+  "dreadful-harvester": {hp:25500,damage:320,armor:35,defense:35,skills:[["physical",0,165],["death",350,720],["physical",0,300],["death",225,275]],defSkills:2},
+  "soulsnatcher": {hp:10000,damage:1500,armor:90,defense:80,skills:[["physical",1000,1500],["physical",1000,1500],["physical",500,1000]],defSkills:0},
+  "greedbeast": {hp:10000,damage:500,armor:80,defense:70,skills:[["earth",50,90],["lifedrain",25,47],["physical",200,400],["physical",200,400],["physical",0,0]],defSkills:1},
+  "powerful-soul": {hp:30000,damage:3000,armor:90,defense:80,skills:[["lifedrain",2000,3000]],defSkills:0},
+};
+for (const [slug, expected] of Object.entries(expectedCombat)) {
+  const mob=ctx.GAMEDATA.monsters[slug];
+  must(mob.hp===expected.hp&&mob.damage===expected.damage&&mob.armor===expected.armor&&mob.defense===expected.defense,
+    slug+": stats do Canary divergentes");
+  must(JSON.stringify((mob.skills||[]).map(s=>[s.el,s.min,s.max]))===JSON.stringify(expected.skills)&&
+       (mob.defSkills||[]).length===expected.defSkills,
+    slug+": danos/magias do Canary divergentes");
+}
 
-// --- mini game: seis adds, quinta Greedbeast abre exatamente 20 segundos
+// --- mini game: seis adds, 30% Greedbeast e janela exata de 40 segundos
 ctx.huntMapBlocked = () => false;
 ctx.buildOccupancy = () => new Map();
 ctx.cellToScreen = (x, y) => ({x:(x+.5)/30,y:(y+.5)/30});
 ctx.resolveSQMOccupancy = () => {};
 const bossDef = ctx.GAMEDATA.monsters["goshnar-s-greed"];
-const bossMob = {slug:"goshnar-s-greed",def:bossDef,boss:true,hp:550000,maxHp:550000,
+const bossMob = {slug:"goshnar-s-greed",def:bossDef,boss:true,greedImmune:true,hp:300000,maxHp:300000,
   id:"boss-greed",cx:14,cy:9,x:.48,y:.32};
 const combat = {boss:{id:"goshnar-s-greed"},mobs:[bossMob],events:[],gridW:30,gridH:30,
   huntMap:{rows:Array(30).fill(".".repeat(30)),leg:{".":{v:[1]}}},player:{cx:14,cy:20}};
 ctx.greedBossInit(combat, {}, () => 0.1);
 must(combat.greed && combat.greed.immune && ctx.greedBossAdds(combat).length === 6,
   "luta não começou imune com seis adds");
+must(ctx.greedBossAdds(combat).every((add) => add.def.armor === 0 &&
+  add.def.defense === 0 && add.def.mitigation === 0 &&
+  !Object.keys(add.def.resist).length && !add.def.imune.length && add.def.skills.length),
+  "adds nasceram com defesa/imunidade ou perderam as magias do Canary");
+must(ctx.greedRandomAddSlug(() => .299999) === "greedbeast" &&
+  ctx.greedRandomAddSlug(() => .30) !== "greedbeast",
+  "chance de nascimento da Greedbeast não é exatamente 30%");
 must(combat.mobs[combat.mobs.length-1].boss,
   "boss imune ficou antes dos adds e impediu o auto-combate");
 must(!ctx.greedBossCanTakePlayerDamage(combat, bossMob) &&
@@ -87,15 +110,15 @@ const openedAt = 123456;
 for (let i=0;i<5;i++) {
   ctx.greedBossHandleKill(combat, {slug:"greedbeast"}, openedAt);
 }
-must(!combat.greed.immune && combat.greed.vulnerableUntil === openedAt + 20000 &&
+must(!combat.greed.immune && combat.greed.vulnerableUntil === openedAt + 40000 &&
      ctx.greedBossCanTakePlayerDamage(combat, bossMob) &&
      ctx.greedBossOutgoingDamageMultiplier(combat, bossMob) === 1,
-  "quinta Greedbeast não abriu janela exata de 20s");
+  "quinta Greedbeast não abriu janela exata de 40s");
 must(combat.mobs[0].boss, "boss vulnerável não recebeu prioridade de ataque");
-ctx.greedBossTick(combat, openedAt + 20000);
+ctx.greedBossTick(combat, openedAt + 40000);
 must(combat.greed.immune && bossMob.greedImmune &&
      ctx.greedBossOutgoingDamageMultiplier(combat, bossMob) === 0.7,
-  "boss não voltou à imunidade ao final dos 20s");
+  "boss não voltou à imunidade ao final dos 40s");
 
 // --- missão Mirrored Nightmare recompensa e requisito obrigatório
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");
@@ -113,12 +136,13 @@ const bossEnd = gameSrc.indexOf("\n\n/* Quivers", bossStart);
 ctx.BOSS_COOLDOWN = 0;
 vm.runInContext(gameSrc.slice(bossStart, bossEnd) + "\nwindow.__BOSS_DEFS=BOSS_DEFS;", ctx);
 const boss = ctx.__BOSS_DEFS["goshnar-s-greed"];
-must(boss.hunt === "goshnars-greed-room" && boss.requirement.enforced &&
-     boss.requirement.mission === "dark-thais" && boss.requirement.access === "goshnar-s-greed",
-  "Goshnar não exige acesso da Mirrored Nightmare");
-must(gameSrc.includes("p.bossAccess[reward.bossAccess] = true") &&
-     gameSrc.includes("BOSS_REQUIREMENTS_ENABLED || boss.requirement.enforced"),
-  "recompensa/requisito obrigatório não foi implementado");
+must(boss.hunt === "goshnars-greed-room" && boss.requirement.enforced === false &&
+     boss.requirement.mission === "dark-thais" && boss.requirement.access === "goshnar-s-greed" &&
+     boss.cooldown === 0,
+  "Goshnar não ficou livre de requisito/cooldown durante os testes");
+must(boss.hp === 300000 && boss.exp === 150000 && boss.damage === 5000 &&
+     boss.armor === 160 && boss.defense === 160,
+  "stats de Goshnar divergem do Canary");
 
 const combatSrc = fs.readFileSync(path.join(js, "combat.js"), "utf8");
 const scarlettSrc = fs.readFileSync(path.join(js, "scarlett-boss.js"), "utf8");
@@ -129,15 +153,19 @@ for (const marker of ["greedBossInit(c, player)", "greedBossTick(c, now)",
   must(combatSrc.includes(marker), "combat.js sem hook: " + marker);
 must(scarlettSrc.includes("greedBossCanTakePlayerDamage(c, target)"),
   "gate global não protege a imunidade de Goshnar");
-must(renderSrc.includes("Greedbeasts ${combat.greed.greedbeastKills}/5") &&
-     renderSrc.includes("VULNERÁVEL"),
-  "bossbar não informa o progresso do mini game");
+must(!renderSrc.includes("Greedbeasts ${combat.greed.greedbeastKills}/5"),
+  "contagem de Greedbeasts ainda aparece na bossbar");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-for (const script of ["render", "scarlett-boss"])
-  must(html.includes(`js/${script}.js?v=goshnar-greed-v1`),
-    script + ".js sem cache-busting da mecânica");
-for (const script of ["combat", "soulwar"])
-  must(html.includes(`js/${script}.js?v=soulwar-taints-v1`),
-    script + ".js sem cache-busting Soul War");
+const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
+must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
+     fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
+  "modal separado com contagem de Greedbeasts não foi criado");
+for (const script of ["combat", "render", "soulwar"])
+  must(html.includes(`js/${script}.js?v=goshnar-greed-v2`),
+    script + ".js sem cache-busting v2 da mecânica");
+must(html.includes("js/scarlett-boss.js?v=goshnar-greed-v1"),
+  "gate compartilhado sem cache-busting");
+must(html.includes("css/layout.css?v=goshnar-greed-v2"),
+  "CSS do modal Greedbeast sem cache-busting");
 
-console.log("OK: Goshnar's Greed — acesso Mirrored Nightmare, 6 adds, 5 Greedbeasts e vulnerabilidade de 20s.");
+console.log("OK: Goshnar's Greed — testes livres, adds sem defesa, Greedbeast 30% e vulnerabilidade de 40s.");

@@ -705,10 +705,10 @@ const BOSS_DEFS = {
     id:"goshnar-s-greed", name:"Goshnar's Greed",
     title:"Boss de Mirrored Nightmare", hunt:"goshnars-greed-room",
     baseMonster:"goshnar-s-greed", sprite:"goshnar-s-greed",
-    hp:550000, exp:350000, damage:1800, armor:120, defense:110,
+    hp:300000, exp:150000, damage:5000, armor:160, defense:160,
     cooldown:BOSS_COOLDOWN,
     requirement:{
-      level:550, mission:"dark-thais", access:"goshnar-s-greed", enforced:true,
+      level:550, mission:"dark-thais", access:"goshnar-s-greed", enforced:false,
       text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Greed",
     },
     mechanic:"greedbeast-vulnerability",

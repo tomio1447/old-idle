@@ -236,6 +236,16 @@ canvas { image-rendering: pixelated; }
 }
 .scarlett-qte.success .scarlett-qte-result { border-color: #48c864; color: #72ff8b; }
 .scarlett-qte.fail .scarlett-qte-result { border-color: #d34c45; color: #ff7068; }
+/* Goshnar's Greed — objetivo do mini game, separado da bossbar. */
+.greed-minigame {
+  position: absolute; z-index: 44; top: 54px; left: 50%; transform: translateX(-50%);
+  min-width: 270px; padding: 9px 14px; pointer-events: none;
+  color: #ffe99a; background: rgba(20,11,5,.94); border: 2px solid #b78331;
+  box-shadow: 0 3px 14px #000, inset 0 0 9px rgba(170,90,20,.35);
+  font: bold 12px Verdana; text-align: center;
+}
+.greed-minigame b { color: #ffbd55; font-size: 14px; }
+.greed-minigame small { display:block; margin-top:3px; color:#ddd0b0; font-size:9px; }
 /* Selo da postura (stance) ativa: quadrado no canto superior esquerdo da
  * cena — mesma ideia da area de icones de condicao do cliente oficial.
  * Sorcerer pode mostrar dois (elemental + aura crippling). */
