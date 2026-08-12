@@ -34,6 +34,7 @@ function JsonStore() {
     if(!Number.isSafeInteger(Number(c.save_version))||Number(c.save_version)<1)c.save_version=1;
   }
   this.sessions = this._load("sessions.json", []);
+  this.leases = this._load("leases.json", []);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
   const partyData = this._load("parties.json", null);
@@ -88,6 +89,8 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.characters, null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "sessions.json"),
     JSON.stringify(this.sessions || [], null, 1));
+  fs.writeFileSync(path.join(DATA_DIR, "leases.json"),
+    JSON.stringify(this.leases || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
     JSON.stringify({ marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
@@ -113,6 +116,46 @@ JsonStore.prototype.createSession = function (accountId, token) {
   });
   this._save();
   return token;
+};
+JsonStore.prototype.leaseAcquire = function(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
+  this.leases=this.leases||[];
+  let row=this.leases.find((lease)=>Number(lease.account_id)===Number(accountId));
+  const active=row&&new Date(row.expires_at).getTime()>now;
+  if(active&&(row.holder_id===holderId||row.holder_id===previousHolderId)&&row.secret_hash===presentedHash){
+    row.holder_id=holderId;row.renewed_at=new Date(now).toISOString();
+    row.expires_at=new Date(expiresAt).toISOString();this._save();
+    return {ok:true,resumed:true,lease:row};
+  }
+  if(active)return {ok:false,error:"LEASE_HELD",lease:row};
+  if(!row){row={account_id:Number(accountId)};this.leases.push(row);}
+  Object.assign(row,{holder_id:holderId,secret_hash:newHash,acquired_at:new Date(now).toISOString(),
+    renewed_at:new Date(now).toISOString(),expires_at:new Date(expiresAt).toISOString()});
+  this._save();return {ok:true,resumed:false,lease:row};
+};
+JsonStore.prototype.leaseTakeover = function(accountId,holderId,newHash,now,expiresAt){
+  this.leases=this.leases||[];
+  let row=this.leases.find((lease)=>Number(lease.account_id)===Number(accountId));
+  if(!row){row={account_id:Number(accountId)};this.leases.push(row);}
+  Object.assign(row,{holder_id:holderId,secret_hash:newHash,acquired_at:new Date(now).toISOString(),
+    renewed_at:new Date(now).toISOString(),expires_at:new Date(expiresAt).toISOString()});
+  this._save();return {ok:true,lease:row};
+};
+JsonStore.prototype.leaseRenew = function(accountId,holderId,secretHash,now,expiresAt){
+  const row=(this.leases||[]).find((lease)=>Number(lease.account_id)===Number(accountId));
+  if(!row||row.holder_id!==holderId||row.secret_hash!==secretHash||new Date(row.expires_at).getTime()<=now)
+    return {ok:false,error:"LEASE_LOST",lease:row||null};
+  row.renewed_at=new Date(now).toISOString();row.expires_at=new Date(expiresAt).toISOString();this._save();
+  return {ok:true,lease:row};
+};
+JsonStore.prototype.leaseValidate = function(accountId,holderId,secretHash,now){
+  const row=(this.leases||[]).find((lease)=>Number(lease.account_id)===Number(accountId));
+  return !!(row&&row.holder_id===holderId&&row.secret_hash===secretHash&&new Date(row.expires_at).getTime()>now);
+};
+JsonStore.prototype.leaseRelease = function(accountId,holderId,secretHash){
+  const before=(this.leases||[]).length;
+  this.leases=(this.leases||[]).filter((row)=>!(Number(row.account_id)===Number(accountId)&&
+    row.holder_id===holderId&&row.secret_hash===secretHash));
+  if(this.leases.length!==before)this._save();return this.leases.length!==before;
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
@@ -162,7 +205,9 @@ JsonStore.prototype.updateCharacter = function (id, voc, level, data, extra) {
   }
   return c;
 };
-JsonStore.prototype.saveCharactersVersioned = function (accountId, saves) {
+JsonStore.prototype.saveCharactersVersioned = function (accountId, saves, lease) {
+  if(lease&&!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
+    return {ok:false,error:"LEASE_REQUIRED"};
   const rows=saves.map((save)=>this.findCharacter(save.id));
   const missing=saves.filter((save,index)=>!rows[index]||Number(rows[index].account_id)!==Number(accountId));
   if(missing.length)return {ok:false,error:"CHARACTER_NOT_FOUND",ids:missing.map((save)=>Number(save.id))};
@@ -183,7 +228,9 @@ JsonStore.prototype.saveCharactersVersioned = function (accountId, saves) {
   return {ok:true,characters:rows};
 };
 JsonStore.prototype.savePartyCharactersVersioned = function (accountId, partyId,
-    expectedPartyVersion, expectedOrder, saves) {
+    expectedPartyVersion, expectedOrder, saves, lease) {
+  if(lease&&!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
+    return {ok:false,error:"LEASE_REQUIRED"};
   const p=(this.parties||[]).find((party)=>Number(party.id)===Number(partyId));
   if(!p||Number(p.owner_account_id)!==Number(accountId))return {ok:false,error:"PARTY_NOT_OWNER"};
   if(Number(p.roster_version)!==Number(expectedPartyVersion))
@@ -197,7 +244,7 @@ JsonStore.prototype.savePartyCharactersVersioned = function (accountId, partyId,
   });
   if(controlled.length!==saves.length||controlled.some((id)=>!saves.some((save)=>Number(save.id)===id)))
     return {ok:false,error:"PARTY_SAVE_SET_MISMATCH"};
-  return this.saveCharactersVersioned(accountId,saves);
+  return this.saveCharactersVersioned(accountId,saves,lease);
 };
 JsonStore.prototype.setCharacterZone = function (id, zone) {
   const c = this.findCharacter(id);
@@ -540,6 +587,14 @@ async function MysqlStore() {
   // garante o schema (tabelas) no primeiro uso
   await ensureSchema(pool);
 
+  async function lockValidLease(conn,accountId,lease){
+    if(!lease)return true;
+    const [rows]=await conn.query("SELECT holder_id,secret_hash,expires_at FROM account_leases WHERE account_id=? FOR UPDATE",
+      [Number(accountId)]);
+    const row=rows[0];
+    return !!(row&&row.holder_id===lease.holderId&&row.secret_hash===lease.secretHash&&
+      new Date(row.expires_at).getTime()>lease.now);
+  }
   async function persistVersionedRows(conn,accountId,saves){
     if(!saves.length)return {ok:true,characters:[]};
     const ids=saves.map((save)=>Number(save.id));
@@ -631,20 +686,26 @@ async function MysqlStore() {
          Number(id)]);
       return this.findCharacter(id);
     },
-    async saveCharactersVersioned(accountId,saves){
+    async saveCharactersVersioned(accountId,saves,lease){
       const conn=await pool.getConnection();
       try{
         await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){
+          await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
+        }
         const result=await persistVersionedRows(conn,accountId,saves);
         if(!result.ok){await conn.rollback();return result;}
         await conn.commit();return result;
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}
       finally{conn.release();}
     },
-    async savePartyCharactersVersioned(accountId,partyId,expectedPartyVersion,expectedOrder,saves){
+    async savePartyCharactersVersioned(accountId,partyId,expectedPartyVersion,expectedOrder,saves,lease){
       const conn=await pool.getConnection();
       try{
         await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){
+          await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
+        }
         const [parties]=await conn.query("SELECT * FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
         const p=parties[0];
         if(!p||Number(p.owner_account_id)!==Number(accountId)){
@@ -687,6 +748,65 @@ async function MysqlStore() {
     async createSession(accountId, token) {
       await this.run("INSERT INTO sessions (account_id, token) VALUES (?, ?)",
         [Number(accountId), token]);
+    },
+    async leaseAcquire(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
+      const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
+      try{
+        const [locks]=await conn.query("SELECT GET_LOCK(?,5) AS acquired",[lockName]);
+        if(!locks[0]||Number(locks[0].acquired)!==1)throw new Error("lease lock timeout");
+        await conn.beginTransaction();
+        const [rows]=await conn.query("SELECT * FROM account_leases WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        let row=rows[0]||null;const active=row&&new Date(row.expires_at).getTime()>now;
+        if(active&&(row.holder_id===holderId||row.holder_id===previousHolderId)&&row.secret_hash===presentedHash){
+          await conn.query("UPDATE account_leases SET holder_id=?,renewed_at=?,expires_at=? WHERE account_id=?",
+            [holderId,new Date(now),new Date(expiresAt),Number(accountId)]);
+          await conn.commit();row.holder_id=holderId;row.renewed_at=new Date(now);row.expires_at=new Date(expiresAt);
+          return {ok:true,resumed:true,lease:row};
+        }
+        if(active){await conn.rollback();return {ok:false,error:"LEASE_HELD",lease:row};}
+        await conn.query(
+          `INSERT INTO account_leases (account_id,holder_id,secret_hash,acquired_at,renewed_at,expires_at)
+           VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE holder_id=VALUES(holder_id),secret_hash=VALUES(secret_hash),
+             acquired_at=VALUES(acquired_at),renewed_at=VALUES(renewed_at),expires_at=VALUES(expires_at)`,
+          [Number(accountId),holderId,newHash,new Date(now),new Date(now),new Date(expiresAt)]);
+        await conn.commit();return {ok:true,resumed:false,lease:{account_id:Number(accountId),holder_id:holderId,
+          secret_hash:newHash,acquired_at:new Date(now),renewed_at:new Date(now),expires_at:new Date(expiresAt)}};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{
+        try{await conn.query("SELECT RELEASE_LOCK(?)",[lockName]);}catch(e){}conn.release();
+      }
+    },
+    async leaseTakeover(accountId,holderId,newHash,now,expiresAt){
+      await this.run(
+        `INSERT INTO account_leases (account_id,holder_id,secret_hash,acquired_at,renewed_at,expires_at)
+         VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE holder_id=VALUES(holder_id),secret_hash=VALUES(secret_hash),
+           acquired_at=VALUES(acquired_at),renewed_at=VALUES(renewed_at),expires_at=VALUES(expires_at)`,
+        [Number(accountId),holderId,newHash,new Date(now),new Date(now),new Date(expiresAt)]);
+      return {ok:true,lease:{account_id:Number(accountId),holder_id:holderId,secret_hash:newHash,
+        acquired_at:new Date(now),renewed_at:new Date(now),expires_at:new Date(expiresAt)}};
+    },
+    async leaseRenew(accountId,holderId,secretHash,now,expiresAt){
+      const result=await this.run(
+        `UPDATE account_leases SET renewed_at=?,expires_at=?
+         WHERE account_id=? AND holder_id=? AND secret_hash=? AND expires_at>?`,
+        [new Date(now),new Date(expiresAt),Number(accountId),holderId,secretHash,new Date(now)]);
+      if(!result.affectedRows){
+        const rows=await this.query("SELECT * FROM account_leases WHERE account_id=?",[Number(accountId)]);
+        return {ok:false,error:"LEASE_LOST",lease:rows[0]||null};
+      }
+      return {ok:true,lease:{account_id:Number(accountId),holder_id:holderId,secret_hash:secretHash,
+        renewed_at:new Date(now),expires_at:new Date(expiresAt)}};
+    },
+    async leaseValidate(accountId,holderId,secretHash,now){
+      const rows=await this.query(
+        "SELECT account_id FROM account_leases WHERE account_id=? AND holder_id=? AND secret_hash=? AND expires_at>?",
+        [Number(accountId),holderId,secretHash,new Date(now)]);
+      return rows.length>0;
+    },
+    async leaseRelease(accountId,holderId,secretHash){
+      const result=await this.run(
+        "DELETE FROM account_leases WHERE account_id=? AND holder_id=? AND secret_hash=?",
+        [Number(accountId),holderId,secretHash]);
+      return result.affectedRows>0;
     },
 
     // ---- MARKET P2P ----
@@ -1030,6 +1150,17 @@ async function ensureSchema(pool) {
     token CHAR(64) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NULL
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS account_leases (
+    account_id INT UNSIGNED PRIMARY KEY,
+    holder_id VARCHAR(80) NOT NULL,
+    secret_hash CHAR(64) NOT NULL,
+    acquired_at DATETIME(3) NOT NULL,
+    renewed_at DATETIME(3) NOT NULL,
+    expires_at DATETIME(3) NOT NULL,
+    INDEX idx_account_leases_expiry (expires_at),
+    CONSTRAINT fk_account_leases_account FOREIGN KEY (account_id)
+      REFERENCES accounts(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS characters (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

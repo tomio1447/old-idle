@@ -90,6 +90,9 @@ async function post(route, body) {
   }
   const login = await post('/api/login', {login:'2',password:'2'});
   const token = login.data.token;
+  const acquired=await post('/api/lease/acquire',{token,holder_id:'accounttestholder'});
+  must(acquired.status===200&&acquired.data.leaseToken,'lease do test server falhou');
+  const lease={holder_id:acquired.data.holderId,lease_token:acquired.data.leaseToken};
   const created = await post('/api/characters', {
     token, name:'Server Test', voc:'druid',
     data:JSON.stringify({name:'Server Test',voc:'druid',level:7,hp:500,sex:'female',
@@ -101,8 +104,8 @@ async function post(route, body) {
   const id = created.data.character.id;
   const crossed = await request('/api/characters/' + id, {
     method:'PUT',headers:{'content-type':'application/json'},
-    body:JSON.stringify({token,expected_version:created.data.character.saveVersion,
-      voc:'paladin',level:500,data:JSON.stringify({id:'999',name:'Other',voc:'paladin'})}),
+    body:JSON.stringify(Object.assign({token,expected_version:created.data.character.saveVersion,
+      voc:'paladin',level:500,data:JSON.stringify({id:'999',name:'Other',voc:'paladin'})},lease)),
   });
   must(crossed.status===409&&crossed.data.error==='CHARACTER_IDENTITY_MISMATCH',
     'servidor aceitou save pertencente a outro personagem');
@@ -124,8 +127,8 @@ async function post(route, body) {
     'save completo não foi carregado');
   const saved = await request('/api/characters/' + id, {
     method:'PUT', headers:{'content-type':'application/json'},
-    body:JSON.stringify({token,expected_version:summaryChar.saveVersion,voc:'druid',level:8,
-      data:JSON.stringify({name:'Server Test',voc:'druid',level:8,hp:700})}),
+    body:JSON.stringify(Object.assign({token,expected_version:summaryChar.saveVersion,voc:'druid',level:8,
+      data:JSON.stringify({name:'Server Test',voc:'druid',level:8,hp:700})},lease)),
   });
   must(saved.data.ok, 'save de personagem falhou');
   loaded = await request('/api/characters/' + id, {

@@ -6,12 +6,17 @@ function must(ok,msg){if(!ok)throw Error(msg);}
 const local=new Map(),session=new Map();
 const storage=(map)=>({getItem:(k)=>map.has(k)?map.get(k):null,setItem:(k,v)=>map.set(k,String(v)),removeItem:(k)=>map.delete(k)});
 let active=0,maxActive=0,mode="success";const requests=[];
-const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,encodeURIComponent,URLSearchParams,
+const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,encodeURIComponent,URLSearchParams,
+  setTimeout,clearTimeout,
   localStorage:storage(local),sessionStorage:storage(session),CustomEvent:function(type,init){this.type=type;this.detail=init.detail;},
   window:{GLOBAL_IDLE_SERVER_CONFIG:{online:true,testServer:false,apiUrl:"http://game"},location:{origin:"http://game"},dispatchEvent(){}},
   maxStats:()=>({hp:500,mp:300}),toast(){},
   fetch:async(url,options)=>{
-    const body=JSON.parse(options.body||"{}");requests.push({url,body});active++;maxActive=Math.max(maxActive,active);
+    const body=JSON.parse(options.body||"{}");
+    if(url.endsWith("/api/lease/acquire")||url.endsWith("/api/lease/takeover"))return {status:200,json:async()=>({ok:true,
+      leaseToken:"a".repeat(64),holderId:body.holder_id,expiresAt:new Date(Date.now()+120000).toISOString(),renewAfterMs:30000})};
+    if(url.endsWith("/api/lease/release"))return {status:200,json:async()=>({ok:true})};
+    requests.push({url,body});active++;maxActive=Math.max(maxActive,active);
     await new Promise((resolve)=>setTimeout(resolve,8));active--;
     if(mode==="conflict")return {status:409,json:async()=>({ok:false,error:"SAVE_VERSION_CONFLICT",msg:"conflito",
       characters:[{id:1,name:"Queue",voc:"knight",level:1,saveVersion:4,snapshot:{id:"1",name:"Queue",marker:"remote"}}]})};
@@ -23,6 +28,7 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,encodeUR
 vm.createContext(ctx);vm.runInContext(source,ctx);
 ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:1,snapshot:{}}]);
 (async()=>{
+  must((await ctx.accountAcquireLease("token",false)).ok,"cliente não adquiriu lease antes do save");
   const p={id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50};
   const results=await Promise.all([
     ctx.accountSaveCharacter("token","1",p),ctx.accountSaveCharacter("token","1",p),
@@ -35,5 +41,6 @@ ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVers
   must(ctx.accountCharacterCacheRead()[0].saveVersion===4,"snapshot autoritativo do conflito não atualizou o cache");
   must(await ctx.accountSaveCharacter("token","1",p)===false&&requests.length===before+1,
     "autosave posterior tentou sobrescrever novamente após conflito");
+  await ctx.accountReleaseLease("token");
   console.log("OK: cliente serializa versões e bloqueia overwrite depois de conflito.");
 })().catch((error)=>{console.error(error);process.exit(1);});

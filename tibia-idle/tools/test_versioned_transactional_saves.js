@@ -7,7 +7,7 @@ const source=fs.readFileSync(path.join(serverDir,"db.js"),"utf8");
 const client=fs.readFileSync(path.join(root,"game","js","account-client.js"),"utf8");
 const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),"global-idle-versioned-save-"));
 const port=36200+(process.pid%900),base=`http://127.0.0.1:${port}`;
-let child=null,logs="";
+let child=null,logs="",lease={};
 function must(ok,msg){if(!ok)throw Error(msg);}
 async function request(route,options){
   const response=await fetch(base+route,options),text=await response.text();
@@ -36,10 +36,11 @@ async function load(token,id){
 }
 async function me(token){return (await request("/api/me",{headers:{authorization:"Bearer "+token}})).data;}
 async function state(token,id){return (await request("/api/party/state?char_id="+id,{headers:{authorization:"Bearer "+token}})).data.state;}
-function singleBody(token,c,version,marker){return {token,expected_version:version,voc:c.voc,level:c.level,
-  data:JSON.stringify({id:String(c.id),name:c.name,voc:c.voc,level:c.level,marker,hp:100}),hp:100,mp:20,maxHp:100,maxMp:20};}
+function singleBody(token,c,version,marker){return Object.assign({token,expected_version:version,voc:c.voc,level:c.level,
+  data:JSON.stringify({id:String(c.id),name:c.name,voc:c.voc,level:c.level,marker,hp:100}),hp:100,mp:20,maxHp:100,maxMp:20},lease);}
 function partyEntry(c,marker){return {id:Number(c.id),expected_version:Number(c.saveVersion),voc:c.voc,level:c.level,
   data:JSON.stringify({id:String(c.id),name:c.name,voc:c.voc,level:c.level,marker,hp:100}),hp:100,mp:20,maxHp:100,maxMp:20};}
+function withLease(body){return Object.assign({},body,lease);}
 
 (async()=>{
   must(source.includes("save_version=save_version+1")&&source.includes("FOR UPDATE")&&
@@ -51,6 +52,9 @@ function partyEntry(c,marker){return {id:Number(c.id),expected_version:Number(c.
   await post("/api/register",{login:"versioned",password:"x"});
   const login=await post("/api/login",{login:"versioned",password:"x"});
   const token=login.data.token;
+  const acquired=await post("/api/lease/acquire",{token,holder_id:"phase3holder0001"});
+  must(acquired.status===200&&acquired.data.leaseToken,"lease para os saves não foi concedido");
+  lease={holder_id:acquired.data.holderId,lease_token:acquired.data.leaseToken};
   const leader=await create(token,"Version Leader","knight");
   const second=await create(token,"Version Second","druid");
   const third=await create(token,"Version Third","paladin");
@@ -87,16 +91,16 @@ function partyEntry(c,marker){return {id:Number(c.id),expected_version:Number(c.
   const before=new Map(summaries.map((c)=>[Number(c.id),c.saveVersion]));
   const entries=summaries.map((c)=>partyEntry(c,"atomic-attempt"));
   entries.find((e)=>e.id===Number(second.id)).expected_version=0;
-  r=await post("/api/party/save",{token,party_id:partyState.id,party_version:partyState.version,
-    party_order:partyState.order,characters:entries});
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:partyState.version,
+    party_order:partyState.order,characters:entries}));
   must(r.status===409&&r.data.error==="SAVE_VERSION_CONFLICT","party com um char obsoleto não gerou conflito");
   summaries=(await me(token)).characters;
   must(summaries.every((c)=>c.saveVersion===before.get(Number(c.id))),
     "falha de um membro causou save parcial nos demais");
 
   const validEntries=summaries.map((c)=>partyEntry(c,"atomic-success"));
-  r=await post("/api/party/save",{token,party_id:partyState.id,party_version:partyState.version,
-    party_order:partyState.order,characters:validEntries});
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:partyState.version,
+    party_order:partyState.order,characters:validEntries}));
   must(r.status===200&&r.data.characters.every((c)=>c.saveVersion===before.get(Number(c.id))+1),
     "transação válida não avançou todos os personagens exatamente uma versão");
   for(const c of r.data.characters){loaded=await load(token,c.id);must(loaded.snapshot.marker==="atomic-success","snapshot da transação não persistiu");}
@@ -112,21 +116,21 @@ function partyEntry(c,marker){return {id:Number(c.id),expected_version:Number(c.
     "reorder obsoleto não foi recusado pela versão do roster");
   summaries=(await me(token)).characters;
   const versionsAfterAtomic=new Map(summaries.map((c)=>[Number(c.id),c.saveVersion]));
-  r=await post("/api/party/save",{token,party_id:partyState.id,party_version:oldPartyVersion,
-    party_order:oldOrder,characters:summaries.map((c)=>partyEntry(c,"stale-party"))});
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:oldPartyVersion,
+    party_order:oldOrder,characters:summaries.map((c)=>partyEntry(c,"stale-party"))}));
   must(r.status===409&&r.data.error==="PARTY_VERSION_CONFLICT","save com composição antiga não foi recusado");
   summaries=(await me(token)).characters;
   must(summaries.every((c)=>c.saveVersion===versionsAfterAtomic.get(Number(c.id))),
     "conflito do roster alterou versões de personagens");
 
   const partial=summaries.slice(0,-1).map((c)=>partyEntry(c,"partial"));
-  r=await post("/api/party/save",{token,party_id:partyState.id,party_version:partyState.version,
-    party_order:partyState.order,characters:partial});
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:partyState.version,
+    party_order:partyState.order,characters:partial}));
   must(r.status===409&&r.data.error==="PARTY_SAVE_SET_MISMATCH","save parcial da party foi aceito");
 
   const finalEntries=summaries.map((c)=>partyEntry(c,"after-reorder"));
-  r=await post("/api/party/save",{token,party_id:partyState.id,party_version:partyState.version,
-    party_order:partyState.order,characters:finalEntries});
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:partyState.version,
+    party_order:partyState.order,characters:finalEntries}));
   must(r.status===200,"save atômico após reorder válido falhou");
   const finalVersions=new Map(r.data.characters.map((c)=>[Number(c.id),c.saveVersion]));
   await stop();await start();

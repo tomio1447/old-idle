@@ -69,8 +69,12 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/register` | `{ login, password, email? }` | Cria uma conta |
 | POST | `/api/login` | `{ login, password }` | Login → `{ token, account, characters }` |
 | GET | `/api/me` | header `Authorization: Bearer <token>` | Conta + personagens |
+| POST | `/api/lease/acquire` | `{ token, holder_id, lease_token? }` | Adquire/retoma controle exclusivo |
+| POST | `/api/lease/renew` | `{ token, holder_id, lease_token }` | Heartbeat do holder atual |
+| POST | `/api/lease/takeover` | `{ token, holder_id }` | Transferência explícita de controle |
+| POST | `/api/lease/release` | `{ token, holder_id, lease_token }` | Libera no logout explícito |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
-| PUT | `/api/characters/:id` | `{ token, expected_version, level, data, hp, mp, maxHp, maxMp }` | Save otimista; incrementa `saveVersion` |
+| PUT | `/api/characters/:id` | `{ token, holder_id, lease_token, expected_version, level, data, ... }` | Save otimista protegido pelo lease |
 | POST | `/api/coins` | `{ token, amount }` | Admin adiciona/remove Tibia Coins |
 | POST | `/api/market/offers` | `{ token, kind, slug?, tier?, qty, price, price_tc?, days?, seller_name }` | Cria oferta de venda (item ou TC) |
 | GET | `/api/market/offers?kind=&tier=&slug=` | — | Lista ofertas ativas (P2P) |
@@ -89,10 +93,22 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/party/leave` | `{ token, char_id }` | Sai da party (líder dissolve) |
 | POST | `/api/party/kick` | `{ token, char_id, member_id }` | Líder remove um membro |
 | POST | `/api/party/reorder` | `{ token, char_id, expected_version, character_ids[] }` | Reordena com optimistic concurrency |
-| POST | `/api/party/save` | `{ token, party_id, party_version, party_order, characters[] }` | Salva todos os chars controlados em uma transação |
+| POST | `/api/party/save` | `{ token, holder_id, lease_token, party_id, party_version, party_order, characters[] }` | Save transacional protegido pelo lease |
 | GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, versão, ordem e follow pendente |
 | POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
 | POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
+
+**Lease exclusivo de simulação:**
+- `account_leases` concede a somente um documento o direito de simular e
+  persistir a conta; saves sem o segredo vigente recebem HTTP 423
+- O segredo bruto é devolvido apenas ao holder e só seu SHA-256 fica no banco
+- Heartbeat a cada 5 segundos renova o lease de 2 minutos; BroadcastChannel
+  pausa imediatamente outra aba local. Timers continuam ativos em abas
+  ocultas; se o SO congelar a página, o cliente readquire antes do catch-up
+- Reload rotaciona o `holder_id`, impedindo que uma aba clonada use a cópia do
+  mesmo `sessionStorage`. Takeover por outro dispositivo exige ação explícita
+- Fechar a página não libera o lease nem encerra a instância. Logout explícito
+  libera imediatamente; expiração permite retomada segura
 
 **Integridade dos saves online:**
 - Cada personagem possui `save_version`; o cliente deve enviar a versão que
