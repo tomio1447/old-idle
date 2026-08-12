@@ -1,7 +1,8 @@
 /* Cliente: saves da aba são serializados e conflito bloqueia overwrite futuro. */
 "use strict";
 const fs=require("fs"),path=require("path"),vm=require("vm");
-const source=fs.readFileSync(path.join(__dirname,"..","game","js","account-client.js"),"utf8");
+const source=fs.readFileSync(path.join(__dirname,"..","game","js","account-client.js"),"utf8"),
+  indexSource=fs.readFileSync(path.join(__dirname,"..","game","index.html"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
 const local=new Map(),session=new Map();
 const storage=(map)=>({getItem:(k)=>map.has(k)?map.get(k):null,setItem:(k,v)=>map.set(k,String(v)),removeItem:(k)=>map.delete(k)});
@@ -30,6 +31,8 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
 vm.createContext(ctx);vm.runInContext(source,ctx);
 ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:1,snapshot:{}}]);
 (async()=>{
+  must(indexSource.includes('js/account-client.js?v=online-sync-v6'),
+    "index não invalida o cache do cliente com a correção de party-save");
   must((await ctx.accountAcquireLease("token",false)).ok,"cliente não adquiriu lease antes do save");
   const p={id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50};
   const results=await Promise.all([
