@@ -39,8 +39,9 @@ const saved=ctx.persistActiveInstance();
 must(saved&&saved.members.length===2,"snapshot não preserva toda a party");
 must(p1.stamina===42*3600&&p2.stamina===42*3600,"snapshot não mantém stamina cheia");
 const disk=JSON.parse(storage.get("idle-instance-test"));
-must(disk.state&&!disk.state.huntMap&&!disk.state.events&&!disk.state._authorityDescriptor,
-  "snapshot persistiu mapa/eventos pesados ou ciclo autoritativo");
+must(disk.state&&!disk.state.huntMap&&!disk.state.events&&!disk.state._authorityDescriptor&&
+  disk.state.players.length===2&&disk.state.players.every(Boolean),
+  "snapshot persistiu ciclo ou removeu membros por referência compartilhada");
 must(disk.state.mobs[0].target.__targetId==="p2","identidade do alvo não foi serializada");
 must(ctx.readInstanceSession().huntId==="rats","sessão persistida não pode ser relida");
 
