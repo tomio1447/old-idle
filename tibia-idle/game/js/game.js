@@ -3237,6 +3237,7 @@ function initAccountLogin() {
       <div class="panel-body account-flow-body">
         <div class="account-character-list">${cards}</div>
         <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
+        <button class="full mt8" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
         <button class="danger full mt8" id="acc-logout">Logout</button>
       </div>`, true)) return;
     paintAccountPortraits(characters);
@@ -3249,6 +3250,11 @@ function initAccountLogin() {
       if(summary)showIdentityRepair(token,account,characters,summary);
     }));
     $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
+    const customize=$("#acc-customize-char");
+    if(customize)customize.onclick=()=>{
+      if(typeof G==="undefined"||!G||!G.p){msg("Entre em um personagem antes de personalizá-lo.");return;}
+      closeAccountModal();openOutfitModal();
+    };
     $("#acc-logout").onclick = logoutAccount;
   }
   function openRegisterModal() {

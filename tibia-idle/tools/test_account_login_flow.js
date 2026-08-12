@@ -21,8 +21,9 @@ must(js.includes("function showPicker(token, account, characters)")&&
   js.includes('Level ${Number(c.level) || 1} · ${vocationName'),
   "picker não mostra cards com outfit, level e vocação");
 const picker=js.indexOf("function showPicker(token, account, characters)");
-const create=js.indexOf('id="acc-open-create-char"',picker),logout=js.indexOf('id="acc-logout"',picker);
-must(create>picker&&logout>create,"botões Criar personagem/Logout estão ausentes ou fora de ordem");
+const create=js.indexOf('id="acc-open-create-char"',picker),customize=js.indexOf('id="acc-customize-char"',picker),logout=js.indexOf('id="acc-logout"',picker);
+must(create>picker&&customize>create&&logout>customize,"botões Criar/Personalizar/Logout estão ausentes ou fora de ordem");
+must(js.includes('closeAccountModal();openOutfitModal();'),"Personalizar não abre o editor do personagem ativo");
 must(js.includes("function showCharacterCreator")&&js.includes("const refreshed = await accountMe(token)")&&
   js.includes("showPicker(token, refreshed.account, refreshed.characters || [])"),
   "personagem criado não retorna ao picker atualizado");
