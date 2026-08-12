@@ -14,6 +14,11 @@ async function api(method, path, body, token) {
 }
 async function reg() { P += 1; const l = "v16" + RUN + "_" + P; await api("POST","/api/register",{login:l,password:"x"}); return (await api("POST","/api/login",{login:l,password:"x"})).data; }
 async function createChar(token, name) { const r = await api("POST","/api/characters",{token,name,voc:"knight",data:JSON.stringify({name,voc:"knight",level:50,hp:300,mp:100})}); return r.data.character; }
+async function saveChar(token,c,body){
+  const r=await api("PUT","/api/characters/"+c.id,Object.assign({token,
+    expected_version:c.saveVersion,voc:"knight",level:c.level||50},body));
+  if(r.data.ok)c.saveVersion=r.data.saveVersion;return r;
+}
 
 const errors = [];
 const check = (c, m) => { if (!c) errors.push(m); else console.log("  ok:", m); };
@@ -43,7 +48,7 @@ const check = (c, m) => { if (!c) errors.push(m); else console.log("  ok:", m); 
 
   console.log("== 4. state com hp/mp/zona por membro ==");
   // salva o char com snapshots de hp/mp
-  await api("PUT","/api/characters/"+c2.id,{token:a2.token,voc:"knight",level:50,data:"{}",hp:280,mp:95,maxHp:350,maxMp:140});
+  await saveChar(a2.token,c2,{level:50,data:"{}",hp:280,mp:95,maxHp:350,maxMp:140});
   const st = await api("GET","/api/party/state?char_id="+c1.id,null,a1.token);
   const membro = st.data.state.members.find(m=>m.id===c2.id);
   check(!!membro && membro.hp === 280 && membro.mp === 95 && membro.maxHp === 350 && membro.maxMp === 140, "hp/mp/max no state");
@@ -70,8 +75,8 @@ const check = (c, m) => { if (!c) errors.push(m); else console.log("  ok:", m); 
   // dá missão completa ao membro e ao líder
   const dataL = JSON.stringify({ level: 300, missions: { "marapur-nagas": { progress: { "naga-archer": 25, "naga-warrior": 25, "makara": 25 }, claimed: {}, completeClaimed: false } } });
   const dataM = JSON.stringify({ level: 300, missions: { "marapur-nagas": { progress: { "naga-archer": 25, "naga-warrior": 25, "makara": 25 }, claimed: {}, completeClaimed: false } } });
-  await api("PUT","/api/characters/"+c1.id,{token:a1.token,voc:"knight",level:300,data:dataL});
-  await api("PUT","/api/characters/"+c2.id,{token:a2.token,voc:"knight",level:300,data:dataM});
+  await saveChar(a1.token,c1,{level:300,data:dataL});
+  await saveChar(a2.token,c2,{level:300,data:dataM});
   // líder em cidade -> boss
   await api("POST","/api/party/zone",{token:a1.token,char_id:c1.id,zone:"city"});
   const zoneBoss2 = await api("POST","/api/party/zone",{
@@ -84,7 +89,7 @@ const check = (c, m) => { if (!c) errors.push(m); else console.log("  ok:", m); 
   console.log("== 8. boss com membro em COOLDOWN -> recusa ==");
   const dataM2 = JSON.stringify({ level: 300, bosses: { "timira-the-many-headed": { lastFight: Date.now() } },
     missions: { "marapur-nagas": { progress: { "naga-archer": 25, "naga-warrior": 25, "makara": 25 } } } });
-  await api("PUT","/api/characters/"+c2.id,{token:a2.token,voc:"knight",level:300,data:dataM2});
+  await saveChar(a2.token,c2,{level:300,data:dataM2});
   await api("POST","/api/party/zone",{token:a1.token,char_id:c1.id,zone:"city"});
   const zoneBoss3 = await api("POST","/api/party/zone",{
     token:a1.token, char_id:c1.id, zone:"boss", boss:"timira-the-many-headed",

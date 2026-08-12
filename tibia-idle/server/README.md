@@ -70,8 +70,8 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/login` | `{ login, password }` | Login → `{ token, account, characters }` |
 | GET | `/api/me` | header `Authorization: Bearer <token>` | Conta + personagens |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
-| PUT | `/api/characters/:id` | `{ token, voc, level, data }` | Salva personagem |
-| POST | `/api/coins` | `{ token, amount }` | Adiciona/remove Tibia Coins |
+| PUT | `/api/characters/:id` | `{ token, expected_version, level, data, hp, mp, maxHp, maxMp }` | Save otimista; incrementa `saveVersion` |
+| POST | `/api/coins` | `{ token, amount }` | Admin adiciona/remove Tibia Coins |
 | POST | `/api/market/offers` | `{ token, kind, slug?, tier?, qty, price, price_tc?, days?, seller_name }` | Cria oferta de venda (item ou TC) |
 | GET | `/api/market/offers?kind=&tier=&slug=` | — | Lista ofertas ativas (P2P) |
 | GET | `/api/market/mine` | Bearer token | Minhas ofertas |
@@ -88,10 +88,21 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/party/decline` | `{ token, invite_id }` | Recusa um convite |
 | POST | `/api/party/leave` | `{ token, char_id }` | Sai da party (líder dissolve) |
 | POST | `/api/party/kick` | `{ token, char_id, member_id }` | Líder remove um membro |
-| POST | `/api/party/reorder` | `{ token, char_id, character_ids[] }` | Conta dona persiste a ordem completa |
-| GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, ordem e follow pendente |
+| POST | `/api/party/reorder` | `{ token, char_id, expected_version, character_ids[] }` | Reordena com optimistic concurrency |
+| POST | `/api/party/save` | `{ token, party_id, party_version, party_order, characters[] }` | Salva todos os chars controlados em uma transação |
+| GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, versão, ordem e follow pendente |
 | POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
 | POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
+
+**Integridade dos saves online:**
+- Cada personagem possui `save_version`; o cliente deve enviar a versão que
+  carregou. Uma versão obsoleta recebe HTTP 409 e nunca sobrescreve o servidor
+- Saves da party travam a linha da party e todos os personagens no MySQL;
+  qualquer conflito faz rollback completo, sem salvar apenas parte do grupo
+- A composição possui `roster_version`, incrementada em add/remove/reorder.
+  Saves e reorders feitos sobre uma composição antiga são recusados
+- O cliente serializa autosaves da mesma aba e, ao detectar conflito externo,
+  bloqueia novas gravações até recarregar o estado autoritativo
 
 **Regras do Party (multiplayer, convites assíncronos + follow):**
 - Cada party possui `owner_account_id`: uma conta só pode possuir uma party,

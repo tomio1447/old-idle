@@ -6,8 +6,9 @@
  *   POST /api/login      { login, password }           -> { token, account }
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
  *   POST /api/characters { token, name, voc, data }    -> cria personagem
- *   PUT  /api/characters/:id { token, voc, level, data } -> salva personagem
- *   POST /api/coins      { token, amount }             -> adiciona Tibia Coins
+ *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
+ *   POST /api/party/save { token, party_version, characters } -> save transacional
+ *   POST /api/coins      { token, amount }             -> Admin altera Tibia Coins
  *
  * Uso:
  *   cd tibia-idle/server
@@ -152,7 +153,8 @@ function accountCharacterSummary(character) {
   const wrongName=!!(data.name&&String(data.name).toLowerCase()!==String(character.name).toLowerCase());
   return {
     id:character.id, name:character.name, voc:character.voc,
-    level:character.level, sex:data.sex || "male", promoted:!!data.promoted,
+    level:character.level, saveVersion:Number(character.save_version)||0,
+    sex:data.sex || "male", promoted:!!data.promoted,
     outfit:data.outfit && typeof data.outfit === "object" ? data.outfit : null,
     identityMismatch:wrongId||wrongName,
     dataOwnerId:wrongId?String(data.id):null,
@@ -212,13 +214,13 @@ async function createCharacter(db, body) {
   const c = await db.createCharacter(acc.id, name, voc, 1, JSON.stringify(payload));
   payload.id=String(c.id);payload.name=c.name;payload.voc=voc;payload.level=1;
   const data=JSON.stringify(payload);
-  await db.updateCharacter(c.id,voc,1,data);
+  const normalized=await db.updateCharacter(c.id,voc,1,data);
   // Bônus inicial é concedido pelo servidor uma única vez, no primeiro char.
   // O cliente nunca recebe permissão para fabricar saldo premium.
   if(!existingCharacters.length)await db.updateCoins(acc.id,(acc.coins||0)+25);
   const updatedAccount=await db.findAccountById(acc.id);
   return { code: 201, body: { ok: true,
-    character: accountCharacterSummary(Object.assign({}, c, { data })),
+    character: accountCharacterSummary(normalized||Object.assign({},c,{data,save_version:1})),
     coins:updatedAccount ? updatedAccount.coins||0 : acc.coins||0 } };
 }
 
@@ -234,38 +236,100 @@ async function loadCharacter(db, token, id) {
       ok:true,
       character:{
         id:character.id, name:character.name, voc:character.voc,
-        level:character.level, data:character.data,
+        level:character.level, saveVersion:Number(character.save_version)||0,
+        data:character.data,
       },
     },
   };
 }
 
+function prepareCharacterSave(c,body){
+  let payload=body.data;
+  if(typeof payload==="string"){
+    try{payload=JSON.parse(payload);}catch(e){return {error:{code:400,body:{ok:false,error:"INVALID_SAVE_JSON",msg:"Save JSON inválido"}}};}
+  }
+  if(!payload||typeof payload!=="object"||Array.isArray(payload))
+    return {error:{code:400,body:{ok:false,error:"INVALID_SAVE_DATA",msg:"Save inválido"}}};
+  const wrongId=payload.id!==undefined&&String(payload.id)!==String(c.id);
+  const wrongName=!!(payload.name&&String(payload.name).toLowerCase()!==String(c.name).toLowerCase());
+  if(wrongId||wrongName)return {error:{code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
+    msg:"Save bloqueado: os dados pertencem a outro personagem."}}};
+  // Nome e vocação-base são identidades imutáveis. Promotion vive no JSON.
+  payload=Object.assign({},payload,{id:String(c.id),name:c.name,voc:c.voc});
+  const level=Math.max(1,Math.floor(Number(body.level)||Number(c.level)||1));
+  payload.level=level;
+  return {save:{
+    id:Number(c.id),expectedVersion:Number(body.expected_version),voc:c.voc,level,
+    data:JSON.stringify(payload),extra:{
+      hp:Math.max(0,Math.floor(Number.isFinite(Number(body.hp))?Number(body.hp):(Number(payload.hp)||0))),
+      mp:Math.max(0,Math.floor(Number.isFinite(Number(body.mp))?Number(body.mp):(Number(payload.mp)||0))),
+      max_hp:Math.max(0,Math.floor(Number(body.maxHp)||0)),
+      max_mp:Math.max(0,Math.floor(Number(body.maxMp)||0)),
+    },
+  }};
+}
+
+function saveConflictResponse(result){
+  if(result.error==="SAVE_VERSION_CONFLICT")return {code:409,body:{ok:false,error:result.error,
+    msg:"O save foi alterado por outra sessão.",characters:(result.characters||[]).map(accountCharacterSummary)}};
+  return {code:result.error==="CHARACTER_NOT_FOUND"?404:409,body:{ok:false,error:result.error,
+    msg:"Não foi possível salvar o estado solicitado."}};
+}
+
 async function saveCharacter(db, body, id) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const expected=Number(body.expected_version);
+  if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"SAVE_VERSION_REQUIRED",
+    msg:"Atualize o personagem antes de salvar."}};
   const c = await db.findCharacter(id);
   if (!c || Number(c.account_id) !== Number(acc.id)) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
-  let payload=body.data;
-  if(typeof payload==="string"){try{payload=JSON.parse(payload);}catch(e){payload={};}}
-  payload=payload&&typeof payload==="object"?payload:{};
-  const wrongId=payload.id!==undefined&&String(payload.id)!==String(c.id);
-  const wrongName=!!(payload.name&&String(payload.name).toLowerCase()!==String(c.name).toLowerCase());
-  if(wrongId||wrongName)return {code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
-    msg:"Save bloqueado: os dados pertencem a outro personagem."}};
-  // Nome e vocação-base são identidades imutáveis. Promotion vive no JSON.
-  payload.id=String(c.id);payload.name=c.name;payload.voc=c.voc;
-  const voc = c.voc;
-  const level = body.level || c.level;
-  const data = JSON.stringify(payload);
-  // snapshots de vida/mana (o cliente manda hp/mp/maxHp/maxMp a cada save) —
-  // usados pelo painel de party para mostrar as barras dos membros
-  await db.updateCharacter(id, voc, level, data, {
-    hp: Math.max(0, Math.floor(Number(body.hp) || 0)),
-    mp: Math.max(0, Math.floor(Number(body.mp) || 0)),
-    max_hp: Math.max(0, Math.floor(Number(body.maxHp) || 0)),
-    max_mp: Math.max(0, Math.floor(Number(body.maxMp) || 0)),
-  });
-  return { code: 200, body: { ok: true } };
+  const prepared=prepareCharacterSave(c,body);if(prepared.error)return prepared.error;
+  const result=await db.saveCharactersVersioned(acc.id,[prepared.save]);
+  if(!result.ok)return saveConflictResponse(result);
+  const updated=result.characters[0];
+  return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
+}
+
+async function savePartyCharacters(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const partyId=Number(body.party_id),partyVersion=Number(body.party_version);
+  const order=Array.isArray(body.party_order)?body.party_order.map(Number):[];
+  const entries=Array.isArray(body.characters)?body.characters:[];
+  if(!Number.isSafeInteger(partyId)||partyId<=0||!Number.isSafeInteger(partyVersion)||partyVersion<1)
+    return {code:428,body:{ok:false,error:"PARTY_VERSION_REQUIRED",msg:"Atualize a party antes de salvar."}};
+  if(!order.length||order.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(order).size!==order.length||
+     !entries.length||entries.length>5)
+    return {code:400,body:{ok:false,error:"INVALID_PARTY_SAVE",msg:"Save da party inválido."}};
+  const owned=await db.partyFindByAccount(acc.id);
+  if(!owned||Number(owned.id)!==partyId)return {code:403,body:{ok:false,error:"PARTY_NOT_OWNER",
+    msg:"A party não pertence à sua conta."}};
+  const saves=[];
+  for(const entry of entries){
+    const expected=Number(entry.expected_version);
+    if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"SAVE_VERSION_REQUIRED",
+      msg:"Atualize todos os personagens antes de salvar a party."}};
+    const c=await db.findCharacter(Number(entry.id));
+    if(!c||Number(c.account_id)!==Number(acc.id))return {code:403,body:{ok:false,error:"PARTY_CHARACTER_NOT_OWNED",
+      msg:"A party contém um personagem que não pertence à sua conta."}};
+    const prepared=prepareCharacterSave(c,entry);if(prepared.error)return prepared.error;
+    saves.push(prepared.save);
+  }
+  if(new Set(saves.map((save)=>save.id)).size!==saves.length)
+    return {code:400,body:{ok:false,error:"INVALID_PARTY_SAVE",msg:"Personagem duplicado no save da party."}};
+  const result=await db.savePartyCharactersVersioned(acc.id,partyId,partyVersion,order,saves);
+  if(!result.ok){
+    if(result.error==="PARTY_VERSION_CONFLICT"){
+      const current=await db.partyFindByAccount(acc.id),members=current?await db.partyMembers(current.id):[];
+      return {code:409,body:{ok:false,error:result.error,msg:"A composição da party mudou.",
+        party:current?{id:Number(current.id),version:Number(current.roster_version),
+          order:[Number(current.leader_id)].concat(members.map((m)=>Number(m.id)))}:null}};
+    }
+    return saveConflictResponse(result);
+  }
+  return {code:200,body:{ok:true,partyVersion,
+    characters:result.characters.map(accountCharacterSummary)}};
 }
 
 /* Recuperação explícita para saves cruzados por versões antigas. Recria os
@@ -793,6 +857,11 @@ async function main() {
         return send(res, r.code, r.body);
       }
       // ---- PARTY (multiplayer: convites assíncronos + follow) ----
+      if (req.method === "POST" && url === "/api/party/save") {
+        const body=await readBody(req);
+        const r=await savePartyCharacters(db,body);
+        return send(res,r.code,r.body);
+      }
       if (req.method === "POST" && url === "/api/party/create") {
         const body = await readBody(req);
         const r = await party.partyCreate(db, body);

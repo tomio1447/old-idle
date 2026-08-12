@@ -96,8 +96,11 @@ async function partySwitchToChar(id) {
     const currentId = current && current.id ? String(current.id) :
       (typeof sessionCharId === "function" ? String(sessionCharId() || "") : "");
     if (typeof save === "function") save();
-    if (current && token && currentId && typeof accountSaveCharacter === "function") {
-      try { await accountSaveCharacter(token, currentId, current); } catch (e) { /* autosave já tentou */ }
+    if(current&&token&&currentId){
+      try{
+        if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
+        else if(typeof accountSaveCharacter==="function")await accountSaveCharacter(token,currentId,current);
+      }catch(e){ /* conflito é tratado pelo cliente da conta */ }
     }
     try { sessionStorage.setItem("tibia-idle-online-autoload", String(id)); } catch (e) {}
     location.reload();
@@ -872,7 +875,7 @@ function bindPartyOnline(p, st, inbox) {
       // posição zero é reservada ao líder.
       if(index<1||next<1||next>=order.length)return;
       [order[index],order[next]]=[order[next],order[index]];
-      const r=await accountPartyReorder(Number(sessionCharId()),order);
+      const r=await accountPartyReorder(Number(sessionCharId()),Number(st.version),order);
       toast(r.ok?"Ordem da party salva.":(r.msg||"Falha"),r.ok?"":"bad");
       if(r.ok)recarregar();
     }));

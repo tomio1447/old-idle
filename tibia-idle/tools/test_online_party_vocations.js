@@ -31,9 +31,9 @@ must(entities[1].p.config.combo[0]==="rp"&&entities[1].p.equip.weapon.item==="bo
 must(!combat.includes('if (typeof partyOnlineMode === "function" && partyOnlineMode()) return;')&&
   combat.includes("if(online&&(!player._partyOnline||!player._partyOnline.isLeader))return;"),
   "newCombat ainda bloqueia party online ou não exige líder");
-must(party.includes("accountSaveCharacter(token,String(ent.id),ent.p)")&&
+must(party.includes("accountSaveParty(token,state,G.combat.players)")&&
   game.includes('typeof partyCombatSaveAll==="function")partyCombatSaveAll()'),
-  "autosave não persiste todos os membros por id próprio");
+  "autosave não persiste a party online em transação única");
 must(admin.includes("await accountRepairCharacter(sessionToken(),String(p.id),newVoc,p)")&&
   server.includes("async function repairCharacterIdentity"),
   "Admin não usa rota autorizada para trocar vocation-base");
