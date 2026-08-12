@@ -44,6 +44,7 @@ const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"8640000
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
 const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_MAX_STEP_MS||"3600000",10)||3600000);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
+const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
 let SYNC_BUS=null;
 const RATE_BUCKETS=new Map(),TRUST_PROXY=process.env.TRUST_PROXY==="1",RATE_LIMIT_DISABLED=process.env.RATE_LIMIT_DISABLED==="1";
@@ -1122,12 +1123,12 @@ async function main() {
       }
       if (req.method === "GET" && url === "/api/health") {
         return send(res, 200, { ok:true, testServer:TEST_SERVER,
-          worker:instanceWorker.stats(),sync:{cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
+          worker:instanceWorker.stats(),sync:{protocol:SYNC_PROTOCOL,cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
           accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
       }
       if (req.method === "GET" && url === "/js/server-config.js") {
         const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
-          TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin};\n`;
+          TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin,syncProtocol:"${SYNC_PROTOCOL}"};\n`;
         return sendText(res, 200, config, "text/javascript; charset=utf-8");
       }
       if (req.method === "POST" && url === "/api/register") {

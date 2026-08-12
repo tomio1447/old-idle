@@ -2686,7 +2686,7 @@ function startGame(p) {
         else showGameLoading(false);
       })
       .catch((error) => {
-        showGameLoading(false);
+        G.runtimeStarting=false;showGameLoading(false);
         console.error(error);
         toast("Não foi possível carregar o templo oficial.", "bad");
       });
@@ -2695,6 +2695,7 @@ function startGame(p) {
 }
 
 async function startGameReady(p) {
+  if(G.runtimeStarting||G.runtimeStarted)return;G.runtimeStarting=true;
   p = normalizePlayer(p);
   G.p = p;
   G.renderer = new Renderer($("#scene"));
@@ -2770,6 +2771,9 @@ async function startGameReady(p) {
   p.lastSeen=Date.now();
 
   const startRuntime=(resumeResult)=>{
+    // Duplo clique/reconnect concorrente não pode criar dois rAF loops,
+    // timers e listeners sobre a mesma instância.
+    if(G.runtimeStarted)return;G.runtimeStarting=false;G.runtimeStarted=true;
     if(!instanceSession)G.inCity=true;
     renderAll();bindControls();
     addLog("info",`Bem-vindo, <b>${G.p.name}</b>!`);
