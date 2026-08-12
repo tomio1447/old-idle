@@ -33,11 +33,14 @@ const e1={id:"p1",name:"Knight",p:p1},e2={id:"p2",name:"Druid",p:p2};
 ctx.G.p=p1;ctx.G.combat={huntId:"rats",instanceMode:"non-pvp",huntMap:{rows:["huge"]},
   players:[e1,e2],player:e1,events:[{t:"hit"}],mobs:[{id:"m1",slug:"rat",target:e2}],
   stats:{startedAt:1}};
+// Reproduz o ciclo visto após um tick autoritativo antigo.
+const authorityDescriptor={state:ctx.G.combat};ctx.G.combat._authorityDescriptor=authorityDescriptor;
 const saved=ctx.persistActiveInstance();
 must(saved&&saved.members.length===2,"snapshot não preserva toda a party");
 must(p1.stamina===42*3600&&p2.stamina===42*3600,"snapshot não mantém stamina cheia");
 const disk=JSON.parse(storage.get("idle-instance-test"));
-must(disk.state&&!disk.state.huntMap&&!disk.state.events,"snapshot persistiu mapa/eventos pesados");
+must(disk.state&&!disk.state.huntMap&&!disk.state.events&&!disk.state._authorityDescriptor,
+  "snapshot persistiu mapa/eventos pesados ou ciclo autoritativo");
 must(disk.state.mobs[0].target.__targetId==="p2","identidade do alvo não foi serializada");
 must(ctx.readInstanceSession().huntId==="rats","sessão persistida não pode ser relida");
 

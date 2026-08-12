@@ -43,8 +43,11 @@ const ZONE_LEGAL = {
   unknown:  ["city", "training", "hunt", "boss"],
   city:     ["city", "training", "hunt", "boss"],
   training: ["training", "city", "hunt", "boss"],
-  hunt:     ["hunt", "city", "training"],
-  boss:     ["boss", "city", "training"],
+  // Troca de arena pode chegar no mesmo lote HTTP do checkpoint city. Hunt
+  // e boss são destinos autenticados/validados; aceite a transição direta de
+  // forma idempotente para não deixar a party presa por reordenação de rede.
+  hunt:     ["hunt", "boss", "city", "training"],
+  boss:     ["boss", "hunt", "city", "training"],
 };
 
 /* Valida o token e devolve { account, char } — o personagem TEM que
