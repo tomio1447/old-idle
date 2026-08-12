@@ -125,6 +125,22 @@ a aplicação e usar um banco/disco persistente.
 - Fechar o navegador não encerra a linha ativa. O próximo holder retoma a mesma
   instância e processa o intervalo desde `saved_at`
 
+**Worker idle sem navegador:**
+- `instance_worker.js` varre instâncias ativas e só reivindica tempo quando o
+  lease da conta expirou ou foi liberado; aba oculta com lease nunca duplica
+  processamento com o worker
+- Cada claim bloqueia lease e instância na mesma ordem transacional, avança no
+  no máximo 1 hora por claim e move `worker_cursor_at`. Múltiplos processos não podem
+  consumir o mesmo intervalo
+- O tempo reivindicado fica em `workerElapsedMs` dentro do snapshot. Ao voltar,
+  o cliente soma apenas o residual após o checkpoint e aplica o intervalo uma
+  vez no motor completo; o próximo save limpa o carry
+- Cursor, carry, total auditável e versão sobrevivem a restart. Tombstones
+  `ended` nunca entram na fila
+- Esta fase torna o relógio offline server-side e exatamente uma vez. A próxima
+  fase moverá também combate, recompensas e morte para execução autoritativa
+  no servidor, reutilizando os mesmos locks/checkpoints
+
 **Integridade dos saves online:**
 - Cada personagem possui `save_version`; o cliente deve enviar a versão que
   carregou. Uma versão obsoleta recebe HTTP 409 e nunca sobrescreve o servidor

@@ -202,8 +202,14 @@ function resumeIdleInstance(session){
         G.combat=restoreCombatSessionState(fresh,session);
         G.p.hunt=session.kind==="hunt"?session.huntId:null;
         G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
-        const elapsed=Math.max(0,Date.now()-session.savedAt);
-        const result=advanceIdleInstance(elapsed,session.savedAt,{silent:true});
+        // O worker já reivindicou intervalos completos sem lease. Soma o
+        // pequeno residual após o último checkpoint e aplica cada período uma
+        // única vez no mesmo motor de combate usado pela aba ativa.
+        const workerElapsed=Math.max(0,Number(session.workerElapsedMs)||0);
+        const residual=Math.max(0,Date.now()-session.savedAt);
+        const elapsed=workerElapsed+residual,startAt=session.savedAt-workerElapsed;
+        delete session.workerElapsedMs;delete session.workerCheckpointAt;
+        const result=advanceIdleInstance(elapsed,startAt,{silent:true});
         if(G.combat){persistActiveInstance();G.inCity=false;}
         resolve({resumed:!!G.combat,ended:result.ended,elapsed});
       }catch(error){
@@ -2230,6 +2236,18 @@ document.addEventListener("visibilitychange", async () => {
        typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()){
       const lease=typeof accountEnsureLease==="function"?await accountEnsureLease(sessionToken()):{ok:false};
       if(!lease.ok){const deniedAt=Date.now();G.bgLast=deniedAt;G.bgAcc=0;G.last=performance.now();G.tickAcc=0;_wasHidden=false;return;}
+      // Durante um congelamento maior que o TTL, o worker pode ter avançado o
+      // relógio remoto. Recarrega o snapshot antes de qualquer catch-up local.
+      if(typeof accountLoadInstance==="function"){
+        const remote=await accountLoadInstance(sessionToken());
+        if(remote.ok&&remote.instance&&typeof resumeIdleInstance==="function"){
+          await resumeIdleInstance(remote.instance);
+          const resumedAt=Date.now();G.bgLast=resumedAt;G.bgAcc=0;G.last=performance.now();G.tickAcc=0;_wasHidden=false;return;
+        }
+        if(remote.ok&&remote.lastStatus==="ended"){
+          clearInstanceSession("worker-ended",true);G.combat=null;G.inCity=true;G.p.hunt=null;G.p.instanceMode=null;
+        }
+      }
     }
     // Timers podem ser totalmente congelados pelo navegador/SO. Reconcilia
     // aqui todo o intervalo ainda não processado antes de reativar o rAF.

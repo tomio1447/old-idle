@@ -182,11 +182,30 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
   }else{
     if(Number(expectedVersion)!==0)return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
     if(!row){row={account_id:Number(accountId)};this.instances.push(row);}
-    row.instance_id=instanceId;row.version=1;row.started_at=meta.startedAt;
+    row.instance_id=instanceId;row.version=1;row.started_at=meta.startedAt;row.worker_total_ms=0;
   }
   Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
+    worker_cursor_at:new Date(meta.saved_at).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
     updated_at:new Date(lease.now).toISOString()});
   this._save();return {ok:true,instance:row};
+};
+JsonStore.prototype.instanceWorkerCandidates = function(limit){
+  return (this.instances||[]).filter((row)=>row.status==="active")
+    .sort((a,b)=>new Date(a.worker_cursor_at||a.saved_at)-new Date(b.worker_cursor_at||b.saved_at))
+    .slice(0,Math.max(1,Number(limit)||50)).map((row)=>Number(row.account_id));
+};
+JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep,advanceState){
+  const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,skipped:"inactive"};
+  const lease=(this.leases||[]).find((item)=>Number(item.account_id)===Number(accountId));
+  if(lease&&new Date(lease.expires_at).getTime()>now)return {ok:false,skipped:"leased"};
+  const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
+  const elapsed=Math.min(Math.max(0,now-cursor),Math.max(1,Number(maxStep)||3600000));
+  if(elapsed<Math.max(1,Number(minStep)||500))return {ok:false,skipped:"not-due"};
+  const checkpoint=cursor+elapsed,next=advanceState(row.state,elapsed,checkpoint);
+  row.state=next;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
+  row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
+  row.updated_at=new Date(now).toISOString();this._save();
+  return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)};
 };
 JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,reason,lease){
   if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
@@ -885,10 +904,10 @@ async function MysqlStore() {
           }
           await conn.query(
             `UPDATE account_instances SET version=version+1,kind=?,hunt_id=?,boss_id=?,instance_mode=?,
-             party_id=?,party_version=?,active_character_id=?,state=?,saved_at=?,status='active',
+             party_id=?,party_version=?,active_character_id=?,state=?,saved_at=?,worker_cursor_at=?,status='active',
              ended_at=NULL,terminal_reason=NULL WHERE account_id=?`,
             [meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,meta.party_id,meta.party_version,
-             meta.active_character_id,state,meta.saved_at,Number(accountId)]);
+             meta.active_character_id,state,meta.saved_at,meta.saved_at,Number(accountId)]);
         }else{
           if(Number(expectedVersion)!==0){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
@@ -896,19 +915,56 @@ async function MysqlStore() {
           await conn.query(
             `INSERT INTO account_instances
              (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
-              party_version,active_character_id,state,saved_at,started_at)
-             VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?)
+              party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
+             VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,0)
              ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=1,status='active',kind=VALUES(kind),
               hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),instance_mode=VALUES(instance_mode),
               party_id=VALUES(party_id),party_version=VALUES(party_version),
               active_character_id=VALUES(active_character_id),state=VALUES(state),saved_at=VALUES(saved_at),
-              started_at=VALUES(started_at),ended_at=NULL,terminal_reason=NULL`,
+              started_at=VALUES(started_at),worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=0,
+              ended_at=NULL,terminal_reason=NULL`,
             [Number(accountId),instanceId,meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,
-             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,meta.started_at]);
+             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,meta.started_at,meta.saved_at]);
         }
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceWorkerCandidates(limit){
+      const rows=await this.query(
+        `SELECT account_id FROM account_instances WHERE status='active'
+         ORDER BY COALESCE(worker_cursor_at,saved_at) ASC LIMIT ?`,
+        [Math.max(1,Math.min(500,Number(limit)||50))]);
+      return rows.map((row)=>Number(row.account_id));
+    },
+    async instanceWorkerClaim(accountId,now,maxStep,minStep,advanceState){
+      const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
+      try{
+        const [locks]=await conn.query("SELECT GET_LOCK(?,5) AS acquired",[lockName]);
+        if(!locks[0]||Number(locks[0].acquired)!==1)return {ok:false,skipped:"lock-timeout"};
+        await conn.beginTransaction();
+        const [leases]=await conn.query("SELECT expires_at FROM account_leases WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        if(leases[0]&&new Date(leases[0].expires_at).getTime()>now){
+          await conn.rollback();return {ok:false,skipped:"leased"};
+        }
+        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const row=rows[0];if(!row||row.status!=="active"){
+          await conn.rollback();return {ok:false,skipped:"inactive"};
+        }
+        const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
+        const elapsed=Math.min(Math.max(0,now-cursor),Math.max(1,Number(maxStep)||3600000));
+        if(elapsed<Math.max(1,Number(minStep)||500)){
+          await conn.rollback();return {ok:false,skipped:"not-due"};
+        }
+        const checkpoint=cursor+elapsed,next=advanceState(row.state,elapsed,checkpoint);
+        await conn.query(
+          `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
+             worker_total_ms=worker_total_ms+? WHERE account_id=?`,
+          [next,new Date(checkpoint),new Date(checkpoint),elapsed,Number(accountId)]);
+        await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)+1};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{
+        try{await conn.query("SELECT RELEASE_LOCK(?)",[lockName]);}catch(e){}conn.release();
+      }
     },
     async instanceEnd(accountId,instanceId,expectedVersion,reason,lease){
       const conn=await pool.getConnection();
@@ -1301,6 +1357,8 @@ async function ensureSchema(pool) {
     state MEDIUMTEXT NOT NULL,
     saved_at DATETIME(3) NOT NULL,
     started_at DATETIME(3) NOT NULL,
+    worker_cursor_at DATETIME(3) DEFAULT NULL,
+    worker_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
     ended_at DATETIME(3) DEFAULT NULL,
     terminal_reason VARCHAR(40) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1309,6 +1367,11 @@ async function ensureSchema(pool) {
     CONSTRAINT fk_instances_account FOREIGN KEY (account_id)
       REFERENCES accounts(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
+  for(const col of [
+    "ADD COLUMN worker_cursor_at DATETIME(3) DEFAULT NULL AFTER started_at",
+    "ADD COLUMN worker_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER worker_cursor_at",
+  ]){try{await pool.query("ALTER TABLE account_instances "+col);}catch(e){/* já existe */}}
+  try{await pool.query("UPDATE account_instances SET worker_cursor_at=saved_at WHERE worker_cursor_at IS NULL");}catch(e){}
   await pool.query(`CREATE TABLE IF NOT EXISTS characters (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     account_id INT UNSIGNED NOT NULL,
