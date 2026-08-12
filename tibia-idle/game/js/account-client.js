@@ -200,14 +200,22 @@ function accountInstanceApply(instance){
 }
 function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
 async function accountLoadInstance(token){
-  if(accountLeaseAllowsSimulation()){
-    const tick=await _api("POST","/api/instance/tick",Object.assign({token},accountLeaseFields()));
-    if(tick.data&&tick.data.ok&&tick.data.characters)accountMergeCharacterCache(tick.data.characters);
-  }
-  const r=await _api("GET","/api/instance",null,token);
+  // Consulte antes de tickar: uma conta sem instância ativa deve receber 200
+  // com null, não provocar o 410 esperado de /tick no console do navegador.
+  let r=await _api("GET","/api/instance",null,token);
   if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
   if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
   accountInstanceApply(r.data.instance);
+  if(accountLeaseAllowsSimulation()){
+    const tick=await _api("POST","/api/instance/tick",Object.assign({token,
+      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
+      accountInstanceApply(tick.data.instance||null);
+      return {ok:true,instance:tick.data.instance&&tick.data.instance.state||null,
+        meta:tick.data.instance||null,lastStatus:tick.data.instance?null:"ended"};}
+    // Em caso de corrida com worker/SSE, use o snapshot GET já validado; a
+    // próxima sincronização reconciliará a versão sem erro destrutivo.
+  }
   return {ok:true,instance:r.data.instance.state||null,meta:r.data.instance};
 }
 function accountSaveInstance(token,state){

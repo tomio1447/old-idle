@@ -28,8 +28,11 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   r=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt",hunt:"cobra-bastion",instance:"non-pvp",otbm:"cobra_bastion"});
   must(r.status===200,"boss -> city -> Cobra retornou 400: "+JSON.stringify(r.data));
   const acquired=await post("/api/lease/acquire",{token,holder_id:"cobratransition"}),lease={holder_id:acquired.data.holderId,lease_token:acquired.data.leaseToken};
-  r=await put("/api/instance",Object.assign({token,instance_id:null,expected_version:0,state:descriptor([a,b])},lease));
-  must(r.status===200,"snapshot Cobra retornou "+r.status+": "+JSON.stringify(r.data));
+  const emptyTick=await post("/api/instance/tick",Object.assign({token},lease));
+  must(emptyTick.status===200&&emptyTick.data.instance===null,"tick sem instância ainda retorna HTTP 410");
+  const snapshot=descriptor([a,b]);snapshot.state.players=[null,snapshot.state.players[1]];
+  r=await put("/api/instance",Object.assign({token,instance_id:null,expected_version:0,state:snapshot},lease));
+  must(r.status===200,"snapshot Cobra recuperável retornou "+r.status+": "+JSON.stringify(r.data));
   must(client.includes("ACCOUNT_PARTY_ZONE_QUEUE")&&game.includes('key==="_authorityDescriptor"')&&
     !game.includes("G.combat._authorityDescriptor=descriptor")&&game.includes("G.huntEntryPendingToken"),
     "cliente não serializa zona/remove ciclo/protege entrada OTBM");

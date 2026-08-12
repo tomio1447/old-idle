@@ -100,13 +100,12 @@ function persistActiveInstance() {
     })),
   };
   try {
-    const seen=new WeakSet();
     const state=JSON.parse(JSON.stringify(c,(key,value)=>{
+      // Shared references (c.player também está em c.players) são válidas e
+      // devem ser duplicadas pelo JSON.stringify. Remova apenas ciclos reais.
       if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||key==="_authorityDescriptor")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
-      if(typeof value==="function")return undefined;
-      if(value&&typeof value==="object"){if(seen.has(value))return undefined;seen.add(value);}
-      return value;
+      return typeof value==="function"?undefined:value;
     }));
     descriptor.state=state;
   } catch(error) {

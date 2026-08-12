@@ -534,15 +534,25 @@ async function prepareInstanceState(db,acc,input){
     if(Number(c.hp)>0)canonical.hp=Number(c.hp);if(Number(c.mp)>=0)canonical.mp=Number(c.mp);
     member.p=canonical;member.hp=canonical.hp;member.mp=canonical.mp;rows.push(c);
   }
-  if(input.state&&Array.isArray(input.state.players))for(const ent of input.state.players){
-    const member=members.find((m)=>String(m.id)===String(ent&&ent.id));if(member)ent.p=cloneJson(member.p);
-  }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
   if(input.state&&Array.isArray(input.state.players)){
-    const stateIds=input.state.players.map((ent)=>Number(ent&&((ent.id!==undefined&&ent.id)||(ent.p&&ent.p.id))));
-    if(stateIds.length!==ids.length||stateIds.some((id,index)=>id!==ids[index]))
-      return {error:{code:400,body:{ok:false,error:"INSTANCE_STATE_MEMBERS_MISMATCH",msg:"Entidades/ordem não correspondem aos membros"}}};
+    // Ordem visual e referências compartilhadas não são autoridade. Rejeite
+    // somente entidades estrangeiras/duplicadas e reconstrua ausentes na
+    // ordem validada de `members` (snapshots antigos podiam conter null).
+    const visualById=new Map();
+    for(const ent of input.state.players){
+      if(!ent)continue;const visualId=Number(ent.id!==undefined?ent.id:(ent.p&&ent.p.id));
+      if(!ids.includes(visualId))return {error:{code:400,body:{ok:false,error:"INSTANCE_STATE_MEMBERS_MISMATCH",
+        msg:"Entidade não pertence aos membros da instância"}}};
+      if(visualById.has(visualId))return {error:{code:400,body:{ok:false,error:"INSTANCE_STATE_MEMBERS_MISMATCH",
+        msg:"Entidade duplicada na instância"}}};
+      visualById.set(visualId,ent);
+    }
+    input.state.players=ids.map((id,index)=>{
+      const ent=Object.assign({},visualById.get(id)||{id:String(id)});
+      ent.id=String(id);ent.p=cloneJson(members[index].p);return ent;
+    });
   }
   let partyId=null,partyVersion=null;
   const party=await db.partyFindByAccount(acc.id),partyMembers=party?await db.partyMembers(party.id):[];
@@ -604,8 +614,14 @@ async function tickInstance(db,body){
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_VERSION",msg:"Versão inválida"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const result=await db.instanceAuthorityTick(acc.id,expected,Date.now(),3600000,advanceAuthorityState,lease);
-  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_NOT_ACTIVE"?410:409,
-    body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+  if(!result.ok){
+    // Tick é idempotente: ausência/terminal entre GET e POST não é falha de
+    // transporte e não deve poluir o console com HTTP 410.
+    if(result.error==="INSTANCE_NOT_ACTIVE")return {code:200,body:{ok:true,instance:null,
+      terminalReason:"inactive",characters:[],elapsed:0}};
+    return {code:result.error==="LEASE_REQUIRED"?423:409,
+      body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+  }
   if(typeof db.snapshotAdd==="function"&&(result.terminalReason||Number(result.instance.version)%120===0))
     await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
       result.terminalReason||"tick",result.instance,!!result.terminalReason);
