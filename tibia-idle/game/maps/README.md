@@ -115,10 +115,11 @@ Goshnar's Hatred.
 
 ## Goshnar's Hatred
 
-`goshnars_hatred.otbm` é uma cópia runtime independente do OTBM entregue para
-Rotten Wasteland, evitando compartilhar cache e zonas com a hunt. A sala/FOV
-informada ocupa `(1044,1012,7)..(1061,1025,7)` sem recortar o mundo 30×30.
-O player nasce em `(1047,1019,7)` e o boss em `(1059,1019,7)`. Após 20–40s,
+`goshnars_hatred_room.otbm` é uma boss room dedicada de 18×14, gerada por
+`tools/build_soulwar_boss_rooms.js`, sem compartilhar bytes, cache ou terreno
+com Rotten Wasteland. Ela é centralizada num mundo runtime 30×30; o player
+nasce em `(2,7)` (runtime `(8,15)`) e o boss em `(15,7)` (runtime `(21,15)`).
+Dois pilares e a fogueira central delimitam a mecânica. Após 20–40s,
 Dread's Torment ativa: os contadores sobem a cada 5s, elevando em 10% por
 ponto o dano de Hatred. A sala mantém até cinco summons; Dreadful Harvester
 tem 15.000 HP e reduz os contadores em 1 ao morrer, enquanto Hateful Soul tem
@@ -126,12 +127,12 @@ tem 15.000 HP e reduz os contadores em 1 ao morrer, enquanto Hateful Soul tem
 
 ## Goshnar's Greed
 
-`goshnarsgreed.otbm` vem do beta-map atualizado em `beta-maps/bossesroom/`,
-seleciona integralmente o piso `z=7` de 20×14 (`1048,1011` até `1067,1024`)
-e o centraliza num mundo 30×30. A FOV informada continua registrada como
-`(1042,1009,7)..(1060,1024,7)`, sem recortar o mundo. O player nasce em
-`(1052,1022,7)`, runtime `(9,19)`, e Goshnar em `(1052,1011,7)`, runtime
-`(9,8)`. A recompensa da Mirrored Nightmare já registra o acesso, mas
+`goshnars_greed_room.otbm` é uma boss room dedicada de 20×14, gerada por
+`tools/build_soulwar_boss_rooms.js`, sem reutilizar o terreno de Rotten
+Wasteland. O mapa é centralizado num mundo runtime 30×30; o player nasce em
+`(10,12)` (runtime `(15,20)`) e Goshnar em `(10,2)` (runtime `(15,10)`).
+Quatro ilhas laterais separam os pontos dos adds do corredor do boss.
+A recompensa da Mirrored Nightmare já registra o acesso, mas
 requisito e cooldown estão temporariamente desligados para testes. Durante a
 luta aparecem até seis adds sem defesa/imunidade; cada nascimento tem 30% de
 chance de ser Greedbeast. A cada cinco Greedbeasts mortos, o boss perde a
