@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS account_instances (
   state              MEDIUMTEXT NOT NULL,
   saved_at           DATETIME(3) NOT NULL,
   started_at         DATETIME(3) NOT NULL,
+  worker_cursor_at   DATETIME(3) DEFAULT NULL, -- último intervalo reivindicado
+  worker_total_ms    BIGINT UNSIGNED NOT NULL DEFAULT 0, -- auditoria acumulada
   ended_at           DATETIME(3) DEFAULT NULL,
   terminal_reason    VARCHAR(40) DEFAULT NULL,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

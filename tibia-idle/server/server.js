@@ -7,6 +7,7 @@
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
  *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
  *   GET/PUT /api/instance                              -> instância persistente
+ *   worker server-side                                 -> relógio idle sem browser
  *   POST /api/characters { token, name, voc, data }    -> cria personagem
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
@@ -28,12 +29,15 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
+const { startInstanceWorker } = require("./instance_worker");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
 const TEST_SERVER = process.env.TEST_SERVER === "1";
 const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
+const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
+const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_MAX_STEP_MS||"3600000",10)||3600000);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
 
 /* ------------------------------- helpers ------------------------------- */
@@ -397,7 +401,8 @@ function instanceSummary(row,includeState){
     huntId:row.hunt_id||null,bossId:row.boss_id||null,instanceMode:row.instance_mode,
     partyId:row.party_id?Number(row.party_id):null,partyVersion:row.party_version?Number(row.party_version):null,
     activeCharacterId:String(row.active_character_id),savedAt:new Date(row.saved_at).getTime(),
-    startedAt:new Date(row.started_at).getTime(),terminalReason:row.terminal_reason||null,state};
+    startedAt:new Date(row.started_at).getTime(),workerCursorAt:new Date(row.worker_cursor_at||row.saved_at).getTime(),
+    workerTotalMs:Number(row.worker_total_ms)||0,terminalReason:row.terminal_reason||null,state};
 }
 async function loadInstance(db,token){
   const acc=await db.findAccountByToken(token);
@@ -904,6 +909,10 @@ async function main() {
   }
 
   await ensureTestAccounts(db);
+  const instanceWorker=startInstanceWorker(db,{
+    intervalMs:INSTANCE_WORKER_INTERVAL_MS,maxStepMs:INSTANCE_WORKER_MAX_STEP_MS,
+    minStepMs:Math.min(500,INSTANCE_WORKER_INTERVAL_MS),
+  });
 
   const server = http.createServer(async (req, res) => {
     // CORS preflight
@@ -912,7 +921,8 @@ async function main() {
     const url = req.url.split("?")[0];
     try {
       if (req.method === "GET" && url === "/api/health") {
-        return send(res, 200, { ok:true, testServer:TEST_SERVER, accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
+        return send(res, 200, { ok:true, testServer:TEST_SERVER,
+          worker:instanceWorker.stats(),accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
       }
       if (req.method === "GET" && url === "/js/server-config.js") {
         const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${

@@ -1,0 +1,54 @@
+/*
+ * Relógio server-side das instâncias ociosas.
+ *
+ * Nesta fase o worker reivindica, em transação, cada intervalo sem lease e o
+ * anexa ao snapshot como `workerElapsedMs`. O cliente aplica esse intervalo
+ * usando o mesmo motor completo ao reconectar. A fase de combate autoritativo
+ * substituirá advanceInstanceClock sem alterar locks/checkpoints desta fila.
+ */
+"use strict";
+
+function advanceInstanceClock(serialized,elapsed,checkpointAt){
+  let state=serialized;
+  if(typeof state==="string")state=JSON.parse(state);
+  if(!state||typeof state!=="object"||Array.isArray(state))throw new Error("invalid instance state");
+  const carry=Math.max(0,Number(state.workerElapsedMs)||0);
+  state.workerElapsedMs=Math.min(Number.MAX_SAFE_INTEGER,carry+Math.max(0,Number(elapsed)||0));
+  state.workerCheckpointAt=checkpointAt;
+  state.savedAt=checkpointAt;
+  return JSON.stringify(state);
+}
+
+async function runInstanceWorkerOnce(db,options){
+  options=options||{};
+  const now=Number(options.now)||Date.now();
+  const limit=Math.max(1,Math.min(500,Number(options.limit)||50));
+  const maxStep=Math.max(100,Number(options.maxStepMs)||3600000);
+  const minStep=Math.max(50,Number(options.minStepMs)||500);
+  const ids=await db.instanceWorkerCandidates(limit),result={claimed:0,elapsed:0,skipped:0,errors:[]};
+  for(const accountId of ids){
+    try{
+      const claim=await db.instanceWorkerClaim(accountId,now,maxStep,minStep,advanceInstanceClock);
+      if(claim&&claim.ok){result.claimed++;result.elapsed+=Number(claim.elapsed)||0;}
+      else result.skipped++;
+    }catch(error){result.errors.push({accountId,message:error.message});}
+  }
+  return result;
+}
+
+function startInstanceWorker(db,options){
+  options=options||{};
+  const intervalMs=Math.max(100,Number(options.intervalMs)||1000);
+  let stopped=false,running=false,timer=null,last={claimed:0,elapsed:0,skipped:0,errors:[]};
+  const run=async()=>{
+    if(stopped||running)return last;running=true;
+    try{last=await runInstanceWorkerOnce(db,options);return last;}
+    finally{running=false;}
+  };
+  timer=setInterval(()=>{run().catch((error)=>console.error("[instance-worker]",error));},intervalMs);
+  if(timer&&typeof timer.unref==="function")timer.unref();
+  setTimeout(()=>run().catch((error)=>console.error("[instance-worker]",error)),Math.min(100,intervalMs));
+  return {runOnce:run,stats:()=>last,stop(){stopped=true;if(timer)clearInterval(timer);timer=null;}};
+}
+
+module.exports={advanceInstanceClock,runInstanceWorkerOnce,startInstanceWorker};
