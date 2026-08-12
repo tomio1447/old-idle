@@ -510,6 +510,21 @@ async function accountAddCoins(token, amount) {
   return r.data.ok ? { ok: true, coins: r.data.coins } : { ok: false };
 }
 
+function accountApplyServerBalances(data){
+  data=data||{};
+  if(data.character){accountMergeCharacterCache([data.character]);
+    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)&&data.character.snapshot)
+      G.p.gold=Math.max(0,Number(data.character.snapshot.gold)||0);}catch(e){}}
+  const coins=Number(data.coinBalance);
+  if(Number.isFinite(coins)){
+    try{const raw=sessionStorage.getItem("tibia-idle-account"),account=raw?JSON.parse(raw):null;
+      if(account){account.coins=Math.max(0,coins);sessionStorage.setItem("tibia-idle-account",JSON.stringify(account));}}catch(e){}
+    if(typeof accountSetCoins==="function")accountSetCoins(Math.max(0,coins));
+    if(typeof renderCoinBalance==="function")renderCoinBalance();
+  }
+  return data;
+}
+
 /* ------------------------------ MARKET P2P ------------------------------ */
 
 /* Cria oferta de venda (item ou Tibia Coins).
@@ -517,7 +532,9 @@ async function accountAddCoins(token, amount) {
  *        seller_name? } */
 async function marketCreateOffer(body) {
   const r = await _api("POST", "/api/market/offers", body);
-  return r.data.ok ? { ok: true, offer: r.data.offer } : { ok: false, msg: r.data.msg || "Falha ao criar oferta" };
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,offer:r.data.offer,matched:r.data.matched,
+    bank:r.data.bank,coinBalance:r.data.coinBalance};}
+  return {ok:false,msg:r.data.msg||"Falha ao criar oferta"};
 }
 
 /* Lista ofertas ativas. filtro: { kind?, tier?, slug? } */
@@ -540,13 +557,16 @@ async function marketMineOffers(token) {
 /* Compra uma oferta. body: { token, offer_id, buyer_name? } */
 async function marketBuyOffer(body) {
   const r = await _api("POST", "/api/market/buy", body);
-  return r.data.ok ? { ok: true, data: r.data } : { ok: false, msg: r.data.msg || "Falha na compra" };
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,data:r.data};}
+  return {ok:false,msg:r.data.msg||"Falha na compra"};
 }
 
 /* Cancela oferta. body: { token } */
 async function marketCancelOffer(token, offerId) {
   const r = await _api("DELETE", "/api/market/offers/" + offerId, { token });
-  return r.data.ok ? { ok: true, refundCoins: r.data.refundCoins || 0 } : { ok: false, msg: r.data.msg };
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,refundCoins:r.data.refundCoins||0,
+    refundGold:r.data.refundGold||0,bank:r.data.bank,coinBalance:r.data.coinBalance};}
+  return {ok:false,msg:r.data.msg};
 }
 
 /* Coleta o gold pendente de vendas do market. */
@@ -555,22 +575,31 @@ async function marketClaimGold(token) {
   return r.data.ok ? { ok: true, gold: r.data.gold || 0 } : { ok: false, msg: r.data.msg };
 }
 
+function marketGoldTransferBody(token,amount,p){
+  p=p||(typeof G!=="undefined"&&G&&G.p);const id=p&&p.id,cache=accountCharacterCacheRead();
+  const summary=cache.find((c)=>String(c.id)===String(id));
+  return Object.assign({token,amount,char_id:Number(id),expected_version:summary?Number(summary.saveVersion):0},accountLeaseFields());
+}
 /* Deposita gold do personagem no banco do market. */
-async function marketDeposit(token, amount) {
-  const r = await _api("POST", "/api/market/deposit", { token, amount });
-  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
+async function marketDeposit(token, amount, p) {
+  const r = await _api("POST", "/api/market/deposit", marketGoldTransferBody(token,amount,p));
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,coinBalance:r.data.coinBalance};}
+  return {ok:false,msg:r.data.msg};
 }
 
 /* Saca gold do banco do market para o personagem. */
-async function marketWithdraw(token, amount) {
-  const r = await _api("POST", "/api/market/withdraw", { token, amount });
-  return r.data.ok ? { ok: true, bank: r.data.bank, amount: r.data.amount } : { ok: false, msg: r.data.msg };
+async function marketWithdraw(token, amount, p) {
+  const r = await _api("POST", "/api/market/withdraw", marketGoldTransferBody(token,amount,p));
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,amount:r.data.amount,
+    coinBalance:r.data.coinBalance};}
+  return {ok:false,msg:r.data.msg};
 }
 
 /* Saldo do banco do market. */
 async function marketBank(token) {
   const r = await _api("GET", "/api/market/bank", null, token);
-  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,coinBalance:r.data.coinBalance};}
+  return {ok:false,msg:r.data.msg};
 }
 
 /* ------------------------------ PARTY (multiplayer) ------------------------------

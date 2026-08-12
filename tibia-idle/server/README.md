@@ -233,6 +233,12 @@ node tibia-idle/tools/backup_restore.js restore --file backup.json --data-dir ti
   1 party por personagem participante
 
 **Regras do Market (guia oficial do Tibia 4.3.3):**
+- Respostas devolvem `coinBalance` e `bank` autoritativos; o cliente nunca
+  soma/subtrai TC ou saldo por conta própria
+- Depósito/saque move gold do personagem e banco na mesma transação, usando
+  lease + `save_version`; Market fica bloqueado durante instância ativa
+- Compra/cancelamento da mesma oferta são serializados para impedir consumo
+  duplo por requests concorrentes
 - Fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco
 - Ofertas duram 30 dias (fixo); item volta ao depot, dinheiro volta ao banco
 - Vendedor usa itens do DEPOT; comprado vai para o DEPOT/inbox

@@ -356,11 +356,8 @@ function renderMarketBuy(body, p) {
         if (!r.ok) { toast(r.msg || "Falha na compra"); return; }
         const d = r.data;
         if (d.item) marketReceiveItem(p, d.item.slug, d.item.tier, d.item.qty);
-        if (d.coins) accountAddCoins(tok, d.coins);
-        if (!d.price_tc) {
-          p.gold -= d.total || d.price;      // cliente já debita do gold (banco no servidor)
-          _mBank = Math.max(0, _mBank - (d.total || d.price));
-        } else accountSpendCoins(d.price);
+        // Saldos já foram debitados/creditados atomicamente no servidor.
+        if(Number.isFinite(Number(d.bank)))_mBank=Number(d.bank);
         toast(`Comprou <b>${itemName(d.item ? d.item.slug : "")}</b> — foi para o Depot`, "level");
         addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → Depot`);
         renderMarket();
@@ -378,10 +375,9 @@ function renderMarketBuy(body, p) {
         }
         const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name, qty: 1 });
         if (!r.ok) { toast(r.msg || "Falha"); return; }
-        // remove do depot (o servidor credita o dinheiro)
+        // remove do depot; o servidor já creditou o banco autoritativo.
         marketRemoveDepotItem(p, oferta.slug);
-        p.gold += r.data.total || r.data.price;
-        _mBank += r.data.total || r.data.price;
+        if(Number.isFinite(Number(r.data.bank)))_mBank=Number(r.data.bank);
         toast(`Vendeu <b>${itemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
         renderMarket();
         renderAll && renderAll();
@@ -456,7 +452,7 @@ function renderMarketBuyOffer(body, p) {
       price_tc: 0, seller_name: _mBuyAnon ? "Anônimo" : p.name,
     });
     if (!r.ok) { toast(r.msg || "Falha"); return; }
-    _mBank = Math.max(0, _mBank - total - marketFee(price));
+    if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
     if (r.matched) {
       toast(`Oferta casada automaticamente! Comprou por ${fmtFull(r.matched.price)} gp`, "level");
       marketReceiveItem(p, slugTxt, 0, r.matched.qty || qty);
@@ -542,9 +538,8 @@ function renderMarketSell(body, p) {
     });
     if (!r.ok) { toast(r.msg || "Falha ao vender"); return; }
     marketRemoveForSale(p, { slug: selItem.slug, instId: selItem.instId, qty, tier: selItem.tier || 0, from: "depot" }, r.offer.id);
-    _mBank = Math.max(0, _mBank - fee);
+    if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
     if (r.matched) {
-      _mBank += r.matched.price * r.matched.qty;
       toast(`Vendido na hora por ${fmtFull(r.matched.price)} gp! (match automático)`, "level");
     } else {
       toast(`Oferta criada: <b>${selItem.n}</b> por ${fmtFull(price)}${_mPriceTc ? " TC" : " gp"} (30d)`, "level");
@@ -586,8 +581,7 @@ function renderMarketMine(body, p) {
         const r = await marketCancelOffer(tok, id);
         if (!r.ok) { toast(r.msg || "Falha"); return; }
         marketRefundItem(p, id);
-        if (r.refundCoins) accountAddCoins(tok, r.refundCoins);
-        if (r.refundGold) _mBank += r.refundGold;
+        if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
         toast("Oferta cancelada — devolvido", "level");
         renderMarket();
         renderAll && renderAll();
@@ -653,8 +647,7 @@ function renderMarketCoins(body, p) {
         seller_name: _mCoinsAnon ? "Anônimo" : p.name,
       });
       if (!r.ok) { toast(r.msg || "Falha"); return; }
-      accountSpendCoins(qty);
-      _mBank = Math.max(0, _mBank - fee);
+      if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
       toast(`Oferta criada: ${qty} TC por ${fmtFull(price)} gp`, "level");
       _mCoinsQty = ""; _mCoinsPrice = "";
       renderMarketCoins(body, p);
@@ -681,8 +674,7 @@ function renderMarketCoins(body, p) {
           if (_mBank < price) { toast("Ouro insuficiente no banco"); return; }
           const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
           if (!r.ok) { toast(r.msg || "Falha"); return; }
-          _mBank = Math.max(0, _mBank - price);
-          if (r.data.coins) accountAddCoins(tok, r.data.coins);
+          if(Number.isFinite(Number(r.data.bank)))_mBank=Number(r.data.bank);
           toast(`Comprou ${r.data.coins} TC por ${fmtFull(price)} gp`, "level");
           renderMarketCoins(body, p);
           renderStats(p);
@@ -714,18 +706,18 @@ function renderMarketBank() {
   $("#m-bank-deposit").addEventListener("click", async () => {
     const n = Math.floor(Number(amt.value) || 0);
     if (n <= 0 || n > p.gold) { toast("Valor inválido"); return; }
-    const r = await marketDeposit(tok, n);
+    const r = await marketDeposit(tok,n,p);
     if (!r.ok) { toast(r.msg || "Falha"); return; }
-    p.gold -= n; _mBank = r.bank;
+    _mBank=r.bank;
     toast("Depositado " + fmtFull(n) + " gp", "level");
     renderMarketBank();
   });
   $("#m-bank-withdraw").addEventListener("click", async () => {
     const n = Math.floor(Number(amt.value) || 0);
     if (n <= 0) { toast("Valor inválido"); return; }
-    const r = await marketWithdraw(tok, n);
+    const r = await marketWithdraw(tok,n,p);
     if (!r.ok) { toast(r.msg || "Falha"); return; }
-    p.gold += r.amount; _mBank = r.bank;
+    _mBank=r.bank;
     toast("Sacou " + fmtFull(r.amount) + " gp", "level");
     renderMarketBank();
   });
