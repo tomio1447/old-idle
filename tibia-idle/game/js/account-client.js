@@ -36,21 +36,27 @@ function accountApiConfigured() {
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
-  const r = await fetch(ACCOUNT_API_URL + path, {
-    method: method,
-    headers: headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = {};
-  try { data = await r.json(); } catch (e) { data = {}; }
-  return { code: r.status, data: data };
+  try {
+    const r = await fetch(ACCOUNT_API_URL + path, {
+      method: method,
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let data = {};
+    try { data = await r.json(); } catch (e) { data = {}; }
+    return { code: r.status, data: data };
+  } catch (error) {
+    return { code: 0, data: { ok:false, error:"NETWORK_ERROR",
+      msg:"Servidor indisponível. Verifique se a API está ligada." } };
+  }
 }
 
 async function accountRegister(login, password) {
   const r = await _api("POST", "/api/register", { login, password });
-  return r.data.ok
-    ? { ok: true, msg: "Conta criada!" }
-    : { ok: false, msg: r.data.msg || "Falha ao criar conta" };
+  if (r.data.ok) return { ok:true, msg:"Conta criada!" };
+  if (r.code === 409 || r.data.error === "ACCOUNT_EXISTS")
+    return { ok:false, exists:true, msg:"Conta já existe. Use a aba Entrar." };
+  return { ok:false, msg:r.data.msg || "Falha ao criar conta" };
 }
 
 async function accountLogin(login, password) {

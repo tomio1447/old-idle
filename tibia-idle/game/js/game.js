@@ -3122,17 +3122,23 @@ function initAccountLogin() {
     if (!r.ok) { msg(r.msg || "Falha no login"); return; }
     showPicker(r.token, r.account, r.characters);
   });
-  $("#acc-btn-register").addEventListener("click", async () => {
+  $("#acc-btn-register").addEventListener("click", async (event) => {
+    const button=event.currentTarget;
+    if(button.disabled||button.dataset.pending==="1")return;
     const login = ($("#acc-new-login").value || "").trim();
     const pass = $("#acc-new-password").value || "";
     if (login.length < 1 || pass.length < 1) { msg("Informe login e senha"); return; }
-    msg("Criando conta...");
-    const r = await accountRegister(login, pass);
-    msg(r.ok ? "Conta criada! Faça o login." : (r.msg || "Falha"));
-    if (r.ok) {
-      $("#acc-tab-login").click();
-      $("#acc-login").value = login;
-      $("#acc-password").value = pass;
+    button.dataset.pending="1";button.disabled=true;msg("Criando conta...");
+    try {
+      const r = await accountRegister(login, pass);
+      msg(r.ok ? "Conta criada! Faça o login." : (r.msg || "Falha"));
+      if (r.ok) {
+        $("#acc-tab-login").click();
+        $("#acc-login").value = login;
+        $("#acc-password").value = pass;
+      }
+    } finally {
+      button.dataset.pending="0";button.disabled=false;
     }
   });
   $("#acc-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });

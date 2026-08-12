@@ -132,7 +132,11 @@ async function register(db, body) {
   if (login.length < 1 || login.length > 32) return { code: 400, body: { ok: false, msg: "Login inválido (1-32 caracteres)" } };
   if (password.length < 1) return { code: 400, body: { ok: false, msg: "Senha obrigatória" } };
   const exist = await db.findAccountByLogin(login);
-  if (exist) return { code: 409, body: { ok: false, msg: "Conta já existe" } };
+  // Duplicidade é erro de formulário, não falha de transporte. Responder
+  // 200 evita o falso "Failed to load resource" no console; `ok:false`
+  // continua impedindo sobrescrever ou acessar a conta existente.
+  if (exist) return { code: 200, body: { ok: false, error: "ACCOUNT_EXISTS",
+    msg: "Conta já existe. Use a aba Entrar." } };
   const hash = bcrypt.hashSync(password, SALT_ROUNDS);
   const acc = await db.createAccount(login, hash, "user", 0);
   return { code: 201, body: { ok: true, id: acc.id, login: acc.login, role: acc.role } };

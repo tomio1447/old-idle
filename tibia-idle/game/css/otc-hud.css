@@ -133,7 +133,14 @@
 .crosshair {
   position: absolute; pointer-events: none; z-index: 100;
   width: 32px; height: 32px;
-  background: url('assets/ui/crosshair.png') center/contain no-repeat;
+  /* Vetorial em CSS: evita request/404 e permanece nítido em qualquer DPR. */
+  background:
+    linear-gradient(#f4f4f4,#f4f4f4) center top/2px 10px no-repeat,
+    linear-gradient(#f4f4f4,#f4f4f4) center bottom/2px 10px no-repeat,
+    linear-gradient(90deg,#f4f4f4,#f4f4f4) left center/10px 2px no-repeat,
+    linear-gradient(90deg,#f4f4f4,#f4f4f4) right center/10px 2px no-repeat,
+    radial-gradient(circle,transparent 0 5px,#d93030 6px 7px,transparent 8px);
+  filter: drop-shadow(1px 1px 0 #000);
   image-rendering: pixelated;
   transform: translate(-50%,-50%);
 }
