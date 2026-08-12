@@ -874,6 +874,8 @@ const BOSS_DEFS = {
     },
     mechanic:"greedbeast-vulnerability",
   },
+  // TEMPORARIO: boss Goshnar's Hatred desativado para testes (arena removida)
+  /*
   "goshnar-s-hatred": {
     id:"goshnar-s-hatred",name:"Goshnar's Hatred",
     title:"Boss de Rotten Wasteland",hunt:"goshnars-hatred-room",
@@ -886,6 +888,7 @@ const BOSS_DEFS = {
     },
     mechanic:"dreads-torment",
   },
+  */
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
@@ -2588,8 +2591,8 @@ function bindControls() {
       window.GLOBAL_IDLE_SERVER_CONFIG) || {};
     const account = sessionAccount();
     const onlineMode = typeof accountApiConfigured === "function" && accountApiConfigured();
-    const adminAllowed = !!serverCfg.testServer || !onlineMode ||
-      !!(account && account.role === "admin");
+    // TEMPORARIO: painel admin liberado para todos (testes)
+    const adminAllowed = true;
     if (typeof openAdmin === "function" && adminAllowed) {
       btnAdmin.addEventListener("click", () => openAdmin());
     } else {
