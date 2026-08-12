@@ -57,6 +57,34 @@ CREATE TABLE IF NOT EXISTS account_leases (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- Instância ativa persistida por conta. O worker server-side da fase seguinte
+-- poderá avançar este mesmo snapshot quando não houver browser conectado.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS account_instances (
+  account_id         INT UNSIGNED PRIMARY KEY,
+  instance_id        CHAR(64) NOT NULL,
+  version            BIGINT UNSIGNED NOT NULL DEFAULT 1,
+  status             ENUM('active','ended') NOT NULL DEFAULT 'active',
+  kind               ENUM('hunt','boss') NOT NULL,
+  hunt_id            VARCHAR(64) DEFAULT NULL,
+  boss_id            VARCHAR(64) DEFAULT NULL,
+  instance_mode      VARCHAR(24) NOT NULL DEFAULT 'non-pvp',
+  party_id           INT UNSIGNED DEFAULT NULL,
+  party_version      BIGINT UNSIGNED DEFAULT NULL,
+  active_character_id INT UNSIGNED NOT NULL,
+  state              MEDIUMTEXT NOT NULL,
+  saved_at           DATETIME(3) NOT NULL,
+  started_at         DATETIME(3) NOT NULL,
+  ended_at           DATETIME(3) DEFAULT NULL,
+  terminal_reason    VARCHAR(40) DEFAULT NULL,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_instances_account
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  INDEX idx_instances_status (status, saved_at)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- Personagens. O campo `data` guarda o SAVE COMPLETO do jogo
 -- (JSON: bag, equip, skills, stats, missions, lootPouch, ...),
 -- exatamente o que o cliente tinha no localStorage.
