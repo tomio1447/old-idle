@@ -11,8 +11,8 @@ must(!css.includes("crosshair.png")&&css.includes("radial-gradient(circle")&&
   css.includes("linear-gradient(#f4f4f4"),"crosshair ainda depende de PNG ausente");
 must(server.includes('code: 200, body: { ok: false, error: "ACCOUNT_EXISTS"')&&
   !server.includes('if (exist) return { code: 409'),"cadastro duplicado ainda responde HTTP 409");
-must(game.includes('button.dataset.pending="1";button.disabled=true')&&
-  game.includes('if(button.disabled||button.dataset.pending==="1")return;'),
+must(game.includes('if (register.disabled) return;')&&
+  game.includes('register.disabled = true; status.textContent = "Criando conta..."'),
   "botão Criar conta permite requests duplicados");
 must(client.includes('error:"NETWORK_ERROR"')&&client.includes('r.data.error === "ACCOUNT_EXISTS"'),
   "cliente não diferencia conta existente/servidor offline");
