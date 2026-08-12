@@ -160,8 +160,9 @@ function newCombat(player, huntId, instanceMode) {
  * painel OTC sem recarregar. */
 function maybeLoadPartyCombat(c, player, spx, spy) {
   try {
-    if (typeof partyOnlineMode === "function" && partyOnlineMode()) return;
-    if (typeof partyIsLeaderLocal !== "function" || !partyIsLeaderLocal(player)) return;
+    const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
+    if(!online&&(typeof partyIsLeaderLocal!=="function"||!partyIsLeaderLocal(player)))return;
+    if(online&&(!player._partyOnline||!player._partyOnline.isLeader))return;
     if (typeof partyCombatLoad !== "function") return;
     const ents = partyCombatLoad(player);
     if (!ents || ents.length < 2) return;

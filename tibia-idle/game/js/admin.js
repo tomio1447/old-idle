@@ -338,10 +338,20 @@ function renderAdminChar(p, el) {
     }));
 
   $$("#admin-content [data-voc]").forEach((b) =>
-    b.addEventListener("click", () => {
-      p.voc = b.dataset.voc;
-      const mm = maxStats(p);
-      p.hp = mm.hp; p.mp = mm.mp;
+    b.addEventListener("click", async () => {
+      const oldVoc=p.voc,newVoc=b.dataset.voc;
+      p.voc=newVoc;p.promoted=false;p.promotedAt=null;
+      const mm=maxStats(p);p.hp=mm.hp;p.mp=mm.mp;
+      // Vocation-base é imutável no save comum para impedir cruzamento entre
+      // personagens. Admin/test server usa a rota explícita de reparo.
+      if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+         typeof accountRepairCharacter==="function"&&typeof sessionToken==="function"){
+        const result=await accountRepairCharacter(sessionToken(),String(p.id),newVoc,p);
+        if(!result.ok){p.voc=oldVoc;toast(result.msg||"Falha ao trocar vocação","bad");renderAdminContent();return;}
+      }
+      if(typeof G!=="undefined"&&G.combat&&G.combat.players){
+        const ent=G.combat.players.find(e=>e.p===p||String(e.id)===String(p.id));if(ent)ent.voc=newVoc;
+      }
       adminAplicar(`vocação → ${VOCATIONS[p.voc].name}`);
     }));
 

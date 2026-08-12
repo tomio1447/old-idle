@@ -33,6 +33,15 @@ function accountApiConfigured() {
   return !!ACCOUNT_API_URL;
 }
 
+const ONLINE_CHARACTER_CACHE_KEY="tibia-idle-online-character-cache-v1";
+function accountCharacterCacheWrite(characters){
+  try{sessionStorage.setItem(ONLINE_CHARACTER_CACHE_KEY,JSON.stringify(characters||[]));}catch(e){}
+}
+function accountCharacterCacheRead(){
+  try{const raw=sessionStorage.getItem(ONLINE_CHARACTER_CACHE_KEY);return raw?JSON.parse(raw):[];}catch(e){return [];}
+}
+function accountCharacterCacheClear(){try{sessionStorage.removeItem(ONLINE_CHARACTER_CACHE_KEY);}catch(e){}}
+
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
