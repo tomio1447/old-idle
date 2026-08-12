@@ -134,8 +134,8 @@ async function post(route, body) {
   loaded = await request('/api/characters/' + id, {
     headers:{authorization:'Bearer ' + token},
   });
-  must(loaded.data.character.level === 8 && JSON.parse(loaded.data.character.data).hp === 700,
-    'save atualizado não persistiu');
+  must(loaded.data.character.level === 1 && JSON.parse(loaded.data.character.data).hp === 700,
+    'save visual não persistiu ou usuário fabricou level fora do motor autoritativo');
 
   console.log('OK: test server único, contas 1/1 e 2/2, Admin e save completo funcionando.');
 })().catch(error => {

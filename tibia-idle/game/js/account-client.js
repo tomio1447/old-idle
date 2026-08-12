@@ -200,6 +200,10 @@ function accountInstanceApply(instance){
 }
 function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
 async function accountLoadInstance(token){
+  if(accountLeaseAllowsSimulation()){
+    const tick=await _api("POST","/api/instance/tick",Object.assign({token},accountLeaseFields()));
+    if(tick.data&&tick.data.ok&&tick.data.characters)accountMergeCharacterCache(tick.data.characters);
+  }
   const r=await _api("GET","/api/instance",null,token);
   if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
   if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
@@ -222,6 +226,18 @@ function accountSaveInstance(token,state){
       if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
     }
     return false;
+  });
+}
+function accountTickInstance(token){
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const r=await _api("POST","/api/instance/tick",Object.assign({token,
+      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
+      return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,elapsed:r.data.elapsed||0};}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,error:r.data.error};
   });
 }
 function accountEndInstance(token,reason){

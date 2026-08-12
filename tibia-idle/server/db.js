@@ -201,11 +201,35 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
   const elapsed=Math.min(Math.max(0,now-cursor),Math.max(1,Number(maxStep)||3600000));
   if(elapsed<Math.max(1,Number(minStep)||500))return {ok:false,skipped:"not-due"};
-  const checkpoint=cursor+elapsed,next=advanceState(row.state,elapsed,checkpoint);
-  row.state=next;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
+  const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
+  const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+  row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
+  if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
+  for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
+    if(!c||Number(c.account_id)!==Number(accountId))continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
+    c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
   row.updated_at=new Date(now).toISOString();this._save();
-  return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)};
+  return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version),terminalReason:next.terminalReason||null};
+};
+JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,now,maxStep,advanceState,lease){
+  if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))return {ok:false,error:"LEASE_REQUIRED"};
+  const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
+  if(expectedVersion!==null&&expectedVersion!==undefined&&Number(row.version)!==Number(expectedVersion))
+    return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+  const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
+  const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
+  if(elapsed<50)return {ok:true,instance:row,characters:[],elapsed:0};
+  const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+  row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
+  if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
+  const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
+    if(!c||Number(c.account_id)!==Number(accountId))continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
+    c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
+  row.updated_at=row.saved_at;this._save();return {ok:true,instance:row,characters:changed,elapsed,
+    terminalReason:next.terminalReason||null};
 };
 JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,reason,lease){
   if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
@@ -956,15 +980,58 @@ async function MysqlStore() {
         if(elapsed<Math.max(1,Number(minStep)||500)){
           await conn.rollback();return {ok:false,skipped:"not-due"};
         }
-        const checkpoint=cursor+elapsed,next=advanceState(row.state,elapsed,checkpoint);
+        const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
+        const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        for(const projection of next.characters||[])await conn.query(
+          `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
+           WHERE id=? AND account_id=?`,
+          [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
+           projection.max_mp,Number(projection.id),Number(accountId)]);
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
-             worker_total_ms=worker_total_ms+? WHERE account_id=?`,
-          [next,new Date(checkpoint),new Date(checkpoint),elapsed,Number(accountId)]);
-        await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)+1};
+             worker_total_ms=worker_total_ms+?,status=?,terminal_reason=?,ended_at=? WHERE account_id=?`,
+          [next.state,new Date(checkpoint),new Date(checkpoint),elapsed,next.terminalReason?"ended":"active",
+           next.terminalReason||null,next.terminalReason?new Date(checkpoint):null,Number(accountId)]);
+        await conn.commit();return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version)+1,
+          terminalReason:next.terminalReason||null};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{
         try{await conn.query("SELECT RELEASE_LOCK(?)",[lockName]);}catch(e){}conn.release();
       }
+    },
+    async instanceAuthorityTick(accountId,expectedVersion,now,maxStep,advanceState,lease){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){
+          await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
+        }
+        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const row=rows[0];if(!row||row.status!=="active"){
+          await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
+        }
+        if(expectedVersion!==null&&expectedVersion!==undefined&&Number(row.version)!==Number(expectedVersion)){
+          await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+        }
+        const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
+        const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
+        if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
+        const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        for(const projection of next.characters||[])await conn.query(
+          `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
+           WHERE id=? AND account_id=?`,
+          [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
+           projection.max_mp,Number(projection.id),Number(accountId)]);
+        await conn.query(
+          `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
+             terminal_reason=?,ended_at=? WHERE account_id=?`,
+          [next.state,new Date(now),new Date(now),next.terminalReason?"ended":"active",next.terminalReason||null,
+           next.terminalReason?new Date(now):null,Number(accountId)]);
+        const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+        const ids=(next.characters||[]).map((p)=>Number(p.id));let characters=[];
+        if(ids.length){const marks=ids.map(()=>"?").join(",");[characters]=await conn.query(
+          `SELECT * FROM characters WHERE account_id=? AND id IN (${marks})`,[Number(accountId)].concat(ids));}
+        await conn.commit();return {ok:true,instance:saved[0],characters,elapsed,terminalReason:next.terminalReason||null};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },
     async instanceEnd(accountId,instanceId,expectedVersion,reason,lease){
       const conn=await pool.getConnection();
