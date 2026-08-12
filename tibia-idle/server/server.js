@@ -585,6 +585,16 @@ async function prepareInstanceState(db,acc,input){
     party_version:partyVersion,member_ids:ids,active_character_id:activeId,
     saved_at:new Date(now),startedAt:new Date(now).toISOString()}};
 }
+function restoreAuthoritativeEntry(state){
+  if(!state||!Array.isArray(state.members))return state;
+  for(const member of state.members){if(!member||!member.p)continue;const max=maxStats(member.p);
+    member.p.hp=max.hp;member.p.mp=max.mp;member.hp=max.hp;member.mp=max.mp;}
+  if(state.state&&Array.isArray(state.state.players))for(const ent of state.state.players){
+    if(!ent)continue;const member=state.members.find((m)=>String(m.id)===String(ent.id||ent.p&&ent.p.id));
+    if(member){ent.p=cloneJson(member.p);ent.hp=member.hp;ent.mp=member.mp;ent.reviveAt=0;ent.downedAt=0;
+      ent.permadead=false;ent.deathPos=null;}}
+  return state;
+}
 async function saveInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -594,7 +604,8 @@ async function saveInstance(db,body){
   const prepared=await prepareInstanceState(db,acc,body.state);if(prepared.error)return prepared.error;
   let instanceId=String(body.instance_id||"");
   if(expected===0){
-    instanceId=newToken();prepared.state=initializeAuthority(prepared.state,instanceId,Date.now());
+    instanceId=newToken();prepared.state=restoreAuthoritativeEntry(prepared.state);
+    prepared.state=initializeAuthority(prepared.state,instanceId,Date.now());
   }else{
     if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
     const current=await db.instanceGet(acc.id);let currentState=null;

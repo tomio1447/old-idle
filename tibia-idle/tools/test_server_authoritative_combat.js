@@ -48,12 +48,27 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   must(hardAuth.authority.spawnPool.includes("floating-savant")&&hardAuth.authority.spawnPool.includes("fury"),
     "catálogo server-side não recupera MOTA sem pendingSpawns");
   const legacy=engine.initializeAuthority(directDescriptor(basePlayer),"9".repeat(64),1000);
+  legacy.authority.v=1;legacy.authority.players[0].p.hp=1;legacy.authority.players[0].downUntil=999999;
   legacy.authority.mobs=[];legacy.authority.spawnPool=[];legacy.state.mobs=[];
   legacy.state.pendingSpawns=[{mob:{id:"legacy-rat",slug:"rat"},cx:9,cy:7,startedAt:1000}];
   const migrated=JSON.parse(engine.advanceAuthorityState(JSON.stringify(legacy),1000,2000).state);
   must(migrated.authority.spawnPool[0]==="rat"&&migrated.authority.mobs.length>0&&
-    migrated.state.mobs[0].cx===9&&migrated.state.mobs[0].cy===7,
-    "instância HARD antiga sem pool/posição não foi autorrecuperada");
+    migrated.state.mobs[0].cx===9&&migrated.state.mobs[0].cy===7&&
+    migrated.authority.v===2&&migrated.authority.players[0].p.hp===engine.maxStats(migrated.authority.players[0].p).hp&&
+    migrated.authority.players[0].downUntil===0,
+    "instância HARD antiga sem pool/posição/HP não foi autorrecuperada");
+  const motaPlayers=["knight","paladin","druid","sorcerer"].map((voc,index)=>({id:20+index,name:voc,voc,level:500,
+    exp:engine.expForLevel(500),hp:999999,mp:999999,gold:10000000,config:{healAt:75},skills:{sword:100,dist:100,fist:100,shield:100},
+    ml:80,equip:{weapon:{item:voc==="knight"?"sword":"bow"}},supplies:{"ultimate-health-potion":100,"ultimate-mana-potion":100},lootPouch:{},kills:{},bosses:{}}));
+  const mota=directDescriptor(motaPlayers[0]);mota.huntId="mota-extension";
+  mota.members=motaPlayers.map((p)=>({id:String(p.id),p}));mota.activeCharacterId=String(motaPlayers[0].id);
+  mota.state.players=motaPlayers.map((p,index)=>({id:String(p.id),p,cx:10+index,cy:10,x:(10.5+index)/30,y:10.5/30}));mota.state.mobs=[];
+  const motaSlugs=["floating-savant","retching-horror","fury","hellhound","demon"];
+  mota.state.pendingSpawns=Array.from({length:10},(_,i)=>({mob:{id:"mota-"+i,slug:motaSlugs[i%5]},cx:5+i*2,cy:5+(i%3),startedAt:1000}));
+  const motaAuth=engine.initializeAuthority(mota,"7".repeat(64),1000),motaAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(motaAuth),60000,61000).state);
+  must(!motaAfter.authority.ended&&motaAfter.authority.mobs.length>0&&motaAfter.authority.players.every((p)=>p.p.hp>0)&&
+    motaAfter.authority.players[0].p.missions["mota-extension"].progress,
+    "party MOTA não sobrevive/progride missões por 60s no motor autoritativo");
   const d1=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
   const d2=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
   const once=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),10000,11000).state);
@@ -116,9 +131,9 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     auth.players[0].p.equip.weapon.item==="sword",
     "servidor aceitou level/XP/equip/HP de monstro fabricados pelo cliente");
 
-  await new Promise((resolve)=>setTimeout(resolve,2800));
+  await new Promise((resolve)=>setTimeout(resolve,4200));
   r=await post("/api/instance/tick",Object.assign({token,expected_version:loaded.data.instance.version},lease));
-  must(r.status===200&&r.data.elapsed>=2000&&r.data.characters.length===1,"tick online não atualizou instância/personagem");
+  must(r.status===200&&r.data.elapsed>=3500&&r.data.characters.length===1,"tick online não atualizou instância/personagem");
   const authoritativeExp=r.data.characters[0].snapshot.exp,tickVersion=r.data.instance.version;
   must(authoritativeExp>0&&r.data.characters[0].snapshot.totalKills>0,"kill/XP não foram materializados no banco");
   const spam=await post("/api/instance/tick",Object.assign({token,expected_version:tickVersion},lease));
