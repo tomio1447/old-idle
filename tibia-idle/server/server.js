@@ -717,6 +717,9 @@ async function coins(db, body) {
  *  - preco medio por item (market_stats) p/ avisar oferta injusta (25%).
  * ====================================================================== */
 
+async function marketBalances(db,accountId){const account=await db.findAccountById(accountId),bank=await db.accountMarketGold(accountId);
+  return {coinBalance:account?Number(account.coins)||0:0,bank:Number(bank)||0};}
+
 /* Fee de 2% (mín 20, máx 1.000.000) */
 function marketFee(price) {
   return Math.max(20, Math.min(1000000, Math.round(price * 0.02)));
@@ -778,8 +781,8 @@ async function marketCreate(db, body, charName) {
   });
 
   // ---- MATCH AUTOMATICO: casa com contra-oferta existente ----
-  const matched = await marketTryMatch(db, offer, acc, charName);
-  return { code: 201, body: { ok: true, offer, fee, matched } };
+  const matched = await marketTryMatch(db, offer, acc, charName),balances=await marketBalances(db,acc.id);
+  return { code: 201, body: Object.assign({ ok: true, offer, fee, matched },balances) };
 }
 
 /* Tenta casar uma oferta nova com contra-ofertas ativas.
@@ -848,7 +851,12 @@ async function marketMine(db, token) {
  *   (vendedor entrega item e recebe o dinheiro da oferta);
  * - oferta kind=coins: compra de TC por gold.
  */
-async function marketBuy(db, body, actorName) {
+const MARKET_OFFER_LOCKS=new Map();
+async function withMarketOfferLock(id,work){const key=String(id),previous=MARKET_OFFER_LOCKS.get(key)||Promise.resolve();
+  const run=previous.catch(()=>{}).then(work);MARKET_OFFER_LOCKS.set(key,run);
+  try{return await run;}finally{if(MARKET_OFFER_LOCKS.get(key)===run)MARKET_OFFER_LOCKS.delete(key);}}
+async function marketBuy(db,body,actorName){return withMarketOfferLock(body.offer_id,()=>marketBuyUnlocked(db,body,actorName));}
+async function marketBuyUnlocked(db, body, actorName) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const offer = await db.findMarketOffer(Number(body.offer_id));
@@ -875,20 +883,22 @@ async function marketBuy(db, body, actorName) {
       kind: "item", slug: offer.slug, tier: offer.tier || 0,
       qty, price: valor, price_tc: 0,
     });
+    const remaining=Math.max(0,offer.qty-qty);
     await db.updateMarketOffer(offer.id, {
-      status: "sold", qty: offer.qty - qty,
+      status: remaining>0?"active":"sold", qty: remaining,
       buyer_id: acc.id, bought_at: new Date().toISOString(),
     });
+    const balances=await marketBalances(db,acc.id);
     return {
       code: 200,
-      body: {
+      body: Object.assign({
         ok: true,
         action: "sell-to-buyoffer",
         item: { slug: offer.slug, tier: offer.tier, data: offer.data, qty },
         price: offer.price,
         total: valor,
         buyer_name: offer.seller_name,
-      },
+      },balances),
     };
   }
 
@@ -910,8 +920,9 @@ async function marketBuy(db, body, actorName) {
     if (offer.kind === "item") await db.recordSale(offer.slug, offer.tier || 0, offer.price);
   }
 
+  const remaining=Math.max(0,offer.qty-qty);
   await db.updateMarketOffer(offer.id, {
-    status: "sold", qty: offer.qty - qty,
+    status: remaining>0?"active":"sold", qty: remaining,
     buyer_id: acc.id, bought_at: new Date().toISOString(),
   });
   // histórico de trade (v36: DB expandida)
@@ -921,9 +932,10 @@ async function marketBuy(db, body, actorName) {
     kind: offer.kind, slug: offer.slug, tier: offer.tier || 0,
     qty, price: valor, price_tc: !!offer.price_tc,
   });
+  const balances=await marketBalances(db,acc.id);
   return {
     code: 200,
-    body: {
+    body: Object.assign({
       ok: true,
       item: offer.kind === "item"
         ? { slug: offer.slug, tier: offer.tier, data: offer.data, qty }
@@ -933,7 +945,7 @@ async function marketBuy(db, body, actorName) {
       price: offer.price,
       total: valor,
       price_tc: !!offer.price_tc,
-    },
+    },balances),
   };
 }
 
@@ -964,7 +976,8 @@ async function adminAccountBundle(db,token,accountId,limit){
 }
 
 /* Cancela uma oferta (só o dono); devolve item/TC. */
-async function marketCancel(db, body, id) {
+async function marketCancel(db,body,id){return withMarketOfferLock(id,()=>marketCancelUnlocked(db,body,id));}
+async function marketCancelUnlocked(db, body, id) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const offer = await db.findMarketOffer(Number(id));
@@ -981,13 +994,14 @@ async function marketCancel(db, body, id) {
   } else if (offer.kind === "buy") {
     await db.addAccountMarketGold(acc.id, offer.price * offer.qty);
   }
+  const balances=await marketBalances(db,acc.id);
   return {
     code: 200,
-    body: {
+    body: Object.assign({
       ok: true,
       refundCoins: offer.kind === "coins" ? offer.qty : 0,
       refundGold: offer.kind === "buy" ? offer.price * offer.qty : 0,
-    },
+    },balances),
   };
 }
 
@@ -999,40 +1013,34 @@ async function marketClaim(db, token) {
   return { code: 200, body: { ok: true, gold } };
 }
 
-/* Depósito no banco do market (o cliente debita do p.gold do personagem).
- * body: { token, amount } */
-async function marketDeposit(db, body) {
-  const acc = await db.findAccountByToken(body.token);
-  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
-  if (amount <= 0) return { code: 400, body: { ok: false, msg: "Valor inválido" } };
-  await db.addAccountMarketGold(acc.id, amount);
-  const gold = await db.accountMarketGold(acc.id);
-  return { code: 200, body: { ok: true, bank: gold } };
+async function marketGoldTransfer(db,body,direction){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const active=await db.instanceGet(acc.id);if(active&&active.status==="active")
+    return {code:409,body:{ok:false,error:"MARKET_IN_INSTANCE",msg:"Banco do Market só pode ser usado no templo"}};
+  const amount=Math.max(0,Math.floor(Number(body.amount)||0)),charId=Number(body.char_id),expected=Number(body.expected_version);
+  if(amount<=0||!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1)
+    return {code:400,body:{ok:false,error:"INVALID_MARKET_TRANSFER",msg:"Transferência inválida"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.marketTransferGold(acc.id,charId,expected,amount,direction,lease);
+  if(!result.ok){const messages={CHARACTER_GOLD_LOW:"Gold insuficiente no personagem",BANK_GOLD_LOW:"Saldo insuficiente no banco",
+      SAVE_VERSION_CONFLICT:"Personagem atualizado em outra sessão",LEASE_REQUIRED:"Controle da conta foi transferido"};
+    return {code:result.error==="LEASE_REQUIRED"?423:result.error==="SAVE_VERSION_CONFLICT"?409:400,
+      body:{ok:false,error:result.error,msg:messages[result.error]||"Transferência recusada",
+        character:result.character?accountCharacterSummary(result.character):null}};}
+  const balances=await marketBalances(db,acc.id),character=accountCharacterSummary(result.character);
+  publishSync(acc.id,"character",{id:charId,saveVersion:character.saveVersion,source:"market-bank"});
+  return {code:200,body:Object.assign({ok:true,amount,character},balances)};
 }
-
-/* Saque do banco do market (o cliente credita no p.gold).
- * body: { token, amount } */
-async function marketWithdraw(db, body) {
-  const acc = await db.findAccountByToken(body.token);
-  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
-  if (amount <= 0) return { code: 400, body: { ok: false, msg: "Valor inválido" } };
-  const tem = await db.accountMarketGold(acc.id);
-  if (tem < amount) return { code: 400, body: { ok: false, msg: "Saldo insuficiente no banco" } };
-  // desconta do banco (market_gold) sem passar pelo claim (claim zera tudo)
-  const ok = await db.payMarketGold(acc.id, amount);
-  if (!ok) return { code: 400, body: { ok: false, msg: "Saldo insuficiente no banco" } };
-  const gold = await db.accountMarketGold(acc.id);
-  return { code: 200, body: { ok: true, bank: gold, amount } };
-}
+async function marketDeposit(db,body){return marketGoldTransfer(db,body,"deposit");}
+async function marketWithdraw(db,body){return marketGoldTransfer(db,body,"withdraw");}
 
 /* Saldo do banco do market. */
 async function marketBank(db, token) {
   const acc = await db.findAccountByToken(token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  const gold = await db.accountMarketGold(acc.id);
-  return { code: 200, body: { ok: true, bank: gold } };
+  const balances=await marketBalances(db,acc.id);
+  return { code: 200, body: Object.assign({ok:true},balances) };
 }
 
 /* ------------------------- storage (sessions) -------------------------

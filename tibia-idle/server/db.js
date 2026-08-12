@@ -416,9 +416,19 @@ JsonStore.prototype.payMarketGold = function (accountId, amount) {
   return this.payMarketFee(accountId, amount);
 };
 JsonStore.prototype.claimMarketGold = function (accountId) {
-  // As vendas caem DIRETO no banco (market_gold). Nada pendente para
-  // "coletar" — o saque e feito pela rota /api/market/withdraw.
   return 0;
+};
+JsonStore.prototype.marketTransferGold=function(accountId,charId,expectedVersion,amount,direction,lease){
+  if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))return {ok:false,error:"LEASE_REQUIRED"};
+  const account=this.findAccountById(accountId),character=this.findCharacter(charId);
+  if(!account||!character||Number(character.account_id)!==Number(accountId))return {ok:false,error:"CHARACTER_NOT_FOUND"};
+  if(Number(character.save_version)!==Number(expectedVersion))return {ok:false,error:"SAVE_VERSION_CONFLICT",character};
+  let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+  data.gold=Math.max(0,Math.floor(Number(data.gold)||0));account.market_gold=Math.max(0,Number(account.market_gold)||0);
+  if(direction==="deposit"){if(data.gold<amount)return {ok:false,error:"CHARACTER_GOLD_LOW"};data.gold-=amount;account.market_gold+=amount;}
+  else{if(account.market_gold<amount)return {ok:false,error:"BANK_GOLD_LOW"};account.market_gold-=amount;data.gold+=amount;}
+  character.data=JSON.stringify(data);character.save_version=Number(character.save_version)+1;character.updated_at=new Date(lease.now).toISOString();
+  this._save();return {ok:true,character,bank:account.market_gold};
 };
 JsonStore.prototype.recordSale = function (slug, tier, price) {
   this.marketStats = this.marketStats || {};
@@ -1150,9 +1160,25 @@ async function MysqlStore() {
         [amount, Number(accountId), amount]);
       return r.affectedRows > 0;
     },
-    async claimMarketGold(accountId) {
-      // vendas caem direto no banco; saque via /withdraw
-      return 0;
+    async claimMarketGold(accountId) { return 0; },
+    async marketTransferGold(accountId,charId,expectedVersion,amount,direction,lease){
+      const conn=await pool.getConnection();
+      try{await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};}
+        const [accounts]=await conn.query("SELECT * FROM accounts WHERE id=? FOR UPDATE",[Number(accountId)]);
+        const [characters]=await conn.query("SELECT * FROM characters WHERE id=? AND account_id=? FOR UPDATE",[Number(charId),Number(accountId)]);
+        const account=accounts[0],character=characters[0];if(!account||!character){await conn.rollback();return {ok:false,error:"CHARACTER_NOT_FOUND"};}
+        if(Number(character.save_version)!==Number(expectedVersion)){await conn.rollback();return {ok:false,error:"SAVE_VERSION_CONFLICT",character};}
+        let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+        data.gold=Math.max(0,Math.floor(Number(data.gold)||0));let bank=Math.max(0,Number(account.market_gold)||0);
+        if(direction==="deposit"){if(data.gold<amount){await conn.rollback();return {ok:false,error:"CHARACTER_GOLD_LOW"};}data.gold-=amount;bank+=amount;}
+        else{if(bank<amount){await conn.rollback();return {ok:false,error:"BANK_GOLD_LOW"};}bank-=amount;data.gold+=amount;}
+        await conn.query("UPDATE accounts SET market_gold=? WHERE id=?",[bank,Number(accountId)]);
+        await conn.query("UPDATE characters SET data=?,save_version=save_version+1 WHERE id=? AND account_id=?",
+          [JSON.stringify(data),Number(charId),Number(accountId)]);
+        character.data=JSON.stringify(data);character.save_version=Number(character.save_version)+1;
+        await conn.commit();return {ok:true,character,bank};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },
 
     // ---- MARKET STATS (preço médio por item/tier) ----
