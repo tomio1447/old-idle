@@ -226,7 +226,10 @@ function save() {
     if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
         typeof accountSaveCharacter === "function") {
       const tok = sessionToken();
-      const cid = sessionCharId();
+      // Nunca use apenas o seletor da sessão: durante uma troca ele pode já
+      // apontar para o próximo card enquanto G.p ainda é o personagem atual.
+      // O id do próprio save impede sobrescrever outro personagem da conta.
+      const cid = G.p && G.p.id ? String(G.p.id) : sessionCharId();
       if (tok && cid) {
         accountSaveCharacter(tok, cid, G.p).catch(() => {});
       }
