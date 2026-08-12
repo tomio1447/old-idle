@@ -87,6 +87,103 @@ function accountSavePayload(p){
     hp:p&&p.hp||0,mp:p&&p.mp||0,maxHp,maxMp};
 }
 
+const ACCOUNT_LEASE_HOLDER_KEY="tibia-idle-lease-holder-v1";
+const ACCOUNT_LEASE_TOKEN_KEY="tibia-idle-lease-token-v1";
+const ACCOUNT_LEASE_EXPIRY_KEY="tibia-idle-lease-expiry-v1";
+let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,sessionToken:"",timer:null,lost:false};
+function accountLeaseRandom(){
+  try{if(crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID().replace(/-/g,"");}catch(e){}
+  return Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+}
+// Novo por documento: reload/aba clonada rotaciona holder no servidor. Mesmo
+// que sessionStorage seja copiado, duas páginas nunca renovam o mesmo holder.
+const ACCOUNT_LEASE_PAGE_HOLDER=accountLeaseRandom();
+let ACCOUNT_LEASE_CHANNEL=null;
+function accountLeaseAccountId(){
+  try{const raw=sessionStorage.getItem("tibia-idle-account");return raw?String(JSON.parse(raw).id||""):"";}catch(e){return "";}
+}
+try{
+  if(typeof BroadcastChannel!=="undefined"){
+    ACCOUNT_LEASE_CHANNEL=new BroadcastChannel("tibia-idle-account-lease-v1");
+    ACCOUNT_LEASE_CHANNEL.onmessage=(event)=>{
+      const data=event&&event.data||{};
+      if(data.type==="acquired"&&data.accountId&&data.accountId===accountLeaseAccountId()&&
+         data.holderId!==ACCOUNT_LEASE_PAGE_HOLDER&&ACCOUNT_LEASE.active)
+        accountLeaseMarkLost("Outra aba assumiu o controle. A simulação foi pausada.");
+    };
+  }
+}catch(e){ACCOUNT_LEASE_CHANNEL=null;}
+function accountLeaseStored(){
+  let previousHolder="",token="",expiresAt=0;
+  try{
+    previousHolder=sessionStorage.getItem(ACCOUNT_LEASE_HOLDER_KEY)||ACCOUNT_LEASE_PAGE_HOLDER;
+    token=sessionStorage.getItem(ACCOUNT_LEASE_TOKEN_KEY)||"";
+    expiresAt=Number(sessionStorage.getItem(ACCOUNT_LEASE_EXPIRY_KEY)||0);
+  }catch(e){previousHolder=ACCOUNT_LEASE_PAGE_HOLDER;}
+  return {holder:ACCOUNT_LEASE_PAGE_HOLDER,previousHolder,token,expiresAt};
+}
+function accountLeaseFields(){
+  const stored=accountLeaseStored();
+  return {holder_id:ACCOUNT_LEASE.holder||stored.holder,lease_token:ACCOUNT_LEASE.token||stored.token};
+}
+function accountLeaseApply(token,data){
+  const stored=accountLeaseStored();
+  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.sessionToken=token;
+  ACCOUNT_LEASE.holder=data.holderId||stored.holder;ACCOUNT_LEASE.token=data.leaseToken;
+  ACCOUNT_LEASE.expiresAt=new Date(data.expiresAt).getTime();
+  try{
+    sessionStorage.setItem(ACCOUNT_LEASE_HOLDER_KEY,ACCOUNT_LEASE.holder);
+    sessionStorage.setItem(ACCOUNT_LEASE_TOKEN_KEY,ACCOUNT_LEASE.token);
+    sessionStorage.setItem(ACCOUNT_LEASE_EXPIRY_KEY,String(ACCOUNT_LEASE.expiresAt));
+  }catch(e){}
+  try{if(ACCOUNT_LEASE_CHANNEL)ACCOUNT_LEASE_CHANNEL.postMessage({type:"acquired",
+    accountId:accountLeaseAccountId(),holderId:ACCOUNT_LEASE.holder});}catch(e){}
+  if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
+  ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),Math.max(1000,Number(data.renewAfterMs)||30000));
+}
+function accountLeaseMarkLost(message){
+  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.token="";ACCOUNT_LEASE.expiresAt=0;
+  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+  try{sessionStorage.removeItem(ACCOUNT_LEASE_TOKEN_KEY);sessionStorage.removeItem(ACCOUNT_LEASE_EXPIRY_KEY);}catch(e){}
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
+  if(message!==false&&typeof toast==="function")
+    toast(message||"Outra aba assumiu o controle. A simulação foi pausada.","bad");
+}
+function accountLeaseAllowsSimulation(){
+  if(!accountApiConfigured())return true;
+  return !!(ACCOUNT_LEASE.active&&ACCOUNT_LEASE.token&&Date.now()<ACCOUNT_LEASE.expiresAt);
+}
+async function accountAcquireLease(token,takeover){
+  const stored=accountLeaseStored(),path=takeover?"/api/lease/takeover":"/api/lease/acquire";
+  const r=await _api("POST",path,{token,holder_id:stored.holder,
+    previous_holder_id:stored.previousHolder,lease_token:stored.token});
+  if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true,resumed:!!r.data.resumed};}
+  return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
+    msg:r.data.msg||"Não foi possível obter o controle da conta."};
+}
+async function accountRenewLease(token){
+  token=token||ACCOUNT_LEASE.sessionToken;const fields=accountLeaseFields();
+  if(!token||!fields.lease_token)return {ok:false};
+  const r=await _api("POST","/api/lease/renew",Object.assign({token},fields));
+  if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true};}
+  if(r.code===0&&Date.now()<ACCOUNT_LEASE.expiresAt){
+    if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
+    ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
+  }
+  accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
+}
+async function accountEnsureLease(token){
+  if(accountLeaseAllowsSimulation())return {ok:true};
+  const acquired=await accountAcquireLease(token,false);
+  if(!acquired.ok&&acquired.held)accountLeaseMarkLost(acquired.msg);
+  return acquired;
+}
+async function accountReleaseLease(token){
+  const fields=accountLeaseFields();
+  if(token&&fields.lease_token)await _api("POST","/api/lease/release",Object.assign({token},fields));
+  accountLeaseMarkLost(false);ACCOUNT_LEASE.lost=false;
+}
+
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
@@ -155,17 +252,18 @@ async function accountCreateCharacter(token, name, voc, data) {
 async function accountSaveCharacter(token, charId, p) {
   const id=String(charId);
   return accountQueueSave(async()=>{
-    if(ACCOUNT_SAVE_CONFLICTS.has(id))return false;
+    if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation())return false;
     const cache=await accountEnsureVersions(token,[id]);
     const summary=cache.find((c)=>String(c.id)===id);
     if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))return false;
-    const body=Object.assign({token,expected_version:Number(summary.saveVersion)},accountSavePayload(p));
+    const body=Object.assign({token,expected_version:Number(summary.saveVersion)},accountLeaseFields(),accountSavePayload(p));
     const r=await _api("PUT","/api/characters/"+encodeURIComponent(id),body);
     if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
     if(r.code===409){
       accountSaveConflict([id],r.data.characters||[],r.data.msg);return false;
     }
     if(r.code===428)accountSaveConflict([id],[],r.data.msg);
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
     return false;
   });
 }
@@ -173,7 +271,8 @@ async function accountSaveCharacter(token, charId, p) {
 async function accountSaveParty(token,state,players){
   const ids=(players||[]).filter((ent)=>ent&&ent.p).map((ent)=>String(ent.id));
   return accountQueueSave(async()=>{
-    if(!state||!state.id||!Number.isSafeInteger(Number(state.version))||ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
+    if(!accountLeaseAllowsSimulation()||!state||!state.id||!Number.isSafeInteger(Number(state.version))||
+       ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
     const cache=await accountEnsureVersions(token,ids);
     const entries=[];
     for(const ent of players||[]){
@@ -182,16 +281,17 @@ async function accountSaveParty(token,state,players){
       if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))continue;
       entries.push(Object.assign({id:Number(ent.id),expected_version:Number(summary.saveVersion)},accountSavePayload(ent.p)));
     }
-    const r=await _api("POST","/api/party/save",{
+    const r=await _api("POST","/api/party/save",Object.assign({
       token,party_id:Number(state.id),party_version:Number(state.version),
       party_order:(state.order||[]).map(Number),characters:entries,
-    });
+    },accountLeaseFields()));
     if(r.data.ok){accountMergeCharacterCache(r.data.characters||[]);return true;}
     if(r.code===409){
       const conflicts=(r.data.characters||[]).map((c)=>String(c.id));
       accountSaveConflict(conflicts.length?conflicts:ids,r.data.characters||[],r.data.msg);return false;
     }
     if(r.code===428)accountSaveConflict(ids,[],r.data.msg);
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
     return false;
   });
 }

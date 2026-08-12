@@ -41,6 +41,22 @@ CREATE TABLE IF NOT EXISTS sessions (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- Lease exclusivo de simulação: somente um browser/dispositivo por conta.
+-- O segredo bruto nunca é persistido; apenas SHA-256.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS account_leases (
+  account_id   INT UNSIGNED PRIMARY KEY,
+  holder_id    VARCHAR(80) NOT NULL,
+  secret_hash  CHAR(64) NOT NULL,
+  acquired_at  DATETIME(3) NOT NULL,
+  renewed_at   DATETIME(3) NOT NULL,
+  expires_at   DATETIME(3) NOT NULL,
+  CONSTRAINT fk_account_leases_account
+    FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+  INDEX idx_account_leases_expiry (expires_at)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- Personagens. O campo `data` guarda o SAVE COMPLETO do jogo
 -- (JSON: bag, equip, skills, stats, missions, lootPouch, ...),
 -- exatamente o que o cliente tinha no localStorage.

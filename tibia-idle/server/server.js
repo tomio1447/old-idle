@@ -5,6 +5,7 @@
  *   POST /api/register   { login, password, [email] }  -> cria conta
  *   POST /api/login      { login, password }           -> { token, account }
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
+ *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
  *   POST /api/characters { token, name, voc, data }    -> cria personagem
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
@@ -31,6 +32,7 @@ const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
 const TEST_SERVER = process.env.TEST_SERVER === "1";
+const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
 
 /* ------------------------------- helpers ------------------------------- */
@@ -61,6 +63,55 @@ function send(res, code, obj) {
 
 function newToken() {
   return crypto.randomBytes(32).toString("hex");
+}
+function leaseHash(secret){return crypto.createHash("sha256").update(String(secret||"")).digest("hex");}
+function validLeaseHolder(holder){return /^[A-Za-z0-9_-]{8,80}$/.test(String(holder||""));}
+function leaseBody(secret,row,resumed){
+  const expiresAt=new Date(row.expires_at).toISOString();
+  return {ok:true,leaseToken:secret,holderId:row.holder_id,expiresAt,
+    ttlMs:LEASE_TTL_MS,renewAfterMs:Math.min(5000,Math.max(1000,Math.floor(LEASE_TTL_MS/4))),resumed:!!resumed};
+}
+async function acquireLease(db,body,takeover){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const holder=String(body.holder_id||"");
+  if(!validLeaseHolder(holder))return {code:400,body:{ok:false,error:"INVALID_LEASE_HOLDER",msg:"Identificador do navegador inválido"}};
+  const now=Date.now(),expires=now+LEASE_TTL_MS,newSecret=newToken();
+  if(takeover){
+    const result=await db.leaseTakeover(acc.id,holder,leaseHash(newSecret),now,expires);
+    return {code:200,body:leaseBody(newSecret,result.lease,false)};
+  }
+  const presented=String(body.lease_token||"");
+  const previousHolder=validLeaseHolder(body.previous_holder_id)?String(body.previous_holder_id):"";
+  const result=await db.leaseAcquire(acc.id,holder,previousHolder,presented?leaseHash(presented):"",
+    leaseHash(newSecret),now,expires);
+  if(!result.ok)return {code:409,body:{ok:false,error:"LEASE_HELD",
+    msg:"Esta conta já está ativa em outra aba ou dispositivo.",
+    expiresAt:result.lease&&new Date(result.lease.expires_at).toISOString()}};
+  return {code:200,body:leaseBody(result.resumed?presented:newSecret,result.lease,result.resumed)};
+}
+async function renewLease(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
+  if(!validLeaseHolder(holder)||secret.length!==64)return {code:400,body:{ok:false,error:"INVALID_LEASE",msg:"Lease inválido"}};
+  const now=Date.now(),result=await db.leaseRenew(acc.id,holder,leaseHash(secret),now,now+LEASE_TTL_MS);
+  if(!result.ok)return {code:409,body:{ok:false,error:"LEASE_LOST",msg:"O controle desta conta foi transferido."}};
+  return {code:200,body:leaseBody(secret,result.lease,true)};
+}
+async function releaseLease(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
+  if(validLeaseHolder(holder)&&secret.length===64)await db.leaseRelease(acc.id,holder,leaseHash(secret));
+  return {code:200,body:{ok:true}};
+}
+async function requireLease(db,acc,body){
+  const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
+  const valid=validLeaseHolder(holder)&&secret.length===64&&
+    await db.leaseValidate(acc.id,holder,leaseHash(secret),Date.now());
+  return valid?null:{code:423,body:{ok:false,error:"LEASE_REQUIRED",
+    msg:"Esta aba não possui o controle ativo da conta."}};
 }
 
 const MIME = {
@@ -272,6 +323,8 @@ function prepareCharacterSave(c,body){
 function saveConflictResponse(result){
   if(result.error==="SAVE_VERSION_CONFLICT")return {code:409,body:{ok:false,error:result.error,
     msg:"O save foi alterado por outra sessão.",characters:(result.characters||[]).map(accountCharacterSummary)}};
+  if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,
+    msg:"O controle desta conta foi transferido antes do save terminar."}};
   return {code:result.error==="CHARACTER_NOT_FOUND"?404:409,body:{ok:false,error:result.error,
     msg:"Não foi possível salvar o estado solicitado."}};
 }
@@ -279,13 +332,15 @@ function saveConflictResponse(result){
 async function saveCharacter(db, body, id) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
   const expected=Number(body.expected_version);
   if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"SAVE_VERSION_REQUIRED",
     msg:"Atualize o personagem antes de salvar."}};
   const c = await db.findCharacter(id);
   if (!c || Number(c.account_id) !== Number(acc.id)) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
   const prepared=prepareCharacterSave(c,body);if(prepared.error)return prepared.error;
-  const result=await db.saveCharactersVersioned(acc.id,[prepared.save]);
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result);
   const updated=result.characters[0];
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
@@ -294,6 +349,7 @@ async function saveCharacter(db, body, id) {
 async function savePartyCharacters(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
   const partyId=Number(body.party_id),partyVersion=Number(body.party_version);
   const order=Array.isArray(body.party_order)?body.party_order.map(Number):[];
   const entries=Array.isArray(body.characters)?body.characters:[];
@@ -318,7 +374,8 @@ async function savePartyCharacters(db,body){
   }
   if(new Set(saves.map((save)=>save.id)).size!==saves.length)
     return {code:400,body:{ok:false,error:"INVALID_PARTY_SAVE",msg:"Personagem duplicado no save da party."}};
-  const result=await db.savePartyCharactersVersioned(acc.id,partyId,partyVersion,order,saves);
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.savePartyCharactersVersioned(acc.id,partyId,partyVersion,order,saves,lease);
   if(!result.ok){
     if(result.error==="PARTY_VERSION_CONFLICT"){
       const current=await db.partyFindByAccount(acc.id),members=current?await db.partyMembers(current.id):[];
@@ -767,6 +824,18 @@ async function main() {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const r = await me(db, token);
         return send(res, r.code, r.body);
+      }
+      if(req.method==="POST"&&url==="/api/lease/acquire"){
+        const r=await acquireLease(db,await readBody(req),false);return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/lease/takeover"){
+        const r=await acquireLease(db,await readBody(req),true);return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/lease/renew"){
+        const r=await renewLease(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/lease/release"){
+        const r=await releaseLease(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "POST" && url === "/api/characters") {
         const body = await readBody(req);

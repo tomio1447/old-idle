@@ -2208,11 +2208,18 @@ function advanceIdleInstance(elapsed,startAt,options){
  * percebe. A solução: resetar o acumulador ao retomar a aba e ignorar
  * o frame gigante que o browser entrega na volta. */
 let _wasHidden = false;
-document.addEventListener("visibilitychange", () => {
+document.addEventListener("visibilitychange", async () => {
   if (document.hidden) {
     _wasHidden = true;G.bgLast = Date.now();G.bgAcc=0;
     if(G.combat)persistActiveInstance();
   } else {
+    // Se o SO congelou os timers além do TTL, readquire antes do catch-up.
+    // Só processa o intervalo oculto quando nenhuma outra aba assumiu o lease.
+    if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+       typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()){
+      const lease=typeof accountEnsureLease==="function"?await accountEnsureLease(sessionToken()):{ok:false};
+      if(!lease.ok){const deniedAt=Date.now();G.bgLast=deniedAt;G.bgAcc=0;G.last=performance.now();G.tickAcc=0;_wasHidden=false;return;}
+    }
     // Timers podem ser totalmente congelados pelo navegador/SO. Reconcilia
     // aqui todo o intervalo ainda não processado antes de reativar o rAF.
     const agora=Date.now();
@@ -2245,6 +2252,7 @@ function startBackgroundTick() {
   if (_bgTimer) return;
   _bgTimer = setInterval(() => {
     if (!G || !G.p || G.paused || !G.combat || !document.hidden) return;
+    if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation())return;
     const agora=Date.now(),last=G.bgLast||agora,carry=G.bgAcc||0;
     const elapsed=Math.max(0,agora-last)+carry;
     const result=advanceIdleInstance(elapsed,last-carry,{silent:true});
@@ -2272,6 +2280,9 @@ function pouchFillPct(p) {
 function loop(ts) {
   requestAnimationFrame(loop);
   if (!G.p) return;
+  if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()){
+    G.last=ts;G.tickAcc=0;G.bgLast=Date.now();G.bgAcc=0;return;
+  }
   // Alguns browsers ainda entregam rAF a 1fps em background. A simulação
   // oculta pertence exclusivamente ao relógio idle, evitando tick duplo.
   if(typeof document!=="undefined"&&document.hidden){G.last=ts;return;}
@@ -3088,7 +3099,28 @@ function initAccountLogin() {
     }
     if (pending && tries > 0) setTimeout(() => paintAccountPortraits(characters, tries - 1), 90);
   }
-  async function enterCharacter(token, summary) {
+  function showLeaseConflict(token,summary,lease){
+    const until=lease&&lease.expiresAt?new Date(lease.expiresAt).toLocaleTimeString():"em instantes";
+    if(!openAccountModal(`<div class="panel-title">Conta já está ativa</div>
+      <div class="panel-body account-flow-body">
+        <div class="account-identity-warning">Outra aba ou dispositivo controla esta conta até <b>${until}</b>.
+          Para impedir recompensas duplicadas, somente uma instância pode simular por vez.</div>
+        <button class="danger full mt8" id="acc-lease-takeover">Assumir controle nesta aba</button>
+        <button class="full mt8" id="acc-lease-cancel">Cancelar</button>
+        <div class="tiny dim center mt8" id="acc-lease-msg"></div>
+      </div>`,true))return;
+    $("#acc-lease-cancel").onclick=closeAccountModal;
+    $("#acc-lease-takeover").onclick=async()=>{
+      const button=$("#acc-lease-takeover"),status=$("#acc-lease-msg");button.disabled=true;
+      status.textContent="Transferindo controle...";
+      try{
+        const result=await accountAcquireLease(token,true);
+        if(!result.ok){status.textContent=result.msg||"Falha ao transferir controle.";return;}
+        closeAccountModal();await enterCharacter(token,summary,true);
+      }finally{button.disabled=false;}
+    };
+  }
+  async function enterCharacter(token, summary, leaseReady) {
     const alreadyPlaying = typeof G !== "undefined" && G && G.p;
     if (alreadyPlaying) {
       if (String(G.p.id) === String(summary.id)) { closeAccountModal(); return; }
@@ -3096,10 +3128,16 @@ function initAccountLogin() {
       try { sessionStorage.setItem("tibia-idle-online-autoload", String(summary.id)); } catch (e) {}
       location.reload(); return;
     }
+    if(!leaseReady&&typeof accountAcquireLease==="function"){
+      msg("Reservando controle da conta...");
+      const lease=await accountAcquireLease(token,false);
+      if(!lease.ok){msg("");showLeaseConflict(token,summary,lease);return;}
+    }
     msg("Carregando <b>" + summary.name + "</b>...");
     const loaded = typeof accountLoadCharacter === "function"
       ? await accountLoadCharacter(token, summary.id) : { ok:false };
     if (!loaded.ok || !loaded.character) {
+      if(typeof accountReleaseLease==="function")await accountReleaseLease(token);
       msg(loaded.msg || "Não foi possível carregar o personagem.");
       return;
     }
@@ -3187,6 +3225,9 @@ function initAccountLogin() {
     if (wasPlaying && typeof save === "function") save();
     if(wasPlaying&&typeof accountLastSavePromise==="function"){
       try{await accountLastSavePromise();}catch(e){}
+    }
+    if(typeof accountReleaseLease==="function"){
+      try{await accountReleaseLease(sessionToken());}catch(e){}
     }
     if(typeof accountCharacterCacheClear==="function")accountCharacterCacheClear();
     try {

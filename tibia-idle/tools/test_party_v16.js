@@ -4,7 +4,7 @@
 "use strict";
 const API = process.env.API_URL || "http://127.0.0.1:3456";
 const RUN = String(Date.now()).slice(-6);
-let P = 0;
+let P = 0;const LEASES=new Map();
 async function api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
@@ -12,11 +12,16 @@ async function api(method, path, body, token) {
   let d = {}; try { d = await r.json(); } catch (e) {}
   return { code: r.status, data: d };
 }
-async function reg() { P += 1; const l = "v16" + RUN + "_" + P; await api("POST","/api/register",{login:l,password:"x"}); return (await api("POST","/api/login",{login:l,password:"x"})).data; }
+async function reg() {
+  P+=1;const l="v16"+RUN+"_"+P;await api("POST","/api/register",{login:l,password:"x"});
+  const account=(await api("POST","/api/login",{login:l,password:"x"})).data;
+  const lease=await api("POST","/api/lease/acquire",{token:account.token,holder_id:"v16holder"+P+"xxxx"});
+  LEASES.set(account.token,{holder_id:lease.data.holderId,lease_token:lease.data.leaseToken});return account;
+}
 async function createChar(token, name) { const r = await api("POST","/api/characters",{token,name,voc:"knight",data:JSON.stringify({name,voc:"knight",level:50,hp:300,mp:100})}); return r.data.character; }
 async function saveChar(token,c,body){
   const r=await api("PUT","/api/characters/"+c.id,Object.assign({token,
-    expected_version:c.saveVersion,voc:"knight",level:c.level||50},body));
+    expected_version:c.saveVersion,voc:"knight",level:c.level||50},body,LEASES.get(token)||{}));
   if(r.data.ok)c.saveVersion=r.data.saveVersion;return r;
 }
 
