@@ -20,8 +20,8 @@
  *   - toda rota valida o token -> conta -> personagem (o personagem que
  *     age TEM que pertencer à conta autenticada);
  *   - o líder não pode convidar/ser convidado fora de safe zone;
- *   - cada personagem só pode estar em 1 party e ter 1 convite pendente
- *     (UNIQUEs no banco + checagem explícita);
+ *   - cada conta só pode possuir 1 party; cada personagem só pode participar
+ *     de 1 party e ter 1 convite pendente (UNIQUEs + checagem explícita);
  *   - nonce de follow consumido atomicamente (UPDATE ... WHERE nonce = ?).
  */
 "use strict";
@@ -96,6 +96,8 @@ async function charSnapshot(db, charId) {
 /* Monta o estado público da party para um personagem. */
 async function partyStateFor(db, party, charId) {
   const members = await db.partyMembers(party.id);
+  const actor=await charSnapshot(db,charId);
+  const isOwner=!!(actor&&Number(actor.account_id)===Number(party.owner_account_id));
   const isLeader = Number(party.leader_id) === Number(charId);
   const isMember = members.some((m) => Number(m.id) === Number(charId));
   // follow pendente APENAS para membros (o líder não se segue)
@@ -113,13 +115,17 @@ async function partyStateFor(db, party, charId) {
   const memberSnaps = [];
   for (const m of members) {
     const s = await charSnapshot(db, m.id);
-    if (s) memberSnaps.push(s);
+    if (s) memberSnaps.push(Object.assign({ position:Number(m.position)||1 },s));
   }
   return {
     ok: true,
     state: {
       id: party.id,
+      ownedByAccount:Number(party.owner_account_id)||null,
+      order:[Number(party.leader_id)].concat(memberSnaps.map((m)=>Number(m.id))),
+      isOwner,
       isLeader,
+      isMember,
       leader: Object.assign({
         hunt: party.leader_hunt,
         instance: party.leader_instance,
@@ -148,11 +154,22 @@ async function partyCreate(db, body) {
   const { account, char, error } = await authChar(db, body.token, body.char_id);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
-  // já está em party (como líder ou membro)?
+  // A party pertence à CONTA, não ao browser nem ao save local. Uma conta
+  // não pode criar dois rosters concorrentes usando personagens diferentes.
+  const owned=await db.partyFindByAccount(account.id);
+  if(owned)return {code:409,body:{ok:false,error:"ACCOUNT_PARTY_EXISTS",
+    msg:"Sua conta já possui uma party"}};
+  // O personagem também não pode estar em party de outra conta.
   const exist = await partyOf(db, char.id);
   if (exist) return { code: 409, body: { ok: false, msg: "Você já está em uma party" } };
-  const party = await db.partyCreate(char);
-  return { code: 201, body: await partyStateFor(db, party, char.id) };
+  let created;
+  try{created=await db.partyCreate(char);}catch(e){
+    // A UNIQUE(owner_account_id) também fecha a corrida entre duas requisições.
+    const raced=await db.partyFindByAccount(account.id);
+    if(raced)return {code:409,body:{ok:false,error:"ACCOUNT_PARTY_EXISTS",msg:"Sua conta já possui uma party"}};
+    throw e;
+  }
+  return { code: 201, body: await partyStateFor(db, created, char.id) };
 }
 
 /* POST /api/party/invite — líder convida por NOME de personagem.
@@ -358,14 +375,41 @@ async function partyKick(db, body) {
   return { code: 200, body: { ok: true, msg: "Membro removido" } };
 }
 
+/* POST /api/party/reorder — a CONTA proprietária persiste a ordem completa.
+ * O líder continua na posição zero; trocar liderança é outra operação. */
+async function partyReorder(db,body){
+  const {account,char,error}=await authChar(db,body.token,body.char_id);
+  if(error)return error;
+  if(!char)return {code:400,body:{ok:false,msg:"Selecione um personagem"}};
+  const owned=await db.partyFindByAccount(account.id);
+  if(!owned)return {code:404,body:{ok:false,error:"ACCOUNT_PARTY_NOT_FOUND",msg:"Sua conta não possui party"}};
+  if(Number(owned.owner_account_id)!==Number(account.id))
+    return {code:403,body:{ok:false,error:"PARTY_NOT_OWNER",msg:"A party pertence a outra conta"}};
+  const ids=Array.isArray(body.character_ids)?body.character_ids.map(Number):[];
+  if(!ids.length||ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
+    return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"Ordem da party inválida"}};
+  const members=await db.partyMembers(owned.id);
+  const current=[Number(owned.leader_id)].concat(members.map((m)=>Number(m.id)));
+  if(ids.length!==current.length||ids.some((id)=>current.indexOf(id)===-1))
+    return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"A ordem deve conter todos os membros uma única vez"}};
+  if(ids[0]!==Number(owned.leader_id))
+    return {code:400,body:{ok:false,error:"PARTY_LEADER_FIXED",msg:"O líder deve permanecer na primeira posição"}};
+  const saved=await db.partyReorder(owned.id,ids.slice(1));
+  if(!saved)return {code:409,body:{ok:false,error:"PARTY_ORDER_CONFLICT",msg:"A composição da party mudou; atualize e tente novamente"}};
+  return {code:200,body:await partyStateFor(db,owned,char.id)};
+}
+
 /* GET /api/party/state — estado da party + follow pendente do personagem. */
 async function partyState(db, token, charId) {
-  const { char, error } = await authChar(db, token, charId);
+  const { account,char, error } = await authChar(db, token, charId);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
-  const party = await partyOf(db, char.id);
-  if (!party) return { code: 200, body: { ok: true, state: null } };
-  return { code: 200, body: await partyStateFor(db, party, char.id) };
+  // Primeiro a party em que o personagem participa; se ele ainda não faz
+  // parte dela, a conta dona continua enxergando e administrando seu roster.
+  let current = await partyOf(db, char.id);
+  if(!current)current=await db.partyFindByAccount(account.id);
+  if (!current) return { code: 200, body: { ok: true, state: null } };
+  return { code: 200, body: await partyStateFor(db, current, char.id) };
 }
 
 /* Pega o `p` (save) de um personagem a partir do data JSON. */
@@ -552,6 +596,7 @@ module.exports = {
   partyDecline,
   partyLeave,
   partyKick,
+  partyReorder,
   partyState,
   partyReportZone,
   partyFollow,

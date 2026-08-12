@@ -88,11 +88,16 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/party/decline` | `{ token, invite_id }` | Recusa um convite |
 | POST | `/api/party/leave` | `{ token, char_id }` | Sai da party (líder dissolve) |
 | POST | `/api/party/kick` | `{ token, char_id, member_id }` | Líder remove um membro |
-| GET | `/api/party/state?char_id=` | Bearer token | Estado da party + follow pendente |
+| POST | `/api/party/reorder` | `{ token, char_id, character_ids[] }` | Conta dona persiste a ordem completa |
+| GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, ordem e follow pendente |
 | POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
 | POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
 
 **Regras do Party (multiplayer, convites assíncronos + follow):**
+- Cada party possui `owner_account_id`: uma conta só pode possuir uma party,
+  mesmo que tente criá-la simultaneamente com personagens diferentes
+- A ordem é persistida em `party_members.position`; somente a conta dona
+  pode reordenar e a posição zero permanece reservada ao líder
 - O LÍDER só pode CONVIDAR estando em Safe Zone (cidade) ou Área de Treino
   (academia / sala de exercise weapons) — validado no servidor
 - CONVIDADO também só ACEITA em cidade/treino: a zona de cada personagem é
@@ -110,7 +115,8 @@ a aplicação e usar um banco/disco persistente.
 - O state da party inclui hp/mp/maxHp/maxMp/zona por membro (snapshots
   enviados no save do personagem) — usado pelo painel de party estilo OTC
 - Segurança: nonce consumido atomicamente (sem replay), conta errada não
-  aceita convite, membro não reporta zona, 1 party por personagem
+  aceita convite, membro não reporta zona, 1 party por conta proprietária e
+  1 party por personagem participante
 
 **Regras do Market (guia oficial do Tibia 4.3.3):**
 - Fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco

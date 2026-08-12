@@ -773,12 +773,19 @@ function partyOnlineHtml(p, st, inbox) {
         <span class="dim tiny">líder</span>
         <span class="tiny" style="color:#9ce84a">${partyZoneName(st.leader.zone)}</span>
       </div>`;
-    // membros
-    for (const m of st.members) {
+    // membros: a ordem vem do banco e pode ser alterada pela conta dona.
+    for (let index=0;index<st.members.length;index++) {
+      const m=st.members[index];
       h += `<div class="party-member">
         <span class="party-member-voc">${voc(m.voc)}</span>
         <b>${m.name}</b>
         <span class="dim">nv ${m.level}</span>
+        ${st.isOwner ? `<span class="row" style="gap:2px;margin-left:auto">
+          <button class="sm" data-party-order="up" data-party-member="${m.id}"
+            ${index===0?"disabled":""} title="Subir na ordem">▲</button>
+          <button class="sm" data-party-order="down" data-party-member="${m.id}"
+            ${index===st.members.length-1?"disabled":""} title="Descer na ordem">▼</button>
+        </span>` : ""}
         ${st.isLeader ? `<button class="sm" data-party-kick="${m.id}">Remover</button>` : ""}
       </div>`;
     }
@@ -798,10 +805,13 @@ function partyOnlineHtml(p, st, inbox) {
             : "⚠️ O líder só pode convidar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
         </div>`;
       h += `<button class="sm mt8" id="party-leave">Dissolver party</button>`;
-    } else {
+    } else if(st.isMember) {
       h += `<div class="tiny dim mt4">Follow ativo: quando o líder mudar de
         mapa ou entrar numa hunt/boss, você será teleportado para a MESMA instância.</div>
         <button class="sm mt8" id="party-leave">Sair do party</button>`;
+    } else {
+      h += `<div class="tiny dim mt4">Esta party pertence à sua conta. Troque
+        para o personagem líder para convidar, entrar em hunts ou dissolver a party.</div>`;
     }
   }
 
@@ -853,6 +863,19 @@ function bindPartyOnline(p, st, inbox) {
     toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "" : "bad");
     if (r.ok) recarregar();
   });
+
+  $$("#party-content [data-party-order]").forEach((el)=>
+    el.addEventListener("click",async()=>{
+      const order=(st&&Array.isArray(st.order)?st.order:[]).map(Number);
+      const member=Number(el.dataset.partyMember),index=order.indexOf(member);
+      const next=index+(el.dataset.partyOrder==="up"?-1:1);
+      // posição zero é reservada ao líder.
+      if(index<1||next<1||next>=order.length)return;
+      [order[index],order[next]]=[order[next],order[index]];
+      const r=await accountPartyReorder(Number(sessionCharId()),order);
+      toast(r.ok?"Ordem da party salva.":(r.msg||"Falha"),r.ok?"":"bad");
+      if(r.ok)recarregar();
+    }));
 
   $$("#party-content [data-party-kick]").forEach((el) =>
     el.addEventListener("click", async () => {

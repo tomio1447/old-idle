@@ -156,7 +156,9 @@ CREATE TABLE IF NOT EXISTS market_history (
 -- ============================================================
 -- PARTY (multiplayer, convites assíncronos + follow)
 -- ============================================================
--- Uma party tem um LÍDER (um personagem) e até 4 membros convidados.
+-- Uma party pertence a UMA CONTA, tem um LÍDER (um personagem dessa conta)
+-- e até 4 membros convidados. `owner_account_id` impede a mesma conta de
+-- criar rosters concorrentes; `party_members.position` persiste a ordem.
 -- O líder só pode CONVIDAR estando em Safe Zone (cidade) ou Área de
 -- Treino (academia / sala de exercise weapons) — validado em
 -- parties.leader_zone.
@@ -169,6 +171,7 @@ CREATE TABLE IF NOT EXISTS market_history (
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS parties (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  owner_account_id INT UNSIGNED NOT NULL,          -- conta proprietária
   leader_id      INT UNSIGNED NOT NULL,           -- personagem líder
   leader_name    VARCHAR(32)  NOT NULL,
   -- zona atual do líder (validada nas transições de mapa):
@@ -181,13 +184,17 @@ CREATE TABLE IF NOT EXISTS parties (
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                    ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_parties_leader (leader_id),       -- 1 party por líder
-  INDEX idx_parties_zone (leader_zone)
+  UNIQUE KEY uq_parties_owner (owner_account_id), -- 1 party por conta
+  UNIQUE KEY uq_parties_leader (leader_id),
+  INDEX idx_parties_zone (leader_zone),
+  CONSTRAINT fk_parties_owner
+    FOREIGN KEY (owner_account_id) REFERENCES accounts(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS party_members (
   party_id      INT UNSIGNED NOT NULL,
   character_id  INT UNSIGNED NOT NULL,
+  position      TINYINT UNSIGNED NOT NULL DEFAULT 1,
   joined_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   -- follow pendente PARA ESTE MEMBRO (nonce de uso único). Quando o líder
   -- entra em hunt/boss, o servidor preenche aqui o destino + nonce; o
@@ -200,7 +207,8 @@ CREATE TABLE IF NOT EXISTS party_members (
   follow_at      TIMESTAMP NULL,
   PRIMARY KEY (party_id, character_id),
   UNIQUE KEY uq_member_character (character_id),  -- 1 party por personagem
-  INDEX idx_members_party (party_id)
+  INDEX idx_members_party (party_id),
+  INDEX idx_members_order (party_id, position)
 ) ENGINE=InnoDB;
 
 -- Convites PENDENTES (inbox assíncrono): o convidado pode trocar para o

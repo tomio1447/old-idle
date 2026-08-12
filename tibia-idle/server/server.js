@@ -828,6 +828,11 @@ async function main() {
         const r = await party.partyKick(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/party/reorder") {
+        const body = await readBody(req);
+        const r = await party.partyReorder(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "GET" && url === "/api/party/state") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const q = new URL(req.url, "http://x").searchParams;

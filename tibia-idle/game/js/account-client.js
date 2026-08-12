@@ -244,6 +244,13 @@ async function accountPartyKick(charId, memberId) {
   return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
 }
 
+async function accountPartyReorder(charId, characterIds) {
+  const r=await _api("POST","/api/party/reorder",{
+    token:sessionToken(),char_id:charId,character_ids:characterIds,
+  });
+  return r.data.ok?{ok:true,state:r.data.state}:{ok:false,msg:r.data.msg,error:r.data.error};
+}
+
 async function accountPartyState(charId) {
   const r = await _api("GET", "/api/party/state?char_id=" + encodeURIComponent(charId), null, sessionToken());
   return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };

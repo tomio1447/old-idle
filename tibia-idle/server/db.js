@@ -40,6 +40,24 @@ function JsonStore() {
     this.parties = [];
     this.invites = [];
   }
+  // Migração transparente do formato antigo: a conta do líder é a dona da
+  // party e a ordem dos membros deixa de depender da ordem incidental do JSON.
+  // Se um legado tiver duas parties da mesma conta, preserva a mais antiga.
+  const ownedParties=new Map(),validParties=[];
+  this.parties.slice().sort((a,b)=>Number(a.id)-Number(b.id)).forEach((p)=>{
+    const leader=this.characters.find((c)=>Number(c.id)===Number(p.leader_id));
+    if(!p.owner_account_id&&leader)p.owner_account_id=Number(leader.account_id);
+    const owner=Number(p.owner_account_id)||0;
+    if(!owner||ownedParties.has(owner)){
+      (this.invites||[]).forEach((i)=>{if(Number(i.party_id)===Number(p.id)&&i.status==="pending")i.status="cancelled";});
+      return;
+    }
+    ownedParties.set(owner,p.id);
+    (p.members||[]).sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0))
+      .forEach((m,index)=>{m.position=index+1;});
+    validParties.push(p);
+  });
+  this.parties=validParties;
   // market (stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
@@ -51,6 +69,7 @@ function JsonStore() {
     this.marketHistoryArr = [];
   }
   this._save();
+  this._partySave();
 }
 JsonStore.prototype._load = function (file, dft) {
   try {
@@ -288,8 +307,12 @@ JsonStore.prototype._partySave = function () {
 JsonStore.prototype.partyCreate = function (leaderChar) {
   this.parties = this.parties || [];
   this.invites = this.invites || [];
+  if(this.partyFindByAccount(leaderChar.account_id)){
+    const error=new Error("account already owns a party");error.code="ER_DUP_ENTRY";throw error;
+  }
   const p = {
-    id: this._nextPartyId(), leader_id: leaderChar.id, leader_name: leaderChar.name,
+    id: this._nextPartyId(), owner_account_id:Number(leaderChar.account_id),
+    leader_id: leaderChar.id, leader_name: leaderChar.name,
     leader_zone: "unknown", leader_hunt: null, leader_instance: null,
     leader_otbm: null, leader_boss: null,
     created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -298,6 +321,10 @@ JsonStore.prototype.partyCreate = function (leaderChar) {
   this.parties.push(p);
   this._partySave();
   return p;
+};
+JsonStore.prototype.partyFindByAccount = function (accountId) {
+  this.parties = this.parties || [];
+  return this.parties.find((p) => Number(p.owner_account_id)===Number(accountId)) || null;
 };
 JsonStore.prototype.partyFindByLeader = function (charId) {
   this.parties = this.parties || [];
@@ -312,26 +339,38 @@ JsonStore.prototype.partyFindByCharacter = function (charId) {
 JsonStore.prototype.partyMembers = function (partyId) {
   const p = (this.parties || []).find((x) => x.id === Number(partyId));
   if (!p) return [];
-  return (p.members || []).map((m) => {
-    const c = this.findCharacter(m.character_id);
-    return {
-      id: m.character_id, name: c ? c.name : "?", voc: c ? c.voc : "none",
-      level: c ? c.level : 1, account_id: c ? c.account_id : null,
-      follow_nonce: m.follow_nonce || null, follow_hunt: m.follow_hunt || null,
-      follow_instance: m.follow_instance || null, follow_otbm: m.follow_otbm || null,
-      follow_boss: m.follow_boss || null,
-    };
-  });
+  return (p.members || []).slice().sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0))
+    .map((m) => {
+      const c = this.findCharacter(m.character_id);
+      return {
+        id: m.character_id, name: c ? c.name : "?", voc: c ? c.voc : "none",
+        level: c ? c.level : 1, account_id: c ? c.account_id : null,
+        position:Number(m.position)||1,
+        follow_nonce: m.follow_nonce || null, follow_hunt: m.follow_hunt || null,
+        follow_instance: m.follow_instance || null, follow_otbm: m.follow_otbm || null,
+        follow_boss: m.follow_boss || null,
+      };
+    });
 };
 JsonStore.prototype.partyAddMember = function (partyId, charId) {
   const p = (this.parties || []).find((x) => x.id === Number(partyId));
   if (!p) return;
   p.members = p.members || [];
   if (!p.members.some((m) => m.character_id === Number(charId))) {
-    p.members.push({ character_id: Number(charId), joined_at: new Date().toISOString() });
+    const position=p.members.reduce((max,m)=>Math.max(max,Number(m.position)||0),0)+1;
+    p.members.push({ character_id: Number(charId), position,
+      joined_at: new Date().toISOString() });
   }
   p.updated_at = new Date().toISOString();
   this._partySave();
+};
+JsonStore.prototype.partyReorder = function (partyId, memberIds) {
+  const p=(this.parties||[]).find((x)=>x.id===Number(partyId));
+  if(!p)return false;
+  const byId=new Map((p.members||[]).map((m)=>[Number(m.character_id),m]));
+  if(memberIds.length!==byId.size||memberIds.some((id)=>!byId.has(Number(id))))return false;
+  memberIds.forEach((id,index)=>{byId.get(Number(id)).position=index+1;});
+  p.updated_at=new Date().toISOString();this._partySave();return true;
 };
 JsonStore.prototype.partyRemoveMember = function (partyId, charId) {
   const p = (this.parties || []).find((x) => x.id === Number(partyId));
@@ -656,9 +695,14 @@ async function MysqlStore() {
     // ---- PARTY (multiplayer) ----
     async partyCreate(leaderChar) {
       const r = await this.run(
-        "INSERT INTO parties (leader_id, leader_name) VALUES (?, ?)",
-        [Number(leaderChar.id), leaderChar.name]);
+        "INSERT INTO parties (owner_account_id, leader_id, leader_name) VALUES (?, ?, ?)",
+        [Number(leaderChar.account_id), Number(leaderChar.id), leaderChar.name]);
       return this.partyFindByLeader(leaderChar.id);
+    },
+    async partyFindByAccount(accountId) {
+      const rows=await this.query("SELECT * FROM parties WHERE owner_account_id = ? LIMIT 1",
+        [Number(accountId)]);
+      return rows[0]||null;
     },
     async partyFindByLeader(charId) {
       const rows = await this.query("SELECT * FROM parties WHERE leader_id = ?",
@@ -676,19 +720,30 @@ async function MysqlStore() {
     },
     async partyMembers(partyId) {
       return this.query(
-        `SELECT c.id, c.name, c.voc, c.level, c.account_id,
+        `SELECT c.id, c.name, c.voc, c.level, c.account_id, m.position,
                 m.follow_nonce, m.follow_hunt, m.follow_instance,
                 m.follow_otbm, m.follow_boss
          FROM party_members m
          JOIN characters c ON c.id = m.character_id
          WHERE m.party_id = ?
-         ORDER BY m.joined_at ASC`,
+         ORDER BY m.position ASC, m.joined_at ASC, m.character_id ASC`,
         [Number(partyId)]);
     },
     async partyAddMember(partyId, charId) {
       await this.run(
-        "INSERT IGNORE INTO party_members (party_id, character_id) VALUES (?, ?)",
-        [Number(partyId), Number(charId)]);
+        `INSERT IGNORE INTO party_members (party_id, character_id, position)
+         SELECT ?, ?, COALESCE(MAX(position),0)+1 FROM party_members WHERE party_id = ?`,
+        [Number(partyId), Number(charId), Number(partyId)]);
+    },
+    async partyReorder(partyId, memberIds) {
+      const current=await this.partyMembers(partyId);
+      const wanted=memberIds.map(Number);
+      if(current.length!==wanted.length||wanted.some((id)=>!current.some((m)=>Number(m.id)===id)))return false;
+      for(let index=0;index<wanted.length;index++){
+        await this.run("UPDATE party_members SET position = ? WHERE party_id = ? AND character_id = ?",
+          [index+1,Number(partyId),wanted[index]]);
+      }
+      return true;
     },
     async partyRemoveMember(partyId, charId) {
       await this.run(
@@ -844,6 +899,7 @@ async function ensureSchema(pool) {
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS parties (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    owner_account_id INT UNSIGNED NOT NULL,
     leader_id INT UNSIGNED NOT NULL,
     leader_name VARCHAR(32) NOT NULL,
     leader_zone ENUM('unknown','city','training','hunt','boss')
@@ -855,12 +911,16 @@ async function ensureSchema(pool) {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_parties_owner (owner_account_id),
     UNIQUE KEY uq_parties_leader (leader_id),
-    INDEX idx_parties_zone (leader_zone)
+    INDEX idx_parties_zone (leader_zone),
+    CONSTRAINT fk_parties_owner FOREIGN KEY (owner_account_id)
+      REFERENCES accounts(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS party_members (
     party_id INT UNSIGNED NOT NULL,
     character_id INT UNSIGNED NOT NULL,
+    position TINYINT UNSIGNED NOT NULL DEFAULT 1,
     joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     follow_nonce VARCHAR(64) DEFAULT NULL,
     follow_hunt VARCHAR(64) DEFAULT NULL,
@@ -884,6 +944,51 @@ async function ensureSchema(pool) {
     UNIQUE KEY uq_invite_pending (invitee_id, status),
     INDEX idx_invites_party (party_id, status)
   ) ENGINE=InnoDB`);
+
+  // Migração das parties anteriores ao modelo account-owned. A conta do
+  // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.
+  try { await pool.query("ALTER TABLE parties ADD COLUMN owner_account_id INT UNSIGNED DEFAULT NULL AFTER id"); }
+  catch(e) { /* já existe */ }
+  const [legacyParties]=await pool.query(
+    `SELECT p.id, p.owner_account_id, c.account_id AS leader_account_id
+     FROM parties p LEFT JOIN characters c ON c.id = p.leader_id ORDER BY p.id ASC`);
+  const ownerParty=new Map();
+  for(const p of legacyParties){
+    const owner=Number(p.owner_account_id||p.leader_account_id)||0;
+    if(!owner||ownerParty.has(owner)){
+      await pool.query("DELETE FROM party_members WHERE party_id = ?",[p.id]);
+      await pool.query("UPDATE party_invites SET status='cancelled' WHERE party_id=? AND status='pending'",[p.id]);
+      await pool.query("DELETE FROM parties WHERE id = ?",[p.id]);
+      continue;
+    }
+    ownerParty.set(owner,p.id);
+    if(!p.owner_account_id)await pool.query("UPDATE parties SET owner_account_id=? WHERE id=?",[owner,p.id]);
+  }
+  try { await pool.query("ALTER TABLE parties MODIFY owner_account_id INT UNSIGNED NOT NULL"); }
+  catch(e) { /* instalação incompatível será denunciada ao criar/usar party */ }
+  try { await pool.query("ALTER TABLE parties ADD UNIQUE KEY uq_parties_owner (owner_account_id)"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query(
+    "ALTER TABLE parties ADD CONSTRAINT fk_parties_owner FOREIGN KEY (owner_account_id) REFERENCES accounts(id) ON DELETE CASCADE"); }
+  catch(e) { /* já existe ou instalação antiga sem suporte a FK */ }
+
+  let addedPosition=false;
+  try {
+    await pool.query("ALTER TABLE party_members ADD COLUMN position TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER character_id");
+    addedPosition=true;
+  } catch(e) { /* já existe */ }
+  if(addedPosition){
+    const [legacyMembers]=await pool.query(
+      "SELECT party_id, character_id FROM party_members ORDER BY party_id, joined_at, character_id");
+    const positions=new Map();
+    for(const member of legacyMembers){
+      const pos=(positions.get(member.party_id)||0)+1;positions.set(member.party_id,pos);
+      await pool.query("UPDATE party_members SET position=? WHERE party_id=? AND character_id=?",
+        [pos,member.party_id,member.character_id]);
+    }
+  }
+  try { await pool.query("ALTER TABLE party_members ADD INDEX idx_members_order (party_id, position)"); }
+  catch(e) { /* já existe */ }
 }
 
 /* Cria a instancia de db conforme o ambiente */
