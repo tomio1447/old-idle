@@ -17,7 +17,7 @@ class SyncBus{
     return event;}
   write(res,event){if(res.destroyed||res.writableEnded)return;
     res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(Object.assign({at:event.at},event.data))}\n\n`);}
-  subscribe(accountId,res,lastEventId){accountId=Number(accountId);lastEventId=Math.max(0,Number(lastEventId)||0);
+  subscribe(accountId,res,lastEventId,expiresAt){accountId=Number(accountId);lastEventId=Math.max(0,Number(lastEventId)||0);
     let set=this.clients.get(accountId);if(!set){set=new Set();this.clients.set(accountId,set);}const client={res};set.add(client);
     const history=this.histories.get(accountId)||[];
     if(lastEventId>this.sequence)
@@ -28,7 +28,9 @@ class SyncBus{
     this.write(res,{id:++this.sequence,type:"ready",at:Date.now(),data:{cursor:this.sequence}});
     const heartbeat=setInterval(()=>{if(!res.destroyed&&!res.writableEnded)res.write(`: heartbeat ${Date.now()}\n\n`);},15000);
     if(heartbeat.unref)heartbeat.unref();
-    const close=()=>{clearInterval(heartbeat);set.delete(client);if(!set.size)this.clients.delete(accountId);};
+    const expiry=expiresAt?setTimeout(()=>{if(!res.writableEnded)res.end();},Math.max(1,Number(expiresAt)-Date.now())):null;
+    if(expiry&&expiry.unref)expiry.unref();
+    const close=()=>{clearInterval(heartbeat);if(expiry)clearTimeout(expiry);set.delete(client);if(!set.size)this.clients.delete(accountId);};
     res.on("close",close);res.on("error",close);return close;}
   cursor(){return this.sequence;}
   clientCount(){let count=0;for(const set of this.clients.values())count+=set.size;return count;}

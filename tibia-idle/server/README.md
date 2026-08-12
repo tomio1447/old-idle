@@ -67,7 +67,8 @@ a aplicação e usar um banco/disco persistente.
 | Método | Rota | Corpo | Descrição |
 | --- | --- | --- | --- |
 | POST | `/api/register` | `{ login, password, email? }` | Cria uma conta |
-| POST | `/api/login` | `{ login, password }` | Login → `{ token, account, characters }` |
+| POST | `/api/login` | `{ login, password }` | Login → sessão com expiração |
+| POST | `/api/logout` | `{ token }` | Revoga a sessão no servidor |
 | GET | `/api/me` | header `Authorization: Bearer <token>` | Conta + personagens |
 | POST | `/api/sync/ticket` | `{ token }` | Ticket temporário para SSE |
 | GET | `/api/sync/events?ticket=&lastEventId=` | SSE | Eventos ordenados com replay |
@@ -92,6 +93,8 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/market/deposit` | `{ token, amount }` | Deposita gold no banco do market |
 | POST | `/api/market/withdraw` | `{ token, amount }` | Saca gold do banco do market |
 | GET | `/api/market/bank` | Bearer token | Saldo do banco do market |
+| GET | `/api/admin/snapshots?account_id=` | Bearer Admin | Histórico imutável/checksums |
+| GET | `/api/admin/backup?account_id=` | Bearer Admin | Bundle sanitizado e verificável |
 | POST | `/api/party/create` | `{ token, char_id }` | Cria a party (char vira líder) |
 | POST | `/api/party/invite` | `{ token, char_id, invitee_name }` | Líder convida por nome (só em cidade/treino) |
 | GET | `/api/party/inbox` | Bearer token | Convites PENDENTES de todos os chars da conta |
@@ -104,6 +107,27 @@ a aplicação e usar um banco/disco persistente.
 | GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, versão, ordem e follow pendente |
 | POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
 | POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
+
+**Snapshots, backup e hardening:**
+- `snapshot_history` mantém snapshots imutáveis por entidade com SHA-256,
+  motivo, versão, retenção de 500 entradas por conta e throttle de checkpoints
+- Admin pode consultar o histórico e exportar bundle sem `password_hash`
+- `tools/backup_restore.js` oferece `backup`, `verify` e `restore` para JSON,
+  além de `backup-mysql`/`restore-mysql`. Restore exige `--apply` e confirmação
+  exata do checksum; JSON cria um safety backup antes de trocar arquivos
+- Sessões expiram (24h por padrão), novo login revoga a sessão anterior e
+  `/api/logout` revoga imediatamente token e tickets SSE vinculados
+- CORS aceita same-origin e allowlist explícita; headers CSP, nosniff,
+  Referrer-Policy e Permissions-Policy são enviados em API e estáticos
+- Login, cadastro, takeover e emissão de tickets possuem rate limit por IP;
+  `TRUST_PROXY=1` só deve ser usado atrás de proxy confiável
+
+```bash
+node tibia-idle/tools/backup_restore.js backup --data-dir tibia-idle/server/data --out backup.json
+node tibia-idle/tools/backup_restore.js verify --file backup.json
+node tibia-idle/tools/backup_restore.js restore --file backup.json --data-dir tibia-idle/server/data --apply --confirm SHA256
+# MySQL: backup-mysql / restore-mysql usam MYSQL_HOST, MYSQL_USER, MYSQL_PASS e MYSQL_DB
+```
 
 **Sincronização SSE e reconexão:**
 - O navegador troca a sessão por um ticket temporário; o token da conta não é

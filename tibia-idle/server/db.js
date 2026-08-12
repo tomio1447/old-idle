@@ -11,6 +11,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 // ---- configuração via .env (MYSQL_HOST, MYSQL_USER, ...) ----
 const MYSQL_HOST = process.env.MYSQL_HOST || "";
@@ -36,6 +37,7 @@ function JsonStore() {
   this.sessions = this._load("sessions.json", []);
   this.leases = this._load("leases.json", []);
   this.instances = this._load("instances.json", []);
+  this.snapshots = this._load("snapshots.json", []);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
   const partyData = this._load("parties.json", null);
@@ -94,6 +96,8 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.leases || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "instances.json"),
     JSON.stringify(this.instances || [], null, 1));
+  fs.writeFileSync(path.join(DATA_DIR, "snapshots.json"),
+    JSON.stringify(this.snapshots || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
     JSON.stringify({ marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
@@ -108,18 +112,24 @@ JsonStore.prototype.findAccountById = function (id) {
   return this.accounts.find((a) => a.id === Number(id)) || null;
 };
 JsonStore.prototype.findAccountByToken = function (token) {
-  const session = (this.sessions || []).find((s) => s.token === String(token));
+  const now=Date.now();
+  const session = (this.sessions || []).find((s) => s.token === String(token)&&
+    (!s.expires_at||new Date(s.expires_at).getTime()>now));
   return session ? this.findAccountById(session.account_id) : null;
 };
-JsonStore.prototype.createSession = function (accountId, token) {
+JsonStore.prototype.createSession = function (accountId, token, expiresAt) {
   this.sessions = (this.sessions || []).filter((s) => s.account_id !== Number(accountId));
   this.sessions.push({
     id: this._nextId(this.sessions), account_id:Number(accountId), token:String(token),
-    created_at:new Date().toISOString(),
+    created_at:new Date().toISOString(),expires_at:expiresAt?new Date(expiresAt).toISOString():null,
   });
   this._save();
   return token;
 };
+JsonStore.prototype.revokeSession = function(token){const before=(this.sessions||[]).length;
+  this.sessions=(this.sessions||[]).filter((s)=>s.token!==String(token));if(this.sessions.length!==before)this._save();return this.sessions.length!==before;};
+JsonStore.prototype.pruneExpiredSessions=function(now){const before=(this.sessions||[]).length;
+  this.sessions=(this.sessions||[]).filter((s)=>!s.expires_at||new Date(s.expires_at).getTime()>now);if(this.sessions.length!==before)this._save();return before-this.sessions.length;};
 JsonStore.prototype.leaseAcquire = function(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
   this.leases=this.leases||[];
   let row=this.leases.find((lease)=>Number(lease.account_id)===Number(accountId));
@@ -458,6 +468,21 @@ JsonStore.prototype.rankings = function (by, limit) {
   else rows.sort((a, b) => (b.level - a.level));
   return rows.slice(0, limit);
 };
+
+/* --------------------------- SNAPSHOT HISTORY --------------------------- */
+JsonStore.prototype.snapshotAdd=function(accountId,entityType,entityId,version,reason,data,force){
+  this.snapshots=this.snapshots||[];const now=Date.now(),type=String(entityType),id=String(entityId);
+  const recent=[...this.snapshots].reverse().find((s)=>Number(s.account_id)===Number(accountId)&&s.entity_type===type&&s.entity_id===id);
+  if(!force&&recent&&now-new Date(recent.created_at).getTime()<60000)return recent;
+  const serialized=typeof data==="string"?data:JSON.stringify(data||{}),row={id:this._nextId(this.snapshots),
+    account_id:Number(accountId),entity_type:type,entity_id:id,version:Number(version)||0,reason:String(reason||"checkpoint").slice(0,40),
+    checksum:crypto.createHash("sha256").update(serialized).digest("hex"),data:serialized,created_at:new Date(now).toISOString()};
+  this.snapshots.push(row);const own=this.snapshots.filter((s)=>Number(s.account_id)===Number(accountId));
+  if(own.length>500){const remove=new Set(own.slice(0,own.length-500).map((s)=>s.id));this.snapshots=this.snapshots.filter((s)=>!remove.has(s.id));}
+  this._save();return row;
+};
+JsonStore.prototype.snapshotList=function(accountId,limit){return (this.snapshots||[]).filter((s)=>Number(s.account_id)===Number(accountId))
+  .sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,Math.max(1,Math.min(500,Number(limit)||100)));};
 
 /* ------------------------------ PARTY ------------------------------ */
 
@@ -826,14 +851,17 @@ async function MysqlStore() {
     },
     async findAccountByToken(token) {
       const rows = await this.query(
-        "SELECT a.* FROM accounts a JOIN sessions s ON s.account_id = a.id WHERE s.token = ?",
-        [token]);
+        `SELECT a.* FROM accounts a JOIN sessions s ON s.account_id=a.id
+         WHERE s.token=? AND (s.expires_at IS NULL OR s.expires_at>NOW())`,[token]);
       return rows[0] || null;
     },
-    async createSession(accountId, token) {
-      await this.run("INSERT INTO sessions (account_id, token) VALUES (?, ?)",
-        [Number(accountId), token]);
+    async createSession(accountId, token, expiresAt) {
+      await this.run("DELETE FROM sessions WHERE account_id=?",[Number(accountId)]);
+      await this.run("INSERT INTO sessions (account_id,token,expires_at) VALUES (?,?,?)",
+        [Number(accountId),token,expiresAt?new Date(expiresAt):null]);
     },
+    async revokeSession(token){const result=await this.run("DELETE FROM sessions WHERE token=?",[String(token)]);return result.affectedRows>0;},
+    async pruneExpiredSessions(now){const result=await this.run("DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at<=?",[new Date(now)]);return result.affectedRows;},
     async leaseAcquire(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
       const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
       try{
@@ -1182,6 +1210,28 @@ async function MysqlStore() {
         [limit]);
     },
 
+    // ---- SNAPSHOT HISTORY ----
+    async snapshotAdd(accountId,entityType,entityId,version,reason,data,force){
+      const serialized=typeof data==="string"?data:JSON.stringify(data||{});
+      if(!force){const recent=await this.query(
+        `SELECT id FROM snapshot_history WHERE account_id=? AND entity_type=? AND entity_id=?
+         AND created_at>DATE_SUB(NOW(),INTERVAL 60 SECOND) ORDER BY id DESC LIMIT 1`,
+        [Number(accountId),String(entityType),String(entityId)]);if(recent[0])return recent[0];}
+      const checksum=crypto.createHash("sha256").update(serialized).digest("hex");
+      const result=await this.run(
+        `INSERT INTO snapshot_history (account_id,entity_type,entity_id,version,reason,checksum,data)
+         VALUES (?,?,?,?,?,?,?)`,[Number(accountId),String(entityType),String(entityId),Number(version)||0,
+          String(reason||"checkpoint").slice(0,40),checksum,serialized]);
+      await this.run(`DELETE FROM snapshot_history WHERE account_id=? AND id NOT IN
+        (SELECT id FROM (SELECT id FROM snapshot_history WHERE account_id=? ORDER BY id DESC LIMIT 500) kept)`,
+        [Number(accountId),Number(accountId)]);
+      return {id:result.insertId,checksum};
+    },
+    async snapshotList(accountId,limit){return this.query(
+      "SELECT * FROM snapshot_history WHERE account_id=? ORDER BY id DESC LIMIT ?",
+      [Number(accountId),Math.max(1,Math.min(500,Number(limit)||100))]);
+    },
+
     // ---- PARTY (multiplayer) ----
     async partyCreate(leaderChar) {
       const r = await this.run(
@@ -1439,6 +1489,20 @@ async function ensureSchema(pool) {
     "ADD COLUMN worker_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER worker_cursor_at",
   ]){try{await pool.query("ALTER TABLE account_instances "+col);}catch(e){/* já existe */}}
   try{await pool.query("UPDATE account_instances SET worker_cursor_at=saved_at WHERE worker_cursor_at IS NULL");}catch(e){}
+  await pool.query(`CREATE TABLE IF NOT EXISTS snapshot_history (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    entity_type VARCHAR(24) NOT NULL,
+    entity_id VARCHAR(64) NOT NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    reason VARCHAR(40) NOT NULL,
+    checksum CHAR(64) NOT NULL,
+    data MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_snapshot_account (account_id,id),
+    INDEX idx_snapshot_entity (account_id,entity_type,entity_id,created_at),
+    CONSTRAINT fk_snapshot_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS characters (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     account_id INT UNSIGNED NOT NULL,

@@ -3380,6 +3380,9 @@ function initAccountLogin() {
     if(typeof accountReleaseLease==="function"){
       try{await accountReleaseLease(sessionToken());}catch(e){}
     }
+    if(typeof accountLogout==="function"){
+      try{await accountLogout(sessionToken());}catch(e){}
+    }
     if(typeof accountCharacterCacheClear==="function")accountCharacterCacheClear();
     try {
       sessionStorage.removeItem("tibia-idle-token");

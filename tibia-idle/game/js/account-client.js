@@ -367,6 +367,9 @@ async function accountMe(token) {
   const r = await _api("GET", "/api/me", null, token);
   return r.data.ok ? r.data : { ok: false };
 }
+async function accountLogout(token){
+  const r=await _api("POST","/api/logout",{token});return !!r.data.ok;
+}
 
 async function accountLoadCharacter(token, charId) {
   const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
