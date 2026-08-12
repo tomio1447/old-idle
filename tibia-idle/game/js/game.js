@@ -100,10 +100,13 @@ function persistActiveInstance() {
     })),
   };
   try {
+    const seen=new WeakSet();
     const state=JSON.parse(JSON.stringify(c,(key,value)=>{
-      if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf")return undefined;
+      if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||key==="_authorityDescriptor")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
-      return typeof value==="function"?undefined:value;
+      if(typeof value==="function")return undefined;
+      if(value&&typeof value==="object"){if(seen.has(value))return undefined;seen.add(value);}
+      return value;
     }));
     descriptor.state=state;
   } catch(error) {
@@ -1322,13 +1325,16 @@ function startHunt(id, instanceMode, force) {
   }
   if (!instanceMode) { openInstanceModal(id); return; }
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada da hunt");
+  // Toda troca de arena passa pelo checkpoint city. Além de limpar a
+  // instância anterior, isso ordena a transição da party no servidor.
+  if(G.combat)stopHunt(true);
   if (G.training) stopAcademy(false);
   G.inCity = false;
   G.p.hunt = id;
   G.p.instanceMode = instanceMode;
   G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
   const entryToken = (G.huntEntryToken || 0) + 1;
-  G.huntEntryToken = entryToken;
+  G.huntEntryToken = entryToken;G.huntEntryPendingToken=entryToken;
   if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${hu.name}...`);
 
   // Última barreira contra overlay infinito: mesmo que um callback externo
@@ -1362,11 +1368,11 @@ function startHunt(id, instanceMode, force) {
   const finishHuntEntry = () => {
     if (entryCompleted) return;
     if (!restoreHuntEntryState("finalização")) {
-      entryCompleted = true;
+      entryCompleted = true;if(G.huntEntryPendingToken===entryToken)G.huntEntryPendingToken=null;
       if (entryWatchdog) clearTimeout(entryWatchdog);
       return;
     }
-    entryCompleted = true;
+    entryCompleted = true;if(G.huntEntryPendingToken===entryToken)G.huntEntryPendingToken=null;
     if (entryWatchdog) clearTimeout(entryWatchdog);
     try {
       if(typeof accountBeginInstance==="function")accountBeginInstance();
@@ -1384,7 +1390,7 @@ function startHunt(id, instanceMode, force) {
       // O watchdog é a última barreira de acesso: um erro secundário de UI
       // não pode manter a tela inteira bloqueada. O callback OTBM ainda pode
       // tentar novamente quando o mapa integral terminar de carregar.
-      entryCompleted = false;
+      entryCompleted = false;G.huntEntryPendingToken=entryToken;
       console.error(`[hunt] falha ao concluir entrada em ${id}:`, error);
     } finally {
       closeHuntEntryLoading(false);
@@ -1479,7 +1485,7 @@ function stopHunt(skipMapLoading) {
   if (!skipMapLoading && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
-  G.huntEntryToken = (G.huntEntryToken || 0) + 1;
+  G.huntEntryToken = (G.huntEntryToken || 0) + 1;G.huntEntryPendingToken=null;
   if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
   // Checkpoint do templo: cura inclusive membros inconscientes antes de
   // persistir o roster, para ninguém permanecer morto fora da instância.
@@ -2320,7 +2326,9 @@ function onlineAuthorityCombat(){
 function applyOnlineAuthorityState(descriptor,terminalReason){
   if(!descriptor||!G.combat)return false;
   const fresh={hunt:G.combat.hunt,huntMap:G.combat.huntMap,boss:G.combat.boss};
-  G.combat=restoreCombatSessionState(fresh,descriptor);G.combat._authorityDescriptor=descriptor;
+  // `descriptor.state` passa a ser o próprio G.combat. Nunca reanexe o
+  // descriptor dentro dele: isso cria state -> combat -> descriptor -> state.
+  G.combat=restoreCombatSessionState(fresh,descriptor);
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);
@@ -2507,9 +2515,9 @@ function loop(ts) {
   if (G.training) {
     G.renderer.drawAcademy(G.training, G.p, dt);
   } else if (!G.combat) {
-    // Recupera saves que ficaram sem instância e com inCity=false após troca
-    // de branch/reload: a ausência de combate sempre deve renderizar Thais.
-    G.inCity = true;
+    // Durante o fetch OTBM ainda não há G.combat, mas a entrada já é válida.
+    // Não reverta G.inCity nesse intervalo ou a finalização parecerá corrompida.
+    if(!G.huntEntryPendingToken)G.inCity = true;
     // Na cidade a stamina também permanece temporariamente cheia.
     G.p.stamina = FULL_STAMINA_SECONDS;
     regenInCity(G.p, dt);

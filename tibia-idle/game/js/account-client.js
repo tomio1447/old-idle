@@ -224,6 +224,8 @@ function accountSaveInstance(token,state){
       accountInstanceApply(r.data.instance||null);
       try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
       if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+    }else if(typeof console!=="undefined"){
+      console.warn("[instance] save recusado",r.code,r.data.error||"",r.data.msg||"");
     }
     return false;
   });
@@ -573,9 +575,17 @@ async function accountPartyState(charId) {
   return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };
 }
 
+let ACCOUNT_PARTY_ZONE_QUEUE=Promise.resolve(true);
 async function accountPartyReportZone(charId, zoneInfo) {
-  const r = await _api("POST", "/api/party/zone", Object.assign({ token: sessionToken(), char_id: charId }, zoneInfo));
-  return r.data.ok ? { ok: true } : { ok: false, msg: r.data.msg };
+  // Retorno à cidade e entrada seguinte podem acontecer no mesmo tick
+  // (boss -> hunt, hunt -> boss). Preserve a ordem HTTP para a máquina de
+  // estados do servidor nunca receber o destino antes do checkpoint city.
+  const body=Object.assign({token:sessionToken(),char_id:charId},zoneInfo||{});
+  const run=ACCOUNT_PARTY_ZONE_QUEUE.catch(()=>false).then(async()=>{
+    const r=await _api("POST","/api/party/zone",body);
+    return r.data.ok?{ok:true,zone:r.data.zone}:{ok:false,msg:r.data.msg,error:r.data.error};
+  });
+  ACCOUNT_PARTY_ZONE_QUEUE=run.catch(()=>false);return run;
 }
 
 async function accountPartyFollow(charId, nonce) {
