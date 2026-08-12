@@ -104,13 +104,24 @@ livres após a colisão. A hunt contém Many Faces, as cinco Apparitions e
 Distorted Phantom. A missão exige 25 mortes de cada criatura e concede acesso
 a Goshnar's Greed.
 
+## Rotten Wasteland
+
+`rotten_wasteland.otbm` publica integralmente o novo beta-map `Rotten
+Wasteland.otbm`: piso `z=7` de 21×15, limites `(1040,1012,7)..(1060,1026,7)`,
+centralizado num mundo runtime 30×30. O player nasce em `(1045,1022,7)` e os
+respawns usam a região `(1047,1017,7)..(1058,1023,7)`. A hunt contém Rotten
+Golem, Branchy Crawler e Mould Phantom. Eliminar 50 Rotten Golems libera
+Goshnar's Hatred.
+
 ## Goshnar's Greed
 
-`goshnarsgreed.otbm` vem de `beta-maps/bossesroom/`, seleciona integralmente
-o piso `z=7` de 21×18 (`1042,1008` até `1062,1025`) e o centraliza num mundo
-30×30. O player nasce em `(1052,1022,7)`, runtime `(14,20)`, e Goshnar em
-`(1052,1011,7)`, runtime `(14,9)`. A recompensa da Mirrored Nightmare já
-registra o acesso, mas requisito e cooldown estão temporariamente desligados
-para testes. Durante a luta aparecem até seis adds sem defesa/imunidade; cada
-nascimento tem 30% de chance de ser Greedbeast. A cada cinco Greedbeasts mortos,
-o boss perde a imunidade durante 40 segundos.
+`goshnarsgreed.otbm` vem do beta-map atualizado em `beta-maps/bossesroom/`,
+seleciona integralmente o piso `z=7` de 20×14 (`1048,1011` até `1067,1024`)
+e o centraliza num mundo 30×30. A FOV informada continua registrada como
+`(1042,1009,7)..(1060,1024,7)`, sem recortar o mundo. O player nasce em
+`(1052,1022,7)`, runtime `(9,19)`, e Goshnar em `(1052,1011,7)`, runtime
+`(9,8)`. A recompensa da Mirrored Nightmare já registra o acesso, mas
+requisito e cooldown estão temporariamente desligados para testes. Durante a
+luta aparecem até seis adds sem defesa/imunidade; cada nascimento tem 30% de
+chance de ser Greedbeast. A cada cinco Greedbeasts mortos, o boss perde a
+imunidade durante 40 segundos.

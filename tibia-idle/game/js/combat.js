@@ -252,6 +252,7 @@ function huntWaveSize(hunt, randomValue) {
 }
 
 function spawnWave(c, p) {
+  const spawnNow=(c&&c._tickNow)||Date.now();
   // Categoria HARD sempre usa ondas variáveis de 6–10. Hunts podem declarar
   // outra faixa explicitamente (ex.: HARDCORE da Library usa 10–12).
   const pack = huntWaveSize(c.hunt);
@@ -293,7 +294,7 @@ function spawnWave(c, p) {
       moving: false,
       attackAnim: 0,
       speed: 0.000045 + Math.random() * 0.000025,
-      spawnAt: Date.now(),
+      spawnAt: spawnNow,
     };
     // --- ponto de respawn (posicao designada no RME) ---
     // A zona G do .otbm marca EXATAMENTE onde o editor quer os monstros.
@@ -363,7 +364,7 @@ function spawnWave(c, p) {
     c.pendingSpawns.push({
       mob: mob,
       cx: cx, cy: cy,
-      startedAt: Date.now(),
+      startedAt: spawnNow,
       blink: 0,
       done: false,
     });
@@ -374,9 +375,9 @@ function spawnWave(c, p) {
 /* Processa a fila de spawn: a cada SPAWN_BLINK_MS o teleporte "pisca" no
  * ponto (evento spawn-blink -> renderer mostra o efeito). Depois de
  * SPAWN_BLINKS piscadas o monstro nasce de verdade. */
-function tickSpawnQueue(c) {
+function tickSpawnQueue(c, now) {
   if (!c.pendingSpawns || !c.pendingSpawns.length) return;
-  const now = Date.now();
+  now=now||Date.now();
   for (const sp of c.pendingSpawns) {
     const b = Math.floor((now - sp.startedAt) / SPAWN_BLINK_MS);
     if (b > sp.blink) {
@@ -401,7 +402,7 @@ function tickSpawnQueue(c) {
       if (s) { m.x = s.x; m.y = s.y; m.sx = s.x; m.sy = s.y; }
       else { m.x = (sp.cx + 0.5) / GRID_W; m.y = (sp.cy + 0.5) / GRID_H; }
       m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
-      m.spawnAt = Date.now();
+      m.spawnAt = now;
       c.mobs.push(m);
       c.events.push({ t: "spawn", slug: m.slug, x: m.x, y: m.y });
     }
@@ -3521,6 +3522,15 @@ function mobAttack(c, p, mob) {
   return raw;
 }
 
+/* Quantidade oficial do drop. Entradas sem `min` preservam a regra antiga
+ * de 1..max; bosses como Hatred podem declarar 70..75 ou 50..100. */
+function lootStackCount(entry,randomValue){
+  const max=Math.max(1,Math.floor(Number(entry&&entry.max)||1));
+  const min=Math.max(1,Math.min(max,Math.floor(Number(entry&&entry.min)||1)));
+  const roll=randomValue===undefined?Math.random():Math.max(0,Math.min(.999999,randomValue));
+  return min+Math.floor(roll*(max-min+1));
+}
+
 /* Gera o loot de um monstro morto */
 function rollLoot(c, p, mob) {
   // Party combat: a Loot Pouch do líder é o destino ÚNICO de todo loot,
@@ -3552,7 +3562,8 @@ function rollLoot(c, p, mob) {
     if (Math.random() * 100 > effectiveChance) continue;
     // Multiplicadores aumentam SOMENTE a chance. A quantidade respeita o
     // max original do Canary; não multiplicar aqui evita 15 blank runes.
-    const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+    const count = typeof lootStackCount === "function" ? lootStackCount(l) :
+      (l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1);
     const it = GAMEDATA.items[l.item];
     if (!it) continue;
     if (!mob.boss && isNoCollect(p, l.item)) continue;
@@ -3593,7 +3604,8 @@ function rollLoot(c, p, mob) {
     if (pLoot > 0 && Math.random() * 100 < pLoot) {
       for (const l of mob.def.loot) {
         if (Math.random() * 100 > l.chance) continue;
-        const count = l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1;
+        const count = typeof lootStackCount === "function" ? lootStackCount(l) :
+          (l.max > 1 ? 1 + Math.floor(Math.random() * l.max) : 1);
         const it = GAMEDATA.items[l.item];
         if (!it) continue;
         if (!mob.boss && isNoCollect(p, l.item)) continue;
@@ -3769,11 +3781,12 @@ function partyHelperTick(c, ent, now, dt) {
 
 /* Personagem da party caiu (hp <= 0): vira INCONSCIENTE (revive no local
  * depois de reviveTime) e o controle passa para o próximo membro vivo. */
-function partyHandleDown(c, fallenP) {
+function partyHandleDown(c, fallenP, now) {
+  now=now||Date.now();
   const ent = c.players.find((e) => e.p === fallenP) || c.player;
   if (ent) {
     if (!ent.reviveAt) {
-      ent.downedAt = Date.now();
+      ent.downedAt = now;
       ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
       ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       ent.p.hp = 0;
@@ -3781,17 +3794,20 @@ function partyHandleDown(c, fallenP) {
       ent.p.deaths = (ent.p.deaths || 0) + 1;
       if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
       if (typeof addLog === "function") {
-        addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round(ent.reviveAt / 1000 - Date.now() / 1000)}s.`);
+        addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
       }
     }
   }
   // troca o controle para o próximo vivo
   const proximo = c.players.find((e) => e !== ent && e.p && e.p.hp > 0);
-  if (proximo && typeof partyCombatSwitchTo === "function") {
+  if (proximo) {
     if (typeof addLog === "function") {
       addLog("party", `Controlando agora: <b>${proximo.name}</b> (${fallenP.name} inconsciente).`);
     }
-    partyCombatSwitchTo(proximo.id);
+    // No catch-up offline não renderiza/salva a cada troca; apenas mantém a
+    // entidade ativa correta para o próximo tick histórico.
+    if(typeof G!=="undefined"&&G&&G._idleCatchup){c.player=proximo;G.p=proximo.p;}
+    else if(typeof partyCombatSwitchTo === "function")partyCombatSwitchTo(proximo.id);
   }
 }
 
@@ -3842,14 +3858,20 @@ function playerDeath(c, p) {
 /* --------------------------------------------------- tick principal */
 
 function combatTick(c, p, dt, now) {
+  now=now||Date.now();c._tickNow=now;
   c.stats.time += dt;
   p.playtime += dt;
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
 
-  // stamina: gasta 1s por segundo caçando
-  p.stamina = Math.max(0, p.stamina - dt / 1000);
+  // Stamina temporariamente desativada: toda a party permanece em 42h.
+  // A condição de encerramento por stamina continua prevista, mas não pode
+  // ocorrer enquanto este modo de testes estiver ativo.
+  const fullStamina=42*3600;
+  p.stamina=fullStamina;
+  if(c.players&&c.players.length)for(const ent of c.players)
+    if(ent&&ent.p)ent.p.stamina=fullStamina;
 
   if (c.dead) return;
 
@@ -3889,7 +3911,7 @@ function combatTick(c, p, dt, now) {
     spawnWave(c, p);
   }
   // fila de spawn: teleporte piscando 3x antes do monstro nascer
-  if (c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c);
+  if (c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c,now);
   if (c.raidEnabled) {
     c.raidCd -= dt;
     if (c.raidCd <= 0) {
@@ -4020,7 +4042,7 @@ function combatTick(c, p, dt, now) {
     }
     if (c.players && c.players.length > 1 &&
         typeof partyHandleDown === "function") {
-      partyHandleDown(c, p);
+      partyHandleDown(c, p, now);
       const vivos = c.players.some((e) => e.p && e.p.hp > 0);
       if (!vivos) { playerDeath(c, p); return; }
     } else {

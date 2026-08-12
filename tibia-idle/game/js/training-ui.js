@@ -86,7 +86,7 @@ function renderTrainingDummy(p, el) {
       </div>
       <div class="row small" style="justify-content:space-between">
         <span class="dim">Stamina</span>
-        <span>${fmtTime(p.stamina)} / 42h · regen <b>3:1</b></span>
+        <span>${fmtTime(p.stamina)} / 42h · <b>sempre cheia</b></span>
       </div>
     </div>
     <div class="tiny dim mb4">Exercise weapons — escolha uma e bata no dummy.
@@ -136,7 +136,7 @@ function renderTrainingOnline(p, el) {
     <div class="panel-inset mb8" style="padding:8px">
       <div class="stat-row"><span class="k">Treinador</span><span class="v">Treiner da Academia (Safezone)</span></div>
       <div class="stat-row"><span class="k">Custo</span><span class="v" style="color:#9ce84a">Grátis</span></div>
-      <div class="stat-row"><span class="k">Stamina</span><span class="v">${fmtTime(p.stamina)} / 42h · regen <b>1:1</b></span></div>
+      <div class="stat-row"><span class="k">Stamina</span><span class="v">${fmtTime(p.stamina)} / 42h · <b>sempre cheia</b></span></div>
       <div class="stat-row"><span class="k">Skill treinada</span><span class="v">${skillTxt}</span></div>
       <div class="stat-row"><span class="k">Por golpe</span><span class="v" style="color:#9ce84a">${EXERCISE_TRIES} tries</span></div>
       <div class="stat-row"><span class="k">Intervalo</span><span class="v">${(exerciseInterval(p) / 1000).toFixed(1)}s</span></div>

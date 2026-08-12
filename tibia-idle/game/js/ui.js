@@ -58,6 +58,7 @@ function helperSupplyFlash(slug, kind) {
 
 /* ------------------------------------------------------------ toasts */
 function toast(msg, kind) {
+  if(typeof G!=="undefined"&&G&&G._silentCombat)return;
   const el = document.createElement("div");
   el.className = "toast " + (kind || "");
   el.innerHTML = msg;
@@ -297,6 +298,7 @@ function imbSlotsTip(p, slug, slot, total) {
 
 /* ------------------------------------------------------------ log */
 function addLog(kind, html) {
+  if(typeof G!=="undefined"&&G&&G._silentCombat)return;
   const box = $("#log");
   if (!box) return;
   const d = new Date();
@@ -688,7 +690,7 @@ const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS 100–250", ids: [] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
-  { title: "SOULWAR 400+", ids: ["dark-thais"] },
+  { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland"] },
 ];
 
 /* Único catálogo público de hunts. As áreas 7.4 continuam no GAMEDATA para
