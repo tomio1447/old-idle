@@ -53,6 +53,14 @@ vm.createContext(ctx);vm.runInContext(source,ctx);
   const puts=calls.filter((c)=>c.method==="PUT"&&c.url.endsWith("/api/instance"));
   must(puts[puts.length-1].body.expected_version===0&&!puts[puts.length-1].body.instance_id,
     "nova instância reutilizou id/versão terminal");
+
+  // Transição hunt -> boss ocorre no mesmo tick: o begin novo pode chegar
+  // antes de o POST /end anterior terminar, sem perder a permissão de create.
+  const transitionEnd=ctx.accountEndInstance("token","switch-to-boss");
+  ctx.accountBeginInstance();
+  const transitionSave=ctx.accountSaveInstance("token",{kind:"boss",bossId:"hatred",marker:"transition"});
+  must(await transitionEnd&&await transitionSave,
+    "transição imediata entre instâncias perdeu a nova geração");
   await ctx.accountReleaseLease("token");
   console.log("OK: cliente usa snapshot remoto e não ressuscita instância encerrada.");
 })().catch((error)=>{console.error(error);process.exit(1);});

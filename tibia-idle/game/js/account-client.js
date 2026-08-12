@@ -241,13 +241,14 @@ function accountTickInstance(token){
   });
 }
 function accountEndInstance(token,reason){
-  ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=false;
+  ACCOUNT_INSTANCE_EPOCH+=1;const endEpoch=ACCOUNT_INSTANCE_EPOCH;ACCOUNT_INSTANCE_CAN_CREATE=false;
   return accountQueueInstance(async()=>{
     if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
     if(!accountLeaseAllowsSimulation())return false;
     const r=await _api("POST","/api/instance/end",Object.assign({token,
       instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(null);return true;}
+    if(r.data.ok){const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
+      if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountInstanceApply(r.data.instance||null);
     return false;

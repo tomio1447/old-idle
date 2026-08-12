@@ -8,28 +8,31 @@ const ctx={window:{},console,Math,Date,Map,Set};ctx.window=ctx;vm.createContext(
 for(const file of ["gamedata.js","monsterdata.js","mobsheetdata.js","monsters.js","soulwar.js","tileflags.js"])
   vm.runInContext(fs.readFileSync(path.join(js,file),"utf8"),ctx,{filename:file});
 
-const room=fs.readFileSync(path.join(game,"maps","goshnars_hatred.otbm"));
+const room=fs.readFileSync(path.join(game,"maps","goshnars_hatred_room.otbm"));
+const beta=fs.readFileSync(path.join(game,"beta-maps","bossesroom","goshnars_hatred_room.otbm"));
 const rotten=fs.readFileSync(path.join(game,"maps","rotten_wasteland.otbm"));
-must(room.equals(rotten)&&crypto.createHash("sha256").update(room).digest("hex")===
-  "ba751589dd9afe6000bda56015df9c2a8c2b4d501a713108236760d25983081d",
-  "room de Hatred não preserva o OTBM entregue");
+must(room.equals(beta)&&!room.equals(rotten)&&crypto.createHash("sha256").update(room).digest("hex")===
+  "8728c78730ed243c3cd4a620c9529af0c3edbd5396a2a07cc368ffb2d4031f8a",
+  "Hatred não usa bossroom própria/distinta da Rotten Wasteland");
 const hunt=ctx.GAMEDATA.hunts["goshnars-hatred-room"];
-must(hunt&&hunt.otbm==="goshnars_hatred"&&hunt.otbmFloor===7&&
+must(hunt&&hunt.otbm==="goshnars_hatred_room"&&hunt.otbmFloor===7&&
   hunt.otbmRuntimeWidth===30&&hunt.otbmRuntimeHeight===30,
   "room técnica de Hatred não usa OTBM/mundo 30×30 próprio");
-must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:1044,y:1012,w:18,h:14,z:7})&&
-  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1047,y:1019,z:7})&&
-  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:1059,y:1019,w:1,h:1,z:7}),
-  "FOV/player/boss spawn globais de Hatred divergentes");
+must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:0,y:0,w:18,h:14,z:7})&&
+  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:2,y:7,z:7})&&
+  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:15,y:7,w:1,h:1,z:7}),
+  "FOV/player/boss spawn locais de Hatred divergentes");
 let map=OTBM.read(room,{z:7});
+must(map.w===18&&map.h===14&&Object.keys(map.cells).length===252,
+  "bossroom própria de Hatred não manteve 18×14 completo");
 const loader=fs.readFileSync(path.join(js,"otbmhunt.js"),"utf8");
 const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("\n\n/* Garante",zs);
 vm.runInContext(loader.slice(zs,ze),ctx);ctx.applyHuntOtbmZones(map,hunt);
 map.idleTargetWidth=30;map.idleTargetHeight=30;
 const hm=OTBM.huntMapFromOtbm(map,ctx.TILEFLAGS);
 must(hm.rows.length===30&&hm.rows.every(row=>row.length===30)&&
-  hm.spawn.x===11&&hm.spawn.y===14&&hm.mob.length===1&&hm.mob[0].x===23&&hm.mob[0].y===14,
-  "coordenadas runtime de player/boss Hatred incorretas");
+  hm.spawn.x===8&&hm.spawn.y===15&&hm.mob.length===1&&hm.mob[0].x===21&&hm.mob[0].y===15,
+  "coordenadas runtime de player/boss Hatred dedicadas incorretas");
 
 // Arena sintética livre para testar a mecânica sem depender do renderer.
 ctx.huntMapBlocked=()=>false;

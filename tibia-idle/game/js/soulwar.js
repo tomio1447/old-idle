@@ -90,11 +90,11 @@
  // entregue. A FOV registra o retângulo informado sem recortar o mundo 30×30.
  GAMEDATA.hunts['goshnars-hatred-room']={
   name:"Goshnar's Hatred Room",hidden:true,level:400,minLevel:400,
-  cat:'boss-room',scene:'soulwar',otbm:'goshnars_hatred',otbmFloor:7,
-  otbmFovBounds:{x:1044,y:1012,w:18,h:14,z:7},
+  cat:'boss-room',scene:'soulwar',otbm:'goshnars_hatred_room',otbmFloor:7,
+  otbmFovBounds:{x:0,y:0,w:18,h:14,z:7},
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
-  otbmSpawn:{x:1047,y:1019,z:7},
-  otbmMobBounds:{x:1059,y:1019,w:1,h:1,z:7},
+  otbmSpawn:{x:2,y:7,z:7},
+  otbmMobBounds:{x:15,y:7,w:1,h:1,z:7},
   monsters:['goshnar-s-hatred','dreadful-harvester','hateful-soul'],
   avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
   respawn:1,pack:1,
@@ -105,11 +105,11 @@
  // livres da sala e não dependem desta zona.
  GAMEDATA.hunts['goshnars-greed-room']={
   name:"Goshnar's Greed Room",hidden:true,level:550,minLevel:550,
-  cat:'boss-room',scene:'soulwar',otbm:'goshnarsgreed',otbmFloor:7,
-  otbmFovBounds:{x:1042,y:1009,w:19,h:16,z:7},
+  cat:'boss-room',scene:'soulwar',otbm:'goshnars_greed_room',otbmFloor:7,
+  otbmFovBounds:{x:0,y:0,w:20,h:14,z:7},
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
-  otbmSpawn:{x:1052,y:1022,z:7},
-  otbmMobBounds:{x:1052,y:1011,w:1,h:1,z:7},
+  otbmSpawn:{x:10,y:12,z:7},
+  otbmMobBounds:{x:10,y:2,w:1,h:1,z:7},
   monsters:['goshnar-s-greed','dreadful-harvester','soulsnatcher','greedbeast','powerful-soul'],
   avgHp:300000,avgExp:150000,avgDamage:1800,avgArmor:120,avgGold:100,
   respawn:1,pack:1,

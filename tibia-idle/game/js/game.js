@@ -136,6 +136,11 @@ function persistActiveInstance() {
   return descriptor;
 }
 
+function instanceIncludesCharacter(instance,id){
+  return !!(instance&&Array.isArray(instance.members)&&
+    instance.members.some((member)=>String(member&&member.id)===String(id)));
+}
+
 function readInstanceSession() {
   try{
     const raw=localStorage.getItem(INSTANCE_SESSION_KEY);if(!raw)return null;
@@ -182,7 +187,7 @@ function resumeIdleInstance(session){
     const member=(session.members||[]).find((m)=>String(m.id)===activeId)||(session.members||[])[0];
     if(member&&member.p){G.p=normalizePlayer(member.p);G.p.id=member.id||G.p.id;}
     const boss=session.kind==="boss"&&typeof BOSS_DEFS!=="undefined"?BOSS_DEFS[session.bossId]:null;
-    const hunt=boss&&boss.hunt?GAMEDATA.hunts[boss.hunt]:GAMEDATA.hunts[session.huntId];
+    const hunt=boss?bossArenaDefinition(boss):GAMEDATA.hunts[session.huntId];
     if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)){
       clearInstanceSession();resolve({resumed:false,ended:true});return;
     }
@@ -233,7 +238,7 @@ function save() {
     G.p.stamina=FULL_STAMINA_SECONDS;
     saveCharacterToRoster(G.p);
     const activeSession=G.combat?persistActiveInstance():null;
-    if(!G.combat)clearInstanceSession();
+    if(!G.combat)clearInstanceSession(G.foreignInstance?"foreign-instance":"no-combat",!!G.foreignInstance);
     // mantém compatibilidade com saves antigos de 1 personagem
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       v: 1, p: G.p,
@@ -504,7 +509,7 @@ function wipeSave() {
     else localStorage.removeItem(ACTIVE_CHARACTER_KEY);
   }
   localStorage.removeItem(SAVE_KEY);
-  clearInstanceSession();
+  clearInstanceSession("character-reset",!!G.foreignInstance);
   try { sessionStorage.removeItem(AUTOLOGIN_KEY); } catch (e) {}
   location.reload();
 }
@@ -965,6 +970,24 @@ const BOSS_DEFS = {
   },
 };
 
+/* Boss rooms Soul War são rotas imutáveis. Não reutilize `p.hunt`, mapa da
+ * missão anterior ou aliases de cache: cada boss sempre resolve seu próprio
+ * hunt id + OTBM dedicado. */
+const SOULWAR_BOSS_ROOMS={
+  "goshnar-s-greed":{hunt:"goshnars-greed-room",otbm:"goshnars_greed_room"},
+  "goshnar-s-hatred":{hunt:"goshnars-hatred-room",otbm:"goshnars_hatred_room"},
+};
+function bossArenaDefinition(boss){
+  if(!boss)return null;const route=SOULWAR_BOSS_ROOMS[boss.id];
+  if(route){
+    boss.hunt=route.hunt;
+    const arena=GAMEDATA.hunts[route.hunt];
+    if(arena){arena.otbm=route.otbm;const key="otbm:"+route.otbm;
+      if(typeof HUNTMAPS!=="undefined"&&HUNTMAPS[key])arena.mapa=key;return arena;}
+  }
+  return boss.hunt&&GAMEDATA.hunts[boss.hunt];
+}
+
 /* Quivers que so vem de boss (QUIVER_DEFS[x].drop). Cada um fica ligado ao
  * boss que o entrega, para o painel dizer onde consegui-lo em vez de so
  * mostrar "indisponivel". Enquanto o jogo tiver poucos bosses, os de nivel
@@ -1159,6 +1182,9 @@ function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  if(!force&&G.foreignInstance){
+    toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outro boss.","bad");return;
+  }
   // PARTY: membros (não líder) não podem entrar em boss por conta própria —
   // só o líder escolhe e leva a party (requisitos validados no server).
   // `force = true` é o FOLLOW (membro teleportado para a sala do líder).
@@ -1171,7 +1197,7 @@ function startBoss(id, force, arenaReady) {
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada do boss");
 
   // Boss com sala própria espera OTBM + sprites antes de criar entidades.
-  const arena = boss.hunt && GAMEDATA.hunts[boss.hunt];
+  const arena = bossArenaDefinition(boss);
   if (!arenaReady && arena && arena.otbm && typeof huntMapFromOtbmAsync === "function") {
     if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${boss.name}...`);
     huntMapFromOtbmAsync(arena, () => {
@@ -1282,6 +1308,9 @@ function startHunt(id, instanceMode, force) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  if(!force&&G.foreignInstance){
+    toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outra hunt.","bad");return;
+  }
   // Hunts sem requisito de nível (modo de testes/progressão livre).
   // PARTY: membros (não líder) não podem entrar em hunt por conta própria —
   // só cidade/treino. O líder escolhe a hunt e leva a party junto (follow).
@@ -2658,7 +2687,7 @@ async function startGameReady(p) {
 
   let localInstance=readInstanceSession();
   if(localInstance&&p.id&&(localInstance.members||[]).length&&
-     !(localInstance.members||[]).some((m)=>String(m.id)===String(p.id))){
+     !instanceIncludesCharacter(localInstance,p.id)){
     clearInstanceSession("wrong-character",true);localInstance=null;
   }
   let instanceSession=localInstance;
@@ -2666,8 +2695,18 @@ async function startGameReady(p) {
      typeof accountLoadInstance==="function"){
     const remote=await accountLoadInstance(sessionToken());
     if(remote.ok&&remote.instance){
-      instanceSession=remote.instance;
-      try{localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(instanceSession));}catch(e){}
+      const belongs=instanceIncludesCharacter(remote.instance,p.id);
+      if(belongs){
+        instanceSession=remote.instance;G.foreignInstance=null;
+        try{localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(instanceSession));}catch(e){}
+      }else{
+        // A conta pode ter outro char solo caçando. Não renderize/controle a
+        // instância dele; somente membros persistidos da mesma party entram.
+        instanceSession=null;clearInstanceSession("different-character",true);
+        G.foreignInstance={id:remote.meta&&remote.meta.id,kind:remote.instance.kind,
+          activeCharacterId:remote.instance.activeCharacterId,
+          memberNames:(remote.instance.members||[]).map((m)=>m.p&&m.p.name||m.id)};
+      }
     }else if(remote.ok&&remote.lastStatus==="ended"){
       clearInstanceSession("remote-ended",true);instanceSession=null;
     }else if(remote.ok&&localInstance&&typeof accountSaveInstance==="function"){
@@ -2699,6 +2738,11 @@ async function startGameReady(p) {
     if(!instanceSession)G.inCity=true;
     renderAll();bindControls();
     addLog("info",`Bem-vindo, <b>${G.p.name}</b>!`);
+    if(G.foreignInstance){
+      const names=(G.foreignInstance.memberNames||[]).join(", ")||"outro personagem";
+      addLog("info",`A instância ativa pertence a <b>${names}</b>; ${G.p.name} permaneceu no templo.`);
+      toast(`Instância ativa de <b>${names}</b> não foi aberta neste personagem.`,"bad");
+    }
     if(resumeResult&&resumeResult.resumed){
       addLog("info",`Instância retomada após <b>${fmtTime(Math.floor(resumeResult.elapsed/1000))}</b> em segundo plano.`);
     }
