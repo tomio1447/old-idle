@@ -3176,6 +3176,40 @@ function initAccountLogin() {
     $("#app").classList.remove("ready");
     msg("Logout realizado.");
   }
+  function showIdentityRepair(token,account,characters,summary){
+    selSex=summary.sex||"male";selVoc=["knight","paladin","druid","sorcerer","monk"].includes(summary.voc)?summary.voc:"knight";
+    if(!openAccountModal(`
+      <div class="panel-title">Reparar ${summary.name}
+        <span style="flex:1"></span><button class="sm" id="acc-repair-back">← Voltar</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="account-identity-warning">Este personagem recebeu dados de <b>${summary.dataOwnerName||"outro personagem"}</b>
+          em uma versão antiga. Escolha a identidade correta. O level ${summary.level} será mantido e o kit inicial será recriado.</div>
+        <div class="row mb8" style="gap:5px"><button data-sex="male" class="sm acc-sex ${selSex==="male"?"primary":""}">Masculino</button>
+          <button data-sex="female" class="sm acc-sex ${selSex==="female"?"primary":""}">Feminino</button></div>
+        <div class="small dim mb4">Vocação correta</div><div class="voc-grid mb8" id="acc-voc-grid"></div>
+        <button class="primary full" id="acc-confirm-repair">Reparar identidade</button>
+        <div class="tiny dim center mt8" id="acc-repair-msg"></div>
+      </div>`,true))return;
+    paintCreatorVocations();
+    $$("#modal-body .acc-sex").forEach(button=>button.onclick=()=>{
+      selSex=button.dataset.sex;$$("#modal-body .acc-sex").forEach(x=>x.classList.remove("primary"));
+      button.classList.add("primary");paintCreatorVocations();
+    });
+    $("#acc-repair-back").onclick=()=>showPicker(token,account,characters);
+    const confirm=$("#acc-confirm-repair");confirm.onclick=async()=>{
+      if(confirm.disabled)return;confirm.disabled=true;const status=$("#acc-repair-msg");status.textContent="Reparando...";
+      try{
+        const draft=newPlayer(summary.name,selVoc,selSex);giveStarterKit(draft,{skipCoins:true});
+        draft.id=String(summary.id);draft.level=Number(summary.level)||1;draft.exp=expForLevel(draft.level);
+        const mx=maxStats(draft);draft.hp=mx.hp;draft.mp=mx.mp;
+        const result=await accountRepairCharacter(token,summary.id,selVoc,draft);
+        if(!result.ok){status.textContent=result.msg||"Falha ao reparar.";return;}
+        const refreshed=await accountMe(token);
+        if(refreshed.ok)showPicker(token,refreshed.account,refreshed.characters||[]);
+      }finally{confirm.disabled=false;}
+    };
+  }
   function showPicker(token, account, characters) {
     characters = Array.isArray(characters) ? characters : [];
     try {
@@ -3183,12 +3217,14 @@ function initAccountLogin() {
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
     } catch (e) {}
     const cards = characters.length ? characters.map((c) => `
-      <button class="account-character-card" data-acc-char="${c.id}">
+      <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
+        ${c.identityMismatch?`data-repair-char="${c.id}"`:`data-acc-char="${c.id}"`}>
         <span class="account-character-outfit" data-account-portrait="${c.id}"></span>
         <span class="account-character-info">
           <b>${c.name}</b>
           <span>Level ${Number(c.level) || 1} · ${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
-        </span><span class="account-character-enter">ENTRAR ›</span>
+          ${c.identityMismatch?`<span class="identity-error">Dados cruzados com ${c.dataOwnerName||"outro personagem"}</span>`:""}
+        </span><span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
       </button>`).join("") :
       `<div class="account-character-empty">Nenhum personagem nesta conta.</div>`;
     if (!openAccountModal(`
@@ -3204,6 +3240,10 @@ function initAccountLogin() {
     $$("#modal-body [data-acc-char]").forEach((row) => row.addEventListener("click", () => {
       const summary = characters.find((c) => String(c.id) === String(row.dataset.accChar));
       if (summary) enterCharacter(token, summary);
+    }));
+    $$("#modal-body [data-repair-char]").forEach(row=>row.addEventListener("click",()=>{
+      const summary=characters.find(c=>String(c.id)===String(row.dataset.repairChar));
+      if(summary)showIdentityRepair(token,account,characters,summary);
     }));
     $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
     $("#acc-logout").onclick = logoutAccount;
