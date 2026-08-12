@@ -18,7 +18,8 @@ const ctx={
   readRoster:()=>({}),writeRoster:()=>{},normalizePlayer:p=>p,
   maxStats:p=>({hp:p.maxHp||100,mp:p.maxMp||100}),ensureCell:()=>{},
   addLog:()=>{},saveCharacterToRoster:()=>{},tickAccessoryCharges:()=>{},
-  imbTickAll:()=>{},preyTick:()=>{},
+  imbTickAll:()=>{},preyTick:()=>{},blessingPriceForLevel:l=>Math.max(1,l||1)*500,
+  spendGold(p,n){if((p.gold||0)<n)return false;p.gold-=n;return true;},
 };
 ctx.window=ctx;vm.createContext(ctx);
 const sessionStart=src.indexOf("function clearInstanceSession");
@@ -26,8 +27,8 @@ const sessionEnd=src.indexOf("\nfunction save()",sessionStart);
 must(sessionStart>0&&sessionEnd>sessionStart,"funções de sessão não encontradas");
 vm.runInContext(src.slice(sessionStart,sessionEnd),ctx);
 
-const p1={id:"p1",name:"Knight",hp:90,mp:50,stamina:1};
-const p2={id:"p2",name:"Druid",hp:80,mp:60,stamina:2};
+const p1={id:"p1",name:"Knight",level:100,gold:0,hp:90,mp:50,stamina:1};
+const p2={id:"p2",name:"Druid",level:100,gold:0,hp:80,mp:60,stamina:2};
 const e1={id:"p1",name:"Knight",p:p1},e2={id:"p2",name:"Druid",p:p2};
 ctx.G.p=p1;ctx.G.combat={huntId:"rats",instanceMode:"non-pvp",huntMap:{rows:["huge"]},
   players:[e1,e2],player:e1,events:[{t:"hit"}],mobs:[{id:"m1",slug:"rat",target:e2}],

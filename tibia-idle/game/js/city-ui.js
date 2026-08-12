@@ -404,7 +404,8 @@ function npcTemple(p) {
     <button class="primary full" id="temple-bless" ${p.blessed || p.gold < price ? "disabled" : ""}>
       Comprar bênção — ${fmtFull(price)} gp</button>
     <div class="tiny dim mt8">
-      Com a bênção você perde bem menos experiência ao morrer.</div>`;
+      A bênção é consumida ao morrer. Preço: 50% × level até 120,
+      70% até 399 e 100% a partir do level 400.</div>`;
 }
 
 /* ---------------------------------------------------------- promoção */

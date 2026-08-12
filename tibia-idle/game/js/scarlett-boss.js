@@ -176,11 +176,11 @@ function scarlettPermanentKill(c, ent, reason) {
   ent.downedAt = now;
   ent.deathPos = { x:ent.x, y:ent.y, cx:ent.cx, cy:ent.cy, dir:ent.dir || "e" };
   ent.moving = false;
-  c.stats.deaths++;
-  ent.p.deaths = (ent.p.deaths || 0) + 1;
+  const loss=typeof applyCharacterDeathConsequences==="function"
+    ?applyCharacterDeathConsequences(c,ent.p):{exp:0};
   if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
   if (typeof addLog === "function")
-    addLog("death", `<b>${ent.name || ent.p.name}</b> morreu para Scarlett${reason ? " — " + reason : ""}. Não poderá renascer nesta luta.`);
+    addLog("death", `<b>${ent.name || ent.p.name}</b> morreu para Scarlett e perdeu a bless${loss.exp?` e ${loss.exp} XP`:""}${reason ? " — " + reason : ""}. Não poderá renascer nesta luta.`);
 
   if (c.player === ent) {
     const next = scarlettAlive(c).find((e) => e !== ent);
@@ -216,11 +216,13 @@ function scarlettCheckWipe(c) {
   st.wiped = true;
   st.phase = "wiped";
   st.immune = true;
+  const now=c._tickNow||Date.now();c.dead=true;c.deadAt=now;
+  c.deadUntil=now+(typeof reviveTime==="function"?reviveTime():30000);
+  for(const ent of scarlettParticipants(c))if(ent&&ent.p&&ent.p.hp<=0){
+    ent.permadead=false;ent.reviveAt=c.deadUntil;
+  }
   scarlettOverlayMessage("PARTY DERROTADA", "fail");
-  if (typeof addLog === "function") addLog("death", "Toda a party morreu. A luta contra Scarlett terminou.");
-  if (typeof setTimeout === "function") setTimeout(() => {
-    if (typeof G !== "undefined" && G.combat === c && typeof stopHunt === "function") stopHunt();
-  }, 2500);
+  if (typeof addLog === "function") addLog("death", "Toda a party morreu. Aguardando bênçãos para retornar ou ir ao templo.");
   return true;
 }
 
