@@ -3185,9 +3185,12 @@ function initAccountLogin() {
     };
     $("#acc-char-name").onkeydown = (e) => { if (e.key === "Enter") create.click(); };
   }
-  function logoutAccount() {
+  async function logoutAccount() {
     const wasPlaying = typeof G !== "undefined" && G && G.p;
     if (wasPlaying && typeof save === "function") save();
+    if(wasPlaying&&typeof accountLastSavePromise==="function"){
+      try{await accountLastSavePromise();}catch(e){}
+    }
     if(typeof accountCharacterCacheClear==="function")accountCharacterCacheClear();
     try {
       sessionStorage.removeItem("tibia-idle-token");

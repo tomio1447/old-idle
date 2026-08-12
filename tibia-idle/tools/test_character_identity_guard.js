@@ -11,7 +11,7 @@ must(server.includes('error:"CHARACTER_IDENTITY_MISMATCH"')&&
   server.includes('String(payload.id)!==String(c.id)')&&
   server.includes('String(payload.name).toLowerCase()!==String(c.name).toLowerCase()'),
   "save cruzado não é rejeitado por id/nome");
-must(server.includes("const voc = c.voc;")&&server.includes("payload.voc=c.voc"),
+must(server.includes("name:c.name,voc:c.voc")&&server.includes("voc:c.voc,level"),
   "save comum ainda pode substituir a vocação-base");
 must(server.includes("function repairCharacterIdentity")&&
   server.includes('/^\\/api\\/characters\\/\\d+\\/repair$/.test(url)'),

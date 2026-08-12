@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS characters (
   voc        VARCHAR(24)  NOT NULL DEFAULT 'none',
   level      INT UNSIGNED NOT NULL DEFAULT 1,
   data       MEDIUMTEXT   NOT NULL,          -- save completo do personagem
+  save_version BIGINT UNSIGNED NOT NULL DEFAULT 0, -- optimistic concurrency
   zone       VARCHAR(16)  NOT NULL DEFAULT 'unknown',  -- cidade/treino/hunt/boss (party)
   hp         INT UNSIGNED NOT NULL DEFAULT 0,          -- snapshot de vida (party)
   mp         INT UNSIGNED NOT NULL DEFAULT 0,          -- snapshot de mana (party)
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS characters (
 
 -- migração de instalações antigas (colunas novas)
 ALTER TABLE characters
+  ADD COLUMN save_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
   ADD COLUMN zone VARCHAR(16) NOT NULL DEFAULT 'unknown',
   ADD COLUMN hp INT UNSIGNED NOT NULL DEFAULT 0,
   ADD COLUMN mp INT UNSIGNED NOT NULL DEFAULT 0,
@@ -172,6 +174,7 @@ CREATE TABLE IF NOT EXISTS market_history (
 CREATE TABLE IF NOT EXISTS parties (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   owner_account_id INT UNSIGNED NOT NULL,          -- conta proprietária
+  roster_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
   leader_id      INT UNSIGNED NOT NULL,           -- personagem líder
   leader_name    VARCHAR(32)  NOT NULL,
   -- zona atual do líder (validada nas transições de mapa):

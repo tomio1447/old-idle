@@ -29,6 +29,10 @@ function JsonStore() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   this.accounts = this._load("accounts.json", []);
   this.characters = this._load("characters.json", []);
+  // Saves anteriores à versão otimista começam na versão 1.
+  for(const c of this.characters){
+    if(!Number.isSafeInteger(Number(c.save_version))||Number(c.save_version)<1)c.save_version=1;
+  }
   this.sessions = this._load("sessions.json", []);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
@@ -53,6 +57,7 @@ function JsonStore() {
       return;
     }
     ownedParties.set(owner,p.id);
+    if(!Number.isSafeInteger(Number(p.roster_version))||Number(p.roster_version)<1)p.roster_version=1;
     (p.members||[]).sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0))
       .forEach((m,index)=>{m.position=index+1;});
     validParties.push(p);
@@ -133,7 +138,7 @@ JsonStore.prototype.findCharacter = function (id) {
 };
 JsonStore.prototype.createCharacter = function (accountId, name, voc, level, data) {
   const c = { id: this._nextId(this.characters), account_id: Number(accountId),
-              name, voc, level, data, zone: "unknown",
+              name, voc, level, data, save_version:0, zone: "unknown",
               hp: 0, mp: 0, max_hp: 0, max_mp: 0,
               created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   this.characters.push(c);
@@ -144,6 +149,7 @@ JsonStore.prototype.updateCharacter = function (id, voc, level, data, extra) {
   const c = this.findCharacter(id);
   if (c) {
     c.voc = voc; c.level = level; c.data = data;
+    c.save_version=(Number(c.save_version)||0)+1;
     if (extra) {
       if (extra.zone !== undefined) c.zone = extra.zone;
       if (extra.hp !== undefined) c.hp = extra.hp;
@@ -155,6 +161,43 @@ JsonStore.prototype.updateCharacter = function (id, voc, level, data, extra) {
     this._save();
   }
   return c;
+};
+JsonStore.prototype.saveCharactersVersioned = function (accountId, saves) {
+  const rows=saves.map((save)=>this.findCharacter(save.id));
+  const missing=saves.filter((save,index)=>!rows[index]||Number(rows[index].account_id)!==Number(accountId));
+  if(missing.length)return {ok:false,error:"CHARACTER_NOT_FOUND",ids:missing.map((save)=>Number(save.id))};
+  const conflicts=rows.filter((row,index)=>Number(row.save_version)!==Number(saves[index].expectedVersion));
+  if(conflicts.length)return {ok:false,error:"SAVE_VERSION_CONFLICT",characters:conflicts};
+  rows.forEach((row,index)=>{
+    const save=saves[index],extra=save.extra||{};
+    row.voc=save.voc;row.level=save.level;row.data=save.data;
+    row.save_version=Number(row.save_version)+1;
+    if(extra.zone!==undefined)row.zone=extra.zone;
+    if(extra.hp!==undefined)row.hp=extra.hp;
+    if(extra.mp!==undefined)row.mp=extra.mp;
+    if(extra.max_hp!==undefined)row.max_hp=extra.max_hp;
+    if(extra.max_mp!==undefined)row.max_mp=extra.max_mp;
+    row.updated_at=new Date().toISOString();
+  });
+  this._save();
+  return {ok:true,characters:rows};
+};
+JsonStore.prototype.savePartyCharactersVersioned = function (accountId, partyId,
+    expectedPartyVersion, expectedOrder, saves) {
+  const p=(this.parties||[]).find((party)=>Number(party.id)===Number(partyId));
+  if(!p||Number(p.owner_account_id)!==Number(accountId))return {ok:false,error:"PARTY_NOT_OWNER"};
+  if(Number(p.roster_version)!==Number(expectedPartyVersion))
+    return {ok:false,error:"PARTY_VERSION_CONFLICT",party:p};
+  const members=(p.members||[]).slice().sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0));
+  const order=[Number(p.leader_id)].concat(members.map((m)=>Number(m.character_id)));
+  if(order.length!==expectedOrder.length||order.some((id,index)=>id!==Number(expectedOrder[index])))
+    return {ok:false,error:"PARTY_VERSION_CONFLICT",party:p};
+  const controlled=order.filter((id)=>{
+    const c=this.findCharacter(id);return c&&Number(c.account_id)===Number(accountId);
+  });
+  if(controlled.length!==saves.length||controlled.some((id)=>!saves.some((save)=>Number(save.id)===id)))
+    return {ok:false,error:"PARTY_SAVE_SET_MISMATCH"};
+  return this.saveCharactersVersioned(accountId,saves);
 };
 JsonStore.prototype.setCharacterZone = function (id, zone) {
   const c = this.findCharacter(id);
@@ -312,7 +355,7 @@ JsonStore.prototype.partyCreate = function (leaderChar) {
   }
   const p = {
     id: this._nextPartyId(), owner_account_id:Number(leaderChar.account_id),
-    leader_id: leaderChar.id, leader_name: leaderChar.name,
+    roster_version:1,leader_id: leaderChar.id, leader_name: leaderChar.name,
     leader_zone: "unknown", leader_hunt: null, leader_instance: null,
     leader_otbm: null, leader_boss: null,
     created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -360,22 +403,26 @@ JsonStore.prototype.partyAddMember = function (partyId, charId) {
     const position=p.members.reduce((max,m)=>Math.max(max,Number(m.position)||0),0)+1;
     p.members.push({ character_id: Number(charId), position,
       joined_at: new Date().toISOString() });
+    p.roster_version=(Number(p.roster_version)||1)+1;
   }
   p.updated_at = new Date().toISOString();
   this._partySave();
 };
-JsonStore.prototype.partyReorder = function (partyId, memberIds) {
+JsonStore.prototype.partyReorder = function (partyId, expectedVersion, memberIds) {
   const p=(this.parties||[]).find((x)=>x.id===Number(partyId));
-  if(!p)return false;
+  if(!p||Number(p.roster_version)!==Number(expectedVersion))return false;
   const byId=new Map((p.members||[]).map((m)=>[Number(m.character_id),m]));
   if(memberIds.length!==byId.size||memberIds.some((id)=>!byId.has(Number(id))))return false;
   memberIds.forEach((id,index)=>{byId.get(Number(id)).position=index+1;});
+  p.roster_version=Number(p.roster_version)+1;
   p.updated_at=new Date().toISOString();this._partySave();return true;
 };
 JsonStore.prototype.partyRemoveMember = function (partyId, charId) {
   const p = (this.parties || []).find((x) => x.id === Number(partyId));
   if (!p) return;
+  const before=(p.members||[]).length;
   p.members = (p.members || []).filter((m) => m.character_id !== Number(charId));
+  if(p.members.length!==before)p.roster_version=(Number(p.roster_version)||1)+1;
   p.updated_at = new Date().toISOString();
   this._partySave();
 };
@@ -492,6 +539,40 @@ async function MysqlStore() {
   });
   // garante o schema (tabelas) no primeiro uso
   await ensureSchema(pool);
+
+  async function persistVersionedRows(conn,accountId,saves){
+    if(!saves.length)return {ok:true,characters:[]};
+    const ids=saves.map((save)=>Number(save.id));
+    const placeholders=ids.map(()=>"?").join(",");
+    const [rows]=await conn.query(
+      `SELECT * FROM characters WHERE account_id=? AND id IN (${placeholders}) FOR UPDATE`,
+      [Number(accountId)].concat(ids));
+    const byId=new Map(rows.map((row)=>[Number(row.id),row]));
+    const missing=ids.filter((id)=>!byId.has(id));
+    if(missing.length)return {ok:false,error:"CHARACTER_NOT_FOUND",ids:missing};
+    const conflicts=saves.map((save)=>byId.get(Number(save.id)))
+      .filter((row,index)=>Number(row.save_version)!==Number(saves[index].expectedVersion));
+    if(conflicts.length)return {ok:false,error:"SAVE_VERSION_CONFLICT",characters:conflicts};
+    const updated=[];
+    for(const save of saves){
+      const row=byId.get(Number(save.id)),extra=save.extra||{};
+      const next={
+        zone:extra.zone!==undefined?extra.zone:row.zone,
+        hp:extra.hp!==undefined?extra.hp:row.hp,
+        mp:extra.mp!==undefined?extra.mp:row.mp,
+        max_hp:extra.max_hp!==undefined?extra.max_hp:row.max_hp,
+        max_mp:extra.max_mp!==undefined?extra.max_mp:row.max_mp,
+      };
+      await conn.query(
+        `UPDATE characters SET voc=?, level=?, data=?, save_version=save_version+1,
+           zone=?, hp=?, mp=?, max_hp=?, max_mp=? WHERE id=? AND account_id=?`,
+        [save.voc,save.level,save.data,next.zone,next.hp,next.mp,next.max_hp,next.max_mp,
+         Number(save.id),Number(accountId)]);
+      updated.push(Object.assign({},row,save,next,{save_version:Number(row.save_version)+1}));
+    }
+    return {ok:true,characters:updated};
+  }
+
   const db = {
     async query(sql, params) { const [rows] = await pool.query(sql, params || []); return rows; },
     async run(sql, params) { const [r] = await pool.query(sql, params || []); return r; },
@@ -517,7 +598,7 @@ async function MysqlStore() {
     },
     async charactersOf(accountId) {
       return this.query(
-        "SELECT id, account_id, name, voc, level, data, created_at, updated_at FROM characters WHERE account_id = ?",
+        "SELECT id, account_id, name, voc, level, data, save_version, created_at, updated_at FROM characters WHERE account_id = ?",
         [Number(accountId)]);
     },
     async findCharacterByName(name) {
@@ -533,12 +614,12 @@ async function MysqlStore() {
       const r = await this.run(
         "INSERT INTO characters (account_id, name, voc, level, data) VALUES (?, ?, ?, ?, ?)",
         [Number(accountId), name, voc, level, data]);
-      return { id: r.insertId, account_id: Number(accountId), name, voc, level, data };
+      return { id: r.insertId, account_id: Number(accountId), name, voc, level, data, save_version:0 };
     },
     async updateCharacter(id, voc, level, data, extra) {
       extra = extra || {};
       await this.run(
-        `UPDATE characters SET voc = ?, level = ?, data = ?,
+        `UPDATE characters SET voc = ?, level = ?, data = ?, save_version=save_version+1,
            zone = ?, hp = ?, mp = ?, max_hp = ?, max_mp = ?
          WHERE id = ?`,
         [voc, level, data,
@@ -549,6 +630,48 @@ async function MysqlStore() {
          extra.max_mp !== undefined ? extra.max_mp : 0,
          Number(id)]);
       return this.findCharacter(id);
+    },
+    async saveCharactersVersioned(accountId,saves){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const result=await persistVersionedRows(conn,accountId,saves);
+        if(!result.ok){await conn.rollback();return result;}
+        await conn.commit();return result;
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
+    },
+    async savePartyCharactersVersioned(accountId,partyId,expectedPartyVersion,expectedOrder,saves){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const [parties]=await conn.query("SELECT * FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
+        const p=parties[0];
+        if(!p||Number(p.owner_account_id)!==Number(accountId)){
+          await conn.rollback();return {ok:false,error:"PARTY_NOT_OWNER"};
+        }
+        if(Number(p.roster_version)!==Number(expectedPartyVersion)){
+          await conn.rollback();return {ok:false,error:"PARTY_VERSION_CONFLICT",party:p};
+        }
+        const [members]=await conn.query(
+          "SELECT character_id FROM party_members WHERE party_id=? ORDER BY position, joined_at, character_id",
+          [Number(partyId)]);
+        const order=[Number(p.leader_id)].concat(members.map((m)=>Number(m.character_id)));
+        if(order.length!==expectedOrder.length||order.some((id,index)=>id!==Number(expectedOrder[index]))){
+          await conn.rollback();return {ok:false,error:"PARTY_VERSION_CONFLICT",party:p};
+        }
+        const placeholders=order.map(()=>"?").join(",");
+        const [partyCharacters]=await conn.query(
+          `SELECT id,account_id FROM characters WHERE id IN (${placeholders})`,order);
+        const controlled=order.filter((id)=>partyCharacters.some((c)=>Number(c.id)===id&&Number(c.account_id)===Number(accountId)));
+        if(controlled.length!==saves.length||controlled.some((id)=>!saves.some((save)=>Number(save.id)===id))){
+          await conn.rollback();return {ok:false,error:"PARTY_SAVE_SET_MISMATCH"};
+        }
+        const result=await persistVersionedRows(conn,accountId,saves);
+        if(!result.ok){await conn.rollback();return result;}
+        await conn.commit();return result;
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
     },
     async setCharacterZone(id, zone) {
       await this.run("UPDATE characters SET zone = ? WHERE id = ?",
@@ -730,32 +853,70 @@ async function MysqlStore() {
         [Number(partyId)]);
     },
     async partyAddMember(partyId, charId) {
-      await this.run(
-        `INSERT IGNORE INTO party_members (party_id, character_id, position)
-         SELECT ?, ?, COALESCE(MAX(position),0)+1 FROM party_members WHERE party_id = ?`,
-        [Number(partyId), Number(charId), Number(partyId)]);
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        await conn.query("SELECT id FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
+        const [positions]=await conn.query("SELECT COALESCE(MAX(position),0)+1 AS next FROM party_members WHERE party_id=?",
+          [Number(partyId)]);
+        const [result]=await conn.query(
+          "INSERT IGNORE INTO party_members (party_id, character_id, position) VALUES (?, ?, ?)",
+          [Number(partyId),Number(charId),Number(positions[0].next)||1]);
+        if(result.affectedRows)await conn.query(
+          "UPDATE parties SET roster_version=roster_version+1 WHERE id=?",[Number(partyId)]);
+        await conn.commit();return result.affectedRows>0;
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
     },
-    async partyReorder(partyId, memberIds) {
-      const current=await this.partyMembers(partyId);
-      const wanted=memberIds.map(Number);
-      if(current.length!==wanted.length||wanted.some((id)=>!current.some((m)=>Number(m.id)===id)))return false;
-      for(let index=0;index<wanted.length;index++){
-        await this.run("UPDATE party_members SET position = ? WHERE party_id = ? AND character_id = ?",
+    async partyReorder(partyId, expectedVersion, memberIds) {
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const [parties]=await conn.query("SELECT roster_version FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
+        if(!parties[0]||Number(parties[0].roster_version)!==Number(expectedVersion)){
+          await conn.rollback();return false;
+        }
+        const [current]=await conn.query("SELECT character_id FROM party_members WHERE party_id=?",
+          [Number(partyId)]);
+        const wanted=memberIds.map(Number);
+        if(current.length!==wanted.length||wanted.some((id)=>!current.some((m)=>Number(m.character_id)===id))){
+          await conn.rollback();return false;
+        }
+        for(let index=0;index<wanted.length;index++)await conn.query(
+          "UPDATE party_members SET position=? WHERE party_id=? AND character_id=?",
           [index+1,Number(partyId),wanted[index]]);
-      }
-      return true;
+        await conn.query("UPDATE parties SET roster_version=roster_version+1 WHERE id=?",[Number(partyId)]);
+        await conn.commit();return true;
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
     },
     async partyRemoveMember(partyId, charId) {
-      await this.run(
-        "DELETE FROM party_members WHERE party_id = ? AND character_id = ?",
-        [Number(partyId), Number(charId)]);
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        await conn.query("SELECT id FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
+        const [result]=await conn.query(
+          "DELETE FROM party_members WHERE party_id=? AND character_id=?",
+          [Number(partyId),Number(charId)]);
+        if(result.affectedRows)await conn.query(
+          "UPDATE parties SET roster_version=roster_version+1 WHERE id=?",[Number(partyId)]);
+        await conn.commit();return result.affectedRows>0;
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
     },
     async partyDelete(partyId) {
-      await this.run("DELETE FROM party_members WHERE party_id = ?", [Number(partyId)]);
-      await this.run(
-        "UPDATE party_invites SET status = 'cancelled' WHERE party_id = ? AND status = 'pending'",
-        [Number(partyId)]);
-      await this.run("DELETE FROM parties WHERE id = ?", [Number(partyId)]);
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        await conn.query("SELECT id FROM parties WHERE id=? FOR UPDATE",[Number(partyId)]);
+        await conn.query("DELETE FROM party_members WHERE party_id=?",[Number(partyId)]);
+        await conn.query(
+          "UPDATE party_invites SET status='cancelled' WHERE party_id=? AND status='pending'",
+          [Number(partyId)]);
+        await conn.query("DELETE FROM parties WHERE id=?",[Number(partyId)]);
+        await conn.commit();
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}
+      finally{conn.release();}
     },
     async partySetZone(partyId, zone, opts) {
       opts = opts || {};
@@ -877,6 +1038,7 @@ async function ensureSchema(pool) {
     voc VARCHAR(24) NOT NULL DEFAULT 'none',
     level INT UNSIGNED NOT NULL DEFAULT 1,
     data MEDIUMTEXT NOT NULL,
+    save_version BIGINT UNSIGNED NOT NULL DEFAULT 0,
     zone VARCHAR(16) NOT NULL DEFAULT 'unknown',
     hp INT UNSIGNED NOT NULL DEFAULT 0,
     mp INT UNSIGNED NOT NULL DEFAULT 0,
@@ -889,6 +1051,7 @@ async function ensureSchema(pool) {
   ) ENGINE=InnoDB`);
   // colunas novas (migração de instalações antigas)
   for (const col of [
+    "ADD COLUMN save_version BIGINT UNSIGNED NOT NULL DEFAULT 1",
     "ADD COLUMN zone VARCHAR(16) NOT NULL DEFAULT 'unknown'",
     "ADD COLUMN hp INT UNSIGNED NOT NULL DEFAULT 0",
     "ADD COLUMN mp INT UNSIGNED NOT NULL DEFAULT 0",
@@ -900,6 +1063,7 @@ async function ensureSchema(pool) {
   await pool.query(`CREATE TABLE IF NOT EXISTS parties (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     owner_account_id INT UNSIGNED NOT NULL,
+    roster_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     leader_id INT UNSIGNED NOT NULL,
     leader_name VARCHAR(32) NOT NULL,
     leader_zone ENUM('unknown','city','training','hunt','boss')
@@ -948,6 +1112,8 @@ async function ensureSchema(pool) {
   // Migração das parties anteriores ao modelo account-owned. A conta do
   // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.
   try { await pool.query("ALTER TABLE parties ADD COLUMN owner_account_id INT UNSIGNED DEFAULT NULL AFTER id"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE parties ADD COLUMN roster_version BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER owner_account_id"); }
   catch(e) { /* já existe */ }
   const [legacyParties]=await pool.query(
     `SELECT p.id, p.owner_account_id, c.account_id AS leader_account_id

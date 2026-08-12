@@ -101,7 +101,8 @@ async function post(route, body) {
   const id = created.data.character.id;
   const crossed = await request('/api/characters/' + id, {
     method:'PUT',headers:{'content-type':'application/json'},
-    body:JSON.stringify({token,voc:'paladin',level:500,data:JSON.stringify({id:'999',name:'Other',voc:'paladin'})}),
+    body:JSON.stringify({token,expected_version:created.data.character.saveVersion,
+      voc:'paladin',level:500,data:JSON.stringify({id:'999',name:'Other',voc:'paladin'})}),
   });
   must(crossed.status===409&&crossed.data.error==='CHARACTER_IDENTITY_MISMATCH',
     'servidor aceitou save pertencente a outro personagem');
@@ -123,7 +124,7 @@ async function post(route, body) {
     'save completo não foi carregado');
   const saved = await request('/api/characters/' + id, {
     method:'PUT', headers:{'content-type':'application/json'},
-    body:JSON.stringify({token,voc:'druid',level:8,
+    body:JSON.stringify({token,expected_version:summaryChar.saveVersion,voc:'druid',level:8,
       data:JSON.stringify({name:'Server Test',voc:'druid',level:8,hp:700})}),
   });
   must(saved.data.ok, 'save de personagem falhou');

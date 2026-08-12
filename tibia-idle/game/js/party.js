@@ -1101,20 +1101,25 @@ function partyCombatSwitchTo(id) {
 /* Salva TODOS os personagens do party combat no roster (hp/mana/exp). */
 function partyCombatSaveAll() {
   try {
-    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return;
+    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return Promise.resolve(false);
     const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
     const token=online&&typeof sessionToken==="function"?sessionToken():"";
     const cache=online&&typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
     for (const ent of G.combat.players) {
       if(!ent.p)continue;
       if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(ent.p);
-      if(token&&typeof accountSaveCharacter==="function")accountSaveCharacter(token,String(ent.id),ent.p).catch(()=>{});
       const summary=cache.find(c=>String(c.id)===String(ent.id));
       if(summary){summary.voc=ent.p.voc;summary.level=ent.p.level;summary.sex=ent.p.sex;
         summary.outfit=ent.p.outfit;summary.snapshot=ent.p;}
     }
     if(online&&typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(cache);
-  } catch (e) { /* não bloqueia */ }
+    if(token&&typeof accountSaveParty==="function"){
+      const leader=G.combat.players.find((ent)=>ent&&ent.isLeader&&ent.p);
+      const state=G.combat.partyOnlineState||(G.p&&G.p._partyOnline)||(leader&&leader.p._partyOnline);
+      if(state){G.combat.partyOnlineState=state;return accountSaveParty(token,state,G.combat.players);}
+    }
+    return Promise.resolve(false);
+  } catch (e) { return Promise.resolve(false); }
 }
 
 /* Alcance de ataque de um aliado (mesma regra do jogador). */

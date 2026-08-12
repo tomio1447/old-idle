@@ -40,7 +40,52 @@ function accountCharacterCacheWrite(characters){
 function accountCharacterCacheRead(){
   try{const raw=sessionStorage.getItem(ONLINE_CHARACTER_CACHE_KEY);return raw?JSON.parse(raw):[];}catch(e){return [];}
 }
-function accountCharacterCacheClear(){try{sessionStorage.removeItem(ONLINE_CHARACTER_CACHE_KEY);}catch(e){}}
+function accountCharacterCacheClear(){
+  try{sessionStorage.removeItem(ONLINE_CHARACTER_CACHE_KEY);}catch(e){}
+  try{ACCOUNT_SAVE_CONFLICTS.clear();}catch(e){}
+}
+
+/* Saves online são serializados nesta aba e usam optimistic concurrency.
+ * Ao detectar outra sessão, o personagem fica bloqueado até recarregar; sem
+ * isso, o autosave seguinte poderia sobrescrever silenciosamente o vencedor. */
+let ACCOUNT_SAVE_QUEUE=Promise.resolve(true);
+let ACCOUNT_LAST_SAVE_PROMISE=ACCOUNT_SAVE_QUEUE;
+const ACCOUNT_SAVE_CONFLICTS=new Set();
+function accountMergeCharacterCache(characters){
+  const cache=accountCharacterCacheRead();
+  for(const character of characters||[]){
+    const index=cache.findIndex((c)=>String(c.id)===String(character.id));
+    if(index>=0)cache[index]=Object.assign({},cache[index],character);
+    else cache.push(character);
+  }
+  accountCharacterCacheWrite(cache);return cache;
+}
+function accountQueueSave(task){
+  const run=ACCOUNT_SAVE_QUEUE.catch(()=>false).then(task);
+  ACCOUNT_SAVE_QUEUE=run.catch(()=>false);ACCOUNT_LAST_SAVE_PROMISE=run;return run;
+}
+function accountLastSavePromise(){return ACCOUNT_LAST_SAVE_PROMISE.catch(()=>false);}
+function accountSaveConflict(ids,characters,message){
+  (ids||[]).forEach((id)=>ACCOUNT_SAVE_CONFLICTS.add(String(id)));
+  if(characters&&characters.length)accountMergeCharacterCache(characters);
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-save-conflict",{detail:{ids:ids||[]}}));}catch(e){}
+  if(typeof toast==="function")toast(message||"Save alterado em outra sessão. Recarregue antes de continuar.","bad");
+}
+async function accountEnsureVersions(token,ids){
+  let cache=accountCharacterCacheRead();
+  const missing=(ids||[]).some((id)=>{
+    const c=cache.find((row)=>String(row.id)===String(id));
+    return !c||!Number.isSafeInteger(Number(c.saveVersion))||Number(c.saveVersion)<1;
+  });
+  if(missing){const fresh=await accountMe(token);if(fresh.ok){cache=fresh.characters||[];accountCharacterCacheWrite(cache);}}
+  return cache;
+}
+function accountSavePayload(p){
+  let maxHp=0,maxMp=0;
+  try{if(typeof maxStats==="function"&&p){const m=maxStats(p);maxHp=m.hp||0;maxMp=m.mp||0;}}catch(e){}
+  return {voc:p&&p.voc||"none",level:p&&p.level||1,data:JSON.stringify(p||{}),
+    hp:p&&p.hp||0,mp:p&&p.mp||0,maxHp,maxMp};
+}
 
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
@@ -86,9 +131,15 @@ async function accountMe(token) {
 
 async function accountLoadCharacter(token, charId) {
   const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
-  return r.data.ok
-    ? { ok:true, character:r.data.character }
-    : { ok:false, msg:r.data.msg || "Falha ao carregar personagem" };
+  if(r.data.ok){
+    const character=r.data.character;let snapshot={};
+    try{snapshot=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+    accountMergeCharacterCache([{id:character.id,name:character.name,voc:character.voc,
+      level:character.level,saveVersion:character.saveVersion,sex:snapshot.sex||"male",
+      outfit:snapshot.outfit||null,snapshot}]);
+    return {ok:true,character};
+  }
+  return {ok:false,msg:r.data.msg||"Falha ao carregar personagem"};
 }
 
 async function accountCreateCharacter(token, name, voc, data) {
@@ -102,27 +153,47 @@ async function accountCreateCharacter(token, name, voc, data) {
 }
 
 async function accountSaveCharacter(token, charId, p) {
-  const data = JSON.stringify(p || {});
-  // snapshots de vida/mana para o painel de party (barras dos membros)
-  let maxHp = 0, maxMp = 0;
-  try {
-    if (typeof maxStats === "function" && p) {
-      const m = maxStats(p);
-      maxHp = m.hp || 0;
-      maxMp = m.mp || 0;
+  const id=String(charId);
+  return accountQueueSave(async()=>{
+    if(ACCOUNT_SAVE_CONFLICTS.has(id))return false;
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))return false;
+    const body=Object.assign({token,expected_version:Number(summary.saveVersion)},accountSavePayload(p));
+    const r=await _api("PUT","/api/characters/"+encodeURIComponent(id),body);
+    if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
+    if(r.code===409){
+      accountSaveConflict([id],r.data.characters||[],r.data.msg);return false;
     }
-  } catch (e) { /* segue */ }
-  const r = await _api("PUT", "/api/characters/" + charId, {
-    token,
-    voc: p.voc || "none",
-    level: p.level || 1,
-    data,
-    hp: (p && p.hp) || 0,
-    mp: (p && p.mp) || 0,
-    maxHp,
-    maxMp,
+    if(r.code===428)accountSaveConflict([id],[],r.data.msg);
+    return false;
   });
-  return r.data.ok;
+}
+
+async function accountSaveParty(token,state,players){
+  const ids=(players||[]).filter((ent)=>ent&&ent.p).map((ent)=>String(ent.id));
+  return accountQueueSave(async()=>{
+    if(!state||!state.id||!Number.isSafeInteger(Number(state.version))||ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
+    const cache=await accountEnsureVersions(token,ids);
+    const entries=[];
+    for(const ent of players||[]){
+      if(!ent||!ent.p)continue;
+      const summary=cache.find((c)=>String(c.id)===String(ent.id));
+      if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))continue;
+      entries.push(Object.assign({id:Number(ent.id),expected_version:Number(summary.saveVersion)},accountSavePayload(ent.p)));
+    }
+    const r=await _api("POST","/api/party/save",{
+      token,party_id:Number(state.id),party_version:Number(state.version),
+      party_order:(state.order||[]).map(Number),characters:entries,
+    });
+    if(r.data.ok){accountMergeCharacterCache(r.data.characters||[]);return true;}
+    if(r.code===409){
+      const conflicts=(r.data.characters||[]).map((c)=>String(c.id));
+      accountSaveConflict(conflicts.length?conflicts:ids,r.data.characters||[],r.data.msg);return false;
+    }
+    if(r.code===428)accountSaveConflict(ids,[],r.data.msg);
+    return false;
+  });
 }
 
 async function accountRepairCharacter(token,charId,voc,data){
@@ -130,7 +201,8 @@ async function accountRepairCharacter(token,charId,voc,data){
   const r=await _api("PUT","/api/characters/"+encodeURIComponent(charId)+"/repair",{
     token,voc,data:JSON.stringify(data||{}),maxHp:max.hp||0,maxMp:max.mp||0,
   });
-  return r.data.ok?{ok:true,character:r.data.character}:{ok:false,msg:r.data.msg||"Falha ao reparar personagem"};
+  if(r.data.ok){accountMergeCharacterCache([r.data.character]);return {ok:true,character:r.data.character};}
+  return {ok:false,msg:r.data.msg||"Falha ao reparar personagem"};
 }
 
 async function accountAddCoins(token, amount) {
@@ -244,9 +316,9 @@ async function accountPartyKick(charId, memberId) {
   return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
 }
 
-async function accountPartyReorder(charId, characterIds) {
+async function accountPartyReorder(charId, expectedVersion, characterIds) {
   const r=await _api("POST","/api/party/reorder",{
-    token:sessionToken(),char_id:charId,character_ids:characterIds,
+    token:sessionToken(),char_id:charId,expected_version:expectedVersion,character_ids:characterIds,
   });
   return r.data.ok?{ok:true,state:r.data.state}:{ok:false,msg:r.data.msg,error:r.data.error};
 }

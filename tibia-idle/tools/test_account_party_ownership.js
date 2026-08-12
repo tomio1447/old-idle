@@ -85,22 +85,23 @@ async function state(token,charId){return request("/api/party/state?char_id="+ch
   r=await state(owner.token,leader.id);
   must(JSON.stringify(r.data.state.order)===JSON.stringify([leader.id,first.id,second.id]),
     "ordem inicial não segue a entrada dos membros");
+  const rosterVersion=r.data.state.version;
 
   const invalid=await post("/api/party/reorder",{token:owner.token,char_id:first.id,
-    character_ids:[second.id,leader.id,first.id]});
+    expected_version:rosterVersion,character_ids:[second.id,leader.id,first.id]});
   must(invalid.status===400&&invalid.data.error==="PARTY_LEADER_FIXED",
     "reorder permitiu retirar o líder da primeira posição");
   const missing=await post("/api/party/reorder",{token:owner.token,char_id:first.id,
-    character_ids:[leader.id,second.id]});
+    expected_version:rosterVersion,character_ids:[leader.id,second.id]});
   must(missing.status===400&&missing.data.error==="INVALID_PARTY_ORDER",
     "reorder parcial apagou membro da composição");
   const denied=await post("/api/party/reorder",{token:stranger.token,char_id:outsider.id,
-    character_ids:[leader.id,second.id,first.id]});
+    expected_version:rosterVersion,character_ids:[leader.id,second.id,first.id]});
   must(denied.status===404&&denied.data.error==="ACCOUNT_PARTY_NOT_FOUND",
     "outra conta conseguiu selecionar/reordenar a party alheia");
 
   r=await post("/api/party/reorder",{token:owner.token,char_id:first.id,
-    character_ids:[leader.id,second.id,first.id]});
+    expected_version:rosterVersion,character_ids:[leader.id,second.id,first.id]});
   must(r.status===200&&JSON.stringify(r.data.state.order)===JSON.stringify([leader.id,second.id,first.id]),
     "conta dona não conseguiu persistir a nova ordem");
   const partyFile=JSON.parse(fs.readFileSync(path.join(dataDir,"parties.json"),"utf8"));

@@ -121,6 +121,7 @@ async function partyStateFor(db, party, charId) {
     ok: true,
     state: {
       id: party.id,
+      version:Number(party.roster_version)||1,
       ownedByAccount:Number(party.owner_account_id)||null,
       order:[Number(party.leader_id)].concat(memberSnaps.map((m)=>Number(m.id))),
       isOwner,
@@ -385,6 +386,11 @@ async function partyReorder(db,body){
   if(!owned)return {code:404,body:{ok:false,error:"ACCOUNT_PARTY_NOT_FOUND",msg:"Sua conta não possui party"}};
   if(Number(owned.owner_account_id)!==Number(account.id))
     return {code:403,body:{ok:false,error:"PARTY_NOT_OWNER",msg:"A party pertence a outra conta"}};
+  const expectedVersion=Number(body.expected_version);
+  if(!Number.isSafeInteger(expectedVersion)||expectedVersion<1)
+    return {code:428,body:{ok:false,error:"PARTY_VERSION_REQUIRED",msg:"Atualize a party antes de reordenar"}};
+  if(Number(owned.roster_version)!==expectedVersion)return {code:409,body:{ok:false,error:"PARTY_VERSION_CONFLICT",
+    msg:"A composição da party mudou; atualize e tente novamente",partyVersion:Number(owned.roster_version)}};
   const ids=Array.isArray(body.character_ids)?body.character_ids.map(Number):[];
   if(!ids.length||ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
     return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"Ordem da party inválida"}};
@@ -394,9 +400,15 @@ async function partyReorder(db,body){
     return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"A ordem deve conter todos os membros uma única vez"}};
   if(ids[0]!==Number(owned.leader_id))
     return {code:400,body:{ok:false,error:"PARTY_LEADER_FIXED",msg:"O líder deve permanecer na primeira posição"}};
-  const saved=await db.partyReorder(owned.id,ids.slice(1));
-  if(!saved)return {code:409,body:{ok:false,error:"PARTY_ORDER_CONFLICT",msg:"A composição da party mudou; atualize e tente novamente"}};
-  return {code:200,body:await partyStateFor(db,owned,char.id)};
+  const saved=await db.partyReorder(owned.id,expectedVersion,ids.slice(1));
+  if(!saved){
+    const current=await db.partyFindByAccount(account.id);
+    return {code:409,body:{ok:false,error:"PARTY_VERSION_CONFLICT",
+      msg:"A composição da party mudou; atualize e tente novamente",
+      partyVersion:current?Number(current.roster_version):null}};
+  }
+  const updated=await db.partyFindByAccount(account.id);
+  return {code:200,body:await partyStateFor(db,updated,char.id)};
 }
 
 /* GET /api/party/state — estado da party + follow pendente do personagem. */
