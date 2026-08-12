@@ -41,10 +41,13 @@ class FakeResponse extends EventEmitter{constructor(){super();this.text="";this.
     "cursor expirado não pediu snapshot/reabriu stream");close();fake.emit("close");
   must(clientSource.includes("new EventSource")&&clientSource.includes("/api/sync/ticket")&&
     clientSource.includes("/api/sync/state")&&clientSource.includes("accountSyncFallback")&&
-    clientSource.includes('type==="sync-expired"')&&clientSource.includes("lastEventId"),
+    clientSource.includes('type==="sync-expired"')&&clientSource.includes("accountSyncProtocolSupported")&&
+    clientSource.includes("ACCOUNT_SYNC.starting")&&clientSource.includes("lastEventId"),
     "cliente não implementa SSE/replay/fallback");
 
-  await start();await post("/api/register",{login:"sync",password:"x"});const login=await post("/api/login",{login:"sync",password:"x"}),token=login.data.token;
+  await start();const health=await request("/api/health");
+  must(health.data.sync&&health.data.sync.protocol==="sse-v2","servidor não anuncia protocolo SSE compatível");
+  await post("/api/register",{login:"sync",password:"x"});const login=await post("/api/login",{login:"sync",password:"x"}),token=login.data.token;
   const ticket=await post("/api/sync/ticket",{token});must(ticket.status===200&&ticket.data.ticket,"ticket SSE não emitido");
   const stream=openSse(ticket.data.ticket);await stream.wait("ready");
   const created=await post("/api/characters",{token,name:"Sync Hero",voc:"knight",data:JSON.stringify({name:"Sync Hero",voc:"knight"})});

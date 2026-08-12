@@ -52,7 +52,8 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
     !game.slice(applyStart,applyEnd).includes("renderAll()")&&
     !game.slice(applyStart,applyEnd).includes("renderPartyPanel(")&&
     game.includes('if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now())')&&
-    partyUi.includes("function updatePartyPanelLiveBars")&&client.includes("data.holderId===ACCOUNT_LEASE_PAGE_HOLDER"),
+    partyUi.includes("function updatePartyPanelLiveBars")&&client.includes("data.holderId===ACCOUNT_LEASE_PAGE_HOLDER")&&
+    game.includes("if(G.runtimeStarting||G.runtimeStarted)return"),
     "cliente não preserva movimento/membros ou ainda reconstrói UI a cada tick");
   console.log("OK: Cobra online salva instância e transita party sem HTTP 400/ciclo JSON.");
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{if(child)child.kill("SIGTERM");fs.rmSync(dataDir,{recursive:true,force:true});});

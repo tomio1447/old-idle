@@ -288,7 +288,9 @@ function accountEndInstance(token,reason){
 }
 
 const ACCOUNT_SYNC_CURSOR_KEY="tibia-idle-sync-cursor-v1";
-let ACCOUNT_SYNC={source:null,token:"",errors:0,reconnect:null,poll:null,stopped:true,charRefresh:null};
+let ACCOUNT_SYNC={source:null,token:"",errors:0,totalFailures:0,reconnect:null,poll:null,
+  stopped:true,charRefresh:null,starting:null,generation:0,disabled:false};
+function accountSyncProtocolSupported(){return ACCOUNT_SERVER_CONFIG.syncProtocol==="sse-v2";}
 function accountSyncCursor(value){
   if(value!==undefined){try{sessionStorage.setItem(ACCOUNT_SYNC_CURSOR_KEY,String(value));}catch(e){}return Number(value)||0;}
   try{return Number(sessionStorage.getItem(ACCOUNT_SYNC_CURSOR_KEY)||0);}catch(e){return 0;}
@@ -311,12 +313,30 @@ function accountSyncFallback(token){
   },5000);
 }
 function accountSyncStopFallback(){if(ACCOUNT_SYNC.poll){clearInterval(ACCOUNT_SYNC.poll);ACCOUNT_SYNC.poll=null;}}
-async function accountStartSync(token){
-  if(!token)return false;if(ACCOUNT_SYNC.source&&ACCOUNT_SYNC.token===token)return true;
-  accountStopSync();ACCOUNT_SYNC.stopped=false;ACCOUNT_SYNC.token=token;
+function accountStartSync(token){
+  if(!token)return Promise.resolve(false);
+  // Servidor anterior ao protocolo sse-v2 devolve 401 para tickets expirados.
+  // Não abra EventSource nesse caso: party polling e ticks HTTP continuam.
+  if(!accountSyncProtocolSupported()){ACCOUNT_SYNC.disabled=true;return Promise.resolve(false);}
+  if(ACCOUNT_SYNC.disabled)return Promise.resolve(false);
+  if(ACCOUNT_SYNC.source&&ACCOUNT_SYNC.token===token)return Promise.resolve(true);
+  if(ACCOUNT_SYNC.starting&&ACCOUNT_SYNC.token===token)return ACCOUNT_SYNC.starting;
+  ACCOUNT_SYNC.generation++;const generation=ACCOUNT_SYNC.generation;
+  if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
+  ACCOUNT_SYNC.source=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;accountSyncStopFallback();
+  ACCOUNT_SYNC.stopped=false;ACCOUNT_SYNC.token=token;
+  const run=accountStartSyncNow(token,generation).finally(()=>{
+    if(ACCOUNT_SYNC.generation===generation)ACCOUNT_SYNC.starting=null;
+  });
+  ACCOUNT_SYNC.starting=run;return run;
+}
+async function accountStartSyncNow(token,generation){
   if(typeof EventSource==="undefined"){accountSyncFallback(token);return false;}
   const ticket=await _api("POST","/api/sync/ticket",{token});
-  if(!ticket.data.ok){accountSyncFallback(token);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),5000);return false;}
+  if(ACCOUNT_SYNC.stopped||ACCOUNT_SYNC.generation!==generation)return false;
+  if(!ticket.data.ok){ACCOUNT_SYNC.totalFailures++;accountSyncFallback(token);
+    if(ACCOUNT_SYNC.totalFailures<5)ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),5000);
+    else ACCOUNT_SYNC.disabled=true;return false;}
   const url=ACCOUNT_API_URL+"/api/sync/events?ticket="+encodeURIComponent(ticket.data.ticket)+
     "&lastEventId="+encodeURIComponent(accountSyncCursor());
   const source=new EventSource(url);ACCOUNT_SYNC.source=source;
@@ -332,8 +352,6 @@ async function accountStartSync(token){
       accountSyncDispatch("lease",data);return;
     }
     if(type==="instance"){
-      // O holder que originou tick/checkpoint já recebe o snapshot na resposta
-      // HTTP. Ignorar o eco SSE evita aplicar a mesma versão duas vezes.
       if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
       if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
       accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,{event:data}));});return;
@@ -347,15 +365,21 @@ async function accountStartSync(token){
   };
   for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired"])
     source.addEventListener(type,(event)=>receive(type,event));
-  source.addEventListener("ready",(event)=>{if(event.lastEventId)accountSyncCursor(event.lastEventId);ACCOUNT_SYNC.errors=0;accountSyncStopFallback();accountSyncDispatch("connected",{});});
-  source.onopen=()=>{ACCOUNT_SYNC.errors=0;accountSyncStopFallback();};
-  source.onerror=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;ACCOUNT_SYNC.errors++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.errors});
+  const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
+    ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
+  source.addEventListener("ready",connected);source.onopen=()=>connected(null);
+  source.onerror=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;
+    ACCOUNT_SYNC.errors++;ACCOUNT_SYNC.totalFailures++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.totalFailures});
+    if(ACCOUNT_SYNC.totalFailures>=5){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;
+      ACCOUNT_SYNC.disabled=true;accountSyncFallback(token);return;}
     if(ACCOUNT_SYNC.errors>=3){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
-      clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),Math.min(15000,1000*ACCOUNT_SYNC.errors));}};
+      clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),Math.min(15000,1000*ACCOUNT_SYNC.totalFailures));}};
   return true;
 }
-function accountStopSync(){ACCOUNT_SYNC.stopped=true;if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
-  ACCOUNT_SYNC.source=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;accountSyncStopFallback();ACCOUNT_SYNC.token="";}
+function accountStopSync(){ACCOUNT_SYNC.stopped=true;ACCOUNT_SYNC.generation++;
+  if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
+  ACCOUNT_SYNC.source=null;ACCOUNT_SYNC.starting=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;
+  accountSyncStopFallback();ACCOUNT_SYNC.token="";ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;ACCOUNT_SYNC.disabled=false;}
 
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
