@@ -228,10 +228,14 @@ function newBossCombat(player, boss) {
     bossMob.x = pos.x; bossMob.y = pos.y;
     bossMob.sx = pos.x; bossMob.sy = pos.y;
   }
+  if(boss.id==="goshnar-s-hatred"){
+    bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
+  }
   c.mobs = [bossMob];
   resolveSQMOccupancy(c);
   if (typeof scarlettBossInit === "function") scarlettBossInit(c, player);
   if (typeof greedBossInit === "function") greedBossInit(c, player);
+  if (typeof hatredBossInit === "function") hatredBossInit(c, player);
   return c;
 }
 
@@ -501,7 +505,8 @@ function resolveSQMOccupancy(c) {
   occupied.add(cellKey(entityCell(c.player)));
   for (const m of c.mobs) {
     let cell = entityCell(m);
-    if (!isCellFree(cell, occupied)) {
+    const keepFixed=!!(m.allowBlockedSpawn&&cell.x===m.fixedSpawnCx&&cell.y===m.fixedSpawnCy);
+    if (!keepFixed && !isCellFree(cell, occupied)) {
       const pc = entityCell(c.player);
       const prefer = { x: Math.sign(cell.x - pc.x) || 1, y: Math.sign(cell.y - pc.y) || 0 };
       const free = nearestFreeCell(cell, occupied, prefer) || nearestFreeCell(pc, occupied, prefer);
@@ -572,6 +577,13 @@ function movePoint(ent, target, speed, dt, stopRange) {
 function helperPriorityTarget(c) {
   if (!c || !c.mobs || !c.mobs.length) return null;
   if (c.boss) {
+    // Hatred exige controlar os summons; Hateful Soul tem prioridade por
+    // zerar todos os contadores, depois vêm os Harvesters.
+    if (c.hatred && c.hatred.active) {
+      const hateful=c.mobs.find(m=>m&&m.hatredSummon&&m.slug==="hateful-soul"&&m.hp>0);
+      const summon=hateful||c.mobs.find(m=>m&&m.hatredSummon&&m.hp>0);
+      if(summon)return summon;
+    }
     const boss = c.mobs.find((mob) => mob && mob.boss && mob.hp > 0);
     const immune = !!((c.greed && c.greed.immune) ||
       (c.scarlett && c.scarlett.immune) || (boss && boss.greedImmune));
@@ -3043,6 +3055,8 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   let raw = dmg;
   if (typeof greedBossOutgoingDamageMultiplier === "function")
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
+  if (typeof hatredBossOutgoingDamageMultiplier === "function")
+    raw *= hatredBossOutgoingDamageMultiplier(c, mob, p);
   if (typeof soulwarTaintDamageMultiplier === "function")
     raw *= soulwarTaintDamageMultiplier(c, p);
   // Tipos especiais de dano (TibiaWiki/Damage):
@@ -3365,6 +3379,8 @@ function mobAttack(c, p, mob) {
   let raw = mob.def.damage * (0.6 + Math.random() * 0.8);
   if (typeof greedBossOutgoingDamageMultiplier === "function")
     raw *= greedBossOutgoingDamageMultiplier(c, mob);
+  if (typeof hatredBossOutgoingDamageMultiplier === "function")
+    raw *= hatredBossOutgoingDamageMultiplier(c, mob, p);
   if (typeof soulwarTaintDamageMultiplier === "function")
     raw *= soulwarTaintDamageMultiplier(c, p);
   const agora = Date.now();
@@ -3863,6 +3879,7 @@ function combatTick(c, p, dt, now) {
   p.playtime += dt;
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
+  if (typeof hatredBossTick === "function" && hatredBossTick(c, now) === false) return;
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
 
   // Stamina temporariamente desativada: toda a party permanece em 42h.
@@ -4063,6 +4080,8 @@ function combatTick(c, p, dt, now) {
         soulwarTaintPreventMonsterDeath(c, m, p)) { alive.push(m); continue; }
     if (typeof greedBossHandleKill === "function")
       greedBossHandleKill(c, m, now);
+    if (typeof hatredBossHandleKill === "function")
+      hatredBossHandleKill(c, m, now);
     // recompensa
     const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));

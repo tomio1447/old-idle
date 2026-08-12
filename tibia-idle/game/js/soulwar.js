@@ -85,11 +85,17 @@
   color:'#54652d',soulWarZone:true,soulWarZoneMonster:'rotten-golem',
  };
 
- // Sala técnica temporária: o OTBM e a mecânica próprios serão conectados
- // quando forem entregues. O boss já existe, com stats/loot oficiais.
+ // Bossroom de Hatred usa uma cópia runtime própria para manter cache/zonas
+ // independentes da hunt Rotten Wasteland, embora ambas venham do OTBM
+ // entregue. A FOV registra o retângulo informado sem recortar o mundo 30×30.
  GAMEDATA.hunts['goshnars-hatred-room']={
   name:"Goshnar's Hatred Room",hidden:true,level:400,minLevel:400,
-  cat:'boss-room',scene:'soulwar',monsters:['goshnar-s-hatred'],
+  cat:'boss-room',scene:'soulwar',otbm:'goshnars_hatred',otbmFloor:7,
+  otbmFovBounds:{x:1044,y:1012,w:18,h:14,z:7},
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1047,y:1019,z:7},
+  otbmMobBounds:{x:1059,y:1019,w:1,h:1,z:7},
+  monsters:['goshnar-s-hatred','dreadful-harvester','hateful-soul'],
   avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
   respawn:1,pack:1,
  };
@@ -322,3 +328,107 @@ function greedBossOutgoingDamageMultiplier(c,mob){
  return greedBossFight(c)&&c.greed&&c.greed.immune&&mob&&mob.boss ? .7 : 1;
 }
 function greedBossCleanup(c){if(c&&c.greed)delete c.greed;greedHideMinigame();}
+
+/* ------------------------------------------------ Goshnar's Hatred
+ * Dread's Torment: ativa após 20–40s, soma um contador individual a cada
+ * 5s e aumenta em 10% por ponto o dano de Hatred/Hateful Soul. */
+const HATRED_MAX_SUMMONS=5;
+const HATRED_COUNTER_TICK=5000;
+function hatredBossFight(c){return !!(c&&c.boss&&c.boss.id==='goshnar-s-hatred');}
+function hatredMinigameElement(){return typeof document!=='undefined'?document.getElementById('hatred-minigame'):null;}
+function hatredHideMinigame(){const el=hatredMinigameElement();if(el){el.style.display='none';el.innerHTML='';}}
+function hatredParticipants(c){
+ if(c&&c.players&&c.players.length)return c.players.filter(e=>e&&e.p);
+ if(c&&c._hatredPlayer)return [{id:c._hatredPlayer.id||'player',name:c._hatredPlayer.name||'Player',p:c._hatredPlayer}];
+ return [];
+}
+function hatredPlayerKey(ent){return String((ent&&ent.id)||(ent&&ent.p&&ent.p.id)||'player');}
+function hatredEnsureCounters(c){
+ const counters=c.hatred.counters||(c.hatred.counters={});
+ for(const ent of hatredParticipants(c)){const key=hatredPlayerKey(ent);if(counters[key]===undefined)counters[key]=0;}
+ return counters;
+}
+function hatredCounterFor(c,p){
+ if(!c||!c.hatred)return 0;const counters=hatredEnsureCounters(c);
+ const ent=hatredParticipants(c).find(e=>e.p===p||String(e.id)===String(p&&p.id));
+ return Math.max(0,counters[hatredPlayerKey(ent)]||0);
+}
+function hatredChangeAllCounters(c,delta,reset){
+ if(!c||!c.hatred)return;const counters=hatredEnsureCounters(c);
+ for(const key of Object.keys(counters))counters[key]=reset?0:Math.max(0,(counters[key]||0)+delta);
+}
+function hatredSummons(c){return (c&&c.mobs||[]).filter(m=>m&&m.hatredSummon&&m.hp>0);}
+function hatredRandomSummonSlug(randomFn){return (randomFn||Math.random)()<.10?'hateful-soul':'dreadful-harvester';}
+function hatredCreateSummon(c,slug,randomFn,now){
+ const base=GAMEDATA.monsters&&GAMEDATA.monsters[slug];
+ const cells=typeof greedFreeCells==='function'?greedFreeCells(c):[];if(!base||!cells.length)return null;
+ const rnd=randomFn||Math.random,cell=cells[Math.floor(rnd()*cells.length)%cells.length];
+ const hp=slug==='hateful-soul'?50000:15000;
+ const def=Object.assign({},base,{hp,exp:0,loot:[]});
+ const pos=typeof cellToScreen==='function'?cellToScreen(cell.x,cell.y):
+  {x:(cell.x+.5)/(c.gridW||30),y:(cell.y+.5)/(c.gridH||30)};
+ const mob={slug,def,hp,maxHp:hp,hatredSummon:true,atkCd:400+rnd()*1200,
+  id:'hatred-add-'+now.toString(36)+'-'+Math.random().toString(36).slice(2,7),
+  cx:cell.x,cy:cell.y,x:pos.x,y:pos.y,sx:pos.x,sy:pos.y,dir:'w',moving:false,
+  attackAnim:0,speed:.000055,spawnAt:now};
+ c.mobs.unshift(mob);c.events.push({t:'spawn',slug,x:mob.x,y:mob.y});return mob;
+}
+function hatredFillSummons(c,randomFn,now){
+ if(!hatredBossFight(c)||!c.hatred||!c.hatred.active)return 0;let made=0;
+ while(hatredSummons(c).length<HATRED_MAX_SUMMONS){
+  const slug=hatredRandomSummonSlug(randomFn);if(!hatredCreateSummon(c,slug,randomFn,now))break;made++;
+ }
+ if(made&&typeof resolveSQMOccupancy==='function')resolveSQMOccupancy(c);return made;
+}
+function hatredRenderMinigame(c,now){
+ const el=hatredMinigameElement();if(!el||!c||!c.hatred)return;
+ const st=c.hatred,summons=hatredSummons(c),dread=summons.filter(m=>m.slug==='dreadful-harvester').length;
+ const hateful=summons.filter(m=>m.slug==='hateful-soul').length;
+ const state=st.active?'MECÂNICA ATIVA':`ATIVA EM ${Math.max(0,Math.ceil((st.nextActivationAt-now)/1000))}s`;
+ const rows=hatredParticipants(c).map(ent=>{const n=st.counters[hatredPlayerKey(ent)]||0;
+  return `<div class="hatred-row"><span>${ent.name||ent.p.name||'Player'}</span><span class="hatred-count">${n} · +${n*10}% dano</span></div>`;}).join('');
+ const renderKey=state+'|'+dread+'|'+hateful+'|'+rows;if(st.renderKey===renderKey)return;st.renderKey=renderKey;
+ el.style.display='block';el.innerHTML=`<div class="hatred-title">GOSHNAR'S HATRED — ${state}</div>
+  <div class="hatred-row"><b>Summons</b><span class="hatred-count">${summons.length}/${HATRED_MAX_SUMMONS}</span></div>
+  <div class="hatred-row"><span>Dreadful Harvester</span><b>${dread}</b></div>
+  <div class="hatred-row"><span>Hateful Soul</span><b>${hateful}</b></div>${rows}
+  <small>Harvester morto: −1 contador · Hateful Soul morto: zera todos</small>`;
+}
+function hatredBossInit(c,player,randomFn,now){
+ if(!hatredBossFight(c))return c;now=now||Date.now();const rnd=randomFn||Math.random;
+ c._hatredPlayer=player;c.hatred={active:false,nextActivationAt:now+20000+Math.floor(rnd()*20001),
+  nextCounterAt:0,counters:{},randomFn:rnd};hatredEnsureCounters(c);
+ const boss=(c.mobs||[]).find(m=>m&&m.boss);if(boss){boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;}
+ hatredRenderMinigame(c,now);return c;
+}
+function hatredBossTick(c,now){
+ now=now||Date.now();if(!hatredBossFight(c)||!c.hatred)return true;const st=c.hatred;
+ const boss=(c.mobs||[]).find(m=>m&&m.boss&&m.hp>0);if(!boss){hatredHideMinigame();return true;}
+ hatredEnsureCounters(c);
+ if(!st.active&&now>=st.nextActivationAt){
+  st.active=true;st.nextCounterAt=now+HATRED_COUNTER_TICK;hatredFillSummons(c,st.randomFn,now);
+  if(typeof addLog==='function')addLog('death',"Dread's Torment foi ativado. Elimine os summons para controlar o dano!");
+ }
+ while(st.active&&now>=st.nextCounterAt){
+  for(const ent of hatredParticipants(c))if(ent.p&&ent.p.hp>0){const key=hatredPlayerKey(ent);st.counters[key]=(st.counters[key]||0)+1;}
+  hatredFillSummons(c,st.randomFn,st.nextCounterAt);st.nextCounterAt+=HATRED_COUNTER_TICK;
+ }
+ hatredRenderMinigame(c,now);return true;
+}
+function hatredBossHandleKill(c,mob,now){
+ if(!hatredBossFight(c)||!c.hatred||!mob||!mob.hatredSummon)return false;
+ if(mob.slug==='hateful-soul'){
+  hatredChangeAllCounters(c,0,true);
+  if(typeof addLog==='function')addLog('level','Hateful Soul derrotada — todos os contadores foram zerados.');
+ }else{
+  hatredChangeAllCounters(c,-1,false);
+  if(typeof addLog==='function')addLog('info','Dreadful Harvester derrotado — contadores reduzidos em 1.');
+ }
+ hatredRenderMinigame(c,now||Date.now());return true;
+}
+function hatredBossOutgoingDamageMultiplier(c,mob,p){
+ if(!hatredBossFight(c)||!c.hatred||!mob)return 1;
+ if(!mob.boss&&mob.slug!=='hateful-soul')return 1;
+ return 1+hatredCounterFor(c,p)*.10;
+}
+function hatredBossCleanup(c){if(c){delete c.hatred;delete c._hatredPlayer;}hatredHideMinigame();}
