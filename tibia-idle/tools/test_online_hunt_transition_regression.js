@@ -13,7 +13,15 @@ async function start(){child=spawn(process.execPath,["server.js"],{cwd:serverDir
 function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:String(c.id),name:c.name,voc:c.voc,level:1,hp:185,mp:5}}));
   return {v:1,savedAt:Date.now(),kind:"hunt",huntId:"cobra-bastion",instanceMode:"non-pvp",activeCharacterId:String(chars[0].id),
     members:players.map(e=>({id:e.id,p:e.p,hp:e.p.hp,mp:e.p.mp})),state:{players,mobs:[],events:[]}};}
-(async()=>{await start();const login=await post("/api/login",{login:"2",password:"2"}),token=login.data.token;
+(async()=>{
+  const normalizeStart=client.indexOf("function accountNormalizeInstanceMembers"),normalizeEnd=client.indexOf("\nfunction accountSaveInstance",normalizeStart);
+  const normalizeCtx={Map,Object,Array,String};require("vm").createContext(normalizeCtx);
+  require("vm").runInContext(client.slice(normalizeStart,normalizeEnd),normalizeCtx);
+  const normalized=normalizeCtx.accountNormalizeInstanceMembers({members:[{id:"1",p:{name:"EK"}},{id:"2",p:{name:"MS"}}],
+    state:{players:[null,{id:"2",p:{name:"MS antigo"}}]}});
+  must(normalized.state.players.map((e)=>e.id).join(",")==="1,2"&&normalized.state.players[0].p.name==="EK",
+    "account-client não reconstrói membros antes do PUT");
+  await start();const login=await post("/api/login",{login:"2",password:"2"}),token=login.data.token;
   const a=(await post("/api/characters",{token,name:"Cobra EK",voc:"knight",data:JSON.stringify({name:"Cobra EK",voc:"knight"})})).data.character;
   const b=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
   await post("/api/party/create",{token,char_id:a.id});for(const c of [a,b])await post("/api/party/zone",{token,char_id:c.id,zone:"city"});
