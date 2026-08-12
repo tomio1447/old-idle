@@ -184,6 +184,60 @@ async function accountReleaseLease(token){
   accountLeaseMarkLost(false);ACCOUNT_LEASE.lost=false;
 }
 
+let ACCOUNT_INSTANCE={id:"",version:0,status:null};
+let ACCOUNT_INSTANCE_EPOCH=0,ACCOUNT_INSTANCE_CAN_CREATE=false;
+let ACCOUNT_INSTANCE_QUEUE=Promise.resolve(true);
+let ACCOUNT_INSTANCE_LAST_PROMISE=ACCOUNT_INSTANCE_QUEUE;
+function accountQueueInstance(task){
+  const run=ACCOUNT_INSTANCE_QUEUE.catch(()=>false).then(task);
+  ACCOUNT_INSTANCE_QUEUE=run.catch(()=>false);ACCOUNT_INSTANCE_LAST_PROMISE=run;return run;
+}
+function accountLastInstancePromise(){return ACCOUNT_INSTANCE_LAST_PROMISE.catch(()=>false);}
+function accountInstanceApply(instance){
+  if(!instance){ACCOUNT_INSTANCE={id:"",version:0,status:null};ACCOUNT_INSTANCE_CAN_CREATE=false;return;}
+  ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active"};
+  ACCOUNT_INSTANCE_CAN_CREATE=false;
+}
+function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
+async function accountLoadInstance(token){
+  const r=await _api("GET","/api/instance",null,token);
+  if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
+  if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
+  accountInstanceApply(r.data.instance);
+  return {ok:true,instance:r.data.instance.state||null,meta:r.data.instance};
+}
+function accountSaveInstance(token,state){
+  const epoch=ACCOUNT_INSTANCE_EPOCH;
+  return accountQueueInstance(async()=>{
+    if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
+    if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
+    const r=await _api("PUT","/api/instance",Object.assign({token,
+      instance_id:ACCOUNT_INSTANCE.id||null,expected_version:ACCOUNT_INSTANCE.status==="active"?ACCOUNT_INSTANCE.version:0,
+      state},accountLeaseFields()));
+    if(r.data.ok){accountInstanceApply(r.data.instance);return true;}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409){
+      accountInstanceApply(r.data.instance||null);
+      try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
+      if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
+    }
+    return false;
+  });
+}
+function accountEndInstance(token,reason){
+  ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=false;
+  return accountQueueInstance(async()=>{
+    if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
+    if(!accountLeaseAllowsSimulation())return false;
+    const r=await _api("POST","/api/instance/end",Object.assign({token,
+      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
+    if(r.data.ok){accountInstanceApply(null);return true;}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountInstanceApply(r.data.instance||null);
+    return false;
+  });
+}
+
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;

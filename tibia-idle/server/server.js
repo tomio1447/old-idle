@@ -6,6 +6,7 @@
  *   POST /api/login      { login, password }           -> { token, account }
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
  *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
+ *   GET/PUT /api/instance                              -> instância persistente
  *   POST /api/characters { token, name, voc, data }    -> cria personagem
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
@@ -387,6 +388,114 @@ async function savePartyCharacters(db,body){
   }
   return {code:200,body:{ok:true,partyVersion,
     characters:result.characters.map(accountCharacterSummary)}};
+}
+
+function instanceSummary(row,includeState){
+  if(!row)return null;let state=null;
+  if(includeState&&row.state){try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){state=null;}}
+  return {id:row.instance_id,version:Number(row.version)||0,status:row.status,kind:row.kind,
+    huntId:row.hunt_id||null,bossId:row.boss_id||null,instanceMode:row.instance_mode,
+    partyId:row.party_id?Number(row.party_id):null,partyVersion:row.party_version?Number(row.party_version):null,
+    activeCharacterId:String(row.active_character_id),savedAt:new Date(row.saved_at).getTime(),
+    startedAt:new Date(row.started_at).getTime(),terminalReason:row.terminal_reason||null,state};
+}
+async function loadInstance(db,token){
+  const acc=await db.findAccountByToken(token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const row=await db.instanceGet(acc.id);
+  if(!row||row.status!=="active")return {code:200,body:{ok:true,instance:null,lastStatus:row?row.status:null,
+    terminalReason:row&&row.terminal_reason||null}};
+  const summary=instanceSummary(row,true);
+  if(!summary.state)return {code:500,body:{ok:false,error:"INSTANCE_STATE_INVALID",msg:"Snapshot da instância está corrompido"}};
+  return {code:200,body:{ok:true,instance:summary}};
+}
+async function prepareInstanceState(db,acc,input){
+  if(!input||typeof input!=="object"||Array.isArray(input))
+    return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_STATE",msg:"Snapshot da instância inválido"}}};
+  const kind=input.kind==="boss"?"boss":input.kind==="hunt"?"hunt":null;
+  const idPattern=/^[a-z0-9][a-z0-9_-]{0,63}$/;
+  const huntId=input.huntId?String(input.huntId):null,bossId=input.bossId?String(input.bossId):null;
+  if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||"")))
+    return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
+  const mode=["non-pvp","pvp","boss"].includes(String(input.instanceMode))?String(input.instanceMode):
+    (kind==="boss"?"boss":"non-pvp");
+  const members=Array.isArray(input.members)?input.members:[];
+  if(!members.length||members.length>5)return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros da instância inválidos"}}};
+  const ids=members.map((member)=>Number(member&&member.id));
+  if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
+    return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros duplicados ou inválidos"}}};
+  const rows=[];
+  for(let index=0;index<ids.length;index++){
+    const id=ids[index],c=await db.findCharacter(id),member=members[index]||{},player=member.p||{};
+    if(!c||Number(c.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",
+      msg:"A instância contém personagem de outra conta"}}};
+    if((player.id!==undefined&&String(player.id)!==String(c.id))||
+       (player.name&&String(player.name).toLowerCase()!==String(c.name).toLowerCase()))
+      return {error:{code:409,body:{ok:false,error:"INSTANCE_IDENTITY_MISMATCH",msg:"Snapshot contém identidade cruzada"}}};
+    rows.push(c);
+  }
+  const activeId=Number(input.activeCharacterId);
+  if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
+  if(input.state&&Array.isArray(input.state.players)){
+    const stateIds=input.state.players.map((ent)=>Number(ent&&((ent.id!==undefined&&ent.id)||(ent.p&&ent.p.id))));
+    if(stateIds.length!==ids.length||stateIds.some((id,index)=>id!==ids[index]))
+      return {error:{code:400,body:{ok:false,error:"INSTANCE_STATE_MEMBERS_MISMATCH",msg:"Entidades/ordem não correspondem aos membros"}}};
+  }
+  let partyId=null,partyVersion=null;
+  const party=await db.partyFindByAccount(acc.id),partyMembers=party?await db.partyMembers(party.id):[];
+  const controlled=[];
+  if(party){
+    const order=[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id)));
+    for(const id of order){const c=await db.findCharacter(id);if(c&&Number(c.account_id)===Number(acc.id))controlled.push(id);}
+  }
+  // Se o personagem ativo participa da party controlada, nenhum snapshot
+  // pode deixá-la parcialmente para trás. Chars da conta fora do roster ainda
+  // podem possuir instância solo própria.
+  if(ids.length>1||(party&&controlled.includes(activeId))){
+    if(!party)return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
+    if(controlled.length!==ids.length||controlled.some((id,index)=>id!==ids[index]))
+      return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
+    partyId=Number(party.id);partyVersion=Number(party.roster_version);
+  }
+  const now=Date.now(),state=Object.assign({},input,{v:1,savedAt:now,kind,huntId,bossId,
+    instanceMode:mode,activeCharacterId:String(activeId)});
+  return {state,meta:{kind,hunt_id:huntId,boss_id:bossId,instance_mode:mode,party_id:partyId,
+    party_version:partyVersion,member_ids:ids,active_character_id:activeId,
+    saved_at:new Date(now),startedAt:new Date(now).toISOString()}};
+}
+async function saveInstance(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const expected=Number(body.expected_version);
+  if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"INSTANCE_VERSION_REQUIRED",msg:"Atualize a instância antes de salvar"}};
+  const prepared=await prepareInstanceState(db,acc,body.state);if(prepared.error)return prepared.error;
+  let instanceId=String(body.instance_id||"");
+  if(expected===0)instanceId=newToken();
+  else if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.instanceSave(acc.id,instanceId,expected,prepared.meta,JSON.stringify(prepared.state),lease);
+  if(!result.ok){
+    if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante o save"}};
+    return {code:409,body:{ok:false,error:result.error,msg:"A instância foi alterada por outra sessão",
+      instance:instanceSummary(result.instance,true)}};
+  }
+  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
+}
+async function endInstance(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const id=String(body.instance_id||""),expected=Number(body.expected_version);
+  if(!/^[a-f0-9]{64}$/.test(id)||!Number.isSafeInteger(expected)||expected<1)
+    return {code:400,body:{ok:false,error:"INVALID_INSTANCE_END",msg:"Instância inválida"}};
+  const reason=String(body.reason||"finished").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"finished";
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.instanceEnd(acc.id,id,expected,reason,lease);
+  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:409,body:{ok:false,error:result.error,
+    msg:result.error==="LEASE_REQUIRED"?"Controle transferido durante o encerramento":"A instância foi alterada",
+    instance:instanceSummary(result.instance,true)}};
+  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 
 /* Recuperação explícita para saves cruzados por versões antigas. Recria os
@@ -836,6 +945,16 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/lease/release"){
         const r=await releaseLease(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="GET"&&url==="/api/instance"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await loadInstance(db,token);return send(res,r.code,r.body);
+      }
+      if(req.method==="PUT"&&url==="/api/instance"){
+        const r=await saveInstance(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/end"){
+        const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "POST" && url === "/api/characters") {
         const body = await readBody(req);

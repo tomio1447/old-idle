@@ -67,8 +67,11 @@ function getCharacters() {
   }).filter(Boolean).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
 }
 
-function clearInstanceSession() {
+function clearInstanceSession(reason,localOnly) {
   try { localStorage.removeItem(INSTANCE_SESSION_KEY); } catch (e) { /* sem storage */ }
+  if(!localOnly&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+     typeof accountEndInstance==="function"&&typeof sessionToken==="function")
+    accountEndInstance(sessionToken(),reason||"cleared").catch(()=>{});
 }
 
 function combatSessionParticipants(c) {
@@ -82,11 +85,12 @@ function combatSessionParticipants(c) {
  * a aba oculta, em vez de teleportar a party para a cidade. */
 function persistActiveInstance() {
   const c=G.combat;
-  if(!c||c.instanceFinished||c.bossDefeated){clearInstanceSession();return null;}
+  if(!c||c.instanceFinished||c.bossDefeated){clearInstanceSession(c&&c.bossDefeated?"boss-defeated":"finished");return null;}
   const savedAt=Date.now(),participants=combatSessionParticipants(c);
   for(const ent of participants)if(ent.p)ent.p.stamina=FULL_STAMINA_SECONDS;
   const descriptor={
-    v:1,savedAt,kind:c.boss?"boss":"hunt",huntId:c.huntId||null,
+    v:1,savedAt,startedAt:c.instanceStartedAt||(c.instanceStartedAt=savedAt),
+    kind:c.boss?"boss":"hunt",huntId:c.huntId||null,
     bossId:c.boss&&c.boss.id?c.boss.id:null,
     instanceMode:c.instanceMode||(G.p&&G.p.instanceMode)||"non-pvp",
     activeCharacterId:G.p&&G.p.id?String(G.p.id):null,
@@ -113,6 +117,11 @@ function persistActiveInstance() {
     try { localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(descriptor)); }
     catch(e){console.warn("[idle] não foi possível persistir a instância",e);return null;}
   }
+  // Online: o servidor é a fonte de verdade; localStorage fica somente como
+  // espelho de emergência/migração de versões anteriores.
+  if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+     typeof accountSaveInstance==="function"&&typeof sessionToken==="function")
+    accountSaveInstance(sessionToken(),descriptor).catch(()=>{});
   // Saves dos aliados acompanham o snapshot sem trocar o personagem ativo.
   if(participants.length>1){
     try{
@@ -1175,6 +1184,7 @@ function startBoss(id, force, arenaReady) {
   }
   G.p.hunt = null;
   G.p.instanceMode = "boss";
+  if(typeof accountBeginInstance==="function")accountBeginInstance();
   G.combat = newBossCombat(G.p, boss);
   G.inCity = false;
   if(typeof persistActiveInstance==="function")persistActiveInstance();
@@ -1318,6 +1328,7 @@ function startHunt(id, instanceMode, force) {
     entryCompleted = true;
     if (entryWatchdog) clearTimeout(entryWatchdog);
     try {
+      if(typeof accountBeginInstance==="function")accountBeginInstance();
       G.combat = newCombat(G.p, id, instanceMode);
       spawnWave(G.combat, G.p);
       if(typeof persistActiveInstance==="function")persistActiveInstance();
@@ -1428,7 +1439,7 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;
-  if(typeof clearInstanceSession==="function")clearInstanceSession();
+  if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
   // Checkpoint do templo: cura inclusive membros inconscientes antes de
   // persistir o roster, para ninguém permanecer morto fora da instância.
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
@@ -2157,7 +2168,7 @@ function finishIdleInstance(reason,silent){
     if(returnPartyToInstanceAfterWipe(c,cost,silent))return true;
     if(!silent&&typeof addLog==="function")addLog("death",`Party sem ${fmtFull(cost)} gp para as bênçãos — retorno ao templo.`);
   }
-  c.instanceFinished=true;clearInstanceSession();
+  c.instanceFinished=true;clearInstanceSession(reason||"finished");
   if(reason==="stamina"&&!silent&&typeof addLog==="function")
     addLog("death","A stamina de um membro acabou. A instância foi encerrada.");
   // O templo é checkpoint seguro e regenera toda a party, sem devolver bless.
@@ -2550,8 +2561,8 @@ function startGame(p) {
     else showGameLoading(true, "Carregando o Templo Oficial de Thais...", 0);
     return templeReady
       .then(() => preloadGameAssets(p, "Preparando templo"))
+      .then(() => startGameReady(p))
       .then(() => {
-        startGameReady(p);
         if (typeof finishMapLoading === "function") finishMapLoading();
         else showGameLoading(false);
       })
@@ -2564,7 +2575,7 @@ function startGame(p) {
   return templeReady.then(() => startGameReady(p));
 }
 
-function startGameReady(p) {
+async function startGameReady(p) {
   p = normalizePlayer(p);
   G.p = p;
   G.renderer = new Renderer($("#scene"));
@@ -2590,17 +2601,42 @@ function startGameReady(p) {
   window.dispatchEvent(new Event("bg-game-start"));
   if (typeof moduleLifecycleStart === "function") moduleLifecycleStart();
 
-  let instanceSession=readInstanceSession();
-  if(instanceSession&&p.id&&(instanceSession.members||[]).length&&
-     !(instanceSession.members||[]).some((m)=>String(m.id)===String(p.id))){
-    clearInstanceSession();instanceSession=null;
+  let localInstance=readInstanceSession();
+  if(localInstance&&p.id&&(localInstance.members||[]).length&&
+     !(localInstance.members||[]).some((m)=>String(m.id)===String(p.id))){
+    clearInstanceSession("wrong-character",true);localInstance=null;
   }
-  // Migra saves antigos que guardavam apenas p.hunt/lastSeen.
-  if(!instanceSession&&p.hunt&&GAMEDATA.hunts[p.hunt])instanceSession={
-    v:1,savedAt:p.lastSeen||Date.now(),kind:"hunt",huntId:p.hunt,
+  let instanceSession=localInstance;
+  if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+     typeof accountLoadInstance==="function"){
+    const remote=await accountLoadInstance(sessionToken());
+    if(remote.ok&&remote.instance){
+      instanceSession=remote.instance;
+      try{localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(instanceSession));}catch(e){}
+    }else if(remote.ok&&remote.lastStatus==="ended"){
+      clearInstanceSession("remote-ended",true);instanceSession=null;
+    }else if(remote.ok&&localInstance&&typeof accountSaveInstance==="function"){
+      // Migração única do snapshot local legado para a fonte autoritativa.
+      if(typeof accountBeginInstance==="function")accountBeginInstance();
+      const migrated=await accountSaveInstance(sessionToken(),localInstance);
+      instanceSession=migrated?localInstance:null;
+    }else if(remote.ok){
+      clearInstanceSession("remote-empty",true);instanceSession=null;
+    }else{
+      // Sem resposta do servidor não inicia uma cópia local concorrente.
+      instanceSession=null;
+    }
+  }
+  // Migra saves antigos que guardavam apenas p.hunt/lastSeen (somente offline).
+  if(!(typeof accountApiConfigured==="function"&&accountApiConfigured())&&
+     !instanceSession&&p.hunt&&GAMEDATA.hunts[p.hunt])instanceSession={
+    v:1,savedAt:p.lastSeen||Date.now(),startedAt:p.lastSeen||Date.now(),kind:"hunt",huntId:p.hunt,
     instanceMode:p.instanceMode||"non-pvp",activeCharacterId:p.id,
     members:[{id:p.id,p}],
   };
+  if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&!instanceSession){
+    p.hunt=null;p.instanceMode=null;
+  }
   const off=instanceSession?null:computeOffline(p);
   p.lastSeen=Date.now();
 
@@ -3225,6 +3261,9 @@ function initAccountLogin() {
     if (wasPlaying && typeof save === "function") save();
     if(wasPlaying&&typeof accountLastSavePromise==="function"){
       try{await accountLastSavePromise();}catch(e){}
+    }
+    if(wasPlaying&&typeof accountLastInstancePromise==="function"){
+      try{await accountLastInstancePromise();}catch(e){}
     }
     if(typeof accountReleaseLease==="function"){
       try{await accountReleaseLease(sessionToken());}catch(e){}

@@ -73,6 +73,9 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/lease/renew` | `{ token, holder_id, lease_token }` | Heartbeat do holder atual |
 | POST | `/api/lease/takeover` | `{ token, holder_id }` | Transferência explícita de controle |
 | POST | `/api/lease/release` | `{ token, holder_id, lease_token }` | Libera no logout explícito |
+| GET | `/api/instance` | Bearer token | Carrega a hunt/boss ativa da conta |
+| PUT | `/api/instance` | `{ token, lease, expected_version, state }` | Cria/atualiza snapshot versionado |
+| POST | `/api/instance/end` | `{ token, lease, instance_id, expected_version, reason }` | Persiste condição terminal |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
 | PUT | `/api/characters/:id` | `{ token, holder_id, lease_token, expected_version, level, data, ... }` | Save otimista protegido pelo lease |
 | POST | `/api/coins` | `{ token, amount }` | Admin adiciona/remove Tibia Coins |
@@ -109,6 +112,18 @@ a aplicação e usar um banco/disco persistente.
   mesmo `sessionStorage`. Takeover por outro dispositivo exige ação explícita
 - Fechar a página não libera o lease nem encerra a instância. Logout explícito
   libera imediatamente; expiração permite retomada segura
+
+**Instâncias persistentes:**
+- `account_instances` guarda uma hunt ou boss ativo por conta, incluindo
+  membros, HP/MP, mobs, waves, cooldowns e mecânicas específicas do encontro
+- O snapshot possui `instance_id` e versão otimista. Saves obsoletos recebem
+  HTTP 409; lease, party e composição são revalidados dentro da transação
+- Ao entrar por outro dispositivo, `/api/instance` substitui qualquer cópia
+  local. `localStorage` permanece apenas como espelho e migração legada
+- Wipe sem bless, retorno à cidade, boss derrotado e demais condições finais
+  persistem um tombstone `ended`, impedindo a reabertura de snapshot local velho
+- Fechar o navegador não encerra a linha ativa. O próximo holder retoma a mesma
+  instância e processa o intervalo desde `saved_at`
 
 **Integridade dos saves online:**
 - Cada personagem possui `save_version`; o cliente deve enviar a versão que

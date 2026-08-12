@@ -35,6 +35,7 @@ function JsonStore() {
   }
   this.sessions = this._load("sessions.json", []);
   this.leases = this._load("leases.json", []);
+  this.instances = this._load("instances.json", []);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
   const partyData = this._load("parties.json", null);
@@ -91,6 +92,8 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.sessions || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "leases.json"),
     JSON.stringify(this.leases || [], null, 1));
+  fs.writeFileSync(path.join(DATA_DIR, "instances.json"),
+    JSON.stringify(this.instances || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
     JSON.stringify({ marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
@@ -156,6 +159,45 @@ JsonStore.prototype.leaseRelease = function(accountId,holderId,secretHash){
   this.leases=(this.leases||[]).filter((row)=>!(Number(row.account_id)===Number(accountId)&&
     row.holder_id===holderId&&row.secret_hash===secretHash));
   if(this.leases.length!==before)this._save();return this.leases.length!==before;
+};
+JsonStore.prototype.instanceGet = function(accountId){
+  return (this.instances||[]).find((row)=>Number(row.account_id)===Number(accountId))||null;
+};
+JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion,meta,state,lease){
+  if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
+    return {ok:false,error:"LEASE_REQUIRED"};
+  if(meta.party_id){
+    const party=(this.parties||[]).find((p)=>Number(p.id)===Number(meta.party_id));
+    const members=party?(party.members||[]).slice().sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0)):[];
+    const order=party?[Number(party.leader_id)].concat(members.map((m)=>Number(m.character_id))):[];
+    const controlled=order.filter((id)=>{const c=this.findCharacter(id);return c&&Number(c.account_id)===Number(accountId);});
+    if(!party||Number(party.roster_version)!==Number(meta.party_version)||controlled.length!==meta.member_ids.length||
+       controlled.some((id,index)=>id!==meta.member_ids[index]))return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
+  }
+  this.instances=this.instances||[];let row=this.instanceGet(accountId);
+  if(row&&row.status==="active"){
+    if(Number(row.version)!==Number(expectedVersion)||String(row.instance_id)!==String(instanceId||""))
+      return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+    row.version=Number(row.version)+1;
+  }else{
+    if(Number(expectedVersion)!==0)return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+    if(!row){row={account_id:Number(accountId)};this.instances.push(row);}
+    row.instance_id=instanceId;row.version=1;row.started_at=meta.startedAt;
+  }
+  Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
+    updated_at:new Date(lease.now).toISOString()});
+  this._save();return {ok:true,instance:row};
+};
+JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,reason,lease){
+  if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
+    return {ok:false,error:"LEASE_REQUIRED"};
+  const row=this.instanceGet(accountId);
+  if(!row||row.status!=="active")return {ok:true,instance:row||null,alreadyEnded:true};
+  if(Number(row.version)!==Number(expectedVersion)||String(row.instance_id)!==String(instanceId||""))
+    return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+  row.version=Number(row.version)+1;row.status="ended";row.terminal_reason=reason;
+  row.ended_at=new Date(lease.now).toISOString();row.updated_at=row.ended_at;
+  this._save();return {ok:true,instance:row};
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
@@ -808,6 +850,88 @@ async function MysqlStore() {
         [Number(accountId),holderId,secretHash]);
       return result.affectedRows>0;
     },
+    async instanceGet(accountId){
+      const rows=await this.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+      return rows[0]||null;
+    },
+    async instanceSave(accountId,instanceId,expectedVersion,meta,state,lease){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){
+          await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
+        }
+        if(meta.party_id){
+          const [parties]=await conn.query(
+            "SELECT leader_id,roster_version FROM parties WHERE id=? AND owner_account_id=? FOR UPDATE",
+            [Number(meta.party_id),Number(accountId)]);
+          const party=parties[0];
+          let members=[];
+          if(party)[members]=await conn.query(
+            `SELECT m.character_id FROM party_members m JOIN characters c ON c.id=m.character_id
+             WHERE m.party_id=? AND c.account_id=? ORDER BY m.position,m.joined_at,m.character_id`,
+            [Number(meta.party_id),Number(accountId)]);
+          const controlled=party?[Number(party.leader_id)].concat(members.map((m)=>Number(m.character_id))):[];
+          if(!party||Number(party.roster_version)!==Number(meta.party_version)||
+             controlled.length!==meta.member_ids.length||controlled.some((id,index)=>id!==meta.member_ids[index])){
+            await conn.rollback();return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
+          }
+        }
+        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const current=rows[0]||null;
+        if(current&&current.status==="active"){
+          if(Number(current.version)!==Number(expectedVersion)||String(current.instance_id)!==String(instanceId||"")){
+            await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
+          }
+          await conn.query(
+            `UPDATE account_instances SET version=version+1,kind=?,hunt_id=?,boss_id=?,instance_mode=?,
+             party_id=?,party_version=?,active_character_id=?,state=?,saved_at=?,status='active',
+             ended_at=NULL,terminal_reason=NULL WHERE account_id=?`,
+            [meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,meta.party_id,meta.party_version,
+             meta.active_character_id,state,meta.saved_at,Number(accountId)]);
+        }else{
+          if(Number(expectedVersion)!==0){
+            await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
+          }
+          await conn.query(
+            `INSERT INTO account_instances
+             (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
+              party_version,active_character_id,state,saved_at,started_at)
+             VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=1,status='active',kind=VALUES(kind),
+              hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),instance_mode=VALUES(instance_mode),
+              party_id=VALUES(party_id),party_version=VALUES(party_version),
+              active_character_id=VALUES(active_character_id),state=VALUES(state),saved_at=VALUES(saved_at),
+              started_at=VALUES(started_at),ended_at=NULL,terminal_reason=NULL`,
+            [Number(accountId),instanceId,meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,
+             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,meta.started_at]);
+        }
+        const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+        await conn.commit();return {ok:true,instance:saved[0]};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceEnd(accountId,instanceId,expectedVersion,reason,lease){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        if(!await lockValidLease(conn,accountId,lease)){
+          await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
+        }
+        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const current=rows[0]||null;
+        if(!current||current.status!=="active"){
+          await conn.commit();return {ok:true,instance:current,alreadyEnded:true};
+        }
+        if(Number(current.version)!==Number(expectedVersion)||String(current.instance_id)!==String(instanceId||"")){
+          await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
+        }
+        await conn.query(
+          "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
+          [reason,new Date(lease.now),new Date(lease.now),Number(accountId)]);
+        current.version=Number(current.version)+1;current.status="ended";current.terminal_reason=reason;
+        current.ended_at=new Date(lease.now);await conn.commit();return {ok:true,instance:current};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
 
     // ---- MARKET P2P ----
     async createMarketOffer(offer) {
@@ -1160,6 +1284,29 @@ async function ensureSchema(pool) {
     expires_at DATETIME(3) NOT NULL,
     INDEX idx_account_leases_expiry (expires_at),
     CONSTRAINT fk_account_leases_account FOREIGN KEY (account_id)
+      REFERENCES accounts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS account_instances (
+    account_id INT UNSIGNED PRIMARY KEY,
+    instance_id CHAR(64) NOT NULL,
+    version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    status ENUM('active','ended') NOT NULL DEFAULT 'active',
+    kind ENUM('hunt','boss') NOT NULL,
+    hunt_id VARCHAR(64) DEFAULT NULL,
+    boss_id VARCHAR(64) DEFAULT NULL,
+    instance_mode VARCHAR(24) NOT NULL DEFAULT 'non-pvp',
+    party_id INT UNSIGNED DEFAULT NULL,
+    party_version BIGINT UNSIGNED DEFAULT NULL,
+    active_character_id INT UNSIGNED NOT NULL,
+    state MEDIUMTEXT NOT NULL,
+    saved_at DATETIME(3) NOT NULL,
+    started_at DATETIME(3) NOT NULL,
+    ended_at DATETIME(3) DEFAULT NULL,
+    terminal_reason VARCHAR(40) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_instances_status (status,saved_at),
+    CONSTRAINT fk_instances_account FOREIGN KEY (account_id)
       REFERENCES accounts(id) ON DELETE CASCADE
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS characters (
