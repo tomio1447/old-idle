@@ -467,13 +467,6 @@ function renderPartyModal(p, online) {
   h += `</div>`;
 
   box.innerHTML = h;
-  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
-  for (const m of alvos) {
-    const host = box.querySelector(`[data-party-preview="${m.id}"]`);
-    if (!host || typeof AppearanceRenderer === "undefined") continue;
-    const cv = AppearanceRenderer.preview(m, "s");
-    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
-  }
 
   // handlers
   const leave = $("#party-leave");
