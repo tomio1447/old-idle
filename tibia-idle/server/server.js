@@ -463,6 +463,28 @@ async function savePartyCharacters(db,body){
   const owned=await db.partyFindByAccount(acc.id);
   if(!owned||Number(owned.id)!==partyId)return {code:403,body:{ok:false,error:"PARTY_NOT_OWNER",
     msg:"A party não pertence à sua conta."}};
+  const partyMembers=await db.partyMembers(owned.id),currentOrder=[Number(owned.leader_id)].concat(partyMembers.map((m)=>Number(m.id)));
+  if(Number(owned.roster_version)!==partyVersion||order.length!==currentOrder.length||
+     order.some((id,index)=>id!==currentOrder[index]))
+    return {code:409,body:{ok:false,error:"PARTY_VERSION_CONFLICT",msg:"A composição da party mudou.",
+      party:{id:Number(owned.id),version:Number(owned.roster_version),order:currentOrder}}};
+  const entryIds=entries.map((entry)=>Number(entry&&entry.id));
+  if(entryIds.length!==currentOrder.length||entryIds.some((id)=>!currentOrder.includes(id))||new Set(entryIds).size!==entryIds.length)
+    return {code:409,body:{ok:false,error:"PARTY_SAVE_SET_MISMATCH",msg:"O save deve conter todos os membros da party."}};
+  // Clientes antigos chamavam esta rota ao trocar o personagem controlado no
+  // meio da hunt. O tick autoritativo já salva exatamente este conjunto e
+  // avança save_version; tratar o checkpoint visual como no-op evita um 409
+  // rotineiro sem abrir mão da validação de lease, roster ou propriedade.
+  const activeInstance=await db.instanceGet(acc.id);
+  if(activeInstance&&activeInstance.status==="active"&&Number(activeInstance.party_id)===partyId){
+    const currentCharacters=[];
+    for(const id of currentOrder){const character=await db.findCharacter(id);
+      if(!character||Number(character.account_id)!==Number(acc.id))return {code:403,body:{ok:false,error:"PARTY_CHARACTER_NOT_OWNED",
+        msg:"A party contém um personagem que não pertence à sua conta."}};
+      currentCharacters.push(accountCharacterSummary(character));}
+    return {code:200,body:{ok:true,partyVersion:Number(owned.roster_version),authoritativeInstance:true,
+      characters:currentCharacters}};
+  }
   const saves=[];
   for(const entry of entries){
     const expected=Number(entry.expected_version);

@@ -473,6 +473,12 @@ async function accountSaveParty(token,state,players){
   return accountQueueSave(async()=>{
     if(!accountLeaseAllowsSimulation()||!state||!state.id||!Number.isSafeInteger(Number(state.version))||
        ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
+    // O tick da instância já materializa todos os membros atomicamente e
+    // incrementa seus save_versions. Espera qualquer tick/end já enfileirado:
+    // durante combate o party-save seria redundante (e disputaria a versão);
+    // após stopHunt, o end conclui primeiro e o checkpoint curado é salvo.
+    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
+    if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
     const cache=await accountEnsureVersions(token,ids);
     const entries=[];
     for(const ent of players||[]){
@@ -487,6 +493,11 @@ async function accountSaveParty(token,state,players){
     },accountLeaseFields()));
     if(r.data.ok){accountMergeCharacterCache(r.data.characters||[]);return true;}
     if(r.code===409){
+      // Alteração do roster não significa conflito de save dos personagens.
+      // Atualize a party, mas não deixe todos os chars bloqueados até reload.
+      if(r.data.error==="PARTY_VERSION_CONFLICT"||r.data.error==="PARTY_SAVE_SET_MISMATCH"){
+        accountSyncDispatch("party",r.data.party||{});return false;
+      }
       const conflicts=(r.data.characters||[]).map((c)=>String(c.id));
       accountSaveConflict(conflicts.length?conflicts:ids,r.data.characters||[],r.data.msg);return false;
     }
