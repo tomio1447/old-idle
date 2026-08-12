@@ -102,7 +102,8 @@ async function post(route, body) {
   const accountSummary = await request('/api/me', {headers:{authorization:'Bearer ' + token}});
   const summaryChar = accountSummary.data.characters.find(c => Number(c.id) === Number(id));
   must(summaryChar && summaryChar.sex === 'female' && summaryChar.outfit &&
-    summaryChar.outfit.colors[2] === 56, 'seletor da conta não recebe outfit/cores atuais');
+    summaryChar.outfit.colors[2] === 56 && summaryChar.snapshot && summaryChar.snapshot.voc === 'druid',
+    'seletor/cache da conta não recebe outfit/cores/snapshot atuais');
   let loaded = await request('/api/characters/' + id, {
     headers:{authorization:'Bearer ' + token},
   });

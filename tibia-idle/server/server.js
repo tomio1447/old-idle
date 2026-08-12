@@ -157,6 +157,7 @@ function accountCharacterSummary(character) {
     identityMismatch:wrongId||wrongName,
     dataOwnerId:wrongId?String(data.id):null,
     dataOwnerName:wrongName?String(data.name):null,
+    snapshot:data,
   };
 }
 

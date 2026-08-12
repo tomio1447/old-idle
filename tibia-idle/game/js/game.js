@@ -230,9 +230,14 @@ function save() {
       // apontar para o próximo card enquanto G.p ainda é o personagem atual.
       // O id do próprio save impede sobrescrever outro personagem da conta.
       const cid = G.p && G.p.id ? String(G.p.id) : sessionCharId();
-      if (tok && cid) {
-        accountSaveCharacter(tok, cid, G.p).catch(() => {});
+      if(typeof accountCharacterCacheRead==="function"&&typeof accountCharacterCacheWrite==="function"){
+        const cache=accountCharacterCacheRead();const summary=cache.find(c=>String(c.id)===String(cid));
+        if(summary){summary.voc=G.p.voc;summary.level=G.p.level;summary.sex=G.p.sex;
+          summary.outfit=G.p.outfit;summary.snapshot=G.p;accountCharacterCacheWrite(cache);}
       }
+      if(G.combat&&G.combat.players&&G.combat.players.length>1&&
+         typeof partyCombatSaveAll==="function")partyCombatSaveAll();
+      else if (tok && cid) accountSaveCharacter(tok, cid, G.p).catch(() => {});
     }
     return true;
   } catch (e) {
@@ -3180,6 +3185,7 @@ function initAccountLogin() {
   function logoutAccount() {
     const wasPlaying = typeof G !== "undefined" && G && G.p;
     if (wasPlaying && typeof save === "function") save();
+    if(typeof accountCharacterCacheClear==="function")accountCharacterCacheClear();
     try {
       sessionStorage.removeItem("tibia-idle-token");
       sessionStorage.removeItem("tibia-idle-account");
@@ -3229,6 +3235,7 @@ function initAccountLogin() {
   }
   function showPicker(token, account, characters) {
     characters = Array.isArray(characters) ? characters : [];
+    if(typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(characters);
     try {
       sessionStorage.setItem("tibia-idle-token", token);
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));

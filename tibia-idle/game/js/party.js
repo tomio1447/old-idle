@@ -955,9 +955,26 @@ function partyCombatRestoreAll(reason) {
 /* Carrega as entidades do party combat. `player` = personagem ativo (o
  * líder). Devolve o array completo (líder + membros) ou null sem party. */
 function partyCombatLoad(player) {
-  const d = partyLocalData();
-  if (!d) return null;
-  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
+  let order=[],chars=[];
+  if(online){
+    const st=player&&player._partyOnline;if(!st||!st.leader)return null;
+    order=[st.leader].concat(st.members||[]);
+    const cached=typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
+    chars=cached.map(summary=>{
+      let raw=summary.snapshot||{};if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw={};}}
+      raw=Object.assign({},raw,{id:String(summary.id),name:summary.name,voc:summary.voc,
+        level:Number(summary.level)||raw.level||1,sex:summary.sex||raw.sex||"male",
+        outfit:summary.outfit||raw.outfit});return raw;
+    });
+    const me=String(player.id||"");
+    const i=chars.findIndex(c=>String(c.id)===me);
+    if(i>=0)chars[i]=player;else chars.push(player);
+  }else{
+    const d=partyLocalData();if(!d)return null;
+    chars=typeof getCharacters==="function"?getCharacters():[];
+    order=[{id:d.leaderId}].concat(d.members||[]);
+  }
   const me = String(player.id || characterId(player));
   const entidades = [];
   const seen = new Set();
@@ -980,14 +997,15 @@ function partyCombatLoad(player) {
       taken: 0,
     });
   };
-  // líder primeiro (ativa por padrão)
-  const lider = chars.find((c) => String(c.id || characterId(c)) === me);
-  mkEnt(lider, true);
-  // membros na ordem do party
-  for (const m of d.members) {
-    const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
-    if (c) mkEnt(c, false);
+  // líder primeiro, depois os membros na ordem fornecida pelo servidor/storage.
+  for(let i=0;i<order.length;i++){
+    const ref=order[i];
+    const c=chars.find(x=>String(x.id||characterId(x))===String(ref.id));
+    if(c)mkEnt(c,i===0);
   }
+  // O personagem ativo sempre precisa existir, inclusive durante transições
+  // em que o poll da party ainda está uma versão atrás.
+  if(!seen.has(me))mkEnt(player,!!(order[0]&&String(order[0].id)===me));
   return entidades.length > 1 ? entidades : null;
 }
 
@@ -1084,9 +1102,18 @@ function partyCombatSwitchTo(id) {
 function partyCombatSaveAll() {
   try {
     if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return;
+    const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
+    const token=online&&typeof sessionToken==="function"?sessionToken():"";
+    const cache=online&&typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
     for (const ent of G.combat.players) {
-      if (ent.p && typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+      if(!ent.p)continue;
+      if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(ent.p);
+      if(token&&typeof accountSaveCharacter==="function")accountSaveCharacter(token,String(ent.id),ent.p).catch(()=>{});
+      const summary=cache.find(c=>String(c.id)===String(ent.id));
+      if(summary){summary.voc=ent.p.voc;summary.level=ent.p.level;summary.sex=ent.p.sex;
+        summary.outfit=ent.p.outfit;summary.snapshot=ent.p;}
     }
+    if(online&&typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(cache);
   } catch (e) { /* não bloqueia */ }
 }
 
