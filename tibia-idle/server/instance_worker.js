@@ -1,14 +1,16 @@
 /*
  * Relógio server-side das instâncias ociosas.
  *
- * Nesta fase o worker reivindica, em transação, cada intervalo sem lease e o
- * anexa ao snapshot como `workerElapsedMs`. O cliente aplica esse intervalo
- * usando o mesmo motor completo ao reconectar. A fase de combate autoritativo
- * substituirá advanceInstanceClock sem alterar locks/checkpoints desta fila.
+ * O worker reivindica, em transação, cada intervalo sem lease. Snapshots
+ * autoritativos são avançados pelo mesmo motor dos ticks online; snapshots
+ * legados ainda recebem `workerElapsedMs` para migração segura no cliente.
  */
 "use strict";
+const {advanceAuthorityState}=require("./authoritative_engine");
 
 function advanceInstanceClock(serialized,elapsed,checkpointAt){
+  const authoritative=advanceAuthorityState(serialized,elapsed,checkpointAt);
+  if(authoritative)return authoritative;
   let state=serialized;
   if(typeof state==="string")state=JSON.parse(state);
   if(!state||typeof state!=="object"||Array.isArray(state))throw new Error("invalid instance state");

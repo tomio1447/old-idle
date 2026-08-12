@@ -209,7 +209,9 @@ function resumeIdleInstance(session){
         const residual=Math.max(0,Date.now()-session.savedAt);
         const elapsed=workerElapsed+residual,startAt=session.savedAt-workerElapsed;
         delete session.workerElapsedMs;delete session.workerCheckpointAt;
-        const result=advanceIdleInstance(elapsed,startAt,{silent:true});
+        // Snapshot autoritativo já foi avançado pelo mesmo núcleo no servidor.
+        const result=session.authority?{processed:elapsed,ended:!!session.authority.ended,
+          reason:session.authority.terminalReason||null}:advanceIdleInstance(elapsed,startAt,{silent:true});
         if(G.combat){persistActiveInstance();G.inCity=false;}
         resolve({resumed:!!G.combat,ended:result.ended,elapsed});
       }catch(error){
@@ -250,7 +252,11 @@ function save() {
         if(summary){summary.voc=G.p.voc;summary.level=G.p.level;summary.sex=G.p.sex;
           summary.outfit=G.p.outfit;summary.snapshot=G.p;accountCharacterCacheWrite(cache);}
       }
-      if(G.combat&&G.combat.players&&G.combat.players.length>1&&
+      // Durante combate online, /api/instance/tick já grava todos os membros
+      // na mesma transação. Um autosave paralelo criaria conflito de versão.
+      if(G.combat&&typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()){
+        // persistActiveInstance acima já enfileirou o checkpoint visual.
+      }else if(G.combat&&G.combat.players&&G.combat.players.length>1&&
          typeof partyCombatSaveAll==="function")partyCombatSaveAll();
       else if (tok && cid) accountSaveCharacter(tok, cid, G.p).catch(() => {});
     }
@@ -2277,11 +2283,37 @@ document.addEventListener("visibilitychange", async () => {
  *     não morrer nem perder progresso.
  */
 let _bgTimer = null;
+let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0;
+function onlineAuthorityCombat(){
+  return !!(G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+    typeof accountTickInstance==="function");
+}
+function applyOnlineAuthorityState(descriptor,terminalReason){
+  if(!descriptor||!G.combat)return false;
+  const fresh={hunt:G.combat.hunt,huntMap:G.combat.huntMap,boss:G.combat.boss};
+  G.combat=restoreCombatSessionState(fresh,descriptor);G.combat._authorityDescriptor=descriptor;
+  if(terminalReason){
+    clearInstanceSession(terminalReason,true);
+    setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+  }
+  if(typeof renderAll==="function")renderAll();return true;
+}
+function requestOnlineAuthorityTick(){
+  if(ONLINE_AUTH_TICKING||!onlineAuthorityCombat()||
+     (typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()))return;
+  ONLINE_AUTH_TICKING=true;
+  accountTickInstance(sessionToken()).then((result)=>{
+    if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
+  }).catch(()=>{}).finally(()=>{ONLINE_AUTH_TICKING=false;});
+}
 function startBackgroundTick() {
   if (_bgTimer) return;
   _bgTimer = setInterval(() => {
     if (!G || !G.p || G.paused || !G.combat || !document.hidden) return;
     if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation())return;
+    if(onlineAuthorityCombat()){
+      requestOnlineAuthorityTick();G.bgLast=Date.now();G.bgAcc=0;return;
+    }
     const agora=Date.now(),last=G.bgLast||agora,carry=G.bgAcc||0;
     const elapsed=Math.max(0,agora-last)+carry;
     const result=advanceIdleInstance(elapsed,last-carry,{silent:true});
@@ -2331,6 +2363,10 @@ function loop(ts) {
   if (typeof avatarTick === "function") avatarTick(G.p, Date.now());
 
   if (!G.paused && G.combat) {
+    if(onlineAuthorityCombat()){
+      ONLINE_AUTH_ACC+=dt;
+      if(ONLINE_AUTH_ACC>=500){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
+    }else{
     const before = G.p.level;
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     G.tickAcc += dt;
@@ -2408,6 +2444,7 @@ function loop(ts) {
       }
       renderInventory(G.p);
       renderLootPouch(G.p);
+    }
     }
   }
 

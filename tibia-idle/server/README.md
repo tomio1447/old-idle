@@ -74,7 +74,8 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/lease/takeover` | `{ token, holder_id }` | Transferência explícita de controle |
 | POST | `/api/lease/release` | `{ token, holder_id, lease_token }` | Libera no logout explícito |
 | GET | `/api/instance` | Bearer token | Carrega a hunt/boss ativa da conta |
-| PUT | `/api/instance` | `{ token, lease, expected_version, state }` | Cria/atualiza snapshot versionado |
+| PUT | `/api/instance` | `{ token, lease, expected_version, state }` | Cria/atualiza apenas snapshot visual/versionado |
+| POST | `/api/instance/tick` | `{ token, lease, expected_version? }` | Executa combate/progressão autoritativos |
 | POST | `/api/instance/end` | `{ token, lease, instance_id, expected_version, reason }` | Persiste condição terminal |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
 | PUT | `/api/characters/:id` | `{ token, holder_id, lease_token, expected_version, level, data, ... }` | Save otimista protegido pelo lease |
@@ -125,21 +126,36 @@ a aplicação e usar um banco/disco persistente.
 - Fechar o navegador não encerra a linha ativa. O próximo holder retoma a mesma
   instância e processa o intervalo desde `saved_at`
 
+**Combate e progressão autoritativos:**
+- `authoritative_engine.js` é o único núcleo online que decide dano, cura,
+  consumo de supplies, XP, level, kills, loot, gold, morte, bless e cooldowns
+- O navegador envia somente heartbeat/tick e renderiza snapshots. Seus valores
+  locais de level, XP, skills, gold, HP ou mobs não substituem a autoridade
+- Criação de personagem normaliza progressão e starter kit no servidor. Saves
+  comuns preservam campos protegidos; ferramentas Admin continuam explícitas
+- Monstros, HP, dano, armor, XP e loot vêm dos JSONs oficiais do servidor. RNG
+  xorshift persistido por instância torna worker e ticks online reproduzíveis
+- Ticks usam cursor server-side: spam de requests não gera ações/recompensas
+  extras. Instância e personagens são atualizados na mesma transação
+- Morte normal consome bless sem XP; wipe compra a bless e retorna se houver
+  gold. No PVP, monstros retiram 3% e raid de jogador 8%
+- Boss cooldown começa no relógio do servidor e a morte atualiza kills/reward.
+  Goshnar's Greed mantém imunidade, adds prioritários, 30% de Greedbeast,
+  janela vulnerável de 40s e dano do boss reduzido em 30% na fase imune
+
 **Worker idle sem navegador:**
 - `instance_worker.js` varre instâncias ativas e só reivindica tempo quando o
   lease da conta expirou ou foi liberado; aba oculta com lease nunca duplica
   processamento com o worker
 - Cada claim bloqueia lease e instância na mesma ordem transacional, avança no
-  no máximo 1 hora por claim e move `worker_cursor_at`. Múltiplos processos não podem
-  consumir o mesmo intervalo
-- O tempo reivindicado fica em `workerElapsedMs` dentro do snapshot. Ao voltar,
-  o cliente soma apenas o residual após o checkpoint e aplica o intervalo uma
-  vez no motor completo; o próximo save limpa o carry
-- Cursor, carry, total auditável e versão sobrevivem a restart. Tombstones
+  máximo 1 hora e move `worker_cursor_at`. Múltiplos processos não consomem o
+  mesmo intervalo
+- Snapshots autoritativos são combatidos e materializados no próprio worker;
+  apenas snapshots legados usam `workerElapsedMs` para migração no cliente
+- Cursor, estado, total auditável e versão sobrevivem a restart. Tombstones
   `ended` nunca entram na fila
-- Esta fase torna o relógio offline server-side e exatamente uma vez. A próxima
-  fase moverá também combate, recompensas e morte para execução autoritativa
-  no servidor, reutilizando os mesmos locks/checkpoints
+- O mesmo claim agora chama o núcleo autoritativo: fechar o navegador continua
+  combate, recompensas, morte e progressão sem depender de código do cliente
 
 **Integridade dos saves online:**
 - Cada personagem possui `save_version`; o cliente deve enviar a versão que

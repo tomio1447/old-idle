@@ -7,7 +7,7 @@
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
  *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
  *   GET/PUT /api/instance                              -> instância persistente
- *   worker server-side                                 -> relógio idle sem browser
+ *   worker + /api/instance/tick                       -> combate autoritativo
  *   POST /api/characters { token, name, voc, data }    -> cria personagem
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
@@ -30,6 +30,7 @@ const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
+const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats } = require("./authoritative_engine");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -69,6 +70,7 @@ function send(res, code, obj) {
 function newToken() {
   return crypto.randomBytes(32).toString("hex");
 }
+function cloneJson(value){return JSON.parse(JSON.stringify(value||{}));}
 function leaseHash(secret){return crypto.createHash("sha256").update(String(secret||"")).digest("hex");}
 function validLeaseHolder(holder){return /^[A-Za-z0-9_-]{8,80}$/.test(String(holder||""));}
 function leaseBody(secret,row,resumed){
@@ -256,6 +258,20 @@ async function me(db, token) {
   };
 }
 
+function sanitizeNewPlayer(payload,voc){
+  const safe={id:payload.id,name:payload.name,voc,sex:payload.sex==="female"?"female":"male",
+    outfit:payload.outfit&&typeof payload.outfit==="object"?payload.outfit:null,
+    config:payload.config&&typeof payload.config==="object"?payload.config:{},level:1,exp:0,
+    skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
+    skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
+    kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},rewardChest:[],bag:{},ammo:{},
+    supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600};
+  if(voc==="knight")safe.equip={weapon:{item:"sword",count:1},shield:{item:"wooden-shield",count:1}};
+  else if(voc==="paladin")safe.equip={weapon:{item:"bow",count:1},shield:{item:"quiver",count:1},ammo:{item:"simple-arrow",count:1}};
+  else if(voc==="monk")safe.equip={weapon:{item:"simple-jo-staff",count:1}};
+  const stats=maxStats(safe);safe.hp=stats.hp;safe.mp=stats.mp;return safe;
+}
+
 async function createCharacter(db, body) {
   const token = body.token;
   const acc = await db.findAccountByToken(token);
@@ -266,6 +282,7 @@ async function createCharacter(db, body) {
   const voc = String(body.voc || "none");
   let payload=body.data;if(typeof payload==="string"){try{payload=JSON.parse(payload);}catch(e){payload={};}}
   payload=payload&&typeof payload==="object"?payload:{};
+  payload=sanitizeNewPlayer(Object.assign({},payload,{name}),voc);
   const existingCharacters=await db.charactersOf(acc.id);
   const c = await db.createCharacter(acc.id, name, voc, 1, JSON.stringify(payload));
   payload.id=String(c.id);payload.name=c.name;payload.voc=voc;payload.level=1;
@@ -310,10 +327,15 @@ function prepareCharacterSave(c,body){
   const wrongName=!!(payload.name&&String(payload.name).toLowerCase()!==String(c.name).toLowerCase());
   if(wrongId||wrongName)return {error:{code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
     msg:"Save bloqueado: os dados pertencem a outro personagem."}}};
-  // Nome e vocação-base são identidades imutáveis. Promotion vive no JSON.
+  // Identidade e progressão são server-owned. Saves comuns só persistem
+  // preferências/visual; XP, skills, gold, kills, bless e cooldowns vêm das
+  // transações autoritativas (ou das ferramentas Admin explícitas).
+  let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
+  const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
+    "bosses","missions","lootPouch","rewardChest","blessed","deathLog"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name,voc:c.voc});
-  const level=Math.max(1,Math.floor(Number(body.level)||Number(c.level)||1));
-  payload.level=level;
+  for(const key of protectedKeys)if(current[key]!==undefined)payload[key]=cloneJson(current[key]);
+  const level=Math.max(1,Number(c.level)||1);payload.level=level;
   return {save:{
     id:Number(c.id),expectedVersion:Number(body.expected_version),voc:c.voc,level,
     data:JSON.stringify(payload),extra:{
@@ -323,6 +345,15 @@ function prepareCharacterSave(c,body){
       max_mp:Math.max(0,Math.floor(Number(body.maxMp)||0)),
     },
   }};
+}
+
+async function enforceAuthoritativeProgress(db,accountId,prepared){
+  const row=await db.instanceGet(accountId);if(!row||row.status!=="active")return prepared;
+  let descriptor=null;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
+  const player=protectedPlayer(descriptor,prepared.save.id);if(!player)return prepared;
+  prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
+  prepared.save.voc=String(player.voc||prepared.save.voc);prepared.save.extra.hp=Math.max(0,Number(player.hp)||0);
+  prepared.save.extra.mp=Math.max(0,Number(player.mp)||0);return prepared;
 }
 
 function saveConflictResponse(result){
@@ -343,7 +374,8 @@ async function saveCharacter(db, body, id) {
     msg:"Atualize o personagem antes de salvar."}};
   const c = await db.findCharacter(id);
   if (!c || Number(c.account_id) !== Number(acc.id)) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
-  const prepared=prepareCharacterSave(c,body);if(prepared.error)return prepared.error;
+  let prepared=prepareCharacterSave(c,body);if(prepared.error)return prepared.error;
+  prepared=await enforceAuthoritativeProgress(db,acc.id,prepared);
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result);
@@ -374,8 +406,8 @@ async function savePartyCharacters(db,body){
     const c=await db.findCharacter(Number(entry.id));
     if(!c||Number(c.account_id)!==Number(acc.id))return {code:403,body:{ok:false,error:"PARTY_CHARACTER_NOT_OWNED",
       msg:"A party contém um personagem que não pertence à sua conta."}};
-    const prepared=prepareCharacterSave(c,entry);if(prepared.error)return prepared.error;
-    saves.push(prepared.save);
+    let prepared=prepareCharacterSave(c,entry);if(prepared.error)return prepared.error;
+    prepared=await enforceAuthoritativeProgress(db,acc.id,prepared);saves.push(prepared.save);
   }
   if(new Set(saves.map((save)=>save.id)).size!==saves.length)
     return {code:400,body:{ok:false,error:"INVALID_PARTY_SAVE",msg:"Personagem duplicado no save da party."}};
@@ -437,7 +469,13 @@ async function prepareInstanceState(db,acc,input){
     if((player.id!==undefined&&String(player.id)!==String(c.id))||
        (player.name&&String(player.name).toLowerCase()!==String(c.name).toLowerCase()))
       return {error:{code:409,body:{ok:false,error:"INSTANCE_IDENTITY_MISMATCH",msg:"Snapshot contém identidade cruzada"}}};
-    rows.push(c);
+    let canonical={};try{canonical=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
+    canonical=Object.assign({},canonical,{id:String(c.id),name:c.name,voc:c.voc,level:Number(c.level)||1});
+    if(Number(c.hp)>0)canonical.hp=Number(c.hp);if(Number(c.mp)>=0)canonical.mp=Number(c.mp);
+    member.p=canonical;member.hp=canonical.hp;member.mp=canonical.mp;rows.push(c);
+  }
+  if(input.state&&Array.isArray(input.state.players))for(const ent of input.state.players){
+    const member=members.find((m)=>String(m.id)===String(ent&&ent.id));if(member)ent.p=cloneJson(member.p);
   }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
@@ -476,8 +514,14 @@ async function saveInstance(db,body){
   if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"INSTANCE_VERSION_REQUIRED",msg:"Atualize a instância antes de salvar"}};
   const prepared=await prepareInstanceState(db,acc,body.state);if(prepared.error)return prepared.error;
   let instanceId=String(body.instance_id||"");
-  if(expected===0)instanceId=newToken();
-  else if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
+  if(expected===0){
+    instanceId=newToken();prepared.state=initializeAuthority(prepared.state,instanceId,Date.now());
+  }else{
+    if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
+    const current=await db.instanceGet(acc.id);let currentState=null;
+    try{currentState=current&&current.state?(typeof current.state==="string"?JSON.parse(current.state):current.state):null;}catch(e){}
+    if(currentState&&currentState.authority){prepared.state.authority=currentState.authority;prepared.state=materializeAuthority(prepared.state);}
+  }
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const result=await db.instanceSave(acc.id,instanceId,expected,prepared.meta,JSON.stringify(prepared.state),lease);
   if(!result.ok){
@@ -487,6 +531,21 @@ async function saveInstance(db,body){
   }
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
+async function tickInstance(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const expected=body.expected_version===undefined||body.expected_version===null?null:Number(body.expected_version);
+  if(expected!==null&&(!Number.isSafeInteger(expected)||expected<1))
+    return {code:400,body:{ok:false,error:"INVALID_INSTANCE_VERSION",msg:"Versão inválida"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.instanceAuthorityTick(acc.id,expected,Date.now(),3600000,advanceAuthorityState,lease);
+  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_NOT_ACTIVE"?410:409,
+    body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+  return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
+    instance:instanceSummary(result.instance,true),characters:(result.characters||[]).map(accountCharacterSummary)}};
+}
+
 async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -962,6 +1021,9 @@ async function main() {
       }
       if(req.method==="PUT"&&url==="/api/instance"){
         const r=await saveInstance(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/tick"){
+        const r=await tickInstance(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/end"){
         const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);

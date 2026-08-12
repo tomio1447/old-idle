@@ -57,9 +57,10 @@ function state(c,marker){return {v:1,savedAt:Date.now(),kind:"hunt",huntId:"rats
   await new Promise((resolve)=>setTimeout(resolve,850));
   r=await getInstance(token);
   const claimed=r.data.instance;
-  must(claimed.version>1&&claimed.workerTotalMs>0&&claimed.state.workerElapsedMs>0,
+  must(claimed.version>1&&claimed.workerTotalMs>0&&
+    (claimed.state.workerElapsedMs>0||(claimed.state.authority&&claimed.state.authority.clock>0)),
     "worker não reivindicou tempo após expiração do lease");
-  const firstCarry=claimed.state.workerElapsedMs,firstCursor=claimed.workerCursorAt;
+  const firstCarry=claimed.workerTotalMs,firstCursor=claimed.workerCursorAt;
 
   leaseResponse=await acquire(token,"workerhold02");fields=lease(leaseResponse);
   const leasedVersion=(await getInstance(token)).data.instance.version;
@@ -74,21 +75,23 @@ function state(c,marker){return {v:1,savedAt:Date.now(),kind:"hunt",huntId:"rats
   r=await put("/api/instance",Object.assign({token,instance_id:id,expected_version:leasedVersion,state:applied},fields));
   must(r.status===200,"cliente não conseguiu confirmar checkpoint do worker");
   const afterApply=await getInstance(token);
-  must(!afterApply.data.instance.state.workerElapsedMs&&afterApply.data.instance.workerTotalMs>=firstCarry,
-    "checkpoint aplicado não limpou carry mantendo auditoria acumulada");
+  must(!afterApply.data.instance.state.workerElapsedMs&&afterApply.data.instance.workerTotalMs>=firstCarry&&
+    (!claimed.state.authority||afterApply.data.instance.state.authority),
+    "checkpoint aplicado não limpou carry/autoridade mantendo auditoria acumulada");
 
   await post("/api/lease/release",Object.assign({token},fields));
   await new Promise((resolve)=>setTimeout(resolve,420));
   const beforeRestart=(await getInstance(token)).data.instance;
-  must(beforeRestart.state.workerElapsedMs>0&&beforeRestart.workerCursorAt>firstCursor,
+  const beforeProgress=beforeRestart.state.authority?beforeRestart.state.authority.clock:beforeRestart.state.workerElapsedMs;
+  must(beforeProgress>0&&beforeRestart.workerCursorAt>firstCursor,
     "worker não retomou após release/fechamento");
   await stop();await start();
   await new Promise((resolve)=>setTimeout(resolve,320));
   const afterRestart=(await getInstance(token)).data.instance;
-  must(afterRestart.state.workerElapsedMs>=beforeRestart.state.workerElapsedMs&&
-    afterRestart.workerCursorAt>=beforeRestart.workerCursorAt,
+  const afterProgress=afterRestart.state.authority?afterRestart.state.authority.clock:afterRestart.state.workerElapsedMs;
+  must(afterProgress>=beforeProgress&&afterRestart.workerCursorAt>=beforeRestart.workerCursorAt,
     "restart perdeu cursor/carry ou voltou no tempo");
-  must(afterRestart.state.workerElapsedMs<beforeRestart.state.workerElapsedMs+2000,
+  must(afterRestart.workerTotalMs<beforeRestart.workerTotalMs+2000,
     "restart reprocessou todo o intervalo histórico");
 
   leaseResponse=await acquire(token,"workerhold03");fields=lease(leaseResponse);
