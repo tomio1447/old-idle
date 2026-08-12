@@ -528,7 +528,7 @@ function partyIsLeader() {
 /* O personagem atual é MEMBRO (não líder) de uma party online? */
 function partyIsMember() {
   const st = partyOnlineState();
-  return !!(st && !st.isLeader);
+  return !!(st && st.isMember && !st.isLeader);
 }
 
 /* Jogadores em party NÃO podem entrar em hunt/boss — só cidade ou área de
