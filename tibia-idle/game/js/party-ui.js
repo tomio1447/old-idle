@@ -273,6 +273,21 @@ function renderPartyPanel(p) {
     }));
 }
 
+/* Atualiza somente barras já montadas. Não toca em innerHTML, portraits,
+ * handlers ou botão LEAVE HUNT — evita piscar a cada snapshot SSE/tick. */
+function updatePartyPanelLiveBars(){
+  if(typeof G==="undefined"||!G||!G.combat||!Array.isArray(G.combat.players))return;
+  const body=$("#party-panel-body");if(!body)return;
+  for(const ent of G.combat.players){
+    if(!ent||!ent.p)continue;const id=String(ent.id||ent.p.id||""),row=body.querySelector(`[data-party-char="${id}"]`);
+    if(!row)continue;const bars=row.querySelectorAll(".party-pbar"),max=typeof maxStats==="function"?maxStats(ent.p):{hp:ent.p.hp||1,mp:ent.p.mp||0};
+    const values=[[Math.max(0,ent.p.hp||0),Math.max(1,max.hp||1)],[Math.max(0,ent.p.mp||0),Math.max(0,max.mp||0)]];
+    for(let i=0;i<Math.min(2,bars.length);i++){const current=values[i][0],maximum=values[i][1],fill=bars[i].querySelector(".fill"),label=bars[i].querySelector(".val");
+      if(fill)fill.style.width=(maximum>0?Math.max(0,Math.min(100,current*100/maximum)):0)+"%";
+      if(label)label.textContent=fmtFull(Math.floor(current))+"/"+fmtFull(maximum);}
+  }
+}
+
 function openPartyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }

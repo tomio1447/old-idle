@@ -5,7 +5,19 @@ const DATA=path.join(__dirname,"..","game","data");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const ITEMS=read("items.json");
-const HUNTS=read("hunts.json");
+const HUNTS=Object.assign(read("hunts.json"),{
+  "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"]},
+  "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"]},
+  "timira-room":{monsters:["timira-the-many-headed"]},
+  "library-fire":{monsters:["burning-book","rage-squid","biting-book"]},
+  "library-energy":{monsters:["energetic-book","biting-book"]},
+  "library-ice":{monsters:["icecold-book","squid-warden","ink-blob"]},
+  "library-earth":{monsters:["cursed-book","biting-book"]},
+  "dark-thais":{monsters:["many-faces","knight-s-apparition","paladin-s-apparition","sorcerer-s-apparition","druid-s-apparition","monk-s-apparition","distorted-phantom"]},
+  "rotten-wasteland":{monsters:["rotten-golem","branchy-crawler","mould-phantom"]},
+  "goshnars-greed-room":{monsters:["goshnar-s-greed","dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"]},
+  "goshnars-hatred-room":{monsters:["goshnar-s-hatred","dreadful-harvester","hateful-soul"]},
+});
 const VOC={none:{hp:5,mp:5},knight:{hp:15,mp:5},paladin:{hp:10,mp:15},druid:{hp:5,mp:30},sorcerer:{hp:5,mp:30},monk:{hp:10,mp:10}};
 const START_HP=185,START_MP=5,FULL_STAMINA=42*3600;
 function clone(v){return JSON.parse(JSON.stringify(v||{}));}
@@ -45,9 +57,14 @@ function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
   p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=FULL_STAMINA;
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));return p;}
-function makeMob(auth,slug,boss,id){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));return {id:id||("srv-"+(auth.nextMobId++)),slug:String(slug),boss:!!boss,
-  hp:Math.max(1,Number(def.hp)||1),maxHp:Math.max(1,Number(def.hp)||1),armor:greedAdd?0:Math.max(0,Number(def.armor)||0),damage:Math.max(0,Number(def.damage)||0),
-  exp:Math.max(0,Number(def.exp)||0),attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};}
+function makeMob(auth,slug,boss,id){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
+  const sequence=Math.max(1,Number(auth.nextMobId)||1);auth.nextMobId=sequence+1;const mob={id:id||("srv-"+sequence),slug:String(slug),boss:!!boss,
+    hp:Math.max(1,Number(def.hp)||1),maxHp:Math.max(1,Number(def.hp)||1),armor:greedAdd?0:Math.max(0,Number(def.armor)||0),damage:Math.max(0,Number(def.damage)||0),
+    exp:Math.max(0,Number(def.exp)||0),attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};
+  const points=auth.spawnPoints||[],point=points.length?points[(sequence-1)%points.length]:null;
+  if(point)Object.assign(mob,point);else if(auth.gridW&&auth.gridH){mob.cx=Math.floor(auth.gridW/2);mob.cy=Math.floor(auth.gridH/2);
+    mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;}
+  return mob;}
 function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),receivers=alive.length?alive:players,share=Math.floor(mob.exp/Math.max(1,receivers.length));
   for(const item of receivers){addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;}
   const leader=players[0]&&players[0].p;if(!leader)return;
@@ -97,12 +114,30 @@ function step(auth,now){if(auth.ended)return;
     if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;}}}
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
 }
-function initializeAuthority(descriptor,instanceId,now){const combat=descriptor.state||{},visual=Array.isArray(combat.mobs)?combat.mobs:[];
+function initializeAuthority(descriptor,instanceId,now){
+  const combat=descriptor.state||{},active=Array.isArray(combat.mobs)?combat.mobs:[];
+  // HARD hunts begin with teleport-blink entries in pendingSpawns; the local
+  // array `mobs` is still empty when the first server snapshot is created.
+  // Promote those pending definitions into the authoritative initial wave.
+  const pending=Array.isArray(combat.pendingSpawns)?combat.pendingSpawns.map((sp)=>{
+    if(!sp||!sp.mob)return null;const mob=Object.assign({},sp.mob,{cx:sp.cx,cy:sp.cy});
+    const w=Number(combat.gridW)||30,h=Number(combat.gridH)||30;
+    if(mob.x===undefined)mob.x=(Number(sp.cx)+.5)/w;if(mob.y===undefined)mob.y=(Number(sp.cy)+.5)/h;
+    return mob;
+  }).filter(Boolean):[];
+  const seen=new Set(),visual=active.concat(pending).filter((mob)=>{
+    const key=String(mob&&mob.id||mob&&mob.slug||"");if(!key||seen.has(key))return false;seen.add(key);return true;});
+  combat.mobs=visual;combat.pendingSpawns=[];
   const players=(descriptor.members||[]).map((m)=>({id:String(m.id),p:canonicalPlayer(m),attackAcc:0,downUntil:0}));
   const auth={v:1,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
-    huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",players,mobs:[],spawnPool:[],pack:Math.max(1,visual.length||3),
+    huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",players,mobs:[],spawnPool:[],spawnPoints:[],
+    gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,pack:Math.max(1,visual.length||3),
     stats:{kills:0,exp:0,loot:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
-  for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""));if(m){auth.mobs.push(m);if(!m.boss&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);}}
+  for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""));if(m){
+      for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
+      if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
+        auth.spawnPoints.push({cx:Number(old.cx),cy:Number(old.cy),x:Number(old.x),y:Number(old.y),sx:Number(old.sx),sy:Number(old.sy)});
+      auth.mobs.push(m);if(!m.boss&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);}}
   if(!auth.spawnPool.length){const hunt=HUNTS[auth.huntId];for(const slug of (hunt&&hunt.monsters)||[])if(monsterDef(slug))auth.spawnPool.push(slug);}
   if(descriptor.kind==="boss"){const boss=auth.mobs.find((m)=>m.boss)||auth.mobs[0];if(boss)boss.boss=true;const leader=players[0]&&players[0].p;
     if(leader&&auth.bossId){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].lastFight=auth.clock;}
@@ -114,15 +149,29 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
   descriptor.state.players=auth.players.map((item)=>Object.assign({},oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},{id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0}));
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
-  descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},oldMobs.find((x)=>String(x.id)===String(m.id))||{},{id:m.id,slug:m.slug,boss:m.boss,
-    greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),def:m.def}));
+  descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},
+    {cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
+    {id:m.id,slug:m.slug,boss:m.boss,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
+      hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),def:m.def}));
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
   descriptor.savedAt=auth.clock;return descriptor;
 }
 function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=typeof serialized==="string"?JSON.parse(serialized):clone(serialized);
-  const auth=descriptor.authority;if(!auth)return null;const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
+  const auth=descriptor.authority;if(!auth)return null;
+  // Migra instâncias HARD criadas pela versão que ignorava pendingSpawns.
+  if(!auth.spawnPool.length&&descriptor.state&&Array.isArray(descriptor.state.pendingSpawns)){
+    const recoverMobs=auth.mobs.length===0;auth.spawnPoints=auth.spawnPoints||[];
+    auth.gridW=Number(auth.gridW)||Number(descriptor.state.gridW)||30;auth.gridH=Number(auth.gridH)||Number(descriptor.state.gridH)||30;
+    for(const sp of descriptor.state.pendingSpawns){const old=sp&&sp.mob,slug=String(old&&old.slug||"");if(!monsterDef(slug))continue;
+      if(!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
+      const point={cx:Number(sp.cx),cy:Number(sp.cy),x:(Number(sp.cx)+.5)/auth.gridW,y:(Number(sp.cy)+.5)/auth.gridH};
+      if(!auth.spawnPoints.some((p)=>p.cx===point.cx&&p.cy===point.cy))auth.spawnPoints.push(point);
+      if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""));if(mob){Object.assign(mob,point);auth.mobs.push(mob);}}}
+    descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.spawnPool.length||1);
+  }
+  const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
   const requested=Math.floor(total/1000),steps=Math.min(250000,requested);auth.carryMs=total-steps*1000;
   for(let i=0;i<steps;i++){auth.clock+=1000;step(auth,auth.clock);if(auth.ended){auth.carryMs=0;break;}}
   auth.clock=Math.max(auth.clock,Number(checkpointAt)||auth.clock);descriptor=materializeAuthority(descriptor);

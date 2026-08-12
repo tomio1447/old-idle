@@ -2,7 +2,8 @@
 "use strict";
 const fs=require("fs"),os=require("os"),path=require("path"),{spawn}=require("child_process");
 const root=path.join(__dirname,".."),serverDir=path.join(root,"server"),dataDir=fs.mkdtempSync(path.join(os.tmpdir(),"cobra-online-"));
-const client=fs.readFileSync(path.join(root,"game","js","account-client.js"),"utf8"),game=fs.readFileSync(path.join(root,"game","js","game.js"),"utf8");
+const client=fs.readFileSync(path.join(root,"game","js","account-client.js"),"utf8"),game=fs.readFileSync(path.join(root,"game","js","game.js"),"utf8"),
+  partyUi=fs.readFileSync(path.join(root,"game","js","party-ui.js"),"utf8");
 const port=40700+(process.pid%200),base=`http://127.0.0.1:${port}`;let child,logs="";
 function must(v,m){if(!v)throw Error(m);}async function request(route,options){const response=await fetch(base+route,options),text=await response.text();let data;
   try{data=JSON.parse(text);}catch(e){data=text;}return {status:response.status,data};}
@@ -48,7 +49,10 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   const applyStart=game.indexOf("function applyOnlineAuthorityState"),applyEnd=game.indexOf("\nfunction requestOnlineAuthorityTick",applyStart);
   must(client.includes("ACCOUNT_PARTY_ZONE_QUEUE")&&game.includes('key==="_authorityDescriptor"')&&
     !game.includes("G.combat._authorityDescriptor=descriptor")&&game.includes("G.huntEntryPendingToken")&&
-    !game.slice(applyStart,applyEnd).includes("renderAll()"),
-    "cliente não serializa zona/remove ciclo/protege entrada ou ainda pisca UI");
+    !game.slice(applyStart,applyEnd).includes("renderAll()")&&
+    !game.slice(applyStart,applyEnd).includes("renderPartyPanel(")&&
+    game.includes('if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now())')&&
+    partyUi.includes("function updatePartyPanelLiveBars")&&client.includes("data.holderId===ACCOUNT_LEASE_PAGE_HOLDER"),
+    "cliente não preserva movimento/membros ou ainda reconstrói UI a cada tick");
   console.log("OK: Cobra online salva instância e transita party sem HTTP 400/ciclo JSON.");
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{if(child)child.kill("SIGTERM");fs.rmSync(dataDir,{recursive:true,force:true});});

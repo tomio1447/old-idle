@@ -320,14 +320,21 @@ async function accountStartSync(token){
   const url=ACCOUNT_API_URL+"/api/sync/events?ticket="+encodeURIComponent(ticket.data.ticket)+
     "&lastEventId="+encodeURIComponent(accountSyncCursor());
   const source=new EventSource(url);ACCOUNT_SYNC.source=source;
+  const renewTicket=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;
+    try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
+    clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),250);};
   const receive=(type,event)=>{
     if(event.lastEventId)accountSyncCursor(event.lastEventId);let data={};try{data=JSON.parse(event.data||"{}");}catch(e){}
+    if(type==="sync-expired"){accountSyncDispatch("disconnected",{reason:data.reason||"ticket-expired"});renewTicket();return;}
     if(type==="lease"){
       if(data.holderId&&data.holderId!==ACCOUNT_LEASE_PAGE_HOLDER&&ACCOUNT_LEASE.active&&data.action!=="release")
         accountLeaseMarkLost("Outra aba ou dispositivo assumiu o controle.");
       accountSyncDispatch("lease",data);return;
     }
     if(type==="instance"){
+      // O holder que originou tick/checkpoint já recebe o snapshot na resposta
+      // HTTP. Ignorar o eco SSE evita aplicar a mesma versão duas vezes.
+      if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
       if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
       accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,{event:data}));});return;
     }
@@ -338,11 +345,11 @@ async function accountStartSync(token){
       accountSyncDispatch("party",data);
     }
   };
-  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required"])
+  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired"])
     source.addEventListener(type,(event)=>receive(type,event));
   source.addEventListener("ready",(event)=>{if(event.lastEventId)accountSyncCursor(event.lastEventId);ACCOUNT_SYNC.errors=0;accountSyncStopFallback();accountSyncDispatch("connected",{});});
   source.onopen=()=>{ACCOUNT_SYNC.errors=0;accountSyncStopFallback();};
-  source.onerror=()=>{if(ACCOUNT_SYNC.stopped)return;ACCOUNT_SYNC.errors++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.errors});
+  source.onerror=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;ACCOUNT_SYNC.errors++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.errors});
     if(ACCOUNT_SYNC.errors>=3){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
       clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),Math.min(15000,1000*ACCOUNT_SYNC.errors));}};
   return true;

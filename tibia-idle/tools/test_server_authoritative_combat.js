@@ -38,6 +38,22 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
 
   const basePlayer={id:1,name:"Deterministic",voc:"knight",level:20,exp:1000,hp:300,mp:50,gold:5000,
     skills:{sword:40,axe:10,club:10,dist:10,fist:10,shield:30},equip:{weapon:{item:"sword"}},supplies:{},lootPouch:{},kills:{},bosses:{}};
+  const pendingDesc=directDescriptor(basePlayer);pendingDesc.state.mobs=[];
+  pendingDesc.state.pendingSpawns=[{mob:{id:"pending-rat",slug:"rat"},cx:8,cy:6,startedAt:1000}];
+  const pendingAuth=engine.initializeAuthority(pendingDesc,"0".repeat(64),1000);
+  must(pendingAuth.authority.mobs.length===1&&pendingAuth.authority.spawnPool[0]==="rat"&&
+    pendingAuth.state.mobs[0].cx===8,"pendingSpawns de HARD hunt não virou wave autoritativa");
+  const emptyHard=directDescriptor(basePlayer);emptyHard.huntId="mota-extension";emptyHard.state.mobs=[];
+  const hardAuth=engine.initializeAuthority(emptyHard,"8".repeat(64),1000);
+  must(hardAuth.authority.spawnPool.includes("floating-savant")&&hardAuth.authority.spawnPool.includes("fury"),
+    "catálogo server-side não recupera MOTA sem pendingSpawns");
+  const legacy=engine.initializeAuthority(directDescriptor(basePlayer),"9".repeat(64),1000);
+  legacy.authority.mobs=[];legacy.authority.spawnPool=[];legacy.state.mobs=[];
+  legacy.state.pendingSpawns=[{mob:{id:"legacy-rat",slug:"rat"},cx:9,cy:7,startedAt:1000}];
+  const migrated=JSON.parse(engine.advanceAuthorityState(JSON.stringify(legacy),1000,2000).state);
+  must(migrated.authority.spawnPool[0]==="rat"&&migrated.authority.mobs.length>0&&
+    migrated.state.mobs[0].cx===9&&migrated.state.mobs[0].cy===7,
+    "instância HARD antiga sem pool/posição não foi autorrecuperada");
   const d1=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
   const d2=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
   const once=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),10000,11000).state);

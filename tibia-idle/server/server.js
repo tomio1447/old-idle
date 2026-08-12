@@ -75,6 +75,11 @@ function hardenedHeaders(res){const headers={
   "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
   "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
 };if(res._corsOrigin){headers["Access-Control-Allow-Origin"]=res._corsOrigin;headers.Vary="Origin";}return headers;}
+function sendSyncExpired(res,reason){
+  res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8",
+    "Cache-Control":"no-cache, no-transform","Connection":"close","X-Accel-Buffering":"no"}));
+  res.end(`event: sync-expired\ndata: ${JSON.stringify({reason:reason||"ticket-invalid"})}\n\n`);
+}
 function send(res, code, obj) {
   const body = JSON.stringify(obj),headers=Object.assign(hardenedHeaders(res),{
     "Content-Type": "application/json; charset=utf-8","Content-Length": Buffer.byteLength(body),
@@ -273,7 +278,9 @@ async function login(db, body) {
     return { code: 401, body: { ok: false, msg: "Login ou senha inválidos" } };
   }
   const token = newToken();
-  // persiste a sessão (MySQL) — no JSON store fica em memória
+  // Novo login transfere a sessão e encerra streams/tickets anteriores antes
+  // de persistir o token substituto.
+  if(SYNC_BUS)SYNC_BUS.revokeAccount(acc.id);
   if (typeof db.createSession === "function") await db.createSession(acc.id,token,Date.now()+SESSION_TTL_MS);
   const characters = await db.charactersOf(acc.id);
   return {
@@ -318,6 +325,7 @@ function sanitizeNewPlayer(payload,voc){
 
 async function logout(db,body){
   const token=String(body.token||"");if(!token)return {code:400,body:{ok:false,msg:"Token obrigatório"}};
+  if(SYNC_BUS)SYNC_BUS.revokeSession(token);
   if(typeof db.revokeSession==="function")await db.revokeSession(token);
   return {code:200,body:{ok:true}};
 }
@@ -602,7 +610,7 @@ async function saveInstance(db,body){
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,
     result.instance.version,expected===0?"created":"checkpoint",result.instance,expected===0);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,source:expected===0?"created":"checkpoint"});
+    status:result.instance.status,source:expected===0?"created":"checkpoint",holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 async function tickInstance(db,body){
@@ -626,7 +634,7 @@ async function tickInstance(db,body){
     await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
       result.terminalReason||"tick",result.instance,!!result.terminalReason);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",
+    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
     instance:instanceSummary(result.instance,true),characters:(result.characters||[]).map(accountCharacterSummary)}};
@@ -648,7 +656,8 @@ async function endInstance(db,body){
   if(typeof db.snapshotAdd==="function"&&result.instance)await db.snapshotAdd(acc.id,"instance",
     result.instance.instance_id,result.instance.version,"ended-"+reason,result.instance,true);
   publishSync(acc.id,"instance",{id:result.instance&&result.instance.instance_id||id,
-    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end"});
+    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end",
+    holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 
@@ -1095,13 +1104,13 @@ async function main() {
     try {
       if(req.method==="GET"&&url==="/api/sync/events"){
         const q=new URL(req.url,"http://x").searchParams,ticket=SYNC_BUS.consumeTicket(q.get("ticket"));
-        if(!ticket)return send(res,401,{ok:false,error:"SYNC_TICKET_INVALID",msg:"Ticket de sincronização inválido"});
-        const acc=await db.findAccountByToken(ticket.sessionToken);
-        if(!acc||Number(acc.id)!==Number(ticket.accountId))return send(res,401,{ok:false,error:"SYNC_SESSION_EXPIRED",msg:"Sessão expirada"});
+        // Ticket expirado/restart é um evento SSE normal, não HTTP 401. O
+        // cliente renova imediatamente sem poluir o console do navegador.
+        if(!ticket)return sendSyncExpired(res,"ticket-invalid");
         res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",
           "Connection":"keep-alive","X-Accel-Buffering":"no"}));
         res.write("retry: 1500\n\n");
-        SYNC_BUS.subscribe(acc.id,res,req.headers["last-event-id"]||q.get("lastEventId"),ticket.expiresAt);return;
+        SYNC_BUS.subscribe(ticket.accountId,res,req.headers["last-event-id"]||q.get("lastEventId"),ticket.expiresAt,ticket.sessionToken);return;
       }
       if(req.method==="POST"&&url==="/api/sync/ticket"){
         const limited=rateLimit(req,"sync-ticket",60,60000);if(limited)return send(res,limited.code,limited.body);
