@@ -602,7 +602,7 @@ async function saveInstance(db,body){
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,
     result.instance.version,expected===0?"created":"checkpoint",result.instance,expected===0);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,source:expected===0?"created":"checkpoint"});
+    status:result.instance.status,source:expected===0?"created":"checkpoint",holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 async function tickInstance(db,body){
@@ -626,7 +626,7 @@ async function tickInstance(db,body){
     await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
       result.terminalReason||"tick",result.instance,!!result.terminalReason);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",
+    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
     instance:instanceSummary(result.instance,true),characters:(result.characters||[]).map(accountCharacterSummary)}};
@@ -648,7 +648,8 @@ async function endInstance(db,body){
   if(typeof db.snapshotAdd==="function"&&result.instance)await db.snapshotAdd(acc.id,"instance",
     result.instance.instance_id,result.instance.version,"ended-"+reason,result.instance,true);
   publishSync(acc.id,"instance",{id:result.instance&&result.instance.instance_id||id,
-    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end"});
+    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end",
+    holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 

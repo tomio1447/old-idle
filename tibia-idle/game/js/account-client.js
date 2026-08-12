@@ -328,6 +328,9 @@ async function accountStartSync(token){
       accountSyncDispatch("lease",data);return;
     }
     if(type==="instance"){
+      // O holder que originou tick/checkpoint já recebe o snapshot na resposta
+      // HTTP. Ignorar o eco SSE evita aplicar a mesma versão duas vezes.
+      if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
       if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
       accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,{event:data}));});return;
     }

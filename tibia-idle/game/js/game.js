@@ -2324,17 +2324,25 @@ function onlineAuthorityCombat(){
 }
 function applyOnlineAuthorityState(descriptor,terminalReason){
   if(!descriptor||!G.combat)return false;
-  const fresh={hunt:G.combat.hunt,huntMap:G.combat.huntMap,boss:G.combat.boss};
+  const previous=G.combat,fresh={hunt:previous.hunt,huntMap:previous.huntMap,boss:previous.boss};
+  // Movimento é predição visual local; dano/HP/recompensas vêm do servidor.
+  // Preserve coordenadas interpoladas para snapshots de 500ms não puxarem
+  // personagens e mobs de volta ao último checkpoint.
+  const visualKeys=["cx","cy","x","y","sx","sy","dir","moving","frame","walkT","nextStepAt","path","pathIndex","moveFrom","moveTo","moveProgress"];
+  const visualPlayers=new Map((previous.players||[]).map((ent)=>[String(ent.id||ent.p&&ent.p.id),ent]));
+  const visualMobs=new Map((previous.mobs||[]).map((mob)=>[String(mob.id),mob]));
   // `descriptor.state` passa a ser o próprio G.combat. Nunca reanexe o
   // descriptor dentro dele: isso cria state -> combat -> descriptor -> state.
   G.combat=restoreCombatSessionState(fresh,descriptor);
+  for(const ent of G.combat.players||[]){const old=visualPlayers.get(String(ent.id||ent.p&&ent.p.id));
+    if(old)for(const key of visualKeys)if(old[key]!==undefined)ent[key]=old[key];}
+  for(const mob of G.combat.mobs||[]){const old=visualMobs.get(String(mob.id));
+    if(old)for(const key of visualKeys)if(old[key]!==undefined)mob[key]=old[key];}
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);
   }
-  // O loop já redesenha canvas/HUD. A renderização completa aqui recriava
-  // painéis e modais a cada snapshot (2×/s), causando o piscar da interface.
-  if(typeof renderPartyPanel==="function")renderPartyPanel(G.p);
+  // O loop redesenha canvas/HUD; não reconstrua party/modal a cada snapshot.
   return true;
 }
 function requestOnlineAuthorityTick(){
@@ -2417,6 +2425,11 @@ function loop(ts) {
     if(onlineAuthorityCombat()){
       ONLINE_AUTH_ACC+=dt;
       if(ONLINE_AUTH_ACC>=500){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
+      // Somente interpolação/pathfinding visual roda no cliente online.
+      if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
+      else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
+      G._partyHudAt=(G._partyHudAt||0)+dt;
+      if(G._partyHudAt>=120){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{
     const before = G.p.level;
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
