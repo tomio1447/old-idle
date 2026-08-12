@@ -1361,28 +1361,67 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 };
 
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */
-function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
+function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent, mode) {
   if (!ent || !p || (!until && !permanent)) return;
   const px = (ent.x || 0) * W, py = (ent.y || 0) * H;
-  const sex = String(p.sex || p.gender || "").toLowerCase();
-  const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
-  const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
   const ts = tilePx(W);
-  if (corpse && corpse.complete && corpse.naturalWidth) {
-    const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
-    ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
+  if (mode !== "timer") {
+    const sex = String(p.sex || p.gender || "").toLowerCase();
+    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
+    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
+    if (corpse && corpse.complete && corpse.naturalWidth) {
+      const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
+      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
+    }
   }
-  // Na Scarlett o corpse permanece até o fim da luta, sem contador/revive.
-  if (permanent) return;
+  // Body fica na camada do chão; contador continua como overlay de UI.
+  if (mode === "body" || permanent) return;
   const now = Date.now(), left = Math.max(0, Math.ceil((until - now) / 1000));
   const total = Math.max(1, until - (startedAt || now));
   const elapsed = Math.max(0, Math.min(1, 1 - (until - now) / total));
   ctx.font = "bold 16px Verdana"; ctx.textAlign = "center";
   ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
   ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
-  const ly = py - ts * .85 - elapsed * ts * .7;
+  const ly = py - ts * .85 - elapsed * ts * 0.7;
   ctx.strokeText(left + "s", px, ly); ctx.fillStyle = "#ff3b30"; ctx.fillText(left + "s", px, ly);
   ctx.globalAlpha = 1;
+}
+
+function drawCombatPlayerCorpses(ctx,W,H,combat,player,mode){
+  if(!combat)return;let usedParty=false;
+  if(Array.isArray(combat.players)&&combat.players.length){
+    for(const ent of combat.players){
+      if(!ent||!ent.p||ent.p.hp>0||(!ent.reviveAt&&!ent.permadead))continue;
+      const pos=ent.deathPos?Object.assign({},ent,ent.deathPos):ent;
+      drawPlayerCorpse(ctx,W,H,pos,ent.p,ent.reviveAt||combat.deadUntil,
+        ent.downedAt||combat.deadAt,!!ent.permadead,mode);usedParty=true;
+    }
+  }
+  if(combat.dead&&!usedParty){
+    const pos=combat.deathPos||{x:.18,y:.62,dir:"e"};
+    drawPlayerCorpse(ctx,W,H,pos,player,combat.deadUntil,combat.deadAt,false,mode);
+  }
+}
+
+/* Poeira oficial visual dos monstros Influenced/Fiendish. O glow sozinho
+ * não criava partículas visíveis; estes pontos orbitam e sobem no sprite. */
+function drawSinisterDust(ctx,ent,cx,cy,tile,now){
+  if(!ent||( !ent.influenced&&!ent.fiendish))return;
+  const text=String(ent.id||ent.slug||"mob");let seed=0;
+  for(let i=0;i<text.length;i++)seed=(seed*31+text.charCodeAt(i))>>>0;
+  const count=ent.fiendish?12:Math.min(9,4+Math.max(1,ent.sinisterStacks||1));
+  const color=ent.fiendish?"#c85bff":"#43b9ff";
+  ctx.save();ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=Math.max(3,tile*.12);
+  for(let i=0;i<count;i++){
+    const phase=((now/1500)+i/count+((seed>>>(i%16))&15)/17)%1;
+    const angle=(seed%360)*Math.PI/180+i*2.399+phase*3.2;
+    const radius=tile*(.23+.17*Math.sin(phase*Math.PI));
+    const x=cx+Math.cos(angle)*radius;
+    const y=cy-tile*(.12+phase*1.18)+Math.sin(angle)*tile*.12;
+    const size=Math.max(2,tile*(ent.fiendish?.075:.055))*(.65+phase*.45);
+    ctx.globalAlpha=.3+.7*Math.sin(phase*Math.PI);ctx.fillRect(x-size/2,y-size/2,size,size);
+  }
+  ctx.restore();ctx.globalAlpha=1;
 }
 
 Renderer.prototype.draw = function (combat, player, dt) {
@@ -1439,6 +1478,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.fillRect(0, 0, W, H);
     }
   }
+
+  // Corpse de player é item do chão: somente o ground fica abaixo dele;
+  // criaturas, paredes, efeitos e labels são desenhados por cima.
+  drawCombatPlayerCorpses(ctx,W,H,combat,player,"body");
 
   // Iluminação/vinheta dinâmica desativada: o OTC/Canary aplica luz por
   // criatura e por tile. Sem esse sistema completo, a vinheta escurecia
@@ -1507,8 +1550,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.save(); ctx.shadowColor = ent.fiendish ? '#c14bff' : '#39a8ff'; ctx.shadowBlur = ent.fiendish ? 22 : 18;
       ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
     }
-    if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
-    else ctx.drawImage(img, origin.x, origin.y, w, h);
+    if (e.kind === "monster") {
+      drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
+      drawSinisterDust(ctx,ent,cx,cy,tile,Date.now());
+    } else ctx.drawImage(img, origin.x, origin.y, w, h);
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
 
@@ -1617,46 +1662,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // Membros inconscientes da party: não renderizam outfit/IA; ficam como
-  // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
-  if (combat && !combat.dead && combat.players) {
-    for (const ent of combat.players) {
-      if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
-      const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
-      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
-    }
-  }
-
-  // --- morte do player: corpse oficial Canary e contador de respawn.
-  if (combat && combat.dead) {
-    const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
-    const px = dp.x * W, py = dp.y * H;
-    // Canary Player::getLookCorpse(): masculino 4240, feminino 4247.
-    const sex = String((player && (player.sex || player.gender)) || "").toLowerCase();
-    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
-    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
-    const ts = tilePx(W);
-    if (corpse && corpse.complete && corpse.naturalWidth) {
-      const scale = ts / 32;
-      const cw = corpse.naturalWidth * scale, ch = corpse.naturalHeight * scale;
-      // Item corpse ancora pelo pé/base do SQM, como o client.
-      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
-    }
-    const now = Date.now();
-    const left = Math.max(0, Math.ceil((combat.deadUntil - now) / 1000));
-    const total = Math.max(1, combat.deadUntil - (combat.deadAt || now));
-    const elapsed = Math.max(0, Math.min(1, 1 - (combat.deadUntil - now) / total));
-    // Contador vermelho sobe continuamente sobre o corpo até o respawn.
-    const labelY = py - ts * 0.85 - elapsed * ts * 0.7;
-    ctx.font = "bold 16px Verdana";
-    ctx.textAlign = "center";
-    ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
-    ctx.strokeText(left + "s", px, labelY);
-    ctx.fillStyle = "#ff3b30";
-    ctx.fillText(left + "s", px, labelY);
-    ctx.globalAlpha = 1;
-  }
+  // Contadores de revive permanecem como UI, acima de toda a cena.
+  drawCombatPlayerCorpses(ctx,W,H,combat,player,"timer");
 
   // --- sem hunt
   if (!combat) {

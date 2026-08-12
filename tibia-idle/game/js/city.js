@@ -690,10 +690,9 @@ function bankWithdraw(p, amount) {
 }
 
 /* Templo: cura completa gratuita + compra de blessing */
-const BLESS_PRICE_BASE = 2000;
-
 function blessPrice(p) {
-  return Math.floor(BLESS_PRICE_BASE + p.level * 200);
+  return typeof blessingPriceForLevel === "function"
+    ? blessingPriceForLevel(p && p.level) : Math.max(1, p.level || 1) * 1000;
 }
 
 function buyBlessing(p) {
@@ -706,7 +705,7 @@ function buyBlessing(p) {
   if (typeof vipFullBless === "function" && vipFullBless()) {
     p.blessed = 7;   // 7 bênçãos completas
   }
-  return { ok: true, msg: "Você foi abençoado! A próxima morte custará muito menos." };
+  return { ok: true, msg: "Você foi abençoado! A bênção será consumida na próxima morte." };
 }
 
 /* Estalagem: restaura stamina pagando por hora */

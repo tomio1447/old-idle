@@ -1944,11 +1944,12 @@ function drainEvents() {
         }
         break;
       }
-      case "death":
-        addLog("death", `Você morreu! Perdeu ${fmtFull(e.exp)} xp e ${fmtFull(e.gold)} gp.` +
-          (e.blessed ? " <span style='color:#9ce84a'>A bênção protegeu você.</span>" : ""));
-        toast("Você morreu!", "death");
+      case "death": {
+        const xp=e.exp?` Perdeu <b>${fmtFull(e.exp)} XP</b> (${Math.round((e.rate||0)*100)}% PVP).`:" Nenhuma experiência foi perdida.";
+        addLog("death",`Você morreu e perdeu a bless.${xp}`);
+        toast("Você morreu — bless perdida!", "death");
         break;
+      }
 
       case "spawn-blink": {
         // Piscada do teleporte no ponto de respawn (o monstro ainda nao
@@ -2090,21 +2091,71 @@ function reviveDownedParty(c,now,silent){
   return revived;
 }
 
-function idleInstanceEndReason(c){
-  if(!c)return null;
+function idleInstanceEndReason(c,now){
+  if(!c)return null;now=now||Date.now();
   const members=combatSessionParticipants(c);
   if(members.some((ent)=>ent.p&&Number(ent.p.stamina)<=0))return "stamina";
-  if(c.dead||members.length&&members.every((ent)=>!ent.p||ent.p.hp<=0))return "party-wipe";
+  // O corpse/countdown permanece visível até deadUntil. Só então a party
+  // compra as bênçãos e retorna à hunt ou é enviada ao templo.
+  if(c.dead)return now>=(c.deadUntil||0)?"party-wipe":null;
+  if(members.length&&members.every((ent)=>!ent.p||ent.p.hp<=0))return "party-wipe";
   return null;
+}
+
+function partyWipeBlessCost(c){
+  return combatSessionParticipants(c).reduce((sum,ent)=>sum+(
+    typeof blessingPriceForLevel==="function"?blessingPriceForLevel(ent.p&&ent.p.level):
+      Math.max(1,(ent.p&&ent.p.level)||1)*1000),0);
+}
+
+function cleanupEncounterState(c){
+  if(typeof scarlettBossCleanup==="function")scarlettBossCleanup(c);
+  if(typeof greedBossCleanup==="function")greedBossCleanup(c);
+  if(typeof hatredBossCleanup==="function")hatredBossCleanup(c);
+}
+
+/* Compra automaticamente a bless de todos e recria a mesma instância.
+ * Retorna false sem descontar nada quando o saldo não cobre a party toda. */
+function returnPartyToInstanceAfterWipe(c,cost,silent){
+  const members=combatSessionParticipants(c),activeId=G.p&&G.p.id;
+  if(!members.length||!G.p||G.p.gold<cost||!spendGold(G.p,cost))return false;
+  const fullBless=typeof vipFullBless==="function"&&vipFullBless();
+  for(const ent of members){
+    if(!ent.p)continue;const mx=maxStats(ent.p);ent.p.hp=mx.hp;ent.p.mp=mx.mp;
+    ent.p.blessed=fullBless?7:true;ent.reviveAt=0;ent.downedAt=0;ent.deathPos=null;
+    ent.permadead=false;ent.moving=false;
+    if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(ent.p);
+  }
+  const leader=(members[0]&&members[0].p)||G.p;
+  const huntId=c.huntId,mode=c.instanceMode||"non-pvp",boss=c.boss||null;
+  cleanupEncounterState(c);leader.hunt=boss?null:huntId;leader.instanceMode=boss?"boss":mode;G.p=leader;
+  const next=boss?newBossCombat(leader,boss):newCombat(leader,huntId,mode);
+  if(!boss)spawnWave(next,leader);
+  G.combat=next;G.inCity=false;
+  if(next.players&&activeId){
+    const active=next.players.find(ent=>String(ent.id)===String(activeId));
+    if(active&&active.p){next.player=active;G.p=active.p;}
+  }
+  try{if(G.p&&G.p.id)localStorage.setItem(ACTIVE_CHARACTER_KEY,String(G.p.id));}catch(e){}
+  if(typeof persistActiveInstance==="function")persistActiveInstance();
+  if(typeof save==="function")save();
+  if(!silent&&typeof addLog==="function")addLog("info",`Party reviveu com bless por <b>${fmtFull(cost)} gp</b> e retornou à instância.`);
+  if(!silent&&typeof toast==="function")toast("Party abençoada — retornando à hunt!","level");
+  if(!silent&&typeof renderAll==="function")renderAll();
+  return true;
 }
 
 function finishIdleInstance(reason,silent){
   const c=G.combat;if(!c||c.instanceFinished)return false;
+  if(reason==="party-wipe"){
+    const cost=partyWipeBlessCost(c);
+    if(returnPartyToInstanceAfterWipe(c,cost,silent))return true;
+    if(!silent&&typeof addLog==="function")addLog("death",`Party sem ${fmtFull(cost)} gp para as bênçãos — retorno ao templo.`);
+  }
   c.instanceFinished=true;clearInstanceSession();
-  if(!silent&&typeof addLog==="function")addLog("death",reason==="stamina"
-    ?"A stamina de um membro acabou. A instância foi encerrada."
-    :"Toda a party caiu. A instância foi encerrada.");
-  // O templo é checkpoint seguro e regenera toda a party.
+  if(reason==="stamina"&&!silent&&typeof addLog==="function")
+    addLog("death","A stamina de um membro acabou. A instância foi encerrada.");
+  // O templo é checkpoint seguro e regenera toda a party, sem devolver bless.
   stopHunt(!!silent);save();return true;
 }
 
@@ -2125,7 +2176,7 @@ function advanceIdleInstance(elapsed,startAt,options){
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,step,cursor);
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,step);
       remaining-=step;processed+=step;
-      reason=idleInstanceEndReason(G.combat);
+      reason=idleInstanceEndReason(G.combat,cursor);
       if(reason)break;
       reviveDownedParty(G.combat,cursor,true);
       G.combat.events.length=0;
@@ -2241,7 +2292,7 @@ function loop(ts) {
     while (G.tickAcc >= TICK) {
       combatTick(G.combat, G.p, TICK, Date.now());
       G.tickAcc -= TICK;
-      const endedBecause=idleInstanceEndReason(G.combat);
+      const endedBecause=idleInstanceEndReason(G.combat,Date.now());
       if(endedBecause){finishIdleInstance(endedBecause,false);return;}
     }
     reviveDownedParty(G.combat,Date.now(),false);

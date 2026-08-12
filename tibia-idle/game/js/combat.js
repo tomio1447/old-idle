@@ -3717,6 +3717,29 @@ function actorPos(c, p) {
   };
 }
 
+function combatDeathCause(c) {
+  return c && c.deathCause === "raid" ? "raid" : "monster";
+}
+
+/* Toda morte consome a bless. Fora de PVP nunca há perda de experiência;
+ * em PVP a penalidade é 3% para monstros e 8% para raid de outro jogador. */
+function applyCharacterDeathConsequences(c, p, cause) {
+  if (!p) return {exp:0,rate:0,cause:"monster",blessed:false};
+  cause = cause || combatDeathCause(c);
+  const hadBless = !!p.blessed;
+  p.blessed = false;
+  p.deaths = (p.deaths || 0) + 1;
+  if (c && c.stats) c.stats.deaths = (c.stats.deaths || 0) + 1;
+  const isPvp = !!(c && (c.pvp || c.instanceMode === "pvp"));
+  const rate = isPvp ? (cause === "raid" ? .08 : .03) : 0;
+  const lostExp = Math.floor((p.exp || 0) * rate);
+  if (lostExp > 0) {
+    p.exp = Math.max(0, p.exp - lostExp);
+    while (p.level > 1 && p.exp < expForLevel(p.level)) p.level--;
+  }
+  return {exp:lostExp,rate,cause,blessed:hadBless};
+}
+
 /* Tick dos aliados (membros da party que NÃO são o personagem ativo):
  * roda o HELPER COMPLETO de cada um com a configuração DELE — cura (spell
  * + potion), mana, cura de condition, anel/amuleto emergencial, magic
@@ -3732,10 +3755,10 @@ function partyTickAllies(c, now, dt) {
         ent.downedAt = now;
         ent.reviveAt = now + ((typeof reviveTime === "function") ? reviveTime() : 30000);
         ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
-        ent.p.deaths = (ent.p.deaths || 0) + 1;
+        const loss=applyCharacterDeathConsequences(c,ent.p);
         if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
         if (typeof addLog === "function") {
-          addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round((typeof reviveTime === "function" ? reviveTime() : 30000) / 1000)}s.`);
+          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${loss.exp?` e ${loss.exp} XP`:""} — renasce no local em ${Math.round((typeof reviveTime === "function" ? reviveTime() : 30000) / 1000)}s.`);
         }
       }
       continue;
@@ -3800,17 +3823,17 @@ function partyHelperTick(c, ent, now, dt) {
 function partyHandleDown(c, fallenP, now) {
   now=now||Date.now();
   const ent = c.players.find((e) => e.p === fallenP) || c.player;
+  let consequence=null;
   if (ent) {
     if (!ent.reviveAt) {
       ent.downedAt = now;
       ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
       ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       ent.p.hp = 0;
-      c.stats.deaths++;
-      ent.p.deaths = (ent.p.deaths || 0) + 1;
+      consequence=applyCharacterDeathConsequences(c,ent.p);
       if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
       if (typeof addLog === "function") {
-        addLog("death", `<b>${ent.name}</b> caiu em combate — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
+        addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${consequence.exp?` e ${consequence.exp} XP`:""} — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
       }
     }
   }
@@ -3825,10 +3848,11 @@ function partyHandleDown(c, fallenP, now) {
     if(typeof G!=="undefined"&&G&&G._idleCatchup){c.player=proximo;G.p=proximo.p;}
     else if(typeof partyCombatSwitchTo === "function")partyCombatSwitchTo(proximo.id);
   }
+  return consequence;
 }
 
 /* Morte do jogador: perde exp, skills e renasce no local */
-function playerDeath(c, p) {
+function playerDeath(c, p, consequencesApplied) {
   // Wheel of Destiny — Gift of Life (estágio VERDE): revive no local, sem
   // perder XP/ouro, 1 vez a cada 2h (como a magia do jogo).
   if (typeof wheelStage === "function" && p.wheel && wheelStage(p, "green") >= 1) {
@@ -3844,31 +3868,17 @@ function playerDeath(c, p) {
     }
   }
 
-  p.deaths++;
-  c.stats.deaths++;
-  // a bencao do templo reduz muito a perda e e consumida na morte
-  // Full Bless (7 bênçãos VIP): perda ainda menor
-  const blessCount = p.blessed === true ? 1 : (p.blessed || 0);
-  const blessed = blessCount > 0;
-  const fullBless = blessCount >= 7;
-  const expRate = fullBless ? 0.005 : blessed ? 0.015 : 0.07;
-  const goldRate = fullBless ? 0.01 : blessed ? 0.02 : 0.1;
-  if (blessed) p.blessed = false;
-  const lostExp = Math.floor(p.exp * expRate);
-  p.exp = Math.max(0, p.exp - lostExp);
-  while (p.level > 1 && p.exp < expForLevel(p.level)) p.level--;
-  const lostGold = Math.floor(p.gold * goldRate);
-  spendGold(p, lostGold);
+  const loss = consequencesApplied || applyCharacterDeathConsequences(c,p);
   // Guarda posição da morte para o corpse
   const deathX = c.player ? c.player.x : 0.18;
   const deathY = c.player ? c.player.y : 0.62;
   const deathDir = c.player ? c.player.dir : "e";
   c.dead = true;
-  c.deadAt = Date.now();
+  c.deadAt = c._tickNow || Date.now();
   c.deadUntil = c.deadAt + reviveTime();   // 30s normal, 15s VIP
   c.deathPos = { x: deathX, y: deathY, dir: deathDir };
-  c.events.push({ t: "death", exp: lostExp, gold: lostGold, blessed: blessed });
-  return { exp: lostExp, gold: lostGold };
+  c.events.push({ t:"death",exp:loss.exp,gold:0,blessed:loss.blessed,cause:loss.cause,rate:loss.rate });
+  return loss;
 }
 
 /* --------------------------------------------------- tick principal */
@@ -4059,9 +4069,9 @@ function combatTick(c, p, dt, now) {
     }
     if (c.players && c.players.length > 1 &&
         typeof partyHandleDown === "function") {
-      partyHandleDown(c, p, now);
+      const consequence=partyHandleDown(c, p, now);
       const vivos = c.players.some((e) => e.p && e.p.hp > 0);
-      if (!vivos) { playerDeath(c, p); return; }
+      if (!vivos) { playerDeath(c, p, consequence || {exp:0,rate:0,cause:combatDeathCause(c),blessed:false}); return; }
     } else {
       playerDeath(c, p); return;
     }

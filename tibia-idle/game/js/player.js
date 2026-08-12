@@ -56,6 +56,16 @@ function vocationName(p) {
   return VOCATIONS[voc] ? VOCATIONS[voc].name : voc;
 }
 
+/* Preço da bênção por faixa de level:
+ *   1–120   = 50% do level × 1000
+ *   121–399 = 70% do level × 1000
+ *   400+    = 100% do level × 1000 */
+function blessingPriceForLevel(level) {
+  level = Math.max(1, Math.floor(Number(level) || 1));
+  const pricePerLevel = level <= 120 ? 500 : level < 400 ? 700 : 1000;
+  return level * pricePerLevel;
+}
+
 function newPlayer(name, voc, sex) {
   const p = {
     name: name || "Sem Nome",
