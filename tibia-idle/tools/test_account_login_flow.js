@@ -17,7 +17,7 @@ must(js.includes("function openRegisterModal()")&&js.includes('id="acc-new-login
   js.includes('msg("Conta criada! Informe sua senha para entrar.")'),
   "criação de conta não abre/fecha modal voltando ao login");
 must(js.includes("function showPicker(token, account, characters)")&&
-  js.includes('class="account-character-card"')&&js.includes('data-account-portrait')&&
+  js.includes('class="account-character-card ${c.identityMismatch')&&js.includes('data-account-portrait')&&
   js.includes('Level ${Number(c.level) || 1} · ${vocationName'),
   "picker não mostra cards com outfit, level e vocação");
 const picker=js.indexOf("function showPicker(token, account, characters)");

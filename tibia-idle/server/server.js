@@ -148,10 +148,15 @@ function accountCharacterSummary(character) {
     try { data = JSON.parse(data); } catch (e) { data = {}; }
   }
   data = data && typeof data === "object" ? data : {};
+  const wrongId=data.id!==undefined&&String(data.id)!==String(character.id);
+  const wrongName=!!(data.name&&String(data.name).toLowerCase()!==String(character.name).toLowerCase());
   return {
     id:character.id, name:character.name, voc:character.voc,
     level:character.level, sex:data.sex || "male", promoted:!!data.promoted,
     outfit:data.outfit && typeof data.outfit === "object" ? data.outfit : null,
+    identityMismatch:wrongId||wrongName,
+    dataOwnerId:wrongId?String(data.id):null,
+    dataOwnerName:wrongName?String(data.name):null,
   };
 }
 
@@ -228,10 +233,19 @@ async function saveCharacter(db, body, id) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   const c = await db.findCharacter(id);
-  if (!c || c.account_id !== acc.id) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
-  const voc = body.voc || c.voc;
+  if (!c || Number(c.account_id) !== Number(acc.id)) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
+  let payload=body.data;
+  if(typeof payload==="string"){try{payload=JSON.parse(payload);}catch(e){payload={};}}
+  payload=payload&&typeof payload==="object"?payload:{};
+  const wrongId=payload.id!==undefined&&String(payload.id)!==String(c.id);
+  const wrongName=!!(payload.name&&String(payload.name).toLowerCase()!==String(c.name).toLowerCase());
+  if(wrongId||wrongName)return {code:409,body:{ok:false,error:"CHARACTER_IDENTITY_MISMATCH",
+    msg:"Save bloqueado: os dados pertencem a outro personagem."}};
+  // Nome e vocação-base são identidades imutáveis. Promotion vive no JSON.
+  payload.id=String(c.id);payload.name=c.name;payload.voc=c.voc;
+  const voc = c.voc;
   const level = body.level || c.level;
-  const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data || {});
+  const data = JSON.stringify(payload);
   // snapshots de vida/mana (o cliente manda hp/mp/maxHp/maxMp a cada save) —
   // usados pelo painel de party para mostrar as barras dos membros
   await db.updateCharacter(id, voc, level, data, {
@@ -241,6 +255,28 @@ async function saveCharacter(db, body, id) {
     max_mp: Math.max(0, Math.floor(Number(body.maxMp) || 0)),
   });
   return { code: 200, body: { ok: true } };
+}
+
+/* Recuperação explícita para saves cruzados por versões antigas. Recria os
+ * dados enviados pelo dono, mas mantém id/nome/level da linha correta. */
+async function repairCharacterIdentity(db,body,id){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const c=await db.findCharacter(id);
+  if(!c||Number(c.account_id)!==Number(acc.id))return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const allowed=["knight","paladin","druid","sorcerer","monk"];
+  const voc=allowed.includes(String(body.voc))?String(body.voc):null;
+  if(!voc)return {code:400,body:{ok:false,msg:"Vocação inválida"}};
+  let payload=body.data;
+  if(typeof payload==="string"){try{payload=JSON.parse(payload);}catch(e){payload={};}}
+  payload=payload&&typeof payload==="object"?payload:{};
+  payload.id=String(c.id);payload.name=c.name;payload.voc=voc;payload.level=c.level;
+  await db.updateCharacter(id,voc,c.level,JSON.stringify(payload),{
+    hp:Math.max(0,Math.floor(Number(payload.hp)||0)),mp:Math.max(0,Math.floor(Number(payload.mp)||0)),
+    max_hp:Math.max(0,Math.floor(Number(body.maxHp)||0)),max_mp:Math.max(0,Math.floor(Number(body.maxMp)||0)),
+  });
+  const updated=await db.findCharacter(id);
+  return {code:200,body:{ok:true,character:accountCharacterSummary(updated)}};
 }
 
 async function coins(db, body) {
@@ -659,7 +695,13 @@ async function main() {
         const r = await loadCharacter(db, token, id);
         return send(res, r.code, r.body);
       }
-      if (req.method === "PUT" && url.startsWith("/api/characters/")) {
+      if (req.method === "PUT" && /^\/api\/characters\/\d+\/repair$/.test(url)) {
+        const id=Number(url.split("/")[3]);
+        const body=await readBody(req);
+        const r=await repairCharacterIdentity(db,body,id);
+        return send(res,r.code,r.body);
+      }
+      if (req.method === "PUT" && /^\/api\/characters\/\d+$/.test(url)) {
         const id = Number(url.split("/").pop());
         const body = await readBody(req);
         const r = await saveCharacter(db, body, id);

@@ -87,6 +87,18 @@ async function post(route, body) {
     JSON.stringify(created.data.character.outfit.colors) === JSON.stringify([12,34,56,78]),
     'criação/resumo visual do personagem falhou');
   const id = created.data.character.id;
+  const crossed = await request('/api/characters/' + id, {
+    method:'PUT',headers:{'content-type':'application/json'},
+    body:JSON.stringify({token,voc:'paladin',level:500,data:JSON.stringify({id:'999',name:'Other',voc:'paladin'})}),
+  });
+  must(crossed.status===409&&crossed.data.error==='CHARACTER_IDENTITY_MISMATCH',
+    'servidor aceitou save pertencente a outro personagem');
+  const repaired = await request('/api/characters/' + id + '/repair', {
+    method:'PUT',headers:{'content-type':'application/json'},
+    body:JSON.stringify({token,voc:'druid',data:JSON.stringify({id:String(id),name:'Server Test',voc:'druid',sex:'female',hp:500,outfit:{type:'summoner',colors:[12,34,56,78]}})}),
+  });
+  must(repaired.status===200&&repaired.data.ok&&repaired.data.character.voc==='druid',
+    'rota de reparo de identidade falhou');
   const accountSummary = await request('/api/me', {headers:{authorization:'Bearer ' + token}});
   const summaryChar = accountSummary.data.characters.find(c => Number(c.id) === Number(id));
   must(summaryChar && summaryChar.sex === 'female' && summaryChar.outfit &&

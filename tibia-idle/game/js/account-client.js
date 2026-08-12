@@ -116,6 +116,14 @@ async function accountSaveCharacter(token, charId, p) {
   return r.data.ok;
 }
 
+async function accountRepairCharacter(token,charId,voc,data){
+  const max=typeof maxStats==="function"?maxStats(data):{hp:0,mp:0};
+  const r=await _api("PUT","/api/characters/"+encodeURIComponent(charId)+"/repair",{
+    token,voc,data:JSON.stringify(data||{}),maxHp:max.hp||0,maxMp:max.mp||0,
+  });
+  return r.data.ok?{ok:true,character:r.data.character}:{ok:false,msg:r.data.msg||"Falha ao reparar personagem"};
+}
+
 async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });
   return r.data.ok ? { ok: true, coins: r.data.coins } : { ok: false };
