@@ -88,8 +88,6 @@
  // Bossroom de Hatred usa uma cópia runtime própria para manter cache/zonas
  // independentes da hunt Rotten Wasteland, embora ambas venham do OTBM
  // entregue. A FOV registra o retângulo informado sem recortar o mundo 30×30.
- // TEMPORARIO: arena do Goshnar Hatred desativada para testes
- /*
  GAMEDATA.hunts['goshnars-hatred-room']={
   name:"Goshnar's Hatred Room",hidden:true,level:400,minLevel:400,
   cat:'boss-room',scene:'soulwar',otbm:'goshnars_hatred',otbmFloor:7,
@@ -101,7 +99,6 @@
   avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
   respawn:1,pack:1,
  };
- */
 
  // Bossroom integral: o mundo 30×30 mantém todo o piso z=7. A célula G
  // exclusiva posiciona Goshnar no norte; os adds usam as demais células
