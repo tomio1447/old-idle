@@ -2647,8 +2647,8 @@ function bindControls() {
       window.GLOBAL_IDLE_SERVER_CONFIG) || {};
     const account = sessionAccount();
     const onlineMode = typeof accountApiConfigured === "function" && accountApiConfigured();
-    const adminAllowed = !!serverCfg.testServer || !onlineMode ||
-      !!(account && account.role === "admin");
+    // Mesmo no test server, somente contas com role admin recebem o painel.
+    const adminAllowed = !onlineMode || !!(account && account.role === "admin");
     if (typeof openAdmin === "function" && adminAllowed) {
       btnAdmin.addEventListener("click", () => openAdmin());
     } else {
@@ -3170,7 +3170,7 @@ function initAccountLogin() {
         if(typeof ensureWardrobe==="function")ensureWardrobe(draft);
         const result = await accountCreateCharacter(token, name, selVoc, draft);
         if (!result.ok) { status.textContent = result.msg || "Falha ao criar personagem."; return; }
-        if(typeof accountAddCoins==="function")await accountAddCoins(token,25);
+        // O bônus inicial de TC é transação exclusiva do servidor.
         const refreshed = await accountMe(token);
         if (refreshed.ok) showPicker(token, refreshed.account, refreshed.characters || []);
         else showPicker(token, account, characters.concat([Object.assign({}, result.character, {

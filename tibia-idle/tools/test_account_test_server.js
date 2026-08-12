@@ -57,9 +57,9 @@ async function post(route, body) {
   must(accountClient.includes('ACCOUNT_SERVER_CONFIG.online') &&
        accountClient.includes('function accountLoadCharacter'),
     'frontend não ativa API/carregamento completo automaticamente');
-  must(gameClient.includes('window.GLOBAL_IDLE_SERVER_CONFIG') &&
-       gameClient.includes('serverCfg.testServer'),
-    'Admin não está condicionado/liberado no test server');
+  must(gameClient.includes('account.role === "admin"') &&
+       !gameClient.includes('const adminAllowed = !!serverCfg.testServer'),
+    'painel Admin não está restrito à role admin');
 
   const registered = await post('/api/register', {login:'friend',password:'friend'});
   must(registered.status === 201 && registered.data.ok,
@@ -70,6 +70,18 @@ async function post(route, body) {
   const friendLogin = await post('/api/login', {login:'friend',password:'friend'});
   must(friendLogin.status === 200 && friendLogin.data.ok,
     'conta recém-criada não consegue entrar');
+  const friendToken=friendLogin.data.token;
+  const forgedCoins=await post('/api/coins',{token:friendToken,amount:999999});
+  must(forgedCoins.status===403&&forgedCoins.data.error==='ADMIN_ONLY',
+    'usuário comum ainda consegue fabricar Tibia Coins');
+  const firstFriend=await post('/api/characters',{token:friendToken,name:'Friend One',voc:'knight',
+    data:JSON.stringify({name:'Friend One',voc:'knight',sex:'male'})});
+  must(firstFriend.status===201&&firstFriend.data.coins===25,
+    'bônus inicial de 25 TC não foi concedido pelo servidor');
+  const secondFriend=await post('/api/characters',{token:friendToken,name:'Friend Two',voc:'druid',
+    data:JSON.stringify({name:'Friend Two',voc:'druid',sex:'female'})});
+  must(secondFriend.status===201&&secondFriend.data.coins===25,
+    'criação de personagem adicional duplicou o bônus de TC');
 
   for (const credential of [['1','1'],['2','2']]) {
     const logged = await post('/api/login', {login:credential[0],password:credential[1]});
