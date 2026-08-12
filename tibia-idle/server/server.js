@@ -5,6 +5,7 @@
  *   POST /api/register   { login, password, [email] }  -> cria conta
  *   POST /api/login      { login, password }           -> { token, account }
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
+ *   GET  /api/admin/backup + snapshots                 -> recovery/auditoria
  *   GET  /api/sync/events (ticket SSE)                 -> eventos/replay
  *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
  *   GET/PUT /api/instance                              -> instância persistente
@@ -39,11 +40,21 @@ const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
 const TEST_SERVER = process.env.TEST_SERVER === "1";
 const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
+const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"86400000",10)||86400000);
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
 const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_MAX_STEP_MS||"3600000",10)||3600000);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
+const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
 let SYNC_BUS=null;
+const RATE_BUCKETS=new Map(),TRUST_PROXY=process.env.TRUST_PROXY==="1",RATE_LIMIT_DISABLED=process.env.RATE_LIMIT_DISABLED==="1";
 function publishSync(accountId,type,data){return SYNC_BUS?SYNC_BUS.publish(accountId,type,data):null;}
+function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;if(ALLOWED_ORIGINS.has(origin))return origin;
+  try{if(new URL(origin).host===String(req.headers.host||""))return origin;}catch(e){}return false;}
+function rateLimit(req,scope,max,windowMs){if(RATE_LIMIT_DISABLED)return null;const forwarded=TRUST_PROXY&&req.headers["x-forwarded-for"];
+  const ip=String(forwarded||req.socket.remoteAddress||"unknown").split(",")[0].trim(),key=scope+":"+ip,now=Date.now();
+  let row=RATE_BUCKETS.get(key);if(!row||row.resetAt<=now)row={count:0,resetAt:now+windowMs};row.count++;RATE_BUCKETS.set(key,row);
+  if(RATE_BUCKETS.size>5000)for(const [k,v] of RATE_BUCKETS)if(v.resetAt<=now)RATE_BUCKETS.delete(k);
+  return row.count>max?{code:429,body:{ok:false,error:"RATE_LIMITED",msg:"Muitas tentativas. Tente novamente mais tarde.",retryAfterMs:row.resetAt-now}}:null;}
 
 /* ------------------------------- helpers ------------------------------- */
 
@@ -59,16 +70,17 @@ function readBody(req) {
   });
 }
 
+function hardenedHeaders(res){const headers={
+  "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
+  "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
+  "Content-Security-Policy":"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://arena.ai https://*.arena.ai",
+};if(res._corsOrigin){headers["Access-Control-Allow-Origin"]=res._corsOrigin;headers.Vary="Origin";}return headers;}
 function send(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body),
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+  const body = JSON.stringify(obj),headers=Object.assign(hardenedHeaders(res),{
+    "Content-Type": "application/json; charset=utf-8","Content-Length": Buffer.byteLength(body),
+    "Access-Control-Allow-Headers": "Content-Type, Authorization","Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
-  res.end(body);
+  res.writeHead(code,headers);res.end(body);
 }
 
 function newToken() {
@@ -137,8 +149,11 @@ async function issueSyncTicket(db,body){
 }
 async function publishPartyState(db,accountId,action){
   const party=await db.partyFindByAccount(accountId),members=party?await db.partyMembers(party.id):[];
-  publishSync(accountId,"party",{action,party:party?{id:Number(party.id),version:Number(party.roster_version),
-    order:[Number(party.leader_id)].concat(members.map((m)=>Number(m.id)))}:null});
+  const summary=party?{id:Number(party.id),version:Number(party.roster_version),
+    order:[Number(party.leader_id)].concat(members.map((m)=>Number(m.id)))}:null;
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(accountId,"party",party?party.id:"none",
+    party?party.roster_version:0,action,{party,members},true);
+  publishSync(accountId,"party",{action,party:summary});
 }
 async function syncState(db,token){
   const acc=await db.findAccountByToken(token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -161,11 +176,10 @@ const MIME = {
 
 function sendText(res, code, body, type) {
   body = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
-  res.writeHead(code, {
+  res.writeHead(code,Object.assign(hardenedHeaders(res),{
     "Content-Type": type || "text/plain; charset=utf-8",
-    "Content-Length": body.length,
-    "Cache-Control": "no-cache",
-  });
+    "Content-Length": body.length,"Cache-Control":"no-cache",
+  }));
   res.end(body);
 }
 
@@ -184,7 +198,7 @@ function serveStatic(req, res, pathname) {
       if (error) { sendText(res, 404, "Arquivo não encontrado"); return; }
       const type = MIME[path.extname(target).toLowerCase()] || "application/octet-stream";
       if (req.method === "HEAD") {
-        res.writeHead(200, { "Content-Type":type, "Content-Length":data.length, "Cache-Control":"no-cache" });
+        res.writeHead(200,Object.assign(hardenedHeaders(res),{ "Content-Type":type, "Content-Length":data.length, "Cache-Control":"no-cache" }));
         res.end();
       } else sendText(res, 200, data, type);
     });
@@ -260,7 +274,7 @@ async function login(db, body) {
   }
   const token = newToken();
   // persiste a sessão (MySQL) — no JSON store fica em memória
-  if (typeof db.createSession === "function") await db.createSession(acc.id, token);
+  if (typeof db.createSession === "function") await db.createSession(acc.id,token,Date.now()+SESSION_TTL_MS);
   const characters = await db.charactersOf(acc.id);
   return {
     code: 200,
@@ -302,6 +316,12 @@ function sanitizeNewPlayer(payload,voc){
   const stats=maxStats(safe);safe.hp=stats.hp;safe.mp=stats.mp;return safe;
 }
 
+async function logout(db,body){
+  const token=String(body.token||"");if(!token)return {code:400,body:{ok:false,msg:"Token obrigatório"}};
+  if(typeof db.revokeSession==="function")await db.revokeSession(token);
+  return {code:200,body:{ok:true}};
+}
+
 async function createCharacter(db, body) {
   const token = body.token;
   const acc = await db.findAccountByToken(token);
@@ -323,6 +343,8 @@ async function createCharacter(db, body) {
   if(!existingCharacters.length)await db.updateCoins(acc.id,(acc.coins||0)+25);
   const updatedAccount=await db.findAccountById(acc.id);
   const createdCharacter=normalized||Object.assign({},c,{data,save_version:1});
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",createdCharacter.id,
+    createdCharacter.save_version,"created",createdCharacter,true);
   publishSync(acc.id,"character",{id:Number(createdCharacter.id),saveVersion:Number(createdCharacter.save_version),action:"created"});
   return { code: 201, body: { ok: true,
     character: accountCharacterSummary(createdCharacter),
@@ -412,6 +434,7 @@ async function saveCharacter(db, body, id) {
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result);
   const updated=result.characters[0];
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"save",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"save"});
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
 }
@@ -455,6 +478,8 @@ async function savePartyCharacters(db,body){
     }
     return saveConflictResponse(result);
   }
+  if(typeof db.snapshotAdd==="function")for(const character of result.characters)
+    await db.snapshotAdd(acc.id,"character",character.id,character.save_version,"party-save",character,false);
   publishSync(acc.id,"character",{ids:result.characters.map((c)=>Number(c.id)),
     saveVersions:result.characters.map((c)=>Number(c.save_version)),source:"party-save"});
   return {code:200,body:{ok:true,partyVersion,
@@ -564,6 +589,8 @@ async function saveInstance(db,body){
     return {code:409,body:{ok:false,error:result.error,msg:"A instância foi alterada por outra sessão",
       instance:instanceSummary(result.instance,true)}};
   }
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,
+    result.instance.version,expected===0?"created":"checkpoint",result.instance,expected===0);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,source:expected===0?"created":"checkpoint"});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
@@ -579,6 +606,9 @@ async function tickInstance(db,body){
   const result=await db.instanceAuthorityTick(acc.id,expected,Date.now(),3600000,advanceAuthorityState,lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_NOT_ACTIVE"?410:409,
     body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+  if(typeof db.snapshotAdd==="function"&&(result.terminalReason||Number(result.instance.version)%120===0))
+    await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
+      result.terminalReason||"tick",result.instance,!!result.terminalReason);
   publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
@@ -599,6 +629,8 @@ async function endInstance(db,body){
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:409,body:{ok:false,error:result.error,
     msg:result.error==="LEASE_REQUIRED"?"Controle transferido durante o encerramento":"A instância foi alterada",
     instance:instanceSummary(result.instance,true)}};
+  if(typeof db.snapshotAdd==="function"&&result.instance)await db.snapshotAdd(acc.id,"instance",
+    result.instance.instance_id,result.instance.version,"ended-"+reason,result.instance,true);
   publishSync(acc.id,"instance",{id:result.instance&&result.instance.instance_id||id,
     version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end"});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
@@ -630,6 +662,7 @@ async function repairCharacterIdentity(db,body,id){
     max_hp:Math.max(0,Math.floor(Number(body.maxHp)||0)),max_mp:Math.max(0,Math.floor(Number(body.maxMp)||0)),
   });
   const updated=await db.findCharacter(id);
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"repair",updated,true);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),action:"repair"});
   return {code:200,body:{ok:true,character:accountCharacterSummary(updated)}};
 }
@@ -891,6 +924,18 @@ async function rankings(db, by, limit) {
   const rows = await db.rankings(by, limit);
   return { code: 200, body: { ok: true, rankings: rows } };
 }
+async function adminAccountBundle(db,token,accountId,limit){
+  const admin=await db.findAccountByToken(token);if(!admin)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  if(admin.role!=="admin")return {code:403,body:{ok:false,error:"ADMIN_ONLY",msg:"Acesso administrativo"}};
+  const account=await db.findAccountById(accountId);if(!account)return {code:404,body:{ok:false,msg:"Conta não encontrada"}};
+  const characters=await db.charactersOf(account.id),party=await db.partyFindByAccount(account.id),
+    members=party?await db.partyMembers(party.id):[],instance=await db.instanceGet(account.id),
+    snapshots=typeof db.snapshotList==="function"?await db.snapshotList(account.id,limit||100):[];
+  const payload={schema:1,generatedAt:new Date().toISOString(),account:{id:Number(account.id),login:account.login,
+    role:account.role,coins:Number(account.coins)||0},characters,party:party?{row:party,members}:null,instance,snapshots};
+  const serialized=JSON.stringify(payload),checksum=crypto.createHash("sha256").update(serialized).digest("hex");
+  return {code:200,body:{ok:true,checksum,payload}};
+}
 
 /* Cancela uma oferta (só o dono); devolve item/TC. */
 async function marketCancel(db, body, id) {
@@ -1015,27 +1060,35 @@ async function main() {
   const instanceWorker=startInstanceWorker(db,{
     intervalMs:INSTANCE_WORKER_INTERVAL_MS,maxStepMs:INSTANCE_WORKER_MAX_STEP_MS,
     minStepMs:Math.min(500,INSTANCE_WORKER_INTERVAL_MS),
-    onClaim:(claim)=>publishSync(claim.accountId,"instance",{version:claim.version,
-      terminalReason:claim.terminalReason||null,source:"worker"}),
+    onClaim:async(claim)=>{if(typeof db.snapshotAdd==="function"&&(claim.terminalReason||claim.version%60===0)){
+        const row=await db.instanceGet(claim.accountId);if(row)await db.snapshotAdd(claim.accountId,"instance",
+          row.instance_id,row.version,claim.terminalReason||"worker",row,!!claim.terminalReason);}
+      publishSync(claim.accountId,"instance",{version:claim.version,
+        terminalReason:claim.terminalReason||null,source:"worker"});},
   });
 
+  const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
+    if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
+
   const server = http.createServer(async (req, res) => {
-    // CORS preflight
+    const url=req.url.split("?")[0],cors=allowedOrigin(req);
+    if(cors===false&&url.startsWith("/api/"))return send(res,403,{ok:false,error:"ORIGIN_DENIED",msg:"Origem não autorizada"});
+    if(cors)res._corsOrigin=cors;
     if (req.method === "OPTIONS") { send(res, 204, {}); return; }
 
-    const url = req.url.split("?")[0];
     try {
       if(req.method==="GET"&&url==="/api/sync/events"){
         const q=new URL(req.url,"http://x").searchParams,ticket=SYNC_BUS.consumeTicket(q.get("ticket"));
         if(!ticket)return send(res,401,{ok:false,error:"SYNC_TICKET_INVALID",msg:"Ticket de sincronização inválido"});
         const acc=await db.findAccountByToken(ticket.sessionToken);
         if(!acc||Number(acc.id)!==Number(ticket.accountId))return send(res,401,{ok:false,error:"SYNC_SESSION_EXPIRED",msg:"Sessão expirada"});
-        res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",
-          "Connection":"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":"*"});
+        res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",
+          "Connection":"keep-alive","X-Accel-Buffering":"no"}));
         res.write("retry: 1500\n\n");
-        SYNC_BUS.subscribe(acc.id,res,req.headers["last-event-id"]||q.get("lastEventId"));return;
+        SYNC_BUS.subscribe(acc.id,res,req.headers["last-event-id"]||q.get("lastEventId"),ticket.expiresAt);return;
       }
       if(req.method==="POST"&&url==="/api/sync/ticket"){
+        const limited=rateLimit(req,"sync-ticket",60,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await issueSyncTicket(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="GET"&&url==="/api/sync/state"){
@@ -1053,14 +1106,19 @@ async function main() {
         return sendText(res, 200, config, "text/javascript; charset=utf-8");
       }
       if (req.method === "POST" && url === "/api/register") {
+        const limited=rateLimit(req,"register",10,3600000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
         const r = await register(db, body);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/login") {
+        const limited=rateLimit(req,"login",20,60000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
         const r = await login(db, body);
         return send(res, r.code, r.body);
+      }
+      if(req.method==="POST"&&url==="/api/logout"){
+        const r=await logout(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "GET" && url === "/api/me") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
@@ -1071,6 +1129,7 @@ async function main() {
         const r=await acquireLease(db,await readBody(req),false);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/takeover"){
+        const limited=rateLimit(req,"lease-takeover",10,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await acquireLease(db,await readBody(req),true);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/renew"){
@@ -1173,6 +1232,13 @@ async function main() {
         const q = new URL(req.url, "http://x").searchParams;
         const r = await marketHistory(db, token, Number(q.get("limit")) || 100);
         return send(res, r.code, r.body);
+      }
+      if(req.method==="GET"&&(url==="/api/admin/backup"||url==="/api/admin/snapshots")){
+        const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
+        const bundle=await adminAccountBundle(db,token,Number(q.get("account_id")),Number(q.get("limit"))||100);
+        if(url==="/api/admin/snapshots"&&bundle.body.ok)return send(res,200,{ok:true,
+          checksum:bundle.body.checksum,snapshots:bundle.body.payload.snapshots});
+        return send(res,bundle.code,bundle.body);
       }
       // ---- RANKINGS (DB expandida) ----
       if (req.method === "GET" && url === "/api/rankings") {

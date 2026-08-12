@@ -87,6 +87,24 @@ CREATE TABLE IF NOT EXISTS account_instances (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
+-- Histórico imutável de snapshots (retenção aplicada pelo servidor).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS snapshot_history (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  account_id INT UNSIGNED NOT NULL,
+  entity_type VARCHAR(24) NOT NULL,
+  entity_id VARCHAR(64) NOT NULL,
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  reason VARCHAR(40) NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  data MEDIUMTEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_snapshot_account (account_id, id),
+  INDEX idx_snapshot_entity (account_id, entity_type, entity_id, created_at),
+  CONSTRAINT fk_snapshot_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
 -- Personagens. O campo `data` guarda o SAVE COMPLETO do jogo
 -- (JSON: bag, equip, skills, stats, missions, lootPouch, ...),
 -- exatamente o que o cliente tinha no localStorage.
