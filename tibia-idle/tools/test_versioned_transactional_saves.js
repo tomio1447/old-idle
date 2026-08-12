@@ -140,6 +140,17 @@ function withLease(body){return Object.assign({},body,lease);}
   summaries=(await me(token)).characters;
   must(summaries.every((c)=>c.saveVersion===finalVersions.get(Number(c.id))),
     "versões dos personagens não sobreviveram ao restart");
+
+  const byId=new Map(summaries.map((c)=>[Number(c.id),c])),ordered=partyState.order.map((id)=>byId.get(Number(id)));
+  const instanceState={v:1,savedAt:Date.now(),kind:"hunt",huntId:"rats",instanceMode:"non-pvp",
+    activeCharacterId:String(partyState.order[0]),members:ordered.map((c)=>({id:String(c.id),p:c.snapshot})),
+    state:{players:ordered.map((c)=>({id:String(c.id),p:c.snapshot})),mobs:[{id:"party-rat",slug:"rat"}],events:[]}};
+  r=await put("/api/instance",withLease({token,instance_id:null,expected_version:0,state:instanceState}));
+  must(r.status===200,"instância da party não foi criada para testar checkpoint redundante");
+  r=await post("/api/party/save",withLease({token,party_id:partyState.id,party_version:partyState.version,
+    party_order:partyState.order,characters:ordered.map((c)=>Object.assign({},partyEntry(c,"stale-in-instance"),{expected_version:0}))}));
+  must(r.status===200&&r.data.authoritativeInstance===true&&r.data.characters.length===ordered.length,
+    "party-save redundante durante instância ainda respondeu conflito");
   console.log("OK: Fase 3 — saves versionados; party salva tudo ou nada em uma transação.");
 })().catch((error)=>{console.error(error);process.exitCode=1;}).finally(async()=>{
   await stop();fs.rmSync(dataDir,{recursive:true,force:true});
