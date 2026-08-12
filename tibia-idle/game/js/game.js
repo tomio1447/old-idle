@@ -887,9 +887,9 @@ const BOSS_DEFS = {
     title:"Boss de Rotten Wasteland",hunt:"goshnars-hatred-room",
     baseMonster:"goshnar-s-hatred",sprite:"goshnar-s-hatred",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
-    cooldown:BOSS_COOLDOWN,
+    cooldown:0,
     requirement:{
-      mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:true,
+      mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:false,
       text:"Elimine 50 Rotten Golems em Rotten Wasteland para liberar Goshnar's Hatred",
     },
     mechanic:"dreads-torment",
