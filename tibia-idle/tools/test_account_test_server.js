@@ -64,6 +64,9 @@ async function post(route, body) {
   const registered = await post('/api/register', {login:'friend',password:'friend'});
   must(registered.status === 201 && registered.data.ok,
     'cadastro público de conta não está liberado');
+  const duplicate = await post('/api/register', {login:'friend',password:'friend'});
+  must(duplicate.status === 200 && !duplicate.data.ok && duplicate.data.error === 'ACCOUNT_EXISTS',
+    'conta duplicada deveria ser erro de formulário sem HTTP 409');
   const friendLogin = await post('/api/login', {login:'friend',password:'friend'});
   must(friendLogin.status === 200 && friendLogin.data.ok,
     'conta recém-criada não consegue entrar');
