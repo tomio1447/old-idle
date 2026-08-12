@@ -2787,7 +2787,8 @@ function bindControls() {
  * Todos recebem leather helmet, coat, leather legs e leather boots, mais as
  * potions e runas da vocacao. giveStartingItems (js/supplies.js) le esses
  * dados; aqui ficam so os ajustes que o motor do jogo precisa. */
-function giveStarterKit(p) {
+function giveStarterKit(p, options) {
+  options = options || {};
   if (typeof giveStartingItems === "function") {
     giveStartingItems(p);
   } else {
@@ -2833,8 +2834,10 @@ function giveStarterKit(p) {
       p.exercise["exercise-shield"] = 5000;
     }
   }
-  if (typeof accountAddCoins === "function") {
-    accountAddCoins(25);
+  if (!options.skipCoins && typeof accountAddCoins === "function") {
+    if (typeof accountApiConfigured === "function" && accountApiConfigured())
+      accountAddCoins(typeof sessionToken === "function" ? sessionToken() : "", 25);
+    else accountAddCoins(25);
   }
   return p;
 }
@@ -2933,6 +2936,12 @@ function openOutfitModal() {
 
 function openCharacterModal() {
   save();
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && sessionToken() &&
+      typeof window.openAccountCharacterPicker === "function") {
+    window.openAccountCharacterPicker();
+    return;
+  }
   const chars = getCharacters();
   const currentId = G.p ? characterId(G.p) : localStorage.getItem(ACTIVE_CHARACTER_KEY);
   $("#modal-body").innerHTML = `
@@ -3013,12 +3022,81 @@ function initAccountLogin() {
     const el = $("#acc-msg");
     if (el) el.innerHTML = t || "";
   }
-  function vocOutfit(v, s) {
-    const map = { knight: "knight", paladin: "hunter", druid: "summoner",
-                  sorcerer: "mage", monk: "monk" };
-    return map[v] + "-" + (s === "female" ? "f" : "m");
+  function closeAccountModal() {
+    const modal = $("#modal");
+    if (modal) modal.classList.remove("show", "wide");
   }
-  function paintAccVocs() {
+  function openAccountModal(html, wide) {
+    const body = $("#modal-body"), modal = $("#modal");
+    if (!body || !modal) return false;
+    body.innerHTML = html;
+    modal.classList.add("show");
+    modal.classList.toggle("wide", !!wide);
+    return true;
+  }
+  function vocOutfit(v, s) {
+    const map = { knight:"knight", paladin:"hunter", druid:"summoner",
+      sorcerer:"mage", monk:"monk" };
+    return (map[v] || "citizen") + "-" + (s === "female" ? "f" : "m");
+  }
+  function accountCharacterPreview(c) {
+    const preview = {
+      id:String(c.id), name:c.name, voc:c.voc || "knight", promoted:!!c.promoted,
+      level:Number(c.level) || 1, sex:c.sex || "male",
+      outfit:c.outfit ? JSON.parse(JSON.stringify(c.outfit)) : null,
+    };
+    if (typeof ensureOutfit === "function") ensureOutfit(preview);
+    return preview;
+  }
+  function paintAccountPortraits(characters, tries) {
+    tries = tries === undefined ? 25 : tries;
+    let pending = false;
+    for (const c of characters) {
+      const host = document.querySelector(`[data-account-portrait="${c.id}"]`);
+      if (!host || host.dataset.done === "1") continue;
+      const preview = accountCharacterPreview(c);
+      const cv = typeof AppearanceRenderer !== "undefined"
+        ? AppearanceRenderer.preview(preview, "s") : null;
+      if (cv) {
+        cv.style.width = "48px"; cv.style.height = "48px";
+        cv.style.imageRendering = "pixelated";
+        host.innerHTML = ""; host.appendChild(cv); host.dataset.done = "1";
+      } else {
+        pending = true;
+      }
+    }
+    if (pending && tries > 0) setTimeout(() => paintAccountPortraits(characters, tries - 1), 90);
+  }
+  async function enterCharacter(token, summary) {
+    const alreadyPlaying = typeof G !== "undefined" && G && G.p;
+    if (alreadyPlaying) {
+      if (String(G.p.id) === String(summary.id)) { closeAccountModal(); return; }
+      if (typeof save === "function") save();
+      try { sessionStorage.setItem("tibia-idle-online-autoload", String(summary.id)); } catch (e) {}
+      location.reload(); return;
+    }
+    msg("Carregando <b>" + summary.name + "</b>...");
+    const loaded = typeof accountLoadCharacter === "function"
+      ? await accountLoadCharacter(token, summary.id) : { ok:false };
+    if (!loaded.ok || !loaded.character) {
+      msg(loaded.msg || "Não foi possível carregar o personagem.");
+      return;
+    }
+    const character = loaded.character;
+    let raw = character.data || {};
+    if (typeof raw === "string") {
+      try { raw = JSON.parse(raw); } catch (e) { raw = {}; }
+    }
+    const p = normalizePlayer(Object.assign({}, raw, {
+      id:String(character.id), name:character.name || summary.name,
+      voc:character.voc || raw.voc || "knight",
+      level:Number(character.level) || raw.level || 1,
+    }));
+    try { sessionStorage.setItem("tibia-idle-char", String(character.id)); } catch (e) {}
+    closeAccountModal();
+    startGame(p);
+  }
+  function paintCreatorVocations() {
     const grid = $("#acc-voc-grid");
     if (!grid) return;
     const vocs = ["knight", "paladin", "druid", "sorcerer", "monk"];
@@ -3028,136 +3106,187 @@ function initAccountLogin() {
         <div class="vn">${VOCATIONS[v].name}</div>
         <div class="vd">${VOCATIONS[v].desc}</div>
       </div>`).join("");
-    $$("#acc-voc-grid .voc-card").forEach((c) =>
-      c.addEventListener("click", () => { selVoc = c.dataset.voc; paintAccVocs(); }));
+    $$("#acc-voc-grid .voc-card").forEach((card) =>
+      card.addEventListener("click", () => { selVoc = card.dataset.voc; paintCreatorVocations(); }));
   }
-  function bindAccSex() {
-    $$("#acc-char-picker .acc-sex").forEach((b) =>
-      b.addEventListener("click", () => {
-        selSex = b.dataset.sex;
-        $$("#acc-char-picker .acc-sex").forEach((x) => x.classList.remove("primary"));
-        b.classList.add("primary");
-        paintAccVocs();
-      }));
+  function showCharacterCreator(token, account, characters) {
+    if (!openAccountModal(`
+      <div class="panel-title">Criar personagem
+        <span style="flex:1"></span><button class="sm" id="acc-create-back">← Voltar</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="field"><label>Nome do personagem</label>
+          <input id="acc-char-name" maxlength="20" placeholder="Nome do personagem" autocomplete="off"></div>
+        <div class="row mb8" style="gap:5px">
+          <button data-sex="male" class="primary sm acc-sex">Masculino</button>
+          <button data-sex="female" class="sm acc-sex">Feminino</button>
+        </div>
+        <div class="small dim mb4">Vocação</div>
+        <div class="voc-grid mb8" id="acc-voc-grid"></div>
+        <button class="primary full" id="acc-btn-create-char">Criar personagem</button>
+        <div class="tiny dim center mt8" id="acc-flow-msg"></div>
+      </div>`, true)) return;
+    selSex = "male"; selVoc = "knight"; paintCreatorVocations();
+    $$("#modal-body .acc-sex").forEach((button) => button.addEventListener("click", () => {
+      selSex = button.dataset.sex;
+      $$("#modal-body .acc-sex").forEach((x) => x.classList.remove("primary"));
+      button.classList.add("primary"); paintCreatorVocations();
+    }));
+    $("#acc-create-back").onclick = () => showPicker(token, account, characters);
+    const create = $("#acc-btn-create-char");
+    create.onclick = async () => {
+      if (create.disabled) return;
+      const name = ($("#acc-char-name").value || "").trim();
+      const status = $("#acc-flow-msg");
+      if (name.length < 2) { status.textContent = "Digite um nome válido."; return; }
+      create.disabled = true; status.textContent = "Criando personagem...";
+      try {
+        const draft = newPlayer(name, selVoc, selSex);
+        giveStarterKit(draft,{skipCoins:true}); normalizePlayer(draft);
+        const result = await accountCreateCharacter(token, name, selVoc, draft);
+        if (!result.ok) { status.textContent = result.msg || "Falha ao criar personagem."; return; }
+        if(typeof accountAddCoins==="function")await accountAddCoins(token,25);
+        const refreshed = await accountMe(token);
+        if (refreshed.ok) showPicker(token, refreshed.account, refreshed.characters || []);
+        else showPicker(token, account, characters.concat([Object.assign({}, result.character, {
+          sex:selSex, outfit:draft.outfit,
+        })]));
+      } finally {
+        create.disabled = false;
+      }
+    };
+    $("#acc-char-name").onkeydown = (e) => { if (e.key === "Enter") create.click(); };
   }
-
-  /* Mostra a lista de personagens da conta + form de novo personagem */
+  function logoutAccount() {
+    const wasPlaying = typeof G !== "undefined" && G && G.p;
+    if (wasPlaying && typeof save === "function") save();
+    try {
+      sessionStorage.removeItem("tibia-idle-token");
+      sessionStorage.removeItem("tibia-idle-account");
+      sessionStorage.removeItem("tibia-idle-char");
+      sessionStorage.removeItem("tibia-idle-online-autoload");
+      sessionStorage.removeItem(AUTOLOGIN_KEY);
+    } catch (e) {}
+    closeAccountModal();
+    if (wasPlaying) { location.reload(); return; }
+    $("#login").style.display = "";
+    $("#app").classList.remove("ready");
+    msg("Logout realizado.");
+  }
   function showPicker(token, account, characters) {
-    $("#acc-panel-login").style.display = "none";
-    $("#acc-panel-register").style.display = "none";
-    $("#acc-char-picker").style.display = "";
-    // salva a sessão
+    characters = Array.isArray(characters) ? characters : [];
     try {
       sessionStorage.setItem("tibia-idle-token", token);
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
     } catch (e) {}
-    const coins = account.coins || 0;
-    const cEl = $("#acc-char-coins");
-    if (cEl) cEl.textContent = coins + " Tibia Coins";
-    const list = $("#acc-char-list");
-    if (list) {
-      list.innerHTML = characters.length
-        ? characters.map((c) => `
-            <div class="shop-row clickable" data-acc-char="${c.id}" data-acc-char-name="${c.name}">
-              <div style="flex:1"><b>${c.name}</b> · ${vocationName({ voc: c.voc })} · nv ${c.level}</div>
-              <span>➜</span>
-            </div>`).join("")
-        : '<div class="tiny dim">Nenhum personagem ainda — crie o primeiro abaixo.</div>';
-      $$("#acc-char-list [data-acc-char]").forEach((row) =>
-        row.addEventListener("click", async () => {
-          const cid = row.dataset.accChar;
-          const name = row.dataset.accCharName;
-          msg("Carregando <b>" + name + "</b>...");
-          const loaded = typeof accountLoadCharacter === "function"
-            ? await accountLoadCharacter(token, cid) : { ok:false };
-          if (!loaded.ok || !loaded.character) {
-            msg(loaded.msg || "Não foi possível carregar o personagem.");
-            return;
-          }
-          const character = loaded.character;
-          let raw = character.data || {};
-          if (typeof raw === "string") {
-            try { raw = JSON.parse(raw); } catch (e) { raw = {}; }
-          }
-          const p = normalizePlayer(Object.assign({}, raw, {
-            id:String(character.id), name:character.name || name,
-            voc:character.voc || raw.voc || "knight",
-            level:Number(character.level) || raw.level || 1,
-          }));
-          try { sessionStorage.setItem("tibia-idle-char", cid); } catch (e) {}
-          startGame(p);
-        }));
-    }
-    paintAccVocs();
-    bindAccSex();
-    $("#acc-btn-create-char").addEventListener("click", async () => {
-      const name = ($("#acc-char-name").value || "").trim();
-      if (name.length < 2) { msg("Digite um nome válido"); return; }
-      const r = await accountCreateCharacter(token, name, selVoc, createCharacter(name, selVoc, selSex));
-      if (!r.ok) { msg(r.msg || "Falha ao criar personagem"); return; }
-      try { sessionStorage.setItem("tibia-idle-char", r.character.id); } catch (e) {}
-      const p = createCharacter(name, selVoc, selSex);
-      p.id = r.character.id;
-      startGame(p);
-    });
+    const cards = characters.length ? characters.map((c) => `
+      <button class="account-character-card" data-acc-char="${c.id}">
+        <span class="account-character-outfit" data-account-portrait="${c.id}"></span>
+        <span class="account-character-info">
+          <b>${c.name}</b>
+          <span>Level ${Number(c.level) || 1} · ${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
+        </span><span class="account-character-enter">ENTRAR ›</span>
+      </button>`).join("") :
+      `<div class="account-character-empty">Nenhum personagem nesta conta.</div>`;
+    if (!openAccountModal(`
+      <div class="panel-title">Personagens de ${account.login || "sua conta"}
+        <span style="flex:1"></span><span class="tiny dim">${account.coins || 0} Tibia Coins</span>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="account-character-list">${cards}</div>
+        <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
+        <button class="danger full mt8" id="acc-logout">Logout</button>
+      </div>`, true)) return;
+    paintAccountPortraits(characters);
+    $$("#modal-body [data-acc-char]").forEach((row) => row.addEventListener("click", () => {
+      const summary = characters.find((c) => String(c.id) === String(row.dataset.accChar));
+      if (summary) enterCharacter(token, summary);
+    }));
+    $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
+    $("#acc-logout").onclick = logoutAccount;
+  }
+  function openRegisterModal() {
+    if (!openAccountModal(`
+      <div class="panel-title">Criar conta
+        <span style="flex:1"></span><button class="sm" id="acc-register-cancel">✕</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="field"><label>Login</label>
+          <input id="acc-new-login" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
+        <div class="field"><label>Senha</label>
+          <input id="acc-new-password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
+        <button class="primary full" id="acc-btn-register">Criar conta</button>
+        <div class="tiny dim center mt8" id="acc-register-msg"></div>
+      </div>`)) return;
+    $("#acc-register-cancel").onclick = closeAccountModal;
+    const register = $("#acc-btn-register");
+    register.onclick = async () => {
+      if (register.disabled) return;
+      const login = ($("#acc-new-login").value || "").trim();
+      const pass = $("#acc-new-password").value || "";
+      const status = $("#acc-register-msg");
+      if (!login || !pass) { status.textContent = "Informe login e senha."; return; }
+      register.disabled = true; status.textContent = "Criando conta...";
+      try {
+        const result = await accountRegister(login, pass);
+        if (!result.ok) { status.textContent = result.msg || "Falha ao criar conta."; return; }
+        closeAccountModal();
+        $("#acc-login").value = login; $("#acc-password").value = "";
+        msg("Conta criada! Informe sua senha para entrar.");
+        $("#acc-password").focus();
+      } finally {
+        register.disabled = false;
+      }
+    };
+    $("#acc-new-login").onkeydown = (e) => { if (e.key === "Enter") register.click(); };
+    $("#acc-new-password").onkeydown = (e) => { if (e.key === "Enter") register.click(); };
+    $("#acc-new-login").focus();
   }
 
-  // abas
-  $$("[data-acc-tab]").forEach((tab) =>
-    tab.addEventListener("click", () => {
-      const which = tab.dataset.accTab;
-      $("#acc-tab-login").classList.toggle("active", which === "login");
-      $("#acc-tab-register").classList.toggle("active", which === "register");
-      $("#acc-panel-login").style.display = which === "login" ? "" : "none";
-      $("#acc-panel-register").style.display = which === "register" ? "" : "none";
-      msg("");
-    }));
-
-  $("#acc-btn-login").addEventListener("click", async () => {
+  $("#acc-open-register").addEventListener("click", openRegisterModal);
+  $("#acc-btn-login").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
     const login = ($("#acc-login").value || "").trim();
     const pass = $("#acc-password").value || "";
     if (!login || !pass) { msg("Informe login e senha"); return; }
-    msg("Entrando...");
-    const r = await accountLogin(login, pass);
-    if (!r.ok) { msg(r.msg || "Falha no login"); return; }
-    showPicker(r.token, r.account, r.characters);
-  });
-  $("#acc-btn-register").addEventListener("click", async (event) => {
-    const button=event.currentTarget;
-    if(button.disabled||button.dataset.pending==="1")return;
-    const login = ($("#acc-new-login").value || "").trim();
-    const pass = $("#acc-new-password").value || "";
-    if (login.length < 1 || pass.length < 1) { msg("Informe login e senha"); return; }
-    button.dataset.pending="1";button.disabled=true;msg("Criando conta...");
+    button.disabled = true; msg("Entrando...");
     try {
-      const r = await accountRegister(login, pass);
-      msg(r.ok ? "Conta criada! Faça o login." : (r.msg || "Falha"));
-      if (r.ok) {
-        $("#acc-tab-login").click();
-        $("#acc-login").value = login;
-        $("#acc-password").value = pass;
-      }
+      const result = await accountLogin(login, pass);
+      if (!result.ok) { msg(result.msg || "Falha no login"); return; }
+      msg(""); showPicker(result.token, result.account, result.characters);
     } finally {
-      button.dataset.pending="0";button.disabled=false;
+      button.disabled = false;
     }
   });
   $("#acc-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
   $("#acc-password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
-  $("#acc-new-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-register").click(); });
-  $("#acc-new-password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-register").click(); });
-  $("#acc-char-name").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-create-char").click(); });
 
-  // sessão já existente (refresh da página): pula o login
-  const tok = sessionToken();
-  if (tok && acc) {
+  // Sessão existente em refresh: reabre diretamente o modal de personagens.
+  const token = sessionToken();
+  if (token && acc) {
     msg("Reconectando...");
-    accountMe(tok).then((r) => {
-      if (r.ok) showPicker(tok, r.account, r.characters);
-      else msg("Sessão expirada — faça login novamente.");
+    accountMe(token).then((result) => {
+      if (result.ok) {
+        msg("");
+        let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";
+          sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
+        const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));
+        if(target)enterCharacter(token,target);
+        else showPicker(token, result.account, result.characters || []);
+      } else { logoutAccount(); msg("Sessão expirada — faça login novamente."); }
     });
   }
+  // Reutilizado pelo botão Trocar personagem no modo online.
+  window.openAccountCharacterPicker = async function () {
+    const currentToken = sessionToken();
+    if (!currentToken) return false;
+    const result = await accountMe(currentToken);
+    if (!result.ok) { logoutAccount(); return false; }
+    showPicker(currentToken, result.account, result.characters || []);
+    return true;
+  };
 }
-
 function initLogin() {
   // MODO ONLINE: o servidor injeta a configuração antes de account-client.js.
   // Não carregue roster/localStorage nessa tela: a conta é a fonte de verdade.

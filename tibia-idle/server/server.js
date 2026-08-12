@@ -142,6 +142,19 @@ async function register(db, body) {
   return { code: 201, body: { ok: true, id: acc.id, login: acc.login, role: acc.role } };
 }
 
+function accountCharacterSummary(character) {
+  let data = character && character.data;
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch (e) { data = {}; }
+  }
+  data = data && typeof data === "object" ? data : {};
+  return {
+    id:character.id, name:character.name, voc:character.voc,
+    level:character.level, sex:data.sex || "male", promoted:!!data.promoted,
+    outfit:data.outfit && typeof data.outfit === "object" ? data.outfit : null,
+  };
+}
+
 async function login(db, body) {
   const login = String(body.login || "").trim();
   const password = String(body.password || "");
@@ -159,7 +172,7 @@ async function login(db, body) {
       ok: true,
       token,
       account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0 },
-      characters: characters.map((c) => ({ id: c.id, name: c.name, voc: c.voc, level: c.level })),
+      characters: characters.map(accountCharacterSummary),
     },
   };
 }
@@ -174,7 +187,7 @@ async function me(db, token) {
     body: {
       ok: true,
       account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0 },
-      characters: characters.map((c) => ({ id: c.id, name: c.name, voc: c.voc, level: c.level })),
+      characters: characters.map(accountCharacterSummary),
     },
   };
 }
@@ -189,7 +202,8 @@ async function createCharacter(db, body) {
   const voc = String(body.voc || "none");
   const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data || {});
   const c = await db.createCharacter(acc.id, name, voc, 1, data);
-  return { code: 201, body: { ok: true, character: { id: c.id, name: c.name, voc: c.voc, level: c.level } } };
+  return { code: 201, body: { ok: true,
+    character: accountCharacterSummary(Object.assign({}, c, { data })) } };
 }
 
 async function loadCharacter(db, token, id) {

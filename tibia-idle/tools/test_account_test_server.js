@@ -80,10 +80,17 @@ async function post(route, body) {
   const token = login.data.token;
   const created = await post('/api/characters', {
     token, name:'Server Test', voc:'druid',
-    data:JSON.stringify({name:'Server Test',voc:'druid',level:7,hp:500}),
+    data:JSON.stringify({name:'Server Test',voc:'druid',level:7,hp:500,sex:'female',
+      outfit:{type:'summoner',colors:[12,34,56,78]}}),
   });
-  must(created.status === 201 && created.data.ok, 'criação de personagem falhou');
+  must(created.status === 201 && created.data.ok && created.data.character.sex === 'female' &&
+    JSON.stringify(created.data.character.outfit.colors) === JSON.stringify([12,34,56,78]),
+    'criação/resumo visual do personagem falhou');
   const id = created.data.character.id;
+  const accountSummary = await request('/api/me', {headers:{authorization:'Bearer ' + token}});
+  const summaryChar = accountSummary.data.characters.find(c => Number(c.id) === Number(id));
+  must(summaryChar && summaryChar.sex === 'female' && summaryChar.outfit &&
+    summaryChar.outfit.colors[2] === 56, 'seletor da conta não recebe outfit/cores atuais');
   let loaded = await request('/api/characters/' + id, {
     headers:{authorization:'Bearer ' + token},
   });

@@ -40,51 +40,17 @@
 
       <!-- MODO ONLINE (conta) — visível quando accountApiConfigured() -->
       <div id="account-login" style="display:none">
-        <div class="tabs mb4">
-          <div class="tab active" id="acc-tab-login" data-acc-tab="login">Entrar</div>
-          <div class="tab" id="acc-tab-register" data-acc-tab="register">Criar conta</div>
+        <div class="small dim center mb8">Entre com sua conta para acessar seus personagens.</div>
+        <div class="field">
+          <label>Login</label>
+          <input id="acc-login" maxlength="32" placeholder="login" autocomplete="username">
         </div>
-
-        <div id="acc-panel-login">
-          <div class="field">
-            <label>Login</label>
-            <input id="acc-login" maxlength="32" placeholder="login" autocomplete="username">
-          </div>
-          <div class="field">
-            <label>Senha</label>
-            <input id="acc-password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
-          </div>
-          <button class="primary full mt8" id="acc-btn-login">Entrar</button>
+        <div class="field">
+          <label>Senha</label>
+          <input id="acc-password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
         </div>
-
-        <div id="acc-panel-register" style="display:none">
-          <div class="field">
-            <label>Novo login</label>
-            <input id="acc-new-login" maxlength="32" placeholder="escolha um login" autocomplete="username">
-          </div>
-          <div class="field">
-            <label>Nova senha</label>
-            <input id="acc-new-password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password">
-          </div>
-          <button class="primary full mt8" id="acc-btn-register">Criar conta</button>
-        </div>
-
-        <div id="acc-char-picker" style="display:none">
-          <div class="small dim mb4">Escolha o personagem</div>
-          <div class="list mb4" id="acc-char-list" style="max-height:150px"></div>
-          <div class="small dim mb4">ou crie um novo</div>
-          <div class="row mb4">
-            <input id="acc-char-name" maxlength="20" placeholder="Nome do personagem" style="flex:1;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-          </div>
-          <div class="row mb4">
-            <button data-sex="male" class="primary sm acc-sex">Masculino</button>
-            <button data-sex="female" class="sm acc-sex">Feminino</button>
-            <span style="flex:1"></span>
-            <span class="tiny dim" id="acc-char-coins"></span>
-          </div>
-          <div class="voc-grid mb4" id="acc-voc-grid"></div>
-          <button class="primary full" id="acc-btn-create-char">Criar personagem e caçar</button>
-        </div>
+        <button class="primary full mt8" id="acc-btn-login">Entrar</button>
+        <button class="full mt8" id="acc-open-register">Criar conta</button>
         <div class="tiny dim center mt8" id="acc-msg"></div>
       </div>
 
