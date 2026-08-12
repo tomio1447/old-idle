@@ -76,7 +76,7 @@ function partyOutfitIcon(member, sex) {
 }
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
-function partySwitchToChar(id) {
+async function partySwitchToChar(id) {
   // Em party combat, trocar personagem é trocar o controle para a entidade
   // viva já presente na hunt — recarregar levaria o membro a Thais e o
   // duplicaria na instância.
@@ -85,10 +85,28 @@ function partySwitchToChar(id) {
       typeof partyCombatSwitchTo === "function") {
     return partyCombatSwitchTo(id);
   }
+  // ONLINE: mantenha `tibia-idle-char` no personagem ATUAL até o save
+  // terminar. Alterá-lo antes do beforeunload gravava o RP inteiro sobre o
+  // Druid escolhido (equipamento, vocação, outfit e level).
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    if (partySwitchToChar._pending) return false;
+    partySwitchToChar._pending = true;
+    const current = typeof G !== "undefined" && G && G.p ? G.p : null;
+    const token = typeof sessionToken === "function" ? sessionToken() : "";
+    const currentId = current && current.id ? String(current.id) :
+      (typeof sessionCharId === "function" ? String(sessionCharId() || "") : "");
+    if (typeof save === "function") save();
+    if (current && token && currentId && typeof accountSaveCharacter === "function") {
+      try { await accountSaveCharacter(token, currentId, current); } catch (e) { /* autosave já tentou */ }
+    }
+    try { sessionStorage.setItem("tibia-idle-online-autoload", String(id)); } catch (e) {}
+    location.reload();
+    return true;
+  }
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
-  try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
   location.reload();
+  return true;
 }
 
 /* Estado de colapso do painel (persiste na sessão). */
