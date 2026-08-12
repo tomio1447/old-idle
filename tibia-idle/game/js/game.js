@@ -2786,7 +2786,9 @@ async function startGameReady(p) {
     requestAnimationFrame(loop);
     window.addEventListener("beforeunload",save);
     window.addEventListener("pagehide",save);
-    setInterval(save,20000);startBackgroundTick();
+    // O loop visível e startBackgroundTick já salvam a cada 20s. Um segundo
+    // setInterval duplicava JSON/localStorage e causava long-task warnings.
+    startBackgroundTick();
     if(typeof partyStartPolling==="function")partyStartPolling();
     if(typeof partyReportZone==="function"&&typeof partyCurrentZone==="function")
       setTimeout(()=>partyReportZone(partyCurrentZone()),1500);

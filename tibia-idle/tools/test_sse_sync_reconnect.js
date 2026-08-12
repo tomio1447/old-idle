@@ -40,7 +40,8 @@ class FakeResponse extends EventEmitter{constructor(){super();this.text="";this.
   const fake=new FakeResponse();const close=bus.subscribe(1,fake,1);must(fake.text.includes("event: snapshot-required")&&fake.text.includes("event: ready"),
     "cursor expirado não pediu snapshot/reabriu stream");close();fake.emit("close");
   must(clientSource.includes("new EventSource")&&clientSource.includes("/api/sync/ticket")&&
-    clientSource.includes("/api/sync/state")&&clientSource.includes("accountSyncFallback")&&clientSource.includes("lastEventId"),
+    clientSource.includes("/api/sync/state")&&clientSource.includes("accountSyncFallback")&&
+    clientSource.includes('type==="sync-expired"')&&clientSource.includes("lastEventId"),
     "cliente não implementa SSE/replay/fallback");
 
   await start();await post("/api/register",{login:"sync",password:"x"});const login=await post("/api/login",{login:"sync",password:"x"}),token=login.data.token;
@@ -69,10 +70,13 @@ class FakeResponse extends EventEmitter{constructor(){super();this.text="";this.
   const state=await request("/api/sync/state",{headers:{authorization:"Bearer "+token}});
   must(state.status===200&&state.data.cursor>=takeoverEvent.id&&state.data.instance.id===saved.data.instance.id&&
     state.data.characters[0].saveVersion>=1,"fallback snapshot não contém versões atuais");
-  const invalid=await request("/api/sync/events?ticket=invalid");must(invalid.status===401,"stream aceitou ticket inválido");
+  const invalid=await request("/api/sync/events?ticket=invalid");
+  must(invalid.status===200&&String(invalid.data).includes("event: sync-expired"),
+    "ticket inválido não foi renovável sem HTTP 401");
   replay.close();await stop();await start();
   const oldAfterRestart=await request("/api/sync/events?ticket="+ticket.data.ticket);
-  must(oldAfterRestart.status===401,"ticket em memória sobreviveu indevidamente ao restart");
+  must(oldAfterRestart.status===200&&String(oldAfterRestart.data).includes("event: sync-expired"),
+    "ticket antigo após restart não solicitou renovação limpa");
   const renewedTicket=await post("/api/sync/ticket",{token}),afterRestart=openSse(renewedTicket.data.ticket,takeoverEvent.id);
   const reset=await afterRestart.wait("snapshot-required");await afterRestart.wait("ready");
   must(reset.data.reason==="server-reset","cursor antigo não forçou reconciliação depois do restart");
