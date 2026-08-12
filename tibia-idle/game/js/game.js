@@ -2332,7 +2332,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);
   }
-  if(typeof renderAll==="function")renderAll();return true;
+  // O loop já redesenha canvas/HUD. A renderização completa aqui recriava
+  // painéis e modais a cada snapshot (2×/s), causando o piscar da interface.
+  if(typeof renderPartyPanel==="function")renderPartyPanel(G.p);
+  return true;
 }
 function requestOnlineAuthorityTick(){
   if(ONLINE_AUTH_TICKING||!onlineAuthorityCombat()||

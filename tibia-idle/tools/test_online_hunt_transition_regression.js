@@ -41,8 +41,10 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   const snapshot=descriptor([a,b]);snapshot.state.players=[null,snapshot.state.players[1]];
   r=await put("/api/instance",Object.assign({token,instance_id:null,expected_version:0,state:snapshot},lease));
   must(r.status===200,"snapshot Cobra recuperável retornou "+r.status+": "+JSON.stringify(r.data));
+  const applyStart=game.indexOf("function applyOnlineAuthorityState"),applyEnd=game.indexOf("\nfunction requestOnlineAuthorityTick",applyStart);
   must(client.includes("ACCOUNT_PARTY_ZONE_QUEUE")&&game.includes('key==="_authorityDescriptor"')&&
-    !game.includes("G.combat._authorityDescriptor=descriptor")&&game.includes("G.huntEntryPendingToken"),
-    "cliente não serializa zona/remove ciclo/protege entrada OTBM");
+    !game.includes("G.combat._authorityDescriptor=descriptor")&&game.includes("G.huntEntryPendingToken")&&
+    !game.slice(applyStart,applyEnd).includes("renderAll()"),
+    "cliente não serializa zona/remove ciclo/protege entrada ou ainda pisca UI");
   console.log("OK: Cobra online salva instância e transita party sem HTTP 400/ciclo JSON.");
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>{if(child)child.kill("SIGTERM");fs.rmSync(dataDir,{recursive:true,force:true});});
