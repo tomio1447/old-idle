@@ -206,10 +206,20 @@ async function createCharacter(db, body) {
   if (name.length < 2 || name.length > 20) return { code: 400, body: { ok: false, msg: "Nome inválido" } };
   if (await db.findCharacterByName(name)) return { code: 409, body: { ok: false, msg: "Nome já em uso" } };
   const voc = String(body.voc || "none");
-  const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data || {});
-  const c = await db.createCharacter(acc.id, name, voc, 1, data);
+  let payload=body.data;if(typeof payload==="string"){try{payload=JSON.parse(payload);}catch(e){payload={};}}
+  payload=payload&&typeof payload==="object"?payload:{};
+  const existingCharacters=await db.charactersOf(acc.id);
+  const c = await db.createCharacter(acc.id, name, voc, 1, JSON.stringify(payload));
+  payload.id=String(c.id);payload.name=c.name;payload.voc=voc;payload.level=1;
+  const data=JSON.stringify(payload);
+  await db.updateCharacter(c.id,voc,1,data);
+  // Bônus inicial é concedido pelo servidor uma única vez, no primeiro char.
+  // O cliente nunca recebe permissão para fabricar saldo premium.
+  if(!existingCharacters.length)await db.updateCoins(acc.id,(acc.coins||0)+25);
+  const updatedAccount=await db.findAccountById(acc.id);
   return { code: 201, body: { ok: true,
-    character: accountCharacterSummary(Object.assign({}, c, { data })) } };
+    character: accountCharacterSummary(Object.assign({}, c, { data })),
+    coins:updatedAccount ? updatedAccount.coins||0 : acc.coins||0 } };
 }
 
 async function loadCharacter(db, token, id) {
@@ -265,6 +275,13 @@ async function repairCharacterIdentity(db,body,id){
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const c=await db.findCharacter(id);
   if(!c||Number(c.account_id)!==Number(acc.id))return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  let current=c.data;if(typeof current==="string"){try{current=JSON.parse(current);}catch(e){current={};}}
+  current=current&&typeof current==="object"?current:{};
+  const identityMismatch=(current.id!==undefined&&String(current.id)!==String(c.id))||
+    !!(current.name&&String(current.name).toLowerCase()!==String(c.name).toLowerCase());
+  const privileged=acc.role==="admin";
+  if(!privileged&&!identityMismatch)return {code:403,body:{ok:false,error:"REPAIR_NOT_ALLOWED",
+    msg:"Reparo permitido apenas para identidade corrompida ou administrador."}};
   const allowed=["knight","paladin","druid","sorcerer","monk"];
   const voc=allowed.includes(String(body.voc))?String(body.voc):null;
   if(!voc)return {code:400,body:{ok:false,msg:"Vocação inválida"}};
@@ -283,6 +300,8 @@ async function repairCharacterIdentity(db,body,id){
 async function coins(db, body) {
   const acc = await db.findAccountByToken(body.token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if(acc.role!=="admin")return {code:403,body:{ok:false,error:"ADMIN_ONLY",
+    msg:"Alteração direta de Tibia Coins é exclusiva do administrador."}};
   const amount = Math.max(-999999, Math.min(999999, Math.floor(Number(body.amount) || 0)));
   const novo = (acc.coins || 0) + amount;
   await db.updateCoins(acc.id, novo);

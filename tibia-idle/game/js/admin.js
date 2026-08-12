@@ -160,16 +160,29 @@ function renderAdminCoins(p, el) {
 
     </div>`;
 
-  $("#adm-coins-set").addEventListener("click", () => {
+  const updateCoins=async(n,reset)=>{
+    if(typeof accountApiConfigured==="function"&&accountApiConfigured()){
+      const acc=typeof sessionAccount==="function"?sessionAccount():null;
+      const amount=reset?-(acc&&acc.coins||0):n;
+      const result=await accountAddCoins(sessionToken(),amount);
+      if(!result.ok){toast("Servidor recusou a alteração de Coins","bad");return null;}
+      if(acc){acc.coins=result.coins;sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));}
+      if(typeof accountSetCoins==="function")accountSetCoins(result.coins);
+      return result.coins;
+    }
+    return typeof accountSetCoins==="function"
+      ?accountSetCoins(reset?0:accountCoins()+n):0;
+  };
+  $("#adm-coins-set").addEventListener("click", async () => {
     const n = parseInt($("#adm-coins").value, 10);
     if (!Number.isFinite(n) || n <= 0) { toast("Valor inválido"); return; }
-    const total = accountAddCoins(n);
+    const total=await updateCoins(n,false);if(total===null)return;
     adminAplicar(`+${fmtFull(n)} Tibia Coins na conta (saldo: ${fmtFull(total)})`);
   });
   $$("#admin-content [data-coins]").forEach((b) =>
-    b.addEventListener("click", () => {
+    b.addEventListener("click", async () => {
       const n = parseInt(b.dataset.coins, 10);
-      const total = n > 0 ? accountAddCoins(n) : accountSetCoins(0);
+      const total=await updateCoins(n,n===0);if(total===null)return;
       adminAplicar(n > 0
         ? `+${fmtFull(n)} Tibia Coins na conta (saldo: ${fmtFull(total)})`
         : "Tibia Coins zerados");
