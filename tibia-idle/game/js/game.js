@@ -2335,6 +2335,18 @@ function requestOnlineAuthorityTick(){
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
   }).catch(()=>{}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
+if(typeof window!=="undefined"){
+  window.addEventListener("tibia-idle-sync-instance",(event)=>{
+    const detail=event&&event.detail||{},state=detail.state;
+    if(!state){if(G.foreignInstance)G.foreignInstance=null;return;}
+    const belongs=G.p&&instanceIncludesCharacter(state,G.p.id);
+    if(G.combat&&belongs)applyOnlineAuthorityState(state,detail.event&&detail.event.terminalReason);
+    else if(G.foreignInstance&&!belongs)G.foreignInstance.memberNames=(state.members||[]).map((m)=>m.p&&m.p.name||m.id);
+  });
+  window.addEventListener("tibia-idle-sync-party",()=>{
+    if(typeof partySync==="function")partySync();
+  });
+}
 function startBackgroundTick() {
   if (_bgTimer) return;
   _bgTimer = setInterval(() => {
@@ -3364,6 +3376,7 @@ function initAccountLogin() {
     if(wasPlaying&&typeof accountLastInstancePromise==="function"){
       try{await accountLastInstancePromise();}catch(e){}
     }
+    if(typeof accountStopSync==="function")accountStopSync();
     if(typeof accountReleaseLease==="function"){
       try{await accountReleaseLease(sessionToken());}catch(e){}
     }
@@ -3422,6 +3435,7 @@ function initAccountLogin() {
       sessionStorage.setItem("tibia-idle-token", token);
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
     } catch (e) {}
+    if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
     const cards = characters.length ? characters.map((c) => `
       <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
         ${c.identityMismatch?`data-repair-char="${c.id}"`:`data-acc-char="${c.id}"`}>
@@ -3523,7 +3537,7 @@ function initAccountLogin() {
     msg("Reconectando...");
     accountMe(token).then((result) => {
       if (result.ok) {
-        msg("");
+        msg("");if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
         let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";
           sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
         const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));

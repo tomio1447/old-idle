@@ -5,6 +5,7 @@
  *   POST /api/register   { login, password, [email] }  -> cria conta
  *   POST /api/login      { login, password }           -> { token, account }
  *   GET  /api/me         (Authorization: Bearer token) -> { account, characters }
+ *   GET  /api/sync/events (ticket SSE)                 -> eventos/replay
  *   POST /api/lease/*    { token, holder_id, ... }     -> controle exclusivo
  *   GET/PUT /api/instance                              -> instância persistente
  *   worker + /api/instance/tick                       -> combate autoritativo
@@ -30,6 +31,7 @@ const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
+const { SyncBus } = require("./sync_bus");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats } = require("./authoritative_engine");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
@@ -40,6 +42,8 @@ const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)|
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
 const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_MAX_STEP_MS||"3600000",10)||3600000);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
+let SYNC_BUS=null;
+function publishSync(accountId,type,data){return SYNC_BUS?SYNC_BUS.publish(accountId,type,data):null;}
 
 /* ------------------------------- helpers ------------------------------- */
 
@@ -86,6 +90,7 @@ async function acquireLease(db,body,takeover){
   const now=Date.now(),expires=now+LEASE_TTL_MS,newSecret=newToken();
   if(takeover){
     const result=await db.leaseTakeover(acc.id,holder,leaseHash(newSecret),now,expires);
+    publishSync(acc.id,"lease",{action:"takeover",holderId:holder,expiresAt:new Date(expires).toISOString()});
     return {code:200,body:leaseBody(newSecret,result.lease,false)};
   }
   const presented=String(body.lease_token||"");
@@ -95,6 +100,8 @@ async function acquireLease(db,body,takeover){
   if(!result.ok)return {code:409,body:{ok:false,error:"LEASE_HELD",
     msg:"Esta conta já está ativa em outra aba ou dispositivo.",
     expiresAt:result.lease&&new Date(result.lease.expires_at).toISOString()}};
+  publishSync(acc.id,"lease",{action:result.resumed?"resume":"acquire",holderId:holder,
+    expiresAt:new Date(expires).toISOString()});
   return {code:200,body:leaseBody(result.resumed?presented:newSecret,result.lease,result.resumed)};
 }
 async function renewLease(db,body){
@@ -110,7 +117,9 @@ async function releaseLease(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
-  if(validLeaseHolder(holder)&&secret.length===64)await db.leaseRelease(acc.id,holder,leaseHash(secret));
+  let released=false;
+  if(validLeaseHolder(holder)&&secret.length===64)released=await db.leaseRelease(acc.id,holder,leaseHash(secret));
+  if(released)publishSync(acc.id,"lease",{action:"release",holderId:holder});
   return {code:200,body:{ok:true}};
 }
 async function requireLease(db,acc,body){
@@ -119,6 +128,27 @@ async function requireLease(db,acc,body){
     await db.leaseValidate(acc.id,holder,leaseHash(secret),Date.now());
   return valid?null:{code:423,body:{ok:false,error:"LEASE_REQUIRED",
     msg:"Esta aba não possui o controle ativo da conta."}};
+}
+async function issueSyncTicket(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const issued=SYNC_BUS.issueTicket(acc.id,body.token);
+  return {code:200,body:{ok:true,ticket:issued.ticket,expiresAt:new Date(issued.expiresAt).toISOString(),cursor:SYNC_BUS.cursor()}};
+}
+async function publishPartyState(db,accountId,action){
+  const party=await db.partyFindByAccount(accountId),members=party?await db.partyMembers(party.id):[];
+  publishSync(accountId,"party",{action,party:party?{id:Number(party.id),version:Number(party.roster_version),
+    order:[Number(party.leader_id)].concat(members.map((m)=>Number(m.id)))}:null});
+}
+async function syncState(db,token){
+  const acc=await db.findAccountByToken(token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const chars=await db.charactersOf(acc.id),party=await db.partyFindByAccount(acc.id),instance=await db.instanceGet(acc.id);
+  const members=party?await db.partyMembers(party.id):[];
+  return {code:200,body:{ok:true,cursor:SYNC_BUS.cursor(),
+    characters:chars.map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)||0})),
+    party:party?{id:Number(party.id),version:Number(party.roster_version),
+      order:[Number(party.leader_id)].concat(members.map((m)=>Number(m.id)))}:null,
+    instance:instance?instanceSummary(instance,false):null}};
 }
 
 const MIME = {
@@ -292,8 +322,10 @@ async function createCharacter(db, body) {
   // O cliente nunca recebe permissão para fabricar saldo premium.
   if(!existingCharacters.length)await db.updateCoins(acc.id,(acc.coins||0)+25);
   const updatedAccount=await db.findAccountById(acc.id);
+  const createdCharacter=normalized||Object.assign({},c,{data,save_version:1});
+  publishSync(acc.id,"character",{id:Number(createdCharacter.id),saveVersion:Number(createdCharacter.save_version),action:"created"});
   return { code: 201, body: { ok: true,
-    character: accountCharacterSummary(normalized||Object.assign({},c,{data,save_version:1})),
+    character: accountCharacterSummary(createdCharacter),
     coins:updatedAccount ? updatedAccount.coins||0 : acc.coins||0 } };
 }
 
@@ -380,6 +412,7 @@ async function saveCharacter(db, body, id) {
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result);
   const updated=result.characters[0];
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"save"});
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
 }
 
@@ -422,6 +455,8 @@ async function savePartyCharacters(db,body){
     }
     return saveConflictResponse(result);
   }
+  publishSync(acc.id,"character",{ids:result.characters.map((c)=>Number(c.id)),
+    saveVersions:result.characters.map((c)=>Number(c.save_version)),source:"party-save"});
   return {code:200,body:{ok:true,partyVersion,
     characters:result.characters.map(accountCharacterSummary)}};
 }
@@ -529,6 +564,8 @@ async function saveInstance(db,body){
     return {code:409,body:{ok:false,error:result.error,msg:"A instância foi alterada por outra sessão",
       instance:instanceSummary(result.instance,true)}};
   }
+  publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
+    status:result.instance.status,source:expected===0?"created":"checkpoint"});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 async function tickInstance(db,body){
@@ -542,6 +579,9 @@ async function tickInstance(db,body){
   const result=await db.instanceAuthorityTick(acc.id,expected,Date.now(),3600000,advanceAuthorityState,lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_NOT_ACTIVE"?410:409,
     body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
+  publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
+    status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",
+    characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
     instance:instanceSummary(result.instance,true),characters:(result.characters||[]).map(accountCharacterSummary)}};
 }
@@ -559,6 +599,8 @@ async function endInstance(db,body){
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:409,body:{ok:false,error:result.error,
     msg:result.error==="LEASE_REQUIRED"?"Controle transferido durante o encerramento":"A instância foi alterada",
     instance:instanceSummary(result.instance,true)}};
+  publishSync(acc.id,"instance",{id:result.instance&&result.instance.instance_id||id,
+    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end"});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
 
@@ -588,6 +630,7 @@ async function repairCharacterIdentity(db,body,id){
     max_hp:Math.max(0,Math.floor(Number(body.maxHp)||0)),max_mp:Math.max(0,Math.floor(Number(body.maxMp)||0)),
   });
   const updated=await db.findCharacter(id);
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),action:"repair"});
   return {code:200,body:{ok:true,character:accountCharacterSummary(updated)}};
 }
 
@@ -968,9 +1011,12 @@ async function main() {
   }
 
   await ensureTestAccounts(db);
+  SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
   const instanceWorker=startInstanceWorker(db,{
     intervalMs:INSTANCE_WORKER_INTERVAL_MS,maxStepMs:INSTANCE_WORKER_MAX_STEP_MS,
     minStepMs:Math.min(500,INSTANCE_WORKER_INTERVAL_MS),
+    onClaim:(claim)=>publishSync(claim.accountId,"instance",{version:claim.version,
+      terminalReason:claim.terminalReason||null,source:"worker"}),
   });
 
   const server = http.createServer(async (req, res) => {
@@ -979,9 +1025,27 @@ async function main() {
 
     const url = req.url.split("?")[0];
     try {
+      if(req.method==="GET"&&url==="/api/sync/events"){
+        const q=new URL(req.url,"http://x").searchParams,ticket=SYNC_BUS.consumeTicket(q.get("ticket"));
+        if(!ticket)return send(res,401,{ok:false,error:"SYNC_TICKET_INVALID",msg:"Ticket de sincronização inválido"});
+        const acc=await db.findAccountByToken(ticket.sessionToken);
+        if(!acc||Number(acc.id)!==Number(ticket.accountId))return send(res,401,{ok:false,error:"SYNC_SESSION_EXPIRED",msg:"Sessão expirada"});
+        res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",
+          "Connection":"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":"*"});
+        res.write("retry: 1500\n\n");
+        SYNC_BUS.subscribe(acc.id,res,req.headers["last-event-id"]||q.get("lastEventId"));return;
+      }
+      if(req.method==="POST"&&url==="/api/sync/ticket"){
+        const r=await issueSyncTicket(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="GET"&&url==="/api/sync/state"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await syncState(db,token);return send(res,r.code,r.body);
+      }
       if (req.method === "GET" && url === "/api/health") {
         return send(res, 200, { ok:true, testServer:TEST_SERVER,
-          worker:instanceWorker.stats(),accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
+          worker:instanceWorker.stats(),sync:{cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
+          accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
       }
       if (req.method === "GET" && url === "/js/server-config.js") {
         const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
@@ -1125,11 +1189,14 @@ async function main() {
       if (req.method === "POST" && url === "/api/party/create") {
         const body = await readBody(req);
         const r = await party.partyCreate(db, body);
+        if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"create");}
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/invite") {
         const body = await readBody(req);
         const r = await party.partyInvite(db, body);
+        if(r.body&&r.body.ok&&r.body.invite){const invited=await db.findCharacter(r.body.invite.invitee_id);
+          if(invited)publishSync(invited.account_id,"party-inbox",{action:"invite",inviteId:r.body.invite.id});}
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/party/inbox") {
@@ -1138,28 +1205,38 @@ async function main() {
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/accept") {
-        const body = await readBody(req);
+        const body = await readBody(req),invite=await db.inviteFind(Number(body.invite_id));
         const r = await party.partyAccept(db, body);
+        if(r.body&&r.body.ok&&invite){const leader=await db.findCharacter(invite.leader_id),guest=await db.findCharacter(invite.invitee_id);
+          if(leader)await publishPartyState(db,leader.account_id,"accept");if(guest&&(!leader||guest.account_id!==leader.account_id))await publishPartyState(db,guest.account_id,"accept");}
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/decline") {
         const body = await readBody(req);
         const r = await party.partyDecline(db, body);
+        if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)publishSync(acc.id,"party-inbox",{action:"decline"});}
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/leave") {
-        const body = await readBody(req);
+        const body = await readBody(req),actor=await db.findCharacter(Number(body.char_id));
+        const current=actor?await db.partyFindByCharacter(actor.id):null,affected=new Set();
+        if(current){const leader=await db.findCharacter(current.leader_id);if(leader)affected.add(Number(leader.account_id));
+          for(const member of await db.partyMembers(current.id))affected.add(Number(member.account_id));}
         const r = await party.partyLeave(db, body);
+        if(r.body&&r.body.ok){if(actor)affected.add(Number(actor.account_id));for(const accountId of affected)await publishPartyState(db,accountId,"leave");}
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/kick") {
-        const body = await readBody(req);
+        const body = await readBody(req),removed=await db.findCharacter(Number(body.member_id));
         const r = await party.partyKick(db, body);
+        if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"kick");
+          if(removed&&(!acc||Number(removed.account_id)!==Number(acc.id)))await publishPartyState(db,removed.account_id,"kick");}
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/reorder") {
         const body = await readBody(req);
         const r = await party.partyReorder(db, body);
+        if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"reorder");}
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/party/state") {

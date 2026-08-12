@@ -69,6 +69,9 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/register` | `{ login, password, email? }` | Cria uma conta |
 | POST | `/api/login` | `{ login, password }` | Login → `{ token, account, characters }` |
 | GET | `/api/me` | header `Authorization: Bearer <token>` | Conta + personagens |
+| POST | `/api/sync/ticket` | `{ token }` | Ticket temporário para SSE |
+| GET | `/api/sync/events?ticket=&lastEventId=` | SSE | Eventos ordenados com replay |
+| GET | `/api/sync/state` | Bearer token | Snapshot de versões para fallback |
 | POST | `/api/lease/acquire` | `{ token, holder_id, lease_token? }` | Adquire/retoma controle exclusivo |
 | POST | `/api/lease/renew` | `{ token, holder_id, lease_token }` | Heartbeat do holder atual |
 | POST | `/api/lease/takeover` | `{ token, holder_id }` | Transferência explícita de controle |
@@ -101,6 +104,19 @@ a aplicação e usar um banco/disco persistente.
 | GET | `/api/party/state?char_id=` | Bearer token | Estado, proprietário, versão, ordem e follow pendente |
 | POST | `/api/party/zone` | `{ token, char_id, zone, hunt?, instance?, otbm?, boss? }` | Líder reporta transição de mapa |
 | POST | `/api/party/follow` | `{ token, char_id, nonce }` | Membro confirma o teleporte (consome nonce) |
+
+**Sincronização SSE e reconexão:**
+- O navegador troca a sessão por um ticket temporário; o token da conta não é
+  colocado na URL do `EventSource`
+- Eventos `lease`, `instance`, `character`, `party` e `party-inbox` possuem ID
+  monotônico. `Last-Event-ID`/`lastEventId` reproduz somente o que faltou
+- Um histórico curto por conta mantém ordem no reconnect. Cursor expirado envia
+  `snapshot-required`, e o cliente reconcilia `/api/me`, `/api/instance` e party
+- Heartbeat SSE atravessa proxies; após erros repetidos o cliente renova ticket
+  com backoff e mantém fallback de `/api/sync/state` a cada 5 segundos
+- Takeover chega imediatamente a outras abas/dispositivos; versões de instância
+  e personagens disparam refresh coalescido, sem aplicar snapshot de outro char
+- `/api/health` expõe cursor e quantidade de conexões para observabilidade
 
 **Lease exclusivo de simulação:**
 - `account_leases` concede a somente um documento o direito de simular e

@@ -240,6 +240,14 @@ function accountTickInstance(token){
     return {ok:false,error:r.data.error};
   });
 }
+function accountRefreshInstance(token){
+  return accountQueueInstance(async()=>{
+    const r=await _api("GET","/api/instance",null,token);
+    if(!r.data.ok)return {ok:false};
+    if(!r.data.instance){accountInstanceApply(null);return {ok:true,state:null,lastStatus:r.data.lastStatus||null};}
+    accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance.state,meta:r.data.instance};
+  });
+}
 function accountEndInstance(token,reason){
   ACCOUNT_INSTANCE_EPOCH+=1;const endEpoch=ACCOUNT_INSTANCE_EPOCH;ACCOUNT_INSTANCE_CAN_CREATE=false;
   return accountQueueInstance(async()=>{
@@ -254,6 +262,69 @@ function accountEndInstance(token,reason){
     return false;
   });
 }
+
+const ACCOUNT_SYNC_CURSOR_KEY="tibia-idle-sync-cursor-v1";
+let ACCOUNT_SYNC={source:null,token:"",errors:0,reconnect:null,poll:null,stopped:true,charRefresh:null};
+function accountSyncCursor(value){
+  if(value!==undefined){try{sessionStorage.setItem(ACCOUNT_SYNC_CURSOR_KEY,String(value));}catch(e){}return Number(value)||0;}
+  try{return Number(sessionStorage.getItem(ACCOUNT_SYNC_CURSOR_KEY)||0);}catch(e){return 0;}
+}
+function accountSyncDispatch(type,detail){try{window.dispatchEvent(new CustomEvent("tibia-idle-sync-"+type,{detail:detail||{}}));}catch(e){}}
+async function accountSyncRefreshCharacters(token){
+  if(ACCOUNT_SYNC.charRefresh)return ACCOUNT_SYNC.charRefresh;
+  ACCOUNT_SYNC.charRefresh=accountMe(token).then((fresh)=>{
+    if(fresh.ok){accountCharacterCacheWrite(fresh.characters||[]);accountSyncDispatch("character",fresh);}
+    return fresh;
+  }).finally(()=>{ACCOUNT_SYNC.charRefresh=null;});return ACCOUNT_SYNC.charRefresh;
+}
+function accountSyncFallback(token){
+  if(ACCOUNT_SYNC.poll)return;ACCOUNT_SYNC.poll=setInterval(async()=>{
+    const state=await _api("GET","/api/sync/state",null,token);
+    if(!state.data.ok)return;accountSyncCursor(state.data.cursor);
+    await accountSyncRefreshCharacters(token);
+    const instance=await accountRefreshInstance(token);if(instance.ok)accountSyncDispatch("instance",instance);
+    accountSyncDispatch("party",state.data.party||{});
+  },5000);
+}
+function accountSyncStopFallback(){if(ACCOUNT_SYNC.poll){clearInterval(ACCOUNT_SYNC.poll);ACCOUNT_SYNC.poll=null;}}
+async function accountStartSync(token){
+  if(!token)return false;if(ACCOUNT_SYNC.source&&ACCOUNT_SYNC.token===token)return true;
+  accountStopSync();ACCOUNT_SYNC.stopped=false;ACCOUNT_SYNC.token=token;
+  if(typeof EventSource==="undefined"){accountSyncFallback(token);return false;}
+  const ticket=await _api("POST","/api/sync/ticket",{token});
+  if(!ticket.data.ok){accountSyncFallback(token);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),5000);return false;}
+  const url=ACCOUNT_API_URL+"/api/sync/events?ticket="+encodeURIComponent(ticket.data.ticket)+
+    "&lastEventId="+encodeURIComponent(accountSyncCursor());
+  const source=new EventSource(url);ACCOUNT_SYNC.source=source;
+  const receive=(type,event)=>{
+    if(event.lastEventId)accountSyncCursor(event.lastEventId);let data={};try{data=JSON.parse(event.data||"{}");}catch(e){}
+    if(type==="lease"){
+      if(data.holderId&&data.holderId!==ACCOUNT_LEASE_PAGE_HOLDER&&ACCOUNT_LEASE.active&&data.action!=="release")
+        accountLeaseMarkLost("Outra aba ou dispositivo assumiu o controle.");
+      accountSyncDispatch("lease",data);return;
+    }
+    if(type==="instance"){
+      if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
+      accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,{event:data}));});return;
+    }
+    if(type==="character"){accountSyncRefreshCharacters(token);return;}
+    if(type==="party"||type==="party-inbox"){accountSyncDispatch("party",data);return;}
+    if(type==="snapshot-required"){
+      accountSyncRefreshCharacters(token);accountRefreshInstance(token).then((fresh)=>accountSyncDispatch("instance",fresh));
+      accountSyncDispatch("party",data);
+    }
+  };
+  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required"])
+    source.addEventListener(type,(event)=>receive(type,event));
+  source.addEventListener("ready",(event)=>{if(event.lastEventId)accountSyncCursor(event.lastEventId);ACCOUNT_SYNC.errors=0;accountSyncStopFallback();accountSyncDispatch("connected",{});});
+  source.onopen=()=>{ACCOUNT_SYNC.errors=0;accountSyncStopFallback();};
+  source.onerror=()=>{if(ACCOUNT_SYNC.stopped)return;ACCOUNT_SYNC.errors++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.errors});
+    if(ACCOUNT_SYNC.errors>=3){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
+      clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),Math.min(15000,1000*ACCOUNT_SYNC.errors));}};
+  return true;
+}
+function accountStopSync(){ACCOUNT_SYNC.stopped=true;if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
+  ACCOUNT_SYNC.source=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;accountSyncStopFallback();ACCOUNT_SYNC.token="";}
 
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };

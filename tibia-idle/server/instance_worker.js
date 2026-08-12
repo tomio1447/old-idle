@@ -31,7 +31,8 @@ async function runInstanceWorkerOnce(db,options){
   for(const accountId of ids){
     try{
       const claim=await db.instanceWorkerClaim(accountId,now,maxStep,minStep,advanceInstanceClock);
-      if(claim&&claim.ok){result.claimed++;result.elapsed+=Number(claim.elapsed)||0;}
+      if(claim&&claim.ok){result.claimed++;result.elapsed+=Number(claim.elapsed)||0;
+        if(typeof options.onClaim==="function")await options.onClaim(claim);}
       else result.skipped++;
     }catch(error){result.errors.push({accountId,message:error.message});}
   }
