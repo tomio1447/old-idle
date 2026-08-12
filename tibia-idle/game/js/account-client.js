@@ -218,8 +218,22 @@ async function accountLoadInstance(token){
   }
   return {ok:true,instance:r.data.instance.state||null,meta:r.data.instance};
 }
+function accountNormalizeInstanceMembers(state){
+  if(!state||!Array.isArray(state.members)||!state.members.length)return state;
+  state.state=state.state&&typeof state.state==="object"?state.state:{};
+  const visual=new Map();
+  for(const ent of Array.isArray(state.state.players)?state.state.players:[]){
+    if(!ent)continue;const id=String(ent.id!==undefined?ent.id:(ent.p&&ent.p.id));
+    if(id&&!visual.has(id))visual.set(id,ent);
+  }
+  state.state.players=state.members.map((member)=>{
+    const id=String(member.id),ent=Object.assign({},visual.get(id)||{id});
+    ent.id=id;ent.p=member.p;return ent;
+  });
+  return state;
+}
 function accountSaveInstance(token,state){
-  const epoch=ACCOUNT_INSTANCE_EPOCH;
+  const epoch=ACCOUNT_INSTANCE_EPOCH;state=accountNormalizeInstanceMembers(state);
   return accountQueueInstance(async()=>{
     if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
     if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
