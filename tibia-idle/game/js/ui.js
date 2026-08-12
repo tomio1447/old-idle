@@ -2498,9 +2498,8 @@ function renderCooldownBar(p) {
  * no topo. A lista antiga era uma coluna unica com as 22 municoes, o que
  * obrigava a rolar muito para achar a bolt certa.
  *
- * As categorias sao por familia de municao, nao por arma: quem usa bow so
- * enxerga flechas de qualquer jeito (a checagem de compatibilidade vive em
- * ammoCompatibleWithWeapon), mas separar por efeito ajuda a escolher.
+ * As categorias são por família de munição. A escolha manual é livre: não
+ * exige bow/crossbow equipado; a compatibilidade só é validada ao disparar.
  */
 const AMMO_CATS = [
   { id: "todas", nome: "Todas" },
@@ -2527,12 +2526,9 @@ function ammoInCat(slug, cat) {
 /* A munição pode ser usada agora? */
 function ammoUsable(p, slug) {
   const it = GAMEDATA.items[slug];
-  if (!it) return false;
+  if (!it || it.s !== "ammo") return false;
   if (!equippedQuiver(p)) return false;
-  if (p.level < (it.lvl || 1)) return false;
-  if (typeof ammoCompatibleWithWeapon === "function" &&
-      !ammoCompatibleWithWeapon(it, p.equip.weapon)) return false;
-  return true;
+  return p.level >= (it.lvl || 1);
 }
 
 /* Melhor munição por custo-benefício, usada pelo modo automático */
@@ -2540,6 +2536,11 @@ function bestAmmoFor(p) {
   let melhor = null, melhorNota = -1;
   for (const slug in AMMO_DEFS) {
     if (!ammoUsable(p, slug)) continue;
+    const item=GAMEDATA.items[slug];
+    // No modo automático, se já há arma equipada, mantenha munição capaz de
+    // disparar com ela. A seleção manual continua totalmente livre.
+    if(p.equip.weapon&&typeof ammoCompatibleWithWeapon==="function"&&
+       !ammoCompatibleWithWeapon(item,p.equip.weapon))continue;
     const a = AMMO_DEFS[slug];
     const nota = (a.atk || 0) / (a.shotCost || 1);
     if (nota > melhorNota) { melhorNota = nota; melhor = slug; }
@@ -2569,10 +2570,7 @@ function desenhaAmmoPicker() {
     const ok = ammoUsable(p, slug);
     const sel = !auto && atual === slug;
     const motivo = !equippedQuiver(p) ? "equipe um quiver"
-      : (p.level < (it.lvl || 1) ? "nível " + it.lvl
-      : (typeof ammoCompatibleWithWeapon === "function" &&
-         !ammoCompatibleWithWeapon(it, p.equip.weapon)
-         ? (a.kind === "bolt" ? "crossbow" : "bow") : ""));
+      : (p.level < (it.lvl || 1) ? "nível " + it.lvl : "");
     return `<div class="pick-row ${sel ? "selected" : ""}"
                  style="opacity:${ok ? 1 : .5}">
       <img src="assets/item/${slug}.png" alt="${a.n}">
