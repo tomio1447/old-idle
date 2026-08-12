@@ -550,10 +550,27 @@ function partyIsLeaderAny(p) {
  * nos hooks do game.js e no início do jogo). Só o líder altera o estado da
  * party; membros só registram a própria zona (servidor). */
 async function partyReportZone(zoneInfo) {
-  if (!partyOnlineMode()) return;
+  if (!partyOnlineMode()) return {ok:true,ignored:true};
+  const info=Object.assign({},zoneInfo||{}),allowed=["city","training","hunt","boss"];
+  if(!allowed.includes(info.zone))return {ok:true,ignored:true,reason:"zone-not-ready"};
+  // Callbacks de loading podem capturar um objeto incompleto. Complete com o
+  // estado vivo ou ignore o no-op em vez de gerar HTTP 400 no console.
+  if(info.zone==="hunt"&&!info.hunt){
+    info.hunt=(G&&G.combat&&G.combat.huntId)||(G&&G.p&&G.p.hunt)||null;
+    if(!info.hunt)return {ok:true,ignored:true,reason:"hunt-not-ready"};
+  }
+  if(info.zone==="boss"&&!info.boss){
+    info.boss=G&&G.combat&&G.combat.boss&&G.combat.boss.id||null;
+    if(!info.boss)return {ok:true,ignored:true,reason:"boss-not-ready"};
+  }
+  const charId=Number(sessionCharId());if(!Number.isSafeInteger(charId)||charId<=0)
+    return {ok:true,ignored:true,reason:"character-not-ready"};
   try {
-    await accountPartyReportZone(Number(sessionCharId()), zoneInfo);
-  } catch (e) { /* offline/erro de rede: segue o jogo */ }
+    const result=await accountPartyReportZone(charId,info);
+    if(result&&!result.ok&&typeof console!=="undefined")
+      console.warn("[party] zone recusada",info,result.code||0,result.error||"",result.msg||"");
+    return result;
+  } catch (e) { return {ok:false,error:"NETWORK_ERROR",msg:e&&e.message}; }
 }
 
 /* Poll do estado da party: espelha no save (para a UI) e aplica o

@@ -26,6 +26,10 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   const b=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
   await post("/api/party/create",{token,char_id:a.id});for(const c of [a,b])await post("/api/party/zone",{token,char_id:c.id,zone:"city"});
   const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:b.name});await post("/api/party/accept",{token,invite_id:invite.data.invite.id});
+  let noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"unknown"});
+  must(noOp.status===200&&noOp.data.ignored,"zona transitória ainda gera HTTP 400");
+  noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt"});
+  must(noOp.status===200&&noOp.data.ignored,"hunt ainda incompleta gera HTTP 400");
   let r=await post("/api/party/zone",{token,char_id:a.id,zone:"boss",boss:"goshnar-s-greed",cooldownMs:0});
   must(r.status===200,"entrada boss inicial falhou: "+JSON.stringify(r.data));
   r=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt",hunt:"cobra-bastion",instance:"non-pvp",otbm:"cobra_bastion"});

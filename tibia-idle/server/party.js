@@ -496,7 +496,7 @@ async function partyReportZone(db, body) {
 
   const zone = String(body.zone || "").toLowerCase();
   if (["city", "training", "hunt", "boss"].indexOf(zone) === -1) {
-    return { code: 400, body: { ok: false, msg: "Zona inválida" } };
+    return {code:200,body:{ok:true,ignored:true,error:"ZONE_NOT_READY",msg:"Reporte de zona ignorado"}};
   }
   // grava a zona do personagem (qualquer membro reporta a própria)
   await db.setCharacterZone(char.id, zone);
@@ -515,11 +515,13 @@ async function partyReportZone(db, body) {
       body: { ok: false, msg: "Transição inválida: " + party.leader_zone + " -> " + zone },
     };
   }
+  if(zone==="hunt"&&!body.hunt&&party.leader_hunt)body.hunt=party.leader_hunt;
+  if(zone==="boss"&&!body.boss&&party.leader_boss)body.boss=party.leader_boss;
   if (zone === "hunt" && !body.hunt) {
-    return { code: 400, body: { ok: false, msg: "hunt_id obrigatório" } };
+    return {code:200,body:{ok:true,ignored:true,error:"HUNT_NOT_READY",msg:"Hunt ainda não definida"}};
   }
   if (zone === "boss" && !body.boss) {
-    return { code: 400, body: { ok: false, msg: "boss obrigatório" } };
+    return {code:200,body:{ok:true,ignored:true,error:"BOSS_NOT_READY",msg:"Boss ainda não definido"}};
   }
 
   // BOSS: todos da party precisam ter cooldown disponível + missão completa

@@ -605,7 +605,8 @@ async function accountPartyReportZone(charId, zoneInfo) {
   const body=Object.assign({token:sessionToken(),char_id:charId},zoneInfo||{});
   const run=ACCOUNT_PARTY_ZONE_QUEUE.catch(()=>false).then(async()=>{
     const r=await _api("POST","/api/party/zone",body);
-    return r.data.ok?{ok:true,zone:r.data.zone}:{ok:false,msg:r.data.msg,error:r.data.error};
+    return r.data.ok?{ok:true,zone:r.data.zone,ignored:!!r.data.ignored}:
+      {ok:false,code:r.code,msg:r.data.msg,error:r.data.error};
   });
   ACCOUNT_PARTY_ZONE_QUEUE=run.catch(()=>false);return run;
 }
