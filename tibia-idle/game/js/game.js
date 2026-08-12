@@ -162,6 +162,7 @@ function restoreCombatSessionState(fresh,session){
   c.mobs=(c.mobs||[]).map(hydrateMob);
   for(const pending of c.pendingSpawns)pending.mob=hydrateMob(pending.mob);
   if(c.greed)c.greed.randomFn=Math.random;
+  if(c.hatred){c.hatred.randomFn=Math.random;delete c.hatred.renderKey;if(!c.players)c._hatredPlayer=G.p;}
   if(c.scarlett)c.scarlett.raf=0;
   return c;
 }
@@ -883,8 +884,7 @@ const BOSS_DEFS = {
       mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:true,
       text:"Elimine 50 Rotten Golems em Rotten Wasteland para liberar Goshnar's Hatred",
     },
-    // O mapa e a mecânica próprios entram no próximo pacote.
-    mechanic:"pending-hatred-room",
+    mechanic:"dreads-torment",
   },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
@@ -1427,6 +1427,7 @@ function stopHunt(skipMapLoading) {
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
   if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
   if (typeof greedBossCleanup === "function" && G.combat) greedBossCleanup(G.combat);
+  if (typeof hatredBossCleanup === "function" && G.combat) hatredBossCleanup(G.combat);
   G.p.hunt = null;
   G.p.instanceMode = null;
   G.combat = null;

@@ -284,8 +284,12 @@ function placeFree(ent, occ, cx, cy, maxRadius) {
  * Reposiciona para o SQM livre mais próximo antes de qualquer interpolação. */
 function repairBlockedMapPosition(c, ent) {
   if (!c || !ent || ent.cx === undefined || ent.cy === undefined ||
-      !c.huntMap || typeof huntMapBlocked !== "function" ||
-      !huntMapBlocked(c.huntMap, ent.cx, ent.cy)) return false;
+      !c.huntMap || typeof huntMapBlocked !== "function") return false;
+  // Algumas bossrooms usam uma âncora visual marcada como bloqueante pelo
+  // footprint 2×2 do client. Preserve apenas o SQM inicial explicitamente
+  // fornecido; depois que o boss andar, a colisão normal volta a valer.
+  if(ent.allowBlockedSpawn&&ent.cx===ent.fixedSpawnCx&&ent.cy===ent.fixedSpawnCy)return false;
+  if(!huntMapBlocked(c.huntMap, ent.cx, ent.cy)) return false;
   const occ = buildOccupancy(c, ent);
   const moved = placeFree(ent, occ, ent.cx, ent.cy, Math.max(GRID_W, GRID_H));
   if (moved) {

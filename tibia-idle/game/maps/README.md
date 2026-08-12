@@ -113,6 +113,17 @@ respawns usam a região `(1047,1017,7)..(1058,1023,7)`. A hunt contém Rotten
 Golem, Branchy Crawler e Mould Phantom. Eliminar 50 Rotten Golems libera
 Goshnar's Hatred.
 
+## Goshnar's Hatred
+
+`goshnars_hatred.otbm` é uma cópia runtime independente do OTBM entregue para
+Rotten Wasteland, evitando compartilhar cache e zonas com a hunt. A sala/FOV
+informada ocupa `(1044,1012,7)..(1061,1025,7)` sem recortar o mundo 30×30.
+O player nasce em `(1047,1019,7)` e o boss em `(1059,1019,7)`. Após 20–40s,
+Dread's Torment ativa: os contadores sobem a cada 5s, elevando em 10% por
+ponto o dano de Hatred. A sala mantém até cinco summons; Dreadful Harvester
+tem 15.000 HP e reduz os contadores em 1 ao morrer, enquanto Hateful Soul tem
+10% de chance de nascer, 50.000 HP, dano escalado e zera todos os contadores.
+
 ## Goshnar's Greed
 
 `goshnarsgreed.otbm` vem do beta-map atualizado em `beta-maps/bossesroom/`,
