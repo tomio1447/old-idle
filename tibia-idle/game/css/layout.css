@@ -795,6 +795,9 @@ button.full { width: 100%; }
 .account-character-card.identity-mismatch { border-color:#c85a5a #5c2020 #5c2020 #c85a5a; }
 .account-character-card .identity-error { color:#ff8585; font-weight:bold; }
 .account-identity-warning { margin-bottom:10px; padding:9px; color:#ffd0d0; background:#321717; border:1px solid #9e4343; }
+.account-sex-choice .acc-sex { flex:1; min-height:42px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.account-sex-choice .acc-sex b { color:#ffe680; font-size:11px; }
+.account-sex-choice .acc-sex span { color:#a9a08d; font-size:8px; }
 .account-character-outfit {
   width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
   background: #0d0d10; border: 1px solid #474238; overflow: hidden;

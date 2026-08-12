@@ -2880,14 +2880,24 @@ function paintCharPortraits(chars, tries) {
 function openOutfitModal() {
   const p = G.p;
   ensureOutfit(p);
-  // trabalha numa cópia: só aplica ao confirmar
-  const draft = { type: p.outfit.type, colors: p.outfit.colors.slice() };
+  // As cores são pré-visualizadas no personagem vivo, mas o Cancelar
+  // restaura esta cópia antes de voltar ao seletor.
+  const originalColors = p.outfit.colors.slice();
+  const draft = { type: p.outfit.type, colors: originalColors.slice() };
   const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
   let part = 0;
   const render = () => {
     $$("#outfit-parts [data-opart]").forEach((b) => b.classList.toggle("primary", +b.dataset.opart === part));
     $$("#outfit-palette [data-ocolor]").forEach((s) => s.classList.toggle("sel", +s.dataset.ocolor === draft.colors[part]));
-    // O único preview agora é o 15x do Wardrobe abaixo.
+    // O renderer e o Wardrobe leem p.outfit.colors. Aplicar o draft aqui
+    // faz cada clique da paleta atualizar imediatamente base + addons.
+    p.outfit.colors = draft.colors.slice();
+    const preview=$("#outfit-color-preview");
+    if(preview&&typeof AppearanceRenderer!=="undefined"){
+      const cv=AppearanceRenderer.preview(p,"s");
+      if(cv){cv.style.width="72px";cv.style.height="72px";cv.style.imageRendering="pixelated";
+        preview.innerHTML="";preview.appendChild(cv);}
+    }
     const ward = $("#cyclo-content");
     if (ward && typeof cycloAppearance === "function") cycloAppearance(p, ward);
   };
@@ -2908,6 +2918,7 @@ function openOutfitModal() {
           `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
         </div>
       </div>
+      <div id="outfit-color-preview" class="outfit-preview" style="width:84px;height:84px;flex:none"></div>
       </div>
       <div class="small dim mt8 mb4">Wardrobe — outfits, addons e montarias</div>
       <div id="cyclo-content" class="outfit-wardrobe" style="max-height:330px;overflow:auto"></div>
@@ -2919,7 +2930,6 @@ function openOutfitModal() {
   $("#modal").classList.add("show", "wide");
   // A antiga tela Aparências da Cyclopedia passa a viver dentro do Change Outfit.
   if (typeof CYCLO !== "undefined") { CYCLO.appModo = "outfit"; CYCLO.filtro = "all"; }
-  if (typeof cycloAppearance === "function") cycloAppearance(p, $("#cyclo-content"));
 
   $$("#outfit-parts [data-opart]").forEach((b) => b.addEventListener("click", () => {
     part = +b.dataset.opart; render();
@@ -2927,7 +2937,10 @@ function openOutfitModal() {
   $$("#outfit-palette [data-ocolor]").forEach((s) => s.addEventListener("click", () => {
     draft.colors[part] = +s.dataset.ocolor; render();
   }));
-  const close = () => openCharacterModal();
+  const close = () => {
+    p.outfit.colors=originalColors.slice();
+    save();renderAll();openCharacterModal();
+  };
   $("#outfit-close").addEventListener("click", close);
   $("#outfit-cancel").addEventListener("click", close);
   $("#outfit-save").addEventListener("click", () => {
@@ -3123,9 +3136,10 @@ function initAccountLogin() {
       <div class="panel-body account-flow-body">
         <div class="field"><label>Nome do personagem</label>
           <input id="acc-char-name" maxlength="20" placeholder="Nome do personagem" autocomplete="off"></div>
-        <div class="row mb8" style="gap:5px">
-          <button data-sex="male" class="primary sm acc-sex">Masculino</button>
-          <button data-sex="female" class="sm acc-sex">Feminino</button>
+        <div class="small dim mb4">Sexo — define permanentemente quais outfits e addons estarão disponíveis</div>
+        <div class="row mb8 account-sex-choice" style="gap:5px">
+          <button data-sex="male" class="primary sm acc-sex"><b>MALE</b><span>Masculino</span></button>
+          <button data-sex="female" class="sm acc-sex"><b>FEMALE</b><span>Feminino</span></button>
         </div>
         <div class="small dim mb4">Vocação</div>
         <div class="voc-grid mb8" id="acc-voc-grid"></div>
@@ -3149,6 +3163,9 @@ function initAccountLogin() {
       try {
         const draft = newPlayer(name, selVoc, selSex);
         giveStarterKit(draft,{skipCoins:true}); normalizePlayer(draft);
+        // A wardrobe inicial é materializada já com o sexo escolhido; o
+        // catálogo nunca mistura outfits/addons MALE e FEMALE.
+        if(typeof ensureWardrobe==="function")ensureWardrobe(draft);
         const result = await accountCreateCharacter(token, name, selVoc, draft);
         if (!result.ok) { status.textContent = result.msg || "Falha ao criar personagem."; return; }
         if(typeof accountAddCoins==="function")await accountAddCoins(token,25);
