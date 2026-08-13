@@ -2312,7 +2312,8 @@ document.addEventListener("visibilitychange", async () => {
           const resumedAt=Date.now();G.bgLast=resumedAt;G.bgAcc=0;G.last=performance.now();G.tickAcc=0;_wasHidden=false;return;
         }
         if(remote.ok&&remote.lastStatus==="ended"){
-          clearInstanceSession("worker-ended",true);G.combat=null;G.inCity=true;G.p.hunt=null;G.p.instanceMode=null;
+          clearInstanceSession("worker-ended",true);G.combat=null;G.inCity=true;
+          if(G.p){G.p.hunt=null;G.p.instanceMode=null;}
         }
       }
     }
