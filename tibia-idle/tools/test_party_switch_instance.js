@@ -5,6 +5,6 @@ for(const [s,r] of [[game,/G\.combat\.players\.some/],[game,/partyCombatSwitchTo
   [party,/partyCombatSaveAll\(\)/],[party,/localStorage\.setItem\(ACTIVE_CHARACTER_KEY, String\(ent\.id\)\)/],
   [party,/onlineAuthorityCombat\(\).*persistActiveInstance\(\)/s],[game,/const localActiveId=.*previous\.player/],
   [game,/G\.combat\.player=localActive;G\.p=localActive\.p/],[index,/js\/party\.js\?v=shared-instance-v1/],
-  [index,/js\/game\.js\?v=shared-instance-v1/]])
+  [index,/js\/game\.js\?v=shared-instance-v2/]])
   if(!r.test(s))throw Error('troca segura/compartilhada de party ausente');
 console.log('OK: troca de personagem em party reutiliza uma instância e persiste o personagem ativo sem reload.');

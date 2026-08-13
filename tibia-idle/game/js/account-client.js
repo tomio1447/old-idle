@@ -202,12 +202,15 @@ function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_C
 async function accountLoadInstance(token){
   // Consulte antes de tickar: uma conta sem instância ativa deve receber 200
   // com null, não provocar o 410 esperado de /tick no console do navegador.
-  let r=await _api("GET","/api/instance",null,token);
+  const activeChar=typeof sessionCharId==="function"?sessionCharId():"";
+  let r=await _api("GET","/api/instance?char_id="+encodeURIComponent(activeChar||""),null,token);
   if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
   if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
   accountInstanceApply(r.data.instance);
-  if(accountLeaseAllowsSimulation()){
-    const tick=await _api("POST","/api/instance/tick",Object.assign({token,
+  const viewerMember=!!(r.data.instance.state&&Array.isArray(r.data.instance.state.members)&&
+    r.data.instance.state.members.some((member)=>String(member.id)===String(activeChar)));
+  if(accountLeaseAllowsSimulation()&&viewerMember){
+    const tick=await _api("POST","/api/instance/tick",Object.assign({token,char_id:activeChar||null,
       expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
     if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
       accountInstanceApply(tick.data.instance||null);
@@ -237,9 +240,9 @@ function accountSaveInstance(token,state){
   return accountQueueInstance(async()=>{
     if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
     if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
-    const r=await _api("PUT","/api/instance",Object.assign({token,
-      instance_id:ACCOUNT_INSTANCE.id||null,expected_version:ACCOUNT_INSTANCE.status==="active"?ACCOUNT_INSTANCE.version:0,
-      state},accountLeaseFields()));
+    const r=await _api("PUT","/api/instance",Object.assign({token,char_id:state.activeCharacterId||
+      (typeof sessionCharId==="function"?sessionCharId():null),instance_id:ACCOUNT_INSTANCE.id||null,
+      expected_version:ACCOUNT_INSTANCE.status==="active"?ACCOUNT_INSTANCE.version:0,state},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409){
@@ -256,6 +259,7 @@ function accountTickInstance(token){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
     const r=await _api("POST","/api/instance/tick",Object.assign({token,
+      char_id:typeof sessionCharId==="function"?sessionCharId():null,
       expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
       return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,elapsed:r.data.elapsed||0};}
@@ -266,7 +270,8 @@ function accountTickInstance(token){
 }
 function accountRefreshInstance(token){
   return accountQueueInstance(async()=>{
-    const r=await _api("GET","/api/instance",null,token);
+    const charId=typeof sessionCharId==="function"?sessionCharId():"";
+    const r=await _api("GET","/api/instance?char_id="+encodeURIComponent(charId||""),null,token);
     if(!r.data.ok)return {ok:false};
     if(!r.data.instance){accountInstanceApply(null);return {ok:true,state:null,lastStatus:r.data.lastStatus||null};}
     accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance.state,meta:r.data.instance};
@@ -278,6 +283,7 @@ function accountEndInstance(token,reason){
     if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
     if(!accountLeaseAllowsSimulation())return false;
     const r=await _api("POST","/api/instance/end",Object.assign({token,
+      char_id:typeof sessionCharId==="function"?sessionCharId():null,
       instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
     if(r.data.ok){const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
       if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
@@ -354,7 +360,9 @@ async function accountStartSyncNow(token,generation){
     if(type==="instance"){
       if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
       if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
-      accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,{event:data}));});return;
+      const matchesCurrent=!!(data.id&&String(data.id)===String(ACCOUNT_INSTANCE.id));
+      accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,
+        {event:Object.assign({},data,{matchesCurrent})}));});return;
     }
     if(type==="character"){accountSyncRefreshCharacters(token);return;}
     if(type==="party"||type==="party-inbox"){accountSyncDispatch("party",data);return;}
@@ -479,6 +487,8 @@ async function accountSaveParty(token,state,players){
     // após stopHunt, o end conclui primeiro e o checkpoint curado é salvo.
     if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
     if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
+    let account=null;try{account=typeof sessionAccount==="function"?sessionAccount():null;}catch(e){}
+    if(state.ownedByAccount&&account&&Number(state.ownedByAccount)!==Number(account.id))return true;
     const cache=await accountEnsureVersions(token,ids);
     const entries=[];
     for(const ent of players||[]){

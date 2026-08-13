@@ -173,6 +173,9 @@ JsonStore.prototype.leaseRelease = function(accountId,holderId,secretHash){
 JsonStore.prototype.instanceGet = function(accountId){
   return (this.instances||[]).find((row)=>Number(row.account_id)===Number(accountId))||null;
 };
+JsonStore.prototype.instanceGetByParty = function(partyId){
+  return (this.instances||[]).find((row)=>row.status==="active"&&Number(row.party_id)===Number(partyId))||null;
+};
 JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion,meta,state,lease){
   if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
     return {ok:false,error:"LEASE_REQUIRED"};
@@ -180,9 +183,9 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
     const party=(this.parties||[]).find((p)=>Number(p.id)===Number(meta.party_id));
     const members=party?(party.members||[]).slice().sort((a,b)=>(Number(a.position)||0)-(Number(b.position)||0)):[];
     const order=party?[Number(party.leader_id)].concat(members.map((m)=>Number(m.character_id))):[];
-    const controlled=order.filter((id)=>{const c=this.findCharacter(id);return c&&Number(c.account_id)===Number(accountId);});
-    if(!party||Number(party.roster_version)!==Number(meta.party_version)||controlled.length!==meta.member_ids.length||
-       controlled.some((id,index)=>id!==meta.member_ids[index]))return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
+    if(!party||Number(party.owner_account_id)!==Number(accountId)||
+       Number(party.roster_version)!==Number(meta.party_version)||order.length!==meta.member_ids.length||
+       order.some((id,index)=>id!==meta.member_ids[index]))return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
   }
   this.instances=this.instances||[];let row=this.instanceGet(accountId);
   if(row&&row.status==="active"){
@@ -217,7 +220,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
-    if(!c||Number(c.account_id)!==Number(accountId))continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
   row.updated_at=new Date(now).toISOString();this._save();
@@ -235,7 +238,7 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
-    if(!c||Number(c.account_id)!==Number(accountId))continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
   row.updated_at=row.saved_at;this._save();return {ok:true,instance:row,characters:changed,elapsed,
@@ -935,6 +938,10 @@ async function MysqlStore() {
       const rows=await this.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
       return rows[0]||null;
     },
+    async instanceGetByParty(partyId){
+      const rows=await this.query("SELECT * FROM account_instances WHERE party_id=? AND status='active' LIMIT 1",[Number(partyId)]);
+      return rows[0]||null;
+    },
     async instanceSave(accountId,instanceId,expectedVersion,meta,state,lease){
       const conn=await pool.getConnection();
       try{
@@ -949,12 +956,12 @@ async function MysqlStore() {
           const party=parties[0];
           let members=[];
           if(party)[members]=await conn.query(
-            `SELECT m.character_id FROM party_members m JOIN characters c ON c.id=m.character_id
-             WHERE m.party_id=? AND c.account_id=? ORDER BY m.position,m.joined_at,m.character_id`,
-            [Number(meta.party_id),Number(accountId)]);
-          const controlled=party?[Number(party.leader_id)].concat(members.map((m)=>Number(m.character_id))):[];
+            `SELECT m.character_id FROM party_members m
+             WHERE m.party_id=? ORDER BY m.position,m.joined_at,m.character_id`,
+            [Number(meta.party_id)]);
+          const order=party?[Number(party.leader_id)].concat(members.map((m)=>Number(m.character_id))):[];
           if(!party||Number(party.roster_version)!==Number(meta.party_version)||
-             controlled.length!==meta.member_ids.length||controlled.some((id,index)=>id!==meta.member_ids[index])){
+             order.length!==meta.member_ids.length||order.some((id,index)=>id!==meta.member_ids[index])){
             await conn.rollback();return {ok:false,error:"INSTANCE_PARTY_CONFLICT"};
           }
         }
@@ -1022,9 +1029,9 @@ async function MysqlStore() {
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         for(const projection of next.characters||[])await conn.query(
           `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
-           WHERE id=? AND account_id=?`,
+           WHERE id=?`,
           [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
-           projection.max_mp,Number(projection.id),Number(accountId)]);
+           projection.max_mp,Number(projection.id)]);
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
              worker_total_ms=worker_total_ms+?,status=?,terminal_reason=?,ended_at=? WHERE account_id=?`,
@@ -1056,9 +1063,9 @@ async function MysqlStore() {
         const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         for(const projection of next.characters||[])await conn.query(
           `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
-           WHERE id=? AND account_id=?`,
+           WHERE id=?`,
           [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
-           projection.max_mp,Number(projection.id),Number(accountId)]);
+           projection.max_mp,Number(projection.id)]);
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
              terminal_reason=?,ended_at=? WHERE account_id=?`,
@@ -1067,7 +1074,7 @@ async function MysqlStore() {
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         const ids=(next.characters||[]).map((p)=>Number(p.id));let characters=[];
         if(ids.length){const marks=ids.map(()=>"?").join(",");[characters]=await conn.query(
-          `SELECT * FROM characters WHERE account_id=? AND id IN (${marks})`,[Number(accountId)].concat(ids));}
+          `SELECT * FROM characters WHERE id IN (${marks})`,ids);}
         await conn.commit();return {ok:true,instance:saved[0],characters,elapsed,terminalReason:next.terminalReason||null};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },

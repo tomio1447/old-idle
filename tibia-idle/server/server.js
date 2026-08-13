@@ -422,7 +422,10 @@ function prepareCharacterSave(c,body){
 }
 
 async function enforceAuthoritativeProgress(db,accountId,prepared){
-  const row=await db.instanceGet(accountId);if(!row||row.status!=="active")return prepared;
+  let row=await db.instanceGet(accountId);
+  const party=await db.partyFindByCharacter(prepared.save.id);
+  if(party&&typeof db.instanceGetByParty==="function")row=await db.instanceGetByParty(party.id)||row;
+  if(!row||row.status!=="active")return prepared;
   let descriptor=null;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
   const player=protectedPlayer(descriptor,prepared.save.id);if(!player)return prepared;
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
@@ -533,21 +536,49 @@ async function savePartyCharacters(db,body){
 function instanceSummary(row,includeState){
   if(!row)return null;let state=null;
   if(includeState&&row.state){try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){state=null;}}
-  return {id:row.instance_id,version:Number(row.version)||0,status:row.status,kind:row.kind,
+  return {id:row.instance_id,version:Number(row.version)||0,status:row.status,ownerAccountId:Number(row.account_id)||null,kind:row.kind,
     huntId:row.hunt_id||null,bossId:row.boss_id||null,instanceMode:row.instance_mode,
     partyId:row.party_id?Number(row.party_id):null,partyVersion:row.party_version?Number(row.party_version):null,
     activeCharacterId:String(row.active_character_id),savedAt:new Date(row.saved_at).getTime(),
     startedAt:new Date(row.started_at).getTime(),workerCursorAt:new Date(row.worker_cursor_at||row.saved_at).getTime(),
     workerTotalMs:Number(row.worker_total_ms)||0,terminalReason:row.terminal_reason||null,state};
 }
-async function loadInstance(db,token){
+async function resolveInstanceRow(db,acc,charId){
+  const id=Number(charId);let character=null,party=null;
+  if(Number.isSafeInteger(id)&&id>0){character=await db.findCharacter(id);
+    if(!character||Number(character.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}}};
+    party=await db.partyFindByCharacter(id);
+    if(party&&typeof db.instanceGetByParty==="function"){
+      const shared=await db.instanceGetByParty(party.id);if(shared)return {row:shared,character,party,shared:Number(shared.account_id)!==Number(acc.id)};}
+  }
+  return {row:await db.instanceGet(acc.id),character,party,shared:false};
+}
+async function instanceCharactersForAccount(db,row,accountId){
+  let state=null;try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
+  const ids=((state&&state.authority&&state.authority.players)||[]).map((item)=>Number(item.id)),out=[];
+  for(const id of ids){const character=await db.findCharacter(id);
+    if(character&&Number(character.account_id)===Number(accountId))out.push(accountCharacterSummary(character));}
+  return out;
+}
+async function publishInstanceForRow(db,row,data){
+  const accounts=new Set([Number(row.account_id)]);
+  if(row.party_id){const members=await db.partyMembers(row.party_id),ids=[Number(row.active_character_id)].concat(members.map((m)=>Number(m.id)));
+    const party=await db.partyFindByCharacter(ids[0]);if(party)ids[0]=Number(party.leader_id);
+    for(const id of ids){const character=await db.findCharacter(id);if(character)accounts.add(Number(character.account_id));}}
+  for(const accountId of accounts)publishSync(accountId,"instance",data);
+}
+async function loadInstance(db,token,charId){
   const acc=await db.findAccountByToken(token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
-  const row=await db.instanceGet(acc.id);
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
   if(!row||row.status!=="active")return {code:200,body:{ok:true,instance:null,lastStatus:row?row.status:null,
     terminalReason:row&&row.terminal_reason||null}};
   const summary=instanceSummary(row,true);
   if(!summary.state)return {code:500,body:{ok:false,error:"INSTANCE_STATE_INVALID",msg:"Snapshot da instância está corrompido"}};
+  if(resolved.shared&&resolved.character&&summary.state.members&&
+     summary.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
+    summary.state.activeCharacterId=String(resolved.character.id);
   return {code:200,body:{ok:true,instance:summary}};
 }
 async function prepareInstanceState(db,acc,input){
@@ -560,7 +591,19 @@ async function prepareInstanceState(db,acc,input){
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
   const mode=["non-pvp","pvp","boss"].includes(String(input.instanceMode))?String(input.instanceMode):
     (kind==="boss"?"boss":"non-pvp");
-  const members=Array.isArray(input.members)?input.members:[];
+  let members=Array.isArray(input.members)?input.members:[];
+  const requestedActiveId=Number(input.activeCharacterId),requestedActive=await db.findCharacter(requestedActiveId),
+    requestedParty=requestedActive&&Number(requestedActive.account_id)===Number(acc.id)?await db.partyFindByCharacter(requestedActiveId):null;
+  if(requestedParty&&Number(requestedParty.owner_account_id)===Number(acc.id)){
+    const roster=await db.partyMembers(requestedParty.id),order=[Number(requestedParty.leader_id)].concat(roster.map((m)=>Number(m.id))),expanded=[];
+    for(const id of order){const supplied=members.find((member)=>Number(member&&member.id)===id);
+      if(supplied)expanded.push(supplied);else{const row=await db.findCharacter(id);
+        // O cliente do líder não possui snapshots de contas convidadas; o
+        // servidor os completa. Personagens da própria conta continuam
+        // obrigatórios para detectar snapshot parcial/corrompido.
+        if(row&&Number(row.account_id)!==Number(acc.id))expanded.push({id:String(id),p:{}});}}
+    members=expanded;input.members=members;
+  }
   if(!members.length||members.length>5)return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros da instância inválidos"}}};
   const ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
@@ -568,8 +611,8 @@ async function prepareInstanceState(db,acc,input){
   const rows=[];
   for(let index=0;index<ids.length;index++){
     const id=ids[index],c=await db.findCharacter(id),member=members[index]||{},player=member.p||{};
-    if(!c||Number(c.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",
-      msg:"A instância contém personagem de outra conta"}}};
+    if(!c)return {error:{code:404,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_FOUND",
+      msg:"A instância contém personagem inexistente"}}};
     if((player.id!==undefined&&String(player.id)!==String(c.id))||
        (player.name&&String(player.name).toLowerCase()!==String(c.name).toLowerCase()))
       return {error:{code:409,body:{ok:false,error:"INSTANCE_IDENTITY_MISMATCH",msg:"Snapshot contém identidade cruzada"}}};
@@ -580,6 +623,9 @@ async function prepareInstanceState(db,acc,input){
   }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
+  const activeRow=rows[ids.indexOf(activeId)];
+  if(!activeRow||Number(activeRow.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_ACTIVE_NOT_OWNED",
+    msg:"O personagem ativo não pertence à conta"}}};
   if(input.state&&Array.isArray(input.state.players)){
     // Ordem visual e referências compartilhadas não são autoridade. Rejeite
     // somente entidades estrangeiras/duplicadas e reconstrua ausentes na
@@ -599,18 +645,16 @@ async function prepareInstanceState(db,acc,input){
     });
   }
   let partyId=null,partyVersion=null;
-  const party=await db.partyFindByAccount(acc.id),partyMembers=party?await db.partyMembers(party.id):[];
-  const controlled=[];
-  if(party){
-    const order=[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id)));
-    for(const id of order){const c=await db.findCharacter(id);if(c&&Number(c.account_id)===Number(acc.id))controlled.push(id);}
-  }
-  // Se o personagem ativo participa da party controlada, nenhum snapshot
-  // pode deixá-la parcialmente para trás. Chars da conta fora do roster ainda
-  // podem possuir instância solo própria.
-  if(ids.length>1||(party&&controlled.includes(activeId))){
+  const party=await db.partyFindByCharacter(activeId),partyMembers=party?await db.partyMembers(party.id):[];
+  const partyOrder=party?[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id))):[];
+  // A instância pertence ao roster, não à conta individual. Portanto uma
+  // party entre contas também precisa enviar líder + todos os membros na
+  // mesma ordem; somente o personagem ativo precisa pertencer ao requester.
+  if(!party&&rows.some((row)=>Number(row.account_id)!==Number(acc.id)))
+    return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Instância solo contém personagem externo"}}};
+  if(ids.length>1||party){
     if(!party)return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
-    if(controlled.length!==ids.length||controlled.some((id,index)=>id!==ids[index]))
+    if(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))
       return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
     partyId=Number(party.id);partyVersion=Number(party.roster_version);
   }
@@ -636,6 +680,18 @@ async function saveInstance(db,body){
   const denied=await requireLease(db,acc,body);if(denied)return denied;
   const expected=Number(body.expected_version);
   if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"INSTANCE_VERSION_REQUIRED",msg:"Atualize a instância antes de salvar"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const activeId=Number(body.state&&body.state.activeCharacterId),active=await db.findCharacter(activeId);
+  if(active&&Number(active.account_id)===Number(acc.id)){
+    const party=await db.partyFindByCharacter(activeId),shared=party&&typeof db.instanceGetByParty==="function"?await db.instanceGetByParty(party.id):null;
+    if(party&&Number(party.owner_account_id)!==Number(acc.id)){
+      if(!shared)return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
+      const own=await db.instanceGet(acc.id);
+      if(own&&own.status==="active"&&String(own.instance_id)!==String(shared.instance_id))
+        await db.instanceEnd(acc.id,own.instance_id,own.version,"joined-shared-party",lease);
+      return {code:200,body:{ok:true,shared:true,instance:instanceSummary(shared,false)}};
+    }
+  }
   const prepared=await prepareInstanceState(db,acc,body.state);if(prepared.error)return prepared.error;
   let instanceId=String(body.instance_id||"");
   if(expected===0){
@@ -647,7 +703,6 @@ async function saveInstance(db,body){
     try{currentState=current&&current.state?(typeof current.state==="string"?JSON.parse(current.state):current.state):null;}catch(e){}
     if(currentState&&currentState.authority){prepared.state.authority=currentState.authority;prepared.state=materializeAuthority(prepared.state);}
   }
-  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const result=await db.instanceSave(acc.id,instanceId,expected,prepared.meta,JSON.stringify(prepared.state),lease);
   if(!result.ok){
     if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante o save"}};
@@ -656,7 +711,7 @@ async function saveInstance(db,body){
   }
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,
     result.instance.version,expected===0?"created":"checkpoint",result.instance,expected===0);
-  publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
+  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,source:expected===0?"created":"checkpoint",holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
@@ -667,8 +722,19 @@ async function tickInstance(db,body){
   const expected=body.expected_version===undefined||body.expected_version===null?null:Number(body.expected_version);
   if(expected!==null&&(!Number.isSafeInteger(expected)||expected<1))
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_VERSION",msg:"Versão inválida"}};
+  const resolved=await resolveInstanceRow(db,acc,body.char_id);if(resolved.error)return resolved.error;
+  if(resolved.shared&&resolved.row&&resolved.row.status==="active"){
+    const guestLease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()},own=await db.instanceGet(acc.id);
+    if(own&&own.status==="active"&&String(own.instance_id)!==String(resolved.row.instance_id))
+      await db.instanceEnd(acc.id,own.instance_id,own.version,"joined-shared-party",guestLease);
+    const summary=instanceSummary(resolved.row,true);
+    if(summary.state&&resolved.character)summary.state.activeCharacterId=String(resolved.character.id);
+    return {code:200,body:{ok:true,shared:true,elapsed:0,terminalReason:null,instance:summary,
+      characters:await instanceCharactersForAccount(db,resolved.row,acc.id)}};
+  }
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  const result=await db.instanceAuthorityTick(acc.id,expected,Date.now(),3600000,advanceAuthorityState,lease);
+  const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
+  const result=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceAuthorityState,lease);
   if(!result.ok){
     // Tick é idempotente: ausência/terminal entre GET e POST não é falha de
     // transporte e não deve poluir o console com HTTP 410.
@@ -680,11 +746,12 @@ async function tickInstance(db,body){
   if(typeof db.snapshotAdd==="function"&&(result.terminalReason||Number(result.instance.version)%120===0))
     await db.snapshotAdd(acc.id,"instance",result.instance.instance_id,result.instance.version,
       result.terminalReason||"tick",result.instance,!!result.terminalReason);
-  publishSync(acc.id,"instance",{id:result.instance.instance_id,version:Number(result.instance.version),
+  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
-    instance:instanceSummary(result.instance,true),characters:(result.characters||[]).map(accountCharacterSummary)}};
+    instance:instanceSummary(result.instance,true),characters:(result.characters||[])
+      .filter((character)=>Number(character.account_id)===Number(acc.id)).map(accountCharacterSummary)}};
 }
 
 async function endInstance(db,body){
@@ -695,15 +762,19 @@ async function endInstance(db,body){
   if(!/^[a-f0-9]{64}$/.test(id)||!Number.isSafeInteger(expected)||expected<1)
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_END",msg:"Instância inválida"}};
   const reason=String(body.reason||"finished").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"finished";
+  const resolved=await resolveInstanceRow(db,acc,body.char_id);if(resolved.error)return resolved.error;
+  if(resolved.shared&&resolved.row&&String(resolved.row.instance_id)===id)
+    return {code:200,body:{ok:true,sharedDetached:true,instance:null}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  const result=await db.instanceEnd(acc.id,id,expected,reason,lease);
+  const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
+  const result=await db.instanceEnd(ownerId,id,expected,reason,lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:409,body:{ok:false,error:result.error,
     msg:result.error==="LEASE_REQUIRED"?"Controle transferido durante o encerramento":"A instância foi alterada",
     instance:instanceSummary(result.instance,true)}};
   if(typeof db.snapshotAdd==="function"&&result.instance)await db.snapshotAdd(acc.id,"instance",
     result.instance.instance_id,result.instance.version,"ended-"+reason,result.instance,true);
-  publishSync(acc.id,"instance",{id:result.instance&&result.instance.instance_id||id,
-    version:Number(result.instance&&result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end",
+  if(result.instance)await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id||id,
+    version:Number(result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end",
     holderId:String(body.holder_id||"")});
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
 }
@@ -1063,9 +1134,11 @@ async function marketClaim(db, token) {
 async function marketGoldTransfer(db,body,direction){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
-  const active=await db.instanceGet(acc.id);if(active&&active.status==="active")
-    return {code:409,body:{ok:false,error:"MARKET_IN_INSTANCE",msg:"Banco do Market só pode ser usado no templo"}};
   const amount=Math.max(0,Math.floor(Number(body.amount)||0)),charId=Number(body.char_id),expected=Number(body.expected_version);
+  let active=await db.instanceGet(acc.id);const party=await db.partyFindByCharacter(charId);
+  if(party&&typeof db.instanceGetByParty==="function")active=await db.instanceGetByParty(party.id)||active;
+  if(active&&active.status==="active")
+    return {code:409,body:{ok:false,error:"MARKET_IN_INSTANCE",msg:"Banco do Market só pode ser usado no templo"}};
   if(amount<=0||!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1)
     return {code:400,body:{ok:false,error:"INVALID_MARKET_TRANSFER",msg:"Transferência inválida"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
@@ -1144,7 +1217,8 @@ async function main() {
     onClaim:async(claim)=>{if(typeof db.snapshotAdd==="function"&&(claim.terminalReason||claim.version%60===0)){
         const row=await db.instanceGet(claim.accountId);if(row)await db.snapshotAdd(claim.accountId,"instance",
           row.instance_id,row.version,claim.terminalReason||"worker",row,!!claim.terminalReason);}
-      publishSync(claim.accountId,"instance",{version:claim.version,
+      const current=await db.instanceGet(claim.accountId);
+      if(current)await publishInstanceForRow(db,current,{id:current.instance_id,version:claim.version,status:current.status,
         terminalReason:claim.terminalReason||null,source:"worker"});},
   });
 
@@ -1220,8 +1294,8 @@ async function main() {
         const r=await releaseLease(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="GET"&&url==="/api/instance"){
-        const token=(req.headers.authorization||"").replace("Bearer ","");
-        const r=await loadInstance(db,token);return send(res,r.code,r.body);
+        const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
+        const r=await loadInstance(db,token,q.get("char_id"));return send(res,r.code,r.body);
       }
       if(req.method==="PUT"&&url==="/api/instance"){
         const r=await saveInstance(db,await readBody(req));return send(res,r.code,r.body);
