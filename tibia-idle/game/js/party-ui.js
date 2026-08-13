@@ -249,6 +249,27 @@ function renderPartyPanel(p) {
     }));
 }
 
+/* Atualização barata do HUD durante combate autoritativo. Recriar todo o
+ * painel a cada frame refazia canvases de outfit e listeners, causando lag;
+ * aqui mudam somente largura e texto das quatro barras já existentes. */
+function updatePartyPanelLiveBars(){
+  if(typeof G==="undefined"||!G||!G.combat||!Array.isArray(G.combat.players))return;
+  const body=$("#party-panel-body");if(!body)return;
+  for(const ent of G.combat.players){
+    if(!ent||!ent.p)continue;
+    const id=String(ent.id!==undefined?ent.id:ent.p.id),row=body.querySelector(`[data-party-char="${id}"]`);
+    if(!row)continue;const bars=row.querySelectorAll(".party-pbar");if(bars.length<2)continue;
+    const max=typeof maxStats==="function"?maxStats(ent.p):{hp:1,mp:1},values=[
+      {now:Math.max(0,Number(ent.p.hp)||0),max:Math.max(1,Number(max.hp)||1)},
+      {now:Math.max(0,Number(ent.p.mp)||0),max:Math.max(0,Number(max.mp)||0)},
+    ];
+    for(let i=0;i<2;i++){const fill=bars[i].querySelector(".fill"),label=bars[i].querySelector(".val"),value=values[i],
+      pct=value.max>0?Math.max(0,Math.min(100,value.now*100/value.max)):0;
+      if(fill)fill.style.width=pct+"%";
+      if(label)label.textContent=fmtFull(Math.floor(value.now))+"/"+fmtFull(value.max);}
+  }
+}
+
 function openPartyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }

@@ -104,7 +104,7 @@ function saveBody(token,state,expected,id,leaseFields){return Object.assign({tok
   await post("/api/party/create",{token:owner.token,char_id:hero.id});
   for(const c of [hero,ally])await post("/api/party/zone",{token:owner.token,char_id:c.id,zone:"city"});
   const invite=await post("/api/party/invite",{token:owner.token,char_id:hero.id,invitee_name:ally.name});
-  await post("/api/party/accept",{token:owner.token,invite_id:invite.data.invite.id});
+  await post("/api/party/accept",{token:owner.token,char_id:ally.id,invite_id:invite.data.invite.id});
   const partyBoss=descriptor([hero,ally],1,"boss");
   r=await put("/api/instance",saveBody(owner.token,partyBoss,0,null,leaseB));
   must(r.status===200&&r.data.instance.version===1&&r.data.instance.partyId,

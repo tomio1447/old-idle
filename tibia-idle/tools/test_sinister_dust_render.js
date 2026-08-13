@@ -27,5 +27,5 @@ const call=source.lastIndexOf("drawSinisterDust(ctx,ent,cx,cy,tile,Date.now())")
   entities=source.indexOf("const depthEntities = buildRenderEntities"),
   objects=source.indexOf('drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects")',entities);
 must(call>entities&&call<objects,"poeira não está na camada das criaturas");
-must(html.includes("js/render.js?v=sinister-dust-v1"),"render.js sem cache-bust da poeira");
+must(html.includes("js/render.js?v=sinister-dust-v2"),"render.js sem cache-bust da poeira");
 console.log("OK: poeira Influenced/Fiendish aparece animada nos dois lados da criatura.");
