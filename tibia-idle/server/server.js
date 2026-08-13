@@ -576,7 +576,7 @@ async function loadInstance(db,token,charId){
     terminalReason:row&&row.terminal_reason||null}};
   const summary=instanceSummary(row,true);
   if(!summary.state)return {code:500,body:{ok:false,error:"INSTANCE_STATE_INVALID",msg:"Snapshot da instância está corrompido"}};
-  if(resolved.shared&&resolved.character&&summary.state.members&&
+  if(resolved.party&&resolved.character&&summary.state.members&&
      summary.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
     summary.state.activeCharacterId=String(resolved.character.id);
   return {code:200,body:{ok:true,instance:summary}};
@@ -684,6 +684,10 @@ async function saveInstance(db,body){
   const activeId=Number(body.state&&body.state.activeCharacterId),active=await db.findCharacter(activeId);
   if(active&&Number(active.account_id)===Number(acc.id)){
     const party=await db.partyFindByCharacter(activeId),shared=party&&typeof db.instanceGetByParty==="function"?await db.instanceGetByParty(party.id):null;
+    if(party&&shared&&(activeId!==Number(party.leader_id)||expected===0||String(body.instance_id||"")!==String(shared.instance_id)))
+      return {code:200,body:{ok:true,shared:true,instance:instanceSummary(shared,false)}};
+    if(party&&Number(party.leader_id)!==activeId&&!shared)
+      return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
     if(party&&Number(party.owner_account_id)!==Number(acc.id)){
       if(!shared)return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
       const own=await db.instanceGet(acc.id);
@@ -749,8 +753,12 @@ async function tickInstance(db,body){
   await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
+  const responseInstance=instanceSummary(result.instance,true);
+  if(resolved.party&&resolved.character&&responseInstance.state&&responseInstance.state.members&&
+     responseInstance.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
+    responseInstance.state.activeCharacterId=String(resolved.character.id);
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
-    instance:instanceSummary(result.instance,true),characters:(result.characters||[])
+    instance:responseInstance,characters:(result.characters||[])
       .filter((character)=>Number(character.account_id)===Number(acc.id)).map(accountCharacterSummary)}};
 }
 
@@ -763,7 +771,8 @@ async function endInstance(db,body){
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_END",msg:"Instância inválida"}};
   const reason=String(body.reason||"finished").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"finished";
   const resolved=await resolveInstanceRow(db,acc,body.char_id);if(resolved.error)return resolved.error;
-  if(resolved.shared&&resolved.row&&String(resolved.row.instance_id)===id)
+  if(resolved.row&&String(resolved.row.instance_id)===id&&resolved.party&&resolved.character&&
+     Number(resolved.character.id)!==Number(resolved.party.leader_id))
     return {code:200,body:{ok:true,sharedDetached:true,instance:null}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
