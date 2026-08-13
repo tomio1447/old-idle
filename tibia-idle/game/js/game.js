@@ -144,6 +144,26 @@ function instanceIncludesCharacter(instance,id){
     instance.members.some((member)=>String(member&&member.id)===String(id)));
 }
 
+/* Atualiza somente quem está sendo controlado no espelho local da instância.
+ * Não serializa nem recria o combate: a troca em party precisa preservar o
+ * runtime compartilhado que já está em execução. */
+function setActiveInstanceCharacter(id){
+  const activeId=String(id||"");
+  if(!activeId)return false;
+  try{
+    const raw=localStorage.getItem(INSTANCE_SESSION_KEY);
+    if(!raw)return false;
+    const session=JSON.parse(raw);
+    if(!instanceIncludesCharacter(session,activeId))return false;
+    session.activeCharacterId=activeId;
+    localStorage.setItem(INSTANCE_SESSION_KEY,JSON.stringify(session));
+    return true;
+  }catch(error){
+    console.warn("[idle] falha ao atualizar personagem ativo da instância",error);
+    return false;
+  }
+}
+
 function readInstanceSession() {
   try{
     const raw=localStorage.getItem(INSTANCE_SESSION_KEY);if(!raw)return null;
@@ -3272,10 +3292,20 @@ function initAccountLogin() {
   async function enterCharacter(token, summary, leaseReady) {
     const alreadyPlaying = typeof G !== "undefined" && G && G.p;
     if (alreadyPlaying) {
-      if (String(G.p.id) === String(summary.id)) { closeAccountModal(); return; }
+      if (String(G.p.id) === String(summary.id)) { closeAccountModal(); return true; }
+      // O picker online também é usado dentro de hunts/bosses. Se o alvo já
+      // participa do combate compartilhado, trocar significa apenas transferir
+      // o controle para a entidade existente — nunca salvar/recarregar a página.
+      const partyEntity=G.combat&&Array.isArray(G.combat.players)&&
+        G.combat.players.find((ent)=>String(ent&&(ent.id||(ent.p&&ent.p.id)))===String(summary.id));
+      if(partyEntity){
+        const switched=typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(summary.id);
+        if(switched)closeAccountModal();
+        return !!switched;
+      }
       if (typeof save === "function") save();
       try { sessionStorage.setItem("tibia-idle-online-autoload", String(summary.id)); } catch (e) {}
-      location.reload(); return;
+      location.reload(); return true;
     }
     if(!leaseReady&&typeof accountAcquireLease==="function"){
       msg("Reservando controle da conta...");

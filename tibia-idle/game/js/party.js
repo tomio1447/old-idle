@@ -1083,33 +1083,35 @@ function partyNearestTarget(c, mob) {
   return best || c.player || null;
 }
 
-/* Troca o personagem ATIVO durante o party combat (sem recarregar). */
+/* Troca o personagem ATIVO durante o party combat (sem recarregar).
+ * A instância e o combate existentes são mantidos: persistActiveInstance()
+ * não deve rodar aqui, pois um checkpoint completo durante a troca podia
+ * sobrescrever a autoridade e separar/duplicar membros da party. */
 function partyCombatSwitchTo(id) {
   try {
-    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return false;
+    if (typeof G === "undefined" || !G || !G.combat || !Array.isArray(G.combat.players)) return false;
     const c = G.combat;
-    const ent = c.players.find((e) => String(e.id) === String(id));
+    const ent = c.players.find((e) => String(e&&(e.id||(e.p&&e.p.id))) === String(id));
     if (!ent || !ent.p) return false;
     if (ent.p.hp <= 0) {
       if (typeof toast === "function") toast(ent.name + " está inconsciente — espere ele renascer.", "bad");
       return false;
     }
-    // Persiste TODOS antes da troca: HP/MP/posição da instância não ficam
-    // presos ao personagem anterior quando o jogador alterna o controle.
+    // Persiste os dados dos membros antes de mudar G.p, sem recriar runtime.
     if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
     else if (typeof saveCharacterToRoster === "function" && G.p) saveCharacterToRoster(G.p);
     c.player = ent;
     G.p = ent.p;
-    // A escolha ativa também precisa acompanhar a entidade ativa; sem isto,
-    // um reload posterior voltava para o personagem antigo/cidade.
+    const activeId=String(ent.id||(ent.p&&ent.p.id)||id);
+    // Todos os seletores precisam apontar para a mesma entidade. Em especial,
+    // tibia-idle-char define o char_id do próximo tick autoritativo online.
     try {
-      localStorage.setItem(ACTIVE_CHARACTER_KEY, String(ent.id));
-      sessionStorage.setItem(AUTOLOGIN_KEY, String(ent.id));
+      localStorage.setItem(ACTIVE_CHARACTER_KEY, activeId);
+      sessionStorage.setItem(AUTOLOGIN_KEY, activeId);
+      sessionStorage.setItem("tibia-idle-char", activeId);
+      sessionStorage.removeItem("tibia-idle-online-autoload");
     } catch (e) { /* storage indisponível: instância continua válida */ }
-    // FIX GRAVE: ao trocar de personagem na PT durante hunt/boss,
-    // o personagem logava em outra instância fora da PT porque a sessão
-    // persistida ainda tinha activeCharacterId antigo e o novo char tinha
-    // hunt=null. Agora garante hunt/instance e persiste imediatamente.
+    // Propaga hunt/instanceMode para o personagem ativo (para um reload futuro).
     try {
       if (c.huntId) {
         ent.p.hunt = c.huntId;
@@ -1118,17 +1120,12 @@ function partyCombatSwitchTo(id) {
         ent.p.hunt = null;
         ent.p.instanceMode = "boss";
       }
-      // Garante que o p recém-ativo tenha a hunt da instância atual
-      G.p.hunt = ent.p.hunt;
-      G.p.instanceMode = ent.p.instanceMode;
     } catch (e) {}
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
-    // Persiste a instância com o novo activeCharacterId imediatamente,
-    // senão um reload rápido voltava para instância antiga/fora da PT.
-    try {
-      if (typeof persistActiveInstance === "function" && G.combat) persistActiveInstance();
-      if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
-    } catch (e) {}
+    // Apenas muda activeCharacterId no espelho local. O tick com o novo char_id
+    // resolve a MESMA instância compartilhada no servidor e sincroniza a autoridade.
+    if (typeof setActiveInstanceCharacter === "function") setActiveInstanceCharacter(activeId);
+    if (typeof requestOnlineAuthorityTick === "function") requestOnlineAuthorityTick();
     if (typeof renderAll === "function") renderAll();
     if (typeof toast === "function") toast("Controlando: " + ent.name);
     return true;

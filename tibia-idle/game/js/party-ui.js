@@ -79,16 +79,20 @@ function partyOutfitIcon(member, sex) {
 function partySwitchToChar(id) {
   // Em party combat, trocar personagem é trocar o controle para a entidade
   // viva já presente na hunt — recarregar levaria o membro a Thais e o
-  // duplicaria na instância.
-  if (typeof G !== "undefined" && G.combat && G.combat.players &&
-      G.combat.players.some((e) => String(e.id) === String(id)) &&
-      typeof partyCombatSwitchTo === "function") {
-    return partyCombatSwitchTo(id);
+  // duplicaria na instância. Se o snapshot ainda não trouxe esse membro,
+  // falhe fechado e aguarde a sincronização em vez de abrir outro runtime.
+  if (typeof G !== "undefined" && G && G.combat) {
+    const players=Array.isArray(G.combat.players)?G.combat.players:[];
+    const present=players.some((e)=>String(e&&(e.id||(e.p&&e.p.id)))===String(id));
+    if(present&&typeof partyCombatSwitchTo==="function")return partyCombatSwitchTo(id);
+    if(typeof toast==="function")toast("Este membro ainda não está disponível na instância ativa.","bad");
+    return false;
   }
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
   try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
   location.reload();
+  return true;
 }
 
 /* Estado de colapso do painel (persiste na sessão). */
