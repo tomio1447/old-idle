@@ -121,8 +121,12 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
     leader.dustLimit=Math.max(100,Number(leader.dustLimit)||100);leader.dust=Math.max(0,Number(leader.dust)||0);
     const gained=Math.min(Math.max(0,leader.dustLimit-leader.dust),dust);leader.dust+=gained;
     if(gained)auth.stats.loot.dust=(Number(auth.stats.loot.dust)||0)+gained;
-    if(mob.fiendish){const stars=Math.max(1,Number(mob.def&&mob.def.best&&mob.def.best.stars)||3),slivers=roll(auth,1,stars);
-      leader.slivers=(Number(leader.slivers)||0)+slivers;auth.stats.loot.slivers=(Number(auth.stats.loot.slivers)||0)+slivers;}
+    let sliversGained=0;
+    if(mob.fiendish){const stars=Math.max(1,Number(mob.def&&mob.def.best&&mob.def.best.stars)||3);sliversGained=roll(auth,1,stars);
+      leader.slivers=(Number(leader.slivers)||0)+sliversGained;auth.stats.loot.slivers=(Number(auth.stats.loot.slivers)||0)+sliversGained;}
+    // Evento de dust para o cliente mostrar o floater
+    if(gained||sliversGained)auth.events.push({t:"dust",dust:gained,slivers:sliversGained,
+      x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,fiendish:!!mob.fiendish,screen:true});
   }
   auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
 }
@@ -172,13 +176,22 @@ function step(auth,now){if(auth.ended)return;
   for(const mob of dead){
     if(auth.greed&&auth.greed.immune&&mob.slug==="greedbeast"){
       auth.greed.greedbeastKills++;if(auth.greed.greedbeastKills>=5){auth.greed.immune=false;auth.greed.greedbeastKills=0;auth.greed.vulnerableUntil=now+40000;}}
+    // Evento de kill para o cliente: missões, bestiário, loot log, XP floater
+    auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
+      exp:mob.exp||0,loot:[],x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
+      screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish});
     reward(auth,mob,auth.players);if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
       const leader=auth.players[0]&&auth.players[0].p;if(leader){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].kills=(leader.bosses[auth.bossId].kills||0)+1;}}}
   for(const mob of auth.mobs){mob.attackAcc+=1000;while(mob.attackAcc>=mob.attackSpeed){mob.attackAcc-=mob.attackSpeed;
     const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);if(!alive.length)break;const victim=alive[roll(auth,0,alive.length-1)];
     let damage=mobDamage(auth,mob,victim.p);if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);victim.p.hp-=damage;
-    auth.events.push({t:"range",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,el:mob.def&&mob.def.element||"physical",screen:true});
-    if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;}}}
+    // "taken" = dano recebido pelo player (o client usa case "taken" para
+    // mostrar o floater vermelho e o flash de dano). Antes usava "range"
+    // que o client trata como "fora de alcance" (não faz nada).
+    auth.events.push({t:"taken",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,el:mob.def&&mob.def.element||"physical",screen:true});
+    if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
+      auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true});
+    }}}
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
   // O último monstro da wave pode morrer no mesmo segundo autoritativo. Se o
   // respawn ficar apenas no início do próximo step, o snapshot intermediário

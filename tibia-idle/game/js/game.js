@@ -2051,6 +2051,15 @@ function drainEvents() {
           }).join(", ");
           addLog("loot", `Loot: ${txt}`);
         }
+        // Bestiário/bosstiário: no modo local isto roda dentro de combatTick
+        // (combat.js). No online, o evento kill é a única oportunidade de
+        // contar o abate para a Cyclopedia.
+        if (typeof bestiaryKill === "function") bestiaryKill(G.p, e.mob, 1);
+        if (e.boss && typeof bosstiaryKill === "function") bosstiaryKill(G.p, e.mob, 1);
+        // Kill count no save do personagem
+        G.p.totalKills = (G.p.totalKills || 0) + 1;
+        G.p.kills = G.p.kills || {};
+        G.p.kills[e.mob] = (G.p.kills[e.mob] || 0) + 1;
         if (c.boss) {
           const st = bossState(G.p, c.boss.id);
           st.kills = (st.kills || 0) + 1;
@@ -2632,21 +2641,33 @@ function loop(ts) {
   if (typeof avatarTick === "function") avatarTick(G.p, Date.now());
 
   if (!G.paused && G.combat) {
+    // Level/skill up detection funciona nos dois modos (online e local).
+    // No online, applyOnlineAuthorityState atualiza G.p.level/exp/skills
+    // via Object.assign; sem este检测 o level-up não mostra toast/floater.
+    const before = G.p.level;
+    const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     if(onlineAuthorityCombat()){
       ONLINE_AUTH_ACC+=dt;
       if(ONLINE_AUTH_ACC>=ONLINE_AUTH_TICK_MS){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
-      // Eventos de combate (dano/cura) chegam via applyOnlineAuthorityState
-      // e ficam na fila c.events. Sem drainEvents() os floaters e logs de
-      // dano nunca aparecem no modo online.
+      // Eventos de combate (dano/cura/kill/dust/death) chegam via
+      // applyOnlineAuthorityState e ficam na fila c.events.
       drainEvents();
+      // Imbuements tickam por TEMPO DE COMBATE no cliente (o servidor
+      // autoritativo não gerencia imbuements — eles são do save do char).
+      if (typeof imbTickAll === "function") {
+        const ents = G.combat.players && G.combat.players.length > 1 ? G.combat.players : [{ p: G.p }];
+        for (const ent of ents) if (ent.p) imbTickAll(ent.p, dt);
+      }
+      // CARGAS de anéis/amuletos por TEMPO (time ring: 1 carga/3s equipado)
+      if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
+      // Revive de party members caídos (visual)
+      reviveDownedParty(G.combat,Date.now(),false);
       G._partyHudAt=(G._partyHudAt||0)+dt;
       if(G._partyHudAt>=250){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{
-    const before = G.p.level;
-    const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     G.tickAcc += dt;
     while (G.tickAcc >= TICK) {
       combatTick(G.combat, G.p, TICK, Date.now());
@@ -2690,9 +2711,10 @@ function loop(ts) {
         else if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
       }
     }
-    // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido,
-    // vende apenas itens liberados (nunca classes 3/4, "Não vender" ou sem
-    // valor). Checagem espaçada para não rodar a cada frame.
+    }
+    // Autoseller da Loot Pouch: roda nos dois modos (online e local).
+    // No online o loot é adicionado ao save do char pelo servidor, mas o
+    // autoseller é responsabilidade do cliente (config do usuário).
     if (G.p && G.p.config && G.p.config.pouchAutoSell &&
         typeof sellAllPouch === "function") {
       G._pouchTick = (G._pouchTick || 0) + dt;
@@ -2708,6 +2730,7 @@ function loop(ts) {
         }
       }
     }
+    // Level up detection (online + local)
     if (G.p.level > before) {
       addLog("level", `Subiu para o nível <b>${G.p.level}</b>!`);
       toast(`Nível <b>${G.p.level}</b>!`, "level");
@@ -2717,7 +2740,7 @@ function loop(ts) {
       renderSkills(G.p);
     }
 
-    // auto equip a cada 15s (a venda e sempre manual: Sell all ou menu do item)
+    // auto equip a cada 15s (online + local) — reposição de supplies
     G.sellTimer += dt;
     if (G.sellTimer > 15000) {
       G.sellTimer = 0;
@@ -2728,7 +2751,6 @@ function loop(ts) {
       }
       renderInventory(G.p);
       renderLootPouch(G.p);
-    }
     }
   }
 
