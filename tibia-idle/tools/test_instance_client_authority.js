@@ -16,7 +16,9 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
     if(url.endsWith("/api/lease/acquire"))return response(200,{ok:true,leaseToken:"a".repeat(64),
       holderId:body.holder_id,expiresAt:new Date(Date.now()+120000).toISOString(),renewAfterMs:30000});
     if(url.endsWith("/api/lease/release"))return response(200,{ok:true});
-    if(url.endsWith("/api/instance")&&options.method==="GET")return response(200,{ok:true,instance:remote});
+    if(url.endsWith("/api/characters/1")&&options.method==="PUT")
+      return response(200,{ok:true,character:{id:1,name:"Lease Hero",voc:"knight",level:10,saveVersion:8}});
+    if(url.includes("/api/instance?")&&options.method==="GET")return response(200,{ok:true,instance:remote});
     if(url.endsWith("/api/instance")&&options.method==="PUT"){
       const next={id:body.instance_id||"c".repeat(64),version:body.expected_version+1,status:"active"};
       remote=Object.assign({},next,{state:body.state});return response(200,{ok:true,instance:next});
@@ -32,6 +34,14 @@ function response(status,data){return {status,json:async()=>data};}
 vm.createContext(ctx);vm.runInContext(source,ctx);
 (async()=>{
   must((await ctx.accountAcquireLease("token",false)).ok,"lease fake não adquirido");
+  ctx.accountCharacterCacheWrite([{id:1,name:"Lease Hero",voc:"knight",level:10,saveVersion:7}]);
+  must(await ctx.accountSaveCharacter("token",1,{id:"1",name:"Lease Hero",voc:"knight",level:10,hp:100,mp:50}),
+    "save versionado com lease falhou");
+  const characterPut=calls.find((c)=>c.url.endsWith("/api/characters/1")&&c.method==="PUT");
+  must(characterPut&&characterPut.body.expected_version===7&&characterPut.body.holder_id&&
+    characterPut.body.lease_token==="a".repeat(64),
+    "save de personagem não enviou versão, holder e lease token");
+
   const loaded=await ctx.accountLoadInstance("token");
   must(loaded.ok&&loaded.instance.marker==="remote","cliente não carregou snapshot remoto");
   const state={kind:"hunt",huntId:"rats",marker:"updated"};
