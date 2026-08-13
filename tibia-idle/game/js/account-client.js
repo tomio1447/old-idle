@@ -202,12 +202,13 @@ async function accountPartyInbox() {
 }
 
 async function accountPartyAccept(inviteId) {
-  const r = await _api("POST", "/api/party/accept", { token: sessionToken(), invite_id: inviteId });
+  // FIX: envia char_id para validar que está no personagem convidado
+  const r = await _api("POST", "/api/party/accept", { token: sessionToken(), char_id: Number(sessionCharId()), invite_id: inviteId });
   return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
 }
 
 async function accountPartyDecline(inviteId) {
-  const r = await _api("POST", "/api/party/decline", { token: sessionToken(), invite_id: inviteId });
+  const r = await _api("POST", "/api/party/decline", { token: sessionToken(), char_id: Number(sessionCharId()), invite_id: inviteId });
   return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
 }
 

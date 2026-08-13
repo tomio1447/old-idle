@@ -292,7 +292,11 @@ Renderer.prototype.__getFloorTilesTiles = function(floor) {
         return;
       }
 
-      if(tile.id === 0 && tile.items.length === 0 && tile.neighbours.length === 1) {
+      // Previously the filter ignored monsters and deferred creatures,
+      // causing tiles that had a moving monster to be dropped from the cache.
+      // When that happens the deferred rendering has no target tile and the
+      // creature disappears for a frame, looking like lag.
+      if(tile.id === 0 && tile.items.length === 0 && tile.monsters.size === 0 && tile.__deferredCreatures.size === 0 && tile.neighbours.length === 1) {
         return;
       }
 
@@ -317,8 +321,54 @@ Renderer.prototype.__renderWorld = function() {
   // Clear the full game canvas
   this.screen.clear();
 
+  // Prevent accumulation of deferred creatures on tiles that are no longer
+  // in the cache (e.g., void tiles filtered out). Without this, a stale set
+  // could keep old references or, conversely, a tile that was never rendered
+  // would never get its deferred set cleared.
+  // We clear BEFORE rendering so that deferred sets populated during this
+  // frame (by __defer) are preserved until their target tile is drawn.
+  try {
+    gameClient.world.chunks.forEach(function(chunk) {
+      chunk.tiles.forEach(function(tile) {
+        if(tile && tile.__deferredCreatures) {
+          // Only clear tiles that are NOT going to be visited this frame
+          // if they already have stale data from previous frame where they
+          // were not in cache. The visited tiles clear themselves in
+          // __renderDeferred, so we clear only tiles outside the current cache
+          // to be safe. For simplicity, clear tiles that are outside canSee
+          // range or have id 0.
+          if(tile.__deferredCreatures.size > 0 && !gameClient.player.canSee(tile)) {
+            tile.__deferredCreatures.clear();
+          }
+        }
+      });
+    });
+  } catch(e) {}
+
   // Render all of the cached tiles: only needs to be updated when the character moves
   this.getTileCache().forEach(this.__renderFloor, this);
+
+  // Final safety: any deferred set that survived (e.g., deferTile was null
+  // or outside cache) would otherwise cause the creature to disappear.
+  // Clear them now so the next frame starts clean; the creature will be
+  // rendered normally on its current tile in the next frame if defer failed.
+  try {
+    gameClient.world.chunks.forEach(function(chunk) {
+      chunk.tiles.forEach(function(tile) {
+        if(tile && tile.__deferredCreatures && tile.__deferredCreatures.size > 0) {
+          // If tile was in cache, it was already cleared by __renderDeferred.
+          // This only hits tiles that were not rendered or where defer failed.
+          // We clear to avoid stale references, but we do NOT clear tiles that
+          // still have a pending deferred that belongs to this frame and whose
+          // target was not rendered yet – however at this point all cached tiles
+          // were rendered, so it is safe to clear.
+          let stillVisible = false;
+          try { stillVisible = gameClient.player.canSee(tile); } catch(e) {}
+          if(!stillVisible) tile.__deferredCreatures.clear();
+        }
+      });
+    });
+  } catch(e) {}
 
   // If requested render the weather canvas
   if(gameClient.interface.settings.isWeatherEnabled()) {
@@ -594,12 +644,17 @@ Renderer.prototype.__renderDeferred = function(tile) {
     return;
   }
 
-  tile.__deferredCreatures.forEach(function(creature) {
-    let tile = gameClient.world.getTileFromWorldPosition(creature.__position);
-    this.__renderCreature(tile, creature, true);
-  }, this);
-
+  // Copy to array to avoid mutation during iteration
+  let deferred = Array.from(tile.__deferredCreatures);
   tile.__deferredCreatures.clear();
+
+  deferred.forEach(function(creature) {
+    // Use the tile where creature currently is for elevation reference,
+    // but if that tile is null (chunk not loaded) fallback to the defer tile
+    let currentTile = gameClient.world.getTileFromWorldPosition(creature.__position);
+    let renderTile = currentTile || tile;
+    this.__renderCreature(renderTile, creature, true);
+  }, this);
 
 }
 
@@ -610,9 +665,42 @@ Renderer.prototype.__renderCreature = function(tile, creature, deferred) {
    * Render the available creatures to the screen
    */
 
-  // If the creature is not visible in the gamescreen: skip rendering
-  if(!gameClient.player.canSee(creature)) {
+  // Deferred logic first: if this tile is the destination of a north/west
+  // move, we want to defer rendering to the origin tile even if the
+  // destination is slightly outside canSee, so the walk-out animation is
+  // still visible. Previous code checked canSee before defer, causing the
+  // creature to disappear when walking out of view.
+  if(!deferred && this.__shouldDefer(tile, creature)) {
+    let deferTile = this.__getDeferTile(tile, creature);
+    if(deferTile !== null) {
+      // Valid defer target – move rendering there
+      deferTile.__deferredCreatures.add(creature);
+      return;
+    }
+    // deferTile null means chunk not loaded – fall through to normal render
+    // instead of disappearing
+  }
+
+  // Visibility check: render if either current or previous position is
+  // visible, to keep smooth slide in/out. Without this, a monster leaving
+  // the screen would vanish instantly instead of sliding out.
+  let visibleCurrent = false;
+  try { visibleCurrent = gameClient.player.canSee(creature); } catch(e) {}
+  let visiblePrevious = false;
+  try {
+    if(creature.__previousPosition) {
+      visiblePrevious = gameClient.player.canSee({ getPosition: () => creature.__previousPosition });
+    }
+  } catch(e) {}
+  if(!visibleCurrent && !visiblePrevious) {
     return;
+  }
+
+  // If tile reference is null (chunk missing), try to recover a valid tile
+  // for elevation, otherwise skip
+  if(tile === null) {
+    tile = gameClient.world.getTileFromWorldPosition(creature.__position);
+    if(tile === null) return;
   }
 
   // Get the position of the creature
@@ -622,11 +710,6 @@ Renderer.prototype.__renderCreature = function(tile, creature, deferred) {
     position.x - tile.__renderElevation,
     position.y - tile.__renderElevation
   );
-
-  // Should the rendering of the creature be deferred to another tile
-  if(this.__shouldDefer(tile, creature) && !deferred) {
-    return this.__defer(tile, creature);
-  }
 
   // Render top animations
   this.__renderCreatureAnimationsBelow(creature);
@@ -657,15 +740,18 @@ Renderer.prototype.__defer = function(tile, creature) {
   /*
    * Function Renderer.__defer
    * Defers rendering of a creature to a new tile
+   * Returns true if defer succeeded, false otherwise
    */
 
   // Deferred rendering happens to the tile the player moved from
   let deferTile = this.__getDeferTile(tile, creature);
 
-  // Make sure the tile exists and is not itself
+  // Make sure the tile exists
   if(deferTile !== null) {
     deferTile.__deferredCreatures.add(creature);
+    return true;
   }
+  return false;
 
 }
 
@@ -674,16 +760,13 @@ Renderer.prototype.__getDeferTile = function(tile, creature) {
   /*
    * Function Renderer.__getDeferTile
    * Get the tile we need to defer the rendering of the creature to
+   * Simplified: always use previous position. The old NE/SW special cases
+   * returned south/east of destination which could be void (id 0) or not in
+   * cache, causing the creature to disappear for a frame.
    */
 
-  // Depends on the moving position
-  if(creature.__lookDirection === Position.prototype.opcodes.NORTH_EAST) {
-    return gameClient.world.getTileFromWorldPosition(creature.getPosition().south());
-  } else if(creature.__lookDirection === Position.prototype.opcodes.SOUTH_WEST) {
-    return gameClient.world.getTileFromWorldPosition(creature.getPosition().east());
-  } else {
-    return gameClient.world.getTileFromWorldPosition(creature.__previousPosition);
-  }
+  if(!creature.__previousPosition) return null;
+  return gameClient.world.getTileFromWorldPosition(creature.__previousPosition);
 
 }
 
@@ -692,6 +775,9 @@ Renderer.prototype.__shouldDefer = function(tile, creature) {
   /*
    * Function Renderer.__shouldDefer
    * Renders true if the drawing of a creature should be deferred to another tile
+   * Defer when moving north or west (including diagonals that contain north/west)
+   * and when rendering the destination tile. This keeps the sprite behind the
+   * foreground as in Tibia.
    */
 
   if(creature.__teleported) {
@@ -702,29 +788,30 @@ Renderer.prototype.__shouldDefer = function(tile, creature) {
     return false;
   }
 
+  if(!creature.__previousPosition) {
+    return false;
+  }
+
   if(creature.getPosition().z !== creature.__previousPosition.z) {
     return false;
   }
 
-  if((creature.__lookDirection === Position.prototype.opcodes.NORTH || creature.__lookDirection === Position.prototype.opcodes.WEST || creature.__lookDirection === Position.prototype.opcodes.NORTH_WEST)) {
-    if(!creature.__previousPosition.equals(tile.getPosition())) {
-      return true;
-    }
-  }
+  // Only defer when we are currently rendering the destination tile.
+  // For north/west moves, rendering on destination first would put the
+  // creature in front of tiles it should be behind, so we defer to origin.
+  let isDestination = tile.getPosition().equals(creature.getPosition());
+  if(!isDestination) return false;
 
-  if((creature.__lookDirection === Position.prototype.opcodes.NORTH_EAST)) {
-    if(!creature.__previousPosition.equals(tile.getPosition().west())) {
-      return true;
-    }
-  }
+  let dir = creature.__lookDirection;
+  let northWestComponents = [
+    Position.prototype.opcodes.NORTH,
+    Position.prototype.opcodes.WEST,
+    Position.prototype.opcodes.NORTH_WEST,
+    Position.prototype.opcodes.NORTH_EAST,
+    Position.prototype.opcodes.SOUTH_WEST
+  ];
 
-  if((creature.__lookDirection === Position.prototype.opcodes.SOUTH_WEST)) {
-    if(!creature.__previousPosition.equals(tile.getPosition().north())) {
-      return true;
-    }
-  }
-
-  return false;
+  return northWestComponents.indexOf(dir) !== -1;
 
 }
 
