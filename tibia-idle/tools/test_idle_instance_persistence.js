@@ -32,7 +32,7 @@ const p2={id:"p2",name:"Druid",level:100,gold:0,hp:80,mp:60,stamina:2};
 const e1={id:"p1",name:"Knight",p:p1},e2={id:"p2",name:"Druid",p:p2};
 ctx.G.p=p1;ctx.G.combat={huntId:"rats",instanceMode:"non-pvp",huntMap:{rows:["huge"]},
   players:[e1,e2],player:e1,events:[{t:"hit"}],mobs:[{id:"m1",slug:"rat",target:e2}],
-  stats:{startedAt:1}};
+  _formationReservations:new Map([[e1,{cx:5,cy:5}]]),stats:{startedAt:1}};
 // Reproduz o ciclo visto após um tick autoritativo antigo.
 const authorityDescriptor={state:ctx.G.combat};ctx.G.combat._authorityDescriptor=authorityDescriptor;
 const saved=ctx.persistActiveInstance();
@@ -40,10 +40,20 @@ must(saved&&saved.members.length===2,"snapshot não preserva toda a party");
 must(p1.stamina===42*3600&&p2.stamina===42*3600,"snapshot não mantém stamina cheia");
 const disk=JSON.parse(storage.get("idle-instance-test"));
 must(disk.state&&!disk.state.huntMap&&!disk.state.events&&!disk.state._authorityDescriptor&&
-  disk.state.players.length===2&&disk.state.players.every(Boolean),
-  "snapshot persistiu ciclo ou removeu membros por referência compartilhada");
+  !disk.state._formationReservations&&disk.state.players.length===2&&disk.state.players.every(Boolean),
+  "snapshot persistiu estado transitório/ciclo ou removeu membros por referência compartilhada");
 must(disk.state.mobs[0].target.__targetId==="p2","identidade do alvo não foi serializada");
 must(ctx.readInstanceSession().huntId==="rats","sessão persistida não pode ser relida");
+// Compatibilidade com snapshots já gravados antes da correção: `{}` precisa
+// ser hidratado como Map, sem descartar a instância do jogador.
+const legacyState=JSON.parse(JSON.stringify(disk.state));
+legacyState._formationReservations={};
+const restored=ctx.restoreCombatSessionState(
+  {hunt:{id:"rats"},huntMap:{rows:[]},boss:null},
+  {state:legacyState,activeCharacterId:"p1"}
+);
+must(restored._formationReservations instanceof Map,
+  "snapshot antigo não recriou as reservas de formação como Map");
 
 const advanceStart=src.indexOf("function reviveDownedParty");
 const advanceEnd=src.indexOf("\n/* ------------------------------------------------------------ loop */",advanceStart);

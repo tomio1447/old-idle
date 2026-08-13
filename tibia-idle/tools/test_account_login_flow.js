@@ -7,9 +7,14 @@ const js=fs.readFileSync(path.join(game,"js","game.js"),"utf8");
 const css=fs.readFileSync(path.join(game,"css","layout.css"),"utf8");
 const server=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
-must(html.includes('id="acc-login"')&&html.includes('id="acc-password"')&&
-  html.includes('id="acc-btn-login"')&&html.includes('id="acc-open-register"'),
-  "tela inicial não contém somente login/criar conta");
+must(html.includes('id="account-login-form"')&&html.includes('id="acc-login"')&&
+  html.includes('id="acc-password"')&&html.includes('id="acc-btn-login"')&&
+  html.includes('id="acc-open-register"')&&html.includes('type="submit">Entrar'),
+  "tela inicial não contém o formulário de login/criar conta");
+must(js.includes('$("#account-login-form").addEventListener("submit"')&&
+  js.includes('id="acc-register-form"')&&
+  js.includes('$("#acc-register-form").addEventListener("submit"'),
+  "login/cadastro não usam submit semântico (Enter/formulário)");
 must(!html.includes('id="acc-panel-register"')&&!html.includes('id="acc-char-picker"')&&
   !html.includes('data-acc-tab'),"cadastro/picker ainda estão embutidos na tela inicial");
 must(js.includes("function openRegisterModal()")&&js.includes('id="acc-new-login"')&&

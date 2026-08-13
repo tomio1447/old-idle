@@ -413,7 +413,10 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
     const planningOcc = buildOccupancy(c, ent);
     // Reservas evitam que dois aliados escolham a mesma excelente reta antes
     // de qualquer um chegar nela. A reserva é só planejamento, não atributo.
-    if (!c._formationReservations) c._formationReservations = new Map();
+    // Snapshots antigos serializavam Map como `{}`; normalize sempre para que
+    // retomar uma instância não tente chamar delete/forEach em um objeto comum.
+    if (!(c._formationReservations instanceof Map))
+      c._formationReservations = new Map();
     c._formationReservations.delete(ent);
     c._formationReservations.forEach((cell) => planningOcc.set(cell.cx + ":" + cell.cy, true));
     const candidato = targetFn(c, ent, planningOcc);

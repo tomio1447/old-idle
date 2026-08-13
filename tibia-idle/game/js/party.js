@@ -973,9 +973,12 @@ function partyCombatRestoreAll(reason) {
         }
       }
     }
-    if (typeof saveCharacterToRoster === 'function' and False):
-        pass
-  } catch (e) { print('restoreAll', e); }
+  } catch (e) {
+    // Restaurar a party é uma proteção de checkpoint; uma falha não pode
+    // interromper o carregamento dos demais módulos nem esconder ensureParty.
+    if (typeof console !== "undefined" && console.warn)
+      console.warn("[party] falha ao restaurar HP/MP da party", e);
+  }
   return count;
 }
 

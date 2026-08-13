@@ -40,18 +40,20 @@
 
       <!-- MODO ONLINE (conta) — visível quando accountApiConfigured() -->
       <div id="account-login" style="display:none">
-        <div class="small dim center mb8">Entre com sua conta para acessar seus personagens.</div>
-        <div class="field">
-          <label>Login</label>
-          <input id="acc-login" maxlength="32" placeholder="login" autocomplete="username">
-        </div>
-        <div class="field">
-          <label>Senha</label>
-          <input id="acc-password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
-        </div>
-        <button class="primary full mt8" id="acc-btn-login">Entrar</button>
-        <button class="full mt8" id="acc-open-register">Criar conta</button>
-        <div class="tiny dim center mt8" id="acc-msg"></div>
+        <form id="account-login-form" method="post">
+          <div class="small dim center mb8">Entre com sua conta para acessar seus personagens.</div>
+          <div class="field">
+            <label for="acc-login">Login</label>
+            <input id="acc-login" name="username" maxlength="32" placeholder="login" autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="acc-password">Senha</label>
+            <input id="acc-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
+          </div>
+          <button class="primary full mt8" id="acc-btn-login" type="submit">Entrar</button>
+          <button class="full mt8" id="acc-open-register" type="button">Criar conta</button>
+          <div class="tiny dim center mt8" id="acc-msg"></div>
+        </form>
       </div>
 
       <!-- MODO LOCAL (sem conta) — visível quando offline -->
@@ -395,7 +397,7 @@
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=mirrored-nightmare-v1"></script>
 <script src="js/area.js"></script>
-<script src="js/gridai.js"></script>
+<script src="js/gridai.js?v=runtime-recovery-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
 <script src="js/monk.js"></script>
@@ -440,7 +442,7 @@
 <script src="js/forge-ui.js"></script>
 <script src="js/prey.js"></script>
 <script src="js/prey-ui.js"></script>
-<script src="js/party.js?v=pt-fix-v6"></script>
+<script src="js/party.js?v=runtime-recovery-v1"></script>
 <script src="js/party-ui.js?v=pt-fix-v6"></script>
 <script src="js/analyzers.js"></script>
 <script src="js/wheeldata.js"></script>
@@ -459,7 +461,7 @@
 <script src="js/admin.js"></script>
 <script src="js/city-ui.js?v=hunts-modal-v1"></script>
 <script src="js/preload.js?v=cobra-loading-v17"></script>
-<script src="js/game.js?v=pt-fix-v6"></script>
+<script src="js/game.js?v=runtime-recovery-v1"></script>
 <script src="js/scarlett-boss.js?v=goshnar-greed-v1"></script>
 </body>
 </html>

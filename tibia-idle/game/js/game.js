@@ -103,7 +103,8 @@ function persistActiveInstance() {
     const state=JSON.parse(JSON.stringify(c,(key,value)=>{
       // Shared references (c.player também está em c.players) são válidas e
       // devem ser duplicadas pelo JSON.stringify. Remova apenas ciclos reais.
-      if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||key==="_authorityDescriptor")return undefined;
+      if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||
+         key==="_authorityDescriptor"||key==="_formationReservations")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
       return typeof value==="function"?undefined:value;
     }));
@@ -159,6 +160,10 @@ function restoreCombatSessionState(fresh,session){
   const c=raw;
   c.hunt=fresh.hunt;c.huntMap=fresh.huntMap;c.boss=fresh.boss;
   c.events=[];c.delayedHits=c.delayedHits||[];c.pendingSpawns=c.pendingSpawns||[];
+  // Reserva de formação é estado transitório com chaves de objeto (Map).
+  // JSON antigo a transformava em `{}`; recriá-la também limpa referências
+  // para entidades anteriores ao reload.
+  c._formationReservations=new Map();
   if(c.players&&c.players.length){
     c.players=c.players.map((ent)=>{
       if(ent.p)ent.p=normalizePlayer(ent.p);
@@ -3527,17 +3532,18 @@ function initAccountLogin() {
       <div class="panel-title">Criar conta
         <span style="flex:1"></span><button class="sm" id="acc-register-cancel">✕</button>
       </div>
-      <div class="panel-body account-flow-body">
-        <div class="field"><label>Login</label>
-          <input id="acc-new-login" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
-        <div class="field"><label>Senha</label>
-          <input id="acc-new-password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
-        <button class="primary full" id="acc-btn-register">Criar conta</button>
+      <form class="panel-body account-flow-body" id="acc-register-form" method="post">
+        <div class="field"><label for="acc-new-login">Login</label>
+          <input id="acc-new-login" name="username" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
+        <div class="field"><label for="acc-new-password">Senha</label>
+          <input id="acc-new-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
+        <button class="primary full" id="acc-btn-register" type="submit">Criar conta</button>
         <div class="tiny dim center mt8" id="acc-register-msg"></div>
-      </div>`)) return;
+      </form>`)) return;
     $("#acc-register-cancel").onclick = closeAccountModal;
     const register = $("#acc-btn-register");
-    register.onclick = async () => {
+    $("#acc-register-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
       if (register.disabled) return;
       const login = ($("#acc-new-login").value || "").trim();
       const pass = $("#acc-new-password").value || "";
@@ -3554,15 +3560,14 @@ function initAccountLogin() {
       } finally {
         register.disabled = false;
       }
-    };
-    $("#acc-new-login").onkeydown = (e) => { if (e.key === "Enter") register.click(); };
-    $("#acc-new-password").onkeydown = (e) => { if (e.key === "Enter") register.click(); };
+    });
     $("#acc-new-login").focus();
   }
 
   $("#acc-open-register").addEventListener("click", openRegisterModal);
-  $("#acc-btn-login").addEventListener("click", async (event) => {
-    const button = event.currentTarget;
+  $("#account-login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = $("#acc-btn-login");
     if (button.disabled) return;
     const login = ($("#acc-login").value || "").trim();
     const pass = $("#acc-password").value || "";
@@ -3576,8 +3581,6 @@ function initAccountLogin() {
       button.disabled = false;
     }
   });
-  $("#acc-login").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
-  $("#acc-password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#acc-btn-login").click(); });
 
   // Sessão existente em refresh: reabre diretamente o modal de personagens.
   const token = sessionToken();
