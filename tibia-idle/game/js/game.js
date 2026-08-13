@@ -1673,7 +1673,25 @@ function drainEvents() {
   const c = G.combat;
   if (!c) return;
   const r = G.renderer;
-  const visualTotals=aggregateCombatVisualEvents(c.events);
+
+  // Modo online: eventos do servidor têm `ts` (timestamp absoluto). O
+  // servidor processa 1s de combate de uma vez e envia todos os eventos
+  // juntos; sem espaçar, todos os floaters aparecem no mesmo frame.
+  // Filtramos apenas os eventos cujo `ts` já passou (Date.now() >= ts),
+  // deixando os demais para o próximo frame. Sem `ts` (modo local), processa
+  // tudo imediatamente como antes.
+  const now = Date.now();
+  const ready = [];
+  const pending = [];
+  for (const e of c.events) {
+    if (e.ts && e.ts > now) pending.push(e);
+    else ready.push(e);
+  }
+  c.events = pending;
+
+  if (!ready.length) return;
+
+  const visualTotals=aggregateCombatVisualEvents(ready);
   const visualAmount=(event,fallback)=>{
     const group=visualTotals.byEvent.get(event);
     return !group||group.first===event?(group?group.total:fallback):0;
@@ -1687,7 +1705,7 @@ function drainEvents() {
     ? e.x : (c.player ? c.player.x : 0.5);
   const ey = (e) => (e.y !== undefined && e.y !== null)
     ? e.y : (c.player ? c.player.y : 0.5);
-  for (const e of c.events) {
+  for (const e of ready) {
     switch (e.t) {
       case "hit": {
         // Cor do NUMERO de dano: fisico em VERMELHO contra criaturas de
@@ -2118,7 +2136,9 @@ function drainEvents() {
 
     }
   }
-  c.events.length = 0;
+  // Modo online: c.events agora contém apenas os eventos pendentes (ts no
+  // futuro). Eles serão processados nos próximos frames quando ts passar.
+  // Modo local: c.events foi esvaziado pela filtragem (todos sem ts = ready).
 }
 
 function regenInCity(p, dt) {
@@ -2550,6 +2570,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   }
   if(Array.isArray(previous.mobs)){previous.mobs.splice(0,previous.mobs.length,...reconciledMobs);}
   else previous.mobs=reconciledMobs;
+
+  // Eventos de combate (dano/cura/kill/dust/death/condition/buff) gerados
+  // pelo step() do servidor autoritativo. Eles chegam em incoming.events
+  // (do snapshot do servidor) mas G.combat é `previous` — sem esta cópia
+  // os eventos nunca chegam a drainEvents() e nenhum floater/log aparece.
+  if(Array.isArray(incoming.events)&&incoming.events.length){
+    previous.events=Array.isArray(previous.events)?previous.events:[];
+    for(const ev of incoming.events)previous.events.push(ev);
+  }
 
   // O activeCharacterId remoto pode estar um tick atrás logo após o clique.
   // Preserve primeiro o selecionado local; só use o remoto como fallback.

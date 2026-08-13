@@ -260,7 +260,7 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
       leader.slivers=(Number(leader.slivers)||0)+sliversGained;auth.stats.loot.slivers=(Number(auth.stats.loot.slivers)||0)+sliversGained;}
     // Evento de dust para o cliente mostrar o floater
     if(gained||sliversGained)auth.events.push({t:"dust",dust:gained,slivers:sliversGained,
-      x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,fiendish:!!mob.fiendish,screen:true});
+      x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,fiendish:!!mob.fiendish,screen:true,ts:stepTs+900});
   }
   auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
   return lootDrops;
@@ -298,6 +298,9 @@ function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const ite
 function step(auth,now){if(auth.ended)return;
   auth.stats=auth.stats||{};auth.stats.time=(Number(auth.stats.time)||0)+1000;
   auth.events=auth.events||[];
+  // Timestamp base do step: o cliente usa para espaçar os floaters ao longo
+  // de 1s em vez de mostrar todos de uma vez (lag visual).
+  const stepTs=Number(now)||Date.now();
   if(auth.greed){if(!auth.greed.immune&&now>=auth.greed.vulnerableUntil){auth.greed.immune=true;auth.greed.vulnerableUntil=0;}
     if(auth.greed.immune)fillGreed(auth);}
   for(const item of auth.players){
@@ -316,6 +319,7 @@ function step(auth,now){if(auth.ended)return;
     if(item.p.hp<=0||item.downUntil)continue;
     item.attackAcc+=1000;
     const p=item.p;
+    let hitIdx=0; // index do hit dentro do step (para espaçar floaters)
     // Tenta spells primeiro (maior dano fora de cooldown)
     let spellCdLeft=(p._lastSpellAt||0)+2000-now;
     while(item.attackAcc>=1200&&primaryTarget.hp>0){
@@ -364,7 +368,8 @@ function step(auth,now){if(auth.ended)return;
               auth.events.push({t:"hit",dmg:finalDmg,x:Number(tgt.x)||0.5,y:Number(tgt.y)||0.5,
                 el:el,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
                 mobId:String(tgt.id),mobSlug:tgt.slug,
-                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,missile:s.area?"":(s.words||"")});
+                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,missile:s.area?"":(s.words||""),
+                ts:stepTs+hitIdx*200});
             }
             // Mana cost
             if(s.mana)p.mp=Math.max(0,p.mp-s.mana);
@@ -399,9 +404,11 @@ function step(auth,now){if(auth.ended)return;
         auth.events.push({t:"hit",dmg:finalDmg,x:Number(primaryTarget.x)||0.5,y:Number(primaryTarget.y)||0.5,
           el:"physical",race:primaryTarget.def&&primaryTarget.def.race||"blood",
           crit:isCrit,fatal:isFatal,mobId:String(primaryTarget.id),mobSlug:primaryTarget.slug,
-          sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,projectile:isDist});
+          sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,projectile:isDist,
+          ts:stepTs+hitIdx*200});
         progressAttack(p);
       }
+      hitIdx++;
     }
   }
 
@@ -413,15 +420,16 @@ function step(auth,now){if(auth.ended)return;
     // Forge buffs on kill
     const leader=auth.players[0];
     if(leader&&leader.p.hp>0){
-      if(forgeTryMomentum(leader.p,now))auth.events.push({t:"buff",nome:"Momentum",x:0.13,y:0.6,screen:true});
-      if(forgeTryTranscendence(leader.p,now))auth.events.push({t:"buff",nome:"Transcendence",x:0.13,y:0.6,screen:true});
-      if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true});
+      if(forgeTryMomentum(leader.p,now))auth.events.push({t:"buff",nome:"Momentum",x:0.13,y:0.6,screen:true,ts:stepTs+800});
+      if(forgeTryTranscendence(leader.p,now))auth.events.push({t:"buff",nome:"Transcendence",x:0.13,y:0.6,screen:true,ts:stepTs+800});
+      if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true,ts:stepTs+800});
     }
     // Evento de kill para o cliente
     const lootDrops=reward(auth,mob,auth.players);
     auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
       exp:mob.exp||0,loot:lootDrops,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
-      screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish});
+      screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish,
+      ts:stepTs+800});
     if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
       if(leader){leader.p.bosses[auth.bossId]=leader.p.bosses[auth.bossId]||{};leader.p.bosses[auth.bossId].kills=(leader.p.bosses[auth.bossId].kills||0)+1;}}
   }
@@ -429,6 +437,7 @@ function step(auth,now){if(auth.ended)return;
   /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
   for(const mob of auth.mobs){
     mob.attackAcc+=1000;
+    let mobHitIdx=0;
     while(mob.attackAcc>=mob.attackSpeed){
       mob.attackAcc-=mob.attackSpeed;
       const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);
@@ -448,7 +457,7 @@ function step(auth,now){if(auth.ended)return;
             dmg=Math.max(0,Math.floor(dmg-playerArmor(victim.p)*.3));
             victim.p.hp-=dmg;
             auth.events.push({t:"taken",dmg:dmg,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
-              el:el,screen:true,fx:sk.fx});
+              el:el,screen:true,fx:sk.fx,ts:stepTs+mobHitIdx*200});
           }
           // Conditions aplicadas por skills
           if(sk.campo==="fire"&&dmg>0)applyCondition(victim.p,"fire",Math.floor(dmg*.1),4);
@@ -470,15 +479,16 @@ function step(auth,now){if(auth.ended)return;
         if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);
         victim.p.hp-=damage;
         auth.events.push({t:"taken",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
-          el:mob.def&&mob.def.element||"physical",screen:true});
+          el:mob.def&&mob.def.element||"physical",screen:true,ts:stepTs+mobHitIdx*200});
         // Conditions do melee (race-based, como no Canary)
         const race=mob.def&&mob.def.race;
         if(race==="poison"&&random(auth)<.15)applyCondition(victim.p,"poison",Math.floor(damage*.1),5);
         if(race==="fire"&&random(auth)<.15)applyCondition(victim.p,"fire",Math.floor(damage*.1),4);
         if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
-          auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true});
+          auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true,ts:stepTs+mobHitIdx*200});
         }
       }
+      mobHitIdx++;
     }
   }
 
@@ -532,6 +542,11 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
+  // Grid dimensions: o renderer usa combat.gridW/gridH para calcular o
+  // viewport e converter posições normalizadas (0-1) em pixels. Sem isso,
+  // o renderer cai no fallback GRID_W=21 e os floaters saem na posição
+  // errada (o grid real pode ser 30x30).
+  descriptor.state.gridW=Number(auth.gridW)||30;descriptor.state.gridH=Number(auth.gridH)||30;
   // Eventos de combate (dano/cura) gerados pelo step() desde o último tick.
   // O cliente drena esses eventos via drainEvents() para mostrar floaters e
   // logs de dano no modo online.
