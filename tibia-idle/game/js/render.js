@@ -420,28 +420,52 @@ Renderer.prototype.resize = function () {
   }
 };
 
-/* Textos de combate no idle não devem acumular como um battle log. Todos
- * sobem e desaparecem progressivamente em no máximo 2 segundos. */
+/* Floating damage — replicando Canary/OTClient AnimatedText */
 const FLOATER_MAX_LIFE = 2000;
+const ANIMATED_TEXT_DURATION = 1000;
+function floaterAlphaCanary(p, t, tf) {
+  const t0 = tf / 1.2;
+  if (t <= t0) return 1;
+  return Math.max(0, 1 - (t - t0) / (tf - t0));
+}
 function floaterAlpha(p) {
-  // Fade contínuo desde o primeiro frame (mais rápido no final), em vez de
-  // permanecer opaco até os últimos 300 ms e poluir a cena.
   return Math.max(0, Math.pow(1 - p, 1.35));
 }
 Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
   const life = kind === "damage" ? 1300 : (kind === "restore" ? 1150 : (big ? FLOATER_MAX_LIFE : 1500));
+  const now = Date.now();
+  for (let i = this.floaters.length - 1; i >= 0; i--) {
+    const f = this.floaters[i];
+    if (f.color !== color) continue;
+    if (f.kind !== kind) continue;
+    const elapsed = f.max - f.life;
+    if (elapsed > f.max / 2.5) continue;
+    const dx = Math.abs(f.x - x), dy = Math.abs(f.y - y);
+    if (dx > 0.15 || dy > 0.15) continue;
+    try {
+      const n1 = parseInt(String(f.text).replace(/[^0-9\-]/g, "")) || 0;
+      const n2 = parseInt(String(text).replace(/[^0-9\-]/g, "")) || 0;
+      if (!isNaN(n1) && !isNaN(n2) && String(text).match(/^-?\d/) && String(f.text).match(/^-?\d/)) {
+        const sum = n1 + n2;
+        const prefix = String(f.text).trim().startsWith("+") ? "+" : "";
+        f.text = (sum > 0 && prefix === "+" ? "+" : "") + sum;
+        f.life = Math.max(f.life, life * 0.6);
+        return;
+      }
+    } catch (e) {}
+  }
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
-    small: !!small,   // numeros de cura/dano com tamanho reduzido (v27)
+    small: !!small,
     kind: kind || "",
-    // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
-    // lateral (vx = 0) e com velocidade vertical constante.
-    vy: -0.007,
     vx: 0,
+    vy: -48,
+    spawnTime: now,
+    offsetX: 0,
+    offsetY: 0,
   });
-  // Limite curto evita mural de números em party/box com dano em área.
   if (this.floaters.length > 28) this.floaters.shift();
 };
 
@@ -569,13 +593,15 @@ function drawNameText(ctx, x, y, name, cor) {
   ctx.fillText(name, x, y);
 }
 
-/* Barra de vida do Tibia: 27x4 com 1px de borda preta.
- *
- * O client usa largura FIXA (nao acompanha o tamanho da criatura) e a cor
- * muda em degraus conforme a faixa de vida — nao ha gradiente nem barra
- * proporcional ao sprite. */
-const TIBIA_BAR_W = 27;
+/* Barra de vida do Tibia — replicando Canary/OTClient:
+ * Canary: backgroundRect 31x4, healthRect 29x2 (1px borda)
+ * Nosso antigo 27x4 era aproximação que deixava barra desalinhada.
+ * Agora reproduz exatamente: 31 bg, 29 inner, 4 total, 2 fill.
+ */
+const TIBIA_BAR_W = 31;
 const TIBIA_BAR_H = 4;
+const TIBIA_BAR_INNER_W = 29;
+const TIBIA_BAR_INNER_H = 2;
 
 /* Degraus de cor do client: >60 verde, >30 amarelo, >8 laranja/vermelho. */
 function tibiaHpColor(pct) {
@@ -588,12 +614,15 @@ function tibiaHpColor(pct) {
 }
 
 function drawTibiaBar(ctx, x, y, pct, cor) {
+  // Canary: background 31x4 preto, inner 29x2 com 1px borda
   const w = TIBIA_BAR_W, h = TIBIA_BAR_H;
+  const iw = TIBIA_BAR_INNER_W, ih = TIBIA_BAR_INNER_H;
   const bx = Math.round(x - w / 2), by = Math.round(y);
   ctx.fillStyle = "#000";
-  ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+  ctx.fillRect(bx, by, w, h);
   ctx.fillStyle = cor;
-  ctx.fillRect(bx, by, Math.round(w * Math.max(0, Math.min(1, pct))), h);
+  const fillW = Math.round(iw * Math.max(0, Math.min(1, pct)));
+  ctx.fillRect(bx + 1, by + 1, fillW, ih);
 }
 
 /* Cor da barra de HP do personagem na cena — MESMO padrao da healthbar do
@@ -608,20 +637,16 @@ function playerHpBarColor(pct) {
   return "#f87171";
 }
 
-function drawNameBars(ctx, x, y, name, hpPct, mpPct, shieldPct) {
-  // ordem do client: barra de vida logo acima da criatura e o nome acima
-  // dela. A mana so aparece para o proprio jogador (o Tibia nao mostra mana
-  // de terceiros), entao fica numa terceira linha, mais fina.
-  const hpY = y + 2;
-  // Nome segue exatamente a cor dinâmica da própria barra de HP, tal como
-  // os monstros. Não manter branco para player/party.
+function drawNameBars(ctx, x, nameY, name, hpPct, mpPct, shieldPct, barY) {
   const hpColor = playerHpBarColor(hpPct);
-  drawNameText(ctx, x, y - 3, name, hpColor);
+  const hpY = (typeof barY === 'number') ? barY : nameY + 12;
+  const nY = (typeof barY === 'number') ? nameY : nameY;
+  drawNameText(ctx, x, nY, name, hpColor);
   drawTibiaBar(ctx, x, hpY, hpPct, hpColor);
-  let nextY = hpY + TIBIA_BAR_H + 2;
+  let nextY = hpY + 4;
   if (shieldPct !== undefined && shieldPct !== null && shieldPct > 0) {
     drawTibiaBar(ctx, x, nextY, shieldPct, "#a64dff");
-    nextY += TIBIA_BAR_H + 2;
+    nextY += 4;
   }
   if (mpPct !== undefined && mpPct !== null) drawTibiaBar(ctx, x, nextY, mpPct, "#3c66ff");
 }
@@ -1529,19 +1554,34 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
   const occupiedLabels = [];
   for (const info of entityInfo) {
-    let y = info.top - 15;
-    // Empilha apenas labels que cruzam horizontalmente e verticalmente.
+    const exactSize = Math.max(info.w, info.h) / (typeof tibiaScale !== 'undefined' ? tibiaScale(info.tile ? info.tile : tilePx(W)) : 1);
+    const sizeOffset = Math.max(0, (exactSize - 32) * 0.15);
+    let barY = info.top - 6 - sizeOffset;
+    let nameY = barY - 12;
+    let y = nameY;
     for (const prev of occupiedLabels) {
-      if (Math.abs(prev.x - info.cx) < 42 && Math.abs(prev.y - y) < 20) y = prev.y - 20;
+      if (Math.abs(prev.x - info.cx) < 42 && Math.abs(prev.y - y) < 20) {
+        const shift = 20;
+        y -= shift;
+        barY -= shift;
+        nameY -= shift;
+      }
     }
     occupiedLabels.push({ x:info.cx, y:y });
+    const minTop = 2;
+    if (nameY < minTop) {
+      const delta = minTop - nameY;
+      nameY += delta;
+      barY += delta;
+      y += delta;
+    }
     if (info.e.kind === 'monster') {
-      drawTibiaBar(ctx, info.cx, y + 8, info.hpPct, tibiaHpColor(info.hpPct));
-      drawNameText(ctx, info.cx, y + 2, info.name, tibiaHpColor(info.hpPct));
+      drawTibiaBar(ctx, info.cx, barY, info.hpPct, tibiaHpColor(info.hpPct));
+      drawNameText(ctx, info.cx, nameY, info.name, tibiaHpColor(info.hpPct));
       if (typeof monsterAttackRange === 'function' && monsterAttackRange(info.ent) > .16)
         drawWikiIcon(ctx, 'range-atk', Math.round(info.cx + info.w/2 + 3), Math.round(info.top + info.h*.35), 9);
     } else {
-      drawNameBars(ctx, info.cx, y, info.name, info.hpPct, info.mpPct, info.shieldPct);
+      drawNameBars(ctx, info.cx, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY);
     }
     if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, dt);
     else if (info.e.kind === 'player') this.drawSpeech(ctx, info.cx, y, dt);
@@ -1601,18 +1641,28 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   ctx.restore();
 
-  // --- numeros flutuantes
-  ctx.textAlign = "center";
+  // --- numeros flutuantes — replicando Canary AnimatedText
+  ctx.textAlign = "left";
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
     f.life -= dt;
     if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
-    const p = 1 - f.life / f.max;
-    const alpha = floaterAlpha(p);
-    const fx = (f.x + f.vx * p * 60) * W;
-    const fy = (f.y + f.vy * p * 22) * H;
-    ctx.globalAlpha = alpha;
+    const elapsed = f.max - f.life;
+    const tf = f.max;
+    const p = elapsed / tf;
     ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    const textW = ctx.measureText(f.text).width;
+    const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
+    const baseX = f.x * W;
+    const baseY = f.y * H;
+    let fx = baseX + (24 * scale - textW / 2);
+    let fy = baseY + (8 * scale - 48 * scale * p);
+    const t0 = tf / 1.2;
+    let alpha = 1;
+    if (elapsed > t0) {
+      alpha = Math.max(0, 1 - (elapsed - t0) / (tf - t0));
+    }
+    ctx.globalAlpha = alpha;
     ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
@@ -1620,6 +1670,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.fillText(f.text, fx, fy);
     ctx.globalAlpha = 1;
   }
+  ctx.textAlign = "center";
 
   // Membros inconscientes da party: não renderizam outfit/IA; ficam como
   // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
