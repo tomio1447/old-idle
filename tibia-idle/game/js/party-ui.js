@@ -76,17 +76,15 @@ function partyOutfitIcon(member, sex) {
 }
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
-function partySwitchToChar(id) {
-  // Em party combat, trocar personagem é trocar o controle para a entidade
-  // viva já presente na hunt — recarregar levaria o membro a Thais e o
-  // duplicaria na instância. Se o snapshot ainda não trouxe esse membro,
-  // falhe fechado e aguarde a sincronização em vez de abrir outro runtime.
+async function partySwitchToChar(id) {
+  // Dentro de hunt/boss a troca sempre acontece no runtime atual. Sessões
+  // online antigas podem ainda não ter materializado o alvo em c.players;
+  // nesse caso o helper o hidrata no mesmo combate antes de transferir controle.
   if (typeof G !== "undefined" && G && G.combat) {
+    if(typeof partyCombatSwitchOnlineTo==="function")return await partyCombatSwitchOnlineTo(id);
     const players=Array.isArray(G.combat.players)?G.combat.players:[];
     const present=players.some((e)=>String(e&&(e.id||(e.p&&e.p.id)))===String(id));
-    if(present&&typeof partyCombatSwitchTo==="function")return partyCombatSwitchTo(id);
-    if(typeof toast==="function")toast("Este membro ainda não está disponível na instância ativa.","bad");
-    return false;
+    return !!(present&&typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(id));
   }
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
@@ -245,13 +243,8 @@ function renderPartyPanel(p) {
   $$("#party-panel-body [data-party-char]").forEach((el) =>
     el.addEventListener("click", () => {
       if (el.dataset.switch !== "1") return;
-      const inCombat = typeof G !== "undefined" && G && G.combat &&
-        Array.isArray(G.combat.players) && G.combat.players.length > 1 &&
-        G.combat.players.some((e) => String(e.id) === String(el.dataset.partyChar));
-      if (inCombat && typeof partyCombatSwitchTo === "function") {
-        partyCombatSwitchTo(el.dataset.partyChar);
-        return;
-      }
+      // Um único caminho atende entidade já carregada e snapshot legado
+      // incompleto, garantindo save/hidratação antes de transferir controle.
       partySwitchToChar(el.dataset.partyChar);
     }));
 }

@@ -3306,8 +3306,13 @@ function initAccountLogin() {
       // o controle para a entidade existente — nunca salvar/recarregar a página.
       const partyEntity=G.combat&&Array.isArray(G.combat.players)&&
         G.combat.players.find((ent)=>String(ent&&(ent.id||(ent.p&&ent.p.id)))===String(summary.id));
-      if(partyEntity){
-        const switched=typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(summary.id);
+      const partyState=G.p._partyOnline||null;
+      const partyMember=partyState&&[partyState.leader].concat(partyState.members||[])
+        .some((member)=>String(member&&member.id)===String(summary.id));
+      if(partyEntity||partyMember){
+        const switched=typeof partyCombatSwitchOnlineTo==="function"
+          ? await partyCombatSwitchOnlineTo(summary.id)
+          : typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(summary.id);
         if(switched)closeAccountModal();
         return !!switched;
       }
