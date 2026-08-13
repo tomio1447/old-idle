@@ -2788,6 +2788,14 @@ async function startGameReady(p) {
   if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&!instanceSession){
     p.hunt=null;p.instanceMode=null;
   }
+  // FIX: ao trocar de personagem na PT (online), o reload carrega o novo
+  // personagem mas a sessão ainda tem activeCharacterId do personagem
+  // anterior. Isso fazia resumeIdleInstance sobrescrever G.p de volta para
+  // o personagem antigo. Atualiza para o personagem atual antes de retomar.
+  if(instanceSession && p.id && instanceIncludesCharacter(instanceSession, p.id)){
+    instanceSession = Object.assign({}, instanceSession, { activeCharacterId: String(p.id) });
+    try { localStorage.setItem(INSTANCE_SESSION_KEY, JSON.stringify(instanceSession)); } catch(e){}
+  }
   const off=instanceSession?null:computeOffline(p);
   p.lastSeen=Date.now();
 
