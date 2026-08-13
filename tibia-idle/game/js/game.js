@@ -1942,6 +1942,25 @@ function drainEvents() {
         renderStats(G.p);
         break;
       }
+      case "condition": {
+        // Condition ticking (poison/fire/bleed/energy/curse) do servidor
+        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
+        const el = e.el || "physical";
+        const col = (typeof ELEMENTS !== "undefined" && ELEMENTS[el]) ? ELEMENTS[el].color : "#ff6b6b";
+        if (e.dmg > 0) r.addFloater(px, py - 0.07, "-" + fmtDmg(e.dmg), col, false, true, "damage");
+        const d = CONDITIONS && CONDITIONS[el];
+        if (d) addLog("death", `<b style="color:${d.cor}">${d.nome}</b> causou <b>${e.dmg}</b> de dano.`);
+        renderStats(G.p);
+        break;
+      }
+      case "buff": {
+        // Forge buffs (Momentum/Transcendence/Onslaught/Ruse) do servidor
+        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
+        r.addFloater(px, py - 0.10, e.nome + "!", "#ffe680", true);
+        r.addEffect(px, py, "magic-blue");
+        addLog("skill", `<b>${e.nome}</b> ativado!`);
+        break;
+      }
       case "cured":
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);

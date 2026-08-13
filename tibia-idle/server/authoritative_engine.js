@@ -5,6 +5,7 @@ const DATA=path.join(__dirname,"..","game","data");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
+const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW;
 for(const slug of Object.keys(AMMO)){const raw=AMMO[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
   {name:raw.n||slug,slot:"ammo",type:"ammo",attack:Number(raw.atk)||0,level:Number(raw.lvl)||0});}
 for(const slug of Object.keys(QUIVERS)){const raw=QUIVERS[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
@@ -55,6 +56,137 @@ function progressAttack(p){
 function playerDamage(auth,p,mob){const level=Number(p.level)||1,skill=playerSkill(p),magic=p.voc==="druid"||p.voc==="sorcerer";
   const power=magic?level*.45+(Number(p.ml)||0)*2.8+12:level*.25+skill*.72+weaponAttack(p)*1.15;
   return Math.max(1,Math.floor(power*(.85+random(auth)*.3)-(Number(mob.armor)||0)*.35));}
+
+/* ---------- elementos e resistências (Canary) ---------- */
+const ELEMENT_KEYS=["physical","fire","energy","earth","ice","holy","death","lifedrain","manadrain","heal"];
+function mobResist(mob,element){
+  const r=mob.def&&mob.def.resist;
+  if(!r)return 0;
+  const v=Number(r[element]);
+  if(!isFinite(v))return 0;
+  return v; // percent: 50 = toma 50% menos; -12 = toma 12% mais
+}
+function applyResist(dmg,mob,element){
+  const r=mobResist(mob,element);
+  if(r===0)return dmg;
+  // 100% = imune; >100 heals; negative = weak
+  if(r>=100)return 0;
+  return Math.max(0,Math.floor(dmg*(1-r/100)));
+}
+
+/* ---------- spells (Canary formulas) ---------- */
+function spellSkillFor(p,s){
+  if(s&&s.shieldSpell)return "shield";
+  const e=p.equip&&p.equip.weapon,it=e&&ITEMS[e.item],type=it&&String(it.type||it.t||"");
+  if(s&&s.range&&s.range>1&&p.voc==="paladin")return "dist";
+  if(s&&p.voc==="monk"&&/pug|nia/.test(s.words||""))return "fist";
+  return ["sword","axe","club"].includes(type)?type:"fist";
+}
+function spellAttackValue(p,s){
+  if(s&&s.shieldSpell){const e=p.equip&&p.equip.shield,it=e&&ITEMS[e.item];if(!it||it.t==="quiver")return 1;return Math.floor((Number(it.def)||1)*1.3);}
+  const w=p.equip&&p.equip.weapon;if(!w)return 7;
+  const it=ITEMS[w.item];if(!it)return 7;
+  if(it.t==="distance"){const a=p.equip&&p.equip.ammo,am=a&&ITEMS[a.item];return Math.max(7,((it.atk||0)+(am?(am.atk||am.attack||0):0))*1.2)||7;}
+  const elDmg=(it.el&&it.el!=="physical")?(it.elDmg||0):0;
+  return Math.floor(((it.atk||0)+elDmg)*1.2)||7;
+}
+function spellValues(auth,p,s){
+  const f=s&&s.f;if(!f){const base=Math.max(4,(s&&s.mana?s.mana:20)*.9);return{min:Math.floor(base*.7),max:Math.floor(base*1.3)};}
+  const level=Number(p.level)||1;let lo,hi;
+  if(f.modo==="magic"){const ml=Number(p.ml)||0;
+    lo=(f.lvlMin||0)*level+(f.mlMin||0)*ml+(f.flatMin||0);
+    hi=(f.lvlMax||0)*level+(f.mlMax||0)*ml+(f.flatMax||0);
+  }else{const skill=Number(p.skills&&p.skills[spellSkillFor(p,s)])||10;const atk=spellAttackValue(p,s);const sa=skill*atk;
+    lo=(f.saMin||0)*sa+(f.skMin||0)*skill+(f.atMin||0)*atk+(f.lvlMin||0)*level+(f.flatMin||0);
+    hi=(f.saMax||0)*sa+(f.skMax||0)*skill+(f.atMax||0)*atk+(f.lvlMax||0)*level+(f.flatMax||0);}
+  lo=Math.max(0,lo);hi=Math.max(lo,hi);
+  return{min:Math.floor(lo),max:Math.floor(hi)};
+}
+function rollSpell(auth,p,s){
+  const v=spellValues(auth,p,s);
+  if(v.max<=v.min)return v.min;
+  return v.min+roll(auth,0,v.max-v.min);
+}
+function spellTargets(s){if(!s.area)return 1;return Math.max(2,Math.min(6,Math.round((s.alvos||8)/3)));}
+function spellReach(s){if(s.range&&s.range>0)return s.range;if(s.area)return 4;return 1;}
+
+/* Lista de spells de ataque habilitadas pelo jogador no Helper.
+ * p.config.spells = { "exori-flam": true, "exori-gran-con": true, ... }
+ * Retorna a melhor spell fora de cooldown, na prioridade do jogador. */
+function playerSpellList(p){
+  const cfg=(p.config&&p.config.spells)||{};
+  const voc=p.voc;
+  const out=[];
+  for(const id of Object.keys(cfg)){
+    if(!cfg[id])continue;
+    const s=ALL_SPELLS[id];if(!s)continue;
+    if(s.type!=="attack"&&!s.aggr)continue;
+    if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
+    if(Number(s.lvl||0)>Number(p.level||1))continue;
+    out.push(s);
+  }
+  // sem spells marcadas: usa a spell de ataque padrão da vocação
+  if(!out.length){
+    const defaults={knight:"exori",paladin:"exori-san",sorcerer:"exori-mort",druid:"exori-frigo",monk:"exori-pug"};
+    const sid=defaults[voc];if(sid&&ALL_SPELLS[sid]){const s=ALL_SPELLS[sid];if(Number(s.lvl||0)<=Number(p.level||1))out.push(s);}
+  }
+  return out;
+}
+
+/* ---------- forge buffs (15.25) ---------- */
+/* Momentum: 10% chance a cada kill de ganhar +25% dano por 10s.
+ * Transcendence: 8% chance a cada kill de ganhar +50% dano por 8s.
+ * Onslaught (Fatal): 5% chance a cada kill de ganhar crit garantido por 6s.
+ * Ruse: 12% chance ao errar de ganhar +15% dano no próximo acerto. */
+function forgeTryMomentum(p,now){
+  if(!p.config||!p.config.forgeMomentum)return false;
+  if(Math.random()<.10){p._momentumUntil=(now||Date.now())+10000;return true;}
+  return false;
+}
+function forgeTryTranscendence(p,now){
+  if(!p.config||!p.config.forgeTranscendence)return false;
+  if(Math.random()<.08){p._transcendenceUntil=(now||Date.now())+8000;return true;}
+  return false;
+}
+function forgeTryOnslaught(p){
+  if(!p.config||!p.config.forgeOnslaught)return false;
+  if(Math.random()<.05){p._onslaughtUntil=(Date.now())+6000;return true;}
+  return false;
+}
+function forgeDamageMult(p,now){
+  let m=1;
+  if(p._momentumUntil&&(now||Date.now())<p._momentumUntil)m*=1.25;
+  if(p._transcendenceUntil&&(now||Date.now())<p._transcendenceUntil)m*=1.50;
+  return m;
+}
+function forgeGuaranteedCrit(p,now){
+  return !!(p._onslaughtUntil&&(now||Date.now())<p._onslaughtUntil);
+}
+
+/* ---------- conditions (poison/fire/bleed/energy/curse) ---------- */
+/* p.conditions = { poison: {dmg, turns}, fire: {...}, ... }
+ * Cada tick (1s) decrementa turns e aplica dmg. */
+function tickPlayerConditions(auth,p){
+  if(!p.conditions)return;
+  const now=auth.clock;
+  for(const el of ["poison","fire","energy","bleed","curse"]){
+    const c=p.conditions[el];if(!c)continue;
+    if(c.turns<=0){delete p.conditions[el];continue;}
+    c.turns--;
+    const dmg=Math.max(0,Math.floor(Number(c.dmg)||0));
+    if(dmg>0){p.hp=Math.max(0,p.hp-dmg);
+      auth.events.push({t:"condition",el:el,dmg:dmg,x:Number(p.x)||0.13,y:Number(p.y)||0.6,screen:true});
+    }
+    if(c.turns<=0)delete p.conditions[el];
+  }
+}
+function applyCondition(p,el,dmg,turns){
+  if(!p.conditions)p.conditions={};
+  const existing=p.conditions[el];
+  // Canary: refresh duração mas mantém o dano original se maior
+  if(existing){existing.turns=Math.max(existing.turns,turns);existing.dmg=Math.max(existing.dmg,dmg);}
+  else p.conditions[el]={dmg,turns};
+}
 function playerArmor(p){let armor=0;for(const slot of Object.keys(p.equip||{})){const e=p.equip[slot],it=e&&ITEMS[e.item];armor+=Number(it&&it.armor)||0;}return armor;}
 function mobDamage(auth,mob,p){return Math.max(0,Math.floor((Number(mob.damage)||1)*(.55+random(auth)*.45)-playerArmor(p)*.45));}
 function addExp(p,amount){p.exp=Math.max(0,Number(p.exp)||0)+Math.max(0,Math.floor(amount));p.level=Math.max(1,Number(p.level)||1);
@@ -165,38 +297,189 @@ function step(auth,now){if(auth.ended)return;
   auth.events=auth.events||[];
   if(auth.greed){if(!auth.greed.immune&&now>=auth.greed.vulnerableUntil){auth.greed.immune=true;auth.greed.vulnerableUntil=0;}
     if(auth.greed.immune)fillGreed(auth);}
-  for(const item of auth.players){const p=item.p;p.stamina=FULL_STAMINA;if(item.downUntil&&now>=item.downUntil){const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;}usePotion(p);}
-  healPlayers(auth);respawn(auth);const living=auth.mobs.filter((m)=>m.hp>0),boss=living.find((m)=>m.boss);
-  const target=auth.greed&&auth.greed.immune?living.find((m)=>!m.boss):(boss||living[0]);
-  if(target)for(const item of auth.players){if(item.p.hp<=0||item.downUntil)continue;item.attackAcc+=1000;
-    while(item.attackAcc>=1200&&target.hp>0){item.attackAcc-=1200;const dmg=playerDamage(auth,item.p,target);target.hp-=dmg;progressAttack(item.p);
-      auth.events.push({t:"hit",dmg:dmg,x:Number(target.x)||0.5,y:Number(target.y)||0.5,el:"physical",race:target.def&&target.def.race||"blood",mobId:String(target.id),mobSlug:target.slug});
-    }}
+  for(const item of auth.players){
+    const p=item.p;p.stamina=FULL_STAMINA;
+    if(item.downUntil&&now>=item.downUntil){const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;p.conditions={};}
+    usePotion(p);
+    // Conditions (poison/fire/bleed/energy/curse) tickam a cada 1s
+    tickPlayerConditions(auth,p);
+  }
+  healPlayers(auth);respawn(auth);
+  const living=auth.mobs.filter((m)=>m.hp>0),boss=living.find((m)=>m.boss);
+  const primaryTarget=auth.greed&&auth.greed.immune?living.find((m)=>!m.boss):(boss||living[0]);
+
+  /* ---------- ATAQUE DOS PLAYERS ---------- */
+  if(primaryTarget)for(const item of auth.players){
+    if(item.p.hp<=0||item.downUntil)continue;
+    item.attackAcc+=1000;
+    const p=item.p;
+    // Tenta spells primeiro (maior dano fora de cooldown)
+    let spellCdLeft=(p._lastSpellAt||0)+2000-now;
+    while(item.attackAcc>=1200&&primaryTarget.hp>0){
+      item.attackAcc-=1200;
+      let acted=false;
+
+      // SPELLS: usa a melhor spell disponível
+      if(spellCdLeft<=0){
+        const spells=playerSpellList(p);
+        if(spells.length){
+          // Escolhe a spell de maior dano
+          let best=null,bestDmg=0;
+          for(const s of spells){
+            if((p._spellCd&&p._spellCd[s.id])>(now||0))continue;
+            const sv=spellValues(auth,p,s);
+            const avgDmg=Math.floor((sv.min+sv.max)/2);
+            const el=s.element||"physical";
+            const r=mobResist(primaryTarget,el);
+            // Pula spells em que o mob é imune
+            if(r>=100)continue;
+            const adjusted=Math.floor(avgDmg*(1-r/100));
+            if(adjusted>bestDmg){best=spells;bestDmg=adjusted;}
+          }
+          if(best){
+            const s=best;
+            const el=s.element||"physical";
+            let dmg=rollSpell(auth,p,s);
+            // Area spells atingem múltiplos monstros
+            const targets=[primaryTarget];
+            if(s.area){const others=living.filter((m)=>m!==primaryTarget&&m.hp>0).slice(0,spellTargets(s)-1);targets.push(...others);}
+            // Forge buffs
+            const forgeMult=forgeDamageMult(p,now);
+            const guaranteedCrit=forgeGuaranteedCrit(p,now);
+            // Critical (10% base + forge)
+            const critChance=0.10+(p.config&&p.config.critBonus||0);
+            const isCrit=guaranteedCrit||random(auth)<critChance;
+            // Fatal (Onslaught) — 5% chance
+            const isFatal=isCrit&&random(auth)<0.05;
+            for(const tgt of targets){
+              let finalDmg=Math.floor(dmg*forgeMult);
+              if(isCrit)finalDmg=Math.floor(finalDmg*1.5);
+              if(isFatal)finalDmg=Math.floor(finalDmg*1.5);
+              finalDmg=applyResist(finalDmg,tgt,el);
+              finalDmg=Math.max(1,finalDmg);
+              tgt.hp-=finalDmg;
+              auth.events.push({t:"hit",dmg:finalDmg,x:Number(tgt.x)||0.5,y:Number(tgt.y)||0.5,
+                el:el,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
+                mobId:String(tgt.id),mobSlug:tgt.slug,
+                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,missile:s.area?"":(s.words||"")});
+            }
+            // Mana cost
+            if(s.mana)p.mp=Math.max(0,p.mp-s.mana);
+            // Cooldown
+            if(!p._spellCd)p._spellCd={};
+            p._spellCd[s.id]=(now||Date.now())+(s.cd||2000);
+            p._lastSpellAt=now||Date.now();
+            spellCdLeft=2000;
+            progressAttack(p);
+            acted=true;
+          }
+        }
+      }
+
+      // ATAQUE BÁSICO (se não castou spell)
+      if(!acted){
+        const dmg=playerDamage(auth,p,primaryTarget);
+        const forgeMult=forgeDamageMult(p,now);
+        const guaranteedCrit=forgeGuaranteedCrit(p,now);
+        const critChance=0.10+(p.config&&p.config.critBonus||0);
+        const isCrit=guaranteedCrit||random(auth)<critChance;
+        const isFatal=isCrit&&random(auth)<0.05;
+        let finalDmg=Math.floor(dmg*forgeMult);
+        if(isCrit)finalDmg=Math.floor(finalDmg*1.5);
+        if(isFatal)finalDmg=Math.floor(finalDmg*1.5);
+        finalDmg=applyResist(finalDmg,primaryTarget,"physical");
+        finalDmg=Math.max(1,finalDmg);
+        primaryTarget.hp-=finalDmg;
+        // Projectile para distance weapons
+        const weapon=p.equip&&p.equip.weapon,it=weapon&&ITEMS[weapon.item];
+        const isDist=it&&it.type==="distance";
+        auth.events.push({t:"hit",dmg:finalDmg,x:Number(primaryTarget.x)||0.5,y:Number(primaryTarget.y)||0.5,
+          el:"physical",race:primaryTarget.def&&primaryTarget.def.race||"blood",
+          crit:isCrit,fatal:isFatal,mobId:String(primaryTarget.id),mobSlug:primaryTarget.slug,
+          sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,projectile:isDist});
+        progressAttack(p);
+      }
+    }
+  }
+
+  /* ---------- MORTE DE MONSTROS ---------- */
   const dead=auth.mobs.filter((m)=>m.hp<=0);auth.mobs=auth.mobs.filter((m)=>m.hp>0);
   for(const mob of dead){
     if(auth.greed&&auth.greed.immune&&mob.slug==="greedbeast"){
       auth.greed.greedbeastKills++;if(auth.greed.greedbeastKills>=5){auth.greed.immune=false;auth.greed.greedbeastKills=0;auth.greed.vulnerableUntil=now+40000;}}
-    // Evento de kill para o cliente: missões, bestiário, loot log, XP floater
+    // Forge buffs on kill
+    const leader=auth.players[0];
+    if(leader&&leader.p.hp>0){
+      if(forgeTryMomentum(leader.p,now))auth.events.push({t:"buff",nome:"Momentum",x:0.13,y:0.6,screen:true});
+      if(forgeTryTranscendence(leader.p,now))auth.events.push({t:"buff",nome:"Transcendence",x:0.13,y:0.6,screen:true});
+      if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true});
+    }
+    // Evento de kill para o cliente
     auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
       exp:mob.exp||0,loot:[],x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish});
-    reward(auth,mob,auth.players);if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
-      const leader=auth.players[0]&&auth.players[0].p;if(leader){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].kills=(leader.bosses[auth.bossId].kills||0)+1;}}}
-  for(const mob of auth.mobs){mob.attackAcc+=1000;while(mob.attackAcc>=mob.attackSpeed){mob.attackAcc-=mob.attackSpeed;
-    const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);if(!alive.length)break;const victim=alive[roll(auth,0,alive.length-1)];
-    let damage=mobDamage(auth,mob,victim.p);if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);victim.p.hp-=damage;
-    // "taken" = dano recebido pelo player (o client usa case "taken" para
-    // mostrar o floater vermelho e o flash de dano). Antes usava "range"
-    // que o client trata como "fora de alcance" (não faz nada).
-    auth.events.push({t:"taken",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,el:mob.def&&mob.def.element||"physical",screen:true});
-    if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
-      auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true});
-    }}}
+    reward(auth,mob,auth.players);
+    if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
+      if(leader){leader.p.bosses[auth.bossId]=leader.p.bosses[auth.bossId]||{};leader.p.bosses[auth.bossId].kills=(leader.p.bosses[auth.bossId].kills||0)+1;}}
+  }
+
+  /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
+  for(const mob of auth.mobs){
+    mob.attackAcc+=1000;
+    while(mob.attackAcc>=mob.attackSpeed){
+      mob.attackAcc-=mob.attackSpeed;
+      const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);
+      if(!alive.length)break;
+      const victim=alive[roll(auth,0,alive.length-1)];
+
+      // 1) Skills do monstro (cada uma rola sua chance)
+      const skills=mob.def&&mob.def.skills;
+      if(Array.isArray(skills)){
+        for(const sk of skills){
+          const chance=Number(sk.ch||0)/100;
+          if(random(auth)>=chance)continue;
+          const el=sk.el||"physical";
+          const min=Number(sk.min)||0,max=Number(sk.max)||0;
+          let dmg=min<max?roll(auth,min,max):min;
+          if(dmg>0){
+            dmg=Math.max(0,Math.floor(dmg-playerArmor(victim.p)*.3));
+            victim.p.hp-=dmg;
+            auth.events.push({t:"taken",dmg:dmg,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
+              el:el,screen:true,fx:sk.fx});
+          }
+          // Conditions aplicadas por skills
+          if(sk.campo==="fire"&&dmg>0)applyCondition(victim.p,"fire",Math.floor(dmg*.1),4);
+          if(sk.campo==="poison"&&dmg>0)applyCondition(victim.p,"poison",Math.floor(dmg*.1),5);
+          if(sk.n==="speed"&&dmg===0){
+            // Haste do monstro — sem efeito no idle
+          }
+          if(sk.n==="healing"){
+            // Monstro se cura
+            const heal=roll(auth,Number(sk.min)||0,Number(sk.max)||0);
+            if(heal>0)mob.hp=Math.min(mob.maxHp,mob.hp+heal);
+          }
+        }
+      }
+
+      // 2) Melee (ataque básico) — roda SEMPRE que tem damage base
+      if(Number(mob.damage||0)>0){
+        let damage=mobDamage(auth,mob,victim.p);
+        if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);
+        victim.p.hp-=damage;
+        auth.events.push({t:"taken",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
+          el:mob.def&&mob.def.element||"physical",screen:true});
+        // Conditions do melee (race-based, como no Canary)
+        const race=mob.def&&mob.def.race;
+        if(race==="poison"&&random(auth)<.15)applyCondition(victim.p,"poison",Math.floor(damage*.1),5);
+        if(race==="fire"&&random(auth)<.15)applyCondition(victim.p,"fire",Math.floor(damage*.1),4);
+        if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
+          auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true});
+        }
+      }
+    }
+  }
+
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
-  // O último monstro da wave pode morrer no mesmo segundo autoritativo. Se o
-  // respawn ficar apenas no início do próximo step, o snapshot intermediário
-  // chega com mobs=[] e a arena inteira pisca no navegador. Hunts mantêm a
-  // próxima wave materializada; bosses continuam terminais normalmente.
   if(!auth.ended&&auth.kind==="hunt"&&!auth.mobs.length)respawn(auth);
 }
 function initializeAuthority(descriptor,instanceId,now){
