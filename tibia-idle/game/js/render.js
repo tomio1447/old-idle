@@ -1607,8 +1607,21 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // Replicando Canary: getExactSize() ajusta para sprites grandes.
   // Layout Canary: nome colado ~2px acima da healthbar, healthbar ~2px acima
   // do topo da sprite. Antes o nome ficava 12px acima da barra (longe demais).
+  //
+  // POSICIONAMENTO (Canary): o monstro mais baixo (y maior, mais próximo da
+  // câmera) tem PRIORIDADE — seu label fica na posição natural. Monstros
+  // acima têm o label empurrado para cima quando sobrepõe. Antes o código
+  // processava de cima para baixo e empurrava para cima, invertendo a ordem
+  // (o monstro de baixo ficava com o label no topo da fila).
+  //
+  // Z-ORDER: labels são desenhados de cima para baixo, então o label do
+  // monstro mais baixo é desenhado por último (fica por cima em caso de
+  // sobreposição residual), igual ao Canary.
   const occupiedLabels = [];
-  for (const info of entityInfo) {
+  // 1) Calcula posições processando de baixo para cima (Canary: prioridade
+  //    do monstro mais próximo da câmera).
+  for (let i = entityInfo.length - 1; i >= 0; i--) {
+    const info = entityInfo[i];
     const tileSize = info.tile;
     const sizeOffset = Math.max(0, (info.h - tileSize) * 0.15);
     let barY = info.top - 3 - sizeOffset;
@@ -1622,7 +1635,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
         nameY -= shift;
       }
     }
-    occupiedLabels.push({ x:info.cx, y:y });
+    occupiedLabels.push({ x: info.cx, y: y });
     const minTop = 2;
     if (nameY < minTop) {
       const delta = minTop - nameY;
@@ -1630,6 +1643,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
       barY += delta;
       y += delta;
     }
+    // Guarda as posições calculadas para o segundo passo (desenho).
+    info._barY = barY;
+    info._nameY = nameY;
+    info._y = y;
+  }
+  // 2) Desenha de cima para baixo (z-order Canary: mais baixo por cima).
+  for (const info of entityInfo) {
+    const barY = info._barY, nameY = info._nameY, y = info._y;
     if (info.e.kind === 'monster') {
       drawTibiaBar(ctx, info.cx, barY, info.hpPct, tibiaHpColor(info.hpPct));
       drawNameText(ctx, info.cx, nameY, info.name, tibiaHpColor(info.hpPct));
