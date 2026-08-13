@@ -651,16 +651,10 @@ function drawTibiaBar(ctx, x, y, pct, cor) {
   ctx.fillRect(bx + 1, by + 1, fillW, ih);
 }
 
-/* Cor da barra de HP do personagem na cena — MESMO padrao da healthbar do
- * HUD (hpBarColor, em ui.js): verde > amarelo > laranja > vermelho. Antes o
- * personagem usava tibiaHpColor (paleta diferente/apagada em relacao a barra
- * de vida da interface), por isso parecia sem a cor certa. */
+/* Cor da barra de HP do personagem na cena — usa a mesma paleta Canary
+ * (tibiaHpColor) dos monstros, para nome e healthbar ficarem identicos. */
 function playerHpBarColor(pct) {
-  if (typeof hpBarColor === "function") return hpBarColor(pct).text;
-  if (pct > 0.6) return "#4ade80";
-  if (pct > 0.3) return "#facc15";
-  if (pct > 0.1) return "#fb923c";
-  return "#f87171";
+  return tibiaHpColor(pct);
 }
 
 function drawNameBars(ctx, x, nameY, name, hpPct, mpPct, shieldPct, barY) {
@@ -1610,13 +1604,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
   drawBossBar(ctx, canvasW, combat, -view.x, -view.y);
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
-  // Replicando Canary: getExactSize() ajusta para sprites grandes
+  // Replicando Canary: getExactSize() ajusta para sprites grandes.
+  // Layout Canary: nome colado ~2px acima da healthbar, healthbar ~2px acima
+  // do topo da sprite. Antes o nome ficava 12px acima da barra (longe demais).
   const occupiedLabels = [];
   for (const info of entityInfo) {
     const tileSize = info.tile;
     const sizeOffset = Math.max(0, (info.h - tileSize) * 0.15);
-    let barY = info.top - 6 - sizeOffset;
-    let nameY = barY - 12;
+    let barY = info.top - 3 - sizeOffset;
+    let nameY = barY - 3;
     let y = nameY;
     for (const prev of occupiedLabels) {
       if (Math.abs(prev.x - info.cx) < 42 && Math.abs(prev.y - y) < 20) {
@@ -1700,7 +1696,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   ctx.restore();
 
-  // --- numeros flutuantes — Canary + anti-flood para MOTA
+  // --- numeros flutuantes — Canary + anti-flood para MOTA.
+  // Posicionamento Canary: texto centralizado em cima da sprite e subindo.
   ctx.textAlign = "left";
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
@@ -1714,9 +1711,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
     const baseX = f.x * W;
     const baseY = f.y * H;
-    // Canary base + offset de stacking (f.offsetY) para evitar sobreposição exata
-    let fx = baseX + (24 * scale - textW / 2) + (f.offsetX || 0);
-    let fy = baseY + (8 * scale - 64 * scale * p) + (f.offsetY || 0);
+    // Centraliza no tile (16*scale = metade de 32px) e comeca no centro
+    // vertical da sprite, subindo ao longo da animacao — igual ao Canary.
+    let fx = baseX + (16 * scale - textW / 2) + (f.offsetX || 0);
+    let fy = baseY + (16 * scale - 64 * scale * p) + (f.offsetY || 0);
     const t0 = tf / 1.2;
     let alpha = 1;
     if (elapsed > t0) {

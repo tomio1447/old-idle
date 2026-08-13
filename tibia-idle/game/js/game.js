@@ -2643,10 +2643,16 @@ function loop(ts) {
     if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
     drainEvents();
     // HP/MP da party são entidades vivas; atualiza o painel em tempo real
-    // mesmo quando outro membro está selecionado.
-    if (G.combat.players && G.combat.players.length > 1 && typeof renderPartyPanel === "function") {
+    // mesmo quando outro membro está selecionado. Usamos a versão leve
+    // (updatePartyPanelLiveBars) que só atualiza as barras via estilo,
+    // evitando reconstruir innerHTML a cada 120ms (causava lag em combate).
+    if (G.combat.players && G.combat.players.length > 1) {
       G._partyHudAt = (G._partyHudAt || 0) + dt;
-      if (G._partyHudAt >= 120) { G._partyHudAt = 0; renderPartyPanel(G.p); }
+      if (G._partyHudAt >= 120) {
+        G._partyHudAt = 0;
+        if (typeof updatePartyPanelLiveBars === "function") updatePartyPanelLiveBars();
+        else if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
+      }
     }
     // Autoseller da Loot Pouch: quando o enchimento passa do % escolhido,
     // vende apenas itens liberados (nunca classes 3/4, "Não vender" ou sem

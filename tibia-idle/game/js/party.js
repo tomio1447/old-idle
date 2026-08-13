@@ -144,6 +144,16 @@ function ensureParty(p) {
 function partyVocations(p) {
   ensureParty(p);
   const vocs = new Set([p.voc]);
+  // Modo online: membros vêm do estado online (p._partyOnline)
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || (typeof G !== "undefined" && G && G.p ? G.p._partyOnline : null);
+    if (st) {
+      if (st.leader) vocs.add(st.leader.voc || "none");
+      for (const m of (st.members || [])) vocs.add(m.voc || "none");
+    }
+    return vocs;
+  }
+  // Modo local: membros vêm de p.party.members
   for (const m of p.party.members) vocs.add(m.voc || "none");
   return vocs;
 }
@@ -192,9 +202,24 @@ function partyCanShare(p) {
  * Retorna { leaderExp, members } ou null quando o share não está ativo.
  * Cada membro recebe exp base * multiplicador (100%/55%/75%/100%/102%)
  * conforme número de vocações diferentes, sem dividir.
+ * Em modo online, os membros vêm de G.combat.players (entidades vivas)
+ * ou do estado online (p._partyOnline), não de p.party.members.
  */
 function partyShareExp(p, exp) {
   ensureParty(p);
+  // Modo online: membros vêm do estado online ou das entidades em cena
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || (typeof G !== "undefined" && G && G.p ? G.p._partyOnline : null);
+    if (!st || !st.members || !st.members.length) return null;
+    // Verifica se o share está ativo no estado online
+    if (!st.shareExp) return null;
+    const mult = partyExpMultiplier(p);
+    const parte = Math.max(0, Math.floor((exp || 0) * mult));
+    const P = st.members.length + 1;
+    return { leaderExp: parte, S: mult, P: P, bonusPct: Math.floor(mult*100),
+             members: st.members.map((m) => ({ id: m.id, exp: parte })) };
+  }
+  // Modo local: membros vêm de p.party.members
   if (!p.party.shareExp || !p.party.members.length) return null;
   const mult = partyExpMultiplier(p);
   const parte = Math.max(0, Math.floor((exp || 0) * mult));
