@@ -148,15 +148,33 @@ function partyVocations(p) {
   return vocs;
 }
 
-/* Bônus de exp compartilhada: as cinco vocações distintas, incluindo Monk,
- * formam a composição completa e recebem 102% de bônus. */
+/* Regra custom pedida pelo dono:
+ * 1 vocação diferente = 100% da exp base para cada membro
+ * 2 vocações diferentes = 55%
+ * 3 vocações diferentes = 75%
+ * 4 vocações diferentes = 100%
+ * 5 vocações diferentes = 102% (cap)
+ * Cada membro recebe a exp total * multiplicador (não divide).
+ * Ex: monstro 100 exp, party 5 membros voc diferentes => 102 exp cada.
+ */
+function partyDistinctVocCount(p) {
+  return partyVocations(p).size;
+}
+
+function partyExpMultiplier(p) {
+  const n = partyDistinctVocCount(p);
+  if (n >= 5) return 1.02;
+  if (n === 4) return 1.00;
+  if (n === 3) return 0.75;
+  if (n === 2) return 0.55;
+  return 1.00;
+}
+
+/* Bônus de exp compartilhada (custom): retorna % direto que cada membro ganha */
 function partyExpBonusPct(p) {
-  const n = partyVocations(p).size;
-  if (n >= 5) return 102;
-  if (n === 4) return 100;
-  if (n === 3) return 70;
-  if (n === 2) return 35;
-  return 20;   // mesma vocação
+  const mult = partyExpMultiplier(p);
+  return Math.floor(mult * 100);
+}
 }
 
 /* Pode compartilhar exp? (nível mínimo ≥ 2/3 do maior — wiki) */
@@ -171,17 +189,19 @@ function partyCanShare(p) {
   return { ok: true, msg: "Condições ok." };
 }
 
-/* Aplica a fórmula de compartilhamento. Retorna { leaderExp, members } ou
- * null quando o share não está ativo. O exp passado já é o M*C do líder
- * (stamina/prey inclusos); cada um recebe M*S/P*C (membros: C=1). */
+/* Aplica a fórmula de compartilhamento CUSTOM.
+ * Retorna { leaderExp, members } ou null quando o share não está ativo.
+ * Cada membro recebe exp base * multiplicador (100%/55%/75%/100%/102%)
+ * conforme número de vocações diferentes, sem dividir.
+ */
 function partyShareExp(p, exp) {
   ensureParty(p);
   if (!p.party.shareExp || !p.party.members.length) return null;
-  const eligible=partyCanShare(p);if(!eligible.ok)return null;
-  const S = 1 + partyExpBonusPct(p) / 100;
+  const eligible = partyCanShare(p); if (!eligible.ok) return null;
+  const mult = partyExpMultiplier(p);
+  const parte = Math.max(0, Math.floor((exp || 0) * mult));
   const P = p.party.members.length + 1;
-  const parte = Math.max(0, Math.floor((exp || 0) * S / P));
-  return { leaderExp: parte, S: S, P: P, bonusPct: partyExpBonusPct(p),
+  return { leaderExp: parte, S: mult, P: P, bonusPct: Math.floor(mult*100),
            members: p.party.members.map((m) => ({ id: m.id, exp: parte })) };
 }
 

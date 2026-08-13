@@ -280,10 +280,12 @@ async function partyInbox(db, token) {
 /* POST /api/party/accept — aceita um convite pendente. O personagem
  * convidado precisa pertencer à conta autenticada E estar em Safe Zone
  * (cidade) ou Área de Treino — regra do dono: jogadores em party só
- * circulam em cidade/treino, e é nessas condições que aceitam convite. */
+ * circulam em cidade/treino, e é nessas condições que aceitam convite.
+ * FIX: exige char_id e valida que é o personagem convidado. */
 async function partyAccept(db, body) {
-  const { account, error } = await authChar(db, body.token, null);
+  const { account, char, error } = await authChar(db, body.token, body.char_id);
   if (error) return error;
+  if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
   const inv = await db.inviteFind(Number(body.invite_id));
   if (!inv || inv.status !== "pending") {
     return { code: 404, body: { ok: false, msg: "Convite não encontrado ou já respondido" } };
@@ -297,6 +299,10 @@ async function partyAccept(db, body) {
   const invitee = await db.findCharacter(inv.invitee_id);
   if (!invitee || invitee.account_id !== account.id) {
     return { code: 403, body: { ok: false, msg: "Convite não pertence à sua conta" } };
+  }
+  // FIX: só o personagem convidado pode aceitar (não outro char da mesma conta)
+  if (Number(inv.invitee_id) !== Number(char.id)) {
+    return { code: 403, body: { ok: false, msg: "Você precisa estar no personagem convidado (" + invitee.name + ") para aceitar" } };
   }
   // REGRA: só aceita convite em Safe Zone (cidade) ou Área de Treino
   const invZone = invitee.zone || "unknown";
@@ -344,10 +350,11 @@ async function partyAccept(db, body) {
   return { code: 200, body: { ok: true, msg: "Você entrou na party de " + party.leader_name } };
 }
 
-/* POST /api/party/decline — recusa um convite. */
+/* POST /api/party/decline — recusa um convite. FIX: exige char_id */
 async function partyDecline(db, body) {
-  const { account, error } = await authChar(db, body.token, null);
+  const { account, char, error } = await authChar(db, body.token, body.char_id);
   if (error) return error;
+  if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
   const inv = await db.inviteFind(Number(body.invite_id));
   if (!inv || inv.status !== "pending") {
     return { code: 404, body: { ok: false, msg: "Convite não encontrado" } };
@@ -355,6 +362,9 @@ async function partyDecline(db, body) {
   const invitee = await db.findCharacter(inv.invitee_id);
   if (!invitee || invitee.account_id !== account.id) {
     return { code: 403, body: { ok: false, msg: "Convite não pertence à sua conta" } };
+  }
+  if (Number(inv.invitee_id) !== Number(char.id)) {
+    return { code: 403, body: { ok: false, msg: "Você precisa estar no personagem convidado (" + invitee.name + ") para recusar" } };
   }
   await db.inviteUpdate(inv.id, { status: "declined" });
   return { code: 200, body: { ok: true, msg: "Convite recusado" } };

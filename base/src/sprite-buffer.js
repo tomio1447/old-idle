@@ -44,6 +44,9 @@ SpriteBuffer.prototype.SIGNATURES = new Object({
 });
 
 SpriteBuffer.prototype.__spriteAddressPointers = new Object();
+SpriteBuffer.prototype.__decodedCache = new Object();
+SpriteBuffer.prototype.__decodedCacheSize = 0;
+SpriteBuffer.prototype.__decodedCacheMax = 4096;
 
 SpriteBuffer.prototype.addComposedOutfitLayer = function(id, outfit, item, frame, xPattern, yPattern, zPattern, x, y) {
 
@@ -397,9 +400,27 @@ SpriteBuffer.prototype.__getImageData = function(id) {
   /*
    * Function SpriteBuffer.getImageData
    * Returns the image data from the loaded sprite file
+   * Cached to avoid heavy RLE decoding every frame which caused
+   * requestAnimationFrame handler >50ms and laggy look
    */
 
-  return this.__loadSingleSprite(this.__spriteAddressPointers[id]);
+  // Simple cache lookup – sprites never change
+  if(this.__decodedCache.hasOwnProperty(id)) {
+    // Return a copy because __compose mutates the ImageData buffer
+    let cached = this.__decodedCache[id];
+    return new ImageData(new Uint8ClampedArray(cached.data), 32, 32);
+  }
+
+  let decoded = this.__loadSingleSprite(this.__spriteAddressPointers[id]);
+
+  // Bound cache size to avoid unbounded memory growth
+  if(this.__decodedCacheSize < this.__decodedCacheMax) {
+    // Store a copy for later reuse
+    this.__decodedCache[id] = new ImageData(new Uint8ClampedArray(decoded.data), 32, 32);
+    this.__decodedCacheSize++;
+  }
+
+  return decoded;
 
 }
 

@@ -249,7 +249,9 @@ const Sprites = {
     // enquanto o sheet carrega devolvemos null SEM cachear, senao a
     // criatura ficaria invisivel pelo resto da sessao
     if (!sheet || !sheet.complete) return null;
-    if (!sheet.naturalWidth) { this.mobCache[k] = null; return null; }
+    // Se naturalWidth ainda 0 pode ser erro temporário de decode; não cacheia
+    // null permanente para permitir retry e evitar sumiço definitivo.
+    if (!sheet.naturalWidth) return null;
     const cv = document.createElement("canvas");
     cv.width = meta.cw; cv.height = meta.ch;
     cv.getContext("2d").drawImage(sheet, col * meta.cw, linha * meta.ch,
@@ -268,7 +270,7 @@ const Sprites = {
     if (this.mobIdleCache[key] !== undefined) return this.mobIdleCache[key];
     const sheet = this.get(`assets/mob/${slug}.idle.png`);
     if (!sheet || !sheet.complete) return null;
-    if (!sheet.naturalWidth) { this.mobIdleCache[key] = null; return null; }
+    if (!sheet.naturalWidth) return null;
     const cv = document.createElement("canvas");
     cv.width = meta.cw; cv.height = meta.ch;
     cv.getContext("2d").drawImage(sheet,
@@ -1542,7 +1544,19 @@ Renderer.prototype.draw = function (combat, player, dt) {
       shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(e.p, Date.now()))
         ? Math.max(0, Math.min(1, (e.p.magicShieldPool || 0) / (e.p.magicShieldCap || 1))) : 0;
     }
-    if (!spriteReady(img)) continue;
+    if (!spriteReady(img)) {
+      // Tenta fallback para sul ou outra direção já cacheada, em vez de
+      // fazer a criatura sumir por um frame (causa sensação de lag/piscada).
+      let fallback = null;
+      if (e.kind === "monster") {
+        fallback = Sprites.mob(ent.slug, "s") || Sprites.mob(ent.slug, "w") || Sprites.mob(ent.slug, "e") || Sprites.mob(ent.slug, "n");
+      }
+      if (spriteReady(fallback)) {
+        img = fallback;
+      } else {
+        continue;
+      }
+    }
     const sc = creatureScale(W); w = spriteW(img) * sc; h = spriteH(img) * sc;
     const cx = ent.x * W, cy = ent.y * H, tile = tilePx(W);
     const origin = creatureTileOrigin(cx, cy, w, h, tile, img._spriteAnchor, sc);

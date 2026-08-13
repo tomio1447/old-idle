@@ -399,13 +399,23 @@ function renderPartyModal(p, online) {
   const liderChar = ld ? chars.find((x) => String(x.id || characterId(x)) === String(ld.leaderId)) : p;
   const podeConvidar = (typeof partyCanInviteNow === "function") && partyCanInviteNow();
 
-  // ---- membros (líder fixo no criador)
-  let h = `<div class="party-header">
+  // FIX: Se não faz parte da party, não mostrar info da party de outro personagem.
+  // Antes mostrava "Líder: X" mesmo para quem não estava na PT, causando
+  // "consigo ver a PT em outro personagem que não está na PT".
+  let h = "";
+  if (!souLider && !souMembro) {
+    // Não está na party: mostrar que não está + convites pendentes + opção de criar
+    h = `<div class="party-header"><b>👥 Party</b><span class="tiny dim">você não está em party</span></div>
+      <div class="dim small center" style="padding:10px">Você não está em nenhuma party.<br>Existe uma party liderada por <b>${ld ? ld.leaderName : "?"}</b>, mas você não faz parte dela.</div>`;
+  } else {
+    // Está na party: mostrar header normal
+    h = `<div class="party-header">
       <b>Líder: ${liderChar ? liderChar.name : (ld ? ld.leaderName : p.name)}
         ${liderChar ? `<span class="dim">(${partyVocName(liderChar.voc)} · nv ${liderChar.level})</span>` : ""}</b>
       <button class="sm" id="party-leave" ${(ld || pt.members.length) ? "" : "disabled"}>
-        ${souLider ? "Dissolver party" : (souMembro ? "Sair do party" : "Sair do party")}</button>
+        ${souLider ? "Dissolver party" : "Sair do party"}</button>
     </div>`;
+  }
 
   if (pt.members.length) {
     h += `<div class="party-members">` + pt.members.map((m, i) => `
@@ -480,7 +490,8 @@ function renderPartyModal(p, online) {
       <div class="tiny dim">O convite fica PENDENTE: troque para o personagem convidado e aceite pelo menu Party.</div>`;
   }
 
-  // ---- compartilhar exp
+  // ---- compartilhar exp (só para quem está na PT)
+  if (souLider || souMembro) {
   h += `<div class="party-share">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="party-share-exp" ${pt.shareExp ? "checked" : ""}
@@ -494,7 +505,10 @@ function renderPartyModal(p, online) {
       <div class="tiny dim mt4">⭐ Ao caçar com o líder, TODOS os membros vão para a MESMA instância — clique neles no painel para controlar cada um.</div>
     </div>`;
 
-  // ---- Party Hunt Analyser (sessão unificada local/online)
+  } // fim share só para membros
+
+  // ---- Party Hunt Analyser (só para quem está na PT)
+  if (souLider || souMembro) {
   const s = (typeof partyAnalyserSession === "function") ? partyAnalyserSession(p) : null;
   h += `<div class="party-analyser">
       <div class="panel-title" style="font-size:13px">📊 Party Hunt Analyser
@@ -521,8 +535,33 @@ function renderPartyModal(p, online) {
     h += `<div class="dim small center" style="padding:8px">Nenhuma caçada registrada ainda.</div>`;
   }
   h += `</div>`;
+  } // fim analyser só para membros
+
+  // Se não está na PT, mostrar opção de criar nova PT (sobrescreve existente)
+  if (!souLider && !souMembro) {
+    h += `<div class="party-share" style="margin-top:8px">
+      <button class="primary full" id="party-create-local-2">Criar nova party (dissolve atual)</button>
+      <div class="tiny dim" style="margin-top:4px">Ao criar, <b>${p.name}</b> vira líder e a PT antiga <b>${ld ? ld.leaderName : ""}</b> é dissolvida.</div>
+    </div>`;
+  }
 
   box.innerHTML = h;
+
+  // FIX: handler para botão de criar nova party quando não está na PT
+  const create2 = $("#party-create-local-2");
+  if (create2) create2.addEventListener("click", () => {
+    try {
+      localStorage.setItem("tibia-idle-party-local-v1", JSON.stringify({
+        leaderId: String(p.id || characterId(p)),
+        leaderName: p.name,
+        members: [], invites: [],
+        shareExp: false, session: null,
+      }));
+    } catch (e) {}
+    toast("Nova party criada! Você é o líder. A antiga foi dissolvida.");
+    renderPartyModal(p);
+    renderAll();
+  });
 
   // handlers
   const leave = $("#party-leave");

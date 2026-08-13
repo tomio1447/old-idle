@@ -91,6 +91,10 @@ World.prototype.checkEntityReferences = function() {
   /*
    * Function GameClient.checkEntityReferences
    * Called when the server moves the player and references to entities outside of our sector can be dropped by the player
+   * Fixed: do not drop entities that are still visible on screen (canSee),
+   * even if their chunk is not besides. This prevents monsters from
+   * disappearing for a frame when player crosses chunk border, which looked
+   * like lag.
    */
 
   // Player moves: drop references to entities not in sector
@@ -101,8 +105,19 @@ World.prototype.checkEntityReferences = function() {
       return;
     }
 
-    // Remove reference to the creature
-    if(!gameClient.player.getChunk().besides(activeCreature.getChunk())) {
+    let chunk = activeCreature.getChunk();
+    if(chunk === null) {
+      // If chunk unknown, keep reference until server tells otherwise
+      return;
+    }
+
+    // Remove reference to the creature only if outside besides AND outside view
+    if(!gameClient.player.getChunk().besides(chunk)) {
+      try {
+        if(gameClient.player.canSee(activeCreature)) {
+          return;
+        }
+      } catch(e) {}
       gameClient.networkManager.packetHandler.handleEntityRemove(activeCreature.id);
     }
 
@@ -144,15 +159,18 @@ World.prototype.__handleCreatureMove = function(id, position, speed) {
   }
 
   let fromTile = this.getTileFromWorldPosition(creature.getPosition());
+  let tile = this.getTileFromWorldPosition(position);
+
+  // If destination chunk not loaded, keep creature where it was to avoid
+  // disappearing. The server will later send the chunk and teleport.
+  if(tile === null) {
+    return false;
+  }
 
   if(fromTile !== null) {
     fromTile.removeCreature(creature);
   }
 
-  let tile = this.getTileFromWorldPosition(position);
-  if(tile === null) {
-    return false;
-  }
   tile.addCreature(creature);
 
   // Actually update the actual creature position
