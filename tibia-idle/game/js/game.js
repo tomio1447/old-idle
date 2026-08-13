@@ -2353,6 +2353,57 @@ function onlineAuthorityCombat(){
   return !!(G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
 }
+let ONLINE_RUNTIME_RECOVERING=false,ONLINE_RUNTIME_RETRY_AT=0;
+function resetOnlineRuntimeClocks(){
+  G.last=performance.now();G.tickAcc=0;G.bgLast=Date.now();G.bgAcc=0;ONLINE_AUTH_ACC=0;
+}
+async function requestOnlineRuntimeRecovery(){
+  if(ONLINE_RUNTIME_RECOVERING||!onlineAuthorityCombat()||Date.now()<ONLINE_RUNTIME_RETRY_AT)return false;
+  ONLINE_RUNTIME_RECOVERING=true;ONLINE_RUNTIME_RETRY_AT=Date.now()+2000;
+  try{
+    const token=typeof sessionToken==="function"?sessionToken():"";if(!token)return false;
+    const lease=typeof accountEnsureLease==="function"
+      ?await accountEnsureLease(token,{silent:true}):{ok:true};
+    if(!lease||!lease.ok){
+      // Outra aba realmente ativa continua vencendo; apenas tente novamente
+      // depois, sem takeover automático nem toast repetido.
+      ONLINE_RUNTIME_RETRY_AT=Date.now()+Math.max(2000,Math.min(10000,
+        Number(lease&&lease.expiresAt?new Date(lease.expiresAt).getTime()-Date.now():3000)||3000));
+      return false;
+    }
+    if(typeof accountLoadInstance!=="function")return false;
+    let remote=await accountLoadInstance(token);
+    if(remote&&remote.ok&&remote.instance){
+      if(!G.combat||!instanceIncludesCharacter(remote.instance,G.p&&G.p.id))return false;
+      const applied=applyOnlineAuthorityState(remote.instance,
+        remote.lastStatus==="ended"?"ended":null);
+      if(applied)resetOnlineRuntimeClocks();
+      return !!applied;
+    }
+    if(remote&&remote.ok&&remote.lastStatus==="ended"){
+      if(G.combat){clearInstanceSession(remote.terminalReason||"remote-ended",true);
+        setTimeout(()=>{if(G.combat)stopHunt(true);},0);}
+      return false;
+    }
+    // Storage reiniciado sem tombstone: restaure o checkpoint que permaneceu
+    // aberto na aba, usando o lease recém-readquirido e a mesma party/runtime.
+    if(remote&&remote.ok&&!remote.instance&&G.combat&&typeof accountBeginInstance==="function"&&
+       typeof persistActiveInstance==="function"){
+      accountBeginInstance();persistActiveInstance();
+      const saved=typeof accountLastInstancePromise==="function"?await accountLastInstancePromise():false;
+      if(saved){
+        remote=await accountLoadInstance(token);
+        const applied=!!(remote&&remote.ok&&remote.instance&&
+          instanceIncludesCharacter(remote.instance,G.p&&G.p.id)&&
+          applyOnlineAuthorityState(remote.instance,null));
+        if(applied)resetOnlineRuntimeClocks();
+        return applied;
+      }
+    }
+    return false;
+  }catch(error){return false;}
+  finally{ONLINE_RUNTIME_RECOVERING=false;}
+}
 function applyOnlineAuthorityState(descriptor,terminalReason){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat,fresh={hunt:previous.hunt,huntMap:previous.huntMap,boss:previous.boss};
@@ -2453,15 +2504,17 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   return true;
 }
 function requestOnlineAuthorityTick(){
-  if(ONLINE_AUTH_TICKING||!onlineAuthorityCombat()||
-     (typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()))return;
+  if(ONLINE_AUTH_TICKING||!onlineAuthorityCombat())return;
+  const leaseReady=typeof accountLeaseAllowsSimulation!=="function"||accountLeaseAllowsSimulation(),
+    instanceReady=typeof accountInstanceActive!=="function"||accountInstanceActive();
+  if(!leaseReady||!instanceReady||G.instanceReconnectPending){requestOnlineRuntimeRecovery();return;}
   ONLINE_AUTH_TICKING=true;
   accountTickInstance(sessionToken()).then((result)=>{
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
-    }
-  }).catch(()=>{}).finally(()=>{ONLINE_AUTH_TICKING=false;});
+    }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
+  }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
 if(typeof window!=="undefined"){
   window.addEventListener("tibia-idle-sync-instance",(event)=>{
@@ -2488,7 +2541,9 @@ function startBackgroundTick() {
   if (_bgTimer) return;
   _bgTimer = setInterval(() => {
     if (!G || !G.p || G.paused || !G.combat || !document.hidden) return;
-    if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation())return;
+    if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()){
+      if(onlineAuthorityCombat())requestOnlineRuntimeRecovery();return;
+    }
     if(onlineAuthorityCombat()){
       requestOnlineAuthorityTick();G.bgLast=Date.now();G.bgAcc=0;return;
     }
@@ -2520,6 +2575,9 @@ function loop(ts) {
   requestAnimationFrame(loop);
   if (!G.p) return;
   if(typeof accountLeaseAllowsSimulation==="function"&&!accountLeaseAllowsSimulation()){
+    // FPS continua vivo enquanto a autoridade está pausada; tente readquirir
+    // o lease/runtime para o jogo não ficar visualmente fluido porém congelado.
+    if(G.combat&&onlineAuthorityCombat())requestOnlineRuntimeRecovery();
     G.last=ts;G.tickAcc=0;G.bgLast=Date.now();G.bgAcc=0;return;
   }
   // Alguns browsers ainda entregam rAF a 1fps em background. A simulação

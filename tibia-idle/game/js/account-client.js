@@ -172,10 +172,13 @@ async function accountRenewLease(token){
   }
   accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
 }
-async function accountEnsureLease(token){
+async function accountEnsureLease(token,options){
   if(accountLeaseAllowsSimulation())return {ok:true};
   const acquired=await accountAcquireLease(token,false);
-  if(!acquired.ok&&acquired.held)accountLeaseMarkLost(acquired.msg);
+  // A recuperação automática roda periodicamente. Se outra aba é a dona
+  // legítima, mantenha esta pausada sem repetir o mesmo toast a cada retry.
+  if(!acquired.ok&&acquired.held&&!ACCOUNT_LEASE.lost)
+    accountLeaseMarkLost(options&&options.silent?false:acquired.msg);
   return acquired;
 }
 async function accountReleaseLease(token){
@@ -193,6 +196,7 @@ function accountQueueInstance(task){
   ACCOUNT_INSTANCE_QUEUE=run.catch(()=>false);ACCOUNT_INSTANCE_LAST_PROMISE=run;return run;
 }
 function accountLastInstancePromise(){return ACCOUNT_INSTANCE_LAST_PROMISE.catch(()=>false);}
+function accountInstanceActive(){return !!(ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active");}
 function accountInstanceApply(instance){
   if(!instance){ACCOUNT_INSTANCE={id:"",version:0,status:null};ACCOUNT_INSTANCE_CAN_CREATE=false;return;}
   ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active"};
