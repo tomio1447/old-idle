@@ -3391,7 +3391,7 @@ function initAccountLogin() {
   }
   function closeAccountModal() {
     const modal = $("#modal");
-    if (modal) modal.classList.remove("show", "wide");
+    if (modal) modal.classList.remove("show", "wide", "login-modal");
   }
   function openAccountModal(html, wide) {
     const body = $("#modal-body"), modal = $("#modal");
@@ -3399,6 +3399,11 @@ function initAccountLogin() {
     body.innerHTML = html;
     modal.classList.add("show");
     modal.classList.toggle("wide", !!wide);
+    // Na tela de login (jogo não started), deixa o background aparecer
+    // atrás do modal de seleção de personagens.
+    const loginVisible = $("#login") && $("#login").style.display !== "none";
+    const gameActive = typeof G !== "undefined" && G && (G.combat || G.inCity || G.training);
+    modal.classList.toggle("login-modal", !!loginVisible && !gameActive);
     return true;
   }
   function vocOutfit(v, s) {

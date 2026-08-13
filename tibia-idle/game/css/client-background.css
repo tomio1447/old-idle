@@ -1,9 +1,12 @@
 #login-bg {
   position: fixed; inset: 0; z-index: 0;
+  /* Gradientes semi-transparentes sobre o background do body (Summer 2026).
+     Antes o último gradiente era opaco (#1a1e24 -> #0d1014) e cobria o
+     background do body, deixando a login screen sem o wallpaper. */
   background:
-    radial-gradient(ellipse at 30% 40%, rgba(30,45,60,.55) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 60%, rgba(25,40,30,.45) 0%, transparent 55%),
-    radial-gradient(ellipse at center, #1a1e24 0%, #0d1014 100%);
+    radial-gradient(ellipse at 30% 40%, rgba(30,45,60,.35) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 60%, rgba(25,40,30,.25) 0%, transparent 55%),
+    radial-gradient(ellipse at center, rgba(10,14,20,.25) 0%, rgba(6,8,12,.55) 100%);
 }
 #client-version-label {
   position: fixed; right: 12px; bottom: 12px; z-index: 3;
@@ -42,7 +45,13 @@
 }
 #login-overlay {
   position: fixed; inset: 0; z-index: 1;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.25) 0%, rgba(0,0,0,.55) 80%);
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.15) 0%, rgba(0,0,0,.35) 80%);
   pointer-events: none;
 }
 #login { position: relative; z-index: 10; }
+/* Modal de seleção de personagens: deixa o background aparecer atrás.
+   O .modal-bg padrão tem rgba(0,0,0,.82) que cobre o wallpaper; na tela
+   de login usamos uma classe mais transparente. */
+.modal-bg.login-modal {
+  background: rgba(0,0,0,.45);
+}
