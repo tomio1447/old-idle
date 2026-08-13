@@ -86,6 +86,11 @@ function partyExpShare(players,baseExp){const bonus=partyExpBonusPct(players),to
 function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),eligible=partyCanShareExp(players),
     receivers=eligible?(alive.length?alive:players):[(alive[0]||players[0])],split=partyExpShare(players,mob.exp),
     share=eligible?split.each:Math.floor(mob.exp);
+  auth.stats=auth.stats||{};auth.stats.rawExp=(Number(auth.stats.rawExp)||0)+Math.max(0,Number(mob.exp)||0);
+  auth.stats.rawHp=(Number(auth.stats.rawHp)||0)+Math.max(0,Number(mob.maxHp)||0);auth.stats.monsters=auth.stats.monsters||{};
+  const raw=auth.stats.monsters[mob.slug]||(auth.stats.monsters[mob.slug]={name:mob.def.name||mob.slug,kills:0,rawExp:0,rawHp:0});
+  raw.kills=(Number(raw.kills)||0)+1;raw.rawExp=(Number(raw.rawExp)||0)+Math.max(0,Number(mob.exp)||0);
+  raw.rawHp=(Number(raw.rawHp)||0)+Math.max(0,Number(mob.maxHp)||0);
   for(const item of receivers){addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
@@ -131,6 +136,7 @@ function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const ite
   auth.ended=true;auth.terminalReason="party-wipe";
 }
 function step(auth,now){if(auth.ended)return;
+  auth.stats=auth.stats||{};auth.stats.time=(Number(auth.stats.time)||0)+1000;
   if(auth.greed){if(!auth.greed.immune&&now>=auth.greed.vulnerableUntil){auth.greed.immune=true;auth.greed.vulnerableUntil=0;}
     if(auth.greed.immune)fillGreed(auth);}
   for(const item of auth.players){const p=item.p;p.stamina=FULL_STAMINA;if(item.downUntil&&now>=item.downUntil){const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;}usePotion(p);}
@@ -168,7 +174,7 @@ function initializeAuthority(descriptor,instanceId,now){
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",players,mobs:[],spawnPool:[],spawnPoints:[],
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,pack:Math.max(1,visual.length||3),
-    stats:{kills:0,exp:0,loot:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
+    stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,loot:{},monsters:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""));if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))

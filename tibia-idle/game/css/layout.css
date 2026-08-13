@@ -2488,6 +2488,79 @@ button.danger {
 .stat-row .k { color: #9ca3af; }
 .stat-row .v { color: var(--gi-text-bright); }
 
+/* Hunt Session Analyser lateral — nunca usa o modal global. */
+.hunt-analytics-panel > .panel-title { gap: 6px; }
+.hunt-analytics-panel > .panel-title #otc-analyser-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.otc-live-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  color: #9ce84a; font-size: 9px; font-weight: bold; letter-spacing: .5px;
+}
+.otc-live-badge i, .otc-session-head em i {
+  width: 6px; height: 6px; border-radius: 50%; background: #78d83f;
+  box-shadow: 0 0 6px rgba(120,216,63,.8); animation: otc-live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes otc-live-pulse { 50% { opacity: .35; box-shadow: 0 0 2px rgba(120,216,63,.25); } }
+.otc-analytics-shell { padding: 4px !important; }
+.otc-analyser-tabs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px;
+  padding-bottom: 5px; border-bottom: 1px solid #242830;
+}
+.otc-analyser-btn {
+  width: 100%; min-height: 25px; padding: 3px 4px; overflow: hidden;
+  color: #aeb3bd; font-size: 10px; text-align: left; text-overflow: ellipsis;
+  white-space: nowrap; border-color: #4b4e55; background: linear-gradient(#303239,#202228);
+}
+.otc-analyser-btn span { margin-right: 3px; }
+.otc-analyser-btn:hover { color: #ffe680; border-color: #8b742d; }
+.otc-analyser-btn.active {
+  color: #fff0a6; border-color: #b79639; background: linear-gradient(#544722,#2d2818);
+  box-shadow: inset 0 0 0 1px rgba(255,224,128,.08);
+}
+.otc-analyser-result {
+  min-width: 0; max-height: 520px; overflow: auto; padding: 6px 2px 2px;
+  color: #c8cbd1; font-size: 11px; line-height: 1.35;
+  scrollbar-color: #555 #17191d; scrollbar-width: thin;
+}
+.otc-session-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.otc-session-head > span { min-width: 0; display: flex; flex-direction: column; }
+.otc-session-head > span b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ffe680; }
+.otc-session-head > span small { color: #848a94; font-size: 9px; text-transform: uppercase; }
+.otc-session-head em { display: inline-flex; align-items: center; gap: 4px; color: #9ce84a; font-size: 9px; font-style: normal; white-space: nowrap; }
+.otc-analyser-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.otc-analyser-metric {
+  min-width: 0; padding: 5px 6px; border: 1px solid #34383f; background: #17191d;
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+.otc-analyser-metric > span { display: block; color: #8f959f; font-size: 9px; }
+.otc-analyser-metric > b { display: block; overflow: hidden; color: #e6e8ec; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.otc-analyser-metric > small { display: block; overflow: hidden; color: #75caff; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.otc-analyser-metric.xp-gained > b { color: #9ce84a; }
+.otc-analyser-metric.raw-xp { border-color: #675a30; }
+.otc-analyser-metric.raw-xp > b, .otc-analyser-metric.raw-ratio > b { color: #ffe680; }
+.otc-analyser-metric.gold > b { color: #e7c55b; }
+.otc-raw-note {
+  margin: 6px 0; padding: 5px 6px; color: #9da2aa; font-size: 9px;
+  border-left: 2px solid #b79639; background: rgba(183,150,57,.08);
+}
+.otc-raw-note b { color: #ffe680; }
+.otc-analyser-section-title { margin: 7px 0 3px; color: #d8dadd; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+.otc-analyser-line {
+  min-height: 25px; display: flex; align-items: center; gap: 5px; padding: 3px 4px;
+  border-bottom: 1px solid #2d3036;
+}
+.otc-analyser-line > img { flex: none; image-rendering: pixelated; }
+.otc-analyser-line > span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otc-analyser-line > strong { color: #ffe680; white-space: nowrap; }
+.otc-monster-line > span { display: flex; flex-direction: column; white-space: normal; }
+.otc-monster-line > span b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otc-monster-line > span small { color: #858b95; font-size: 9px; }
+.otc-analyser-summary { margin-bottom: 4px; padding: 5px; background: #17191d; border: 1px solid #34383f; }
+.otc-analyser-summary b { color: #e7c55b; }
+.otc-analyser-empty { display: flex; flex-direction: column; gap: 3px; padding: 14px 7px; text-align: center; color: #858b95; }
+.otc-analyser-empty b { color: #c7cad0; }
+
 /* -------------------------- log */
 .log-line .time { color: var(--gi-dim); }
 .log-line.exp   { color: var(--gi-success); }
