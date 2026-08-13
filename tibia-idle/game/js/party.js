@@ -630,6 +630,21 @@ async function partyApplyFollow(f) {
   if (PARTY_FOLLOW_USED[f.nonce]) return;   // já aplicado (replay de poll)
   PARTY_FOLLOW_USED[f.nonce] = now;
   try {
+    // Troca de controle entre personagens da mesma conta: o alvo já foi
+    // materializado nesta arena. O follow pendente só precisa ser consumido;
+    // chamar startHunt/startBoss aqui destruiria e recriaria o runtime atual.
+    const controlId=typeof sessionCharId==="function"?String(sessionCharId()||""):"";
+    const transferred=G&&String(G.partyControlTransferId||"")===controlId&&
+      now-Number(G.partyControlTransferAt||0)<15000;
+    const inRuntime=transferred&&G.combat&&Array.isArray(G.combat.players)&&
+      G.combat.players.some((ent)=>String(ent&&(ent.id||(ent.p&&ent.p.id)))===controlId);
+    const sameDestination=inRuntime&&((f.hunt&&String(G.combat.huntId||"")===String(f.hunt))||
+      (f.boss&&G.combat.boss&&String(G.combat.boss.id||"")===String(f.boss)));
+    if(!f.returnHome&&sameDestination){
+      delete G.partyControlTransferId;delete G.partyControlTransferAt;
+      await accountPartyFollow(Number(controlId),f.nonce);
+      return;
+    }
     if (f.returnHome) {
       // líder saiu da hunt/boss -> membro volta para a cidade (instância
       // fica ativa só enquanto o líder estiver nela)
@@ -919,7 +934,10 @@ async function partyOnlineLeave() {
 
 /* Quantos membros o party combat vai carregar (0 = sem party). */
 function partyCombatCount() {
-  if (typeof partyOnlineMode === "function" && partyOnlineMode()) return 0;
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st=typeof partyOnlineState==="function"?partyOnlineState():null;
+    return st&&Array.isArray(st.members)?st.members.length:0;
+  }
   const d = partyLocalData();
   if (!d) return 0;
   return d.members.length;
@@ -984,24 +1002,46 @@ function partyCombatRestoreAll(reason) {
 
 
 function partyCombatLoad(player) {
-  const d = partyLocalData();
-  if (!d) return null;
-  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
+  let order=[],chars=[];
+  if(online){
+    const st=player&&player._partyOnline;
+    if(!st||!st.leader)return null;
+    order=[st.leader].concat(st.members||[]);
+    const cached=typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
+    chars=cached.map((summary)=>{
+      let raw=summary.snapshot||{};
+      if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw={};}}
+      return Object.assign({},raw,{id:String(summary.id),name:summary.name,voc:summary.voc,
+        level:Number(summary.level)||raw.level||1,sex:summary.sex||raw.sex||"male",
+        outfit:summary.outfit||raw.outfit});
+    });
+    const me=String(player.id||"");
+    const currentIndex=chars.findIndex((character)=>String(character.id)===me);
+    if(currentIndex>=0)chars[currentIndex]=player;else chars.push(player);
+  }else{
+    const d=partyLocalData();
+    if(!d)return null;
+    chars=typeof getCharacters==="function"?getCharacters():[];
+    order=[{id:d.leaderId}].concat(d.members||[]);
+  }
   const me = String(player.id || characterId(player));
   const entidades = [];
   const seen = new Set();
   const mkEnt = (c, isLeader) => {
-    // FIX: ignora chars inválidos que causavam "jogador não identificável morto"
-    if (!c) return;
-    const rawId = c.id;
-    if (!rawId) return;
-    const idStr = String(rawId);
-    if (seen.has(idStr)) return;
-    if (!c.name) return;
+    // Ignora snapshots incompletos e nunca duplica um id na arena.
+    if (!c || !c.id || !c.name) return;
+    const idStr=String(c.id);
+    if(seen.has(idStr))return;
     seen.add(idStr);
     const pp = normalizePlayer(c);
-    pp.id = c.id; // não gerar id novo aqui, usa id existente
-    if (!pp.name) return;
+    pp.id = c.id;
+    if(!pp.name)return;
+    if(online&&player&&player._partyOnline){
+      pp._partyOnline=Object.assign({},player._partyOnline,{isLeader:!!(player._partyOnline.leader&&
+        String(player._partyOnline.leader.id)===String(pp.id))});
+      pp._partyInvites=player._partyInvites||0;
+    }
     const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1, mp: 1 };
     entidades.push({
       p: pp, id: pp.id, name: pp.name, voc: pp.voc, sex: pp.sex,
@@ -1013,14 +1053,14 @@ function partyCombatLoad(player) {
       taken: 0,
     });
   };
-  // líder primeiro (ativa por padrão)
-  const lider = chars.find((c) => String(c.id || characterId(c)) === me);
-  mkEnt(lider, true);
-  // membros na ordem do party
-  for (const m of d.members) {
-    const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
-    if (c) mkEnt(c, false);
+  // Respeita a ordem da party vinda do servidor/storage.
+  for(let index=0;index<order.length;index++){
+    const ref=order[index];
+    const character=chars.find((item)=>String(item.id||characterId(item))===String(ref.id));
+    if(character)mkEnt(character,index===0);
   }
+  // O personagem atual precisa existir mesmo se o poll/cache estiver atrasado.
+  if(!seen.has(me))mkEnt(player,!!(order[0]&&String(order[0].id)===me));
   return entidades.length > 1 ? entidades : null;
 }
 
@@ -1081,6 +1121,103 @@ function partyNearestTarget(c, mob) {
     if (d < bestD) { bestD = d; best = ent; }
   }
   return best || c.player || null;
+}
+
+function partyCombatFindPlayer(id){
+  const players=typeof G!=="undefined"&&G&&G.combat&&Array.isArray(G.combat.players)?G.combat.players:[];
+  return players.find((ent)=>String(ent&&(ent.id||(ent.p&&ent.p.id)))===String(id))||null;
+}
+
+/* Instâncias online abertas por versões antigas podem conter apenas a
+ * entidade que iniciou a hunt, embora o painel já tenha o roster completo.
+ * Carrega o personagem escolhido e o anexa uma única vez ao MESMO combate,
+ * permitindo corrigir a sessão em andamento sem reload ou nova instância. */
+async function partyCombatEnsureOnlinePlayer(id){
+  if(typeof G==="undefined"||!G||!G.combat||!G.p)return null;
+  const existing=partyCombatFindPlayer(id);if(existing)return existing;
+  if(typeof partyOnlineMode!=="function"||!partyOnlineMode())return null;
+  const state=G.p._partyOnline||null,all=state?[state.leader].concat(state.members||[]):[];
+  const member=all.find((item)=>String(item&&item.id)===String(id));
+  if(!member)return null;
+  const account=typeof sessionAccount==="function"?sessionAccount():null;
+  if(member.account_id&&account&&Number(member.account_id)!==Number(account.id))return null;
+
+  let summary=null;
+  const cached=typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
+  summary=cached.find((item)=>String(item.id)===String(id))||null;
+  let raw=summary&&summary.snapshot||null;
+  if(!raw&&typeof accountLoadCharacter==="function"&&typeof sessionToken==="function"){
+    const loaded=await accountLoadCharacter(sessionToken(),id);
+    if(loaded&&loaded.ok&&loaded.character){
+      summary=loaded.character;raw=loaded.character.data||{};
+    }
+  }
+  if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw={};}}
+  if(!raw||typeof raw!=="object")return null;
+  // Outra resposta assíncrona pode ter anexado o mesmo membro enquanto o GET rodava.
+  const afterLoad=partyCombatFindPlayer(id);if(afterLoad)return afterLoad;
+  const p=normalizePlayer(Object.assign({},raw,{id:String(id),name:member.name||(summary&&summary.name),
+    voc:member.voc||(summary&&summary.voc)||raw.voc,level:Number(member.level||(summary&&summary.level))||raw.level||1}));
+  p.id=String(id);p._partyOnline=Object.assign({},state,{isLeader:!!(state&&state.leader&&
+    String(state.leader.id)===String(id))});p._partyInvites=G.p._partyInvites||0;
+  const combat=G.combat;
+  p.hunt=combat.huntId||G.p.hunt||null;
+  p.instanceMode=combat.boss?"boss":combat.instanceMode||G.p.instanceMode||"non-pvp";
+  if(member.hp!==undefined)p.hp=Math.max(0,Number(member.hp)||0);
+  if(member.mp!==undefined)p.mp=Math.max(0,Number(member.mp)||0);
+  const mx=typeof maxStats==="function"?maxStats(p):{hp:Math.max(1,p.hp||1),mp:Math.max(0,p.mp||0)};
+
+  const active=combat.player||{};
+  if(!active.p){active.p=G.p;active.id=G.p.id;active.name=G.p.name;
+    active.voc=G.p.voc;active.sex=G.p.sex;combat.player=active;}
+  if(!Array.isArray(combat.players))combat.players=[active];
+  else if(!combat.players.includes(active))combat.players.unshift(active);
+  let cx=Number.isFinite(active.cx)?active.cx:0,cy=Number.isFinite(active.cy)?active.cy:0;
+  const occupied=new Set(combat.players.map((ent)=>String(ent.cx)+":"+String(ent.cy)));
+  const offsets=[[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[1,1],[-1,1]];
+  for(const offset of offsets){
+    const nx=cx+offset[0],ny=cy+offset[1],key=String(nx)+":"+String(ny);
+    const inMap=nx>=0&&ny>=0&&nx<(combat.gridW||30)&&ny<(combat.gridH||30);
+    const blocked=typeof huntMapBlocked==="function"&&combat.huntMap&&huntMapBlocked(combat.huntMap,nx,ny);
+    if(inMap&&!blocked&&!occupied.has(key)){cx=nx;cy=ny;break;}
+  }
+  const pos=typeof cellToScreen==="function"?cellToScreen(cx,cy):
+    {x:(cx+.5)/(combat.gridW||30),y:(cy+.5)/(combat.gridH||30)};
+  const ent={p,id:p.id,name:p.name,voc:p.voc,sex:p.sex,cx,cy,x:pos.x,y:pos.y,sx:pos.x,sy:pos.y,
+    dir:active.dir||"e",moving:false,frame:0,walkT:0,attackAnim:0,atkCd:500+Math.random()*900,
+    speedPts:110+Math.min(200,p.level||1),maxHp:mx.hp,maxMp:mx.mp,reviveAt:0,deathPos:null,
+    isLeader:!!(state&&state.leader&&String(state.leader.id)===String(id)),taken:0};
+  combat.players.push(ent);
+  return ent;
+}
+
+async function partyCombatSwitchOnlineTo(id){
+  if(typeof G==="undefined"||!G||!G.combat)return false;
+  if(partyCombatSwitchOnlineTo._pending)return false;
+  partyCombatSwitchOnlineTo._pending=true;
+  try{
+    // No modo legado o tick autoritativo não existe; grave o personagem atual
+    // com seu próprio id antes de transferir o controle.
+    if(typeof partyOnlineMode==="function"&&partyOnlineMode()&&
+       (typeof onlineAuthorityCombat!=="function"||!onlineAuthorityCombat())&&G.p&&
+       typeof accountSaveCharacter==="function"&&typeof sessionToken==="function"){
+      try{await accountSaveCharacter(sessionToken(),String(G.p.id),G.p);}catch(e){}
+    }
+    const ent=partyCombatFindPlayer(id)||await partyCombatEnsureOnlinePlayer(id);
+    if(!ent){if(typeof toast==="function")toast("Não foi possível carregar este membro na instância ativa.","bad");return false;}
+    const switched=typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(id);
+    if(switched&&typeof partyOnlineMode==="function"&&partyOnlineMode()){
+      // Cliente legado não possui persistência autoritativa: atualize o único
+      // snapshot local depois da hidratação para um refresh imediato continuar
+      // nesta arena. A versão autoritativa nunca passa por este checkpoint.
+      if(typeof accountSaveInstance!=="function"&&typeof persistActiveInstance==="function")
+        persistActiveInstance();
+      // O servidor pode ainda ter um follow pendente para este char. Marque a
+      // transferência para o poll apenas consumir o nonce, sem reiniciar a hunt.
+      G.partyControlTransferId=String(id);G.partyControlTransferAt=Date.now();
+    }
+    return switched;
+  }finally{partyCombatSwitchOnlineTo._pending=false;}
 }
 
 /* Troca o personagem ATIVO durante o party combat (sem recarregar).

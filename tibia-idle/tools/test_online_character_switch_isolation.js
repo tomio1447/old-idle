@@ -6,13 +6,14 @@ const root=path.join(__dirname,".."),game=fs.readFileSync(path.join(root,"game",
 function must(value,message){if(!value)throw Error(message);}
 function extract(source,begin,end){const a=source.indexOf(begin),b=source.indexOf(end,a);must(a>=0&&b>a,"segmento ausente: "+begin);return source.slice(a,b);}
 const enterSegment=extract(game,"async function enterCharacter","\n  function paintCreatorVocations");
-const panelSegment=extract(partyUi,"function partySwitchToChar","\n\n/* Estado de colapso");
+const panelSegment=extract(partyUi,"async function partySwitchToChar","\n\n/* Estado de colapso");
 
 (async()=>{
   const session=new Map();let switches=0,closes=0,saves=0,reloads=0,allowSwitch=true;
   const pickerCtx={
-    G:{p:{id:"10",name:"Royal"},combat:{players:[{id:"10",p:{id:"10"}},{id:"20",p:{id:"20"}}]}},
-    partyCombatSwitchTo:(id)=>{switches++;must(String(id)==="20","picker tentou controlar id incorreto");return allowSwitch;},
+    G:{p:{id:"10",name:"Royal",_partyOnline:{leader:{id:"10"},members:[{id:"20"}]}},
+      combat:{players:[{id:"10",p:{id:"10"}}]}},
+    partyCombatSwitchOnlineTo:async(id)=>{switches++;must(String(id)==="20","picker tentou controlar id incorreto");return allowSwitch;},
     closeAccountModal:()=>{closes++;},save:()=>{saves++;},
     sessionStorage:{setItem:(key,value)=>session.set(key,String(value))},location:{reload:()=>{reloads++;}},
     Array,String,
@@ -22,36 +23,36 @@ const panelSegment=extract(partyUi,"function partySwitchToChar","\n\n/* Estado d
   must(result===true&&switches===1&&closes===1&&saves===0&&reloads===0&&
     !session.has("tibia-idle-online-autoload"),"picker online recarregou em vez de transferir o controle");
 
-  // Se o membro estiver no snapshot mas inconsciente/indisponível, não use o
-  // reload como fallback: ele criaria/abriria um runtime diferente.
+  // Mesmo ausente de c.players, um membro do roster remoto precisa seguir o
+  // caminho de hidratação; nunca use reload como fallback.
   allowSwitch=false;result=await pickerCtx.enterCharacter("token",{id:"20",name:"Druid"});
   must(result===false&&switches===2&&closes===1&&saves===0&&reloads===0,
-    "falha ao controlar membro da instância caiu no caminho de reload");
+    "falha ao hidratar membro da instância caiu no caminho de reload");
 
-  // Personagem que não pertence ao combate ativo mantém o fluxo legado.
+  // Personagem que não pertence à party mantém o fluxo legado.
   result=await pickerCtx.enterCharacter("token",{id:"30",name:"Knight"});
   must(result===true&&saves===1&&reloads===1&&session.get("tibia-idle-online-autoload")==="30",
     "troca normal fora da party deixou de usar o reload isolado");
 
-  let panelSwitches=0,panelReloads=0,toasts=0;const panelStore=new Map();
+  let panelSwitches=0,panelReloads=0;const panelStore=new Map();
   const panelCtx={
-    G:{p:{id:"10"},combat:{players:[{id:"10",p:{id:"10"}},{p:{id:"20"}}]}},
-    partyCombatSwitchTo:(id)=>{panelSwitches++;return String(id)==="20";},toast:()=>{toasts++;},
+    G:{p:{id:"10"},combat:{players:[{id:"10",p:{id:"10"}}]}},
+    partyCombatSwitchOnlineTo:async(id)=>{panelSwitches++;return String(id)==="20";},
     localStorage:{setItem:(key,value)=>panelStore.set(key,String(value))},
     sessionStorage:{setItem:(key,value)=>panelStore.set(key,String(value))},
     location:{reload:()=>{panelReloads++;}},ACTIVE_CHARACTER_KEY:"active",AUTOLOGIN_KEY:"autoload",Array,String,
   };
   vm.createContext(panelCtx);vm.runInContext(panelSegment,panelCtx);
-  must(panelCtx.partySwitchToChar("20")===true&&panelSwitches===1&&panelReloads===0,
-    "painel da party não reutilizou a entidade já presente");
-  must(panelCtx.partySwitchToChar("99")===false&&panelReloads===0&&toasts===1,
+  must(await panelCtx.partySwitchToChar("20")===true&&panelSwitches===1&&panelReloads===0,
+    "painel da party não hidratou/reutilizou o membro no runtime atual");
+  must(await panelCtx.partySwitchToChar("99")===false&&panelReloads===0,
     "membro ausente durante combate abriu outro runtime");
   panelCtx.G.combat=null;
-  must(panelCtx.partySwitchToChar("30")===true&&panelReloads===1&&panelStore.get("tibia-idle-char")==="30",
+  must(await panelCtx.partySwitchToChar("30")===true&&panelReloads===1&&panelStore.get("tibia-idle-char")==="30",
     "troca fora de combate deixou de recarregar o personagem escolhido");
 
-  must(enterSegment.includes("partyCombatSwitchTo(summary.id)")&&
-    !enterSegment.slice(0,enterSegment.indexOf("if (typeof save")).includes("location.reload"),
-    "picker não prioriza a troca em memória antes do save/reload");
-  console.log("OK: picker e painel online preservam a instância ao trocar personagens da party.");
+  must(enterSegment.includes("await partyCombatSwitchOnlineTo(summary.id)")&&
+    panelSegment.includes("await partyCombatSwitchOnlineTo(id)"),
+    "picker/painel não aguardam a hidratação no runtime atual");
+  console.log("OK: picker e painel online preservam e hidratam a instância ao trocar personagens da party.");
 })().catch((error)=>{console.error(error);process.exitCode=1;});

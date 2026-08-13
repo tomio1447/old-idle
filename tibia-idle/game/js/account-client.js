@@ -33,6 +33,30 @@ function accountApiConfigured() {
   return !!ACCOUNT_API_URL;
 }
 
+/* Snapshot dos personagens da conta. A party online precisa desses dados
+ * para montar todas as entidades da mesma conta na arena sem recarregar a
+ * página nem abrir um runtime por personagem. */
+const ONLINE_CHARACTER_CACHE_KEY="tibia-idle-online-character-cache-v1";
+function accountCharacterCacheWrite(characters){
+  try{sessionStorage.setItem(ONLINE_CHARACTER_CACHE_KEY,JSON.stringify(characters||[]));}catch(e){}
+}
+function accountCharacterCacheRead(){
+  try{const raw=sessionStorage.getItem(ONLINE_CHARACTER_CACHE_KEY);return raw?JSON.parse(raw):[];}catch(e){return [];}
+}
+function accountCharacterCacheClear(){
+  try{sessionStorage.removeItem(ONLINE_CHARACTER_CACHE_KEY);}catch(e){}
+}
+function accountMergeCharacterCache(characters){
+  const cache=accountCharacterCacheRead();
+  for(const character of characters||[]){
+    const index=cache.findIndex((entry)=>String(entry.id)===String(character.id));
+    if(index>=0)cache[index]=Object.assign({},cache[index],character);
+    else cache.push(character);
+  }
+  accountCharacterCacheWrite(cache);
+  return cache;
+}
+
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
@@ -71,9 +95,15 @@ async function accountMe(token) {
 
 async function accountLoadCharacter(token, charId) {
   const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
-  return r.data.ok
-    ? { ok:true, character:r.data.character }
-    : { ok:false, msg:r.data.msg || "Falha ao carregar personagem" };
+  if(r.data.ok){
+    const character=r.data.character;
+    let snapshot={};
+    try{snapshot=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+    accountMergeCharacterCache([{id:character.id,name:character.name,voc:character.voc,
+      level:character.level,sex:snapshot.sex||"male",outfit:snapshot.outfit||null,snapshot}]);
+    return {ok:true,character};
+  }
+  return {ok:false,msg:r.data.msg||"Falha ao carregar personagem"};
 }
 
 async function accountCreateCharacter(token, name, voc, data) {
