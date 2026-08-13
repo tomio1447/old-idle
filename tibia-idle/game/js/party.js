@@ -935,10 +935,17 @@ function partyCombatLoad(player) {
   const entidades = [];
   const seen = new Set();
   const mkEnt = (c, isLeader) => {
-    if (!c || seen.has(String(c.id || characterId(c)))) return;
-    seen.add(String(c.id || characterId(c)));
+    // FIX: ignora chars inválidos que causavam "jogador não identificável morto"
+    if (!c) return;
+    const rawId = c.id;
+    if (!rawId) return;
+    const idStr = String(rawId);
+    if (seen.has(idStr)) return;
+    if (!c.name) return;
+    seen.add(idStr);
     const pp = normalizePlayer(c);
-    pp.id = c.id || characterId(c);
+    pp.id = c.id; // não gerar id novo aqui, usa id existente
+    if (!pp.name) return;
     const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1, mp: 1 };
     entidades.push({
       p: pp, id: pp.id, name: pp.name, voc: pp.voc, sex: pp.sex,
