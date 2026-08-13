@@ -81,6 +81,7 @@ a aplicação e usar um banco/disco persistente.
 | GET | `/api/instance?char_id=` | Bearer token | Carrega a instância solo ou compartilhada da party do personagem |
 | PUT | `/api/instance` | `{ token, char_id, lease, expected_version, state }` | Cria/atualiza o único snapshot visual/versionado do roster |
 | POST | `/api/instance/tick` | `{ token, char_id, lease, expected_version? }` | Avança a autoridade pelo líder; membros recebem o mesmo snapshot |
+| POST | `/api/instance/ammo` | `{ token, char_id, ammo, ammo_auto, instance_id, expected_version, lease }` | Troca a munição do RP na autoridade compartilhada |
 | POST | `/api/instance/end` | `{ token, char_id, lease, instance_id, expected_version, reason }` | Líder encerra; membro apenas se desconecta da instância compartilhada |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
 | GET | `/api/characters/:id` | Bearer token | Carrega um personagem pertencente à conta |
@@ -221,6 +222,9 @@ node tibia-idle/tools/backup_restore.js restore --file backup.json --data-dir ti
   mesmo que tente criá-la simultaneamente com personagens diferentes
 - A ordem é persistida em `party_members.position`; somente a conta dona
   pode reordenar e a posição zero permanece reservada ao líder
+- O roster aceita até cinco personagens, inclusive Monk da mesma conta. A
+  composição EK/RP/ED/MS/Monk dentro da regra de nível 2/3 recebe 102% de
+  bônus de Shared Experience (pool 202%, dividido entre os cinco)
 - O LÍDER só pode CONVIDAR estando em Safe Zone (cidade) ou Área de Treino
   (academia / sala de exercise weapons) — validado no servidor
 - CONVIDADO também só ACEITA em cidade/treino: a zona de cada personagem é

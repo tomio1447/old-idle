@@ -34,7 +34,7 @@ must(partyServer.includes("outfit.addons=Math.max")&&partyServer.includes("outfi
   "API da party não publica a aparência persistida com addons");
 must(partyUi.includes("partyApplyOutfitPreview")&&partyUi.includes("AppearanceRenderer.preview(member")&&
   partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit")&&
-  index.includes('js/party-ui.js?v=party-outfit-v1'),
+  index.includes('js/party-ui.js?v=party-exp-v1'),
   "painel da party não compõe/cache-busta outfit, cores e addons atuais");
 must(outfitRenderer.includes("Um asset 15x em carregamento/erro nunca pode remover a entidade")&&
   outfitRenderer.includes("Sprites.walk(o.name, dir, numericFrame) || Sprites.outfit(o.name, dir)")&&

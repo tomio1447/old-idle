@@ -268,6 +268,16 @@ function accountTickInstance(token){
     return {ok:false,error:r.data.error};
   });
 }
+function accountSelectInstanceAmmo(token,charId,slug,automatic){
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const r=await _api("POST","/api/instance/ammo",Object.assign({token,char_id:Number(charId),ammo:String(slug||""),
+      ammo_auto:!!automatic,instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state};}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,msg:r.data.msg||"Não foi possível trocar a munição"};
+  });
+}
 function accountRefreshInstance(token){
   return accountQueueInstance(async()=>{
     const charId=typeof sessionCharId==="function"?sessionCharId():"";

@@ -27,8 +27,8 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   const a=(await post("/api/characters",{token,name:"Cobra EK",voc:"knight",data:JSON.stringify({name:"Cobra EK",voc:"knight"})})).data.character;
   const b=(await post("/api/characters",{token,name:"Cobra RP",voc:"paladin",data:JSON.stringify({name:"Cobra RP",voc:"paladin"})})).data.character;
   const c=(await post("/api/characters",{token,name:"Cobra ED",voc:"druid",data:JSON.stringify({name:"Cobra ED",voc:"druid"})})).data.character;
-  const d=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
-  const guest=(await post("/api/characters",{token:guestToken,name:"Cobra Monk",voc:"monk",data:JSON.stringify({name:"Cobra Monk",voc:"monk"})})).data.character;
+  const d=(await post("/api/characters",{token,name:"Cobra Monk",voc:"monk",data:JSON.stringify({name:"Cobra Monk",voc:"monk"})})).data.character;
+  const guest=(await post("/api/characters",{token:guestToken,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
   const roster=[a,b,c,d];await post("/api/party/create",{token,char_id:a.id});
   for(const character of roster)await post("/api/party/zone",{token,char_id:character.id,zone:"city"});
   await post("/api/party/zone",{token:guestToken,char_id:guest.id,zone:"city"});
@@ -64,6 +64,12 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
     expected_version:loaded.data.instance.version},lease));
   must(ownerTick.status===200&&ownerTick.data.characters.length===4&&ownerTick.data.instance.state.state.players.length===5,
     "tick compartilhado não projetou a party sem vazar personagens externos no cache do líder");
+  loaded=await request("/api/instance?char_id="+a.id,{headers:{authorization:"Bearer "+token}});
+  const ammoSwap=await post("/api/instance/ammo",Object.assign({token,char_id:b.id,ammo:"bolt",instance_id:sharedId,
+    expected_version:loaded.data.instance.version},lease));
+  const rpAuthority=ammoSwap.data.instance&&ammoSwap.data.instance.state.authority.players.find((item)=>Number(item.id)===Number(b.id));
+  must(ammoSwap.status===200&&ammoSwap.data.instance.id===sharedId&&rpAuthority&&rpAuthority.p.equip.ammo.item==="bolt",
+    "RP não trocou arrow por bolt autoritativamente dentro da mesma instância");
   loaded=await request("/api/instance?char_id="+a.id,{headers:{authorization:"Bearer "+token}});
   const guestCharacter=await request("/api/characters/"+guest.id,{headers:{authorization:"Bearer "+guestToken}});
   must(guestCharacter.status===200&&guestCharacter.data.character.saveVersion>guest.saveVersion,

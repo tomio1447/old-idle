@@ -202,6 +202,16 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
     updated_at:new Date(lease.now).toISOString()});
   this._save();return {ok:true,instance:row};
 };
+JsonStore.prototype.instancePatchState = function(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
+  if(!this.leaseValidate(requesterAccountId,lease.holderId,lease.secretHash,lease.now))
+    return {ok:false,error:"LEASE_REQUIRED"};
+  const row=this.instanceGet(ownerAccountId);if(!row||row.status!=="active")return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
+  if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion))
+    return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
+  const next=patchState(row.state);if(!next)return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};
+  row.state=next;row.version=Number(row.version)+1;row.updated_at=new Date(lease.now).toISOString();
+  this._save();return {ok:true,instance:row};
+};
 JsonStore.prototype.instanceWorkerCandidates = function(limit){
   return (this.instances||[]).filter((row)=>row.status==="active")
     .sort((a,b)=>new Date(a.worker_cursor_at||a.saved_at)-new Date(b.worker_cursor_at||b.saved_at))
@@ -996,6 +1006,21 @@ async function MysqlStore() {
              meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,meta.started_at,meta.saved_at]);
         }
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+        await conn.commit();return {ok:true,instance:saved[0]};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instancePatchState(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
+      const conn=await pool.getConnection();
+      try{await conn.beginTransaction();
+        if(!await lockValidLease(conn,requesterAccountId,lease)){await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};}
+        const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(ownerAccountId)]),row=rows[0];
+        if(!row||row.status!=="active"){await conn.rollback();return {ok:false,error:"INSTANCE_NOT_ACTIVE"};}
+        if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion)){
+          await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
+        const next=patchState(row.state);if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
+        await conn.query("UPDATE account_instances SET state=?,version=version+1,updated_at=? WHERE account_id=?",
+          [next,new Date(lease.now),Number(ownerAccountId)]);
+        const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(ownerAccountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },

@@ -261,7 +261,7 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
   const slot = chk.slot;
 
   if (slot === "ammo") {
-    if (typeof setActiveAmmo === "function") setActiveAmmo(p, slug);
+    if (typeof setActiveAmmo === "function") setActiveAmmo(p, slug, true);
     if (typeof toast === "function") toast(`Munição no quiver: <b>${it.n}</b>`);
     return true;
   }

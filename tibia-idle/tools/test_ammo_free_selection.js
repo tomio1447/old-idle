@@ -4,6 +4,9 @@ const fs=require("fs"),path=require("path"),vm=require("vm");
 const js=path.join(__dirname,"..","game","js");
 const ui=fs.readFileSync(path.join(js,"ui.js"),"utf8");
 const combat=fs.readFileSync(path.join(js,"combat.js"),"utf8");
+const player=fs.readFileSync(path.join(js,"player.js"),"utf8");
+const client=fs.readFileSync(path.join(js,"account-client.js"),"utf8");
+const index=fs.readFileSync(path.join(__dirname,"..","game","index.html"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
 const start=ui.indexOf("const AMMO_CATS"),end=ui.indexOf("\nfunction openAmmoPicker",start);
 const ctx={
@@ -27,4 +30,9 @@ const pickerStart=ui.indexOf("const linhaAmmo"),pickerEnd=ui.indexOf("const linh
 const picker=ui.slice(pickerStart,pickerEnd);
 must(!picker.includes('a.kind === "bolt" ? "crossbow" : "bow"'),
   "modal ainda exibe requer bow/crossbow");
-console.log("OK: arrows/bolts têm seleção manual livre; compatibilidade permanece apenas no disparo/automático.");
+must(player.includes("accountSelectInstanceAmmo(sessionToken(),p.id,slug")&&
+  client.includes('"/api/instance/ammo"')&&ui.includes("setActiveAmmo(p, b.dataset.pickAmmo, true)")&&
+  index.includes('js/player.js?v=ammo-authority-v1')&&index.includes('js/ui.js?v=ammo-authority-v1')&&
+  index.includes('js/account-client.js?v=ammo-authority-v1'),
+  "troca de munição online não persiste na autoridade/cache atualizados");
+console.log("OK: arrows/bolts têm seleção livre e troca autoritativa durante a instância.");

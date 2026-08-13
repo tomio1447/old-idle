@@ -4,7 +4,11 @@ const fs=require("fs"),path=require("path"),crypto=require("crypto");
 const DATA=path.join(__dirname,"..","game","data");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
-const ITEMS=read("items.json");
+const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
+for(const slug of Object.keys(AMMO)){const raw=AMMO[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
+  {name:raw.n||slug,slot:"ammo",type:"ammo",attack:Number(raw.atk)||0,level:Number(raw.lvl)||0});}
+for(const slug of Object.keys(QUIVERS)){const raw=QUIVERS[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
+  {name:raw.nome||slug,slot:"shield",type:"quiver",level:Number(raw.lvl)||0});}
 const HUNTS=Object.assign(read("hunts.json"),{
   "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"]},
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"]},
@@ -31,7 +35,9 @@ function seedFor(id){return parseInt(crypto.createHash("sha256").update(String(i
 function random(auth){let x=Number(auth.rngState)||1;x^=x<<13;x^=x>>>17;x^=x<<5;auth.rngState=x>>>0;return auth.rngState/4294967296;}
 function roll(auth,min,max){return Math.floor(min+random(auth)*(max-min+1));}
 function monsterDef(slug){return MONSTERS[String(slug)]||null;}
-function weaponAttack(p){const e=p.equip&&p.equip.weapon,it=e&&ITEMS[e.item];return Math.max(7,Number(it&&(it.attack!==undefined?it.attack:it.atk))||7);}
+function weaponAttack(p){const e=p.equip&&p.equip.weapon,it=e&&ITEMS[e.item],a=p.equip&&p.equip.ammo,ammo=a&&ITEMS[a.item];
+  const base=Number(it&&(it.attack!==undefined?it.attack:it.atk))||0,shot=it&&it.type==="distance"&&ammo?Number(ammo.attack||ammo.atk)||0:0;
+  return Math.max(7,base+shot||7);}
 function attackSkillName(p){if(p.voc==="paladin")return "dist";if(p.voc==="monk")return "fist";
   const e=p.equip&&p.equip.weapon,it=e&&ITEMS[e.item],type=it&&String(it.type||it.t||"");return ["sword","axe","club"].includes(type)?type:"fist";}
 function playerSkill(p){const skills=p.skills||{},which=attackSkillName(p);return Number(skills[which])||10;}
@@ -65,7 +71,21 @@ function makeMob(auth,slug,boss,id){const def=monsterDef(slug);if(!def)return nu
   if(point)Object.assign(mob,point);else if(auth.gridW&&auth.gridH){mob.cx=Math.floor(auth.gridW/2);mob.cy=Math.floor(auth.gridH/2);
     mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;}
   return mob;}
-function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),receivers=alive.length?alive:players,share=Math.floor(mob.exp/Math.max(1,receivers.length));
+function partyCanShareExp(players){players=Array.isArray(players)?players:[];if(players.length<2)return false;
+  const levels=players.map((item)=>Math.max(1,Number(item&&item.p&&item.p.level)||1));
+  return Math.min(...levels)*3>=Math.max(...levels)*2;
+}
+function partyExpBonusPct(players){
+  players=Array.isArray(players)?players:[];if(!partyCanShareExp(players))return 0;
+  const vocs=new Set(players.map((item)=>String(item&&item.p&&item.p.voc||"none")));
+  if(players.length===5&&vocs.size===5&&["knight","paladin","druid","sorcerer","monk"].every((voc)=>vocs.has(voc)))return 102;
+  if(vocs.size>=4)return 100;if(vocs.size===3)return 70;if(vocs.size===2)return 35;return 20;
+}
+function partyExpShare(players,baseExp){const bonus=partyExpBonusPct(players),total=Math.floor(Math.max(0,Number(baseExp)||0)*(1+bonus/100));
+  return {bonusPct:bonus,total,each:Math.floor(total/Math.max(1,players.length))};}
+function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),eligible=partyCanShareExp(players),
+    receivers=eligible?(alive.length?alive:players):[(alive[0]||players[0])],split=partyExpShare(players,mob.exp),
+    share=eligible?split.each:Math.floor(mob.exp);
   for(const item of receivers){addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
@@ -78,7 +98,7 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),rece
     else leader.lootPouch[entry.item]=(Number(leader.lootPouch[entry.item])||0)+count;
     auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+count;
   }
-  auth.stats.exp+=mob.exp;auth.stats.kills++;
+  auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
 }
 function usePotion(p){const max=maxStats(p),sup=p.supplies||{};
   if(p.hp<max.hp*.45){for(const id of ["supreme-health-potion","ultimate-health-potion","great-health-potion","strong-health-potion","health-potion","small-health-potion"]){
@@ -200,4 +220,5 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=t
     hp:item.p.hp,mp:item.p.mp,max_hp:maxStats(item.p).hp,max_mp:maxStats(item.p).mp})),terminalReason:auth.ended?auth.terminalReason:null};
 }
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
-module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,blessingPrice,MONSTERS,ITEMS};
+module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
+  blessingPrice,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS};

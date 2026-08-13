@@ -31,8 +31,8 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
 vm.createContext(ctx);vm.runInContext(source,ctx);
 ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:1,snapshot:{}}]);
 (async()=>{
-  must(indexSource.includes('js/account-client.js?v=shared-instance-v1'),
-    "index não invalida o cache do cliente com a instância compartilhada");
+  must(indexSource.includes('js/account-client.js?v=ammo-authority-v1'),
+    "index não invalida o cache do cliente com a troca autoritativa de munição");
   must((await ctx.accountAcquireLease("token",false)).ok,"cliente não adquiriu lease antes do save");
   const p={id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50};
   const results=await Promise.all([
