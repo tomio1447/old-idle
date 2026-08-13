@@ -7,7 +7,7 @@ const partySrc=fs.readFileSync(path.join(js,"party.js"),"utf8");
 const gameSrc=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const trainingSrc=fs.readFileSync(path.join(js,"training.js"),"utf8");
 const html=fs.readFileSync(path.join(game,"index.html"),"utf8");
-must(html.includes("js/party.js?v=shared-instance-v1")&&html.includes("js/training.js?v=party-checkpoint-v1"),
+must(html.includes("js/party.js?v=five-vocations-v1")&&html.includes("js/training.js?v=party-checkpoint-v1"),
   "scripts de checkpoint da party sem cache-busting");
 const start=partySrc.indexOf("function partyRestoreCharacterFull");
 const end=partySrc.indexOf("\n\n/* Carrega as entidades",start);

@@ -13,8 +13,8 @@
  *       Exp = M * S / P * C
  *     M = exp base do monstro · S = bônus de vocações · P = nº de membros
  *     C = bônus individual (stamina/prey do líder já entra no exp base)
- *   Bônus por vocações DIFERENTES (wiki): 1 voc = 20%, 2 = 35%, 3 = 70%,
- *   4+ = 100%.
+ *   Bônus por vocações DIFERENTES: 1 voc = 20%, 2 = 35%, 3 = 70%,
+ *   4 = 100%; a formação completa EK/RP/ED/MS/Monk recebe 102%.
  * - Requisito da wiki: o menor nível ≥ 2/3 do maior.
  * - Party Hunt Analyser: sessão da caçada com stats por membro.
  */
@@ -148,10 +148,12 @@ function partyVocations(p) {
   return vocs;
 }
 
-/* Bônus de exp compartilhada (wiki): 1 voc=20%, 2=35%, 3=70%, 4+=100%. */
+/* Bônus de exp compartilhada: as cinco vocações distintas, incluindo Monk,
+ * formam a composição completa e recebem 102% de bônus. */
 function partyExpBonusPct(p) {
   const n = partyVocations(p).size;
-  if (n >= 4) return 100;
+  if (n >= 5) return 102;
+  if (n === 4) return 100;
   if (n === 3) return 70;
   if (n === 2) return 35;
   return 20;   // mesma vocação
@@ -175,6 +177,7 @@ function partyCanShare(p) {
 function partyShareExp(p, exp) {
   ensureParty(p);
   if (!p.party.shareExp || !p.party.members.length) return null;
+  const eligible=partyCanShare(p);if(!eligible.ok)return null;
   const S = 1 + partyExpBonusPct(p) / 100;
   const P = p.party.members.length + 1;
   const parte = Math.max(0, Math.floor((exp || 0) * S / P));

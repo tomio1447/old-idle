@@ -826,6 +826,14 @@ function partyOnlineHtml(p, st, inbox) {
       </div>`;
     }
     h += `</div>`;
+    const expMembers=[st.leader].concat(st.members||[]),expVocs=new Set(expMembers.map((m)=>m.voc)),
+      expLevels=expMembers.map((m)=>Number(m.level)||1),expEligible=expMembers.length>1&&Math.min(...expLevels)*3>=Math.max(...expLevels)*2,
+      expBonus=expVocs.size>=5?102:expVocs.size===4?100:expVocs.size===3?70:expVocs.size===2?35:20;
+    h += `<div class="party-share tiny" style="color:${expEligible?"#9ce84a":"#ff9a6a"}">
+      Shared Experience: <b>${expEligible?expBonus+"% de bônus":"inativa"}</b> · ${expVocs.size}/5 vocações
+      ${expVocs.size===5&&expEligible?" · composição completa EK/RP/ED/MS/Monk":""}
+      ${!expEligible?" · menor nível precisa ser ≥ 2/3 do maior":""}
+    </div>`;
 
     if (st.isLeader) {
       // ---- líder: convidar por nome (só em cidade/treino) ----

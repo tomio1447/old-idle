@@ -33,7 +33,7 @@ const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
 const { SyncBus } = require("./sync_bus");
-const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats } = require("./authoritative_engine");
+const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS } = require("./authoritative_engine");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -762,6 +762,39 @@ async function tickInstance(db,body){
       .filter((character)=>Number(character.account_id)===Number(acc.id)).map(accountCharacterSummary)}};
 }
 
+async function selectInstanceAmmo(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||""),slug=String(body.ammo||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+    return {code:400,body:{ok:false,error:"INVALID_AMMO_SELECTION",msg:"Seleção de munição inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
+    return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;
+  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+    let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+    const item=descriptor.authority&&descriptor.authority.players&&
+      descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+    if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+    const p=item.p,ammo=ITEMS[slug],shield=p.equip&&p.equip.shield,quiver=shield&&ITEMS[shield.item];
+    if(p.voc!=="paladin"){rejection="Somente paladins podem selecionar munição";return null;}
+    if(!ammo||(ammo.s!=="ammo"&&ammo.slot!=="ammo"&&ammo.type!=="ammo")){rejection="Munição desconhecida";return null;}
+    if((Number(ammo.lvl!==undefined?ammo.lvl:ammo.level)||0)>(Number(p.level)||1)){rejection="Nível insuficiente para esta munição";return null;}
+    if(!quiver||(quiver.t!=="quiver"&&quiver.type!=="quiver")){rejection="Equipe um quiver antes de selecionar munição";return null;}
+    p.equip=p.equip||{};p.equip.ammo={item:slug,count:null};p.config=p.config||{};p.config.ammoAuto=!!body.ammo_auto;
+    const bolt=/bolt/.test(slug);p.config.refillArrow=bolt?"":slug;p.config.refillBolt=bolt?slug:"";
+    descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+  },lease);
+  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+    body:{ok:false,error:result.error,msg:rejection||"Não foi possível trocar a munição",instance:instanceSummary(result.instance,true)}};
+  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+    status:result.instance.status,source:"ammo",holderId:String(body.holder_id||"")});
+  return {code:200,body:{ok:true,ammo:slug,instance:instanceSummary(result.instance,true)}};
+}
+
 async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -1311,6 +1344,9 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/instance/tick"){
         const r=await tickInstance(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/ammo"){
+        const r=await selectInstanceAmmo(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/end"){
         const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);

@@ -951,7 +951,7 @@ function equipFromBag(p, slug, instId) {
   if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "bag", it.s, instId);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
-    setActiveAmmo(p, slug);
+    setActiveAmmo(p, slug, true);
     toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     return true;
   }
@@ -1196,7 +1196,7 @@ function equipFromPouch(p, slug) {
   if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "pouch", it.s);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
-    setActiveAmmo(p, slug);
+    setActiveAmmo(p, slug, true);
     toast(`Munição no quiver: <b>${it.n}</b> (${fmtFull(ammoPrice(slug))} gp/tiro)`);
     return true;
   }
@@ -2721,7 +2721,7 @@ function desenhaAmmoPicker() {
   const ligarAuto = () => {
     p.config.ammoAuto = true;
     const b = bestAmmoFor(p);
-    if (b) setActiveAmmo(p, b);
+    if (b) setActiveAmmo(p, b, true);
     toast(b ? `Automática: <b>${itemName(b)}</b>` : "Automática ligada.");
     save(); renderAll(); desenhaAmmoPicker();
   };
@@ -2733,7 +2733,7 @@ function desenhaAmmoPicker() {
   $$("#modal-body [data-pick-ammo]").forEach((b) =>
     b.addEventListener("click", () => {
       p.config.ammoAuto = false;
-      setActiveAmmo(p, b.dataset.pickAmmo);
+      setActiveAmmo(p, b.dataset.pickAmmo, true);
       toast(`Munição: <b>${itemName(b.dataset.pickAmmo)}</b>`);
       save(); renderAll(); desenhaAmmoPicker();
     }));

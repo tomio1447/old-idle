@@ -57,7 +57,7 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     migrated.authority.v===2&&migrated.authority.players[0].p.hp===engine.maxStats(migrated.authority.players[0].p).hp&&
     migrated.authority.players[0].downUntil===0,
     "instância HARD antiga sem pool/posição/HP não foi autorrecuperada");
-  const motaPlayers=["knight","paladin","druid","sorcerer"].map((voc,index)=>({id:20+index,name:voc,voc,level:500,
+  const motaPlayers=["knight","paladin","druid","sorcerer","monk"].map((voc,index)=>({id:20+index,name:voc,voc,level:500,
     exp:engine.expForLevel(500),hp:999999,mp:999999,gold:10000000,config:{healAt:75},skills:{sword:100,dist:100,fist:100,shield:100},
     ml:80,equip:{weapon:{item:voc==="knight"?"sword":"bow"}},supplies:{"ultimate-health-potion":100,"ultimate-mana-potion":100},lootPouch:{},kills:{},bosses:{}}));
   const mota=directDescriptor(motaPlayers[0]);mota.huntId="mota-extension";
@@ -65,7 +65,13 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   mota.state.players=motaPlayers.map((p,index)=>({id:String(p.id),p,cx:10+index,cy:10,x:(10.5+index)/30,y:10.5/30}));mota.state.mobs=[];
   const motaSlugs=["floating-savant","retching-horror","fury","hellhound","demon"];
   mota.state.pendingSpawns=Array.from({length:10},(_,i)=>({mob:{id:"mota-"+i,slug:motaSlugs[i%5]},cx:5+i*2,cy:5+(i%3),startedAt:1000}));
-  const motaAuth=engine.initializeAuthority(mota,"7".repeat(64),1000),motaAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(motaAuth),60000,61000).state);
+  const motaAuth=engine.initializeAuthority(mota,"7".repeat(64),1000);
+  must(engine.partyExpBonusPct(motaAuth.authority.players)===102&&engine.partyExpShare(motaAuth.authority.players,100).each===40,
+    "composição EK/RP/ED/MS/Monk não recebeu bônus compartilhado de 102%");
+  const invalidLevels=JSON.parse(JSON.stringify(motaAuth.authority.players));invalidLevels[4].p.level=100;
+  must(!engine.partyCanShareExp(invalidLevels)&&engine.partyExpBonusPct(invalidLevels)===0,
+    "party fora da regra de 2/3 recebeu compartilhamento/bônus de vocações");
+  const motaAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(motaAuth),60000,61000).state);
   must(!motaAfter.authority.ended&&motaAfter.authority.mobs.length>0&&motaAfter.authority.players.every((p)=>p.p.hp>0)&&
     motaAfter.authority.players[0].p.missions["mota-extension"].progress,
     "party MOTA não sobrevive/progride missões por 60s no motor autoritativo");

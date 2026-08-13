@@ -522,7 +522,7 @@ function removeAmmo(p, slug, count) {
 /* Seleciona a munição ativa. O slot de ammo é único: escolher uma arrow
  * desequipa automaticamente o bolt anterior (e vice-versa), evitando
  * qualquer estado com duas munições ativas ao mesmo tempo. */
-function setActiveAmmo(p, slug) {
+function setActiveAmmo(p, slug, persistOnline) {
   if (!slug) { delete p.equip.ammo; return null; }
   const it = GAMEDATA.items[slug];
   if (!it || it.s !== "ammo") return null;
@@ -533,6 +533,14 @@ function setActiveAmmo(p, slug) {
     p.config.refillArrow = isBolt ? "" : slug;
     p.config.refillBolt = isBolt ? slug : "";
   }
+  // Em combate online o próximo tick substitui o snapshot local. Seleções
+  // explícitas precisam passar pela autoridade para não voltar à munição
+  // anterior após 500 ms. Não há requisito de bow/crossbow nesta etapa.
+  if(persistOnline&&p.id&&typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()&&
+     typeof accountSelectInstanceAmmo==="function"&&typeof sessionToken==="function")
+    accountSelectInstanceAmmo(sessionToken(),p.id,slug,!!(p.config&&p.config.ammoAuto)).then((result)=>{
+      if(!result.ok&&typeof toast==="function")toast(result.msg||"Não foi possível trocar a munição","bad");
+    }).catch(()=>{});
   return p.equip.ammo;
 }
 
@@ -1095,7 +1103,7 @@ function autoEquip(p) {
         const nota = (it.atk || 0) / custo;
         if (nota > melhorNota) { melhorNota = nota; melhor = slug; }
       }
-      if (melhor) setActiveAmmo(p, melhor);
+      if (melhor) setActiveAmmo(p, melhor, true);
     }
   }
   return changes;
