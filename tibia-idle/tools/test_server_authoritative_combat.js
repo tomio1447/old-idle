@@ -76,6 +76,9 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     motaAfter.authority.players[0].p.missions["mota-extension"].progress,
     "party MOTA não sobrevive/progride missões por 60s no motor autoritativo");
   const d1=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
+  const visibleWave=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),1000,2000).state);
+  must(visibleWave.authority.mobs.length>0&&visibleWave.state.mobs.length>0,
+    "snapshot entre waves removeu todos os monstros da arena");
   const d2=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
   const once=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),10000,11000).state);
   let split=d2;for(let i=0;i<5;i++)split=JSON.parse(engine.advanceAuthorityState(JSON.stringify(split),2000,3000+i*2000).state);

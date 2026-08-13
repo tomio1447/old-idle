@@ -2351,24 +2351,93 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat,fresh={hunt:previous.hunt,huntMap:previous.huntMap,boss:previous.boss};
   // Movimento é predição visual local; dano/HP/recompensas vêm do servidor.
-  // Preserve coordenadas interpoladas para snapshots de 500ms não puxarem
-  // personagens e mobs de volta ao último checkpoint.
+  // Um tick não pode substituir G.combat nem as entidades que o renderer e a
+  // troca de personagem já estão usando. A substituição integral fazia um
+  // membro recém-selecionado e ondas inteiras piscarem/sumirem.
   const visualKeys=["cx","cy","x","y","sx","sy","dir","moving","frame","walkT","nextStepAt","path","pathIndex","moveFrom","moveTo","moveProgress"];
-  const localActiveId=String(previous.player&&previous.player.id||previous.player&&previous.player.p&&previous.player.p.id||"");
-  const visualPlayers=new Map((previous.players||[]).map((ent)=>[String(ent.id||ent.p&&ent.p.id),ent]));
-  const visualMobs=new Map((previous.mobs||[]).map((mob)=>[String(mob.id),mob]));
-  // `descriptor.state` passa a ser o próprio G.combat. Nunca reanexe o
-  // descriptor dentro dele: isso cria state -> combat -> descriptor -> state.
-  G.combat=restoreCombatSessionState(fresh,descriptor);
-  for(const ent of G.combat.players||[]){const old=visualPlayers.get(String(ent.id||ent.p&&ent.p.id));
-    if(old)for(const key of visualKeys)if(old[key]!==undefined)ent[key]=old[key];}
-  for(const mob of G.combat.mobs||[]){const old=visualMobs.get(String(mob.id));
-    if(old)for(const key of visualKeys)if(old[key]!==undefined)mob[key]=old[key];}
+  const entityId=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
+  const localActiveId=entityId(previous.player),previousPlayers=Array.isArray(previous.players)?previous.players:[],
+    previousMobs=Array.isArray(previous.mobs)?previous.mobs:[];
+  // `descriptor.state` vira um combate temporário. Ele nunca é reanexado ao
+  // descriptor e nunca toma o lugar do runtime que já está na tela.
+  const incoming=restoreCombatSessionState(fresh,descriptor);
+  if(!incoming)return false;
+
+  const mergeEntity=(local,remote,isPlayer)=>{
+    if(!local)return remote;
+    const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
+    const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
+    Object.assign(local,remote||{});
+    if(playerRef&&remote&&remote.p){Object.assign(playerRef,remote.p);local.p=playerRef;}
+    for(const key of Object.keys(visual))local[key]=visual[key];
+    return local;
+  };
+  const ensurePosition=(ent,fallback,index)=>{
+    if(!ent)return ent;const w=Number(incoming.gridW)||Number(previous.gridW)||30,
+      h=Number(incoming.gridH)||Number(previous.gridH)||30;
+    let cx=Number(ent.cx),cy=Number(ent.cy);
+    if(!Number.isFinite(cx))cx=Number(fallback&&fallback.cx);
+    if(!Number.isFinite(cy))cy=Number(fallback&&fallback.cy);
+    if(!Number.isFinite(cx))cx=Math.floor(w/2)+(index%3)-1;
+    if(!Number.isFinite(cy))cy=Math.floor(h/2)+Math.floor(index/3);
+    cx=Math.max(0,Math.min(w-1,Math.round(cx)));cy=Math.max(0,Math.min(h-1,Math.round(cy)));
+    ent.cx=cx;ent.cy=cy;
+    if(!Number.isFinite(Number(ent.x)))ent.x=(cx+.5)/w;
+    if(!Number.isFinite(Number(ent.y)))ent.y=(cy+.5)/h;
+    if(!Number.isFinite(Number(ent.sx)))ent.sx=ent.x;
+    if(!Number.isFinite(Number(ent.sy)))ent.sy=ent.y;
+    return ent;
+  };
+
+  // Atualiza escalares/mecânicas no próprio objeto, mas reconcilia criaturas
+  // separadamente para manter referências, posição e identidade visual.
+  for(const key of Object.keys(incoming))
+    if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="hunt"&&key!=="huntMap"&&key!=="boss")previous[key]=incoming[key];
+
+  const remotePlayers=Array.isArray(incoming.players)?incoming.players:[],remotePlayersById=new Map();
+  for(const ent of remotePlayers){const id=entityId(ent);if(id)remotePlayersById.set(id,ent);}
+  const reconciledPlayers=[];
+  for(const local of previousPlayers){
+    const id=entityId(local),remote=remotePlayersById.get(id);
+    if(remote){reconciledPlayers.push(mergeEntity(local,remote,true));remotePlayersById.delete(id);}
+    // O snapshot remoto pode estar um tick atrás da hidratação da party. Um
+    // membro válido do runtime não deve desaparecer só por essa defasagem.
+    else if(local&&local.p)reconciledPlayers.push(local);
+  }
+  let playerIndex=reconciledPlayers.length;
+  for(const remote of remotePlayersById.values()){
+    const fallback=previous.player||reconciledPlayers[0]||null;
+    reconciledPlayers.push(ensurePosition(remote,fallback,playerIndex++));
+  }
+  for(let index=0;index<reconciledPlayers.length;index++)
+    ensurePosition(reconciledPlayers[index],previous.player||reconciledPlayers[0]||null,index);
+  if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
+  else previous.players=reconciledPlayers;
+
+  const remoteMobs=Array.isArray(incoming.mobs)?incoming.mobs:[],localMobsById=new Map();
+  for(const mob of previousMobs){const id=entityId(mob);if(id)localMobsById.set(id,mob);}
+  const reconciledMobs=[];
+  // Entre a morte do último monstro e o respawn autoritativo existe um tick
+  // vazio. Preserve a onda visual nesse intervalo curto para não piscar toda
+  // a arena; terminal de boss/wipe continua removendo-a normalmente.
+  if(!terminalReason&&remoteMobs.length===0&&previousMobs.some((mob)=>mob&&mob.hp>0)){
+    reconciledMobs.push(...previousMobs);
+  }else{
+    for(let index=0;index<remoteMobs.length;index++){
+      const remote=remoteMobs[index],local=localMobsById.get(entityId(remote));
+      const merged=mergeEntity(local,remote,false),fallback=local||previousMobs[index%Math.max(1,previousMobs.length)]||previous.player;
+      reconciledMobs.push(ensurePosition(merged,fallback,index));
+    }
+  }
+  if(Array.isArray(previous.mobs)){previous.mobs.splice(0,previous.mobs.length,...reconciledMobs);}
+  else previous.mobs=reconciledMobs;
+
   // O activeCharacterId remoto pode estar um tick atrás logo após o clique.
-  // Enquanto a instância já está aberta, preserve a entidade controlada
-  // localmente; todos continuam no mesmo roster/runtime autoritativo.
-  const localActive=(G.combat.players||[]).find((ent)=>String(ent.id||ent.p&&ent.p.id)===localActiveId);
-  if(localActive&&localActive.p){G.combat.player=localActive;G.p=localActive.p;}
+  // Preserve primeiro o selecionado local; só use o remoto como fallback.
+  const active=(previous.players||[]).find((ent)=>entityId(ent)===localActiveId)||
+    (previous.players||[]).find((ent)=>entityId(ent)===String(descriptor.activeCharacterId||""))||previous.players[0];
+  if(active&&active.p){previous.player=active;G.p=active.p;}
+  G.combat=previous;
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);

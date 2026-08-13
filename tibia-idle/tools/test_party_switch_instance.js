@@ -35,6 +35,6 @@ must(saveAllCalls===1&&targetSaves===1&&instanceUpdates===1&&authorityTicks===1&
 must(persists===0,"troca chamou persistActiveInstance e tentou regravar o runtime inteiro");
 must(gameSource.includes("function setActiveInstanceCharacter")&&
   gameSource.includes("session.activeCharacterId=activeId"),"espelho da instância não atualiza apenas activeCharacterId");
-must(index.includes("js/party.js?v=party-runtime-v4")&&index.includes("js/game.js?v=party-runtime-v4"),
+must(index.includes("js/party.js?v=party-runtime-v5")&&index.includes("js/game.js?v=party-runtime-v5"),
   "assets da correção não receberam cache-bust");
 console.log("OK: troca da party transfere controle e preserva hunt, membros e runtime sem reload/checkpoint.");
