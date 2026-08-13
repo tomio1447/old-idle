@@ -1109,6 +1109,11 @@ function partyCombatSwitchTo(id) {
       sessionStorage.setItem(AUTOLOGIN_KEY, String(ent.id));
     } catch (e) { /* storage indisponível: instância continua válida */ }
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+    // A troca muda somente activeCharacterId da MESMA instância. Persista
+    // imediatamente: sem isso o próximo tick autoritativo ainda apontava ao
+    // líder e parecia abrir/voltar para um runtime por personagem.
+    if(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()&&
+       typeof persistActiveInstance==="function")persistActiveInstance();
     if (typeof renderAll === "function") renderAll();
     if (typeof toast === "function") toast("Controlando: " + ent.name);
     return true;

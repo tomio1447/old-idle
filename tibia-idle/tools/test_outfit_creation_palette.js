@@ -4,6 +4,7 @@ const fs=require("fs"),path=require("path");
 const js=path.join(__dirname,"..","game","js");
 const game=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const appearance=fs.readFileSync(path.join(js,"appearance.js"),"utf8");
+const outfitRenderer=fs.readFileSync(path.join(js,"outfit.js"),"utf8");
 const partyUi=fs.readFileSync(path.join(js,"party-ui.js"),"utf8");
 const index=fs.readFileSync(path.join(__dirname,"..","game","index.html"),"utf8");
 const server=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf8");
@@ -35,4 +36,8 @@ must(partyUi.includes("partyApplyOutfitPreview")&&partyUi.includes("AppearanceRe
   partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit")&&
   index.includes('js/party-ui.js?v=party-outfit-v1'),
   "painel da party não compõe/cache-busta outfit, cores e addons atuais");
-console.log("OK: MALE/FEMALE, paleta e party preservam outfit/cores/addons atuais.");
+must(outfitRenderer.includes("Um asset 15x em carregamento/erro nunca pode remover a entidade")&&
+  outfitRenderer.includes("Sprites.walk(o.name, dir, numericFrame) || Sprites.outfit(o.name, dir)")&&
+  index.includes('js/outfit.js?v=party-visible-v1'),
+  "falha/carregamento de outfit ainda pode deixar um membro invisível no mapa");
+console.log("OK: MALE/FEMALE, paleta e party preservam outfit/cores/addons sem ocultar membros.");

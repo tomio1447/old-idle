@@ -24,9 +24,13 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
     "account-client não reconstrói membros antes do PUT");
   await start();const login=await post("/api/login",{login:"2",password:"2"}),token=login.data.token;
   const a=(await post("/api/characters",{token,name:"Cobra EK",voc:"knight",data:JSON.stringify({name:"Cobra EK",voc:"knight"})})).data.character;
-  const b=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
-  await post("/api/party/create",{token,char_id:a.id});for(const c of [a,b])await post("/api/party/zone",{token,char_id:c.id,zone:"city"});
-  const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:b.name});await post("/api/party/accept",{token,invite_id:invite.data.invite.id});
+  const b=(await post("/api/characters",{token,name:"Cobra RP",voc:"paladin",data:JSON.stringify({name:"Cobra RP",voc:"paladin"})})).data.character;
+  const c=(await post("/api/characters",{token,name:"Cobra ED",voc:"druid",data:JSON.stringify({name:"Cobra ED",voc:"druid"})})).data.character;
+  const d=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
+  const roster=[a,b,c,d];await post("/api/party/create",{token,char_id:a.id});
+  for(const character of roster)await post("/api/party/zone",{token,char_id:character.id,zone:"city"});
+  for(const character of [b,c,d]){const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:character.name});
+    await post("/api/party/accept",{token,invite_id:invite.data.invite.id});}
   let noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"unknown"});
   must(noOp.status===200&&noOp.data.ignored,"zona transitória ainda gera HTTP 400");
   noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt"});
@@ -43,9 +47,25 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   const acquired=await post("/api/lease/acquire",{token,holder_id:"cobratransition"}),lease={holder_id:acquired.data.holderId,lease_token:acquired.data.leaseToken};
   const emptyTick=await post("/api/instance/tick",Object.assign({token},lease));
   must(emptyTick.status===200&&emptyTick.data.instance===null,"tick sem instância ainda retorna HTTP 410");
-  const snapshot=descriptor([a,b]);snapshot.state.players=[null,snapshot.state.players[1]];
+  const snapshot=descriptor(roster);snapshot.state.players=[null,snapshot.state.players[1]];
   r=await put("/api/instance",Object.assign({token,instance_id:null,expected_version:0,state:snapshot},lease));
   must(r.status===200,"snapshot Cobra recuperável retornou "+r.status+": "+JSON.stringify(r.data));
+  const sharedId=r.data.instance.id;
+  let loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});
+  must(loaded.status===200&&loaded.data.instance.id===sharedId&&loaded.data.instance.state.state.players.length===4&&
+    loaded.data.instance.state.state.players.every(Boolean)&&new Set(loaded.data.instance.state.state.players.map((p)=>String(p.id))).size===4,
+    "party Cobra não entrou completa na única instância autoritativa");
+  for(const active of [b,c,d,a]){
+    const state=loaded.data.instance.state;state.activeCharacterId=String(active.id);
+    const saved=await put("/api/instance",Object.assign({token,instance_id:sharedId,
+      expected_version:loaded.data.instance.version,state},lease));
+    must(saved.status===200&&saved.data.instance.id===sharedId,"troca de personagem criou outra instância");
+    loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});
+  }
+  const diskInstances=JSON.parse(fs.readFileSync(path.join(dataDir,"instances.json"),"utf8"));
+  must(diskInstances.length===1&&diskInstances[0].instance_id===sharedId&&
+    loaded.data.instance.state.state.players.length===4&&loaded.data.instance.state.activeCharacterId===String(a.id),
+    "cada membro da party recebeu runtime/instância separado");
   const applyStart=game.indexOf("function applyOnlineAuthorityState"),applyEnd=game.indexOf("\nfunction requestOnlineAuthorityTick",applyStart);
   must(client.includes("ACCOUNT_PARTY_ZONE_QUEUE")&&game.includes('key==="_authorityDescriptor"')&&
     !game.includes("G.combat._authorityDescriptor=descriptor")&&game.includes("G.huntEntryPendingToken")&&

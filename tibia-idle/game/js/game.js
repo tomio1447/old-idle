@@ -2329,6 +2329,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // Preserve coordenadas interpoladas para snapshots de 500ms não puxarem
   // personagens e mobs de volta ao último checkpoint.
   const visualKeys=["cx","cy","x","y","sx","sy","dir","moving","frame","walkT","nextStepAt","path","pathIndex","moveFrom","moveTo","moveProgress"];
+  const localActiveId=String(previous.player&&previous.player.id||previous.player&&previous.player.p&&previous.player.p.id||"");
   const visualPlayers=new Map((previous.players||[]).map((ent)=>[String(ent.id||ent.p&&ent.p.id),ent]));
   const visualMobs=new Map((previous.mobs||[]).map((mob)=>[String(mob.id),mob]));
   // `descriptor.state` passa a ser o próprio G.combat. Nunca reanexe o
@@ -2338,6 +2339,11 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
     if(old)for(const key of visualKeys)if(old[key]!==undefined)ent[key]=old[key];}
   for(const mob of G.combat.mobs||[]){const old=visualMobs.get(String(mob.id));
     if(old)for(const key of visualKeys)if(old[key]!==undefined)mob[key]=old[key];}
+  // O activeCharacterId remoto pode estar um tick atrás logo após o clique.
+  // Enquanto a instância já está aberta, preserve a entidade controlada
+  // localmente; todos continuam no mesmo roster/runtime autoritativo.
+  const localActive=(G.combat.players||[]).find((ent)=>String(ent.id||ent.p&&ent.p.id)===localActiveId);
+  if(localActive&&localActive.p){G.combat.player=localActive;G.p=localActive.p;}
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);
