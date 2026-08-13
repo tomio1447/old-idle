@@ -552,6 +552,10 @@ async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });
   return r.data.ok ? { ok: true, coins: r.data.coins } : { ok: false };
 }
+async function accountUpdateMissions(token, missions, missionsDone) {
+  const r = await _api("POST", "/api/account/missions", { token, missions, missionsDone });
+  return r.data.ok ? { ok: true, missions: r.data.missions, missionsDone: r.data.missionsDone } : { ok: false };
+}
 
 function accountApplyServerBalances(data){
   data=data||{};

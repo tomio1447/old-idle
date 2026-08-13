@@ -158,13 +158,16 @@ function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const ite
 }
 function step(auth,now){if(auth.ended)return;
   auth.stats=auth.stats||{};auth.stats.time=(Number(auth.stats.time)||0)+1000;
+  auth.events=auth.events||[];
   if(auth.greed){if(!auth.greed.immune&&now>=auth.greed.vulnerableUntil){auth.greed.immune=true;auth.greed.vulnerableUntil=0;}
     if(auth.greed.immune)fillGreed(auth);}
   for(const item of auth.players){const p=item.p;p.stamina=FULL_STAMINA;if(item.downUntil&&now>=item.downUntil){const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;}usePotion(p);}
   healPlayers(auth);respawn(auth);const living=auth.mobs.filter((m)=>m.hp>0),boss=living.find((m)=>m.boss);
   const target=auth.greed&&auth.greed.immune?living.find((m)=>!m.boss):(boss||living[0]);
   if(target)for(const item of auth.players){if(item.p.hp<=0||item.downUntil)continue;item.attackAcc+=1000;
-    while(item.attackAcc>=1200&&target.hp>0){item.attackAcc-=1200;target.hp-=playerDamage(auth,item.p,target);progressAttack(item.p);}}
+    while(item.attackAcc>=1200&&target.hp>0){item.attackAcc-=1200;const dmg=playerDamage(auth,item.p,target);target.hp-=dmg;progressAttack(item.p);
+      auth.events.push({t:"hit",dmg:dmg,x:Number(target.x)||0.5,y:Number(target.y)||0.5,el:"physical",race:target.def&&target.def.race||"blood",mobId:String(target.id),mobSlug:target.slug});
+    }}
   const dead=auth.mobs.filter((m)=>m.hp<=0);auth.mobs=auth.mobs.filter((m)=>m.hp>0);
   for(const mob of dead){
     if(auth.greed&&auth.greed.immune&&mob.slug==="greedbeast"){
@@ -174,6 +177,7 @@ function step(auth,now){if(auth.ended)return;
   for(const mob of auth.mobs){mob.attackAcc+=1000;while(mob.attackAcc>=mob.attackSpeed){mob.attackAcc-=mob.attackSpeed;
     const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);if(!alive.length)break;const victim=alive[roll(auth,0,alive.length-1)];
     let damage=mobDamage(auth,mob,victim.p);if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);victim.p.hp-=damage;
+    auth.events.push({t:"range",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,el:mob.def&&mob.def.element||"physical",screen:true});
     if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;}}}
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
   // O último monstro da wave pode morrer no mesmo segundo autoritativo. Se o
@@ -229,6 +233,11 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
+  // Eventos de combate (dano/cura) gerados pelo step() desde o último tick.
+  // O cliente drena esses eventos via drainEvents() para mostrar floaters e
+  // logs de dano no modo online.
+  descriptor.state.events=auth.events||[];
+  auth.events=[];
   descriptor.savedAt=auth.clock;return descriptor;
 }
 function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=typeof serialized==="string"?JSON.parse(serialized):clone(serialized);

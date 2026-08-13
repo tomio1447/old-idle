@@ -179,7 +179,9 @@ function restoreCombatSessionState(fresh,session){
   const raw=session.state;if(!raw)return fresh;
   const c=raw;
   c.hunt=fresh.hunt;c.huntMap=fresh.huntMap;c.boss=fresh.boss;
-  c.events=[];c.delayedHits=c.delayedHits||[];c.pendingSpawns=c.pendingSpawns||[];
+  // Preserva eventos do servidor (modo online). O step() do authoritative
+  // engine gera eventos de dano/cura que drainEvents() processa em floaters.
+  c.events=Array.isArray(c.events)?c.events:[];c.delayedHits=c.delayedHits||[];c.pendingSpawns=c.pendingSpawns||[];
   // Reserva de formação é estado transitório com chaves de objeto (Map).
   // JSON antigo a transformava em `{}`; recriá-la também limpa referências
   // para entidades anteriores ao reload.
@@ -751,9 +753,37 @@ function missionForHunt(id) {
 
 function missionState(p, huntId) {
   p.missions = p.missions || {};
+  // Modo online: missões são por conta. Sincroniza do account data para o
+  // personagem antes de acessar, assim qualquer char vê o mesmo progresso.
+  if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
+    const acc = sessionAccount();
+    if (acc && acc.missions) {
+      if (!p.missions[huntId] && acc.missions[huntId])
+        p.missions[huntId] = acc.missions[huntId];
+    }
+    if (acc && acc.missionsDone) {
+      p.missionsDone = p.missionsDone || {};
+      for (const k of Object.keys(acc.missionsDone)) p.missionsDone[k] = acc.missionsDone[k];
+    }
+  }
   if (!p.missions[huntId])
     p.missions[huntId] = { progress: {}, claimed: {}, completeClaimed: false };
   return p.missions[huntId];
+}
+
+/* Sincroniza o progresso de missões do personagem para a conta (online).
+ * Chamada após handleMissionKill e tryCompleteMissionRewards. */
+function syncMissionsToAccount(p) {
+  if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
+    const acc = sessionAccount();
+    if (!acc) return;
+    acc.missions = p.missions || {};
+    acc.missionsDone = p.missionsDone || {};
+    try { sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc)); } catch (e) {}
+    const token = sessionToken();
+    if (token && typeof accountUpdateMissions === "function")
+      accountUpdateMissions(token, p.missions, p.missionsDone).catch(() => {});
+  }
 }
 
 function rewardText(reward) {
@@ -823,6 +853,7 @@ function handleMissionKill(p, huntId, monster) {
   const task = def.tasks.find((t) => t.monster === monster);
   st.progress[monster] = Math.min(task.target, (st.progress[monster] || 0) + 1);
   tryCompleteMissionRewards(p, huntId);
+  syncMissionsToAccount(p);
   renderMission();
 }
 
@@ -878,6 +909,7 @@ function renderMission() {
       if (e.target.closest && e.target.closest("#mission-finish")) {
         G.p.missionsDone = G.p.missionsDone || {};
         G.p.missionsDone[huntId] = true;
+        syncMissionsToAccount(G.p);
         addLog("info", `Missão <b>${def.title}</b> finalizada.`);
         renderMission();
       } else if (e.target.closest && e.target.closest("#mission-toggle")) {
@@ -2606,6 +2638,10 @@ function loop(ts) {
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
+      // Eventos de combate (dano/cura) chegam via applyOnlineAuthorityState
+      // e ficam na fila c.events. Sem drainEvents() os floaters e logs de
+      // dano nunca aparecem no modo online.
+      drainEvents();
       G._partyHudAt=(G._partyHudAt||0)+dt;
       if(G._partyHudAt>=250){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{

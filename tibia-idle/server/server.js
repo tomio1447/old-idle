@@ -144,6 +144,16 @@ async function releaseLease(db,body){
   if(released)publishSync(acc.id,"lease",{action:"release",holderId:holder});
   return {code:200,body:{ok:true}};
 }
+async function updateAccountMissions(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  // Missões são por conta: qualquer personagem pode progredir as mesmas
+  // missões. O cliente envia o estado completo (missions + missionsDone).
+  acc.missions=body.missions&&typeof body.missions==="object"?body.missions:{};
+  acc.missionsDone=body.missionsDone&&typeof body.missionsDone==="object"?body.missionsDone:{};
+  if(typeof db._save==="function")db._save();
+  return {code:200,body:{ok:true,missions:acc.missions,missionsDone:acc.missionsDone}};
+}
 async function requireLease(db,acc,body){
   const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
   const valid=validLeaseHolder(holder)&&secret.length===64&&
@@ -304,7 +314,8 @@ async function login(db, body) {
     body: {
       ok: true,
       token,
-      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0 },
+      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0,
+        missions: acc.missions || {}, missionsDone: acc.missionsDone || {} },
       characters: characters.map(accountCharacterSummary),
     },
   };
@@ -319,7 +330,8 @@ async function me(db, token) {
     code: 200,
     body: {
       ok: true,
-      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0 },
+      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0,
+        missions: acc.missions || {}, missionsDone: acc.missionsDone || {} },
       characters: characters.map(accountCharacterSummary),
     },
   };
@@ -1410,6 +1422,9 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/lease/release"){
         const r=await releaseLease(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/missions"){
+        const r=await updateAccountMissions(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="GET"&&url==="/api/instance"){
         const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
