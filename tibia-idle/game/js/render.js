@@ -1424,32 +1424,33 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
   ctx.globalAlpha = 1;
 }
 
-/* Poeira permanente dos monstros da Exaltation Forge. Os pontos sobem dos
- * dois lados da criatura com fase derivada do id, portanto animam sem criar
- * arrays/objetos persistentes a cada frame. Fiendish usa mais partículas e
- * brilho roxo; Influenced escala levemente com a quantidade de stacks. */
+/* Poeira permanente dos monstros da Exaltation Forge (Canary). As
+ * partículas sobem do lado DIREITO da criatura, com fase derivada do id
+ * — portanto animam sem criar arrays/objetos persistentes a cada frame.
+ * Fiendish usa mais partículas e brilho roxo; Influenced escala levemente
+ * com a quantidade de stacks. */
 function drawSinisterDust(ctx,ent,cx,cy,tile,now){
   if(!ctx||!ent||(!ent.influenced&&!ent.fiendish))return;
   const fiendish=!!ent.fiendish;
   const stacks=fiendish?15:Math.max(1,Math.min(5,Number(ent.sinisterStacks)||1));
-  const count=fiendish?12:Math.max(5,Math.min(9,4+stacks));
+  const count=fiendish?14:Math.max(6,Math.min(10,5+stacks));
   const id=String(ent.id||ent.slug||"sinister");
   let seed=0;
   for(let i=0;i<id.length;i++)seed=(seed*31+id.charCodeAt(i))>>>0;
   const seconds=(Number(now)||Date.now())/1000;
   ctx.save();
-  ctx.fillStyle=fiendish?"rgba(229,151,255,.96)":"rgba(139,213,255,.94)";
+  ctx.fillStyle=fiendish?"rgba(229,151,255,.98)":"rgba(139,213,255,.96)";
   ctx.shadowColor=fiendish?"#bd3fff":"#238fd5";
-  ctx.shadowBlur=fiendish?6:4;
+  ctx.shadowBlur=fiendish?8:5;
   for(let i=0;i<count;i++){
-    const side=i%2===0?-1:1;
-    const phase=((seconds*(fiendish?.48:.38)+i/count+(seed%997)/997)%1+1)%1;
-    const spread=.42+((seed+i*37)%7)*.035;
-    const drift=Math.sin(seconds*2.1+i*1.73+(seed%17))*.09;
-    const x=cx+side*tile*(spread+drift);
-    const y=cy+tile*.3-phase*tile*1.18;
-    const size=Math.max(1,Math.round(tile*(fiendish?.075:.06)*(i%3===0?1.25:1)));
-    ctx.globalAlpha=(fiendish?.52:.44)+(1-phase)*(fiendish?.42:.38);
+    // Canary: partículas no lado DIREITO da sprite
+    const phase=((seconds*(fiendish?.5:.4)+i/count+(seed%997)/997)%1+1)%1;
+    const spread=.38+((seed+i*37)%7)*.04;
+    const drift=Math.sin(seconds*2.1+i*1.73+(seed%17))*.08;
+    const x=cx+tile*(spread+drift);
+    const y=cy+tile*.35-phase*tile*1.25;
+    const size=Math.max(2,Math.round(tile*(fiendish?.09:.07)*(i%3===0?1.35:1)));
+    ctx.globalAlpha=(fiendish?.6:.5)+(1-phase)*(fiendish?.4:.35);
     ctx.fillRect(Math.round(x-size/2),Math.round(y-size/2),size,size);
   }
   ctx.restore();
@@ -1589,7 +1590,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
     }
     if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
     else ctx.drawImage(img, origin.x, origin.y, w, h);
-    if(e.kind==="monster")drawSinisterDust(ctx,ent,cx,cy,tile,Date.now());
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
 
@@ -1598,6 +1598,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // do seu footprint; a healthbar (abaixo) fica acima de tudo.
   if (combat && combat.huntMap && typeof drawTileCharMap === "function")
     drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects");
+
+  // --- Poeira da Exaltation Forge (influenced/fiendish) — DEPOIS dos
+  // objetos do mapa, igual ao Canary: a poeira fica por cima de paredes
+  // e pilares. Antes era desenhada junto com a sprite e os objetos do mapa
+  // a cobriam, fazendo a poeira "sumir".
+  for (const info of entityInfo) {
+    if (info.e.kind === "monster")
+      drawSinisterDust(ctx, info.ent, info.cx, info.cy, info.tile, Date.now());
+  }
 
   // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
   // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
