@@ -1083,7 +1083,12 @@ function partyNearestTarget(c, mob) {
   return best || c.player || null;
 }
 
-/* Troca o personagem ATIVO durante o party combat (sem recarregar). */
+/* Troca o personagem ATIVO durante o party combat (sem recarregar).
+ * Mantém a instância ativa — apenas troca quem o jogador controla.
+ * Não chama persistActiveInstance() nem partyCombatSaveAll() depois da
+ * troca: isso sobrescrevia ACTIVE_CHARACTER_KEY com o último char do
+ * loop e causava efeitos colaterais que mandavam o personagem para
+ * outra instância. */
 function partyCombatSwitchTo(id) {
   try {
     if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return false;
@@ -1106,10 +1111,7 @@ function partyCombatSwitchTo(id) {
       localStorage.setItem(ACTIVE_CHARACTER_KEY, String(ent.id));
       sessionStorage.setItem(AUTOLOGIN_KEY, String(ent.id));
     } catch (e) { /* storage indisponível: instância continua válida */ }
-    // FIX GRAVE: ao trocar de personagem na PT durante hunt/boss,
-    // o personagem logava em outra instância fora da PT porque a sessão
-    // persistida ainda tinha activeCharacterId antigo e o novo char tinha
-    // hunt=null. Agora garante hunt/instance e persiste imediatamente.
+    // Propaga hunt/instanceMode para o personagem ativo (para reload).
     try {
       if (c.huntId) {
         ent.p.hunt = c.huntId;
@@ -1118,17 +1120,8 @@ function partyCombatSwitchTo(id) {
         ent.p.hunt = null;
         ent.p.instanceMode = "boss";
       }
-      // Garante que o p recém-ativo tenha a hunt da instância atual
-      G.p.hunt = ent.p.hunt;
-      G.p.instanceMode = ent.p.instanceMode;
     } catch (e) {}
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
-    // Persiste a instância com o novo activeCharacterId imediatamente,
-    // senão um reload rápido voltava para instância antiga/fora da PT.
-    try {
-      if (typeof persistActiveInstance === "function" && G.combat) persistActiveInstance();
-      if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
-    } catch (e) {}
     if (typeof renderAll === "function") renderAll();
     if (typeof toast === "function") toast("Controlando: " + ent.name);
     return true;
