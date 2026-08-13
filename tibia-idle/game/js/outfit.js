@@ -185,9 +185,10 @@ const OutfitRenderer = {
     // garante a visual inicial por sexo mesmo para saves antigos sem campo appearance.
     if (typeof AppearanceRenderer !== "undefined") {
       const cv = AppearanceRenderer.forPlayer(p, dir, frame);
-      // null significa assets 15x ainda carregando: não caia no renderer 7.4.
       if (cv) return cv;
-      return null;
+      // Um asset 15x em carregamento/erro nunca pode remover a entidade da
+      // arena. Usa temporariamente a sprite clássica da mesma vocação/sexo;
+      // o próximo frame volta a tentar a outfit atual com cores e addons.
     }
     const numericFrame = typeof frame === "number" ? frame : 0;
     const suf = numericFrame ? `${dir}${numericFrame}` : dir;
