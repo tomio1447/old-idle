@@ -155,6 +155,11 @@ function step(auth,now){if(auth.ended)return;
     let damage=mobDamage(auth,mob,victim.p);if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);victim.p.hp-=damage;
     if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;}}}
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
+  // O último monstro da wave pode morrer no mesmo segundo autoritativo. Se o
+  // respawn ficar apenas no início do próximo step, o snapshot intermediário
+  // chega com mobs=[] e a arena inteira pisca no navegador. Hunts mantêm a
+  // próxima wave materializada; bosses continuam terminais normalmente.
+  if(!auth.ended&&auth.kind==="hunt"&&!auth.mobs.length)respawn(auth);
 }
 function initializeAuthority(descriptor,instanceId,now){
   const combat=descriptor.state||{},active=Array.isArray(combat.mobs)?combat.mobs:[];
