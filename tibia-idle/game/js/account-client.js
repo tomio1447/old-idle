@@ -158,8 +158,16 @@ async function accountAcquireLease(token,takeover){
   const r=await _api("POST",path,{token,holder_id:stored.holder,
     previous_holder_id:stored.previousHolder,lease_token:stored.token});
   if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true,resumed:!!r.data.resumed};}
+  // 401 = token inválido/expirado: limpa a sessão e deixa o cliente voltar
+  // ao login em vez de ficar retryando com um token morto.
+  if(r.code===401){
+    accountLeaseMarkLost(false);
+    try{sessionStorage.removeItem("tibia-idle-token");
+        sessionStorage.removeItem("tibia-idle-account");
+        sessionStorage.removeItem("tibia-idle-char");}catch(e){}
+  }
   return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
-    msg:r.data.msg||"Não foi possível obter o controle da conta."};
+    msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:r.code===401};
 }
 async function accountRenewLease(token){
   token=token||ACCOUNT_LEASE.sessionToken;const fields=accountLeaseFields();

@@ -1315,6 +1315,16 @@ async function main() {
       if (restored > 0 && typeof db._save === "function") db._save();
       if (restored > 0) console.log("[server] reset de boot: " + restored + " personagem(ns) restaurado(s) ao templo");
     }
+    // Limpa leases antigos: após restart, nenhuma aba tem lease válido.
+    // Sem isso, o cliente recebe 409 (LEASE_HELD) ao tentar adquirir.
+    if (db.leases && Array.isArray(db.leases)) {
+      const before = db.leases.length;
+      if (before > 0) {
+        db.leases = [];
+        if (typeof db._save === "function") db._save();
+        console.log("[server] reset de boot: " + before + " lease(s) limpo(s)");
+      }
+    }
   } catch (e) { console.warn("[server] falha no reset de boot:", e); }
 
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
