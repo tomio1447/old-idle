@@ -1430,6 +1430,37 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
   ctx.globalAlpha = 1;
 }
 
+/* Poeira permanente dos monstros da Exaltation Forge. Os pontos sobem dos
+ * dois lados da criatura com fase derivada do id, portanto animam sem criar
+ * arrays/objetos persistentes a cada frame. Fiendish usa mais partículas e
+ * brilho roxo; Influenced escala levemente com a quantidade de stacks. */
+function drawSinisterDust(ctx,ent,cx,cy,tile,now){
+  if(!ctx||!ent||(!ent.influenced&&!ent.fiendish))return;
+  const fiendish=!!ent.fiendish;
+  const stacks=fiendish?15:Math.max(1,Math.min(5,Number(ent.sinisterStacks)||1));
+  const count=fiendish?12:Math.max(5,Math.min(9,4+stacks));
+  const id=String(ent.id||ent.slug||"sinister");
+  let seed=0;
+  for(let i=0;i<id.length;i++)seed=(seed*31+id.charCodeAt(i))>>>0;
+  const seconds=(Number(now)||Date.now())/1000;
+  ctx.save();
+  ctx.fillStyle=fiendish?"rgba(229,151,255,.96)":"rgba(139,213,255,.94)";
+  ctx.shadowColor=fiendish?"#bd3fff":"#238fd5";
+  ctx.shadowBlur=fiendish?6:4;
+  for(let i=0;i<count;i++){
+    const side=i%2===0?-1:1;
+    const phase=((seconds*(fiendish?.48:.38)+i/count+(seed%997)/997)%1+1)%1;
+    const spread=.42+((seed+i*37)%7)*.035;
+    const drift=Math.sin(seconds*2.1+i*1.73+(seed%17))*.09;
+    const x=cx+side*tile*(spread+drift);
+    const y=cy+tile*.3-phase*tile*1.18;
+    const size=Math.max(1,Math.round(tile*(fiendish?.075:.06)*(i%3===0?1.25:1)));
+    ctx.globalAlpha=(fiendish?.52:.44)+(1-phase)*(fiendish?.42:.38);
+    ctx.fillRect(Math.round(x-size/2),Math.round(y-size/2),size,size);
+  }
+  ctx.restore();
+}
+
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
   const canvasW = this.c.width, canvasH = this.c.height;
@@ -1564,6 +1595,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     }
     if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
     else ctx.drawImage(img, origin.x, origin.y, w, h);
+    if(e.kind==="monster")drawSinisterDust(ctx,ent,cx,cy,tile,Date.now());
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
 
