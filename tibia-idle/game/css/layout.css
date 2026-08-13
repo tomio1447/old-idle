@@ -1128,6 +1128,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   height: 52px; display: flex; align-items: flex-end; justify-content: center;
 }
 .app-img img { max-width: 48px; max-height: 52px; image-rendering: pixelated; }
+.app-img canvas { max-width: 48px; max-height: 52px; image-rendering: pixelated; object-fit: contain; }
+.app-img-loading { color: #6b6455; font-size: 11px; }
 .app-card canvas { image-rendering: pixelated; }
 
 /* barra de progresso do bestiario */

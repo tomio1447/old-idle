@@ -263,9 +263,9 @@ function cycloAppearance(p, el) {
     // depois em pintarCards(), com as cores do proprio personagem
     return `<div class="app-card ${ativo ? "ativo" : ""} ${tem ? "" : "bloq"}"
                  data-app-outfit="${o.id}">
-      <div class="app-img" data-pintar="${o.id}"><img
-        src="assets/appearance/outfit/${o.id}.base.png"
-        alt="${o.nome}" loading="lazy"></div>
+      <div class="app-img" data-pintar="${o.id}">
+        <div class="tiny dim app-img-loading">…</div>
+      </div>
       <div class="tiny">${o.nome}</div>
       <div class="tiny dim">
         ${tem ? (o.addons ? `addons ${ads}/${o.addons}` : "sem addon")
@@ -353,6 +353,12 @@ function cycloAppearance(p, el) {
         const id = box.dataset.pintar;
         const cv = AppearanceRenderer.outfit(id, 0, cores);
         if (cv) {
+          // Esconde o <img> do spritesheet inteiro e substitui pelo canvas
+          // de uma celula so, com tamanho explicito para caber no card.
+          cv.style.width = "48px";
+          cv.style.height = "52px";
+          cv.style.imageRendering = "pixelated";
+          cv.style.objectFit = "contain";
           box.innerHTML = "";
           box.appendChild(cv);
           i++; feitos++;
