@@ -3,6 +3,7 @@
 const fs=require("fs"),path=require("path");
 const root=path.join(__dirname,"..");
 const server=fs.readFileSync(path.join(root,"server","server.js"),"utf8");
+const db=fs.readFileSync(path.join(root,"server","db.js"),"utf8");
 const client=fs.readFileSync(path.join(root,"game","js","account-client.js"),"utf8");
 const market=fs.readFileSync(path.join(root,"game","js","market-ui.js"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
@@ -28,6 +29,13 @@ for(const type of ["lease","instance","character","party","party-inbox","snapsho
 must(server.includes('publishPartyForCharacters(db,[updated.id],"character-save")')&&
   server.includes('publishPartyForCharacters(db,[body.char_id],"zone")'),
   "outfit/addons ou follow da party ainda dependem somente de polling");
+must(server.includes("instanceGetByParty")&&server.includes("sharedDetached")&&
+  client.includes('char_id:typeof sessionCharId==="function"?sessionCharId():null'),
+  "cliente/API não resolvem uma única instância por party e personagem");
+const mysqlTick=db.slice(db.indexOf("async instanceAuthorityTick"),db.indexOf("async instanceEnd"));
+must(db.includes("JsonStore.prototype.instanceGetByParty")&&db.includes("async instanceGetByParty")&&
+  mysqlTick.includes("WHERE id=?`")&&!mysqlTick.includes("WHERE id=? AND account_id=?"),
+  "storage JSON/MySQL não materializa todos os membros da party compartilhada");
 must(!client.includes("new WebSocket(")&&!server.includes("WebSocketServer"),
   "WebSocket paralelo foi introduzido e pode duplicar o runtime SSE");
 console.log("OK: APIs online e SSE v2 estão integrados sem WebSocket/runtime duplicado.");

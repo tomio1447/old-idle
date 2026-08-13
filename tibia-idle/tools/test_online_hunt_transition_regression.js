@@ -23,14 +23,18 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   must(normalized.state.players.map((e)=>e.id).join(",")==="1,2"&&normalized.state.players[0].p.name==="EK",
     "account-client não reconstrói membros antes do PUT");
   await start();const login=await post("/api/login",{login:"2",password:"2"}),token=login.data.token;
+  const guestLogin=await post("/api/login",{login:"1",password:"1"}),guestToken=guestLogin.data.token;
   const a=(await post("/api/characters",{token,name:"Cobra EK",voc:"knight",data:JSON.stringify({name:"Cobra EK",voc:"knight"})})).data.character;
   const b=(await post("/api/characters",{token,name:"Cobra RP",voc:"paladin",data:JSON.stringify({name:"Cobra RP",voc:"paladin"})})).data.character;
   const c=(await post("/api/characters",{token,name:"Cobra ED",voc:"druid",data:JSON.stringify({name:"Cobra ED",voc:"druid"})})).data.character;
   const d=(await post("/api/characters",{token,name:"Cobra MS",voc:"sorcerer",data:JSON.stringify({name:"Cobra MS",voc:"sorcerer"})})).data.character;
+  const guest=(await post("/api/characters",{token:guestToken,name:"Cobra Monk",voc:"monk",data:JSON.stringify({name:"Cobra Monk",voc:"monk"})})).data.character;
   const roster=[a,b,c,d];await post("/api/party/create",{token,char_id:a.id});
   for(const character of roster)await post("/api/party/zone",{token,char_id:character.id,zone:"city"});
-  for(const character of [b,c,d]){const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:character.name});
-    await post("/api/party/accept",{token,invite_id:invite.data.invite.id});}
+  await post("/api/party/zone",{token:guestToken,char_id:guest.id,zone:"city"});
+  for(const [character,acceptToken] of [[b,token],[c,token],[d,token],[guest,guestToken]]){
+    const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:character.name});
+    await post("/api/party/accept",{token:acceptToken,invite_id:invite.data.invite.id});}
   let noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"unknown"});
   must(noOp.status===200&&noOp.data.ignored,"zona transitória ainda gera HTTP 400");
   noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt"});
@@ -52,9 +56,40 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   must(r.status===200,"snapshot Cobra recuperável retornou "+r.status+": "+JSON.stringify(r.data));
   const sharedId=r.data.instance.id;
   let loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});
-  must(loaded.status===200&&loaded.data.instance.id===sharedId&&loaded.data.instance.state.state.players.length===4&&
-    loaded.data.instance.state.state.players.every(Boolean)&&new Set(loaded.data.instance.state.state.players.map((p)=>String(p.id))).size===4,
+  must(loaded.status===200&&loaded.data.instance.id===sharedId&&loaded.data.instance.state.state.players.length===5&&
+    loaded.data.instance.state.state.players.every(Boolean)&&new Set(loaded.data.instance.state.state.players.map((p)=>String(p.id))).size===5,
     "party Cobra não entrou completa na única instância autoritativa");
+  await new Promise((resolve)=>setTimeout(resolve,1100));
+  const ownerTick=await post("/api/instance/tick",Object.assign({token,char_id:a.id,
+    expected_version:loaded.data.instance.version},lease));
+  must(ownerTick.status===200&&ownerTick.data.characters.length===4&&ownerTick.data.instance.state.state.players.length===5,
+    "tick compartilhado não projetou a party sem vazar personagens externos no cache do líder");
+  loaded=await request("/api/instance?char_id="+a.id,{headers:{authorization:"Bearer "+token}});
+  const guestCharacter=await request("/api/characters/"+guest.id,{headers:{authorization:"Bearer "+guestToken}});
+  must(guestCharacter.status===200&&guestCharacter.data.character.saveVersion>guest.saveVersion,
+    "autoridade compartilhada não persistiu o membro de outra conta");
+  const guestLeaseRaw=await post("/api/lease/acquire",{token:guestToken,holder_id:"cobraguestholder"}),
+    guestLease={holder_id:guestLeaseRaw.data.holderId,lease_token:guestLeaseRaw.data.leaseToken};
+  let guestView=await request("/api/instance?char_id="+guest.id,{headers:{authorization:"Bearer "+guestToken}});
+  must(guestView.status===200&&guestView.data.instance.id===sharedId&&
+    guestView.data.instance.state.activeCharacterId===String(guest.id),"membro de outra conta não recebeu a instância compartilhada");
+  const guestTick=await post("/api/instance/tick",Object.assign({token:guestToken,char_id:guest.id,
+    expected_version:guestView.data.instance.version},guestLease));
+  must(guestTick.status===200&&guestTick.data.shared&&guestTick.data.instance.id===sharedId&&guestTick.data.elapsed===0&&
+    guestTick.data.characters.length===1&&Number(guestTick.data.characters[0].id)===Number(guest.id),
+    "membro externo abriu/tickou uma segunda instância ou recebeu cache alheio");
+  const blockedMarket=await post("/api/market/deposit",Object.assign({token:guestToken,amount:1,char_id:guest.id,
+    expected_version:guestTick.data.characters[0].saveVersion},guestLease));
+  must(blockedMarket.status===409&&blockedMarket.data.error==="MARKET_IN_INSTANCE",
+    "membro externo usou Market dentro da instância compartilhada");
+  const guestSolo=descriptor([guest]);
+  const guestSave=await put("/api/instance",Object.assign({token:guestToken,char_id:guest.id,instance_id:null,
+    expected_version:0,state:guestSolo},guestLease));
+  must(guestSave.status===200&&guestSave.data.shared&&guestSave.data.instance.id===sharedId,
+    "follow externo criou instância própria em vez de aderir à party");
+  const guestEnd=await post("/api/instance/end",Object.assign({token:guestToken,char_id:guest.id,
+    instance_id:sharedId,expected_version:guestView.data.instance.version,reason:"guest-left"},guestLease));
+  must(guestEnd.status===200&&guestEnd.data.sharedDetached,"membro externo encerrou a instância do líder");
   for(const active of [b,c,d,a]){
     const state=loaded.data.instance.state;state.activeCharacterId=String(active.id);
     const saved=await put("/api/instance",Object.assign({token,instance_id:sharedId,
@@ -64,7 +99,7 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   }
   const diskInstances=JSON.parse(fs.readFileSync(path.join(dataDir,"instances.json"),"utf8"));
   must(diskInstances.length===1&&diskInstances[0].instance_id===sharedId&&
-    loaded.data.instance.state.state.players.length===4&&loaded.data.instance.state.activeCharacterId===String(a.id),
+    loaded.data.instance.state.state.players.length===5&&loaded.data.instance.state.activeCharacterId===String(a.id),
     "cada membro da party recebeu runtime/instância separado");
   const applyStart=game.indexOf("function applyOnlineAuthorityState"),applyEnd=game.indexOf("\nfunction requestOnlineAuthorityTick",applyStart);
   must(client.includes("ACCOUNT_PARTY_ZONE_QUEUE")&&game.includes('key==="_authorityDescriptor"')&&

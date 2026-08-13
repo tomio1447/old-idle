@@ -78,10 +78,10 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/lease/renew` | `{ token, holder_id, lease_token }` | Heartbeat do holder atual |
 | POST | `/api/lease/takeover` | `{ token, holder_id }` | Transferência explícita de controle |
 | POST | `/api/lease/release` | `{ token, holder_id, lease_token }` | Libera no logout explícito |
-| GET | `/api/instance` | Bearer token | Carrega a hunt/boss ativa da conta |
-| PUT | `/api/instance` | `{ token, lease, expected_version, state }` | Cria/atualiza apenas snapshot visual/versionado |
-| POST | `/api/instance/tick` | `{ token, lease, expected_version? }` | Executa combate/progressão autoritativos |
-| POST | `/api/instance/end` | `{ token, lease, instance_id, expected_version, reason }` | Persiste condição terminal |
+| GET | `/api/instance?char_id=` | Bearer token | Carrega a instância solo ou compartilhada da party do personagem |
+| PUT | `/api/instance` | `{ token, char_id, lease, expected_version, state }` | Cria/atualiza o único snapshot visual/versionado do roster |
+| POST | `/api/instance/tick` | `{ token, char_id, lease, expected_version? }` | Avança a autoridade pelo líder; membros recebem o mesmo snapshot |
+| POST | `/api/instance/end` | `{ token, char_id, lease, instance_id, expected_version, reason }` | Líder encerra; membro apenas se desconecta da instância compartilhada |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
 | GET | `/api/characters/:id` | Bearer token | Carrega um personagem pertencente à conta |
 | PUT | `/api/characters/:id` | `{ token, holder_id, lease_token, expected_version, level, data, ... }` | Save otimista protegido pelo lease |
@@ -145,8 +145,10 @@ node tibia-idle/tools/backup_restore.js restore --file backup.json --data-dir ti
   com backoff e mantém fallback de `/api/sync/state` a cada 5 segundos
 - Takeover chega imediatamente a outras abas/dispositivos; versões de instância
   e personagens disparam refresh coalescido, sem aplicar snapshot de outro char
-- Saves de outfit/cores/addons e mudanças de zona notificam em tempo real todas
-  as contas presentes na party; polling fica apenas como fallback de recuperação
+- Saves de outfit/cores/addons, mudanças de zona e snapshots da instância notificam
+  em tempo real todas as contas da party; polling fica apenas como fallback
+- Party entre contas usa um único `instance_id`/authority na conta do líder;
+  membros consultam esse snapshot e nunca abrem/tickam um runtime concorrente
 - `/api/health` expõe cursor e quantidade de conexões para observabilidade
 
 **Lease exclusivo de simulação:**

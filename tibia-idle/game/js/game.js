@@ -2357,12 +2357,22 @@ function requestOnlineAuthorityTick(){
   ONLINE_AUTH_TICKING=true;
   accountTickInstance(sessionToken()).then((result)=>{
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
+    else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
+      clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+    }
   }).catch(()=>{}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
 if(typeof window!=="undefined"){
   window.addEventListener("tibia-idle-sync-instance",(event)=>{
-    const detail=event&&event.detail||{},state=detail.state;
-    if(!state){if(G.foreignInstance)G.foreignInstance=null;return;}
+    const detail=event&&event.detail||{},state=detail.state,remote=detail.event||{};
+    if(!state){
+      if(G.foreignInstance)G.foreignInstance=null;
+      if(G.combat&&remote.status==="ended"&&remote.matchesCurrent){
+        clearInstanceSession(remote.terminalReason||"shared-ended",true);
+        setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+      }
+      return;
+    }
     const belongs=G.p&&instanceIncludesCharacter(state,G.p.id);
     if(G.combat&&belongs)applyOnlineAuthorityState(state,detail.event&&detail.event.terminalReason);
     else if(G.foreignInstance&&!belongs)G.foreignInstance.memberNames=(state.members||[]).map((m)=>m.p&&m.p.name||m.id);

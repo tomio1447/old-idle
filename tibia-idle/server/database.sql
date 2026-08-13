@@ -57,8 +57,9 @@ CREATE TABLE IF NOT EXISTS account_leases (
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- Instância ativa persistida por conta. O worker server-side da fase seguinte
--- poderá avançar este mesmo snapshot quando não houver browser conectado.
+-- Instância ativa persistida na conta proprietária. Quando party_id existe,
+-- este único snapshot é compartilhado por todo o roster, inclusive entre contas;
+-- o worker avança a mesma autoridade quando o líder fica sem navegador.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS account_instances (
   account_id         INT UNSIGNED PRIMARY KEY,
