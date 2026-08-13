@@ -43,6 +43,10 @@ const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)|
 const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"86400000",10)||86400000);
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
 const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_MAX_STEP_MS||"3600000",10)||3600000);
+// Após restart, dê tempo para abas retomarem o lease antes de o worker
+// calcular o período offline. Sem essa janela, uma party podia sofrer wipe
+// no primeiro tick de boot e ser enviada ao templo durante manutenção.
+const INSTANCE_WORKER_STARTUP_GRACE_MS=Math.max(0,parseInt(process.env.INSTANCE_WORKER_STARTUP_GRACE_MS||"5000",10)||0);
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
 const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
@@ -1255,6 +1259,7 @@ async function main() {
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
   const instanceWorker=startInstanceWorker(db,{
     intervalMs:INSTANCE_WORKER_INTERVAL_MS,maxStepMs:INSTANCE_WORKER_MAX_STEP_MS,
+    startupGraceMs:INSTANCE_WORKER_STARTUP_GRACE_MS,
     minStepMs:Math.min(500,INSTANCE_WORKER_INTERVAL_MS),
     onClaim:async(claim)=>{if(typeof db.snapshotAdd==="function"&&(claim.terminalReason||claim.version%60===0)){
         const row=await db.instanceGet(claim.accountId);if(row)await db.snapshotAdd(claim.accountId,"instance",

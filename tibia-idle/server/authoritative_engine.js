@@ -24,6 +24,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
 });
 const VOC={none:{hp:5,mp:5},knight:{hp:15,mp:5},paladin:{hp:10,mp:15},druid:{hp:5,mp:30},sorcerer:{hp:5,mp:30},monk:{hp:10,mp:10}};
 const START_HP=185,START_MP=5,FULL_STAMINA=42*3600;
+const INFLUENCED_BASE_CHANCE=.004,INFLUENCED_PVP_BONUS=.004,
+  FIENDISH_BASE_CHANCE=.0012,FIENDISH_PVP_BONUS=.0008;
 function clone(v){return JSON.parse(JSON.stringify(v||{}));}
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
 function maxStats(p){const level=Math.max(1,Number(p.level)||1),v=VOC[p.voc]||VOC.none;
@@ -63,10 +65,20 @@ function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
   p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=FULL_STAMINA;
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));return p;}
-function makeMob(auth,slug,boss,id){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
-  const sequence=Math.max(1,Number(auth.nextMobId)||1);auth.nextMobId=sequence+1;const mob={id:id||("srv-"+sequence),slug:String(slug),boss:!!boss,
-    hp:Math.max(1,Number(def.hp)||1),maxHp:Math.max(1,Number(def.hp)||1),armor:greedAdd?0:Math.max(0,Number(def.armor)||0),damage:Math.max(0,Number(def.damage)||0),
-    exp:Math.max(0,Number(def.exp)||0),attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};
+function makeMob(auth,slug,boss,id,source){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
+  const sequence=Math.max(1,Number(auth.nextMobId)||1);auth.nextMobId=sequence+1;
+  const sinisterEligible=auth.kind==="hunt"&&!boss;
+  let fiendish=sinisterEligible&&!!(source&&source.fiendish),influenced=!fiendish&&sinisterEligible&&!!(source&&source.influenced),
+    stacks=fiendish?15:(influenced?Math.max(1,Math.min(5,Number(source.sinisterStacks)||1)):0);
+  if(sinisterEligible&&!fiendish&&!influenced){fiendish=random(auth)<Math.max(0,Number(auth.fiendishChance)||0);
+    influenced=!fiendish&&random(auth)<Math.max(0,Number(auth.influencedChance)||0);
+    stacks=fiendish?15:(influenced?roll(auth,1,5):0);}
+  const mult=stacks?1.35+stacks*.15:1,hp=Math.max(1,Math.floor((Number(def.hp)||1)*mult));
+  const mob={id:id||("srv-"+sequence),slug:String(slug),boss:!!boss,influenced,fiendish,sinisterStacks:stacks,
+    hp,maxHp:hp,armor:greedAdd?0:Math.max(0,Math.floor((Number(def.armor)||0)*(stacks?1+stacks*.05:1))),
+    damage:Math.max(0,Math.floor((Number(def.damage)||0)*(stacks?1+stacks*.08:1))),
+    exp:Math.max(0,Math.floor((Number(def.exp)||0)*(stacks?1+stacks*.25:1))),
+    attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};
   const points=auth.spawnPoints||[],point=points.length?points[(sequence-1)%points.length]:null;
   if(point)Object.assign(mob,point);else if(auth.gridW&&auth.gridH){mob.cx=Math.floor(auth.gridW/2);mob.cy=Math.floor(auth.gridH/2);
     mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;}
@@ -102,6 +114,15 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
     else if(entry.item==="gold-coin")leader.gold=(Number(leader.gold)||0)+count;
     else leader.lootPouch[entry.item]=(Number(leader.lootPouch[entry.item])||0)+count;
     auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+count;
+  }
+  if(mob.influenced||mob.fiendish){
+    const stacks=mob.fiendish?15:Math.max(1,Number(mob.sinisterStacks)||1);let dust=0;
+    for(let i=0;i<stacks;i++)dust+=roll(auth,1,3);
+    leader.dustLimit=Math.max(100,Number(leader.dustLimit)||100);leader.dust=Math.max(0,Number(leader.dust)||0);
+    const gained=Math.min(Math.max(0,leader.dustLimit-leader.dust),dust);leader.dust+=gained;
+    if(gained)auth.stats.loot.dust=(Number(auth.stats.loot.dust)||0)+gained;
+    if(mob.fiendish){const stars=Math.max(1,Number(mob.def&&mob.def.best&&mob.def.best.stars)||3),slivers=roll(auth,1,stars);
+      leader.slivers=(Number(leader.slivers)||0)+slivers;auth.stats.loot.slivers=(Number(auth.stats.loot.slivers)||0)+slivers;}
   }
   auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
 }
@@ -178,9 +199,13 @@ function initializeAuthority(descriptor,instanceId,now){
   const players=(descriptor.members||[]).map((m)=>({id:String(m.id),p:canonicalPlayer(m),attackAcc:0,downUntil:0}));
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",players,mobs:[],spawnPool:[],spawnPoints:[],
+    influencedChance:Math.max(0,Number(combat.influencedChance)||
+      (INFLUENCED_BASE_CHANCE+(descriptor.instanceMode==="pvp"?INFLUENCED_PVP_BONUS:0))),
+    fiendishChance:Math.max(0,Number(combat.fiendishChance)||
+      (FIENDISH_BASE_CHANCE+(descriptor.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0))),
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,pack:Math.max(1,visual.length||3),
     stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,loot:{},monsters:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
-  for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""));if(m){
+  for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
         auth.spawnPoints.push({cx:Number(old.cx),cy:Number(old.cy),x:Number(old.x),y:Number(old.y),sx:Number(old.sx),sy:Number(old.sy)});
@@ -198,7 +223,8 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
   descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},
     {cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
-    {id:m.id,slug:m.slug,boss:m.boss,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
+    {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
+      sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),def:m.def}));
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
@@ -212,6 +238,12 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=t
   if(Number(auth.v||1)<2){for(const item of auth.players||[]){const max=maxStats(item.p);
       item.p.hp=max.hp;item.p.mp=max.mp;item.p.stamina=FULL_STAMINA;item.downUntil=0;}
     auth.v=2;}
+  if(!Number.isFinite(Number(auth.influencedChance)))auth.influencedChance=Math.max(0,
+    Number(descriptor.state&&descriptor.state.influencedChance)||
+    (INFLUENCED_BASE_CHANCE+(auth.instanceMode==="pvp"?INFLUENCED_PVP_BONUS:0)));
+  if(!Number.isFinite(Number(auth.fiendishChance)))auth.fiendishChance=Math.max(0,
+    Number(descriptor.state&&descriptor.state.fiendishChance)||
+    (FIENDISH_BASE_CHANCE+(auth.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0)));
   // Migra instâncias HARD criadas pela versão que ignorava pendingSpawns.
   if(!auth.spawnPool.length&&descriptor.state&&Array.isArray(descriptor.state.pendingSpawns)){
     const recoverMobs=auth.mobs.length===0;auth.spawnPoints=auth.spawnPoints||[];
@@ -220,7 +252,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=t
       if(!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
       const point={cx:Number(sp.cx),cy:Number(sp.cy),x:(Number(sp.cx)+.5)/auth.gridW,y:(Number(sp.cy)+.5)/auth.gridH};
       if(!auth.spawnPoints.some((p)=>p.cx===point.cx&&p.cy===point.cy))auth.spawnPoints.push(point);
-      if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""));if(mob){Object.assign(mob,point);auth.mobs.push(mob);}}}
+      if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(mob){Object.assign(mob,point);auth.mobs.push(mob);}}}
     descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.spawnPool.length||1);
   }
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);

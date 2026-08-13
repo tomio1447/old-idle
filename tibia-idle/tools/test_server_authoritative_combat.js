@@ -16,7 +16,7 @@ async function post(route,body){return request(route,{method:"POST",headers:{"co
 async function put(route,body){return request(route,{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(body)});}
 async function start(){child=spawn(process.execPath,["server.js"],{cwd:serverDir,env:Object.assign({},process.env,{
   PORT:String(port),HOST:"127.0.0.1",MYSQL_HOST:"",TEST_SERVER:"0",LEASE_TTL_MS:"10000",
-  INSTANCE_WORKER_INTERVAL_MS:"100",INSTANCE_WORKER_MAX_STEP_MS:"1000",GLOBAL_IDLE_DATA_DIR:dataDir,
+  INSTANCE_WORKER_INTERVAL_MS:"100",INSTANCE_WORKER_MAX_STEP_MS:"1000",INSTANCE_WORKER_STARTUP_GRACE_MS:"0",GLOBAL_IDLE_DATA_DIR:dataDir,
 }),stdio:["ignore","pipe","pipe"]});child.stdout.on("data",(c)=>{logs+=c;});child.stderr.on("data",(c)=>{logs+=c;});
   for(let i=0;i<100;i++){try{const r=await request("/api/health");if(r.data.ok)return;}catch(e){}
     await new Promise((resolve)=>setTimeout(resolve,35));}throw Error("servidor não iniciou: "+logs);}
@@ -43,6 +43,15 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   const pendingAuth=engine.initializeAuthority(pendingDesc,"0".repeat(64),1000);
   must(pendingAuth.authority.mobs.length===1&&pendingAuth.authority.spawnPool[0]==="rat"&&
     pendingAuth.state.mobs[0].cx===8,"pendingSpawns de HARD hunt não virou wave autoritativa");
+  const sinisterDesc=directDescriptor(Object.assign({},basePlayer,{dust:0,dustLimit:100,slivers:0}));
+  sinisterDesc.state.fiendishChance=1;sinisterDesc.state.influencedChance=.001;
+  const sinisterAuth=engine.initializeAuthority(sinisterDesc,"6".repeat(64),1000);
+  must(sinisterAuth.authority.mobs[0].fiendish&&sinisterAuth.authority.mobs[0].sinisterStacks===15&&
+    sinisterAuth.state.mobs[0].fiendish,"Fiendish autoritativo perdeu flags usadas pela poeira");
+  sinisterAuth.authority.mobs[0].hp=1;sinisterAuth.authority.mobs[0].damage=0;
+  const sinisterAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(sinisterAuth),2000,3000).state);
+  must(sinisterAfter.authority.players[0].p.dust>0&&sinisterAfter.authority.players[0].p.slivers>0,
+    "Fiendish autoritativo não concedeu Dust/Slivers");
   const emptyHard=directDescriptor(basePlayer);emptyHard.huntId="mota-extension";emptyHard.state.mobs=[];
   const hardAuth=engine.initializeAuthority(emptyHard,"8".repeat(64),1000);
   must(hardAuth.authority.spawnPool.includes("floating-savant")&&hardAuth.authority.spawnPool.includes("fury"),

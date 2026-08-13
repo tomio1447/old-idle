@@ -447,7 +447,10 @@ async function partyReportZone(db, body) {
 
   const zone = String(body.zone || "").toLowerCase();
   if (["city", "training", "hunt", "boss"].indexOf(zone) === -1) {
-    return { code: 400, body: { ok: false, msg: "Zona inválida" } };
+    // Durante boot/reconexão o runtime ainda pode não ter decidido entre
+    // templo e instância. Isso não é requisição inválida nem deve poluir o
+    // console com HTTP 400; simplesmente aguarde o próximo reporte completo.
+    return {code:200,body:{ok:true,ignored:true,error:"ZONE_NOT_READY",msg:"Reporte de zona ignorado"}};
   }
   // grava a zona do personagem (qualquer membro reporta a própria)
   await db.setCharacterZone(char.id, zone);
@@ -460,17 +463,25 @@ async function partyReportZone(db, body) {
 
   // máquina de estados: salto impossível é rejeitado
   const legais = ZONE_LEGAL[party.leader_zone] || ZONE_LEGAL.unknown;
-  if (legais.indexOf(zone) === -1) {
+  const instanceReconcile=["hunt","boss"].includes(String(party.leader_zone))&&["hunt","boss"].includes(zone);
+  if (legais.indexOf(zone) === -1 && !instanceReconcile) {
     return {
       code: 400,
       body: { ok: false, msg: "Transição inválida: " + party.leader_zone + " -> " + zone },
     };
   }
+  // Restart/SSE pode restaurar o destino novo antes de o reporte intermediário
+  // de city chegar. Hunt<->boss completo é reconciliação idempotente do líder,
+  // não tentativa de um membro criar outra instância.
+  // Em reconexão, o primeiro frame pode conhecer a zona antes do id. Reuse
+  // o destino persistido da party; se ele ainda não existir, trate como no-op.
+  if(zone==="hunt"&&!body.hunt&&party.leader_hunt)body.hunt=party.leader_hunt;
+  if(zone==="boss"&&!body.boss&&party.leader_boss)body.boss=party.leader_boss;
   if (zone === "hunt" && !body.hunt) {
-    return { code: 400, body: { ok: false, msg: "hunt_id obrigatório" } };
+    return {code:200,body:{ok:true,ignored:true,error:"HUNT_NOT_READY",msg:"Hunt ainda não definida"}};
   }
   if (zone === "boss" && !body.boss) {
-    return { code: 400, body: { ok: false, msg: "boss obrigatório" } };
+    return {code:200,body:{ok:true,ignored:true,error:"BOSS_NOT_READY",msg:"Boss ainda não definido"}};
   }
 
   // BOSS: todos da party precisam ter cooldown disponível + missão completa

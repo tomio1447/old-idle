@@ -2,7 +2,7 @@
 "use strict";
 const fs=require("fs"),os=require("os"),path=require("path");
 const {spawn}=require("child_process");
-const {advanceInstanceClock}=require("../server/instance_worker");
+const {advanceInstanceClock,startInstanceWorker}=require("../server/instance_worker");
 const root=path.join(__dirname,".."),serverDir=path.join(root,"server");
 const workerSource=fs.readFileSync(path.join(serverDir,"instance_worker.js"),"utf8");
 const dbSource=fs.readFileSync(path.join(serverDir,"db.js"),"utf8");
@@ -17,7 +17,7 @@ async function post(route,body){return request(route,{method:"POST",headers:{"co
 async function put(route,body){return request(route,{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(body)});}
 async function start(){logs="";child=spawn(process.execPath,["server.js"],{cwd:serverDir,env:Object.assign({},process.env,{
   PORT:String(port),HOST:"127.0.0.1",TEST_SERVER:"0",MYSQL_HOST:"",GLOBAL_IDLE_DATA_DIR:dataDir,
-  LEASE_TTL_MS:"700",INSTANCE_WORKER_INTERVAL_MS:"100",INSTANCE_WORKER_MAX_STEP_MS:"250",
+  LEASE_TTL_MS:"700",INSTANCE_WORKER_INTERVAL_MS:"100",INSTANCE_WORKER_MAX_STEP_MS:"250",INSTANCE_WORKER_STARTUP_GRACE_MS:"0",
 }),stdio:["ignore","pipe","pipe"]});child.stdout.on("data",(c)=>{logs+=c;});child.stderr.on("data",(c)=>{logs+=c;});
   for(let i=0;i<100;i++){try{const r=await request("/api/health");if(r.data.ok)return;}catch(e){}
     await new Promise((resolve)=>setTimeout(resolve,35));}throw Error("servidor não iniciou: "+logs);}
@@ -39,6 +39,13 @@ function state(c,marker){return {v:1,savedAt:Date.now(),kind:"hunt",huntId:"rats
     dbSource.includes("worker_cursor_at")&&dbSource.includes("SELECT GET_LOCK")&&
     gameSource.includes("workerElapsed+residual")&&gameSource.includes("Recarrega o snapshot antes"),
     "worker/checkpoint/reconciliação do cliente ausentes");
+  let startupClaims=0;const startupWorker=startInstanceWorker({
+    instanceWorkerCandidates:async()=>[1],instanceWorkerClaim:async()=>{startupClaims++;return {ok:false};},
+  },{intervalMs:100,startupGraceMs:180,minStepMs:50});
+  await new Promise((resolve)=>setTimeout(resolve,120));
+  must(startupClaims===0,"worker processou instância antes da janela de reconexão do restart");
+  await new Promise((resolve)=>setTimeout(resolve,140));startupWorker.stop();
+  must(startupClaims>0,"worker não retomou depois da janela de reconexão");
   await start();
   await post("/api/register",{login:"worker",password:"x"});
   const logged=await post("/api/login",{login:"worker",password:"x"}),token=logged.data.token;

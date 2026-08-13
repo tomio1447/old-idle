@@ -41,16 +41,18 @@ async function runInstanceWorkerOnce(db,options){
 
 function startInstanceWorker(db,options){
   options=options||{};
-  const intervalMs=Math.max(100,Number(options.intervalMs)||1000);
+  const intervalMs=Math.max(100,Number(options.intervalMs)||1000),
+    startupGraceMs=Math.max(0,Number(options.startupGraceMs)||0),startedAt=Date.now();
   let stopped=false,running=false,timer=null,last={claimed:0,elapsed:0,skipped:0,errors:[]};
   const run=async()=>{
-    if(stopped||running)return last;running=true;
+    if(stopped||running||Date.now()-startedAt<startupGraceMs)return last;running=true;
     try{last=await runInstanceWorkerOnce(db,options);return last;}
     finally{running=false;}
   };
   timer=setInterval(()=>{run().catch((error)=>console.error("[instance-worker]",error));},intervalMs);
   if(timer&&typeof timer.unref==="function")timer.unref();
-  setTimeout(()=>run().catch((error)=>console.error("[instance-worker]",error)),Math.min(100,intervalMs));
+  setTimeout(()=>run().catch((error)=>console.error("[instance-worker]",error)),
+    Math.max(Math.min(100,intervalMs),startupGraceMs));
   return {runOnce:run,stats:()=>last,stop(){stopped=true;if(timer)clearInterval(timer);timer=null;}};
 }
 

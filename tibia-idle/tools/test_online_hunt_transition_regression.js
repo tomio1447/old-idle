@@ -34,7 +34,7 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
   await post("/api/party/zone",{token:guestToken,char_id:guest.id,zone:"city"});
   for(const [character,acceptToken] of [[b,token],[c,token],[d,token],[guest,guestToken]]){
     const invite=await post("/api/party/invite",{token,char_id:a.id,invitee_name:character.name});
-    await post("/api/party/accept",{token:acceptToken,invite_id:invite.data.invite.id});}
+    await post("/api/party/accept",{token:acceptToken,char_id:character.id,invite_id:invite.data.invite.id});}
   let noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"unknown"});
   must(noOp.status===200&&noOp.data.ignored,"zona transitória ainda gera HTTP 400");
   noOp=await post("/api/party/zone",{token,char_id:a.id,zone:"hunt"});

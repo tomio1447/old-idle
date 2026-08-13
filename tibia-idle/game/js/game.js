@@ -242,8 +242,10 @@ function resumeIdleInstance(session){
         const elapsed=workerElapsed+residual,startAt=session.savedAt-workerElapsed;
         delete session.workerElapsedMs;delete session.workerCheckpointAt;
         // Snapshot autoritativo já foi avançado pelo mesmo núcleo no servidor.
-        const result=session.authority?{processed:elapsed,ended:!!session.authority.ended,
-          reason:session.authority.terminalReason||null}:advanceIdleInstance(elapsed,startAt,{silent:true});
+        const result=(session.authority||G.instanceReconnectPending)?{processed:0,
+          ended:!!(session.authority&&session.authority.ended),
+          reason:session.authority&&session.authority.terminalReason||null}:
+          advanceIdleInstance(elapsed,startAt,{silent:true});
         if(G.combat){persistActiveInstance();G.inCity=false;}
         resolve({resumed:!!G.combat,ended:result.ended,elapsed});
       }catch(error){
@@ -2342,6 +2344,10 @@ document.addEventListener("visibilitychange", async () => {
  *     não morrer nem perder progresso.
  */
 let _bgTimer = null;
+// O núcleo autoritativo avança em passos de 1s. Poll de 500ms duplicava
+// serialização de personagens/instância sem ganhar precisão e saturava o
+// servidor JSON, causando lag no canvas e no painel da party.
+const ONLINE_AUTH_TICK_MS=1000;
 let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0;
 function onlineAuthorityCombat(){
   return !!(G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
@@ -2362,6 +2368,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // descriptor e nunca toma o lugar do runtime que já está na tela.
   const incoming=restoreCombatSessionState(fresh,descriptor);
   if(!incoming)return false;
+  delete G.instanceReconnectPending;
 
   const mergeEntity=(local,remote,isPlayer)=>{
     if(!local)return remote;
@@ -2461,8 +2468,10 @@ if(typeof window!=="undefined"){
     const detail=event&&event.detail||{},state=detail.state,remote=detail.event||{};
     if(!state){
       if(G.foreignInstance)G.foreignInstance=null;
-      if(G.combat&&remote.status==="ended"&&remote.matchesCurrent){
-        clearInstanceSession(remote.terminalReason||"shared-ended",true);
+      const confirmedEnded=detail.lastStatus==="ended"||
+        (remote.status==="ended"&&remote.matchesCurrent);
+      if(G.combat&&confirmedEnded){
+        clearInstanceSession(remote.terminalReason||detail.terminalReason||"shared-ended",true);
         setTimeout(()=>{if(G.combat)stopHunt(true);},0);
       }
       return;
@@ -2534,12 +2543,12 @@ function loop(ts) {
   if (!G.paused && G.combat) {
     if(onlineAuthorityCombat()){
       ONLINE_AUTH_ACC+=dt;
-      if(ONLINE_AUTH_ACC>=500){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
+      if(ONLINE_AUTH_ACC>=ONLINE_AUTH_TICK_MS){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
       G._partyHudAt=(G._partyHudAt||0)+dt;
-      if(G._partyHudAt>=120){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
+      if(G._partyHudAt>=250){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{
     const before = G.p.level;
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
@@ -2730,6 +2739,18 @@ function resetRosterToTemple() {
   }
   writeRoster(roster);
 }
+async function loadOnlineInstanceAtBoot(token){
+  let result={ok:false};
+  // Reiniciar o processo HTTP derruba GET/SSE por alguns instantes. Não
+  // conclua "sem instância" na primeira falha de transporte: isso limpava o
+  // checkpoint local e mandava toda a party ao templo durante manutenção.
+  for(let attempt=0;attempt<12;attempt++){
+    result=await accountLoadInstance(token);
+    if(result&&result.ok)return result;
+    await new Promise((resolve)=>setTimeout(resolve,500));
+  }
+  return result;
+}
 function startGame(p) {
   // O templo OTBM precisa estar convertido antes de criar o CityWalker para
   // que o player nasça exatamente em (1020,1021,7).
@@ -2791,7 +2812,7 @@ async function startGameReady(p) {
   let instanceSession=localInstance;
   if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
      typeof accountLoadInstance==="function"){
-    const remote=await accountLoadInstance(sessionToken());
+    const remote=await loadOnlineInstanceAtBoot(sessionToken());
     if(remote.ok&&remote.instance){
       const belongs=instanceIncludesCharacter(remote.instance,p.id);
       if(belongs){
@@ -2815,8 +2836,11 @@ async function startGameReady(p) {
     }else if(remote.ok){
       clearInstanceSession("remote-empty",true);instanceSession=null;
     }else{
-      // Sem resposta do servidor não inicia uma cópia local concorrente.
-      instanceSession=null;
+      // Depois das tentativas, mantenha apenas o espelho já existente em vez
+      // de teleportar para o templo. Ele não simula dano online sem resposta;
+      // SSE/fallback reconciliará o snapshot assim que a API voltar.
+      instanceSession=localInstance||null;
+      if(instanceSession)G.instanceReconnectPending=true;
     }
   }
   // Migra saves antigos que guardavam apenas p.hunt/lastSeen (somente offline).
