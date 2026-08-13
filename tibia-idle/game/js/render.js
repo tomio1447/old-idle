@@ -624,9 +624,9 @@ function drawNameText(ctx, x, y, name, cor) {
  * Nosso antigo 27x4 era aproximação que deixava barra desalinhada.
  * Agora reproduz exatamente: 31 bg, 29 inner, 4 total, 2 fill.
  */
-const TIBIA_BAR_W = 31;
+const TIBIA_BAR_W = 27;
 const TIBIA_BAR_H = 4;
-const TIBIA_BAR_INNER_W = 29;
+const TIBIA_BAR_INNER_W = 25;
 const TIBIA_BAR_INNER_H = 2;
 
 /* Degraus de cor do client: >60 verde, >30 amarelo, >8 laranja/vermelho. */
