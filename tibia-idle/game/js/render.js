@@ -113,7 +113,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "42";
+const ASSET_VERSION = "41";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -391,8 +391,9 @@ function Renderer(canvas) {
   // canvas ter o DOBRO de resolução do CSS, e desenha com
   // imageSmoothingEnabled=false (nearest) — pixel art NÍTIDO, sem o blur
   // que o bilinear da v27 causava. O navegador faz o downscale 2:1 do
-  // canvas para o tamanho CSS com nearest-neighbour/pixelated, preservando
-  // contornos, sprites e textos sem o blur do filtro bilinear.
+  // canvas para o tamanho CSS (#scene image-rendering:auto), então o
+  // resultado é nítido E sem serrilhado (o serrilhado antigo vinha do
+  // canvas 1x esticado pelo CSS).
   this.ctx.imageSmoothingEnabled = false;
   this.floaters = [];       // numeros de dano
   this.effects = [];        // animacoes de efeito
@@ -427,14 +428,6 @@ function floaterAlpha(p) {
   // permanecer opaco até os últimos 300 ms e poluir a cena.
   return Math.max(0, Math.pow(1 - p, 1.35));
 }
-function floaterFont(f) {
-  // O canvas trabalha em DPR 2x; estes tamanhos resultam em aproximadamente
-  // 8–9px CSS e mantêm números de dano legíveis durante a subida.
-  if (f.kind === "damage" || f.kind === "restore") return "bold 16px Verdana";
-  if (f.big) return "bold 18px Verdana";
-  if (f.small) return "bold 11px Verdana";
-  return "bold 15px Verdana";
-}
 Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
   const life = kind === "damage" ? 1300 : (kind === "restore" ? 1150 : (big ? FLOATER_MAX_LIFE : 1500));
   this.floaters.push({
@@ -445,8 +438,7 @@ Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
     kind: kind || "",
     // Sobem em LINHA RETA, exatamente como no client do Tibia: sem drift
     // lateral (vx = 0) e com velocidade vertical constante.
-    // Subida suave: mantém o valor legível perto do alvo por mais tempo.
-    vy: -0.0035,
+    vy: -0.007,
     vx: 0,
   });
   // Limite curto evita mural de números em party/box com dano em área.
@@ -1093,9 +1085,9 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillStyle = "#999";
   if (isDummy) {
     const w = training.weapon ? (EXERCISE_WEAPONS[training.weapon] || {}).name : "—";
-    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · stamina sempre cheia", 12, 40);
+    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12, 40);
   } else {
-    ctx.fillText("Treiner padrão · sem custo · stamina sempre cheia · conjure disponível", 12, 40);
+    ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12, 40);
   }
 
   const pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);
@@ -1352,8 +1344,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = floaterFont(f);
-    ctx.lineWidth = f.kind ? 3 : (f.small ? 2 : 2.5);
+    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1363,67 +1355,28 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
 };
 
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */
-function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent, mode) {
+function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
   if (!ent || !p || (!until && !permanent)) return;
   const px = (ent.x || 0) * W, py = (ent.y || 0) * H;
+  const sex = String(p.sex || p.gender || "").toLowerCase();
+  const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
+  const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
   const ts = tilePx(W);
-  if (mode !== "timer") {
-    const sex = String(p.sex || p.gender || "").toLowerCase();
-    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
-    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
-    if (corpse && corpse.complete && corpse.naturalWidth) {
-      const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
-      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
-    }
+  if (corpse && corpse.complete && corpse.naturalWidth) {
+    const sc = ts / 32, cw = corpse.naturalWidth * sc, ch = corpse.naturalHeight * sc;
+    ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
   }
-  // Body fica na camada do chão; contador continua como overlay de UI.
-  if (mode === "body" || permanent) return;
+  // Na Scarlett o corpse permanece até o fim da luta, sem contador/revive.
+  if (permanent) return;
   const now = Date.now(), left = Math.max(0, Math.ceil((until - now) / 1000));
   const total = Math.max(1, until - (startedAt || now));
   const elapsed = Math.max(0, Math.min(1, 1 - (until - now) / total));
   ctx.font = "bold 16px Verdana"; ctx.textAlign = "center";
   ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
   ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
-  const ly = py - ts * .85 - elapsed * ts * 0.7;
+  const ly = py - ts * .85 - elapsed * ts * .7;
   ctx.strokeText(left + "s", px, ly); ctx.fillStyle = "#ff3b30"; ctx.fillText(left + "s", px, ly);
   ctx.globalAlpha = 1;
-}
-
-function drawCombatPlayerCorpses(ctx,W,H,combat,player,mode){
-  if(!combat)return;let usedParty=false;
-  if(Array.isArray(combat.players)&&combat.players.length){
-    for(const ent of combat.players){
-      if(!ent||!ent.p||ent.p.hp>0||(!ent.reviveAt&&!ent.permadead))continue;
-      const pos=ent.deathPos?Object.assign({},ent,ent.deathPos):ent;
-      drawPlayerCorpse(ctx,W,H,pos,ent.p,ent.reviveAt||combat.deadUntil,
-        ent.downedAt||combat.deadAt,!!ent.permadead,mode);usedParty=true;
-    }
-  }
-  if(combat.dead&&!usedParty){
-    const pos=combat.deathPos||{x:.18,y:.62,dir:"e"};
-    drawPlayerCorpse(ctx,W,H,pos,player,combat.deadUntil,combat.deadAt,false,mode);
-  }
-}
-
-/* Poeira oficial visual dos monstros Influenced/Fiendish. O glow sozinho
- * não criava partículas visíveis; estes pontos orbitam e sobem no sprite. */
-function drawSinisterDust(ctx,ent,cx,cy,tile,now){
-  if(!ent||( !ent.influenced&&!ent.fiendish))return;
-  const text=String(ent.id||ent.slug||"mob");let seed=0;
-  for(let i=0;i<text.length;i++)seed=(seed*31+text.charCodeAt(i))>>>0;
-  const count=ent.fiendish?12:Math.min(9,4+Math.max(1,ent.sinisterStacks||1));
-  const color=ent.fiendish?"#c85bff":"#43b9ff";
-  ctx.save();ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=Math.max(3,tile*.12);
-  for(let i=0;i<count;i++){
-    const phase=((now/1500)+i/count+((seed>>>(i%16))&15)/17)%1;
-    const angle=(seed%360)*Math.PI/180+i*2.399+phase*3.2;
-    const radius=tile*(.23+.17*Math.sin(phase*Math.PI));
-    const x=cx+Math.cos(angle)*radius;
-    const y=cy-tile*(.12+phase*1.18)+Math.sin(angle)*tile*.12;
-    const size=Math.max(2,tile*(ent.fiendish?.075:.055))*(.65+phase*.45);
-    ctx.globalAlpha=.3+.7*Math.sin(phase*Math.PI);ctx.fillRect(x-size/2,y-size/2,size,size);
-  }
-  ctx.restore();ctx.globalAlpha=1;
 }
 
 Renderer.prototype.draw = function (combat, player, dt) {
@@ -1433,10 +1386,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     : (typeof GRID_W !== "undefined" ? GRID_W : 21);
   const gridH = combat && combat.gridH ? combat.gridH
     : (typeof GRID_H !== "undefined" ? GRID_H : 13);
-  const mapFov = combat && combat.huntMap ? combat.huntMap : null;
   const view = (typeof centeredGridViewport === "function")
-    ? centeredGridViewport(canvasW, canvasH, gridW, gridH,
-        mapFov && mapFov.fovWidth, mapFov && mapFov.fovHeight)
+    ? centeredGridViewport(canvasW, canvasH, gridW, gridH)
     : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 
@@ -1480,10 +1431,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.fillRect(0, 0, W, H);
     }
   }
-
-  // Corpse de player é item do chão: somente o ground fica abaixo dele;
-  // criaturas, paredes, efeitos e labels são desenhados por cima.
-  drawCombatPlayerCorpses(ctx,W,H,combat,player,"body");
 
   // Iluminação/vinheta dinâmica desativada: o OTC/Canary aplica luz por
   // criatura e por tile. Sem esse sistema completo, a vinheta escurecia
@@ -1564,10 +1511,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.save(); ctx.shadowColor = ent.fiendish ? '#c14bff' : '#39a8ff'; ctx.shadowBlur = ent.fiendish ? 22 : 18;
       ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
     }
-    if (e.kind === "monster") {
-      drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
-      drawSinisterDust(ctx,ent,cx,cy,tile,Date.now());
-    } else ctx.drawImage(img, origin.x, origin.y, w, h);
+    if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
+    else ctx.drawImage(img, origin.x, origin.y, w, h);
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   }
 
@@ -1667,8 +1612,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const fx = (f.x + f.vx * p * 60) * W;
     const fy = (f.y + f.vy * p * 22) * H;
     ctx.globalAlpha = alpha;
-    ctx.font = floaterFont(f);
-    ctx.lineWidth = f.kind ? 3 : (f.small ? 2 : 2.5);
+    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
@@ -1676,8 +1621,46 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // Contadores de revive permanecem como UI, acima de toda a cena.
-  drawCombatPlayerCorpses(ctx,W,H,combat,player,"timer");
+  // Membros inconscientes da party: não renderizam outfit/IA; ficam como
+  // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
+  if (combat && !combat.dead && combat.players) {
+    for (const ent of combat.players) {
+      if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
+      const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
+      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
+    }
+  }
+
+  // --- morte do player: corpse oficial Canary e contador de respawn.
+  if (combat && combat.dead) {
+    const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
+    const px = dp.x * W, py = dp.y * H;
+    // Canary Player::getLookCorpse(): masculino 4240, feminino 4247.
+    const sex = String((player && (player.sex || player.gender)) || "").toLowerCase();
+    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
+    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
+    const ts = tilePx(W);
+    if (corpse && corpse.complete && corpse.naturalWidth) {
+      const scale = ts / 32;
+      const cw = corpse.naturalWidth * scale, ch = corpse.naturalHeight * scale;
+      // Item corpse ancora pelo pé/base do SQM, como o client.
+      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
+    }
+    const now = Date.now();
+    const left = Math.max(0, Math.ceil((combat.deadUntil - now) / 1000));
+    const total = Math.max(1, combat.deadUntil - (combat.deadAt || now));
+    const elapsed = Math.max(0, Math.min(1, 1 - (combat.deadUntil - now) / total));
+    // Contador vermelho sobe continuamente sobre o corpo até o respawn.
+    const labelY = py - ts * 0.85 - elapsed * ts * 0.7;
+    ctx.font = "bold 16px Verdana";
+    ctx.textAlign = "center";
+    ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.strokeText(left + "s", px, labelY);
+    ctx.fillStyle = "#ff3b30";
+    ctx.fillText(left + "s", px, labelY);
+    ctx.globalAlpha = 1;
+  }
 
   // --- sem hunt
   if (!combat) {

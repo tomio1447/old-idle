@@ -20,8 +20,8 @@
  *   - toda rota valida o token -> conta -> personagem (o personagem que
  *     age TEM que pertencer à conta autenticada);
  *   - o líder não pode convidar/ser convidado fora de safe zone;
- *   - cada conta só pode possuir 1 party; cada personagem só pode participar
- *     de 1 party e ter 1 convite pendente (UNIQUEs + checagem explícita);
+ *   - cada personagem só pode estar em 1 party e ter 1 convite pendente
+ *     (UNIQUEs no banco + checagem explícita);
  *   - nonce de follow consumido atomicamente (UPDATE ... WHERE nonce = ?).
  */
 "use strict";
@@ -43,11 +43,8 @@ const ZONE_LEGAL = {
   unknown:  ["city", "training", "hunt", "boss"],
   city:     ["city", "training", "hunt", "boss"],
   training: ["training", "city", "hunt", "boss"],
-  // Troca de arena pode chegar no mesmo lote HTTP do checkpoint city. Hunt
-  // e boss são destinos autenticados/validados; aceite a transição direta de
-  // forma idempotente para não deixar a party presa por reordenação de rede.
-  hunt:     ["hunt", "boss", "city", "training"],
-  boss:     ["boss", "hunt", "city", "training"],
+  hunt:     ["hunt", "city", "training"],
+  boss:     ["boss", "city", "training"],
 };
 
 /* Valida o token e devolve { account, char } — o personagem TEM que
@@ -82,26 +79,12 @@ function newNonce() {
 async function charSnapshot(db, charId) {
   const c = await db.findCharacter(Number(charId));
   if (!c) return null;
-  let data={};try{data=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
-  const raw=data.outfit&&typeof data.outfit==="object"&&!Array.isArray(data.outfit)?data.outfit:null;
-  let outfit=null;
-  if(raw){
-    outfit={};
-    if(typeof raw.type==="string")outfit.type=raw.type.slice(0,64);
-    if(typeof raw.appearance==="string")outfit.appearance=raw.appearance.slice(0,96);
-    if(Array.isArray(raw.colors)&&raw.colors.length===4)
-      outfit.colors=raw.colors.map((value)=>Math.max(0,Math.min(255,Math.floor(Number(value)||0))));
-    outfit.addons=Math.max(0,Math.min(3,Math.floor(Number(raw.addons)||0)));
-    outfit.mount=typeof raw.mount==="string"?raw.mount.slice(0,96):null;
-  }
   return {
     id: Number(c.id),
     account_id: c.account_id ? Number(c.account_id) : null,
     name: c.name,
     voc: c.voc,
     level: c.level,
-    sex:data.sex==="female"?"female":"male",
-    outfit,
     zone: c.zone || "unknown",
     hp: Number(c.hp) || 0,
     mp: Number(c.mp) || 0,
@@ -113,8 +96,6 @@ async function charSnapshot(db, charId) {
 /* Monta o estado público da party para um personagem. */
 async function partyStateFor(db, party, charId) {
   const members = await db.partyMembers(party.id);
-  const actor=await charSnapshot(db,charId);
-  const isOwner=!!(actor&&Number(actor.account_id)===Number(party.owner_account_id));
   const isLeader = Number(party.leader_id) === Number(charId);
   const isMember = members.some((m) => Number(m.id) === Number(charId));
   // follow pendente APENAS para membros (o líder não se segue)
@@ -132,18 +113,13 @@ async function partyStateFor(db, party, charId) {
   const memberSnaps = [];
   for (const m of members) {
     const s = await charSnapshot(db, m.id);
-    if (s) memberSnaps.push(Object.assign({ position:Number(m.position)||1 },s));
+    if (s) memberSnaps.push(s);
   }
   return {
     ok: true,
     state: {
       id: party.id,
-      version:Number(party.roster_version)||1,
-      ownedByAccount:Number(party.owner_account_id)||null,
-      order:[Number(party.leader_id)].concat(memberSnaps.map((m)=>Number(m.id))),
-      isOwner,
       isLeader,
-      isMember,
       leader: Object.assign({
         hunt: party.leader_hunt,
         instance: party.leader_instance,
@@ -172,22 +148,11 @@ async function partyCreate(db, body) {
   const { account, char, error } = await authChar(db, body.token, body.char_id);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
-  // A party pertence à CONTA, não ao browser nem ao save local. Uma conta
-  // não pode criar dois rosters concorrentes usando personagens diferentes.
-  const owned=await db.partyFindByAccount(account.id);
-  if(owned)return {code:409,body:{ok:false,error:"ACCOUNT_PARTY_EXISTS",
-    msg:"Sua conta já possui uma party"}};
-  // O personagem também não pode estar em party de outra conta.
+  // já está em party (como líder ou membro)?
   const exist = await partyOf(db, char.id);
   if (exist) return { code: 409, body: { ok: false, msg: "Você já está em uma party" } };
-  let created;
-  try{created=await db.partyCreate(char);}catch(e){
-    // A UNIQUE(owner_account_id) também fecha a corrida entre duas requisições.
-    const raced=await db.partyFindByAccount(account.id);
-    if(raced)return {code:409,body:{ok:false,error:"ACCOUNT_PARTY_EXISTS",msg:"Sua conta já possui uma party"}};
-    throw e;
-  }
-  return { code: 201, body: await partyStateFor(db, created, char.id) };
+  const party = await db.partyCreate(char);
+  return { code: 201, body: await partyStateFor(db, party, char.id) };
 }
 
 /* POST /api/party/invite — líder convida por NOME de personagem.
@@ -403,52 +368,14 @@ async function partyKick(db, body) {
   return { code: 200, body: { ok: true, msg: "Membro removido" } };
 }
 
-/* POST /api/party/reorder — a CONTA proprietária persiste a ordem completa.
- * O líder continua na posição zero; trocar liderança é outra operação. */
-async function partyReorder(db,body){
-  const {account,char,error}=await authChar(db,body.token,body.char_id);
-  if(error)return error;
-  if(!char)return {code:400,body:{ok:false,msg:"Selecione um personagem"}};
-  const owned=await db.partyFindByAccount(account.id);
-  if(!owned)return {code:404,body:{ok:false,error:"ACCOUNT_PARTY_NOT_FOUND",msg:"Sua conta não possui party"}};
-  if(Number(owned.owner_account_id)!==Number(account.id))
-    return {code:403,body:{ok:false,error:"PARTY_NOT_OWNER",msg:"A party pertence a outra conta"}};
-  const expectedVersion=Number(body.expected_version);
-  if(!Number.isSafeInteger(expectedVersion)||expectedVersion<1)
-    return {code:428,body:{ok:false,error:"PARTY_VERSION_REQUIRED",msg:"Atualize a party antes de reordenar"}};
-  if(Number(owned.roster_version)!==expectedVersion)return {code:409,body:{ok:false,error:"PARTY_VERSION_CONFLICT",
-    msg:"A composição da party mudou; atualize e tente novamente",partyVersion:Number(owned.roster_version)}};
-  const ids=Array.isArray(body.character_ids)?body.character_ids.map(Number):[];
-  if(!ids.length||ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
-    return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"Ordem da party inválida"}};
-  const members=await db.partyMembers(owned.id);
-  const current=[Number(owned.leader_id)].concat(members.map((m)=>Number(m.id)));
-  if(ids.length!==current.length||ids.some((id)=>current.indexOf(id)===-1))
-    return {code:400,body:{ok:false,error:"INVALID_PARTY_ORDER",msg:"A ordem deve conter todos os membros uma única vez"}};
-  if(ids[0]!==Number(owned.leader_id))
-    return {code:400,body:{ok:false,error:"PARTY_LEADER_FIXED",msg:"O líder deve permanecer na primeira posição"}};
-  const saved=await db.partyReorder(owned.id,expectedVersion,ids.slice(1));
-  if(!saved){
-    const current=await db.partyFindByAccount(account.id);
-    return {code:409,body:{ok:false,error:"PARTY_VERSION_CONFLICT",
-      msg:"A composição da party mudou; atualize e tente novamente",
-      partyVersion:current?Number(current.roster_version):null}};
-  }
-  const updated=await db.partyFindByAccount(account.id);
-  return {code:200,body:await partyStateFor(db,updated,char.id)};
-}
-
 /* GET /api/party/state — estado da party + follow pendente do personagem. */
 async function partyState(db, token, charId) {
-  const { account,char, error } = await authChar(db, token, charId);
+  const { char, error } = await authChar(db, token, charId);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
-  // Primeiro a party em que o personagem participa; se ele ainda não faz
-  // parte dela, a conta dona continua enxergando e administrando seu roster.
-  let current = await partyOf(db, char.id);
-  if(!current)current=await db.partyFindByAccount(account.id);
-  if (!current) return { code: 200, body: { ok: true, state: null } };
-  return { code: 200, body: await partyStateFor(db, current, char.id) };
+  const party = await partyOf(db, char.id);
+  if (!party) return { code: 200, body: { ok: true, state: null } };
+  return { code: 200, body: await partyStateFor(db, party, char.id) };
 }
 
 /* Pega o `p` (save) de um personagem a partir do data JSON. */
@@ -520,7 +447,7 @@ async function partyReportZone(db, body) {
 
   const zone = String(body.zone || "").toLowerCase();
   if (["city", "training", "hunt", "boss"].indexOf(zone) === -1) {
-    return {code:200,body:{ok:true,ignored:true,error:"ZONE_NOT_READY",msg:"Reporte de zona ignorado"}};
+    return { code: 400, body: { ok: false, msg: "Zona inválida" } };
   }
   // grava a zona do personagem (qualquer membro reporta a própria)
   await db.setCharacterZone(char.id, zone);
@@ -539,13 +466,11 @@ async function partyReportZone(db, body) {
       body: { ok: false, msg: "Transição inválida: " + party.leader_zone + " -> " + zone },
     };
   }
-  if(zone==="hunt"&&!body.hunt&&party.leader_hunt)body.hunt=party.leader_hunt;
-  if(zone==="boss"&&!body.boss&&party.leader_boss)body.boss=party.leader_boss;
   if (zone === "hunt" && !body.hunt) {
-    return {code:200,body:{ok:true,ignored:true,error:"HUNT_NOT_READY",msg:"Hunt ainda não definida"}};
+    return { code: 400, body: { ok: false, msg: "hunt_id obrigatório" } };
   }
   if (zone === "boss" && !body.boss) {
-    return {code:200,body:{ok:true,ignored:true,error:"BOSS_NOT_READY",msg:"Boss ainda não definido"}};
+    return { code: 400, body: { ok: false, msg: "boss obrigatório" } };
   }
 
   // BOSS: todos da party precisam ter cooldown disponível + missão completa
@@ -637,7 +562,6 @@ module.exports = {
   partyDecline,
   partyLeave,
   partyKick,
-  partyReorder,
   partyState,
   partyReportZone,
   partyFollow,

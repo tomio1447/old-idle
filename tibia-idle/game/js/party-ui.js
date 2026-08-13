@@ -67,17 +67,6 @@ function partyOutfitHtml(member) {
   // sheet .base branco/preto inteiro como se fosse uma miniatura.
   return `<div class="party-outfit-preview" data-party-preview="${member.id}"></div>`;
 }
-function partyApplyOutfitPreview(host,member,attempt) {
-  if(!host||!member)return;attempt=Number(attempt)||0;
-  const cv=(typeof AppearanceRenderer!=="undefined")?AppearanceRenderer.preview(member,"s"):null;
-  if(cv){host.innerHTML="";cv.style.width="32px";cv.style.height="32px";
-    cv.style.imageRendering="pixelated";host.appendChild(cv);return;}
-  if(!attempt)host.innerHTML=`<img src="assets/outfit/citizen-${member.sex==="female"?"f":"m"}_s.png" alt="">`;
-  // Sprites.get() inicia o carregamento na primeira tentativa. Refaça apenas
-  // esta miniatura para que base, cores, montaria e camadas a1/a2 apareçam
-  // assim que os assets terminarem, sem reconstruir o painel inteiro.
-  if(attempt<20)setTimeout(()=>{if(host.isConnected)partyApplyOutfitPreview(host,member,attempt+1);},120);
-}
 // Compatibilidade do cartão Heal Friend: a preview completa é aplicada no
 // painel OTC; aqui usa a sprite clássica segura para não interromper o Helper.
 function partyOutfitIcon(member, sex) {
@@ -87,7 +76,7 @@ function partyOutfitIcon(member, sex) {
 }
 
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
-async function partySwitchToChar(id) {
+function partySwitchToChar(id) {
   // Em party combat, trocar personagem é trocar o controle para a entidade
   // viva já presente na hunt — recarregar levaria o membro a Thais e o
   // duplicaria na instância.
@@ -96,31 +85,10 @@ async function partySwitchToChar(id) {
       typeof partyCombatSwitchTo === "function") {
     return partyCombatSwitchTo(id);
   }
-  // ONLINE: mantenha `tibia-idle-char` no personagem ATUAL até o save
-  // terminar. Alterá-lo antes do beforeunload gravava o RP inteiro sobre o
-  // Druid escolhido (equipamento, vocação, outfit e level).
-  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
-    if (partySwitchToChar._pending) return false;
-    partySwitchToChar._pending = true;
-    const current = typeof G !== "undefined" && G && G.p ? G.p : null;
-    const token = typeof sessionToken === "function" ? sessionToken() : "";
-    const currentId = current && current.id ? String(current.id) :
-      (typeof sessionCharId === "function" ? String(sessionCharId() || "") : "");
-    if (typeof save === "function") save();
-    if(current&&token&&currentId){
-      try{
-        if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
-        else if(typeof accountSaveCharacter==="function")await accountSaveCharacter(token,currentId,current);
-      }catch(e){ /* conflito é tratado pelo cliente da conta */ }
-    }
-    try { sessionStorage.setItem("tibia-idle-online-autoload", String(id)); } catch (e) {}
-    location.reload();
-    return true;
-  }
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
+  try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
   location.reload();
-  return true;
 }
 
 /* Estado de colapso do painel (persiste na sessão). */
@@ -145,19 +113,6 @@ function renderPartyPanel(p) {
     if (!st) { panel.style.display = "none"; return; }
     isOnline = true;
     membros = [st.leader].concat(st.members || []);
-    // O estado público traz a aparência persistida inclusive para contas
-    // externas. Para personagens desta conta, prefira o snapshot/cache mais
-    // recente (save() o atualiza imediatamente ao trocar outfit/addons).
-    const cache=typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
-    membros=membros.map((member)=>{
-      const summary=cache.find((row)=>String(row.id)===String(member.id));let source=null;
-      if(String(member.id)===String(p.id))source=p;
-      else if(summary){source=summary.snapshot||null;
-        if(typeof source==="string"){try{source=JSON.parse(source);}catch(e){source=null;}}}
-      if(!source)return member;
-      return Object.assign({},member,{sex:source.sex||summary&&summary.sex||member.sex,
-        outfit:source.outfit||summary&&summary.outfit||member.outfit,_p:source});
-    });
     panel.style.display = "";
   } else {
     ensureParty(p);
@@ -247,10 +202,14 @@ function renderPartyPanel(p) {
     </div>`;
   }).join("");
 
-  // Aplica a composição 15x persistida: outfit, quatro cores, addons e mount.
+  // Aplica a composição 15x com cores/addons/montaria à miniatura da party.
   for (const m of membros) {
     const host = body.querySelector(`[data-party-preview="${m.id}"]`);
-    if (host) partyApplyOutfitPreview(host,m._p||m,0);
+    if (!host) continue;
+    const source = m._p || m;
+    const cv = (typeof AppearanceRenderer !== "undefined") ? AppearanceRenderer.preview(source, "s") : null;
+    if (cv) { host.innerHTML = ""; cv.style.width = "32px"; cv.style.height = "32px"; host.appendChild(cv); }
+    else host.innerHTML = `<img src="assets/outfit/citizen-${m.sex === "female" ? "f" : "m"}_s.png" alt="">`;
   }
 
   // botão LEAVE HUNT: visível quando a party está numa hunt/boss — o líder
@@ -291,21 +250,6 @@ function renderPartyPanel(p) {
       }
       partySwitchToChar(el.dataset.partyChar);
     }));
-}
-
-/* Atualiza somente barras já montadas. Não toca em innerHTML, portraits,
- * handlers ou botão LEAVE HUNT — evita piscar a cada snapshot SSE/tick. */
-function updatePartyPanelLiveBars(){
-  if(typeof G==="undefined"||!G||!G.combat||!Array.isArray(G.combat.players))return;
-  const body=$("#party-panel-body");if(!body)return;
-  for(const ent of G.combat.players){
-    if(!ent||!ent.p)continue;const id=String(ent.id||ent.p.id||""),row=body.querySelector(`[data-party-char="${id}"]`);
-    if(!row)continue;const bars=row.querySelectorAll(".party-pbar"),max=typeof maxStats==="function"?maxStats(ent.p):{hp:ent.p.hp||1,mp:ent.p.mp||0};
-    const values=[[Math.max(0,ent.p.hp||0),Math.max(1,max.hp||1)],[Math.max(0,ent.p.mp||0),Math.max(0,max.mp||0)]];
-    for(let i=0;i<Math.min(2,bars.length);i++){const current=values[i][0],maximum=values[i][1],fill=bars[i].querySelector(".fill"),label=bars[i].querySelector(".val");
-      if(fill)fill.style.width=(maximum>0?Math.max(0,Math.min(100,current*100/maximum)):0)+"%";
-      if(label)label.textContent=fmtFull(Math.floor(current))+"/"+fmtFull(maximum);}
-  }
 }
 
 function openPartyModal() {
@@ -546,6 +490,13 @@ function renderPartyModal(p, online) {
   }
 
   box.innerHTML = h;
+  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
+  for (const m of alvos) {
+    const host = box.querySelector(`[data-party-preview="${m.id}"]`);
+    if (!host || typeof AppearanceRenderer === "undefined") continue;
+    const cv = AppearanceRenderer.preview(m, "s");
+    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
+  }
 
   // FIX: handler para botão de criar nova party quando não está na PT
   const create2 = $("#party-create-local-2");
@@ -730,10 +681,12 @@ function renderHealFriend(p) {
   h += `<div class="tiny dim mt4">A cura aplica de verdade nos aliados (save deles). A Mass Healing
     (exura gran mas res) só dispara com <b>2+ aliados feridos</b> ao alcance.</div>`;
   box.innerHTML = h;
-  // Preview 15x colorida no próprio painel Heal Friend (inclui addons).
+  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
   for (const m of alvos) {
     const host = box.querySelector(`[data-party-preview="${m.id}"]`);
-    if(host)partyApplyOutfitPreview(host,m,0);
+    if (!host || typeof AppearanceRenderer === "undefined") continue;
+    const cv = AppearanceRenderer.preview(m, "s");
+    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
   }
 
   // handlers
@@ -848,31 +801,16 @@ function partyOnlineHtml(p, st, inbox) {
         <span class="dim tiny">líder</span>
         <span class="tiny" style="color:#9ce84a">${partyZoneName(st.leader.zone)}</span>
       </div>`;
-    // membros: a ordem vem do banco e pode ser alterada pela conta dona.
-    for (let index=0;index<st.members.length;index++) {
-      const m=st.members[index];
+    // membros
+    for (const m of st.members) {
       h += `<div class="party-member">
         <span class="party-member-voc">${voc(m.voc)}</span>
         <b>${m.name}</b>
         <span class="dim">nv ${m.level}</span>
-        ${st.isOwner ? `<span class="row" style="gap:2px;margin-left:auto">
-          <button class="sm" data-party-order="up" data-party-member="${m.id}"
-            ${index===0?"disabled":""} title="Subir na ordem">▲</button>
-          <button class="sm" data-party-order="down" data-party-member="${m.id}"
-            ${index===st.members.length-1?"disabled":""} title="Descer na ordem">▼</button>
-        </span>` : ""}
         ${st.isLeader ? `<button class="sm" data-party-kick="${m.id}">Remover</button>` : ""}
       </div>`;
     }
     h += `</div>`;
-    const expMembers=[st.leader].concat(st.members||[]),expVocs=new Set(expMembers.map((m)=>m.voc)),
-      expLevels=expMembers.map((m)=>Number(m.level)||1),expEligible=expMembers.length>1&&Math.min(...expLevels)*3>=Math.max(...expLevels)*2,
-      expBonus=expVocs.size>=5?102:expVocs.size===4?100:expVocs.size===3?70:expVocs.size===2?35:20;
-    h += `<div class="party-share tiny" style="color:${expEligible?"#9ce84a":"#ff9a6a"}">
-      Shared Experience: <b>${expEligible?expBonus+"% de bônus":"inativa"}</b> · ${expVocs.size}/5 vocações
-      ${expVocs.size===5&&expEligible?" · composição completa EK/RP/ED/MS/Monk":""}
-      ${!expEligible?" · menor nível precisa ser ≥ 2/3 do maior":""}
-    </div>`;
 
     if (st.isLeader) {
       // ---- líder: convidar por nome (só em cidade/treino) ----
@@ -888,13 +826,10 @@ function partyOnlineHtml(p, st, inbox) {
             : "⚠️ O líder só pode convidar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
         </div>`;
       h += `<button class="sm mt8" id="party-leave">Dissolver party</button>`;
-    } else if(st.isMember) {
+    } else {
       h += `<div class="tiny dim mt4">Follow ativo: quando o líder mudar de
         mapa ou entrar numa hunt/boss, você será teleportado para a MESMA instância.</div>
         <button class="sm mt8" id="party-leave">Sair do party</button>`;
-    } else {
-      h += `<div class="tiny dim mt4">Esta party pertence à sua conta. Troque
-        para o personagem líder para convidar, entrar em hunts ou dissolver a party.</div>`;
     }
   }
 
@@ -946,19 +881,6 @@ function bindPartyOnline(p, st, inbox) {
     toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "" : "bad");
     if (r.ok) recarregar();
   });
-
-  $$("#party-content [data-party-order]").forEach((el)=>
-    el.addEventListener("click",async()=>{
-      const order=(st&&Array.isArray(st.order)?st.order:[]).map(Number);
-      const member=Number(el.dataset.partyMember),index=order.indexOf(member);
-      const next=index+(el.dataset.partyOrder==="up"?-1:1);
-      // posição zero é reservada ao líder.
-      if(index<1||next<1||next>=order.length)return;
-      [order[index],order[next]]=[order[next],order[index]];
-      const r=await accountPartyReorder(Number(sessionCharId()),Number(st.version),order);
-      toast(r.ok?"Ordem da party salva.":(r.msg||"Falha"),r.ok?"":"bad");
-      if(r.ok)recarregar();
-    }));
 
   $$("#party-content [data-party-kick]").forEach((el) =>
     el.addEventListener("click", async () => {

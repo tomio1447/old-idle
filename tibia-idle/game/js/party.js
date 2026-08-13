@@ -13,8 +13,8 @@
  *       Exp = M * S / P * C
  *     M = exp base do monstro · S = bônus de vocações · P = nº de membros
  *     C = bônus individual (stamina/prey do líder já entra no exp base)
- *   Bônus por vocações DIFERENTES: 1 voc = 20%, 2 = 35%, 3 = 70%,
- *   4 = 100%; a formação completa EK/RP/ED/MS/Monk recebe 102%.
+ *   Bônus por vocações DIFERENTES (wiki): 1 voc = 20%, 2 = 35%, 3 = 70%,
+ *   4+ = 100%.
  * - Requisito da wiki: o menor nível ≥ 2/3 do maior.
  * - Party Hunt Analyser: sessão da caçada com stats por membro.
  */
@@ -175,7 +175,6 @@ function partyExpBonusPct(p) {
   const mult = partyExpMultiplier(p);
   return Math.floor(mult * 100);
 }
-}
 
 /* Pode compartilhar exp? (nível mínimo ≥ 2/3 do maior — wiki) */
 function partyCanShare(p) {
@@ -197,7 +196,6 @@ function partyCanShare(p) {
 function partyShareExp(p, exp) {
   ensureParty(p);
   if (!p.party.shareExp || !p.party.members.length) return null;
-  const eligible = partyCanShare(p); if (!eligible.ok) return null;
   const mult = partyExpMultiplier(p);
   const parte = Math.max(0, Math.floor((exp || 0) * mult));
   const P = p.party.members.length + 1;
@@ -551,7 +549,7 @@ function partyIsLeader() {
 /* O personagem atual é MEMBRO (não líder) de uma party online? */
 function partyIsMember() {
   const st = partyOnlineState();
-  return !!(st && st.isMember && !st.isLeader);
+  return !!(st && !st.isLeader);
 }
 
 /* Jogadores em party NÃO podem entrar em hunt/boss — só cidade ou área de
@@ -573,27 +571,10 @@ function partyIsLeaderAny(p) {
  * nos hooks do game.js e no início do jogo). Só o líder altera o estado da
  * party; membros só registram a própria zona (servidor). */
 async function partyReportZone(zoneInfo) {
-  if (!partyOnlineMode()) return {ok:true,ignored:true};
-  const info=Object.assign({},zoneInfo||{}),allowed=["city","training","hunt","boss"];
-  if(!allowed.includes(info.zone))return {ok:true,ignored:true,reason:"zone-not-ready"};
-  // Callbacks de loading podem capturar um objeto incompleto. Complete com o
-  // estado vivo ou ignore o no-op em vez de gerar HTTP 400 no console.
-  if(info.zone==="hunt"&&!info.hunt){
-    info.hunt=(G&&G.combat&&G.combat.huntId)||(G&&G.p&&G.p.hunt)||null;
-    if(!info.hunt)return {ok:true,ignored:true,reason:"hunt-not-ready"};
-  }
-  if(info.zone==="boss"&&!info.boss){
-    info.boss=G&&G.combat&&G.combat.boss&&G.combat.boss.id||null;
-    if(!info.boss)return {ok:true,ignored:true,reason:"boss-not-ready"};
-  }
-  const charId=Number(sessionCharId());if(!Number.isSafeInteger(charId)||charId<=0)
-    return {ok:true,ignored:true,reason:"character-not-ready"};
+  if (!partyOnlineMode()) return;
   try {
-    const result=await accountPartyReportZone(charId,info);
-    if(result&&!result.ok&&typeof console!=="undefined")
-      console.warn("[party] zone recusada",info,result.code||0,result.error||"",result.msg||"");
-    return result;
-  } catch (e) { return {ok:false,error:"NETWORK_ERROR",msg:e&&e.message}; }
+    await accountPartyReportZone(Number(sessionCharId()), zoneInfo);
+  } catch (e) { /* offline/erro de rede: segue o jogo */ }
 }
 
 /* Poll do estado da party: espelha no save (para a UI) e aplica o
@@ -944,77 +925,12 @@ function partyCombatCount() {
   return d.members.length;
 }
 
-function partyRestoreCharacterFull(p) {
-  if (!p) return false;
-  const mx = typeof maxStats === "function" ? maxStats(p) :
-    { hp:Math.max(1,p.maxHp||p.hp||1), mp:Math.max(0,p.maxMp||p.mp||0) };
-  p.hp = mx.hp; p.mp = mx.mp;
-  return true;
-}
-
-/* Templo, treino e entrada de arena são checkpoints seguros: nenhum membro
- * local pode permanecer inconsciente no roster nem reaparecer morto na nova
- * instância. Restaura tanto entidades ao vivo quanto as cópias do roster. */
-function partyCombatRestoreAll(reason) {
-  const restored = new Set();
-  try {
-    if (typeof G !== "undefined" && G && G.combat && G.combat.players) {
-      for (const ent of G.combat.players) {
-        if (!ent || !ent.p) continue;
-        partyRestoreCharacterFull(ent.p);
-        ent.permadead = false; ent.reviveAt = 0; ent.deathPos = null;
-        ent.downedAt = 0; ent.moving = false;
-        restored.add(String(ent.id || ent.p.id || ""));
-        if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
-      }
-      G.combat.dead = false; G.combat.deadUntil = 0; G.combat.deathPos = null;
-    }
-    if (typeof G !== "undefined" && G && G.p) partyRestoreCharacterFull(G.p);
-    if (typeof partyOnlineMode === "function" && partyOnlineMode()) return restored.size;
-    const data = partyLocalData();
-    const chars = typeof getCharacters === "function" ? getCharacters() : [];
-    const ids = new Set();
-    if (typeof G !== "undefined" && G && G.p)
-      ids.add(String(G.p.id || (typeof characterId === "function" ? characterId(G.p) : "")));
-    if (typeof partyLocalMemberIds === "function")
-      for (const id of partyLocalMemberIds(data)) ids.add(String(id));
-    else
-      for (const member of (data && data.members) || []) ids.add(String(member.id));
-    for (const char of chars) {
-      const id = String(char.id || (typeof characterId === "function" ? characterId(char) : ""));
-      if (!ids.has(id)) continue;
-      partyRestoreCharacterFull(char); restored.add(id);
-      if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(char);
-    }
-  } catch (error) {
-    console.warn("[party] falha ao restaurar party no checkpoint " + (reason || ""), error);
-  }
-  return restored.size;
-}
-
 /* Carrega as entidades do party combat. `player` = personagem ativo (o
  * líder). Devolve o array completo (líder + membros) ou null sem party. */
 function partyCombatLoad(player) {
-  const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
-  let order=[],chars=[];
-  if(online){
-    const st=player&&player._partyOnline;if(!st||!st.leader)return null;
-    order=[st.leader].concat(st.members||[]);
-    const cached=typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
-    chars=cached.map(summary=>{
-      let raw=summary.snapshot||{};if(typeof raw==="string"){try{raw=JSON.parse(raw);}catch(e){raw={};}}
-      raw=Object.assign({},raw,{id:String(summary.id),name:summary.name,voc:summary.voc,
-        level:Number(summary.level)||raw.level||1,sex:summary.sex||raw.sex||"male",
-        outfit:summary.outfit||raw.outfit});return raw;
-    });
-    const me=String(player.id||"");
-    const i=chars.findIndex(c=>String(c.id)===me);
-    if(i>=0)chars[i]=player;else chars.push(player);
-  }else{
-    const d=partyLocalData();if(!d)return null;
-    chars=typeof getCharacters==="function"?getCharacters():[];
-    order=[{id:d.leaderId}].concat(d.members||[]);
-  }
+  const d = partyLocalData();
+  if (!d) return null;
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
   const me = String(player.id || characterId(player));
   const entidades = [];
   const seen = new Set();
@@ -1024,9 +940,6 @@ function partyCombatLoad(player) {
     const pp = normalizePlayer(c);
     pp.id = c.id || characterId(c);
     const mx = typeof maxStats === "function" ? maxStats(pp) : { hp: 1, mp: 1 };
-    // Última barreira: mesmo que algum fluxo esqueça o checkpoint, a entidade
-    // nunca é criada morta dentro de uma arena.
-    pp.hp = mx.hp; pp.mp = mx.mp;
     entidades.push({
       p: pp, id: pp.id, name: pp.name, voc: pp.voc, sex: pp.sex,
       cx: 0, cy: 0, x: 0, y: 0, dir: "e", moving: false, frame: 0,
@@ -1037,15 +950,14 @@ function partyCombatLoad(player) {
       taken: 0,
     });
   };
-  // líder primeiro, depois os membros na ordem fornecida pelo servidor/storage.
-  for(let i=0;i<order.length;i++){
-    const ref=order[i];
-    const c=chars.find(x=>String(x.id||characterId(x))===String(ref.id));
-    if(c)mkEnt(c,i===0);
+  // líder primeiro (ativa por padrão)
+  const lider = chars.find((c) => String(c.id || characterId(c)) === me);
+  mkEnt(lider, true);
+  // membros na ordem do party
+  for (const m of d.members) {
+    const c = chars.find((x) => String(x.id || characterId(x)) === String(m.id));
+    if (c) mkEnt(c, false);
   }
-  // O personagem ativo sempre precisa existir, inclusive durante transições
-  // em que o poll da party ainda está uma versão atrás.
-  if(!seen.has(me))mkEnt(player,!!(order[0]&&String(order[0].id)===me));
   return entidades.length > 1 ? entidades : null;
 }
 
@@ -1132,11 +1044,6 @@ function partyCombatSwitchTo(id) {
       sessionStorage.setItem(AUTOLOGIN_KEY, String(ent.id));
     } catch (e) { /* storage indisponível: instância continua válida */ }
     if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
-    // A troca muda somente activeCharacterId da MESMA instância. Persista
-    // imediatamente: sem isso o próximo tick autoritativo ainda apontava ao
-    // líder e parecia abrir/voltar para um runtime por personagem.
-    if(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()&&
-       typeof persistActiveInstance==="function")persistActiveInstance();
     if (typeof renderAll === "function") renderAll();
     if (typeof toast === "function") toast("Controlando: " + ent.name);
     return true;
@@ -1146,25 +1053,11 @@ function partyCombatSwitchTo(id) {
 /* Salva TODOS os personagens do party combat no roster (hp/mana/exp). */
 function partyCombatSaveAll() {
   try {
-    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return Promise.resolve(false);
-    const online=typeof partyOnlineMode==="function"&&partyOnlineMode();
-    const token=online&&typeof sessionToken==="function"?sessionToken():"";
-    const cache=online&&typeof accountCharacterCacheRead==="function"?accountCharacterCacheRead():[];
+    if (typeof G === "undefined" || !G || !G.combat || !G.combat.players) return;
     for (const ent of G.combat.players) {
-      if(!ent.p)continue;
-      if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(ent.p);
-      const summary=cache.find(c=>String(c.id)===String(ent.id));
-      if(summary){summary.voc=ent.p.voc;summary.level=ent.p.level;summary.sex=ent.p.sex;
-        summary.outfit=ent.p.outfit;summary.snapshot=ent.p;}
+      if (ent.p && typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
     }
-    if(online&&typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(cache);
-    if(token&&typeof accountSaveParty==="function"){
-      const leader=G.combat.players.find((ent)=>ent&&ent.isLeader&&ent.p);
-      const state=G.combat.partyOnlineState||(G.p&&G.p._partyOnline)||(leader&&leader.p._partyOnline);
-      if(state){G.combat.partyOnlineState=state;return accountSaveParty(token,state,G.combat.players);}
-    }
-    return Promise.resolve(false);
-  } catch (e) { return Promise.resolve(false); }
+  } catch (e) { /* não bloqueia */ }
 }
 
 /* Alcance de ataque de um aliado (mesma regra do jogador). */

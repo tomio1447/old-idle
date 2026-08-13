@@ -33,396 +33,24 @@ function accountApiConfigured() {
   return !!ACCOUNT_API_URL;
 }
 
-const ONLINE_CHARACTER_CACHE_KEY="tibia-idle-online-character-cache-v1";
-function accountCharacterCacheWrite(characters){
-  try{sessionStorage.setItem(ONLINE_CHARACTER_CACHE_KEY,JSON.stringify(characters||[]));}catch(e){}
-}
-function accountCharacterCacheRead(){
-  try{const raw=sessionStorage.getItem(ONLINE_CHARACTER_CACHE_KEY);return raw?JSON.parse(raw):[];}catch(e){return [];}
-}
-function accountCharacterCacheClear(){
-  try{sessionStorage.removeItem(ONLINE_CHARACTER_CACHE_KEY);}catch(e){}
-  try{ACCOUNT_SAVE_CONFLICTS.clear();}catch(e){}
-}
-
-/* Saves online são serializados nesta aba e usam optimistic concurrency.
- * Ao detectar outra sessão, o personagem fica bloqueado até recarregar; sem
- * isso, o autosave seguinte poderia sobrescrever silenciosamente o vencedor. */
-let ACCOUNT_SAVE_QUEUE=Promise.resolve(true);
-let ACCOUNT_LAST_SAVE_PROMISE=ACCOUNT_SAVE_QUEUE;
-const ACCOUNT_SAVE_CONFLICTS=new Set();
-function accountMergeCharacterCache(characters){
-  const cache=accountCharacterCacheRead();
-  for(const character of characters||[]){
-    const index=cache.findIndex((c)=>String(c.id)===String(character.id));
-    if(index>=0)cache[index]=Object.assign({},cache[index],character);
-    else cache.push(character);
-  }
-  accountCharacterCacheWrite(cache);return cache;
-}
-function accountQueueSave(task){
-  const run=ACCOUNT_SAVE_QUEUE.catch(()=>false).then(task);
-  ACCOUNT_SAVE_QUEUE=run.catch(()=>false);ACCOUNT_LAST_SAVE_PROMISE=run;return run;
-}
-function accountLastSavePromise(){return ACCOUNT_LAST_SAVE_PROMISE.catch(()=>false);}
-function accountSaveConflict(ids,characters,message){
-  (ids||[]).forEach((id)=>ACCOUNT_SAVE_CONFLICTS.add(String(id)));
-  if(characters&&characters.length)accountMergeCharacterCache(characters);
-  try{window.dispatchEvent(new CustomEvent("tibia-idle-save-conflict",{detail:{ids:ids||[]}}));}catch(e){}
-  if(typeof toast==="function")toast(message||"Save alterado em outra sessão. Recarregue antes de continuar.","bad");
-}
-async function accountEnsureVersions(token,ids){
-  let cache=accountCharacterCacheRead();
-  const missing=(ids||[]).some((id)=>{
-    const c=cache.find((row)=>String(row.id)===String(id));
-    return !c||!Number.isSafeInteger(Number(c.saveVersion))||Number(c.saveVersion)<1;
-  });
-  if(missing){const fresh=await accountMe(token);if(fresh.ok){cache=fresh.characters||[];accountCharacterCacheWrite(cache);}}
-  return cache;
-}
-function accountSavePayload(p){
-  let maxHp=0,maxMp=0;
-  try{if(typeof maxStats==="function"&&p){const m=maxStats(p);maxHp=m.hp||0;maxMp=m.mp||0;}}catch(e){}
-  return {voc:p&&p.voc||"none",level:p&&p.level||1,data:JSON.stringify(p||{}),
-    hp:p&&p.hp||0,mp:p&&p.mp||0,maxHp,maxMp};
-}
-
-const ACCOUNT_LEASE_HOLDER_KEY="tibia-idle-lease-holder-v1";
-const ACCOUNT_LEASE_TOKEN_KEY="tibia-idle-lease-token-v1";
-const ACCOUNT_LEASE_EXPIRY_KEY="tibia-idle-lease-expiry-v1";
-let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,sessionToken:"",timer:null,lost:false};
-function accountLeaseRandom(){
-  try{if(crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID().replace(/-/g,"");}catch(e){}
-  return Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
-}
-// Novo por documento: reload/aba clonada rotaciona holder no servidor. Mesmo
-// que sessionStorage seja copiado, duas páginas nunca renovam o mesmo holder.
-const ACCOUNT_LEASE_PAGE_HOLDER=accountLeaseRandom();
-let ACCOUNT_LEASE_CHANNEL=null;
-function accountLeaseAccountId(){
-  try{const raw=sessionStorage.getItem("tibia-idle-account");return raw?String(JSON.parse(raw).id||""):"";}catch(e){return "";}
-}
-try{
-  if(typeof BroadcastChannel!=="undefined"){
-    ACCOUNT_LEASE_CHANNEL=new BroadcastChannel("tibia-idle-account-lease-v1");
-    ACCOUNT_LEASE_CHANNEL.onmessage=(event)=>{
-      const data=event&&event.data||{};
-      if(data.type==="acquired"&&data.accountId&&data.accountId===accountLeaseAccountId()&&
-         data.holderId!==ACCOUNT_LEASE_PAGE_HOLDER&&ACCOUNT_LEASE.active)
-        accountLeaseMarkLost("Outra aba assumiu o controle. A simulação foi pausada.");
-    };
-  }
-}catch(e){ACCOUNT_LEASE_CHANNEL=null;}
-function accountLeaseStored(){
-  let previousHolder="",token="",expiresAt=0;
-  try{
-    previousHolder=sessionStorage.getItem(ACCOUNT_LEASE_HOLDER_KEY)||ACCOUNT_LEASE_PAGE_HOLDER;
-    token=sessionStorage.getItem(ACCOUNT_LEASE_TOKEN_KEY)||"";
-    expiresAt=Number(sessionStorage.getItem(ACCOUNT_LEASE_EXPIRY_KEY)||0);
-  }catch(e){previousHolder=ACCOUNT_LEASE_PAGE_HOLDER;}
-  return {holder:ACCOUNT_LEASE_PAGE_HOLDER,previousHolder,token,expiresAt};
-}
-function accountLeaseFields(){
-  const stored=accountLeaseStored();
-  return {holder_id:ACCOUNT_LEASE.holder||stored.holder,lease_token:ACCOUNT_LEASE.token||stored.token};
-}
-function accountLeaseApply(token,data){
-  const stored=accountLeaseStored();
-  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.sessionToken=token;
-  ACCOUNT_LEASE.holder=data.holderId||stored.holder;ACCOUNT_LEASE.token=data.leaseToken;
-  ACCOUNT_LEASE.expiresAt=new Date(data.expiresAt).getTime();
-  try{
-    sessionStorage.setItem(ACCOUNT_LEASE_HOLDER_KEY,ACCOUNT_LEASE.holder);
-    sessionStorage.setItem(ACCOUNT_LEASE_TOKEN_KEY,ACCOUNT_LEASE.token);
-    sessionStorage.setItem(ACCOUNT_LEASE_EXPIRY_KEY,String(ACCOUNT_LEASE.expiresAt));
-  }catch(e){}
-  try{if(ACCOUNT_LEASE_CHANNEL)ACCOUNT_LEASE_CHANNEL.postMessage({type:"acquired",
-    accountId:accountLeaseAccountId(),holderId:ACCOUNT_LEASE.holder});}catch(e){}
-  if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
-  ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),Math.max(1000,Number(data.renewAfterMs)||30000));
-}
-function accountLeaseMarkLost(message){
-  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.token="";ACCOUNT_LEASE.expiresAt=0;
-  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
-  try{sessionStorage.removeItem(ACCOUNT_LEASE_TOKEN_KEY);sessionStorage.removeItem(ACCOUNT_LEASE_EXPIRY_KEY);}catch(e){}
-  try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
-  if(message!==false&&typeof toast==="function")
-    toast(message||"Outra aba assumiu o controle. A simulação foi pausada.","bad");
-}
-function accountLeaseAllowsSimulation(){
-  if(!accountApiConfigured())return true;
-  return !!(ACCOUNT_LEASE.active&&ACCOUNT_LEASE.token&&Date.now()<ACCOUNT_LEASE.expiresAt);
-}
-async function accountAcquireLease(token,takeover){
-  const stored=accountLeaseStored(),path=takeover?"/api/lease/takeover":"/api/lease/acquire";
-  const r=await _api("POST",path,{token,holder_id:stored.holder,
-    previous_holder_id:stored.previousHolder,lease_token:stored.token});
-  if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true,resumed:!!r.data.resumed};}
-  return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
-    msg:r.data.msg||"Não foi possível obter o controle da conta."};
-}
-async function accountRenewLease(token){
-  token=token||ACCOUNT_LEASE.sessionToken;const fields=accountLeaseFields();
-  if(!token||!fields.lease_token)return {ok:false};
-  const r=await _api("POST","/api/lease/renew",Object.assign({token},fields));
-  if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true};}
-  if(r.code===0&&Date.now()<ACCOUNT_LEASE.expiresAt){
-    if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
-    ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
-  }
-  accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
-}
-async function accountEnsureLease(token){
-  if(accountLeaseAllowsSimulation())return {ok:true};
-  const acquired=await accountAcquireLease(token,false);
-  if(!acquired.ok&&acquired.held)accountLeaseMarkLost(acquired.msg);
-  return acquired;
-}
-async function accountReleaseLease(token){
-  const fields=accountLeaseFields();
-  if(token&&fields.lease_token)await _api("POST","/api/lease/release",Object.assign({token},fields));
-  accountLeaseMarkLost(false);ACCOUNT_LEASE.lost=false;
-}
-
-let ACCOUNT_INSTANCE={id:"",version:0,status:null};
-let ACCOUNT_INSTANCE_EPOCH=0,ACCOUNT_INSTANCE_CAN_CREATE=false;
-let ACCOUNT_INSTANCE_QUEUE=Promise.resolve(true);
-let ACCOUNT_INSTANCE_LAST_PROMISE=ACCOUNT_INSTANCE_QUEUE;
-function accountQueueInstance(task){
-  const run=ACCOUNT_INSTANCE_QUEUE.catch(()=>false).then(task);
-  ACCOUNT_INSTANCE_QUEUE=run.catch(()=>false);ACCOUNT_INSTANCE_LAST_PROMISE=run;return run;
-}
-function accountLastInstancePromise(){return ACCOUNT_INSTANCE_LAST_PROMISE.catch(()=>false);}
-function accountInstanceApply(instance){
-  if(!instance){ACCOUNT_INSTANCE={id:"",version:0,status:null};ACCOUNT_INSTANCE_CAN_CREATE=false;return;}
-  ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active"};
-  ACCOUNT_INSTANCE_CAN_CREATE=false;
-}
-function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
-async function accountLoadInstance(token){
-  // Consulte antes de tickar: uma conta sem instância ativa deve receber 200
-  // com null, não provocar o 410 esperado de /tick no console do navegador.
-  const activeChar=typeof sessionCharId==="function"?sessionCharId():"";
-  let r=await _api("GET","/api/instance?char_id="+encodeURIComponent(activeChar||""),null,token);
-  if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
-  if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
-  accountInstanceApply(r.data.instance);
-  const viewerMember=!!(r.data.instance.state&&Array.isArray(r.data.instance.state.members)&&
-    r.data.instance.state.members.some((member)=>String(member.id)===String(activeChar)));
-  if(accountLeaseAllowsSimulation()&&viewerMember){
-    const tick=await _api("POST","/api/instance/tick",Object.assign({token,char_id:activeChar||null,
-      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
-    if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
-      accountInstanceApply(tick.data.instance||null);
-      return {ok:true,instance:tick.data.instance&&tick.data.instance.state||null,
-        meta:tick.data.instance||null,lastStatus:tick.data.instance?null:"ended"};}
-    // Em caso de corrida com worker/SSE, use o snapshot GET já validado; a
-    // próxima sincronização reconciliará a versão sem erro destrutivo.
-  }
-  return {ok:true,instance:r.data.instance.state||null,meta:r.data.instance};
-}
-function accountNormalizeInstanceMembers(state){
-  if(!state||!Array.isArray(state.members)||!state.members.length)return state;
-  state.state=state.state&&typeof state.state==="object"?state.state:{};
-  const visual=new Map();
-  for(const ent of Array.isArray(state.state.players)?state.state.players:[]){
-    if(!ent)continue;const id=String(ent.id!==undefined?ent.id:(ent.p&&ent.p.id));
-    if(id&&!visual.has(id))visual.set(id,ent);
-  }
-  state.state.players=state.members.map((member)=>{
-    const id=String(member.id),ent=Object.assign({},visual.get(id)||{id});
-    ent.id=id;ent.p=member.p;return ent;
-  });
-  return state;
-}
-function accountSaveInstance(token,state){
-  const epoch=ACCOUNT_INSTANCE_EPOCH;state=accountNormalizeInstanceMembers(state);
-  return accountQueueInstance(async()=>{
-    if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
-    if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
-    const r=await _api("PUT","/api/instance",Object.assign({token,char_id:state.activeCharacterId||
-      (typeof sessionCharId==="function"?sessionCharId():null),instance_id:ACCOUNT_INSTANCE.id||null,
-      expected_version:ACCOUNT_INSTANCE.status==="active"?ACCOUNT_INSTANCE.version:0,state},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(r.data.instance);return true;}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    if(r.code===409){
-      accountInstanceApply(r.data.instance||null);
-      try{window.dispatchEvent(new CustomEvent("tibia-idle-instance-conflict"));}catch(e){}
-      if(typeof toast==="function")toast(r.data.msg||"A instância foi alterada em outra sessão.","bad");
-    }else if(typeof console!=="undefined"){
-      console.warn("[instance] save recusado",r.code,r.data.error||"",r.data.msg||"");
-    }
-    return false;
-  });
-}
-function accountTickInstance(token){
-  return accountQueueInstance(async()=>{
-    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
-    const r=await _api("POST","/api/instance/tick",Object.assign({token,
-      char_id:typeof sessionCharId==="function"?sessionCharId():null,
-      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
-      return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,elapsed:r.data.elapsed||0};}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    if(r.data.instance)accountInstanceApply(r.data.instance);
-    return {ok:false,error:r.data.error};
-  });
-}
-function accountSelectInstanceAmmo(token,charId,slug,automatic){
-  return accountQueueInstance(async()=>{
-    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
-    const r=await _api("POST","/api/instance/ammo",Object.assign({token,char_id:Number(charId),ammo:String(slug||""),
-      ammo_auto:!!automatic,instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
-    if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state};}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
-    return {ok:false,msg:r.data.msg||"Não foi possível trocar a munição"};
-  });
-}
-function accountRefreshInstance(token){
-  return accountQueueInstance(async()=>{
-    const charId=typeof sessionCharId==="function"?sessionCharId():"";
-    const r=await _api("GET","/api/instance?char_id="+encodeURIComponent(charId||""),null,token);
-    if(!r.data.ok)return {ok:false};
-    if(!r.data.instance){accountInstanceApply(null);return {ok:true,state:null,lastStatus:r.data.lastStatus||null};}
-    accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance.state,meta:r.data.instance};
-  });
-}
-function accountEndInstance(token,reason){
-  ACCOUNT_INSTANCE_EPOCH+=1;const endEpoch=ACCOUNT_INSTANCE_EPOCH;ACCOUNT_INSTANCE_CAN_CREATE=false;
-  return accountQueueInstance(async()=>{
-    if(!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return true;
-    if(!accountLeaseAllowsSimulation())return false;
-    const r=await _api("POST","/api/instance/end",Object.assign({token,
-      char_id:typeof sessionCharId==="function"?sessionCharId():null,
-      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
-    if(r.data.ok){const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
-      if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    if(r.code===409)accountInstanceApply(r.data.instance||null);
-    return false;
-  });
-}
-
-const ACCOUNT_SYNC_CURSOR_KEY="tibia-idle-sync-cursor-v1";
-let ACCOUNT_SYNC={source:null,token:"",errors:0,totalFailures:0,reconnect:null,poll:null,
-  stopped:true,charRefresh:null,starting:null,generation:0,disabled:false};
-function accountSyncProtocolSupported(){return ACCOUNT_SERVER_CONFIG.syncProtocol==="sse-v2";}
-function accountSyncCursor(value){
-  if(value!==undefined){try{sessionStorage.setItem(ACCOUNT_SYNC_CURSOR_KEY,String(value));}catch(e){}return Number(value)||0;}
-  try{return Number(sessionStorage.getItem(ACCOUNT_SYNC_CURSOR_KEY)||0);}catch(e){return 0;}
-}
-function accountSyncDispatch(type,detail){try{window.dispatchEvent(new CustomEvent("tibia-idle-sync-"+type,{detail:detail||{}}));}catch(e){}}
-async function accountSyncRefreshCharacters(token){
-  if(ACCOUNT_SYNC.charRefresh)return ACCOUNT_SYNC.charRefresh;
-  ACCOUNT_SYNC.charRefresh=accountMe(token).then((fresh)=>{
-    if(fresh.ok){accountCharacterCacheWrite(fresh.characters||[]);accountSyncDispatch("character",fresh);}
-    return fresh;
-  }).finally(()=>{ACCOUNT_SYNC.charRefresh=null;});return ACCOUNT_SYNC.charRefresh;
-}
-function accountSyncFallback(token){
-  if(ACCOUNT_SYNC.poll)return;ACCOUNT_SYNC.poll=setInterval(async()=>{
-    const state=await _api("GET","/api/sync/state",null,token);
-    if(!state.data.ok)return;accountSyncCursor(state.data.cursor);
-    await accountSyncRefreshCharacters(token);
-    const instance=await accountRefreshInstance(token);if(instance.ok)accountSyncDispatch("instance",instance);
-    accountSyncDispatch("party",state.data.party||{});
-  },5000);
-}
-function accountSyncStopFallback(){if(ACCOUNT_SYNC.poll){clearInterval(ACCOUNT_SYNC.poll);ACCOUNT_SYNC.poll=null;}}
-function accountStartSync(token){
-  if(!token)return Promise.resolve(false);
-  // Servidor anterior ao protocolo sse-v2 devolve 401 para tickets expirados.
-  // Não abra EventSource nesse caso: party polling e ticks HTTP continuam.
-  if(!accountSyncProtocolSupported()){ACCOUNT_SYNC.disabled=true;return Promise.resolve(false);}
-  if(ACCOUNT_SYNC.disabled)return Promise.resolve(false);
-  if(ACCOUNT_SYNC.source&&ACCOUNT_SYNC.token===token)return Promise.resolve(true);
-  if(ACCOUNT_SYNC.starting&&ACCOUNT_SYNC.token===token)return ACCOUNT_SYNC.starting;
-  ACCOUNT_SYNC.generation++;const generation=ACCOUNT_SYNC.generation;
-  if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
-  ACCOUNT_SYNC.source=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;accountSyncStopFallback();
-  ACCOUNT_SYNC.stopped=false;ACCOUNT_SYNC.token=token;
-  const run=accountStartSyncNow(token,generation).finally(()=>{
-    if(ACCOUNT_SYNC.generation===generation)ACCOUNT_SYNC.starting=null;
-  });
-  ACCOUNT_SYNC.starting=run;return run;
-}
-async function accountStartSyncNow(token,generation){
-  if(typeof EventSource==="undefined"){accountSyncFallback(token);return false;}
-  const ticket=await _api("POST","/api/sync/ticket",{token});
-  if(ACCOUNT_SYNC.stopped||ACCOUNT_SYNC.generation!==generation)return false;
-  if(!ticket.data.ok){ACCOUNT_SYNC.totalFailures++;accountSyncFallback(token);
-    if(ACCOUNT_SYNC.totalFailures<5)ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),5000);
-    else ACCOUNT_SYNC.disabled=true;return false;}
-  const url=ACCOUNT_API_URL+"/api/sync/events?ticket="+encodeURIComponent(ticket.data.ticket)+
-    "&lastEventId="+encodeURIComponent(accountSyncCursor());
-  const source=new EventSource(url);ACCOUNT_SYNC.source=source;
-  const renewTicket=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;
-    try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
-    clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),250);};
-  const receive=(type,event)=>{
-    if(event.lastEventId)accountSyncCursor(event.lastEventId);let data={};try{data=JSON.parse(event.data||"{}");}catch(e){}
-    if(type==="sync-expired"){accountSyncDispatch("disconnected",{reason:data.reason||"ticket-expired"});renewTicket();return;}
-    if(type==="lease"){
-      if(data.holderId&&data.holderId!==ACCOUNT_LEASE_PAGE_HOLDER&&ACCOUNT_LEASE.active&&data.action!=="release")
-        accountLeaseMarkLost("Outra aba ou dispositivo assumiu o controle.");
-      accountSyncDispatch("lease",data);return;
-    }
-    if(type==="instance"){
-      if(data.holderId&&data.holderId===ACCOUNT_LEASE_PAGE_HOLDER)return;
-      if(Number(data.version)<=Number(ACCOUNT_INSTANCE.version)&&data.status===ACCOUNT_INSTANCE.status)return;
-      const matchesCurrent=!!(data.id&&String(data.id)===String(ACCOUNT_INSTANCE.id));
-      accountRefreshInstance(token).then((fresh)=>{if(fresh.ok)accountSyncDispatch("instance",Object.assign({},fresh,
-        {event:Object.assign({},data,{matchesCurrent})}));});return;
-    }
-    if(type==="character"){accountSyncRefreshCharacters(token);return;}
-    if(type==="party"||type==="party-inbox"){accountSyncDispatch("party",data);return;}
-    if(type==="snapshot-required"){
-      accountSyncRefreshCharacters(token);accountRefreshInstance(token).then((fresh)=>accountSyncDispatch("instance",fresh));
-      accountSyncDispatch("party",data);
-    }
-  };
-  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired"])
-    source.addEventListener(type,(event)=>receive(type,event));
-  const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
-    ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
-  source.addEventListener("ready",connected);source.onopen=()=>connected(null);
-  source.onerror=()=>{if(ACCOUNT_SYNC.stopped||source!==ACCOUNT_SYNC.source)return;
-    ACCOUNT_SYNC.errors++;ACCOUNT_SYNC.totalFailures++;accountSyncDispatch("disconnected",{attempt:ACCOUNT_SYNC.totalFailures});
-    if(ACCOUNT_SYNC.totalFailures>=5){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;
-      ACCOUNT_SYNC.disabled=true;accountSyncFallback(token);return;}
-    if(ACCOUNT_SYNC.errors>=3){try{source.close();}catch(e){}ACCOUNT_SYNC.source=null;accountSyncFallback(token);
-      clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=setTimeout(()=>accountStartSync(token),Math.min(15000,1000*ACCOUNT_SYNC.totalFailures));}};
-  return true;
-}
-function accountStopSync(){ACCOUNT_SYNC.stopped=true;ACCOUNT_SYNC.generation++;
-  if(ACCOUNT_SYNC.source){try{ACCOUNT_SYNC.source.close();}catch(e){}}
-  ACCOUNT_SYNC.source=null;ACCOUNT_SYNC.starting=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;
-  accountSyncStopFallback();ACCOUNT_SYNC.token="";ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;ACCOUNT_SYNC.disabled=false;}
-
 async function _api(method, path, body, token) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = "Bearer " + token;
-  try {
-    const r = await fetch(ACCOUNT_API_URL + path, {
-      method: method,
-      headers: headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    let data = {};
-    try { data = await r.json(); } catch (e) { data = {}; }
-    return { code: r.status, data: data };
-  } catch (error) {
-    return { code: 0, data: { ok:false, error:"NETWORK_ERROR",
-      msg:"Servidor indisponível. Verifique se a API está ligada." } };
-  }
+  const r = await fetch(ACCOUNT_API_URL + path, {
+    method: method,
+    headers: headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = {};
+  try { data = await r.json(); } catch (e) { data = {}; }
+  return { code: r.status, data: data };
 }
 
 async function accountRegister(login, password) {
   const r = await _api("POST", "/api/register", { login, password });
-  if (r.data.ok) return { ok:true, msg:"Conta criada!" };
-  if (r.code === 409 || r.data.error === "ACCOUNT_EXISTS")
-    return { ok:false, exists:true, msg:"Conta já existe. Use a aba Entrar." };
-  return { ok:false, msg:r.data.msg || "Falha ao criar conta" };
+  return r.data.ok
+    ? { ok: true, msg: "Conta criada!" }
+    : { ok: false, msg: r.data.msg || "Falha ao criar conta" };
 }
 
 async function accountLogin(login, password) {
@@ -440,21 +68,12 @@ async function accountMe(token) {
   const r = await _api("GET", "/api/me", null, token);
   return r.data.ok ? r.data : { ok: false };
 }
-async function accountLogout(token){
-  const r=await _api("POST","/api/logout",{token});return !!r.data.ok;
-}
 
 async function accountLoadCharacter(token, charId) {
   const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
-  if(r.data.ok){
-    const character=r.data.character;let snapshot={};
-    try{snapshot=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-    accountMergeCharacterCache([{id:character.id,name:character.name,voc:character.voc,
-      level:character.level,saveVersion:character.saveVersion,sex:snapshot.sex||"male",
-      outfit:snapshot.outfit||null,snapshot}]);
-    return {ok:true,character};
-  }
-  return {ok:false,msg:r.data.msg||"Falha ao carregar personagem"};
+  return r.data.ok
+    ? { ok:true, character:r.data.character }
+    : { ok:false, msg:r.data.msg || "Falha ao carregar personagem" };
 }
 
 async function accountCreateCharacter(token, name, voc, data) {
@@ -468,92 +87,32 @@ async function accountCreateCharacter(token, name, voc, data) {
 }
 
 async function accountSaveCharacter(token, charId, p) {
-  const id=String(charId);
-  return accountQueueSave(async()=>{
-    if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation())return false;
-    const cache=await accountEnsureVersions(token,[id]);
-    const summary=cache.find((c)=>String(c.id)===id);
-    if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))return false;
-    const body=Object.assign({token,expected_version:Number(summary.saveVersion)},accountLeaseFields(),accountSavePayload(p));
-    const r=await _api("PUT","/api/characters/"+encodeURIComponent(id),body);
-    if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
-    if(r.code===409){
-      accountSaveConflict([id],r.data.characters||[],r.data.msg);return false;
+  const data = JSON.stringify(p || {});
+  // snapshots de vida/mana para o painel de party (barras dos membros)
+  let maxHp = 0, maxMp = 0;
+  try {
+    if (typeof maxStats === "function" && p) {
+      const m = maxStats(p);
+      maxHp = m.hp || 0;
+      maxMp = m.mp || 0;
     }
-    if(r.code===428)accountSaveConflict([id],[],r.data.msg);
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    return false;
+  } catch (e) { /* segue */ }
+  const r = await _api("PUT", "/api/characters/" + charId, {
+    token,
+    voc: p.voc || "none",
+    level: p.level || 1,
+    data,
+    hp: (p && p.hp) || 0,
+    mp: (p && p.mp) || 0,
+    maxHp,
+    maxMp,
   });
-}
-
-async function accountSaveParty(token,state,players){
-  const ids=(players||[]).filter((ent)=>ent&&ent.p).map((ent)=>String(ent.id));
-  return accountQueueSave(async()=>{
-    if(!accountLeaseAllowsSimulation()||!state||!state.id||!Number.isSafeInteger(Number(state.version))||
-       ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
-    // O tick da instância já materializa todos os membros atomicamente e
-    // incrementa seus save_versions. Espera qualquer tick/end já enfileirado:
-    // durante combate o party-save seria redundante (e disputaria a versão);
-    // após stopHunt, o end conclui primeiro e o checkpoint curado é salvo.
-    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
-    if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
-    let account=null;try{account=typeof sessionAccount==="function"?sessionAccount():null;}catch(e){}
-    if(state.ownedByAccount&&account&&Number(state.ownedByAccount)!==Number(account.id))return true;
-    const cache=await accountEnsureVersions(token,ids);
-    const entries=[];
-    for(const ent of players||[]){
-      if(!ent||!ent.p)continue;
-      const summary=cache.find((c)=>String(c.id)===String(ent.id));
-      if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))continue;
-      entries.push(Object.assign({id:Number(ent.id),expected_version:Number(summary.saveVersion)},accountSavePayload(ent.p)));
-    }
-    const r=await _api("POST","/api/party/save",Object.assign({
-      token,party_id:Number(state.id),party_version:Number(state.version),
-      party_order:(state.order||[]).map(Number),characters:entries,
-    },accountLeaseFields()));
-    if(r.data.ok){accountMergeCharacterCache(r.data.characters||[]);return true;}
-    if(r.code===409){
-      // Alteração do roster não significa conflito de save dos personagens.
-      // Atualize a party, mas não deixe todos os chars bloqueados até reload.
-      if(r.data.error==="PARTY_VERSION_CONFLICT"||r.data.error==="PARTY_SAVE_SET_MISMATCH"){
-        accountSyncDispatch("party",r.data.party||{});return false;
-      }
-      const conflicts=(r.data.characters||[]).map((c)=>String(c.id));
-      accountSaveConflict(conflicts.length?conflicts:ids,r.data.characters||[],r.data.msg);return false;
-    }
-    if(r.code===428)accountSaveConflict(ids,[],r.data.msg);
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);
-    return false;
-  });
-}
-
-async function accountRepairCharacter(token,charId,voc,data){
-  const max=typeof maxStats==="function"?maxStats(data):{hp:0,mp:0};
-  const r=await _api("PUT","/api/characters/"+encodeURIComponent(charId)+"/repair",{
-    token,voc,data:JSON.stringify(data||{}),maxHp:max.hp||0,maxMp:max.mp||0,
-  });
-  if(r.data.ok){accountMergeCharacterCache([r.data.character]);return {ok:true,character:r.data.character};}
-  return {ok:false,msg:r.data.msg||"Falha ao reparar personagem"};
+  return r.data.ok;
 }
 
 async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });
   return r.data.ok ? { ok: true, coins: r.data.coins } : { ok: false };
-}
-
-function accountApplyServerBalances(data){
-  data=data||{};
-  if(data.character){accountMergeCharacterCache([data.character]);
-    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)&&data.character.snapshot)
-      G.p.gold=Math.max(0,Number(data.character.snapshot.gold)||0);}catch(e){}}
-  const coins=Number(data.coinBalance);
-  if(Number.isFinite(coins)){
-    try{const raw=sessionStorage.getItem("tibia-idle-account"),account=raw?JSON.parse(raw):null;
-      if(account){account.coins=Math.max(0,coins);sessionStorage.setItem("tibia-idle-account",JSON.stringify(account));}}catch(e){}
-    if(typeof accountSetCoins==="function")accountSetCoins(Math.max(0,coins));
-    if(typeof renderCoinBalance==="function")renderCoinBalance();
-  }
-  return data;
 }
 
 /* ------------------------------ MARKET P2P ------------------------------ */
@@ -563,9 +122,7 @@ function accountApplyServerBalances(data){
  *        seller_name? } */
 async function marketCreateOffer(body) {
   const r = await _api("POST", "/api/market/offers", body);
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,offer:r.data.offer,matched:r.data.matched,
-    bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg||"Falha ao criar oferta"};
+  return r.data.ok ? { ok: true, offer: r.data.offer } : { ok: false, msg: r.data.msg || "Falha ao criar oferta" };
 }
 
 /* Lista ofertas ativas. filtro: { kind?, tier?, slug? } */
@@ -588,16 +145,13 @@ async function marketMineOffers(token) {
 /* Compra uma oferta. body: { token, offer_id, buyer_name? } */
 async function marketBuyOffer(body) {
   const r = await _api("POST", "/api/market/buy", body);
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,data:r.data};}
-  return {ok:false,msg:r.data.msg||"Falha na compra"};
+  return r.data.ok ? { ok: true, data: r.data } : { ok: false, msg: r.data.msg || "Falha na compra" };
 }
 
 /* Cancela oferta. body: { token } */
 async function marketCancelOffer(token, offerId) {
   const r = await _api("DELETE", "/api/market/offers/" + offerId, { token });
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,refundCoins:r.data.refundCoins||0,
-    refundGold:r.data.refundGold||0,bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg};
+  return r.data.ok ? { ok: true, refundCoins: r.data.refundCoins || 0 } : { ok: false, msg: r.data.msg };
 }
 
 /* Coleta o gold pendente de vendas do market. */
@@ -606,31 +160,22 @@ async function marketClaimGold(token) {
   return r.data.ok ? { ok: true, gold: r.data.gold || 0 } : { ok: false, msg: r.data.msg };
 }
 
-function marketGoldTransferBody(token,amount,p){
-  p=p||(typeof G!=="undefined"&&G&&G.p);const id=p&&p.id,cache=accountCharacterCacheRead();
-  const summary=cache.find((c)=>String(c.id)===String(id));
-  return Object.assign({token,amount,char_id:Number(id),expected_version:summary?Number(summary.saveVersion):0},accountLeaseFields());
-}
 /* Deposita gold do personagem no banco do market. */
-async function marketDeposit(token, amount, p) {
-  const r = await _api("POST", "/api/market/deposit", marketGoldTransferBody(token,amount,p));
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg};
+async function marketDeposit(token, amount) {
+  const r = await _api("POST", "/api/market/deposit", { token, amount });
+  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
 }
 
 /* Saca gold do banco do market para o personagem. */
-async function marketWithdraw(token, amount, p) {
-  const r = await _api("POST", "/api/market/withdraw", marketGoldTransferBody(token,amount,p));
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,amount:r.data.amount,
-    coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg};
+async function marketWithdraw(token, amount) {
+  const r = await _api("POST", "/api/market/withdraw", { token, amount });
+  return r.data.ok ? { ok: true, bank: r.data.bank, amount: r.data.amount } : { ok: false, msg: r.data.msg };
 }
 
 /* Saldo do banco do market. */
 async function marketBank(token) {
   const r = await _api("GET", "/api/market/bank", null, token);
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg};
+  return r.data.ok ? { ok: true, bank: r.data.bank } : { ok: false, msg: r.data.msg };
 }
 
 /* ------------------------------ PARTY (multiplayer) ------------------------------
@@ -677,30 +222,14 @@ async function accountPartyKick(charId, memberId) {
   return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
 }
 
-async function accountPartyReorder(charId, expectedVersion, characterIds) {
-  const r=await _api("POST","/api/party/reorder",{
-    token:sessionToken(),char_id:charId,expected_version:expectedVersion,character_ids:characterIds,
-  });
-  return r.data.ok?{ok:true,state:r.data.state}:{ok:false,msg:r.data.msg,error:r.data.error};
-}
-
 async function accountPartyState(charId) {
   const r = await _api("GET", "/api/party/state?char_id=" + encodeURIComponent(charId), null, sessionToken());
   return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };
 }
 
-let ACCOUNT_PARTY_ZONE_QUEUE=Promise.resolve(true);
 async function accountPartyReportZone(charId, zoneInfo) {
-  // Retorno à cidade e entrada seguinte podem acontecer no mesmo tick
-  // (boss -> hunt, hunt -> boss). Preserve a ordem HTTP para a máquina de
-  // estados do servidor nunca receber o destino antes do checkpoint city.
-  const body=Object.assign({token:sessionToken(),char_id:charId},zoneInfo||{});
-  const run=ACCOUNT_PARTY_ZONE_QUEUE.catch(()=>false).then(async()=>{
-    const r=await _api("POST","/api/party/zone",body);
-    return r.data.ok?{ok:true,zone:r.data.zone,ignored:!!r.data.ignored}:
-      {ok:false,code:r.code,msg:r.data.msg,error:r.data.error};
-  });
-  ACCOUNT_PARTY_ZONE_QUEUE=run.catch(()=>false);return run;
+  const r = await _api("POST", "/api/party/zone", Object.assign({ token: sessionToken(), char_id: charId }, zoneInfo));
+  return r.data.ok ? { ok: true } : { ok: false, msg: r.data.msg };
 }
 
 async function accountPartyFollow(charId, nonce) {
