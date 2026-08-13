@@ -161,6 +161,17 @@ async function publishPartyState(db,accountId,action){
     party?party.roster_version:0,action,{party,members},true);
   publishSync(accountId,"party",{action,party:summary});
 }
+async function publishPartyForCharacters(db,characterIds,action){
+  const parties=new Map();
+  for(const rawId of characterIds||[]){const id=Number(rawId);if(!Number.isSafeInteger(id)||id<=0)continue;
+    const found=await db.partyFindByCharacter(id);if(found)parties.set(Number(found.id),found);}
+  for(const party of parties.values()){
+    const members=await db.partyMembers(party.id),ids=[Number(party.leader_id)].concat(members.map((m)=>Number(m.id))),
+      summary={id:Number(party.id),version:Number(party.roster_version),order:ids},accounts=new Set();
+    for(const id of ids){const character=await db.findCharacter(id);if(character)accounts.add(Number(character.account_id));}
+    for(const accountId of accounts)publishSync(accountId,"party",{action,party:summary});
+  }
+}
 async function syncState(db,token){
   const acc=await db.findAccountByToken(token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const chars=await db.charactersOf(acc.id),party=await db.partyFindByAccount(acc.id),instance=await db.instanceGet(acc.id);
@@ -445,6 +456,7 @@ async function saveCharacter(db, body, id) {
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"save",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"save"});
+  await publishPartyForCharacters(db,[updated.id],"character-save");
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
 }
 
@@ -513,6 +525,7 @@ async function savePartyCharacters(db,body){
     await db.snapshotAdd(acc.id,"character",character.id,character.save_version,"party-save",character,false);
   publishSync(acc.id,"character",{ids:result.characters.map((c)=>Number(c.id)),
     saveVersions:result.characters.map((c)=>Number(c.save_version)),source:"party-save"});
+  await publishPartyForCharacters(db,result.characters.map((c)=>c.id),"party-save");
   return {code:200,body:{ok:true,partyVersion,
     characters:result.characters.map(accountCharacterSummary)}};
 }
@@ -723,6 +736,7 @@ async function repairCharacterIdentity(db,body,id){
   const updated=await db.findCharacter(id);
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"repair",updated,true);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),action:"repair"});
+  await publishPartyForCharacters(db,[updated.id],"character-repair");
   return {code:200,body:{ok:true,character:accountCharacterSummary(updated)}};
 }
 
@@ -1381,6 +1395,7 @@ async function main() {
       if (req.method === "POST" && url === "/api/party/zone") {
         const body = await readBody(req);
         const r = await party.partyReportZone(db, body);
+        if(r.body&&r.body.ok)await publishPartyForCharacters(db,[body.char_id],"zone");
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/party/follow") {

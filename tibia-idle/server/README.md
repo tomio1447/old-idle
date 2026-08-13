@@ -66,6 +66,7 @@ a aplicação e usar um banco/disco persistente.
 
 | Método | Rota | Corpo | Descrição |
 | --- | --- | --- | --- |
+| GET | `/api/health` | — | Saúde, protocolo SSE, cursor, conexões e worker |
 | POST | `/api/register` | `{ login, password, email? }` | Cria uma conta |
 | POST | `/api/login` | `{ login, password }` | Login → sessão com expiração |
 | POST | `/api/logout` | `{ token }` | Revoga a sessão no servidor |
@@ -82,7 +83,9 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/instance/tick` | `{ token, lease, expected_version? }` | Executa combate/progressão autoritativos |
 | POST | `/api/instance/end` | `{ token, lease, instance_id, expected_version, reason }` | Persiste condição terminal |
 | POST | `/api/characters` | `{ token, name, voc, data }` | Cria personagem |
+| GET | `/api/characters/:id` | Bearer token | Carrega um personagem pertencente à conta |
 | PUT | `/api/characters/:id` | `{ token, holder_id, lease_token, expected_version, level, data, ... }` | Save otimista protegido pelo lease |
+| PUT | `/api/characters/:id/repair` | `{ token, voc, data, maxHp, maxMp }` | Reparo administrativo explícito de identidade |
 | POST | `/api/coins` | `{ token, amount }` | Admin adiciona/remove Tibia Coins |
 | POST | `/api/market/offers` | `{ token, kind, slug?, tier?, qty, price, price_tc?, days?, seller_name }` | Cria oferta de venda (item ou TC) |
 | GET | `/api/market/offers?kind=&tier=&slug=` | — | Lista ofertas ativas (P2P) |
@@ -90,9 +93,11 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/market/buy` | `{ token, offer_id, buyer_name }` | Compra oferta (item ou TC) |
 | DELETE | `/api/market/offers/:id` | `{ token }` | Cancela oferta (devolve item/TC) |
 | POST | `/api/market/claim` | `{ token }` | (legado) nada pendente — vendas caem no banco |
-| POST | `/api/market/deposit` | `{ token, amount }` | Deposita gold no banco do market |
-| POST | `/api/market/withdraw` | `{ token, amount }` | Saca gold do banco do market |
+| POST | `/api/market/deposit` | `{ token, amount, char_id, expected_version, holder_id, lease_token }` | Transfere gold do personagem ao banco atomicamente |
+| POST | `/api/market/withdraw` | `{ token, amount, char_id, expected_version, holder_id, lease_token }` | Transfere gold do banco ao personagem atomicamente |
 | GET | `/api/market/bank` | Bearer token | Saldo do banco do market |
+| GET | `/api/market/history?limit=` | Bearer token | Histórico autoritativo de transações |
+| GET | `/api/rankings?by=&limit=` | — | Ranking persistido por critério |
 | GET | `/api/admin/snapshots?account_id=` | Bearer Admin | Histórico imutável/checksums |
 | GET | `/api/admin/backup?account_id=` | Bearer Admin | Bundle sanitizado e verificável |
 | POST | `/api/party/create` | `{ token, char_id }` | Cria a party (char vira líder) |
@@ -140,6 +145,8 @@ node tibia-idle/tools/backup_restore.js restore --file backup.json --data-dir ti
   com backoff e mantém fallback de `/api/sync/state` a cada 5 segundos
 - Takeover chega imediatamente a outras abas/dispositivos; versões de instância
   e personagens disparam refresh coalescido, sem aplicar snapshot de outro char
+- Saves de outfit/cores/addons e mudanças de zona notificam em tempo real todas
+  as contas presentes na party; polling fica apenas como fallback de recuperação
 - `/api/health` expõe cursor e quantidade de conexões para observabilidade
 
 **Lease exclusivo de simulação:**

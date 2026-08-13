@@ -57,6 +57,13 @@ class FakeResponse extends EventEmitter{constructor(){super();this.text="";this.
     "versão/composição da party não foi transmitida");
   const acquired=await post("/api/lease/acquire",{token,holder_id:"syncholder01"}),lease={holder_id:acquired.data.holderId,lease_token:acquired.data.leaseToken};
   const leaseEvent=await stream.wait("lease");must(leaseEvent.data.action==="acquire","aquisição do lease não foi transmitida");
+  const visual=Object.assign({},created.data.character.snapshot,{outfit:{appearance:"demon-hunter-m",addons:3,colors:[11,22,33,44],mount:null}});
+  const appearanceSave=await put("/api/characters/"+created.data.character.id,Object.assign({token,
+    expected_version:created.data.character.saveVersion,data:JSON.stringify(visual),hp:185,mp:5,maxHp:185,maxMp:5},lease));
+  must(appearanceSave.status===200,"save visual para SSE falhou");
+  const appearancePartyEvent=await stream.wait("party",4000,leaseEvent.id);
+  must(appearancePartyEvent.data.action==="character-save"&&appearancePartyEvent.data.party.id===partyCreated.data.state.id,
+    "mudança de outfit/addons não notificou a party em tempo real");
   const saved=await put("/api/instance",Object.assign({token,expected_version:0,instance_id:null,state:descriptor(created.data.character)},lease));
   const instanceEvent=await stream.wait("instance");must(instanceEvent.data.version===saved.data.instance.version,"versão da instância SSE divergente");
 
