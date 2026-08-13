@@ -748,6 +748,19 @@ async function tickInstance(db,body){
     // transporte e não deve poluir o console com HTTP 410.
     if(result.error==="INSTANCE_NOT_ACTIVE")return {code:200,body:{ok:true,instance:null,
       terminalReason:"inactive",characters:[],elapsed:0}};
+    // SSE, checkpoint e troca de personagem podem atualizar a versão entre
+    // o último snapshot do browser e este tick. Isso é uma ressincronização
+    // normal, não um erro: devolva o estado vencedor sem avançar o relógio.
+    // Assim o cliente aplica a versão atual imediatamente e o DevTools não
+    // fica emitindo 409 enquanto o jogo aparenta estar congelado.
+    if(result.error==="INSTANCE_VERSION_CONFLICT"&&result.instance){
+      const current=instanceSummary(result.instance,true);
+      if(resolved.party&&resolved.character&&current.state&&current.state.members&&
+         current.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
+        current.state.activeCharacterId=String(resolved.character.id);
+      return {code:200,body:{ok:true,resynced:true,elapsed:0,terminalReason:null,
+        instance:current,characters:[]}};
+    }
     return {code:result.error==="LEASE_REQUIRED"?423:409,
       body:{ok:false,error:result.error,msg:"Tick autoritativo recusado",instance:instanceSummary(result.instance,true)}};
   }

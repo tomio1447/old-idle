@@ -154,6 +154,11 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   must(r.status===200&&r.data.elapsed>=3500&&r.data.characters.length===1,"tick online não atualizou instância/personagem");
   const authoritativeExp=r.data.characters[0].snapshot.exp,tickVersion=r.data.instance.version;
   must(authoritativeExp>0&&r.data.characters[0].snapshot.totalKills>0,"kill/XP não foram materializados no banco");
+  const staleTick=await post("/api/instance/tick",Object.assign({token,
+    expected_version:loaded.data.instance.version},lease));
+  must(staleTick.status===200&&staleTick.data.ok&&staleTick.data.resynced&&
+    staleTick.data.elapsed===0&&staleTick.data.instance.version===tickVersion,
+    "tick com versão defasada gerou HTTP 409 em vez de ressincronizar o runtime");
   const spam=await post("/api/instance/tick",Object.assign({token,expected_version:tickVersion},lease));
   must(spam.status===200&&spam.data.elapsed<50&&
     (!spam.data.characters.length||spam.data.characters[0].snapshot.exp===authoritativeExp),
