@@ -82,12 +82,26 @@ function newNonce() {
 async function charSnapshot(db, charId) {
   const c = await db.findCharacter(Number(charId));
   if (!c) return null;
+  let data={};try{data=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
+  const raw=data.outfit&&typeof data.outfit==="object"&&!Array.isArray(data.outfit)?data.outfit:null;
+  let outfit=null;
+  if(raw){
+    outfit={};
+    if(typeof raw.type==="string")outfit.type=raw.type.slice(0,64);
+    if(typeof raw.appearance==="string")outfit.appearance=raw.appearance.slice(0,96);
+    if(Array.isArray(raw.colors)&&raw.colors.length===4)
+      outfit.colors=raw.colors.map((value)=>Math.max(0,Math.min(255,Math.floor(Number(value)||0))));
+    outfit.addons=Math.max(0,Math.min(3,Math.floor(Number(raw.addons)||0)));
+    outfit.mount=typeof raw.mount==="string"?raw.mount.slice(0,96):null;
+  }
   return {
     id: Number(c.id),
     account_id: c.account_id ? Number(c.account_id) : null,
     name: c.name,
     voc: c.voc,
     level: c.level,
+    sex:data.sex==="female"?"female":"male",
+    outfit,
     zone: c.zone || "unknown",
     hp: Number(c.hp) || 0,
     mp: Number(c.mp) || 0,
