@@ -4,7 +4,10 @@ const fs=require("fs"),path=require("path");
 const js=path.join(__dirname,"..","game","js");
 const game=fs.readFileSync(path.join(js,"game.js"),"utf8");
 const appearance=fs.readFileSync(path.join(js,"appearance.js"),"utf8");
+const partyUi=fs.readFileSync(path.join(js,"party-ui.js"),"utf8");
+const index=fs.readFileSync(path.join(__dirname,"..","game","index.html"),"utf8");
 const server=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf8");
+const partyServer=fs.readFileSync(path.join(__dirname,"..","server","party.js"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
 const creatorStart=game.indexOf("function showCharacterCreator"),creatorEnd=game.indexOf("\n  function logoutAccount",creatorStart);
 const creator=game.slice(creatorStart,creatorEnd);
@@ -25,4 +28,11 @@ must(outfit.includes('draft.colors[part] = +s.dataset.ocolor')&&
   "clique/salvar/cancelar da paleta não preservam as cores corretamente");
 must(server.includes('sex:data.sex || "male"')&&server.includes('outfit:data.outfit'),
   "API não persiste sexo/outfit no seletor da conta");
-console.log("OK: MALE/FEMALE define o Wardrobe e a paleta atualiza/salva as cores.");
+must(partyServer.includes("outfit.addons=Math.max")&&partyServer.includes("outfit.appearance=raw.appearance")&&
+  partyServer.includes('sex:data.sex==="female"?"female":"male"'),
+  "API da party não publica a aparência persistida com addons");
+must(partyUi.includes("partyApplyOutfitPreview")&&partyUi.includes("AppearanceRenderer.preview(member")&&
+  partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit")&&
+  index.includes('js/party-ui.js?v=party-outfit-v1'),
+  "painel da party não compõe/cache-busta outfit, cores e addons atuais");
+console.log("OK: MALE/FEMALE, paleta e party preservam outfit/cores/addons atuais.");

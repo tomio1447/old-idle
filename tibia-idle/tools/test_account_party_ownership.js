@@ -36,8 +36,10 @@ async function account(login){
   await post("/api/register",{login,password:"x"});
   const r=await post("/api/login",{login,password:"x"});must(r.status===200,"login falhou: "+login);return r.data;
 }
-async function character(token,name,voc){
-  const r=await post("/api/characters",{token,name,voc,data:JSON.stringify({name,voc,level:10})});
+async function character(token,name,voc,appearance){
+  const visual=appearance||{},data={name,voc,level:10,sex:visual.sex||"male",
+    outfit:visual.outfit||{appearance:"citizen-m",addons:0,colors:[1,2,3,4],mount:null}};
+  const r=await post("/api/characters",{token,name,voc,data:JSON.stringify(data)});
   must(r.status===201,"char falhou: "+name);return r.data.character;
 }
 async function state(token,charId){return request("/api/party/state?char_id="+charId,{headers:{authorization:"Bearer "+token}});}
@@ -51,8 +53,9 @@ async function state(token,charId){return request("/api/party/state?char_id="+ch
     "cliente online não permite à conta salvar a ordem no servidor");
   await start();
   const owner=await account("owner"),stranger=await account("stranger"),racer=await account("racer");
-  const leader=await character(owner.token,"Owner Leader","knight");
-  const first=await character(owner.token,"Owner First","paladin");
+  const leaderVisual={sex:"female",outfit:{appearance:"demon-hunter-f",addons:3,colors:[11,22,33,44],mount:"widow-queen"}};
+  const leader=await character(owner.token,"Owner Leader","knight",leaderVisual);
+  const first=await character(owner.token,"Owner First","paladin",{outfit:{appearance:"hunter-m",addons:2,colors:[55,66,77,88],mount:null}});
   const second=await character(owner.token,"Owner Second","druid");
   const outsider=await character(stranger.token,"Other Account","sorcerer");
   const raceA=await character(racer.token,"Race A","knight");
@@ -85,6 +88,10 @@ async function state(token,charId){return request("/api/party/state?char_id="+ch
   r=await state(owner.token,leader.id);
   must(JSON.stringify(r.data.state.order)===JSON.stringify([leader.id,first.id,second.id]),
     "ordem inicial não segue a entrada dos membros");
+  must(r.data.state.leader.sex==="female"&&r.data.state.leader.outfit.appearance==="demon-hunter-f"&&
+    r.data.state.leader.outfit.addons===3&&JSON.stringify(r.data.state.leader.outfit.colors)===JSON.stringify([11,22,33,44])&&
+    r.data.state.leader.outfit.mount==="widow-queen"&&r.data.state.members[0].outfit.addons===2,
+    "estado online da party não expõe outfit/sexo/cores/addons/mount persistidos");
   const rosterVersion=r.data.state.version;
 
   const invalid=await post("/api/party/reorder",{token:owner.token,char_id:first.id,
