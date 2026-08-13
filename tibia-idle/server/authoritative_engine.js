@@ -238,9 +238,11 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
   for(const item of receivers){addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
-  const leader=players[0]&&players[0].p;if(!leader)return;
+  const leader=players[0]&&players[0].p;if(!leader)return [];
+  const lootDrops=[];
   for(const entry of mob.def.loot||[]){if(random(auth)*100>Math.min(100,Number(entry.chance)||0))continue;
     const min=Math.max(1,Number(entry.min)||1),max=Math.max(min,Number(entry.max)||1),count=roll(auth,min,max);
+    lootDrops.push({item:entry.item,count});
     if(mob.boss){leader.rewardChest=Array.isArray(leader.rewardChest)?leader.rewardChest:[];
       leader.rewardChest.push({item:entry.item,count,bossId:auth.bossId||mob.slug,source:"server"});}
     else if(entry.item==="gold-coin")leader.gold=(Number(leader.gold)||0)+count;
@@ -261,6 +263,7 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
       x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,fiendish:!!mob.fiendish,screen:true});
   }
   auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
+  return lootDrops;
 }
 function usePotion(p){const max=maxStats(p),sup=p.supplies||{};
   if(p.hp<max.hp*.45){for(const id of ["supreme-health-potion","ultimate-health-potion","great-health-potion","strong-health-potion","health-potion","small-health-potion"]){
@@ -415,10 +418,10 @@ function step(auth,now){if(auth.ended)return;
       if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true});
     }
     // Evento de kill para o cliente
+    const lootDrops=reward(auth,mob,auth.players);
     auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
-      exp:mob.exp||0,loot:[],x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
+      exp:mob.exp||0,loot:lootDrops,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish});
-    reward(auth,mob,auth.players);
     if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
       if(leader){leader.p.bosses[auth.bossId]=leader.p.bosses[auth.bossId]||{};leader.p.bosses[auth.bossId].kills=(leader.p.bosses[auth.bossId].kills||0)+1;}}
   }
