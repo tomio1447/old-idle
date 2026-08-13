@@ -1544,6 +1544,11 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;G.huntEntryPendingToken=null;
+  // SALVA o personagem no servidor ANTES de encerrar a instância.
+  // No modo online, o tick salva o estado durante o combate, mas o último
+  // tick pode não ter capturado o HP/MP/loot final. Sem isto, o progresso
+  // da última sessão de combate é perdido ao voltar para a cidade.
+  if (typeof save === "function") save();
   if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
   // Checkpoint do templo: cura inclusive membros inconscientes antes de
   // persistir o roster, para ninguém permanecer morto fora da instância.
@@ -2603,8 +2608,24 @@ function requestOnlineAuthorityTick(){
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
-    }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
-  }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
+    }else if(!result||!result.ok){
+      // Tick falhou (rede/servidor): tenta salvar o personagem diretamente
+      // como fallback antes de tentar recuperar o runtime. Sem isto, o
+      // progresso desde o último tick bem-sucedido é perdido.
+      if(G.p&&typeof sessionToken==="function"&&typeof sessionCharId==="function"&&
+         typeof accountSaveCharacter==="function"){
+        try{accountSaveCharacter(sessionToken(),sessionCharId(),G.p).catch(()=>{});}catch(e){}
+      }
+      requestOnlineRuntimeRecovery();
+    }
+  }).catch(()=>{
+    // Erro de transporte: mesmo fallback de save antes de recuperar.
+    if(G.p&&typeof sessionToken==="function"&&typeof sessionCharId==="function"&&
+       typeof accountSaveCharacter==="function"){
+      try{accountSaveCharacter(sessionToken(),sessionCharId(),G.p).catch(()=>{});}catch(e){}
+    }
+    requestOnlineRuntimeRecovery();
+  }).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
 if(typeof window!=="undefined"){
   window.addEventListener("tibia-idle-sync-instance",(event)=>{

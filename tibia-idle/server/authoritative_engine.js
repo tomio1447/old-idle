@@ -55,7 +55,11 @@ function progressAttack(p){
 }
 function playerDamage(auth,p,mob){const level=Number(p.level)||1,skill=playerSkill(p),magic=p.voc==="druid"||p.voc==="sorcerer";
   const power=magic?level*.45+(Number(p.ml)||0)*2.8+12:level*.25+skill*.72+weaponAttack(p)*1.15;
-  return Math.max(1,Math.floor(power*(.85+random(auth)*.3)-(Number(mob.armor)||0)*.35));}
+  let dmg=Math.max(1,Math.floor(power*(.85+random(auth)*.3)-(Number(mob.armor)||0)*.35));
+  // Prey damage bonus
+  const preyDmg=preyDamageBonus(p,mob.slug);
+  if(preyDmg>0)dmg=Math.floor(dmg*(1+preyDmg/100));
+  return dmg;}
 
 /* ---------- elementos e resistências (Canary) ---------- */
 const ELEMENT_KEYS=["physical","fire","energy","earth","ice","holy","death","lifedrain","manadrain","heal"];
@@ -227,27 +231,101 @@ function partyExpBonusPct(players){
 }
 function partyExpShare(players,baseExp){const bonus=partyExpBonusPct(players),total=Math.floor(Math.max(0,Number(baseExp)||0)*(1+bonus/100));
   return {bonusPct:bonus,total,each:Math.floor(total/Math.max(1,players.length))};}
+/* ---------- multiplicadores de EXP (rates.js do cliente) ---------- */
+const SERVER_EXP_STAGES=[
+  {min:1,max:8,rate:50},{min:9,max:50,rate:80},{min:51,max:100,rate:60},
+  {min:101,max:150,rate:40},{min:151,max:200,rate:30},{min:201,max:300,rate:15},
+  {min:301,max:400,rate:12},{min:401,max:500,rate:10},{min:501,max:600,rate:7},
+  {min:601,max:700,rate:6},{min:701,max:800,rate:5},{min:801,max:900,rate:4},
+  {min:901,max:1000,rate:3},{min:1001,max:1200,rate:2},{min:1201,max:1400,rate:1.5},
+  {min:1401,max:Infinity,rate:1.2},
+];
+function expStage(level){
+  for(const s of SERVER_EXP_STAGES)if(level>=s.min&&level<=s.max)return s.rate;
+  return 1.2;
+}
+/* Prey EXP bonus: p.prey.slots[].selected = {creature, bonus, step, until} */
+const PREY_BONUSES={exp:{base:13,step:3,max:40},damage:{base:7,step:2,max:25},
+  defense:{base:12,step:2,max:30},loot:{base:13,step:3,max:40}};
+function preyBonusValue(tipo,step){
+  const b=PREY_BONUSES[tipo];if(!b)return 0;
+  return Math.min(b.max,b.base+b.step*Math.max(0,Math.min(9,step||0)));
+}
+function preyForCreature(p,slug){
+  if(!p.prey||!Array.isArray(p.prey.slots))return null;
+  const now=Date.now();
+  for(const slot of p.prey.slots){
+    const s=slot.selected;if(!s)continue;
+    if(s.until<=now){slot.selected=null;continue;}
+    if(s.creature===slug)return s;
+  }
+  return null;
+}
+function preyExpBonus(p,slug){
+  const s=preyForCreature(p,slug);
+  return s&&s.bonus==="exp"?preyBonusValue("exp",s.step):0;
+}
+function preyDamageBonus(p,slug){
+  const s=preyForCreature(p,slug);
+  return s&&s.bonus==="damage"?preyBonusValue("damage",s.step):0;
+}
+function preyLootBonus(p,slug){
+  const s=preyForCreature(p,slug);
+  return s&&s.bonus==="loot"?preyBonusValue("loot",s.step):0;
+}
+/* VIP EXP bonus (1.10 = +10%) */
+function vipExpBonus(p){
+  if(!p||!p.vipUntil)return 1;
+  return Number(p.vipUntil)>Date.now()?1.10:1;
+}
+/* Calcula EXP final com todos os multiplicadores */
+function finalExp(p,mobExp,mobSlug){
+  let exp=Math.max(0,Math.floor(Number(mobExp)||0));
+  // Stage multiplier (rates.js)
+  exp=Math.floor(exp*expStage(Number(p.level)||1));
+  // Prey EXP bonus
+  const prey=preyExpBonus(p,mobSlug);
+  if(prey>0)exp=Math.floor(exp*(1+prey/100));
+  // VIP EXP bonus
+  exp=Math.floor(exp*vipExpBonus(p));
+  return exp;
+}
+
 function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),eligible=partyCanShareExp(players),
-    receivers=eligible?(alive.length?alive:players):[(alive[0]||players[0])],split=partyExpShare(players,mob.exp),
-    share=eligible?split.each:Math.floor(mob.exp);
-  auth.stats=auth.stats||{};auth.stats.rawExp=(Number(auth.stats.rawExp)||0)+Math.max(0,Number(mob.exp)||0);
+    receivers=eligible?(alive.length?alive:players):[(alive[0]||players[0])];
+  // EXP final com stage + prey + VIP (cada receiver pode ter stage/prey diferentes)
+  const baseExp=Number(mob.exp)||0;
+  // Party split: cada membro recebe uma fração da EXP base, mas com seus
+  // próprios multiplicadores (stage por level, prey, VIP).
+  const expPerReceiver=eligible?Math.floor(baseExp/Math.max(1,receivers.length)):baseExp;
+  const split=partyExpShare(players,baseExp);
+  auth.stats=auth.stats||{};auth.stats.rawExp=(Number(auth.stats.rawExp)||0)+Math.max(0,baseExp);
   auth.stats.rawHp=(Number(auth.stats.rawHp)||0)+Math.max(0,Number(mob.maxHp)||0);auth.stats.monsters=auth.stats.monsters||{};
   const raw=auth.stats.monsters[mob.slug]||(auth.stats.monsters[mob.slug]={name:mob.def.name||mob.slug,kills:0,rawExp:0,rawHp:0});
-  raw.kills=(Number(raw.kills)||0)+1;raw.rawExp=(Number(raw.rawExp)||0)+Math.max(0,Number(mob.exp)||0);
+  raw.kills=(Number(raw.kills)||0)+1;raw.rawExp=(Number(raw.rawExp)||0)+Math.max(0,baseExp);
   raw.rawHp=(Number(raw.rawHp)||0)+Math.max(0,Number(mob.maxHp)||0);
-  for(const item of receivers){addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
+  for(const item of receivers){
+    // Aplica stage/prey/VIP individuais na cota do receiver
+    const share=eligible?Math.floor(split.each*expStage(Number(item.p.level)||1)):finalExp(item.p,baseExp,mob.slug);
+    addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
   const leader=players[0]&&players[0].p;if(!leader)return [];
   const lootDrops=[];
+  // Loot rate global (SERVER_LOOT_RATE=2.5) + Prey loot bonus do líder
+  const lootRate=2.5;
+  const preyLoot=preyLootBonus(leader,mob.slug);
+  const lootMult=lootRate*(1+preyLoot/100);
   for(const entry of mob.def.loot||[]){if(random(auth)*100>Math.min(100,Number(entry.chance)||0))continue;
     const min=Math.max(1,Number(entry.min)||1),max=Math.max(min,Number(entry.max)||1),count=roll(auth,min,max);
-    lootDrops.push({item:entry.item,count});
+    // Aplica loot rate + prey loot bonus
+    const finalCount=Math.max(1,Math.floor(count*lootMult));
+    lootDrops.push({item:entry.item,count:finalCount});
     if(mob.boss){leader.rewardChest=Array.isArray(leader.rewardChest)?leader.rewardChest:[];
-      leader.rewardChest.push({item:entry.item,count,bossId:auth.bossId||mob.slug,source:"server"});}
-    else if(entry.item==="gold-coin")leader.gold=(Number(leader.gold)||0)+count;
-    else leader.lootPouch[entry.item]=(Number(leader.lootPouch[entry.item])||0)+count;
-    auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+count;
+      leader.rewardChest.push({item:entry.item,count:finalCount,bossId:auth.bossId||mob.slug,source:"server"});}
+    else if(entry.item==="gold-coin")leader.gold=(Number(leader.gold)||0)+finalCount;
+    else leader.lootPouch[entry.item]=(Number(leader.lootPouch[entry.item])||0)+finalCount;
+    auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+finalCount;
   }
   if(mob.influenced||mob.fiendish){
     const stacks=mob.fiendish?15:Math.max(1,Number(mob.sinisterStacks)||1);let dust=0;

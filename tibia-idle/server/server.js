@@ -53,7 +53,10 @@ const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",")
 let SYNC_BUS=null;
 const RATE_BUCKETS=new Map(),TRUST_PROXY=process.env.TRUST_PROXY==="1",RATE_LIMIT_DISABLED=process.env.RATE_LIMIT_DISABLED==="1";
 function publishSync(accountId,type,data){return SYNC_BUS?SYNC_BUS.publish(accountId,type,data):null;}
-function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;if(ALLOWED_ORIGINS.has(origin))return origin;
+function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;
+  // ALLOWED_ORIGINS=* permite qualquer origem (deploy Cloudflare/testes)
+  if(ALLOWED_ORIGINS.has("*"))return origin;
+  if(ALLOWED_ORIGINS.has(origin))return origin;
   try{if(new URL(origin).host===String(req.headers.host||""))return origin;}catch(e){}return false;}
 function rateLimit(req,scope,max,windowMs){if(RATE_LIMIT_DISABLED)return null;const forwarded=TRUST_PROXY&&req.headers["x-forwarded-for"];
   const ip=String(forwarded||req.socket.remoteAddress||"unknown").split(",")[0].trim(),key=scope+":"+ip,now=Date.now();
@@ -838,6 +841,20 @@ async function endInstance(db,body){
     return {code:200,body:{ok:true,sharedDetached:true,instance:null}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
+  // Tick final: avança o estado autoritativo até agora e salva os
+  // personagens (HP/MP/loot/exp) antes de encerrar a instância. Sem isto,
+  // o último segundo de combate é perdido — o tick anterior pode ter
+  // capturado o estado antes da última kill/loot.
+  if(resolved.row&&resolved.row.status==="active"){
+    try{
+      const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceAuthorityState,lease);
+      if(tickResult.ok&&tickResult.instance){
+        // Atualiza expected version para o end usar a versão pós-tick
+        const ticked=await db.instanceGet(ownerId);
+        if(ticked)expected=Number(ticked.version);
+      }
+    }catch(e){/* tick final é best-effort; o end ainda roda */}
+  }
   const result=await db.instanceEnd(ownerId,id,expected,reason,lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:409,body:{ok:false,error:result.error,
     msg:result.error==="LEASE_REQUIRED"?"Controle transferido durante o encerramento":"A instância foi alterada",
