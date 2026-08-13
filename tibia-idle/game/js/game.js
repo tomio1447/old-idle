@@ -2575,6 +2575,12 @@ function loop(ts) {
     // selo da postura ativa no canto superior esquerdo da cena
     if (typeof renderStanceBadge === "function") renderStanceBadge(G.p);
   }
+  // Analytics laterais acompanham a sessão sem redesenhar o DOM a cada frame.
+  G.analyserAcc = (G.analyserAcc || 0) + dt;
+  if (G.analyserAcc >= 500) {
+    G.analyserAcc = 0;
+    if (typeof renderOtcAnalyser === "function") renderOtcAnalyser();
+  }
 
   // autosave a cada 20s
   G.saveTimer += dt;
@@ -2605,7 +2611,7 @@ function renderAll() {
   if (typeof renderCoinBalance === "function") renderCoinBalance();
   var db = $("#depot-badge");
   if (db) { var n = p.depotNotification || 0; db.textContent = n > 0 ? n : ""; db.style.display = n > 0 ? "" : "none"; }
-  renderHuntInfo();
+  if (typeof renderOtcAnalyser === "function") renderOtcAnalyser();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
@@ -2616,60 +2622,6 @@ function renderAll() {
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
   // removido — level e mana já têm as barras fixas do painel do personagem)
   if (typeof renderPlayerStates === "function") renderPlayerStates(p);
-}
-
-function renderHuntInfo() {
-  const p = G.p;
-  const el = $("#hunt-info");
-  if (!el) return;
-  if (G.training) {
-    const t = G.training;
-    const st = academyStatus(p);
-    el.innerHTML = `
-      <div class="row mb4" style="justify-content:space-between">
-        <b style="color:#9ce84a">Academia Safezone</b>
-        <span class="risk low">seguro</span>
-      </div>
-      <div class="stat-row"><span class="k">Alvo</span><span class="v">Treiner</span></div>
-      <div class="stat-row"><span class="k">Skill</span><span class="v">${st.skill ? (SKILL_NAMES[st.skill] || st.skill) : "—"}</span></div>
-      <div class="stat-row"><span class="k">Hits</span><span class="v">${fmtFull(t.stats.hits)}</span></div>
-      <div class="stat-row"><span class="k">Dano causado</span><span class="v">${fmtFull(t.stats.damage || 0)}</span></div>
-      <div class="stat-row"><span class="k">Bônus</span><span class="v" style="color:#9ce84a">+200% ticks/hit</span></div>
-      <button class="primary full mt8" onclick="openAcademyConjureModal(true)">Conjure</button>`;
-    return;
-  }
-  if (G.combat && G.combat.boss) {
-    const boss = G.combat.boss;
-    const mob = G.combat.mobs[0];
-    el.innerHTML = `
-      <div class="row mb4" style="justify-content:space-between">
-        <b style="color:#ff9a6a">${boss.name}</b>
-        <span class="risk high">boss</span>
-      </div>
-      <div class="stat-row"><span class="k">Vida</span><span class="v">${mob ? Math.ceil(mob.hp) + " / " + mob.maxHp : "derrotado"}</span></div>
-      <div class="stat-row"><span class="k">Sprite</span><span class="v">Cave Rat</span></div>`;
-    return;
-  }
-  if (!p.hunt) {
-    el.innerHTML = `<div class="dim small center" style="padding:8px">Nenhuma caçada ativa</div>`;
-    return;
-  }
-  const hu = GAMEDATA.hunts[p.hunt];
-  const est = huntEstimate(p, hu);
-  const risk = huntRisk(p, hu);
-  const mode = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
-  el.innerHTML = `
-    <div class="row mb4" style="justify-content:space-between">
-      <b style="color:#d4af37">${hu.name}</b>
-      <span class="risk ${risk.cls}">${risk.txt}</span>
-    </div>
-    <div class="stat-row"><span class="k">Instância</span><span class="v" style="color:${mode === "pvp" ? "#ff9a6a" : "#9ce84a"}">${mode}</span></div>
-    ${mode === "pvp" ? `<div class="stat-row"><span class="k">Bônus PvP</span><span class="v">+25% exp/loot/skills · raidável</span></div>` : ""}
-    <div class="stat-row"><span class="k">XP / hora</span><span class="v" style="color:#9ce84a">${fmt(est.exp * (mode === "pvp" ? 1.25 : 1))}</span></div>
-    <div class="stat-row"><span class="k">Gold / hora</span><span class="v gold-txt">${fmt(est.gold * (mode === "pvp" ? 1.25 : 1))}</span></div>
-    <div class="stat-row"><span class="k">Kills / hora</span><span class="v">${Math.round(est.kills)}</span></div>
-    <div class="stat-row"><span class="k">Tempo por kill</span><span class="v">${est.ttk.toFixed(1)}s</span></div>
-    <div class="stat-row"><span class="k">Sobrevivência</span><span class="v">${risk.ttd > 900 ? "∞" : Math.round(risk.ttd) + "s"}</span></div>`;
 }
 
 /* ------------------------------------------------------------ boot */

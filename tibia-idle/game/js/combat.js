@@ -30,6 +30,31 @@ function displayMonsterName(name) {
   return String(name || "").replace(/^Influenced\s+/i, "").replace(/^Fiendish\s+/i, "");
 }
 
+/* Registra a eficiência original da criatura, sem nenhum multiplicador de XP
+ * do personagem. Para Influenced/Fiendish usamos o monstro-base do catálogo;
+ * bosses com definição própria usam os valores oficiais da própria instância. */
+function recordRawMonsterStats(c, mob) {
+  if (!c || !c.stats || !mob) return { exp: 0, hp: 0 };
+  const catalog = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+    ? GAMEDATA.monsters[mob.slug] : null;
+  const source = mob.boss ? (mob.def || catalog || {}) : (catalog || mob.def || {});
+  const rawExp = Math.max(0, Math.floor(Number(source.exp) || 0));
+  const rawHp = Math.max(0, Math.floor(Number(source.hp) || Number(mob.maxHp) || 0));
+  const stats = c.stats;
+  stats.rawExp = (Number(stats.rawExp) || 0) + rawExp;
+  stats.rawHp = (Number(stats.rawHp) || 0) + rawHp;
+  if (!stats.monsters || typeof stats.monsters !== "object") stats.monsters = {};
+  const slug = String(mob.slug || "unknown");
+  const bucket = stats.monsters[slug] || (stats.monsters[slug] = {
+    name: displayMonsterName(source.name || (mob.def && mob.def.name) || slug),
+    kills: 0, rawExp: 0, rawHp: 0,
+  });
+  bucket.kills = (Number(bucket.kills) || 0) + 1;
+  bucket.rawExp = (Number(bucket.rawExp) || 0) + rawExp;
+  bucket.rawHp = (Number(bucket.rawHp) || 0) + rawHp;
+  return { exp: rawExp, hp: rawHp };
+}
+
 function applyBossMultiplier(base, mult) {
   mult = mult || 10;
   return {
@@ -134,9 +159,9 @@ function newCombat(player, huntId, instanceMode) {
       frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
     },
     stats: {
-      startedAt: Date.now(), kills: 0, exp: 0, gold: 0, damage: 0,
-      taken: 0, deaths: 0, loot: {}, supplyUsed: {}, supplyCost: 0,
-      time: 0,
+      startedAt: Date.now(), kills: 0, exp: 0, rawExp: 0, rawHp: 0,
+      gold: 0, damage: 0, taken: 0, deaths: 0, loot: {}, monsters: {},
+      supplyUsed: {}, supplyCost: 0, time: 0,
     },
     events: [],       // eventos visuais para a UI
     delayedHits: [],  // re-strikes agendados (Death Echo / Spiritual Outburst 15.25)
@@ -4124,6 +4149,8 @@ function combatTick(c, p, dt, now) {
       greedBossHandleKill(c, m, now);
     if (typeof hatredBossHandleKill === "function")
       hatredBossHandleKill(c, m, now);
+    // Raw XP/HP é registrado antes de stage, PvP, Prey, VIP, taints e party.
+    recordRawMonsterStats(c, m);
     // recompensa
     const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
