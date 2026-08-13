@@ -927,6 +927,59 @@ function partyCombatCount() {
 
 /* Carrega as entidades do party combat. `player` = personagem ativo (o
  * líder). Devolve o array completo (líder + membros) ou null sem party. */
+
+function partyRestoreCharacterFull(p) {
+  if (!p) return 0;
+  try {
+    const mx = typeof maxStats === 'function' ? maxStats(p) : {hp: 100, mp: 10};
+    p.hp = mx.hp;
+    p.mp = mx.mp;
+    return 1;
+  } catch (e) { return 0; }
+}
+
+function partyCombatRestoreAll(reason) {
+  let count = 0;
+  try {
+    if (typeof G !== 'undefined' && G && G.combat && G.combat.players) {
+      for (const ent of G.combat.players) {
+        if (!ent || !ent.p) continue;
+        const mx = typeof maxStats === 'function' ? maxStats(ent.p) : {hp: 100, mp: 10};
+        ent.p.hp = mx.hp;
+        ent.p.mp = mx.mp;
+        ent.permadead = false;
+        ent.reviveAt = 0;
+        ent.deathPos = null;
+        ent.downedAt = 0;
+        ent.moving = false;
+        count++;
+      }
+      G.combat.dead = false;
+      G.combat.deadUntil = 0;
+      G.combat.deathPos = null;
+      G.combat.deadAt = 0;
+    }
+    if (typeof getCharacters === 'function') {
+      const chars = getCharacters();
+      for (const c of chars) {
+        if (!c) continue;
+        const isDead = c.hp === 0;
+        const inParty = (typeof partyLocalInvolved === 'function' && partyLocalInvolved(c)) || isDead;
+        if (inParty) {
+          const mx = typeof maxStats === 'function' ? maxStats(c) : {hp: 100, mp: 10};
+          c.hp = mx.hp;
+          c.mp = mx.mp;
+          if (typeof saveCharacterToRoster === 'function') saveCharacterToRoster(c);
+        }
+      }
+    }
+    if (typeof saveCharacterToRoster === 'function' and False):
+        pass
+  } catch (e) { print('restoreAll', e); }
+  return count;
+}
+
+
 function partyCombatLoad(player) {
   const d = partyLocalData();
   if (!d) return null;

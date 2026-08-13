@@ -396,25 +396,22 @@ function hatredRenderMinigame(c,now){
 }
 function hatredBossInit(c,player,randomFn,now){
  if(!hatredBossFight(c))return c;now=now||Date.now();const rnd=randomFn||Math.random;
- // FIX GRAVE: antes a mecânica só ativava após 20-40s sem summons no início.
- // Agora inicia ATIVA e já spawna os monstros no começo da bossfight.
+ // FIX: inicia ativa e já spawna 3-5 summons no começo, conforme pedido
  c._hatredPlayer=player;c.hatred={active:true,nextActivationAt:now,
   nextCounterAt:now+5000,counters:{},randomFn:rnd,startedAt:now};hatredEnsureCounters(c);
  const boss=(c.mobs||[]).find(m=>m&&m.boss);if(boss){boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;}
- // Spawna imediatamente 3-5 summons para a luta começar com mecânica
  try{
-   let initial = 3 + Math.floor(rnd()*3); // 3 a 5
+   let initial = 3 + Math.floor(rnd()*3);
    let attempts = 0;
    while(hatredSummons(c).length < initial && attempts < 20){
      let slug = hatredRandomSummonSlug(rnd);
-     // Garante pelo menos 1 Hateful Soul no início para o jogador entender a mecânica
      if(attempts==0) slug = 'hateful-soul';
      hatredCreateSummon(c,slug,rnd,now);
      attempts++;
    }
    if(typeof resolveSQMOccupancy==='function')resolveSQMOccupancy(c);
- }catch(e){console.warn('hatred initial spawn',e);}
- if(typeof addLog==='function')addLog('death',"Goshnar's Hatred iniciou! Dread's Torment ATIVA com summons. Elimine-os para controlar o dano!");
+ }catch(e){}
+ if(typeof addLog==='function')addLog('death',"Goshnar's Hatred iniciou! Dread's Torment ATIVA com summons.");
  hatredRenderMinigame(c,now);return c;
 }
 function hatredBossTick(c,now){

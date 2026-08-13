@@ -3820,21 +3820,34 @@ function partyHelperTick(c, ent, now, dt) {
 }
 
 /* Personagem da party caiu (hp <= 0): vira INCONSCIENTE (revive no local
- * depois de reviveTime) e o controle passa para o próximo membro vivo. */
+ * depois de reviveTime) e o controle passa para o próximo membro vivo.
+ * FIX: dentro da bossroom mortos NÃO renascem (permadead), conforme pedido.
+ * Quando PT toda morre, boss falha e volta pro templo. */
 function partyHandleDown(c, fallenP, now) {
   now=now||Date.now();
   const ent = c.players.find((e) => e.p === fallenP) || c.player;
   let consequence=null;
+  const isBoss = !!(c && c.boss);
   if (ent) {
-    if (!ent.reviveAt) {
+    if (!ent.reviveAt && !ent.permadead) {
       ent.downedAt = now;
-      ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
-      ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+      if (isBoss) {
+        ent.permadead = true;
+        ent.reviveAt = 0;
+        ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+      } else {
+        ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
+        ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+      }
       ent.p.hp = 0;
       consequence=applyCharacterDeathConsequences(c,ent.p);
       if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
       if (typeof addLog === "function") {
-        addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${consequence.exp?` e ${consequence.exp} XP`:""} — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
+        if (isBoss) {
+          addLog("death", `<b>${ent.name}</b> caiu na bossroom e não renasce até o fim da luta.`);
+        } else {
+          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${consequence.exp?` e ${consequence.exp} XP`:""} — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
+        }
       }
     }
   }
@@ -3844,10 +3857,28 @@ function partyHandleDown(c, fallenP, now) {
     if (typeof addLog === "function") {
       addLog("party", `Controlando agora: <b>${proximo.name}</b> (${fallenP.name} inconsciente).`);
     }
-    // No catch-up offline não renderiza/salva a cada troca; apenas mantém a
-    // entidade ativa correta para o próximo tick histórico.
     if(typeof G!=="undefined"&&G&&G._idleCatchup){c.player=proximo;G.p=proximo.p;}
     else if(typeof partyCombatSwitchTo === "function")partyCombatSwitchTo(proximo.id);
+  } else {
+    const allDead = c.players.every(e => !e.p || e.p.hp <= 0);
+    if (allDead) {
+      if (c.boss) {
+        if (typeof addLog === "function") addLog("death", `<b>Party wipe!</b> Todos morreram no boss <b>${c.boss.name||c.boss.id}</b> — boss falhou, voltando ao templo.`);
+        if (typeof toast === "function") toast("Party wipe! Boss falhou.", "death");
+        c.bossFailed = true;
+        c.instanceFinished = true;
+        if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-boss");
+        if (typeof stopHunt === "function") {
+          setTimeout(() => { try { stopHunt(); } catch(e){} }, 1500);
+        }
+      } else if (c.huntId) {
+        if (typeof addLog === "function") addLog("death", `<b>Party wipe!</b> Todos morreram na hunt — voltando ao templo.`);
+        if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-hunt");
+        if (typeof stopHunt === "function") {
+          setTimeout(() => { try { stopHunt(); } catch(e){} }, 1500);
+        }
+      }
+    }
   }
   return consequence;
 }
