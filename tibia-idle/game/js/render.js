@@ -420,9 +420,12 @@ Renderer.prototype.resize = function () {
   }
 };
 
-/* Floating damage — replicando Canary/OTClient AnimatedText */
-const FLOATER_MAX_LIFE = 2000;
-const ANIMATED_TEXT_DURATION = 1000;
+/* Floating damage — replicando Canary/OTClient AnimatedText
+ * Ajustado para hunts de alta densidade como MOTA: duração menor e subida mais rápida
+ * para evitar mural de números que polui a tela (print do usuário)
+ */
+const FLOATER_MAX_LIFE = 1200;
+const ANIMATED_TEXT_DURATION = 900;
 function floaterAlphaCanary(p, t, tf) {
   const t0 = tf / 1.2;
   if (t <= t0) return 1;
@@ -432,28 +435,46 @@ function floaterAlpha(p) {
   return Math.max(0, Math.pow(1 - p, 1.35));
 }
 Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
-  const life = kind === "damage" ? 1300 : (kind === "restore" ? 1150 : (big ? FLOATER_MAX_LIFE : 1500));
+  const life = kind === "damage" ? 900 : (kind === "restore" ? 800 : (big ? 1100 : 1000));
   const now = Date.now();
+  // Merge e stacking estilo Canary/Map::addAnimatedText
+  let prevAtPos = null;
+  let stackOffsetY = 0;
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
-    if (f.color !== color) continue;
-    if (f.kind !== kind) continue;
-    const elapsed = f.max - f.life;
-    if (elapsed > f.max / 2.5) continue;
     const dx = Math.abs(f.x - x), dy = Math.abs(f.y - y);
-    if (dx > 0.15 || dy > 0.15) continue;
-    try {
-      const n1 = parseInt(String(f.text).replace(/[^0-9\-]/g, "")) || 0;
-      const n2 = parseInt(String(text).replace(/[^0-9\-]/g, "")) || 0;
-      if (!isNaN(n1) && !isNaN(n2) && String(text).match(/^-?\d/) && String(f.text).match(/^-?\d/)) {
-        const sum = n1 + n2;
-        const prefix = String(f.text).trim().startsWith("+") ? "+" : "";
-        f.text = (sum > 0 && prefix === "+" ? "+" : "") + sum;
-        f.life = Math.max(f.life, life * 0.6);
-        return;
+    if (dx > 0.08 || dy > 0.08) continue; // mesma tile ~0.08 = ~1 tile
+    prevAtPos = f;
+    // Se mesma cor e dentro de 40% de vida, mergeia somando
+    if (f.color === color && f.kind === kind) {
+      const elapsed = f.max - f.life;
+      if (elapsed <= f.max / 2.5) {
+        try {
+          const n1 = parseInt(String(f.text).replace(/[^0-9\-]/g, "")) || 0;
+          const n2 = parseInt(String(text).replace(/[^0-9\-]/g, "")) || 0;
+          if (!isNaN(n1) && !isNaN(n2) && String(text).match(/^-?\d/) && String(f.text).match(/^-?\d/)) {
+            const sum = n1 + n2;
+            const prefix = String(f.text).trim().startsWith("+") ? "+" : "";
+            f.text = (sum > 0 && prefix === "+" ? "+" : "") + sum;
+            f.life = Math.max(f.life, life * 0.7);
+            return;
+          }
+        } catch (e) {}
       }
-    } catch (e) {}
+    }
+    // Se não mergeou, prepara offset para novo texto não sobrepor exatamente
+    if (!stackOffsetY) {
+      const elapsed = f.max - f.life;
+      const tf = f.max;
+      // Canary: y = 12 -48*t/tf, offset += y, cap 12 -> nós usamos 14 e cap 48 para MOTA
+      const yOff = 14 - 48 * (elapsed / tf);
+      stackOffsetY = (f.offsetY || 0) + yOff;
+    }
   }
+  // Cap de stacking para não subir infinito (Canary cap 12, nós 48 para MOTA)
+  if (stackOffsetY > 48) stackOffsetY = 48;
+  if (stackOffsetY < 0) stackOffsetY = 0;
+
   this.floaters.push({
     x: x, y: y, text: text, color: color,
     life: life, max: life,
@@ -461,12 +482,17 @@ Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
     small: !!small,
     kind: kind || "",
     vx: 0,
-    vy: -48,
+    vy: -64,
     spawnTime: now,
-    offsetX: 0,
-    offsetY: 0,
+    offsetX: (Math.random() - 0.5) * 4, // leve jitter horizontal para não empilhar 100% vertical
+    offsetY: -stackOffsetY, // negativo = sobe
   });
-  if (this.floaters.length > 28) this.floaters.shift();
+  const limit = kind === "damage" ? 16 : 24;
+  while (this.floaters.length > limit) {
+    let idx = this.floaters.findIndex(f => f.kind === kind);
+    if (idx === -1) idx = 0;
+    this.floaters.splice(idx, 1);
+  }
 };
 
 /* Fala de criatura, no modelo do internalCreatureSay do Canary.
@@ -1552,10 +1578,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
   drawBossBar(ctx, canvasW, combat, -view.x, -view.y);
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
+  // Replicando Canary: getExactSize() ajusta para sprites grandes
   const occupiedLabels = [];
   for (const info of entityInfo) {
-    const exactSize = Math.max(info.w, info.h) / (typeof tibiaScale !== 'undefined' ? tibiaScale(info.tile ? info.tile : tilePx(W)) : 1);
-    const sizeOffset = Math.max(0, (exactSize - 32) * 0.15);
+    const tileSize = info.tile;
+    const sizeOffset = Math.max(0, (info.h - tileSize) * 0.15);
     let barY = info.top - 6 - sizeOffset;
     let nameY = barY - 12;
     let y = nameY;
@@ -1641,7 +1668,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   ctx.restore();
 
-  // --- numeros flutuantes — replicando Canary AnimatedText
+  // --- numeros flutuantes — Canary + anti-flood para MOTA
   ctx.textAlign = "left";
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
@@ -1655,12 +1682,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
     const baseX = f.x * W;
     const baseY = f.y * H;
-    let fx = baseX + (24 * scale - textW / 2);
-    let fy = baseY + (8 * scale - 48 * scale * p);
+    // Canary base + offset de stacking (f.offsetY) para evitar sobreposição exata
+    let fx = baseX + (24 * scale - textW / 2) + (f.offsetX || 0);
+    let fy = baseY + (8 * scale - 64 * scale * p) + (f.offsetY || 0);
     const t0 = tf / 1.2;
     let alpha = 1;
     if (elapsed > t0) {
       alpha = Math.max(0, 1 - (elapsed - t0) / (tf - t0));
+    } else if (p > 0.15) {
+      // leve fade desde 15% para reduzir poluição em área grande
+      alpha = 0.95;
     }
     ctx.globalAlpha = alpha;
     ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
