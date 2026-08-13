@@ -97,6 +97,10 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
     must(saved.status===200&&saved.data.instance.id===sharedId,"troca de personagem criou outra instância");
     loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});
   }
+  const sameAccountMember=await request("/api/instance?char_id="+b.id,{headers:{authorization:"Bearer "+token}});
+  must(sameAccountMember.status===200&&sameAccountMember.data.instance.id===sharedId&&
+    sameAccountMember.data.instance.state.activeCharacterId===String(b.id),
+    "membro da conta do líder retomou a instância como runtime separado");
   const diskInstances=JSON.parse(fs.readFileSync(path.join(dataDir,"instances.json"),"utf8"));
   must(diskInstances.length===1&&diskInstances[0].instance_id===sharedId&&
     loaded.data.instance.state.state.players.length===5&&loaded.data.instance.state.activeCharacterId===String(a.id),
