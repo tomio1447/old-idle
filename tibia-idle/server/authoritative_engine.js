@@ -165,6 +165,21 @@ function playerSpellList(p){
   return out;
 }
 
+/* Sprite do projétil de uma magia (espelha combat.js/playerMissile).
+ * O cliente carrega assets/missile/<nome>_<dir>.png; mandar as palavras
+ * mágicas ("exori gran con") gera 404 em cada direção. Magias no modo
+ * "skill" batem no SQM do alvo e não voam nada. */
+const ELEMENT_MISSILE={fire:"fire",energy:"energy",earth:"earth",ice:"ice",
+  death:"death",holy:"holy",physical:"small-stone"};
+function isSkillSpell(s){return !!(s&&s.f&&s.f.modo==="skill");}
+function spellMissileName(s,element){
+  if(!s||isSkillSpell(s)||s.area)return "";
+  const declared=String(s.missile||"");
+  // "$weapon" depende da arma equipada; sem resolver, cai no elemento.
+  if(declared&&declared!=="$weapon")return declared;
+  return ELEMENT_MISSILE[element]||"energy";
+}
+
 /* ---------- forge buffs (15.25) ---------- */
 /* Momentum: 10% chance a cada kill de ganhar +25% dano por 10s.
  * Transcendence: 8% chance a cada kill de ganhar +50% dano por 8s.
@@ -484,10 +499,13 @@ function step(auth,now){if(auth.ended)return;
             const isCrit=guaranteedCrit||random(auth)<critChance;
             // Fatal (Onslaught) — 5% chance
             const isFatal=isCrit&&random(auth)<0.05;
+            // Projétil da magia: o cliente espera o NOME DO SPRITE, não as
+            // palavras mágicas. Magias em modo "skill" (exori e cia.) batem
+            // no próprio SQM e não têm nada voando até o alvo.
+            const spellMissile=spellMissileName(s,el);
             // Evento de cast para o cliente renderizar a animação da spell
             auth.events.push({t:"cast",name:s.name,area:!!s.area,element:el,
               x:Number(p.x)||0.13,y:Number(p.y)||0.6,screen:true,
-              missile:s.words||"",projectile:!s.area,
               ts:stepTs+hitIdx*100});
             for(const tgt of targets){
               let finalDmg=Math.floor(dmg*forgeMult);
@@ -499,8 +517,9 @@ function step(auth,now){if(auth.ended)return;
               auth.events.push({t:"hit",dmg:finalDmg,x:Number(tgt.x)||0.5,y:Number(tgt.y)||0.5,
                 el:el,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
                 mobId:String(tgt.id),mobSlug:tgt.slug,
-                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,missile:s.area?"":(s.words||""),
-                projectile:!s.area,
+                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,
+                spell:s.name,exori:isSkillSpell(s)?1:0,
+                missile:spellMissile,projectile:!!spellMissile&&tgt===primaryTarget,
                 ts:stepTs+hitIdx*200+50});
               hitIdx++;
             }
