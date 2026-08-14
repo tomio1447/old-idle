@@ -95,11 +95,12 @@ function buildRenderEntities(combat, player) {
     if (mob.hp <= 0) continue;
     out.push({ kind: "monster", ent: mob, p: null, footY: mob.y || 0, id: String(mob.id) });
   }
-  // Sobreposição das imagens de BAIXO PARA CIMA: a criatura com os pés mais
-  // abaixo entra primeiro na fila do canvas; as linhas superiores são
-  // desenhadas depois. O desempate mantém a ordem determinística por tipo.
+  // Painter order do Tibia: desenha as linhas de CIMA primeiro e as de BAIXO
+  // por último. Assim quem tem os pés mais abaixo cobre corretamente quem
+  // está acima — inclusive a parte alta de sprites 2x2 (ex.: cabeça do Demon)
+  // não fica soterrada por um outfit cuja base está numa linha anterior.
   const order = { monster: 0, ally: 1, player: 2 };
-  return out.sort((a, b) => b.footY - a.footY || order[a.kind] - order[b.kind]);
+  return out.sort((a, b) => a.footY - b.footY || order[a.kind] - order[b.kind]);
 }
 
 /* A paleta de cada criatura é composta na importação a partir da máscara do
@@ -1637,9 +1638,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // monstro mais baixo é desenhado por último (fica por cima em caso de
   // sobreposição residual), igual ao Canary.
   const occupiedLabels = [];
-  // entityInfo já está de baixo para cima: calcula nessa mesma ordem para o
-  // label da criatura mais próxima conservar a posição natural.
-  for (const info of entityInfo) {
+  // Calcula de baixo para cima: a criatura mais próxima conserva a posição
+  // natural e as que estão atrás têm seus labels deslocados.
+  for (let i = entityInfo.length - 1; i >= 0; i--) {
+    const info = entityInfo[i];
     const tileSize = info.tile;
     const sizeOffset = Math.max(0, (info.h - tileSize) * 0.15);
     let barY = info.top - 3 - sizeOffset;
@@ -1666,10 +1668,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     info._nameY = nameY;
     info._y = y;
   }
-  // Labels continuam de cima para baixo para que os mais baixos sejam
-  // desenhados por último e mantenham a prioridade visual do Canary.
-  for (let i = entityInfo.length - 1; i >= 0; i--) {
-    const info = entityInfo[i];
+  // Desenha labels de cima para baixo; os mais baixos ficam por último e
+  // mantêm a mesma prioridade visual das sprites.
+  for (const info of entityInfo) {
     const barY = info._barY, nameY = info._nameY, y = info._y;
     if (info.e.kind === 'monster') {
       drawTibiaBar(ctx, info.cx, barY, info.hpPct, tibiaHpColor(info.hpPct));
