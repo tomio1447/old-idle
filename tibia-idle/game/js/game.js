@@ -754,6 +754,24 @@ function missionForHunt(id) {
   };
 }
 
+function mergeMissionMaps(remote, local) {
+  const out = Object.assign({}, remote && typeof remote === "object" ? remote : {});
+  const src = local && typeof local === "object" ? local : {};
+  for (const huntId of Object.keys(src)) {
+    const a = out[huntId] && typeof out[huntId] === "object" ? out[huntId] : { progress: {}, claimed: {}, completeClaimed: false };
+    const b = src[huntId] && typeof src[huntId] === "object" ? src[huntId] : {};
+    const progress = Object.assign({}, a.progress || {});
+    for (const k of Object.keys(b.progress || {}))
+      progress[k] = Math.max(Number(progress[k]) || 0, Number(b.progress[k]) || 0);
+    out[huntId] = {
+      progress,
+      claimed: Object.assign({}, a.claimed || {}, b.claimed || {}),
+      completeClaimed: !!(a.completeClaimed || b.completeClaimed),
+    };
+  }
+  return out;
+}
+
 function missionState(p, huntId) {
   p.missions = p.missions || {};
   // Modo online: missões são por conta. Sincroniza do account data para o
@@ -852,8 +870,17 @@ function tryCompleteMissionRewards(p, huntId) {
 function handleMissionKill(p, huntId, monster) {
   const def = missionForHunt(huntId);
   if (!def || !def.tasks.some((t) => t.monster === monster)) return;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
+  if (st.completeClaimed) return;
   const task = def.tasks.find((t) => t.monster === monster);
+  if (st.claimed && st.claimed[task.monster] && (st.progress[monster] || 0) >= task.target) {
+    tryCompleteMissionRewards(p, huntId);
+    syncMissionsToAccount(p);
+    renderMission();
+    return;
+  }
   st.progress[monster] = Math.min(task.target, (st.progress[monster] || 0) + 1);
   tryCompleteMissionRewards(p, huntId);
   syncMissionsToAccount(p);
@@ -1547,29 +1574,28 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;G.huntEntryPendingToken=null;
-  // SALVA o personagem no servidor ANTES de encerrar a instância.
-  // No modo online, o tick salva o estado durante o combate, mas o último
-  // tick pode não ter capturado o HP/MP/loot final. Sem isto, o progresso
-  // da última sessão de combate é perdido ao voltar para a cidade.
-  if (typeof save === "function") save();
-  if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
-  // Checkpoint do templo: cura inclusive membros inconscientes antes de
-  // persistir o roster, para ninguém permanecer morto fora da instância.
+  // Checkpoint do templo: cura ANTES de persistir. save() com G.combat
+  // online não grava o personagem (o tick já o fez com HP de combate),
+  // então HP 150/0 acabava no banco se a cura viesse depois.
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("templo");
+  if (G.p) {
+    const m = maxStats(G.p);
+    G.p.hp = m.hp; G.p.mp = m.mp;
+    G.p.hunt = null;
+    G.p.instanceMode = null;
+  }
   if (typeof partyCombatSaveAll === "function") partyCombatSaveAll();
   if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
   if (typeof greedBossCleanup === "function" && G.combat) greedBossCleanup(G.combat);
   if (typeof hatredBossCleanup === "function" && G.combat) hatredBossCleanup(G.combat);
-  G.p.hunt = null;
-  G.p.instanceMode = null;
   G.combat = null;
+  ONLINE_AUTH_APPLIED_VERSION=0;ONLINE_AUTH_APPLIED_INSTANCE="";
+  if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
+  if (typeof save === "function") save();
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
   resetTemplePlayerPosition();
   addLog("info", "Voltou para o <b style='color:#ffe680'>Templo Oficial de Thais</b>.");
-  // ao chegar na cidade o char descansa: cura completa
-  const m = maxStats(G.p);
-  G.p.hp = m.hp; G.p.mp = m.mp;
   // PARTY: líder voltou para a safe zone -> limpa follows pendentes
   if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
   renderAll();
@@ -1755,7 +1781,7 @@ function drainEvents() {
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
         // Exori usa o estouro CINZA "hit-area" (nao o draw-blood vermelho).
-        r.addEffect(x, y, e.fx || (e.exori ? "hit-area"
+        r.addEffect(x, y, e.fx || ((e.exori && ehFisico) ? "hit-area"
                     : (raca ? raca.fx
                        : (ELEMENTS[visualElement] || ELEMENTS.physical).fx)));
         // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
@@ -1845,9 +1871,11 @@ function drainEvents() {
         break;
       }
       case "dust": {
-        const px = c.player ? c.player.x : 0.13, py = c.player ? c.player.y - 0.12 : 0.5;
-        if (e.dust) r.addFloater(px, py, "+" + fmt(e.dust) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
-        if (e.slivers) r.addFloater(px + 0.03, py + 0.04, "+" + fmt(e.slivers) + " slivers", "#ffe680");
+        const px = e.screen ? (e.x || 0.13) : (c.player ? c.player.x : 0.13);
+        const py = e.screen ? ((e.y || 0.5) - 0.12) : (c.player ? c.player.y - 0.12 : 0.5);
+        const dustN = Number(e.dust) || 0;
+        if (dustN > 0) r.addFloater(px, py, "+" + fmtDmg(dustN) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
+        if (e.slivers) r.addFloater(px + 0.03, py + 0.04, "+" + fmtDmg(e.slivers) + " slivers", "#ffe680");
         if (e.overflow) addLog("info", `Dust no limite: <b>${fmtFull(e.overflow)}</b> perdido.`);
         break;
       }
@@ -1905,14 +1933,8 @@ function drainEvents() {
           r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
           r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), "critical-heal-effect", 800);
         }
-        // Confirmação visível no PRÓPRIO aliado curado. Assim a party vê
-        // exatamente quem recebeu exura sio "Nome", sem liberar as falas
-        // automáticas dos demais aliados durante o combate.
-        const healedEnt = e.targetId && c.players
-          ? (typeof partyLiveEntity === "function" ? partyLiveEntity(c, { id:e.targetId, name:e.target }) : null) : null;
-        if (healedEnt && typeof creatureSay === "function" && e.words) {
-          creatureSay(healedEnt, e.words, TALK.SPELL);
-        }
+        // A fala (exura sio "Nome") vem no evento `say` do caster, como no
+        // Canary. Não repetir as palavras sobre o aliado curado.
         if (e.mass) addLog("party", `<b style="color:#9ce84a">Mass Healing</b> curou <b>${e.target}</b> (+${fmtFull(e.amount)} hp)`);
         else addLog("party", `Curou <b>${e.target}</b> com ${e.spell} (+${fmtFull(e.amount)} hp)`);
         break;
@@ -1976,15 +1998,19 @@ function drainEvents() {
         const d = CONDITIONS[e.tipo];
         if (d) addLog("death", `Você está <b style="color:${d.cor}">${d.nome}</b>!`);
         renderStats(G.p);
+        if (typeof renderStatusBar === "function") renderStatusBar(G.p);
+        if (typeof renderPlayerStates === "function") renderPlayerStates(G.p);
         break;
       }
       case "condition": {
-        // Condition ticking (poison/fire/bleed/energy/curse) do servidor
+        // Condition ticking (poison/fire/bleed/energy/cursed) do servidor
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
-        const el = e.el || "physical";
+        const tipo = e.condition || e.tipo || e.el || "physical";
+        const d = typeof CONDITIONS !== "undefined" && (CONDITIONS[tipo] || CONDITIONS[e.el]);
+        const el = (d && d.el) || e.el || "physical";
         const col = (typeof ELEMENTS !== "undefined" && ELEMENTS[el]) ? ELEMENTS[el].color : "#ff6b6b";
         if (e.dmg > 0) r.addFloater(px, py - 0.07, "-" + fmtDmg(e.dmg), col, false, true, "damage");
-        const d = CONDITIONS && CONDITIONS[el];
+        r.addEffect(px, py, (d && d.fx) || (typeof ELEMENTS !== "undefined" && ELEMENTS[el] && ELEMENTS[el].fx) || "draw-blood");
         if (d) addLog("death", `<b style="color:${d.cor}">${d.nome}</b> causou <b>${e.dmg}</b> de dano.`);
         renderStats(G.p);
         break;
@@ -2002,7 +2028,7 @@ function drainEvents() {
         renderStats(G.p);
         break;
       case "challenge-target":
-        r.addEffect(e.x, e.y, e.amp ? "chivalrous-challenge" : "magic-blue");
+        r.addEffect(e.x, e.y, e.amp ? "chivalrous-challenge" : "challenge-effect");
         break;
       case "challenge": {
         // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
@@ -2013,7 +2039,7 @@ function drainEvents() {
         // Exeta Amp Res: animação oficial (CONST_ME_CHIVALRIOUS_CHALLENGE,
         // anel de energia roxo/azul do DAT 15.x). Exeta Res: magic blue do
         // challenge.lua do Canary.
-        if (!ehAmp) r.addEffect(px, py, "magic-blue");
+        if (!ehAmp) r.addEffect(px, py, "challenge-effect");
         addLog("party", `<b style="color:#ffd65a">${e.spell || "Challenge"}</b> marcou <b>${e.count}</b> inimigo(s) — dano deles reduzido 20%`);
         break;
       }
@@ -2066,34 +2092,36 @@ function drainEvents() {
         addLog("info", `Corrente atingiu <b>${e.n}</b> alvos.`);
         break;
       case "say": {
-        // o personagem fala a magia/supply, como no client do Tibia.
-        // Aliados do party combat falam no próprio lugar (bolha + log).
-        const saidor = (e.whoId && c && c.players)
-          ? c.players.find((x) => String(x.id) === String(e.whoId)) : null;
-        if (saidor) {
-          // A cena só mostra palavras mágicas do personagem selecionado.
-          // Aliados continuam aplicando spell/efeito/cura normalmente, mas
-          // não enchem a tela nem o log com falas automáticas.
-          const selecionado = c && c.player && String(c.player.id) === String(saidor.id);
-          if (!selecionado) break;
-          if (typeof creatureSay === "function") {
-            creatureSay(saidor, e.text, e.supply ? TALK.SAY : TALK.SPELL);
-          }
-          addLog("say", `<b>${saidor.name}</b>: ${e.text}`);
+        // TALKTYPE_SPELL: palavras no caster, visíveis para toda a party.
+        // Potion/comida ("Aaaah...", Munch.) não são magia — não desenhar.
+        const text = String(e.text || "");
+        if (e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text)) break;
+        const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
+        const wanted = e.whoId !== undefined && e.whoId !== null ? String(e.whoId) : "";
+        const saidor = wanted && c && Array.isArray(c.players)
+          ? (c.players.find((x) => idOf(x) === wanted) || null) : null;
+        const alvo = saidor || (!wanted && c && c.player) || null;
+        const nome = (alvo && (alvo.name || (alvo.p && alvo.p.name))) || (G.p && G.p.name) || "";
+        if (alvo && typeof creatureSay === "function") {
+          creatureSay(alvo, text, TALK.SPELL);
+          addLog("say", `<b>${nome}</b>: ${text}`);
         } else {
-          r.addSpeech(e.text, e.supply ? "#7ae87a" : "#ffe680");
-          addLog("say", `<b>${G.p.name}</b>: ${e.text}`);
+          r.addSpeech(text, "#ffe680");
+          addLog("say", `<b>${nome}</b>: ${text}`);
         }
         break;
       }
       case "kill": {
         const x = ex(e), y = ey(e);
         r.addCorpse(x, y, e.mob);
-        // XP na tela exatamente como o cliente oficial: valor cheio
-        // (nunca abreviado para "1.2k"), numero BRANCO e inteiro
-        r.addFloater(x, y - 0.06, "+" + fmtDmg(e.exp) + " xp", "#ffffff");
+        let shownExp=Number(e.exp)||0;
+        if(Array.isArray(e.shares)&&G.p){
+          const mine=e.shares.find((row)=>String(row&&row.id)===String(G.p.id));
+          if(mine&&mine.exp!==undefined)shownExp=Number(mine.exp)||0;
+        }else if(e.gained!==undefined&&e.gained!==null)shownExp=Number(e.gained)||0;
+        r.addFloater(x, y - 0.06, "+" + fmtDmg(shownExp) + " xp", "#ffffff");
         r.addEffect(x, y, "poff");
-        addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(e.exp)} xp</span>`);
+        addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(shownExp)} xp</span>`);
         if (e.loot && e.loot.length) {
           // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
           // esquerda) e sem a mensagem verde que sobe na tela. O loot fica
@@ -2111,13 +2139,19 @@ function drainEvents() {
         // contar o abate para a Cyclopedia.
         if (typeof bestiaryKill === "function") bestiaryKill(G.p, e.mob, 1);
         if (e.boss && typeof bosstiaryKill === "function") bosstiaryKill(G.p, e.mob, 1);
-        // Kill count no save do personagem
-        G.p.totalKills = (G.p.totalKills || 0) + 1;
-        G.p.kills = G.p.kills || {};
-        G.p.kills[e.mob] = (G.p.kills[e.mob] || 0) + 1;
+        // No online o snapshot já traz kills/totalKills/bossState. Somar de
+        // novo no drain duplicava o bosstiário e as tasks.
+        const onlineAuth=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+        if (!onlineAuth) {
+          G.p.totalKills = (G.p.totalKills || 0) + 1;
+          G.p.kills = G.p.kills || {};
+          G.p.kills[e.mob] = (G.p.kills[e.mob] || 0) + 1;
+        }
         if (c.boss) {
-          const st = bossState(G.p, c.boss.id);
-          st.kills = (st.kills || 0) + 1;
+          if (!onlineAuth) {
+            const st = bossState(G.p, c.boss.id);
+            st.kills = (st.kills || 0) + 1;
+          }
           addLog("level", `Boss <b>${c.boss.name}</b> derrotado!`);
           toast(`Boss derrotado: <b>${c.boss.name}</b>`, "level");
           renderBosses(G.p);
@@ -2443,14 +2477,80 @@ document.addEventListener("visibilitychange", async () => {
  *     não morrer nem perder progresso.
  */
 let _bgTimer = null;
-// O núcleo autoritativo avança em passos de 1s. Poll de 500ms duplicava
-// serialização de personagens/instância sem ganhar precisão e saturava o
-// servidor JSON, causando lag no canvas e no painel da party.
-const ONLINE_AUTH_TICK_MS=1000;
+// O núcleo autoritativo avança em passos de 200ms. Poll de 200ms entrega
+// spells/ataques no mesmo ritmo; o disco JSON é gravado com debounce.
+const ONLINE_AUTH_TICK_MS=200;
 let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0,ONLINE_SESSION_INVALID=false;
+let ONLINE_AUTH_APPLIED_VERSION=0,ONLINE_AUTH_APPLIED_INSTANCE="";
+let SERVER_CONNECTION_ONLINE=true,SERVER_STATUS_BOUND=false;
 function onlineAuthorityCombat(){
   return !!(!ONLINE_SESSION_INVALID&&G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
+}
+function setServerConnectionStatus(online,options){
+  const was=SERVER_CONNECTION_ONLINE;
+  SERVER_CONNECTION_ONLINE=!!online;
+  const box=$("#server-status"),text=$("#server-status-text"),btn=$("#btn-reconnect");
+  const show=typeof accountApiConfigured==="function"&&accountApiConfigured();
+  if(box){
+    box.hidden=!show;
+    box.classList.toggle("online",!!online);
+    box.classList.toggle("offline",!online);
+  }
+  if(text){
+    const key=online?"server.online":"server.offline";
+    text.setAttribute("data-i18n",key);
+    text.textContent=typeof t==="function"?t(key):(online?"ONLINE":"OFFLINE");
+  }
+  if(btn)btn.hidden=!!online;
+  if(!online&&was&&!(options&&options.silent)&&typeof toast==="function"&&show)
+    toast("Servidor OFFLINE. A caçada permanece nesta aba — use Reconnect quando a API voltar.","bad");
+}
+function bindServerStatusControls(){
+  if(SERVER_STATUS_BOUND)return;SERVER_STATUS_BOUND=true;
+  const btn=$("#btn-reconnect");
+  if(btn)btn.addEventListener("click",()=>{reconnectOnlineRuntime();});
+  window.addEventListener("tibia-idle-server-online",()=>setServerConnectionStatus(true,{silent:true}));
+  window.addEventListener("tibia-idle-server-offline",()=>{
+    if(G)G.instanceReconnectPending=true;
+    setServerConnectionStatus(false);
+  });
+  if(typeof accountApiConfigured==="function"&&accountApiConfigured())
+    setServerConnectionStatus(true,{silent:true});
+}
+async function reconnectOnlineRuntime(){
+  const btn=$("#btn-reconnect");
+  if(btn){btn.disabled=true;btn.textContent=(typeof t==="function"?t("server.reconnect"):"Reconnect")+"...";}
+  ONLINE_RUNTIME_RETRY_AT=0;ONLINE_SESSION_INVALID=false;
+  if(G)G.instanceReconnectPending=true;
+  try{
+    if(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE)ACCOUNT_LEASE.heldUntil=0;
+    if(typeof accountApiConfigured==="function"&&accountApiConfigured()){
+      const token=typeof sessionToken==="function"?sessionToken():"";
+      if(token&&typeof accountEnsureLease==="function"){
+        const lease=await accountEnsureLease(token,{silent:true});
+        if(!lease||!lease.ok){
+          if(typeof toast==="function")toast((lease&&lease.msg)||"Não foi possível reassumir o controle.","bad");
+          return false;
+        }
+      }
+      if(token&&typeof accountStartSync==="function")accountStartSync(token);
+    }
+    const recovered=await requestOnlineRuntimeRecovery();
+    if(recovered||(typeof accountLeaseAllowsSimulation==="function"&&accountLeaseAllowsSimulation())){
+      if(G)delete G.instanceReconnectPending;
+      setServerConnectionStatus(true,{silent:true});
+      if(typeof toast==="function")toast("Servidor ONLINE. Instância reconectada.","good");
+      return true;
+    }
+    if(typeof toast==="function")toast("Servidor ainda indisponível.","bad");
+    return false;
+  }catch(e){
+    if(typeof toast==="function")toast("Falha ao reconectar.","bad");
+    return false;
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=typeof t==="function"?t("server.reconnect"):"Reconnect";}
+  }
 }
 let ONLINE_RUNTIME_RECOVERING=false,ONLINE_RUNTIME_RETRY_AT=0;
 function resetOnlineRuntimeClocks(){
@@ -2464,10 +2564,10 @@ async function requestOnlineRuntimeRecovery(){
     const lease=typeof accountEnsureLease==="function"
       ?await accountEnsureLease(token,{silent:true}):{ok:true};
     if(!lease||!lease.ok){
-      // Outra aba realmente ativa continua vencendo; apenas tente novamente
-      // depois, sem takeover automático nem toast repetido.
-      ONLINE_RUNTIME_RETRY_AT=Date.now()+Math.max(2000,Math.min(10000,
-        Number(lease&&lease.expiresAt?new Date(lease.expiresAt).getTime()-Date.now():3000)||3000));
+      // Outra aba realmente ativa continua vencendo; só volte a pedir o lease
+      // depois que o TTL atual expirar. Takeover continua só no botão.
+      const heldMs=Number(lease&&lease.expiresAt?new Date(lease.expiresAt).getTime()-Date.now():0);
+      ONLINE_RUNTIME_RETRY_AT=Date.now()+Math.max(2000,heldMs||3000);
       return false;
     }
     if(typeof accountLoadInstance!=="function")return false;
@@ -2476,7 +2576,11 @@ async function requestOnlineRuntimeRecovery(){
       if(!G.combat||!instanceIncludesCharacter(remote.instance,G.p&&G.p.id))return false;
       const applied=applyOnlineAuthorityState(remote.instance,
         remote.lastStatus==="ended"?"ended":null);
-      if(applied)resetOnlineRuntimeClocks();
+      if(applied){
+        resetOnlineRuntimeClocks();
+        if(G)delete G.instanceReconnectPending;
+        setServerConnectionStatus(true,{silent:true});
+      }
       return !!applied;
     }
     if(remote&&remote.ok&&remote.lastStatus==="ended"){
@@ -2495,7 +2599,11 @@ async function requestOnlineRuntimeRecovery(){
         const applied=!!(remote&&remote.ok&&remote.instance&&
           instanceIncludesCharacter(remote.instance,G.p&&G.p.id)&&
           applyOnlineAuthorityState(remote.instance,null));
-        if(applied)resetOnlineRuntimeClocks();
+        if(applied){
+          resetOnlineRuntimeClocks();
+          if(G)delete G.instanceReconnectPending;
+          setServerConnectionStatus(true,{silent:true});
+        }
         return applied;
       }
     }
@@ -2529,28 +2637,34 @@ function resolveLiveCombatEventPosition(combat,event){
   return event;
 }
 
-/* Distribui o lote autoritativo pelo próximo segundo sem reintroduzir ping.
- * O servidor calcula combate em passos de 1s; descarregar o lote inteiro no
- * mesmo frame transforma a hunt em explosões/floaters aos trancos. A linha do
- * tempo começa AGORA e preserva a ordem relativa dos timestamps do servidor,
- * comprimindo apenas catch-up/restart para caber antes do próximo tick. */
+/* Distribui o lote autoritativo em poucos frames, sem o ping de ~1s que o
+ * espalhamento antigo (850ms) introduzia. Preserva a ordem relativa. */
 function scheduleOnlineAuthorityEvents(events,receivedAt){
   const input=Array.isArray(events)?events:[],now=Number(receivedAt)||Date.now();
   if(!input.length)return [];
   const valid=input.map((event)=>Number(event&&event.ts)).filter(Number.isFinite),
     first=valid.length?Math.min(...valid):0,last=valid.length?Math.max(...valid):first,
-    span=Math.max(0,last-first),scale=span>850?850/span:1,ties=new Map();
+    span=Math.max(0,last-first),spread=140,
+    scale=span>spread?spread/span:1,ties=new Map();
   return input.map((remote,index)=>{
     const event=Object.assign({},remote),raw=Number(event.ts),base=Number.isFinite(raw)?Math.max(0,raw-first):0,
       tieKey=Number.isFinite(raw)?String(raw):"missing",tie=ties.get(tieKey)||0;
     ties.set(tieKey,tie+1);
-    event.ts=now+Math.min(850,Math.round(base*scale)+Math.min(24,tie*8));
+    event.ts=now+Math.min(spread,Math.round(base*scale)+Math.min(16,tie*4));
     return{event,index};
   }).sort((a,b)=>a.event.ts-b.event.ts||a.index-b.index).map((item)=>item.event);
 }
-function applyOnlineAuthorityState(descriptor,terminalReason){
+function applyOnlineAuthorityState(descriptor,terminalReason,version){
   if(!descriptor||!G.combat)return false;
-  const previous=G.combat,fresh={hunt:previous.hunt,huntMap:previous.huntMap,boss:previous.boss};
+  const previous=G.combat;
+  const incomingVersion=Number(version!==undefined&&version!==null?version:descriptor.version);
+  const instanceId=String(descriptor.id||descriptor.instanceId||
+    (typeof ACCOUNT_INSTANCE!=="undefined"&&ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.id)||
+    ONLINE_AUTH_APPLIED_INSTANCE||"");
+  if(!terminalReason&&Number.isFinite(incomingVersion)&&incomingVersion>0&&
+     incomingVersion<=ONLINE_AUTH_APPLIED_VERSION&&
+     (!ONLINE_AUTH_APPLIED_INSTANCE||!instanceId||instanceId===ONLINE_AUTH_APPLIED_INSTANCE))
+    return false;
   // Movimento é predição visual local; dano/HP/recompensas vêm do servidor.
   // Um tick não pode substituir G.combat nem as entidades que o renderer e a
   // troca de personagem já estão usando. A substituição integral fazia um
@@ -2565,16 +2679,34 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   const entityId=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
   const localActiveId=entityId(previous.player),previousPlayers=Array.isArray(previous.players)?previous.players:[],
     previousMobs=Array.isArray(previous.mobs)?previous.mobs:[];
-  // `descriptor.state` vira um combate temporário. Ele nunca é reanexado ao
-  // descriptor e nunca toma o lugar do runtime que já está na tela.
-  const incoming=restoreCombatSessionState(fresh,descriptor);
-  if(!incoming)return false;
+  // Não passe por restoreCombatSessionState/normalizePlayer a cada segundo:
+  // isso clona saves enormes (lootPouch/missões) e congela a aba. O nested
+  // `state` já é o combate; o descriptor externo só traz versão/membros.
+  const incoming=(descriptor.state&&(descriptor.state.players||descriptor.state.mobs||
+    descriptor.state.events))?descriptor.state:descriptor;
+  if(!incoming||incoming===previous)return false;
   delete G.instanceReconnectPending;
+  const beforeLevel=G.p&&Number(G.p.level)||0;
 
+  const hydrateMobDef=(ent)=>{
+    if(!ent)return ent;
+    const slug=ent.slug,catalog=typeof GAMEDATA!=="undefined"&&GAMEDATA.monsters&&slug?GAMEDATA.monsters[slug]:null;
+    // Sempre amarra o def ao slug atual. ID reciclado (Demon → Floating
+    // Savant) não pode conservar looktype/nome da espécie anterior.
+    if(catalog)ent.def=catalog;
+    return ent;
+  };
   const mergeEntity=(local,remote,isPlayer)=>{
-    if(!local)return remote;
+    if(!local)return hydrateMobDef(remote);
+    // ID reciclado: cadáver (hp 0) virando spawn novo, OU a mesma slot
+    // visual recebendo outra espécie. Nos dois casos o outfit/nome/posição
+    // do bicho antigo não podem vazar para o novo.
+    if(!isPlayer&&((Number(local.hp)<=0&&Number(remote&&remote.hp)>0)||
+       String(local.slug||"")!==String(remote&&remote.slug||"")))
+      return hydrateMobDef(Object.assign({},remote));
     const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
     const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
+    const localDef=local.def;
     // O snapshot do servidor também carrega posição DENTRO de `p` (o save do
     // personagem). Sem preservar aqui, `Object.assign(playerRef,remote.p)`
     // devolvia o char ao tile de spawn a cada tick: a party inteira piscava
@@ -2582,13 +2714,34 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
     const playerVisual={};
     if(playerRef)for(const key of visualKeys)if(playerRef[key]!==undefined)playerVisual[key]=playerRef[key];
     Object.assign(local,remote||{});
-    if(playerRef&&remote&&remote.p){Object.assign(playerRef,remote.p);local.p=playerRef;
-      for(const key of Object.keys(playerVisual))playerRef[key]=playerVisual[key];}
+    if(localDef)local.def=localDef;
+    hydrateMobDef(local);
+    if(playerRef&&remote&&remote.p){
+      const localConfig=playerRef.config,localCombo=localConfig&&localConfig.combo,localStances=playerRef.stances,
+        localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone;
+      Object.assign(playerRef,remote.p);local.p=playerRef;
+      if(remote.p.exp!==undefined)playerRef.exp=Number(remote.p.exp)||0;
+      if(remote.p.level!==undefined)playerRef.level=Math.max(1,Number(remote.p.level)||1);
+      if(localConfig){
+        playerRef.config=Object.assign({},remote.p.config||{},localConfig);
+        if(Array.isArray(localCombo))playerRef.config.combo=localCombo;
+      }
+      if(localStances&&typeof localStances==="object")playerRef.stances=localStances;
+      if(localPrey&&typeof localPrey==="object")playerRef.prey=localPrey;
+      if(localMissions&&typeof localMissions==="object")
+        playerRef.missions=mergeMissionMaps(remote.p.missions,localMissions);
+      if(localMissionsDone&&typeof localMissionsDone==="object")
+        playerRef.missionsDone=Object.assign({},remote.p.missionsDone||{},localMissionsDone);
+      for(const key of Object.keys(playerVisual))playerRef[key]=playerVisual[key];
+      if(typeof rewardChestEnsureShape==="function")rewardChestEnsureShape(playerRef);
+      if(typeof renderRewardButton==="function")renderRewardButton(playerRef);}
     for(const key of Object.keys(visual))local[key]=visual[key];
     return local;
   };
   const ensurePosition=(ent,fallback,index)=>{
-    if(!ent)return ent;const w=Number(incoming.gridW)||Number(previous.gridW)||30,
+    if(!ent)return ent;
+    if(Number.isFinite(Number(ent.x))&&Number.isFinite(Number(ent.y)))return ent;
+    const w=Number(incoming.gridW)||Number(previous.gridW)||30,
       h=Number(incoming.gridH)||Number(previous.gridH)||30;
     let cx=Number(ent.cx),cy=Number(ent.cy);
     if(!Number.isFinite(cx))cx=Number(fallback&&fallback.cx);
@@ -2608,7 +2761,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // separadamente para manter referências, posição e identidade visual.
   for(const key of Object.keys(incoming))
     if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="events"&&
-       key!=="hunt"&&key!=="huntMap"&&key!=="boss")previous[key]=incoming[key];
+       key!=="hunt"&&key!=="huntMap"&&key!=="boss"&&key!=="stats")previous[key]=incoming[key];
+  if(incoming.stats){
+    previous.stats=Object.assign({},previous.stats||{},incoming.stats);
+    previous.stats.supplyUsed=Object.assign({},incoming.stats.supplyUsed||{});
+    previous.stats.supplyCost=Number(incoming.stats.supplyCost)||0;
+    previous.stats.loot=Object.assign({},incoming.stats.loot||previous.stats.loot||{});
+  }
 
   const remotePlayers=Array.isArray(incoming.players)?incoming.players:[],remotePlayersById=new Map();
   for(const ent of remotePlayers){const id=entityId(ent);if(id)remotePlayersById.set(id,ent);}
@@ -2623,10 +2782,8 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   let playerIndex=reconciledPlayers.length;
   for(const remote of remotePlayersById.values()){
     const fallback=previous.player||reconciledPlayers[0]||null;
-    reconciledPlayers.push(ensurePosition(remote,fallback,playerIndex++));
+    reconciledPlayers.push(ensurePosition(hydrateMobDef(remote),fallback,playerIndex++));
   }
-  for(let index=0;index<reconciledPlayers.length;index++)
-    ensurePosition(reconciledPlayers[index],previous.player||reconciledPlayers[0]||null,index);
   if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
   else previous.players=reconciledPlayers;
 
@@ -2688,8 +2845,19 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // Preserve primeiro o selecionado local; só use o remoto como fallback.
   const active=(previous.players||[]).find((ent)=>entityId(ent)===localActiveId)||
     (previous.players||[]).find((ent)=>entityId(ent)===String(descriptor.activeCharacterId||""))||previous.players[0];
-  if(active&&active.p){previous.player=active;G.p=active.p;}
+  if(active&&active.p){
+    previous.player=active;G.p=active.p;
+    if(beforeLevel&&G.p.level>beforeLevel){
+      if(typeof addLog==="function")addLog("level",`Subiu para o nível <b>${G.p.level}</b>!`);
+      if(typeof toast==="function")toast(`Nível <b>${G.p.level}</b>!`,"level");
+      if(G.renderer&&typeof G.renderer.addFloater==="function")G.renderer.addFloater(0.13,0.42,"LEVEL UP!","#ffe680",true);
+    }
+  }
   G.combat=previous;
+  if(Number.isFinite(incomingVersion)&&incomingVersion>0){
+    ONLINE_AUTH_APPLIED_VERSION=incomingVersion;
+    if(instanceId)ONLINE_AUTH_APPLIED_INSTANCE=instanceId;
+  }
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{if(G.combat)stopHunt(true);},0);
@@ -2704,7 +2872,8 @@ function requestOnlineAuthorityTick(){
   if(!leaseReady||!instanceReady||G.instanceReconnectPending){requestOnlineRuntimeRecovery();return;}
   ONLINE_AUTH_TICKING=true;
   accountTickInstance(sessionToken()).then((result)=>{
-    if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
+    if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason,
+      result.version);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
     }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
@@ -2734,7 +2903,8 @@ if(typeof window!=="undefined"){
       return;
     }
     const belongs=G.p&&instanceIncludesCharacter(state,G.p.id);
-    if(G.combat&&belongs)applyOnlineAuthorityState(state,detail.event&&detail.event.terminalReason);
+    if(G.combat&&belongs)applyOnlineAuthorityState(state,detail.event&&detail.event.terminalReason,
+      detail.meta&&detail.meta.version);
     else if(G.foreignInstance&&!belongs)G.foreignInstance.memberNames=(state.members||[]).map((m)=>m.p&&m.p.name||m.id);
   });
   window.addEventListener("tibia-idle-sync-party",()=>{
@@ -2810,13 +2980,22 @@ function loop(ts) {
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     if(onlineAuthorityCombat()){
       ONLINE_AUTH_ACC+=dt;
-      if(ONLINE_AUTH_ACC>=ONLINE_AUTH_TICK_MS){ONLINE_AUTH_ACC=0;requestOnlineAuthorityTick();}
+      if(!ONLINE_AUTH_TICKING&&ONLINE_AUTH_ACC>=ONLINE_AUTH_TICK_MS){
+        ONLINE_AUTH_ACC=Math.min(ONLINE_AUTH_ACC-ONLINE_AUTH_TICK_MS,ONLINE_AUTH_TICK_MS);
+        requestOnlineAuthorityTick();
+      }
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
       // Eventos de combate (dano/cura/kill/dust/death) chegam via
       // applyOnlineAuthorityState e ficam na fila c.events.
       drainEvents();
+      if (G.combat.greed && typeof greedRenderMinigame === "function") greedRenderMinigame(G.combat);
+      else if (typeof greedHideMinigame === "function") greedHideMinigame();
+      if (G.combat.hatred && typeof hatredRenderMinigame === "function") hatredRenderMinigame(G.combat, Date.now());
+      else if (typeof hatredHideMinigame === "function") hatredHideMinigame();
+      if (typeof scarlettRenderOnline === "function") scarlettRenderOnline(G.combat);
+      if (G.combat.greed) G.combat.greed.randomFn = Math.random;
       // Imbuements tickam por TEMPO DE COMBATE no cliente (o servidor
       // autoritativo não gerencia imbuements — eles são do save do char).
       if (typeof imbTickAll === "function") {
@@ -2955,6 +3134,8 @@ function loop(ts) {
     G.hudAcc = 0;
     renderStats(G.p);
     renderTopbar(G.p);
+    if (typeof renderStatusBar === "function") renderStatusBar(G.p);
+    if (typeof renderPlayerStates === "function") renderPlayerStates(G.p);
     // selo da postura ativa no canto superior esquerdo da cena
     if (typeof renderStanceBadge === "function") renderStanceBadge(G.p);
   }
@@ -3154,7 +3335,8 @@ async function startGameReady(p) {
     // timers e listeners sobre a mesma instância.
     if(G.runtimeStarted)return;G.runtimeStarting=false;G.runtimeStarted=true;
     if(!instanceSession)G.inCity=true;
-    renderAll();bindControls();
+    renderAll();bindControls();bindServerStatusControls();
+    if(G.instanceReconnectPending)setServerConnectionStatus(false,{silent:true});
     addLog("info",`Bem-vindo, <b>${G.p.name}</b>!`);
     if(G.foreignInstance){
       const names=(G.foreignInstance.memberNames||[]).join(", ")||"outro personagem";
@@ -3177,6 +3359,10 @@ async function startGameReady(p) {
       setTimeout(()=>partyReportZone(partyCurrentZone()),1500);
   };
 
+  if(!instanceSession){
+    const mx=typeof maxStats==="function"?maxStats(p):null;
+    if(mx){p.hp=mx.hp;p.mp=mx.mp;}
+  }
   if(instanceSession)resumeIdleInstance(instanceSession).then(startRuntime);
   else startRuntime(null);
 }
@@ -3537,17 +3723,17 @@ function openCharacterModal() {
     </div>
     <div class="panel-body">
       <div class="small dim mb4">Personagens salvos neste navegador</div>
-      <div class="list mb8" style="max-height:260px">
-        ${chars.length ? chars.map((p) => `
-          <div class="shop-row">
-            <div class="char-portrait" data-portrait="${p.id}"></div>
-            <div style="flex:1;min-width:0">
-              <div class="small" style="color:${p.id === currentId ? "#9ce84a" : "#c8c0a8"}">
-                ${p.name}${p.id === currentId ? " · atual" : ""}</div>
-              <div class="tiny dim">${vocationName(p)} · nível ${p.level} · ${fmtFull(p.gold)} gp</div>
-            </div>
+      <div class="account-character-list mb8">
+        ${chars.length ? `<div class="account-character-list-head">
+          <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
+        </div>` + chars.map((p) => `
+          <div class="account-character-card ${p.id === currentId ? "is-current" : ""}">
+            <span class="account-character-outfit char-portrait" data-portrait="${p.id}"></span>
+            <span class="account-character-name"><b>${p.name}${p.id === currentId ? " · atual" : ""}</b></span>
+            <span class="account-character-voc">${vocationName(p)}</span>
+            <span class="account-character-level">${p.level}</span>
             <button class="sm primary" data-load-char="${p.id}" ${p.id === currentId ? "disabled" : ""}>Entrar</button>
-          </div>`).join("") : `<div class="dim small center" style="padding:12px">Nenhum personagem salvo.</div>`}
+          </div>`).join("") : `<div class="account-character-empty">Nenhum personagem salvo.</div>`}
       </div>
       <button class="full mb8" id="char-outfit">👕 Change Outfit</button>
       <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
@@ -3603,6 +3789,10 @@ function openCharacterModal() {
  * personagem e criação de personagem na conta. */
 function initAccountLogin() {
   let selSex = "male", selVoc = "knight";
+  let selAppearance = "knight-m";
+  let selColors = (typeof DEFAULT_OUTFIT_COLORS !== "undefined" && DEFAULT_OUTFIT_COLORS.knight
+    ? DEFAULT_OUTFIT_COLORS.knight : [95, 116, 116, 95]).slice();
+  let selLookPart = 0;
   const acc = sessionAccount();
 
   function msg(t) {
@@ -3628,7 +3818,8 @@ function initAccountLogin() {
     // Na tela de login (jogo não started), deixa o background aparecer
     // atrás do modal de seleção de personagens.
     const loginVisible = $("#login") && $("#login").style.display !== "none";
-    const gameActive = typeof G !== "undefined" && G && (G.combat || G.inCity || G.training);
+    const gameActive = typeof G !== "undefined" && G && G.p &&
+      (G.combat || G.inCity || G.training || ($("#app") && $("#app").classList.contains("ready")));
     modal.classList.toggle("login-modal", !!loginVisible && !gameActive);
     return true;
   }
@@ -3637,6 +3828,69 @@ function initAccountLogin() {
       sorcerer:"mage", monk:"monk" };
     return (map[v] || "citizen") + "-" + (s === "female" ? "f" : "m");
   }
+  function resetCreatorLook() {
+    selAppearance = vocOutfit(selVoc, selSex);
+    selColors = (typeof DEFAULT_OUTFIT_COLORS !== "undefined" &&
+      (DEFAULT_OUTFIT_COLORS[selVoc] || DEFAULT_OUTFIT_COLORS.none)
+      ? (DEFAULT_OUTFIT_COLORS[selVoc] || DEFAULT_OUTFIT_COLORS.none) : [78, 68, 58, 76]).slice();
+    selLookPart = 0;
+  }
+  function creatorLookPlayer() {
+    const p = { voc: selVoc, sex: selSex,
+      outfit: { appearance: selAppearance, colors: selColors.slice(), addons: 0, mount: null } };
+    if (typeof ensureOutfit === "function") ensureOutfit(p);
+    if (typeof ensureWardrobe === "function") ensureWardrobe(p);
+    if (typeof setAppearance === "function") setAppearance(p, selAppearance);
+    else if (p.outfit) p.outfit.appearance = selAppearance;
+    if (p.outfit) p.outfit.colors = selColors.slice();
+    if (typeof syncOutfitLook === "function") syncOutfitLook(p);
+    return p;
+  }
+  function starterOutfitIds() {
+    const sexo = selSex === "female" ? "f" : "m";
+    const bases = (typeof APP_INICIAIS !== "undefined" && APP_INICIAIS.length)
+      ? APP_INICIAIS : ["citizen", "hunter", "mage", "knight", "summoner", "monk"];
+    const ids = [];
+    for (const base of bases) {
+      const id = base + "-" + sexo;
+      if (typeof APP_OUTFIT === "undefined" || APP_OUTFIT[id]) ids.push(id);
+    }
+    const vocId = vocOutfit(selVoc, selSex);
+    if (ids.indexOf(vocId) === -1) ids.unshift(vocId);
+    return ids;
+  }
+  function paintCreatorLook() {
+    const p = creatorLookPlayer();
+    const preview = $("#acc-create-preview");
+    if (preview && typeof AppearanceRenderer !== "undefined") {
+      const cv = AppearanceRenderer.preview(p, "s");
+      if (cv) {
+        cv.style.width = "72px"; cv.style.height = "72px";
+        cv.style.imageRendering = "pixelated";
+        preview.innerHTML = ""; preview.appendChild(cv);
+      } else {
+        preview.innerHTML = `<div class="tiny dim">…</div>`;
+        setTimeout(paintCreatorLook, 90);
+      }
+    }
+    $$("#acc-look-parts [data-opart]").forEach((b) =>
+      b.classList.toggle("primary", +b.dataset.opart === selLookPart));
+    $$("#acc-look-palette [data-ocolor]").forEach((s) =>
+      s.classList.toggle("sel", +s.dataset.ocolor === selColors[selLookPart]));
+    const grid = $("#acc-starter-outfits");
+    if (grid) {
+      grid.innerHTML = starterOutfitIds().map((id) => {
+        const o = typeof APP_OUTFIT !== "undefined" ? APP_OUTFIT[id] : null;
+        const nome = o ? o.nome : id;
+        return `<button class="sm ${id === selAppearance ? "primary" : ""}" data-starter-outfit="${id}">${nome}</button>`;
+      }).join("");
+      $$("#acc-starter-outfits [data-starter-outfit]").forEach((b) =>
+        b.addEventListener("click", () => {
+          selAppearance = b.dataset.starterOutfit;
+          paintCreatorLook();
+        }));
+    }
+  }
   function accountCharacterPreview(c) {
     const preview = {
       id:String(c.id), name:c.name, voc:c.voc || "knight", promoted:!!c.promoted,
@@ -3644,6 +3898,7 @@ function initAccountLogin() {
       outfit:c.outfit ? JSON.parse(JSON.stringify(c.outfit)) : null,
     };
     if (typeof ensureOutfit === "function") ensureOutfit(preview);
+    if (typeof syncOutfitLook === "function") syncOutfitLook(preview);
     return preview;
   }
   function paintAccountPortraits(characters, tries) {
@@ -3698,7 +3953,7 @@ function initAccountLogin() {
       const partyState=G.p._partyOnline||null;
       const partyMember=partyState&&[partyState.leader].concat(partyState.members||[])
         .some((member)=>String(member&&member.id)===String(summary.id));
-      if(partyEntity||partyMember){
+      if(G.combat&&(partyEntity||partyMember)){
         const switched=typeof partyCombatSwitchOnlineTo==="function"
           ? await partyCombatSwitchOnlineTo(summary.id)
           : typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(summary.id);
@@ -3747,9 +4002,15 @@ function initAccountLogin() {
         <div class="vd">${VOCATIONS[v].desc}</div>
       </div>`).join("");
     $$("#acc-voc-grid .voc-card").forEach((card) =>
-      card.addEventListener("click", () => { selVoc = card.dataset.voc; paintCreatorVocations(); }));
+      card.addEventListener("click", () => {
+        selVoc = card.dataset.voc;
+        resetCreatorLook();
+        paintCreatorVocations();
+        paintCreatorLook();
+      }));
   }
   function showCharacterCreator(token, account, characters) {
+    const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
     if (!openAccountModal(`
       <div class="panel-title">Criar personagem
         <span style="flex:1"></span><button class="sm" id="acc-create-back">← Voltar</button>
@@ -3764,14 +4025,37 @@ function initAccountLogin() {
         </div>
         <div class="small dim mb4">Vocação</div>
         <div class="voc-grid mb8" id="acc-voc-grid"></div>
+        <div class="small dim mb4">Visual inicial — cores e outfit da vocação</div>
+        <div class="creator-look-editor mb8">
+          <div id="acc-create-preview" class="outfit-preview" style="width:84px;height:84px;flex:none"></div>
+          <div style="min-width:0;flex:1">
+            <div class="row wrap mb4" id="acc-look-parts" style="gap:4px">
+              ${PARTS.map(([n, i]) => `<button class="sm" data-opart="${i}">${n}</button>`).join("")}
+            </div>
+            <div id="acc-look-palette" class="outfit-palette outfit-palette-compact">
+              ${(typeof OUTFIT_PALETTE !== "undefined" ? OUTFIT_PALETTE : []).map((c, i) =>
+                `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
+            </div>
+            <div class="tiny dim mt4 mb4">Outfits iniciais desta conta (addons e montarias compram-se com gold depois)</div>
+            <div class="row wrap" id="acc-starter-outfits" style="gap:4px"></div>
+          </div>
+        </div>
         <button class="primary full" id="acc-btn-create-char">Criar personagem</button>
         <div class="tiny dim center mt8" id="acc-flow-msg"></div>
       </div>`, true)) return;
-    selSex = "male"; selVoc = "knight"; paintCreatorVocations();
+    selSex = "male"; selVoc = "knight"; resetCreatorLook();
+    paintCreatorVocations(); paintCreatorLook();
     $$("#modal-body .acc-sex").forEach((button) => button.addEventListener("click", () => {
       selSex = button.dataset.sex;
       $$("#modal-body .acc-sex").forEach((x) => x.classList.remove("primary"));
-      button.classList.add("primary"); paintCreatorVocations();
+      button.classList.add("primary");
+      resetCreatorLook(); paintCreatorVocations(); paintCreatorLook();
+    }));
+    $$("#acc-look-parts [data-opart]").forEach((b) => b.addEventListener("click", () => {
+      selLookPart = +b.dataset.opart; paintCreatorLook();
+    }));
+    $$("#acc-look-palette [data-ocolor]").forEach((s) => s.addEventListener("click", () => {
+      selColors[selLookPart] = +s.dataset.ocolor; paintCreatorLook();
     }));
     $("#acc-create-back").onclick = () => showPicker(token, account, characters);
     const create = $("#acc-btn-create-char");
@@ -3787,13 +4071,16 @@ function initAccountLogin() {
         // A wardrobe inicial é materializada já com o sexo escolhido; o
         // catálogo nunca mistura outfits/addons MALE e FEMALE.
         if(typeof ensureWardrobe==="function")ensureWardrobe(draft);
+        if(typeof setAppearance==="function")setAppearance(draft, selAppearance);
+        draft.outfit.colors = selColors.slice();
+        if(typeof syncOutfitLook==="function")syncOutfitLook(draft);
         const result = await accountCreateCharacter(token, name, selVoc, draft);
         if (!result.ok) { status.textContent = result.msg || "Falha ao criar personagem."; return; }
         // O bônus inicial de TC é transação exclusiva do servidor.
         const refreshed = await accountMe(token);
         if (refreshed.ok) showPicker(token, refreshed.account, refreshed.characters || []);
         else showPicker(token, account, characters.concat([Object.assign({}, result.character, {
-          sex:selSex, outfit:draft.outfit,
+          sex:selSex, outfit:draft.outfit, wardrobe:draft.wardrobe,
         })]));
       } finally {
         create.disabled = false;
@@ -3877,11 +4164,13 @@ function initAccountLogin() {
       <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
         ${c.identityMismatch?`data-repair-char="${c.id}"`:`data-acc-char="${c.id}"`}>
         <span class="account-character-outfit" data-account-portrait="${c.id}"></span>
-        <span class="account-character-info">
+        <span class="account-character-name">
           <b>${c.name}</b>
-          <span>Level ${Number(c.level) || 1} · ${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
           ${c.identityMismatch?`<span class="identity-error">Dados cruzados com ${c.dataOwnerName||"outro personagem"}</span>`:""}
-        </span><span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
+        </span>
+        <span class="account-character-voc">${vocationName({voc:c.voc || "knight",promoted:!!c.promoted})}</span>
+        <span class="account-character-level">${Number(c.level) || 1}</span>
+        <span class="account-character-enter">${c.identityMismatch?"REPARAR":"ENTRAR ›"}</span>
       </button>`).join("") :
       `<div class="account-character-empty">Nenhum personagem nesta conta.</div>`;
     if (!openAccountModal(`
@@ -3889,7 +4178,9 @@ function initAccountLogin() {
         <span style="flex:1"></span><span class="tiny dim">${account.coins || 0} Tibia Coins</span>
       </div>
       <div class="panel-body account-flow-body">
-        <div class="account-character-list">${cards}</div>
+        <div class="account-character-list">${characters.length ? `<div class="account-character-list-head">
+          <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
+        </div>` : ""}${cards}</div>
         <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
         <button class="full mt8" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
         <button class="danger full mt8" id="acc-logout">Logout</button>
@@ -4028,7 +4319,7 @@ function initLogin() {
     $("#continue-box").style.display = "";
     $("#saved-name").textContent = saved.name;
     $("#saved-info").textContent =
-      `${vocationName(saved)} · nível ${saved.level}`;
+      `${vocationName(saved)} · ${typeof t === "function" ? t("login.levelOf") : "nível"} ${saved.level}`;
     $("#btn-continue").addEventListener("click", () => startGame(saved));
   }
 
@@ -4049,6 +4340,7 @@ function initLogin() {
     $$("#voc-grid .voc-card").forEach((c) =>
       c.addEventListener("click", () => { selVoc = c.dataset.voc; paintVocs(); }));
   }
+  window.refreshVocGrid = paintVocs;
   paintVocs();
 
   $$("[data-sex]").forEach((b) => {

@@ -92,6 +92,23 @@ canvas { image-rendering: pixelated; }
   letter-spacing: 1px;
 }
 .topbar .spacer { flex: 1; }
+.server-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  padding: 2px 8px; border: 1px solid var(--border-out, #5a5346);
+  background: #1c1a16; color: #c8c0b0;
+}
+.server-status[hidden] { display: none !important; }
+.server-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #6ee07a; box-shadow: 0 0 6px #6ee07a;
+}
+.server-status.offline { color: #f0b4b4; }
+.server-status.offline .server-status-dot {
+  background: #e25b5b; box-shadow: 0 0 6px #e25b5b;
+}
+.server-status #btn-reconnect { margin-left: 4px; min-height: 22px; padding: 0 8px; }
+.server-status #btn-reconnect[hidden] { display: none !important; }
 
 .layout {
   display: grid;
@@ -782,32 +799,53 @@ button.full { width: 100%; }
 /* Fluxo online: cadastro/criação em modal e seletor de personagens. */
 .account-flow-body { padding: 12px; }
 .account-character-list {
-  display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr));
-  gap: 7px; max-height: 56vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 56vh; overflow-y: auto;
+}
+.account-character-list-head,
+.account-character-card {
+  width: 100%; padding: 6px 7px;
+  display: grid; grid-template-columns: 52px minmax(0,1.7fr) minmax(0,1.1fr) 52px auto;
+  align-items: center; gap: 8px;
+}
+.account-character-list-head {
+  padding: 2px 7px 4px;
+  font-size: 9px; color: #8f8775; letter-spacing: .4px; text-transform: uppercase;
 }
 .account-character-card {
-  width: 100%; min-height: 70px; padding: 7px;
-  display: grid; grid-template-columns: 54px 1fr auto; align-items: center; gap: 9px;
-  text-align: left; background: linear-gradient(180deg,#292720,#171612);
+  min-height: 58px; text-align: left;
+  background: linear-gradient(180deg,#292720,#171612);
   border: 2px solid; border-color: #686252 #17150f #17150f #686252;
 }
 .account-character-card:hover { border-color: #d4af37 #6b5715 #6b5715 #d4af37; filter: brightness(1.1); }
 .account-character-card.identity-mismatch { border-color:#c85a5a #5c2020 #5c2020 #c85a5a; }
-.account-character-card .identity-error { color:#ff8585; font-weight:bold; }
+.account-character-card.is-current { border-color: #5a7a3a #243018 #243018 #5a7a3a; }
+.account-character-card .identity-error { display:block; color:#ff8585; font-weight:bold; font-size:9px; }
 .account-identity-warning { margin-bottom:10px; padding:9px; color:#ffd0d0; background:#321717; border:1px solid #9e4343; }
 .account-sex-choice .acc-sex { flex:1; min-height:42px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .account-sex-choice .acc-sex b { color:#ffe680; font-size:11px; }
 .account-sex-choice .acc-sex span { color:#a9a08d; font-size:8px; }
 .account-character-outfit {
-  width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
   background: #0d0d10; border: 1px solid #474238; overflow: hidden;
 }
-.account-character-outfit canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.account-character-outfit canvas, .account-character-outfit img {
+  width: 44px; height: 44px; image-rendering: pixelated; object-fit: contain;
+}
+.account-character-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.account-character-name b { color: #f1db7a; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-character-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .account-character-info b { color: #f1db7a; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 .account-character-info span { color: #aaa18d; font-size: 9px; }
+.account-character-voc { color: #d4af37; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-character-level { color: #9ce84a; font-size: 12px; font-weight: bold; text-align: right; }
 .account-character-enter { color: #9ce84a; font-size: 9px; font-weight: bold; white-space: nowrap; }
 .account-character-empty { padding: 20px; text-align: center; color: #8f8775; border: 1px dashed #514b40; }
+.creator-look-editor {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px; background: #1a1814; border: 1px solid #474238;
+}
+.creator-look-editor .outfit-preview { background: #0d0d10; }
 
 .voc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .voc-card {
@@ -1001,7 +1039,8 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .status-bar .sb-ico.harmful { border-color: #c04848; }
 .status-bar .sb-ico.positive { border-color: #7ec86a; }
 .status-bar .sb-ico.neutral { border-color: #8a8272; }
-.status-bar .sb-ico .sb-tempo {
+.status-bar .sb-ico .sb-tempo,
+.cond-bar .sb-ico .sb-tempo {
   position: absolute; right: -4px; bottom: -4px;
   font-size: 8px; line-height: 1; padding: 1px 2px;
   background: #000; color: #fff; border: 1px solid rgba(255,255,255,.25);
@@ -2019,6 +2058,9 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   padding: 5px 8px; border: 1px solid rgba(255,255,255,.1);
   background: rgba(0,0,0,.22); border-radius: 4px; font-size: 12px;
 }
+.party-member[data-switch="1"] { cursor: pointer; }
+.party-member[data-switch="1"]:hover { background: rgba(212, 175, 55, .08); }
+.party-member .ppm-outfit { width: 34px; height: 34px; flex: none; }
 .party-member-voc {
   font-size: 10px; padding: 1px 5px; border-radius: 3px;
   background: rgba(255,214,90,.15); color: #ffd65a;
@@ -2586,6 +2628,7 @@ a:hover { color: #aab6f7; }
 .combo-slot[draggable="true"] { cursor: grab; }
 .combo-slot.dragging { opacity: .45; cursor: grabbing; }
 .combo-slot.drop-here { outline: 2px solid #d4af37; box-shadow: 0 0 10px rgba(212,175,55,.45); }
+.combo-slot img, .combo-slot .combo-art { pointer-events: none; -webkit-user-drag: none; }
 .txt-red { color: #ff9090; }
 .mt10 { margin-top: 10px; }
 .party-analyser-tabs{display:flex;gap:4px;flex-wrap:wrap;padding:4px 0 8px}.pa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.pa-grid>div{background:#171719;border:1px solid #3f3f43;padding:7px;color:#aaa}.pa-grid b{display:block;color:#ffe680;font-size:14px}.pa-grid small{color:#75caff}.pa-table{width:100%;border-collapse:collapse;font-size:11px}.pa-table th{color:#ffe680;text-align:left;background:#191919}.pa-table td,.pa-table th{padding:5px;border-bottom:1px solid #333}.pa-line{display:flex;gap:7px;align-items:center;padding:3px;border-bottom:1px solid #303034}.pa-line span{flex:1}.pa-list-title{color:#ffe680;margin-bottom:5px}
@@ -2596,7 +2639,7 @@ a:hover { color: #aab6f7; }
 .outfit-palette-compact { grid-template-columns:repeat(16, 18px); gap:1px; width:max-content; padding:3px; }
 .outfit-palette-compact .swatch { width:18px; height:18px; aspect-ratio:auto; }
 
-#game-loading{position:fixed;inset:0;z-index:9999;background:rgba(8,10,14,.92);align-items:center;justify-content:center}.gl-box{width:min(360px,85vw);padding:22px;background:#20242c;border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 8px 35px #000}.gl-text{font-size:12px;color:#d8d8dc;margin:14px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}
+#game-loading{display:none;position:fixed;inset:0;z-index:9999;background:rgba(8,10,14,.92);align-items:center;justify-content:center}.gl-box{width:min(360px,85vw);padding:22px;background:#20242c;border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 8px 35px #000}.gl-text{font-size:12px;color:#d8d8dc;margin:14px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}
 /* Background Summer 2026: fixo na viewport; o conteúdo rola sobre ele.
    !important necessário pois otc-complete.css é carregado depois deste
    arquivo e define body/#app com a mesma especificidade. */
@@ -2611,4 +2654,32 @@ body {
 #app { background: transparent !important; min-height: 100vh; }
 @media (max-width: 760px) {
   body { background-position: center top; background-attachment: scroll; }
+}
+
+/* CONFIG / FULLHD — depois da consolidação, especificidade alta para
+   vencer #scene e canvas { image-rendering: pixelated }. */
+.config-fab {
+  position: fixed; top: 10px; right: 12px; z-index: 80;
+}
+body:has(#app.ready) #btn-config-login { display: none; }
+
+.cfg-body { padding: 12px; }
+.cfg-lang button { min-width: 110px; }
+.cfg-fullhd { font-size: 12px; gap: 8px; }
+.cfg-fullhd b { color: #ffe680; letter-spacing: .04em; }
+
+body.fullhd {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body.fullhd #scene-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+body.fullhd #scene,
+body.fullhd canvas#scene {
+  /* Buffer em DPR inteiro; o present 2:1/3:1 usa filtro do browser.
+     pixelated aqui em razão não-inteira era o “quadriculado”. */
+  image-rendering: auto !important;
 }

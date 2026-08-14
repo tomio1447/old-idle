@@ -54,7 +54,7 @@ must(ctx.helperPriorityTarget({boss:{},mobs:[add,boss]})===boss,
   "Helper não prioriza boss vulnerável");
 must(ctx.helperPriorityTarget({boss:{},greed:{immune:true},mobs:[add,boss]})===add,
   "Helper ignora adds necessários durante imunidade do boss");
-must((combatSrc.match(/helperPriorityTarget\(c\)/g)||[]).length>=3,
+must((combatSrc.match(/helperPriorityTarget\(c/g)||[]).length>=3,
   "movimento/ataques ativo e aliado não compartilham prioridade do boss");
 
 const anim=path.join(game,"assets","tiles","33791_anim.png"),animSize=pngSize(anim);
@@ -92,7 +92,7 @@ for(const match of combatSrc.matchAll(/events\.push\(\{\s*t:\s*"hit"[\s\S]{0,260
   if(!match[0].includes("targetId:"))missingIdentity=true;
 must(!missingIdentity,"evento hit sem identidade estável do alvo");
 
-must(html.includes("css/layout.css?v=interface-sharp-v2")&&
+must(html.includes("css/layout.css?v=party-list-v1")&&
   html.includes("js/render.js?v=interface-sharp-v1")&&
   html.includes("js/combat.js?v=boss-immunity-v1"),"ajustes visuais sem cache-busting");
 console.log("OK: navegação esquerda, combo por alvo/elemento, Fury e visual nítido validados.");

@@ -126,7 +126,8 @@ function accountSavePayload(p){
 const ACCOUNT_LEASE_HOLDER_KEY="tibia-idle-lease-holder-v1";
 const ACCOUNT_LEASE_TOKEN_KEY="tibia-idle-lease-token-v1";
 const ACCOUNT_LEASE_EXPIRY_KEY="tibia-idle-lease-expiry-v1";
-let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,sessionToken:"",timer:null,lost:false};
+let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,heldUntil:0,sessionToken:"",timer:null,lost:false};
+let ACCOUNT_LEASE_INFLIGHT=null;
 function accountLeaseRandom(){
   try{if(crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID().replace(/-/g,"");}catch(e){}
   return Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
@@ -164,7 +165,7 @@ function accountLeaseFields(){
 }
 function accountLeaseApply(token,data){
   const stored=accountLeaseStored();
-  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.sessionToken=token;
+  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.sessionToken=token;
   ACCOUNT_LEASE.holder=data.holderId||stored.holder;ACCOUNT_LEASE.token=data.leaseToken;
   ACCOUNT_LEASE.expiresAt=new Date(data.expiresAt).getTime();
   try{
@@ -177,19 +178,31 @@ function accountLeaseApply(token,data){
   if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
   ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),Math.max(1000,Number(data.renewAfterMs)||30000));
 }
-function accountLeaseMarkLost(message){
-  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.token="";ACCOUNT_LEASE.expiresAt=0;
-  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+function accountLeaseClearSecret(){
+  ACCOUNT_LEASE.token="";
   try{sessionStorage.removeItem(ACCOUNT_LEASE_TOKEN_KEY);sessionStorage.removeItem(ACCOUNT_LEASE_EXPIRY_KEY);}catch(e){}
+}
+function accountLeaseMarkLost(message,options){
+  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.expiresAt=0;ACCOUNT_LEASE.heldUntil=0;
+  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+  if(!(options&&options.keepSecret))accountLeaseClearSecret();
   try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
   if(message!==false&&typeof toast==="function")
     toast(message||"Outra aba assumiu o controle. A simulação foi pausada.","bad");
+}
+function accountLeasePauseHeld(expiresAt,message,silent){
+  const until=Math.max(Date.now()+2000,new Date(expiresAt||0).getTime()||Date.now()+10000);
+  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.heldUntil=until;
+  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
+  if(!silent&&message!==false&&typeof toast==="function")
+    toast(message||"Esta conta já está ativa em outra aba ou dispositivo.","bad");
 }
 function accountLeaseAllowsSimulation(){
   if(!accountApiConfigured())return true;
   return !!(ACCOUNT_LEASE.active&&ACCOUNT_LEASE.token&&Date.now()<ACCOUNT_LEASE.expiresAt);
 }
-async function accountAcquireLease(token,takeover){
+async function accountAcquireLeaseRequest(token,takeover){
   const stored=accountLeaseStored(),path=takeover?"/api/lease/takeover":"/api/lease/acquire";
   const r=await _api("POST",path,{token,holder_id:stored.holder,
     previous_holder_id:stored.previousHolder,lease_token:stored.token});
@@ -198,6 +211,29 @@ async function accountAcquireLease(token,takeover){
   // segundo lease-lost nem outro ciclo de limpeza para a mesma resposta.
   return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
     msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:r.code===401};
+}
+async function accountAcquireLease(token,takeover){
+  if(takeover){
+    ACCOUNT_LEASE.heldUntil=0;
+    return accountAcquireLeaseRequest(token,true);
+  }
+  if(accountLeaseAllowsSimulation())return {ok:true,resumed:true};
+  if(ACCOUNT_LEASE.heldUntil&&Date.now()<ACCOUNT_LEASE.heldUntil)
+    return {ok:false,held:true,expiresAt:new Date(ACCOUNT_LEASE.heldUntil).toISOString(),
+      msg:"Esta conta já está ativa em outra aba ou dispositivo."};
+  if(ACCOUNT_LEASE_INFLIGHT)return ACCOUNT_LEASE_INFLIGHT;
+  ACCOUNT_LEASE_INFLIGHT=(async()=>{
+    try{
+      const result=await accountAcquireLeaseRequest(token,false);
+      if(result.ok||accountLeaseAllowsSimulation()){ACCOUNT_LEASE.heldUntil=0;return result.ok?result:{ok:true};}
+      if(result.held){
+        const until=new Date(result.expiresAt||0).getTime();
+        ACCOUNT_LEASE.heldUntil=Math.max(Date.now()+2000,until||Date.now()+10000);
+      }
+      return result;
+    }finally{ACCOUNT_LEASE_INFLIGHT=null;}
+  })();
+  return ACCOUNT_LEASE_INFLIGHT;
 }
 async function accountRenewLease(token){
   token=token||ACCOUNT_LEASE.sessionToken;const fields=accountLeaseFields();
@@ -214,16 +250,17 @@ async function accountRenewLease(token){
 async function accountEnsureLease(token,options){
   if(accountLeaseAllowsSimulation())return {ok:true};
   const acquired=await accountAcquireLease(token,false);
+  if(acquired.ok||accountLeaseAllowsSimulation())return {ok:true,resumed:!!(acquired&&acquired.resumed)};
   // A recuperação automática roda periodicamente. Se outra aba é a dona
-  // legítima, mantenha esta pausada sem repetir o mesmo toast a cada retry.
-  if(!acquired.ok&&acquired.held&&!ACCOUNT_LEASE.lost)
-    accountLeaseMarkLost(options&&options.silent?false:acquired.msg);
+  // legítima, mantenha esta pausada sem apagar o segredo nem repetir o toast.
+  if(acquired.held&&!ACCOUNT_LEASE.lost)
+    accountLeasePauseHeld(acquired.expiresAt,acquired.msg,options&&options.silent);
   return acquired;
 }
 async function accountReleaseLease(token){
   const fields=accountLeaseFields();
   if(token&&fields.lease_token)await _api("POST","/api/lease/release",Object.assign({token},fields));
-  accountLeaseMarkLost(false);ACCOUNT_LEASE.lost=false;
+  accountLeaseMarkLost(false);ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.heldUntil=0;
 }
 
 let ACCOUNT_INSTANCE={id:"",version:0,status:null};
@@ -313,6 +350,18 @@ function accountAuthorityVisualState(){
       const visual={id,x,y},cx=ent.cx===null||ent.cx===undefined?NaN:Number(ent.cx),
         cy=ent.cy===null||ent.cy===undefined?NaN:Number(ent.cy);
       if(Number.isFinite(cx))visual.cx=Math.round(cx);if(Number.isFinite(cy))visual.cy=Math.round(cy);
+      const activeId=typeof sessionCharId==="function"?String(sessionCharId()||""):"";
+      const isSelf=!activeId||id===activeId;
+      if(isSelf&&ent.p&&ent.p.config&&Array.isArray(ent.p.config.combo))visual.combo=ent.p.config.combo;
+      if(isSelf&&ent.p&&ent.p.stances&&typeof ent.p.stances==="object")visual.stances=ent.p.stances;
+      if(isSelf&&ent.p&&ent.p.config){
+        const mode=ent.p.config.attackMode||(combat&&combat.huntMode)||"kiting";
+        visual.challenge={
+          res:!!ent.p.config.exetaRes,amp:!!ent.p.config.exetaAmpRes,
+          box:mode==="box",
+          huntMode:mode==="box"||mode==="safe"||mode==="kiting"?mode:"kiting",
+          kiteDistance:Math.max(1,Math.min(5,Number(ent.p.config.kiteDistance)||3))};
+      }
       out.push(visual);
     }
     return out;
@@ -327,10 +376,33 @@ function accountTickInstance(token){
       char_id:typeof sessionCharId==="function"?sessionCharId():null,
       expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
-      return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,elapsed:r.data.elapsed||0};}
+      return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,
+        elapsed:r.data.elapsed||0,version:ACCOUNT_INSTANCE.version,instanceId:ACCOUNT_INSTANCE.id};}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.data.instance)accountInstanceApply(r.data.instance);
     return {ok:false,error:r.data.error};
+  });
+}
+function accountClaimRewardChest(token,charId,opts){
+  opts=opts||{};
+  return accountQueueSave(async()=>{
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),
+      expected_version:Number(summary&&summary.saveVersion)||0,
+      bundleId:opts.bundleId||null,slug:opts.slug||null,all:!!opts.all,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/reward/claim",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      return {ok:true,rewardChest:r.data.rewardChest||{},rewardChestBundles:r.data.rewardChestBundles||[],
+        lootPouch:r.data.lootPouch||{},saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível recolher",code:r.code,error:r.data.error};
   });
 }
 function accountSelectInstanceAmmo(token,charId,slug,automatic){
@@ -481,11 +553,16 @@ async function _api(method, path, body, token) {
     // desligar todos os loops ao primeiro 401 autenticado; login inválido não
     // traz token e portanto nunca passa por esta invalidação.
     if(r.status===401&&requestToken)accountInvalidateSession(requestToken,data);
+    if(r.status>0)accountNotifyServerReachable(true);
     return { code: r.status, data: data };
   } catch (error) {
+    accountNotifyServerReachable(false);
     return { code: 0, data: { ok:false, error:"NETWORK_ERROR",
       msg:"Servidor indisponível. Verifique se a API está ligada." } };
   }
+}
+function accountNotifyServerReachable(online){
+  try{window.dispatchEvent(new CustomEvent(online?"tibia-idle-server-online":"tibia-idle-server-offline"));}catch(e){}
 }
 
 async function accountRegister(login, password) {

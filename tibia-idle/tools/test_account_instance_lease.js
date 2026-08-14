@@ -37,8 +37,9 @@ async function summary(token,id){const me=await request("/api/me",{headers:{auth
     dbSource.includes("lockValidLease(conn,accountId,lease)"),
     "servidor/MySQL não implementam lease exclusivo e atômico");
   must(clientSource.includes("accountRenewLease")&&clientSource.includes("accountLeaseMarkLost")&&
+    clientSource.includes("accountLeasePauseHeld")&&clientSource.includes("ACCOUNT_LEASE_INFLIGHT")&&
     clientSource.includes('new BroadcastChannel("tibia-idle-account-lease-v1")')&&
-    gameSource.includes("accountLeaseAllowsSimulation())return")&&gameSource.includes("acc-lease-takeover"),
+    gameSource.includes("accountLeaseAllowsSimulation")&&gameSource.includes("acc-lease-takeover"),
     "cliente não renova, pausa ou oferece takeover controlado");
   must(!gameSource.includes('addEventListener("beforeunload",accountReleaseLease')&&
     !gameSource.includes('addEventListener("pagehide",accountReleaseLease'),

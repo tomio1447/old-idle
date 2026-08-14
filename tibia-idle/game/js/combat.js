@@ -600,8 +600,9 @@ function movePoint(ent, target, speed, dt, stopRange) {
 /* Em boss fights, runas/spells/ataques do Helper focam o boss antes dos
  * summons. A única exceção é uma fase explicitamente imune (Greed/QTE),
  * quando os adds da mecânica precisam ser eliminados primeiro. */
-function helperPriorityTarget(c) {
+function helperPriorityTarget(c, caster) {
   if (!c || !c.mobs || !c.mobs.length) return null;
+  const from = caster || c.player;
   if (c.boss) {
     // Hatred exige controlar os summons; Hateful Soul tem prioridade por
     // zerar todos os contadores, depois vêm os Harvesters.
@@ -615,7 +616,17 @@ function helperPriorityTarget(c) {
       (c.scarlett && c.scarlett.immune) || (boss && boss.greedImmune));
     if (boss && !immune) return boss;
   }
-  return c.mobs[0];
+  const vivos = c.mobs.filter((m) => m && m.hp > 0);
+  if (!vivos.length) return null;
+  const dist = (a, b) => {
+    if (!a || !b) return 99;
+    if (Number.isFinite(Number(a.cx)) && Number.isFinite(Number(b.cx)) &&
+        Number.isFinite(Number(a.cy)) && Number.isFinite(Number(b.cy)))
+      return Math.max(Math.abs(a.cx - b.cx), Math.abs(a.cy - b.cy));
+    return Math.max(Math.abs((Number(a.x) || 0) - (Number(b.x) || 0)),
+      Math.abs((Number(a.y) || 0) - (Number(b.y) || 0)));
+  };
+  return vivos.slice().sort((a, b) => dist(from, a) - dist(from, b))[0] || vivos[0];
 }
 
 function updateCombatMovement(c, p, dt) {
@@ -625,7 +636,8 @@ function updateCombatMovement(c, p, dt) {
   pl.moving = false;
   if (!c.mobs.length) return;
 
-  const target = helperPriorityTarget(c);
+  const target = helperPriorityTarget(c, pl);
+  if (!target) return;
   const desired = playerAttackRange(p);
   const cur = pointDistance(pl, target);
   const playerSpeed = 0.000070 + Math.min(0.000035, gearStats(p).speed * 0.0000012);
@@ -728,12 +740,30 @@ function ammoPrice(slug) {
   return it.shotCost || it.buy || it.sell || 0;
 }
 
+/* Canary items.xml ammotype: bow=arrow, crossbow=bolt. Arremesso
+ * (spear/star/knife) não tem ammotype — a arma É a munição. */
+function weaponAmmoKind(wp, slug) {
+  if (!wp) return null;
+  const explicit = wp.ammoKind || wp.ammoType || wp.ammotype;
+  if (explicit) {
+    const k = String(explicit).toLowerCase();
+    return k === "bolt" ? "bolt" : k === "arrow" ? "arrow" : null;
+  }
+  const id = String(slug || wp.sprite || "");
+  if (/crossbow|arbalest|bolter|spitter|ironworker|devileye/.test(id)) return "bolt";
+  if (/bow/.test(id) && !/crossbow/.test(id)) return "arrow";
+  return null;
+}
+
 function ammoCompatibleWithWeapon(ammo, weapon) {
   if (!ammo || !weapon) return false;
-  const wid = weapon.item || "";
+  const wid = weapon.item || weapon || "";
+  const wp = (typeof GAMEDATA !== "undefined" && GAMEDATA.items)
+    ? GAMEDATA.items[wid] : null;
+  const need = weaponAmmoKind(wp, wid);
+  if (!need) return false;
   const kind = ammo.ammoKind || (ammo.n && ammo.n.indexOf("bolt") !== -1 ? "bolt" : "arrow");
-  if (kind === "bolt") return wid === "crossbow" || /crossbow/.test(wid);
-  return wid === "bow" || (/bow/.test(wid) && !/crossbow/.test(wid));
+  return kind === need;
 }
 
 /* Consome 1 unidade de munição do contador.
@@ -744,10 +774,11 @@ function consumeAmmoCharge(c, p) {
   // igual ao exercise weapon do servidor, que so consome cargas do proprio
   // exercise. Sem isso treinar distance drenava o gold do jogador.
   if (c && c.training) return true;
-  // armas com munição infinita (spear) nunca gastam gold
+  // armas com munição infinita (spear / throwing) nunca gastam gold
   const weapon = p.equip.weapon || null;
   const wp = weapon ? GAMEDATA.items[weapon.item] : null;
   if (wp && wp.inf) return true;
+  if (wp && !weaponAmmoKind(wp, weapon.item)) return true;
   if (!equippedQuiver(p)) {
     if (c && c.events) c.events.push({ t: "no-ammo", name: "quiver" });
     return false;
@@ -1559,11 +1590,13 @@ function playerAttack(c, p, target) {
       c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: false, el: "physical", crit: critou, fatal: fatalou,
-                      race: target.def && target.def.race });
+                      race: target.def && target.def.race,
+                      fx: (ELEMENTS.physical && ELEMENTS.physical.fx) || "draw-blood" });
       // dano elemental: cor e animacao do elemento (gelo = azul + ice-attack)
       c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
-                      projectile: false, el: parte2, dual: 1 });
+                      projectile: false, el: parte2, dual: 1,
+                      fx: (ELEMENTS[parte2] || ELEMENTS.physical).fx });
     } else {
       target.hp -= raw;
       c.stats.damage += raw;
@@ -1860,7 +1893,9 @@ function castSpellById(c, p, target, now, id) {
     // estava visivelmente fora do circulo.
     const soMatriz = (typeof SPELLTARGET !== "undefined" && SPELLTARGET[id])
       ? !!SPELLTARGET[id].self : false;
-    if (soMatriz) {
+    const fromCaster = typeof areaSaiDoConjurador === "function" &&
+      areaSaiDoConjurador(nomeArea, id);
+    if (soMatriz || fromCaster) {
       targets = porMatriz;
     } else {
       targets = porMatriz.indexOf(target) === -1
@@ -2108,7 +2143,8 @@ function castSpellById(c, p, target, now, id) {
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: false, el: armaEl.el, dual: 1,
-                      crit: critSt, fatal: fatalSpell });
+                      crit: critSt, fatal: fatalSpell,
+                      fx: (ELEMENTS[armaEl.el] || ELEMENTS.physical).fx });
       return;
     }
     dmg = applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento)));
@@ -3032,7 +3068,7 @@ function skillPatternHas(mob, pl, pattern, px, py) {
 
 /* A animacao oficial da habilidade (area, onda ou impacto), sem dano. */
 function mobSkillFx(c, mob, pl, sk) {
-  const el = sk.el || "physical";
+  const el = inferSkillElement(sk);
   const fx = sk.fx || (ELEMENTS[el] || ELEMENTS.physical).fx;
   if (sk.areaPattern && sk.areaPattern.length) {
     c.events.push({ t: "areafx",
@@ -3093,13 +3129,18 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   const ehManaDrain = /mana\s*drain|manadrain/i.test(nomeSk);
   const ehLifeDrain = /life\s*drain|lifedrain/i.test(nomeSk);
   const ehAgony = sk.el === "agony" || /agony/i.test(nomeSk);
-  const tipoEl = ehManaDrain ? "manadrain" : ehLifeDrain ? "lifedrain" : (sk.el || "physical");
+  const tipoEl = ehManaDrain ? "manadrain" : ehLifeDrain ? "lifedrain" : inferSkillElement(sk);
   // Sap Strength (15.25): monstro marcado causa 10% menos — vale para todo
   // dano causado, nao so o auto attack (o debuff marca o ALVO, nao o golpe)
   if (mob.sapStrUntil && mob.sapStrUntil > agora) raw = Math.floor(raw * 0.9);
   const def0 = playerDefense(p);
   // Agony ignora TODAS as reduções (armor, proteção %, imbuement, mantra).
   if (!ehAgony) {
+    // basic_attack físico (name=combat, sem área) usa armor/defense como melee.
+    if (typeof skillUsesMeleeBlock === "function" && skillUsesMeleeBlock(sk)
+        && typeof mitigate === "function") {
+      raw = mitigate(raw, def0.armor, def0.defense, def0.shielding);
+    }
     raw = raw * (1 - Math.min(0.7, def0.protection / 100));
     if (typeof imbProtection === "function") {
       const prot = imbProtection(p, tipoEl);
@@ -3244,6 +3285,44 @@ function mobSkillHit(c, p, mob, sk, dmg) {
                   fx: sk.fx || null,
                   projectile: bolt, missile: miss });
   return raw;
+}
+
+/* O import só extrai name="melee" para `damage`. Monstros novos (naga,
+ * makara...) declaram o basic_attack como name="combat"; o campo damage
+ * vira max(skills) e um melee extra somaria a magia mais forte no mesmo
+ * turno. */
+function mobHasExtractedMelee(def) {
+  def = def || {};
+  const dmg = Number(def.damage) || 0;
+  if (dmg <= 0) return false;
+  const skills = def.skills || [];
+  if (!skills.length) return true;
+  let skillMax = 0;
+  for (let i = 0; i < skills.length; i++)
+    skillMax = Math.max(skillMax, Number(skills[i].max) || 0);
+  if (skillMax > 0 && dmg === skillMax) return false;
+  return true;
+}
+
+function skillUsesMeleeBlock(sk) {
+  if (!sk) return false;
+  if ((sk.el || "physical") !== "physical") return false;
+  if (sk.radius || sk.length || sk.areaPattern) return false;
+  const n = String(sk.n || sk.name || "");
+  if (n && n !== "combat") return false;
+  return (Number(sk.max) || 0) > 0;
+}
+
+function inferSkillElement(sk) {
+  const named = String((sk && (sk.n || sk.name)) || "").toLowerCase();
+  const el = (sk && sk.el) || "physical";
+  if (el !== "physical" || !named) return el;
+  if (/death|mort/.test(named)) return "death";
+  if (/water|splash|ice|frost|frigo/.test(named)) return "ice";
+  if (/fire|flam/.test(named)) return "fire";
+  if (/energy|electr/.test(named)) return "energy";
+  if (/earth|poison|stone/.test(named)) return "earth";
+  return el;
 }
 
 /* Rola a lista de habilidades do monstro (defensivas antes, na ordem do
@@ -3823,7 +3902,7 @@ function partyHelperTick(c, ent, now, dt) {
     // ---- ataque com a arma/magias DELE: runa > spell > ataque básico ----
     ent.atkCd -= dt;
     if (ent.atkCd <= 0 && c.mobs.length) {
-      const alvo = helperPriorityTarget(c);
+      const alvo = helperPriorityTarget(c, ent);
       let acted = false;
       if (typeof tryUseRune === "function") { try { acted = tryUseRune(c, p, alvo, now); } catch (e) { /* segue */ } }
       if (!acted && typeof tryCastSpell === "function") { try { acted = tryCastSpell(c, p, alvo, now); } catch (e) { /* segue */ } }
@@ -4050,7 +4129,7 @@ function combatTick(c, p, dt, now) {
   // ataque do jogador (personagem ATIVO)
   c.playerAtkCd -= dt;
   if (c.playerAtkCd <= 0 && c.mobs.length) {
-    const target = helperPriorityTarget(c);
+    const target = helperPriorityTarget(c, c.player);
     // prioridade: runa > spell > arma, respeitando alcance
     let acted = tryUseRune(c, p, target, now) ||
                 tryCastSpell(c, p, target, now);
@@ -4086,10 +4165,13 @@ function combatTick(c, p, dt, now) {
       // PARTY COMBAT: escolhe o alvo (mais próximo entre líder + membros)
       if (typeof partyNearestTarget === "function") m.target = partyNearestTarget(c, m);
       const pp = (m.target && m.target.p) ? m.target.p : p;
-      // 1) skills do .lua (cada uma rola a própria chance)
+      // 1) skills do .lua (cada uma rola a própria chance + interval)
       if (typeof mobCastSkill === "function") mobCastSkill(c, pp, m, now);
-      // 2) melee (ataque básico) — roda SEMPRE que o monstro tem dano base
-      if ((m.def && (m.def.damage || 0) > 0)) mobAttack(c, pp, m);
+      // 2) melee extraído do name="melee". Sem melee real (naga combat
+      // basic_attack) o damage é cópia do maior spell — não somar de novo.
+      if ((m.def && (m.def.damage || 0) > 0) &&
+          (typeof mobHasExtractedMelee !== "function" || mobHasExtractedMelee(m.def)))
+        mobAttack(c, pp, m);
       m.atkCd = (m.def && m.def.attackSpeed) || 2000;
     }
     monsterThinkYell(m, dt);
