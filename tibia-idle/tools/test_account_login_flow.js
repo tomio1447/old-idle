@@ -23,8 +23,9 @@ must(js.includes("function openRegisterModal()")&&js.includes('id="acc-new-login
   "criação de conta não abre/fecha modal voltando ao login");
 must(js.includes("function showPicker(token, account, characters)")&&
   js.includes('class="account-character-card ${c.identityMismatch')&&js.includes('data-account-portrait')&&
-  js.includes('Level ${Number(c.level) || 1} · ${vocationName'),
-  "picker não mostra cards com outfit, level e vocação");
+  js.includes("account-character-name")&&js.includes("account-character-voc")&&
+  js.includes("account-character-level")&&js.includes('vocationName({voc:c.voc || "knight"'),
+  "picker não mostra lista com outfit, nome, vocação e level");
 const picker=js.indexOf("function showPicker(token, account, characters)");
 const create=js.indexOf('id="acc-open-create-char"',picker),customize=js.indexOf('id="acc-customize-char"',picker),logout=js.indexOf('id="acc-logout"',picker);
 must(create>picker&&customize>create&&logout>customize,"botões Criar/Personalizar/Logout estão ausentes ou fora de ordem");
@@ -34,8 +35,10 @@ must(js.includes("function showCharacterCreator")&&js.includes("const refreshed 
   "personagem criado não retorna ao picker atualizado");
 must(js.includes('sessionStorage.removeItem("tibia-idle-token")')&&
   js.includes('window.openAccountCharacterPicker'),"logout/troca online não reutilizam o picker da conta");
-must(css.includes(".account-character-list")&&css.includes(".account-character-card")&&
-  css.includes(".account-character-outfit"),"picker de personagens sem layout próprio");
+must(css.includes(".account-character-list")&&css.includes(".account-character-list-head")&&
+  css.includes(".account-character-card")&&css.includes(".account-character-outfit")&&
+  css.includes(".account-character-voc")&&css.includes(".account-character-level"),
+  "picker de personagens sem layout em lista");
 must(server.includes("function accountCharacterSummary")&&server.includes("sex:data.sex")&&
   server.includes("outfit:data.outfit")&&
   (server.match(/characters: characters\.map\(accountCharacterSummary\)/g)||[]).length===2,

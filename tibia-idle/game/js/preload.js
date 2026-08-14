@@ -16,6 +16,18 @@ function beginMapLoading(text) {
   return MAP_LOADING_GENERATION;
 }
 
+function markHuntMapReady() {
+  if (typeof G === "undefined" || !G) return;
+  const wasBlocked = G.huntMapReady === false;
+  G.huntMapReady = true;
+  if (!wasBlocked || !G.combat) return;
+  const now = Date.now();
+  for (const sp of G.combat.pendingSpawns || []) {
+    if (sp && !sp.done && !(Number(sp.blink) > 0)) sp.startedAt = now;
+  }
+  if (typeof releaseHeldAuthoritySpawns === "function") releaseHeldAuthoritySpawns(G.combat, now);
+}
+
 function finishMapLoading() {
   // Invalida qualquer progresso atrasado da transição anterior. Sem isso,
   // um onload tardio pode reabrir o overlay depois de a hunt já ter iniciado.
@@ -40,7 +52,8 @@ function finishMapLoading() {
   }, 350);
 }
 
-function preloadAssetPaths(paths, label) {
+function preloadAssetPaths(paths, label, opts) {
+  opts = opts || {};
   const list = [...new Set(paths || [])];
   if (!list.length) return Promise.resolve();
   const text = label || 'Carregando mapa';
@@ -54,7 +67,8 @@ function preloadAssetPaths(paths, label) {
   // deixa a tela presa visualmente na etapa anterior (fetch do OTBM).
   update(0);
   const timeoutMs = Math.max(1, Number(
-    typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS
+    opts.timeoutMs !== undefined ? opts.timeoutMs :
+    (typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS)
   ) || 3000);
   let done = 0;
   return Promise.all(list.map((src) => new Promise((resolve) => {
@@ -105,20 +119,73 @@ function addTileMapAssetPaths(paths, map) {
   return paths;
 }
 
+function resolveHuntMap(hunt) {
+  if (!hunt || typeof HUNTMAPS === 'undefined') return null;
+  if (hunt.mapa && HUNTMAPS[hunt.mapa]) return HUNTMAPS[hunt.mapa];
+  if (hunt.otbm && HUNTMAPS['otbm:' + hunt.otbm]) return HUNTMAPS['otbm:' + hunt.otbm];
+  return null;
+}
+
+function warmHuntTileSprites(map) {
+  if (!map || typeof TileSprites === 'undefined' || !TileSprites.get) return [];
+  const ids = new Set();
+  if (map.leg) {
+    for (const key in map.leg) {
+      const entry = map.leg[key] || {};
+      for (const id of entry.v || []) ids.add(id);
+      for (const id of entry.g || []) ids.add(id);
+    }
+  }
+  const imgs = [];
+  for (const id of ids) {
+    const img = TileSprites.get(id, 0);
+    if (img) imgs.push(img);
+    if (typeof TILE_PATTERNS !== 'undefined' && TILE_PATTERNS[id] &&
+        typeof TileSprites._patternSource === 'function')
+      TileSprites._patternSource(id, 0, 0);
+  }
+  return imgs;
+}
+
+function waitForImages(imgs, timeoutMs) {
+  const list = (imgs || []).filter(Boolean);
+  if (!list.length) return Promise.resolve();
+  const waitMs = Math.max(1, Number(timeoutMs) || 4000);
+  return Promise.all(list.map((img) => new Promise((resolve) => {
+    if (img.complete && img.naturalWidth) return resolve();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      resolve();
+    };
+    const timer = setTimeout(finish, waitMs);
+    img.onload = finish;
+    img.onerror = finish;
+  }))).then(() => undefined);
+}
+
 function preloadHuntMapAssets(hunt, label) {
   try {
     const paths = new Set();
-    const map = hunt && hunt.mapa && typeof HUNTMAPS !== 'undefined'
-      ? HUNTMAPS[hunt.mapa] : null;
+    const map = resolveHuntMap(hunt);
     addTileMapAssetPaths(paths, map);
     for (const slug of (hunt && hunt.monsters) || []) {
       paths.add('assets/mob/' + slug + '.png');
       if (typeof IDLE_ANIMATIONS !== 'undefined' && IDLE_ANIMATIONS.monsters &&
           IDLE_ANIMATIONS.monsters[slug]) paths.add('assets/mob/' + slug + '.idle.png');
     }
-    return preloadAssetPaths(paths, label || 'Preparando arena').catch((error) => {
-      console.warn('[preload] arena continuará sem esperar todos os assets:', error);
-    });
+    const huntTimeout = Math.max(6000, Number(
+      typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS
+    ) || 3000);
+    return preloadAssetPaths(paths, label || 'Preparando arena', { timeoutMs: huntTimeout })
+      .then(() => waitForImages(warmHuntTileSprites(map), huntTimeout))
+      .catch((error) => {
+        console.warn('[preload] arena continuará sem esperar todos os assets:', error);
+      });
   } catch (error) {
     console.warn('[preload] falha ao preparar lista de assets:', error);
     return Promise.resolve();

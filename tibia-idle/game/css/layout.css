@@ -72,6 +72,49 @@ canvas { image-rendering: pixelated; }
   display: flex; align-items: center; gap: 6px;
   user-select: none;
 }
+#btn-auto-walk, .btn-auto-walk {
+  letter-spacing: .6px;
+  min-width: 48px;
+  font-weight: 700;
+}
+/* AUTO/SQM na tela da caçada — sempre visível sobre o canvas. */
+.sqm-walk-hud {
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(13, 15, 20, .88);
+  border: 1px solid #2a2d34;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+  pointer-events: auto;
+}
+.sqm-walk-hud .sqm-walk-hint {
+  font-size: 9px;
+  color: #8a8270;
+  max-width: 140px;
+  line-height: 1.2;
+}
+.sqm-walk-hud #btn-auto-walk:not(.on):not(.primary) {
+  background: #3a2a1a;
+  color: #ffc878;
+  border-color: #8a5a20;
+}
+.party-member-row .btn-auto-walk {
+  flex: none;
+  min-width: 38px;
+  padding: 2px 5px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+.party-member-row .btn-auto-walk.off {
+  background: #3a2a1a;
+  color: #ffc878;
+}
 .panel-body { padding: 8px; }
 
 /* ---------------------------------------------------------- layout */
@@ -301,7 +344,7 @@ canvas { image-rendering: pixelated; }
  * cena — mesma ideia da area de icones de condicao do cliente oficial.
  * Sorcerer pode mostrar dois (elemental + aura crippling). */
 .stance-badge {
-  position: absolute; top: 4px; left: 4px; z-index: 6;
+  position: absolute; top: 38px; left: 4px; z-index: 6;
   display: none; gap: 3px;
 }
 .stance-badge .stance-sq {
@@ -462,6 +505,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .log-line.info  { color: #a8a090; }
 .log-line.sell  { color: #c8a860; }
 .log-line.say   { color: #ffe680; }
+.log-line.hit   { color: #d8c8b0; }
 
 .helper-supply-row {
   display: flex; align-items: center; gap: 7px;
@@ -2614,6 +2658,7 @@ button.danger {
 .log-line.death { color: var(--gi-danger); }
 .log-line.info  { color: var(--gi-text); }
 .log-line.sell  { color: #d1d5db; }
+.log-line.hit   { color: var(--gi-text); }
 
 /* -------------------------- modal */
 .modal-bg { background: rgba(10, 11, 14, .86); }
@@ -2683,3 +2728,29 @@ body.fullhd canvas#scene {
      pixelated aqui em razão não-inteira era o “quadriculado”. */
   image-rendering: auto !important;
 }
+
+/* HUD DOM: barras, logs e party overlay ficam em px fixos; no FULLHD
+   o canvas sobe 2–3× e esses textos somem. Sobe só a camada de leitura. */
+body.fullhd .bar { height: 16px; }
+body.fullhd .bar .label { font-size: 12px; }
+body.fullhd .stat-row { font-size: 13px; }
+body.fullhd .log-line { font-size: 13px; line-height: 1.45; }
+body.fullhd .log-line .time { font-size: 11px; }
+body.fullhd .tiny { font-size: 11px; }
+body.fullhd .small { font-size: 12px; }
+body.fullhd .panel-title { font-size: 13px; }
+body.fullhd .spell-row { font-size: 13px; padding: 6px 6px; }
+body.fullhd .helper-supply-row { font-size: 13px; }
+body.fullhd .cooldown-bar .cd-vazio,
+body.fullhd .cd-slot .cd-num { font-size: 11px; }
+body.fullhd .party-panel {
+  width: 248px;
+  font-size: 13px;
+}
+body.fullhd .party-member-row .ppm-name { font-size: 13px; }
+body.fullhd .party-member-row .ppm-meta,
+body.fullhd .party-member-row .ppm-zone { font-size: 11px; }
+body.fullhd .party-pbar { height: 8px; margin-top: 3px; }
+body.fullhd .party-pbar .val { font-size: 10px; line-height: 8px; }
+body.fullhd .hunt-tag,
+body.fullhd .scene-overlay { font-size: 13px; }

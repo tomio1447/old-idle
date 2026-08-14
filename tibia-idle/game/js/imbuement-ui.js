@@ -5,37 +5,23 @@
  * aceitam imbuement, a lista por categoria, os tiers com chance de
  * sucesso/protection e os materiais exigidos.
  *
- * Regras de slot seguem o Tibia global (imbuements so vao em certas
- * pecas — fontes: gameplay oficial + cliente):
- *   weapon (melee): critico, leech vida/mana, elemental, skill do tipo
- *   weapon (dist) : critico, leech vida/mana, skill distancia
- *   weapon (magic): leech vida/mana          (wands/rods do global)
- *   shield        : protecoes + shielding
+ * Regras de slot seguem o Tibia global / Canary (imbuements so vao em
+ * certas pecas — fontes: TibiaWiki Imbuing + shrine do client):
+ *   weapon (melee): elemental, vamp, void, strike, skill do tipo
+ *   weapon (bow 2H): elemental + vamp + void + strike + precision
+ *   weapon (1H dist): vamp + void + strike + precision (sem elemental)
+ *   weapon (magic): void + epiphany; strike so em wands/rods especiais
+ *   shield        : protecoes + blockade — NUNCA life leech
+ *   spellbook     : protecoes + blockade + epiphany
  *   armor         : life leech + protecoes
  *   helmet        : mana leech + skills
  *   boots         : velocidade + anti-paralisia
  *   backpack      : capacidade (featherweight)
  *   legs/amulet/ring/ammo: nenhum (igual ao global)
+ *
+ * A tabela de categorias vive em imbuement.js (`imbSlotCats`).
  */
 "use strict";
-
-const IMB_SKILL_CAT = { axe: 11, sword: 12, club: 13, distance: 15 };
-
-function imbSlotCats(slot, itemSlug) {
-  if (slot === "weapon") {
-    const it = GAMEDATA.items[itemSlug] || {};
-    const t = it.t || "sword";
-    if (t === "distance") return [1, 2, 3, 15];
-    if (t === "magic") return [1, 2];             // wands/rods: so leech
-    return [0, 1, 2, 3, IMB_SKILL_CAT[t] || 12]; // melee + skill do tipo
-  }
-  if (slot === "shield") return [1, 4, 5, 6, 7, 8, 9, 14];
-  if (slot === "armor") return [1, 4, 5, 6, 7, 8, 9];
-  if (slot === "helmet") return [2, 11, 12, 13, 14, 15, 16, 18];
-  if (slot === "boots") return [10, 19];
-  if (slot === "backpack") return [17];
-  return [];
-}
 
 /* slots que devem aparecer na janela (mesmo vazios nao aparecem — sem item
  * equipado nao tem o que imbuar) */
@@ -86,6 +72,9 @@ function renderImbueModal(p) {
   if (!eqs.some((e) => e.slot === IMB_UI.slot)) IMB_UI.slot = eqs[0].slot;
   const cur = eqs.find((e) => e.slot === IMB_UI.slot);
   const cats = imbSlotCats(cur.slot, cur.item);
+  const selGroup = IMB_UI.key && typeof imbFindGroup === "function"
+    ? imbFindGroup(IMB_UI.key) : null;
+  if (!selGroup || cats.indexOf(selGroup.cat) < 0) IMB_UI.key = null;
 
   // ------ coluna esquerda: equipamentos + imbuements ativos do slot
   let left = `<div class="imb-eqlist">`;
@@ -202,7 +191,6 @@ function renderImbueModal(p) {
 
 function openImbueModal() {
   if (!G.p) return;
-  if (IMB_UI.key === null) IMB_UI.key = "Vampirism";
   $("#modal").classList.add("wide");
   $("#modal-body").innerHTML = renderImbueModal(G.p);
   $("#modal").classList.add("show");

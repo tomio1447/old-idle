@@ -28,8 +28,8 @@ if (!/drawCellItems\(true\)/.test(blockingBlock) ||
 const groundCall = render.indexOf('gridW, gridH, "ground"');
 const entityPass = render.indexOf('const entityInfo = []', groundCall);
 const objectsCall = render.indexOf('gridW, gridH, "objects"', entityPass);
-const bossBarCall = render.indexOf('drawBossBar(ctx, canvasW, combat, -view.x, -view.y);', objectsCall);
-const healthBars = render.indexOf('const occupiedLabels = []', bossBarCall);
+const bossBarCall = render.indexOf('drawBossBar(ctx, canvasW, combat, -view.x, -view.y', objectsCall);
+const healthBars = render.indexOf('layoutCreatureInformation(info, W, H', bossBarCall);
 if (groundCall < 0 || entityPass < 0 || objectsCall < 0 ||
     !(groundCall < entityPass && entityPass < objectsCall))
   throw Error('Render de combate deve manter mapa ground → criaturas → objects');

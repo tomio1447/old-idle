@@ -172,31 +172,39 @@ function comboPronta(c, p, entrada, alvo, now) {
  * Devolve { kind, id, entrada } ou null. A ordem dos slots E a prioridade —
  * nao ha ordenacao por dano aqui, de proposito: quem manda e o jogador.
  */
+function comboAlvosSuficientes(c, entrada, alvo) {
+  if (!entrada || !(entrada.min > 1)) return true;
+  let n = null;
+  if (typeof areaNameOf === "function" && typeof areaCount === "function") {
+    const nome = areaNameOf(entrada.kind, entrada.id);
+    if (nome && c && c.player) {
+      n = areaCount(c, nome, c.player, alvo,
+                    entrada.kind === "spell" ? entrada.id : null);
+    }
+  }
+  if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
+  return n >= entrada.min;
+}
+
 function comboEscolhe(c, p, alvo, now) {
   const lista = ensureCombo(p);
   // Em multi-target, não gasta SD/strikes únicos se há spell de área
   // configurada para aproveitar a box. Só cai no alvo único quando resta 1 mob.
   const multi = c && c.mobs ? c.mobs.filter((m) => m.hp > 0).length > 1 : false;
   const hasArea = lista.some((x) => x && x.min > 1);
+  const spellPronta = (entrada) => {
+    if (!entrada || entrada.kind === "rune") return false;
+    if (multi && hasArea && entrada.min <= 1) return false;
+    if (!comboPronta(c, p, entrada, alvo, now)) return false;
+    return comboAlvosSuficientes(c, entrada, alvo);
+  };
+  const spellReady = lista.some(spellPronta);
   for (const entrada of lista) {
     if (!entrada) continue;
+    if (entrada.kind === "rune" && spellReady) continue;
     if (multi && hasArea && entrada.min <= 1) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
-    // Requisito de alvos: so dispara se o pack for grande o bastante.
-    // Usa a MATRIZ real da area quando ela existe, para o "4+" contar
-    // exatamente quem o golpe vai acertar -- inclusive o formato do leque.
-    if (entrada.min > 1) {
-      let n = null;
-      if (typeof areaNameOf === "function" && typeof areaCount === "function") {
-        const nome = areaNameOf(entrada.kind, entrada.id);
-        if (nome && c && c.player) {
-          n = areaCount(c, nome, c.player, alvo,
-                        entrada.kind === "spell" ? entrada.id : null);
-        }
-      }
-      if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
-      if (n < entrada.min) continue;
-    }
+    if (!comboAlvosSuficientes(c, entrada, alvo)) continue;
     return { kind: entrada.kind, id: entrada.id, entrada: entrada };
   }
   return null;

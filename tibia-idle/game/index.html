@@ -8,10 +8,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Global-Idle — caçada automática</title>
 <link rel="icon" href="assets/item/gold-coin.png">
-  <link rel="stylesheet" href="css/layout.css?v=hunt-fix-v1">
+  <link rel="stylesheet" href="css/layout.css?v=knight-fx-combo-v1">
   <link rel="stylesheet" href="css/otc-complete.css">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
-  <link rel="stylesheet" href="css/wheel-otc.css">
+  <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
   <link rel="stylesheet" href="css/client-background.css">
 </head>
 <body>
@@ -220,6 +220,12 @@
         <div id="scarlett-qte" class="scarlett-qte" style="display:none" aria-live="assertive"></div>
         <div id="greed-minigame" class="greed-minigame" style="display:none" aria-live="polite"></div>
         <div id="hatred-minigame" class="hatred-minigame" style="display:none" aria-live="polite"></div>
+        <!-- AUTO/SQM: fica na tela da caçada (antes só existia no título da
+             Mochila, fora do foco). OFF = clique no chão / WASD por SQM. -->
+        <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
+          <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
+          <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
+        </div>
         <!-- PARTY (OTC): painel fixo no canto superior direito da tela do
              jogo — lista os personagens da party com level, outfit, HP e
              mana; clicar num membro da sua conta troca de personagem. -->
@@ -391,11 +397,12 @@
 <script src="js/weapondata.js"></script>
 <!-- update 15.25.3a4a52: aplica os ajustes POR CIMA dos dados gerados,
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
-<script src="js/spelldata_1525.js?v=wave-matrix-v1"></script>
+<script src="js/spelldata_1525.js?v=cd-bar-v1"></script>
 <script src="js/tiledata.js"></script>
 <script src="js/tileflags.js"></script>
 <script src="js/imbuementdata.js"></script>
-<script src="js/patch_clientfx.js"></script>
+<script src="js/wandshootdata.js?v=basic-fx-v1"></script>
+<script src="js/patch_clientfx.js?v=basic-fx-v1"></script>
 <script src="js/rates.js"></script>
 <script src="js/vip.js"></script>
 <script src="js/huntmapdata.js"></script>
@@ -407,23 +414,23 @@
 <script src="js/ammo.js"></script>
 <script src="js/combo.js?v=spell-prio-v1"></script>
 <script src="js/speed.js"></script>
-<script src="js/grid.js?v=config-v1"></script>
+<script src="js/grid.js?v=knight-fx-combo-v1"></script>
 <script src="js/area.js?v=wave-matrix-v1"></script>
-<script src="js/gridai.js?v=canary-walk-v1"></script>
+<script src="js/gridai.js?v=sqm-hud-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
 <script src="js/monk.js?v=thousand-fist-v1"></script>
 <script src="js/core.js"></script>
 <script src="js/spells.js?v=elem-melee-fx-v1"></script>
-<script src="js/cooldown.js"></script>
+<script src="js/cooldown.js?v=cd-bar-v1"></script>
 <script src="js/augments.js"></script>
 <script src="js/supplies.js"></script>
 <script src="js/outfit.js?v=party-visible-v1"></script>
 <script src="js/appearance.js?v=outfit-mount-v1"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=ammo-distance-v1"></script>
+<script src="js/player.js?v=knight-fx-combo-v1"></script>
 <script src="js/accessories.js?v=ms-potion-v1"></script>
-<script src="js/combat.js?v=hunt-fix-v1"></script>
+<script src="js/combat.js?v=knight-fx-combo-v2"></script>
 <script src="js/city.js?v=training-fx-v1"></script>
 <script src="js/citymap.js"></script>
 <script src="js/walker.js"></script>
@@ -432,8 +439,8 @@
 <script src="js/tilemap.js?v=cobra-loading-v17"></script>
 <script src="js/effectdata.js?v=cobra-wave-t-v1"></script>
 <script src="js/icondata.js?v=cond-icons-v1"></script>
-<script src="js/render.js?v=config-v1"></script>
-<script src="js/city-render.js?v=config-v1"></script>
+<script src="js/render.js?v=knight-fx-combo-v1"></script>
+<script src="js/city-render.js?v=hd-hud-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
      GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
@@ -445,8 +452,8 @@
 <script src="js/soulwar.js?v=hatred-v3"></script>
 <script src="js/cyclopedia.js"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=config-v1"></script>
-<script src="js/i18n.js?v=hunt-fix-v1"></script>
+<script src="js/ui.js?v=sqm-hud-v1"></script>
+<script src="js/i18n.js?v=sqm-hud-v1"></script>
 <script src="js/settings.js?v=config-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-v1"></script>
 <script src="js/cyclopedia-ui.js?v=outfit-cards-v1"></script>
@@ -456,15 +463,16 @@
 <script src="js/forge-ui.js"></script>
 <script src="js/prey.js?v=prey-timer-v1"></script>
 <script src="js/prey-ui.js"></script>
-<script src="js/party.js?v=outfit-mount-v1"></script>
-<script src="js/party-ui.js?v=heal-friend-v2"></script>
+<script src="js/party.js?v=challenge-ai-v1"></script>
+<script src="js/party-ui.js?v=sqm-hud-v1"></script>
 <script src="js/analyzers.js?v=loot-supply-v1"></script>
-<script src="js/wheeldata.js"></script>
-<script src="js/wheel.js"></script>
-<script src="js/wheel-ui.js"></script>
+<script src="js/wheeldata.js?v=wheel-otc-v1"></script>
+<script src="js/wheel-gems.js?v=wheel-otc-v1"></script>
+<script src="js/wheel.js?v=wheel-otc-v1"></script>
+<script src="js/wheel-ui.js?v=wheel-otc-v1"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=hunt-fix-v1"></script>
+<script src="js/account-client.js?v=sqm-hud-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js"></script>
 <script src="js/market-local.js"></script>
@@ -474,8 +482,8 @@
 <script src="js/accessorydata.js"></script>
 <script src="js/admin.js"></script>
 <script src="js/city-ui.js?v=hunts-modal-v1"></script>
-<script src="js/preload.js?v=cobra-loading-v17"></script>
-<script src="js/game.js?v=hunt-fix-v1"></script>
+<script src="js/preload.js?v=spawn-map-v1"></script>
+<script src="js/game.js?v=knight-fx-combo-v2"></script>
 <script src="js/scarlett-boss.js?v=goshnar-greed-v2"></script>
 </body>
 </html>

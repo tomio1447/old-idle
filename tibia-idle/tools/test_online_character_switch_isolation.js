@@ -6,7 +6,7 @@ const root=path.join(__dirname,".."),game=fs.readFileSync(path.join(root,"game",
 function must(value,message){if(!value)throw Error(message);}
 function extract(source,begin,end){const a=source.indexOf(begin),b=source.indexOf(end,a);must(a>=0&&b>a,"segmento ausente: "+begin);return source.slice(a,b);}
 const enterSegment=extract(game,"async function enterCharacter","\n  function paintCreatorVocations");
-const panelSegment=extract(partyUi,"async function partySwitchToChar","\n\n/* Estado de colapso");
+const panelSegment=extract(partyUi,"async function partySwitchToChar","let PARTY_PANEL_OPEN");
 
 (async()=>{
   const session=new Map();let switches=0,closes=0,saves=0,reloads=0,allowSwitch=true;
@@ -48,11 +48,22 @@ const panelSegment=extract(partyUi,"async function partySwitchToChar","\n\n/* Es
   must(await panelCtx.partySwitchToChar("99")===false&&panelReloads===0,
     "membro ausente durante combate abriu outro runtime");
   panelCtx.G.combat=null;
-  must(await panelCtx.partySwitchToChar("30")===true&&panelReloads===1&&panelStore.get("tibia-idle-char")==="30",
+  must(await panelCtx.partySwitchToChar("30")===true&&panelReloads===1&&panelStore.get("tibia-idle-char")==="30"&&
+    panelStore.get("tibia-idle-online-autoload")==="30",
     "troca fora de combate deixou de recarregar o personagem escolhido");
 
+  // Party na cidade (sem G.combat): o membro pertence à PT, mas não há
+  // runtime de hunt. Recarrega com autoload — nunca reabre o picker.
+  pickerCtx.G.combat=null;saves=0;reloads=0;switches=0;
+  result=await pickerCtx.enterCharacter("token",{id:"20",name:"Druid"});
+  must(result===true&&switches===0&&saves===1&&reloads===1&&
+    session.get("tibia-idle-online-autoload")==="20",
+    "troca de personagem da party fora de combate voltou ao picker");
+
   must(enterSegment.includes("await partyCombatSwitchOnlineTo(summary.id)")&&
-    panelSegment.includes("await partyCombatSwitchOnlineTo(id)"),
+    enterSegment.includes("G.combat&&(partyEntity||partyMember)")&&
+    panelSegment.includes("await partyCombatSwitchOnlineTo(id)")&&
+    panelSegment.includes("tibia-idle-online-autoload"),
     "picker/painel não aguardam a hidratação no runtime atual");
   console.log("OK: picker e painel online preservam e hidratam a instância ao trocar personagens da party.");
 })().catch((error)=>{console.error(error);process.exitCode=1;});

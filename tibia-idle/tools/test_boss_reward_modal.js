@@ -113,4 +113,10 @@ must(ctx.rewardChestClaimBundle(p,'fight-2')===1 && p.lootPouch.a===6 && !p.rewa
 must(ctx.rewardChestClaimAll(p)===1 && p.lootPouch.b===3 && !ctx.rewardChestBundleList(p).length,
   'Coleta total quebrou');
 
+const legacy={rewardChest:[{item:'a',count:2,bossId:'the-monster'}]};
+ctx.rewardChestEnsureShape(legacy);
+must(!Array.isArray(legacy.rewardChest) && legacy.rewardChest.a===2 &&
+  ctx.rewardChestBundleList(legacy).length===1,
+  'Array legado do servidor online não abriu o Reward Chest');
+
 console.log('OK: drops com tooltip completo/classificação e Forja com Exalted Core animado.');

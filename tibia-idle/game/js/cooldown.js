@@ -95,6 +95,64 @@ function cdPrune(p, now) {
   for (const k in p.gcd) if (p.gcd[k].ate <= now) delete p.gcd[k];
 }
 
+function cdGroupKey(raw) {
+  const g = String(raw || "");
+  if (g === "attack" || g === "1") return "1";
+  if (g === "healing" || g === "2") return "2";
+  if (g === "support" || g === "3") return "3";
+  return g;
+}
+
+function cdSpellInfo(id) {
+  if (typeof SPELLS !== "undefined" && SPELLS[id]) return SPELLS[id];
+  const rd = (typeof RUNEDATA !== "undefined" && RUNEDATA[id]) || null;
+  const sup = (typeof SUPPLIES !== "undefined" && SUPPLIES[id]) || null;
+  const src = rd || sup;
+  if (!src) return null;
+  const grupo = cdGroupKey(src.grupo || src.group || "1");
+  return {
+    id: id,
+    name: src.nome || src.name || id,
+    cd: Number(src.cd) || 2000,
+    grupos: { [grupo]: Number(src.gcd) || 2000 },
+    icon: src.icon,
+    img: "assets/item/" + id + ".png",
+    rune: true,
+  };
+}
+
+/* O motor online guarda _spellCd/_groupCd/_runeCd no relógio da instância.
+ * A barra do cliente compara Date.now() — converte o restante para parede. */
+function cdHydrateFromAuthority(p, clock, now) {
+  if (!p) return p;
+  cdInit(p);
+  clock = Number(clock);
+  now = Number(now) || Date.now();
+  if (!Number.isFinite(clock)) return p;
+  const nextCd = {}, nextGcd = {};
+  for (const id of Object.keys(p._spellCd || {})) {
+    const left = Number(p._spellCd[id]) - clock;
+    if (!(left > 0)) continue;
+    const s = cdSpellInfo(id);
+    nextCd[id] = { ate: now + left, dur: Number(s && s.cd) || left };
+  }
+  const runeLeft = Number(p._runeCd) - clock;
+  if (runeLeft > 0 && p._lastRuneId) {
+    const s = cdSpellInfo(p._lastRuneId);
+    nextCd[p._lastRuneId] = { ate: now + runeLeft, dur: Number(s && s.cd) || runeLeft };
+  }
+  for (const g of Object.keys(p._groupCd || {})) {
+    const left = Number(p._groupCd[g]) - clock;
+    if (!(left > 0)) continue;
+    const id = cdGroupKey(g);
+    const ate = now + left;
+    if (!nextGcd[id] || nextGcd[id].ate < ate) nextGcd[id] = { ate: ate, dur: left };
+  }
+  p.cd = nextCd;
+  p.gcd = nextGcd;
+  return p;
+}
+
 /* Magias em cooldown agora, da que falta menos para a que falta mais.
  * E o que a barra desenha na fileira de icones. */
 function cdActiveSpells(p, now) {
@@ -105,7 +163,7 @@ function cdActiveSpells(p, now) {
     const e = p.cd[id];
     const resta = e.ate - now;
     if (resta <= 0) continue;
-    const s = typeof SPELLS !== "undefined" ? SPELLS[id] : null;
+    const s = cdSpellInfo(id);
     if (!s) continue;
     out.push({
       id: id, spell: s, resta: resta, dur: e.dur || s.cd || 2000,
@@ -153,5 +211,6 @@ function cdGroupState(p, g, now) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     cdStart, cdReady, cdRemaining, cdActiveSpells, cdVocGroups, cdGroupState,
+    cdHydrateFromAuthority, cdSpellInfo, cdGroupKey,
   };
 }

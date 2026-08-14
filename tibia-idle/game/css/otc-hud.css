@@ -67,6 +67,8 @@
 .player-state-icon {
   width: 18px; height: 18px; position: relative;
   display: flex; align-items: center; justify-content: center;
+  overflow: visible;
+  border: 1px solid transparent;
 }
 .player-state-icon img {
   max-width: 16px; max-height: 16px; image-rendering: pixelated;

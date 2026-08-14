@@ -92,7 +92,7 @@ for(const match of combatSrc.matchAll(/events\.push\(\{\s*t:\s*"hit"[\s\S]{0,260
   if(!match[0].includes("targetId:"))missingIdentity=true;
 must(!missingIdentity,"evento hit sem identidade estável do alvo");
 
-must(html.includes("css/layout.css?v=party-list-v1")&&
-  html.includes("js/render.js?v=interface-sharp-v1")&&
-  html.includes("js/combat.js?v=boss-immunity-v1"),"ajustes visuais sem cache-busting");
+must(html.includes("css/layout.css?v=knight-fx-combo-v1")&&
+  html.includes("js/render.js?v=knight-fx-combo-v1")&&
+  html.includes("js/combat.js?v=knight-fx-combo-v2"),"ajustes visuais sem cache-busting");
 console.log("OK: navegação esquerda, combo por alvo/elemento, Fury e visual nítido validados.");

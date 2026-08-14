@@ -79,6 +79,28 @@ function newNonce() {
 async function charSnapshot(db, charId) {
   const c = await db.findCharacter(Number(charId));
   if (!c) return null;
+  let data = c.data;
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch (e) { data = {}; }
+  }
+  data = data && typeof data === "object" ? data : {};
+  const raw = data.outfit && typeof data.outfit === "object" ? data.outfit : {};
+  const outfit = {
+    type: raw.type || null,
+    appearance: raw.appearance,
+    colors: Array.isArray(raw.colors) ? raw.colors.slice(0, 4) : null,
+    addons: Math.max(0, Math.min(3, Number(raw.addons) || 0)),
+    mount: raw.mount || null,
+    lookType: Math.max(0, Number(raw.lookType) || 0),
+    lookAddons: Math.max(0, Math.min(3, Number(raw.lookAddons) || Number(raw.addons) || 0)),
+    lookMount: Math.max(0, Number(raw.lookMount) || 0),
+    lookHead: Math.max(0, Number(raw.lookHead) || 0),
+    lookBody: Math.max(0, Number(raw.lookBody) || 0),
+    lookLegs: Math.max(0, Number(raw.lookLegs) || 0),
+    lookFeet: Math.max(0, Number(raw.lookFeet) || 0),
+  };
+  outfit.appearance=raw.appearance;
+  outfit.addons=Math.max(0, Number(outfit.addons) || 0);
   return {
     id: Number(c.id),
     account_id: c.account_id ? Number(c.account_id) : null,
@@ -90,6 +112,8 @@ async function charSnapshot(db, charId) {
     mp: Number(c.mp) || 0,
     maxHp: Number(c.max_hp) || 0,
     maxMp: Number(c.max_mp) || 0,
+    sex:data.sex==="female"?"female":"male",
+    outfit,
   };
 }
 

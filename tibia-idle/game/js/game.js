@@ -226,12 +226,15 @@ function resumeIdleInstance(session){
     G.p.hunt=session.kind==="hunt"?session.huntId:null;
     G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
     G.inCity=false;
+    G.huntMapReady=false;
     if(typeof beginMapLoading==="function")beginMapLoading(`Retomando ${boss?boss.name:hunt.name}...`);
     let done=false,watchdog=null;
     const build=()=>{
       if(done)return;done=true;if(watchdog)clearTimeout(watchdog);
       try{
         const fresh=boss?newBossCombat(G.p,boss):newCombat(G.p,session.huntId,session.instanceMode);
+        if(typeof markHuntMapReady==="function")markHuntMapReady();
+        else G.huntMapReady=true;
         if(!boss&&!session.state){
           spawnWave(fresh,G.p);
           for(const pending of fresh.pendingSpawns||[])pending.startedAt=session.savedAt;
@@ -396,6 +399,7 @@ function normalizePlayer(p) {
     pouchAutoSellPct: 80,     // Loot Pouch: % de enchimento p/ vender tudo
     spellAttack: true,
     autoRetreat: true,
+    autoWalk: true,
     barMode: "bars",
     lootFilter: "all",
     refillArrow: "",
@@ -440,6 +444,12 @@ function normalizePlayer(p) {
     p.config.manaSupply = "";
   if (p.config.healSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.healSupply])
     p.config.healSupply = "";
+  if (p.config.manaSupply && typeof supplyAllowed === "function" && !supplyAllowed(p, p.config.manaSupply)) {
+    const manaOrder = ["distilled-ultimate-mana-potion", "distilled-superior-mana-potion",
+      "great-mana-potion", "strong-mana-potion", "mana-potion"];
+    p.config.manaSupply = manaOrder.find((slug) => supplyAllowed(p, slug)) || "mana-potion";
+  }
+  if (p.config.autoWalk === undefined) p.config.autoWalk = true;
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
@@ -1423,6 +1433,7 @@ function startHunt(id, instanceMode, force) {
   G.p.lastInstanceChoice = instanceMode;   // pre-seleciona no proximo modal
   const entryToken = (G.huntEntryToken || 0) + 1;
   G.huntEntryToken = entryToken;G.huntEntryPendingToken=entryToken;
+  G.huntMapReady = false;
   if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${hu.name}...`);
 
   // Última barreira contra overlay infinito: mesmo que um callback externo
@@ -1465,6 +1476,8 @@ function startHunt(id, instanceMode, force) {
     try {
       if(typeof accountBeginInstance==="function")accountBeginInstance();
       G.combat = newCombat(G.p, id, instanceMode);
+      if (typeof markHuntMapReady === "function") markHuntMapReady();
+      else G.huntMapReady = true;
       spawnWave(G.combat, G.p);
       if(typeof persistActiveInstance==="function")persistActiveInstance();
       addLog("info", `Viajando para <b style="color:#d4af37">${hu.name}</b> · instância <b>${instanceMode}</b>`);
@@ -1530,6 +1543,8 @@ function startHunt(id, instanceMode, force) {
                 G.combat.huntId !== id || G.combat.huntMap === integralMap) return;
             try {
               G.combat = newCombat(G.p, id, instanceMode);
+              if (typeof markHuntMapReady === "function") markHuntMapReady();
+              else G.huntMapReady = true;
               spawnWave(G.combat, G.p);
               if(typeof persistActiveInstance==="function")persistActiveInstance();
               renderAll();
@@ -1570,6 +1585,7 @@ function resetTemplePlayerPosition() {
 }
 
 function stopHunt(skipMapLoading) {
+  G.huntMapReady = true;
   if (!skipMapLoading && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
@@ -1776,7 +1792,14 @@ function drainEvents() {
         // de arma híbrida (`dual`) recebe deslocamento para não cobrir o
         // número físico; magia elemental comum não deve flutuar à direita.
         const floaterX=ex(e)+(e.dual?0.022:0);
-        if (shownDamage > 0) r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage");
+        const comboKey=e.targetId?("damage|"+visualElement+"|"+String(e.targetId)):null;
+        if (shownDamage > 0) r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage", comboKey);
+        if (shownDamage > 0 && typeof addLog === "function") {
+          const elName=(ELEMENTS[visualElement]||ELEMENTS.physical).name;
+          const alvo=typeof displayMonsterName==="function"
+            ? displayMonsterName(e.mobSlug||e.spell||"alvo") : (e.mobSlug||e.spell||"alvo");
+          addLog("hit", `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(shownDamage)}</b> (${elName}).`);
+        }
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
@@ -2027,9 +2050,28 @@ function drainEvents() {
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
         break;
-      case "challenge-target":
+      case "challenge-target": {
         r.addEffect(e.x, e.y, e.amp ? "chivalrous-challenge" : "challenge-effect");
+        // Online: a animação vinha no evento, mas o alvo/melee ficavam só no
+        // motor do servidor. Aplica na hora para a IA visual colar no knight.
+        const mob = e.targetId && c.mobs
+          ? c.mobs.find((m) => m && String(m.id) === String(e.targetId))
+          : null;
+        if (mob) {
+          const until = Date.now() + 10000;
+          mob.challengedUntil = until;
+          if (e.whoId) {
+            mob.challengeTargetId = String(e.whoId);
+            mob.targetId = String(e.whoId);
+            const knight = (c.players || []).find((ent) =>
+              String(ent && (ent.id || (ent.p && ent.p.id))) === String(e.whoId) &&
+              ent.p && ent.p.hp > 0);
+            if (knight) mob.target = knight;
+          }
+          if (e.amp) mob.forceMeleeUntil = until;
+        }
         break;
+      }
       case "challenge": {
         // Exeta (Challenge / Chivalrous Challenge) do Knight: monstros
         // marcados focam o knight e causam 20% menos dano por 10s.
@@ -2078,9 +2120,27 @@ function drainEvents() {
       case "areafx": {
         // pinta o efeito em TODAS as casas cobertas pela matriz, nao so onde
         // havia monstro. Sem isso a magia de area parecia acertar um alvo so.
+        const gw=Number(c&&c.gridW)||(typeof GRID_W!=="undefined"?GRID_W:21);
+        const gh=Number(c&&c.gridH)||(typeof GRID_H!=="undefined"?GRID_H:13);
+        const idOf=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
+        const wantedWho=e.whoId!==undefined&&e.whoId!==null?String(e.whoId):"";
+        const caster=wantedWho&&c&&Array.isArray(c.players)
+          ? (c.players.find((x)=>idOf(x)===wantedWho)||null) : (c&&c.player)||null;
+        const wantedTgt=e.targetId!==undefined&&e.targetId!==null?String(e.targetId):"";
+        const target=wantedTgt&&c&&Array.isArray(c.mobs)
+          ? (c.mobs.find((m)=>idOf(m)===wantedTgt)||null) : null;
+        const anchor=e.anchor==="target"?(target||caster):(caster||target||(c&&c.player)||null);
+        const base=e.base;
         for (const cel of (e.cells || [])) {
-          const pos = typeof cellToScreen === "function"
-            ? cellToScreen(cel.cx, cel.cy) : null;
+          let pos=null;
+          if (anchor&&base&&Number.isFinite(Number(anchor.x))&&Number.isFinite(Number(base.cx))) {
+            pos={x:Number(anchor.x)+(Number(cel.cx)-Number(base.cx))/gw,
+                 y:Number(anchor.y)+(Number(cel.cy)-Number(base.cy))/gh};
+          } else if (cel&&cel.x!=null&&cel.y!=null) {
+            pos={x:Number(cel.x),y:Number(cel.y)};
+          } else if (typeof cellToScreen==="function") {
+            pos=cellToScreen(cel.cx, cel.cy, gw, gh);
+          }
           if (!pos) continue;
           r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
         }
@@ -2639,6 +2699,36 @@ function resolveLiveCombatEventPosition(combat,event){
 
 /* Distribui o lote autoritativo em poucos frames, sem o ping de ~1s que o
  * espalhamento antigo (850ms) introduzia. Preserva a ordem relativa. */
+function releaseHeldAuthoritySpawns(c, now) {
+  if (!c || !Array.isArray(c._heldAuthorityMobs) || !c._heldAuthorityMobs.length) return;
+  const held = c._heldAuthorityMobs;
+  c._heldAuthorityMobs = [];
+  now = now || Date.now();
+  const seen = new Set();
+  for (const mob of c.mobs || []) {
+    const id = String(mob && mob.id || "");
+    if (id) seen.add(id);
+  }
+  for (const pending of c.pendingSpawns || []) {
+    const id = String(pending && pending.mob && pending.mob.id || "");
+    if (id) seen.add(id);
+  }
+  c.pendingSpawns = c.pendingSpawns || [];
+  const w = Number(c.gridW) || 30, h = Number(c.gridH) || 30;
+  for (const remote of held) {
+    if (!remote) continue;
+    const id = String(remote.id || "");
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    const slug = remote.slug;
+    const catalog = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && slug
+      ? GAMEDATA.monsters[slug] : null;
+    if (catalog) remote.def = catalog;
+    const cx = Number.isFinite(Number(remote.cx)) ? Number(remote.cx) : Math.floor(w / 2);
+    const cy = Number.isFinite(Number(remote.cy)) ? Number(remote.cy) : Math.floor(h / 2);
+    c.pendingSpawns.push({ mob: remote, cx, cy, startedAt: now, blink: 0, done: false });
+  }
+}
 function scheduleOnlineAuthorityEvents(events,receivedAt){
   const input=Array.isArray(events)?events:[],now=Number(receivedAt)||Date.now();
   if(!input.length)return [];
@@ -2761,7 +2851,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   // separadamente para manter referências, posição e identidade visual.
   for(const key of Object.keys(incoming))
     if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="events"&&
-       key!=="hunt"&&key!=="huntMap"&&key!=="boss"&&key!=="stats")previous[key]=incoming[key];
+       key!=="hunt"&&key!=="huntMap"&&key!=="boss"&&key!=="stats"&&
+       key!=="pendingSpawns"&&key!=="_heldAuthorityMobs")previous[key]=incoming[key];
+  if(typeof setGridSize==="function"){
+    const gw=Number(previous.gridW)||Number(incoming.gridW);
+    const gh=Number(previous.gridH)||Number(incoming.gridH);
+    if(gw>0&&gh>0)setGridSize(gw,gh);
+  }
   if(incoming.stats){
     previous.stats=Object.assign({},previous.stats||{},incoming.stats);
     previous.stats.supplyUsed=Object.assign({},incoming.stats.supplyUsed||{});
@@ -2786,18 +2882,34 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   }
   if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
   else previous.players=reconciledPlayers;
+  const authClock=Number(incoming.authClock);
+  if(Number.isFinite(authClock)&&typeof cdHydrateFromAuthority==="function"){
+    previous.authClock=authClock;
+    for(const ent of previous.players||[])if(ent&&ent.p)cdHydrateFromAuthority(ent.p,authClock);
+  }
 
   const remoteMobs=Array.isArray(incoming.mobs)?incoming.mobs:[],localMobsById=new Map();
   for(const mob of previousMobs){const id=entityId(mob);if(id)localMobsById.set(id,mob);}
   const reconciledMobs=[];
+  const spawnBlocked=typeof G!=="undefined"&&G&&G.huntMapReady===false;
+  const previewIds=new Set();
+  for(const pending of previous.pendingSpawns||[]){
+    const id=String(pending&&pending.mob&&pending.mob.id||"");
+    if(id)previewIds.add(id);
+  }
   // Entre a morte do último monstro e o respawn autoritativo existe um tick
   // vazio. Preserve a onda visual nesse intervalo curto para não piscar toda
   // a arena; terminal de boss/wipe continua removendo-a normalmente.
   if(!terminalReason&&remoteMobs.length===0&&previousMobs.some((mob)=>mob&&mob.hp>0)){
     reconciledMobs.push(...previousMobs);
+  }else if(spawnBlocked){
+    previous._heldAuthorityMobs=remoteMobs.slice();
+    for(const local of previousMobs)if(local)reconciledMobs.push(local);
   }else{
     for(let index=0;index<remoteMobs.length;index++){
-      const remote=remoteMobs[index],local=localMobsById.get(entityId(remote));
+      const remote=remoteMobs[index],id=entityId(remote),local=localMobsById.get(id);
+      if(!local&&(previewIds.has(id)||((previous.pendingSpawns||[]).length&&!previousMobs.length)))
+        continue;
       const merged=mergeEntity(local,remote,false),fallback=local||previousMobs[index%Math.max(1,previousMobs.length)]||previous.player;
       reconciledMobs.push(ensurePosition(merged,fallback,index));
     }
@@ -2832,7 +2944,9 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
       return event;
     };
     const scheduled=scheduleOnlineAuthorityEvents(incoming.events,receivedAt);
+    const suppressSpawnFx=!!((previous.pendingSpawns&&previous.pendingSpawns.length)||spawnBlocked);
     for(const remote of scheduled){
+      if(suppressSpawnFx&&(remote.t==="spawn-blink"||remote.t==="spawn"))continue;
       const event=placeEvent(remote);
       previous.events.push(event);
     }
@@ -2987,6 +3101,9 @@ function loop(ts) {
       // Somente interpolação/pathfinding visual roda no cliente online.
       if(typeof updateGridMovement==="function")updateGridMovement(G.combat,G.p,dt,Date.now());
       else if(typeof updateCombatMovement==="function")updateCombatMovement(G.combat,G.p,dt);
+      // Preview Canary: teleporte 3× no cliente mesmo com combate no servidor.
+      if(typeof tickSpawnQueue==="function"&&G.combat.pendingSpawns&&G.combat.pendingSpawns.length)
+        tickSpawnQueue(G.combat,Date.now());
       // Eventos de combate (dano/cura/kill/dust/death) chegam via
       // applyOnlineAuthorityState e ficam na fila c.events.
       drainEvents();
@@ -3431,7 +3548,15 @@ function bindControls() {
   });
   cv.addEventListener("mouseleave", () => { G.hoverNpc = null; });
   cv.addEventListener("click", (e) => {
-    if (!G.inCity || G.combat) return;
+    if (G.combat) {
+      if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
+      const { mx, my } = canvasPos(e);
+      if (typeof canvasToCombatCell === "function" && G.combat.player) {
+        G.combat.player.walkGoal = canvasToCombatCell(mx, my, cv.width, cv.height);
+      }
+      return;
+    }
+    if (!G.inCity) return;
     const { mx, my } = canvasPos(e);
     const id = G.renderer.npcAt(mx, my);
     if (id) {
@@ -3449,18 +3574,29 @@ function bindControls() {
     w: "up", s: "down", a: "left", d: "right",
     W: "up", S: "down", A: "left", D: "right",
   };
+  G.walkKeys = G.walkKeys || {};
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
     const k = KEYMAP[e.key];
-    if (!k || !G.inCity || G.combat) return;
+    if (!k) return;
+    if (G.combat) {
+      if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
+      G.walkKeys[k] = true;
+      e.preventDefault();
+      return;
+    }
+    if (!G.inCity) return;
     G.walker.keys[k] = true;
     e.preventDefault();
   });
   document.addEventListener("keyup", (e) => {
     const k = KEYMAP[e.key];
-    if (k) G.walker.keys[k] = false;
+    if (k) {
+      G.walker.keys[k] = false;
+      if (G.walkKeys) G.walkKeys[k] = false;
+    }
   });
-  window.addEventListener("blur", () => { G.walker.keys = {}; });
+  window.addEventListener("blur", () => { G.walker.keys = {}; G.walkKeys = {}; });
 
   // ESC fecha o modal aberto (e o context menu), como no client do Tibia.
   // O handler roda mesmo com foco em input, para o jogador nunca ficar
@@ -3479,6 +3615,17 @@ function bindControls() {
   });
 
   initPanelCollapse();
+  const btnAutoWalk = $("#btn-auto-walk");
+  if (btnAutoWalk) btnAutoWalk.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!G.p) return;
+    const on = typeof togglePlayerAutoWalk === "function"
+      ? togglePlayerAutoWalk(G.p)
+      : (G.p.config.autoWalk = !(G.p.config && G.p.config.autoWalk !== false));
+    if (typeof save === "function") save();
+    if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
+    toast(on ? "AUTO ligado" : "AUTO desligado — clique no chão ou WASD (1 SQM)");
+  });
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-pouch-sell-all").addEventListener("click", () => {
     const r = sellAllPouch(p);

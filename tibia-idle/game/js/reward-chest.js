@@ -14,11 +14,34 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.items && !GAMEDATA.items["reward
   };
 }
 
-/* Migra saves antigos (apenas rewardChest agregado) para um pacote legado. */
+/* Migra saves antigos (array do servidor online, ou rewardChest agregado) para pacotes. */
+function rewardChestEnsureShape(p) {
+  if (!p) return p;
+  p.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles : [];
+  if (Array.isArray(p.rewardChest)) {
+    const rows = p.rewardChest;
+    p.rewardChest = {};
+    for (const row of rows) {
+      if (!row || !row.item) continue;
+      const n = Math.max(0, Number(row.count) || 0);
+      if (!n) continue;
+      const bossId = row.bossId || null;
+      rewardChestAdd(p, row.item, n, {
+        bundleId: row.bundleId || (String(bossId || "boss") + "-migrated"),
+        bossId,
+        name: row.name || bossId || "Recompensa de boss",
+        sprite: row.sprite || bossId || null,
+      });
+    }
+  } else if (!p.rewardChest || typeof p.rewardChest !== "object") {
+    p.rewardChest = {};
+  }
+  return p;
+}
+
 function rewardChestBundleList(p) {
   if (!p) return [];
-  p.rewardChest = p.rewardChest || {};
-  p.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles : [];
+  rewardChestEnsureShape(p);
   if (!p.rewardChestBundles.length && !p.rewardChestLegacyMigrated &&
       Object.keys(p.rewardChest).some((slug) => p.rewardChest[slug] > 0)) {
     p.rewardChestBundles.push({
@@ -54,11 +77,36 @@ function rewardChestItems(p, bundleId) {
   return out;
 }
 
+function rewardChestIsOnline() {
+  try {
+    return typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && !!sessionToken();
+  } catch (e) { return false; }
+}
+
+function rewardChestApplyServer(p, data) {
+  if (!p || !data) return;
+  if (data.rewardChest && typeof data.rewardChest === "object") p.rewardChest = data.rewardChest;
+  if (Array.isArray(data.rewardChestBundles)) p.rewardChestBundles = data.rewardChestBundles;
+  if (data.lootPouch && typeof data.lootPouch === "object") p.lootPouch = data.lootPouch;
+  rewardChestEnsureShape(p);
+  if (typeof renderRewardButton === "function") renderRewardButton(p);
+}
+
+function rewardChestOnlineClaim(p, opts) {
+  if (typeof accountClaimRewardChest !== "function") return Promise.resolve(false);
+  const id = p && (p.id !== undefined ? p.id : (typeof sessionCharId === "function" ? sessionCharId() : null));
+  return accountClaimRewardChest(sessionToken(), id, opts || {}).then((r) => {
+    if (r && r.ok) { rewardChestApplyServer(p, r); return true; }
+    if (typeof toast === "function") toast((r && r.msg) || "Não foi possível recolher", "bad");
+    return false;
+  });
+}
+
 /* Adiciona drop ao total e ao pacote da batalha que o gerou. */
 function rewardChestAdd(p, slug, count, source) {
   if (!p || !slug || !count) return;
-  p.rewardChest = p.rewardChest || {};
-  rewardChestBundleList(p); // executa migração antes de criar pacote novo
+  rewardChestEnsureShape(p);
   p.rewardChest[slug] = (p.rewardChest[slug] || 0) + count;
 
   source = source || {};
@@ -84,7 +132,9 @@ function rewardChestRemoveBundleIfEmpty(p, bundle) {
 
 /* Coleta um item. Com bundleId, coleta somente o drop daquela batalha. */
 function rewardChestClaimOne(p, slug, bundleId) {
-  if (!p || !p.rewardChest) return false;
+  if (!p) return false;
+  if (rewardChestIsOnline()) return rewardChestOnlineClaim(p, { slug, bundleId });
+  if (!p.rewardChest) return false;
   let count = 0;
   if (bundleId) {
     const bundle = rewardChestFindBundle(p, bundleId);
@@ -108,6 +158,7 @@ function rewardChestClaimOne(p, slug, bundleId) {
 
 /* Coleta todos os drops de um boss específico. */
 function rewardChestClaimBundle(p, bundleId) {
+  if (rewardChestIsOnline()) return rewardChestOnlineClaim(p, { bundleId });
   const bundle = rewardChestFindBundle(p, bundleId);
   if (!bundle) return 0;
   let types = 0;
@@ -128,6 +179,7 @@ function rewardChestClaimBundle(p, bundleId) {
 
 /* Compatibilidade: coleta absolutamente todos os pacotes pendentes. */
 function rewardChestClaimAll(p) {
+  if (rewardChestIsOnline()) return rewardChestOnlineClaim(p, { all:true });
   if (!p || !p.rewardChest) return 0;
   let n = 0;
   for (const slug of Object.keys(p.rewardChest)) {
@@ -229,9 +281,13 @@ function openRewardChest(bundleId) {
   const all = $("#reward-claim-all");
   if (all && bundle) all.addEventListener("click", () => {
     if (typeof hideTip === "function") hideTip();
-    const n = rewardChestClaimBundle(p, bundle.id);
-    toast(`Recolhido <b>${n}</b> tipo(s) para a Loot Pouch.`);
-    openRewardChest();
+    const result = rewardChestClaimBundle(p, bundle.id);
+    const done = (n) => {
+      toast(`Recolhido <b>${n === true ? "os itens" : n}</b> tipo(s) para a Loot Pouch.`);
+      openRewardChest();
+    };
+    if (result && typeof result.then === "function") result.then((ok) => { if (ok) done(true); });
+    else if (result) done(result);
   });
   $$("#modal-body [data-reward-claim]").forEach((b) => {
     const slug = b.dataset.rewardClaim;
@@ -242,9 +298,13 @@ function openRewardChest(bundleId) {
     }
     b.addEventListener("click", () => {
       if (typeof hideTip === "function") hideTip();
-      rewardChestClaimOne(p, slug, bundle && bundle.id);
-      toast("Item recolhido para a Loot Pouch.");
-      openRewardChest(bundle && rewardChestFindBundle(p, bundle.id) ? bundle.id : undefined);
+      const result = rewardChestClaimOne(p, slug, bundle && bundle.id);
+      const done = () => {
+        toast("Item recolhido para a Loot Pouch.");
+        openRewardChest(bundle && rewardChestFindBundle(p, bundle.id) ? bundle.id : undefined);
+      };
+      if (result && typeof result.then === "function") result.then((ok) => { if (ok) done(); });
+      else if (result) done();
     });
   });
 }

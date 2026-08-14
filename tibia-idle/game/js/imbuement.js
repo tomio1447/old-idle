@@ -105,6 +105,84 @@ function imbTempoTexto(ms) {
   return Math.max(1, Math.floor(ms / 1000)) + "s";
 }
 
+/* Skill cat por tipo de arma (XML Canary / TibiaWiki Imbuing). */
+const IMB_SKILL_CAT = { axe: 11, sword: 12, club: 13, distance: 15, fist: 18 };
+const IMB_PROT_CAT_EL = {
+  4: "death", 5: "earth", 6: "fire", 7: "ice", 8: "energy", 9: "holy",
+};
+/* Wands/rods que aceitam Strike (Critical) além de Void + Epiphany.
+ * Lista do TibiaWiki / shrine oficial — o restante das magias NÃO leva
+ * Vampirism nem Strike. */
+const IMB_STRIKE_MAGIC = {
+  "falcon-wand": 1, "falcon-rod": 1,
+  "wand-of-destruction": 1, "rod-of-destruction": 1,
+  "cobra-wand": 1, "cobra-rod": 1,
+  "lion-wand": 1, "lion-rod": 1,
+  "naga-wand": 1, "naga-rod": 1,
+  "jungle-wand": 1, "jungle-rod": 1,
+  "soulhexer": 1, "soultainter": 1,
+  "eldritch-wand": 1, "eldritch-rod": 1,
+  "gilded-eldritch-wand": 1, "gilded-eldritch-rod": 1,
+  "amber-wand": 1, "amber-rod": 1,
+  "sanguine-coil": 1, "sanguine-rod": 1,
+  "grand-sanguine-coil": 1, "grand-sanguine-rod": 1,
+};
+
+function imbItemDef(itemSlug) {
+  const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) || {};
+  return gd[itemSlug] || {};
+}
+
+/* Categorias permitidas no shrine, iguais ao client Canary / Tibia global.
+ * Escudo NÃO recebe Life Leech. Wand/rod NÃO recebe Vampirism. Proteção
+ * nativa do mesmo elemento, life/mana leech nativo e dano elemental nativo
+ * bloqueiam a categoria correspondente. */
+function imbSlotCats(slot, itemSlug) {
+  const it = imbItemDef(itemSlug);
+  const t = it.t || it.type || "";
+  let cats = [];
+  if (slot === "weapon") {
+    if (t === "distance") {
+      cats = it.th ? [0, 1, 2, 3, 15] : [1, 2, 3, 15];
+    } else if (t === "magic") {
+      cats = [2, 16];
+      if (IMB_STRIKE_MAGIC[itemSlug]) cats.push(3);
+    } else {
+      cats = [0, 1, 2, 3, IMB_SKILL_CAT[t] || 12];
+    }
+  } else if (slot === "shield") {
+    if (t === "spellbook") cats = [4, 5, 6, 7, 8, 9, 14, 16];
+    else if (t === "quiver") cats = [];
+    else cats = [4, 5, 6, 7, 8, 9, 14];
+  } else if (slot === "armor") {
+    cats = [1, 4, 5, 6, 7, 8, 9];
+  } else if (slot === "helmet") {
+    cats = [2, 11, 12, 13, 14, 15, 16, 18];
+  } else if (slot === "boots") {
+    cats = [10, 19];
+  } else if (slot === "backpack") {
+    cats = [17];
+  }
+  const res = it.res || {};
+  return cats.filter((cat) => {
+    const el = IMB_PROT_CAT_EL[cat];
+    if (el && Number(res[el]) > 0) return false;
+    if (cat === 1 && Number(it.lifeLeech) > 0) return false;
+    if (cat === 2 && Number(it.manaLeech) > 0) return false;
+    if (cat === 0 && (it.el || it.elDmg)) return false;
+    return true;
+  });
+}
+
+function imbCatAllowedOn(slot, itemSlug, cat) {
+  return imbSlotCats(slot, itemSlug).indexOf(cat) >= 0;
+}
+
+function imbKeyAllowedOn(slot, itemSlug, key) {
+  const g = imbFindGroup(key);
+  return !!(g && imbCatAllowedOn(slot, itemSlug, g.cat));
+}
+
 /* ---------- alvo: slots do equipamento que aceitam imbuement ---------- */
 function imbSlotsOf(slug) {
   const it = GAMEDATA.items[slug];
@@ -179,11 +257,18 @@ function imbAdd(p, slot, key, tier, protection) {
   if (!max) return { ok: false, msg: "Este item não aceita imbuement." };
   const g = imbFindGroup(key);
   if (!g || !g.tiers[tier]) return { ok: false, msg: "Imbuement desconhecido." };
+  if (!imbCatAllowedOn(slot, e.item, g.cat))
+    return { ok: false, msg: "Este imbuement não pode ser aplicado neste item." };
   const lista = imbOf(p, slot);
   if (lista.length >= max)
     return { ok: false, msg: `Só cabem ${max} imbuement(s) neste item.` };
   if (lista.some((x) => x.key === key))
     return { ok: false, msg: "Já existe esse imbuement no item." };
+  if (lista.some((x) => {
+    const og = imbFindGroup(x.key);
+    return og && og.cat === g.cat;
+  }))
+    return { ok: false, msg: "Já existe um imbuement desta categoria no item." };
   if (!imbHaveMats(p, key, tier))
     return { ok: false, msg: "Faltam materiais na loot pouch." };
   const custo = imbCusto(key, tier, protection);
@@ -267,6 +352,7 @@ function imbTotals(p) {
       if (imbExpirado(im)) continue;
       const g = imbFindGroup(im.key);
       if (!g || !g.tiers[im.tier]) continue;
+      if (!imbCatAllowedOn(slot, e.item, g.cat)) continue;
       const ef = g.tiers[im.tier].effect;
       if (!ef) continue;
       if (ef.type === "damage") {

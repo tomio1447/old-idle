@@ -2,6 +2,9 @@
 "use strict";
 const fs=require("fs"),path=require("path"),crypto=require("crypto"),vm=require("vm");
 const DATA=path.join(__dirname,"..","game","data");
+let WAND_SHOOT={};
+try{WAND_SHOOT=require(path.join(__dirname,"..","game","js","wandshootdata.js"))||{};}
+catch(e){WAND_SHOOT={};}
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
@@ -200,10 +203,20 @@ if(ALL_SPELLS["exeta-amp-res"]){ALL_SPELLS["exeta-amp-res"].range=7;ALL_SPELLS["
     "exori-scu":{areaNome:"AREA_SQUARE1X1",self:1,nome:"Shield Slam",words:"exori scu"},
     "exori-mas-amp-pug":{areaNome:"AREA_SQUARE1X1",blockWalls:1,needTarget:1,nome:"Thousand Fist Blows",range:1,words:"exori mas amp pug"},
   });
+  for(const id of ["exori","exori-gran","exori-mas","exori-min"]){
+    SPELL_TARGET[id]=Object.assign({},SPELL_TARGET[id]||{},{self:1});
+    const s=ALL_SPELLS[id],meta=SPELL_TARGET[id];
+    if(s&&meta&&meta.areaNome)s.area=meta.areaNome;
+  }
+  for(const id of Object.keys(SPELL_TARGET)){
+    const s=ALL_SPELLS[id],meta=SPELL_TARGET[id];
+    if(s&&meta&&meta.areaNome&&typeof s.area!=="string")s.area=meta.areaNome;
+  }
   SPELL_FX.words=SPELL_FX.words||{};SPELL_FX.names=SPELL_FX.names||{};
   Object.assign(SPELL_FX.words,{
     "exori ico scu":{fx:"shield-bash-effect"},"exori scu":{fx:"shield-bash-effect"},
     "exevo dir san":{fx:"divine-barrage-effect"},"exevo dir moe":{fx:"ethereal-barrage-effect"},
+    "exevo tempo mas san":{fx:"divine-grenade-effect"},
     "exevo fur frigo":{fx:"forked-glacier-effect",miss:"ice"},
     "exevo fur tera":{fx:"forked-thorns-effect",miss:"earth"},
     "exevo mort ora":{fx:"death-echo-effect",miss:"death"},
@@ -218,6 +231,7 @@ if(ALL_SPELLS["exeta-amp-res"]){ALL_SPELLS["exeta-amp-res"].range=7;ALL_SPELLS["
   if(ALL_SPELLS["utito-tempo"])ALL_SPELLS["utito-tempo"].fx="stance-blood-rage";
   if(ALL_SPELLS["utamo-tempo"])ALL_SPELLS["utamo-tempo"].fx="stance-protector";
   if(ALL_SPELLS["utori-con"])ALL_SPELLS["utori-con"].fx="stance-sharpshooter";
+  if(ALL_SPELLS["exevo-tempo-mas-san"])ALL_SPELLS["exevo-tempo-mas-san"].fx="divine-grenade-effect";
   delete ALL_SPELLS["exori-dir-san"];
   delete ALL_SPELLS["exori-dir-moe"];
   delete ALL_SPELLS["uteta-tio"];
@@ -279,6 +293,10 @@ Object.assign(POTIONS,{
   "distilled-ultimate-mana-potion":POTIONS["distilled-ultimate-mana-potion"]||{mp:[425,575],lvl:200,tipo:"mp",
     vocs:["sorcerer","druid","paladin","knight","monk"]},
 });
+// 15.25.3a4a52: great mana potion passou a ser de todas as vocações (EK incluso).
+if(POTIONS["great-mana-potion"]){
+  POTIONS["great-mana-potion"].vocs=["sorcerer","druid","paladin","knight","monk"];
+}
 const SUPPLY_PRICE={
   "lightest-missile-rune":5,"lightest-magic-missile-rune":5,"light-stone-shower-rune":5,"light-magic-missile-rune":12,
   "intense-healing-rune":95,"ultimate-healing-rune":175,"stalagmite-rune":12,"heavy-magic-missile-rune":25,
@@ -321,11 +339,12 @@ const WAND_PERFECT_SHOT={"eldritch-wand":{shotDmg:65,shotRange:4},"gilded-eldrit
 for(const slug of Object.keys(WAND_PERFECT_SHOT)){
   if(ITEMS[slug])Object.assign(ITEMS[slug],WAND_PERFECT_SHOT[slug]);
 }
-let WHEEL_SLOTS={},WHEEL_SPELL_UPGRADES={},WHEEL_SKILL_VOC={},WHEEL_LEECH={life:0.75,mana:0.25};
+let WHEEL_SLOTS={},WHEEL_SPELL_UPGRADES={},WHEEL_SKILL_VOC={},WHEEL_LEECH={life:0.75,mana:0.25},WHEEL_FN=null;
 try{
   const wd=require(path.join(__dirname,"..","game","js","wheeldata.js"));
   WHEEL_SLOTS=wd.WHEEL_SLOTS||{};WHEEL_SPELL_UPGRADES=wd.WHEEL_SPELL_UPGRADES||{};
   WHEEL_SKILL_VOC=wd.WHEEL_SKILL||{};WHEEL_LEECH=wd.WHEEL_LEECH||WHEEL_LEECH;
+  WHEEL_FN=require(path.join(__dirname,"..","game","js","wheel.js"));
 }catch(e){/* wheel opcional */}
 for(const slug of Object.keys(AMMO)){
   const raw=AMMO[slug],it=ITEMS[slug]||(ITEMS[slug]={});
@@ -336,6 +355,12 @@ for(const slug of Object.keys(AMMO)){
   if(raw.ammoKind)it.ammoKind=raw.ammoKind;
   if(raw.poison)it.poison=raw.poison;
   it.s=it.s||"ammo";it.type=it.type||"ammo";it.slot=it.slot||"ammo";
+}
+if(ITEMS["diamond-arrow"])ITEMS["diamond-arrow"].areaFx="blue-electricity";
+for(const slug of Object.keys(ITEMS)){
+  const it=ITEMS[slug];if(!it)continue;
+  const miss=WAND_SHOOT[it.id]||WAND_SHOOT[String(it.id)];
+  if(miss)it.shoot=miss;
 }
 const QAMMO=QUIVER_DATA.ammo||{};
 for(const slug of Object.keys(QAMMO)){
@@ -384,6 +409,11 @@ const ELEMENT_FX={physical:"draw-blood",fire:"hit-by-fire",ice:"ice-attack",ener
   manadrain:"mana-wisp",lifedrain:"draw-blood",agony:"draw-blood"};
 const ELEMENT_MISSILE={physical:"small-stone",fire:"fire",ice:"ice",energy:"energy",earth:"earth",
   death:"death",holy:"holy",drown:"small-stone",manadrain:"energy",lifedrain:"death",agony:"death"};
+const SHOOT_TO_MISSILE={energy:"energy",fire:"fire",death:"death",holy:"holy",ice:"ice",earth:"earth",
+  poison:"earth",smallice:"small-ice",smallearth:"small-earth",smallholy:"small-holy",
+  energyball:"energy-ball",suddendeath:"sudden-death",smallstone:"small-stone"};
+const RACE_HIT_FX={blood:"draw-blood",venom:"hit-by-poison",undead:"hit-area",ink:"hit-area",
+  fire:"draw-blood",energy:"energy-hit",candy:"hit-area",chocolate:"hit-area"};
 function clone(v){return JSON.parse(JSON.stringify(v||{}));}
 function clonePlayerState(p){const out=clone(p||{});out.conditions=out.conditions&&typeof out.conditions==="object"?out.conditions:{};return out;}
 function finitePosition(value,fallback){const n=Number(value);return Number.isFinite(n)?n:fallback;}
@@ -414,6 +444,13 @@ function authorityVisualDistance(a,b,auth){
 function authorityMobTarget(auth,mob){
   const alive=(auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil);
   if(!alive.length)return null;
+  const now=Number(auth.clock)||0;
+  // Exeta Res / Amp Res: o monstro marcado ataca o knight que lançou, não o
+  // membro que estava mais perto quando o alvo grudou.
+  if(mob&&Number(mob.challengedUntil||0)>now){
+    const knight=alive.find((item)=>String(item.id)===String(mob.challengeTargetId||""));
+    if(knight){mob.targetId=String(knight.id);return knight;}
+  }
   let target=alive.find((item)=>String(item.id)===String(mob.targetId||""));
   if(!target){target=alive.slice().sort((a,b)=>authorityVisualDistance(mob,a,auth)-authorityVisualDistance(mob,b,auth)||
       String(a.id).localeCompare(String(b.id)))[0];mob.targetId=String(target.id);}
@@ -467,6 +504,11 @@ function normalizeVisualState(raw,auth){
       item.cy=Math.max(0,Math.min(gh-1,Number.isFinite(cy)?Math.round(cy):Math.floor(y*gh)));
       if(input.combo)item.combo=sanitizeCombo(input.combo);
       if(input.stances&&typeof input.stances==="object")item.stances=input.stances;
+      if(typeof input.autoWalk==="boolean")item.autoWalk=input.autoWalk;
+      const wdx=Number(input.walkIntent&&input.walkIntent.dx),wdy=Number(input.walkIntent&&input.walkIntent.dy);
+      if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
+        item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
+      }
       if(input.challenge&&typeof input.challenge==="object"){
         const hunt=String(input.challenge.huntMode||"");
         item.challenge={
@@ -478,13 +520,31 @@ function normalizeVisualState(raw,auth){
     return out;};
   raw=raw&&typeof raw==="object"?raw:{};return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64)};
 }
+function snapAuthorityEntityToCell(auth,ent){
+  if(!ent)return;
+  const w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30;
+  const cell=entityGridCell(ent,auth);
+  ent.cx=cell.cx;ent.cy=cell.cy;
+  ent.x=(cell.cx+.5)/w;ent.y=(cell.cy+.5)/h;
+  ent.sx=ent.x;ent.sy=ent.y;
+}
 function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(raw,auth),players=new Map(visual.players.map((v)=>[v.id,v])),
   mobs=new Map(visual.mobs.map((v)=>[v.id,v]));
+  const applyPose=(ent,pos)=>{
+    if(!ent||!pos)return;
+    if(Number.isFinite(Number(pos.cx)))ent.cx=pos.cx;
+    if(Number.isFinite(Number(pos.cy)))ent.cy=pos.cy;
+    snapAuthorityEntityToCell(auth,ent);
+    const x=Number(pos.x),y=Number(pos.y);
+    if(Number.isFinite(x)&&Number.isFinite(y)){ent.x=x;ent.y=y;}
+  };
   for(const item of auth.players||[]){const pos=players.get(String(item.id));if(pos){
     const combo=pos.combo,stances=pos.stances,challenge=pos.challenge;
-    delete pos.combo;delete pos.stances;delete pos.challenge;Object.assign(item,pos);
+    applyPose(item,pos);
     if(combo){item.p=item.p||{};item.p.config=item.p.config||{};item.p.config.combo=combo;}
     if(stances){item.p=item.p||{};item.p.stances=sanitizeStances(stances,item.p);}
+    if(typeof pos.autoWalk==="boolean"){item.p=item.p||{};item.p.config=item.p.config||{};item.p.config.autoWalk=pos.autoWalk;}
+    if(pos.walkIntent)item.walkIntent=pos.walkIntent;else delete item.walkIntent;
     if(challenge){item.p=item.p||{};item.p.config=item.p.config||{};
       item.p.config.exetaRes=!!challenge.res;item.p.config.exetaAmpRes=!!challenge.amp;
       const mode=challenge.huntMode||(challenge.box?"box":"");
@@ -492,13 +552,23 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       if(challenge.kiteDistance)item.p.config.kiteDistance=challenge.kiteDistance;
       if(mode==="box"||mode==="safe")auth.huntMode=mode;}
   }}
-  for(const mob of auth.mobs||[]){const pos=mobs.get(String(mob.id));if(pos)Object.assign(mob,pos);}
+  const clock=Number(auth.clock)||0;
+  for(const mob of auth.mobs||[]){
+    const pos=mobs.get(String(mob.id));if(!pos)continue;
+    // Enquanto o Challenge puxa o bicho para o knight, a predição ranged do
+    // cliente não pode devolver o alvo à distância de tiro a cada tick.
+    if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)continue;
+    applyPose(mob,pos);
+  }
   return visual;
 }
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
 function maxStats(p){const level=Math.max(1,Number(p.level)||1),v=VOC[p.voc]||VOC.none;
   const rook=Math.min(level-1,7),voc=Math.max(0,level-1-rook);let hp=START_HP+rook*5+voc*v.hp,mp=START_MP+rook*5+voc*v.mp;
   for(const slot of Object.keys(p.equip||{})){const e=p.equip[slot],it=e&&ITEMS[e.item];if(it){hp+=Number(it.hp)||0;mp+=Number(it.mp)||0;}}
+  if(WHEEL_FN&&typeof WHEEL_FN.wheelTotals==="function"){
+    const w=WHEEL_FN.wheelTotals(p);hp+=Number(w&&w.hp)||0;mp+=Number(w&&w.mp)||0;
+  }
   return {hp:Math.max(1,Math.floor(hp)),mp:Math.max(0,Math.floor(mp))};}
 function blessingPrice(level){level=Math.max(1,Math.floor(Number(level)||1));return level*(level<=120?500:level<400?700:1000);}
 function seedFor(id){return parseInt(crypto.createHash("sha256").update(String(id)).digest("hex").slice(0,8),16)||1;}
@@ -572,6 +642,19 @@ function ammoMatrixTargets(auth,matrix,center,living){
   for(let r=0;r<matrix.length;r++)for(let c=0;c<(matrix[r]||[]).length;c++){
     if(!matrix[r][c])continue;hit.add((origin.cx+(c-oc))+":"+(origin.cy+(r-or)));}
   return (living||[]).filter((m)=>{if(!m||!(m.hp>0))return false;const g=entityGridCell(m,auth);return hit.has(g.cx+":"+g.cy);});}
+function ammoMatrixCells(auth,matrix,center){
+  if(!Array.isArray(matrix)||!matrix.length||!center)return [];
+  const origin=entityGridCell(center,auth);let or=Math.floor(matrix.length/2),oc=Math.floor((matrix[0]||[]).length/2);
+  for(let r=0;r<matrix.length;r++)for(let c=0;c<(matrix[r]||[]).length;c++)if(Number(matrix[r][c])===3){or=r;oc=c;}
+  const w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30,cells=[],seen=new Set();
+  for(let r=0;r<matrix.length;r++)for(let c=0;c<(matrix[r]||[]).length;c++){
+    if(!matrix[r][c])continue;
+    const cx=origin.cx+(c-oc),cy=origin.cy+(r-or),key=cx+":"+cy;
+    if(cx<0||cy<0||cx>=w||cy>=h||seen.has(key))continue;
+    seen.add(key);cells.push({cx,cy});
+  }
+  return cells;
+}
 function quiverPerfectShot(p,sqm){
   const q=equippedQuiver(p),it=q&&ITEMS[q.item];
   if(!it||!(Number(it.shotDmg)>0))return 0;
@@ -966,13 +1049,39 @@ function applyOutgoingDamage(mob,element,dmg,now){
   return applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
 }
 function itemTypeOf(it){return String((it&&(it.t||it.type))||"");}
+function isMagicWeapon(it){
+  const type=itemTypeOf(it);
+  return type==="magic"||type==="wand"||type==="rod";
+}
+function wandMissileOf(it,element){
+  if(it&&it.shoot){
+    const k=String(it.shoot).toLowerCase().replace(/[-_]/g,"");
+    return SHOOT_TO_MISSILE[k]||it.shoot;
+  }
+  const id=it&&it.id;
+  const mapped=id!==undefined&&id!==null?(WAND_SHOOT[id]||WAND_SHOOT[String(id)]):null;
+  if(mapped)return mapped;
+  return ELEMENT_MISSILE[element||(it&&it.el)||"energy"]||"energy";
+}
+function physicalHitFx(race){return RACE_HIT_FX[race]||RACE_HIT_FX.blood;}
+function basicHitFx(p,profile,tgt,el,ammoIt){
+  if(ammoIt&&ammoIt.areaFx)return ammoIt.areaFx;
+  if(profile&&profile.type==="magic")return ELEMENT_FX[el]||ELEMENT_FX.energy;
+  const fist=!!(profile&&profile.fist)||(p&&p.voc==="monk"&&attackSkillName(p)==="fist");
+  if(fist){
+    if(el&&el!=="physical")return ELEMENT_FX[el]||ELEMENT_FX.physical;
+    return "whirlwind-blow-white";
+  }
+  if(el==="physical")return physicalHitFx(tgt&&tgt.def&&tgt.def.race);
+  return ELEMENT_FX[el]||ELEMENT_FX.physical;
+}
 function playerWeaponProfile(p){
   const e=p&&p.equip&&p.equip.weapon,it=e&&ITEMS[e.item];
   const ammo=p&&p.equip&&p.equip.ammo,ammoIt=ammo&&ITEMS[ammo.item];
   const type=itemTypeOf(it);
-  if(it&&(type==="magic"||type==="wand"||type==="rod")){
+  if(it&&isMagicWeapon(it)){
     const el=it.el&&it.el!=="physical"?it.el:"energy";
-    return {element:el,type:"magic",projectile:true,missile:ELEMENT_MISSILE[el]||"energy"};
+    return {element:el,type:"magic",projectile:true,missile:wandMissileOf(it,el)};
   }
   if(it&&type==="distance"){
     const throwW=!weaponAmmoKind(it,e.item);
@@ -980,9 +1089,12 @@ function playerWeaponProfile(p){
     const el=(shot&&shot.el&&shot.el!=="physical")?shot.el:((it.el&&it.el!=="physical")?it.el:"physical");
     return {element:el,type:"distance",projectile:true,missile:throwW?(e.item||"spear"):((ammo&&ammo.item)||"arrow")};
   }
+  const fist=attackSkillName(p)==="fist";
+  const bond=elementalBond(p);
+  if(bond)return {element:bond,type:"melee",projectile:false,missile:null,bond:true,fist:true};
   const elDmg=(it&&it.el&&it.el!=="physical")?(Number(it.elDmg)||0):0;
   const fis=Number(it&&(it.atk!==undefined?it.atk:it.attack))||7;
-  const out={element:"physical",type:"melee",projectile:false,missile:null};
+  const out={element:"physical",type:"melee",projectile:false,missile:null,fist:!!fist};
   if(elDmg>0){const total=fis+elDmg;out.elemento2=it.el;out.propFisica=total>0?fis/total:1;}
   return out;
 }
@@ -1059,6 +1171,11 @@ function spellAreaDirection(origin,target){
   if(dy!==0)return dy>0?"s":"n";
   return dx>=0?"e":"w";
 }
+function spellAreaName(s){
+  if(typeof(s&&s.area)==="string"&&s.area)return s.area;
+  const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
+  return meta.areaNome||null;
+}
 function spellAreaFromCaster(name,s){
   const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
   if(meta.self)return true;
@@ -1071,8 +1188,7 @@ function spellAreaFromCaster(name,s){
  * mesmas células do cliente: ondas/feixes nascem no caster e círculos self
  * ficam ao redor dele; áreas com target são ancoradas no alvo. */
 function spellAreaCells(auth,s,caster,target){
-  const meta=SPELL_TARGET[String(s&&s.id||"")]||{},name=typeof(s&&s.area)==="string"?s.area:meta.areaNome,
-    area=name&&AREA_DATA[name];
+  const name=spellAreaName(s),area=name&&AREA_DATA[name];
   if(!area||!caster||!target)return[];
   const origin=entityGridCell(caster,auth),aim=entityGridCell(target,auth),dir=spellAreaDirection(origin,aim),
     offsets=area[dir]||area.n;if(!Array.isArray(offsets))return[];
@@ -1129,9 +1245,22 @@ function spellAreaTargets(auth,s,caster,target,living){
   return inside.includes(target)?inside:[target].concat(inside);
 }
 function spellReach(s){if(s.range&&s.range>0)return s.range;if(s.area)return 4;return 1;}
+const KNIGHT_EXORI=new Set(["exori","exori-gran","exori-min","exori-mas",
+  "exori-hur","exori-ico","exori-gran-ico","exori-con","exori-gran-con","exori-amp-kor"]);
+function knightSpellFx(s,fx){
+  if(!s||!KNIGHT_EXORI.has(s.id))return fx||null;
+  if(fx&&fx!=="draw-blood")return fx;
+  return s.id==="exori-mas"?"groundshaker":"hit-area";
+}
 function spellVisual(s){const words=String(s&&s.words||"").toLowerCase(),name=String(s&&s.name||"").toLowerCase(),
   imported=SPELL_FX.words&&SPELL_FX.words[words]||SPELL_FX.names&&SPELL_FX.names[name]||{};
-  return{fx:s&&s.fx||imported.fx||null,missile:s&&s.missile||imported.miss||null};}
+  return{fx:knightSpellFx(s,s&&s.fx||imported.fx||null),missile:s&&s.missile||imported.miss||null};}
+function spellAreaAnchor(auth,s,caster,target,cells){
+  const meta=SPELL_TARGET[String(s&&s.id||"")]||{},name=typeof(s&&s.area)==="string"?s.area:meta.areaNome;
+  const fromCaster=!!(meta.self||spellAreaFromCaster(name,s));
+  const origin=fromCaster?caster:target;
+  return {fromCaster,base:entityGridCell(origin,auth),cells:cells||[]};
+}
 
 /* Lista de spells de ataque habilitadas pelo jogador no Helper/barra de
  * combo, com compatibilidade para attackSpells/shooter/config.spells antigos.
@@ -1351,6 +1480,7 @@ function wheelSkillBonus(p,which){
   return bonus;
 }
 function wheelApplySpellBoost(p,spellId){
+  if(WHEEL_FN&&typeof WHEEL_FN.wheelApplySpellBoost==="function")return WHEEL_FN.wheelApplySpellBoost(p,spellId);
   const out={damagePct:0,healPct:0,cooldownMs:0,manaPct:0,lifeLeech:0,manaLeech:0,critChance:0,critDamage:0};
   if(!p||!p.wheel||!p.wheel.slots||!spellId)return out;
   const voc=p.voc||"knight";
@@ -1403,7 +1533,11 @@ function augmentTotals(p,spellId){
   return t;
 }
 function playerCritChancePct(p){return 5+(imbCombatTotals(p).critChance||0);}
-function playerCritExtraPct(p){return 10+(imbCombatTotals(p).crit||0);}
+function playerCritExtraPct(p){
+  let extra=10+(imbCombatTotals(p).crit||0);
+  if(WHEEL_FN)extra+=Number(WHEEL_FN.wheelTotals(p).critDamage)||0;
+  return extra;
+}
 function rollPlayerCrit(auth,p,spellId){
   let chance=playerCritChancePct(p),extra=playerCritExtraPct(p);
   if(spellId){
@@ -1418,6 +1552,7 @@ function scalePlayerDamage(p,mob,element,dmg,now){
   dmg=applyCharmDamage(p,element,Math.max(0,Math.floor(Number(dmg)||0)));
   if(mob&&(mob.boss||(mob.def&&mob.def.boss)))dmg=Math.max(1,Math.floor(dmg*bosstiaryDamageBonus(p)));
   const swf=swiftFootMul(p,now);if(swf!==1)dmg=Math.max(1,Math.floor(dmg*swf));
+  if(WHEEL_FN)dmg=Math.max(1,Math.floor(dmg*WHEEL_FN.wheelDamageMul(p)));
   return dmg;
 }
 function boostHealAmount(auth,p,s,amount){
@@ -1426,6 +1561,7 @@ function boostHealAmount(auth,p,s,amount){
   if(aug.baseHeal)amount=Math.max(1,Math.floor(amount*(1+aug.baseHeal/100)));
   const wh=wheelApplySpellBoost(p,s&&s.id);
   if(wh.healPct)amount=Math.max(1,Math.floor(amount*(1+wh.healPct/100)));
+  if(WHEEL_FN)amount=Math.max(1,Math.floor(amount*WHEEL_FN.wheelHealMul(p)));
   if(p&&p.voc==="druid"&&(!p.config||p.config.criticalHeal!==false)){
     const chance=10+Math.max(0,playerCritChancePct(p)-5);
     if(random(auth)*100<chance)amount=Math.max(1,Math.floor(amount*(1+playerCritExtraPct(p)/100)));
@@ -1491,6 +1627,11 @@ function applyOutgoingLeech(p,dmg){
   const leech=imbLeechTotals(p),max=maxStats(p);
   if(leech.life>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*leech.life/100)));
   if(leech.mana>0)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*leech.mana/100)));
+  if(WHEEL_FN){
+    const wl=WHEEL_FN.wheelLeechTotals(p);
+    if(wl.lifeLeech)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*wl.lifeLeech/100)));
+    if(wl.manaLeech)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*wl.manaLeech/100)));
+  }
   const vamp=charmTotals(p).vampirismo;
   if(vamp>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*vamp/100)));
 }
@@ -1505,7 +1646,12 @@ function playerMitigationPct(p){
   if(st.noBlock)return Math.min(50,Math.max(0,defEquip*0.2));
   let sh=st.noBlock?0:stanceSkill(p,"shield");
   if(st.shieldPct)sh=Math.floor(sh*(1+st.shieldPct/100));
-  return Math.min(50,Math.max(0,sh*0.04+defEquip*0.2));
+  let wheelMit=0;
+  if(WHEEL_FN){
+    const wt=WHEEL_FN.wheelTotals(p);
+    wheelMit=(Number(wt.mitigation)||0)*100+(Number(wt.gemMitigation)||0);
+  }
+  return Math.min(50,Math.max(0,sh*0.04+defEquip*0.2+wheelMit));
 }
 function applyPlayerMitigation(p,element,dmg){
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
@@ -1690,6 +1836,10 @@ function playerResistPct(p,element){
     const it=ITEMS[p.equip[slot]&&p.equip[slot].item];
     if(it&&it.res)total+=Number(it.res[element])||0;
   }
+  if(WHEEL_FN){
+    const r=WHEEL_FN.wheelTotals(p).resist||{};
+    total+=Number(r[element])||0;
+  }
   return total;
 }
 function absorbMagicShield(auth,item,p,dmg,now,pos,element){
@@ -1710,7 +1860,7 @@ function absorbMagicShield(auth,item,p,dmg,now,pos,element){
 function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
   if(dmg<=0)return 0;
-  const dodge=charmTotals(p).esquiva;
+  const dodge=charmTotals(p).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0);
   if(dodge>0&&random(auth)*100<dodge){
     auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,ts:now});
     return 0;
@@ -2198,9 +2348,10 @@ function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String
 function claimSpawnCell(auth,cx,cy){
   const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
   const used=new Set();
-  for(const ent of (auth.mobs||[]).concat(auth.players||[])){
-    if(Number.isFinite(Number(ent.cx))&&Number.isFinite(Number(ent.cy)))used.add(Number(ent.cx)+","+Number(ent.cy));
-  }
+  const mark=(ent)=>{if(ent&&Number.isFinite(Number(ent.cx))&&Number.isFinite(Number(ent.cy)))
+    used.add(Number(ent.cx)+","+Number(ent.cy));};
+  for(const ent of (auth.mobs||[]).concat(auth.players||[]))mark(ent);
+  for(const sp of auth.pendingSpawns||[])mark(sp.mob||sp);
   cx=Math.max(0,Math.min(w-1,Math.round(Number(cx)||0)));cy=Math.max(0,Math.min(h-1,Math.round(Number(cy)||0)));
   if(!used.has(cx+","+cy))return {cx,cy};
   const dirs=[[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1],[2,0],[0,2],[-2,0],[0,-2],
@@ -2511,6 +2662,7 @@ function usePotion(auth,p){
   const drink=(slug)=>{
     const pot=POTIONS[slug];
     if(pot&&(pot.hp||pot.mp)){
+      if(!Object.prototype.hasOwnProperty.call(p.supplies,slug))p.supplies[slug]=0;
       if(!potionAllowed(p,slug,pot)||!consumeSupply(auth,p,slug))return false;
       if(pot.hp)p.hp=Math.min(max.hp,p.hp+roll(auth,pot.hp[0],pot.hp[1]));
       if(pot.mp)p.mp=Math.min(max.mp,p.mp+roll(auth,pot.mp[0],pot.mp[1]));
@@ -2531,7 +2683,15 @@ function usePotion(auth,p){
   }
   if(magicShieldActive(p,now))return false;
   if(!cfg.noManaPotions&&!cfg.noPotions&&mpPct<=manaAt){
-    for(const slug of orderOf(cfg.manaSupply,MANA_POTION_ORDER))if(drink(slug))return true;
+    const selected=cfg.manaSupply;
+    if(selected){
+      const selectedOk=potionAllowed(p,selected,POTIONS[selected]||{});
+      const manaOrder=selectedOk?orderOf(selected,MANA_POTION_ORDER)
+        :MANA_POTION_ORDER.filter((slug)=>potionAllowed(p,slug,POTIONS[slug]));
+      for(const slug of manaOrder)if(drink(slug))return true;
+    }else{
+      for(const slug of orderOf(null,MANA_POTION_ORDER))if(drink(slug))return true;
+    }
   }
   return false;
 }
@@ -2674,6 +2834,10 @@ function ensureSpawnIds(auth){
     const id=String(m&&m.id||"");
     if(id&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
   }
+  for(const sp of auth.pendingSpawns||[]){
+    const id=String(sp&&sp.mob&&sp.mob.id||"");
+    if(id&&!auth.spawnIds.includes(id))auth.spawnIds.push(id);
+  }
   while(auth.spawnIds.length<pack)auth.spawnIds.push("srv-slot-"+auth.spawnIds.length);
 }
 function huntWaveSize(auth){
@@ -2689,23 +2853,48 @@ function spawnHuntWave(auth,now,opts){
   opts=opts||{};
   if(!auth||auth.kind==="boss"||auth.ended||auth.greed)return;
   const living=(auth.mobs||[]).filter((m)=>m&&m.hp>0);
-  if(!opts.force&&living.length)return;
+  if(!opts.force&&(living.length||(auth.pendingSpawns&&auth.pendingSpawns.length)))return;
   auth.mobs=living;
+  auth.pendingSpawns=auth.pendingSpawns||[];
   auth.wave=(Number(auth.wave)||0)+1;
   if(!opts.keepPack)auth.pack=huntWaveSize(auth);
   ensureSpawnIds(auth);
   const occupied=new Set(auth.mobs.map((m)=>String(m.id)));
+  for(const sp of auth.pendingSpawns)if(sp&&sp.mob&&sp.mob.id)occupied.add(String(sp.mob.id));
   const count=Math.max(1,auth.pack||3);
+  now=now||auth.clock;
   for(let i=0;i<count;i++){
     const id=auth.spawnIds[i];if(occupied.has(id)||!auth.spawnPool.length)continue;
     const slug=auth.spawnPool[roll(auth,0,auth.spawnPool.length-1)],m=makeMob(auth,slug,false,id,null,i);
     if(!m)break;
-    auth.mobs.push(m);occupied.add(id);
-    const pos=entityPosition(m,.5,.5);
-    auth.events=auth.events||[];
-    auth.events.push({t:"spawn-blink",x:pos.x,y:pos.y,screen:true,ts:now||auth.clock});
-    auth.events.push({t:"spawn",slug:m.slug,x:pos.x,y:pos.y,targetId:String(m.id),screen:true,ts:now||auth.clock});
+    occupied.add(id);
+    auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
   }
+}
+const AUTH_SPAWN_BLINK_MS=1000,AUTH_SPAWN_BLINKS=3;
+function tickAuthSpawnQueue(auth,now){
+  if(!auth||!Array.isArray(auth.pendingSpawns)||!auth.pendingSpawns.length)return;
+  now=Number(now)||auth.clock;
+  auth.events=auth.events||[];
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  for(const sp of auth.pendingSpawns){
+    const elapsed=now-(Number(sp.startedAt)||now);
+    if(elapsed<0)continue;
+    const due=Math.min(AUTH_SPAWN_BLINKS,Math.floor(elapsed/AUTH_SPAWN_BLINK_MS)+1);
+    while((Number(sp.blink)||0)<due){
+      sp.blink=(Number(sp.blink)||0)+1;
+      auth.events.push({t:"spawn-blink",x:(Number(sp.cx)+.5)/gw,y:(Number(sp.cy)+.5)/gh,
+        blink:sp.blink,screen:true,ts:now});
+    }
+    if(elapsed>=AUTH_SPAWN_BLINKS*AUTH_SPAWN_BLINK_MS&&!sp.done){
+      sp.done=true;
+      const m=sp.mob;
+      m.cx=sp.cx;m.cy=sp.cy;m.x=(m.cx+.5)/gw;m.y=(m.cy+.5)/gh;m.sx=m.x;m.sy=m.y;
+      auth.mobs.push(m);
+      auth.events.push({t:"spawn",slug:m.slug,x:m.x,y:m.y,targetId:String(m.id),screen:true,ts:now});
+    }
+  }
+  auth.pendingSpawns=auth.pendingSpawns.filter((sp)=>!sp.done);
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
 function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players)applyPvpLoss(item.p,auth.lastDamageSource||"monster");
@@ -2936,7 +3125,7 @@ function advanceAuthorityMovement(auth,now,opts){
     ent.walkStepsWindow=ent.walkStepsWindow&&typeof ent.walkStepsWindow==="object"?ent.walkStepsWindow:{at:0,n:0};
     if(now-ent.walkStepsWindow.at>=1000){ent.walkStepsWindow={at:now,n:0};}
     let steps=0;
-    while(ent.walkAcc>=80&&steps<3&&ent.walkStepsWindow.n<3){
+    while(ent.walkAcc>=80&&steps<1&&ent.walkStepsWindow.n<1){
       const here=entityGridCell(ent,auth),d=chebyshevCells(here,{cx:gx,cy:gy});
       let dir=null;
       if(d>td)dir=authorityStepToward(auth,occ,ent,gx,gy);
@@ -2948,6 +3137,20 @@ function advanceAuthorityMovement(auth,now,opts){
     }
   };
   if(!(opts&&opts.freezePlayers))for(const item of livingPlayers){
+    const auto=!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
+    if(!auto){
+      const intent=item.walkIntent,dir=intent&&AUTH_STEP_DIRS.find((d)=>d.dx===intent.dx&&d.dy===intent.dy);
+      if(dir){
+        const dt=Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);
+        item.walkAcc=Number(item.walkAcc)||0;item.walkAcc+=dt;
+        const here=entityGridCell(item,auth);
+        const dur=authorityStepDuration(authoritySpeedPts(item,true,now),!!dir.diag,false);
+        if(authorityStepFree(auth,occ,here.cx,here.cy,dir)&&item.walkAcc>=dur){
+          authorityApplyStep(auth,item,dir,occ);item.walkAcc-=dur;
+        }else item.walkAcc=Math.min(item.walkAcc,dur);
+      }
+      continue;
+    }
     const mode=huntModeOf(auth,item);
     if(mode==="box"||mode==="safe"){
       const alvo=pickFormationCell(auth,item,now,mode==="box"?boxTargetCell:safeTargetCell);
@@ -2972,15 +3175,25 @@ function advanceAuthorityMovement(auth,now,opts){
     walkToward(mob,to.cx,to.cy,authorityTargetDistance(mob,now),false);
   }
 }
+function challengeWallUntil(until,clock){
+  const left=Number(until)||0,now=Number(clock)||0;
+  if(left<=now)return 0;
+  return Date.now()+(left-now);
+}
 function doChallengeCast(auth,item,p,now,id,s,living){
   const amp=id==="exeta-amp-res",range=Number(s.range)||7,origin=entityGridCell(item,auth),pos=playerPosition(auth,p);
+  const casterId=String(item.id);
   let marcou=0;
   for(const m of living){
     if(chebyshevCells(origin,entityGridCell(m,auth))>range)continue;
     m.challengedUntil=now+10000;
-    if(amp&&(Number(m.def&&m.def.targetDistance)||1)>1)m.forceMeleeUntil=now+10000;
+    m.challengeTargetId=casterId;
+    m.targetId=casterId;
+    // Chivalrous Challenge força melee em todo marcado, inclusive quem já
+    // luta corpo-a-corpo (no-op de distância) e quem só é ranged no MOVDATA.
+    if(amp)m.forceMeleeUntil=now+10000;
     const mp=entityPosition(m,.5,.5);
-    auth.events.push({t:"challenge-target",x:mp.x,y:mp.y,screen:true,amp:amp,targetId:String(m.id),ts:now});
+    auth.events.push({t:"challenge-target",x:mp.x,y:mp.y,screen:true,amp:amp,targetId:String(m.id),whoId:casterId,ts:now});
     marcou++;
   }
   if(!marcou)return false;
@@ -3101,7 +3314,7 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   if(!runeUsable(p,id,now)||!primary||primary.hp<=0)return false;
   const rd=RUNEDATA[id];if(!rd||!consumeSupply(auth,p,id))return false;
   const cd=Number(rd.cd||rd.gcd||2000);
-  p._runeCd=now+cd;p._offensiveCd=now+2000;p._groupCd=p._groupCd||{};
+  p._runeCd=now+cd;p._offensiveCd=now+2000;p._lastRuneId=id;p._groupCd=p._groupCd||{};
   const group=String(rd.grupo||rd.group||"1");p._groupCd[group]=now+Number(rd.gcd||2000);p._groupCd["1"]=Math.max(p._groupCd["1"]||0,now+2000);
   const el=rd.element||"physical",fx=rd.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,missile=rd.missile||ELEMENT_MISSILE[el]||"energy";
   const fake={id,area:rd.areaNome,needTarget:!!rd.needTarget};
@@ -3194,10 +3407,11 @@ function step(auth,now,opts){if(auth.ended)return;
             if(stOut.dmgDealt!==1)dmg=Math.max(1,Math.floor(dmg*stOut.dmgDealt));
             const elPct=stOut.elemPct[el]||0;
             if(elPct)dmg=Math.max(1,Math.floor(dmg*(1+elPct/100)));
-            const areaCells=s.area?spellAreaCells(auth,s,item,primaryTarget):[];
+            const areaName=spellAreaName(s);
+            const areaCells=areaName?spellAreaCells(auth,s,item,primaryTarget):[];
             const md=MONKSPELLDATA[s.id];
             const echoFrac=Number(s.echo)||Number(md&&md.echo)||0;
-            const targets=(s.area||Number(s.chain)>1||(md&&md.chain)||(md&&md.area))?spellAreaTargets(auth,s,item,primaryTarget,living):[primaryTarget];
+            const targets=(areaName||Number(s.chain)>1||(md&&md.chain)||(md&&md.area))?spellAreaTargets(auth,s,item,primaryTarget,living):[primaryTarget];
             const forgeMult=forgeDamageMult(p,now);
             const guaranteedCrit=forgeGuaranteedCrit(p,now);
             const stanceExtra=stanceCritExtra(auth,p,el);
@@ -3208,7 +3422,7 @@ function step(auth,now,opts){if(auth.ended)return;
             const isFatal=isCrit&&random(auth)<0.05;
             const source=playerPosition(auth,p),visual=spellVisual(s);
             let fx=visual.fx||ELEMENT_FX[el]||ELEMENT_FX.physical;
-            fx=stanceDamageFx(p,s,originalEl,el,fx);fx=monkFx(p,fx);
+            fx=stanceDamageFx(p,s,originalEl,el,fx);fx=monkFx(p,fx);fx=knightSpellFx(s,fx);
             const converted=el!==originalEl;
             const magical=!s.f||s.f.modo==="magic",
               missile=converted? (magical?(ELEMENT_MISSILE[el]||"energy"):null)
@@ -3230,7 +3444,8 @@ function step(auth,now,opts){if(auth.ended)return;
               const target=entityPosition(tgt,.5,.5);
               const hitBase={x:target.x,y:target.y,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
                 mobId:String(tgt.id),targetId:String(tgt.id),mobSlug:tgt.slug,whoId:String(item.id),
-                sx:source.x,sy:source.y,spell:s.name,spellId:s.id,ts:visualTs};
+                sx:source.x,sy:source.y,spell:s.name,spellId:s.id,ts:visualTs,
+                exori:KNIGHT_EXORI.has(s.id)?1:0};
               if(armaEl&&!elementalBond(p)){
                 const parts=splitDualParts(finalDmg,armaEl.propFisica);
                 const fisFinal=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now);
@@ -3251,12 +3466,14 @@ function step(auth,now,opts){if(auth.ended)return;
               hitIdx++;
             }
             if(kind==="spender")gastaHarmony(p);else if(kind==="builder")ganhaHarmony(p);
-            if(s.area){
-              if(areaCells.length>1)auth.events.push({t:"areafx",cells:areaCells,
-                fx,spell:s.name,spellId:s.id,screen:true,ts:castVisualTs+20});
+            if(areaName){
+              const areaVis=spellAreaAnchor(auth,s,item,primaryTarget,areaCells);
+              if(areaVis.cells.length)auth.events.push({t:"areafx",cells:areaVis.cells,fx,spell:s.name,spellId:s.id,
+                screen:true,ts:castVisualTs+20,whoId:String(item.id),anchor:areaVis.fromCaster?"caster":"target",
+                base:areaVis.base,targetId:String(primaryTarget.id)});
               else{const target=entityPosition(primaryTarget,.5,.5);
                 auth.events.push({t:"burst",x:target.x,y:target.y,targetId:String(primaryTarget.id),
-                  fx,spell:s.name,spellId:s.id,screen:true,ts:visualTs+20});}
+                  fx,spell:s.name,spellId:s.id,screen:true,ts:visualTs+20,whoId:String(item.id)});}
             }
             auth.events.push({t:"say",text:s.words||String(s.name||"").toLowerCase(),whoId:String(item.id),
               x:source.x,y:source.y,screen:true,ts:visualTs+40});
@@ -3279,9 +3496,8 @@ function step(auth,now,opts){if(auth.ended)return;
         }
       }
 
-      // ATAQUE BÁSICO (se não castou spell/runa)
+      // ATAQUE BÁSICO: independente do group CD de magia/runa (Tibia auto-attack).
       if(!acted){
-        if((Number(p._offensiveCd)||0)>now){hitIdx++;continue;}
         if(primaryTarget.greedImmune||primaryTarget.qteImmune){
           if(!auth._immuneFx||now-auth._immuneFx>500){
             auth._immuneFx=now;const blocked=entityPosition(primaryTarget,.5,.5);
@@ -3332,19 +3548,19 @@ function step(auth,now,opts){if(auth.ended)return;
             let raw=splash?Math.max(1,Math.floor(finalDmg)):finalDmg;
             const tpos=entityPosition(tgt,.5,.5);
             const base=Object.assign({},hitBase,{x:tpos.x,y:tpos.y,mobId:String(tgt.id),targetId:String(tgt.id),mobSlug:tgt.slug});
-            if(convEl){
+            if(convEl&&!profile.bond){
               const parts=splitDualParts(raw,convProp);
               const fisFinal=applyOutgoingDamage(tgt,"physical",scalePlayerDamage(p,tgt,"physical",parts.fis,now),now);
               const eleFinal=applyOutgoingDamage(tgt,convEl,scalePlayerDamage(p,tgt,convEl,parts.ele,now),now);
               const dealt=fisFinal+eleFinal;tgt.hp-=dealt;if(dealt>0)applyOutgoingLeech(p,dealt);
-              if(fisFinal>0)auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el:"physical",fx:ELEMENT_FX.physical,
+              if(fisFinal>0)auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el:"physical",fx:physicalHitFx(tgt.def&&tgt.def.race),
                 projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));
               if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:convEl,fx:ELEMENT_FX[convEl]||ELEMENT_FX.physical,
-                dual:1,projectile:false,missile:null},base,{ts:visualTs+40}));
+                dual:1,projectile:false,missile:null},base));
             }else{
               raw=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
               if(raw>0){tgt.hp-=raw;applyOutgoingLeech(p,raw);
-                auth.events.push(Object.assign({t:"hit",dmg:raw,el,fx:ELEMENT_FX[el]||ELEMENT_FX.physical,
+                auth.events.push(Object.assign({t:"hit",dmg:raw,el,fx:basicHitFx(p,profile,tgt,el,ammoIt),
                   projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));}
             }
             stanceApplyDebuffs(p,tgt,now);
@@ -3355,15 +3571,16 @@ function step(auth,now,opts){if(auth.ended)return;
             if(perfect>0&&primaryTarget.hp>0){
               primaryTarget.hp-=perfect;applyOutgoingLeech(p,perfect);
               const tpos=entityPosition(primaryTarget,.5,.5);
-              auth.events.push(Object.assign({t:"hit",dmg:perfect,el:"physical",fx:ELEMENT_FX.physical,
+              auth.events.push(Object.assign({t:"hit",dmg:perfect,el:"physical",fx:physicalHitFx(primaryTarget.def&&primaryTarget.def.race),
                 perfect:1,projectile:false},hitBase,{x:tpos.x,y:tpos.y}));
             }
           }
           else auth.events.push({t:"miss",x:target.x,y:target.y,whoId:String(item.id),screen:true,ts:visualTs});
           for(const extra of areaMobs)if(extra!==primaryTarget||!landed)strike(extra,extra!==primaryTarget);
-          if(ammoIt&&ammoIt.areaMatrix&&areaMobs.length)
-            auth.events.push({t:"burst",x:target.x,y:target.y,fx:ammoIt.areaFx||"explosion-area",el,screen:true,ts:visualTs+20,
-              targetId:String(primaryTarget.id)});
+          if(ammoIt&&ammoIt.areaMatrix){
+            const cells=ammoMatrixCells(auth,ammoIt.areaMatrix,primaryTarget);
+            if(cells.length)auth.events.push({t:"areafx",cells,fx:ammoIt.areaFx||"explosion-area",el,screen:true,ts:visualTs+20});
+          }
         }
         progressAttack(p);
       }
@@ -3450,21 +3667,15 @@ function step(auth,now,opts){if(auth.ended)return;
   if(!auth.ended)for(const mob of auth.mobs||[])if(mob.hp>0)monsterThinkYell(auth,mob,now);
   if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual)});
   if(!auth.ended&&auth.kind==="hunt")spawnHuntWave(auth,stepTs);
+  if(!auth.ended)tickAuthSpawnQueue(auth,stepTs);
 }
 function initializeAuthority(descriptor,instanceId,now){
   const combat=descriptor.state||{},active=Array.isArray(combat.mobs)?combat.mobs:[];
-  // HARD hunts begin with teleport-blink entries in pendingSpawns; the local
-  // array `mobs` is still empty when the first server snapshot is created.
-  // Promote those pending definitions into the authoritative initial wave.
-  const pending=Array.isArray(combat.pendingSpawns)?combat.pendingSpawns.map((sp)=>{
-    if(!sp||!sp.mob)return null;const mob=Object.assign({},sp.mob,{cx:sp.cx,cy:sp.cy});
-    const w=Number(combat.gridW)||30,h=Number(combat.gridH)||30;
-    if(mob.x===undefined)mob.x=(Number(sp.cx)+.5)/w;if(mob.y===undefined)mob.y=(Number(sp.cy)+.5)/h;
-    return mob;
-  }).filter(Boolean):[];
-  const seen=new Set(),visual=active.concat(pending).filter((mob)=>{
+  // HARD hunts come in with teleport-blink entries in pendingSpawns. Keep
+  // them pending so the Canary 3×/1s preview runs before combat starts.
+  const pendingIn=Array.isArray(combat.pendingSpawns)?combat.pendingSpawns.filter((sp)=>sp&&sp.mob):[];
+  const seen=new Set(),visual=active.filter((mob)=>{
     const key=String(mob&&mob.id||mob&&mob.slug||"");if(!key||seen.has(key))return false;seen.add(key);return true;});
-  combat.mobs=visual;combat.pendingSpawns=[];
   const oldPlayers=Array.isArray(combat.players)?combat.players:[];
   const players=(descriptor.members||[]).map((m)=>{const id=String(m.id),old=oldPlayers.find((ent)=>String(ent&&ent.id)===id)||{};
     const item={id,p:canonicalPlayer(m),attackAcc:0,downUntil:0};
@@ -3472,12 +3683,14 @@ function initializeAuthority(descriptor,instanceId,now){
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",
     huntMode:(players[0]&&players[0].p&&players[0].p.config&&players[0].p.config.attackMode)||"",players,mobs:[],spawnPool:[],spawnPoints:[],
+    pendingSpawns:[],
     influencedChance:Math.max(0,Number(combat.influencedChance)||
       (INFLUENCED_BASE_CHANCE+(descriptor.instanceMode==="pvp"?INFLUENCED_PVP_BONUS:0))),
     fiendishChance:Math.max(0,Number(combat.fiendishChance)||
       (FIENDISH_BASE_CHANCE+(descriptor.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0))),
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,
-    pack:Math.max(1,visual.length||Number((HUNTS[descriptor.huntId]||{}).pack)||3),wave:visual.length?1:0,
+    pack:Math.max(1,visual.length||pendingIn.length||Number((HUNTS[descriptor.huntId]||{}).pack)||3),
+    wave:visual.length||pendingIn.length?1:0,
     stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,loot:{},monsters:{},
       supplyUsed:{},supplyCost:0,supplyBought:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
@@ -3487,6 +3700,24 @@ function initializeAuthority(descriptor,instanceId,now){
       const cell=claimSpawnCell(auth,m.cx,m.cy),gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
       m.cx=cell.cx;m.cy=cell.cy;m.x=(m.cx+.5)/gw;m.y=(m.cy+.5)/gh;m.sx=m.x;m.sy=m.y;
       auth.mobs.push(m);if(!m.boss&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);}}
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  for(const sp of pendingIn){
+    const old=sp.mob,slug=String(old&&old.slug||"");
+    if(!monsterDef(slug))continue;
+    if(!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
+    const mob=makeMob(auth,slug,!!old.boss,String(old.id||""),old);
+    if(!mob)continue;
+    if(Number.isFinite(Number(sp.cx)))mob.cx=Number(sp.cx);
+    if(Number.isFinite(Number(sp.cy)))mob.cy=Number(sp.cy);
+    mob.x=(mob.cx+.5)/gw;mob.y=(mob.cy+.5)/gh;mob.sx=mob.x;mob.sy=mob.y;
+    if(!auth.spawnPoints.some((p)=>p.cx===mob.cx&&p.cy===mob.cy))
+      auth.spawnPoints.push({cx:mob.cx,cy:mob.cy,x:mob.x,y:mob.y,sx:mob.x,sy:mob.y});
+    auth.pendingSpawns.push({
+      mob,cx:mob.cx,cy:mob.cy,
+      startedAt:Number(sp.startedAt)||Number(now)||auth.clock,
+      blink:Number(sp.blink)||0,done:false
+    });
+  }
   if(!auth.spawnPool.length){const hunt=HUNTS[auth.huntId];for(const slug of (hunt&&hunt.monsters)||[])if(monsterDef(slug))auth.spawnPool.push(slug);}
   if(descriptor.kind==="boss"){const boss=auth.mobs.find((m)=>m.boss)||auth.mobs[0];if(boss)boss.boss=true;const leader=players[0]&&players[0].p;
     if(leader&&auth.bossId){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].lastFight=auth.clock;}
@@ -3508,6 +3739,7 @@ function initializeAuthority(descriptor,instanceId,now){
     }
     syncBossImmunityFlags(auth);}
   ensureSpawnIds(auth);
+  tickAuthSpawnQueue(auth,Number(now)||auth.clock);
   descriptor.authority=auth;return materializeAuthority(descriptor);
 }
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
@@ -3522,7 +3754,13 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     // Slot reciclado com outra espécie não herda sprite/passo da anterior.
     const inherit=prev&&String(prev.slug||"")===String(m.slug||"")?prev:{};
     return stripStaleVisualStep(Object.assign({},inherit,entityVisual(m),
-    {id:m.id,slug:m.slug,boss:m.boss,targetId:m.targetId||null,influenced:!!m.influenced,fiendish:!!m.fiendish,
+    {id:m.id,slug:m.slug,boss:m.boss,targetId:m.targetId||null,
+      challengeTargetId:m.challengeTargetId||null,
+      challengedUntil:challengeWallUntil(m.challengedUntil,auth.clock),
+      forceMeleeUntil:challengeWallUntil(m.forceMeleeUntil,auth.clock),
+      sapStrUntil:challengeWallUntil(m.sapStrUntil,auth.clock),
+      exposeUntil:challengeWallUntil(m.exposeUntil,auth.clock),
+      influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
       qteImmune:!!(auth.scarlett&&auth.scarlett.immune&&m.boss),hatredSummon:!!m.hatredSummon,
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
@@ -3549,6 +3787,11 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   descriptor.state.gridW=Number(auth.gridW)||30;descriptor.state.gridH=Number(auth.gridH)||30;
   descriptor.state.wave=Number(auth.wave)||0;
   descriptor.state.huntMode=auth.huntMode||"";
+  descriptor.state.authClock=Number(auth.clock)||0;
+  descriptor.state.pendingSpawns=(auth.pendingSpawns||[]).map((sp)=>({
+    cx:sp.cx,cy:sp.cy,startedAt:sp.startedAt,blink:sp.blink,
+    mob:sp.mob?{id:sp.mob.id,slug:sp.mob.slug,hp:sp.mob.hp,maxHp:sp.mob.maxHp}:null
+  }));
   // Eventos de combate (dano/cura) gerados pelo step() desde o último tick.
   // O cliente drena esses eventos via drainEvents() para mostrar floaters e
   // logs de dano no modo online. Corta o lote: área × vocações ainda pode
@@ -3580,6 +3823,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
   // Migra instâncias HARD criadas pela versão que ignorava pendingSpawns.
   if(!auth.spawnPool.length&&descriptor.state&&Array.isArray(descriptor.state.pendingSpawns)){
     const recoverMobs=auth.mobs.length===0;auth.spawnPoints=auth.spawnPoints||[];
+    auth.pendingSpawns=auth.pendingSpawns||[];
     auth.gridW=Number(auth.gridW)||Number(descriptor.state.gridW)||30;auth.gridH=Number(auth.gridH)||Number(descriptor.state.gridH)||30;
     for(const sp of descriptor.state.pendingSpawns){const old=sp&&sp.mob,slug=String(old&&old.slug||"");if(!monsterDef(slug))continue;
       if(!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
@@ -3588,9 +3832,9 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
       if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(mob){
         Object.assign(mob,point);const cell=claimSpawnCell(auth,mob.cx,mob.cy);
         mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;
-        auth.mobs.push(mob);}}
+        auth.pendingSpawns.push({mob,cx:mob.cx,cy:mob.cy,startedAt:Number(sp.startedAt)||auth.clock,blink:Number(sp.blink)||0,done:false});}}
     }
-    descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.spawnPool.length||1);
+    descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.pendingSpawns.length||auth.spawnPool.length||1);
     ensureSpawnIds(auth);
   }
   // Sincroniza a predição visual antes do step. Ela alinha efeitos e a vítima
@@ -3615,13 +3859,15 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   consumeDistanceAmmo,tryUseRune,RUNEDATA,
   meleeDamage,distanceDamage,addSkillTries,addManaSpent,playerDamage,playerSkill,attackSkillName,
   skillTriesNeeded,mlTriesNeeded,SKILL_MUL,VOC,gearSkillBonus,progressAttack,progressWeaponSkill,
-  weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
+  weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,ammoMatrixCells,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
   rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,
   playerCritChancePct,playerCritExtraPct,rollPlayerCrit,imbCombatTotals,charmTotals,applyCharmDamage,
   bestiaryKill,bosstiaryKill,bosstiaryDamageBonus,boostSpellDamage,boostHealAmount,scalePlayerDamage,
-  tickDelayedHits,wheelApplySpellBoost,augmentTotals,authoritySpeedPts,
+  tickDelayedHits,wheelApplySpellBoost,playerResistPct,augmentTotals,authoritySpeedPts,
   huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,
+  wandMissileOf,physicalHitFx,basicHitFx,WAND_SHOOT,
   tickAccessoryCharges,tryAccessoryHelper,consumeAccessoryHitCharge,energyRingOn,
-  nextComboSpell,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget};
+  nextComboSpell,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
+  spellAreaFromCaster,spellAreaName,knightSpellFx,KNIGHT_EXORI,isMagicWeapon};

@@ -30,11 +30,12 @@ must(outfit.includes('draft.colors[part] = +s.dataset.ocolor')&&
 must(server.includes('sex:data.sex || "male"')&&server.includes('outfit:data.outfit'),
   "API não persiste sexo/outfit no seletor da conta");
 must(partyServer.includes("outfit.addons=Math.max")&&partyServer.includes("outfit.appearance=raw.appearance")&&
-  partyServer.includes('sex:data.sex==="female"?"female":"male"'),
+  (partyServer.includes('sex:data.sex==="female"?"female":"male"')||
+   partyServer.includes('sex: data.sex === "female" ? "female" : "male"')),
   "API da party não publica a aparência persistida com addons");
 must(partyUi.includes("partyApplyOutfitPreview")&&partyUi.includes("AppearanceRenderer.preview(member")&&
   partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit")&&
-  index.includes('js/party-ui.js?v=party-exp-v1'),
+  index.includes('js/party-ui.js?v=party-switch-v1'),
   "painel da party não compõe/cache-busta outfit, cores e addons atuais");
 must(outfitRenderer.includes("Um asset 15x em carregamento/erro nunca pode remover a entidade")&&
   outfitRenderer.includes("Sprites.walk(o.name, dir, numericFrame) || Sprites.outfit(o.name, dir)")&&

@@ -35,6 +35,61 @@ function canUseQuiver(p) {
   return p && p.voc === "paladin";
 }
 
+/* Idle nasce em AUTO. Só desliga quando o jogador aperta o botão. */
+function playerAutoWalkOn(p) {
+  return !p || !p.config || p.config.autoWalk !== false;
+}
+
+/* Resolve o personagem vivo (combate) ou o save — para AUTO por membro. */
+function resolvePlayerById(id) {
+  if (id === null || id === undefined || id === "") return null;
+  const sid = String(id);
+  if (typeof G !== "undefined" && G && G.p) {
+    const cur = (typeof characterId === "function") ? String(characterId(G.p)) : String(G.p.id);
+    if (cur === sid) return G.p;
+  }
+  if (typeof G !== "undefined" && G && G.combat && Array.isArray(G.combat.players)) {
+    for (const e of G.combat.players) {
+      if (!e || !e.p) continue;
+      const eid = String(e.id !== undefined ? e.id : "");
+      const pid = (typeof characterId === "function")
+        ? String(characterId(e.p)) : String(e.p.id || "");
+      if (eid === sid || pid === sid) return e.p;
+    }
+  }
+  if (typeof getCharacters === "function") {
+    const list = getCharacters() || [];
+    for (const c of list) {
+      if (!c) continue;
+      const cid = (typeof characterId === "function") ? String(characterId(c)) : String(c.id || "");
+      if (cid === sid) return c;
+    }
+  }
+  return null;
+}
+
+/* Liga/desliga AUTO no personagem. OFF = parado (park) até WASD/clique. */
+function togglePlayerAutoWalk(p) {
+  if (!p) return true;
+  p.config = p.config || {};
+  const next = !(typeof playerAutoWalkOn === "function" ? playerAutoWalkOn(p) : p.config.autoWalk !== false);
+  p.config.autoWalk = next;
+  if (next && typeof G !== "undefined" && G && G.combat) {
+    const sid = (typeof characterId === "function") ? String(characterId(p)) : String(p.id || "");
+    const clear = (ent) => {
+      if (!ent || !ent.p) return;
+      const eid = String(ent.id !== undefined ? ent.id : "");
+      const pid = (typeof characterId === "function")
+        ? String(characterId(ent.p)) : String(ent.p.id || "");
+      if (eid === sid || pid === sid) ent.walkGoal = null;
+    };
+    if (G.combat.player) clear(G.combat.player);
+    if (Array.isArray(G.combat.players)) G.combat.players.forEach(clear);
+  }
+  if (typeof paintAutoWalkButton === "function") paintAutoWalkButton(typeof G !== "undefined" && G ? G.p : p);
+  return next;
+}
+
 const SKILL_NAMES = {
   fist: "Punho", sword: "Espada", axe: "Machado", club: "Clava",
   dist: "Distância", shield: "Escudo", magic: "Magic Level",
@@ -134,6 +189,7 @@ function newPlayer(name, voc, sex) {
       noPotions: false,
       pouchAutoSell: false,
       pouchAutoSellPct: 80,
+      autoWalk: true,       // AUTO: IA anda sozinha; off = WASD/clique por SQM
       refillArrow: "",      // arrow selecionada
       refillBolt: "",       // bolt selecionada
       healFriendSpells: {},
@@ -307,10 +363,16 @@ function weaponSkill(p) {
   if (it.t === "axe") return "axe";
   if (it.t === "club") return "club";
   if (it.t === "distance") return "dist";
-  if (it.t === "magic") return "magic";
+  if (it.t === "magic" || it.t === "wand" || it.t === "rod") return "magic";
   // "fist" e o weaponType das armas de monk (jo staff, katar, sai...):
   // elas contam como punho, e nao como clava
   return "fist";
+}
+
+function isMagicWeaponItem(it) {
+  if (!it) return false;
+  const t = String(it.t || it.type || "");
+  return t === "magic" || t === "wand" || t === "rod";
 }
 
 /* Dano por golpe do jogador */
@@ -320,7 +382,7 @@ function playerDamage(p) {
     ? upgradedStats(p, "equip:weapon", w.item) : GAMEDATA.items[w.item]) : null;
   const voc = VOCATIONS[p.voc];
 
-  if (it && it.t === "magic") {
+  if (isMagicWeaponItem(it)) {
     // Canary WeaponWand::getWeaponDamage: dano base do item (fromDamage a
     // toDamage em items.xml) + level/5, mantendo o elemento real da wand/rod
     // em vez de forçar energy e escalar com ml (magicDamage).
@@ -331,7 +393,8 @@ function playerDamage(p) {
   }
   if (it && it.t === "distance") {
     // armas de munição infinita (spear) usam só o próprio ataque
-    const ammo = it.inf ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
+    const throwW = !!(it.inf || (typeof weaponAmmoKind === "function" && !weaponAmmoKind(it, w.item)));
+    const ammo = throwW ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
     let atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
     atk = Math.floor(atk * 1.2);            // +20% attack value (15.25)
     // municao elemental corta o dano pela metade contra monstro (o resto
@@ -355,6 +418,11 @@ function playerDamage(p) {
   const total = fis + elDmg;
   const d = meleeDamage(effSkill(p, sk), total, 1.0, p.level);
   const r = { min: d.min, max: d.max, element: "physical", type: "melee" };
+  const bond = (typeof elementalBond === "function") ? elementalBond(p) : null;
+  if (bond) {
+    r.element = bond;
+    return r;
+  }
   if (elDmg > 0) {
     // proporcao do golpe que fica em cada tipo. O servidor reparte o MESMO
     // valor rolado: primary = realDamage * (fisico/total) e secondary o
@@ -930,7 +998,8 @@ function removeLootPouch(p, slug, count) {
 function distanceWeaponPower(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it || it.t !== "distance") return 0;
-  if (it.inf) return it.atk || 0;              // spear: autossuficiente
+  if (it.inf || (typeof weaponAmmoKind === "function" && !weaponAmmoKind(it, slug)))
+    return it.atk || 0;                        // spear/star: autossuficiente
 
   if (!equippedQuiver(p)) return 0;
   let best = 0;
@@ -1079,7 +1148,9 @@ function autoEquip(p) {
   // auto-equip so garante que EXISTA alguma municao valida selecionada —
   // trocar a escolha do jogador aqui zerava a selecao dele a cada 15s e,
   // pior, gravava count 0, o que fazia o ataque a distancia sair sem dano.
-  if (w && w.t === "distance" && !w.inf && equippedQuiver(p)) {
+  const needsAmmo = w && w.t === "distance" && !w.inf &&
+    (typeof weaponAmmoKind !== "function" || !!weaponAmmoKind(w, p.equip.weapon && p.equip.weapon.item));
+  if (needsAmmo && equippedQuiver(p)) {
     const atual = p.equip.ammo && p.equip.ammo.item
       ? GAMEDATA.items[p.equip.ammo.item] : null;
     const serve = atual && atual.s === "ammo" &&

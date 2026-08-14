@@ -200,10 +200,25 @@ for (const id of Object.keys(esperado)) {
   }
 }
 
+// ---- TESTE 8: treino online usa as mesmas animações Canary (hit-area) ----
+p.exercise["exercise-sword"] = 5000;
+const tOnline = w.newAcademyTraining(p, "online", null, null);
+tOnline.hitCd = 0;
+w.academyTrainingTick(tOnline, p, 100, Date.now());
+if (!tOnline.proj) errors.push("T8: treino online não criou projétil no tick");
+else if (tOnline.proj.fx !== "hit-area")
+  errors.push("T8: fx online = " + tOnline.proj.fx + ", esperava hit-area");
+if (tOnline.lungeT <= 0) errors.push("T8: lungeT online não setado");
+if (typeof w.trainingWeaponFx === "function") {
+  const fxBow = w.trainingWeaponFx({ mode: "dummy", weapon: "exercise-bow" }, p);
+  if (!fxBow || fxBow.fx !== "hit-area" || fxBow.missile !== "arrow")
+    errors.push("T8: trainingWeaponFx bow divergiu do Canary hit-area");
+}
+
 if (errors.length) {
   console.log("ERROS (" + errors.length + "):");
   for (const e of errors.slice(0, 40)) console.log("  - " + e);
   process.exit(1);
 }
-console.log("EXERCISE ANIM OK — facing, projétil por weapon, cargas e posicoes validados");
+console.log("EXERCISE ANIM OK — facing, projétil por weapon, cargas, posicoes e ticks online");
 process.exit(0);

@@ -88,7 +88,7 @@ function areaCells(nome, origem, alvo, spellId) {
   const vistos = new Set();
   // [0,0] em matrizes de wave é a âncora técnica, não um tile atingido.
   // Toda onda começa no SQM à frente do caster, para qualquer vocação.
-  const waveProjetada = areaSaiDoConjurador(nome, spellId) && /WAVE/i.test(nome);
+  const waveProjetada = areaSaiDoConjurador(nome, spellId) && /(WAVE|BEAM)/i.test(nome);
   for (const [dx, dy] of offs) {
     if (waveProjetada && dx === 0 && dy === 0) continue;
     const cx = (base.cx || 0) + dx;
@@ -189,5 +189,6 @@ function areaNameOf(kind, id) {
   const s = (typeof SPELLS !== "undefined") ? SPELLS[id] : null;
   // nas magias comuns o proprio campo `area` guarda o nome da matriz
   if (s && typeof s.area === "string") return s.area;
-  return null;
+  const st = (typeof SPELLTARGET !== "undefined") ? SPELLTARGET[id] : null;
+  return (st && st.areaNome) || null;
 }

@@ -20,7 +20,7 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
   // Uma nova hunt já deve nascer com os quatro personagens da conta.
   const loadCtx={partyOnlineMode:()=>true,accountCharacterCacheRead:()=>snapshots,
     normalizePlayer:(p)=>Object.assign({},p),characterId:(p)=>p.id,maxStats:()=>({hp:1000,mp:1000}),Set,Array,String,Number,Math};
-  vm.createContext(loadCtx);vm.runInContext(segment("function partyCombatLoad","\n\n/* Posiciona"),loadCtx);
+  vm.createContext(loadCtx);vm.runInContext(segment("function partyCombatLoad","\n/* Posiciona"),loadCtx);
   const current=Object.assign({},snapshots.find((item)=>item.id==="10").snapshot,{_partyOnline:state});
   const entities=loadCtx.partyCombatLoad(current);
   must(entities&&entities.length===4&&new Set(entities.map((ent)=>String(ent.id))).size===4,
@@ -43,7 +43,7 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
     toast:()=>{},Set,Array,String,Number,Math,JSON,
   };
   vm.createContext(hydrationCtx);
-  vm.runInContext(segment("function partyCombatFindPlayer","\n\n/* Troca o personagem ATIVO"),hydrationCtx);
+  vm.runInContext(segment("function partyCombatFindPlayer","\n/* Troca o personagem ATIVO"),hydrationCtx);
   const originalCombat=hydrationCtx.G.combat,originalMobs=hydrationCtx.G.combat.mobs;
   must(await hydrationCtx.partyCombatSwitchOnlineTo("20")===true,"hidratação do membro falhou");
   must(hydrationCtx.G.combat===originalCombat&&hydrationCtx.G.combat.mobs===originalMobs&&originalMobs[0].hp===1234,
@@ -63,7 +63,7 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
   Object.assign(hydrationCtx,{sessionCharId:()=>String(hydrationCtx.G.p.id),
     accountPartyFollow:async(id,nonce)=>{follows++;must(id===20&&nonce==="follow-20","follow incorreto");return {ok:true};},
     startHunt:()=>{restarts++;},startBoss:()=>{restarts++;},addLog:()=>{},renderAll:()=>{}});
-  vm.runInContext(segment("const PARTY_FOLLOW_USED = {}","\n\n/* ======================================================================\n * HEAL FRIEND"),hydrationCtx);
+  vm.runInContext(segment("const PARTY_FOLLOW_USED = {}","\n/* ======================================================================"),hydrationCtx);
   const beforeFollowCombat=hydrationCtx.G.combat;
   await hydrationCtx.partyApplyFollow({nonce:"follow-20",hunt:"mota-extension",instance:"pvp"});
   must(follows===1&&restarts===0&&hydrationCtx.G.combat===beforeFollowCombat,
@@ -71,8 +71,8 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
 
   must(client.includes("function accountCharacterCacheRead")&&client.includes("function accountMergeCharacterCache")&&
     client.includes("accountMergeCharacterCache([{id:character.id"),"cliente não mantém snapshots para a party online");
-  must(html.includes("js/account-client.js?v=online-fix-v11")&&html.includes("js/party.js?v=party-xp-v1")&&
-    html.includes("js/party-ui.js?v=party-runtime-v7")&&html.includes("js/game.js?v=online-fix-v13"),
+  must(html.includes("js/account-client.js?v=online-fix-v15")&&html.includes("js/party.js?v=outfit-mount-v1")&&
+    html.includes("js/party-ui.js?v=party-switch-v1")&&html.includes("js/game.js?v=party-switch-v1"),
     "assets da hidratação sem cache-bust");
   console.log("OK: membro online é materializado e controlado na mesma instância, sem reload ou duplicação.");
 })().catch((error)=>{console.error(error);process.exitCode=1;});

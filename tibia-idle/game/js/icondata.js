@@ -125,7 +125,15 @@ window.WIKI_CONDITIONS = {
     icon: "cond-poisoned", nome: "Envenenado", tipo: "harmful",
     desc: "Causa dano de terra ao longo do tempo. Pode ser curado com exana pox (Antidote) ou passa sozinho.",
   },
+  poisoned: {
+    icon: "cond-poisoned", nome: "Envenenado", tipo: "harmful",
+    desc: "Causa dano de terra ao longo do tempo. Pode ser curado com exana pox (Antidote) ou passa sozinho.",
+  },
   fire: {
+    icon: "cond-burning", nome: "Queimando", tipo: "harmful",
+    desc: "Causa dano de fogo ao longo do tempo. Pode ser curado com exana flam (Cure Burning) ou passa sozinho.",
+  },
+  burning: {
     icon: "cond-burning", nome: "Queimando", tipo: "harmful",
     desc: "Causa dano de fogo ao longo do tempo. Pode ser curado com exana flam (Cure Burning) ou passa sozinho.",
   },
@@ -133,7 +141,15 @@ window.WIKI_CONDITIONS = {
     icon: "cond-electrified", nome: "Eletrificado", tipo: "harmful",
     desc: "Causa dano de energia ao longo do tempo. Pode ser curado com exana vis (Cure Electrification) ou passa sozinho.",
   },
+  electrified: {
+    icon: "cond-electrified", nome: "Eletrificado", tipo: "harmful",
+    desc: "Causa dano de energia ao longo do tempo. Pode ser curado com exana vis (Cure Electrification) ou passa sozinho.",
+  },
   bleed: {
+    icon: "cond-bleed", nome: "Sangrando", tipo: "harmful",
+    desc: "Causa dano físico ao longo do tempo. Pode ser curado com exana kor (Cure Bleeding) ou passa sozinho.",
+  },
+  bleeding: {
     icon: "cond-bleed", nome: "Sangrando", tipo: "harmful",
     desc: "Causa dano físico ao longo do tempo. Pode ser curado com exana kor (Cure Bleeding) ou passa sozinho.",
   },
@@ -141,10 +157,72 @@ window.WIKI_CONDITIONS = {
     icon: "cond-cursed", nome: "Amaldiçoado", tipo: "harmful",
     desc: "Causa dano de morte ao longo do tempo. Pode ser curado com exana mort (Cure Curse) ou passa sozinho.",
   },
+  curse: {
+    icon: "cond-cursed", nome: "Amaldiçoado", tipo: "harmful",
+    desc: "Causa dano de morte ao longo do tempo. Pode ser curado com exana mort (Cure Curse) ou passa sozinho.",
+  },
   freezing: {
     icon: "cond-freezing", nome: "Congelado", tipo: "harmful",
     desc: "Causa dano de gelo ao longo do tempo. Não tem cura própria: passa sozinho com o tempo.",
   },
+  agony: {
+    icon: "cond-agony", nome: "Agony", tipo: "harmful",
+    desc: "Causa dano de Agony ao longo do tempo. Não pode ser curado nem protegido — só esperar acabar.",
+  },
+  dazzled: {
+    icon: "cond-dazzled", nome: "Deslumbrado", tipo: "harmful",
+    desc: "Causa dano sagrado ao longo do tempo.",
+  },
+  drowning: {
+    icon: "cond-drowning", nome: "Afogando", tipo: "harmful",
+    desc: "Causa dano de afogamento ao longo do tempo.",
+  },
+  drown: {
+    icon: "cond-drowning", nome: "Afogando", tipo: "harmful",
+    desc: "Causa dano de afogamento ao longo do tempo.",
+  },
+  drunk: {
+    icon: "cond-drunk", nome: "Bêbado", tipo: "negative",
+    desc: "O personagem às vezes anda numa direção diferente da pretendida. Passa sozinho.",
+  },
+  paralyzed: {
+    icon: "cond-slowed", nome: "Paralisado", tipo: "negative",
+    desc: "Impede de se mover enquanto dura.",
+  },
+  paralyze: {
+    icon: "cond-slowed", nome: "Paralisado", tipo: "negative",
+    desc: "Impede de se mover enquanto dura.",
+  },
+  rooted: {
+    icon: "cond-rooted", nome: "Enraizado", tipo: "negative",
+    desc: "Impede de se mover por alguns segundos.",
+  },
+  slowed: {
+    icon: "cond-slowed", nome: "Lento", tipo: "negative",
+    desc: "O personagem se move muito mais devagar.",
+  },
+};
+
+/* Tipo de condição do jogo → arquivo OTC/Canary em assets/ui/conditions/. */
+window.CONDITION_ICON_SLUG = {
+  poison: "cond-poisoned", poisoned: "cond-poisoned", "cond-poison": "cond-poisoned",
+  fire: "cond-burning", burning: "cond-burning", "cond-fire": "cond-burning",
+  energy: "cond-electrified", electrified: "cond-electrified", "cond-energy": "cond-electrified",
+  bleed: "cond-bleed", bleeding: "cond-bleed",
+  cursed: "cond-cursed", curse: "cond-cursed",
+  freezing: "cond-freezing",
+  agony: "cond-agony",
+  dazzled: "cond-dazzled",
+  drowning: "cond-drowning", drown: "cond-drowning",
+  drunk: "cond-drunk",
+  paralyzed: "cond-slowed", paralyze: "cond-slowed", slowed: "cond-slowed",
+  rooted: "cond-rooted",
+  haste: "cond-haste",
+  "magic-shield": "cond-magic-shield",
+  strengthened: "cond-strengthened",
+  feared: "cond-feared", hexed: "cond-hexed",
+  hungry: "cond-hungry", powerless: "cond-powerless",
+  battle: "cond-logout-block",
 };
 
 /* Registro completo dos ícones de condição disponíveis (inclui os que o

@@ -67,8 +67,11 @@ function centeredGridViewport(canvasWidth, canvasHeight, cols, rows, fovCols, fo
   rows = Math.max(1, Math.floor(Number(rows) || GRID_H));
   fovCols = Math.max(1, Math.floor(Number(fovCols) || DEFAULT_GRID_W));
   fovRows = Math.max(1, Math.floor(Number(fovRows) || DEFAULT_GRID_H));
-  const tile = Math.min(canvasWidth / fovCols,
-                        canvasHeight / fovRows);
+  let tile = Math.min(canvasWidth / fovCols,
+                      canvasHeight / fovRows);
+  if (typeof ClientSettings !== "undefined" && ClientSettings.fullhd) {
+    tile = Math.max(1, Math.round(tile));
+  }
   const width = cols * tile;
   const height = rows * tile;
   return {
@@ -222,8 +225,11 @@ function stepCellFree(occ, cx, cy, dir) {
 
 /* Converte celula -> posicao de tela (0..1), que e o que o render usa.
  * O +0.5 centraliza a criatura no tile. */
-function cellToScreen(cx, cy) {
-  return { x: (cx + 0.5) / GRID_W, y: (cy + 0.5) / GRID_H };
+function cellToScreen(cx, cy, gridW, gridH) {
+  const w = Number(gridW), h = Number(gridH);
+  const gw = Number.isFinite(w) && w > 0 ? w : GRID_W;
+  const gh = Number.isFinite(h) && h > 0 ? h : GRID_H;
+  return { x: (cx + 0.5) / gw, y: (cy + 0.5) / gh };
 }
 
 /* Converte tela -> celula, para migrar entidades que ainda usam float */
@@ -371,12 +377,44 @@ function advanceStep(ent, dt) {
   ent.frame = 1 + Math.min(n - 1, Math.floor(p * n));
   if (p >= 1) {
     ent.moving = false;
-    ent.x = ent.tx; ent.y = ent.ty;
-    ent.sx = ent.x; ent.sy = ent.y;
+    snapIdleToCell(ent);
     ent.frame = 0;
     return true;
   }
   return false;
+}
+
+/* Sem interpolação residual: parado = centro do SQM, como no Canary. */
+function snapIdleToCell(ent) {
+  if (!ent || ent.moving) return;
+  if (!Number.isFinite(Number(ent.cx)) || !Number.isFinite(Number(ent.cy))) return;
+  const s = cellToScreen(ent.cx, ent.cy);
+  ent.x = s.x; ent.y = s.y;
+  ent.sx = s.x; ent.sy = s.y;
+  ent.tx = s.x; ent.ty = s.y;
+}
+
+function combatKeyDir(keys) {
+  if (!keys) return null;
+  let dx = 0, dy = 0;
+  if (keys.up) dy -= 1;
+  if (keys.down) dy += 1;
+  if (keys.left) dx -= 1;
+  if (keys.right) dx += 1;
+  if (!dx && !dy) return null;
+  for (let i = 0; i < DIRS.length; i++) {
+    if (DIRS[i].dx === dx && DIRS[i].dy === dy) return DIRS[i];
+  }
+  return null;
+}
+
+function canvasToCombatCell(mx, my, canvasW, canvasH) {
+  const view = typeof centeredGridViewport === "function"
+    ? centeredGridViewport(canvasW, canvasH, GRID_W, GRID_H)
+    : { x: 0, y: 0, width: canvasW, height: canvasH };
+  const nx = view.width ? (mx - view.x) / view.width : 0.5;
+  const ny = view.height ? (my - view.y) / view.height : 0.5;
+  return screenToCell(nx, ny);
 }
 
 /* A* de verdade, no lugar do greedy.

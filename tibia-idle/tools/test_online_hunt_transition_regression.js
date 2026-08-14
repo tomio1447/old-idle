@@ -22,6 +22,13 @@ function descriptor(chars){const players=chars.map(c=>({id:String(c.id),p:{id:St
     state:{players:[null,{id:"2",p:{name:"MS antigo"}}]}});
   must(normalized.state.players.map((e)=>e.id).join(",")==="1,2"&&normalized.state.players[0].p.name==="EK",
     "account-client não reconstrói membros antes do PUT");
+  const stopHunt=game.slice(game.indexOf("function stopHunt"),game.indexOf("function goToCity"));
+  must(stopHunt.includes("partyCombatRestoreAll")&&stopHunt.includes("G.p.hp = m.hp")&&
+    stopHunt.indexOf("G.p.hp = m.hp")<stopHunt.indexOf("G.combat = null")&&
+    stopHunt.indexOf("G.combat = null")<stopHunt.indexOf("if (typeof save === \"function\") save()"),
+    "stopHunt ainda grava HP de combate antes de curar no templo");
+  must(game.includes("if(!instanceSession){")&&game.includes("p.hp=mx.hp")&&game.includes("p.mp=mx.mp"),
+    "startGameReady não hidrata HP/MP cheios na cidade");
   await start();const login=await post("/api/login",{login:"2",password:"2"}),token=login.data.token;
   const guestLogin=await post("/api/login",{login:"1",password:"1"}),guestToken=guestLogin.data.token;
   const a=(await post("/api/characters",{token,name:"Cobra EK",voc:"knight",data:JSON.stringify({name:"Cobra EK",voc:"knight"})})).data.character;

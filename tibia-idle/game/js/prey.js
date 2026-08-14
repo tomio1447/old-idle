@@ -254,16 +254,14 @@ function preyLootChance(p, slug) {
   return s && s.bonus === "loot" ? preyBonusValue("loot", s.step) : 0;
 }
 
-/* Tick do timer: decrementa o tempo das preys ativas enquanto caça. */
+/* Tick do timer: a duração é wall-clock (`until = Date.now() + 2h`).
+ * Não subtrai dt do timestamp — isso drenava o dobro enquanto caçava. */
 function preyTick(p, dt) {
   ensurePrey(p);
-  if (!dt) return;
   const agora = Date.now();
   for (const slot of p.prey.slots) {
     const s = slot.selected;
     if (!s) continue;
-    if (s.until <= agora) { slot.selected = null; continue; }
-    s.until -= dt;
     if (s.until <= agora) slot.selected = null;
   }
 }

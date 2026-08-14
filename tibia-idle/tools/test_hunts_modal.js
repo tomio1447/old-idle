@@ -20,7 +20,7 @@ must(demon.readUInt32BE(16)===192&&demon.readUInt32BE(20)===256,
   "sheet do ícone Demon não é 3×4 células de 64px");
 must(gameSrc.includes('$("#btn-hunts")')&&gameSrc.includes("openHuntsModal"),
   "botão HUNTS não abre o modal");
-must(html.includes("css/layout.css?v=interface-sharp-v2")&&html.includes("js/ui.js?v=ammo-authority-v1")&&
+must(html.includes("css/layout.css?v=party-list-v1")&&html.includes("js/ui.js?v=combo-drag-v1")&&
      html.includes("js/city-ui.js?v=hunts-modal-v1"),
   "UI/CSS do catálogo sem cache-busting");
 must(cityUi.includes("data-open-hunts-catalog")&&!cityUi.includes("Object.keys(GAMEDATA.hunts).map"),

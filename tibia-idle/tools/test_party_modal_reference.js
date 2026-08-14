@@ -4,7 +4,7 @@ const fs=require("fs"),path=require("path"),vm=require("vm");
 const src=fs.readFileSync(path.join(__dirname,"..","game","js","party-ui.js"),"utf8");
 function must(ok,msg){if(!ok)throw Error(msg);}
 const start=src.indexOf("function renderPartyModal");
-const end=src.indexOf("\n/* ------------------------------------------------------------------ */\n/* HEAL FRIEND",start);
+const end=src.indexOf("function healFriendSpells",start);
 must(start>0&&end>start,"renderPartyModal não encontrado");
 const segment=src.slice(start,end);
 must(!segment.includes("for (const m of alvos)"),"renderPartyModal ainda usa `alvos` fora do escopo");

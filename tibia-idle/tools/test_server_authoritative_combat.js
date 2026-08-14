@@ -42,8 +42,15 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   const pendingDesc=directDescriptor(basePlayer);pendingDesc.state.mobs=[];
   pendingDesc.state.pendingSpawns=[{mob:{id:"pending-rat",slug:"rat"},cx:8,cy:6,startedAt:1000}];
   const pendingAuth=engine.initializeAuthority(pendingDesc,"0".repeat(64),1000);
-  must(pendingAuth.authority.mobs.length===1&&pendingAuth.authority.spawnPool[0]==="rat"&&
-    pendingAuth.state.mobs[0].cx===8,"pendingSpawns de HARD hunt não virou wave autoritativa");
+  must(pendingAuth.authority.mobs.length===0&&pendingAuth.authority.pendingSpawns.length===1&&
+    pendingAuth.authority.spawnPool[0]==="rat"&&pendingAuth.authority.pendingSpawns[0].cx===8&&
+    pendingAuth.state.events.some((event)=>event.t==="spawn-blink"),
+    "pendingSpawns de HARD hunt nasceu sem o preview de teleporte");
+  const pendingLive=JSON.parse(engine.advanceAuthorityState(JSON.stringify(pendingAuth),3000,4000).state);
+  must(pendingLive.authority.mobs.length===1&&pendingLive.authority.mobs[0].cx===8&&
+    pendingLive.state.events.filter((event)=>event.t==="spawn-blink").length>=2&&
+    pendingLive.state.events.some((event)=>event.t==="spawn"),
+    "teleporte 3x não concluiu o spawn autoritativo");
   const sinisterDesc=directDescriptor(Object.assign({},basePlayer,{dust:0,dustLimit:100,slivers:0}));
   sinisterDesc.state.fiendishChance=1;sinisterDesc.state.influencedChance=.001;
   const sinisterAuth=engine.initializeAuthority(sinisterDesc,"6".repeat(64),1000);
@@ -63,8 +70,8 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   legacy.authority.mobs=[];legacy.authority.spawnPool=[];legacy.state.mobs=[];
   legacy.state.pendingSpawns=[{mob:{id:"legacy-rat",slug:"rat"},cx:9,cy:7,startedAt:1000}];
   const migrated=JSON.parse(engine.advanceAuthorityState(JSON.stringify(legacy),1000,2000).state);
-  must(migrated.authority.spawnPool[0]==="rat"&&migrated.authority.mobs.length>0&&
-    Number.isFinite(migrated.state.mobs[0].cx)&&Number.isFinite(migrated.state.mobs[0].cy)&&
+  must(migrated.authority.spawnPool[0]==="rat"&&
+    ((migrated.authority.pendingSpawns&&migrated.authority.pendingSpawns.length)||migrated.authority.mobs.length>0)&&
     migrated.authority.v===2&&migrated.authority.players[0].p.hp===engine.maxStats(migrated.authority.players[0].p).hp&&
     migrated.authority.players[0].downUntil===0,
     "instância HARD antiga sem pool/posição/HP não foi autorrecuperada");
@@ -264,7 +271,13 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     "primeira wave não registrou IDs recicláveis");
   recycleAuth.authority.mobs[0].hp=0;recycleAuth.authority.players[0].attackAcc=-100000;
   const recycled=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycleAuth),1000,2000).state);
-  must(recycled.authority.mobs.some((m)=>String(m.id)==="rat-keep")&&recycled.state.mobs.some((m)=>String(m.id)==="rat-keep"),
+  must(recycled.authority.spawnIds.includes("rat-keep")&&
+    ((recycled.authority.pendingSpawns||[]).some((sp)=>String(sp.mob&&sp.mob.id)==="rat-keep")||
+      recycled.state.events.some((event)=>event.t==="spawn-blink")),
+    "respawn não reciclou o slot visual / não emitiu spawn-blink");
+  const recycledLive=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycled),3000,5000).state);
+  must(recycledLive.authority.mobs.some((m)=>String(m.id)==="rat-keep"&&m.hp>0)&&
+    recycledLive.state.mobs.some((m)=>String(m.id)==="rat-keep"),
     "respawn mintou ID novo em vez de reciclar o slot visual");
 
   const packWaveDesc=directDescriptor(basePlayer);
@@ -280,7 +293,7 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     "servidor reencheu a onda no meio: vivos="+packWaveAlive.length+" wave="+packWaveMid.authority.wave);
   for(const mob of packWaveMid.authority.mobs)mob.hp=0;
   packWaveMid.authority.players[0].attackAcc=-100000;
-  const packWaveNext=JSON.parse(engine.advanceAuthorityState(JSON.stringify(packWaveMid),1000,3000).state);
+  const packWaveNext=JSON.parse(engine.advanceAuthorityState(JSON.stringify(packWaveMid),4000,7000).state);
   must(packWaveNext.authority.mobs.filter((m)=>m.hp>0).length>=3&&packWaveNext.authority.wave===2,
     "próxima onda não nasceu depois de limpar o pack: vivos="+
     packWaveNext.authority.mobs.filter((m)=>m.hp>0).length+" wave="+packWaveNext.authority.wave);

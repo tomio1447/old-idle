@@ -1041,6 +1041,13 @@ function partyCombatLoad(player) {
         level:Number(summary.level)||raw.level||1,sex:summary.sex||raw.sex||"male",
         outfit:summary.outfit||raw.outfit});
     });
+    for (const ref of order) {
+      if (!ref || chars.some((item) => String(item.id) === String(ref.id))) continue;
+      chars.push({
+        id: String(ref.id), name: ref.name, voc: ref.voc, level: Number(ref.level) || 1,
+        sex: ref.sex || "male", outfit: ref.outfit || null, hp: ref.hp, mp: ref.mp,
+      });
+    }
     const me=String(player.id||"");
     const currentIndex=chars.findIndex((character)=>String(character.id)===me);
     if(currentIndex>=0)chars[currentIndex]=player;else chars.push(player);
@@ -1131,6 +1138,15 @@ function partyCombatPlace(c, spawnCx, spawnCy) {
 /* Entidade viva mais próxima de um monstro (alvo do ataque). */
 function partyNearestTarget(c, mob) {
   if (!c.players || c.players.length < 2) return c.player || null;
+  const now = Date.now();
+  const focusId = (mob && Number(mob.challengedUntil || 0) > now && mob.challengeTargetId) ||
+    (mob && mob.targetId) || "";
+  if (focusId) {
+    const focused = c.players.find((ent) =>
+      String(ent && (ent.id || (ent.p && ent.p.id))) === String(focusId) &&
+      ent.p && ent.p.hp > 0);
+    if (focused) return focused;
+  }
   let best = null, bestD = Infinity;
   for (const ent of c.players) {
     if (!ent.p || ent.p.hp <= 0) continue;

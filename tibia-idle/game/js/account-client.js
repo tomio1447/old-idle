@@ -340,6 +340,8 @@ function accountSaveInstance(token,state){
  * das entidades que o grid local está animando, sem persistir o combate todo. */
 function accountAuthorityVisualState(){
   const combat=typeof G!=="undefined"&&G&&G.combat;if(!combat)return null;
+  const gw=Number(combat.gridW)||(typeof GRID_W!=="undefined"?GRID_W:30);
+  const gh=Number(combat.gridH)||(typeof GRID_H!=="undefined"?GRID_H:30);
   const collect=(list,limit)=>{
     const out=[];
     for(const ent of Array.isArray(list)?list:[]){
@@ -350,12 +352,28 @@ function accountAuthorityVisualState(){
       const visual={id,x,y},cx=ent.cx===null||ent.cx===undefined?NaN:Number(ent.cx),
         cy=ent.cy===null||ent.cy===undefined?NaN:Number(ent.cy);
       if(Number.isFinite(cx))visual.cx=Math.round(cx);if(Number.isFinite(cy))visual.cy=Math.round(cy);
+      // Servidor só aceita SQM. Nunca mandar x/y interpolados (micro-passo).
+      if(Number.isFinite(visual.cx)&&gw>0)visual.x=(visual.cx+.5)/gw;
+      if(Number.isFinite(visual.cy)&&gh>0)visual.y=(visual.cy+.5)/gh;
       const activeId=typeof sessionCharId==="function"?String(sessionCharId()||""):"";
       const isSelf=!activeId||id===activeId;
       if(isSelf&&ent.p&&ent.p.config&&Array.isArray(ent.p.config.combo))visual.combo=ent.p.config.combo;
       if(isSelf&&ent.p&&ent.p.stances&&typeof ent.p.stances==="object")visual.stances=ent.p.stances;
-      if(isSelf&&ent.p&&ent.p.config){
+      if(ent.p&&ent.p.config){
         const mode=ent.p.config.attackMode||(combat&&combat.huntMode)||"kiting";
+        visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(ent.p):ent.p.config.autoWalk!==false;
+        let dir=typeof combatKeyDir==="function"?combatKeyDir((typeof G!=="undefined"&&G.walkKeys)||{}):null;
+        // Clique no chão: transforma walkGoal em 1 passo para a autoridade.
+        if(!visual.autoWalk&&isSelf&&!dir&&ent.walkGoal&&Number.isFinite(ent.walkGoal.cx)&&Number.isFinite(ent.walkGoal.cy)
+          &&Number.isFinite(Number(ent.cx))&&Number.isFinite(Number(ent.cy))){
+          if(ent.cx===ent.walkGoal.cx&&ent.cy===ent.walkGoal.cy)ent.walkGoal=null;
+          else{
+            const dx=Math.max(-1,Math.min(1,Math.sign(ent.walkGoal.cx-ent.cx)));
+            const dy=Math.max(-1,Math.min(1,Math.sign(ent.walkGoal.cy-ent.cy)));
+            if(dx||dy)dir={dx,dy};
+          }
+        }
+        if(!visual.autoWalk&&isSelf&&dir)visual.walkIntent={dx:dir.dx,dy:dir.dy};
         visual.challenge={
           res:!!ent.p.config.exetaRes,amp:!!ent.p.config.exetaAmpRes,
           box:mode==="box",

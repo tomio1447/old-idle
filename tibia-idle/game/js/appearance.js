@@ -142,14 +142,33 @@ function mountPrice(m) {
  * p.wardrobe = { outfits: {id: addonsComprados}, mounts: {id: true} }
  * As outfits classicas da vocacao nascem liberadas para o personagem nao
  * comecar sem nenhuma opcao. */
-const APP_INICIAIS = ["citizen", "hunter", "mage", "knight", "summoner"];
+const APP_INICIAIS = ["citizen", "hunter", "mage", "knight", "summoner", "monk"];
+
+function sexSuffix(p) {
+  return p && p.sex === "female" ? "f" : "m";
+}
+
+function appearanceIdForSex(id, sexo) {
+  if (!id || typeof id !== "string") return null;
+  const flipped = id.replace(/-[mf]$/, "-" + sexo);
+  return APP_OUTFIT[flipped] && APP_OUTFIT[flipped].sexo === sexo ? flipped : null;
+}
+
+function defaultAppearanceId(p) {
+  const sexo = sexSuffix(p);
+  const base = ((typeof VOC_OUTFIT !== "undefined" && VOC_OUTFIT[p && p.voc]) || "citizen") + "-" + sexo;
+  return APP_OUTFIT[base] ? base : null;
+}
 
 function ensureWardrobe(p) {
   if (!p.wardrobe) p.wardrobe = { outfits: {}, mounts: {} };
   if (!p.wardrobe.outfits) p.wardrobe.outfits = {};
   if (!p.wardrobe.mounts) p.wardrobe.mounts = {};
-  const sexo = p.sex === "female" ? "f" : "m";
-  for (const base of APP_INICIAIS) {
+  const sexo = sexSuffix(p);
+  const iniciais = APP_INICIAIS.slice();
+  const vocBase = (typeof VOC_OUTFIT !== "undefined" && VOC_OUTFIT[p.voc]) || "citizen";
+  if (iniciais.indexOf(vocBase) === -1) iniciais.push(vocBase);
+  for (const base of iniciais) {
     const id = base + "-" + sexo;
     if (APP_OUTFIT[id] && p.wardrobe.outfits[id] === undefined) {
       p.wardrobe.outfits[id] = 0;      // possui a outfit, nenhum addon
@@ -213,24 +232,85 @@ function buyMount(p, id) {
 
 /* ------------------------------------------------------------ equipar */
 
+/* Alinha o save idle com o Outfit_t do Canary:
+ *   lookType + lookHead/Body/Legs/Feet + lookAddons (bitflags 0-3)
+ *   lookMount = lookType da montaria (0 = a pe)
+ * Montar NAO troca o lookType do cavaleiro: o renderer desenha o bicho
+ * primeiro e o personagem por cima, com addons, como o cliente. */
+function syncOutfitLook(p) {
+  if (!p) return null;
+  if (typeof ensureOutfit === "function") {
+    p.outfit = p.outfit || {};
+    if (!p.outfit.type && typeof VOC_OUTFIT !== "undefined")
+      p.outfit.type = VOC_OUTFIT[p.voc] || "citizen";
+    if (!Array.isArray(p.outfit.colors) || p.outfit.colors.length !== 4) {
+      const def = (typeof DEFAULT_OUTFIT_COLORS !== "undefined" &&
+        (DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none)) || [78, 68, 58, 76];
+      p.outfit.colors = def.slice();
+    }
+  }
+  const sexo = sexSuffix(p);
+  let id = p.outfit.appearance;
+  if (!(id && APP_OUTFIT[id] && APP_OUTFIT[id].sexo === sexo)) {
+    id = appearanceIdForSex(id, sexo) || defaultAppearanceId(p);
+    if (id) p.outfit.appearance = id;
+  }
+  const o = id ? APP_OUTFIT[id] : null;
+  if (o) {
+    p.outfit.type = o.id.replace(/-[mf]$/, "");
+    p.outfit.lookType = o.looktype || 0;
+  } else {
+    p.outfit.lookType = Math.max(0, Number(p.outfit.lookType) || 0);
+  }
+  p.outfit.colors = p.outfit.colors.map((n) => Math.max(0, Math.min(95, n | 0)));
+  p.outfit.lookHead = p.outfit.colors[0];
+  p.outfit.lookBody = p.outfit.colors[1];
+  p.outfit.lookLegs = p.outfit.colors[2];
+  p.outfit.lookFeet = p.outfit.colors[3];
+  const addons = Math.max(0, Math.min(3, p.outfit.addons | 0));
+  p.outfit.addons = addons;
+  p.outfit.lookAddons = addons;
+  const m = p.outfit.mount && APP_MOUNT[p.outfit.mount] ? APP_MOUNT[p.outfit.mount] : null;
+  if (!m) {
+    p.outfit.mount = null;
+    p.outfit.lookMount = 0;
+    p.outfit.mountId = 0;
+  } else {
+    p.outfit.lookMount = m.looktype || 0;
+    p.outfit.mountId = m.mountId || 0;
+  }
+  p.outfit.lookMountHead = 0;
+  p.outfit.lookMountBody = 0;
+  p.outfit.lookMountLegs = 0;
+  p.outfit.lookMountFeet = 0;
+  return p.outfit;
+}
+
 /* Qual visual o personagem esta usando (id do catalogo novo, se houver) */
 function currentAppearance(p) {
   ensureOutfit(p);
-  const sexo = p.sex === "female" ? "f" : "m";
+  const sexo = sexSuffix(p);
   const id = p.outfit.appearance;
-  if (id && APP_OUTFIT[id]) return APP_OUTFIT[id];
-  // sem escolha explicita: usa a outfit classica da vocacao
-  const base = (VOC_OUTFIT[p.voc] || "citizen") + "-" + sexo;
-  return APP_OUTFIT[base] || null;
+  if (id && APP_OUTFIT[id] && APP_OUTFIT[id].sexo === sexo) return APP_OUTFIT[id];
+  const flipped = appearanceIdForSex(id, sexo);
+  if (flipped) {
+    p.outfit.appearance = flipped;
+    return APP_OUTFIT[flipped];
+  }
+  const base = defaultAppearanceId(p);
+  if (base) p.outfit.appearance = base;
+  return base ? APP_OUTFIT[base] : null;
 }
 
 function setAppearance(p, id) {
   if (!APP_OUTFIT[id] || !ownsOutfit(p, id)) return false;
+  if (APP_OUTFIT[id].sexo !== sexSuffix(p)) return false;
   ensureOutfit(p);
   p.outfit.appearance = id;
   // o addon ativo nao pode passar do que foi comprado
   const max = Math.min(ownedAddons(p, id), APP_OUTFIT[id].addons || 0);
   if ((p.outfit.addons || 0) > max) p.outfit.addons = max;
+  syncOutfitLook(p);
   return true;
 }
 
@@ -245,14 +325,16 @@ function setAddons(p, n) {
   if (donos < 1) n = 0;
   if (donos === 1 && n === 2) n = 1;
   p.outfit.addons = n;
+  syncOutfitLook(p);
   return n;
 }
 
 function setMount(p, id) {
   ensureOutfit(p);
-  if (!id) { p.outfit.mount = null; return true; }
+  if (!id) { p.outfit.mount = null; syncOutfitLook(p); return true; }
   if (!APP_MOUNT[id] || !ownsMount(p, id)) return false;
   p.outfit.mount = id;
+  syncOutfitLook(p);
   return true;
 }
 
@@ -546,7 +628,7 @@ function colorize(base, mask, colors) {
 
 /* Catalogo filtrado, para as telas de loja e customizacao */
 function appearanceCatalog(p, filtro) {
-  const sexo = p.sex === "female" ? "f" : "m";
+  const sexo = sexSuffix(p);
   let ls = APPEARANCE_DATA.outfits.filter((o) => o.sexo === sexo);
   if (filtro === "owned") ls = ls.filter((o) => ownsOutfit(p, o.id));
   else if (filtro === "locked") ls = ls.filter((o) => !ownsOutfit(p, o.id));
@@ -562,9 +644,20 @@ function mountCatalog(p, filtro) {
   return ls;
 }
 
+if (typeof ensureOutfit === "function") {
+  const _ensureOutfitBase = ensureOutfit;
+  ensureOutfit = function ensureOutfitLook(p) {
+    _ensureOutfitBase(p);
+    syncOutfitLook(p);
+    return p.outfit;
+  };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    APP_OUTFIT, APP_MOUNT, ensureWardrobe, buyOutfit, buyAddon, buyMount,
-    setAppearance, setAddons, setMount, appearanceCatalog, mountCatalog,
+    APP_OUTFIT, APP_MOUNT, APP_PRECO, APP_INICIAIS, ensureWardrobe,
+    buyOutfit, buyAddon, buyMount, setAppearance, setAddons, setMount,
+    appearanceCatalog, mountCatalog, currentAppearance, currentMount,
+    syncOutfitLook, mountSpeedBonus,
   };
 }

@@ -42,6 +42,8 @@ function saveBody(token,state,expected,id,leaseFields){return Object.assign({tok
 
 (async()=>{
   must(dbSource.includes("CREATE TABLE IF NOT EXISTS account_instances")&&
+    dbSource.includes("CREATE TABLE IF NOT EXISTS market_offers")&&
+    dbSource.includes("ALTER TABLE accounts ADD COLUMN market_gold")&&
     dbSource.includes("instanceSave(accountId,instanceId,expectedVersion")&&
     dbSource.includes("instanceEnd(accountId,instanceId,expectedVersion")&&
     serverSource.includes('url==="/api/instance"')&&serverSource.includes('url==="/api/instance/end"'),

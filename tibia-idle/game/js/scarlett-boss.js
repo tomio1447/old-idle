@@ -339,6 +339,22 @@ function bossCanTakePlayerDamage(c, target) {
   return false;
 }
 
+function scarlettRenderOnline(c) {
+  if (!c || !c.scarlett) {
+    if (typeof scarlettHideOverlay === "function") scarlettHideOverlay();
+    return;
+  }
+  const st = c.scarlett;
+  if (st.immune) {
+    const msg = st.phase === "qte"
+      ? "SCARLETT IMUNE — DANÇA AUTOMÁTICA"
+      : "SCARLETT IMUNE — PREPARE-SE!";
+    scarlettOverlayMessage(msg, "immune");
+  } else if (st.phase === "vulnerable") {
+    scarlettHideOverlay();
+  }
+}
+
 function scarlettBossCleanup(c) {
   if (!c || !c.scarlett) return;
   if (typeof cancelAnimationFrame === "function" && c.scarlett.raf)

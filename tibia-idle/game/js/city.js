@@ -570,6 +570,20 @@ function academyAutoConjureTick(t, p, dt) {
   }
 }
 
+function trainingWeaponFx(t, p) {
+  if (t && t.mode === "dummy" && t.weapon && EXERCISE_FX[t.weapon])
+    return EXERCISE_FX[t.weapon];
+  const skill = (t && t.skill) || (p && typeof academySkillFor === "function" && academySkillFor(p));
+  if (skill === "axe") return EXERCISE_FX["exercise-axe"];
+  if (skill === "club") return EXERCISE_FX["exercise-club"];
+  if (skill === "dist") return EXERCISE_FX["exercise-bow"];
+  if (skill === "magic")
+    return (p && p.voc === "druid") ? EXERCISE_FX["exercise-rod"] : EXERCISE_FX["exercise-wand"];
+  if (skill === "shield") return EXERCISE_FX["exercise-shield"];
+  if (skill === "fist") return EXERCISE_FX["exercise-wraps"];
+  return EXERCISE_FX["exercise-sword"] || { kind: "melee", missile: "whirlwind-sword", fx: "hit-area", lunge: 1 };
+}
+
 function academyTrainingTick(t, p, dt, now) {
   t.time += dt;
   academyAutoConjureTick(t, p, dt);
@@ -639,14 +653,10 @@ function academyTrainingTick(t, p, dt, now) {
   t.events.push({ type: "hit", skill: t.skill, dmg: dmg, mode: t.mode,
                   weapon: t.weapon,
                   skillUp: skillUp, shieldUp: shieldUp });
-  // Animação do golpe no modo dummy: o personagem MIRA no dummy e a
-  // exercise weapon é "usada" nele (simula o useitemid onitemid do client —
-  // usar o item da arma no item dummy). Cada arma tem o próprio visual:
-  // golpe melee girando, flecha, projétil mágico, escudo erguido ou soco.
-  if (t.mode === "dummy" && t.playerPos && t.dummyPos) {
-    const ef = EXERCISE_FX[t.weapon] ||
-      { kind: "melee", missile: "whirlwind-sword", fx: "block-hit", lunge: 1 };
-    // direção que o personagem deve encarar durante o gesto
+  // Animação do golpe: dummy E treiner usam os mesmos efeitos Canary
+  // (hit-area / projétil da exercise weapon) a cada tick.
+  if (t.playerPos && t.dummyPos) {
+    const ef = trainingWeaponFx(t, p);
     const ddx = t.dummyPos.x - t.playerPos.x;
     const ddy = t.dummyPos.y - t.playerPos.y;
     t.facing = dirFromDelta(ddx, ddy);
@@ -664,7 +674,7 @@ function academyTrainingTick(t, p, dt, now) {
                                   t.dummyPos.x, t.dummyPos.y) : "e",
     };
     t.projHitFx = false;
-    t.lungeT = 230;      // o personagem faz o gesto enquanto a arma vai
+    t.lungeT = 230;
   } else {
     t.lungeT = 180;
   }

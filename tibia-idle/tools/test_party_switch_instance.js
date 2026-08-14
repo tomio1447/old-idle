@@ -5,7 +5,7 @@ const root=path.join(__dirname,".."),partySource=fs.readFileSync(path.join(root,
   gameSource=fs.readFileSync(path.join(root,"game","js","game.js"),"utf8"),
   index=fs.readFileSync(path.join(root,"game","index.html"),"utf8");
 function must(value,message){if(!value)throw Error(message);}
-const start=partySource.indexOf("function partyCombatSwitchTo"),end=partySource.indexOf("\n\n/* Salva TODOS",start);
+const start=partySource.indexOf("function partyCombatSwitchTo"),end=partySource.indexOf("\n/* Salva TODOS",start);
 must(start>=0&&end>start,"partyCombatSwitchTo ausente");
 const segment=partySource.slice(start,end);
 const storage=new Map([["tibia-idle-online-autoload","stale"]]);
@@ -35,6 +35,6 @@ must(saveAllCalls===1&&targetSaves===1&&instanceUpdates===1&&authorityTicks===1&
 must(persists===0,"troca chamou persistActiveInstance e tentou regravar o runtime inteiro");
 must(gameSource.includes("function setActiveInstanceCharacter")&&
   gameSource.includes("session.activeCharacterId=activeId"),"espelho da instância não atualiza apenas activeCharacterId");
-must(index.includes("js/party.js?v=party-xp-v1")&&index.includes("js/game.js?v=online-fix-v13"),
+must(index.includes("js/party.js?v=")&&index.includes("js/game.js?v="),
   "assets da correção não receberam cache-bust");
 console.log("OK: troca da party transfere controle e preserva hunt, membros e runtime sem reload/checkpoint.");

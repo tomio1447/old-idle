@@ -45,6 +45,7 @@ const MONK_BUILDERS = [
   "exori-med-pug",        // Chained Penance
   "exori-gran-mas-pug",   // Greater Flurry of Blows
   "exori-gran-pug",       // Forceful Uppercut
+  "exori-mas-amp-pug",    // Thousand Fist Blows
 ];
 const MONK_SPENDERS = [
   "exori-infir-nia",      // Tiger Clash
@@ -61,6 +62,9 @@ function isMonk(p) {
 function monkSpellKind(id) {
   if (MONK_BUILDERS.indexOf(id) !== -1) return "builder";
   if (MONK_SPENDERS.indexOf(id) !== -1) return "spender";
+  const md = (typeof MONKSPELLS !== "undefined") ? MONKSPELLS[id] : null;
+  if (md && md.monk === "builder") return "builder";
+  if (md && md.monk === "spender") return "spender";
   return null;
 }
 
@@ -236,8 +240,8 @@ function mantraAtaqueBonus(p, c) {
  * do bond, seja qual for o COMBAT_PARAM_TYPE do script. E o jeito do Monk
  * escolher contra que resistencia vai bater, trocando de arma.
  *
- * So vale para magia -- o parse do items.xml aceita apenas energy, earth e
- * physical, e o auto-ataque continua fisico.
+ * Magias e o auto-ataque de punho usam o bond: o golpe vira UM elemento
+ * (sem split fisico+gelo). Bond physical / sem arma continua punho fisico.
  */
 function elementalBond(p) {
   if (!isMonk(p)) return null;

@@ -33,7 +33,8 @@ const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
 const { SyncBus } = require("./sync_bus");
-const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS } = require("./authoritative_engine");
+const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
+  rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll } = require("./authoritative_engine");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -292,6 +293,7 @@ function accountCharacterSummary(character) {
     level:character.level, saveVersion:Number(character.save_version)||0,
     sex:data.sex || "male", promoted:!!data.promoted,
     outfit:data.outfit && typeof data.outfit === "object" ? data.outfit : null,
+    wardrobe:data.wardrobe && typeof data.wardrobe === "object" ? data.wardrobe : null,
     identityMismatch:wrongId||wrongName,
     dataOwnerId:wrongId?String(data.id):null,
     dataOwnerName:wrongName?String(data.name):null,
@@ -340,13 +342,62 @@ async function me(db, token) {
   };
 }
 
+function sanitizeOutfit(raw,sex,voc){
+  const o=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{};
+  const sexo=sex==="female"?"f":"m";
+  const colors=Array.isArray(o.colors)&&o.colors.length===4
+    ?o.colors.slice(0,4).map((n)=>Math.max(0,Math.min(95,Math.floor(Number(n)||0))))
+    :null;
+  let appearance=typeof o.appearance==="string"?o.appearance.slice(0,80):null;
+  if(appearance&&!new RegExp("-"+sexo+"$").test(appearance)){
+    const flipped=appearance.replace(/-[mf]$/,"-"+sexo);
+    appearance=flipped!==appearance?flipped:appearance;
+  }
+  const type=typeof o.type==="string"?o.type.replace(/-[mf]$/,"").slice(0,40):null;
+  const mount=typeof o.mount==="string"&&o.mount?o.mount.slice(0,80):null;
+  const addons=Math.max(0,Math.min(3,Math.floor(Number(o.addons)||0)));
+  return {
+    type,appearance,colors,addons,mount,
+    lookType:Math.max(0,Math.floor(Number(o.lookType)||0)),
+    lookHead:colors?colors[0]:Math.max(0,Math.floor(Number(o.lookHead)||0)),
+    lookBody:colors?colors[1]:Math.max(0,Math.floor(Number(o.lookBody)||0)),
+    lookLegs:colors?colors[2]:Math.max(0,Math.floor(Number(o.lookLegs)||0)),
+    lookFeet:colors?colors[3]:Math.max(0,Math.floor(Number(o.lookFeet)||0)),
+    lookAddons:addons,
+    lookMount:mount?Math.max(0,Math.floor(Number(o.lookMount)||0)):0,
+    mountId:mount?Math.max(0,Math.floor(Number(o.mountId)||0)):0,
+    lookMountHead:0,lookMountBody:0,lookMountLegs:0,lookMountFeet:0,
+  };
+}
+
+function sanitizeWardrobe(raw){
+  const w=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw:{};
+  const outfits={};
+  if(w.outfits&&typeof w.outfits==="object"&&!Array.isArray(w.outfits)){
+    for(const id of Object.keys(w.outfits)){
+      if(typeof id!=="string"||id.length>80)continue;
+      outfits[id]=Math.max(0,Math.min(3,Math.floor(Number(w.outfits[id])||0)));
+    }
+  }
+  const mounts={};
+  if(w.mounts&&typeof w.mounts==="object"&&!Array.isArray(w.mounts)){
+    for(const id of Object.keys(w.mounts)){
+      if(typeof id!=="string"||id.length>80)continue;
+      if(w.mounts[id])mounts[id]=true;
+    }
+  }
+  return {outfits,mounts};
+}
+
 function sanitizeNewPlayer(payload,voc){
-  const safe={id:payload.id,name:payload.name,voc,sex:payload.sex==="female"?"female":"male",
-    outfit:payload.outfit&&typeof payload.outfit==="object"?payload.outfit:null,
+  const sex=payload.sex==="female"?"female":"male";
+  const safe={id:payload.id,name:payload.name,voc,sex,
+    outfit:sanitizeOutfit(payload.outfit,sex,voc),
+    wardrobe:sanitizeWardrobe(payload.wardrobe),
     config:payload.config&&typeof payload.config==="object"?payload.config:{},level:1,exp:0,
     skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
     skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
-    kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},rewardChest:[],bag:{},ammo:{},
+    kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},rewardChest:{},rewardChestBundles:[],bag:{},ammo:{},
     supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600};
   if(voc==="knight")safe.equip={weapon:{item:"sword",count:1},shield:{item:"wooden-shield",count:1}};
   else if(voc==="paladin")safe.equip={weapon:{item:"bow",count:1},shield:{item:"quiver",count:1},ammo:{item:"simple-arrow",count:1}};
@@ -425,7 +476,7 @@ function prepareCharacterSave(c,body){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","rewardChest","blessed","deathLog"];
+    "bosses","missions","lootPouch","rewardChest","rewardChestBundles","blessed","deathLog"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name,voc:c.voc});
   for(const key of protectedKeys)if(current[key]!==undefined)payload[key]=cloneJson(current[key]);
   const level=Math.max(1,Number(c.level)||1);payload.level=level;
@@ -480,6 +531,84 @@ async function saveCharacter(db, body, id) {
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"save"});
   await publishPartyForCharacters(db,[updated.id],"character-save");
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),character:accountCharacterSummary(updated)}};
+}
+
+function applyRewardChestClaim(p,body){
+  rewardChestEnsure(p);
+  if(body&&body.all)return rewardChestClaimAll(p);
+  const bundleId=body&&(body.bundleId||body.bundle_id)||null;
+  const slug=body&&body.slug?String(body.slug):"";
+  if(bundleId&&slug)return rewardChestClaimOne(p,slug,bundleId)?1:0;
+  if(bundleId)return rewardChestClaimBundle(p,bundleId);
+  if(slug)return rewardChestClaimOne(p,slug,null)?1:0;
+  return 0;
+}
+
+async function persistClaimedPlayer(db,acc,character,p,lease){
+  const result=await db.saveCharactersVersioned(acc.id,[{
+    id:Number(character.id),expectedVersion:Number(character.save_version),voc:character.voc,
+    level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
+    extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
+  }],lease);
+  if(!result.ok)return saveConflictResponse(result);
+  const updated=result.characters[0];
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"reward-claim",updated,false);
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"reward-claim"});
+  await publishPartyForCharacters(db,[updated.id],"reward-claim");
+  rewardChestEnsure(p);
+  return {code:200,body:{ok:true,claimed:true,saveVersion:Number(updated.save_version),
+    character:accountCharacterSummary(updated),rewardChest:p.rewardChest||{},
+    rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{}}};
+}
+
+async function claimRewardChest(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id!==undefined?body.char_id:body.id);
+  if(!Number.isSafeInteger(charId)||charId<=0)
+    return {code:400,body:{ok:false,error:"INVALID_REWARD_CLAIM",msg:"Personagem inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);
+  if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active")break;
+      let claimedPlayer=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p)return null;
+        applyRewardChestClaim(item.p,body);
+        claimedPlayer=cloneJson(item.p);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+          status:result.instance.status,source:"reward-claim",holderId:String(body.holder_id||"")});
+        const fresh=await db.findCharacter(charId);
+        return persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease);
+      }
+      if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+    }
+    if(last&&last.error==="INSTANCE_NOT_ACTIVE"){/* cai no save do personagem */}
+    else if(last&&!last.ok)
+      return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível recolher a recompensa",
+        instance:instanceSummary(last.instance,true)}};
+  }
+  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
+  p=p&&typeof p==="object"?p:{};
+  applyRewardChestClaim(p,body);
+  return persistClaimedPlayer(db,acc,character,p,lease);
 }
 
 async function savePartyCharacters(db,body){
@@ -1429,6 +1558,9 @@ async function main() {
         const body = await readBody(req);
         const r = await saveCharacter(db, body, id);
         return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/reward/claim") {
+        const r = await claimRewardChest(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/coins") {
         const body = await readBody(req);

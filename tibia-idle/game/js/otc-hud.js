@@ -87,66 +87,31 @@ function renderCombatModesStrip(p) {
 }
 
 // ═══════════════════════ PLAYER STATES ═══════════════════════
-/** Renders state icons from player-state-flags.png positions */
+/** Renders OTC condition icons on the scene overlay (duration overlay). */
 function renderPlayerStates(p) {
   const el = document.getElementById('player-states-strip');
   if (!el) return;
-  const agora = Date.now();
-  const icons = [];
-
-  // Poison
-  if (hasCondition && hasCondition(p, 'poison')) {
-    const co = p.conditions.poison;
-    icons.push({ icon: 'poison', timer: co ? co.turns + 't' : '', color: '#8ac83c' });
+  const itens = (typeof collectConditionBarItems === "function")
+    ? collectConditionBarItems(p) : [];
+  if (!itens.length) {
+    el.innerHTML = "";
+    return;
   }
-  // Fire
-  if (hasCondition && hasCondition(p, 'fire')) {
-    const co = p.conditions.fire;
-    icons.push({ icon: 'fire', timer: co ? co.turns + 't' : '', color: '#ff8a3c' });
-  }
-  // Energy
-  if (hasCondition && hasCondition(p, 'energy')) {
-    const co = p.conditions.energy;
-    icons.push({ icon: 'energy', timer: co ? co.turns + 't' : '', color: '#c07cff' });
-  }
-  // Bleed
-  if (hasCondition && hasCondition(p, 'bleed')) {
-    const co = p.conditions.bleed;
-    icons.push({ icon: 'bleed', timer: co ? co.turns + 't' : '', color: '#d84040' });
-  }
-  // Magic Shield
-  if (typeof isMagicShieldActive === 'function' && isMagicShieldActive(p, agora)) {
-    icons.push({ icon: 'magic-shield', timer: '', color: '#7ec8ff' });
-  }
-  // Haste
-  if (typeof hasteAtiva === 'function') {
-    const hs = hasteAtiva(p, agora);
-    if (hs) icons.push({ icon: 'haste', timer: Math.ceil((hs.ate - agora) / 1000) + 's', color: '#ffe680' });
-  }
-  // Buffs
-  if (typeof buffTotals === 'function') {
-    for (const b of buffTotals(p, agora).lista) {
-      icons.push({ icon: 'strengthened', timer: Math.ceil((b.ate - agora) / 1000) + 's', color: '#9ce84a' });
-    }
-  }
-  // Goshnar's Taints — ícones 22..26 extraídos do OTClient oficial.
-  if (typeof soulwarTaintInfo === 'function') {
-    const taint = soulwarTaintInfo(p);
-    if (taint) icons.push({ icon: taint.icon, timer: taint.level + '/5',
-      color: '#9b65c8', title: typeof soulwarTaintTooltip === 'function'
-        ? soulwarTaintTooltip(p) : taint.name });
-  }
-
-  // Use the existing condition icons from assets/ui/conditions/
   let h = '<div class="player-state-strip">';
-  for (const s of icons) {
-    h += `<div class="player-state-icon" title="${s.title || s.icon}" style="border-color:${s.color}">
-      <img src="assets/ui/conditions/cond-${s.icon}.png" alt="${s.icon}">`;
-    if (s.timer) h += `<span class="psi-timer">${s.timer}</span>`;
+  for (const s of itens) {
+    if (s.avatar) {
+      h += `<div class="player-state-icon" title="${s.nome || "Avatar"}">◈</div>`;
+      continue;
+    }
+    const slug = s.icon || "";
+    const border = s.tipo === "positive" ? "#7ec86a" : s.tipo === "neutral" ? "#8a8272" : "#c04848";
+    h += `<div class="player-state-icon" title="${s.nome || slug}" style="border-color:${border}">
+      <img src="assets/ui/conditions/${slug}.png" alt="${s.nome || slug}">`;
+    if (s.tempo) h += `<span class="psi-timer">${s.tempo}</span>`;
     h += `</div>`;
   }
   h += '</div>';
-  el.innerHTML = h || '';
+  el.innerHTML = h;
 }
 
 // ═══════════════════════ SKULL ICONS ═══════════════════════

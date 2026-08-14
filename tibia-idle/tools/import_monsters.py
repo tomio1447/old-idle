@@ -463,8 +463,9 @@ def parse_arquivo(caminho):
         "speed": int(num(txt, "speed", 100) or 100),
         "armor": defesas["armor"],
         "defense": defesas["defense"],
-        # dano do golpe corpo a corpo; sem melee usa a maior habilidade
-        "damage": int(melee or max([h.get("max", 0) for h in skills] or [0])),
+        # dano do golpe corpo a corpo (name="melee"). Sem melee, damage=0:
+        # o basic_attack name="combat" (nagas) fica só na lista de skills.
+        "damage": int(melee or 0),
         "element": elemento_principal(skills, melee),
         "attackSpeed": 2000,
     }

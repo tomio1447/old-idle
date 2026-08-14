@@ -67,16 +67,19 @@ function JsonStore() {
     validParties.push(p);
   });
   this.parties=validParties;
-  // market (stats + histórico) persiste em data/market.json
+  // market (ofertas + stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
     this.marketStats = marketData.marketStats || {};
     this.marketHistoryArr = Array.isArray(marketData.marketHistoryArr)
       ? marketData.marketHistoryArr : [];
+    this.market = Array.isArray(marketData.offers) ? marketData.offers : [];
   } else {
     this.marketStats = {};
     this.marketHistoryArr = [];
+    this.market = [];
   }
+  this._marketSeq = (this.market || []).reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._save();
   this._partySave();
 }
@@ -99,19 +102,43 @@ JsonStore.prototype._save = function () {
   fs.writeFileSync(path.join(DATA_DIR, "snapshots.json"),
     JSON.stringify(this.snapshots || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
-    JSON.stringify({ marketStats: this.marketStats || {},
+    JSON.stringify({ offers: this.market || [],
+                     marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
 };
-/* O tick autoritativo local acontece a cada segundo. Chamar `_save()` nele
- * reserializava accounts, sessions, leases, até 500 snapshots e market mesmo
- * sem nenhuma mudança nesses dados. Em disco do Windows isso fazia uma API
- * em 127.0.0.1 parecer uma conexão remota de ping altíssimo. Persista apenas
- * os dois arquivos realmente alterados e sem pretty-print no hot path. */
-JsonStore.prototype._saveRuntime = function (withCharacters) {
+/* O tick autoritativo local acontece várias vezes por segundo. Chamar `_save()`
+   nele reserializava accounts, sessions, leases, até 500 snapshots e market mesmo
+   sem nenhuma mudança nesses dados. Em disco do Windows isso fazia uma API
+   em 127.0.0.1 parecer uma conexão remota de ping altíssimo. Persista apenas
+   os dois arquivos realmente alterados, sem pretty-print, e com debounce. */
+JsonStore.prototype._flushRuntime = function () {
+  if (this._runtimeFlushTimer) {
+    clearTimeout(this._runtimeFlushTimer);
+    this._runtimeFlushTimer = null;
+  }
+  if (!this._runtimeDirty) return;
+  const withCharacters = !!this._runtimeDirtyChars;
+  this._runtimeDirty = false;
+  this._runtimeDirtyChars = false;
+  this._runtimeSavedAt = Date.now();
   if (withCharacters) fs.writeFileSync(path.join(DATA_DIR, "characters.json"),
     JSON.stringify(this.characters));
   fs.writeFileSync(path.join(DATA_DIR, "instances.json"),
     JSON.stringify(this.instances || []));
+};
+JsonStore.prototype._saveRuntime = function (withCharacters, immediate) {
+  this._runtimeDirty = true;
+  if (withCharacters) this._runtimeDirtyChars = true;
+  if (immediate) { this._flushRuntime(); return; }
+  const now = Date.now();
+  const due = (this._runtimeSavedAt || 0) + 800;
+  if (now >= due) { this._flushRuntime(); return; }
+  if (!this._runtimeFlushTimer) {
+    this._runtimeFlushTimer = setTimeout(() => {
+      this._runtimeFlushTimer = null;
+      this._flushRuntime();
+    }, Math.max(16, due - now));
+  }
 };
 JsonStore.prototype._nextId = function (arr) {
   return arr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
@@ -274,7 +301,7 @@ JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
   row.version=Number(row.version)+1;row.status="ended";row.terminal_reason=reason;
   row.ended_at=new Date(lease.now).toISOString();row.updated_at=row.ended_at;
-  this._saveRuntime(false);return {ok:true,instance:row};
+  this._saveRuntime(false,true);return {ok:true,instance:row};
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
@@ -1696,6 +1723,54 @@ async function ensureSchema(pool) {
   }
   try { await pool.query("ALTER TABLE party_members ADD INDEX idx_members_order (party_id, position)"); }
   catch(e) { /* já existe */ }
+
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN market_gold INT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
+  await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    seller_id INT UNSIGNED NOT NULL,
+    seller_name VARCHAR(32) NOT NULL,
+    kind ENUM('item','coins','buy') NOT NULL DEFAULT 'item',
+    slug VARCHAR(64) DEFAULT NULL,
+    tier INT UNSIGNED NOT NULL DEFAULT 0,
+    data MEDIUMTEXT DEFAULT NULL,
+    qty INT UNSIGNED NOT NULL DEFAULT 1,
+    price INT UNSIGNED NOT NULL,
+    price_tc TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NULL,
+    status ENUM('active','sold','cancelled','expired') NOT NULL DEFAULT 'active',
+    buyer_id INT UNSIGNED DEFAULT NULL,
+    bought_at TIMESTAMP NULL,
+    INDEX idx_market_active (status, kind, tier),
+    INDEX idx_market_seller (seller_id, status)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS market_stats (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(64) NOT NULL,
+    tier INT UNSIGNED NOT NULL DEFAULT 0,
+    count INT UNSIGNED NOT NULL DEFAULT 0,
+    total BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    last_price INT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_stats_item (slug, tier)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS market_history (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    seller_id INT UNSIGNED NOT NULL,
+    seller_name VARCHAR(32) NOT NULL,
+    buyer_id INT UNSIGNED DEFAULT NULL,
+    buyer_name VARCHAR(32) DEFAULT NULL,
+    kind ENUM('item','coins','buy') NOT NULL DEFAULT 'item',
+    slug VARCHAR(64) DEFAULT NULL,
+    tier INT UNSIGNED NOT NULL DEFAULT 0,
+    qty INT UNSIGNED NOT NULL DEFAULT 1,
+    price INT UNSIGNED NOT NULL,
+    price_tc TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_history_created (created_at),
+    INDEX idx_history_item (slug, created_at)
+  ) ENGINE=InnoDB`);
 }
 
 /* Cria a instancia de db conforme o ambiente */

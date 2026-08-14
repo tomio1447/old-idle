@@ -25,7 +25,7 @@ vm.createContext(ctx);vm.runInContext(game.slice(start,end),ctx);
     "worker não reserva janela para o browser retomar o lease após restart");
   must(party.includes('error:"ZONE_NOT_READY"')&&party.includes('error:"HUNT_NOT_READY"')&&
     party.includes("instanceReconcile"),"reconexão ainda transforma zona transitória em HTTP 400");
-  must(game.includes("const ONLINE_AUTH_TICK_MS=1000"),"tick online voltou a saturar o servidor em 500ms");
+  must(game.includes("const ONLINE_AUTH_TICK_MS=200"),"tick online não acompanha o passo autoritativo de 200ms");
   must(client.includes("function accountInstanceActive()")&&client.includes("options&&options.silent?false")&&
     game.includes("!instanceReady||G.instanceReconnectPending")&&
     game.includes("if(G.combat&&onlineAuthorityCombat())requestOnlineRuntimeRecovery()")&&

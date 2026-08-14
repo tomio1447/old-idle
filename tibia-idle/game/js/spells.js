@@ -138,10 +138,19 @@ function spellWeaponElement(p) {
   const it = (typeof upgradedStats === "function")
     ? upgradedStats(p, "equip:weapon", w.item)
     : (typeof GAMEDATA !== "undefined" ? GAMEDATA.items[w.item] : null);
-  if (!it || !it.el || it.el === "physical" || !it.elDmg) return null;
-  const fis = it.atk || 0;
-  const total = fis + it.elDmg;
-  return { el: it.el, propFisica: total > 0 ? fis / total : 1 };
+  if (it && it.el && it.el !== "physical" && it.elDmg) {
+    const fis = it.atk || 0;
+    const total = fis + it.elDmg;
+    return { el: it.el, propFisica: total > 0 ? fis / total : 1 };
+  }
+  // Scorch/Venom/Frost/Electrify/Reap: mesma conversão do auto-ataque nas
+  // magias de skill (Canary getElementType / secondary damage).
+  if (typeof imbTotals === "function") {
+    const t = imbTotals(p);
+    if (t && t.elemental && t.elementalType)
+      return { el: t.elementalType, propFisica: 1 - Math.min(100, t.elemental) / 100 };
+  }
+  return null;
 }
 
 /* Avalia a formula do canary e devolve {min, max} ja em valores positivos */

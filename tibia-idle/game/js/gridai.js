@@ -52,9 +52,8 @@ function monsterTargetDistance(mob) {
 /* Chance (0-100) de ficar parado em vez de dancar */
 function monsterStaticChance(mob) {
   const mi = moveInfo(mob.slug);
-  // O idle roda em ticks curtos: usar o valor cru do Canary deixava a
-  // "dança" visualmente muito mais frequente que no servidor. Acrescentamos
-  // uma margem conservadora e mantemos ao menos 95% de pausa entre passos.
+  // O idle interpola a cada frame: o staticAttack cru do Canary (70–90)
+  // virava dança contínua. Piso 95 = o mesmo contrato de test_tactical_ai.js.
   return Math.min(99, Math.max(95, (mi.staticAttack === undefined ? 90 : mi.staticAttack) + 7));
 }
 
@@ -90,6 +89,13 @@ function monsterReachableTarget(c, mob, occ, preferred) {
   return preferred || candidates[0] || null;
 }
 
+function stepJitterMs(ent) {
+  const id = String((ent && (ent.id !== undefined ? ent.id : ent.slug)) || "");
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h * 33) + id.charCodeAt(i)) | 0;
+  return Math.abs(h) % 180;
+}
+
 /* Decide e executa o passo de UM monstro. Devolve true se andou. */
 function monsterThinkStep(c, mob, alvo, occ, now) {
   ensureCell(mob);
@@ -97,6 +103,9 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
 
   // passo em andamento: so continua interpolando
   if (mob.moving) return false;
+
+  if (mob.nextStepAt === undefined || mob.nextStepAt === null)
+    mob.nextStepAt = now + stepJitterMs(mob);
 
   // respeita a duracao do passo anterior antes de dar o proximo
   if (mob.nextStepAt && now < mob.nextStepAt) return false;
@@ -123,9 +132,10 @@ function monsterThinkStep(c, mob, alvo, occ, now) {
   }
 
   if (!dir) {
-    // parado: encara o alvo e espera o proximo tick
+    // parado: encara o alvo. Longe/bloqueado tenta de novo no próximo
+    // frame útil; na distância certa respeita o staticAttack do Canary.
     if (alvo) mob.dir = dirTo(mob, alvo);
-    mob.nextStepAt = now + 450;
+    mob.nextStepAt = now + (dist > td ? 200 + stepJitterMs(mob) % 50 : 250);
     return false;
   }
 
@@ -456,6 +466,31 @@ function safeThinkStep(c, ent, alvo, occ, now) {
   return formationThinkStep(c, ent, alvo, occ, now, safeTargetCell);
 }
 
+/* Controle manual: um SQM por tecla/clique, sem micro-passos. */
+function manualThinkStep(c, p, occ, now) {
+  const pl = c.player;
+  if (!pl) return false;
+  ensureCell(pl);
+  if (pl.moving) return false;
+  if (pl.nextStepAt && now < pl.nextStepAt) return false;
+  pl.speedPts = typeof playerSpeed === "function"
+    ? playerSpeed(p, now)
+    : 110 + (typeof gearStats === "function" ? (gearStats(p).speed || 0) : 0);
+  const keys = (typeof G !== "undefined" && G.walkKeys) || {};
+  let dir = typeof combatKeyDir === "function" ? combatKeyDir(keys) : null;
+  if (!dir && pl.walkGoal && Number.isFinite(pl.walkGoal.cx) && Number.isFinite(pl.walkGoal.cy)) {
+    if (pl.cx === pl.walkGoal.cx && pl.cy === pl.walkGoal.cy) pl.walkGoal = null;
+    else dir = stepToward(pl, pl.walkGoal.cx, pl.walkGoal.cy, occ);
+  }
+  if (!dir) {
+    pl.nextStepAt = now + 80;
+    return false;
+  }
+  const ok = beginStep(pl, dir, occ, false);
+  pl.nextStepAt = now + (ok ? pl.stepDur : 150);
+  return ok;
+}
+
 /* Tick de movimento de toda a cena. Substitui updateCombatMovement. */
 function updateGridMovement(c, p, dt, now) {
   if (!c.player) return;
@@ -488,28 +523,31 @@ function updateGridMovement(c, p, dt, now) {
   if(typeof repairOverlappingGridEntities==="function")repairOverlappingGridEntities(c);
 
   // Interpola somente entidade viva; corpse permanece imóvel no SQM da morte.
-  if (activeAlive) advanceStep(c.player, dt);
+  if (activeAlive) { advanceStep(c.player, dt); snapIdleToCell(c.player); }
   if (c.players && c.players.length > 1) {
     for (const e of c.players) {
-      if (e !== c.player && e.p && e.p.hp > 0) advanceStep(e, dt);
+      if (e !== c.player && e.p && e.p.hp > 0) { advanceStep(e, dt); snapIdleToCell(e); }
     }
   }
-  for (const m of c.mobs) advanceStep(m, dt);
+  for (const m of c.mobs) { advanceStep(m, dt); snapIdleToCell(m); }
 
   const occ = buildOccupancy(c);
   const vivos = c.mobs.filter((m) => m.hp > 0);
   const alvo = vivos.length ? vivos[0] : null;
 
-  // MODO BOX: o personagem ATIVO também segue a formação (o playerThinkStep
-  // delega para o boxThinkStep quando attackMode === "box").
-  if (activeAlive) playerThinkStep(c, p, alvo, occ, now);
+  // AUTO: a IA anda sozinha. Manual: WASD/clique, um SQM por passo.
+  if (activeAlive) {
+    if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(p))
+      manualThinkStep(c, p, occ, now);
+    else playerThinkStep(c, p, alvo, occ, now);
+  }
 
-  // PARTY COMBAT: os aliados andam sozinhos até o alvo (cada um com o
-  // alcance da própria arma) — ou seguem a formação BOX/SAFE — e os
-  // MONSTROS perseguem o alvo que escolheram (o mais próximo).
+  // PARTY COMBAT: aliados com AUTO ligado caçam sozinhos; AUTO off = park
+  // (fica no SQM até o jogador trocar e mover com clique/WASD).
   if (c.players && c.players.length > 1) {
     for (const ent of c.players) {
       if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
+      if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(ent.p)) continue;
       const fm = formationMode(c, ent);
       if (fm === "box") {
         boxThinkStep(c, ent, alvo, occ, now);

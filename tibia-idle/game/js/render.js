@@ -44,6 +44,32 @@ const TIBIA_SPRITE = 32;
 
 function tibiaScale(W) { return tilePx(W) / TIBIA_SPRITE; }
 
+/* Overlay (nomes, healthbars, dano/cura) fica em pixels de tela.
+ * FULLHD aumenta o backing store pelo DPR; sem esta escala a fonte 8–10px
+ * e a barra 31×4 viram um terço do tamanho CSS e somem na caçada. */
+function canvasHudScale(canvas) {
+  const dpr = typeof clientDisplayDpr === "function"
+    ? clientDisplayDpr()
+    : Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+  if (!canvas) return Math.max(1, dpr);
+  const css = Number(canvas.clientWidth) || 0;
+  const backing = Number(canvas.width) || 0;
+  if (css > 0 && backing > 0) return Math.max(1, backing / css);
+  return Math.max(1, dpr);
+}
+function hudFontPx(px, s) {
+  return Math.max(1, Math.round(Number(px) * Math.max(1, Number(s) || 1)));
+}
+function hudFont(px, s, bold) {
+  return (bold ? "bold " : "") + hudFontPx(px, s) + "px Verdana";
+}
+function floaterFont(f, s) {
+  const spec = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px"))));
+  const scale = Math.max(1, Number(s) || 1);
+  if (scale === 1) return spec + " Verdana";
+  return spec.replace(/(\d+)px/, (_, n) => hudFontPx(n, scale) + "px") + " Verdana";
+}
+
 /* O OTClient/Canary desenha outfit na escala nativa do tile: 32 px de arte
  * para 1 SQM. Escalar 1.18x fazia um outfit de 1 tile invadir o tile abaixo
  * e mascarava a âncora real usada pelo client. */
@@ -215,6 +241,12 @@ function fxClientMeta(name) {
   return all[key] || null;
 }
 
+/* Sprites que vivem em assets/effects (wiki/DAT) e não no extrator clássico assets/fx. */
+const FX_EFFECT_FILES = {
+  "chivalrous-challenge": "assets/effects/chivalrous-challenge.png",
+  "challenge-effect": "assets/effects/challenge-effect.png",
+};
+
 function fxFrameCount(name) {
   const meta = fxClientMeta(name);
   if (meta && meta.frames) return meta.frames;
@@ -294,6 +326,7 @@ const Sprites = {
   fx(name) {
     const meta = fxClientMeta(name);
     if (meta && meta.path) return this.get(meta.path);
+    if (FX_EFFECT_FILES[name]) return this.get(FX_EFFECT_FILES[name]);
     return this.get(`assets/fx/${name}.png`);
   },
   missile(name, dir) { return this.get(`assets/missile/${name}_${dir || "e"}.png`); },
@@ -326,6 +359,8 @@ const FX_FRAMES = {
   // Exeta Amp Res (Chivalrous Challenge, CONST_ME_CHIVALRIOUS_CHALLENGE=219)
   // — anel de energia roxo/azul extraído do DAT 15.x (8 quadros)
   "chivalrous-challenge": 8,
+  // Exeta Res (CONST_ME_MAGIC_BLUE no lua; sprite wiki Challenge Effect)
+  "challenge-effect": 9,
   // efeitos que algumas magias pedem e nao estavam no extrator antigo
   // (extraidos por tools/extract_fx_faltantes.py)
   "energy-hit": 10, "carniphila": 8, "holy-area": 11,
@@ -362,6 +397,9 @@ const FX_FRAMES = {
   // fandom, tira de 12 quadros a 64px.
   "barrage-divine": 12,         // chuva sagrada (Divine_Barrage_Effect)
   "barrage-ethereal": 12,       // chuva eteria (Ethereal_Barrage_Effect)
+  "divine-barrage-effect": 12,
+  "ethereal-barrage-effect": 12,
+  "divine-grenade-effect": 7,
   // Impacto em area da Diamond Arrow: a nota oficial do item registra
   // "[Blue Electricity Effects] appears on the damage area". O areaFx
   // importado pelo elemento fisico caiu no "energy-hit" antigo — sprite em
@@ -405,21 +443,47 @@ function Renderer(canvas) {
   this.scale = 2;
 }
 
+function gcdInt(a, b) {
+  a = Math.abs(a | 0); b = Math.abs(b | 0);
+  while (b) { const t = b; b = a % b; a = t; }
+  return a || 1;
+}
+
 Renderer.prototype.resize = function () {
-  const w = this.c.parentElement.clientWidth;
+  const parent = this.c.parentElement;
+  const parentW = parent ? parent.clientWidth : this.c.clientWidth;
   // A janela mantém a proporção clássica 21×13. Hunts maiores usam essa
   // janela como FOV fixo, sem reduzir o tamanho dos tiles.
-  const h = Math.round(w * (13 / 21));
-  // Canvas em DPR (máx. 2x) + desenho nearest: nítido e sem serrilhado.
-  // O loop roda em requestAnimationFrame — na taxa do display (60/120/144Hz).
-  const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
-  const nw = Math.max(1, Math.round(w * dpr));
-  const nh = Math.max(1, Math.round(h * dpr));
+  const fullhd = typeof ClientSettings !== "undefined" && !!ClientSettings.fullhd;
+  const dpr = typeof clientDisplayDpr === "function"
+    ? clientDisplayDpr()
+    : Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+  let cssW, cssH;
+  if (fullhd) {
+    // Tile CSS inteiro × DPR inteiro: backing store múltiplo de 21×13.
+    // Alinha ao sprite 32px quando cabe, para o blit nearest não “quadricular”.
+    let cssTile = Math.max(1, Math.floor(parentW / 21));
+    const step = 32 / gcdInt(32, dpr | 0 || 1);
+    const aligned = Math.floor(cssTile / step) * step;
+    if (aligned >= 1) cssTile = aligned;
+    cssW = cssTile * 21;
+    cssH = cssTile * 13;
+    this.c.style.width = cssW + "px";
+    this.c.style.height = cssH + "px";
+  } else {
+    this.c.style.width = "";
+    this.c.style.height = "";
+    cssW = parentW;
+    cssH = Math.round(parentW * (13 / 21));
+  }
+  const nw = Math.max(1, Math.round(cssW * dpr));
+  const nh = Math.max(1, Math.round(cssH * dpr));
   if (this.c.width !== nw || this.c.height !== nh) {
     this.c.width = nw;
     this.c.height = nh;
-    this.ctx.imageSmoothingEnabled = false;
   }
+  if (typeof setCanvasNearest === "function") setCanvasNearest(this.ctx);
+  else this.ctx.imageSmoothingEnabled = false;
 };
 
 /* Floating damage — replicando Canary/OTClient AnimatedText
@@ -436,65 +500,79 @@ function floaterAlphaCanary(p, t, tf) {
 function floaterAlpha(p) {
   return Math.max(0, Math.pow(1 - p, 1.35));
 }
-Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind) {
+function mergeFloaterText(prev, next) {
+  const t1 = String(prev || "").trim(), t2 = String(next || "").trim();
+  if (!/^[+\-]?\d/.test(t1) || !/^[+\-]?\d/.test(t2)) return null;
+  const n1 = parseInt(t1.replace(/[^0-9\-]/g, ""), 10);
+  const n2 = parseInt(t2.replace(/[^0-9\-]/g, ""), 10);
+  if (!Number.isFinite(n1) || !Number.isFinite(n2)) return null;
+  const sum = n1 + n2;
+  if (t1.startsWith("+") || t2.startsWith("+")) return "+" + Math.abs(sum);
+  return "-" + Math.abs(sum);
+}
+
+Renderer.prototype.addFloater = function (x, y, text, color, big, small, kind, comboKey) {
   const life = kind === "damage" ? 900 : (kind === "restore" ? 800 : (big ? 1100 : 1000));
   const now = Date.now();
-  // Merge e stacking estilo Canary/Map::addAnimatedText
-  let prevAtPos = null;
+  const tryMerge = (f) => {
+    const elapsed = f.max - f.life;
+    if (elapsed > f.max / 2.5) return null;
+    const merged = mergeFloaterText(f.text, text);
+    if (merged == null) return null;
+    f.text = merged;
+    f.life = Math.max(f.life, life * 0.7);
+    return f;
+  };
+  // Combo Canary: mesmo alvo + mesmo elemento soma o número, mesmo com
+  // pequeno deslocamento (parcela dual da arma / dois personagens).
+  if (comboKey) {
+    for (let i = this.floaters.length - 1; i >= 0; i--) {
+      const f = this.floaters[i];
+      if (f.comboKey === comboKey && f.kind === kind) {
+        const hit = tryMerge(f);
+        if (hit) return hit;
+      }
+    }
+  }
   let stackOffsetY = 0;
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
     const dx = Math.abs(f.x - x), dy = Math.abs(f.y - y);
-    if (dx > 0.08 || dy > 0.08) continue; // mesma tile ~0.08 = ~1 tile
-    prevAtPos = f;
-    // Se mesma cor e dentro de 40% de vida, mergeia somando
-    if (f.color === color && f.kind === kind) {
-      const elapsed = f.max - f.life;
-      if (elapsed <= f.max / 2.5) {
-        try {
-          const n1 = parseInt(String(f.text).replace(/[^0-9\-]/g, "")) || 0;
-          const n2 = parseInt(String(text).replace(/[^0-9\-]/g, "")) || 0;
-          if (!isNaN(n1) && !isNaN(n2) && String(text).match(/^-?\d/) && String(f.text).match(/^-?\d/)) {
-            const sum = n1 + n2;
-            const prefix = String(f.text).trim().startsWith("+") ? "+" : "";
-            f.text = (sum > 0 && prefix === "+" ? "+" : "") + sum;
-            f.life = Math.max(f.life, life * 0.7);
-            return;
-          }
-        } catch (e) {}
-      }
+    if (dx > 0.08 || dy > 0.08) continue;
+    if (!comboKey && f.color === color && f.kind === kind) {
+      const hit = tryMerge(f);
+      if (hit) return hit;
     }
-    // Se não mergeou, prepara offset para novo texto não sobrepor exatamente
     if (!stackOffsetY) {
       const elapsed = f.max - f.life;
-      const tf = f.max;
-      // Canary: y = 12 -48*t/tf, offset += y, cap 12 -> nós usamos 14 e cap 48 para MOTA
-      const yOff = 14 - 48 * (elapsed / tf);
+      const yOff = 14 - 48 * (elapsed / f.max);
       stackOffsetY = (f.offsetY || 0) + yOff;
     }
   }
-  // Cap de stacking para não subir infinito (Canary cap 12, nós 48 para MOTA)
   if (stackOffsetY > 48) stackOffsetY = 48;
   if (stackOffsetY < 0) stackOffsetY = 0;
 
-  this.floaters.push({
+  const floater = {
     x: x, y: y, text: text, color: color,
     life: life, max: life,
     big: !!big,
     small: !!small,
     kind: kind || "",
+    comboKey: comboKey || "",
     vx: 0,
     vy: -64,
     spawnTime: now,
-    offsetX: (Math.random() - 0.5) * 4, // leve jitter horizontal para não empilhar 100% vertical
-    offsetY: -stackOffsetY, // negativo = sobe
-  });
+    offsetX: (Math.random() - 0.5) * 4,
+    offsetY: -stackOffsetY,
+  };
+  this.floaters.push(floater);
   const limit = kind === "damage" ? 16 : 24;
   while (this.floaters.length > limit) {
     let idx = this.floaters.findIndex(f => f.kind === kind);
     if (idx === -1) idx = 0;
     this.floaters.splice(idx, 1);
   }
+  return floater;
 };
 
 /* Fala de criatura, no modelo do internalCreatureSay do Canary.
@@ -545,8 +623,9 @@ function creatureSay(dono, texto, tipo) {
 }
 
 /* Desenha e envelhece a fila de falas de uma criatura. */
-function drawCreatureSpeech(ctx, dono, x, y, dt) {
+function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
   if (!dono || !dono.speech || !dono.speech.length) return;
+  const s = Math.max(1, Number(hudScale) || 1);
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   for (let i = dono.speech.length - 1; i >= 0; i--) {
@@ -554,13 +633,12 @@ function drawCreatureSpeech(ctx, dono, x, y, dt) {
     sp.life -= dt;
     if (sp.life <= 0) { dono.speech.splice(i, 1); continue; }
     // o grito e maior, como no client
-    ctx.font = (sp.tipo === TALK.MONSTER_YELL ? "bold 12px" : "bold 10px") +
-               " Verdana";
+    ctx.font = hudFont(sp.tipo === TALK.MONSTER_YELL ? 12 : 10, s, true);
     const p = 1 - sp.life / sp.max;
     const a = Math.max(0, Math.pow(1 - p, 1.35));
-    const ty = y - 34 - (sp.slot || 0) * 13 - p * 10;
+    const ty = y - 34 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
     ctx.globalAlpha = a;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * s;
     ctx.strokeStyle = "rgba(0,0,0,.9)";
     ctx.strokeText(sp.text, x, ty);
     ctx.fillStyle = sp.color;
@@ -580,8 +658,8 @@ Renderer.prototype.addSpeech = function (text, color, tipo) {
   }
 };
 
-Renderer.prototype.drawSpeech = function (ctx, x, y, dt) {
-  drawCreatureSpeech(ctx, this.playerTalk, x, y, dt);
+Renderer.prototype.drawSpeech = function (ctx, x, y, dt, hudScale) {
+  drawCreatureSpeech(ctx, this.playerTalk, x, y, dt, hudScale);
 };
 
 Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
@@ -610,26 +688,107 @@ Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {
  * A moldura escura atras do nome era invencao nossa e nao existe no Tibia —
  * la o nome e desenhado direto sobre o mapa, so com outline para continuar
  * legivel em cima de qualquer chao. */
-function drawNameText(ctx, x, y, name, cor) {
-  ctx.font = "bold 9px Verdana";
+function drawNameText(ctx, x, y, name, cor, hudScale) {
+  const s = Math.max(1, Number(hudScale) || 1);
+  ctx.font = hudFont(9, s, true);
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   ctx.strokeStyle = "#000";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(2, 2 * s);
   ctx.strokeText(name, x, y);
   ctx.fillStyle = cor || "#ffffff";
   ctx.fillText(name, x, y);
 }
 
-/* Barra de vida do Tibia — replicando Canary/OTClient:
- * Canary: backgroundRect 31x4, healthRect 29x2 (1px borda)
- * Nosso antigo 27x4 era aproximação que deixava barra desalinhada.
- * Agora reproduz exatamente: 31 bg, 29 inner, 4 total, 2 fill.
+/* Barra de vida do Tibia — Creature::drawInformation do OTClient/Canary:
+ * backgroundRect 31x4, healthRect expanded(-1) com largura 29, 1px de borda.
+ * Nome com minNameBarSpacing = 2. Mana/escudo colados em barsRect.bottom.
  */
-const TIBIA_BAR_W = 27;
+const TIBIA_BAR_W = 31;
 const TIBIA_BAR_H = 4;
-const TIBIA_BAR_INNER_W = 25;
+const TIBIA_BAR_INNER_W = 29;
 const TIBIA_BAR_INNER_H = 2;
+const TIBIA_NAME_H = 9;
+const TIBIA_MIN_NAME_BAR = 2;
+
+function creatureInformationPoint(info, hudScale) {
+  // OTC: dest interpolado (já com walkOffset) + (16, -2). cx/cy são o
+  // centro do SQM; top é a origem da sprite no mesmo frame — a barra
+  // viaja com o outfit, não com um HUD ancorado no mundo.
+  const s = Math.max(1, Number(hudScale) || 1);
+  return { x: info.cx, y: (info.top || 0) - 2 * s };
+}
+function creatureCropSize() {
+  // p.y já é o topo da sprite. OTC usa cropSizeText=12 nesse caso
+  // (getExactSize só quando dest é o tile, não o topo do outfit).
+  return 12;
+}
+function creatureInfoExtraBars(info) {
+  if (!info || !info.e || info.e.kind === "monster") return 0;
+  return (info.shieldPct > 0 ? 1 : 0) + (info.mpPct != null ? 1 : 0);
+}
+function monsterRenderName(ent) {
+  if (!ent) return "";
+  const slug = String(ent.slug || "");
+  const catalog = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && slug)
+    ? GAMEDATA.monsters[slug] : null;
+  let raw = catalog && catalog.name;
+  if (!raw) {
+    const defName = ent.def && ent.def.name;
+    const defSlug = String(defName || "").toLowerCase().replace(/\s+/g, "-");
+    raw = (defName && (!slug || defSlug === slug)) ? defName
+      : (slug ? slug.split("-").filter(Boolean).map((part) =>
+        part.charAt(0).toUpperCase() + part.slice(1)).join(" ") : (defName || ""));
+  }
+  return typeof displayMonsterName === "function" ? displayMonsterName(raw) : raw;
+}
+/* Layout Canary Creature::drawInformation: p = dest + (16, -2), crop 12,
+ * gap 2px, clamp na viewport. O OTC NÃO afasta labels de criaturas vizinhas
+ * — nome+HP são da sprite e se sobrepõem no combate denso. */
+function layoutCreatureInformation(info, viewW, viewH, hudScale) {
+  const s = Math.max(1, Number(hudScale) || 1);
+  const barW = TIBIA_BAR_W * s, barH = TIBIA_BAR_H * s, nameH = TIBIA_NAME_H * s;
+  const p = creatureInformationPoint(info, s);
+  const cropSizeText = creatureCropSize(info) * s;
+  const cropSizeBackGround = Math.max(0, cropSizeText - nameH);
+  let nameTop = p.y - cropSizeText;
+  let barY = p.y - cropSizeBackGround;
+  let nameBottom = nameTop + nameH;
+  if (barY - nameBottom < TIBIA_MIN_NAME_BAR * s) barY = nameBottom + TIBIA_MIN_NAME_BAR * s;
+  const extra = creatureInfoExtraBars(info);
+  const barsH = barH * (1 + extra);
+  const nameW = Math.max(barW, String(info.name || "").length * 6 * s);
+  const box = {
+    x: Math.min(p.x - nameW / 2, p.x - barW / 2),
+    y: nameTop,
+    w: Math.max(nameW, barW),
+    h: (barY + barsH) - nameTop
+  };
+  const vw = Number(viewW), vh = Number(viewH);
+  if (vw > 0 && vh > 0) {
+    let textX = p.x - nameW / 2, textY = nameTop;
+    let bgX = p.x - barW / 2, bgY = barY;
+    if (textX < 0) textX = 0;
+    if (textX + nameW > vw) textX = vw - nameW;
+    if (textY < 0) textY = 0;
+    if (textY + nameH > vh) textY = vh - nameH;
+    if (bgX < 0) bgX = 0;
+    if (bgX + barW > vw) bgX = vw - barW;
+    if (bgY < 0) bgY = 0;
+    if (bgY + barH > vh) bgY = vh - barH;
+    const offset = 12 * s * (info.e && info.e.kind === "player" ? 2 : 1);
+    if (textY === 0) bgY = textY + offset;
+    if (bgY + barH >= vh) textY = bgY - offset;
+    nameTop = textY;
+    barY = bgY;
+    box.x = Math.min(textX, bgX);
+    box.y = Math.min(nameTop, barY);
+    box.w = Math.max(textX + nameW, bgX + barW) - box.x;
+    box.h = (barY + barsH) - box.y;
+    return { nameX: textX + nameW / 2, nameY: nameTop + nameH, barX: bgX + barW / 2, barY: barY, box: box, scale: s };
+  }
+  return { nameX: p.x, nameY: nameTop + nameH, barX: p.x, barY: barY, box: box, scale: s };
+}
 
 /* Degraus de cor do client: >60 verde, >30 amarelo, >8 laranja/vermelho. */
 function tibiaHpColor(pct) {
@@ -641,16 +800,17 @@ function tibiaHpColor(pct) {
   return "#600000";
 }
 
-function drawTibiaBar(ctx, x, y, pct, cor) {
-  // Canary: background 31x4 preto, inner 29x2 com 1px borda
-  const w = TIBIA_BAR_W, h = TIBIA_BAR_H;
-  const iw = TIBIA_BAR_INNER_W, ih = TIBIA_BAR_INNER_H;
+function drawTibiaBar(ctx, x, y, pct, cor, hudScale) {
+  // Canary: background 31x4 preto, inner 29x2 com 1px borda — escalado no FULLHD
+  const s = Math.max(1, Number(hudScale) || 1);
+  const w = TIBIA_BAR_W * s, h = TIBIA_BAR_H * s;
+  const iw = TIBIA_BAR_INNER_W * s, ih = TIBIA_BAR_INNER_H * s;
   const bx = Math.round(x - w / 2), by = Math.round(y);
   ctx.fillStyle = "#000";
   ctx.fillRect(bx, by, w, h);
   ctx.fillStyle = cor;
   const fillW = Math.round(iw * Math.max(0, Math.min(1, pct)));
-  ctx.fillRect(bx + 1, by + 1, fillW, ih);
+  ctx.fillRect(bx + s, by + s, fillW, ih);
 }
 
 /* Cor da barra de HP do personagem na cena — usa a mesma paleta Canary
@@ -659,18 +819,20 @@ function playerHpBarColor(pct) {
   return tibiaHpColor(pct);
 }
 
-function drawNameBars(ctx, x, nameY, name, hpPct, mpPct, shieldPct, barY) {
+function drawNameBars(ctx, x, nameY, name, hpPct, mpPct, shieldPct, barY, barX, hudScale) {
+  const s = Math.max(1, Number(hudScale) || 1);
   const hpColor = playerHpBarColor(hpPct);
-  const hpY = (typeof barY === 'number') ? barY : nameY + 12;
+  const hpY = (typeof barY === 'number') ? barY : nameY + 12 * s;
   const nY = (typeof barY === 'number') ? nameY : nameY;
-  drawNameText(ctx, x, nY, name, hpColor);
-  drawTibiaBar(ctx, x, hpY, hpPct, hpColor);
-  let nextY = hpY + 4;
+  const bx = (typeof barX === 'number') ? barX : x;
+  drawNameText(ctx, x, nY, name, hpColor, s);
+  drawTibiaBar(ctx, bx, hpY, hpPct, hpColor, s);
+  let nextY = hpY + TIBIA_BAR_H * s;
   if (shieldPct !== undefined && shieldPct !== null && shieldPct > 0) {
-    drawTibiaBar(ctx, x, nextY, shieldPct, "#a64dff");
-    nextY += 4;
+    drawTibiaBar(ctx, bx, nextY, shieldPct, "#a64dff", s);
+    nextY += TIBIA_BAR_H * s;
   }
-  if (mpPct !== undefined && mpPct !== null) drawTibiaBar(ctx, x, nextY, mpPct, "#3c66ff");
+  if (mpPct !== undefined && mpPct !== null) drawTibiaBar(ctx, bx, nextY, mpPct, "#3c66ff", s);
 }
 
 function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
@@ -748,39 +910,40 @@ function drawTargetSquare(ctx, x, y, w, h) {
   ctx.restore();
 }
 
-function drawBossBar(ctx, viewportW, combat, offsetX, offsetY) {
+function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   if (!combat || !combat.boss || !combat.mobs.length) return;
   const boss = combat.mobs.find((m) => m.boss) || combat.mobs[0];
   if (!boss || boss.hp <= 0) return;
+  const s = Math.max(1, Number(hudScale) || 1);
   offsetX = Number(offsetX) || 0;
   offsetY = Number(offsetY) || 0;
   const pct = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
-  const bw = Math.min(520, viewportW * 0.72), bh = 18;
+  const bw = Math.min(520 * s, viewportW * 0.72), bh = 18 * s;
   const center = offsetX + viewportW / 2;
-  const x = center - bw / 2, y = offsetY + 10;
+  const x = center - bw / 2, y = offsetY + 10 * s;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,.78)";
-  ctx.fillRect(x - 3, y - 3, bw + 6, bh + 24);
+  ctx.fillRect(x - 3 * s, y - 3 * s, bw + 6 * s, bh + 24 * s);
   ctx.strokeStyle = "#8b6b2a";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x - 3, y - 3, bw + 6, bh + 24);
+  ctx.lineWidth = 2 * s;
+  ctx.strokeRect(x - 3 * s, y - 3 * s, bw + 6 * s, bh + 24 * s);
   ctx.fillStyle = "#050505";
-  ctx.fillRect(x, y + 17, bw, bh);
-  const g = ctx.createLinearGradient(0, y + 17, 0, y + 17 + bh);
+  ctx.fillRect(x, y + 17 * s, bw, bh);
+  const g = ctx.createLinearGradient(0, y + 17 * s, 0, y + 17 * s + bh);
   g.addColorStop(0, "#ff5656");
   g.addColorStop(1, "#7c0808");
   ctx.fillStyle = g;
-  ctx.fillRect(x, y + 17, bw * pct, bh);
+  ctx.fillRect(x, y + 17 * s, bw * pct, bh);
   ctx.strokeStyle = "#000";
-  ctx.strokeRect(x, y + 17, bw, bh);
-  ctx.font = "bold 13px Verdana";
+  ctx.strokeRect(x, y + 17 * s, bw, bh);
+  ctx.font = hudFont(13, s, true);
   ctx.textAlign = "center";
   // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
   ctx.fillStyle = tibiaHpColor(pct);
-  ctx.fillText(boss.def.name, center, y + 11);
-  ctx.font = "bold 10px Verdana";
+  ctx.fillText(boss.def.name, center, y + 11 * s);
+  ctx.font = hudFont(10, s, true);
   ctx.fillStyle = "#fff";
-  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31);
+  ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31 * s);
   ctx.restore();
 }
 
@@ -880,14 +1043,15 @@ function drawRookgaardSewer(ctx, W, H) {
   });
 
   // legenda local
+  const hudS = typeof canvasHudScale === "function" ? canvasHudScale(ctx.canvas) : 1;
   ctx.fillStyle = "rgba(0,0,0,.55)";
-  ctx.fillRect(8, 8, 178, 22);
+  ctx.fillRect(8 * hudS, 8 * hudS, 178 * hudS, 22 * hudS);
   ctx.strokeStyle = "rgba(120,100,60,.6)";
-  ctx.strokeRect(8, 8, 178, 22);
-  ctx.font = "bold 11px Verdana";
+  ctx.strokeRect(8 * hudS, 8 * hudS, 178 * hudS, 22 * hudS);
+  ctx.font = hudFont(11, hudS, true);
   ctx.textAlign = "left";
   ctx.fillStyle = "#d8c47a";
-  ctx.fillText("Bueiro de Rookgaard", 16, 23);
+  ctx.fillText("Bueiro de Rookgaard", 16 * hudS, 23 * hudS);
 }
 
 /* Caverna das Aranhas: gruta de pedra com teias, ovos e poças de veneno.
@@ -1035,15 +1199,16 @@ function drawSpiderCave(ctx, W, H) {
   }
 
   // legenda local
+  const hudS = typeof canvasHudScale === "function" ? canvasHudScale(ctx.canvas) : 1;
   ctx.fillStyle = "rgba(0,0,0,.55)";
-  ctx.fillRect(8, 8, 190, 22);
+  ctx.fillRect(8 * hudS, 8 * hudS, 190 * hudS, 22 * hudS);
   ctx.strokeStyle = "rgba(120,100,60,.6)";
   ctx.lineWidth = 1;
-  ctx.strokeRect(8, 8, 190, 22);
-  ctx.font = "bold 11px Verdana";
+  ctx.strokeRect(8 * hudS, 8 * hudS, 190 * hudS, 22 * hudS);
+  ctx.font = hudFont(11, hudS, true);
   ctx.textAlign = "left";
   ctx.fillStyle = "#c8d87a";
-  ctx.fillText("Caverna das Aranhas", 16, 23);
+  ctx.fillText("Caverna das Aranhas", 16 * hudS, 23 * hudS);
 }
 
 Renderer.prototype.addCorpse = function (x, y, slug) {
@@ -1054,6 +1219,7 @@ Renderer.prototype.addCorpse = function (x, y, slug) {
 Renderer.prototype.drawAcademy = function (training, player, dt) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
+  const hudS = canvasHudScale(this.c);
   ctx.clearRect(0, 0, W, H);
 
   const isDummy = training.mode === "dummy";
@@ -1125,16 +1291,16 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 
   ctx.textAlign = "left";
-  ctx.font = "bold 14px Verdana";
+  ctx.font = hudFont(14, hudS, true);
   ctx.fillStyle = "#d8d8dc";
-  ctx.fillText(temMapa ? "Sala de Exercise Weapons" : (isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone"), 12, 24);
-  ctx.font = "10px Verdana";
+  ctx.fillText(temMapa ? "Sala de Exercise Weapons" : (isDummy ? "Ferumbras Dummy Safezone" : "Academia Safezone"), 12 * hudS, 24 * hudS);
+  ctx.font = hudFont(10, hudS);
   ctx.fillStyle = "#999";
   if (isDummy) {
     const w = training.weapon ? (EXERCISE_WEAPONS[training.weapon] || {}).name : "—";
-    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12, 40);
+    ctx.fillText("Exercise weapon: " + w + " · 1 carga/golpe · regen stamina 3:1", 12 * hudS, 40 * hudS);
   } else {
-    ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12, 40);
+    ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12 * hudS, 40 * hudS);
   }
 
   const pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);
@@ -1155,7 +1321,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   //    (lunge) enquanto a exercise weapon é usada (proj voando até lá);
   //  - alterna frames de caminhada 1/2 durante o gesto.
   let lungeX = 0, lungeY = 0, atkFrame = 0;
-  if (training.mode === "dummy" && training.lungeT > 0) {
+  if (training.lungeT > 0) {
     const prog = 1 - training.lungeT / 230;
     const mag = W * 0.02 * ((training.proj && training.proj.lunge) || 1);
     const alvo = (training.proj && training.proj.to) ||
@@ -1233,18 +1399,18 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     }
 
     ctx.textAlign = "center";
-    ctx.font = "bold 12px Verdana";
+    ctx.font = hudFont(12, hudS, true);
     ctx.fillStyle = "rgba(0,0,0,.85)";
-    ctx.fillText("Ferumbras Exercise Dummy", tx + 1, ty - 90);
+    ctx.fillText("Ferumbras Exercise Dummy", tx + 1, ty - 90 * hudS);
     ctx.fillStyle = "#d8d8dc";
-    ctx.fillText("Ferumbras Exercise Dummy", tx, ty - 91);
+    ctx.fillText("Ferumbras Exercise Dummy", tx, ty - 91 * hudS);
 
     // cargas da exercise weapon (sem barra de HP — o dummy não leva dano)
     const cargas = (player.exercise && training.weapon)
       ? (player.exercise[training.weapon] || 0) : 0;
-    ctx.font = "10px Verdana";
+    ctx.font = hudFont(10, hudS);
     ctx.fillStyle = "#999";
-    ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 105);
+    ctx.fillText(fmtFull(cargas) + " cargas", tx, ty - 105 * hudS);
   } else {
     const trainer = Sprites.mob("monk", "w") || Sprites.mob("monk", "s");
     let trainerBox = { x: tx - 22, y: ty - 52, w: 44, h: 74 };
@@ -1264,11 +1430,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     }
 
     ctx.textAlign = "center";
-    ctx.font = "bold 12px Verdana";
+    ctx.font = hudFont(12, hudS, true);
     ctx.fillStyle = "rgba(0,0,0,.85)";
-    ctx.fillText("Treiner", tx + 1, ty - 64);
+    ctx.fillText("Treiner", tx + 1, ty - 64 * hudS);
     ctx.fillStyle = "#d8d8dc";
-    ctx.fillText("Treiner", tx, ty - 65);
+    ctx.fillText("Treiner", tx, ty - 65 * hudS);
 
     // barra do Treiner: nunca morre
     ctx.fillStyle = "#000";
@@ -1353,15 +1519,15 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 
   ctx.textAlign = "left";
-  ctx.font = "11px Verdana";
+  ctx.font = hudFont(11, hudS);
   ctx.fillStyle = "rgba(20,20,24,.80)";
-  ctx.fillRect(12, H - 58, 250, 44);
+  ctx.fillRect(12 * hudS, H - 58 * hudS, 250 * hudS, 44 * hudS);
   ctx.strokeStyle = "rgba(100,100,110,.45)";
-  ctx.strokeRect(12, H - 58, 250, 44);
+  ctx.strokeRect(12 * hudS, H - 58 * hudS, 250 * hudS, 44 * hudS);
   ctx.fillStyle = "#b0b0b8";
   const sk = training.skill ? (SKILL_NAMES[training.skill] || training.skill) : "—";
-  ctx.fillText("Skill: " + sk, 22, H - 38);
-  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ativo", 22, H - 22);
+  ctx.fillText("Skill: " + sk, 22 * hudS, H - 38 * hudS);
+  ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ativo", 22 * hudS, H - 22 * hudS);
 
   // efeitos/números flutuantes
   for (let i = this.effects.length - 1; i >= 0; i--) {
@@ -1391,8 +1557,8 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // numero de dano do tamanho do client original: menor e fino, nao um
     // texto "gordo" tomando conta da tela. v27: os numeros de CURA/DANO
     // (small) saem com METADE do tamanho — menos poluição visual no idle.
-    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
-    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
+    ctx.font = floaterFont(f, hudS);
+    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.fillStyle = f.color;
@@ -1418,9 +1584,10 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
   const now = Date.now(), left = Math.max(0, Math.ceil((until - now) / 1000));
   const total = Math.max(1, until - (startedAt || now));
   const elapsed = Math.max(0, Math.min(1, 1 - (until - now) / total));
-  ctx.font = "bold 16px Verdana"; ctx.textAlign = "center";
+  const hudS = canvasHudScale(ctx.canvas);
+  ctx.font = hudFont(16, hudS, true); ctx.textAlign = "center";
   ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
-  ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 3 * hudS;
   const ly = py - ts * .85 - elapsed * ts * .7;
   ctx.strokeText(left + "s", px, ly); ctx.fillStyle = "#ff3b30"; ctx.fillText(left + "s", px, ly);
   ctx.globalAlpha = 1;
@@ -1431,13 +1598,45 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
  * — portanto animam sem criar arrays/objetos persistentes a cada frame.
  * Fiendish usa mais partículas e brilho roxo; Influenced escala levemente
  * com a quantidade de stacks. */
+/* OTC: ranged mostra flecha; Amp Res / force melee troca para espadas. */
+function monsterAttackTypeIcon(ent) {
+  if (!ent) return "";
+  let ranged = !!(ent.def && ent.def.ranged);
+  if (typeof monsterAttackRange === "function" && monsterAttackRange(ent) > .16) ranged = true;
+  if (typeof moveInfo === "function") {
+    const td = Number(moveInfo(ent.slug).targetDistance) || 0;
+    if (td > 1) ranged = true;
+  }
+  if (!ranged) return "";
+  if (ent.forceMeleeUntil && ent.forceMeleeUntil > Date.now()) return "melee-atk";
+  if (typeof monsterTargetDistance === "function" && monsterTargetDistance(ent) <= 1) return "melee-atk";
+  return "range-atk";
+}
+
 /* Marcador oficial do client ao lado da barra de vida: triângulo azul para
  * Influenced e vermelho para Fiendish. Poeira/glow não substituem este ícone
  * — ele é a identificação inequívoca mostrada no print do Tibia. */
-function drawSinisterCreatureIcon(ctx,ent,cx,barY){
+function drawSinisterCreatureIcon(ctx,ent,cx,barY,hudScale){
   if(!ctx||!ent||(!ent.influenced&&!ent.fiendish)||typeof drawWikiIcon!=="function")return false;
-  const slug=ent.fiendish?"fiendish-creature":"influenced-creature",size=11;
-  return drawWikiIcon(ctx,slug,Math.round(cx+TIBIA_BAR_W/2+2),Math.round(barY-4),size);
+  const s=Math.max(1,Number(hudScale)||1);
+  const slug=ent.fiendish?"fiendish-creature":"influenced-creature",size=11*s;
+  const iconX=Math.round(cx+TIBIA_BAR_W*s/2+2*s),iconY=Math.round(barY-4*s);
+  const ok=drawWikiIcon(ctx,slug,iconX,iconY,size);
+  if(!ent.fiendish&&typeof ctx.fillText==="function"){
+    const n=Math.max(1,Math.min(5,Number(ent.sinisterStacks)||1));
+    ctx.save();
+    ctx.font="bold "+Math.max(1,Math.round(8*s))+"px Verdana";
+    ctx.textAlign="left";
+    ctx.textBaseline="bottom";
+    ctx.lineJoin="round";
+    ctx.strokeStyle="#000";ctx.lineWidth=2*s;
+    const tx=iconX+size+1,ty=iconY+size;
+    ctx.strokeText(String(n),tx,ty);
+    ctx.fillStyle="#7ec8ff";
+    ctx.fillText(String(n),tx,ty);
+    ctx.restore();
+  }
+  return ok;
 }
 
 function drawSinisterDust(ctx,ent,cx,cy,tile,now){
@@ -1463,6 +1662,14 @@ function drawSinisterDust(ctx,ent,cx,cy,tile,now){
     const size=Math.max(2,Math.round(tile*(fiendish?.09:.07)*(i%3===0?1.35:1)));
     ctx.globalAlpha=(fiendish?.6:.5)+(1-phase)*(fiendish?.4:.35);
     ctx.fillRect(Math.round(x-size/2),Math.round(y-size/2),size,size);
+  }
+  if(!fiendish&&typeof ctx.fillText==="function"){
+    const hs=typeof canvasHudScale==="function"?canvasHudScale(ctx.canvas):1;
+    ctx.globalAlpha=1;ctx.shadowBlur=0;
+    ctx.font="bold "+Math.max(1,Math.round(9*hs))+"px Verdana";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.lineJoin="round";ctx.strokeStyle="#000";ctx.lineWidth=2*hs;
+    const lx=cx+tile*.52,ly=cy-tile*.12,label=String(stacks);
+    ctx.strokeText(label,lx,ly);ctx.fillStyle="#7ec8ff";ctx.fillText(label,lx,ly);
   }
   ctx.restore();
 }
@@ -1567,7 +1774,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
           monsterIdleFrame(ent.slug, Date.now(), monsterAnimationPhase(ent))) : null;
         img = spriteReady(idle) ? idle : Sprites.mob(ent.slug, ent.dir || "w");
       }
-      name = typeof displayMonsterName === "function" ? displayMonsterName(ent.def.name) : ent.def.name;
+      name = monsterRenderName(ent);
       hpPct = Math.max(0, ent.hp / ent.maxHp);
     } else {
       const frame = ent.moving ? (ent.frame || 1) : (typeof appearanceIdleFrame === "function" ? appearanceIdleFrame(e.p, Date.now()) : 0);
@@ -1621,69 +1828,45 @@ Renderer.prototype.draw = function (combat, player, dt) {
 
   // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
   // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
-  drawBossBar(ctx, canvasW, combat, -view.x, -view.y);
+  drawBossBar(ctx, canvasW, combat, -view.x, -view.y, canvasHudScale(this.c));
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
-  // Replicando Canary: getExactSize() ajusta para sprites grandes.
-  // Layout Canary: nome colado ~2px acima da healthbar, healthbar ~2px acima
-  // do topo da sprite. Antes o nome ficava 12px acima da barra (longe demais).
-  //
-  // POSICIONAMENTO (Canary): o monstro mais baixo (y maior, mais próximo da
-  // câmera) tem PRIORIDADE — seu label fica na posição natural. Monstros
-  // acima têm o label empurrado para cima quando sobrepõe. Antes o código
-  // processava de cima para baixo e empurrava para cima, invertendo a ordem
-  // (o monstro de baixo ficava com o label no topo da fila).
-  //
-  // Z-ORDER: labels são desenhados de cima para baixo, então o label do
-  // monstro mais baixo é desenhado por último (fica por cima em caso de
-  // sobreposição residual), igual ao Canary.
-  const occupiedLabels = [];
-  // Calcula de baixo para cima: a criatura mais próxima conserva a posição
-  // natural e as que estão atrás têm seus labels deslocados.
-  for (let i = entityInfo.length - 1; i >= 0; i--) {
-    const info = entityInfo[i];
-    const tileSize = info.tile;
-    const sizeOffset = Math.max(0, (info.h - tileSize) * 0.15);
-    let barY = info.top - 3 - sizeOffset;
-    let nameY = barY - 3;
-    let y = nameY;
-    for (const prev of occupiedLabels) {
-      if (Math.abs(prev.x - info.cx) < 42 && Math.abs(prev.y - y) < 20) {
-        const shift = 20;
-        y -= shift;
-        barY -= shift;
-        nameY -= shift;
-      }
-    }
-    occupiedLabels.push({ x: info.cx, y: y });
-    const minTop = 2;
-    if (nameY < minTop) {
-      const delta = minTop - nameY;
-      nameY += delta;
-      barY += delta;
-      y += delta;
-    }
-    // Guarda as posições calculadas para o segundo passo (desenho).
-    info._barY = barY;
-    info._nameY = nameY;
-    info._y = y;
-  }
-  // Desenha labels de cima para baixo; os mais baixos ficam por último e
-  // mantêm a mesma prioridade visual das sprites.
+  // OTC Creature::drawInformation: nome+HP no dest interpolado da própria
+  // criatura, mesma ordem bottom-up das outfits. Sem empilhar labels.
+  const hudS = canvasHudScale(this.c);
   for (const info of entityInfo) {
-    const barY = info._barY, nameY = info._nameY, y = info._y;
+    const layout = layoutCreatureInformation(info, W, H, hudS);
+    const barY = layout.barY, nameY = layout.nameY, y = layout.nameY;
+    const nameX = layout.nameX, barX = layout.barX;
     if (info.e.kind === 'monster') {
-      drawTibiaBar(ctx, info.cx, barY, info.hpPct, tibiaHpColor(info.hpPct));
-      drawNameText(ctx, info.cx, nameY, info.name, tibiaHpColor(info.hpPct));
-      drawSinisterCreatureIcon(ctx,info.ent,info.cx,barY);
-      if (typeof monsterAttackRange === 'function' && monsterAttackRange(info.ent) > .16)
-        drawWikiIcon(ctx, 'range-atk', Math.round(info.cx + info.w/2 + 3), Math.round(info.top + info.h*.35), 9);
+      drawTibiaBar(ctx, barX, barY, info.hpPct, tibiaHpColor(info.hpPct), hudS);
+      drawNameText(ctx, nameX, nameY, info.name, tibiaHpColor(info.hpPct), hudS);
+      drawSinisterCreatureIcon(ctx,info.ent,barX,barY,hudS);
+      const iconSize = 9 * hudS;
+      let iconX = Math.round(info.cx + info.w/2 + 3 * hudS);
+      const iconY = Math.round(info.top + info.h*.35);
+      const atkIcon = typeof monsterAttackTypeIcon === "function" ? monsterAttackTypeIcon(info.ent) : "";
+      if (atkIcon) {
+        drawWikiIcon(ctx, atkIcon, iconX, iconY, iconSize);
+        iconX += iconSize + 2 * hudS;
+      }
+      const nowHud = Date.now();
+      if (info.ent.sapStrUntil && info.ent.sapStrUntil > nowHud) {
+        drawWikiIcon(ctx, "sap-strength", iconX, iconY, iconSize);
+        iconX += iconSize + 2 * hudS;
+      }
+      if (info.ent.exposeUntil && info.ent.exposeUntil > nowHud)
+        drawWikiIcon(ctx, "expose-weakness", iconX, iconY, iconSize);
     } else {
-      drawNameBars(ctx, info.cx, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY);
+      drawNameBars(ctx, nameX, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY, barX, hudS);
     }
-    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, dt);
-    else if (info.e.kind === 'player') this.drawSpeech(ctx, info.cx, y, dt);
-    else drawCreatureSpeech(ctx, info.ent, info.cx, y, dt);
+    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
+    else if (info.e.kind === 'player') {
+      // Cada personagem tem a própria fila (creatureSay no caster). O
+      // playerTalk do renderer só cobre o fallback addSpeech sem whoId.
+      drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
+      if (combat && combat.player && info.ent === combat.player) this.drawSpeech(ctx, info.cx, y, dt, hudS);
+    } else drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
   }
 
   // --- projeteis / ataques a distancia
@@ -1742,6 +1925,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   // --- numeros flutuantes — Canary + anti-flood para MOTA.
   // Posicionamento Canary: texto centralizado em cima da sprite e subindo.
   ctx.textAlign = "left";
+  const floaterHud = canvasHudScale(this.c);
   for (let i = this.floaters.length - 1; i >= 0; i--) {
     const f = this.floaters[i];
     f.life -= dt;
@@ -1749,7 +1933,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const elapsed = f.max - f.life;
     const tf = f.max;
     const p = elapsed / tf;
-    ctx.font = (f.kind === "damage" ? "8px" : (f.kind === "restore" ? "8px" : (f.big ? "bold 12px" : (f.small ? "5px" : "11px")))) + " Verdana";
+    ctx.font = floaterFont(f, floaterHud);
     const textW = ctx.measureText(f.text).width;
     const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
     const baseX = f.x * W;
@@ -1768,7 +1952,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       alpha = 0.95;
     }
     ctx.globalAlpha = alpha;
-    ctx.lineWidth = f.kind ? 2 : (f.small ? 1.5 : 2);
+    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * floaterHud;
     ctx.strokeStyle = "rgba(0,0,0,.85)";
     ctx.strokeText(f.text, fx, fy);
     ctx.fillStyle = f.color;
@@ -1808,10 +1992,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const elapsed = Math.max(0, Math.min(1, 1 - (combat.deadUntil - now) / total));
     // Contador vermelho sobe continuamente sobre o corpo até o respawn.
     const labelY = py - ts * 0.85 - elapsed * ts * 0.7;
-    ctx.font = "bold 16px Verdana";
+    ctx.font = hudFont(16, canvasHudScale(this.c), true);
     ctx.textAlign = "center";
     ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3 * canvasHudScale(this.c);
     ctx.strokeText(left + "s", px, labelY);
     ctx.fillStyle = "#ff3b30";
     ctx.fillText(left + "s", px, labelY);
@@ -1822,7 +2006,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   if (!combat) {
     ctx.fillStyle = "rgba(0,0,0,.6)";
     ctx.fillRect(0, 0, W, H);
-    ctx.font = "bold 14px Verdana";
+    ctx.font = hudFont(14, canvasHudScale(this.c), true);
     ctx.fillStyle = "#c8c0a8";
     ctx.textAlign = "center";
     ctx.fillText("Escolha uma caçada para começar", W / 2, H / 2);

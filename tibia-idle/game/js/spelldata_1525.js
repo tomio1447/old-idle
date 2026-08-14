@@ -152,6 +152,21 @@
     SD["exevo-gran-frigo-hur"].alvos = 17;
   }
 
+  // Matrizes Canary (register_spells.lua): length = SQMs à frente, width =
+  // laterais. O JSON de targeting omitia vis hur / vis lux / gran vis lux.
+  const CANARY_DIR_AREAS = {
+    "exevo-flam-hur": "AREA_WAVE4", "exevo-frigo-hur": "AREA_WAVE4",
+    "exevo-infir-flam-hur": "AREA_WAVE4", "exevo-infir-frigo-hur": "AREA_WAVE4",
+    "exevo-dis-flam-hur": "AREA_WAVE4", "exevo-gran-flam-hur": "AREA_WAVE7",
+    "exevo-gran-frigo-hur": "AREA_WAVE7", "exevo-vis-hur": "AREA_SQUAREWAVE5",
+    "exevo-tera-hur": "AREA_SQUAREWAVE5", "exevo-vis-lux": "AREA_BEAM5",
+    "exevo-gran-vis-lux": "AREA_BEAM8", "exevo-max-mort": "AREA_BEAM6",
+    "exori-min": "AREA_WAVE6",
+  };
+  for (const id of Object.keys(CANARY_DIR_AREAS)) {
+    if (SD[id]) SD[id].area = CANARY_DIR_AREAS[id];
+  }
+
   // Chivalrous Challenge: alcance 7 (+1 alvo: 8 -> 9 criaturas)
   if (SD["exeta-amp-res"]) {
     SD["exeta-amp-res"].range = 7;
@@ -407,6 +422,7 @@
     // dos Effect_3xx pelo visual.
     W["exevo dir san"] = { fx: "divine-barrage-effect" };
     W["exevo dir moe"] = { fx: "ethereal-barrage-effect" };
+    W["exevo tempo mas san"] = { fx: "divine-grenade-effect" };
     W["exevo fur frigo"] = { fx: "forked-glacier-effect", miss: "ice" };
     W["exevo fur tera"] = { fx: "forked-thorns-effect", miss: "earth" };
     W["exevo mort ora"] = { fx: "death-echo-effect", miss: "death" };
@@ -462,6 +478,19 @@
       if (T[id]) T[id].range = 7;
     }
     if (T["exori-amp-vis"]) T["exori-amp-vis"].range = 7;
+    if (T["exevo-gran-frigo-hur"]) T["exevo-gran-frigo-hur"].areaNome = "AREA_WAVE7";
+    const CANARY_DIR = {
+      "exevo-flam-hur": "AREA_WAVE4", "exevo-frigo-hur": "AREA_WAVE4",
+      "exevo-infir-flam-hur": "AREA_WAVE4", "exevo-infir-frigo-hur": "AREA_WAVE4",
+      "exevo-dis-flam-hur": "AREA_WAVE4", "exevo-gran-flam-hur": "AREA_WAVE7",
+      "exevo-gran-frigo-hur": "AREA_WAVE7", "exevo-vis-hur": "AREA_SQUAREWAVE5",
+      "exevo-tera-hur": "AREA_SQUAREWAVE5", "exevo-vis-lux": "AREA_BEAM5",
+      "exevo-gran-vis-lux": "AREA_BEAM8", "exevo-max-mort": "AREA_BEAM6",
+      "exori-min": "AREA_WAVE6",
+    };
+    for (const id of Object.keys(CANARY_DIR)) {
+      T[id] = Object.assign({}, T[id] || {}, { areaNome: CANARY_DIR[id] });
+    }
   }
 
   // Areas novas do update, no formato do importador de areas:

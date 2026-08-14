@@ -16,6 +16,22 @@ const CitySprites = {
   tile(n) { return this.get(`assets/city/${n}.png`); },
 };
 
+function cityViewScale(W, H) {
+  let S = Math.min(W / (21 * TILE), H / (13 * TILE));
+  if (typeof ClientSettings !== "undefined" && ClientSettings.fullhd) {
+    S = Math.max(1, Math.floor(S));
+  }
+  return S;
+}
+
+function cityHudScale(canvas) {
+  return typeof canvasHudScale === "function" ? canvasHudScale(canvas) : 1;
+}
+function cityHudFont(px, canvas, bold) {
+  const s = cityHudScale(canvas);
+  return (bold ? "bold " : "") + Math.max(1, Math.round(px * s)) + "px Verdana";
+}
+
 /* Desenha uma imagem alinhada pelo canto inferior do tile (como no Tibia) */
 function drawTileSprite(ctx, img, sx, sy, scale) {
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -28,7 +44,7 @@ function drawTileSprite(ctx, img, sx, sy, scale) {
 Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
-  const S = Math.min(W / (21 * TILE), H / (13 * TILE));
+  const S = cityViewScale(W, H);
   const TS = TILE * S;
   const worldW = MAP_W * TS, worldH = MAP_H * TS;
   let camX = walker.px * S - W / 2;
@@ -76,17 +92,18 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
   drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "objects");
   ctx.restore();
 
+  const hs = cityHudScale(this.c);
   ctx.textAlign = "left";
-  ctx.font = "bold 13px Verdana";
+  ctx.font = cityHudFont(13, this.c, true);
   ctx.fillStyle = "rgba(0,0,0,.85)";
-  ctx.fillText("Templo Oficial de Thais", 13, 23);
+  ctx.fillText("Templo Oficial de Thais", 13 * hs, 23 * hs);
   ctx.fillStyle = "#ffe680";
-  ctx.fillText("Templo Oficial de Thais", 12, 22);
-  ctx.font = "10px Verdana";
+  ctx.fillText("Templo Oficial de Thais", 12 * hs, 22 * hs);
+  ctx.font = cityHudFont(10, this.c);
   ctx.fillStyle = "rgba(0,0,0,.85)";
-  ctx.fillText("Clique para andar · WASD/setas também", 13, 39);
+  ctx.fillText("Clique para andar · WASD/setas também", 13 * hs, 39 * hs);
   ctx.fillStyle = "#c8c0a8";
-  ctx.fillText("Clique para andar · WASD/setas também", 12, 38);
+  ctx.fillText("Clique para andar · WASD/setas também", 12 * hs, 38 * hs);
 };
 
 Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
@@ -97,8 +114,9 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
   // Mais visão no mapa para testes: 21 × 13 SQMs.
-  const S = Math.min(W / (21 * TILE), H / (13 * TILE));
+  const S = cityViewScale(W, H);
   const TS = TILE * S;
+  const hs = cityHudScale(this.c);
 
   // ---- camera centrada no jogador, presa aos limites do mapa
   const worldW = MAP_W * TS, worldH = MAP_H * TS;
@@ -243,16 +261,16 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
     if (b.label) {
       const lx = (b.x + b.w / 2) * TS - camX;
       const ly = (b.y + b.h - 1) * TS - camY - 6;
-      ctx.font = "bold 11px Verdana";
+      ctx.font = cityHudFont(11, this.c, true);
       ctx.textAlign = "center";
-      const tw = ctx.measureText(b.label).width + 12;
+      const tw = ctx.measureText(b.label).width + 12 * hs;
       ctx.fillStyle = "rgba(20,16,10,.85)";
-      ctx.fillRect(lx - tw / 2, ly - 14, tw, 16);
+      ctx.fillRect(lx - tw / 2, ly - 14 * hs, tw, 16 * hs);
       ctx.strokeStyle = "rgba(180,150,80,.8)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(lx - tw / 2, ly - 14, tw, 16);
+      ctx.lineWidth = hs;
+      ctx.strokeRect(lx - tw / 2, ly - 14 * hs, tw, 16 * hs);
       ctx.fillStyle = "#e8d9a8";
-      ctx.fillText(b.label, lx, ly - 2);
+      ctx.fillText(b.label, lx, ly - 2 * hs);
     }
   }
 
@@ -287,16 +305,16 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
       ctx.drawImage(img, sx - w / 2, sy - h / 2 + bob, w, h);
       if (hovered) ctx.restore();
 
-      ctx.font = "bold 10px Verdana";
+      ctx.font = cityHudFont(10, this.c, true);
       ctx.textAlign = "center";
-      const tw = ctx.measureText(npc.name).width + 10;
-      const by = sy - h / 2 - 14;
+      const tw = ctx.measureText(npc.name).width + 10 * hs;
+      const by = sy - h / 2 - 14 * hs;
       ctx.fillStyle = hovered ? "rgba(90,70,20,.92)" : "rgba(0,0,0,.7)";
-      ctx.fillRect(sx - tw / 2, by, tw, 14);
+      ctx.fillRect(sx - tw / 2, by, tw, 14 * hs);
       ctx.strokeStyle = hovered ? "#ffd24a" : "rgba(120,110,90,.5)";
-      ctx.strokeRect(sx - tw / 2, by, tw, 14);
+      ctx.strokeRect(sx - tw / 2, by, tw, 14 * hs);
       ctx.fillStyle = hovered ? "#ffe680" : "#d8d0b8";
-      ctx.fillText(npc.name, sx, by + 10);
+      ctx.fillText(npc.name, sx, by + 10 * hs);
     }
     this.npcHit.push({ id: id, x: sx, y: sy, w: 48, h: 64 });
   }
@@ -327,16 +345,16 @@ Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
 
   // ---- cabecalho
   ctx.textAlign = "left";
-  ctx.font = "bold 13px Verdana";
+  ctx.font = cityHudFont(13, this.c, true);
   ctx.fillStyle = "rgba(0,0,0,.85)";
-  ctx.fillText("Cidade de Thais", 13, 23);
+  ctx.fillText("Cidade de Thais", 13 * hs, 23 * hs);
   ctx.fillStyle = "#ffe680";
-  ctx.fillText("Cidade de Thais", 12, 22);
-  ctx.font = "10px Verdana";
+  ctx.fillText("Cidade de Thais", 12 * hs, 22 * hs);
+  ctx.font = cityHudFont(10, this.c);
   ctx.fillStyle = "rgba(0,0,0,.85)";
-  ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 13, 39);
+  ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 13 * hs, 39 * hs);
   ctx.fillStyle = "#c8c0a8";
-  ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 12, 38);
+  ctx.fillText("Clique para andar · WASD/setas também · clique num NPC para falar", 12 * hs, 38 * hs);
 };
 
 /* Minimapa no canto superior direito — REMOVIDO a pedido do jogador:

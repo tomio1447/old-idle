@@ -21,6 +21,6 @@ leader.party.members[3].level=100;
 must(!ctx.partyCanShare(leader).ok&&ctx.partyShareExp(leader,100)===null,
   "regra de nível mínimo 2/3 não bloqueou o bônus");
 must(partyUi.includes('expBonus=expVocs.size>=5?102')&&partyUi.includes('composição completa EK/RP/ED/MS/Monk')&&
-  index.includes('js/party-ui.js?v=party-exp-v1')&&index.includes('js/party.js?v=five-vocations-v1'),
+  index.includes('js/party-ui.js?v=party-switch-v1')&&index.includes('js/party.js?v=outfit-mount-v1'),
   "party online não exibe/cache-busta a composição completa e seu bônus");
 console.log("OK: Monk da mesma conta completa a party e libera bônus de EXP de 102% dentro das regras.");

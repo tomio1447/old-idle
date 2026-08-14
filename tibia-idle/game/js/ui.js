@@ -14,7 +14,8 @@ function fmt(n) {
   return String(n);
 }
 function fmtFull(n) {
-  return Math.floor(n || 0).toLocaleString("pt-BR");
+  const loc = (typeof i18nLang === "function" && i18nLang() === "en") ? "en-US" : "pt-BR";
+  return Math.floor(n || 0).toLocaleString(loc);
 }
 /* Numero de dano na tela: o client original mostra o valor inteiro puro
  * (ex: 1500), sem abreviar em "1.5k" nem separador de milhar. */
@@ -314,33 +315,8 @@ function addLog(kind, html) {
 
 /* ------------------------------------------------------------ paineis */
 function renderStats(p) {
-  // faixa de conditions/buffs ativos
-  const box = $("#cond-bar");
-  if (box) {
-    const partes = [];
-    if (typeof conditionList === "function") {
-      for (const t of conditionList(p)) {
-        const d = CONDITIONS[t];
-        if (!d) continue;
-        const c = p.conditions[t];
-        partes.push(`<span class="cond" style="border-color:${d.cor};color:${d.cor}"
-          title="${d.nome}">${d.nome} ${c.turns}</span>`);
-      }
-    }
-    if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, Date.now())) {
-      const src = typeof magicShieldSource === "function" ? magicShieldSource(p, Date.now()) : "Magic Shield";
-      partes.push(`<span class="cond buff" style="border-color:#6a8aff;color:#7ec8ff" title="${src}">Magic Shield</span>`);
-    }
-    if (typeof buffTotals === "function") {
-      const agora = Date.now();
-      for (const b of buffTotals(p).lista) {
-        const s2 = Math.max(0, Math.ceil((b.ate - agora) / 1000));
-        partes.push(`<span class="cond buff" title="${b.nome}">${b.nome} ${s2}s</span>`);
-      }
-    }
-    box.innerHTML = partes.join("");
-    box.style.display = partes.length ? "" : "none";
-  }
+  // faixa de conditions/buffs ativos (ícones OTC, mesma fonte da status-bar)
+  if (typeof paintConditionBar === "function") paintConditionBar($("#cond-bar"), p, false);
 
   // faixa exclusiva do Monk: harmonia, mantra e o estado sereno
   const mbox = $("#monk-bar");
@@ -569,76 +545,87 @@ function renderEquip(p) {
 }
 
 /* ------------------------------------------------------------ status bar
- * Barra de status estilo Tibia: ícones de condições especiais logo abaixo
- * dos equipamentos (como o client oficial, que mostra os ícones de
- * condição sob o inventário). Passar o mouse mostra o tooltip com nome,
- * descrição e tempo restante.
- *
- * Fonte dos ícones: TibiaWiki "Special Conditions" + "Icons"
- * (assets/ui/conditions/*.png, registrados em icondata.js).
+ * Barra de status estilo Tibia/OTC: ícones de condições especiais logo abaixo
+ * dos equipamentos e também em #cond-bar (sob HP/mana), com overlay de duração.
+ * Fonte: TibiaWiki Special Conditions + assets/ui/conditions/*.png.
  */
 
-function renderStatusBar(p) {
-  const box = $("#status-bar");
-  if (!box) return;
+function conditionTurnsLabel(c) {
+  if (!c) return "";
+  const turns = Math.max(0, Math.floor(Number(c.turns) || 0));
+  if (!turns) return "";
+  return (turns * 2) + "s";
+}
+
+function conditionIconSlug(tipo, fallback) {
+  const wiki = (typeof WIKI_CONDITIONS !== "undefined") ? WIKI_CONDITIONS[tipo] : null;
+  if (wiki && wiki.icon) return wiki.icon;
+  const map = (typeof CONDITION_ICON_SLUG !== "undefined") ? CONDITION_ICON_SLUG : {};
+  if (map[tipo]) return map[tipo];
+  if (fallback) return fallback;
+  const raw = String(tipo || "");
+  if (raw.indexOf("cond-") === 0) return raw;
+  return raw ? ("cond-" + raw) : "";
+}
+
+function collectConditionBarItems(p) {
   const agora = Date.now();
   const itens = [];
+  if (!p) return itens;
 
-  // 1) conditions de dano no tempo (poison, fire, energy, bleed, cursed, freezing)
-  if (p.conditions && typeof conditionList === "function") {
-    for (const t of conditionList(p)) {
-      const d = (typeof WIKI_CONDITIONS !== "undefined") ? WIKI_CONDITIONS[t] : null;
+  const push = (icon, nome, desc, tipo, tempo) => {
+    const meta = (typeof WIKI_CONDITION_ICONS !== "undefined") ? WIKI_CONDITION_ICONS[icon] : null;
+    itens.push({
+      icon: icon,
+      nome: nome || (meta && meta.nome) || icon,
+      desc: desc || (meta && meta.desc) || "",
+      tipo: tipo || (meta && meta.tipo) || "harmful",
+      tempo: tempo || "",
+    });
+  };
+
+  if (p.conditions) {
+    const keys = typeof conditionList === "function" ? conditionList(p) : Object.keys(p.conditions);
+    for (const t of keys) {
       const c = p.conditions[t];
-      if (!d) continue;
-      itens.push({
-        icon: d.icon, nome: d.nome, desc: d.desc, tipo: d.tipo || "harmful",
-        tempo: c && c.turns ? c.turns + " turno" + (c.turns > 1 ? "s" : "") : "",
-      });
+      if (!c) continue;
+      const wiki = (typeof WIKI_CONDITIONS !== "undefined") ? WIKI_CONDITIONS[t] : null;
+      const d = (typeof CONDITIONS !== "undefined") ? CONDITIONS[t] : null;
+      push(conditionIconSlug(t), (wiki && wiki.nome) || (d && d.nome) || t,
+        (wiki && wiki.desc) || "", (wiki && wiki.tipo) || "harmful", conditionTurnsLabel(c));
     }
   }
 
-  // 2) magic shield (energia do utamo vita / Energy Ring)
   if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, agora)) {
     const src = typeof magicShieldSource === "function" ? magicShieldSource(p, agora) : "Magic Shield";
     const meta = (typeof WIKI_CONDITION_ICONS !== "undefined")
       ? WIKI_CONDITION_ICONS["cond-magic-shield"] : null;
-    itens.push({
-      icon: "cond-magic-shield", nome: "Magic Shield", tipo: "neutral",
-      desc: meta ? meta.desc : "O personagem perde mana em vez de vida quando é ferido.",
-      tempo: src,
-    });
+    push("cond-magic-shield", "Magic Shield",
+      meta ? meta.desc : "O personagem perde mana em vez de vida quando é ferido.",
+      "neutral", src);
   }
 
-  // 3) haste ativa
   if (typeof hasteAtiva === "function") {
     const hs = hasteAtiva(p, agora);
     if (hs) {
       const meta = (typeof WIKI_CONDITION_ICONS !== "undefined")
         ? WIKI_CONDITION_ICONS["cond-haste"] : null;
-      itens.push({
-        icon: "cond-haste", nome: "Haste — " + hs.nome, tipo: "positive",
-        desc: meta ? meta.desc : "Faz o personagem se mover mais rápido.",
-        tempo: Math.max(0, Math.ceil((hs.ate - agora) / 1000)) + "s",
-      });
+      push("cond-haste", "Haste — " + hs.nome,
+        meta ? meta.desc : "Faz o personagem se mover mais rápido.",
+        "positive", Math.max(0, Math.ceil((hs.ate - agora) / 1000)) + "s");
     }
   }
 
-  // 4) buffs gerais (virtudes do Monk, Divine Dazzle...)
   if (typeof buffTotals === "function") {
     const bt = buffTotals(p, agora);
     for (const b of bt.lista) {
       const def = (typeof BUFFS !== "undefined" && BUFFS[b.chave]) ? BUFFS[b.chave] : null;
-      itens.push({
-        icon: "cond-strengthened", nome: b.nome, tipo: "positive",
-        desc: (def && def.desc) ? def.desc : "Bônus de skill ativo por um período.",
-        tempo: Math.max(0, Math.ceil((b.ate - agora) / 1000)) + "s",
-      });
+      push("cond-strengthened", b.nome,
+        (def && def.desc) ? def.desc : "Bônus de skill ativo por um período.",
+        "positive", Math.max(0, Math.ceil((b.ate - agora) / 1000)) + "s");
     }
   }
 
-  // Stances ficam somente no selo discreto da cena; não duplicamos texto/tempo sobre as conditions.
-
-  // 6) Avatar Stage 3 (Transcendence ativo)
   if (typeof avatarActive === "function" && avatarActive(p, agora)) {
     const av = p._avatar || {};
     const resta = Math.max(0, Math.ceil((av.started + av.duration - agora) / 1000));
@@ -649,30 +636,65 @@ function renderStatusBar(p) {
     });
   }
 
+  if (typeof soulwarTaintInfo === "function") {
+    const taint = soulwarTaintInfo(p);
+    if (taint) {
+      const icon = taint.icon && String(taint.icon).indexOf("cond-") === 0
+        ? taint.icon : ("cond-" + (taint.icon || "goshnar-taint-1"));
+      push(icon, taint.name || "Goshnar's Taint",
+        typeof soulwarTaintTooltip === "function" ? soulwarTaintTooltip(p) : "",
+        "negative", taint.level + "/5");
+    }
+  }
+
+  if (p.stances && typeof STANCES !== "undefined") {
+    for (const id in p.stances) {
+      if (!p.stances[id] || !STANCES[id]) continue;
+      const st = STANCES[id];
+      const wiki = st.iconWiki;
+      const img = wiki && typeof WIKI_ICONS !== "undefined" && WIKI_ICONS[wiki]
+        ? WIKI_ICONS[wiki].path : "";
+      itens.push({
+        icon: wiki || "cond-strengthened",
+        img: img || undefined,
+        nome: st.nome,
+        desc: st.desc || "",
+        tipo: "positive",
+        tempo: "",
+      });
+    }
+  }
+
+  return itens;
+}
+
+function paintConditionBar(box, p, withLabel) {
+  if (!box) return;
+  const itens = collectConditionBarItems(p);
   if (!itens.length) {
     box.style.display = "none";
     box.innerHTML = "";
     return;
   }
-
-  let h = '<span class="sb-label">Status</span>';
+  let h = withLabel ? '<span class="sb-label">Status</span>' : "";
   for (const it of itens) {
     if (it.avatar) {
+      const voc = p && p.voc;
       const cor = { knight: "#ff7a3a", paladin: "#ffe680", sorcerer: "#c78cff",
-                    druid: "#7ae87a", monk: "#66c7ff" }[p.voc] || "#c78cff";
+                    druid: "#7ae87a", monk: "#66c7ff" }[voc] || "#c78cff";
       h += `<span class="sb-avatar" style="color:${cor}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">◈</span>`;
       continue;
     }
     const img = it.img
       ? `<img src="${it.img}" alt="">`
       : `<img src="assets/ui/conditions/${it.icon}.png" alt="">`;
-    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}</span>`;
+    const tempo = it.tempo
+      ? `<span class="sb-tempo">${it.tempo}</span>` : "";
+    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}${tempo}</span>`;
   }
   box.innerHTML = h;
   box.style.display = "flex";
-
-  // tooltip custom (mesmo sistema dos itens): nome + descrição + tempo
-  $$("#status-bar .sb-ico, #status-bar .sb-avatar").forEach((el) => {
+  box.querySelectorAll(".sb-ico, .sb-avatar").forEach((el) => {
     el.addEventListener("mouseenter", () => {
       const nome = el.dataset.nome || "";
       const desc = el.dataset.desc || "";
@@ -683,6 +705,42 @@ function renderStatusBar(p) {
     });
     el.addEventListener("mouseleave", hideTip);
   });
+}
+
+function renderStatusBar(p) {
+  paintConditionBar($("#status-bar"), p, true);
+  paintAutoWalkButton(p);
+}
+
+function paintAutoWalkButton(p) {
+  const on = typeof playerAutoWalkOn === "function" ? playerAutoWalkOn(p) : !(p && p.config && p.config.autoWalk === false);
+  const title = on
+    ? "AUTO ligado — o personagem anda sozinho"
+    : "AUTO desligado — clique no chão ou WASD (1 SQM). Deixe um membro parado no canto.";
+  const apply = (btn) => {
+    if (!btn) return;
+    btn.classList.toggle("primary", on);
+    btn.classList.toggle("on", on);
+    btn.classList.toggle("off", !on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = title;
+    if (btn.id === "btn-auto-walk") btn.textContent = on ? "AUTO" : "SQM";
+  };
+  apply($("#btn-auto-walk"));
+  // Botões por membro da party (painel OTC) — só o personagem ativo espelha
+  // o estado global; os demais são pintados em renderPartyPanel.
+  const curId = p && (typeof characterId === "function" ? characterId(p) : p.id);
+  if (curId !== undefined && curId !== null) {
+    $$("#party-panel-body .btn-auto-walk").forEach((btn) => {
+      if (String(btn.dataset.autoWalkChar) === String(curId)) apply(btn);
+    });
+  }
+  const hint = $(".sqm-walk-hint");
+  if (hint) {
+    hint.textContent = on
+      ? "ON = caça sozinho"
+      : "OFF = clique no chão / WASD";
+  }
 }
 
 const HUNT_MODAL_SECTIONS = [
@@ -2458,8 +2516,10 @@ function renderCooldownBar(p) {
       el.dataset.cdSpell = a.id;
       el.title = `${a.spell.name} (${Math.round(a.dur / 1000)}s)`;
       el.innerHTML =
-        `${a.spell.icon != null
-          ? `<img src="assets/spell/otc20/${a.spell.icon}.png" alt="">` : ""}
+        `${a.spell.img
+          ? `<img src="${a.spell.img}" alt="">`
+          : (a.spell.icon != null
+          ? `<img src="assets/spell/otc20/${a.spell.icon}.png" alt="">` : "")}
          <div class="cd-fill" style="height:0"></div>
          <div class="cd-num"></div>`;
       elSpells.appendChild(el);
@@ -2766,6 +2826,7 @@ function desenhaAmmoPicker() {
  * disparar. A ordem das caixas e a prioridade da rotacao.
  */
 const COMBO_MODAL = { slot: 0, cat: "todas", busca: "" };
+let COMBO_DRAG_FROM = -1, COMBO_JUST_DROPPED = false;
 
 const COMBO_CATS = [
   { id: "todas", nome: "Todas" },
@@ -2795,32 +2856,46 @@ function renderComboBar(p, el) {
 
   $$("#helper-combo [data-combo-slot]").forEach((b) => {
     b.addEventListener("click", (ev) => {
+      if (COMBO_JUST_DROPPED) { ev.preventDefault(); return; }
       if (ev.target.closest("[data-combo-min]") ||
           ev.target.closest("[data-combo-clear]")) return;
       openComboPicker(parseInt(b.dataset.comboSlot, 10));
     });
-    // Reordenação por arrastar-e-soltar para todas as vocações: arraste um
-    // slot para outro e a sequência troca de posição.
+    // Reordenação: o Chrome esconde MIME customizado no dragover e o drop
+    // nunca dispara. Índice em memória + text/plain, preventDefault sempre.
     b.addEventListener("dragstart", (ev) => {
       if (ev.target.closest("select") || ev.target.closest("button")) { ev.preventDefault(); return; }
-      ev.dataTransfer.setData("text/combo-slot", b.dataset.comboSlot);
-      ev.dataTransfer.effectAllowed = "move";
+      COMBO_DRAG_FROM = parseInt(b.dataset.comboSlot, 10);
+      try {
+        ev.dataTransfer.setData("text/plain", String(COMBO_DRAG_FROM));
+        ev.dataTransfer.setData("text/combo-slot", String(COMBO_DRAG_FROM));
+        ev.dataTransfer.effectAllowed = "move";
+      } catch (e) {}
       b.classList.add("dragging");
     });
-    b.addEventListener("dragend", () => b.classList.remove("dragging"));
+    b.addEventListener("dragend", () => { b.classList.remove("dragging"); COMBO_DRAG_FROM = -1; });
     b.addEventListener("dragover", (ev) => {
-      if (ev.dataTransfer && Array.from(ev.dataTransfer.types).includes("text/combo-slot")) {
-        ev.preventDefault(); b.classList.add("drop-here");
-      }
+      ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+      b.classList.add("drop-here");
     });
     b.addEventListener("dragleave", () => b.classList.remove("drop-here"));
     b.addEventListener("drop", (ev) => {
-      const from = ev.dataTransfer ? parseInt(ev.dataTransfer.getData("text/combo-slot"), 10) : NaN;
-      const to = parseInt(b.dataset.comboSlot, 10);
-      b.classList.remove("drop-here");
-      if (isNaN(from) || from === to) return;
       ev.preventDefault();
-      const tmp = combo[from]; combo[from] = combo[to]; combo[to] = tmp;
+      ev.stopPropagation();
+      b.classList.remove("drop-here");
+      let from = COMBO_DRAG_FROM;
+      if (!(from >= 0) && ev.dataTransfer) {
+        from = parseInt(ev.dataTransfer.getData("text/plain") ||
+          ev.dataTransfer.getData("text/combo-slot"), 10);
+      }
+      const to = parseInt(b.dataset.comboSlot, 10);
+      COMBO_DRAG_FROM = -1;
+      if (isNaN(from) || isNaN(to) || from === to) return;
+      const live = ensureCombo(p);
+      const tmp = live[from]; live[from] = live[to]; live[to] = tmp;
+      COMBO_JUST_DROPPED = true;
+      setTimeout(() => { COMBO_JUST_DROPPED = false; }, 80);
       save();
       renderComboBar(p, el);
     });
@@ -2862,7 +2937,7 @@ return `<div class="combo-slot vazio" data-combo-slot="${i}" draggable="true">
       ${num}<div class="tiny dim">indisponível</div></div>`;
   }
   const arte = info.img
-    ? `<img src="${info.img}" alt="">`
+    ? `<img src="${info.img}" alt="" draggable="false">`
     : (typeof spellIcon === "function" && info.icon != null
        ? spellIcon({ icon: info.icon, name: info.nome }) : "");
 

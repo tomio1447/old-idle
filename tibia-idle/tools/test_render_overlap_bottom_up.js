@@ -26,8 +26,9 @@ must(queue.every((item,index)=>index===0||queue[index-1].footY<=item.footY),
   "ordem vertical da fila não é crescente");
 must(queue[queue.length-1].ent.slug==="demon",
   "Demon 2x2 abaixo do outfit não é pintado por último");
-must(source.includes("for (let i = entityInfo.length - 1; i >= 0; i--)")&&
-  source.includes("for (const info of entityInfo) {"),
-  "correção das sprites quebrou a prioridade independente dos labels");
-must(html.includes("js/render.js?v=combat-visual-v1"),"render.js sem cache-bust da profundidade 2x2");
+must(source.includes("for (const info of entityInfo) {"),
+  "labels precisam da mesma fila bottom-up das sprites");
+must(!source.includes("occupiedLabels"),
+  "labels ainda empilham fora da sprite como HUD independente");
+must(html.includes("js/render.js?v=knight-fx-combo-v1"),"render.js sem cache-bust da profundidade 2x2");
 console.log("OK: bases inferiores cobrem as superiores, incluindo Demon 2x2, sem inverter labels.");

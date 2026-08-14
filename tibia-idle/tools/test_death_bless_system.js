@@ -66,7 +66,9 @@ must(ground<body&&body<entities&&entities<objects&&objects<timer,
 
 const rc={};vm.createContext(rc);a=renderSrc.indexOf("function drawSinisterDust");b=renderSrc.indexOf("\n\nRenderer.prototype.draw",a);
 vm.runInContext(renderSrc.slice(a,b),rc);
-const draw={n:0,save(){},restore(){},fillRect(){this.n++;},set fillStyle(v){},set shadowColor(v){},set shadowBlur(v){},set globalAlpha(v){}};
+const draw={n:0,save(){},restore(){},fillRect(){this.n++;},fillText(){},strokeText(){},
+  set fillStyle(v){},set shadowColor(v){},set shadowBlur(v){},set globalAlpha(v){},
+  set font(v){},set textAlign(v){},set textBaseline(v){},set lineJoin(v){},set strokeStyle(v){},set lineWidth(v){}};
 rc.drawSinisterDust(draw,{id:"i",influenced:true,sinisterStacks:3},100,100,32,1000);
 const influenced=draw.n;draw.n=0;rc.drawSinisterDust(draw,{id:"f",fiendish:true,sinisterStacks:15},100,100,32,1000);
 const fiendish=draw.n;draw.n=0;rc.drawSinisterDust(draw,{id:"n"},100,100,32,1000);

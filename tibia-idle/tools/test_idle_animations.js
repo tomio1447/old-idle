@@ -105,7 +105,7 @@ must(ctx.avatarIdleAnimationFrame(steel, 50) === 0 &&
 must(appearanceSrc.includes('avatarIdleAnimationFrame(o, frame.now)') &&
      appearanceSrc.includes('avatar-idle:'),
   'AppearanceRenderer não seleciona o frame idle especial do avatar');
-must(html.includes('<script src="js/appearance.js?v=avatar-idle-v1"></script>'),
+must(html.includes('<script src="js/appearance.js?v=outfit-mount-v1"></script>'),
   'appearance.js do idle de avatar está sem cache-busting');
 
 // Durações variáveis do DAT são respeitadas no renderer canvas.

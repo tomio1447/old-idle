@@ -15,6 +15,13 @@ const MAGIC_SHIELD_SPELL_ID = "utamo-vita";
 // Duração oficial (Update 12.55): 60s (antes era 200s). O shield moderno
 // absorve uma CAPACIDADE limitada de dano baseada em level/magic level.
 const MAGIC_SHIELD_DURATION_MS = 60 * 1000;
+// Canary: Magic Shield Potion (id 35563) aplica o mesmo CONDITION_MANASHIELD
+// do utamo vita, NÃO gasta o CD da magia e NÃO entra no exhaustion de 1s
+// das potions de HP/mana (PR #3393). No idle o custo é 50k gp e o CD
+// próprio é 15s — emergência cara, não substituto do utamo vita.
+const MAGIC_SHIELD_POTION_COST = 50000;
+const MAGIC_SHIELD_POTION_CD_MS = 15 * 1000;
+const MAGIC_SHIELD_POTION_LVL = 14;
 
 const HELPER_EQUIP_UI = { slot: "amulet" };
 
@@ -187,6 +194,7 @@ function ensureAccessoryConfig(p) {
     hpBelow: Math.max(1, Math.min(99, parseInt(ms.hpBelow, 10) || 45)),
     mpAbove: Math.max(0, Math.min(100, parseInt(ms.mpAbove, 10) || 15)),
     recastBelow: Math.max(1, Math.min(99, parseInt(ms.recastBelow, 10) || 70)),
+    usePotion: !!ms.usePotion,
   };
   return p.config;
 }
@@ -627,7 +635,7 @@ function isMagicShieldActive(p, now) {
 function magicShieldSource(p, now) {
   if (energyRingEquipped(p)) return "Energy Ring";
   if ((p.magicShieldUntil || 0) > (now || Date.now()) && (p.magicShieldPool || 0) > 0)
-    return "Magic Shield";
+    return p.magicShieldFrom === "potion" ? "Magic Shield Potion" : "Magic Shield";
   return "";
 }
 
@@ -656,45 +664,92 @@ function magicShieldSpellAllowed(p) {
   return s.vocs.indexOf(p.voc) !== -1;
 }
 
+function applyMagicShieldPool(p, now, source) {
+  p.magicShieldCap = magicShieldCapacity(p);
+  p.magicShieldPool = p.magicShieldCap;
+  p.magicShieldUntil = now + MAGIC_SHIELD_DURATION_MS;
+  p.magicShieldFrom = source || "spell";
+}
+
+function magicShieldNeedsRefresh(p, now) {
+  if (!isMagicShieldActive(p, now)) return true;
+  const cap = p.magicShieldCap || magicShieldCapacity(p);
+  return (p.magicShieldPool || 0) < cap * 0.5;
+}
+
+function magicShieldPotionReady(p, now) {
+  return !(Number(p.magicShieldPotionUntil) > now);
+}
+
+function magicShieldPotionAllowed(p) {
+  return magicShieldSpellAllowed(p) && Number(p.level || 1) >= MAGIC_SHIELD_POTION_LVL;
+}
+
+function emitMagicShieldOn(c, p, source) {
+  if (!c || !c.events) return;
+  c.events.push({ t: "magic-shield-on", cap: p.magicShieldCap, source: source || "Magic Shield",
+    x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });
+}
+
+/* Canary: a potion força o mesmo manashield do utamo vita sem travar a
+ * magia, o grupo Support nem o potionCd de 1s. Custa 50k e tem CD 15s. */
+function tryMagicShieldPotion(c, p, now, force) {
+  now = now || Date.now();
+  if (!magicShieldPotionAllowed(p)) return false;
+  if (!magicShieldPotionReady(p, now)) return false;
+  if ((Number(p.gold) || 0) < MAGIC_SHIELD_POTION_COST) return false;
+  if (typeof spendGold === "function") {
+    if (!spendGold(p, MAGIC_SHIELD_POTION_COST)) return false;
+  } else {
+    p.gold = Math.max(0, (Number(p.gold) || 0) - MAGIC_SHIELD_POTION_COST);
+  }
+  p.magicShieldPotionUntil = now + MAGIC_SHIELD_POTION_CD_MS;
+  applyMagicShieldPool(p, now, "potion");
+  if (c && c.stats) c.stats.supplyCost = (c.stats.supplyCost || 0) + MAGIC_SHIELD_POTION_COST;
+  if (c && c.events) {
+    c.events.push({ t: "say", text: "Aaaah..." });
+    emitMagicShieldOn(c, p, "Magic Shield Potion");
+  }
+  return true;
+}
+
 function tryMagicShield(c, p, now) {
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
+  const forceOnce = !!cfg.forceOnce;
+  if (forceOnce) cfg.forceOnce = false;
   const mode = cfg.mode || (cfg.enabled ? "hp" : "off");
-  if (mode === "off") return false;
-  const s = SPELLS[MAGIC_SHIELD_SPELL_ID];
-  if (!s || !magicShieldSpellAllowed(p)) return false;
+  if (mode === "off" && !forceOnce) return false;
+  if (!magicShieldSpellAllowed(p)) return false;
   const max = maxStats(p);
   const hpPct = max.hp ? (p.hp / max.hp) * 100 : 100;
   const mpPct = max.mp ? (p.mp / max.mp) * 100 : 0;
   // Sempre ativo só exige mana para o próprio cast. A porcentagem de mana
   // é um gatilho adicional exclusivo do modo por HP.
-  if (mode === "hp" && (mpPct < cfg.mpAbove || hpPct > cfg.hpBelow)) return false;
-  if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
-  if (typeof cdReady === "function" && !cdReady(p, MAGIC_SHIELD_SPELL_ID, now)) return false;
-  // 12.55+: recast com o escudo ATIVO renova a capacidade (oficial) — o
-  // auto-cast só renova quando a pool está gasta (<50%) para não drenar
-  // mana à toa. Escudo inativo: casta normal.
-  if (isMagicShieldActive(p, now)) {
-    const cap = p.magicShieldCap || magicShieldCapacity(p);
-    if ((p.magicShieldPool || 0) >= cap * 0.5) return false;
+  if (!forceOnce && mode === "hp" && (mpPct < cfg.mpAbove || hpPct > cfg.hpBelow)) return false;
+  if (!forceOnce && !magicShieldNeedsRefresh(p, now)) return false;
+
+  if (forceOnce) return tryMagicShieldPotion(c, p, now, true);
+
+  const s = typeof SPELLS !== "undefined" ? SPELLS[MAGIC_SHIELD_SPELL_ID] : null;
+  const spellReady = s && p.level >= (s.lvl || 1) && p.mp >= s.mana &&
+    !(typeof cdReady === "function" && !cdReady(p, MAGIC_SHIELD_SPELL_ID, now));
+  if (spellReady) {
+    p.mp -= s.mana;
+    if (typeof addManaSpent === "function") addManaSpent(p, combatManaSkillGain(c, s.mana));
+    if (typeof cdStart === "function") cdStart(p, MAGIC_SHIELD_SPELL_ID, s, now);
+    applyMagicShieldPool(p, now, "spell");
+    if (c && typeof entCdSet === "function") entCdSet(c, p, "magicShieldCd", now + 1000);
+    else if (c) c.magicShieldCd = now + 1000;
+    if (c && c.events) {
+      c.events.push({ t: "say", text: s.words || "utamo vita" });
+      emitMagicShieldOn(c, p, "Magic Shield");
+    }
+    return true;
   }
-  p.mp -= s.mana;
-  if (typeof addManaSpent === "function") addManaSpent(p, combatManaSkillGain(c, s.mana));
-  if (typeof cdStart === "function") cdStart(p, MAGIC_SHIELD_SPELL_ID, s, now);
-  // 12.55+: o shield ganha uma CAPACIDADE (level/ml) e dura 60s. Recastar
-  // com o shield ativo renova a capacidade (oficial) — o auto-cast espera
-  // o shield quebrar para recastar.
-  p.magicShieldCap = magicShieldCapacity(p);
-  p.magicShieldPool = p.magicShieldCap;
-  p.magicShieldUntil = now + MAGIC_SHIELD_DURATION_MS;
-  if (typeof entCdSet === "function") entCdSet(c, p, "magicShieldCd", now + 1000);
-  else c.magicShieldCd = now + 1000;
-  if (c.events) {
-    c.events.push({ t: "say", text: s.words || "utamo vita" });
-    c.events.push({ t: "magic-shield-on", cap: p.magicShieldCap,
-      x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });
-  }
-  return true;
+  // Emergência Canary: potion quando o utamo vita está em CD ou sem mana.
+  if (cfg.usePotion) return tryMagicShieldPotion(c, p, now, true);
+  return false;
 }
 
 function applyMagicShieldAbsorb(c, p, raw, meta) {
@@ -783,6 +838,29 @@ function renderMagicShieldHelper(p) {
             style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
         </div>
       </div>
+      ${spellOk ? (() => {
+        const cdLeft = Math.max(0, (p.magicShieldPotionUntil || 0) - now);
+        const goldOk = (Number(p.gold) || 0) >= MAGIC_SHIELD_POTION_COST;
+        const lvlOk = Number(p.level || 1) >= MAGIC_SHIELD_POTION_LVL;
+        const using = !!cfg.usePotion;
+        return `
+      <div class="small dim mt10 mb4">Magic Shield Potion
+        ${cdLeft > 0 ? `<span style="color:#ffb347">· CD ${typeof fmtTime === "function" ? fmtTime(cdLeft / 1000) : Math.ceil(cdLeft / 1000) + "s"}</span>` : ""}</div>
+      <div class="shop-row ${using ? "selected" : ""}" style="opacity:${lvlOk ? 1 : .55}">
+        <img class="item-sprite" src="assets/item/magic-shield-potion.webp" alt="Magic Shield Potion"
+          onerror="this.onerror=null;this.src='assets/item/mana-potion.png'"
+          style="max-width:32px;max-height:32px;width:auto;height:auto">
+        <div style="flex:1;min-width:0">
+          <div class="small">Magic Shield Potion ${using ? "· emergência" : ""}</div>
+          <div class="tiny dim">Força o mesmo escudo do <b>utamo vita</b> (Canary id 35563). Não gasta o CD da magia nem o de 1s das potions de HP/mana. Custa <span class="gold-txt">${typeof fmtFull === "function" ? fmtFull(MAGIC_SHIELD_POTION_COST) : MAGIC_SHIELD_POTION_COST} gp</span> · CD 15s · nv ${MAGIC_SHIELD_POTION_LVL}+.</div>
+          <div class="tiny ${goldOk ? "dim" : "txt-red"}">${goldOk ? "Ouro suficiente." : "Sem ouro suficiente."}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button class="sm ${using ? "primary" : ""}" id="ms-use-potion" ${lvlOk ? "" : "disabled"}>${using ? "USANDO" : "USAR"}</button>
+          <button class="sm" id="ms-drink-potion" ${lvlOk && goldOk && cdLeft <= 0 ? "" : "disabled"}>Beber agora</button>
+        </div>
+      </div>`;
+      })() : ""}
       ${podeEnergy ? `
       <div class="small dim mt10 mb4">Energy Ring ${eq ? `<span style="color:#7ec8ff">· ⚡ ${eq.now}/${eq.max} cargas</span>` : ""}</div>
       <div class="shop-row ${energyRingEquipped(p) ? "selected" : ""}" style="opacity:${hasEnergy ? 1 : .55}">
@@ -819,6 +897,35 @@ function bindMagicShieldHelper(p) {
     rh.equipBelow = cfg.hpBelow || 50;
     if (typeof toast === "function") toast("Energy Ring definido como anel emergencial.");
     if (typeof save === "function") save();
+    rer();
+  });
+  const usePot = document.getElementById("ms-use-potion");
+  if (usePot) usePot.addEventListener("click", () => {
+    cfg.usePotion = !cfg.usePotion;
+    if (typeof toast === "function") toast(cfg.usePotion
+      ? "Magic Shield Potion: emergência quando o utamo vita estiver em CD."
+      : "Magic Shield Potion desativada.");
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+    else if (typeof save === "function") save();
+    rer();
+  });
+  const drinkPot = document.getElementById("ms-drink-potion");
+  if (drinkPot) drinkPot.addEventListener("click", () => {
+    const combat = (typeof G !== "undefined" && G.combat) ? G.combat : null;
+    const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+    if (online) {
+      cfg.forceOnce = true;
+      if (typeof toast === "function") toast("Potion será usada no próximo segundo de combate.");
+      rer();
+      return;
+    }
+    if (tryMagicShieldPotion(combat, p, Date.now(), true)) {
+      if (typeof toast === "function") toast("Magic Shield forçado pela potion.");
+      if (typeof renderStats === "function") renderStats(p);
+      if (typeof save === "function") save();
+    } else if (typeof toast === "function") {
+      toast("Não foi possível beber a potion (ouro, nível ou cooldown).");
+    }
     rer();
   });
 }

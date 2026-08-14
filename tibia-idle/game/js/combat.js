@@ -9,8 +9,12 @@ const TICK = 100;   // ms por tick de simulacao
 /* Animacao de spawn dos monstros: o teleporte "pisca" 3x no ponto antes de
  * o bicho nascer (pedido do jogador). SPAWN_BLINK_MS e o intervalo entre
  * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma. */
-const SPAWN_BLINK_MS = 300;
+const SPAWN_BLINK_MS = 1000;
 const SPAWN_BLINKS = 3;
+
+function huntMapSpawnBlocked() {
+  return typeof G !== "undefined" && G && G.huntMapReady === false;
+}
 
 /* Spells "exori" do Knight: golpe de skill FISICO (Berserk, Fierce Berserk,
  * Front Sweep, Groundshaker, Whirlwind Throw, Brutal Strike, Annihilation,
@@ -282,6 +286,7 @@ function huntWaveSize(hunt, randomValue) {
 }
 
 function spawnWave(c, p) {
+  if (huntMapSpawnBlocked()) return;
   const spawnNow=(c&&c._tickNow)||Date.now();
   // Categoria HARD sempre usa ondas variáveis de 6–10. Hunts podem declarar
   // outra faixa explicitamente (ex.: HARDCORE da Library usa 10–12).
@@ -402,39 +407,42 @@ function spawnWave(c, p) {
   c.wave++;
 }
 
-/* Processa a fila de spawn: a cada SPAWN_BLINK_MS o teleporte "pisca" no
- * ponto (evento spawn-blink -> renderer mostra o efeito). Depois de
- * SPAWN_BLINKS piscadas o monstro nasce de verdade. */
+/* Processa a fila de spawn: teleporte pisca em 0s/1s/2s e o monstro só
+ * nasce depois da 3ª piscada (t=3s), como no Canary. */
 function tickSpawnQueue(c, now) {
+  if (huntMapSpawnBlocked()) return;
   if (!c.pendingSpawns || !c.pendingSpawns.length) return;
   now=now||Date.now();
+  const gridW = Number(c.gridW) || (typeof GRID_W === "number" ? GRID_W : 30);
+  const gridH = Number(c.gridH) || (typeof GRID_H === "number" ? GRID_H : 30);
   for (const sp of c.pendingSpawns) {
-    const b = Math.floor((now - sp.startedAt) / SPAWN_BLINK_MS);
-    if (b > sp.blink) {
-      sp.blink = Math.min(SPAWN_BLINKS, b);
-      if (sp.blink <= SPAWN_BLINKS) {
-        const s = (typeof cellToScreen === "function")
-          ? cellToScreen(sp.cx, sp.cy) : null;
-        c.events.push({
-          t: "spawn-blink",
-          x: s ? s.x : (sp.cx + 0.5) / GRID_W,
-          y: s ? s.y : (sp.cy + 0.5) / GRID_H,
-          blink: sp.blink,
-        });
-      }
+    const elapsed = now - (Number(sp.startedAt) || now);
+    if (elapsed < 0) continue;
+    const due = Math.min(SPAWN_BLINKS, Math.floor(elapsed / SPAWN_BLINK_MS) + 1);
+    while ((Number(sp.blink) || 0) < due) {
+      sp.blink = (Number(sp.blink) || 0) + 1;
+      const s = (typeof cellToScreen === "function")
+        ? cellToScreen(sp.cx, sp.cy) : null;
+      c.events = c.events || [];
+      c.events.push({
+        t: "spawn-blink",
+        x: s ? s.x : (sp.cx + 0.5) / gridW,
+        y: s ? s.y : (sp.cy + 0.5) / gridH,
+        blink: sp.blink,
+      });
     }
-    if (b >= SPAWN_BLINKS && !sp.done) {
+    if (elapsed >= SPAWN_BLINKS * SPAWN_BLINK_MS && !sp.done) {
       sp.done = true;
       const m = sp.mob;
       m.cx = sp.cx; m.cy = sp.cy;
       const s = (typeof cellToScreen === "function")
         ? cellToScreen(sp.cx, sp.cy) : null;
       if (s) { m.x = s.x; m.y = s.y; m.sx = s.x; m.sy = s.y; }
-      else { m.x = (sp.cx + 0.5) / GRID_W; m.y = (sp.cy + 0.5) / GRID_H; }
+      else { m.x = (sp.cx + 0.5) / gridW; m.y = (sp.cy + 0.5) / gridH; }
       m.speedPts = typeof monsterSpeedPts === "function" ? monsterSpeedPts(m) : 100;
       m.spawnAt = now;
       c.mobs.push(m);
-      c.events.push({ t: "spawn", slug: m.slug, x: m.x, y: m.y });
+      c.events.push({ t: "spawn", slug: m.slug, x: m.x, y: m.y, targetId: String(m.id || "") });
     }
   }
   c.pendingSpawns = c.pendingSpawns.filter((sp) => !sp.done);
@@ -1039,9 +1047,52 @@ const ELEMENT_MISSILE = {
   death: "death", holy: "holy", physical: "small-stone",
 };
 
+/* items.xml shootType -> PNG em assets/missile. smallice != ice. */
+const SHOOT_TO_MISSILE = {
+  energy: "energy", fire: "fire", death: "death", holy: "holy",
+  ice: "ice", earth: "earth", poison: "earth",
+  smallice: "small-ice", smallearth: "small-earth", smallholy: "small-holy",
+  energyball: "energy-ball", suddendeath: "sudden-death",
+  smallstone: "small-stone",
+};
+
+function wandMissileOf(it, element) {
+  if (it && it.shoot) {
+    const k = String(it.shoot).toLowerCase().replace(/[-_]/g, "");
+    return SHOOT_TO_MISSILE[k] || it.shoot;
+  }
+  const table = typeof WAND_SHOOT !== "undefined" ? WAND_SHOOT : {};
+  const id = it && it.id;
+  const mapped = id !== undefined && id !== null
+    ? (table[id] || table[String(id)]) : null;
+  if (mapped) return mapped;
+  return ELEMENT_MISSILE[element || (it && it.el) || "energy"] || "energy";
+}
+
+function racePhysicalFx(race) {
+  if (typeof fisicoPorRaca === "function") {
+    const r = fisicoPorRaca(race);
+    if (r && r.fx) return r.fx;
+  }
+  return "draw-blood";
+}
+
+function monkBasicHitFx(p, element) {
+  const bond = typeof elementalBond === "function" ? elementalBond(p) : null;
+  if (bond && bond !== "physical")
+    return ((typeof ELEMENTS !== "undefined" && ELEMENTS[bond]) || {}).fx
+      || "energy-damage";
+  if (element && element !== "physical")
+    return ((typeof ELEMENTS !== "undefined" && ELEMENTS[element]) || {}).fx
+      || "whirlwind-blow-white";
+  return "whirlwind-blow-white";
+}
+
 /* Escolhe o sprite de projetil de um ataque a distancia do jogador. */
 function playerMissile(p, element) {
   const wp = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
+  if (wp && (wp.t === "magic" || wp.t === "wand" || wp.t === "rod"))
+    return wandMissileOf(wp, element);
   if (wp && wp.inf && AMMO_MISSILE[p.equip.weapon.item])
     return AMMO_MISSILE[p.equip.weapon.item];      // spear arremessada
   const a = p.equip.ammo;
@@ -1166,7 +1217,8 @@ function playerMitigationPct(p) {
   // Wheel of Destiny: mitigacao extra dos nos (0.03 por ponto, em %)
   let wheelMit = 0;
   if (typeof wheelTotals === "function" && p.wheel) {
-    wheelMit = wheelTotals(p).mitigation * 100;
+    const wt = wheelTotals(p);
+    wheelMit = wt.mitigation * 100 + (wt.gemMitigation || 0);
   }
   return Math.min(50, Math.max(0, sh * 0.04 + defEquip * 0.2 + wheelMit));
 }
@@ -1184,14 +1236,20 @@ function applyPlayerMitigation(p, element, dano) {
  * armadura, escudo etc.). Proteção positiva reduz o dano; negativa (fraqueza,
  * ex.: terra amulet -10% fogo) aumenta. */
 function playerResistPct(p, element) {
-  if (!p || !p.equip || typeof GAMEDATA === "undefined") return 0;
+  if (!p || !element) return 0;
   let total = 0;
-  for (const s in p.equip) {
-    const e = p.equip[s];
-    if (!e || !e.item) continue;
-    const it = GAMEDATA.items[e.item];
-    if (!it || !it.res) continue;
-    total += Number(it.res[element]) || 0;
+  if (p.equip && typeof GAMEDATA !== "undefined") {
+    for (const s in p.equip) {
+      const e = p.equip[s];
+      if (!e || !e.item) continue;
+      const it = GAMEDATA.items[e.item];
+      if (!it || !it.res) continue;
+      total += Number(it.res[element]) || 0;
+    }
+  }
+  if (typeof wheelTotals === "function" && p.wheel) {
+    const r = wheelTotals(p).resist || {};
+    total += Number(r[element]) || 0;
   }
   return total;
 }
@@ -1586,12 +1644,12 @@ function playerAttack(c, p, target) {
                          playerPiercePct(p, parte2)));
       target.hp -= fisBruto + elemFinal;
       c.stats.damage += fisBruto + elemFinal;
-      // dano fisico: numero vermelho e efeito de sangue
+      // dano fisico: efeito da raca (sangue / hit-area / veneno), nao slash cinza
       c.events.push({ t: "hit", dmg: fisBruto, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: false, el: "physical", crit: critou, fatal: fatalou,
                       race: target.def && target.def.race,
-                      fx: (ELEMENTS.physical && ELEMENTS.physical.fx) || "draw-blood" });
+                      fx: racePhysicalFx(target.def && target.def.race) });
       // dano elemental: cor e animacao do elemento (gelo = azul + ice-attack)
       c.events.push({ t: "hit", dmg: elemFinal, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
@@ -1600,12 +1658,21 @@ function playerAttack(c, p, target) {
     } else {
       target.hp -= raw;
       c.stats.damage += raw;
+      const race = target.def && target.def.race;
+      const hitFx = ammo && ammo.areaFx
+        ? ammo.areaFx
+        : (isMagic
+          ? ((ELEMENTS[element] || ELEMENTS.physical).fx)
+          : (!isDist && p.voc === "monk"
+            ? monkBasicHitFx(p, element)
+            : (element === "physical"
+              ? racePhysicalFx(race)
+              : ((ELEMENTS[element] || ELEMENTS.physical).fx))));
       c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: isDist || isMagic, el: element, crit: critou, fatal: fatalou,
-                      race: target.def && target.def.race,
-                      missile: isDist ? playerMissile(p, element)
-                                      : (isMagic ? (ELEMENT_MISSILE[element] || "energy") : null) });
+                      race: race, fx: hitFx,
+                      missile: (isDist || isMagic) ? playerMissile(p, element) : null });
     }
     // 15.25: as crippling stances do Sorcerer aplicam Sap Strength /
     // Expose Weakness em qualquer golpe que acerte (auto attack incluso)
@@ -1637,7 +1704,10 @@ function playerAttack(c, p, target) {
       // crippling stance tambem marca quem tomou o respingo
       if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
       c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y, targetId:m.id,
-                      screen: true, el: element });
+                      screen: true, el: element, race: m.def && m.def.race,
+                      fx: element === "physical"
+                        ? racePhysicalFx(m.def && m.def.race)
+                        : ((ELEMENTS[element] || ELEMENTS.physical).fx) });
     }
     c.events.push({ t: "cleave", x: target.x, y: target.y });
   }
@@ -1672,14 +1742,20 @@ function playerAttack(c, p, target) {
       atingidos = c.mobs.filter((m) => m.hp > 0 && sqmDist(m, centro) <= R);
     }
     if (atingidos) {
-      c.events.push({ t: "burst", x: centro.x, y: centro.y });
-      // pinta o efeito em TODA celula da area, nao so onde ha monstro
+      const splashFx = ammo.areaFx || "explosion-area";
+      // pinta o efeito em TODA celula da area. Sem areafx o burst antigo
+      // caia em explosion-area no centro — a diamond arrow virava sangue
+      // no alvo + explosao, nao Blue Electricity em cada SQM.
       if (matriz && typeof matrixCells === "function") {
         const cells = matrixCells(matriz, centro);
-        if (cells.length > 1) {
+        if (cells.length) {
           c.events.push({ t: "areafx", cells: cells, screen: true,
-                          fx: ammo.areaFx || "explosion-area", el: element });
+                          fx: splashFx, el: element });
+        } else {
+          c.events.push({ t: "burst", x: centro.x, y: centro.y, fx: splashFx });
         }
+      } else {
+        c.events.push({ t: "burst", x: centro.x, y: centro.y, fx: splashFx });
       }
       for (const m of atingidos) {
         // o alvo principal ja levou o golpe direto; nao conta duas vezes
@@ -1695,7 +1771,8 @@ function playerAttack(c, p, target) {
         // crippling stance tambem marca quem estava na area da flecha
         if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
         c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y, targetId:m.id,
-                        screen: true, el: element });
+                        screen: true, el: element, fx: splashFx,
+                        race: m.def && m.def.race });
       }
     }
   }
@@ -1964,6 +2041,12 @@ function castSpellById(c, p, target, now, id) {
   const converteuEl = !md && elemento !== originalElement;
   let fxMagia = (md && md.fx && typeof monkFx === "function")
     ? monkFx(p, md.fx) : (converteuEl ? null : (s.fx || null));
+  if (!fxMagia && !converteuEl && typeof SPELLFX !== "undefined" && SPELLFX) {
+    const fxd = (s.words && SPELLFX.words[String(s.words).toLowerCase()]) ||
+                (s.name && SPELLFX.names[String(s.name).toLowerCase()]) || null;
+    if (fxd && fxd.fx) fxMagia = fxd.fx;
+  }
+  if (!fxMagia && ehExori) fxMagia = id === "exori-mas" ? "groundshaker" : "hit-area";
   if (!md && typeof stanceDamageFx === "function") {
     fxMagia = stanceDamageFx(p, s, originalElement, elemento, fxMagia);
   }
@@ -2191,10 +2274,19 @@ function castSpellById(c, p, target, now, id) {
                     exori: ehExori ? 1 : 0,
                     missile: missMagia });
   });
-  if (areaTiles.length > 1) {
+  if (areaTiles.length) {
+    const st = (typeof SPELLTARGET !== "undefined" && SPELLTARGET[id]) ? SPELLTARGET[id] : null;
+    const fromCaster = !!(st && st.self) ||
+      (typeof areaSaiDoConjurador === "function" && areaSaiDoConjurador(nomeArea, id));
+    const origin = fromCaster && c.player ? c.player : target;
     c.events.push({ t: "areafx", cells: areaTiles, screen: true,
-                    fx: fxMagia || (ELEMENTS[elemento] || ELEMENTS.physical).fx,
-                    el: elemento });
+                    fx: fxMagia || (ehExori ? (id === "exori-mas" ? "groundshaker" : "hit-area")
+                      : (ELEMENTS[elemento] || ELEMENTS.physical).fx),
+                    el: elemento,
+                    whoId: c.player && (c.player.id !== undefined ? c.player.id : (c.player.p && c.player.p.id)),
+                    anchor: fromCaster ? "caster" : "target",
+                    base: origin ? { cx: origin.cx, cy: origin.cy } : null,
+                    targetId: target && target.id });
   }
   if (ehChain && targets.length > 1) {
     c.events.push({ t: "chain", n: targets.length, x: target.x, y: target.y,
@@ -2263,6 +2355,13 @@ function tryUseRune(c, p, target, now, forcada) {
   // 2000 fixo para todas
   entCdSet(c, p, "runeCd", now + (s.cd || 2000));
   entCdSet(c, p, "offensiveCd", now + 2000);
+  p._lastRuneId = best;
+  p._runeCd = now + (s.cd || 2000);
+  if (typeof cdStart === "function") {
+    const g = (s.grupo === "healing" || s.group === "healing") ? "2"
+      : (s.grupo === "support" || s.group === "support") ? "3" : "1";
+    cdStart(p, best, { cd: s.cd || 2000, grupos: { [g]: s.gcd || 2000 } }, now);
+  }
   if (typeof forgeRegisterOffensiveAction === "function") forgeRegisterOffensiveAction(p, now);
   if (typeof forgeTryTranscendence === "function") {
     const tr = forgeTryTranscendence(p, now);
@@ -2383,13 +2482,14 @@ function tryUseRune(c, p, target, now, forcada) {
 function playerCritChancePct(p) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
   const base = 5 + ((imb && imb.critChance) ? imb.critChance : 0);
-  // VIP: +3% chance de crítico
   return base + (typeof vipCritBonus === "function" ? vipCritBonus() * 100 : 0);
 }
 
 function playerCritExtraPct(p) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
-  return 10 + ((imb && imb.crit) ? imb.crit : 0);
+  let extra = 10 + ((imb && imb.crit) ? imb.crit : 0);
+  if (typeof wheelTotals === "function" && p && p.wheel) extra += wheelTotals(p).critDamage || 0;
+  return extra;
 }
 
 /* Rola o crítico do golpe: { crit, extraPct }. */
@@ -2779,7 +2879,11 @@ function tryChallenge(c, p, now) {
  * TODOS ao alcance) e emite os eventos com o efeito oficial de cada uma. */
 function doChallengeCast(c, p, now, id, s) {
   const amp = id === "exeta-amp-res";
-  const pl = c.player || { x: 0.18, y: 0.62 };
+  const caster = (c.players || []).find((ent) => ent && ent.p === p) ||
+    (c.players || []).find((ent) => String(ent && (ent.id || (ent.p && ent.p.id))) === String(p && p.id)) ||
+    c.player || { x: 0.18, y: 0.62 };
+  const casterId = String(caster.id || (p && p.id) || "");
+  const pl = caster;
   let marcou = 0;
   for (const m of c.mobs) {
     if (m.hp <= 0) continue;
@@ -2790,10 +2894,14 @@ function doChallengeCast(c, p, now, id, s) {
     // pedido do dono (v24): o exeta RES também pega TODOS os monstros ao
     // alcance (antes marcava só 1)
     m.challengedUntil = now + 10000;   // 10s de Challenge
-    if (amp && monsterTargetDistance(m) > 1) m.forceMeleeUntil = now + 10000;
+    m.challengeTargetId = casterId;
+    m.targetId = casterId;
+    if (caster && caster.p) m.target = caster;
+    // Amp Res força melee em todo marcado (Chivalrous Challenge).
+    if (amp) m.forceMeleeUntil = now + 10000;
     // A animação do Chivalrous Challenge é aplicada em CADA alvo marcado.
     if (c.events) c.events.push({ t: "challenge-target", x: m.x, y: m.y,
-      screen: true, amp: amp });
+      screen: true, amp: amp, targetId: String(m.id), whoId: casterId });
     marcou++;
   }
   if (!marcou) return false;
@@ -2823,15 +2931,31 @@ function tryMana(c, p, now) {
   if (p.config.manaSupply === "") return false;
   const candidates = [];
   if (p.config.manaSupply) candidates.push(p.config.manaSupply);
-  // Sem potion selecionada no Helper, não consome mana potion.
+  const selectedOk = p.config.manaSupply && typeof supplyAllowed === "function"
+    ? supplyAllowed(p, p.config.manaSupply) : !!p.config.manaSupply;
+  if (!selectedOk) {
+    const order = ["distilled-ultimate-mana-potion", "distilled-superior-mana-potion",
+      "great-mana-potion", "strong-mana-potion", "mana-potion"];
+    for (const slug of order) if (candidates.indexOf(slug) === -1) candidates.push(slug);
+  }
   for (const slug of candidates) {
     const s = SUPPLIES[slug];
-    // potions spirit tem cura+mana: elas so entram aqui quando o jogador as
-    // escolheu explicitamente como fonte de mana (senao o motor bebia a
-    // spirit cara como se fosse mana potion comum)
     if (!s || !(s.type === "mana" || (s.both && p.config.manaSupply === slug))) continue;
-    if (!canRechargeSupply(p, slug)) continue;
-    if (!consumeSupplyCharge(c, p, slug)) continue;
+    if (typeof supplyAllowed === "function" && !supplyAllowed(p, slug)) continue;
+    let drank = false;
+    if (canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug)) drank = true;
+    else if (!selectedOk) {
+      const cost = typeof supplyPrice === "function" ? supplyPrice(s, p.level) : 50;
+      if ((p.supplies[slug] || 0) > 0) { p.supplies[slug]--; drank = true; }
+      else if (p.gold >= cost && typeof spendGold === "function" && spendGold(p, cost)) {
+        if (c && c.stats) {
+          c.stats.supplyCost += cost;
+          c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
+        }
+        drank = true;
+      }
+    }
+    if (!drank) continue;
     const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
     p.mp = Math.min(max.mp, p.mp + amount);
     // spirit tambem cura HP no mesmo gole
@@ -3461,6 +3585,13 @@ function mobAttack(c, p, mob) {
     c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
     return 0;
   }
+  if (typeof wheelTotals === "function" && p.wheel) {
+    const dodge = wheelTotals(p).dodge || 0;
+    if (dodge && Math.random() * 100 < dodge) {
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+      return 0;
+    }
+  }
   // Exaltation Forge oficial: Ruse (armor)
   if (typeof forgeTryRuse === "function") {
     const ruse = forgeTryRuse(p);
@@ -4068,13 +4199,13 @@ function combatTick(c, p, dt, now) {
   // buffs decaem
   if (c.buffs.haste > 0) c.buffs.haste -= dt;
 
-  // spawn
+  // spawn — só depois do mapa 100% pronto (G.huntMapReady).
   if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
     if (c.boss) return;
-    spawnWave(c, p);
+    if (!huntMapSpawnBlocked()) spawnWave(c, p);
   }
-  // fila de spawn: teleporte piscando 3x antes do monstro nascer
-  if (c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c,now);
+  // fila de spawn: teleporte piscando 3x (1/s) antes do monstro nascer
+  if (!huntMapSpawnBlocked() && c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c,now);
   if (c.raidEnabled) {
     c.raidCd -= dt;
     if (c.raidCd <= 0) {

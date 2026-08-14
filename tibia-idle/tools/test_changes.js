@@ -121,7 +121,7 @@ try {
     if (c.pendingSpawns && c.pendingSpawns.length > 0) {
       // simula o tick do spawn
       const sp = c.pendingSpawns[0];
-      sp.startedAt = Date.now() - 2000; // 2s atras: deve ter nascido
+      sp.startedAt = Date.now() - 4000; // 4s atras: 3 piscadas + nascimento
       window.tickSpawnQueue(c);
       if (c.mobs.length === 0) errors.push("spawn: mob nao nasceu apos tickSpawnQueue");
     } else {

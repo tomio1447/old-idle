@@ -57,11 +57,23 @@ function otcAnalyserMetric(label, value, detail, cls) {
 }
 
 function otcAnalyserItemName(id) {
+  const mapped = { dust: "Dust", sliver: "Sliver", slivers: "Slivers", "exalted-core": "Exalted Core" };
+  if (mapped[id]) return mapped[id];
   const name = typeof itemName === "function" ? itemName(id) : id;
   return otcAnalyserEscape(name || id);
 }
 
 function otcAnalyserItemIcon(id) {
+  const OTC_ANALYSER_ITEM_SPRITES = {
+    dust: "assets/item/dust.gif",
+    sliver: "assets/item/sliver.gif",
+    slivers: "assets/item/sliver.gif",
+    "exalted-core": "assets/item/exalted-core.gif",
+  };
+  const src = OTC_ANALYSER_ITEM_SPRITES[id];
+  if (src) {
+    return `<img class="item-sprite" src="${src}" alt="" loading="lazy" style="max-width:18px;max-height:18px;width:auto;height:auto">`;
+  }
   return typeof itemImg === "function" ? itemImg(id, 18) : "";
 }
 

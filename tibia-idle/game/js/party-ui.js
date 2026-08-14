@@ -75,6 +75,75 @@ function partyOutfitIcon(member, sex) {
   return `assets/outfit/${map[voc] || "citizen"}-${sex === "female" ? "f" : "m"}_s.png`;
 }
 
+function partyLookKey(p) {
+  const o = (p && p.outfit) || {};
+  return [o.appearance || o.type || "", o.addons || 0,
+    Array.isArray(o.colors) ? o.colors.join(",") : "",
+    o.mount || "", o.lookMount || 0, (p && p.sex) || ""].join("|");
+}
+
+/* Compõe a miniatura com o look AO VIVO: entidade de combate, personagem
+ * ativo, cache da conta e por último o snapshot da party. Sem isso o modal
+ * ficava com a outfit gravada na criação da party. */
+function partyApplyOutfitPreview(host, member, size, tries) {
+  if (!host || !member) return false;
+  size = size || 32;
+  tries = tries === undefined ? 20 : tries;
+  const id = String(member.id);
+  let source = member._p || member;
+  const live = (typeof G !== "undefined" && G && G.combat && Array.isArray(G.combat.players))
+    ? G.combat.players.find((e) => String(e && (e.id || (e.p && e.p.id))) === id) : null;
+  if (live && live.p) source = live.p;
+  else if (typeof G !== "undefined" && G && G.p && String(G.p.id) === id) source = G.p;
+  const cached = typeof accountCharacterCacheRead === "function" ? accountCharacterCacheRead() : [];
+  const summary = (cached || []).find((c) => String(c.id) === id) || null;
+  const outfit = source.outfit||summary&&summary.outfit||member.outfit
+    || (summary && summary.snapshot && summary.snapshot.outfit) || null;
+  const preview = {
+    id: source.id || member.id,
+    name: source.name || member.name,
+    voc: source.voc || member.voc || "knight",
+    sex: source.sex || member.sex || (summary && summary.sex) || "male",
+    outfit: outfit && typeof outfit === "object" ? Object.assign({}, outfit, {
+      colors: Array.isArray(outfit.colors) ? outfit.colors.slice() : outfit.colors,
+    }) : null,
+  };
+  if (typeof ensureOutfit === "function") ensureOutfit(preview);
+  member.sex = preview.sex;
+  member.outfit = preview.outfit;
+  const key = partyLookKey(preview);
+  if (host.dataset.look === key && host.querySelector("canvas")) return true;
+  const cv = (typeof AppearanceRenderer !== "undefined")
+    ? AppearanceRenderer.preview(member, "s") : null;
+  if (cv) {
+    cv.style.width = size + "px";
+    cv.style.height = size + "px";
+    cv.style.imageRendering = "pixelated";
+    host.innerHTML = "";
+    host.appendChild(cv);
+    host.dataset.look = key;
+    return true;
+  }
+  if (tries > 0) {
+    setTimeout(() => partyApplyOutfitPreview(host, member, size, tries - 1), 90);
+    return false;
+  }
+  if (!host.querySelector("img,canvas")) {
+    const sex = preview.sex === "female" ? "f" : "m";
+    host.innerHTML = `<img src="assets/outfit/citizen-${sex}_s.png" alt="">`;
+  }
+  return false;
+}
+
+function partyPaintMemberLooks(root, membros, size) {
+  if (!root || !Array.isArray(membros)) return;
+  for (const m of membros) {
+    if (!m) continue;
+    const host = root.querySelector(`[data-party-preview="${m.id}"]`);
+    if (host) partyApplyOutfitPreview(host, m, size);
+  }
+}
+
 /* Troca para um personagem da party (mesma função do "Trocar personagem"). */
 async function partySwitchToChar(id) {
   // Dentro de hunt/boss a troca sempre acontece no runtime atual. Sessões
@@ -86,9 +155,13 @@ async function partySwitchToChar(id) {
     const present=players.some((e)=>String(e&&(e.id||(e.p&&e.p.id)))===String(id));
     return !!(present&&typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(id));
   }
+  // Fora de combate (cidade/treino, mesmo em party): recarrega NA SESSÃO
+  // com autoload online. Sem essa chave o boot reabre o picker da tela inicial.
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
   try { sessionStorage.setItem(AUTOLOGIN_KEY, id); } catch (e) {}
   try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
+  try { sessionStorage.setItem("tibia-idle-online-autoload", String(id)); } catch (e) {}
+  if (typeof save === "function") save();
   location.reload();
   return true;
 }
@@ -190,6 +263,13 @@ function renderPartyPanel(p) {
     const isLeader = m._leader || (isOnline && Number(m.id) === Number(p._partyOnline && p._partyOnline.leader && p._partyOnline.leader.id));
     const myAccount = !isOnline || !m.account_id || (acc && Number(acc.id) === Number(m.account_id));
     const clickable = !isCurrent && myAccount;
+    const liveP = (typeof resolvePlayerById === "function")
+      ? resolvePlayerById(m.id)
+      : (m._p || (isCurrent ? p : null));
+    const autoOn = typeof playerAutoWalkOn === "function"
+      ? playerAutoWalkOn(liveP || { config: { autoWalk: true } })
+      : !(liveP && liveP.config && liveP.config.autoWalk === false);
+    const canToggleAuto = myAccount && !!liveP;
     return `<div class="party-member-row ${clickable ? "" : "no-switch"}"
         data-party-char="${m.id}" data-switch="${clickable ? 1 : 0}"
         title="${clickable ? "Trocar para " + m.name : (isCurrent ? "Personagem atual" : "Membro de outra conta")}">
@@ -201,18 +281,31 @@ function renderPartyPanel(p) {
           <span class="ppm-zone" title="zona">${zonaIcon(m.zone)}</span></div>
         ${barra(m.hp, m.mp, m.maxHp, m.maxMp)}
       </div>
+      ${canToggleAuto ? `<button type="button" class="sm btn-auto-walk ${autoOn ? "primary on" : "off"}"
+          data-auto-walk-char="${m.id}" aria-pressed="${autoOn ? "true" : "false"}"
+          title="${autoOn ? "AUTO ligado — desligue para estacionar neste SQM" : "AUTO off — parado; troque e clique no chão para mover"}">${autoOn ? "AUTO" : "SQM"}</button>` : ""}
     </div>`;
   }).join("");
 
-  // Aplica a composição 15x com cores/addons/montaria à miniatura da party.
-  for (const m of membros) {
-    const host = body.querySelector(`[data-party-preview="${m.id}"]`);
-    if (!host) continue;
-    const source = m._p || m;
-    const cv = (typeof AppearanceRenderer !== "undefined") ? AppearanceRenderer.preview(source, "s") : null;
-    if (cv) { host.innerHTML = ""; cv.style.width = "32px"; cv.style.height = "32px"; host.appendChild(cv); }
-    else host.innerHTML = `<img src="assets/outfit/citizen-${m.sex === "female" ? "f" : "m"}_s.png" alt="">`;
-  }
+  partyPaintMemberLooks(body, membros, 32);
+
+  $$("#party-panel-body .btn-auto-walk").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const target = (typeof resolvePlayerById === "function")
+        ? resolvePlayerById(btn.dataset.autoWalkChar) : null;
+      if (!target || typeof togglePlayerAutoWalk !== "function") return;
+      const on = togglePlayerAutoWalk(target);
+      if (typeof save === "function") save();
+      if (typeof toast === "function") {
+        toast(on
+          ? `AUTO ligado: <b>${target.name || "membro"}</b>`
+          : `AUTO off: <b>${target.name || "membro"}</b> parado — clique no chão / WASD`);
+      }
+      renderPartyPanel(G.p);
+    });
+  });
 
   // botão LEAVE HUNT: visível quando a party está numa hunt/boss — o líder
   // sai (todos voltam via follow de retorno) ou o membro sai sozinho
@@ -267,6 +360,8 @@ function updatePartyPanelLiveBars(){
       pct=value.max>0?Math.max(0,Math.min(100,value.now*100/value.max)):0;
       if(fill)fill.style.width=pct+"%";
       if(label)label.textContent=fmtFull(Math.floor(value.now))+"/"+fmtFull(value.max);}
+    const host=row.querySelector("[data-party-preview]");
+    if(host)partyApplyOutfitPreview(host,ent.p,32,0);
   }
 }
 
@@ -320,6 +415,7 @@ function renderPartyModal(p, online) {
     const inbox = (online && online.inbox) || [];
     box.innerHTML = partyOnlineHtml(p, st, inbox);
     bindPartyOnline(p, st, inbox);
+    if (st) partyPaintMemberLooks(box, [st.leader].concat(st.members || []), 32);
     return;
   }
   // ---- modo local (roster do save) ----
@@ -508,13 +604,6 @@ function renderPartyModal(p, online) {
   }
 
   box.innerHTML = h;
-  // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
-  for (const m of alvos) {
-    const host = box.querySelector(`[data-party-preview="${m.id}"]`);
-    if (!host || typeof AppearanceRenderer === "undefined") continue;
-    const cv = AppearanceRenderer.preview(m, "s");
-    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
-  }
 
   // FIX: handler para botão de criar nova party quando não está na PT
   const create2 = $("#party-create-local-2");
@@ -608,7 +697,7 @@ function healFriendSpells(p) {
   if (!p) return ids;
   const éDruid = p.voc === "druid" || p.voc === "elder druid";
   const éMonk = p.voc === "monk" || p.voc === "exalted monk";
-  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-mas-res");
+  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-tio-sio", "exura-gran-mas-res");
   if (éMonk) ids.push("exura-tio-sio");
   return ids.filter((id) => SPELLS[id] && p.level >= (SPELLS[id].lvl || 1));
 }
@@ -811,23 +900,27 @@ function partyOnlineHtml(p, st, inbox) {
       <div class="tiny dim mt4">Ao criar, seu personagem vira o líder. Para
         convidar, você precisa estar na <b>Cidade</b> ou na <b>Área de Treino</b>.</div>`;
   } else {
-    h += `<div class="party-members">`;
-    // líder (sempre presente)
-    h += `<div class="party-member leader">
-        <span class="party-member-voc">${voc(st.leader.voc)}</span>
-        <b>${st.leader.name}</b>
-        <span class="dim tiny">líder</span>
-        <span class="tiny" style="color:#9ce84a">${partyZoneName(st.leader.zone)}</span>
-      </div>`;
-    // membros
-    for (const m of st.members) {
-      h += `<div class="party-member">
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    const currentId = typeof characterId === "function" ? characterId(p) : p.id;
+    const rowFor = (m, extra) => {
+      extra = extra || {};
+      const isCurrent = Number(m.id) === Number(currentId);
+      const myAccount = !m.account_id || (acc && Number(acc.id) === Number(m.account_id));
+      const clickable = !isCurrent && myAccount;
+      return `<div class="party-member ${extra.leader ? "leader" : ""} ${clickable ? "" : "no-switch"}"
+          data-party-char="${m.id}" data-switch="${clickable ? 1 : 0}"
+          title="${clickable ? "Trocar para " + m.name : (isCurrent ? "Personagem atual" : "Membro de outra conta")}">
+        <div class="ppm-outfit">${partyOutfitHtml(m)}</div>
         <span class="party-member-voc">${voc(m.voc)}</span>
         <b>${m.name}</b>
-        <span class="dim">nv ${m.level}</span>
-        ${st.isLeader ? `<button class="sm" data-party-kick="${m.id}">Remover</button>` : ""}
+        ${extra.leader ? `<span class="dim tiny">líder</span>` : `<span class="dim">nv ${m.level}</span>`}
+        <span class="tiny" style="color:#9ce84a">${partyZoneName(m.zone)}</span>
+        ${extra.kick ? `<button class="sm" data-party-kick="${m.id}">Remover</button>` : ""}
       </div>`;
-    }
+    };
+    h += `<div class="party-members">`;
+    h += rowFor(st.leader, { leader: true });
+    for (const m of st.members) h += rowFor(m, { kick: !!st.isLeader });
     h += `</div>`;
 
     if (st.isLeader) {
@@ -901,10 +994,17 @@ function bindPartyOnline(p, st, inbox) {
   });
 
   $$("#party-content [data-party-kick]").forEach((el) =>
-    el.addEventListener("click", async () => {
+    el.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
       const r = await accountPartyKick(Number(sessionCharId()), el.dataset.partyKick);
       toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "" : "bad");
       if (r.ok) recarregar();
+    }));
+
+  $$("#party-content [data-party-char]").forEach((el) =>
+    el.addEventListener("click", () => {
+      if (el.dataset.switch !== "1") return;
+      partySwitchToChar(el.dataset.partyChar);
     }));
 
   $$("#party-content [data-party-accept]").forEach((el) =>
