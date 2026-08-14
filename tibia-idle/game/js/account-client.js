@@ -45,6 +45,42 @@ function accountCharacterCacheClear(){
   try{ACCOUNT_SAVE_CONFLICTS.clear();}catch(e){}
 }
 
+/* Uma sessão inválida é terminal para TODOS os transportes desta aba.
+ * Antes cada 401 era tratado isoladamente: SSE abria fallback, party seguia
+ * no poll, lease tentava reacquire e o game pedia recovery, produzindo dezenas
+ * de requests por minuto com o mesmo token morto. Centralize e execute uma
+ * única vez, mas ignore respostas atrasadas de um token anterior após login. */
+let ACCOUNT_UNAUTHORIZED_TOKEN="",ACCOUNT_UNAUTHORIZED_RELOAD=null;
+function accountInvalidateSession(token,data){
+  const presented=String(token||"");if(!presented)return false;
+  if(ACCOUNT_UNAUTHORIZED_TOKEN===presented)return true;
+  let current="";try{current=sessionStorage.getItem("tibia-idle-token")||"";}catch(e){}
+  if(!current||current!==presented)return false;
+  ACCOUNT_UNAUTHORIZED_TOKEN=presented;
+  if(typeof accountStopSync==="function")accountStopSync();
+  if(typeof accountLeaseMarkLost==="function")accountLeaseMarkLost(false);
+  ACCOUNT_LEASE.sessionToken="";
+  if(typeof partyStopPolling==="function")partyStopPolling();
+  accountCharacterCacheClear();
+  try{
+    sessionStorage.removeItem("tibia-idle-token");
+    sessionStorage.removeItem("tibia-idle-account");
+    sessionStorage.removeItem("tibia-idle-char");
+    sessionStorage.removeItem("tibia-idle-online-autoload");
+    sessionStorage.setItem("tibia-idle-session-expired","1");
+  }catch(e){}
+  const detail={reason:data&&data.error||"UNAUTHORIZED",msg:data&&data.msg||"Sessão expirada"};
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-session-invalid",{detail}));}catch(e){}
+  if(typeof toast==="function")toast("Sessão online expirada. Entre novamente para retomar a instância.","bad");
+  // Reload encerra também callbacks antigos já enfileirados. O checkpoint e a
+  // instância autoritativa ficam persistidos; após o login, o runtime retoma.
+  if(!ACCOUNT_UNAUTHORIZED_RELOAD&&typeof setTimeout==="function")
+    ACCOUNT_UNAUTHORIZED_RELOAD=setTimeout(()=>{
+      try{if(typeof location!=="undefined"&&location&&typeof location.reload==="function")location.reload();}catch(e){}
+    },250);
+  return true;
+}
+
 /* Saves online são serializados nesta aba e usam optimistic concurrency.
  * Ao detectar outra sessão, o personagem fica bloqueado até recarregar; sem
  * isso, o autosave seguinte poderia sobrescrever silenciosamente o vencedor. */
@@ -158,14 +194,8 @@ async function accountAcquireLease(token,takeover){
   const r=await _api("POST",path,{token,holder_id:stored.holder,
     previous_holder_id:stored.previousHolder,lease_token:stored.token});
   if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true,resumed:!!r.data.resumed};}
-  // 401 = token inválido/expirado: limpa a sessão e deixa o cliente voltar
-  // ao login em vez de ficar retryando com um token morto.
-  if(r.code===401){
-    accountLeaseMarkLost(false);
-    try{sessionStorage.removeItem("tibia-idle-token");
-        sessionStorage.removeItem("tibia-idle-account");
-        sessionStorage.removeItem("tibia-idle-char");}catch(e){}
-  }
+  // `_api` encerra globalmente sync/poll/lease em 401. Não dispare aqui um
+  // segundo lease-lost nem outro ciclo de limpeza para a mesma resposta.
   return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
     msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:r.code===401};
 }
@@ -178,6 +208,7 @@ async function accountRenewLease(token){
     if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
     ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
   }
+  if(r.code===401)return {ok:false,lost:true,unauthorized:true};
   accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
 }
 async function accountEnsureLease(token,options){
@@ -434,7 +465,9 @@ function accountStopSync(){ACCOUNT_SYNC.stopped=true;ACCOUNT_SYNC.generation++;
   accountSyncStopFallback();ACCOUNT_SYNC.token="";ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;ACCOUNT_SYNC.disabled=false;}
 
 async function _api(method, path, body, token) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json" },requestToken=token||(body&&body.token)||"";
+  if(requestToken&&ACCOUNT_UNAUTHORIZED_TOKEN===String(requestToken))
+    return {code:401,data:{ok:false,error:"SESSION_INVALID",msg:"Sessão expirada"}};
   if (token) headers["Authorization"] = "Bearer " + token;
   try {
     const r = await fetch(ACCOUNT_API_URL + path, {
@@ -444,6 +477,10 @@ async function _api(method, path, body, token) {
     });
     let data = {};
     try { data = await r.json(); } catch (e) { data = {}; }
+    // APIs antigas misturam Bearer e `token` no body. Considere ambos para
+    // desligar todos os loops ao primeiro 401 autenticado; login inválido não
+    // traz token e portanto nunca passa por esta invalidação.
+    if(r.status===401&&requestToken)accountInvalidateSession(requestToken,data);
     return { code: r.status, data: data };
   } catch (error) {
     return { code: 0, data: { ok:false, error:"NETWORK_ERROR",
@@ -462,6 +499,10 @@ async function accountRegister(login, password) {
 async function accountLogin(login, password) {
   const r = await _api("POST", "/api/login", { login, password });
   if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha no login" };
+  ACCOUNT_UNAUTHORIZED_TOKEN="";
+  if(ACCOUNT_UNAUTHORIZED_RELOAD){clearTimeout(ACCOUNT_UNAUTHORIZED_RELOAD);ACCOUNT_UNAUTHORIZED_RELOAD=null;}
+  try{sessionStorage.removeItem("tibia-idle-session-expired");}catch(e){}
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-session-restored"));}catch(e){}
   return {
     ok: true,
     token: r.data.token,

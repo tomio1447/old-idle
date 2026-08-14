@@ -2447,9 +2447,9 @@ let _bgTimer = null;
 // serialização de personagens/instância sem ganhar precisão e saturava o
 // servidor JSON, causando lag no canvas e no painel da party.
 const ONLINE_AUTH_TICK_MS=1000;
-let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0;
+let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0,ONLINE_SESSION_INVALID=false;
 function onlineAuthorityCombat(){
-  return !!(G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+  return !!(!ONLINE_SESSION_INVALID&&G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
 }
 let ONLINE_RUNTIME_RECOVERING=false,ONLINE_RUNTIME_RETRY_AT=0;
@@ -2711,6 +2711,16 @@ function requestOnlineAuthorityTick(){
   }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
 if(typeof window!=="undefined"){
+  window.addEventListener("tibia-idle-session-invalid",()=>{
+    // O primeiro 401 autenticado é terminal para esta página. A conta-cliente
+    // já encerrou transportes/lease; impeça também rAF/background de iniciar
+    // ticks ou recovery com o token morto enquanto o login é recarregado.
+    ONLINE_SESSION_INVALID=true;ONLINE_RUNTIME_RETRY_AT=Number.POSITIVE_INFINITY;ONLINE_AUTH_ACC=0;
+    if(G){G.tickAcc=0;G.bgAcc=0;G.bgLast=Date.now();}
+  });
+  window.addEventListener("tibia-idle-session-restored",()=>{
+    ONLINE_SESSION_INVALID=false;ONLINE_RUNTIME_RETRY_AT=0;
+  });
   window.addEventListener("tibia-idle-sync-instance",(event)=>{
     const detail=event&&event.detail||{},state=detail.state,remote=detail.event||{};
     if(!state){
@@ -3599,6 +3609,12 @@ function initAccountLogin() {
     const el = $("#acc-msg");
     if (el) el.innerHTML = t || "";
   }
+  try{
+    if(sessionStorage.getItem("tibia-idle-session-expired")){
+      sessionStorage.removeItem("tibia-idle-session-expired");
+      msg("Sessão expirada — faça login novamente para retomar sua instância.");
+    }
+  }catch(e){}
   function closeAccountModal() {
     const modal = $("#modal");
     if (modal) modal.classList.remove("show", "wide", "login-modal");
