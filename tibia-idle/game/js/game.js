@@ -2540,7 +2540,8 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // Atualiza escalares/mecânicas no próprio objeto, mas reconcilia criaturas
   // separadamente para manter referências, posição e identidade visual.
   for(const key of Object.keys(incoming))
-    if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="hunt"&&key!=="huntMap"&&key!=="boss")previous[key]=incoming[key];
+    if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="events"&&
+       key!=="hunt"&&key!=="huntMap"&&key!=="boss")previous[key]=incoming[key];
 
   const remotePlayers=Array.isArray(incoming.players)?incoming.players:[],remotePlayersById=new Map();
   for(const ent of remotePlayers){const id=entityId(ent);if(id)remotePlayersById.set(id,ent);}
@@ -2581,12 +2582,16 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   else previous.mobs=reconciledMobs;
 
   // Eventos de combate (dano/cura/kill/dust/death/condition/buff) gerados
-  // pelo step() do servidor autoritativo. Eles chegam em incoming.events
-  // (do snapshot do servidor) mas G.combat é `previous` — sem esta cópia
-  // os eventos nunca chegam a drainEvents() e nenhum floater/log aparece.
+  // pelo servidor entram na fila local sem substituir os eventos com `ts`
+  // ainda pendentes. `events` é excluído do Object.assign de escalares acima:
+  // se os dois arrays forem o mesmo, fazer push durante `for..of` cresce o
+  // próprio iterador para sempre e congela completamente a aba no 1º hit.
+  previous.events=Array.isArray(previous.events)?previous.events:[];
   if(Array.isArray(incoming.events)&&incoming.events.length){
-    previous.events=Array.isArray(previous.events)?previous.events:[];
     for(const ev of incoming.events)previous.events.push(ev);
+    // Defesa adicional contra snapshots repetidos/falhas prolongadas: uma
+    // fila visual nunca pode crescer sem limite e bloquear o renderer.
+    if(previous.events.length>500)previous.events.splice(0,previous.events.length-500);
   }
 
   // O activeCharacterId remoto pode estar um tick atrás logo após o clique.
@@ -2612,24 +2617,8 @@ function requestOnlineAuthorityTick(){
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
-    }else if(!result||!result.ok){
-      // Tick falhou (rede/servidor): tenta salvar o personagem diretamente
-      // como fallback antes de tentar recuperar o runtime. Sem isto, o
-      // progresso desde o último tick bem-sucedido é perdido.
-      if(G.p&&typeof sessionToken==="function"&&typeof sessionCharId==="function"&&
-         typeof accountSaveCharacter==="function"){
-        try{accountSaveCharacter(sessionToken(),sessionCharId(),G.p).catch(()=>{});}catch(e){}
-      }
-      requestOnlineRuntimeRecovery();
-    }
-  }).catch(()=>{
-    // Erro de transporte: mesmo fallback de save antes de recuperar.
-    if(G.p&&typeof sessionToken==="function"&&typeof sessionCharId==="function"&&
-       typeof accountSaveCharacter==="function"){
-      try{accountSaveCharacter(sessionToken(),sessionCharId(),G.p).catch(()=>{});}catch(e){}
-    }
-    requestOnlineRuntimeRecovery();
-  }).finally(()=>{ONLINE_AUTH_TICKING=false;});
+    }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
+  }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }
 if(typeof window!=="undefined"){
   window.addEventListener("tibia-idle-sync-instance",(event)=>{

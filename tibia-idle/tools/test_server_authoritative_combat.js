@@ -50,8 +50,9 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     sinisterAuth.state.mobs[0].fiendish,"Fiendish autoritativo perdeu flags usadas pela poeira");
   sinisterAuth.authority.mobs[0].hp=1;sinisterAuth.authority.mobs[0].damage=0;
   const sinisterAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(sinisterAuth),2000,3000).state);
-  must(sinisterAfter.authority.players[0].p.dust>0&&sinisterAfter.authority.players[0].p.slivers>0,
-    "Fiendish autoritativo não concedeu Dust/Slivers");
+  must(sinisterAfter.authority.players[0].p.dust>0&&sinisterAfter.authority.players[0].p.slivers>0&&
+    sinisterAfter.state.events.some((event)=>event.t==="dust"&&Number.isFinite(event.ts)),
+    "Fiendish autoritativo não concedeu Dust/Slivers ou quebrou o timestamp do tick");
   const emptyHard=directDescriptor(basePlayer);emptyHard.huntId="mota-extension";emptyHard.state.mobs=[];
   const hardAuth=engine.initializeAuthority(emptyHard,"8".repeat(64),1000);
   must(hardAuth.authority.spawnPool.includes("floating-savant")&&hardAuth.authority.spawnPool.includes("fury"),
@@ -118,7 +119,15 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   must(greedImmune.authority.greed.immune&&greedImmune.authority.mobs.find((m)=>m.boss).hp===greedHp&&
     greedImmune.authority.mobs.filter((m)=>!m.boss).length<=6,
     "Greed recebeu dano imune ou excedeu seis adds");
+  greedImmune.authority.ended=false;greedImmune.authority.terminalReason=null;
   greedImmune.authority.greed.immune=false;greedImmune.authority.greed.vulnerableUntil=greedImmune.authority.clock+40000;
+  // Isole o relógio da mecânica: spells/skills autoritativas novas não devem
+  // matar o boss ou a party antes de completar a janela que este teste mede.
+  const durableGreed=greedImmune.authority.mobs.find((mob)=>mob.boss);
+  durableGreed.hp=durableGreed.maxHp=Number.MAX_SAFE_INTEGER;
+  for(const mob of greedImmune.authority.mobs){mob.damage=0;mob.attackSpeed=Number.MAX_SAFE_INTEGER;
+    mob.def=Object.assign({},mob.def,{skills:[]});}
+  for(const item of greedImmune.authority.players){item.p.conditions={};item.p.hp=engine.maxStats(item.p).hp;item.p.gold=1000000;}
   const beforeForty=JSON.parse(engine.advanceAuthorityState(JSON.stringify(greedImmune),39000,42000).state);
   must(!beforeForty.authority.greed.immune,"janela de Greed terminou antes de 40 segundos");
   const afterForty=JSON.parse(engine.advanceAuthorityState(JSON.stringify(beforeForty),1000,43000).state);

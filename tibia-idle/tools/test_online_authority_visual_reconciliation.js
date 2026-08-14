@@ -38,7 +38,7 @@ const authoritative={activeCharacterId:"10",state:{gridW:30,gridH:20,players:[
   {id:"10",p:{id:"10",name:"Kina",hp:6800}},{id:"20",p:{id:"20",name:"Pally",hp:5800}},
   {id:"30",p:{id:"30",name:"Druideiro",hp:4800}},{id:"40",p:{id:"40",name:"Sorc",hp:3800}},
 ],mobs:[{id:"a",slug:"retching-horror",hp:700,cx:2,cy:2,x:.08,y:.1},
-  {id:"c",slug:"fury",hp:1200}],events:[]}};
+  {id:"c",slug:"fury",hp:1200}],events:[{t:"hit",dmg:50,mobId:"a",ts:1234}]}};
 must(ctx.applyOnlineAuthorityState(authoritative,null),"segundo snapshot não foi aplicado");
 must(ctx.G.combat===originalCombat&&ctx.G.combat.player===e20&&ctx.G.p===p20&&p20.hp===5800,
   "snapshot completo quebrou o controle selecionado");
@@ -47,4 +47,7 @@ must(ctx.G.combat.mobs.length===2&&ctx.G.combat.mobs[0]===mobA&&mobA.hp===700&&m
 const mobC=ctx.G.combat.mobs.find((mob)=>mob.id==="c");
 must(mobC&&Number.isFinite(mobC.x)&&Number.isFinite(mobC.y),
   "novo monstro autoritativo nasceu sem posição renderizável");
+must(ctx.G.combat.events!==authoritative.state.events&&ctx.G.combat.events.length===1&&
+  ctx.G.combat.events[0].t==="hit",
+  "fila de eventos foi aliasada ao snapshot e pode entrar em push infinito");
 console.log("OK: ticks autoritativos preservam runtime, players ativos e continuidade visual dos monstros.");

@@ -291,7 +291,7 @@ function finalExp(p,mobExp,mobSlug){
   return exp;
 }
 
-function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),eligible=partyCanShareExp(players),
+function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x.p.hp>0),eligible=partyCanShareExp(players),
     receivers=eligible?(alive.length?alive:players):[(alive[0]||players[0])];
   // EXP final com stage + prey + VIP (cada receiver pode ter stage/prey diferentes)
   const baseExp=Number(mob.exp)||0;
@@ -505,7 +505,7 @@ function step(auth,now){if(auth.ended)return;
       if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true,ts:stepTs+800});
     }
     // Evento de kill para o cliente
-    const lootDrops=reward(auth,mob,auth.players);
+    const lootDrops=reward(auth,mob,auth.players,stepTs);
     auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
       exp:mob.exp||0,loot:lootDrops,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish,

@@ -831,7 +831,8 @@ async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
-  const id=String(body.instance_id||""),expected=Number(body.expected_version);
+  const id=String(body.instance_id||"");
+  let expected=Number(body.expected_version);
   if(!/^[a-f0-9]{64}$/.test(id)||!Number.isSafeInteger(expected)||expected<1)
     return {code:400,body:{ok:false,error:"INVALID_INSTANCE_END",msg:"Instância inválida"}};
   const reason=String(body.reason||"finished").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"finished";
@@ -1298,63 +1299,6 @@ async function main() {
   }
 
   await ensureTestAccounts(db);
-
-  // Reset de boot: toda vez que o servidor reinicia, todas as instâncias
-  // ativas são encerradas e todos os personagens voltam ao templo com HP/MP
-  // cheio. Isso evita estados inconsistentes após manutenção/restart.
-  try {
-    if (db.instances && Array.isArray(db.instances)) {
-      let cleared = 0;
-      for (const row of db.instances) {
-        if (row && row.status === "active") {
-          row.status = "ended";
-          row.terminal_reason = "server-restart";
-          row.ended_at = new Date().toISOString();
-          row.updated_at = row.ended_at;
-          cleared++;
-        }
-      }
-      if (cleared > 0 && typeof db._save === "function") db._save();
-      if (cleared > 0) console.log("[server] reset de boot: " + cleared + " instância(s) encerrada(s)");
-    }
-    // Restaura HP/MP de todos os personagens para o máximo
-    if (db.characters && Array.isArray(db.characters) && typeof maxStats === "function") {
-      let restored = 0;
-      for (const c of db.characters) {
-        try {
-          let p = {};
-          if (c.data) {
-            p = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {});
-          }
-          const mx = maxStats(p);
-          p.hp = mx.hp;
-          p.mp = mx.mp;
-          p.hunt = null;
-          p.instanceMode = null;
-          c.data = JSON.stringify(p);
-          c.hp = mx.hp;
-          c.mp = mx.mp;
-          c.max_hp = mx.hp;
-          c.max_mp = mx.mp;
-          c.save_version = (Number(c.save_version) || 0) + 1;
-          c.updated_at = new Date().toISOString();
-          restored++;
-        } catch (e) { /* personagem com dados inválidos: ignora */ }
-      }
-      if (restored > 0 && typeof db._save === "function") db._save();
-      if (restored > 0) console.log("[server] reset de boot: " + restored + " personagem(ns) restaurado(s) ao templo");
-    }
-    // Limpa leases antigos: após restart, nenhuma aba tem lease válido.
-    // Sem isso, o cliente recebe 409 (LEASE_HELD) ao tentar adquirir.
-    if (db.leases && Array.isArray(db.leases)) {
-      const before = db.leases.length;
-      if (before > 0) {
-        db.leases = [];
-        if (typeof db._save === "function") db._save();
-        console.log("[server] reset de boot: " + before + " lease(s) limpo(s)");
-      }
-    }
-  } catch (e) { console.warn("[server] falha no reset de boot:", e); }
 
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
   const instanceWorker=startInstanceWorker(db,{
