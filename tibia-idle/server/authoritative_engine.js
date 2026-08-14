@@ -115,19 +115,47 @@ function spellTargets(s){if(!s.area)return 1;return Math.max(2,Math.min(6,Math.r
 function spellReach(s){if(s.range&&s.range>0)return s.range;if(s.area)return 4;return 1;}
 
 /* Lista de spells de ataque habilitadas pelo jogador no Helper.
- * p.config.spells = { "exori-flam": true, "exori-gran-con": true, ... }
+ * p.config.combo = [{kind:"spell",id:"exori-flam",min:1},...]  (sistema novo)
+ * p.config.attackSpells = ["exori-flam","exori-gran-con",...]  (sistema antigo)
+ * p.config.spells = { "exori-flam": true, ... }  (formato legacy)
  * Retorna a melhor spell fora de cooldown, na prioridade do jogador. */
 function playerSpellList(p){
-  const cfg=(p.config&&p.config.spells)||{};
   const voc=p.voc;
   const out=[];
-  for(const id of Object.keys(cfg)){
-    if(!cfg[id])continue;
-    const s=ALL_SPELLS[id];if(!s)continue;
+  const seen=new Set();
+  // Sistema novo: combo bar (array de slots {kind,id,min})
+  const combo=(p.config&&Array.isArray(p.config.combo))?p.config.combo:[];
+  for(const slot of combo){
+    if(!slot||slot.kind!=="spell"||!slot.id)continue;
+    if(seen.has(slot.id))continue;
+    const s=ALL_SPELLS[slot.id];if(!s)continue;
     if(s.type!=="attack"&&!s.aggr)continue;
     if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
     if(Number(s.lvl||0)>Number(p.level||1))continue;
-    out.push(s);
+    seen.add(slot.id);out.push(s);
+  }
+  // Sistema antigo: attackSpells (array de ids)
+  if(!out.length&&Array.isArray(p.config&&p.config.attackSpells)){
+    for(const id of p.config.attackSpells){
+      if(!id||seen.has(id))continue;
+      const s=ALL_SPELLS[id];if(!s)continue;
+      if(s.type!=="attack"&&!s.aggr)continue;
+      if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
+      if(Number(s.lvl||0)>Number(p.level||1))continue;
+      seen.add(id);out.push(s);
+    }
+  }
+  // Legacy: spells (mapa de ids -> true)
+  if(!out.length){
+    const cfg=(p.config&&p.config.spells)||{};
+    for(const id of Object.keys(cfg)){
+      if(!cfg[id]||seen.has(id))continue;
+      const s=ALL_SPELLS[id];if(!s)continue;
+      if(s.type!=="attack"&&!s.aggr)continue;
+      if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
+      if(Number(s.lvl||0)>Number(p.level||1))continue;
+      seen.add(id);out.push(s);
+    }
   }
   // sem spells marcadas: usa a spell de ataque padrão da vocação
   if(!out.length){
@@ -200,6 +228,15 @@ function applyPvpLoss(p,source){const rate=source==="player-raid"?.08:.03,loss=M
 function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String(member.id);p.level=Math.max(1,Number(p.level)||1);p.exp=Math.max(0,Number(p.exp)||0);
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
   p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=FULL_STAMINA;
+  // Posição visual do player no grid. Sem isto, eventos de dano (taken/
+  // death/condition) usam fallback 0.13/0.6 e os floaters aparecem nos
+  // cantos da tela. O cliente sobrescreve com posição real via mergeEntity.
+  if(!Number.isFinite(Number(p.cx)))p.cx=3;
+  if(!Number.isFinite(Number(p.cy)))p.cy=Math.floor((Number(p._gridH)||30)/2);
+  if(!Number.isFinite(Number(p.x)))p.x=(Number(p.cx)+.5)/(Number(p._gridW)||30);
+  if(!Number.isFinite(Number(p.y)))p.y=(Number(p.cy)+.5)/(Number(p._gridH)||30);
+  if(!Number.isFinite(Number(p.sx)))p.sx=p.x;
+  if(!Number.isFinite(Number(p.sy)))p.sy=p.y;
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));return p;}
 function makeMob(auth,slug,boss,id,source){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
   const sequence=Math.max(1,Number(auth.nextMobId)||1);auth.nextMobId=sequence+1;
@@ -438,6 +475,11 @@ function step(auth,now){if(auth.ended)return;
             const isCrit=guaranteedCrit||random(auth)<critChance;
             // Fatal (Onslaught) — 5% chance
             const isFatal=isCrit&&random(auth)<0.05;
+            // Evento de cast para o cliente renderizar a animação da spell
+            auth.events.push({t:"cast",name:s.name,area:!!s.area,element:el,
+              x:Number(p.x)||0.13,y:Number(p.y)||0.6,screen:true,
+              missile:s.words||"",projectile:!s.area,
+              ts:stepTs+hitIdx*100});
             for(const tgt of targets){
               let finalDmg=Math.floor(dmg*forgeMult);
               if(isCrit)finalDmg=Math.floor(finalDmg*1.5);
@@ -449,7 +491,9 @@ function step(auth,now){if(auth.ended)return;
                 el:el,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
                 mobId:String(tgt.id),mobSlug:tgt.slug,
                 sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,missile:s.area?"":(s.words||""),
-                ts:stepTs+hitIdx*200});
+                projectile:!s.area,
+                ts:stepTs+hitIdx*200+50});
+              hitIdx++;
             }
             // Mana cost
             if(s.mana)p.mp=Math.max(0,p.mp-s.mana);
@@ -457,7 +501,7 @@ function step(auth,now){if(auth.ended)return;
             if(!p._spellCd)p._spellCd={};
             p._spellCd[s.id]=(now||Date.now())+(s.cd||2000);
             p._lastSpellAt=now||Date.now();
-            spellCdLeft=2000;
+            spellCdLeft=s.cd||2000;
             progressAttack(p);
             acted=true;
           }
@@ -598,6 +642,17 @@ function initializeAuthority(descriptor,instanceId,now){
       (FIENDISH_BASE_CHANCE+(descriptor.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0))),
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,pack:Math.max(1,visual.length||3),
     stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,loot:{},monsters:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
+  // Set player positions based on grid. Players are placed on the left side
+  // of the arena in a vertical column, like the client's newCombat does.
+  for(let pi=0;pi<auth.players.length;pi++){
+    const item=auth.players[pi],p=item.p;
+    if(!Number.isFinite(Number(p.cx)))p.cx=2;
+    if(!Number.isFinite(Number(p.cy)))p.cy=Math.floor(auth.gridH/2)-Math.floor(auth.players.length/2)+pi;
+    if(!Number.isFinite(Number(p.x)))p.x=(Number(p.cx)+.5)/auth.gridW;
+    if(!Number.isFinite(Number(p.y)))p.y=(Number(p.cy)+.5)/auth.gridH;
+    if(!Number.isFinite(Number(p.sx)))p.sx=p.x;
+    if(!Number.isFinite(Number(p.sy)))p.sy=p.y;
+  }
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
@@ -614,17 +669,24 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
   descriptor.state.players=auth.players.map((item)=>Object.assign({},oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},{id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0}));
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
-  descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},
-    {cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
-    {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
-      sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
-      hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
-      // def compacto: só campos necessários para o cliente renderizar.
-      // O def completo (loot, skills, voices) é pesado e já existe no
-      // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
-      // browser (50KB+ por snapshot com 6 mobs).
-      def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
-           element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}}));
+  descriptor.state.mobs=auth.mobs.map((m)=>{
+    const existing=oldMobs.find((x)=>String(x.id)===String(m.id));
+    // O cliente é dono do movimento visual (client-side prediction via
+    // updateGridMovement/monsterThinkStep). O servidor só envia posição
+    // para mobs NOVOS (que o cliente ainda não tem). Para mobs existentes,
+    // NÃO enviamos cx/cy/x/y/sx/sy — o cliente preserva via visualKeys.
+    const base=existing?{}:{cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy};
+    return Object.assign({},base,existing||{},
+      {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
+        sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
+        hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
+        // def compacto: só campos necessários para o cliente renderizar.
+        // O def completo (loot, skills, voices) é pesado e já existe no
+        // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
+        // browser (50KB+ por snapshot com 6 mobs).
+        def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
+             element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}});
+  });
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
