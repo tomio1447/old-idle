@@ -618,7 +618,13 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     {cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
     {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
-      hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),def:m.def}));
+      hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
+      // def compacto: só campos necessários para o cliente renderizar.
+      // O def completo (loot, skills, voices) é pesado e já existe no
+      // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
+      // browser (50KB+ por snapshot com 6 mobs).
+      def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
+           element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}}));
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";

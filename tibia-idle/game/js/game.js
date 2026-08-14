@@ -198,7 +198,10 @@ function restoreCombatSessionState(fresh,session){
   const findTarget=(id)=>c.players&&c.players.find((ent)=>String(ent.id)===String(id));
   const hydrateMob=(mob)=>{
     if(!mob)return mob;
-    if(!mob.def)mob.def=(GAMEDATA.monsters&&GAMEDATA.monsters[mob.slug])||{};
+    // Sempre usa o def completo do GAMEDATA local. O servidor envia um
+    // def compacto (só name/race/element) para reduzir o tamanho do
+    // snapshot; o cliente precisa do def completo para renderização.
+    mob.def=(GAMEDATA.monsters&&GAMEDATA.monsters[mob.slug])||mob.def||{};
     if(mob.target&&mob.target.__targetId)mob.target=findTarget(mob.target.__targetId)||null;
     return mob;
   };
@@ -1679,17 +1682,18 @@ function drainEvents() {
   if (!c) return;
   const r = G.renderer;
 
-  // Modo online: eventos do servidor têm `ts` (timestamp absoluto). O
-  // servidor processa 1s de combate de uma vez e envia todos os eventos
-  // juntos; sem espaçar, todos os floaters aparecem no mesmo frame.
-  // Filtramos apenas os eventos cujo `ts` já passou (Date.now() >= ts),
-  // deixando os demais para o próximo frame. Sem `ts` (modo local), processa
-  // tudo imediatamente como antes.
+  // Modo online: eventos do servidor têm `ts` (timestamp). O servidor
+  // processa 1s de combate de uma vez; sem espaçar, todos os floaters
+  // aparecem no mesmo frame. Filtramos apenas os eventos cujo `ts` já
+  // passou. MAS se o clock do servidor estiver à frente do cliente,
+  // os eventos ficariam presos indefinidamente. Limite de 5s de pending:
+  // se o ts está mais de 5s no futuro, processa imediatamente (provável
+  // diferença de clock).
   const now = Date.now();
   const ready = [];
   const pending = [];
   for (const e of c.events) {
-    if (e.ts && e.ts > now) pending.push(e);
+    if (e.ts && e.ts > now && (e.ts - now) < 5000) pending.push(e);
     else ready.push(e);
   }
   c.events = pending;
