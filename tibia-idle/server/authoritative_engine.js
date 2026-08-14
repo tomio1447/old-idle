@@ -5,7 +5,8 @@ const DATA=path.join(__dirname,"..","game","data");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
-const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW,SPELL_FX=read("spellfx.json");
+const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW,SPELL_FX=read("spellfx.json"),
+  AREA_DATA=read("areas.json"),SPELL_TARGET=read("spelltarget.json");
 for(const slug of Object.keys(AMMO)){const raw=AMMO[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
   {name:raw.n||slug,slot:"ammo",type:"ammo",attack:Number(raw.atk)||0,level:Number(raw.lvl)||0});}
 for(const slug of Object.keys(QUIVERS)){const raw=QUIVERS[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
@@ -35,6 +36,15 @@ function finitePosition(value,fallback){const n=Number(value);return Number.isFi
 function entityPosition(entity,fallbackX,fallbackY){return{x:finitePosition(entity&&entity.x,fallbackX),y:finitePosition(entity&&entity.y,fallbackY)};}
 function entityVisual(entity){const out={};for(const key of ["cx","cy","x","y","sx","sy"])
   if(entity&&entity[key]!==undefined)out[key]=entity[key];return out;}
+const TRANSIENT_VISUAL_KEYS=["tx","ty","moving","frame","walkT","stepT","stepDur","nextStepAt","attackAnim",
+  "target","path","pathIndex","moveFrom","moveTo","moveProgress"];
+function stripStaleVisualStep(entity){
+  // O servidor recebe posição/célula, mas não simula o trajeto entre elas.
+  // Nunca republique o passo que ficou no checkpoint inicial: numa aba nova
+  // ele faria a criatura interpolar de volta para um destino já vencido.
+  for(const key of TRANSIENT_VISUAL_KEYS)delete entity[key];
+  return entity;
+}
 function playerPosition(auth,p){const item=(auth.players||[]).find((entry)=>entry.p===p||String(entry.id)===String(p&&p.id));
   return entityPosition(item,.13,.6);}
 function authorityVisualDistance(a,b,auth){
@@ -162,6 +172,65 @@ function rollSpell(auth,p,s){
   return v.min+roll(auth,0,v.max-v.min);
 }
 function spellTargets(s){if(!s.area)return 1;return Math.max(2,Math.min(6,Math.round((s.alvos||8)/3)));}
+const AREA_ANCHORED_ON_TARGET=new Set(["AREA_CIRCLE1X1","AREA_CIRCLE2X2","AREA_CIRCLE3X3",
+  "AREA_CIRCLE4X4","AREA_CIRCLE5X5","AREA_CIRCLE6X6","AREA_SQUARE1X1","AREA_CROSS1X1"]);
+function entityGridCell(entity,auth){
+  let cx=Number(entity&&entity.cx),cy=Number(entity&&entity.cy);
+  const w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30;
+  if(!Number.isFinite(cx))cx=Math.floor(finitePosition(entity&&entity.x,.5)*w);
+  if(!Number.isFinite(cy))cy=Math.floor(finitePosition(entity&&entity.y,.5)*h);
+  return{cx:Math.max(0,Math.min(w-1,Math.round(cx))),cy:Math.max(0,Math.min(h-1,Math.round(cy)))};
+}
+function spellAreaDirection(origin,target){
+  const dx=target.cx-origin.cx,dy=target.cy-origin.cy;
+  if(Math.abs(dx)>Math.abs(dy))return dx>=0?"e":"w";
+  if(dy!==0)return dy>0?"s":"n";
+  return dx>=0?"e":"w";
+}
+function spellAreaFromCaster(name,s){
+  const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
+  if(meta.self)return true;
+  if(meta.needTarget||s&&s.needTarget)return false;
+  if(AREA_ANCHORED_ON_TARGET.has(name))return false;
+  const area=AREA_DATA[name],north=area&&area.n;
+  return Array.isArray(north)&&!north.some((cell)=>Number(cell&&cell[1])>0);
+}
+/* Geometria oficial importada do register_spells.lua. A autoridade usa as
+ * mesmas células do cliente: ondas/feixes nascem no caster e círculos self
+ * ficam ao redor dele; áreas com target são ancoradas no alvo. */
+function spellAreaCells(auth,s,caster,target){
+  const meta=SPELL_TARGET[String(s&&s.id||"")]||{},name=typeof(s&&s.area)==="string"?s.area:meta.areaNome,
+    area=name&&AREA_DATA[name];
+  if(!area||!caster||!target)return[];
+  const origin=entityGridCell(caster,auth),aim=entityGridCell(target,auth),dir=spellAreaDirection(origin,aim),
+    offsets=area[dir]||area.n;if(!Array.isArray(offsets))return[];
+  const fromCaster=spellAreaFromCaster(name,s),base=fromCaster?origin:aim,
+    wave=fromCaster&&/WAVE/i.test(name),w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30,
+    seen=new Set(),cells=[];
+  for(const offset of offsets){
+    const dx=Number(offset&&offset[0])||0,dy=Number(offset&&offset[1])||0;
+    if(wave&&dx===0&&dy===0)continue;
+    const cx=base.cx+dx,cy=base.cy+dy,key=cx+":"+cy;
+    if(cx<0||cy<0||cx>=w||cy>=h||seen.has(key))continue;
+    seen.add(key);cells.push({cx,cy});
+  }
+  return cells;
+}
+function spellAreaTargets(auth,s,caster,target,living){
+  const cells=spellAreaCells(auth,s,caster,target);
+  if(!cells.length){
+    const count=spellTargets(s);
+    return [target].concat((living||[]).filter((mob)=>mob!==target&&mob.hp>0)
+      .sort((a,b)=>authorityVisualDistance(a,target,auth)-authorityVisualDistance(b,target,auth))
+      .slice(0,count-1));
+  }
+  const covered=new Set(cells.map((cell)=>cell.cx+":"+cell.cy)),inside=(living||[]).filter((mob)=>{
+    if(!mob||mob.hp<=0)return false;const cell=entityGridCell(mob,auth);return covered.has(cell.cx+":"+cell.cy);
+  });
+  const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
+  if(meta.self)return inside;
+  return inside.includes(target)?inside:[target].concat(inside);
+}
 function spellReach(s){if(s.range&&s.range>0)return s.range;if(s.area)return 4;return 1;}
 function spellVisual(s){const words=String(s&&s.words||"").toLowerCase(),name=String(s&&s.name||"").toLowerCase(),
   imported=SPELL_FX.words&&SPELL_FX.words[words]||SPELL_FX.names&&SPELL_FX.names[name]||{};
@@ -494,9 +563,12 @@ function step(auth,now){if(auth.ended)return;
             const s=best;
             const el=s.element||"physical";
             let dmg=rollSpell(auth,p,s);
-            // Area spells atingem múltiplos monstros
-            const targets=[primaryTarget];
-            if(s.area){const others=living.filter((m)=>m!==primaryTarget&&m.hp>0).slice(0,spellTargets(s)-1);targets.push(...others);}
+            // Área usa a matriz oficial e as posições/células sincronizadas.
+            // Não escolha apenas os primeiros N monstros do array: isso dava
+            // dano fora do desenho e deixava criaturas visivelmente dentro
+            // da wave/caldeira sem receber o golpe.
+            const areaCells=s.area?spellAreaCells(auth,s,item,primaryTarget):[];
+            const targets=s.area?spellAreaTargets(auth,s,item,primaryTarget,living):[primaryTarget];
             // Forge buffs
             const forgeMult=forgeDamageMult(p,now);
             const guaranteedCrit=forgeGuaranteedCrit(p,now);
@@ -507,7 +579,7 @@ function step(auth,now){if(auth.ended)return;
             const isFatal=isCrit&&random(auth)<0.05;
             const source=playerPosition(auth,p),visual=spellVisual(s),fx=visual.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,
               magical=!s.f||s.f.modo==="magic",missile=visual.missile||(magical?(ELEMENT_MISSILE[el]||"energy"):null),
-              projectile=!!missile&&spellReach(s)>1;
+              projectile=!!missile&&spellReach(s)>1,castVisualTs=stepTs+hitIdx*200;
             for(const tgt of targets){
               let finalDmg=Math.floor(dmg*forgeMult);
               if(isCrit)finalDmg=Math.floor(finalDmg*1.5);
@@ -524,9 +596,13 @@ function step(auth,now){if(auth.ended)return;
             }
             // A fala e o estouro de área fazem parte do mesmo schema visual
             // usado pelo combate local; palavras nunca são chave de missile.
-            if(s.area){const target=entityPosition(primaryTarget,.5,.5);
-              auth.events.push({t:"burst",x:target.x,y:target.y,targetId:String(primaryTarget.id),
-                fx,spell:s.name,spellId:s.id,screen:true,ts:stepTs+hitIdx*200+20});}
+            if(s.area){
+              if(areaCells.length>1)auth.events.push({t:"areafx",cells:areaCells,
+                fx,spell:s.name,spellId:s.id,screen:true,ts:castVisualTs+20});
+              else{const target=entityPosition(primaryTarget,.5,.5);
+                auth.events.push({t:"burst",x:target.x,y:target.y,targetId:String(primaryTarget.id),
+                  fx,spell:s.name,spellId:s.id,screen:true,ts:stepTs+hitIdx*200+20});}
+            }
             auth.events.push({t:"say",text:s.words||String(s.name||"").toLowerCase(),whoId:String(item.id),
               x:source.x,y:source.y,screen:true,ts:stepTs+hitIdx*200+40});
             // Mana cost
@@ -696,11 +772,12 @@ function initializeAuthority(descriptor,instanceId,now){
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
   descriptor.members=auth.players.map((item)=>({id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp}));descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
   descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
-  descriptor.state.players=auth.players.map((item)=>Object.assign({},oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},
-    entityVisual(item),{id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0}));
+  descriptor.state.players=auth.players.map((item)=>stripStaleVisualStep(Object.assign({},
+    oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},entityVisual(item),
+    {id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0})));
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
-  descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
-    entityVisual(m),
+  descriptor.state.mobs=auth.mobs.map((m)=>stripStaleVisualStep(Object.assign({},
+    oldMobs.find((x)=>String(x.id)===String(m.id))||{},entityVisual(m),
     {id:m.id,slug:m.slug,boss:m.boss,targetId:m.targetId||null,influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
@@ -709,7 +786,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
       // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
       // browser (50KB+ por snapshot com 6 mobs).
       def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
-           element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}}));
+           element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}})));
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";

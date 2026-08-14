@@ -85,7 +85,12 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   must(!motaAfter.authority.ended&&motaAfter.authority.mobs.length>0&&motaAfter.authority.players.every((p)=>p.p.hp>0)&&
     motaAfter.authority.players[0].p.missions["mota-extension"].progress,
     "party MOTA não sobrevive/progride missões por 60s no motor autoritativo");
-  const d1=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
+  const d1Descriptor=directDescriptor(basePlayer);
+  Object.assign(d1Descriptor.state.mobs[0],{moving:true,tx:.9,ty:.9,stepT:1,stepDur:9999,nextStepAt:9999});
+  const d1=engine.initializeAuthority(d1Descriptor,"1".repeat(64),1000);
+  must(d1.state.mobs[0].moving===undefined&&d1.state.mobs[0].tx===undefined&&
+    d1.state.mobs[0].stepT===undefined&&d1.state.mobs[0].nextStepAt===undefined,
+    "snapshot autoritativo republicou passo visual antigo para reconnect/restart");
   const visualPayload={players:[{id:"1",x:.31,y:.62,cx:9,cy:18}],
     mobs:[{id:"direct-mob",x:.74,y:.42,cx:22,cy:12}]};
   const positioned=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),0,1000,visualPayload).state);
@@ -125,6 +130,50 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     spellHit.projectile&&spellHit.missile==="fire"&&spellHit.fx==="fire-attack"&&
     spellAfter.state.events.some((event)=>event.t==="say"&&event.text==="exori flam"),
     "spell autoritativa perdeu alvo/origem, projectile, efeito ou fala compatíveis com o renderer");
+
+  // Área oficial: Hell's Core é self-target e cobre a matriz CIRCLE5X5 ao
+  // redor do caster. Monstro fora dela não pode entrar só por estar no array.
+  const areaPlayer=Object.assign({},basePlayer,{id:6,voc:"sorcerer",level:500,ml:120,hp:999999,mp:999999,equip:{},
+    config:{spellAttack:true,combo:[{kind:"spell",id:"exevo-gran-mas-flam",min:1}]}}),
+    areaDesc=directDescriptor(areaPlayer);
+  areaDesc.state.gridW=30;areaDesc.state.gridH=30;
+  areaDesc.state.players[0]=Object.assign(areaDesc.state.players[0],{cx:10,cy:10,x:10.5/30,y:10.5/30});
+  areaDesc.state.mobs=[
+    {id:"area-near-1",slug:"behemoth",cx:11,cy:10,x:11.5/30,y:10.5/30},
+    {id:"area-near-2",slug:"behemoth",cx:14,cy:10,x:14.5/30,y:10.5/30},
+    {id:"area-far",slug:"behemoth",cx:20,cy:20,x:20.5/30,y:20.5/30},
+  ];
+  const areaAuth=engine.initializeAuthority(areaDesc,"c".repeat(64),1000);
+  for(const mob of areaAuth.authority.mobs){mob.damage=0;mob.def=Object.assign({},mob.def,{skills:[]});}
+  const areaAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(areaAuth),2000,3000).state),
+    areaHits=areaAfter.state.events.filter((event)=>event.t==="hit"&&event.spellId==="exevo-gran-mas-flam"),
+    areaIds=new Set(areaHits.map((event)=>event.targetId)),areaFx=areaAfter.state.events.find((event)=>event.t==="areafx");
+  must(areaIds.has("area-near-1")&&areaIds.has("area-near-2")&&!areaIds.has("area-far"),
+    "spell autoritativa não respeitou os monstros dentro/fora da matriz de área: "+[...areaIds].join(",")+
+    " events="+areaAfter.state.events.map((event)=>event.t+":"+(event.spellId||event.targetId||"")).join("|"));
+  must(areaFx&&areaFx.cells.length>1&&areaFx.cells.some((cell)=>cell.cx===10&&cell.cy===10)&&
+    areaFx.ts<=Math.min(...areaHits.map((event)=>event.ts))+20,
+    "spell autoritativa não enviou a matriz visual junto do primeiro impacto");
+
+  // Waves são direcionais e começam uma casa à frente do caster.
+  const wavePlayer=Object.assign({},areaPlayer,{id:7,config:{spellAttack:true,
+      combo:[{kind:"spell",id:"exevo-flam-hur",min:1}]}}),waveDesc=directDescriptor(wavePlayer);
+  waveDesc.state.gridW=30;waveDesc.state.gridH=30;
+  waveDesc.state.players[0]=Object.assign(waveDesc.state.players[0],{cx:10,cy:10,x:10.5/30,y:10.5/30});
+  waveDesc.state.mobs=[
+    {id:"wave-front",slug:"behemoth",cx:12,cy:10,x:12.5/30,y:10.5/30},
+    {id:"wave-edge",slug:"behemoth",cx:13,cy:12,x:13.5/30,y:12.5/30},
+    {id:"wave-behind",slug:"behemoth",cx:9,cy:10,x:9.5/30,y:10.5/30},
+  ];
+  const waveAuth=engine.initializeAuthority(waveDesc,"d".repeat(64),1000);
+  for(const mob of waveAuth.authority.mobs){mob.damage=0;mob.def=Object.assign({},mob.def,{skills:[]});}
+  const waveAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(waveAuth),2000,3000).state),
+    waveHits=new Set(waveAfter.state.events.filter((event)=>event.spellId==="exevo-flam-hur"&&event.t==="hit")
+      .map((event)=>event.targetId)),waveFx=waveAfter.state.events.find((event)=>event.t==="areafx");
+  must(waveHits.has("wave-front")&&waveHits.has("wave-edge")&&!waveHits.has("wave-behind")&&
+    waveFx&&waveFx.cells.every((cell)=>!(cell.cx===10&&cell.cy===10)),
+    "wave autoritativa perdeu direção, largura ou origem à frente do caster");
+
   const visibleWave=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),1000,2000).state);
   must(visibleWave.authority.mobs.length>0&&visibleWave.state.mobs.length>0,
     "snapshot entre waves removeu todos os monstros da arena");

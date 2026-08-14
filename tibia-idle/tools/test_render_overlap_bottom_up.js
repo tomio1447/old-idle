@@ -29,5 +29,5 @@ must(queue[queue.length-1].ent.slug==="demon",
 must(source.includes("for (let i = entityInfo.length - 1; i >= 0; i--)")&&
   source.includes("for (const info of entityInfo) {"),
   "correção das sprites quebrou a prioridade independente dos labels");
-must(html.includes("js/render.js?v=creature-depth-v2"),"render.js sem cache-bust da profundidade 2x2");
+must(html.includes("js/render.js?v=combat-visual-v1"),"render.js sem cache-bust da profundidade 2x2");
 console.log("OK: bases inferiores cobrem as superiores, incluindo Demon 2x2, sem inverter labels.");

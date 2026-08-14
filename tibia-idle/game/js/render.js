@@ -1754,10 +1754,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const scale = (typeof tibiaScale !== 'undefined') ? tibiaScale(W) : (typeof tilePx !== 'undefined' ? tilePx(W)/32 : 1);
     const baseX = f.x * W;
     const baseY = f.y * H;
-    // Centraliza no tile (16*scale = metade de 32px) e comeca no centro
-    // vertical da sprite, subindo ao longo da animacao — igual ao Canary.
-    let fx = baseX + (16 * scale - textW / 2) + (f.offsetX || 0);
-    let fy = baseY + (16 * scale - 64 * scale * p) + (f.offsetY || 0);
+    // f.x/f.y já são o CENTRO normalizado da entidade/SQM (cellToScreen usa
+    // +0.5). Somar mais meio tile deslocava todo número para baixo e para a
+    // direita. O texto nasce exatamente no alvo e sobe dali, como no Canary.
+    let fx = baseX - textW / 2 + (f.offsetX || 0);
+    let fy = baseY - 64 * scale * p + (f.offsetY || 0);
     const t0 = tf / 1.2;
     let alpha = 1;
     if (elapsed > t0) {

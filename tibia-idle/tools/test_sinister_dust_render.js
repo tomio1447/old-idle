@@ -43,5 +43,5 @@ const call=source.lastIndexOf("drawSinisterDust(ctx, info.ent, info.cx, info.cy,
 must(call>objects&&call<bossbar,"poeira não está visível acima dos objetos e abaixo da UI");
 must(source.lastIndexOf("drawSinisterCreatureIcon(ctx,info.ent,info.cx,barY)")>bossbar,
   "ícone de criatura não está na camada de UI acima do mapa");
-must(html.includes("js/render.js?v=creature-depth-v2"),"render.js sem cache-bust visual");
+must(html.includes("js/render.js?v=combat-visual-v1"),"render.js sem cache-bust visual");
 console.log("OK: ícone e poeira Influenced/Fiendish aparecem animados e visíveis.");

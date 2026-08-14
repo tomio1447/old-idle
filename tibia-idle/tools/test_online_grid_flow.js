@@ -19,5 +19,5 @@ must(gridAi.includes("const authoritativeTarget=m.targetId&&c.players")&&
   gridAi.includes("authoritativeTarget||monsterReachableTarget"),
   "IA visual não segue o targetId decidido pela autoridade");
 must(html.includes("js/grid.js?v=online-flow-v1")&&html.includes("js/gridai.js?v=online-flow-v1")&&
-  html.includes("js/game.js?v=online-fix-v11"),"assets do fluxo online sem cache-bust");
+  html.includes("js/game.js?v=online-fix-v12"),"assets do fluxo online sem cache-bust");
 console.log("OK: party/mobs são separados e perseguem a vítima autoritativa.");

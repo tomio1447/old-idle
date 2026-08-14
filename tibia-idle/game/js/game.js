@@ -1700,6 +1700,12 @@ function drainEvents() {
 
   if (!ready.length) return;
 
+  // O alvo pode ter avançado vários frames desde que o lote foi recebido.
+  // Atualize origem/destino imediatamente antes de criar texto, efeito e
+  // projétil; se a entidade já morreu/sumiu, a coordenada congelada do evento
+  // continua sendo o fallback correto para o último hit/corpse.
+  for (const event of ready) resolveLiveCombatEventPosition(c, event);
+
   const visualTotals=aggregateCombatVisualEvents(ready);
   const visualAmount=(event,fallback)=>{
     const group=visualTotals.byEvent.get(event);
@@ -1740,7 +1746,10 @@ function drainEvents() {
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
         const shownDamage=visualAmount(e,e.dmg||0);
-        const floaterX=ex(e)+(ehFisico?0:0.022);
+        // Todo dano nasce exatamente no alvo. Só a segunda parcela elemental
+        // de arma híbrida (`dual`) recebe deslocamento para não cobrir o
+        // número físico; magia elemental comum não deve flutuar à direita.
+        const floaterX=ex(e)+(e.dual?0.022:0);
         if (shownDamage > 0) r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage");
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
@@ -2494,6 +2503,32 @@ async function requestOnlineRuntimeRecovery(){
   }catch(error){return false;}
   finally{ONLINE_RUNTIME_RECOVERING=false;}
 }
+/* Reancora um evento quando ele REALMENTE vira efeito/floater, não apenas
+ * quando o lote chega. Os eventos são distribuídos por até 850 ms e nesse
+ * intervalo a interpolação continua; congelar x/y no recebimento deixava o
+ * número no tile anterior enquanto a criatura já estava no próximo. */
+function resolveLiveCombatEventPosition(combat,event){
+  if(!combat||!event)return event;
+  const idOf=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||""),
+    players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]),
+    mobs=Array.isArray(combat.mobs)?combat.mobs:[],find=(list,id)=>{
+      const wanted=String(id===undefined||id===null?"":id);return wanted?list.find((ent)=>idOf(ent)===wanted):null;
+    },targetId=event.targetId!==undefined?event.targetId:event.mobId,
+    playerEvent=event.t==="taken"||event.t==="death"||event.t==="condition"||event.t==="block"||
+      event.t==="heal"||event.t==="heal-friend"||event.t==="mana"||event.t==="magic-shield",
+    target=playerEvent?find(players,targetId):(find(mobs,targetId)||find(players,targetId));
+  if(target&&Number.isFinite(Number(target.x))&&Number.isFinite(Number(target.y))){
+    event.x=Number(target.x);event.y=Number(target.y);event.screen=true;
+  }
+  const source=(event.whoId!==undefined?find(players,event.whoId):null)||
+    (event.sourceId!==undefined?find(mobs,event.sourceId):null);
+  if(source&&Number.isFinite(Number(source.x))&&Number.isFinite(Number(source.y))){
+    event.sx=Number(source.x);event.sy=Number(source.y);
+    if((event.t==="say"||event.t==="buff")&&!target){event.x=event.sx;event.y=event.sy;event.screen=true;}
+  }
+  return event;
+}
+
 /* Distribui o lote autoritativo pelo próximo segundo sem reintroduzir ping.
  * O servidor calcula combate em passos de 1s; descarregar o lote inteiro no
  * mesmo frame transforma a hunt em explosões/floaters aos trancos. A linha do
@@ -2520,7 +2555,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // Um tick não pode substituir G.combat nem as entidades que o renderer e a
   // troca de personagem já estão usando. A substituição integral fazia um
   // membro recém-selecionado e ondas inteiras piscarem/sumirem.
-  const visualKeys=["cx","cy","x","y","sx","sy","dir","moving","frame","walkT","nextStepAt","path","pathIndex","moveFrom","moveTo","moveProgress"];
+  // O snapshot materializado ainda contém campos transitórios do checkpoint
+  // inicial. Preserve o passo local INTEIRO: manter x/y mas sobrescrever
+  // tx/ty/stepT a cada resposta de 1s fazia a interpolação voltar para um
+  // trajeto antigo e os monstros saltarem como se perdessem frames.
+  const visualKeys=["cx","cy","x","y","sx","sy","tx","ty","dir","moving","frame","walkT",
+    "stepT","stepDur","speedPts","walkFrames","_walkFramesSlug","nextStepAt","attackAnim","target",
+    "path","pathIndex","moveFrom","moveTo","moveProgress"];
   const entityId=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
   const localActiveId=entityId(previous.player),previousPlayers=Array.isArray(previous.players)?previous.players:[],
     previousMobs=Array.isArray(previous.mobs)?previous.mobs:[];
