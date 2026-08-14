@@ -2515,8 +2515,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
     if(!local)return remote;
     const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
     const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
+    // O snapshot do servidor também carrega posição DENTRO de `p` (o save do
+    // personagem). Sem preservar aqui, `Object.assign(playerRef,remote.p)`
+    // devolvia o char ao tile de spawn a cada tick: a party inteira piscava
+    // empilhada no mesmo quadrado e o movimento local era descartado.
+    const playerVisual={};
+    if(playerRef)for(const key of visualKeys)if(playerRef[key]!==undefined)playerVisual[key]=playerRef[key];
     Object.assign(local,remote||{});
-    if(playerRef&&remote&&remote.p){Object.assign(playerRef,remote.p);local.p=playerRef;}
+    if(playerRef&&remote&&remote.p){Object.assign(playerRef,remote.p);local.p=playerRef;
+      for(const key of Object.keys(playerVisual))playerRef[key]=playerVisual[key];}
     for(const key of Object.keys(visual))local[key]=visual[key];
     return local;
   };

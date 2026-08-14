@@ -252,9 +252,18 @@ function makeMob(auth,slug,boss,id,source){const def=monsterDef(slug);if(!def)re
     damage:Math.max(0,Math.floor((Number(def.damage)||0)*(stacks?1+stacks*.08:1))),
     exp:Math.max(0,Math.floor((Number(def.exp)||0)*(stacks?1+stacks*.25:1))),
     attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};
+  // Espalha cada spawn: mobs empilhados no mesmo tile ficam invisíveis uns
+  // sob os outros e o pathfinding do cliente não consegue separá-los. Poucos
+  // spawnPoints (ou nenhum) precisam de deslocamento próprio por criatura.
   const points=auth.spawnPoints||[],point=points.length?points[(sequence-1)%points.length]:null;
-  if(point)Object.assign(mob,point);else if(auth.gridW&&auth.gridH){mob.cx=Math.floor(auth.gridW/2);mob.cy=Math.floor(auth.gridH/2);
-    mob.x=(mob.cx+.5)/auth.gridW;mob.y=(mob.cy+.5)/auth.gridH;mob.sx=mob.x;mob.sy=mob.y;}
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  const ring=Math.floor((sequence-1)/Math.max(1,points.length||1)),
+    spread=[[0,0],[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]][((sequence-1)+ring)%9];
+  let cx,cy;
+  if(point){cx=Number(point.cx)+spread[0]*(ring?ring:0);cy=Number(point.cy)+spread[1]*(ring?ring:0);}
+  else{cx=Math.floor(w/2)+spread[0]*(1+ring);cy=Math.floor(h/2)+spread[1]*(1+ring);}
+  mob.cx=Math.max(0,Math.min(w-1,Math.round(cx)));mob.cy=Math.max(0,Math.min(h-1,Math.round(cy)));
+  mob.x=(mob.cx+.5)/w;mob.y=(mob.cy+.5)/h;mob.sx=mob.x;mob.sy=mob.y;
   return mob;}
 function partyCanShareExp(players){players=Array.isArray(players)?players:[];if(players.length<2)return false;
   const levels=players.map((item)=>Math.max(1,Number(item&&item.p&&item.p.level)||1));
