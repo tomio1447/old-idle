@@ -304,9 +304,11 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
   const raw=auth.stats.monsters[mob.slug]||(auth.stats.monsters[mob.slug]={name:mob.def.name||mob.slug,kills:0,rawExp:0,rawHp:0});
   raw.kills=(Number(raw.kills)||0)+1;raw.rawExp=(Number(raw.rawExp)||0)+Math.max(0,baseExp);
   raw.rawHp=(Number(raw.rawHp)||0)+Math.max(0,Number(mob.maxHp)||0);
+  let totalShare=0;
   for(const item of receivers){
     // Aplica stage/prey/VIP individuais na cota do receiver
     const share=eligible?Math.floor(split.each*expStage(Number(item.p.level)||1)):finalExp(item.p,baseExp,mob.slug);
+    totalShare+=share;
     addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
@@ -340,7 +342,7 @@ function reward(auth,mob,players){const alive=players.filter((x)=>x.p.hp>0),elig
     if(gained||sliversGained)auth.events.push({t:"dust",dust:gained,slivers:sliversGained,
       x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,fiendish:!!mob.fiendish,screen:true,ts:stepTs+900});
   }
-  auth.stats.exp+=share*receivers.length;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
+  auth.stats.exp+=totalShare;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
   return lootDrops;
 }
 function usePotion(p){const max=maxStats(p),sup=p.supplies||{};
@@ -419,7 +421,7 @@ function step(auth,now){if(auth.ended)return;
             // Pula spells em que o mob é imune
             if(r>=100)continue;
             const adjusted=Math.floor(avgDmg*(1-r/100));
-            if(adjusted>bestDmg){best=spells;bestDmg=adjusted;}
+            if(adjusted>bestDmg){best=s;bestDmg=adjusted;}
           }
           if(best){
             const s=best;
