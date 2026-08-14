@@ -10,6 +10,7 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
   setTimeout,clearTimeout,localStorage:storage(local),sessionStorage:storage(session),
   CustomEvent:function(type,init){this.type=type;this.detail=init&&init.detail;},
   window:{GLOBAL_IDLE_SERVER_CONFIG:{online:true,testServer:false,apiUrl:"http://game"},location:{origin:"http://game"},dispatchEvent(){}},
+  G:{combat:{players:[{id:"1",x:.31,y:.62,cx:9,cy:18}],mobs:[{id:"rat-a",x:.74,y:.42,cx:22,cy:12}]}},
   toast(){},maxStats:()=>({hp:100,mp:50}),
   fetch:async(url,options)=>{
     const body=options.body?JSON.parse(options.body):null;calls.push({url,method:options.method,body});
@@ -33,6 +34,10 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
 function response(status,data){return {status,json:async()=>data};}
 vm.createContext(ctx);vm.runInContext(source,ctx);
 (async()=>{
+  const visual=ctx.accountAuthorityVisualState();
+  must(visual&&visual.players[0].x===.31&&visual.players[0].cx===9&&
+    visual.mobs[0].id==="rat-a"&&visual.mobs[0].y===.42,
+    "tick não coleta posições visuais compactas de players/mobs");
   must((await ctx.accountAcquireLease("token",false)).ok,"lease fake não adquirido");
   ctx.accountCharacterCacheWrite([{id:1,name:"Lease Hero",voc:"knight",level:10,saveVersion:7}]);
   must(await ctx.accountSaveCharacter("token",1,{id:"1",name:"Lease Hero",voc:"knight",level:10,hp:100,mp:50}),

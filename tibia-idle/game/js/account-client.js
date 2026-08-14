@@ -223,7 +223,7 @@ async function accountLoadInstance(token){
     r.data.instance.state.members.some((member)=>String(member.id)===String(activeChar)));
   if(accountLeaseAllowsSimulation()&&viewerMember){
     const tick=await _api("POST","/api/instance/tick",Object.assign({token,char_id:activeChar||null,
-      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+      expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
       accountInstanceApply(tick.data.instance||null);
       return {ok:true,instance:tick.data.instance&&tick.data.instance.state||null,
@@ -267,12 +267,34 @@ function accountSaveInstance(token,state){
     return false;
   });
 }
+/* Posições são apenas apresentação/predição: HP, alcance e dano continuam
+ * autoritativos. Enviá-las no tick mantém projéteis, efeitos e floaters junto
+ * das entidades que o grid local está animando, sem persistir o combate todo. */
+function accountAuthorityVisualState(){
+  const combat=typeof G!=="undefined"&&G&&G.combat;if(!combat)return null;
+  const collect=(list,limit)=>{
+    const out=[];
+    for(const ent of Array.isArray(list)?list:[]){
+      if(!ent||out.length>=limit)break;
+      const id=String(ent.id!==undefined?ent.id:(ent.p&&ent.p.id)||"");
+      if(ent.x===null||ent.x===undefined||ent.y===null||ent.y===undefined)continue;
+      const x=Number(ent.x),y=Number(ent.y);if(!id||!Number.isFinite(x)||!Number.isFinite(y))continue;
+      const visual={id,x,y},cx=ent.cx===null||ent.cx===undefined?NaN:Number(ent.cx),
+        cy=ent.cy===null||ent.cy===undefined?NaN:Number(ent.cy);
+      if(Number.isFinite(cx))visual.cx=Math.round(cx);if(Number.isFinite(cy))visual.cy=Math.round(cy);
+      out.push(visual);
+    }
+    return out;
+  };
+  const players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
+  return {players:collect(players,8),mobs:collect(combat.mobs,64)};
+}
 function accountTickInstance(token){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
     const r=await _api("POST","/api/instance/tick",Object.assign({token,
       char_id:typeof sessionCharId==="function"?sessionCharId():null,
-      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+      expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
       return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,elapsed:r.data.elapsed||0};}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);

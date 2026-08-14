@@ -757,7 +757,11 @@ async function tickInstance(db,body){
   }
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const ownerId=resolved.row?Number(resolved.row.account_id):Number(acc.id);
-  const result=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceAuthorityState,lease);
+  // A posição visual prevista pelo grid não decide dano/alcance. Ela só é
+  // sincronizada no snapshot/eventos para efeitos acompanharem as entidades.
+  const advanceWithVisuals=(state,elapsed,checkpointAt)=>
+    advanceAuthorityState(state,elapsed,checkpointAt,body.visual_state);
+  const result=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceWithVisuals,lease);
   if(!result.ok){
     // Tick é idempotente: ausência/terminal entre GET e POST não é falha de
     // transporte e não deve poluir o console com HTTP 410.

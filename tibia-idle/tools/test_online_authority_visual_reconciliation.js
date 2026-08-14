@@ -39,7 +39,12 @@ const authoritative={activeCharacterId:"10",state:{gridW:30,gridH:20,players:[
   {id:"10",p:{id:"10",name:"Kina",hp:6800}},{id:"20",p:{id:"20",name:"Pally",hp:5800}},
   {id:"30",p:{id:"30",name:"Druideiro",hp:4800}},{id:"40",p:{id:"40",name:"Sorc",hp:3800}},
 ],mobs:[{id:"a",slug:"retching-horror",hp:700,cx:2,cy:2,x:.08,y:.1},
-  {id:"c",slug:"fury",hp:1200}],events:[{t:"hit",dmg:50,mobId:"a",ts:futureEventTs}]}};
+  {id:"c",slug:"fury",hp:1200}],events:[
+    {t:"hit",dmg:50,mobId:"a",targetId:"a",whoId:"20",x:.99,y:.99,sx:0,sy:0,ts:futureEventTs},
+    {t:"taken",dmg:25,targetId:"20",sourceId:"a",x:.01,y:.01,ts:futureEventTs},
+    {t:"burst",targetId:"a",fx:"hit-by-fire",x:.01,y:.01,ts:futureEventTs},
+    {t:"say",whoId:"20",text:"exori flam",x:.01,y:.01,ts:futureEventTs}
+  ]}};
 must(ctx.applyOnlineAuthorityState(authoritative,null),"segundo snapshot não foi aplicado");
 must(ctx.G.combat===originalCombat&&ctx.G.combat.player===e20&&ctx.G.p===p20&&p20.hp===5800,
   "snapshot completo quebrou o controle selecionado");
@@ -48,9 +53,14 @@ must(ctx.G.combat.mobs.length===2&&ctx.G.combat.mobs[0]===mobA&&mobA.hp===700&&m
 const mobC=ctx.G.combat.mobs.find((mob)=>mob.id==="c");
 must(mobC&&Number.isFinite(mobC.x)&&Number.isFinite(mobC.y),
   "novo monstro autoritativo nasceu sem posição renderizável");
-must(ctx.G.combat.events!==authoritative.state.events&&ctx.G.combat.events.length===1&&
+must(ctx.G.combat.events!==authoritative.state.events&&ctx.G.combat.events.length===4&&
   ctx.G.combat.events[0].t==="hit",
   "fila de eventos foi aliasada ao snapshot e pode entrar em push infinito");
-must(ctx.G.combat.events[0].ts<futureEventTs&&ctx.G.combat.events[0].ts<=Date.now()+200,
+const [hit,taken,burst,say]=ctx.G.combat.events;
+must(hit.x===mobA.x&&hit.y===mobA.y&&hit.sx===e20.x&&hit.sy===e20.y&&
+  taken.x===e20.x&&taken.y===e20.y&&taken.sx===mobA.x&&taken.sy===mobA.y&&
+  burst.x===mobA.x&&burst.y===mobA.y&&say.x===e20.x&&say.y===e20.y,
+  "dano/spell não foi reancorado nas entidades visuais e ainda pode aparecer nos cantos");
+must(ctx.G.combat.events.every((event)=>event.ts<futureEventTs&&event.ts<=Date.now()+200),
   "timestamp futuro manteve latência artificial mesmo em servidor local");
 console.log("OK: ticks autoritativos preservam runtime, players ativos e continuidade visual dos monstros.");
