@@ -37,6 +37,7 @@ function state(c,marker){return {v:1,savedAt:Date.now(),kind:"hunt",huntId:"rats
   must(advanced.workerElapsedMs===500&&advanced.savedAt===1300,"núcleo do worker não acumula relógio determinístico");
   must(workerSource.includes("runInstanceWorkerOnce")&&workerSource.includes("instanceWorkerClaim")&&
     dbSource.includes("worker_cursor_at")&&dbSource.includes("SELECT GET_LOCK")&&
+    dbSource.includes("prototype._saveRuntime")&&dbSource.includes("this._saveRuntime(true)")&&
     gameSource.includes("workerElapsed+residual")&&gameSource.includes("Recarrega o snapshot antes"),
     "worker/checkpoint/reconciliação do cliente ausentes");
   let startupClaims=0;const startupWorker=startInstanceWorker({

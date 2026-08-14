@@ -72,7 +72,7 @@ function segment(begin,end){const a=party.indexOf(begin),b=party.indexOf(end,a);
   must(client.includes("function accountCharacterCacheRead")&&client.includes("function accountMergeCharacterCache")&&
     client.includes("accountMergeCharacterCache([{id:character.id"),"cliente não mantém snapshots para a party online");
   must(html.includes("js/account-client.js?v=missions-v1")&&html.includes("js/party.js?v=party-xp-v1")&&
-    html.includes("js/party-ui.js?v=party-runtime-v7")&&html.includes("js/game.js?v=online-fix-v8"),
+    html.includes("js/party-ui.js?v=party-runtime-v7")&&html.includes("js/game.js?v=online-fix-v9"),
     "assets da hidratação sem cache-bust");
   console.log("OK: membro online é materializado e controlado na mesma instância, sem reload ou duplicação.");
 })().catch((error)=>{console.error(error);process.exitCode=1;});

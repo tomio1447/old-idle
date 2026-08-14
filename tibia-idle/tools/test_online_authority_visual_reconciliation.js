@@ -34,11 +34,12 @@ must(ctx.G.combat.mobs.length===2&&ctx.G.combat.mobs[0]===mobA&&ctx.G.combat.mob
 must(e10.p===p10&&p10.hp===6900&&e10.x===.35&&e20.x===.38,
   "reconciliação perdeu referência, status ou posição dos players");
 
+const futureEventTs=Date.now()+10000;
 const authoritative={activeCharacterId:"10",state:{gridW:30,gridH:20,players:[
   {id:"10",p:{id:"10",name:"Kina",hp:6800}},{id:"20",p:{id:"20",name:"Pally",hp:5800}},
   {id:"30",p:{id:"30",name:"Druideiro",hp:4800}},{id:"40",p:{id:"40",name:"Sorc",hp:3800}},
 ],mobs:[{id:"a",slug:"retching-horror",hp:700,cx:2,cy:2,x:.08,y:.1},
-  {id:"c",slug:"fury",hp:1200}],events:[{t:"hit",dmg:50,mobId:"a",ts:1234}]}};
+  {id:"c",slug:"fury",hp:1200}],events:[{t:"hit",dmg:50,mobId:"a",ts:futureEventTs}]}};
 must(ctx.applyOnlineAuthorityState(authoritative,null),"segundo snapshot não foi aplicado");
 must(ctx.G.combat===originalCombat&&ctx.G.combat.player===e20&&ctx.G.p===p20&&p20.hp===5800,
   "snapshot completo quebrou o controle selecionado");
@@ -50,4 +51,6 @@ must(mobC&&Number.isFinite(mobC.x)&&Number.isFinite(mobC.y),
 must(ctx.G.combat.events!==authoritative.state.events&&ctx.G.combat.events.length===1&&
   ctx.G.combat.events[0].t==="hit",
   "fila de eventos foi aliasada ao snapshot e pode entrar em push infinito");
+must(ctx.G.combat.events[0].ts<futureEventTs&&ctx.G.combat.events[0].ts<=Date.now()+200,
+  "timestamp futuro manteve latência artificial mesmo em servidor local");
 console.log("OK: ticks autoritativos preservam runtime, players ativos e continuidade visual dos monstros.");

@@ -2588,7 +2588,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // próprio iterador para sempre e congela completamente a aba no 1º hit.
   previous.events=Array.isArray(previous.events)?previous.events:[];
   if(Array.isArray(incoming.events)&&incoming.events.length){
-    for(const ev of incoming.events)previous.events.push(ev);
+    const receivedAt=Date.now();
+    for(let index=0;index<incoming.events.length;index++){
+      const remote=incoming.events[index],event=Object.assign({},remote);
+      // O timestamp absoluto do servidor chegava até 900ms no futuro. Somado
+      // ao tick de 1s, isso simulava quase 2s de ping até em 127.0.0.1.
+      // Rebaseie somente eventos futuros para uma animação curta (máx. 120ms).
+      if(Number(event.ts)>receivedAt)event.ts=receivedAt+Math.min(120,index*20);
+      previous.events.push(event);
+    }
     // Defesa adicional contra snapshots repetidos/falhas prolongadas: uma
     // fila visual nunca pode crescer sem limite e bloquear o renderer.
     if(previous.events.length>500)previous.events.splice(0,previous.events.length-500);

@@ -102,6 +102,17 @@ JsonStore.prototype._save = function () {
     JSON.stringify({ marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
 };
+/* O tick autoritativo local acontece a cada segundo. Chamar `_save()` nele
+ * reserializava accounts, sessions, leases, até 500 snapshots e market mesmo
+ * sem nenhuma mudança nesses dados. Em disco do Windows isso fazia uma API
+ * em 127.0.0.1 parecer uma conexão remota de ping altíssimo. Persista apenas
+ * os dois arquivos realmente alterados e sem pretty-print no hot path. */
+JsonStore.prototype._saveRuntime = function (withCharacters) {
+  if (withCharacters) fs.writeFileSync(path.join(DATA_DIR, "characters.json"),
+    JSON.stringify(this.characters));
+  fs.writeFileSync(path.join(DATA_DIR, "instances.json"),
+    JSON.stringify(this.instances || []));
+};
 JsonStore.prototype._nextId = function (arr) {
   return arr.reduce((m, x) => Math.max(m, x.id || 0), 0) + 1;
 };
@@ -200,7 +211,7 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
   Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
     worker_cursor_at:new Date(meta.saved_at).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
     updated_at:new Date(lease.now).toISOString()});
-  this._save();return {ok:true,instance:row};
+  this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.instancePatchState = function(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
   if(!this.leaseValidate(requesterAccountId,lease.holderId,lease.secretHash,lease.now))
@@ -210,7 +221,7 @@ JsonStore.prototype.instancePatchState = function(ownerAccountId,requesterAccoun
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
   const next=patchState(row.state);if(!next)return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};
   row.state=next;row.version=Number(row.version)+1;row.updated_at=new Date(lease.now).toISOString();
-  this._save();return {ok:true,instance:row};
+  this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.instanceWorkerCandidates = function(limit){
   return (this.instances||[]).filter((row)=>row.status==="active")
@@ -233,7 +244,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
     if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
-  row.updated_at=new Date(now).toISOString();this._save();
+  row.updated_at=new Date(now).toISOString();this._saveRuntime(true);
   return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version),terminalReason:next.terminalReason||null};
 };
 JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,now,maxStep,advanceState,lease){
@@ -251,7 +262,7 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
     if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
-  row.updated_at=row.saved_at;this._save();return {ok:true,instance:row,characters:changed,elapsed,
+  row.updated_at=row.saved_at;this._saveRuntime(true);return {ok:true,instance:row,characters:changed,elapsed,
     terminalReason:next.terminalReason||null};
 };
 JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,reason,lease){
@@ -263,7 +274,7 @@ JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
   row.version=Number(row.version)+1;row.status="ended";row.terminal_reason=reason;
   row.ended_at=new Date(lease.now).toISOString();row.updated_at=row.ended_at;
-  this._save();return {ok:true,instance:row};
+  this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
