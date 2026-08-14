@@ -21,5 +21,5 @@ must(queue.every((item,index)=>index===0||queue[index-1].footY>=item.footY),
 must(source.includes("for (const info of entityInfo) {")&&
   source.includes("for (let i = entityInfo.length - 1; i >= 0; i--)"),
   "reordenação das sprites quebrou a prioridade dos labels");
-must(html.includes("js/render.js?v=overlap-bottom-up-v1"),"render.js sem cache-bust da sobreposição");
+must(html.includes("js/render.js?v=sinister-icon-v1"),"render.js sem cache-bust da sobreposição");
 console.log("OK: imagens sobrepõem de baixo para cima sem inverter os labels.");

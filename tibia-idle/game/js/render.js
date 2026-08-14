@@ -1430,6 +1430,15 @@ function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
  * — portanto animam sem criar arrays/objetos persistentes a cada frame.
  * Fiendish usa mais partículas e brilho roxo; Influenced escala levemente
  * com a quantidade de stacks. */
+/* Marcador oficial do client ao lado da barra de vida: triângulo azul para
+ * Influenced e vermelho para Fiendish. Poeira/glow não substituem este ícone
+ * — ele é a identificação inequívoca mostrada no print do Tibia. */
+function drawSinisterCreatureIcon(ctx,ent,cx,barY){
+  if(!ctx||!ent||(!ent.influenced&&!ent.fiendish)||typeof drawWikiIcon!=="function")return false;
+  const slug=ent.fiendish?"fiendish-creature":"influenced-creature",size=11;
+  return drawWikiIcon(ctx,slug,Math.round(cx+TIBIA_BAR_W/2+2),Math.round(barY-4),size);
+}
+
 function drawSinisterDust(ctx,ent,cx,cy,tile,now){
   if(!ctx||!ent||(!ent.influenced&&!ent.fiendish))return;
   const fiendish=!!ent.fiendish;
@@ -1665,6 +1674,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (info.e.kind === 'monster') {
       drawTibiaBar(ctx, info.cx, barY, info.hpPct, tibiaHpColor(info.hpPct));
       drawNameText(ctx, info.cx, nameY, info.name, tibiaHpColor(info.hpPct));
+      drawSinisterCreatureIcon(ctx,info.ent,info.cx,barY);
       if (typeof monsterAttackRange === 'function' && monsterAttackRange(info.ent) > .16)
         drawWikiIcon(ctx, 'range-atk', Math.round(info.cx + info.w/2 + 3), Math.round(info.top + info.h*.35), 9);
     } else {
