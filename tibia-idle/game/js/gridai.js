@@ -485,6 +485,7 @@ function updateGridMovement(c, p, dt, now) {
       repairBlockedMapPosition(c, e);
     }
   }
+  if(typeof repairOverlappingGridEntities==="function")repairOverlappingGridEntities(c);
 
   // Interpola somente entidade viva; corpse permanece imóvel no SQM da morte.
   if (activeAlive) advanceStep(c.player, dt);
@@ -522,10 +523,15 @@ function updateGridMovement(c, p, dt, now) {
   for (const m of vivos) {
     // Target morto não mantém vaga nem atenção: escolhe instantaneamente o
     // membro vivo mais próximo, inclusive quando o personagem ativo caiu.
-    const preferred = (typeof partyNearestTarget === "function")
+    // No online, targetId vem da autoridade: a imagem precisa perseguir a
+    // mesma vítima que recebe os eventos `taken`. Sem isso a IA visual seguia
+    // o mais próximo enquanto o servidor batia em outro membro da party.
+    const authoritativeTarget=m.targetId&&c.players
+      ?c.players.find((ent)=>String(ent&&ent.id)===String(m.targetId)&&ent.p&&ent.p.hp>0):null;
+    const preferred = authoritativeTarget||((typeof partyNearestTarget === "function")
       ? partyNearestTarget(c, m)
-      : ((m.target && m.target.p && m.target.p.hp > 0) ? m.target : c.player);
-    const alvoMob = monsterReachableTarget(c, m, occ, preferred);
+      : ((m.target && m.target.p && m.target.p.hp > 0) ? m.target : c.player));
+    const alvoMob = authoritativeTarget||monsterReachableTarget(c, m, occ, preferred);
     m.target = alvoMob;
     monsterThinkStep(c, m, alvoMob, occ, now);
   }

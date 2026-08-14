@@ -2494,6 +2494,25 @@ async function requestOnlineRuntimeRecovery(){
   }catch(error){return false;}
   finally{ONLINE_RUNTIME_RECOVERING=false;}
 }
+/* Distribui o lote autoritativo pelo próximo segundo sem reintroduzir ping.
+ * O servidor calcula combate em passos de 1s; descarregar o lote inteiro no
+ * mesmo frame transforma a hunt em explosões/floaters aos trancos. A linha do
+ * tempo começa AGORA e preserva a ordem relativa dos timestamps do servidor,
+ * comprimindo apenas catch-up/restart para caber antes do próximo tick. */
+function scheduleOnlineAuthorityEvents(events,receivedAt){
+  const input=Array.isArray(events)?events:[],now=Number(receivedAt)||Date.now();
+  if(!input.length)return [];
+  const valid=input.map((event)=>Number(event&&event.ts)).filter(Number.isFinite),
+    first=valid.length?Math.min(...valid):0,last=valid.length?Math.max(...valid):first,
+    span=Math.max(0,last-first),scale=span>850?850/span:1,ties=new Map();
+  return input.map((remote,index)=>{
+    const event=Object.assign({},remote),raw=Number(event.ts),base=Number.isFinite(raw)?Math.max(0,raw-first):0,
+      tieKey=Number.isFinite(raw)?String(raw):"missing",tie=ties.get(tieKey)||0;
+    ties.set(tieKey,tie+1);
+    event.ts=now+Math.min(850,Math.round(base*scale)+Math.min(24,tie*8));
+    return{event,index};
+  }).sort((a,b)=>a.event.ts-b.event.ts||a.index-b.index).map((item)=>item.event);
+}
 function applyOnlineAuthorityState(descriptor,terminalReason){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat,fresh={hunt:previous.hunt,huntMap:previous.huntMap,boss:previous.boss};
@@ -2614,12 +2633,9 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
         if((event.t==="say"||event.t==="buff")&&!target){event.x=event.sx;event.y=event.sy;event.screen=true;}}
       return event;
     };
-    for(let index=0;index<incoming.events.length;index++){
-      const remote=incoming.events[index],event=placeEvent(Object.assign({},remote));
-      // O timestamp absoluto do servidor chegava até 900ms no futuro. Somado
-      // ao tick de 1s, isso simulava quase 2s de ping até em 127.0.0.1.
-      // Rebaseie somente eventos futuros para uma animação curta (máx. 120ms).
-      if(Number(event.ts)>receivedAt)event.ts=receivedAt+Math.min(120,index*20);
+    const scheduled=scheduleOnlineAuthorityEvents(incoming.events,receivedAt);
+    for(const remote of scheduled){
+      const event=placeEvent(remote);
       previous.events.push(event);
     }
     // Defesa adicional contra snapshots repetidos/falhas prolongadas: uma

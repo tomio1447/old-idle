@@ -96,7 +96,26 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     Array.from({length:12},(_,i)=>({id:String(i+1),x:.1,y:.2}))),mobs:[]},positioned.authority);
   must(bounded.players.length===8&&!bounded.players.some((entry)=>entry.id==="bad"),
     "payload visual não foi limitado/validado");
+  const targetDesc=directDescriptor(basePlayer),secondPlayer=Object.assign({},clone(basePlayer),{id:2,name:"Nearest"});
+  targetDesc.members.push({id:"2",p:secondPlayer});targetDesc.state.players.push({id:"2",p:secondPlayer});
+  const targetAuth=engine.initializeAuthority(targetDesc,"b".repeat(64),1000),targetMob=targetAuth.authority.mobs[0];
+  targetMob.hp=targetMob.maxHp=999999;targetMob.damage=20;targetMob.attackAcc=targetMob.attackSpeed;
+  targetMob.def=Object.assign({},targetMob.def,{skills:[]});
+  for(const item of targetAuth.authority.players)item.attackAcc=-100000;
+  const targetVisual={players:[{id:"1",x:.1,y:.1,cx:3,cy:3},{id:"2",x:.7,y:.4,cx:21,cy:12}],
+    mobs:[{id:"direct-mob",x:.72,y:.42,cx:22,cy:12}]};
+  const targetAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(targetAuth),1000,2000,targetVisual).state);
+  must(targetAfter.state.mobs[0].targetId==="2"&&
+    targetAfter.state.events.some((event)=>event.t==="taken"&&event.targetId==="2"),
+    "monstro não perseguiu/atacou a mesma vítima mais próxima");
+  const swappedVisual={players:[{id:"1",x:.71,y:.41,cx:21,cy:12},{id:"2",x:.1,y:.1,cx:3,cy:3}],
+    mobs:[{id:"direct-mob",x:.72,y:.42,cx:22,cy:12}]};
+  const stickyAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(targetAfter),1000,3000,swappedVisual).state);
+  must(stickyAfter.state.mobs[0].targetId==="2"&&
+    stickyAfter.state.events.some((event)=>event.t==="taken"&&event.targetId==="2"),
+    "autoridade trocou aleatoriamente de vítima entre dois ataques");
   const spellPlayer=Object.assign({},basePlayer,{voc:"sorcerer",level:100,ml:80,equip:{},
+
     config:{spellAttack:true,combo:[{kind:"spell",id:"exori-flam",min:1}]}});
   const spellAuth=engine.initializeAuthority(directDescriptor(spellPlayer),"a".repeat(64),1000);
   const spellPositioned=JSON.parse(engine.advanceAuthorityState(JSON.stringify(spellAuth),0,1000,visualPayload).state);

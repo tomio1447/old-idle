@@ -3,8 +3,8 @@
 const fs=require("fs"),path=require("path"),vm=require("vm");
 const game=fs.readFileSync(path.join(__dirname,"..","game","js","game.js"),"utf8");
 function must(value,message){if(!value)throw Error(message);}
-const start=game.indexOf("function applyOnlineAuthorityState"),end=game.indexOf("\nfunction requestOnlineAuthorityTick",start);
-must(start>=0&&end>start,"applyOnlineAuthorityState ausente");
+const start=game.indexOf("function scheduleOnlineAuthorityEvents"),end=game.indexOf("\nfunction requestOnlineAuthorityTick",start);
+must(start>=0&&end>start,"scheduler/applyOnlineAuthorityState ausente");
 
 const p10={id:"10",name:"Kina",hp:7000},p20={id:"20",name:"Pally",hp:6000},
   p30={id:"30",name:"Druideiro",hp:5000},p40={id:"40",name:"Sorc",hp:4000};
@@ -41,10 +41,11 @@ const authoritative={activeCharacterId:"10",state:{gridW:30,gridH:20,players:[
 ],mobs:[{id:"a",slug:"retching-horror",hp:700,cx:2,cy:2,x:.08,y:.1},
   {id:"c",slug:"fury",hp:1200}],events:[
     {t:"hit",dmg:50,mobId:"a",targetId:"a",whoId:"20",x:.99,y:.99,sx:0,sy:0,ts:futureEventTs},
-    {t:"taken",dmg:25,targetId:"20",sourceId:"a",x:.01,y:.01,ts:futureEventTs},
-    {t:"burst",targetId:"a",fx:"hit-by-fire",x:.01,y:.01,ts:futureEventTs},
-    {t:"say",whoId:"20",text:"exori flam",x:.01,y:.01,ts:futureEventTs}
+    {t:"taken",dmg:25,targetId:"20",sourceId:"a",x:.01,y:.01,ts:futureEventTs+200},
+    {t:"burst",targetId:"a",fx:"hit-by-fire",x:.01,y:.01,ts:futureEventTs+800},
+    {t:"say",whoId:"20",text:"exori flam",x:.01,y:.01,ts:futureEventTs+820}
   ]}};
+const appliedAt=Date.now();
 must(ctx.applyOnlineAuthorityState(authoritative,null),"segundo snapshot não foi aplicado");
 must(ctx.G.combat===originalCombat&&ctx.G.combat.player===e20&&ctx.G.p===p20&&p20.hp===5800,
   "snapshot completo quebrou o controle selecionado");
@@ -61,6 +62,7 @@ must(hit.x===mobA.x&&hit.y===mobA.y&&hit.sx===e20.x&&hit.sy===e20.y&&
   taken.x===e20.x&&taken.y===e20.y&&taken.sx===mobA.x&&taken.sy===mobA.y&&
   burst.x===mobA.x&&burst.y===mobA.y&&say.x===e20.x&&say.y===e20.y,
   "dano/spell não foi reancorado nas entidades visuais e ainda pode aparecer nos cantos");
-must(ctx.G.combat.events.every((event)=>event.ts<futureEventTs&&event.ts<=Date.now()+200),
-  "timestamp futuro manteve latência artificial mesmo em servidor local");
+must(hit.ts>=appliedAt&&hit.ts<=appliedAt+50&&taken.ts-hit.ts>=180&&
+  burst.ts-taken.ts>=550&&say.ts>=burst.ts&&say.ts<=appliedAt+850,
+  "lote autoritativo não flui pelo segundo ou reintroduziu latência inicial");
 console.log("OK: ticks autoritativos preservam runtime, players ativos e continuidade visual dos monstros.");

@@ -37,8 +37,27 @@ function entityVisual(entity){const out={};for(const key of ["cx","cy","x","y","
   if(entity&&entity[key]!==undefined)out[key]=entity[key];return out;}
 function playerPosition(auth,p){const item=(auth.players||[]).find((entry)=>entry.p===p||String(entry.id)===String(p&&p.id));
   return entityPosition(item,.13,.6);}
-/* O payload visual nunca entra na decisão de combate. Limites e faixas
- * impedem snapshots arbitrariamente grandes ou coordenadas não renderizáveis. */
+function authorityVisualDistance(a,b,auth){
+  const acx=Number(a&&a.cx),acy=Number(a&&a.cy),bcx=Number(b&&b.cx),bcy=Number(b&&b.cy);
+  if([acx,acy,bcx,bcy].every(Number.isFinite))return Math.max(Math.abs(acx-bcx),Math.abs(acy-bcy));
+  const ap=entityPosition(a,.5,.5),bp=entityPosition(b,.5,.5),w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30;
+  return Math.max(Math.abs(ap.x-bp.x)*w,Math.abs(ap.y-bp.y)*h);
+}
+/* Cada monstro conserva o alvo enquanto ele estiver vivo. O cliente recebe o
+ * mesmo targetId e anima a perseguição da vítima que realmente toma o dano;
+ * antes o servidor sorteava outra pessoa a cada golpe enquanto a imagem
+ * perseguia o mais próximo, deixando o combate visualmente sem causa/efeito. */
+function authorityMobTarget(auth,mob){
+  const alive=(auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil);
+  if(!alive.length)return null;
+  let target=alive.find((item)=>String(item.id)===String(mob.targetId||""));
+  if(!target){target=alive.slice().sort((a,b)=>authorityVisualDistance(mob,a,auth)-authorityVisualDistance(mob,b,auth)||
+      String(a.id).localeCompare(String(b.id)))[0];mob.targetId=String(target.id);}
+  return target;
+}
+/* O payload visual não altera dano, chance, HP ou recompensa; ele só alinha
+ * posição e seleção do alvo mais próximo. Limites e faixas impedem snapshots
+ * arbitrariamente grandes ou coordenadas não renderizáveis. */
 function normalizeVisualState(raw,auth){
   auth=auth||{};const normalize=(list,limit)=>{const out=[];
     for(const input of Array.isArray(list)?list:[]){if(out.length>=limit)break;
@@ -581,9 +600,8 @@ function step(auth,now){if(auth.ended)return;
     let mobHitIdx=0;
     while(mob.attackAcc>=mob.attackSpeed){
       mob.attackAcc-=mob.attackSpeed;
-      const alive=auth.players.filter((x)=>x.p.hp>0&&!x.downUntil);
-      if(!alive.length)break;
-      const victim=alive[roll(auth,0,alive.length-1)];
+      const victim=authorityMobTarget(auth,mob);
+      if(!victim)break;
 
       // 1) Skills do monstro (cada uma rola sua chance)
       const skills=mob.def&&mob.def.skills;
@@ -683,7 +701,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
   descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
     entityVisual(m),
-    {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
+    {id:m.id,slug:m.slug,boss:m.boss,targetId:m.targetId||null,influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
       // def compacto: só campos necessários para o cliente renderizar.
@@ -731,8 +749,8 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
       if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(mob){Object.assign(mob,point);auth.mobs.push(mob);}}}
     descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.spawnPool.length||1);
   }
-  // Sincroniza a predição visual antes de criar eventos deste step. Não há
-  // qualquer leitura dessas coordenadas nos cálculos de dano/recompensa.
+  // Sincroniza a predição visual antes do step. Ela alinha efeitos e a vítima
+  // perseguida, sem alterar fórmulas de dano, HP, loot ou recompensas.
   syncAuthorityVisualState(auth,visualState);
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
   const requested=Math.floor(total/1000),steps=Math.min(250000,requested);auth.carryMs=total-steps*1000;

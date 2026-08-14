@@ -279,6 +279,31 @@ function placeFree(ent, occ, cx, cy, maxRadius) {
   return false;
 }
 
+/* Repara snapshots online antigos/transicionais em que várias entidades
+ * chegaram no mesmo SQM. A ocupação preventiva evita novos conflitos, mas
+ * não separava um estado que já vinha empilhado do servidor. */
+function repairOverlappingGridEntities(c) {
+  if (!c) return 0;
+  const occupied = new Map();
+  for (const key of mapBlockKeys(c)) occupied.set(key, true);
+  const entities=[],seen=new Set(),add=(ent)=>{
+    if(!ent||seen.has(ent))return;seen.add(ent);entities.push(ent);
+  };
+  if(Array.isArray(c.players)&&c.players.length)for(const ent of c.players)if(ent&&ent.p&&ent.p.hp>0)add(ent);
+  else if(c.player&&(!c.player.p||c.player.p.hp>0))add(c.player);
+  for(const mob of c.mobs||[])if(mob&&mob.hp>0)add(mob);
+  let repaired=0;
+  for(const ent of entities){
+    ensureCell(ent);const key=ent.cx+":"+ent.cy,
+      fixed=!!(ent.allowBlockedSpawn&&ent.cx===ent.fixedSpawnCx&&ent.cy===ent.fixedSpawnCy),
+      conflict=occupied.has(key)&&!(fixed&&occupied.get(key)===true);
+    if(conflict&&placeFree(ent,occupied,ent.cx,ent.cy,Math.max(GRID_W,GRID_H))){
+      ent.moving=false;ent.stepT=0;ent.tx=ent.x;ent.ty=ent.y;ent.sx=ent.x;ent.sy=ent.y;ent.nextStepAt=0;repaired++;
+    }else if(!conflict){occupied.set(key,ent);}
+  }
+  return repaired;
+}
+
 /* Última barreira de segurança: saves antigos, teleporte/admin ou mudança
  * de footprint podem deixar uma entidade numa parede já no início do tick.
  * Reposiciona para o SQM livre mais próximo antes de qualquer interpolação. */
