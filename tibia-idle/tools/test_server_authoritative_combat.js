@@ -86,6 +86,26 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     motaAfter.authority.players[0].p.missions["mota-extension"].progress,
     "party MOTA não sobrevive/progride missões por 60s no motor autoritativo");
   const d1=engine.initializeAuthority(directDescriptor(basePlayer),"1".repeat(64),1000);
+  const visualPayload={players:[{id:"1",x:.31,y:.62,cx:9,cy:18}],
+    mobs:[{id:"direct-mob",x:.74,y:.42,cx:22,cy:12}]};
+  const positioned=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),0,1000,visualPayload).state);
+  must(positioned.state.players[0].x===.31&&positioned.state.players[0].y===.62&&
+    positioned.state.mobs[0].x===.74&&positioned.state.mobs[0].y===.42,
+    "posição visual validada não foi materializada no snapshot autoritativo");
+  const bounded=engine.normalizeVisualState({players:[{id:"bad",x:9,y:-1}].concat(
+    Array.from({length:12},(_,i)=>({id:String(i+1),x:.1,y:.2}))),mobs:[]},positioned.authority);
+  must(bounded.players.length===8&&!bounded.players.some((entry)=>entry.id==="bad"),
+    "payload visual não foi limitado/validado");
+  const spellPlayer=Object.assign({},basePlayer,{voc:"sorcerer",level:100,ml:80,equip:{},
+    config:{spellAttack:true,combo:[{kind:"spell",id:"exori-flam",min:1}]}});
+  const spellAuth=engine.initializeAuthority(directDescriptor(spellPlayer),"a".repeat(64),1000);
+  const spellPositioned=JSON.parse(engine.advanceAuthorityState(JSON.stringify(spellAuth),0,1000,visualPayload).state);
+  const spellAfter=JSON.parse(engine.advanceAuthorityState(JSON.stringify(spellPositioned),2000,3000,visualPayload).state),
+    spellHit=spellAfter.state.events.find((event)=>event.t==="hit"&&event.spellId==="exori-flam");
+  must(spellHit&&spellHit.x===.74&&spellHit.y===.42&&spellHit.sx===.31&&spellHit.sy===.62&&
+    spellHit.projectile&&spellHit.missile==="fire"&&spellHit.fx==="fire-attack"&&
+    spellAfter.state.events.some((event)=>event.t==="say"&&event.text==="exori flam"),
+    "spell autoritativa perdeu alvo/origem, projectile, efeito ou fala compatíveis com o renderer");
   const visibleWave=JSON.parse(engine.advanceAuthorityState(JSON.stringify(d1),1000,2000).state);
   must(visibleWave.authority.mobs.length>0&&visibleWave.state.mobs.length>0,
     "snapshot entre waves removeu todos os monstros da arena");
@@ -153,14 +173,18 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   let r=await put("/api/instance",Object.assign({token,expected_version:0,instance_id:null,state:descriptor(c)},lease));
   must(r.status===200,"instância autoritativa não foi criada");const id=r.data.instance.id;
   let loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});
-  let auth=loaded.data.instance.state.authority;
+  let auth=loaded.data.instance.state.authority;const onlineMobId=String(auth&&auth.mobs[0]&&auth.mobs[0].id||"");
   must(auth&&auth.players[0].p.level===1&&auth.players[0].p.exp===0&&auth.mobs[0].maxHp===20&&
     auth.players[0].p.equip.weapon.item==="sword",
     "servidor aceitou level/XP/equip/HP de monstro fabricados pelo cliente");
 
   await new Promise((resolve)=>setTimeout(resolve,4200));
-  r=await post("/api/instance/tick",Object.assign({token,expected_version:loaded.data.instance.version},lease));
+  r=await post("/api/instance/tick",Object.assign({token,expected_version:loaded.data.instance.version,
+    visual_state:{players:[{id:String(c.id),x:.28,y:.64}],mobs:[{id:onlineMobId,x:.71,y:.39}]}},lease));
   must(r.status===200&&r.data.elapsed>=3500&&r.data.characters.length===1,"tick online não atualizou instância/personagem");
+  const positionedEvent=(r.data.instance.state.state.events||[]).find((event)=>event.mobId===onlineMobId);
+  must(positionedEvent&&positionedEvent.x===.71&&positionedEvent.y===.39&&positionedEvent.sx===.28&&positionedEvent.sy===.64,
+    "POST /api/instance/tick não encaminhou posições visuais até os eventos");
   const authoritativeExp=r.data.characters[0].snapshot.exp,tickVersion=r.data.instance.version;
   must(authoritativeExp>0&&r.data.characters[0].snapshot.totalKills>0,"kill/XP não foram materializados no banco");
   const staleTick=await post("/api/instance/tick",Object.assign({token,

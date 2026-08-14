@@ -5,7 +5,7 @@ const DATA=path.join(__dirname,"..","game","data");
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
 const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
-const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW;
+const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW,SPELL_FX=read("spellfx.json");
 for(const slug of Object.keys(AMMO)){const raw=AMMO[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
   {name:raw.n||slug,slot:"ammo",type:"ammo",attack:Number(raw.atk)||0,level:Number(raw.lvl)||0});}
 for(const slug of Object.keys(QUIVERS)){const raw=QUIVERS[slug];ITEMS[slug]=Object.assign({},ITEMS[slug]||{},raw,
@@ -27,7 +27,38 @@ const VOC={none:{hp:5,mp:5},knight:{hp:15,mp:5},paladin:{hp:10,mp:15},druid:{hp:
 const START_HP=185,START_MP=5,FULL_STAMINA=42*3600;
 const INFLUENCED_BASE_CHANCE=.004,INFLUENCED_PVP_BONUS=.004,
   FIENDISH_BASE_CHANCE=.0012,FIENDISH_PVP_BONUS=.0008;
+const ELEMENT_FX={physical:"draw-blood",fire:"hit-by-fire",ice:"ice-attack",energy:"energy-damage",
+  earth:"hit-by-poison",death:"mort-area",holy:"holy-damage"};
+const ELEMENT_MISSILE={physical:"small-stone",fire:"fire",ice:"ice",energy:"energy",earth:"earth",death:"death",holy:"holy"};
 function clone(v){return JSON.parse(JSON.stringify(v||{}));}
+function finitePosition(value,fallback){const n=Number(value);return Number.isFinite(n)?n:fallback;}
+function entityPosition(entity,fallbackX,fallbackY){return{x:finitePosition(entity&&entity.x,fallbackX),y:finitePosition(entity&&entity.y,fallbackY)};}
+function entityVisual(entity){const out={};for(const key of ["cx","cy","x","y","sx","sy"])
+  if(entity&&entity[key]!==undefined)out[key]=entity[key];return out;}
+function playerPosition(auth,p){const item=(auth.players||[]).find((entry)=>entry.p===p||String(entry.id)===String(p&&p.id));
+  return entityPosition(item,.13,.6);}
+/* O payload visual nunca entra na decisão de combate. Limites e faixas
+ * impedem snapshots arbitrariamente grandes ou coordenadas não renderizáveis. */
+function normalizeVisualState(raw,auth){
+  auth=auth||{};const normalize=(list,limit)=>{const out=[];
+    for(const input of Array.isArray(list)?list:[]){if(out.length>=limit)break;
+      const id=String(input&&input.id||"");
+      if(!id||id.length>128||input.x===null||input.x===undefined||input.y===null||input.y===undefined)continue;
+      const x=Number(input.x),y=Number(input.y);if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||x>1||y<0||y>1)continue;
+      const item={id,x,y},cx=input.cx===null||input.cx===undefined?NaN:Number(input.cx),
+        cy=input.cy===null||input.cy===undefined?NaN:Number(input.cy);
+      if(Number.isFinite(cx))item.cx=Math.max(0,Math.min((Number(auth.gridW)||30)-1,Math.round(cx)));
+      if(Number.isFinite(cy))item.cy=Math.max(0,Math.min((Number(auth.gridH)||30)-1,Math.round(cy)));
+      out.push(item);}
+    return out;};
+  raw=raw&&typeof raw==="object"?raw:{};return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64)};
+}
+function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(raw,auth),players=new Map(visual.players.map((v)=>[v.id,v])),
+  mobs=new Map(visual.mobs.map((v)=>[v.id,v]));
+  for(const item of auth.players||[]){const pos=players.get(String(item.id));if(pos)Object.assign(item,pos);}
+  for(const mob of auth.mobs||[]){const pos=mobs.get(String(mob.id));if(pos)Object.assign(mob,pos);}
+  return visual;
+}
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
 function maxStats(p){const level=Math.max(1,Number(p.level)||1),v=VOC[p.voc]||VOC.none;
   const rook=Math.min(level-1,7),voc=Math.max(0,level-1-rook);let hp=START_HP+rook*5+voc*v.hp,mp=START_MP+rook*5+voc*v.mp;
@@ -113,49 +144,29 @@ function rollSpell(auth,p,s){
 }
 function spellTargets(s){if(!s.area)return 1;return Math.max(2,Math.min(6,Math.round((s.alvos||8)/3)));}
 function spellReach(s){if(s.range&&s.range>0)return s.range;if(s.area)return 4;return 1;}
+function spellVisual(s){const words=String(s&&s.words||"").toLowerCase(),name=String(s&&s.name||"").toLowerCase(),
+  imported=SPELL_FX.words&&SPELL_FX.words[words]||SPELL_FX.names&&SPELL_FX.names[name]||{};
+  return{fx:s&&s.fx||imported.fx||null,missile:s&&s.missile||imported.miss||null};}
 
-/* Lista de spells de ataque habilitadas pelo jogador no Helper.
- * p.config.combo = [{kind:"spell",id:"exori-flam",min:1},...]  (sistema novo)
- * p.config.attackSpells = ["exori-flam","exori-gran-con",...]  (sistema antigo)
- * p.config.spells = { "exori-flam": true, ... }  (formato legacy)
- * Retorna a melhor spell fora de cooldown, na prioridade do jogador. */
+/* Lista de spells de ataque habilitadas pelo jogador no Helper/barra de
+ * combo, com compatibilidade para attackSpells/shooter/config.spells antigos.
+ * Retorna as candidatas válidas para a escolha autoritativa. */
 function playerSpellList(p){
-  const voc=p.voc;
-  const out=[];
-  const seen=new Set();
-  // Sistema novo: combo bar (array de slots {kind,id,min})
-  const combo=(p.config&&Array.isArray(p.config.combo))?p.config.combo:[];
-  for(const slot of combo){
-    if(!slot||slot.kind!=="spell"||!slot.id)continue;
-    if(seen.has(slot.id))continue;
-    const s=ALL_SPELLS[slot.id];if(!s)continue;
+  const config=p.config||{},legacy=config.spells||{},voc=p.voc,out=[],ids=[];
+  if(config.spellAttack===false)return out;
+  // Mesma configuração usada pelo Helper/barra de combo do browser. O mapa
+  // `config.spells` é mantido apenas para saves antigos.
+  for(const slot of Array.isArray(config.combo)?config.combo:[])if(slot&&slot.kind==="spell"&&slot.id)ids.push(slot.id);
+  for(const id of Array.isArray(config.attackSpells)?config.attackSpells:[])ids.push(id);
+  if(config.shooterType==="spell"&&config.shooterSpell)ids.push(config.shooterSpell);
+  for(const id of Object.keys(legacy))if(legacy[id])ids.push(id);
+  for(const id of [...new Set(ids)]){
+    const s=ALL_SPELLS[id];if(!s)continue;
     if(s.type!=="attack"&&!s.aggr)continue;
     if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
     if(Number(s.lvl||0)>Number(p.level||1))continue;
-    seen.add(slot.id);out.push(s);
-  }
-  // Sistema antigo: attackSpells (array de ids)
-  if(!out.length&&Array.isArray(p.config&&p.config.attackSpells)){
-    for(const id of p.config.attackSpells){
-      if(!id||seen.has(id))continue;
-      const s=ALL_SPELLS[id];if(!s)continue;
-      if(s.type!=="attack"&&!s.aggr)continue;
-      if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
-      if(Number(s.lvl||0)>Number(p.level||1))continue;
-      seen.add(id);out.push(s);
-    }
-  }
-  // Legacy: spells (mapa de ids -> true)
-  if(!out.length){
-    const cfg=(p.config&&p.config.spells)||{};
-    for(const id of Object.keys(cfg)){
-      if(!cfg[id]||seen.has(id))continue;
-      const s=ALL_SPELLS[id];if(!s)continue;
-      if(s.type!=="attack"&&!s.aggr)continue;
-      if(s.vocs&&s.vocs.length&&!s.vocs.includes(voc))continue;
-      if(Number(s.lvl||0)>Number(p.level||1))continue;
-      seen.add(id);out.push(s);
-    }
+    if(Number(s.mana||0)>Number(p.mp||0))continue;
+    out.push(s);
   }
   // sem spells marcadas: usa a spell de ataque padrão da vocação
   if(!out.length){
@@ -163,21 +174,6 @@ function playerSpellList(p){
     const sid=defaults[voc];if(sid&&ALL_SPELLS[sid]){const s=ALL_SPELLS[sid];if(Number(s.lvl||0)<=Number(p.level||1))out.push(s);}
   }
   return out;
-}
-
-/* Sprite do projétil de uma magia (espelha combat.js/playerMissile).
- * O cliente carrega assets/missile/<nome>_<dir>.png; mandar as palavras
- * mágicas ("exori gran con") gera 404 em cada direção. Magias no modo
- * "skill" batem no SQM do alvo e não voam nada. */
-const ELEMENT_MISSILE={fire:"fire",energy:"energy",earth:"earth",ice:"ice",
-  death:"death",holy:"holy",physical:"small-stone"};
-function isSkillSpell(s){return !!(s&&s.f&&s.f.modo==="skill");}
-function spellMissileName(s,element){
-  if(!s||isSkillSpell(s)||s.area)return "";
-  const declared=String(s.missile||"");
-  // "$weapon" depende da arma equipada; sem resolver, cai no elemento.
-  if(declared&&declared!=="$weapon")return declared;
-  return ELEMENT_MISSILE[element]||"energy";
 }
 
 /* ---------- forge buffs (15.25) ---------- */
@@ -221,8 +217,8 @@ function tickPlayerConditions(auth,p){
     if(c.turns<=0){delete p.conditions[el];continue;}
     c.turns--;
     const dmg=Math.max(0,Math.floor(Number(c.dmg)||0));
-    if(dmg>0){p.hp=Math.max(0,p.hp-dmg);
-      auth.events.push({t:"condition",el:el,dmg:dmg,x:Number(p.x)||0.13,y:Number(p.y)||0.6,screen:true});
+    if(dmg>0){p.hp=Math.max(0,p.hp-dmg);const pos=playerPosition(auth,p);
+      auth.events.push({t:"condition",el:el,dmg:dmg,x:pos.x,y:pos.y,targetId:String(p.id||""),screen:true});
     }
     if(c.turns<=0)delete p.conditions[el];
   }
@@ -243,15 +239,6 @@ function applyPvpLoss(p,source){const rate=source==="player-raid"?.08:.03,loss=M
 function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String(member.id);p.level=Math.max(1,Number(p.level)||1);p.exp=Math.max(0,Number(p.exp)||0);
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
   p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=FULL_STAMINA;
-  // Posição visual do player no grid. Sem isto, eventos de dano (taken/
-  // death/condition) usam fallback 0.13/0.6 e os floaters aparecem nos
-  // cantos da tela. O cliente sobrescreve com posição real via mergeEntity.
-  if(!Number.isFinite(Number(p.cx)))p.cx=3;
-  if(!Number.isFinite(Number(p.cy)))p.cy=Math.floor((Number(p._gridH)||30)/2);
-  if(!Number.isFinite(Number(p.x)))p.x=(Number(p.cx)+.5)/(Number(p._gridW)||30);
-  if(!Number.isFinite(Number(p.y)))p.y=(Number(p.cy)+.5)/(Number(p._gridH)||30);
-  if(!Number.isFinite(Number(p.sx)))p.sx=p.x;
-  if(!Number.isFinite(Number(p.sy)))p.sy=p.y;
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));return p;}
 function makeMob(auth,slug,boss,id,source){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
   const sequence=Math.max(1,Number(auth.nextMobId)||1);auth.nextMobId=sequence+1;
@@ -499,30 +486,30 @@ function step(auth,now){if(auth.ended)return;
             const isCrit=guaranteedCrit||random(auth)<critChance;
             // Fatal (Onslaught) — 5% chance
             const isFatal=isCrit&&random(auth)<0.05;
-            // Projétil da magia: o cliente espera o NOME DO SPRITE, não as
-            // palavras mágicas. Magias em modo "skill" (exori e cia.) batem
-            // no próprio SQM e não têm nada voando até o alvo.
-            const spellMissile=spellMissileName(s,el);
-            // Evento de cast para o cliente renderizar a animação da spell
-            auth.events.push({t:"cast",name:s.name,area:!!s.area,element:el,
-              x:Number(p.x)||0.13,y:Number(p.y)||0.6,screen:true,
-              ts:stepTs+hitIdx*100});
+            const source=playerPosition(auth,p),visual=spellVisual(s),fx=visual.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,
+              magical=!s.f||s.f.modo==="magic",missile=visual.missile||(magical?(ELEMENT_MISSILE[el]||"energy"):null),
+              projectile=!!missile&&spellReach(s)>1;
             for(const tgt of targets){
               let finalDmg=Math.floor(dmg*forgeMult);
               if(isCrit)finalDmg=Math.floor(finalDmg*1.5);
               if(isFatal)finalDmg=Math.floor(finalDmg*1.5);
               finalDmg=applyResist(finalDmg,tgt,el);
               finalDmg=Math.max(1,finalDmg);
-              tgt.hp-=finalDmg;
-              auth.events.push({t:"hit",dmg:finalDmg,x:Number(tgt.x)||0.5,y:Number(tgt.y)||0.5,
+              tgt.hp-=finalDmg;const target=entityPosition(tgt,.5,.5);
+              auth.events.push({t:"hit",dmg:finalDmg,x:target.x,y:target.y,
                 el:el,race:tgt.def&&tgt.def.race||"blood",crit:isCrit,fatal:isFatal,
-                mobId:String(tgt.id),mobSlug:tgt.slug,
-                sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,
-                spell:s.name,exori:isSkillSpell(s)?1:0,
-                missile:spellMissile,projectile:!!spellMissile&&tgt===primaryTarget,
-                ts:stepTs+hitIdx*200+50});
+                mobId:String(tgt.id),targetId:String(tgt.id),mobSlug:tgt.slug,whoId:String(item.id),
+                sx:source.x,sy:source.y,projectile,missile:projectile?missile:null,
+                fx,spell:s.name,spellId:s.id,ts:stepTs+hitIdx*200});
               hitIdx++;
             }
+            // A fala e o estouro de área fazem parte do mesmo schema visual
+            // usado pelo combate local; palavras nunca são chave de missile.
+            if(s.area){const target=entityPosition(primaryTarget,.5,.5);
+              auth.events.push({t:"burst",x:target.x,y:target.y,targetId:String(primaryTarget.id),
+                fx,spell:s.name,spellId:s.id,screen:true,ts:stepTs+hitIdx*200+20});}
+            auth.events.push({t:"say",text:s.words||String(s.name||"").toLowerCase(),whoId:String(item.id),
+              x:source.x,y:source.y,screen:true,ts:stepTs+hitIdx*200+40});
             // Mana cost
             if(s.mana)p.mp=Math.max(0,p.mp-s.mana);
             // Cooldown
@@ -551,12 +538,14 @@ function step(auth,now){if(auth.ended)return;
         finalDmg=Math.max(1,finalDmg);
         primaryTarget.hp-=finalDmg;
         // Projectile para distance weapons
-        const weapon=p.equip&&p.equip.weapon,it=weapon&&ITEMS[weapon.item];
-        const isDist=it&&it.type==="distance";
-        auth.events.push({t:"hit",dmg:finalDmg,x:Number(primaryTarget.x)||0.5,y:Number(primaryTarget.y)||0.5,
+        const weapon=p.equip&&p.equip.weapon,it=weapon&&ITEMS[weapon.item],ammo=p.equip&&p.equip.ammo,
+          isDist=it&&String(it.type||it.t||"")==="distance",source=playerPosition(auth,p),
+          target=entityPosition(primaryTarget,.5,.5);
+        auth.events.push({t:"hit",dmg:finalDmg,x:target.x,y:target.y,
           el:"physical",race:primaryTarget.def&&primaryTarget.def.race||"blood",
-          crit:isCrit,fatal:isFatal,mobId:String(primaryTarget.id),mobSlug:primaryTarget.slug,
-          sx:Number(p.x)||0.13,sy:Number(p.y)||0.6,projectile:isDist,
+          crit:isCrit,fatal:isFatal,mobId:String(primaryTarget.id),targetId:String(primaryTarget.id),
+          mobSlug:primaryTarget.slug,whoId:String(item.id),sx:source.x,sy:source.y,projectile:isDist,
+          missile:isDist&&ammo&&ammo.item?String(ammo.item):(isDist?"arrow":null),
           ts:stepTs+hitIdx*200});
         progressAttack(p);
       }
@@ -570,16 +559,16 @@ function step(auth,now){if(auth.ended)return;
     if(auth.greed&&auth.greed.immune&&mob.slug==="greedbeast"){
       auth.greed.greedbeastKills++;if(auth.greed.greedbeastKills>=5){auth.greed.immune=false;auth.greed.greedbeastKills=0;auth.greed.vulnerableUntil=now+40000;}}
     // Forge buffs on kill
-    const leader=auth.players[0];
+    const leader=auth.players[0],leaderPos=entityPosition(leader,.13,.6);
     if(leader&&leader.p.hp>0){
-      if(forgeTryMomentum(leader.p,now))auth.events.push({t:"buff",nome:"Momentum",x:0.13,y:0.6,screen:true,ts:stepTs+800});
-      if(forgeTryTranscendence(leader.p,now))auth.events.push({t:"buff",nome:"Transcendence",x:0.13,y:0.6,screen:true,ts:stepTs+800});
-      if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:0.13,y:0.6,screen:true,ts:stepTs+800});
+      if(forgeTryMomentum(leader.p,now))auth.events.push({t:"buff",nome:"Momentum",x:leaderPos.x,y:leaderPos.y,whoId:String(leader.id),screen:true,ts:stepTs+800});
+      if(forgeTryTranscendence(leader.p,now))auth.events.push({t:"buff",nome:"Transcendence",x:leaderPos.x,y:leaderPos.y,whoId:String(leader.id),screen:true,ts:stepTs+800});
+      if(forgeTryOnslaught(leader.p))auth.events.push({t:"buff",nome:"Onslaught",x:leaderPos.x,y:leaderPos.y,whoId:String(leader.id),screen:true,ts:stepTs+800});
     }
     // Evento de kill para o cliente
-    const lootDrops=reward(auth,mob,auth.players,stepTs);
-    auth.events.push({t:"kill",mob:mob.slug,name:mob.def?mob.def.name:mob.slug,
-      exp:mob.exp||0,loot:lootDrops,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,
+    const lootDrops=reward(auth,mob,auth.players,stepTs),deadPos=entityPosition(mob,.5,.5);
+    auth.events.push({t:"kill",mob:mob.slug,mobId:String(mob.id),targetId:String(mob.id),name:mob.def?mob.def.name:mob.slug,
+      exp:mob.exp||0,loot:lootDrops,x:deadPos.x,y:deadPos.y,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish,
       ts:stepTs+800});
     if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
@@ -607,9 +596,10 @@ function step(auth,now){if(auth.ended)return;
           let dmg=min<max?roll(auth,min,max):min;
           if(dmg>0){
             dmg=Math.max(0,Math.floor(dmg-playerArmor(victim.p)*.3));
-            victim.p.hp-=dmg;
-            auth.events.push({t:"taken",dmg:dmg,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
-              el:el,screen:true,fx:sk.fx,ts:stepTs+mobHitIdx*200});
+            victim.p.hp-=dmg;const target=entityPosition(victim,.13,.6),source=entityPosition(mob,.5,.5);
+            auth.events.push({t:"taken",dmg:dmg,x:target.x,y:target.y,targetId:String(victim.id),
+              sx:source.x,sy:source.y,sourceId:String(mob.id),el:el,screen:true,fx:sk.fx,
+              projectile:!!sk.miss,missile:sk.miss||null,ts:stepTs+mobHitIdx*200});
           }
           // Conditions aplicadas por skills
           if(sk.campo==="fire"&&dmg>0)applyCondition(victim.p,"fire",Math.floor(dmg*.1),4);
@@ -629,15 +619,16 @@ function step(auth,now){if(auth.ended)return;
       if(Number(mob.damage||0)>0){
         let damage=mobDamage(auth,mob,victim.p);
         if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);
-        victim.p.hp-=damage;
-        auth.events.push({t:"taken",dmg:damage,x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,
+        victim.p.hp-=damage;const target=entityPosition(victim,.13,.6),source=entityPosition(mob,.5,.5);
+        auth.events.push({t:"taken",dmg:damage,x:target.x,y:target.y,targetId:String(victim.id),
+          sx:source.x,sy:source.y,sourceId:String(mob.id),
           el:mob.def&&mob.def.element||"physical",screen:true,ts:stepTs+mobHitIdx*200});
         // Conditions do melee (race-based, como no Canary)
         const race=mob.def&&mob.def.race;
         if(race==="poison"&&random(auth)<.15)applyCondition(victim.p,"poison",Math.floor(damage*.1),5);
         if(race==="fire"&&random(auth)<.15)applyCondition(victim.p,"fire",Math.floor(damage*.1),4);
         if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
-          auth.events.push({t:"death",x:Number(victim.p.x)||0.13,y:Number(victim.p.y)||0.6,screen:true,ts:stepTs+mobHitIdx*200});
+          auth.events.push({t:"death",x:target.x,y:target.y,targetId:String(victim.id),screen:true,ts:stepTs+mobHitIdx*200});
         }
       }
       mobHitIdx++;
@@ -661,7 +652,10 @@ function initializeAuthority(descriptor,instanceId,now){
   const seen=new Set(),visual=active.concat(pending).filter((mob)=>{
     const key=String(mob&&mob.id||mob&&mob.slug||"");if(!key||seen.has(key))return false;seen.add(key);return true;});
   combat.mobs=visual;combat.pendingSpawns=[];
-  const players=(descriptor.members||[]).map((m)=>({id:String(m.id),p:canonicalPlayer(m),attackAcc:0,downUntil:0}));
+  const oldPlayers=Array.isArray(combat.players)?combat.players:[];
+  const players=(descriptor.members||[]).map((m)=>{const id=String(m.id),old=oldPlayers.find((ent)=>String(ent&&ent.id)===id)||{};
+    const item={id,p:canonicalPlayer(m),attackAcc:0,downUntil:0};
+    for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)item[key]=old[key];return item;});
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",players,mobs:[],spawnPool:[],spawnPoints:[],
     influencedChance:Math.max(0,Number(combat.influencedChance)||
@@ -670,17 +664,6 @@ function initializeAuthority(descriptor,instanceId,now){
       (FIENDISH_BASE_CHANCE+(descriptor.instanceMode==="pvp"?FIENDISH_PVP_BONUS:0))),
     gridW:Number(combat.gridW)||30,gridH:Number(combat.gridH)||30,pack:Math.max(1,visual.length||3),
     stats:{startedAt:Number(now)||Date.now(),time:0,kills:0,exp:0,rawExp:0,rawHp:0,loot:{},monsters:{}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster"};
-  // Set player positions based on grid. Players are placed on the left side
-  // of the arena in a vertical column, like the client's newCombat does.
-  for(let pi=0;pi<auth.players.length;pi++){
-    const item=auth.players[pi],p=item.p;
-    if(!Number.isFinite(Number(p.cx)))p.cx=2;
-    if(!Number.isFinite(Number(p.cy)))p.cy=Math.floor(auth.gridH/2)-Math.floor(auth.players.length/2)+pi;
-    if(!Number.isFinite(Number(p.x)))p.x=(Number(p.cx)+.5)/auth.gridW;
-    if(!Number.isFinite(Number(p.y)))p.y=(Number(p.cy)+.5)/auth.gridH;
-    if(!Number.isFinite(Number(p.sx)))p.sx=p.x;
-    if(!Number.isFinite(Number(p.sy)))p.sy=p.y;
-  }
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
@@ -695,26 +678,20 @@ function initializeAuthority(descriptor,instanceId,now){
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
   descriptor.members=auth.players.map((item)=>({id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp}));descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
   descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
-  descriptor.state.players=auth.players.map((item)=>Object.assign({},oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},{id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0}));
+  descriptor.state.players=auth.players.map((item)=>Object.assign({},oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},
+    entityVisual(item),{id:item.id,p:clone(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0}));
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
-  descriptor.state.mobs=auth.mobs.map((m)=>{
-    const existing=oldMobs.find((x)=>String(x.id)===String(m.id));
-    // O cliente é dono do movimento visual (client-side prediction via
-    // updateGridMovement/monsterThinkStep). O servidor só envia posição
-    // para mobs NOVOS (que o cliente ainda não tem). Para mobs existentes,
-    // NÃO enviamos cx/cy/x/y/sx/sy — o cliente preserva via visualKeys.
-    const base=existing?{}:{cx:m.cx,cy:m.cy,x:m.x,y:m.y,sx:m.sx,sy:m.sy};
-    return Object.assign({},base,existing||{},
-      {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
-        sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
-        hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
-        // def compacto: só campos necessários para o cliente renderizar.
-        // O def completo (loot, skills, voices) é pesado e já existe no
-        // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
-        // browser (50KB+ por snapshot com 6 mobs).
-        def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
-             element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}});
-  });
+  descriptor.state.mobs=auth.mobs.map((m)=>Object.assign({},oldMobs.find((x)=>String(x.id)===String(m.id))||{},
+    entityVisual(m),
+    {id:m.id,slug:m.slug,boss:m.boss,influenced:!!m.influenced,fiendish:!!m.fiendish,
+      sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
+      hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
+      // def compacto: só campos necessários para o cliente renderizar.
+      // O def completo (loot, skills, voices) é pesado e já existe no
+      // cliente via GAMEDATA.monsters. Enviar tudo a cada tick trava o
+      // browser (50KB+ por snapshot com 6 mobs).
+      def:{name:m.def?m.def.name:m.slug,race:m.def&&m.def.race||"blood",
+           element:m.def&&m.def.element||"physical",looktype:m.def&&m.def.looktype||null}}));
   if(auth.greed)descriptor.state.greed={immune:auth.greed.immune,greedbeastKills:auth.greed.greedbeastKills,
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
@@ -730,7 +707,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   auth.events=[];
   descriptor.savedAt=auth.clock;return descriptor;
 }
-function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=typeof serialized==="string"?JSON.parse(serialized):clone(serialized);
+function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let descriptor=typeof serialized==="string"?JSON.parse(serialized):clone(serialized);
   const auth=descriptor.authority;if(!auth)return null;
   // v2 corrige instâncias criadas com HP/MP antigos do banco no checkpoint de
   // entrada. A migração roda uma única vez também para snapshots já ativos.
@@ -754,6 +731,9 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=t
       if(recoverMobs){const mob=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(mob){Object.assign(mob,point);auth.mobs.push(mob);}}}
     descriptor.state.pendingSpawns=[];auth.pack=Math.max(auth.pack||0,auth.mobs.length||auth.spawnPool.length||1);
   }
+  // Sincroniza a predição visual antes de criar eventos deste step. Não há
+  // qualquer leitura dessas coordenadas nos cálculos de dano/recompensa.
+  syncAuthorityVisualState(auth,visualState);
   const total=Math.max(0,Number(elapsed)||0)+(Number(auth.carryMs)||0);
   const requested=Math.floor(total/1000),steps=Math.min(250000,requested);auth.carryMs=total-steps*1000;
   for(let i=0;i<steps;i++){auth.clock+=1000;step(auth,auth.clock);if(auth.ended){auth.carryMs=0;break;}}
@@ -763,4 +743,4 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt){let descriptor=t
 }
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
-  blessingPrice,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS};
+  normalizeVisualState,blessingPrice,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS};

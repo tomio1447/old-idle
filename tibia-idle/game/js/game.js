@@ -2595,9 +2595,27 @@ function applyOnlineAuthorityState(descriptor,terminalReason){
   // próprio iterador para sempre e congela completamente a aba no 1º hit.
   previous.events=Array.isArray(previous.events)?previous.events:[];
   if(Array.isArray(incoming.events)&&incoming.events.length){
-    const receivedAt=Date.now();
+    const receivedAt=Date.now(),visualPlayersById=new Map(),visualMobsById=new Map(localMobsById);
+    for(const ent of previous.players||[]){const id=entityId(ent);if(id)visualPlayersById.set(id,ent);}
+    for(const ent of previous.mobs||[]){const id=entityId(ent);if(id)visualMobsById.set(id,ent);}
+    const placeEvent=(event)=>{
+      // IDs são a fonte estável. Coordenadas do snapshot podem ter sido
+      // produzidas até um tick antes; rebasing mantém dano/spells no alvo que
+      // o grid local está mostrando e também cobre o mob removido no kill.
+      const targetId=String(event.targetId!==undefined?event.targetId:(event.mobId!==undefined?event.mobId:""));
+      let target=null;
+      if(targetId){target=(event.t==="taken"||event.t==="death"||event.t==="condition"||event.t==="block")
+        ?visualPlayersById.get(targetId):visualMobsById.get(targetId)||visualPlayersById.get(targetId);}
+      if(target&&Number.isFinite(Number(target.x))&&Number.isFinite(Number(target.y))){event.x=Number(target.x);event.y=Number(target.y);event.screen=true;}
+      const playerSource=event.whoId!==undefined?visualPlayersById.get(String(event.whoId)):null,
+        mobSource=event.sourceId!==undefined?visualMobsById.get(String(event.sourceId)):null,
+        source=playerSource||mobSource;
+      if(source&&Number.isFinite(Number(source.x))&&Number.isFinite(Number(source.y))){event.sx=Number(source.x);event.sy=Number(source.y);
+        if((event.t==="say"||event.t==="buff")&&!target){event.x=event.sx;event.y=event.sy;event.screen=true;}}
+      return event;
+    };
     for(let index=0;index<incoming.events.length;index++){
-      const remote=incoming.events[index],event=Object.assign({},remote);
+      const remote=incoming.events[index],event=placeEvent(Object.assign({},remote));
       // O timestamp absoluto do servidor chegava até 900ms no futuro. Somado
       // ao tick de 1s, isso simulava quase 2s de ping até em 127.0.0.1.
       // Rebaseie somente eventos futuros para uma animação curta (máx. 120ms).
