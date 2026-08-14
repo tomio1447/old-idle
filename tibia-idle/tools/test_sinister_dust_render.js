@@ -28,5 +28,5 @@ const call=source.lastIndexOf("drawSinisterDust(ctx, info.ent, info.cx, info.cy,
   objects=source.indexOf('drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects")',entities),
   bossbar=source.indexOf("drawBossBar(ctx, canvasW",objects);
 must(call>objects&&call<bossbar,"poeira não está visível acima dos objetos e abaixo da UI");
-must(html.includes("js/render.js?v=sinister-dust-v3"),"render.js sem cache-bust da poeira");
+must(html.includes("js/render.js?v=overlap-bottom-up-v1"),"render.js sem cache-bust visual");
 console.log("OK: poeira Influenced/Fiendish Canary aparece animada e visível.");
