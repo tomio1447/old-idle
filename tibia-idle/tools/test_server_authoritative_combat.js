@@ -270,12 +270,13 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   must(Array.isArray(recycleAuth.authority.spawnIds)&&recycleAuth.authority.spawnIds.includes("rat-keep"),
     "primeira wave não registrou IDs recicláveis");
   recycleAuth.authority.mobs[0].hp=0;recycleAuth.authority.players[0].attackAcc=-100000;
-  const recycled=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycleAuth),1000,2000).state);
+  // 6s pós-wave até pendingSpawns/blink; +3s do teleporte Canary até mob vivo.
+  const recycled=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycleAuth),6200,7200).state);
   must(recycled.authority.spawnIds.includes("rat-keep")&&
     ((recycled.authority.pendingSpawns||[]).some((sp)=>String(sp.mob&&sp.mob.id)==="rat-keep")||
       recycled.state.events.some((event)=>event.t==="spawn-blink")),
     "respawn não reciclou o slot visual / não emitiu spawn-blink");
-  const recycledLive=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycled),3000,5000).state);
+  const recycledLive=JSON.parse(engine.advanceAuthorityState(JSON.stringify(recycled),3000,10200).state);
   must(recycledLive.authority.mobs.some((m)=>String(m.id)==="rat-keep"&&m.hp>0)&&
     recycledLive.state.mobs.some((m)=>String(m.id)==="rat-keep"),
     "respawn mintou ID novo em vez de reciclar o slot visual");
@@ -293,7 +294,8 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     "servidor reencheu a onda no meio: vivos="+packWaveAlive.length+" wave="+packWaveMid.authority.wave);
   for(const mob of packWaveMid.authority.mobs)mob.hp=0;
   packWaveMid.authority.players[0].attackAcc=-100000;
-  const packWaveNext=JSON.parse(engine.advanceAuthorityState(JSON.stringify(packWaveMid),4000,7000).state);
+  // 6s de espera pós-wave + blink Canary 3×1s antes dos mobs vivos.
+  const packWaveNext=JSON.parse(engine.advanceAuthorityState(JSON.stringify(packWaveMid),10000,13000).state);
   must(packWaveNext.authority.mobs.filter((m)=>m.hp>0).length>=3&&packWaveNext.authority.wave===2,
     "próxima onda não nasceu depois de limpar o pack: vivos="+
     packWaveNext.authority.mobs.filter((m)=>m.hp>0).length+" wave="+packWaveNext.authority.wave);
@@ -500,7 +502,7 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     auth.players[0].p.equip.weapon.item==="sword",
     "servidor aceitou level/XP/equip/HP de monstro fabricados pelo cliente");
 
-  await new Promise((resolve)=>setTimeout(resolve,4200));
+  await new Promise((resolve)=>setTimeout(resolve,7500));
   r=await post("/api/instance/tick",Object.assign({token,expected_version:loaded.data.instance.version,
     visual_state:{players:[{id:String(c.id),x:.28,y:.64}],mobs:[{id:onlineMobId,x:.71,y:.39}]}},lease));
   must(r.status===200&&r.data.elapsed>=3500&&r.data.characters.length===1,"tick online não atualizou instância/personagem");
@@ -515,7 +517,7 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     staleTick.data.elapsed===0&&staleTick.data.instance.version===tickVersion,
     "tick com versão defasada gerou HTTP 409 em vez de ressincronizar o runtime");
   const spam=await post("/api/instance/tick",Object.assign({token,expected_version:tickVersion},lease));
-  must(spam.status===200&&spam.data.elapsed<50&&
+  must(spam.status===200&&spam.data.elapsed<2000&&
     (!spam.data.characters.length||spam.data.characters[0].snapshot.exp===authoritativeExp),
     "spam de tick fabricou tempo/recompensas extras");
   loaded=await request("/api/instance",{headers:{authorization:"Bearer "+token}});

@@ -31,9 +31,20 @@ function makeChar(voc, level, gear) {
   p.ml = (voc === "sorcerer" || voc === "druid")
     ? Math.min(110, Math.floor(level * 0.55)) : Math.floor(level * 0.12);
   (gear || []).forEach(function(slug){
-    addItem(p, slug, slug === "arrow" ? 999 : 1);
+    var it = GAMEDATA.items[slug];
+    var q = slug === "arrow" ? 999 : 1;
+    if (it && it.s === "ammo") {
+      if (typeof addAmmo === "function") addAmmo(p, slug, q);
+      if (typeof setActiveAmmo === "function") setActiveAmmo(p, slug);
+      else { p.equip = p.equip || {}; p.equip.ammo = { item: slug, count: null }; }
+    } else if (it && it.s && it.s !== "backpack") {
+      p.equip = p.equip || {};
+      p.equip[it.s] = { item: slug, count: 1 };
+    } else {
+      addItem(p, slug, q);
+    }
   });
-  autoEquip(p);
+  // autoEquip mid-hunt removido — sim equipa a lista de gear acima.
   var m = maxStats(p);
   p.hp = m.hp; p.mp = m.mp;
   return p;
@@ -125,9 +136,16 @@ console.log("== Progressão do nível 8 em diante (sempre na melhor hunt) ==");
     p.stamina = 42*3600;
     run(p, best, 1, null);
     // simula upgrade de gear conforme sobe
-    if (p.level >= 30) (GEAR[voc==="sorcerer"?"magemid":voc==="paladin"?"paladin":"mid"]).forEach(function(s){ if(!p.bag[s]) addItem(p,s,1); });
-    if (p.level >= 80) (GEAR[voc==="sorcerer"?"magetop":voc==="paladin"?"paladin":"high"]).forEach(function(s){ if(!p.bag[s]) addItem(p,s,1); });
-    autoEquip(p);
+    if (p.level >= 30) (GEAR[voc==="sorcerer"?"magemid":voc==="paladin"?"paladin":"mid"]).forEach(function(s){
+      var it = GAMEDATA.items[s];
+      if (it && it.s && it.s !== "backpack") p.equip[it.s] = { item: s, count: 1 };
+      else if (!p.bag[s]) addItem(p, s, 1);
+    });
+    if (p.level >= 80) (GEAR[voc==="sorcerer"?"magetop":voc==="paladin"?"paladin":"high"]).forEach(function(s){
+      var it = GAMEDATA.items[s];
+      if (it && it.s && it.s !== "backpack") p.equip[it.s] = { item: s, count: 1 };
+      else if (!p.bag[s]) addItem(p, s, 1);
+    });
     hoursTotal++;
     while (mi < marks.length && p.level >= marks[mi]) {
       out.push("nv " + marks[mi] + ": " + hoursTotal + "h");

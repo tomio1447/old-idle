@@ -48,7 +48,10 @@ must(map.z === 7 && map.w === 23 && map.h === 21 &&
 
 const otbmhunt = fs.readFileSync(path.join(js, "otbmhunt.js"), "utf8");
 const start = otbmhunt.indexOf("function applyHuntOtbmZones");
-const end = otbmhunt.indexOf("\n\n/* Garante", start);
+const end = otbmhunt.indexOf("function huntMapFromOtbmAsync", start);
+must(start >= 0 && end > start, "applyHuntOtbmZones ausente");
+context.window.addEventListener = context.window.addEventListener || function () {};
+context.addEventListener = context.addEventListener || function () {};
 vm.runInContext(otbmhunt.slice(start, end), context);
 context.applyHuntOtbmZones(map, hunt);
 must(map.spawn.x === 9 && map.spawn.y === 11 && map.mob.length === 483,
@@ -93,7 +96,7 @@ must(otbmhunt.includes("OTBM.read(buf, { z: hunt.otbmFloor })"),
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/otbm.js?v=cobra-loading-v17") &&
      html.includes("js/otbmhunt.js?v=cobra-loading-v17") &&
-     html.includes("js/hard-hunts.js?v=cobra-loading-v17"),
+     html.includes("js/hard-hunts.js?v=naga-avg-v1"),
   "scripts do novo mapa Marapur estão sem cache-busting v11");
 
 console.log("OK: nagas_marapur integral em mundo 30×30; FOV não recorta o mapa.");

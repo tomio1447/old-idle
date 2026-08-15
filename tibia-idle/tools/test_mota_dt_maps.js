@@ -20,7 +20,10 @@ for (const file of ["gamedata.js", "monsterdata.js", "monsters.js",
     { filename:file });
 const loader = fs.readFileSync(path.join(js, "otbmhunt.js"), "utf8");
 const zoneStart = loader.indexOf("function applyHuntOtbmZones");
-const zoneEnd = loader.indexOf("\n\n/* Garante", zoneStart);
+const zoneEnd = loader.indexOf("function huntMapFromOtbmAsync", zoneStart);
+must(zoneStart >= 0 && zoneEnd > zoneStart, "applyHuntOtbmZones ausente");
+context.window.addEventListener = context.window.addEventListener || function () {};
+context.addEventListener = context.addEventListener || function () {};
 vm.runInContext(loader.slice(zoneStart, zoneEnd), context);
 
 const specs = {
@@ -109,7 +112,7 @@ must(loader.includes("mapa.idleTargetWidth = Number(hunt.otbmRuntimeWidth) || 0"
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/otbm.js?v=cobra-loading-v17") &&
      html.includes("js/otbmhunt.js?v=cobra-loading-v17") &&
-     html.includes("js/hard-hunts.js?v=cobra-loading-v17"),
+     html.includes("js/hard-hunts.js?v=naga-avg-v1"),
   "scripts dos mundos 30×30 estão sem cache-busting v11");
 
 console.log("OK: MOTA Extension e DT Seal preservam mapas integrais 30×30; FOV não recorta o mundo.");

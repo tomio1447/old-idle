@@ -198,7 +198,13 @@ function preloadGameAssets(p, label) {
     'assets/ui/conditions/cond-magic-shield.png','assets/effects/critical-heal-effect.png'
   ]);
   // Aparência atual + party inicial: evita frames brancos ao entrar.
-  if (p && p.outfit && p.outfit.appearance) paths.add('assets/appearance/outfit/' + p.outfit.appearance + '.base.png');
+  // Sempre resolve o id pelo sexo (nunca pré-carrega noblewoman-m em male).
+  if (p && typeof currentAppearance === 'function') {
+    const resolved = (typeof activeAvatarAppearance === 'function' && activeAvatarAppearance(p)) || currentAppearance(p);
+    if (resolved && resolved.id) paths.add('assets/appearance/outfit/' + resolved.id + '.base.png');
+  } else if (p && p.outfit && p.outfit.appearance) {
+    paths.add('assets/appearance/outfit/' + p.outfit.appearance + '.base.png');
+  }
   if (p && p.outfit && p.outfit.mount) paths.add('assets/appearance/mount/' + p.outfit.mount + '.base.png');
   // Sheets idle são separados dos frames de caminhada. Pré-carrega somente
   // os que a aparência atual realmente possui no DAT.

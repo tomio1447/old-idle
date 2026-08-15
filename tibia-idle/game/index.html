@@ -5,18 +5,53 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Global-Idle — caçada automática</title>
 <link rel="icon" href="assets/item/gold-coin.png">
-  <link rel="stylesheet" href="css/layout.css?v=knight-fx-combo-v1">
-  <link rel="stylesheet" href="css/otc-complete.css">
+  <link rel="stylesheet" href="css/layout.css?v=charms-cidade-v2">
+  <link rel="stylesheet" href="css/otc-complete.css?v=settings-click-fix-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
   <link rel="stylesheet" href="css/client-background.css">
+  <link rel="stylesheet" href="css/mobile.css?v=settings-click-fix-v1">
+  <link rel="stylesheet" href="css/chat.css?v=global-chat-v1">
+  <script>
+  /* Aplica modo salvo antes do paint para evitar flash. */
+  (function () {
+    try {
+      var m = localStorage.getItem("global-idle-ui-mode-v1");
+      if (m === "mobile" || m === "desktop") {
+        document.documentElement.setAttribute("data-ui-mode", m);
+      }
+    } catch (e) {}
+  })();
+  </script>
 </head>
 <body>
 
 <button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
+
+<!-- Escolha Mobile / Desktop (primeira visita) -->
+<div class="modal-bg" id="ui-mode-modal" role="dialog" aria-modal="true" aria-labelledby="ui-mode-title">
+  <div class="modal panel ui-mode-box">
+    <div class="panel-title" id="ui-mode-title" data-i18n="uimode.title">Versão do jogo</div>
+    <div class="panel-body">
+      <div class="small dim center mb8" data-i18n="uimode.ask">Como você quer jogar neste dispositivo?</div>
+      <div class="ui-mode-choices">
+        <button type="button" class="sm" data-ui-mode-pick="mobile">
+          <span class="ui-mode-icon" aria-hidden="true">📱</span>
+          <span data-i18n="uimode.mobile">Mobile</span>
+        </button>
+        <button type="button" class="sm" data-ui-mode-pick="desktop">
+          <span class="ui-mode-icon" aria-hidden="true">🖥</span>
+          <span data-i18n="uimode.desktop">Desktop</span>
+        </button>
+      </div>
+      <div class="tiny dim center mt8" id="ui-mode-suggest"></div>
+      <div class="tiny dim center mt4" data-i18n="uimode.hint">Você pode trocar depois em CONFIG.</div>
+    </div>
+  </div>
+</div>
 
 <!-- =============================================== CLIENT BACKGROUND -->
 <div id="client-version-label"></div>
@@ -40,8 +75,8 @@
         </div>
       </div>
 
-      <!-- MODO ONLINE (conta) — visível quando accountApiConfigured() -->
-      <div id="account-login" style="display:none">
+      <!-- Conta (primeira tela no boot). O create local legado fica oculto. -->
+      <div id="account-login">
         <form id="account-login-form" method="post">
           <div class="small dim center mb8" data-i18n="login.enter">Entre com sua conta para acessar seus personagens.</div>
           <div class="field">
@@ -58,8 +93,8 @@
         </form>
       </div>
 
-      <!-- MODO LOCAL (sem conta) — visível quando offline -->
-      <div id="local-login">
+      <!-- Legado offline (só se !accountApiConfigured). Nunca no primeiro paint. -->
+      <div id="local-login" style="display:none" hidden>
         <div class="field">
           <label data-i18n="login.charName">Nome do personagem</label>
           <input id="char-name" maxlength="20" placeholder="Ex: Bubble" autocomplete="off">
@@ -183,6 +218,17 @@
         <div class="panel-title" data-i18n="panel.bag">Mochila</div>
         <div class="panel-body">
           <div class="inv-grid" id="inv"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="supply-stash">
+        <div class="panel-title">
+          <span>Supply Stash</span>
+          <span style="flex:1"></span>
+          <span class="tiny dim" id="supply-stash-cap"></span>
+        </div>
+        <div class="panel-body">
+          <div class="inv-grid" id="supplystash"></div>
         </div>
       </div>
 
@@ -354,7 +400,10 @@
       <div class="panel hunt-analytics-panel" data-collapse="analysers">
         <div class="panel-title">
           <span id="otc-analyser-title">📈 Hunt Session Analyser</span>
+          <span class="spacer" style="flex:1"></span>
           <span class="otc-live-badge" title="Atualização em tempo real"><i></i> LIVE</span>
+          <button type="button" class="otc-dmg-reset otc-session-reset" id="otc-analyser-session-reset"
+            data-otc-session-reset title="Resetar sessão" aria-label="Resetar sessão">↻</button>
         </div>
         <div class="panel-body otc-analytics-shell">
           <div id="otc-analysers" class="otc-analyser-tabs" role="tablist" aria-label="Analytics da caçada"></div>
@@ -364,6 +413,35 @@
 
     </div>
 
+  </div>
+</div>
+
+<!-- Dock / menu mobile (visível só com data-ui-mode=mobile) -->
+<nav id="mobile-dock" hidden aria-label="Navegação mobile">
+  <button type="button" class="sm" data-mobile-tab="game" aria-pressed="true">
+    <span class="dock-ico" aria-hidden="true">⚔</span><span data-i18n="mobile.tab.game">Jogo</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="inv" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">🎒</span><span data-i18n="mobile.tab.inv">Itens</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="helper" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">♥</span><span data-i18n="mobile.tab.helper">Helper</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="analyse" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">📈</span><span data-i18n="mobile.tab.analyse">Stats</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="menu" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">☰</span><span data-i18n="mobile.tab.menu">Menu</span>
+  </button>
+</nav>
+<div id="mobile-menu-sheet" aria-hidden="true">
+  <div class="panel mobile-menu-panel">
+    <div class="panel-title">
+      <span data-i18n="mobile.menu.title">Funções</span>
+      <span style="flex:1"></span>
+      <button type="button" class="sm" id="mobile-menu-close">✕</button>
+    </div>
+    <div class="mobile-menu-actions" id="mobile-menu-actions"></div>
   </div>
 </div>
 
@@ -378,14 +456,14 @@
 <script src="js/client-background.js"></script>
 <script src="js/canarydata.js"></script>
 <script src="js/spelldata.js"></script>
-<script src="js/appearancedata.js"></script>
+<script src="js/appearancedata.js?v=sex-looktype-v2"></script>
 <script src="js/avatardata.js"></script>
 <script src="js/supplydata.js"></script>
 <script src="js/runedata.js"></script>
 <script src="js/monstermovedata.js"></script>
-<script src="js/monsterdata.js"></script>
+<script src="js/monsterdata.js?v=prey-bestiary-v1"></script>
 <script src="js/mobsheetdata.js"></script>
-<script src="js/idleanimdata.js"></script>
+<script src="js/idleanimdata.js?v=sex-looktype-v2"></script>
 <script src="js/creatureanchordata.js"></script>
 <script src="js/areadata.js"></script>
 <script src="js/spelltargetdata.js"></script>
@@ -397,49 +475,51 @@
 <script src="js/weapondata.js"></script>
 <!-- update 15.25.3a4a52: aplica os ajustes POR CIMA dos dados gerados,
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
-<script src="js/spelldata_1525.js?v=cd-bar-v1"></script>
+<script src="js/spelldata_1525.js?v=monk-lesser-repulse-v1"></script>
 <script src="js/tiledata.js"></script>
 <script src="js/tileflags.js"></script>
 <script src="js/imbuementdata.js"></script>
 <script src="js/wandshootdata.js?v=basic-fx-v1"></script>
-<script src="js/patch_clientfx.js?v=basic-fx-v1"></script>
-<script src="js/rates.js"></script>
-<script src="js/vip.js"></script>
+<script src="js/patch_clientfx.js?v=caldera-diamond-dmg-v1"></script>
+<script src="js/rates.js?v=loot-chance-not-qty-v1"></script>
+<script src="js/vip.js?v=account-gold-cap-vip-v1"></script>
 <script src="js/huntmapdata.js"></script>
 <script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>
 <script src="js/dark-thais-map.js"></script>
 <script src="js/otbm.js?v=cobra-loading-v17"></script>
 <script src="js/otbmhunt.js?v=cobra-loading-v17"></script>
-<script src="js/weapons.js"></script>
-<script src="js/ammo.js"></script>
-<script src="js/combo.js?v=spell-prio-v1"></script>
+<script src="js/weapons.js?v=npc-shops-v1"></script>
+<script src="js/ammo.js?v=caldera-diamond-dmg-v1"></script>
+  <script src="js/combo.js?v=mas-san-range-v1"></script>
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=knight-fx-combo-v1"></script>
-<script src="js/area.js?v=wave-matrix-v1"></script>
-<script src="js/gridai.js?v=sqm-hud-v1"></script>
+<script src="js/area.js?v=mas-san-range-v1"></script>
+  <script src="js/gridai.js?v=mob-retarget-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
-<script src="js/monk.js?v=thousand-fist-v1"></script>
-<script src="js/core.js"></script>
-<script src="js/spells.js?v=elem-melee-fx-v1"></script>
+<script src="js/monk.js?v=monk-lesser-repulse-v1"></script>
+<script src="js/canary-vocation.js?v=voc-filter-regen-v1"></script>
+<script src="js/core.js?v=forked-chain-v1"></script>
+<script src="js/spells.js?v=voc-filter-regen-v1"></script>
 <script src="js/cooldown.js?v=cd-bar-v1"></script>
 <script src="js/augments.js"></script>
-<script src="js/supplies.js"></script>
-<script src="js/outfit.js?v=party-visible-v1"></script>
-<script src="js/appearance.js?v=outfit-mount-v1"></script>
+<script src="js/supplies.js?v=potion-audit-v1"></script>
+<script src="js/outfit.js?v=sex-looktype-v2"></script>
+<script src="js/appearance.js?v=sex-looktype-v2"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=knight-fx-combo-v1"></script>
-<script src="js/accessories.js?v=ms-potion-v1"></script>
-<script src="js/combat.js?v=knight-fx-combo-v2"></script>
-<script src="js/city.js?v=training-fx-v1"></script>
-<script src="js/citymap.js"></script>
+<script src="js/player.js?v=loot-pouch-clear-v1"></script>
+<script src="js/accessories.js?v=supply-stash-v1"></script>
+  <script src="js/combat.js?v=wave-clear-respawn-6s"></script>
+<script src="js/city.js?v=npc-shops-v1"></script>
+<script src="js/npc-shops.js?v=npc-shops-v1"></script>
+<script src="js/citymap.js?v=npc-shops-v1"></script>
 <script src="js/walker.js"></script>
 <script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
 <script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
 <script src="js/tilemap.js?v=cobra-loading-v17"></script>
-<script src="js/effectdata.js?v=cobra-wave-t-v1"></script>
+<script src="js/effectdata.js?v=blow-white-fix-v1"></script>
 <script src="js/icondata.js?v=cond-icons-v1"></script>
-<script src="js/render.js?v=knight-fx-combo-v1"></script>
+<script src="js/render.js?v=fx-dur-fullframes-v1"></script>
 <script src="js/city-render.js?v=hd-hud-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
@@ -447,32 +527,34 @@
 <script src="js/patch_imbuement.js"></script>
 <script src="js/patch_amazon.js"></script>
 <!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
-<script src="js/hardcore-library.js"></script>
-<script src="js/hard-hunts.js?v=cobra-loading-v17"></script>
+<script src="js/hardcore-library.js?v=library-canary-dmg-v1"></script>
+<script src="js/hard-hunts.js?v=naga-avg-v1"></script>
 <script src="js/soulwar.js?v=hatred-v3"></script>
-<script src="js/cyclopedia.js"></script>
+<script src="js/cyclopedia.js?v=npc-shops-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=sqm-hud-v1"></script>
-<script src="js/i18n.js?v=sqm-hud-v1"></script>
-<script src="js/settings.js?v=config-v1"></script>
+<script src="js/ui.js?v=loot-pouch-clear-v1"></script>
+<script src="js/i18n.js?v=npc-shops-v1"></script>
+<script src="js/settings.js?v=settings-click-fix-v1"></script>
+<script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-v1"></script>
-<script src="js/cyclopedia-ui.js?v=outfit-cards-v1"></script>
+<script src="js/cyclopedia-ui.js?v=npc-shops-v1"></script>
 <script src="js/forgedata.js"></script>
 <script src="js/forge.js"></script>
 <script src="js/imbuement-ui.js?v=imbue-slots-v1"></script>
 <script src="js/forge-ui.js"></script>
-<script src="js/prey.js?v=prey-timer-v1"></script>
-<script src="js/prey-ui.js"></script>
-<script src="js/party.js?v=challenge-ai-v1"></script>
-<script src="js/party-ui.js?v=sqm-hud-v1"></script>
-<script src="js/analyzers.js?v=loot-supply-v1"></script>
-<script src="js/wheeldata.js?v=wheel-otc-v1"></script>
-<script src="js/wheel-gems.js?v=wheel-otc-v1"></script>
-<script src="js/wheel.js?v=wheel-otc-v1"></script>
-<script src="js/wheel-ui.js?v=wheel-otc-v1"></script>
+<script src="js/prey.js?v=prey-bestiary-v1"></script>
+<script src="js/prey-ui.js?v=prey-bestiary-v1"></script>
+<script src="js/party.js?v=helper-only-spells-v1"></script>
+<script src="js/party-ui.js?v=helper-only-spells-v1"></script>
+<script src="js/analyzers.js?v=hunt-analyser-death-v1"></script>
+<script src="js/wheeldata.js?v=wheel-otc-v2"></script>
+<script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
+<script src="js/wheel.js?v=wheel-otc-v2"></script>
+<script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=sqm-hud-v1"></script>
+<script src="js/account-client.js?v=save-conflict-retry-v1"></script>
+<script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js"></script>
 <script src="js/market-local.js"></script>
@@ -480,10 +562,12 @@
 <script src="js/training.js?v=party-checkpoint-v1"></script>
 <script src="js/training-ui.js"></script>
 <script src="js/accessorydata.js"></script>
-<script src="js/admin.js"></script>
-<script src="js/city-ui.js?v=hunts-modal-v1"></script>
-<script src="js/preload.js?v=spawn-map-v1"></script>
-<script src="js/game.js?v=knight-fx-combo-v2"></script>
+<script src="js/supply-stash-data.js?v=supply-stash-v1"></script>
+<script src="js/supply-stash.js?v=loot-coins-analyser-v1"></script>
+<script src="js/admin.js?v=admin-no-rme-mundo-v1"></script>
+<script src="js/city-ui.js?v=npc-shops-v1"></script>
+<script src="js/preload.js?v=sex-looktype-v2"></script>
+<script src="js/game.js?v=global-chat-v1"></script>
 <script src="js/scarlett-boss.js?v=goshnar-greed-v2"></script>
 </body>
 </html>

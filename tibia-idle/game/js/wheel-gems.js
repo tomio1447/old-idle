@@ -279,9 +279,12 @@ function wheelGemSpellId(name) {
 }
 
 function ensureWheelGems(p) {
-  if (typeof ensureWheel === "function") ensureWheel(p);
-  else {
-    if (!p.wheel || typeof p.wheel !== "object") p.wheel = {};
+  if (!p) return;
+  /* Do not call ensureWheel when p.wheel already exists — in the browser both
+   * functions are global, so ensureWheel → ensureWheelGems → ensureWheel loops. */
+  if (!p.wheel || typeof p.wheel !== "object") {
+    if (typeof ensureWheel === "function") ensureWheel(p);
+    else p.wheel = {};
   }
   var w = p.wheel;
   if (!Array.isArray(w.gems)) w.gems = [];

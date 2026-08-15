@@ -533,7 +533,9 @@ async function partyReportZone(db, body) {
     const members = await db.partyMembers(party.id);
     const f = {
       hunt: zone === "hunt" ? String(body.hunt) : null,
-      instance: zone === "hunt" ? String(body.instance || "non-pvp") : null,
+      instance: zone === "hunt"
+        ? (["pvp", "non-pvp"].includes(String(body.instance)) ? String(body.instance) : "non-pvp")
+        : null,
       otbm: zone === "hunt" ? (body.otbm || null) : null,
       boss: zone === "boss" ? String(body.boss) : null,
     };
@@ -553,7 +555,9 @@ async function partyReportZone(db, body) {
 
   await db.partySetZone(party.id, zone, {
     hunt: zone === "hunt" ? String(body.hunt) : null,
-    instance: zone === "hunt" ? String(body.instance || "non-pvp") : null,
+    instance: zone === "hunt"
+      ? (["pvp", "non-pvp"].includes(String(body.instance)) ? String(body.instance) : "non-pvp")
+      : null,
     otbm: zone === "hunt" ? (body.otbm || null) : null,
     boss: zone === "boss" ? String(body.boss) : null,
     follows,

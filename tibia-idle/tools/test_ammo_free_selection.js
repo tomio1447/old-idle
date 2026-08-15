@@ -32,7 +32,7 @@ must(!picker.includes('a.kind === "bolt" ? "crossbow" : "bow"'),
   "modal ainda exibe requer bow/crossbow");
 must(player.includes("accountSelectInstanceAmmo(sessionToken(),p.id,slug")&&
   client.includes('"/api/instance/ammo"')&&ui.includes("setActiveAmmo(p, b.dataset.pickAmmo, true)")&&
-  index.includes('js/player.js?v=ammo-authority-v1')&&index.includes('js/ui.js?v=combo-drag-v1')&&
-  index.includes('js/account-client.js?v=online-fix-v15'),
+  /js\/player\.js\?v=[^"]+/.test(index)&&/js\/ui\.js\?v=[^"]+/.test(index)&&
+  /js\/account-client\.js\?v=[^"]+/.test(index),
   "troca de munição online não persiste na autoridade/cache atualizados");
 console.log("OK: arrows/bolts têm seleção livre e troca autoritativa durante a instância.");

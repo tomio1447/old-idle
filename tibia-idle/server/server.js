@@ -14,6 +14,8 @@
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
  *   POST /api/coins      { token, amount }             -> Admin altera Tibia Coins
+ *   GET  /api/chat/history + POST /api/chat/send       -> chat global
+ *   POST /api/chat/ticket + GET /api/chat/events       -> SSE do chat
  *
  * Uso:
  *   cd tibia-idle/server
@@ -33,6 +35,10 @@ const { getDb } = require("./db");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
 const { SyncBus } = require("./sync_bus");
+const {
+  ChatBus, CHANNELS: CHAT_CHANNELS, MAX_TEXT: CHAT_MAX_TEXT,
+  filterHardObscenity, sanitizeText, vocShort, parsePm,
+} = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll } = require("./authoritative_engine");
 
@@ -52,6 +58,7 @@ const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "
 const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
 let SYNC_BUS=null;
+let CHAT_BUS=null;
 const RATE_BUCKETS=new Map(),TRUST_PROXY=process.env.TRUST_PROXY==="1",RATE_LIMIT_DISABLED=process.env.RATE_LIMIT_DISABLED==="1";
 function publishSync(accountId,type,data){return SYNC_BUS?SYNC_BUS.publish(accountId,type,data):null;}
 function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;
@@ -201,6 +208,82 @@ async function syncState(db,token){
     instance:instance?instanceSummary(instance,false):null}};
 }
 
+function sendChatExpired(res,reason){
+  res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8",
+    "Cache-Control":"no-cache, no-transform","Connection":"close","X-Accel-Buffering":"no"}));
+  res.end(`event: chat-expired\ndata: ${JSON.stringify({reason:reason||"ticket-invalid"})}\n\n`);
+}
+
+async function issueChatTicket(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.charId||body.char_id||0);
+  let viewerName="";
+  if(Number.isSafeInteger(charId)&&charId>0){
+    const character=await db.findCharacter(charId);
+    if(character&&Number(character.account_id)===Number(acc.id))viewerName=String(character.name||"");
+  }
+  const issued=CHAT_BUS.issueTicket(acc.id,body.token,viewerName);
+  return {code:200,body:{ok:true,ticket:issued.ticket,
+    expiresAt:new Date(issued.expiresAt).toISOString(),cursor:CHAT_BUS.cursor(),viewerName}};
+}
+
+async function chatHistory(db,token,query){
+  const acc=await db.findAccountByToken(token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const channel=String(query.get("channel")||"geral").toLowerCase();
+  if(!CHAT_CHANNELS.includes(channel))
+    return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
+  const charId=Number(query.get("charId")||query.get("char_id")||0);
+  let viewerName="";
+  if(Number.isSafeInteger(charId)&&charId>0){
+    const character=await db.findCharacter(charId);
+    if(character&&Number(character.account_id)===Number(acc.id))viewerName=String(character.name||"");
+  }
+  const sinceId=Number(query.get("since")||0);
+  const limit=Number(query.get("limit")||50);
+  return {code:200,body:{ok:true,channel,cursor:CHAT_BUS.cursor(),
+    messages:CHAT_BUS.history(channel,sinceId,limit,viewerName)}};
+}
+
+async function chatSend(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.charId||body.char_id||0);
+  if(!Number.isSafeInteger(charId)||charId<=0)
+    return {code:400,body:{ok:false,error:"CHAR_REQUIRED",msg:"Personagem obrigatório"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"CHAR_DENIED",msg:"Personagem inválido"}};
+  let channel=String(body.channel||"geral").toLowerCase();
+  if(!CHAT_CHANNELS.includes(channel))
+    return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
+  if(channel!=="geral")
+    return {code:400,body:{ok:false,error:"CHANNEL_LOCKED",msg:"Este canal ainda não está aberto para mensagens."}};
+  const rate=CHAT_BUS.checkRate(Number(acc.id));
+  if(!rate.ok)return {code:429,body:{ok:false,error:"RATE_LIMITED",msg:"Muitas mensagens. Aguarde um momento.",
+    retryAfterMs:rate.retryAfterMs}};
+  let raw=sanitizeText(body.text);
+  if(!raw)return {code:400,body:{ok:false,error:"EMPTY",msg:"Mensagem vazia"}};
+  let type="chat",toName=null,text=raw;
+  const pm=parsePm(raw);
+  if(pm){
+    if(!pm.text)return {code:400,body:{ok:false,error:"EMPTY",msg:"Mensagem privada vazia"}};
+    type="pm";toName=pm.toName;text=pm.text;channel="geral";
+  }
+  // Filtro leve no servidor (somente termos extremos); o toggle do cliente
+  // aplica a lista completa na exibição.
+  text=filterHardObscenity(text);
+  if(text.length>CHAT_MAX_TEXT)text=text.slice(0,CHAT_MAX_TEXT);
+  const level=Math.max(1,Math.floor(Number(character.level)||1));
+  const voc=String(character.voc||"none");
+  const msg=CHAT_BUS.post({
+    channel,type,nickname:String(character.name||"?"),voc,vocShort:vocShort(voc),
+    level,accountId:Number(acc.id),charId:Number(character.id),text,toName,
+  });
+  return {code:200,body:{ok:true,message:msg}};
+}
+
 const MIME = {
   ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8",
   ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8",
@@ -218,11 +301,22 @@ function sendText(res, code, body, type) {
   res.end(body);
 }
 
-function serveStatic(req, res, pathname) {
+function normalizeStaticPath(pathname) {
   let relative;
   try { relative = decodeURIComponent(pathname || "/"); }
-  catch (e) { sendText(res, 400, "URL inválida"); return; }
-  if (relative === "/") relative = "/index.html";
+  catch (e) { return null; }
+  // Aceita /game e /game/... (docs/atalhos antigos) além da raiz /
+  if (relative === "/game" || relative === "/game/") relative = "/";
+  else if (relative.startsWith("/game/")) relative = relative.slice(5);
+  if (relative === "/" || relative === "") relative = "/index.html";
+  // Chrome pede /favicon.ico; o jogo usa gold-coin como ícone
+  if (relative === "/favicon.ico") relative = "/assets/item/gold-coin.png";
+  return relative;
+}
+
+function serveStatic(req, res, pathname) {
+  const relative = normalizeStaticPath(pathname);
+  if (relative == null) { sendText(res, 400, "URL inválida"); return; }
   const file = path.resolve(STATIC_DIR, relative.replace(/^\/+/, ""));
   if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) {
     sendText(res, 403, "Acesso negado"); return;
@@ -240,8 +334,27 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+function accountPublicView(acc){
+  const vipUntil=Math.max(0,Math.floor(Number(acc&&acc.vip_until)||0));
+  return {
+    id:acc.id, login:acc.login, role:acc.role, coins:acc.coins||0,
+    gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
+    vipUntil, vip:vipUntil>Date.now(),
+    missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
+  };
+}
+async function ensureAccountWallet(db,acc){
+  if(!acc)return acc;
+  if(typeof db.migrateAccountGold==="function"){
+    const migrated=await db.migrateAccountGold(acc.id);
+    if(migrated)Object.assign(acc,migrated);
+  }
+  return acc;
+}
+
 async function ensureTestAccounts(db) {
   if (!TEST_SERVER) return;
+  const vipYear=Date.now()+365*24*3600*1000;
   for (const credential of [
     { login:"1", password:"1" },
     { login:"2", password:"2" },
@@ -249,17 +362,22 @@ async function ensureTestAccounts(db) {
     const hash = bcrypt.hashSync(credential.password, SALT_ROUNDS);
     const existing = await db.findAccountByLogin(credential.login);
     if (!existing) {
-      await db.createAccount(credential.login, hash, "admin", 1000);
+      const created=await db.createAccount(credential.login, hash, "admin", 1000);
+      if(typeof db.setAccountVipUntil==="function")await db.setAccountVipUntil(created.id,vipYear);
     } else if (typeof db.run === "function") {
       await db.run("UPDATE accounts SET password_hash = ?, role = 'admin' WHERE id = ?", [hash, existing.id]);
+      if(typeof db.setAccountVipUntil==="function")await db.setAccountVipUntil(existing.id,vipYear);
+      if(typeof db.migrateAccountGold==="function")await db.migrateAccountGold(existing.id);
     } else {
       existing.password_hash = hash;
       existing.role = "admin";
       existing.coins = Math.max(1000, existing.coins || 0);
+      existing.vip_until = Math.max(Number(existing.vip_until)||0, vipYear);
       db._save();
+      if(typeof db.migrateAccountGold==="function")db.migrateAccountGold(existing.id);
     }
   }
-  console.log("[test-server] contas liberadas: 1/1 e 2/2; Admin habilitado");
+  console.log("[test-server] contas liberadas: 1/1 e 2/2; Admin+VIP habilitado");
 }
 
 /* ------------------------------ rotas ------------------------------ */
@@ -304,10 +422,11 @@ function accountCharacterSummary(character) {
 async function login(db, body) {
   const login = String(body.login || "").trim();
   const password = String(body.password || "");
-  const acc = await db.findAccountByLogin(login);
+  let acc = await db.findAccountByLogin(login);
   if (!acc || !bcrypt.compareSync(password, acc.password_hash)) {
     return { code: 401, body: { ok: false, msg: "Login ou senha inválidos" } };
   }
+  acc = await ensureAccountWallet(db, acc);
   const token = newToken();
   // Novo login transfere a sessão e encerra streams/tickets anteriores antes
   // de persistir o token substituto.
@@ -319,8 +438,7 @@ async function login(db, body) {
     body: {
       ok: true,
       token,
-      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0,
-        missions: acc.missions || {}, missionsDone: acc.missionsDone || {} },
+      account: accountPublicView(acc),
       characters: characters.map(accountCharacterSummary),
     },
   };
@@ -328,15 +446,15 @@ async function login(db, body) {
 
 async function me(db, token) {
   if (!token) return { code: 401, body: { ok: false, msg: "Sem token" } };
-  const acc = await db.findAccountByToken(token);
+  let acc = await db.findAccountByToken(token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  acc = await ensureAccountWallet(db, acc);
   const characters = await db.charactersOf(acc.id);
   return {
     code: 200,
     body: {
       ok: true,
-      account: { id: acc.id, login: acc.login, role: acc.role, coins: acc.coins || 0,
-        missions: acc.missions || {}, missionsDone: acc.missionsDone || {} },
+      account: accountPublicView(acc),
       characters: characters.map(accountCharacterSummary),
     },
   };
@@ -348,12 +466,40 @@ function sanitizeOutfit(raw,sex,voc){
   const colors=Array.isArray(o.colors)&&o.colors.length===4
     ?o.colors.slice(0,4).map((n)=>Math.max(0,Math.min(95,Math.floor(Number(n)||0))))
     :null;
-  let appearance=typeof o.appearance==="string"?o.appearance.slice(0,80):null;
-  if(appearance&&!new RegExp("-"+sexo+"$").test(appearance)){
-    const flipped=appearance.replace(/-[mf]$/,"-"+sexo);
-    appearance=flipped!==appearance?flipped:appearance;
+  const SEX_BASE_PAIR={
+    noblewoman:"nobleman",nobleman:"noblewoman",
+    norsewoman:"norseman",norseman:"norsewoman",
+    "retro-noblewoman":"retro-nobleman","retro-nobleman":"retro-noblewoman",
+  };
+  const CLASSIC={citizen:1,hunter:1,mage:1,knight:1,summoner:1,monk:1};
+  const VOC={knight:"knight",paladin:"hunter",druid:"summoner",sorcerer:"mage",monk:"monk"};
+  function baseName(id){
+    return String(id||"").replace(/-[mf](-\d+)?$/,"").replace(/-\d+$/,"");
   }
-  const type=typeof o.type==="string"?o.type.replace(/-[mf]$/,"").slice(0,40):null;
+  function flipAppearance(id){
+    if(!id)return null;
+    const flipped=id.replace(/-[mf]$/,"-"+sexo);
+    if(flipped!==id)return flipped;
+    const base=baseName(id);
+    const paired=SEX_BASE_PAIR[base];
+    if(paired)return paired+"-"+sexo;
+    return null;
+  }
+  let appearance=typeof o.appearance==="string"?o.appearance.slice(0,80):null;
+  if(appearance){
+    const base=baseName(appearance);
+    const femaleName=/woman$/.test(base);
+    if(SEX_BASE_PAIR[base]&&((sexo==="m"&&femaleName)||(sexo==="f"&&!femaleName))){
+      appearance=SEX_BASE_PAIR[base]+"-"+sexo;
+    }else if(!new RegExp("-"+sexo+"(?:-\\d+)?$").test(appearance)){
+      const flipped=flipAppearance(appearance);
+      if(flipped)appearance=flipped;
+    }
+  }
+  // type classico nunca carrega slug premium (druid/noblewoman/…)
+  let type=typeof o.type==="string"?o.type.replace(/-[mf]$/,"").slice(0,40):null;
+  if(!type||!CLASSIC[type])type=VOC[voc]||"citizen";
+  if(!CLASSIC[type])type="citizen";
   const mount=typeof o.mount==="string"&&o.mount?o.mount.slice(0,80):null;
   const addons=Math.max(0,Math.min(3,Math.floor(Number(o.addons)||0)));
   return {
@@ -397,7 +543,7 @@ function sanitizeNewPlayer(payload,voc){
     config:payload.config&&typeof payload.config==="object"?payload.config:{},level:1,exp:0,
     skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
     skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
-    kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},rewardChest:{},rewardChestBundles:[],bag:{},ammo:{},
+    kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},supplyStash:{},rewardChest:{},rewardChestBundles:[],bag:{},ammo:{},
     supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600};
   if(voc==="knight")safe.equip={weapon:{item:"sword",count:1},shield:{item:"wooden-shield",count:1}};
   else if(voc==="paladin")safe.equip={weapon:{item:"bow",count:1},shield:{item:"quiver",count:1},ammo:{item:"simple-arrow",count:1}};
@@ -442,19 +588,28 @@ async function createCharacter(db, body) {
 }
 
 async function loadCharacter(db, token, id) {
-  const acc = await db.findAccountByToken(token);
+  let acc = await db.findAccountByToken(token);
   if (!acc) return { code:401, body:{ok:false,msg:"Sessão inválida"} };
+  acc = await ensureAccountWallet(db, acc);
   const character = await db.findCharacter(id);
   if (!character || Number(character.account_id) !== Number(acc.id))
     return { code:404, body:{ok:false,msg:"Personagem não encontrado"} };
+  let data = character.data;
+  try {
+    const parsed = typeof data === "string" ? JSON.parse(data) : (data || {});
+    parsed.gold = Math.max(0, Math.floor(Number(acc.gold) || 0));
+    parsed.vipUntil = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
+    data = JSON.stringify(parsed);
+  } catch (e) {}
   return {
     code:200,
     body:{
       ok:true,
+      account:accountPublicView(acc),
       character:{
         id:character.id, name:character.name, voc:character.voc,
         level:character.level, saveVersion:Number(character.save_version)||0,
-        data:character.data,
+        data,
       },
     },
   };
@@ -476,7 +631,7 @@ function prepareCharacterSave(c,body){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","rewardChest","rewardChestBundles","blessed","deathLog"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name,voc:c.voc});
   for(const key of protectedKeys)if(current[key]!==undefined)payload[key]=cloneJson(current[key]);
   const level=Math.max(1,Number(c.level)||1);payload.level=level;
@@ -558,7 +713,7 @@ async function persistClaimedPlayer(db,acc,character,p,lease){
   rewardChestEnsure(p);
   return {code:200,body:{ok:true,claimed:true,saveVersion:Number(updated.save_version),
     character:accountCharacterSummary(updated),rewardChest:p.rewardChest||{},
-    rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{}}};
+    rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{}}};
 }
 
 async function claimRewardChest(db,body){
@@ -737,8 +892,19 @@ async function prepareInstanceState(db,acc,input){
   const huntId=input.huntId?String(input.huntId):null,bossId=input.bossId?String(input.bossId):null;
   if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||"")))
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
-  const mode=["non-pvp","pvp","boss"].includes(String(input.instanceMode))?String(input.instanceMode):
+  let mode=["non-pvp","pvp","boss"].includes(String(input.instanceMode))?String(input.instanceMode):
     (kind==="boss"?"boss":"non-pvp");
+  // Idle: non-pvp e pvp são instâncias distintas. Após criar, o modo fica
+  // travado no registro ativo — não mistura flags no meio da caçada.
+  const currentRow=await db.instanceGet(acc.id);
+  if(currentRow&&currentRow.status==="active"&&currentRow.instance_mode){
+    const locked=String(currentRow.instance_mode);
+    if(["non-pvp","pvp","boss"].includes(locked)){
+      if(mode!==locked)return {error:{code:409,body:{ok:false,error:"INSTANCE_MODE_MISMATCH",
+        msg:"Não é possível misturar instância pvp e non-pvp",instance_mode:locked}}};
+      mode=locked;
+    }
+  }
   let members=Array.isArray(input.members)?input.members:[];
   const requestedActiveId=Number(input.activeCharacterId),requestedActive=await db.findCharacter(requestedActiveId),
     requestedParty=requestedActive&&Number(requestedActive.account_id)===Number(acc.id)?await db.partyFindByCharacter(requestedActiveId):null;
@@ -757,6 +923,7 @@ async function prepareInstanceState(db,acc,input){
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros duplicados ou inválidos"}}};
   const rows=[];
+  const accountCache=new Map();
   for(let index=0;index<ids.length;index++){
     const id=ids[index],c=await db.findCharacter(id),member=members[index]||{},player=member.p||{};
     if(!c)return {error:{code:404,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_FOUND",
@@ -764,10 +931,19 @@ async function prepareInstanceState(db,acc,input){
     if((player.id!==undefined&&String(player.id)!==String(c.id))||
        (player.name&&String(player.name).toLowerCase()!==String(c.name).toLowerCase()))
       return {error:{code:409,body:{ok:false,error:"INSTANCE_IDENTITY_MISMATCH",msg:"Snapshot contém identidade cruzada"}}};
+    let ownerAcc=accountCache.get(Number(c.account_id));
+    if(!ownerAcc){
+      ownerAcc=await db.findAccountById(c.account_id);
+      if(typeof db.migrateAccountGold==="function")ownerAcc=await db.migrateAccountGold(c.account_id)||ownerAcc;
+      accountCache.set(Number(c.account_id),ownerAcc);
+    }
     let canonical={};try{canonical=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
     canonical=Object.assign({},canonical,{id:String(c.id),name:c.name,voc:c.voc,level:Number(c.level)||1});
+    canonical.gold=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.gold)||0));
+    canonical.vipUntil=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.vip_until)||0));
+    canonical.accountId=Number(c.account_id);
     if(Number(c.hp)>0)canonical.hp=Number(c.hp);if(Number(c.mp)>=0)canonical.mp=Number(c.mp);
-    member.p=canonical;member.hp=canonical.hp;member.mp=canonical.mp;rows.push(c);
+    member.p=canonical;member.hp=canonical.hp;member.mp=canonical.mp;member.accountId=Number(c.account_id);rows.push(c);
   }
   const activeId=Number(input.activeCharacterId);
   if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
@@ -923,7 +1099,8 @@ async function tickInstance(db,body){
      responseInstance.state.members.some((member)=>String(member.id)===String(resolved.character.id)))
     responseInstance.state.activeCharacterId=String(resolved.character.id);
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
-    instance:responseInstance,characters:(result.characters||[])
+    instance:responseInstance,account:accountPublicView(await ensureAccountWallet(db,acc)),
+    characters:(result.characters||[])
       .filter((character)=>Number(character.account_id)===Number(acc.id)).map(accountCharacterSummary)}};
 }
 
@@ -960,6 +1137,34 @@ async function selectInstanceAmmo(db,body){
   return {code:200,body:{ok:true,ammo:slug,instance:instanceSummary(result.instance,true)}};
 }
 
+async function clearInstanceLootPouch(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+    return {code:400,body:{ok:false,error:"INVALID_POUCH_CLEAR",msg:"Limpeza da Loot Pouch inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
+    return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;
+  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+    let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+    const item=descriptor.authority&&descriptor.authority.players&&
+      descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+    if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+    item.p.lootPouch={};
+    descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+  },lease);
+  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+    body:{ok:false,error:result.error,msg:rejection||"Não foi possível limpar a Loot Pouch",instance:instanceSummary(result.instance,true)}};
+  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+    status:result.instance.status,source:"pouch-clear",holderId:String(body.holder_id||"")});
+  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+}
+
 async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -979,6 +1184,7 @@ async function endInstance(db,body){
   // personagens (HP/MP/loot/exp) antes de encerrar a instância. Sem isto,
   // o último segundo de combate é perdido — o tick anterior pode ter
   // capturado o estado antes da última kill/loot.
+  let endedCharacters=[];
   if(resolved.row&&resolved.row.status==="active"){
     try{
       const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceAuthorityState,lease);
@@ -986,6 +1192,7 @@ async function endInstance(db,body){
         // Atualiza expected version para o end usar a versão pós-tick
         const ticked=await db.instanceGet(ownerId);
         if(ticked)expected=Number(ticked.version);
+        endedCharacters=Array.isArray(tickResult.characters)?tickResult.characters:[];
       }
     }catch(e){/* tick final é best-effort; o end ainda roda */}
   }
@@ -997,8 +1204,13 @@ async function endInstance(db,body){
     result.instance.instance_id,result.instance.version,"ended-"+reason,result.instance,true);
   if(result.instance)await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id||id,
     version:Number(result.instance.version)||expected,status:"ended",terminalReason:reason,source:"end",
-    holderId:String(body.holder_id||"")});
-  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false)}};
+    holderId:String(body.holder_id||""),
+    characterVersions:endedCharacters.map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
+  // Devolve save_versions pós-tick para o cliente não disparar PUT 409 no
+  // checkpoint do templo com expected_version obsoleto.
+  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false),
+    characters:endedCharacters.filter((character)=>Number(character.account_id)===Number(acc.id))
+      .map(accountCharacterSummary)}};
 }
 
 /* Recuperação explícita para saves cruzados por versões antigas. Recria os
@@ -1434,6 +1646,11 @@ async function main() {
   await ensureTestAccounts(db);
 
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
+  CHAT_BUS=new ChatBus({historyLimit:200,ticketTtlMs:10*60*1000,sendLimit:8,sendWindowMs:10000});
+  CHAT_BUS.post({
+    channel:"geral",type:"system",nickname:"Sistema",voc:"none",vocShort:"SYS",
+    level:0,accountId:0,charId:0,text:"Chat global ativo. Digite /pm nick texto para mensagem privada.",
+  });
   const instanceWorker=startInstanceWorker(db,{
     intervalMs:INSTANCE_WORKER_INTERVAL_MS,maxStepMs:INSTANCE_WORKER_MAX_STEP_MS,
     startupGraceMs:INSTANCE_WORKER_STARTUP_GRACE_MS,
@@ -1447,7 +1664,8 @@ async function main() {
   });
 
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
-    if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
+    if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
+    if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
 
   const server = http.createServer(async (req, res) => {
     const url=req.url.split("?")[0],cors=allowedOrigin(req);
@@ -1456,6 +1674,16 @@ async function main() {
     if (req.method === "OPTIONS") { send(res, 204, {}); return; }
 
     try {
+      // Estáticos ANTES das rotas /api: GET / deve abrir o jogo (index.html),
+      // nunca cair no 404 JSON "Rota não encontrada".
+      if ((req.method === "GET" || req.method === "HEAD") && !url.startsWith("/api/")) {
+        if (url === "/js/server-config.js") {
+          const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
+            TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin,syncProtocol:"${SYNC_PROTOCOL}"};\n`;
+          return sendText(res, 200, config, "text/javascript; charset=utf-8");
+        }
+        return serveStatic(req, res, url);
+      }
       if(req.method==="GET"&&url==="/api/sync/events"){
         const q=new URL(req.url,"http://x").searchParams,ticket=SYNC_BUS.consumeTicket(q.get("ticket"));
         // Ticket expirado/restart é um evento SSE normal, não HTTP 401. O
@@ -1477,12 +1705,32 @@ async function main() {
       if (req.method === "GET" && url === "/api/health") {
         return send(res, 200, { ok:true, testServer:TEST_SERVER,
           worker:instanceWorker.stats(),sync:{protocol:SYNC_PROTOCOL,cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
+          chat:{cursor:CHAT_BUS.cursor(),clients:CHAT_BUS.clientCount(),channels:CHAT_CHANNELS},
           accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
       }
-      if (req.method === "GET" && url === "/js/server-config.js") {
-        const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
-          TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin,syncProtocol:"${SYNC_PROTOCOL}"};\n`;
-        return sendText(res, 200, config, "text/javascript; charset=utf-8");
+      if(req.method==="POST"&&url==="/api/chat/ticket"){
+        const limited=rateLimit(req,"chat-ticket",60,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await issueChatTicket(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="GET"&&url==="/api/chat/events"){
+        const q=new URL(req.url,"http://x").searchParams,ticket=CHAT_BUS.consumeTicket(q.get("ticket"));
+        if(!ticket)return sendChatExpired(res,"ticket-invalid");
+        res.writeHead(200,Object.assign(hardenedHeaders(res),{"Content-Type":"text/event-stream; charset=utf-8",
+          "Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"}));
+        res.write("retry: 1500\n\n");
+        CHAT_BUS.subscribe(res,req.headers["last-event-id"]||q.get("lastEventId"),{
+          accountId:ticket.accountId,sessionToken:ticket.sessionToken,viewerName:ticket.viewerName||"",
+          expiresAt:ticket.expiresAt,
+        });return;
+      }
+      if(req.method==="GET"&&url==="/api/chat/history"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const q=new URL(req.url,"http://x").searchParams;
+        const r=await chatHistory(db,token,q);return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/chat/send"){
+        const limited=rateLimit(req,"chat-send",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await chatSend(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "POST" && url === "/api/register") {
         const limited=rateLimit(req,"register",10,3600000);if(limited)return send(res,limited.code,limited.body);
@@ -1532,6 +1780,9 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/instance/ammo"){
         const r=await selectInstanceAmmo(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/pouch-clear"){
+        const r=await clearInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/end"){
         const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);
@@ -1709,9 +1960,6 @@ async function main() {
         const body = await readBody(req);
         const r = await party.partyFollow(db, body);
         return send(res, r.code, r.body);
-      }
-      if ((req.method === "GET" || req.method === "HEAD") && !url.startsWith("/api/")) {
-        return serveStatic(req, res, url);
       }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
     } catch (e) {

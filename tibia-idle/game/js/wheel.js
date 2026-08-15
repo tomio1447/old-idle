@@ -8,23 +8,37 @@
  * ========================================================================= */
 "use strict";
 
-if (typeof WHEEL_SLOTS === "undefined" && typeof require === "function") {
-  var _wd = require("./wheeldata.js");
-  var WHEEL_SLOTS = _wd.WHEEL_SLOTS, WHEEL_POS = _wd.WHEEL_POS, WHEEL_CONNECTED = _wd.WHEEL_CONNECTED;
-  var WHEEL_ROOTS = _wd.WHEEL_ROOTS, WHEEL_CONFIG = _wd.WHEEL_CONFIG, WHEEL_HP = _wd.WHEEL_HP;
-  var WHEEL_MP = _wd.WHEEL_MP, WHEEL_CAP = _wd.WHEEL_CAP, WHEEL_SKILL = _wd.WHEEL_SKILL;
-  var WHEEL_LEECH = _wd.WHEEL_LEECH, WHEEL_MIT_PER_POINT = _wd.WHEEL_MIT_PER_POINT;
-  var WHEEL_STAGE_ABILITY = _wd.WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES = _wd.WHEEL_SPELL_UPGRADES;
-}
-if (typeof ensureWheelGems === "undefined" && typeof require === "function") {
-  var _wg = require("./wheel-gems.js");
-  var ensureWheelGems = _wg.ensureWheelGems;
-  var wheelGemBonus = _wg.wheelGemBonus;
-  var wheelGradeIvPoints = _wg.wheelGradeIvPoints;
-  var wheelGemSpellId = _wg.wheelGemSpellId;
-  var wheelFindGem = _wg.wheelFindGem;
-  var wheelVesselResonance = _wg.wheelVesselResonance;
-}
+/* Browser classic <script> shares one scope with wheeldata.js (const WHEEL_*).
+ * Never redeclare those names — a hoisted var of the same identifier
+ * throws "already been declared". Node: require into _wd. */
+var _wd = (typeof WHEEL_SLOTS !== "undefined")
+  ? {
+      WHEEL_SLOTS: WHEEL_SLOTS, WHEEL_CONNECTED: WHEEL_CONNECTED, WHEEL_ROOTS: WHEEL_ROOTS,
+      WHEEL_CONFIG: WHEEL_CONFIG, WHEEL_HP: WHEEL_HP, WHEEL_MP: WHEEL_MP, WHEEL_CAP: WHEEL_CAP,
+      WHEEL_SKILL: WHEEL_SKILL, WHEEL_LEECH: WHEEL_LEECH, WHEEL_MIT_PER_POINT: WHEEL_MIT_PER_POINT,
+      WHEEL_STAGE_ABILITY: WHEEL_STAGE_ABILITY, WHEEL_SPELL_UPGRADES: WHEEL_SPELL_UPGRADES
+    }
+  : (typeof require === "function" ? require("./wheeldata.js") : {});
+var _WHEEL_SLOTS = _wd.WHEEL_SLOTS || {};
+var _WHEEL_CONNECTED = _wd.WHEEL_CONNECTED || {};
+var _WHEEL_ROOTS = _wd.WHEEL_ROOTS || [];
+var _WHEEL_CONFIG = _wd.WHEEL_CONFIG || {};
+var _WHEEL_HP = _wd.WHEEL_HP || {};
+var _WHEEL_MP = _wd.WHEEL_MP || {};
+var _WHEEL_CAP = _wd.WHEEL_CAP || {};
+var _WHEEL_SKILL = _wd.WHEEL_SKILL || {};
+var _WHEEL_LEECH = _wd.WHEEL_LEECH || {};
+var _WHEEL_MIT_PER_POINT = _wd.WHEEL_MIT_PER_POINT;
+var _WHEEL_STAGE_ABILITY = _wd.WHEEL_STAGE_ABILITY || {};
+var _WHEEL_SPELL_UPGRADES = _wd.WHEEL_SPELL_UPGRADES || {};
+
+var _wg = (typeof ensureWheelGems !== "undefined")
+  ? null
+  : (typeof require === "function" ? require("./wheel-gems.js") : null);
+var _ensureWheelGems = (typeof ensureWheelGems === "function") ? ensureWheelGems : (_wg && _wg.ensureWheelGems);
+var _wheelGemBonus = (typeof wheelGemBonus === "function") ? wheelGemBonus : (_wg && _wg.wheelGemBonus);
+var _wheelGradeIvPoints = (typeof wheelGradeIvPoints === "function") ? wheelGradeIvPoints : (_wg && _wg.wheelGradeIvPoints);
+var _wheelGemSpellId = (typeof wheelGemSpellId === "function") ? wheelGemSpellId : (_wg && _wg.wheelGemSpellId);
 
 function ensureWheel(p) {
   if (!p) return;
@@ -32,26 +46,26 @@ function ensureWheel(p) {
   if (!p.wheel.slots || typeof p.wheel.slots !== "object") p.wheel.slots = {};
   if (!p.wheel.scrolls || typeof p.wheel.scrolls !== "object") p.wheel.scrolls = {};
   if (!p.wheel.giftOfLifeAt) p.wheel.giftOfLifeAt = 0;
-  if (typeof ensureWheelGems === "function") ensureWheelGems(p);
+  if (typeof _ensureWheelGems === "function") _ensureWheelGems(p);
   return p.wheel;
 }
 
 function wheelPoints(p) {
-  if (!p || p.level < WHEEL_CONFIG.minLevel) return 0;
+  if (!p || p.level < _WHEEL_CONFIG.minLevel) return 0;
   ensureWheel(p);
-  var base = Math.max(0, (p.level - WHEEL_CONFIG.minLevel)) * WHEEL_CONFIG.pointsPerLevel;
+  var base = Math.max(0, (p.level - _WHEEL_CONFIG.minLevel)) * _WHEEL_CONFIG.pointsPerLevel;
   var extra = 0;
-  for (var i = 0; i < WHEEL_CONFIG.scrolls.length; i++) {
-    if (p.wheel.scrolls[WHEEL_CONFIG.scrolls[i].id]) extra += WHEEL_CONFIG.scrolls[i].pontos;
+  for (var i = 0; i < _WHEEL_CONFIG.scrolls.length; i++) {
+    if (p.wheel.scrolls[_WHEEL_CONFIG.scrolls[i].id]) extra += _WHEEL_CONFIG.scrolls[i].pontos;
   }
-  if (typeof wheelGradeIvPoints === "function") extra += wheelGradeIvPoints(p);
+  if (typeof _wheelGradeIvPoints === "function") extra += _wheelGradeIvPoints(p);
   return base + extra;
 }
 
 function wheelSpent(p) {
   ensureWheel(p);
   var tot = 0;
-  for (var id in WHEEL_SLOTS) tot += (p.wheel.slots[id] || 0);
+  for (var id in _WHEEL_SLOTS) tot += (p.wheel.slots[id] || 0);
   return tot;
 }
 
@@ -65,7 +79,7 @@ function wheelSlotPoints(p, slotId) {
 }
 
 function wheelIsFull(p, slotId) {
-  var spec = WHEEL_SLOTS[slotId];
+  var spec = _WHEEL_SLOTS[slotId];
   return (p.wheel.slots[slotId] || 0) >= (spec ? spec.max : Infinity);
 }
 
@@ -74,15 +88,15 @@ function wheelIsFull(p, slotId) {
  * - senao, existe um caminho do no ate uma raiz onde cada no do caminho
  *   (exceto o proprio) esta totalmente maximizado. */
 function wheelCanAllocate(p, slotId) {
-  if (!p || p.level < WHEEL_CONFIG.minLevel) return false;
-  var spec = WHEEL_SLOTS[slotId];
+  if (!p || p.level < _WHEEL_CONFIG.minLevel) return false;
+  var spec = _WHEEL_SLOTS[slotId];
   if (!spec) return false;
   if (wheelAvail(p) <= 0) return false;
   if (wheelSlotPoints(p, slotId) >= spec.max) return false;
   // pontos TOTAIS minimos (nivel + scrolls) para comecar este no
   if (wheelPoints(p) < spec.min) return false;
   // adjacencia / alcancabilidade
-  if (WHEEL_ROOTS.indexOf(slotId) !== -1) return true;
+  if (_WHEEL_ROOTS.indexOf(slotId) !== -1) return true;
   return wheelReachesRoot(p, slotId);
 }
 
@@ -94,8 +108,8 @@ function wheelReachesRoot(p, slotId, ignoreNode) {
     var cur = queue.shift();
     if (visited[cur]) continue;
     visited[cur] = true;
-    if (WHEEL_ROOTS.indexOf(cur) !== -1) return true;
-    var connected = WHEEL_CONNECTED[cur] || [];
+    if (_WHEEL_ROOTS.indexOf(cur) !== -1) return true;
+    var connected = _WHEEL_CONNECTED[cur] || [];
     for (var i = 0; i < connected.length; i++) {
       var n = connected[i];
       if (n === ignoreNode) continue;
@@ -121,10 +135,10 @@ function wheelRemove(p, slotId) {
   if (cur <= 0) return false;
   p.wheel.slots[slotId] = cur - 1;
   // verifica se algum vizinho com pontos ficou sem caminho ate a raiz
-  var connected = WHEEL_CONNECTED[slotId] || [];
+  var connected = _WHEEL_CONNECTED[slotId] || [];
   for (var i = 0; i < connected.length; i++) {
     var n = connected[i];
-    if (WHEEL_ROOTS.indexOf(n) !== -1) continue;
+    if (_WHEEL_ROOTS.indexOf(n) !== -1) continue;
     if ((p.wheel.slots[n] || 0) > 0 && !wheelReachesRoot(p, n)) {
       // reverte e bloqueia
       p.wheel.slots[slotId] = cur;
@@ -138,11 +152,11 @@ function wheelRemove(p, slotId) {
 function wheelColorPoints(p, color) {
   ensureWheel(p);
   var tot = 0;
-  for (var id in WHEEL_SLOTS) {
-    if (WHEEL_SLOTS[id].color === color) tot += (p.wheel.slots[id] || 0);
+  for (var id in _WHEEL_SLOTS) {
+    if (_WHEEL_SLOTS[id].color === color) tot += (p.wheel.slots[id] || 0);
   }
-  if (typeof wheelGemBonus === "function") {
-    var gb = wheelGemBonus(p);
+  if (typeof _wheelGemBonus === "function") {
+    var gb = _wheelGemBonus(p);
     tot += Math.floor((gb.revelation && gb.revelation[color]) || 0);
   }
   return tot;
@@ -151,9 +165,9 @@ function wheelColorPoints(p, color) {
 /* Estagio de uma cor: 0/1/2/3 conforme os limiares. */
 function wheelStage(p, color) {
   var pts = wheelColorPoints(p, color);
-  if (pts >= WHEEL_CONFIG.stageThresholds[2]) return 3;
-  if (pts >= WHEEL_CONFIG.stageThresholds[1]) return 2;
-  if (pts >= WHEEL_CONFIG.stageThresholds[0]) return 1;
+  if (pts >= _WHEEL_CONFIG.stageThresholds[2]) return 3;
+  if (pts >= _WHEEL_CONFIG.stageThresholds[1]) return 2;
+  if (pts >= _WHEEL_CONFIG.stageThresholds[0]) return 1;
   return 0;
 }
 
@@ -167,10 +181,10 @@ function wheelStages(p) {
 function wheelSkillBonus(p, which) {
   ensureWheel(p);
   var voc = p.voc || "knight";
-  var targetSkill = WHEEL_SKILL[voc];
+  var targetSkill = _WHEEL_SKILL[voc];
   var bonus = 0;
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     if (!spec.skill) continue;
     if ((p.wheel.slots[id] || 0) < spec.max) continue;
     if (targetSkill === "melee") {
@@ -184,10 +198,10 @@ function wheelSkillBonus(p, which) {
 function wheelMagicBonus(p) {
   ensureWheel(p);
   var voc = p.voc || "knight";
-  if (WHEEL_SKILL[voc] !== "magic") return 0;
+  if (_WHEEL_SKILL[voc] !== "magic") return 0;
   var bonus = 0;
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     if (spec.skill && (p.wheel.slots[id] || 0) >= spec.max) bonus++;
   }
   return bonus;
@@ -196,15 +210,15 @@ function wheelMagicBonus(p) {
 function wheelLeechTotals(p) {
   ensureWheel(p);
   var life = 0, mana = 0;
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     if (!spec.leech) continue;
     if ((p.wheel.slots[id] || 0) < spec.max) continue;
-    life += spec.leech === "life" ? WHEEL_LEECH.life : 0;
-    mana += spec.leech === "mana" ? WHEEL_LEECH.mana : 0;
+    life += spec.leech === "life" ? _WHEEL_LEECH.life : 0;
+    mana += spec.leech === "mana" ? _WHEEL_LEECH.mana : 0;
   }
-  if (typeof wheelGemBonus === "function") {
-    var gb = wheelGemBonus(p);
+  if (typeof _wheelGemBonus === "function") {
+    var gb = _wheelGemBonus(p);
     life += gb.lifeLeech || 0;
     mana += gb.manaLeech || 0;
   }
@@ -215,8 +229,8 @@ function wheelUnlockedSpells(p) {
   ensureWheel(p);
   var voc = p.voc || "knight";
   var out = [], seen = {};
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     if (!spec.spell) continue;
     if ((p.wheel.slots[id] || 0) < spec.max) continue;
     var sp = spec.spell[voc];
@@ -229,8 +243,8 @@ function wheelInstants(p) {
   ensureWheel(p);
   var voc = p.voc || "knight";
   var out = [];
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     if (!spec.instant) continue;
     if ((p.wheel.slots[id] || 0) < spec.max) continue;
     var nm = spec.instant[voc];
@@ -243,7 +257,7 @@ function wheelRevelation(p) {
   var dmg = 0, heal = 0;
   ["green", "red", "blue", "purple"].forEach(function (c) {
     var st = wheelStage(p, c);
-    if (st > 0) { dmg += WHEEL_CONFIG.revelation[st - 1].damage; heal += WHEEL_CONFIG.revelation[st - 1].healing; }
+    if (st > 0) { dmg += _WHEEL_CONFIG.revelation[st - 1].damage; heal += _WHEEL_CONFIG.revelation[st - 1].healing; }
   });
   return { damagePct: dmg, healPct: heal };
 }
@@ -251,7 +265,7 @@ function wheelRevelation(p) {
 function wheelStageAbilities(p) {
   var voc = p.voc || "knight", out = {};
   ["green", "red", "blue", "purple"].forEach(function (c) {
-    if (wheelStage(p, c) > 0) out[c] = WHEEL_STAGE_ABILITY[c][voc] || null;
+    if (wheelStage(p, c) > 0) out[c] = _WHEEL_STAGE_ABILITY[c][voc] || null;
   });
   return out;
 }
@@ -268,21 +282,21 @@ function wheelTotals(p) {
             mitigation: 0, gemMitigation: 0, dodge: 0, resist: {}, critDamage: 0, momentum: 0,
             lifeLeech: 0, manaLeech: 0, damagePct: 0, healPct: 0,
             spells: [], instants: [], stages: {}, stageAbilities: {}, avatarLevel: 0, gemSpells: {} };
-  for (var id in WHEEL_SLOTS) {
-    var spec = WHEEL_SLOTS[id];
+  for (var id in _WHEEL_SLOTS) {
+    var spec = _WHEEL_SLOTS[id];
     var pts = p.wheel.slots[id] || 0;
     if (pts <= 0) continue;
-    if (spec.hp) t.hp += WHEEL_HP[voc] * pts;
-    if (spec.mana) t.mp += WHEEL_MP[voc] * pts;
-    if (spec.cap) t.cap += WHEEL_CAP[voc] * pts;
-    if (spec.mit) t.mitigation += WHEEL_MIT_PER_POINT * pts;
+    if (spec.hp) t.hp += _WHEEL_HP[voc] * pts;
+    if (spec.mana) t.mp += _WHEEL_MP[voc] * pts;
+    if (spec.cap) t.cap += _WHEEL_CAP[voc] * pts;
+    if (spec.mit) t.mitigation += _WHEEL_MIT_PER_POINT * pts;
     if (pts >= spec.max) {
       if (spec.skill) {
-        var sk = WHEEL_SKILL[voc];
+        var sk = _WHEEL_SKILL[voc];
         if (sk === "melee") t.melee++; else if (sk === "distance") t.distance++;
         else if (sk === "magic") t.magic++; else if (sk === "fist") t.fist++;
       }
-      if (spec.leech) { t.lifeLeech += spec.leech === "life" ? WHEEL_LEECH.life : 0; t.manaLeech += spec.leech === "mana" ? WHEEL_LEECH.mana : 0; }
+      if (spec.leech) { t.lifeLeech += spec.leech === "life" ? _WHEEL_LEECH.life : 0; t.manaLeech += spec.leech === "mana" ? _WHEEL_LEECH.mana : 0; }
       if (spec.spell && spec.spell[voc] && spec.spell[voc] !== "__focus__" && t.spells.indexOf(spec.spell[voc]) === -1) t.spells.push(spec.spell[voc]);
       if (spec.instant && spec.instant[voc]) t.instants.push(spec.instant[voc]);
     }
@@ -291,8 +305,8 @@ function wheelTotals(p) {
   t.damagePct = rev.damagePct; t.healPct = rev.healPct;
   t.stages = wheelStages(p); t.stageAbilities = wheelStageAbilities(p);
   t.avatarLevel = wheelAvatarLevel(p);
-  if (typeof wheelGemBonus === "function") {
-    var gb = wheelGemBonus(p);
+  if (typeof _wheelGemBonus === "function") {
+    var gb = _wheelGemBonus(p);
     t.hp += gb.hp || 0; t.mp += gb.mp || 0; t.cap += gb.cap || 0;
     t.gemMitigation += gb.mitigationPct || 0;
     t.dodge += gb.dodge || 0;
@@ -318,14 +332,14 @@ function mergeWheelBonus(a, b) {
 function wheelSpellUpgrade(p, spellId) {
   ensureWheel(p);
   var voc = p.voc || "knight";
-  var list = WHEEL_SPELL_UPGRADES[voc];
+  var list = _WHEEL_SPELL_UPGRADES[voc];
   if (!list) return null;
   for (var i = 0; i < list.length; i++) {
     var u = list[i];
     if (u.name !== spellId) continue;
     var grade = 0;
-    for (var id in WHEEL_SLOTS) {
-      var spec = WHEEL_SLOTS[id];
+    for (var id in _WHEEL_SLOTS) {
+      var spec = _WHEEL_SLOTS[id];
       if (!spec.spell || spec.spell[voc] !== spellId) continue;
       if ((p.wheel.slots[id] || 0) >= spec.max) grade++;
     }
@@ -353,11 +367,11 @@ function wheelApplySpellBoost(p, spellId) {
     out.critChance = b.criticalChance || 0; out.critDamage = b.criticalDamage || 0;
     out.extraTarget = b.additionalTarget || 0; out.area = !!b.area;
   }
-  if (typeof wheelGemBonus === "function" && spellId) {
-    var gb = wheelGemBonus(p);
+  if (typeof _wheelGemBonus === "function" && spellId) {
+    var gb = _wheelGemBonus(p);
     var gs = gb.spells && (gb.spells[spellId] || gb.spells[baseId]);
-    if (!gs && typeof wheelGemSpellId === "function") {
-      var alt = wheelGemSpellId(spellId);
+    if (!gs && typeof _wheelGemSpellId === "function") {
+      var alt = _wheelGemSpellId(spellId);
       gs = gb.spells && gb.spells[alt];
     }
     if (gs) {

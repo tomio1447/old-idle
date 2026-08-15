@@ -35,7 +35,6 @@ const ADMIN_TABS = [
   { id: "equip", nome: "🛡 Equipamento" },
   { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
-  { id: "world", nome: "🌍 Mundo" },
 ];
 
 /* Registra o que foi feito, para o usuario ver que a acao pegou */
@@ -65,7 +64,6 @@ function openAdmin(aba) {
     <div class="panel-title">🛠 Painel Admin
       <span class="tiny dim" style="margin-left:8px">modo de testes</span>
       <span style="flex:1"></span>
-      <button class="sm" id="admin-rme" title="Abre o editor de mapas .otbm em outra aba">🗺 OPEN RME</button>
       <button class="sm" id="admin-close">✕</button>
     </div>
     <div class="panel-body">
@@ -77,9 +75,6 @@ function openAdmin(aba) {
   $("#admin-close").addEventListener("click", () => {
     $("#modal").classList.remove("show", "wide");
   });
-  // editor de mapas: pagina propria (game/rme/), mesma pasta do jogo
-  $("#admin-rme").addEventListener("click", () =>
-    window.open("rme/index.html", "_blank"));
   renderAdminTabs();
   renderAdminContent();
 }
@@ -115,7 +110,6 @@ function renderAdminContent() {
     skills: renderAdminSkills,
     items: renderAdminItems, loot: renderAdminLoot, imb: renderAdminImbuements, equip: renderAdminEquip,
     forge: renderAdminForge, mobs: renderAdminMobs,
-    world: renderAdminWorld,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
   renderAdminLog();
@@ -594,7 +588,52 @@ function renderAdminItems(p, el) {
 
 /* Equipa direto no slot certo do item, ignorando nivel e vocacao.
  * O objetivo do painel e justamente testar item que o char ainda nao pode
- * usar, entao aqui as regras de uso nao valem. */
+ * usar, entao aqui as regras de uso nao valem.
+ * Sempre cria/liga itemInstances: a aba FORJE e os procs leem por instância. */
+function adminSetEquipSlot(p, slot, slug) {
+  if (typeof ensureItemInstances === "function") ensureItemInstances(p);
+  if (p.equip[slot]) {
+    if (typeof takeEquippedItemInstance === "function"
+        && typeof itemUsesInstances === "function"
+        && itemUsesInstances(p.equip[slot].item)) {
+      const old = takeEquippedItemInstance(p, slot);
+      if (old) {
+        if (typeof putBagItemInstance === "function") {
+          if (!putBagItemInstance(p, old) && typeof addItem === "function") {
+            // mochila cheia: ainda devolve como stack legado se der
+            addItem(p, old.slug, 1);
+            if (typeof deleteItemInstance === "function") deleteItemInstance(p, old.id);
+          }
+        } else if (typeof addItem === "function") {
+          addItem(p, old.slug, 1);
+        }
+      }
+    } else {
+      if (typeof addItem === "function") addItem(p, p.equip[slot].item, 1);
+      delete p.equip[slot];
+    }
+  }
+  if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)
+      && typeof equipEntryInstance === "function") {
+    let inst = (typeof takeBagItemInstance === "function")
+      ? takeBagItemInstance(p, slug) : null;
+    if (!inst) {
+      inst = {
+        id: nextItemInstanceId(p),
+        slug: slug,
+        loc: null,
+        tier: 0,
+      };
+      p.itemInstances = p.itemInstances || [];
+      p.itemInstances.push(inst);
+    }
+    equipEntryInstance(p, slot, inst);
+    return;
+  }
+  if (p.bag && p.bag[slug] && typeof removeItem === "function") removeItem(p, slug, 1);
+  p.equip[slot] = { item: slug, count: 1 };
+}
+
 function adminEquipar(p, slug) {
   const it = GAMEDATA.items[slug];
   if (!it) return;
@@ -608,10 +647,7 @@ function adminEquipar(p, slug) {
     toast("Esse item não é equipável", "bad");
     return;
   }
-  // devolve o que estava no slot, igual ao auto-equip faz
-  if (p.equip[slot]) addItem(p, p.equip[slot].item, 1);
-  if (p.bag && p.bag[slug]) removeItem(p, slug, 1);
-  p.equip[slot] = { item: slug, count: 1 };
+  adminSetEquipSlot(p, slot, slug);
   adminAplicar(`equipou ${it.n} em ${slot}`);
 }
 
@@ -633,12 +669,14 @@ function adminForgeLocLabel(loc) {
 }
 
 function adminForgeInventoryInstances(p) {
+  // Garante instâncias para slots equipados sem instId (kits/admin legados).
   if (typeof ensureItemInstances === "function") ensureItemInstances(p);
   if (typeof ensureForge === "function") ensureForge(p);
   const out = [];
+  const seen = Object.create(null);
   const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   for (const inst of insts) {
-    if (!inst || !inst.slug) continue;
+    if (!inst || !inst.slug || !inst.id || seen[inst.id]) continue;
     const loc = String(inst.loc || "");
     if (loc !== "bag" && loc.indexOf("equip:") !== 0) continue;
     if (typeof forgeIsEligibleItem === "function" && !forgeIsEligibleItem(inst.slug)) continue;
@@ -646,6 +684,7 @@ function adminForgeInventoryInstances(p) {
     if (!it) continue;
     const maxTier = typeof forgeMaxTierForSlug === "function" ? forgeMaxTierForSlug(inst.slug) : 0;
     if (!maxTier) continue;
+    seen[inst.id] = true;
     out.push({
       id: inst.id,
       inst: inst,
@@ -781,9 +820,11 @@ function renderAdminForge(p, el) {
         <div class="row mb8" style="gap:6px;align-items:center;flex-wrap:wrap">
           <input id="adm-forge-busca" placeholder="Buscar item, slot ou local…" value="${ADMIN.forgeBusca || ""}"
                  class="admin-in" style="flex:1;min-width:220px">
-          <span class="tiny dim">${items.length} de ${allItems.length} itens elegíveis</span>
+          <span class="tiny dim" id="adm-forge-eligible-count">${items.length} de ${allItems.length} itens elegíveis</span>
+          <span class="tiny dim">tier</span>
           <input type="number" id="adm-forge-all-tier" value="0" min="0" max="10"
-                 class="admin-in" style="width:62px" title="Tier para aplicar em todos da lista">
+                 class="admin-in" style="width:62px" title="Tier para aplicar em todos da lista"
+                 aria-label="Tier para aplicar na lista">
           <button class="sm" id="adm-forge-all-apply">Aplicar tier na lista</button>
           <button class="sm" id="adm-forge-all-zero">Zerar lista</button>
         </div>
@@ -1100,15 +1141,25 @@ function renderAdminEquip(p, el) {
       const s = b.dataset.bestSlot;
       const melhor = adminMelhorDoSlot(p, s, false);
       if (!melhor) { toast("Nenhum item para esse slot", "bad"); return; }
-      if (p.equip[s]) addItem(p, p.equip[s].item, 1);
-      p.equip[s] = { item: melhor, count: 1 };
+      adminSetEquipSlot(p, s, melhor);
       adminAplicar(`${s}: ${GAMEDATA.items[melhor].n}`);
     }));
   $$("#admin-content [data-clear-slot]").forEach((b) =>
     b.addEventListener("click", () => {
       const s = b.dataset.clearSlot;
-      if (p.equip[s] && s !== "ammo") addItem(p, p.equip[s].item, 1);
-      delete p.equip[s];
+      if (p.equip[s] && s !== "ammo"
+          && typeof takeEquippedItemInstance === "function"
+          && typeof itemUsesInstances === "function"
+          && itemUsesInstances(p.equip[s].item)) {
+        const old = takeEquippedItemInstance(p, s);
+        if (old && typeof putBagItemInstance === "function") putBagItemInstance(p, old);
+        else if (old && typeof addItem === "function") addItem(p, old.slug, 1);
+      } else if (p.equip[s] && s !== "ammo") {
+        addItem(p, p.equip[s].item, 1);
+        delete p.equip[s];
+      } else {
+        delete p.equip[s];
+      }
       adminAplicar(`slot ${s} liberado`);
     }));
 
@@ -1118,8 +1169,7 @@ function renderAdminEquip(p, el) {
       if (s === "ammo" || s === "backpack") continue;
       const melhor = adminMelhorDoSlot(p, s, respeitarVoc);
       if (!melhor) continue;
-      if (p.equip[s]) addItem(p, p.equip[s].item, 1);
-      p.equip[s] = { item: melhor, count: 1 };
+      adminSetEquipSlot(p, s, melhor);
       n++;
     }
     adminAplicar(`${n} slots preenchidos`);
@@ -1288,88 +1338,3 @@ function renderAdminMobs(p, el) {
     }));
 }
 
-/* ---------------------------------------------------------- aba: mundo */
-
-function renderAdminWorld(p, el) {
-  const hunts = Object.keys(GAMEDATA.hunts || {});
-  el.innerHTML = `
-    <div class="admin-card">
-      <div class="admin-card-t">Bestiário e Charms</div>
-      <div class="admin-quick">
-        <button class="sm primary" id="adm-bestiary">Completar bestiário</button>
-        <button class="sm" id="adm-charm-pts">+100.000 pontos de charm</button>
-      </div>
-      <div class="tiny dim mt4">
-        Completar libera todos os 4 estágios de cada monstro, o que destrava
-        os charms para compra.
-      </div>
-    </div>
-
-    <div class="admin-card">
-      <div class="admin-card-t">Aparências</div>
-      <div class="admin-quick">
-        <button class="sm primary" id="adm-outfits">Liberar outfits e montarias</button>
-      </div>
-    </div>
-
-    <div class="admin-card">
-      <div class="admin-card-t">Áreas de caça</div>
-      <div class="tiny dim mb4">${hunts.length} áreas. O nível libera o acesso.</div>
-      <div class="admin-quick">
-        <button class="sm" id="adm-kills">+1000 kills registrados</button>
-      </div>
-    </div>
-
-    <div class="admin-card admin-danger">
-      <div class="admin-card-t">Save</div>
-      <div class="admin-quick">
-        <button class="sm" id="adm-export">Copiar save (JSON)</button>
-        <button class="sm" id="adm-reload">Recarregar página</button>
-      </div>
-      <div class="tiny dim mt4">
-        O save fica no localStorage e é gravado a cada alteração aqui.
-      </div>
-    </div>`;
-
-  $("#adm-bestiary").addEventListener("click", () => {
-    if (typeof ensureCyclopedia === "function") ensureCyclopedia(p);
-    if (!p.bestiary) p.bestiary = {};
-    let n = 0;
-    for (const slug in GAMEDATA.monsters) {
-      // 5000 abates cobre o ultimo estagio de qualquer bicho da tabela
-      p.bestiary[slug] = Math.max(p.bestiary[slug] || 0, 5000);
-      n++;
-    }
-    adminAplicar(`bestiário completo (${n} monstros)`);
-  });
-  $("#adm-charm-pts").addEventListener("click", () => {
-    p.charmPoints = (p.charmPoints || 0) + 100000;
-    adminAplicar(`charm points: ${fmtFull(p.charmPoints)}`);
-  });
-  $("#adm-outfits").addEventListener("click", () => {
-    if (typeof ensureWardrobe === "function") ensureWardrobe(p);
-    // o guarda-roupa mora em p.wardrobe.outfits (id "nome-sexo" -> addons)
-    // e p.wardrobe.mounts (id -> true); nao em p.outfits/p.mounts
-    let no = 0, nm = 0;
-    if (typeof APP_OUTFIT !== "undefined") {
-      for (const id in APP_OUTFIT) { p.wardrobe.outfits[id] = 3; no++; }
-    }
-    if (typeof APP_MOUNT !== "undefined") {
-      for (const id in APP_MOUNT) { p.wardrobe.mounts[id] = true; nm++; }
-    }
-    adminAplicar(`${no} outfits (com addons) e ${nm} montarias liberadas`);
-  });
-  $("#adm-kills").addEventListener("click", () => {
-    p.totalKills = (p.totalKills || 0) + 1000;
-    adminAplicar(`total de kills: ${p.totalKills}`);
-  });
-  $("#adm-export").addEventListener("click", () => {
-    const txt = JSON.stringify(p);
-    if (navigator.clipboard) navigator.clipboard.writeText(txt);
-    toast(`Save copiado (${(txt.length / 1024).toFixed(1)} KB)`);
-  });
-  $("#adm-reload").addEventListener("click", () => {
-    save();
-    location.reload();
-  });
-}

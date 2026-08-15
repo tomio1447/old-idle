@@ -89,11 +89,15 @@ let ACCOUNT_LAST_SAVE_PROMISE=ACCOUNT_SAVE_QUEUE;
 const ACCOUNT_SAVE_CONFLICTS=new Set();
 function accountMergeCharacterCache(characters){
   const cache=accountCharacterCacheRead();
+  let sharedGold=null;
   for(const character of characters||[]){
     const index=cache.findIndex((c)=>String(c.id)===String(character.id));
     if(index>=0)cache[index]=Object.assign({},cache[index],character);
     else cache.push(character);
+    const snap=character.snapshot||(()=>{try{return typeof character.data==="string"?JSON.parse(character.data):character.data;}catch(e){return null;}})();
+    if(snap&&snap.gold!==undefined)sharedGold=Math.max(0,Math.floor(Number(snap.gold)||0));
   }
+  if(sharedGold!==null&&typeof accountSetGold==="function")accountSetGold(sharedGold);
   accountCharacterCacheWrite(cache);return cache;
 }
 function accountQueueSave(task){
@@ -362,6 +366,9 @@ function accountAuthorityVisualState(){
       if(ent.p&&ent.p.config){
         const mode=ent.p.config.attackMode||(combat&&combat.huntMode)||"kiting";
         visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(ent.p):ent.p.config.autoWalk!==false;
+        if(typeof vipManualControlAllowed==="function"&&!vipManualControlAllowed()){
+          visual.autoWalk=true;
+        }
         let dir=typeof combatKeyDir==="function"?combatKeyDir((typeof G!=="undefined"&&G.walkKeys)||{}):null;
         // Clique no chão: transforma walkGoal em 1 passo para a autoridade.
         if(!visual.autoWalk&&isSelf&&!dir&&ent.walkGoal&&Number.isFinite(ent.walkGoal.cx)&&Number.isFinite(ent.walkGoal.cy)
@@ -416,7 +423,7 @@ function accountClaimRewardChest(token,charId,opts){
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
       return {ok:true,rewardChest:r.data.rewardChest||{},rewardChestBundles:r.data.rewardChestBundles||[],
-        lootPouch:r.data.lootPouch||{},saveVersion:r.data.saveVersion};
+        lootPouch:r.data.lootPouch||{},supplyStash:r.data.supplyStash||{},saveVersion:r.data.saveVersion};
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
@@ -431,6 +438,19 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
     if(r.data.ok){accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance&&r.data.instance.state};}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
     return {ok:false,msg:r.data.msg||"Não foi possível trocar a munição"};
+  });
+}
+function accountClearInstanceLootPouch(token,charId){
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const r=await _api("POST","/api/instance/pouch-clear",Object.assign({token,char_id:Number(charId),
+      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(r.data.ok){
+      accountInstanceApply(r.data.instance);
+      return {ok:true,state:r.data.instance&&r.data.instance.state,version:r.data.instance&&r.data.instance.version};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,msg:r.data.msg||"Não foi possível limpar a Loot Pouch"};
   });
 }
 function accountRefreshInstance(token){
@@ -450,7 +470,11 @@ function accountEndInstance(token,reason){
     const r=await _api("POST","/api/instance/end",Object.assign({token,
       char_id:typeof sessionCharId==="function"?sessionCharId():null,
       instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version,reason:reason||"finished"},accountLeaseFields()));
-    if(r.data.ok){const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
+    if(r.data.ok){
+      // O tick final do end avança save_version; sem este merge o PUT seguinte
+      // sai com expected_version obsoleto e gera 409 rotineiro no templo.
+      if(r.data.characters&&r.data.characters.length)accountMergeCharacterCache(r.data.characters);
+      const newerGeneration=ACCOUNT_INSTANCE_EPOCH!==endEpoch;accountInstanceApply(null);
       if(newerGeneration)ACCOUNT_INSTANCE_CAN_CREATE=true;return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountInstanceApply(r.data.instance||null);
@@ -598,6 +622,11 @@ async function accountLogin(login, password) {
   if(ACCOUNT_UNAUTHORIZED_RELOAD){clearTimeout(ACCOUNT_UNAUTHORIZED_RELOAD);ACCOUNT_UNAUTHORIZED_RELOAD=null;}
   try{sessionStorage.removeItem("tibia-idle-session-expired");}catch(e){}
   try{window.dispatchEvent(new CustomEvent("tibia-idle-session-restored"));}catch(e){}
+  if(r.data.account){
+    if(typeof syncVipFromAccount==="function")syncVipFromAccount(r.data.account);
+    if(typeof accountSetGold==="function"&&r.data.account.gold!==undefined)
+      accountSetGold(Math.max(0,Number(r.data.account.gold)||0));
+  }
   return {
     ok: true,
     token: r.data.token,
@@ -641,12 +670,31 @@ async function accountSaveCharacter(token, charId, p) {
   const id=String(charId);
   return accountQueueSave(async()=>{
     if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation())return false;
-    const cache=await accountEnsureVersions(token,[id]);
-    const summary=cache.find((c)=>String(c.id)===id);
+    // Mesma regra do party-save: tick/end autoritativo materializa o char e
+    // avança save_version. Esperar a fila da instância evita PUT com versão
+    // stale logo após stopHunt (end + save em filas distintas).
+    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
+    if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
+    let cache=await accountEnsureVersions(token,[id]);
+    let summary=cache.find((c)=>String(c.id)===id);
     if(!summary||!Number.isSafeInteger(Number(summary.saveVersion)))return false;
-    const body=Object.assign({token,expected_version:Number(summary.saveVersion)},accountLeaseFields(),accountSavePayload(p));
-    const r=await _api("PUT","/api/characters/"+encodeURIComponent(id),body);
+    const putOnce=(expected)=>_api("PUT","/api/characters/"+encodeURIComponent(id),
+      Object.assign({token,expected_version:Number(expected)},accountLeaseFields(),accountSavePayload(p)));
+    let r=await putOnce(summary.saveVersion);
     if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
+    // Corrida benigna (tick final, market, claim): atualize a revisão e tente
+    // uma vez. Só bloqueie a aba se o retry também perder — aí há sessão
+    // concorrente de verdade. Gold/inventário protegidos no servidor.
+    if(r.code===409&&r.data.error==="SAVE_VERSION_CONFLICT"){
+      if(r.data.characters&&r.data.characters.length)accountMergeCharacterCache(r.data.characters);
+      else{await accountSyncRefreshCharacters(token);}
+      cache=accountCharacterCacheRead();
+      summary=cache.find((c)=>String(c.id)===id);
+      if(summary&&Number.isSafeInteger(Number(summary.saveVersion))){
+        r=await putOnce(summary.saveVersion);
+        if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
+      }
+    }
     if(r.code===409){
       accountSaveConflict([id],r.data.characters||[],r.data.msg);return false;
     }
@@ -718,8 +766,14 @@ async function accountUpdateMissions(token, missions, missionsDone) {
 function accountApplyServerBalances(data){
   data=data||{};
   if(data.character){accountMergeCharacterCache([data.character]);
-    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)&&data.character.snapshot)
-      G.p.gold=Math.max(0,Number(data.character.snapshot.gold)||0);}catch(e){}}
+    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)&&data.character.snapshot){
+      const g=Math.max(0,Number(data.character.snapshot.gold)||0);
+      if(typeof accountSetGold==="function")accountSetGold(g);
+      else G.p.gold=g;
+    }}catch(e){}}
+  if(data.account&&typeof syncVipFromAccount==="function")syncVipFromAccount(data.account);
+  const gold=Number(data.gold!==undefined?data.gold:(data.account&&data.account.gold));
+  if(Number.isFinite(gold)&&typeof accountSetGold==="function")accountSetGold(Math.max(0,gold));
   const coins=Number(data.coinBalance);
   if(Number.isFinite(coins)){
     try{const raw=sessionStorage.getItem("tibia-idle-account"),account=raw?JSON.parse(raw):null;

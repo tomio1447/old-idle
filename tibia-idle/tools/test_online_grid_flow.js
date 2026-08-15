@@ -18,8 +18,8 @@ must([active,ally,mobA,mobB].every((ent)=>Number.isFinite(ent.x)&&Number.isFinit
 must(gridAi.includes("const authoritativeTarget=m.targetId&&c.players")&&
   gridAi.includes("authoritativeTarget||monsterReachableTarget"),
   "IA visual não segue o targetId decidido pela autoridade");
-must(html.includes("js/grid.js?v=knight-fx-combo-v1")&&html.includes("js/gridai.js?v=sqm-hud-v1")&&
-  html.includes("js/game.js?v=knight-fx-combo-v2"),"assets do fluxo online sem cache-bust");
+must(html.includes("js/grid.js?v=knight-fx-combo-v1")&&html.includes("js/gridai.js?v=mob-retarget-v1")&&
+  html.includes("js/game.js?v=hunt-analyser-death-v1")||html.includes("js/game.js?v=helper-only-spells-v1"),"assets do fluxo online sem cache-bust");
 const ui=fs.readFileSync(path.join(__dirname,"..","game","js","ui.js"),"utf8");
 must(ui.includes("COMBO_DRAG_FROM")&&ui.includes('setData("text/plain"')&&
   ui.includes("dropEffect = \"move\""),

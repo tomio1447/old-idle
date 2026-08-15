@@ -40,9 +40,13 @@ const slashP=basePlayer({voc:"knight",skills:{sword:50,axe:10,club:10,dist:10,fi
   equip:{weapon:{item:"magic-sword"}},imbuements:{weapon:[{key:"Slash",tier:3}]}});
 must(engine.gearSkillBonus(slashP,"sword")>=4,"Slash powerful não soma sword no online");
 
-const charmP=basePlayer({charms:{enflame:true}});
-must(engine.applyCharmDamage(charmP,"fire",100)===105,"charm Enflame não aplica +5% fogo");
-must(engine.applyCharmDamage(charmP,"ice",100)===100,"charm de fogo não pode vazar para gelo");
+const charmP=basePlayer({charms:{enflame:true},charmRace:{enflame:"rat"}});
+must(engine.applyCharmDamage(charmP,"fire",100)===100,
+  "charm Enflame não é mais +% passivo (proc por raça)");
+must(typeof engine.tryCharmOffensive==="function"&&typeof engine.assignCharm==="function",
+  "helpers Canary de charm não exportados");
+must(engine.assignCharm(charmP,"enflame","rat").ok,"assignCharm Enflame→rat");
+must(engine.buyCharm({charms:{},charmPoints:400},"enflame").ok,"buyCharm Enflame 400 pts");
 
 must(engine.wandPerfectShot(basePlayer({equip:{weapon:{item:"eldritch-wand"}}}),4)===65,
   "Eldritch Wand perfect shot 4 SQM ausente no online");

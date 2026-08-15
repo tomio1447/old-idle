@@ -17,7 +17,7 @@ must(pc.blessingPriceForLevel(1)===500&&pc.blessingPriceForLevel(120)===60000&&
   "faixas de preço da bless incorretas");
 
 const cc={expForLevel:()=>0};vm.createContext(cc);
-a=combatSrc.indexOf("function combatDeathCause");b=combatSrc.indexOf("\n\n/* Tick dos aliados",a);
+a=combatSrc.indexOf("function combatDeathCause");b=combatSrc.indexOf("function partyTickAllies",a);
 vm.runInContext(combatSrc.slice(a,b),cc);
 let p={exp:100000,level:100,blessed:true,deaths:0},c={pvp:false,stats:{deaths:0}};
 let loss=cc.applyCharacterDeathConsequences(c,p);
@@ -41,7 +41,7 @@ const gc={
   newCombat(){return {players:[e1,e2],player:e1,events:[]};},spawnWave(){},persistActiveInstance(){},save(){},
   addLog(){},toast(){},renderAll(){},stopHunt(){gc.stopped=true;gc.G.combat=null;},clearInstanceSession(){},fmtFull:String,
 };
-vm.createContext(gc);a=gameSrc.indexOf("function partyWipeBlessCost");b=gameSrc.indexOf("\n\n/* Avança combate",a);
+vm.createContext(gc);a=gameSrc.indexOf("function partyWipeBlessCost");b=gameSrc.indexOf("function advanceIdleInstance",a);
 vm.runInContext(gameSrc.slice(a,b),gc);
 must(gc.partyWipeBlessCost(old)===190000,"custo total da bless da PT incorreto");
 must(gc.returnPartyToInstanceAfterWipe(old,190000,true)===true&&p1.gold===110000&&

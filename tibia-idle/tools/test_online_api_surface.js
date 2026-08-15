@@ -10,7 +10,7 @@ function must(ok,msg){if(!ok)throw Error(msg);}
 const required=[
   "/api/register","/api/login","/api/logout","/api/me",
   "/api/lease/acquire","/api/lease/takeover","/api/lease/renew","/api/lease/release",
-  "/api/instance","/api/instance/tick","/api/instance/ammo","/api/instance/end","/api/characters",
+  "/api/instance","/api/instance/tick","/api/instance/ammo","/api/instance/pouch-clear","/api/instance/end","/api/characters",
   "/api/party/save","/api/party/create","/api/party/invite","/api/party/inbox",
   "/api/party/accept","/api/party/decline","/api/party/leave","/api/party/kick",
   "/api/party/reorder","/api/party/state","/api/party/zone","/api/party/follow",
@@ -37,8 +37,10 @@ must(db.includes("JsonStore.prototype.instanceGetByParty")&&db.includes("async i
   mysqlTick.includes("WHERE id=?`")&&!mysqlTick.includes("WHERE id=? AND account_id=?"),
   "storage JSON/MySQL não materializa todos os membros da party compartilhada");
 must(db.includes("JsonStore.prototype.instancePatchState")&&db.includes("async instancePatchState")&&
-  server.includes("async function selectInstanceAmmo"),
-  "storage/API não persistem a troca de munição na autoridade");
+  server.includes("async function selectInstanceAmmo")&&
+  server.includes("async function clearInstanceLootPouch")&&
+  client.includes("accountClearInstanceLootPouch"),
+  "storage/API não persistem a troca de munição/limpeza de pouch na autoridade");
 must(!client.includes("new WebSocket(")&&!server.includes("WebSocketServer"),
   "WebSocket paralelo foi introduzido e pode duplicar o runtime SSE");
 console.log("OK: APIs online e SSE v2 estão integrados sem WebSocket/runtime duplicado.");

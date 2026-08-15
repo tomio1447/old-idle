@@ -7,30 +7,30 @@
 const VOCATIONS = {
   none: {
     name: "Sem vocação", hpGain: 5, mpGain: 5, capGain: 10,
-    weapon: "melee", magicFactor: 3.0, mpRegen: 6, hpRegen: 6,
+    weapon: "melee", magicFactor: 3.0, mpRegen: 6, hpRegen: 12,
     desc: "Rookgaard. Escolha uma vocação ao chegar no nível 8.",
   },
   knight: {
     name: "Knight", hpGain: 15, mpGain: 5, capGain: 25,
-    weapon: "melee", magicFactor: 3.0, mpRegen: 6, hpRegen: 3,
+    weapon: "melee", magicFactor: 3.0, mpRegen: 6, hpRegen: 6,
     skillFactor: 1.1, defFactor: 1.0, atkFactor: 1.0,
     desc: "Tanque puro. Muita vida, skills de melee sobem rápido.",
   },
   paladin: {
     name: "Paladin", hpGain: 10, mpGain: 15, capGain: 20,
-    weapon: "distance", magicFactor: 1.4, mpRegen: 4, hpRegen: 4,
+    weapon: "distance", magicFactor: 1.4, mpRegen: 4, hpRegen: 8,
     skillFactor: 1.2, defFactor: 1.1, atkFactor: 1.0,
     desc: "Distância. Equilíbrio entre dano, vida e mana.",
   },
   druid: {
     name: "Druid", hpGain: 5, mpGain: 30, capGain: 10,
-    weapon: "magic", magicFactor: 1.1, mpRegen: 3, hpRegen: 6,
+    weapon: "magic", magicFactor: 1.1, mpRegen: 3, hpRegen: 12,
     skillFactor: 1.8, defFactor: 1.0, atkFactor: 1.0,
     desc: "Magia de gelo/terra e cura forte. Muita mana.",
   },
   sorcerer: {
     name: "Sorcerer", hpGain: 5, mpGain: 30, capGain: 10,
-    weapon: "magic", magicFactor: 1.1, mpRegen: 3, hpRegen: 6,
+    weapon: "magic", magicFactor: 1.1, mpRegen: 3, hpRegen: 12,
     skillFactor: 1.8, defFactor: 1.0, atkFactor: 1.0,
     desc: "Magia de fogo/energia. O maior dano mágico do jogo.",
   },
@@ -227,9 +227,15 @@ function hitChance(skill) {
   return Math.min(0.95, 0.35 + skill * 0.006);
 }
 
-/* Regeneracao de HP/MP por tick (segundos entre pontos) */
+/* Intervalo em segundos entre ticks Canary (hpGain/manaGain). */
 function regenRate(voc, hasLifeRing) {
-  const v = VOCATIONS[voc];
+  const spec = (typeof CanaryVocation !== "undefined" && CanaryVocation.vocationRegenSpec)
+    ? CanaryVocation.vocationRegenSpec(typeof voc === "object" ? voc : { voc: voc })
+    : null;
+  if (spec) {
+    return { hp: spec.hpTicks / 1000, mp: spec.mpTicks / 1000 };
+  }
+  const v = VOCATIONS[voc] || VOCATIONS.none;
   return {
     hp: hasLifeRing ? Math.max(2, v.hpRegen - 3) : v.hpRegen,
     mp: hasLifeRing ? Math.max(1, v.mpRegen - 2) : v.mpRegen,
@@ -347,6 +353,7 @@ const SPELLS = {};
       element: d.element, area: d.area || false, alvos: d.alvos,
       range: d.range, needTarget: !!d.needTarget, needWeapon: !!d.needWeapon,
       premium: !!d.premium, group: d.group, chain: d.chain,
+      chainDist: d.chainDist, chainFx: d.chainFx, fx: d.fx, missile: d.missile,
       cond: d.cond, dispel: d.dispel, regen: d.regen, monk: d.monk,
       // Update 15.25.3a4a52: campos novos das magias do Vocation
       // Balancing — magia de escudo, debuff do proximo auto attack,

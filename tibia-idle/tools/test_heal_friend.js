@@ -23,6 +23,12 @@ if (!ctx.applied || ctx.applied.amount !== 600) throw Error('Cura não foi aplic
 if (!c.events.some(e => e.t==='heal-friend' && e.targetId==='knight-1')) throw Error('Evento visual do Heal Friend ausente');
 if (!c.events.some(e => e.t==='say' && e.text === 'exura sio "Tomio"')) throw Error('Fala parametrizada ausente');
 console.log('OK: Heal Friend — seleção, aplicação, evento e fala validados.');
+const CanaryVocation = require('../game/js/canary-vocation');
+if (CanaryVocation.friendHealSpellIds('druid').includes('exura-tio-sio'))
+  throw Error('Heal Friend do druid não pode listar exura tio sio');
+if (!CanaryVocation.friendHealSpellIds('monk').includes('exura-tio-sio'))
+  throw Error('Heal Friend do monk precisa de exura tio sio');
+console.log('OK: Heal Friend — vocações Druid/Monk sem vazamento de magia.');
 const combatSource = fs.readFileSync(__dirname + '/../game/js/combat.js', 'utf8');
 if (!combatSource.includes('p.config.healFriendPriority === "self"')) throw Error('Prioridade self/friend ausente no combate');
 console.log('OK: prioridade auto cura vs Exura Sio configurável.');

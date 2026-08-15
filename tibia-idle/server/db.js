@@ -271,6 +271,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
     if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
+  if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
   row.updated_at=new Date(now).toISOString();this._saveRuntime(true);
   return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version),terminalReason:next.terminalReason||null};
 };
@@ -289,6 +290,7 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
     if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
+  if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
   row.updated_at=row.saved_at;this._saveRuntime(true);return {ok:true,instance:row,characters:changed,elapsed,
     terminalReason:next.terminalReason||null};
 };
@@ -305,7 +307,8 @@ JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
-                role: role || "user", coins: coins || 0,
+                role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
+                vip_until: 0, market_gold: 0,
                 created_at: new Date().toISOString() };
   this.accounts.push(acc);
   this._save();
@@ -315,6 +318,79 @@ JsonStore.prototype.updateCoins = function (id, coins) {
   const a = this.findAccountById(id);
   if (a) { a.coins = Math.max(0, coins); this._save(); return a; }
   return null;
+};
+JsonStore.prototype.accountGold = function (accountId) {
+  const a = this.findAccountById(accountId);
+  return a ? Math.max(0, Math.floor(Number(a.gold) || 0)) : 0;
+};
+JsonStore.prototype.setAccountGold = function (accountId, gold) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.gold = Math.max(0, Math.floor(Number(gold) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountVipUntil = function (accountId, vipUntil) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.vip_until = Math.max(0, Math.floor(Number(vipUntil) || 0));
+  this._save();
+  return a;
+};
+/* Soma gold dos personagens para a conta uma vez; espelha o saldo nos chars. */
+JsonStore.prototype.migrateAccountGold = function (accountId) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  if (a.gold_migrated) {
+    a.gold = Math.max(0, Math.floor(Number(a.gold) || 0));
+    return a;
+  }
+  let total = Math.max(0, Math.floor(Number(a.gold) || 0));
+  const chars = this.charactersOf(accountId);
+  for (const c of chars) {
+    let data = {};
+    try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+    const g = Number(data.gold);
+    if (Number.isFinite(g) && g > 0) total += Math.floor(g);
+    data.gold = 0;
+    c.data = typeof c.data === "string" ? JSON.stringify(data) : data;
+  }
+  a.gold = total;
+  a.gold_migrated = true;
+  for (const c of chars) {
+    let data = {};
+    try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+    data.gold = a.gold;
+    c.data = JSON.stringify(data);
+  }
+  this._save();
+  return a;
+};
+JsonStore.prototype.syncAccountGoldFromCharacters = function (projections) {
+  const byAccount = new Map();
+  for (const proj of projections || []) {
+    const c = this.findCharacter(proj.id);
+    if (!c) continue;
+    let data = {};
+    try { data = typeof proj.data === "string" ? JSON.parse(proj.data) : (proj.data || {}); } catch (e) { data = {}; }
+    const gold = Math.max(0, Math.floor(Number(data.gold) || 0));
+    const aid = Number(c.account_id);
+    const prev = byAccount.get(aid);
+    if (!prev || gold !== prev.gold) byAccount.set(aid, { gold, accountId: aid });
+  }
+  for (const entry of byAccount.values()) {
+    const a = this.findAccountById(entry.accountId);
+    if (!a) continue;
+    a.gold = entry.gold;
+    a.gold_migrated = true;
+    for (const c of this.charactersOf(entry.accountId)) {
+      let data = {};
+      try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+      data.gold = entry.gold;
+      c.data = JSON.stringify(data);
+    }
+  }
+  if (byAccount.size) this._save();
 };
 JsonStore.prototype.charactersOf = function (accountId) {
   return this.characters.filter((c) => c.account_id === Number(accountId));
@@ -471,15 +547,21 @@ JsonStore.prototype.claimMarketGold = function (accountId) {
 };
 JsonStore.prototype.marketTransferGold=function(accountId,charId,expectedVersion,amount,direction,lease){
   if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))return {ok:false,error:"LEASE_REQUIRED"};
-  const account=this.findAccountById(accountId),character=this.findCharacter(charId);
+  const account=this.migrateAccountGold(accountId),character=this.findCharacter(charId);
   if(!account||!character||Number(character.account_id)!==Number(accountId))return {ok:false,error:"CHARACTER_NOT_FOUND"};
   if(Number(character.save_version)!==Number(expectedVersion))return {ok:false,error:"SAVE_VERSION_CONFLICT",character};
   let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-  data.gold=Math.max(0,Math.floor(Number(data.gold)||0));account.market_gold=Math.max(0,Number(account.market_gold)||0);
-  if(direction==="deposit"){if(data.gold<amount)return {ok:false,error:"CHARACTER_GOLD_LOW"};data.gold-=amount;account.market_gold+=amount;}
-  else{if(account.market_gold<amount)return {ok:false,error:"BANK_GOLD_LOW"};account.market_gold-=amount;data.gold+=amount;}
+  account.gold=Math.max(0,Math.floor(Number(account.gold)||0));account.market_gold=Math.max(0,Number(account.market_gold)||0);
+  if(direction==="deposit"){if(account.gold<amount)return {ok:false,error:"CHARACTER_GOLD_LOW"};account.gold-=amount;account.market_gold+=amount;}
+  else{if(account.market_gold<amount)return {ok:false,error:"BANK_GOLD_LOW"};account.market_gold-=amount;account.gold+=amount;}
+  data.gold=account.gold;
   character.data=JSON.stringify(data);character.save_version=Number(character.save_version)+1;character.updated_at=new Date(lease.now).toISOString();
-  this._save();return {ok:true,character,bank:account.market_gold};
+  for(const sibling of this.charactersOf(accountId)){
+    if(Number(sibling.id)===Number(character.id))continue;
+    let sd={};try{sd=typeof sibling.data==="string"?JSON.parse(sibling.data):(sibling.data||{});}catch(e){sd={};}
+    sd.gold=account.gold;sibling.data=JSON.stringify(sd);
+  }
+  this._save();return {ok:true,character,bank:account.market_gold,gold:account.gold};
 };
 JsonStore.prototype.recordSale = function (slug, tier, price) {
   this.marketStats = this.marketStats || {};
@@ -814,13 +896,73 @@ async function MysqlStore() {
     },
     async createAccount(login, hash, role, coins) {
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, role, coins) VALUES (?, ?, ?, ?)",
+        "INSERT INTO accounts (login, password_hash, role, coins, gold, gold_migrated, vip_until) VALUES (?, ?, ?, ?, 0, 1, 0)",
         [login, hash, role || "user", coins || 0]);
-      return { id: r.insertId, login, password_hash: hash, role: role || "user", coins: coins || 0 };
+      return { id: r.insertId, login, password_hash: hash, role: role || "user", coins: coins || 0,
+        gold: 0, gold_migrated: 1, vip_until: 0 };
     },
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
+    },
+    async accountGold(accountId) {
+      const rows = await this.query("SELECT gold FROM accounts WHERE id = ?", [Number(accountId)]);
+      return rows[0] ? Math.max(0, Math.floor(Number(rows[0].gold) || 0)) : 0;
+    },
+    async setAccountGold(accountId, gold) {
+      await this.run("UPDATE accounts SET gold = ? WHERE id = ?",
+        [Math.max(0, Math.floor(Number(gold) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountVipUntil(accountId, vipUntil) {
+      await this.run("UPDATE accounts SET vip_until = ? WHERE id = ?",
+        [Math.max(0, Math.floor(Number(vipUntil) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async migrateAccountGold(accountId) {
+      const account = await this.findAccountById(accountId);
+      if (!account) return null;
+      if (Number(account.gold_migrated)) {
+        account.gold = Math.max(0, Math.floor(Number(account.gold) || 0));
+        return account;
+      }
+      const chars = await this.charactersOf(accountId);
+      let total = Math.max(0, Math.floor(Number(account.gold) || 0));
+      for (const c of chars) {
+        let data = {};
+        try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+        const g = Number(data.gold);
+        if (Number.isFinite(g) && g > 0) total += Math.floor(g);
+      }
+      await this.run("UPDATE accounts SET gold = ?, gold_migrated = 1 WHERE id = ?", [total, Number(accountId)]);
+      for (const c of chars) {
+        let data = {};
+        try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+        data.gold = total;
+        await this.run("UPDATE characters SET data = ? WHERE id = ?", [JSON.stringify(data), Number(c.id)]);
+      }
+      return this.findAccountById(accountId);
+    },
+    async syncAccountGoldFromCharacters(projections) {
+      const byAccount = new Map();
+      for (const proj of projections || []) {
+        const c = await this.findCharacter(proj.id);
+        if (!c) continue;
+        let data = {};
+        try { data = typeof proj.data === "string" ? JSON.parse(proj.data) : (proj.data || {}); } catch (e) { data = {}; }
+        const gold = Math.max(0, Math.floor(Number(data.gold) || 0));
+        byAccount.set(Number(c.account_id), gold);
+      }
+      for (const [accountId, gold] of byAccount.entries()) {
+        await this.run("UPDATE accounts SET gold = ?, gold_migrated = 1 WHERE id = ?", [gold, accountId]);
+        const chars = await this.charactersOf(accountId);
+        for (const c of chars) {
+          let data = {};
+          try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+          data.gold = gold;
+          await this.run("UPDATE characters SET data = ? WHERE id = ?", [JSON.stringify(data), Number(c.id)]);
+        }
+      }
     },
     async charactersOf(accountId) {
       return this.query(
@@ -1129,6 +1271,23 @@ async function MysqlStore() {
            WHERE id=?`,
           [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
            projection.max_mp,Number(projection.id)]);
+        // Gold é por conta: propaga o saldo autoritativo para accounts.gold.
+        const walletByAcc=new Map();
+        for(const projection of next.characters||[]){
+          const [chars]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+          if(!chars[0])continue;
+          let data={};try{data=typeof projection.data==="string"?JSON.parse(projection.data):(projection.data||{});}catch(e){}
+          walletByAcc.set(Number(chars[0].account_id),Math.max(0,Math.floor(Number(data.gold)||0)));
+        }
+        for(const [aid,gold] of walletByAcc.entries()){
+          await conn.query("UPDATE accounts SET gold=?, gold_migrated=1 WHERE id=?",[gold,aid]);
+          const [siblings]=await conn.query("SELECT id, data FROM characters WHERE account_id=?",[aid]);
+          for(const sib of siblings){
+            let sd={};try{sd=typeof sib.data==="string"?JSON.parse(sib.data):(sib.data||{});}catch(e){sd={};}
+            sd.gold=gold;
+            await conn.query("UPDATE characters SET data=? WHERE id=?",[JSON.stringify(sd),Number(sib.id)]);
+          }
+        }
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,status=?,
              terminal_reason=?,ended_at=? WHERE account_id=?`,
@@ -1239,15 +1398,30 @@ async function MysqlStore() {
         const [characters]=await conn.query("SELECT * FROM characters WHERE id=? AND account_id=? FOR UPDATE",[Number(charId),Number(accountId)]);
         const account=accounts[0],character=characters[0];if(!account||!character){await conn.rollback();return {ok:false,error:"CHARACTER_NOT_FOUND"};}
         if(Number(character.save_version)!==Number(expectedVersion)){await conn.rollback();return {ok:false,error:"SAVE_VERSION_CONFLICT",character};}
+        let pocket=Math.max(0,Math.floor(Number(account.gold)||0));
+        if(!Number(account.gold_migrated)){
+          const [allChars]=await conn.query("SELECT id, data FROM characters WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+          for(const row of allChars){
+            let d={};try{d=typeof row.data==="string"?JSON.parse(row.data):(row.data||{});}catch(e){d={};}
+            const g=Number(d.gold);if(Number.isFinite(g)&&g>0)pocket+=Math.floor(g);
+          }
+        }
         let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-        data.gold=Math.max(0,Math.floor(Number(data.gold)||0));let bank=Math.max(0,Number(account.market_gold)||0);
-        if(direction==="deposit"){if(data.gold<amount){await conn.rollback();return {ok:false,error:"CHARACTER_GOLD_LOW"};}data.gold-=amount;bank+=amount;}
-        else{if(bank<amount){await conn.rollback();return {ok:false,error:"BANK_GOLD_LOW"};}bank-=amount;data.gold+=amount;}
-        await conn.query("UPDATE accounts SET market_gold=? WHERE id=?",[bank,Number(accountId)]);
+        let bank=Math.max(0,Number(account.market_gold)||0);
+        if(direction==="deposit"){if(pocket<amount){await conn.rollback();return {ok:false,error:"CHARACTER_GOLD_LOW"};}pocket-=amount;bank+=amount;}
+        else{if(bank<amount){await conn.rollback();return {ok:false,error:"BANK_GOLD_LOW"};}bank-=amount;pocket+=amount;}
+        await conn.query("UPDATE accounts SET market_gold=?, gold=?, gold_migrated=1 WHERE id=?",[bank,pocket,Number(accountId)]);
+        data.gold=pocket;
         await conn.query("UPDATE characters SET data=?,save_version=save_version+1 WHERE id=? AND account_id=?",
           [JSON.stringify(data),Number(charId),Number(accountId)]);
+        const [siblings]=await conn.query("SELECT id, data FROM characters WHERE account_id=? AND id<>?",[Number(accountId),Number(charId)]);
+        for(const sib of siblings){
+          let sd={};try{sd=typeof sib.data==="string"?JSON.parse(sib.data):(sib.data||{});}catch(e){sd={};}
+          sd.gold=pocket;
+          await conn.query("UPDATE characters SET data=? WHERE id=?",[JSON.stringify(sd),Number(sib.id)]);
+        }
         character.data=JSON.stringify(data);character.save_version=Number(character.save_version)+1;
-        await conn.commit();return {ok:true,character,bank};
+        await conn.commit();return {ok:true,character,bank,gold:pocket};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
     },
 
@@ -1725,6 +1899,12 @@ async function ensureSchema(pool) {
   catch(e) { /* já existe */ }
 
   try { await pool.query("ALTER TABLE accounts ADD COLUMN market_gold INT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN gold BIGINT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN gold_migrated TINYINT(1) NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN vip_until BIGINT UNSIGNED NOT NULL DEFAULT 0"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

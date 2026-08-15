@@ -445,15 +445,25 @@ function normalizePlayer(p) {
   if (p.config.healSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.healSupply])
     p.config.healSupply = "";
   if (p.config.manaSupply && typeof supplyAllowed === "function" && !supplyAllowed(p, p.config.manaSupply)) {
-    const manaOrder = ["distilled-ultimate-mana-potion", "distilled-superior-mana-potion",
+    const manaOrder = ["distilled-ultimate-mana-potion", "ultimate-mana-potion",
+      "distilled-superior-mana-potion", "superior-mana-potion",
       "great-mana-potion", "strong-mana-potion", "mana-potion"];
     p.config.manaSupply = manaOrder.find((slug) => supplyAllowed(p, slug)) || "mana-potion";
   }
+  // Garante chave de supply para a potion selecionada (CARGAS 0 + auto-buy).
+  if (p.config.manaSupply && !Object.prototype.hasOwnProperty.call(p.supplies, p.config.manaSupply))
+    p.supplies[p.config.manaSupply] = 0;
+  if (p.config.healSupply && !Object.prototype.hasOwnProperty.call(p.supplies, p.config.healSupply))
+    p.supplies[p.config.healSupply] = 0;
   if (p.config.autoWalk === undefined) p.config.autoWalk = true;
   p.bag = p.bag || {};
   p.bagSlots = p.bagSlots || 8;
   p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   p.lootPouch = p.lootPouch || {};
+  p.supplyStash = p.supplyStash || {};
+  if (!p.config.autoSupplyStash || typeof p.config.autoSupplyStash !== "object") {
+    p.config.autoSupplyStash = {};
+  }
   p.lootConfig = p.lootConfig || { noCollect: [], noSell: [] };
   p.lootConfig.noCollect = p.lootConfig.noCollect || [];
   p.lootConfig.noSell = p.lootConfig.noSell || [];
@@ -531,8 +541,13 @@ function normalizePlayer(p) {
   // barra de combo: cria a estrutura e migra a config antiga do shooter
   if (typeof ensureCombo === "function") ensureCombo(p);
   if (typeof migrateComboFromShooter === "function") migrateComboFromShooter(p);
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.sanitizePlayerSpells
+      && typeof SPELLS !== "undefined") {
+    CanaryVocation.sanitizePlayerSpells(p, SPELLS);
+  }
   // helper de rings/amulets e Magic Shield (saves antigos nascem desligados)
   if (typeof ensureAccessoryConfig === "function") ensureAccessoryConfig(p);
+  if (typeof ensureCyclopedia === "function") ensureCyclopedia(p);
   p.harmony = Math.max(0, Math.min(5, p.harmony || 0));
   p.monkShrines = Math.max(0, Math.min(3, p.monkShrines || 0));
   if (!p.config.dummy) p.config.dummy = "exercise";
@@ -653,6 +668,7 @@ function computeOffline(p) {
     if (currencyValue(slug)) gold += creditCurrency(p, slug, loot[slug]);
     else if (SUPPLIES[slug]) p.supplies[slug] = (p.supplies[slug] || 0) + loot[slug];
     else if (GAMEDATA.items[slug] && GAMEDATA.items[slug].s === "ammo") addAmmo(p, slug, loot[slug]);
+    else if (typeof routeLootItem === "function") routeLootItem(p, slug, loot[slug]);
     else if (shouldGoLootPouch(slug)) addLootPouch(p, slug, loot[slug]);
     else if (!addItem(p, slug, loot[slug])) delete loot[slug];
   }
@@ -888,13 +904,31 @@ function handleMissionKill(p, huntId, monster) {
   if (st.claimed && st.claimed[task.monster] && (st.progress[monster] || 0) >= task.target) {
     tryCompleteMissionRewards(p, huntId);
     syncMissionsToAccount(p);
-    renderMission();
+    if (typeof requestAnimationFrame === "function") {
+      if (!G._missionRenderQueued) {
+        G._missionRenderQueued = true;
+        requestAnimationFrame(() => {
+          G._missionRenderQueued = false;
+          renderMission();
+        });
+      }
+    } else renderMission();
     return;
   }
   st.progress[monster] = Math.min(task.target, (st.progress[monster] || 0) + 1);
   tryCompleteMissionRewards(p, huntId);
   syncMissionsToAccount(p);
-  renderMission();
+  // innerHTML da missão no mesmo frame do kill (e do wave-clear) causa hitch;
+  // redesenha no próximo frame.
+  if (typeof requestAnimationFrame === "function") {
+    if (!G._missionRenderQueued) {
+      G._missionRenderQueued = true;
+      requestAnimationFrame(() => {
+        G._missionRenderQueued = false;
+        renderMission();
+      });
+    }
+  } else renderMission();
 }
 
 function renderMission() {
@@ -1742,6 +1776,12 @@ function drainEvents() {
 
   if (!ready.length) return;
 
+  // Damage / Damage Taken: agrega hit+taken por personagem/elemento a partir
+  // dos eventos já emitidos (offline e online), sem campos extras no servidor.
+  if (typeof otcAnalyserIngestEvents === "function") {
+    try { otcAnalyserIngestEvents(ready, c); } catch (err) { /* analyser opcional */ }
+  }
+
   // O alvo pode ter avançado vários frames desde que o lote foi recebido.
   // Atualize origem/destino imediatamente antes de criar texto, efeito e
   // projétil; se a entidade já morreu/sumiu, a coordenada congelada do evento
@@ -2146,11 +2186,29 @@ function drainEvents() {
         }
         break;
       }
-      case "chain":
-        // faisca do salto em cadeia (CONST_ME_WHITE_ENERGY_SPARK do Canary)
-        r.addEffect(ex(e), ey(e), e.fx || "white-energy-spark");
-        addLog("info", `Corrente atingiu <b>${e.n}</b> alvos.`);
+      case "chain": {
+        // Elos da corrente: impacto/faisca em CADA salto (nao so no primario).
+        // SQMs vazios entre hops: areafx com chainPath (Bresenham + stagger);
+        // o contrato autoritativo tambem manda e.path no evento chain.
+        const hops = Array.isArray(e.links) && e.links.length ? e.links : null;
+        if (hops) {
+          const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
+          for (const link of hops) {
+            const live = link && link.id != null && c && Array.isArray(c.mobs)
+              ? c.mobs.find((m) => idOf(m) === String(link.id)) : null;
+            const x = live && live.x != null ? live.x : (link && link.x != null ? link.x : ex(e));
+            const y = live && live.y != null ? live.y : (link && link.y != null ? link.y : ey(e));
+            r.addEffect(x, y, e.impactFx || e.fx || "white-energy-spark");
+            if (e.chainFx && e.chainFx !== (e.impactFx || e.fx)) {
+              r.addEffect(x, y, e.chainFx);
+            }
+          }
+        } else {
+          r.addEffect(ex(e), ey(e), e.fx || "white-energy-spark");
+        }
+        if (e.n > 1) addLog("info", `Corrente atingiu <b>${e.n}</b> alvos.`);
         break;
+      }
       case "say": {
         // TALKTYPE_SPELL: palavras no caster, visíveis para toda a party.
         // Potion/comida ("Aaaah...", Munch.) não são magia — não desenhar.
@@ -2255,6 +2313,13 @@ function drainEvents() {
 
 function regenInCity(p, dt) {
   const max = maxStats(p);
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.applyVocationRegenTo) {
+    G.cityRegen = G.cityRegen || {};
+    const key = String((p && (p.id || p.name)) || "local");
+    const holder = G.cityRegen[key] || (G.cityRegen[key] = { vocRegenAcc: { hp: 0, mp: 0 } });
+    CanaryVocation.applyVocationRegenTo(holder, p, dt, max);
+    return;
+  }
   const g = gearStats(p);
   const rr = regenRate(p.voc, g.hpreg > 0);
   G.cityRegenHp += dt;
@@ -2263,11 +2328,11 @@ function regenInCity(p, dt) {
   const mpEvery = Math.max(800, (rr.mp * 1000) / (1 + g.mpreg * 0.4));
   while (G.cityRegenHp >= hpEvery) {
     G.cityRegenHp -= hpEvery;
-    p.hp = Math.min(max.hp, p.hp + 1 + Math.floor(p.level / 20));
+    p.hp = Math.min(max.hp, p.hp + 1);
   }
   while (G.cityRegenMp >= mpEvery) {
     G.cityRegenMp -= mpEvery;
-    p.mp = Math.min(max.mp, p.mp + 2 + Math.floor(p.level / 15));
+    p.mp = Math.min(max.mp, p.mp + 2);
   }
 }
 
@@ -2389,6 +2454,18 @@ function partyWipeBlessCost(c){
       Math.max(1,(ent.p&&ent.p.level)||1)*1000),0);
 }
 
+function partyWipeBlessByPlayer(c){
+  const out={};
+  for(const ent of combatSessionParticipants(c)){
+    if(!ent||!ent.p)continue;
+    const id=String(ent.id!=null?ent.id:(ent.p.id!=null?ent.p.id:"player"));
+    const price=typeof blessingPriceForLevel==="function"?blessingPriceForLevel(ent.p.level):
+      Math.max(1,(ent.p.level)||1)*1000;
+    out[id]=(Number(out[id])||0)+price;
+  }
+  return out;
+}
+
 function cleanupEncounterState(c){
   if(typeof scarlettBossCleanup==="function")scarlettBossCleanup(c);
   if(typeof greedBossCleanup==="function")greedBossCleanup(c);
@@ -2400,6 +2477,10 @@ function cleanupEncounterState(c){
 function returnPartyToInstanceAfterWipe(c,cost,silent){
   const members=combatSessionParticipants(c),activeId=G.p&&G.p.id;
   if(!members.length||!G.p||G.p.gold<cost||!spendGold(G.p,cost))return false;
+  const blessByPlayer=partyWipeBlessByPlayer(c);
+  const prevDeathTrack=c.stats&&c.stats.deathTrack?c.stats.deathTrack:null;
+  const prevDeaths=c.stats?Number(c.stats.deaths)||0:0;
+  const prevBless=c.stats?Number(c.stats.blessCost)||0:0;
   const fullBless=typeof vipFullBless==="function"&&vipFullBless();
   for(const ent of members){
     if(!ent.p)continue;const mx=maxStats(ent.p);ent.p.hp=mx.hp;ent.p.mp=mx.mp;
@@ -2412,6 +2493,22 @@ function returnPartyToInstanceAfterWipe(c,cost,silent){
   cleanupEncounterState(c);leader.hunt=boss?null:huntId;leader.instanceMode=boss?"boss":mode;G.p=leader;
   const next=boss?newBossCombat(leader,boss):newCombat(leader,huntId,mode);
   if(!boss)spawnWave(next,leader);
+  /* Mantém mortes/bless da sessão ao recriar a instância após o wipe. */
+  if(next&&next.stats){
+    next.stats.deaths=prevDeaths;
+    next.stats.blessCost=prevBless;
+    if(prevDeathTrack&&typeof prevDeathTrack==="object"){
+      next.stats.deathTrack={
+        startedAt:Number(prevDeathTrack.startedAt)||Date.now(),
+        byPlayer:Object.assign({},prevDeathTrack.byPlayer||{}),
+      };
+      for(const id of Object.keys(next.stats.deathTrack.byPlayer)){
+        const src=prevDeathTrack.byPlayer[id];
+        if(src&&typeof src==="object")next.stats.deathTrack.byPlayer[id]=Object.assign({},src);
+      }
+    }
+    if(typeof recordCombatSessionBless==="function")recordCombatSessionBless(next,blessByPlayer);
+  }
   G.combat=next;G.inCity=false;
   if(next.players&&activeId){
     const active=next.players.find(ent=>String(ent.id)===String(activeId));
@@ -2688,7 +2785,9 @@ function resolveLiveCombatEventPosition(combat,event){
   if(target&&Number.isFinite(Number(target.x))&&Number.isFinite(Number(target.y))){
     event.x=Number(target.x);event.y=Number(target.y);event.screen=true;
   }
-  const source=(event.whoId!==undefined?find(players,event.whoId):null)||
+  const hopFrom=event.chain&&event.fromId!==undefined&&event.fromId!==null
+    ? (find(mobs,event.fromId)||find(players,event.fromId)) : null;
+  const source=hopFrom||(event.whoId!==undefined?find(players,event.whoId):null)||
     (event.sourceId!==undefined?find(mobs,event.sourceId):null);
   if(source&&Number.isFinite(Number(source.x))&&Number.isFinite(Number(source.y))){
     event.sx=Number(source.x);event.sy=Number(source.y);
@@ -2728,6 +2827,42 @@ function releaseHeldAuthoritySpawns(c, now) {
     const cy = Number.isFinite(Number(remote.cy)) ? Number(remote.cy) : Math.floor(h / 2);
     c.pendingSpawns.push({ mob: remote, cx, cy, startedAt: now, blink: 0, done: false });
   }
+}
+/* Aplica pendingSpawns compactos do snapshot (sem spawnWave / sem OTBM). */
+function syncAuthorityPendingSpawns(c, remotePending, now) {
+  if (!c || !Array.isArray(remotePending)) return;
+  now = now || Date.now();
+  const local = Array.isArray(c.pendingSpawns) ? c.pendingSpawns : [];
+  const byId = new Map();
+  for (const sp of local) {
+    const id = String(sp && sp.mob && sp.mob.id || "");
+    if (id) byId.set(id, sp);
+  }
+  const next = [];
+  const w = Number(c.gridW) || 30, h = Number(c.gridH) || 30;
+  for (const remote of remotePending) {
+    if (!remote || !remote.mob) continue;
+    const id = String(remote.mob.id || "");
+    const prev = id ? byId.get(id) : null;
+    const slug = remote.mob.slug;
+    const catalog = typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && slug
+      ? GAMEDATA.monsters[slug] : null;
+    const mob = prev && prev.mob ? prev.mob : Object.assign({}, remote.mob);
+    if (catalog) mob.def = catalog;
+    if (remote.mob.hp !== undefined) mob.hp = Number(remote.mob.hp) || mob.hp;
+    if (remote.mob.maxHp !== undefined) mob.maxHp = Number(remote.mob.maxHp) || mob.maxHp;
+    const cx = Number.isFinite(Number(remote.cx)) ? Number(remote.cx)
+      : (prev ? prev.cx : Math.floor(w / 2));
+    const cy = Number.isFinite(Number(remote.cy)) ? Number(remote.cy)
+      : (prev ? prev.cy : Math.floor(h / 2));
+    next.push({
+      mob, cx, cy,
+      startedAt: Number(remote.startedAt) || (prev && prev.startedAt) || now,
+      blink: Math.max(Number(prev && prev.blink) || 0, Number(remote.blink) || 0),
+      done: false,
+    });
+  }
+  c.pendingSpawns = next;
 }
 function scheduleOnlineAuthorityEvents(events,receivedAt){
   const input=Array.isArray(events)?events:[],now=Number(receivedAt)||Date.now();
@@ -2808,8 +2943,22 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     hydrateMobDef(local);
     if(playerRef&&remote&&remote.p){
       const localConfig=playerRef.config,localCombo=localConfig&&localConfig.combo,localStances=playerRef.stances,
-        localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone;
+        localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone,
+        localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
+        localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
+        localBestiary=playerRef.bestiary;
       Object.assign(playerRef,remote.p);local.p=playerRef;
+      /* Charms/bestiary: não deixar snapshot remoto vazio apagar unlock local. */
+      playerRef.charms=Object.assign({}, remote.p.charms||{}, localCharms||{});
+      playerRef.charmRace=Object.assign({}, remote.p.charmRace||{}, localCharmRace||{});
+      playerRef.charmsPagos=Object.assign({}, remote.p.charmsPagos||{}, localCharmsPagos||{});
+      playerRef.bestiary=Object.assign({}, remote.p.bestiary||{}, localBestiary||{});
+      const rp=Number(remote.p.charmPoints), lp=Number(localCharmPoints);
+      const localOnlyUnlock=Object.keys(localCharms||{}).some((k)=>localCharms[k]&&!(remote.p.charms||{})[k]);
+      if(localOnlyUnlock&&Number.isFinite(lp))playerRef.charmPoints=lp;
+      else if(Number.isFinite(rp))playerRef.charmPoints=rp;
+      else if(Number.isFinite(lp))playerRef.charmPoints=lp;
+      if(typeof ensureCyclopedia==="function")ensureCyclopedia(playerRef);
       if(remote.p.exp!==undefined)playerRef.exp=Number(remote.p.exp)||0;
       if(remote.p.level!==undefined)playerRef.level=Math.max(1,Number(remote.p.level)||1);
       if(localConfig){
@@ -2892,15 +3041,23 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   for(const mob of previousMobs){const id=entityId(mob);if(id)localMobsById.set(id,mob);}
   const reconciledMobs=[];
   const spawnBlocked=typeof G!=="undefined"&&G&&G.huntMapReady===false;
+  // pendingSpawns vêm compactos do servidor — aplicar sem spawnWave/OTBM.
+  if(Array.isArray(incoming.pendingSpawns))
+    syncAuthorityPendingSpawns(previous,incoming.pendingSpawns,Date.now());
   const previewIds=new Set();
   for(const pending of previous.pendingSpawns||[]){
     const id=String(pending&&pending.mob&&pending.mob.id||"");
     if(id)previewIds.add(id);
   }
+  const incomingHasKill=Array.isArray(incoming.events)&&
+    incoming.events.some((ev)=>ev&&ev.t==="kill");
+  const hasPendingPreview=!!(previous.pendingSpawns&&previous.pendingSpawns.length);
   // Entre a morte do último monstro e o respawn autoritativo existe um tick
   // vazio. Preserve a onda visual nesse intervalo curto para não piscar toda
-  // a arena; terminal de boss/wipe continua removendo-a normalmente.
-  if(!terminalReason&&remoteMobs.length===0&&previousMobs.some((mob)=>mob&&mob.hp>0)){
+  // a arena — MAS se já há kill ou pendingSpawns, limpe os fantasmas da onda
+  // morta (senão o último mob "vivo" fica na tela durante o hitch do clear).
+  if(!terminalReason&&remoteMobs.length===0&&previousMobs.some((mob)=>mob&&mob.hp>0)&&
+     !incomingHasKill&&!hasPendingPreview){
     reconciledMobs.push(...previousMobs);
   }else if(spawnBlocked){
     previous._heldAuthorityMobs=remoteMobs.slice();
@@ -3170,20 +3327,22 @@ function loop(ts) {
       }
     }
     }
-    // Autoseller da Loot Pouch: roda nos dois modos (online e local).
-    // No online o loot é adicionado ao save do char pelo servidor, mas o
-    // autoseller é responsabilidade do cliente (config do usuário).
-    if (G.p && G.p.config && G.p.config.pouchAutoSell &&
-        typeof sellAllPouch === "function") {
-      G._pouchTick = (G._pouchTick || 0) + dt;
-      if (G._pouchTick >= 2000) {
-        G._pouchTick = 0;
-        const pct = pouchFillPct(G.p);
-        if (pct >= (G.p.config.pouchAutoSellPct || 80)) {
-          const r = sellAllPouch(G.p);
-          if (r.kinds) {
-            addLog("sell", `Autoseller: Loot Pouch em <b>${pct}%</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
-            if (typeof renderLootPouch === "function") renderLootPouch(G.p);
+    // Autoseller da Loot Pouch: local/offline. Online a autoridade vende
+    // (VIP) no tick; aqui só espelha UI/local e bloqueia sem VIP.
+    if (G.p && G.p.config && G.p.config.pouchAutoSell) {
+      if (typeof vipAutoSellAllowed === "function" && !vipAutoSellAllowed()) {
+        G.p.config.pouchAutoSell = false;
+      } else if (typeof sellAllPouch === "function") {
+        G._pouchTick = (G._pouchTick || 0) + dt;
+        if (G._pouchTick >= 2000) {
+          G._pouchTick = 0;
+          const pct = pouchFillPct(G.p);
+          if (pct >= (G.p.config.pouchAutoSellPct || 80)) {
+            const r = sellAllPouch(G.p);
+            if (r.kinds) {
+              addLog("sell", `Autoseller: Loot Pouch em <b>${pct}%</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
+              if (typeof renderLootPouch === "function") renderLootPouch(G.p);
+            }
           }
         }
       }
@@ -3282,6 +3441,7 @@ function renderAll() {
   renderHunts(p);
   renderInventory(p);
   renderLootPouch(p);
+  if (typeof renderSupplyStash === "function") renderSupplyStash(p);
   renderSupplies(p);
   renderSpells(p);
   renderHelper(p);
@@ -3386,6 +3546,8 @@ async function startGameReady(p) {
   // modulelib lifecycle + background hide
   window.dispatchEvent(new Event("bg-game-start"));
   if (typeof moduleLifecycleStart === "function") moduleLifecycleStart();
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof showGlobalChat === "function") showGlobalChat();
 
   let localInstance=readInstanceSession();
   if(localInstance&&p.id&&(localInstance.members||[]).length&&
@@ -3704,10 +3866,8 @@ function giveStarterKit(p, options) {
     addItem(p, "wooden-shield", 1);
   }
   p.gold = Math.max(0, p.gold || 0);
-  // Unico lugar que ainda equipa sozinho: o kit inicial. O auto-equip
-  // periodico foi removido (o jogador troca o que quiser na mao), mas nascer
-  // com a mochila cheia e nenhum item vestido nao ajuda ninguem.
-  autoEquip(p);
+  // Kit inicial: giveStartingItems já veste os slots Dawnport. Sem auto-equip
+  // de "melhor item da bag" — o jogador troca o resto na aba Equipamento.
   if (p.voc === "paladin") {
     // o quiver de Dawnport ocupa o slot proprio; sem ele o paladino nao
     // consegue atirar, entao garantimos que esteja equipado
@@ -4245,6 +4405,7 @@ function initAccountLogin() {
       try{await accountLastInstancePromise();}catch(e){}
     }
     if(typeof accountStopSync==="function")accountStopSync();
+    if(typeof hideGlobalChat==="function")hideGlobalChat();
     if(typeof accountReleaseLease==="function"){
       try{await accountReleaseLease(sessionToken());}catch(e){}
     }
@@ -4306,6 +4467,9 @@ function initAccountLogin() {
       sessionStorage.setItem("tibia-idle-token", token);
       sessionStorage.setItem("tibia-idle-account", JSON.stringify(account));
     } catch (e) {}
+    if(typeof syncVipFromAccount==="function")syncVipFromAccount(account);
+    if(typeof accountSetGold==="function"&&account&&account.gold!==undefined)
+      accountSetGold(Math.max(0,Number(account.gold)||0));
     if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
     const cards = characters.length ? characters.map((c) => `
       <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
@@ -4430,19 +4594,25 @@ function initAccountLogin() {
   };
 }
 function initLogin() {
-  // MODO ONLINE: o servidor injeta a configuração antes de account-client.js.
-  // Não carregue roster/localStorage nessa tela: a conta é a fonte de verdade.
+  // Boot online-first: o HTML já mostra #account-login. O create local
+  // legado (#local-login / "Criar personagem e caçar") nunca entra no
+  // primeiro paint — só reaparece se a API de contas não estiver configurada.
   const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  const accLogin = $("#account-login");
+  const localLogin = $("#local-login");
+  const continueBox = $("#continue-box");
   if (online) {
-    const accLogin = $("#account-login");
-    const localLogin = $("#local-login");
-    const continueBox = $("#continue-box");
     if (accLogin) accLogin.style.display = "";
-    if (localLogin) localLogin.style.display = "none";
+    if (localLogin) { localLogin.style.display = "none"; localLogin.hidden = true; }
     if (continueBox) continueBox.style.display = "none";
     initAccountLogin();
     return;
   }
+
+  // Offline legado: libera o create local; criação pós-login da conta
+  // continua em showCharacterCreator (modal), não nesta tela.
+  if (accLogin) accLogin.style.display = "none";
+  if (localLogin) { localLogin.hidden = false; localLogin.style.display = ""; }
 
   const saved = load();
 
@@ -4478,7 +4648,9 @@ function initLogin() {
     return map[v] + "-" + (s === "female" ? "f" : "m");
   };
   function paintVocs() {
-    $("#voc-grid").innerHTML = vocs.map((v) => `
+    const grid = $("#voc-grid");
+    if (!grid) return;
+    grid.innerHTML = vocs.map((v) => `
       <div class="voc-card ${v === selVoc ? "sel" : ""}" data-voc="${v}">
         <img src="assets/outfit/${outfitOf(v, selSex)}_s.png" alt="">
         <div class="vn">${VOCATIONS[v].name}</div>
@@ -4490,24 +4662,26 @@ function initLogin() {
   window.refreshVocGrid = paintVocs;
   paintVocs();
 
-  $$("[data-sex]").forEach((b) => {
+  $$("#local-login [data-sex]").forEach((b) => {
     b.addEventListener("click", () => {
       selSex = b.dataset.sex;
-      $$("[data-sex]").forEach((x) => x.classList.remove("primary"));
+      $$("#local-login [data-sex]").forEach((x) => x.classList.remove("primary"));
       b.classList.add("primary");
       paintVocs();
     });
   });
 
-  $("#btn-create").addEventListener("click", () => {
+  const btnCreate = $("#btn-create");
+  if (btnCreate) btnCreate.addEventListener("click", () => {
     const name = ($("#char-name").value || "").trim();
     if (name.length < 2) { toast("Digite um nome válido"); return; }
     const p = createCharacter(name, selVoc, selSex);
     startGame(p);
   });
 
-  $("#char-name").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") $("#btn-create").click();
+  const charName = $("#char-name");
+  if (charName) charName.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && btnCreate) btnCreate.click();
   });
 }
 

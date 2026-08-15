@@ -19,10 +19,16 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
     if(url.endsWith("/api/lease/release"))return {status:200,json:async()=>({ok:true})};
     requests.push({url,body});active++;maxActive=Math.max(maxActive,active);
     await new Promise((resolve)=>setTimeout(resolve,8));active--;
-    if(url.endsWith("/api/instance/end"))return {status:200,json:async()=>({ok:true})};
+    if(url.endsWith("/api/instance/end"))return {status:200,json:async()=>({ok:true,
+      characters:[{id:1,name:"Queue",voc:"knight",level:1,saveVersion:3,snapshot:{id:"1",name:"Queue"}}]})};
     if(url.endsWith("/api/party/save"))return {status:200,json:async()=>({ok:true,characters:[]})};
     if(mode==="conflict")return {status:409,json:async()=>({ok:false,error:"SAVE_VERSION_CONFLICT",msg:"conflito",
       characters:[{id:1,name:"Queue",voc:"knight",level:1,saveVersion:4,snapshot:{id:"1",name:"Queue",marker:"remote"}}]})};
+    if(mode==="stale-then-ok"){
+      mode="success";
+      return {status:409,json:async()=>({ok:false,error:"SAVE_VERSION_CONFLICT",msg:"stale",
+        characters:[{id:1,name:"Queue",voc:"knight",level:1,saveVersion:4,snapshot:{id:"1",name:"Queue",marker:"server"}}]})};
+    }
     return {status:200,json:async()=>({ok:true,saveVersion:body.expected_version+1,
       character:{id:1,name:"Queue",voc:"knight",level:1,saveVersion:body.expected_version+1,
         snapshot:JSON.parse(body.data)}})};
@@ -31,8 +37,8 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
 vm.createContext(ctx);vm.runInContext(source,ctx);
 ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:1,snapshot:{}}]);
 (async()=>{
-  must(indexSource.includes('js/account-client.js?v=online-fix-v15'),
-    "index não invalida o cache do cliente com a troca autoritativa de munição");
+  must(indexSource.includes('js/account-client.js?v=save-conflict-retry-v1'),
+    "index não invalida o cache do cliente após retry de conflito de versão");
   must((await ctx.accountAcquireLease("token",false)).ok,"cliente não adquiriu lease antes do save");
   const p={id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50};
   const results=await Promise.all([
@@ -44,16 +50,30 @@ ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVers
   const beforeParty=requests.length;ctx.accountInstanceApply({id:"i",version:3,status:"active"});
   must(await ctx.accountSaveParty("token",{id:7,version:1,order:[1]},[{id:"1",p}])===true&&requests.length===beforeParty,
     "troca de personagem enviou party-save redundante durante instância autoritativa");
+  must(await ctx.accountSaveCharacter("token","1",p)===true&&requests.length===beforeParty,
+    "autosave de personagem disputou versão durante instância autoritativa");
   const checkpointStart=requests.length,ending=ctx.accountEndInstance("token","temple"),
     checkpoint=ctx.accountSaveParty("token",{id:7,version:1,order:[1]},[{id:"1",p}]);
   must(await checkpoint===true&&await ending===true&&
     requests.slice(checkpointStart).map((r)=>r.url).join("|").endsWith("/api/instance/end|http://game/api/party/save"),
     "checkpoint da party não aguardou o encerramento autoritativo: "+requests.slice(checkpointStart).map((r)=>r.url).join("|"));
+  must(ctx.accountCharacterCacheRead()[0].saveVersion===3,
+    "end da instância não propagou saveVersion do tick final para o cache");
+  mode="stale-then-ok";
+  ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:2,snapshot:{}}]);
+  const staleBefore=requests.length;
+  must(await ctx.accountSaveCharacter("token","1",{id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50,marker:"retried"})===true,
+    "corrida benigna de versão não recuperou com retry");
+  must(requests.length===staleBefore+2&&requests[staleBefore].body.expected_version===2&&
+    requests[staleBefore+1].body.expected_version===4,
+    "retry não usou a saveVersion autoritativa do 409");
+  must(ctx.accountCharacterCacheRead()[0].saveVersion===5,"retry bem-sucedido não avançou o cache");
   mode="conflict";const before=requests.length;
   must(await ctx.accountSaveCharacter("token","1",p)===false,"conflito externo foi tratado como sucesso");
   must(ctx.accountCharacterCacheRead()[0].saveVersion===4,"snapshot autoritativo do conflito não atualizou o cache");
-  must(await ctx.accountSaveCharacter("token","1",p)===false&&requests.length===before+1,
+  must(requests.length===before+2,"conflito de versão não tentou um único retry com revisão atualizada");
+  must(await ctx.accountSaveCharacter("token","1",p)===false&&requests.length===before+2,
     "autosave posterior tentou sobrescrever novamente após conflito");
   await ctx.accountReleaseLease("token");
-  console.log("OK: cliente serializa versões e bloqueia overwrite depois de conflito.");
+  console.log("OK: cliente serializa versões, aguarda instância, faz retry único e só bloqueia conflito persistente.");
 })().catch((error)=>{console.error(error);process.exit(1);});

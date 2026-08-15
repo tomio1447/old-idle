@@ -7,7 +7,8 @@
  *    - o dano drena a POOL do escudo (não a mana do personagem) e o escudo
  *      QUEBRA quando a pool zera (mesmo com mana cheia);
  *    - recast renova a capacidade;
- *    - mana potion BLOQUEADA enquanto o escudo está ativo (oficial);
+ *    - mana potion CONTINUA repondo p.mp com escudo ativo (a pool do
+ *      escudo que NÃO sobe com potion — só recast);
  *    - energy ring continua com o mana shield clássico (drena a mana do
  *      personagem).
  * 2) NAGA HUNT: pack 8 e respawn 1.2 (hard igual ao DT Seal).
@@ -80,15 +81,17 @@ setTimeout(() => {
       if (sorc.magicShieldPool !== cap - 500) fail("pool deveria cair 500, veio " + sorc.magicShieldPool);
       ok.push("dano drena a pool do escudo (mana do personagem intocada)");
 
-      // mana potion bloqueada com escudo ativo (a pool ainda está alta)
+      // mana potion CONTINUA repondo p.mp com escudo ativo (pool separada)
       sorc.mp = 100;
       sorc.config.manaAt = 50;
       sorc.supplies["mana-potion"] = 10;
       sorc.config.manaSupply = "mana-potion";
-      const mpBloq = sorc.mp;
+      const poolAntes = sorc.magicShieldPool;
       tryMana(c, sorc, Date.now() + 1500);
-      if (sorc.mp !== mpBloq) fail("mana potion NÃO deveria funcionar com escudo ativo");
-      ok.push("mana potion bloqueada enquanto o escudo está ativo (oficial)");
+      if (sorc.mp <= 100) fail("mana potion deveria repor p.mp com escudo ativo");
+      if (sorc.magicShieldPool !== poolAntes)
+        fail("mana potion NÃO deveria alterar a pool do escudo");
+      ok.push("mana potion repõe p.mp com escudo ativo (pool intocada)");
       sorc.mp = 5000;
 
       // escudo QUEBRA quando a pool zera (mesmo com mana cheia)
@@ -128,7 +131,7 @@ setTimeout(() => {
       console.log("  - " + ok.join("\\n  - "));
     `, vctx);
     if (errors.length) throw new Error(errors.join(" | "));
-    console.log("V25 OK — magic shield moderno (60s, capacidade por level/ml, pool, quebra, potions bloqueadas) + naga hard validados");
+    console.log("V25 OK — magic shield moderno (60s, capacidade por level/ml, pool, quebra, potions em p.mp) + naga hard validados");
     process.exit(0);
   } catch (e) {
     console.log("ERRO:", e.message);

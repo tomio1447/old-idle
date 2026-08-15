@@ -818,15 +818,16 @@ function healFriendConfig(p) {
   const cfg = p.config || (p.config = {});
   const old = cfg.healFriend || {};
   const voc = String(p.voc || '').toLowerCase();
-  const druid = /druid/.test(voc), monk = /monk/.test(voc);
-  const ids = druid ? ['exura-sio','exura-gran-sio','exura-gran-mas-res'] :
-    monk ? ['exura-tio-sio'] : [];
+  const ids = (typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
+    ? CanaryVocation.friendHealSpellIds(voc)
+    : (/druid/.test(voc) ? ['exura-sio','exura-gran-sio','exura-gran-mas-res','exura-gran-tio-sio'] :
+      /monk/.test(voc) ? ['exura-tio-sio'] : []);
   old.priority = old.priority === 'self' ? 'self' : 'friend';
   // UI legado ainda edita estes dois mapas; eles são a fonte de verdade para não perder cliques.
   old.targets = cfg.healFriendTargets || old.targets || {};
   old.spells = cfg.healFriendSpells || old.spells || {};
   for (const id of ids) if (!old.spells[id]) old.spells[id] = {
-    enabled: id === 'exura-sio' || id === 'exura-tio-sio',
+    enabled: false,
     hpBelow: cfg.healFriendAt === undefined ? 70 : cfg.healFriendAt,
     minTargets: 2,
   };
@@ -847,11 +848,15 @@ function tryHealFriend(c, p, now) {
     return pa-pb || (a.hp/a.maxHp)-(b.hp/b.maxHp);
   };
   // Mass first only when configured count is met; Gran Sio then Sio for low HP.
-  const order = ['exura-gran-mas-res','exura-gran-sio','exura-sio','exura-tio-sio'];
+  const order = (typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
+    ? CanaryVocation.friendHealSpellIds(p.voc)
+    : ['exura-gran-mas-res','exura-gran-sio','exura-sio','exura-tio-sio'];
   for (const id of order) {
     if (!setup.ids.includes(id)) continue;
     const rule=cfg.spells[id], spell=SPELLS[id];
     if (!rule || !rule.enabled || !spell || p.level < spell.lvl || p.mp < spell.mana || !cdReady(p,id,now)) continue;
+    if (typeof spellForVoc === "function" ? !spellForVoc(spell, p.voc)
+        : (typeof CanaryVocation !== "undefined" && !CanaryVocation.spellAllowedForVoc(spell, p.voc))) continue;
     const hurt=targets.filter((t)=>t.hp/t.maxHp*100 < rule.hpBelow).sort(sort);
     const mass=id==='exura-gran-mas-res';
     if (!hurt.length || (mass && hurt.length < (rule.minTargets||2))) continue;

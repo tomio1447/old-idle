@@ -68,11 +68,19 @@ function resolvePlayerById(id) {
   return null;
 }
 
-/* Liga/desliga AUTO no personagem. OFF = parado (park) até WASD/clique. */
+/* Liga/desliga AUTO no personagem. OFF = parado (park) até WASD/clique.
+ * Controle manual (AUTO off) exige VIP. */
 function togglePlayerAutoWalk(p) {
   if (!p) return true;
   p.config = p.config || {};
-  const next = !(typeof playerAutoWalkOn === "function" ? playerAutoWalkOn(p) : p.config.autoWalk !== false);
+  const on = typeof playerAutoWalkOn === "function" ? playerAutoWalkOn(p) : p.config.autoWalk !== false;
+  if (on && typeof vipManualControlAllowed === "function" && !vipManualControlAllowed()) {
+    if (typeof toast === "function") toast("Controle manual SQM é exclusivo VIP.", "bad");
+    p.config.autoWalk = true;
+    if (typeof paintAutoWalkButton === "function") paintAutoWalkButton(typeof G !== "undefined" && G ? G.p : p);
+    return true;
+  }
+  const next = !on;
   p.config.autoWalk = next;
   if (next && typeof G !== "undefined" && G && G.combat) {
     const sid = (typeof characterId === "function") ? String(characterId(p)) : String(p.id || "");
@@ -147,6 +155,7 @@ function newPlayer(name, voc, sex) {
     buffs: {},              // buff de vocacao -> timestamp de expiracao
     bagSlots: 8,            // bag padrão: 8 slots/tipos de item
     lootPouch: {},          // loot de hunt para auto-seller
+    supplyStash: {},        // rings/amulets com cargas (Auto Supply Stash)
     lootConfig: { noCollect: [], noSell: [] },
     supplies: { "mana-potion": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
@@ -402,7 +411,15 @@ function playerDamage(p) {
     const el = (ammo && ammo.el) || "physical";
     const temEl = !!(ammo && ammo.el && ammo.el !== "physical");
     const d = distanceDamage(effSkill(p, "dist"), atk, 1.0, p.level, temEl);
-    return { min: d.min, max: d.max, element: el, type: "distance" };
+    let min = d.min, max = d.max;
+    // dmgMul da munição (ex.: diamond arrow idle +15%) multiplica o
+    // resultado da fórmula, não o atk bruto — cobre min e max.
+    const ammoMul = Number(ammo && ammo.dmgMul);
+    if (ammoMul > 0 && ammoMul !== 1) {
+      min = Math.max(0, Math.floor(min * ammoMul));
+      max = Math.max(1, Math.floor(max * ammoMul));
+    }
+    return { min: min, max: max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
   // +20% attack value (15.25) sobre o ataque da arma
@@ -688,6 +705,48 @@ function ensureItemInstances(p) {
       if (!inst.id) inst.id = nextItemInstanceId(p);
       if (inst.tier === undefined) inst.tier = 0;
     }
+    // Equip/admin kits muitas vezes gravam só {item,count} sem instId.
+    // Sem reconciliar, a lista da Forge (e os procs) enxergam só o que
+    // ainda tem instância — tipicamente só a arma do fluxo normal.
+    for (const slot in p.equip) {
+      const e = p.equip[slot];
+      if (!e || !e.item || !itemUsesInstances(e.item)) continue;
+      let inst = null;
+      if (e.instId) {
+        for (const cand of p.itemInstances) {
+          if (cand && cand.id === e.instId) { inst = cand; break; }
+        }
+      }
+      if (!inst) {
+        for (const cand of p.itemInstances) {
+          if (cand && cand.slug === e.item && cand.loc === "equip:" + slot) {
+            inst = cand;
+            break;
+          }
+        }
+      }
+      if (!inst) {
+        const tier = (p.forge && p.forge[e.item]) || 0;
+        inst = {
+          id: nextItemInstanceId(p),
+          slug: e.item,
+          loc: "equip:" + slot,
+          tier: tier,
+        };
+        p.itemInstances.push(inst);
+      } else {
+        inst.slug = e.item;
+        inst.loc = "equip:" + slot;
+        if (inst.tier === undefined) inst.tier = 0;
+      }
+      e.instId = inst.id;
+    }
+    for (const cand of p.itemInstances) {
+      if (!cand || typeof cand.loc !== "string" || cand.loc.indexOf("equip:") !== 0) continue;
+      const slot = cand.loc.slice(6);
+      const e = p.equip[slot];
+      if (!e || e.instId !== cand.id) cand.loc = "bag";
+    }
     syncBagCountsFromInstances(p);
     return p.itemInstances;
   }
@@ -913,7 +972,7 @@ function removeLootRuleByText(p, key, text) {
   return removed;
 }
 
-/* Moedas são convertidas direto em gold, nunca ocupam a pouch */
+/* Moedas são convertidas direto em gold da conta, nunca ocupam a pouch */
 const CURRENCY_ITEMS = {
   "gold-coin": 1,
   "platinum-coin": 100,
@@ -924,13 +983,45 @@ function currencyValue(slug) {
   return CURRENCY_ITEMS[slug] || 0;
 }
 
-/* Credita moedas no balance do jogador. Retorna o gold gerado. */
+/* Credita moedas no balance da conta (p.gold compartilhado). Retorna o gold gerado. */
 function creditCurrency(p, slug, count) {
   const unit = currencyValue(slug);
-  if (!unit) return 0;
-  const total = unit * (count || 0);
+  if (!unit || !p) return 0;
+  const total = unit * Math.max(0, Math.floor(Number(count) || 0));
   if (total <= 0) return 0;
-  p.gold += total;
+  p.gold = (Number(p.gold) || 0) + total;
+  return total;
+}
+
+/* Valor unitário de loot para o analyser / profit.
+ * Regra (melhor preço NPC, sem inventar):
+ *  1) moedas → face value (1 / 100 / 10000)
+ *  2) item.npcSell → max(buy_price) de todos os NPCs em appearances.dat
+ *     (Rashid, Yasir, Djinns, Fiona, Telas, Baxter, etc. via Canary)
+ *  3) creature products / misc sem slot → item.sell (SELL_VALUE / tabela idle)
+ *  4) equipamento sem npcSell → 0 (sem comprador conhecido)
+ */
+function lootNpcUnitValue(slug) {
+  const face = currencyValue(slug);
+  if (face) return face;
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items)
+    ? GAMEDATA.items[slug] : null;
+  if (!it) return 0;
+  const npc = Number(it.npcSell);
+  if (npc > 0) return npc;
+  const slot = it.s || it.slot || null;
+  const equipSlot = slot && slot !== "loot";
+  if (equipSlot) return 0;
+  return Math.max(0, Number(it.sell) || 0);
+}
+
+function sessionLootValue(lootMap) {
+  let total = 0;
+  for (const slug of Object.keys(lootMap || {})) {
+    const count = Math.max(0, Number(lootMap[slug]) || 0);
+    if (!count) continue;
+    total += lootNpcUnitValue(slug) * count;
+  }
   return total;
 }
 
@@ -948,20 +1039,40 @@ function shouldGoLootPouch(slug) {
 // Loot nunca pode desaparecer silenciosamente quando a pouch chega a 100%.
 const LOOT_POUCH_MAX_SLOTS = 50;
 function lootPouchSlotsUsed(p) {
+  // 1 slot por stack (slug com quantidade > 0). A pouch guarda contagens
+  // empilhadas — não multiplique por count de equipamentos, senão o HUD
+  // mostra ocupação absurda (ex.: 21007/50) e o autoseller fica “travado”.
   let slots = 0;
   for (const slug of Object.keys((p && p.lootPouch) || {})) {
     const count = p.lootPouch[slug] || 0;
     if (!count || typeof GAMEDATA === "undefined" || !GAMEDATA.items[slug]) continue;
-    // Equipamentos/itens de instância não empilham: cada unidade usa slot.
-    slots += (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) ? count : 1;
+    slots += 1;
   }
   return slots;
 }
 function lootPouchSlotsFree(p) { return Math.max(0, LOOT_POUCH_MAX_SLOTS - lootPouchSlotsUsed(p)); }
 
+/* Esvazia a Loot Pouch do personagem. Não mexe em ouro/moedas da conta. */
+function clearLootPouch(p) {
+  if (!p) return 0;
+  const before = Object.keys(p.lootPouch || {}).filter((slug) => (p.lootPouch[slug] || 0) > 0).length;
+  p.lootPouch = {};
+  return before;
+}
+
 function addLootPouch(p, slug, count) {
   count = Math.max(1, Math.floor(Number(count) || 1));
+  // Moedas nunca entram na pouch — vão direto para o balance da conta.
+  if (currencyValue(slug)) {
+    creditCurrency(p, slug, count);
+    return true;
+  }
   p.lootPouch = p.lootPouch || {};
+  const weight = (typeof itemUnitWeight === "function" ? itemUnitWeight(slug) : 0.1) * count;
+  if (typeof freeCapacity === "function" && weight > freeCapacity(p) + 1e-9) {
+    if (typeof addLog === "function") addLog("death", "You cannot carry more.");
+    return false;
+  }
   // Aceita overflow acima dos 50 slots. O percentual continua em 100% e o
   // autoseller tenta liberar itens vendáveis, mas classes protegidas e novos
   // drops permanecem seguros na pouch.
@@ -1076,120 +1187,41 @@ function itemScore(p, slug) {
   return s;
 }
 
-/* Auto-equip: veste o melhor item disponivel de cada slot */
-function autoEquip(p) {
-  const changes = [];
-  for (const slot of SLOTS) {
-    if (slot === "backpack" || slot === "ammo") continue;
-    let best = p.equip[slot] ? p.equip[slot].item : null;
-    let bestScore = best ? itemScore(p, best) : -1;
-    const cur = best ? GAMEDATA.items[best] : null;
-    for (const slug in p.bag) {
-      const it = GAMEDATA.items[slug];
-      if (!it || it.s !== slot) continue;
-      if (it.lvl && p.level < it.lvl) continue;
-      if (it.vocs && it.vocs.indexOf(p.voc) === -1) continue;
-      // aljava e item de paladino e disputa a mao secundaria com o escudo:
-      // o auto-equip nao pode trocar o escudo de um knight por um quiver
-      if (it.t === "quiver" && !canUseQuiver(p)) continue;
-      // não troca a arma de distância equipada por uma spear só porque a
-      // munição acabou: as regras de arrow continuam valendo e o jogador
-      // fica sem atacar, em vez de virar arremessador sem avisar.
-      if (slot === "weapon" && it.inf && cur && cur.t === "distance" && !cur.inf)
-        continue;
-      const sc = itemScore(p, slug);
-      if (sc > bestScore) { bestScore = sc; best = slug; }
-    }
-    if (best && (!p.equip[slot] || p.equip[slot].item !== best)) {
-      // devolve o antigo pra bag
-      if (p.equip[slot]) {
-        if (p.equip[slot].instId) {
-          const oldInst = takeEquippedItemInstance(p, slot);
-          if (!putBagItemInstance(p, oldInst)) continue;
-        } else addItem(p, p.equip[slot].item, 1);
-      }
-      if (itemUsesInstances(best)) {
-        const bestInst = takeBagItemInstance(p, best, { highestTier: true });
-        if (!bestInst) continue;
-        equipEntryInstance(p, slot, bestInst);
-      } else {
-        removeItem(p, best, 1);
-        p.equip[slot] = { item: best, count: 1 };
-      }
-      changes.push({ slot: slot, item: best });
-    }
-  }
-  // Arma de duas maos remove o ESCUDO -- mas nao a aljava.
-  //
-  // Causa raiz do "quiver desequipa sozinho": no Tibia a aljava ocupa a mao
-  // secundaria (o mesmo slot do escudo), e TODA arma de distancia e marcada
-  // como two-handed no items.xml (bow, crossbow, royal crossbow...). A regra
-  // generica de "th remove shield" apagava a propria aljava do paladino a
-  // cada auto-equip, deixando o personagem sem municao.
-  //
-  // No servidor as duas convivem: o que a arma de duas maos impede e um
-  // ESCUDO/spellbook, nao a aljava que alimenta a arma.
-  const w = p.equip.weapon ? GAMEDATA.items[p.equip.weapon.item] : null;
-  if (w && w.th && p.equip.shield) {
-    const sec = GAMEDATA.items[p.equip.shield.item];
-    const ehQuiver = sec && sec.t === "quiver";
-    if (!ehQuiver) {
-      if (p.equip.shield.instId) {
-        const shInst = takeEquippedItemInstance(p, "shield");
-        putBagItemInstance(p, shInst);
-      } else {
-        addItem(p, p.equip.shield.item, 1);
-        delete p.equip.shield;
-      }
-    }
-  }
-  // Municao para paladin. A municao nao e mais estocada: cada tiro cobra
-  // gold, entao nao existe "melhor municao disponivel no contador". O
-  // auto-equip so garante que EXISTA alguma municao valida selecionada —
-  // trocar a escolha do jogador aqui zerava a selecao dele a cada 15s e,
-  // pior, gravava count 0, o que fazia o ataque a distancia sair sem dano.
-  const needsAmmo = w && w.t === "distance" && !w.inf &&
-    (typeof weaponAmmoKind !== "function" || !!weaponAmmoKind(w, p.equip.weapon && p.equip.weapon.item));
-  if (needsAmmo && equippedQuiver(p)) {
-    const atual = p.equip.ammo && p.equip.ammo.item
-      ? GAMEDATA.items[p.equip.ammo.item] : null;
-    const serve = atual && atual.s === "ammo" &&
-      (typeof ammoCompatibleWithWeapon !== "function" ||
-       ammoCompatibleWithWeapon(atual, p.equip.weapon)) &&
-      p.level >= (atual.lvl || 1);
-    // no modo automatico o jogador delegou a escolha, entao reavaliamos
-    // sempre (subiu de nivel = pode ter liberado municao melhor)
-    if (!serve || p.config.ammoAuto) {
-      // Escolhe a municao com melhor custo-beneficio, nao a de maior ataque.
-      // Pegar so o maior atk fazia o auto-equip trocar para burst arrow
-      // (15 gp/tiro) sozinho e drenar o gold do jogador em pouco tempo.
-      let melhor = null, melhorNota = -1;
-      for (const slug in GAMEDATA.items) {
-        const it = GAMEDATA.items[slug];
-        if (!it || it.s !== "ammo") continue;
-        if (p.level < (it.lvl || 1)) continue;
-        if (typeof ammoCompatibleWithWeapon === "function" &&
-            !ammoCompatibleWithWeapon(it, p.equip.weapon)) continue;
-        const custo = it.shotCost || it.buy || 1;
-        const nota = (it.atk || 0) / custo;
-        if (nota > melhorNota) { melhorNota = nota; melhor = slug; }
-      }
-      if (melhor) setActiveAmmo(p, melhor, true);
-    }
-  }
-  return changes;
+/* Auto-equip mid-hunt foi removido: só equipa o que o jogador (ou Helper de
+ * equipamento / stash) escolher. itemScore continua para loja/admin. Stub
+ * mantido para não quebrar tools/sim legados — não veste nada. */
+function autoEquip(/* p */) {
+  return [];
 }
 
-/* Peso total carregado */
+/* Peso total carregado (equip + bag + loot pouch + supplies + ammo + supply stash). */
 function carriedWeight(p) {
   let w = 0;
   for (const s of SLOTS) {
     const e = p.equip[s];
     if (e && GAMEDATA.items[e.item]) w += GAMEDATA.items[e.item].w || 0;
   }
-  for (const slug in p.bag) {
-    const it = GAMEDATA.items[slug];
-    if (it) w += (it.w || 0.1) * p.bag[slug];
-  }
+  const addMap = (map) => {
+    for (const slug in (map || {})) {
+      const it = GAMEDATA.items[slug];
+      const n = map[slug] || 0;
+      if (!n) continue;
+      w += (it && it.w != null ? it.w : 0.1) * n;
+    }
+  };
+  addMap(p.bag);
+  addMap(p.lootPouch);
+  addMap(p.supplies);
+  addMap(p.ammo);
+  addMap(p.supplyStash);
   return w;
+}
+function freeCapacity(p) {
+  const max = typeof maxStats === "function" ? maxStats(p).cap : 400;
+  return Math.max(0, max - carriedWeight(p));
+}
+function itemUnitWeight(slug) {
+  const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
+  const w = Number(it && it.w);
+  return Number.isFinite(w) && w >= 0 ? w : 0.1;
 }

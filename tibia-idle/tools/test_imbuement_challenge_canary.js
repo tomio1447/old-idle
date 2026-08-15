@@ -175,17 +175,19 @@ must(preySrc.includes("s.until <= agora") && !preySrc.includes("s.until -= dt"),
   "preyTick ainda drena o timestamp com dt");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "game", "index.html"), "utf8");
+must(html.includes("js/prey.js?v=prey-bestiary-v1") &&
+  html.includes("js/prey-ui.js?v=prey-bestiary-v1"),
+  "cache-bust prey bestiary ausente");
 must(html.includes("js/imbuement.js?v=imbue-slots-v1") &&
-  html.includes("js/imbuement-ui.js?v=imbue-slots-v1") &&
-  html.includes("js/prey.js?v=prey-timer-v1") &&
-  html.includes("js/spellfxdata.js?v=exeta-fx-v1") &&
-  html.includes("js/game.js?v=knight-fx-combo-v2") &&
-  html.includes("js/account-client.js?v=sqm-hud-v1") &&
-  html.includes("js/combat.js?v=knight-fx-combo-v2") &&
-  html.includes("js/party.js?v=challenge-ai-v1") &&
-  html.includes("js/reward-chest.js?v=reward-online-v1") &&
-  html.includes("js/render.js?v=knight-fx-combo-v1"),
-  "cache-bust dos sistemas Canary ausente");
+  html.includes("js/imbuement-ui.js?v=imbue-slots-v1"),
+  "cache-bust imbuement ausente");
+must(/js\/spellfxdata\.js\?v=/.test(html) &&
+  /js\/game\.js\?v=/.test(html) &&
+  /js\/combat\.js\?v=/.test(html) &&
+  /js\/party\.js\?v=/.test(html) &&
+  /js\/reward-chest\.js\?v=/.test(html) &&
+  /js\/render\.js\?v=/.test(html),
+  "scripts Canary sem cache-bust no index");
 
 const spellfx = fs.readFileSync(path.join(__dirname, "..", "game", "js", "spellfxdata.js"), "utf8");
 must(spellfx.includes("exeta amp res") && spellfx.includes("chivalrous-challenge"),

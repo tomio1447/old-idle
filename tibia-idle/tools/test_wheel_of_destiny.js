@@ -10,9 +10,37 @@ function must(ok, msg) { if (!ok) throw Error(msg); }
 
 const root = path.join(__dirname, "../game");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
-must(html.includes("js/wheel-gems.js?v=wheel-otc-v1"), "index sem wheel-gems cache-bust");
+must(html.includes("js/wheeldata.js?v=wheel-otc-v2"), "index sem wheeldata cache-bust v2");
+must(html.includes("js/wheel-gems.js?v=wheel-otc-v2"), "index sem wheel-gems cache-bust v2");
+must(html.includes("js/wheel.js?v=wheel-otc-v2"), "index sem wheel.js cache-bust v2");
+must(html.includes("js/wheel-ui.js?v=wheel-otc-v2"), "index sem wheel-ui cache-bust v2");
 must(html.includes("css/wheel-otc.css?v=wheel-otc-v1"), "index sem wheel-otc.css cache-bust");
-must(html.includes("js/wheel.js?v=wheel-otc-v1"), "index sem wheel.js cache-bust");
+must(!html.includes("js/wheel.js?v=wheel-otc-v1"), "wheel.js ainda com cache wheel-otc-v1");
+
+const redecl = /\b(?:var|let|const)\s+WHEEL_(?:SLOTS|POS|CONNECTED|ROOTS|CONFIG|HP|MP|CAP|SKILL|LEECH|MIT_PER_POINT|STAGE_ABILITY|SPELL_UPGRADES|COLORS)\b/;
+for (const name of ["wheel.js", "wheel-gems.js", "wheel-ui.js"]) {
+  const src = fs.readFileSync(path.join(root, "js", name), "utf8");
+  must(!redecl.test(src), name + " ainda declara identificador WHEEL_* do wheeldata");
+}
+
+const vm = require("vm");
+const concat = ["wheeldata.js", "wheel-gems.js", "wheel.js"].map(function (name) {
+  return fs.readFileSync(path.join(root, "js", name), "utf8");
+}).join("\n;\n");
+const concatCtx = {};
+vm.runInNewContext(concat, concatCtx, { filename: "wheel-browser-concat.js" });
+must(typeof concatCtx.ensureWheel === "function", "concat: ensureWheel ausente");
+const vmPlayer = { voc: "knight", level: 80, wheel: { slots: {}, scrolls: {} } };
+must(concatCtx.wheelPoints(vmPlayer) === 30,
+  "concat: wheelPoints=" + concatCtx.wheelPoints(vmPlayer));
+
+const seqCtx = {};
+vm.createContext(seqCtx);
+for (const name of ["wheeldata.js", "wheel-gems.js", "wheel.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(root, "js", name), "utf8"), seqCtx, { filename: name });
+}
+must(typeof seqCtx.ensureWheel === "function", "seq: ensureWheel ausente após wheeldata+wheel.js");
+must(seqCtx.wheelPoints(vmPlayer) === 30, "seq: wheelPoints=" + seqCtx.wheelPoints(vmPlayer));
 
 const assets = [
   "assets/wheel/backdrop_skillwheel.png",

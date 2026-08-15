@@ -9,8 +9,27 @@ const server=fs.readFileSync(path.join(__dirname,"..","server","server.js"),"utf
 function must(ok,msg){if(!ok)throw Error(msg);}
 must(html.includes('id="account-login-form"')&&html.includes('id="acc-login"')&&
   html.includes('id="acc-password"')&&html.includes('id="acc-btn-login"')&&
-  html.includes('id="acc-open-register"')&&html.includes('type="submit">Entrar'),
+  html.includes('id="acc-open-register"')&&html.includes('type="submit"')&&
+  html.includes(">Entrar</button>"),
   "tela inicial não contém o formulário de login/criar conta");
+/* Boot sem sessão: login da conta é o primeiro paint; create local legado fica oculto. */
+const accLoginIdx=html.indexOf('id="account-login"');
+const localLoginIdx=html.indexOf('id="local-login"');
+must(accLoginIdx>=0&&localLoginIdx>accLoginIdx,"account-login deve vir antes de local-login no HTML");
+const accOpen=html.slice(accLoginIdx,accLoginIdx+80);
+const localBlock=html.slice(localLoginIdx,html.indexOf("</div>",html.indexOf("btn-create",localLoginIdx))+6);
+must(!/style\s*=\s*["'][^"']*display\s*:\s*none/i.test(accOpen),
+  "account-login não pode nascer oculto (FOUC do create legado)");
+must(/style\s*=\s*["'][^"']*display\s*:\s*none/i.test(localBlock)&&/\bhidden\b/.test(localBlock),
+  "local-login legado deve nascer oculto no boot");
+must(localBlock.includes("Criar personagem e caçar")&&localBlock.includes("Ex: Bubble"),
+  "textos do create legado devem permanecer só dentro do bloco oculto");
+must(js.includes("Boot online-first")&&js.includes("localLogin.hidden = true")&&
+  js.includes("initAccountLogin()"),
+  "initLogin online não esconde o create local legado");
+must(js.includes("function showCharacterCreator")&&js.includes('id="acc-btn-create-char"')&&
+  !js.includes('data-i18n="login.createChar"'),
+  "criação pós-login da conta deve existir; create legado não pode ser o fluxo da conta");
 must(js.includes('$("#account-login-form").addEventListener("submit"')&&
   js.includes('id="acc-register-form"')&&
   js.includes('$("#acc-register-form").addEventListener("submit"'),
