@@ -617,9 +617,31 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .hunt-modal-section:last-child:nth-child(odd) { grid-column:1/-1; }
 .hunt-modal-section .hunts-group { display:grid; gap:4px; }
 .hunt-modal-card { width:100%; margin:0; text-align:left; }
-.hunt-modal-card .mobs { width:96px; }
 .hunt-section-empty { padding:12px; color:#8a8270; text-align:center; border:1px dashed #4b493e; background:#17191e; }
 @media (max-width:720px) { #hunts-modal-list { grid-template-columns:1fr; } .hunt-modal-section:last-child:nth-child(odd) { grid-column:auto; } }
+/* Modal HUNTS: coluna fixa de outfits + texto; outfits não sobrepõem nome/XP. */
+#hunts-modal-list .hunt-modal-card.hunt-card {
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  overflow: hidden; position: relative;
+}
+#hunts-modal-list .hunt-modal-card .mobs {
+  display: flex; align-items: center; justify-content: flex-start; gap: 2px;
+  flex: 0 0 88px; width: 88px; min-width: 88px; max-width: 88px;
+  height: 34px; overflow: hidden; position: relative; z-index: 0;
+}
+#hunts-modal-list .hunt-modal-card .mobs .hunt-modal-mob {
+  flex: 0 0 auto; max-width: 28px; overflow: hidden;
+}
+#hunts-modal-list .hunt-modal-card .mobs .mob-img {
+  max-width: 26px; max-height: 32px;
+}
+#hunts-modal-list .hunt-modal-card .info {
+  flex: 1 1 auto; min-width: 0; position: relative; z-index: 1;
+  padding-left: 2px;
+}
+#hunts-modal-list .hunt-modal-card .risk {
+  flex: 0 0 auto; position: relative; z-index: 1; margin-left: 4px;
+}
 .hunt-card {
   display: flex; gap: 8px; align-items: center;
   padding: 6px; margin-bottom: 4px;
@@ -813,7 +835,7 @@ button.full { width: 100%; }
 /* ---------------------------------------------------------- modal */
 .modal-bg {
   position: fixed; inset: 0; background: rgba(0,0,0,.82);
-  display: none; align-items: center; justify-content: center; z-index: 200;
+  display: none; align-items: center; justify-content: center; z-index: 350;
   padding: 16px;
   /* v34: modal alto (party) — rola em vez de cortar o topo */
   overflow-y: auto;
@@ -956,8 +978,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 #toasts {
   position: fixed; bottom: 12px; right: 12px; z-index: 300;
   display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+  pointer-events: none;
 }
 .toast {
+  pointer-events: auto;
   background: #1e1c17; border: 1px solid var(--gold);
   padding: 7px 12px; font-size: 11px; color: var(--text-bright);
   box-shadow: 0 4px 14px rgba(0,0,0,.7);
@@ -1176,6 +1200,11 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 }
 .cyclo-tab.indisponivel { opacity: .5; }
 .cyclo-tab img { width: 18px; height: 18px; image-rendering: pixelated; }
+.cyclo-tab-section {
+  margin-top: 10px; padding: 6px 6px 2px; font-size: 10px; letter-spacing: .08em;
+  color: #d4af37; font-weight: bold; border-top: 1px solid #3a3428;
+}
+.cyclo-tab-city img { width: 16px; height: 16px; }
 .cyclo-content { flex: 1; min-width: 0; max-height: 70vh; overflow-y: auto; }
 .cyclo-subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .cyclo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -1219,6 +1248,68 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .best-bar { height: 3px; background: #0d0b08; margin-top: 3px; }
 .best-bar.big { height: 7px; }
 .best-bar div { height: 100%; background: var(--gold, #d4af37); }
+
+/* Charms OTC (sprite sheet monster-bonus-effects.png) */
+.charm-rune-icon {
+  display: inline-block; flex: none;
+  image-rendering: pixelated; background-repeat: no-repeat;
+  vertical-align: middle;
+}
+.charm-otc-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.charm-points-badge {
+  display: flex; align-items: center; gap: 4px;
+  background: #14120e; border: 1px solid #3a3428; padding: 3px 8px;
+}
+.charm-otc-layout {
+  display: grid; grid-template-columns: 1fr 220px; gap: 10px; min-height: 360px;
+}
+.charm-otc-list { overflow-y: auto; max-height: 58vh; }
+.charm-otc-row {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+  border: 1px solid transparent; background: #14120e; margin-bottom: 2px;
+  cursor: pointer;
+}
+.charm-otc-row:hover { background: #26221a; }
+.charm-otc-row.active { border-color: var(--gold, #d4af37); background: #35301f; }
+.charm-otc-row.locked { opacity: .72; }
+.charm-otc-meta { flex: 1; min-width: 0; }
+.charm-otc-detail {
+  background: #14120e; border: 1px solid #3a3428; padding: 10px;
+}
+.charm-detail-head { display: flex; align-items: center; gap: 10px; }
+.charm-race-sel {
+  width: 100%; margin: 4px 0 8px; padding: 4px;
+  background: #0d0b08; color: #c8c0a8; border: 1px solid #3a3428;
+}
+
+/* Hunts Canary/OTC */
+.hunt-stars { letter-spacing: 1px; }
+.hunt-star { color: #3a3428; font-size: 11px; }
+.hunt-star.on { color: #d4af37; }
+.hunt-cyclo-sections { display: flex; flex-direction: column; gap: 12px; }
+.hunt-cyclo-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px;
+}
+.hunt-cyclo-card {
+  text-align: left; background: #14120e; border: 1px solid #3a3428;
+  padding: 8px; cursor: pointer; color: inherit;
+}
+.hunt-cyclo-card:hover, .hunt-cyclo-card.active {
+  border-color: var(--gold, #d4af37); background: #26221a;
+}
+.hunt-cyclo-top {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+}
+.hunt-cyclo-top .nm { font-size: 12px; color: #ffe680; }
+.hunt-cyclo-mobs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.hunt-cyclo-mob { position: relative; display: inline-flex; }
+.hunt-cyclo-mob .charm-rune-icon {
+  position: absolute; right: -2px; bottom: -2px;
+}
+.hunt-modal-mob { position: relative; display: inline-flex; }
+.hunt-canary-card .nm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 /* ------------------------------------------- seletor em modal (munição)
  * Mesmo formato do seletor de cura do baiakidle: abas no topo, busca e
@@ -2158,25 +2249,34 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .tr-buy { white-space: nowrap; }
 .tr-buy img { width: 14px; height: 14px; vertical-align: -2px; image-rendering: pixelated; }
 
-/* ==================== Anéis e Amuletos (TibiaWiki) ==================== */
-/* Sprite brilhando quando equipado: anel/amuleto no slot ganham um pulso
- * dourado indicando que os atributos estão ativos. */
+/* ==================== Anéis e Amuletos (Canary transform) ==================== */
+/* Removido o glow amarelo (.acc-glow). Equipado = sprite transformEquipSlug
+ * (quando existe) + leve brilho neutro no ícone, sem borda dourada. */
 .slot.acc-glow {
-  border-color: #ffd65a;
-  box-shadow: 0 0 6px rgba(255, 214, 90, .55), inset 0 0 6px rgba(255, 214, 90, .25);
-  animation: acc-glow-pulse 2.2s ease-in-out infinite;
+  /* legado desativado — mantido vazio para não quebrar saves/CSS antigos */
+  box-shadow: none;
+  animation: none;
+  border-color: inherit;
 }
 .slot.acc-glow img {
-  filter: drop-shadow(0 0 3px rgba(255, 214, 90, .9));
-  animation: acc-glow-sprite 2.2s ease-in-out infinite;
+  filter: none;
+  animation: none;
 }
-@keyframes acc-glow-pulse {
-  0%, 100% { box-shadow: 0 0 5px rgba(255,214,90,.4), inset 0 0 5px rgba(255,214,90,.18); }
-  50%      { box-shadow: 0 0 12px rgba(255,214,90,.8), inset 0 0 9px rgba(255,214,90,.4); }
+.slot.acc-active img,
+.slot.acc-active .item-sprite {
+  filter: brightness(1.15) saturate(1.1);
+  animation: acc-active-sprite 2.4s ease-in-out infinite;
 }
-@keyframes acc-glow-sprite {
-  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,214,90,.6)) brightness(1); }
-  50%      { filter: drop-shadow(0 0 6px rgba(255,214,90,1)) brightness(1.25); }
+@keyframes acc-active-sprite {
+  0%, 100% { filter: brightness(1.08) saturate(1.05); }
+  50%      { filter: brightness(1.22) saturate(1.15); }
+}
+.inv-item.stash-auto {
+  outline: 1px solid rgba(120, 200, 120, .55);
+}
+.slot .cnt.charge-cnt {
+  color: #c8e8ff;
+  font-size: 9px;
 }
 
 /* ==================== Wheel of Destiny (Roda do Destino) ==================== */
@@ -2581,9 +2681,13 @@ button.danger {
 .hunt-analytics-panel > .panel-title #otc-analyser-title {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Ordem do chrome: LIVE → Reset sessão → Minimizar (collapse-btn no fim). */
 .otc-live-badge {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
   color: #9ce84a; font-size: 9px; font-weight: bold; letter-spacing: .5px;
+}
+.hunt-analytics-panel > .panel-title .otc-session-reset {
+  flex: none; margin: 0;
 }
 .otc-live-badge i, .otc-session-head em i {
   width: 6px; height: 6px; border-radius: 50%; background: #78d83f;
@@ -2646,8 +2750,91 @@ button.danger {
 .otc-monster-line > span small { color: #858b95; font-size: 9px; }
 .otc-analyser-summary { margin-bottom: 4px; padding: 5px; background: #17191d; border: 1px solid #34383f; }
 .otc-analyser-summary b { color: #e7c55b; }
+.otc-loot-econ {
+  margin-bottom: 6px; padding: 6px 7px; background: #17191d; border: 1px solid #34383f;
+  display: grid; gap: 3px;
+}
+.otc-loot-econ-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  color: #8f959f; font-size: 10px;
+}
+.otc-loot-econ-row > b { color: #e7c55b; font-size: 11px; white-space: nowrap; }
+.otc-loot-econ-row.profit-pos > b { color: #9ce84a; }
+.otc-loot-econ-row.profit-neg > b { color: #ff7b7b; }
+.otc-death-legend {
+  display: flex; align-items: center; justify-content: space-between;
+  color: #6f757f; font-size: 9px; text-transform: uppercase; margin: 0 1px 3px;
+}
+.otc-death-line > strong {
+  display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  line-height: 1.15;
+}
+.otc-death-line > strong > em {
+  font-style: normal; color: #ff9a9a; font-size: 11px;
+}
+.otc-death-line > strong > i {
+  font-style: normal; color: #e7c55b; font-size: 10px;
+}
+.otc-bless-total { margin-top: 4px; margin-bottom: 8px; }
 .otc-analyser-empty { display: flex; flex-direction: column; gap: 3px; padding: 14px 7px; text-align: center; color: #858b95; }
 .otc-analyser-empty b { color: #c7cad0; }
+
+/* Damage / Damage Taken — estilo Baiak Idle, com breakdown por personagem. */
+.otc-dmg-panel { display: flex; flex-direction: column; gap: 6px; }
+.otc-dmg-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 2px 2px 4px; border-bottom: 1px solid #2d3036;
+}
+.otc-dmg-session { color: #c8cbd1; font-size: 11px; }
+.otc-dmg-session em { margin-left: 6px; color: #e6e8ec; font-style: normal; font-variant-numeric: tabular-nums; }
+.otc-dmg-reset {
+  width: 22px; height: 22px; padding: 0; line-height: 1;
+  color: #ffe680; font-size: 14px; border: 1px solid #5a5240;
+  background: linear-gradient(#3a3424, #242018); cursor: pointer;
+}
+.otc-dmg-reset:hover { color: #fff0a6; border-color: #b79639; }
+.otc-dmg-char {
+  padding: 4px 3px 6px; border-bottom: 1px solid #2a2d33;
+}
+.otc-dmg-char:last-child { border-bottom: 0; }
+.otc-dmg-char-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  margin-bottom: 3px;
+}
+.otc-dmg-char-head > span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #e6e8ec; font-weight: bold; font-size: 11px;
+}
+.otc-dmg-char-head > b {
+  flex: none; color: #c8cbd1; font-size: 11px; font-weight: normal;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.otc-dmg-els { display: flex; flex-direction: column; gap: 1px; padding-left: 2px; }
+.otc-dmg-el {
+  display: flex; align-items: center; gap: 5px; min-height: 18px;
+  color: #aeb3bd; font-size: 11px;
+}
+.otc-dmg-el > img { flex: none; width: 14px; height: 14px; image-rendering: pixelated; }
+.otc-dmg-el > strong { color: #e6e8ec; font-weight: normal; font-variant-numeric: tabular-nums; }
+.otc-dmg-el > span { color: #858b95; }
+.otc-dmg-el-fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; color: #ffe680; font-size: 9px; font-weight: bold;
+  border: 1px solid #5a5240; background: #1a1c20;
+}
+.otc-dmg-best {
+  margin-top: 4px; padding: 6px 3px 2px;
+  border-top: 1px solid #2d3036;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.otc-dmg-best-label {
+  color: #8f959f; font-size: 9px; font-weight: bold; text-transform: uppercase;
+}
+.otc-dmg-best-value {
+  color: #e6e8ec; font-size: 11px; line-height: 1.35;
+  font-variant-numeric: tabular-nums; word-break: break-word;
+}
+.otc-dmg-best-badges { color: #ffe680; }
 
 /* -------------------------- log */
 .log-line .time { color: var(--gi-dim); }

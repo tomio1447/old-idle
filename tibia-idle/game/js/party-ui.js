@@ -695,11 +695,15 @@ function renderPartyModal(p, online) {
 function healFriendSpells(p) {
   const ids = [];
   if (!p) return ids;
-  const éDruid = p.voc === "druid" || p.voc === "elder druid";
-  const éMonk = p.voc === "monk" || p.voc === "exalted monk";
-  if (éDruid) ids.push("exura-sio", "exura-gran-sio", "exura-gran-tio-sio", "exura-gran-mas-res");
-  if (éMonk) ids.push("exura-tio-sio");
-  return ids.filter((id) => SPELLS[id] && p.level >= (SPELLS[id].lvl || 1));
+  const list = (typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
+    ? CanaryVocation.friendHealSpellIds(p.voc)
+    : ((p.voc === "druid" || p.voc === "elder druid")
+      ? ["exura-sio", "exura-gran-sio", "exura-gran-tio-sio", "exura-gran-mas-res"]
+      : ((p.voc === "monk" || p.voc === "exalted monk") ? ["exura-tio-sio"] : []));
+  for (const id of list) {
+    if (SPELLS[id] && p.level >= (SPELLS[id].lvl || 1)) ids.push(id);
+  }
+  return ids;
 }
 
 /* Renderiza a aba HEAL FRIEND dentro do Helper: Cura (só Druid/Monk). */
@@ -732,7 +736,7 @@ function renderHealFriend(p) {
 
   // seleção de magia de aliado
   const spells = healFriendSpells(p);
-  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) { cfg.healFriendSpells[id] = { enabled: (selecionada === id) || id === "exura-sio", at: cfg.healFriendAt || 70, minTargets: 2 }; healCfgDirty = true; } });
+  spells.forEach((id) => { if (!cfg.healFriendSpells[id]) { cfg.healFriendSpells[id] = { enabled: selecionada === id, at: cfg.healFriendAt || 70, minTargets: 2 }; healCfgDirty = true; } });
   if (healCfgDirty && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   if (!spells.length) {
     h += `<div class="tiny dim">As magias de cura de aliado desbloqueiam com o nível.</div>`;
