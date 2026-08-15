@@ -21,7 +21,7 @@ must(demon.readUInt32BE(16)===192&&demon.readUInt32BE(20)===256,
 must(gameSrc.includes('$("#btn-hunts")')&&gameSrc.includes("openHuntsModal"),
   "botão HUNTS não abre o modal");
 must(html.includes("css/layout.css?v=")&&html.includes("js/ui.js?v=")&&
-     html.includes("js/city-ui.js?v=hunts-modal-v1"),
+     html.includes("js/city-ui.js?v=cidade-modal-v1"),
   "UI/CSS do catálogo sem cache-busting");
 must(css.includes("#hunts-modal-list .hunt-modal-card .mobs") &&
      css.includes("overflow: hidden") &&

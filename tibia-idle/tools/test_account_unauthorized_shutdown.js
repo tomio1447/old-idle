@@ -46,6 +46,9 @@ vm.runInContext(`
     "primeiro 401 não invalidou a sessão nem marcou o retorno ao login");
   const second=await ctx._api("GET","/api/sync/state",null,"dead-token");
   must(second.code===401&&fetches===2,"token já inválido ainda chegou à rede");
+  const blocked=await ctx.accountAcquireLease("dead-token",false);
+  must(blocked.unauthorized&&fetches===2,
+    "lease/acquire com sessão morta ainda reabriu tempestade de requests");
   const stopped=vm.runInContext("ACCOUNT_SYNC.stopped&&ACCOUNT_SYNC.source===null&&ACCOUNT_SYNC.reconnect===null&&"+
     "ACCOUNT_SYNC.poll===null&&!ACCOUNT_LEASE.active&&ACCOUNT_LEASE.timer===null",ctx);
   must(stopped&&sourceCloses===1&&intervalClears===1&&timers.size===1,

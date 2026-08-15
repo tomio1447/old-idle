@@ -7,8 +7,13 @@
 const SCARLETT_ID = "scarlett-etzel";
 const SCARLETT_KEYS = ["up", "down", "left", "right"];
 const SCARLETT_KEY_ICON = { up: "↑", down: "↓", left: "←", right: "→" };
-const SCARLETT_TIMING_WINDOW = 280;
+/* Janela de acerto ±ms em torno de note.due (marcador a 20%).
+ * Offline: 360ms (antes 280) — margem humana sem “auto-hit”.
+ * Online: +SCARLETT_ONLINE_SLACK no servidor (tick ~200ms + RTT). */
+const SCARLETT_TIMING_WINDOW = 360;
+const SCARLETT_ONLINE_SLACK = 180;
 const SCARLETT_NOTE_GAP = 760;
+const SCARLETT_LEAD_MS = 1400;
 const SCARLETT_TRAVEL_MS = 2200;
 
 (function registerScarlett() {
@@ -116,8 +121,9 @@ function scarlettStartQte(c, now, randomFn) {
   st.sequence = sequence;
   st.index = 0;
   st.notes = sequence.map((dir, i) => ({
-    dir, due: now + 1400 + i * SCARLETT_NOTE_GAP, hit:false,
+    dir, due: now + SCARLETT_LEAD_MS + i * SCARLETT_NOTE_GAP, hit:false,
   }));
+  st._localSig = null;
   const bossMob = c.mobs && c.mobs[0];
   if (bossMob) bossMob.qteImmune = true;
   if (typeof addLog === "function")
@@ -140,7 +146,7 @@ function scarlettRenderQte(c, now) {
   }).join("");
   el.innerHTML = `<div class="scarlett-qte-title">SCARLETT'S DANCE — ${st.index}/5</div>
     <div class="scarlett-track"><i class="scarlett-hit-zone"></i>${notes}</div>
-    <div class="scarlett-qte-help">Use ↑ ↓ ← → ou W S A D no momento em que a seta cruzar o marcador</div>`;
+    <div class="scarlett-qte-help">↑ ↓ ← → ou W S A D quando a seta cruzar a faixa verde (±${SCARLETT_TIMING_WINDOW}ms)</div>`;
   if (typeof cancelAnimationFrame === "function" && st.raf) cancelAnimationFrame(st.raf);
   if (typeof requestAnimationFrame === "function") {
     st.raf = requestAnimationFrame(() => {
@@ -216,13 +222,18 @@ function scarlettCheckWipe(c) {
   st.wiped = true;
   st.phase = "wiped";
   st.immune = true;
-  const now=c._tickNow||Date.now();c.dead=true;c.deadAt=now;
-  c.deadUntil=now+(typeof reviveTime==="function"?reviveTime():30000);
-  for(const ent of scarlettParticipants(c))if(ent&&ent.p&&ent.p.hp<=0){
-    ent.permadead=false;ent.reviveAt=c.deadUntil;
+  // Mantém corpses permadead — sem contador/revive; wipe falha o boss.
+  scarlettOverlayMessage("PARTY DERROTADA — BOSS FALHOU", "fail");
+  if (typeof bossFailAndReturnTemple === "function") bossFailAndReturnTemple(c);
+  else {
+    if (typeof addLog === "function")
+      addLog("death", "Toda a party morreu. Boss falhou — voltando ao templo.");
+    c.bossFailed = true;
+    c.instanceFinished = true;
+    if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-boss");
+    if (typeof stopHunt === "function")
+      setTimeout(() => { try { stopHunt(); } catch (e) { /* ignore */ } }, 1500);
   }
-  scarlettOverlayMessage("PARTY DERROTADA", "fail");
-  if (typeof addLog === "function") addLog("death", "Toda a party morreu. Aguardando bênçãos para retornar ou ir ao templo.");
   return true;
 }
 
@@ -264,10 +275,42 @@ function scarlettDirectionFromKey(key) {
             arrowleft:"left", a:"left", arrowright:"right", d:"right" })[k] || null;
 }
 
+function scarlettOnlineAuthority() {
+  return typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+}
+
+function scarlettQueueOnlineIntent(dir) {
+  const c = typeof G !== "undefined" ? G.combat : null;
+  if (!c || !dir) return false;
+  c._scarlettPendingDir = dir;
+  c._scarlettPendingAt = Date.now();
+  // Feedback local otimista; o servidor confirma no próximo tick.
+  const st = c.scarlett;
+  if (!st || st.phase !== "qte" || !st.notes || !st.notes.length) {
+    if (typeof requestOnlineAuthorityTick === "function") requestOnlineAuthorityTick();
+    return true;
+  }
+  const note = st.notes[st.index];
+  const now = Date.now();
+  if (note && !note.hit && dir === note.dir &&
+      Math.abs(now - note.due) <= SCARLETT_TIMING_WINDOW + SCARLETT_ONLINE_SLACK) {
+    note.hit = true;
+    st.index++;
+    if (st.index >= st.notes.length) scarlettOverlayMessage("SEQUÊNCIA ENVIADA…", "success");
+    else scarlettRenderQte(c, now);
+  }
+  if (typeof requestOnlineAuthorityTick === "function") requestOnlineAuthorityTick();
+  return true;
+}
+
 function scarlettHandleKey(c, key, now) {
   if (!scarlettFight(c) || !c.scarlett || c.scarlett.phase !== "qte") return null;
   const dir = scarlettDirectionFromKey(key);
   if (!dir) return null;
+  if (scarlettOnlineAuthority()) {
+    scarlettQueueOnlineIntent(dir);
+    return true;
+  }
   const st = c.scarlett;
   const note = st.notes[st.index];
   if (!note || dir !== note.dir || Math.abs(now - note.due) > SCARLETT_TIMING_WINDOW)
@@ -339,19 +382,52 @@ function bossCanTakePlayerDamage(c, target) {
   return false;
 }
 
+function scarlettHydrateOnlineNotes(c) {
+  const st = c && c.scarlett;
+  if (!st || st.phase !== "qte") return false;
+  const sequence = Array.isArray(st.sequence) ? st.sequence : [];
+  const dues = Array.isArray(st.noteDues) ? st.noteDues : [];
+  if (!sequence.length || dues.length !== sequence.length) return false;
+  const authClock = Number(c.authClock);
+  const sig = `${st.qteStartedAt || 0}:${st.thresholdIndex || 0}:${sequence.join(",")}:${dues.join(",")}`;
+  if (st._localSig === sig && Array.isArray(st.notes) && st.notes.length === sequence.length) {
+    const idx = Math.max(0, Math.min(sequence.length, Number(st.index) || 0));
+    for (let i = 0; i < st.notes.length; i++) st.notes[i].hit = i < idx || !!st.notes[i].hit;
+    st.index = Math.max(st.index || 0, idx);
+    return true;
+  }
+  // Converte dues do relógio autoritativo → wall-clock para a esteira/rAF.
+  const wallOffset = Number.isFinite(authClock) ? (Date.now() - authClock) : 0;
+  const idx = Math.max(0, Math.min(sequence.length, Number(st.index) || 0));
+  st.notes = sequence.map((dir, i) => ({
+    dir, due: Number(dues[i]) + wallOffset, hit: i < idx,
+  }));
+  st.index = idx;
+  st._localSig = sig;
+  return true;
+}
+
 function scarlettRenderOnline(c) {
   if (!c || !c.scarlett) {
     if (typeof scarlettHideOverlay === "function") scarlettHideOverlay();
     return;
   }
   const st = c.scarlett;
+  if (st.phase === "qte") {
+    if (scarlettHydrateOnlineNotes(c)) {
+      scarlettRenderQte(c, Date.now());
+      return;
+    }
+    // Snapshot ainda sem sequência: aviso curto até o próximo tick.
+    scarlettOverlayMessage("SCARLETT IMUNE — PREPARE A DANÇA!", "immune");
+    return;
+  }
   if (st.immune) {
-    const msg = st.phase === "qte"
-      ? "SCARLETT IMUNE — DANÇA AUTOMÁTICA"
-      : "SCARLETT IMUNE — PREPARE-SE!";
-    scarlettOverlayMessage(msg, "immune");
+    scarlettOverlayMessage("SCARLETT IMUNE — PREPARE-SE!", "immune");
   } else if (st.phase === "vulnerable") {
-    scarlettHideOverlay();
+    // Não apaga o banner de sucesso imediato; só limpa em idle.
+    if (!st._successBannerUntil || Date.now() >= st._successBannerUntil)
+      scarlettHideOverlay();
   }
 }
 

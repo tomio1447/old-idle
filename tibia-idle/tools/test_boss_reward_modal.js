@@ -7,6 +7,7 @@ const gameJs = fs.readFileSync(path.join(game,'js','game.js'),'utf8');
 const rewardJs = fs.readFileSync(path.join(game,'js','reward-chest.js'),'utf8');
 const uiJs = fs.readFileSync(path.join(game,'js','ui.js'),'utf8');
 const forgeUiJs = fs.readFileSync(path.join(game,'js','forge-ui.js'),'utf8');
+const cityUiJs = fs.readFileSync(path.join(game,'js','city-ui.js'),'utf8');
 const soulwarJs = fs.readFileSync(path.join(game,'js','soulwar.js'),'utf8');
 const css = fs.readFileSync(path.join(game,'css','layout.css'),'utf8');
 const indexHtml = fs.readFileSync(path.join(game,'index.html'),'utf8');
@@ -40,18 +41,17 @@ must(!desirePng.equals(piratePng), 'Bag You Desire ainda usa a Pirate Bag');
 must(desireAnim.readUInt32BE(16) === 240 && desireAnim.readUInt32BE(20) === 30 &&
      soulwarJs.includes("cid:34109,af:10,aw:24,ah:30"),
   'Sprite animada oficial da Bag You Desire está incompleta');
-must(indexHtml.includes('<img src="assets/item/reward-chest.png" class="reward-btn-icon"') &&
-     !indexHtml.includes('🎁 REWARD'),
-  'Botão REWARD ainda usa emoji em vez do client id 19250');
+must(!indexHtml.includes('id="btn-reward"') && !indexHtml.includes('🎁 REWARD'),
+  'Botão REWARD ainda aparece na topbar (deve abrir só via CIDADE)');
 must(!indexHtml.includes('id="xph"') && !indexHtml.includes('id="gph"') &&
      !indexHtml.includes('id="kills"') && !indexHtml.includes('id="session"'),
   'Analisador XP/h, Gold/h, Kills ou Sessão ainda aparece na topbar');
 must(indexHtml.includes('assets/ui/prey/prey_bigxp.png'),
   'Botão PREY não usa o card de bônus de EXP');
-must(css.includes('#btn-imbue {') && css.includes('flex-direction: row'),
-  'Ícone de Imbuements não fica ao lado do texto');
-must(rewardJs.includes('badge.style.visibility = n ? "visible" : "hidden"'),
-  'Badge do Reward Chest ainda desloca a linha de botões');
+must(indexHtml.includes('id="btn-cidade"') && cityUiJs.includes('action: "reward"'),
+  'Reward Chest não está acessível via modal CIDADE');
+must(rewardJs.includes('function openRewardChest'),
+  'openRewardChest ausente (necessário para modal CIDADE)');
 must(uiJs.includes('function bindFullItemTooltip') &&
      uiJs.includes('showTip(itemTip(slug, extra || "", slot || null, instId || null))'),
   'Drops não reutilizam o tooltip completo do inventário');
@@ -68,10 +68,10 @@ for (const cls of [2,3,4]) {
 const coreGif = fs.readFileSync(path.join(game,'assets','item','exalted-core.gif'));
 must(coreGif.subarray(0,6).toString() === 'GIF89a' && coreGif.includes(Buffer.from('NETSCAPE2.0')),
   'Exalted Core não é um GIF animado');
-must(indexHtml.includes('<img src="assets/item/exalted-core.gif" class="forge-btn-icon"') &&
-     !indexHtml.includes('>⚒ FORGE</button>') && forgeUiJs.includes('forge-btn-icon'),
-  'Botão FORGE não usa o Exalted Core animado');
-must(css.includes('.forge-btn-icon') && css.includes('#btn-forge { display:inline-flex'),
+must(!indexHtml.includes('id="btn-forge"') && !indexHtml.includes('>⚒ FORGE</button>') &&
+     cityUiJs.includes('action: "forge"') && forgeUiJs.includes('forge-btn-icon'),
+  'FORGE ainda na topbar ou ausente do modal CIDADE');
+must(css.includes('.forge-btn-icon'),
   'CSS do ícone animado da Forja ausente');
 must(gameJs.includes('hunt-best-card boss-best-card') &&
      gameJs.includes('hunt-best-loot boss-best-loot') &&
@@ -85,7 +85,7 @@ must(rewardJs.includes('class="reward-slot') && rewardJs.includes('class="reward
 for (const cls of ['.reward-chest-custom','.reward-boss-grid','button.reward-boss-card',
                    '.reward-slot-grid','button.reward-slot','.reward-slot-count',
                    '.modal.reward-modal-shell','.modal.boss-modal-shell',
-                   '.boss-best-card','.boss-best-loot','.reward-btn-icon'])
+                   '.boss-best-card','.boss-best-loot','.forge-btn-icon'])
   must(css.includes(cls), 'CSS ausente: '+cls);
 const combat=fs.readFileSync(path.join(game,'js','combat.js'),'utf8');
 must(combat.includes('rewardChestAdd(p, l.item, count, rewardSource)') &&

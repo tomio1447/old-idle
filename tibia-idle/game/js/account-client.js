@@ -268,15 +268,45 @@ async function accountAcquireLease(token,takeover){
   return ACCOUNT_LEASE_INFLIGHT;
 }
 async function accountRenewLease(token){
+  // Soft-pause / SERVIDOR OFF: nunca rearmar o heartbeat. Um fetch em voo
+  // que falhava com rede (code 0) antes reprogramava o timer e gerava storm
+  // de /lease/renew (401) depois do restart com sessão/lease mortos.
+  if(typeof accountServerForcedOffline==="function"&&accountServerForcedOffline())
+    return {ok:false,offline:true};
+  if(ACCOUNT_LEASE.lost&&!ACCOUNT_LEASE.active)return {ok:false,lost:true};
   token=accountSessionToken(token||ACCOUNT_LEASE.sessionToken);const fields=accountLeaseFields();
   if(!token||!fields.lease_token)return {ok:false};
-  const r=await _api("POST","/api/lease/renew",Object.assign({token},fields));
-  if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true};}
-  if(r.code===0&&Date.now()<ACCOUNT_LEASE.expiresAt){
-    if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
-    ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
+  // skipInvalidate: 401 de renew após restart não deve apagar a sessão e
+  // disparar reload automático — alinha com o banner Reconnect. Acquire no
+  // reconnect (ou outro endpoint autenticado) ainda invalida se a sessão
+  // estiver de fato morta.
+  const r=await _api("POST","/api/lease/renew",Object.assign({token},fields),null,{skipInvalidate:true});
+  if(r.data.ok){
+    if(typeof accountServerForcedOffline==="function"&&accountServerForcedOffline())
+      return {ok:false,offline:true};
+    accountLeaseApply(token,r.data);return {ok:true};
   }
-  if(r.code===401)return accountLeaseMarkUnauthorized(r.data.msg);
+  if(r.code===0){
+    if((typeof accountServerForcedOffline==="function"&&accountServerForcedOffline())||
+       ACCOUNT_LEASE.lost||!ACCOUNT_LEASE.active)return {ok:false,offline:true};
+    if(Date.now()<ACCOUNT_LEASE.expiresAt){
+      if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
+      ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
+    }
+  }
+  if(r.code===401){
+    // Não use authFailUntil aqui: o banner Reconnect precisa reassumir o
+    // lease imediatamente. Sessão realmente morta cai no acquire→invalidate.
+    ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.expiresAt=0;ACCOUNT_LEASE.heldUntil=0;
+    if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+    accountLeaseClearSecret();
+    try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
+    if(typeof accountForceServerDisconnect==="function")
+      accountForceServerDisconnect("session");
+    if(typeof toast==="function")
+      toast(r.data.msg||"Controle online expirado. Use Reconnect.","bad");
+    return {ok:false,unauthorized:true,lost:true,msg:r.data.msg||"Sessão online expirada. Entre novamente."};
+  }
   accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
 }
 async function accountEnsureLease(token,options){
@@ -487,6 +517,67 @@ function accountClearInstanceLootPouch(token,charId){
     return {ok:false,msg:r.data.msg||"Não foi possível limpar a Loot Pouch"};
   });
 }
+function accountSellInstanceLootPouch(token,charId,slug){
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const body=Object.assign({token,char_id:Number(charId),instance_id:ACCOUNT_INSTANCE.id,
+      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+    if(slug)body.slug=String(slug);
+    const r=await _api("POST","/api/instance/pouch-sell",body);
+    if(r.data.ok){
+      accountInstanceApply(r.data.instance);
+      return {ok:true,gold:Number(r.data.gold)||0,state:r.data.instance&&r.data.instance.state,
+        version:r.data.instance&&r.data.instance.version};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,msg:r.data.msg||"Não foi possível vender a Loot Pouch"};
+  });
+}
+/** Move pouch/bag → Supply Stash com persistência (instância ou personagem na cidade). */
+function accountMoveToSupplyStash(token,charId,opts){
+  opts=opts||{};
+  const slug=String(opts.slug||"");
+  const source=String(opts.source||"pouch");
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,source,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      const r=await _api("POST","/api/instance/stash-move",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível mover para a Supply Stash"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,source,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/stash/move",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(r.data.lootPouch&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        G.p.lootPouch=r.data.lootPouch||{};
+        G.p.supplyStash=r.data.supplyStash||{};
+      }
+      return {ok:true,lootPouch:r.data.lootPouch,supplyStash:r.data.supplyStash,
+        saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível mover para a Supply Stash",code:r.code};
+  });
+}
 function accountRefreshInstance(token){
   return accountQueueInstance(async()=>{
     const charId=typeof sessionCharId==="function"?sessionCharId():"";
@@ -601,8 +692,9 @@ async function accountStartSyncNow(token,generation){
         remainingSec:Math.max(0,Number(data.remainingSec)||0),
       });
     }
+    if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
   };
-  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired","maintenance"])
+  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired","maintenance","world-boss"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
@@ -620,7 +712,7 @@ function accountStopSync(){ACCOUNT_SYNC.stopped=true;ACCOUNT_SYNC.generation++;
   ACCOUNT_SYNC.source=null;ACCOUNT_SYNC.starting=null;clearTimeout(ACCOUNT_SYNC.reconnect);ACCOUNT_SYNC.reconnect=null;
   accountSyncStopFallback();ACCOUNT_SYNC.token="";ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;ACCOUNT_SYNC.disabled=false;}
 
-async function _api(method, path, body, token) {
+async function _api(method, path, body, token, options) {
   const headers = { "Content-Type": "application/json" },requestToken=String(token||(body&&body.token)||"");
   if(requestToken&&ACCOUNT_UNAUTHORIZED_TOKEN===requestToken)
     return {code:401,data:{ok:false,error:"SESSION_INVALID",msg:"Sessão expirada"}};
@@ -638,7 +730,10 @@ async function _api(method, path, body, token) {
     // APIs antigas misturam Bearer e `token` no body. Considere ambos para
     // desligar todos os loops ao primeiro 401 autenticado; login inválido não
     // traz token e portanto nunca passa por esta invalidação.
-    if(r.status===401&&requestToken)accountInvalidateSession(requestToken,data);
+    // skipInvalidate: renew pós-restart usa o caminho SERVIDOR/Reconnect sem
+    // apagar a sessão local (acquire/tick ainda invalidam se o token morreu).
+    if(r.status===401&&requestToken&&!(options&&options.skipInvalidate))
+      accountInvalidateSession(requestToken,data);
     if(r.status>0)accountNotifyServerReachable(true);
     return { code: r.status, data: data };
   } catch (error) {
@@ -668,6 +763,36 @@ function accountServerDisconnectReason(){return ACCOUNT_SERVER_LAST_REASON||"";}
 
 function accountNotifyServerPower(on){
   try{window.dispatchEvent(new CustomEvent("tibia-idle-server-power",{detail:{on:!!on}}));}catch(e){}
+}
+
+function applyPlayersOnlineCount(payload){
+  const box=document.getElementById("players-online");
+  const countEl=document.getElementById("players-online-count");
+  if(!box||!countEl)return;
+  const online=payload&&typeof payload==="object"?payload:null;
+  const total=online&&online.total!=null?Number(online.total)
+    :(online&&online.onlineChars!=null?Number(online.onlineChars)+Number(online.offlineHunting||0):NaN);
+  if(!Number.isFinite(total)){
+    box.hidden=true;
+    return;
+  }
+  countEl.textContent=String(Math.max(0,Math.floor(total)));
+  box.hidden=false;
+  const title=typeof t==="function"?t("players.onTitle"):"Personagens online ou em caçada offline";
+  box.title=title;
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-players-online",{detail:online}));}catch(e){}
+}
+
+async function accountFetchOnlineCount(){
+  if(!accountApiConfigured())return null;
+  try{
+    const response=await fetch(ACCOUNT_API_URL+"/api/online-count",{method:"GET",cache:"no-store"});
+    let data={};
+    try{data=await response.json();}catch(e){data={};}
+    if(!response.ok||!data||!data.ok)return null;
+    applyPlayersOnlineCount(data);
+    return data;
+  }catch(e){return null;}
 }
 function accountNotifyMaintenance(state){
   try{window.dispatchEvent(new CustomEvent("tibia-idle-maintenance",{detail:state||{}}));}catch(e){}
@@ -735,6 +860,7 @@ function accountClearServerForcedOffline(){
   ACCOUNT_SERVER_REACHABLE=true;
   ACCOUNT_SERVER_FAIL_STREAK=0;
   ACCOUNT_SERVER_LAST_REASON="";
+  ACCOUNT_LEASE.authFailUntil=0;
   try{window.dispatchEvent(new CustomEvent("tibia-idle-server-online"));}catch(e){}
 }
 
@@ -751,6 +877,8 @@ async function accountCheckServerHealth(){
         return {ok:false};
       }
       accountApplyMaintenanceFromHealth(data);
+      if(data.playersOnline)applyPlayersOnlineCount(data.playersOnline);
+      else accountFetchOnlineCount();
       const bootId=String(data.bootId||"");
       const startedAt=Number(data.startedAt)||0;
       if(ACCOUNT_SERVER_BOOT_ID&&bootId&&bootId!==ACCOUNT_SERVER_BOOT_ID){

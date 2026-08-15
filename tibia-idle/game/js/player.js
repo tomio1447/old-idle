@@ -157,6 +157,7 @@ function newPlayer(name, voc, sex) {
     lootPouch: {},          // loot de hunt para auto-seller
     supplyStash: {},        // rings/amulets com cargas (Auto Supply Stash)
     lootConfig: { noCollect: [], noSell: [] },
+    cap: 5000,              // capacidade base (oz); piso se a fórmula por nível for menor
     supplies: { "mana-potion": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
     stamina: 42 * 3600,     // segundos (42h cheio)
@@ -216,7 +217,19 @@ function newPlayer(name, voc, sex) {
   return p;
 }
 
+const DEFAULT_PLAYER_CAP = 5000;
+
+/* Garante CAP base nos saves antigos (faltava o campo → loot bloqueado). */
+function ensurePlayerCapacity(p) {
+  if (!p) return DEFAULT_PLAYER_CAP;
+  const n = Math.floor(Number(p.cap));
+  if (!Number.isFinite(n) || n <= 0) p.cap = DEFAULT_PLAYER_CAP;
+  else p.cap = n;
+  return p.cap;
+}
+
 function maxStats(p) {
+  ensurePlayerCapacity(p);
   const b = baseStats(p.voc, p.level);
   let bonusHp = 0, bonusMp = 0;
   for (const s of SLOTS) {
@@ -231,7 +244,8 @@ function maxStats(p) {
   let w = null;
   if (typeof wheelTotals === "function" && p.wheel) w = wheelTotals(p);
   if (w) { bonusHp += w.hp; bonusMp += w.mp; }
-  const cap = b.cap + (w ? w.cap : 0);
+  // Piso: CAP salva (default 5000) ou fórmula por nível — o que for maior.
+  const cap = Math.max(b.cap + (w ? w.cap : 0), ensurePlayerCapacity(p));
   return { hp: b.hp + bonusHp, mp: b.mp + bonusMp, cap: cap };
 }
 
@@ -1070,7 +1084,7 @@ function addLootPouch(p, slug, count) {
   p.lootPouch = p.lootPouch || {};
   const weight = (typeof itemUnitWeight === "function" ? itemUnitWeight(slug) : 0.1) * count;
   if (typeof freeCapacity === "function" && weight > freeCapacity(p) + 1e-9) {
-    if (typeof addLog === "function") addLog("death", "You cannot carry more.");
+    if (typeof addLog === "function") addLog("death", typeof capacityMessage === "function" ? capacityMessage() : "You cannot carry more.");
     return false;
   }
   // Aceita overflow acima dos 50 slots. O percentual continua em 100% e o
@@ -1194,7 +1208,9 @@ function autoEquip(/* p */) {
   return [];
 }
 
-/* Peso total carregado (equip + bag + loot pouch + supplies + ammo + supply stash). */
+/* Peso carregado para CAP: equip + bag + loot pouch + supply stash.
+ * Supplies/ammo são contadores de idle (milhares de unidades) e NÃO entram
+ * no peso — senão stock de potions zera a CAP e o loot some em silêncio. */
 function carriedWeight(p) {
   let w = 0;
   for (const s of SLOTS) {
@@ -1211,14 +1227,19 @@ function carriedWeight(p) {
   };
   addMap(p.bag);
   addMap(p.lootPouch);
-  addMap(p.supplies);
-  addMap(p.ammo);
   addMap(p.supplyStash);
   return w;
 }
 function freeCapacity(p) {
-  const max = typeof maxStats === "function" ? maxStats(p).cap : 400;
+  const max = typeof maxStats === "function" ? maxStats(p).cap : DEFAULT_PLAYER_CAP;
   return Math.max(0, max - carriedWeight(p));
+}
+function capacityMessage() {
+  if (typeof t === "function") {
+    const msg = t("cap.full");
+    if (msg && msg !== "cap.full") return msg;
+  }
+  return "You cannot carry more.";
 }
 function itemUnitWeight(slug) {
   const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;

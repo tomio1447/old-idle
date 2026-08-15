@@ -16,7 +16,7 @@ must(!source.includes("occupiedLabels"),
 must(!source.includes("Math.abs(prev.x - info.cx) < 42"),
   "ainda empurra barras de SQMs vizinhos");
 must(html.includes("js/render.js?v=knight-fx-combo-v1"),"render.js sem cache-bust das barras");
-must(html.includes("css/layout.css?v=knight-fx-combo-v1")&&html.includes("js/city-render.js?v=hd-hud-v1"),
+must(html.includes("css/layout.css?v=npc-buttons-v1")&&html.includes("js/city-render.js?v=npc-buttons-v1"),
   "FULLHD HUD sem cache-bust de CSS/cidade");
 const css=fs.readFileSync(path.join(__dirname,"..","game","css","layout.css"),"utf8");
 must(css.includes("body.fullhd .bar .label")&&css.includes("body.fullhd .log-line")&&

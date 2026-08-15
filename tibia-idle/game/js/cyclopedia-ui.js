@@ -27,8 +27,9 @@ function openCycloCityAction(action) {
   else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
   else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
   else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
-  else if (action === "enpa" && typeof openNpc === "function") openNpc("enpa");
-  else if (action === "gnomally" && typeof openNpc === "function") openNpc("gnomally");
+  else if (action === "enpa" && typeof openNpcShop === "function") openNpcShop("enpa");
+  else if (action === "gnomally" && typeof openNpcShop === "function") openNpcShop("gnomally");
+  else if (action === "tibianus" && typeof openNpcShop === "function") openNpcShop("tibianus");
 }
 
 function cycloCharmIdFromEl(el) {

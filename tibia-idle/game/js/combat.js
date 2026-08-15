@@ -11,9 +11,10 @@ const TICK = 100;   // ms por tick de simulacao
  * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma. */
 const SPAWN_BLINK_MS = 1000;
 const SPAWN_BLINKS = 3;
-/* Após limpar a onda: espera antes de enfileirar pendingSpawns / começar o
- * teleporte-blink da próxima wave (o blink 3×1s continua separado). */
-const WAVE_CLEAR_RESPAWN_MS = 6000;
+/* Após limpar a onda: tempo até o monstro aparecer. O teleporte-blink
+ * (SPAWN_BLINKS × SPAWN_BLINK_MS = 3s) começa em T-3s, dentro desta janela. */
+const WAVE_CLEAR_RESPAWN_MS = 5000;
+const WAVE_TELEPORT_LEAD_MS = SPAWN_BLINKS * SPAWN_BLINK_MS;
 
 function huntMapSpawnBlocked() {
   return typeof G !== "undefined" && G && G.huntMapReady === false;
@@ -1465,7 +1466,7 @@ function playerAttack(c, p, target) {
   // Distância usa cargas de ammo. Se acabou, compra 1 carga no uso;
   // se não houver gold, o ataque não sai.
   if (isDist && !consumeAmmoCharge(c, p)) {
-    c.events.push({ t: "miss", x: target.x, y: target.y, reason: "ammo" });
+    c.events.push({ t: "miss", x: target.x, y: target.y, reason: "ammo", fx: "poff" });
     return 0;
   }
 
@@ -1528,7 +1529,7 @@ function playerAttack(c, p, target) {
   // Sem area o tiro perdido simplesmente nao acerta ninguem. Com area, o
   // disparo continua e explode na casa desviada.
   if (errou && !(ammo && (ammo.areaMatrix || ammo.area))) {
-    c.events.push({ t: "miss", x: target.x, y: target.y });
+    c.events.push({ t: "miss", x: target.x, y: target.y, fx: "poff" });
     addSkillTries(p, "dist", combatSkillGain(c, 1));
     return 0;
   }
@@ -1780,7 +1781,7 @@ function playerAttack(c, p, target) {
     }
   } else if (errou) {
     // o projetil ainda voa, mas cai na casa desviada
-    c.events.push({ t: "miss", x: target.x, y: target.y });
+    c.events.push({ t: "miss", x: target.x, y: target.y, fx: "poff" });
   }
 
   // Cleave (15.x): certas armas atingem alvos adjacentes por 50% do dano
@@ -1797,6 +1798,7 @@ function playerAttack(c, p, target) {
       if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
       c.events.push({ t: "hit", dmg: corte, x: m.x, y: m.y, targetId:m.id,
                       screen: true, el: element, race: m.def && m.def.race,
+                      crit: critou, fatal: fatalou,
                       fx: element === "physical"
                         ? racePhysicalFx(m.def && m.def.race)
                         : ((ELEMENTS[element] || ELEMENTS.physical).fx) });
@@ -1857,13 +1859,16 @@ function playerAttack(c, p, target) {
         // Rolagem CHEIA em cada alvo. O 0.75 que estava aqui era invencao
         // nossa: no Canary a municao de area executa a mesma formula em
         // todas as casas cobertas, sem desconto por ser respingo.
-        const splash = Math.max(1, Math.floor(rollDamage(false)));
+        // Crit/Fatal do swing principal valem para toda a explosao.
+        let splash = Math.max(1, Math.floor(rollDamage(false)));
+        if (extraPct > 0) splash = Math.max(1, Math.floor(splash * (1 + extraPct / 100)));
         m.hp -= splash;
         c.stats.damage += splash;
         // crippling stance tambem marca quem estava na area da flecha
         if (typeof stanceApplyDebuffs === "function") stanceApplyDebuffs(p, m);
         c.events.push({ t: "hit", dmg: splash, x: m.x, y: m.y, targetId:m.id,
                         screen: true, el: element, fx: splashFx,
+                        crit: critou, fatal: fatalou,
                         race: m.def && m.def.race });
       }
     }
@@ -2222,6 +2227,56 @@ function castSpellById(c, p, target, now, id) {
   const armaElemento = (typeof spellWeaponElement === "function")
     ? spellWeaponElement(p) : null;
   const forgeOnslaughtSpell = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
+  const transcendSpellPct = (typeof forgeTranscendenceDamagePct === "function")
+    ? forgeTranscendenceDamagePct(p, now) : 0;
+
+  // Crit/Fatal: UM roll por cast. Em AoE (exevo vis hur, mas san, exori gran,
+  // chain…), se proc, o bônus e o FX valem para TODOS os alvos desta magia.
+  let castCrit = false;
+  let castFatal = false;
+  let castExtraPct = 0;
+  if (typeof stanceTotals === "function") {
+    const stCrit = stanceTotals(p);
+    const crCh = stCrit.elemCrit[elemento] || 0;
+    const crDg = stCrit.elemCritDmg[elemento] || 0;
+    if (crCh && Math.random() < crCh / 100) {
+      castExtraPct += 50;
+      castCrit = true;
+    } else if (crDg && Math.random() < 0.10) {
+      castExtraPct += crDg;
+      castCrit = true;
+    }
+  }
+  if (!castCrit && typeof rollPlayerCrit === "function") {
+    const critSpell = rollPlayerCrit(p);
+    if (critSpell.crit) {
+      castExtraPct += critSpell.extraPct;
+      castCrit = true;
+    }
+  }
+  if (aug) {
+    if (!castCrit && aug.critChance > 0 &&
+        Math.random() * 100 < aug.critChance) {
+      castCrit = true;
+    }
+    if (castCrit && aug.critDmg > 0) castExtraPct += aug.critDmg;
+  }
+  if (forgeOnslaughtSpell) {
+    castExtraPct += (forgeOnslaughtSpell.bonusPct || 60);
+    castFatal = true;
+  }
+  if (transcendSpellPct > 0) {
+    castExtraPct += transcendSpellPct;
+    castCrit = true;
+  }
+  if (typeof wheelApplySpellBoost === "function" && p.wheel) {
+    const wbCast = wheelApplySpellBoost(p, id);
+    if (wbCast.critChance > 0 && !castCrit &&
+        Math.random() * 100 < wbCast.critChance) {
+      castCrit = true;
+      castExtraPct += (wbCast.critDamage || 0);
+    }
+  }
 
   targets.forEach((t, idx) => {
     if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, t)) return;
@@ -2244,70 +2299,26 @@ function castSpellById(c, p, target, now, id) {
     if (typeof buffTotals === "function") {
       dmg = Math.floor(dmg * buffTotals(p, now).dmgDealt);
     }
-    // ---- efeitos de stance do 15.25 sobre a magia:
+    // ---- efeitos de stance do 15.25 sobre a magia (multiplicadores por
+    // alvo). Critico/Fatal ja foram rolados uma vez no cast acima.
     //   - Protector: -15% de dano causado (mesmo multiplicador do ataque);
     //   - Master of Flames: +4% base power nas magias de fogo;
-    //   - Master of Thunder: +4% de chance de CRITICO (150%) em energia;
-    //   - Master of Decay: 10% de chance de +30% de dano extra em morte.
-    // O critico do update sai com o efeito "CRIT!" (ver drainEvents).
-    let critSt = false;
-    let fatalSpell = false;
-    let extraSpellPct = 0;
+    const critSt = castCrit;
+    const fatalSpell = castFatal;
+    const extraSpellPct = castExtraPct;
     if (typeof stanceTotals === "function") {
       const stT = stanceTotals(p);
       if (stT.dmgDealt !== 1) dmg = Math.floor(dmg * stT.dmgDealt);
       const pEl = stT.elemPct[elemento] || 0;
       if (pEl) dmg = Math.max(1, Math.floor(dmg * (1 + pEl / 100)));
-      const crCh = stT.elemCrit[elemento] || 0;
-      const crDg = stT.elemCritDmg[elemento] || 0;
-      if (crCh && Math.random() < crCh / 100) {
-        extraSpellPct += 50;
-        critSt = true;
-      } else if (crDg && Math.random() < 0.10) {
-        extraSpellPct += crDg;
-        critSt = true;
-      }
-    }
-    // Crítico intrínseco (Summer Update 2025): 5%/10% também vale para
-    // magias — rola quando a stance não deu crítico.
-    if (!critSt && typeof rollPlayerCrit === "function") {
-      const critSpell = rollPlayerCrit(p);
-      if (critSpell.crit) {
-        extraSpellPct += critSpell.extraPct;
-        critSt = true;
-      }
-    }
-    // Augments de crítico (TibiaWiki): "critical extra damage" aumenta o
-    // dano crítico DA spell; "critical hit chance" pode conceder crítico à
-    // spell mesmo sem outra fonte de chance.
-    if (aug) {
-      if (!critSt && aug.critChance > 0 &&
-          Math.random() * 100 < aug.critChance) {
-        critSt = true;
-      }
-      if (critSt && aug.critDmg > 0) extraSpellPct += aug.critDmg;
     }
     // Swift Foot (15.25): conjurar durante o buff custa -30% de dano
     if (typeof swiftFootMul === "function") dmg = Math.floor(dmg * swiftFootMul(p));
-    if (forgeOnslaughtSpell) {
-      extraSpellPct += (forgeOnslaughtSpell.bonusPct || 60);
-      fatalSpell = true;
-    }
-    const transcendSpellPct = (typeof forgeTranscendenceDamagePct === "function")
-      ? forgeTranscendenceDamagePct(p, now) : 0;
-    if (transcendSpellPct > 0) {
-      extraSpellPct += transcendSpellPct;
-      critSt = true;
-    }
     if (extraSpellPct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraSpellPct / 100)));
-    // Wheel of Destiny: bonus de dano % da magia (upgrade da wheel) + critico
+    // Wheel of Destiny: bonus de dano % da magia (upgrade da wheel)
     if (typeof wheelApplySpellBoost === "function" && p.wheel) {
       const wb = wheelApplySpellBoost(p, id);
       if (wb.damagePct) dmg = Math.max(1, Math.floor(dmg * (1 + wb.damagePct / 100)));
-      if (wb.critChance > 0 && !critSt && Math.random() * 100 < wb.critChance) {
-        critSt = true;
-        dmg = Math.max(1, Math.floor(dmg * (1 + (wb.critDamage || 0) / 100)));
-      }
     }
     if (typeof wheelDamageMul === "function" && p.wheel) {
       dmg = Math.max(1, Math.floor(dmg * wheelDamageMul(p)));
@@ -2363,7 +2374,9 @@ function castSpellById(c, p, target, now, id) {
                       sx: c.player ? c.player.x : 0.18,
                       sy: c.player ? c.player.y : 0.62, screen: true,
                       projectile: false, el: armaEl.el, dual: 1,
-                      crit: critSt, fatal: fatalSpell,
+                      // Crit/Fatal só no hit principal do alvo — o dual não
+                      // reemite o sprite (drainEvents dedupeia por targetId).
+                      crit: false, fatal: false,
                       fx: (ELEMENTS[armaEl.el] || ELEMENTS.physical).fx });
       return;
     }
@@ -2530,6 +2543,24 @@ function tryUseRune(c, p, target, now, forcada) {
   const forgeOnslaughtRune = (typeof forgeTryOnslaught === "function") ? forgeTryOnslaught(p) : null;
   const transcendRunePct = (typeof forgeTranscendenceDamagePct === "function")
     ? forgeTranscendenceDamagePct(p, now) : 0;
+  // Crit/Fatal da runa: um roll por uso — em área vale para todos os alvos.
+  const rolledRuneCrit = (typeof rollPlayerCrit === "function")
+    ? rollPlayerCrit(p) : { crit: false, extraPct: 0 };
+  let runeCastExtra = 0;
+  let runeCastCrit = false;
+  let runeCastFatal = false;
+  if (rolledRuneCrit.crit) {
+    runeCastExtra += rolledRuneCrit.extraPct;
+    runeCastCrit = true;
+  }
+  if (forgeOnslaughtRune) {
+    runeCastExtra += (forgeOnslaughtRune.bonusPct || 60);
+    runeCastFatal = true;
+  }
+  if (transcendRunePct > 0) {
+    runeCastExtra += transcendRunePct;
+    runeCastCrit = true;
+  }
 
   // Alvos: as runas de area do Canary cobrem uma GRADE (avalanche e great
   // fireball pegam 37 SQMs). Como a cena da caçada tem poucos monstros, o
@@ -2561,18 +2592,7 @@ function tryUseRune(c, p, target, now, forcada) {
       // formula real do .lua: (level/5) + (magicLevel * K) + C
       const pw = supplyPowerFor(p, best);
       dmg = Math.floor(pw[0] + Math.random() * (pw[1] - pw[0]));
-      let extraRunePct = 0;
-      let runeCrit = false;
-      let runeFatal = false;
-      if (forgeOnslaughtRune) {
-        extraRunePct += (forgeOnslaughtRune.bonusPct || 60);
-        runeFatal = true;
-      }
-      if (transcendRunePct > 0) {
-        extraRunePct += transcendRunePct;
-        runeCrit = true;
-      }
-      if (extraRunePct > 0) dmg = Math.max(1, Math.floor(dmg * (1 + extraRunePct / 100)));
+      if (runeCastExtra > 0) dmg = Math.max(1, Math.floor(dmg * (1 + runeCastExtra / 100)));
       // charms e resistencia do monstro, na mesma ordem do ataque normal
       if (typeof applyCharmDamage === "function") {
         dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
@@ -2588,7 +2608,7 @@ function tryUseRune(c, p, target, now, forcada) {
                       screen: true,
                       projectile: alvo === target,
                       el: s.element, rune: s.name,
-                      crit: runeCrit, fatal: runeFatal,
+                      crit: runeCastCrit, fatal: runeCastFatal,
                       fx: s.fx || null, missile: missile });
     }
     // crippling stances do Sorcerer (15.25): "spells, runes e auto
@@ -2610,6 +2630,7 @@ function tryUseRune(c, p, target, now, forcada) {
                       // arremessada uma vez e explode em area
                       projectile: alvo === target,
                       el: s.element, rune: s.name,
+                      crit: runeCastCrit, fatal: runeCastFatal,
                       fx: s.fx || null, missile: missile });
     }
   }
@@ -3543,7 +3564,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
-                    screen: true, mantra: true,
+                    screen: true, mantra: true, fx: "block-hit",
                     projectile: bolt, missile: miss });
     return 0;
   }
@@ -3745,19 +3766,19 @@ function mobAttack(c, p, mob) {
   // Divine Dazzle (exana amp res): o alvo ofuscado erra golpes
   const bfm = typeof buffTotals === "function" ? buffTotals(p) : null;
   if (bfm && bfm.mobMissChance && Math.random() < bfm.mobMissChance) {
-    c.events.push({ t: "miss", x: pl.x, y: pl.y, dazzle: true });
+    c.events.push({ t: "miss", x: pl.x, y: pl.y, dazzle: true, fx: "poff" });
     return 0;
   }
   // charm Dodge: esquiva total do golpe
   const chm = typeof charmTotals === "function" ? charmTotals(p) : null;
   if (chm && chm.esquiva && Math.random() * 100 < chm.esquiva) {
-    c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+    c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, fx: "poff" });
     return 0;
   }
   if (typeof wheelTotals === "function" && p.wheel) {
     const dodge = wheelTotals(p).dodge || 0;
     if (dodge && Math.random() * 100 < dodge) {
-      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, fx: "poff" });
       return 0;
     }
   }
@@ -3776,7 +3797,7 @@ function mobAttack(c, p, mob) {
       pl.cx !== undefined && mob.cx !== undefined) {
     const dod = stanceTotals(p).dodgeRanged;
     if (dod && sqmDistance(pl, mob) > 1 && Math.random() < dod) {
-      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true });
+      c.events.push({ t: "miss", x: pl.x, y: pl.y, dodge: true, fx: "poff" });
       return 0;
     }
   }
@@ -3843,7 +3864,8 @@ function mobAttack(c, p, mob) {
   mob.attackAnim = 180;
   if (raw <= 0) {
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
-                    screen: true, projectile: monsterAttackRange(mob) > 0.16,
+                    screen: true, fx: "block-hit",
+                    projectile: monsterAttackRange(mob) > 0.16,
                     missile: monsterMissile(mob) });
     addSkillTries(p, "shield", combatSkillGain(c, 1));
     return 0;
@@ -3890,7 +3912,7 @@ function mobAttack(c, p, mob) {
     raw = mantraAbsorve(p, raw, mob.def.element, c);
     if (raw <= 0) {
       c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
-                      screen: true, mantra: true,
+                      screen: true, mantra: true, fx: "block-hit",
                       projectile: monsterAttackRange(mob) > 0.16,
                       missile: monsterMissile(mob) });
       addSkillTries(p, "shield", combatSkillGain(c, 1));
@@ -3954,6 +3976,9 @@ function lootStackCount(entry,randomValue){
 
 /* Gera o loot de um monstro morto */
 function rollLoot(c, p, mob) {
+  // Online: crédito só via creditHuntLoot no servidor. Catch-up local não pode
+  // empilhar qty na pouch em cima do snapshot autoritativo.
+  if (typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) return [];
   // Party combat: a Loot Pouch do líder é o destino ÚNICO de todo loot,
   // mesmo quando o membro ativo/quem deu o último hit é outro personagem.
   // Equipamentos, imbuements e Forge continuam calculados pelo `p` atacante
@@ -4014,8 +4039,10 @@ function rollLoot(c, p, mob) {
     } else if (it.s === "ammo") {
       addAmmo(p, l.item, count);
     } else {
-      if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
-      else addLootPouch(p, l.item, count);
+      const ok = (typeof routeLootItem === "function")
+        ? routeLootItem(p, l.item, count)
+        : addLootPouch(p, l.item, count);
+      if (!ok) continue;
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
@@ -4050,8 +4077,10 @@ function rollLoot(c, p, mob) {
         } else if (it.s === "ammo") {
           addAmmo(p, l.item, count);
         } else {
-          if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
-          else addLootPouch(p, l.item, count);
+          const ok = (typeof routeLootItem === "function")
+            ? routeLootItem(p, l.item, count)
+            : addLootPouch(p, l.item, count);
+          if (!ok) continue;
         }
         c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
         got.push({ item: l.item, count: count });
@@ -4205,17 +4234,30 @@ function partyTickAllies(c, now, dt) {
   if (!c || !c.players || c.players.length < 2) return;
   for (const ent of c.players) {
     if (ent === c.player || !ent.p) continue;
-    // aliado caiu: agenda o renascimento no local (reviveAt) — o loop do
-    // game.js revive quando o tempo chega
+    // aliado caiu: em hunt agenda reviveAt; em boss fica permadead (corpo).
     if (ent.p.hp <= 0) {
-      if (!ent.reviveAt) {
+      if (c.boss) {
+        if (!ent.permadead) {
+          ent.downedAt = now;
+          ent.permadead = true;
+          ent.reviveAt = 0;
+          ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
+          const loss = applyCharacterDeathConsequences(c, ent.p);
+          if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
+          if (typeof addLog === "function") {
+            addLog("death", `<b>${ent.name}</b> caiu na bossroom e não renasce — corpo permanece no chão${loss.exp ? ` (−${loss.exp} XP)` : ""}.`);
+          }
+        }
+        if (c.players.every((e) => !e.p || e.p.hp <= 0) && typeof bossFailAndReturnTemple === "function")
+          bossFailAndReturnTemple(c);
+      } else if (!ent.reviveAt) {
         ent.downedAt = now;
         ent.reviveAt = now + ((typeof reviveTime === "function") ? reviveTime() : 30000);
         ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
-        const loss=applyCharacterDeathConsequences(c,ent.p);
+        const loss = applyCharacterDeathConsequences(c, ent.p);
         if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
         if (typeof addLog === "function") {
-          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${loss.exp?` e ${loss.exp} XP`:""} — renasce no local em ${Math.round((typeof reviveTime === "function" ? reviveTime() : 30000) / 1000)}s.`);
+          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${loss.exp ? ` e ${loss.exp} XP` : ""} — renasce no local em ${Math.round((typeof reviveTime === "function" ? reviveTime() : 30000) / 1000)}s.`);
         }
       }
       continue;
@@ -4275,64 +4317,69 @@ function partyHelperTick(c, ent, now, dt) {
   }
 }
 
+/* Wipe de boss: sem revive/bless de retorno — falha, limpa a instância e
+ * manda a party de volta ao templo. */
+function bossFailAndReturnTemple(c) {
+  if (!c || !c.boss || c.bossFailed || c.instanceFinished) return false;
+  c.bossFailed = true;
+  c.instanceFinished = true;
+  const name = (c.boss && (c.boss.name || c.boss.id)) || "Boss";
+  if (typeof addLog === "function")
+    addLog("death", `<b>Party wipe!</b> Todos morreram no boss <b>${name}</b> — boss falhou, voltando ao templo.`);
+  if (typeof toast === "function") toast("Party wipe! Boss falhou.", "death");
+  if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-boss");
+  if (typeof stopHunt === "function") {
+    setTimeout(() => { try { stopHunt(); } catch (e) { /* ignore */ } }, 1500);
+  }
+  return true;
+}
+
 /* Personagem da party caiu (hp <= 0): vira INCONSCIENTE (revive no local
  * depois de reviveTime) e o controle passa para o próximo membro vivo.
- * FIX: dentro da bossroom mortos NÃO renascem (permadead), conforme pedido.
- * Quando PT toda morre, boss falha e volta pro templo. */
+ * Dentro da bossroom mortos NÃO renascem (permadead / corpo no chão).
+ * Quando a PT toda morre, o boss falha e volta pro templo. */
 function partyHandleDown(c, fallenP, now) {
-  now=now||Date.now();
-  const ent = c.players.find((e) => e.p === fallenP) || c.player;
-  let consequence=null;
+  now = now || Date.now();
+  const members = (c.players && c.players.length) ? c.players : (c.player ? [c.player] : []);
+  const ent = members.find((e) => e.p === fallenP) || c.player;
+  let consequence = null;
   const isBoss = !!(c && c.boss);
   if (ent) {
     if (!ent.reviveAt && !ent.permadead) {
       ent.downedAt = now;
+      ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       if (isBoss) {
         ent.permadead = true;
         ent.reviveAt = 0;
-        ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       } else {
         ent.reviveAt = ent.downedAt + ((typeof reviveTime === "function") ? reviveTime() : 30000);
-        ent.deathPos = { x: ent.x, y: ent.y, dir: ent.dir || "e" };
       }
       ent.p.hp = 0;
-      consequence=applyCharacterDeathConsequences(c,ent.p);
+      consequence = applyCharacterDeathConsequences(c, ent.p);
       if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(ent.p);
       if (typeof addLog === "function") {
         if (isBoss) {
-          addLog("death", `<b>${ent.name}</b> caiu na bossroom e não renasce até o fim da luta.`);
+          addLog("death", `<b>${ent.name || (fallenP && fallenP.name) || "Personagem"}</b> caiu na bossroom e não renasce — corpo permanece no chão.`);
         } else {
-          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${consequence.exp?` e ${consequence.exp} XP`:""} — renasce no local em ${Math.round((ent.reviveAt-now)/1000)}s.`);
+          addLog("death", `<b>${ent.name}</b> caiu em combate e perdeu a bless${consequence.exp ? ` e ${consequence.exp} XP` : ""} — renasce no local em ${Math.round((ent.reviveAt - now) / 1000)}s.`);
         }
       }
     }
   }
-  // troca o controle para o próximo vivo
-  const proximo = c.players.find((e) => e !== ent && e.p && e.p.hp > 0);
+  const proximo = members.find((e) => e !== ent && e.p && e.p.hp > 0);
   if (proximo) {
     if (typeof addLog === "function") {
-      addLog("party", `Controlando agora: <b>${proximo.name}</b> (${fallenP.name} inconsciente).`);
+      addLog("party", `Controlando agora: <b>${proximo.name}</b> (${(fallenP && fallenP.name) || "aliado"} inconsciente).`);
     }
-    if(typeof G!=="undefined"&&G&&G._idleCatchup){c.player=proximo;G.p=proximo.p;}
-    else if(typeof partyCombatSwitchTo === "function")partyCombatSwitchTo(proximo.id);
-  } else {
-    const allDead = c.players.every(e => !e.p || e.p.hp <= 0);
-    if (allDead) {
-      if (c.boss) {
-        if (typeof addLog === "function") addLog("death", `<b>Party wipe!</b> Todos morreram no boss <b>${c.boss.name||c.boss.id}</b> — boss falhou, voltando ao templo.`);
-        if (typeof toast === "function") toast("Party wipe! Boss falhou.", "death");
-        c.bossFailed = true;
-        c.instanceFinished = true;
-        if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-boss");
-        if (typeof stopHunt === "function") {
-          setTimeout(() => { try { stopHunt(); } catch(e){} }, 1500);
-        }
-      } else if (c.huntId) {
-        if (typeof addLog === "function") addLog("death", `<b>Party wipe!</b> Todos morreram na hunt — voltando ao templo.`);
-        if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-hunt");
-        if (typeof stopHunt === "function") {
-          setTimeout(() => { try { stopHunt(); } catch(e){} }, 1500);
-        }
+    if (typeof G !== "undefined" && G && G._idleCatchup) { c.player = proximo; G.p = proximo.p; }
+    else if (typeof partyCombatSwitchTo === "function") partyCombatSwitchTo(proximo.id);
+  } else if (members.every((e) => !e.p || e.p.hp <= 0)) {
+    if (c.boss) bossFailAndReturnTemple(c);
+    else if (c.huntId) {
+      if (typeof addLog === "function") addLog("death", `<b>Party wipe!</b> Todos morreram na hunt — voltando ao templo.`);
+      if (typeof clearInstanceSession === "function") clearInstanceSession("party-wipe-hunt");
+      if (typeof stopHunt === "function") {
+        setTimeout(() => { try { stopHunt(); } catch (e) { /* ignore */ } }, 1500);
       }
     }
   }
@@ -4443,12 +4490,14 @@ function combatTick(c, p, dt, now) {
   if (c.buffs.haste > 0) c.buffs.haste -= dt;
 
   // spawn — só depois do mapa 100% pronto (G.huntMapReady).
-  // Após limpar a onda, espera WAVE_CLEAR_RESPAWN_MS antes do blink/respawn
-  // (também evita kill+spawnWave no mesmo frame do último monstro).
+  // Após limpar a onda, agenda WAVE_CLEAR_RESPAWN_MS até o monstro nascer.
+  // Em T-3s (WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns e começa o blink.
   if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
     if (c.boss) return;
-    if (c._nextWaveAt && now < c._nextWaveAt) {
-      /* ainda no intervalo pós-wave */
+    const teleportAt = c._nextWaveAt
+      ? (Number(c._nextWaveAt) - WAVE_TELEPORT_LEAD_MS) : 0;
+    if (c._nextWaveAt && now < teleportAt) {
+      /* ainda no intervalo pós-wave (antes do teleporte) */
     } else if (!huntMapSpawnBlocked()) {
       c._nextWaveAt = 0;
       spawnWave(c, p);
@@ -4584,16 +4633,21 @@ function combatTick(c, p, dt, now) {
   // INCONSCIENTE e renasce no local depois de um tempo; o controle passa
   // para o próximo membro vivo. Só quando TODOS caem é que vale a morte
   // normal (perda + revive da instância inteira).
+  // BOSS: sem revive/contador — permadead + corpo; wipe encerra a instância.
   if (p.hp <= 0) {
     if (c.boss && c.boss.noRevive && typeof bossHandlePermanentDown === "function") {
       bossHandlePermanentDown(c, p, "dano do boss");
       return;
     }
+    if (c.boss && typeof partyHandleDown === "function") {
+      partyHandleDown(c, p, now);
+      return;
+    }
     if (c.players && c.players.length > 1 &&
         typeof partyHandleDown === "function") {
-      const consequence=partyHandleDown(c, p, now);
+      const consequence = partyHandleDown(c, p, now);
       const vivos = c.players.some((e) => e.p && e.p.hp > 0);
-      if (!vivos) { playerDeath(c, p, consequence || {exp:0,rate:0,cause:combatDeathCause(c),blessed:false}); return; }
+      if (!vivos) { playerDeath(c, p, consequence || { exp: 0, rate: 0, cause: combatDeathCause(c), blessed: false }); return; }
     } else {
       playerDeath(c, p); return;
     }

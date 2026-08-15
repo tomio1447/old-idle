@@ -183,41 +183,99 @@ function tileVariant(ids, cx, cy) {
   return ids[(cx * 31 + cy * 17) % ids.length];
 }
 
+/* Item explicitamente NÃO-ANDÁVEL (parede/pilar/bloqueante) em TILEFLAGS. */
+function tileItemIsBlocking(id) {
+  const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+  return !!(f && f[0] === 0);
+}
+
+function tileLegendIsWall(L) {
+  return !!(L && L.v && L.v.some(function (id) {
+    const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
+    return f && f[0] === 0;
+  }));
+}
+
+/* Ordena drawables por SQM (sul depois, leste depois) — mesma regra do client. */
+function sortTileDepthDrawables(list) {
+  return (list || []).slice().sort(function (a, b) {
+    return (a.ty - b.ty) || (a.tx - b.tx) || ((a.footY || 0) - (b.footY || 0))
+      || ((a.order || 0) - (b.order || 0));
+  });
+}
+
+/* Desenha paredes/bloqueantes célula a célula (N→S, O→L). Em cada SQM,
+ * opcionalmente intercalá criaturas via opts.drawables [{tx,ty,footY,order,draw}].
+ * Assim: criatura à DIREITA da parede fica por cima; à ESQUERDA, a parede cobre. */
+function drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts) {
+  opts = opts || {};
+  const tw = W / cols, th = H / rows;
+  const decoAt = {};
+  for (const d of map.deco || []) {
+    if (!tileItemIsBlocking(d[0])) continue;
+    const key = (d[1] | 0) + ":" + (d[2] | 0);
+    (decoAt[key] || (decoAt[key] = [])).push(d);
+  }
+  const drawables = sortTileDepthDrawables(opts.drawables);
+  let di = 0;
+  const n = drawables.length;
+  const flushCell = function (x, y) {
+    while (di < n && drawables[di].ty === y && drawables[di].tx === x) {
+      const item = drawables[di++];
+      if (typeof item.draw === "function") item.draw();
+    }
+  };
+  for (let y = 0; y < rows; y++) {
+    const row = (y < map.rows.length) ? map.rows[y] : null;
+    for (let x = 0; x < cols; x++) {
+      if (row && x < row.length) {
+        const L = map.leg[row[x]];
+        if (L && L.g) {
+          const cw = tileLegendIsWall(L);
+          for (const id of L.g) {
+            if (!tileItemIsBlocking(id)) continue;
+            TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw, x, y);
+          }
+        }
+      }
+      const extras = decoAt[x + ":" + y];
+      if (extras) {
+        for (const d of extras)
+          TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false, d[1], d[2]);
+      }
+      flushCell(x, y);
+    }
+  }
+  while (di < n) {
+    const item = drawables[di++];
+    if (typeof item.draw === "function") item.draw();
+  }
+}
+
 /* Desenha um mapa de caracteres inteiro numa area W x H (cena de combate).
  * mode:
  *   'all'      -> chão + objetos (comportamento original, usado pela cidade)
  *   'ground'   -> chão + objetos ANDÁVEIS (desenhado ANTES das criaturas)
- *   'objects'  -> só objetos NÃO-ANDÁVEIS (desenhado DEPOIS das criaturas,
- *                 para paredes/pilares sobreporem monstros/players como no client)
+ *   'objects'  -> só objetos NÃO-ANDÁVEIS; com opts.drawables, intercalá
+ *                 criaturas por SQM (profundidade Oeste/Leste e Norte/Sul)
+ * opts (opcional):
+ *   drawables: [{ tx, ty, footY?, order?, draw }] — só em mode 'objects'/'all'
  * Regra de z-order (igual ao client Tibia): tiles/pisos e decorações andáveis
  * (sofás, gelo, tapetes) ficam ABAIXO das criaturas (o player anda em cima);
- * paredes/pilares (não-andáveis) ficam ACIMA, cobrindo quem está atrás/dentro
- * do footprint. */
-function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
+ * paredes/pilares (não-andáveis) intercalam por posição de tile com criaturas. */
+function drawTileCharMap(ctx, map, W, H, cols, rows, mode, opts) {
   if (mode === undefined) mode = "all";
+  opts = opts || null;
   const tw = W / cols, th = H / rows;
-  // Item explicitamente NÃO-ANDÁVEL (parede/pilar/bloqueante) em TILEFLAGS:
-  // desenhado POR CIMA das criaturas. Ausente em TILEFLAGS ou andável =>
-  // decoração andável (sofá, gelo), desenhada ABAIXO das criaturas.
-  const isBlocking = function (id) {
-    const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
-    return !!(f && f[0] === 0);
-  };
-  const cellIsWall = function (L) {
-    return !!(L.v && L.v.some(function (id) {
-      const f = (typeof TILEFLAGS !== "undefined" && TILEFLAGS[id]);
-      return f && f[0] === 0;
-    }));
-  };
   const drawCellItems = function (onlyBlocking) {
     for (let y = 0; y < rows && y < map.rows.length; y++) {
       const row = map.rows[y];
       for (let x = 0; x < cols && x < row.length; x++) {
         const L = map.leg[row[x]];
         if (!L || !L.g) continue;
-        const cw = cellIsWall(L);
+        const cw = tileLegendIsWall(L);
         for (const id of L.g) {
-          if (isBlocking(id) !== onlyBlocking) continue;
+          if (tileItemIsBlocking(id) !== onlyBlocking) continue;
           TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw, x, y);
         }
       }
@@ -225,7 +283,7 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
   };
   const drawDecoItems = function (onlyBlocking) {
     for (const d of map.deco || []) {
-      if (isBlocking(d[0]) !== onlyBlocking) continue;
+      if (tileItemIsBlocking(d[0]) !== onlyBlocking) continue;
       TileSprites.drawDeco(ctx, d[0], d[1] * tw, d[2] * th, tw, false, d[1], d[2]);
     }
   };
@@ -245,8 +303,11 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode) {
     if (mode === "all" || mode === "ground") { drawCellItems(false); drawDecoItems(false); }
   }
   if (mode !== "ground") {
-    // Objetos NÃO-ANDÁVEIS (paredes, pilares, móveis bloqueantes): ACIMA das
-    // criaturas — sobrepõem monstros/players que estejam atrás/dentro do footprint.
-    if (mode === "all" || mode === "objects") { drawCellItems(true); drawDecoItems(true); }
+    // Paredes/pilares: intercalados com criaturas quando opts.drawables existe.
+    if (mode === "all" || mode === "objects") {
+      if (opts && opts.drawables)
+        drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts);
+      else { drawCellItems(true); drawDecoItems(true); }
+    }
   }
 }

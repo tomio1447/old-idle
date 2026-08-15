@@ -20,14 +20,26 @@ const MYSQL_PASS = process.env.MYSQL_PASS || "";
 const MYSQL_DB   = process.env.MYSQL_DB   || "global_idle";
 const MYSQL_PORT = parseInt(process.env.MYSQL_PORT || "3306", 10);
 
-const DATA_DIR = process.env.GLOBAL_IDLE_DATA_DIR
+let DATA_DIR = process.env.GLOBAL_IDLE_DATA_DIR
   ? path.resolve(process.env.GLOBAL_IDLE_DATA_DIR)
   : path.join(__dirname, "data");
+
+function ensureDataDir() {
+  const fallback = path.join(__dirname, "data");
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.accessSync(DATA_DIR, fs.constants.W_OK);
+  } catch (e) {
+    console.error("[db] DATA_DIR inacessível:", DATA_DIR, "-", e.message, "→ fallback", fallback);
+    DATA_DIR = fallback;
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
 
 /* Storage JSON local (fallback sem MySQL): dois arquivos
  * data/accounts.json e data/characters.json */
 function JsonStore() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  ensureDataDir();
   this.accounts = this._load("accounts.json", []);
   this.characters = this._load("characters.json", []);
   // Saves anteriores à versão otimista começam na versão 1.
@@ -37,7 +49,11 @@ function JsonStore() {
   this.sessions = this._load("sessions.json", []);
   this.leases = this._load("leases.json", []);
   this.instances = this._load("instances.json", []);
-  this.snapshots = this._load("snapshots.json", []);
+  // null = parse falhou (arquivo truncado a meio de um _save antigo de 50MB+).
+  // Reescreva no boot para não deixar lixo gigante no disco.
+  const loadedSnapshots = this._load("snapshots.json", null);
+  this.snapshots = Array.isArray(loadedSnapshots) ? loadedSnapshots : [];
+  this._snapshotsDirty = !Array.isArray(loadedSnapshots);
   // parties/invites persistem em data/parties.json (convites assíncronos
   // precisam sobreviver a reinícios do servidor)
   const partyData = this._load("parties.json", null);
@@ -80,6 +96,10 @@ function JsonStore() {
     this.market = [];
   }
   this._marketSeq = (this.market || []).reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
+  // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
+  const snapBefore = (this.snapshots || []).length;
+  this._pruneSnapshots();
+  if ((this.snapshots || []).length !== snapBefore) this._snapshotsDirty = true;
   this._save();
   this._partySave();
 }
@@ -99,12 +119,45 @@ JsonStore.prototype._save = function () {
     JSON.stringify(this.leases || [], null, 1));
   fs.writeFileSync(path.join(DATA_DIR, "instances.json"),
     JSON.stringify(this.instances || [], null, 1));
-  fs.writeFileSync(path.join(DATA_DIR, "snapshots.json"),
-    JSON.stringify(this.snapshots || [], null, 1));
+  // snapshots.json pode passar de dezenas de MB. NÃO regrave no _save() de
+  // login/lease/market — isso bloqueava o event loop e fazia 127.0.0.1 parecer
+  // ping 999999. Snapshots só saem em _saveSnapshots() (dirty).
+  if (this._snapshotsDirty) this._saveSnapshots();
   fs.writeFileSync(path.join(DATA_DIR, "market.json"),
     JSON.stringify({ offers: this.market || [],
                      marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
+};
+JsonStore.prototype._pruneSnapshots = function () {
+  const list = Array.isArray(this.snapshots) ? this.snapshots : [];
+  const byAccount = new Map();
+  for (const row of list) {
+    const key = String(row && row.account_id);
+    if (!byAccount.has(key)) byAccount.set(key, []);
+    byAccount.get(key).push(row);
+  }
+  const kept = [];
+  for (const rows of byAccount.values()) {
+    rows.sort((a, b) => Number(a.id) - Number(b.id));
+    kept.push(...rows.slice(-50));
+  }
+  kept.sort((a, b) => Number(a.id) - Number(b.id));
+  this.snapshots = kept;
+};
+JsonStore.prototype._saveSnapshots = function () {
+  this._pruneSnapshots();
+  this._snapshotsDirty = false;
+  // Compacto: pretty-print de 50MB+ serializa por centenas de ms no Windows.
+  fs.writeFileSync(path.join(DATA_DIR, "snapshots.json"),
+    JSON.stringify(this.snapshots || []));
+};
+JsonStore.prototype._saveSessions = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "sessions.json"),
+    JSON.stringify(this.sessions || [], null, 1));
+};
+JsonStore.prototype._saveLeases = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "leases.json"),
+    JSON.stringify(this.leases || [], null, 1));
 };
 /* O tick autoritativo local acontece várias vezes por segundo. Chamar `_save()`
    nele reserializava accounts, sessions, leases, até 500 snapshots e market mesmo
@@ -161,27 +214,27 @@ JsonStore.prototype.createSession = function (accountId, token, expiresAt) {
     id: this._nextId(this.sessions), account_id:Number(accountId), token:String(token),
     created_at:new Date().toISOString(),expires_at:expiresAt?new Date(expiresAt).toISOString():null,
   });
-  this._save();
+  this._saveSessions();
   return token;
 };
 JsonStore.prototype.revokeSession = function(token){const before=(this.sessions||[]).length;
-  this.sessions=(this.sessions||[]).filter((s)=>s.token!==String(token));if(this.sessions.length!==before)this._save();return this.sessions.length!==before;};
+  this.sessions=(this.sessions||[]).filter((s)=>s.token!==String(token));if(this.sessions.length!==before)this._saveSessions();return this.sessions.length!==before;};
 JsonStore.prototype.pruneExpiredSessions=function(now){const before=(this.sessions||[]).length;
-  this.sessions=(this.sessions||[]).filter((s)=>!s.expires_at||new Date(s.expires_at).getTime()>now);if(this.sessions.length!==before)this._save();return before-this.sessions.length;};
+  this.sessions=(this.sessions||[]).filter((s)=>!s.expires_at||new Date(s.expires_at).getTime()>now);if(this.sessions.length!==before)this._saveSessions();return before-this.sessions.length;};
 JsonStore.prototype.leaseAcquire = function(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
   this.leases=this.leases||[];
   let row=this.leases.find((lease)=>Number(lease.account_id)===Number(accountId));
   const active=row&&new Date(row.expires_at).getTime()>now;
   if(active&&(row.holder_id===holderId||row.holder_id===previousHolderId)&&row.secret_hash===presentedHash){
     row.holder_id=holderId;row.renewed_at=new Date(now).toISOString();
-    row.expires_at=new Date(expiresAt).toISOString();this._save();
+    row.expires_at=new Date(expiresAt).toISOString();this._saveLeases();
     return {ok:true,resumed:true,lease:row};
   }
   if(active)return {ok:false,error:"LEASE_HELD",lease:row};
   if(!row){row={account_id:Number(accountId)};this.leases.push(row);}
   Object.assign(row,{holder_id:holderId,secret_hash:newHash,acquired_at:new Date(now).toISOString(),
     renewed_at:new Date(now).toISOString(),expires_at:new Date(expiresAt).toISOString()});
-  this._save();return {ok:true,resumed:false,lease:row};
+  this._saveLeases();return {ok:true,resumed:false,lease:row};
 };
 JsonStore.prototype.leaseTakeover = function(accountId,holderId,newHash,now,expiresAt){
   this.leases=this.leases||[];
@@ -189,13 +242,13 @@ JsonStore.prototype.leaseTakeover = function(accountId,holderId,newHash,now,expi
   if(!row){row={account_id:Number(accountId)};this.leases.push(row);}
   Object.assign(row,{holder_id:holderId,secret_hash:newHash,acquired_at:new Date(now).toISOString(),
     renewed_at:new Date(now).toISOString(),expires_at:new Date(expiresAt).toISOString()});
-  this._save();return {ok:true,lease:row};
+  this._saveLeases();return {ok:true,lease:row};
 };
 JsonStore.prototype.leaseRenew = function(accountId,holderId,secretHash,now,expiresAt){
   const row=(this.leases||[]).find((lease)=>Number(lease.account_id)===Number(accountId));
   if(!row||row.holder_id!==holderId||row.secret_hash!==secretHash||new Date(row.expires_at).getTime()<=now)
     return {ok:false,error:"LEASE_LOST",lease:row||null};
-  row.renewed_at=new Date(now).toISOString();row.expires_at=new Date(expiresAt).toISOString();this._save();
+  row.renewed_at=new Date(now).toISOString();row.expires_at=new Date(expiresAt).toISOString();this._saveLeases();
   return {ok:true,lease:row};
 };
 JsonStore.prototype.leaseValidate = function(accountId,holderId,secretHash,now){
@@ -206,7 +259,7 @@ JsonStore.prototype.leaseRelease = function(accountId,holderId,secretHash){
   const before=(this.leases||[]).length;
   this.leases=(this.leases||[]).filter((row)=>!(Number(row.account_id)===Number(accountId)&&
     row.holder_id===holderId&&row.secret_hash===secretHash));
-  if(this.leases.length!==before)this._save();return this.leases.length!==before;
+  if(this.leases.length!==before)this._saveLeases();return this.leases.length!==before;
 };
 JsonStore.prototype.instanceGet = function(accountId){
   return (this.instances||[]).find((row)=>Number(row.account_id)===Number(accountId))||null;
@@ -233,7 +286,9 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
   }else{
     if(Number(expectedVersion)!==0)return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
     if(!row){row={account_id:Number(accountId)};this.instances.push(row);}
-    row.instance_id=instanceId;row.version=1;row.started_at=meta.startedAt;row.worker_total_ms=0;
+    row.instance_id=instanceId;row.version=1;
+    row.started_at=meta.started_at||meta.startedAt||meta.saved_at||new Date().toISOString();
+    row.worker_total_ms=0;
   }
   Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
     worker_cursor_at:new Date(meta.saved_at).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
@@ -334,6 +389,15 @@ JsonStore.prototype.setAccountVipUntil = function (accountId, vipUntil) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
   a.vip_until = Math.max(0, Math.floor(Number(vipUntil) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountMissions = function (accountId, missions, missionsDone) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.missions = missions && typeof missions === "object" && !Array.isArray(missions) ? missions : {};
+  a.missionsDone = missionsDone && typeof missionsDone === "object" && !Array.isArray(missionsDone)
+    ? missionsDone : {};
   this._save();
   return a;
 };
@@ -596,20 +660,76 @@ JsonStore.prototype.marketHistory = function (limit) {
   this.marketHistoryArr = this.marketHistoryArr || [];
   return this.marketHistoryArr.slice(0, Math.min(600, Math.max(1, Number(limit) || 100)));
 };
+JsonStore.prototype._rankingMetric = function (c, by) {
+  let d = {};
+  try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = {}; }
+  const skills = d.skills || {};
+  const level = Math.floor(Number(c.level) || 1);
+  if (by === "kills") return Math.floor(Number(d.totalKills) || 0);
+  if (by === "magic") return Math.floor(Number(d.ml) || 0);
+  if (by === "sword") return Math.floor(Number(skills.sword) || 10);
+  if (by === "fist") return Math.floor(Number(skills.fist) || 10);
+  if (by === "club") return Math.floor(Number(skills.club) || 10);
+  if (by === "axe") return Math.floor(Number(skills.axe) || 10);
+  if (by === "distance" || by === "dist") return Math.floor(Number(skills.dist) || 10);
+  return level;
+};
 JsonStore.prototype.rankings = function (by, limit) {
   limit = Math.min(100, Math.max(1, Number(limit) || 50));
-  const chars = Object.keys(this.characters || {}).map((k) => this.characters[k]);
+  by = String(by || "level").toLowerCase();
+  if (by === "dist") by = "distance";
+  const chars = Array.isArray(this.characters) ? this.characters
+    : Object.keys(this.characters || {}).map((k) => this.characters[k]);
   let rows = chars.map((c) => {
-    let kills = 0;
-    try {
-      const d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {});
-      kills = Math.floor(d.totalKills || 0);
-    } catch (e) { /* sem data */ }
-    return { id: c.id, name: c.name, voc: c.voc, level: c.level, totalKills: kills };
+    const value = this._rankingMetric(c, by);
+    const row = { id: c.id, name: c.name, voc: c.voc, level: Math.floor(Number(c.level) || 1), value };
+    if (by === "kills") row.totalKills = value;
+    return row;
   });
-  if (by === "kills") rows.sort((a, b) => (b.totalKills - a.totalKills) || (b.level - a.level));
-  else rows.sort((a, b) => (b.level - a.level));
+  rows.sort((a, b) => (b.value - a.value) || (b.level - a.level) || String(a.name).localeCompare(String(b.name)));
   return rows.slice(0, limit);
+};
+
+/* Contagem pública: personagens online (lease ativo) + stub offlineHunting. */
+JsonStore.prototype.onlineCount = function () {
+  const now = Date.now();
+  const offlineHunting = 0; // stub: caçadas em instâncias offline (futuro)
+  const leases = (this.leases || []).filter((l) => l && l.expires_at &&
+    new Date(l.expires_at).getTime() > now);
+  const leasedAccounts = new Set(leases.map((l) => Number(l.account_id)));
+  const activeInstances = (this.instances || []).filter((r) => r && r.status === "active");
+  const charIds = new Set();
+  for (const row of activeInstances) {
+    let state = null;
+    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    const fromAuth = ((state && state.authority && state.authority.players) || [])
+      .map((p) => Number(p && p.id));
+    const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
+    const ids = fromAuth.length ? fromAuth : fromMembers;
+    if (!ids.length && row.active_character_id) ids.push(Number(row.active_character_id));
+    for (const id of ids) {
+      if (!Number.isSafeInteger(id) || id <= 0) continue;
+      const c = this.findCharacter(id);
+      if (c && leasedAccounts.has(Number(c.account_id))) charIds.add(id);
+    }
+  }
+  const accountsWithChars = new Set();
+  for (const id of charIds) {
+    const c = this.findCharacter(id);
+    if (c) accountsWithChars.add(Number(c.account_id));
+  }
+  let cityOnline = 0;
+  for (const accId of leasedAccounts) {
+    if (!accountsWithChars.has(accId)) cityOnline++;
+  }
+  const onlineChars = charIds.size + cityOnline;
+  return {
+    onlineChars,
+    offlineHunting,
+    total: onlineChars + offlineHunting,
+    leases: leases.length,
+    instances: activeInstances.length,
+  };
 };
 
 /* --------------------------- SNAPSHOT HISTORY --------------------------- */
@@ -620,9 +740,10 @@ JsonStore.prototype.snapshotAdd=function(accountId,entityType,entityId,version,r
   const serialized=typeof data==="string"?data:JSON.stringify(data||{}),row={id:this._nextId(this.snapshots),
     account_id:Number(accountId),entity_type:type,entity_id:id,version:Number(version)||0,reason:String(reason||"checkpoint").slice(0,40),
     checksum:crypto.createHash("sha256").update(serialized).digest("hex"),data:serialized,created_at:new Date(now).toISOString()};
-  this.snapshots.push(row);const own=this.snapshots.filter((s)=>Number(s.account_id)===Number(accountId));
-  if(own.length>500){const remove=new Set(own.slice(0,own.length-500).map((s)=>s.id));this.snapshots=this.snapshots.filter((s)=>!remove.has(s.id));}
-  this._save();return row;
+  this.snapshots.push(row);
+  this._snapshotsDirty=true;
+  this._saveSnapshots();
+  return row;
 };
 JsonStore.prototype.snapshotList=function(accountId,limit){return (this.snapshots||[]).filter((s)=>Number(s.account_id)===Number(accountId))
   .sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,Math.max(1,Math.min(500,Number(limit)||100)));};
@@ -840,6 +961,19 @@ async function MysqlStore() {
   // garante o schema (tabelas) no primeiro uso
   await ensureSchema(pool);
 
+  function hydrateAccount(row) {
+    if (!row) return null;
+    const out = Object.assign({}, row);
+    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"]]) {
+      let v = row[col];
+      if (typeof v === "string") {
+        try { v = JSON.parse(v); } catch (e) { v = {}; }
+      }
+      out[key] = v && typeof v === "object" && !Array.isArray(v) ? v : {};
+    }
+    return out;
+  }
+
   async function lockValidLease(conn,accountId,lease){
     if(!lease)return true;
     const [rows]=await conn.query("SELECT holder_id,secret_hash,expires_at FROM account_leases WHERE account_id=? FOR UPDATE",
@@ -888,18 +1022,26 @@ async function MysqlStore() {
 
     async findAccountByLogin(login) {
       const rows = await this.query("SELECT * FROM accounts WHERE login = ?", [login]);
-      return rows[0] || null;
+      return hydrateAccount(rows[0] || null);
     },
     async findAccountById(id) {
       const rows = await this.query("SELECT * FROM accounts WHERE id = ?", [Number(id)]);
-      return rows[0] || null;
+      return hydrateAccount(rows[0] || null);
     },
     async createAccount(login, hash, role, coins) {
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, role, coins, gold, gold_migrated, vip_until) VALUES (?, ?, ?, ?, 0, 1, 0)",
+        "INSERT INTO accounts (login, password_hash, role, coins, gold, gold_migrated, vip_until, missions, missions_done) VALUES (?, ?, ?, ?, 0, 1, 0, '{}', '{}')",
         [login, hash, role || "user", coins || 0]);
       return { id: r.insertId, login, password_hash: hash, role: role || "user", coins: coins || 0,
-        gold: 0, gold_migrated: 1, vip_until: 0 };
+        gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {} };
+    },
+    async setAccountMissions(accountId, missions, missionsDone) {
+      const m = missions && typeof missions === "object" && !Array.isArray(missions) ? missions : {};
+      const d = missionsDone && typeof missionsDone === "object" && !Array.isArray(missionsDone) ? missionsDone : {};
+      await this.run(
+        "UPDATE accounts SET missions = ?, missions_done = ? WHERE id = ?",
+        [JSON.stringify(m), JSON.stringify(d), Number(accountId)]);
+      return this.findAccountById(accountId);
     },
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
@@ -1171,6 +1313,8 @@ async function MysqlStore() {
           if(Number(expectedVersion)!==0){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
           }
+          // Meta usa snake_case (started_at); fallback evita NULL em coluna NOT NULL.
+          const startedAt=meta.started_at||meta.startedAt||meta.saved_at||new Date();
           await conn.query(
             `INSERT INTO account_instances
              (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
@@ -1183,7 +1327,7 @@ async function MysqlStore() {
               started_at=VALUES(started_at),worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=0,
               ended_at=NULL,terminal_reason=NULL`,
             [Number(accountId),instanceId,meta.kind,meta.hunt_id,meta.boss_id,meta.instance_mode,
-             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,meta.started_at,meta.saved_at]);
+             meta.party_id,meta.party_version,meta.active_character_id,state,meta.saved_at,startedAt,meta.saved_at]);
         }
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
@@ -1464,20 +1608,95 @@ async function MysqlStore() {
     },
 
     // ---- RANKINGS (leaderboard) ----
-    /* Top personagens por nível (default) ou por total de kills
-     * (JSON_EXTRACT do save). Retorna name, voc, level, totalKills. */
+    /* Top por level, kills, magic (ml) ou skills melee/distance.
+     * Retorna id, name, voc, level, value (+ totalKills quando by=kills). */
     async rankings(by, limit) {
       limit = Math.min(100, Math.max(1, Number(limit) || 50));
+      by = String(by || "level").toLowerCase();
+      if (by === "dist") by = "distance";
+      const skillPath = {
+        sword: "$.skills.sword",
+        fist: "$.skills.fist",
+        club: "$.skills.club",
+        axe: "$.skills.axe",
+        distance: "$.skills.dist",
+      };
       if (by === "kills") {
-        return this.query(
+        const rows = await this.query(
           `SELECT id, name, voc, level,
-                  COALESCE(JSON_EXTRACT(data, '$.totalKills'), 0) AS totalKills
-           FROM characters ORDER BY totalKills DESC, level DESC LIMIT ?`,
+                  FLOOR(COALESCE(JSON_EXTRACT(data, '$.totalKills'), 0)) AS value
+           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
           [limit]);
+        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
+          value: Number(r.value) || 0, totalKills: Number(r.value) || 0 }));
       }
-      return this.query(
-        "SELECT id, name, voc, level FROM characters ORDER BY level DESC, updated_at ASC LIMIT ?",
+      if (by === "magic") {
+        const rows = await this.query(
+          `SELECT id, name, voc, level,
+                  FLOOR(COALESCE(JSON_EXTRACT(data, '$.ml'), 0)) AS value
+           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
+          [limit]);
+        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
+          value: Number(r.value) || 0 }));
+      }
+      if (skillPath[by]) {
+        const rows = await this.query(
+          `SELECT id, name, voc, level,
+                  FLOOR(COALESCE(JSON_EXTRACT(data, '${skillPath[by]}'), 10)) AS value
+           FROM characters ORDER BY value DESC, level DESC, name ASC LIMIT ?`,
+          [limit]);
+        return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
+          value: Number(r.value) || 0 }));
+      }
+      const rows = await this.query(
+        `SELECT id, name, voc, level, level AS value
+         FROM characters ORDER BY level DESC, updated_at ASC, name ASC LIMIT ?`,
         [limit]);
+      return rows.map((r) => ({ id: r.id, name: r.name, voc: r.voc, level: r.level,
+        value: Number(r.level) || 1 }));
+    },
+
+    /* Contagem pública: leases ativos → personagens online; offlineHunting=0 (stub). */
+    async onlineCount() {
+      const offlineHunting = 0; // stub: caçadas em instâncias offline (futuro)
+      const leases = await this.query(
+        "SELECT account_id FROM account_leases WHERE expires_at > ?",
+        [new Date()]);
+      const leasedAccounts = new Set(leases.map((l) => Number(l.account_id)));
+      const activeInstances = await this.query(
+        "SELECT account_id, active_character_id, state FROM account_instances WHERE status='active'");
+      const charIds = new Set();
+      for (const row of activeInstances) {
+        let state = null;
+        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        const fromAuth = ((state && state.authority && state.authority.players) || [])
+          .map((p) => Number(p && p.id));
+        const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
+        const ids = fromAuth.length ? fromAuth : fromMembers;
+        if (!ids.length && row.active_character_id) ids.push(Number(row.active_character_id));
+        for (const id of ids) {
+          if (!Number.isSafeInteger(id) || id <= 0) continue;
+          const c = await this.findCharacter(id);
+          if (c && leasedAccounts.has(Number(c.account_id))) charIds.add(id);
+        }
+      }
+      const accountsWithChars = new Set();
+      for (const id of charIds) {
+        const c = await this.findCharacter(id);
+        if (c) accountsWithChars.add(Number(c.account_id));
+      }
+      let cityOnline = 0;
+      for (const accId of leasedAccounts) {
+        if (!accountsWithChars.has(accId)) cityOnline++;
+      }
+      const onlineChars = charIds.size + cityOnline;
+      return {
+        onlineChars,
+        offlineHunting,
+        total: onlineChars + offlineHunting,
+        leases: leases.length,
+        instances: activeInstances.length,
+      };
     },
 
     // ---- SNAPSHOT HISTORY ----
@@ -1905,6 +2124,10 @@ async function ensureSchema(pool) {
   try { await pool.query("ALTER TABLE accounts ADD COLUMN gold_migrated TINYINT(1) NOT NULL DEFAULT 0"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN vip_until BIGINT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN missions MEDIUMTEXT NULL"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN missions_done MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -27,8 +27,14 @@ must(playerSrc.includes("freeCapacity") && playerSrc.includes("supplyStash") &&
 must(uiSrc.includes("vipAutoSellAllowed") && (uiSrc.includes("Exclusivo VIP") || uiSrc.includes("(VIP)")),
   "UI autoseller sem gate VIP");
 must(html.includes("vip.js?v=account-gold-cap-vip-v1") &&
-  (html.includes("player.js?v=account-gold-cap-vip-v1") || html.includes("player.js?v=loot-coins-analyser-v1")),
+  (html.includes("player.js?v=cap-loot-fix-v1") ||
+   html.includes("player.js?v=account-gold-cap-vip-v1") ||
+   html.includes("player.js?v=loot-coins-analyser-v1")),
   "cache-bust account-gold-cap-vip ausente");
+must(playerSrc.includes("ensurePlayerCapacity") && playerSrc.includes("DEFAULT_PLAYER_CAP"),
+  "player.js sem ensurePlayerCapacity");
+must(!/addMap\(p\.supplies\)/.test(playerSrc) && !/addMap\(p\.ammo\)/.test(playerSrc),
+  "carriedWeight não deve pesar supplies/ammo");
 
 function player(id, extra) {
   return Object.assign({
@@ -105,6 +111,18 @@ function desc(members) {
   const before = p.gold;
   const r = engine.creditHuntLoot(p, "gold-coin", 5);
   must(r && r.ok && p.gold === before + 5, "gold-coin deveria ignorar cap");
+}
+
+/* Cap: supplies/ammo não pesam — stock de potions não bloqueia loot */
+{
+  const p = player(1, {
+    level: 50, voc: "knight", gold: 0, lootPouch: {}, bag: {},
+    supplies: { "ultimate-health-potion": 5000 },
+    ammo: { "earth-arrow": 20000 },
+  });
+  must(engine.freeCapacity(p) > 100, "supplies/ammo não deveriam zerar CAP");
+  const r = engine.creditHuntLoot(p, "sword", 1);
+  must(r && r.ok && (p.lootPouch.sword || 0) === 1, "loot deveria entrar com stock de potions");
 }
 
 /* C) Autosell VIP */

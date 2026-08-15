@@ -12,6 +12,14 @@ must(html.includes('id="account-login-form"')&&html.includes('id="acc-login"')&&
   html.includes('id="acc-open-register"')&&html.includes('type="submit"')&&
   html.includes(">Entrar</button>"),
   "tela inicial não contém o formulário de login/criar conta");
+must(html.includes('id="account-login-form"')&&html.includes('onsubmit="return false;"')&&
+  html.includes('action="#"'),
+  "form de login deve bloquear navegação nativa (POST / → JSON)");
+must(js.includes('id="acc-register-form" method="post" action="#" onsubmit="return false;"'),
+  "form de registro também deve bloquear navegação nativa");
+must(server.includes("res.writeHead(303")&&server.includes('Location: "/"')&&
+  server.includes("Form POST acidental"),
+  "POST não-API deve redirecionar 303 para / em vez de JSON catch-all");
 /* Boot sem sessão: login da conta é o primeiro paint; create local legado fica oculto. */
 const accLoginIdx=html.indexOf('id="account-login"');
 const localLoginIdx=html.indexOf('id="local-login"');
@@ -62,4 +70,9 @@ must(server.includes("function accountCharacterSummary")&&server.includes("sex:d
   server.includes("outfit:data.outfit")&&
   (server.match(/characters: characters\.map\(accountCharacterSummary\)/g)||[]).length===2,
   "API não retorna outfit/cores/sexo no resumo da conta");
+must(js.includes("startHuntAfterLease")&&js.includes("lease.unauthorized")&&
+  js.includes("ONLINE_SESSION_INVALID=true;ONLINE_RUNTIME_RETRY_AT=Number.POSITIVE_INFINITY"),
+  "hunt/recovery online devem parar em 401 de sessão em vez de martelar lease/acquire");
+must(server.includes("function bodyWithSessionToken")&&server.includes("bearerToken(req)"),
+  "lease deve aceitar token do body ou Authorization Bearer");
 console.log("OK: fluxo conta/login, picker visual, criação de personagem e logout validados.");

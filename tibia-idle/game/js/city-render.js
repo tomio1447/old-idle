@@ -41,7 +41,7 @@ function drawTileSprite(ctx, img, sx, sy, scale) {
   ctx.drawImage(img, sx, sy + TILE * scale - h, w, h);
 }
 
-Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
+Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker, hoverNpc) {
   const ctx = this.ctx;
   const W = this.c.width, H = this.c.height;
   const S = cityViewScale(W, H);
@@ -54,7 +54,6 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
   if (worldW < W) camX = (worldW - W) / 2;
   if (worldH < H) camY = (worldH - H) / 2;
   this.camX = camX; this.camY = camY; this.scale = S;
-  this.npcHit = [];
 
   ctx.clearRect(0, 0, W, H);
   ctx.save();
@@ -62,20 +61,82 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
   drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "ground");
   ctx.restore();
 
-  // Player entre chão/decorações e paredes, na mesma ordem visual das hunts.
-  const pimg = OutfitRenderer.forPlayer(player, walker.dir,
-    walker.moving ? walker.frame : (typeof appearanceIdleFrame === "function"
-      ? appearanceIdleFrame(player, Date.now()) : 0));
-  const psx = walker.px * S - camX, psy = walker.py * S - camY;
-  if (spriteReady(pimg)) {
-    const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
-    const origin = creatureTileOrigin(psx, psy, w, h, TS, pimg._spriteAnchor, S);
-    ctx.fillStyle = "rgba(0,0,0,.4)";
-    ctx.beginPath();
-    ctx.ellipse(psx, psy + TS / 2, w * 0.3, Math.max(2, TS * 0.08), 0, 0, 7);
-    ctx.fill();
-    ctx.drawImage(pimg, origin.x, origin.y, w, h);
+  // Profundidade Tibia: paredes e criaturas intercaladas por SQM (Y depois X).
+  // À direita da parede o personagem cobre; à esquerda a parede cobre.
+  this.npcHit = [];
+  const depthDrawables = [];
+  const pTx = Math.max(0, Math.min(MAP_W - 1, Math.floor(walker.px / TILE)));
+  const pTy = Math.max(0, Math.min(MAP_H - 1, Math.floor(walker.py / TILE)));
+  depthDrawables.push({
+    tx: pTx, ty: pTy, footY: walker.py, order: 2,
+    draw: () => {
+      const pimg = OutfitRenderer.forPlayer(player, walker.dir,
+        walker.moving ? walker.frame : (typeof appearanceIdleFrame === "function"
+          ? appearanceIdleFrame(player, Date.now()) : 0));
+      // Dentro do translate(-cam): coordenadas em pixels do mundo escalado.
+      const psx = walker.px * S, psy = walker.py * S;
+      if (!spriteReady(pimg)) return;
+      const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
+      const origin = creatureTileOrigin(psx, psy, w, h, TS, pimg._spriteAnchor, S);
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.beginPath();
+      ctx.ellipse(psx, psy + TS / 2, w * 0.3, Math.max(2, TS * 0.08), 0, 0, 7);
+      ctx.fill();
+      ctx.drawImage(pimg, origin.x, origin.y, w, h);
+    },
+  });
+
+  const templeNpcs = (CITY && Array.isArray(CITY.npcs) && CITY.npcs.length)
+    ? CITY.npcs
+    : Object.keys(POI).filter((id) => POI[id] && POI[id].npc).map((id) => ({
+        id: id, tx: POI[id].tx, ty: POI[id].ty,
+      }));
+  for (const entry of templeNpcs) {
+    const npc = typeof NPCS !== "undefined" ? NPCS[entry.id] : null;
+    if (!npc) continue;
+    const nTx = entry.tx | 0, nTy = entry.ty | 0;
+    depthDrawables.push({
+      tx: nTx, ty: nTy, footY: (nTy + 0.5) * TILE, order: 1,
+      draw: () => {
+        const sx = entry.tx * TS + TS / 2;
+        const sy = entry.ty * TS + TS / 2;
+        const screenX = sx - camX, screenY = sy - camY;
+        if (screenX < -80 || screenX > W + 80 || screenY < -80 || screenY > H + 80) return;
+        const img = Sprites.npc(npc.sprite, "s");
+        const hovered = hoverNpc === entry.id;
+        if (img && img.complete && img.naturalWidth) {
+          const w = img.naturalWidth * S, h = img.naturalHeight * S;
+          const bob = Math.sin(Date.now() / 700 + entry.tx) * 1.5;
+          ctx.fillStyle = "rgba(0,0,0,.35)";
+          ctx.beginPath();
+          ctx.ellipse(sx, sy + h * 0.38, w * 0.3, h * 0.09, 0, 0, 7);
+          ctx.fill();
+          if (hovered) { ctx.save(); ctx.shadowColor = "#ffd24a"; ctx.shadowBlur = 14; }
+          ctx.drawImage(img, sx - w / 2, sy - h / 2 + bob, w, h);
+          if (hovered) ctx.restore();
+          const hsLabel = cityHudScale(this.c);
+          ctx.font = cityHudFont(10, this.c, true);
+          ctx.textAlign = "center";
+          const tw = ctx.measureText(npc.name).width + 10 * hsLabel;
+          const by = sy - h / 2 - 14 * hsLabel;
+          ctx.fillStyle = hovered ? "rgba(90,70,20,.92)" : "rgba(0,0,0,.7)";
+          ctx.fillRect(sx - tw / 2, by, tw, 14 * hsLabel);
+          ctx.strokeStyle = hovered ? "#ffd24a" : "rgba(120,110,90,.5)";
+          ctx.strokeRect(sx - tw / 2, by, tw, 14 * hsLabel);
+          ctx.fillStyle = hovered ? "#ffe680" : "#d8d0b8";
+          ctx.fillText(npc.name, sx, by + 10 * hsLabel);
+        }
+        // Hit-test em coordenadas de tela (canvas), fora do translate.
+        this.npcHit.push({ id: entry.id, x: screenX, y: screenY, w: 48, h: 64 });
+      },
+    });
   }
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+  drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "objects",
+    { drawables: depthDrawables });
+  ctx.restore();
 
   if (walker.moving) {
     const mx = walker.tpx * S - camX, my = walker.tpy * S - camY;
@@ -86,11 +147,6 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
     ctx.ellipse(mx, my + 8, 9 + t * 10, 4 + t * 4, 0, 0, 7);
     ctx.stroke();
   }
-
-  ctx.save();
-  ctx.translate(-camX, -camY);
-  drawTileCharMap(ctx, CITY.map, worldW, worldH, MAP_W, MAP_H, "objects");
-  ctx.restore();
 
   const hs = cityHudScale(this.c);
   ctx.textAlign = "left";
@@ -108,7 +164,7 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker) {
 
 Renderer.prototype.drawCityMap = function (player, dt, walker, hoverNpc) {
   if (CITY && CITY.officialTemple) {
-    this.drawOfficialTempleMap(player, dt, walker);
+    this.drawOfficialTempleMap(player, dt, walker, hoverNpc);
     return;
   }
   const ctx = this.ctx;

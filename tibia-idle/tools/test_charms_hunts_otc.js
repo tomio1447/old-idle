@@ -76,7 +76,7 @@ must(asgLegacy.ok, "assign após normalize de array legado");
 must(C.resolveCharmId("Enflame") === "enflame", "resolveCharmId por nome");
 must((C.CYCLO_ABAS || []).some((a) => a.id === "cidade" && a.secao), "seção CIDADE");
 must((C.CYCLO_ABAS || []).filter((a) => a.cityAction).map((a) => a.cityAction).join(",")
-  === "market,reward,forge,depot,imbuements", "CIDADE city actions");
+  === "market,reward,forge,depot,imbuements,enpa,gnomally", "CIDADE city actions");
 
 
 /* ── bosstiary ── */
@@ -117,8 +117,8 @@ must(cycloUi.includes("renderCycloHunts") && cycloUi.includes("charmIconHtml"),
   "aba Hunts/Charms OTC ausente");
 must(html.includes("layout.css?v="), "layout cache-bust");
 must(html.includes("ui.js?v="), "ui cache-bust");
-must(html.includes("cyclopedia.js?v=charms-cidade-v2"), "cache-bust cyclopedia");
-must(html.includes("cyclopedia-ui.js?v=charms-cidade-v2"), "cache-bust cyclopedia-ui");
-must(html.includes("layout.css?v=charms-cidade-v2"), "cache-bust layout CIDADE");
+must(html.includes("cyclopedia.js?v=npc-buttons-v1"), "cache-bust cyclopedia");
+must(html.includes("cyclopedia-ui.js?v=npc-buttons-v1"), "cache-bust cyclopedia-ui");
+must(html.includes("layout.css?v=npc-buttons-v1"), "cache-bust layout CIDADE");
 
 console.log("OK: charms Canary (pontos/assign/ícones), bosstiary kills, hunts fields.");

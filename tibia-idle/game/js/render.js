@@ -141,7 +141,11 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "42";
+const ASSET_VERSION = "45";
+/* Teto absoluto de vida visual: strip/meta errado ou dt travado nunca
+ * pode deixar magia/areafx/fala grudados no canvas. */
+const FX_MAX_LIFE_MS = 2800;
+const TALK_MAX_LIFE_MS = 2000;
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -255,6 +259,48 @@ function fxFrameCount(name) {
   const meta = fxClientMeta(name);
   if (meta && meta.frames) return meta.frames;
   return FX_FRAMES[name] || 0;
+}
+
+/* Duração automática do strip: percorre TODOS os frames na cadência do
+ * OTClient (~55–85ms/quadro). O meta.duration da TibiaWiki é o delay médio
+ * do GIF — em vários efeitos de combate (blue electricity, explosion-hit
+ * white, fire/energy area) ele fica em 120–200ms e a magia parece arrastar
+ * ou "truncar" o ritmo. Mantém o ciclo completo; só limita a velocidade. */
+function fxPerFrameMs(name, frames) {
+  const meta = fxClientMeta(name);
+  const n = Math.max(1, frames | 0);
+  let per = 75;
+  if (meta && meta.duration > 0) {
+    const d = Number(meta.duration) || 0;
+    // Se duration*frames estoura, duration já é o tempo total do strip.
+    if (d > 250 && d * n > 4000) per = d / n;
+    else per = d;
+  }
+  const key = String((meta && meta.slug) || name || "").toLowerCase();
+  // Diamond arrow, exori/groundshaker, waves/beams/caldera do RP.
+  const combatFx = /blue-electric|hit-area|explosion-hit-white|groundshaker|trembl|holy-cross|holy-effect|holy-area|holy-damage|fire-area|fire-effect|fireball|fire-attack|energy-area|energy-effect|energy-hit|ice-area|ice-attack|icicle|mort-area|death-effect|explosion-area|explosion-effect/.test(key);
+  // ~75ms/quadro (OTClient). Wiki GIFs de combate costumam vir mais lentos.
+  if (combatFx) return Math.max(55, Math.min(75, per));
+  return Math.max(45, Math.min(120, per));
+}
+
+function fxAutoDurationMs(name, frames) {
+  const n = Math.max(1, Math.min(48, frames | 0));
+  return Math.min(FX_MAX_LIFE_MS, Math.max(280, Math.round(n * fxPerFrameMs(name, n))));
+}
+
+function fxEffectExpired(e, now) {
+  if (!e) return true;
+  const dur = Math.max(1, Number(e.dur) || FX_MAX_LIFE_MS);
+  const born = Number(e.born) || 0;
+  if (born && (now - born) > dur + 200) return true;
+  const t = Number(e.t);
+  return Number.isFinite(t) && t >= dur;
+}
+
+function fxStripCellWidth(img, frames, meta) {
+  if (meta && meta.width > 0) return meta.width;
+  return (img && img.naturalWidth ? img.naturalWidth : 32) / Math.max(1, frames | 0);
 }
 
 const Sprites = {
@@ -610,7 +656,52 @@ const TALK_COR = {
 /* Palavras mágicas e falas de combate também são texto flutuante: em idle
  * desaparecem durante a subida e nunca ficam mais de 2 segundos na tela. */
 function talkDuracao(tipo) {
-  return tipo === TALK.MONSTER_YELL ? 2000 : 1600;
+  return tipo === TALK.MONSTER_YELL ? TALK_MAX_LIFE_MS : 1600;
+}
+
+/* Deadline absoluto (wall-clock). Sem isso, life infinito / dt=0 / entidade
+ * fora do FOV deixava "exori gran" grudado no canvas para sempre. */
+function ensureTalkDeadline(sp, now) {
+  if (!sp || typeof sp !== "object") return 0;
+  now = Number(now) || Date.now();
+  const max = Math.max(1, Math.min(TALK_MAX_LIFE_MS,
+    Number(sp.max) || talkDuracao(sp.tipo)));
+  sp.max = max;
+  let born = Number(sp.born);
+  if (!Number.isFinite(born) || born <= 0) {
+    born = now;
+    sp.born = born;
+  }
+  let exp = Number(sp.expiresAt);
+  if (!Number.isFinite(exp) || exp <= born) {
+    exp = born + max;
+    sp.expiresAt = exp;
+  }
+  const hard = born + TALK_MAX_LIFE_MS + 200;
+  if (exp > hard) {
+    exp = hard;
+    sp.expiresAt = hard;
+  }
+  return exp;
+}
+
+function talkExpired(sp, now) {
+  if (!sp || typeof sp !== "object" || !sp.text) return true;
+  now = Number(now) || Date.now();
+  const exp = ensureTalkDeadline(sp, now);
+  if (now >= exp) {
+    sp.life = 0;
+    return true;
+  }
+  // life acompanha o relógio — opacity correta mesmo se dt não envelhecer.
+  sp.life = Math.max(0, exp - now);
+  return sp.life <= 0;
+}
+
+function ageTalkEntry(sp, dt, now) {
+  // Wall-clock (expiresAt) é a fonte da verdade — dt só existe por compat.
+  void dt;
+  return talkExpired(sp, now || Date.now());
 }
 
 /* Empilha uma fala num dono qualquer (jogador ou monstro).
@@ -619,33 +710,62 @@ function talkDuracao(tipo) {
 function creatureSay(dono, texto, tipo) {
   if (!dono || !texto) return;
   tipo = tipo || TALK.SAY;
-  dono.speech = dono.speech || [];
+  // Uma conjuração = um bubble. Nunca concatena palavras de magias
+  // diferentes no mesmo texto (ex.: "exori gran" + "exevo mas san").
+  let text = String(texto).replace(/\s+/g, " ").trim();
+  if (!text) return;
+  if (text.length > 64) text = text.slice(0, 64);
+  if (!Array.isArray(dono.speech)) dono.speech = [];
+  const now = Date.now();
+  // Descarta falas já vencidas antes de empilhar (evita fila zumbi).
+  for (let i = dono.speech.length - 1; i >= 0; i--) {
+    if (talkExpired(dono.speech[i], now)) dono.speech.splice(i, 1);
+  }
   // empurra as falas antigas para cima, como no client
-  for (const sp of dono.speech) sp.slot = (sp.slot || 0) + 1;
+  for (const sp of dono.speech) {
+    if (sp && typeof sp === "object") sp.slot = (sp.slot || 0) + 1;
+  }
   const dur = talkDuracao(tipo);
   dono.speech.push({
     // o client mostra o grito em caixa alta
-    text: tipo === TALK.MONSTER_YELL ? String(texto).toUpperCase() : texto,
+    text: tipo === TALK.MONSTER_YELL ? text.toUpperCase() : text,
     tipo: tipo, color: TALK_COR[tipo] || "#ffe680",
-    life: dur, max: dur, slot: 0,
+    life: dur, max: dur, slot: 0, born: now, expiresAt: now + dur,
   });
-  if (dono.speech.length > 2) dono.speech.shift();
+  while (dono.speech.length > 2) dono.speech.shift();
 }
 
-/* Desenha e envelhece a fila de falas de uma criatura. */
+/* Envelhece falas mesmo se a criatura não for desenhada neste frame
+ * (fora do FOV / pause parcial) — senão o texto amarelo fica eterno. */
+function ageCreatureSpeech(dono, dt, now) {
+  if (!dono || !Array.isArray(dono.speech) || !dono.speech.length) return;
+  now = now || Date.now();
+  for (let i = dono.speech.length - 1; i >= 0; i--) {
+    if (ageTalkEntry(dono.speech[i], dt, now)) dono.speech.splice(i, 1);
+  }
+}
+
+/* Desenha a fila de falas. Com `dt` numérico envelhece aqui; com `dt == null`
+ * assume que ageCombatSpeech / ageCreatureSpeech já consumiu o frame. */
 function drawCreatureSpeech(ctx, dono, x, y, dt, hudScale) {
-  if (!dono || !dono.speech || !dono.speech.length) return;
+  if (!dono || !Array.isArray(dono.speech) || !dono.speech.length) return;
   const s = Math.max(1, Number(hudScale) || 1);
+  const now = Date.now();
+  const ageHere = dt != null && Number.isFinite(Number(dt));
   ctx.textAlign = "center";
   ctx.lineJoin = "round";
   for (let i = dono.speech.length - 1; i >= 0; i--) {
     const sp = dono.speech[i];
-    sp.life -= dt;
-    if (sp.life <= 0) { dono.speech.splice(i, 1); continue; }
+    if (ageHere && ageTalkEntry(sp, dt, now)) { dono.speech.splice(i, 1); continue; }
+    if (talkExpired(sp, now)) { dono.speech.splice(i, 1); continue; }
+    if (!sp || !sp.text) continue;
     // o grito e maior, como no client
     ctx.font = hudFont(sp.tipo === TALK.MONSTER_YELL ? 12 : 10, s, true);
-    const p = 1 - sp.life / sp.max;
+    const max = Math.max(1, Number(sp.max) || 1);
+    const lifeLeft = Math.max(0, Math.min(max, Number(sp.life) || 0));
+    const p = Math.max(0, Math.min(1, 1 - lifeLeft / max));
     const a = Math.max(0, Math.pow(1 - p, 1.35));
+    if (a <= 0.02) { dono.speech.splice(i, 1); continue; }
     const ty = y - 34 * s - (sp.slot || 0) * 13 * s - p * 10 * s;
     ctx.globalAlpha = a;
     ctx.lineWidth = 3 * s;
@@ -675,23 +795,79 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt, hudScale) {
 Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
   let n = fxFrameCount(name);
   if (!n) { name = "draw-blood"; n = fxFrameCount(name) || 4; }
-  // Duração automática: strips curtos (~55ms/quadro, teto 900ms). Strips
-  // longos (14+ frames: forked thorns, blue electricity, holy-cross…)
-  // ganham teto maior para não comprimir a animação até parecer truncada
-  // — o loop já percorre todos os frames; o problema era só a velocidade.
   const meta = fxClientMeta(name);
-  let autoDur = Math.max(300, Math.min(900, n * 55));
-  if (meta && meta.frames && meta.duration)
-    autoDur = Math.max(300, Math.min(2200, meta.frames * meta.duration));
-  else if (n > 14)
-    autoDur = Math.max(autoDur, Math.min(1800, n * 70));
-  this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: n, dur: customDurMs || autoDur,
+  const metaFrames = Math.max(1, (meta && meta.frames) || n || 1);
+  // Se o PNG já carregou, só confia no strip quando bate com o meta.
+  // Strip 69×32px com meta 23×96 (ice-crystal) rasgava o quadro no chão e
+  // inflava a duração — FX “congelado” / cristalino serrilhado.
+  const img = Sprites.fx(name);
+  if (img && img.complete && img.naturalWidth && meta && meta.width > 0) {
+    const fromStrip = Math.max(1, Math.round(img.naturalWidth / meta.width));
+    if (fromStrip > 1 && Math.abs(fromStrip - metaFrames) <= 2) n = fromStrip;
+    else n = metaFrames;
+  } else {
+    n = metaFrames;
+  }
+  n = Math.max(1, Math.min(48, n | 0));
+  const autoDur = fxAutoDurationMs(name, n);
+  const custom = Number(customDurMs);
+  const dur = Math.min(FX_MAX_LIFE_MS, Math.max(280,
+    Number.isFinite(custom) && custom > 0 ? custom : autoDur));
+  this.effects.push({ x: x, y: y, name: name, t: 0, born: Date.now(),
+                      frames: n, dur: dur,
                       scale: Math.max(0.1, Number(customScale) || 1) });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
-  // as primeiras eram descartadas antes de aparecer. 120 cabe a maior
-  // matriz do jogo com folga e ainda protege contra vazamento.
-  if (this.effects.length > 120) this.effects.shift();
+  // as primeiras eram descartadas antes de aparecer. 160 cabe pack denso +
+  // areafx; Crit/Fatal NÃO podem ser os primeiros a sair — senão um mas san
+  // em 40+ rats apaga o critical-hit-effect dos alvos iniciais e parece
+  // que só um monstro “criticou”.
+  const FX_CAP = 160;
+  // Crit/Fatal e impactos fisicos basicos (hit/block/miss) nao podem ser os
+  // primeiros a sair — senão AoE denso apaga sangue/block/poff e parece que
+  // o auto-ataque “não anima”.
+  const fxPriority = (nm) => nm === "critical-hit-effect" || nm === "fatal-text"
+    || nm === "critical-heal-effect"
+    || nm === "draw-blood" || nm === "block-hit" || nm === "poff"
+    || nm === "hit-area" || nm === "hit-by-poison" || nm === "energy-hit"
+    || nm === "whirlwind-blow-white" || nm === "blood-effect"
+    || nm === "block-effect" || nm === "poof-effect";
+  while (this.effects.length > FX_CAP) {
+    let drop = -1;
+    for (let i = 0; i < this.effects.length; i++) {
+      if (!fxPriority(this.effects[i].name)) { drop = i; break; }
+    }
+    if (drop < 0) drop = 0;
+    this.effects.splice(drop, 1);
+  }
+};
+
+/* Limpa overlays de combate (FX, fala, floaters, projéteis). Chamado em
+ * stopHunt / enterHunt / disconnect / reconnect para nunca herdar magia
+ * congelada de uma sessão anterior. */
+Renderer.prototype.clearCombatVisuals = function () {
+  this.effects = [];
+  this.floaters = [];
+  this.projectiles = [];
+  this.corpses = [];
+  this.playerFlash = 0;
+  this.playerTalk = { speech: [] };
+};
+
+Renderer.prototype.ageCombatSpeech = function (combat, dt) {
+  const now = Date.now();
+  ageCreatureSpeech(this.playerTalk, dt, now);
+  if (!combat) return;
+  const seen = new Set();
+  const visit = (ent) => {
+    if (!ent || seen.has(ent)) return;
+    seen.add(ent);
+    ageCreatureSpeech(ent, dt, now);
+  };
+  visit(combat.player);
+  for (const ent of combat.players || []) visit(ent);
+  for (const ent of combat.mobs || []) visit(ent);
+  // pendingSpawns: monstro ainda não nasceu, mas pode herdar fala residual.
+  for (const sp of combat.pendingSpawns || []) if (sp && sp.mob) visit(sp.mob);
 };
 
 Renderer.prototype.addProjectile = function (sx, sy, tx, ty, color, missile) {
@@ -1548,13 +1724,15 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   ctx.fillText("Hits: " + fmtFull(training.stats.hits) + " · Shielding ativo", 22 * hudS, H - 22 * hudS);
 
   // efeitos/números flutuantes
+  const fxNow = Date.now();
   for (let i = this.effects.length - 1; i >= 0; i--) {
     const e = this.effects[i];
-    e.t += dt;
-    if (e.t >= e.dur) { this.effects.splice(i, 1); continue; }
+    e.t = (Number(e.t) || 0) + (Number(dt) || 0);
+    if (fxEffectExpired(e, fxNow)) { this.effects.splice(i, 1); continue; }
     const img = Sprites.fx(e.name);
     if (!img || !img.complete || !img.naturalWidth) continue;
-    const fw = img.naturalWidth / e.frames;
+    const meta = fxClientMeta(e.name);
+    const fw = fxStripCellWidth(img, e.frames, meta);
     const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
     // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
@@ -1704,6 +1882,9 @@ Renderer.prototype.draw = function (combat, player, dt) {
     : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 
+  // Fala/FX envelhecem mesmo fora do FOV ou com entidade sem draw neste frame.
+  this.ageCombatSpeech(combat, dt);
+
   // A câmera não segue criaturas: permanece no centro geométrico do mapa.
   // O mundo inteiro é desenhado em escala nativa; o canvas recorta o FOV
   // fixo de 21×13, sem zoom-out em hunts grandes.
@@ -1776,10 +1957,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
 
-  // --- entidades: uma única fila ordenada pela posição dos pés (OTC).
+  // --- entidades + paredes intercaladas por SQM (profundidade Tibia/OTC).
+  // Antes: todas as criaturas, depois TODAS as paredes → parede à esquerda
+  // do player cobria ele. Agora cada célula desenha bloqueantes e depois
+  // as criaturas daquele SQM (N→S, O→L).
   const depthEntities = buildRenderEntities(combat, player);
   const entityInfo = [];
-  for (const e of depthEntities) {
+  const kindOrder = { monster: 0, ally: 1, player: 2 };
+  const depthDrawables = [];
+
+  const paintEntity = (e) => {
     const ent = e.ent;
     let img = null, w = 0, h = 0, name = '', hpPct = 0, mpPct = null, shieldPct = 0;
     if (e.kind === "monster") {
@@ -1805,8 +1992,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ? Math.max(0, Math.min(1, (e.p.magicShieldPool || 0) / (e.p.magicShieldCap || 1))) : 0;
     }
     if (!spriteReady(img)) {
-      // Tenta fallback para sul ou outra direção já cacheada, em vez de
-      // fazer a criatura sumir por um frame (causa sensação de lag/piscada).
       let fallback = null;
       if (e.kind === "monster") {
         fallback = Sprites.mob(ent.slug, "s") || Sprites.mob(ent.slug, "w") || Sprites.mob(ent.slug, "e") || Sprites.mob(ent.slug, "n");
@@ -1814,7 +1999,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
       if (spriteReady(fallback)) {
         img = fallback;
       } else {
-        continue;
+        return;
       }
     }
     const sc = creatureScale(W); w = spriteW(img) * sc; h = spriteH(img) * sc;
@@ -1827,14 +2012,29 @@ Renderer.prototype.draw = function (combat, player, dt) {
     if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
     else ctx.drawImage(img, origin.x, origin.y, w, h);
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
+  };
+
+  for (const e of depthEntities) {
+    const ent = e.ent;
+    const tx = Math.max(0, Math.min(gridW - 1,
+      Number.isFinite(ent.cx) ? (ent.cx | 0) : Math.floor((ent.x || 0) * gridW)));
+    const ty = Math.max(0, Math.min(gridH - 1,
+      Number.isFinite(ent.cy) ? (ent.cy | 0) : Math.floor((ent.y || 0) * gridH)));
+    depthDrawables.push({
+      tx: tx, ty: ty, footY: e.footY, order: kindOrder[e.kind] || 0,
+      draw: () => paintEntity(e),
+    });
   }
 
-  // --- objetos do mapa (paredes, pilares, móveis) POR CIMA das criaturas.
-  // No client, paredes/pilares altos cobrem criaturas que estão atrás/dentro
-  // do seu footprint; a healthbar (abaixo) fica acima de tudo.
-  if (combat && combat.huntMap && typeof drawTileCharMap === "function")
-    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects");
-
+  if (combat && combat.huntMap && typeof drawTileCharMap === "function") {
+    drawTileCharMap(ctx, combat.huntMap, W, H, gridW, gridH, "objects",
+      { drawables: depthDrawables });
+  } else {
+    for (const d of (typeof sortTileDepthDrawables === "function"
+      ? sortTileDepthDrawables(depthDrawables) : depthDrawables)) {
+      if (typeof d.draw === "function") d.draw();
+    }
+  }
   // --- Poeira da Exaltation Forge (influenced/fiendish) — DEPOIS dos
   // objetos do mapa, igual ao Canary: a poeira fica por cima de paredes
   // e pilares. Antes era desenhada junto com a sprite e os objetos do mapa
@@ -1878,13 +2078,14 @@ Renderer.prototype.draw = function (combat, player, dt) {
     } else {
       drawNameBars(ctx, nameX, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY, barX, hudS);
     }
-    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
+    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
     else if (info.e.kind === 'player') {
       // Cada personagem tem a própria fila (creatureSay no caster). O
       // playerTalk do renderer só cobre o fallback addSpeech sem whoId.
-      drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
-      if (combat && combat.player && info.ent === combat.player) this.drawSpeech(ctx, info.cx, y, dt, hudS);
-    } else drawCreatureSpeech(ctx, info.ent, info.cx, y, dt, hudS);
+      // dt=null: ageCombatSpeech já consumiu o frame (evita half-life).
+      drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
+      if (combat && combat.player && info.ent === combat.player) this.drawSpeech(ctx, info.cx, y, null, hudS);
+    } else drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
   }
 
   // --- projeteis / ataques a distancia
@@ -1921,14 +2122,16 @@ Renderer.prototype.draw = function (combat, player, dt) {
   }
 
   // --- efeitos
+  const fxNow = Date.now();
   for (let i = this.effects.length - 1; i >= 0; i--) {
     const e = this.effects[i];
-    e.t += dt;
-    if (e.t >= e.dur) { this.effects.splice(i, 1); continue; }
+    e.t = (Number(e.t) || 0) + (Number(dt) || 0);
+    if (fxEffectExpired(e, fxNow)) { this.effects.splice(i, 1); continue; }
     const img = Sprites.fx(e.name);
     if (!img || !img.complete || !img.naturalWidth) continue;
-    const fw = img.naturalWidth / e.frames;
-    const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
+    const meta = fxClientMeta(e.name);
+    const fw = fxStripCellWidth(img, e.frames, meta);
+    const f = Math.min(e.frames - 1, Math.floor((e.t / Math.max(1, e.dur)) * e.frames));
     // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
     // parecia solta do grid.
@@ -1979,18 +2182,22 @@ Renderer.prototype.draw = function (combat, player, dt) {
   }
   ctx.textAlign = "center";
 
-  // Membros inconscientes da party: não renderizam outfit/IA; ficam como
-  // corpse oficial imóvel até o revive, inclusive quando o líder continua vivo.
-  if (combat && !combat.dead && combat.players) {
-    for (const ent of combat.players) {
+  // Membros inconscientes / permadead: corpse oficial imóvel (sem outfit).
+  // Solo em boss também usa o mesmo path (players pode estar ausente).
+  if (combat && !combat.dead) {
+    const downed = (combat.players && combat.players.length)
+      ? combat.players
+      : (combat.player ? [combat.player] : []);
+    for (const ent of downed) {
       if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
       const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
       drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
     }
   }
 
-  // --- morte do player: corpse oficial Canary e contador de respawn.
-  if (combat && combat.dead) {
+  // --- morte do player (hunt): corpse oficial Canary e contador de respawn.
+  // Boss wipe NÃO usa este path (sem contador — só corpses permadead acima).
+  if (combat && combat.dead && !combat.boss) {
     const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
     const px = dp.x * W, py = dp.y * H;
     // Canary Player::getLookCorpse(): masculino 4240, feminino 4247.

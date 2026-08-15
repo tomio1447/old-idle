@@ -16,6 +16,8 @@
  *   POST /api/coins      { token, amount }             -> Admin altera Tibia Coins
  *   GET  /api/chat/history + POST /api/chat/send       -> chat global
  *   POST /api/chat/ticket + GET /api/chat/events       -> SSE do chat
+ *   GET  /api/online-count                            -> PLAYER ON (leases/instâncias)
+ *   GET  /api/rankings?by=&limit=                     -> leaderboard (level/skills)
  *
  * Uso:
  *   cd tibia-idle/server
@@ -40,7 +42,9 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
-  rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll } = require("./authoritative_engine");
+  rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
+  sellAuthAllPouch, sellAuthPouchItem, moveItemToSupplyStash } = require("./authoritative_engine");
+const { createWorldBossController } = require("./world_boss");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -62,6 +66,12 @@ const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "
 const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
 const MAINTENANCE_TOKEN=String(process.env.MAINTENANCE_TOKEN||"").trim();
+// Lock persistente de produção (default OFF). Quando 1: UI de manutenção +
+// 503 em login/register/lease. Não apaga DB; /api/health e /api/admin seguem.
+const MAINTENANCE_MODE=process.env.MAINTENANCE_MODE==="1";
+const MAINTENANCE_DISCORD=String(process.env.MAINTENANCE_DISCORD||"https://discord.gg/bnbh3jtvBf").trim()||
+  "https://discord.gg/bnbh3jtvBf";
+const MAINTENANCE_PUBLIC_MSG="FECHADO PARA MANUTENÇÃO, VOLTAMOS EM BREVE, QUALQUER DUVIDA ACESSE NOSSO DISCORD.";
 let MAINTENANCE_UNTIL=0;
 let SYNC_BUS=null;
 let CHAT_BUS=null;
@@ -71,12 +81,48 @@ function getMaintenanceState(now){
   now=now||Date.now();
   const endsAt=Number(MAINTENANCE_UNTIL)||0;
   const remainingMs=Math.max(0,endsAt-now);
+  const scheduled=remainingMs>0;
   return {
-    active:remainingMs>0,
-    endsAt:remainingMs>0?endsAt:0,
-    remainingMs,
-    remainingSec:remainingMs>0?Math.ceil(remainingMs/1000):0,
+    active:MAINTENANCE_MODE||scheduled,
+    mode:MAINTENANCE_MODE,
+    endsAt:scheduled?endsAt:0,
+    remainingMs:scheduled?remainingMs:0,
+    remainingSec:scheduled?Math.ceil(remainingMs/1000):0,
+    message:MAINTENANCE_MODE?MAINTENANCE_PUBLIC_MSG:null,
+    discord:MAINTENANCE_MODE?MAINTENANCE_DISCORD:null,
   };
+}
+function maintenanceAuthReject(){
+  return {code:503,body:{ok:false,error:"MAINTENANCE_MODE",msg:MAINTENANCE_PUBLIC_MSG,
+    discord:MAINTENANCE_DISCORD}};
+}
+function maintenanceHtmlPage(){
+  const discord=MAINTENANCE_DISCORD.replace(/"/g,"&quot;");
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Global-Idle — Manutenção</title>
+<style>
+html,body{margin:0;min-height:100%;font-family:Georgia,"Times New Roman",serif;background:
+  radial-gradient(ellipse at 50% 20%,#3a2a14 0%,#1a120a 55%,#0a0806 100%);color:#f3e6c8}
+.wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+.card{max-width:560px;text-align:center;padding:28px 22px;border:2px solid #6b5a2e;
+  background:rgba(18,14,10,.88);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+h1{margin:0 0 14px;font-size:clamp(1.15rem,3.2vw,1.55rem);letter-spacing:.04em;line-height:1.35;color:#ffe680}
+p{margin:0 0 18px;font-size:1rem;line-height:1.5;color:#e8d9b0}
+a{color:#7ec8ff;font-weight:bold;word-break:break-all}
+.sub{font-size:.85rem;color:#b9a882;margin-top:8px}
+</style></head><body><div class="wrap"><div class="card">
+<h1>${MAINTENANCE_PUBLIC_MSG}</h1>
+<p>Discord: <a href="${discord}" target="_blank" rel="noopener noreferrer">${discord}</a></p>
+<p class="sub">Global-Idle — voltamos em breve.</p>
+</div></div></body></html>`;
+}
+function isMaintenanceUiPath(pathname){
+  const p=String(pathname||"/");
+  if(p==="/"||p==="/index.html"||p==="/game"||p==="/game/"||p==="/game/index.html")return true;
+  if(p.endsWith(".html"))return true;
+  return false;
 }
 function scheduleMaintenance(seconds){
   const sec=Math.max(1,Math.min(600,Math.floor(Number(seconds)||30)));
@@ -374,6 +420,10 @@ function normalizeStaticPath(pathname) {
 }
 
 function serveStatic(req, res, pathname) {
+  if (MAINTENANCE_MODE && isMaintenanceUiPath(pathname)) {
+    sendText(res, 503, maintenanceHtmlPage(), "text/html; charset=utf-8");
+    return;
+  }
   const relative = normalizeStaticPath(pathname);
   if (relative == null) { sendText(res, 400, "URL inválida"); return; }
   const file = path.resolve(STATIC_DIR, relative.replace(/^\/+/, ""));
@@ -1224,6 +1274,81 @@ async function clearInstanceLootPouch(db,body){
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
 }
 
+async function sellInstanceLootPouch(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+  const slug=body.slug!=null&&body.slug!==""?String(body.slug):"";
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+    return {code:400,body:{ok:false,error:"INVALID_POUCH_SELL",msg:"Venda da Loot Pouch inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
+    return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  let rejection=null,soldGold=0;
+  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+    let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+    const item=descriptor.authority&&descriptor.authority.players&&
+      descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+    if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+    soldGold=slug?sellAuthPouchItem(item.p,slug):sellAuthAllPouch(item.p);
+    descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+  },lease);
+  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+    body:{ok:false,error:result.error,msg:rejection||"Não foi possível vender a Loot Pouch",instance:instanceSummary(result.instance,true)}};
+  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+    status:result.instance.status,source:"pouch-sell",holderId:String(body.holder_id||"")});
+  return {code:200,body:{ok:true,gold:soldGold,instance:instanceSummary(result.instance,true)}};
+}
+
+/** Move bag/pouch → Supply Stash (autoritativo). Em combate usa a instância;
+ * fora dela grava o personagem (lootPouch/supplyStash são protected no PUT comum). */
+async function moveToSupplyStash(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),slug=String(body.slug||""),source=String(body.source||"pouch");
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_STASH_MOVE",msg:"Movimento para Supply Stash inválido"}};
+  if(source!=="pouch"&&source!=="bag")
+    return {code:400,body:{ok:false,error:"INVALID_STASH_SOURCE",msg:"Origem inválida (use pouch ou bag)"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_STASH_MOVE",msg:"Instância inválida para o movimento"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      if(!moveItemToSupplyStash(item.p,{source,slug})){rejection="Não foi possível mover o item (stash cheia ou item ausente)";return null;}
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível mover para a Supply Stash",
+        instance:instanceSummary(result.instance,true)}};
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"stash-move",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+  }
+  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
+  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  if(!moveItemToSupplyStash(p,{source,slug}))
+    return {code:400,body:{ok:false,error:"STASH_MOVE_FAILED",msg:"Não foi possível mover o item (stash cheia ou item ausente)"}};
+  return persistClaimedPlayer(db,acc,character,p,lease);
+}
+
 async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -1570,8 +1695,18 @@ async function marketHistory(db, token, limit) {
 
 /* Rankings (top personagens por nível ou kills). */
 async function rankings(db, by, limit) {
-  const rows = await db.rankings(by, limit);
-  return { code: 200, body: { ok: true, rankings: rows } };
+  const criterion = String(by || "level").toLowerCase() === "dist" ? "distance"
+    : String(by || "level").toLowerCase();
+  const rows = await db.rankings(criterion, limit);
+  return { code: 200, body: { ok: true, by: criterion, limit: Math.min(100, Math.max(1, Number(limit) || 50)),
+    rankings: rows } };
+}
+async function onlineCountPayload(db) {
+  if (typeof db.onlineCount === "function") {
+    const count = await db.onlineCount();
+    return count && typeof count === "object" ? count : { onlineChars: 0, offlineHunting: 0, total: 0 };
+  }
+  return { onlineChars: 0, offlineHunting: 0, total: 0, leases: 0, instances: 0 };
 }
 async function adminAccountBundle(db,token,accountId,limit){
   const admin=await db.findAccountByToken(token);if(!admin)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -1722,6 +1857,14 @@ async function main() {
         terminalReason:claim.terminalReason||null,source:"worker"});},
   });
 
+  const WORLD_BOSS=createWorldBossController({
+    testServer:TEST_SERVER,
+    getDb:()=>db,
+    publishAll:(type,data)=>{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll(type,data);},
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+  });
+  WORLD_BOSS.start();
+
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
@@ -1738,7 +1881,8 @@ async function main() {
       if ((req.method === "GET" || req.method === "HEAD") && !url.startsWith("/api/")) {
         if (url === "/js/server-config.js") {
           const config = `window.GLOBAL_IDLE_SERVER_CONFIG={online:true,testServer:${
-            TEST_SERVER ? "true" : "false"},apiUrl:window.location.origin,syncProtocol:"${SYNC_PROTOCOL}"};\n`;
+            TEST_SERVER ? "true" : "false"},maintenanceMode:${MAINTENANCE_MODE?"true":"false"
+            },apiUrl:window.location.origin,syncProtocol:"${SYNC_PROTOCOL}"};\n`;
           return sendText(res, 200, config, "text/javascript; charset=utf-8");
         }
         return serveStatic(req, res, url);
@@ -1772,13 +1916,19 @@ async function main() {
         const r=await syncState(db,token);return send(res,r.code,r.body);
       }
       if (req.method === "GET" && url === "/api/health") {
+        const playersOnline = await onlineCountPayload(db);
         return send(res, 200, { ok:true, testServer:TEST_SERVER,
           bootId:SERVER_BOOT_ID,startedAt:SERVER_STARTED_AT,
           serverPower:"on",
           maintenance:getMaintenanceState(),
+          playersOnline,
           worker:instanceWorker.stats(),sync:{protocol:SYNC_PROTOCOL,cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
           chat:{cursor:CHAT_BUS.cursor(),clients:CHAT_BUS.clientCount(),channels:CHAT_CHANNELS},
           accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
+      }
+      if (req.method === "GET" && url === "/api/online-count") {
+        const playersOnline = await onlineCountPayload(db);
+        return send(res, 200, { ok: true, ...playersOnline });
       }
       if(req.method==="POST"&&url==="/api/maintenance/schedule"){
         const limited=rateLimit(req,"maintenance-schedule",10,60000);if(limited)return send(res,limited.code,limited.body);
@@ -1818,12 +1968,14 @@ async function main() {
         const r=await chatSend(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "POST" && url === "/api/register") {
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const limited=rateLimit(req,"register",10,3600000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
         const r = await register(db, body);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/login") {
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const limited=rateLimit(req,"login",20,60000);if(limited)return send(res,limited.code,limited.body);
         const body = await readBody(req);
         const r = await login(db, body);
@@ -1838,16 +1990,20 @@ async function main() {
         return send(res, r.code, r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/acquire"){
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const r=await acquireLease(db,bodyWithSessionToken(req,await readBody(req)),false);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/takeover"){
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const limited=rateLimit(req,"lease-takeover",10,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await acquireLease(db,bodyWithSessionToken(req,await readBody(req)),true);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/renew"){
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const r=await renewLease(db,bodyWithSessionToken(req,await readBody(req)));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/release"){
+        if(MAINTENANCE_MODE){const m=maintenanceAuthReject();return send(res,m.code,m.body);}
         const r=await releaseLease(db,bodyWithSessionToken(req,await readBody(req)));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/account/missions"){
@@ -1868,6 +2024,13 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/instance/pouch-clear"){
         const r=await clearInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/pouch-sell"){
+        const r=await sellInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if((req.method==="POST"&&url==="/api/instance/stash-move")||
+         (req.method==="POST"&&url==="/api/stash/move")){
+        const r=await moveToSupplyStash(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/end"){
         const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);
@@ -2046,6 +2209,46 @@ async function main() {
         const r = await party.partyFollow(db, body);
         return send(res, r.code, r.body);
       }
+      // ---- WORLD BOSS / WARZONE ----
+      if(req.method==="GET"&&url==="/api/world-boss/state"){
+        const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+        const q=new URL(req.url,"http://x").searchParams;
+        const r=await WORLD_BOSS.stateFor(db,token||q.get("token")||"");
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/join"){
+        const limited=rateLimit(req,"wb-join",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.join(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/leave"){
+        const r=await WORLD_BOSS.leave(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/loaded"){
+        const r=await WORLD_BOSS.markLoaded(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/report"){
+        const r=await WORLD_BOSS.reportCombat(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/admin/force-open"){
+        const limited=rateLimit(req,"wb-force",20,60000);if(limited)return send(res,limited.code,limited.body);
+        let body={};
+        try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON"});}
+        const auth=await authorizeMaintenance(req,body,db);
+        const r=await WORLD_BOSS.forceOpen(db,body,auth.ok);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/admin/force-close"){
+        const limited=rateLimit(req,"wb-force",20,60000);if(limited)return send(res,limited.code,limited.body);
+        let body={};
+        try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON"});}
+        const auth=await authorizeMaintenance(req,body,db);
+        const r=await WORLD_BOSS.forceClose(db,body,auth.ok);
+        return send(res,r.code,r.body);
+      }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
     } catch (e) {
       console.error("[server] erro:", e);
@@ -2059,6 +2262,8 @@ async function main() {
     console.log("[server] bootId:", SERVER_BOOT_ID, "startedAt:", new Date(SERVER_STARTED_AT).toISOString());
     console.log("[server] registre/login: POST /api/register e /api/login");
     if (TEST_SERVER) console.log("[server] TEST SERVER ativo — Admin liberado para testers");
+    if (MAINTENANCE_MODE) console.log("[server] MAINTENANCE_MODE=1 — UI bloqueada + login/register/lease 503");
+    console.log("[server] world-boss timers:", WORLD_BOSS.timers);
   });
 }
 

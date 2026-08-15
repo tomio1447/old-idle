@@ -170,5 +170,14 @@ must(gameSrc.includes('!ent.permadead && ent.reviveAt'), 'Loop ainda revive mort
 must(renderSrc.includes('!!ent.permadead'), 'Corpse permanente não é renderizado');
 must(indexSrc.includes('id="scarlett-qte"') && indexSrc.includes('js/scarlett-boss.js'),
   'Overlay/script da esteira não estão no jogo');
+const scarlettSrc=fs.readFileSync(path.join(js,'scarlett-boss.js'),'utf8');
+must(scarlettSrc.includes('SCARLETT_TIMING_WINDOW = 360') &&
+  scarlettSrc.includes('SCARLETT_ONLINE_SLACK = 180') &&
+  scarlettSrc.includes('SCARLETT_LEAD_MS = 1400'),
+  'Constantes de timing da Scarlett divergiram');
+must(!scarlettSrc.includes('DANÇA AUTOMÁTICA') && scarlettSrc.includes('scarlettHydrateOnlineNotes'),
+  'Online ainda não hidrata a esteira QTE');
+must(indexSrc.includes('scarlett-boss.js?v=boss-death-wipe-v1'),
+  'Cache-bust do QTE Scarlett ausente');
 
 console.log('OK: Scarlett, loot, outfit, magias, mapa, QTE, gates, permadeath e corpses validados.');

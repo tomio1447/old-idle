@@ -85,5 +85,12 @@ const uiClear = uiSrc.includes('LIMPAR LOOT POUCH') &&
   uiSrc.includes('clearLootPouchWithConfirm') &&
   uiSrc.includes('Limpar toda a Loot Pouch? Itens serão perdidos.');
 must(uiClear, 'Config da Loot Pouch sem botão/confirmação de limpar');
+must(uiSrc.includes('sellAllPouchAndPersist') && uiSrc.includes('accountSellInstanceLootPouch') &&
+  uiSrc.includes('persistLootPouchSell'),
+  'Sell All / venda unitária sem persistência online da Loot Pouch');
+
+const gameSrc = fs.readFileSync(path.join(game, 'js', 'game.js'), 'utf8');
+must(gameSrc.includes('sellAllPouchAndPersist') && gameSrc.includes('!onlineAuthorityCombat()'),
+  'botão/autoseller ainda vende só no cliente em hunt online');
 
 console.log('OK: loot nunca some com 50+ slots; classes 3/4 entram e nunca são vendidas; clear + slots sane.');

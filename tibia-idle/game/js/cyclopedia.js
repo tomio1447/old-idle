@@ -36,9 +36,11 @@ const CYCLO_ABAS = [
   { id: "city-imbuements", nome: "IMBUEMENTS", pronta: true,
     cityAction: "imbuements", iconSrc: "assets/ui/imbuement-machine.png" },
   { id: "city-enpa", nome: "ENPA", pronta: true, cityAction: "enpa",
-    iconSrc: "assets/npc/shopkeeper_s.png" },
+    iconSrc: "assets/npc/enpa-deia-pema_s.png" },
   { id: "city-gnomally", nome: "GNOMALLY", pronta: true,
-    cityAction: "gnomally", iconSrc: "assets/npc/magicshop_s.png" },
+    cityAction: "gnomally", iconSrc: "assets/npc/gnomally_s.png" },
+  { id: "city-tibianus", nome: "TIBIANUS", pronta: true,
+    cityAction: "tibianus", iconSrc: "assets/npc/king-tibianus_s.png" },
 ];
 
 const BEST_CLASSES = {

@@ -46,7 +46,9 @@ function saveBody(token,state,expected,id,leaseFields){return Object.assign({tok
     dbSource.includes("ALTER TABLE accounts ADD COLUMN market_gold")&&
     dbSource.includes("instanceSave(accountId,instanceId,expectedVersion")&&
     dbSource.includes("instanceEnd(accountId,instanceId,expectedVersion")&&
-    serverSource.includes('url==="/api/instance"')&&serverSource.includes('url==="/api/instance/end"'),
+    dbSource.includes("meta.started_at||meta.startedAt")&&
+    serverSource.includes('url==="/api/instance"')&&serverSource.includes('url==="/api/instance/end"')&&
+    serverSource.includes("started_at:new Date(now)")&&!serverSource.includes("startedAt:new Date(now)"),
     "API/schema da instância server-side ausentes");
   must(clientSource.includes("accountLoadInstance")&&clientSource.includes("accountSaveInstance")&&
     clientSource.includes("accountEndInstance")&&gameSource.includes("remote.lastStatus===\"ended\"")&&

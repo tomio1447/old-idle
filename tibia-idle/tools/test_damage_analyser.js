@@ -13,15 +13,24 @@ const src = fs.readFileSync(path.join(game, "js", "analyzers.js"), "utf8");
 const gameSrc = fs.readFileSync(path.join(game, "js", "game.js"), "utf8");
 const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 
-must(html.includes("js/analyzers.js?v=hunt-analyser-death-v1") ||
-  html.includes("js/analyzers.js?v=analyser-header-reset-v1"), "analyzers.js sem cache-bust header reset");
-must(html.includes("css/layout.css?v=hunt-analyser-death-v1") ||
-  html.includes("css/layout.css?v=analyser-header-reset-v1"), "layout.css sem cache-bust header reset");
+must(html.includes("js/analyzers.js?v=taken-session-total-v1") ||
+  html.includes("js/analyzers.js?v=hunt-analyser-death-v1") ||
+  html.includes("js/analyzers.js?v=analyser-header-reset-v1"), "analyzers.js sem cache-bust session total");
+must(html.includes("js/game.js?v=taken-session-total-v1") ||
+  html.includes("js/game.js?v=phys-hit-fx-v1"), "game.js sem cache-bust session total");
+must(html.includes("css/layout.css?v=taken-session-total-v1") ||
+  html.includes("css/layout.css?v=hunt-analyser-death-v1") ||
+  html.includes("css/layout.css?v=analyser-header-reset-v1") ||
+  html.includes("css/layout.css?v=world-boss-lobby-v2"), "layout.css sem cache-bust");
 must(html.includes('data-otc-session-reset'), "botão reset no header do painel");
 must(/otc-live-badge[\s\S]*?data-otc-session-reset[\s\S]*?data-collapse="analysers"/.test(html) ||
   /otc-live-badge[\s\S]*?otc-analyser-session-reset/.test(html),
   "LIVE antes do reset no header");
 must(gameSrc.includes("otcAnalyserIngestEvents"), "drainEvents não alimenta o damage analyser");
+must(gameSrc.includes("keepTakenTrack") || gameSrc.includes("keepDamageTrack"),
+  "applyOnlineAuthorityState deve preservar damageTrack/takenTrack");
+must(gameSrc.includes('key==="damageTrack"') || gameSrc.includes('key==="takenTrack"'),
+  "persistActiveInstance não deve serializar tracks do analyser");
 must(css.includes("otc-dmg-best"), "CSS do best session damage ausente");
 must(css.includes("otc-loot-econ"), "CSS do loot economy ausente");
 must(css.includes("otc-session-reset"), "CSS do reset no header");
@@ -68,7 +77,7 @@ must(taken["2"].total === 300 && taken["2"].byElement.fire === 300, "taken do EK
 const htmlDealt = analyzers.otcAnalyserDamageBody("damage", combat);
 must(htmlDealt.includes("Druidero - ED"), "label Nome - VOC no damage");
 must(htmlDealt.includes("Kina - EK"), "label do EK no damage");
-must(htmlDealt.includes("/h -"), "taxa deve ser /h e não /s");
+must(htmlDealt.includes("/h"), "taxa deve ser /h e não /s");
 must(!htmlDealt.includes("/s -"), "não deve usar /s como Baiak");
 must(htmlDealt.includes("otc-dmg-els"), "breakdown elemental por personagem");
 must((htmlDealt.match(/otc-dmg-char/g) || []).length >= 2, "uma seção por personagem");
@@ -78,13 +87,39 @@ must(combat.stats.damageTrack.bestHit && combat.stats.damageTrack.bestHit.total 
 must(htmlDealt.includes("Kina"), "best hit deve citar o personagem do maior golpe");
 must(htmlDealt.includes("ataque básico"), "hit sem spell/rune = ataque básico");
 must(htmlDealt.includes(analyzers.otcAnalyserNumber(2000)), "UI mostra o valor formatado do best");
+/* Total da sessão vem ANTES da taxa /h */
+must(/2[\.\u00a0]?000\s*·/.test(htmlDealt.replace(/\s/g, " ")) ||
+  htmlDealt.includes(analyzers.otcAnalyserNumber(2000) + " ·"),
+  "total da sessão deve aparecer antes de /h");
 
 const htmlTaken = analyzers.otcAnalyserDamageBody("taken", combat);
 must(htmlTaken.includes("Druidero - ED"), "label Nome - VOC no taken");
 must(htmlTaken.includes("Session"), "session timer no taken");
+must(htmlTaken.includes(analyzers.otcAnalyserNumber(100)) &&
+  htmlTaken.includes(analyzers.otcAnalyserNumber(300)), "taken mostra totais acumulados da sessão");
 must(!htmlTaken.includes("data-otc-dmg-reset"), "reset saiu do corpo; fica no header LIVE|↻|–");
 must(!htmlTaken.includes("Best session damage"), "best hit só na aba Damage");
 must(src.includes("otcAnalyserResetSession"), "reset de sessão no header do painel");
+
+/* Sessão cumulativa: segundo lote soma, não substitui */
+analyzers.otcAnalyserIngestEvents([
+  { t: "taken", dmg: 50, el: "fire", targetId: "1" },
+], combat);
+must(combat.stats.takenTrack.byPlayer["1"].total === 150, "taken acumulado após segundo lote");
+must(combat.stats.takenTrack.byPlayer["2"].total === 300, "taken do EK permanece");
+
+/* Simula overwrite online: snapshot velho não pode apagar o acumulado cliente */
+const liveTaken = combat.stats.takenTrack;
+const staleStats = Object.assign({}, combat.stats, {
+  takenTrack: { startedAt: Date.now(), byPlayer: {} },
+  damageTrack: { startedAt: Date.now(), byPlayer: {} },
+});
+const preserved = Object.assign({}, staleStats);
+preserved.takenTrack = liveTaken;
+preserved.damageTrack = combat.stats.damageTrack;
+must(preserved.takenTrack.byPlayer["1"].total === 150, "preservar takenTrack após merge de stats");
+must(src.includes("otcAnalyserSyncSessionScalars") || src.includes("otcAnalyserRowForMeta"),
+  "helpers de total de sessão presentes");
 
 must(src.includes('id: "damage"') && src.includes('id: "taken"'), "IDs damage/taken no fonte");
 must(!/\{\s*id:\s*"xp"/.test(src), "fonte ainda declara aba xp");

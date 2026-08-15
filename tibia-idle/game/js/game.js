@@ -103,8 +103,12 @@ function persistActiveInstance() {
     const state=JSON.parse(JSON.stringify(c,(key,value)=>{
       // Shared references (c.player também está em c.players) são válidas e
       // devem ser duplicadas pelo JSON.stringify. Remova apenas ciclos reais.
+      // damageTrack/takenTrack: só cliente (rederivados dos eventos); se
+      // persistirem no checkpoint, o tick online reenvia o snapshot e zera
+      // o acumulado da sessão no analyser.
       if(key==="huntMap"||key==="events"||key==="randomFn"||key==="raf"||
-         key==="_authorityDescriptor"||key==="_formationReservations")return undefined;
+         key==="_authorityDescriptor"||key==="_formationReservations"||
+         key==="damageTrack"||key==="takenTrack")return undefined;
       if(key==="target")return value&&value.id?{__targetId:String(value.id)}:null;
       return typeof value==="function"?undefined:value;
     }));
@@ -1214,7 +1218,7 @@ function openBossesCatalogModal() {
   const modal = $("#modal"), body = $("#modal-body");
   body.classList.remove(
     "hunts-modal-shell", "boss-modal-shell", "reward-modal-shell",
-    "npcs-modal-shell", "cidade-modal-shell"
+    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
   );
   body.classList.add("bosses-modal-shell");
   body.innerHTML = `<div class="panel-title bosses-modal-title">
@@ -1883,9 +1887,12 @@ function drainEvents() {
         // stones...). Sem isso toda runa mostrava so o efeito generico do
         // elemento e a sudden death parecia igual a um golpe de death comum.
         // Exori usa o estouro CINZA "hit-area" (nao o draw-blood vermelho).
-        r.addEffect(x, y, e.fx || ((e.exori && ehFisico) ? "hit-area"
+        // Golpe fisico basico: prioriza e.fx do motor; fallback pela raca
+        // (sangue / hit-area / veneno) — nunca omitir o impacto.
+        const hitFx = e.fx || ((e.exori && ehFisico) ? "hit-area"
                     : (raca ? raca.fx
-                       : (ELEMENTS[visualElement] || ELEMENTS.physical).fx)));
+                       : (ELEMENTS[visualElement] || ELEMENTS.physical).fx));
+        r.addEffect(x, y, hitFx || "draw-blood");
         // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
         // Critical Hit ocupa ~37px dentro do frame 64px, contra ~53px do
         // Onslaught; 1.45x iguala o tamanho percebido sem trocar a sprite.
@@ -1973,6 +1980,11 @@ function drainEvents() {
           fdc.ruse = (fdc.ruse || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else {
+          // CONST_ME_POFF: sem o sprite, só o texto "errou" aparecia.
+          if (e.projectile && r.addProjectile)
+            r.addProjectile(e.sx || (c.player ? c.player.x : mx), e.sy || (c.player ? c.player.y : my),
+                            mx, ey(e), "#a0a0a0", e.missile);
+          r.addEffect(mx, ey(e), e.fx || "poff");
           r.addFloater(mx, my, "errou", "#a0a0a0");
         }
         break;
@@ -1992,13 +2004,24 @@ function drainEvents() {
         // alcance fica só no log, sem poluir a cena.
         break;
       case "taken": {
+        // Mitigação total online às vezes chega como taken dmg=0 (em vez de
+        // block). Sem dano e sem condition → trata como bloqueio (block-hit).
+        const takenDmg = Number(e.dmg) || 0;
+        if (takenDmg <= 0 && !e.condition) {
+          const bx = ex(e), by = ey(e);
+          if (e.projectile && r.addProjectile)
+            r.addProjectile(e.sx, e.sy, bx, by, "#9ac0e8", e.missile);
+          r.addEffect(bx, by, e.fx || "block-hit");
+          r.addFloater(bx, by - 0.07, "bloqueou", "#9ac0e8");
+          break;
+        }
         // O dano físico RECEBIDO por player usa sangue vermelho no client.
         // A cor cinza é exclusiva de físico sem sangue (pedra/constructos).
         const col = e.el === "physical" || !e.el
           ? "#ff6b6b" : (ELEMENTS[e.el] || ELEMENTS.physical).color;
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
-        const shownTaken=visualAmount(e,e.dmg||0);
+        const shownTaken=visualAmount(e,takenDmg);
         if(shownTaken>0)r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(shownTaken), col, false, true, "damage");
         // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
         // demon, mort area do lich...) — sem, cai o generico do elemento
@@ -2021,11 +2044,17 @@ function drainEvents() {
           r.addProjectile(e.sx, e.sy, ex(e), ey(e), "#ffffff", e.missile);
         r.addEffect(ex(e), ey(e), e.fx || "magic-blue");
         break;
-      case "block":
+      case "block": {
+        const bx = ex(e), by = ey(e);
         if (e.projectile && r.addProjectile)
-          r.addProjectile(e.sx, e.sy, e.x, e.y, "#9ac0e8", e.missile);
-        if (!e.magicShield) r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "bloqueou", "#9ac0e8");
+          r.addProjectile(e.sx, e.sy, bx, by, "#9ac0e8", e.missile);
+        // CONST_ME_BLOCKHIT: o floater sozinho não basta — precisa do sprite.
+        if (!e.magicShield) {
+          r.addEffect(bx, by, e.fx || "block-hit");
+          r.addFloater(bx, by - 0.07, "bloqueou", "#9ac0e8");
+        }
         break;
+      }
       case "heal-friend": {
         // HEAL FRIEND: cura aplicada em um aliado da party (exura sio /
         // gran sio / gran mas res). Mostra o +HP sobre o personagem.
@@ -2260,6 +2289,23 @@ function drainEvents() {
         // "exevo mas san" no mesmo texto).
         const text = String(e.text || "").replace(/\s+/g, " ").trim();
         if (!text || e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text)) break;
+        // Dedup só com authTs (replay online). Local não tem authTs e não
+        // deve perder re-casts legítimos da mesma magia.
+        const authTs = Number(e.authTs);
+        if (Number.isFinite(authTs)) {
+          const sayFinger = "say|" + String(e.whoId || "") + "|" + text + "|" +
+            String(Math.floor(authTs / 50));
+          const seenSay = (typeof G !== "undefined" && G)
+            ? (G._saySeen || (G._saySeen = new Map())) : null;
+          if (seenSay) {
+            const prev = seenSay.get(sayFinger) || 0;
+            if (prev && (now - prev) < 2500) break;
+            seenSay.set(sayFinger, now);
+            if (seenSay.size > 80) {
+              for (const [k, t0] of seenSay) if (now - t0 > 4000) seenSay.delete(k);
+            }
+          }
+        }
         const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
         const wanted = e.whoId !== undefined && e.whoId !== null ? String(e.whoId) : "";
         const saidor = wanted && c && Array.isArray(c.players)
@@ -2608,6 +2654,10 @@ function finishIdleInstance(reason,silent){
 function advanceIdleInstance(elapsed,startAt,options){
   options=options||{};elapsed=Math.max(0,Number(elapsed)||0);
   if(!G.combat||!G.p||!elapsed)return {processed:0,ended:false,reason:null};
+  // Online: o servidor já avançou (tick/bg). Catch-up local re-simulava kills
+  // e empilhava loot na pouch (analyser/log certos, qty inflada).
+  if(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat())
+    return {processed:0,ended:false,reason:null};
   const maxSteps=250000;
   const step=options.step||Math.max(TICK,Math.ceil(elapsed/maxSteps/TICK)*TICK);
   let remaining=elapsed,cursor=Number(startAt)||Date.now()-elapsed,processed=0,reason=null;
@@ -2622,6 +2672,10 @@ function advanceIdleInstance(elapsed,startAt,options){
       reason=idleInstanceEndReason(G.combat,cursor);
       if(reason)break;
       reviveDownedParty(G.combat,cursor,true);
+      // Catch-up não renderiza floaters, mas o analyser precisa do total da sessão.
+      if(typeof otcAnalyserIngestEvents==="function"&&G.combat.events&&G.combat.events.length){
+        try{otcAnalyserIngestEvents(G.combat.events,G.combat);}catch(err){/* analyser opcional */}
+      }
       G.combat.events.length=0;
     }
     if(G.combat){
@@ -2632,6 +2686,9 @@ function advanceIdleInstance(elapsed,startAt,options){
         if(typeof imbTickAll==="function")imbTickAll(ent.p,processed);
       }
       if(typeof preyTick==="function")preyTick(G.p,processed);
+      if(typeof otcAnalyserIngestEvents==="function"&&G.combat.events&&G.combat.events.length){
+        try{otcAnalyserIngestEvents(G.combat.events,G.combat);}catch(err){/* analyser opcional */}
+      }
       G.combat.events.length=0;
     }
   }finally{G._idleCatchup=false;G._silentCombat=false;}
@@ -2675,10 +2732,16 @@ document.addEventListener("visibilitychange", async () => {
     // aqui todo o intervalo ainda não processado antes de reativar o rAF.
     const agora=Date.now();
     if(G.combat&&G.bgLast){
-      const elapsed=Math.max(0,agora-G.bgLast)+(G.bgAcc||0);
-      const result=advanceIdleInstance(elapsed,G.bgLast-(G.bgAcc||0),{silent:true});
-      G.bgAcc=Math.max(0,elapsed-result.processed);
-      if(G.combat)persistActiveInstance();
+      if(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()){
+        // Não rode combatTick/rollLoot local — o tick autoritativo já creditou.
+        if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
+        G.bgAcc=0;
+      }else{
+        const elapsed=Math.max(0,agora-G.bgLast)+(G.bgAcc||0);
+        const result=advanceIdleInstance(elapsed,G.bgLast-(G.bgAcc||0),{silent:true});
+        G.bgAcc=Math.max(0,elapsed-result.processed);
+        if(G.combat)persistActiveInstance();
+      }
     }
     G.bgLast=agora;G.last=performance.now();G.tickAcc=0;_wasHidden=false;
   }
@@ -2714,6 +2777,7 @@ function onlineAuthorityCombat(){
 function clearCombatVisualOverlays(combat){
   if(typeof G!=="undefined"&&G&&G.renderer&&typeof G.renderer.clearCombatVisuals==="function")
     G.renderer.clearCombatVisuals();
+  if(typeof G!=="undefined"&&G)G._saySeen=new Map();
   const c=combat||(typeof G!=="undefined"&&G&&G.combat)||null;
   if(!c)return;
   c.events=[];
@@ -2726,6 +2790,7 @@ function clearCombatVisualOverlays(combat){
   wipe(c.player);
   for(const ent of c.players||[])wipe(ent);
   for(const ent of c.mobs||[])wipe(ent);
+  for(const sp of c.pendingSpawns||[])if(sp&&sp.mob)wipe(sp.mob);
 }
 function serverDisconnectCopy(reason){
   const why=reason||(typeof accountServerDisconnectReason==="function"?accountServerDisconnectReason():"");
@@ -2745,6 +2810,15 @@ function serverDisconnectCopy(reason){
         "O servidor reiniciou. A caçada ficou pausada nesta aba — use Reconnect quando a API voltar.",
       toast:typeof t==="function"?t("server.restartToast"):
         "Servidor reiniciou. Use Reconnect para retomar.",
+    };
+  }
+  if(why==="session"){
+    return {
+      title:typeof t==="function"?t("server.sessionTitle"):"Sessão online perdida",
+      msg:typeof t==="function"?t("server.sessionMsg"):
+        "O controle online expirou (restart ou sessão inválida). Use Reconnect; se falhar, entre novamente.",
+      toast:typeof t==="function"?t("server.sessionToast"):
+        "Sessão/lease inválidos. Use Reconnect.",
     };
   }
   return {
@@ -2805,8 +2879,10 @@ function setServerConnectionStatus(online,options){
   const was=SERVER_CONNECTION_ONLINE;
   SERVER_CONNECTION_ONLINE=!!online;
   const box=$("#server-status"),btn=$("#btn-reconnect");
+  const playersBox=$("#players-online");
   const show=typeof accountApiConfigured==="function"&&accountApiConfigured();
   if(box)box.hidden=!show;
+  if(playersBox&&!show)playersBox.hidden=true;
   if(btn)btn.hidden=!!online;
   const healthOk=options&&options.healthOk!==undefined
     ?!!options.healthOk
@@ -2909,7 +2985,9 @@ async function reconnectOnlineRuntime(){
   if(G)G.instanceReconnectPending=true;
   if(typeof clearCombatVisualOverlays==="function")clearCombatVisualOverlays(G&&G.combat);
   try{
-    if(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE)ACCOUNT_LEASE.heldUntil=0;
+    if(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE){
+      ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.authFailUntil=0;ACCOUNT_LEASE.lost=false;
+    }
     if(typeof accountApiConfigured==="function"&&accountApiConfigured()){
       const health=typeof accountCheckServerHealth==="function"?await accountCheckServerHealth():{ok:true};
       if(!health||!health.ok){
@@ -3132,6 +3210,8 @@ function scheduleOnlineAuthorityEvents(events,receivedAt){
     const event=Object.assign({},remote),raw=Number(event.ts),base=Number.isFinite(raw)?Math.max(0,raw-first):0,
       tieKey=Number.isFinite(raw)?String(raw):"missing",tie=ties.get(tieKey)||0;
     ties.set(tieKey,tie+1);
+    // Preserva o ts autoritativo para dedup de say (o ts de exibição é remapeado).
+    if(Number.isFinite(raw))event.authTs=raw;
     event.ts=now+Math.min(spread,Math.round(base*scale)+Math.min(16,tie*4));
     return{event,index};
   }).sort((a,b)=>a.event.ts-b.event.ts||a.index-b.index).map((item)=>item.event);
@@ -3157,7 +3237,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   // trajeto antigo e os monstros saltarem como se perdessem frames.
   const visualKeys=["cx","cy","x","y","sx","sy","tx","ty","dir","moving","frame","walkT",
     "stepT","stepDur","speedPts","walkFrames","_walkFramesSlug","nextStepAt","attackAnim","target",
-    "path","pathIndex","moveFrom","moveTo","moveProgress"];
+    "path","pathIndex","moveFrom","moveTo","moveProgress","speech"];
   const entityId=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
   const localActiveId=entityId(previous.player),previousPlayers=Array.isArray(previous.players)?previous.players:[],
     previousMobs=Array.isArray(previous.mobs)?previous.mobs:[];
@@ -3196,6 +3276,8 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     const playerVisual={};
     if(playerRef)for(const key of visualKeys)if(playerRef[key]!==undefined)playerVisual[key]=playerRef[key];
     Object.assign(local,remote||{});
+    // speech é client-only; snapshot remoto nunca deve implantar fala eterna.
+    if(visual.speech===undefined)delete local.speech;
     if(localDef)local.def=localDef;
     hydrateMobDef(local);
     if(playerRef&&remote&&remote.p){
@@ -3265,7 +3347,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     if(gw>0&&gh>0)setGridSize(gw,gh);
   }
   if(incoming.stats){
+    // damageTrack/takenTrack vivem só no cliente (eventos hit/taken). O
+    // checkpoint do servidor carrega um snapshot velho desses campos e
+    // Object.assign apagava o acumulado a cada tick — Damage Taken (e
+    // Damage) pareciam “valores do último segundo” em vez do total da sessão.
+    const keepDamageTrack=previous.stats&&previous.stats.damageTrack;
+    const keepTakenTrack=previous.stats&&previous.stats.takenTrack;
     previous.stats=Object.assign({},previous.stats||{},incoming.stats);
+    if(keepDamageTrack&&typeof keepDamageTrack==="object")previous.stats.damageTrack=keepDamageTrack;
+    if(keepTakenTrack&&typeof keepTakenTrack==="object")previous.stats.takenTrack=keepTakenTrack;
     previous.stats.supplyUsed=Object.assign({},incoming.stats.supplyUsed||{});
     previous.stats.supplyCost=Number(incoming.stats.supplyCost)||0;
     previous.stats.loot=Object.assign({},incoming.stats.loot||previous.stats.loot||{});
@@ -3584,12 +3674,12 @@ function loop(ts) {
       }
     }
     }
-    // Autoseller da Loot Pouch: local/offline. Online a autoridade vende
-    // (VIP) no tick; aqui só espelha UI/local e bloqueia sem VIP.
+    // Autoseller da Loot Pouch: só local/offline. Online a autoridade vende
+    // (VIP) no tick — vender aqui mutava o cliente e o snapshot restaurava a pouch.
     if (G.p && G.p.config && G.p.config.pouchAutoSell) {
       if (typeof vipAutoSellAllowed === "function" && !vipAutoSellAllowed()) {
         G.p.config.pouchAutoSell = false;
-      } else if (typeof sellAllPouch === "function") {
+      } else if (!onlineAuthorityCombat() && typeof sellAllPouch === "function") {
         G._pouchTick = (G._pouchTick || 0) + dt;
         if (G._pouchTick >= 2000) {
           G._pouchTick = 0;
@@ -3597,6 +3687,7 @@ function loop(ts) {
           if (pct >= (G.p.config.pouchAutoSellPct || 80)) {
             const r = sellAllPouch(G.p);
             if (r.kinds) {
+              if (typeof save === "function") save();
               addLog("sell", `Autoseller: Loot Pouch em <b>${pct}%</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
               if (typeof renderLootPouch === "function") renderLootPouch(G.p);
             }
@@ -3911,6 +4002,10 @@ function bindControls() {
   if (btnCidade) btnCidade.addEventListener("click", () => {
     if (typeof openCidadeModal === "function") openCidadeModal();
   });
+  const btnRanking = $("#btn-ranking");
+  if (btnRanking) btnRanking.addEventListener("click", () => {
+    if (typeof openRankingModal === "function") openRankingModal();
+  });
   const btnNpcs = $("#btn-npcs");
   if (btnNpcs) btnNpcs.addEventListener("click", () => {
     if (typeof openNpcsModal === "function") openNpcsModal();
@@ -3919,6 +4014,10 @@ function bindControls() {
   /* Market / Reward / Forge / Depot / Imbuements: só via modal CIDADE (e Cyclopedia). */
   const btnWheel = $("#btn-wheel");
   if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
+  const btnCharms = $("#btn-charms");
+  if (btnCharms) btnCharms.addEventListener("click", () => {
+    if (typeof openCyclopedia === "function") openCyclopedia("charms");
+  });
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
@@ -4024,7 +4123,7 @@ function bindControls() {
       if (modalBody) {
         modalBody.classList.remove(
           "hunts-modal-shell", "bosses-modal-shell",
-          "npcs-modal-shell", "cidade-modal-shell"
+          "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
         );
       }
       if (typeof closeModal === "function") closeModal();
@@ -4047,10 +4146,19 @@ function bindControls() {
   });
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-pouch-sell-all").addEventListener("click", () => {
-    const r = sellAllPouch(p);
-    if (!r.kinds) { toast("Nada para vender na Loot Pouch."); return; }
-    toast(`Loot Pouch vendida por <b>${fmtFull(r.gold)} gp</b>`);
-    renderAll();
+    const run = typeof sellAllPouchAndPersist === "function"
+      ? sellAllPouchAndPersist(p)
+      : Promise.resolve((() => {
+          const r = sellAllPouch(p);
+          if (r.kinds && typeof save === "function") save();
+          return Object.assign({ ok: true }, r);
+        })());
+    Promise.resolve(run).then((r) => {
+      if (!r || !r.ok) return;
+      if (!r.kinds && !(r.gold > 0)) { toast("Nada para vender na Loot Pouch."); return; }
+      toast(`Loot Pouch vendida por <b>${fmtFull(r.gold)} gp</b>`);
+      if (typeof renderAll === "function") renderAll();
+    });
   });
   $("#btn-switch").addEventListener("click", openCharacterModal);
   $("#btn-reset").addEventListener("click", () => {

@@ -1,0 +1,6431 @@
+{
+  "wikiTotal": 971,
+  "wikiNonzero": 845,
+  "updatedCount": 3,
+  "unchangedCount": 131,
+  "unmappedWikiCount": 837,
+  "unmappedGameLootCount": 193,
+  "updated": [
+    {
+      "slug": "dragon-s-tail",
+      "name": "Dragon's Tail",
+      "oldSell": 1,
+      "oldNpcSell": 0,
+      "newPrice": 100,
+      "changed": true
+    },
+    {
+      "slug": "geomancer-s-robe",
+      "name": "Geomancer's Robe",
+      "oldSell": 1,
+      "oldNpcSell": 0,
+      "newPrice": 80,
+      "changed": true
+    },
+    {
+      "slug": "geomancer-s-staff",
+      "name": "Geomancer's Staff",
+      "oldSell": 1,
+      "oldNpcSell": 0,
+      "newPrice": 120,
+      "changed": true
+    }
+  ],
+  "unchanged": [
+    {
+      "slug": "acorn",
+      "name": "Acorn",
+      "oldSell": 10,
+      "oldNpcSell": 10,
+      "newPrice": 10,
+      "changed": false
+    },
+    {
+      "slug": "ancient-stone",
+      "name": "Ancient Stone",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "antlers",
+      "name": "Antlers",
+      "oldSell": 50,
+      "oldNpcSell": 50,
+      "newPrice": 50,
+      "changed": false
+    },
+    {
+      "slug": "badger-fur",
+      "name": "Badger Fur",
+      "oldSell": 15,
+      "oldNpcSell": 15,
+      "newPrice": 15,
+      "changed": false
+    },
+    {
+      "slug": "battle-stone",
+      "name": "Battle Stone",
+      "oldSell": 290,
+      "oldNpcSell": 290,
+      "newPrice": 290,
+      "changed": false
+    },
+    {
+      "slug": "bear-paw",
+      "name": "Bear Paw",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "behemoth-claw",
+      "name": "Behemoth Claw",
+      "oldSell": 2000,
+      "oldNpcSell": 2000,
+      "newPrice": 2000,
+      "changed": false
+    },
+    {
+      "slug": "black-hood",
+      "name": "Black Hood",
+      "oldSell": 190,
+      "oldNpcSell": 190,
+      "newPrice": 190,
+      "changed": false
+    },
+    {
+      "slug": "blood-preservation",
+      "name": "Blood Preservation",
+      "oldSell": 320,
+      "oldNpcSell": 320,
+      "newPrice": 320,
+      "changed": false
+    },
+    {
+      "slug": "blue-piece-of-cloth",
+      "name": "Blue Piece of Cloth",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "bonelord-eye",
+      "name": "Bonelord Eye",
+      "oldSell": 80,
+      "oldNpcSell": 80,
+      "newPrice": 80,
+      "changed": false
+    },
+    {
+      "slug": "bony-tail",
+      "name": "Bony Tail",
+      "oldSell": 210,
+      "oldNpcSell": 210,
+      "newPrice": 210,
+      "changed": false
+    },
+    {
+      "slug": "book-of-necromantic-rituals",
+      "name": "Book of Necromantic Rituals",
+      "oldSell": 180,
+      "oldNpcSell": 180,
+      "newPrice": 180,
+      "changed": false
+    },
+    {
+      "slug": "book-of-prayers",
+      "name": "Book of Prayers",
+      "oldSell": 120,
+      "oldNpcSell": 120,
+      "newPrice": 120,
+      "changed": false
+    },
+    {
+      "slug": "broken-crossbow",
+      "name": "Broken Crossbow",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "broken-helmet",
+      "name": "Broken Helmet",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "broken-shamanic-staff",
+      "name": "Broken Shamanic Staff",
+      "oldSell": 35,
+      "oldNpcSell": 35,
+      "newPrice": 35,
+      "changed": false
+    },
+    {
+      "slug": "broken-visor",
+      "name": "Broken Visor",
+      "oldSell": 1900,
+      "oldNpcSell": 1900,
+      "newPrice": 1900,
+      "changed": false
+    },
+    {
+      "slug": "brown-piece-of-cloth",
+      "name": "Brown Piece of Cloth",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "bunch-of-troll-hair",
+      "name": "Bunch of Troll Hair",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "cat-s-paw",
+      "name": "Cat's Paw",
+      "oldSell": 2000,
+      "oldNpcSell": 2000,
+      "newPrice": 2000,
+      "changed": false
+    },
+    {
+      "slug": "coal",
+      "name": "Coal",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "cobra-tongue",
+      "name": "Cobra Tongue",
+      "oldSell": 15,
+      "oldNpcSell": 15,
+      "newPrice": 15,
+      "changed": false
+    },
+    {
+      "slug": "compass",
+      "name": "Compass",
+      "oldSell": 45,
+      "oldNpcSell": 45,
+      "newPrice": 45,
+      "changed": false
+    },
+    {
+      "slug": "corrupt-naga-scales",
+      "name": "Corrupt Naga Scales",
+      "oldSell": 570,
+      "oldNpcSell": 570,
+      "newPrice": 570,
+      "changed": false
+    },
+    {
+      "slug": "cultish-robe",
+      "name": "Cultish Robe",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "cyclops-toe",
+      "name": "Cyclops Toe",
+      "oldSell": 55,
+      "oldNpcSell": 55,
+      "newPrice": 55,
+      "changed": false
+    },
+    {
+      "slug": "dark-rosary",
+      "name": "Dark Rosary",
+      "oldSell": 48,
+      "oldNpcSell": 48,
+      "newPrice": 48,
+      "changed": false
+    },
+    {
+      "slug": "demon-horn",
+      "name": "Demon Horn",
+      "oldSell": 1000,
+      "oldNpcSell": 1000,
+      "newPrice": 1000,
+      "changed": false
+    },
+    {
+      "slug": "demonic-essence",
+      "name": "Demonic Essence",
+      "oldSell": 1000,
+      "oldNpcSell": 1000,
+      "newPrice": 1000,
+      "changed": false
+    },
+    {
+      "slug": "demonic-skeletal-hand",
+      "name": "Demonic Skeletal Hand",
+      "oldSell": 80,
+      "oldNpcSell": 80,
+      "newPrice": 80,
+      "changed": false
+    },
+    {
+      "slug": "dirty-turban",
+      "name": "Dirty Turban",
+      "oldSell": 120,
+      "oldNpcSell": 120,
+      "newPrice": 120,
+      "changed": false
+    },
+    {
+      "slug": "elder-bonelord-tentacle",
+      "name": "Elder Bonelord Tentacle",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "elven-astral-observer",
+      "name": "Elven Astral Observer",
+      "oldSell": 90,
+      "oldNpcSell": 90,
+      "newPrice": 90,
+      "changed": false
+    },
+    {
+      "slug": "elven-scouting-glass",
+      "name": "Elven Scouting Glass",
+      "oldSell": 50,
+      "oldNpcSell": 50,
+      "newPrice": 50,
+      "changed": false
+    },
+    {
+      "slug": "elvish-talisman",
+      "name": "Elvish Talisman",
+      "oldSell": 45,
+      "oldNpcSell": 45,
+      "newPrice": 45,
+      "changed": false
+    },
+    {
+      "slug": "eye-patch",
+      "name": "Eye Patch",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "ferumbras-hat",
+      "name": "Ferumbras' Hat",
+      "oldSell": 10000,
+      "oldNpcSell": 10000,
+      "newPrice": 10000,
+      "changed": false
+    },
+    {
+      "slug": "ferumbras-mana-keg",
+      "name": "Ferumbras' Mana Keg",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "fish-fin",
+      "name": "Fish Fin",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "flask-of-demonic-blood",
+      "name": "Flask of Demonic Blood",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "flask-of-embalming-fluid",
+      "name": "Flask of Embalming Fluid",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "frosty-ear-of-a-troll",
+      "name": "Frosty Ear of a Troll",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "gauze-bandage",
+      "name": "Gauze Bandage",
+      "oldSell": 90,
+      "oldNpcSell": 90,
+      "newPrice": 90,
+      "changed": false
+    },
+    {
+      "slug": "ghostly-tissue",
+      "name": "Ghostly Tissue",
+      "oldSell": 90,
+      "oldNpcSell": 90,
+      "newPrice": 90,
+      "changed": false
+    },
+    {
+      "slug": "ghoul-snack",
+      "name": "Ghoul Snack",
+      "oldSell": 60,
+      "oldNpcSell": 60,
+      "newPrice": 60,
+      "changed": false
+    },
+    {
+      "slug": "giant-eye",
+      "name": "Giant Eye",
+      "oldSell": 380,
+      "oldNpcSell": 380,
+      "newPrice": 380,
+      "changed": false
+    },
+    {
+      "slug": "girlish-hair-decoration",
+      "name": "Girlish Hair Decoration",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "goblin-ear",
+      "name": "Goblin Ear",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "green-dragon-leather",
+      "name": "Green Dragon Leather",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "green-dragon-scale",
+      "name": "Green Dragon Scale",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "green-piece-of-cloth",
+      "name": "Green Piece of Cloth",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "hair-of-a-banshee",
+      "name": "Hair of a Banshee",
+      "oldSell": 350,
+      "oldNpcSell": 350,
+      "newPrice": 350,
+      "changed": false
+    },
+    {
+      "slug": "half-digested-piece-of-meat",
+      "name": "Half-Digested Piece of Meat",
+      "oldSell": 55,
+      "oldNpcSell": 55,
+      "newPrice": 55,
+      "changed": false
+    },
+    {
+      "slug": "hardened-bone",
+      "name": "Hardened Bone",
+      "oldSell": 70,
+      "oldNpcSell": 70,
+      "newPrice": 70,
+      "changed": false
+    },
+    {
+      "slug": "heaven-blossom",
+      "name": "Heaven Blossom",
+      "oldSell": 50,
+      "oldNpcSell": 50,
+      "newPrice": 50,
+      "changed": false
+    },
+    {
+      "slug": "holy-orchid",
+      "name": "Holy Orchid",
+      "oldSell": 90,
+      "oldNpcSell": 90,
+      "newPrice": 90,
+      "changed": false
+    },
+    {
+      "slug": "honeycomb",
+      "name": "Honeycomb",
+      "oldSell": 40,
+      "oldNpcSell": 40,
+      "newPrice": 40,
+      "changed": false
+    },
+    {
+      "slug": "hook",
+      "name": "Hook",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "iron-ore",
+      "name": "Iron Ore",
+      "oldSell": 500,
+      "oldNpcSell": 500,
+      "newPrice": 500,
+      "changed": false
+    },
+    {
+      "slug": "jewelled-belt",
+      "name": "Jewelled Belt",
+      "oldSell": 180,
+      "oldNpcSell": 180,
+      "newPrice": 180,
+      "changed": false
+    },
+    {
+      "slug": "lion-s-mane",
+      "name": "Lion's Mane",
+      "oldSell": 60,
+      "oldNpcSell": 60,
+      "newPrice": 60,
+      "changed": false
+    },
+    {
+      "slug": "lump-of-dirt",
+      "name": "Lump of Dirt",
+      "oldSell": 10,
+      "oldNpcSell": 10,
+      "newPrice": 10,
+      "changed": false
+    },
+    {
+      "slug": "makara-fin",
+      "name": "Makara Fin",
+      "oldSell": 350,
+      "oldNpcSell": 350,
+      "newPrice": 350,
+      "changed": false
+    },
+    {
+      "slug": "makara-tongue",
+      "name": "Makara Tongue",
+      "oldSell": 320,
+      "oldNpcSell": 320,
+      "newPrice": 320,
+      "changed": false
+    },
+    {
+      "slug": "minotaur-horn",
+      "name": "Minotaur Horn",
+      "oldSell": 75,
+      "oldNpcSell": 75,
+      "newPrice": 75,
+      "changed": false
+    },
+    {
+      "slug": "minotaur-leather",
+      "name": "Minotaur Leather",
+      "oldSell": 80,
+      "oldNpcSell": 80,
+      "newPrice": 80,
+      "changed": false
+    },
+    {
+      "slug": "naga-archer-scales",
+      "name": "Naga Archer Scales",
+      "oldSell": 340,
+      "oldNpcSell": 340,
+      "newPrice": 340,
+      "changed": false
+    },
+    {
+      "slug": "naga-armring",
+      "name": "Naga Armring",
+      "oldSell": 390,
+      "oldNpcSell": 390,
+      "newPrice": 390,
+      "changed": false
+    },
+    {
+      "slug": "naga-earring",
+      "name": "Naga Earring",
+      "oldSell": 380,
+      "oldNpcSell": 380,
+      "newPrice": 380,
+      "changed": false
+    },
+    {
+      "slug": "naga-warrior-scales",
+      "name": "Naga Warrior Scales",
+      "oldSell": 340,
+      "oldNpcSell": 340,
+      "newPrice": 340,
+      "changed": false
+    },
+    {
+      "slug": "necromantic-robe",
+      "name": "Necromantic Robe",
+      "oldSell": 250,
+      "oldNpcSell": 250,
+      "newPrice": 250,
+      "changed": false
+    },
+    {
+      "slug": "noble-turban",
+      "name": "Noble Turban",
+      "oldSell": 430,
+      "oldNpcSell": 430,
+      "newPrice": 430,
+      "changed": false
+    },
+    {
+      "slug": "one-of-timira-s-many-heads",
+      "name": "One of Timira's Many Heads",
+      "oldSell": 215000,
+      "oldNpcSell": 215000,
+      "newPrice": 215000,
+      "changed": false
+    },
+    {
+      "slug": "orc-leather",
+      "name": "Orc Leather",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "orc-tooth",
+      "name": "Orc Tooth",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "orcish-gear",
+      "name": "Orcish Gear",
+      "oldSell": 85,
+      "oldNpcSell": 85,
+      "newPrice": 85,
+      "changed": false
+    },
+    {
+      "slug": "pair-of-hellflayer-horns",
+      "name": "Pair of Hellflayer Horns",
+      "oldSell": 1300,
+      "oldNpcSell": 1300,
+      "newPrice": 1300,
+      "changed": false
+    },
+    {
+      "slug": "peg-leg",
+      "name": "Peg Leg",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "pelvis-bone",
+      "name": "Pelvis Bone",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "perfect-behemoth-fang",
+      "name": "Perfect Behemoth Fang",
+      "oldSell": 250,
+      "oldNpcSell": 250,
+      "newPrice": 250,
+      "changed": false
+    },
+    {
+      "slug": "petrified-scream",
+      "name": "Petrified Scream",
+      "oldSell": 250,
+      "oldNpcSell": 250,
+      "newPrice": 250,
+      "changed": false
+    },
+    {
+      "slug": "piece-of-archer-armor",
+      "name": "Piece of Archer Armor",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "piece-of-scarab-shell",
+      "name": "Piece of Scarab Shell",
+      "oldSell": 45,
+      "oldNpcSell": 45,
+      "newPrice": 45,
+      "changed": false
+    },
+    {
+      "slug": "piece-of-timira-s-sensors",
+      "name": "Piece of Timira's Sensors",
+      "oldSell": 150000,
+      "oldNpcSell": 150000,
+      "newPrice": 150000,
+      "changed": false
+    },
+    {
+      "slug": "piece-of-warrior-armor",
+      "name": "Piece of Warrior Armor",
+      "oldSell": 50,
+      "oldNpcSell": 50,
+      "newPrice": 50,
+      "changed": false
+    },
+    {
+      "slug": "pig-foot",
+      "name": "Pig Foot",
+      "oldSell": 10,
+      "oldNpcSell": 10,
+      "newPrice": 10,
+      "changed": false
+    },
+    {
+      "slug": "pile-of-grave-earth",
+      "name": "Pile of Grave Earth",
+      "oldSell": 25,
+      "oldNpcSell": 25,
+      "newPrice": 25,
+      "changed": false
+    },
+    {
+      "slug": "poison-spider-shell",
+      "name": "Poison Spider Shell",
+      "oldSell": 10,
+      "oldNpcSell": 10,
+      "newPrice": 10,
+      "changed": false
+    },
+    {
+      "slug": "polar-bear-paw",
+      "name": "Polar Bear Paw",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "protective-charm",
+      "name": "Protective Charm",
+      "oldSell": 60,
+      "oldNpcSell": 60,
+      "newPrice": 60,
+      "changed": false
+    },
+    {
+      "slug": "purple-robe",
+      "name": "Purple Robe",
+      "oldSell": 110,
+      "oldNpcSell": 110,
+      "newPrice": 110,
+      "changed": false
+    },
+    {
+      "slug": "quara-bone",
+      "name": "Quara Bone",
+      "oldSell": 500,
+      "oldNpcSell": 500,
+      "newPrice": 500,
+      "changed": false
+    },
+    {
+      "slug": "red-dragon-leather",
+      "name": "Red Dragon Leather",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "red-dragon-scale",
+      "name": "Red Dragon Scale",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "red-piece-of-cloth",
+      "name": "Red Piece of Cloth",
+      "oldSell": 300,
+      "oldNpcSell": 300,
+      "newPrice": 300,
+      "changed": false
+    },
+    {
+      "slug": "rogue-naga-scales",
+      "name": "Rogue Naga Scales",
+      "oldSell": 570,
+      "oldNpcSell": 570,
+      "newPrice": 570,
+      "changed": false
+    },
+    {
+      "slug": "rope-belt",
+      "name": "Rope Belt",
+      "oldSell": 66,
+      "oldNpcSell": 66,
+      "newPrice": 66,
+      "changed": false
+    },
+    {
+      "slug": "rotten-piece-of-cloth",
+      "name": "Rotten Piece of Cloth",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "safety-pin",
+      "name": "Safety Pin",
+      "oldSell": 120,
+      "oldNpcSell": 120,
+      "newPrice": 120,
+      "changed": false
+    },
+    {
+      "slug": "scarab-pincers",
+      "name": "Scarab Pincers",
+      "oldSell": 280,
+      "oldNpcSell": 280,
+      "newPrice": 280,
+      "changed": false
+    },
+    {
+      "slug": "scorpion-tail",
+      "name": "Scorpion Tail",
+      "oldSell": 25,
+      "oldNpcSell": 25,
+      "newPrice": 25,
+      "changed": false
+    },
+    {
+      "slug": "scroll-of-heroic-deeds",
+      "name": "Scroll of Heroic Deeds",
+      "oldSell": 230,
+      "oldNpcSell": 230,
+      "newPrice": 230,
+      "changed": false
+    },
+    {
+      "slug": "seeds",
+      "name": "Seeds",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "shamanic-hood",
+      "name": "Shamanic Hood",
+      "oldSell": 45,
+      "oldNpcSell": 45,
+      "newPrice": 45,
+      "changed": false
+    },
+    {
+      "slug": "shiny-stone",
+      "name": "Shiny Stone",
+      "oldSell": 500,
+      "oldNpcSell": 500,
+      "newPrice": 500,
+      "changed": false
+    },
+    {
+      "slug": "skull-belt",
+      "name": "Skull Belt",
+      "oldSell": 80,
+      "oldNpcSell": 80,
+      "newPrice": 80,
+      "changed": false
+    },
+    {
+      "slug": "small-flask-of-eyedrops",
+      "name": "Small Flask of Eyedrops",
+      "oldSell": 95,
+      "oldNpcSell": 95,
+      "newPrice": 95,
+      "changed": false
+    },
+    {
+      "slug": "small-notebook",
+      "name": "Small Notebook",
+      "oldSell": 480,
+      "oldNpcSell": 480,
+      "newPrice": 480,
+      "changed": false
+    },
+    {
+      "slug": "small-oil-lamp",
+      "name": "Small Oil Lamp",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    },
+    {
+      "slug": "small-pitchfork",
+      "name": "Small Pitchfork",
+      "oldSell": 70,
+      "oldNpcSell": 70,
+      "newPrice": 70,
+      "changed": false
+    },
+    {
+      "slug": "some-grimeleech-wings",
+      "name": "Some Grimeleech Wings",
+      "oldSell": 1200,
+      "oldNpcSell": 1200,
+      "newPrice": 1200,
+      "changed": false
+    },
+    {
+      "slug": "spider-fangs",
+      "name": "Spider Fangs",
+      "oldSell": 10,
+      "oldNpcSell": 10,
+      "newPrice": 10,
+      "changed": false
+    },
+    {
+      "slug": "spider-silk",
+      "name": "Spider Silk",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "star-herb",
+      "name": "Star Herb",
+      "oldSell": 15,
+      "oldNpcSell": 15,
+      "newPrice": 15,
+      "changed": false
+    },
+    {
+      "slug": "stone-herb",
+      "name": "Stone Herb",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "stone-wing",
+      "name": "Stone Wing",
+      "oldSell": 120,
+      "oldNpcSell": 120,
+      "newPrice": 120,
+      "changed": false
+    },
+    {
+      "slug": "strange-symbol",
+      "name": "Strange Symbol",
+      "oldSell": 200,
+      "oldNpcSell": 200,
+      "newPrice": 200,
+      "changed": false
+    },
+    {
+      "slug": "sulphurous-stone",
+      "name": "Sulphurous Stone",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "swamp-grass",
+      "name": "Swamp Grass",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "vampire-teeth",
+      "name": "Vampire Teeth",
+      "oldSell": 275,
+      "oldNpcSell": 275,
+      "newPrice": 275,
+      "changed": false
+    },
+    {
+      "slug": "vexclaw-talon",
+      "name": "Vexclaw Talon",
+      "oldSell": 1100,
+      "oldNpcSell": 1100,
+      "newPrice": 1100,
+      "changed": false
+    },
+    {
+      "slug": "warwolf-fur",
+      "name": "Warwolf Fur",
+      "oldSell": 30,
+      "oldNpcSell": 30,
+      "newPrice": 30,
+      "changed": false
+    },
+    {
+      "slug": "white-piece-of-cloth",
+      "name": "White Piece of Cloth",
+      "oldSell": 100,
+      "oldNpcSell": 100,
+      "newPrice": 100,
+      "changed": false
+    },
+    {
+      "slug": "winter-wolf-fur",
+      "name": "Winter Wolf Fur",
+      "oldSell": 20,
+      "oldNpcSell": 20,
+      "newPrice": 20,
+      "changed": false
+    },
+    {
+      "slug": "witch-broom",
+      "name": "Witch Broom",
+      "oldSell": 60,
+      "oldNpcSell": 60,
+      "newPrice": 60,
+      "changed": false
+    },
+    {
+      "slug": "wolf-paw",
+      "name": "Wolf Paw",
+      "oldSell": 70,
+      "oldNpcSell": 70,
+      "newPrice": 70,
+      "changed": false
+    },
+    {
+      "slug": "wood",
+      "name": "Wood",
+      "oldSell": 50,
+      "oldNpcSell": 50,
+      "newPrice": 50,
+      "changed": false
+    },
+    {
+      "slug": "wool",
+      "name": "Wool",
+      "oldSell": 15,
+      "oldNpcSell": 15,
+      "newPrice": 15,
+      "changed": false
+    },
+    {
+      "slug": "worm",
+      "name": "Worm",
+      "oldSell": 0,
+      "oldNpcSell": 0,
+      "newPrice": 0,
+      "changed": false
+    },
+    {
+      "slug": "yellow-piece-of-cloth",
+      "name": "Yellow Piece of Cloth",
+      "oldSell": 150,
+      "oldNpcSell": 150,
+      "newPrice": 150,
+      "changed": false
+    }
+  ],
+  "unmappedWiki": [
+    {
+      "name": "Abomination's Eye",
+      "npcPrice": 650000,
+      "slug_guess": "abominations-eye"
+    },
+    {
+      "name": "Abomination's Tail",
+      "npcPrice": 700000,
+      "slug_guess": "abominations-tail"
+    },
+    {
+      "name": "Abomination's Tongue",
+      "npcPrice": 950000,
+      "slug_guess": "abominations-tongue"
+    },
+    {
+      "name": "Abyssador's Lash",
+      "npcPrice": 0,
+      "slug_guess": "abyssadors-lash"
+    },
+    {
+      "name": "Afflicted Strider Head",
+      "npcPrice": 900,
+      "slug_guess": "afflicted-strider-head"
+    },
+    {
+      "name": "Afflicted Strider Worms",
+      "npcPrice": 500,
+      "slug_guess": "afflicted-strider-worms"
+    },
+    {
+      "name": "Albino Dragon Leather",
+      "npcPrice": 0,
+      "slug_guess": "albino-dragon-leather"
+    },
+    {
+      "name": "Alptramun's Toothbrush",
+      "npcPrice": 270000,
+      "slug_guess": "alptramuns-toothbrush"
+    },
+    {
+      "name": "Amber Souvenir",
+      "npcPrice": 850,
+      "slug_guess": "amber-souvenir"
+    },
+    {
+      "name": "Ancient Belt Buckle",
+      "npcPrice": 260,
+      "slug_guess": "ancient-belt-buckle"
+    },
+    {
+      "name": "Ancient Crypt Rune",
+      "npcPrice": 0,
+      "slug_guess": "ancient-crypt-rune"
+    },
+    {
+      "name": "Ancient Eye Stalk",
+      "npcPrice": 3500000,
+      "slug_guess": "ancient-eye-stalk"
+    },
+    {
+      "name": "Ancient Liche Bone",
+      "npcPrice": 28000,
+      "slug_guess": "ancient-liche-bone"
+    },
+    {
+      "name": "Ancient Scales",
+      "npcPrice": 400000,
+      "slug_guess": "ancient-scales"
+    },
+    {
+      "name": "Ancient Watch",
+      "npcPrice": 0,
+      "slug_guess": "ancient-watch"
+    },
+    {
+      "name": "Ape Fur",
+      "npcPrice": 120,
+      "slug_guess": "ape-fur"
+    },
+    {
+      "name": "Apron",
+      "npcPrice": 1300,
+      "slug_guess": "apron"
+    },
+    {
+      "name": "Arbaziloth Shoulder Piece",
+      "npcPrice": 450000,
+      "slug_guess": "arbaziloth-shoulder-piece"
+    },
+    {
+      "name": "Astral Glyph",
+      "npcPrice": 0,
+      "slug_guess": "astral-glyph"
+    },
+    {
+      "name": "Astral Source",
+      "npcPrice": 0,
+      "slug_guess": "astral-source"
+    },
+    {
+      "name": "Atab's Mitmah Helmet",
+      "npcPrice": 580,
+      "slug_guess": "atabs-mitmah-helmet"
+    },
+    {
+      "name": "Axe of Sir Leonard",
+      "npcPrice": 49000,
+      "slug_guess": "axe-of-sir-leonard"
+    },
+    {
+      "name": "Bakragore's Amalgamation",
+      "npcPrice": 2000000,
+      "slug_guess": "bakragores-amalgamation"
+    },
+    {
+      "name": "Bamboo Stick",
+      "npcPrice": 30,
+      "slug_guess": "bamboo-stick"
+    },
+    {
+      "name": "Banana Sash",
+      "npcPrice": 55,
+      "slug_guess": "banana-sash"
+    },
+    {
+      "name": "Basalt Core",
+      "npcPrice": 5800,
+      "slug_guess": "basalt-core"
+    },
+    {
+      "name": "Basalt Crumbs",
+      "npcPrice": 3000,
+      "slug_guess": "basalt-crumbs"
+    },
+    {
+      "name": "Basalt Fetish",
+      "npcPrice": 210,
+      "slug_guess": "basalt-fetish"
+    },
+    {
+      "name": "Basalt Figurine",
+      "npcPrice": 160,
+      "slug_guess": "basalt-figurine"
+    },
+    {
+      "name": "Bashmu Fang",
+      "npcPrice": 600,
+      "slug_guess": "bashmu-fang"
+    },
+    {
+      "name": "Bashmu Feather",
+      "npcPrice": 350,
+      "slug_guess": "bashmu-feather"
+    },
+    {
+      "name": "Bashmu Tongue",
+      "npcPrice": 400,
+      "slug_guess": "bashmu-tongue"
+    },
+    {
+      "name": "Bat Decoration",
+      "npcPrice": 2000,
+      "slug_guess": "bat-decoration"
+    },
+    {
+      "name": "Bat Wing",
+      "npcPrice": 50,
+      "slug_guess": "bat-wing"
+    },
+    {
+      "name": "Beast's Nightmare-Cushion",
+      "npcPrice": 630000,
+      "slug_guess": "beasts-nightmare-cushion"
+    },
+    {
+      "name": "Bed of Nails",
+      "npcPrice": 500,
+      "slug_guess": "bed-of-nails"
+    },
+    {
+      "name": "Beetle Carapace",
+      "npcPrice": 200,
+      "slug_guess": "beetle-carapace"
+    },
+    {
+      "name": "Beijinho",
+      "npcPrice": 2780,
+      "slug_guess": "beijinho"
+    },
+    {
+      "name": "Black Wool",
+      "npcPrice": 300,
+      "slug_guess": "black-wool"
+    },
+    {
+      "name": "Blazing Bone",
+      "npcPrice": 610,
+      "slug_guess": "blazing-bone"
+    },
+    {
+      "name": "Blemished Spawn Abdomen",
+      "npcPrice": 550,
+      "slug_guess": "blemished-spawn-abdomen"
+    },
+    {
+      "name": "Blemished Spawn Head",
+      "npcPrice": 800,
+      "slug_guess": "blemished-spawn-head"
+    },
+    {
+      "name": "Blemished Spawn Tail",
+      "npcPrice": 1000,
+      "slug_guess": "blemished-spawn-tail"
+    },
+    {
+      "name": "Bloated Maggot",
+      "npcPrice": 5200,
+      "slug_guess": "bloated-maggot"
+    },
+    {
+      "name": "Blood Amulet",
+      "npcPrice": 1230,
+      "slug_guess": "blood-amulet"
+    },
+    {
+      "name": "Blood Crown",
+      "npcPrice": 116000,
+      "slug_guess": "blood-crown"
+    },
+    {
+      "name": "Blood Hood",
+      "npcPrice": 1550,
+      "slug_guess": "blood-hood"
+    },
+    {
+      "name": "Blood Sceptre",
+      "npcPrice": 178000,
+      "slug_guess": "blood-sceptre"
+    },
+    {
+      "name": "Blood Tincture in a Vial",
+      "npcPrice": 360,
+      "slug_guess": "blood-tincture-in-a-vial"
+    },
+    {
+      "name": "Blooded Worm",
+      "npcPrice": 4700,
+      "slug_guess": "blooded-worm"
+    },
+    {
+      "name": "Bloodshot Giant Eye",
+      "npcPrice": 1820,
+      "slug_guess": "bloodshot-giant-eye"
+    },
+    {
+      "name": "Bloodstained Scythe",
+      "npcPrice": 4200,
+      "slug_guess": "bloodstained-scythe"
+    },
+    {
+      "name": "Bloody Dwarven Beard",
+      "npcPrice": 110,
+      "slug_guess": "bloody-dwarven-beard"
+    },
+    {
+      "name": "Bloody Pincers",
+      "npcPrice": 100,
+      "slug_guess": "bloody-pincers"
+    },
+    {
+      "name": "Bloody Tears",
+      "npcPrice": 70000,
+      "slug_guess": "bloody-tears"
+    },
+    {
+      "name": "Blue Goanna Scale",
+      "npcPrice": 230,
+      "slug_guess": "blue-goanna-scale"
+    },
+    {
+      "name": "Boar Man Hoof",
+      "npcPrice": 600,
+      "slug_guess": "boar-man-hoof"
+    },
+    {
+      "name": "Boggy Dreads",
+      "npcPrice": 200,
+      "slug_guess": "boggy-dreads"
+    },
+    {
+      "name": "Bola",
+      "npcPrice": 35,
+      "slug_guess": "bola"
+    },
+    {
+      "name": "Bone Fetish",
+      "npcPrice": 150,
+      "slug_guess": "bone-fetish"
+    },
+    {
+      "name": "Bone Fibula",
+      "npcPrice": 580,
+      "slug_guess": "bone-fibula"
+    },
+    {
+      "name": "Bone Rattle",
+      "npcPrice": 790,
+      "slug_guess": "bone-rattle"
+    },
+    {
+      "name": "Bone Shoulderplate",
+      "npcPrice": 150,
+      "slug_guess": "bone-shoulderplate"
+    },
+    {
+      "name": "Bone Spikes",
+      "npcPrice": 1500000,
+      "slug_guess": "bone-spikes"
+    },
+    {
+      "name": "Bone Toothpick",
+      "npcPrice": 150,
+      "slug_guess": "bone-toothpick"
+    },
+    {
+      "name": "Bonecarving Knife",
+      "npcPrice": 190,
+      "slug_guess": "bonecarving-knife"
+    },
+    {
+      "name": "Bones of Zorvorax",
+      "npcPrice": 10000,
+      "slug_guess": "bones-of-zorvorax"
+    },
+    {
+      "name": "Book Page",
+      "npcPrice": 640,
+      "slug_guess": "book-page"
+    },
+    {
+      "name": "Book of Faith",
+      "npcPrice": 0,
+      "slug_guess": "book-of-faith"
+    },
+    {
+      "name": "Book with a Dragon",
+      "npcPrice": 1800,
+      "slug_guess": "book-with-a-dragon"
+    },
+    {
+      "name": "Book with an Hourglass",
+      "npcPrice": 1450,
+      "slug_guess": "book-with-an-hourglass"
+    },
+    {
+      "name": "Bottled Dragon Breath",
+      "npcPrice": 0,
+      "slug_guess": "bottled-dragon-breath"
+    },
+    {
+      "name": "Bowl of Terror Sweat",
+      "npcPrice": 500,
+      "slug_guess": "bowl-of-terror-sweat"
+    },
+    {
+      "name": "Brain Head's Brain",
+      "npcPrice": 0,
+      "slug_guess": "brain-heads-brain"
+    },
+    {
+      "name": "Brain Head's Giant Neuron",
+      "npcPrice": 100000,
+      "slug_guess": "brain-heads-giant-neuron"
+    },
+    {
+      "name": "Brain Head's Left Hemisphere",
+      "npcPrice": 90000,
+      "slug_guess": "brain-heads-left-hemisphere"
+    },
+    {
+      "name": "Brain Head's Right Hemisphere",
+      "npcPrice": 50000,
+      "slug_guess": "brain-heads-right-hemisphere"
+    },
+    {
+      "name": "Brainstealer's Brain",
+      "npcPrice": 300000,
+      "slug_guess": "brainstealers-brain"
+    },
+    {
+      "name": "Brainstealer's Brainwave",
+      "npcPrice": 440000,
+      "slug_guess": "brainstealers-brainwave"
+    },
+    {
+      "name": "Brainstealer's Tissue",
+      "npcPrice": 240000,
+      "slug_guess": "brainstealers-tissue"
+    },
+    {
+      "name": "Brigadeiro",
+      "npcPrice": 2640,
+      "slug_guess": "brigadeiro"
+    },
+    {
+      "name": "Bright Bell",
+      "npcPrice": 220,
+      "slug_guess": "bright-bell"
+    },
+    {
+      "name": "Brimstone Fangs",
+      "npcPrice": 380,
+      "slug_guess": "brimstone-fangs"
+    },
+    {
+      "name": "Brimstone Shell",
+      "npcPrice": 210,
+      "slug_guess": "brimstone-shell"
+    },
+    {
+      "name": "Brinebrute Claw",
+      "npcPrice": 2600,
+      "slug_guess": "brinebrute-claw"
+    },
+    {
+      "name": "Broken Arrow",
+      "npcPrice": 0,
+      "slug_guess": "broken-arrow"
+    },
+    {
+      "name": "Broken Draken Mail",
+      "npcPrice": 340,
+      "slug_guess": "broken-draken-mail"
+    },
+    {
+      "name": "Broken Gladiator Shield",
+      "npcPrice": 190,
+      "slug_guess": "broken-gladiator-shield"
+    },
+    {
+      "name": "Broken Halberd",
+      "npcPrice": 100,
+      "slug_guess": "broken-halberd"
+    },
+    {
+      "name": "Broken Iks Cuirass",
+      "npcPrice": 640,
+      "slug_guess": "broken-iks-cuirass"
+    },
+    {
+      "name": "Broken Iks Faulds",
+      "npcPrice": 530,
+      "slug_guess": "broken-iks-faulds"
+    },
+    {
+      "name": "Broken Iks Headpiece",
+      "npcPrice": 560,
+      "slug_guess": "broken-iks-headpiece"
+    },
+    {
+      "name": "Broken Iks Sandals",
+      "npcPrice": 440,
+      "slug_guess": "broken-iks-sandals"
+    },
+    {
+      "name": "Broken Key Ring",
+      "npcPrice": 8000,
+      "slug_guess": "broken-key-ring"
+    },
+    {
+      "name": "Broken Longbow",
+      "npcPrice": 130,
+      "slug_guess": "broken-longbow"
+    },
+    {
+      "name": "Broken Macuahuitl",
+      "npcPrice": 1000,
+      "slug_guess": "broken-macuahuitl"
+    },
+    {
+      "name": "Broken Mitmah Chestplate",
+      "npcPrice": 85000,
+      "slug_guess": "broken-mitmah-chestplate"
+    },
+    {
+      "name": "Broken Mitmah Necklace",
+      "npcPrice": 210,
+      "slug_guess": "broken-mitmah-necklace"
+    },
+    {
+      "name": "Broken Ring of Ending",
+      "npcPrice": 4000,
+      "slug_guess": "broken-ring-of-ending"
+    },
+    {
+      "name": "Broken Slicer",
+      "npcPrice": 120,
+      "slug_guess": "broken-slicer"
+    },
+    {
+      "name": "Broken Staff of Mind Control",
+      "npcPrice": 1250000,
+      "slug_guess": "broken-staff-of-mind-control"
+    },
+    {
+      "name": "Broken Throwing Axe",
+      "npcPrice": 230,
+      "slug_guess": "broken-throwing-axe"
+    },
+    {
+      "name": "Broodrider Saddle",
+      "npcPrice": 2800,
+      "slug_guess": "broodrider-saddle"
+    },
+    {
+      "name": "Brutus Bloodbeard's Hat",
+      "npcPrice": 0,
+      "slug_guess": "brutus-bloodbeards-hat"
+    },
+    {
+      "name": "Bulltaur Armor Scrap",
+      "npcPrice": 480,
+      "slug_guess": "bulltaur-armor-scrap"
+    },
+    {
+      "name": "Bulltaur Hoof",
+      "npcPrice": 540,
+      "slug_guess": "bulltaur-hoof"
+    },
+    {
+      "name": "Bulltaur Horn",
+      "npcPrice": 385,
+      "slug_guess": "bulltaur-horn"
+    },
+    {
+      "name": "Bundle of Cursed Straw",
+      "npcPrice": 800,
+      "slug_guess": "bundle-of-cursed-straw"
+    },
+    {
+      "name": "Burnt Out Devourer Core",
+      "npcPrice": 0,
+      "slug_guess": "burnt-out-devourer-core"
+    },
+    {
+      "name": "Capricious Heart",
+      "npcPrice": 2100,
+      "slug_guess": "capricious-heart"
+    },
+    {
+      "name": "Capricious Robe",
+      "npcPrice": 1200,
+      "slug_guess": "capricious-robe"
+    },
+    {
+      "name": "Carniphila Seeds",
+      "npcPrice": 50,
+      "slug_guess": "carniphila-seeds"
+    },
+    {
+      "name": "Carnisylvan Bark",
+      "npcPrice": 230,
+      "slug_guess": "carnisylvan-bark"
+    },
+    {
+      "name": "Carnisylvan Finger",
+      "npcPrice": 250,
+      "slug_guess": "carnisylvan-finger"
+    },
+    {
+      "name": "Carnivostrich Feather",
+      "npcPrice": 630,
+      "slug_guess": "carnivostrich-feather"
+    },
+    {
+      "name": "Carrion Worm Fang",
+      "npcPrice": 35,
+      "slug_guess": "carrion-worm-fang"
+    },
+    {
+      "name": "Catnip",
+      "npcPrice": 580,
+      "slug_guess": "catnip"
+    },
+    {
+      "name": "Cave Chimera Head",
+      "npcPrice": 1200,
+      "slug_guess": "cave-chimera-head"
+    },
+    {
+      "name": "Cave Chimera Leg",
+      "npcPrice": 650,
+      "slug_guess": "cave-chimera-leg"
+    },
+    {
+      "name": "Cave Devourer Eyes",
+      "npcPrice": 550,
+      "slug_guess": "cave-devourer-eyes"
+    },
+    {
+      "name": "Cave Devourer Legs",
+      "npcPrice": 350,
+      "slug_guess": "cave-devourer-legs"
+    },
+    {
+      "name": "Cave Devourer Maw",
+      "npcPrice": 600,
+      "slug_guess": "cave-devourer-maw"
+    },
+    {
+      "name": "Cavebear Skull",
+      "npcPrice": 550,
+      "slug_guess": "cavebear-skull"
+    },
+    {
+      "name": "Centipede Leg",
+      "npcPrice": 28,
+      "slug_guess": "centipede-leg"
+    },
+    {
+      "name": "Ceremonial Bowl",
+      "npcPrice": 0,
+      "slug_guess": "ceremonial-bowl"
+    },
+    {
+      "name": "Chagorz Igneous Obsidian",
+      "npcPrice": 1100000,
+      "slug_guess": "chagorz-igneous-obsidian"
+    },
+    {
+      "name": "Chain Leash",
+      "npcPrice": 970,
+      "slug_guess": "chain-leash"
+    },
+    {
+      "name": "Chasm Spawn Abdomen",
+      "npcPrice": 240,
+      "slug_guess": "chasm-spawn-abdomen"
+    },
+    {
+      "name": "Chasm Spawn Head",
+      "npcPrice": 850,
+      "slug_guess": "chasm-spawn-head"
+    },
+    {
+      "name": "Chasm Spawn Tail",
+      "npcPrice": 120,
+      "slug_guess": "chasm-spawn-tail"
+    },
+    {
+      "name": "Cheese Cutter",
+      "npcPrice": 50,
+      "slug_guess": "cheese-cutter"
+    },
+    {
+      "name": "Cheesy Figurine",
+      "npcPrice": 150,
+      "slug_guess": "cheesy-figurine"
+    },
+    {
+      "name": "Cheesy Membership Card",
+      "npcPrice": 120000,
+      "slug_guess": "cheesy-membership-card"
+    },
+    {
+      "name": "Chicken Feather",
+      "npcPrice": 30,
+      "slug_guess": "chicken-feather"
+    },
+    {
+      "name": "Chitinous Mouth (Baron from Below)",
+      "npcPrice": 10000,
+      "slug_guess": "chitinous-mouth-baron-from-below"
+    },
+    {
+      "name": "Chitinous Mouth (Count of the Core)",
+      "npcPrice": 10000,
+      "slug_guess": "chitinous-mouth-count-of-the-core"
+    },
+    {
+      "name": "Christmas Present Bag",
+      "npcPrice": 0,
+      "slug_guess": "christmas-present-bag"
+    },
+    {
+      "name": "Christmas Token",
+      "npcPrice": 0,
+      "slug_guess": "christmas-token"
+    },
+    {
+      "name": "Churro Heart",
+      "npcPrice": 2680,
+      "slug_guess": "churro-heart"
+    },
+    {
+      "name": "Claw of 'The Noxious Spawn'",
+      "npcPrice": 15000,
+      "slug_guess": "claw-of-the-noxious-spawn"
+    },
+    {
+      "name": "Cliff Strider Claw",
+      "npcPrice": 800,
+      "slug_guess": "cliff-strider-claw"
+    },
+    {
+      "name": "Closed Pocket Sundial",
+      "npcPrice": 5000,
+      "slug_guess": "closed-pocket-sundial"
+    },
+    {
+      "name": "Cloud Familiar",
+      "npcPrice": 0,
+      "slug_guess": "cloud-familiar"
+    },
+    {
+      "name": "Cluster of Crystallized Death",
+      "npcPrice": 9000,
+      "slug_guess": "cluster-of-crystallized-death"
+    },
+    {
+      "name": "Cluster of Solace",
+      "npcPrice": 0,
+      "slug_guess": "cluster-of-solace"
+    },
+    {
+      "name": "Coal Eyes",
+      "npcPrice": 0,
+      "slug_guess": "coal-eyes"
+    },
+    {
+      "name": "Cobra Crest",
+      "npcPrice": 650,
+      "slug_guess": "cobra-crest"
+    },
+    {
+      "name": "Cockroach Leg",
+      "npcPrice": 0,
+      "slug_guess": "cockroach-leg"
+    },
+    {
+      "name": "Colourful Feather",
+      "npcPrice": 110,
+      "slug_guess": "colourful-feather"
+    },
+    {
+      "name": "Colourful Feathers",
+      "npcPrice": 400,
+      "slug_guess": "colourful-feathers"
+    },
+    {
+      "name": "Colourful Quill",
+      "npcPrice": 110000,
+      "slug_guess": "colourful-quill"
+    },
+    {
+      "name": "Colourful Snail Shell",
+      "npcPrice": 250,
+      "slug_guess": "colourful-snail-shell"
+    },
+    {
+      "name": "Compound Eye",
+      "npcPrice": 150,
+      "slug_guess": "compound-eye"
+    },
+    {
+      "name": "Condensed Energy",
+      "npcPrice": 260,
+      "slug_guess": "condensed-energy"
+    },
+    {
+      "name": "Cookbook (Creature Product)",
+      "npcPrice": 870,
+      "slug_guess": "cookbook-creature-product"
+    },
+    {
+      "name": "Coral Branch",
+      "npcPrice": 360,
+      "slug_guess": "coral-branch"
+    },
+    {
+      "name": "Corrupted Flag",
+      "npcPrice": 700,
+      "slug_guess": "corrupted-flag"
+    },
+    {
+      "name": "Countess Sorrow's Frozen Tear",
+      "npcPrice": 50000,
+      "slug_guess": "countess-sorrows-frozen-tear"
+    },
+    {
+      "name": "Cow Bell",
+      "npcPrice": 120,
+      "slug_guess": "cow-bell"
+    },
+    {
+      "name": "Cowbell",
+      "npcPrice": 210,
+      "slug_guess": "cowbell"
+    },
+    {
+      "name": "Crab Man Claws",
+      "npcPrice": 550,
+      "slug_guess": "crab-man-claws"
+    },
+    {
+      "name": "Crab Pincers",
+      "npcPrice": 35,
+      "slug_guess": "crab-pincers"
+    },
+    {
+      "name": "Cracked Alabaster Vase",
+      "npcPrice": 180,
+      "slug_guess": "cracked-alabaster-vase"
+    },
+    {
+      "name": "Crawler Head Plating",
+      "npcPrice": 210,
+      "slug_guess": "crawler-head-plating"
+    },
+    {
+      "name": "Crawler's Essence",
+      "npcPrice": 3700,
+      "slug_guess": "crawlers-essence"
+    },
+    {
+      "name": "Crown (Plant)",
+      "npcPrice": 2700,
+      "slug_guess": "crown-plant"
+    },
+    {
+      "name": "Cruelty's Chest",
+      "npcPrice": 720000,
+      "slug_guess": "crueltys-chest"
+    },
+    {
+      "name": "Cruelty's Claw",
+      "npcPrice": 640000,
+      "slug_guess": "crueltys-claw"
+    },
+    {
+      "name": "Cry-Stal",
+      "npcPrice": 3200,
+      "slug_guess": "cry-stal"
+    },
+    {
+      "name": "Cryptic Fossil",
+      "npcPrice": 0,
+      "slug_guess": "cryptic-fossil"
+    },
+    {
+      "name": "Crystal Bone",
+      "npcPrice": 250,
+      "slug_guess": "crystal-bone"
+    },
+    {
+      "name": "Crystal of the Mitmah",
+      "npcPrice": 280,
+      "slug_guess": "crystal-of-the-mitmah"
+    },
+    {
+      "name": "Crystalline Spikes",
+      "npcPrice": 440,
+      "slug_guess": "crystalline-spikes"
+    },
+    {
+      "name": "Crystallised Blood",
+      "npcPrice": 270000,
+      "slug_guess": "crystallised-blood"
+    },
+    {
+      "name": "Crystallized Anger",
+      "npcPrice": 400,
+      "slug_guess": "crystallized-anger"
+    },
+    {
+      "name": "Crystallized Death",
+      "npcPrice": 3000,
+      "slug_guess": "crystallized-death"
+    },
+    {
+      "name": "Cuirass Plate",
+      "npcPrice": 1000,
+      "slug_guess": "cuirass-plate"
+    },
+    {
+      "name": "Cultish Mask",
+      "npcPrice": 280,
+      "slug_guess": "cultish-mask"
+    },
+    {
+      "name": "Cultish Symbol",
+      "npcPrice": 500,
+      "slug_guess": "cultish-symbol"
+    },
+    {
+      "name": "Curious Matter",
+      "npcPrice": 430,
+      "slug_guess": "curious-matter"
+    },
+    {
+      "name": "Curl of Hair",
+      "npcPrice": 320000,
+      "slug_guess": "curl-of-hair"
+    },
+    {
+      "name": "Cursed Bone",
+      "npcPrice": 6000,
+      "slug_guess": "cursed-bone"
+    },
+    {
+      "name": "Cursed Shoulder Spikes",
+      "npcPrice": 320,
+      "slug_guess": "cursed-shoulder-spikes"
+    },
+    {
+      "name": "Damaged Armor Plates",
+      "npcPrice": 280,
+      "slug_guess": "damaged-armor-plates"
+    },
+    {
+      "name": "Damaged Worm Head",
+      "npcPrice": 8000,
+      "slug_guess": "damaged-worm-head"
+    },
+    {
+      "name": "Damselfly Eye",
+      "npcPrice": 25,
+      "slug_guess": "damselfly-eye"
+    },
+    {
+      "name": "Damselfly Wing",
+      "npcPrice": 20,
+      "slug_guess": "damselfly-wing"
+    },
+    {
+      "name": "Dandelion Seeds",
+      "npcPrice": 200,
+      "slug_guess": "dandelion-seeds"
+    },
+    {
+      "name": "Dangerous Proto Matter",
+      "npcPrice": 300,
+      "slug_guess": "dangerous-proto-matter"
+    },
+    {
+      "name": "Dark Bell",
+      "npcPrice": 250,
+      "slug_guess": "dark-bell"
+    },
+    {
+      "name": "Dark Bell (Silver)",
+      "npcPrice": 310000,
+      "slug_guess": "dark-bell-silver"
+    },
+    {
+      "name": "Dark Obsidian Splinter",
+      "npcPrice": 4400,
+      "slug_guess": "dark-obsidian-splinter"
+    },
+    {
+      "name": "Darklight Basalt Chunk",
+      "npcPrice": 3800,
+      "slug_guess": "darklight-basalt-chunk"
+    },
+    {
+      "name": "Darklight Core (Object)",
+      "npcPrice": 4100,
+      "slug_guess": "darklight-core-object"
+    },
+    {
+      "name": "Darklight Figurine",
+      "npcPrice": 3400000,
+      "slug_guess": "darklight-figurine"
+    },
+    {
+      "name": "Darklight Heart",
+      "npcPrice": 0,
+      "slug_guess": "darklight-heart"
+    },
+    {
+      "name": "Darklight Matter (Object)",
+      "npcPrice": 5500,
+      "slug_guess": "darklight-matter-object"
+    },
+    {
+      "name": "Dead Weight",
+      "npcPrice": 450,
+      "slug_guess": "dead-weight"
+    },
+    {
+      "name": "Deadeye Devious' Eye Patch",
+      "npcPrice": 0,
+      "slug_guess": "deadeye-devious-eye-patch"
+    },
+    {
+      "name": "Deadly Fangs",
+      "npcPrice": 5500,
+      "slug_guess": "deadly-fangs"
+    },
+    {
+      "name": "Deathly Crypt Rune",
+      "npcPrice": 0,
+      "slug_guess": "deathly-crypt-rune"
+    },
+    {
+      "name": "Deathstrike's Snippet",
+      "npcPrice": 0,
+      "slug_guess": "deathstrikes-snippet"
+    },
+    {
+      "name": "Decayed Finger Bone",
+      "npcPrice": 5100,
+      "slug_guess": "decayed-finger-bone"
+    },
+    {
+      "name": "Deepling Breaktime Snack",
+      "npcPrice": 90,
+      "slug_guess": "deepling-breaktime-snack"
+    },
+    {
+      "name": "Deepling Claw",
+      "npcPrice": 430,
+      "slug_guess": "deepling-claw"
+    },
+    {
+      "name": "Deepling Guard Belt Buckle",
+      "npcPrice": 230,
+      "slug_guess": "deepling-guard-belt-buckle"
+    },
+    {
+      "name": "Deepling Ridge",
+      "npcPrice": 360,
+      "slug_guess": "deepling-ridge"
+    },
+    {
+      "name": "Deepling Scales",
+      "npcPrice": 80,
+      "slug_guess": "deepling-scales"
+    },
+    {
+      "name": "Deepling Warts",
+      "npcPrice": 180,
+      "slug_guess": "deepling-warts"
+    },
+    {
+      "name": "Deeptags",
+      "npcPrice": 290,
+      "slug_guess": "deeptags"
+    },
+    {
+      "name": "Deepworm Jaws",
+      "npcPrice": 500,
+      "slug_guess": "deepworm-jaws"
+    },
+    {
+      "name": "Deepworm Spike Roots",
+      "npcPrice": 650,
+      "slug_guess": "deepworm-spike-roots"
+    },
+    {
+      "name": "Deepworm Spikes",
+      "npcPrice": 800,
+      "slug_guess": "deepworm-spikes"
+    },
+    {
+      "name": "Demon Claws",
+      "npcPrice": 0,
+      "slug_guess": "demon-claws"
+    },
+    {
+      "name": "Demon Dust",
+      "npcPrice": 300,
+      "slug_guess": "demon-dust"
+    },
+    {
+      "name": "Demon Root",
+      "npcPrice": 950,
+      "slug_guess": "demon-root"
+    },
+    {
+      "name": "Demon Skull",
+      "npcPrice": 0,
+      "slug_guess": "demon-skull"
+    },
+    {
+      "name": "Demonic Core Essence",
+      "npcPrice": 0,
+      "slug_guess": "demonic-core-essence"
+    },
+    {
+      "name": "Demonic Finger",
+      "npcPrice": 1000,
+      "slug_guess": "demonic-finger"
+    },
+    {
+      "name": "Demonic Matter",
+      "npcPrice": 0,
+      "slug_guess": "demonic-matter"
+    },
+    {
+      "name": "Devourer Core",
+      "npcPrice": 0,
+      "slug_guess": "devourer-core"
+    },
+    {
+      "name": "Dewberry Palm Leaf",
+      "npcPrice": 0,
+      "slug_guess": "dewberry-palm-leaf"
+    },
+    {
+      "name": "Diremaw Brainpan",
+      "npcPrice": 350,
+      "slug_guess": "diremaw-brainpan"
+    },
+    {
+      "name": "Diremaw Legs",
+      "npcPrice": 270,
+      "slug_guess": "diremaw-legs"
+    },
+    {
+      "name": "Distorted Heart",
+      "npcPrice": 2100,
+      "slug_guess": "distorted-heart"
+    },
+    {
+      "name": "Distorted Robe",
+      "npcPrice": 1200,
+      "slug_guess": "distorted-robe"
+    },
+    {
+      "name": "Downy Feather",
+      "npcPrice": 20,
+      "slug_guess": "downy-feather"
+    },
+    {
+      "name": "Dowser",
+      "npcPrice": 35,
+      "slug_guess": "dowser"
+    },
+    {
+      "name": "Dracola's Eye",
+      "npcPrice": 50000,
+      "slug_guess": "dracolas-eye"
+    },
+    {
+      "name": "Dracoyle Statue",
+      "npcPrice": 5000,
+      "slug_guess": "dracoyle-statue"
+    },
+    {
+      "name": "Dracoyle Statue (Enchanted)",
+      "npcPrice": 5000,
+      "slug_guess": "dracoyle-statue-enchanted"
+    },
+    {
+      "name": "Dragolisk Eye",
+      "npcPrice": 690,
+      "slug_guess": "dragolisk-eye"
+    },
+    {
+      "name": "Dragolisk Poison Gland",
+      "npcPrice": 475,
+      "slug_guess": "dragolisk-poison-gland"
+    },
+    {
+      "name": "Dragon Blood",
+      "npcPrice": 700,
+      "slug_guess": "dragon-blood"
+    },
+    {
+      "name": "Dragon Claw",
+      "npcPrice": 8000,
+      "slug_guess": "dragon-claw"
+    },
+    {
+      "name": "Dragon Claw (Green)",
+      "npcPrice": 0,
+      "slug_guess": "dragon-claw-green"
+    },
+    {
+      "name": "Dragon Crown",
+      "npcPrice": 0,
+      "slug_guess": "dragon-crown"
+    },
+    {
+      "name": "Dragon Priest's Wandtip",
+      "npcPrice": 175,
+      "slug_guess": "dragon-priests-wandtip"
+    },
+    {
+      "name": "Dragon Tongue",
+      "npcPrice": 550,
+      "slug_guess": "dragon-tongue"
+    },
+    {
+      "name": "Draken Sulphur",
+      "npcPrice": 550,
+      "slug_guess": "draken-sulphur"
+    },
+    {
+      "name": "Draken Wristbands",
+      "npcPrice": 430,
+      "slug_guess": "draken-wristbands"
+    },
+    {
+      "name": "Draptor Scales",
+      "npcPrice": 800,
+      "slug_guess": "draptor-scales"
+    },
+    {
+      "name": "Dream Essence Egg",
+      "npcPrice": 205,
+      "slug_guess": "dream-essence-egg"
+    },
+    {
+      "name": "Dream Matter",
+      "npcPrice": 0,
+      "slug_guess": "dream-matter"
+    },
+    {
+      "name": "Dream Warden Claw",
+      "npcPrice": 0,
+      "slug_guess": "dream-warden-claw"
+    },
+    {
+      "name": "Dream Warden Mask",
+      "npcPrice": 0,
+      "slug_guess": "dream-warden-mask"
+    },
+    {
+      "name": "Dubious Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "dubious-piece-of-cloth"
+    },
+    {
+      "name": "Dung Ball",
+      "npcPrice": 130,
+      "slug_guess": "dung-ball"
+    },
+    {
+      "name": "Dwarven Beard",
+      "npcPrice": 0,
+      "slug_guess": "dwarven-beard"
+    },
+    {
+      "name": "Earflap",
+      "npcPrice": 40,
+      "slug_guess": "earflap"
+    },
+    {
+      "name": "Egg of The Many",
+      "npcPrice": 15000,
+      "slug_guess": "egg-of-the-many"
+    },
+    {
+      "name": "Elemental Spikes",
+      "npcPrice": 0,
+      "slug_guess": "elemental-spikes"
+    },
+    {
+      "name": "Elven Hoof",
+      "npcPrice": 115,
+      "slug_guess": "elven-hoof"
+    },
+    {
+      "name": "Emerald Tortoise Shell",
+      "npcPrice": 2150,
+      "slug_guess": "emerald-tortoise-shell"
+    },
+    {
+      "name": "Empty Honey Glass",
+      "npcPrice": 270,
+      "slug_guess": "empty-honey-glass"
+    },
+    {
+      "name": "Enchanted Chicken Wing",
+      "npcPrice": 20000,
+      "slug_guess": "enchanted-chicken-wing"
+    },
+    {
+      "name": "Encrypted Notes",
+      "npcPrice": 620,
+      "slug_guess": "encrypted-notes"
+    },
+    {
+      "name": "Energy Ball",
+      "npcPrice": 300,
+      "slug_guess": "energy-ball"
+    },
+    {
+      "name": "Energy Soil",
+      "npcPrice": 2000,
+      "slug_guess": "energy-soil"
+    },
+    {
+      "name": "Energy Vein",
+      "npcPrice": 270,
+      "slug_guess": "energy-vein"
+    },
+    {
+      "name": "Ensouled Essence",
+      "npcPrice": 820,
+      "slug_guess": "ensouled-essence"
+    },
+    {
+      "name": "Essence of a Bad Dream",
+      "npcPrice": 360,
+      "slug_guess": "essence-of-a-bad-dream"
+    },
+    {
+      "name": "Eternal Flames",
+      "npcPrice": 5000,
+      "slug_guess": "eternal-flames"
+    },
+    {
+      "name": "Exalted Seal",
+      "npcPrice": 190000,
+      "slug_guess": "exalted-seal"
+    },
+    {
+      "name": "Execowtioner Mask",
+      "npcPrice": 240,
+      "slug_guess": "execowtioner-mask"
+    },
+    {
+      "name": "Eye of Corruption",
+      "npcPrice": 390,
+      "slug_guess": "eye-of-corruption"
+    },
+    {
+      "name": "Eye of a Deepling",
+      "npcPrice": 150,
+      "slug_guess": "eye-of-a-deepling"
+    },
+    {
+      "name": "Eye of a Weeper",
+      "npcPrice": 650,
+      "slug_guess": "eye-of-a-weeper"
+    },
+    {
+      "name": "Eyeless Devourer Legs",
+      "npcPrice": 650,
+      "slug_guess": "eyeless-devourer-legs"
+    },
+    {
+      "name": "Eyeless Devourer Maw",
+      "npcPrice": 420,
+      "slug_guess": "eyeless-devourer-maw"
+    },
+    {
+      "name": "Eyeless Devourer Tongue",
+      "npcPrice": 900,
+      "slug_guess": "eyeless-devourer-tongue"
+    },
+    {
+      "name": "Fafnar Symbol",
+      "npcPrice": 950,
+      "slug_guess": "fafnar-symbol"
+    },
+    {
+      "name": "Fairy Wings",
+      "npcPrice": 200,
+      "slug_guess": "fairy-wings"
+    },
+    {
+      "name": "Falcon Crest",
+      "npcPrice": 650,
+      "slug_guess": "falcon-crest"
+    },
+    {
+      "name": "Fetid Heart",
+      "npcPrice": 0,
+      "slug_guess": "fetid-heart"
+    },
+    {
+      "name": "Fiery Crypt Rune",
+      "npcPrice": 0,
+      "slug_guess": "fiery-crypt-rune"
+    },
+    {
+      "name": "Fiery Heart",
+      "npcPrice": 375,
+      "slug_guess": "fiery-heart"
+    },
+    {
+      "name": "Fig Leaf",
+      "npcPrice": 200,
+      "slug_guess": "fig-leaf"
+    },
+    {
+      "name": "Figurine of Bakragore",
+      "npcPrice": 5400000,
+      "slug_guess": "figurine-of-bakragore"
+    },
+    {
+      "name": "Figurine of Cruelty",
+      "npcPrice": 3100000,
+      "slug_guess": "figurine-of-cruelty"
+    },
+    {
+      "name": "Figurine of Greed",
+      "npcPrice": 2900000,
+      "slug_guess": "figurine-of-greed"
+    },
+    {
+      "name": "Figurine of Hatred",
+      "npcPrice": 2700000,
+      "slug_guess": "figurine-of-hatred"
+    },
+    {
+      "name": "Figurine of Maior Domus",
+      "npcPrice": 3400000,
+      "slug_guess": "figurine-of-maior-domus"
+    },
+    {
+      "name": "Figurine of Malice",
+      "npcPrice": 2800000,
+      "slug_guess": "figurine-of-malice"
+    },
+    {
+      "name": "Figurine of Megalomania",
+      "npcPrice": 5000000,
+      "slug_guess": "figurine-of-megalomania"
+    },
+    {
+      "name": "Figurine of Mimar Haffar",
+      "npcPrice": 2800000,
+      "slug_guess": "figurine-of-mimar-haffar"
+    },
+    {
+      "name": "Figurine of Phosphorus",
+      "npcPrice": 5700000,
+      "slug_guess": "figurine-of-phosphorus"
+    },
+    {
+      "name": "Figurine of Spite",
+      "npcPrice": 3000000,
+      "slug_guess": "figurine-of-spite"
+    },
+    {
+      "name": "Fir Cone",
+      "npcPrice": 25,
+      "slug_guess": "fir-cone"
+    },
+    {
+      "name": "Fireworks Capsule",
+      "npcPrice": 0,
+      "slug_guess": "fireworks-capsule"
+    },
+    {
+      "name": "Fish Eye",
+      "npcPrice": 500000,
+      "slug_guess": "fish-eye"
+    },
+    {
+      "name": "Flames of the Percht Queen",
+      "npcPrice": 0,
+      "slug_guess": "flames-of-the-percht-queen"
+    },
+    {
+      "name": "Flask of Warrior's Sweat",
+      "npcPrice": 10000,
+      "slug_guess": "flask-of-warriors-sweat"
+    },
+    {
+      "name": "Flawless Ice Crystal",
+      "npcPrice": 5000,
+      "slug_guess": "flawless-ice-crystal"
+    },
+    {
+      "name": "Flintstone",
+      "npcPrice": 800,
+      "slug_guess": "flintstone"
+    },
+    {
+      "name": "Flotsam",
+      "npcPrice": 330,
+      "slug_guess": "flotsam"
+    },
+    {
+      "name": "Foam Stalker Spume",
+      "npcPrice": 0,
+      "slug_guess": "foam-stalker-spume"
+    },
+    {
+      "name": "Forbidden Fruit",
+      "npcPrice": 0,
+      "slug_guess": "forbidden-fruit"
+    },
+    {
+      "name": "Forbidden Tome",
+      "npcPrice": 0,
+      "slug_guess": "forbidden-tome"
+    },
+    {
+      "name": "Fox Paw",
+      "npcPrice": 100,
+      "slug_guess": "fox-paw"
+    },
+    {
+      "name": "Frazzle Skin",
+      "npcPrice": 400,
+      "slug_guess": "frazzle-skin"
+    },
+    {
+      "name": "Frazzle Tongue",
+      "npcPrice": 700,
+      "slug_guess": "frazzle-tongue"
+    },
+    {
+      "name": "Frost Giant Pelt",
+      "npcPrice": 160,
+      "slug_guess": "frost-giant-pelt"
+    },
+    {
+      "name": "Frosty Heart",
+      "npcPrice": 280,
+      "slug_guess": "frosty-heart"
+    },
+    {
+      "name": "Frozen Chain",
+      "npcPrice": 0,
+      "slug_guess": "frozen-chain"
+    },
+    {
+      "name": "Frozen Claw",
+      "npcPrice": 0,
+      "slug_guess": "frozen-claw"
+    },
+    {
+      "name": "Frozen Claw (Ice Horror)",
+      "npcPrice": 900000,
+      "slug_guess": "frozen-claw-ice-horror"
+    },
+    {
+      "name": "Frozen Crapace",
+      "npcPrice": 500000,
+      "slug_guess": "frozen-crapace"
+    },
+    {
+      "name": "Frozen Lightning",
+      "npcPrice": 270,
+      "slug_guess": "frozen-lightning"
+    },
+    {
+      "name": "Frozen Peacock Feather",
+      "npcPrice": 110000,
+      "slug_guess": "frozen-peacock-feather"
+    },
+    {
+      "name": "Frozen Time",
+      "npcPrice": 0,
+      "slug_guess": "frozen-time"
+    },
+    {
+      "name": "Fungal Blister",
+      "npcPrice": 0,
+      "slug_guess": "fungal-blister"
+    },
+    {
+      "name": "Fur Shred",
+      "npcPrice": 200,
+      "slug_guess": "fur-shred"
+    },
+    {
+      "name": "Gear Crystal",
+      "npcPrice": 200,
+      "slug_guess": "gear-crystal"
+    },
+    {
+      "name": "Gear Wheel",
+      "npcPrice": 500,
+      "slug_guess": "gear-wheel"
+    },
+    {
+      "name": "Ghastly Dragon Head",
+      "npcPrice": 700,
+      "slug_guess": "ghastly-dragon-head"
+    },
+    {
+      "name": "Giant Crab Pincer",
+      "npcPrice": 950,
+      "slug_guess": "giant-crab-pincer"
+    },
+    {
+      "name": "Giant Pacifier",
+      "npcPrice": 170,
+      "slug_guess": "giant-pacifier"
+    },
+    {
+      "name": "Giant Tentacle",
+      "npcPrice": 10000,
+      "slug_guess": "giant-tentacle"
+    },
+    {
+      "name": "Giant Tusk",
+      "npcPrice": 6000,
+      "slug_guess": "giant-tusk"
+    },
+    {
+      "name": "Gilded Bell",
+      "npcPrice": 0,
+      "slug_guess": "gilded-bell"
+    },
+    {
+      "name": "Girtablilu Warrior Carapace",
+      "npcPrice": 520,
+      "slug_guess": "girtablilu-warrior-carapace"
+    },
+    {
+      "name": "Gland",
+      "npcPrice": 500,
+      "slug_guess": "gland"
+    },
+    {
+      "name": "Glimmering Soil",
+      "npcPrice": 2000,
+      "slug_guess": "glimmering-soil"
+    },
+    {
+      "name": "Glistening Bone",
+      "npcPrice": 250,
+      "slug_guess": "glistening-bone"
+    },
+    {
+      "name": "Glob of Acid Slime",
+      "npcPrice": 25,
+      "slug_guess": "glob-of-acid-slime"
+    },
+    {
+      "name": "Glob of Glooth",
+      "npcPrice": 125,
+      "slug_guess": "glob-of-glooth"
+    },
+    {
+      "name": "Glob of Mercury",
+      "npcPrice": 20,
+      "slug_guess": "glob-of-mercury"
+    },
+    {
+      "name": "Glob of Tar",
+      "npcPrice": 30,
+      "slug_guess": "glob-of-tar"
+    },
+    {
+      "name": "Gloom Wolf Fur",
+      "npcPrice": 70,
+      "slug_guess": "gloom-wolf-fur"
+    },
+    {
+      "name": "Glooth Injection Tube",
+      "npcPrice": 350,
+      "slug_guess": "glooth-injection-tube"
+    },
+    {
+      "name": "Glowing Carrot",
+      "npcPrice": 0,
+      "slug_guess": "glowing-carrot"
+    },
+    {
+      "name": "Glowing Rune",
+      "npcPrice": 350,
+      "slug_guess": "glowing-rune"
+    },
+    {
+      "name": "Gnomevil's Hat",
+      "npcPrice": 0,
+      "slug_guess": "gnomevils-hat"
+    },
+    {
+      "name": "Goanna Claw",
+      "npcPrice": 260,
+      "slug_guess": "goanna-claw"
+    },
+    {
+      "name": "Goanna Meat",
+      "npcPrice": 190,
+      "slug_guess": "goanna-meat"
+    },
+    {
+      "name": "Gold Tooth",
+      "npcPrice": 120,
+      "slug_guess": "gold-tooth"
+    },
+    {
+      "name": "Gold-Brocaded Cloth",
+      "npcPrice": 175,
+      "slug_guess": "gold-brocaded-cloth"
+    },
+    {
+      "name": "Gold-Scaled Sentinel",
+      "npcPrice": 380000,
+      "slug_guess": "gold-scaled-sentinel"
+    },
+    {
+      "name": "Golden Bell",
+      "npcPrice": 0,
+      "slug_guess": "golden-bell"
+    },
+    {
+      "name": "Golden Belt",
+      "npcPrice": 0,
+      "slug_guess": "golden-belt"
+    },
+    {
+      "name": "Golden Brush",
+      "npcPrice": 250,
+      "slug_guess": "golden-brush"
+    },
+    {
+      "name": "Golden Claw",
+      "npcPrice": 250000,
+      "slug_guess": "golden-claw"
+    },
+    {
+      "name": "Golden Cotton Reel",
+      "npcPrice": 0,
+      "slug_guess": "golden-cotton-reel"
+    },
+    {
+      "name": "Golden Lotus Brooch",
+      "npcPrice": 270,
+      "slug_guess": "golden-lotus-brooch"
+    },
+    {
+      "name": "Golden Sun Coin",
+      "npcPrice": 11000,
+      "slug_guess": "golden-sun-coin"
+    },
+    {
+      "name": "Golden Talon",
+      "npcPrice": 0,
+      "slug_guess": "golden-talon"
+    },
+    {
+      "name": "Golden Tiger Coin",
+      "npcPrice": 11000,
+      "slug_guess": "golden-tiger-coin"
+    },
+    {
+      "name": "Goosebump Leather",
+      "npcPrice": 650,
+      "slug_guess": "goosebump-leather"
+    },
+    {
+      "name": "Gore Horn (Item)",
+      "npcPrice": 2900,
+      "slug_guess": "gore-horn-item"
+    },
+    {
+      "name": "Gorerilla Mane",
+      "npcPrice": 2750,
+      "slug_guess": "gorerilla-mane"
+    },
+    {
+      "name": "Gorerilla Tail",
+      "npcPrice": 2650,
+      "slug_guess": "gorerilla-tail"
+    },
+    {
+      "name": "Gorger Antlers",
+      "npcPrice": 2250,
+      "slug_guess": "gorger-antlers"
+    },
+    {
+      "name": "Grant of Arms",
+      "npcPrice": 950,
+      "slug_guess": "grant-of-arms"
+    },
+    {
+      "name": "Grappling Hook",
+      "npcPrice": 150,
+      "slug_guess": "grappling-hook"
+    },
+    {
+      "name": "Greasy Wool",
+      "npcPrice": 0,
+      "slug_guess": "greasy-wool"
+    },
+    {
+      "name": "Greed's Arm",
+      "npcPrice": 950000,
+      "slug_guess": "greeds-arm"
+    },
+    {
+      "name": "Green Bandage",
+      "npcPrice": 180,
+      "slug_guess": "green-bandage"
+    },
+    {
+      "name": "Grimace",
+      "npcPrice": 120000,
+      "slug_guess": "grimace"
+    },
+    {
+      "name": "Guidebook",
+      "npcPrice": 200,
+      "slug_guess": "guidebook"
+    },
+    {
+      "name": "Gummy Rotworm",
+      "npcPrice": 0,
+      "slug_guess": "gummy-rotworm"
+    },
+    {
+      "name": "Half-Digested Stones",
+      "npcPrice": 40,
+      "slug_guess": "half-digested-stones"
+    },
+    {
+      "name": "Half-Eaten Brain",
+      "npcPrice": 85,
+      "slug_guess": "half-eaten-brain"
+    },
+    {
+      "name": "Hand",
+      "npcPrice": 1450,
+      "slug_guess": "hand"
+    },
+    {
+      "name": "Hard-Boiled Hydra Egg",
+      "npcPrice": 0,
+      "slug_guess": "hard-boiled-hydra-egg"
+    },
+    {
+      "name": "Harpoon of a Giant Snail",
+      "npcPrice": 15000,
+      "slug_guess": "harpoon-of-a-giant-snail"
+    },
+    {
+      "name": "Harpy Feathers",
+      "npcPrice": 730,
+      "slug_guess": "harpy-feathers"
+    },
+    {
+      "name": "Hatched Rorc Egg",
+      "npcPrice": 30,
+      "slug_guess": "hatched-rorc-egg"
+    },
+    {
+      "name": "Haunted Piece of Wood",
+      "npcPrice": 115,
+      "slug_guess": "haunted-piece-of-wood"
+    },
+    {
+      "name": "Hazardous Heart",
+      "npcPrice": 5000,
+      "slug_guess": "hazardous-heart"
+    },
+    {
+      "name": "Hazardous Robe",
+      "npcPrice": 3000,
+      "slug_guess": "hazardous-robe"
+    },
+    {
+      "name": "Head (Brachiodemon)",
+      "npcPrice": 3500,
+      "slug_guess": "head-brachiodemon"
+    },
+    {
+      "name": "Head (Many Faces)",
+      "npcPrice": 3200,
+      "slug_guess": "head-many-faces"
+    },
+    {
+      "name": "Headpecker Beak",
+      "npcPrice": 2800,
+      "slug_guess": "headpecker-beak"
+    },
+    {
+      "name": "Headpecker Feather",
+      "npcPrice": 1300,
+      "slug_guess": "headpecker-feather"
+    },
+    {
+      "name": "Heart Amphora",
+      "npcPrice": 930,
+      "slug_guess": "heart-amphora"
+    },
+    {
+      "name": "Hellhound Slobber",
+      "npcPrice": 500,
+      "slug_guess": "hellhound-slobber"
+    },
+    {
+      "name": "Hellhunter Eye",
+      "npcPrice": 2950,
+      "slug_guess": "hellhunter-eye"
+    },
+    {
+      "name": "Hellspawn Tail",
+      "npcPrice": 475,
+      "slug_guess": "hellspawn-tail"
+    },
+    {
+      "name": "Helmet of Sir Leonard",
+      "npcPrice": 46000,
+      "slug_guess": "helmet-of-sir-leonard"
+    },
+    {
+      "name": "Hemp Rope",
+      "npcPrice": 350,
+      "slug_guess": "hemp-rope"
+    },
+    {
+      "name": "Hideous Chunk",
+      "npcPrice": 510,
+      "slug_guess": "hideous-chunk"
+    },
+    {
+      "name": "High Guard Flag",
+      "npcPrice": 550,
+      "slug_guess": "high-guard-flag"
+    },
+    {
+      "name": "High Guard Shoulderplates",
+      "npcPrice": 130,
+      "slug_guess": "high-guard-shoulderplates"
+    },
+    {
+      "name": "Hollow Stampor Hoof",
+      "npcPrice": 400,
+      "slug_guess": "hollow-stampor-hoof"
+    },
+    {
+      "name": "Holy Ash",
+      "npcPrice": 160,
+      "slug_guess": "holy-ash"
+    },
+    {
+      "name": "Horn of Kalyassa",
+      "npcPrice": 10000,
+      "slug_guess": "horn-of-kalyassa"
+    },
+    {
+      "name": "Horoscope",
+      "npcPrice": 40,
+      "slug_guess": "horoscope"
+    },
+    {
+      "name": "Horseshoe",
+      "npcPrice": 0,
+      "slug_guess": "horseshoe"
+    },
+    {
+      "name": "Huge Chunk of Crude Iron",
+      "npcPrice": 15000,
+      "slug_guess": "huge-chunk-of-crude-iron"
+    },
+    {
+      "name": "Huge Shell",
+      "npcPrice": 15000,
+      "slug_guess": "huge-shell"
+    },
+    {
+      "name": "Huge Spiky Snail Shell",
+      "npcPrice": 8000,
+      "slug_guess": "huge-spiky-snail-shell"
+    },
+    {
+      "name": "Human Teeth",
+      "npcPrice": 2000,
+      "slug_guess": "human-teeth"
+    },
+    {
+      "name": "Humongous Chunk",
+      "npcPrice": 540,
+      "slug_guess": "humongous-chunk"
+    },
+    {
+      "name": "Hunter's Quiver",
+      "npcPrice": 80,
+      "slug_guess": "hunters-quiver"
+    },
+    {
+      "name": "Hydra Egg",
+      "npcPrice": 500,
+      "slug_guess": "hydra-egg"
+    },
+    {
+      "name": "Hydra Head",
+      "npcPrice": 600,
+      "slug_guess": "hydra-head"
+    },
+    {
+      "name": "Hydra Tongue",
+      "npcPrice": 0,
+      "slug_guess": "hydra-tongue"
+    },
+    {
+      "name": "Hydrophytes",
+      "npcPrice": 220,
+      "slug_guess": "hydrophytes"
+    },
+    {
+      "name": "Ice Flower (Item)",
+      "npcPrice": 370,
+      "slug_guess": "ice-flower-item"
+    },
+    {
+      "name": "Ice Flower Seeds",
+      "npcPrice": 0,
+      "slug_guess": "ice-flower-seeds"
+    },
+    {
+      "name": "Ice Shard",
+      "npcPrice": 500,
+      "slug_guess": "ice-shard"
+    },
+    {
+      "name": "Iced Soil",
+      "npcPrice": 2000,
+      "slug_guess": "iced-soil"
+    },
+    {
+      "name": "Ichgahal's Fungal Infestation",
+      "npcPrice": 900000,
+      "slug_guess": "ichgahals-fungal-infestation"
+    },
+    {
+      "name": "Icicle (Percht)",
+      "npcPrice": 0,
+      "slug_guess": "icicle-percht"
+    },
+    {
+      "name": "Icy Crypt Rune",
+      "npcPrice": 0,
+      "slug_guess": "icy-crypt-rune"
+    },
+    {
+      "name": "Icy Horns",
+      "npcPrice": 250000,
+      "slug_guess": "icy-horns"
+    },
+    {
+      "name": "Icy Scales",
+      "npcPrice": 250000,
+      "slug_guess": "icy-scales"
+    },
+    {
+      "name": "Idol of the Forge",
+      "npcPrice": 950,
+      "slug_guess": "idol-of-the-forge"
+    },
+    {
+      "name": "Incantation Notes",
+      "npcPrice": 90,
+      "slug_guess": "incantation-notes"
+    },
+    {
+      "name": "Infernal Heart",
+      "npcPrice": 2100,
+      "slug_guess": "infernal-heart"
+    },
+    {
+      "name": "Infernal Robe",
+      "npcPrice": 1200,
+      "slug_guess": "infernal-robe"
+    },
+    {
+      "name": "Infernoid Ember",
+      "npcPrice": 160,
+      "slug_guess": "infernoid-ember"
+    },
+    {
+      "name": "Inkwell (Black)",
+      "npcPrice": 720,
+      "slug_guess": "inkwell-black"
+    },
+    {
+      "name": "Insectoid Cocoon (Item)",
+      "npcPrice": 0,
+      "slug_guess": "insectoid-cocoon-item"
+    },
+    {
+      "name": "Instable Proto Matter",
+      "npcPrice": 300,
+      "slug_guess": "instable-proto-matter"
+    },
+    {
+      "name": "Ivory Carving",
+      "npcPrice": 300,
+      "slug_guess": "ivory-carving"
+    },
+    {
+      "name": "Ivory Comb",
+      "npcPrice": 8000,
+      "slug_guess": "ivory-comb"
+    },
+    {
+      "name": "Izcandar's Snow Globe",
+      "npcPrice": 180000,
+      "slug_guess": "izcandars-snow-globe"
+    },
+    {
+      "name": "Izcandar's Sundial",
+      "npcPrice": 225000,
+      "slug_guess": "izcandars-sundial"
+    },
+    {
+      "name": "Jagged Sickle",
+      "npcPrice": 150000,
+      "slug_guess": "jagged-sickle"
+    },
+    {
+      "name": "Jaul's Pearl",
+      "npcPrice": 0,
+      "slug_guess": "jauls-pearl"
+    },
+    {
+      "name": "Jaws",
+      "npcPrice": 3900,
+      "slug_guess": "jaws"
+    },
+    {
+      "name": "Jungle Moa Claw",
+      "npcPrice": 160,
+      "slug_guess": "jungle-moa-claw"
+    },
+    {
+      "name": "Jungle Moa Egg",
+      "npcPrice": 250,
+      "slug_guess": "jungle-moa-egg"
+    },
+    {
+      "name": "Jungle Moa Feather",
+      "npcPrice": 140,
+      "slug_guess": "jungle-moa-feather"
+    },
+    {
+      "name": "Katex' Blood",
+      "npcPrice": 210,
+      "slug_guess": "katex-blood"
+    },
+    {
+      "name": "Key to Knowledge",
+      "npcPrice": 0,
+      "slug_guess": "key-to-knowledge"
+    },
+    {
+      "name": "Key to the Drowned Library",
+      "npcPrice": 330,
+      "slug_guess": "key-to-the-drowned-library"
+    },
+    {
+      "name": "Kollos Shell",
+      "npcPrice": 420,
+      "slug_guess": "kollos-shell"
+    },
+    {
+      "name": "Kongra's Shoulderpad",
+      "npcPrice": 100,
+      "slug_guess": "kongras-shoulderpad"
+    },
+    {
+      "name": "Lamassu Hoof",
+      "npcPrice": 330,
+      "slug_guess": "lamassu-hoof"
+    },
+    {
+      "name": "Lamassu Horn",
+      "npcPrice": 240,
+      "slug_guess": "lamassu-horn"
+    },
+    {
+      "name": "Lancer Beetle Shell",
+      "npcPrice": 80,
+      "slug_guess": "lancer-beetle-shell"
+    },
+    {
+      "name": "Lancet",
+      "npcPrice": 90,
+      "slug_guess": "lancet"
+    },
+    {
+      "name": "Lavafungus Head",
+      "npcPrice": 900,
+      "slug_guess": "lavafungus-head"
+    },
+    {
+      "name": "Lavafungus Ring",
+      "npcPrice": 390,
+      "slug_guess": "lavafungus-ring"
+    },
+    {
+      "name": "Lavaworm Jaws",
+      "npcPrice": 1100,
+      "slug_guess": "lavaworm-jaws"
+    },
+    {
+      "name": "Lavaworm Spike Roots",
+      "npcPrice": 600,
+      "slug_guess": "lavaworm-spike-roots"
+    },
+    {
+      "name": "Lavaworm Spikes",
+      "npcPrice": 750,
+      "slug_guess": "lavaworm-spikes"
+    },
+    {
+      "name": "Legionnaire Flags",
+      "npcPrice": 500,
+      "slug_guess": "legionnaire-flags"
+    },
+    {
+      "name": "Lime Tart",
+      "npcPrice": 1870,
+      "slug_guess": "lime-tart"
+    },
+    {
+      "name": "Liodile Fang",
+      "npcPrice": 480,
+      "slug_guess": "liodile-fang"
+    },
+    {
+      "name": "Lion Cloak Patch",
+      "npcPrice": 190,
+      "slug_guess": "lion-cloak-patch"
+    },
+    {
+      "name": "Lion Crest",
+      "npcPrice": 270,
+      "slug_guess": "lion-crest"
+    },
+    {
+      "name": "Lion Seal",
+      "npcPrice": 210,
+      "slug_guess": "lion-seal"
+    },
+    {
+      "name": "Little Bowl of Myrrh",
+      "npcPrice": 500,
+      "slug_guess": "little-bowl-of-myrrh"
+    },
+    {
+      "name": "Lizard Essence",
+      "npcPrice": 300,
+      "slug_guess": "lizard-essence"
+    },
+    {
+      "name": "Lizard Heart",
+      "npcPrice": 530,
+      "slug_guess": "lizard-heart"
+    },
+    {
+      "name": "Lizard Leather",
+      "npcPrice": 150,
+      "slug_guess": "lizard-leather"
+    },
+    {
+      "name": "Lizard Scale",
+      "npcPrice": 120,
+      "slug_guess": "lizard-scale"
+    },
+    {
+      "name": "Lizard Tail",
+      "npcPrice": 95,
+      "slug_guess": "lizard-tail"
+    },
+    {
+      "name": "Longing Eyes",
+      "npcPrice": 8000,
+      "slug_guess": "longing-eyes"
+    },
+    {
+      "name": "Loose Prayer Beads",
+      "npcPrice": 0,
+      "slug_guess": "loose-prayer-beads"
+    },
+    {
+      "name": "Lost Basher's Spike",
+      "npcPrice": 280,
+      "slug_guess": "lost-bashers-spike"
+    },
+    {
+      "name": "Lost Bracers",
+      "npcPrice": 140,
+      "slug_guess": "lost-bracers"
+    },
+    {
+      "name": "Lost Husher's Staff",
+      "npcPrice": 250,
+      "slug_guess": "lost-hushers-staff"
+    },
+    {
+      "name": "Lost Soul (Item)",
+      "npcPrice": 120,
+      "slug_guess": "lost-soul-item"
+    },
+    {
+      "name": "Lucky Pig",
+      "npcPrice": 0,
+      "slug_guess": "lucky-pig"
+    },
+    {
+      "name": "Ludicrous Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "ludicrous-piece-of-cloth"
+    },
+    {
+      "name": "Luminous Orb",
+      "npcPrice": 1000,
+      "slug_guess": "luminous-orb"
+    },
+    {
+      "name": "Luminous Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "luminous-piece-of-cloth"
+    },
+    {
+      "name": "Lump of Earth",
+      "npcPrice": 130,
+      "slug_guess": "lump-of-earth"
+    },
+    {
+      "name": "Mad Froth",
+      "npcPrice": 80,
+      "slug_guess": "mad-froth"
+    },
+    {
+      "name": "Magic Sulphur",
+      "npcPrice": 8000,
+      "slug_guess": "magic-sulphur"
+    },
+    {
+      "name": "Magma Clump",
+      "npcPrice": 570,
+      "slug_guess": "magma-clump"
+    },
+    {
+      "name": "Malice's Horn",
+      "npcPrice": 620000,
+      "slug_guess": "malices-horn"
+    },
+    {
+      "name": "Malice's Spine",
+      "npcPrice": 850000,
+      "slug_guess": "malices-spine"
+    },
+    {
+      "name": "Malofur's Lunchbox",
+      "npcPrice": 240000,
+      "slug_guess": "malofurs-lunchbox"
+    },
+    {
+      "name": "Mammoth Tusk",
+      "npcPrice": 100,
+      "slug_guess": "mammoth-tusk"
+    },
+    {
+      "name": "Mantassin Tail",
+      "npcPrice": 280,
+      "slug_guess": "mantassin-tail"
+    },
+    {
+      "name": "Manticore Ear",
+      "npcPrice": 310,
+      "slug_guess": "manticore-ear"
+    },
+    {
+      "name": "Manticore Tail",
+      "npcPrice": 220,
+      "slug_guess": "manticore-tail"
+    },
+    {
+      "name": "Mantosaurus Jaw",
+      "npcPrice": 2800,
+      "slug_guess": "mantosaurus-jaw"
+    },
+    {
+      "name": "Marsh Stalker Beak",
+      "npcPrice": 65,
+      "slug_guess": "marsh-stalker-beak"
+    },
+    {
+      "name": "Marsh Stalker Feather",
+      "npcPrice": 50,
+      "slug_guess": "marsh-stalker-feather"
+    },
+    {
+      "name": "Maxilla",
+      "npcPrice": 250,
+      "slug_guess": "maxilla"
+    },
+    {
+      "name": "Maxxenius Head",
+      "npcPrice": 500000,
+      "slug_guess": "maxxenius-head"
+    },
+    {
+      "name": "Meat Hammer",
+      "npcPrice": 60,
+      "slug_guess": "meat-hammer"
+    },
+    {
+      "name": "Medal of Valiance",
+      "npcPrice": 410000,
+      "slug_guess": "medal-of-valiance"
+    },
+    {
+      "name": "Mega Dragon Heart",
+      "npcPrice": 1100,
+      "slug_guess": "mega-dragon-heart"
+    },
+    {
+      "name": "Megalomania's Essence",
+      "npcPrice": 1900000,
+      "slug_guess": "megalomanias-essence"
+    },
+    {
+      "name": "Megalomania's Skull",
+      "npcPrice": 1500000,
+      "slug_guess": "megalomanias-skull"
+    },
+    {
+      "name": "Mercurial Wing",
+      "npcPrice": 2500,
+      "slug_guess": "mercurial-wing"
+    },
+    {
+      "name": "Metal Jaw",
+      "npcPrice": 260,
+      "slug_guess": "metal-jaw"
+    },
+    {
+      "name": "Metal Spike",
+      "npcPrice": 320,
+      "slug_guess": "metal-spike"
+    },
+    {
+      "name": "Metal Toe",
+      "npcPrice": 430,
+      "slug_guess": "metal-toe"
+    },
+    {
+      "name": "Mighty Demonic Core Essence",
+      "npcPrice": 0,
+      "slug_guess": "mighty-demonic-core-essence"
+    },
+    {
+      "name": "Milk Churn",
+      "npcPrice": 100,
+      "slug_guess": "milk-churn"
+    },
+    {
+      "name": "Miraculum",
+      "npcPrice": 60,
+      "slug_guess": "miraculum"
+    },
+    {
+      "name": "Molten Dragon Essence",
+      "npcPrice": 840,
+      "slug_guess": "molten-dragon-essence"
+    },
+    {
+      "name": "Mooh'tah Shell",
+      "npcPrice": 110,
+      "slug_guess": "moohtah-shell"
+    },
+    {
+      "name": "Moohtant Horn",
+      "npcPrice": 140,
+      "slug_guess": "moohtant-horn"
+    },
+    {
+      "name": "Moon Compass",
+      "npcPrice": 5000,
+      "slug_guess": "moon-compass"
+    },
+    {
+      "name": "Moon Melon Slice",
+      "npcPrice": 0,
+      "slug_guess": "moon-melon-slice"
+    },
+    {
+      "name": "Moon Pin",
+      "npcPrice": 18000,
+      "slug_guess": "moon-pin"
+    },
+    {
+      "name": "Moonspawn Headpiece",
+      "npcPrice": 900,
+      "slug_guess": "moonspawn-headpiece"
+    },
+    {
+      "name": "Moonspawn Tentacle",
+      "npcPrice": 670,
+      "slug_guess": "moonspawn-tentacle"
+    },
+    {
+      "name": "Morgaroth's Heart",
+      "npcPrice": 15000,
+      "slug_guess": "morgaroths-heart"
+    },
+    {
+      "name": "Morshabaal's Brain",
+      "npcPrice": 5000000,
+      "slug_guess": "morshabaals-brain"
+    },
+    {
+      "name": "Morshabaal's Extract",
+      "npcPrice": 3250000,
+      "slug_guess": "morshabaals-extract"
+    },
+    {
+      "name": "Mother Soil",
+      "npcPrice": 5000,
+      "slug_guess": "mother-soil"
+    },
+    {
+      "name": "Mould Heart",
+      "npcPrice": 2100,
+      "slug_guess": "mould-heart"
+    },
+    {
+      "name": "Mould Robe",
+      "npcPrice": 1200,
+      "slug_guess": "mould-robe"
+    },
+    {
+      "name": "Mouldy Powder",
+      "npcPrice": 200,
+      "slug_guess": "mouldy-powder"
+    },
+    {
+      "name": "Mr. Punish's Handcuffs",
+      "npcPrice": 50000,
+      "slug_guess": "mr-punishs-handcuffs"
+    },
+    {
+      "name": "Mummified Demon Finger",
+      "npcPrice": 0,
+      "slug_guess": "mummified-demon-finger"
+    },
+    {
+      "name": "Murcion's Mycelium",
+      "npcPrice": 950000,
+      "slug_guess": "murcions-mycelium"
+    },
+    {
+      "name": "Mutated Bat Ear",
+      "npcPrice": 420,
+      "slug_guess": "mutated-bat-ear"
+    },
+    {
+      "name": "Mutated Flesh",
+      "npcPrice": 50,
+      "slug_guess": "mutated-flesh"
+    },
+    {
+      "name": "Mutated Rat Tail",
+      "npcPrice": 150,
+      "slug_guess": "mutated-rat-tail"
+    },
+    {
+      "name": "Mysterious Remains",
+      "npcPrice": 0,
+      "slug_guess": "mysterious-remains"
+    },
+    {
+      "name": "Mystical Hourglass",
+      "npcPrice": 700,
+      "slug_guess": "mystical-hourglass"
+    },
+    {
+      "name": "Natural Soil",
+      "npcPrice": 2000,
+      "slug_guess": "natural-soil"
+    },
+    {
+      "name": "Necromantic Core",
+      "npcPrice": 10000,
+      "slug_guess": "necromantic-core"
+    },
+    {
+      "name": "Necromantic Crypt Rune",
+      "npcPrice": 0,
+      "slug_guess": "necromantic-crypt-rune"
+    },
+    {
+      "name": "Necromantic Rust",
+      "npcPrice": 390,
+      "slug_guess": "necromantic-rust"
+    },
+    {
+      "name": "Nettle Blossom",
+      "npcPrice": 75,
+      "slug_guess": "nettle-blossom"
+    },
+    {
+      "name": "Nettle Spit",
+      "npcPrice": 25,
+      "slug_guess": "nettle-spit"
+    },
+    {
+      "name": "Neutral Matter",
+      "npcPrice": 5000,
+      "slug_guess": "neutral-matter"
+    },
+    {
+      "name": "Night Harpy Beak",
+      "npcPrice": 10000,
+      "slug_guess": "night-harpy-beak"
+    },
+    {
+      "name": "Night Harpy Feathers",
+      "npcPrice": 5000,
+      "slug_guess": "night-harpy-feathers"
+    },
+    {
+      "name": "Nighthunter Wing",
+      "npcPrice": 2000,
+      "slug_guess": "nighthunter-wing"
+    },
+    {
+      "name": "Nimmersatt's Seal",
+      "npcPrice": 520,
+      "slug_guess": "nimmersatts-seal"
+    },
+    {
+      "name": "Noble Amulet",
+      "npcPrice": 430000,
+      "slug_guess": "noble-amulet"
+    },
+    {
+      "name": "Noble Cape",
+      "npcPrice": 425000,
+      "slug_guess": "noble-cape"
+    },
+    {
+      "name": "Norcferatu Talisman",
+      "npcPrice": 670,
+      "slug_guess": "norcferatu-talisman"
+    },
+    {
+      "name": "Nose Ring",
+      "npcPrice": 2000,
+      "slug_guess": "nose-ring"
+    },
+    {
+      "name": "Obujos' Shell",
+      "npcPrice": 0,
+      "slug_guess": "obujos-shell"
+    },
+    {
+      "name": "Obvious Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "obvious-piece-of-cloth"
+    },
+    {
+      "name": "Odd Organ",
+      "npcPrice": 410,
+      "slug_guess": "odd-organ"
+    },
+    {
+      "name": "Ogre Ear Stud",
+      "npcPrice": 180,
+      "slug_guess": "ogre-ear-stud"
+    },
+    {
+      "name": "Ogre Nose Ring",
+      "npcPrice": 210,
+      "slug_guess": "ogre-nose-ring"
+    },
+    {
+      "name": "Old Girtablilu Carapace",
+      "npcPrice": 570,
+      "slug_guess": "old-girtablilu-carapace"
+    },
+    {
+      "name": "Old Royal Diary",
+      "npcPrice": 220000,
+      "slug_guess": "old-royal-diary"
+    },
+    {
+      "name": "Ominous Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "ominous-piece-of-cloth"
+    },
+    {
+      "name": "Orc Tusk",
+      "npcPrice": 700,
+      "slug_guess": "orc-tusk"
+    },
+    {
+      "name": "Orcish Toothbrush",
+      "npcPrice": 750,
+      "slug_guess": "orcish-toothbrush"
+    },
+    {
+      "name": "Orshabaal's Brain",
+      "npcPrice": 12000,
+      "slug_guess": "orshabaals-brain"
+    },
+    {
+      "name": "Pale Worm's Scalp",
+      "npcPrice": 489000,
+      "slug_guess": "pale-worms-scalp"
+    },
+    {
+      "name": "Panther Head",
+      "npcPrice": 750,
+      "slug_guess": "panther-head"
+    },
+    {
+      "name": "Panther Paw",
+      "npcPrice": 300,
+      "slug_guess": "panther-paw"
+    },
+    {
+      "name": "Paper Boat",
+      "npcPrice": 800,
+      "slug_guess": "paper-boat"
+    },
+    {
+      "name": "Paper Plane",
+      "npcPrice": 480,
+      "slug_guess": "paper-plane"
+    },
+    {
+      "name": "Parder Fur",
+      "npcPrice": 150,
+      "slug_guess": "parder-fur"
+    },
+    {
+      "name": "Parder Tooth",
+      "npcPrice": 150,
+      "slug_guess": "parder-tooth"
+    },
+    {
+      "name": "Pastry Dragon",
+      "npcPrice": 7500,
+      "slug_guess": "pastry-dragon"
+    },
+    {
+      "name": "Patch of Fine Cloth",
+      "npcPrice": 1350,
+      "slug_guess": "patch-of-fine-cloth"
+    },
+    {
+      "name": "Peacock Feather Fan",
+      "npcPrice": 350,
+      "slug_guess": "peacock-feather-fan"
+    },
+    {
+      "name": "Percht Broom",
+      "npcPrice": 0,
+      "slug_guess": "percht-broom"
+    },
+    {
+      "name": "Percht Handkerchief",
+      "npcPrice": 0,
+      "slug_guess": "percht-handkerchief"
+    },
+    {
+      "name": "Percht Horns",
+      "npcPrice": 0,
+      "slug_guess": "percht-horns"
+    },
+    {
+      "name": "Percht Queen's Frozen Heart",
+      "npcPrice": 0,
+      "slug_guess": "percht-queens-frozen-heart"
+    },
+    {
+      "name": "Percht Skull",
+      "npcPrice": 0,
+      "slug_guess": "percht-skull"
+    },
+    {
+      "name": "Phantasmal Hair",
+      "npcPrice": 500,
+      "slug_guess": "phantasmal-hair"
+    },
+    {
+      "name": "Piece of Crocodile Leather",
+      "npcPrice": 15,
+      "slug_guess": "piece-of-crocodile-leather"
+    },
+    {
+      "name": "Piece of Dead Brain",
+      "npcPrice": 420,
+      "slug_guess": "piece-of-dead-brain"
+    },
+    {
+      "name": "Piece of Draconian Steel",
+      "npcPrice": 3000,
+      "slug_guess": "piece-of-draconian-steel"
+    },
+    {
+      "name": "Piece of Frozen Night",
+      "npcPrice": 680,
+      "slug_guess": "piece-of-frozen-night"
+    },
+    {
+      "name": "Piece of Hell Steel",
+      "npcPrice": 500,
+      "slug_guess": "piece-of-hell-steel"
+    },
+    {
+      "name": "Piece of Hellfire Armor",
+      "npcPrice": 550,
+      "slug_guess": "piece-of-hellfire-armor"
+    },
+    {
+      "name": "Piece of Massacre's Shell",
+      "npcPrice": 50000,
+      "slug_guess": "piece-of-massacres-shell"
+    },
+    {
+      "name": "Piece of Royal Steel",
+      "npcPrice": 10000,
+      "slug_guess": "piece-of-royal-steel"
+    },
+    {
+      "name": "Piece of Swampling Wood",
+      "npcPrice": 30,
+      "slug_guess": "piece-of-swampling-wood"
+    },
+    {
+      "name": "Pieces of Magic Chalk",
+      "npcPrice": 210,
+      "slug_guess": "pieces-of-magic-chalk"
+    },
+    {
+      "name": "Pirat's Tail",
+      "npcPrice": 180,
+      "slug_guess": "pirats-tail"
+    },
+    {
+      "name": "Pirate Coin",
+      "npcPrice": 110,
+      "slug_guess": "pirate-coin"
+    },
+    {
+      "name": "Plagueroot Offshoot",
+      "npcPrice": 280000,
+      "slug_guess": "plagueroot-offshoot"
+    },
+    {
+      "name": "Plasma Pearls",
+      "npcPrice": 250,
+      "slug_guess": "plasma-pearls"
+    },
+    {
+      "name": "Plasmatic Lightning",
+      "npcPrice": 270,
+      "slug_guess": "plasmatic-lightning"
+    },
+    {
+      "name": "Poison Gland",
+      "npcPrice": 210,
+      "slug_guess": "poison-gland"
+    },
+    {
+      "name": "Poisoned Fang",
+      "npcPrice": 130,
+      "slug_guess": "poisoned-fang"
+    },
+    {
+      "name": "Poisonous Slime",
+      "npcPrice": 50,
+      "slug_guess": "poisonous-slime"
+    },
+    {
+      "name": "Pool of Chitinous Glue",
+      "npcPrice": 480,
+      "slug_guess": "pool-of-chitinous-glue"
+    },
+    {
+      "name": "Pot of Orcish Warpaint",
+      "npcPrice": 1150,
+      "slug_guess": "pot-of-orcish-warpaint"
+    },
+    {
+      "name": "Prehemoth Claw",
+      "npcPrice": 2300,
+      "slug_guess": "prehemoth-claw"
+    },
+    {
+      "name": "Prehemoth Horns",
+      "npcPrice": 3000,
+      "slug_guess": "prehemoth-horns"
+    },
+    {
+      "name": "Preserved Dark Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-dark-seed"
+    },
+    {
+      "name": "Preserved Light Blue Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-light-blue-seed"
+    },
+    {
+      "name": "Preserved Pink Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-pink-seed"
+    },
+    {
+      "name": "Preserved Purple Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-purple-seed"
+    },
+    {
+      "name": "Preserved Red Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-red-seed"
+    },
+    {
+      "name": "Preserved Violet Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-violet-seed"
+    },
+    {
+      "name": "Preserved Yellow Seed",
+      "npcPrice": 0,
+      "slug_guess": "preserved-yellow-seed"
+    },
+    {
+      "name": "Pressed Flower",
+      "npcPrice": 570,
+      "slug_guess": "pressed-flower"
+    },
+    {
+      "name": "Pristine Worm Head",
+      "npcPrice": 15000,
+      "slug_guess": "pristine-worm-head"
+    },
+    {
+      "name": "Pulverized Ore",
+      "npcPrice": 400,
+      "slug_guess": "pulverized-ore"
+    },
+    {
+      "name": "Purified Soul (Netherworld)",
+      "npcPrice": 260,
+      "slug_guess": "purified-soul-netherworld"
+    },
+    {
+      "name": "Putrefactive Figurine",
+      "npcPrice": 3200000,
+      "slug_guess": "putrefactive-figurine"
+    },
+    {
+      "name": "Pyrophyte Seed Pod",
+      "npcPrice": 720,
+      "slug_guess": "pyrophyte-seed-pod"
+    },
+    {
+      "name": "Quara Eye",
+      "npcPrice": 350,
+      "slug_guess": "quara-eye"
+    },
+    {
+      "name": "Quara Pincers",
+      "npcPrice": 410,
+      "slug_guess": "quara-pincers"
+    },
+    {
+      "name": "Quara Tentacle",
+      "npcPrice": 140,
+      "slug_guess": "quara-tentacle"
+    },
+    {
+      "name": "Quill",
+      "npcPrice": 1100,
+      "slug_guess": "quill"
+    },
+    {
+      "name": "Rabbit's Foot",
+      "npcPrice": 50,
+      "slug_guess": "rabbits-foot"
+    },
+    {
+      "name": "Rare Earth",
+      "npcPrice": 80,
+      "slug_guess": "rare-earth"
+    },
+    {
+      "name": "Ratmiral's Hat",
+      "npcPrice": 150000,
+      "slug_guess": "ratmirals-hat"
+    },
+    {
+      "name": "Ravenous Circlet",
+      "npcPrice": 220000,
+      "slug_guess": "ravenous-circlet"
+    },
+    {
+      "name": "Raw Meat",
+      "npcPrice": 0,
+      "slug_guess": "raw-meat"
+    },
+    {
+      "name": "Reality Splinter",
+      "npcPrice": 5000,
+      "slug_guess": "reality-splinter"
+    },
+    {
+      "name": "Red Goanna Scale",
+      "npcPrice": 270,
+      "slug_guess": "red-goanna-scale"
+    },
+    {
+      "name": "Red Hair Dye",
+      "npcPrice": 40,
+      "slug_guess": "red-hair-dye"
+    },
+    {
+      "name": "Red Lantern",
+      "npcPrice": 250,
+      "slug_guess": "red-lantern"
+    },
+    {
+      "name": "Resin Parasite",
+      "npcPrice": 1450,
+      "slug_guess": "resin-parasite"
+    },
+    {
+      "name": "Resinous Fish Fin",
+      "npcPrice": 1250,
+      "slug_guess": "resinous-fish-fin"
+    },
+    {
+      "name": "Rhindeer Antlers",
+      "npcPrice": 680,
+      "slug_guess": "rhindeer-antlers"
+    },
+    {
+      "name": "Rhino Hide",
+      "npcPrice": 175,
+      "slug_guess": "rhino-hide"
+    },
+    {
+      "name": "Rhino Horn",
+      "npcPrice": 265,
+      "slug_guess": "rhino-horn"
+    },
+    {
+      "name": "Rhino Horn Carving",
+      "npcPrice": 300,
+      "slug_guess": "rhino-horn-carving"
+    },
+    {
+      "name": "Ripptor Claw",
+      "npcPrice": 2600,
+      "slug_guess": "ripptor-claw"
+    },
+    {
+      "name": "Ripptor Scales",
+      "npcPrice": 1200,
+      "slug_guess": "ripptor-scales"
+    },
+    {
+      "name": "Ritual Bone Knife",
+      "npcPrice": 820,
+      "slug_guess": "ritual-bone-knife"
+    },
+    {
+      "name": "Ritual Tooth",
+      "npcPrice": 135,
+      "slug_guess": "ritual-tooth"
+    },
+    {
+      "name": "Rod (Creature Product)",
+      "npcPrice": 2200,
+      "slug_guess": "rod-creature-product"
+    },
+    {
+      "name": "Root Tentacle",
+      "npcPrice": 300000,
+      "slug_guess": "root-tentacle"
+    },
+    {
+      "name": "Roots",
+      "npcPrice": 1200,
+      "slug_guess": "roots"
+    },
+    {
+      "name": "Rorc Egg",
+      "npcPrice": 120,
+      "slug_guess": "rorc-egg"
+    },
+    {
+      "name": "Rorc Feather",
+      "npcPrice": 70,
+      "slug_guess": "rorc-feather"
+    },
+    {
+      "name": "Rotrender Claw",
+      "npcPrice": 0,
+      "slug_guess": "rotrender-claw"
+    },
+    {
+      "name": "Rotrender Scalp",
+      "npcPrice": 0,
+      "slug_guess": "rotrender-scalp"
+    },
+    {
+      "name": "Rotten Feather",
+      "npcPrice": 120,
+      "slug_guess": "rotten-feather"
+    },
+    {
+      "name": "Rotten Heart",
+      "npcPrice": 74000,
+      "slug_guess": "rotten-heart"
+    },
+    {
+      "name": "Rotten Roots",
+      "npcPrice": 3800,
+      "slug_guess": "rotten-roots"
+    },
+    {
+      "name": "Rotten Vermin Ichor",
+      "npcPrice": 4500,
+      "slug_guess": "rotten-vermin-ichor"
+    },
+    {
+      "name": "Sabretooth",
+      "npcPrice": 400,
+      "slug_guess": "sabretooth"
+    },
+    {
+      "name": "Sabretooth Fur",
+      "npcPrice": 2500,
+      "slug_guess": "sabretooth-fur"
+    },
+    {
+      "name": "Sailor's Burn Cure",
+      "npcPrice": 0,
+      "slug_guess": "sailors-burn-cure"
+    },
+    {
+      "name": "Sandcrawler Shell",
+      "npcPrice": 20,
+      "slug_guess": "sandcrawler-shell"
+    },
+    {
+      "name": "Scale of Corruption",
+      "npcPrice": 680,
+      "slug_guess": "scale-of-corruption"
+    },
+    {
+      "name": "Scale of Gelidrazah",
+      "npcPrice": 10000,
+      "slug_guess": "scale-of-gelidrazah"
+    },
+    {
+      "name": "Scorpion Charm",
+      "npcPrice": 620,
+      "slug_guess": "scorpion-charm"
+    },
+    {
+      "name": "Scythe Leg",
+      "npcPrice": 450,
+      "slug_guess": "scythe-leg"
+    },
+    {
+      "name": "Sea Serpent Scale",
+      "npcPrice": 520,
+      "slug_guess": "sea-serpent-scale"
+    },
+    {
+      "name": "Sea Serpent Trophy",
+      "npcPrice": 10000,
+      "slug_guess": "sea-serpent-trophy"
+    },
+    {
+      "name": "Seacrest Hair",
+      "npcPrice": 260,
+      "slug_guess": "seacrest-hair"
+    },
+    {
+      "name": "Seacrest Pearl",
+      "npcPrice": 400,
+      "slug_guess": "seacrest-pearl"
+    },
+    {
+      "name": "Seacrest Scale",
+      "npcPrice": 150,
+      "slug_guess": "seacrest-scale"
+    },
+    {
+      "name": "Sealing Wax",
+      "npcPrice": 620,
+      "slug_guess": "sealing-wax"
+    },
+    {
+      "name": "Shadow Mask",
+      "npcPrice": 0,
+      "slug_guess": "shadow-mask"
+    },
+    {
+      "name": "Shadow Paint",
+      "npcPrice": 0,
+      "slug_guess": "shadow-paint"
+    },
+    {
+      "name": "Shaggy Tail",
+      "npcPrice": 25,
+      "slug_guess": "shaggy-tail"
+    },
+    {
+      "name": "Shamanic Talisman",
+      "npcPrice": 200,
+      "slug_guess": "shamanic-talisman"
+    },
+    {
+      "name": "Shard",
+      "npcPrice": 2000,
+      "slug_guess": "shard"
+    },
+    {
+      "name": "Shark Fins",
+      "npcPrice": 250,
+      "slug_guess": "shark-fins"
+    },
+    {
+      "name": "Shimmering Beetles",
+      "npcPrice": 150,
+      "slug_guess": "shimmering-beetles"
+    },
+    {
+      "name": "Shrunken Head",
+      "npcPrice": 250000,
+      "slug_guess": "shrunken-head"
+    },
+    {
+      "name": "Sight of Surrender's Eye",
+      "npcPrice": 3000,
+      "slug_guess": "sight-of-surrenders-eye"
+    },
+    {
+      "name": "Signet Ring",
+      "npcPrice": 480000,
+      "slug_guess": "signet-ring"
+    },
+    {
+      "name": "Silencer Claws",
+      "npcPrice": 390,
+      "slug_guess": "silencer-claws"
+    },
+    {
+      "name": "Silencer Resonating Chamber",
+      "npcPrice": 600,
+      "slug_guess": "silencer-resonating-chamber"
+    },
+    {
+      "name": "Silken Bookmark",
+      "npcPrice": 1300,
+      "slug_guess": "silken-bookmark"
+    },
+    {
+      "name": "Silky Fur",
+      "npcPrice": 35,
+      "slug_guess": "silky-fur"
+    },
+    {
+      "name": "Silver Foxmouse Coin",
+      "npcPrice": 11000,
+      "slug_guess": "silver-foxmouse-coin"
+    },
+    {
+      "name": "Silver Moon Coin",
+      "npcPrice": 11000,
+      "slug_guess": "silver-moon-coin"
+    },
+    {
+      "name": "Silver Poniard",
+      "npcPrice": 2000,
+      "slug_guess": "silver-poniard"
+    },
+    {
+      "name": "Sineater Wing",
+      "npcPrice": 2100,
+      "slug_guess": "sineater-wing"
+    },
+    {
+      "name": "Single Human Eye",
+      "npcPrice": 1000,
+      "slug_guess": "single-human-eye"
+    },
+    {
+      "name": "Skeleton Decoration",
+      "npcPrice": 3000,
+      "slug_guess": "skeleton-decoration"
+    },
+    {
+      "name": "Skin of Gralvalon",
+      "npcPrice": 0,
+      "slug_guess": "skin-of-gralvalon"
+    },
+    {
+      "name": "Skin of Malvaroth",
+      "npcPrice": 0,
+      "slug_guess": "skin-of-malvaroth"
+    },
+    {
+      "name": "Skin of Twisterror",
+      "npcPrice": 0,
+      "slug_guess": "skin-of-twisterror"
+    },
+    {
+      "name": "Skull Fetish",
+      "npcPrice": 250,
+      "slug_guess": "skull-fetish"
+    },
+    {
+      "name": "Skull Shatterer",
+      "npcPrice": 170,
+      "slug_guess": "skull-shatterer"
+    },
+    {
+      "name": "Skull Tendril",
+      "npcPrice": 650000,
+      "slug_guess": "skull-tendril"
+    },
+    {
+      "name": "Skunk Tail",
+      "npcPrice": 50,
+      "slug_guess": "skunk-tail"
+    },
+    {
+      "name": "Slime Heart",
+      "npcPrice": 160,
+      "slug_guess": "slime-heart"
+    },
+    {
+      "name": "Slime Mould",
+      "npcPrice": 175,
+      "slug_guess": "slime-mould"
+    },
+    {
+      "name": "Slimy Leaf Tentacle",
+      "npcPrice": 320,
+      "slug_guess": "slimy-leaf-tentacle"
+    },
+    {
+      "name": "Slimy Leg",
+      "npcPrice": 4500,
+      "slug_guess": "slimy-leg"
+    },
+    {
+      "name": "Small Energy Ball",
+      "npcPrice": 250,
+      "slug_guess": "small-energy-ball"
+    },
+    {
+      "name": "Small Ladybug",
+      "npcPrice": 0,
+      "slug_guess": "small-ladybug"
+    },
+    {
+      "name": "Small Treasure Chest",
+      "npcPrice": 500,
+      "slug_guess": "small-treasure-chest"
+    },
+    {
+      "name": "Small Tropical Fish",
+      "npcPrice": 380,
+      "slug_guess": "small-tropical-fish"
+    },
+    {
+      "name": "Smoldering Eye",
+      "npcPrice": 470000,
+      "slug_guess": "smoldering-eye"
+    },
+    {
+      "name": "Snake Skin",
+      "npcPrice": 400,
+      "slug_guess": "snake-skin"
+    },
+    {
+      "name": "Sniper Gloves",
+      "npcPrice": 2000,
+      "slug_guess": "sniper-gloves"
+    },
+    {
+      "name": "Soul Stone",
+      "npcPrice": 6000,
+      "slug_guess": "soul-stone"
+    },
+    {
+      "name": "Soul Trap",
+      "npcPrice": 250000,
+      "slug_guess": "soul-trap"
+    },
+    {
+      "name": "Spark Sphere",
+      "npcPrice": 350,
+      "slug_guess": "spark-sphere"
+    },
+    {
+      "name": "Sparkion Claw",
+      "npcPrice": 290,
+      "slug_guess": "sparkion-claw"
+    },
+    {
+      "name": "Sparkion Legs",
+      "npcPrice": 310,
+      "slug_guess": "sparkion-legs"
+    },
+    {
+      "name": "Sparkion Stings",
+      "npcPrice": 280,
+      "slug_guess": "sparkion-stings"
+    },
+    {
+      "name": "Sparkion Tail",
+      "npcPrice": 300,
+      "slug_guess": "sparkion-tail"
+    },
+    {
+      "name": "Spectral Gold Nugget",
+      "npcPrice": 500,
+      "slug_guess": "spectral-gold-nugget"
+    },
+    {
+      "name": "Spectral Silver Nugget",
+      "npcPrice": 250,
+      "slug_guess": "spectral-silver-nugget"
+    },
+    {
+      "name": "Spellreaper Staff Totem",
+      "npcPrice": 3100,
+      "slug_guess": "spellreaper-staff-totem"
+    },
+    {
+      "name": "Spellsinger's Seal",
+      "npcPrice": 280,
+      "slug_guess": "spellsingers-seal"
+    },
+    {
+      "name": "Sphinx Feather",
+      "npcPrice": 470,
+      "slug_guess": "sphinx-feather"
+    },
+    {
+      "name": "Sphinx Tiara",
+      "npcPrice": 360,
+      "slug_guess": "sphinx-tiara"
+    },
+    {
+      "name": "Spiderweb Clouds Shreds",
+      "npcPrice": 0,
+      "slug_guess": "spiderweb-clouds-shreds"
+    },
+    {
+      "name": "Spidris Mandible",
+      "npcPrice": 450,
+      "slug_guess": "spidris-mandible"
+    },
+    {
+      "name": "Spiked Bracers",
+      "npcPrice": 1360,
+      "slug_guess": "spiked-bracers"
+    },
+    {
+      "name": "Spiked Gorget",
+      "npcPrice": 850,
+      "slug_guess": "spiked-gorget"
+    },
+    {
+      "name": "Spiked Iron Ball",
+      "npcPrice": 100,
+      "slug_guess": "spiked-iron-ball"
+    },
+    {
+      "name": "Spirit Container",
+      "npcPrice": 40000,
+      "slug_guess": "spirit-container"
+    },
+    {
+      "name": "Spirited Soil",
+      "npcPrice": 2000,
+      "slug_guess": "spirited-soil"
+    },
+    {
+      "name": "Spite's Spirit",
+      "npcPrice": 840000,
+      "slug_guess": "spites-spirit"
+    },
+    {
+      "name": "Spitter Nose",
+      "npcPrice": 340,
+      "slug_guess": "spitter-nose"
+    },
+    {
+      "name": "Splintered Mitmah Gem",
+      "npcPrice": 225000,
+      "slug_guess": "splintered-mitmah-gem"
+    },
+    {
+      "name": "Spooky Blue Eye",
+      "npcPrice": 95,
+      "slug_guess": "spooky-blue-eye"
+    },
+    {
+      "name": "Spool of Yarn",
+      "npcPrice": 1000,
+      "slug_guess": "spool-of-yarn"
+    },
+    {
+      "name": "Srezz' Eye",
+      "npcPrice": 300,
+      "slug_guess": "srezz-eye"
+    },
+    {
+      "name": "Staff Piece",
+      "npcPrice": 560,
+      "slug_guess": "staff-piece"
+    },
+    {
+      "name": "Stag Parchment",
+      "npcPrice": 3000,
+      "slug_guess": "stag-parchment"
+    },
+    {
+      "name": "Stalking Seeds",
+      "npcPrice": 1800,
+      "slug_guess": "stalking-seeds"
+    },
+    {
+      "name": "Stampor Horn",
+      "npcPrice": 280,
+      "slug_guess": "stampor-horn"
+    },
+    {
+      "name": "Stampor Talons",
+      "npcPrice": 150,
+      "slug_guess": "stampor-talons"
+    },
+    {
+      "name": "Star Ink",
+      "npcPrice": 1250,
+      "slug_guess": "star-ink"
+    },
+    {
+      "name": "Steel Spider Silk",
+      "npcPrice": 0,
+      "slug_guess": "steel-spider-silk"
+    },
+    {
+      "name": "Stone Nose",
+      "npcPrice": 590,
+      "slug_guess": "stone-nose"
+    },
+    {
+      "name": "Stonerefiner's Skull",
+      "npcPrice": 100,
+      "slug_guess": "stonerefiners-skull"
+    },
+    {
+      "name": "Strand of Medusa Hair",
+      "npcPrice": 600,
+      "slug_guess": "strand-of-medusa-hair"
+    },
+    {
+      "name": "Strange Proto Matter",
+      "npcPrice": 300,
+      "slug_guess": "strange-proto-matter"
+    },
+    {
+      "name": "Strange Substance",
+      "npcPrice": 810,
+      "slug_guess": "strange-substance"
+    },
+    {
+      "name": "Streaked Devourer Eyes",
+      "npcPrice": 500,
+      "slug_guess": "streaked-devourer-eyes"
+    },
+    {
+      "name": "Streaked Devourer Legs",
+      "npcPrice": 600,
+      "slug_guess": "streaked-devourer-legs"
+    },
+    {
+      "name": "Streaked Devourer Maw",
+      "npcPrice": 400,
+      "slug_guess": "streaked-devourer-maw"
+    },
+    {
+      "name": "Striped Fur",
+      "npcPrice": 50,
+      "slug_guess": "striped-fur"
+    },
+    {
+      "name": "Sulphider Shell",
+      "npcPrice": 2200,
+      "slug_guess": "sulphider-shell"
+    },
+    {
+      "name": "Sulphur Powder",
+      "npcPrice": 1900,
+      "slug_guess": "sulphur-powder"
+    },
+    {
+      "name": "Sun Brooch",
+      "npcPrice": 18000,
+      "slug_guess": "sun-brooch"
+    },
+    {
+      "name": "Swampling Moss",
+      "npcPrice": 20,
+      "slug_guess": "swampling-moss"
+    },
+    {
+      "name": "Swarmer Antenna",
+      "npcPrice": 130,
+      "slug_guess": "swarmer-antenna"
+    },
+    {
+      "name": "Tail of Corruption",
+      "npcPrice": 240,
+      "slug_guess": "tail-of-corruption"
+    },
+    {
+      "name": "Tainted Heart",
+      "npcPrice": 0,
+      "slug_guess": "tainted-heart"
+    },
+    {
+      "name": "Taiyaki Ice Cream",
+      "npcPrice": 6750,
+      "slug_guess": "taiyaki-ice-cream"
+    },
+    {
+      "name": "Tanjis' Sight",
+      "npcPrice": 0,
+      "slug_guess": "tanjis-sight"
+    },
+    {
+      "name": "Tarantula Egg",
+      "npcPrice": 80,
+      "slug_guess": "tarantula-egg"
+    },
+    {
+      "name": "Tarnished Rhino Figurine",
+      "npcPrice": 320,
+      "slug_guess": "tarnished-rhino-figurine"
+    },
+    {
+      "name": "Tattered Piece of Robe",
+      "npcPrice": 120,
+      "slug_guess": "tattered-piece-of-robe"
+    },
+    {
+      "name": "Tatty Robe",
+      "npcPrice": 0,
+      "slug_guess": "tatty-robe"
+    },
+    {
+      "name": "Technomancer Beard",
+      "npcPrice": 0,
+      "slug_guess": "technomancer-beard"
+    },
+    {
+      "name": "Telescope Eye",
+      "npcPrice": 1600,
+      "slug_guess": "telescope-eye"
+    },
+    {
+      "name": "Tender Venison",
+      "npcPrice": 0,
+      "slug_guess": "tender-venison"
+    },
+    {
+      "name": "Tentacle Piece",
+      "npcPrice": 5000,
+      "slug_guess": "tentacle-piece"
+    },
+    {
+      "name": "Tentacle of Tentugly",
+      "npcPrice": 27000,
+      "slug_guess": "tentacle-of-tentugly"
+    },
+    {
+      "name": "Tentugly's Eye",
+      "npcPrice": 52000,
+      "slug_guess": "tentuglys-eye"
+    },
+    {
+      "name": "Tentugly's Jaws",
+      "npcPrice": 80000,
+      "slug_guess": "tentuglys-jaws"
+    },
+    {
+      "name": "Terramite Eggs",
+      "npcPrice": 50,
+      "slug_guess": "terramite-eggs"
+    },
+    {
+      "name": "Terramite Legs",
+      "npcPrice": 60,
+      "slug_guess": "terramite-legs"
+    },
+    {
+      "name": "Terramite Shell",
+      "npcPrice": 170,
+      "slug_guess": "terramite-shell"
+    },
+    {
+      "name": "Terrorbird Beak",
+      "npcPrice": 95,
+      "slug_guess": "terrorbird-beak"
+    },
+    {
+      "name": "The Crown of the Percht Queen (Fire)",
+      "npcPrice": 0,
+      "slug_guess": "the-crown-of-the-percht-queen-fire"
+    },
+    {
+      "name": "The Crown of the Percht Queen (Ice)",
+      "npcPrice": 0,
+      "slug_guess": "the-crown-of-the-percht-queen-ice"
+    },
+    {
+      "name": "The Handmaiden's Protector",
+      "npcPrice": 50000,
+      "slug_guess": "the-handmaidens-protector"
+    },
+    {
+      "name": "The Imperor's Trident",
+      "npcPrice": 50000,
+      "slug_guess": "the-imperors-trident"
+    },
+    {
+      "name": "The Lethal Lissy's Shirt",
+      "npcPrice": 0,
+      "slug_guess": "the-lethal-lissys-shirt"
+    },
+    {
+      "name": "The Plasmother's Remains",
+      "npcPrice": 50000,
+      "slug_guess": "the-plasmothers-remains"
+    },
+    {
+      "name": "The Vampire Count's Medal",
+      "npcPrice": 0,
+      "slug_guess": "the-vampire-counts-medal"
+    },
+    {
+      "name": "Thick Fur",
+      "npcPrice": 150,
+      "slug_guess": "thick-fur"
+    },
+    {
+      "name": "Thorn",
+      "npcPrice": 100,
+      "slug_guess": "thorn"
+    },
+    {
+      "name": "Thorn Seed",
+      "npcPrice": 0,
+      "slug_guess": "thorn-seed"
+    },
+    {
+      "name": "Tiny Bat Coffin",
+      "npcPrice": 0,
+      "slug_guess": "tiny-bat-coffin"
+    },
+    {
+      "name": "Toe Nails",
+      "npcPrice": 4500,
+      "slug_guess": "toe-nails"
+    },
+    {
+      "name": "Token of Love",
+      "npcPrice": 440000,
+      "slug_guess": "token-of-love"
+    },
+    {
+      "name": "Tooth File",
+      "npcPrice": 60,
+      "slug_guess": "tooth-file"
+    },
+    {
+      "name": "Tooth of Tazhadur",
+      "npcPrice": 10000,
+      "slug_guess": "tooth-of-tazhadur"
+    },
+    {
+      "name": "Torn Page",
+      "npcPrice": 340,
+      "slug_guess": "torn-page"
+    },
+    {
+      "name": "Torn Shirt",
+      "npcPrice": 250,
+      "slug_guess": "torn-shirt"
+    },
+    {
+      "name": "Trapped Bad Dream Monster",
+      "npcPrice": 900,
+      "slug_guess": "trapped-bad-dream-monster"
+    },
+    {
+      "name": "Tremendous Tyrant Head",
+      "npcPrice": 930,
+      "slug_guess": "tremendous-tyrant-head"
+    },
+    {
+      "name": "Tremendous Tyrant Shell",
+      "npcPrice": 740,
+      "slug_guess": "tremendous-tyrant-shell"
+    },
+    {
+      "name": "Trollroot",
+      "npcPrice": 50,
+      "slug_guess": "trollroot"
+    },
+    {
+      "name": "Tunnel Tyrant Head",
+      "npcPrice": 500,
+      "slug_guess": "tunnel-tyrant-head"
+    },
+    {
+      "name": "Tunnel Tyrant Shell",
+      "npcPrice": 700,
+      "slug_guess": "tunnel-tyrant-shell"
+    },
+    {
+      "name": "Turtle Shell",
+      "npcPrice": 90,
+      "slug_guess": "turtle-shell"
+    },
+    {
+      "name": "Tusk",
+      "npcPrice": 100,
+      "slug_guess": "tusk"
+    },
+    {
+      "name": "Twig Arms",
+      "npcPrice": 0,
+      "slug_guess": "twig-arms"
+    },
+    {
+      "name": "Twisted Marionette",
+      "npcPrice": 125000,
+      "slug_guess": "twisted-marionette"
+    },
+    {
+      "name": "Two-Headed Turtle Heads",
+      "npcPrice": 460,
+      "slug_guess": "two-headed-turtle-heads"
+    },
+    {
+      "name": "Ulcer Probe",
+      "npcPrice": 0,
+      "slug_guess": "ulcer-probe"
+    },
+    {
+      "name": "Undead Heart",
+      "npcPrice": 200,
+      "slug_guess": "undead-heart"
+    },
+    {
+      "name": "Undertaker Fangs",
+      "npcPrice": 2700,
+      "slug_guess": "undertaker-fangs"
+    },
+    {
+      "name": "Unholy Bone",
+      "npcPrice": 480,
+      "slug_guess": "unholy-bone"
+    },
+    {
+      "name": "Urmahlullu's Mane",
+      "npcPrice": 490000,
+      "slug_guess": "urmahlullus-mane"
+    },
+    {
+      "name": "Urmahlullu's Paw",
+      "npcPrice": 245000,
+      "slug_guess": "urmahlullus-paw"
+    },
+    {
+      "name": "Urmahlullu's Tail",
+      "npcPrice": 210000,
+      "slug_guess": "urmahlullus-tail"
+    },
+    {
+      "name": "Utua's Poison",
+      "npcPrice": 230,
+      "slug_guess": "utuas-poison"
+    },
+    {
+      "name": "Vampire Dust",
+      "npcPrice": 100,
+      "slug_guess": "vampire-dust"
+    },
+    {
+      "name": "Vampire Lord Token",
+      "npcPrice": 0,
+      "slug_guess": "vampire-lord-token"
+    },
+    {
+      "name": "Vampire's Cape Chain",
+      "npcPrice": 150,
+      "slug_guess": "vampires-cape-chain"
+    },
+    {
+      "name": "Varnished Diremaw Brainpan",
+      "npcPrice": 750,
+      "slug_guess": "varnished-diremaw-brainpan"
+    },
+    {
+      "name": "Varnished Diremaw Legs",
+      "npcPrice": 670,
+      "slug_guess": "varnished-diremaw-legs"
+    },
+    {
+      "name": "Vein of Ore",
+      "npcPrice": 330,
+      "slug_guess": "vein-of-ore"
+    },
+    {
+      "name": "Vemiath's Infused Basalt",
+      "npcPrice": 1000000,
+      "slug_guess": "vemiaths-infused-basalt"
+    },
+    {
+      "name": "Venison",
+      "npcPrice": 55,
+      "slug_guess": "venison"
+    },
+    {
+      "name": "Versicolour Fireworks Powder",
+      "npcPrice": 0,
+      "slug_guess": "versicolour-fireworks-powder"
+    },
+    {
+      "name": "Vial of Hatred",
+      "npcPrice": 737000,
+      "slug_guess": "vial-of-hatred"
+    },
+    {
+      "name": "Vibrant Heart",
+      "npcPrice": 2100,
+      "slug_guess": "vibrant-heart"
+    },
+    {
+      "name": "Vibrant Robe",
+      "npcPrice": 1200,
+      "slug_guess": "vibrant-robe"
+    },
+    {
+      "name": "Volatile Proto Matter",
+      "npcPrice": 300,
+      "slug_guess": "volatile-proto-matter"
+    },
+    {
+      "name": "Voluminous Piece of Cloth",
+      "npcPrice": 0,
+      "slug_guess": "voluminous-piece-of-cloth"
+    },
+    {
+      "name": "Wad of Fairy Floss",
+      "npcPrice": 2910,
+      "slug_guess": "wad-of-fairy-floss"
+    },
+    {
+      "name": "Wafer Paper Flower",
+      "npcPrice": 2350,
+      "slug_guess": "wafer-paper-flower"
+    },
+    {
+      "name": "War Crystal",
+      "npcPrice": 460,
+      "slug_guess": "war-crystal"
+    },
+    {
+      "name": "War Wolf Skin",
+      "npcPrice": 0,
+      "slug_guess": "war-wolf-skin"
+    },
+    {
+      "name": "Wardragon Claw",
+      "npcPrice": 550,
+      "slug_guess": "wardragon-claw"
+    },
+    {
+      "name": "Wardragon Tooth",
+      "npcPrice": 730,
+      "slug_guess": "wardragon-tooth"
+    },
+    {
+      "name": "Warmaster's Wristguards",
+      "npcPrice": 200,
+      "slug_guess": "warmasters-wristguards"
+    },
+    {
+      "name": "Waspoid Claw",
+      "npcPrice": 320,
+      "slug_guess": "waspoid-claw"
+    },
+    {
+      "name": "Waspoid Wing",
+      "npcPrice": 190,
+      "slug_guess": "waspoid-wing"
+    },
+    {
+      "name": "Weaver's Wandtip",
+      "npcPrice": 250,
+      "slug_guess": "weavers-wandtip"
+    },
+    {
+      "name": "Werebadger Claws",
+      "npcPrice": 160,
+      "slug_guess": "werebadger-claws"
+    },
+    {
+      "name": "Werebadger Skull",
+      "npcPrice": 185,
+      "slug_guess": "werebadger-skull"
+    },
+    {
+      "name": "Werebear Fur",
+      "npcPrice": 185,
+      "slug_guess": "werebear-fur"
+    },
+    {
+      "name": "Werebear Skull",
+      "npcPrice": 195,
+      "slug_guess": "werebear-skull"
+    },
+    {
+      "name": "Wereboar Hooves",
+      "npcPrice": 175,
+      "slug_guess": "wereboar-hooves"
+    },
+    {
+      "name": "Wereboar Tusks",
+      "npcPrice": 165,
+      "slug_guess": "wereboar-tusks"
+    },
+    {
+      "name": "Werecrocodile Tongue",
+      "npcPrice": 570,
+      "slug_guess": "werecrocodile-tongue"
+    },
+    {
+      "name": "Werefox Tail",
+      "npcPrice": 200,
+      "slug_guess": "werefox-tail"
+    },
+    {
+      "name": "Werehyaena Nose",
+      "npcPrice": 220,
+      "slug_guess": "werehyaena-nose"
+    },
+    {
+      "name": "Werehyaena Talisman",
+      "npcPrice": 350,
+      "slug_guess": "werehyaena-talisman"
+    },
+    {
+      "name": "Werepanther Claw",
+      "npcPrice": 280,
+      "slug_guess": "werepanther-claw"
+    },
+    {
+      "name": "Weretiger Tooth",
+      "npcPrice": 490,
+      "slug_guess": "weretiger-tooth"
+    },
+    {
+      "name": "Werewolf Fangs",
+      "npcPrice": 180,
+      "slug_guess": "werewolf-fangs"
+    },
+    {
+      "name": "Werewolf Fur",
+      "npcPrice": 380,
+      "slug_guess": "werewolf-fur"
+    },
+    {
+      "name": "White Deer Antlers",
+      "npcPrice": 400,
+      "slug_guess": "white-deer-antlers"
+    },
+    {
+      "name": "White Deer Skin",
+      "npcPrice": 245,
+      "slug_guess": "white-deer-skin"
+    },
+    {
+      "name": "Widow's Mandibles",
+      "npcPrice": 110,
+      "slug_guess": "widows-mandibles"
+    },
+    {
+      "name": "Wild Flowers",
+      "npcPrice": 120,
+      "slug_guess": "wild-flowers"
+    },
+    {
+      "name": "Wimp Tooth Chain",
+      "npcPrice": 120,
+      "slug_guess": "wimp-tooth-chain"
+    },
+    {
+      "name": "Winged Tail",
+      "npcPrice": 800,
+      "slug_guess": "winged-tail"
+    },
+    {
+      "name": "Withered Pauldrons",
+      "npcPrice": 850,
+      "slug_guess": "withered-pauldrons"
+    },
+    {
+      "name": "Withered Scalp",
+      "npcPrice": 900,
+      "slug_guess": "withered-scalp"
+    },
+    {
+      "name": "Worm Sponge",
+      "npcPrice": 4200,
+      "slug_guess": "worm-sponge"
+    },
+    {
+      "name": "Worn Guide Book",
+      "npcPrice": 250000,
+      "slug_guess": "worn-guide-book"
+    },
+    {
+      "name": "Writhing Brain",
+      "npcPrice": 370000,
+      "slug_guess": "writhing-brain"
+    },
+    {
+      "name": "Writhing Heart",
+      "npcPrice": 185000,
+      "slug_guess": "writhing-heart"
+    },
+    {
+      "name": "Wyrm Scale",
+      "npcPrice": 400,
+      "slug_guess": "wyrm-scale"
+    },
+    {
+      "name": "Wyvern Talisman",
+      "npcPrice": 265,
+      "slug_guess": "wyvern-talisman"
+    },
+    {
+      "name": "Yapunac Dagger",
+      "npcPrice": 240,
+      "slug_guess": "yapunac-dagger"
+    },
+    {
+      "name": "Yielocks",
+      "npcPrice": 600,
+      "slug_guess": "yielocks"
+    },
+    {
+      "name": "Yielowax",
+      "npcPrice": 600,
+      "slug_guess": "yielowax"
+    },
+    {
+      "name": "Yirkas' Egg",
+      "npcPrice": 280,
+      "slug_guess": "yirkas-egg"
+    },
+    {
+      "name": "Young Lich Worm",
+      "npcPrice": 25000,
+      "slug_guess": "young-lich-worm"
+    },
+    {
+      "name": "Zaogun Flag",
+      "npcPrice": 600,
+      "slug_guess": "zaogun-flag"
+    },
+    {
+      "name": "Zaogun Shoulderplates",
+      "npcPrice": 150,
+      "slug_guess": "zaogun-shoulderplates"
+    }
+  ],
+  "unmappedGameLoot": [
+    {
+      "slug": "brown-mushroom",
+      "name": "brown mushroom",
+      "sell": 15,
+      "npcSell": null
+    },
+    {
+      "slug": "white-mushroom",
+      "name": "white mushroom",
+      "sell": 5,
+      "npcSell": null
+    },
+    {
+      "slug": "golden-mug",
+      "name": "golden mug",
+      "sell": 200,
+      "npcSell": null
+    },
+    {
+      "slug": "dragon-ham",
+      "name": "dragon ham",
+      "sell": 30,
+      "npcSell": null
+    },
+    {
+      "slug": "skull",
+      "name": "skull",
+      "sell": 4,
+      "npcSell": null
+    },
+    {
+      "slug": "bone",
+      "name": "bone",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "small-diamond",
+      "name": "small diamond",
+      "sell": 300,
+      "npcSell": null
+    },
+    {
+      "slug": "small-ruby",
+      "name": "small ruby",
+      "sell": 250,
+      "npcSell": null
+    },
+    {
+      "slug": "small-emerald",
+      "name": "small emerald",
+      "sell": 250,
+      "npcSell": null
+    },
+    {
+      "slug": "small-sapphire",
+      "name": "small sapphire",
+      "sell": 250,
+      "npcSell": null
+    },
+    {
+      "slug": "small-amethyst",
+      "name": "small amethyst",
+      "sell": 200,
+      "npcSell": null
+    },
+    {
+      "slug": "talon",
+      "name": "talon",
+      "sell": 800,
+      "npcSell": null
+    },
+    {
+      "slug": "green-gem",
+      "name": "green gem",
+      "sell": 5000,
+      "npcSell": null
+    },
+    {
+      "slug": "blue-gem",
+      "name": "blue gem",
+      "sell": 5000,
+      "npcSell": null
+    },
+    {
+      "slug": "red-gem",
+      "name": "red gem",
+      "sell": 1000,
+      "npcSell": null
+    },
+    {
+      "slug": "yellow-gem",
+      "name": "yellow gem",
+      "sell": 1000,
+      "npcSell": null
+    },
+    {
+      "slug": "violet-gem",
+      "name": "violet gem",
+      "sell": 1000,
+      "npcSell": null
+    },
+    {
+      "slug": "green-mushroom",
+      "name": "green mushroom",
+      "sell": 25,
+      "npcSell": null
+    },
+    {
+      "slug": "small-axe",
+      "name": "small axe",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "damaged-helmet",
+      "name": "damaged helmet",
+      "sell": 240,
+      "npcSell": null
+    },
+    {
+      "slug": "white-pearl",
+      "name": "white pearl",
+      "sell": 160,
+      "npcSell": null
+    },
+    {
+      "slug": "black-pearl",
+      "name": "black pearl",
+      "sell": 280,
+      "npcSell": null
+    },
+    {
+      "slug": "gold-nugget",
+      "name": "gold nugget",
+      "sell": 850,
+      "npcSell": null
+    },
+    {
+      "slug": "holy-scarab",
+      "name": "holy scarab",
+      "sell": 300,
+      "npcSell": null
+    },
+    {
+      "slug": "scarab-coin",
+      "name": "scarab coin",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "burning-heart",
+      "name": "burning heart",
+      "sell": 400,
+      "npcSell": null
+    },
+    {
+      "slug": "blood-orb",
+      "name": "blood orb",
+      "sell": 500,
+      "npcSell": null
+    },
+    {
+      "slug": "roc-feather",
+      "name": "roc feather",
+      "sell": 400,
+      "npcSell": null
+    },
+    {
+      "slug": "phoenix-egg",
+      "name": "phoenix egg",
+      "sell": 750,
+      "npcSell": null
+    },
+    {
+      "slug": "mysterious-fetish",
+      "name": "mysterious fetish",
+      "sell": 50,
+      "npcSell": null
+    },
+    {
+      "slug": "voodoo-doll",
+      "name": "voodoo doll",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "dirty-fur",
+      "name": "dirty fur",
+      "sell": 30,
+      "npcSell": null
+    },
+    {
+      "slug": "big-bone",
+      "name": "big bone",
+      "sell": 15,
+      "npcSell": null
+    },
+    {
+      "slug": "fishbone",
+      "name": "fishbone",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "salmon",
+      "name": "salmon",
+      "sell": 6,
+      "npcSell": null
+    },
+    {
+      "slug": "shrimp",
+      "name": "shrimp",
+      "sell": 8,
+      "npcSell": null
+    },
+    {
+      "slug": "northern-pike",
+      "name": "northern pike",
+      "sell": 10,
+      "npcSell": null
+    },
+    {
+      "slug": "red-mushroom",
+      "name": "red mushroom",
+      "sell": 20,
+      "npcSell": null
+    },
+    {
+      "slug": "fire-mushroom",
+      "name": "fire mushroom",
+      "sell": 30,
+      "npcSell": null
+    },
+    {
+      "slug": "dark-mushroom",
+      "name": "dark mushroom",
+      "sell": 25,
+      "npcSell": null
+    },
+    {
+      "slug": "orange-mushroom",
+      "name": "orange mushroom",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "wood-mushroom",
+      "name": "wood mushroom",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "blood-herb",
+      "name": "blood herb",
+      "sell": 500,
+      "npcSell": null
+    },
+    {
+      "slug": "sling-herb",
+      "name": "sling herb",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "powder-herb",
+      "name": "powder herb",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "shadow-herb",
+      "name": "shadow herb",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "blue-backpack",
+      "name": "blue backpack",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "red-backpack",
+      "name": "red backpack",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "purple-backpack",
+      "name": "purple backpack",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "grey-backpack",
+      "name": "grey backpack",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "golden-backpack",
+      "name": "golden backpack",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "backpack-of-holding",
+      "name": "backpack of holding",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "torn-book",
+      "name": "torn book",
+      "sell": 4,
+      "npcSell": null
+    },
+    {
+      "slug": "cookbook",
+      "name": "cookbook",
+      "sell": 15,
+      "npcSell": null
+    },
+    {
+      "slug": "spy-report",
+      "name": "spy report",
+      "sell": 100,
+      "npcSell": null
+    },
+    {
+      "slug": "intense-healing-rune",
+      "name": "intense healing rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "ultimate-healing-rune",
+      "name": "ultimate healing rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "great-fireball-rune",
+      "name": "great fireball rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "sudden-death-rune",
+      "name": "sudden death rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "explosion-rune",
+      "name": "explosion rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "heavy-magic-missile-rune",
+      "name": "heavy magic missile rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "light-magic-missile-rune",
+      "name": "light magic missile rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "fireball-rune",
+      "name": "fireball rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "firebomb-rune",
+      "name": "firebomb rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "poison-bomb-rune",
+      "name": "poison bomb rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "energy-bomb-rune",
+      "name": "energy bomb rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "paralyze-rune",
+      "name": "paralyze rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "magic-wall-rune",
+      "name": "magic wall rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "destroy-field-rune",
+      "name": "destroy field rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "antidote-rune",
+      "name": "antidote rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "animate-dead-rune",
+      "name": "animate dead rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "convince-creature-rune",
+      "name": "convince creature rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "soulfire-rune",
+      "name": "soulfire rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "chameleon-rune",
+      "name": "chameleon rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "desintegrate-rune",
+      "name": "desintegrate rune",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "crystal-arrow",
+      "name": "crystal arrow",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "worn-leather-boots",
+      "name": "worn leather boots",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "piggy-bank",
+      "name": "piggy bank",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "copper-key",
+      "name": "copper key",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "bone-key",
+      "name": "bone key",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "purple-key",
+      "name": "purple key",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "wooden-key",
+      "name": "wooden key",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "depot-chest",
+      "name": "depot chest",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "locker",
+      "name": "locker",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "mirror",
+      "name": "mirror",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "vase",
+      "name": "vase",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "candlestick",
+      "name": "candlestick",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "lamp",
+      "name": "lamp",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "gemmed-lamp",
+      "name": "gemmed lamp",
+      "sell": 2,
+      "npcSell": null
+    },
+    {
+      "slug": "cyan-crystal-fragment",
+      "name": "cyan crystal fragment",
+      "sell": 35,
+      "npcSell": null
+    },
+    {
+      "slug": "rainbow-quartz",
+      "name": "rainbow quartz",
+      "sell": 500,
+      "npcSell": null
+    },
+    {
+      "slug": "green-crystal-shard",
+      "name": "green crystal shard",
+      "sell": 25,
+      "npcSell": null
+    },
+    {
+      "slug": "green-crystal-fragment",
+      "name": "green crystal fragment",
+      "sell": 35,
+      "npcSell": null
+    },
+    {
+      "slug": "sea-horse-figurine",
+      "name": "sea horse figurine",
+      "sell": 2500,
+      "npcSell": null
+    },
+    {
+      "slug": "amphora",
+      "name": "amphora",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "ankh",
+      "name": "ankh",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "bag-of-apple-slices",
+      "name": "bag of apple slices",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "behemoth-trophy",
+      "name": "behemoth trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "blue-rose",
+      "name": "blue rose",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "blue-tapestry",
+      "name": "blue tapestry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "blueberry",
+      "name": "blueberry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "bonebeast-trophy",
+      "name": "bonebeast trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "bonelord-shield",
+      "name": "bonelord shield",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "cleaver",
+      "name": "cleaver",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "corncob",
+      "name": "corncob",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "cyclops-trophy",
+      "name": "cyclops trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "demon-trophy",
+      "name": "demon trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "die",
+      "name": "die",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "dragon-lord-trophy",
+      "name": "dragon lord trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "emerald-bangle",
+      "name": "emerald bangle",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "empty-goldfish-bowl",
+      "name": "empty goldfish bowl",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "fishing-rod",
+      "name": "fishing rod",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-shrimp",
+      "name": "giant shrimp",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "goat-grass",
+      "name": "goat grass",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "grave-flower",
+      "name": "grave flower",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "great-health-potion",
+      "name": "great health potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "great-mana-potion",
+      "name": "great mana potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "great-spirit-potion",
+      "name": "great spirit potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "green-tapestry",
+      "name": "green tapestry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "heavy-old-tome",
+      "name": "heavy old tome",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "ice-cube",
+      "name": "ice cube",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "inkwell",
+      "name": "inkwell",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "light-bandana",
+      "name": "light bandana",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "light-shovel",
+      "name": "light shovel",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "lyre",
+      "name": "lyre",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "magic-light-wand",
+      "name": "magic light wand",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "medicine-pouch",
+      "name": "medicine pouch",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "mini-mummy",
+      "name": "mini mummy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "minotaur-trophy",
+      "name": "minotaur trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "mouldy-cheese",
+      "name": "mouldy cheese",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "orc-trophy",
+      "name": "orc trophy",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "pear",
+      "name": "pear",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "piece-of-marble-rock",
+      "name": "piece of marble rock",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "pirate-backpack",
+      "name": "pirate backpack",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "pirate-bag",
+      "name": "pirate bag",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "plum",
+      "name": "plum",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "potato",
+      "name": "potato",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "purple-tome",
+      "name": "purple tome",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "red-apple",
+      "name": "red apple",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "red-rose",
+      "name": "red rose",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "rum-flask",
+      "name": "rum flask",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "scroll",
+      "name": "scroll",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "silver-brooch",
+      "name": "silver brooch",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "skull-candle",
+      "name": "skull candle",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "small-topaz",
+      "name": "small topaz",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "spellbook-of-warding",
+      "name": "spellbook of warding",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "strawberry",
+      "name": "strawberry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "strong-health-potion",
+      "name": "strong health potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "strong-mana-potion",
+      "name": "strong mana potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "stuffed-toad",
+      "name": "stuffed toad",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "sweet-smelling-bait",
+      "name": "sweet smelling bait",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "treasure-map",
+      "name": "treasure map",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "troll-green",
+      "name": "troll green",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "ultimate-health-potion",
+      "name": "ultimate health potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "violet-crystal-shard",
+      "name": "violet crystal shard",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "waterskin",
+      "name": "waterskin",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "wooden-flute",
+      "name": "wooden flute",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "maxilla-maximus",
+      "name": "maxilla maximus",
+      "sell": 500,
+      "npcSell": null
+    },
+    {
+      "slug": "market",
+      "name": "market",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "beetroot",
+      "name": "beetroot",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "berserk-potion",
+      "name": "berserk potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "blue-crystal-shard",
+      "name": "blue crystal shard",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "bullseye-potion",
+      "name": "bullseye potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "cherry",
+      "name": "cherry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "dawnfire-pantaloons",
+      "name": "dawnfire pantaloons",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "dawnfire-sherwani",
+      "name": "dawnfire sherwani",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "elven-parchment",
+      "name": "elven parchment",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "enchanted-turtle-amulet",
+      "name": "enchanted turtle amulet",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "feverbloom-boots",
+      "name": "feverbloom boots",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "folded-rift-carpet",
+      "name": "folded rift carpet",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "frostflower-boots",
+      "name": "frostflower boots",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-amethyst",
+      "name": "giant amethyst",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-emerald",
+      "name": "giant emerald",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-ruby",
+      "name": "giant ruby",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-sapphire",
+      "name": "giant sapphire",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-topaz",
+      "name": "giant topaz",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "gold-ingot",
+      "name": "gold ingot",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "jewelled-backpack",
+      "name": "jewelled backpack",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "mastermind-potion",
+      "name": "mastermind potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "midnight-sarong",
+      "name": "midnight sarong",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "midnight-tunic",
+      "name": "midnight tunic",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "naga-basin",
+      "name": "naga basin",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "naga-quiver",
+      "name": "naga quiver",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "naga-tanko",
+      "name": "naga tanko",
+      "sell": 3,
+      "npcSell": null
+    },
+    {
+      "slug": "orichalcum-pearl",
+      "name": "orichalcum pearl",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "rift-tapestry",
+      "name": "rift tapestry",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "saw",
+      "name": "saw",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "scroll-of-ascension",
+      "name": "scroll of ascension",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "silver-token",
+      "name": "silver token",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "soul-orb",
+      "name": "soul orb",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "transcendence-potion",
+      "name": "transcendence potion",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "twigs",
+      "name": "twigs",
+      "sell": 1,
+      "npcSell": null
+    },
+    {
+      "slug": "giant-shimmering-pearl",
+      "name": "giant shimmering pearl",
+      "sell": 5000,
+      "npcSell": null
+    }
+  ]
+}

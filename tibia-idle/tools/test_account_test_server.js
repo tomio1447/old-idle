@@ -55,7 +55,9 @@ async function post(route, body) {
   const accountClient = fs.readFileSync(path.join(root, 'game', 'js', 'account-client.js'), 'utf8');
   const gameClient = fs.readFileSync(path.join(root, 'game', 'js', 'game.js'), 'utf8');
   must(accountClient.includes('ACCOUNT_SERVER_CONFIG.online') &&
-       accountClient.includes('function accountLoadCharacter'),
+       accountClient.includes('ACCOUNT_SERVER_CONFIG.apiUrl') &&
+       accountClient.includes('function accountLoadCharacter') &&
+       accountClient.includes('accountLeaseMarkUnauthorized'),
     'frontend não ativa API/carregamento completo automaticamente');
   must(gameClient.includes('account.role === "admin"') &&
        !gameClient.includes('const adminAllowed = !!serverCfg.testServer'),

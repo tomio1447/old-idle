@@ -155,6 +155,15 @@ canvas { image-rendering: pixelated; }
 .server-status.power-on #server-status-text { color: #9ce84a; }
 .server-status.power-off #server-status-text { color: #f0b4b4; }
 
+.players-online {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  padding: 2px 8px; border: 1px solid var(--border-out, #5a5346);
+  background: #1c1a16; color: #c8c0b0;
+}
+.players-online[hidden] { display: none !important; }
+.players-online b { color: #9ce84a; font-variant-numeric: tabular-nums; }
+
 .server-reconnect-banner {
   position: fixed; inset: 0; z-index: 9200;
   display: flex; align-items: center; justify-content: center;
@@ -226,6 +235,64 @@ canvas { image-rendering: pixelated; }
   word-break: break-all;
 }
 .alpha-discord-link:hover { color: #a8d0ff; }
+
+/* ---- Brand logo / créditos ---- */
+.brand-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+}
+.brand-logo {
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+  user-select: none;
+  pointer-events: none;
+  background: transparent;
+}
+.brand-logo--hero {
+  width: 128px;
+  height: 128px;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, .65));
+}
+.brand-logo--topbar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7));
+}
+.login-brand-title {
+  font-size: 14px;
+  justify-content: center;
+  letter-spacing: 1px;
+}
+.login-brand-hero {
+  margin: 4px 0 12px;
+}
+.alpha-brand-logo {
+  margin: 2px 0 10px;
+}
+.alpha-brand-logo .brand-logo {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, .55));
+}
+.brand-credits {
+  margin: 10px 0 0;
+  line-height: 1.35;
+  color: #8a8274;
+  border-top: 1px solid #3a352c;
+  padding-top: 8px;
+}
+.logo.brand-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo.brand-logo-mark > span {
+  white-space: nowrap;
+}
 
 .alpha-test-banner {
   display: flex;
@@ -548,6 +615,48 @@ canvas { image-rendering: pixelated; }
 .mission-row.done { color:#9ce84a; }
 .mission-reward { color:#d4af37; font-size:9px; margin-top:5px; }
 
+.world-boss-box {
+  position: absolute; top: 8px; right: 8px; z-index: 21;
+  width: min(300px, calc(100% - 16px));
+  background: rgba(18,15,10,.92);
+  border: 2px solid; border-color: #8a3a2a #090807 #090807 #8a3a2a;
+  box-shadow: 0 4px 18px rgba(0,0,0,.75);
+  color: var(--text, #eee); font-size: 10px;
+  margin-top: 0;
+}
+.world-boss-head {
+  display:flex; align-items:center; gap:8px; padding:6px 8px;
+  color:#ffb4a0; font-weight:bold;
+  background: linear-gradient(180deg, rgba(90,30,22,.95), rgba(28,14,12,.95));
+}
+.world-boss-sprite {
+  flex:0 0 auto; width:48px; height:48px;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.35); border:1px solid rgba(255,180,160,.25);
+  overflow:hidden;
+}
+.world-boss-sprite .mob-img,
+.world-boss-sprite-img { max-width:48px; max-height:48px; }
+.world-boss-head-text { flex:1; min-width:0; line-height:1.25; }
+.world-boss-body { padding:7px 8px; line-height:1.35; }
+.world-boss-body .ok { color:#9ce84a; margin-top:4px; }
+.world-boss-actions { display:flex; gap:6px; margin-top:8px; }
+.world-boss-picker { margin-top:6px; display:flex; flex-direction:column; gap:4px; }
+.world-boss-pick { display:flex; align-items:center; gap:6px; cursor:pointer; }
+.world-boss-pick input:disabled { opacity:.45; }
+.world-boss-overlay {
+  position:fixed; inset:0; z-index:1200; display:none;
+  align-items:flex-start; justify-content:center; pointer-events:none;
+  padding-top:12vh; background:rgba(0,0,0,.35);
+}
+.world-boss-overlay-msg {
+  max-width:min(720px,92vw); text-align:center;
+  padding:14px 18px; font-size:clamp(13px,2.2vw,18px); font-weight:bold;
+  color:#ffe680; background:rgba(12,10,8,.88);
+  border:2px solid #6b5a2e; box-shadow:0 8px 28px rgba(0,0,0,.6);
+  line-height:1.4;
+}
+
 /* Reward Chest — inventário dedicado em slots, inspirado no client. */
 .modal-bg .modal.reward-modal-shell {
   width:min(740px,calc(100vw - 32px)); overflow:hidden;
@@ -771,10 +880,17 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background-size:contain; background-repeat:no-repeat; background-position:center;
   image-rendering:pixelated;
 }
+.ranking-btn-icon {
+  display:inline-block; width:22px; height:22px; flex:0 0 22px;
+  background-image:url('../assets/ui/prey/prey_bigxp.png');
+  background-size:contain; background-repeat:no-repeat; background-position:center;
+  image-rendering:pixelated;
+}
 .modal-bg .modal.hunts-modal-shell,
 .modal-bg .modal.bosses-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
-.modal-bg .modal.cidade-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.modal-bg .modal.cidade-modal-shell,
+.modal-bg .modal.ranking-modal-shell { width:min(920px,calc(100vw - 32px)); }
 .bosses-modal-title { display:flex; align-items:center; gap:7px; }
 .bosses-modal-title #bosses-modal-close { margin-left:auto; }
 .bosses-modal-title .bosses-megalomania-icon { transform:scale(1.1); margin:0 2px; }
@@ -789,6 +905,39 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .cidade-modal-title { display:flex; align-items:center; gap:7px; }
 .cidade-modal-title #cidade-modal-close { margin-left:auto; }
 .cidade-modal-title .cidade-btn-icon { transform:scale(1.15); margin:0 2px; }
+.ranking-modal-title { display:flex; align-items:center; gap:7px; }
+.ranking-modal-title #ranking-modal-close { margin-left:auto; }
+.ranking-modal-title .ranking-btn-icon { transform:scale(1.15); margin:0 2px; }
+.ranking-tabs {
+  display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px 0;
+  border-bottom:1px solid #3a372f;
+}
+.ranking-tab {
+  min-height:28px; padding:0 8px; border:1px solid #4b493e;
+  background:#1c1a16; color:#c8c0a8; font:inherit; font-size:11px;
+  font-weight:700; letter-spacing:.3px; cursor:pointer;
+}
+.ranking-tab:hover { color:#fff; border-color:#6a6558; }
+.ranking-tab.active { color:#ffe680; border-color:#8a7a40; background:#2a2618; }
+#ranking-modal-list { display:grid; grid-template-columns:1fr; gap:10px; }
+.ranking-table-wrap { overflow:auto; max-height:min(60vh,520px); border:1px solid #3a372f; }
+.ranking-table {
+  width:100%; border-collapse:collapse; font-size:12px; color:#d8d0bc;
+}
+.ranking-table th, .ranking-table td {
+  padding:6px 8px; border-bottom:1px solid #2a2822; text-align:left;
+}
+.ranking-table th {
+  position:sticky; top:0; background:#1c1a16; color:#a89f88;
+  font-size:11px; letter-spacing:.4px; z-index:1;
+}
+.ranking-table tbody tr:hover { background:rgba(255,255,255,.03); }
+.ranking-pos { width:36px; color:#8a8270; font-variant-numeric:tabular-nums; }
+.ranking-name { color:#ffe680; font-weight:700; }
+.ranking-voc { color:#a8c0d8; }
+.ranking-value { text-align:right; font-variant-numeric:tabular-nums; color:#9ce84a; font-weight:700; }
+.ranking-table th:last-child, .ranking-table td.ranking-value { text-align:right; }
+.ranking-status { padding:16px; text-align:center; }
 #hunts-modal-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
 #npcs-modal-list,
 #cidade-modal-list { display:grid; grid-template-columns:1fr; gap:10px; }
@@ -2261,7 +2410,15 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   .forge-client-wallet { min-width: 70px; }
 }
 
-/* ============================ Sistema de Prey ============================ */
+/* ============================ Topbar: Wheel / Charms / Prey ============================ */
+.topbar-btn-icon {
+  width: 18px; height: 18px; object-fit: contain;
+  margin-right: 2px; flex: none;
+  image-rendering: pixelated;
+}
+#btn-wheel,
+#btn-charms { display:inline-flex; align-items:center; gap:2px; white-space:nowrap; }
+
 .prey-btn-gif {
   width: 16px; height: 28px; object-fit: contain;
   margin-right: 2px; flex: none;

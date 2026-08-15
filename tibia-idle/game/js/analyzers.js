@@ -170,23 +170,28 @@ function otcAnalyserEnsureTrack(stats, key) {
 }
 
 function otcAnalyserPlayerMeta(c, idHint) {
-  const id = String(idHint == null ? "" : idHint);
+  const hint = idHint == null || idHint === "" ? "" : String(idHint);
   const ents = (c && Array.isArray(c.players) && c.players.length) ? c.players
     : (c && c.player ? [c.player] : []);
-  let ent = ents.find((e) => String(e && (e.id !== undefined ? e.id : (e.p && e.p.id))) === id);
+  let ent = hint
+    ? ents.find((e) => String(e && (e.id !== undefined ? e.id : (e.p && e.p.id))) === hint)
+    : null;
   if (!ent && ents.length === 1) ent = ents[0];
-  if (!ent && typeof G !== "undefined" && G && G.p) {
-    return {
-      id: String(G.p.id || id || "player"),
-      name: G.p.name || "Player",
-      voc: G.p.voc || "none",
-    };
-  }
-  const p = ent && ent.p;
+  const nested = ent && ent.p;
+  const gp = (typeof G !== "undefined" && G && G.p) ? G.p : null;
+  // Solo offline: c.player não tem id/p — usar G.p para casar com targetId=p.id
+  // nos eventos taken (senão o total ia para "5" e a UI lia a chave "player").
+  const id = String(
+    (ent && ent.id !== undefined && ent.id !== null && ent.id !== "" ? ent.id : null)
+    || (nested && nested.id)
+    || hint
+    || (gp && gp.id)
+    || "player"
+  );
   return {
-    id: String((ent && ent.id !== undefined) ? ent.id : (p && p.id) || id || "player"),
-    name: (p && p.name) || (ent && ent.name) || "Player",
-    voc: (p && p.voc) || (ent && ent.voc) || "none",
+    id,
+    name: (nested && nested.name) || (ent && ent.name) || (gp && gp.name) || "Player",
+    voc: (nested && nested.voc) || (ent && ent.voc) || (gp && gp.voc) || "none",
   };
 }
 
@@ -212,6 +217,18 @@ function otcAnalyserAddToTrack(c, trackKey, playerId, element, amount) {
   const el = otcAnalyserNormalizeElement(element);
   row.total = (Number(row.total) || 0) + dmg;
   row.byElement[el] = (Number(row.byElement[el]) || 0) + dmg;
+}
+
+/* Online o servidor não manda stats.damage/taken — espelha o total dos tracks
+ * para Party Hunt Analyser. Offline o combat.js já soma; o max evita perda. */
+function otcAnalyserSyncSessionScalars(c) {
+  if (!c || !c.stats) return;
+  const sum = (track) => Object.values((track && track.byPlayer) || {})
+    .reduce((acc, row) => acc + (Number(row && row.total) || 0), 0);
+  const dealt = sum(c.stats.damageTrack);
+  const taken = sum(c.stats.takenTrack);
+  if (dealt > 0) c.stats.damage = Math.max(Number(c.stats.damage) || 0, dealt);
+  if (taken > 0) c.stats.taken = Math.max(Number(c.stats.taken) || 0, taken);
 }
 
 function otcAnalyserHitWhoId(e, activeId) {
@@ -396,6 +413,7 @@ function otcAnalyserIngestEvents(events, combat) {
     }
   }
   otcAnalyserIngestBestHits(damageTrack, hitEvents, c, activeId);
+  otcAnalyserSyncSessionScalars(c);
 }
 
 function otcAnalyserResetTrack(kind) {
@@ -403,6 +421,8 @@ function otcAnalyserResetTrack(kind) {
   if (!c || !c.stats) return;
   const key = kind === "taken" ? "takenTrack" : "damageTrack";
   c.stats[key] = { startedAt: Date.now(), byPlayer: {} };
+  if (kind === "taken") c.stats.taken = 0;
+  else c.stats.damage = 0;
   if (typeof document !== "undefined") renderOtcAnalyser();
 }
 
@@ -481,6 +501,8 @@ function otcAnalyserResetSession() {
   if (!c || !c.stats) return;
   c.stats.damageTrack = { startedAt: Date.now(), byPlayer: {} };
   c.stats.takenTrack = { startedAt: Date.now(), byPlayer: {} };
+  c.stats.damage = 0;
+  c.stats.taken = 0;
   otcAnalyserResetDeathTrack(c);
   if (typeof document !== "undefined") renderOtcAnalyser();
 }
@@ -522,9 +544,46 @@ function otcAnalyserBestHitLine(best) {
 }
 
 function otcAnalyserTrackDuration(track, c) {
+  // Preferir o tempo da hunt (igual XP/kills). Fallback: relógio do track.
+  const session = otcAnalyserDuration(c);
+  if (session > 0) return session;
   const started = Number(track && track.startedAt) || 0;
   if (started) return Math.max(0, Date.now() - started);
-  return otcAnalyserDuration(c);
+  return 0;
+}
+
+/* Resolve o bucket do personagem, fundindo aliases (p.id vs "player" no solo). */
+function otcAnalyserRowForMeta(track, meta, partySize) {
+  const byPlayer = (track && track.byPlayer) || {};
+  const ids = [];
+  const pushId = (value) => {
+    const id = value == null || value === "" ? "" : String(value);
+    if (!id || ids.indexOf(id) >= 0) return;
+    ids.push(id);
+  };
+  pushId(meta && meta.id);
+  if ((Number(partySize) || 0) <= 1) {
+    if (typeof G !== "undefined" && G && G.p && G.p.id != null) pushId(G.p.id);
+    pushId("player");
+  }
+  let total = 0;
+  const byElement = {};
+  let name = meta && meta.name;
+  let voc = meta && meta.voc;
+  for (const id of ids) {
+    const row = byPlayer[id];
+    if (!row) continue;
+    if (row.name) name = row.name;
+    if (row.voc) voc = row.voc;
+    total += Number(row.total) || 0;
+    for (const el of Object.keys(row.byElement || {})) {
+      byElement[el] = (Number(byElement[el]) || 0) + (Number(row.byElement[el]) || 0);
+    }
+  }
+  return {
+    id: meta && meta.id, name: name || "Player", voc: voc || "none",
+    total, byElement,
+  };
 }
 
 function otcAnalyserOrderedElements(byElement) {
@@ -556,7 +615,7 @@ function otcAnalyserDamageBody(kind, c) {
 
   let blocks = "";
   for (const meta of party) {
-    const row = (track.byPlayer && track.byPlayer[meta.id]) || { total: 0, byElement: {}, name: meta.name, voc: meta.voc };
+    const row = otcAnalyserRowForMeta(track, meta, party.length);
     const total = Math.max(0, Number(row.total) || 0);
     const perHour = otcAnalyserRate(total, duration);
     const label = `${otcAnalyserEscape(row.name || meta.name)} - ${otcAnalyserVocAbbr(row.voc || meta.voc)}`;
@@ -570,10 +629,11 @@ function otcAnalyserDamageBody(kind, c) {
         <span>(${pct}%)</span>
       </div>`;
     }).join("");
+    // Total da sessão em primeiro (como XP/kills); /h é só taxa.
     blocks += `<div class="otc-dmg-char">
       <div class="otc-dmg-char-head">
         <span>${label}</span>
-        <b title="${rateLabel}">${otcAnalyserNumber(perHour)}/h - ${otcAnalyserNumber(total)}</b>
+        <b title="${rateLabel}">${otcAnalyserNumber(total)} · ${otcAnalyserNumber(perHour)}/h</b>
       </div>
       <div class="otc-dmg-els">${elRows || '<div class="tiny dim">Sem dano registrado.</div>'}</div>
     </div>`;
@@ -694,7 +754,8 @@ if (typeof module !== "undefined" && module.exports) {
     otcAnalyserBestHitLine, otcAnalyserConsiderBestHit, otcAnalyserIngestBestHits,
     otcAnalyserLootUnitValue, otcAnalyserSessionLootValue, otcAnalyserBody,
     otcAnalyserLootEconBlock, otcAnalyserDeathSection, otcAnalyserResetDeathTrack,
-    otcAnalyserResetTrack, otcAnalyserResetSession,
+    otcAnalyserResetTrack, otcAnalyserResetSession, otcAnalyserRowForMeta,
+    otcAnalyserPlayerMeta, otcAnalyserSyncSessionScalars,
   };
 }
 

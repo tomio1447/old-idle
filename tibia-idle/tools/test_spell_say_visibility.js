@@ -101,7 +101,8 @@ must(game.includes("TALKTYPE_SPELL: palavras no caster"),
   "drainEvents não aplica fala no caster da party");
 must(!game.includes("creatureSay(healedEnt"),
   "heal-friend ainda desenha as palavras no alvo em vez do caster");
-must(render.includes("drawCreatureSpeech(ctx, info.ent, info.cx, y, dt")&&
+must((render.includes("drawCreatureSpeech(ctx, info.ent, info.cx, y, null")||
+      render.includes("drawCreatureSpeech(ctx, info.ent, info.cx, y, dt"))&&
   render.includes("info.ent === combat.player"),
   "renderer ainda desenha só playerTalk compartilhado nos players");
 must(/js\/game\.js\?v=/.test(index)&&/js\/render\.js\?v=/.test(index),

@@ -721,7 +721,12 @@ function normalizeVisualState(raw,auth){
       }
       out.push(item);}
     return out;};
-  raw=raw&&typeof raw==="object"?raw:{};return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64)};
+  raw=raw&&typeof raw==="object"?raw:{};
+  const scarlettIntent=raw.scarlettIntent&&typeof raw.scarlettIntent==="object"?raw.scarlettIntent:null;
+  const intentDir=scarlettIntent?String(scarlettIntent.dir||""):"";
+  return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64),
+    scarlettIntent:intentDir==="up"||intentDir==="down"||intentDir==="left"||intentDir==="right"
+      ?{dir:intentDir}:null};
 }
 function snapAuthorityEntityToCell(auth,ent){
   if(!ent)return;
@@ -769,17 +774,28 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)continue;
     applyPose(mob,pos);
   }
+  if(auth.scarlett&&visual.scarlettIntent&&visual.scarlettIntent.dir)
+    auth.scarlett.pendingIntent={dir:visual.scarlettIntent.dir};
   return visual;
 }
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
-function maxStats(p){const level=Math.max(1,Number(p.level)||1),v=VOC[p.voc]||VOC.none;
+function maxStats(p){ensurePlayerCapacity(p);const level=Math.max(1,Number(p.level)||1),v=VOC[p.voc]||VOC.none;
   const rook=Math.min(level-1,7),voc=Math.max(0,level-1-rook);let hp=START_HP+rook*5+voc*v.hp,mp=START_MP+rook*5+voc*v.mp;
   let cap=400+rook*10+voc*(Number(v.cap)||10);
   for(const slot of Object.keys(p.equip||{})){const e=p.equip[slot],it=e&&ITEMS[e.item];if(it){hp+=Number(it.hp)||0;mp+=Number(it.mp)||0;}}
   if(WHEEL_FN&&typeof WHEEL_FN.wheelTotals==="function"){
     const w=WHEEL_FN.wheelTotals(p);hp+=Number(w&&w.hp)||0;mp+=Number(w&&w.mp)||0;cap+=Number(w&&w.cap)||0;
   }
+  cap=Math.max(cap,ensurePlayerCapacity(p));
   return {hp:Math.max(1,Math.floor(hp)),mp:Math.max(0,Math.floor(mp)),cap:Math.max(0,Math.floor(cap))};}
+const DEFAULT_PLAYER_CAP=5000;
+function ensurePlayerCapacity(p){
+  if(!p)return DEFAULT_PLAYER_CAP;
+  const n=Math.floor(Number(p.cap));
+  if(!Number.isFinite(n)||n<=0)p.cap=DEFAULT_PLAYER_CAP;
+  else p.cap=n;
+  return p.cap;
+}
 function itemUnitWeight(slug){
   const it=ITEMS[slug];
   const w=Number(it&&(it.w!==undefined?it.w:it.weight));
@@ -792,6 +808,7 @@ function containerWeight(map){
   }
   return w;
 }
+/* Equip + bag + loot pouch + supply stash. Supplies/ammo são contadores idle. */
 function carriedWeight(p){
   if(!p)return 0;
   let w=0;
@@ -800,8 +817,6 @@ function carriedWeight(p){
   }
   w+=containerWeight(p.bag);
   w+=containerWeight(p.lootPouch);
-  w+=containerWeight(p.supplies);
-  w+=containerWeight(p.ammo);
   w+=containerWeight(p.supplyStash);
   return w;
 }
@@ -2428,12 +2443,12 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
   const attackerSlug=mob&&mob.slug||null;
   const dodge=charmTotals(p,attackerSlug).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0);
   if(dodge>0&&random(auth)*100<dodge){
-    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,ts:now});
+    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,fx:"poff",ts:now});
     return 0;
   }
   const dazzle=p&&p.buffs&&Number(p.buffs["exana-amp-res"])>now?0.35:0;
   if(dazzle&&random(auth)<dazzle){
-    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dazzle",targetId:String(item.id),screen:true,ts:now});
+    auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dazzle",targetId:String(item.id),screen:true,fx:"poff",ts:now});
     return 0;
   }
   if(dmg>0)consumeAccessoryHitCharge(auth,p,now);
@@ -2677,9 +2692,9 @@ function tickEntityConditions(auth,alvo,kind,item){
     if(co.turns<=0)delete alvo.conditions[tipo];
   }
   if(kind==="player"&&item&&alvo.hp<=0){
-    alvo.hp=0;alvo.blessed=false;item.downUntil=now+30000;
-    recordAuthSessionDeath(auth,item);
-    auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),screen:true,ts:now});
+    authMarkPlayerDeath(auth,item,now);
+    auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
+      permadead:!!item.permadead,screen:true,ts:now});
   }
 }
 function tickPlayerConditions(auth,p,item){
@@ -2879,9 +2894,9 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     auth.events.push({t:"taken",dmg:dmg,x:pos.x,y:pos.y,targetId:String(item.id),
       sx:source.x,sy:source.y,sourceId:String(mob.id),el:el,screen:true,fx:sk.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,
       projectile:!!sk.miss,missile:sk.miss||null,ts:stepTs+mobHitIdx*200});
-    if(item.p.hp<=0){item.p.hp=0;item.p.blessed=false;item.downUntil=now+30000;
-      recordAuthSessionDeath(auth,item);
-      auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),screen:true,ts:stepTs+mobHitIdx*200});}
+    if(item.p.hp<=0){authMarkPlayerDeath(auth,item,now);
+      auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
+        permadead:!!item.permadead,screen:true,ts:stepTs+mobHitIdx*200});}
   };
   for(let i=0;i<defS.length;i++){
     const sk=defS[i],key="d"+i;
@@ -2999,14 +3014,14 @@ function playerCombatProxy(item){
       item.p.hp=next;
       if(proxy._auth&&next<prev)proxy._auth.lastDamageSource="player-raid";
       if(next<=0&&prev>0){
-        item.p.blessed=false;
         const at=Number(proxy._auth&&proxy._auth.clock)||Number(item._pvpDeathAt)||Date.now();
-        item.downUntil=at+30000;
+        if(proxy._auth)authMarkPlayerDeath(proxy._auth,item,at);
+        else{item.p.blessed=false;item.downUntil=at+30000;}
         if(proxy._auth){
-          recordAuthSessionDeath(proxy._auth,item);
           const pos=entityPosition(item,.13,.6);
           proxy._auth.events=proxy._auth.events||[];
-          proxy._auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),screen:true,pvp:true,ts:at});
+          proxy._auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
+            permadead:!!item.permadead,screen:true,pvp:true,ts:at});
         }
       }
     },
@@ -3041,9 +3056,9 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
   auth.events=auth.events||[];
   auth.events.push({t:"taken",dmg,x:pos.x,y:pos.y,targetId:String(victim.id),
     sx:source.x,sy:source.y,sourceId:String(attacker.id),el:element,screen:true,pvp:true,ts:now});
-  if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
-    recordAuthSessionDeath(auth,victim);
-    auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(victim.id),screen:true,pvp:true,ts:now});}
+  if(victim.p.hp<=0){authMarkPlayerDeath(auth,victim,now);
+    auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(victim.id),
+      permadead:!!victim.permadead,screen:true,pvp:true,ts:now});}
   return dmg;
 }
 function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String(member.id);syncPlayerProgress(p);
@@ -3238,9 +3253,10 @@ function isSupplyStashableItem(slug){
   return !!(it.charges&&(it.s==="ring"||it.s==="amulet"||it.slot==="ring"||it.slot==="necklace"));
 }
 function ensureSupplyStash(p){
-  if(!p.supplyStash||typeof p.supplyStash!=="object")p.supplyStash={};
+  if(!p.supplyStash||typeof p.supplyStash!=="object"||Array.isArray(p.supplyStash))p.supplyStash={};
   if(!p.config)p.config={};
-  if(!p.config.autoSupplyStash||typeof p.config.autoSupplyStash!=="object")p.config.autoSupplyStash={};
+  if(!p.config.autoSupplyStash||typeof p.config.autoSupplyStash!=="object"||Array.isArray(p.config.autoSupplyStash))
+    p.config.autoSupplyStash={};
   return p.supplyStash;
 }
 function isAutoSupplyStash(p,slug){
@@ -3253,15 +3269,42 @@ function supplyStashSlotsUsed(p){
   let n=0;for(const slug of Object.keys(p.supplyStash))if((p.supplyStash[slug]||0)>0)n++;
   return n;
 }
-function addSupplyStash(p,slug,count){
+function addSupplyStash(p,slug,count,opts){
   if(!p||!slug||!isSupplyStashableItem(slug))return false;
   count=Math.max(1,Math.floor(Number(count)||1));
+  const allowOverflow=!(opts&&opts.allowPouchOverflow===false);
   ensureSupplyStash(p);
   const had=(p.supplyStash[slug]||0)>0;
   if(!had&&supplyStashSlotsUsed(p)>=SUPPLY_STASH_MAX_SLOTS){
+    if(!allowOverflow)return false;
     p.lootPouch=p.lootPouch||{};p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+count;return true;
   }
   p.supplyStash[slug]=(Number(p.supplyStash[slug])||0)+count;return true;
+}
+/** Move bag/pouch → supply stash (autoritativo). Remove da origem antes de adicionar. */
+function moveItemToSupplyStash(p,payload){
+  if(!p||!payload||!payload.slug)return false;
+  const slug=String(payload.slug),source=String(payload.source||"");
+  if(!isSupplyStashableItem(slug))return false;
+  const addOpts={allowPouchOverflow:false};
+  if(source==="bag"){
+    const count=Math.max(0,Math.floor(Number(p.bag&&p.bag[slug])||0));
+    if(count<=0)return false;
+    p.bag=p.bag||{};delete p.bag[slug];
+    if(!addSupplyStash(p,slug,count,addOpts)){p.bag[slug]=(Number(p.bag[slug])||0)+count;return false;}
+    return true;
+  }
+  if(source==="pouch"){
+    const count=Math.max(0,Math.floor(Number(p.lootPouch&&p.lootPouch[slug])||0));
+    if(count<=0)return false;
+    p.lootPouch=p.lootPouch||{};
+    p.lootPouch[slug]-=count;if(p.lootPouch[slug]<=0)delete p.lootPouch[slug];
+    if(!addSupplyStash(p,slug,count,addOpts)){
+      p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+count;return false;
+    }
+    return true;
+  }
+  return false;
 }
 function creditHuntLoot(p,slug,count){
   if(!p||!slug)return {ok:false,discarded:true};
@@ -3359,6 +3402,7 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
   auth._lastKillExp=shares[0]?shares[0].exp:0;auth._lastKillShares=shares;
+  // Loot: UM crédito por kill no líder (players[0]). Nunca por membro da party.
   const leader=players[0]&&players[0].p;if(!leader)return [];
   const lootDrops=[];
   // Rate idle global (mesmo SERVER_LOOT_RATE=2.5 do cliente). NÃO é o 2.5×
@@ -3570,12 +3614,116 @@ function tickHatred(auth,now){
   }
   fillHatred(auth);
 }
+function authIsBossFight(auth){
+  return !!(auth&&(auth.kind==="boss"||auth.bossId));
+}
+/* Marca morte autoritativa: hunt = revive 30s; boss = permadead (sem revive). */
+function authMarkPlayerDeath(auth,item,now,opts){
+  opts=opts||{};
+  if(!item||!item.p)return false;
+  const ts=Number(now)||Number(auth&&auth.clock)||Date.now();
+  const wasDown=item.p.hp<=0&&(item.permadead||item.downUntil);
+  item.p.hp=0;item.p.blessed=false;
+  if(authIsBossFight(auth)||opts.permadead){
+    item.permadead=true;
+    item.downUntil=ts+365*86400000;
+  }else{
+    item.downUntil=ts+30000;
+  }
+  if(!item.downedAt)item.downedAt=ts;
+  if(!item.deathPos)item.deathPos={x:item.x,y:item.y,dir:item.dir||"e"};
+  if(!wasDown)recordAuthSessionDeath(auth,item);
+  return true;
+}
+const SCARLETT_KEYS=["up","down","left","right"];
+/* Timing alinhado ao cliente (scarlett-boss.js): lead, gap, janela ±ms e
+ * folga online (~1 tick AUTH_STEP + RTT) para o press não perder por latência. */
+const SCARLETT_LEAD_MS=1400,SCARLETT_NOTE_GAP=760,SCARLETT_TIMING_WINDOW=360,SCARLETT_ONLINE_SLACK=180;
+function scarlettBuildSequence(auth){
+  return Array.from({length:5},()=>SCARLETT_KEYS[Math.min(3,Math.floor(random(auth)*4))]);
+}
+function scarlettAlivePlayers(auth){
+  return (auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil&&!item.permadead);
+}
+function scarlettPermanentKill(auth,item,now,reason){
+  if(!item||!item.p||item.permadead||item.p.hp<=0)return false;
+  authMarkPlayerDeath(auth,item,now,{permadead:true});
+  auth.events=auth.events||[];
+  auth.events.push({t:"death",whoId:String(item.id),name:item.p.name||"Player",
+    reason:reason||"scarlett-qte",permadead:true,screen:true,ts:now||auth.clock});
+  return true;
+}
+function scarlettKillLowestMaxHp(auth,now){
+  const alive=scarlettAlivePlayers(auth);
+  if(!alive.length)return null;
+  const hpMax=(e)=>maxStats(e.p).hp;
+  const min=Math.min(...alive.map(hpMax));
+  const priority=alive.filter((e)=>hpMax(e)===min);
+  const victim=priority[Math.min(priority.length-1,Math.floor(random(auth)*priority.length))];
+  scarlettPermanentKill(auth,victim,now,"sequência incorreta");
+  return victim;
+}
+function scarlettStartQte(auth,now){
+  const st=auth.scarlett;if(!st)return;
+  const sequence=scarlettBuildSequence(auth);
+  st.phase="qte";st.immune=true;st.sequence=sequence;st.index=0;
+  st.notes=sequence.map((dir,i)=>({dir,due:now+SCARLETT_LEAD_MS+i*SCARLETT_NOTE_GAP,hit:false}));
+  st.noteDues=st.notes.map((n)=>n.due);
+  st.qteStartedAt=now;
+  const last=st.notes[st.notes.length-1];
+  st.qteUntil=(last?last.due:now)+SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK+200;
+  delete st.pendingIntent;
+}
+function scarlettQteSuccess(auth,now){
+  const st=auth.scarlett;if(!st)return;
+  st.phase="vulnerable";st.immune=false;st.sequence=[];st.notes=[];st.noteDues=[];st.index=0;
+  delete st.pendingIntent;delete st.qteUntil;
+  auth.events=auth.events||[];
+  auth.events.push({t:"scarlett-qte",result:"success",screen:true,ts:now||auth.clock});
+}
+function scarlettQteFail(auth,now){
+  const st=auth.scarlett;if(!st||st.phase!=="qte")return;
+  st.phase="waiting";st.immune=true;st.nextAt=(Number(now)||auth.clock)+3500;
+  st.sequence=[];st.notes=[];st.noteDues=[];st.index=0;
+  delete st.pendingIntent;delete st.qteUntil;
+  const victim=scarlettKillLowestMaxHp(auth,now);
+  auth.events=auth.events||[];
+  auth.events.push({t:"scarlett-qte",result:"fail",victimId:victim?String(victim.id):null,
+    screen:true,ts:now||auth.clock});
+  if(!scarlettAlivePlayers(auth).length)fullWipe(auth);
+}
+function scarlettAcceptIntent(auth,now){
+  const st=auth.scarlett;if(!st||st.phase!=="qte"||!st.pendingIntent)return;
+  const intent=st.pendingIntent;
+  const dir=String(intent.dir||"");
+  const note=st.notes&&st.notes[st.index];
+  if(!note||SCARLETT_KEYS.indexOf(dir)<0){delete st.pendingIntent;scarlettQteFail(auth,now);return;}
+  const window=SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK;
+  const delta=(Number(now)||0)-note.due;
+  // Ainda cedo neste step do batch: mantém o intent até a janela abrir.
+  if(delta<-window)return;
+  delete st.pendingIntent;
+  if(dir!==note.dir||delta>window){scarlettQteFail(auth,now);return;}
+  note.hit=true;st.index=(Number(st.index)||0)+1;
+  if(st.index>=st.notes.length)scarlettQteSuccess(auth,now);
+}
 function tickScarlett(auth,now){
   if(!auth.scarlett)return;
   const st=auth.scarlett,boss=(auth.mobs||[]).find((m)=>m.boss);
   if(!boss||boss.hp<=0){auth.scarlett=null;return;}
-  if(st.phase==="waiting"&&now>=st.nextAt){st.phase="qte";st.immune=true;st.qteUntil=now+5500;}
-  if(st.phase==="qte"&&now>=(Number(st.qteUntil)||0)){st.phase="vulnerable";st.immune=false;}
+  // Revive automático não ressuscita mortos da dança nesta luta.
+  for(const item of auth.players||[]){
+    if(item&&item.permadead){item.p.hp=0;item.downUntil=Math.max(Number(item.downUntil)||0,now+1000);}
+  }
+  if(st.phase==="waiting"&&now>=st.nextAt)scarlettStartQte(auth,now);
+  if(st.phase==="qte"){
+    scarlettAcceptIntent(auth,now);
+    if(st.phase==="qte"){
+      const note=st.notes&&st.notes[st.index];
+      if(note&&now>note.due+SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK)
+        scarlettQteFail(auth,now);
+    }
+  }
   if(st.phase==="vulnerable"&&st.thresholdIndex<st.thresholds.length){
     const gate=st.thresholds[st.thresholdIndex];
     if(boss.hp/boss.maxHp<=gate){
@@ -3646,8 +3794,9 @@ function spawnHuntWave(auth,now,opts){
   }
 }
 const AUTH_SPAWN_BLINK_MS=1000,AUTH_SPAWN_BLINKS=3;
-/* Espera após limpar a onda antes de pendingSpawns / blink da próxima wave. */
-const AUTH_WAVE_CLEAR_RESPAWN_MS=6000;
+/* Tempo até o monstro nascer após limpar a onda. Blink começa em T-3s. */
+const AUTH_WAVE_CLEAR_RESPAWN_MS=5000;
+const AUTH_WAVE_TELEPORT_LEAD_MS=AUTH_SPAWN_BLINKS*AUTH_SPAWN_BLINK_MS;
 function tickAuthSpawnQueue(auth,now){
   if(!auth||!Array.isArray(auth.pendingSpawns)||!auth.pendingSpawns.length)return;
   now=Number(now)||auth.clock;
@@ -3673,7 +3822,19 @@ function tickAuthSpawnQueue(auth,now){
   auth.pendingSpawns=auth.pendingSpawns.filter((sp)=>!sp.done);
 }
 function respawn(auth,now){spawnHuntWave(auth,now,{force:true,keepPack:true});}
-function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players)applyPvpLoss(item.p,auth.lastDamageSource||"monster");
+function fullWipe(auth){
+  // Boss: wipe = falha da tentativa. Sem bless/retorno à sala — encerra instância.
+  if(authIsBossFight(auth)){
+    for(const item of auth.players||[]){
+      if(!item||!item.p)continue;
+      if(item.p.hp<=0||item.downUntil||item.permadead){
+        item.permadead=true;item.p.hp=0;
+        item.downUntil=Math.max(Number(item.downUntil)||0,(Number(auth.clock)||Date.now())+365*86400000);
+      }
+    }
+    auth.ended=true;auth.terminalReason="party-wipe";return;
+  }
+  const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players)applyPvpLoss(item.p,auth.lastDamageSource||"monster");
   const byPlayer={};let cost=0;
   for(const item of auth.players||[]){
     if(!item||!item.p)continue;
@@ -3685,7 +3846,7 @@ function fullWipe(auth){const pvp=auth.instanceMode==="pvp";if(pvp)for(const ite
   const leader=auth.players[0]&&auth.players[0].p;
   if(leader&&leader.gold>=cost){
     leader.gold-=cost;
-    for(const item of auth.players){const max=maxStats(item.p);item.p.hp=max.hp;item.p.mp=max.mp;item.p.blessed=true;item.downUntil=0;}
+    for(const item of auth.players){const max=maxStats(item.p);item.p.hp=max.hp;item.p.mp=max.mp;item.p.blessed=true;item.downUntil=0;item.permadead=false;}
     recordAuthSessionBless(auth,byPlayer);
     auth.events.push({t:"bless",gold:cost,byPlayer:Object.assign({},byPlayer),screen:true,ts:auth.clock});
     auth.wipes++;auth.mobs=[];spawnHuntWave(auth,auth.clock,{force:true});return;}
@@ -4157,6 +4318,8 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
   }
   lo=Math.max(0,lo);hi=Math.max(lo,hi);
   const source=playerPosition(auth,p);
+  /* Crit/Fatal da runa: um roll por uso — em área (GFB/avalanche…) vale
+   * para todos os alvos desta explosão. */
   const rolled=rollPlayerCrit(auth,p);
   const isCrit=!!rolled.crit;
   const isFatal=forgeRollOnslaught(auth,p);
@@ -4196,7 +4359,14 @@ function step(auth,now,opts){if(auth.ended)return;
   tickDelayedHits(auth,now);
   for(const item of auth.players){
     const p=item.p;p.stamina=FULL_STAMINA;
-    if(item.downUntil&&now>=item.downUntil){const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;p.conditions={};}
+    if(item.downUntil&&now>=item.downUntil){
+      if(item.permadead||authIsBossFight(auth)){
+        item.permadead=true;p.hp=0;
+        item.downUntil=now+365*86400000;
+      }else{
+        const max=maxStats(p);p.hp=max.hp;p.mp=max.mp;item.downUntil=0;p.conditions={};
+      }
+    }
     if(p.hp>0&&!item.downUntil)usePotion(auth,p);
     tickPlayerConditions(auth,p,item);
   }
@@ -4247,13 +4417,13 @@ function step(auth,now,opts){if(auth.ended)return;
             let el=monkSpellElement(p,s,originalEl);el=stanceConvert(p,el);
             const kind=monkSpellKind(s.id);let monkMult=1;
             if(kind==="spender")monkMult=harmonyBonus(p);
-            let dmg=boostSpellDamage(p,s,Math.max(1,Math.floor(rollSpell(auth,p,s)*monkMult)));
             const stOut=stanceTotals(p);
-            if(stOut.dmgDealt!==1)dmg=Math.max(1,Math.floor(dmg*stOut.dmgDealt));
             const elPct=stOut.elemPct[el]||0;
-            if(elPct)dmg=Math.max(1,Math.floor(dmg*(1+elPct/100)));
             const forgeMult=forgeDamageMult(p,now);
             const guaranteedCrit=forgeGuaranteedCrit(p,now);
+            /* Crit/Fatal: UM roll por cast/swing. Em AoE (wave, caldera,
+             * exori gran, chain…), se proc, o bônus e o FX valem para
+             * TODOS os alvos desta conjuração — não re-rola por monstro. */
             const stanceExtra=stanceCritExtra(auth,p,el);
             const rolled=rollPlayerCrit(auth,p,s.id);
             let extraPct=stanceExtra,isCrit=!!(guaranteedCrit||stanceExtra||rolled.crit);
@@ -4281,6 +4451,9 @@ function step(auth,now,opts){if(auth.ended)return;
                 }
                 continue;
               }
+              let dmg=boostSpellDamage(p,s,Math.max(1,Math.floor(rollSpell(auth,p,s)*monkMult)));
+              if(stOut.dmgDealt!==1)dmg=Math.max(1,Math.floor(dmg*stOut.dmgDealt));
+              if(elPct)dmg=Math.max(1,Math.floor(dmg*(1+elPct/100)));
               let finalDmg=Math.floor(dmg*forgeMult);
               if(extraPct)finalDmg=Math.floor(finalDmg*(1+extraPct/100));
               const armaEl=spellWeaponElement(p,s);
@@ -4297,7 +4470,7 @@ function step(auth,now,opts){if(auth.ended)return;
                 const eleFinal=applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now);
                 const dealt=fisFinal+eleFinal;tgt.hp-=dealt;afterPlayerHit(auth,p,tgt,dealt,now);
                 auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
-                if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:armaEl.el,fx:ELEMENT_FX[armaEl.el]||fx,dual:1,projectile:false,missile:null},hitBase));
+                if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:armaEl.el,fx:ELEMENT_FX[armaEl.el]||fx,dual:1,projectile:false,missile:null},hitBase,{crit:false,fatal:false}));
                 if(echoFrac&&dealt>0){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(dealt*echoFrac)),el,fx,whoId:item.id});}
               }else{
                 finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now);
@@ -4377,7 +4550,7 @@ function step(auth,now,opts){if(auth.ended)return;
         const ammoShot=consumeDistanceAmmo(auth,p);
         if(!ammoShot.ok){
           const missPos=entityPosition(primaryTarget,.5,.5);
-          auth.events.push({t:"miss",x:missPos.x,y:missPos.y,reason:"ammo",whoId:String(item.id),screen:true,ts:visualTs});
+          auth.events.push({t:"miss",x:missPos.x,y:missPos.y,reason:"ammo",whoId:String(item.id),screen:true,fx:"poff",ts:visualTs});
           hitIdx++;continue;
         }
         const stOut=stanceTotals(p);
@@ -4393,6 +4566,8 @@ function step(auth,now,opts){if(auth.ended)return;
         if(ammoShot.ranged&&!perfect&&!distanceHitChance(auth,p,ammoIt,sqm,ITEMS[p.equip&&p.equip.weapon&&p.equip.weapon.item]))landed=false;
         const forgeMult=forgeDamageMult(p,now);
         const guaranteedCrit=forgeGuaranteedCrit(p,now);
+        /* Crit/Fatal do auto-attack: um roll por swing. Municao AoE
+         * (diamond/burst) herda o mesmo proc em todos os alvos da matriz. */
         const rolled=rollPlayerCrit(auth,p);
         const isCrit=guaranteedCrit||rolled.crit;
         const isFatal=forgeRollOnslaught(auth,p);
@@ -4411,7 +4586,7 @@ function step(auth,now,opts){if(auth.ended)return;
           mobSlug:primaryTarget.slug,whoId:String(item.id),sx:source.x,sy:source.y,ts:visualTs};
         const areaMobs=ammoIt&&ammoIt.areaMatrix?ammoMatrixTargets(auth,ammoIt.areaMatrix,primaryTarget,living):[];
         if(!landed&&!areaMobs.length){
-          auth.events.push({t:"miss",x:target.x,y:target.y,whoId:String(item.id),screen:true,ts:visualTs});
+          auth.events.push({t:"miss",x:target.x,y:target.y,whoId:String(item.id),screen:true,fx:"poff",ts:visualTs});
         }else{
           const strike=(tgt,splash)=>{
             if(!tgt||tgt.hp<=0||tgt.greedImmune||tgt.qteImmune)return;
@@ -4426,7 +4601,7 @@ function step(auth,now,opts){if(auth.ended)return;
               if(fisFinal>0)auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el:"physical",fx:physicalHitFx(tgt.def&&tgt.def.race),
                 projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));
               if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:convEl,fx:ELEMENT_FX[convEl]||ELEMENT_FX.physical,
-                dual:1,projectile:false,missile:null},base));
+                dual:1,projectile:false,missile:null},base,{crit:false,fatal:false}));
             }else{
               raw=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
               if(raw>0){tgt.hp-=raw;afterPlayerHit(auth,p,tgt,raw,now);
@@ -4445,7 +4620,7 @@ function step(auth,now,opts){if(auth.ended)return;
                 perfect:1,projectile:false},hitBase,{x:tpos.x,y:tpos.y}));
             }
           }
-          else auth.events.push({t:"miss",x:target.x,y:target.y,whoId:String(item.id),screen:true,ts:visualTs});
+          else auth.events.push({t:"miss",x:target.x,y:target.y,whoId:String(item.id),screen:true,fx:"poff",ts:visualTs});
           for(const extra of areaMobs)if(extra!==primaryTarget||!landed)strike(extra,extra!==primaryTarget);
           if(ammoIt&&ammoIt.areaMatrix){
             const cells=ammoMatrixCells(auth,ammoIt.areaMatrix,primaryTarget);
@@ -4509,23 +4684,35 @@ function step(auth,now,opts){if(auth.ended)return;
         const rangedSqm=Math.max(Math.abs(from.cx-to.cx),Math.abs(from.cy-to.cy));
         if(dodge&&rangedSqm>1&&random(auth)<dodge){
           const missPos=entityPosition(victim,.13,.6);
-          auth.events.push({t:"miss",x:missPos.x,y:missPos.y,targetId:String(victim.id),dodge:true,screen:true,ts:mobVisualTs});
+          auth.events.push({t:"miss",x:missPos.x,y:missPos.y,targetId:String(victim.id),dodge:true,screen:true,fx:"poff",ts:mobVisualTs});
         }else{
         let damage=mobDamage(auth,mob,victim.p);
         if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);
         const target=entityPosition(victim,.13,.6),source=entityPosition(mob,.5,.5);
         const el=mob.def&&mob.def.element||"physical";
         const ranged=(Number(mob.def&&mob.def.targetDistance)||1)>1;
+        const evBefore=auth.events.length;
         damage=absorbIncomingDamage(auth,victim,victim.p,damage,now,target,el,mob);
+        if(damage<=0){
+          // dodge/dazzle ja emitiu miss; mitigacao total → block (nao taken 0).
+          const alreadyMiss=auth.events.slice(evBefore).some((ev)=>ev&&ev.t==="miss");
+          if(!alreadyMiss){
+            auth.events.push({t:"block",x:target.x,y:target.y,targetId:String(victim.id),
+              sx:source.x,sy:source.y,sourceId:String(mob.id),fx:"block-hit",
+              projectile:ranged,missile:ranged?(ELEMENT_MISSILE[el]||"small-stone"):null,
+              screen:true,ts:mobVisualTs});
+          }
+        }else{
         victim.p.hp-=damage;
         auth.events.push({t:"taken",dmg:damage,x:target.x,y:target.y,targetId:String(victim.id),
           sx:source.x,sy:source.y,sourceId:String(mob.id),el,fx:ELEMENT_FX[el]||ELEMENT_FX.physical,
           projectile:ranged,missile:ranged?(ELEMENT_MISSILE[el]||"small-stone"):null,
           screen:true,ts:mobVisualTs});
         applyMonsterMeleeCondition(auth,victim,victim.p,mob);
-        if(victim.p.hp<=0){victim.p.hp=0;victim.p.blessed=false;victim.downUntil=now+30000;
-          recordAuthSessionDeath(auth,victim);
-          auth.events.push({t:"death",x:target.x,y:target.y,targetId:String(victim.id),screen:true,ts:mobVisualTs});
+        if(victim.p.hp<=0){authMarkPlayerDeath(auth,victim,now);
+          auth.events.push({t:"death",x:target.x,y:target.y,targetId:String(victim.id),
+            permadead:!!victim.permadead,screen:true,ts:mobVisualTs});
+        }
         }
         }
         }
@@ -4537,15 +4724,18 @@ function step(auth,now,opts){if(auth.ended)return;
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
   if(!auth.ended)for(const mob of auth.mobs||[])if(mob.hp>0)monsterThinkYell(auth,mob,now);
   if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual)});
-  // Wave clear: adia spawnHuntWave em AUTH_WAVE_CLEAR_RESPAWN_MS (6s) antes
-  // do blink/respawn. Também separa kill e makeMob×pack em respostas distintas
-  // e evita o custo no step do último kill (catchup incluso).
+  // Wave clear: agenda AUTH_WAVE_CLEAR_RESPAWN_MS (5s) até o monstro nascer.
+  // Em T-3s (AUTH_WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns / blink.
+  // Também separa kill e makeMob×pack em respostas distintas e evita o custo
+  // no step do último kill (catchup incluso).
   if(!auth.ended&&auth.kind==="hunt"){
     const empty=!auth.mobs.length&&!(auth.pendingSpawns&&auth.pendingSpawns.length);
     if(empty){
       if(dead.length)auth._nextWaveAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
       else if(auth._nextWaveAt){
-        if(stepTs>=auth._nextWaveAt){auth._nextWaveAt=0;spawnHuntWave(auth,stepTs);}
+        if(stepTs>=auth._nextWaveAt-AUTH_WAVE_TELEPORT_LEAD_MS){
+          auth._nextWaveAt=0;spawnHuntWave(auth,stepTs);
+        }
       }else spawnHuntWave(auth,stepTs);
     }else auth._nextWaveAt=0;
   }
@@ -4638,7 +4828,12 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
   descriptor.state.players=auth.players.map((item)=>stripStaleVisualStep(Object.assign({},
     oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},entityVisual(item),
-    {id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp,reviveAt:item.downUntil||0})));
+    {id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp,
+      reviveAt:item.permadead?0:(item.downUntil||0),
+      permadead:!!item.permadead,
+      downedAt:item.downedAt||0,
+      deathPos:item.deathPos||((item.p.hp<=0||item.downUntil||item.permadead)
+        ?{x:item.x,y:item.y,dir:item.dir||"e"}:null)})));
   const oldMobs=Array.isArray(descriptor.state.mobs)?descriptor.state.mobs:[];
   descriptor.state.mobs=auth.mobs.map((m)=>{
     const prev=oldMobs.find((x)=>String(x.id)===String(m.id));
@@ -4669,8 +4864,14 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     nextCounterAt:Number(auth.hatred.nextCounterAt)||0}:null;
   descriptor.state.scarlett=auth.scarlett?{immune:!!auth.scarlett.immune,phase:auth.scarlett.phase||"waiting",
     nextAt:Number(auth.scarlett.nextAt)||0,qteUntil:Number(auth.scarlett.qteUntil)||0,
-    thresholdIndex:Number(auth.scarlett.thresholdIndex)||0,thresholds:auth.scarlett.thresholds||[0.75,0.50,0.25]}:null;
-  descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe";
+    qteStartedAt:Number(auth.scarlett.qteStartedAt)||0,
+    thresholdIndex:Number(auth.scarlett.thresholdIndex)||0,thresholds:auth.scarlett.thresholds||[0.75,0.50,0.25],
+    sequence:Array.isArray(auth.scarlett.sequence)?auth.scarlett.sequence.slice():[],
+    noteDues:Array.isArray(auth.scarlett.noteDues)?auth.scarlett.noteDues.map(Number):[],
+    index:Number(auth.scarlett.index)||0}:null;
+  descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;
+  // Hunt wipe mostra corpse+contador; boss wipe só corpses permadead (sem timer).
+  descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe"&&!authIsBossFight(auth);
   // Grid dimensions: o renderer usa combat.gridW/gridH para calcular o
   // viewport e converter posições normalizadas (0-1) em pixels. Sem isso,
   // o renderer cai no fallback GRID_W=21 e os floaters saem na posição
@@ -4695,7 +4896,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   const MAX_AUTH_EVENTS=120;
   let events=Array.isArray(auth.events)?auth.events:[];
   if(events.length>MAX_AUTH_EVENTS){
-    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","buff","cured","break"]);
+    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","buff","cured","break","miss","block","effect"]);
     events=events.filter((e)=>keep.has(e&&e.t)).concat(events.filter((e)=>!keep.has(e&&e.t))).slice(0,MAX_AUTH_EVENTS);
   }
   descriptor.state.events=events;
@@ -4768,8 +4969,9 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,ammoMatrixCells,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
   rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
+  ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   CURRENCY_GOLD,
-  shareAccountGoldWallets,sellAuthAllPouch,tryAuthAutoSell,
+  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,tryAuthAutoSell,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,
   playerCritChancePct,playerCritExtraPct,rollPlayerCrit,imbCombatTotals,charmTotals,applyCharmDamage,
   tryCharmOffensive,buyCharm,assignCharm,clearCharm,afterPlayerHit,
@@ -4780,7 +4982,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   huntModeOf,boxTargetCell,safeTargetCell,playerAttackRangeSQM,
   wandMissileOf,physicalHitFx,basicHitFx,WAND_SHOOT,
   tickAccessoryCharges,tryAccessoryHelper,consumeAccessoryHitCharge,energyRingOn,
-  isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,creditHuntLoot,
+  isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,moveItemToSupplyStash,creditHuntLoot,
   nextComboSpell,playerSpellList,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
   authorityMobTarget,authorityMobHasFollowPath,authorityFindPathStep,authorityCellBlocked,
   densestPackTarget,mobClusterDensity,packOpportunity,spellIsMultiHit,runeIsMultiHit,

@@ -8,3 +8,5 @@ output/
 tibia-idle/server/data/
 tibia-idle/server/.env
 tibia-idle/server/my.cnf
+tibia-idle/dist/
+tibia-idle/.env

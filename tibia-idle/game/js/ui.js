@@ -465,18 +465,30 @@ const SLOT_LABELS = {
  *   colar | helmet | bag
  *   arma  | armor  | shield
  *   ring  | legs   | extra slot
- *         | boots  | ammo */
+ *   CAP   | boots  | ammo */
 const SLOT_ORDER = [
   "amulet", "helmet", "backpack",
   "weapon", "armor", "shield",
   "ring", "legs", "extra",
-  null, "boots", "ammo",
+  "cap", "boots", "ammo",
 ];
 
 function renderEquip(p) {
+  if (typeof ensurePlayerCapacity === "function") ensurePlayerCapacity(p);
   let h = "";
   for (const slot of SLOT_ORDER) {
     if (!slot) { h += `<div></div>`; continue; }
+    if (slot === "cap") {
+      const max = typeof maxStats === "function" ? maxStats(p).cap : (p.cap || 5000);
+      const free = typeof freeCapacity === "function" ? freeCapacity(p) : max;
+      const label = (typeof t === "function" && t("equip.cap")) || "CAP";
+      const full = free <= 0;
+      h += `<div class="slot cap-slot${full ? " cap-full" : ""}" data-slot="cap" title="${label}: ${fmt(free)} / ${fmt(max)}">
+        <span class="cap-label">${label}:</span>
+        <span class="cap-value">${fmt(free)}</span>
+      </div>`;
+      continue;
+    }
     const e = p.equip[slot];
     if (e) {
       const cnt = slot === "ammo" ? "∞" : e.count;
@@ -508,6 +520,7 @@ function renderEquip(p) {
 
   $$("#equip .slot").forEach((el) => {
     const slotDrop = el.dataset.slot;
+    if (slotDrop === "cap") return;
     if (typeof bindDrop === "function") {
       bindDrop(el, (payload) => typeof moveItemToEquip === "function" && moveItemToEquip(G.p, payload, slotDrop));
     }
@@ -809,7 +822,10 @@ function renderHunts(p) {
 function openHuntsModal() {
   if (!G.p) return;
   const modal = $("#modal"), body = $("#modal-body");
-  body.classList.remove("boss-modal-shell", "reward-modal-shell");
+  body.classList.remove(
+    "boss-modal-shell", "reward-modal-shell",
+    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
+  );
   body.classList.add("hunts-modal-shell");
   body.innerHTML = `<div class="panel-title hunts-modal-title">
       <span class="hunts-demon-icon" aria-hidden="true"></span>
@@ -1180,9 +1196,14 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
     opts.push({
       label: "Mover para Supply Stash",
       action: () => {
+        if (typeof persistMoveToSupplyStash === "function") {
+          persistMoveToSupplyStash(p, { source: "bag", slug: slug });
+          return;
+        }
         if (typeof moveItemToSupplyStash === "function" &&
             moveItemToSupplyStash(p, { source: "bag", slug: slug })) {
           addLog("info", `Moveu <b>${it.n}</b> para a Supply Stash.`);
+          if (typeof save === "function") save();
           refresh();
           if (typeof renderSupplyStash === "function") renderSupplyStash(p);
         }
@@ -1343,6 +1364,78 @@ function sellPouchItem(p, slug) {
   return value;
 }
 
+/* Persiste venda da pouch: online em combate usa patch autoritativo (senão o
+ * tick restaura o lootPouch antigo). Offline/cidade grava o save local. */
+function persistLootPouchSell(p, options) {
+  const opts = options || {};
+  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  if (onlineCombat && typeof accountSellInstanceLootPouch === "function" &&
+      typeof sessionToken === "function" && p && p.id) {
+    return accountSellInstanceLootPouch(sessionToken(), p.id, opts.slug || null).then((result) => {
+      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function")
+        applyOnlineAuthorityState(result.state, null, result.version);
+      else if (!result || !result.ok)
+        toast((result && result.msg) || "Não foi possível vender a Loot Pouch online.", "bad");
+      if (typeof renderAll === "function") renderAll();
+      else if (typeof renderLootPouch === "function") renderLootPouch(p);
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível vender a Loot Pouch online.", "bad");
+      return { ok: false };
+    });
+  }
+  if (typeof save === "function") save();
+  return Promise.resolve({ ok: true, local: true, gold: opts.gold || 0 });
+}
+
+/* Move pouch/bag → Supply Stash com persistência (igual pouch-sell/clear).
+ * Conta online: API autoritativa (PUT comum ignora lootPouch/supplyStash).
+ * Offline/localStorage: move local + save. */
+function persistMoveToSupplyStash(p, payload) {
+  const opts = payload || {};
+  const slug = opts.slug;
+  const source = opts.source || "pouch";
+  if (!p || !slug) return Promise.resolve({ ok: false });
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountMoveToSupplyStash === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountMoveToSupplyStash(sessionToken(), p.id, { slug, source }).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.lootPouch || result.supplyStash) {
+          p.lootPouch = result.lootPouch || {};
+          p.supplyStash = result.supplyStash || {};
+        } else if (typeof moveItemToSupplyStash === "function") {
+          // Resposta sem snapshot: aplica localmente (já refletido no servidor).
+          moveItemToSupplyStash(p, { source, slug });
+        }
+        if (typeof addLog === "function")
+          addLog("info", `Moveu <b>${typeof itemName === "function" ? itemName(slug) : slug}</b> para a Supply Stash.`);
+      } else {
+        toast((result && result.msg) || "Não foi possível mover para a Supply Stash.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      else {
+        if (typeof renderLootPouch === "function") renderLootPouch(p);
+        if (typeof renderSupplyStash === "function") renderSupplyStash(p);
+      }
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível mover para a Supply Stash.", "bad");
+      return { ok: false };
+    });
+  }
+  if (typeof moveItemToSupplyStash !== "function" || !moveItemToSupplyStash(p, { source, slug }))
+    return Promise.resolve({ ok: false });
+  if (typeof addLog === "function")
+    addLog("info", `Moveu <b>${typeof itemName === "function" ? itemName(slug) : slug}</b> para a Supply Stash.`);
+  if (typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  return Promise.resolve({ ok: true, local: true });
+}
+
 /* Vende tudo que estiver liberado dentro do Loot Pouch.
    Respeita "Não vender" e nunca vende itens de classificação 3 ou 4. */
 function sellAllPouch(p) {
@@ -1356,6 +1449,43 @@ function sellAllPouch(p) {
     kinds++;
   }
   return { gold: total, kinds: kinds };
+}
+
+/* Sell All com persistência: em hunt online não muta localmente — só o
+ * servidor vende (evita ouro/pouch reaparecer no próximo tick/autosave). */
+function sellAllPouchAndPersist(p) {
+  if (!p) return Promise.resolve({ gold: 0, kinds: 0, ok: false });
+  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  if (onlineCombat && typeof accountSellInstanceLootPouch === "function" &&
+      typeof sessionToken === "function" && p.id) {
+    const beforeKeys = Object.keys(p.lootPouch || {}).filter((slug) => {
+      const it = GAMEDATA.items[slug];
+      if (!it || (typeof isNoSell === "function" && isNoSell(p, slug))) return false;
+      if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) return false;
+      return (it.sell || 0) > 0 && (p.lootPouch[slug] || 0) > 0;
+    });
+    if (!beforeKeys.length) return Promise.resolve({ gold: 0, kinds: 0, ok: true });
+    return accountSellInstanceLootPouch(sessionToken(), p.id, null).then((result) => {
+      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function")
+        applyOnlineAuthorityState(result.state, null, result.version);
+      else if (!result || !result.ok) {
+        toast((result && result.msg) || "Não foi possível vender a Loot Pouch online.", "bad");
+        return { gold: 0, kinds: 0, ok: false };
+      }
+      const gold = Number(result.gold) || 0;
+      if (gold > 0 && typeof addLog === "function")
+        addLog("sell", `Vendeu a Loot Pouch por <span class="gold-txt">${fmtFull(gold)} gp</span>`);
+      if (typeof renderAll === "function") renderAll();
+      else if (typeof renderLootPouch === "function") renderLootPouch(p);
+      return { gold, kinds: beforeKeys.length, ok: true };
+    }).catch(() => {
+      toast("Não foi possível vender a Loot Pouch online.", "bad");
+      return { gold: 0, kinds: 0, ok: false };
+    });
+  }
+  const r = sellAllPouch(p);
+  if (r.kinds && typeof save === "function") save();
+  return Promise.resolve(Object.assign({ ok: true }, r));
 }
 
 /* Valor total vendável da mochila (para o hint do botão). */
@@ -1520,6 +1650,15 @@ function renderSupplyStash(p) {
   if (typeof bindDrop === "function" && !box.dataset.dropBound) {
     box.dataset.dropBound = "1";
     bindDrop(box, (payload) => {
+      if (!payload || !payload.slug) return false;
+      if (typeof persistMoveToSupplyStash === "function") {
+        persistMoveToSupplyStash(G.p, {
+          source: payload.source || "pouch",
+          slug: payload.slug,
+        });
+        // Persistência assíncrona cuida de save/render; não duplique o move.
+        return false;
+      }
       const ok = typeof moveItemToSupplyStash === "function" && moveItemToSupplyStash(G.p, payload);
       if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a Supply Stash.`);
       return ok;
@@ -1721,9 +1860,14 @@ function openPouchItemMenu(p, slug, x, y) {
       {
         label: "Mover para Supply Stash",
         action: () => {
+          if (typeof persistMoveToSupplyStash === "function") {
+            persistMoveToSupplyStash(p, { source: "pouch", slug: slug });
+            return;
+          }
           if (typeof moveItemToSupplyStash === "function" &&
               moveItemToSupplyStash(p, { source: "pouch", slug: slug })) {
             addLog("info", `Moveu <b>${it.n}</b> para a Supply Stash.`);
+            if (typeof save === "function") save();
             renderAll();
           }
         },
@@ -1759,7 +1903,22 @@ function openPouchItemMenu(p, slug, x, y) {
       label: protectedClass ? "Venda bloqueada (classe protegida)"
         : `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
       disabled: protectedClass || value <= 0,
-      action: () => { if (sellPouchItem(p, slug) > 0) renderAll(); },
+      action: () => {
+        const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+        if (onlineCombat && typeof persistLootPouchSell === "function") {
+          persistLootPouchSell(p, { slug }).then((result) => {
+            if (result && result.ok && (Number(result.gold) || 0) > 0 && typeof addLog === "function") {
+              const it2 = GAMEDATA.items[slug];
+              addLog("sell", `Vendeu ${it2 ? it2.n : slug} do Loot Pouch por <span class="gold-txt">${fmtFull(result.gold)} gp</span>`);
+            }
+          });
+          return;
+        }
+        if (sellPouchItem(p, slug) > 0) {
+          if (typeof save === "function") save();
+          renderAll();
+        }
+      },
     },
     {
       label: "Destruir",
@@ -2585,39 +2744,13 @@ function renderTopbar(p) {
   $("#gold").textContent = fmtFull(p.gold);
   const cityBtn = $("#btn-city");
   if (cityBtn) cityBtn.textContent = G.training ? "🏛 Sair da academia" : "🏛 Ir para o templo";
-  const forgeBtn = $("#btn-forge");
-  if (forgeBtn) {
-    const atCap = typeof p.dust === "number" && typeof p.dustLimit === "number" && p.dust >= p.dustLimit;
-    forgeBtn.style.color = atCap ? "#ffe680" : "";
-    forgeBtn.style.borderColor = atCap ? "#d4af37" : "";
-    forgeBtn.title = atCap ? `Dust no limite (${p.dust}/${p.dustLimit})` : "Abrir Exaltation Forge";
-  }
 }
 
-/* Atalhos para os NPCs da cidade */
+/* Atalhos legados (#npc-quick) removidos — use o modal NPCS. */
 function renderNpcQuick() {
   const el = $("#npc-quick");
   if (!el) return;
-  el.innerHTML = Object.keys(NPCS).map((id) => {
-    const n = NPCS[id];
-    return `<div class="npc-btn" data-npc="${id}" title="${n.name} — ${n.role}">
-      <img src="assets/npc/${n.sprite}_s.png" alt="">
-      <div class="nb">${n.role.split(" ")[0]}</div>
-    </div>`;
-  }).join("");
-  $$("#npc-quick .npc-btn").forEach((b) =>
-    b.addEventListener("click", () => {
-      const id = b.dataset.npc;
-      // se estiver na cidade, o personagem caminha ate o NPC;
-      // fora dela (caçando) abre direto
-      if (G.training && id === "trainer") {
-        openAcademyConjureModal(true);
-      } else if (G.inCity && !G.combat && !G.training && G.walker) {
-        if (G.walker.goToNpc(id)) openNpc(id);
-      } else {
-        openNpc(id);
-      }
-    }));
+  el.innerHTML = "";
 }
 
 /* Painel "Magias": o grimorio completo da vocacao — SOMENTE LEITURA.

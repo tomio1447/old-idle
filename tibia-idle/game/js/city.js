@@ -27,7 +27,9 @@ const NPCS = {
     type: "bank",
   },
   priest: {
-    name: "King Tibianus", role: "Promoção", sprite: "banker",
+    /* Canary king_tibianus.lua: lookType 332 (outfit único do rei). */
+    name: "King Tibianus", role: "Promoção", sprite: "king-tibianus",
+    look: { lookType: 332 },
     greet: "Greetings, adventurer. I can grant promotions to worthy citizens of Tibia.",
     type: "promotion",
   },
@@ -47,12 +49,16 @@ const NPCS = {
     type: "travel",
   },
   enpa: {
-    name: "Enpa-Deia Pema", role: "Equipamentos Monk", sprite: "shopkeeper",
+    /* Canary enpa-deia_pema.lua: lookType 1817 + cores/addon. */
+    name: "Enpa-Deia Pema", role: "Equipamentos Monk", sprite: "enpa-deia-pema",
+    look: { lookType: 1817, lookHead: 40, lookBody: 9, lookLegs: 63, lookFeet: 63, lookAddons: 1 },
     greet: "Harmony, friend. Posso fornecer equipamento para sua jornada.",
     type: "npcbuy", shopId: "enpa",
   },
   gnomally: {
-    name: "Gnomally", role: "Trocas Crystalline", sprite: "magicshop",
+    /* Canary gnomally.lua: lookType 507 (gnome f) + cores. */
+    name: "Gnomally", role: "Trocas Crystalline", sprite: "gnomally",
+    look: { lookType: 507, lookHead: 52, lookBody: 90, lookLegs: 90, lookFeet: 90, lookAddons: 0 },
     greet: "Major crystalline tokens? Eu troco por equipamentos gnômicos.",
     type: "tokenbarter", shopId: "gnomally",
   },

@@ -6,12 +6,334 @@
 let shopFilter = "";
 let shopSlot = "all";
 
+/* Catálogo do modal NPCS (mesmo estilo de cards do modal HUNTS). */
+const NPC_MODAL_CATALOG = [
+  {
+    shop: "tibianus",
+    name: "King Tibianus",
+    role: "Promoção",
+    sprite: "king-tibianus",
+    descKey: "npc.desc.tibianus",
+  },
+  {
+    shop: "gnomally",
+    name: "Gnomally",
+    role: "Trocas Crystalline",
+    sprite: "gnomally",
+    descKey: "npc.desc.gnomally",
+  },
+  {
+    shop: "enpa",
+    name: "Enpa-Deia Pema",
+    role: "Equipamentos Monk",
+    sprite: "enpa-deia-pema",
+    descKey: "npc.desc.enpa",
+  },
+];
+
+/* Serviços do templo (Cyclopedia CIDADE) — modal paralelo ao NPCS. */
+const CIDADE_MODAL_CATALOG = [
+  {
+    action: "market",
+    nameKey: "btn.market",
+    name: "MARKET",
+    roleKey: "cidade.role.market",
+    role: "Comércio",
+    icon: "assets/ui/market/market.png",
+    descKey: "cidade.desc.market",
+  },
+  {
+    action: "reward",
+    nameKey: "btn.reward",
+    name: "REWARD",
+    roleKey: "cidade.role.reward",
+    role: "Reward Chest",
+    icon: "assets/item/reward-chest.png",
+    descKey: "cidade.desc.reward",
+  },
+  {
+    action: "forge",
+    nameKey: "cidade.name.forge",
+    name: "FORJE",
+    roleKey: "cidade.role.forge",
+    role: "Exaltation Forge",
+    icon: "assets/item/exalted-core.gif",
+    descKey: "cidade.desc.forge",
+  },
+  {
+    action: "depot",
+    nameKey: "btn.depot",
+    name: "DEPOT",
+    roleKey: "cidade.role.depot",
+    role: "Depósito",
+    icon: "assets/item/depot-item-3497.png",
+    descKey: "cidade.desc.depot",
+  },
+  {
+    action: "imbuements",
+    nameKey: "btn.imbuements",
+    name: "IMBUEMENTS",
+    roleKey: "cidade.role.imbuements",
+    role: "Imbuements",
+    icon: "assets/ui/imbuement-machine.png",
+    descKey: "cidade.desc.imbuements",
+  },
+];
+
+const CITY_MODAL_SHELLS = [
+  "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
+  "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
+];
+
+const RANKING_TABS = [
+  { by: "level", labelKey: "ranking.tab.level", label: "TOP LEVEL" },
+  { by: "magic", labelKey: "ranking.tab.magic", label: "MAGIC" },
+  { by: "sword", labelKey: "ranking.tab.sword", label: "SWORD" },
+  { by: "fist", labelKey: "ranking.tab.fist", label: "FIST" },
+  { by: "club", labelKey: "ranking.tab.club", label: "CLUB" },
+  { by: "axe", labelKey: "ranking.tab.axe", label: "AXE" },
+  { by: "distance", labelKey: "ranking.tab.distance", label: "DISTANCE" },
+];
+
+let RANKING_UI = { by: "level", loading: false };
+
+function clearCityModalShells(body) {
+  if (!body) return;
+  body.classList.remove(...CITY_MODAL_SHELLS);
+}
+
+/* Chaves públicas → ids internos em NPCS (King Tibianus = priest). */
+const NPC_SHOP_IDS = {
+  enpa: "enpa",
+  gnomally: "gnomally",
+  tibianus: "priest",
+};
+
+function openNpcShop(shopKey) {
+  const id = NPC_SHOP_IDS[shopKey] || shopKey;
+  clearCityModalShells($("#modal-body"));
+  if (typeof openNpc === "function") openNpc(id);
+}
+
+function openCidadeService(action) {
+  clearCityModalShells($("#modal-body"));
+  if (typeof openCycloCityAction === "function") {
+    openCycloCityAction(action);
+    return;
+  }
+  if (action === "market" && typeof openMarket === "function") openMarket();
+  else if (action === "reward" && typeof openRewardChest === "function") openRewardChest();
+  else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
+  else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
+  else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
+}
+
+function openCidadeModal() {
+  if (!G.p) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  clearCityModalShells(body);
+  body.classList.add("cidade-modal-shell");
+  body.innerHTML = `<div class="panel-title cidade-modal-title">
+      <span class="cidade-btn-icon" aria-hidden="true"></span>
+      <span data-i18n="btn.cidade">CIDADE</span>
+      <button class="sm" id="cidade-modal-close">Fechar</button>
+    </div>
+    <div class="panel-body" id="cidade-modal-list"></div>`;
+  modal.classList.add("show");
+  if (typeof applyI18n === "function") applyI18n(body);
+  $("#cidade-modal-close").addEventListener("click", () => {
+    modal.classList.remove("show");
+    body.classList.remove("cidade-modal-shell");
+  });
+  renderCidadeCatalog();
+}
+
+function renderCidadeCatalog() {
+  const root = $("#cidade-modal-list");
+  if (!root) return;
+  const tt = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
+  root.innerHTML = `<section class="hunt-modal-section cidade-modal-section">
+    <div class="hunt-cat-title">${tt("cidade.catalogTitle", "Serviços da cidade")}</div>
+    <div class="hunts-group">${CIDADE_MODAL_CATALOG.map((entry) => {
+      const name = tt(entry.nameKey, entry.name);
+      const role = tt(entry.roleKey, entry.role);
+      const desc = tt(entry.descKey, entry.descKey);
+      return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card cidade-modal-card" data-cidade-action="${entry.action}">
+        <span class="mobs" aria-hidden="true">
+          <img src="${entry.icon}" alt="" class="cidade-modal-sprite">
+        </span>
+        <span class="info">
+          <span class="nm">${name}</span>
+          <span class="meta">${role}</span>
+          <span class="tiny dim cidade-modal-desc">${desc}</span>
+        </span>
+        <span class="risk low">${tt("npc.open", "Abrir")}</span>
+      </button>`;
+    }).join("")}</div>
+  </section>`;
+  $$("#cidade-modal-list [data-cidade-action]").forEach((btn) => {
+    btn.addEventListener("click", () => openCidadeService(btn.dataset.cidadeAction));
+  });
+}
+
+function openNpcsModal() {
+  if (!G.p) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  clearCityModalShells(body);
+  body.classList.add("npcs-modal-shell");
+  body.innerHTML = `<div class="panel-title npcs-modal-title">
+      <span class="npcs-btn-icon" aria-hidden="true"></span>
+      <span data-i18n="btn.npcs">NPCS</span>
+      <button class="sm" id="npcs-modal-close">Fechar</button>
+    </div>
+    <div class="panel-body" id="npcs-modal-list"></div>`;
+  modal.classList.add("show");
+  if (typeof applyI18n === "function") applyI18n(body);
+  $("#npcs-modal-close").addEventListener("click", () => {
+    modal.classList.remove("show");
+    body.classList.remove("npcs-modal-shell");
+  });
+  renderNpcsCatalog();
+}
+
+function rankingEscape(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function rankingVocLabel(voc) {
+  if (typeof VOCATIONS !== "undefined" && VOCATIONS[voc] && VOCATIONS[voc].name)
+    return VOCATIONS[voc].name;
+  return voc || "—";
+}
+
+function openRankingModal() {
+  if (!G.p) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  clearCityModalShells(body);
+  body.classList.add("ranking-modal-shell");
+  const tt = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
+  const tabs = RANKING_TABS.map((tab) =>
+    `<button type="button" class="ranking-tab${RANKING_UI.by === tab.by ? " active" : ""}" data-ranking-by="${tab.by}">${tt(tab.labelKey, tab.label)}</button>`
+  ).join("");
+  body.innerHTML = `<div class="panel-title ranking-modal-title">
+      <span class="ranking-btn-icon" aria-hidden="true"></span>
+      <span data-i18n="btn.ranking">RANKING</span>
+      <button class="sm" id="ranking-modal-close">Fechar</button>
+    </div>
+    <div class="ranking-tabs" role="tablist">${tabs}</div>
+    <div class="panel-body" id="ranking-modal-list"></div>`;
+  modal.classList.add("show");
+  if (typeof applyI18n === "function") applyI18n(body);
+  $("#ranking-modal-close").addEventListener("click", () => {
+    modal.classList.remove("show");
+    body.classList.remove("ranking-modal-shell");
+  });
+  $$("#modal-body [data-ranking-by]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      RANKING_UI.by = btn.dataset.rankingBy || "level";
+      $$("#modal-body [data-ranking-by]").forEach((b) =>
+        b.classList.toggle("active", b.dataset.rankingBy === RANKING_UI.by));
+      loadRankingList();
+    });
+  });
+  loadRankingList();
+}
+
+async function loadRankingList() {
+  const root = $("#ranking-modal-list");
+  if (!root) return;
+  const tt = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
+  const by = RANKING_UI.by || "level";
+  root.innerHTML = `<div class="tiny dim ranking-status">${tt("ranking.loading", "Carregando…")}</div>`;
+  RANKING_UI.loading = true;
+  try {
+    const base = (typeof ACCOUNT_API_URL === "string" && ACCOUNT_API_URL) || "";
+    const url = `${base}/api/rankings?by=${encodeURIComponent(by)}&limit=50`;
+    const response = await fetch(url, { method: "GET", cache: "no-store" });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    if (!response.ok || !data || !data.ok) {
+      root.innerHTML = `<div class="hunt-section-empty">${tt("ranking.error", "Não foi possível carregar o ranking.")}</div>`;
+      return;
+    }
+    renderRankingList(data.rankings || [], by);
+  } catch (e) {
+    root.innerHTML = `<div class="hunt-section-empty">${tt("ranking.error", "Não foi possível carregar o ranking.")}</div>`;
+  } finally {
+    RANKING_UI.loading = false;
+  }
+}
+
+function renderRankingList(rows, by) {
+  const root = $("#ranking-modal-list");
+  if (!root) return;
+  const tt = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
+  if (!rows.length) {
+    root.innerHTML = `<div class="hunt-section-empty">${tt("ranking.empty", "Nenhum personagem no ranking.")}</div>`;
+    return;
+  }
+  const valueHeader = by === "level" ? tt("char.level", "Nível") : tt("ranking.col.value", "Valor");
+  const body = rows.map((row, index) => {
+    const value = row.value != null ? row.value : (by === "level" ? row.level : "—");
+    return `<tr>
+      <td class="ranking-pos">${index + 1}</td>
+      <td class="ranking-name">${rankingEscape(row.name)}</td>
+      <td class="ranking-voc">${rankingEscape(rankingVocLabel(row.voc))}</td>
+      <td class="ranking-value">${rankingEscape(value)}</td>
+    </tr>`;
+  }).join("");
+  root.innerHTML = `<section class="hunt-modal-section ranking-modal-section">
+    <div class="hunt-cat-title">${tt("ranking.catalogTitle", "Ranking de personagens")}</div>
+    <div class="ranking-table-wrap">
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>${tt("ranking.col.rank", "#")}</th>
+            <th>${tt("ranking.col.name", "Nome")}</th>
+            <th>${tt("ranking.col.voc", "Vocação")}</th>
+            <th>${valueHeader}</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  </section>`;
+}
+
+function renderNpcsCatalog() {
+  const root = $("#npcs-modal-list");
+  if (!root) return;
+  root.innerHTML = `<section class="hunt-modal-section npcs-modal-section">
+    <div class="hunt-cat-title">${typeof t === "function" ? t("npc.catalogTitle") : "Serviços"}</div>
+    <div class="hunts-group">${NPC_MODAL_CATALOG.map((entry) => {
+      const desc = typeof t === "function" ? t(entry.descKey) : entry.descKey;
+      return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card npc-modal-card" data-npc-shop="${entry.shop}">
+        <span class="mobs" aria-hidden="true">
+          <img src="assets/npc/${entry.sprite}_s.png" alt="" class="npc-modal-sprite">
+        </span>
+        <span class="info">
+          <span class="nm">${entry.name}</span>
+          <span class="meta">${entry.role}</span>
+          <span class="tiny dim npc-modal-desc">${desc}</span>
+        </span>
+        <span class="risk low">${typeof t === "function" ? t("npc.open") : "Abrir"}</span>
+      </button>`;
+    }).join("")}</div>
+  </section>`;
+  $$("#npcs-modal-list [data-npc-shop]").forEach((btn) => {
+    btn.addEventListener("click", () => openNpcShop(btn.dataset.npcShop));
+  });
+}
+
 function openNpc(id) {
   const npc = NPCS[id];
   if (!npc) return;
   G.activeNpc = id;
   const p = G.p;
   let body = "";
+  clearCityModalShells($("#modal-body"));
 
   switch (npc.type) {
     case "shop":   body = npcShop(p); break;
@@ -230,35 +552,135 @@ function npcShop(p) {
 function shopStatLine(it) {
   const s = [];
   if (it.atk) s.push("atk " + it.atk);
-  if (it.def) s.push("def " + it.def);
+  if (it.def) s.push("def " + it.def + (it.extraDef ? " (+" + it.extraDef + ")" : ""));
   if (it.arm) s.push("arm " + it.arm);
-  if (it.mdmg) s.push("mag " + it.mdmg);
+  if (it.mdmg) s.push("mag " + (it.dmgMin ? it.dmgMin + "–" + it.dmgMax : it.mdmg));
   if (it.mag) s.push("ML+" + it.mag);
+  for (const [campo, nome] of [["sword", "sword"], ["axe", "axe"], ["club", "club"],
+       ["dist", "dist"], ["shield", "shield"], ["fist", "fist"], ["melee", "melee"]]) {
+    if (it[campo]) s.push(nome + "+" + it[campo]);
+  }
   if (it.prot) s.push("prot " + it.prot + "%");
+  if (it.res && typeof it.res === "object") {
+    for (const e of Object.keys(it.res)) {
+      const v = it.res[e];
+      s.push((v > 0 ? "+" : "") + v + "% " + e);
+    }
+  }
+  if (it.lifeLeech) s.push("life leech " + it.lifeLeech + "%");
+  if (it.manaLeech) s.push("mana leech " + it.manaLeech + "%");
   if (it.hpreg) s.push("hp+" + it.hpreg);
   if (it.mpreg) s.push("mp+" + it.mpreg);
+  if (it.spd) s.push("spd+" + it.spd);
+  if (it.mantra) s.push("mantra " + it.mantra);
+  if (it.bond) s.push("bond " + it.bond);
+  if (it.th) s.push("2H");
   if (it.lvl) s.push("nv " + it.lvl);
+  if (it.w) s.push(Number(it.w).toFixed(2) + " oz");
   return s.join(" · ") || "—";
+}
+
+/** Rótulo de classe/tipo do item (slot/categoria), não a classificação de forja. */
+function npcShopClassLabel(it) {
+  if (!it) return "";
+  const key = String(it.cat || it.s || it.t || "").toLowerCase();
+  if (!key) return "";
+  const i18nKey = "npc.class." + key;
+  if (typeof t === "function") {
+    const translated = t(i18nKey);
+    if (translated && translated !== i18nKey) return translated;
+  }
+  const fallback = {
+    helmet: "Elmo", armor: "Armadura", legs: "Pernas", boots: "Botas",
+    shield: "Escudo", spellbook: "Spellbook", weapon: "Arma", fist: "Punho",
+    ring: "Anel", amulet: "Amuleto", distance: "Distância", club: "Clava",
+    sword: "Espada", axe: "Machado", loot: "Item", ammo: "Munição"
+  };
+  return fallback[key] || key;
+}
+
+function npcShopVocLabel(vocs) {
+  if (!vocs || !vocs.length) return "";
+  return vocs.map((v) => {
+    const key = "voc." + v + ".name";
+    if (typeof t === "function") {
+      const name = t(key);
+      if (name && name !== key) return name;
+    }
+    return v.charAt(0).toUpperCase() + v.slice(1);
+  }).join(", ");
+}
+
+/**
+ * Bloco de texto compartilhado das linhas de loja NPC (Enpa / Gnomally):
+ * nome, descrição completa (stats / desc), vocação, classe, imbuements.
+ */
+function npcShopItemTextHtml(it, opts) {
+  opts = opts || {};
+  const name = (it && it.n) || opts.name || "—";
+  const nameColor = opts.nameColor || "#c8c0a8";
+  const nameSuffix = opts.nameSuffix || "";
+  const descParts = [];
+  if (it && it.desc) descParts.push(it.desc);
+  const stats = it ? shopStatLine(it) : "";
+  if (stats && stats !== "—") descParts.push(stats);
+  const desc = descParts.join(" · ") || (opts.fallbackDesc || "—");
+
+  const meta = [];
+  const voc = npcShopVocLabel(it && it.vocs);
+  if (voc) {
+    const lab = typeof t === "function" ? t("npc.meta.vocation") : "Vocação";
+    meta.push(`<div class="npc-shop-meta-line"><span class="npc-shop-meta-k">${lab}:</span> ${voc}</div>`);
+  }
+  const cls = npcShopClassLabel(it);
+  if (cls) {
+    const lab = typeof t === "function" ? t("npc.meta.class") : "Classe";
+    meta.push(`<div class="npc-shop-meta-line"><span class="npc-shop-meta-k">${lab}:</span> ${cls}</div>`);
+  }
+  if (it && it.imbSlots) {
+    const lab = typeof t === "function" ? t("npc.meta.imbuements") : "Imbuements";
+    meta.push(`<div class="npc-shop-meta-line"><span class="npc-shop-meta-k">${lab}:</span> ${it.imbSlots}</div>`);
+  }
+
+  return `<div class="npc-shop-text">
+      <div class="small npc-shop-name" style="color:${nameColor}">${name}${nameSuffix}</div>
+      <div class="tiny dim npc-shop-desc">${desc}</div>
+      ${meta.length ? `<div class="npc-shop-meta">${meta.join("")}</div>` : ""}
+    </div>`;
 }
 
 /* ---------------------------------------------------------- NPC buy-only (catálogo fixo) */
 function npcBuyOnly(p, shopId) {
   if (typeof ensureNpcShopItems === "function") ensureNpcShopItems();
   const shop = typeof npcShopDef === "function" ? npcShopDef(shopId) : null;
-  const items = (shop && shop.items) || [];
+  const items = ((shop && shop.items) || []).slice().sort((a, b) => {
+    const la = (GAMEDATA.items[a.slug] && GAMEDATA.items[a.slug].lvl) || 0;
+    const lb = (GAMEDATA.items[b.slug] && GAMEDATA.items[b.slug].lvl) || 0;
+    if (la !== lb) return la - lb;
+    return (a.price || 0) - (b.price || 0);
+  });
+  let lastLvl = null;
   const rows = items.map((e) => {
     const it = GAMEDATA.items[e.slug];
     if (!it) return "";
+    const lvl = it.lvl || 0;
+    let header = "";
+    if (lvl !== lastLvl) {
+      lastLvl = lvl;
+      const label = lvl > 0
+        ? ((typeof t === "function" ? t("char.level") : "Nível") + " " + lvl)
+        : (typeof t === "function" ? t("npc.levelNone") : "Sem nível");
+      header = `<div class="hunt-cat-title">${label}</div>`;
+    }
     const afford = p.gold >= e.price;
     const cur = it.s ? p.equip[it.s] : null;
     const better = it.s && (!cur || itemScore(p, e.slug) > itemScore(p, cur.item));
-    return `<div class="shop-row" data-tip="${e.slug}">
+    return header + `<div class="shop-row npc-shop-row" data-tip="${e.slug}">
       ${itemImg(e.slug, 30)}
-      <div style="flex:1;min-width:0">
-        <div class="small" style="color:${better ? "#9ce84a" : "#c8c0a8"}">
-          ${it.n}${better ? " ▲" : ""}</div>
-        <div class="tiny dim">${shopStatLine(it)}</div>
-      </div>
+      ${npcShopItemTextHtml(it, {
+        nameColor: better ? "#9ce84a" : "#c8c0a8",
+        nameSuffix: better ? " ▲" : ""
+      })}
       <button class="sm ${afford ? "primary" : ""}" data-npc-buy="${e.slug}"
         data-shop="${shopId}" data-price="${e.price}" ${afford ? "" : "disabled"}>
         ${typeof t === "function" ? t("npc.buy") : "Comprar"} ${fmtFull(e.price)}</button>
@@ -280,6 +702,12 @@ function npcTokenBarter(p, shopId) {
   const tokenName = typeof itemName === "function" ? itemName(token) : token;
   const items = (shop && shop.items) || [];
 
+  const costBtn = (cost, can, extraAttr, disabled) =>
+    `<button class="sm npc-barter-btn ${can ? "primary" : ""}" data-npc-barter="${extraAttr}"
+      data-shop="${shopId}" ${disabled ? "disabled" : ""}>
+      <span class="npc-barter-qty">${fmtFull(cost)}</span>${itemImg(token, 16, "npc-barter-token")}
+    </button>`;
+
   const rows = items.map((e, idx) => {
     const cost = e.cost || 0;
     const can = have >= cost;
@@ -288,28 +716,21 @@ function npcTokenBarter(p, shopId) {
         ? npcOutfitIdForPlayer(p, e.outfitBase) : null;
       const owned = oid && typeof ownsOutfit === "function" && ownsOutfit(p, oid);
       const disabled = !can || owned;
-      return `<div class="shop-row">
-        <span style="width:30px;text-align:center">🧥</span>
-        <div style="flex:1;min-width:0">
-          <div class="small">${e.name || e.outfitBase}</div>
-          <div class="tiny dim">${cost}× ${tokenName}${owned ? " · já possui" : ""}</div>
-        </div>
-        <button class="sm ${can && !owned ? "primary" : ""}" data-npc-barter="${idx}"
-          data-shop="${shopId}" ${disabled ? "disabled" : ""}>
-          ${typeof t === "function" ? t("npc.trade") : "Trocar"}</button>
+      return `<div class="shop-row npc-shop-row">
+        <span class="npc-shop-icon-fallback" style="width:30px;text-align:center">🧥</span>
+        ${npcShopItemTextHtml(null, {
+          name: e.name || e.outfitBase,
+          fallbackDesc: owned ? "já possui" : "—"
+        })}
+        ${costBtn(cost, can && !owned, idx, disabled)}
       </div>`;
     }
     const it = GAMEDATA.items[e.slug];
     if (!it) return "";
-    return `<div class="shop-row" data-tip="${e.slug}">
+    return `<div class="shop-row npc-shop-row" data-tip="${e.slug}">
       ${itemImg(e.slug, 30)}
-      <div style="flex:1;min-width:0">
-        <div class="small">${it.n}</div>
-        <div class="tiny dim">${shopStatLine(it)} · ${cost}× ${tokenName}</div>
-      </div>
-      <button class="sm ${can ? "primary" : ""}" data-npc-barter="${idx}"
-        data-shop="${shopId}" ${can ? "" : "disabled"}>
-        ${typeof t === "function" ? t("npc.trade") : "Trocar"}</button>
+      ${npcShopItemTextHtml(it)}
+      ${costBtn(cost, can, idx, !can)}
     </div>`;
   }).join("");
 
@@ -502,6 +923,45 @@ function npcTemple(p) {
 const PROMOTION_PRICE = 20000;
 const PROMOTION_LEVEL = 20;
 
+/* Online: só personagens da conta logada (mesmo escopo do picker pós-login /
+ * accountCharacterCache de /api/me). Offline: roster local completo. */
+function promotionAccountCharacters() {
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured()
+    && typeof sessionToken === "function" && !!sessionToken()
+    && typeof accountCharacterCacheRead === "function";
+  if (!online) return typeof getCharacters === "function" ? getCharacters() : [];
+
+  const cache = accountCharacterCacheRead() || [];
+  if (!cache.length) {
+    return G.p ? [G.p] : [];
+  }
+  const roster = typeof getCharacters === "function" ? getCharacters() : [];
+  const byId = new Map(roster.map((c) => [String(c.id), c]));
+  const currentId = G.p ? String(characterId(G.p)) : "";
+  return cache.map((summary) => {
+    const id = String(summary.id);
+    if (currentId && id === currentId) return G.p;
+    if (byId.has(id)) return byId.get(id);
+    let raw = summary.snapshot || {};
+    if (typeof raw === "string") {
+      try { raw = JSON.parse(raw); } catch (e) { raw = {}; }
+    }
+    raw = raw && typeof raw === "object" ? raw : {};
+    const merged = Object.assign({}, raw, {
+      id,
+      name: summary.name || raw.name,
+      voc: summary.voc || raw.voc || "knight",
+      level: Number(summary.level) || Number(raw.level) || 1,
+      sex: summary.sex || raw.sex || "male",
+      promoted: summary.promoted !== undefined ? !!summary.promoted : !!raw.promoted,
+      outfit: summary.outfit || raw.outfit || null,
+    });
+    const p = typeof normalizePlayer === "function" ? normalizePlayer(merged) : merged;
+    p.id = id;
+    return p;
+  }).filter(Boolean);
+}
+
 function promotionEligibility(p) {
   if (p.promoted) return { ok: false, msg: "Já promovido" };
   if (p.level < PROMOTION_LEVEL) return { ok: false, msg: `Requer nível ${PROMOTION_LEVEL}` };
@@ -511,9 +971,10 @@ function promotionEligibility(p) {
 
 function promoteCharacterById(id) {
   const currentId = G.p ? characterId(G.p) : null;
+  const wanted = String(id);
   let target = null;
-  if (id === currentId) target = G.p;
-  else target = getCharacters().find((p) => p.id === id);
+  if (String(currentId) === wanted) target = G.p;
+  else target = promotionAccountCharacters().find((p) => String(p.id) === wanted);
   if (!target) return { ok: false, msg: "Personagem não encontrado." };
   const check = promotionEligibility(target);
   if (!check.ok) return check;
@@ -521,12 +982,12 @@ function promoteCharacterById(id) {
   target.promoted = true;
   target.promotedAt = Date.now();
   saveCharacterToRoster(target);
-  if (id === currentId) G.p = target;
+  if (String(currentId) === wanted) G.p = target;
   return { ok: true, msg: `${target.name} agora é ${vocationName(target)}!` };
 }
 
 function npcPromotion() {
-  const chars = getCharacters();
+  const chars = promotionAccountCharacters();
   return `
     <div class="panel-inset mb8" style="padding:8px">
       <div class="stat-row"><span class="k">Preço</span><span class="v gold-txt">${fmtFull(PROMOTION_PRICE)} gp</span></div>

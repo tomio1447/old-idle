@@ -1,0 +1,4857 @@
+[
+ {
+  "name": "Abomination's Eye",
+  "npcPrice": 650000,
+  "weight": "0.50"
+ },
+ {
+  "name": "Abomination's Tail",
+  "npcPrice": 700000,
+  "weight": "0.80"
+ },
+ {
+  "name": "Abomination's Tongue",
+  "npcPrice": 950000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Abyssador's Lash",
+  "npcPrice": 0,
+  "weight": "1.90"
+ },
+ {
+  "name": "Acorn",
+  "npcPrice": 10,
+  "weight": "0.50"
+ },
+ {
+  "name": "Afflicted Strider Head",
+  "npcPrice": 900,
+  "weight": "1.70"
+ },
+ {
+  "name": "Afflicted Strider Worms",
+  "npcPrice": 500,
+  "weight": "1.70"
+ },
+ {
+  "name": "Albino Dragon Leather",
+  "npcPrice": 0,
+  "weight": "0.60"
+ },
+ {
+  "name": "Alptramun's Toothbrush",
+  "npcPrice": 270000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Amber Souvenir",
+  "npcPrice": 850,
+  "weight": "0.25"
+ },
+ {
+  "name": "Ancient Belt Buckle",
+  "npcPrice": 260,
+  "weight": "2.50"
+ },
+ {
+  "name": "Ancient Crypt Rune",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Ancient Eye Stalk",
+  "npcPrice": 3500000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Ancient Liche Bone",
+  "npcPrice": 28000,
+  "weight": "0.80"
+ },
+ {
+  "name": "Ancient Scales",
+  "npcPrice": 400000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Ancient Stone",
+  "npcPrice": 200,
+  "weight": "1.60"
+ },
+ {
+  "name": "Ancient Watch",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Antlers",
+  "npcPrice": 50,
+  "weight": "0.90"
+ },
+ {
+  "name": "Ape Fur",
+  "npcPrice": 120,
+  "weight": "1.20"
+ },
+ {
+  "name": "Apron",
+  "npcPrice": 1300,
+  "weight": "0.60"
+ },
+ {
+  "name": "Arbaziloth Shoulder Piece",
+  "npcPrice": 450000,
+  "weight": "0.25"
+ },
+ {
+  "name": "Astral Glyph",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Astral Source",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Atab's Mitmah Helmet",
+  "npcPrice": 580,
+  "weight": "2.00"
+ },
+ {
+  "name": "Axe of Sir Leonard",
+  "npcPrice": 49000,
+  "weight": "0.25"
+ },
+ {
+  "name": "Badger Fur",
+  "npcPrice": 15,
+  "weight": "0.65"
+ },
+ {
+  "name": "Bakragore's Amalgamation",
+  "npcPrice": 2000000,
+  "weight": "5.10"
+ },
+ {
+  "name": "Bamboo Stick",
+  "npcPrice": 30,
+  "weight": "1.12"
+ },
+ {
+  "name": "Banana Sash",
+  "npcPrice": 55,
+  "weight": "0.68"
+ },
+ {
+  "name": "Basalt Core",
+  "npcPrice": 5800,
+  "weight": "1.00"
+ },
+ {
+  "name": "Basalt Crumbs",
+  "npcPrice": 3000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Basalt Fetish",
+  "npcPrice": 210,
+  "weight": "2.10"
+ },
+ {
+  "name": "Basalt Figurine",
+  "npcPrice": 160,
+  "weight": "2.10"
+ },
+ {
+  "name": "Bashmu Fang",
+  "npcPrice": 600,
+  "weight": "1.50"
+ },
+ {
+  "name": "Bashmu Feather",
+  "npcPrice": 350,
+  "weight": "2.50"
+ },
+ {
+  "name": "Bashmu Tongue",
+  "npcPrice": 400,
+  "weight": "2.50"
+ },
+ {
+  "name": "Bat Decoration",
+  "npcPrice": 2000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Bat Wing",
+  "npcPrice": 50,
+  "weight": "1.00"
+ },
+ {
+  "name": "Battle Stone",
+  "npcPrice": 290,
+  "weight": "1.50"
+ },
+ {
+  "name": "Bear Paw",
+  "npcPrice": 100,
+  "weight": "1.20"
+ },
+ {
+  "name": "Beast's Nightmare-Cushion",
+  "npcPrice": 630000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Bed of Nails",
+  "npcPrice": 500,
+  "weight": "0.60"
+ },
+ {
+  "name": "Beetle Carapace",
+  "npcPrice": 200,
+  "weight": "35.00"
+ },
+ {
+  "name": "Behemoth Claw",
+  "npcPrice": 2000,
+  "weight": "12.50"
+ },
+ {
+  "name": "Beijinho",
+  "npcPrice": 2780,
+  "weight": "0.10"
+ },
+ {
+  "name": "Black Hood",
+  "npcPrice": 190,
+  "weight": "1.75"
+ },
+ {
+  "name": "Black Wool",
+  "npcPrice": 300,
+  "weight": "1.18"
+ },
+ {
+  "name": "Blazing Bone",
+  "npcPrice": 610,
+  "weight": "2.20"
+ },
+ {
+  "name": "Blemished Spawn Abdomen",
+  "npcPrice": 550,
+  "weight": "2.70"
+ },
+ {
+  "name": "Blemished Spawn Head",
+  "npcPrice": 800,
+  "weight": "1.60"
+ },
+ {
+  "name": "Blemished Spawn Tail",
+  "npcPrice": 1000,
+  "weight": "1.60"
+ },
+ {
+  "name": "Bloated Maggot",
+  "npcPrice": 5200,
+  "weight": "1.00"
+ },
+ {
+  "name": "Blood Amulet",
+  "npcPrice": 1230,
+  "weight": "0.20"
+ },
+ {
+  "name": "Blood Crown",
+  "npcPrice": 116000,
+  "weight": "0.20"
+ },
+ {
+  "name": "Blood Hood",
+  "npcPrice": 1550,
+  "weight": "0.20"
+ },
+ {
+  "name": "Blood Preservation",
+  "npcPrice": 320,
+  "weight": "0.80"
+ },
+ {
+  "name": "Blood Sceptre",
+  "npcPrice": 178000,
+  "weight": "0.20"
+ },
+ {
+  "name": "Blood Tincture in a Vial",
+  "npcPrice": 360,
+  "weight": "6.30"
+ },
+ {
+  "name": "Blooded Worm",
+  "npcPrice": 4700,
+  "weight": "1.00"
+ },
+ {
+  "name": "Bloodshot Giant Eye",
+  "npcPrice": 1820,
+  "weight": "0.20"
+ },
+ {
+  "name": "Bloodstained Scythe",
+  "npcPrice": 4200,
+  "weight": "8.10"
+ },
+ {
+  "name": "Bloody Dwarven Beard",
+  "npcPrice": 110,
+  "weight": "0.70"
+ },
+ {
+  "name": "Bloody Pincers",
+  "npcPrice": 100,
+  "weight": "1.20"
+ },
+ {
+  "name": "Bloody Tears",
+  "npcPrice": 70000,
+  "weight": "0.20"
+ },
+ {
+  "name": "Blue Goanna Scale",
+  "npcPrice": 230,
+  "weight": "0.90"
+ },
+ {
+  "name": "Blue Piece of Cloth",
+  "npcPrice": 200,
+  "weight": "5.00"
+ },
+ {
+  "name": "Boar Man Hoof",
+  "npcPrice": 600,
+  "weight": "2.10"
+ },
+ {
+  "name": "Boggy Dreads",
+  "npcPrice": 200,
+  "weight": "1.69"
+ },
+ {
+  "name": "Bola",
+  "npcPrice": 35,
+  "weight": "5.00"
+ },
+ {
+  "name": "Bone Fetish",
+  "npcPrice": 150,
+  "weight": "1.60"
+ },
+ {
+  "name": "Bone Fibula",
+  "npcPrice": 580,
+  "weight": "0.20"
+ },
+ {
+  "name": "Bone Rattle",
+  "npcPrice": 790,
+  "weight": "0.20"
+ },
+ {
+  "name": "Bone Shoulderplate",
+  "npcPrice": 150,
+  "weight": "2.20"
+ },
+ {
+  "name": "Bone Spikes",
+  "npcPrice": 1500000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Bone Toothpick",
+  "npcPrice": 150,
+  "weight": "20.00"
+ },
+ {
+  "name": "Bonecarving Knife",
+  "npcPrice": 190,
+  "weight": "1.20"
+ },
+ {
+  "name": "Bonelord Eye",
+  "npcPrice": 80,
+  "weight": "5.00"
+ },
+ {
+  "name": "Bones of Zorvorax",
+  "npcPrice": 10000,
+  "weight": "8.00"
+ },
+ {
+  "name": "Bony Tail",
+  "npcPrice": 210,
+  "weight": "0.92"
+ },
+ {
+  "name": "Book Page",
+  "npcPrice": 640,
+  "weight": "1.00"
+ },
+ {
+  "name": "Book of Faith",
+  "npcPrice": 0,
+  "weight": "2.70"
+ },
+ {
+  "name": "Book of Necromantic Rituals",
+  "npcPrice": 180,
+  "weight": "3.58"
+ },
+ {
+  "name": "Book of Prayers",
+  "npcPrice": 120,
+  "weight": "1.50"
+ },
+ {
+  "name": "Book with a Dragon",
+  "npcPrice": 1800,
+  "weight": "8.00"
+ },
+ {
+  "name": "Book with an Hourglass",
+  "npcPrice": 1450,
+  "weight": "8.00"
+ },
+ {
+  "name": "Bottled Dragon Breath",
+  "npcPrice": 0,
+  "weight": "0.60"
+ },
+ {
+  "name": "Bowl of Terror Sweat",
+  "npcPrice": 500,
+  "weight": "3.60"
+ },
+ {
+  "name": "Brain Head's Brain",
+  "npcPrice": 0,
+  "weight": "0.70"
+ },
+ {
+  "name": "Brain Head's Giant Neuron",
+  "npcPrice": 100000,
+  "weight": "0.24"
+ },
+ {
+  "name": "Brain Head's Left Hemisphere",
+  "npcPrice": 90000,
+  "weight": "0.35"
+ },
+ {
+  "name": "Brain Head's Right Hemisphere",
+  "npcPrice": 50000,
+  "weight": "0.35"
+ },
+ {
+  "name": "Brainstealer's Brain",
+  "npcPrice": 300000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Brainstealer's Brainwave",
+  "npcPrice": 440000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Brainstealer's Tissue",
+  "npcPrice": 240000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Brigadeiro",
+  "npcPrice": 2640,
+  "weight": "0.10"
+ },
+ {
+  "name": "Bright Bell",
+  "npcPrice": 220,
+  "weight": "2.20"
+ },
+ {
+  "name": "Brimstone Fangs",
+  "npcPrice": 380,
+  "weight": "1.12"
+ },
+ {
+  "name": "Brimstone Shell",
+  "npcPrice": 210,
+  "weight": "1.12"
+ },
+ {
+  "name": "Brinebrute Claw",
+  "npcPrice": 2600,
+  "weight": "2.40"
+ },
+ {
+  "name": "Broken Arrow",
+  "npcPrice": 0,
+  "weight": "0.90"
+ },
+ {
+  "name": "Broken Crossbow",
+  "npcPrice": 30,
+  "weight": "1.30"
+ },
+ {
+  "name": "Broken Draken Mail",
+  "npcPrice": 340,
+  "weight": "2.00"
+ },
+ {
+  "name": "Broken Gladiator Shield",
+  "npcPrice": 190,
+  "weight": "6.40"
+ },
+ {
+  "name": "Broken Halberd",
+  "npcPrice": 100,
+  "weight": "2.10"
+ },
+ {
+  "name": "Broken Helmet",
+  "npcPrice": 20,
+  "weight": "1.56"
+ },
+ {
+  "name": "Broken Iks Cuirass",
+  "npcPrice": 640,
+  "weight": "19.00"
+ },
+ {
+  "name": "Broken Iks Faulds",
+  "npcPrice": 530,
+  "weight": "15.00"
+ },
+ {
+  "name": "Broken Iks Headpiece",
+  "npcPrice": 560,
+  "weight": "9.00"
+ },
+ {
+  "name": "Broken Iks Sandals",
+  "npcPrice": 440,
+  "weight": "3.80"
+ },
+ {
+  "name": "Broken Key Ring",
+  "npcPrice": 8000,
+  "weight": "0.50"
+ },
+ {
+  "name": "Broken Longbow",
+  "npcPrice": 130,
+  "weight": "5.00"
+ },
+ {
+  "name": "Broken Macuahuitl",
+  "npcPrice": 1000,
+  "weight": "24.00"
+ },
+ {
+  "name": "Broken Mitmah Chestplate",
+  "npcPrice": 85000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Broken Mitmah Necklace",
+  "npcPrice": 210,
+  "weight": "1.00"
+ },
+ {
+  "name": "Broken Ring of Ending",
+  "npcPrice": 4000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Broken Shamanic Staff",
+  "npcPrice": 35,
+  "weight": "1.28"
+ },
+ {
+  "name": "Broken Slicer",
+  "npcPrice": 120,
+  "weight": "1.40"
+ },
+ {
+  "name": "Broken Staff of Mind Control",
+  "npcPrice": 1250000,
+  "weight": "10.01"
+ },
+ {
+  "name": "Broken Throwing Axe",
+  "npcPrice": 230,
+  "weight": "11.00"
+ },
+ {
+  "name": "Broken Visor",
+  "npcPrice": 1900,
+  "weight": "14.00"
+ },
+ {
+  "name": "Broodrider Saddle",
+  "npcPrice": 2800,
+  "weight": "3.90"
+ },
+ {
+  "name": "Brown Piece of Cloth",
+  "npcPrice": 100,
+  "weight": "5.00"
+ },
+ {
+  "name": "Brutus Bloodbeard's Hat",
+  "npcPrice": 0,
+  "weight": "12.50"
+ },
+ {
+  "name": "Bulltaur Armor Scrap",
+  "npcPrice": 480,
+  "weight": "2.00"
+ },
+ {
+  "name": "Bulltaur Hoof",
+  "npcPrice": 540,
+  "weight": "2.00"
+ },
+ {
+  "name": "Bulltaur Horn",
+  "npcPrice": 385,
+  "weight": "2.00"
+ },
+ {
+  "name": "Bunch of Troll Hair",
+  "npcPrice": 30,
+  "weight": "0.85"
+ },
+ {
+  "name": "Bundle of Cursed Straw",
+  "npcPrice": 800,
+  "weight": "2.27"
+ },
+ {
+  "name": "Burnt Out Devourer Core",
+  "npcPrice": 0,
+  "weight": "5.60"
+ },
+ {
+  "name": "Capricious Heart",
+  "npcPrice": 2100,
+  "weight": "0.75"
+ },
+ {
+  "name": "Capricious Robe",
+  "npcPrice": 1200,
+  "weight": "1.80"
+ },
+ {
+  "name": "Carniphila Seeds",
+  "npcPrice": 50,
+  "weight": "0.35"
+ },
+ {
+  "name": "Carnisylvan Bark",
+  "npcPrice": 230,
+  "weight": "1.00"
+ },
+ {
+  "name": "Carnisylvan Finger",
+  "npcPrice": 250,
+  "weight": "1.00"
+ },
+ {
+  "name": "Carnivostrich Feather",
+  "npcPrice": 630,
+  "weight": "1.20"
+ },
+ {
+  "name": "Carrion Worm Fang",
+  "npcPrice": 35,
+  "weight": "0.88"
+ },
+ {
+  "name": "Cat's Paw",
+  "npcPrice": 2000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Catnip",
+  "npcPrice": 580,
+  "weight": "1.10"
+ },
+ {
+  "name": "Cave Chimera Head",
+  "npcPrice": 1200,
+  "weight": "1.90"
+ },
+ {
+  "name": "Cave Chimera Leg",
+  "npcPrice": 650,
+  "weight": "1.10"
+ },
+ {
+  "name": "Cave Devourer Eyes",
+  "npcPrice": 550,
+  "weight": "0.80"
+ },
+ {
+  "name": "Cave Devourer Legs",
+  "npcPrice": 350,
+  "weight": "2.40"
+ },
+ {
+  "name": "Cave Devourer Maw",
+  "npcPrice": 600,
+  "weight": "1.90"
+ },
+ {
+  "name": "Cavebear Skull",
+  "npcPrice": 550,
+  "weight": "1.3"
+ },
+ {
+  "name": "Centipede Leg",
+  "npcPrice": 28,
+  "weight": "0.69"
+ },
+ {
+  "name": "Ceremonial Bowl",
+  "npcPrice": 0,
+  "weight": "3.10"
+ },
+ {
+  "name": "Chagorz Igneous Obsidian",
+  "npcPrice": 1100000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Chain Leash",
+  "npcPrice": 970,
+  "weight": "0.20"
+ },
+ {
+  "name": "Chasm Spawn Abdomen",
+  "npcPrice": 240,
+  "weight": "2.70"
+ },
+ {
+  "name": "Chasm Spawn Head",
+  "npcPrice": 850,
+  "weight": "1.60"
+ },
+ {
+  "name": "Chasm Spawn Tail",
+  "npcPrice": 120,
+  "weight": "1.60"
+ },
+ {
+  "name": "Cheese Cutter",
+  "npcPrice": 50,
+  "weight": "0.45"
+ },
+ {
+  "name": "Cheesy Figurine",
+  "npcPrice": 150,
+  "weight": "0.75"
+ },
+ {
+  "name": "Cheesy Membership Card",
+  "npcPrice": 120000,
+  "weight": "2.70"
+ },
+ {
+  "name": "Chicken Feather",
+  "npcPrice": 30,
+  "weight": "0.10"
+ },
+ {
+  "name": "Chitinous Mouth (Baron from Below)",
+  "npcPrice": 10000,
+  "weight": "2.40"
+ },
+ {
+  "name": "Chitinous Mouth (Count of the Core)",
+  "npcPrice": 10000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Christmas Present Bag",
+  "npcPrice": 0,
+  "weight": "80.00"
+ },
+ {
+  "name": "Christmas Token",
+  "npcPrice": 0,
+  "weight": "0.05"
+ },
+ {
+  "name": "Churro Heart",
+  "npcPrice": 2680,
+  "weight": "0.15"
+ },
+ {
+  "name": "Claw of 'The Noxious Spawn'",
+  "npcPrice": 15000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Cliff Strider Claw",
+  "npcPrice": 800,
+  "weight": "2.20"
+ },
+ {
+  "name": "Closed Pocket Sundial",
+  "npcPrice": 5000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Cloud Familiar",
+  "npcPrice": 0,
+  "weight": "0.50"
+ },
+ {
+  "name": "Cluster of Crystallized Death",
+  "npcPrice": 9000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Cluster of Solace",
+  "npcPrice": 0,
+  "weight": "2.80"
+ },
+ {
+  "name": "Coal",
+  "npcPrice": 20,
+  "weight": "5.00"
+ },
+ {
+  "name": "Coal Eyes",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Cobra Crest",
+  "npcPrice": 650,
+  "weight": "1.70"
+ },
+ {
+  "name": "Cobra Tongue",
+  "npcPrice": 15,
+  "weight": "0.75"
+ },
+ {
+  "name": "Cockroach Leg",
+  "npcPrice": 0,
+  "weight": "0.10"
+ },
+ {
+  "name": "Colourful Feather",
+  "npcPrice": 110,
+  "weight": "0.36"
+ },
+ {
+  "name": "Colourful Feathers",
+  "npcPrice": 400,
+  "weight": "4.50"
+ },
+ {
+  "name": "Colourful Quill",
+  "npcPrice": 110000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Colourful Snail Shell",
+  "npcPrice": 250,
+  "weight": "1.70"
+ },
+ {
+  "name": "Compass",
+  "npcPrice": 45,
+  "weight": "0.80"
+ },
+ {
+  "name": "Compound Eye",
+  "npcPrice": 150,
+  "weight": "1.65"
+ },
+ {
+  "name": "Condensed Energy",
+  "npcPrice": 260,
+  "weight": "2.00"
+ },
+ {
+  "name": "Cookbook (Creature Product)",
+  "npcPrice": 870,
+  "weight": "8.00"
+ },
+ {
+  "name": "Coral Branch",
+  "npcPrice": 360,
+  "weight": "1.10"
+ },
+ {
+  "name": "Corrupt Naga Scales",
+  "npcPrice": 570,
+  "weight": "0.30"
+ },
+ {
+  "name": "Corrupted Flag",
+  "npcPrice": 700,
+  "weight": "1.12"
+ },
+ {
+  "name": "Countess Sorrow's Frozen Tear",
+  "npcPrice": 50000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Cow Bell",
+  "npcPrice": 120,
+  "weight": "7.20"
+ },
+ {
+  "name": "Cowbell",
+  "npcPrice": 210,
+  "weight": "4.00"
+ },
+ {
+  "name": "Crab Man Claws",
+  "npcPrice": 550,
+  "weight": "2.30"
+ },
+ {
+  "name": "Crab Pincers",
+  "npcPrice": 35,
+  "weight": "1.75"
+ },
+ {
+  "name": "Cracked Alabaster Vase",
+  "npcPrice": 180,
+  "weight": "4.50"
+ },
+ {
+  "name": "Crawler Head Plating",
+  "npcPrice": 210,
+  "weight": "2.65"
+ },
+ {
+  "name": "Crawler's Essence",
+  "npcPrice": 3700,
+  "weight": "0.45"
+ },
+ {
+  "name": "Crown (Plant)",
+  "npcPrice": 2700,
+  "weight": "0.90"
+ },
+ {
+  "name": "Cruelty's Chest",
+  "npcPrice": 720000,
+  "weight": "1.40"
+ },
+ {
+  "name": "Cruelty's Claw",
+  "npcPrice": 640000,
+  "weight": "1.40"
+ },
+ {
+  "name": "Cry-Stal",
+  "npcPrice": 3200,
+  "weight": "9.70"
+ },
+ {
+  "name": "Cryptic Fossil",
+  "npcPrice": 0,
+  "weight": "10.00"
+ },
+ {
+  "name": "Crystal Bone",
+  "npcPrice": 250,
+  "weight": "12.00"
+ },
+ {
+  "name": "Crystal of the Mitmah",
+  "npcPrice": 280,
+  "weight": "1.50"
+ },
+ {
+  "name": "Crystalline Spikes",
+  "npcPrice": 440,
+  "weight": "3.40"
+ },
+ {
+  "name": "Crystallised Blood",
+  "npcPrice": 270000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Crystallized Anger",
+  "npcPrice": 400,
+  "weight": "12.00"
+ },
+ {
+  "name": "Crystallized Death",
+  "npcPrice": 3000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Cuirass Plate",
+  "npcPrice": 1000,
+  "weight": "7.50"
+ },
+ {
+  "name": "Cultish Mask",
+  "npcPrice": 280,
+  "weight": "1.65"
+ },
+ {
+  "name": "Cultish Robe",
+  "npcPrice": 150,
+  "weight": "2.00"
+ },
+ {
+  "name": "Cultish Symbol",
+  "npcPrice": 500,
+  "weight": "0.82"
+ },
+ {
+  "name": "Curious Matter",
+  "npcPrice": 430,
+  "weight": "4.50"
+ },
+ {
+  "name": "Curl of Hair",
+  "npcPrice": 320000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Cursed Bone",
+  "npcPrice": 6000,
+  "weight": "6.50"
+ },
+ {
+  "name": "Cursed Shoulder Spikes",
+  "npcPrice": 320,
+  "weight": "0.97"
+ },
+ {
+  "name": "Cyclops Toe",
+  "npcPrice": 55,
+  "weight": "1.11"
+ },
+ {
+  "name": "Damaged Armor Plates",
+  "npcPrice": 280,
+  "weight": "2.00"
+ },
+ {
+  "name": "Damaged Worm Head",
+  "npcPrice": 8000,
+  "weight": "1.60"
+ },
+ {
+  "name": "Damselfly Eye",
+  "npcPrice": 25,
+  "weight": "1.50"
+ },
+ {
+  "name": "Damselfly Wing",
+  "npcPrice": 20,
+  "weight": "1.20"
+ },
+ {
+  "name": "Dandelion Seeds",
+  "npcPrice": 200,
+  "weight": "1.30"
+ },
+ {
+  "name": "Dangerous Proto Matter",
+  "npcPrice": 300,
+  "weight": "6.00"
+ },
+ {
+  "name": "Dark Bell",
+  "npcPrice": 250,
+  "weight": "2.20"
+ },
+ {
+  "name": "Dark Bell (Silver)",
+  "npcPrice": 310000,
+  "weight": "0.95"
+ },
+ {
+  "name": "Dark Obsidian Splinter",
+  "npcPrice": 4400,
+  "weight": "1.00"
+ },
+ {
+  "name": "Dark Rosary",
+  "npcPrice": 48,
+  "weight": "0.90"
+ },
+ {
+  "name": "Darklight Basalt Chunk",
+  "npcPrice": 3800,
+  "weight": "1.00"
+ },
+ {
+  "name": "Darklight Core (Object)",
+  "npcPrice": 4100,
+  "weight": "1.00"
+ },
+ {
+  "name": "Darklight Figurine",
+  "npcPrice": 3400000,
+  "weight": "0.50"
+ },
+ {
+  "name": "Darklight Heart",
+  "npcPrice": 0,
+  "weight": "1.00"
+ },
+ {
+  "name": "Darklight Matter (Object)",
+  "npcPrice": 5500,
+  "weight": "1.00"
+ },
+ {
+  "name": "Dead Weight",
+  "npcPrice": 450,
+  "weight": "7.50"
+ },
+ {
+  "name": "Deadeye Devious' Eye Patch",
+  "npcPrice": 0,
+  "weight": "1.50"
+ },
+ {
+  "name": "Deadly Fangs",
+  "npcPrice": 5500,
+  "weight": "10.00"
+ },
+ {
+  "name": "Deathly Crypt Rune",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Deathstrike's Snippet",
+  "npcPrice": 0,
+  "weight": "3.80"
+ },
+ {
+  "name": "Decayed Finger Bone",
+  "npcPrice": 5100,
+  "weight": "1.00"
+ },
+ {
+  "name": "Deepling Breaktime Snack",
+  "npcPrice": 90,
+  "weight": "2.40"
+ },
+ {
+  "name": "Deepling Claw",
+  "npcPrice": 430,
+  "weight": "1.80"
+ },
+ {
+  "name": "Deepling Guard Belt Buckle",
+  "npcPrice": 230,
+  "weight": "2.60"
+ },
+ {
+  "name": "Deepling Ridge",
+  "npcPrice": 360,
+  "weight": "1.80"
+ },
+ {
+  "name": "Deepling Scales",
+  "npcPrice": 80,
+  "weight": "4.80"
+ },
+ {
+  "name": "Deepling Warts",
+  "npcPrice": 180,
+  "weight": "2.40"
+ },
+ {
+  "name": "Deeptags",
+  "npcPrice": 290,
+  "weight": "2.40"
+ },
+ {
+  "name": "Deepworm Jaws",
+  "npcPrice": 500,
+  "weight": "1.80"
+ },
+ {
+  "name": "Deepworm Spike Roots",
+  "npcPrice": 650,
+  "weight": "0.70"
+ },
+ {
+  "name": "Deepworm Spikes",
+  "npcPrice": 800,
+  "weight": "1.00"
+ },
+ {
+  "name": "Demon Claws",
+  "npcPrice": 0,
+  "weight": "2.40"
+ },
+ {
+  "name": "Demon Dust",
+  "npcPrice": 300,
+  "weight": "1.00"
+ },
+ {
+  "name": "Demon Horn",
+  "npcPrice": 1000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Demon Root",
+  "npcPrice": 950,
+  "weight": "0.25"
+ },
+ {
+  "name": "Demon Skull",
+  "npcPrice": 0,
+  "weight": "3.20"
+ },
+ {
+  "name": "Demonic Core Essence",
+  "npcPrice": 0,
+  "weight": "1.90"
+ },
+ {
+  "name": "Demonic Essence",
+  "npcPrice": 1000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Demonic Finger",
+  "npcPrice": 1000,
+  "weight": "3.00"
+ },
+ {
+  "name": "Demonic Matter",
+  "npcPrice": 0,
+  "weight": "0.50"
+ },
+ {
+  "name": "Demonic Skeletal Hand",
+  "npcPrice": 80,
+  "weight": "1.32"
+ },
+ {
+  "name": "Devourer Core",
+  "npcPrice": 0,
+  "weight": "5.60"
+ },
+ {
+  "name": "Dewberry Palm Leaf",
+  "npcPrice": 0,
+  "weight": "0.60"
+ },
+ {
+  "name": "Diremaw Brainpan",
+  "npcPrice": 350,
+  "weight": "1.50"
+ },
+ {
+  "name": "Diremaw Legs",
+  "npcPrice": 270,
+  "weight": "2.30"
+ },
+ {
+  "name": "Dirty Turban",
+  "npcPrice": 120,
+  "weight": "1.34"
+ },
+ {
+  "name": "Distorted Heart",
+  "npcPrice": 2100,
+  "weight": "0.75"
+ },
+ {
+  "name": "Distorted Robe",
+  "npcPrice": 1200,
+  "weight": "1.80"
+ },
+ {
+  "name": "Downy Feather",
+  "npcPrice": 20,
+  "weight": "0.32"
+ },
+ {
+  "name": "Dowser",
+  "npcPrice": 35,
+  "weight": "3.60"
+ },
+ {
+  "name": "Dracola's Eye",
+  "npcPrice": 50000,
+  "weight": "15.00"
+ },
+ {
+  "name": "Dracoyle Statue",
+  "npcPrice": 5000,
+  "weight": "15.00"
+ },
+ {
+  "name": "Dracoyle Statue (Enchanted)",
+  "npcPrice": 5000,
+  "weight": "15.00"
+ },
+ {
+  "name": "Dragolisk Eye",
+  "npcPrice": 690,
+  "weight": "2.00"
+ },
+ {
+  "name": "Dragolisk Poison Gland",
+  "npcPrice": 475,
+  "weight": "2.00"
+ },
+ {
+  "name": "Dragon Blood",
+  "npcPrice": 700,
+  "weight": "3.50"
+ },
+ {
+  "name": "Dragon Claw",
+  "npcPrice": 8000,
+  "weight": "12.50"
+ },
+ {
+  "name": "Dragon Claw (Green)",
+  "npcPrice": 0,
+  "weight": "12.50"
+ },
+ {
+  "name": "Dragon Crown",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Dragon Priest's Wandtip",
+  "npcPrice": 175,
+  "weight": "1.55"
+ },
+ {
+  "name": "Dragon Tongue",
+  "npcPrice": 550,
+  "weight": "5.50"
+ },
+ {
+  "name": "Dragon's Tail",
+  "npcPrice": 100,
+  "weight": "2.50"
+ },
+ {
+  "name": "Draken Sulphur",
+  "npcPrice": 550,
+  "weight": "0.68"
+ },
+ {
+  "name": "Draken Wristbands",
+  "npcPrice": 430,
+  "weight": "0.78"
+ },
+ {
+  "name": "Draptor Scales",
+  "npcPrice": 800,
+  "weight": "2.00"
+ },
+ {
+  "name": "Dream Essence Egg",
+  "npcPrice": 205,
+  "weight": "2.80"
+ },
+ {
+  "name": "Dream Matter",
+  "npcPrice": 0,
+  "weight": "3.90"
+ },
+ {
+  "name": "Dream Warden Claw",
+  "npcPrice": 0,
+  "weight": "31.00"
+ },
+ {
+  "name": "Dream Warden Mask",
+  "npcPrice": 0,
+  "weight": "34.00"
+ },
+ {
+  "name": "Dubious Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Dung Ball",
+  "npcPrice": 130,
+  "weight": "1.90"
+ },
+ {
+  "name": "Dwarven Beard",
+  "npcPrice": 0,
+  "weight": "0.50"
+ },
+ {
+  "name": "Earflap",
+  "npcPrice": 40,
+  "weight": "0.75"
+ },
+ {
+  "name": "Egg of The Many",
+  "npcPrice": 15000,
+  "weight": "50.00"
+ },
+ {
+  "name": "Elder Bonelord Tentacle",
+  "npcPrice": 150,
+  "weight": "0.75"
+ },
+ {
+  "name": "Elemental Spikes",
+  "npcPrice": 0,
+  "weight": "12.00"
+ },
+ {
+  "name": "Elven Astral Observer",
+  "npcPrice": 90,
+  "weight": "1.12"
+ },
+ {
+  "name": "Elven Hoof",
+  "npcPrice": 115,
+  "weight": "2.30"
+ },
+ {
+  "name": "Elven Scouting Glass",
+  "npcPrice": 50,
+  "weight": "0.80"
+ },
+ {
+  "name": "Elvish Talisman",
+  "npcPrice": 45,
+  "weight": "1.10"
+ },
+ {
+  "name": "Emerald Tortoise Shell",
+  "npcPrice": 2150,
+  "weight": "6.00"
+ },
+ {
+  "name": "Empty Honey Glass",
+  "npcPrice": 270,
+  "weight": "1.50"
+ },
+ {
+  "name": "Enchanted Chicken Wing",
+  "npcPrice": 20000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Encrypted Notes",
+  "npcPrice": 620,
+  "weight": "2.00"
+ },
+ {
+  "name": "Energy Ball",
+  "npcPrice": 300,
+  "weight": "3.50"
+ },
+ {
+  "name": "Energy Soil",
+  "npcPrice": 2000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Energy Vein",
+  "npcPrice": 270,
+  "weight": "2.00"
+ },
+ {
+  "name": "Ensouled Essence",
+  "npcPrice": 820,
+  "weight": "1.35"
+ },
+ {
+  "name": "Essence of a Bad Dream",
+  "npcPrice": 360,
+  "weight": "0.95"
+ },
+ {
+  "name": "Eternal Flames",
+  "npcPrice": 5000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Exalted Seal",
+  "npcPrice": 190000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Execowtioner Mask",
+  "npcPrice": 240,
+  "weight": "3.20"
+ },
+ {
+  "name": "Eye Patch",
+  "npcPrice": 0,
+  "weight": "1.50"
+ },
+ {
+  "name": "Eye of Corruption",
+  "npcPrice": 390,
+  "weight": "0.93"
+ },
+ {
+  "name": "Eye of a Deepling",
+  "npcPrice": 150,
+  "weight": "2.40"
+ },
+ {
+  "name": "Eye of a Weeper",
+  "npcPrice": 650,
+  "weight": "0.90"
+ },
+ {
+  "name": "Eyeless Devourer Legs",
+  "npcPrice": 650,
+  "weight": "2.40"
+ },
+ {
+  "name": "Eyeless Devourer Maw",
+  "npcPrice": 420,
+  "weight": "1.90"
+ },
+ {
+  "name": "Eyeless Devourer Tongue",
+  "npcPrice": 900,
+  "weight": "0.60"
+ },
+ {
+  "name": "Fafnar Symbol",
+  "npcPrice": 950,
+  "weight": "1.70"
+ },
+ {
+  "name": "Fairy Wings",
+  "npcPrice": 200,
+  "weight": "2.00"
+ },
+ {
+  "name": "Falcon Crest",
+  "npcPrice": 650,
+  "weight": "0.50"
+ },
+ {
+  "name": "Ferumbras' Hat",
+  "npcPrice": 10000,
+  "weight": "8.50"
+ },
+ {
+  "name": "Ferumbras' Mana Keg",
+  "npcPrice": 0,
+  "weight": "14.00"
+ },
+ {
+  "name": "Fetid Heart",
+  "npcPrice": 0,
+  "weight": "10.00"
+ },
+ {
+  "name": "Fiery Crypt Rune",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Fiery Heart",
+  "npcPrice": 375,
+  "weight": "1.15"
+ },
+ {
+  "name": "Fig Leaf",
+  "npcPrice": 200,
+  "weight": "0.60"
+ },
+ {
+  "name": "Figurine of Bakragore",
+  "npcPrice": 5400000,
+  "weight": "0.55"
+ },
+ {
+  "name": "Figurine of Cruelty",
+  "npcPrice": 3100000,
+  "weight": "0.44"
+ },
+ {
+  "name": "Figurine of Greed",
+  "npcPrice": 2900000,
+  "weight": "0.44"
+ },
+ {
+  "name": "Figurine of Hatred",
+  "npcPrice": 2700000,
+  "weight": "0.44"
+ },
+ {
+  "name": "Figurine of Maior Domus",
+  "npcPrice": 3400000,
+  "weight": "0.80"
+ },
+ {
+  "name": "Figurine of Malice",
+  "npcPrice": 2800000,
+  "weight": "0.42"
+ },
+ {
+  "name": "Figurine of Megalomania",
+  "npcPrice": 5000000,
+  "weight": "0.50"
+ },
+ {
+  "name": "Figurine of Mimar Haffar",
+  "npcPrice": 2800000,
+  "weight": "0.65"
+ },
+ {
+  "name": "Figurine of Phosphorus",
+  "npcPrice": 5700000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Figurine of Spite",
+  "npcPrice": 3000000,
+  "weight": "1.10"
+ },
+ {
+  "name": "Fir Cone",
+  "npcPrice": 25,
+  "weight": "1.90"
+ },
+ {
+  "name": "Fireworks Capsule",
+  "npcPrice": 0,
+  "weight": "20.00"
+ },
+ {
+  "name": "Fish Eye",
+  "npcPrice": 500000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Fish Fin",
+  "npcPrice": 150,
+  "weight": "1.20"
+ },
+ {
+  "name": "Flames of the Percht Queen",
+  "npcPrice": 0,
+  "weight": "2.50"
+ },
+ {
+  "name": "Flask of Demonic Blood",
+  "npcPrice": 0,
+  "weight": "2.90"
+ },
+ {
+  "name": "Flask of Embalming Fluid",
+  "npcPrice": 30,
+  "weight": "0.75"
+ },
+ {
+  "name": "Flask of Warrior's Sweat",
+  "npcPrice": 10000,
+  "weight": "3.00"
+ },
+ {
+  "name": "Flawless Ice Crystal",
+  "npcPrice": 5000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Flintstone",
+  "npcPrice": 800,
+  "weight": "3.75"
+ },
+ {
+  "name": "Flotsam",
+  "npcPrice": 330,
+  "weight": "2.90"
+ },
+ {
+  "name": "Foam Stalker Spume",
+  "npcPrice": 0,
+  "weight": "1.80"
+ },
+ {
+  "name": "Forbidden Fruit",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Forbidden Tome",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Fox Paw",
+  "npcPrice": 100,
+  "weight": "1.20"
+ },
+ {
+  "name": "Frazzle Skin",
+  "npcPrice": 400,
+  "weight": "1.90"
+ },
+ {
+  "name": "Frazzle Tongue",
+  "npcPrice": 700,
+  "weight": "6.80"
+ },
+ {
+  "name": "Frost Giant Pelt",
+  "npcPrice": 160,
+  "weight": "2.48"
+ },
+ {
+  "name": "Frosty Ear of a Troll",
+  "npcPrice": 30,
+  "weight": "1.80"
+ },
+ {
+  "name": "Frosty Heart",
+  "npcPrice": 280,
+  "weight": "1.86"
+ },
+ {
+  "name": "Frozen Chain",
+  "npcPrice": 0,
+  "weight": "2.25"
+ },
+ {
+  "name": "Frozen Claw",
+  "npcPrice": 0,
+  "weight": "4.55"
+ },
+ {
+  "name": "Frozen Claw (Ice Horror)",
+  "npcPrice": 900000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Frozen Crapace",
+  "npcPrice": 500000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Frozen Lightning",
+  "npcPrice": 270,
+  "weight": "7.00"
+ },
+ {
+  "name": "Frozen Peacock Feather",
+  "npcPrice": 110000,
+  "weight": "0.65"
+ },
+ {
+  "name": "Frozen Time",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Fungal Blister",
+  "npcPrice": 0,
+  "weight": "2.40"
+ },
+ {
+  "name": "Fur Shred",
+  "npcPrice": 200,
+  "weight": "5.00"
+ },
+ {
+  "name": "Gauze Bandage",
+  "npcPrice": 90,
+  "weight": "0.97"
+ },
+ {
+  "name": "Gear Crystal",
+  "npcPrice": 200,
+  "weight": "0.95"
+ },
+ {
+  "name": "Gear Wheel",
+  "npcPrice": 500,
+  "weight": "0.05"
+ },
+ {
+  "name": "Geomancer's Robe",
+  "npcPrice": 80,
+  "weight": "1.30"
+ },
+ {
+  "name": "Geomancer's Staff",
+  "npcPrice": 120,
+  "weight": "1.22"
+ },
+ {
+  "name": "Ghastly Dragon Head",
+  "npcPrice": 700,
+  "weight": "12.00"
+ },
+ {
+  "name": "Ghostly Tissue",
+  "npcPrice": 90,
+  "weight": "0.50"
+ },
+ {
+  "name": "Ghoul Snack",
+  "npcPrice": 60,
+  "weight": "1.40"
+ },
+ {
+  "name": "Giant Crab Pincer",
+  "npcPrice": 950,
+  "weight": "1.12"
+ },
+ {
+  "name": "Giant Eye",
+  "npcPrice": 380,
+  "weight": "1.20"
+ },
+ {
+  "name": "Giant Pacifier",
+  "npcPrice": 170,
+  "weight": "9.00"
+ },
+ {
+  "name": "Giant Tentacle",
+  "npcPrice": 10000,
+  "weight": "2.10"
+ },
+ {
+  "name": "Giant Tusk",
+  "npcPrice": 6000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Gilded Bell",
+  "npcPrice": 0,
+  "weight": "0.80"
+ },
+ {
+  "name": "Girlish Hair Decoration",
+  "npcPrice": 30,
+  "weight": "0.50"
+ },
+ {
+  "name": "Girtablilu Warrior Carapace",
+  "npcPrice": 520,
+  "weight": "2.50"
+ },
+ {
+  "name": "Gland",
+  "npcPrice": 500,
+  "weight": "0.50"
+ },
+ {
+  "name": "Glimmering Soil",
+  "npcPrice": 2000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Glistening Bone",
+  "npcPrice": 250,
+  "weight": "12.00"
+ },
+ {
+  "name": "Glob of Acid Slime",
+  "npcPrice": 25,
+  "weight": "0.10"
+ },
+ {
+  "name": "Glob of Glooth",
+  "npcPrice": 125,
+  "weight": "0.10"
+ },
+ {
+  "name": "Glob of Mercury",
+  "npcPrice": 20,
+  "weight": "0.10"
+ },
+ {
+  "name": "Glob of Tar",
+  "npcPrice": 30,
+  "weight": "0.10"
+ },
+ {
+  "name": "Gloom Wolf Fur",
+  "npcPrice": 70,
+  "weight": "1.20"
+ },
+ {
+  "name": "Glooth Injection Tube",
+  "npcPrice": 350,
+  "weight": "14.00"
+ },
+ {
+  "name": "Glowing Carrot",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Glowing Rune",
+  "npcPrice": 350,
+  "weight": "0.10"
+ },
+ {
+  "name": "Gnomevil's Hat",
+  "npcPrice": 0,
+  "weight": "2.10"
+ },
+ {
+  "name": "Goanna Claw",
+  "npcPrice": 260,
+  "weight": "0.90"
+ },
+ {
+  "name": "Goanna Meat",
+  "npcPrice": 190,
+  "weight": "0.90"
+ },
+ {
+  "name": "Goblin Ear",
+  "npcPrice": 20,
+  "weight": "0.75"
+ },
+ {
+  "name": "Gold Tooth",
+  "npcPrice": 120,
+  "weight": "0.90"
+ },
+ {
+  "name": "Gold-Brocaded Cloth",
+  "npcPrice": 175,
+  "weight": "2.10"
+ },
+ {
+  "name": "Gold-Scaled Sentinel",
+  "npcPrice": 380000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Golden Bell",
+  "npcPrice": 0,
+  "weight": "1.55"
+ },
+ {
+  "name": "Golden Belt",
+  "npcPrice": 0,
+  "weight": "1.40"
+ },
+ {
+  "name": "Golden Brush",
+  "npcPrice": 250,
+  "weight": "12.40"
+ },
+ {
+  "name": "Golden Claw",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Golden Cotton Reel",
+  "npcPrice": 0,
+  "weight": "2.20"
+ },
+ {
+  "name": "Golden Lotus Brooch",
+  "npcPrice": 270,
+  "weight": "1.00"
+ },
+ {
+  "name": "Golden Sun Coin",
+  "npcPrice": 11000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Golden Talon",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Golden Tiger Coin",
+  "npcPrice": 11000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Goosebump Leather",
+  "npcPrice": 650,
+  "weight": "2.80"
+ },
+ {
+  "name": "Gore Horn (Item)",
+  "npcPrice": 2900,
+  "weight": "2.60"
+ },
+ {
+  "name": "Gorerilla Mane",
+  "npcPrice": 2750,
+  "weight": "2.40"
+ },
+ {
+  "name": "Gorerilla Tail",
+  "npcPrice": 2650,
+  "weight": "2.80"
+ },
+ {
+  "name": "Gorger Antlers",
+  "npcPrice": 2250,
+  "weight": "6.30"
+ },
+ {
+  "name": "Grant of Arms",
+  "npcPrice": 950,
+  "weight": "0.50"
+ },
+ {
+  "name": "Grappling Hook",
+  "npcPrice": 150,
+  "weight": "6.20"
+ },
+ {
+  "name": "Greasy Wool",
+  "npcPrice": 0,
+  "weight": "1.18"
+ },
+ {
+  "name": "Greed's Arm",
+  "npcPrice": 950000,
+  "weight": "1.25"
+ },
+ {
+  "name": "Green Bandage",
+  "npcPrice": 180,
+  "weight": "0.60"
+ },
+ {
+  "name": "Green Dragon Leather",
+  "npcPrice": 100,
+  "weight": "0.60"
+ },
+ {
+  "name": "Green Dragon Scale",
+  "npcPrice": 100,
+  "weight": "0.80"
+ },
+ {
+  "name": "Green Piece of Cloth",
+  "npcPrice": 200,
+  "weight": "5.00"
+ },
+ {
+  "name": "Grimace",
+  "npcPrice": 120000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Guidebook",
+  "npcPrice": 200,
+  "weight": "1.50"
+ },
+ {
+  "name": "Gummy Rotworm",
+  "npcPrice": 0,
+  "weight": "0.20"
+ },
+ {
+  "name": "Hair of a Banshee",
+  "npcPrice": 350,
+  "weight": "0.46"
+ },
+ {
+  "name": "Half-Digested Piece of Meat",
+  "npcPrice": 55,
+  "weight": "1.24"
+ },
+ {
+  "name": "Half-Digested Stones",
+  "npcPrice": 40,
+  "weight": "2.00"
+ },
+ {
+  "name": "Half-Eaten Brain",
+  "npcPrice": 85,
+  "weight": "0.64"
+ },
+ {
+  "name": "Hand",
+  "npcPrice": 1450,
+  "weight": "0.90"
+ },
+ {
+  "name": "Hard-Boiled Hydra Egg",
+  "npcPrice": 0,
+  "weight": "20.00"
+ },
+ {
+  "name": "Hardened Bone",
+  "npcPrice": 70,
+  "weight": "6.00"
+ },
+ {
+  "name": "Harpoon of a Giant Snail",
+  "npcPrice": 15000,
+  "weight": "0.80"
+ },
+ {
+  "name": "Harpy Feathers",
+  "npcPrice": 730,
+  "weight": "3.90"
+ },
+ {
+  "name": "Hatched Rorc Egg",
+  "npcPrice": 30,
+  "weight": "1.50"
+ },
+ {
+  "name": "Haunted Piece of Wood",
+  "npcPrice": 115,
+  "weight": "2.26"
+ },
+ {
+  "name": "Hazardous Heart",
+  "npcPrice": 5000,
+  "weight": "0.75"
+ },
+ {
+  "name": "Hazardous Robe",
+  "npcPrice": 3000,
+  "weight": "1.80"
+ },
+ {
+  "name": "Head (Brachiodemon)",
+  "npcPrice": 3500,
+  "weight": "0.90"
+ },
+ {
+  "name": "Head (Many Faces)",
+  "npcPrice": 3200,
+  "weight": "0.60"
+ },
+ {
+  "name": "Headpecker Beak",
+  "npcPrice": 2800,
+  "weight": "3.90"
+ },
+ {
+  "name": "Headpecker Feather",
+  "npcPrice": 1300,
+  "weight": "0.70"
+ },
+ {
+  "name": "Heart Amphora",
+  "npcPrice": 930,
+  "weight": "0.20"
+ },
+ {
+  "name": "Heaven Blossom",
+  "npcPrice": 50,
+  "weight": "2.10"
+ },
+ {
+  "name": "Hellhound Slobber",
+  "npcPrice": 500,
+  "weight": "0.75"
+ },
+ {
+  "name": "Hellhunter Eye",
+  "npcPrice": 2950,
+  "weight": "1.90"
+ },
+ {
+  "name": "Hellspawn Tail",
+  "npcPrice": 475,
+  "weight": "1.25"
+ },
+ {
+  "name": "Helmet of Sir Leonard",
+  "npcPrice": 46000,
+  "weight": "0.25"
+ },
+ {
+  "name": "Hemp Rope",
+  "npcPrice": 350,
+  "weight": "1.90"
+ },
+ {
+  "name": "Hideous Chunk",
+  "npcPrice": 510,
+  "weight": "1.60"
+ },
+ {
+  "name": "High Guard Flag",
+  "npcPrice": 550,
+  "weight": "1.12"
+ },
+ {
+  "name": "High Guard Shoulderplates",
+  "npcPrice": 130,
+  "weight": "1.03"
+ },
+ {
+  "name": "Hollow Stampor Hoof",
+  "npcPrice": 400,
+  "weight": "1.80"
+ },
+ {
+  "name": "Holy Ash",
+  "npcPrice": 160,
+  "weight": "1.90"
+ },
+ {
+  "name": "Holy Orchid",
+  "npcPrice": 90,
+  "weight": "2.50"
+ },
+ {
+  "name": "Honeycomb",
+  "npcPrice": 40,
+  "weight": "0.80"
+ },
+ {
+  "name": "Hook",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Horn of Kalyassa",
+  "npcPrice": 10000,
+  "weight": "6.50"
+ },
+ {
+  "name": "Horoscope",
+  "npcPrice": 40,
+  "weight": "2.80"
+ },
+ {
+  "name": "Horseshoe",
+  "npcPrice": 0,
+  "weight": "10.00"
+ },
+ {
+  "name": "Huge Chunk of Crude Iron",
+  "npcPrice": 15000,
+  "weight": "50.00"
+ },
+ {
+  "name": "Huge Shell",
+  "npcPrice": 15000,
+  "weight": "3.20"
+ },
+ {
+  "name": "Huge Spiky Snail Shell",
+  "npcPrice": 8000,
+  "weight": "3.80"
+ },
+ {
+  "name": "Human Teeth",
+  "npcPrice": 2000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Humongous Chunk",
+  "npcPrice": 540,
+  "weight": "1.90"
+ },
+ {
+  "name": "Hunter's Quiver",
+  "npcPrice": 80,
+  "weight": "1.32"
+ },
+ {
+  "name": "Hydra Egg",
+  "npcPrice": 500,
+  "weight": "20.00"
+ },
+ {
+  "name": "Hydra Head",
+  "npcPrice": 600,
+  "weight": "13.00"
+ },
+ {
+  "name": "Hydra Tongue",
+  "npcPrice": 0,
+  "weight": "1.00"
+ },
+ {
+  "name": "Hydrophytes",
+  "npcPrice": 220,
+  "weight": "0.45"
+ },
+ {
+  "name": "Ice Flower (Item)",
+  "npcPrice": 370,
+  "weight": "0.10"
+ },
+ {
+  "name": "Ice Flower Seeds",
+  "npcPrice": 0,
+  "weight": "0.50"
+ },
+ {
+  "name": "Ice Shard",
+  "npcPrice": 500,
+  "weight": "0.18"
+ },
+ {
+  "name": "Iced Soil",
+  "npcPrice": 2000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Ichgahal's Fungal Infestation",
+  "npcPrice": 900000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Icicle (Percht)",
+  "npcPrice": 0,
+  "weight": "19.00"
+ },
+ {
+  "name": "Icy Crypt Rune",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Icy Horns",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Icy Scales",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Idol of the Forge",
+  "npcPrice": 950,
+  "weight": "2.00"
+ },
+ {
+  "name": "Incantation Notes",
+  "npcPrice": 90,
+  "weight": "4.40"
+ },
+ {
+  "name": "Infernal Heart",
+  "npcPrice": 2100,
+  "weight": "0.75"
+ },
+ {
+  "name": "Infernal Robe",
+  "npcPrice": 1200,
+  "weight": "1.80"
+ },
+ {
+  "name": "Infernoid Ember",
+  "npcPrice": 160,
+  "weight": "0.80"
+ },
+ {
+  "name": "Inkwell (Black)",
+  "npcPrice": 720,
+  "weight": "1.80"
+ },
+ {
+  "name": "Insectoid Cocoon (Item)",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Instable Proto Matter",
+  "npcPrice": 300,
+  "weight": "6.00"
+ },
+ {
+  "name": "Iron Ore",
+  "npcPrice": 500,
+  "weight": "2.00"
+ },
+ {
+  "name": "Ivory Carving",
+  "npcPrice": 300,
+  "weight": "1.40"
+ },
+ {
+  "name": "Ivory Comb",
+  "npcPrice": 8000,
+  "weight": "6.50"
+ },
+ {
+  "name": "Izcandar's Snow Globe",
+  "npcPrice": 180000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Izcandar's Sundial",
+  "npcPrice": 225000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Jagged Sickle",
+  "npcPrice": 150000,
+  "weight": "0.80"
+ },
+ {
+  "name": "Jaul's Pearl",
+  "npcPrice": 0,
+  "weight": "3.10"
+ },
+ {
+  "name": "Jaws",
+  "npcPrice": 3900,
+  "weight": "1.70"
+ },
+ {
+  "name": "Jewelled Belt",
+  "npcPrice": 180,
+  "weight": "1.24"
+ },
+ {
+  "name": "Jungle Moa Claw",
+  "npcPrice": 160,
+  "weight": "1.70"
+ },
+ {
+  "name": "Jungle Moa Egg",
+  "npcPrice": 250,
+  "weight": "8.40"
+ },
+ {
+  "name": "Jungle Moa Feather",
+  "npcPrice": 140,
+  "weight": "0.50"
+ },
+ {
+  "name": "Katex' Blood",
+  "npcPrice": 210,
+  "weight": "0.70"
+ },
+ {
+  "name": "Key to Knowledge",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Key to the Drowned Library",
+  "npcPrice": 330,
+  "weight": "1.20"
+ },
+ {
+  "name": "Kollos Shell",
+  "npcPrice": 420,
+  "weight": "4.60"
+ },
+ {
+  "name": "Kongra's Shoulderpad",
+  "npcPrice": 100,
+  "weight": "1.40"
+ },
+ {
+  "name": "Lamassu Hoof",
+  "npcPrice": 330,
+  "weight": "1.10"
+ },
+ {
+  "name": "Lamassu Horn",
+  "npcPrice": 240,
+  "weight": "2.50"
+ },
+ {
+  "name": "Lancer Beetle Shell",
+  "npcPrice": 80,
+  "weight": "1.07"
+ },
+ {
+  "name": "Lancet",
+  "npcPrice": 90,
+  "weight": "4.90"
+ },
+ {
+  "name": "Lavafungus Head",
+  "npcPrice": 900,
+  "weight": "1.80"
+ },
+ {
+  "name": "Lavafungus Ring",
+  "npcPrice": 390,
+  "weight": "0.40"
+ },
+ {
+  "name": "Lavaworm Jaws",
+  "npcPrice": 1100,
+  "weight": "1.80"
+ },
+ {
+  "name": "Lavaworm Spike Roots",
+  "npcPrice": 600,
+  "weight": "0.70"
+ },
+ {
+  "name": "Lavaworm Spikes",
+  "npcPrice": 750,
+  "weight": "1.00"
+ },
+ {
+  "name": "Legionnaire Flags",
+  "npcPrice": 500,
+  "weight": "1.10"
+ },
+ {
+  "name": "Lime Tart",
+  "npcPrice": 1870,
+  "weight": "0.25"
+ },
+ {
+  "name": "Liodile Fang",
+  "npcPrice": 480,
+  "weight": "1.70"
+ },
+ {
+  "name": "Lion Cloak Patch",
+  "npcPrice": 190,
+  "weight": "5.00"
+ },
+ {
+  "name": "Lion Crest",
+  "npcPrice": 270,
+  "weight": "2.00"
+ },
+ {
+  "name": "Lion Seal",
+  "npcPrice": 210,
+  "weight": "5.00"
+ },
+ {
+  "name": "Lion's Mane",
+  "npcPrice": 60,
+  "weight": "1.80"
+ },
+ {
+  "name": "Little Bowl of Myrrh",
+  "npcPrice": 500,
+  "weight": "0.60"
+ },
+ {
+  "name": "Lizard Essence",
+  "npcPrice": 300,
+  "weight": "1.50"
+ },
+ {
+  "name": "Lizard Heart",
+  "npcPrice": 530,
+  "weight": "3.50"
+ },
+ {
+  "name": "Lizard Leather",
+  "npcPrice": 150,
+  "weight": "0.50"
+ },
+ {
+  "name": "Lizard Scale",
+  "npcPrice": 120,
+  "weight": "0.80"
+ },
+ {
+  "name": "Lizard Tail",
+  "npcPrice": 95,
+  "weight": "1.10"
+ },
+ {
+  "name": "Longing Eyes",
+  "npcPrice": 8000,
+  "weight": "1.20"
+ },
+ {
+  "name": "Loose Prayer Beads",
+  "npcPrice": 0,
+  "weight": "1.60"
+ },
+ {
+  "name": "Lost Basher's Spike",
+  "npcPrice": 280,
+  "weight": "2.20"
+ },
+ {
+  "name": "Lost Bracers",
+  "npcPrice": 140,
+  "weight": "2.90"
+ },
+ {
+  "name": "Lost Husher's Staff",
+  "npcPrice": 250,
+  "weight": "8.00"
+ },
+ {
+  "name": "Lost Soul (Item)",
+  "npcPrice": 120,
+  "weight": "0.20"
+ },
+ {
+  "name": "Lucky Pig",
+  "npcPrice": 0,
+  "weight": "7.00"
+ },
+ {
+  "name": "Ludicrous Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Luminous Orb",
+  "npcPrice": 1000,
+  "weight": "0.94"
+ },
+ {
+  "name": "Luminous Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Lump of Dirt",
+  "npcPrice": 10,
+  "weight": "0.68"
+ },
+ {
+  "name": "Lump of Earth",
+  "npcPrice": 130,
+  "weight": "1.16"
+ },
+ {
+  "name": "Mad Froth",
+  "npcPrice": 80,
+  "weight": "1.60"
+ },
+ {
+  "name": "Magic Sulphur",
+  "npcPrice": 8000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Magma Clump",
+  "npcPrice": 570,
+  "weight": "3.10"
+ },
+ {
+  "name": "Makara Fin",
+  "npcPrice": 350,
+  "weight": "2.50"
+ },
+ {
+  "name": "Makara Tongue",
+  "npcPrice": 320,
+  "weight": "1.20"
+ },
+ {
+  "name": "Malice's Horn",
+  "npcPrice": 620000,
+  "weight": "1.50"
+ },
+ {
+  "name": "Malice's Spine",
+  "npcPrice": 850000,
+  "weight": "2.30"
+ },
+ {
+  "name": "Malofur's Lunchbox",
+  "npcPrice": 240000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Mammoth Tusk",
+  "npcPrice": 100,
+  "weight": "6.00"
+ },
+ {
+  "name": "Mantassin Tail",
+  "npcPrice": 280,
+  "weight": "1.15"
+ },
+ {
+  "name": "Manticore Ear",
+  "npcPrice": 310,
+  "weight": "0.90"
+ },
+ {
+  "name": "Manticore Tail",
+  "npcPrice": 220,
+  "weight": "7.50"
+ },
+ {
+  "name": "Mantosaurus Jaw",
+  "npcPrice": 2800,
+  "weight": "4.20"
+ },
+ {
+  "name": "Marsh Stalker Beak",
+  "npcPrice": 65,
+  "weight": "1.10"
+ },
+ {
+  "name": "Marsh Stalker Feather",
+  "npcPrice": 50,
+  "weight": "0.30"
+ },
+ {
+  "name": "Maxilla",
+  "npcPrice": 250,
+  "weight": "2.10"
+ },
+ {
+  "name": "Maxxenius Head",
+  "npcPrice": 500000,
+  "weight": "2.10"
+ },
+ {
+  "name": "Meat Hammer",
+  "npcPrice": 60,
+  "weight": "3.70"
+ },
+ {
+  "name": "Medal of Valiance",
+  "npcPrice": 410000,
+  "weight": "0.55"
+ },
+ {
+  "name": "Mega Dragon Heart",
+  "npcPrice": 1100,
+  "weight": "2.00"
+ },
+ {
+  "name": "Megalomania's Essence",
+  "npcPrice": 1900000,
+  "weight": "1.10"
+ },
+ {
+  "name": "Megalomania's Skull",
+  "npcPrice": 1500000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Mercurial Wing",
+  "npcPrice": 2500,
+  "weight": "0.10"
+ },
+ {
+  "name": "Metal Jaw",
+  "npcPrice": 260,
+  "weight": "1.40"
+ },
+ {
+  "name": "Metal Spike",
+  "npcPrice": 320,
+  "weight": "0.50"
+ },
+ {
+  "name": "Metal Toe",
+  "npcPrice": 430,
+  "weight": "5.00"
+ },
+ {
+  "name": "Mighty Demonic Core Essence",
+  "npcPrice": 0,
+  "weight": "1.90"
+ },
+ {
+  "name": "Milk Churn",
+  "npcPrice": 100,
+  "weight": "20.00"
+ },
+ {
+  "name": "Minotaur Horn",
+  "npcPrice": 75,
+  "weight": "1.11"
+ },
+ {
+  "name": "Minotaur Leather",
+  "npcPrice": 80,
+  "weight": "0.40"
+ },
+ {
+  "name": "Miraculum",
+  "npcPrice": 60,
+  "weight": "1.40"
+ },
+ {
+  "name": "Molten Dragon Essence",
+  "npcPrice": 840,
+  "weight": "2.00"
+ },
+ {
+  "name": "Mooh'tah Shell",
+  "npcPrice": 110,
+  "weight": "5.00"
+ },
+ {
+  "name": "Moohtant Horn",
+  "npcPrice": 140,
+  "weight": "3.50"
+ },
+ {
+  "name": "Moon Compass",
+  "npcPrice": 5000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Moon Melon Slice",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Moon Pin",
+  "npcPrice": 18000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Moonspawn Headpiece",
+  "npcPrice": 900,
+  "weight": "3.20"
+ },
+ {
+  "name": "Moonspawn Tentacle",
+  "npcPrice": 670,
+  "weight": "1.80"
+ },
+ {
+  "name": "Morgaroth's Heart",
+  "npcPrice": 15000,
+  "weight": "35.00"
+ },
+ {
+  "name": "Morshabaal's Brain",
+  "npcPrice": 5000000,
+  "weight": "33.00"
+ },
+ {
+  "name": "Morshabaal's Extract",
+  "npcPrice": 3250000,
+  "weight": "31.50"
+ },
+ {
+  "name": "Mother Soil",
+  "npcPrice": 5000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Mould Heart",
+  "npcPrice": 2100,
+  "weight": "0.75"
+ },
+ {
+  "name": "Mould Robe",
+  "npcPrice": 1200,
+  "weight": "1.80"
+ },
+ {
+  "name": "Mouldy Powder",
+  "npcPrice": 200,
+  "weight": "1.70"
+ },
+ {
+  "name": "Mr. Punish's Handcuffs",
+  "npcPrice": 50000,
+  "weight": "25.00"
+ },
+ {
+  "name": "Mummified Demon Finger",
+  "npcPrice": 0,
+  "weight": "1.20"
+ },
+ {
+  "name": "Murcion's Mycelium",
+  "npcPrice": 950000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Mutated Bat Ear",
+  "npcPrice": 420,
+  "weight": "1.75"
+ },
+ {
+  "name": "Mutated Flesh",
+  "npcPrice": 50,
+  "weight": "2.50"
+ },
+ {
+  "name": "Mutated Rat Tail",
+  "npcPrice": 150,
+  "weight": "1.43"
+ },
+ {
+  "name": "Mysterious Remains",
+  "npcPrice": 0,
+  "weight": "120.00"
+ },
+ {
+  "name": "Mystical Hourglass",
+  "npcPrice": 700,
+  "weight": "0.96"
+ },
+ {
+  "name": "Naga Archer Scales",
+  "npcPrice": 340,
+  "weight": "0.30"
+ },
+ {
+  "name": "Naga Armring",
+  "npcPrice": 390,
+  "weight": "3.50"
+ },
+ {
+  "name": "Naga Earring",
+  "npcPrice": 380,
+  "weight": "2.80"
+ },
+ {
+  "name": "Naga Warrior Scales",
+  "npcPrice": 340,
+  "weight": "0.30"
+ },
+ {
+  "name": "Natural Soil",
+  "npcPrice": 2000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Necromantic Core",
+  "npcPrice": 10000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Necromantic Crypt Rune",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Necromantic Robe",
+  "npcPrice": 250,
+  "weight": "2.20"
+ },
+ {
+  "name": "Necromantic Rust",
+  "npcPrice": 390,
+  "weight": "1.50"
+ },
+ {
+  "name": "Nettle Blossom",
+  "npcPrice": 75,
+  "weight": "0.88"
+ },
+ {
+  "name": "Nettle Spit",
+  "npcPrice": 25,
+  "weight": "0.90"
+ },
+ {
+  "name": "Neutral Matter",
+  "npcPrice": 5000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Night Harpy Beak",
+  "npcPrice": 10000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Night Harpy Feathers",
+  "npcPrice": 5000,
+  "weight": "7.50"
+ },
+ {
+  "name": "Nighthunter Wing",
+  "npcPrice": 2000,
+  "weight": "1.40"
+ },
+ {
+  "name": "Nimmersatt's Seal",
+  "npcPrice": 520,
+  "weight": "2.00"
+ },
+ {
+  "name": "Noble Amulet",
+  "npcPrice": 430000,
+  "weight": "0.65"
+ },
+ {
+  "name": "Noble Cape",
+  "npcPrice": 425000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Noble Turban",
+  "npcPrice": 430,
+  "weight": "1.44"
+ },
+ {
+  "name": "Norcferatu Talisman",
+  "npcPrice": 670,
+  "weight": "0.20"
+ },
+ {
+  "name": "Nose Ring",
+  "npcPrice": 2000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Obujos' Shell",
+  "npcPrice": 0,
+  "weight": "2.80"
+ },
+ {
+  "name": "Obvious Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Odd Organ",
+  "npcPrice": 410,
+  "weight": "4.50"
+ },
+ {
+  "name": "Ogre Ear Stud",
+  "npcPrice": 180,
+  "weight": "16.00"
+ },
+ {
+  "name": "Ogre Nose Ring",
+  "npcPrice": 210,
+  "weight": "21.00"
+ },
+ {
+  "name": "Old Girtablilu Carapace",
+  "npcPrice": 570,
+  "weight": "2.50"
+ },
+ {
+  "name": "Old Royal Diary",
+  "npcPrice": 220000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Ominous Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "One of Timira's Many Heads",
+  "npcPrice": 215000,
+  "weight": "31.50"
+ },
+ {
+  "name": "Orc Leather",
+  "npcPrice": 30,
+  "weight": "0.50"
+ },
+ {
+  "name": "Orc Tooth",
+  "npcPrice": 150,
+  "weight": "1.00"
+ },
+ {
+  "name": "Orc Tusk",
+  "npcPrice": 700,
+  "weight": "10.00"
+ },
+ {
+  "name": "Orcish Gear",
+  "npcPrice": 85,
+  "weight": "1.80"
+ },
+ {
+  "name": "Orcish Toothbrush",
+  "npcPrice": 750,
+  "weight": "0.20"
+ },
+ {
+  "name": "Orshabaal's Brain",
+  "npcPrice": 12000,
+  "weight": "35.00"
+ },
+ {
+  "name": "Pair of Hellflayer Horns",
+  "npcPrice": 1300,
+  "weight": "12.00"
+ },
+ {
+  "name": "Pale Worm's Scalp",
+  "npcPrice": 489000,
+  "weight": "0.75"
+ },
+ {
+  "name": "Panther Head",
+  "npcPrice": 750,
+  "weight": "1.50"
+ },
+ {
+  "name": "Panther Paw",
+  "npcPrice": 300,
+  "weight": "1.50"
+ },
+ {
+  "name": "Paper Boat",
+  "npcPrice": 800,
+  "weight": "0.50"
+ },
+ {
+  "name": "Paper Plane",
+  "npcPrice": 480,
+  "weight": "0.50"
+ },
+ {
+  "name": "Parder Fur",
+  "npcPrice": 150,
+  "weight": "2.90"
+ },
+ {
+  "name": "Parder Tooth",
+  "npcPrice": 150,
+  "weight": "0.70"
+ },
+ {
+  "name": "Pastry Dragon",
+  "npcPrice": 7500,
+  "weight": "0.25"
+ },
+ {
+  "name": "Patch of Fine Cloth",
+  "npcPrice": 1350,
+  "weight": "1.80"
+ },
+ {
+  "name": "Peacock Feather Fan",
+  "npcPrice": 350,
+  "weight": "2.00"
+ },
+ {
+  "name": "Peg Leg",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Pelvis Bone",
+  "npcPrice": 30,
+  "weight": "1.30"
+ },
+ {
+  "name": "Percht Broom",
+  "npcPrice": 0,
+  "weight": "8.50"
+ },
+ {
+  "name": "Percht Handkerchief",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Percht Horns",
+  "npcPrice": 0,
+  "weight": "5.80"
+ },
+ {
+  "name": "Percht Queen's Frozen Heart",
+  "npcPrice": 0,
+  "weight": "17.00"
+ },
+ {
+  "name": "Percht Skull",
+  "npcPrice": 0,
+  "weight": "8.70"
+ },
+ {
+  "name": "Perfect Behemoth Fang",
+  "npcPrice": 250,
+  "weight": "5.00"
+ },
+ {
+  "name": "Petrified Scream",
+  "npcPrice": 250,
+  "weight": "1.50"
+ },
+ {
+  "name": "Phantasmal Hair",
+  "npcPrice": 500,
+  "weight": "0.50"
+ },
+ {
+  "name": "Piece of Archer Armor",
+  "npcPrice": 20,
+  "weight": "1.10"
+ },
+ {
+  "name": "Piece of Crocodile Leather",
+  "npcPrice": 15,
+  "weight": "1.04"
+ },
+ {
+  "name": "Piece of Dead Brain",
+  "npcPrice": 420,
+  "weight": "1.32"
+ },
+ {
+  "name": "Piece of Draconian Steel",
+  "npcPrice": 3000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Piece of Frozen Night",
+  "npcPrice": 680,
+  "weight": "0.20"
+ },
+ {
+  "name": "Piece of Hell Steel",
+  "npcPrice": 500,
+  "weight": "5.00"
+ },
+ {
+  "name": "Piece of Hellfire Armor",
+  "npcPrice": 550,
+  "weight": "2.50"
+ },
+ {
+  "name": "Piece of Massacre's Shell",
+  "npcPrice": 50000,
+  "weight": "65.00"
+ },
+ {
+  "name": "Piece of Royal Steel",
+  "npcPrice": 10000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Piece of Scarab Shell",
+  "npcPrice": 45,
+  "weight": "1.42"
+ },
+ {
+  "name": "Piece of Swampling Wood",
+  "npcPrice": 30,
+  "weight": "3.50"
+ },
+ {
+  "name": "Piece of Timira's Sensors",
+  "npcPrice": 150000,
+  "weight": "31.50"
+ },
+ {
+  "name": "Piece of Warrior Armor",
+  "npcPrice": 50,
+  "weight": "1.10"
+ },
+ {
+  "name": "Pieces of Magic Chalk",
+  "npcPrice": 210,
+  "weight": "6.80"
+ },
+ {
+  "name": "Pig Foot",
+  "npcPrice": 10,
+  "weight": "0.98"
+ },
+ {
+  "name": "Pile of Grave Earth",
+  "npcPrice": 25,
+  "weight": "0.98"
+ },
+ {
+  "name": "Pirat's Tail",
+  "npcPrice": 180,
+  "weight": "1.90"
+ },
+ {
+  "name": "Pirate Coin",
+  "npcPrice": 110,
+  "weight": "0.40"
+ },
+ {
+  "name": "Plagueroot Offshoot",
+  "npcPrice": 280000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Plasma Pearls",
+  "npcPrice": 250,
+  "weight": "3.50"
+ },
+ {
+  "name": "Plasmatic Lightning",
+  "npcPrice": 270,
+  "weight": "7.00"
+ },
+ {
+  "name": "Poison Gland",
+  "npcPrice": 210,
+  "weight": "0.33"
+ },
+ {
+  "name": "Poison Spider Shell",
+  "npcPrice": 10,
+  "weight": "1.30"
+ },
+ {
+  "name": "Poisoned Fang",
+  "npcPrice": 130,
+  "weight": "1.20"
+ },
+ {
+  "name": "Poisonous Slime",
+  "npcPrice": 50,
+  "weight": "0.80"
+ },
+ {
+  "name": "Polar Bear Paw",
+  "npcPrice": 30,
+  "weight": "1.50"
+ },
+ {
+  "name": "Pool of Chitinous Glue",
+  "npcPrice": 480,
+  "weight": "2.70"
+ },
+ {
+  "name": "Pot of Orcish Warpaint",
+  "npcPrice": 1150,
+  "weight": "0.20"
+ },
+ {
+  "name": "Prehemoth Claw",
+  "npcPrice": 2300,
+  "weight": "8.50"
+ },
+ {
+  "name": "Prehemoth Horns",
+  "npcPrice": 3000,
+  "weight": "11.00"
+ },
+ {
+  "name": "Preserved Dark Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Light Blue Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Pink Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Purple Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Red Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Violet Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Preserved Yellow Seed",
+  "npcPrice": 0,
+  "weight": "0.30"
+ },
+ {
+  "name": "Pressed Flower",
+  "npcPrice": 570,
+  "weight": "0.05"
+ },
+ {
+  "name": "Pristine Worm Head",
+  "npcPrice": 15000,
+  "weight": "1.90"
+ },
+ {
+  "name": "Protective Charm",
+  "npcPrice": 60,
+  "weight": "1.20"
+ },
+ {
+  "name": "Pulverized Ore",
+  "npcPrice": 400,
+  "weight": "1.70"
+ },
+ {
+  "name": "Purified Soul (Netherworld)",
+  "npcPrice": 260,
+  "weight": "0.20"
+ },
+ {
+  "name": "Purple Robe",
+  "npcPrice": 110,
+  "weight": "2.30"
+ },
+ {
+  "name": "Putrefactive Figurine",
+  "npcPrice": 3200000,
+  "weight": "0.50"
+ },
+ {
+  "name": "Pyrophyte Seed Pod",
+  "npcPrice": 720,
+  "weight": "3.20"
+ },
+ {
+  "name": "Quara Bone",
+  "npcPrice": 500,
+  "weight": "1.44"
+ },
+ {
+  "name": "Quara Eye",
+  "npcPrice": 350,
+  "weight": "0.80"
+ },
+ {
+  "name": "Quara Pincers",
+  "npcPrice": 410,
+  "weight": "1.20"
+ },
+ {
+  "name": "Quara Tentacle",
+  "npcPrice": 140,
+  "weight": "1.07"
+ },
+ {
+  "name": "Quill",
+  "npcPrice": 1100,
+  "weight": "0.90"
+ },
+ {
+  "name": "Rabbit's Foot",
+  "npcPrice": 50,
+  "weight": "0.98"
+ },
+ {
+  "name": "Rare Earth",
+  "npcPrice": 80,
+  "weight": "2.50"
+ },
+ {
+  "name": "Ratmiral's Hat",
+  "npcPrice": 150000,
+  "weight": "2.70"
+ },
+ {
+  "name": "Ravenous Circlet",
+  "npcPrice": 220000,
+  "weight": "0.40"
+ },
+ {
+  "name": "Raw Meat",
+  "npcPrice": 0,
+  "weight": "28.00"
+ },
+ {
+  "name": "Reality Splinter",
+  "npcPrice": 5000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Red Dragon Leather",
+  "npcPrice": 200,
+  "weight": "0.60"
+ },
+ {
+  "name": "Red Dragon Scale",
+  "npcPrice": 200,
+  "weight": "0.90"
+ },
+ {
+  "name": "Red Goanna Scale",
+  "npcPrice": 270,
+  "weight": "0.90"
+ },
+ {
+  "name": "Red Hair Dye",
+  "npcPrice": 40,
+  "weight": "2.10"
+ },
+ {
+  "name": "Red Lantern",
+  "npcPrice": 250,
+  "weight": "3.00"
+ },
+ {
+  "name": "Red Piece of Cloth",
+  "npcPrice": 300,
+  "weight": "5.00"
+ },
+ {
+  "name": "Resin Parasite",
+  "npcPrice": 1450,
+  "weight": "0.25"
+ },
+ {
+  "name": "Resinous Fish Fin",
+  "npcPrice": 1250,
+  "weight": "0.25"
+ },
+ {
+  "name": "Rhindeer Antlers",
+  "npcPrice": 680,
+  "weight": "5.70"
+ },
+ {
+  "name": "Rhino Hide",
+  "npcPrice": 175,
+  "weight": "8.00"
+ },
+ {
+  "name": "Rhino Horn",
+  "npcPrice": 265,
+  "weight": "6.50"
+ },
+ {
+  "name": "Rhino Horn Carving",
+  "npcPrice": 300,
+  "weight": "6.00"
+ },
+ {
+  "name": "Ripptor Claw",
+  "npcPrice": 2600,
+  "weight": "2.80"
+ },
+ {
+  "name": "Ripptor Scales",
+  "npcPrice": 1200,
+  "weight": "0.30"
+ },
+ {
+  "name": "Ritual Bone Knife",
+  "npcPrice": 820,
+  "weight": "0.20"
+ },
+ {
+  "name": "Ritual Tooth",
+  "npcPrice": 135,
+  "weight": "0.55"
+ },
+ {
+  "name": "Rod (Creature Product)",
+  "npcPrice": 2200,
+  "weight": "0.90"
+ },
+ {
+  "name": "Rogue Naga Scales",
+  "npcPrice": 570,
+  "weight": "0.30"
+ },
+ {
+  "name": "Root Tentacle",
+  "npcPrice": 300000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Roots",
+  "npcPrice": 1200,
+  "weight": "0.90"
+ },
+ {
+  "name": "Rope Belt",
+  "npcPrice": 66,
+  "weight": "0.97"
+ },
+ {
+  "name": "Rorc Egg",
+  "npcPrice": 120,
+  "weight": "2.50"
+ },
+ {
+  "name": "Rorc Feather",
+  "npcPrice": 70,
+  "weight": "2.50"
+ },
+ {
+  "name": "Rotrender Claw",
+  "npcPrice": 0,
+  "weight": "0.25"
+ },
+ {
+  "name": "Rotrender Scalp",
+  "npcPrice": 0,
+  "weight": "0.25"
+ },
+ {
+  "name": "Rotten Feather",
+  "npcPrice": 120,
+  "weight": "0.20"
+ },
+ {
+  "name": "Rotten Heart",
+  "npcPrice": 74000,
+  "weight": "1.10"
+ },
+ {
+  "name": "Rotten Piece of Cloth",
+  "npcPrice": 30,
+  "weight": "0.60"
+ },
+ {
+  "name": "Rotten Roots",
+  "npcPrice": 3800,
+  "weight": "1.00"
+ },
+ {
+  "name": "Rotten Vermin Ichor",
+  "npcPrice": 4500,
+  "weight": "1.00"
+ },
+ {
+  "name": "Sabretooth",
+  "npcPrice": 400,
+  "weight": "1.28"
+ },
+ {
+  "name": "Sabretooth Fur",
+  "npcPrice": 2500,
+  "weight": "1.35"
+ },
+ {
+  "name": "Safety Pin",
+  "npcPrice": 120,
+  "weight": "0.50"
+ },
+ {
+  "name": "Sailor's Burn Cure",
+  "npcPrice": 0,
+  "weight": "1.20"
+ },
+ {
+  "name": "Sandcrawler Shell",
+  "npcPrice": 20,
+  "weight": "0.75"
+ },
+ {
+  "name": "Scale of Corruption",
+  "npcPrice": 680,
+  "weight": "0.93"
+ },
+ {
+  "name": "Scale of Gelidrazah",
+  "npcPrice": 10000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Scarab Pincers",
+  "npcPrice": 280,
+  "weight": "2.30"
+ },
+ {
+  "name": "Scorpion Charm",
+  "npcPrice": 620,
+  "weight": "2.50"
+ },
+ {
+  "name": "Scorpion Tail",
+  "npcPrice": 25,
+  "weight": "1.20"
+ },
+ {
+  "name": "Scroll of Heroic Deeds",
+  "npcPrice": 230,
+  "weight": "0.79"
+ },
+ {
+  "name": "Scythe Leg",
+  "npcPrice": 450,
+  "weight": "1.50"
+ },
+ {
+  "name": "Sea Serpent Scale",
+  "npcPrice": 520,
+  "weight": "1.46"
+ },
+ {
+  "name": "Sea Serpent Trophy",
+  "npcPrice": 10000,
+  "weight": "5.00"
+ },
+ {
+  "name": "Seacrest Hair",
+  "npcPrice": 260,
+  "weight": "1.80"
+ },
+ {
+  "name": "Seacrest Pearl",
+  "npcPrice": 400,
+  "weight": "3.50"
+ },
+ {
+  "name": "Seacrest Scale",
+  "npcPrice": 150,
+  "weight": "1.80"
+ },
+ {
+  "name": "Sealing Wax",
+  "npcPrice": 620,
+  "weight": "1.00"
+ },
+ {
+  "name": "Seeds",
+  "npcPrice": 150,
+  "weight": "0.50"
+ },
+ {
+  "name": "Shadow Mask",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Shadow Paint",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Shaggy Tail",
+  "npcPrice": 25,
+  "weight": "1.12"
+ },
+ {
+  "name": "Shamanic Hood",
+  "npcPrice": 45,
+  "weight": "0.90"
+ },
+ {
+  "name": "Shamanic Talisman",
+  "npcPrice": 200,
+  "weight": "1.28"
+ },
+ {
+  "name": "Shard",
+  "npcPrice": 2000,
+  "weight": "19.00"
+ },
+ {
+  "name": "Shark Fins",
+  "npcPrice": 250,
+  "weight": "6.20"
+ },
+ {
+  "name": "Shimmering Beetles",
+  "npcPrice": 150,
+  "weight": "1.70"
+ },
+ {
+  "name": "Shiny Stone",
+  "npcPrice": 500,
+  "weight": "1.56"
+ },
+ {
+  "name": "Shrunken Head",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Sight of Surrender's Eye",
+  "npcPrice": 3000,
+  "weight": "5.50"
+ },
+ {
+  "name": "Signet Ring",
+  "npcPrice": 480000,
+  "weight": "0.70"
+ },
+ {
+  "name": "Silencer Claws",
+  "npcPrice": 390,
+  "weight": "4.20"
+ },
+ {
+  "name": "Silencer Resonating Chamber",
+  "npcPrice": 600,
+  "weight": "3.50"
+ },
+ {
+  "name": "Silken Bookmark",
+  "npcPrice": 1300,
+  "weight": "1.00"
+ },
+ {
+  "name": "Silky Fur",
+  "npcPrice": 35,
+  "weight": "1.15"
+ },
+ {
+  "name": "Silver Foxmouse Coin",
+  "npcPrice": 11000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Silver Moon Coin",
+  "npcPrice": 11000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Silver Poniard",
+  "npcPrice": 2000,
+  "weight": "7.50"
+ },
+ {
+  "name": "Sineater Wing",
+  "npcPrice": 2100,
+  "weight": "4.70"
+ },
+ {
+  "name": "Single Human Eye",
+  "npcPrice": 1000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Skeleton Decoration",
+  "npcPrice": 3000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Skin of Gralvalon",
+  "npcPrice": 0,
+  "weight": "1.85"
+ },
+ {
+  "name": "Skin of Malvaroth",
+  "npcPrice": 0,
+  "weight": "1.60"
+ },
+ {
+  "name": "Skin of Twisterror",
+  "npcPrice": 0,
+  "weight": "1.70"
+ },
+ {
+  "name": "Skull Belt",
+  "npcPrice": 80,
+  "weight": "1.16"
+ },
+ {
+  "name": "Skull Fetish",
+  "npcPrice": 250,
+  "weight": "4.40"
+ },
+ {
+  "name": "Skull Shatterer",
+  "npcPrice": 170,
+  "weight": "3.80"
+ },
+ {
+  "name": "Skull Tendril",
+  "npcPrice": 650000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Skunk Tail",
+  "npcPrice": 50,
+  "weight": "1.05"
+ },
+ {
+  "name": "Slime Heart",
+  "npcPrice": 160,
+  "weight": "1.80"
+ },
+ {
+  "name": "Slime Mould",
+  "npcPrice": 175,
+  "weight": "3.00"
+ },
+ {
+  "name": "Slimy Leaf Tentacle",
+  "npcPrice": 320,
+  "weight": "3.00"
+ },
+ {
+  "name": "Slimy Leg",
+  "npcPrice": 4500,
+  "weight": "1.60"
+ },
+ {
+  "name": "Small Energy Ball",
+  "npcPrice": 250,
+  "weight": "1.50"
+ },
+ {
+  "name": "Small Flask of Eyedrops",
+  "npcPrice": 95,
+  "weight": "0.50"
+ },
+ {
+  "name": "Small Ladybug",
+  "npcPrice": 0,
+  "weight": "7.00"
+ },
+ {
+  "name": "Small Notebook",
+  "npcPrice": 480,
+  "weight": "0.80"
+ },
+ {
+  "name": "Small Oil Lamp",
+  "npcPrice": 150,
+  "weight": "9.00"
+ },
+ {
+  "name": "Small Pitchfork",
+  "npcPrice": 70,
+  "weight": "1.10"
+ },
+ {
+  "name": "Small Treasure Chest",
+  "npcPrice": 500,
+  "weight": "8.00"
+ },
+ {
+  "name": "Small Tropical Fish",
+  "npcPrice": 380,
+  "weight": "2.20"
+ },
+ {
+  "name": "Smoldering Eye",
+  "npcPrice": 470000,
+  "weight": "31.50"
+ },
+ {
+  "name": "Snake Skin",
+  "npcPrice": 400,
+  "weight": "1.00"
+ },
+ {
+  "name": "Sniper Gloves",
+  "npcPrice": 2000,
+  "weight": "4.00"
+ },
+ {
+  "name": "Some Grimeleech Wings",
+  "npcPrice": 1200,
+  "weight": "8.50"
+ },
+ {
+  "name": "Soul Stone",
+  "npcPrice": 6000,
+  "weight": "0.30"
+ },
+ {
+  "name": "Soul Trap",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Spark Sphere",
+  "npcPrice": 350,
+  "weight": "5.00"
+ },
+ {
+  "name": "Sparkion Claw",
+  "npcPrice": 290,
+  "weight": "8.00"
+ },
+ {
+  "name": "Sparkion Legs",
+  "npcPrice": 310,
+  "weight": "7.50"
+ },
+ {
+  "name": "Sparkion Stings",
+  "npcPrice": 280,
+  "weight": "3.50"
+ },
+ {
+  "name": "Sparkion Tail",
+  "npcPrice": 300,
+  "weight": "7.50"
+ },
+ {
+  "name": "Spectral Gold Nugget",
+  "npcPrice": 500,
+  "weight": "1.35"
+ },
+ {
+  "name": "Spectral Silver Nugget",
+  "npcPrice": 250,
+  "weight": "1.35"
+ },
+ {
+  "name": "Spellreaper Staff Totem",
+  "npcPrice": 3100,
+  "weight": "6.50"
+ },
+ {
+  "name": "Spellsinger's Seal",
+  "npcPrice": 280,
+  "weight": "1.90"
+ },
+ {
+  "name": "Sphinx Feather",
+  "npcPrice": 470,
+  "weight": "0.10"
+ },
+ {
+  "name": "Sphinx Tiara",
+  "npcPrice": 360,
+  "weight": "3.50"
+ },
+ {
+  "name": "Spider Fangs",
+  "npcPrice": 10,
+  "weight": "0.50"
+ },
+ {
+  "name": "Spider Silk",
+  "npcPrice": 100,
+  "weight": "0.10"
+ },
+ {
+  "name": "Spiderweb Clouds Shreds",
+  "npcPrice": 0,
+  "weight": "0.10"
+ },
+ {
+  "name": "Spidris Mandible",
+  "npcPrice": 450,
+  "weight": "2.38"
+ },
+ {
+  "name": "Spiked Bracers",
+  "npcPrice": 1360,
+  "weight": "0.20"
+ },
+ {
+  "name": "Spiked Gorget",
+  "npcPrice": 850,
+  "weight": "0.20"
+ },
+ {
+  "name": "Spiked Iron Ball",
+  "npcPrice": 100,
+  "weight": "1.25"
+ },
+ {
+  "name": "Spirit Container",
+  "npcPrice": 40000,
+  "weight": "6.00"
+ },
+ {
+  "name": "Spirited Soil",
+  "npcPrice": 2000,
+  "weight": "2.50"
+ },
+ {
+  "name": "Spite's Spirit",
+  "npcPrice": 840000,
+  "weight": "1.10"
+ },
+ {
+  "name": "Spitter Nose",
+  "npcPrice": 340,
+  "weight": "1.90"
+ },
+ {
+  "name": "Splintered Mitmah Gem",
+  "npcPrice": 225000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Spooky Blue Eye",
+  "npcPrice": 95,
+  "weight": "0.86"
+ },
+ {
+  "name": "Spool of Yarn",
+  "npcPrice": 1000,
+  "weight": "1.00"
+ },
+ {
+  "name": "Srezz' Eye",
+  "npcPrice": 300,
+  "weight": "0.80"
+ },
+ {
+  "name": "Staff Piece",
+  "npcPrice": 560,
+  "weight": "2.00"
+ },
+ {
+  "name": "Stag Parchment",
+  "npcPrice": 3000,
+  "weight": "7.50"
+ },
+ {
+  "name": "Stalking Seeds",
+  "npcPrice": 1800,
+  "weight": "0.40"
+ },
+ {
+  "name": "Stampor Horn",
+  "npcPrice": 280,
+  "weight": "1.50"
+ },
+ {
+  "name": "Stampor Talons",
+  "npcPrice": 150,
+  "weight": "1.70"
+ },
+ {
+  "name": "Star Herb",
+  "npcPrice": 15,
+  "weight": "0.30"
+ },
+ {
+  "name": "Star Ink",
+  "npcPrice": 1250,
+  "weight": "0.60"
+ },
+ {
+  "name": "Steel Spider Silk",
+  "npcPrice": 0,
+  "weight": "0.10"
+ },
+ {
+  "name": "Stone Herb",
+  "npcPrice": 20,
+  "weight": "0.20"
+ },
+ {
+  "name": "Stone Nose",
+  "npcPrice": 590,
+  "weight": "2.60"
+ },
+ {
+  "name": "Stone Wing",
+  "npcPrice": 120,
+  "weight": "1.53"
+ },
+ {
+  "name": "Stonerefiner's Skull",
+  "npcPrice": 100,
+  "weight": "3.00"
+ },
+ {
+  "name": "Strand of Medusa Hair",
+  "npcPrice": 600,
+  "weight": "2.30"
+ },
+ {
+  "name": "Strange Proto Matter",
+  "npcPrice": 300,
+  "weight": "6.00"
+ },
+ {
+  "name": "Strange Substance",
+  "npcPrice": 810,
+  "weight": "2.00"
+ },
+ {
+  "name": "Strange Symbol",
+  "npcPrice": 200,
+  "weight": "2.00"
+ },
+ {
+  "name": "Streaked Devourer Eyes",
+  "npcPrice": 500,
+  "weight": "0.80"
+ },
+ {
+  "name": "Streaked Devourer Legs",
+  "npcPrice": 600,
+  "weight": "2.40"
+ },
+ {
+  "name": "Streaked Devourer Maw",
+  "npcPrice": 400,
+  "weight": "1.90"
+ },
+ {
+  "name": "Striped Fur",
+  "npcPrice": 50,
+  "weight": "1.20"
+ },
+ {
+  "name": "Sulphider Shell",
+  "npcPrice": 2200,
+  "weight": "1.50"
+ },
+ {
+  "name": "Sulphur Powder",
+  "npcPrice": 1900,
+  "weight": "1.00"
+ },
+ {
+  "name": "Sulphurous Stone",
+  "npcPrice": 100,
+  "weight": "1.42"
+ },
+ {
+  "name": "Sun Brooch",
+  "npcPrice": 18000,
+  "weight": "2.80"
+ },
+ {
+  "name": "Swamp Grass",
+  "npcPrice": 20,
+  "weight": "0.94"
+ },
+ {
+  "name": "Swampling Moss",
+  "npcPrice": 20,
+  "weight": "2.70"
+ },
+ {
+  "name": "Swarmer Antenna",
+  "npcPrice": 130,
+  "weight": "1.00"
+ },
+ {
+  "name": "Tail of Corruption",
+  "npcPrice": 240,
+  "weight": "0.93"
+ },
+ {
+  "name": "Tainted Heart",
+  "npcPrice": 0,
+  "weight": "1.00"
+ },
+ {
+  "name": "Taiyaki Ice Cream",
+  "npcPrice": 6750,
+  "weight": "0.20"
+ },
+ {
+  "name": "Tanjis' Sight",
+  "npcPrice": 0,
+  "weight": "2.20"
+ },
+ {
+  "name": "Tarantula Egg",
+  "npcPrice": 80,
+  "weight": "0.40"
+ },
+ {
+  "name": "Tarnished Rhino Figurine",
+  "npcPrice": 320,
+  "weight": "7.50"
+ },
+ {
+  "name": "Tattered Piece of Robe",
+  "npcPrice": 120,
+  "weight": "0.70"
+ },
+ {
+  "name": "Tatty Robe",
+  "npcPrice": 0,
+  "weight": "2.30"
+ },
+ {
+  "name": "Technomancer Beard",
+  "npcPrice": 0,
+  "weight": "0.50"
+ },
+ {
+  "name": "Telescope Eye",
+  "npcPrice": 1600,
+  "weight": "0.30"
+ },
+ {
+  "name": "Tender Venison",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Tentacle Piece",
+  "npcPrice": 5000,
+  "weight": "3.00"
+ },
+ {
+  "name": "Tentacle of Tentugly",
+  "npcPrice": 27000,
+  "weight": "4.80"
+ },
+ {
+  "name": "Tentugly's Eye",
+  "npcPrice": 52000,
+  "weight": "1.20"
+ },
+ {
+  "name": "Tentugly's Jaws",
+  "npcPrice": 80000,
+  "weight": "3.20"
+ },
+ {
+  "name": "Terramite Eggs",
+  "npcPrice": 50,
+  "weight": "0.20"
+ },
+ {
+  "name": "Terramite Legs",
+  "npcPrice": 60,
+  "weight": "1.15"
+ },
+ {
+  "name": "Terramite Shell",
+  "npcPrice": 170,
+  "weight": "1.50"
+ },
+ {
+  "name": "Terrorbird Beak",
+  "npcPrice": 95,
+  "weight": "1.17"
+ },
+ {
+  "name": "The Crown of the Percht Queen (Fire)",
+  "npcPrice": 0,
+  "weight": "19.00"
+ },
+ {
+  "name": "The Crown of the Percht Queen (Ice)",
+  "npcPrice": 0,
+  "weight": "19.00"
+ },
+ {
+  "name": "The Handmaiden's Protector",
+  "npcPrice": 50000,
+  "weight": "35.00"
+ },
+ {
+  "name": "The Imperor's Trident",
+  "npcPrice": 50000,
+  "weight": "80.00"
+ },
+ {
+  "name": "The Lethal Lissy's Shirt",
+  "npcPrice": 0,
+  "weight": "20.00"
+ },
+ {
+  "name": "The Plasmother's Remains",
+  "npcPrice": 50000,
+  "weight": "30.00"
+ },
+ {
+  "name": "The Vampire Count's Medal",
+  "npcPrice": 0,
+  "weight": "0.10"
+ },
+ {
+  "name": "Thick Fur",
+  "npcPrice": 150,
+  "weight": "1.25"
+ },
+ {
+  "name": "Thorn",
+  "npcPrice": 100,
+  "weight": "1.20"
+ },
+ {
+  "name": "Thorn Seed",
+  "npcPrice": 0,
+  "weight": "6.50"
+ },
+ {
+  "name": "Tiny Bat Coffin",
+  "npcPrice": 0,
+  "weight": "6.30"
+ },
+ {
+  "name": "Toe Nails",
+  "npcPrice": 4500,
+  "weight": "10.00"
+ },
+ {
+  "name": "Token of Love",
+  "npcPrice": 440000,
+  "weight": "1.30"
+ },
+ {
+  "name": "Tooth File",
+  "npcPrice": 60,
+  "weight": "5.10"
+ },
+ {
+  "name": "Tooth of Tazhadur",
+  "npcPrice": 10000,
+  "weight": "3.50"
+ },
+ {
+  "name": "Torn Page",
+  "npcPrice": 340,
+  "weight": "0.20"
+ },
+ {
+  "name": "Torn Shirt",
+  "npcPrice": 250,
+  "weight": "2.50"
+ },
+ {
+  "name": "Trapped Bad Dream Monster",
+  "npcPrice": 900,
+  "weight": "12.00"
+ },
+ {
+  "name": "Tremendous Tyrant Head",
+  "npcPrice": 930,
+  "weight": "1.80"
+ },
+ {
+  "name": "Tremendous Tyrant Shell",
+  "npcPrice": 740,
+  "weight": "2.50"
+ },
+ {
+  "name": "Trollroot",
+  "npcPrice": 50,
+  "weight": "1.40"
+ },
+ {
+  "name": "Tunnel Tyrant Head",
+  "npcPrice": 500,
+  "weight": "1.80"
+ },
+ {
+  "name": "Tunnel Tyrant Shell",
+  "npcPrice": 700,
+  "weight": "2.50"
+ },
+ {
+  "name": "Turtle Shell",
+  "npcPrice": 90,
+  "weight": "5.00"
+ },
+ {
+  "name": "Tusk",
+  "npcPrice": 100,
+  "weight": "10.00"
+ },
+ {
+  "name": "Twig Arms",
+  "npcPrice": 0,
+  "weight": "2.20"
+ },
+ {
+  "name": "Twisted Marionette",
+  "npcPrice": 125000,
+  "weight": "10.01"
+ },
+ {
+  "name": "Two-Headed Turtle Heads",
+  "npcPrice": 460,
+  "weight": "7.60"
+ },
+ {
+  "name": "Ulcer Probe",
+  "npcPrice": 0,
+  "weight": "0.10"
+ },
+ {
+  "name": "Undead Heart",
+  "npcPrice": 200,
+  "weight": "0.80"
+ },
+ {
+  "name": "Undertaker Fangs",
+  "npcPrice": 2700,
+  "weight": "0.75"
+ },
+ {
+  "name": "Unholy Bone",
+  "npcPrice": 480,
+  "weight": "1.25"
+ },
+ {
+  "name": "Urmahlullu's Mane",
+  "npcPrice": 490000,
+  "weight": "0.76"
+ },
+ {
+  "name": "Urmahlullu's Paw",
+  "npcPrice": 245000,
+  "weight": "0.76"
+ },
+ {
+  "name": "Urmahlullu's Tail",
+  "npcPrice": 210000,
+  "weight": "0.76"
+ },
+ {
+  "name": "Utua's Poison",
+  "npcPrice": 230,
+  "weight": "0.80"
+ },
+ {
+  "name": "Vampire Dust",
+  "npcPrice": 100,
+  "weight": "1.00"
+ },
+ {
+  "name": "Vampire Lord Token",
+  "npcPrice": 0,
+  "weight": "0.05"
+ },
+ {
+  "name": "Vampire Teeth",
+  "npcPrice": 275,
+  "weight": "0.50"
+ },
+ {
+  "name": "Vampire's Cape Chain",
+  "npcPrice": 150,
+  "weight": "6.20"
+ },
+ {
+  "name": "Varnished Diremaw Brainpan",
+  "npcPrice": 750,
+  "weight": "1.50"
+ },
+ {
+  "name": "Varnished Diremaw Legs",
+  "npcPrice": 670,
+  "weight": "2.30"
+ },
+ {
+  "name": "Vein of Ore",
+  "npcPrice": 330,
+  "weight": "3.60"
+ },
+ {
+  "name": "Vemiath's Infused Basalt",
+  "npcPrice": 1000000,
+  "weight": "2.00"
+ },
+ {
+  "name": "Venison",
+  "npcPrice": 55,
+  "weight": "3.80"
+ },
+ {
+  "name": "Versicolour Fireworks Powder",
+  "npcPrice": 0,
+  "weight": "1.00"
+ },
+ {
+  "name": "Vexclaw Talon",
+  "npcPrice": 1100,
+  "weight": "9.00"
+ },
+ {
+  "name": "Vial of Hatred",
+  "npcPrice": 737000,
+  "weight": "1.10"
+ },
+ {
+  "name": "Vibrant Heart",
+  "npcPrice": 2100,
+  "weight": "0.75"
+ },
+ {
+  "name": "Vibrant Robe",
+  "npcPrice": 1200,
+  "weight": "1.80"
+ },
+ {
+  "name": "Volatile Proto Matter",
+  "npcPrice": 300,
+  "weight": "6.00"
+ },
+ {
+  "name": "Voluminous Piece of Cloth",
+  "npcPrice": 0,
+  "weight": "5.00"
+ },
+ {
+  "name": "Wad of Fairy Floss",
+  "npcPrice": 2910,
+  "weight": "0.25"
+ },
+ {
+  "name": "Wafer Paper Flower",
+  "npcPrice": 2350,
+  "weight": "0.05"
+ },
+ {
+  "name": "War Crystal",
+  "npcPrice": 460,
+  "weight": "1.45"
+ },
+ {
+  "name": "War Wolf Skin",
+  "npcPrice": 0,
+  "weight": "0.40"
+ },
+ {
+  "name": "Wardragon Claw",
+  "npcPrice": 550,
+  "weight": "2.00"
+ },
+ {
+  "name": "Wardragon Tooth",
+  "npcPrice": 730,
+  "weight": "2.00"
+ },
+ {
+  "name": "Warmaster's Wristguards",
+  "npcPrice": 200,
+  "weight": "1.20"
+ },
+ {
+  "name": "Warwolf Fur",
+  "npcPrice": 30,
+  "weight": "1.05"
+ },
+ {
+  "name": "Waspoid Claw",
+  "npcPrice": 320,
+  "weight": "2.15"
+ },
+ {
+  "name": "Waspoid Wing",
+  "npcPrice": 190,
+  "weight": "0.99"
+ },
+ {
+  "name": "Weaver's Wandtip",
+  "npcPrice": 250,
+  "weight": "1.70"
+ },
+ {
+  "name": "Werebadger Claws",
+  "npcPrice": 160,
+  "weight": "1.10"
+ },
+ {
+  "name": "Werebadger Skull",
+  "npcPrice": 185,
+  "weight": "3.00"
+ },
+ {
+  "name": "Werebear Fur",
+  "npcPrice": 185,
+  "weight": "5.00"
+ },
+ {
+  "name": "Werebear Skull",
+  "npcPrice": 195,
+  "weight": "5.00"
+ },
+ {
+  "name": "Wereboar Hooves",
+  "npcPrice": 175,
+  "weight": "2.50"
+ },
+ {
+  "name": "Wereboar Tusks",
+  "npcPrice": 165,
+  "weight": "1.90"
+ },
+ {
+  "name": "Werecrocodile Tongue",
+  "npcPrice": 570,
+  "weight": "2.80"
+ },
+ {
+  "name": "Werefox Tail",
+  "npcPrice": 200,
+  "weight": "1.40"
+ },
+ {
+  "name": "Werehyaena Nose",
+  "npcPrice": 220,
+  "weight": "1.00"
+ },
+ {
+  "name": "Werehyaena Talisman",
+  "npcPrice": 350,
+  "weight": "0.80"
+ },
+ {
+  "name": "Werepanther Claw",
+  "npcPrice": 280,
+  "weight": "2.80"
+ },
+ {
+  "name": "Weretiger Tooth",
+  "npcPrice": 490,
+  "weight": "2.80"
+ },
+ {
+  "name": "Werewolf Fangs",
+  "npcPrice": 180,
+  "weight": "1.60"
+ },
+ {
+  "name": "Werewolf Fur",
+  "npcPrice": 380,
+  "weight": "1.13"
+ },
+ {
+  "name": "White Deer Antlers",
+  "npcPrice": 400,
+  "weight": "3.00"
+ },
+ {
+  "name": "White Deer Skin",
+  "npcPrice": 245,
+  "weight": "3.00"
+ },
+ {
+  "name": "White Piece of Cloth",
+  "npcPrice": 100,
+  "weight": "5.00"
+ },
+ {
+  "name": "Widow's Mandibles",
+  "npcPrice": 110,
+  "weight": "1.05"
+ },
+ {
+  "name": "Wild Flowers",
+  "npcPrice": 120,
+  "weight": "1.50"
+ },
+ {
+  "name": "Wimp Tooth Chain",
+  "npcPrice": 120,
+  "weight": "2.40"
+ },
+ {
+  "name": "Winged Tail",
+  "npcPrice": 800,
+  "weight": "4.50"
+ },
+ {
+  "name": "Winter Wolf Fur",
+  "npcPrice": 20,
+  "weight": "1.10"
+ },
+ {
+  "name": "Witch Broom",
+  "npcPrice": 60,
+  "weight": "3.33"
+ },
+ {
+  "name": "Withered Pauldrons",
+  "npcPrice": 850,
+  "weight": "1.40"
+ },
+ {
+  "name": "Withered Scalp",
+  "npcPrice": 900,
+  "weight": "1.70"
+ },
+ {
+  "name": "Wolf Paw",
+  "npcPrice": 70,
+  "weight": "0.80"
+ },
+ {
+  "name": "Wood",
+  "npcPrice": 50,
+  "weight": "5.00"
+ },
+ {
+  "name": "Wool",
+  "npcPrice": 15,
+  "weight": "1.18"
+ },
+ {
+  "name": "Worm",
+  "npcPrice": 0,
+  "weight": "0.05"
+ },
+ {
+  "name": "Worm Sponge",
+  "npcPrice": 4200,
+  "weight": "1.00"
+ },
+ {
+  "name": "Worn Guide Book",
+  "npcPrice": 250000,
+  "weight": "10.00"
+ },
+ {
+  "name": "Writhing Brain",
+  "npcPrice": 370000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Writhing Heart",
+  "npcPrice": 185000,
+  "weight": "0.60"
+ },
+ {
+  "name": "Wyrm Scale",
+  "npcPrice": 400,
+  "weight": "1.80"
+ },
+ {
+  "name": "Wyvern Talisman",
+  "npcPrice": 265,
+  "weight": "2.25"
+ },
+ {
+  "name": "Yapunac Dagger",
+  "npcPrice": 240,
+  "weight": "2.00"
+ },
+ {
+  "name": "Yellow Piece of Cloth",
+  "npcPrice": 150,
+  "weight": "5.00"
+ },
+ {
+  "name": "Yielocks",
+  "npcPrice": 600,
+  "weight": "2.95"
+ },
+ {
+  "name": "Yielowax",
+  "npcPrice": 600,
+  "weight": "4.75"
+ },
+ {
+  "name": "Yirkas' Egg",
+  "npcPrice": 280,
+  "weight": "2.50"
+ },
+ {
+  "name": "Young Lich Worm",
+  "npcPrice": 25000,
+  "weight": "0.30"
+ },
+ {
+  "name": "Zaogun Flag",
+  "npcPrice": 600,
+  "weight": "0.98"
+ },
+ {
+  "name": "Zaogun Shoulderplates",
+  "npcPrice": 150,
+  "weight": "1.03"
+ }
+]

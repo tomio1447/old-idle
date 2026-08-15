@@ -1,5 +1,6 @@
 /* Último monstro da wave: kill não monta spawnWave no mesmo passo; a próxima
- * onda espera WAVE_CLEAR_RESPAWN_MS (6s) e só então entra em pendingSpawns/blink. */
+ * onda espera WAVE_CLEAR_RESPAWN_MS (5s até nascer). Em T-3s começa o
+ * teleporte-blink (pendingSpawns). */
 "use strict";
 const fs = require("fs");
 const path = require("path");
@@ -14,15 +15,17 @@ const combatSrc = fs.readFileSync(path.join(js, "combat.js"), "utf8");
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");
 const engineSrc = fs.readFileSync(path.join(root, "server", "authoritative_engine.js"), "utf8");
 
-must(/const WAVE_CLEAR_RESPAWN_MS = 6000/.test(combatSrc) &&
+must(/const WAVE_CLEAR_RESPAWN_MS = 5000/.test(combatSrc) &&
+  /WAVE_TELEPORT_LEAD_MS/.test(combatSrc) &&
   combatSrc.includes("c._nextWaveAt = (c._tickNow || now || Date.now()) + WAVE_CLEAR_RESPAWN_MS") &&
-  combatSrc.includes("if (c._nextWaveAt && now < c._nextWaveAt)") &&
+  combatSrc.includes("Number(c._nextWaveAt) - WAVE_TELEPORT_LEAD_MS") &&
   combatSrc.includes("Occupancy uma vez por wave"),
-  "cliente não agenda 6s / spawnWave no wave-clear");
-must(engineSrc.includes("AUTH_WAVE_CLEAR_RESPAWN_MS=6000") &&
+  "cliente não agenda 5s / teleporte T-3s no wave-clear");
+must(engineSrc.includes("AUTH_WAVE_CLEAR_RESPAWN_MS=5000") &&
+  engineSrc.includes("AUTH_WAVE_TELEPORT_LEAD_MS") &&
   engineSrc.includes("auth._nextWaveAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS") &&
-  engineSrc.includes("if(stepTs>=auth._nextWaveAt){auth._nextWaveAt=0;spawnHuntWave(auth,stepTs);}"),
-  "servidor não adia spawnHuntWave em 6s após o último kill");
+  engineSrc.includes("stepTs>=auth._nextWaveAt-AUTH_WAVE_TELEPORT_LEAD_MS"),
+  "servidor não adia spawnHuntWave com teleporte em T-3s após o último kill");
 must(gameSrc.includes("function syncAuthorityPendingSpawns") &&
   gameSrc.includes("syncAuthorityPendingSpawns(previous,incoming.pendingSpawns") &&
   gameSrc.includes("!incomingHasKill&&!hasPendingPreview"),
@@ -30,7 +33,7 @@ must(gameSrc.includes("function syncAuthorityPendingSpawns") &&
 must(gameSrc.includes('key!=="pendingSpawns"'),
   "Object.assign escalar ainda não exclui pendingSpawns (evita replace acidental)");
 
-/* --- local: após limpar a onda, spawnWave só após WAVE_CLEAR_RESPAWN_MS --- */
+/* --- local: após limpar a onda, spawnWave só em T-3s (teleporte) --- */
 const GRID_W = 30, GRID_H = 13;
 const walls = [];
 for (let y = 0; y < GRID_H; y++)
@@ -76,7 +79,8 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(combatSrc, ctx);
-const WAVE_CLEAR_RESPAWN_MS = 6000;
+const WAVE_CLEAR_RESPAWN_MS = 5000;
+const WAVE_TELEPORT_LEAD_MS = 3000;
 const realSpawnWave = ctx.spawnWave;
 ctx.spawnWave = function (c, p) {
   spawnWaveCalls++;
@@ -86,7 +90,9 @@ ctx.spawnWave = function (c, p) {
 function runSpawnGate(c, p, now) {
   if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
     if (c.boss) return;
-    if (c._nextWaveAt && now < c._nextWaveAt) {
+    const teleportAt = c._nextWaveAt
+      ? (Number(c._nextWaveAt) - WAVE_TELEPORT_LEAD_MS) : 0;
+    if (c._nextWaveAt && now < teleportAt) {
       /* waiting */
     } else if (!ctx.huntMapSpawnBlocked()) {
       c._nextWaveAt = 0;
@@ -111,22 +117,22 @@ const combat = {
 };
 combat.player = combat.players[0];
 
-// Simula fim do tick do kill: arena vazia + próximo spawn em t0+6s.
+// Simula fim do tick do kill: arena vazia + próximo spawn em t0+5s.
 combat._nextWaveAt = t0 + WAVE_CLEAR_RESPAWN_MS;
 spawnWaveCalls = 0;
 runSpawnGate(combat, player, t0);
 must(spawnWaveCalls === 0, "spawnWave rodou no tick imediato após o kill");
-must(combat._nextWaveAt === t0 + 6000, "agenda de 6s não se manteve");
+must(combat._nextWaveAt === t0 + 5000, "agenda de 5s não se manteve");
 must(!(combat.pendingSpawns && combat.pendingSpawns.length),
   "pendingSpawns preenchido no frame do kill");
 
 spawnWaveCalls = 0;
-runSpawnGate(combat, player, t0 + 5999);
-must(spawnWaveCalls === 0, "spawnWave rodou antes dos 6s");
+runSpawnGate(combat, player, t0 + 1999);
+must(spawnWaveCalls === 0, "spawnWave rodou antes do T-3s");
 
 spawnWaveCalls = 0;
-runSpawnGate(combat, player, t0 + 6000);
-must(spawnWaveCalls === 1, "spawnWave não rodou após os 6s");
+runSpawnGate(combat, player, t0 + 2000);
+must(spawnWaveCalls === 1, "spawnWave não rodou no T-3s (teleporte)");
 must(combat._nextWaveAt === 0, "flag de agenda não limpou");
 must(combat.pendingSpawns.length > 0, "próxima wave não entrou em pendingSpawns");
 must(combat.mobs.length === 0, "mobs nasceram sem blink Canary");
@@ -158,29 +164,29 @@ must(auth0.authority.mobs.length >= 1, "hunt de teste sem mob inicial");
 auth0.authority.mobs.forEach((m) => { m.hp = 0; });
 auth0.authority.pack = 3;
 auth0.authority.spawnPool = ["rat"];
-// Um único AUTH_STEP (200ms): processa mortes e agenda 6s — sem spawnHuntWave.
+// Um único AUTH_STEP (200ms): processa mortes e agenda 5s — sem spawnHuntWave.
 const killAdvance = JSON.parse(engine.advanceAuthorityState(JSON.stringify(auth0), 200, 1200).state);
 must(killAdvance.authority.mobs.length === 0, "servidor não removeu o último mob");
-must(killAdvance.authority._nextWaveAt === 1200 + 6000,
-  "servidor não agenda spawn em +6s no kill");
+must(killAdvance.authority._nextWaveAt === 1200 + 5000,
+  "servidor não agenda spawn em +5s no kill");
 must(!(killAdvance.authority.pendingSpawns && killAdvance.authority.pendingSpawns.length),
   "spawnHuntWave rodou no mesmo step do último kill");
 must(!(killAdvance.state.pendingSpawns && killAdvance.state.pendingSpawns.length),
   "snapshot do kill já trouxe pendingSpawns");
 
-// Ainda dentro da janela de 6s: não enfileira.
-const midAdvance = JSON.parse(engine.advanceAuthorityState(JSON.stringify(killAdvance), 5800, 7000).state);
+// Ainda antes do T-3s (2s após kill; faltam >3s): não enfileira.
+const midAdvance = JSON.parse(engine.advanceAuthorityState(JSON.stringify(killAdvance), 1800, 3000).state);
 must(!(midAdvance.authority.pendingSpawns && midAdvance.authority.pendingSpawns.length) &&
   !(midAdvance.authority.mobs && midAdvance.authority.mobs.length),
-  "spawnHuntWave rodou antes dos 6s");
-must(midAdvance.authority._nextWaveAt === 7200,
-  "agenda de 6s não persistiu no catchup");
+  "spawnHuntWave rodou antes do T-3s");
+must(midAdvance.authority._nextWaveAt === 6200,
+  "agenda de 5s não persistiu no catchup");
 
-// Após completar os 6s: enfileira pendingSpawns/blink.
-const nextAdvance = JSON.parse(engine.advanceAuthorityState(JSON.stringify(midAdvance), 200, 7400).state);
+// No T-3s (2s de espera + lead): enfileira pendingSpawns/blink.
+const nextAdvance = JSON.parse(engine.advanceAuthorityState(JSON.stringify(midAdvance), 400, 3400).state);
 must((nextAdvance.authority.pendingSpawns && nextAdvance.authority.pendingSpawns.length) ||
   (nextAdvance.authority.mobs && nextAdvance.authority.mobs.length),
-  "após 6s não enfileirou a wave via pendingSpawns/blink");
+  "no T-3s não enfileirou a wave via pendingSpawns/blink");
 must(!nextAdvance.authority._nextWaveAt,
   "flag de agenda ficou presa após o spawn");
 
@@ -242,4 +248,4 @@ must(applyCtx.G.combat.pendingSpawns.length === 1 &&
 must(applyCtx.G.combat.mobs.length === 0,
   "pendingSpawns promoveu mobs visíveis cedo demais");
 
-console.log("OK: último kill adia spawnWave/spawnHuntWave em 6s; pendingSpawns/blink depois.");
+console.log("OK: último kill adia spawn em 5s; teleporte-blink começa em T-3s.");

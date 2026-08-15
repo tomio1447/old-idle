@@ -109,10 +109,12 @@ setTimeout(() => {
 // ---- validação estática do HTML (roda fora do vm) ----
 (function checkHtml() {
   const ih = fs.readFileSync(path.join(GAME, "index.html"), "utf8");
-  const mIdx = ih.indexOf('id="btn-market"');
-  const rIdx = ih.indexOf('id="btn-reward"');
-  if (mIdx < 0 || rIdx < 0 || rIdx < mIdx)
-    throw new Error("botão REWARD deveria vir DEPOIS do MARKET no topo");
+  const topbarMatch = ih.match(/<div class="topbar">[\s\S]*?<\/div>\s*<div class="layout">/);
+  const topbar = topbarMatch ? topbarMatch[0] : "";
+  if (/id="btn-market"|id="btn-reward"|id="btn-forge"|id="btn-depot"|id="btn-imbue"/.test(topbar))
+    throw new Error("atalhos de cidade (market/reward/forge/depot/imbue) não devem estar na topbar");
+  if (ih.indexOf('id="btn-cidade"') === -1)
+    throw new Error("botão CIDADE (modal) deve permanecer na lateral");
   if (ih.indexOf("reward-chest.js") === -1) throw new Error("reward-chest.js não está no index.html");
-  console.log("  - html: botão 🎁 REWARD ao lado do MARKET + script reward-chest.js");
+  console.log("  - html: serviços de cidade só via CIDADE + script reward-chest.js");
 })();

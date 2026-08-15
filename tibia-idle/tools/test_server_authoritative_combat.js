@@ -34,7 +34,8 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
 (async()=>{
   must(serverSource.includes('url==="/api/instance/tick"')&&serverSource.includes("enforceAuthoritativeProgress")&&
     gameSource.includes("onlineAuthorityCombat()")&&gameSource.includes("requestOnlineAuthorityTick")&&
-    gameSource.includes("bindServerStatusControls")&&gameSource.includes("reconnectOnlineRuntime"),
+    gameSource.includes("bindServerStatusControls")&&gameSource.includes("reconnectOnlineRuntime")&&
+    gameSource.includes("accountCheckServerHealth")&&serverSource.includes("bootId:SERVER_BOOT_ID"),
     "rota antifraude ou cliente autoritativo ausentes");
 
   const basePlayer={id:1,name:"Deterministic",voc:"knight",level:20,exp:1000,hp:300,mp:50,gold:5000,
@@ -221,6 +222,23 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
     richDone.authority.players[0].p.blessed&&richDone.authority.players[0].p.exp===poorExp,
     "wipe com gold não comprou bless/retornou ou alterou XP normal");
 
+  // Boss wipe: permadead + encerra instância (sem bless/retorno à sala).
+  const bossWipePlayer=Object.assign({},basePlayer,{id:41,hp:1,mp:0,gold:100000,blessed:true,
+    lootPouch:{},kills:{},bosses:{},config:{healSpell:"none",spellAttack:false,noPotions:true}});
+  const bossWipeDesc=directDescriptor(bossWipePlayer,"boss");bossWipeDesc.bossId="goshnar-s-greed";
+  const bossWipeFight=engine.initializeAuthority(bossWipeDesc,"a".repeat(64),1000);
+  bossWipeFight.authority.players[0].attackAcc=-1e9;
+  for(const mob of bossWipeFight.authority.mobs){
+    mob.damage=Math.max(500,Number(mob.damage)||0);
+    mob.attackAcc=Number(mob.attackSpeed)||2000;mob.walkAcc=-1e9;
+  }
+  const bossWipeDone=JSON.parse(engine.advanceAuthorityState(JSON.stringify(bossWipeFight),1200,2200).state);
+  must(bossWipeDone.authority.ended&&bossWipeDone.authority.terminalReason==="party-wipe"&&
+    bossWipeDone.authority.players[0].permadead&&bossWipeDone.authority.wipes===0&&
+    bossWipeDone.authority.players[0].p.gold===100000&&
+    bossWipeDone.state&&bossWipeDone.state.players[0].permadead&&!bossWipeDone.state.dead,
+    "wipe de boss não encerrou com permadead / ainda comprou bless ou marcou dead+timer");
+
   const greedPlayer=Object.assign({},basePlayer,{id:5,mobSlug:"goshnar-s-greed",bosses:{},lootPouch:{},kills:{}});
   const greedDesc=directDescriptor(greedPlayer,"boss");greedDesc.bossId="goshnar-s-greed";
   const greed=engine.initializeAuthority(greedDesc,"5".repeat(64),1000),greedBoss=greed.authority.mobs.find((m)=>m.boss),greedHp=greedBoss.hp;
@@ -237,7 +255,10 @@ function directDescriptor(p,kind){const member={id:String(p.id),p:JSON.parse(JSO
   durableGreed.hp=durableGreed.maxHp=Number.MAX_SAFE_INTEGER;
   for(const mob of greedImmune.authority.mobs){mob.damage=0;mob.attackSpeed=Number.MAX_SAFE_INTEGER;
     mob.def=Object.assign({},mob.def,{skills:[]});}
-  for(const item of greedImmune.authority.players){item.p.conditions={};item.p.hp=engine.maxStats(item.p).hp;item.p.gold=1000000;}
+  for(const item of greedImmune.authority.players){
+    item.p.conditions={};item.p.hp=engine.maxStats(item.p).hp;item.p.mp=engine.maxStats(item.p).mp;
+    item.p.gold=1000000;item.downUntil=0;item.permadead=false;item.deathPos=null;item.downedAt=0;
+  }
   const beforeForty=JSON.parse(engine.advanceAuthorityState(JSON.stringify(greedImmune),39000,42000).state);
   must(!beforeForty.authority.greed.immune,"janela de Greed terminou antes de 40 segundos");
   const afterForty=JSON.parse(engine.advanceAuthorityState(JSON.stringify(beforeForty),1000,43000).state);

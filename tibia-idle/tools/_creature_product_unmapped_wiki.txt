@@ -1,0 +1,837 @@
+Abomination's Eye	650000
+Abomination's Tail	700000
+Abomination's Tongue	950000
+Abyssador's Lash	0
+Afflicted Strider Head	900
+Afflicted Strider Worms	500
+Albino Dragon Leather	0
+Alptramun's Toothbrush	270000
+Amber Souvenir	850
+Ancient Belt Buckle	260
+Ancient Crypt Rune	0
+Ancient Eye Stalk	3500000
+Ancient Liche Bone	28000
+Ancient Scales	400000
+Ancient Watch	0
+Ape Fur	120
+Apron	1300
+Arbaziloth Shoulder Piece	450000
+Astral Glyph	0
+Astral Source	0
+Atab's Mitmah Helmet	580
+Axe of Sir Leonard	49000
+Bakragore's Amalgamation	2000000
+Bamboo Stick	30
+Banana Sash	55
+Basalt Core	5800
+Basalt Crumbs	3000
+Basalt Fetish	210
+Basalt Figurine	160
+Bashmu Fang	600
+Bashmu Feather	350
+Bashmu Tongue	400
+Bat Decoration	2000
+Bat Wing	50
+Beast's Nightmare-Cushion	630000
+Bed of Nails	500
+Beetle Carapace	200
+Beijinho	2780
+Black Wool	300
+Blazing Bone	610
+Blemished Spawn Abdomen	550
+Blemished Spawn Head	800
+Blemished Spawn Tail	1000
+Bloated Maggot	5200
+Blood Amulet	1230
+Blood Crown	116000
+Blood Hood	1550
+Blood Sceptre	178000
+Blood Tincture in a Vial	360
+Blooded Worm	4700
+Bloodshot Giant Eye	1820
+Bloodstained Scythe	4200
+Bloody Dwarven Beard	110
+Bloody Pincers	100
+Bloody Tears	70000
+Blue Goanna Scale	230
+Boar Man Hoof	600
+Boggy Dreads	200
+Bola	35
+Bone Fetish	150
+Bone Fibula	580
+Bone Rattle	790
+Bone Shoulderplate	150
+Bone Spikes	1500000
+Bone Toothpick	150
+Bonecarving Knife	190
+Bones of Zorvorax	10000
+Book Page	640
+Book of Faith	0
+Book with a Dragon	1800
+Book with an Hourglass	1450
+Bottled Dragon Breath	0
+Bowl of Terror Sweat	500
+Brain Head's Brain	0
+Brain Head's Giant Neuron	100000
+Brain Head's Left Hemisphere	90000
+Brain Head's Right Hemisphere	50000
+Brainstealer's Brain	300000
+Brainstealer's Brainwave	440000
+Brainstealer's Tissue	240000
+Brigadeiro	2640
+Bright Bell	220
+Brimstone Fangs	380
+Brimstone Shell	210
+Brinebrute Claw	2600
+Broken Arrow	0
+Broken Draken Mail	340
+Broken Gladiator Shield	190
+Broken Halberd	100
+Broken Iks Cuirass	640
+Broken Iks Faulds	530
+Broken Iks Headpiece	560
+Broken Iks Sandals	440
+Broken Key Ring	8000
+Broken Longbow	130
+Broken Macuahuitl	1000
+Broken Mitmah Chestplate	85000
+Broken Mitmah Necklace	210
+Broken Ring of Ending	4000
+Broken Slicer	120
+Broken Staff of Mind Control	1250000
+Broken Throwing Axe	230
+Broodrider Saddle	2800
+Brutus Bloodbeard's Hat	0
+Bulltaur Armor Scrap	480
+Bulltaur Hoof	540
+Bulltaur Horn	385
+Bundle of Cursed Straw	800
+Burnt Out Devourer Core	0
+Capricious Heart	2100
+Capricious Robe	1200
+Carniphila Seeds	50
+Carnisylvan Bark	230
+Carnisylvan Finger	250
+Carnivostrich Feather	630
+Carrion Worm Fang	35
+Catnip	580
+Cave Chimera Head	1200
+Cave Chimera Leg	650
+Cave Devourer Eyes	550
+Cave Devourer Legs	350
+Cave Devourer Maw	600
+Cavebear Skull	550
+Centipede Leg	28
+Ceremonial Bowl	0
+Chagorz Igneous Obsidian	1100000
+Chain Leash	970
+Chasm Spawn Abdomen	240
+Chasm Spawn Head	850
+Chasm Spawn Tail	120
+Cheese Cutter	50
+Cheesy Figurine	150
+Cheesy Membership Card	120000
+Chicken Feather	30
+Chitinous Mouth (Baron from Below)	10000
+Chitinous Mouth (Count of the Core)	10000
+Christmas Present Bag	0
+Christmas Token	0
+Churro Heart	2680
+Claw of 'The Noxious Spawn'	15000
+Cliff Strider Claw	800
+Closed Pocket Sundial	5000
+Cloud Familiar	0
+Cluster of Crystallized Death	9000
+Cluster of Solace	0
+Coal Eyes	0
+Cobra Crest	650
+Cockroach Leg	0
+Colourful Feather	110
+Colourful Feathers	400
+Colourful Quill	110000
+Colourful Snail Shell	250
+Compound Eye	150
+Condensed Energy	260
+Cookbook (Creature Product)	870
+Coral Branch	360
+Corrupted Flag	700
+Countess Sorrow's Frozen Tear	50000
+Cow Bell	120
+Cowbell	210
+Crab Man Claws	550
+Crab Pincers	35
+Cracked Alabaster Vase	180
+Crawler Head Plating	210
+Crawler's Essence	3700
+Crown (Plant)	2700
+Cruelty's Chest	720000
+Cruelty's Claw	640000
+Cry-Stal	3200
+Cryptic Fossil	0
+Crystal Bone	250
+Crystal of the Mitmah	280
+Crystalline Spikes	440
+Crystallised Blood	270000
+Crystallized Anger	400
+Crystallized Death	3000
+Cuirass Plate	1000
+Cultish Mask	280
+Cultish Symbol	500
+Curious Matter	430
+Curl of Hair	320000
+Cursed Bone	6000
+Cursed Shoulder Spikes	320
+Damaged Armor Plates	280
+Damaged Worm Head	8000
+Damselfly Eye	25
+Damselfly Wing	20
+Dandelion Seeds	200
+Dangerous Proto Matter	300
+Dark Bell	250
+Dark Bell (Silver)	310000
+Dark Obsidian Splinter	4400
+Darklight Basalt Chunk	3800
+Darklight Core (Object)	4100
+Darklight Figurine	3400000
+Darklight Heart	0
+Darklight Matter (Object)	5500
+Dead Weight	450
+Deadeye Devious' Eye Patch	0
+Deadly Fangs	5500
+Deathly Crypt Rune	0
+Deathstrike's Snippet	0
+Decayed Finger Bone	5100
+Deepling Breaktime Snack	90
+Deepling Claw	430
+Deepling Guard Belt Buckle	230
+Deepling Ridge	360
+Deepling Scales	80
+Deepling Warts	180
+Deeptags	290
+Deepworm Jaws	500
+Deepworm Spike Roots	650
+Deepworm Spikes	800
+Demon Claws	0
+Demon Dust	300
+Demon Root	950
+Demon Skull	0
+Demonic Core Essence	0
+Demonic Finger	1000
+Demonic Matter	0
+Devourer Core	0
+Dewberry Palm Leaf	0
+Diremaw Brainpan	350
+Diremaw Legs	270
+Distorted Heart	2100
+Distorted Robe	1200
+Downy Feather	20
+Dowser	35
+Dracola's Eye	50000
+Dracoyle Statue	5000
+Dracoyle Statue (Enchanted)	5000
+Dragolisk Eye	690
+Dragolisk Poison Gland	475
+Dragon Blood	700
+Dragon Claw	8000
+Dragon Claw (Green)	0
+Dragon Crown	0
+Dragon Priest's Wandtip	175
+Dragon Tongue	550
+Draken Sulphur	550
+Draken Wristbands	430
+Draptor Scales	800
+Dream Essence Egg	205
+Dream Matter	0
+Dream Warden Claw	0
+Dream Warden Mask	0
+Dubious Piece of Cloth	0
+Dung Ball	130
+Dwarven Beard	0
+Earflap	40
+Egg of The Many	15000
+Elemental Spikes	0
+Elven Hoof	115
+Emerald Tortoise Shell	2150
+Empty Honey Glass	270
+Enchanted Chicken Wing	20000
+Encrypted Notes	620
+Energy Ball	300
+Energy Soil	2000
+Energy Vein	270
+Ensouled Essence	820
+Essence of a Bad Dream	360
+Eternal Flames	5000
+Exalted Seal	190000
+Execowtioner Mask	240
+Eye of Corruption	390
+Eye of a Deepling	150
+Eye of a Weeper	650
+Eyeless Devourer Legs	650
+Eyeless Devourer Maw	420
+Eyeless Devourer Tongue	900
+Fafnar Symbol	950
+Fairy Wings	200
+Falcon Crest	650
+Fetid Heart	0
+Fiery Crypt Rune	0
+Fiery Heart	375
+Fig Leaf	200
+Figurine of Bakragore	5400000
+Figurine of Cruelty	3100000
+Figurine of Greed	2900000
+Figurine of Hatred	2700000
+Figurine of Maior Domus	3400000
+Figurine of Malice	2800000
+Figurine of Megalomania	5000000
+Figurine of Mimar Haffar	2800000
+Figurine of Phosphorus	5700000
+Figurine of Spite	3000000
+Fir Cone	25
+Fireworks Capsule	0
+Fish Eye	500000
+Flames of the Percht Queen	0
+Flask of Warrior's Sweat	10000
+Flawless Ice Crystal	5000
+Flintstone	800
+Flotsam	330
+Foam Stalker Spume	0
+Forbidden Fruit	0
+Forbidden Tome	0
+Fox Paw	100
+Frazzle Skin	400
+Frazzle Tongue	700
+Frost Giant Pelt	160
+Frosty Heart	280
+Frozen Chain	0
+Frozen Claw	0
+Frozen Claw (Ice Horror)	900000
+Frozen Crapace	500000
+Frozen Lightning	270
+Frozen Peacock Feather	110000
+Frozen Time	0
+Fungal Blister	0
+Fur Shred	200
+Gear Crystal	200
+Gear Wheel	500
+Ghastly Dragon Head	700
+Giant Crab Pincer	950
+Giant Pacifier	170
+Giant Tentacle	10000
+Giant Tusk	6000
+Gilded Bell	0
+Girtablilu Warrior Carapace	520
+Gland	500
+Glimmering Soil	2000
+Glistening Bone	250
+Glob of Acid Slime	25
+Glob of Glooth	125
+Glob of Mercury	20
+Glob of Tar	30
+Gloom Wolf Fur	70
+Glooth Injection Tube	350
+Glowing Carrot	0
+Glowing Rune	350
+Gnomevil's Hat	0
+Goanna Claw	260
+Goanna Meat	190
+Gold Tooth	120
+Gold-Brocaded Cloth	175
+Gold-Scaled Sentinel	380000
+Golden Bell	0
+Golden Belt	0
+Golden Brush	250
+Golden Claw	250000
+Golden Cotton Reel	0
+Golden Lotus Brooch	270
+Golden Sun Coin	11000
+Golden Talon	0
+Golden Tiger Coin	11000
+Goosebump Leather	650
+Gore Horn (Item)	2900
+Gorerilla Mane	2750
+Gorerilla Tail	2650
+Gorger Antlers	2250
+Grant of Arms	950
+Grappling Hook	150
+Greasy Wool	0
+Greed's Arm	950000
+Green Bandage	180
+Grimace	120000
+Guidebook	200
+Gummy Rotworm	0
+Half-Digested Stones	40
+Half-Eaten Brain	85
+Hand	1450
+Hard-Boiled Hydra Egg	0
+Harpoon of a Giant Snail	15000
+Harpy Feathers	730
+Hatched Rorc Egg	30
+Haunted Piece of Wood	115
+Hazardous Heart	5000
+Hazardous Robe	3000
+Head (Brachiodemon)	3500
+Head (Many Faces)	3200
+Headpecker Beak	2800
+Headpecker Feather	1300
+Heart Amphora	930
+Hellhound Slobber	500
+Hellhunter Eye	2950
+Hellspawn Tail	475
+Helmet of Sir Leonard	46000
+Hemp Rope	350
+Hideous Chunk	510
+High Guard Flag	550
+High Guard Shoulderplates	130
+Hollow Stampor Hoof	400
+Holy Ash	160
+Horn of Kalyassa	10000
+Horoscope	40
+Horseshoe	0
+Huge Chunk of Crude Iron	15000
+Huge Shell	15000
+Huge Spiky Snail Shell	8000
+Human Teeth	2000
+Humongous Chunk	540
+Hunter's Quiver	80
+Hydra Egg	500
+Hydra Head	600
+Hydra Tongue	0
+Hydrophytes	220
+Ice Flower (Item)	370
+Ice Flower Seeds	0
+Ice Shard	500
+Iced Soil	2000
+Ichgahal's Fungal Infestation	900000
+Icicle (Percht)	0
+Icy Crypt Rune	0
+Icy Horns	250000
+Icy Scales	250000
+Idol of the Forge	950
+Incantation Notes	90
+Infernal Heart	2100
+Infernal Robe	1200
+Infernoid Ember	160
+Inkwell (Black)	720
+Insectoid Cocoon (Item)	0
+Instable Proto Matter	300
+Ivory Carving	300
+Ivory Comb	8000
+Izcandar's Snow Globe	180000
+Izcandar's Sundial	225000
+Jagged Sickle	150000
+Jaul's Pearl	0
+Jaws	3900
+Jungle Moa Claw	160
+Jungle Moa Egg	250
+Jungle Moa Feather	140
+Katex' Blood	210
+Key to Knowledge	0
+Key to the Drowned Library	330
+Kollos Shell	420
+Kongra's Shoulderpad	100
+Lamassu Hoof	330
+Lamassu Horn	240
+Lancer Beetle Shell	80
+Lancet	90
+Lavafungus Head	900
+Lavafungus Ring	390
+Lavaworm Jaws	1100
+Lavaworm Spike Roots	600
+Lavaworm Spikes	750
+Legionnaire Flags	500
+Lime Tart	1870
+Liodile Fang	480
+Lion Cloak Patch	190
+Lion Crest	270
+Lion Seal	210
+Little Bowl of Myrrh	500
+Lizard Essence	300
+Lizard Heart	530
+Lizard Leather	150
+Lizard Scale	120
+Lizard Tail	95
+Longing Eyes	8000
+Loose Prayer Beads	0
+Lost Basher's Spike	280
+Lost Bracers	140
+Lost Husher's Staff	250
+Lost Soul (Item)	120
+Lucky Pig	0
+Ludicrous Piece of Cloth	0
+Luminous Orb	1000
+Luminous Piece of Cloth	0
+Lump of Earth	130
+Mad Froth	80
+Magic Sulphur	8000
+Magma Clump	570
+Malice's Horn	620000
+Malice's Spine	850000
+Malofur's Lunchbox	240000
+Mammoth Tusk	100
+Mantassin Tail	280
+Manticore Ear	310
+Manticore Tail	220
+Mantosaurus Jaw	2800
+Marsh Stalker Beak	65
+Marsh Stalker Feather	50
+Maxilla	250
+Maxxenius Head	500000
+Meat Hammer	60
+Medal of Valiance	410000
+Mega Dragon Heart	1100
+Megalomania's Essence	1900000
+Megalomania's Skull	1500000
+Mercurial Wing	2500
+Metal Jaw	260
+Metal Spike	320
+Metal Toe	430
+Mighty Demonic Core Essence	0
+Milk Churn	100
+Miraculum	60
+Molten Dragon Essence	840
+Mooh'tah Shell	110
+Moohtant Horn	140
+Moon Compass	5000
+Moon Melon Slice	0
+Moon Pin	18000
+Moonspawn Headpiece	900
+Moonspawn Tentacle	670
+Morgaroth's Heart	15000
+Morshabaal's Brain	5000000
+Morshabaal's Extract	3250000
+Mother Soil	5000
+Mould Heart	2100
+Mould Robe	1200
+Mouldy Powder	200
+Mr. Punish's Handcuffs	50000
+Mummified Demon Finger	0
+Murcion's Mycelium	950000
+Mutated Bat Ear	420
+Mutated Flesh	50
+Mutated Rat Tail	150
+Mysterious Remains	0
+Mystical Hourglass	700
+Natural Soil	2000
+Necromantic Core	10000
+Necromantic Crypt Rune	0
+Necromantic Rust	390
+Nettle Blossom	75
+Nettle Spit	25
+Neutral Matter	5000
+Night Harpy Beak	10000
+Night Harpy Feathers	5000
+Nighthunter Wing	2000
+Nimmersatt's Seal	520
+Noble Amulet	430000
+Noble Cape	425000
+Norcferatu Talisman	670
+Nose Ring	2000
+Obujos' Shell	0
+Obvious Piece of Cloth	0
+Odd Organ	410
+Ogre Ear Stud	180
+Ogre Nose Ring	210
+Old Girtablilu Carapace	570
+Old Royal Diary	220000
+Ominous Piece of Cloth	0
+Orc Tusk	700
+Orcish Toothbrush	750
+Orshabaal's Brain	12000
+Pale Worm's Scalp	489000
+Panther Head	750
+Panther Paw	300
+Paper Boat	800
+Paper Plane	480
+Parder Fur	150
+Parder Tooth	150
+Pastry Dragon	7500
+Patch of Fine Cloth	1350
+Peacock Feather Fan	350
+Percht Broom	0
+Percht Handkerchief	0
+Percht Horns	0
+Percht Queen's Frozen Heart	0
+Percht Skull	0
+Phantasmal Hair	500
+Piece of Crocodile Leather	15
+Piece of Dead Brain	420
+Piece of Draconian Steel	3000
+Piece of Frozen Night	680
+Piece of Hell Steel	500
+Piece of Hellfire Armor	550
+Piece of Massacre's Shell	50000
+Piece of Royal Steel	10000
+Piece of Swampling Wood	30
+Pieces of Magic Chalk	210
+Pirat's Tail	180
+Pirate Coin	110
+Plagueroot Offshoot	280000
+Plasma Pearls	250
+Plasmatic Lightning	270
+Poison Gland	210
+Poisoned Fang	130
+Poisonous Slime	50
+Pool of Chitinous Glue	480
+Pot of Orcish Warpaint	1150
+Prehemoth Claw	2300
+Prehemoth Horns	3000
+Preserved Dark Seed	0
+Preserved Light Blue Seed	0
+Preserved Pink Seed	0
+Preserved Purple Seed	0
+Preserved Red Seed	0
+Preserved Violet Seed	0
+Preserved Yellow Seed	0
+Pressed Flower	570
+Pristine Worm Head	15000
+Pulverized Ore	400
+Purified Soul (Netherworld)	260
+Putrefactive Figurine	3200000
+Pyrophyte Seed Pod	720
+Quara Eye	350
+Quara Pincers	410
+Quara Tentacle	140
+Quill	1100
+Rabbit's Foot	50
+Rare Earth	80
+Ratmiral's Hat	150000
+Ravenous Circlet	220000
+Raw Meat	0
+Reality Splinter	5000
+Red Goanna Scale	270
+Red Hair Dye	40
+Red Lantern	250
+Resin Parasite	1450
+Resinous Fish Fin	1250
+Rhindeer Antlers	680
+Rhino Hide	175
+Rhino Horn	265
+Rhino Horn Carving	300
+Ripptor Claw	2600
+Ripptor Scales	1200
+Ritual Bone Knife	820
+Ritual Tooth	135
+Rod (Creature Product)	2200
+Root Tentacle	300000
+Roots	1200
+Rorc Egg	120
+Rorc Feather	70
+Rotrender Claw	0
+Rotrender Scalp	0
+Rotten Feather	120
+Rotten Heart	74000
+Rotten Roots	3800
+Rotten Vermin Ichor	4500
+Sabretooth	400
+Sabretooth Fur	2500
+Sailor's Burn Cure	0
+Sandcrawler Shell	20
+Scale of Corruption	680
+Scale of Gelidrazah	10000
+Scorpion Charm	620
+Scythe Leg	450
+Sea Serpent Scale	520
+Sea Serpent Trophy	10000
+Seacrest Hair	260
+Seacrest Pearl	400
+Seacrest Scale	150
+Sealing Wax	620
+Shadow Mask	0
+Shadow Paint	0
+Shaggy Tail	25
+Shamanic Talisman	200
+Shard	2000
+Shark Fins	250
+Shimmering Beetles	150
+Shrunken Head	250000
+Sight of Surrender's Eye	3000
+Signet Ring	480000
+Silencer Claws	390
+Silencer Resonating Chamber	600
+Silken Bookmark	1300
+Silky Fur	35
+Silver Foxmouse Coin	11000
+Silver Moon Coin	11000
+Silver Poniard	2000
+Sineater Wing	2100
+Single Human Eye	1000
+Skeleton Decoration	3000
+Skin of Gralvalon	0
+Skin of Malvaroth	0
+Skin of Twisterror	0
+Skull Fetish	250
+Skull Shatterer	170
+Skull Tendril	650000
+Skunk Tail	50
+Slime Heart	160
+Slime Mould	175
+Slimy Leaf Tentacle	320
+Slimy Leg	4500
+Small Energy Ball	250
+Small Ladybug	0
+Small Treasure Chest	500
+Small Tropical Fish	380
+Smoldering Eye	470000
+Snake Skin	400
+Sniper Gloves	2000
+Soul Stone	6000
+Soul Trap	250000
+Spark Sphere	350
+Sparkion Claw	290
+Sparkion Legs	310
+Sparkion Stings	280
+Sparkion Tail	300
+Spectral Gold Nugget	500
+Spectral Silver Nugget	250
+Spellreaper Staff Totem	3100
+Spellsinger's Seal	280
+Sphinx Feather	470
+Sphinx Tiara	360
+Spiderweb Clouds Shreds	0
+Spidris Mandible	450
+Spiked Bracers	1360
+Spiked Gorget	850
+Spiked Iron Ball	100
+Spirit Container	40000
+Spirited Soil	2000
+Spite's Spirit	840000
+Spitter Nose	340
+Splintered Mitmah Gem	225000
+Spooky Blue Eye	95
+Spool of Yarn	1000
+Srezz' Eye	300
+Staff Piece	560
+Stag Parchment	3000
+Stalking Seeds	1800
+Stampor Horn	280
+Stampor Talons	150
+Star Ink	1250
+Steel Spider Silk	0
+Stone Nose	590
+Stonerefiner's Skull	100
+Strand of Medusa Hair	600
+Strange Proto Matter	300
+Strange Substance	810
+Streaked Devourer Eyes	500
+Streaked Devourer Legs	600
+Streaked Devourer Maw	400
+Striped Fur	50
+Sulphider Shell	2200
+Sulphur Powder	1900
+Sun Brooch	18000
+Swampling Moss	20
+Swarmer Antenna	130
+Tail of Corruption	240
+Tainted Heart	0
+Taiyaki Ice Cream	6750
+Tanjis' Sight	0
+Tarantula Egg	80
+Tarnished Rhino Figurine	320
+Tattered Piece of Robe	120
+Tatty Robe	0
+Technomancer Beard	0
+Telescope Eye	1600
+Tender Venison	0
+Tentacle Piece	5000
+Tentacle of Tentugly	27000
+Tentugly's Eye	52000
+Tentugly's Jaws	80000
+Terramite Eggs	50
+Terramite Legs	60
+Terramite Shell	170
+Terrorbird Beak	95
+The Crown of the Percht Queen (Fire)	0
+The Crown of the Percht Queen (Ice)	0
+The Handmaiden's Protector	50000
+The Imperor's Trident	50000
+The Lethal Lissy's Shirt	0
+The Plasmother's Remains	50000
+The Vampire Count's Medal	0
+Thick Fur	150
+Thorn	100
+Thorn Seed	0
+Tiny Bat Coffin	0
+Toe Nails	4500
+Token of Love	440000
+Tooth File	60
+Tooth of Tazhadur	10000
+Torn Page	340
+Torn Shirt	250
+Trapped Bad Dream Monster	900
+Tremendous Tyrant Head	930
+Tremendous Tyrant Shell	740
+Trollroot	50
+Tunnel Tyrant Head	500
+Tunnel Tyrant Shell	700
+Turtle Shell	90
+Tusk	100
+Twig Arms	0
+Twisted Marionette	125000
+Two-Headed Turtle Heads	460
+Ulcer Probe	0
+Undead Heart	200
+Undertaker Fangs	2700
+Unholy Bone	480
+Urmahlullu's Mane	490000
+Urmahlullu's Paw	245000
+Urmahlullu's Tail	210000
+Utua's Poison	230
+Vampire Dust	100
+Vampire Lord Token	0
+Vampire's Cape Chain	150
+Varnished Diremaw Brainpan	750
+Varnished Diremaw Legs	670
+Vein of Ore	330
+Vemiath's Infused Basalt	1000000
+Venison	55
+Versicolour Fireworks Powder	0
+Vial of Hatred	737000
+Vibrant Heart	2100
+Vibrant Robe	1200
+Volatile Proto Matter	300
+Voluminous Piece of Cloth	0
+Wad of Fairy Floss	2910
+Wafer Paper Flower	2350
+War Crystal	460
+War Wolf Skin	0
+Wardragon Claw	550
+Wardragon Tooth	730
+Warmaster's Wristguards	200
+Waspoid Claw	320
+Waspoid Wing	190
+Weaver's Wandtip	250
+Werebadger Claws	160
+Werebadger Skull	185
+Werebear Fur	185
+Werebear Skull	195
+Wereboar Hooves	175
+Wereboar Tusks	165
+Werecrocodile Tongue	570
+Werefox Tail	200
+Werehyaena Nose	220
+Werehyaena Talisman	350
+Werepanther Claw	280
+Weretiger Tooth	490
+Werewolf Fangs	180
+Werewolf Fur	380
+White Deer Antlers	400
+White Deer Skin	245
+Widow's Mandibles	110
+Wild Flowers	120
+Wimp Tooth Chain	120
+Winged Tail	800
+Withered Pauldrons	850
+Withered Scalp	900
+Worm Sponge	4200
+Worn Guide Book	250000
+Writhing Brain	370000
+Writhing Heart	185000
+Wyrm Scale	400
+Wyvern Talisman	265
+Yapunac Dagger	240
+Yielocks	600
+Yielowax	600
+Yirkas' Egg	280
+Young Lich Worm	25000
+Zaogun Flag	600
+Zaogun Shoulderplates	150

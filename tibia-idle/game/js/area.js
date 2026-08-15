@@ -86,13 +86,16 @@ function areaCells(nome, origem, alvo, spellId) {
   const base = areaSaiDoConjurador(nome, spellId) ? origem : alvo;
   const out = [];
   const vistos = new Set();
-  // [0,0] em matrizes de wave é a âncora técnica, não um tile atingido.
-  // Toda onda começa no SQM à frente do caster, para qualquer vocação.
+  // [0,0] em matrizes WAVE/BEAM é a âncora no conjurador (valor 3 no
+  // register_spells.lua), NÃO um tile atingido. Toda onda/feixe começa
+  // obrigatoriamente 1 SQM à frente do caster na direção do alvo —
+  // igual ao AreaCombat do Canary (origem pulada).
   const waveProjetada = areaSaiDoConjurador(nome, spellId) && /(WAVE|BEAM)/i.test(nome);
   for (const [dx, dy] of offs) {
-    if (waveProjetada && dx === 0 && dy === 0) continue;
-    const cx = (base.cx || 0) + dx;
-    const cy = (base.cy || 0) + dy;
+    const ox = Number(dx) || 0, oy = Number(dy) || 0;
+    if (waveProjetada && ox === 0 && oy === 0) continue;
+    const cx = (base.cx || 0) + ox;
+    const cy = (base.cy || 0) + oy;
     if (typeof inBounds === "function" && !inBounds(cx, cy)) continue;
     const k = cx + ":" + cy;
     if (vistos.has(k)) continue;

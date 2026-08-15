@@ -161,9 +161,9 @@ must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
 must(html.includes("js/combat.js?v=boss-immunity-v1"), "combat sem cache-busting Greed v2");
 must(html.includes("js/render.js?v=interface-sharp-v1"), "render sem cache-busting visual");
 must(html.includes("js/soulwar.js?v=mirrored-nightmare-v1"), "soulwar sem cache-busting Mirrored Nightmare");
-must(html.includes("js/scarlett-boss.js?v=goshnar-greed-v1"),
+must(html.includes("js/scarlett-boss.js?v=scarlett-qte-v3"),
   "gate compartilhado sem cache-busting");
-must(html.includes("css/layout.css?v=party-list-v1"),
+must(html.includes("css/layout.css?v=cidade-modal-v1"),
   "CSS do modal Greedbeast sem cache-busting");
 
 console.log("OK: Goshnar's Greed — testes livres, adds sem defesa, Greedbeast 30% e vulnerabilidade de 40s.");

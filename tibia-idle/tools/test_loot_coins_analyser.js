@@ -18,7 +18,9 @@ must(html.includes("js/analyzers.js?v=hunt-analyser-death-v1") ||
   html.includes("js/analyzers.js?v=analyser-header-reset-v1"), "cache-bust analyzers");
 must(html.includes("js/player.js?v=loot-coins-analyser-v1") ||
   html.includes("js/player.js?v=admin-forge-equip-v1"), "cache-bust player");
-must(html.includes("js/supply-stash.js?v=loot-coins-analyser-v1"), "cache-bust supply-stash");
+must(html.includes("js/supply-stash.js?v=loot-coins-analyser-v1") ||
+  html.includes("js/supply-stash.js?v=stash-multi-v1") ||
+  html.includes("js/supply-stash.js?v=cap-loot-fix-v1"), "cache-bust supply-stash");
 must(playerSrc.includes("lootNpcUnitValue") && playerSrc.includes("sessionLootValue"), "player sem lootNpcUnitValue");
 must(stashSrc.includes("currencyValue(slug)"), "routeLootItem sem divert de moedas");
 must(analyzersSrc.includes("otc-loot-econ") && analyzersSrc.includes("Valor do loot"), "loot analyser sem footer de economia");

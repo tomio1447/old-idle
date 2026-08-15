@@ -170,6 +170,41 @@ const TEMPLE_REMOVED_NPC_POSITIONS = [
   { x:1013, y:1018, z:7 },
   { x:1013, y:1020, z:7 },
 ];
+/* Serviços Enpa/Gnomally no templo OTBM (offsets locais a partir do spawn).
+ * O mapa oficial não traz NPCs; sem isso o POI antigo do mapa procedural
+ * fica fora da câmera e o clique no canvas nunca abre a loja. */
+const TEMPLE_SERVICE_NPC_OFFSETS = {
+  enpa: { dx: -3, dy: -1 },
+  gnomally: { dx: 3, dy: -1 },
+};
+
+function templeFindWalkableNear(tx, ty) {
+  const tryAt = (x, y) => {
+    if (x < 1 || y < 1 || x >= MAP_W - 1 || y >= MAP_H - 1) return null;
+    if (CITY.grid[y * MAP_W + x] === T_BLOCK) return null;
+    return { tx: x, ty: y };
+  };
+  const direct = tryAt(tx, ty);
+  if (direct) return direct;
+  for (let r = 1; r <= 4; r++) {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const hit = tryAt(tx + dx, ty + dy);
+      if (hit) return hit;
+    }
+  }
+  return { tx: Math.max(1, Math.min(MAP_W - 2, tx)), ty: Math.max(1, Math.min(MAP_H - 2, ty)) };
+}
+
+function placeTempleServiceNpcs(spawn) {
+  const list = [];
+  for (const id of Object.keys(TEMPLE_SERVICE_NPC_OFFSETS)) {
+    const off = TEMPLE_SERVICE_NPC_OFFSETS[id];
+    const spot = templeFindWalkableNear(spawn.x + off.dx, spawn.y + off.dy);
+    POI[id] = { tx: spot.tx, ty: spot.ty, npc: true };
+    list.push({ id: id, tx: spot.tx, ty: spot.ty });
+  }
+  return list;
+}
 
 function installOfficialTempleMap(source) {
   if (!source || !source.sourceBounds)
@@ -207,6 +242,7 @@ function installOfficialTempleMap(source) {
     npcs: [],
     officialTemple: true,
   };
+  CITY.npcs = placeTempleServiceNpcs(spawn);
   return CITY;
 }
 

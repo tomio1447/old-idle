@@ -85,12 +85,39 @@ must(scarlett.authority.scarlett&&scarlett.authority.scarlett.immune&&scarlettBo
 const stillImmune=JSON.parse(engine.advanceAuthorityState(JSON.stringify(scarlett),2000,3000).state);
 must(stillImmune.authority.scarlett.immune&&stillImmune.authority.mobs.find((m)=>m.boss).hp===scarlettHp,
   "Scarlett tomou dano durante a imunidade inicial");
-const opened=JSON.parse(engine.advanceAuthorityState(JSON.stringify(stillImmune),16000,19000).state);
-must(opened.authority.scarlett&&!opened.authority.scarlett.immune&&opened.authority.scarlett.phase==="vulnerable",
-  "QTE idle da Scarlett não abriu a janela de vulnerabilidade");
-const openedBoss=opened.authority.mobs.find((m)=>m.boss);
+// Avança só até o QTE começar (passar das notas sem input mata o tester).
+let inQte=stillImmune;
+for(let i=0;i<40&&inQte.authority.scarlett&&inQte.authority.scarlett.phase!=="qte";i++){
+  const clock=Number(inQte.authority.clock)||0;
+  inQte=JSON.parse(engine.advanceAuthorityState(JSON.stringify(inQte),500,clock+500).state);
+}
+must(inQte.authority.scarlett&&inQte.authority.scarlett.phase==="qte"&&
+  Array.isArray(inQte.authority.scarlett.sequence)&&inQte.authority.scarlett.sequence.length===5&&
+  Array.isArray(inQte.state.scarlett.noteDues)&&inQte.state.scarlett.noteDues.length===5,
+  "QTE da Scarlett não gerou sequência/noteDues no snapshot");
+must(inQte.authority.scarlett.immune,"Scarlett deveria continuar imune durante o QTE");
+function scarlettVisual(dir){
+  return {players:[{id:"1",x:0.5,y:0.5,cx:10,cy:10}],mobs:[],scarlettIntent:dir?{dir}:undefined};
+}
+// Completa as 5 notas: avança até o due com o intent (servidor segura se ainda cedo).
+let qteState=inQte;
+for(let i=0;i<5;i++){
+  const due=Number(qteState.authority.scarlett.noteDues[i]);
+  const clock=Number(qteState.authority.clock)||0;
+  const dir=qteState.authority.scarlett.sequence[i];
+  const elapsed=Math.max(200,due-clock+50);
+  qteState=JSON.parse(engine.advanceAuthorityState(JSON.stringify(qteState),elapsed,clock+elapsed,
+    scarlettVisual(dir)).state);
+  must(qteState.authority.scarlett&&
+    (qteState.authority.scarlett.phase==="vulnerable"||Number(qteState.authority.scarlett.index)>=i+1),
+    "acerto "+(i+1)+" da Scarlett rejeitado");
+}
+must(qteState.authority.scarlett&&!qteState.authority.scarlett.immune&&qteState.authority.scarlett.phase==="vulnerable",
+  "QTE com 5 acertos não abriu a janela de vulnerabilidade");
+const openedBoss=qteState.authority.mobs.find((m)=>m.boss);
 openedBoss.hp=Math.floor(openedBoss.maxHp*0.74);
-const gated=JSON.parse(engine.advanceAuthorityState(JSON.stringify(opened),1000,20000).state);
+const gated=JSON.parse(engine.advanceAuthorityState(JSON.stringify(qteState),1000,
+  Number(qteState.authority.clock)+1000).state);
 const gatedBoss=gated.authority.mobs.find((m)=>m.boss);
 must(gated.authority.scarlett.immune&&gatedBoss.hp>=Math.ceil(gatedBoss.maxHp*0.75),
   "gate de 75% da Scarlett não reaplicou imunidade");

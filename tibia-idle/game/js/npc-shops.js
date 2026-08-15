@@ -38,18 +38,19 @@ const NPC_SHOPS = {
   enpa: {
     currency: "gold",
     buyOnly: true,
+    /* Ordenado por nível exigido (lvl em weapons.json); sem lvl = 0. */
     items: [
-      { slug: "boots-of-enlightenment", price: 8000 },
-      { slug: "coned-hat-of-enlightenment", price: 70000 },
-      { slug: "fists-of-enlightenment", price: 20000 },
-      { slug: "harmony-amulet", price: 1000 },
-      { slug: "jo-staff", price: 500 },
-      { slug: "legs-of-enlightenment", price: 40000 },
-      { slug: "light-jo-staff", price: 250 },
-      { slug: "nunchaku-of-enlightenment", price: 50000 },
-      { slug: "plain-monk-robe", price: 450 },
-      { slug: "robe-of-enlightenment", price: 150000 },
-      { slug: "sai-of-enlightenment", price: 100000 }
+      { slug: "light-jo-staff", price: 250 },            /* nv 0 */
+      { slug: "plain-monk-robe", price: 450 },           /* nv 0 */
+      { slug: "jo-staff", price: 500 },                  /* nv 0 */
+      { slug: "boots-of-enlightenment", price: 8000 },   /* nv 8 */
+      { slug: "harmony-amulet", price: 1000 },           /* nv 8 */
+      { slug: "fists-of-enlightenment", price: 20000 },  /* nv 20 */
+      { slug: "legs-of-enlightenment", price: 40000 },   /* nv 40 */
+      { slug: "nunchaku-of-enlightenment", price: 50000 }, /* nv 50 */
+      { slug: "coned-hat-of-enlightenment", price: 70000 }, /* nv 70 */
+      { slug: "sai-of-enlightenment", price: 100000 },   /* nv 100 */
+      { slug: "robe-of-enlightenment", price: 150000 }   /* nv 150 */
     ]
   },
   gnomally: {

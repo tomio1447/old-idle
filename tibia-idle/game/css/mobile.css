@@ -181,6 +181,21 @@ html[data-ui-mode="mobile"] .topbar .logo {
   font-size: 12px;
   flex: none;
 }
+html[data-ui-mode="mobile"] .topbar .brand-logo--topbar {
+  width: 22px;
+  height: 22px;
+}
+html[data-ui-mode="mobile"] .login-brand-hero .brand-logo--hero {
+  width: 104px;
+  height: 104px;
+}
+html[data-ui-mode="mobile"] .alpha-brand-logo .brand-logo {
+  width: 80px;
+  height: 80px;
+}
+html[data-ui-mode="mobile"] .brand-credits {
+  font-size: 10px;
+}
 html[data-ui-mode="mobile"] .topbar > button {
   display: none !important; /* ações no sheet / dock Menu */
 }
@@ -195,6 +210,11 @@ html[data-ui-mode="mobile"] .topbar #btn-city {
   flex: none;
 }
 html[data-ui-mode="mobile"] .server-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .players-online {
   font-size: 10px;
   padding: 2px 6px;
   flex: none;
@@ -353,6 +373,7 @@ html[data-ui-mode="mobile"] .modal-bg .modal.hunts-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.bosses-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.npcs-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.cidade-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.ranking-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.boss-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.reward-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg.modal-otc .modal,

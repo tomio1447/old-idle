@@ -7,13 +7,14 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Global-Idle — caçada automática</title>
-<link rel="icon" href="assets/item/gold-coin.png">
-  <link rel="stylesheet" href="css/layout.css?v=alpha-announce-v1">
+  <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
+  <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
+  <link rel="stylesheet" href="css/layout.css?v=taken-session-total-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=settings-click-fix-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
   <link rel="stylesheet" href="css/client-background.css">
-  <link rel="stylesheet" href="css/mobile.css?v=alpha-announce-v1">
+  <link rel="stylesheet" href="css/mobile.css?v=ranking-playeron-v1">
   <link rel="stylesheet" href="css/chat.css?v=global-chat-v1">
   <script>
   /* Aplica modo salvo antes do paint para evitar flash. */
@@ -36,6 +37,9 @@
   <div class="modal panel alpha-announce-box">
     <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">⚠ SERVIDOR DE TESTE (ALPHA)</div>
     <div class="panel-body">
+      <div class="brand-logo-wrap alpha-brand-logo">
+        <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
+      </div>
       <p class="small center mb8" data-i18n="alpha.warn">
         Este é um servidor de testes. Progresso, economia e estabilidade podem mudar a qualquer momento. O beta será anunciado em breve.
       </p>
@@ -46,6 +50,9 @@
       <div class="small dim mb4" data-i18n="alpha.updatesTitle">Atualizações recentes</div>
       <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
       <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
+      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
+        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+      </p>
     </div>
   </div>
 </div>
@@ -78,10 +85,11 @@
 <!-- =============================================== LOGIN -->
 <div id="login">
   <div class="box panel">
-    <div class="panel-title" style="font-size:14px;justify-content:center">
-      🌍 GLOBAL-IDLE
-    </div>
+    <div class="panel-title login-brand-title">GLOBAL-IDLE</div>
     <div class="panel-body">
+      <div class="brand-logo-wrap login-brand-hero">
+        <img class="brand-logo brand-logo--hero" src="assets/brand-logo.png?v=brand-v2" width="128" height="128" alt="Global Idle">
+      </div>
 
       <div id="continue-box" class="panel-inset mb8" style="display:none;padding:8px">
         <div class="small dim" data-i18n="login.saved">Personagem salvo</div>
@@ -139,6 +147,10 @@
           Identidade visual Global-Idle · progresso salvo no seu navegador
         </div>
       </div>
+
+      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
+        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+      </p>
     </div>
   </div>
 </div>
@@ -152,7 +164,10 @@
   </div>
 
   <div class="topbar">
-    <span class="logo">🌍 GLOBAL-IDLE</span>
+    <span class="logo brand-logo-mark">
+      <img class="brand-logo brand-logo--topbar" src="assets/brand-logo.png?v=brand-v2" width="28" height="28" alt="">
+      <span>GLOBAL-IDLE</span>
+    </span>
     <div class="row small">
       <img src="assets/item/gold-coin.png" style="width:16px;height:16px">
       <span class="gold-txt" id="gold">0</span>
@@ -167,8 +182,19 @@
       <b id="server-status-text" data-i18n="server.on">SERVIDOR ON</b>
       <button class="sm" id="btn-reconnect" type="button" hidden data-i18n="server.reconnect">Reconnect</button>
     </div>
+    <div class="players-online" id="players-online" hidden title="Personagens online ou em caçada offline" data-i18n-title="players.onTitle">
+      <span data-i18n="players.onLabel">PLAYER ON:</span>
+      <b id="players-online-count">0</b>
+    </div>
     <span class="spacer"></span>
-    <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">☸ <span data-i18n="btn.wheel">WHEEL</span></button>
+    <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
+      <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
+      <span data-i18n="btn.wheel">WHEEL</span>
+    </button>
+    <button class="sm" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
+      <img src="assets/ui/cyclopedia/charms/low-blow.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
+      <span data-i18n="btn.charms">CHARMS</span>
+    </button>
     <button class="sm" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
       <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="prey-btn-gif">
       <span data-i18n="btn.prey">PREY</span><span id="prey-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
@@ -268,6 +294,7 @@
         <canvas id="scene"></canvas>
         <div id="stance-badge" class="stance-badge"></div>
         <div id="mission-box" class="mission-box" style="display:none"></div>
+        <div id="world-boss-box" class="world-boss-box" style="display:none"></div>
         <div id="scarlett-qte" class="scarlett-qte" style="display:none" aria-live="assertive"></div>
         <div id="greed-minigame" class="greed-minigame" style="display:none" aria-live="polite"></div>
         <div id="hatred-minigame" class="hatred-minigame" style="display:none" aria-live="polite"></div>
@@ -397,6 +424,9 @@
         <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
           <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
         </button>
+        <button class="sm catalog-tab-btn" id="btn-ranking" title="Abrir ranking de personagens" data-i18n-title="title.ranking">
+          <span class="ranking-btn-icon" aria-hidden="true"></span><span data-i18n="btn.ranking">RANKING</span>
+        </button>
         <button class="sm catalog-tab-btn" id="btn-npcs" title="Abrir catálogo de NPCs" data-i18n-title="title.npcs">
           <span class="npcs-btn-icon" aria-hidden="true"></span><span data-i18n="btn.npcs">NPCS</span>
         </button>
@@ -478,7 +508,7 @@
 </div>
 <div class="modal-bg" id="modal"><div class="modal panel" id="modal-body"></div></div>
 
-<script src="js/gamedata.js"></script>
+<script src="js/gamedata.js?v=creature-product-npc-prices-v1"></script>
 <script src="js/gamelib-const.js"></script>
 <script src="js/modulelib.js"></script>
 <script src="js/client-background.js"></script>
@@ -536,19 +566,19 @@
 <script src="js/appearance.js?v=sex-looktype-v2"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
 <script src="js/player.js?v=cap-loot-fix-v1"></script>
-<script src="js/accessories.js?v=supply-stash-v1"></script>
-  <script src="js/combat.js?v=cap-loot-fix-v1"></script>
+<script src="js/accessories.js?v=stash-multi-v1"></script>
+  <script src="js/combat.js?v=phys-hit-fx-v1"></script>
 <script src="js/city.js?v=npc-sprites-canary-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
 <script src="js/walker.js"></script>
 <script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
 <script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
-<script src="js/tilemap.js?v=cobra-loading-v17"></script>
+<script src="js/tilemap.js?v=wall-depth-v1"></script>
 <script src="js/effectdata.js?v=blow-white-fix-v1"></script>
 <script src="js/icondata.js?v=cond-icons-v1"></script>
-<script src="js/render.js?v=combat-fx-expire-v1"></script>
-<script src="js/city-render.js?v=npc-sprites-canary-v1"></script>
+<script src="js/render.js?v=wall-depth-v1"></script>
+<script src="js/city-render.js?v=wall-depth-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
      GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
@@ -560,8 +590,8 @@
 <script src="js/soulwar.js?v=hatred-v3"></script>
 <script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=cap-loot-fix-v1"></script>
-<script src="js/i18n.js?v=alpha-announce-v1"></script>
+<script src="js/ui.js?v=stash-multi-v1"></script>
+<script src="js/i18n.js?v=topbar-wod-charms-v1"></script>
 <script src="js/alpha-announce.js?v=alpha-announce-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
@@ -575,14 +605,14 @@
 <script src="js/prey-ui.js?v=prey-bestiary-v1"></script>
 <script src="js/party.js?v=helper-only-spells-v1"></script>
 <script src="js/party-ui.js?v=helper-only-spells-v1"></script>
-<script src="js/analyzers.js?v=hunt-analyser-death-v1"></script>
+<script src="js/analyzers.js?v=taken-session-total-v1"></script>
 <script src="js/wheeldata.js?v=wheel-otc-v2"></script>
 <script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
 <script src="js/wheel.js?v=wheel-otc-v2"></script>
 <script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=alpha-announce-v1"></script>
+<script src="js/account-client.js?v=stash-multi-v1"></script>
 <script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js"></script>
@@ -591,12 +621,13 @@
 <script src="js/training.js?v=party-checkpoint-v1"></script>
 <script src="js/training-ui.js"></script>
 <script src="js/accessorydata.js"></script>
-<script src="js/supply-stash-data.js?v=supply-stash-v1"></script>
-<script src="js/supply-stash.js?v=cap-loot-fix-v1"></script>
+<script src="js/supply-stash-data.js?v=stash-multi-v1"></script>
+<script src="js/supply-stash.js?v=stash-multi-v1"></script>
 <script src="js/admin.js?v=admin-no-rme-mundo-v1"></script>
-<script src="js/city-ui.js?v=npc-shop-meta-v1"></script>
+<script src="js/city-ui.js?v=ranking-playeron-v1"></script>
 <script src="js/preload.js?v=sex-looktype-v2"></script>
-<script src="js/game.js?v=alpha-announce-v1"></script>
+<script src="js/game.js?v=taken-session-total-v1"></script>
 <script src="js/scarlett-boss.js?v=boss-death-wipe-v1"></script>
+<script src="js/world-boss-ui.js?v=world-boss-lobby-v2"></script>
 </body>
 </html>

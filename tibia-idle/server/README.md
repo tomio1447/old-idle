@@ -98,7 +98,8 @@ a aplicação e usar um banco/disco persistente.
 | POST | `/api/market/withdraw` | `{ token, amount, char_id, expected_version, holder_id, lease_token }` | Transfere gold do banco ao personagem atomicamente |
 | GET | `/api/market/bank` | Bearer token | Saldo do banco do market |
 | GET | `/api/market/history?limit=` | Bearer token | Histórico autoritativo de transações |
-| GET | `/api/rankings?by=&limit=` | — | Ranking persistido por critério |
+| GET | `/api/rankings?by=&limit=` | — | Ranking (level, magic, sword, fist, club, axe, distance, kills) |
+| GET | `/api/online-count` | — | PLAYER ON: `onlineChars` + `offlineHunting` (stub 0) + `total` |
 | GET | `/api/admin/snapshots?account_id=` | Bearer Admin | Histórico imutável/checksums |
 | GET | `/api/admin/backup?account_id=` | Bearer Admin | Bundle sanitizado e verificável |
 | POST | `/api/party/create` | `{ token, char_id }` | Cria a party (char vira líder) |
