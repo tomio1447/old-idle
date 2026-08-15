@@ -11,7 +11,30 @@ const CYCLO = { aba: "character", sub: "stats", filtro: "all", busca: "",
                 sel: null };
 
 function cycloIcon(aba, ativo) {
+  if (aba && aba.iconSrc) return aba.iconSrc;
   return `assets/ui/cyclopedia/${aba.icone}_${ativo ? "on" : "off"}.png`;
+}
+
+function closeCyclopediaModal() {
+  const modal = $("#modal");
+  if (modal) modal.classList.remove("show", "wide", "modal-cyclo");
+}
+
+function openCycloCityAction(action) {
+  closeCyclopediaModal();
+  if (action === "market" && typeof openMarket === "function") openMarket();
+  else if (action === "reward" && typeof openRewardChest === "function") openRewardChest();
+  else if (action === "forge" && typeof openForgeModal === "function") openForgeModal();
+  else if (action === "depot" && typeof openDepotModal === "function") openDepotModal();
+  else if (action === "imbuements" && typeof openImbueModal === "function") openImbueModal();
+  else if (action === "enpa" && typeof openNpc === "function") openNpc("enpa");
+  else if (action === "gnomally" && typeof openNpc === "function") openNpc("gnomally");
+}
+
+function cycloCharmIdFromEl(el) {
+  if (!el) return typeof resolveCharmId === "function" ? resolveCharmId(CYCLO.charmSel) : CYCLO.charmSel;
+  const raw = el.getAttribute("data-charm-id") || (el.dataset && el.dataset.charmId) || CYCLO.charmSel;
+  return typeof resolveCharmId === "function" ? resolveCharmId(raw) : raw;
 }
 
 function openCyclopedia(aba) {
@@ -44,14 +67,25 @@ function openCyclopedia(aba) {
 function renderCycloTabs() {
   const el = $("#cyclo-tabs");
   if (!el) return;
-  el.innerHTML = CYCLO_ABAS.map((a) => `
+  el.innerHTML = CYCLO_ABAS.map((a) => {
+    if (a.secao) {
+      return `<div class="cyclo-tab-section" data-cyclo-section="${a.id}">${a.nome}</div>`;
+    }
+    return `
     <div class="cyclo-tab ${CYCLO.aba === a.id ? "active" : ""}
-                ${a.pronta ? "" : "indisponivel"}" data-cyclo-tab="${a.id}">
+                ${a.pronta ? "" : "indisponivel"}
+                ${a.cityAction ? "cyclo-tab-city" : ""}" data-cyclo-tab="${a.id}">
       <img src="${cycloIcon(a, CYCLO.aba === a.id)}" alt="">
       <span>${a.nome}</span>
-    </div>`).join("");
-  $$("#cyclo-tabs [data-cyclo-tab]").forEach((b) =>
+    </div>`;
+  }).join("");
+  $("#cyclo-tabs [data-cyclo-tab]").forEach((b) =>
     b.addEventListener("click", () => {
+      const aba = CYCLO_ABAS.find((a) => a.id === b.dataset.cycloTab);
+      if (aba && aba.cityAction) {
+        openCycloCityAction(aba.cityAction);
+        return;
+      }
       CYCLO.aba = b.dataset.cycloTab;
       CYCLO.sel = null;
       CYCLO.busca = "";
@@ -85,6 +119,7 @@ function renderCycloContent() {
     bestiary: renderCycloBestiary,
     bosstiary: renderCycloBosstiary,
     charms: renderCycloCharms,
+    hunts: renderCycloHunts,
     items: renderCycloItems,
   }[CYCLO.aba] || (() => { el.innerHTML = ""; }))(p, el);
 }
@@ -694,35 +729,230 @@ function renderCycloBosstiary(p, el) {
 /* ---------------------------------------------------------------- charms */
 
 function renderCycloCharms(p, el) {
+  ensureCyclopedia(p);
   const pts = p.charmPoints || 0;
+  const filtro = CYCLO.charmFiltro || "all";
+  const sel = CYCLO.charmSel && CHARMS[CYCLO.charmSel] ? CYCLO.charmSel : null;
+  const finished = typeof bestiaryFinishedList === "function"
+    ? bestiaryFinishedList(p) : [];
+  const ids = Object.keys(CHARMS).filter((id) => {
+    const c = CHARMS[id];
+    if (filtro === "major") return c.cat === "major";
+    if (filtro === "minor") return c.cat === "minor";
+    if (filtro === "owned") return charmOwned(p, id);
+    return true;
+  });
+
   el.innerHTML = `
-    <div class="tiny dim mb8">
-      Charm points vêm do bestiário: cada estágio de um monstro rende pontos
-      (o total varia por criatura: o Canary define os pontos de cada uma).
-      Você tem <b class="gold-txt">${fmtFull(pts)}</b>.
+    <div class="charm-otc-head">
+      <img src="assets/ui/cyclopedia/charms/icon-charms-major.png" alt="" width="18" height="18">
+      <div class="tiny dim" style="flex:1">
+        Charm points vêm dos estágios do bestiário (valores Canary por criatura).
+        Desbloqueie a runa e <b>assigne</b> a uma raça completa — igual ao Canary.
+      </div>
+      <div class="charm-points-badge">
+        <img src="assets/ui/cyclopedia/icon_charms.png" alt="" width="14" height="14"
+             onerror="this.style.display='none'">
+        <b class="gold-txt">${fmtFull(pts)}</b>
+        <span class="tiny dim">pts</span>
+      </div>
     </div>
-    ${Object.keys(CHARMS).map((id) => {
-      const c = CHARMS[id];
-      const tem = charmOwned(p, id);
-      const pode = pts >= c.custo;
-      return `<div class="shop-row ${tem ? "selected" : ""}">
-        <div style="flex:1;min-width:0">
-          <div class="small">${c.nome}
-            <span class="tiny dim">· ${c.tipo}</span></div>
-          <div class="tiny dim">${c.desc}</div>
-        </div>
-        <button class="sm ${tem ? "primary" : ""}" data-buy-charm="${id}"
-          ${tem || !pode ? "disabled" : ""}>
-          ${tem ? "ATIVO" : fmtFull(c.custo) + " pts"}</button>
-      </div>`;
-    }).join("")}`;
-  $$("#cyclo-content [data-buy-charm]").forEach((b) =>
+    <div class="app-filters mb8">
+      ${[["all", "Todos"], ["major", "Major"], ["minor", "Minor"], ["owned", "Meus"]]
+        .map(([f, t]) => `<button class="sm ${filtro === f ? "on" : ""}"
+          data-charm-filtro="${f}">${t}</button>`).join("")}
+    </div>
+    <div class="charm-otc-layout">
+      <div class="charm-otc-list">
+        ${ids.map((id) => {
+          const c = CHARMS[id];
+          const tem = charmOwned(p, id);
+          const race = charmAssignedRace(p, id);
+          const mob = race && GAMEDATA.monsters[race];
+          return `<div class="charm-otc-row ${sel === id ? "active" : ""} ${tem ? "owned" : "locked"}"
+                       data-charm-sel="${id}">
+            ${charmIconHtml(id, 32)}
+            <div class="charm-otc-meta">
+              <div class="small">${c.nome}
+                <span class="tiny dim">· ${c.cat}</span></div>
+              <div class="tiny dim">${race
+                ? `→ ${mob ? mob.name : race}`
+                : (tem ? "sem assign" : fmtFull(c.custo) + " pts")}</div>
+            </div>
+            ${race ? `<span class="charm-otc-mob">${mobImg(race, 28)}</span>` : ""}
+          </div>`;
+        }).join("") || `<div class="tiny dim">Nenhum charm nesse filtro.</div>`}
+      </div>
+      <div class="charm-otc-detail" id="charm-detail">
+        ${sel ? cycloCharmDetail(p, sel, finished)
+              : `<div class="tiny dim" style="padding:16px;text-align:center">
+                   Selecione uma runa para desbloquear ou assignar.</div>`}
+      </div>
+    </div>`;
+
+  $$("#cyclo-content [data-charm-filtro]").forEach((b) =>
     b.addEventListener("click", () => {
-      const r = buyCharm(p, b.dataset.buyCharm);
-      if (!r.ok) { toast(r.erro); return; }
-      toast(`Charm <b>${CHARMS[b.dataset.buyCharm].nome}</b> ativado!`);
-      save(); renderAll();
+      CYCLO.charmFiltro = b.dataset.charmFiltro;
       renderCycloCharms(p, el);
+    }));
+  $$("#cyclo-content [data-charm-sel]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.charmSel = b.dataset.charmSel;
+      renderCycloCharms(p, el);
+    }));
+  const player = (typeof G !== "undefined" && G && G.p) ? G.p : p;
+  ensureCyclopedia(player);
+  const buy = $("#charm-buy");
+  if (buy) buy.addEventListener("click", () => {
+    const id = cycloCharmIdFromEl(buy) || CYCLO.charmSel;
+    const r = buyCharm(player, id);
+    if (!r.ok) { toast(r.erro); return; }
+    const cid = r.id || id;
+    toast(`Charm <b>${CHARMS[cid].nome}</b> desbloqueado!`);
+    save(); renderAll(); renderCycloCharms(player, el);
+  });
+  const clr = $("#charm-clear");
+  if (clr) clr.addEventListener("click", () => {
+    const id = cycloCharmIdFromEl(clr) || CYCLO.charmSel;
+    const r = clearCharm(player, id);
+    if (!r.ok) { toast(r.erro); return; }
+    toast("Runa removida da criatura.");
+    save(); renderAll(); renderCycloCharms(player, el);
+  });
+  const asg = $("#charm-assign");
+  if (asg) asg.addEventListener("click", () => {
+    const selEl = $("#charm-race-sel");
+    const slug = selEl && selEl.value;
+    const id = cycloCharmIdFromEl(asg) || CYCLO.charmSel;
+    const r = assignCharm(player, id, slug);
+    if (!r.ok) { toast(r.erro); return; }
+    toast(`Runa assignada a <b>${GAMEDATA.monsters[slug].name}</b>.`);
+    save(); renderAll(); renderCycloCharms(player, el);
+  });
+}
+
+function cycloCharmDetail(p, id, finished) {
+  const c = CHARMS[id];
+  const tem = charmOwned(p, id);
+  const race = charmAssignedRace(p, id);
+  const pode = (p.charmPoints || 0) >= c.custo;
+  const opts = finished.map((s) => {
+    const taken = charmOnRace(p, s);
+    const dis = taken && taken !== id ? "disabled" : "";
+    const sel = race === s ? "selected" : "";
+    return `<option value="${s}" ${sel} ${dis}>${GAMEDATA.monsters[s].name}${
+      taken && taken !== id ? " (ocupada)" : ""}</option>`;
+  }).join("");
+  return `
+    <div class="charm-detail-head">
+      ${charmIconHtml(id, 48)}
+      <div>
+        <div class="small" style="color:#d4af37">${c.nome}</div>
+        <div class="tiny dim">${c.cat} · ${c.tipo}</div>
+      </div>
+    </div>
+    <div class="tiny" style="line-height:1.45;margin:8px 0">${c.desc}</div>
+    ${c.chance != null ? `<div class="tiny dim">Chance (tier 1): <b>${c.chance}%</b></div>` : ""}
+    ${c.percent != null ? `<div class="tiny dim">Efeito: <b>${c.percent}%</b></div>` : ""}
+    <div class="tiny dim mb8">Custo: <b class="gold-txt">${fmtFull(c.custo)}</b> charm points</div>
+    ${!tem
+      ? `<button class="primary sm" id="charm-buy" data-charm-id="${id}"
+           ${pode ? "" : "disabled"}>${pode ? "Desbloquear" : "Pontos insuficientes"}</button>`
+      : `<div class="tiny" style="color:#9ce84a;margin-bottom:6px">Desbloqueado</div>
+         ${race
+           ? `<div class="row" style="gap:6px;align-items:center;margin-bottom:6px">
+                ${mobImg(race, 36)}
+                <div class="tiny">Assign: <b>${GAMEDATA.monsters[race].name}</b></div>
+              </div>
+              <button class="sm" id="charm-clear" data-charm-id="${id}">Remover assign</button>`
+           : (finished.length
+              ? `<label class="tiny dim">Criatura (bestiário completo)</label>
+                 <select id="charm-race-sel" class="charm-race-sel">${opts}</select>
+                 <button class="primary sm mt4" id="charm-assign" data-charm-id="${id}">
+                   Assignar runa</button>`
+              : `<div class="tiny dim">Complete o bestiário de uma criatura para assignar.</div>`)}`
+    }`;
+}
+
+/* ------------------------------------------------------------------ hunts */
+
+function renderCycloHunts(p, el) {
+  const sections = (typeof HUNT_MODAL_SECTIONS !== "undefined")
+    ? HUNT_MODAL_SECTIONS
+    : [{ title: "Hunts", ids: Object.keys((GAMEDATA && GAMEDATA.hunts) || {}) }];
+  const busca = (CYCLO.huntBusca || "").toLowerCase();
+  const filtro = CYCLO.huntFiltro || "all";
+
+  const card = (id) => {
+    const hu = GAMEDATA.hunts[id];
+    if (!hu) return "";
+    if (busca && (hu.name || "").toLowerCase().indexOf(busca) === -1) return "";
+    const risk = typeof huntRisk === "function" ? huntRisk(p, hu) : { cls: "mid", txt: "—" };
+    if (filtro === "safe" && risk.cls === "high") return "";
+    if (filtro === "danger" && risk.cls !== "high") return "";
+    const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
+    const starsHtml = typeof huntStarsHtml === "function"
+      ? huntStarsHtml(stars) : `★${stars}`;
+    const mobs = (hu.monsters || []).slice(0, 6).map((m) => {
+      const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 0;
+      const charm = typeof charmOnRace === "function" ? charmOnRace(p, m) : null;
+      return `<span class="hunt-cyclo-mob ${st ? "" : "unk"}" title="${
+        GAMEDATA.monsters[m] ? GAMEDATA.monsters[m].name : m}">
+        ${mobImg(m, 28, st ? "" : "filter:brightness(0);")}
+        ${charm ? charmIconHtml(charm, 14) : ""}
+      </span>`;
+    }).join("");
+    const ativa = p.hunt === id;
+    return `<button class="hunt-cyclo-card ${ativa ? "active" : ""}" data-cyclo-hunt="${id}">
+      <div class="hunt-cyclo-top">
+        <span class="nm">${hu.name}</span>
+        ${starsHtml}
+      </div>
+      <div class="tiny dim">Nível recomendado <b>${hu.level || "?"}</b>
+        · ${fmt(hu.avgExp)} xp/kill
+        · <span class="risk ${risk.cls}">${risk.txt}</span></div>
+      <div class="hunt-cyclo-mobs">${mobs}</div>
+    </button>`;
+  };
+
+  el.innerHTML = `
+    <div class="row mb8" style="gap:6px;align-items:center">
+      <div class="tiny dim" style="flex:1">Hunting grounds no padrão Cyclopedia/Canary:
+        dificuldade (estrelas), nível recomendado e criaturas da área.</div>
+      <input id="cyclo-hunt-busca" placeholder="buscar hunt…"
+        value="${CYCLO.huntBusca || ""}"
+        style="width:130px;padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      ${[["all", "Todas"], ["safe", "Seguras"], ["danger", "Perigo"]]
+        .map(([f, t]) => `<button class="sm ${filtro === f ? "primary" : ""}"
+          data-hunt-filtro="${f}">${t}</button>`).join("")}
+    </div>
+    <div class="hunt-cyclo-sections">
+      ${sections.map((section) => {
+        const cards = section.ids.map(card).filter(Boolean).join("");
+        return `<section class="hunt-cyclo-section">
+          <div class="hunt-cat-title">${section.title}</div>
+          <div class="hunt-cyclo-grid">${cards ||
+            `<div class="hunt-section-empty">Em breve</div>`}</div>
+        </section>`;
+      }).join("")}
+    </div>`;
+
+  const inp = $("#cyclo-hunt-busca");
+  if (inp) inp.addEventListener("input", () => {
+    CYCLO.huntBusca = inp.value;
+    renderCycloHunts(p, el);
+    const n = $("#cyclo-hunt-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+  });
+  $$("#cyclo-content [data-hunt-filtro]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.huntFiltro = b.dataset.huntFiltro;
+      renderCycloHunts(p, el);
+    }));
+  $$("#cyclo-content [data-cyclo-hunt]").forEach((b) =>
+    b.addEventListener("click", () => {
+      $("#modal").classList.remove("modal-cyclo");
+      if (typeof openHuntInfoModal === "function") openHuntInfoModal(b.dataset.cycloHunt);
     }));
 }
 

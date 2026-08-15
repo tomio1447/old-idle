@@ -20,9 +20,18 @@ must(demon.readUInt32BE(16)===192&&demon.readUInt32BE(20)===256,
   "sheet do ícone Demon não é 3×4 células de 64px");
 must(gameSrc.includes('$("#btn-hunts")')&&gameSrc.includes("openHuntsModal"),
   "botão HUNTS não abre o modal");
-must(html.includes("css/layout.css?v=party-list-v1")&&html.includes("js/ui.js?v=combo-drag-v1")&&
+must(html.includes("css/layout.css?v=")&&html.includes("js/ui.js?v=")&&
      html.includes("js/city-ui.js?v=hunts-modal-v1"),
   "UI/CSS do catálogo sem cache-busting");
+must(css.includes("#hunts-modal-list .hunt-modal-card .mobs") &&
+     css.includes("overflow: hidden") &&
+     css.includes("#hunts-modal-list .hunt-modal-card .info"),
+  "CSS do modal Hunts sem coluna de sprites/texto separados");
+must(ui.includes('class="mobs"') && ui.includes('class="info"') &&
+     ui.includes("mobImg(m, 24"),
+  "card do modal sem regiões sprites|info ou sprites grandes demais");
+must(ui.includes("Nível recomendado")&&ui.includes("huntStars"),
+  "modal Hunts sem campos Canary (estrelas/nível)");
 must(cityUi.includes("data-open-hunts-catalog")&&!cityUi.includes("Object.keys(GAMEDATA.hunts).map"),
   "NPC de viagens ainda expõe a lista completa 7.4");
 
@@ -34,7 +43,8 @@ const expected=[
  ["SOULWAR 400+",["dark-thais","rotten-wasteland"]],
 ];
 const start=ui.indexOf("const HUNT_MODAL_SECTIONS");
-const end=ui.indexOf("\n\n/* ─────────────────",start);
+const end=ui.indexOf("\nfunction openHuntInfoModal",start);
+must(start>=0&&end>start,"bloco HUNT_MODAL_SECTIONS não encontrado");
 const root={innerHTML:""};
 const hunts={};
 for(const [,ids] of expected)for(const id of ids)hunts[id]={name:id,level:1,avgExp:10,monsters:["rat"]};
@@ -44,6 +54,7 @@ const ctx={
  GAMEDATA:{hunts},G:{p:{level:1,hunt:null}},
  $(selector){return selector==="#hunts-modal-list"?root:null;},$$(selector){return [];},
  huntRisk(){return {cls:"low",txt:"seguro"};},mobImg(){return "<i></i>";},fmt(n){return String(n);},
+ huntStars(){return 1;},huntStarsHtml(){return "★";},bestiaryStage(){return 1;},charmOnRace(){return null;},
  openHuntInfoModal(){},console,
 };
 vm.createContext(ctx);vm.runInContext(ui.slice(start,end),ctx);
@@ -54,4 +65,13 @@ for(const [,ids] of expected)for(const id of ids)
   must(root.innerHTML.includes(`data-hunt="${id}"`),id+" ausente do modal");
 must(!root.innerHTML.includes('data-hunt="spiders"')&&root.innerHTML.includes("Em breve"),
   "hunt 7.4 vazou para o modal ou seção vazia não foi mantida");
+must(root.innerHTML.includes('class="mobs"')&&root.innerHTML.includes('class="info"'),
+  "card sem regiões sprites e texto");
+const cardSample=root.innerHTML.match(/<button class="hunt-card[^"]*"[\s\S]*?<\/button>/);
+must(cardSample, "nenhum card gerado");
+must(/<span class="mobs"[^>]*>[\s\S]*?<\/span>\s*<span class="info"/.test(cardSample[0]),
+  "card não é flex row [sprites|info]");
+const mobsOnly=(cardSample[0].match(/<span class="mobs"[^>]*>[\s\S]*?<\/span>/)||[""])[0];
+must(!mobsOnly.includes('class="nm"')&&!mobsOnly.includes('class="meta"'),
+  "texto da hunt vazou para a coluna de sprites");
 console.log("OK: botão Demon abre catálogo com 5 sessões e as 11 hunts permitidas.");
