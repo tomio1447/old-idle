@@ -475,17 +475,15 @@
     }
   }
 
-  /* Sistema de CARGAS (pedido do dono):
-   *  - qualquer anel/amuleto com `charges` consome por TEMPO enquanto
-   *    equipado (1 carga a cada 3s — 200 cargas = 10 min, como o time ring);
-   *  - exceção: `chargeMode: "hits"` consome 1 carga POR GOLPE recebido
-   *    (o might ring de 20 cargas);
-   *  - quando zera, o item QUEBRA (sai do slot e não volta pra mochila). */
+  /* Sistema de CARGAS (Canary):
+   *  - rings com duration/transformEquipTo → chargeMode "time" (1/3s);
+   *  - showCharges (might ring, SSA, amuletos) → chargeMode "hits";
+   *  - supply-stash-data.js sobrescreve o mode correto por item. */
   for (const slug in IT) {
     const it = IT[slug];
     if (it && (it.s === "ring" || it.s === "amulet") && it.charges &&
         !it.chargeMode) {
-      it.chargeMode = "time";
+      it.chargeMode = "hits";
     }
   }
 })();

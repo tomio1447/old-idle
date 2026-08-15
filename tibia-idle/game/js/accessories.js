@@ -282,6 +282,8 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
     } else if (!removeItem(p, slug, 1)) return false;
   } else if (source === "pouch") {
     if (!removeLootPouch(p, slug, 1)) return false;
+  } else if (source === "stash") {
+    if (typeof removeSupplyStash !== "function" || !removeSupplyStash(p, slug, 1)) return false;
   } else if (source === "equip") {
     return true;
   }
@@ -385,6 +387,13 @@ function moveItemToBag(p, payload) {
     removeLootPouch(p, payload.slug, count);
     return true;
   }
+  if (payload.source === "stash") {
+    const count = p.supplyStash && p.supplyStash[payload.slug] ? p.supplyStash[payload.slug] : 0;
+    if (count <= 0) return false;
+    if (!addItem(p, payload.slug, count)) { if (typeof toast === "function") toast("Mochila cheia."); return false; }
+    removeSupplyStash(p, payload.slug, count);
+    return true;
+  }
   if (payload.source === "equip") return unequipToContainer(p, payload.slot, "bag");
   return false;
 }
@@ -482,6 +491,13 @@ function accessoryAvailableCounts(p, slot) {
     const it = GAMEDATA.items[slug];
     if (it && it.s === slot && (p.lootPouch[slug] || 0) > 0) out[slug] = (out[slug] || 0) + p.lootPouch[slug];
   }
+  if (typeof ensureSupplyStash === "function") ensureSupplyStash(p);
+  for (const slug in (p.supplyStash || {})) {
+    const it = GAMEDATA.items[slug];
+    if (it && it.s === slot && (p.supplyStash[slug] || 0) > 0) {
+      out[slug] = (out[slug] || 0) + p.supplyStash[slug];
+    }
+  }
   if (p.equip && p.equip[slot]) out[p.equip[slot].item] = (out[p.equip[slot].item] || 0) + 1;
   return out;
 }
@@ -511,7 +527,10 @@ function accessoryEquipConfigured(p, slot, slug) {
   }
   if (p.bag && p.bag[slug] > 0) return equipItemFromContainer(p, slug, "bag", slot);
   if (p.lootPouch && p.lootPouch[slug] > 0) return equipItemFromContainer(p, slug, "pouch", slot);
-  if (typeof toast === "function") toast(`${itemName(slug)} não está na mochila nem na Loot Pouch.`, "bad");
+  if (p.supplyStash && p.supplyStash[slug] > 0) return equipItemFromContainer(p, slug, "stash", slot);
+  if (typeof toast === "function") {
+    toast(`${itemName(slug)} não está na mochila, Loot Pouch nem Supply Stash.`, "bad");
+  }
   return false;
 }
 
@@ -577,9 +596,9 @@ function renderEquipmentHelper(p) {
             style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
         </div>
       </div>
-      <div class="small dim mt10 mb4">Na mochila / Loot Pouch</div>
+      <div class="small dim mt10 mb4">Na mochila / Loot Pouch / Supply Stash</div>
       <div class="row wrap" style="gap:5px">${pouchIcons || `<div class="tiny dim">Nenhum ${slot === "amulet" ? "amuleto" : "anel"} disponível.</div>`}</div>
-      <div class="tiny dim mt8">Veste o item emergencial quando a vida cai e devolve o padrão quando recupera. Os itens precisam estar na mochila ou na Loot Pouch.</div>
+      <div class="tiny dim mt8">Veste o item emergencial quando a vida cai e devolve o padrão quando recupera. Os itens podem estar na mochila, Loot Pouch ou Supply Stash.</div>
     </div>`;
 }
 

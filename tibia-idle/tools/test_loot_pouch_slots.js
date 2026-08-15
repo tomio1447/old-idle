@@ -9,7 +9,8 @@ const combatSrc = fs.readFileSync(path.join(game, 'js', 'combat.js'), 'utf8');
 function must(ok, msg) { if (!ok) throw Error(msg); }
 
 const start = playerSrc.indexOf('const LOOT_POUCH_MAX_SLOTS');
-const end = playerSrc.indexOf('\n\n/* Poder real', start);
+const end = playerSrc.indexOf('function distanceWeaponPower', start);
+must(start >= 0 && end > start, 'bloco da Loot Pouch não encontrado em player.js');
 const items = {};
 for (let i=0;i<55;i++) items['loot-'+i] = {n:'Loot '+i,s:null,sell:10,cls:2};
 items['class-3'] = {n:'Class 3',s:'weapon',sell:5000,cls:3};
@@ -18,6 +19,11 @@ const ctx = {
   GAMEDATA:{items}, SUPPLIES:{},
   itemUsesInstances(){ return false; },
   isNoSell(){ return false; },
+  currencyValue(){ return 0; },
+  creditCurrency(){ return 0; },
+  freeCapacity(){ return 1e9; },
+  itemUnitWeight(){ return 0.1; },
+  addLog(){},
 };
 vm.createContext(ctx);
 vm.runInContext(playerSrc.slice(start,end),ctx);
@@ -66,4 +72,18 @@ must(combatSrc.includes('addLootPouch(p, l.item, count)'),
 must(!playerSrc.includes('lootPouchSlotsUsed(p) + needed > LOOT_POUCH_MAX_SLOTS'),
   'bloqueio silencioso de pouch cheia ainda existe');
 
-console.log('OK: loot nunca some com 50+ slots; classes 3/4 entram e nunca são vendidas.');
+// Contagem de slots: 1 por stack, nunca quantidade de equipamento.
+ctx.itemUsesInstances = () => true;
+items['sword'] = {n:'sword',s:'weapon',sell:100,cls:1};
+p.lootPouch = { sword: 21007 };
+must(ctx.lootPouchSlotsUsed(p) === 1, 'equipamento empilhado na pouch não pode contar 21007 slots');
+must(ctx.clearLootPouch(p) === 1 && Object.keys(p.lootPouch).length === 0,
+  'clearLootPouch não esvaziou a pouch');
+must(ctx.lootPouchSlotsUsed(p) === 0, 'slots após limpar devem ser 0');
+
+const uiClear = uiSrc.includes('LIMPAR LOOT POUCH') &&
+  uiSrc.includes('clearLootPouchWithConfirm') &&
+  uiSrc.includes('Limpar toda a Loot Pouch? Itens serão perdidos.');
+must(uiClear, 'Config da Loot Pouch sem botão/confirmação de limpar');
+
+console.log('OK: loot nunca some com 50+ slots; classes 3/4 entram e nunca são vendidas; clear + slots sane.');

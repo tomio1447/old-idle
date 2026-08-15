@@ -1,6 +1,9 @@
 /*
  * vip.js — Sistema de Conta VIP do servidor old-idle.
  *
+ * Fonte de verdade online: account.vipUntil (timestamp ms) vindo do login/me.
+ * Offline/local: localStorage oti_vip (legado).
+ *
  * Benefícios VIP:
  *   - Fast Revive: 15s (vs 30s normal)
  *   - Cooldown Wheel: 30% menos CD em Gift of Life e Avatar
@@ -14,14 +17,42 @@
  *   - Prioridade de Login: fila prioritária
  *   - Ausência de Casa: 10 dias (vs 7 normal)
  *   - Bônus Proficiência: +10% EXP de arma
+ *   - Autoseller da Loot Pouch
+ *   - Controle manual SQM (AUTO off / WASD / clique)
  */
 "use strict";
 
-/* ── VIP State ── */
 const VIP_KEY = "oti_vip";
+
+function sessionVipUntil() {
+  try {
+    const raw = sessionStorage.getItem("tibia-idle-account");
+    if (!raw) return 0;
+    const acc = JSON.parse(raw);
+    return Math.max(0, Math.floor(Number(acc && (acc.vipUntil || acc.vip_until)) || 0));
+  } catch (e) { return 0; }
+}
+
+function syncVipFromAccount(account) {
+  if (!account) return;
+  const until = Math.max(0, Math.floor(Number(account.vipUntil || account.vip_until) || 0));
+  try {
+    const raw = sessionStorage.getItem("tibia-idle-account");
+    const acc = raw ? JSON.parse(raw) : {};
+    acc.vipUntil = until;
+    acc.vip = until > Date.now();
+    sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+  } catch (e) {}
+  try {
+    const v = { active: until > Date.now(), expires: until };
+    localStorage.setItem(VIP_KEY, JSON.stringify(v));
+  } catch (e) {}
+}
 
 /* Verifica se a conta é VIP */
 function isVip() {
+  const until = sessionVipUntil();
+  if (until > Date.now()) return true;
   try {
     const v = JSON.parse(localStorage.getItem(VIP_KEY));
     if (!v || !v.active) return false;
@@ -38,11 +69,19 @@ function isVip() {
 function activateVip(days) {
   const v = JSON.parse(localStorage.getItem(VIP_KEY) || "{}");
   const now = Date.now();
-  // Se já é VIP, estende o tempo
   const currentExp = (v.active && v.expires && v.expires > now) ? v.expires : now;
   v.active = true;
   v.expires = currentExp + days * 24 * 3600 * 1000;
   localStorage.setItem(VIP_KEY, JSON.stringify(v));
+  try {
+    const raw = sessionStorage.getItem("tibia-idle-account");
+    if (raw) {
+      const acc = JSON.parse(raw);
+      acc.vipUntil = v.expires;
+      acc.vip = true;
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  } catch (e) {}
   return v;
 }
 
@@ -55,6 +94,8 @@ function deactivateVip() {
 
 /* Tempo restante de VIP em ms */
 function vipTimeLeft() {
+  const until = sessionVipUntil();
+  if (until > Date.now()) return until - Date.now();
   if (!isVip()) return 0;
   try {
     const v = JSON.parse(localStorage.getItem(VIP_KEY));
@@ -62,67 +103,49 @@ function vipTimeLeft() {
   } catch { return 0; }
 }
 
-/* ── VIP Benefit Constants ── */
-
-/* Tempo de revive (ms) */
 function reviveTime() {
   return isVip() ? 15000 : 30000;
 }
-
-/* Bônus de EXP (1.0 = sem bônus) */
 function vipExpBonus() {
   return isVip() ? 1.10 : 1.0;
 }
-
-/* Chance de crítico adicional (0-1) */
 function vipCritBonus() {
   return isVip() ? 0.03 : 0;
 }
-
-/* Velocidade de exercise (multiplicador) */
 function vipExerciseSpeed() {
   return isVip() ? 1.10 : 1.0;
 }
-
-/* Dano de familiar (multiplicador) */
 function vipFamiliarDamage() {
   return isVip() ? 1.30 : 1.0;
 }
-
-/* Cooldown da Wheel (multiplicador — 0.7 = 30% menos) */
 function vipWheelCooldown() {
   return isVip() ? 0.70 : 1.0;
 }
-
-/* Regeneração extra a cada 3s */
 function vipRegenHp() {
   return isVip() ? 10 : 0;
 }
 function vipRegenMp() {
   return isVip() ? 20 : 0;
 }
-
-/* Full Bless: se VIP, comprar bless dá todas as 7 */
 function vipFullBless() {
   return isVip();
 }
-
-/* Bônus de proficiência de arma (multiplicador) */
 function vipProficiencyBonus() {
   return isVip() ? 1.10 : 1.0;
 }
-
-/* Dias offline sem perder house */
 function vipHouseDays() {
   return isVip() ? 10 : 7;
 }
-
-/* Imbuement protegido em zona de proteção */
 function vipImbuementProtected() {
   return isVip();
 }
+function vipAutoSellAllowed() {
+  return isVip();
+}
+function vipManualControlAllowed() {
+  return isVip();
+}
 
-/* Formata tempo restante de VIP */
 function fmtVipTime() {
   const ms = vipTimeLeft();
   if (ms <= 0) return "—";
