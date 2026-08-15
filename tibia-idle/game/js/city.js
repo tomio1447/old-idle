@@ -46,6 +46,16 @@ const NPCS = {
     greet: "Para onde vamos caçar hoje?",
     type: "travel",
   },
+  enpa: {
+    name: "Enpa-Deia Pema", role: "Equipamentos Monk", sprite: "shopkeeper",
+    greet: "Harmony, friend. Posso fornecer equipamento para sua jornada.",
+    type: "npcbuy", shopId: "enpa",
+  },
+  gnomally: {
+    name: "Gnomally", role: "Trocas Crystalline", sprite: "magicshop",
+    greet: "Major crystalline tokens? Eu troco por equipamentos gnômicos.",
+    type: "tokenbarter", shopId: "gnomally",
+  },
 };
 
 /* Visual de cada exercise weapon ao ser USADA no dummy — simula o

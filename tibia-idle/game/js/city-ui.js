@@ -17,6 +17,8 @@ function openNpc(id) {
     case "shop":   body = npcShop(p); break;
     case "supply": body = npcSupply(p); break;
     case "sell":   body = npcSell(p); break;
+    case "npcbuy": body = npcBuyOnly(p, npc.shopId || id); break;
+    case "tokenbarter": body = npcTokenBarter(p, npc.shopId || id); break;
     case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
@@ -56,6 +58,8 @@ function refreshNpc(id) {
     case "shop":   body = npcShop(p); break;
     case "supply": body = npcSupply(p); break;
     case "sell":   body = npcSell(p); break;
+    case "npcbuy": body = npcBuyOnly(p, npc.shopId || id); break;
+    case "tokenbarter": body = npcTokenBarter(p, npc.shopId || id); break;
     case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
@@ -235,6 +239,92 @@ function shopStatLine(it) {
   if (it.mpreg) s.push("mp+" + it.mpreg);
   if (it.lvl) s.push("nv " + it.lvl);
   return s.join(" · ") || "—";
+}
+
+/* ---------------------------------------------------------- NPC buy-only (catálogo fixo) */
+function npcBuyOnly(p, shopId) {
+  if (typeof ensureNpcShopItems === "function") ensureNpcShopItems();
+  const shop = typeof npcShopDef === "function" ? npcShopDef(shopId) : null;
+  const items = (shop && shop.items) || [];
+  const rows = items.map((e) => {
+    const it = GAMEDATA.items[e.slug];
+    if (!it) return "";
+    const afford = p.gold >= e.price;
+    const cur = it.s ? p.equip[it.s] : null;
+    const better = it.s && (!cur || itemScore(p, e.slug) > itemScore(p, cur.item));
+    return `<div class="shop-row" data-tip="${e.slug}">
+      ${itemImg(e.slug, 30)}
+      <div style="flex:1;min-width:0">
+        <div class="small" style="color:${better ? "#9ce84a" : "#c8c0a8"}">
+          ${it.n}${better ? " ▲" : ""}</div>
+        <div class="tiny dim">${shopStatLine(it)}</div>
+      </div>
+      <button class="sm ${afford ? "primary" : ""}" data-npc-buy="${e.slug}"
+        data-shop="${shopId}" data-price="${e.price}" ${afford ? "" : "disabled"}>
+        ${typeof t === "function" ? t("npc.buy") : "Comprar"} ${fmtFull(e.price)}</button>
+    </div>`;
+  }).join("");
+
+  return goldLine(p) + `
+    <div class="tiny dim mb8">${typeof t === "function" ? t("npc.buyOnlyHint") : "Apenas compra — venda de loot pela Loot Pouch."}</div>
+    <div class="list" style="max-height:360px">${rows ||
+      '<div class="dim small center" style="padding:16px">Catálogo vazio</div>'}</div>`;
+}
+
+/* ---------------------------------------------------------- token barter (Gnomally) */
+function npcTokenBarter(p, shopId) {
+  if (typeof ensureNpcShopItems === "function") ensureNpcShopItems();
+  const shop = typeof npcShopDef === "function" ? npcShopDef(shopId) : null;
+  const token = (shop && shop.currency) || "major-crystalline-token";
+  const have = typeof bagTokenCount === "function" ? bagTokenCount(p, token) : ((p.bag && p.bag[token]) || 0);
+  const tokenName = typeof itemName === "function" ? itemName(token) : token;
+  const items = (shop && shop.items) || [];
+
+  const rows = items.map((e, idx) => {
+    const cost = e.cost || 0;
+    const can = have >= cost;
+    if (e.kind === "outfit") {
+      const oid = typeof npcOutfitIdForPlayer === "function"
+        ? npcOutfitIdForPlayer(p, e.outfitBase) : null;
+      const owned = oid && typeof ownsOutfit === "function" && ownsOutfit(p, oid);
+      const disabled = !can || owned;
+      return `<div class="shop-row">
+        <span style="width:30px;text-align:center">🧥</span>
+        <div style="flex:1;min-width:0">
+          <div class="small">${e.name || e.outfitBase}</div>
+          <div class="tiny dim">${cost}× ${tokenName}${owned ? " · já possui" : ""}</div>
+        </div>
+        <button class="sm ${can && !owned ? "primary" : ""}" data-npc-barter="${idx}"
+          data-shop="${shopId}" ${disabled ? "disabled" : ""}>
+          ${typeof t === "function" ? t("npc.trade") : "Trocar"}</button>
+      </div>`;
+    }
+    const it = GAMEDATA.items[e.slug];
+    if (!it) return "";
+    return `<div class="shop-row" data-tip="${e.slug}">
+      ${itemImg(e.slug, 30)}
+      <div style="flex:1;min-width:0">
+        <div class="small">${it.n}</div>
+        <div class="tiny dim">${shopStatLine(it)} · ${cost}× ${tokenName}</div>
+      </div>
+      <button class="sm ${can ? "primary" : ""}" data-npc-barter="${idx}"
+        data-shop="${shopId}" ${can ? "" : "disabled"}>
+        ${typeof t === "function" ? t("npc.trade") : "Trocar"}</button>
+    </div>`;
+  }).join("");
+
+  return `
+    <div class="row mb8" style="justify-content:space-between;align-items:center">
+      <span class="small dim">${typeof t === "function" ? t("npc.tokensInBag") : "Tokens na backpack"}</span>
+      <span class="row" style="gap:6px;align-items:center">
+        ${itemImg(token, 22)}
+        <b class="gold-txt">${fmtFull(have)}</b>
+        <span class="tiny dim">${tokenName}</span>
+      </span>
+    </div>
+    <div class="tiny dim mb8">${typeof t === "function" ? t("npc.tokenBarterHint") : "Trocas só com tokens da backpack (não da pouch)."}</div>
+    <div class="list" style="max-height:360px">${rows ||
+      '<div class="dim small center" style="padding:16px">Nenhuma oferta</div>'}</div>`;
 }
 
 /* ---------------------------------------------------------- supplies */
@@ -584,6 +674,35 @@ function bindNpc(id, type) {
       addLog("sell", `Comprou <b>${itemName(slug)}</b> por ${fmtFull(b.dataset.price)} gp`);
       hideTip();
       refreshNpc(id);
+    }));
+
+  $$("#npc-content [data-npc-buy]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const slug = b.dataset.npcBuy;
+      const shopId = b.dataset.shop;
+      const r = typeof buyNpcCatalogItem === "function"
+        ? buyNpcCatalogItem(p, shopId, slug)
+        : buyItem(p, slug, parseInt(b.dataset.price, 10));
+      if (!r.ok) { toast(r.msg); return; }
+      toast(`${typeof t === "function" ? t("npc.bought") : "Comprou"} <b>${itemName(slug)}</b>`);
+      addLog("sell", `Comprou <b>${itemName(slug)}</b> por ${fmtFull(b.dataset.price)} gp`);
+      hideTip();
+      refreshNpc(id);
+    }));
+
+  $$("#npc-content [data-npc-barter]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const idx = parseInt(b.dataset.npcBarter, 10);
+      const shopId = b.dataset.shop;
+      const r = typeof exchangeNpcBarter === "function"
+        ? exchangeNpcBarter(p, shopId, idx)
+        : { ok: false, msg: "Troca indisponível." };
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, "level");
+      addLog("sell", r.msg);
+      hideTip();
+      refreshNpc(id);
+      renderAll();
     }));
 
   // supplies

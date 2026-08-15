@@ -752,7 +752,8 @@
    "traditional-sai",
    "transcendent-bo",
    "umbral-katar",
-   "umbral-master-katar"
+   "umbral-master-katar",
+   "light-jo-staff"
   ],
   "helmet": [
    "alicorn-headguard",
@@ -1373,7 +1374,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 55.0
+   "w": 55
   },
   "albino-plate": {
    "arm": 11,
@@ -1387,7 +1388,7 @@
    "s": "armor",
    "sell": 528,
    "t": "armor",
-   "w": 84.0
+   "w": 84
   },
   "alchemist-s-boots": {
    "arm": 2,
@@ -1409,7 +1410,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 16.0
+   "w": 16
   },
   "alchemist-s-notepad": {
    "cat": "shield",
@@ -1430,7 +1431,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 13.0
+   "w": 13
   },
   "alicorn-headguard": {
    "af": 8,
@@ -1461,7 +1462,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 39.0
+   "w": 39
   },
   "alicorn-ring": {
    "af": 7,
@@ -1500,7 +1501,7 @@
    "sell": 448,
    "spd": 10,
    "t": "armor",
-   "w": 45.0
+   "w": 45
   },
   "amazon-armor": {
    "arm": 13,
@@ -1518,7 +1519,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 45.0
+   "w": 45
   },
   "amazon-helmet": {
    "arm": 7,
@@ -1543,7 +1544,7 @@
    "s": "shield",
    "sell": 512,
    "t": "shield",
-   "w": 62.0
+   "w": 62
   },
   "amber-axe": {
    "af": 3,
@@ -1579,7 +1580,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 53.0
+   "w": 53
   },
   "amber-bludgeon": {
    "af": 3,
@@ -1615,7 +1616,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 73.0
+   "w": 73
   },
   "amber-bow": {
    "af": 3,
@@ -1650,7 +1651,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 37.0
+   "w": 37
   },
   "amber-crossbow": {
    "af": 3,
@@ -1685,7 +1686,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 39.0
+   "w": 39
   },
   "amber-cudgel": {
    "af": 3,
@@ -1721,7 +1722,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 58.0
+   "w": 58
   },
   "amber-greataxe": {
    "af": 3,
@@ -1757,7 +1758,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "amber-kusarigama": {
    "af": 6,
@@ -1794,7 +1795,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 86.0
+   "w": 86
   },
   "amber-rod": {
    "af": 3,
@@ -1831,7 +1832,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 18.0
+   "w": 18
   },
   "amber-sabre": {
    "af": 3,
@@ -1867,7 +1868,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "amber-slayer": {
    "af": 3,
@@ -1903,7 +1904,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "amber-staff": {
    "atk": 43,
@@ -1920,7 +1921,7 @@
    "sell": 1225,
    "t": "club",
    "th": 1,
-   "w": 35.0
+   "w": 35
   },
   "amber-wand": {
    "af": 3,
@@ -1957,7 +1958,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 20.0
+   "w": 20
   },
   "amulet-of-loss": {
    "cat": "amulet",
@@ -1985,7 +1986,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 5.0
+   "w": 5
   },
   "ancient-amulet": {
    "cat": "amulet",
@@ -2009,7 +2010,7 @@
    "sell": 432,
    "shop": 1,
    "t": "shield",
-   "w": 61.0
+   "w": 61
   },
   "ancient-tiara": {
    "cat": "helmet",
@@ -2039,7 +2040,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 56.0
+   "w": 56
   },
   "antler-horn-helmet": {
    "arm": 9,
@@ -2064,7 +2065,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 22.0
+   "w": 22
   },
   "arbalest": {
    "atk": 2,
@@ -2084,7 +2085,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 95.0
+   "w": 95
   },
   "arboreal-crown": {
    "af": 5,
@@ -2110,7 +2111,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 12.0
+   "w": 12
   },
   "arboreal-ring": {
    "af": 4,
@@ -2159,7 +2160,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 23.0
+   "w": 23
   },
   "arcane-dragon-robe": {
    "arm": 15,
@@ -2189,7 +2190,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 43.0
+   "w": 43
   },
   "arcane-staff": {
    "atk": 50,
@@ -2206,7 +2207,7 @@
    "sell": 1440,
    "t": "club",
    "th": 1,
-   "w": 40.0
+   "w": 40
   },
   "arcanomancer-folio": {
    "af": 8,
@@ -2231,7 +2232,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 26.0
+   "w": 26
   },
   "arcanomancer-regalia": {
    "af": 5,
@@ -2257,7 +2258,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 15.0
+   "w": 15
   },
   "arcanomancer-sigil": {
    "af": 8,
@@ -2298,7 +2299,7 @@
    "s": "weapon",
    "sell": 960,
    "t": "sword",
-   "w": 17.0
+   "w": 17
   },
   "assassin-star": {
    "atk": 65,
@@ -2312,7 +2313,7 @@
    "sell": 1248,
    "shop": 1,
    "t": "distance",
-   "w": 2.0
+   "w": 2
   },
   "avenger": {
    "atk": 50,
@@ -2332,7 +2333,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "axe": {
    "atk": 12,
@@ -2347,7 +2348,7 @@
    "sell": 326,
    "shop": 1,
    "t": "axe",
-   "w": 40.0
+   "w": 40
   },
   "axe-of-destruction": {
    "af": 8,
@@ -2369,7 +2370,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "axe-ring": {
    "cat": "ring",
@@ -2397,7 +2398,7 @@
    "sell": 256,
    "spd": 10,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "ball-gown": {
    "cat": "armor",
@@ -2407,7 +2408,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 25.0
+   "w": 25
   },
   "bambus-jo": {
    "atk": 42,
@@ -2428,7 +2429,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 38.0
+   "w": 38
   },
   "banana-staff": {
    "atk": 25,
@@ -2443,7 +2444,7 @@
    "s": "weapon",
    "sell": 720,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "bandana": {
    "arm": 1,
@@ -2474,7 +2475,7 @@
    "sell": 825,
    "shop": 1,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "bast-legs": {
    "arm": 8,
@@ -2495,7 +2496,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 64.0
+   "w": 64
   },
   "bast-skirt": {
    "cat": "legs",
@@ -2525,7 +2526,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "battle-hammer": {
    "atk": 24,
@@ -2540,7 +2541,7 @@
    "sell": 684,
    "shop": 1,
    "t": "club",
-   "w": 68.0
+   "w": 68
   },
   "battle-shield": {
    "cat": "shield",
@@ -2552,7 +2553,7 @@
    "s": "shield",
    "sell": 368,
    "t": "shield",
-   "w": 62.0
+   "w": 62
   },
   "batwing-hat": {
    "arm": 3,
@@ -2572,7 +2573,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 6.0
+   "w": 6
   },
   "bear-skin": {
    "arm": 16,
@@ -2595,7 +2596,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 44.0
+   "w": 44
   },
   "beastslayer-axe": {
    "atk": 35,
@@ -2641,7 +2642,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "berserker": {
    "atk": 48,
@@ -2661,7 +2662,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 130.0
+   "w": 130
   },
   "biscuit-barrier": {
    "aug": [
@@ -2676,7 +2677,7 @@
    "hpreg": 4,
    "id": 45643,
    "imbSlots": 1,
-   "lifeLeech": 2.0,
+   "lifeLeech": 2,
    "lvl": 200,
    "mpreg": 16,
    "n": "biscuit barrier",
@@ -2694,7 +2695,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 52.0
+   "w": 52
   },
   "black-shield": {
    "cat": "shield",
@@ -2706,7 +2707,7 @@
    "s": "shield",
    "sell": 288,
    "t": "shield",
-   "w": 42.0
+   "w": 42
   },
   "blacksteel-sword": {
    "atk": 42,
@@ -2726,7 +2727,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "blade-of-corruption": {
    "atk": 48,
@@ -2743,7 +2744,7 @@
    "s": "weapon",
    "sell": 1385,
    "t": "sword",
-   "w": 64.0
+   "w": 64
   },
   "blade-of-destruction": {
    "af": 8,
@@ -2765,7 +2766,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "blessed-sceptre": {
    "af": 4,
@@ -2785,7 +2786,7 @@
    "s": "weapon",
    "sell": 1238,
    "t": "club",
-   "w": 39.0
+   "w": 39
   },
   "blessed-shield": {
    "cat": "shield",
@@ -2797,7 +2798,7 @@
    "s": "shield",
    "sell": 640,
    "t": "shield",
-   "w": 68.0
+   "w": 68
   },
   "blister-ring": {
    "cat": "ring",
@@ -2825,7 +2826,7 @@
    "s": "weapon",
    "sell": 1161,
    "t": "sword",
-   "w": 52.0
+   "w": 52
   },
   "blue-legs": {
    "arm": 8,
@@ -2838,7 +2839,7 @@
    "s": "legs",
    "sell": 384,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "blue-robe": {
    "arm": 11,
@@ -2852,7 +2853,7 @@
    "s": "armor",
    "sell": 528,
    "t": "armor",
-   "w": 22.0
+   "w": 22
   },
   "blue-spectacles": {
    "cat": "helmet",
@@ -2876,7 +2877,7 @@
    "s": "weapon",
    "sell": 358,
    "t": "club",
-   "w": 39.0
+   "w": 39
   },
   "bone-shield": {
    "cat": "shield",
@@ -2888,7 +2889,7 @@
    "s": "shield",
    "sell": 320,
    "t": "shield",
-   "w": 55.0
+   "w": 55
   },
   "bone-sword": {
    "atk": 13,
@@ -2903,7 +2904,7 @@
    "sell": 409,
    "shop": 1,
    "t": "sword",
-   "w": 19.0
+   "w": 19
   },
   "bonebreaker": {
    "atk": 46,
@@ -2922,7 +2923,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "bonelord-helmet": {
    "arm": 7,
@@ -2936,7 +2937,7 @@
    "s": "helmet",
    "sell": 336,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "bonelord-shield": {
    "af": 8,
@@ -2953,7 +2954,7 @@
    "sell": 448,
    "shop": 1,
    "t": "shield",
-   "w": 47.0
+   "w": 47
   },
   "bonfire-amulet": {
    "cat": "amulet",
@@ -2970,7 +2971,7 @@
    "s": "amulet",
    "sell": 1920,
    "t": "accessory",
-   "w": 7.0
+   "w": 7
   },
   "book-of-lies": {
    "cat": "shield",
@@ -2988,7 +2989,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 24.0
+   "w": 24
   },
   "boots-of-enlightenment": {
    "arm": 1,
@@ -3001,13 +3002,13 @@
    "npcBuy": 8000,
    "npcSell": 80,
    "s": "boots",
-   "sell": 48,
+   "sell": 80,
    "shop": 1,
    "t": "armor",
    "vocs": [
     "monk"
    ],
-   "w": 9.0
+   "w": 9
   },
   "boots-of-haste": {
    "cat": "boots",
@@ -3033,7 +3034,7 @@
    "s": "boots",
    "sell": 96,
    "t": "armor",
-   "w": 16.0
+   "w": 16
   },
   "boots-of-waterwalking": {
    "cat": "boots",
@@ -3059,7 +3060,7 @@
    "shop": 1,
    "t": "distance",
    "th": 1,
-   "w": 31.0
+   "w": 31
   },
   "bow-of-cataclysm": {
    "atk": 6,
@@ -3084,7 +3085,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "bow-of-destruction": {
    "af": 8,
@@ -3108,7 +3109,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 55.0
+   "w": 55
   },
   "brain-in-a-jar": {
    "cat": "shield",
@@ -3130,7 +3131,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "brandon-s-wedding-ring": {
    "cat": "ring",
@@ -3140,7 +3141,7 @@
    "s": "ring",
    "sell": 2,
    "t": "accessory",
-   "w": 1.0
+   "w": 1
   },
   "brass-armor": {
    "arm": 8,
@@ -3154,7 +3155,7 @@
    "sell": 384,
    "shop": 1,
    "t": "armor",
-   "w": 80.0
+   "w": 80
   },
   "brass-helmet": {
    "arm": 3,
@@ -3168,7 +3169,7 @@
    "sell": 144,
    "shop": 1,
    "t": "armor",
-   "w": 27.0
+   "w": 27
   },
   "brass-legs": {
    "arm": 5,
@@ -3182,7 +3183,7 @@
    "sell": 240,
    "shop": 1,
    "t": "armor",
-   "w": 38.0
+   "w": 38
   },
   "brass-shield": {
    "cat": "shield",
@@ -3195,7 +3196,7 @@
    "sell": 256,
    "shop": 1,
    "t": "shield",
-   "w": 60.0
+   "w": 60
   },
   "bright-sword": {
    "atk": 36,
@@ -3212,7 +3213,7 @@
    "s": "weapon",
    "sell": 1171,
    "t": "sword",
-   "w": 29.0
+   "w": 29
   },
   "broadsword": {
    "atk": 26,
@@ -3254,7 +3255,7 @@
    "s": "armor",
    "sell": 48,
    "t": "armor",
-   "w": 19.0
+   "w": 19
   },
   "broken-iks-faulds": {
    "arm": 1,
@@ -3266,7 +3267,7 @@
    "s": "legs",
    "sell": 48,
    "t": "armor",
-   "w": 15.0
+   "w": 15
   },
   "broken-iks-sandals": {
    "arm": 1,
@@ -3292,7 +3293,7 @@
    "s": "weapon",
    "sell": 35,
    "t": "distance",
-   "w": 13.0
+   "w": 13
   },
   "broken-macuahuitl": {
    "atk": 1,
@@ -3305,7 +3306,7 @@
    "s": "weapon",
    "sell": 35,
    "t": "sword",
-   "w": 24.0
+   "w": 24
   },
   "broken-ring-of-ending": {
    "cat": "ring",
@@ -3328,7 +3329,7 @@
    "s": "helmet",
    "sell": 48,
    "t": "armor",
-   "w": 14.0
+   "w": 14
   },
   "broken-wedding-ring": {
    "cat": "ring",
@@ -3355,7 +3356,7 @@
    "sell": 2,
    "shop": 1,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "bronze-medal": {
    "cat": "amulet",
@@ -3365,7 +3366,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 12.0
+   "w": 12
   },
   "bronze-necklace": {
    "cat": "amulet",
@@ -3391,7 +3392,7 @@
    "sell": 912,
    "t": "club",
    "th": 1,
-   "w": 38.0
+   "w": 38
   },
   "buckle": {
    "arm": 12,
@@ -3404,7 +3405,7 @@
    "s": "armor",
    "sell": 576,
    "t": "armor",
-   "w": 75.0
+   "w": 75
   },
   "bunnyslippers": {
    "cat": "boots",
@@ -3416,7 +3417,7 @@
    "s": "boots",
    "sell": 2,
    "t": "armor",
-   "w": 6.0
+   "w": 6
   },
   "burial-shroud": {
    "cat": "armor",
@@ -3430,7 +3431,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "butcher-s-axe": {
    "atk": 41,
@@ -3447,7 +3448,7 @@
    "s": "weapon",
    "sell": 1171,
    "t": "axe",
-   "w": 63.0
+   "w": 63
   },
   "butterfly-ring": {
    "arm": 2,
@@ -3482,7 +3483,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 68.0
+   "w": 68
   },
   "calopteryx-cape": {
    "arm": 12,
@@ -3505,7 +3506,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 20.0
+   "w": 20
   },
   "candy-necklace": {
    "arm": 2,
@@ -3537,7 +3538,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "carapace-shield": {
    "cat": "shield",
@@ -3550,7 +3551,7 @@
    "s": "shield",
    "sell": 576,
    "t": "shield",
-   "w": 55.0
+   "w": 55
   },
   "carlin-sword": {
    "atk": 15,
@@ -3566,7 +3567,7 @@
    "sell": 496,
    "shop": 1,
    "t": "sword",
-   "w": 40.0
+   "w": 40
   },
   "castle-shield": {
    "cat": "shield",
@@ -3579,7 +3580,7 @@
    "s": "shield",
    "sell": 448,
    "t": "shield",
-   "w": 49.0
+   "w": 49
   },
   "ceremonial-mask": {
    "arm": 9,
@@ -3591,7 +3592,7 @@
    "s": "helmet",
    "sell": 432,
    "t": "armor",
-   "w": 40.0
+   "w": 40
   },
   "chain-armor": {
    "arm": 6,
@@ -3606,7 +3607,7 @@
    "sell": 288,
    "shop": 1,
    "t": "armor",
-   "w": 100.0
+   "w": 100
   },
   "chain-bolter": {
    "atk": 4,
@@ -3626,7 +3627,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 55.0
+   "w": 55
   },
   "chain-helmet": {
    "arm": 2,
@@ -3640,7 +3641,7 @@
    "sell": 96,
    "shop": 1,
    "t": "armor",
-   "w": 42.0
+   "w": 42
   },
   "chain-legs": {
    "arm": 3,
@@ -3654,7 +3655,7 @@
    "sell": 144,
    "shop": 1,
    "t": "armor",
-   "w": 35.0
+   "w": 35
   },
   "chaos-mace": {
    "atk": 44,
@@ -3670,7 +3671,7 @@
    "sell": 1180,
    "t": "club",
    "th": 1,
-   "w": 63.0
+   "w": 63
   },
   "charged-alicorn-ring": {
    "af": 7,
@@ -3768,7 +3769,7 @@
    "s": "helmet",
    "sell": 96,
    "t": "armor",
-   "w": 22.0
+   "w": 22
   },
   "chiller": {
    "cat": "wand",
@@ -3790,7 +3791,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 15.0
+   "w": 15
   },
   "chocolatey-dragon-scale-legs": {
    "arm": 2,
@@ -3802,7 +3803,7 @@
    "s": "legs",
    "sell": 96,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "chopper-of-destruction": {
    "af": 8,
@@ -3825,7 +3826,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "claw-of-the-noxious-spawn": {
    "cat": "ring",
@@ -3837,7 +3838,7 @@
    "s": "ring",
    "sell": 2,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "clerical-mace": {
    "atk": 28,
@@ -3855,7 +3856,7 @@
    "sell": 777,
    "shop": 1,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "club": {
    "atk": 7,
@@ -3870,7 +3871,7 @@
    "sell": 246,
    "shop": 1,
    "t": "club",
-   "w": 25.0
+   "w": 25
   },
   "club-of-the-fury": {
    "atk": 16,
@@ -3883,7 +3884,7 @@
    "s": "weapon",
    "sell": 435,
    "t": "club",
-   "w": 5.0
+   "w": 5
   },
   "club-ring": {
    "cat": "ring",
@@ -3909,7 +3910,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 27.0
+   "w": 27
   },
   "cobra-amulet": {
    "arm": 4,
@@ -3947,7 +3948,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 40.0
+   "w": 40
   },
   "cobra-bo": {
    "atk": 44,
@@ -3959,7 +3960,7 @@
    "fist": 4,
    "id": 50167,
    "imbSlots": 2,
-   "lifeLeech": 14.0,
+   "lifeLeech": 14,
    "lvl": 250,
    "n": "cobra bo",
    "s": "weapon",
@@ -3969,7 +3970,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 56.0
+   "w": 56
   },
   "cobra-boots": {
    "arm": 3,
@@ -3991,7 +3992,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 9.0
+   "w": 9
   },
   "cobra-club": {
    "atk": 8,
@@ -4013,7 +4014,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 25.0
+   "w": 25
   },
   "cobra-crossbow": {
    "atk": 7,
@@ -4034,7 +4035,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 40.0
+   "w": 40
   },
   "cobra-crown": {
    "arm": 3,
@@ -4081,7 +4082,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 27.0
+   "w": 27
   },
   "cobra-rod": {
    "cat": "wand",
@@ -4092,7 +4093,7 @@
    "el": "earth",
    "id": 30400,
    "imbSlots": 2,
-   "lifeLeech": 18.0,
+   "lifeLeech": 18,
    "lvl": 220,
    "mag": 2,
    "manaCost": 21,
@@ -4105,7 +4106,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "cobra-sword": {
    "atk": 52,
@@ -4125,7 +4126,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 63.0
+   "w": 63
   },
   "cobra-wand": {
    "cat": "wand",
@@ -4148,7 +4149,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 19.0
+   "w": 19
   },
   "cocoa-grimoire": {
    "aug": [
@@ -4173,7 +4174,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 15.0
+   "w": 15
   },
   "coconut-shoes": {
    "cat": "boots",
@@ -4186,7 +4187,7 @@
    "s": "boots",
    "sell": 2,
    "t": "armor",
-   "w": 6.0
+   "w": 6
   },
   "collar-of-blue-plasma": {
    "af": 8,
@@ -4205,7 +4206,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 5.0
+   "w": 5
   },
   "collar-of-green-plasma": {
    "af": 8,
@@ -4226,7 +4227,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 5.0
+   "w": 5
   },
   "collar-of-orange-plasma": {
    "cat": "amulet",
@@ -4241,7 +4242,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 5.0
+   "w": 5
   },
   "collar-of-red-plasma": {
    "af": 8,
@@ -4265,7 +4266,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 5.0
+   "w": 5
   },
   "combat-knife": {
    "atk": 8,
@@ -4300,7 +4301,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 52.0
+   "w": 52
   },
   "coned-hat-of-enlightenment": {
    "arm": 4,
@@ -4322,13 +4323,13 @@
    "npcBuy": 70000,
    "npcSell": 700,
    "s": "helmet",
-   "sell": 192,
+   "sell": 700,
    "shop": 1,
    "t": "armor",
    "vocs": [
     "monk"
    ],
-   "w": 10.0
+   "w": 10
   },
   "copper-shield": {
    "cat": "shield",
@@ -4340,7 +4341,7 @@
    "s": "shield",
    "sell": 304,
    "t": "shield",
-   "w": 63.0
+   "w": 63
   },
   "cowtana": {
    "atk": 34,
@@ -4356,7 +4357,7 @@
    "s": "weapon",
    "sell": 956,
    "t": "sword",
-   "w": 28.0
+   "w": 28
   },
   "cranial-basher": {
    "atk": 44,
@@ -4373,7 +4374,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "creamy-grimoire": {
    "aug": [
@@ -4403,7 +4404,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 17.0
+   "w": 17
   },
   "crest-of-the-deep-seas": {
    "arm": 7,
@@ -4422,7 +4423,7 @@
    "sell": 416,
    "spd": 5,
    "t": "armor",
-   "w": 45.0
+   "w": 45
   },
   "crimson-sword": {
    "atk": 18,
@@ -4435,7 +4436,7 @@
    "s": "weapon",
    "sell": 505,
    "t": "sword",
-   "w": 36.0
+   "w": 36
   },
   "crocodile-boots": {
    "arm": 1,
@@ -4449,7 +4450,7 @@
    "s": "boots",
    "sell": 48,
    "t": "armor",
-   "w": 9.0
+   "w": 9
   },
   "crossbow": {
    "cat": "distance",
@@ -4465,7 +4466,7 @@
    "shop": 1,
    "t": "distance",
    "th": 1,
-   "w": 40.0
+   "w": 40
   },
   "crossbow-of-destruction": {
    "af": 8,
@@ -4489,7 +4490,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 65.0
+   "w": 65
   },
   "crowbar": {
    "atk": 5,
@@ -4504,7 +4505,7 @@
    "sell": 192,
    "shop": 1,
    "t": "club",
-   "w": 21.0
+   "w": 21
   },
   "crown": {
    "cat": "helmet",
@@ -4514,7 +4515,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 19.0
+   "w": 19
   },
   "crown-armor": {
    "arm": 13,
@@ -4532,7 +4533,7 @@
     "knight",
     "paladin"
    ],
-   "w": 99.0
+   "w": 99
   },
   "crown-helmet": {
    "arm": 7,
@@ -4563,7 +4564,7 @@
     "knight",
     "paladin"
    ],
-   "w": 65.0
+   "w": 65
   },
   "crown-of-the-percht-queen": {
    "af": 8,
@@ -4576,7 +4577,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 19.0
+   "w": 19
   },
   "crown-shield": {
    "cat": "shield",
@@ -4589,7 +4590,7 @@
    "s": "shield",
    "sell": 512,
    "t": "shield",
-   "w": 62.0
+   "w": 62
   },
   "crude-umbral-axe": {
    "atk": 49,
@@ -4607,7 +4608,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 90.0
+   "w": 90
   },
   "crude-umbral-blade": {
    "atk": 48,
@@ -4625,7 +4626,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 63.0
+   "w": 63
   },
   "crude-umbral-bow": {
    "atk": 2,
@@ -4644,7 +4645,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 50.0
+   "w": 50
   },
   "crude-umbral-chopper": {
    "atk": 51,
@@ -4662,7 +4663,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "crude-umbral-crossbow": {
    "atk": 3,
@@ -4681,7 +4682,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 130.0
+   "w": 130
   },
   "crude-umbral-hammer": {
    "atk": 51,
@@ -4699,7 +4700,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 170.0
+   "w": 170
   },
   "crude-umbral-katar": {
    "atk": 41,
@@ -4718,7 +4719,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 79.0
+   "w": 79
   },
   "crude-umbral-mace": {
    "atk": 48,
@@ -4736,7 +4737,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 90.0
+   "w": 90
   },
   "crude-umbral-slayer": {
    "atk": 51,
@@ -4754,7 +4755,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 100.0
+   "w": 100
   },
   "crude-umbral-spellbook": {
    "cat": "spellbook",
@@ -4778,7 +4779,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 40.0
+   "w": 40
   },
   "crusader-helmet": {
    "arm": 8,
@@ -4792,7 +4793,7 @@
    "s": "helmet",
    "sell": 384,
    "t": "armor",
-   "w": 52.0
+   "w": 52
   },
   "crystal-boots": {
    "arm": 3,
@@ -4835,7 +4836,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 84.0
+   "w": 84
   },
   "crystal-mace": {
    "atk": 38,
@@ -4852,7 +4853,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "crystal-necklace": {
    "cat": "amulet",
@@ -4893,7 +4894,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "crystalline-armor": {
    "arm": 13,
@@ -4933,7 +4934,7 @@
    "s": "weapon",
    "sell": 1443,
    "t": "axe",
-   "w": 76.0
+   "w": 76
   },
   "crystalline-sword": {
    "atk": 47,
@@ -4948,7 +4949,7 @@
    "s": "weapon",
    "sell": 1446,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "dagger": {
    "atk": 8,
@@ -4974,7 +4975,7 @@
    "s": "helmet",
    "sell": 240,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "daramian-axe": {
    "atk": 17,
@@ -4987,7 +4988,7 @@
    "s": "weapon",
    "sell": 454,
    "t": "axe",
-   "w": 41.0
+   "w": 41
   },
   "daramian-mace": {
    "atk": 21,
@@ -5002,7 +5003,7 @@
    "sell": 595,
    "shop": 1,
    "t": "club",
-   "w": 68.0
+   "w": 68
   },
   "daramian-waraxe": {
    "atk": 39,
@@ -5035,7 +5036,7 @@
    "sell": 480,
    "shop": 1,
    "t": "armor",
-   "w": 120.0
+   "w": 120
   },
   "dark-helmet": {
    "arm": 6,
@@ -5049,7 +5050,7 @@
    "sell": 288,
    "shop": 1,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "dark-lord-s-cape": {
    "arm": 11,
@@ -5070,7 +5071,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 29.0
+   "w": 29
   },
   "dark-shield": {
    "cat": "shield",
@@ -5082,7 +5083,7 @@
    "s": "shield",
    "sell": 400,
    "t": "shield",
-   "w": 52.0
+   "w": 52
   },
   "dark-trinity-mace": {
    "atk": 51,
@@ -5097,7 +5098,7 @@
    "s": "weapon",
    "sell": 1491,
    "t": "club",
-   "w": 99.0
+   "w": 99
   },
   "dark-vision-bandana": {
    "arm": 5,
@@ -5120,7 +5121,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 11.0
+   "w": 11
   },
   "dark-whispers": {
    "af": 4,
@@ -5145,7 +5146,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 34.0
+   "w": 34
   },
   "dauntless-dragon-scale-armor": {
    "arm": 18,
@@ -5176,7 +5177,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 152.0
+   "w": 152
   },
   "dawnfire-pantaloons": {
    "arm": 8,
@@ -5197,7 +5198,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 30.0
+   "w": 30
   },
   "dawnfire-sherwani": {
    "arm": 16,
@@ -5220,7 +5221,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 28.0
+   "w": 28
   },
   "death-gaze": {
    "cat": "shield",
@@ -5233,7 +5234,7 @@
    "s": "shield",
    "sell": 608,
    "t": "shield",
-   "w": 79.0
+   "w": 79
   },
   "death-oyoroi": {
    "arm": 9,
@@ -5257,7 +5258,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 105.0
+   "w": 105
   },
   "death-ring": {
    "arm": 1,
@@ -5288,7 +5289,7 @@
    "s": "weapon",
    "sell": 1404,
    "t": "axe",
-   "w": 91.0
+   "w": 91
   },
   "deepling-ceremonial-dagger": {
    "cat": "wand",
@@ -5316,7 +5317,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 32.0
+   "w": 32
   },
   "deepling-fork": {
    "cat": "wand",
@@ -5344,7 +5345,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 33.0
+   "w": 33
   },
   "deepling-squelcher": {
    "atk": 44,
@@ -5360,7 +5361,7 @@
    "s": "weapon",
    "sell": 1292,
    "t": "club",
-   "w": 89.0
+   "w": 89
   },
   "deepling-staff": {
    "atk": 43,
@@ -5376,7 +5377,7 @@
    "sell": 1193,
    "t": "club",
    "th": 1,
-   "w": 88.0
+   "w": 88
   },
   "demon-armor": {
    "arm": 16,
@@ -5390,7 +5391,7 @@
    "s": "armor",
    "sell": 768,
    "t": "armor",
-   "w": 80.0
+   "w": 80
   },
   "demon-helmet": {
    "arm": 10,
@@ -5417,7 +5418,7 @@
    "s": "legs",
    "sell": 432,
    "t": "armor",
-   "w": 70.0
+   "w": 70
   },
   "demon-mengu": {
    "arm": 6,
@@ -5449,7 +5450,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 19.0
+   "w": 19
   },
   "demon-shield": {
    "cat": "shield",
@@ -5462,7 +5463,7 @@
    "s": "shield",
    "sell": 560,
    "t": "shield",
-   "w": 26.0
+   "w": 26
   },
   "demonbone": {
    "atk": 48,
@@ -5478,7 +5479,7 @@
    "s": "weapon",
    "sell": 1529,
    "t": "club",
-   "w": 180.0
+   "w": 180
   },
   "demonbone-amulet": {
    "cat": "amulet",
@@ -5519,7 +5520,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 15.0
+   "w": 15
   },
   "demonrage-sword": {
    "atk": 47,
@@ -5539,7 +5540,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 150.0
+   "w": 150
   },
   "demonwing-axe": {
    "atk": 53,
@@ -5558,7 +5559,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "depth-calcei": {
    "arm": 3,
@@ -5581,7 +5582,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 37.0
+   "w": 37
   },
   "depth-claws": {
    "atk": 42,
@@ -5609,7 +5610,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 64.0
+   "w": 64
   },
   "depth-galea": {
    "arm": 8,
@@ -5626,7 +5627,7 @@
    "s": "helmet",
    "sell": 384,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "depth-lorica": {
    "arm": 16,
@@ -5649,7 +5650,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 145.0
+   "w": 145
   },
   "depth-ocrea": {
    "arm": 8,
@@ -5671,7 +5672,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 48.0
+   "w": 48
   },
   "depth-scutum": {
    "cat": "shield",
@@ -5690,7 +5691,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 30.0
+   "w": 30
   },
   "devil-helmet": {
    "arm": 7,
@@ -5703,7 +5704,7 @@
    "s": "helmet",
    "sell": 336,
    "t": "armor",
-   "w": 50.0
+   "w": 50
   },
   "devileye": {
    "atk": 20,
@@ -5723,7 +5724,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 55.0
+   "w": 55
   },
   "diamond-sceptre": {
    "atk": 34,
@@ -5738,7 +5739,7 @@
    "s": "weapon",
    "sell": 940,
    "t": "club",
-   "w": 15.0
+   "w": 15
   },
   "divine-plate": {
    "arm": 13,
@@ -5760,7 +5761,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 75.0
+   "w": 75
   },
   "djinn-blade": {
    "atk": 38,
@@ -5796,7 +5797,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "doublet": {
    "arm": 2,
@@ -5810,7 +5811,7 @@
    "sell": 96,
    "shop": 1,
    "t": "armor",
-   "w": 25.0
+   "w": 25
   },
   "drachaku": {
    "atk": 33,
@@ -5830,7 +5831,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 60.0
+   "w": 60
   },
   "dragon-hammer": {
    "atk": 32,
@@ -5845,7 +5846,7 @@
    "s": "weapon",
    "sell": 934,
    "t": "club",
-   "w": 97.0
+   "w": 97
   },
   "dragon-lance": {
    "atk": 47,
@@ -5862,7 +5863,7 @@
    "sell": 1158,
    "t": "axe",
    "th": 1,
-   "w": 67.0
+   "w": 67
   },
   "dragon-necklace": {
    "cat": "amulet",
@@ -5949,7 +5950,7 @@
    "s": "legs",
    "sell": 480,
    "t": "armor",
-   "w": 48.0
+   "w": 48
   },
   "dragon-scale-mail": {
    "arm": 15,
@@ -5967,7 +5968,7 @@
     "knight",
     "paladin"
    ],
-   "w": 114.0
+   "w": 114
   },
   "dragon-shield": {
    "cat": "shield",
@@ -5980,7 +5981,7 @@
    "s": "shield",
    "sell": 496,
    "t": "shield",
-   "w": 60.0
+   "w": 60
   },
   "dragon-slayer": {
    "atk": 44,
@@ -6000,7 +6001,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "dragonbone-staff": {
    "af": 3,
@@ -6019,7 +6020,7 @@
    "s": "weapon",
    "sell": 960,
    "t": "club",
-   "w": 18.0
+   "w": 18
   },
   "draining-inferniarch-arbalest": {
    "atk": 8,
@@ -6030,7 +6031,7 @@
    "hit": 6,
    "id": 49862,
    "imbSlots": 2,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch arbalest",
    "prot": 0,
@@ -6045,7 +6046,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 59.0
+   "w": 59
   },
   "draining-inferniarch-battleaxe": {
    "atk": 8,
@@ -6059,7 +6060,7 @@
    "extraDef": 3,
    "id": 49865,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch battleaxe",
    "s": "weapon",
@@ -6068,7 +6069,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 67.0
+   "w": 67
   },
   "draining-inferniarch-blade": {
    "atk": 8,
@@ -6081,7 +6082,7 @@
    "extraDef": 3,
    "id": 49877,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch blade",
    "s": "weapon",
@@ -6091,7 +6092,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "draining-inferniarch-bow": {
    "atk": 7,
@@ -6102,7 +6103,7 @@
    "hit": 5,
    "id": 49859,
    "imbSlots": 3,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch bow",
    "prot": 0,
@@ -6117,7 +6118,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 56.0
+   "w": 56
   },
   "draining-inferniarch-claws": {
    "atk": 45,
@@ -6129,7 +6130,7 @@
    "fist": 4,
    "id": 50252,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch claws",
    "s": "weapon",
@@ -6138,7 +6139,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 84.0
+   "w": 84
   },
   "draining-inferniarch-flail": {
    "atk": 8,
@@ -6152,7 +6153,7 @@
    "extraDef": 3,
    "id": 49871,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch flail",
    "s": "weapon",
@@ -6161,7 +6162,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "draining-inferniarch-greataxe": {
    "atk": 8,
@@ -6175,7 +6176,7 @@
    "extraDef": 3,
    "id": 49868,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch greataxe",
    "s": "weapon",
@@ -6185,7 +6186,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "draining-inferniarch-rod": {
    "cat": "wand",
@@ -6196,7 +6197,7 @@
    "el": "earth",
    "id": 49886,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "mag": 3,
    "manaCost": 20,
@@ -6213,7 +6214,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 22.0
+   "w": 22
   },
   "draining-inferniarch-slayer": {
    "atk": 8,
@@ -6226,7 +6227,7 @@
    "extraDef": 4,
    "id": 49880,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch slayer",
    "s": "weapon",
@@ -6237,7 +6238,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "draining-inferniarch-wand": {
    "cat": "wand",
@@ -6248,7 +6249,7 @@
    "el": "death",
    "id": 49883,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "mag": 3,
    "manaCost": 21,
@@ -6265,7 +6266,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 24.0
+   "w": 24
   },
   "draining-inferniarch-warhammer": {
    "atk": 8,
@@ -6279,7 +6280,7 @@
    "extraDef": 4,
    "id": 49874,
    "imbSlots": 1,
-   "lifeLeech": 29.0,
+   "lifeLeech": 29,
    "lvl": 300,
    "n": "draining inferniarch warhammer",
    "s": "weapon",
@@ -6289,7 +6290,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "draken-boots": {
    "arm": 3,
@@ -6309,7 +6310,7 @@
     "knight",
     "paladin"
    ],
-   "w": 25.0
+   "w": 25
   },
   "drakinata": {
    "atk": 47,
@@ -6326,7 +6327,7 @@
    "sell": 1222,
    "t": "axe",
    "th": 1,
-   "w": 54.0
+   "w": 54
   },
   "dreaded-cleaver": {
    "atk": 40,
@@ -6343,7 +6344,7 @@
    "s": "weapon",
    "sell": 1072,
    "t": "axe",
-   "w": 38.0
+   "w": 38
   },
   "dreadfire-headpiece": {
    "arm": 8,
@@ -6373,7 +6374,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 16.0
+   "w": 16
   },
   "dream-blossom-staff": {
    "cat": "wand",
@@ -6398,7 +6399,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 32.0
+   "w": 32
   },
   "dream-shroud": {
    "arm": 12,
@@ -6421,7 +6422,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "dwarven-armor": {
    "arm": 10,
@@ -6439,7 +6440,7 @@
    "s": "armor",
    "sell": 640,
    "t": "armor",
-   "w": 130.0
+   "w": 130
   },
   "dwarven-axe": {
    "atk": 31,
@@ -6456,7 +6457,7 @@
    "s": "weapon",
    "sell": 899,
    "t": "axe",
-   "w": 82.0
+   "w": 82
   },
   "dwarven-helmet": {
    "arm": 6,
@@ -6473,7 +6474,7 @@
    "s": "helmet",
    "sell": 352,
    "t": "armor",
-   "w": 42.0
+   "w": 42
   },
   "dwarven-legs": {
    "arm": 7,
@@ -6490,7 +6491,7 @@
    "s": "legs",
    "sell": 432,
    "t": "armor",
-   "w": 49.0
+   "w": 49
   },
   "dwarven-ring": {
    "cat": "ring",
@@ -6515,7 +6516,7 @@
    "sell": 416,
    "shop": 1,
    "t": "shield",
-   "w": 55.0
+   "w": 55
   },
   "eagle-shield": {
    "cat": "shield",
@@ -6526,7 +6527,7 @@
    "s": "shield",
    "sell": 512,
    "t": "shield",
-   "w": 62.0
+   "w": 62
   },
   "earth-barbarian-axe": {
    "af": 3,
@@ -6545,7 +6546,7 @@
    "s": "weapon",
    "sell": 825,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "earth-barbaric-axe-replica": {
    "af": 3,
@@ -6562,7 +6563,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "earth-basher-replica": {
    "af": 3,
@@ -6579,7 +6580,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "earth-blacksteel-replica": {
    "af": 3,
@@ -6596,7 +6597,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 59.0
+   "w": 59
   },
   "earth-blacksteel-sword": {
    "af": 3,
@@ -6617,7 +6618,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "earth-cleric-mace-replica": {
    "af": 3,
@@ -6634,7 +6635,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "earth-clerical-mace": {
    "af": 3,
@@ -6653,7 +6654,7 @@
    "s": "weapon",
    "sell": 777,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "earth-cranial-basher": {
    "af": 3,
@@ -6672,7 +6673,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "earth-crystal-mace": {
    "af": 3,
@@ -6691,7 +6692,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "earth-crystal-mace-replica": {
    "af": 3,
@@ -6708,7 +6709,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "earth-dragon-slayer": {
    "af": 3,
@@ -6729,7 +6730,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "earth-headchopper": {
    "af": 3,
@@ -6750,7 +6751,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 45.0
+   "w": 45
   },
   "earth-headchopper-replica": {
    "af": 3,
@@ -6767,7 +6768,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 45.0
+   "w": 45
   },
   "earth-heroic-axe": {
    "af": 3,
@@ -6786,7 +6787,7 @@
    "s": "weapon",
    "sell": 1228,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "earth-heroic-axe-replica": {
    "af": 3,
@@ -6803,7 +6804,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "earth-knight-axe": {
    "af": 3,
@@ -6823,7 +6824,7 @@
    "s": "weapon",
    "sell": 969,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "earth-knight-axe-replica": {
    "af": 3,
@@ -6840,7 +6841,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "earth-mystic-blade": {
    "af": 3,
@@ -6859,7 +6860,7 @@
    "s": "weapon",
    "sell": 1244,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "earth-mystic-blade-replica": {
    "af": 3,
@@ -6876,7 +6877,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "earth-orcish-maul": {
    "af": 3,
@@ -6894,7 +6895,7 @@
    "s": "weapon",
    "sell": 1094,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "earth-orcish-maul-replica": {
    "af": 3,
@@ -6911,7 +6912,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "earth-relic-sword": {
    "af": 3,
@@ -6930,7 +6931,7 @@
    "s": "weapon",
    "sell": 1190,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "earth-relic-sword-replica": {
    "af": 3,
@@ -6947,7 +6948,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "earth-slayer-replica": {
    "af": 3,
@@ -6964,7 +6965,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 82.0
+   "w": 82
   },
   "earth-spike-sword": {
    "af": 3,
@@ -6983,7 +6984,7 @@
    "s": "weapon",
    "sell": 796,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "earth-spike-sword-replica": {
    "af": 3,
@@ -7000,7 +7001,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "earth-war-axe": {
    "af": 3,
@@ -7060,7 +7061,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "earth-war-hammer-replica": {
    "af": 3,
@@ -7077,7 +7078,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 85.0
+   "w": 85
   },
   "earthborn-titan-armor": {
    "arm": 15,
@@ -7099,7 +7100,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "earthheart-cuirass": {
    "arm": 18,
@@ -7122,7 +7123,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "earthheart-hauberk": {
    "arm": 18,
@@ -7145,7 +7146,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "earthheart-platemail": {
    "arm": 18,
@@ -7168,7 +7169,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "earthmind-raiment": {
    "arm": 15,
@@ -7192,7 +7193,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 55.0
+   "w": 55
   },
   "earthsoul-tabard": {
    "arm": 18,
@@ -7215,7 +7216,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 145.0
+   "w": 145
   },
   "ectoplasmic-shield": {
    "axe": 3,
@@ -7238,7 +7239,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 58.0
+   "w": 58
   },
   "eerie-song-book": {
    "cat": "shield",
@@ -7248,7 +7249,7 @@
    "s": "shield",
    "sell": 2,
    "t": "shield",
-   "w": 13.0
+   "w": 13
   },
   "eldritch-bow": {
    "af": 8,
@@ -7272,7 +7273,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 58.0
+   "w": 58
   },
   "eldritch-breeches": {
    "arm": 9,
@@ -7294,7 +7295,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 69.0
+   "w": 69
   },
   "eldritch-claymore": {
    "af": 8,
@@ -7319,7 +7320,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "eldritch-cowl": {
    "arm": 7,
@@ -7341,7 +7342,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 26.0
+   "w": 26
   },
   "eldritch-crescent-moon-spade": {
    "af": 8,
@@ -7366,7 +7367,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 88.0
+   "w": 88
   },
   "eldritch-cuirass": {
    "arm": 16,
@@ -7387,7 +7388,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 110.0
+   "w": 110
   },
   "eldritch-folio": {
    "cat": "spellbook",
@@ -7408,7 +7409,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 28.0
+   "w": 28
   },
   "eldritch-greataxe": {
    "af": 8,
@@ -7431,7 +7432,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "eldritch-hood": {
    "arm": 7,
@@ -7453,7 +7454,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "eldritch-monk-boots": {
    "arm": 2,
@@ -7476,7 +7477,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 13.0
+   "w": 13
   },
   "eldritch-rod": {
    "af": 8,
@@ -7506,7 +7507,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "eldritch-shield": {
    "cat": "shield",
@@ -7526,7 +7527,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "eldritch-tome": {
    "cat": "spellbook",
@@ -7547,7 +7548,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 26.0
+   "w": 26
   },
   "eldritch-wand": {
    "af": 8,
@@ -7576,7 +7577,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 36.0
+   "w": 36
   },
   "eldritch-warmace": {
    "af": 8,
@@ -7601,7 +7602,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "elethriel-s-elemental-bow": {
    "atk": 7,
@@ -7619,7 +7620,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 44.0
+   "w": 44
   },
   "elite-draken-helmet": {
    "arm": 9,
@@ -7641,7 +7642,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 43.0
+   "w": 43
   },
   "elite-draken-mail": {
    "arm": 15,
@@ -7661,7 +7662,7 @@
     "knight",
     "paladin"
    ],
-   "w": 120.0
+   "w": 120
   },
   "elven-amulet": {
    "cat": "amulet",
@@ -7696,7 +7697,7 @@
    "s": "legs",
    "sell": 192,
    "t": "armor",
-   "w": 33.0
+   "w": 33
   },
   "elven-mail": {
    "arm": 9,
@@ -7709,7 +7710,7 @@
    "s": "armor",
    "sell": 432,
    "t": "armor",
-   "w": 90.0
+   "w": 90
   },
   "elvish-bow": {
    "cat": "distance",
@@ -7725,7 +7726,7 @@
    "sell": 2,
    "t": "distance",
    "th": 1,
-   "w": 39.0
+   "w": 39
   },
   "embrace-of-nature": {
    "arm": 16,
@@ -7748,7 +7749,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 24.0
+   "w": 24
   },
   "emerald-sword": {
    "atk": 49,
@@ -7764,7 +7765,7 @@
    "s": "weapon",
    "sell": 1468,
    "t": "sword",
-   "w": 41.0
+   "w": 41
   },
   "enchanted-blister-ring": {
    "cat": "ring",
@@ -7844,7 +7845,7 @@
    "s": "weapon",
    "sell": 729,
    "t": "distance",
-   "w": 20.0
+   "w": 20
   },
   "enchanted-staff": {
    "af": 3,
@@ -7860,7 +7861,7 @@
    "sell": 1468,
    "t": "club",
    "th": 1,
-   "w": 38.0
+   "w": 38
   },
   "enchanted-theurgic-amulet": {
    "af": 7,
@@ -7885,7 +7886,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 5.0
+   "w": 5
   },
   "enchanted-turtle-amulet": {
    "cat": "amulet",
@@ -7929,7 +7930,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 25.0
+   "w": 25
   },
   "energized-demonbone": {
    "arm": 1,
@@ -7950,7 +7951,7 @@
    "s": "weapon",
    "sell": 1571,
    "t": "club",
-   "w": 180.0
+   "w": 180
   },
   "energized-limb": {
    "cat": "wand",
@@ -7978,7 +7979,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "energy-axe-replica": {
    "af": 3,
@@ -7995,7 +7996,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "energy-barbarian-axe": {
    "af": 3,
@@ -8014,7 +8015,7 @@
    "s": "weapon",
    "sell": 825,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "energy-basher-replica": {
    "af": 3,
@@ -8031,7 +8032,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "energy-blacksteel-replica": {
    "af": 3,
@@ -8048,7 +8049,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 59.0
+   "w": 59
   },
   "energy-blacksteel-sword": {
    "af": 3,
@@ -8069,7 +8070,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "energy-blade-replica": {
    "af": 3,
@@ -8086,7 +8087,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "energy-cleric-mace-replica": {
    "af": 8,
@@ -8103,7 +8104,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "energy-clerical-mace": {
    "af": 3,
@@ -8122,7 +8123,7 @@
    "s": "weapon",
    "sell": 777,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "energy-cranial-basher": {
    "af": 3,
@@ -8141,7 +8142,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "energy-crystal-mace": {
    "af": 3,
@@ -8160,7 +8161,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "energy-dragon-slayer": {
    "af": 3,
@@ -8181,7 +8182,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "energy-headchopper": {
    "af": 3,
@@ -8202,7 +8203,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 45.0
+   "w": 45
   },
   "energy-headchopper-replica": {
    "af": 8,
@@ -8219,7 +8220,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 45.0
+   "w": 45
   },
   "energy-heroic-axe": {
    "af": 3,
@@ -8238,7 +8239,7 @@
    "s": "weapon",
    "sell": 1228,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "energy-heroic-axe-replica": {
    "af": 8,
@@ -8255,7 +8256,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "energy-knight-axe": {
    "af": 3,
@@ -8275,7 +8276,7 @@
    "s": "weapon",
    "sell": 969,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "energy-knight-axe-replica": {
    "af": 8,
@@ -8292,7 +8293,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "energy-mace-replica": {
    "af": 3,
@@ -8309,7 +8310,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "energy-mystic-blade": {
    "af": 3,
@@ -8328,7 +8329,7 @@
    "s": "weapon",
    "sell": 1244,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "energy-orcish-maul": {
    "af": 3,
@@ -8346,7 +8347,7 @@
    "s": "weapon",
    "sell": 1094,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "energy-orcish-maul-replica": {
    "af": 3,
@@ -8363,7 +8364,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "energy-relic-sword": {
    "af": 3,
@@ -8382,7 +8383,7 @@
    "s": "weapon",
    "sell": 1190,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "energy-relic-sword-replica": {
    "af": 3,
@@ -8399,7 +8400,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "energy-ring": {
    "cat": "ring",
@@ -8440,7 +8441,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 75.0
+   "w": 75
   },
   "energy-slayer-replica": {
    "af": 3,
@@ -8457,7 +8458,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 82.0
+   "w": 82
   },
   "energy-spike-sword": {
    "af": 3,
@@ -8474,7 +8475,7 @@
    "s": "weapon",
    "sell": 796,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "energy-spike-sword-replica": {
    "af": 3,
@@ -8491,7 +8492,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "energy-war-axe": {
    "af": 3,
@@ -8551,7 +8552,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "energy-war-hammer-replica": {
    "af": 3,
@@ -8568,7 +8569,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 85.0
+   "w": 85
   },
   "engraved-wedding-ring": {
    "cat": "ring",
@@ -8610,7 +8611,7 @@
    "s": "weapon",
    "sell": 1520,
    "t": "sword",
-   "w": 45.0
+   "w": 45
   },
   "ethereal-coned-hat": {
    "af": 8,
@@ -8638,7 +8639,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 12.0
+   "w": 12
   },
   "ethereal-ring": {
    "af": 8,
@@ -8698,7 +8699,7 @@
    "sell": 1171,
    "t": "axe",
    "th": 1,
-   "w": 82.0
+   "w": 82
   },
   "executioner": {
    "atk": 51,
@@ -8718,7 +8719,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 99.0
+   "w": 99
   },
   "exotic-amulet": {
    "cat": "amulet",
@@ -8754,7 +8755,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "fabulous-legs": {
    "arm": 9,
@@ -8780,7 +8781,7 @@
     "knight",
     "paladin"
    ],
-   "w": 55.0
+   "w": 55
   },
   "falcon-battleaxe": {
    "atk": 10,
@@ -8806,7 +8807,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 95.0
+   "w": 95
   },
   "falcon-bow": {
    "atk": 7,
@@ -8831,7 +8832,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "falcon-circlet": {
    "arm": 8,
@@ -8854,7 +8855,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 13.0
+   "w": 13
   },
   "falcon-coif": {
    "arm": 10,
@@ -8879,7 +8880,7 @@
     "knight",
     "paladin"
    ],
-   "w": 28.0
+   "w": 28
   },
   "falcon-escutcheon": {
    "cat": "shield",
@@ -8901,7 +8902,7 @@
     "knight",
     "paladin"
    ],
-   "w": 60.0
+   "w": 60
   },
   "falcon-greaves": {
    "arm": 10,
@@ -8927,7 +8928,7 @@
     "knight",
     "paladin"
    ],
-   "w": 36.0
+   "w": 36
   },
   "falcon-longsword": {
    "atk": 56,
@@ -8951,7 +8952,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "falcon-mace": {
    "atk": 11,
@@ -8977,7 +8978,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 68.0
+   "w": 68
   },
   "falcon-plate": {
    "arm": 18,
@@ -8999,7 +9000,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 188.0
+   "w": 188
   },
   "falcon-rod": {
    "cat": "wand",
@@ -9026,7 +9027,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 37.0
+   "w": 37
   },
   "falcon-sai": {
    "atk": 45,
@@ -9038,7 +9039,7 @@
    "fist": 4,
    "id": 50161,
    "imbSlots": 2,
-   "lifeLeech": 14.0,
+   "lifeLeech": 14,
    "lvl": 300,
    "n": "falcon sai",
    "s": "weapon",
@@ -9047,7 +9048,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 82.0
+   "w": 82
   },
   "falcon-shield": {
    "cat": "shield",
@@ -9069,7 +9070,7 @@
     "knight",
     "paladin"
    ],
-   "w": 57.0
+   "w": 57
   },
   "falcon-wand": {
    "cat": "wand",
@@ -9096,7 +9097,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 33.0
+   "w": 33
   },
   "family-signet-ring": {
    "cat": "ring",
@@ -9121,7 +9122,7 @@
    "sell": 438,
    "t": "axe",
    "th": 1,
-   "w": 25.0
+   "w": 25
   },
   "feather-headdress": {
    "arm": 2,
@@ -9134,7 +9135,7 @@
    "s": "helmet",
    "sell": 96,
    "t": "armor",
-   "w": 21.0
+   "w": 21
   },
   "ferumbras-amulet": {
    "arm": 3,
@@ -9146,7 +9147,7 @@
    "s": "amulet",
    "sell": 144,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "ferumbras-candy-hat": {
    "arm": 1,
@@ -9183,7 +9184,7 @@
    "s": "weapon",
    "sell": 864,
    "t": "club",
-   "w": 29.0
+   "w": 29
   },
   "feverbloom-boots": {
    "arm": 2,
@@ -9225,7 +9226,7 @@
    "s": "weapon",
    "sell": 825,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "fiery-barbarian-axe-replica": {
    "af": 3,
@@ -9242,7 +9243,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "fiery-basher-replica": {
    "af": 3,
@@ -9259,7 +9260,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "fiery-blacksteel-sword": {
    "af": 3,
@@ -9280,7 +9281,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "fiery-clerical-mace": {
    "af": 3,
@@ -9299,7 +9300,7 @@
    "s": "weapon",
    "sell": 777,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "fiery-clerical-mace-replica": {
    "af": 3,
@@ -9316,7 +9317,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "fiery-cranial-basher": {
    "af": 3,
@@ -9335,7 +9336,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "fiery-crystal-mace": {
    "af": 3,
@@ -9354,7 +9355,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "fiery-crystal-mace-replica": {
    "af": 3,
@@ -9371,7 +9372,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "fiery-dragon-slayer": {
    "af": 3,
@@ -9392,7 +9393,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "fiery-dragon-slayer-replica": {
    "af": 3,
@@ -9409,7 +9410,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 82.0
+   "w": 82
   },
   "fiery-headchopper": {
    "af": 3,
@@ -9430,7 +9431,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 45.0
+   "w": 45
   },
   "fiery-headchopper-replica": {
    "af": 3,
@@ -9447,7 +9448,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 45.0
+   "w": 45
   },
   "fiery-heroic-axe": {
    "af": 3,
@@ -9466,7 +9467,7 @@
    "s": "weapon",
    "sell": 1228,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "fiery-heroic-axe-replica": {
    "af": 3,
@@ -9483,7 +9484,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "fiery-knight-axe": {
    "af": 3,
@@ -9503,7 +9504,7 @@
    "s": "weapon",
    "sell": 969,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "fiery-knight-axe-replica": {
    "af": 3,
@@ -9520,7 +9521,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "fiery-mystic-blade": {
    "af": 3,
@@ -9539,7 +9540,7 @@
    "s": "weapon",
    "sell": 1244,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "fiery-mystic-blade-replica": {
    "af": 3,
@@ -9556,7 +9557,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "fiery-orcish-maul": {
    "af": 3,
@@ -9574,7 +9575,7 @@
    "s": "weapon",
    "sell": 1094,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "fiery-orcish-maul-replica": {
    "af": 3,
@@ -9591,7 +9592,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "fiery-rainbow-shield": {
    "cat": "shield",
@@ -9607,7 +9608,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "fiery-relic-sword": {
    "af": 3,
@@ -9626,7 +9627,7 @@
    "s": "weapon",
    "sell": 1190,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "fiery-relic-sword-replica": {
    "af": 3,
@@ -9643,7 +9644,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "fiery-spike-sword": {
    "af": 3,
@@ -9662,7 +9663,7 @@
    "s": "weapon",
    "sell": 796,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "fiery-spike-sword-replica": {
    "af": 3,
@@ -9679,7 +9680,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "fiery-war-axe": {
    "af": 3,
@@ -9739,7 +9740,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "fiery-war-hammer-replica": {
    "af": 3,
@@ -9756,7 +9757,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 85.0
+   "w": 85
   },
   "filthy-bunnyslippers": {
    "cat": "boots",
@@ -9767,7 +9768,7 @@
    "s": "boots",
    "sell": 2,
    "t": "armor",
-   "w": 6.0
+   "w": 6
   },
   "fire-axe": {
    "atk": 27,
@@ -9785,7 +9786,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "axe",
-   "w": 40.0
+   "w": 40
   },
   "fire-blacksteel-replica": {
    "af": 3,
@@ -9802,7 +9803,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 59.0
+   "w": 59
   },
   "fire-sword": {
    "af": 2,
@@ -9823,7 +9824,7 @@
    "s": "weapon",
    "sell": 992,
    "t": "sword",
-   "w": 23.0
+   "w": 23
   },
   "fireborn-giant-armor": {
    "arm": 15,
@@ -9845,7 +9846,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "fireheart-cuirass": {
    "arm": 18,
@@ -9868,7 +9869,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "fireheart-hauberk": {
    "arm": 18,
@@ -9891,7 +9892,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "fireheart-platemail": {
    "arm": 18,
@@ -9914,7 +9915,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "firemind-raiment": {
    "arm": 15,
@@ -9938,7 +9939,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 55.0
+   "w": 55
   },
   "firesoul-tabard": {
    "arm": 18,
@@ -9961,7 +9962,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 145.0
+   "w": 145
   },
   "firewalker-boots": {
    "af": 4,
@@ -10014,7 +10015,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 18.0
+   "w": 18
   },
   "flower-dress": {
    "cat": "armor",
@@ -10025,7 +10026,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 19.0
+   "w": 19
   },
   "flower-wreath": {
    "cat": "helmet",
@@ -10037,7 +10038,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "focus-cape": {
    "arm": 9,
@@ -10055,7 +10056,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 21.0
+   "w": 21
   },
   "foxtail-amulet": {
    "arm": 2,
@@ -10071,7 +10072,7 @@
    "s": "amulet",
    "sell": 256,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "friendship-amulet": {
    "af": 8,
@@ -10107,7 +10108,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 11.0
+   "w": 11
   },
   "frostheart-cuirass": {
    "arm": 18,
@@ -10130,7 +10131,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "frostheart-hauberk": {
    "arm": 18,
@@ -10153,7 +10154,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "frostheart-platemail": {
    "arm": 18,
@@ -10176,7 +10177,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "frostmind-raiment": {
    "arm": 15,
@@ -10200,7 +10201,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 55.0
+   "w": 55
   },
   "frostsoul-tabard": {
    "arm": 18,
@@ -10223,7 +10224,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 145.0
+   "w": 145
   },
   "frozen-claw": {
    "cat": "ring",
@@ -10254,7 +10255,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 75.0
+   "w": 75
   },
   "full-helmet-of-the-ancients": {
    "af": 2,
@@ -10287,7 +10288,7 @@
    "s": "armor",
    "sell": 528,
    "t": "armor",
-   "w": 49.0
+   "w": 49
   },
   "fur-boots": {
    "arm": 2,
@@ -10302,7 +10303,7 @@
    "sell": 2,
    "spd": -6,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "fur-cap": {
    "arm": 3,
@@ -10315,7 +10316,7 @@
    "s": "helmet",
    "sell": 144,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "furious-frock": {
    "af": 3,
@@ -10340,7 +10341,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 34.0
+   "w": 34
   },
   "furry-club": {
    "atk": 31,
@@ -10356,7 +10357,7 @@
    "s": "weapon",
    "sell": 899,
    "t": "club",
-   "w": 42.0
+   "w": 42
   },
   "galea-mortis": {
    "arm": 7,
@@ -10379,7 +10380,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 23.0
+   "w": 23
   },
   "garlic-necklace": {
    "cat": "amulet",
@@ -10409,7 +10410,7 @@
    "s": "amulet",
    "sell": 144,
    "t": "accessory",
-   "w": 10.0
+   "w": 10
   },
   "genesis-serenity-armor": {
    "arm": 11,
@@ -10433,7 +10434,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 107.0
+   "w": 107
   },
   "genesis-serenity-legs": {
    "arm": 7,
@@ -10468,7 +10469,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 41.0
+   "w": 41
   },
   "ghazbaran-oyoroi": {
    "arm": 8,
@@ -10492,7 +10493,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 135.0
+   "w": 135
   },
   "ghost-chestplate": {
    "arm": 17,
@@ -10514,7 +10515,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 123.0
+   "w": 123
   },
   "giant-smithhammer": {
    "atk": 24,
@@ -10527,7 +10528,7 @@
    "s": "weapon",
    "sell": 684,
    "t": "club",
-   "w": 68.0
+   "w": 68
   },
   "giant-sword": {
    "atk": 46,
@@ -10547,7 +10548,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 180.0
+   "w": 180
   },
   "gilded-eldritch-bow": {
    "af": 8,
@@ -10571,7 +10572,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 59.0
+   "w": 59
   },
   "gilded-eldritch-claymore": {
    "af": 8,
@@ -10596,7 +10597,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "gilded-eldritch-crescent-moon-spade": {
    "af": 8,
@@ -10621,7 +10622,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 88.0
+   "w": 88
   },
   "gilded-eldritch-greataxe": {
    "af": 8,
@@ -10644,7 +10645,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 66.0
+   "w": 66
   },
   "gilded-eldritch-rod": {
    "af": 8,
@@ -10674,7 +10675,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 36.0
+   "w": 36
   },
   "gilded-eldritch-wand": {
    "af": 8,
@@ -10703,7 +10704,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 37.0
+   "w": 37
   },
   "gilded-eldritch-warmace": {
    "af": 8,
@@ -10728,7 +10729,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 83.0
+   "w": 83
   },
   "gill-coat": {
    "arm": 12,
@@ -10751,7 +10752,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "gill-gugel": {
    "arm": 5,
@@ -10774,7 +10775,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 9.0
+   "w": 9
   },
   "gill-legs": {
    "arm": 7,
@@ -10797,7 +10798,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 28.0
+   "w": 28
   },
   "gill-necklace": {
    "cat": "amulet",
@@ -10824,7 +10825,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 13.0
+   "w": 13
   },
   "glacial-rod": {
    "cat": "wand",
@@ -10847,7 +10848,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 37.0
+   "w": 37
   },
   "glacier-amulet": {
    "cat": "amulet",
@@ -10865,7 +10866,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "glacier-kilt": {
    "arm": 8,
@@ -10888,7 +10889,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "glacier-mask": {
    "arm": 5,
@@ -10910,7 +10911,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 10.0
+   "w": 10
   },
   "glacier-robe": {
    "arm": 11,
@@ -11005,7 +11006,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 19.0
+   "w": 19
   },
   "glooth-blade": {
    "atk": 39,
@@ -11026,7 +11027,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 19.0
+   "w": 19
   },
   "glooth-cape": {
    "arm": 9,
@@ -11049,7 +11050,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 29.0
+   "w": 29
   },
   "glooth-club": {
    "atk": 39,
@@ -11070,7 +11071,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 19.0
+   "w": 19
   },
   "glooth-spear": {
    "atk": 55,
@@ -11083,7 +11084,7 @@
    "s": "weapon",
    "sell": 1056,
    "t": "distance",
-   "w": 26.0
+   "w": 26
   },
   "glooth-whip": {
    "atk": 33,
@@ -11099,7 +11100,7 @@
    "s": "weapon",
    "sell": 937,
    "t": "club",
-   "w": 32.0
+   "w": 32
   },
   "glorious-axe": {
    "atk": 40,
@@ -11118,7 +11119,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 95.0
+   "w": 95
   },
   "glowing-rubbish-amulet": {
    "af": 8,
@@ -11144,7 +11145,7 @@
    "s": "weapon",
    "sell": 467,
    "t": "club",
-   "w": 13.0
+   "w": 13
   },
   "gnome-armor": {
    "arm": 17,
@@ -11168,7 +11169,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 120.0
+   "w": 120
   },
   "gnome-helmet": {
    "arm": 8,
@@ -11193,7 +11194,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 24.0
+   "w": 24
   },
   "gnome-legs": {
    "arm": 9,
@@ -11216,7 +11217,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "gnome-shield": {
    "cat": "shield",
@@ -11240,7 +11241,7 @@
     "knight",
     "paladin"
    ],
-   "w": 60.0
+   "w": 60
   },
   "gnome-sword": {
    "atk": 10,
@@ -11266,7 +11267,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "gnomish-cuirass": {
    "arm": 8,
@@ -11289,7 +11290,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 100.0
+   "w": 100
   },
   "gnomish-footwraps": {
    "arm": 1,
@@ -11312,7 +11313,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 11.0
+   "w": 11
   },
   "gold-medal": {
    "cat": "amulet",
@@ -11333,7 +11334,7 @@
    "s": "ring",
    "sell": 2,
    "t": "accessory",
-   "w": 1.0
+   "w": 1
   },
   "golden-amulet": {
    "cat": "amulet",
@@ -11363,7 +11364,7 @@
     "knight",
     "paladin"
    ],
-   "w": 80.0
+   "w": 80
   },
   "golden-axe": {
    "atk": 10,
@@ -11390,7 +11391,7 @@
    "s": "boots",
    "sell": 192,
    "t": "armor",
-   "w": 31.0
+   "w": 31
   },
   "golden-helmet": {
    "arm": 12,
@@ -11404,7 +11405,7 @@
    "s": "helmet",
    "sell": 576,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "golden-hyaena-pendant": {
    "cat": "amulet",
@@ -11431,7 +11432,7 @@
     "knight",
     "paladin"
    ],
-   "w": 56.0
+   "w": 56
   },
   "golden-scorpion-pendant": {
    "cat": "amulet",
@@ -11441,7 +11442,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 3.0
+   "w": 3
   },
   "golden-sickle": {
    "atk": 13,
@@ -11473,7 +11474,7 @@
    "s": "armor",
    "sell": 576,
    "t": "armor",
-   "w": 58.0
+   "w": 58
   },
   "grand-sanguine-battleaxe": {
    "af": 8,
@@ -11505,7 +11506,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 83.0
+   "w": 83
   },
   "grand-sanguine-blade": {
    "af": 8,
@@ -11528,9 +11529,9 @@
    "extraDef": 3,
    "id": 43865,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "grand sanguine blade",
    "s": "weapon",
    "sell": 1548,
@@ -11539,7 +11540,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 60.0
+   "w": 60
   },
   "grand-sanguine-bludgeon": {
    "af": 8,
@@ -11571,7 +11572,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 91.0
+   "w": 91
   },
   "grand-sanguine-bow": {
    "af": 8,
@@ -11606,7 +11607,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "grand-sanguine-claws": {
    "af": 8,
@@ -11637,7 +11638,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 69.0
+   "w": 69
   },
   "grand-sanguine-coil": {
    "af": 8,
@@ -11663,11 +11664,11 @@
    "el": "energy",
    "id": 43883,
    "imbSlots": 2,
-   "lifeLeech": 2.0,
+   "lifeLeech": 2,
    "lvl": 600,
    "mag": 5,
    "manaCost": 21,
-   "manaLeech": 1.0,
+   "manaLeech": 1,
    "mdmg": 114,
    "n": "grand sanguine coil",
    "prot": 0,
@@ -11681,7 +11682,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 21.0
+   "w": 21
   },
   "grand-sanguine-crossbow": {
    "af": 8,
@@ -11716,7 +11717,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "grand-sanguine-cudgel": {
    "af": 8,
@@ -11740,9 +11741,9 @@
    "extraDef": 3,
    "id": 43867,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "grand sanguine cudgel",
    "s": "weapon",
    "sell": 1548,
@@ -11750,7 +11751,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 68.0
+   "w": 68
   },
   "grand-sanguine-hatchet": {
    "af": 8,
@@ -11774,9 +11775,9 @@
    "extraDef": 3,
    "id": 43869,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "grand sanguine hatchet",
    "s": "weapon",
    "sell": 1548,
@@ -11784,7 +11785,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "grand-sanguine-razor": {
    "af": 8,
@@ -11816,7 +11817,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 79.0
+   "w": 79
   },
   "grand-sanguine-rod": {
    "af": 8,
@@ -11842,11 +11843,11 @@
    "el": "earth",
    "id": 43886,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
    "mag": 5,
    "manaCost": 20,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "mdmg": 112,
    "n": "grand sanguine rod",
    "prot": 0,
@@ -11860,7 +11861,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 24.0
+   "w": 24
   },
   "grasshopper-legs": {
    "arm": 7,
@@ -11875,7 +11876,7 @@
    "sell": 496,
    "spd": 10,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "great-axe": {
    "atk": 52,
@@ -11895,7 +11896,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 90.0
+   "w": 90
   },
   "great-shield": {
    "cat": "shield",
@@ -11908,7 +11909,7 @@
    "s": "shield",
    "sell": 608,
    "t": "shield",
-   "w": 84.0
+   "w": 84
   },
   "green-demon-armor": {
    "arm": 16,
@@ -11921,7 +11922,7 @@
    "s": "armor",
    "sell": 768,
    "t": "armor",
-   "w": 80.0
+   "w": 80
   },
   "green-demon-helmet": {
    "arm": 10,
@@ -11946,7 +11947,7 @@
    "s": "legs",
    "sell": 432,
    "t": "armor",
-   "w": 70.0
+   "w": 70
   },
   "green-demon-slippers": {
    "cat": "boots",
@@ -11958,7 +11959,7 @@
    "s": "boots",
    "sell": 2,
    "t": "armor",
-   "w": 6.0
+   "w": 6
   },
   "green-tunic": {
    "arm": 1,
@@ -12006,7 +12007,7 @@
    "s": "shield",
    "sell": 464,
    "t": "shield",
-   "w": 50.0
+   "w": 50
   },
   "guardian-axe": {
    "atk": 46,
@@ -12022,7 +12023,7 @@
    "sell": 1059,
    "t": "axe",
    "th": 1,
-   "w": 110.0
+   "w": 110
   },
   "guardian-boots": {
    "arm": 3,
@@ -12063,7 +12064,7 @@
    "sell": 1123,
    "t": "axe",
    "th": 1,
-   "w": 110.0
+   "w": 110
   },
   "guardian-shield": {
    "cat": "shield",
@@ -12075,7 +12076,7 @@
    "s": "shield",
    "sell": 480,
    "t": "shield",
-   "w": 55.0
+   "w": 55
   },
   "hailstorm-rod": {
    "af": 3,
@@ -12101,7 +12102,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "halberd": {
    "atk": 35,
@@ -12117,7 +12118,7 @@
    "sell": 896,
    "t": "axe",
    "th": 1,
-   "w": 90.0
+   "w": 90
   },
   "hammer-of-destruction": {
    "af": 8,
@@ -12140,7 +12141,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "hammer-of-mighty-cheating": {
    "atk": 24,
@@ -12152,7 +12153,7 @@
    "s": "weapon",
    "sell": 684,
    "t": "club",
-   "w": 68.0
+   "w": 68
   },
   "hammer-of-prophecy": {
    "af": 2,
@@ -12173,7 +12174,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 110.0
+   "w": 110
   },
   "hammer-of-wrath": {
    "atk": 48,
@@ -12193,7 +12194,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "hand-axe": {
    "atk": 10,
@@ -12208,7 +12209,7 @@
    "sell": 272,
    "shop": 1,
    "t": "axe",
-   "w": 18.0
+   "w": 18
   },
   "harmony-amulet": {
    "arm": 2,
@@ -12244,7 +12245,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 7.0
+   "w": 7
   },
   "hatchet": {
    "atk": 15,
@@ -12258,7 +12259,7 @@
    "s": "weapon",
    "sell": 416,
    "t": "axe",
-   "w": 35.0
+   "w": 35
   },
   "haunted-blade": {
    "atk": 40,
@@ -12278,7 +12279,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 31.0
+   "w": 31
   },
   "haunted-mirror-piece": {
    "cat": "shield",
@@ -12290,7 +12291,7 @@
    "s": "shield",
    "sell": 544,
    "t": "shield",
-   "w": 28.0
+   "w": 28
   },
   "havoc-blade": {
    "atk": 49,
@@ -12309,7 +12310,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "headchopper": {
    "atk": 42,
@@ -12329,7 +12330,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 45.0
+   "w": 45
   },
   "heat-core": {
    "arm": 12,
@@ -12343,7 +12344,7 @@
    "s": "armor",
    "sell": 576,
    "t": "armor",
-   "w": 55.0
+   "w": 55
   },
   "heavily-rusted-shield": {
    "cat": "shield",
@@ -12354,7 +12355,7 @@
    "s": "shield",
    "sell": 16,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "heavy-mace": {
    "atk": 49,
@@ -12371,7 +12372,7 @@
    "sell": 1180,
    "t": "club",
    "th": 1,
-   "w": 110.0
+   "w": 110
   },
   "heavy-machete": {
    "atk": 16,
@@ -12398,7 +12399,7 @@
    "s": "armor",
    "sell": 288,
    "t": "armor",
-   "w": 8.0
+   "w": 8
   },
   "heavy-trident": {
    "atk": 35,
@@ -12414,7 +12415,7 @@
    "sell": 944,
    "t": "axe",
    "th": 1,
-   "w": 90.0
+   "w": 90
   },
   "hellforged-axe": {
    "atk": 51,
@@ -12430,7 +12431,7 @@
    "s": "weapon",
    "sell": 1427,
    "t": "axe",
-   "w": 88.0
+   "w": 88
   },
   "hellstalker-visor": {
    "arm": 10,
@@ -12460,7 +12461,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 36.0
+   "w": 36
   },
   "helmet-of-nature": {
    "arm": 3,
@@ -12473,7 +12474,7 @@
    "s": "helmet",
    "sell": 144,
    "t": "armor",
-   "w": 11.0
+   "w": 11
   },
   "helmet-of-the-ancients": {
    "arm": 8,
@@ -12501,7 +12502,7 @@
    "sell": 96,
    "shop": 1,
    "t": "armor",
-   "w": 210.0
+   "w": 210
   },
   "helmet-of-the-lost": {
    "arm": 7,
@@ -12515,7 +12516,7 @@
    "s": "helmet",
    "sell": 336,
    "t": "armor",
-   "w": 35.0
+   "w": 35
   },
   "helmet-of-ultimate-terror": {
    "af": 5,
@@ -12548,7 +12549,7 @@
    "s": "weapon",
    "sell": 1228,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "hibiscus-dress": {
    "cat": "armor",
@@ -12559,7 +12560,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 19.0
+   "w": 19
   },
   "hive-bow": {
    "atk": 2,
@@ -12580,7 +12581,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 46.0
+   "w": 46
   },
   "hive-scythe": {
    "atk": 46,
@@ -12596,7 +12597,7 @@
    "s": "weapon",
    "sell": 1267,
    "t": "axe",
-   "w": 75.0
+   "w": 75
   },
   "horn": {
    "arm": 1,
@@ -12621,7 +12622,7 @@
    "s": "helmet",
    "sell": 528,
    "t": "armor",
-   "w": 51.0
+   "w": 51
   },
   "horseman-helmet": {
    "arm": 6,
@@ -12634,7 +12635,7 @@
    "s": "helmet",
    "sell": 288,
    "t": "armor",
-   "w": 42.0
+   "w": 42
   },
   "house-silversun-s-signet-ring": {
    "cat": "ring",
@@ -12658,7 +12659,7 @@
    "s": "weapon",
    "sell": 614,
    "t": "distance",
-   "w": 22.0
+   "w": 22
   },
   "ice-hatchet": {
    "atk": 4,
@@ -12673,7 +12674,7 @@
    "s": "weapon",
    "sell": 416,
    "t": "axe",
-   "w": 35.0
+   "w": 35
   },
   "ice-rapier": {
    "atk": 42,
@@ -12690,7 +12691,7 @@
    "sell": 1168,
    "shop": 1,
    "t": "sword",
-   "w": 15.0
+   "w": 15
   },
   "ice-robe": {
    "arm": 9,
@@ -12714,7 +12715,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 75.0
+   "w": 75
   },
   "icicle-bow": {
    "atk": 1,
@@ -12730,7 +12731,7 @@
    "sell": 19,
    "t": "distance",
    "th": 1,
-   "w": 42.0
+   "w": 42
   },
   "icy-barbarian-axe": {
    "af": 3,
@@ -12749,7 +12750,7 @@
    "s": "weapon",
    "sell": 825,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "icy-barbarian-axe-replica": {
    "af": 3,
@@ -12766,7 +12767,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 51.0
+   "w": 51
   },
   "icy-blacksteel-replica": {
    "af": 3,
@@ -12783,7 +12784,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 59.0
+   "w": 59
   },
   "icy-blacksteel-sword": {
    "af": 3,
@@ -12804,7 +12805,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "icy-clerical-mace": {
    "af": 3,
@@ -12823,7 +12824,7 @@
    "s": "weapon",
    "sell": 777,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "icy-clerical-mace-replica": {
    "af": 3,
@@ -12840,7 +12841,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 58.0
+   "w": 58
   },
   "icy-cranial-basher": {
    "af": 3,
@@ -12859,7 +12860,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "icy-cranial-basher-replica": {
    "af": 3,
@@ -12876,7 +12877,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 78.0
+   "w": 78
   },
   "icy-crystal-mace": {
    "af": 3,
@@ -12895,7 +12896,7 @@
    "s": "weapon",
    "sell": 985,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "icy-crystal-mace-replica": {
    "af": 3,
@@ -12912,7 +12913,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 80.0
+   "w": 80
   },
   "icy-culottes": {
    "arm": 8,
@@ -12932,7 +12933,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 15.0
+   "w": 15
   },
   "icy-dragon-slayer": {
    "af": 3,
@@ -12953,7 +12954,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 82.0
+   "w": 82
   },
   "icy-dragon-slayer-replica": {
    "af": 3,
@@ -12970,7 +12971,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 82.0
+   "w": 82
   },
   "icy-headchopper": {
    "af": 3,
@@ -12991,7 +12992,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 45.0
+   "w": 45
   },
   "icy-headchopper-replica": {
    "af": 3,
@@ -13008,7 +13009,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 45.0
+   "w": 45
   },
   "icy-heroic-axe": {
    "af": 3,
@@ -13027,7 +13028,7 @@
    "s": "weapon",
    "sell": 1228,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "icy-heroic-axe-replica": {
    "af": 3,
@@ -13044,7 +13045,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 61.0
+   "w": 61
   },
   "icy-knight-axe": {
    "af": 3,
@@ -13064,7 +13065,7 @@
    "s": "weapon",
    "sell": 969,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "icy-knight-axe-replica": {
    "af": 3,
@@ -13081,7 +13082,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "icy-mystic-blade": {
    "af": 3,
@@ -13100,7 +13101,7 @@
    "s": "weapon",
    "sell": 1244,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "icy-mystic-blade-replica": {
    "af": 3,
@@ -13117,7 +13118,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "icy-orcish-maul": {
    "af": 3,
@@ -13135,7 +13136,7 @@
    "s": "weapon",
    "sell": 1094,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "icy-orcish-maul-replica": {
    "af": 3,
@@ -13152,7 +13153,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "icy-rainbow-shield": {
    "cat": "shield",
@@ -13167,7 +13168,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "icy-relic-sword": {
    "af": 3,
@@ -13186,7 +13187,7 @@
    "s": "weapon",
    "sell": 1190,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "icy-relic-sword-replica": {
    "af": 3,
@@ -13203,7 +13204,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "icy-spike-sword": {
    "af": 3,
@@ -13222,7 +13223,7 @@
    "s": "weapon",
    "sell": 796,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "icy-spike-sword-replica": {
    "af": 3,
@@ -13239,7 +13240,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "icy-war-axe": {
    "af": 3,
@@ -13299,7 +13300,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "icy-war-hammer-replica": {
    "af": 3,
@@ -13316,7 +13317,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 85.0
+   "w": 85
   },
   "iks-footwraps": {
    "arm": 2,
@@ -13345,7 +13346,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 8.0
+   "w": 8
   },
   "impaler": {
    "atk": 49,
@@ -13361,7 +13362,7 @@
    "s": "weapon",
    "sell": 1340,
    "t": "axe",
-   "w": 82.0
+   "w": 82
   },
   "impaler-of-the-igniter": {
    "atk": 25,
@@ -13378,7 +13379,7 @@
    "s": "weapon",
    "sell": 1475,
    "t": "sword",
-   "w": 59.0
+   "w": 59
   },
   "incandescent-crown": {
    "cat": "helmet",
@@ -13388,7 +13389,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "incredible-mumpiz-slayer": {
    "atk": 17,
@@ -13401,7 +13402,7 @@
    "s": "weapon",
    "sell": 550,
    "t": "sword",
-   "w": 42.0
+   "w": 42
   },
   "inferniarch-arbalest": {
    "atk": 8,
@@ -13426,7 +13427,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 40.0
+   "w": 40
   },
   "inferniarch-battleaxe": {
    "atk": 8,
@@ -13448,7 +13449,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 67.0
+   "w": 67
   },
   "inferniarch-blade": {
    "atk": 8,
@@ -13470,7 +13471,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "inferniarch-bow": {
    "atk": 7,
@@ -13495,7 +13496,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 56.0
+   "w": 56
   },
   "inferniarch-claws": {
    "atk": 45,
@@ -13515,7 +13516,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 84.0
+   "w": 84
   },
   "inferniarch-flail": {
    "atk": 8,
@@ -13537,7 +13538,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "inferniarch-greataxe": {
    "atk": 8,
@@ -13560,7 +13561,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "inferniarch-rod": {
    "cat": "wand",
@@ -13587,7 +13588,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 22.0
+   "w": 22
   },
   "inferniarch-slayer": {
    "atk": 8,
@@ -13610,7 +13611,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "inferniarch-wand": {
    "cat": "wand",
@@ -13637,7 +13638,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 24.0
+   "w": 24
   },
   "inferniarch-warhammer": {
    "atk": 8,
@@ -13660,7 +13661,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "iron-crown": {
    "cat": "helmet",
@@ -13670,7 +13671,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "iron-hammer": {
    "atk": 18,
@@ -13684,7 +13685,7 @@
    "s": "weapon",
    "sell": 505,
    "t": "club",
-   "w": 66.0
+   "w": 66
   },
   "iron-helmet": {
    "arm": 5,
@@ -13698,7 +13699,7 @@
    "sell": 240,
    "shop": 1,
    "t": "armor",
-   "w": 30.0
+   "w": 30
   },
   "ironworker": {
    "atk": 4,
@@ -13718,7 +13719,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 150.0
+   "w": 150
   },
   "jacket": {
    "arm": 1,
@@ -13732,7 +13733,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 24.0
+   "w": 24
   },
   "jade-amulet": {
    "cat": "amulet",
@@ -13743,7 +13744,7 @@
    "sell": 2,
    "shop": 1,
    "t": "accessory",
-   "w": 4.0
+   "w": 4
   },
   "jade-conical-hat": {
    "arm": 5,
@@ -13766,7 +13767,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 21.0
+   "w": 21
   },
   "jade-hammer": {
    "atk": 46,
@@ -13782,7 +13783,7 @@
    "s": "weapon",
    "sell": 1203,
    "t": "club",
-   "w": 32.0
+   "w": 32
   },
   "jade-hat": {
    "arm": 4,
@@ -13802,7 +13803,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 9.0
+   "w": 9
   },
   "jade-legs": {
    "arm": 5,
@@ -13826,7 +13827,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 37.0
+   "w": 37
   },
   "jagged-sword": {
    "atk": 21,
@@ -13842,7 +13843,7 @@
    "sell": 627,
    "shop": 1,
    "t": "sword",
-   "w": 29.0
+   "w": 29
   },
   "jerom-s-family-necklace": {
    "cat": "amulet",
@@ -13864,7 +13865,7 @@
    "s": "helmet",
    "sell": 48,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "jo-staff": {
    "atk": 18,
@@ -13891,7 +13892,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 21.0
+   "w": 21
   },
   "jungle-bow": {
    "atk": 6,
@@ -13916,7 +13917,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "jungle-flail": {
    "atk": 52,
@@ -13935,7 +13936,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 89.0
+   "w": 89
   },
   "jungle-rod": {
    "cat": "wand",
@@ -13962,7 +13963,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 37.0
+   "w": 37
   },
   "jungle-survivor-legs": {
    "arm": 5,
@@ -13984,7 +13985,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 51.0
+   "w": 51
   },
   "jungle-wand": {
    "cat": "wand",
@@ -14011,7 +14012,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 32.0
+   "w": 32
   },
   "justice-seeker": {
    "atk": 47,
@@ -14027,7 +14028,7 @@
    "s": "weapon",
    "sell": 1286,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "katana": {
    "atk": 16,
@@ -14042,7 +14043,7 @@
    "s": "weapon",
    "sell": 499,
    "t": "sword",
-   "w": 31.0
+   "w": 31
   },
   "knife": {
    "atk": 5,
@@ -14074,7 +14075,7 @@
     "knight",
     "paladin"
    ],
-   "w": 120.0
+   "w": 120
   },
   "knight-axe": {
    "atk": 33,
@@ -14091,7 +14092,7 @@
    "s": "weapon",
    "sell": 969,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "knight-legs": {
    "arm": 8,
@@ -14108,7 +14109,7 @@
     "knight",
     "paladin"
    ],
-   "w": 70.0
+   "w": 70
   },
   "koshei-s-ancient-amulet": {
    "cat": "amulet",
@@ -14136,7 +14137,7 @@
    "s": "helmet",
    "sell": 288,
    "t": "armor",
-   "w": 51.0
+   "w": 51
   },
   "laurel-wreath": {
    "cat": "helmet",
@@ -14146,7 +14147,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 9.0
+   "w": 9
   },
   "lavos-armor": {
    "arm": 13,
@@ -14169,7 +14170,7 @@
     "knight",
     "paladin"
    ],
-   "w": 85.0
+   "w": 85
   },
   "leaf-crown": {
    "cat": "helmet",
@@ -14179,7 +14180,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "leaf-legs": {
    "cat": "legs",
@@ -14191,7 +14192,7 @@
    "s": "legs",
    "sell": 2,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "leaf-robe": {
    "arm": 9,
@@ -14215,7 +14216,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 75.0
+   "w": 75
   },
   "leaf-star": {
    "atk": 48,
@@ -14232,7 +14233,7 @@
    "s": "weapon",
    "sell": 960,
    "t": "distance",
-   "w": 2.0
+   "w": 2
   },
   "leather-armor": {
    "arm": 4,
@@ -14246,7 +14247,7 @@
    "sell": 192,
    "shop": 1,
    "t": "armor",
-   "w": 60.0
+   "w": 60
   },
   "leather-boots": {
    "arm": 1,
@@ -14261,7 +14262,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 9.0
+   "w": 9
   },
   "leather-harness": {
    "arm": 9,
@@ -14274,7 +14275,7 @@
    "s": "armor",
    "sell": 432,
    "t": "armor",
-   "w": 29.0
+   "w": 29
   },
   "leather-helmet": {
    "arm": 1,
@@ -14288,7 +14289,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 22.0
+   "w": 22
   },
   "leather-legs": {
    "arm": 1,
@@ -14302,7 +14303,7 @@
    "sell": 48,
    "shop": 1,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "lederhosen": {
    "cat": "legs",
@@ -14312,7 +14313,7 @@
    "s": "legs",
    "sell": 2,
    "t": "armor",
-   "w": 8.0
+   "w": 8
   },
   "legion-helmet": {
    "arm": 4,
@@ -14325,7 +14326,7 @@
    "s": "helmet",
    "sell": 192,
    "t": "armor",
-   "w": 31.0
+   "w": 31
   },
   "legs-of-enlightenment": {
    "arm": 4,
@@ -14350,13 +14351,13 @@
     "earth": 3
    },
    "s": "legs",
-   "sell": 192,
+   "sell": 400,
    "shop": 1,
    "t": "armor",
    "vocs": [
     "monk"
    ],
-   "w": 21.0
+   "w": 21
   },
   "legs-of-wisdom": {
    "arm": 4,
@@ -14378,7 +14379,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 26.0
+   "w": 26
   },
   "leopard-armor": {
    "arm": 9,
@@ -14392,7 +14393,7 @@
    "s": "armor",
    "sell": 432,
    "t": "armor",
-   "w": 95.0
+   "w": 95
   },
   "leviathan-s-amulet": {
    "cat": "amulet",
@@ -14410,7 +14411,7 @@
    "s": "amulet",
    "sell": 1920,
    "t": "accessory",
-   "w": 7.0
+   "w": 7
   },
   "lich-staff": {
    "atk": 40,
@@ -14425,7 +14426,7 @@
    "s": "weapon",
    "sell": 1248,
    "t": "club",
-   "w": 41.0
+   "w": 41
   },
   "life-preserver": {
    "atk": 27,
@@ -14442,7 +14443,7 @@
    "s": "weapon",
    "sell": 822,
    "t": "club",
-   "w": 46.0
+   "w": 46
   },
   "life-ring": {
    "cat": "ring",
@@ -14471,7 +14472,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 9.0
+   "w": 9
   },
   "light-mace": {
    "atk": 14,
@@ -14484,7 +14485,7 @@
    "s": "weapon",
    "sell": 412,
    "t": "club",
-   "w": 41.0
+   "w": 41
   },
   "lightning-boots": {
    "arm": 2,
@@ -14530,7 +14531,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 10.0
+   "w": 10
   },
   "lightning-legs": {
    "arm": 8,
@@ -14553,7 +14554,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "lightning-pendant": {
    "af": 3,
@@ -14574,7 +14575,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "lightning-robe": {
    "arm": 11,
@@ -14636,7 +14637,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 79.0
+   "w": 79
   },
   "lion-claws": {
    "atk": 45,
@@ -14656,7 +14657,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 78.0
+   "w": 78
   },
   "lion-hammer": {
    "atk": 8,
@@ -14678,7 +14679,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "lion-longbow": {
    "atk": 6,
@@ -14703,7 +14704,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 48.0
+   "w": 48
   },
   "lion-longsword": {
    "atk": 8,
@@ -14725,7 +14726,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 75.0
+   "w": 75
   },
   "lion-plate": {
    "arm": 17,
@@ -14749,7 +14750,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 150.0
+   "w": 150
   },
   "lion-ring": {
    "cat": "ring",
@@ -14782,7 +14783,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 26.0
+   "w": 26
   },
   "lion-s-heart": {
    "cat": "amulet",
@@ -14792,7 +14793,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 2.0
+   "w": 2
   },
   "lion-shield": {
    "cat": "shield",
@@ -14813,7 +14814,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "lion-spangenhelm": {
    "arm": 7,
@@ -14836,7 +14837,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 30.0
+   "w": 30
   },
   "lion-spellbook": {
    "cat": "spellbook",
@@ -14859,7 +14860,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "lion-wand": {
    "cat": "wand",
@@ -14870,7 +14871,7 @@
    "el": "ice",
    "id": 34152,
    "imbSlots": 2,
-   "lifeLeech": 18.0,
+   "lifeLeech": 18,
    "lvl": 220,
    "mag": 2,
    "manaCost": 21,
@@ -14883,7 +14884,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 21.0
+   "w": 21
   },
   "living-armor": {
    "arm": 13,
@@ -14907,7 +14908,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 48.0
+   "w": 48
   },
   "living-vine-bow": {
    "atk": 6,
@@ -14932,7 +14933,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 38.0
+   "w": 38
   },
   "longsword": {
    "atk": 17,
@@ -14947,7 +14948,7 @@
    "sell": 550,
    "shop": 1,
    "t": "sword",
-   "w": 42.0
+   "w": 42
   },
   "lucky-clover-amulet": {
    "cat": "amulet",
@@ -14977,7 +14978,7 @@
    "sell": 1168,
    "t": "club",
    "th": 1,
-   "w": 38.0
+   "w": 38
   },
   "mace": {
    "atk": 16,
@@ -14992,7 +14993,7 @@
    "sell": 483,
    "shop": 1,
    "t": "club",
-   "w": 38.0
+   "w": 38
   },
   "mace-of-destruction": {
    "af": 8,
@@ -15014,7 +15015,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "machete": {
    "atk": 12,
@@ -15048,7 +15049,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 9.0
+   "w": 9
   },
   "mage-s-cap": {
    "arm": 3,
@@ -15068,7 +15069,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 10.0
+   "w": 10
   },
   "magic-longsword": {
    "atk": 55,
@@ -15087,7 +15088,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 43.0
+   "w": 43
   },
   "magic-plate-armor": {
    "arm": 17,
@@ -15105,7 +15106,7 @@
     "knight",
     "paladin"
    ],
-   "w": 85.0
+   "w": 85
   },
   "magic-sword": {
    "atk": 48,
@@ -15122,7 +15123,7 @@
    "s": "weapon",
    "sell": 1481,
    "t": "sword",
-   "w": 42.0
+   "w": 42
   },
   "magician-hat": {
    "arm": 1,
@@ -15153,7 +15154,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "magma-amulet": {
    "cat": "amulet",
@@ -15171,7 +15172,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "magma-boots": {
    "arm": 2,
@@ -15247,7 +15248,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "magma-monocle": {
    "arm": 5,
@@ -15269,7 +15270,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 10.0
+   "w": 10
   },
   "magma-robe": {
    "arm": 9,
@@ -15293,7 +15294,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 75.0
+   "w": 75
   },
   "maimer": {
    "atk": 51,
@@ -15308,7 +15309,7 @@
    "s": "weapon",
    "sell": 1491,
    "t": "club",
-   "w": 77.0
+   "w": 77
   },
   "make-do-boots": {
    "arm": 2,
@@ -15384,7 +15385,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 24.0
+   "w": 24
   },
   "mallet-handle": {
    "atk": 24,
@@ -15396,7 +15397,7 @@
    "s": "weapon",
    "sell": 684,
    "t": "club",
-   "w": 15.0
+   "w": 15
   },
   "mammoth-fur-cape": {
    "arm": 10,
@@ -15410,7 +15411,7 @@
    "s": "armor",
    "sell": 480,
    "t": "armor",
-   "w": 20.0
+   "w": 20
   },
   "mammoth-fur-shorts": {
    "cat": "legs",
@@ -15437,7 +15438,7 @@
    "s": "weapon",
    "sell": 816,
    "t": "club",
-   "w": 45.0
+   "w": 45
   },
   "master-archer-s-armor": {
    "arm": 15,
@@ -15455,7 +15456,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 69.0
+   "w": 69
   },
   "mastermind-shield": {
    "cat": "shield",
@@ -15468,7 +15469,7 @@
    "s": "shield",
    "sell": 592,
    "t": "shield",
-   "w": 57.0
+   "w": 57
   },
   "mean-knight-sword": {
    "atk": 14,
@@ -15480,7 +15481,7 @@
    "s": "weapon",
    "sell": 380,
    "t": "sword",
-   "w": 20.0
+   "w": 20
   },
   "mean-paladin-spear": {
    "atk": 15,
@@ -15492,7 +15493,7 @@
    "s": "weapon",
    "sell": 288,
    "t": "distance",
-   "w": 10.0
+   "w": 10
   },
   "meat-shield": {
    "cat": "shield",
@@ -15504,7 +15505,7 @@
    "s": "shield",
    "sell": 160,
    "t": "shield",
-   "w": 5.0
+   "w": 5
   },
   "medusa-shield": {
    "cat": "shield",
@@ -15517,7 +15518,7 @@
    "s": "shield",
    "sell": 528,
    "t": "shield",
-   "w": 58.0
+   "w": 58
   },
   "mercenary-sword": {
    "atk": 43,
@@ -15536,7 +15537,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 68.0
+   "w": 68
   },
   "merudri-battle-mail": {
    "arm": 10,
@@ -15573,7 +15574,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 29.0
+   "w": 29
   },
   "merudri-brooch": {
    "cat": "amulet",
@@ -15614,7 +15615,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 106.0
+   "w": 106
   },
   "merudri-scale-mail": {
    "arm": 7,
@@ -15636,7 +15637,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 29.0
+   "w": 29
   },
   "metal-bat": {
    "atk": 44,
@@ -15651,7 +15652,7 @@
    "s": "weapon",
    "sell": 1164,
    "t": "club",
-   "w": 51.0
+   "w": 51
   },
   "metal-spats": {
    "arm": 1,
@@ -15674,7 +15675,7 @@
     "knight",
     "paladin"
    ],
-   "w": 18.0
+   "w": 18
   },
   "midnight-sarong": {
    "arm": 8,
@@ -15695,7 +15696,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 31.0
+   "w": 31
   },
   "midnight-tunic": {
    "arm": 16,
@@ -15717,7 +15718,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "might-ring": {
    "cat": "ring",
@@ -15740,7 +15741,7 @@
    "sell": 640,
    "shop": 1,
    "t": "accessory",
-   "w": 1.0
+   "w": 1
   },
   "mighty-helm-of-green-sparks": {
    "arm": 6,
@@ -15752,7 +15753,7 @@
    "s": "helmet",
    "sell": 288,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "mining-helmet": {
    "af": 2,
@@ -15767,7 +15768,7 @@
    "s": "helmet",
    "sell": 48,
    "t": "armor",
-   "w": 7.0
+   "w": 7
   },
   "mino-lance": {
    "atk": 40,
@@ -15782,7 +15783,7 @@
    "s": "weapon",
    "sell": 1136,
    "t": "axe",
-   "w": 65.0
+   "w": 65
   },
   "mino-shield": {
    "cat": "shield",
@@ -15794,7 +15795,7 @@
    "s": "shield",
    "sell": 496,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "modified-crossbow": {
    "cat": "distance",
@@ -15814,7 +15815,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "molten-plate": {
    "arm": 13,
@@ -15835,7 +15836,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 75.0
+   "w": 75
   },
   "monk-robe": {
    "arm": 7,
@@ -15852,7 +15853,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 70.0
+   "w": 70
   },
   "mooh-tah-plate": {
    "arm": 12,
@@ -15870,7 +15871,7 @@
     "knight",
     "paladin"
    ],
-   "w": 125.0
+   "w": 125
   },
   "moohtant-cudgel": {
    "atk": 47,
@@ -15886,7 +15887,7 @@
    "sell": 1238,
    "t": "club",
    "th": 1,
-   "w": 85.0
+   "w": 85
   },
   "moonlight-rod": {
    "af": 2,
@@ -15912,7 +15913,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 21.0
+   "w": 21
   },
   "morning-star": {
    "atk": 25,
@@ -15927,7 +15928,7 @@
    "sell": 656,
    "shop": 1,
    "t": "club",
-   "w": 54.0
+   "w": 54
   },
   "mortal-mace": {
    "atk": 8,
@@ -15949,7 +15950,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 41.0
+   "w": 41
   },
   "muck-rod": {
    "cat": "wand",
@@ -15972,7 +15973,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 37.0
+   "w": 37
   },
   "musician-s-bow": {
    "cat": "distance",
@@ -16008,7 +16009,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 11.0
+   "w": 11
   },
   "mutant-bone-kilt": {
    "arm": 8,
@@ -16029,7 +16030,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "mutant-hide-trousers": {
    "arm": 6,
@@ -16053,7 +16054,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 33.0
+   "w": 33
   },
   "mutated-skin-armor": {
    "arm": 17,
@@ -16076,7 +16077,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 63.0
+   "w": 63
   },
   "mutated-skin-legs": {
    "arm": 9,
@@ -16098,7 +16099,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 52.0
+   "w": 52
   },
   "mycological-bow": {
    "atk": 4,
@@ -16119,7 +16120,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 49.0
+   "w": 49
   },
   "mycological-mace": {
    "atk": 50,
@@ -16136,7 +16137,7 @@
    "s": "weapon",
    "sell": 1456,
    "t": "club",
-   "w": 59.0
+   "w": 59
   },
   "mystic-blade": {
    "atk": 44,
@@ -16153,7 +16154,7 @@
    "s": "weapon",
    "sell": 1244,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "mystic-turban": {
    "arm": 1,
@@ -16196,7 +16197,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 38.0
+   "w": 38
   },
   "mythril-axe": {
    "atk": 48,
@@ -16212,7 +16213,7 @@
    "s": "weapon",
    "sell": 1369,
    "t": "axe",
-   "w": 55.0
+   "w": 55
   },
   "naga-axe": {
    "atk": 8,
@@ -16234,7 +16235,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 55.0
+   "w": 55
   },
   "naga-club": {
    "atk": 52,
@@ -16254,7 +16255,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 60.0
+   "w": 60
   },
   "naga-crossbow": {
    "atk": 8,
@@ -16279,7 +16280,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 102.0
+   "w": 102
   },
   "naga-katar": {
    "atk": 44,
@@ -16300,7 +16301,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 60.0
+   "w": 60
   },
   "naga-rod": {
    "cat": "wand",
@@ -16327,7 +16328,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 29.0
+   "w": 29
   },
   "naga-sword": {
    "atk": 8,
@@ -16349,7 +16350,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 52.0
+   "w": 52
   },
   "naga-tanko": {
    "arm": 10,
@@ -16381,7 +16382,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 90.0
+   "w": 90
   },
   "naga-wand": {
    "cat": "wand",
@@ -16408,7 +16409,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 28.0
+   "w": 28
   },
   "naginata": {
    "atk": 39,
@@ -16424,7 +16425,7 @@
    "sell": 1148,
    "t": "axe",
    "th": 1,
-   "w": 78.0
+   "w": 78
   },
   "native-armor": {
    "arm": 7,
@@ -16436,7 +16437,7 @@
    "s": "armor",
    "sell": 336,
    "t": "armor",
-   "w": 80.0
+   "w": 80
   },
   "necklace-of-the-deep": {
    "cat": "amulet",
@@ -16465,7 +16466,7 @@
    "s": "shield",
    "sell": 592,
    "t": "shield",
-   "w": 32.0
+   "w": 32
   },
   "necrotic-rod": {
    "cat": "wand",
@@ -16488,7 +16489,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 23.0
+   "w": 23
   },
   "nightmare-blade": {
    "atk": 46,
@@ -16505,7 +16506,7 @@
    "s": "weapon",
    "sell": 1251,
    "t": "sword",
-   "w": 46.0
+   "w": 46
   },
   "nightmare-shield": {
    "cat": "shield",
@@ -16517,7 +16518,7 @@
    "s": "shield",
    "sell": 592,
    "t": "shield",
-   "w": 32.0
+   "w": 32
   },
   "noble-armor": {
    "arm": 11,
@@ -16532,7 +16533,7 @@
    "sell": 528,
    "shop": 1,
    "t": "armor",
-   "w": 120.0
+   "w": 120
   },
   "noble-axe": {
    "atk": 39,
@@ -16548,7 +16549,7 @@
    "s": "weapon",
    "sell": 1100,
    "t": "axe",
-   "w": 38.0
+   "w": 38
   },
   "norcferatu-bloodhide": {
    "arm": 16,
@@ -16581,7 +16582,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 39.0
+   "w": 39
   },
   "norcferatu-bloodstrider": {
    "arm": 8,
@@ -16642,7 +16643,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 42.0
+   "w": 42
   },
   "norcferatu-bonehood": {
    "arm": 5,
@@ -16678,7 +16679,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 14.0
+   "w": 14
   },
   "norcferatu-fangstompers": {
    "arm": 2,
@@ -16807,7 +16808,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 32.0
+   "w": 32
   },
   "norcferatu-thornwraps": {
    "arm": 9,
@@ -16876,7 +16877,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 148.0
+   "w": 148
   },
   "norse-shield": {
    "cat": "shield",
@@ -16889,7 +16890,7 @@
    "s": "shield",
    "sell": 448,
    "t": "shield",
-   "w": 41.0
+   "w": 41
   },
   "northern-star": {
    "atk": 42,
@@ -16904,7 +16905,7 @@
    "s": "weapon",
    "sell": 1046,
    "t": "club",
-   "w": 42.0
+   "w": 42
   },
   "northwind-rod": {
    "cat": "wand",
@@ -16928,7 +16929,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 29.0
+   "w": 29
   },
   "note-about-two-souls": {
    "cat": "amulet",
@@ -16960,7 +16961,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 25.0
+   "w": 25
   },
   "nunchaku-of-destruction": {
    "af": 8,
@@ -16984,7 +16985,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 70.0
+   "w": 70
   },
   "nunchaku-of-enlightenment": {
    "atk": 34,
@@ -17013,7 +17014,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 29.0
+   "w": 29
   },
   "obsidian-lance": {
    "atk": 34,
@@ -17030,7 +17031,7 @@
    "shop": 1,
    "t": "axe",
    "th": 1,
-   "w": 80.0
+   "w": 80
   },
   "obsidian-truncheon": {
    "atk": 50,
@@ -17046,7 +17047,7 @@
    "s": "weapon",
    "sell": 1440,
    "t": "club",
-   "w": 65.0
+   "w": 65
   },
   "oceanborn-leviathan-armor": {
    "arm": 15,
@@ -17068,7 +17069,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 100.0
+   "w": 100
   },
   "odd-hat": {
    "af": 2,
@@ -17084,7 +17085,7 @@
    "s": "helmet",
    "sell": 240,
    "t": "armor",
-   "w": 7.0
+   "w": 7
   },
   "ogre-choppa": {
    "atk": 39,
@@ -17100,7 +17101,7 @@
    "sell": 1116,
    "t": "axe",
    "th": 1,
-   "w": 75.0
+   "w": 75
   },
   "ogre-klubba": {
    "atk": 45,
@@ -17116,7 +17117,7 @@
    "sell": 1264,
    "t": "club",
    "th": 1,
-   "w": 79.0
+   "w": 79
   },
   "ogre-scepta": {
    "cat": "wand",
@@ -17139,7 +17140,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 29.0
+   "w": 29
   },
   "old-cape": {
    "arm": 1,
@@ -17151,7 +17152,7 @@
    "s": "armor",
    "sell": 48,
    "t": "armor",
-   "w": 35.0
+   "w": 35
   },
   "one-hit-wonder": {
    "atk": 49,
@@ -17166,7 +17167,7 @@
    "sell": 1292,
    "t": "club",
    "th": 1,
-   "w": 96.0
+   "w": 96
   },
   "onyx-flail": {
    "atk": 45,
@@ -17182,7 +17183,7 @@
    "s": "weapon",
    "sell": 1152,
    "t": "club",
-   "w": 26.0
+   "w": 26
   },
   "onyx-pendant": {
    "arm": 2,
@@ -17213,7 +17214,7 @@
    "s": "weapon",
    "sell": 633,
    "t": "axe",
-   "w": 45.0
+   "w": 45
   },
   "orcish-maul": {
    "atk": 42,
@@ -17230,7 +17231,7 @@
    "sell": 1094,
    "t": "club",
    "th": 1,
-   "w": 54.0
+   "w": 54
   },
   "oriental-shoes": {
    "arm": 2,
@@ -17250,7 +17251,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 5.0
+   "w": 5
   },
   "ornamented-axe": {
    "atk": 42,
@@ -17290,7 +17291,7 @@
    "s": "shield",
    "sell": 352,
    "t": "shield",
-   "w": 67.0
+   "w": 67
   },
   "ornate-carving-axe": {
    "af": 8,
@@ -17307,7 +17308,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "ornate-carving-blade": {
    "af": 8,
@@ -17324,7 +17325,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "ornate-carving-chopper": {
    "af": 8,
@@ -17341,7 +17342,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "ornate-carving-hammer": {
    "af": 8,
@@ -17358,7 +17359,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "ornate-carving-mace": {
    "af": 8,
@@ -17375,7 +17376,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "ornate-carving-slayer": {
    "af": 8,
@@ -17392,7 +17393,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "ornate-chestplate": {
    "arm": 16,
@@ -17415,7 +17416,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 156.0
+   "w": 156
   },
   "ornate-crossbow": {
    "atk": 1,
@@ -17435,7 +17436,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 91.0
+   "w": 91
   },
   "ornate-legs": {
    "arm": 8,
@@ -17456,7 +17457,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 77.0
+   "w": 77
   },
   "ornate-mace": {
    "atk": 49,
@@ -17472,7 +17473,7 @@
    "s": "weapon",
    "sell": 1324,
    "t": "club",
-   "w": 149.0
+   "w": 149
   },
   "ornate-mayhem-axe": {
    "af": 8,
@@ -17489,7 +17490,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "ornate-mayhem-blade": {
    "af": 8,
@@ -17506,7 +17507,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "ornate-mayhem-chopper": {
    "af": 8,
@@ -17523,7 +17524,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "ornate-mayhem-hammer": {
    "af": 8,
@@ -17540,7 +17541,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "ornate-mayhem-mace": {
    "af": 8,
@@ -17557,7 +17558,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "ornate-mayhem-slayer": {
    "af": 8,
@@ -17574,7 +17575,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "ornate-remedy-axe": {
    "af": 8,
@@ -17591,7 +17592,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "ornate-remedy-blade": {
    "af": 8,
@@ -17608,7 +17609,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "ornate-remedy-chopper": {
    "af": 8,
@@ -17625,7 +17626,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "ornate-remedy-hammer": {
    "af": 8,
@@ -17642,7 +17643,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "ornate-remedy-mace": {
    "af": 8,
@@ -17659,7 +17660,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "ornate-remedy-slayer": {
    "af": 8,
@@ -17676,7 +17677,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "ornate-shield": {
    "cat": "shield",
@@ -17697,7 +17698,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 71.0
+   "w": 71
   },
   "pair-of-dreamwalkers": {
    "arm": 2,
@@ -17720,7 +17721,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 8.0
+   "w": 8
   },
   "pair-of-earmuffs": {
    "cat": "helmet",
@@ -17736,7 +17737,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "pair-of-iron-fists": {
    "atk": 23,
@@ -17756,7 +17757,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 45.0
+   "w": 45
   },
   "pair-of-monk-fists": {
    "atk": 22,
@@ -17777,7 +17778,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 12.0
+   "w": 12
   },
   "pair-of-nightmare-boots": {
    "arm": 2,
@@ -17800,7 +17801,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 13.0
+   "w": 13
   },
   "pair-of-old-bracers": {
    "arm": 1,
@@ -17812,7 +17813,7 @@
    "s": "armor",
    "sell": 48,
    "t": "armor",
-   "w": 2.0
+   "w": 2
   },
   "pair-of-soft-boots": {
    "cat": "boots",
@@ -17824,7 +17825,7 @@
    "s": "boots",
    "sell": 3024,
    "t": "armor",
-   "w": 8.0
+   "w": 8
   },
   "pair-of-soulstalkers": {
    "af": 8,
@@ -17850,7 +17851,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 13.0
+   "w": 13
   },
   "pair-of-soulwalkers": {
    "af": 8,
@@ -17879,7 +17880,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 13.0
+   "w": 13
   },
   "paladin-armor": {
    "arm": 12,
@@ -17897,7 +17898,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 65.0
+   "w": 65
   },
   "party-hat": {
    "arm": 1,
@@ -17924,7 +17925,7 @@
    "s": "boots",
    "sell": 96,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "paw-amulet": {
    "cat": "amulet",
@@ -17973,7 +17974,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "pharaoh-sword": {
    "atk": 41,
@@ -17989,7 +17990,7 @@
    "s": "weapon",
    "sell": 1155,
    "t": "sword",
-   "w": 52.0
+   "w": 52
   },
   "phoenix-shield": {
    "cat": "shield",
@@ -18002,7 +18003,7 @@
    "s": "shield",
    "sell": 544,
    "t": "shield",
-   "w": 35.0
+   "w": 35
   },
   "pirate-boots": {
    "arm": 2,
@@ -18016,7 +18017,7 @@
    "s": "boots",
    "sell": 96,
    "t": "armor",
-   "w": 8.0
+   "w": 8
   },
   "pirate-hat": {
    "arm": 3,
@@ -18042,7 +18043,7 @@
    "s": "legs",
    "sell": 48,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "pirate-shirt": {
    "arm": 3,
@@ -18055,7 +18056,7 @@
    "s": "armor",
    "sell": 144,
    "t": "armor",
-   "w": 20.0
+   "w": 20
   },
   "plague-bite": {
    "atk": 26,
@@ -18072,7 +18073,7 @@
    "s": "weapon",
    "sell": 1494,
    "t": "axe",
-   "w": 99.0
+   "w": 99
   },
   "plain-carving-axe": {
    "atk": 5,
@@ -18086,7 +18087,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "plain-carving-blade": {
    "atk": 5,
@@ -18100,7 +18101,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "plain-carving-chopper": {
    "atk": 5,
@@ -18114,7 +18115,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "plain-carving-hammer": {
    "atk": 5,
@@ -18128,7 +18129,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "plain-carving-mace": {
    "atk": 5,
@@ -18142,7 +18143,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "plain-carving-slayer": {
    "atk": 5,
@@ -18156,7 +18157,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "plain-mayhem-axe": {
    "atk": 5,
@@ -18170,7 +18171,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "plain-mayhem-blade": {
    "atk": 5,
@@ -18184,7 +18185,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "plain-mayhem-chopper": {
    "atk": 5,
@@ -18198,7 +18199,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "plain-mayhem-hammer": {
    "atk": 5,
@@ -18212,7 +18213,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "plain-mayhem-mace": {
    "atk": 5,
@@ -18226,7 +18227,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "plain-mayhem-slayer": {
    "atk": 5,
@@ -18240,7 +18241,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "plain-monk-robe": {
    "arm": 6,
@@ -18259,7 +18260,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 65.0
+   "w": 65
   },
   "plain-remedy-axe": {
    "atk": 5,
@@ -18273,7 +18274,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "plain-remedy-blade": {
    "atk": 5,
@@ -18287,7 +18288,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "plain-remedy-chopper": {
    "atk": 5,
@@ -18301,7 +18302,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "plain-remedy-hammer": {
    "atk": 5,
@@ -18315,7 +18316,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "plain-remedy-mace": {
    "atk": 5,
@@ -18329,7 +18330,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "plain-remedy-slayer": {
    "atk": 5,
@@ -18343,7 +18344,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "plate-armor": {
    "arm": 10,
@@ -18357,7 +18358,7 @@
    "sell": 480,
    "shop": 1,
    "t": "armor",
-   "w": 120.0
+   "w": 120
   },
   "plate-legs": {
    "arm": 7,
@@ -18370,7 +18371,7 @@
    "s": "legs",
    "sell": 336,
    "t": "armor",
-   "w": 50.0
+   "w": 50
   },
   "plate-shield": {
    "cat": "shield",
@@ -18383,7 +18384,7 @@
    "sell": 272,
    "shop": 1,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "platinum-amulet": {
    "arm": 2,
@@ -18395,7 +18396,7 @@
    "s": "amulet",
    "sell": 96,
    "t": "accessory",
-   "w": 6.0
+   "w": 6
   },
   "poet-s-fencing-quill": {
    "atk": 10,
@@ -18408,7 +18409,7 @@
    "s": "weapon",
    "sell": 320,
    "t": "sword",
-   "w": 2.0
+   "w": 2
   },
   "pointed-rabbitslayer": {
    "atk": 16,
@@ -18466,7 +18467,7 @@
    "s": "helmet",
    "sell": 48,
    "t": "armor",
-   "w": 7.0
+   "w": 7
   },
   "power-ring": {
    "cat": "ring",
@@ -18501,7 +18502,7 @@
     "knight",
     "paladin"
    ],
-   "w": 79.0
+   "w": 79
   },
   "prismatic-boots": {
    "arm": 3,
@@ -18523,7 +18524,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 18.0
+   "w": 18
   },
   "prismatic-helmet": {
    "arm": 9,
@@ -18544,7 +18545,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 56.0
+   "w": 56
   },
   "prismatic-legs": {
    "arm": 8,
@@ -18565,7 +18566,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 71.0
+   "w": 71
   },
   "prismatic-necklace": {
    "cat": "amulet",
@@ -18618,7 +18619,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "protection-amulet": {
    "cat": "amulet",
@@ -18654,7 +18655,7 @@
    "s": "weapon",
    "sell": 1129,
    "t": "club",
-   "w": 23.0
+   "w": 23
   },
   "ragnir-helmet": {
    "arm": 6,
@@ -18667,7 +18668,7 @@
    "s": "helmet",
    "sell": 288,
    "t": "armor",
-   "w": 31.0
+   "w": 31
   },
   "rain-coat": {
    "arm": 1,
@@ -18678,7 +18679,7 @@
    "s": "armor",
    "sell": 48,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "rainbow-amulet": {
    "arm": 3,
@@ -18732,7 +18733,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "ranger-legs": {
    "arm": 4,
@@ -18748,7 +18749,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "ranger-s-cloak": {
    "arm": 7,
@@ -18765,7 +18766,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 48.0
+   "w": 48
   },
   "rapier": {
    "atk": 10,
@@ -18781,7 +18782,7 @@
    "sell": 320,
    "shop": 1,
    "t": "sword",
-   "w": 15.0
+   "w": 15
   },
   "ratana": {
    "atk": 27,
@@ -18797,7 +18798,7 @@
    "s": "weapon",
    "sell": 822,
    "t": "sword",
-   "w": 33.0
+   "w": 33
   },
   "ravager-s-axe": {
    "atk": 49,
@@ -18828,7 +18829,7 @@
    "s": "weapon",
    "sell": 1216,
    "t": "axe",
-   "w": 55.0
+   "w": 55
   },
   "reaper-s-axe": {
    "atk": 46,
@@ -18843,7 +18844,7 @@
    "s": "weapon",
    "sell": 1283,
    "t": "axe",
-   "w": 59.0
+   "w": 59
   },
   "red-robe": {
    "arm": 1,
@@ -18855,7 +18856,7 @@
    "s": "armor",
    "sell": 48,
    "t": "armor",
-   "w": 26.0
+   "w": 26
   },
   "red-tunic": {
    "arm": 2,
@@ -18866,7 +18867,7 @@
    "s": "armor",
    "sell": 96,
    "t": "armor",
-   "w": 14.0
+   "w": 14
   },
   "reflecting-crown": {
    "cat": "helmet",
@@ -18876,7 +18877,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "relic-sword": {
    "atk": 42,
@@ -18893,7 +18894,7 @@
    "s": "weapon",
    "sell": 1190,
    "t": "sword",
-   "w": 48.0
+   "w": 48
   },
   "rending-inferniarch-arbalest": {
    "atk": 8,
@@ -18918,7 +18919,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 59.0
+   "w": 59
   },
   "rending-inferniarch-battleaxe": {
    "atk": 8,
@@ -18940,7 +18941,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 67.0
+   "w": 67
   },
   "rending-inferniarch-blade": {
    "atk": 8,
@@ -18962,7 +18963,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "rending-inferniarch-bow": {
    "atk": 7,
@@ -18987,7 +18988,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 56.0
+   "w": 56
   },
   "rending-inferniarch-claws": {
    "atk": 45,
@@ -19007,7 +19008,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 84.0
+   "w": 84
   },
   "rending-inferniarch-flail": {
    "atk": 8,
@@ -19029,7 +19030,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "rending-inferniarch-greataxe": {
    "atk": 8,
@@ -19052,7 +19053,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "rending-inferniarch-rod": {
    "cat": "wand",
@@ -19079,7 +19080,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 22.0
+   "w": 22
   },
   "rending-inferniarch-slayer": {
    "atk": 8,
@@ -19102,7 +19103,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "rending-inferniarch-wand": {
    "cat": "wand",
@@ -19129,7 +19130,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 24.0
+   "w": 24
   },
   "rending-inferniarch-warhammer": {
    "atk": 8,
@@ -19152,7 +19153,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "resizer": {
    "atk": 11,
@@ -19174,7 +19175,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 89.0
+   "w": 89
   },
   "rift-bow": {
    "atk": 5,
@@ -19195,7 +19196,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 41.0
+   "w": 41
   },
   "rift-crossbow": {
    "atk": 5,
@@ -19216,7 +19217,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 130.0
+   "w": 130
   },
   "rift-lance": {
    "atk": 48,
@@ -19233,7 +19234,7 @@
    "sell": 1369,
    "t": "axe",
    "th": 1,
-   "w": 66.0
+   "w": 66
   },
   "rift-shield": {
    "cat": "shield",
@@ -19246,7 +19247,7 @@
    "s": "shield",
    "sell": 592,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "ring-of-blue-plasma": {
    "cat": "ring",
@@ -19407,7 +19408,7 @@
    "sell": 649,
    "t": "axe",
    "th": 1,
-   "w": 80.0
+   "w": 80
   },
   "robe-of-enlightenment": {
    "arm": 8,
@@ -19440,7 +19441,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 24.0
+   "w": 24
   },
   "robe-of-the-ice-queen": {
    "arm": 12,
@@ -19482,7 +19483,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 31.0
+   "w": 31
   },
   "rod-of-destruction": {
    "af": 8,
@@ -19509,7 +19510,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "ron-the-ripper-s-sabre": {
    "atk": 12,
@@ -19522,7 +19523,7 @@
    "s": "weapon",
    "sell": 390,
    "t": "sword",
-   "w": 25.0
+   "w": 25
   },
   "rose-shield": {
    "cat": "shield",
@@ -19534,7 +19535,7 @@
    "s": "shield",
    "sell": 432,
    "t": "shield",
-   "w": 52.0
+   "w": 52
   },
   "rotten-demonbone": {
    "arm": 1,
@@ -19555,7 +19556,7 @@
    "s": "weapon",
    "sell": 1571,
    "t": "club",
-   "w": 180.0
+   "w": 180
   },
   "royal-axe": {
    "atk": 47,
@@ -19572,7 +19573,7 @@
    "s": "weapon",
    "sell": 1302,
    "t": "axe",
-   "w": 92.0
+   "w": 92
   },
   "royal-crossbow": {
    "atk": 5,
@@ -19592,7 +19593,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 120.0
+   "w": 120
   },
   "royal-draken-mail": {
    "arm": 16,
@@ -19613,7 +19614,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 130.0
+   "w": 130
   },
   "royal-helmet": {
    "arm": 9,
@@ -19627,7 +19628,7 @@
    "s": "helmet",
    "sell": 432,
    "t": "armor",
-   "w": 48.0
+   "w": 48
   },
   "royal-scale-robe": {
    "arm": 12,
@@ -19649,7 +19650,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 45.0
+   "w": 45
   },
   "royal-spear": {
    "atk": 35,
@@ -19663,7 +19664,7 @@
    "sell": 672,
    "shop": 1,
    "t": "distance",
-   "w": 25.0
+   "w": 25
   },
   "rubber-cap": {
    "arm": 5,
@@ -19687,7 +19688,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 8.0
+   "w": 8
   },
   "rubbish-amulet": {
    "cat": "amulet",
@@ -19726,7 +19727,7 @@
    "s": "weapon",
    "sell": 1376,
    "t": "sword",
-   "w": 46.0
+   "w": 46
   },
   "runic-ice-shield": {
    "cat": "shield",
@@ -19738,7 +19739,7 @@
    "s": "shield",
    "sell": 496,
    "t": "shield",
-   "w": 49.0
+   "w": 49
   },
   "rusted-shield": {
    "cat": "shield",
@@ -19749,7 +19750,7 @@
    "s": "shield",
    "sell": 16,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "rusty-winged-helmet": {
    "arm": 2,
@@ -19761,7 +19762,7 @@
    "s": "helmet",
    "sell": 96,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "ruthless-axe": {
    "atk": 50,
@@ -19781,7 +19782,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 58.0
+   "w": 58
   },
   "sabre": {
    "atk": 12,
@@ -19797,7 +19798,7 @@
    "sell": 390,
    "shop": 1,
    "t": "sword",
-   "w": 25.0
+   "w": 25
   },
   "sacred-tree-amulet": {
    "cat": "amulet",
@@ -19815,7 +19816,7 @@
    "s": "amulet",
    "sell": 1920,
    "t": "accessory",
-   "w": 7.0
+   "w": 7
   },
   "sai-of-enlightenment": {
    "atk": 42,
@@ -19844,7 +19845,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 59.0
+   "w": 59
   },
   "sais": {
    "atk": 38,
@@ -19865,7 +19866,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 49.0
+   "w": 49
   },
   "salamander-shield": {
    "cat": "shield",
@@ -19877,7 +19878,7 @@
    "s": "shield",
    "sell": 416,
    "t": "shield",
-   "w": 59.0
+   "w": 59
   },
   "sandals": {
    "cat": "boots",
@@ -19890,7 +19891,7 @@
    "sell": 2,
    "shop": 1,
    "t": "armor",
-   "w": 6.0
+   "w": 6
   },
   "sanguine-battleaxe": {
    "af": 8,
@@ -19922,7 +19923,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "sanguine-blade": {
    "af": 8,
@@ -19945,9 +19946,9 @@
    "extraDef": 3,
    "id": 43864,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "sanguine blade",
    "s": "weapon",
    "sell": 1548,
@@ -19956,7 +19957,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 61.0
+   "w": 61
   },
   "sanguine-bludgeon": {
    "af": 8,
@@ -19988,7 +19989,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 93.0
+   "w": 93
   },
   "sanguine-boots": {
    "af": 8,
@@ -20032,7 +20033,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 19.0
+   "w": 19
   },
   "sanguine-bow": {
    "af": 8,
@@ -20067,7 +20068,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "sanguine-claws": {
    "af": 8,
@@ -20098,7 +20099,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 71.0
+   "w": 71
   },
   "sanguine-coil": {
    "af": 8,
@@ -20124,11 +20125,11 @@
    "el": "fire",
    "id": 43882,
    "imbSlots": 2,
-   "lifeLeech": 2.0,
+   "lifeLeech": 2,
    "lvl": 600,
    "mag": 5,
    "manaCost": 21,
-   "manaLeech": 1.0,
+   "manaLeech": 1,
    "mdmg": 119,
    "n": "sanguine coil",
    "prot": 0,
@@ -20142,7 +20143,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 22.0
+   "w": 22
   },
   "sanguine-crossbow": {
    "af": 8,
@@ -20177,7 +20178,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "sanguine-cudgel": {
    "af": 8,
@@ -20201,9 +20202,9 @@
    "extraDef": 3,
    "id": 43866,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "sanguine cudgel",
    "s": "weapon",
    "sell": 1548,
@@ -20211,7 +20212,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "sanguine-galoshes": {
    "af": 8,
@@ -20255,7 +20256,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 17.0
+   "w": 17
   },
   "sanguine-greaves": {
    "af": 8,
@@ -20292,7 +20293,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 32.0
+   "w": 32
   },
   "sanguine-hatchet": {
    "af": 8,
@@ -20316,9 +20317,9 @@
    "extraDef": 3,
    "id": 43868,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "sanguine hatchet",
    "s": "weapon",
    "sell": 1548,
@@ -20326,7 +20327,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "sanguine-legs": {
    "af": 8,
@@ -20365,7 +20366,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 38.0
+   "w": 38
   },
   "sanguine-razor": {
    "af": 8,
@@ -20397,7 +20398,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 81.0
+   "w": 81
   },
   "sanguine-rod": {
    "af": 8,
@@ -20423,11 +20424,11 @@
    "el": "earth",
    "id": 43885,
    "imbSlots": 2,
-   "lifeLeech": 6.0,
+   "lifeLeech": 6,
    "lvl": 600,
    "mag": 5,
    "manaCost": 20,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "mdmg": 112,
    "n": "sanguine rod",
    "prot": 0,
@@ -20441,7 +20442,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "sanguine-trousers": {
    "af": 8,
@@ -20480,7 +20481,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 35.0
+   "w": 35
   },
   "santa-hat": {
    "arm": 1,
@@ -20519,7 +20520,7 @@
    "s": "weapon",
    "sell": 998,
    "t": "club",
-   "w": 21.0
+   "w": 21
   },
   "scale-armor": {
    "arm": 9,
@@ -20533,7 +20534,7 @@
    "sell": 432,
    "shop": 1,
    "t": "armor",
-   "w": 105.0
+   "w": 105
   },
   "scarab-amulet": {
    "cat": "amulet",
@@ -20556,7 +20557,7 @@
    "s": "shield",
    "sell": 400,
    "t": "shield",
-   "w": 47.0
+   "w": 47
   },
   "scarf": {
    "arm": 1,
@@ -20568,7 +20569,7 @@
    "sell": 48,
    "shop": 1,
    "t": "accessory",
-   "w": 2.0
+   "w": 2
   },
   "schnitzel-meat-grinder": {
    "atk": 10,
@@ -20594,7 +20595,7 @@
    "s": "weapon",
    "sell": 572,
    "t": "sword",
-   "w": 29.0
+   "w": 29
   },
   "scorcher": {
    "cat": "wand",
@@ -20616,7 +20617,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 15.0
+   "w": 15
   },
   "scythe": {
    "atk": 8,
@@ -20632,7 +20633,7 @@
    "shop": 1,
    "t": "club",
    "th": 1,
-   "w": 30.0
+   "w": 30
   },
   "scythe-of-the-reaper": {
    "atk": 16,
@@ -20646,7 +20647,7 @@
    "sell": 403,
    "t": "axe",
    "th": 1,
-   "w": 30.0
+   "w": 30
   },
   "secret-instruction": {
    "cat": "helmet",
@@ -20668,7 +20669,7 @@
    "s": "helmet",
    "sell": 96,
    "t": "armor",
-   "w": 18.0
+   "w": 18
   },
   "sentinel-shield": {
    "cat": "shield",
@@ -20681,7 +20682,7 @@
    "s": "shield",
    "sell": 352,
    "t": "shield",
-   "w": 49.0
+   "w": 49
   },
   "serpent-sword": {
    "atk": 18,
@@ -20699,7 +20700,7 @@
    "sell": 739,
    "shop": 1,
    "t": "sword",
-   "w": 41.0
+   "w": 41
   },
   "shadow-sceptre": {
    "atk": 39,
@@ -20715,7 +20716,7 @@
    "s": "weapon",
    "sell": 1020,
    "t": "club",
-   "w": 41.0
+   "w": 41
   },
   "shamanic-mask": {
    "arm": 4,
@@ -20729,7 +20730,7 @@
    "s": "helmet",
    "sell": 192,
    "t": "armor",
-   "w": 31.0
+   "w": 31
   },
   "shapeshifter-ring": {
    "cat": "ring",
@@ -20750,7 +20751,7 @@
    "s": "shield",
    "sell": 400,
    "t": "shield",
-   "w": 52.0
+   "w": 52
   },
   "shield-of-care": {
    "cat": "shield",
@@ -20762,7 +20763,7 @@
    "s": "shield",
    "sell": 128,
    "t": "shield",
-   "w": 17.0
+   "w": 17
   },
   "shield-of-corruption": {
    "cat": "shield",
@@ -20779,7 +20780,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 49.0
+   "w": 49
   },
   "shield-of-honour": {
    "cat": "shield",
@@ -20791,7 +20792,7 @@
    "s": "shield",
    "sell": 528,
    "t": "shield",
-   "w": 54.0
+   "w": 54
   },
   "shield-of-the-white-knight": {
    "cat": "shield",
@@ -20803,7 +20804,7 @@
    "s": "shield",
    "sell": 128,
    "t": "shield",
-   "w": 5.0
+   "w": 5
   },
   "shimmer-bow": {
    "atk": 1,
@@ -20821,7 +20822,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 48.0
+   "w": 48
   },
   "shimmer-rod": {
    "cat": "wand",
@@ -20841,7 +20842,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 31.0
+   "w": 31
   },
   "shimmer-sword": {
    "atk": 42,
@@ -20854,7 +20855,7 @@
    "s": "weapon",
    "sell": 1126,
    "t": "sword",
-   "w": 52.0
+   "w": 52
   },
   "shimmer-wand": {
    "cat": "wand",
@@ -20874,7 +20875,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 31.0
+   "w": 31
   },
   "shiny-blade": {
    "atk": 49,
@@ -20891,7 +20892,7 @@
    "sell": 1500,
    "sword": 1,
    "t": "sword",
-   "w": 45.0
+   "w": 45
   },
   "shockwave-amulet": {
    "af": 4,
@@ -20912,7 +20913,7 @@
    "s": "amulet",
    "sell": 1920,
    "t": "accessory",
-   "w": 7.0
+   "w": 7
   },
   "short-sword": {
    "atk": 11,
@@ -20927,7 +20928,7 @@
    "sell": 387,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "shoulder-plate": {
    "cat": "shield",
@@ -20950,7 +20951,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "shroud-of-despair": {
    "arm": 7,
@@ -20967,7 +20968,7 @@
    "s": "helmet",
    "sell": 336,
    "t": "armor",
-   "w": 34.0
+   "w": 34
   },
   "shrunken-head-necklace": {
    "cat": "amulet",
@@ -21014,7 +21015,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 25.0
+   "w": 25
   },
   "silver-amulet": {
    "cat": "amulet",
@@ -21031,7 +21032,7 @@
    "sell": 2,
    "shop": 1,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "silver-chimes": {
    "cat": "shield",
@@ -21072,7 +21073,7 @@
    "s": "weapon",
    "sell": 1267,
    "t": "club",
-   "w": 67.0
+   "w": 67
   },
   "silver-mask": {
    "cat": "helmet",
@@ -21082,7 +21083,7 @@
    "s": "helmet",
    "sell": 2,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "silver-medal": {
    "cat": "amulet",
@@ -21113,7 +21114,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "simple-jo-staff": {
    "atk": 10,
@@ -21133,7 +21134,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 17.0
+   "w": 17
   },
   "siphoning-inferniarch-arbalest": {
    "atk": 8,
@@ -21145,7 +21146,7 @@
    "id": 49863,
    "imbSlots": 3,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch arbalest",
    "prot": 0,
    "range": 6,
@@ -21159,7 +21160,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 59.0
+   "w": 59
   },
   "siphoning-inferniarch-battleaxe": {
    "atk": 8,
@@ -21174,7 +21175,7 @@
    "id": 49866,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch battleaxe",
    "s": "weapon",
    "sell": 1494,
@@ -21182,7 +21183,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 67.0
+   "w": 67
   },
   "siphoning-inferniarch-blade": {
    "atk": 8,
@@ -21196,7 +21197,7 @@
    "id": 49878,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch blade",
    "s": "weapon",
    "sell": 1494,
@@ -21205,7 +21206,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "siphoning-inferniarch-bow": {
    "atk": 7,
@@ -21217,7 +21218,7 @@
    "id": 49860,
    "imbSlots": 2,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch bow",
    "prot": 0,
    "range": 6,
@@ -21231,7 +21232,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 56.0
+   "w": 56
   },
   "siphoning-inferniarch-claws": {
    "atk": 45,
@@ -21244,7 +21245,7 @@
    "id": 50253,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch claws",
    "s": "weapon",
    "sell": 1200,
@@ -21252,7 +21253,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 84.0
+   "w": 84
   },
   "siphoning-inferniarch-flail": {
    "atk": 8,
@@ -21267,7 +21268,7 @@
    "id": 49872,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch flail",
    "s": "weapon",
    "sell": 1494,
@@ -21275,7 +21276,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 65.0
+   "w": 65
   },
   "siphoning-inferniarch-greataxe": {
    "atk": 8,
@@ -21290,7 +21291,7 @@
    "id": 49869,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch greataxe",
    "s": "weapon",
    "sell": 1603,
@@ -21299,7 +21300,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "siphoning-inferniarch-rod": {
    "cat": "wand",
@@ -21313,7 +21314,7 @@
    "lvl": 300,
    "mag": 3,
    "manaCost": 20,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "mdmg": 100,
    "n": "siphoning inferniarch rod",
    "prot": 0,
@@ -21327,7 +21328,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 22.0
+   "w": 22
   },
   "siphoning-inferniarch-slayer": {
    "atk": 8,
@@ -21341,7 +21342,7 @@
    "id": 49881,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch slayer",
    "s": "weapon",
    "sell": 1603,
@@ -21351,7 +21352,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "siphoning-inferniarch-wand": {
    "cat": "wand",
@@ -21365,7 +21366,7 @@
    "lvl": 300,
    "mag": 3,
    "manaCost": 21,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "mdmg": 105,
    "n": "siphoning inferniarch wand",
    "prot": 0,
@@ -21379,7 +21380,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 24.0
+   "w": 24
   },
   "siphoning-inferniarch-warhammer": {
    "atk": 8,
@@ -21394,7 +21395,7 @@
    "id": 49875,
    "imbSlots": 1,
    "lvl": 300,
-   "manaLeech": 10.0,
+   "manaLeech": 10,
    "n": "siphoning inferniarch warhammer",
    "s": "weapon",
    "sell": 1603,
@@ -21403,7 +21404,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 86.0
+   "w": 86
   },
   "skull-helmet": {
    "arm": 9,
@@ -21417,7 +21418,7 @@
    "s": "helmet",
    "sell": 432,
    "t": "armor",
-   "w": 42.0
+   "w": 42
   },
   "skull-staff": {
    "af": 2,
@@ -21437,7 +21438,7 @@
    "s": "weapon",
    "sell": 883,
    "t": "club",
-   "w": 17.0
+   "w": 17
   },
   "skullcracker-armor": {
    "arm": 14,
@@ -21459,7 +21460,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 110.0
+   "w": 110
   },
   "skullcrusher": {
    "atk": 51,
@@ -21478,7 +21479,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "slayer-of-destruction": {
    "af": 8,
@@ -21501,7 +21502,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "sleep-shawl": {
    "cat": "amulet",
@@ -21526,7 +21527,7 @@
    "s": "shield",
    "sell": 16,
    "t": "shield",
-   "w": 65.0
+   "w": 65
   },
   "small-stone": {
    "atk": 5,
@@ -21554,7 +21555,7 @@
    "s": "weapon",
    "sell": 1385,
    "t": "club",
-   "w": 120.0
+   "w": 120
   },
   "snake-god-s-wristguard": {
    "cat": "shield",
@@ -21571,7 +21572,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 28.0
+   "w": 28
   },
   "snakebite-rod": {
    "af": 2,
@@ -21597,7 +21598,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "snowball": {
    "cat": "distance",
@@ -21624,7 +21625,7 @@
    "s": "weapon",
    "sell": 1462,
    "t": "axe",
-   "w": 110.0
+   "w": 110
   },
   "soldier-helmet": {
    "arm": 5,
@@ -21638,7 +21639,7 @@
    "sell": 240,
    "shop": 1,
    "t": "armor",
-   "w": 32.0
+   "w": 32
   },
   "sorcerer-and-druid-staff": {
    "af": 7,
@@ -21658,7 +21659,7 @@
    "s": "weapon",
    "sell": 166,
    "t": "magic",
-   "w": 19.0
+   "w": 19
   },
   "soulbastion": {
    "af": 8,
@@ -21682,7 +21683,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 58.0
+   "w": 58
   },
   "soulbiter": {
    "af": 8,
@@ -21699,9 +21700,9 @@
    "extraDef": 3,
    "id": 34084,
    "imbSlots": 2,
-   "lifeLeech": 5.0,
+   "lifeLeech": 5,
    "lvl": 400,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "soulbiter",
    "s": "weapon",
    "sell": 1510,
@@ -21709,7 +21710,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 40.0
+   "w": 40
   },
   "soulbleeder": {
    "af": 8,
@@ -21737,7 +21738,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 47.0
+   "w": 47
   },
   "soulcrusher": {
    "af": 8,
@@ -21754,9 +21755,9 @@
    "extraDef": 3,
    "id": 34086,
    "imbSlots": 2,
-   "lifeLeech": 5.0,
+   "lifeLeech": 5,
    "lvl": 400,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "soulcrusher",
    "s": "weapon",
    "sell": 1526,
@@ -21764,7 +21765,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 41.0
+   "w": 41
   },
   "soulcutter": {
    "af": 8,
@@ -21780,9 +21781,9 @@
    "extraDef": 3,
    "id": 34082,
    "imbSlots": 2,
-   "lifeLeech": 5.0,
+   "lifeLeech": 5,
    "lvl": 400,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "n": "soulcutter",
    "s": "weapon",
    "sell": 1510,
@@ -21791,7 +21792,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 63.0
+   "w": 63
   },
   "souleater": {
    "af": 8,
@@ -21816,7 +21817,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 72.0
+   "w": 72
   },
   "soulful-legs": {
    "arm": 8,
@@ -21838,7 +21839,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 38.0
+   "w": 38
   },
   "soulgarb": {
    "af": 8,
@@ -21866,7 +21867,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 107.0
+   "w": 107
   },
   "soulhexer": {
    "af": 8,
@@ -21880,11 +21881,11 @@
    "el": "ice",
    "id": 34091,
    "imbSlots": 2,
-   "lifeLeech": 5.0,
+   "lifeLeech": 5,
    "lvl": 400,
    "mag": 5,
    "manaCost": 21,
-   "manaLeech": 3.0,
+   "manaLeech": 3,
    "mdmg": 108,
    "n": "soulhexer",
    "prot": 0,
@@ -21898,7 +21899,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "soulkamas": {
    "af": 8,
@@ -21922,7 +21923,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 84.0
+   "w": 84
   },
   "soulmaimer": {
    "af": 8,
@@ -21947,7 +21948,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 89.0
+   "w": 89
   },
   "soulmantle": {
    "af": 8,
@@ -21972,7 +21973,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 24.0
+   "w": 24
   },
   "soulpiercer": {
    "af": 8,
@@ -22000,7 +22001,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 40.0
+   "w": 40
   },
   "soulshanks": {
    "af": 8,
@@ -22024,7 +22025,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 38.0
+   "w": 38
   },
   "soulshell": {
    "af": 8,
@@ -22050,7 +22051,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 123.0
+   "w": 123
   },
   "soulshredder": {
    "af": 8,
@@ -22075,7 +22076,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 81.0
+   "w": 81
   },
   "soulshroud": {
    "af": 8,
@@ -22100,7 +22101,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 24.0
+   "w": 24
   },
   "soulsoles": {
    "af": 6,
@@ -22126,7 +22127,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 13.0
+   "w": 13
   },
   "soulstrider": {
    "af": 8,
@@ -22150,7 +22151,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 38.0
+   "w": 38
   },
   "soultainter": {
    "af": 8,
@@ -22180,7 +22181,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 19.0
+   "w": 19
   },
   "sparking-rainbow-shield": {
    "cat": "shield",
@@ -22196,7 +22197,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "spear": {
    "atk": 25,
@@ -22210,7 +22211,7 @@
    "sell": 480,
    "shop": 1,
    "t": "distance",
-   "w": 20.0
+   "w": 20
   },
   "spectral-dress": {
    "cat": "armor",
@@ -22221,7 +22222,7 @@
    "sell": 2,
    "shop": 1,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "spellbook": {
    "cat": "spellbook",
@@ -22239,7 +22240,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 18.0
+   "w": 18
   },
   "spellbook-of-ancient-arcana": {
    "af": 5,
@@ -22263,7 +22264,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "spellbook-of-dark-mysteries": {
    "cat": "spellbook",
@@ -22352,7 +22353,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 14.0
+   "w": 14
   },
   "spellbook-of-vigilance": {
    "cat": "spellbook",
@@ -22374,7 +22375,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "spellbook-of-warding": {
    "cat": "spellbook",
@@ -22393,7 +22394,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 21.0
+   "w": 21
   },
   "spellscroll-of-prophecies": {
    "cat": "spellbook",
@@ -22456,7 +22457,7 @@
    "s": "shield",
    "sell": 448,
    "t": "shield",
-   "w": 59.0
+   "w": 59
   },
   "spike-sword": {
    "atk": 24,
@@ -22473,7 +22474,7 @@
    "sell": 796,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "spiked-squelcher": {
    "atk": 41,
@@ -22493,7 +22494,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 68.0
+   "w": 68
   },
   "spiky-club": {
    "atk": 31,
@@ -22508,7 +22509,7 @@
    "s": "weapon",
    "sell": 819,
    "t": "club",
-   "w": 39.0
+   "w": 39
   },
   "spirit-cloak": {
    "arm": 8,
@@ -22549,7 +22550,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 18.0
+   "w": 18
   },
   "spiritthorn-armor": {
    "af": 5,
@@ -22576,7 +22577,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 160.0
+   "w": 160
   },
   "spiritthorn-helmet": {
    "af": 5,
@@ -22604,7 +22605,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 44.0
+   "w": 44
   },
   "spiritthorn-ring": {
    "af": 5,
@@ -22662,7 +22663,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 27.0
+   "w": 27
   },
   "staff": {
    "atk": 10,
@@ -22678,7 +22679,7 @@
    "shop": 1,
    "t": "club",
    "th": 1,
-   "w": 38.0
+   "w": 38
   },
   "stale-bread-of-ancientness": {
    "atk": 18,
@@ -22691,7 +22692,7 @@
    "s": "weapon",
    "sell": 473,
    "t": "club",
-   "w": 5.0
+   "w": 5
   },
   "star-amulet": {
    "cat": "amulet",
@@ -22724,7 +22725,7 @@
    "sell": 2,
    "shop": 1,
    "t": "accessory",
-   "w": 1.0
+   "w": 1
   },
   "steel-axe": {
    "atk": 21,
@@ -22738,7 +22739,7 @@
    "sell": 563,
    "shop": 1,
    "t": "axe",
-   "w": 41.0
+   "w": 41
   },
   "steel-boots": {
    "arm": 3,
@@ -22752,7 +22753,7 @@
    "s": "boots",
    "sell": 144,
    "t": "armor",
-   "w": 29.0
+   "w": 29
   },
   "steel-helmet": {
    "arm": 6,
@@ -22766,7 +22767,7 @@
    "sell": 288,
    "shop": 1,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "steel-shield": {
    "cat": "shield",
@@ -22780,7 +22781,7 @@
    "sell": 336,
    "shop": 1,
    "t": "shield",
-   "w": 69.0
+   "w": 69
   },
   "stitched-mutant-hide-legs": {
    "arm": 9,
@@ -22804,7 +22805,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 34.0
+   "w": 34
   },
   "stoic-iks-boots": {
    "arm": 2,
@@ -22830,7 +22831,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 15.0
+   "w": 15
   },
   "stoic-iks-casque": {
    "arm": 8,
@@ -22860,7 +22861,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "stoic-iks-chestplate": {
    "arm": 16,
@@ -22889,7 +22890,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 142.0
+   "w": 142
   },
   "stoic-iks-cuirass": {
    "arm": 15,
@@ -22918,7 +22919,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 44.0
+   "w": 44
   },
   "stoic-iks-culet": {
    "arm": 9,
@@ -22949,7 +22950,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 51.0
+   "w": 51
   },
   "stoic-iks-faulds": {
    "arm": 8,
@@ -22982,7 +22983,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 34.0
+   "w": 34
   },
   "stoic-iks-headpiece": {
    "arm": 8,
@@ -23011,7 +23012,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 21.0
+   "w": 21
   },
   "stoic-iks-robe": {
    "arm": 9,
@@ -23042,7 +23043,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 1280.0
+   "w": 1280
   },
   "stoic-iks-sandals": {
    "arm": 2,
@@ -23076,7 +23077,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 9.0
+   "w": 9
   },
   "stomper": {
    "atk": 51,
@@ -23095,7 +23096,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 115.0
+   "w": 115
   },
   "stone-skin-amulet": {
    "cat": "amulet",
@@ -23113,7 +23114,7 @@
    "sell": 2560,
    "shop": 1,
    "t": "accessory",
-   "w": 7.0
+   "w": 7
   },
   "stonecutter-axe": {
    "atk": 50,
@@ -23130,7 +23131,7 @@
    "s": "weapon",
    "sell": 1440,
    "t": "axe",
-   "w": 99.0
+   "w": 99
   },
   "strange-good-night-songs": {
    "cat": "shield",
@@ -23140,7 +23141,7 @@
    "s": "shield",
    "sell": 2,
    "t": "shield",
-   "w": 13.0
+   "w": 13
   },
   "strange-helmet": {
    "arm": 6,
@@ -23153,7 +23154,7 @@
    "s": "helmet",
    "sell": 288,
    "t": "armor",
-   "w": 46.0
+   "w": 46
   },
   "strange-mallet": {
    "atk": 18,
@@ -23165,7 +23166,7 @@
    "s": "weapon",
    "sell": 489,
    "t": "club",
-   "w": 45.0
+   "w": 45
   },
   "strange-talisman": {
    "cat": "amulet",
@@ -23196,7 +23197,7 @@
    "sell": 240,
    "shop": 1,
    "t": "armor",
-   "w": 71.0
+   "w": 71
   },
   "studded-club": {
    "atk": 9,
@@ -23210,7 +23211,7 @@
    "s": "weapon",
    "sell": 300,
    "t": "club",
-   "w": 35.0
+   "w": 35
   },
   "studded-helmet": {
    "arm": 2,
@@ -23238,7 +23239,7 @@
    "sell": 96,
    "shop": 1,
    "t": "armor",
-   "w": 26.0
+   "w": 26
   },
   "studded-shield": {
    "cat": "shield",
@@ -23251,7 +23252,7 @@
    "sell": 240,
    "shop": 1,
    "t": "shield",
-   "w": 58.0
+   "w": 58
   },
   "sulphurous-demonbone": {
    "arm": 1,
@@ -23272,7 +23273,7 @@
    "s": "weapon",
    "sell": 1571,
    "t": "club",
-   "w": 180.0
+   "w": 180
   },
   "summer-dress": {
    "cat": "armor",
@@ -23287,7 +23288,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 10.0
+   "w": 10
   },
   "summerblade": {
    "af": 4,
@@ -23312,7 +23313,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 43.0
+   "w": 43
   },
   "suspicious-device": {
    "cat": "amulet",
@@ -23322,7 +23323,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 10.0
+   "w": 10
   },
   "suspicious-signet-ring": {
    "cat": "ring",
@@ -23370,7 +23371,7 @@
    "s": "weapon",
    "sell": 518,
    "t": "club",
-   "w": 31.0
+   "w": 31
   },
   "swan-feather-cloak": {
    "arm": 12,
@@ -23389,7 +23390,7 @@
    "sell": 736,
    "spd": 10,
    "t": "armor",
-   "w": 4.0
+   "w": 4
   },
   "sweetheart-ring": {
    "cat": "ring",
@@ -23417,7 +23418,7 @@
    "sell": 460,
    "shop": 1,
    "t": "sword",
-   "w": 35.0
+   "w": 35
   },
   "sword-ring": {
    "cat": "ring",
@@ -23439,7 +23440,7 @@
    "s": "ring",
    "sell": 2,
    "t": "accessory",
-   "w": 1.0
+   "w": 1
   },
   "tagralt-blade": {
    "atk": 7,
@@ -23461,7 +23462,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 81.0
+   "w": 81
   },
   "tatty-dragon-scale-legs": {
    "arm": 2,
@@ -23473,7 +23474,7 @@
    "s": "legs",
    "sell": 96,
    "t": "armor",
-   "w": 38.0
+   "w": 38
   },
   "taurus-mace": {
    "atk": 30,
@@ -23489,7 +23490,7 @@
    "sell": 864,
    "t": "club",
    "th": 1,
-   "w": 51.0
+   "w": 51
   },
   "tempest-shield": {
    "cat": "shield",
@@ -23502,7 +23503,7 @@
    "s": "shield",
    "sell": 576,
    "t": "shield",
-   "w": 51.0
+   "w": 51
   },
   "templar-scytheblade": {
    "atk": 23,
@@ -23517,7 +23518,7 @@
    "s": "weapon",
    "sell": 681,
    "t": "sword",
-   "w": 29.0
+   "w": 29
   },
   "terra-amulet": {
    "cat": "amulet",
@@ -23535,7 +23536,7 @@
    "s": "amulet",
    "sell": 2,
    "t": "accessory",
-   "w": 5.0
+   "w": 5
   },
   "terra-boots": {
    "arm": 2,
@@ -23584,7 +23585,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 31.0
+   "w": 31
   },
   "terra-hood": {
    "arm": 5,
@@ -23606,7 +23607,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 10.0
+   "w": 10
   },
   "terra-legs": {
    "arm": 8,
@@ -23629,7 +23630,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 19.0
+   "w": 19
   },
   "terra-mantle": {
    "arm": 11,
@@ -23678,7 +23679,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 25.0
+   "w": 25
   },
   "terran-rainbow-shield": {
    "cat": "shield",
@@ -23695,7 +23696,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0
+   "w": 69
   },
   "thaian-sword": {
    "atk": 45,
@@ -23715,7 +23716,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 61.0
+   "w": 61
   },
   "thorn-spitter": {
    "atk": 9,
@@ -23735,7 +23736,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 126.0
+   "w": 126
   },
   "throwing-axe": {
    "atk": 51,
@@ -23755,7 +23756,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 47.0
+   "w": 47
   },
   "throwing-cake": {
    "cat": "ring",
@@ -23779,7 +23780,7 @@
    "sell": 480,
    "shop": 1,
    "t": "distance",
-   "w": 5.0
+   "w": 5
   },
   "throwing-star": {
    "atk": 30,
@@ -23793,7 +23794,7 @@
    "sell": 576,
    "shop": 1,
    "t": "distance",
-   "w": 2.0
+   "w": 2
   },
   "throwing-star-of-sula": {
    "atk": 250,
@@ -23805,7 +23806,7 @@
    "s": "weapon",
    "sell": 4800,
    "t": "distance",
-   "w": 2.0
+   "w": 2
   },
   "thunder-hammer": {
    "atk": 49,
@@ -23822,7 +23823,7 @@
    "s": "weapon",
    "sell": 1500,
    "t": "club",
-   "w": 125.0
+   "w": 125
   },
   "thunderheart-cuirass": {
    "arm": 18,
@@ -23845,7 +23846,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "thunderheart-hauberk": {
    "arm": 18,
@@ -23868,7 +23869,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "thunderheart-platemail": {
    "arm": 18,
@@ -23891,7 +23892,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 145.0
+   "w": 145
   },
   "thundermind-raiment": {
    "arm": 15,
@@ -23915,7 +23916,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 55.0
+   "w": 55
   },
   "thundersoul-tabard": {
    "arm": 18,
@@ -23938,7 +23939,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 145.0
+   "w": 145
   },
   "tiara-of-power": {
    "cat": "helmet",
@@ -23984,7 +23985,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 81.0
+   "w": 81
   },
   "toga-mortis": {
    "arm": 16,
@@ -24006,7 +24007,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 52.0
+   "w": 52
   },
   "tortoise-shield": {
    "cat": "shield",
@@ -24018,7 +24019,7 @@
    "s": "shield",
    "sell": 416,
    "t": "shield",
-   "w": 52.0
+   "w": 52
   },
   "tower-shield": {
    "cat": "shield",
@@ -24031,7 +24032,7 @@
    "s": "shield",
    "sell": 512,
    "t": "shield",
-   "w": 82.0
+   "w": 82
   },
   "traditional-gamsbart-hat": {
    "cat": "helmet",
@@ -24051,7 +24052,7 @@
    "s": "boots",
    "sell": 2,
    "t": "armor",
-   "w": 5.0
+   "w": 5
   },
   "traditional-sai": {
    "atk": 28,
@@ -24072,7 +24073,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "traditional-shirt": {
    "cat": "armor",
@@ -24082,7 +24083,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 4.0
+   "w": 4
   },
   "transcendent-bo": {
    "atk": 45,
@@ -24105,7 +24106,7 @@
    "s": "weapon",
    "sell": 1552,
    "t": "fist",
-   "w": 64.0
+   "w": 64
   },
   "treader-of-torment": {
    "arm": 4,
@@ -24118,7 +24119,7 @@
    "s": "boots",
    "sell": 192,
    "t": "armor",
-   "w": 36.0
+   "w": 36
   },
   "tribal-mask": {
    "arm": 2,
@@ -24131,7 +24132,7 @@
    "s": "helmet",
    "sell": 96,
    "t": "armor",
-   "w": 25.0
+   "w": 25
   },
   "triple-bolt-crossbow": {
    "atk": 3,
@@ -24151,7 +24152,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 62.0
+   "w": 62
   },
   "trousers-of-the-ancients": {
    "arm": 2,
@@ -24173,7 +24174,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 15.0
+   "w": 15
   },
   "turtle-amulet": {
    "cat": "amulet",
@@ -24199,7 +24200,7 @@
    "s": "shield",
    "sell": 432,
    "t": "shield",
-   "w": 69.0
+   "w": 69
   },
   "twiceslicer": {
    "atk": 47,
@@ -24219,7 +24220,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 180.0
+   "w": 180
   },
   "twin-axe": {
    "atk": 45,
@@ -24238,7 +24239,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "twin-hooks": {
    "atk": 32,
@@ -24259,7 +24260,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 50.0
+   "w": 50
   },
   "two-handed-sword": {
    "atk": 30,
@@ -24279,7 +24280,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "umbral-axe": {
    "atk": 51,
@@ -24298,7 +24299,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "umbral-blade": {
    "atk": 50,
@@ -24317,7 +24318,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 59.0
+   "w": 59
   },
   "umbral-bow": {
    "atk": 4,
@@ -24337,7 +24338,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 45.0
+   "w": 45
   },
   "umbral-chopper": {
    "atk": 52,
@@ -24356,7 +24357,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 115.0
+   "w": 115
   },
   "umbral-crossbow": {
    "atk": 6,
@@ -24376,7 +24377,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 125.0
+   "w": 125
   },
   "umbral-hammer": {
    "atk": 53,
@@ -24395,7 +24396,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 165.0
+   "w": 165
   },
   "umbral-katar": {
    "atk": 42,
@@ -24415,7 +24416,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 74.0
+   "w": 74
   },
   "umbral-mace": {
    "atk": 50,
@@ -24434,7 +24435,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "umbral-master-axe": {
    "atk": 53,
@@ -24454,7 +24455,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 80.0
+   "w": 80
   },
   "umbral-master-bow": {
    "atk": 6,
@@ -24475,7 +24476,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 40.0
+   "w": 40
   },
   "umbral-master-chopper": {
    "atk": 54,
@@ -24495,7 +24496,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 110.0
+   "w": 110
   },
   "umbral-master-crossbow": {
    "atk": 9,
@@ -24516,7 +24517,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 120.0
+   "w": 120
   },
   "umbral-master-hammer": {
    "atk": 55,
@@ -24536,7 +24537,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 160.0
+   "w": 160
   },
   "umbral-master-katar": {
    "atk": 43,
@@ -24556,7 +24557,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 69.0
+   "w": 69
   },
   "umbral-master-mace": {
    "atk": 52,
@@ -24576,7 +24577,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 80.0
+   "w": 80
   },
   "umbral-master-slayer": {
    "atk": 54,
@@ -24596,7 +24597,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 90.0
+   "w": 90
   },
   "umbral-master-spellbook": {
    "cat": "spellbook",
@@ -24621,7 +24622,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 30.0
+   "w": 30
   },
   "umbral-masterblade": {
    "atk": 52,
@@ -24641,7 +24642,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 55.0
+   "w": 55
   },
   "umbral-slayer": {
    "atk": 52,
@@ -24660,7 +24661,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 95.0
+   "w": 95
   },
   "umbral-spellbook": {
    "cat": "spellbook",
@@ -24685,7 +24686,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "underworld-rod": {
    "cat": "wand",
@@ -24709,7 +24710,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 29.0
+   "w": 29
   },
   "unerring-dragon-scale-armor": {
    "arm": 17,
@@ -24739,7 +24740,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 135.0
+   "w": 135
   },
   "unliving-demonbone": {
    "arm": 1,
@@ -24760,7 +24761,7 @@
    "s": "weapon",
    "sell": 1571,
    "t": "club",
-   "w": 180.0
+   "w": 180
   },
   "unstable-ring-of-ending": {
    "cat": "ring",
@@ -24787,7 +24788,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "valuable-carving-blade": {
    "af": 8,
@@ -24804,7 +24805,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "valuable-carving-chopper": {
    "af": 8,
@@ -24821,7 +24822,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "valuable-carving-hammer": {
    "af": 8,
@@ -24838,7 +24839,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "valuable-carving-mace": {
    "af": 8,
@@ -24855,7 +24856,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "valuable-carving-slayer": {
    "af": 8,
@@ -24872,7 +24873,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "valuable-mayhem-axe": {
    "af": 8,
@@ -24889,7 +24890,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "valuable-mayhem-blade": {
    "af": 8,
@@ -24906,7 +24907,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "valuable-mayhem-chopper": {
    "af": 8,
@@ -24923,7 +24924,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "valuable-mayhem-hammer": {
    "af": 8,
@@ -24940,7 +24941,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "valuable-mayhem-mace": {
    "af": 8,
@@ -24957,7 +24958,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "valuable-mayhem-slayer": {
    "af": 8,
@@ -24974,7 +24975,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "valuable-remedy-axe": {
    "af": 8,
@@ -24991,7 +24992,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 50.0
+   "w": 50
   },
   "valuable-remedy-blade": {
    "af": 8,
@@ -25008,7 +25009,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 50.0
+   "w": 50
   },
   "valuable-remedy-chopper": {
    "af": 8,
@@ -25025,7 +25026,7 @@
    "sell": 176,
    "shop": 1,
    "t": "axe",
-   "w": 70.0
+   "w": 70
   },
   "valuable-remedy-hammer": {
    "af": 8,
@@ -25042,7 +25043,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 70.0
+   "w": 70
   },
   "valuable-remedy-mace": {
    "af": 8,
@@ -25059,7 +25060,7 @@
    "sell": 176,
    "shop": 1,
    "t": "club",
-   "w": 50.0
+   "w": 50
   },
   "valuable-remedy-slayer": {
    "af": 8,
@@ -25076,7 +25077,7 @@
    "sell": 176,
    "shop": 1,
    "t": "sword",
-   "w": 70.0
+   "w": 70
   },
   "vampire-s-signet-ring": {
    "cat": "ring",
@@ -25099,7 +25100,7 @@
    "s": "shield",
    "sell": 544,
    "t": "shield",
-   "w": 38.0
+   "w": 38
   },
   "vampire-silk-slippers": {
    "cat": "boots",
@@ -25146,7 +25147,7 @@
    "sell": 192,
    "shop": 1,
    "t": "armor",
-   "w": 39.0
+   "w": 39
   },
   "viking-shield": {
    "cat": "shield",
@@ -25160,7 +25161,7 @@
    "sell": 352,
    "shop": 1,
    "t": "shield",
-   "w": 66.0
+   "w": 66
   },
   "vile-axe": {
    "atk": 43,
@@ -25176,7 +25177,7 @@
    "s": "weapon",
    "sell": 1129,
    "t": "axe",
-   "w": 52.0
+   "w": 52
   },
   "viper-star": {
    "atk": 28,
@@ -25189,7 +25190,7 @@
    "s": "weapon",
    "sell": 537,
    "t": "distance",
-   "w": 2.0
+   "w": 2
   },
   "visage-of-the-end-days": {
    "arm": 10,
@@ -25202,7 +25203,7 @@
    "s": "helmet",
    "sell": 480,
    "t": "armor",
-   "w": 38.0
+   "w": 38
   },
   "void-boots": {
    "arm": 2,
@@ -25221,7 +25222,7 @@
    "sell": 3600,
    "spd": 30,
    "t": "armor",
-   "w": 15.0
+   "w": 15
   },
   "voltage-armor": {
    "arm": 13,
@@ -25280,7 +25281,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 25.0
+   "w": 25
   },
   "wand-of-darkness": {
    "cat": "wand",
@@ -25301,7 +25302,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 32.0
+   "w": 32
   },
   "wand-of-decay": {
    "af": 3,
@@ -25327,7 +25328,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 23.0
+   "w": 23
   },
   "wand-of-defiance": {
    "af": 8,
@@ -25353,7 +25354,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 37.0
+   "w": 37
   },
   "wand-of-destruction": {
    "af": 8,
@@ -25380,7 +25381,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 35.0
+   "w": 35
   },
   "wand-of-dimensions": {
    "cat": "wand",
@@ -25401,7 +25402,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 28.0
+   "w": 28
   },
   "wand-of-draconia": {
    "cat": "wand",
@@ -25425,7 +25426,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 27.0
+   "w": 27
   },
   "wand-of-dragonbreath": {
    "af": 2,
@@ -25452,7 +25453,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 23.0
+   "w": 23
   },
   "wand-of-everblazing": {
    "af": 2,
@@ -25478,7 +25479,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 37.0
+   "w": 37
   },
   "wand-of-inferno": {
    "af": 3,
@@ -25504,7 +25505,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 27.0
+   "w": 27
   },
   "wand-of-starstorm": {
    "af": 3,
@@ -25581,7 +25582,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 19.0
+   "w": 19
   },
   "war-axe": {
    "atk": 48,
@@ -25622,7 +25623,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0
+   "w": 85
   },
   "warlord-sword": {
    "atk": 53,
@@ -25641,7 +25642,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 64.0
+   "w": 64
   },
   "warrior-helmet": {
    "arm": 8,
@@ -25655,7 +25656,7 @@
    "s": "helmet",
    "sell": 384,
    "t": "armor",
-   "w": 68.0
+   "w": 68
   },
   "warrior-s-axe": {
    "atk": 42,
@@ -25671,7 +25672,7 @@
    "s": "weapon",
    "sell": 1142,
    "t": "axe",
-   "w": 88.0
+   "w": 88
   },
   "warrior-s-shield": {
    "cat": "shield",
@@ -25684,7 +25685,7 @@
    "s": "shield",
    "sell": 528,
    "t": "shield",
-   "w": 75.0
+   "w": 75
   },
   "warsinger-bow": {
    "atk": 3,
@@ -25704,7 +25705,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 45.0
+   "w": 45
   },
   "wedding-ring": {
    "cat": "ring",
@@ -25729,7 +25730,7 @@
    "s": "legs",
    "sell": 288,
    "t": "armor",
-   "w": 13.0
+   "w": 13
   },
   "werewolf-amulet": {
    "cat": "amulet",
@@ -25753,7 +25754,7 @@
    "sell": 672,
    "spd": 15,
    "t": "armor",
-   "w": 25.0
+   "w": 25
   },
   "white-dress": {
    "cat": "armor",
@@ -25763,7 +25764,7 @@
    "s": "armor",
    "sell": 2,
    "t": "armor",
-   "w": 24.0
+   "w": 24
   },
   "windborn-colossus-armor": {
    "arm": 15,
@@ -25786,7 +25787,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 120.0
+   "w": 120
   },
   "winged-boots": {
    "arm": 2,
@@ -25809,7 +25810,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 12.0
+   "w": 12
   },
   "winged-helmet": {
    "arm": 10,
@@ -25822,7 +25823,7 @@
    "s": "helmet",
    "sell": 480,
    "t": "armor",
-   "w": 12.0
+   "w": 12
   },
   "winterblade": {
    "af": 4,
@@ -25847,7 +25848,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 43.0
+   "w": 43
   },
   "witch-hat": {
    "arm": 3,
@@ -25886,7 +25887,7 @@
    "s": "armor",
    "sell": 528,
    "t": "armor",
-   "w": 25.0
+   "w": 25
   },
   "wolf-tooth-chain": {
    "cat": "amulet",
@@ -25918,7 +25919,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 11.0
+   "w": 11
   },
   "wooden-shield": {
    "cat": "shield",
@@ -25931,7 +25932,7 @@
    "sell": 224,
    "shop": 1,
    "t": "shield",
-   "w": 40.0
+   "w": 40
   },
   "wooden-spellbook": {
    "cat": "spellbook",
@@ -25954,7 +25955,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 12.0
+   "w": 12
   },
   "wooden-sword": {
    "atk": 7,
@@ -25966,7 +25967,7 @@
    "s": "weapon",
    "sell": 246,
    "t": "sword",
-   "w": 20.0
+   "w": 20
   },
   "wyvern-fang": {
    "atk": 32,
@@ -25983,7 +25984,7 @@
    "s": "weapon",
    "sell": 918,
    "t": "sword",
-   "w": 20.0
+   "w": 20
   },
   "yalahari-armor": {
    "arm": 16,
@@ -26003,7 +26004,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 70.0
+   "w": 70
   },
   "yalahari-footwraps": {
    "arm": 1,
@@ -26026,7 +26027,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 7.0
+   "w": 7
   },
   "yalahari-leg-piece": {
    "arm": 8,
@@ -26047,7 +26048,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 65.0
+   "w": 65
   },
   "yalahari-mask": {
    "arm": 5,
@@ -26066,7 +26067,7 @@
     "sorcerer",
     "druid"
    ],
-   "w": 35.0
+   "w": 35
   },
   "yetislippers": {
    "cat": "boots",
@@ -26095,7 +26096,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 35.0
+   "w": 35
   },
   "zaoan-armor": {
    "arm": 13,
@@ -26132,7 +26133,7 @@
    "shop": 1,
    "t": "axe",
    "th": 1,
-   "w": 87.0
+   "w": 87
   },
   "zaoan-helmet": {
    "arm": 9,
@@ -26154,7 +26155,7 @@
     "knight",
     "paladin"
    ],
-   "w": 66.0
+   "w": 66
   },
   "zaoan-legs": {
    "arm": 8,
@@ -26171,7 +26172,7 @@
    "s": "legs",
    "sell": 448,
    "t": "armor",
-   "w": 66.0
+   "w": 66
   },
   "zaoan-monk-robe": {
    "arm": 7,
@@ -26196,7 +26197,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 1100.0
+   "w": 1100
   },
   "zaoan-robe": {
    "arm": 11,
@@ -26234,7 +26235,7 @@
    "sell": 128,
    "spd": 5,
    "t": "armor",
-   "w": 7.0
+   "w": 7
   },
   "zaoan-sword": {
    "atk": 43,
@@ -26251,7 +26252,7 @@
    "s": "weapon",
    "sell": 1113,
    "t": "sword",
-   "w": 49.0
+   "w": 49
   },
   "crypt-slicer": {
    "n": "crypt slicer",
@@ -26266,7 +26267,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 80.0,
+   "w": 80,
    "cls": 4,
    "drop": 1,
    "sell": 8000,
@@ -26289,7 +26290,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 80.0,
+   "w": 80,
    "cls": 4,
    "drop": 1,
    "sell": 8000,
@@ -26312,7 +26313,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 85.0,
+   "w": 85,
    "cls": 4,
    "drop": 1,
    "sell": 8000,
@@ -26336,7 +26337,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 68.0,
+   "w": 68,
    "cls": 4,
    "drop": 1,
    "sell": 8000,
@@ -26360,7 +26361,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 44.0,
+   "w": 44,
    "res": {
     "ice": 5
    },
@@ -26389,7 +26390,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 20.0,
+   "w": 20,
    "res": {
     "energy": 6
    },
@@ -26418,7 +26419,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 20.0,
+   "w": 20,
    "res": {
     "fire": 6
    },
@@ -26446,7 +26447,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 61.0,
+   "w": 61,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26471,7 +26472,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 75.0,
+   "w": 75,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26495,7 +26496,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 69.0,
+   "w": 69,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26520,7 +26521,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 87.0,
+   "w": 87,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26545,7 +26546,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 89.0,
+   "w": 89,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26570,7 +26571,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 93.0,
+   "w": 93,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26595,7 +26596,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 72.0,
+   "w": 72,
    "cls": 4,
    "drop": 1,
    "sell": 50000,
@@ -26618,7 +26619,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 51.0,
+   "w": 51,
    "res": {
     "fire": 7
    },
@@ -26644,7 +26645,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 55.0,
+   "w": 55,
    "res": {
     "holy": 7
    },
@@ -26702,7 +26703,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 28.0,
+   "w": 28,
    "res": {
     "earth": 7
    },
@@ -26730,7 +26731,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 62.0,
+   "w": 62,
    "cls": 4,
    "drop": 1,
    "sell": 100000,
@@ -26804,7 +26805,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 89.0,
+   "w": 89,
    "cls": 4,
    "drop": 1,
    "sell": 100000,
@@ -26854,7 +26855,7 @@
    "vocs": [
     "knight"
    ],
-   "w": 95.0,
+   "w": 95,
    "cls": 4,
    "drop": 1,
    "sell": 100000,
@@ -26879,7 +26880,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 73.0,
+   "w": 73,
    "cls": 4,
    "drop": 1,
    "sell": 100000,
@@ -26902,7 +26903,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 52.0,
+   "w": 52,
    "res": {
     "fire": 7
    },
@@ -26928,7 +26929,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 56.0,
+   "w": 56,
    "res": {
     "holy": 7
    },
@@ -26983,7 +26984,7 @@
    "vocs": [
     "sorcerer"
    ],
-   "w": 13.0,
+   "w": 13,
    "res": {
     "physical": 3,
     "ice": 8
@@ -27011,7 +27012,7 @@
    "vocs": [
     "druid"
    ],
-   "w": 38.0,
+   "w": 38,
    "res": {
     "physical": 3,
     "energy": 8
@@ -27041,7 +27042,7 @@
    "vocs": [
     "monk"
    ],
-   "w": 41.0,
+   "w": 41,
    "res": {
     "physical": 5,
     "earth": 8
@@ -27075,7 +27076,7 @@
    "vocs": [
     "paladin"
    ],
-   "w": 12.0,
+   "w": 12,
    "res": {
     "physical": 6,
     "earth": 10
@@ -27122,6 +27123,26 @@
    ],
    "id": 51341,
    "s": "weapon"
+  },
+  "light-jo-staff": {
+   "atk": 10,
+   "bond": "energy",
+   "cat": "fist",
+   "cls": 1,
+   "def": 6,
+   "fist": 1,
+   "id": 50166,
+   "n": "light jo staff",
+   "npcBuy": 250,
+   "s": "weapon",
+   "sell": 288,
+   "shop": 1,
+   "t": "fist",
+   "th": 1,
+   "vocs": [
+    "monk"
+   ],
+   "w": 17
   }
  }
 }

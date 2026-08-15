@@ -66,6 +66,8 @@ const POI = {
   innkeeper:  { tx: 14, ty: 17, npc: true },
   priest:     { tx: 27, ty: 13, npc: true },
   captain:    { tx: 24, ty: 16, npc: true },
+  enpa:       { tx: 8,  ty: 12, npc: true },
+  gnomally:   { tx: 18, ty: 12, npc: true },
 };
 
 /* Objetos decorativos soltos: [sprite, tx, ty, solido]
