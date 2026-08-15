@@ -52,10 +52,13 @@ must(origin.x + sheets['timira-the-many-headed'].cw * scale === centerX + tile/2
 // dentro do canvas 64x64 e termina no mesmo canto inferior-direito do SQM.
 vm.runInContext(fs.readFileSync(path.join(js, 'appearancedata.js'), 'utf8'), ctx);
 const citizen = ctx.APPEARANCES.outfits.find(o => o.id === 'citizen-m');
+must(citizen && citizen.looktype === 128 && citizen.sexo === 'm',
+  'citizen-m deve ser looktype 128 (male Canary)');
 const playerAnchor = {sw:64,sh:64,ox:citizen.ox,oy:citizen.oy};
 const playerOrigin = geoCtx.creatureTileOrigin(centerX,centerY,
   citizen.cw*scale,citizen.ch*scale,tile,playerAnchor,scale);
-must(playerOrigin.x === 66.25 && playerOrigin.y === 66.25,
+const expectPlayer = centerX + tile/2 - citizen.cw*scale;
+must(playerOrigin.x === expectPlayer && playerOrigin.y === expectPlayer,
   'outfit do player não preserva ox/oy do DAT');
 must(playerOrigin.x + citizen.cw*scale === centerX+tile/2 &&
      playerOrigin.y + citizen.ch*scale === centerY+tile/2,

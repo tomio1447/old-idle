@@ -144,14 +144,63 @@ function mountPrice(m) {
  * comecar sem nenhuma opcao. */
 const APP_INICIAIS = ["citizen", "hunter", "mage", "knight", "summoner", "monk"];
 
+/* Sprites classicos em assets/outfit/ so existem para estes starters.
+ * Outfits premium (druid, noblewoman, …) vivem so no catalogo 15x. */
+const CLASSIC_OUTFIT_TYPES = {
+  citizen: 1, hunter: 1, mage: 1, knight: 1, summoner: 1, monk: 1,
+};
+
+/* Canary usa nomes diferentes por sexo em poucos pares (woman/man). */
+const APP_SEX_BASE_PAIR = {
+  noblewoman: "nobleman", nobleman: "noblewoman",
+  norsewoman: "norseman", norseman: "norsewoman",
+  "retro-noblewoman": "retro-nobleman", "retro-nobleman": "retro-noblewoman",
+};
+
 function sexSuffix(p) {
   return p && p.sex === "female" ? "f" : "m";
 }
 
+function appearanceBaseName(id) {
+  if (!id || typeof id !== "string") return "";
+  return id.replace(/-[mf](-\d+)?$/, "").replace(/-\d+$/, "") || id;
+}
+
+function classicOutfitType(p, appearanceId) {
+  const fromApp = appearanceBaseName(appearanceId);
+  if (fromApp && CLASSIC_OUTFIT_TYPES[fromApp]) return fromApp;
+  const voc = (typeof VOC_OUTFIT !== "undefined" && VOC_OUTFIT[p && p.voc]) || "citizen";
+  return CLASSIC_OUTFIT_TYPES[voc] ? voc : "citizen";
+}
+
 function appearanceIdForSex(id, sexo) {
   if (!id || typeof id !== "string") return null;
-  const flipped = id.replace(/-[mf]$/, "-" + sexo);
-  return APP_OUTFIT[flipped] && APP_OUTFIT[flipped].sexo === sexo ? flipped : null;
+  const tryId = (candidate) =>
+    candidate && APP_OUTFIT[candidate] && APP_OUTFIT[candidate].sexo === sexo
+      ? candidate : null;
+
+  // 1) troca so o sufixo -m/-f (Citizen, Knight, …)
+  const flipped = tryId(id.replace(/-[mf]$/, "-" + sexo));
+  if (flipped) return flipped;
+
+  // 2) pares com nome distinto (Noblewoman <-> Nobleman)
+  const base = appearanceBaseName(id);
+  const paired = APP_SEX_BASE_PAIR[base];
+  if (paired) {
+    const hit = tryId(paired + "-" + sexo);
+    if (hit) return hit;
+  }
+
+  // 3) id legado tipo illuminator-m-1860: tenta base-sexo e base-sexo-looktype
+  const bare = id.replace(/-[mf](-\d+)?$/, "");
+  const hitBare = tryId(bare + "-" + sexo);
+  if (hitBare) return hitBare;
+  const lt = id.match(/-(\d+)$/);
+  if (lt) {
+    const hitLt = tryId(bare + "-" + sexo + "-" + lt[1]);
+    if (hitLt) return hitLt;
+  }
+  return null;
 }
 
 function defaultAppearanceId(p) {
@@ -165,6 +214,19 @@ function ensureWardrobe(p) {
   if (!p.wardrobe.outfits) p.wardrobe.outfits = {};
   if (!p.wardrobe.mounts) p.wardrobe.mounts = {};
   const sexo = sexSuffix(p);
+  // Migra ids invertidos/legados e descarta o sexo oposto.
+  const raw = p.wardrobe.outfits;
+  const cleaned = {};
+  for (const id of Object.keys(raw)) {
+    const addons = Math.max(0, Math.min(3, raw[id] | 0));
+    if (APP_OUTFIT[id] && APP_OUTFIT[id].sexo === sexo) {
+      cleaned[id] = Math.max(cleaned[id] | 0, addons);
+      continue;
+    }
+    const flipped = appearanceIdForSex(id, sexo);
+    if (flipped) cleaned[flipped] = Math.max(cleaned[flipped] | 0, addons);
+  }
+  p.wardrobe.outfits = cleaned;
   const iniciais = APP_INICIAIS.slice();
   const vocBase = (typeof VOC_OUTFIT !== "undefined" && VOC_OUTFIT[p.voc]) || "citizen";
   if (iniciais.indexOf(vocBase) === -1) iniciais.push(vocBase);
@@ -257,9 +319,12 @@ function syncOutfitLook(p) {
   }
   const o = id ? APP_OUTFIT[id] : null;
   if (o) {
-    p.outfit.type = o.id.replace(/-[mf]$/, "");
+    // type classico so aponta para starters com PNG em assets/outfit/;
+    // nunca inventa noblewoman-m / druid-m no fallback de caminhada.
+    p.outfit.type = classicOutfitType(p, o.id);
     p.outfit.lookType = o.looktype || 0;
   } else {
+    p.outfit.type = classicOutfitType(p, null);
     p.outfit.lookType = Math.max(0, Number(p.outfit.lookType) || 0);
   }
   p.outfit.colors = p.outfit.colors.map((n) => Math.max(0, Math.min(95, n | 0)));
