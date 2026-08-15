@@ -126,7 +126,8 @@ function itemImg(slug, tam, cls) {
     ? `max-width:${px}px;max-height:${px}px;width:auto;height:auto`
     : `width:auto;height:auto`;
   return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png"
-    alt="" loading="lazy" style="${dim}">`;
+    alt="" loading="lazy" style="${dim}"
+    onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\\.png(\\?|$)/,'.gif$1');}">`;
 }
 
 /* A vocacao pode usar o item? (nivel + restricao de vocacao) */

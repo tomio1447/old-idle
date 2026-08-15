@@ -10,7 +10,8 @@
  *
  * Os rates são aplicados como DIVISORES de custo: rate 10x significa que
  * o custo de XP/skill/mana é DIVIDIDO por 10 (progressa 10x mais rápido).
- * Para loot, o rate multiplica a quantidade de itens dropados.
+ * Para loot, o rate multiplica SOMENTE a chance de cada entrada (cap 100%);
+ * a quantidade fica no min–max Canary/wiki — nunca count*SERVER_LOOT_RATE.
  * Para bestiário, o rate multiplica o número de kills contados.
  */
 "use strict";

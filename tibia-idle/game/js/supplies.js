@@ -107,9 +107,11 @@ const POTIONS_1525 = {
     lvl: 100, vocs: ["sorcerer", "druid", "paladin", "monk"],
     mp: [240, 360], tipo: "mp",
   },
+  // TibiaWiki 15.25.3a4a52: distilled superior = todas as vocações, nv 130
+  // (não 100 — o superior normal fica em 100; a distilled sobe o requisito).
   "distilled-superior-mana-potion": {
     id: "distilled-superior-mana-potion", itemId: 0,
-    nome: "distilled superior mana potion", lvl: 100,
+    nome: "distilled superior mana potion", lvl: 130,
     vocs: ["sorcerer", "druid", "paladin", "knight", "monk"],
     mp: [240, 360], tipo: "mp",
   },
