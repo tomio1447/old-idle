@@ -42,7 +42,10 @@ window.FX_OFFICIAL_ALIASES = {
   "fatal-text": "onslaught-effect",
   "ruse-effect": "ruse-effect",
   "momentum-effect": "momentum-effect",
-  "blow-white": "sweeping-takedown-effect",
+  // NAO aliasar blow-white -> sweeping-takedown-effect:
+  // CONST_ME_BLOW_WHITE (Mystic Repulse / Lesser Mystic Repulse e bond
+  // physical) precisa do strip classico assets/fx/blow-white.png (10
+  // quadros). Sweeping Takedown e outro efeito (arma especial).
   "big-clouds": "cloud-effect",
   "small-clouds": "cloud-effect",
   "block-hit": "block-effect",

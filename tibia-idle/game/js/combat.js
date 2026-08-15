@@ -11,6 +11,9 @@ const TICK = 100;   // ms por tick de simulacao
  * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma. */
 const SPAWN_BLINK_MS = 1000;
 const SPAWN_BLINKS = 3;
+/* Após limpar a onda: espera antes de enfileirar pendingSpawns / começar o
+ * teleporte-blink da próxima wave (o blink 3×1s continua separado). */
+const WAVE_CLEAR_RESPAWN_MS = 6000;
 
 function huntMapSpawnBlocked() {
   return typeof G !== "undefined" && G && G.huntMapReady === false;
@@ -164,7 +167,9 @@ function newCombat(player, huntId, instanceMode) {
     },
     stats: {
       startedAt: Date.now(), kills: 0, exp: 0, rawExp: 0, rawHp: 0,
-      gold: 0, damage: 0, taken: 0, deaths: 0, loot: {}, monsters: {},
+      gold: 0, damage: 0, taken: 0, deaths: 0, blessCost: 0,
+      deathTrack: { startedAt: Date.now(), byPlayer: {} },
+      loot: {}, monsters: {},
       supplyUsed: {}, supplyCost: 0, time: 0,
     },
     events: [],       // eventos visuais para a UI
@@ -298,6 +303,25 @@ function spawnWave(c, p) {
   // disponiveis para a proxima leva.
   if (!c._spawnTaken || !(c.pendingSpawns && c.pendingSpawns.length))
     c._spawnTaken = {};
+  // Occupancy uma vez por wave: rebuild a cada mob (mapas OTBM grandes)
+  // travava o frame do wave-clear / último kill.
+  let occ = null;
+  let zona = null;
+  let lx = Math.floor(GRID_W / 2), ly = Math.floor(GRID_H / 2);
+  const withinLeaderRange = (x, y) => Math.abs(x - lx) <= 10 && Math.abs(y - ly) <= 10;
+  if (typeof placeFree === "function") {
+    if (c.player) ensureCell(c.player);
+    occ = buildOccupancy(c, null);
+    for (const sp of c.pendingSpawns || []) {
+      if (sp && Number.isFinite(Number(sp.cx)) && Number.isFinite(Number(sp.cy)))
+        occ.set(Number(sp.cx) + ":" + Number(sp.cy), true);
+    }
+    const leader = (c.players && c.players.length ? c.players[0] : c.player);
+    if (leader && leader.cx !== undefined) lx = leader.cx;
+    if (leader && leader.cy !== undefined) ly = leader.cy;
+    zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
+      ? c.huntMap.mob.filter((z) => withinLeaderRange(z.x, z.y)) : null;
+  }
   // Conta também os que estão "piscando" (fila de spawn) para não encher a
   // arena além do pack enquanto a animação de teleporte roda. A condição
   // le a fila a cada iteracao (naFila cresce a cada push).
@@ -338,15 +362,7 @@ function spawnWave(c, p) {
     // zona inteira esta ocupada e que cai no fallback (celula livre mais
     // proxima / canto da arena).
     let cx, cy;
-    if (typeof placeFree === "function") {
-      if (c.player) ensureCell(c.player);
-      const occ = buildOccupancy(c, null);
-      const leader = (c.players && c.players.length ? c.players[0] : c.player);
-      const lx = leader && leader.cx !== undefined ? leader.cx : Math.floor(GRID_W / 2);
-      const ly = leader && leader.cy !== undefined ? leader.cy : Math.floor(GRID_H / 2);
-      const withinLeaderRange = (x, y) => Math.abs(x - lx) <= 10 && Math.abs(y - ly) <= 10;
-      const zona = (c.huntMap && c.huntMap.mob && c.huntMap.mob.length)
-        ? c.huntMap.mob.filter((z) => withinLeaderRange(z.x, z.y)) : null;
+    if (occ) {
       if (zona && zona.length) {
         // células G livres (respeita a posicao designada + ocupacao atual
         // + celulas ja escolhidas nesta wave)
@@ -386,11 +402,12 @@ function spawnWave(c, p) {
     // Última rede: nunca use coordenada fixa sem validar parede. Procura em
     // toda a instância; se realmente não houver SQM livre, encerra a wave.
     if (cx === undefined || cy === undefined) {
-      const fallbackOcc = buildOccupancy(c, null);
+      const fallbackOcc = occ || buildOccupancy(c, null);
       const safe = {};
       const fx = Math.floor(GRID_W / 2), fy = Math.floor(GRID_H / 2);
       if (placeFree(safe, fallbackOcc, fx, fy, Math.max(GRID_W, GRID_H))) {
         cx = safe.cx; cy = safe.cy;
+        if (occ) occ.set(cx + ":" + cy, true);
       } else {
         break;
       }
@@ -477,6 +494,41 @@ function sqmDist(a, b) {
   const dx = ((a.x || 0) - (b.x || 0)) * GRID_W;
   const dy = ((a.y || 0) - (b.y || 0)) * GRID_H;
   return Math.max(Math.abs(dx), Math.abs(dy));
+}
+
+/* Bresenham em SQM: FX da corrente nos tiles vazios entre saltos (Canary). */
+function bresenhamCells(x0, y0, x1, y1) {
+  const cells = [];
+  let x = Math.round(Number(x0) || 0), y = Math.round(Number(y0) || 0);
+  const tx = Math.round(Number(x1) || 0), ty = Math.round(Number(y1) || 0);
+  const dx = Math.abs(tx - x), sx = x < tx ? 1 : -1;
+  const dy = -Math.abs(ty - y), sy = y < ty ? 1 : -1;
+  let err = dx + dy;
+  for (;;) {
+    cells.push({ cx: x, cy: y });
+    if (x === tx && y === ty) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x += sx; }
+    if (e2 <= dx) { err += dx; y += sy; }
+  }
+  return cells;
+}
+function spellChainPathCells(fromCell, toCell) {
+  if (!fromCell || !toCell) return [];
+  const line = bresenhamCells(fromCell.cx, fromCell.cy, toCell.cx, toCell.cy);
+  if (line.length <= 2) return [];
+  return line.slice(1, -1);
+}
+function spellChainVisualPath(caster, targets) {
+  const path = [], nodes = [caster].concat(targets || []);
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const a = nodes[i], b = nodes[i + 1];
+    if (!a || !b || a.cx === undefined || b.cx === undefined) continue;
+    for (const cell of spellChainPathCells(a, b)) {
+      path.push({ cx: cell.cx, cy: cell.cy, hop: i });
+    }
+  }
+  return path;
 }
 
 function pointDistance(a, b) {
@@ -607,7 +659,53 @@ function movePoint(ent, target, speed, dt, stopRange) {
 
 /* Em boss fights, runas/spells/ataques do Helper focam o boss antes dos
  * summons. A única exceção é uma fase explicitamente imune (Greed/QTE),
- * quando os adds da mecânica precisam ser eliminados primeiro. */
+ * quando os adds da mecânica precisam ser eliminados primeiro.
+ * Fora de boss: prioriza o pack mais denso na tela (~10 SQM), não o
+ * singleton adjacente (evita SD em mob isolado com box a 3 SQM). */
+const PACK_SEARCH_R = 10, PACK_CLUSTER_R = 2, PACK_HYSTERESIS = 1.25;
+function helperMobDist(a, b) {
+  if (!a || !b) return 99;
+  if (Number.isFinite(Number(a.cx)) && Number.isFinite(Number(b.cx)) &&
+      Number.isFinite(Number(a.cy)) && Number.isFinite(Number(b.cy)))
+    return Math.max(Math.abs(a.cx - b.cx), Math.abs(a.cy - b.cy));
+  return Math.max(Math.abs((Number(a.x) || 0) - (Number(b.x) || 0)),
+    Math.abs((Number(a.y) || 0) - (Number(b.y) || 0)));
+}
+function helperClusterDensity(mobs, mob, r) {
+  if (!mob || !(mob.hp > 0)) return 0;
+  const rr = r == null ? PACK_CLUSTER_R : r;
+  let n = 0;
+  for (const m of mobs || []) {
+    if (!m || !(m.hp > 0)) continue;
+    if (helperMobDist(mob, m) <= rr) n++;
+  }
+  return n;
+}
+function densestPackTargetClient(c, caster, vivos) {
+  const list = (vivos || (c && c.mobs) || []).filter((m) => m && m.hp > 0);
+  if (!list.length) return null;
+  const from = caster || (c && c.player);
+  const scoreOf = (mob) => {
+    const dens = helperClusterDensity(list, mob, PACK_CLUSTER_R);
+    const dist = helperMobDist(from, mob);
+    if (dist > PACK_SEARCH_R) return -Infinity;
+    return dens * 100 - dist * 4;
+  };
+  let best = null, bestScore = -Infinity;
+  for (const mob of list) {
+    const sc = scoreOf(mob);
+    if (sc > bestScore) { best = mob; bestScore = sc; }
+  }
+  if (!best) return list.slice().sort((a, b) => helperMobDist(from, a) - helperMobDist(from, b))[0];
+  const sticky = from && from._packTargetId
+    ? list.find((m) => String(m.id) === String(from._packTargetId)) : null;
+  if (sticky) {
+    const stickyScore = scoreOf(sticky);
+    if (Number.isFinite(stickyScore) && bestScore < stickyScore * PACK_HYSTERESIS) best = sticky;
+  }
+  if (from) from._packTargetId = String(best.id);
+  return best;
+}
 function helperPriorityTarget(c, caster) {
   if (!c || !c.mobs || !c.mobs.length) return null;
   const from = caster || c.player;
@@ -626,15 +724,7 @@ function helperPriorityTarget(c, caster) {
   }
   const vivos = c.mobs.filter((m) => m && m.hp > 0);
   if (!vivos.length) return null;
-  const dist = (a, b) => {
-    if (!a || !b) return 99;
-    if (Number.isFinite(Number(a.cx)) && Number.isFinite(Number(b.cx)) &&
-        Number.isFinite(Number(a.cy)) && Number.isFinite(Number(b.cy)))
-      return Math.max(Math.abs(a.cx - b.cx), Math.abs(a.cy - b.cy));
-    return Math.max(Math.abs((Number(a.x) || 0) - (Number(b.x) || 0)),
-      Math.abs((Number(a.y) || 0) - (Number(b.y) || 0)));
-  };
-  return vivos.slice().sort((a, b) => dist(from, a) - dist(from, b))[0] || vivos[0];
+  return densestPackTargetClient(c, from, vivos) || vivos[0];
 }
 
 function updateCombatMovement(c, p, dt) {
@@ -699,13 +789,18 @@ function combatManaSkillGain(c, mana) {
 }
 
 function hasSelectedSupply(p, slug) {
-  return !!p.supplies && Object.prototype.hasOwnProperty.call(p.supplies, slug);
+  if (!slug || !p) return false;
+  if (p.supplies && Object.prototype.hasOwnProperty.call(p.supplies, slug)) return true;
+  const cfg = p.config || {};
+  return cfg.healSupply === slug || cfg.manaSupply === slug || cfg.shooterRune === slug;
 }
 
 function canRechargeSupply(p, slug) {
   const s = SUPPLIES[slug];
   if (!s || (s.lvl || 1) > p.level) return false;
   if ((p.supplies[slug] || 0) > 0) return true;
+  // Helper selecionou a potion/runa: permite auto-compra no uso (mesmo com
+  // CARGAS 0 e sem chave prévia em p.supplies).
   return hasSelectedSupply(p, slug) && p.gold >= supplyPrice(s, p.level);
 }
 
@@ -1338,11 +1433,8 @@ function applyResist(mob, element, dano, piercePct) {
  * Aplicado ANTES da resistencia, como no servidor: o charm aumenta o golpe
  * e o monstro resiste ao total. */
 function applyCharmDamage(p, element, dano) {
-  if (typeof charmTotals !== "function") return dano;
-  const t = charmTotals(p);
-  const pc = t.dano[element] || 0;
-  if (!pc) return dano;
-  return Math.floor(dano * (1 + pc / 100));
+  /* Canary: charms ofensivos são proc por raça assignada, não % passivo. */
+  return dano;
 }
 
 /* Executa um ataque do jogador no alvo */
@@ -1827,7 +1919,8 @@ function tryCastSpell(c, p, target, now) {
   for (const id in SPELLS) {
     const s = SPELLS[id];
     if (s.type !== "attack") continue;
-    if (s.vocs.indexOf(p.voc) === -1) continue;
+    if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+        : (s.vocs.indexOf(p.voc) === -1)) continue;
     if (p.level < s.lvl) continue;
     if (s.ml && effMagic(p) < s.ml) continue;
     if (p.mp < s.mana) continue;
@@ -1852,15 +1945,47 @@ function tryCastSpell(c, p, target, now) {
       && typeof sqmDistance === "function") {
     if (sqmDistance(c.player, target) > 7) return false;
   } else if (c.player && pointDistance(c.player, target) > spellRange()) return false;
+
+  // Self-AoE / area do caster: so entra na disputa se a matriz pega >=1 vivo.
+  // Sem isso exevo mas san (maior DPS) ganhava de SD/missile com alvo a 5+ SQM.
+  const spellHitsNow = (sid, sp) => {
+    const nome = typeof areaNameOf === "function" ? areaNameOf("spell", sid) : null;
+    const st = (typeof SPELLTARGET !== "undefined") ? SPELLTARGET[sid] : null;
+    const fromCaster = !!(st && st.self) || (nome && typeof areaSaiDoConjurador === "function"
+      && areaSaiDoConjurador(nome, sid));
+    if (fromCaster && nome && typeof areaCount === "function" && c.player) {
+      const n = areaCount(c, nome, c.player, target, sid);
+      if (n !== null) return n;
+    }
+    if (sp && (sp.area || Number(sp.chain) > 1) && nome && typeof areaCount === "function" && c.player) {
+      const n = areaCount(c, nome, c.player, target, sid);
+      if (n !== null) return n;
+    }
+    return target && target.hp > 0 ? 1 : 0;
+  };
+  const availHit = avail.filter(([sid, sp]) => {
+    const st = (typeof SPELLTARGET !== "undefined") ? SPELLTARGET[sid] : null;
+    const nome = typeof areaNameOf === "function" ? areaNameOf("spell", sid) : null;
+    const fromCaster = !!(st && st.self) || (nome && typeof areaSaiDoConjurador === "function"
+      && areaSaiDoConjurador(nome, sid));
+    if (!fromCaster && !(sp && sp.area)) return true;
+    return spellHitsNow(sid, sp) >= 1;
+  });
+  const pool = availHit.length ? availHit : avail.filter(([sid]) => {
+    const st = (typeof SPELLTARGET !== "undefined") ? SPELLTARGET[sid] : null;
+    return !(st && st.self);
+  });
+  if (!pool.length) return false;
+
   // compatibilidade com a config antiga de shooter unico
   let selected = null;
   if (!usaLista && p.config.shooterType === "spell" && p.config.shooterSpell)
-    selected = avail.find((a) => a[0] === p.config.shooterSpell);
+    selected = pool.find((a) => a[0] === p.config.shooterSpell);
   if (!selected) {
     if (!usaLista && p.config.shooterType === "rune") return false;
     // escolhe pelo dano estimado NESTE personagem, nao por um peso fixo
-    avail.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
-    selected = avail[0];
+    pool.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
+    selected = pool[0];
   }
   const [id] = selected;
   return castSpellById(c, p, target, now, id);
@@ -1874,6 +1999,8 @@ function tryCastSpell(c, p, target, now) {
 function castSpellById(c, p, target, now, id) {
   const s = SPELLS[id];
   if (!s) return false;
+  if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+      : (s.vocs && s.vocs.indexOf(p.voc) === -1)) return false;
   // stances nao sao magias de ataque: ligam/desligam pela aba ATAQUE do
   // Helper (toggleStance). Sem o guard uma stance esquecida na rotacao
   // sairia como se fosse golpe.
@@ -1892,18 +2019,25 @@ function castSpellById(c, p, target, now, id) {
 
   // agora que a magia esta escolhida, o alcance dela e que manda.
   // MONKSPELLS traz o spell:range() do .lua (Mystic Repulse alcanca 7).
+  // Self-AoE (exevo mas san, UE, Hell's Core…): distancia ate o alvo
+  // apontado NAO libera o cast — so sai se pelo menos 1 monstro vivo
+  // estiver dentro da matriz ancorada no caster (Canary isSelfTarget).
   if (c.player && c.player.cx !== undefined && target.cx !== undefined
       && typeof sqmDistance === "function") {
     const md0 = (typeof MONKSPELLS !== "undefined") ? MONKSPELLS[id] : null;
     const alc = (md0 && md0.range) ? Math.min(7, md0.range)
               : (s.range && s.range > 1 ? Math.min(7, s.range) : 5);
-    // Magia selfTarget explode em volta de QUEM LANCA, entao a distancia
-    // ate o alvo nao a impede: o Divine Caldera de um paladino cercado sai
-    // mesmo com o alvo apontado longe. Exigir alcance aqui simplesmente
-    // engolia a magia (retornava false sem gastar mana nem avisar).
     const ehSelf = (typeof SPELLTARGET !== "undefined" && SPELLTARGET[id])
       ? !!SPELLTARGET[id].self : false;
-    if (!ehSelf && sqmDistance(c.player, target) > alc) return false;
+    const nomeSelf = typeof areaNameOf === "function" ? areaNameOf("spell", id) : null;
+    const fromCaster = ehSelf || (nomeSelf && typeof areaSaiDoConjurador === "function"
+      && areaSaiDoConjurador(nomeSelf, id));
+    if (fromCaster && nomeSelf && typeof areaMobs === "function") {
+      const inArea = areaMobs(c, nomeSelf, c.player, target, id);
+      if (Array.isArray(inArea) && inArea.length === 0) return false;
+    } else if (!ehSelf && sqmDistance(c.player, target) > alc) {
+      return false;
+    }
   }
 
   // Wheel of Destiny: reducao de custo de mana (%) da magia (upgrade da wheel)
@@ -1981,19 +2115,19 @@ function castSpellById(c, p, target, now, id) {
   } else if (usaMonk) {
     targets = monkSpellTargets(p, id, c, target);
   } else if (s.chain && s.chain > 1) {
-    // Chain generica do 15.25 (nova Lightning, Forked Glacier/Thorns):
-    // a magia acerta o alvo e ate N-1 alvos ADICIONAIS, saltando sempre
-    // para o inimigo mais proximo do ultimo atingido — a mesma regra da
-    // chain do Monk, so que sem janela de distancia (o boletim descreve
-    // apenas "alvos adicionais proximos").
+    // Chain generica do 15.25 (Lightning, Forked Glacier/Thorns):
+    // acerta o primario e ate N-1 vizinhos, saltando ao mais proximo.
+    // Forked usa chainDist 4 SQM (Canary); sem chainDist o salto e livre.
     const vistos = new Set([target]);
     const lista = [target];
     let atual = target;
     while (lista.length < s.chain) {
       let perto = null, menor = Infinity;
+      const maxDist = Number(s.chainDist) || 0;
       for (const m of c.mobs) {
         if (m.hp <= 0 || vistos.has(m)) continue;
         const dd = sqmDist(m, atual);
+        if (maxDist && dd > maxDist) continue;
         if (dd < menor) { menor = dd; perto = m; }
       }
       if (!perto) break;
@@ -2214,12 +2348,15 @@ function castSpellById(c, p, target, now, id) {
           el: elemento, fx: fxMagia });
       }
       c.events.push({ t: "hit", dmg: fisFinal, x: t.x, y: t.y, targetId:t.id,
-                      sx: c.player ? c.player.x : 0.18,
-                      sy: c.player ? c.player.y : 0.62, screen: true,
+                      sx: (ehChain && idx > 0 && targets[idx - 1]) ? targets[idx - 1].x
+                        : (c.player ? c.player.x : 0.18),
+                      sy: (ehChain && idx > 0 && targets[idx - 1]) ? targets[idx - 1].y
+                        : (c.player ? c.player.y : 0.62), screen: true,
                       projectile: (idx === 0 || !!ehChain) && !!missMagia,
                       el: elemento, spell: s.name, fx: fxMagia,
                       race: t.def && t.def.race, crit: critSt, fatal: fatalSpell,
                       chain: ehChain && idx > 0 ? 1 : 0,
+                      fromId: ehChain && idx > 0 ? targets[idx - 1].id : undefined,
                       exori: ehExori ? 1 : 0,
                       missile: missMagia });
       c.events.push({ t: "hit", dmg: eleFinal, x: t.x, y: t.y, targetId:t.id,
@@ -2261,8 +2398,10 @@ function castSpellById(c, p, target, now, id) {
         el: elemento, fx: fxMagia });
     }
     c.events.push({ t: "hit", dmg: dmg, x: t.x, y: t.y, targetId:t.id,
-                    sx: c.player ? c.player.x : 0.18,
-                    sy: c.player ? c.player.y : 0.62,
+                    sx: (ehChain && idx > 0 && targets[idx - 1]) ? targets[idx - 1].x
+                      : (c.player ? c.player.x : 0.18),
+                    sy: (ehChain && idx > 0 && targets[idx - 1]) ? targets[idx - 1].y
+                      : (c.player ? c.player.y : 0.62),
                     screen: true,
                     // no chain o projetil sai do alvo ANTERIOR, nao do
                     // jogador: e o golpe saltando de inimigo em inimigo.
@@ -2271,6 +2410,7 @@ function castSpellById(c, p, target, now, id) {
                     el: elemento, spell: s.name, fx: fxMagia,
                     crit: critSt, fatal: fatalSpell,
                     chain: ehChain && idx > 0 ? 1 : 0,
+                    fromId: ehChain && idx > 0 ? targets[idx - 1].id : undefined,
                     exori: ehExori ? 1 : 0,
                     missile: missMagia });
   });
@@ -2288,10 +2428,35 @@ function castSpellById(c, p, target, now, id) {
                     base: origin ? { cx: origin.cx, cy: origin.cy } : null,
                     targetId: target && target.id });
   }
-  if (ehChain && targets.length > 1) {
+  if (ehChain && targets.length) {
+    const pathFx = (md && md.chainFx) || s.chainFx || "white-energy-spark";
+    const path = (c.player && typeof spellChainVisualPath === "function")
+      ? spellChainVisualPath(c.player, targets) : [];
     c.events.push({ t: "chain", n: targets.length, x: target.x, y: target.y,
                     screen: true,
-                    fx: (md && md.chainFx) || "white-energy-spark" });
+                    fx: fxMagia || pathFx,
+                    impactFx: fxMagia || null,
+                    chainFx: pathFx,
+                    spell: s.name, spellId: id, path: path,
+                    links: targets.map((m) => ({
+                      x: m.x, y: m.y, id: m.id, cx: m.cx, cy: m.cy
+                    })) });
+    // SQMs vazios do caminho (Bresenham), stagger leve por hop.
+    const byHop = new Map();
+    for (const cell of path) {
+      const hop = Number(cell.hop) || 0;
+      if (!byHop.has(hop)) byHop.set(hop, []);
+      byHop.get(hop).push({ cx: cell.cx, cy: cell.cy });
+    }
+    const nowTs = Date.now();
+    for (const [hop, cells] of byHop) {
+      if (!cells.length) continue;
+      c.events.push({ t: "areafx", cells: cells, screen: true, chainPath: 1,
+                      fx: pathFx, spell: s.name, spellId: id,
+                      whoId: c.player && (c.player.id !== undefined ? c.player.id
+                        : (c.player.p && c.player.p.id)),
+                      ts: nowTs + 25 + hop * 45 });
+    }
   }
   // builder gera a harmonia DEPOIS do golpe, como o postCastSpell do servidor
   if (kind === "builder") {
@@ -2341,13 +2506,8 @@ function tryUseRune(c, p, target, now, forcada) {
         p.supplies[p.config.shooterRune] = 0;
       if (canRechargeSupply(p, p.config.shooterRune)) best = p.config.shooterRune;
     }
-  } else if (p.config.shooterType !== "spell") {
-    for (const slug in p.supplies) {
-      const s = SUPPLIES[slug];
-      if (!s || s.type !== "attack" || !canRechargeSupply(p, slug)) continue;
-      if (!best || s.tier > SUPPLIES[best].tier) best = slug;
-    }
   }
+  // Sem shooterRune/combo: não escolhe a "melhor runa" do estoque sozinho.
   if (!best) return false;
   const s = SUPPLIES[best];
   if (!consumeSupplyCharge(c, p, best)) return false;
@@ -2556,7 +2716,8 @@ function tryHeal(c, p, now) {
       const s = SPELLS[selectedHealSpell];
       const friendOnly = typeof healFriendSpells === "function" && healFriendSpells(p).includes(selectedHealSpell);
       // Exura Sio/Gran Sio são spells de alvo: nunca entram na autocura.
-      if (!friendOnly && s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+      if (!friendOnly && s && s.type === "heal"
+          && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) &&
           p.level >= s.lvl && p.mp >= s.mana &&
           cdReady(p, selectedHealSpell, now)) heals.push([selectedHealSpell, s]);
     } // sem spell selecionada: não faz fallback automático
@@ -2623,7 +2784,7 @@ function tryHeal(c, p, now) {
   // 2. item/runa/potion de cura: usa apenas se HP estiver no limite de item
   //    e se as potions nao estiverem no cooldown compartilhado de 1s.
   //    "NÃO USAR POTIONS" (helper) desliga este bloco inteiro.
-  if (!p.config.noHealthPotions && p.config.useRunes && pct <= itemAt && !(entCd(c, p, "potionCd") > now)) {
+  if (!p.config.noHealthPotions && !p.config.noPotions && p.config.useRunes && pct <= itemAt && !(entCd(c, p, "potionCd") > now)) {
     let best = null;
     const selectedHealSupply = p.config.healSupply;
     if (selectedHealSupply) {
@@ -2719,7 +2880,8 @@ function tryHaste(c, p, now) {
   if (typeof hasteAtiva === "function" && hasteAtiva(p, now)) return false;
 
   const sp = SPELLS[escolhida];
-  if (sp.vocs && sp.vocs.indexOf(p.voc) === -1) return false;
+  if (typeof spellForVoc === "function" ? !spellForVoc(sp, p.voc)
+      : (sp.vocs && sp.vocs.indexOf(p.voc) === -1)) return false;
   if (p.level < (sp.lvl || 1) || p.mp < sp.mana) return false;
   if (!cdReady(p, escolhida, now)) return false;
 
@@ -2746,7 +2908,8 @@ function tryBuff(c, p, now) {
   if (entCd(c, p, "buffCd") > now) return false;
   const s = SPELLS[chave];
   if (!s) return false;
-  if (s.vocs && s.vocs.indexOf(p.voc) === -1) return false;
+  if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+      : (s.vocs && s.vocs.indexOf(p.voc) === -1)) return false;
   if (p.level < (s.lvl || 1) || p.mp < s.mana) return false;
   if (!cdReady(p, chave, now)) return false;
   p.mp -= s.mana;
@@ -2779,7 +2942,8 @@ function tryCureCondition(c, p, now) {
     if (!def.cure) continue;
     const s = SPELLS[def.cure];
     if (!s) continue;
-    if (s.vocs && s.vocs.indexOf(p.voc) === -1) continue;
+    if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+        : (s.vocs && s.vocs.indexOf(p.voc) === -1)) continue;
     if (p.level < (s.lvl || 1) || p.mp < s.mana) continue;
     if (!cdReady(p, def.cure, now)) continue;
     p.mp -= s.mana;
@@ -2802,13 +2966,14 @@ function tryCureCondition(c, p, now) {
 function canHeal(c, p) {
   if (p.config.healSpell) {
     const s = SPELLS[p.config.healSpell];
-    if (s && s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 &&
+    if (s && s.type === "heal"
+        && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) &&
         p.level >= s.lvl && p.mp >= s.mana) return true;
   } else {
     for (const id in SPELLS) {
       const s = SPELLS[id];
       if (s.type !== "heal") continue;
-      if (s.vocs.indexOf(p.voc) === -1) continue;
+      if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) === -1) continue;
       if (p.level >= s.lvl && p.mp >= s.mana) return true;
     }
   }
@@ -2918,23 +3083,27 @@ function doChallengeCast(c, p, now, id, s) {
 function tryMana(c, p, now) {
   now = now || Date.now();
   if (entCd(c, p, "potionCd") > now) return false;
-  // MAGIC SHIELD ATIVO (utamo vita 12.55+): o escudo tem POOL própria e a
-  // regra oficial diz que ela NÃO recarrega com potions — só recastando a
-  // spell. Com o escudo ativo o mage não bebe mana potion (e no energy ring
-  // clássico a mana ia toda para o dano, então também não adianta beber).
-  if (typeof isMagicShieldActive === "function" && isMagicShieldActive(p, now)) return false;
+  // Magic Shield (utamo vita): a POOL do escudo NÃO sobe com potion — só
+  // recast. A mana do personagem (p.mp) continua bebendo normalmente, senão
+  // o mage fica com HP cheio + 0 mana e não consegue atacar. Energy Ring
+  // drena p.mp no dano: potions são ainda mais necessárias.
   const max = maxStats(p);
   const manaAt = (p.config.manaAt === undefined ? 50 : p.config.manaAt) / 100;
   if (p.mp > max.mp * manaAt) return false;
-  // "NÃO USAR POTIONS" (helper) desliga potions de mana também
-  if (p.config.noManaPotions) return false;
+  // "NÃO USAR POTIONS MANA" (helper) — noManaPotions / noPotions true = OFF
+  if (p.config.noManaPotions || p.config.noPotions) return false;
   if (p.config.manaSupply === "") return false;
   const candidates = [];
-  if (p.config.manaSupply) candidates.push(p.config.manaSupply);
+  if (p.config.manaSupply) {
+    candidates.push(p.config.manaSupply);
+    if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, p.config.manaSupply))
+      p.supplies = Object.assign({}, p.supplies, { [p.config.manaSupply]: 0 });
+  }
   const selectedOk = p.config.manaSupply && typeof supplyAllowed === "function"
     ? supplyAllowed(p, p.config.manaSupply) : !!p.config.manaSupply;
   if (!selectedOk) {
-    const order = ["distilled-ultimate-mana-potion", "distilled-superior-mana-potion",
+    const order = ["distilled-ultimate-mana-potion", "ultimate-mana-potion",
+      "distilled-superior-mana-potion", "superior-mana-potion",
       "great-mana-potion", "strong-mana-potion", "mana-potion"];
     for (const slug of order) if (candidates.indexOf(slug) === -1) candidates.push(slug);
   }
@@ -3821,13 +3990,14 @@ function rollLoot(c, p, mob) {
     if (!mob.boss && isNoCollect(p, l.item)) continue;
     // filtro de loot
     if (!mob.boss && p.config.lootFilter === "valuable" && (it.sell || 0) < 20 &&
-        l.item !== "gold-coin") continue;
-    if (!mob.boss && p.config.lootFilter === "equip" && !it.s && l.item !== "gold-coin")
+        !currencyValue(l.item)) continue;
+    if (!mob.boss && p.config.lootFilter === "equip" && !it.s && !currencyValue(l.item))
       continue;
     if (mob.boss) {
       // TODO drop do boss, inclusive moedas, fica selado no pacote até o
       // jogador clicar na imagem do boss no Reward Chest.
       if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count, rewardSource);
+      else if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
       else addLootPouch(p, l.item, count);
     } else if (l.item === "gold-coin") {
       const g = Math.floor(count * goldStage(c.hunt.level));
@@ -3844,7 +4014,8 @@ function rollLoot(c, p, mob) {
     } else if (it.s === "ammo") {
       addAmmo(p, l.item, count);
     } else {
-      addLootPouch(p, l.item, count);
+      if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
+      else addLootPouch(p, l.item, count);
     }
     c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
     got.push({ item: l.item, count: count });
@@ -3863,6 +4034,7 @@ function rollLoot(c, p, mob) {
         if (!mob.boss && isNoCollect(p, l.item)) continue;
         if (mob.boss) {
           if (typeof rewardChestAdd === "function") rewardChestAdd(p, l.item, count, rewardSource);
+          else if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
           else addLootPouch(p, l.item, count);
         } else if (l.item === "gold-coin") {
           const g = Math.floor(count * goldStage(c.hunt.level));
@@ -3872,12 +4044,14 @@ function rollLoot(c, p, mob) {
           c.stats.gold += g;
           c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
           got.push({ item: l.item, count: count });
+          continue;
         } else if (SUPPLIES[l.item]) {
           p.supplies[l.item] = (p.supplies[l.item] || 0) + count;
         } else if (it.s === "ammo") {
           addAmmo(p, l.item, count);
         } else {
-          addLootPouch(p, l.item, count);
+          if (typeof routeLootItem === "function") routeLootItem(p, l.item, count);
+          else addLootPouch(p, l.item, count);
         }
         c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
         got.push({ item: l.item, count: count });
@@ -3957,6 +4131,53 @@ function combatDeathCause(c) {
   return c && c.deathCause === "raid" ? "raid" : "monster";
 }
 
+/* Contadores da sessão (Hunt Session Analyser): mortes por personagem. */
+function recordCombatSessionDeath(c, p) {
+  if (!c || !c.stats || !p) return;
+  const id = String(p.id != null ? p.id : "player");
+  c.stats.deaths = (Number(c.stats.deaths) || 0) + 1;
+  if (!c.stats.deathTrack || typeof c.stats.deathTrack !== "object") {
+    c.stats.deathTrack = { startedAt: Date.now(), byPlayer: {} };
+  }
+  if (!c.stats.deathTrack.byPlayer || typeof c.stats.deathTrack.byPlayer !== "object") {
+    c.stats.deathTrack.byPlayer = {};
+  }
+  const row = c.stats.deathTrack.byPlayer[id] || (c.stats.deathTrack.byPlayer[id] = {
+    id, name: p.name || "Player", voc: p.voc || "none", deaths: 0, blessGold: 0,
+  });
+  row.deaths = (Number(row.deaths) || 0) + 1;
+  if (p.name) row.name = p.name;
+  if (p.voc) row.voc = p.voc;
+}
+
+/* Gold de bless gasto na sessão (wipe/retorno), atribuído por personagem. */
+function recordCombatSessionBless(c, byPlayer) {
+  if (!c || !c.stats || !byPlayer) return 0;
+  if (!c.stats.deathTrack || typeof c.stats.deathTrack !== "object") {
+    c.stats.deathTrack = { startedAt: Date.now(), byPlayer: {} };
+  }
+  if (!c.stats.deathTrack.byPlayer || typeof c.stats.deathTrack.byPlayer !== "object") {
+    c.stats.deathTrack.byPlayer = {};
+  }
+  let total = 0;
+  for (const key of Object.keys(byPlayer)) {
+    const amount = Math.max(0, Math.round(Number(byPlayer[key]) || 0));
+    if (!amount) continue;
+    const id = String(key);
+    const meta = (c.players || []).find((e) => String(e && e.id) === id);
+    const p = (meta && meta.p) || {};
+    const row = c.stats.deathTrack.byPlayer[id] || (c.stats.deathTrack.byPlayer[id] = {
+      id, name: p.name || "Player", voc: p.voc || "none", deaths: 0, blessGold: 0,
+    });
+    row.blessGold = (Number(row.blessGold) || 0) + amount;
+    if (p.name) row.name = p.name;
+    if (p.voc) row.voc = p.voc;
+    total += amount;
+  }
+  if (total) c.stats.blessCost = (Number(c.stats.blessCost) || 0) + total;
+  return total;
+}
+
 /* Toda morte consome a bless. Fora de PVP nunca há perda de experiência;
  * em PVP a penalidade é 3% para monstros e 8% para raid de outro jogador. */
 function applyCharacterDeathConsequences(c, p, cause) {
@@ -3965,7 +4186,7 @@ function applyCharacterDeathConsequences(c, p, cause) {
   const hadBless = !!p.blessed;
   p.blessed = false;
   p.deaths = (p.deaths || 0) + 1;
-  if (c && c.stats) c.stats.deaths = (c.stats.deaths || 0) + 1;
+  recordCombatSessionDeath(c, p);
   const isPvp = !!(c && (c.pvp || c.instanceMode === "pvp"));
   const rate = isPvp ? (cause === "raid" ? .08 : .03) : 0;
   const lostExp = Math.floor((p.exp || 0) * rate);
@@ -4144,7 +4365,17 @@ function playerDeath(c, p, consequencesApplied) {
   c.deadAt = c._tickNow || Date.now();
   c.deadUntil = c.deadAt + reviveTime();   // 30s normal, 15s VIP
   c.deathPos = { x: deathX, y: deathY, dir: deathDir };
-  c.events.push({ t:"death",exp:loss.exp,gold:0,blessed:loss.blessed,cause:loss.cause,rate:loss.rate });
+  c.events.push({
+    t: "death",
+    exp: loss.exp,
+    gold: 0,
+    blessed: loss.blessed,
+    cause: loss.cause,
+    rate: loss.rate,
+    whoId: p && p.id != null ? String(p.id) : null,
+    targetId: p && p.id != null ? String(p.id) : null,
+    who: (p && p.name) || "",
+  });
   return loss;
 }
 
@@ -4170,21 +4401,33 @@ function combatTick(c, p, dt, now) {
   if (c.dead) return;
 
   const max = maxStats(p);
-  const g = gearStats(p);
 
-  // regeneracao natural
-  const rr = regenRate(p.voc, g.hpreg > 0);
-  c.regenHp += dt;
-  c.regenMp += dt;
-  const hpEvery = Math.max(1000, (rr.hp * 1000) / (1 + g.hpreg * 0.4));
-  const mpEvery = Math.max(800, (rr.mp * 1000) / (1 + g.mpreg * 0.4));
-  while (c.regenHp >= hpEvery) {
-    c.regenHp -= hpEvery;
-    p.hp = Math.min(max.hp, p.hp + 1 + Math.floor(p.level / 20));
-  }
-  while (c.regenMp >= mpEvery) {
-    c.regenMp -= mpEvery;
-    p.mp = Math.min(max.mp, p.mp + 2 + Math.floor(p.level / 15));
+  // Regeneração Canary (vocation.xml): cada personagem usa o tick da VOC.
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.applyVocationRegenTo) {
+    const ents = (c.players && c.players.length) ? c.players : null;
+    if (ents) {
+      for (const ent of ents) {
+        if (!ent || !ent.p || ent.p.hp <= 0) continue;
+        CanaryVocation.applyVocationRegenTo(ent, ent.p, dt, maxStats(ent.p));
+      }
+    } else {
+      CanaryVocation.applyVocationRegenTo(c, p, dt, max);
+    }
+  } else {
+    const g = gearStats(p);
+    const rr = regenRate(p.voc, g.hpreg > 0);
+    c.regenHp += dt;
+    c.regenMp += dt;
+    const hpEvery = Math.max(1000, (rr.hp * 1000) / (1 + g.hpreg * 0.4));
+    const mpEvery = Math.max(800, (rr.mp * 1000) / (1 + g.mpreg * 0.4));
+    while (c.regenHp >= hpEvery) {
+      c.regenHp -= hpEvery;
+      p.hp = Math.min(max.hp, p.hp + 1);
+    }
+    while (c.regenMp >= mpEvery) {
+      c.regenMp -= mpEvery;
+      p.mp = Math.min(max.mp, p.mp + 2);
+    }
   }
   // VIP: regeneração extra (+10 HP e +20 MP a cada 3s)
   if (typeof vipRegenHp === "function" && vipRegenHp() > 0) {
@@ -4200,9 +4443,18 @@ function combatTick(c, p, dt, now) {
   if (c.buffs.haste > 0) c.buffs.haste -= dt;
 
   // spawn — só depois do mapa 100% pronto (G.huntMapReady).
+  // Após limpar a onda, espera WAVE_CLEAR_RESPAWN_MS antes do blink/respawn
+  // (também evita kill+spawnWave no mesmo frame do último monstro).
   if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
     if (c.boss) return;
-    if (!huntMapSpawnBlocked()) spawnWave(c, p);
+    if (c._nextWaveAt && now < c._nextWaveAt) {
+      /* ainda no intervalo pós-wave */
+    } else if (!huntMapSpawnBlocked()) {
+      c._nextWaveAt = 0;
+      spawnWave(c, p);
+    }
+  } else if (c.mobs.length || (c.pendingSpawns && c.pendingSpawns.length)) {
+    c._nextWaveAt = 0;
   }
   // fila de spawn: teleporte piscando 3x (1/s) antes do monstro nascer
   if (!huntMapSpawnBlocked() && c.pendingSpawns && c.pendingSpawns.length) tickSpawnQueue(c,now);
@@ -4425,6 +4677,10 @@ function combatTick(c, p, dt, now) {
                     charm: charmGanho, bossPts: bossGanho });
   }
   c.mobs = alive;
+  // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /
+  // occupancy no frame do kill+loot+XP).
+  if (!alive.length && !(c.pendingSpawns && c.pendingSpawns.length) && !c.boss)
+    c._nextWaveAt = (c._tickNow || now || Date.now()) + WAVE_CLEAR_RESPAWN_MS;
   if (typeof greedBossAfterDeaths === "function") greedBossAfterDeaths(c);
 
   // auto sell / equip periodicos sao chamados pelo game loop

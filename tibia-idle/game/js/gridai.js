@@ -74,18 +74,26 @@ function monsterRangeSQM(mob) {
 }
 
 /* Escolhe o alvo vivo mais próximo que o monstro consegue alcançar. O
- * Canary não mantém target inalcançável: se uma parede/corredor fecha a rota,
- * retoma o alvo mais próximo com caminho em vez de ficar parado. */
+ * Canary (Monster::searchTargetImmediate + onThink_async #3922) não mantém
+ * target melee inalcançável: se !hasFollowPath, exclui o atual e pega o
+ * NEAREST alcançável em vez de softlock na parede/corredor. */
 function monsterReachableTarget(c, mob, occ, preferred) {
   const candidates = (c.players && c.players.length ? c.players : [c.player])
     .filter((e) => e && (!e.p || e.p.hp > 0) && e.cx !== undefined && e.cy !== undefined);
   candidates.sort((a, b) => sqmDistance(mob, a) - sqmDistance(mob, b));
   const range = monsterRangeSQM(mob);
+  const td = monsterTargetDistance(mob);
+  const canReach = (ent) => {
+    if (sqmDistance(mob, ent) <= range) return true;
+    return typeof findPathGrid === "function" && !!findPathGrid(mob, ent.cx, ent.cy, occ);
+  };
+  // Sticky no preferred se ainda dá pra chegar (anti-flicker Canary).
+  if (preferred && candidates.includes(preferred) && canReach(preferred)) return preferred;
   for (const ent of candidates) {
-    if (sqmDistance(mob, ent) <= range) return ent;
-    // findPathGrid aceita a célula ocupada pelo alvo como destino.
-    if (typeof findPathGrid === "function" && findPathGrid(mob, ent.cx, ent.cy, occ)) return ent;
+    if (canReach(ent)) return ent;
   }
+  // Melee sem rota: preferir null (vagueia) a insistir no inalcançável.
+  if (td <= 1) return null;
   return preferred || candidates[0] || null;
 }
 
@@ -533,7 +541,10 @@ function updateGridMovement(c, p, dt, now) {
 
   const occ = buildOccupancy(c);
   const vivos = c.mobs.filter((m) => m.hp > 0);
-  const alvo = vivos.length ? vivos[0] : null;
+  // Pack denso: a IA de movimento persegue a box, não o singleton próximo.
+  const alvo = (typeof densestPackTargetClient === "function")
+    ? (densestPackTargetClient(c, c.player, vivos) || (vivos.length ? vivos[0] : null))
+    : (vivos.length ? vivos[0] : null);
 
   // AUTO: a IA anda sozinha. Manual: WASD/clique, um SQM por passo.
   if (activeAlive) {
@@ -569,8 +580,10 @@ function updateGridMovement(c, p, dt, now) {
     const preferred = authoritativeTarget||((typeof partyNearestTarget === "function")
       ? partyNearestTarget(c, m)
       : ((m.target && m.target.p && m.target.p.hp > 0) ? m.target : c.player));
+    // Online: targetId da autoridade (já retargeta no servidor). Offline: A* local.
     const alvoMob = authoritativeTarget||monsterReachableTarget(c, m, occ, preferred);
     m.target = alvoMob;
+    if (alvoMob && alvoMob.id != null) m.targetId = String(alvoMob.id);
     monsterThinkStep(c, m, alvoMob, occ, now);
   }
 }

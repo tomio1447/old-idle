@@ -141,7 +141,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "41";
+const ASSET_VERSION = "42";
 
 /* As telas montam HTML com <img src="assets/..."> direto, sem passar pelo
  * Sprites.get. Em vez de carimbar a versao em cada uma das ~30 ocorrencias
@@ -245,6 +245,10 @@ function fxClientMeta(name) {
 const FX_EFFECT_FILES = {
   "chivalrous-challenge": "assets/effects/chivalrous-challenge.png",
   "challenge-effect": "assets/effects/challenge-effect.png",
+  "forked-glacier-effect": "assets/effects/forked-glacier-effect.png",
+  "forked-thorns-effect": "assets/effects/forked-thorns-effect.png",
+  "chain-effect-blue": "assets/effects/chain-effect-blue.png",
+  "chain-effect-green": "assets/effects/chain-effect-green.png",
 };
 
 function fxFrameCount(name) {
@@ -400,19 +404,25 @@ const FX_FRAMES = {
   "divine-barrage-effect": 12,
   "ethereal-barrage-effect": 12,
   "divine-grenade-effect": 7,
+  "thousand-fist-effect": 12,
   // Impacto em area da Diamond Arrow: a nota oficial do item registra
   // "[Blue Electricity Effects] appears on the damage area". O areaFx
   // importado pelo elemento fisico caiu no "energy-hit" antigo — sprite em
   // assets/fx/blue-electricity.png (Blue_Electricity_Effect.gif do fandom,
   // 18 quadros de 32px).
   "forked-glacier": 13,         // garra eletrica (Effect 324)
+  "forked-glacier-effect": 13,
   "forked-thorns": 19,          // rajada terrosa (Effect 325)
+  "forked-thorns-effect": 19,
+  "chain-effect-blue": 7,
+  "chain-effect-green": 7,
   "death-echo": 9,              // fantasma roxo (Effect 332)
   "fist-thousand": 8,           // corte sombrio (Effect 321)
   "crit-text": 14,              // "CRIT!" (Effect 341)
   "fatal-text": 4,              // "FATAL!" / Onslaught Effect
   "mana-wisp": 14,              // vivacidades de mana (Effect 337)
   "blue-electricity": 18,       // Blue Electricity Effect (diamond arrow)
+  "blue-electricity-effect": 18,
 };
 
 /* Projeteis do Tibia: cada tipo tem 8 direcoes de voo. */
@@ -665,10 +675,18 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt, hudScale) {
 Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
   let n = fxFrameCount(name);
   if (!n) { name = "draw-blood"; n = fxFrameCount(name) || 4; }
-  // Os efeitos oficiais importados da TibiaWiki têm durações diferentes;
-  // quando não há duração customizada, usa ~55ms por quadro com teto seguro.
+  // Duração automática: strips curtos (~55ms/quadro, teto 900ms). Strips
+  // longos (14+ frames: forked thorns, blue electricity, holy-cross…)
+  // ganham teto maior para não comprimir a animação até parecer truncada
+  // — o loop já percorre todos os frames; o problema era só a velocidade.
+  const meta = fxClientMeta(name);
+  let autoDur = Math.max(300, Math.min(900, n * 55));
+  if (meta && meta.frames && meta.duration)
+    autoDur = Math.max(300, Math.min(2200, meta.frames * meta.duration));
+  else if (n > 14)
+    autoDur = Math.max(autoDur, Math.min(1800, n * 70));
   this.effects.push({ x: x, y: y, name: name, t: 0,
-                      frames: n, dur: customDurMs || Math.max(300, Math.min(900, n * 55)),
+                      frames: n, dur: customDurMs || autoDur,
                       scale: Math.max(0.1, Number(customScale) || 1) });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
   // as primeiras eram descartadas antes de aparecer. 120 cabe a maior

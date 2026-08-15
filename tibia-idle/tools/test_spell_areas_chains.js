@@ -28,6 +28,7 @@ must(engine.ALL_SPELLS["exori-gran-flam"].f.flatMin > 16,
 must(engine.ALL_SPELLS["exevo-max-mort"].lvl === 66, "Great Death Beam não virou magia comum no 66");
 must(engine.ALL_SPELLS["exori-ico-scu"] && engine.ALL_SPELLS["exori-ico-scu"].shieldSpell
   && engine.ALL_SPELLS["exori-scu"] && engine.ALL_SPELLS["exori-mas-amp-pug"]
+  && engine.ALL_SPELLS["exori-infir-amp-pug"]
   && engine.ALL_SPELLS["utori-con"] && engine.ALL_SPELLS["uteta-flam"]
   && !engine.ALL_SPELLS["utito-tempo-san"] && !engine.ALL_SPELLS["uteta-tio"],
   "magias novas 15.25 (escudo/thousand fist/stances) ausentes no online");
@@ -105,10 +106,16 @@ const lightning = engine.ALL_SPELLS["exori-amp-vis"];
 must(lightning && lightning.chain === 3 && lightning.range === 7 && !lightning.area,
   "Lightning sem chain:3 / range 7 do 15.25");
 const glacier = engine.ALL_SPELLS["exevo-fur-frigo"];
-must(glacier && glacier.chain === 7 && !glacier.area,
-  "Forked Glacier deveria ser chain:7 sem matriz de área");
-must(engine.ALL_SPELLS["exevo-fur-tera"] && engine.ALL_SPELLS["exevo-fur-tera"].chain === 6,
-  "Forked Thorns sem chain:6");
+must(glacier && glacier.chain === 7 && glacier.chainDist === 4 && glacier.range === 7 && !glacier.area,
+  "Forked Glacier deveria ser chain:7 / chainDist:4 / range:7 sem matriz de área");
+const thorns = engine.ALL_SPELLS["exevo-fur-tera"];
+must(thorns && thorns.chain === 6 && thorns.chainDist === 4 && thorns.range === 7,
+  "Forked Thorns sem chain:6 / chainDist:4 / range:7");
+must(Array.isArray(glacier.vocs) && glacier.vocs.indexOf("druid") >= 0
+  && Array.isArray(thorns.vocs) && thorns.vocs.indexOf("druid") >= 0,
+  "Forked Glacier/Thorns devem ser de druid");
+must(engine.spellVisual(thorns).fx === "forked-thorns-effect",
+  "Forked Thorns sem forked-thorns-effect");
 
 const primary = cell(12, 10, { id: "p" });
 const living = [primary];
@@ -122,6 +129,42 @@ const glHits = engine.spellAreaTargets(auth, glacier, casterC, primary, living);
 must(glHits.length === 7, "Forked Glacier deveria encadear 7 alvos, obteve " + glHits.length);
 must(glHits[0] === primary && glHits[6].id === "m6",
   "Forked Glacier não percorreu a cadeia de vizinhos");
+const thHits = engine.spellAreaTargets(auth, thorns, casterC, primary, living);
+must(thHits.length === 6, "Forked Thorns deveria encadear 6 alvos, obteve " + thHits.length);
+
+const lonely = engine.spellAreaTargets(auth, glacier, casterC, primary, [primary]);
+must(lonely.length === 1 && lonely[0] === primary,
+  "Forked Glacier com 1 alvo deveria acertar o primário");
+
+const farHop = cell(17, 10, { id: "far5" });
+const dist5 = engine.spellAreaTargets(auth, glacier, casterC, primary, [primary, farHop]);
+must(dist5.length === 1 && dist5[0] === primary,
+  "Forked Glacier não deve saltar 5 SQM (chainDist 4)");
+const nearHop = cell(16, 10, { id: "near4" });
+const dist4 = engine.spellAreaTargets(auth, glacier, casterC, primary, [primary, nearHop]);
+must(dist4.length === 2 && dist4[1].id === "near4",
+  "Forked Glacier deve saltar 4 SQM");
+
+/* Caminho visual Bresenham: SQMs vazios entre caster e alvo (sem endpoints). */
+must(typeof engine.bresenhamCells === "function"
+  && typeof engine.spellChainPathCells === "function"
+  && typeof engine.spellChainVisualPath === "function",
+  "helpers de path da corrente não exportados");
+const line4 = engine.spellChainPathCells({ cx: 10, cy: 10 }, { cx: 14, cy: 10 });
+must(line4.length === 3 && line4.every((c) => c.cy === 10)
+  && line4[0].cx === 11 && line4[2].cx === 13,
+  "Bresenham dist4 deveria ter 3 SQMs vazios: " + JSON.stringify(line4));
+const adjPath = engine.spellChainPathCells({ cx: 10, cy: 10 }, { cx: 11, cy: 10 });
+must(adjPath.length === 0, "adjacente não deve gerar path intermediário");
+const visPath = engine.spellChainVisualPath(auth, casterC, [primary, nearHop]);
+must(visPath.length > 2,
+  "path visual caster→primary→near4 deveria ter N>2 células, obteve " + visPath.length);
+must(visPath.every((c) => Number.isFinite(c.hop)),
+  "células do path visual precisam de hop index");
+
+const lightningPath = engine.spellChainVisualPath(auth, casterC, litHits);
+must(lightningPath.length >= 1,
+  "Lightning também deve preencher SQMs vazios no path");
 
 const caldera = engine.ALL_SPELLS["exevo-mas-san"];
 must(caldera && caldera.area, "Divine Caldera ausente");

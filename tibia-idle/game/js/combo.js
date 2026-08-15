@@ -50,6 +50,10 @@ function ensureCombo(p) {
     }
     s.min = Math.max(1, Math.min(9, parseInt(s.min, 10) || 1));
   }
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.sanitizePlayerSpells
+      && typeof SPELLS !== "undefined") {
+    CanaryVocation.sanitizePlayerSpells(p, SPELLS);
+  }
   return c;
 }
 
@@ -95,8 +99,13 @@ function comboAlvosNoRaio(c, alvo, raio) {
   let n = 0;
   for (const m of c.mobs) {
     if (m.hp <= 0) continue;
-    if (typeof sqmDist === "function" ? sqmDist(m, alvo) <= raio
-                                      : m === alvo) n++;
+    let d;
+    if (typeof sqmDist === "function") d = sqmDist(m, alvo);
+    else if (Number.isFinite(Number(m.cx)) && Number.isFinite(Number(alvo.cx)) &&
+             Number.isFinite(Number(m.cy)) && Number.isFinite(Number(alvo.cy)))
+      d = Math.max(Math.abs(m.cx - alvo.cx), Math.abs(m.cy - alvo.cy));
+    else d = m === alvo ? 0 : 99;
+    if (d <= raio) n++;
   }
   return Math.max(1, n);
 }
@@ -112,6 +121,7 @@ function comboRaio(entrada) {
   if (md && md.area && md.area.raio) return md.area.raio;
   if (md && md.chain) return md.chain.dist;
   const s = SPELLS[entrada.id];
+  if (s && Number(s.chain) > 1) return Math.max(1, Number(s.chainDist) || 4);
   if (!s || !s.area) return 0;
   // magias comuns nao trazem a grade resolvida; `alvos` conta SQMs cobertos,
   // entao o raio aproximado e a raiz disso
@@ -135,7 +145,8 @@ function comboInfo(entrada) {
   const s = SPELLS[entrada.id];
   if (!s) return null;
   return { nome: s.name, icon: s.icon, words: s.words,
-           tipo: s.area ? "Área" : "Ataque", lvl: s.lvl,
+           tipo: Number(s.chain) > 1 ? "Cadeia" : (s.area ? "Área" : "Ataque"),
+           lvl: s.lvl,
            mana: s.mana, area: comboEhArea(entrada) };
 }
 
@@ -149,7 +160,8 @@ function comboPronta(c, p, entrada, alvo, now) {
   if (entrada.kind === "spell") {
     const s = SPELLS[entrada.id];
     if (!s || s.type !== "attack") return false;
-    if (s.vocs.indexOf(p.voc) === -1) return false;
+    if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+        : (s.vocs.indexOf(p.voc) === -1)) return false;
     if (p.level < s.lvl) return false;
     if (s.ml && effMagic(p) < s.ml) return false;
     if (p.mp < s.mana) return false;
@@ -188,22 +200,61 @@ function comboAlvosSuficientes(c, entrada, alvo) {
 
 function comboEscolhe(c, p, alvo, now) {
   const lista = ensureCombo(p);
-  // Em multi-target, não gasta SD/strikes únicos se há spell de área
-  // configurada para aproveitar a box. Só cai no alvo único quando resta 1 mob.
-  const multi = c && c.mobs ? c.mobs.filter((m) => m.hp > 0).length > 1 : false;
-  const hasArea = lista.some((x) => x && x.min > 1);
+  // Pack denso: não gasta SD/strikes se há AoE/wave/chain pronta que pegue
+  // 2+ (ou se a box melhor está a poucos SQMs — deixa o movimento chegar).
+  const vivos = c && c.mobs ? c.mobs.filter((m) => m && m.hp > 0) : [];
+  const multi = vivos.length > 1;
+  let packDens = 0;
+  if (multi && typeof densestPackTargetClient === "function") {
+    const pack = densestPackTargetClient(c, c.player || (c && c.players && c.players[0]), vivos);
+    packDens = pack ? helperClusterDensity(vivos, pack, PACK_CLUSTER_R) : 0;
+  } else if (multi) {
+    packDens = vivos.length;
+  }
+  const preferPack = multi && packDens >= 2;
+  const slotMulti = (entrada) => {
+    if (!entrada) return false;
+    if (Number(entrada.min) > 1) return true;
+    return comboEhArea(entrada);
+  };
+  const hitsNow = (entrada) => {
+    if (!entrada) return 0;
+    if (!slotMulti(entrada)) return alvo && alvo.hp > 0 ? 1 : 0;
+    let n = null;
+    if (typeof areaNameOf === "function" && typeof areaCount === "function") {
+      const nome = areaNameOf(entrada.kind, entrada.id);
+      if (nome && c && c.player) {
+        n = areaCount(c, nome, c.player, alvo,
+                      entrada.kind === "spell" ? entrada.id : null);
+      }
+    }
+    if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
+    return n;
+  };
   const spellPronta = (entrada) => {
     if (!entrada || entrada.kind === "rune") return false;
-    if (multi && hasArea && entrada.min <= 1) return false;
     if (!comboPronta(c, p, entrada, alvo, now)) return false;
-    return comboAlvosSuficientes(c, entrada, alvo);
+    const isMulti = slotMulti(entrada);
+    const hits = hitsNow(entrada);
+    const need = Math.max(1, Number(entrada.min) || 1);
+    if (preferPack && !isMulti) return false;
+    // AoE/self: sem monstro na matriz (caldera vazia) nao esta "pronta".
+    if (isMulti && hits < need) return false;
+    if (preferPack && isMulti && hits < 2) return false;
+    if (!comboAlvosSuficientes(c, entrada, alvo)) return false;
+    return true;
   };
   const spellReady = lista.some(spellPronta);
   for (const entrada of lista) {
     if (!entrada) continue;
     if (entrada.kind === "rune" && spellReady) continue;
-    if (multi && hasArea && entrada.min <= 1) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
+    const isMulti = slotMulti(entrada);
+    const hits = hitsNow(entrada);
+    const need = Math.max(1, Number(entrada.min) || 1);
+    if (preferPack && !isMulti) continue;
+    if (isMulti && hits < need) continue;
+    if (preferPack && isMulti && hits < 2) continue;
     if (!comboAlvosSuficientes(c, entrada, alvo)) continue;
     return { kind: entrada.kind, id: entrada.id, entrada: entrada };
   }
