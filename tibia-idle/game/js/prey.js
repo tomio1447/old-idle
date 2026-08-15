@@ -62,6 +62,18 @@ function ensurePrey(p) {
   for (const s of pr.slots) {
     // limpa preys expiradas
     if (s.selected && s.selected.until && s.selected.until <= agora) s.selected = null;
+    // Slot salvo com boss / criatura fora do pool Canary: limpa e rerola.
+    if (s.selected && s.selected.creature &&
+        !preyIsEligibleSlug(s.selected.creature)) {
+      s.selected = null;
+      s.creatures = [];
+    } else if (Array.isArray(s.creatures) && s.creatures.length) {
+      const limpas = s.creatures.filter(preyIsEligibleSlug);
+      if (limpas.length !== s.creatures.length) {
+        s.creatures = limpas;
+        if (s._pending && !preyIsEligibleSlug(s._pending)) s._pending = null;
+      }
+    }
     // Como no client: todo slot desbloqueado já nasce com a lista de 9
     // criaturas pronta (3 low, 3 mid, 3 high).
     if (s.unlocked && (!s.creatures || !s.creatures.length)) {
@@ -79,28 +91,54 @@ function preyFaixaDe(mob) {
   return "high";
 }
 
-/* Pool de criaturas para a prey — o BESTIÁRIO COMPLETO do Canary
- * (window.MONSTERDATA, 1600+ criaturas), como o client usa. Se por alguma
- * razão o MONSTERDATA não estiver carregado, cai nos monstros das hunts. */
+/* Canary PreySlot::reloadMonsterGrid (ioprey.cpp):
+ *   pool = g_game().getBestiaryList()  (só raceId de bestiário — bosses
+ *   entram no bosstiary via bossRaceId e NÃO na lista de prey);
+ *   skip se !mtype || experience==0 || !isPreyable || isPreyExclusive.
+ * isPreyExclusive só entra na seleção paga com prey cards. */
+function preyMonsterLookup(slug) {
+  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA && MONSTERDATA[slug])
+    return MONSTERDATA[slug];
+  if (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
+    return GAMEDATA.monsters[slug] || null;
+  return null;
+}
+
+function preyIsEligible(mob) {
+  if (!mob || !mob.name) return false;
+  if (!mob.best) return false;                 // fora do bestiário
+  if (mob.boss) return false;                  // bosstiary / rewardBoss
+  if (!(Number(mob.exp) > 0)) return false;
+  if (mob.isPreyable === 0 || mob.isPreyable === false) return false;
+  if (mob.isPreyExclusive) return false;      // só via ListAll_Cards
+  return true;
+}
+
+function preyIsEligibleSlug(slug) {
+  return preyIsEligible(preyMonsterLookup(slug));
+}
+
+/* Pool de prey = bestiário elegível do Canary (não o catálogo inteiro). */
 function preyMonsterPool() {
   const slugs = [];
-  if (typeof MONSTERDATA !== "undefined" && MONSTERDATA) {
-    for (const slug in MONSTERDATA) {
-      const mob = MONSTERDATA[slug];
-      if (!mob || !mob.name) continue;
-      // só criaturas com sprite de combate (MOBSHEETS) aparecem na janela
-      if (typeof MOBSHEETS !== "undefined" && MOBSHEETS &&
-          !MOBSHEETS[slug]) continue;
+  const src = (typeof MONSTERDATA !== "undefined" && MONSTERDATA)
+    ? MONSTERDATA
+    : (typeof GAMEDATA !== "undefined" ? GAMEDATA.monsters : null);
+  if (src) {
+    for (const slug in src) {
+      if (!preyIsEligible(src[slug])) continue;
       slugs.push(slug);
     }
     if (slugs.length) return slugs;
   }
-  // fallback: monstros das hunts
+  // fallback: monstros das hunts (já jogáveis; ainda filtra elegibilidade)
   const seen = new Set();
   for (const huntId in (typeof GAMEDATA !== "undefined" ? GAMEDATA.hunts : {})) {
     const hu = GAMEDATA.hunts[huntId];
     for (const slug of (hu.monsters || [])) {
-      if (!seen.has(slug)) { seen.add(slug); slugs.push(slug); }
+      if (seen.has(slug) || !preyIsEligibleSlug(slug)) continue;
+      seen.add(slug);
+      slugs.push(slug);
     }
   }
   return slugs;
@@ -119,8 +157,8 @@ function preyRerollList(p, slotIdx) {
   const pool = { low: [], mid: [], high: [] };
   for (const slug of preyMonsterPool()) {
     if (usadas.has(slug)) continue;
-    const mob = (typeof MONSTERDATA !== "undefined") ? MONSTERDATA[slug] : null;
-    if (!mob) continue;
+    const mob = preyMonsterLookup(slug);
+    if (!mob || !preyIsEligible(mob)) continue;
     pool[preyFaixaDe(mob)].push(slug);
   }
   // embaralha cada faixa
@@ -184,6 +222,8 @@ function preySelect(p, slotIdx, creature, tipoForcado) {
   ensurePrey(p);
   const slot = p.prey.slots[slotIdx];
   if (!slot || !slot.unlocked) return { ok: false, msg: "Slot bloqueado." };
+  if (!preyIsEligibleSlug(creature))
+    return { ok: false, msg: "Criatura não disponível na prey." };
   if (!slot.creatures || slot.creatures.indexOf(creature) === -1)
     return { ok: false, msg: "Criatura não está na lista." };
   const roll = tipoForcado
@@ -285,4 +325,12 @@ function preyBuyPermanentSlot(p) {
   slot.unlocked = true;
   slot.creatures = preyRerollList(p, 2);
   return { ok: true };
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    PREY_SLOT_COUNT, PREY_LIST_SIZE, PREY_BONUSES,
+    ensurePrey, preyMonsterPool, preyIsEligible, preyIsEligibleSlug,
+    preyRerollList, preyReroll, preySelect, preyBonusValue,
+  };
 }
