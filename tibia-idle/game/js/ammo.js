@@ -17,7 +17,9 @@
 const AMMO_CAMPOS = ["atk", "el", "ammoKind", "noMiss", "areaMatrix", "lvl",
                      "w",
                      // maxHitChance: escolhe a tabela de acerto do weapons.cpp
-                     "hit", "areaFx"];
+                     "hit", "areaFx",
+                     // multiplicador idle sobre o resultado da fórmula
+                     "dmgMul"];
 
 function fundirAmmoData() {
   if (typeof AMMODATA === "undefined" || typeof GAMEDATA === "undefined") {

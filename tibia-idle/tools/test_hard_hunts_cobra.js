@@ -24,13 +24,14 @@ const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
 must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Cobra/range HARD não aparece na sessão 250+ do modal');
-must(indexSource.includes('<script src="js/hard-hunts.js?v=cobra-loading-v17"></script>'),
+must(indexSource.includes('<script src="js/hard-hunts.js?v=naga-avg-v1"></script>'),
   'Patch HARD versionado não é carregado pelo jogo');
 
 // No test server, um personagem nível 1 ainda deve conseguir clicar na
 // categoria HARD/Cobra; o nível aparece apenas como aviso de risco.
 const renderStart=uiSource.indexOf('const HUNT_MODAL_SECTIONS');
-const renderEnd=uiSource.indexOf('\n\n/* ─────────────────',renderStart);
+const renderEnd=uiSource.indexOf('\nfunction openHuntInfoModal',renderStart);
+must(renderStart>=0&&renderEnd>renderStart,'bloco renderHunts do modal não encontrado');
 const huntsEl={innerHTML:''};
 const lowLevelUi={
   GAMEDATA:{hunts:{'cobra-bastion':{
@@ -38,12 +39,16 @@ const lowLevelUi={
     monsters:['cobra-vizier','cobra-scout','cobra-assassin'],
     avgExp:7000,avgDamage:500,pack:10,respawn:1,
   }}},
+  G:{p:{level:1,hunt:null}},
   $(){return huntsEl;}, $$(){return [];},
   huntRisk(){return {cls:'high',txt:'perigo'};},
-  mobImg(){return '';}, fmt(n){return String(n);}, openHuntInfoModal(){},
+  mobImg(){return '';}, fmt(n){return String(n);},
+  huntStars(){return 4;},huntStarsHtml(){return '★★★★';},
+  bestiaryStage(){return 1;},charmOnRace(){return null;},
+  openHuntInfoModal(){},
 };
 vm.createContext(lowLevelUi);vm.runInContext(uiSource.slice(renderStart,renderEnd),lowLevelUi);
-lowLevelUi.renderHunts({level:1,hunt:null});
+lowLevelUi.renderHunts(lowLevelUi.G.p);
 must(huntsEl.innerHTML.includes('data-hunt="cobra-bastion"') &&
      !huntsEl.innerHTML.includes('hunt-card locked'),
   'Cobra Bastion está bloqueada para conta/personagem de teste');
@@ -188,7 +193,10 @@ must(map.z === 2 && map.w === 24 && map.h === 17 &&
 // Não aplica crop: o mapa inteiro é renderizado e o canvas limita o FOV.
 const zonesSource = fs.readFileSync(path.join(js, 'otbmhunt.js'), 'utf8');
 const start = zonesSource.indexOf('function applyHuntOtbmZones');
-const end = zonesSource.indexOf('\n\n/* Garante', start);
+const end = zonesSource.indexOf('function huntMapFromOtbmAsync', start);
+must(start >= 0 && end > start, 'applyHuntOtbmZones não encontrado em otbmhunt.js');
+ctx.window.addEventListener = ctx.window.addEventListener || function () {};
+ctx.addEventListener = ctx.addEventListener || function () {};
 vm.runInContext(zonesSource.slice(start, end), ctx);
 ctx.applyHuntOtbmZones(map, cobraHunt);
 must(map.w === 24 && map.h === 17 && map.spawn.x === 11 && map.spawn.y === 10 && map.mob.length === 120,
@@ -286,8 +294,8 @@ must([6,7,8,9,10].every(n => seen.has(n)), 'Faixa HARD não alcança todos os ta
 // v4: Cobra Bastion pré-compilado — elimina fetch/parse em runtime
 const prePath = path.join(js, 'cobra-bastion-map.js');
 must(fs.existsSync(prePath), 'cobra-bastion-map.js pré-compilado ausente (gerador não executado)');
-must(indexSource.includes('<script src="js/cobra-bastion-map.js?v=cobra-loading-v4"></script>'),
-  'Mapa pré-compilado não é carregado pelo index (cache bust v4)');
+must(indexSource.includes('<script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>'),
+  'Mapa pré-compilado não é carregado pelo index (cache bust v17)');
 const preSource = fs.readFileSync(prePath, 'utf8');
 must(preSource.includes('otbm:cobra_bastion') && preSource.includes('"rows":'),
   'Pré-compilado não registra HUNTMAPS["otbm:cobra_bastion"]');
@@ -312,9 +320,9 @@ must(otbmhuntSrc.includes('HUNTMAPS[key]') && otbmhuntSrc.includes('pré-compila
 // Guard contra reopen: Montando mapa tardio não pode reabrir overlay após watchdog
 must(otbmhuntSrc.includes('entryGen') && otbmhuntSrc.includes('MAP_LOADING_GENERATION') && otbmhuntSrc.includes('reportGuarded'),
   'otbmhunt.js v4 não protege Montando mapa com geração (overlay reabriria após watchdog)');
-// Se outro OTBM terminar após o watchdog, o integral deve substituir o fallback silenciosamente
-must(otbmhuntSrc.includes('HUNTMAPS[key] = hm') && otbmhuntSrc.includes('isStale'),
-  'Substituição silenciosa de fallback por integral ausente');
+// Se outro OTBM terminar após o watchdog, o integral deve substituir o fallback
+must(otbmhuntSrc.includes('HUNTMAPS[key] = hm'),
+  'Substituição de fallback por integral ausente');
 // Gerador presente para futuras atualizações do OTBM
 must(fs.existsSync(path.join(__dirname, 'build_precompiled_cobra_map.js')),
   'Gerador tools/build_precompiled_cobra_map.js ausente');

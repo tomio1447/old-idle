@@ -506,6 +506,12 @@ def parse_arquivo(caminho):
         m["passivo"] = 1
     if re.search(r"rewardBoss\s*=\s*true", flags):
         m["boss"] = 1
+    # PreySlot::reloadMonsterGrid (Canary ioprey.cpp): free/gold reroll
+    # exige isPreyable && !isPreyExclusive. Default no C++: preyable=true.
+    if re.search(r"isPreyable\s*=\s*false", flags):
+        m["isPreyable"] = 0
+    if re.search(r"isPreyExclusive\s*=\s*true", flags):
+        m["isPreyExclusive"] = 1
 
     imu = parse_imunidades(txt)
     if imu:
@@ -580,11 +586,12 @@ def main():
     comLoot = sum(1 for m in todos.values() if m.get("loot"))
     comBest = sum(1 for m in todos.values() if m.get("best"))
     bosses = sum(1 for m in todos.values() if m.get("boss"))
+    preyEx = sum(1 for m in todos.values() if m.get("isPreyExclusive"))
     print("monstros:", len(todos), "| ignorados:", ignorados)
     comVoz = sum(1 for m in todos.values() if m.get("voices"))
     print("com habilidade:", comSkill, "| com loot:", comLoot,
           "| com bestiario:", comBest, "| bosses:", bosses,
-          "| com falas:", comVoz)
+          "| preyExclusive:", preyEx, "| com falas:", comVoz)
     print("tamanho:", round(os.path.getsize(js) / 1024 / 1024, 1), "MB")
 
 

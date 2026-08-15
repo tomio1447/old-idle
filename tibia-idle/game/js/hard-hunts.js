@@ -86,6 +86,12 @@
     otbmRuntimeHeight: 30,
     otbmSpawn: { x: 1017, y: 1019, z: 7 },
     otbmMobBounds: { x: 1008, y: 1008, w: 23, h: 21, z: 7 },
+    // Médias Canary (naga-archer/warrior + makara). O gamedata antigo
+    // trazia avgDamage 273 / avgHp 3200 — subestimava o risco (badge MÉDIO).
+    avgHp: 5073,
+    avgExp: 5587,
+    avgDamage: 468,
+    avgArmor: 72,
   }));
   const dtSeal = GAMEDATA.hunts["dt-seal"];
   if (dtSeal) harden(Object.assign(dtSeal, {

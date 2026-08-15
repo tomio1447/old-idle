@@ -172,10 +172,12 @@ function areaMobs(c, nome, origem, alvo, spellId) {
   return out;
 }
 
-/* Quantos monstros a area pegaria — usado pelo requisito "N+" do combo. */
+/* Quantos monstros a area pegaria — usado pelo requisito "N+" do combo
+ * e pelo gate de self-AoE (exevo mas san etc.). Devolve 0 quando a matriz
+ * e conhecida e ninguem esta dentro; null so quando nao da para medir. */
 function areaCount(c, nome, origem, alvo, spellId) {
   const l = areaMobs(c, nome, origem, alvo, spellId);
-  return l === null ? null : Math.max(1, l.length);
+  return l === null ? null : l.length;
 }
 
 /* Nome da area de uma magia/runa, olhando as tres fontes de dados */

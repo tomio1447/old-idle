@@ -31,6 +31,7 @@ const MD_CAMPOS = [
   "mitigation", "resist", "skills", "defSkills", "looktype", "race",
   "raceId", "targetDistance", "staticAttack", "runAt", "ranged",
   "imune", "loot", "best", "grupo", "boss", "passivo",
+  "isPreyable", "isPreyExclusive",
   // falas do monster.voices, consumidas pelo monsterThinkYell
   "voices",
 ];

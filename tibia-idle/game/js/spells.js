@@ -37,6 +37,8 @@ const ALL_SPELLS = (typeof window !== "undefined" && window.SPELLDATA)
 
 /* A magia esta disponivel para essa vocacao? */
 function spellForVoc(s, voc) {
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.spellAllowedForVoc)
+    return CanaryVocation.spellAllowedForVoc(s, voc);
   return !!s && Array.isArray(s.vocs) && s.vocs.indexOf(voc) !== -1;
 }
 

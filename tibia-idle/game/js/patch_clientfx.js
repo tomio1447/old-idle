@@ -56,6 +56,12 @@
     entry("exori amp kor").miss = "$weapon";      // executioners_throw.lua
     entry("exori con").miss = "ethereal-spear";   // ethereal_spear.lua
     entry("exori gran con").miss = "ethereal-spear";
+    // Forked Glacier / Thorns (15.25): impacto oficial + projetil do elemento.
+    // Sem estas chaves o cliente caia no ice-attack/hit-by-poison generico.
+    entry("exevo fur frigo").fx = "forked-glacier-effect";
+    entry("exevo fur frigo").miss = "ice";
+    entry("exevo fur tera").fx = "forked-thorns-effect";
+    entry("exevo fur tera").miss = "earth";
   }
 
   // 3) runas: efeito de impacto + arremessavel oficiais
@@ -79,6 +85,8 @@
   //    deste patch, entao o slug novo chega ao GAMEDATA.items sozinho.
   if (W.AMMODATA && W.AMMODATA["diamond-arrow"]) {
     W.AMMODATA["diamond-arrow"].areaFx = "blue-electricity";
+    // idle balance: +15% no resultado da fórmula de distância
+    W.AMMODATA["diamond-arrow"].dmgMul = 1.15;
     // o projetil ja voa com a sprite oficial (diamond-arrow_*, extraida
     // do client); nada a trocar aqui.
   }
@@ -95,5 +103,6 @@
   if (W.GAMEDATA && W.GAMEDATA.items && W.GAMEDATA.items["diamond-arrow"]) {
     // cinto e suspensorio para quem consulta o item antes da fusao
     W.GAMEDATA.items["diamond-arrow"].areaFx = "blue-electricity";
+    W.GAMEDATA.items["diamond-arrow"].dmgMul = 1.15;
   }
 })();
