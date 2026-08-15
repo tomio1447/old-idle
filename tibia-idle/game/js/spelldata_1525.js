@@ -104,8 +104,8 @@
   // Great Death Beam vira magia comum no nivel 66
   if (SD["exevo-max-mort"]) SD["exevo-max-mort"].lvl = 66;
 
-  // Divine Caldera: base 140 -> 160
-  escala("exevo-mas-san", 160 / 140);
+  // Divine Caldera: base 140 -> 160 (15.25) e +30% idle balance
+  escala("exevo-mas-san", (160 / 140) * 1.30);
   // Wrath of Nature: base 150 -> 175 (e "dano mais consistente": a
   // formula real mudaria no servidor; aqui mantemos a faixa escalada)
   escala("exevo-gran-mas-tera", 175 / 150);
@@ -286,12 +286,16 @@
       aggr: true,
     },
     // ---- Druid: magias bifurcadas, alvo + N proximos (chain generica)
+    // TibiaWiki/Canary 15.25: salto de 4 SQM a partir do alvo (como Lightning),
+    // alcance 7, grupo attack 2s. Glacier acerta 1+6; Thorns 1+5.
     "exevo-fur-frigo": {
       id: "exevo-fur-frigo", sid: 302, name: "Forked Glacier",
       words: "exevo fur frigo", type: "attack", lvl: 90, mana: 180,
       soul: 0, ml: 0, icon: 195, vocs: ["druid"], cd: 6000,
       grupos: { "1": 2000 }, gcd: 2000, premium: true, needTarget: true,
-      param: false, group: "attack", element: "ice", chain: 7, range: 5,
+      param: false, group: "attack", element: "ice", chain: 7, chainDist: 4,
+      range: 7, fx: "forked-glacier-effect", missile: "ice",
+      chainFx: "chain-effect-blue",
       f: { modo: "magic", lvlMin: 0.2, mlMin: 3, flatMin: 78,
            lvlMax: 0.2, mlMax: 4.5, flatMax: 116 },
       aggr: true,
@@ -301,7 +305,9 @@
       words: "exevo fur tera", type: "attack", lvl: 80, mana: 180,
       soul: 0, ml: 0, icon: 196, vocs: ["druid"], cd: 6000,
       grupos: { "1": 2000 }, gcd: 2000, premium: true, needTarget: true,
-      param: false, group: "attack", element: "earth", chain: 6, range: 5,
+      param: false, group: "attack", element: "earth", chain: 6, chainDist: 4,
+      range: 7, fx: "forked-thorns-effect", missile: "earth",
+      chainFx: "chain-effect-green",
       f: { modo: "magic", lvlMin: 0.2, mlMin: 3, flatMin: 84,
            lvlMax: 0.2, mlMax: 4.5, flatMax: 126 },
       aggr: true,
@@ -325,6 +331,17 @@
       soul: 0, ml: 0, icon: 205, vocs: ["monk"], cd: 12000,
       grupos: { "1": 2000 }, gcd: 2000, premium: true, needTarget: false,
       param: false, group: "attack", element: "physical", range: 1,
+      monk: "builder",
+      aggr: true,
+    },
+    // ---- Monk: builder de longo alcance (TibiaWiki / update 15.12).
+    // Base power 25, range 7, cd 20s — versão fraca do Mystic Repulse.
+    "exori-infir-amp-pug": {
+      id: "exori-infir-amp-pug", sid: 306, name: "Lesser Mystic Repulse",
+      words: "exori infir amp pug", type: "attack", lvl: 6, mana: 30,
+      soul: 0, ml: 0, icon: 207, vocs: ["monk"], cd: 20000,
+      grupos: { "1": 2000 }, gcd: 2000, premium: false, needTarget: true,
+      param: false, group: "attack", element: "physical", range: 7,
       monk: "builder",
       aggr: true,
     },
@@ -425,8 +442,13 @@
     W["exevo tempo mas san"] = { fx: "divine-grenade-effect" };
     W["exevo fur frigo"] = { fx: "forked-glacier-effect", miss: "ice" };
     W["exevo fur tera"] = { fx: "forked-thorns-effect", miss: "earth" };
+    if (SPELLFX.names) {
+      SPELLFX.names["forked glacier"] = { fx: "forked-glacier-effect", miss: "ice" };
+      SPELLFX.names["forked thorns"] = { fx: "forked-thorns-effect", miss: "earth" };
+    }
     W["exevo mort ora"] = { fx: "death-echo-effect", miss: "death" };
     W["exori mas amp pug"] = { fx: "thousand-fist-effect" };
+    W["exori infir amp pug"] = { fx: "blow-white" };
     W["utito tempo"] = { fx: "stance-blood-rage" };
     W["utamo tempo"] = { fx: "stance-protector" };
     W["utori con"] = { fx: "stance-sharpshooter" };
@@ -458,10 +480,10 @@
                            needTarget: 1, nome: "Ethereal Barrage",
                            range: 5, words: "exevo dir moe" };
     T["exevo-fur-frigo"] = { blockWalls: 1, needTarget: 1,
-                             nome: "Forked Glacier", range: 5,
+                             nome: "Forked Glacier", range: 7,
                              words: "exevo fur frigo" };
     T["exevo-fur-tera"] = { blockWalls: 1, needTarget: 1,
-                            nome: "Forked Thorns", range: 5,
+                            nome: "Forked Thorns", range: 7,
                             words: "exevo fur tera" };
     T["exevo-mort-ora"] = { areaNome: "AREA_ECHO", blockWalls: 1,
                             needTarget: 1, nome: "Death Echo", range: 5,
@@ -469,6 +491,9 @@
     T["exori-mas-amp-pug"] = { blockWalls: 1, needTarget: 1,
                                nome: "Thousand Fist Blows", range: 1,
                                words: "exori mas amp pug" };
+    T["exori-infir-amp-pug"] = { blockWalls: 1, needTarget: 1,
+                                 nome: "Lesser Mystic Repulse", range: 7,
+                                 words: "exori infir amp pug" };
     // alcance 3 -> 7 das strikes melhoradas (fonte do importador tambem
     // precisa acompanhar, senao o areafx sai curto)
     for (const id of ["exori-gran-flam", "exori-gran-vis",
@@ -543,9 +568,20 @@
     if (MD["exori-gran-mas-nia"]) {
       MD["exori-gran-mas-nia"].chain = { alvos: 8, dist: 2 };
       MD["exori-gran-mas-nia"].echo = 0.5;
+      MD["exori-gran-mas-nia"].lvl = 300;
     }
+    // Alinha mana com TibiaWiki / SPELLDATA (Canary importado estava defasado).
+    if (MD["exori-infir-nia"]) MD["exori-infir-nia"].mana = 18;
+    if (MD["exori-mas-nia"]) MD["exori-mas-nia"].mana = 195;
     // Mass Spirit Mend deixou de ser spender (mana/icone em SPELLDATA).
-    if (MD["exura-mas-nia"]) delete MD["exura-mas-nia"].monk;
+    if (MD["exura-mas-nia"]) {
+      delete MD["exura-mas-nia"].monk;
+      MD["exura-mas-nia"].mana = 400;
+    }
+    // CDs do importador vieram em segundos/minutos sem *1000.
+    if (MD["utevo-nia"]) MD["utevo-nia"].cd = 120000;
+    if (MD["utamo-tio"]) MD["utamo-tio"].cd = 600000;
+    if (MD["uteta-res-tio"]) MD["uteta-res-tio"].cd = 7200000;
     // Mentor Other foi REMOVIDO do jogo (secao Monks do update).
     delete SD["uteta-tio"];
     delete MD["uteta-tio"];
@@ -556,6 +592,13 @@
       fxRaw: "EFFECT_321_1525", gcd: 2000, lvl: 120, mana: 145,
       monk: "builder", nome: "Thousand Fist Blows", pow: 62, range: 1,
       area: { raio: 1, sqm: 9 }, words: "exori mas amp pug",
+    };
+    // Lesser Mystic Repulse (15.12): builder a distancia, pow 25.
+    MD["exori-infir-amp-pug"] = {
+      cd: 20000, element: "physical", fx: "blow-white",
+      fxRaw: "CONST_ME_BLOW_WHITE", gcd: 2000, lvl: 6, mana: 30,
+      monk: "builder", nome: "Lesser Mystic Repulse", pow: 25, range: 7,
+      words: "exori infir amp pug",
     };
   }
 

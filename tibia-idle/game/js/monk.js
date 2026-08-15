@@ -40,6 +40,7 @@ const HARMONY_BASE = 8;
 const MONK_BUILDERS = [
   "exori-infir-pug",      // Swift Jab
   "exori-pug",            // Double Jab
+  "exori-infir-amp-pug",  // Lesser Mystic Repulse
   "exori-amp-pug",        // Mystic Repulse
   "exori-mas-pug",        // Flurry of Blows
   "exori-med-pug",        // Chained Penance
