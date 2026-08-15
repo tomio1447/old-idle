@@ -110,9 +110,12 @@
   border-radius: 2px;
 }
 
-/* Glow for ring/amulet */
+/* Glow for ring/amulet — amarelo removido (Canary: transform sprite) */
 #equip .slot.acc-glow {
-  box-shadow: 0 0 8px rgba(212, 175, 55, .3);
+  box-shadow: none;
+}
+#equip .slot.acc-active {
+  box-shadow: none;
 }
 
 /* Stop button */

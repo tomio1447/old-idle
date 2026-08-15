@@ -482,11 +482,15 @@ function renderEquip(p) {
       const cnt = slot === "ammo" ? "∞" : e.count;
       const tierTxt = typeof forgeTierTextForEntry === "function" ? forgeTierTextForEntry(e) : forgeTierText(e.item);
       const tierCls = typeof forgeTierClassForEntry === "function" ? forgeTierClassForEntry(e) : forgeTierClass(e.item);
-      // anel/amuleto equipado: sprite brilha (classe .acc-glow) — o brilho
-      // indica que os atributos do item estão ativos no personagem
-      const glow = (slot === "ring" || slot === "amulet") ? " acc-glow" : "";
+      // anel/amuleto equipado: Canary usa transformEquipTo (sprite ativo).
+      // Sem glow amarelo no slot — só o sprite transformado / filtro neutro.
+      const glow = (slot === "ring" || slot === "amulet") ? " acc-active" : "";
+      const showSlug = (typeof accessoryDisplaySlug === "function")
+        ? accessoryDisplaySlug(e.item, true) : e.item;
+      const chg = (typeof accessoryChargesNow === "function") ? accessoryChargesNow(p, slot) : null;
+      const chgTxt = chg ? `<span class="cnt charge-cnt">${chg.now}</span>` : (cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : "");
       h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(e.item)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : ""}
+        ${itemImg(showSlug)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${chgTxt}
       </div>`;
     } else if (slot === "shield" && p.equip.weapon &&
                (p.voc === "knight" || p.voc === "elite knight" || p.voc === "monk") &&
@@ -751,24 +755,36 @@ const HUNT_MODAL_SECTIONS = [
   { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland"] },
 ];
 
-/* Único catálogo público de hunts. As áreas 7.4 continuam no GAMEDATA para
- * compatibilidade de saves/missões, mas não são mais exibidas na interface. */
+const HUNT_UI = { busca: "" };
+
+/* Único catálogo público de hunts — layout Canary/OTC Cyclopedia:
+ * dificuldade (estrelas), nível recomendado, criaturas e risco. */
 function renderHunts(p) {
   const root = $("#hunts-modal-list");
   if (!root || !p) return;
   const cur = p.hunt;
+  const busca = (HUNT_UI.busca || "").toLowerCase();
   const card = (id) => {
     const hu = GAMEDATA.hunts[id];
     if (!hu) return "";
+    if (busca && (hu.name || "").toLowerCase().indexOf(busca) === -1) return "";
     const risk = huntRisk(p, hu);
+    const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
+    const starsHtml = typeof huntStarsHtml === "function"
+      ? huntStarsHtml(stars) : `★${stars}`;
     const aviso = risk.cls === "high"
       ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
-    const mobs = (hu.monsters || []).slice(0, 4).map((m) => mobImg(m, 30)).join("");
-    return `<button class="hunt-card hunt-modal-card ${cur === id ? "active" : ""}" data-hunt="${id}">
-      <span class="mobs">${mobs}</span>
+    const mobs = (hu.monsters || []).slice(0, 4).map((m) => {
+      const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 1;
+      const charm = typeof charmOnRace === "function" ? charmOnRace(p, m) : null;
+      return `<span class="hunt-modal-mob">${mobImg(m, 24, st ? "" : "filter:brightness(0);")}${
+        charm && typeof charmIconHtml === "function" ? charmIconHtml(charm, 12) : ""}</span>`;
+    }).join("");
+    return `<button class="hunt-card hunt-modal-card hunt-canary-card ${cur === id ? "active" : ""}" data-hunt="${id}">
+      <span class="mobs" aria-hidden="true">${mobs}</span>
       <span class="info">
-        <span class="nm">${hu.name}</span>
-        <span class="meta">nv ${hu.level} · ${fmt(hu.avgExp)} xp/kill</span>
+        <span class="nm">${hu.name} ${starsHtml}</span>
+        <span class="meta">Nível recomendado <b>${hu.level}</b> · ${fmt(hu.avgExp)} xp/kill</span>
         ${aviso}
       </span>
       <span class="risk ${risk.cls}">${risk.txt}</span>
@@ -797,12 +813,22 @@ function openHuntsModal() {
   body.classList.add("hunts-modal-shell");
   body.innerHTML = `<div class="panel-title hunts-modal-title">
       <span class="hunts-demon-icon" aria-hidden="true"></span>
-      <span>HUNTS</span><button class="sm" id="hunts-modal-close">Fechar</button>
+      <span>HUNTS</span>
+      <input id="hunts-modal-busca" placeholder="buscar…" value="${HUNT_UI.busca || ""}"
+        style="margin-left:8px;width:120px;padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      <button class="sm" id="hunts-modal-close">Fechar</button>
     </div><div class="panel-body" id="hunts-modal-list"></div>`;
   modal.classList.add("show");
   $("#hunts-modal-close").addEventListener("click", () => {
     modal.classList.remove("show");
     body.classList.remove("hunts-modal-shell");
+  });
+  const inp = $("#hunts-modal-busca");
+  if (inp) inp.addEventListener("input", () => {
+    HUNT_UI.busca = inp.value;
+    renderHunts(G.p);
+    const n = $("#hunts-modal-busca");
+    if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
   renderHunts(G.p);
 }
@@ -848,9 +874,12 @@ function openHuntInfoModal(id) {
     </div>`;
   };
 
+  const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
+  const starsHtml = typeof huntStarsHtml === "function" ? huntStarsHtml(stars) : "";
   $("#modal-body").innerHTML = `
     <div class="panel-title">${hu.name}
-      <span class="tiny dim" style="margin-left:6px">nv ${hu.level}</span>
+      <span style="margin-left:8px">${starsHtml}</span>
+      <span class="tiny dim" style="margin-left:6px">nv recomendado ${hu.level}</span>
       <span style="flex:1"></span>
       <span class="risk ${risk.cls}" style="margin-right:6px">${risk.txt}</span>
       <button class="sm" id="huntinfo-close">✕</button>
@@ -858,6 +887,7 @@ function openHuntInfoModal(id) {
     <div class="panel-body">
       ${risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
       <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
+        <span class="tiny dim">Dificuldade <b>${stars}/5</b></span>
         <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
         <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>
         <span class="tiny dim">Pack: <b>${packLabel}</b> criaturas</span>
@@ -1111,27 +1141,54 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
       action: () => { if (sellBagItem(p, slug, instId) > 0) refresh(); },
     });
   } else {
+  opts.push({
+    label: "Mover para Loot Pouch",
+    hint: value > 0 ? `${fmtFull(value)} gp` : "",
+    action: () => {
+      if (instId && inst && inst.tier > 0) {
+        toast("Itens tierados precisam ficar em bag/depot/equip. Não mova para a Loot Pouch.");
+        return;
+      }
+      if (instId && typeof takeBagItemInstance === "function") {
+        const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
+        if (!taken) return;
+        deleteItemInstance(p, taken.id);
+        addLootPouch(p, slug, 1);
+      } else {
+        addLootPouch(p, slug, count);
+        delete p.bag[slug];
+      }
+      addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
+      refresh();
+    },
+  });
+  if (typeof isSupplyStashableItem === "function" && isSupplyStashableItem(slug)) {
+    const autoOn = typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug);
     opts.push({
-      label: "Mover para Loot Pouch",
-      hint: value > 0 ? `${fmtFull(value)} gp` : "",
+      label: autoOn ? "Auto Supply Stash: ON" : "Auto Supply Stash",
+      hint: autoOn ? "loot → Supply Stash" : "ligar",
       action: () => {
-        if (instId && inst && inst.tier > 0) {
-          toast("Itens tierados precisam ficar em bag/depot/equip. Não mova para a Loot Pouch.");
-          return;
-        }
-        if (instId && typeof takeBagItemInstance === "function") {
-          const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
-          if (!taken) return;
-          deleteItemInstance(p, taken.id);
-          addLootPouch(p, slug, 1);
-        } else {
-          addLootPouch(p, slug, count);
-          delete p.bag[slug];
-        }
-        addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
+        setAutoSupplyStash(p, slug, !autoOn);
+        toast(autoOn
+          ? `<b>${it.n}</b>: Auto Supply Stash desligado (loot volta para a pouch).`
+          : `<b>${it.n}</b>: loot irá para a Supply Stash.`);
+        if (typeof save === "function") save();
         refresh();
+        if (typeof renderSupplyStash === "function") renderSupplyStash(p);
       },
     });
+    opts.push({
+      label: "Mover para Supply Stash",
+      action: () => {
+        if (typeof moveItemToSupplyStash === "function" &&
+            moveItemToSupplyStash(p, { source: "bag", slug: slug })) {
+          addLog("info", `Moveu <b>${it.n}</b> para a Supply Stash.`);
+          refresh();
+          if (typeof renderSupplyStash === "function") renderSupplyStash(p);
+        }
+      },
+    });
+  }
   }
   opts.push({
     label: "Destruir",
@@ -1385,8 +1442,10 @@ function renderLootPouch(p) {
   if (sellBtn) sellBtn.disabled = !entries.some((s) =>
     typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
   // Autoseller: vende TUDO automaticamente quando a pouch atingir X%.
-  // Respeita as regras do seller (lista "NÃO VENDER" e itens sem valor).
-  const asOn = !!p.config.pouchAutoSell;
+  // Respeita as regras do seller (lista "NÃO VENDER" e itens sem valor). VIP only.
+  const vipOk = typeof vipAutoSellAllowed !== "function" || vipAutoSellAllowed();
+  if (!vipOk && p.config.pouchAutoSell) p.config.pouchAutoSell = false;
+  const asOn = !!p.config.pouchAutoSell && vipOk;
   const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
   const asFill = pouchFillPct(p);
   const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
@@ -1395,9 +1454,9 @@ function renderLootPouch(p) {
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
-        <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller</span>
+        <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "" : "(VIP)"}</span>
         <span class="tiny dim">slots ${pouchSlots}/${pouchCap}${pouchOverflow ? ` · overflow seguro +${pouchOverflow}` : ""} · ${asFill}% / vende em ${asPct}%</span>
-        <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
+        <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell" ${vipOk ? "" : "disabled title=\"Exclusivo VIP\""}>${asOn ? "ATIVO — desligar" : (vipOk ? "LIGAR" : "VIP")}</button>
       </div>
       <div class="row mt4" style="align-items:center;gap:6px">
         <input type="range" id="pouch-autosell-pct" min="10" max="100" step="5" value="${asPct}"
@@ -1452,12 +1511,133 @@ function renderLootPouch(p) {
 }
 
 /* Liga o toggle + slider do Autoseller da Loot Pouch. */
+/* ---------------------------------------------------------- Supply Stash */
+function renderSupplyStash(p) {
+  const box = $("#supplystash");
+  if (!box) return;
+  if (typeof ensureSupplyStash === "function") ensureSupplyStash(p);
+  else { p.supplyStash = p.supplyStash || {}; }
+  if (typeof bindDrop === "function" && !box.dataset.dropBound) {
+    box.dataset.dropBound = "1";
+    bindDrop(box, (payload) => {
+      const ok = typeof moveItemToSupplyStash === "function" && moveItemToSupplyStash(G.p, payload);
+      if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a Supply Stash.`);
+      return ok;
+    });
+  }
+  const used = typeof supplyStashSlotsUsed === "function" ? supplyStashSlotsUsed(p) : Object.keys(p.supplyStash || {}).length;
+  const cap = typeof SUPPLY_STASH_CAP !== "undefined" ? SUPPLY_STASH_CAP : 20;
+  const entries = Object.keys(p.supplyStash || {})
+    .filter((slug) => (p.supplyStash[slug] || 0) > 0 && GAMEDATA.items[slug])
+    .sort((a, b) => (GAMEDATA.items[a].n || a).localeCompare(GAMEDATA.items[b].n || b));
+  const head = `<div class="tiny dim" style="grid-column:1/-1;margin:0 0 3px 2px">
+    slots ${used}/${cap} · rings/amulets com cargas · Auto Supply Stash no botão direito
+  </div>`;
+  if (!entries.length) {
+    box.innerHTML = head + `<div class="dim small center" style="grid-column:1/-1;padding:10px">Supply Stash vazia</div>`;
+    return;
+  }
+  box.innerHTML = head + entries.map((slug) => {
+    const n = p.supplyStash[slug];
+    const it = GAMEDATA.items[slug];
+    const auto = typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug);
+    return `<div class="inv-item ${itemClsBorder(slug)}${auto ? " stash-auto" : ""}" data-stash-item="${slug}" draggable="true"
+      title="${it.n}${auto ? " · Auto ON" : ""}">
+      ${itemImg(slug)}${n > 1 ? `<span class="cnt">${n > 999 ? (Math.floor(n / 100) / 10) + "k" : n}</span>` : ""}
+    </div>`;
+  }).join("");
+
+  $$("#supplystash [data-stash-item]").forEach((el) => {
+    const slug = el.dataset.stashItem;
+    if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "stash", slug: slug });
+    el.addEventListener("mouseenter", () => {
+      const n = p.supplyStash[slug] || 0;
+      const auto = typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug);
+      showTip(itemTip(slug, `${n}x · Supply Stash${auto ? " · Auto ON" : ""} · Clique direito para opções`));
+    });
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openSupplyStashItemMenu(p, slug, e.clientX, e.clientY);
+    });
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSupplyStashItemMenu(p, slug, e.clientX, e.clientY);
+    });
+  });
+}
+
+function openSupplyStashItemMenu(p, slug, x, y) {
+  const it = GAMEDATA.items[slug];
+  if (!it) return;
+  const count = (p.supplyStash && p.supplyStash[slug]) || 0;
+  const autoOn = typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug);
+  const opts = [
+    { label: "Detalhes", action: () => openItemDetails(slug, count) },
+    ...(it.s ? [{
+      label: "Equipar",
+      hint: it.s,
+      action: () => {
+        if (typeof equipItemFromContainer === "function" &&
+            equipItemFromContainer(p, slug, "stash", it.s)) {
+          toast(`Equipou <b>${it.n}</b> da Supply Stash.`);
+          renderAll();
+        }
+      },
+    }] : []),
+    {
+      label: "Mover para backpack",
+      action: () => {
+        if (!addItem(p, slug, count)) { toast("Mochila cheia."); return; }
+        removeSupplyStash(p, slug, count);
+        renderAll();
+      },
+    },
+    {
+      label: "Mover para Loot Pouch",
+      action: () => {
+        addLootPouch(p, slug, count);
+        removeSupplyStash(p, slug, count);
+        renderAll();
+      },
+    },
+    {
+      label: autoOn ? "Auto Supply Stash: ON" : "Auto Supply Stash",
+      hint: autoOn ? "desligar" : "ligar",
+      action: () => {
+        setAutoSupplyStash(p, slug, !autoOn);
+        toast(!autoOn
+          ? `<b>${it.n}</b>: loot irá para a Supply Stash.`
+          : `<b>${it.n}</b>: Auto Supply Stash desligado.`);
+        if (typeof save === "function") save();
+        renderAll();
+      },
+    },
+    {
+      label: "Destruir",
+      danger: true,
+      action: () => {
+        if (!confirm(`Destruir ${count}x ${it.n} da Supply Stash?`)) return;
+        removeSupplyStash(p, slug, count);
+        renderAll();
+      },
+    },
+  ];
+  showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, opts);
+}
+
 function bindPouchAutoseller(p) {
   const btn = $("#btn-pouch-autosell");
   const slider = $("#pouch-autosell-pct");
   if (btn && !btn._bound) {
     btn._bound = true;
     btn.addEventListener("click", () => {
+      if (typeof vipAutoSellAllowed === "function" && !vipAutoSellAllowed()) {
+        p.config.pouchAutoSell = false;
+        toast("Autoseller é exclusivo VIP.", "bad");
+        renderLootPouch(p);
+        return;
+      }
       p.config.pouchAutoSell = !p.config.pouchAutoSell;
       toast(p.config.pouchAutoSell
         ? `Autoseller LIGADO — vende itens liberados em ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct}% (classes 3/4 protegidas)`
@@ -1523,6 +1703,32 @@ function openPouchItemMenu(p, slug, x, y) {
         renderAll();
       },
     },
+    ...(typeof isSupplyStashableItem === "function" && isSupplyStashableItem(slug) ? [
+      {
+        label: (typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug))
+          ? "Auto Supply Stash: ON" : "Auto Supply Stash",
+        hint: "loot → stash",
+        action: () => {
+          const on = !(typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug));
+          setAutoSupplyStash(p, slug, on);
+          toast(on
+            ? `<b>${it.n}</b>: loot irá para a Supply Stash.`
+            : `<b>${it.n}</b>: Auto Supply Stash desligado.`);
+          if (typeof save === "function") save();
+          renderAll();
+        },
+      },
+      {
+        label: "Mover para Supply Stash",
+        action: () => {
+          if (typeof moveItemToSupplyStash === "function" &&
+              moveItemToSupplyStash(p, { source: "pouch", slug: slug })) {
+            addLog("info", `Moveu <b>${it.n}</b> para a Supply Stash.`);
+            renderAll();
+          }
+        },
+      },
+    ] : []),
     {
       label: noCollect ? "Voltar a coletar" : "Não coletar",
       hint: "autoloot",
@@ -1568,6 +1774,39 @@ function openPouchItemMenu(p, slug, x, y) {
   ]);
 }
 
+function clearLootPouchWithConfirm(p) {
+  if (!p) return;
+  if (!confirm("Limpar toda a Loot Pouch? Itens serão perdidos.")) return;
+  const kinds = typeof clearLootPouch === "function" ? clearLootPouch(p) : 0;
+  p.lootPouch = p.lootPouch || {};
+  if (typeof addLog === "function")
+    addLog("info", kinds
+      ? `Loot Pouch limpa (<b>${kinds}</b> tipo(s) removido(s)).`
+      : "Loot Pouch já estava vazia.");
+  toast(kinds ? "Loot Pouch limpa." : "Loot Pouch já estava vazia.");
+  // Online em combate: a autoridade sobrescreve o snapshot local no tick —
+  // a limpeza precisa ir pelo patch da instância (como a troca de munição).
+  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  if (onlineCombat && typeof accountClearInstanceLootPouch === "function" &&
+      typeof sessionToken === "function" && p.id) {
+    accountClearInstanceLootPouch(sessionToken(), p.id).then((result) => {
+      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function")
+        applyOnlineAuthorityState(result.state, null, result.version);
+      else if (!result || !result.ok)
+        toast((result && result.msg) || "Não foi possível limpar a Loot Pouch online.", "bad");
+      if (typeof renderAll === "function") renderAll();
+      else if (typeof renderLootPouch === "function") renderLootPouch(p);
+    }).catch(() => {
+      toast("Não foi possível limpar a Loot Pouch online.", "bad");
+    });
+  } else if (typeof save === "function") {
+    save();
+  }
+  $("#modal").classList.remove("show");
+  if (typeof renderAll === "function") renderAll();
+  else if (typeof renderLootPouch === "function") renderLootPouch(p);
+}
+
 function openLootPouchConfigModal() {
   const p = G.p;
   const renderList = (key) => lootConfigList(p, key).map((rule, i) => `
@@ -1601,10 +1840,17 @@ function openLootPouchConfigModal() {
           <div class="list" style="max-height:220px">${renderList("noSell")}</div>
         </div>
       </div>
+      <div class="panel-inset mt8" style="padding:8px">
+        <div class="small" style="color:#ff6a6a;font-weight:bold">LIMPAR LOOT POUCH</div>
+        <div class="tiny dim mb8">Remove todos os itens da pouch. Ouro da conta não é afetado. Esta ação não pode ser desfeita.</div>
+        <button class="sm danger" id="lootcfg-clear">LIMPAR LOOT POUCH</button>
+      </div>
       <div class="tiny dim mt8">Você pode digitar parte do nome ou slug do item. Ex: meat, gold coin, leather armor.</div>
     </div>`;
   $("#modal").classList.add("show");
   $("#lootcfg-close").addEventListener("click", () => { $("#modal").classList.remove("show"); renderLootPouch(p); });
+  const clearBtn = $("#lootcfg-clear");
+  if (clearBtn) clearBtn.addEventListener("click", () => clearLootPouchWithConfirm(p));
   $$("#modal-body [data-add-rule]").forEach((b) => b.addEventListener("click", () => {
     const key = b.dataset.addRule;
     const input = key === "noCollect" ? $("#no-collect-input") : $("#no-sell-input");
@@ -1873,11 +2119,17 @@ function renderHelper(p) {
     // A aba Cura contém somente autocura. Spells de aliado (exura sio,
     // Restore Friend, Mass Healing) vivem exclusivamente em Curar aliado.
     const friendHealIds = new Set(typeof healFriendSpells === "function"
-      ? healFriendSpells(p) : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-tio-sio"]);
-    const heals = Object.keys(SPELLS).filter((id) => {
-      const s = SPELLS[id];
-      return s.type === "heal" && s.vocs.indexOf(p.voc) !== -1 && !friendHealIds.has(id);
-    }).sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
+      ? healFriendSpells(p)
+      : ((typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
+        ? CanaryVocation.friendHealSpellIds(p.voc)
+        : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-tio-sio"]));
+    const heals = (typeof CanaryVocation !== "undefined" && CanaryVocation.selfHealSpellIds)
+      ? CanaryVocation.selfHealSpellIds(SPELLS, p.voc)
+      : Object.keys(SPELLS).filter((id) => {
+          const s = SPELLS[id];
+          return s.type === "heal" && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) && !friendHealIds.has(id);
+        });
+    heals.sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
     // potions da vocacao, com nivel e cura reais do canary. suppliesOf ja
     // esconde o que a vocacao nunca podera beber (knight nao usa ultimate
     // mana potion em nivel nenhum) e ordena por nivel.
@@ -2978,7 +3230,8 @@ function comboOpcoes(p) {
   for (const id in SPELLS) {
     const s = SPELLS[id];
     if (s.type !== "attack") continue;
-    if (s.vocs.indexOf(p.voc) === -1) continue;
+    if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+        : (s.vocs.indexOf(p.voc) === -1)) continue;
     out.push({ kind: "spell", id: id, s: s, lvl: s.lvl || 1,
                area: !!s.area });
   }

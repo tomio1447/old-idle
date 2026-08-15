@@ -1,4 +1,4 @@
-/* settings.js — CONFIG: idioma e FULLHD. Persistido no navegador. */
+/* settings.js — CONFIG: idioma, FULLHD e versão Mobile/Desktop. */
 "use strict";
 
 const SETTINGS_KEY = "global-idle-settings-v1";
@@ -55,42 +55,65 @@ function openConfigModal() {
   const body = document.getElementById("modal-body");
   if (!modal || !body) return;
   const lang = ClientSettings.lang === "en" ? "en" : "pt";
+  const uiMode = (typeof getUiMode === "function" && getUiMode()) ||
+    (document.documentElement.getAttribute("data-ui-mode") === "mobile" ? "mobile" : "desktop");
   body.innerHTML = `
     <div class="panel-title">${t("config.title")}
       <span style="flex:1"></span>
-      <button class="sm" id="cfg-close">✕</button>
+      <button type="button" class="sm" id="cfg-close">✕</button>
     </div>
     <div class="panel-body cfg-body">
       <div class="small dim mb4">${t("config.language")}</div>
       <div class="row cfg-lang" style="gap:8px">
-        <button class="sm ${lang === "pt" ? "primary" : ""}" data-cfg-lang="pt">${t("config.lang.pt")}</button>
-        <button class="sm ${lang === "en" ? "primary" : ""}" data-cfg-lang="en">${t("config.lang.en")}</button>
+        <button type="button" class="sm ${lang === "pt" ? "primary" : ""}" data-cfg-lang="pt">${t("config.lang.pt")}</button>
+        <button type="button" class="sm ${lang === "en" ? "primary" : ""}" data-cfg-lang="en">${t("config.lang.en")}</button>
       </div>
+      <div class="small dim mt12 mb4">${t("config.uimode")}</div>
+      <div class="cfg-uimode">
+        <button type="button" class="sm ${uiMode === "mobile" ? "primary" : ""}" data-cfg-uimode="mobile">${t("uimode.mobile")}</button>
+        <button type="button" class="sm ${uiMode === "desktop" ? "primary" : ""}" data-cfg-uimode="desktop">${t("uimode.desktop")}</button>
+      </div>
+      <div class="tiny dim mt8">${t("config.uimode.hint")}</div>
       <div class="small dim mt12 mb4">${t("config.graphics")}</div>
       <label class="toggle cfg-fullhd">
         <input type="checkbox" id="cfg-fullhd" ${ClientSettings.fullhd ? "checked" : ""}>
         <b>${t("config.fullhd")}</b>
       </label>
       <div class="tiny dim mt8">${t("config.fullhd.hint")}</div>
-      <button class="primary full mt12" id="cfg-done">${t("config.close")}</button>
+      <button type="button" class="primary full mt12" id="cfg-done">${t("config.close")}</button>
     </div>`;
   modal.classList.add("show");
   const close = () => modal.classList.remove("show");
-  document.getElementById("cfg-close").addEventListener("click", close);
-  document.getElementById("cfg-done").addEventListener("click", close);
+  const closeBtn = document.getElementById("cfg-close");
+  const doneBtn = document.getElementById("cfg-done");
+  const fullhd = document.getElementById("cfg-fullhd");
+  if (closeBtn) closeBtn.addEventListener("click", close);
+  if (doneBtn) doneBtn.addEventListener("click", close);
   body.querySelectorAll("[data-cfg-lang]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
       ClientSettings.lang = btn.getAttribute("data-cfg-lang") === "en" ? "en" : "pt";
       saveClientSettings();
       applyClientSettings();
       openConfigModal();
     });
   });
-  document.getElementById("cfg-fullhd").addEventListener("change", (e) => {
-    ClientSettings.fullhd = !!e.target.checked;
-    saveClientSettings();
-    applyClientSettings();
+  body.querySelectorAll("[data-cfg-uimode]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const mode = btn.getAttribute("data-cfg-uimode") === "mobile" ? "mobile" : "desktop";
+      if (typeof setUiMode === "function") setUiMode(mode);
+      if (typeof rebuildMobileMenuActions === "function") rebuildMobileMenuActions();
+      openConfigModal();
+    });
   });
+  if (fullhd) {
+    fullhd.addEventListener("change", (e) => {
+      ClientSettings.fullhd = !!e.target.checked;
+      saveClientSettings();
+      applyClientSettings();
+    });
+  }
 }
 
 function bindConfigButtons() {

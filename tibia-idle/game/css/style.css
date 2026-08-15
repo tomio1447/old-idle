@@ -1763,21 +1763,17 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 /* Sprite brilhando quando equipado: anel/amuleto no slot ganham um pulso
  * dourado indicando que os atributos estão ativos. */
 .slot.acc-glow {
-  border-color: #ffd65a;
-  box-shadow: 0 0 6px rgba(255, 214, 90, .55), inset 0 0 6px rgba(255, 214, 90, .25);
-  animation: acc-glow-pulse 2.2s ease-in-out infinite;
+  border-color: inherit;
+  box-shadow: none;
+  animation: none;
 }
 .slot.acc-glow img {
-  filter: drop-shadow(0 0 3px rgba(255, 214, 90, .9));
-  animation: acc-glow-sprite 2.2s ease-in-out infinite;
+  filter: none;
+  animation: none;
 }
-@keyframes acc-glow-pulse {
-  0%, 100% { box-shadow: 0 0 5px rgba(255,214,90,.4), inset 0 0 5px rgba(255,214,90,.18); }
-  50%      { box-shadow: 0 0 12px rgba(255,214,90,.8), inset 0 0 9px rgba(255,214,90,.4); }
-}
-@keyframes acc-glow-sprite {
-  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,214,90,.6)) brightness(1); }
-  50%      { filter: drop-shadow(0 0 6px rgba(255,214,90,1)) brightness(1.25); }
+.slot.acc-active img,
+.slot.acc-active .item-sprite {
+  filter: brightness(1.15) saturate(1.1);
 }
 
 /* ==================== Wheel of Destiny (Roda do Destino) ==================== */

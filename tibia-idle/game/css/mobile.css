@@ -1,0 +1,445 @@
+/* mobile.css — overrides só com html[data-ui-mode="mobile"] / body.ui-mobile.
+   Desktop permanece intacto. Visual Global-Idle / OTC (dourado escuro). */
+
+html[data-ui-mode="mobile"] {
+  --mobile-dock-h: 56px;
+  --mobile-safe-b: env(safe-area-inset-bottom, 0px);
+  --mobile-safe-t: env(safe-area-inset-top, 0px);
+  --mobile-safe-l: env(safe-area-inset-left, 0px);
+  --mobile-safe-r: env(safe-area-inset-right, 0px);
+}
+
+html[data-ui-mode="mobile"],
+html[data-ui-mode="mobile"] body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ---------- escolha de versão (primeira visita) ---------- */
+#ui-mode-modal {
+  z-index: 520;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(6, 5, 5, .9);
+}
+#ui-mode-modal:not(.show) {
+  display: none !important;
+  pointer-events: none !important;
+}
+#ui-mode-modal .ui-mode-box {
+  width: min(420px, 96vw);
+}
+#ui-mode-modal .ui-mode-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+#ui-mode-modal .ui-mode-choices button {
+  min-height: 52px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+#ui-mode-modal .ui-mode-icon {
+  display: block;
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+/* ---------- dock inferior (só com o jogo aberto) ---------- */
+#mobile-dock {
+  display: none;
+}
+html[data-ui-mode="mobile"] body.ui-mobile:has(#app.ready) #mobile-dock {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  min-height: var(--mobile-dock-h);
+  padding: 4px 4px calc(4px + var(--mobile-safe-b));
+  gap: 2px;
+  background: linear-gradient(180deg, #2e2a24, #14120e);
+  border-top: 2px solid #16140f;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, .55);
+}
+html[data-ui-mode="mobile"] body.ui-mobile:has(#app.ready) {
+  padding-bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-b) + 8px);
+  padding-left: var(--mobile-safe-l);
+  padding-right: var(--mobile-safe-r);
+}
+html[data-ui-mode="mobile"] #mobile-dock button {
+  min-height: 44px;
+  padding: 4px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+html[data-ui-mode="mobile"] #mobile-dock .dock-ico {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ---------- menu sheet (ações do topbar) ---------- */
+#mobile-menu-sheet {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  background: rgba(0, 0, 0, .72);
+  padding: max(12px, var(--mobile-safe-t)) 12px calc(72px + var(--mobile-safe-b));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#mobile-menu-sheet.show { display: block; }
+#mobile-menu-sheet .mobile-menu-panel {
+  max-width: 520px;
+  margin: 0 auto;
+}
+#mobile-menu-sheet .mobile-menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+}
+#mobile-menu-sheet .mobile-menu-btn {
+  min-height: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+/* ---------- login / teclado virtual ---------- */
+html[data-ui-mode="mobile"] #login {
+  align-items: flex-start;
+  padding: max(16px, var(--mobile-safe-t)) 12px 24px;
+  min-height: 100dvh;
+}
+html[data-ui-mode="mobile"] #login .box {
+  width: min(100%, 480px);
+}
+html[data-ui-mode="mobile"] .field input,
+html[data-ui-mode="mobile"] .field select,
+html[data-ui-mode="mobile"] input,
+html[data-ui-mode="mobile"] select,
+html[data-ui-mode="mobile"] textarea {
+  font-size: 16px !important; /* evita zoom iOS */
+  min-height: 44px;
+  padding: 10px 12px;
+}
+html[data-ui-mode="mobile"] button.primary,
+html[data-ui-mode="mobile"] button.full,
+html[data-ui-mode="mobile"] #login button {
+  min-height: 44px;
+}
+html[data-ui-mode="mobile"] .config-fab {
+  top: max(8px, var(--mobile-safe-t));
+  right: max(8px, var(--mobile-safe-r));
+  min-height: 40px;
+  padding: 6px 10px;
+}
+
+/* ---------- topbar compacta ---------- */
+html[data-ui-mode="mobile"] .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 6px;
+  padding: 6px 8px;
+  padding-top: max(6px, var(--mobile-safe-t));
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+html[data-ui-mode="mobile"] .topbar::-webkit-scrollbar { display: none; }
+html[data-ui-mode="mobile"] .topbar .logo {
+  font-size: 12px;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .topbar > button {
+  display: none !important; /* ações no sheet / dock Menu */
+}
+html[data-ui-mode="mobile"] .topbar #btn-config {
+  display: inline-flex !important;
+  min-height: 40px;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .topbar #btn-city {
+  display: inline-flex !important;
+  min-height: 40px;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .server-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  flex: none;
+}
+
+/* ---------- layout: coluna única + abas ---------- */
+html[data-ui-mode="mobile"] .layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+  max-width: 100%;
+  margin: 0;
+}
+html[data-ui-mode="mobile"] .col-left,
+html[data-ui-mode="mobile"] .col-mid,
+html[data-ui-mode="mobile"] .col-right {
+  grid-column: auto;
+  width: 100%;
+  order: 0;
+}
+
+/* Aba Jogo: canvas + log; esconde inventário/analyser/helper */
+html[data-ui-mode="mobile"] body[data-mobile-tab="game"] .col-left,
+html[data-ui-mode="mobile"] body[data-mobile-tab="game"] .col-right,
+html[data-ui-mode="mobile"] body[data-mobile-tab="game"] .panel[data-collapse="helper"] {
+  display: none !important;
+}
+html[data-ui-mode="mobile"] body[data-mobile-tab="game"] .left-side-actions {
+  display: none !important;
+}
+
+/* Aba Inventário */
+html[data-ui-mode="mobile"] body[data-mobile-tab="inv"] .col-mid,
+html[data-ui-mode="mobile"] body[data-mobile-tab="inv"] .col-right {
+  display: none !important;
+}
+
+/* Aba Helper */
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] .col-left,
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] .col-right,
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] #scene-wrap,
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] #cooldown-bar,
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] .panel[data-collapse="log"],
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] .left-side-actions {
+  display: none !important;
+}
+html[data-ui-mode="mobile"] body[data-mobile-tab="helper"] .panel[data-collapse="helper"] {
+  display: block !important;
+}
+
+/* Aba Analyser */
+html[data-ui-mode="mobile"] body[data-mobile-tab="analyse"] .col-left,
+html[data-ui-mode="mobile"] body[data-mobile-tab="analyse"] .col-mid {
+  display: none !important;
+}
+html[data-ui-mode="mobile"] body[data-mobile-tab="analyse"] .left-side-actions {
+  display: grid !important;
+}
+
+/* ---------- canvas / HUD caçada ---------- */
+html[data-ui-mode="mobile"] #scene-wrap {
+  width: 100%;
+  touch-action: manipulation;
+}
+html[data-ui-mode="mobile"] #scene {
+  width: 100% !important;
+  max-width: 100vw;
+  height: auto !important;
+}
+html[data-ui-mode="mobile"] .sqm-walk-hud {
+  left: 4px;
+  top: 4px;
+  padding: 6px 8px;
+  gap: 8px;
+}
+html[data-ui-mode="mobile"] .sqm-walk-hud #btn-auto-walk {
+  min-width: 56px;
+  min-height: 44px;
+  font-size: 13px;
+}
+html[data-ui-mode="mobile"] .sqm-walk-hud .sqm-walk-hint {
+  max-width: 110px;
+  font-size: 9px;
+}
+html[data-ui-mode="mobile"] .party-panel {
+  right: 4px;
+  top: 4px;
+  max-width: min(200px, 46vw);
+  font-size: 11px;
+}
+html[data-ui-mode="mobile"] .cooldown-bar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 40px;
+}
+
+/* ---------- painéis / grids ---------- */
+html[data-ui-mode="mobile"] .panel-title {
+  min-height: 36px;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+html[data-ui-mode="mobile"] .tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+html[data-ui-mode="mobile"] .tabs .tab {
+  min-height: 40px;
+  padding: 8px 10px;
+  flex: none;
+  white-space: nowrap;
+}
+html[data-ui-mode="mobile"] .inv-grid,
+html[data-ui-mode="mobile"] .equip-grid {
+  justify-content: center;
+}
+html[data-ui-mode="mobile"] .slot {
+  width: 44px;
+  height: 44px;
+}
+html[data-ui-mode="mobile"] .left-side-actions > button {
+  min-height: 48px;
+  font-size: 13px;
+}
+
+/* ---------- modais: quase tela cheia ---------- */
+/* Acima de #toasts (200) e dock/menu para CONFIG/idioma/FULLHD clicarem. */
+html[data-ui-mode="mobile"] .modal-bg.show,
+html[data-ui-mode="mobile"] #modal.show {
+  z-index: 500;
+}
+html[data-ui-mode="mobile"] .modal-bg {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  padding-top: var(--mobile-safe-t);
+  padding-bottom: var(--mobile-safe-b);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+html[data-ui-mode="mobile"] .modal-bg .modal,
+html[data-ui-mode="mobile"] .modal-bg .modal.wide,
+html[data-ui-mode="mobile"] .modal-bg.wide .modal,
+html[data-ui-mode="mobile"] .modal-wide2 .modal,
+html[data-ui-mode="mobile"] .modal-bg .modal.hunts-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.bosses-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.boss-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.reward-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg.modal-otc .modal,
+html[data-ui-mode="mobile"] .modal-bg.modal-cyclo .modal,
+html[data-ui-mode="mobile"] .modal-bg.forge-modal-shell .modal,
+html[data-ui-mode="mobile"] .modal.forge-modal-shell {
+  width: 100% !important;
+  max-width: 100vw !important;
+  min-height: 100%;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+html[data-ui-mode="mobile"] .modal-bg .modal > .panel-title,
+html[data-ui-mode="mobile"] .modal-bg .modal > .otc-win-head,
+html[data-ui-mode="mobile"] .modal-bg .modal > .cyclo-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 44px;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .modal-bg .modal > .panel-title button,
+html[data-ui-mode="mobile"] .modal-bg .modal button.sm {
+  min-height: 40px;
+  min-width: 40px;
+}
+html[data-ui-mode="mobile"] .modal-bg .modal > .panel-body,
+html[data-ui-mode="mobile"] .modal-bg .modal > .otc-win-body,
+html[data-ui-mode="mobile"] .account-flow-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: none;
+}
+html[data-ui-mode="mobile"] .account-character-list {
+  max-height: none;
+}
+html[data-ui-mode="mobile"] .account-character-list button,
+html[data-ui-mode="mobile"] .account-character-list .row {
+  min-height: 48px;
+}
+
+/* Cyclopedia / wheel / prey / imbue / forge em coluna */
+html[data-ui-mode="mobile"] .modal-bg.modal-cyclo .cyclo-wrap {
+  flex-direction: column;
+  min-height: 0;
+}
+html[data-ui-mode="mobile"] .modal-bg.modal-cyclo .cyclo-tabs {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  flex: none;
+}
+html[data-ui-mode="mobile"] .modal-bg.modal-cyclo .cyclo-content {
+  max-height: none;
+  min-height: 50vh;
+}
+html[data-ui-mode="mobile"] .imb-grid {
+  grid-template-columns: 1fr;
+}
+html[data-ui-mode="mobile"] .imb-col-left,
+html[data-ui-mode="mobile"] .imb-col-center,
+html[data-ui-mode="mobile"] .imb-col-right {
+  max-height: 42vh;
+}
+html[data-ui-mode="mobile"] #hunts-modal-list {
+  grid-template-columns: 1fr !important;
+}
+html[data-ui-mode="mobile"] .prey-slots {
+  grid-template-columns: 1fr;
+}
+html[data-ui-mode="mobile"] .combo-bar {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Touch: não depender só de hover */
+html[data-ui-mode="mobile"] .slot:active,
+html[data-ui-mode="mobile"] .imb-eq:active,
+html[data-ui-mode="mobile"] .imb-row:active,
+html[data-ui-mode="mobile"] .spell-row:active {
+  outline: 1px solid var(--gold, #d4af37);
+}
+
+/* Não esticar #toasts com top+bottom (vira overlay invisível que come cliques
+   do CONFIG / modais — z-index 200 > .modal-bg 150). */
+html[data-ui-mode="mobile"] #toasts {
+  top: auto;
+  bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-b) + 8px);
+  left: 8px;
+  right: 8px;
+  pointer-events: none;
+  align-items: stretch;
+}
+html[data-ui-mode="mobile"] #toasts .toast {
+  pointer-events: auto;
+}
+
+html[data-ui-mode="mobile"] #client-version-label {
+  bottom: calc(var(--mobile-dock-h) + var(--mobile-safe-b) + 8px);
+}
+
+/* CONFIG: botões de versão */
+.cfg-uimode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cfg-uimode button {
+  min-height: 44px;
+}
