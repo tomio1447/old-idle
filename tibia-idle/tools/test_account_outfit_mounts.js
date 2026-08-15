@@ -54,7 +54,7 @@ must(partyUi.includes("partyApplyOutfitPreview") &&
   partyUi.includes("AppearanceRenderer.preview(member") &&
   partyUi.includes("source.outfit||summary&&summary.outfit||member.outfit"),
   "painel da party não compõe mount/addons");
-must(index.includes("js/appearance.js?v=outfit-mount-v1") &&
+must(index.includes("js/appearance.js?v=sex-looktype-v2") &&
   /js\/game\.js\?v=/.test(index) &&
   /js\/party\.js\?v=/.test(index) &&
   /js\/party-ui\.js\?v=/.test(index) &&
@@ -74,14 +74,14 @@ const APP_MOUNT = vm.runInContext("APP_MOUNT", ctx);
 const knight = { voc: "knight", sex: "male", gold: 500000, outfit: {}, wardrobe: { outfits: {}, mounts: {} } };
 ctx.ensureOutfit(knight);
 ctx.ensureWardrobe(knight);
-must(knight.outfit.appearance === "knight-m" && knight.outfit.lookType === 139,
+must(knight.outfit.appearance === "knight-m" && knight.outfit.lookType === 131,
   "knight masculino não nasceu com lookType da outfit de vocação");
 must(knight.wardrobe.outfits["monk-m"] === 0 && knight.wardrobe.outfits["knight-m"] === 0,
   "wardrobe inicial não libera monk + vocação");
 
 knight.outfit.appearance = "knight-f";
 ctx.syncOutfitLook(knight);
-must(knight.outfit.appearance === "knight-m" && knight.outfit.lookType === 139,
+must(knight.outfit.appearance === "knight-m" && knight.outfit.lookType === 131,
   "outfit female em personagem male não foi corrigida");
 
 const warrior = APP_OUTFIT["warrior-m"];

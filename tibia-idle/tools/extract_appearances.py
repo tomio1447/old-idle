@@ -101,8 +101,8 @@ def main():
     for o in canary["outfits"]:
         lt = o["looktype"]
         s = slug(o["name"])
-        # o mesmo nome aparece nas versoes masculina e feminina (type 0/1)
-        sexo = "m" if o.get("type") == 0 else "f"
+        # Canary/OT: type 0 = female, type 1 = male (PLAYERSEX)
+        sexo = "f" if o.get("type") == 0 else "m"
         arquivo = "%s-%s" % (s, sexo)
         if arquivo in vistos:            # nomes repetidos no canary
             arquivo = "%s-%s-%d" % (s, sexo, lt)

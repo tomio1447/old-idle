@@ -38,6 +38,11 @@ const OUTFIT_TYPES = [
 const VOC_OUTFIT = { knight: "knight", paladin: "hunter", druid: "summoner",
                      sorcerer: "mage", monk: "monk", none: "citizen" };
 
+/* Somente estes tipos existem como sprites classicos por direcao. */
+const CLASSIC_OUTFIT_FALLBACK = {
+  citizen: 1, hunter: 1, mage: 1, knight: 1, summoner: 1, monk: 1,
+};
+
 /* helpers que aceitam tanto <img> quanto <canvas> */
 function spriteReady(s) {
   if (!s) return false;
@@ -59,7 +64,10 @@ function paletteColor(i) {
 /* normaliza a config de outfit de um personagem */
 function playerOutfit(p) {
   const sex = p.sex === "female" ? "f" : "m";
-  const base = (p.outfit && p.outfit.type) || VOC_OUTFIT[p.voc] || "citizen";
+  let base = (p.outfit && p.outfit.type) || VOC_OUTFIT[p.voc] || "citizen";
+  // Nunca peca assets classicos inexistentes (druid-m, noblewoman-m, …).
+  if (!CLASSIC_OUTFIT_FALLBACK[base]) base = VOC_OUTFIT[p.voc] || "citizen";
+  if (!CLASSIC_OUTFIT_FALLBACK[base]) base = "citizen";
   const def = DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
   const c = (p.outfit && p.outfit.colors) || def;
   return {
@@ -86,16 +94,29 @@ const OutfitRenderer = {
 
   key(name, suf, colors) { return `${name}_${suf}|${colors.join(",")}`; },
 
-  /* Canvas colorido para (outfit, direção/frame, cores). null enquanto carrega. */
+  /* Canvas colorido para (outfit, direção/frame, cores). null enquanto carrega.
+   * Se o frame de caminhada (_s1/_n2/…) não existir, cai no idle da direção
+   * e depois em _s — evita spam de 404 em outfits sem sheet classico. */
   get(name, suf, colors) {
     const k = this.key(name, suf, colors);
     if (this.cache[k] !== undefined) return this.cache[k];
     if (this.pending[k]) return null;
 
-    const base = Sprites.get(`assets/outfit/${name}_${suf}.base.png`);
-    const mask = Sprites.get(`assets/outfit/${name}_${suf}.mask.png`);
+    const dir = String(suf || "s").charAt(0) || "s";
+    const candidates = [suf];
+    if (suf && suf !== dir) candidates.push(dir);
+    if (dir !== "s") candidates.push("s");
+    let base = null, mask = null;
+    for (const trySuf of candidates) {
+      const b = Sprites.get(`assets/outfit/${name}_${trySuf}.base.png`);
+      if (!b) continue;
+      if (!b.complete) return null;            // ainda carregando: nao cacheia
+      if (!b.naturalWidth) continue;           // 404: tenta proximo candidato
+      base = b;
+      mask = Sprites.get(`assets/outfit/${name}_${trySuf}.mask.png`);
+      break;
+    }
     if (!base) { this.cache[k] = null; return null; }
-    if (!base.complete || !base.naturalWidth) return null;
     // Espera a máscara terminar de carregar antes de cachear. Sem isto o
     // canvas era gravado sem cor e o outfit ficava branco — o que só
     // aparecia ao virar de costas, porque as direções n/w carregam depois.
