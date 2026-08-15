@@ -16,6 +16,15 @@ html[data-ui-mode="mobile"] body {
 }
 
 /* ---------- escolha de versão (primeira visita) ---------- */
+#alpha-announce-modal {
+  z-index: 560;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(6, 5, 5, .92);
+}
+#alpha-announce-modal:not(.show) {
+  display: none !important;
+  pointer-events: none !important;
+}
 #ui-mode-modal {
   z-index: 520;
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
@@ -24,6 +33,11 @@ html[data-ui-mode="mobile"] body {
 #ui-mode-modal:not(.show) {
   display: none !important;
   pointer-events: none !important;
+}
+html[data-ui-mode="mobile"] .alpha-test-banner {
+  font-size: 11px;
+  padding: 5px 8px;
+  line-height: 1.35;
 }
 #ui-mode-modal .ui-mode-box {
   width: min(420px, 96vw);
@@ -185,6 +199,14 @@ html[data-ui-mode="mobile"] .server-status {
   padding: 2px 6px;
   flex: none;
 }
+html[data-ui-mode="mobile"] .server-reconnect-banner {
+  padding: 12px;
+  align-items: flex-end;
+}
+html[data-ui-mode="mobile"] .server-reconnect-banner-inner {
+  width: 100%;
+  margin-bottom: 12px;
+}
 
 /* ---------- layout: coluna única + abas ---------- */
 html[data-ui-mode="mobile"] .layout {
@@ -329,6 +351,8 @@ html[data-ui-mode="mobile"] .modal-bg.wide .modal,
 html[data-ui-mode="mobile"] .modal-wide2 .modal,
 html[data-ui-mode="mobile"] .modal-bg .modal.hunts-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.bosses-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.npcs-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.cidade-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.boss-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.reward-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg.modal-otc .modal,

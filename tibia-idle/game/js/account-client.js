@@ -24,9 +24,13 @@ const ACCOUNT_SERVER_CONFIG = (typeof window !== "undefined" &&
 try {
   ACCOUNT_API_URL = localStorage.getItem("tibia-idle-api") || "";
 } catch (e) { ACCOUNT_API_URL = ""; }
-// Quando servido pelo test server, jogo e API compartilham a mesma origem.
-if (!ACCOUNT_API_URL && ACCOUNT_SERVER_CONFIG.online) {
-  ACCOUNT_API_URL = ACCOUNT_SERVER_CONFIG.apiUrl || window.location.origin;
+// Test/prod server injeta a origem correta. Nunca deixe um tibia-idle-api
+// antigo (outra porta/processo) autenticar numa API e tickar noutra — isso
+// produz lease/acquire 401 com a UI ainda "logada".
+if (ACCOUNT_SERVER_CONFIG.online) {
+  ACCOUNT_API_URL = ACCOUNT_SERVER_CONFIG.apiUrl ||
+    (typeof window !== "undefined" && window.location && window.location.origin) ||
+    ACCOUNT_API_URL;
 }
 
 function accountApiConfigured() {
@@ -130,8 +134,24 @@ function accountSavePayload(p){
 const ACCOUNT_LEASE_HOLDER_KEY="tibia-idle-lease-holder-v1";
 const ACCOUNT_LEASE_TOKEN_KEY="tibia-idle-lease-token-v1";
 const ACCOUNT_LEASE_EXPIRY_KEY="tibia-idle-lease-expiry-v1";
-let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,heldUntil:0,sessionToken:"",timer:null,lost:false};
+let ACCOUNT_LEASE={active:false,token:"",holder:"",expiresAt:0,heldUntil:0,sessionToken:"",
+  timer:null,lost:false,authFailUntil:0};
 let ACCOUNT_LEASE_INFLIGHT=null;
+function accountSessionToken(preferred){
+  const presented=String(preferred||"");
+  if(presented)return presented;
+  try{const stored=sessionStorage.getItem("tibia-idle-token")||"";if(stored)return stored;}catch(e){}
+  return String(ACCOUNT_LEASE.sessionToken||"");
+}
+function accountLeaseMarkUnauthorized(message){
+  ACCOUNT_LEASE.authFailUntil=Date.now()+60000;
+  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.expiresAt=0;ACCOUNT_LEASE.heldUntil=0;
+  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+  accountLeaseClearSecret();
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
+  return {ok:false,unauthorized:true,lost:true,
+    msg:message||"Sessão online expirada. Entre novamente."};
+}
 function accountLeaseRandom(){
   try{if(crypto&&typeof crypto.randomUUID==="function")return crypto.randomUUID().replace(/-/g,"");}catch(e){}
   return Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
@@ -169,7 +189,8 @@ function accountLeaseFields(){
 }
 function accountLeaseApply(token,data){
   const stored=accountLeaseStored();
-  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.sessionToken=token;
+  ACCOUNT_LEASE.active=true;ACCOUNT_LEASE.lost=false;ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.authFailUntil=0;
+  ACCOUNT_LEASE.sessionToken=token;
   ACCOUNT_LEASE.holder=data.holderId||stored.holder;ACCOUNT_LEASE.token=data.leaseToken;
   ACCOUNT_LEASE.expiresAt=new Date(data.expiresAt).getTime();
   try{
@@ -207,24 +228,31 @@ function accountLeaseAllowsSimulation(){
   return !!(ACCOUNT_LEASE.active&&ACCOUNT_LEASE.token&&Date.now()<ACCOUNT_LEASE.expiresAt);
 }
 async function accountAcquireLeaseRequest(token,takeover){
+  token=accountSessionToken(token);
+  if(!token)return accountLeaseMarkUnauthorized("Sessão online ausente. Entre novamente.");
   const stored=accountLeaseStored(),path=takeover?"/api/lease/takeover":"/api/lease/acquire";
   const r=await _api("POST",path,{token,holder_id:stored.holder,
     previous_holder_id:stored.previousHolder,lease_token:stored.token});
   if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true,resumed:!!r.data.resumed};}
-  // `_api` encerra globalmente sync/poll/lease em 401. Não dispare aqui um
-  // segundo lease-lost nem outro ciclo de limpeza para a mesma resposta.
+  // `_api` encerra globalmente sync/poll/lease em 401. Marque o backoff local
+  // para o loop de recovery não martelar /acquire enquanto o reload sobe.
+  if(r.code===401)return accountLeaseMarkUnauthorized(r.data.msg);
   return {ok:false,held:r.code===409&&r.data.error==="LEASE_HELD",expiresAt:r.data.expiresAt,
-    msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:r.code===401};
+    msg:r.data.msg||"Não foi possível obter o controle da conta.",unauthorized:false};
 }
 async function accountAcquireLease(token,takeover){
+  token=accountSessionToken(token);
   if(takeover){
-    ACCOUNT_LEASE.heldUntil=0;
+    ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.authFailUntil=0;
     return accountAcquireLeaseRequest(token,true);
   }
   if(accountLeaseAllowsSimulation())return {ok:true,resumed:true};
+  if(ACCOUNT_LEASE.authFailUntil&&Date.now()<ACCOUNT_LEASE.authFailUntil)
+    return {ok:false,unauthorized:true,lost:true,msg:"Sessão online expirada. Entre novamente."};
   if(ACCOUNT_LEASE.heldUntil&&Date.now()<ACCOUNT_LEASE.heldUntil)
     return {ok:false,held:true,expiresAt:new Date(ACCOUNT_LEASE.heldUntil).toISOString(),
       msg:"Esta conta já está ativa em outra aba ou dispositivo."};
+  if(!token)return accountLeaseMarkUnauthorized("Sessão online ausente. Entre novamente.");
   if(ACCOUNT_LEASE_INFLIGHT)return ACCOUNT_LEASE_INFLIGHT;
   ACCOUNT_LEASE_INFLIGHT=(async()=>{
     try{
@@ -240,7 +268,7 @@ async function accountAcquireLease(token,takeover){
   return ACCOUNT_LEASE_INFLIGHT;
 }
 async function accountRenewLease(token){
-  token=token||ACCOUNT_LEASE.sessionToken;const fields=accountLeaseFields();
+  token=accountSessionToken(token||ACCOUNT_LEASE.sessionToken);const fields=accountLeaseFields();
   if(!token||!fields.lease_token)return {ok:false};
   const r=await _api("POST","/api/lease/renew",Object.assign({token},fields));
   if(r.data.ok){accountLeaseApply(token,r.data);return {ok:true};}
@@ -248,7 +276,7 @@ async function accountRenewLease(token){
     if(ACCOUNT_LEASE.timer)clearTimeout(ACCOUNT_LEASE.timer);
     ACCOUNT_LEASE.timer=setTimeout(()=>accountRenewLease(token),5000);return {ok:false,retry:true};
   }
-  if(r.code===401)return {ok:false,lost:true,unauthorized:true};
+  if(r.code===401)return accountLeaseMarkUnauthorized(r.data.msg);
   accountLeaseMarkLost(r.data.msg);return {ok:false,lost:true};
 }
 async function accountEnsureLease(token,options){
@@ -392,7 +420,13 @@ function accountAuthorityVisualState(){
     return out;
   };
   const players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
-  return {players:collect(players,8),mobs:collect(combat.mobs,64)};
+  const out={players:collect(players,8),mobs:collect(combat.mobs,64)};
+  if(combat._scarlettPendingDir){
+    out.scarlettIntent={dir:String(combat._scarlettPendingDir)};
+    combat._scarlettPendingDir=null;
+    combat._scarlettPendingAt=0;
+  }
+  return out;
 }
 function accountTickInstance(token){
   return accountQueueInstance(async()=>{
@@ -559,8 +593,16 @@ async function accountStartSyncNow(token,generation){
       accountSyncRefreshCharacters(token);accountRefreshInstance(token).then((fresh)=>accountSyncDispatch("instance",fresh));
       accountSyncDispatch("party",data);
     }
+    if(type==="maintenance"){
+      accountNotifyMaintenance({
+        active:!!data.active,
+        endsAt:Number(data.endsAt)||0,
+        remainingMs:Math.max(0,Number(data.remainingMs)||0),
+        remainingSec:Math.max(0,Number(data.remainingSec)||0),
+      });
+    }
   };
-  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired"])
+  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired","maintenance"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
@@ -579,10 +621,12 @@ function accountStopSync(){ACCOUNT_SYNC.stopped=true;ACCOUNT_SYNC.generation++;
   accountSyncStopFallback();ACCOUNT_SYNC.token="";ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;ACCOUNT_SYNC.disabled=false;}
 
 async function _api(method, path, body, token) {
-  const headers = { "Content-Type": "application/json" },requestToken=token||(body&&body.token)||"";
-  if(requestToken&&ACCOUNT_UNAUTHORIZED_TOKEN===String(requestToken))
+  const headers = { "Content-Type": "application/json" },requestToken=String(token||(body&&body.token)||"");
+  if(requestToken&&ACCOUNT_UNAUTHORIZED_TOKEN===requestToken)
     return {code:401,data:{ok:false,error:"SESSION_INVALID",msg:"Sessão expirada"}};
-  if (token) headers["Authorization"] = "Bearer " + token;
+  // Lease/renew/tick mandam token no body; Bearer espelha o mesmo segredo para
+  // endpoints que só leem Authorization e para proxies que exigem o header.
+  if (requestToken) headers["Authorization"] = "Bearer " + requestToken;
   try {
     const r = await fetch(ACCOUNT_API_URL + path, {
       method: method,
@@ -603,8 +647,163 @@ async function _api(method, path, body, token) {
       msg:"Servidor indisponível. Verifique se a API está ligada." } };
   }
 }
+/* Monitor de /api/health: detecta queda (rede) e restart (bootId novo) sem
+ * auto-reconnect agressivo. O botão Reconnect é obrigatório para retomar. */
+const ACCOUNT_SERVER_FAIL_NEED=2;
+const ACCOUNT_SERVER_HEALTH_ONLINE_MS=10000;
+const ACCOUNT_SERVER_HEALTH_OFFLINE_MS=5000;
+let ACCOUNT_SERVER_REACHABLE=true;
+let ACCOUNT_SERVER_FORCED_OFFLINE=false;
+let ACCOUNT_SERVER_FAIL_STREAK=0;
+let ACCOUNT_SERVER_BOOT_ID="";
+let ACCOUNT_SERVER_STARTED_AT=0;
+let ACCOUNT_SERVER_LAST_REASON="";
+let ACCOUNT_SERVER_HEALTH_TIMER=null;
+let ACCOUNT_SERVER_HEALTH_INFLIGHT=null;
+
+function accountServerForcedOffline(){return !!ACCOUNT_SERVER_FORCED_OFFLINE;}
+function accountServerReachable(){return !!ACCOUNT_SERVER_REACHABLE;}
+function accountServerBootId(){return ACCOUNT_SERVER_BOOT_ID;}
+function accountServerDisconnectReason(){return ACCOUNT_SERVER_LAST_REASON||"";}
+
+function accountNotifyServerPower(on){
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-server-power",{detail:{on:!!on}}));}catch(e){}
+}
+function accountNotifyMaintenance(state){
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-maintenance",{detail:state||{}}));}catch(e){}
+}
+function accountApplyMaintenanceFromHealth(data){
+  const m=data&&data.maintenance;
+  if(!m||typeof m!=="object")return;
+  const active=!!m.active&&Number(m.endsAt)>Date.now();
+  accountNotifyMaintenance({
+    active,
+    endsAt:Number(m.endsAt)||0,
+    remainingMs:Math.max(0,Number(m.remainingMs)||0),
+    remainingSec:Math.max(0,Number(m.remainingSec)||0),
+  });
+}
 function accountNotifyServerReachable(online){
-  try{window.dispatchEvent(new CustomEvent(online?"tibia-idle-server-online":"tibia-idle-server-offline"));}catch(e){}
+  if(online){
+    ACCOUNT_SERVER_FAIL_STREAK=0;
+    // Disconnect forçado só sai pelo botão Reconnect (accountClearServerForcedOffline).
+    if(ACCOUNT_SERVER_FORCED_OFFLINE){
+      ACCOUNT_SERVER_REACHABLE=true;
+      accountNotifyServerPower(true);
+      return;
+    }
+    if(!ACCOUNT_SERVER_REACHABLE){
+      ACCOUNT_SERVER_REACHABLE=true;
+      accountNotifyServerPower(true);
+      try{window.dispatchEvent(new CustomEvent("tibia-idle-server-online"));}catch(e){}
+    }else{
+      ACCOUNT_SERVER_REACHABLE=true;
+      accountNotifyServerPower(true);
+    }
+    return;
+  }
+  ACCOUNT_SERVER_FAIL_STREAK++;
+  if(ACCOUNT_SERVER_FAIL_STREAK<ACCOUNT_SERVER_FAIL_NEED)return;
+  accountNotifyServerPower(false);
+  accountForceServerDisconnect("network");
+}
+
+function accountLeaseSoftPause(){
+  // Pausa simulação sem limpar o segredo — após o restart o renew/acquire
+  // pode retomar o mesmo holder se o lease ainda existir no storage.
+  ACCOUNT_LEASE.active=false;ACCOUNT_LEASE.lost=true;ACCOUNT_LEASE.heldUntil=0;
+  if(ACCOUNT_LEASE.timer){clearTimeout(ACCOUNT_LEASE.timer);ACCOUNT_LEASE.timer=null;}
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-lease-lost"));}catch(e){}
+}
+
+function accountForceServerDisconnect(reason){
+  const next=String(reason||"network");
+  const already=ACCOUNT_SERVER_FORCED_OFFLINE;
+  ACCOUNT_SERVER_FORCED_OFFLINE=true;
+  ACCOUNT_SERVER_REACHABLE=false;
+  ACCOUNT_SERVER_LAST_REASON=next;
+  if(next!=="restart")accountNotifyServerPower(false);
+  if(ACCOUNT_LEASE.active||ACCOUNT_LEASE.token)accountLeaseSoftPause();
+  if(typeof accountStopSync==="function")accountStopSync();
+  if(!already||next==="restart"||next==="maintenance"){
+    try{window.dispatchEvent(new CustomEvent("tibia-idle-server-offline",{detail:{reason:next}}));}catch(e){}
+  }
+}
+
+function accountClearServerForcedOffline(){
+  ACCOUNT_SERVER_FORCED_OFFLINE=false;
+  ACCOUNT_SERVER_REACHABLE=true;
+  ACCOUNT_SERVER_FAIL_STREAK=0;
+  ACCOUNT_SERVER_LAST_REASON="";
+  try{window.dispatchEvent(new CustomEvent("tibia-idle-server-online"));}catch(e){}
+}
+
+async function accountCheckServerHealth(){
+  if(!accountApiConfigured())return {ok:false,skipped:true};
+  if(ACCOUNT_SERVER_HEALTH_INFLIGHT)return ACCOUNT_SERVER_HEALTH_INFLIGHT;
+  ACCOUNT_SERVER_HEALTH_INFLIGHT=(async()=>{
+    try{
+      const response=await fetch(ACCOUNT_API_URL+"/api/health",{method:"GET",cache:"no-store"});
+      let data={};
+      try{data=await response.json();}catch(e){data={};}
+      if(!response.ok||!data||!data.ok){
+        accountNotifyServerReachable(false);
+        return {ok:false};
+      }
+      accountApplyMaintenanceFromHealth(data);
+      const bootId=String(data.bootId||"");
+      const startedAt=Number(data.startedAt)||0;
+      if(ACCOUNT_SERVER_BOOT_ID&&bootId&&bootId!==ACCOUNT_SERVER_BOOT_ID){
+        ACCOUNT_SERVER_BOOT_ID=bootId;
+        ACCOUNT_SERVER_STARTED_AT=startedAt;
+        accountForceServerDisconnect("restart");
+        accountNotifyServerPower(true);
+        return {ok:true,restarted:true,bootId,startedAt,maintenance:data.maintenance||null};
+      }
+      if(bootId&&!ACCOUNT_SERVER_BOOT_ID){
+        ACCOUNT_SERVER_BOOT_ID=bootId;
+        ACCOUNT_SERVER_STARTED_AT=startedAt;
+      }else if(bootId){
+        ACCOUNT_SERVER_BOOT_ID=bootId;
+        if(startedAt)ACCOUNT_SERVER_STARTED_AT=startedAt;
+      }
+      ACCOUNT_SERVER_FAIL_STREAK=0;
+      if(!ACCOUNT_SERVER_FORCED_OFFLINE)accountNotifyServerReachable(true);
+      else{
+        ACCOUNT_SERVER_REACHABLE=true;
+        accountNotifyServerPower(true);
+        try{window.dispatchEvent(new CustomEvent("tibia-idle-server-ready",{
+          detail:{bootId:ACCOUNT_SERVER_BOOT_ID,startedAt:ACCOUNT_SERVER_STARTED_AT}}));}catch(e){}
+      }
+      return {ok:true,bootId:ACCOUNT_SERVER_BOOT_ID,startedAt:ACCOUNT_SERVER_STARTED_AT,
+        forcedOffline:ACCOUNT_SERVER_FORCED_OFFLINE,maintenance:data.maintenance||null,
+        serverPower:data.serverPower||"on"};
+    }catch(error){
+      accountNotifyServerReachable(false);
+      return {ok:false,error:"NETWORK_ERROR"};
+    }finally{ACCOUNT_SERVER_HEALTH_INFLIGHT=null;}
+  })();
+  return ACCOUNT_SERVER_HEALTH_INFLIGHT;
+}
+
+function accountStartServerHealthMonitor(){
+  if(!accountApiConfigured()||ACCOUNT_SERVER_HEALTH_TIMER)return;
+  const tick=()=>{
+    accountCheckServerHealth().finally(()=>{
+      let ms=ACCOUNT_SERVER_FORCED_OFFLINE?ACCOUNT_SERVER_HEALTH_OFFLINE_MS:ACCOUNT_SERVER_HEALTH_ONLINE_MS;
+      // Durante countdown de manutenção, poll mais rápido.
+      try{
+        const el=document.getElementById("maintenance-countdown");
+        if(el&&!el.hidden)ms=Math.min(ms,2000);
+      }catch(e){}
+      ACCOUNT_SERVER_HEALTH_TIMER=setTimeout(tick,ms);
+    });
+  };
+  ACCOUNT_SERVER_HEALTH_TIMER=setTimeout(tick,1500);
+}
+
+function accountStopServerHealthMonitor(){
+  if(ACCOUNT_SERVER_HEALTH_TIMER){clearTimeout(ACCOUNT_SERVER_HEALTH_TIMER);ACCOUNT_SERVER_HEALTH_TIMER=null;}
 }
 
 async function accountRegister(login, password) {
@@ -619,6 +818,7 @@ async function accountLogin(login, password) {
   const r = await _api("POST", "/api/login", { login, password });
   if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha no login" };
   ACCOUNT_UNAUTHORIZED_TOKEN="";
+  ACCOUNT_LEASE.authFailUntil=0;
   if(ACCOUNT_UNAUTHORIZED_RELOAD){clearTimeout(ACCOUNT_UNAUTHORIZED_RELOAD);ACCOUNT_UNAUTHORIZED_RELOAD=null;}
   try{sessionStorage.removeItem("tibia-idle-session-expired");}catch(e){}
   try{window.dispatchEvent(new CustomEvent("tibia-idle-session-restored"));}catch(e){}

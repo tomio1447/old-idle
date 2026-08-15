@@ -22,6 +22,10 @@ class SyncBus{
     const history=this.histories.get(accountId)||[];history.push(event);while(history.length>this.historyLimit)history.shift();this.histories.set(accountId,history);
     for(const client of this.clients.get(accountId)||[])this.write(client.res,event);
     return event;}
+  broadcastAll(type,data){
+    const event={id:++this.sequence,type:String(type),at:Date.now(),data:data||{}};
+    for(const set of this.clients.values())for(const client of set)this.write(client.res,event);
+    return event;}
   write(res,event){if(res.destroyed||res.writableEnded)return;
     res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(Object.assign({at:event.at},event.data))}\n\n`);}
   subscribe(accountId,res,lastEventId,expiresAt,sessionToken){accountId=Number(accountId);lastEventId=Math.max(0,Number(lastEventId)||0);

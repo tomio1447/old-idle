@@ -8,12 +8,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Global-Idle — caçada automática</title>
 <link rel="icon" href="assets/item/gold-coin.png">
-  <link rel="stylesheet" href="css/layout.css?v=charms-cidade-v2">
+  <link rel="stylesheet" href="css/layout.css?v=alpha-announce-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=settings-click-fix-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
   <link rel="stylesheet" href="css/client-background.css">
-  <link rel="stylesheet" href="css/mobile.css?v=settings-click-fix-v1">
+  <link rel="stylesheet" href="css/mobile.css?v=alpha-announce-v1">
   <link rel="stylesheet" href="css/chat.css?v=global-chat-v1">
   <script>
   /* Aplica modo salvo antes do paint para evitar flash. */
@@ -30,6 +30,25 @@
 <body>
 
 <button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
+
+<!-- Aviso alpha (pré-login, todo page load) -->
+<div class="modal-bg" id="alpha-announce-modal" role="dialog" aria-modal="true" aria-labelledby="alpha-announce-title" aria-hidden="true">
+  <div class="modal panel alpha-announce-box">
+    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">⚠ SERVIDOR DE TESTE (ALPHA)</div>
+    <div class="panel-body">
+      <p class="small center mb8" data-i18n="alpha.warn">
+        Este é um servidor de testes. Progresso, economia e estabilidade podem mudar a qualquer momento. O beta será anunciado em breve.
+      </p>
+      <div class="small center mb8">
+        <span data-i18n="alpha.discord">Discord:</span>
+        <a id="alpha-announce-discord" class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">https://discord.gg/bnbh3jtvBf</a>
+      </div>
+      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Atualizações recentes</div>
+      <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
+      <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
+    </div>
+  </div>
+</div>
 
 <!-- Escolha Mobile / Desktop (primeira visita) -->
 <div class="modal-bg" id="ui-mode-modal" role="dialog" aria-modal="true" aria-labelledby="ui-mode-title">
@@ -77,7 +96,9 @@
 
       <!-- Conta (primeira tela no boot). O create local legado fica oculto. -->
       <div id="account-login">
-        <form id="account-login-form" method="post">
+        <!-- method=post + action=# + onsubmit: evita navegação nativa se
+             o JS ainda não anexou preventDefault (senão o browser POST em /). -->
+        <form id="account-login-form" method="post" action="#" onsubmit="return false;">
           <div class="small dim center mb8" data-i18n="login.enter">Entre com sua conta para acessar seus personagens.</div>
           <div class="field">
             <label for="acc-login" data-i18n="login.user">Login</label>
@@ -125,6 +146,11 @@
 <!-- =============================================== APP -->
 <div id="app">
 
+  <div id="alpha-test-banner" class="alpha-test-banner" role="status">
+    <span class="alpha-test-banner-text">ALPHA-TEST // O BETA IRÁ SER ANUNCIADO EM BREVE // ACESSE NOSSO DISCORD PARA DUVIDAS/REPORTS/SUGESTÕES;</span>
+    <a class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">Discord</a>
+  </div>
+
   <div class="topbar">
     <span class="logo">🌍 GLOBAL-IDLE</span>
     <div class="row small">
@@ -138,22 +164,10 @@
     <div class="server-status online" id="server-status" hidden>
       <span class="server-status-dot" aria-hidden="true"></span>
       <span data-i18n="server.status">SERVER STATUS:</span>
-      <b id="server-status-text" data-i18n="server.online">ONLINE</b>
+      <b id="server-status-text" data-i18n="server.on">SERVIDOR ON</b>
       <button class="sm" id="btn-reconnect" type="button" hidden data-i18n="server.reconnect">Reconnect</button>
     </div>
     <span class="spacer"></span>
-    <button class="sm" id="btn-market" title="Market — equipamentos e itens de imbuement (preços do Canary), venda de Tibia Coins" data-i18n-title="title.market">
-      <img src="assets/ui/market/market.png" alt="" style="width:18px;height:18px;image-rendering:pixelated;vertical-align:middle">
-      <span data-i18n="btn.market">MARKET</span>
-    </button>
-    <button class="sm" id="btn-reward" title="Reward Chest — drops de boss" data-i18n-title="title.reward">
-      <img src="assets/item/reward-chest.png" class="reward-btn-icon" alt="">
-      <span data-i18n="btn.reward">REWARD</span><span id="reward-badge" aria-hidden="true"></span>
-    </button>
-    <button class="sm" id="btn-forge" title="Abrir Exaltation Forge" data-i18n-title="title.forge">
-      <img src="assets/item/exalted-core.gif" class="forge-btn-icon" alt="Exalted Core">
-      <span data-i18n="btn.forge">FORGE</span>
-    </button>
     <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">☸ <span data-i18n="btn.wheel">WHEEL</span></button>
     <button class="sm" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
       <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="prey-btn-gif">
@@ -162,21 +176,12 @@
     <button class="sm" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
       👥 <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm" id="btn-depot" title="Abrir Depot" data-i18n-title="title.depot">
-      <img src="assets/item/depot-item-3497.png" class="depot-btn-icon" alt="Depot">
-      <span data-i18n="btn.depot">DEPOT</span><span id="depot-badge" style="display:none;color:#d4af37;font-weight:bold;margin-left:2px"></span>
-    </button>
-    <button class="sm" id="btn-imbue" title="Abrir janela de imbuement" data-i18n-title="title.imbue">
-      <img src="assets/ui/imbuement-machine.png" alt="">
-      <span data-i18n="btn.imbuements">IMBUEMENTS</span>
-    </button>
     <button class="sm" id="btn-switch" data-i18n="btn.switch">Trocar personagem</button>
     <button class="sm" id="btn-cyclo">📖 <span data-i18n="btn.cyclo">Cyclopedia</span></button>
     <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">🛠 <span data-i18n="btn.admin">Admin</span></button>
     <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
     <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
   </div>
-
   <div class="layout">
 
     <!-- ============================ ESQUERDA -->
@@ -389,6 +394,12 @@
         <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses" data-i18n-title="title.bosses">
           <span class="bosses-megalomania-icon" aria-hidden="true"></span><span data-i18n="btn.bosses">BOSSES</span>
         </button>
+        <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
+          <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-npcs" title="Abrir catálogo de NPCs" data-i18n-title="title.npcs">
+          <span class="npcs-btn-icon" aria-hidden="true"></span><span data-i18n="btn.npcs">NPCS</span>
+        </button>
         <button class="sm" id="btn-training" title="Sistema de Treino — Exercise Dummy (25 TC por 5000 cargas) ou Treinador Online" data-i18n-title="title.training">
           <img src="assets/ui/training/skill-trainer-all.gif" alt="" class="training-btn-gif">
           <span data-i18n="btn.training">TREINO</span>
@@ -448,6 +459,23 @@
 <div id="game-loading" style="display:none"><div class="gl-box"><b>GLOBAL-IDLE</b><div class="gl-text" data-i18n="loading">Carregando recursos...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
 <div id="tooltip"></div>
 <div id="toasts"></div>
+<div id="server-reconnect-banner" class="server-reconnect-banner" hidden>
+  <div class="server-reconnect-banner-inner">
+    <div class="server-power-badge off" id="server-power-badge" data-i18n="server.off">SERVIDOR OFF</div>
+    <strong id="server-reconnect-title" data-i18n="server.lostTitle">Conexão perdida</strong>
+    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.</p>
+    <button class="primary" id="btn-reconnect-banner" type="button" data-i18n="server.reconnect">Reconnect</button>
+    <div class="tiny dim mt8" id="server-reconnect-error" hidden></div>
+  </div>
+</div>
+<div id="maintenance-countdown" class="maintenance-countdown" hidden>
+  <div class="maintenance-countdown-inner panel">
+    <strong data-i18n="maint.title">Manutenção em breve</strong>
+    <p class="small" data-i18n="maint.msg">O servidor será desligado para atualização. Conecte-se novamente após o restart.</p>
+    <div class="maintenance-countdown-num" id="maintenance-countdown-num">30</div>
+    <div class="tiny dim" data-i18n="maint.unit">segundos</div>
+  </div>
+</div>
 <div class="modal-bg" id="modal"><div class="modal panel" id="modal-body"></div></div>
 
 <script src="js/gamedata.js"></script>
@@ -493,7 +521,7 @@
   <script src="js/combo.js?v=mas-san-range-v1"></script>
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=knight-fx-combo-v1"></script>
-<script src="js/area.js?v=mas-san-range-v1"></script>
+<script src="js/area.js?v=wave-origin-v1"></script>
   <script src="js/gridai.js?v=mob-retarget-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
@@ -507,20 +535,20 @@
 <script src="js/outfit.js?v=sex-looktype-v2"></script>
 <script src="js/appearance.js?v=sex-looktype-v2"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=loot-pouch-clear-v1"></script>
+<script src="js/player.js?v=cap-loot-fix-v1"></script>
 <script src="js/accessories.js?v=supply-stash-v1"></script>
-  <script src="js/combat.js?v=wave-clear-respawn-6s"></script>
-<script src="js/city.js?v=npc-shops-v1"></script>
-<script src="js/npc-shops.js?v=npc-shops-v1"></script>
-<script src="js/citymap.js?v=npc-shops-v1"></script>
+  <script src="js/combat.js?v=cap-loot-fix-v1"></script>
+<script src="js/city.js?v=npc-sprites-canary-v1"></script>
+<script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
+<script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
 <script src="js/walker.js"></script>
 <script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
 <script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
 <script src="js/tilemap.js?v=cobra-loading-v17"></script>
 <script src="js/effectdata.js?v=blow-white-fix-v1"></script>
 <script src="js/icondata.js?v=cond-icons-v1"></script>
-<script src="js/render.js?v=fx-dur-fullframes-v1"></script>
-<script src="js/city-render.js?v=hd-hud-v1"></script>
+<script src="js/render.js?v=combat-fx-expire-v1"></script>
+<script src="js/city-render.js?v=npc-sprites-canary-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
      GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
@@ -530,14 +558,15 @@
 <script src="js/hardcore-library.js?v=library-canary-dmg-v1"></script>
 <script src="js/hard-hunts.js?v=naga-avg-v1"></script>
 <script src="js/soulwar.js?v=hatred-v3"></script>
-<script src="js/cyclopedia.js?v=npc-shops-v1"></script>
+<script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=loot-pouch-clear-v1"></script>
-<script src="js/i18n.js?v=npc-shops-v1"></script>
+<script src="js/ui.js?v=cap-loot-fix-v1"></script>
+<script src="js/i18n.js?v=alpha-announce-v1"></script>
+<script src="js/alpha-announce.js?v=alpha-announce-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-v1"></script>
-<script src="js/cyclopedia-ui.js?v=npc-shops-v1"></script>
+<script src="js/cyclopedia-ui.js?v=npcs-modal-v1"></script>
 <script src="js/forgedata.js"></script>
 <script src="js/forge.js"></script>
 <script src="js/imbuement-ui.js?v=imbue-slots-v1"></script>
@@ -553,7 +582,7 @@
 <script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=save-conflict-retry-v1"></script>
+<script src="js/account-client.js?v=alpha-announce-v1"></script>
 <script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js"></script>
@@ -563,11 +592,11 @@
 <script src="js/training-ui.js"></script>
 <script src="js/accessorydata.js"></script>
 <script src="js/supply-stash-data.js?v=supply-stash-v1"></script>
-<script src="js/supply-stash.js?v=loot-coins-analyser-v1"></script>
+<script src="js/supply-stash.js?v=cap-loot-fix-v1"></script>
 <script src="js/admin.js?v=admin-no-rme-mundo-v1"></script>
-<script src="js/city-ui.js?v=npc-shops-v1"></script>
+<script src="js/city-ui.js?v=npc-shop-meta-v1"></script>
 <script src="js/preload.js?v=sex-looktype-v2"></script>
-<script src="js/game.js?v=global-chat-v1"></script>
-<script src="js/scarlett-boss.js?v=goshnar-greed-v2"></script>
+<script src="js/game.js?v=alpha-announce-v1"></script>
+<script src="js/scarlett-boss.js?v=boss-death-wipe-v1"></script>
 </body>
 </html>

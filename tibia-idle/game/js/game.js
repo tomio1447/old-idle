@@ -552,6 +552,7 @@ function normalizePlayer(p) {
   p.monkShrines = Math.max(0, Math.min(3, p.monkShrines || 0));
   if (!p.config.dummy) p.config.dummy = "exercise";
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
+  if (typeof ensurePlayerCapacity === "function") ensurePlayerCapacity(p);
   ensureOutfit(p);
   return p;
 }
@@ -1211,7 +1212,10 @@ function renderBosses(p) {
 function openBossesCatalogModal() {
   if (!G.p) return;
   const modal = $("#modal"), body = $("#modal-body");
-  body.classList.remove("hunts-modal-shell", "boss-modal-shell", "reward-modal-shell");
+  body.classList.remove(
+    "hunts-modal-shell", "boss-modal-shell", "reward-modal-shell",
+    "npcs-modal-shell", "cidade-modal-shell"
+  );
   body.classList.add("bosses-modal-shell");
   body.innerHTML = `<div class="panel-title bosses-modal-title">
       <span class="bosses-megalomania-icon" aria-hidden="true"></span>
@@ -1456,11 +1460,32 @@ function startHunt(id, instanceMode, force) {
     return;
   }
   if (!instanceMode) { openInstanceModal(id); return; }
+  // Online: sem lease a caçada congela (sem ticks de autoridade) e parece
+  // 9999 ping. Garanta o controle antes de mutar o estado da hunt.
+  if(typeof accountApiConfigured==="function"&&accountApiConfigured()&&
+     typeof accountEnsureLease==="function"){
+    const token=sessionToken();
+    if(!token){toast("Sessão online ausente. Entre novamente.","bad");return;}
+    accountEnsureLease(token,{silent:true}).then((lease)=>{
+      if(!lease||!lease.ok){
+        toast((lease&&lease.msg)||"Não foi possível obter o controle da conta.","bad");
+        return;
+      }
+      startHuntAfterLease(id,instanceMode,force);
+    });
+    return;
+  }
+  startHuntAfterLease(id,instanceMode,force);
+}
+function startHuntAfterLease(id, instanceMode, force) {
+  const hu = GAMEDATA.hunts[id];
+  if (!hu) return;
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada da hunt");
   // Toda troca de arena passa pelo checkpoint city. Além de limpar a
   // instância anterior, isso ordena a transição da party no servidor.
   if(G.combat)stopHunt(true);
   if (G.training) stopAcademy(false);
+  if (typeof clearCombatVisualOverlays === "function") clearCombatVisualOverlays(null);
   G.inCity = false;
   G.p.hunt = id;
   G.p.instanceMode = instanceMode;
@@ -1624,6 +1649,7 @@ function stopHunt(skipMapLoading) {
     beginMapLoading("Retornando ao Templo Oficial...");
   // Invalida qualquer callback OTBM iniciado antes do retorno.
   G.huntEntryToken = (G.huntEntryToken || 0) + 1;G.huntEntryPendingToken=null;
+  if (typeof clearCombatVisualOverlays === "function") clearCombatVisualOverlays(G.combat);
   // Checkpoint do templo: cura ANTES de persistir. save() com G.combat
   // online não grava o personagem (o tick já o fez com HP de combate),
   // então HP 150/0 acabava no banco se a cura viesse depois.
@@ -1793,6 +1819,19 @@ function drainEvents() {
     const group=visualTotals.byEvent.get(event);
     return !group||group.first===event?(group?group.total:fallback):0;
   };
+  // Crit/Fatal: no máximo UM sprite por monstro neste lote. Hits dual
+  // (físico+elemento) e agregação de tick não devem empilhar 2× no mesmo
+  // alvo — mas CADA alvo atingido pelo proc precisa do efeito.
+  const critFxShown = new Set();
+  const fatalFxShown = new Set();
+  const critFxKey = (ev) => {
+    if (ev.targetId !== undefined && ev.targetId !== null && ev.targetId !== "")
+      return "id:" + String(ev.targetId);
+    if (ev.mobId !== undefined && ev.mobId !== null && ev.mobId !== "")
+      return "mob:" + String(ev.mobId);
+    return "xy:" + Math.round((Number(ev.x) || 0) * 1000) + ":" +
+      Math.round((Number(ev.y) || 0) * 1000);
+  };
   // Posição normalizada (0-1) de um evento: os eventos carregam a posição
   // REAL da entidade no canvas (player ou mob, que andam pelo grid do
   // mapa). A fórmula antiga (0.42 + x*0.5) era do campo fixo e deslocava
@@ -1850,11 +1889,16 @@ function drainEvents() {
         // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
         // Critical Hit ocupa ~37px dentro do frame 64px, contra ~53px do
         // Onslaught; 1.45x iguala o tamanho percebido sem trocar a sprite.
-        if (e.crit) {
+        // AoE compartilhado: cada monstro hitado pelo proc ganha o FX (não
+        // só o alvo primário). Dedupe por targetId evita dobro em arma dual.
+        const fxKey = critFxKey(e);
+        if (e.crit && !critFxShown.has(fxKey)) {
+          critFxShown.add(fxKey);
           r.addEffect(x, y, "critical-hit-effect", 1200, 1.45);
         }
         // FATAL (Onslaught): sprite "FATAL!" importado do efeito oficial
-        if (e.fatal) {
+        if (e.fatal && !fatalFxShown.has(fxKey)) {
+          fatalFxShown.add(fxKey);
           r.addEffect(x, y - 0.10, "fatal-text", 1200, 1);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.fatal = (fdc.fatal || 0) + 1;
@@ -2212,8 +2256,10 @@ function drainEvents() {
       case "say": {
         // TALKTYPE_SPELL: palavras no caster, visíveis para toda a party.
         // Potion/comida ("Aaaah...", Munch.) não são magia — não desenhar.
-        const text = String(e.text || "");
-        if (e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text)) break;
+        // Cada evento = um bubble separado (nunca concatenar "exori gran" +
+        // "exevo mas san" no mesmo texto).
+        const text = String(e.text || "").replace(/\s+/g, " ").trim();
+        if (!text || e.supply || /^(Aaaah|Aahhh|Munch)\b/i.test(text)) break;
         const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
         const wanted = e.whoId !== undefined && e.whoId !== null ? String(e.whoId) : "";
         const saidor = wanted && c && Array.isArray(c.players)
@@ -2226,6 +2272,20 @@ function drainEvents() {
         } else {
           r.addSpeech(text, "#ffe680");
           addLog("say", `<b>${nome}</b>: ${text}`);
+        }
+        break;
+      }
+      case "cap-drop": {
+        // CAP cheia no servidor autoritativo — avisa sem spam a cada drop.
+        const now = Date.now();
+        if (!G._capDropToastAt || now - G._capDropToastAt > 2500) {
+          G._capDropToastAt = now;
+          const msg = (typeof capacityMessage === "function")
+            ? capacityMessage()
+            : ((typeof t === "function" && t("cap.full")) || e.msg || "You cannot carry more.");
+          addLog("death", msg);
+          if (typeof toast === "function") toast(msg, "bad");
+          if (G.p && typeof renderEquip === "function") renderEquip(G.p);
         }
         break;
       }
@@ -2526,9 +2586,14 @@ function returnPartyToInstanceAfterWipe(c,cost,silent){
 function finishIdleInstance(reason,silent){
   const c=G.combat;if(!c||c.instanceFinished)return false;
   if(reason==="party-wipe"){
-    const cost=partyWipeBlessCost(c);
-    if(returnPartyToInstanceAfterWipe(c,cost,silent))return true;
-    if(!silent&&typeof addLog==="function")addLog("death",`Party sem ${fmtFull(cost)} gp para as bênçãos — retorno ao templo.`);
+    // Boss wipe nunca compra bless/retorna à sala — falha e templo.
+    if(!c.boss){
+      const cost=partyWipeBlessCost(c);
+      if(returnPartyToInstanceAfterWipe(c,cost,silent))return true;
+      if(!silent&&typeof addLog==="function")addLog("death",`Party sem ${fmtFull(cost)} gp para as bênçãos — retorno ao templo.`);
+    }else if(!silent&&typeof addLog==="function"){
+      addLog("death","Party wipe no boss — retorno ao templo.");
+    }
   }
   c.instanceFinished=true;clearInstanceSession(reason||"finished");
   if(reason==="stamina"&&!silent&&typeof addLog==="function")
@@ -2644,83 +2709,275 @@ function onlineAuthorityCombat(){
   return !!(!ONLINE_SESSION_INVALID&&G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
 }
+/* FX/fala/projéteis do canvas + speech nas entidades. Sem isso, reconnect
+ * ou troca de hunt deixava areafx/palavras mágicas congelados na tela. */
+function clearCombatVisualOverlays(combat){
+  if(typeof G!=="undefined"&&G&&G.renderer&&typeof G.renderer.clearCombatVisuals==="function")
+    G.renderer.clearCombatVisuals();
+  const c=combat||(typeof G!=="undefined"&&G&&G.combat)||null;
+  if(!c)return;
+  c.events=[];
+  const seen=new Set();
+  const wipe=(ent)=>{
+    if(!ent||seen.has(ent))return;
+    seen.add(ent);
+    ent.speech=[];
+  };
+  wipe(c.player);
+  for(const ent of c.players||[])wipe(ent);
+  for(const ent of c.mobs||[])wipe(ent);
+}
+function serverDisconnectCopy(reason){
+  const why=reason||(typeof accountServerDisconnectReason==="function"?accountServerDisconnectReason():"");
+  if(why==="maintenance"){
+    return {
+      title:typeof t==="function"?t("maint.title"):"Manutenção em breve",
+      msg:typeof t==="function"?t("maint.msg"):
+        "O servidor será desligado para atualização. Conecte-se novamente após o restart.",
+      toast:typeof t==="function"?t("server.lostToast"):"SERVIDOR OFF. Use Reconnect quando a API voltar.",
+    };
+  }
+  const restarted=why==="restart";
+  if(restarted){
+    return {
+      title:typeof t==="function"?t("server.restartTitle"):"Servidor reiniciou",
+      msg:typeof t==="function"?t("server.restartMsg"):
+        "O servidor reiniciou. A caçada ficou pausada nesta aba — use Reconnect quando a API voltar.",
+      toast:typeof t==="function"?t("server.restartToast"):
+        "Servidor reiniciou. Use Reconnect para retomar.",
+    };
+  }
+  return {
+    title:typeof t==="function"?t("server.lostTitle"):"Conexão perdida",
+    msg:typeof t==="function"?t("server.lostMsg"):
+      "Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.",
+    toast:typeof t==="function"?t("server.lostToast"):
+      "SERVIDOR OFF. Use Reconnect quando a API voltar.",
+  };
+}
+function setServerPowerBadge(powerOn){
+  const badge=$("#server-power-badge");
+  if(!badge)return;
+  const on=!!powerOn;
+  badge.classList.toggle("on",on);
+  badge.classList.toggle("off",!on);
+  const key=on?"server.on":"server.off";
+  badge.setAttribute("data-i18n",key);
+  badge.textContent=typeof t==="function"?t(key):(on?"SERVIDOR ON":"SERVIDOR OFF");
+}
+function setServerPowerStatus(powerOn){
+  const box=$("#server-status"),text=$("#server-status-text");
+  const on=!!powerOn;
+  if(box){
+    box.classList.toggle("power-on",on);
+    box.classList.toggle("power-off",!on);
+    // offline class = sessão/reconnect pendente; power-* = saúde da API
+    box.classList.toggle("online",on&&SERVER_CONNECTION_ONLINE);
+    box.classList.toggle("offline",!SERVER_CONNECTION_ONLINE||!on);
+  }
+  if(text){
+    const key=on?"server.on":"server.off";
+    text.setAttribute("data-i18n",key);
+    text.textContent=typeof t==="function"?t(key):(on?"SERVIDOR ON":"SERVIDOR OFF");
+  }
+  setServerPowerBadge(on);
+}
+function setServerReconnectBanner(online,options){
+  const banner=$("#server-reconnect-banner");
+  if(!banner)return;
+  const show=typeof accountApiConfigured==="function"&&accountApiConfigured()&&!online;
+  banner.hidden=!show;
+  if(!show){
+    const err=$("#server-reconnect-error");
+    if(err){err.hidden=true;err.textContent="";}
+    return;
+  }
+  const copy=serverDisconnectCopy(options&&options.reason);
+  const title=$("#server-reconnect-title"),msg=$("#server-reconnect-msg");
+  if(title)title.textContent=copy.title;
+  if(msg)msg.textContent=copy.msg;
+  const healthOk=options&&options.healthOk;
+  if(healthOk!==undefined)setServerPowerBadge(!!healthOk);
+  else if(typeof accountServerReachable==="function")setServerPowerBadge(!!accountServerReachable());
+  else setServerPowerBadge(false);
+}
 function setServerConnectionStatus(online,options){
   const was=SERVER_CONNECTION_ONLINE;
   SERVER_CONNECTION_ONLINE=!!online;
-  const box=$("#server-status"),text=$("#server-status-text"),btn=$("#btn-reconnect");
+  const box=$("#server-status"),btn=$("#btn-reconnect");
   const show=typeof accountApiConfigured==="function"&&accountApiConfigured();
-  if(box){
-    box.hidden=!show;
-    box.classList.toggle("online",!!online);
-    box.classList.toggle("offline",!online);
-  }
-  if(text){
-    const key=online?"server.online":"server.offline";
-    text.setAttribute("data-i18n",key);
-    text.textContent=typeof t==="function"?t(key):(online?"ONLINE":"OFFLINE");
-  }
+  if(box)box.hidden=!show;
   if(btn)btn.hidden=!!online;
+  const healthOk=options&&options.healthOk!==undefined
+    ?!!options.healthOk
+    :(online?true:(typeof accountServerReachable==="function"?!!accountServerReachable():false));
+  setServerPowerStatus(healthOk);
+  setServerReconnectBanner(online,Object.assign({},options||{},{healthOk}));
   if(!online&&was&&!(options&&options.silent)&&typeof toast==="function"&&show)
-    toast("Servidor OFFLINE. A caçada permanece nesta aba — use Reconnect quando a API voltar.","bad");
+    toast(serverDisconnectCopy(options&&options.reason).toast,"bad");
+}
+let MAINTENANCE_COUNTDOWN_TIMER=null;
+let MAINTENANCE_COUNTDOWN_ENDS_AT=0;
+function hideMaintenanceCountdown(){
+  if(MAINTENANCE_COUNTDOWN_TIMER){clearInterval(MAINTENANCE_COUNTDOWN_TIMER);MAINTENANCE_COUNTDOWN_TIMER=null;}
+  MAINTENANCE_COUNTDOWN_ENDS_AT=0;
+  const el=$("#maintenance-countdown");
+  if(el)el.hidden=true;
+}
+function showMaintenanceCountdown(endsAt){
+  const until=Number(endsAt)||0;
+  if(!until||until<=Date.now()){
+    hideMaintenanceCountdown();
+    return;
+  }
+  MAINTENANCE_COUNTDOWN_ENDS_AT=until;
+  const el=$("#maintenance-countdown"),num=$("#maintenance-countdown-num");
+  if(!el)return;
+  el.hidden=false;
+  const tick=()=>{
+    const left=Math.max(0,Math.ceil((MAINTENANCE_COUNTDOWN_ENDS_AT-Date.now())/1000));
+    if(num)num.textContent=String(left);
+    if(left<=0){
+      hideMaintenanceCountdown();
+      if(typeof accountForceServerDisconnect==="function")
+        accountForceServerDisconnect("maintenance");
+      setServerConnectionStatus(false,{reason:"maintenance",healthOk:false,silent:true});
+      setServerPowerStatus(false);
+    }
+  };
+  tick();
+  if(MAINTENANCE_COUNTDOWN_TIMER)clearInterval(MAINTENANCE_COUNTDOWN_TIMER);
+  MAINTENANCE_COUNTDOWN_TIMER=setInterval(tick,250);
 }
 function bindServerStatusControls(){
   if(SERVER_STATUS_BOUND)return;SERVER_STATUS_BOUND=true;
-  const btn=$("#btn-reconnect");
-  if(btn)btn.addEventListener("click",()=>{reconnectOnlineRuntime();});
-  window.addEventListener("tibia-idle-server-online",()=>setServerConnectionStatus(true,{silent:true}));
-  window.addEventListener("tibia-idle-server-offline",()=>{
-    if(G)G.instanceReconnectPending=true;
-    setServerConnectionStatus(false);
+  const clickReconnect=()=>{reconnectOnlineRuntime();};
+  const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
+  if(btn)btn.addEventListener("click",clickReconnect);
+  if(bannerBtn)bannerBtn.addEventListener("click",clickReconnect);
+  window.addEventListener("tibia-idle-server-online",()=>{
+    // Só limpa a UI OFFLINE após reconnect bem-sucedido (ou boot sem pending).
+    if(G&&G.instanceReconnectPending)return;
+    if(typeof accountServerForcedOffline==="function"&&accountServerForcedOffline())return;
+    setServerConnectionStatus(true,{silent:true,healthOk:true});
   });
+  window.addEventListener("tibia-idle-server-offline",(event)=>{
+    if(G)G.instanceReconnectPending=true;
+    if(typeof clearCombatVisualOverlays==="function")clearCombatVisualOverlays(G&&G.combat);
+    const reason=event&&event.detail&&event.detail.reason;
+    setServerConnectionStatus(false,{reason,healthOk:false});
+  });
+  window.addEventListener("tibia-idle-server-ready",()=>{
+    // Health OK de novo: mostra SERVIDOR ON, mas Reconnect ainda é obrigatório.
+    setServerPowerStatus(true);
+    setServerPowerBadge(true);
+    const hint=$("#server-reconnect-error");
+    if(hint&&!SERVER_CONNECTION_ONLINE){
+      hint.hidden=false;
+      hint.textContent=typeof t==="function"?t("server.readyHint"):"SERVIDOR ON — clique em Reconnect.";
+      hint.classList.remove("bad");hint.classList.add("good");
+    }
+  });
+  window.addEventListener("tibia-idle-server-power",(event)=>{
+    const on=!(event&&event.detail&&event.detail.on===false);
+    setServerPowerStatus(on);
+    if(!SERVER_CONNECTION_ONLINE)setServerPowerBadge(on);
+  });
+  window.addEventListener("tibia-idle-maintenance",(event)=>{
+    const detail=event&&event.detail||{};
+    if(detail.active&&detail.endsAt)showMaintenanceCountdown(detail.endsAt);
+    else hideMaintenanceCountdown();
+  });
+  if(typeof accountStartServerHealthMonitor==="function")accountStartServerHealthMonitor();
   if(typeof accountApiConfigured==="function"&&accountApiConfigured())
-    setServerConnectionStatus(true,{silent:true});
+    setServerConnectionStatus(true,{silent:true,healthOk:true});
 }
 async function reconnectOnlineRuntime(){
-  const btn=$("#btn-reconnect");
-  if(btn){btn.disabled=true;btn.textContent=(typeof t==="function"?t("server.reconnect"):"Reconnect")+"...";}
+  const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
+  const err=$("#server-reconnect-error");
+  const label=(typeof t==="function"?t("server.reconnect"):"Reconnect")+"...";
+  const setBusy=(busy)=>{
+    if(btn){btn.disabled=busy;btn.textContent=busy?label:(typeof t==="function"?t("server.reconnect"):"Reconnect");}
+    if(bannerBtn){bannerBtn.disabled=busy;bannerBtn.textContent=busy?label:(typeof t==="function"?t("server.reconnect"):"Reconnect");}
+  };
+  const showError=(message)=>{
+    if(err){err.hidden=false;err.textContent=message;err.classList.add("bad");err.classList.remove("good");}
+    if(typeof toast==="function")toast(message,"bad");
+  };
+  setBusy(true);
   ONLINE_RUNTIME_RETRY_AT=0;ONLINE_SESSION_INVALID=false;
   if(G)G.instanceReconnectPending=true;
+  if(typeof clearCombatVisualOverlays==="function")clearCombatVisualOverlays(G&&G.combat);
   try{
     if(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE)ACCOUNT_LEASE.heldUntil=0;
     if(typeof accountApiConfigured==="function"&&accountApiConfigured()){
+      const health=typeof accountCheckServerHealth==="function"?await accountCheckServerHealth():{ok:true};
+      if(!health||!health.ok){
+        showError(typeof t==="function"?t("server.stillDown"):"Servidor ainda indisponível.");
+        return false;
+      }
+      // Health ok com bootId novo ainda dispara forced-offline; limpe só depois
+      // do resume. Aqui liberamos o flag temporariamente para lease/sync.
+      if(typeof accountClearServerForcedOffline==="function")accountClearServerForcedOffline();
       const token=typeof sessionToken==="function"?sessionToken():"";
       if(token&&typeof accountEnsureLease==="function"){
         const lease=await accountEnsureLease(token,{silent:true});
         if(!lease||!lease.ok){
-          if(typeof toast==="function")toast((lease&&lease.msg)||"Não foi possível reassumir o controle.","bad");
+          if(typeof accountForceServerDisconnect==="function")
+            accountForceServerDisconnect(accountServerDisconnectReason()||"network");
+          showError((lease&&lease.msg)||(typeof t==="function"?t("server.leaseFail"):"Não foi possível reassumir o controle."));
           return false;
         }
       }
       if(token&&typeof accountStartSync==="function")accountStartSync(token);
     }
-    const recovered=await requestOnlineRuntimeRecovery();
+    const recovered=await requestOnlineRuntimeRecovery({force:true});
     if(recovered||(typeof accountLeaseAllowsSimulation==="function"&&accountLeaseAllowsSimulation())){
       if(G)delete G.instanceReconnectPending;
+      if(typeof accountClearServerForcedOffline==="function")accountClearServerForcedOffline();
       setServerConnectionStatus(true,{silent:true});
-      if(typeof toast==="function")toast("Servidor ONLINE. Instância reconectada.","good");
+      if(err){err.hidden=true;err.textContent="";}
+      if(typeof toast==="function")toast(typeof t==="function"?t("server.reconnected"):"Servidor ONLINE. Instância reconectada.","good");
       return true;
     }
-    if(typeof toast==="function")toast("Servidor ainda indisponível.","bad");
+    if(typeof accountForceServerDisconnect==="function")
+      accountForceServerDisconnect(accountServerDisconnectReason()||"network");
+    showError(typeof t==="function"?t("server.stillDown"):"Servidor ainda indisponível.");
     return false;
   }catch(e){
-    if(typeof toast==="function")toast("Falha ao reconectar.","bad");
+    if(typeof accountForceServerDisconnect==="function")
+      accountForceServerDisconnect(accountServerDisconnectReason()||"network");
+    showError(typeof t==="function"?t("server.reconnectFail"):"Falha ao reconectar.");
     return false;
   }finally{
-    if(btn){btn.disabled=false;btn.textContent=typeof t==="function"?t("server.reconnect"):"Reconnect";}
+    setBusy(false);
   }
 }
 let ONLINE_RUNTIME_RECOVERING=false,ONLINE_RUNTIME_RETRY_AT=0;
 function resetOnlineRuntimeClocks(){
   G.last=performance.now();G.tickAcc=0;G.bgLast=Date.now();G.bgAcc=0;ONLINE_AUTH_ACC=0;
 }
-async function requestOnlineRuntimeRecovery(){
+async function requestOnlineRuntimeRecovery(options){
+  const force=!!(options&&options.force);
   if(ONLINE_RUNTIME_RECOVERING||!onlineAuthorityCombat()||Date.now()<ONLINE_RUNTIME_RETRY_AT)return false;
+  // Sem force: não martelar lease/API enquanto o banner Reconnect está ativo.
+  if(!force){
+    if(typeof accountServerForcedOffline==="function"&&accountServerForcedOffline())return false;
+    if(G&&G.instanceReconnectPending&&!SERVER_CONNECTION_ONLINE)return false;
+  }
   ONLINE_RUNTIME_RECOVERING=true;ONLINE_RUNTIME_RETRY_AT=Date.now()+2000;
   try{
-    const token=typeof sessionToken==="function"?sessionToken():"";if(!token)return false;
+    const token=typeof sessionToken==="function"?sessionToken():"";if(!token){
+      ONLINE_SESSION_INVALID=true;ONLINE_RUNTIME_RETRY_AT=Number.POSITIVE_INFINITY;return false;
+    }
     const lease=typeof accountEnsureLease==="function"
       ?await accountEnsureLease(token,{silent:true}):{ok:true};
     if(!lease||!lease.ok){
+      if(lease&&lease.unauthorized){
+        // Sessão morta: pare o storm de /lease/acquire. O invalidate+reload
+        // do account-client assume o retorno ao login.
+        ONLINE_SESSION_INVALID=true;ONLINE_RUNTIME_RETRY_AT=Number.POSITIVE_INFINITY;return false;
+      }
       // Outra aba realmente ativa continua vencendo; só volte a pedir o lease
       // depois que o TTL atual expirar. Takeover continua só no botão.
       const heldMs=Number(lease&&lease.expiresAt?new Date(lease.expiresAt).getTime()-Date.now():0);
@@ -3450,14 +3707,10 @@ function renderAll() {
   renderBosses(p);
   renderTopbar(p);
   if (typeof renderCoinBalance === "function") renderCoinBalance();
-  var db = $("#depot-badge");
-  if (db) { var n = p.depotNotification || 0; db.textContent = n > 0 ? n : ""; db.style.display = n > 0 ? "" : "none"; }
   if (typeof renderOtcAnalyser === "function") renderOtcAnalyser();
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
-  // Reward Chest: badge do botão (nº de itens de boss)
-  if (typeof renderRewardButton === "function") renderRewardButton(p);
   // painel de party estilo OTC (canto superior direito da tela do jogo)
   if (typeof renderPartyPanel === "function") renderPartyPanel(p);
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
@@ -3654,19 +3907,18 @@ function bindControls() {
   });
   const btnBosses = $("#btn-bosses");
   if (btnBosses) btnBosses.addEventListener("click", () => openBossesCatalogModal());
+  const btnCidade = $("#btn-cidade");
+  if (btnCidade) btnCidade.addEventListener("click", () => {
+    if (typeof openCidadeModal === "function") openCidadeModal();
+  });
+  const btnNpcs = $("#btn-npcs");
+  if (btnNpcs) btnNpcs.addEventListener("click", () => {
+    if (typeof openNpcsModal === "function") openNpcsModal();
+  });
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
-  const btnImb = $("#btn-imbue");
-  if (btnImb) btnImb.addEventListener("click", () => openImbueModal());
-  const btnForge = $("#btn-forge");
-  if (btnForge) btnForge.addEventListener("click", () => { if (typeof openForgeModal === "function") openForgeModal(); });
-  const btnMarket = $("#btn-market");
-  if (btnMarket) btnMarket.addEventListener("click", () => { if (typeof openMarket === "function") openMarket(); });
+  /* Market / Reward / Forge / Depot / Imbuements: só via modal CIDADE (e Cyclopedia). */
   const btnWheel = $("#btn-wheel");
   if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
-  const btnDepot = $("#btn-depot");
-  if (btnDepot) btnDepot.addEventListener("click", () => { if (typeof openDepotModal === "function") openDepotModal(); });
-  // Reward Chest (drops de boss) — botão ao lado do MARKET
-  if (typeof bindRewardButton === "function") bindRewardButton();
   // painel de testes: so liga o botao se admin.js estiver carregado, para o
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
@@ -3769,7 +4021,12 @@ function bindControls() {
     if (modal && modal.classList.contains("show")) {
       modal.classList.remove("show", "wide");
       const modalBody = $("#modal-body");
-      if (modalBody) modalBody.classList.remove("hunts-modal-shell", "bosses-modal-shell");
+      if (modalBody) {
+        modalBody.classList.remove(
+          "hunts-modal-shell", "bosses-modal-shell",
+          "npcs-modal-shell", "cidade-modal-shell"
+        );
+      }
       if (typeof closeModal === "function") closeModal();
     }
     if (typeof hideContextMenu === "function") hideContextMenu();
@@ -4100,6 +4357,7 @@ function initAccountLogin() {
   let selColors = (typeof DEFAULT_OUTFIT_COLORS !== "undefined" && DEFAULT_OUTFIT_COLORS.knight
     ? DEFAULT_OUTFIT_COLORS.knight : [95, 116, 116, 95]).slice();
   let selLookPart = 0;
+  let accountBootGeneration = 0;
   const acc = sessionAccount();
 
   function msg(t) {
@@ -4273,8 +4531,15 @@ function initAccountLogin() {
     }
     if(!leaseReady&&typeof accountAcquireLease==="function"){
       msg("Reservando controle da conta...");
-      const lease=await accountAcquireLease(token,false);
-      if(!lease.ok){msg("");showLeaseConflict(token,summary,lease);return;}
+      const lease=await accountAcquireLease(sessionToken()||token,false);
+      if(!lease.ok){
+        msg("");
+        if(lease.unauthorized){
+          msg(lease.msg||"Sessão expirada — faça login novamente.");
+          return;
+        }
+        showLeaseConflict(token,summary,lease);return;
+      }
     }
     msg("Carregando <b>" + summary.name + "</b>...");
     const loaded = typeof accountLoadCharacter === "function"
@@ -4518,7 +4783,7 @@ function initAccountLogin() {
       <div class="panel-title">Criar conta
         <span style="flex:1"></span><button class="sm" id="acc-register-cancel">✕</button>
       </div>
-      <form class="panel-body account-flow-body" id="acc-register-form" method="post">
+      <form class="panel-body account-flow-body" id="acc-register-form" method="post" action="#" onsubmit="return false;">
         <div class="field"><label for="acc-new-login">Login</label>
           <input id="acc-new-login" name="username" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
         <div class="field"><label for="acc-new-password">Senha</label>
@@ -4559,8 +4824,10 @@ function initAccountLogin() {
     const pass = $("#acc-password").value || "";
     if (!login || !pass) { msg("Informe login e senha"); return; }
     button.disabled = true; msg("Entrando...");
+    const bootGen=++accountBootGeneration;
     try {
       const result = await accountLogin(login, pass);
+      if (bootGen!==accountBootGeneration) return;
       if (!result.ok) { msg(result.msg || "Falha no login"); return; }
       msg(""); showPicker(result.token, result.account, result.characters);
     } finally {
@@ -4572,14 +4839,16 @@ function initAccountLogin() {
   const token = sessionToken();
   if (token && acc) {
     msg("Reconectando...");
+    const bootGen=++accountBootGeneration;
     accountMe(token).then((result) => {
+      if (bootGen!==accountBootGeneration) return;
       if (result.ok) {
         msg("");if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
         let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";
           sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
         const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));
-        if(target)enterCharacter(token,target);
-        else showPicker(token, result.account, result.characters || []);
+        if(target)enterCharacter(sessionToken()||token,target);
+        else showPicker(sessionToken()||token, result.account, result.characters || []);
       } else { logoutAccount(); msg("Sessão expirada — faça login novamente."); }
     });
   }

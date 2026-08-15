@@ -54,13 +54,54 @@ const INSTANCE_WORKER_MAX_STEP_MS=Math.max(100,parseInt(process.env.INSTANCE_WOR
 // calcular o período offline. Sem essa janela, uma party podia sofrer wipe
 // no primeiro tick de boot e ser enviada ao templo durante manutenção.
 const INSTANCE_WORKER_STARTUP_GRACE_MS=Math.max(0,parseInt(process.env.INSTANCE_WORKER_STARTUP_GRACE_MS||"5000",10)||0);
+// Identidade deste processo — o cliente usa bootId em /api/health para
+// detectar restart mesmo quando a porta volta rápido com a mesma URL.
+const SERVER_BOOT_ID=crypto.randomBytes(16).toString("hex");
+const SERVER_STARTED_AT=Date.now();
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
 const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
+const MAINTENANCE_TOKEN=String(process.env.MAINTENANCE_TOKEN||"").trim();
+let MAINTENANCE_UNTIL=0;
 let SYNC_BUS=null;
 let CHAT_BUS=null;
 const RATE_BUCKETS=new Map(),TRUST_PROXY=process.env.TRUST_PROXY==="1",RATE_LIMIT_DISABLED=process.env.RATE_LIMIT_DISABLED==="1";
 function publishSync(accountId,type,data){return SYNC_BUS?SYNC_BUS.publish(accountId,type,data):null;}
+function getMaintenanceState(now){
+  now=now||Date.now();
+  const endsAt=Number(MAINTENANCE_UNTIL)||0;
+  const remainingMs=Math.max(0,endsAt-now);
+  return {
+    active:remainingMs>0,
+    endsAt:remainingMs>0?endsAt:0,
+    remainingMs,
+    remainingSec:remainingMs>0?Math.ceil(remainingMs/1000):0,
+  };
+}
+function scheduleMaintenance(seconds){
+  const sec=Math.max(1,Math.min(600,Math.floor(Number(seconds)||30)));
+  MAINTENANCE_UNTIL=Date.now()+sec*1000;
+  const state=getMaintenanceState();
+  if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("maintenance",state);
+  console.log("[server] maintenance scheduled:", state.remainingSec+"s", "endsAt="+new Date(state.endsAt).toISOString());
+  return state;
+}
+async function authorizeMaintenance(req,body,db){
+  const headerToken=String(req.headers["x-maintenance-token"]||"").trim();
+  const bodyToken=String((body&&body.token)||"").trim();
+  if(MAINTENANCE_TOKEN&&(headerToken===MAINTENANCE_TOKEN||bodyToken===MAINTENANCE_TOKEN))
+    return {ok:true,via:"token"};
+  const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"").trim();
+  const sessionToken=bearer||String((body&&body.sessionToken)||"").trim();
+  if(sessionToken&&db&&db.findAccountByToken){
+    const acc=await db.findAccountByToken(sessionToken);
+    if(acc&&acc.role==="admin")return {ok:true,via:"admin"};
+  }
+  // Alpha: se MAINTENANCE_TOKEN não está definido e TEST_SERVER=1, permite
+  // schedule local/deploy sem segredo (ainda assim rate-limited).
+  if(TEST_SERVER&&!MAINTENANCE_TOKEN)return {ok:true,via:"test-server"};
+  return {ok:false};
+}
 function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;
   // ALLOWED_ORIGINS=* permite qualquer origem (deploy Cloudflare/testes)
   if(ALLOWED_ORIGINS.has("*"))return origin;
@@ -84,6 +125,19 @@ function readBody(req) {
     });
     req.on("error", reject);
   });
+}
+function bearerToken(req){
+  const raw=String((req&&req.headers&&req.headers.authorization)||"");
+  const match=/^Bearer\s+(.+)$/i.exec(raw);
+  return match?String(match[1]||"").trim():"";
+}
+function bodyWithSessionToken(req,body){
+  body=body&&typeof body==="object"?body:{};
+  if(!body.token){
+    const header=bearerToken(req);
+    if(header)body.token=header;
+  }
+  return body;
 }
 
 function hardenedHeaders(res){const headers={
@@ -160,10 +214,15 @@ async function updateAccountMissions(db,body){
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   // Missões são por conta: qualquer personagem pode progredir as mesmas
   // missões. O cliente envia o estado completo (missions + missionsDone).
-  acc.missions=body.missions&&typeof body.missions==="object"?body.missions:{};
-  acc.missionsDone=body.missionsDone&&typeof body.missionsDone==="object"?body.missionsDone:{};
-  if(typeof db._save==="function")db._save();
-  return {code:200,body:{ok:true,missions:acc.missions,missionsDone:acc.missionsDone}};
+  const missions=body.missions&&typeof body.missions==="object"?body.missions:{};
+  const missionsDone=body.missionsDone&&typeof body.missionsDone==="object"?body.missionsDone:{};
+  if(typeof db.setAccountMissions==="function"){
+    await db.setAccountMissions(acc.id,missions,missionsDone);
+  }else{
+    acc.missions=missions;acc.missionsDone=missionsDone;
+    if(typeof db._save==="function")db._save();
+  }
+  return {code:200,body:{ok:true,missions,missionsDone}};
 }
 async function requireLease(db,acc,body){
   const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
@@ -544,7 +603,7 @@ function sanitizeNewPlayer(payload,voc){
     skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
     skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
     kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},supplyStash:{},rewardChest:{},rewardChestBundles:[],bag:{},ammo:{},
-    supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600};
+    supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600,cap:5000};
   if(voc==="knight")safe.equip={weapon:{item:"sword",count:1},shield:{item:"wooden-shield",count:1}};
   else if(voc==="paladin")safe.equip={weapon:{item:"bow",count:1},shield:{item:"quiver",count:1},ammo:{item:"simple-arrow",count:1}};
   else if(voc==="monk")safe.equip={weapon:{item:"simple-jo-staff",count:1}};
@@ -986,7 +1045,7 @@ async function prepareInstanceState(db,acc,input){
     instanceMode:mode,activeCharacterId:String(activeId)});
   return {state,meta:{kind,hunt_id:huntId,boss_id:bossId,instance_mode:mode,party_id:partyId,
     party_version:partyVersion,member_ids:ids,active_character_id:activeId,
-    saved_at:new Date(now),startedAt:new Date(now).toISOString()}};
+    saved_at:new Date(now),started_at:new Date(now)}};
 }
 function restoreAuthoritativeEntry(state){
   if(!state||!Array.isArray(state.members))return state;
@@ -1684,6 +1743,16 @@ async function main() {
         }
         return serveStatic(req, res, url);
       }
+      // Form POST acidental em / (method=post sem preventDefault / scripts
+      // ainda carregando) não deve substituir o documento por JSON de API.
+      // 303 → GET / devolve o HTML do jogo.
+      if (!url.startsWith("/api/")) {
+        res.writeHead(303, Object.assign(hardenedHeaders(res), {
+          Location: "/", "Cache-Control": "no-store",
+        }));
+        res.end();
+        return;
+      }
       if(req.method==="GET"&&url==="/api/sync/events"){
         const q=new URL(req.url,"http://x").searchParams,ticket=SYNC_BUS.consumeTicket(q.get("ticket"));
         // Ticket expirado/restart é um evento SSE normal, não HTTP 401. O
@@ -1704,9 +1773,25 @@ async function main() {
       }
       if (req.method === "GET" && url === "/api/health") {
         return send(res, 200, { ok:true, testServer:TEST_SERVER,
+          bootId:SERVER_BOOT_ID,startedAt:SERVER_STARTED_AT,
+          serverPower:"on",
+          maintenance:getMaintenanceState(),
           worker:instanceWorker.stats(),sync:{protocol:SYNC_PROTOCOL,cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
           chat:{cursor:CHAT_BUS.cursor(),clients:CHAT_BUS.clientCount(),channels:CHAT_CHANNELS},
           accounts:TEST_SERVER ? ["1/1","2/2"] : [] });
+      }
+      if(req.method==="POST"&&url==="/api/maintenance/schedule"){
+        const limited=rateLimit(req,"maintenance-schedule",10,60000);if(limited)return send(res,limited.code,limited.body);
+        let body={};
+        try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON",msg:"JSON inválido"});}
+        const auth=await authorizeMaintenance(req,body,db);
+        if(!auth.ok)return send(res,403,{ok:false,error:"FORBIDDEN",msg:"Token de manutenção ou admin necessário"});
+        const seconds=body.seconds!=null?body.seconds:30;
+        const state=scheduleMaintenance(seconds);
+        return send(res,200,{ok:true,maintenance:state,via:auth.via});
+      }
+      if(req.method==="GET"&&url==="/api/maintenance"){
+        return send(res,200,{ok:true,maintenance:getMaintenanceState(),serverPower:"on"});
       }
       if(req.method==="POST"&&url==="/api/chat/ticket"){
         const limited=rateLimit(req,"chat-ticket",60,60000);if(limited)return send(res,limited.code,limited.body);
@@ -1753,17 +1838,17 @@ async function main() {
         return send(res, r.code, r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/acquire"){
-        const r=await acquireLease(db,await readBody(req),false);return send(res,r.code,r.body);
+        const r=await acquireLease(db,bodyWithSessionToken(req,await readBody(req)),false);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/takeover"){
         const limited=rateLimit(req,"lease-takeover",10,60000);if(limited)return send(res,limited.code,limited.body);
-        const r=await acquireLease(db,await readBody(req),true);return send(res,r.code,r.body);
+        const r=await acquireLease(db,bodyWithSessionToken(req,await readBody(req)),true);return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/renew"){
-        const r=await renewLease(db,await readBody(req));return send(res,r.code,r.body);
+        const r=await renewLease(db,bodyWithSessionToken(req,await readBody(req)));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/lease/release"){
-        const r=await releaseLease(db,await readBody(req));return send(res,r.code,r.body);
+        const r=await releaseLease(db,bodyWithSessionToken(req,await readBody(req)));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/account/missions"){
         const r=await updateAccountMissions(db,await readBody(req));return send(res,r.code,r.body);
@@ -1971,6 +2056,7 @@ async function main() {
   server.listen(PORT, HOST, () => {
     console.log("[server] Global-Idle em http://" + HOST + ":" + PORT);
     console.log("[server] estáticos:", STATIC_DIR);
+    console.log("[server] bootId:", SERVER_BOOT_ID, "startedAt:", new Date(SERVER_STARTED_AT).toISOString());
     console.log("[server] registre/login: POST /api/register e /api/login");
     if (TEST_SERVER) console.log("[server] TEST SERVER ativo — Admin liberado para testers");
   });
