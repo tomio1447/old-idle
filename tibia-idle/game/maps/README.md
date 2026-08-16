@@ -115,15 +115,17 @@ Goshnar's Hatred.
 
 ## Goshnar's Hatred
 
-`goshnars_hatred_room.otbm` é uma boss room dedicada de 18×14, gerada por
-`tools/build_soulwar_boss_rooms.js`, sem compartilhar bytes, cache ou terreno
-com Rotten Wasteland. Ela é centralizada num mundo runtime 30×30; o player
-nasce em `(2,7)` (runtime `(8,15)`) e o boss em `(15,7)` (runtime `(21,15)`).
-Dois pilares e a fogueira central delimitam a mecânica. Após 20–40s,
-Dread's Torment ativa: os contadores sobem a cada 5s, elevando em 10% por
-ponto o dano de Hatred. A sala mantém até cinco summons; Dreadful Harvester
-tem 15.000 HP e reduz os contadores em 1 ao morrer, enquanto Hateful Soul tem
-10% de chance de nascer, 50.000 HP, dano escalado e zera todos os contadores.
+`goshnars_hatred_room.otbm` publica o mapa Canary
+`beta-maps/bossesroom/goshnar_hatred_room.otbm` (piso `z=7`,
+`(1042,1009)..(1063,1026)`, 22×18). `tools/build_soulwar_boss_rooms.js`
+copia essa fonte para `maps/` e `beta-maps/bossesroom/goshnars_hatred_room.otbm`.
+O mundo runtime continua 30×30; o player nasce em `(1052,1023,7)` (runtime
+`(14,20)`, ao norte do portal sul) e o boss em `(1052,1017,7)` (runtime
+`(14,14)`, centro da arena). Após 20–40s, Dread's Torment ativa: os
+contadores sobem a cada 5s, elevando em 10% por ponto o dano de Hatred. A
+sala mantém até cinco summons; Dreadful Harvester tem 15.000 HP e reduz os
+contadores em 1 ao morrer, enquanto Hateful Soul tem 10% de chance de
+nascer, 50.000 HP, dano escalado e zera todos os contadores.
 
 ## Goshnar's Greed
 
@@ -137,3 +139,55 @@ requisito e cooldown estão temporariamente desligados para testes. Durante a
 luta aparecem até seis adds sem defesa/imunidade; cada nascimento tem 30% de
 chance de ser Greedbeast. A cada cinco Greedbeasts mortos, o boss perde a
 imunidade durante 40 segundos.
+
+## Goshnar's Spite
+
+`goshnars_spite_room.otbm` publica o mapa Canary
+`beta-maps/bossesroom/goshnar_spite_room.otbm` (piso `z=7`,
+`(1040,1011)..(1063,1029)`, 24×19). `tools/build_soulwar_boss_rooms.js`
+copia essa fonte para `maps/` e `beta-maps/bossesroom/goshnars_spite_room.otbm`.
+O mundo runtime continua 30×30. Spawns do Map Editor: player
+`(1046,1020,7)` (oeste) e boss `(1057,1020,7)` (leste) — runtime
+`(9,14)` e `(20,14)` após pad 3×5. FOV de câmera `22×13` cobre a
+largura útil da câmara (~22 SQM) e a distância player↔boss (11 SQM);
+o mapa integral permanece 24×19.
+
+Mecânicas Canary: Searing Fire a cada 14s (estampar em 5s ou +10
+defesa), Weeping Soul com 10% de curar 10% do HP do boss, trash
+aleatório (Dreadful Harvester / Spiteful Spitter / Weeping Soul) até
+8 com respawn 15s. Extra idle: Bubble QTE a cada 40s — falha aplica
+−25% de dano no boss até o próximo QTE resolver. Cooldown do boss
+desligado para testes. Matar Spite concede mácula Soul War.
+
+## Goshnar's Malice
+
+`goshars_malice_room.otbm` (typo *goshars* no arquivo entregue) publica
+o mapa Canary de `beta-maps/bossesroom/` (piso `z=7`,
+`(1040,1009)..(1063,1030)`, 24×22). `tools/build_soulwar_boss_rooms.js`
+copia essa fonte para `maps/` e `beta-maps/bossesroom/`. Mundo runtime
+30×30. Spawns Map Editor: player `(1046,1020,7)` e boss
+`(1057,1020,7)` — runtime `(9,15)` e `(20,15)` após pad 3×4. FOV de
+câmera `22×15` segue o player na arena circular de mármore (~17–19 Ø
+centrada ~1052,1020).
+
+Canary usa white tiles a cada 40s; no idle o Maze QTE roda a cada 30s:
+matriz 30×30, azul→vermelho em 5s, blocos caindo top→bottom. Falha =
+6000 death em todos os players. Trash: Dreadful Harvester / Malicious
+Soul até 8, respawn 20s. Cooldown desligado para testes. Kill concede
+mácula Soul War.
+
+## Goshnar's Megalomania
+
+`goshnars_megalomania.otbm` publica o mapa Canary (piso `z=7`,
+`(1039,1010)..(1062,1030)`, 24×21). `tools/build_soulwar_boss_rooms.js`
+copia a fonte para `maps/` e `beta-maps/bossesroom/`. Mundo runtime
+30×30. Spawns Map Editor: player `(1051,1022,7)` e boss
+`(1051,1014,7)` — runtime `(15,16)` e `(15,8)` após pad 3×4. FOV de
+câmera `22×15` na arena circular de areia.
+
+Boss final Soul War: exige as **5 máculas ativas** (Malice, Spite,
+Greed, Hatred e Cruelty). Começa Purple (imune); mate **4 Aspects of
+Power** para abrir Green 70s (Blue burst 7s após 60s); depois volta a
+Purple. White tiles / Maze QTE a cada 40s — falha = 6000 death.
+Bag You Desire com **0.15%** (+50% vs mini-bosses em 0.1%). HP 620k /
+EXP 3M (forma Green). Cooldown desligado para testes.

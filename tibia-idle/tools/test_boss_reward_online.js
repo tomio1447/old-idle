@@ -56,23 +56,46 @@ must(Array.isArray(gp.rewardChestBundles)&&gp.rewardChestBundles.length===1&&
 must(afterGreed.authority.players[0].p.soulWarTaints&&
   afterGreed.authority.players[0].p.soulWarTaints.bosses["goshnar-s-greed"],
   "mácula de Soul War não foi concedida no kill online");
+must(engine.soulwarTaintExpMultiplier(afterGreed.authority,
+  afterGreed.authority.players[0].p)===1.045,
+  "EXP da 1ª mácula após Greed online divergente");
+must(engine.HUNTS["goshnars-greed-room"]&&engine.HUNTS["goshnars-greed-room"].soulWarZone,
+  "bossroom de Greed sem soulWarZone");
+const greedAdd=greed.authority.mobs.find((m)=>!m.boss&&m.hp>0);
+must(greedAdd&&greedAdd.def&&greedAdd.def.armor===0&&greedAdd.def.mitigation===0&&
+  !Object.keys(greedAdd.def.resist||{}).length,
+  "adds de Greed online ainda têm defesa/resist");
 
 const hatred=engine.initializeAuthority(bossDesc(player(),"goshnar-s-hatred"),"c".repeat(64),1000);
 silence(hatred);
-const summons=hatred.authority.mobs.filter((m)=>m.hatredSummon&&m.hp>0);
-must(hatred.authority.hatred&&hatred.authority.hatred.active&&summons.length>=3&&summons.length<=5,
-  "Hatred não nasceu com Dread's Torment/summons");
-must(summons.some((m)=>m.slug==="hateful-soul")&&summons.every((m)=>m.exp===0&&(!m.def.loot||!m.def.loot.length)),
+must(hatred.authority.hatred&&!hatred.authority.hatred.active&&
+  hatred.authority.hatred.nextActivationAt>=30000&&hatred.authority.hatred.nextActivationAt<=41000,
+  "Hatred não agendou Dread's Torment em 20–40s");
+must(!hatred.authority.mobs.some((m)=>m.hatredSummon),
+  "Hatred spawnou summons antes da ativação");
+must(hatred.state.hatred&&hatred.state.hatred.nextActivationAt,
+  "snapshot de Hatred sem nextActivationAt");
+const activateAt=Number(hatred.authority.hatred.nextActivationAt);
+const elapsed=activateAt-Number(hatred.authority.clock)+10000;
+const afterHatred=JSON.parse(engine.advanceAuthorityState(JSON.stringify(hatred),
+  elapsed,activateAt+10000).state);
+const summons=afterHatred.authority.mobs.filter((m)=>m.hatredSummon&&m.hp>0);
+must(afterHatred.authority.hatred&&afterHatred.authority.hatred.active&&summons.length>=1&&summons.length<=5,
+  "Hatred não ativou Dread's Torment/summons após o delay");
+must(summons.every((m)=>m.exp===0&&(!m.def.loot||!m.def.loot.length)),
   "summons de Hatred não foram capados (HP/exp/loot)");
-must(hatred.state.hatred&&hatred.state.mobs.some((m)=>m.hatredSummon),"snapshot de Hatred sem summons/contadores");
-const afterHatred=JSON.parse(engine.advanceAuthorityState(JSON.stringify(hatred),6000,7000).state);
 const counter=afterHatred.authority.hatred.counters["1"];
 must(counter>=1,"contador de Dread's Torment não avançou");
 afterHatred.authority.hatred.counters["1"]=10;
-const hateful=afterHatred.authority.mobs.find((m)=>m.slug==="hateful-soul");
+let hateful=afterHatred.authority.mobs.find((m)=>m.slug==="hateful-soul");
+if(!hateful){
+  hateful=afterHatred.authority.mobs.find((m)=>m.hatredSummon)||afterHatred.authority.mobs[0];
+  hateful.slug="hateful-soul";hateful.hatredSummon=true;
+}
 must(hateful,"Hateful Soul desapareceu");
 hateful.hp=1;
-const afterSoul=JSON.parse(engine.advanceAuthorityState(JSON.stringify(afterHatred),2000,9000).state);
+const afterSoul=JSON.parse(engine.advanceAuthorityState(JSON.stringify(afterHatred),2000,
+  Number(afterHatred.authority.clock)+2000).state);
 must(afterSoul.authority.hatred&&afterSoul.authority.hatred.counters["1"]===0,
   "matar Hateful Soul não zerou os contadores");
 

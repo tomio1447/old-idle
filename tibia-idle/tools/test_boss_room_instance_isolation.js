@@ -9,18 +9,22 @@ const rotten=fs.readFileSync(path.join(game,"maps","rotten_wasteland.otbm"));
 must(!greed.equals(rotten)&&!hatred.equals(rotten)&&!greed.equals(hatred),
   "Greed/Hatred ainda compartilham o mapa da Rotten Wasteland");
 must(crypto.createHash("sha256").update(greed).digest("hex")==="067b88f26d09ea4fb9631088cc6af7c7a094c39cd9c4964866835064ebe822f8"&&
-  crypto.createHash("sha256").update(hatred).digest("hex")==="8728c78730ed243c3cd4a620c9529af0c3edbd5396a2a07cc368ffb2d4031f8a",
-  "geração das boss rooms não é determinística");
+  crypto.createHash("sha256").update(hatred).digest("hex")==="cc5df1e5b31bb4dea72072f4ca65cc21097e41ee807ff76b249c435481ea0510",
+  "publicação das boss rooms Greed/Hatred não é determinística");
 must(!fs.existsSync(path.join(game,"maps","goshnarsgreed.otbm"))&&
   !fs.existsSync(path.join(game,"maps","goshnars_hatred.otbm")),
   "aliases antigos podem recolocar boss no cache/mapa incorreto");
 const soul=fs.readFileSync(path.join(js,"soulwar.js"),"utf8"),src=fs.readFileSync(path.join(js,"game.js"),"utf8");
 must(soul.includes("otbm:'goshnars_greed_room'")&&soul.includes("otbm:'goshnars_hatred_room'")&&
+  soul.includes("otbm:'goshnars_spite_room'")&&soul.includes("otbm:'goshars_malice_room'")&&
   src.includes('"goshnar-s-greed":{hunt:"goshnars-greed-room",otbm:"goshnars_greed_room"}')&&
   src.includes('"goshnar-s-hatred":{hunt:"goshnars-hatred-room",otbm:"goshnars_hatred_room"}')&&
+  src.includes('"goshnar-s-spite":{hunt:"goshnars-spite-room",otbm:"goshnars_spite_room"}')&&
+  src.includes('"goshnar-s-malice":{hunt:"goshnars-malice-room",otbm:"goshars_malice_room"}')&&
   src.includes("const arena = bossArenaDefinition(boss)"),
   "start/resume de boss não força a rota dedicada");
-const start=src.indexOf("function instanceIncludesCharacter"),end=src.indexOf("\n\nfunction readInstanceSession",start);
+const start=src.indexOf("function instanceIncludesCharacter"),end=src.indexOf("\nfunction setActiveInstanceCharacter",start);
+must(start>=0&&end>start,"game.js sem instanceIncludesCharacter/setActiveInstanceCharacter");
 const ctx={};vm.createContext(ctx);vm.runInContext(src.slice(start,end),ctx);
 const ms={members:[{id:"ms",p:{name:"MS"}}]},party={members:[{id:"ms"},{id:"ek"}]};
 must(!ctx.instanceIncludesCharacter(ms,"ek"),"EK recebeu acesso à instância solo do MS");

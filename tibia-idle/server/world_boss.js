@@ -12,19 +12,19 @@
 
 const { rewardChestAdd } = require("./authoritative_engine");
 
-/* Sprites: stubs usam assets/mob existentes (Canary bosses) até arte própria. */
+/* Sprites: bosses clássicos das Warzones (assets/mob/*.png). */
 const WARZONES = [
   {
-    id: "wz1", name: "Warzone 1", bossName: "Warzone 1 Titan", bossHp: 2500000,
-    bossSprite: "goshnar-s-greed", baseMonster: "goshnar-s-greed",
+    id: "wz1", name: "Warzone 1", bossName: "The Deathstrike", bossHp: 2500000,
+    bossSprite: "deathstrike", baseMonster: "deathstrike",
   },
   {
-    id: "wz2", name: "Warzone 2", bossName: "Warzone 2 Colossus", bossHp: 4000000,
-    bossSprite: "timira-the-many-headed", baseMonster: "timira-the-many-headed",
+    id: "wz2", name: "Warzone 2", bossName: "Gnomevil", bossHp: 4000000,
+    bossSprite: "gnomevil", baseMonster: "gnomevil",
   },
   {
-    id: "wz3", name: "Warzone 3", bossName: "Warzone 3 Overlord", bossHp: 6000000,
-    bossSprite: "ferumbras-mortal-shell", baseMonster: "ferumbras-mortal-shell",
+    id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: 6000000,
+    bossSprite: "abyssador", baseMonster: "abyssador",
   },
 ];
 

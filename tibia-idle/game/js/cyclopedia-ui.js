@@ -80,7 +80,7 @@ function renderCycloTabs() {
       <span>${a.nome}</span>
     </div>`;
   }).join("");
-  $("#cyclo-tabs [data-cyclo-tab]").forEach((b) =>
+  $$("#cyclo-tabs [data-cyclo-tab]").forEach((b) =>
     b.addEventListener("click", () => {
       const aba = CYCLO_ABAS.find((a) => a.id === b.dataset.cycloTab);
       if (aba && aba.cityAction) {

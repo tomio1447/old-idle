@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=taken-session-total-v1">
+  <link rel="stylesheet" href="css/layout.css?v=malice-boss-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=settings-click-fix-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
@@ -296,8 +296,14 @@
         <div id="mission-box" class="mission-box" style="display:none"></div>
         <div id="world-boss-box" class="world-boss-box" style="display:none"></div>
         <div id="scarlett-qte" class="scarlett-qte" style="display:none" aria-live="assertive"></div>
+        <div id="spite-qte" class="spite-qte" style="display:none" aria-live="assertive"></div>
+        <div id="malice-qte" class="malice-qte" style="display:none" aria-live="assertive"></div>
+        <div id="mega-qte" class="mega-qte" style="display:none" aria-live="assertive"></div>
         <div id="greed-minigame" class="greed-minigame" style="display:none" aria-live="polite"></div>
         <div id="hatred-minigame" class="hatred-minigame" style="display:none" aria-live="polite"></div>
+        <div id="spite-minigame" class="spite-minigame" style="display:none" aria-live="polite"></div>
+        <div id="malice-minigame" class="malice-minigame" style="display:none" aria-live="polite"></div>
+        <div id="mega-minigame" class="mega-minigame" style="display:none" aria-live="polite"></div>
         <!-- AUTO/SQM: fica na tela da caçada (antes só existia no título da
              Mochila, fora do foco). OFF = clique no chão / WASD por SQM. -->
         <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
@@ -523,8 +529,8 @@
 <script src="js/mobsheetdata.js"></script>
 <script src="js/idleanimdata.js?v=sex-looktype-v2"></script>
 <script src="js/creatureanchordata.js"></script>
-<script src="js/areadata.js"></script>
-<script src="js/spelltargetdata.js"></script>
+<script src="js/areadata.js?v=wave-origin-ahead-v2"></script>
+<script src="js/spelltargetdata.js?v=exori-self-aoe-v1"></script>
 <script src="js/spellfxdata.js?v=exeta-fx-v1"></script>
 <script src="js/hastedata.js"></script>
 <script src="js/monkspelldata.js"></script>
@@ -533,7 +539,7 @@
 <script src="js/weapondata.js"></script>
 <!-- update 15.25.3a4a52: aplica os ajustes POR CIMA dos dados gerados,
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
-<script src="js/spelldata_1525.js?v=monk-lesser-repulse-v1"></script>
+<script src="js/spelldata_1525.js?v=exori-self-aoe-v1"></script>
 <script src="js/tiledata.js"></script>
 <script src="js/tileflags.js"></script>
 <script src="js/imbuementdata.js"></script>
@@ -551,7 +557,7 @@
   <script src="js/combo.js?v=mas-san-range-v1"></script>
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=knight-fx-combo-v1"></script>
-<script src="js/area.js?v=wave-origin-v1"></script>
+<script src="js/area.js?v=wave-origin-ahead-v2"></script>
   <script src="js/gridai.js?v=mob-retarget-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
@@ -565,9 +571,9 @@
 <script src="js/outfit.js?v=sex-looktype-v2"></script>
 <script src="js/appearance.js?v=sex-looktype-v2"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=cap-loot-fix-v1"></script>
+<script src="js/player.js?v=pouch-sell-safe-v1"></script>
 <script src="js/accessories.js?v=stash-multi-v1"></script>
-  <script src="js/combat.js?v=phys-hit-fx-v1"></script>
+  <script src="js/combat.js?v=malice-boss-v1"></script>
 <script src="js/city.js?v=npc-sprites-canary-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
@@ -576,8 +582,8 @@
 <script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
 <script src="js/tilemap.js?v=wall-depth-v1"></script>
 <script src="js/effectdata.js?v=blow-white-fix-v1"></script>
-<script src="js/icondata.js?v=cond-icons-v1"></script>
-<script src="js/render.js?v=wall-depth-v1"></script>
+<script src="js/icondata.js?v=expose-weakness-v1"></script>
+<script src="js/render.js?v=wall-depth-v2"></script>
 <script src="js/city-render.js?v=wall-depth-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
@@ -586,11 +592,11 @@
 <script src="js/patch_amazon.js"></script>
 <!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
 <script src="js/hardcore-library.js?v=library-canary-dmg-v1"></script>
-<script src="js/hard-hunts.js?v=naga-avg-v1"></script>
-<script src="js/soulwar.js?v=hatred-v3"></script>
+<script src="js/hard-hunts.js?v=loot-npc-prices-v1"></script>
+<script src="js/soulwar.js?v=mega-lobby-v1"></script>
 <script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=stash-multi-v1"></script>
+<script src="js/ui.js?v=pouch-destroy-stash-v1"></script>
 <script src="js/i18n.js?v=topbar-wod-charms-v1"></script>
 <script src="js/alpha-announce.js?v=alpha-announce-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
@@ -612,7 +618,7 @@
 <script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=stash-multi-v1"></script>
+<script src="js/account-client.js?v=malice-boss-v1"></script>
 <script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js"></script>
@@ -622,12 +628,13 @@
 <script src="js/training-ui.js"></script>
 <script src="js/accessorydata.js"></script>
 <script src="js/supply-stash-data.js?v=stash-multi-v1"></script>
-<script src="js/supply-stash.js?v=stash-multi-v1"></script>
+<script src="js/supply-stash.js?v=pouch-destroy-stash-v1"></script>
 <script src="js/admin.js?v=admin-no-rme-mundo-v1"></script>
 <script src="js/city-ui.js?v=ranking-playeron-v1"></script>
 <script src="js/preload.js?v=sex-looktype-v2"></script>
-<script src="js/game.js?v=taken-session-total-v1"></script>
-<script src="js/scarlett-boss.js?v=boss-death-wipe-v1"></script>
-<script src="js/world-boss-ui.js?v=world-boss-lobby-v2"></script>
+<script src="js/game.js?v=malice-boss-v1"></script>
+<script src="js/scarlett-boss.js?v=scarlett-qte-v4"></script>
+<script src="js/world-boss-ui.js?v=wb-isolate-v1"></script>
+<script src="js/megalomania-lobby.js?v=mega-lobby-v1"></script>
 </body>
 </html>

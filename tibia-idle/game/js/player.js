@@ -1103,9 +1103,13 @@ function isProtectedPouchClass(slug) {
 function canSellLootPouchItem(p, slug) {
   const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items
     ? GAMEDATA.items[slug] : null;
-  return !!(item && (item.sell || 0) > 0 &&
-    !(typeof isNoSell === "function" && isNoSell(p, slug)) &&
-    !isProtectedPouchClass(slug));
+  if (!item || (typeof isNoSell === "function" && isNoSell(p, slug)) ||
+      isProtectedPouchClass(slug)) return false;
+  if (typeof pouchUnitSellPrice === "function") return pouchUnitSellPrice(item) > 0;
+  const npc = Number(item.npcSell);
+  if (Number.isFinite(npc) && npc > 0) return true;
+  const sell = Number(item.sell);
+  return Number.isFinite(sell) && sell > 0;
 }
 
 function removeLootPouch(p, slug, count) {

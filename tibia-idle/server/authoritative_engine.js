@@ -15,6 +15,11 @@ const selfHealSpellIds=CanaryVocation.selfHealSpellIds;
 const sanitizePlayerSpells=(p,spells)=>CanaryVocation.sanitizePlayerSpells(p,spells||ALL_SPELLS);
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
+/* Megalomania: Bag You Desire +50% vs mini-bosses (0.1% → 0.15%). */
+for(const slug of ["goshnar-s-megalomania-green","goshnar-s-megalomania-blue"]){
+  const m=MONSTERS[slug];if(!m||!Array.isArray(m.loot))continue;
+  for(const drop of m.loot)if(drop&&drop.item==="bag-you-desire")drop.chance=0.15;
+}
 const ITEMS=read("items.json"),AMMO=read("ammo.json"),QUIVER_DATA=read("quivers.json"),QUIVERS=QUIVER_DATA.quivers||{};
 const SPELLS_RAW=read("spells.json"),ALL_SPELLS=SPELLS_RAW.spells||SPELLS_RAW,SPELL_FX=read("spellfx.json"),
   AREA_DATA=read("areas.json"),SPELL_TARGET=read("spelltarget.json");
@@ -357,6 +362,9 @@ try{
   const sandbox={window:{},console};
   vm.runInNewContext(fs.readFileSync(path.join(js,"gamedata.js"),"utf8"),sandbox);
   sandbox.GAMEDATA=sandbox.window.GAMEDATA;
+  // hard-hunts registra loot Cobra/MOTA (preços NPC) ausente do gamedata base —
+  // sem isso Sell All online não encontra o item e a pouch “trava”.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"hard-hunts.js"),"utf8"),sandbox);}catch(_hh){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);
@@ -419,10 +427,13 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-ice":{monsters:["icecold-book","squid-warden","ink-blob"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-earth":{monsters:["cursed-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
-  "dark-thais":{monsters:["many-faces","knight-s-apparition","paladin-s-apparition","sorcerer-s-apparition","druid-s-apparition","monk-s-apparition","distorted-phantom"],cat:"hardcore",pack:10,packMin:8,packMax:10},
-  "rotten-wasteland":{monsters:["rotten-golem","branchy-crawler","mould-phantom"],cat:"hardcore",pack:10,packMin:8,packMax:10},
-  "goshnars-greed-room":{monsters:["goshnar-s-greed","dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"]},
-  "goshnars-hatred-room":{monsters:["goshnar-s-hatred","dreadful-harvester","hateful-soul"]},
+  "dark-thais":{monsters:["many-faces","knight-s-apparition","paladin-s-apparition","sorcerer-s-apparition","druid-s-apparition","monk-s-apparition","distorted-phantom"],cat:"hardcore",pack:10,packMin:8,packMax:10,soulWarZone:true,soulWarZoneMonster:"many-faces"},
+  "rotten-wasteland":{monsters:["rotten-golem","branchy-crawler","mould-phantom"],cat:"hardcore",pack:10,packMin:8,packMax:10,soulWarZone:true,soulWarZoneMonster:"rotten-golem"},
+  "goshnars-greed-room":{monsters:["goshnar-s-greed","dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"],soulWarZone:true,soulWarZoneMonster:"many-faces"},
+  "goshnars-hatred-room":{monsters:["goshnar-s-hatred","dreadful-harvester","hateful-soul"],soulWarZone:true,soulWarZoneMonster:"rotten-golem"},
+  "goshnars-spite-room":{monsters:["goshnar-s-spite","dreadful-harvester","spiteful-spitter","weeping-soul"],soulWarZone:true,soulWarZoneMonster:"bony-sea-devil"},
+  "goshnars-malice-room":{monsters:["goshnar-s-malice","dreadful-harvester","malicious-soul"],soulWarZone:true,soulWarZoneMonster:"dreadful-harvester"},
+  "goshnars-megalomania-room":{monsters:["goshnar-s-megalomania-purple","goshnar-s-megalomania-green","goshnar-s-megalomania-blue","aspect-of-power"],soulWarZone:true,soulWarZoneMonster:"aspect-of-power"},
   "scarlett-room":{monsters:["scarlett-etzel"]},
 });
 for(const slug of ["marapur-nagas","dt-seal"]){
@@ -724,9 +735,38 @@ function normalizeVisualState(raw,auth){
   raw=raw&&typeof raw==="object"?raw:{};
   const scarlettIntent=raw.scarlettIntent&&typeof raw.scarlettIntent==="object"?raw.scarlettIntent:null;
   const intentDir=scarlettIntent?String(scarlettIntent.dir||""):"";
+  const rawPress=scarlettIntent?scarlettIntent.pressAuth:null;
+  const pressAuth=rawPress==null||rawPress===""?NaN:Number(rawPress);
+  const spiteIntent=raw.spiteIntent&&typeof raw.spiteIntent==="object"?raw.spiteIntent:null;
+  const bubbleIdx=spiteIntent&&spiteIntent.bubble!==undefined&&spiteIntent.bubble!==null
+    ?Number(spiteIntent.bubble):NaN;
+  const maliceIntent=raw.maliceIntent&&typeof raw.maliceIntent==="object"?raw.maliceIntent:null;
+  const mx=maliceIntent?Number(maliceIntent.x):NaN,my=maliceIntent?Number(maliceIntent.y):NaN;
+  const megaIntent=raw.megaIntent&&typeof raw.megaIntent==="object"?raw.megaIntent:null;
+  const megaKind=megaIntent?String(megaIntent.kind||""):"";
+  const megaDir=megaIntent?String(megaIntent.dir||""):"";
+  const megaBubble=megaIntent&&megaIntent.bubble!==undefined&&megaIntent.bubble!==null
+    ?Number(megaIntent.bubble):NaN;
+  const megaPress=megaIntent?Number(megaIntent.pressAuth):NaN;
+  const megaSteer=megaIntent?Number(megaIntent.steer):NaN;
+  const megaPlayerId=megaIntent&&megaIntent.playerId!=null?String(megaIntent.playerId):"";
+  let megaOut=null;
+  if(megaKind==="scarlett"&&(megaDir==="up"||megaDir==="down"||megaDir==="left"||megaDir==="right"))
+    megaOut={kind:"scarlett",dir:megaDir,pressAuth:Number.isFinite(megaPress)?megaPress:undefined,playerId:megaPlayerId||undefined};
+  else if(megaKind==="spite"&&Number.isFinite(megaBubble)&&megaBubble>=0&&megaBubble<32)
+    megaOut={kind:"spite",bubble:Math.floor(megaBubble),playerId:megaPlayerId||undefined};
+  else if(megaKind==="fish")
+    megaOut={kind:"fish",hold:!!megaIntent.hold,
+      steer:Number.isFinite(megaSteer)?Math.max(-1,Math.min(1,megaSteer)):undefined,
+      playerId:megaPlayerId||undefined};
   return{players:normalize(raw.players,8),mobs:normalize(raw.mobs,64),
     scarlettIntent:intentDir==="up"||intentDir==="down"||intentDir==="left"||intentDir==="right"
-      ?{dir:intentDir}:null};
+      ?{dir:intentDir,pressAuth:Number.isFinite(pressAuth)&&pressAuth>0?pressAuth:undefined}:null,
+    spiteIntent:{
+      stomp:!!(spiteIntent&&spiteIntent.stomp),
+      bubble:Number.isFinite(bubbleIdx)&&bubbleIdx>=0&&bubbleIdx<32?Math.floor(bubbleIdx):undefined},
+    maliceIntent:Number.isFinite(mx)&&Number.isFinite(my)?{x:Math.floor(mx),y:Math.floor(my)}:null,
+    megaIntent:megaOut};
 }
 function snapAuthorityEntityToCell(auth,ent){
   if(!ent)return;
@@ -774,8 +814,23 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)continue;
     applyPose(mob,pos);
   }
-  if(auth.scarlett&&visual.scarlettIntent&&visual.scarlettIntent.dir)
-    auth.scarlett.pendingIntent={dir:visual.scarlettIntent.dir};
+  if(auth.scarlett&&visual.scarlettIntent&&visual.scarlettIntent.dir){
+    const pi={dir:visual.scarlettIntent.dir};
+    const pressAuth=Number(visual.scarlettIntent.pressAuth);
+    if(Number.isFinite(pressAuth))pi.pressAuth=pressAuth;
+    auth.scarlett.pendingIntent=pi;
+  }
+  if(auth.spite&&visual.spiteIntent){
+    if(visual.spiteIntent.stomp)auth.spite.pendingStomp=true;
+    if(visual.spiteIntent.bubble!==undefined)auth.spite.pendingBubble=visual.spiteIntent.bubble;
+  }
+  if(auth.malice&&visual.maliceIntent){
+    auth.malice.pendingMove={x:visual.maliceIntent.x,y:visual.maliceIntent.y};
+  }
+  if(auth.mega&&visual.megaIntent){
+    auth.mega.pendingIntents=auth.mega.pendingIntents||[];
+    auth.mega.pendingIntents.push(Object.assign({},visual.megaIntent));
+  }
   return visual;
 }
 function expForLevel(level){return Math.floor((50/3)*(level**3-6*level**2+17*level-12));}
@@ -852,12 +907,23 @@ function shareAccountGoldWallets(auth){
     }catch(e){item.p.gold=wallet.gold;}
   }
 }
+function pouchUnitSellPrice(it){
+  if(!it)return 0;
+  const npc=Number(it.npcSell);
+  if(Number.isFinite(npc)&&npc>0)return Math.floor(npc);
+  const sell=Number(it.sell);
+  if(Number.isFinite(sell)&&sell>0)return Math.floor(sell);
+  return 0;
+}
 function sellAuthPouchItem(p,slug){
   const it=ITEMS[slug],count=Math.max(0,Math.floor(Number(p.lootPouch&&p.lootPouch[slug])||0));
   if(!it||count<=0)return 0;
   if(Number(it.cls)>=3)return 0;
   if(p.config&&p.config.noSell&&p.config.noSell[slug])return 0;
-  const value=(Number(it.sell)||0)*count;if(value<=0)return 0;
+  const unit=pouchUnitSellPrice(it);
+  if(unit<=0)return 0;
+  const value=unit*count;
+  if(!Number.isFinite(value)||value<=0)return 0;
   p.gold=Math.max(0,(Number(p.gold)||0)+value);
   delete p.lootPouch[slug];
   return value;
@@ -866,6 +932,23 @@ function sellAuthAllPouch(p){
   let total=0;p.lootPouch=p.lootPouch||{};
   for(const slug of Object.keys(p.lootPouch))total+=sellAuthPouchItem(p,slug);
   return total;
+}
+/** Remove item da loot pouch (destroy/discard). Retorna qty removida. */
+function destroyAuthPouchItem(p,slug){
+  if(!p||!slug)return 0;
+  p.lootPouch=p.lootPouch||{};
+  const count=Math.max(0,Math.floor(Number(p.lootPouch[slug])||0));
+  if(count<=0)return 0;
+  delete p.lootPouch[slug];
+  return count;
+}
+/** Liga/desliga Auto Supply Stash por item na autoridade. */
+function setAuthAutoSupplyStash(p,slug,on){
+  if(!p||!slug||!isSupplyStashableItem(slug))return false;
+  ensureSupplyStash(p);
+  if(on)p.config.autoSupplyStash[slug]=true;
+  else delete p.config.autoSupplyStash[slug];
+  return true;
 }
 function lootPouchFillPct(p){
   let used=0;for(const slug of Object.keys(p.lootPouch||{}))if((p.lootPouch[slug]||0)>0)used+=1;
@@ -1428,7 +1511,10 @@ function applyOutgoingDamage(mob,element,dmg,now){
     return out;
   }
   if(mob&&(mob.greedImmune||mob.qteImmune))return 0;
-  return applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
+  let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
+  if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
+    out=Math.max(1,Math.floor(out*Number(mob.spiteDamageTakenMul)));
+  return out;
 }
 function itemTypeOf(it){return String((it&&(it.t||it.type))||"");}
 function isMagicWeapon(it){
@@ -1548,6 +1634,8 @@ function entityGridCell(entity,auth){
   return{cx:Math.max(0,Math.min(w-1,Math.round(cx))),cy:Math.max(0,Math.min(h-1,Math.round(cy)))};
 }
 function spellAreaDirection(origin,target){
+  const facing=origin&&origin.dir;
+  if(facing==="n"||facing==="e"||facing==="s"||facing==="w")return facing;
   const dx=target.cx-origin.cx,dy=target.cy-origin.cy;
   if(Math.abs(dx)>Math.abs(dy))return dx>=0?"e":"w";
   if(dy!==0)return dy>0?"s":"n";
@@ -1558,8 +1646,12 @@ function spellAreaName(s){
   const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
   return meta.areaNome||null;
 }
+/* Knight self-AoE: box/circulo em volta do caster (Canary isSelfTarget). */
+const SPELL_AREA_FROM_CASTER=new Set(["exori","exori-gran","exori-mas","exori-min","exori-scu"]);
 function spellAreaFromCaster(name,s){
-  const meta=SPELL_TARGET[String(s&&s.id||"")]||{};
+  const id=String(s&&s.id||"");
+  if(SPELL_AREA_FROM_CASTER.has(id))return true;
+  const meta=SPELL_TARGET[id]||{};
   if(meta.self)return true;
   if(meta.needTarget||s&&s.needTarget)return false;
   if(AREA_ANCHORED_ON_TARGET.has(name))return false;
@@ -1567,12 +1659,14 @@ function spellAreaFromCaster(name,s){
   return Array.isArray(north)&&!north.some((cell)=>Number(cell&&cell[1])>0);
 }
 /* Geometria oficial importada do register_spells.lua. A autoridade usa as
- * mesmas células do cliente: ondas/feixes nascem no caster e círculos self
- * ficam ao redor dele; áreas com target são ancoradas no alvo. */
+ * mesmas células do cliente: ondas/feixes começam 1 SQM à frente do caster
+ * (centro da matriz = ancora, nunca dano) e círculos self ficam ao redor
+ * dele; áreas com target são ancoradas no alvo. */
 function spellAreaCells(auth,s,caster,target){
   const name=spellAreaName(s),area=name&&AREA_DATA[name];
   if(!area||!caster||!target)return[];
-  const origin=entityGridCell(caster,auth),aim=entityGridCell(target,auth),dir=spellAreaDirection(origin,aim),
+  const origin=entityGridCell(caster,auth),aim=entityGridCell(target,auth),
+    dir=spellAreaDirection(Object.assign({},origin,{dir:caster&&caster.dir}),aim),
     offsets=area[dir]||area.n;if(!Array.isArray(offsets))return[];
   const fromCaster=spellAreaFromCaster(name,s),base=fromCaster?origin:aim,
     skipOrigin=fromCaster&&/(WAVE|BEAM)/i.test(name),w=Number(auth&&auth.gridW)||30,h=Number(auth&&auth.gridH)||30,
@@ -1581,6 +1675,7 @@ function spellAreaCells(auth,s,caster,target){
     const dx=Number(offset&&offset[0])||0,dy=Number(offset&&offset[1])||0;
     if(skipOrigin&&dx===0&&dy===0)continue;
     const cx=base.cx+dx,cy=base.cy+dy,key=cx+":"+cy;
+    if(skipOrigin&&cx===origin.cx&&cy===origin.cy)continue;
     if(cx<0||cy<0||cx>=w||cy>=h||seen.has(key))continue;
     seen.add(key);cells.push({cx,cy});
   }
@@ -2458,6 +2553,11 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
     const n=Number(auth.hatred.counters&&auth.hatred.counters[String(item.id)])||0;
     if(n>0)dmg=Math.max(0,Math.floor(dmg*(1+n*0.10)));
   }
+  if(auth.greed&&auth.greed.immune&&mob&&mob.boss)dmg=Math.max(0,Math.floor(dmg*0.7));
+  {
+    const taintMul=soulwarTaintDamageMultiplier(auth,p);
+    if(taintMul!==1)dmg=Math.max(0,Math.floor(dmg*taintMul));
+  }
   if(mob&&mob.challengedUntil&&mob.challengedUntil>now)dmg=Math.max(0,Math.floor(dmg*0.8));
   if(mob&&mob.sapStrUntil&&mob.sapStrUntil>now)dmg=Math.max(0,Math.floor(dmg*0.9));
   if(mob&&mob.weakNextUntil){
@@ -3089,6 +3189,7 @@ function claimSpawnCell(auth,cx,cy){
   return {cx,cy};
 }
 function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
+  const stripGreedDef=!!(auth&&auth.greed&&greedAdd&&!boss);
   const hasSlot=Number.isFinite(Number(slot));
   const sequence=hasSlot?Number(slot)+1:Math.max(1,Number(auth.nextMobId)||1);
   if(!hasSlot)auth.nextMobId=sequence+1;
@@ -3099,11 +3200,12 @@ function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!d
     influenced=!fiendish&&random(auth)<Math.max(0,Number(auth.influencedChance)||0);
     stacks=fiendish?15:(influenced?roll(auth,1,5):0);}
   const mult=stacks?1.35+stacks*.15:1,hp=Math.max(1,Math.floor((Number(def.hp)||1)*mult));
+  const useDef=stripGreedDef?Object.assign({},def,{armor:0,defense:0,mitigation:0,resist:{},imune:[]}):def;
   const mob={id:id||("srv-"+sequence),slug:String(slug),boss:!!boss,influenced,fiendish,sinisterStacks:stacks,
-    hp,maxHp:hp,armor:greedAdd?0:Math.max(0,Math.floor((Number(def.armor)||0)*(stacks?1+stacks*.05:1))),
+    hp,maxHp:hp,armor:stripGreedDef||greedAdd?0:Math.max(0,Math.floor((Number(def.armor)||0)*(stacks?1+stacks*.05:1))),
     damage:Math.max(0,Math.floor((Number(def.damage)||0)*(stacks?1+stacks*.08:1))),
     exp:Math.max(0,Math.floor((Number(def.exp)||0)*(stacks?1+stacks*.25:1))),
-    attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def};
+    attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def:useDef};
   // Espalha cada spawn: mobs empilhados no mesmo tile ficam invisíveis uns
   // sob os outros e o pathfinding do cliente não consegue separá-los. Poucos
   // spawnPoints (ou nenhum) precisam de deslocamento próprio por criatura.
@@ -3368,15 +3470,151 @@ function rewardChestClaimAll(p){
   p.rewardChest={};p.rewardChestBundles=[];
   return n;
 }
+/* Goshnar's Taints — port do soulwar.js (idle). Só atuam em Soul War zones /
+ * bosses Goshnar e expiram 14 dias após a primeira mácula. */
+const SOULWAR_TAINT_DURATION=14*24*60*60*1000;
+const SOULWAR_TAINTS=[
+  {id:"teleport",name:"Taint of Teleportation",icon:"goshnar-taint-1",exp:1.045},
+  {id:"spawn",name:"Taint of Duplication",icon:"goshnar-taint-2",exp:1.092},
+  {id:"damage",name:"Taint of Pain",icon:"goshnar-taint-3",exp:1.141},
+  {id:"heal",name:"Taint of Renewal",icon:"goshnar-taint-4",exp:1.192},
+  {id:"loss",name:"Taint of Loss",icon:"goshnar-taint-5",exp:1.246},
+];
 const SOULWAR_TAINT_BOSSES=["goshnar-s-malice","goshnar-s-spite","goshnar-s-greed","goshnar-s-hatred","goshnar-s-cruelty"];
-function soulwarGrantBossTaint(p,bossId,now){
-  if(!p||SOULWAR_TAINT_BOSSES.indexOf(String(bossId||""))===-1)return 0;
+function soulwarTaintState(p,now){
+  if(!p)return null;
   p.soulWarTaints=p.soulWarTaints||{level:0,firstAt:0,bosses:{}};
   const st=p.soulWarTaints;st.bosses=st.bosses||{};
+  const ts=Number(now)||Date.now();
+  if(st.firstAt&&ts-Number(st.firstAt)>=SOULWAR_TAINT_DURATION){st.level=0;st.firstAt=0;st.bosses={};}
+  return st;
+}
+function soulwarTaintLevel(p,now){
+  const st=soulwarTaintState(p,now);
+  return st?Math.max(0,Math.min(5,Number(st.level)||0)):0;
+}
+function soulwarInTaintZone(auth){
+  if(!auth)return false;
+  if(auth.bossId&&SOULWAR_TAINT_BOSSES.indexOf(String(auth.bossId))!==-1)return true;
+  const hunt=HUNTS[auth.huntId];
+  return !!(hunt&&hunt.soulWarZone);
+}
+function soulwarTaintDamageMultiplier(auth,p){
+  return soulwarInTaintZone(auth)&&soulwarTaintLevel(p,auth&&auth.clock)>=3?1.15:1;
+}
+function soulwarTaintExpMultiplier(auth,p){
+  if(!soulwarInTaintZone(auth))return 1;
+  const level=soulwarTaintLevel(p,auth&&auth.clock);
+  return level?SOULWAR_TAINTS[level-1].exp:1;
+}
+function soulwarGrantBossTaint(p,bossId,now){
+  if(!p||SOULWAR_TAINT_BOSSES.indexOf(String(bossId||""))===-1)return 0;
+  const st=soulwarTaintState(p,now);
   if(st.bosses[bossId])return st.level||0;
   st.bosses[bossId]=true;if(!st.firstAt)st.firstAt=Number(now)||Date.now();
   st.level=Math.min(5,(Number(st.level)||0)+1);
   return st.level;
+}
+function soulwarHasAllBossTaints(p,now){
+  const st=soulwarTaintState(p,now);
+  if(!st||soulwarTaintLevel(p,now)<5)return false;
+  for(let i=0;i<SOULWAR_TAINT_BOSSES.length;i++)
+    if(!st.bosses[SOULWAR_TAINT_BOSSES[i]])return false;
+  return true;
+}
+function soulwarTaintPreventMonsterDeath(auth,mob,p){
+  if(!soulwarInTaintZone(auth)||soulwarTaintLevel(p,auth&&auth.clock)<4||!mob||mob.boss)return false;
+  if(random(auth)>=.10)return false;
+  mob.hp=mob.maxHp;
+  const pos=entityPosition(mob,.5,.5);
+  auth.events=auth.events||[];
+  auth.events.push({t:"effect",x:pos.x,y:pos.y,screen:true,fx:"magic-green",ts:Number(auth.clock)||Date.now()});
+  return true;
+}
+function soulwarTaintNearCell(auth,item,radius){
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  const px=Number.isFinite(Number(item&&item.cx))?Number(item.cx):Math.floor(w/2);
+  const py=Number.isFinite(Number(item&&item.cy))?Number(item.cy):Math.floor(h/2);
+  const used=new Set();
+  for(const m of auth.mobs||[])if(m&&m.hp>0)used.add(m.cx+","+m.cy);
+  for(const pl of auth.players||[])if(pl&&Number.isFinite(Number(pl.cx)))used.add(pl.cx+","+pl.cy);
+  const r=Math.max(1,Number(radius)||2);
+  const cells=[];
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    if(!dx&&!dy)continue;
+    const cx=Math.max(0,Math.min(w-1,px+dx)),cy=Math.max(0,Math.min(h-1,py+dy));
+    if(auth.blockedCells&&auth.blockedCells[cy]&&auth.blockedCells[cy][cx])continue;
+    if(used.has(cx+","+cy))continue;
+    cells.push({cx,cy});
+  }
+  if(!cells.length)return null;
+  return cells[Math.min(cells.length-1,Math.floor(random(auth)*cells.length))];
+}
+function soulwarTaintSpawnNearPlayer(auth,item,now){
+  if(!soulwarInTaintZone(auth)||!item||!item.p||item.p.hp<=0||item.downUntil)return false;
+  if(soulwarTaintLevel(item.p,now)<2)return false;
+  auth.soulwarTaintSpawnCd=auth.soulwarTaintSpawnCd||0;
+  if(now<auth.soulwarTaintSpawnCd||random(auth)>=.005)return false;
+  const hunt=HUNTS[auth.huntId]||{};
+  const slug=String(hunt.soulWarZoneMonster||"many-faces");
+  if(!monsterDef(slug))return false;
+  const cell=soulwarTaintNearCell(auth,item,3);if(!cell)return false;
+  const mob=makeMob(auth,slug,false);if(!mob)return false;
+  const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+  mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/w;mob.y=(mob.cy+.5)/h;mob.sx=mob.x;mob.sy=mob.y;
+  auth.mobs.push(mob);auth.soulwarTaintSpawnCd=now+30000;
+  auth.events=auth.events||[];
+  auth.events.push({t:"effect",x:mob.x,y:mob.y,screen:true,fx:"teleport",ts:now});
+  return true;
+}
+function soulwarTaintTick(auth,dt,now){
+  if(!soulwarInTaintZone(auth)||auth.ended)return;
+  const players=(auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil);
+  if(!players.length)return;
+  let maxLevel=0;
+  for(const item of players)maxLevel=Math.max(maxLevel,soulwarTaintLevel(item.p,now));
+  if(!maxLevel)return;
+  if(maxLevel>=1){
+    auth.soulwarTeleportAcc=(Number(auth.soulwarTeleportAcc)||0)+dt;
+    if(auth.soulwarTeleportAcc>=2000){
+      auth.soulwarTeleportAcc=0;
+      if(random(auth)<.10){
+        const mobs=(auth.mobs||[]).filter((m)=>m&&!m.boss&&m.hp>0);
+        if(mobs.length){
+          const mob=mobs[Math.min(mobs.length-1,Math.floor(random(auth)*mobs.length))];
+          const anchor=players[Math.min(players.length-1,Math.floor(random(auth)*players.length))];
+          const cell=soulwarTaintNearCell(auth,anchor,2);
+          if(cell){
+            const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+            mob.cx=cell.cx;mob.cy=cell.cy;mob.x=(mob.cx+.5)/w;mob.y=(mob.cy+.5)/h;mob.sx=mob.x;mob.sy=mob.y;
+            auth.events=auth.events||[];
+            auth.events.push({t:"effect",x:mob.x,y:mob.y,screen:true,fx:"teleport",ts:now});
+          }
+        }
+      }
+    }
+  }
+  if(maxLevel>=2){
+    for(const item of players)if(soulwarTaintLevel(item.p,now)>=2)soulwarTaintSpawnNearPlayer(auth,item,now);
+  }
+  if(maxLevel>=5){
+    auth.soulwarLossAcc=(Number(auth.soulwarLossAcc)||0)+dt;
+    if(auth.soulwarLossAcc>=10000){
+      auth.soulwarLossAcc-=10000;
+      for(const item of players){
+        if(soulwarTaintLevel(item.p,now)<5)continue;
+        const p=item.p;
+        p.hp=Math.max(0,p.hp-Math.ceil(p.hp*.10));
+        p.mp=Math.max(0,p.mp-Math.ceil(p.mp*.10));
+        const pos=playerPosition(auth,p);
+        auth.events=auth.events||[];
+        auth.events.push({t:"effect",x:pos.x,y:pos.y,screen:true,fx:"mort-area",targetId:String(item.id),ts:now});
+        if(p.hp<=0){authMarkPlayerDeath(auth,item,now);
+          auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
+            permadead:!!item.permadead,screen:true,ts:now});}
+      }
+    }
+  }
 }
 
 function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&&x.p.hp>0);
@@ -3392,7 +3630,9 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   let totalShare=0;const shares=[];
   for(const item of receivers){
     const portion=eligible?split.each:baseExp;
-    const share=finalExp(item.p,portion,mob.slug,auth.expMul||1);
+    let share=finalExp(item.p,portion,mob.slug,auth.expMul||1);
+    const taintExp=soulwarTaintExpMultiplier(auth,item.p);
+    if(taintExp!==1)share=Math.floor(share*taintExp);
     totalShare+=share;
     const beforeLevel=Number(item.p.level)||1;
     addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
@@ -3607,12 +3847,388 @@ function tickHatred(auth,now){
   if(!boss){auth.hatred=null;return;}
   st.counters=st.counters||{};
   for(const item of auth.players||[])if(st.counters[String(item.id)]===undefined)st.counters[String(item.id)]=0;
+  if(!st.active&&now>=(Number(st.nextActivationAt)||0)){
+    st.active=true;st.nextCounterAt=now+5000;fillHatred(auth);
+    auth.events=auth.events||[];
+    auth.events.push({t:"effect",x:Number(boss.x)||.5,y:Number(boss.y)||.5,screen:true,fx:"magic-green",ts:now});
+  }
   while(st.active&&now>=st.nextCounterAt){
     for(const item of auth.players||[])if(item.p&&item.p.hp>0&&!item.downUntil)
       st.counters[String(item.id)]=(Number(st.counters[String(item.id)])||0)+1;
     fillHatred(auth);st.nextCounterAt+=5000;
   }
-  fillHatred(auth);
+  if(st.active)fillHatred(auth);
+}
+const SPITE_TRASH=["dreadful-harvester","spiteful-spitter","weeping-soul"];
+const SPITE_MAX_TRASH=8,SPITE_TRASH_RESPAWN_MS=15000;
+const SPITE_FIRE_INTERVAL=14000,SPITE_FIRE_TIMEOUT=5000,SPITE_FIRE_STOMP_CD=56000,SPITE_FIRE_DEFENSE=10;
+const SPITE_HEAL_CHANCE=10,SPITE_HEAL_PCT=10;
+const SPITE_QTE_INTERVAL=40000,SPITE_QTE_DURATION=5500,SPITE_QTE_BUBBLES=7,SPITE_QTE_FAIL_MUL=.75;
+function spiteMakeTrash(auth,slug){
+  const mob=makeMob(auth,slug,false);if(!mob)return null;
+  mob.spiteTrash=true;auth.mobs.unshift(mob);return mob;
+}
+function fillSpiteTrash(auth){
+  if(!auth.spite||auth.ended)return;
+  while(auth.mobs.filter((m)=>m.spiteTrash&&m.hp>0).length<SPITE_MAX_TRASH){
+    const slug=SPITE_TRASH[Math.min(2,Math.floor(random(auth)*3))];
+    if(!spiteMakeTrash(auth,slug))break;
+  }
+}
+function spiteApplyDefense(auth){
+  const boss=(auth.mobs||[]).find((m)=>m.boss);if(!boss||!boss.def||!auth.spite)return;
+  if(boss._spiteBaseArmor===undefined)boss._spiteBaseArmor=Number(boss.def.armor)||0;
+  if(boss._spiteBaseDefense===undefined)boss._spiteBaseDefense=Number(boss.def.defense)||0;
+  const n=Math.max(0,Number(auth.spite.defenseStacks)||0);
+  boss.def.armor=boss._spiteBaseArmor+n*SPITE_FIRE_DEFENSE;
+  boss.def.defense=boss._spiteBaseDefense+n*SPITE_FIRE_DEFENSE;
+  boss.spiteDefenseStacks=n;
+  boss.spiteDamageTakenMul=auth.spite.qtePenalty?SPITE_QTE_FAIL_MUL:1;
+}
+function spiteStartQte(auth,now){
+  const st=auth.spite;if(!st)return;
+  st.qtePhase="active";st.qteUntil=now+SPITE_QTE_DURATION;st.bubblesLeft=SPITE_QTE_BUBBLES;
+  st.bubbles=Array.from({length:SPITE_QTE_BUBBLES},()=>({
+    x:8+Math.floor(random(auth)*84),y:10+Math.floor(random(auth)*70),popped:false}));
+  delete st.pendingBubble;delete st.pendingStomp;
+  auth.events=auth.events||[];
+  auth.events.push({t:"spite-qte",phase:"start",screen:true,ts:now});
+}
+function spiteResolveQte(auth,success,now){
+  const st=auth.spite;if(!st||st.qtePhase!=="active")return;
+  st.qtePhase="idle";st.nextQteAt=now+SPITE_QTE_INTERVAL;st.bubbles=[];st.bubblesLeft=0;
+  delete st.qteUntil;delete st.pendingBubble;
+  st.qtePenalty=!success;
+  spiteApplyDefense(auth);
+  auth.events=auth.events||[];
+  auth.events.push({t:"spite-qte",result:success?"success":"fail",screen:true,ts:now});
+}
+function spiteAcceptIntents(auth,now){
+  const st=auth.spite;if(!st)return;
+  if(st.pendingStomp&&st.fire){
+    if(!(st.stompReadyAt&&now<st.stompReadyAt)){
+      st.fire=null;st.stompReadyAt=now+SPITE_FIRE_STOMP_CD;st.nextFireAt=now+SPITE_FIRE_INTERVAL;
+    }
+    delete st.pendingStomp;
+  }
+  if(st.qtePhase==="active"&&st.pendingBubble!==undefined&&st.pendingBubble!==null){
+    const idx=Number(st.pendingBubble);delete st.pendingBubble;
+    const bubble=st.bubbles&&st.bubbles[idx];
+    if(bubble&&!bubble.popped){
+      bubble.popped=true;st.bubblesLeft=Math.max(0,(Number(st.bubblesLeft)||0)-1);
+      if(st.bubblesLeft<=0)spiteResolveQte(auth,true,now);
+    }
+  }
+}
+function tickSpite(auth,now){
+  if(!auth.spite)return;
+  const st=auth.spite,boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(!boss){auth.spite=null;return;}
+  spiteAcceptIntents(auth,now);
+  st.pendingRespawns=(st.pendingRespawns||[]).filter((job)=>{
+    if(now<job.at)return true;
+    if(auth.mobs.filter((m)=>m.spiteTrash&&m.hp>0).length<SPITE_MAX_TRASH){
+      const slug=SPITE_TRASH[Math.min(2,Math.floor(random(auth)*3))];
+      spiteMakeTrash(auth,slug);
+    }
+    return false;
+  });
+  fillSpiteTrash(auth);
+  if(st.fire&&now>=st.fire.expiresAt){
+    st.defenseStacks=(Number(st.defenseStacks)||0)+1;st.fire=null;st.nextFireAt=now+SPITE_FIRE_INTERVAL;
+    spiteApplyDefense(auth);
+  }else if(!st.fire&&now>=(Number(st.nextFireAt)||0)){
+    const pads=["N","W","E","S"];
+    st.fire={id:pads[Math.min(3,Math.floor(random(auth)*4))],expiresAt:now+SPITE_FIRE_TIMEOUT};
+  }
+  if(st.qtePhase==="active"){
+    if(now>=st.qteUntil)spiteResolveQte(auth,false,now);
+  }else if(now>=(Number(st.nextQteAt)||0))spiteStartQte(auth,now);
+  spiteApplyDefense(auth);
+}
+const MALICE_TRASH=["dreadful-harvester","malicious-soul"];
+const MALICE_MAX_TRASH=8,MALICE_TRASH_RESPAWN_MS=20000;
+const MALICE_QTE_INTERVAL=30000,MALICE_QTE_DURATION=5000,MALICE_QTE_SIZE=30;
+const MALICE_QTE_FAIL_DMG=6000,MALICE_SLIDE_MS=280,MALICE_BLOCK_COUNT=9;
+function maliceMakeTrash(auth,slug){
+  const mob=makeMob(auth,slug,false);if(!mob)return null;
+  mob.maliceTrash=true;auth.mobs.unshift(mob);return mob;
+}
+function fillMaliceTrash(auth){
+  if(!auth.malice||auth.ended)return;
+  while(auth.mobs.filter((m)=>m.maliceTrash&&m.hp>0).length<MALICE_MAX_TRASH){
+    const slug=MALICE_TRASH[Math.min(1,Math.floor(random(auth)*2))];
+    if(!maliceMakeTrash(auth,slug))break;
+  }
+}
+function maliceCellBlocked(st,x,y){
+  if(!st||!st.blocks)return false;
+  const N=MALICE_QTE_SIZE;
+  if(x<0||y<0||x>=N||y>=N)return true;
+  for(const b of st.blocks){
+    if(b.x===x&&y>=b.y&&y<b.y+(b.len||1))return true;
+  }
+  return false;
+}
+function maliceBuildMaze(auth){
+  const N=MALICE_QTE_SIZE,start={x:2,y:14},goal={x:27,y:14},blocks=[],used=new Set();
+  for(let i=0;i<MALICE_BLOCK_COUNT;i++){
+    let x=1+Math.floor(random(auth)*(N-2)),guard=0;
+    while((x===start.x||x===goal.x||used.has(x))&&guard++<40)x=1+Math.floor(random(auth)*(N-2));
+    used.add(x);
+    const len=2+Math.floor(random(auth)*3);
+    blocks.push({x,y:-len-Math.floor(random(auth)*12),len});
+  }
+  return {start,goal,px:start.x,py:start.y,blocks};
+}
+function maliceSlideBlocks(auth,st){
+  let hit=false;
+  for(const b of st.blocks||[]){
+    b.y+=1;
+    if(b.x===st.px&&st.py>=b.y&&st.py<b.y+(b.len||1))hit=true;
+  }
+  for(const b of st.blocks||[]){
+    if(b.y>=MALICE_QTE_SIZE){
+      b.y=-(b.len||1)-Math.floor(random(auth)*8);
+      b.x=1+Math.floor(random(auth)*(MALICE_QTE_SIZE-2));
+    }
+  }
+  return hit;
+}
+function maliceApplyCurse(auth,now){
+  const dmg=MALICE_QTE_FAIL_DMG;
+  auth.events=auth.events||[];
+  for(const item of auth.players||[]){
+    if(!item||!item.p||item.p.hp<=0||item.downUntil||item.permadead)continue;
+    item.p.hp=Math.max(0,item.p.hp-dmg);
+    const pos=entityPosition(item,.13,.6);
+    auth.events.push({t:"taken",dmg,el:"death",fx:"mort-area",screen:true,
+      x:pos.x,y:pos.y,targetId:String(item.id),ts:now});
+    if(item.p.hp<=0){
+      authMarkPlayerDeath(auth,item,now);
+      auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(item.id),
+        permadead:!!item.permadead,screen:true,ts:now});
+    }
+  }
+}
+function maliceStartQte(auth,now){
+  const st=auth.malice;if(!st)return;
+  const maze=maliceBuildMaze(auth);
+  st.qtePhase="active";st.qteUntil=now+MALICE_QTE_DURATION;
+  st.start=maze.start;st.goal=maze.goal;st.px=maze.px;st.py=maze.py;
+  st.blocks=maze.blocks;st.nextSlideAt=now+MALICE_SLIDE_MS;
+  delete st.pendingMove;
+  auth.events=auth.events||[];
+  auth.events.push({t:"malice-qte",phase:"start",screen:true,ts:now});
+}
+function maliceResolveQte(auth,success,now){
+  const st=auth.malice;if(!st||st.qtePhase!=="active")return;
+  st.qtePhase="idle";st.nextQteAt=now+MALICE_QTE_INTERVAL;
+  st.blocks=[];delete st.qteUntil;delete st.nextSlideAt;delete st.pendingMove;
+  if(!success)maliceApplyCurse(auth,now);
+  auth.events=auth.events||[];
+  auth.events.push({t:"malice-qte",result:success?"success":"fail",screen:true,ts:now});
+}
+function maliceAcceptIntents(auth,now){
+  const st=auth.malice;if(!st||st.qtePhase!=="active"||!st.pendingMove)return;
+  const nx=Number(st.pendingMove.x),ny=Number(st.pendingMove.y);delete st.pendingMove;
+  if(!Number.isFinite(nx)||!Number.isFinite(ny))return;
+  if(Math.abs(nx-st.px)+Math.abs(ny-st.py)!==1)return;
+  if(maliceCellBlocked(st,nx,ny))return;
+  st.px=nx;st.py=ny;
+  if(nx===st.goal.x&&ny===st.goal.y)maliceResolveQte(auth,true,now);
+}
+function tickMalice(auth,now){
+  if(!auth.malice)return;
+  const st=auth.malice,boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(!boss){auth.malice=null;return;}
+  maliceAcceptIntents(auth,now);
+  st.pendingRespawns=(st.pendingRespawns||[]).filter((job)=>{
+    if(now<job.at)return true;
+    if(auth.mobs.filter((m)=>m.maliceTrash&&m.hp>0).length<MALICE_MAX_TRASH){
+      const slug=MALICE_TRASH[Math.min(1,Math.floor(random(auth)*2))];
+      maliceMakeTrash(auth,slug);
+    }
+    return false;
+  });
+  fillMaliceTrash(auth);
+  if(st.qtePhase==="active"){
+    if(now>=st.qteUntil)maliceResolveQte(auth,false,now);
+    else{
+      while(st.nextSlideAt&&now>=st.nextSlideAt){
+        st.nextSlideAt+=MALICE_SLIDE_MS;
+        if(maliceSlideBlocks(auth,st)){maliceResolveQte(auth,false,now);break;}
+      }
+    }
+  }else if(now>=(Number(st.nextQteAt)||0))maliceStartQte(auth,now);
+}
+const MEGA_BOSS_SPAWN_MS=15000;
+const MEGA_PERSONAL_MIN_MS=10000,MEGA_PERSONAL_MAX_MS=25000;
+const MEGA_QTE_TYPES=["scarlett","spite","fish"];
+const MEGA_SCARLETT_KEYS=["up","down","left","right"];
+const MEGA_SCARLETT_LEAD_MS=1400,MEGA_SCARLETT_NOTE_GAP=780,MEGA_SCARLETT_WINDOW_MS=480;
+const MEGA_SPITE_BUBBLES=5,MEGA_SPITE_QTE_MS=5000;
+const MEGA_FISH_NEED_MS=10000,MEGA_FISH_TIMEOUT_MS=16000;
+const MEGA_FAIL_DMG_MIN=3000,MEGA_FAIL_DMG_MAX=6000;
+const MEGA_FORM={purple:"goshnar-s-megalomania-purple",green:"goshnar-s-megalomania-green",blue:"goshnar-s-megalomania-blue"};
+function megaFailDmg(auth){
+  return MEGA_FAIL_DMG_MIN+Math.floor(random(auth)*(MEGA_FAIL_DMG_MAX-MEGA_FAIL_DMG_MIN+1));
+}
+function megaNextPersonalAt(auth,now){
+  return now+MEGA_PERSONAL_MIN_MS+Math.floor(random(auth)*(MEGA_PERSONAL_MAX_MS-MEGA_PERSONAL_MIN_MS+1));
+}
+function megaFormDef(form){
+  const slug=MEGA_FORM[form]||MEGA_FORM.green,base=monsterDef(slug);if(!base)return null;
+  return Object.assign({},base,{name:"Goshnar's Megalomania"});
+}
+function megaApplyForm(auth,form,now){
+  const st=auth.mega,boss=(auth.mobs||[]).find((m)=>m.boss);if(!st||!boss)return;
+  const def=megaFormDef(form);if(!def)return;
+  const hpPct=boss.maxHp?boss.hp/boss.maxHp:1;
+  boss.slug=MEGA_FORM[form]||MEGA_FORM.green;
+  boss.def=Object.assign({},def,{hp:boss.maxHp||def.hp});
+  boss.hp=Math.max(1,Math.floor((boss.maxHp||def.hp)*hpPct));
+  st.phase=form;st.immune=false;
+  boss.qteImmune=false;boss.megaImmune=false;boss.megaPendingSpawn=false;
+  auth.events=auth.events||[];
+  auth.events.push({t:"effect",x:Number(boss.x)||.5,y:Number(boss.y)||.5,screen:true,fx:"magic-green",ts:now||auth.clock});
+}
+function megaPersonalSlot(auth,playerId){
+  const st=auth.mega;if(!st)return null;
+  st.personal=st.personal||{};
+  const id=String(playerId);
+  if(!st.personal[id])st.personal[id]={nextAt:0,active:null};
+  return st.personal[id];
+}
+function megaEnsurePersonalSchedulers(auth,now){
+  const st=auth.mega;if(!st)return;
+  for(const item of auth.players||[]){
+    if(!item)continue;
+    const slot=megaPersonalSlot(auth,item.id);
+    if(slot&&!slot.nextAt&&!slot.active)slot.nextAt=megaNextPersonalAt(auth,now);
+  }
+}
+function megaSpawnBoss(auth,now){
+  const st=auth.mega;if(!st||st.bossSpawned)return;
+  let boss=(auth.mobs||[]).find((m)=>m.boss);
+  if(!boss&&st.pendingBoss){
+    boss=st.pendingBoss;delete st.pendingBoss;
+    auth.mobs=auth.mobs||[];auth.mobs.unshift(boss);
+  }
+  if(!boss){st.bossSpawned=true;st.immune=false;return;}
+  boss.maxHp=boss.maxHp||boss.hp||620000;
+  megaApplyForm(auth,"green",now);
+  st.bossSpawned=true;st.immune=false;
+  auth.events=auth.events||[];
+  auth.events.push({t:"spawn",slug:boss.slug,x:Number(boss.x)||.5,y:Number(boss.y)||.5,screen:true,ts:now});
+}
+function megaBuildScarlett(auth,now){
+  const sequence=Array.from({length:5},()=>MEGA_SCARLETT_KEYS[Math.min(3,Math.floor(random(auth)*4))]);
+  return{type:"scarlett",until:now+MEGA_SCARLETT_LEAD_MS+4*MEGA_SCARLETT_NOTE_GAP+MEGA_SCARLETT_WINDOW_MS+400,
+    sequence,index:0,
+    notes:sequence.map((dir,i)=>({dir,due:now+MEGA_SCARLETT_LEAD_MS+i*MEGA_SCARLETT_NOTE_GAP,hit:false}))};
+}
+function megaBuildSpite(auth,now){
+  const bubbles=Array.from({length:MEGA_SPITE_BUBBLES},(_,i)=>({
+    i,x:8+Math.floor(random(auth)*84),y:12+Math.floor(random(auth)*70),popped:false}));
+  return{type:"spite",until:now+MEGA_SPITE_QTE_MS,bubbles,bubblesLeft:MEGA_SPITE_BUBBLES};
+}
+function megaBuildFish(auth,now){
+  return{type:"fish",until:now+MEGA_FISH_TIMEOUT_MS,needMs:MEGA_FISH_NEED_MS,progress:0,
+    needle:.5,zone:.35+random(auth)*.3,zoneW:.16+random(auth)*.06,vel:(random(auth)-.5)*.002,
+    hold:false,steer:0,lastTick:now};
+}
+function megaStartPersonal(auth,playerId,now){
+  const st=auth.mega;if(!st)return;
+  const slot=megaPersonalSlot(auth,playerId);if(!slot||slot.active)return;
+  const type=MEGA_QTE_TYPES[Math.min(MEGA_QTE_TYPES.length-1,Math.floor(random(auth)*MEGA_QTE_TYPES.length))];
+  slot.active=type==="scarlett"?megaBuildScarlett(auth,now):
+    (type==="spite"?megaBuildSpite(auth,now):megaBuildFish(auth,now));
+  slot.nextAt=0;
+  auth.events=auth.events||[];
+  auth.events.push({t:"mega-qte",phase:"start",kind:type,playerId:String(playerId),screen:true,ts:now});
+}
+function megaResolvePersonal(auth,playerId,success,now){
+  const st=auth.mega;if(!st)return;
+  const slot=megaPersonalSlot(auth,playerId);if(!slot||!slot.active)return;
+  const kind=slot.active.type;slot.active=null;
+  slot.nextAt=megaNextPersonalAt(auth,now);
+  if(!success){
+    const dmg=megaFailDmg(auth);
+    const item=(auth.players||[]).find((p)=>String(p.id)===String(playerId));
+    if(item&&item.p&&item.p.hp>0&&!item.downUntil&&!item.permadead){
+      item.p.hp=Math.max(0,item.p.hp-dmg);
+      const pos=entityPosition(item,.5,.5);
+      auth.events=auth.events||[];
+      auth.events.push({t:"taken",dmg,el:"death",fx:"mort-area",screen:true,
+        x:pos.x,y:pos.y,targetId:String(item.id),ts:now});
+      if(item.p.hp<=0)authMarkPlayerDeath(auth,item,now,{permadead:true});
+    }
+  }
+  auth.events=auth.events||[];
+  auth.events.push({t:"mega-qte",result:success?"success":"fail",kind,playerId:String(playerId),screen:true,ts:now});
+}
+function megaTickFish(auth,active,now,dt){
+  if(!active||active.type!=="fish")return;
+  const step=Math.max(16,Math.min(80,dt||AUTH_STEP_MS));
+  active.lastTick=now;
+  active.vel=(Number(active.vel)||0)+(random(auth)-.5)*.0008+(Number(active.steer)||0)*.0009;
+  active.vel=Math.max(-.004,Math.min(.004,active.vel));
+  active.needle=Math.max(0,Math.min(1,(Number(active.needle)||.5)+active.vel*step));
+  if(active.needle<=0||active.needle>=1)active.vel*=-.55;
+  const half=(Number(active.zoneW)||.16)/2;
+  const inZone=Math.abs((Number(active.needle)||.5)-(Number(active.zone)||.5))<=half;
+  if(active.hold&&inZone)active.progress=(Number(active.progress)||0)+step;
+  else active.progress=Math.max(0,(Number(active.progress)||0)-step*.35);
+}
+function megaAcceptIntents(auth,now){
+  const st=auth.mega;if(!st)return;
+  const queue=st.pendingIntents||[];
+  st.pendingIntents=[];
+  for(const intent of queue){
+    if(!intent)continue;
+    const playerId=String(intent.playerId||(auth.players&&auth.players[0]&&auth.players[0].id)||"");
+    if(!playerId)continue;
+    const slot=megaPersonalSlot(auth,playerId);if(!slot||!slot.active)continue;
+    const act=slot.active;
+    if(intent.kind==="scarlett"&&act.type==="scarlett"){
+      const note=act.notes&&act.notes[act.index];
+      const press=Number(intent.pressAuth)||now;
+      if(!note||String(intent.dir)!==String(note.dir)||Math.abs(press-note.due)>MEGA_SCARLETT_WINDOW_MS+320){
+        megaResolvePersonal(auth,playerId,false,now);continue;
+      }
+      note.hit=true;act.index=(act.index||0)+1;
+      if(act.index>=(act.sequence||[]).length)megaResolvePersonal(auth,playerId,true,now);
+    }else if(intent.kind==="spite"&&act.type==="spite"){
+      const idx=Number(intent.bubble);const bubble=(act.bubbles||[])[idx];
+      if(!bubble||bubble.popped)continue;
+      bubble.popped=true;act.bubblesLeft=Math.max(0,(act.bubblesLeft||1)-1);
+      if(act.bubblesLeft<=0)megaResolvePersonal(auth,playerId,true,now);
+    }else if(intent.kind==="fish"&&act.type==="fish"){
+      if(typeof intent.hold==="boolean")act.hold=intent.hold;
+      if(Number.isFinite(Number(intent.steer)))act.steer=Math.max(-1,Math.min(1,Number(intent.steer)));
+    }
+  }
+}
+function tickMega(auth,now){
+  if(!auth.mega)return;
+  const st=auth.mega;
+  megaAcceptIntents(auth,now);
+  if(!st.bossSpawned){
+    if(now>=(Number(st.bossSpawnAt)||0))megaSpawnBoss(auth,now);
+  }
+  const boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+  if(st.bossSpawned&&!boss){auth.mega=null;return;}
+  megaEnsurePersonalSchedulers(auth,now);
+  for(const pid of Object.keys(st.personal||{})){
+    const slot=st.personal[pid];if(!slot)continue;
+    if(slot.active){
+      if(slot.active.type==="fish")megaTickFish(auth,slot.active,now,AUTH_STEP_MS);
+      if(slot.active.type==="fish"&&(Number(slot.active.progress)||0)>=(Number(slot.active.needMs)||MEGA_FISH_NEED_MS))
+        megaResolvePersonal(auth,pid,true,now);
+      else if(now>=(Number(slot.active.until)||0))megaResolvePersonal(auth,pid,false,now);
+    }else if(now>=(Number(slot.nextAt)||0))megaStartPersonal(auth,pid,now);
+  }
 }
 function authIsBossFight(auth){
   return !!(auth&&(auth.kind==="boss"||auth.bossId));
@@ -3637,8 +4253,9 @@ function authMarkPlayerDeath(auth,item,now,opts){
 }
 const SCARLETT_KEYS=["up","down","left","right"];
 /* Timing alinhado ao cliente (scarlett-boss.js): lead, gap, janela ±ms e
- * folga online (~1 tick AUTH_STEP + RTT) para o press não perder por latência. */
-const SCARLETT_LEAD_MS=1400,SCARLETT_NOTE_GAP=760,SCARLETT_TIMING_WINDOW=360,SCARLETT_ONLINE_SLACK=180;
+ * folga online (~1.5×AUTH_STEP + RTT). pressAuth julga o instante do tecla,
+ * não o atraso do tick — anti-cheat ainda rejeita pressAuth no futuro. */
+const SCARLETT_LEAD_MS=1600,SCARLETT_NOTE_GAP=820,SCARLETT_TIMING_WINDOW=500,SCARLETT_ONLINE_SLACK=320;
 function scarlettBuildSequence(auth){
   return Array.from({length:5},()=>SCARLETT_KEYS[Math.min(3,Math.floor(random(auth)*4))]);
 }
@@ -3699,9 +4316,18 @@ function scarlettAcceptIntent(auth,now){
   const note=st.notes&&st.notes[st.index];
   if(!note||SCARLETT_KEYS.indexOf(dir)<0){delete st.pendingIntent;scarlettQteFail(auth,now);return;}
   const window=SCARLETT_TIMING_WINDOW+SCARLETT_ONLINE_SLACK;
-  const delta=(Number(now)||0)-note.due;
-  // Ainda cedo neste step do batch: mantém o intent até a janela abrir.
-  if(delta<-window)return;
+  const serverNow=Number(now)||0;
+  const rawPress=intent.pressAuth;
+  const pressAuth=rawPress==null||rawPress===""?NaN:Number(rawPress);
+  // pressAuth do cliente: só confia se for número real e não estiver no futuro.
+  const usePress=Number.isFinite(pressAuth)&&pressAuth>0&&pressAuth<=serverNow+80;
+  const judgeAt=usePress?pressAuth:serverNow;
+  const delta=judgeAt-note.due;
+  // Intent chegou cedo demais (tick antes da nota): espera a janela abrir.
+  if(delta<-window){
+    if(!usePress)return;
+    delete st.pendingIntent;scarlettQteFail(auth,now);return;
+  }
   delete st.pendingIntent;
   if(dir!==note.dir||delta>window){scarlettQteFail(auth,now);return;}
   note.hit=true;st.index=(Number(st.index)||0)+1;
@@ -3734,9 +4360,10 @@ function tickScarlett(auth,now){
 }
 function syncBossImmunityFlags(auth){
   for(const m of auth.mobs||[]){
-    if(!m.boss){m.greedImmune=false;m.qteImmune=false;continue;}
+    if(!m.boss){m.greedImmune=false;m.qteImmune=false;m.megaImmune=false;continue;}
     m.greedImmune=!!(auth.greed&&auth.greed.immune);
-    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune);
+    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune);
+    m.megaImmune=!!(auth.mega&&auth.mega.immune);
   }
 }
 function tryFerumbrasSummon(auth,mob,now,stepTs){
@@ -3793,10 +4420,11 @@ function spawnHuntWave(auth,now,opts){
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
   }
 }
-const AUTH_SPAWN_BLINK_MS=1000,AUTH_SPAWN_BLINKS=3;
-/* Tempo até o monstro nascer após limpar a onda. Blink começa em T-3s. */
-const AUTH_WAVE_CLEAR_RESPAWN_MS=5000;
-const AUTH_WAVE_TELEPORT_LEAD_MS=AUTH_SPAWN_BLINKS*AUTH_SPAWN_BLINK_MS;
+/* 3 piscadas em ~2s (lead de teleporte). */
+const AUTH_SPAWN_BLINK_MS=667,AUTH_SPAWN_BLINKS=3;
+/* Tempo até o monstro nascer após limpar a onda. Blink começa em T-2s. */
+const AUTH_WAVE_CLEAR_RESPAWN_MS=4000;
+const AUTH_WAVE_TELEPORT_LEAD_MS=2000;
 function tickAuthSpawnQueue(auth,now){
   if(!auth||!Array.isArray(auth.pendingSpawns)||!auth.pendingSpawns.length)return;
   now=Number(now)||auth.clock;
@@ -4355,7 +4983,8 @@ function step(auth,now,opts){if(auth.ended)return;
   const stepTs=Number(now)||Date.now();
   if(auth.greed){if(!auth.greed.immune&&now>=auth.greed.vulnerableUntil){auth.greed.immune=true;auth.greed.vulnerableUntil=0;}
     if(auth.greed.immune)fillGreed(auth);}
-  tickHatred(auth,now);tickScarlett(auth,now);syncBossImmunityFlags(auth);
+  tickHatred(auth,now);tickScarlett(auth,now);tickSpite(auth,now);tickMalice(auth,now);tickMega(auth,now);syncBossImmunityFlags(auth);
+  soulwarTaintTick(auth,dt,now);
   tickDelayedHits(auth,now);
   for(const item of auth.players){
     const p=item.p;p.stamina=FULL_STAMINA;
@@ -4634,7 +5263,14 @@ function step(auth,now,opts){if(auth.ended)return;
   }
 
   /* ---------- MORTE DE MONSTROS ---------- */
-  const dead=auth.mobs.filter((m)=>m.hp<=0);auth.mobs=auth.mobs.filter((m)=>m.hp>0);
+  const survivors=[],dead=[];
+  for(const mob of auth.mobs||[]){
+    if(mob.hp>0){survivors.push(mob);continue;}
+    const leader=auth.players[0];
+    if(leader&&leader.p&&soulwarTaintPreventMonsterDeath(auth,mob,leader.p))survivors.push(mob);
+    else dead.push(mob);
+  }
+  auth.mobs=survivors;
   for(const mob of dead){
     if(auth.greed&&auth.greed.immune&&mob.slug==="greedbeast"){
       auth.greed.greedbeastKills++;if(auth.greed.greedbeastKills>=5){auth.greed.immune=false;auth.greed.greedbeastKills=0;auth.greed.vulnerableUntil=now+40000;}}
@@ -4642,6 +5278,22 @@ function step(auth,now,opts){if(auth.ended)return;
       const counters=auth.hatred.counters||(auth.hatred.counters={});
       if(mob.slug==="hateful-soul"){for(const key of Object.keys(counters))counters[key]=0;}
       else{for(const key of Object.keys(counters))counters[key]=Math.max(0,(Number(counters[key])||0)-1);}
+    }
+    if(auth.spite&&mob.spiteTrash){
+      auth.spite.pendingRespawns=auth.spite.pendingRespawns||[];
+      auth.spite.pendingRespawns.push({at:now+SPITE_TRASH_RESPAWN_MS});
+      if(mob.slug==="weeping-soul"){
+        const boss=(auth.mobs||[]).find((m)=>m.boss&&m.hp>0);
+        if(boss&&Math.floor(random(auth)*100)+1<=SPITE_HEAL_CHANCE){
+          const heal=Math.floor(boss.maxHp*(SPITE_HEAL_PCT/100));
+          boss.hp=Math.min(boss.maxHp,boss.hp+heal);
+          auth.events.push({t:"effect",x:Number(boss.x)||.5,y:Number(boss.y)||.5,screen:true,fx:"magic-blue",ts:stepTs+700});
+        }
+      }
+    }
+    if(auth.malice&&mob.maliceTrash){
+      auth.malice.pendingRespawns=auth.malice.pendingRespawns||[];
+      auth.malice.pendingRespawns.push({at:now+MALICE_TRASH_RESPAWN_MS});
     }
     // Forge buffs on kill
     const leader=auth.players[0],leaderPos=entityPosition(leader,.13,.6);
@@ -4687,7 +5339,6 @@ function step(auth,now,opts){if(auth.ended)return;
           auth.events.push({t:"miss",x:missPos.x,y:missPos.y,targetId:String(victim.id),dodge:true,screen:true,fx:"poff",ts:mobVisualTs});
         }else{
         let damage=mobDamage(auth,mob,victim.p);
-        if(auth.greed&&auth.greed.immune&&mob.boss)damage=Math.floor(damage*.7);
         const target=entityPosition(victim,.13,.6),source=entityPosition(mob,.5,.5);
         const el=mob.def&&mob.def.element||"physical";
         const ranged=(Number(mob.def&&mob.def.targetDistance)||1)>1;
@@ -4724,8 +5375,8 @@ function step(auth,now,opts){if(auth.ended)return;
   if(auth.players.every((x)=>x.p.hp<=0||x.downUntil))fullWipe(auth);
   if(!auth.ended)for(const mob of auth.mobs||[])if(mob.hp>0)monsterThinkYell(auth,mob,now);
   if(!auth.ended)advanceAuthorityMovement(auth,now,{freezePlayers:!!(opts&&opts.freezeVisual)});
-  // Wave clear: agenda AUTH_WAVE_CLEAR_RESPAWN_MS (5s) até o monstro nascer.
-  // Em T-3s (AUTH_WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns / blink.
+  // Wave clear: agenda AUTH_WAVE_CLEAR_RESPAWN_MS (4s) até o monstro nascer.
+  // Em T-2s (AUTH_WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns / blink.
   // Também separa kill e makeMob×pack em respostas distintas e evita o custo
   // no step do último kill (catchup incluso).
   if(!auth.ended&&auth.kind==="hunt"){
@@ -4804,14 +5455,40 @@ function initializeAuthority(descriptor,instanceId,now){
     if(leader&&auth.bossId){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].lastFight=auth.clock;}
     if(auth.bossId==="goshnar-s-greed"){auth.greed={immune:true,greedbeastKills:0,vulnerableUntil:0};fillGreed(auth);}
     if(auth.bossId==="goshnar-s-hatred"){
-      auth.hatred={active:true,nextCounterAt:auth.clock+5000,counters:{}};
+      const delay=20000+Math.min(20000,Math.floor(random(auth)*20001));
+      auth.hatred={active:false,nextActivationAt:auth.clock+delay,nextCounterAt:0,counters:{}};
       for(const item of players)auth.hatred.counters[String(item.id)]=0;
-      const initial=3+Math.min(2,Math.floor(random(auth)*3));
-      let first=true;
-      while(auth.mobs.filter((m)=>m.hatredSummon).length<initial){
-        const slug=first?"hateful-soul":(random(auth)<.10?"hateful-soul":"dreadful-harvester");
-        first=false;if(!hatredMakeSummon(auth,slug))break;
+      if(boss){boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;}
+    }
+    if(auth.bossId==="goshnar-s-spite"){
+      auth.spite={defenseStacks:0,qtePenalty:false,qtePhase:"idle",
+        nextFireAt:auth.clock+SPITE_FIRE_INTERVAL,nextQteAt:auth.clock+SPITE_QTE_INTERVAL,
+        fire:null,stompReadyAt:0,pendingRespawns:[],bubbles:[],bubblesLeft:0};
+      if(boss){
+        boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+        boss._spiteBaseArmor=Number(boss.def&&boss.def.armor)||0;
+        boss._spiteBaseDefense=Number(boss.def&&boss.def.defense)||0;
       }
+      fillSpiteTrash(auth);spiteApplyDefense(auth);
+    }
+    if(auth.bossId==="goshnar-s-malice"){
+      auth.malice={qtePhase:"idle",nextQteAt:auth.clock+MALICE_QTE_INTERVAL,
+        pendingRespawns:[],blocks:[],px:2,py:14,
+        start:{x:2,y:14},goal:{x:27,y:14}};
+      if(boss){boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;}
+      fillMaliceTrash(auth);
+    }
+    if(auth.bossId==="goshnar-s-megalomania"){
+      auth.mega={bossSpawnAt:auth.clock+MEGA_BOSS_SPAWN_MS,bossSpawned:false,pendingBoss:null,
+        phase:"waiting",immune:true,personal:{},pendingIntents:[]};
+      if(boss){
+        boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+        boss.maxHp=boss.maxHp||boss.hp||620000;
+        boss.megaPendingSpawn=true;boss.qteImmune=true;boss.megaImmune=true;
+        auth.mega.pendingBoss=boss;
+        auth.mobs=(auth.mobs||[]).filter((m)=>m!==boss);
+      }
+      megaEnsurePersonalSchedulers(auth,auth.clock+MEGA_BOSS_SPAWN_MS);
     }
     if(auth.bossId==="scarlett-etzel"){
       auth.scarlett={immune:true,phase:"waiting",nextAt:auth.clock+5000+Math.floor(random(auth)*5001),
@@ -4848,7 +5525,11 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
       exposeUntil:challengeWallUntil(m.exposeUntil,auth.clock),
       influenced:!!m.influenced,fiendish:!!m.fiendish,
       sinisterStacks:Number(m.sinisterStacks)||0,greedImmune:!!(auth.greed&&auth.greed.immune&&m.boss),
-      qteImmune:!!(auth.scarlett&&auth.scarlett.immune&&m.boss),hatredSummon:!!m.hatredSummon,
+      qteImmune:!!((auth.scarlett&&auth.scarlett.immune&&m.boss)||(auth.mega&&auth.mega.immune&&m.boss)),hatredSummon:!!m.hatredSummon,
+      spiteTrash:!!m.spiteTrash,spiteDamageTakenMul:Number(m.spiteDamageTakenMul)||1,
+      spiteDefenseStacks:Number(m.spiteDefenseStacks)||0,
+      maliceTrash:!!m.maliceTrash,megaAspect:!!m.megaAspect,
+      megaImmune:!!(auth.mega&&auth.mega.immune&&m.boss),
       hp:m.hp,maxHp:m.maxHp,atkCd:Math.max(0,m.attackSpeed-m.attackAcc),
       // def compacto: só campos necessários para o cliente renderizar.
       // O def completo (loot, skills, voices) é pesado e já existe no
@@ -4861,6 +5542,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     vulnerableUntil:auth.greed.vulnerableUntil,nextSpawnAt:auth.clock+1500,lastBlockFx:0};
   else descriptor.state.greed=null;
   descriptor.state.hatred=auth.hatred?{active:!!auth.hatred.active,counters:Object.assign({},auth.hatred.counters||{}),
+    nextActivationAt:Number(auth.hatred.nextActivationAt)||0,
     nextCounterAt:Number(auth.hatred.nextCounterAt)||0}:null;
   descriptor.state.scarlett=auth.scarlett?{immune:!!auth.scarlett.immune,phase:auth.scarlett.phase||"waiting",
     nextAt:Number(auth.scarlett.nextAt)||0,qteUntil:Number(auth.scarlett.qteUntil)||0,
@@ -4869,6 +5551,47 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     sequence:Array.isArray(auth.scarlett.sequence)?auth.scarlett.sequence.slice():[],
     noteDues:Array.isArray(auth.scarlett.noteDues)?auth.scarlett.noteDues.map(Number):[],
     index:Number(auth.scarlett.index)||0}:null;
+  descriptor.state.spite=auth.spite?{
+    defenseStacks:Number(auth.spite.defenseStacks)||0,qtePenalty:!!auth.spite.qtePenalty,
+    qtePhase:auth.spite.qtePhase||"idle",nextFireAt:Number(auth.spite.nextFireAt)||0,
+    nextQteAt:Number(auth.spite.nextQteAt)||0,qteUntil:Number(auth.spite.qteUntil)||0,
+    stompReadyAt:Number(auth.spite.stompReadyAt)||0,bubblesLeft:Number(auth.spite.bubblesLeft)||0,
+    fire:auth.spite.fire?{id:String(auth.spite.fire.id||""),expiresAt:Number(auth.spite.fire.expiresAt)||0}:null,
+    bubbles:Array.isArray(auth.spite.bubbles)?auth.spite.bubbles.map((b)=>({
+      x:Number(b.x)||0,y:Number(b.y)||0,popped:!!b.popped})):[]}:null;
+  descriptor.state.malice=auth.malice?{
+    qtePhase:auth.malice.qtePhase||"idle",nextQteAt:Number(auth.malice.nextQteAt)||0,
+    qteUntil:Number(auth.malice.qteUntil)||0,nextSlideAt:Number(auth.malice.nextSlideAt)||0,
+    px:Number(auth.malice.px)||0,py:Number(auth.malice.py)||0,
+    start:auth.malice.start?{x:Number(auth.malice.start.x)||0,y:Number(auth.malice.start.y)||0}:null,
+    goal:auth.malice.goal?{x:Number(auth.malice.goal.x)||0,y:Number(auth.malice.goal.y)||0}:null,
+    blocks:Array.isArray(auth.malice.blocks)?auth.malice.blocks.map((b)=>({
+      x:Number(b.x)||0,y:Number(b.y)||0,len:Number(b.len)||1})):[]}:null;
+  descriptor.state.mega=auth.mega?{
+    bossSpawnAt:Number(auth.mega.bossSpawnAt)||0,bossSpawned:!!auth.mega.bossSpawned,
+    phase:auth.mega.phase||"waiting",immune:!!auth.mega.immune,
+    personal:(()=>{
+      const out={};
+      for(const [pid,slot] of Object.entries(auth.mega.personal||{})){
+        if(!slot)continue;
+        const act=slot.active;
+        out[pid]={
+          nextAt:Number(slot.nextAt)||0,
+          active:act?{
+            type:act.type,until:Number(act.until)||0,index:Number(act.index)||0,
+            sequence:Array.isArray(act.sequence)?act.sequence.slice():[],
+            notes:Array.isArray(act.notes)?act.notes.map((n)=>({dir:n.dir,due:Number(n.due)||0,hit:!!n.hit})):[],
+            bubbles:Array.isArray(act.bubbles)?act.bubbles.map((b)=>({
+              x:Number(b.x)||0,y:Number(b.y)||0,popped:!!b.popped})): [],
+            bubblesLeft:Number(act.bubblesLeft)||0,
+            needMs:Number(act.needMs)||0,progress:Number(act.progress)||0,
+            needle:Number(act.needle)||.5,zone:Number(act.zone)||.5,zoneW:Number(act.zoneW)||.16,
+            hold:!!act.hold,steer:Number(act.steer)||0
+          }:null
+        };
+      }
+      return out;
+    })()}:null;
   descriptor.state.stats=Object.assign({},descriptor.state.stats||{},auth.stats);descriptor.state.bossDefeated=!!auth.bossDefeated;
   // Hunt wipe mostra corpse+contador; boss wipe só corpses permadead (sem timer).
   descriptor.state.dead=auth.ended&&auth.terminalReason==="party-wipe"&&!authIsBossFight(auth);
@@ -4896,7 +5619,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
   const MAX_AUTH_EVENTS=120;
   let events=Array.isArray(auth.events)?auth.events:[];
   if(events.length>MAX_AUTH_EVENTS){
-    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","buff","cured","break","miss","block","effect"]);
+    const keep=new Set(["taken","hit","kill","death","heal","heal-friend","say","dust","areafx","chain","mobheal","spawn","spawn-blink","buff","cured","break","miss","block","effect","spite-qte","malice-qte","mega-qte"]);
     events=events.filter((e)=>keep.has(e&&e.t)).concat(events.filter((e)=>!keep.has(e&&e.t))).slice(0,MAX_AUTH_EVENTS);
   }
   descriptor.state.events=events;
@@ -4971,7 +5694,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   CURRENCY_GOLD,
-  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,tryAuthAutoSell,
+  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,destroyAuthPouchItem,setAuthAutoSupplyStash,tryAuthAutoSell,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,
   playerCritChancePct,playerCritExtraPct,rollPlayerCrit,imbCombatTotals,charmTotals,applyCharmDamage,
   tryCharmOffensive,buyCharm,assignCharm,clearCharm,afterPlayerHit,
@@ -4990,4 +5713,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   CanaryVocation,spellAllowedForVoc,vocationRegenSpec,applyVocationRegen,applyVocationRegenTo,
   friendHealSpellIds,selfHealSpellIds,sanitizePlayerSpells,sanitizeCombo,
   isPvpInstance,instanceRewardMul,canPlayerDamagePlayer,playersAreAllies,livingHostilePlayers,
-  applyPlayerPvpDamage,combatLivingFor,finalExp};
+  applyPlayerPvpDamage,combatLivingFor,finalExp,
+  soulwarTaintState,soulwarTaintLevel,soulwarInTaintZone,soulwarTaintDamageMultiplier,
+  soulwarTaintExpMultiplier,soulwarGrantBossTaint,soulwarHasAllBossTaints,soulwarTaintPreventMonsterDeath,
+  soulwarTaintSpawnNearPlayer,soulwarTaintTick,SOULWAR_TAINTS,SOULWAR_TAINT_BOSSES,HUNTS};

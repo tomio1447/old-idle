@@ -10,29 +10,55 @@ for(const file of ["gamedata.js","monsterdata.js","mobsheetdata.js","monsters.js
 
 const room=fs.readFileSync(path.join(game,"maps","goshnars_hatred_room.otbm"));
 const beta=fs.readFileSync(path.join(game,"beta-maps","bossesroom","goshnars_hatred_room.otbm"));
+const canary=fs.readFileSync(path.join(game,"beta-maps","bossesroom","goshnar_hatred_room.otbm"));
 const rotten=fs.readFileSync(path.join(game,"maps","rotten_wasteland.otbm"));
-must(room.equals(beta)&&!room.equals(rotten)&&crypto.createHash("sha256").update(room).digest("hex")===
-  "8728c78730ed243c3cd4a620c9529af0c3edbd5396a2a07cc368ffb2d4031f8a",
-  "Hatred não usa bossroom própria/distinta da Rotten Wasteland");
+must(room.equals(beta)&&room.equals(canary)&&!room.equals(rotten)&&
+  crypto.createHash("sha256").update(room).digest("hex")===
+  "cc5df1e5b31bb4dea72072f4ca65cc21097e41ee807ff76b249c435481ea0510",
+  "Hatred não publica o OTBM Canary goshnar_hatred_room");
 const hunt=ctx.GAMEDATA.hunts["goshnars-hatred-room"];
 must(hunt&&hunt.otbm==="goshnars_hatred_room"&&hunt.otbmFloor===7&&
   hunt.otbmRuntimeWidth===30&&hunt.otbmRuntimeHeight===30,
   "room técnica de Hatred não usa OTBM/mundo 30×30 próprio");
-must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:0,y:0,w:18,h:14,z:7})&&
-  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:2,y:7,z:7})&&
-  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:15,y:7,w:1,h:1,z:7}),
-  "FOV/player/boss spawn locais de Hatred divergentes");
+must(JSON.stringify(hunt.otbmFovBounds)===JSON.stringify({x:1042,y:1009,w:22,h:18,z:7})&&
+  JSON.stringify(hunt.otbmSpawn)===JSON.stringify({x:1052,y:1023,z:7})&&
+  JSON.stringify(hunt.otbmMobBounds)===JSON.stringify({x:1052,y:1017,w:1,h:1,z:7}),
+  "FOV/player/boss spawn Canary de Hatred divergentes");
 let map=OTBM.read(room,{z:7});
-must(map.w===18&&map.h===14&&Object.keys(map.cells).length===252,
-  "bossroom própria de Hatred não manteve 18×14 completo");
-const loader=fs.readFileSync(path.join(js,"otbmhunt.js"),"utf8");
-const zs=loader.indexOf("function applyHuntOtbmZones"),ze=loader.indexOf("\n\n/* Garante",zs);
-vm.runInContext(loader.slice(zs,ze),ctx);ctx.applyHuntOtbmZones(map,hunt);
+must(map.w===22&&map.h===18&&Object.keys(map.cells).length===392&&
+  map.sourceBounds.minX===1042&&map.sourceBounds.minY===1009&&
+  map.sourceBounds.maxX===1063&&map.sourceBounds.maxY===1026,
+  "bossroom Canary de Hatred não manteve z=7 22×18 integral");
+ctx.applyHuntOtbmZones=function(map,hunt){
+  const bounds=map.sourceBounds||{};
+  const ox=Number(bounds.x!==undefined?bounds.x:bounds.minX)||0;
+  const oy=Number(bounds.y!==undefined?bounds.y:bounds.minY)||0;
+  const sameFloor=(z)=>z===undefined||map.z===undefined||Number(z)===Number(map.z);
+  const local=(point)=>point&&sameFloor(point.z)?{x:Number(point.x)-ox,y:Number(point.y)-oy}:null;
+  const spawn=local(hunt.otbmSpawn);
+  if(spawn&&spawn.x>=0&&spawn.y>=0&&spawn.x<map.w&&spawn.y<map.h) map.spawn=spawn;
+  const zone=hunt.otbmMobBounds;
+  if(zone&&sameFloor(zone.z)){
+    const start=local(zone),w=Math.max(0,Math.floor(Number(zone.w)||0)),h=Math.max(0,Math.floor(Number(zone.h)||0));
+    map.mob=[];
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const px=start.x+x,py=start.y+y;
+      if(px>=0&&py>=0&&px<map.w&&py<map.h) map.mob.push({x:px,y:py});
+    }
+  }
+  return map;
+};
+ctx.applyHuntOtbmZones(map,hunt);
 map.idleTargetWidth=30;map.idleTargetHeight=30;
 const hm=OTBM.huntMapFromOtbm(map,ctx.TILEFLAGS);
 must(hm.rows.length===30&&hm.rows.every(row=>row.length===30)&&
-  hm.spawn.x===8&&hm.spawn.y===15&&hm.mob.length===1&&hm.mob[0].x===21&&hm.mob[0].y===15,
-  "coordenadas runtime de player/boss Hatred dedicadas incorretas");
+  hm.spawn.x===14&&hm.spawn.y===20&&hm.mob.length===1&&hm.mob[0].x===14&&hm.mob[0].y===14,
+  "coordenadas runtime de player/boss Hatred Canary incorretas");
+const visualIds=new Set();
+Object.values(hm.leg).forEach(e=>{(e.v||[]).forEach(id=>visualIds.add(id));(e.g||[]).forEach(id=>visualIds.add(id));});
+must(visualIds.size>=50,"mapa Hatred Canary sem variedade visual esperada");
+for(const id of visualIds)
+  must(fs.existsSync(path.join(game,"assets","tiles",id+".png")),"sprite Hatred ausente: "+id);
 
 // Arena sintética livre para testar a mecânica sem depender do renderer.
 ctx.huntMapBlocked=()=>false;
@@ -94,4 +120,4 @@ const html=fs.readFileSync(path.join(game,"index.html"),"utf8"),css=fs.readFileS
 must(html.includes('id="hatred-minigame"')&&css.includes(".hatred-minigame")&&
   css.includes("right:8px; bottom:8px")&&css.includes("width:230px"),
   "modal inferior direito de Hatred ausente");
-console.log("OK: Hatred room 30×30, spawns, ativação 20–40s, contadores, summons e dano escalado validados.");
+console.log("OK: Hatred Canary 22×18→30×30, spawns, ativação 20–40s, contadores, summons e dano escalado validados.");

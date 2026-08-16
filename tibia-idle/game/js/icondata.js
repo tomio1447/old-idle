@@ -298,7 +298,9 @@ function wikiIcon(slug) {
   if (!meta) return null;
   if (!WIKI_ICON_CACHE[slug]) {
     const im = new Image();
-    im.src = meta.path;
+    const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+    const path = meta.path || "";
+    im.src = path.indexOf("?v=") === -1 ? (path + "?v=" + v) : path;
     WIKI_ICON_CACHE[slug] = im;
   }
   return WIKI_ICON_CACHE[slug];

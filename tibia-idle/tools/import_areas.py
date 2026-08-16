@@ -68,8 +68,15 @@ def offsets(grade):
     cells = []
     for y, linha in enumerate(grade):
         for x, v in enumerate(linha):
-            if v in (1, 3):            # 1 = atinge, 3 = centro que tambem atinge
+            if v == 1:
                 cells.append([x - cx, y - cy])
+    # Valor 3 = ancora do caster. Em circulos/cruzes o centro tambem e
+    # area de dano (o 3 ocupa o lugar de um 1). Em WAVE/BEAM so ha casas
+    # "a frente" (dy<=0 na matriz norte) — o centro NAO leva dano; o
+    # primeiro SQM e sempre 1 a frente do caster.
+    atras = any(dy > 0 for _dx, dy in cells)
+    if atras:
+        cells.append([0, 0])
     return cells
 
 

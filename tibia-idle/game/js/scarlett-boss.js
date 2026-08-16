@@ -8,13 +8,15 @@ const SCARLETT_ID = "scarlett-etzel";
 const SCARLETT_KEYS = ["up", "down", "left", "right"];
 const SCARLETT_KEY_ICON = { up: "↑", down: "↓", left: "←", right: "→" };
 /* Janela de acerto ±ms em torno de note.due (marcador a 20%).
- * Offline: 360ms (antes 280) — margem humana sem “auto-hit”.
- * Online: +SCARLETT_ONLINE_SLACK no servidor (tick ~200ms + RTT). */
-const SCARLETT_TIMING_WINDOW = 360;
-const SCARLETT_ONLINE_SLACK = 180;
-const SCARLETT_NOTE_GAP = 760;
-const SCARLETT_LEAD_MS = 1400;
-const SCARLETT_TRAVEL_MS = 2200;
+ * Offline: 500ms — ritmo generoso, ainda exige mirar a faixa.
+ * Online: +SCARLETT_ONLINE_SLACK (~1.5×AUTH_STEP + RTT) no servidor.
+ * TRAVEL mais longo = aproximação clara estilo rhythm QTE. */
+const SCARLETT_TIMING_WINDOW = 500;
+const SCARLETT_ONLINE_SLACK = 320;
+const SCARLETT_NOTE_GAP = 820;
+const SCARLETT_LEAD_MS = 1600;
+const SCARLETT_TRAVEL_MS = 2800;
+const SCARLETT_HIT_PCT = 20;
 
 (function registerScarlett() {
   if (typeof GAMEDATA === "undefined" || typeof BOSS_DEFS === "undefined") return;
@@ -85,6 +87,23 @@ function scarlettOverlay() {
   return typeof document !== "undefined" ? document.getElementById("scarlett-qte") : null;
 }
 
+function scarlettHitZoneStyle() {
+  const halfPct = (SCARLETT_TIMING_WINDOW / SCARLETT_TRAVEL_MS) * 80;
+  return `left:${(SCARLETT_HIT_PCT - halfPct).toFixed(2)}%;width:${(halfPct * 2).toFixed(2)}%`;
+}
+
+function scarlettNoteLeftPct(note, now) {
+  return Math.max(-8, Math.min(108,
+    SCARLETT_HIT_PCT + ((note.due - now) / SCARLETT_TRAVEL_MS) * 80));
+}
+
+function scarlettStopRaf(st) {
+  if (st && typeof cancelAnimationFrame === "function" && st.raf) {
+    cancelAnimationFrame(st.raf);
+    st.raf = 0;
+  }
+}
+
 function scarlettBossInit(c, player, randomFn) {
   if (!scarlettFight(c)) return c;
   const rnd = randomFn || Math.random;
@@ -104,7 +123,7 @@ function scarlettBossInit(c, player, randomFn) {
     thresholdIndex: 0,
     thresholds: [0.75, 0.50, 0.25],
     sequence: [], notes: [], index: 0,
-    lastBlockFx: 0, wiped: false, raf: 0,
+    lastBlockFx: 0, wiped: false, raf: 0, _trackBuilt: false,
   };
   const bossMob = c.mobs && c.mobs[0];
   if (bossMob) bossMob.qteImmune = true;
@@ -124,6 +143,7 @@ function scarlettStartQte(c, now, randomFn) {
     dir, due: now + SCARLETT_LEAD_MS + i * SCARLETT_NOTE_GAP, hit:false,
   }));
   st._localSig = null;
+  st._trackBuilt = false;
   const bossMob = c.mobs && c.mobs[0];
   if (bossMob) bossMob.qteImmune = true;
   if (typeof addLog === "function")
@@ -132,33 +152,73 @@ function scarlettStartQte(c, now, randomFn) {
   return true;
 }
 
-function scarlettRenderQte(c, now) {
+/** Monta a esteira uma vez; depois só atualiza left/% e classes (sem innerHTML). */
+function scarlettEnsureTrack(c) {
   const st = c && c.scarlett;
   const el = scarlettOverlay();
-  if (!st || st.phase !== "qte" || !el) return;
+  if (!st || st.phase !== "qte" || !el) return null;
+  if (st._trackBuilt && el.querySelector(".scarlett-track") &&
+      el.querySelectorAll(".scarlett-note").length === st.notes.length) {
+    const title = el.querySelector(".scarlett-qte-title");
+    if (title) title.textContent = `SCARLETT'S DANCE — ${st.index}/5`;
+    return el;
+  }
   el.style.display = "block";
   el.className = "scarlett-qte active";
   const notes = st.notes.map((note, i) => {
-    const left = Math.max(-5, Math.min(105,
-      20 + ((note.due - now) / SCARLETT_TRAVEL_MS) * 80));
     const cls = note.hit ? "hit" : i === st.index ? "current" : "";
-    return `<span class="scarlett-note ${cls}" style="left:${left.toFixed(2)}%">${SCARLETT_KEY_ICON[note.dir]}</span>`;
+    return `<span class="scarlett-note ${cls}" data-i="${i}">${SCARLETT_KEY_ICON[note.dir]}</span>`;
   }).join("");
   el.innerHTML = `<div class="scarlett-qte-title">SCARLETT'S DANCE — ${st.index}/5</div>
-    <div class="scarlett-track"><i class="scarlett-hit-zone"></i>${notes}</div>
-    <div class="scarlett-qte-help">↑ ↓ ← → ou W S A D quando a seta cruzar a faixa verde (±${SCARLETT_TIMING_WINDOW}ms)</div>`;
-  if (typeof cancelAnimationFrame === "function" && st.raf) cancelAnimationFrame(st.raf);
-  if (typeof requestAnimationFrame === "function") {
-    st.raf = requestAnimationFrame(() => {
-      const active = typeof G !== "undefined" ? G.combat : c;
-      if (active === c && st.phase === "qte") scarlettRenderQte(c, Date.now());
-    });
+    <div class="scarlett-track"><i class="scarlett-hit-zone" style="${scarlettHitZoneStyle()}"></i>${notes}</div>
+    <div class="scarlett-qte-help">↑ ↓ ← → ou W S A D na faixa verde (±${SCARLETT_TIMING_WINDOW}ms)</div>`;
+  st._trackBuilt = true;
+  return el;
+}
+
+function scarlettPaintNotes(c, now) {
+  const st = c && c.scarlett;
+  const el = scarlettEnsureTrack(c);
+  if (!st || !el) return;
+  const nodes = el.querySelectorAll(".scarlett-note");
+  for (let i = 0; i < st.notes.length; i++) {
+    const note = st.notes[i];
+    const node = nodes[i];
+    if (!note || !node) continue;
+    node.style.left = scarlettNoteLeftPct(note, now).toFixed(2) + "%";
+    const want = note.hit ? "hit" : i === st.index ? "current" : "";
+    const cur = node.classList.contains("hit") ? "hit"
+      : node.classList.contains("current") ? "current" : "";
+    if (cur !== want) {
+      node.classList.toggle("hit", want === "hit");
+      node.classList.toggle("current", want === "current");
+    }
   }
+  const title = el.querySelector(".scarlett-qte-title");
+  if (title) title.textContent = `SCARLETT'S DANCE — ${st.index}/5`;
+}
+
+function scarlettRenderQte(c, now) {
+  const st = c && c.scarlett;
+  if (!st || st.phase !== "qte") return;
+  scarlettPaintNotes(c, now || Date.now());
+  if (st.raf) return;
+  if (typeof requestAnimationFrame !== "function") return;
+  const tick = () => {
+    st.raf = 0;
+    const active = typeof G !== "undefined" ? G.combat : c;
+    if (active !== c || st.phase !== "qte") return;
+    scarlettPaintNotes(c, Date.now());
+    st.raf = requestAnimationFrame(tick);
+  };
+  st.raf = requestAnimationFrame(tick);
 }
 
 function scarlettOverlayMessage(text, kind) {
   const el = scarlettOverlay();
   if (!el) return;
+  const st = typeof G !== "undefined" && G.combat && G.combat.scarlett;
+  if (st) { scarlettStopRaf(st); st._trackBuilt = false; }
   el.style.display = "block";
   el.className = "scarlett-qte " + (kind || "");
   el.innerHTML = `<div class="scarlett-qte-result">${text}</div>`;
@@ -166,6 +226,8 @@ function scarlettOverlayMessage(text, kind) {
 
 function scarlettHideOverlay() {
   const el = scarlettOverlay();
+  const st = typeof G !== "undefined" && G.combat && G.combat.scarlett;
+  if (st) { scarlettStopRaf(st); st._trackBuilt = false; }
   if (el) { el.style.display = "none"; el.innerHTML = ""; el.className = "scarlett-qte"; }
 }
 
@@ -245,6 +307,8 @@ function bossHandlePermanentDown(c, fallenP, reason) {
 
 function scarlettQteSuccess(c) {
   const st = c.scarlett;
+  scarlettStopRaf(st);
+  st._trackBuilt = false;
   st.phase = "vulnerable";
   st.immune = false;
   const bossMob = c.mobs && c.mobs[0];
@@ -259,6 +323,8 @@ function scarlettQteSuccess(c) {
 function scarlettQteFail(c, reason, randomFn) {
   const st = c.scarlett;
   if (!st || st.phase !== "qte") return false;
+  scarlettStopRaf(st);
+  st._trackBuilt = false;
   st.phase = "waiting";
   st.immune = true;
   const victim = scarlettKillLowestMaxHp(c, randomFn);
@@ -279,11 +345,22 @@ function scarlettOnlineAuthority() {
   return typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
 }
 
+/** Estima auth.clock no instante do press (anti-lag sem abrir cheat de futuro). */
+function scarlettEstimatePressAuth(c) {
+  const authClock = Number(c && c.authClock);
+  const wallAt = Number(c && c._authWallAt);
+  if (!Number.isFinite(authClock)) return null;
+  if (!Number.isFinite(wallAt) || wallAt <= 0) return authClock;
+  return authClock + (Date.now() - wallAt);
+}
+
 function scarlettQueueOnlineIntent(dir) {
   const c = typeof G !== "undefined" ? G.combat : null;
   if (!c || !dir) return false;
   c._scarlettPendingDir = dir;
   c._scarlettPendingAt = Date.now();
+  const pressAuth = scarlettEstimatePressAuth(c);
+  c._scarlettPendingPressAuth = Number.isFinite(pressAuth) ? pressAuth : null;
   // Feedback local otimista; o servidor confirma no próximo tick.
   const st = c.scarlett;
   if (!st || st.phase !== "qte" || !st.notes || !st.notes.length) {
@@ -292,12 +369,13 @@ function scarlettQueueOnlineIntent(dir) {
   }
   const note = st.notes[st.index];
   const now = Date.now();
+  const localWindow = SCARLETT_TIMING_WINDOW + SCARLETT_ONLINE_SLACK;
   if (note && !note.hit && dir === note.dir &&
-      Math.abs(now - note.due) <= SCARLETT_TIMING_WINDOW + SCARLETT_ONLINE_SLACK) {
+      Math.abs(now - note.due) <= localWindow) {
     note.hit = true;
     st.index++;
     if (st.index >= st.notes.length) scarlettOverlayMessage("SEQUÊNCIA ENVIADA…", "success");
-    else scarlettRenderQte(c, now);
+    else scarlettPaintNotes(c, now);
   }
   if (typeof requestOnlineAuthorityTick === "function") requestOnlineAuthorityTick();
   return true;
@@ -318,7 +396,7 @@ function scarlettHandleKey(c, key, now) {
   note.hit = true;
   st.index++;
   if (st.index >= st.notes.length) scarlettQteSuccess(c);
-  else scarlettRenderQte(c, now);
+  else scarlettPaintNotes(c, now);
   return true;
 }
 
@@ -398,12 +476,14 @@ function scarlettHydrateOnlineNotes(c) {
   }
   // Converte dues do relógio autoritativo → wall-clock para a esteira/rAF.
   const wallOffset = Number.isFinite(authClock) ? (Date.now() - authClock) : 0;
+  if (Number.isFinite(authClock)) c._authWallAt = Date.now();
   const idx = Math.max(0, Math.min(sequence.length, Number(st.index) || 0));
   st.notes = sequence.map((dir, i) => ({
     dir, due: Number(dues[i]) + wallOffset, hit: i < idx,
   }));
   st.index = idx;
   st._localSig = sig;
+  st._trackBuilt = false;
   return true;
 }
 
@@ -415,7 +495,8 @@ function scarlettRenderOnline(c) {
   const st = c.scarlett;
   if (st.phase === "qte") {
     if (scarlettHydrateOnlineNotes(c)) {
-      scarlettRenderQte(c, Date.now());
+      // rAF cuida do scroll; o game loop só (re)inicia a esteira.
+      if (!st.raf || !st._trackBuilt) scarlettRenderQte(c, Date.now());
       return;
     }
     // Snapshot ainda sem sequência: aviso curto até o próximo tick.
@@ -433,8 +514,7 @@ function scarlettRenderOnline(c) {
 
 function scarlettBossCleanup(c) {
   if (!c || !c.scarlett) return;
-  if (typeof cancelAnimationFrame === "function" && c.scarlett.raf)
-    cancelAnimationFrame(c.scarlett.raf);
+  scarlettStopRaf(c.scarlett);
   // O corpse permanece durante a luta; ao encerrá-la, todos voltam vivos à
   // cidade para não deixar personagens da conta presos com HP zero.
   for (const ent of scarlettParticipants(c)) {

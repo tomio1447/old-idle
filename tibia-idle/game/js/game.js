@@ -214,6 +214,9 @@ function restoreCombatSessionState(fresh,session){
   if(c.greed)c.greed.randomFn=Math.random;
   if(c.hatred){c.hatred.randomFn=Math.random;delete c.hatred.renderKey;if(!c.players)c._hatredPlayer=G.p;}
   if(c.scarlett)c.scarlett.raf=0;
+  if(c.spite){c.spite.randomFn=Math.random;delete c.spite.renderKey;}
+  if(c.malice){c.malice.randomFn=Math.random;delete c.malice.renderKey;}
+  if(c.mega){c.mega.randomFn=Math.random;delete c.mega.renderKey;}
   return c;
 }
 
@@ -1060,6 +1063,43 @@ const BOSS_DEFS = {
     },
     mechanic:"dreads-torment",
   },
+  "goshnar-s-spite": {
+    id:"goshnar-s-spite",name:"Goshnar's Spite",
+    title:"Boss de Ebb and Flow",hunt:"goshnars-spite-room",
+    baseMonster:"goshnar-s-spite",sprite:"goshnar-s-spite",
+    hp:300000,exp:75000,damage:5000,armor:160,defense:160,
+    cooldown:0,
+    requirement:{
+      level:400,enforced:false,
+      text:"Boss de Ebb and Flow (cooldown desligado para testes)",
+    },
+    mechanic:"searing-fire-bubble-qte",
+  },
+  "goshnar-s-malice": {
+    id:"goshnar-s-malice",name:"Goshnar's Malice",
+    title:"Boss Soul War — Malice",hunt:"goshnars-malice-room",
+    baseMonster:"goshnar-s-malice",sprite:"goshnar-s-malice",
+    hp:300000,exp:75000,damage:5000,armor:160,defense:160,
+    cooldown:0,
+    requirement:{
+      level:400,enforced:false,
+      text:"Boss de Soul War Malice (cooldown desligado para testes)",
+    },
+    mechanic:"maze-qte-curse",
+  },
+  "goshnar-s-megalomania": {
+    id:"goshnar-s-megalomania",name:"Goshnar's Megalomania",
+    title:"Boss final Soul War",hunt:"goshnars-megalomania-room",
+    baseMonster:"goshnar-s-megalomania-green",
+    sprite:"goshnar-s-megalomania-purple",
+    hp:620000,exp:3000000,damage:2500,armor:55,defense:55,
+    cooldown:0,
+    requirement:{
+      allSoulWarTaints:true,enforced:true,
+      text:"Requer as 5 máculas Soul War ativas (Malice, Spite, Greed, Hatred e Cruelty)",
+    },
+    mechanic:"aspect-phase-white-tiles",
+  },
   // Ferumbras Mortal Shell — boss da Ferumbras Ascendant (Canary 15.x):
   // 300.000 HP, 2.000.000 exp, invoca 3 Demons, resist 65% em quase tudo
   // (menos físico/drown), loot oficial do boss (ids traduzidos do items.xml).
@@ -1116,6 +1156,9 @@ const BOSS_DEFS = {
 const SOULWAR_BOSS_ROOMS={
   "goshnar-s-greed":{hunt:"goshnars-greed-room",otbm:"goshnars_greed_room"},
   "goshnar-s-hatred":{hunt:"goshnars-hatred-room",otbm:"goshnars_hatred_room"},
+  "goshnar-s-spite":{hunt:"goshnars-spite-room",otbm:"goshnars_spite_room"},
+  "goshnar-s-malice":{hunt:"goshnars-malice-room",otbm:"goshars_malice_room"},
+  "goshnar-s-megalomania":{hunt:"goshnars-megalomania-room",otbm:"goshnars_megalomania"},
 };
 function bossArenaDefinition(boss){
   if(!boss)return null;const route=SOULWAR_BOSS_ROOMS[boss.id];
@@ -1161,6 +1204,10 @@ function bossReadyInfo(p, boss) {
       return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
     if (boss.requirement.mission && !isMissionComplete(p, boss.requirement.mission))
       return { ok: false, reason: boss.requirement.text, left: 0 };
+    if (boss.requirement.allSoulWarTaints) {
+      const ok = typeof soulwarHasAllBossTaints === "function" && soulwarHasAllBossTaints(p);
+      if (!ok) return { ok: false, reason: boss.requirement.text, left: 0 };
+    }
     if (boss.requirement.access) {
       p.bossAccess = p.bossAccess || {};
       // Migração para personagens que já concluíram Mirrored Nightmare antes
@@ -1325,6 +1372,12 @@ function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  // Megalomania: abre lobby no templo (exceto follow/start interno do lobby).
+  if (id === "goshnar-s-megalomania" && !force && !window.__MEGA_LOBBY_STARTING &&
+      !window.__MEGA_LOBBY_FOLLOW && typeof megaLobbyOpenFromBoss === "function") {
+    megaLobbyOpenFromBoss();
+    return;
+  }
   if(!force&&G.foreignInstance){
     toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outro boss.","bad");return;
   }
@@ -1668,6 +1721,9 @@ function stopHunt(skipMapLoading) {
   if (typeof scarlettBossCleanup === "function" && G.combat) scarlettBossCleanup(G.combat);
   if (typeof greedBossCleanup === "function" && G.combat) greedBossCleanup(G.combat);
   if (typeof hatredBossCleanup === "function" && G.combat) hatredBossCleanup(G.combat);
+  if (typeof spiteBossCleanup === "function" && G.combat) spiteBossCleanup(G.combat);
+  if (typeof maliceBossCleanup === "function" && G.combat) maliceBossCleanup(G.combat);
+  if (typeof megaBossCleanup === "function" && G.combat) megaBossCleanup(G.combat);
   G.combat = null;
   ONLINE_AUTH_APPLIED_VERSION=0;ONLINE_AUTH_APPLIED_INSTANCE="";
   if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
@@ -2242,7 +2298,11 @@ function drainEvents() {
         const wantedTgt=e.targetId!==undefined&&e.targetId!==null?String(e.targetId):"";
         const target=wantedTgt&&c&&Array.isArray(c.mobs)
           ? (c.mobs.find((m)=>idOf(m)===wantedTgt)||null) : null;
-        const anchor=e.anchor==="target"?(target||caster):(caster||target||(c&&c.player)||null);
+        // Self-AoE (exori, mas san…): NUNCA cair no target — senao a box
+        // pinta centrada no inimigo mesmo com anchor:"caster"/base do knight.
+        const anchor=e.anchor==="target"
+          ?(target||caster)
+          :(caster||(c&&c.player)||null);
         const base=e.base;
         for (const cel of (e.cells || [])) {
           let pos=null;
@@ -2372,16 +2432,20 @@ function drainEvents() {
           G.p.kills[e.mob] = (G.p.kills[e.mob] || 0) + 1;
         }
         if (c.boss) {
-          if (!onlineAuth) {
+          const isWorldBoss = !!(c.worldBoss || c.boss.worldBoss);
+          if (!onlineAuth && !isWorldBoss) {
             const st = bossState(G.p, c.boss.id);
             st.kills = (st.kills || 0) + 1;
           }
-          addLog("level", `Boss <b>${c.boss.name}</b> derrotado!`);
-          toast(`Boss derrotado: <b>${c.boss.name}</b>`, "level");
-          renderBosses(G.p);
-          setTimeout(() => {
-            if (G.combat === c && c.bossDefeated) stopHunt();
-          }, 2500);
+          // World Boss: toast único vem de world-boss-ui (wbExitCombat).
+          if (!isWorldBoss) {
+            addLog("level", `Boss <b>${c.boss.name}</b> derrotado!`);
+            toast(`Boss derrotado: <b>${c.boss.name}</b>`, "level");
+            renderBosses(G.p);
+            setTimeout(() => {
+              if (G.combat === c && c.bossDefeated) stopHunt();
+            }, 2500);
+          }
         } else {
           handleMissionKill(G.p, c.huntId, e.mob);
         }
@@ -2576,6 +2640,9 @@ function cleanupEncounterState(c){
   if(typeof scarlettBossCleanup==="function")scarlettBossCleanup(c);
   if(typeof greedBossCleanup==="function")greedBossCleanup(c);
   if(typeof hatredBossCleanup==="function")hatredBossCleanup(c);
+  if(typeof spiteBossCleanup==="function")spiteBossCleanup(c);
+  if(typeof maliceBossCleanup==="function")maliceBossCleanup(c);
+  if(typeof megaBossCleanup==="function")megaBossCleanup(c);
 }
 
 /* Compra automaticamente a bless de todos e recria a mesma instância.
@@ -2769,6 +2836,8 @@ let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0,ONLINE_SESSION_INVALID=false;
 let ONLINE_AUTH_APPLIED_VERSION=0,ONLINE_AUTH_APPLIED_INSTANCE="";
 let SERVER_CONNECTION_ONLINE=true,SERVER_STATUS_BOUND=false;
 function onlineAuthorityCombat(){
+  // World Boss skeleton: combate local isolado — não misturar com tick/hunt online.
+  if(G&&G.combat&&(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss)))return false;
   return !!(!ONLINE_SESSION_INVALID&&G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
 }
@@ -2968,6 +3037,29 @@ function bindServerStatusControls(){
   if(typeof accountApiConfigured==="function"&&accountApiConfigured())
     setServerConnectionStatus(true,{silent:true,healthOk:true});
 }
+/* Hard reload ≈ Ctrl+F5: nova URL com ?_=timestamp força re-fetch do HTML
+ * (e dos assets versionados nele). Limpa Cache Storage quando existir. */
+function hardReloadBypassCache(){
+  try{
+    const url=new URL(String(location.href));
+    url.searchParams.delete("_");
+    url.searchParams.delete("_ts");
+    url.searchParams.delete("cb");
+    url.searchParams.set("_",String(Date.now()));
+    const go=()=>{
+      try{location.replace(url.href);}catch(e){location.href=url.href;}
+    };
+    if(typeof caches!=="undefined"&&caches&&typeof caches.keys==="function"){
+      Promise.resolve(caches.keys()).then((keys)=>Promise.all((keys||[]).map((k)=>{
+        try{return caches.delete(k);}catch(e){return null;}
+      }))).catch(()=>null).then(go,go);
+      return;
+    }
+    go();
+  }catch(e){
+    try{location.reload();}catch(e2){}
+  }
+}
 async function reconnectOnlineRuntime(){
   const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
   const err=$("#server-reconnect-error");
@@ -2985,50 +3077,23 @@ async function reconnectOnlineRuntime(){
   if(G)G.instanceReconnectPending=true;
   if(typeof clearCombatVisualOverlays==="function")clearCombatVisualOverlays(G&&G.combat);
   try{
-    if(typeof ACCOUNT_LEASE!=="undefined"&&ACCOUNT_LEASE){
-      ACCOUNT_LEASE.heldUntil=0;ACCOUNT_LEASE.authFailUntil=0;ACCOUNT_LEASE.lost=false;
-    }
     if(typeof accountApiConfigured==="function"&&accountApiConfigured()){
       const health=typeof accountCheckServerHealth==="function"?await accountCheckServerHealth():{ok:true};
       if(!health||!health.ok){
         showError(typeof t==="function"?t("server.stillDown"):"Servidor ainda indisponível.");
+        setBusy(false);
         return false;
       }
-      // Health ok com bootId novo ainda dispara forced-offline; limpe só depois
-      // do resume. Aqui liberamos o flag temporariamente para lease/sync.
-      if(typeof accountClearServerForcedOffline==="function")accountClearServerForcedOffline();
-      const token=typeof sessionToken==="function"?sessionToken():"";
-      if(token&&typeof accountEnsureLease==="function"){
-        const lease=await accountEnsureLease(token,{silent:true});
-        if(!lease||!lease.ok){
-          if(typeof accountForceServerDisconnect==="function")
-            accountForceServerDisconnect(accountServerDisconnectReason()||"network");
-          showError((lease&&lease.msg)||(typeof t==="function"?t("server.leaseFail"):"Não foi possível reassumir o controle."));
-          return false;
-        }
-      }
-      if(token&&typeof accountStartSync==="function")accountStartSync(token);
     }
-    const recovered=await requestOnlineRuntimeRecovery({force:true});
-    if(recovered||(typeof accountLeaseAllowsSimulation==="function"&&accountLeaseAllowsSimulation())){
-      if(G)delete G.instanceReconnectPending;
-      if(typeof accountClearServerForcedOffline==="function")accountClearServerForcedOffline();
-      setServerConnectionStatus(true,{silent:true});
-      if(err){err.hidden=true;err.textContent="";}
-      if(typeof toast==="function")toast(typeof t==="function"?t("server.reconnected"):"Servidor ONLINE. Instância reconectada.","good");
-      return true;
-    }
-    if(typeof accountForceServerDisconnect==="function")
-      accountForceServerDisconnect(accountServerDisconnectReason()||"network");
-    showError(typeof t==="function"?t("server.stillDown"):"Servidor ainda indisponível.");
-    return false;
+    // Sempre hard-reload no Reconnect (mesmo bootId): garante JS/CSS novos
+    // após deploy/restart. Sessão em localStorage sobrevive; o boot normal
+    // reassume lease/login.
+    hardReloadBypassCache();
+    return true;
   }catch(e){
-    if(typeof accountForceServerDisconnect==="function")
-      accountForceServerDisconnect(accountServerDisconnectReason()||"network");
     showError(typeof t==="function"?t("server.reconnectFail"):"Falha ao reconectar.");
-    return false;
-  }finally{
     setBusy(false);
+    return false;
   }
 }
 let ONLINE_RUNTIME_RECOVERING=false,ONLINE_RUNTIME_RETRY_AT=0;
@@ -3037,6 +3102,7 @@ function resetOnlineRuntimeClocks(){
 }
 async function requestOnlineRuntimeRecovery(options){
   const force=!!(options&&options.force);
+  if(G&&G.combat&&(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss)))return false;
   if(ONLINE_RUNTIME_RECOVERING||!onlineAuthorityCombat()||Date.now()<ONLINE_RUNTIME_RETRY_AT)return false;
   // Sem force: não martelar lease/API enquanto o banner Reconnect está ativo.
   if(!force){
@@ -3076,13 +3142,16 @@ async function requestOnlineRuntimeRecovery(options){
       return !!applied;
     }
     if(remote&&remote.ok&&remote.lastStatus==="ended"){
-      if(G.combat){clearInstanceSession(remote.terminalReason||"remote-ended",true);
-        setTimeout(()=>{if(G.combat)stopHunt(true);},0);}
+      if(G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))){
+        clearInstanceSession(remote.terminalReason||"remote-ended",true);
+        setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+      }else if(G.combat)clearInstanceSession(remote.terminalReason||"remote-ended",true);
       return false;
     }
     // Storage reiniciado sem tombstone: restaure o checkpoint que permaneceu
     // aberto na aba, usando o lease recém-readquirido e a mesma party/runtime.
-    if(remote&&remote.ok&&!remote.instance&&G.combat&&typeof accountBeginInstance==="function"&&
+    if(remote&&remote.ok&&!remote.instance&&G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))&&
+       typeof accountBeginInstance==="function"&&
        typeof persistActiveInstance==="function"){
       accountBeginInstance();persistActiveInstance();
       const saved=typeof accountLastInstancePromise==="function"?await accountLastInstancePromise():false;
@@ -3190,10 +3259,13 @@ function syncAuthorityPendingSpawns(c, remotePending, now) {
       : (prev ? prev.cx : Math.floor(w / 2));
     const cy = Number.isFinite(Number(remote.cy)) ? Number(remote.cy)
       : (prev ? prev.cy : Math.floor(h / 2));
+    // blink fica só no cliente: o snapshot remoto já pode vir com blink>=1
+    // (servidor emitiu spawn-blink no mesmo step). Se importarmos esse
+    // contador e ainda suprimirmos spawn-blink (abaixo), o FX some.
     next.push({
       mob, cx, cy,
       startedAt: Number(remote.startedAt) || (prev && prev.startedAt) || now,
-      blink: Math.max(Number(prev && prev.blink) || 0, Number(remote.blink) || 0),
+      blink: Number(prev && prev.blink) || 0,
       done: false,
     });
   }
@@ -3303,6 +3375,13 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
       if(localConfig){
         playerRef.config=Object.assign({},remote.p.config||{},localConfig);
         if(Array.isArray(localCombo))playerRef.config.combo=localCombo;
+        // Nested: shallow assign apagava autoSupplyStash remoto com {} local.
+        const remoteAuto=(remote.p.config&&remote.p.config.autoSupplyStash&&
+          typeof remote.p.config.autoSupplyStash==="object"&&!Array.isArray(remote.p.config.autoSupplyStash))
+          ?remote.p.config.autoSupplyStash:{};
+        const localAuto=(localConfig.autoSupplyStash&&typeof localConfig.autoSupplyStash==="object"&&
+          !Array.isArray(localConfig.autoSupplyStash))?localConfig.autoSupplyStash:{};
+        playerRef.config.autoSupplyStash=Object.assign({},remoteAuto,localAuto);
       }
       if(localStances&&typeof localStances==="object")playerRef.stances=localStances;
       if(localPrey&&typeof localPrey==="object")playerRef.prey=localPrey;
@@ -3379,6 +3458,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
   else previous.players=reconciledPlayers;
   const authClock=Number(incoming.authClock);
+  if(Number.isFinite(authClock)){
+    previous.authClock=authClock;
+    previous._authWallAt=Date.now();
+  }
   if(Number.isFinite(authClock)&&typeof cdHydrateFromAuthority==="function"){
     previous.authClock=authClock;
     for(const ent of previous.players||[])if(ent&&ent.p)cdHydrateFromAuthority(ent.p,authClock);
@@ -3478,7 +3561,11 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   }
   if(terminalReason){
     clearInstanceSession(terminalReason,true);
-    setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+    setTimeout(()=>{
+      if(!G.combat)return;
+      if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
+      stopHunt(true);
+    },0);
   }
   // O loop redesenha canvas/HUD; não reconstrua party/modal a cada snapshot.
   return true;
@@ -3516,6 +3603,8 @@ if(typeof window!=="undefined"){
         (remote.status==="ended"&&remote.matchesCurrent);
       if(G.combat&&confirmedEnded){
         clearInstanceSession(remote.terminalReason||detail.terminalReason||"shared-ended",true);
+        // Não derrubar arena World Boss ao encerrar a hunt anterior.
+        if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
         setTimeout(()=>{if(G.combat)stopHunt(true);},0);
       }
       return;
@@ -3616,6 +3705,9 @@ function loop(ts) {
       if (G.combat.hatred && typeof hatredRenderMinigame === "function") hatredRenderMinigame(G.combat, Date.now());
       else if (typeof hatredHideMinigame === "function") hatredHideMinigame();
       if (typeof scarlettRenderOnline === "function") scarlettRenderOnline(G.combat);
+      if (typeof spiteRenderOnline === "function") spiteRenderOnline(G.combat);
+      if (typeof maliceRenderOnline === "function") maliceRenderOnline(G.combat);
+      if (typeof megaRenderOnline === "function") megaRenderOnline(G.combat);
       if (G.combat.greed) G.combat.greed.randomFn = Math.random;
       // Imbuements tickam por TEMPO DE COMBATE no cliente (o servidor
       // autoritativo não gerencia imbuements — eles são do save do char).

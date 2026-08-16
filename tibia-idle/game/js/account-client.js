@@ -452,9 +452,34 @@ function accountAuthorityVisualState(){
   const players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
   const out={players:collect(players,8),mobs:collect(combat.mobs,64)};
   if(combat._scarlettPendingDir){
-    out.scarlettIntent={dir:String(combat._scarlettPendingDir)};
+    const intent={dir:String(combat._scarlettPendingDir)};
+    const pressAuth=Number(combat._scarlettPendingPressAuth);
+    if(Number.isFinite(pressAuth))intent.pressAuth=pressAuth;
+    out.scarlettIntent=intent;
     combat._scarlettPendingDir=null;
     combat._scarlettPendingAt=0;
+    combat._scarlettPendingPressAuth=null;
+  }
+  if(combat._spitePendingBubble!==undefined&&combat._spitePendingBubble!==null||combat._spitePendingStomp){
+    out.spiteIntent={};
+    if(combat._spitePendingStomp)out.spiteIntent.stomp=true;
+    if(combat._spitePendingBubble!==undefined&&combat._spitePendingBubble!==null)
+      out.spiteIntent.bubble=Number(combat._spitePendingBubble);
+    combat._spitePendingBubble=null;combat._spitePendingBubbleAt=0;
+    combat._spitePendingStomp=false;combat._spitePendingStompAt=0;
+  }
+  if(combat._malicePendingMove&&typeof combat._malicePendingMove==="object"){
+    out.maliceIntent={x:Number(combat._malicePendingMove.x),y:Number(combat._malicePendingMove.y)};
+    combat._malicePendingMove=null;combat._malicePendingMoveAt=0;
+  }
+  if(combat._megaPendingIntent&&typeof combat._megaPendingIntent==="object"){
+    out.megaIntent=Object.assign({},combat._megaPendingIntent);
+    if(!out.megaIntent.playerId&&typeof sessionCharId==="function")
+      out.megaIntent.playerId=String(sessionCharId()||"");
+    combat._megaPendingIntent=null;
+  }else if(combat._megaPendingMove&&typeof combat._megaPendingMove==="object"){
+    out.megaIntent={x:Number(combat._megaPendingMove.x),y:Number(combat._megaPendingMove.y)};
+    combat._megaPendingMove=null;combat._megaPendingMoveAt=0;
   }
   return out;
 }
@@ -517,6 +542,49 @@ function accountClearInstanceLootPouch(token,charId){
     return {ok:false,msg:r.data.msg||"Não foi possível limpar a Loot Pouch"};
   });
 }
+/** Destrói um stack da loot pouch (online: instância ou personagem na cidade). */
+function accountDestroyLootPouchItem(token,charId,slug){
+  slug=String(slug||"");
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      const r=await _api("POST","/api/instance/pouch-destroy",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,destroyed:Number(r.data.destroyed)||0,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível destruir o item"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/pouch/destroy",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(r.data.lootPouch&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
+      }
+      return {ok:true,destroyed:Number(r.data.destroyed)||0,lootPouch:r.data.lootPouch,
+        saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível destruir o item",code:r.code};
+  });
+}
 function accountSellInstanceLootPouch(token,charId,slug){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
@@ -576,6 +644,48 @@ function accountMoveToSupplyStash(token,charId,opts){
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível mover para a Supply Stash",code:r.code};
+  });
+}
+/** Persiste Auto Supply Stash (online: instância em combate ou personagem na cidade). */
+function accountSetAutoSupplyStash(token,charId,slug,on){
+  slug=String(slug||"");
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,on:!!on,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      const r=await _api("POST","/api/instance/stash-auto",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,slug,on:!!on,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível salvar Auto Supply Stash"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,on:!!on,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/stash/auto",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(r.data.autoSupplyStash&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        G.p.config=G.p.config||{};
+        G.p.config.autoSupplyStash=r.data.autoSupplyStash||{};
+      }
+      return {ok:true,slug,on:!!on,autoSupplyStash:r.data.autoSupplyStash,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível salvar Auto Supply Stash",code:r.code};
   });
 }
 function accountRefreshInstance(token){
@@ -680,6 +790,7 @@ async function accountStartSyncNow(token,generation){
     }
     if(type==="character"){accountSyncRefreshCharacters(token);return;}
     if(type==="party"||type==="party-inbox"){accountSyncDispatch("party",data);return;}
+    if(type==="mega-lobby"){accountSyncDispatch("mega-lobby",data);return;}
     if(type==="snapshot-required"){
       accountSyncRefreshCharacters(token);accountRefreshInstance(token).then((fresh)=>accountSyncDispatch("instance",fresh));
       accountSyncDispatch("party",data);
@@ -694,7 +805,7 @@ async function accountStartSyncNow(token,generation){
     }
     if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
   };
-  for(const type of ["lease","instance","character","party","party-inbox","snapshot-required","sync-expired","maintenance","world-boss"])
+  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","snapshot-required","sync-expired","maintenance","world-boss"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};

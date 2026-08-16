@@ -1188,6 +1188,10 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
         toast(autoOn
           ? `<b>${it.n}</b>: Auto Supply Stash desligado (loot volta para a pouch).`
           : `<b>${it.n}</b>: loot irá para a Supply Stash.`);
+        if (typeof persistAutoSupplyStash === "function") {
+          persistAutoSupplyStash(p, slug, !autoOn);
+          return;
+        }
         if (typeof save === "function") save();
         refresh();
         if (typeof renderSupplyStash === "function") renderSupplyStash(p);
@@ -1348,17 +1352,31 @@ function equipFromPouch(p, slug) {
 }
 
 /* Vende um item específico do Loot Pouch */
+/* Preço unitário seguro para Sell All / pouch (evita NaN e UI travada). */
+function pouchUnitSellPrice(it) {
+  if (!it) return 0;
+  const npc = Number(it.npcSell);
+  if (Number.isFinite(npc) && npc > 0) return Math.floor(npc);
+  const sell = Number(it.sell);
+  if (Number.isFinite(sell) && sell > 0) return Math.floor(sell);
+  return 0;
+}
+
 function sellPouchItem(p, slug) {
   const it = GAMEDATA.items[slug];
-  const count = p.lootPouch[slug] || 0;
+  const count = Math.max(0, Math.floor(Number(p.lootPouch && p.lootPouch[slug]) || 0));
   if (!it || count <= 0) return 0;
   if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) {
     toast(`Itens de classificação ${it.cls} são protegidos e não podem ser vendidos pela Loot Pouch.`, "bad");
     return 0;
   }
-  const value = (it.sell || 0) * count;
-  if (value <= 0) { toast("Esse item não possui valor de venda."); return 0; }
-  p.gold += value;
+  const unit = pouchUnitSellPrice(it);
+  const value = unit * count;
+  if (!Number.isFinite(value) || value <= 0) {
+    toast("Esse item não possui valor de venda.");
+    return 0;
+  }
+  p.gold = Math.max(0, (Number(p.gold) || 0) + value);
   addLog("sell", `Vendeu ${count}x ${it.n} do Loot Pouch por <span class="gold-txt">${fmtFull(value)} gp</span>`);
   delete p.lootPouch[slug];
   return value;
@@ -1386,6 +1404,85 @@ function persistLootPouchSell(p, options) {
   }
   if (typeof save === "function") save();
   return Promise.resolve({ ok: true, local: true, gold: opts.gold || 0 });
+}
+
+/* Destroy/discard de um stack da pouch. Online: API (lootPouch é protected no
+ * PUT). Offline: remove local + save. */
+function persistLootPouchDestroy(p, slug) {
+  if (!p || !slug) return Promise.resolve({ ok: false });
+  const count = Math.max(0, Math.floor(Number(p.lootPouch && p.lootPouch[slug]) || 0));
+  if (count <= 0) return Promise.resolve({ ok: false, msg: "Item não encontrado." });
+  const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
+  const name = it && it.n ? it.n : slug;
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountDestroyLootPouchItem === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountDestroyLootPouchItem(sessionToken(), p.id, slug).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.lootPouch) {
+          p.lootPouch = result.lootPouch || {};
+        } else {
+          delete p.lootPouch[slug];
+        }
+        if (typeof addLog === "function")
+          addLog("info", `Destruiu ${count}x <b>${name}</b>.`);
+      } else {
+        toast((result && result.msg) || "Não foi possível destruir o item.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      else if (typeof renderLootPouch === "function") renderLootPouch(p);
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível destruir o item.", "bad");
+      return { ok: false };
+    });
+  }
+  delete p.lootPouch[slug];
+  if (typeof addLog === "function") addLog("info", `Destruiu ${count}x <b>${name}</b>.`);
+  if (typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  else if (typeof renderLootPouch === "function") renderLootPouch(p);
+  return Promise.resolve({ ok: true, local: true, destroyed: count });
+}
+
+/* Persiste Auto Supply Stash por item (online: instância ou personagem). */
+function persistAutoSupplyStash(p, slug, on) {
+  if (!p || !slug) return Promise.resolve({ ok: false });
+  if (typeof setAutoSupplyStash === "function") setAutoSupplyStash(p, slug, on);
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSetAutoSupplyStash === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountSetAutoSupplyStash(sessionToken(), p.id, slug, on).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.autoSupplyStash) {
+          p.config = p.config || {};
+          p.config.autoSupplyStash = result.autoSupplyStash;
+        }
+      } else if (!result || !result.ok) {
+        // Reverte o toggle local se a API falhou.
+        if (typeof setAutoSupplyStash === "function") setAutoSupplyStash(p, slug, !on);
+        toast((result && result.msg) || "Não foi possível salvar Auto Supply Stash.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      else {
+        if (typeof renderLootPouch === "function") renderLootPouch(p);
+        if (typeof renderSupplyStash === "function") renderSupplyStash(p);
+      }
+      return result || { ok: false };
+    }).catch(() => {
+      if (typeof setAutoSupplyStash === "function") setAutoSupplyStash(p, slug, !on);
+      toast("Não foi possível salvar Auto Supply Stash.", "bad");
+      return { ok: false };
+    });
+  }
+  if (typeof save === "function") save();
+  return Promise.resolve({ ok: true, local: true, slug, on: !!on });
 }
 
 /* Move pouch/bag → Supply Stash com persistência (igual pouch-sell/clear).
@@ -1440,15 +1537,18 @@ function persistMoveToSupplyStash(p, payload) {
    Respeita "Não vender" e nunca vende itens de classificação 3 ou 4. */
 function sellAllPouch(p) {
   let total = 0, kinds = 0;
+  // Snapshot das chaves: sellPouchItem deleta entradas; preço inválido não conta.
   for (const slug of Object.keys(p.lootPouch || {})) {
     const it = GAMEDATA.items[slug];
     if (!it || isNoSell(p, slug)) continue;
     if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) continue;
-    if ((it.sell || 0) <= 0) continue;
-    total += sellPouchItem(p, slug);
+    if (pouchUnitSellPrice(it) <= 0) continue;
+    const gained = sellPouchItem(p, slug);
+    if (!Number.isFinite(gained) || gained <= 0) continue;
+    total += gained;
     kinds++;
   }
-  return { gold: total, kinds: kinds };
+  return { gold: Number.isFinite(total) ? total : 0, kinds: kinds };
 }
 
 /* Sell All com persistência: em hunt online não muta localmente — só o
@@ -1462,7 +1562,7 @@ function sellAllPouchAndPersist(p) {
       const it = GAMEDATA.items[slug];
       if (!it || (typeof isNoSell === "function" && isNoSell(p, slug))) return false;
       if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) return false;
-      return (it.sell || 0) > 0 && (p.lootPouch[slug] || 0) > 0;
+      return pouchUnitSellPrice(it) > 0 && (p.lootPouch[slug] || 0) > 0;
     });
     if (!beforeKeys.length) return Promise.resolve({ gold: 0, kinds: 0, ok: true });
     return accountSellInstanceLootPouch(sessionToken(), p.id, null).then((result) => {
@@ -1472,12 +1572,19 @@ function sellAllPouchAndPersist(p) {
         toast((result && result.msg) || "Não foi possível vender a Loot Pouch online.", "bad");
         return { gold: 0, kinds: 0, ok: false };
       }
-      const gold = Number(result.gold) || 0;
-      if (gold > 0 && typeof addLog === "function")
-        addLog("sell", `Vendeu a Loot Pouch por <span class="gold-txt">${fmtFull(gold)} gp</span>`);
+      const gold = Number(result.gold);
+      const safeGold = Number.isFinite(gold) && gold > 0 ? Math.floor(gold) : 0;
+      if (safeGold > 0 && typeof addLog === "function")
+        addLog("sell", `Vendeu a Loot Pouch por <span class="gold-txt">${fmtFull(safeGold)} gp</span>`);
       if (typeof renderAll === "function") renderAll();
       else if (typeof renderLootPouch === "function") renderLootPouch(p);
-      return { gold, kinds: beforeKeys.length, ok: true };
+      // gold=0 com itens “vendáveis” no client = catálogo server desatualizado;
+      // não fingir sucesso (evita UI/pouch “travada” sem feedback).
+      if (!safeGold) {
+        toast("Nada vendido — itens sem preço NPC ou ainda na pouch.", "bad");
+        return { gold: 0, kinds: 0, ok: true };
+      }
+      return { gold: safeGold, kinds: beforeKeys.length, ok: true };
     }).catch(() => {
       toast("Não foi possível vender a Loot Pouch online.", "bad");
       return { gold: 0, kinds: 0, ok: false };
@@ -1566,8 +1673,8 @@ function renderLootPouch(p) {
   }
   const entries = Object.keys(p.lootPouch)
     .filter((slug) => (p.lootPouch[slug] || 0) > 0 && GAMEDATA.items[slug])
-    .sort((a, b) => (GAMEDATA.items[b].sell || 0) * p.lootPouch[b] -
-                    (GAMEDATA.items[a].sell || 0) * p.lootPouch[a]);
+    .sort((a, b) => pouchUnitSellPrice(GAMEDATA.items[b]) * p.lootPouch[b] -
+                    pouchUnitSellPrice(GAMEDATA.items[a]) * p.lootPouch[a]);
   const sellBtn = $("#btn-pouch-sell-all");
   if (sellBtn) sellBtn.disabled = !entries.some((s) =>
     typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
@@ -1748,6 +1855,10 @@ function openSupplyStashItemMenu(p, slug, x, y) {
         toast(!autoOn
           ? `<b>${it.n}</b>: loot irá para a Supply Stash.`
           : `<b>${it.n}</b>: Auto Supply Stash desligado.`);
+        if (typeof persistAutoSupplyStash === "function") {
+          persistAutoSupplyStash(p, slug, !autoOn);
+          return;
+        }
         if (typeof save === "function") save();
         renderAll();
       },
@@ -1807,7 +1918,7 @@ function openPouchItemMenu(p, slug, x, y) {
   const noSell = isNoSell(p, slug);
   const noCollect = isNoCollect(p, slug);
   const protectedClass = typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug);
-  const value = protectedClass ? 0 : (it.sell || 0) * count;
+  const value = protectedClass ? 0 : pouchUnitSellPrice(it) * count;
 
   showContextMenu(x, y, `${it.n} <span class="dim">${count}x</span>`, [
     {
@@ -1853,6 +1964,10 @@ function openPouchItemMenu(p, slug, x, y) {
           toast(on
             ? `<b>${it.n}</b>: loot irá para a Supply Stash.`
             : `<b>${it.n}</b>: Auto Supply Stash desligado.`);
+          if (typeof persistAutoSupplyStash === "function") {
+            persistAutoSupplyStash(p, slug, on);
+            return;
+          }
           if (typeof save === "function") save();
           renderAll();
         },
@@ -1899,10 +2014,8 @@ function openPouchItemMenu(p, slug, x, y) {
         renderAll();
       },
     }]),
-    {
-      label: protectedClass ? "Venda bloqueada (classe protegida)"
-        : `Vender${value > 0 ? ` · ${fmtFull(value)} gp` : ""}`,
-      disabled: protectedClass || value <= 0,
+    ...(value > 0 ? [{
+      label: `Vender · ${fmtFull(value)} gp`,
       action: () => {
         const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
         if (onlineCombat && typeof persistLootPouchSell === "function") {
@@ -1919,14 +2032,24 @@ function openPouchItemMenu(p, slug, x, y) {
           renderAll();
         }
       },
-    },
+    }] : (!protectedClass ? [{
+      label: "Sem valor de venda",
+      hint: "NPC não compra — use Destruir",
+      disabled: true,
+    }] : [])),
     {
       label: "Destruir",
       danger: true,
+      hint: value <= 0 ? "item sem venda" : "",
       action: () => {
         if (!confirm(`Destruir ${count}x ${it.n}? Isso não pode ser desfeito.`)) return;
+        if (typeof persistLootPouchDestroy === "function") {
+          persistLootPouchDestroy(p, slug);
+          return;
+        }
         delete p.lootPouch[slug];
         addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
+        if (typeof save === "function") save();
         renderAll();
       },
     },

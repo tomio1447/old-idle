@@ -31,11 +31,19 @@ const AREADATA_MAP = (typeof window !== "undefined" && window.AREADATA)
  * Detectado pelo desenho: se nenhuma casa fica "atras" do centro no eixo
  * vertical da matriz original, o efeito so se projeta para frente -- e um
  * cone/onda/feixe saindo de quem lanca. */
+/* Knight self-AoE (Berserk family): sempre em volta do caster, mesmo se o
+ * SPELLTARGET importado vier sem self (AREA_SQUARE1X1/CIRCLE3X3 estao em
+ * AREA_ANCORA_ALVO e senao centrariam no inimigo). */
+const AREA_SELF_SPELLS = {
+  "exori": 1, "exori-gran": 1, "exori-mas": 1, "exori-min": 1, "exori-scu": 1,
+};
+
 function areaSaiDoConjurador(nome, spellId) {
   // 1) A FONTE DE VERDADE e o spell:isSelfTarget() do .lua. Divine Caldera
   //    (exevo mas san) e Hell's Core usam AREA_CIRCLE3X3/5X5 -- circulos
   //    simetricos que a heuristica abaixo classificaria como "no alvo",
   //    quando na verdade explodem em volta de QUEM LANCA.
+  if (spellId && AREA_SELF_SPELLS[spellId]) return true;
   if (spellId && typeof SPELLTARGET !== "undefined") {
     const st = SPELLTARGET[spellId];
     if (st) {
@@ -63,8 +71,12 @@ const AREA_ANCORA_ALVO = {
 };
 
 /* Direcao do lance, em quatro quadrantes. A matriz so tem 4 rotacoes,
- * entao a diagonal cai no eixo dominante -- igual ao getArea(). */
+ * entao a diagonal cai no eixo dominante -- igual ao getArea().
+ * Prefere a facing do caster (dir n/e/s/w) quando existe — waves/beams
+ * saem sempre para onde ele esta virado. */
 function areaDir(origem, alvo) {
+  const facing = origem && origem.dir;
+  if (facing === "n" || facing === "e" || facing === "s" || facing === "w") return facing;
   const dx = (alvo.cx || 0) - (origem.cx || 0);
   const dy = (alvo.cy || 0) - (origem.cy || 0);
   if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? "e" : "w";
@@ -86,16 +98,18 @@ function areaCells(nome, origem, alvo, spellId) {
   const base = areaSaiDoConjurador(nome, spellId) ? origem : alvo;
   const out = [];
   const vistos = new Set();
-  // [0,0] em matrizes WAVE/BEAM é a âncora no conjurador (valor 3 no
-  // register_spells.lua), NÃO um tile atingido. Toda onda/feixe começa
-  // obrigatoriamente 1 SQM à frente do caster na direção do alvo —
-  // igual ao AreaCombat do Canary (origem pulada).
+  // WAVE/BEAM: o SQM de lancamento e SEMPRE 1 a frente do caster na
+  // direcao em que ele esta virado. O centro da matriz (caster) nunca
+  // entra na lista de dano/FX — filtramos [0,0] e qualquer celula que
+  // coincida com o caster.
   const waveProjetada = areaSaiDoConjurador(nome, spellId) && /(WAVE|BEAM)/i.test(nome);
+  const ox0 = Number(origem.cx) || 0, oy0 = Number(origem.cy) || 0;
   for (const [dx, dy] of offs) {
     const ox = Number(dx) || 0, oy = Number(dy) || 0;
     if (waveProjetada && ox === 0 && oy === 0) continue;
     const cx = (base.cx || 0) + ox;
     const cy = (base.cy || 0) + oy;
+    if (waveProjetada && cx === ox0 && cy === oy0) continue;
     if (typeof inBounds === "function" && !inBounds(cx, cy)) continue;
     const k = cx + ":" + cy;
     if (vistos.has(k)) continue;

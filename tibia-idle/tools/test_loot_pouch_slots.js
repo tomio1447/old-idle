@@ -53,8 +53,9 @@ const got=ctx.rollLoot(combat,p,mob);
 must(got.length===1 && p.lootPouch['loot-54']===1,
   'rollLoot real não enviou o drop para a pouch em overflow');
 
-const sellStart=uiSrc.indexOf('function sellPouchItem');
-const sellEnd=uiSrc.indexOf('\n\n/* Valor total vendável da mochila',sellStart);
+const sellStart=uiSrc.indexOf('function pouchUnitSellPrice');
+const sellEnd=uiSrc.indexOf('function bagSellableValue',sellStart);
+must(sellStart>=0&&sellEnd>sellStart,'bloco sell pouch não encontrado em ui.js');
 Object.assign(ctx,{
   toast(){},addLog(){},fmtFull(n){return String(n);},
   isNoSell(){return false;},

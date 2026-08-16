@@ -171,13 +171,22 @@ must(renderSrc.includes('!!ent.permadead'), 'Corpse permanente não é renderiza
 must(indexSrc.includes('id="scarlett-qte"') && indexSrc.includes('js/scarlett-boss.js'),
   'Overlay/script da esteira não estão no jogo');
 const scarlettSrc=fs.readFileSync(path.join(js,'scarlett-boss.js'),'utf8');
-must(scarlettSrc.includes('SCARLETT_TIMING_WINDOW = 360') &&
-  scarlettSrc.includes('SCARLETT_ONLINE_SLACK = 180') &&
-  scarlettSrc.includes('SCARLETT_LEAD_MS = 1400'),
-  'Constantes de timing da Scarlett divergiram');
+must(scarlettSrc.includes('SCARLETT_TIMING_WINDOW = 500') &&
+  scarlettSrc.includes('SCARLETT_ONLINE_SLACK = 320') &&
+  scarlettSrc.includes('SCARLETT_LEAD_MS = 1600') &&
+  scarlettSrc.includes('scarlettPaintNotes') &&
+  scarlettSrc.includes('scarlettEstimatePressAuth'),
+  'Constantes/animação de timing da Scarlett divergiram');
 must(!scarlettSrc.includes('DANÇA AUTOMÁTICA') && scarlettSrc.includes('scarlettHydrateOnlineNotes'),
   'Online ainda não hidrata a esteira QTE');
-must(indexSrc.includes('scarlett-boss.js?v=boss-death-wipe-v1'),
+must(indexSrc.includes('scarlett-boss.js?v=scarlett-qte-v4'),
   'Cache-bust do QTE Scarlett ausente');
+must(indexSrc.includes('layout.css?v=scarlett-qte-v4'),
+  'Cache-bust do CSS da esteira Scarlett ausente');
+const engineSrc=fs.readFileSync(path.join(__dirname,'..','server','authoritative_engine.js'),'utf8');
+must(engineSrc.includes('SCARLETT_TIMING_WINDOW=500') &&
+  engineSrc.includes('SCARLETT_ONLINE_SLACK=320') &&
+  engineSrc.includes('pressAuth'),
+  'Servidor Scarlett QTE sem janela/pressAuth alinhados');
 
 console.log('OK: Scarlett, loot, outfit, magias, mapa, QTE, gates, permadeath e corpses validados.');

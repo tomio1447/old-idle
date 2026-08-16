@@ -43,7 +43,7 @@ const {
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
-  sellAuthAllPouch, sellAuthPouchItem, moveItemToSupplyStash } = require("./authoritative_engine");
+  sellAuthAllPouch, sellAuthPouchItem, destroyAuthPouchItem, setAuthAutoSupplyStash, moveItemToSupplyStash } = require("./authoritative_engine");
 const { createWorldBossController } = require("./world_boss");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
@@ -963,6 +963,13 @@ async function resolveInstanceRow(db,acc,charId){
     if(party&&typeof db.instanceGetByParty==="function"){
       const shared=await db.instanceGetByParty(party.id);if(shared)return {row:shared,character,party,shared:Number(shared.account_id)!==Number(acc.id)};}
   }
+  // Lobby Megalomania: convidados compartilham a instância do líder.
+  const mega=typeof global.__MEGA_LOBBY!=="undefined"&&global.__MEGA_LOBBY
+    ?global.__MEGA_LOBBY.sharedForAccount(acc.id):null;
+  if(mega&&mega.ownerAccountId&&Number(mega.ownerAccountId)!==Number(acc.id)){
+    const shared=await db.instanceGet(mega.ownerAccountId);
+    if(shared&&shared.status==="active")return {row:shared,character,party,shared:true,mega:true};
+  }
   return {row:await db.instanceGet(acc.id),character,party,shared:false};
 }
 async function instanceCharactersForAccount(db,row,accountId){
@@ -977,6 +984,11 @@ async function publishInstanceForRow(db,row,data){
   if(row.party_id){const members=await db.partyMembers(row.party_id),ids=[Number(row.active_character_id)].concat(members.map((m)=>Number(m.id)));
     const party=await db.partyFindByCharacter(ids[0]);if(party)ids[0]=Number(party.leader_id);
     for(const id of ids){const character=await db.findCharacter(id);if(character)accounts.add(Number(character.account_id));}}
+  // Convidados do lobby Megalomania (sem party).
+  if(typeof global.__MEGA_LOBBY!=="undefined"&&global.__MEGA_LOBBY){
+    const lobby=global.__MEGA_LOBBY.getLobbyForAccount(row.account_id);
+    if(lobby)for(const s of lobby.slots||[])if(s)accounts.add(Number(s.accountId));
+  }
   for(const accountId of accounts)publishSync(accountId,"instance",data);
 }
 async function loadInstance(db,token,charId){
@@ -1080,16 +1092,29 @@ async function prepareInstanceState(db,acc,input){
   let partyId=null,partyVersion=null;
   const party=await db.partyFindByCharacter(activeId),partyMembers=party?await db.partyMembers(party.id):[];
   const partyOrder=party?[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id))):[];
+  const megaCtrl=typeof global.__MEGA_LOBBY!=="undefined"?global.__MEGA_LOBBY:null;
+  const megaLobby=megaCtrl&&typeof megaCtrl.getLobbyForAccount==="function"
+    ?megaCtrl.getLobbyForAccount(acc.id):null;
+  const megaIds=megaLobby
+    ?new Set((megaLobby.slots||[]).filter(Boolean).map((s)=>Number(s.charId)))
+    :null;
+  const megaRosterOk=!!(megaLobby&&megaIds&&ids.every((id)=>megaIds.has(Number(id)))&&
+    Number(megaLobby.leaderAccountId)===Number(acc.id)&&
+    (megaLobby.status==="open"||megaLobby.status==="starting"||megaLobby.status==="fighting"));
   // A instância pertence ao roster, não à conta individual. Portanto uma
   // party entre contas também precisa enviar líder + todos os membros na
   // mesma ordem; somente o personagem ativo precisa pertencer ao requester.
-  if(!party&&rows.some((row)=>Number(row.account_id)!==Number(acc.id)))
+  // Lobby Megalomania permite 1–5 contas sem Party.
+  if(!party&&!megaRosterOk&&rows.some((row)=>Number(row.account_id)!==Number(acc.id)))
     return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Instância solo contém personagem externo"}}};
   if(ids.length>1||party){
-    if(!party)return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
-    if(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))
-      return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
-    partyId=Number(party.id);partyVersion=Number(party.roster_version);
+    if(party){
+      if(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))
+        return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
+      partyId=Number(party.id);partyVersion=Number(party.roster_version);
+    }else if(!megaRosterOk){
+      return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
+    }
   }
   const now=Date.now(),state=Object.assign({},input,{v:1,savedAt:now,kind,huntId,bossId,
     instanceMode:mode,activeCharacterId:String(activeId)});
@@ -1164,6 +1189,16 @@ async function tickInstance(db,body){
     const guestLease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()},own=await db.instanceGet(acc.id);
     if(own&&own.status==="active"&&String(own.instance_id)!==String(resolved.row.instance_id))
       await db.instanceEnd(acc.id,own.instance_id,own.version,"joined-shared-party",guestLease);
+    // Convidado Megalomania: encaminha QTE pessoal para a instância do líder.
+    if(resolved.mega&&body.visual_state&&body.visual_state.megaIntent&&resolved.character){
+      const ownerId=Number(resolved.row.account_id);
+      const intent=Object.assign({},body.visual_state.megaIntent,{playerId:String(resolved.character.id)});
+      const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+      try{
+        await db.instanceAuthorityTick(ownerId,null,Date.now(),3600000,(state,elapsed,checkpointAt)=>
+          advanceAuthorityState(state,50,checkpointAt,{megaIntent:intent}),lease);
+      }catch(e){/* ignore race */}
+    }
     const summary=instanceSummary(resolved.row,true);
     if(summary.state&&resolved.character)summary.state.activeCharacterId=String(resolved.character.id);
     return {code:200,body:{ok:true,shared:true,elapsed:0,terminalReason:null,instance:summary,
@@ -1250,6 +1285,7 @@ async function clearInstanceLootPouch(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
   const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+  const slug=body.slug!=null&&body.slug!==""?String(body.slug):"";
   if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
     return {code:400,body:{ok:false,error:"INVALID_POUCH_CLEAR",msg:"Limpeza da Loot Pouch inválida"}};
   const character=await db.findCharacter(charId);
@@ -1258,20 +1294,119 @@ async function clearInstanceLootPouch(db,body){
   const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
   const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
     return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;let destroyed=0;
   const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
     let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
     const item=descriptor.authority&&descriptor.authority.players&&
       descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
     if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
-    item.p.lootPouch={};
+    if(slug){
+      destroyed=destroyAuthPouchItem(item.p,slug);
+      if(!destroyed){rejection="Item não encontrado na Loot Pouch";return null;}
+    }else{
+      item.p.lootPouch={};
+      destroyed=-1;
+    }
     descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
   },lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
     body:{ok:false,error:result.error,msg:rejection||"Não foi possível limpar a Loot Pouch",instance:instanceSummary(result.instance,true)}};
   await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,source:"pouch-clear",holderId:String(body.holder_id||"")});
-  return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+    status:result.instance.status,source:slug?"pouch-destroy":"pouch-clear",holderId:String(body.holder_id||"")});
+  return {code:200,body:{ok:true,destroyed:destroyed,slug:slug||null,instance:instanceSummary(result.instance,true)}};
+}
+
+/** Destroy um item da pouch (ou limpa via slug ausente só em clear). Em combate = instância;
+ * na cidade grava o personagem (lootPouch é protected no PUT comum). */
+async function destroyLootPouchItem(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),slug=String(body.slug||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_POUCH_DESTROY",msg:"Destruição da Loot Pouch inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_POUCH_DESTROY",msg:"Instância inválida para destruir item"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null,destroyed=0;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      destroyed=destroyAuthPouchItem(item.p,slug);
+      if(!destroyed){rejection="Item não encontrado na Loot Pouch";return null;}
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível destruir o item",
+        instance:instanceSummary(result.instance,true)}};
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"pouch-destroy",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,destroyed,slug,instance:instanceSummary(result.instance,true)}};
+  }
+  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
+  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  const destroyed=destroyAuthPouchItem(p,slug);
+  if(!destroyed)
+    return {code:400,body:{ok:false,error:"POUCH_ITEM_MISSING",msg:"Item não encontrado na Loot Pouch"}};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,destroyed,slug,
+    lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{}})};
+}
+
+/** Persiste Auto Supply Stash (preferência por item) na instância ou no personagem. */
+async function setAutoSupplyStashPreference(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),slug=String(body.slug||""),on=!!body.on;
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_STASH_AUTO",msg:"Preferência Auto Supply Stash inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_STASH_AUTO",msg:"Instância inválida para Auto Supply Stash"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      if(!setAuthAutoSupplyStash(item.p,slug,on)){rejection="Item não pode usar Auto Supply Stash";return null;}
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível salvar Auto Supply Stash",
+        instance:instanceSummary(result.instance,true)}};
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"stash-auto",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,slug,on,instance:instanceSummary(result.instance,true)}};
+  }
+  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
+  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  if(!setAuthAutoSupplyStash(p,slug,on))
+    return {code:400,body:{ok:false,error:"STASH_AUTO_FAILED",msg:"Item não pode usar Auto Supply Stash"}};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,slug,on,
+    autoSupplyStash:(p.config&&p.config.autoSupplyStash)||{}})};
 }
 
 async function sellInstanceLootPouch(db,body){
@@ -1865,6 +2000,13 @@ async function main() {
   });
   WORLD_BOSS.start();
 
+  const { createMegalomaniaLobbyController }=require("./megalomania_lobby");
+  const MEGA_LOBBY=createMegalomaniaLobbyController({
+    getDb:()=>db,
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+  });
+  global.__MEGA_LOBBY=MEGA_LOBBY;
+
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
@@ -2025,12 +2167,20 @@ async function main() {
       if(req.method==="POST"&&url==="/api/instance/pouch-clear"){
         const r=await clearInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
       }
+      if((req.method==="POST"&&url==="/api/instance/pouch-destroy")||
+         (req.method==="POST"&&url==="/api/pouch/destroy")){
+        const r=await destroyLootPouchItem(db,await readBody(req));return send(res,r.code,r.body);
+      }
       if(req.method==="POST"&&url==="/api/instance/pouch-sell"){
         const r=await sellInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
       }
       if((req.method==="POST"&&url==="/api/instance/stash-move")||
          (req.method==="POST"&&url==="/api/stash/move")){
         const r=await moveToSupplyStash(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if((req.method==="POST"&&url==="/api/instance/stash-auto")||
+         (req.method==="POST"&&url==="/api/stash/auto")){
+        const r=await setAutoSupplyStashPreference(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/end"){
         const r=await endInstance(db,await readBody(req));return send(res,r.code,r.body);
@@ -2248,6 +2398,117 @@ async function main() {
         const auth=await authorizeMaintenance(req,body,db);
         const r=await WORLD_BOSS.forceClose(db,body,auth.ok);
         return send(res,r.code,r.body);
+      }
+
+      /* -------- Megalomania lobby (1–5 jogadores, 1 char cada) -------- */
+      if(req.method==="GET"&&url==="/api/mega-lobby/state"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const acc=await db.findAccountByToken(token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        return send(res,200,MEGA_LOBBY.stateFor(acc.id));
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/create"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const character=await db.findCharacter(Number(body.char_id));
+        if(!character||Number(character.account_id)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Personagem inválido"});
+        const r=await MEGA_LOBBY.createLobby(db,acc,character,{
+          inTemple:!!body.inTemple,playerName:body.playerName||character.name});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/invite"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await MEGA_LOBBY.invite(db,acc,body.invitee_name||body.name);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/accept"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const character=await db.findCharacter(Number(body.char_id));
+        if(!character||Number(character.account_id)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Personagem inválido"});
+        const r=await MEGA_LOBBY.acceptInvite(db,acc,body.invite_id,character,{
+          inTemple:!!body.inTemple,playerName:body.playerName||character.name});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/decline"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await MEGA_LOBBY.declineInvite(db,acc,body.invite_id);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/leave"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await MEGA_LOBBY.leave(db,acc);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/kick"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await MEGA_LOBBY.kick(db,acc,body.target_account_id);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/start"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await MEGA_LOBBY.start(db,acc);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/mega-lobby/bind"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const lobby=MEGA_LOBBY.getLobbyForAccount(acc.id);
+        if(!lobby||Number(lobby.leaderAccountId)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Só o líder vincula a instância"});
+        if(!body.instance_id)return send(res,400,{ok:false,msg:"instance_id obrigatório"});
+        MEGA_LOBBY.bindShare(lobby,String(body.instance_id),acc.id);
+        await MEGA_LOBBY.markCharsUsed(db,MEGA_LOBBY.membersForStart(lobby));
+        // Injeta os outros personagens do lobby na autoridade do líder.
+        try{
+          const row=await db.instanceGet(acc.id);
+          if(row&&row.state){
+            let state=typeof row.state==="string"?JSON.parse(row.state):row.state;
+            if(state&&state.authority){
+              const auth=state.authority;
+              auth.players=auth.players||[];
+              const have=new Set(auth.players.map((p)=>Number(p.id)));
+              for(const m of MEGA_LOBBY.membersForStart(lobby)){
+                if(have.has(Number(m.charId)))continue;
+                const character=await db.findCharacter(m.charId);if(!character)continue;
+                let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+                data=Object.assign({},data,{id:String(character.id),name:character.name,voc:character.voc,level:Number(character.level)||1});
+                const leader=auth.players[0]||{};
+                auth.players.push({
+                  id:String(character.id),p:data,hp:data.hp,mp:data.mp,
+                  x:Number(leader.x)||.5,y:Number(leader.y)||.6,
+                  cx:Number(leader.cx)||15,cy:Number(leader.cy)||16,dir:leader.dir||"n"
+                });
+                have.add(Number(m.charId));
+              }
+              if(auth.mega&&typeof auth.mega.personal==="object"){
+                for(const p of auth.players){
+                  const id=String(p.id);
+                  if(!auth.mega.personal[id])auth.mega.personal[id]={
+                    nextAt:(Number(auth.mega.bossSpawnAt)||auth.clock||Date.now())+10000+Math.floor(Math.random()*15000),
+                    active:null
+                  };
+                }
+              }
+              state=materializeAuthority(state);
+              const lease={holderId:String(body.holder_id||"mega-bind"),secretHash:leaseHash(body.lease_token||"mega-bind"),now:Date.now()};
+              await db.instanceSave(acc.id,row.instance_id,row.version,{
+                kind:row.kind,hunt_id:row.hunt_id,boss_id:row.boss_id,instance_mode:row.instance_mode,
+                party_id:row.party_id,party_version:row.party_version,member_ids:auth.players.map((p)=>Number(p.id)),
+                active_character_id:Number(row.active_character_id)||Number(auth.players[0]&&auth.players[0].id),
+                saved_at:new Date(),started_at:row.started_at||new Date()
+              },JSON.stringify(state),lease);
+            }
+          }
+        }catch(e){console.error("[mega-lobby] expand players:",e.message);}
+        return send(res,200,{ok:true,lobby:MEGA_LOBBY.stateFor(acc.id).lobby});
       }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
     } catch (e) {

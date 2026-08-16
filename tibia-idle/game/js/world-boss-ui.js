@@ -336,10 +336,12 @@ function wbRenderOverlay() {
 function wbPlaceholderMap() {
   const w = 40, h = 40;
   const cells = [];
+  const rows = [];
   for (let y = 0; y < h; y++) {
     const row = [];
     for (let x = 0; x < w; x++) row.push({ ground: 100, items: [] });
     cells.push(row);
+    rows.push(".".repeat(w));
   }
   return {
     w, h, z: 7,
@@ -347,78 +349,274 @@ function wbPlaceholderMap() {
     spawn: { x: 20, y: 28 },
     boss: { x: 20, y: 16 },
     cells,
+    rows,
+    leg: { ".": { v: [100] } },
+    // Sem zona G de hunt — evita spawnWave achar spots de cobra/etc.
+    mob: [],
   };
 }
 
-function wbEnterCombatStub(ev) {
-  if (WB.combat) return;
-  WB.combat = { active: true, warzoneId: ev.warzoneId, bossName: ev.bossName, startedAt: Date.now() };
-  // Sai de hunt/boss atual (perde esse boss) e vai ao stub.
+function wbJoinedIdSet() {
+  const chars = (WB.state && WB.state.you && WB.state.you.chars) || [];
+  return new Set(chars.map((c) => Number(c.id)).filter((n) => n > 0));
+}
+
+/* Templo + fim da instância online ANTES da arena WB (evita fusão hunt↔boss). */
+async function wbPrepTempleFromHunt() {
   try {
     if (G.training && typeof stopAcademy === "function") stopAcademy(false);
-    if (G.combat && typeof stopHunt === "function") stopHunt(true);
   } catch (e) { /* ignore */ }
 
+  // Invalida callbacks OTBM da hunt anterior (ex.: Cobra Bastion).
+  G.huntEntryToken = (G.huntEntryToken || 0) + 1;
+  G.huntEntryPendingToken = null;
+  G.huntMapReady = true;
+  try {
+    if (typeof clearCombatVisualOverlays === "function") clearCombatVisualOverlays(G.combat);
+  } catch (e) { /* ignore */ }
+
+  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("world boss templo");
+  if (G.p) {
+    const m = typeof maxStats === "function" ? maxStats(G.p) : null;
+    if (m) { G.p.hp = m.hp; G.p.mp = m.mp; }
+    G.p.hunt = null;
+    G.p.instanceMode = null;
+  }
+
+  G.combat = null;
+  if (typeof ONLINE_AUTH_APPLIED_VERSION !== "undefined") {
+    try { ONLINE_AUTH_APPLIED_VERSION = 0; ONLINE_AUTH_APPLIED_INSTANCE = ""; } catch (e) { /* ignore */ }
+  }
+
+  // Encerra lease de hunt/boss no servidor e ESPERA — senão o tick online
+  // reaplica cobras em cima da arena WB.
+  try {
+    if (typeof accountEndInstance === "function" && typeof sessionToken === "function" && sessionToken()) {
+      await accountEndInstance(sessionToken(), "world-boss-prep");
+    } else if (typeof clearInstanceSession === "function") {
+      clearInstanceSession("world-boss-prep");
+    }
+  } catch (e) {
+    try { if (typeof clearInstanceSession === "function") clearInstanceSession("world-boss-prep"); } catch (e2) { /* ignore */ }
+  }
+
+  G.inCity = true;
+  if (typeof resetGridSize === "function") resetGridSize();
+  if (typeof resetTemplePlayerPosition === "function") resetTemplePlayerPosition();
+  if (typeof partyReportZone === "function") {
+    try { await Promise.resolve(partyReportZone({ zone: "city" })); } catch (e) { /* ignore */ }
+  }
+  if (typeof addLog === "function") {
+    addLog("info", "World Boss: party no <b style='color:#ffe680'>Templo</b> — limpando hunt anterior.");
+  }
+  // Deixa follow/SSE de cidade assentar antes de montar a arena.
+  await new Promise((r) => setTimeout(r, 300));
+}
+
+function wbBuildIsolatedCombat(ev) {
   const map = wbPlaceholderMap();
   const bossId = "world-boss-" + (ev.warzoneId || "wz1");
   const sprite = wbBossSpriteSlug(ev);
-  if (!window.BOSS_DEFS) window.BOSS_DEFS = {};
-  if (typeof BOSS_DEFS === "object") {
-    BOSS_DEFS[bossId] = {
-      id: bossId,
-      name: ev.bossName || "World Boss",
-      title: ev.warzoneName || ("Warzone " + wbWarzoneNumber(ev)),
-      hunt: null,
-      baseMonster: ev.baseMonster || sprite,
-      sprite,
-      mult: 50,
-      requirement: null,
-      cooldown: 0,
-      loot: [],
-      worldBoss: true,
-      arena: map,
-    };
+  const bossName = ev.bossName || "World Boss";
+  const bossHp = Math.max(1, Math.floor(Number(ev.bossMaxHp || ev.bossHp) || 2500000));
+  const spawn = map.spawn || { x: 20, y: 28 };
+  const bossCell = map.boss || { x: 20, y: 16 };
+
+  if (typeof setGridSize === "function") setGridSize(map.w, map.h);
+  else if (typeof setGridForMap === "function") {
+    setGridForMap({ w: map.w, h: map.h, rows: Array.from({ length: map.h }, () => " ".repeat(map.w)) });
   }
 
-  // Full HP/MP nos chars da party local
+  const gw = (typeof GRID_W !== "undefined" ? GRID_W : map.w) || map.w;
+  const gh = (typeof GRID_H !== "undefined" ? GRID_H : map.h) || map.h;
+
+  const bossDef = {
+    id: bossId,
+    name: bossName,
+    title: ev.warzoneName || ("Warzone " + wbWarzoneNumber(ev)),
+    hunt: null,
+    baseMonster: ev.baseMonster || sprite,
+    sprite,
+    hp: bossHp,
+    exp: 0,
+    damage: Math.max(80, Math.floor(bossHp / 8000)),
+    armor: 80,
+    defense: 80,
+    mult: 1,
+    requirement: null,
+    cooldown: 0,
+    loot: [],
+    worldBoss: true,
+  };
+
+  const def = {
+    name: bossName,
+    hp: bossHp,
+    exp: 0,
+    damage: bossDef.damage,
+    armor: bossDef.armor,
+    defense: bossDef.defense,
+    loot: [],
+    attackSpeed: 2000,
+  };
+
+  const bossMob = {
+    slug: sprite,
+    def,
+    boss: true,
+    worldBoss: true,
+    hp: bossHp,
+    maxHp: bossHp,
+    atkCd: 700,
+    id: "boss-" + bossId,
+    cx: bossCell.x,
+    cy: bossCell.y,
+    x: (bossCell.x + 0.5) / gw,
+    y: (bossCell.y + 0.5) / gh,
+    dir: "w",
+    moving: false,
+    attackAnim: 0,
+    speed: 0.00004,
+    spawnAt: Date.now(),
+  };
+
+  const c = {
+    huntId: null,
+    hunt: { name: "World Boss", monsters: [], pack: 0, packMin: 0, packMax: 0 },
+    huntMap: map,
+    gridW: gw,
+    gridH: gh,
+    camera: { x: gw / 2, y: gh / 2, locked: true },
+    instanceMode: "world-boss",
+    worldBoss: true,
+    pvp: false,
+    expMul: 1,
+    lootMul: 1,
+    skillMul: 1,
+    influencedChance: 0,
+    fiendishChance: 0,
+    raidEnabled: false,
+    raidCd: Infinity,
+    raidMode: "none",
+    mobs: [bossMob],
+    pendingSpawns: [],
+    wave: 0,
+    playerAtkCd: 0,
+    spellCd: {},
+    runeCd: 0,
+    healCd: 0,
+    potionCd: 0,
+    regenHp: 0,
+    regenMp: 0,
+    buffs: {},
+    player: {
+      cx: spawn.x, cy: spawn.y,
+      x: (spawn.x + 0.5) / gw, y: (spawn.y + 0.5) / gh,
+      dir: "n", moving: false, frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
+    },
+    stats: {
+      startedAt: Date.now(), kills: 0, exp: 0, rawExp: 0, rawHp: 0,
+      gold: 0, damage: 0, taken: 0, deaths: 0, blessCost: 0,
+      deathTrack: { startedAt: Date.now(), byPlayer: {} },
+      loot: {}, monsters: {},
+      supplyUsed: {}, supplyCost: 0, time: 0,
+    },
+    events: [],
+    delayedHits: [],
+    dead: false,
+    deadUntil: 0,
+    players: null,
+    boss: bossDef,
+    bossDefeated: false,
+  };
+
+  // Só chars do JOIN (máx. 2) — não arrasta a PT inteira da hunt.
+  const joined = wbJoinedIdSet();
   try {
-    if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("world boss");
-    else if (G.p) {
-      const max = typeof maxStats === "function" ? maxStats(G.p) : null;
-      if (max) { G.p.hp = max.hp; G.p.mp = max.mp; }
-      else { G.p.hp = G.p.maxHp || G.p.hp; G.p.mp = G.p.maxMp || G.p.mp; }
+    if (joined.size && typeof partyCombatLoad === "function" && G.p) {
+      const ents = partyCombatLoad(G.p) || [];
+      const filtered = ents.filter((ent) => {
+        const id = Number(ent && (ent.id || (ent.p && ent.p.id)));
+        return joined.has(id) || String(id) === String(G.p.id);
+      });
+      if (filtered.length >= 1) {
+        c.players = filtered;
+        c.players[0].p = G.p;
+        c.players[0].id = G.p.id || c.players[0].id;
+        c.player = c.players[0];
+        if (typeof partyCombatPlace === "function") partyCombatPlace(c, spawn.x, spawn.y);
+      }
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* single player */ }
 
-  G.inCity = false;
-  G.p.instanceMode = "world-boss";
-  G.p.hunt = null;
+  if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(c);
+  return c;
+}
 
-  // Mapa placeholder: se startBoss existir e BOSS_DEFS ok, usa; senão combate mínimo.
-  if (typeof startBoss === "function" && BOSS_DEFS[bossId]) {
-    try {
-      startBoss(bossId, true, true);
-    } catch (e) {
-      console.warn("[world-boss] startBoss stub falhou", e);
-    }
+async function wbEnterCombatStub(ev) {
+  if (WB.combat) return;
+  WB.combat = {
+    active: true,
+    warzoneId: ev.warzoneId,
+    bossName: ev.bossName,
+    startedAt: Date.now(),
+    exiting: false,
+  };
+  WB._lastBossHp = null;
+
+  try {
+    await wbPrepTempleFromHunt();
+  } catch (e) {
+    console.warn("[world-boss] prep templo falhou", e);
   }
+
+  // NÃO usar startBoss: ele faz partyReportZone(boss) e maybeLoadPartyCombat
+  // da PT inteira, e newBossCombat ancora em hunt ("rats"/mapa anterior).
+  const c = wbBuildIsolatedCombat(ev);
+  G.inCity = false;
+  if (G.p) {
+    G.p.hunt = null;
+    G.p.instanceMode = "world-boss";
+  }
+  G.combat = c;
+  G.huntMapReady = true;
+
+  // Sem persistActiveInstance / accountBeginInstance: combate local isolado.
+  if (typeof renderAll === "function") renderAll();
 
   wbFetch("POST", "/api/world-boss/loaded", {}).catch(() => {});
   if (typeof toast === "function") toast(wbT("wb.entered", "Você entrou na arena do World Boss"), "death");
-  if (typeof addLog === "function") addLog("death", "World Boss: <b>" + (ev.bossName || bossId) + "</b>");
+  if (typeof addLog === "function") {
+    addLog("death", "World Boss: <b>" + (ev.bossName || ev.warzoneId) + "</b> (arena isolada)");
+  }
 }
 
 function wbExitCombat(reason) {
+  if (WB.combat && WB.combat.exiting) return;
+  if (WB.combat) WB.combat.exiting = true;
+  const hadCombat = !!WB.combat;
   WB.combat = null;
   WB.pendingDmg = 0;
   WB.pendingHeal = 0;
   WB.pendingTaken = 0;
+  WB._lastBossHp = null;
   try {
-    if (G.combat && typeof stopHunt === "function") stopHunt(true);
-    if (typeof returnToTemple === "function") returnToTemple();
-    else if (typeof goCity === "function") goCity();
+    if (G.combat && (G.combat.worldBoss || (G.combat.boss && G.combat.boss.worldBoss))) {
+      G.combat = null;
+      if (G.p) { G.p.hunt = null; G.p.instanceMode = null; }
+      G.inCity = true;
+      if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("world boss fim");
+      if (typeof resetTemplePlayerPosition === "function") resetTemplePlayerPosition();
+      if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
+      if (typeof resetGridSize === "function") resetGridSize();
+      if (typeof renderAll === "function") renderAll();
+    } else if (G.combat && typeof stopHunt === "function") {
+      stopHunt(true);
+    } else if (typeof goToCity === "function") {
+      goToCity();
+    }
   } catch (e) { /* ignore */ }
-  if (typeof toast === "function") {
+  if (hadCombat && typeof toast === "function") {
     if (reason === "success") toast(wbT("wb.success", "World Boss derrotado! Recompensas no Reward Chest."), "ok");
     else if (reason === "fail") toast(wbT("wb.fail", "World Boss falhou."), "bad");
     else if (reason === "account-failed") toast(wbT("wb.accountFail", "Seus personagens morreram — removido do evento."), "bad");

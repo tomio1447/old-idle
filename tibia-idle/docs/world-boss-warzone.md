@@ -32,16 +32,20 @@ Status: **skeleton** (lobby + timers + stub de combate/loot). Mapas OTBM e drops
 
   > EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!
 
-- Depois: party dos JOINs → templo (PT inteira), limpa hunt instance se preciso, full HP/MP; se estiver em outro boss → perde/skip esse boss.
+- Depois: **PT inteira** vai ao templo (limpa hunt/boss instance online); full HP/MP; se estiver em outro boss → perde/skip esse boss.
+- Só os **chars do JOIN** (máx. 2/conta) entram no mapa WB; demais membros da party ficam no templo.
+- Arena WB é instância **local isolada** (`worldBoss`), sem waves de hunt e sem `partyReportZone({ zone: "boss" })`.
 - Teleporte ao mapa → espera loaded → **10s** → spawn do boss.
 
-## Sprites stub (warzone)
+## Bosses / sprites (warzone)
 
-| Warzone | bossSprite (assets/mob) |
-| ------- | ----------------------- |
-| WZ1 | `goshnar-s-greed` |
-| WZ2 | `timira-the-many-headed` |
-| WZ3 | `ferumbras-mortal-shell` |
+| Warzone | Boss | bossSprite (assets/mob) |
+| ------- | ---- | ----------------------- |
+| WZ1 | The Deathstrike | `deathstrike` |
+| WZ2 | Gnomevil | `gnomevil` |
+| WZ3 | The Abyssador | `abyssador` |
+
+Fluxo de entrada (obrigatório): **parar hunt** → **templo + full HP/MP** → party report `city` (PT inteira) → só os chars do JOIN entram na arena WB isolada (sem `startBoss` / sem follow de party para sala de boss / sem instância de hunt online).
 
 ## Combate (skeleton)
 

@@ -111,6 +111,6 @@ const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
 must(uiSrc.includes("persistMoveToSupplyStash"), "UI persiste move para stash");
 
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-must(html.includes("js/supply-stash.js?v=stash-multi-v1"), "cache-bust supply-stash");
+must(html.includes("js/supply-stash.js?v=pouch-destroy-stash-v1"), "cache-bust supply-stash");
 
 console.log("\nAll supply stash amulet move tests passed. CAP=", SUPPLY_STASH_CAP || 20);

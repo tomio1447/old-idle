@@ -473,6 +473,12 @@
     // cairia na AREA_ANCORA_ALVO e centraria no alvo clicado
     T["exori-scu"] = { areaNome: "AREA_SQUARE1X1", self: 1,
                        nome: "Shield Slam", words: "exori scu" };
+    // Berserk / Fierce Berserk / Groundshaker / Front Sweep: isSelfTarget
+    // no Canary. Sem self, AREA_SQUARE1X1 / AREA_CIRCLE3X3 / WAVE6
+    // ancorariam no inimigo apontado em vez da caixa em volta do knight.
+    for (const id of ["exori", "exori-gran", "exori-mas", "exori-min"]) {
+      if (T[id]) T[id] = Object.assign({}, T[id], { self: 1 });
+    }
     T["exevo-dir-san"] = { areaNome: "AREA_BARRAGE", blockWalls: 1,
                            needTarget: 1, nome: "Divine Barrage",
                            range: 5, words: "exevo dir san" };

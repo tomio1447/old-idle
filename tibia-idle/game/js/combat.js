@@ -8,13 +8,14 @@ const TICK = 100;   // ms por tick de simulacao
 
 /* Animacao de spawn dos monstros: o teleporte "pisca" 3x no ponto antes de
  * o bicho nascer (pedido do jogador). SPAWN_BLINK_MS e o intervalo entre
- * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma. */
-const SPAWN_BLINK_MS = 1000;
+ * piscadas; o renderer toca o efeito assets/fx/teleport.png a cada uma.
+ * 3 × ~667ms = ~2s para caber no lead de teleporte. */
+const SPAWN_BLINK_MS = 667;
 const SPAWN_BLINKS = 3;
 /* Após limpar a onda: tempo até o monstro aparecer. O teleporte-blink
- * (SPAWN_BLINKS × SPAWN_BLINK_MS = 3s) começa em T-3s, dentro desta janela. */
-const WAVE_CLEAR_RESPAWN_MS = 5000;
-const WAVE_TELEPORT_LEAD_MS = SPAWN_BLINKS * SPAWN_BLINK_MS;
+ * (~2s) começa quando faltam 2s (T-2s), dentro desta janela de 4s. */
+const WAVE_CLEAR_RESPAWN_MS = 4000;
+const WAVE_TELEPORT_LEAD_MS = 2000;
 
 function huntMapSpawnBlocked() {
   return typeof G !== "undefined" && G && G.huntMapReady === false;
@@ -267,11 +268,24 @@ function newBossCombat(player, boss) {
   if(boss.id==="goshnar-s-hatred"){
     bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
   }
+  if(boss.id==="goshnar-s-spite"){
+    bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
+  }
+  if(boss.id==="goshnar-s-malice"){
+    bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
+  }
+  if(boss.id==="goshnar-s-megalomania"){
+    bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
+    bossMob.qteImmune=true;bossMob.megaImmune=true;
+  }
   c.mobs = [bossMob];
   resolveSQMOccupancy(c);
   if (typeof scarlettBossInit === "function") scarlettBossInit(c, player);
   if (typeof greedBossInit === "function") greedBossInit(c, player);
   if (typeof hatredBossInit === "function") hatredBossInit(c, player);
+  if (typeof spiteBossInit === "function") spiteBossInit(c, player);
+  if (typeof maliceBossInit === "function") maliceBossInit(c, player);
+  if (typeof megaBossInit === "function") megaBossInit(c, player);
   return c;
 }
 
@@ -425,8 +439,8 @@ function spawnWave(c, p) {
   c.wave++;
 }
 
-/* Processa a fila de spawn: teleporte pisca em 0s/1s/2s e o monstro só
- * nasce depois da 3ª piscada (t=3s), como no Canary. */
+/* Processa a fila de spawn: teleporte pisca 3× (~667ms) e o monstro só
+ * nasce depois da 3ª piscada (~2s), como no Canary. */
 function tickSpawnQueue(c, now) {
   if (huntMapSpawnBlocked()) return;
   if (!c.pendingSpawns || !c.pendingSpawns.length) return;
@@ -1590,6 +1604,10 @@ function playerAttack(c, p, target) {
     const mul = bosstiaryDamageBonus(p);
     if (mul !== 1) raw = Math.max(1, Math.floor(raw * mul));
   }
+  if (typeof spiteIncomingDamageMultiplier === "function") {
+    const spiteMul = spiteIncomingDamageMultiplier(c, target);
+    if (spiteMul !== 1 && raw > 0) raw = Math.max(1, Math.floor(raw * spiteMul));
+  }
 
   // ---- buffs de vocacao (Virtudes, Protector)
   const bf = typeof buffTotals === "function" ? buffTotals(p) : null;
@@ -2322,6 +2340,10 @@ function castSpellById(c, p, target, now, id) {
     }
     if (typeof wheelDamageMul === "function" && p.wheel) {
       dmg = Math.max(1, Math.floor(dmg * wheelDamageMul(p)));
+    }
+    if (typeof spiteIncomingDamageMultiplier === "function") {
+      const spiteMul = spiteIncomingDamageMultiplier(c, t);
+      if (spiteMul !== 1) dmg = Math.max(1, Math.floor(dmg * spiteMul));
     }
     dmg = applyCharmDamage(p, elemento, dmg);
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
@@ -4435,6 +4457,9 @@ function combatTick(c, p, dt, now) {
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
   if (typeof hatredBossTick === "function" && hatredBossTick(c, now) === false) return;
+  if (typeof spiteBossTick === "function" && spiteBossTick(c, now) === false) return;
+  if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
+  if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
 
   // Stamina temporariamente desativada: toda a party permanece em 42h.
@@ -4491,9 +4516,10 @@ function combatTick(c, p, dt, now) {
 
   // spawn — só depois do mapa 100% pronto (G.huntMapReady).
   // Após limpar a onda, agenda WAVE_CLEAR_RESPAWN_MS até o monstro nascer.
-  // Em T-3s (WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns e começa o blink.
+  // Em T-2s (WAVE_TELEPORT_LEAD_MS) enfileira pendingSpawns e começa o blink.
   if (!c.mobs.length && !(c.pendingSpawns && c.pendingSpawns.length)) {
-    if (c.boss) return;
+    // Boss / World Boss: nunca repor wave de hunt (evita fusão cobra↔warzone).
+    if (c.boss || c.worldBoss || (c.boss && c.boss.worldBoss)) return;
     const teleportAt = c._nextWaveAt
       ? (Number(c._nextWaveAt) - WAVE_TELEPORT_LEAD_MS) : 0;
     if (c._nextWaveAt && now < teleportAt) {
@@ -4668,6 +4694,12 @@ function combatTick(c, p, dt, now) {
       greedBossHandleKill(c, m, now);
     if (typeof hatredBossHandleKill === "function")
       hatredBossHandleKill(c, m, now);
+    if (typeof spiteBossHandleKill === "function")
+      spiteBossHandleKill(c, m, now);
+    if (typeof maliceBossHandleKill === "function")
+      maliceBossHandleKill(c, m, now);
+    if (typeof megaBossHandleKill === "function")
+      megaBossHandleKill(c, m, now);
     // Raw XP/HP é registrado antes de stage, PvP, Prey, VIP, taints e party.
     recordRawMonsterStats(c, m);
     // recompensa

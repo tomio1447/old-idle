@@ -11,38 +11,50 @@
   const items = GAMEDATA.items;
   const monsters = GAMEDATA.monsters;
 
-  // Itens sem ficha no recorte antigo. O Canary não declara `value` para
-  // eles; sell=1 evita inventar preço de NPC e mantém o drop utilizável.
-  const cobraLootItems = {
-    "cobra-crest":          { n: "cobra crest", cid: 31678, w: 1.70 },
-    "gemmed-figurine":      { n: "gemmed figurine", cid: 24392, w: 6.50 },
-    "red-crystal-fragment": { n: "red crystal fragment", cid: 16126, w: 0.15 },
-    "onyx-chip":            { n: "onyx chip", cid: 22193, w: 1.20 },
-    "cheesy-figurine":      { n: "cheesy figurine", cid: 17818, w: 0.75 },
-    "opal":                 { n: "opal", cid: 22194, w: 1.20 },
+  // Preços NPC (TibiaWiki / Yasir / gem shops). sell e npcSell iguais —
+  // Sell All / autoseller usam sell; analyser prefere npcSell.
+  // sell=0 = NPC não compra (não inventar 1 gp).
+  const registerLootItem = (slug, def) => {
+    const sell = Math.max(0, Math.floor(Number(def.sell) || 0));
+    const npcSell = def.npcSell != null
+      ? Math.max(0, Math.floor(Number(def.npcSell) || 0))
+      : sell;
+    const base = Object.assign({ s: null, t: "loot" }, def, { sell, npcSell });
+    if (!items[slug]) items[slug] = base;
+    else {
+      items[slug].sell = sell;
+      items[slug].npcSell = npcSell;
+      if (def.n && !items[slug].n) items[slug].n = def.n;
+      if (def.cid && items[slug].cid == null) items[slug].cid = def.cid;
+      if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+    }
   };
-  Object.keys(cobraLootItems).forEach((slug) => {
-    if (!items[slug]) items[slug] = Object.assign({ s: null, t: "loot", sell: 1 }, cobraLootItems[slug]);
-  });
 
-  // Loot usado pelas criaturas da MOTA Extension e ausente do recorte
-  // inicial. CIDs/pesos vêm do items.xml do Canary.
-  const motaLootItems = {
-    "small-enchanted-ruby": { n:"small enchanted ruby", cid:676, w:.10, af:3, aw:4, ah:5 },
-    "sample-of-monster-blood": { n:"sample of monster blood", cid:27874, w:.85 },
-    "pool-of-chitinous-glue": { n:"pool of chitinous glue", cid:20207, w:2.70 },
-    "broken-dream": { n:"broken dream", cid:20029, w:.10 },
-    "jalapeno-pepper": { n:"jalapeno pepper", cid:8016, w:.30 },
-    "explorer-brooch": { n:"explorer brooch", cid:4871, w:.90 },
-    "hellhound-slobber": { n:"hellhound slobber", cid:9637, w:.75, af:2, aw:19, ah:23 },
-    "goosebump-leather": { n:"goosebump leather", cid:20205, w:2.80 },
-    "blazing-bone": { n:"blazing bone", cid:16131, w:2.20, af:2, aw:21, ah:26 },
-    "fiery-heart": { n:"fiery heart", cid:9636, w:1.14, af:2, aw:18, ah:19 },
-    "magma-amulet": { n:"magma amulet", cid:817, w:5, s:"amulet", t:"accessory" },
+  const cobraLootItems = {
+    "cobra-crest":          { n: "cobra crest", cid: 31678, w: 1.70, sell: 650 },
+    "gemmed-figurine":      { n: "gemmed figurine", cid: 24392, w: 6.50, sell: 3500 },
+    "red-crystal-fragment": { n: "red crystal fragment", cid: 16126, w: 0.15, sell: 800 },
+    "onyx-chip":            { n: "onyx chip", cid: 22193, w: 1.20, sell: 500 },
+    "cheesy-figurine":      { n: "cheesy figurine", cid: 17818, w: 0.75, sell: 150 },
+    "opal":                 { n: "opal", cid: 22194, w: 1.20, sell: 500 },
   };
-  Object.keys(motaLootItems).forEach((slug) => {
-    if (!items[slug]) items[slug] = Object.assign({s:null,t:"loot",sell:1},motaLootItems[slug]);
-  });
+  Object.keys(cobraLootItems).forEach((slug) => registerLootItem(slug, cobraLootItems[slug]));
+
+  // Loot MOTA Extension. CIDs/pesos do Canary; preços wiki.
+  const motaLootItems = {
+    "small-enchanted-ruby": { n: "small enchanted ruby", cid: 676, w: 0.10, sell: 250, af: 3, aw: 4, ah: 5 },
+    "sample-of-monster-blood": { n: "sample of monster blood", cid: 27874, w: 0.85, sell: 250 },
+    "pool-of-chitinous-glue": { n: "pool of chitinous glue", cid: 20207, w: 2.70, sell: 480 },
+    "broken-dream": { n: "broken dream", cid: 20029, w: 0.10, sell: 0 },
+    "jalapeno-pepper": { n: "jalapeno pepper", cid: 8016, w: 0.30, sell: 0 },
+    "explorer-brooch": { n: "explorer brooch", cid: 4871, w: 0.90, sell: 0 },
+    "hellhound-slobber": { n: "hellhound slobber", cid: 9637, w: 0.75, sell: 500, af: 2, aw: 19, ah: 23 },
+    "goosebump-leather": { n: "goosebump leather", cid: 20205, w: 2.80, sell: 650 },
+    "blazing-bone": { n: "blazing bone", cid: 16131, w: 2.20, sell: 610, af: 2, aw: 21, ah: 26 },
+    "fiery-heart": { n: "fiery heart", cid: 9636, w: 1.14, sell: 375, af: 2, aw: 18, ah: 19 },
+    "magma-amulet": { n: "magma amulet", cid: 817, w: 5, s: "amulet", t: "accessory", sell: 0 },
+  };
+  Object.keys(motaLootItems).forEach((slug) => registerLootItem(slug, motaLootItems[slug]));
   // Crystal Ring e Black Pearl usam patterns/subtipos no DAT, não frame
   // animation. Os metadados antigos pediam _anim.png inexistente.
   for (const slug of ["crystal-ring", "black-pearl"]) if (items[slug]) {
