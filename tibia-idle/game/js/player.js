@@ -175,7 +175,7 @@ function newPlayer(name, voc, sex) {
       manaAt: 50,           // % de mana para usar potions de mana
       healSpell: "",        // magia de cura selecionada pelo Helper
       healSupply: "",       // runa/potion de cura selecionada pelo Helper
-      manaSupply: "mana-potion", // item de mana selecionado pelo Helper
+      manaSupply: "",       // potion de mana — vazia = nenhuma (jogador escolhe 1)
       useRunes: true,
       autoRestock: false,   // legado: compras agora acontecem por carga, no uso
       manaTrain: null,      // receita ativa do treino online de mana
@@ -229,6 +229,7 @@ function ensurePlayerCapacity(p) {
 }
 
 function maxStats(p) {
+  if (!p) return { hp: 150, mp: 0, cap: DEFAULT_PLAYER_CAP };
   ensurePlayerCapacity(p);
   const b = baseStats(p.voc, p.level);
   let bonusHp = 0, bonusMp = 0;
@@ -325,6 +326,99 @@ function equipmentLeechTotals(p) {
   return t;
 }
 
+/* Bonus flat de skill vindo do equipamento (+ imbuements via gearStats). */
+function gearSkillBonus(p, which) {
+  const g = gearStats(p);
+  if (which === "sword") return (g.sword || 0) + (g.melee || 0);
+  if (which === "axe") return (g.axe || 0) + (g.melee || 0);
+  if (which === "club") return (g.club || 0) + (g.melee || 0);
+  if (which === "shield") return g.shield || 0;
+  if (which === "dist") return g.dist || 0;
+  if (which === "fist") return (g.fist || 0) + (g.melee || 0);
+  if (which === "magic") return g.mag || 0;
+  return 0;
+}
+
+/* Nome curto da stance ativa que mexe em skill (para o tooltip). */
+function stanceSkillBonusLabel(p, kind) {
+  if (!p || !p.stances) return kind === "dist" ? "sharpshooter" : "blood rage";
+  for (const id in p.stances) {
+    const st = typeof STANCES !== "undefined" ? STANCES[id] : null;
+    if (!st) continue;
+    if (kind === "melee" && st.meleePct) {
+      return (st.nome || id).toLowerCase();
+    }
+    if (kind === "dist" && st.distPct) {
+      return (st.nome || id).toLowerCase();
+    }
+  }
+  return kind === "dist" ? "sharpshooter" : "blood rage";
+}
+
+/* Breakdown da skill efetiva: espelha effSkill/effMagic, com cada fonte
+ * flat ou o delta absoluto dos % (blood rage, virtue…). Só partes > 0. */
+function skillBreakdown(p, which) {
+  const isMl = which === "magic";
+  const parts = [];
+  const base = isMl ? (p.ml || 0) : (p.skills[which] || 10);
+  parts.push({ label: "base", value: base });
+
+  const items = gearSkillBonus(p, which);
+  if (items) parts.push({ label: "itens", value: items });
+
+  let wheel = 0;
+  if (isMl) {
+    wheel = (typeof wheelMagicBonus === "function" && p.wheel) ? wheelMagicBonus(p) : 0;
+  } else if (typeof wheelSkillBonus === "function" && p.wheel) {
+    wheel = wheelSkillBonus(p, which);
+  }
+  if (wheel) parts.push({ label: "wheel", value: wheel });
+
+  const loyalty = (typeof loyaltySkillBonus === "function") ? loyaltySkillBonus(p) : 0;
+  if (loyalty) parts.push({ label: "loyalty", value: loyalty });
+
+  let v = base + items + wheel + loyalty;
+
+  if (!isMl && which === "fist" && typeof virtudeFistBonus === "function") {
+    const mul = virtudeFistBonus(p);
+    if (mul && mul !== 1) {
+      const next = Math.floor(v * mul);
+      const delta = next - v;
+      if (delta) parts.push({ label: "virtue of justice", value: delta });
+      v = next;
+    }
+  }
+
+  if (!isMl && typeof stanceTotals === "function") {
+    const st = stanceTotals(p);
+    if (st.meleePct &&
+        (which === "sword" || which === "axe" || which === "club" ||
+         which === "fist")) {
+      const next = Math.floor(v * (1 + st.meleePct / 100));
+      const delta = next - v;
+      if (delta) {
+        parts.push({ label: stanceSkillBonusLabel(p, "melee"), value: delta });
+      }
+      v = next;
+    }
+    if (st.distPct && which === "dist") {
+      const next = Math.floor(v * (1 + st.distPct / 100));
+      const delta = next - v;
+      if (delta) {
+        parts.push({ label: stanceSkillBonusLabel(p, "dist"), value: delta });
+      }
+      v = next;
+    }
+  }
+
+  return { parts: parts, total: v };
+}
+
+function skillBreakdownText(p, which) {
+  const bd = skillBreakdown(p, which);
+  return bd.parts.map((x) => x.value + " " + x.label).join(" + ");
+}
+
 /* Skill efetiva (base + bonus do equip) */
 function effSkill(p, which) {
   const g = gearStats(p);
@@ -340,6 +434,10 @@ function effSkill(p, which) {
   // Wheel of Destiny: bonus de skill (melee/distance/fist) dos nos da wheel
   if (typeof wheelSkillBonus === "function" && p.wheel) {
     v += wheelSkillBonus(p, which);
+  }
+  // Loyalty: flat +N em skills efetivas (não altera o save)
+  if (typeof loyaltySkillBonus === "function") {
+    v += loyaltySkillBonus(p);
   }
   // Virtue of Justice e PERCENTUAL sobre o total, entao entra depois de
   // somar o equipamento (SKILL_FISTPERCENT do Canary trabalha assim)
@@ -365,7 +463,8 @@ function effSkill(p, which) {
 
 function effMagic(p) {
   const wheelMag = (typeof wheelMagicBonus === "function" && p.wheel) ? wheelMagicBonus(p) : 0;
-  return p.ml + gearStats(p).mag + wheelMag;
+  const loyaltyMag = (typeof loyaltySkillBonus === "function") ? loyaltySkillBonus(p) : 0;
+  return p.ml + gearStats(p).mag + wheelMag + loyaltyMag;
 }
 
 /* Qual skill a arma equipada usa */
@@ -398,20 +497,34 @@ function isMagicWeaponItem(it) {
   return t === "magic" || t === "wand" || t === "rod";
 }
 
+/* Multiplicador idle de dano base por vocação (Knight / Sorcerer +15%). */
+function playerIdleBaseDmgMul(p) {
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.idleBaseDamageMul)
+    return CanaryVocation.idleBaseDamageMul(p && p.voc);
+  return 1;
+}
+
 /* Dano por golpe do jogador */
 function playerDamage(p) {
   const w = p.equip.weapon;
   const it = w ? (typeof upgradedStats === "function"
     ? upgradedStats(p, "equip:weapon", w.item) : GAMEDATA.items[w.item]) : null;
   const voc = VOCATIONS[p.voc];
+  const baseVoc = (typeof CanaryVocation !== "undefined" && CanaryVocation.baseVocName)
+    ? CanaryVocation.baseVocName(p.voc) : String(p.voc || "");
+  const idleMul = playerIdleBaseDmgMul(p);
 
   if (isMagicWeaponItem(it)) {
     // Canary WeaponWand::getWeaponDamage: dano base do item (fromDamage a
     // toDamage em items.xml) + level/5, mantendo o elemento real da wand/rod
     // em vez de forçar energy e escalar com ml (magicDamage).
     const lvBonus = Math.floor((p.level || 1) / 5);
-    const min = (it.dmgMin !== undefined ? it.dmgMin : (it.mdmg || 10)) + lvBonus;
-    const max = (it.dmgMax !== undefined ? it.dmgMax : (it.mdmg || 10)) + lvBonus;
+    let min = (it.dmgMin !== undefined ? it.dmgMin : (it.mdmg || 10)) + lvBonus;
+    let max = (it.dmgMax !== undefined ? it.dmgMax : (it.mdmg || 10)) + lvBonus;
+    if (idleMul !== 1) {
+      min = Math.max(0, Math.floor(min * idleMul));
+      max = Math.max(1, Math.floor(max * idleMul));
+    }
     return { min: min, max: Math.max(min, max), element: it.el || "energy", type: "magic" };
   }
   if (it && it.t === "distance") {
@@ -433,6 +546,10 @@ function playerDamage(p) {
       min = Math.max(0, Math.floor(min * ammoMul));
       max = Math.max(1, Math.floor(max * ammoMul));
     }
+    if (idleMul !== 1) {
+      min = Math.max(0, Math.floor(min * idleMul));
+      max = Math.max(1, Math.floor(max * idleMul));
+    }
     return { min: min, max: max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
@@ -440,7 +557,8 @@ function playerDamage(p) {
   let fis = it ? Math.floor((it.atk || 0) * 1.2) : 7;         // punho = attack 7 no canary
   // KNIGHT: dano base +30% (pedido do dono do jogo) — multiplica o ataque
   // da arma antes da rolagem, então vale para o dano físico de melee.
-  if (p.voc === "knight") fis = Math.floor(fis * 1.3);
+  // Elite Knight usa a mesma base (CanaryVocation.baseVocName).
+  if (baseVoc === "knight") fis = Math.floor(fis * 1.3);
   // Arma elemental (naga sword, fire sword, ice rapier...) soma o elDmg ao
   // ataque ANTES de rolar: e o `totalAttack` do Weapon::getCombatDamage.
   // Antes o elDmg era ignorado aqui, entao uma naga sword (atk 8, elDmg 44)
@@ -448,7 +566,12 @@ function playerDamage(p) {
   const elDmg = (it && it.el && it.el !== "physical") ? (it.elDmg || 0) : 0;
   const total = fis + elDmg;
   const d = meleeDamage(effSkill(p, sk), total, 1.0, p.level);
-  const r = { min: d.min, max: d.max, element: "physical", type: "melee" };
+  let min = d.min, max = d.max;
+  if (idleMul !== 1) {
+    min = Math.max(0, Math.floor(min * idleMul));
+    max = Math.max(1, Math.floor(max * idleMul));
+  }
+  const r = { min: min, max: max, element: "physical", type: "melee" };
   const bond = (typeof elementalBond === "function") ? elementalBond(p) : null;
   if (bond) {
     r.element = bond;
@@ -669,7 +792,40 @@ function itemUsesInstances(slug) {
   // (1 slot por tipo, contagem na stack). Itens de verdade (armas com
   // imbuement slot, armaduras etc.) continuam por instância.
   if (it.t === "distance" && !it.imbSlots) return false;
+  // Anéis/amuletos/soft boots com cargas: CHEIOS empilham na bag; PARCIAIS
+  // viram instâncias com .charges (não compartilham ledger por slug).
+  if (isChargeStackableAccessory(slug)) return false;
   return true;
+}
+
+/* Rings/amulets/boots com cargas e sem imbuement (SSA, might, time ring…). */
+function isChargeStackableAccessory(slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
+  if (!it || !it.charges) return false;
+  if (it.s !== "ring" && it.s !== "amulet" && it.s !== "boots") return false;
+  if (it.imbSlots) return false;
+  return true;
+}
+
+function accessoryCatalogCharges(slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
+  const n = Math.floor(Number(it && it.charges) || 0);
+  return n > 0 ? n : 0;
+}
+
+function accessoryChargesAreFull(slug, charges) {
+  const full = accessoryCatalogCharges(slug);
+  if (!full) return true;
+  if (charges === undefined || charges === null) return true;
+  const n = Math.floor(Number(charges));
+  return Number.isFinite(n) && n >= full;
+}
+
+function accessoryChargesArePartial(slug, charges) {
+  const full = accessoryCatalogCharges(slug);
+  if (!full) return false;
+  const n = Math.floor(Number(charges));
+  return Number.isFinite(n) && n > 0 && n < full;
 }
 
 function nextItemInstanceId(p) {
@@ -697,9 +853,19 @@ function syncBagCountsFromInstances(p) {
   // Instâncias de itens que NÃO usam mais instância (arremessáveis viraram
   // empilháveis) são convertidas em quantidade na bag; as demais continuam
   // como instância (e entram na contagem de exibição).
+  // Chargeables: PARCIAL permanece instância; CHEIO funde na stack da bag.
   const rest = [];
   for (const inst of (p.itemInstances || [])) {
     if (!inst || inst.loc !== "bag") { rest.push(inst); continue; }
+    if (isChargeStackableAccessory(inst.slug)) {
+      if (accessoryChargesArePartial(inst.slug, inst.charges)) {
+        rest.push(inst);
+        continue;
+      }
+      // full / sem charges → stack
+      nextBag[inst.slug] = (nextBag[inst.slug] || 0) + 1;
+      continue;
+    }
     nextBag[inst.slug] = (nextBag[inst.slug] || 0) + 1;
     if (itemUsesInstances(inst.slug)) rest.push(inst);
   }
@@ -883,7 +1049,9 @@ function takeEquippedItemInstance(p, slot) {
 
 function bagUsedSlots(p) {
   ensureItemInstances(p);
+  // Parciais chargeable + demais instâncias na bag
   let used = (p.itemInstances || []).filter((inst) => inst && inst.loc === "bag").length;
+  // Stacks cheias (inclui chargeables full e consumíveis)
   used += Object.keys(p.bag || {}).filter((slug) => (p.bag[slug] || 0) > 0 && !itemUsesInstances(slug)).length;
   return used;
 }
@@ -891,12 +1059,37 @@ function bagUsedSlots(p) {
 function hasBagSpace(p, slug) {
   ensureItemInstances(p);
   if (itemUsesInstances(slug)) return bagUsedSlots(p) < bagSlots(p);
+  // Chargeable parcial (opts) usa instância — tratado em addItem.
+  // Stack cheia: reusa o slot do tipo se já existir.
+  if (isChargeStackableAccessory(slug)) return !!p.bag[slug] || bagUsedSlots(p) < bagSlots(p);
   return !!p.bag[slug] || bagUsedSlots(p) < bagSlots(p);
 }
 
-function addItem(p, slug, count) {
+function addItem(p, slug, count, opts) {
   count = count || 1;
+  opts = opts || {};
   ensureItemInstances(p);
+  if (isChargeStackableAccessory(slug)) {
+    const full = accessoryCatalogCharges(slug);
+    let ch = opts.charges !== undefined ? Math.floor(Number(opts.charges)) : full;
+    if (!Number.isFinite(ch) || ch <= 0) return false;
+    if (ch > full) ch = full;
+    if (ch < full) {
+      // Parcial: 1 instância por unidade — NÃO empilha.
+      if (bagUsedSlots(p) + count > bagSlots(p)) return false;
+      for (let i = 0; i < count; i++) {
+        p.itemInstances.push({
+          id: nextItemInstanceId(p), slug: slug, loc: "bag", tier: 0,
+          charges: ch, maxCharges: full,
+        });
+      }
+      return true;
+    }
+    // Cheio: empilha na bag (1 slot por tipo).
+    if (!hasBagSpace(p, slug)) return false;
+    p.bag[slug] = (p.bag[slug] || 0) + count;
+    return true;
+  }
   if (itemUsesInstances(slug)) {
     if (bagUsedSlots(p) + count > bagSlots(p)) return false;
     for (let i = 0; i < count; i++) {
@@ -1100,11 +1293,19 @@ function isProtectedPouchClass(slug) {
   return !!(item && Number(item.cls) >= 3);
 }
 
+/** Material de imbuement (mat-*): VENDER manual ok; Sell All / autoseller não. */
+function isImbueMatItem(item, slug) {
+  if (item && item._imbMat != null) return true;
+  return typeof slug === "string" && /^mat-/.test(slug);
+}
+
 function canSellLootPouchItem(p, slug) {
   const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items
     ? GAMEDATA.items[slug] : null;
   if (!item || (typeof isNoSell === "function" && isNoSell(p, slug)) ||
       isProtectedPouchClass(slug)) return false;
+  // Sell All / autoseller: nunca vender materiais de imbue (use VENDER no menu).
+  if (isImbueMatItem(item, slug)) return false;
   if (typeof pouchUnitSellPrice === "function") return pouchUnitSellPrice(item) > 0;
   const npc = Number(item.npcSell);
   if (Number.isFinite(npc) && npc > 0) return true;

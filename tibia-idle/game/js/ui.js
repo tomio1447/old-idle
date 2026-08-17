@@ -30,6 +30,16 @@ function fmtTime(sec) {
   if (m > 0) return m + "m " + String(s).padStart(2, "0") + "s";
   return s + "s";
 }
+/* Contagem regressiva curta estilo Tibia: 45s / 1m30s / 1h5m / 2h */
+function fmtShortDuration(sec) {
+  sec = Math.max(0, Math.ceil(Number(sec) || 0));
+  if (sec < 60) return sec + "s";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return m > 0 ? (h + "h" + m + "m") : (h + "h");
+  return s > 0 ? (m + "m" + s + "s") : (m + "m");
+}
 function itemName(slug) {
   const it = GAMEDATA.items[slug];
   return it ? it.n : slug;
@@ -186,16 +196,28 @@ function itemTip(slug, extra, slot, instId) {
   if (it.mpreg) st.push("Regen. mana +" + it.mpreg);
   if (it.spd) st.push("Velocidade +" + it.spd);
   if (it.th) st.push("Duas mãos");
-  // Cargas de anéis/amuletos: por tempo (time ring = 10 min) ou por golpe
-  // (might ring = 20 golpes). Se equipado, mostra o saldo atual.
-  if (it.charges && (it.s === "ring" || it.s === "amulet")) {
+  // Cargas de anéis/amuletos/boots por tempo (ou por golpe). Equipado: saldo + tempo.
+  if (it.charges && (it.s === "ring" || it.s === "amulet" || it.s === "boots")) {
     const modo = it.chargeMode === "hits"
       ? "1 carga por golpe recebido" : "1 carga a cada 3s enquanto equipado";
     let linha = `⚡ ${it.charges} cargas · ${modo}`;
+    if (it.chargeMode !== "hits" && it.durationSec) {
+      linha = `⏱ ${typeof fmtShortDuration === "function" ? fmtShortDuration(it.durationSec) : (it.durationSec + "s")} · ${modo}`;
+    } else if (it.chargeMode !== "hits") {
+      linha = `⏱ ${typeof fmtShortDuration === "function" ? fmtShortDuration(it.charges * 3) : ((it.charges * 3) + "s")} · ${modo}`;
+    }
     if (p && p.equip && slot && p.equip[slot] && p.equip[slot].item === slug &&
         typeof accessoryChargesNow === "function") {
       const cg = accessoryChargesNow(p, slot);
-      if (cg) linha = `⚡ ${cg.now}/${cg.max} cargas (equipado) · ${modo}`;
+      if (cg) {
+        if (cg.mode === "hits") {
+          linha = `⚡ ${cg.now}/${cg.max} cargas (equipado) · ${modo}`;
+        } else {
+          const t = typeof fmtShortDuration === "function"
+            ? fmtShortDuration(cg.remSec) : (cg.remSec + "s");
+          linha = `⏱ ${t} restantes (${cg.now}/${cg.max}) · ${modo}`;
+        }
+      }
     }
     st.push(`<span style="color:#ffe680">${linha}</span>`);
   }
@@ -315,6 +337,7 @@ function addLog(kind, html) {
 
 /* ------------------------------------------------------------ paineis */
 function renderStats(p) {
+  if (!p) return;
   // faixa de conditions/buffs ativos (ícones OTC, mesma fonte da status-bar)
   if (typeof paintConditionBar === "function") paintConditionBar($("#cond-bar"), p, false);
 
@@ -445,15 +468,27 @@ function renderSkills(p) {
     const baseLvl = isMl ? p.ml : p.skills[k];
     const prog = isMl ? mlProgress(p) : skillProgress(p, k);
     const bonus = lvl - baseLvl;
-    h += `<div class="mb4">
+    // Valor principal = TOTAL efetivo; +bonus fica muted (detalhe no tooltip).
+    h += `<div class="mb4 skill-row" data-skill="${k}" style="cursor:help">
       <div class="row small" style="justify-content:space-between">
         <span class="k">${SKILL_NAMES[k]}</span>
-        <span class="v">${baseLvl}${bonus > 0 ? ` <span style="color:#7ae87a">+${bonus}</span>` : ""} <span class="dim">${prog.toFixed(1)}%</span></span>
+        <span class="v"><b>${lvl}</b>${bonus > 0 ? ` <span class="dim">+${bonus}</span>` : ""} <span class="dim">${prog.toFixed(1)}%</span></span>
       </div>
       <div class="bar" style="height:8px"><div class="fill skl" style="width:${prog}%"></div></div>
     </div>`;
   }
   $("#skills").innerHTML = h;
+  $$("#skills .skill-row").forEach((el) => {
+    const k = el.dataset.skill;
+    el.addEventListener("mouseenter", () => {
+      const name = SKILL_NAMES[k] || k;
+      const tip = (typeof skillBreakdownText === "function")
+        ? skillBreakdownText(p, k) : "";
+      showTip(`<div class="tt-name">${name}</div>` +
+        (tip ? `<div class="tiny dim mt4" style="max-width:300px">${tip}</div>` : ""));
+    });
+    el.addEventListener("mouseleave", hideTip);
+  });
 }
 
 const SLOT_LABELS = {
@@ -500,9 +535,20 @@ function renderEquip(p) {
       const showSlug = (typeof accessoryDisplaySlug === "function")
         ? accessoryDisplaySlug(e.item, true) : e.item;
       const chg = (typeof accessoryChargesNow === "function") ? accessoryChargesNow(p, slot) : null;
-      const chgTxt = chg ? `<span class="cnt charge-cnt">${chg.now}</span>` : (cnt && cnt !== 1 ? `<span class="cnt">${cnt}</span>` : "");
+      let chgTxt = "";
+      if (chg) {
+        if (chg.mode === "hits") {
+          chgTxt = `<span class="cnt charge-cnt" data-charge-overlay="hits">${chg.now}</span>`;
+        } else {
+          const t = typeof fmtShortDuration === "function"
+            ? fmtShortDuration(chg.remSec) : (chg.remSec + "s");
+          chgTxt = `<span class="cnt charge-cnt item-tempo" data-charge-overlay="time">${t}</span>`;
+        }
+      } else if (cnt && cnt !== 1) {
+        chgTxt = `<span class="cnt">${cnt}</span>`;
+      }
       h += `<div class="slot ${itemClsBorder(e.item)} ${tierCls}${glow}" data-slot="${slot}" data-item="${e.item}">
-        ${itemImg(showSlug)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${chgTxt}
+        ${itemImg(showSlug, 0, null, e.count || 1)}${tierTxt ? `<span class="tier-badge ${tierCls}">${tierTxt}</span>` : ""}${chgTxt}
       </div>`;
     } else if (slot === "shield" && p.equip.weapon &&
                (p.voc === "knight" || p.voc === "elite knight" || p.voc === "monk") &&
@@ -522,7 +568,13 @@ function renderEquip(p) {
     const slotDrop = el.dataset.slot;
     if (slotDrop === "cap") return;
     if (typeof bindDrop === "function") {
-      bindDrop(el, (payload) => typeof moveItemToEquip === "function" && moveItemToEquip(G.p, payload, slotDrop));
+    bindDrop(el, (payload) => {
+      if (payload && payload.source === "stash" && typeof persistEquipFromSupplyStash === "function") {
+        persistEquipFromSupplyStash(G.p, payload.slug, slotDrop);
+        return false;
+      }
+      return typeof moveItemToEquip === "function" && moveItemToEquip(G.p, payload, slotDrop);
+    });
     }
     const slug = el.dataset.item;
     if (!slug) return;
@@ -561,6 +613,46 @@ function renderEquip(p) {
   });
 }
 
+/* Atualiza só o overlay de tempo/cargas nos slots (HUD tick) — sem rebind.
+ * Se o DOM ainda mostra um item que já quebrou no save, re-renderiza o equip. */
+function refreshEquipChargeOverlays(p) {
+  if (!p || !p.equip || typeof accessoryChargesNow !== "function") return;
+  const root = $("#equip");
+  if (!root) return;
+  let stale = false;
+  root.querySelectorAll(".slot[data-slot][data-item]").forEach((el) => {
+    const slot = el.dataset.slot;
+    const live = p.equip[slot] && p.equip[slot].item;
+    if (!live || live !== el.dataset.item) {
+      stale = true;
+      return;
+    }
+    const cg = accessoryChargesNow(p, slot);
+    let ov = el.querySelector("[data-charge-overlay]");
+    if (!cg) {
+      if (ov) ov.remove();
+      return;
+    }
+    const txt = cg.mode === "hits"
+      ? String(Math.max(0, cg.now | 0))
+      : (typeof fmtShortDuration === "function" ? fmtShortDuration(cg.remSec) : (cg.remSec + "s"));
+    const mode = cg.mode === "hits" ? "hits" : "time";
+    if (!ov) {
+      ov = document.createElement("span");
+      ov.className = "cnt charge-cnt" + (mode === "time" ? " item-tempo" : "");
+      ov.dataset.chargeOverlay = mode;
+      el.appendChild(ov);
+    } else {
+      ov.dataset.chargeOverlay = mode;
+      ov.classList.toggle("item-tempo", mode === "time");
+    }
+    if (ov.textContent !== txt) ov.textContent = txt;
+  });
+  if (stale && typeof renderEquip === "function") {
+    try { renderEquip(p); } catch (err) { /* UI opcional */ }
+  }
+}
+
 /* ------------------------------------------------------------ status bar
  * Barra de status estilo Tibia/OTC: ícones de condições especiais logo abaixo
  * dos equipamentos e também em #cond-bar (sob HP/mana), com overlay de duração.
@@ -569,9 +661,15 @@ function renderEquip(p) {
 
 function conditionTurnsLabel(c) {
   if (!c) return "";
+  if (c.until) {
+    const left = Math.max(0, Math.ceil((Number(c.until) - Date.now()) / 1000));
+    if (!left) return "";
+    return typeof fmtShortDuration === "function" ? fmtShortDuration(left) : (left + "s");
+  }
   const turns = Math.max(0, Math.floor(Number(c.turns) || 0));
   if (!turns) return "";
-  return (turns * 2) + "s";
+  const sec = turns * 2;
+  return typeof fmtShortDuration === "function" ? fmtShortDuration(sec) : (sec + "s");
 }
 
 function conditionIconSlug(tipo, fallback) {
@@ -629,7 +727,9 @@ function collectConditionBarItems(p) {
         ? WIKI_CONDITION_ICONS["cond-haste"] : null;
       push("cond-haste", "Haste — " + hs.nome,
         meta ? meta.desc : "Faz o personagem se mover mais rápido.",
-        "positive", Math.max(0, Math.ceil((hs.ate - agora) / 1000)) + "s");
+        "positive", typeof fmtShortDuration === "function"
+          ? fmtShortDuration(Math.max(0, (hs.ate - agora) / 1000))
+          : Math.max(0, Math.ceil((hs.ate - agora) / 1000)) + "s");
     }
   }
 
@@ -639,17 +739,19 @@ function collectConditionBarItems(p) {
       const def = (typeof BUFFS !== "undefined" && BUFFS[b.chave]) ? BUFFS[b.chave] : null;
       push("cond-strengthened", b.nome,
         (def && def.desc) ? def.desc : "Bônus de skill ativo por um período.",
-        "positive", Math.max(0, Math.ceil((b.ate - agora) / 1000)) + "s");
+        "positive", typeof fmtShortDuration === "function"
+          ? fmtShortDuration(Math.max(0, (b.ate - agora) / 1000))
+          : Math.max(0, Math.ceil((b.ate - agora) / 1000)) + "s");
     }
   }
 
   if (typeof avatarActive === "function" && avatarActive(p, agora)) {
     const av = p._avatar || {};
-    const resta = Math.max(0, Math.ceil((av.started + av.duration - agora) / 1000));
+    const resta = Math.max(0, (av.started + av.duration - agora) / 1000);
     itens.push({
       avatar: true, nome: "Avatar Stage 3", tipo: "positive",
       desc: "Transcendence: -15% dano recebido e todos os ataques críticos com +15% de dano extra.",
-      tempo: resta + "s",
+      tempo: typeof fmtShortDuration === "function" ? fmtShortDuration(resta) : (Math.ceil(resta) + "s"),
     });
   }
 
@@ -658,7 +760,7 @@ function collectConditionBarItems(p) {
     if (taint) {
       const icon = taint.icon && String(taint.icon).indexOf("cond-") === 0
         ? taint.icon : ("cond-" + (taint.icon || "goshnar-taint-1"));
-      push(icon, taint.name || "Goshnar's Taint",
+      push(icon, "Máculas de Goshnar",
         typeof soulwarTaintTooltip === "function" ? soulwarTaintTooltip(p) : "",
         "negative", taint.level + "/5");
     }
@@ -685,6 +787,13 @@ function collectConditionBarItems(p) {
   return itens;
 }
 
+function attrEscape(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
 function paintConditionBar(box, p, withLabel) {
   if (!box) return;
   const itens = collectConditionBarItems(p);
@@ -699,7 +808,7 @@ function paintConditionBar(box, p, withLabel) {
       const voc = p && p.voc;
       const cor = { knight: "#ff7a3a", paladin: "#ffe680", sorcerer: "#c78cff",
                     druid: "#7ae87a", monk: "#66c7ff" }[voc] || "#c78cff";
-      h += `<span class="sb-avatar" style="color:${cor}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">◈</span>`;
+      h += `<span class="sb-avatar" style="color:${cor}" data-nome="${attrEscape(it.nome)}" data-desc="${attrEscape(it.desc)}" data-tempo="${attrEscape(it.tempo)}">◈</span>`;
       continue;
     }
     const img = it.img
@@ -707,7 +816,7 @@ function paintConditionBar(box, p, withLabel) {
       : `<img src="assets/ui/conditions/${it.icon}.png" alt="">`;
     const tempo = it.tempo
       ? `<span class="sb-tempo">${it.tempo}</span>` : "";
-    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${it.nome}" data-desc="${it.desc}" data-tempo="${it.tempo}">${img}${tempo}</span>`;
+    h += `<span class="sb-ico ${it.tipo || ""}" data-nome="${attrEscape(it.nome)}" data-desc="${attrEscape(it.desc)}" data-tempo="${attrEscape(it.tempo)}">${img}${tempo}</span>`;
   }
   box.innerHTML = h;
   box.style.display = "flex";
@@ -716,8 +825,11 @@ function paintConditionBar(box, p, withLabel) {
       const nome = el.dataset.nome || "";
       const desc = el.dataset.desc || "";
       const tempo = el.dataset.tempo || "";
+      const taintTip = desc.indexOf("tt-taint-list") !== -1;
+      const descCls = taintTip ? "tiny dim mt4 tt-taint" : "tiny dim mt4";
+      const descW = taintTip ? "320px" : "230px";
       showTip(`<div class="tt-name">${nome}</div>` +
-        (desc ? `<div class="tiny dim mt4" style="max-width:230px">${desc}</div>` : "") +
+        (desc ? `<div class="${descCls}" style="max-width:${descW}">${desc}</div>` : "") +
         (tempo ? `<div class="tiny mt4" style="color:#ffe680">${tempo}</div>` : ""));
     });
     el.addEventListener("mouseleave", hideTip);
@@ -765,7 +877,7 @@ const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS 100–250", ids: [] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
-  { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland"] },
+  { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow"] },
 ];
 
 const HUNT_UI = { busca: "" };
@@ -781,19 +893,21 @@ function renderHunts(p) {
     const hu = GAMEDATA.hunts[id];
     if (!hu) return "";
     if (busca && (hu.name || "").toLowerCase().indexOf(busca) === -1) return "";
-    const risk = huntRisk(p, hu);
+    const risk = hu.comingSoon ? { cls: "mid", txt: "em breve" } : huntRisk(p, hu);
     const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
     const starsHtml = typeof huntStarsHtml === "function"
       ? huntStarsHtml(stars) : `★${stars}`;
-    const aviso = risk.cls === "high"
-      ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "";
+    const aviso = hu.comingSoon
+      ? `<div class="tiny" style="color:#e8d24a">Em breve — missão Fear 15× já ativa</div>`
+      : (risk.cls === "high"
+        ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "");
     const mobs = (hu.monsters || []).slice(0, 4).map((m) => {
       const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 1;
       const charm = typeof charmOnRace === "function" ? charmOnRace(p, m) : null;
       return `<span class="hunt-modal-mob">${mobImg(m, 24, st ? "" : "filter:brightness(0);")}${
         charm && typeof charmIconHtml === "function" ? charmIconHtml(charm, 12) : ""}</span>`;
     }).join("");
-    return `<button class="hunt-card hunt-modal-card hunt-canary-card ${cur === id ? "active" : ""}" data-hunt="${id}">
+    return `<button class="hunt-card hunt-modal-card hunt-canary-card ${cur === id ? "active" : ""} ${hu.comingSoon ? "coming-soon" : ""}" data-hunt="${id}">
       <span class="mobs" aria-hidden="true">${mobs}</span>
       <span class="info">
         <span class="nm">${hu.name} ${starsHtml}</span>
@@ -892,16 +1006,18 @@ function openHuntInfoModal(id) {
 
   const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
   const starsHtml = typeof huntStarsHtml === "function" ? huntStarsHtml(stars) : "";
+  const soon = !!hu.comingSoon;
   $("#modal-body").innerHTML = `
     <div class="panel-title">${hu.name}
       <span style="margin-left:8px">${starsHtml}</span>
       <span class="tiny dim" style="margin-left:6px">nv recomendado ${hu.level}</span>
       <span style="flex:1"></span>
-      <span class="risk ${risk.cls}" style="margin-right:6px">${risk.txt}</span>
+      <span class="risk ${soon ? "mid" : risk.cls}" style="margin-right:6px">${soon ? "em breve" : risk.txt}</span>
       <button class="sm" id="huntinfo-close">✕</button>
     </div>
     <div class="panel-body">
-      ${risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
+      ${soon ? `<div class="tiny mb8" style="color:#e8d24a">Mapa em breve. A missão de Fear (15×) já está pré-setada para liberar Goshnar's Spite.</div>` : ""}
+      ${!soon && risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
       <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
         <span class="tiny dim">Dificuldade <b>${stars}/5</b></span>
         <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
@@ -912,14 +1028,16 @@ function openHuntInfoModal(id) {
       <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
       <div class="row mt8" style="gap:6px;justify-content:flex-end">
         <button class="sm" id="huntinfo-cancel">Cancelar</button>
-        <button class="primary sm" id="huntinfo-go">⚔ Caçar em ${hu.name}</button>
+        <button class="primary sm" id="huntinfo-go" ${soon ? "disabled" : ""}>${soon ? "Em breve" : `⚔ Caçar em ${hu.name}`}</button>
       </div>
     </div>`;
 
   const close = () => $("#modal").classList.remove("show", "wide");
   $("#huntinfo-close").addEventListener("click", close);
   $("#huntinfo-cancel").addEventListener("click", close);
-  $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
+  if (!soon) {
+    $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
+  }
   $("#modal").classList.add("show", "wide");
 }
 
@@ -972,7 +1090,10 @@ function renderInventory(p) {
       if (ds) return ds;
       return itemInstanceTier(b) - itemInstanceTier(a);
     })
-    .map((inst) => ({ slug: inst.slug, instId: inst.id, tier: itemInstanceTier(inst), count: 1, instanced: true }));
+    .map((inst) => ({
+      slug: inst.slug, instId: inst.id, tier: itemInstanceTier(inst), count: 1, instanced: true,
+      charges: inst.charges, maxCharges: inst.maxCharges,
+    }));
   const stacked = Object.keys(p.bag)
     .filter((slug) => (p.bag[slug] || 0) > 0 && !(typeof itemUsesInstances === "function" && itemUsesInstances(slug)))
     .sort((a, b) => {
@@ -987,8 +1108,18 @@ function renderInventory(p) {
     const e = entries[i];
     if (e) {
       const tierCls = e.tier && typeof forgeTierClassForValue === "function" ? forgeTierClassForValue(e.tier) : "";
-      cells.push(`<div class="inv-item ${itemClsBorder(e.slug)} ${tierCls}" data-item="${e.slug}"${e.instId ? ` data-inst="${e.instId}"` : ""}>${itemImg(e.slug)}
-        ${e.tier ? `<span class="tier-badge ${tierCls}">T${e.tier}</span>` : (e.count > 1 ? `<span class="cnt">${e.count}</span>` : "")}
+      let badge = "";
+      if (e.tier) badge = `<span class="tier-badge ${tierCls}">T${e.tier}</span>`;
+      else if (e.instanced && e.charges !== undefined && typeof fmtShortDuration === "function") {
+        const it = GAMEDATA.items[e.slug];
+        if (it && it.chargeMode === "time") {
+          badge = `<span class="cnt charge-cnt item-tempo">${fmtShortDuration(e.charges * 3)}</span>`;
+        } else {
+          badge = `<span class="cnt charge-cnt">${e.charges}</span>`;
+        }
+      } else if (e.count > 1) badge = `<span class="cnt">${e.count}</span>`;
+      cells.push(`<div class="inv-item ${itemClsBorder(e.slug)} ${tierCls}" data-item="${e.slug}"${e.instId ? ` data-inst="${e.instId}"` : ""}>${itemImg(e.slug, 0, null, e.count || 1)}
+        ${badge}
       </div>`);
     } else {
       cells.push(`<div class="inv-item empty" title="Slot vazio"></div>`);
@@ -1010,13 +1141,23 @@ function renderInventory(p) {
     invBox.dataset.sellBound = "1";
     invBox.addEventListener("click", (e) => {
       if (e.target && e.target.closest && e.target.closest("#btn-bag-sell-all")) {
-        if (typeof sellAllBag === "function") sellAllBag(G.p);
+        const run = typeof sellAllBagAndPersist === "function"
+          ? sellAllBagAndPersist(G.p)
+          : Promise.resolve({ gold: typeof sellAllBag === "function" ? sellAllBag(G.p) : 0, ok: true });
+        Promise.resolve(run).catch(() => {});
       }
     });
   }
   if (typeof bindDrop === "function" && !invBox.dataset.dropBound) {
     invBox.dataset.dropBound = "1";
     bindDrop(invBox, (payload) => {
+      if (payload && payload.source === "stash" && typeof persistWithdrawFromSupplyStash === "function") {
+        persistWithdrawFromSupplyStash(G.p, { slug: payload.slug, dest: "bag" }).then((result) => {
+          if (result && result.ok && typeof addLog === "function")
+            addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
+        });
+        return false;
+      }
       const ok = typeof moveItemToBag === "function" && moveItemToBag(G.p, payload);
       if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
       return ok;
@@ -1154,7 +1295,16 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
   if (currencyValue(slug)) {
     opts.push({
       label: `Converter em gold · ${fmtFull(currencyValue(slug) * count)} gp`,
-      action: () => { if (sellBagItem(p, slug, instId) > 0) refresh(); },
+      action: () => {
+        if (typeof persistBagSell === "function") {
+          persistBagSell(p, { slug, instId }).then((result) => {
+            if (result && result.ok && typeof refresh === "function") refresh();
+            else if (result && result.ok) renderAll();
+          });
+          return;
+        }
+        if (sellBagItem(p, slug, instId) > 0) refresh();
+      },
     });
   } else {
   opts.push({
@@ -1485,6 +1635,39 @@ function persistAutoSupplyStash(p, slug, on) {
   return Promise.resolve({ ok: true, local: true, slug, on: !!on });
 }
 
+/* Persiste lootConfig (NÃO COLETAR / NÃO VENDER) — online precisa ir pra autoridade. */
+function persistLootConfig(p) {
+  if (!p) return Promise.resolve({ ok: false });
+  const lootConfig = (typeof lootConfigList === "function")
+    ? { noCollect: lootConfigList(p, "noCollect").slice(), noSell: lootConfigList(p, "noSell").slice() }
+    : (p.lootConfig || { noCollect: [], noSell: [] });
+  p.lootConfig = lootConfig;
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSetLootConfig === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountSetLootConfig(sessionToken(), p.id, lootConfig).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.lootConfig) {
+          p.lootConfig = result.lootConfig;
+        }
+      } else if (!result || !result.ok) {
+        toast((result && result.msg) || "Não foi possível salvar regras de loot.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      else if (typeof renderLootPouch === "function") renderLootPouch(p);
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível salvar regras de loot.", "bad");
+      return { ok: false };
+    });
+  }
+  if (typeof save === "function") save();
+  return Promise.resolve({ ok: true, local: true, lootConfig });
+}
+
 /* Move pouch/bag → Supply Stash com persistência (igual pouch-sell/clear).
  * Conta online: API autoritativa (PUT comum ignora lootPouch/supplyStash).
  * Offline/localStorage: move local + save. */
@@ -1496,30 +1679,55 @@ function persistMoveToSupplyStash(p, payload) {
   const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
     typeof accountMoveToSupplyStash === "function" && typeof sessionToken === "function" && p.id;
   if (useAccount) {
+    const snapshot = {
+      bag: Object.assign({}, p.bag || {}),
+      lootPouch: Object.assign({}, p.lootPouch || {}),
+      supplyStash: Object.assign({}, p.supplyStash || {}),
+      itemInstances: Array.isArray(p.itemInstances)
+        ? p.itemInstances.map((inst) => Object.assign({}, inst)) : [],
+    };
+    const optimistic = typeof moveItemToSupplyStash === "function" &&
+      moveItemToSupplyStash(p, { source, slug });
+    const refreshStashUi = () => {
+      if (typeof renderAll === "function") renderAll();
+      else {
+        if (typeof renderInventory === "function") renderInventory(p);
+        if (typeof renderLootPouch === "function") renderLootPouch(p);
+        if (typeof renderSupplyStash === "function") renderSupplyStash(p);
+      }
+    };
+    if (optimistic) refreshStashUi();
     return accountMoveToSupplyStash(sessionToken(), p.id, { slug, source }).then((result) => {
       if (result && result.ok) {
         if (result.state && typeof applyOnlineAuthorityState === "function" &&
             typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
           applyOnlineAuthorityState(result.state, null, result.version);
-        } else if (result.lootPouch || result.supplyStash) {
-          p.lootPouch = result.lootPouch || {};
-          p.supplyStash = result.supplyStash || {};
-        } else if (typeof moveItemToSupplyStash === "function") {
+        } else if (result.lootPouch || result.supplyStash || result.bag) {
+          if (result.lootPouch) p.lootPouch = result.lootPouch || {};
+          if (result.supplyStash) p.supplyStash = result.supplyStash || {};
+          if (result.bag) p.bag = result.bag || {};
+          if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+        } else if (!optimistic && typeof moveItemToSupplyStash === "function") {
           // Resposta sem snapshot: aplica localmente (já refletido no servidor).
           moveItemToSupplyStash(p, { source, slug });
         }
         if (typeof addLog === "function")
           addLog("info", `Moveu <b>${typeof itemName === "function" ? itemName(slug) : slug}</b> para a Supply Stash.`);
       } else {
+        p.bag = snapshot.bag;
+        p.lootPouch = snapshot.lootPouch;
+        p.supplyStash = snapshot.supplyStash;
+        p.itemInstances = snapshot.itemInstances;
         toast((result && result.msg) || "Não foi possível mover para a Supply Stash.", "bad");
       }
-      if (typeof renderAll === "function") renderAll();
-      else {
-        if (typeof renderLootPouch === "function") renderLootPouch(p);
-        if (typeof renderSupplyStash === "function") renderSupplyStash(p);
-      }
+      refreshStashUi();
       return result || { ok: false };
     }).catch(() => {
+      p.bag = snapshot.bag;
+      p.lootPouch = snapshot.lootPouch;
+      p.supplyStash = snapshot.supplyStash;
+      p.itemInstances = snapshot.itemInstances;
+      refreshStashUi();
       toast("Não foi possível mover para a Supply Stash.", "bad");
       return { ok: false };
     });
@@ -1533,16 +1741,123 @@ function persistMoveToSupplyStash(p, payload) {
   return Promise.resolve({ ok: true, local: true });
 }
 
+/* Equipa 1 item da Supply Stash com persistência (supplyStash protected no PUT). */
+function persistEquipFromSupplyStash(p, slug, slot) {
+  if (!p || !slug) return Promise.resolve({ ok: false });
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountEquipFromSupplyStash === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountEquipFromSupplyStash(sessionToken(), p.id, { slug, slot }).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.supplyStash || result.equip) {
+          if (result.supplyStash) p.supplyStash = result.supplyStash || {};
+          if (result.equip) p.equip = result.equip || {};
+          if (result.bag) p.bag = result.bag || {};
+          if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+        } else if (typeof equipItemFromContainer === "function") {
+          equipItemFromContainer(p, slug, "stash", slot);
+        }
+        const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug];
+        toast(`Equipou <b>${it && it.n ? it.n : slug}</b> da Supply Stash.`);
+      } else {
+        toast((result && result.msg) || "Não foi possível equipar da Supply Stash.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível equipar da Supply Stash.", "bad");
+      return { ok: false };
+    });
+  }
+  if (typeof equipItemFromContainer !== "function" || !equipItemFromContainer(p, slug, "stash", slot))
+    return Promise.resolve({ ok: false });
+  const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug];
+  toast(`Equipou <b>${it && it.n ? it.n : slug}</b> da Supply Stash.`);
+  if (typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  return Promise.resolve({ ok: true, local: true });
+}
+
+/* Retira da Supply Stash (bag/pouch/destroy) com persistência. */
+function persistWithdrawFromSupplyStash(p, opts) {
+  opts = opts || {};
+  const slug = opts.slug;
+  const dest = opts.dest || "bag";
+  const qty = opts.qty;
+  if (!p || !slug) return Promise.resolve({ ok: false });
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountWithdrawFromSupplyStash === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    return accountWithdrawFromSupplyStash(sessionToken(), p.id, { slug, dest, qty }).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.supplyStash) {
+          p.supplyStash = result.supplyStash || {};
+          if (result.lootPouch) p.lootPouch = result.lootPouch || {};
+          if (result.bag) p.bag = result.bag || {};
+          if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+        } else if (dest === "destroy" && typeof removeSupplyStash === "function") {
+          const n = qty != null ? qty : ((p.supplyStash && p.supplyStash[slug]) || 0);
+          if (n > 0) removeSupplyStash(p, slug, n);
+        } else if (dest === "bag" && typeof moveItemToBag === "function") {
+          moveItemToBag(p, { source: "stash", slug });
+        } else if (dest === "pouch") {
+          const n = qty != null ? qty : ((p.supplyStash && p.supplyStash[slug]) || 0);
+          if (n > 0 && typeof addLootPouch === "function" && typeof removeSupplyStash === "function") {
+            addLootPouch(p, slug, n);
+            removeSupplyStash(p, slug, n);
+          }
+        }
+      } else {
+        toast((result && result.msg) || "Não foi possível retirar da Supply Stash.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível retirar da Supply Stash.", "bad");
+      return { ok: false };
+    });
+  }
+  if (dest === "destroy") {
+    const n = qty != null ? qty : ((p.supplyStash && p.supplyStash[slug]) || 0);
+    if (n <= 0 || typeof removeSupplyStash !== "function" || !removeSupplyStash(p, slug, n))
+      return Promise.resolve({ ok: false });
+  } else if (dest === "bag") {
+    if (typeof moveItemToBag !== "function" || !moveItemToBag(p, { source: "stash", slug }))
+      return Promise.resolve({ ok: false });
+  } else if (dest === "pouch") {
+    const n = qty != null ? qty : ((p.supplyStash && p.supplyStash[slug]) || 0);
+    if (n <= 0) return Promise.resolve({ ok: false });
+    if (typeof addLootPouch === "function") addLootPouch(p, slug, n);
+    if (typeof removeSupplyStash === "function") removeSupplyStash(p, slug, n);
+  } else {
+    return Promise.resolve({ ok: false });
+  }
+  if (typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  return Promise.resolve({ ok: true, local: true });
+}
+
 /* Vende tudo que estiver liberado dentro do Loot Pouch.
-   Respeita "Não vender" e nunca vende itens de classificação 3 ou 4. */
+   Respeita "Não vender", classes 3/4 e materiais de imbue (canSellLootPouchItem). */
 function sellAllPouch(p) {
   let total = 0, kinds = 0;
   // Snapshot das chaves: sellPouchItem deleta entradas; preço inválido não conta.
   for (const slug of Object.keys(p.lootPouch || {})) {
-    const it = GAMEDATA.items[slug];
-    if (!it || isNoSell(p, slug)) continue;
-    if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) continue;
-    if (pouchUnitSellPrice(it) <= 0) continue;
+    if (typeof canSellLootPouchItem === "function") {
+      if (!canSellLootPouchItem(p, slug)) continue;
+    } else {
+      const it = GAMEDATA.items[slug];
+      if (!it || isNoSell(p, slug)) continue;
+      if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) continue;
+      if (typeof isImbueMatItem === "function" && isImbueMatItem(it, slug)) continue;
+      if (pouchUnitSellPrice(it) <= 0) continue;
+    }
     const gained = sellPouchItem(p, slug);
     if (!Number.isFinite(gained) || gained <= 0) continue;
     total += gained;
@@ -1559,10 +1874,13 @@ function sellAllPouchAndPersist(p) {
   if (onlineCombat && typeof accountSellInstanceLootPouch === "function" &&
       typeof sessionToken === "function" && p.id) {
     const beforeKeys = Object.keys(p.lootPouch || {}).filter((slug) => {
+      if ((p.lootPouch[slug] || 0) <= 0) return false;
+      if (typeof canSellLootPouchItem === "function") return canSellLootPouchItem(p, slug);
       const it = GAMEDATA.items[slug];
       if (!it || (typeof isNoSell === "function" && isNoSell(p, slug))) return false;
       if (typeof isProtectedPouchClass === "function" && isProtectedPouchClass(slug)) return false;
-      return pouchUnitSellPrice(it) > 0 && (p.lootPouch[slug] || 0) > 0;
+      if (typeof isImbueMatItem === "function" && isImbueMatItem(it, slug)) return false;
+      return pouchUnitSellPrice(it) > 0;
     });
     if (!beforeKeys.length) return Promise.resolve({ gold: 0, kinds: 0, ok: true });
     return accountSellInstanceLootPouch(sessionToken(), p.id, null).then((result) => {
@@ -1647,6 +1965,7 @@ function sellAllBag(p) {
     kinds++;
   }
   p.itemInstances = rest;
+  if (typeof syncBagCountsFromInstances === "function") syncBagCountsFromInstances(p);
   if (total > 0) {
     p.gold += total;
     addLog("sell", `Vendeu tudo da mochila por <span class="gold-txt">${fmtFull(total)} gp</span> (${kinds} tipos).`);
@@ -1655,7 +1974,85 @@ function sellAllBag(p) {
     toast(guardados ? "Nada vendável na mochila (itens sem valor/tierados ficam)." : "Mochila vazia ou sem itens vendáveis.", "bad");
   }
   renderAll();
-  return total;
+  return { gold: total, kinds, guardados };
+}
+
+/* Persiste venda da mochila: online usa API (gold protected no PUT; em hunt
+ * o tick restaura bag). Offline muta local + save. */
+function persistBagSell(p, options) {
+  const opts = options || {};
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSellBag === "function" && typeof sessionToken === "function" && p && p.id;
+  if (useAccount) {
+    return accountSellBag(sessionToken(), p.id, {
+      slug: opts.slug || null,
+      instId: opts.instId || null,
+    }).then((result) => {
+      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function" &&
+          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+        applyOnlineAuthorityState(result.state, null, result.version);
+      } else if (result && result.ok) {
+        // Cidade: accountSellBag já aplicou bag/gold no G.p quando possível.
+        if (result.bag && p) p.bag = result.bag;
+        if (result.itemInstances && p) p.itemInstances = result.itemInstances;
+      } else if (!result || !result.ok) {
+        toast((result && result.msg) || "Não foi possível vender a mochila online.", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      return result || { ok: false };
+    }).catch(() => {
+      toast("Não foi possível vender a mochila online.", "bad");
+      return { ok: false };
+    });
+  }
+  const gold = sellBagItem(p, opts.slug, opts.instId);
+  if (gold > 0 && typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  return Promise.resolve({ ok: gold > 0, local: true, gold });
+}
+
+/* Sell All da mochila com persistência — não muta localmente online. */
+function sellAllBagAndPersist(p) {
+  if (!p) return Promise.resolve({ gold: 0, kinds: 0, ok: false });
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSellBag === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
+    const beforeVal = typeof bagSellableValue === "function" ? bagSellableValue(p) : 0;
+    if (beforeVal <= 0) {
+      toast("Mochila vazia ou sem itens vendáveis.", "bad");
+      return Promise.resolve({ gold: 0, kinds: 0, ok: true });
+    }
+    return accountSellBag(sessionToken(), p.id, {}).then((result) => {
+      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function" &&
+          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+        applyOnlineAuthorityState(result.state, null, result.version);
+      } else if (result && result.ok) {
+        if (result.bag) p.bag = result.bag;
+        if (result.itemInstances) p.itemInstances = result.itemInstances;
+      } else if (!result || !result.ok) {
+        toast((result && result.msg) || "Não foi possível vender a mochila online.", "bad");
+        return { gold: 0, kinds: 0, ok: false };
+      }
+      const gold = Number(result.gold);
+      const safeGold = Number.isFinite(gold) && gold > 0 ? Math.floor(gold) : 0;
+      if (safeGold > 0) {
+        if (typeof addLog === "function")
+          addLog("sell", `Vendeu tudo da mochila por <span class="gold-txt">${fmtFull(safeGold)} gp</span>`);
+        toast(`Vendeu tudo da mochila: <b>+${fmtFull(safeGold)} gp</b>`);
+      } else {
+        toast("Nada vendável na mochila (itens sem valor/tierados ficam).", "bad");
+      }
+      if (typeof renderAll === "function") renderAll();
+      return { gold: safeGold, kinds: safeGold > 0 ? 1 : 0, ok: true };
+    }).catch(() => {
+      toast("Não foi possível vender a mochila online.", "bad");
+      return { gold: 0, kinds: 0, ok: false };
+    });
+  }
+  const r = sellAllBag(p);
+  const gold = typeof r === "object" && r ? (Number(r.gold) || 0) : (Number(r) || 0);
+  if (gold > 0 && typeof save === "function") save();
+  return Promise.resolve(Object.assign({ ok: true }, typeof r === "object" && r ? r : { gold, kinds: gold > 0 ? 1 : 0 }));
 }
 
 function renderLootPouch(p) {
@@ -1715,7 +2112,7 @@ function renderLootPouch(p) {
       Auto-seller: ${entries.filter((s) => typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s)).length} vendável · classes 3/4 protegidas
     </div>` + entries.map((slug) =>
     `<div class="inv-item ${isNoSell(p, slug) ? "locked" : ""} ${itemClsBorder(slug)}" data-pouch-item="${slug}" draggable="true">
-      ${itemImg(slug)}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
+      ${itemImg(slug, 0, null, p.lootPouch[slug])}${p.lootPouch[slug] > 1 ? `<span class="cnt">${p.lootPouch[slug]}</span>` : ""}
     </div>`).join("");
 
   $$("#lootpouch [data-pouch-item]").forEach((el) => {
@@ -1789,7 +2186,7 @@ function renderSupplyStash(p) {
     const auto = typeof isAutoSupplyStash === "function" && isAutoSupplyStash(p, slug);
     return `<div class="inv-item ${itemClsBorder(slug)}${auto ? " stash-auto" : ""}" data-stash-item="${slug}" draggable="true"
       title="${it.n}${auto ? " · Auto ON" : ""}">
-      ${itemImg(slug)}${n > 1 ? `<span class="cnt">${n > 999 ? (Math.floor(n / 100) / 10) + "k" : n}</span>` : ""}
+      ${itemImg(slug, 0, null, n)}${n > 1 ? `<span class="cnt">${n > 999 ? (Math.floor(n / 100) / 10) + "k" : n}</span>` : ""}
     </div>`;
   }).join("");
 
@@ -1824,6 +2221,10 @@ function openSupplyStashItemMenu(p, slug, x, y) {
       label: "Equipar",
       hint: it.s,
       action: () => {
+        if (typeof persistEquipFromSupplyStash === "function") {
+          persistEquipFromSupplyStash(p, slug, it.s);
+          return;
+        }
         if (typeof equipItemFromContainer === "function" &&
             equipItemFromContainer(p, slug, "stash", it.s)) {
           toast(`Equipou <b>${it.n}</b> da Supply Stash.`);
@@ -1834,6 +2235,10 @@ function openSupplyStashItemMenu(p, slug, x, y) {
     {
       label: "Mover para backpack",
       action: () => {
+        if (typeof persistWithdrawFromSupplyStash === "function") {
+          persistWithdrawFromSupplyStash(p, { slug, dest: "bag" });
+          return;
+        }
         if (!addItem(p, slug, count)) { toast("Mochila cheia."); return; }
         removeSupplyStash(p, slug, count);
         renderAll();
@@ -1842,6 +2247,10 @@ function openSupplyStashItemMenu(p, slug, x, y) {
     {
       label: "Mover para Loot Pouch",
       action: () => {
+        if (typeof persistWithdrawFromSupplyStash === "function") {
+          persistWithdrawFromSupplyStash(p, { slug, dest: "pouch" });
+          return;
+        }
         addLootPouch(p, slug, count);
         removeSupplyStash(p, slug, count);
         renderAll();
@@ -1868,6 +2277,10 @@ function openSupplyStashItemMenu(p, slug, x, y) {
       danger: true,
       action: () => {
         if (!confirm(`Destruir ${count}x ${it.n} da Supply Stash?`)) return;
+        if (typeof persistWithdrawFromSupplyStash === "function") {
+          persistWithdrawFromSupplyStash(p, { slug, dest: "destroy" });
+          return;
+        }
         removeSupplyStash(p, slug, count);
         renderAll();
       },
@@ -1947,9 +2360,36 @@ function openPouchItemMenu(p, slug, x, y) {
     {
       label: "Mover para backpack",
       action: () => {
-        if (!addItem(p, slug, count)) { toast("Mochila cheia."); return; }
-        removeLootPouch(p, slug, count);
-        addLog("info", `Moveu <b>${it.n}</b> do Loot Pouch para a mochila.`);
+        const moveLocal = () => {
+          if (!addItem(p, slug, count)) { toast("Mochila cheia."); return false; }
+          removeLootPouch(p, slug, count);
+          addLog("info", `Moveu <b>${it.n}</b> do Loot Pouch para a mochila.`);
+          return true;
+        };
+        // Conta online: lootPouch é protected no PUT — precisa API, senão
+        // o item fica na pouch do servidor e DUPLICA na backpack após restart.
+        if (typeof sessionToken === "function" && sessionToken() && p && p.id &&
+            typeof accountMovePouchToBag === "function") {
+          accountMovePouchToBag(sessionToken(), p.id, { slug: slug, qty: count }).then((result) => {
+            if (result && result.ok) {
+              if (result.state && typeof applyOnlineAuthorityState === "function")
+                applyOnlineAuthorityState(result.state, null, result.version);
+              else if (result.lootPouch) {
+                p.lootPouch = result.lootPouch || {};
+                if (result.bag) p.bag = result.bag || {};
+                if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+              }
+              addLog("info", `Moveu <b>${it.n}</b> do Loot Pouch para a mochila.`);
+              toast(`Moveu <b>${it.n}</b> para a mochila.`);
+              renderAll();
+              return;
+            }
+            toast((result && result.msg) || "Não foi possível mover para a backpack.", "bad");
+          });
+          return;
+        }
+        if (!moveLocal()) return;
+        if (typeof save === "function") save();
         renderAll();
       },
     },
@@ -1996,6 +2436,11 @@ function openPouchItemMenu(p, slug, x, y) {
         else addLootRule(p, "noCollect", slug);
         toast(noCollect ? `<b>${it.n}</b> voltou para o autoloot.`
                         : `<b>${it.n}</b> será ignorado pelo autoloot.`);
+        if (typeof persistLootConfig === "function") {
+          persistLootConfig(p);
+          return;
+        }
+        if (typeof save === "function") save();
         renderAll();
       },
     },
@@ -2011,11 +2456,18 @@ function openPouchItemMenu(p, slug, x, y) {
         else addLootRule(p, "noSell", slug);
         toast(noSell ? `<b>${it.n}</b> voltou para o sell all.`
                      : `<b>${it.n}</b> será ignorado pelo sell all.`);
+        if (typeof persistLootConfig === "function") {
+          persistLootConfig(p);
+          return;
+        }
+        if (typeof save === "function") save();
         renderAll();
       },
     }]),
     ...(value > 0 ? [{
       label: `Vender · ${fmtFull(value)} gp`,
+      hint: (typeof isImbueMatItem === "function" && isImbueMatItem(it, slug))
+        ? "material de imbue" : undefined,
       action: () => {
         const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
         if (onlineCombat && typeof persistLootPouchSell === "function") {
@@ -2137,11 +2589,15 @@ function openLootPouchConfigModal() {
     const key = b.dataset.addRule;
     const input = key === "noCollect" ? $("#no-collect-input") : $("#no-sell-input");
     addLootRule(p, key, input.value);
+    if (typeof persistLootConfig === "function") persistLootConfig(p);
+    else if (typeof save === "function") save();
     openLootPouchConfigModal();
   }));
   $$("#modal-body [data-remove-rule]").forEach((b) => b.addEventListener("click", () => {
     const [key, idx] = b.dataset.removeRule.split(":");
     removeLootRule(p, key, parseInt(idx, 10));
+    if (typeof persistLootConfig === "function") persistLootConfig(p);
+    else if (typeof save === "function") save();
     openLootPouchConfigModal();
   }));
 }
@@ -2422,7 +2878,9 @@ function renderHelper(p) {
       ? suppliesOf(p, "mana").map((x) => x[0])
       : ["mana-potion"]);
 
-    const supplyRow = (slug) => {
+    // slot "mana"|"heal": spirit potions (type heal + both) entram nas DUAS
+    // listas — a seleção/USANDO deve seguir o slot clicado, não s.type.
+    const supplyRow = (slug, slot) => {
       const s = SUPPLIES[slug]; if (!s) return "";
       const pw = typeof supplyPowerFor === "function"
         ? supplyPowerFor(p, slug) : supplyPower(s, p.level);
@@ -2430,7 +2888,7 @@ function renderHelper(p) {
         ? supplyAllowed(p, slug) : p.level >= (s.lvl || 1);
       const motivo = !liberado && typeof supplyBlockReason === "function"
         ? supplyBlockReason(p, slug) : "";
-      const ehMana = s.type === "mana";
+      const ehMana = slot === "mana";
       const selected = ehMana ? p.config.manaSupply === slug
                               : p.config.healSupply === slug;
       const disabledMana = ehMana && !selected;
@@ -2440,7 +2898,7 @@ function renderHelper(p) {
       if (s.mana) valores.push(`<span style="color:#6a8aff">mana ${s.mana[0]}-${s.mana[1]}</span>`);
       if (!valores.length) valores.push(`${ehMana ? "mana" : "hp"} ${pw[0]}-${pw[1]}`);
       return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}"
-                   data-supply-slug="${slug}"
+                   data-supply-slug="${slug}" data-supply-slot="${slot}"
                    style="opacity:${liberado ? 1 : .45}">
         <img src="assets/item/${s.sprite}.png" alt="${s.name}">
         <div style="flex:1;min-width:0">
@@ -2454,7 +2912,7 @@ function renderHelper(p) {
           ${motivo ? `<div class="tiny" style="color:#ff9090">requer ${motivo}</div>` : ""}
         </div>
         <button class="sm ${selected ? "primary" : disabledMana ? "danger" : ""}"
-          data-use-supply="${slug}" ${liberado ? "" : "disabled"}>
+          data-use-supply="${slug}" data-supply-slot="${slot}" ${liberado ? "" : "disabled"}>
           ${selected ? "USANDO" : disabledMana ? "DESATIVADO" : "USAR"}</button>
       </div>`;
     };
@@ -2494,15 +2952,16 @@ function renderHelper(p) {
         </button>
       </div>
       <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map(supplyRow).join("")}</div>
+      <div class="list" style="max-height:210px;${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map((slug) => supplyRow(slug, "heal")).join("")}</div>
       <div class="mt8">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="row mt8 mb4" style="justify-content:space-between"><span class="small ${p.config.noManaPotions ? "" : "dim"}" style="${p.config.noManaPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions de mana</span><button class="sm ${p.config.noManaPotions ? "danger" : ""}" id="helper-no-mana-potions">${p.config.noManaPotions ? "MANA OFF — reativar" : "NÃO USAR POTIONS MANA"}</button></div>
+      <div class="tiny dim mb4">Só 1 potion de mana ativa. Por padrão todas desativadas — escolha qual usar.</div>
       <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map(supplyRow).join("")}</div>`;
+      <div class="list" style="max-height:210px;${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map((slug) => supplyRow(slug, "mana")).join("")}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -2535,15 +2994,17 @@ function renderHelper(p) {
     if (noManaBtn) noManaBtn.addEventListener("click", () => { p.config.noManaPotions = !p.config.noManaPotions; renderHelper(p); });
     $$("#helper-heal [data-use-supply]").forEach((b) => b.addEventListener("click", () => {
       const slug = b.dataset.useSupply;
+      const slot = b.dataset.supplySlot || (SUPPLIES[slug] && SUPPLIES[slug].type === "mana" ? "mana" : "heal");
       const s = SUPPLIES[slug];
       if (!s) return;
       if (!Object.prototype.hasOwnProperty.call(p.supplies, slug)) p.supplies[slug] = 0;
-      if (s.type === "mana") {
+      if (slot === "mana") {
+        // Exclusivo: só 1 potion de mana; toggle desativa.
         p.config.manaSupply = p.config.manaSupply === slug ? "" : slug;
         toast(p.config.manaSupply ? `Mana selecionada: <b>${s.name}</b>` : "Potion de mana desativada");
       } else {
-        p.config.healSupply = slug;
-        toast(`Cura selecionada: <b>${s.name}</b>`);
+        p.config.healSupply = p.config.healSupply === slug ? "" : slug;
+        toast(p.config.healSupply ? `Cura selecionada: <b>${s.name}</b>` : "Potion/runa de cura desativada");
       }
       renderHelper(p);
     }));
@@ -2594,7 +3055,7 @@ function renderHelper(p) {
       <div class="tiny dim mt8">Kiting mantém de 1 a 5 SQMs do monstro. Stand fica parado. Chase aproxima.
         <b>BOX</b> (party de 4): cada vocação assume a posição dela — Knight faz checagem de células x/y e para
         no MELHOR spot do meio da sala tankando (casta exeta res + amp res), RP a 2 SQMs do knight nas retas,
-        Druid/Sorcerer/Monk na posição que atinge o máximo de alvos com as magias de área.
+        Druid/Sorcerer na posição de wave com máximo de alvos, Monk dentro da box no melhor Flurry (não foge).
         <b>SAFE</b>: o personagem vai para os CANTOS da tela, longe da box, mas ainda no range das spells.</div>
       ${renderStancePicker(p)}
       ${challengeHtml}
@@ -3589,8 +4050,17 @@ function desenhaComboPicker() {
       const kind = b.dataset.comboKind;
       const id = b.dataset.comboPick;
       const antigo = combo[slot];
-      // mantem o minimo que o jogador ja tinha ajustado, se for a mesma entrada
-      const min = (antigo && antigo.id === id) ? antigo.min : 1;
+      // Área/chain: default min=2 (uso tipico no pack). ST fica em 1.
+      // Mantem o minimo se for a mesma entrada.
+      let min = 1;
+      if (antigo && antigo.id === id) min = antigo.min;
+      else if (kind === "spell") {
+        const sp = typeof SPELLS !== "undefined" ? SPELLS[id] : null;
+        if (sp && (sp.area || Number(sp.chain) > 1)) min = 2;
+      } else if (kind === "rune") {
+        const ru = typeof SUPPLIES !== "undefined" ? SUPPLIES[id] : null;
+        if (ru && ru.area) min = 2;
+      }
       combo[slot] = { kind: kind, id: id, min: min };
       // runa escolhida precisa existir no mapa de supplies para poder recarregar
       if (kind === "rune" &&

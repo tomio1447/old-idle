@@ -164,6 +164,18 @@ function playerThinkStep(c, p, alvo, occ, now) {
   ensureCell(pl);
   if (pl.moving) return false;
   if (pl.nextStepAt && now < pl.nextStepAt) return false;
+
+  // Feared (Canary CONDITION_FEARED): foge da fonte; ignora chase/box/kiting.
+  // Rooted (Canary CONDITION_ROOTED): trava no SQM — tem prioridade sobre Fear.
+  if (typeof playerIsRooted === "function" && playerIsRooted(p)) {
+    pl.moving = false;
+    pl.stepT = 0;
+    pl.nextStepAt = now + 150;
+    return false;
+  }
+  if (typeof playerIsFeared === "function" && playerIsFeared(p))
+    return fearThinkStep(c, p, pl, occ, now);
+
   if (!alvo) return false;
 
   const modo = (p.config && p.config.attackMode) || "chase";
@@ -210,6 +222,33 @@ function playerThinkStep(c, p, alvo, occ, now) {
   return ok;
 }
 
+/* Fuga forçada enquanto Feared — stepAway da criatura que aplicou o Fear. */
+function fearThinkStep(c, p, pl, occ, now) {
+  if (!pl) return false;
+  ensureCell(pl);
+  if (pl.moving) return false;
+  if (pl.nextStepAt && now < pl.nextStepAt) return false;
+  const src = (typeof fearSourceEntity === "function")
+    ? fearSourceEntity(c, p) : null;
+  const from = src || (c.mobs && c.mobs.find((m) => m.hp > 0)) || null;
+  if (!from || from.cx === undefined) {
+    pl.nextStepAt = now + 150;
+    return false;
+  }
+  const dir = stepAway(pl, from, occ);
+  pl.speedPts = typeof playerSpeed === "function"
+    ? playerSpeed(p, now)
+    : 110 + (typeof gearStats === "function" ? (gearStats(p).speed || 0) : 0);
+  if (!dir) {
+    pl.dir = dirTo(pl, from);
+    pl.nextStepAt = now + 150;
+    return false;
+  }
+  const ok = beginStep(pl, dir, occ, false);
+  pl.nextStepAt = now + (ok ? pl.stepDur : 150);
+  return ok;
+}
+
 /* Alcance do jogador em SQM, derivado do tipo de dano.
  * Melee = 1 (inclui diagonal, por Chebyshev), distancia = 6, magia = 6
  * (o 15.25 aumentou o alcance das wands e rods: "recebem maior alcance"). */
@@ -235,8 +274,10 @@ function playerRangeSQM(p) {
  *         tankando e castando exeta res + exeta amp res;
  *       PALADIN (RP): a 2 SQM do knight, SEMPRE nas RETAS (nunca
  *         diagonais), na reta que pega mais alvos;
- *       DRUID/SORCERER/MONK: na célula que atinge o MÁXIMO de alvos com as
- *         magias de área (raio 3);
+ *       DRUID/SORCERER: na célula que atinge o MÁXIMO de alvos com as
+ *         magias de área (raio 3), evitando ficar cercados;
+ *       MONK: dentro da box no melhor spot de Flurry (máximo de acertos),
+ *         sem fugir de adjacentes;
  *   - SAFE: o personagem vai para os CANTOS da tela, LONGE da box, mas
  *     ainda dentro do alcance das spells (raio 7) — farma do canto.
  * ====================================================================== */
@@ -332,14 +373,82 @@ function waveLineHits(c, from, knight) {
   return hits;
 }
 
+/* Quantos mobs a matriz de Flurry pegaria se o monk estivesse em `cell`
+ * virado para `focus` (centro da box / knight / pack). */
+function monkFlurryHits(c, cell, focus) {
+  if (!cell || !c || !c.mobs) return 0;
+  const dir = (typeof dirTo === "function")
+    ? dirTo(cell, focus || cell)
+    : "e";
+  const area = (typeof AREADATA !== "undefined" && AREADATA)
+    ? (AREADATA.AREA_FLURRY_OF_BLOWS || AREADATA.AREA_GREATER_FLURRY_OF_BLOWS)
+    : null;
+  const offs = area && (area[dir] || area.n);
+  if (!offs || !offs.length) {
+    // Fallback: raio 1 + 1 à frente (aproxima o leque).
+    return boxCountMobs(c, cell.cx, cell.cy, 1);
+  }
+  const keys = new Set();
+  for (const [dx, dy] of offs) {
+    keys.add((cell.cx + (dx | 0)) + ":" + (cell.cy + (dy | 0)));
+  }
+  let n = 0;
+  for (const m of c.mobs) {
+    if (m.hp <= 0 || m.cx === undefined) continue;
+    if (keys.has(m.cx + ":" + m.cy)) n++;
+  }
+  return n;
+}
+
 function mageBoxScore(c, cell, knight) {
   // Segurança vem antes de dano: uma wave ótima não vale um mage cercado.
   return boxCountMobs(c, cell.cx, cell.cy, 3) * 10 +
     waveLineHits(c, cell, knight) * 28 - adjacentMobs(c, cell) * 80;
 }
 
+/* Monk no BOX: fica NA box (melee), maximiza Flurry — NÃO foge de adjacentes. */
+function monkBoxScore(c, cell, focus) {
+  const flurry = monkFlurryHits(c, cell, focus);
+  const perto = boxCountMobs(c, cell.cx, cell.cy, 1);
+  const medio = boxCountMobs(c, cell.cx, cell.cy, 2);
+  return flurry * 100 + perto * 40 + medio * 8 -
+    (Math.abs(cell.cx - focus.cx) + Math.abs(cell.cy - focus.cy));
+}
+
+/* Melhor SQM do monk: varre perto do centro/knight e escolhe o que mais
+ * acerta com Flurry virado para a box (sem penalizar estar cercado). */
+function boxMonkSpot(c, occ, base) {
+  base = base || boxCenter(c);
+  let melhor = null, melhorScore = -Infinity;
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    const cell = { cx: base.cx + dx, cy: base.cy + dy };
+    if (occ && !boxCellLivre(cell.cx, cell.cy, occ)) continue;
+    const score = monkBoxScore(c, cell, base);
+    if (score > melhorScore) { melhorScore = score; melhor = cell; }
+  }
+  return melhor || { cx: base.cx, cy: base.cy };
+}
+
+/* Direção de casting no BOX: olha para o centro da formação / densest pack,
+ * não para um único alvo lateral (senão a wave sai “no monstro”). */
+function boxCastFocus(c, ent, alvo) {
+  const knight = boxKnightEnt(c);
+  if (knight && ent !== knight) return knight;
+  if (typeof helperPriorityTarget === "function") {
+    const prio = helperPriorityTarget(c, ent || c.player);
+    if (prio) return prio;
+  }
+  const vivos = (c.mobs || []).filter((m) => m.hp > 0);
+  if (typeof densestPackTargetClient === "function" && vivos.length) {
+    const pack = densestPackTargetClient(c, ent || c.player, vivos);
+    if (pack) return pack;
+  }
+  if (alvo) return alvo;
+  return boxCenter(c);
+}
+
 /* Posição-alvo do BOX por vocação. Knight tanque central; RP em reta a 2;
- * mages/monk em reta a 3, escolhendo a linha que corta a maior parte da box. */
+ * mages em reta a 3; monk no melhor spot de Flurry dentro da box. */
 function boxTargetCell(c, ent, occ) {
   const p = ent && ent.p;
   if (!p) return null;
@@ -348,8 +457,9 @@ function boxTargetCell(c, ent, occ) {
   const knight = boxKnightEnt(c);
   const base = knight || centro;
   if (voc === "knight" || voc === "elite knight") return boxKnightSpot(c, occ, base);
+  if (voc === "monk" || voc === "exalted monk") return boxMonkSpot(c, occ, base);
 
-  // RP mantém 2 SQM do knight; Mages (ED/MS) e Monk ficam a 3.
+  // RP mantém 2 SQM do knight; Mages (ED/MS) ficam a 3.
   const distancia = (voc === "paladin" || voc === "royal paladin") ? 2 : 3;
   const retas = [
     { cx: base.cx + distancia, cy: base.cy }, { cx: base.cx - distancia, cy: base.cy },
@@ -373,6 +483,7 @@ function boxTargetScore(c, ent, cell, occ) {
   const knight = boxKnightEnt(c), base = knight || boxCenter(c);
   const voc = ent.p.voc;
   if (voc === "knight" || voc === "elite knight") return knightBoxScore(c, cell, occ, base);
+  if (voc === "monk" || voc === "exalted monk") return monkBoxScore(c, cell, base);
   if (voc === "paladin" || voc === "royal paladin")
     return boxCountMobs(c, cell.cx, cell.cy, 6) * 12 - adjacentMobs(c, cell) * 35;
   return mageBoxScore(c, cell, base);
@@ -447,14 +558,17 @@ function formationThinkStep(c, ent, alvo, occ, now, targetFn) {
   const alvoCel = ent._boxTarget;
   if (!alvoCel) return false;
   if (ent.cx === alvoCel.cx && ent.cy === alvoCel.cy) {
-    // parado na posição: encara o alvo de ataque e espera
-    if (alvo) ent.dir = dirTo(ent, alvo);
+    // parado na posição: encara o FOCO da formação (pack/knight), não um
+    // alvo lateral — waves/flurry saem na facing do caster.
+    const focus = boxCastFocus(c, ent, alvo);
+    if (focus) ent.dir = dirTo(ent, focus);
     ent.nextStepAt = now + 250;
     return false;
   }
   const dir = stepToward(ent, alvoCel.cx, alvoCel.cy, occ);
   if (!dir) {
-    if (alvo) ent.dir = dirTo(ent, alvo);
+    const focus = boxCastFocus(c, ent, alvo);
+    if (focus) ent.dir = dirTo(ent, focus);
     ent.nextStepAt = now + 250;
     return false;
   }
@@ -541,14 +655,23 @@ function updateGridMovement(c, p, dt, now) {
 
   const occ = buildOccupancy(c);
   const vivos = c.mobs.filter((m) => m.hp > 0);
-  // Pack denso: a IA de movimento persegue a box, não o singleton próximo.
-  const alvo = (typeof densestPackTargetClient === "function")
-    ? (densestPackTargetClient(c, c.player, vivos) || (vivos.length ? vivos[0] : null))
-    : (vivos.length ? vivos[0] : null);
+  // Mesma prioridade do Helper (boss / Greedy Beast / pack denso) — movimento
+  // e ataque não podem divergir (ex.: chase no pack enquanto ataca o boss).
+  const alvo = (typeof helperPriorityTarget === "function")
+    ? (helperPriorityTarget(c, c.player) || (vivos.length ? vivos[0] : null))
+    : ((typeof densestPackTargetClient === "function")
+      ? (densestPackTargetClient(c, c.player, vivos) || (vivos.length ? vivos[0] : null))
+      : (vivos.length ? vivos[0] : null));
 
   // AUTO: a IA anda sozinha. Manual: WASD/clique, um SQM por passo.
+  // Rooted trava; Feared sobrescreve manual e AUTO (Canary).
   if (activeAlive) {
-    if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(p))
+    if (typeof playerIsRooted === "function" && playerIsRooted(p)) {
+      c.player.moving = false;
+      c.player.stepT = 0;
+    } else if (typeof playerIsFeared === "function" && playerIsFeared(p))
+      fearThinkStep(c, p, c.player, occ, now);
+    else if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(p))
       manualThinkStep(c, p, occ, now);
     else playerThinkStep(c, p, alvo, occ, now);
   }
@@ -558,6 +681,11 @@ function updateGridMovement(c, p, dt, now) {
   if (c.players && c.players.length > 1) {
     for (const ent of c.players) {
       if (ent === c.player || !ent.p || ent.p.hp <= 0) continue;
+      if (typeof playerIsRooted === "function" && playerIsRooted(ent.p)) {
+        ent.moving = false;
+        ent.stepT = 0;
+        continue;
+      }
       if (typeof playerAutoWalkOn === "function" && !playerAutoWalkOn(ent.p)) continue;
       const fm = formationMode(c, ent);
       if (fm === "box") {

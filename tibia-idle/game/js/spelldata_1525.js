@@ -561,10 +561,14 @@
       MD["exori-amp-pug"].pow = 85;
       MD["exori-amp-pug"].cd = 12000;
     }
-    // Chained Penance: encadeia para os mais proximos, ate 6 criaturas,
-    // jump range 3 -> 4 (o Canary importado trazia 3; a tabela oficial do
-    // update registra o salto pos-update como 4).
-    if (MD["exori-med-pug"]) MD["exori-med-pug"].chain = { alvos: 6, dist: 4 };
+    // Chained Penance (exori med pug): hit todos adjacentes ao caster, depois
+    // flood BFS em ≤2 SQM (Chebyshev) de qualquer ja atingido. Cap 16 / max
+    // range 10 do caster evita varrer o mapa inteiro em packs densos.
+    if (MD["exori-med-pug"]) {
+      MD["exori-med-pug"].chain = {
+        alvos: 16, dist: 2, flood: 1, seedAdj: 1, maxRange: 10,
+      };
+    }
     // Spiritual Outburst: ate 8 inimigos, saltos mirando o mais proximo.
     // A tabela oficial do update registra a distancia de salto pos-update
     // como 2 — o valor que o importador do Canary ja trazia (o boletim

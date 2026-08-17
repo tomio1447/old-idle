@@ -695,7 +695,9 @@ function renderCycloBosstiary(p, el) {
         const visto = pr.kills > 0;
         return `<div class="app-card ${visto ? "" : "bloq"}" data-boss-ficha="${slug}">
           <div class="app-img">
-            ${mobImg(slug, 48, visto ? "" : "filter:brightness(0);")}
+            ${(typeof bossMobImg === "function"
+              ? bossMobImg(slug, 48, visto ? "" : "filter:brightness(0);")
+              : mobImg(slug, 48, visto ? "" : "filter:brightness(0);"))}
           </div>
           <div class="tiny">${visto ? m.name : "???"}</div>
           <div class="tiny" style="color:${pr.cat.cor}">${pr.cat.nome}</div>
@@ -1055,7 +1057,7 @@ function filtraItens(p, ids) {
     if (f.usavel && !itemLiberado(p, it)) return false;
     if (f.origem === "loja" && !itemNaLoja(it)) return false;
     if (f.origem === "drop" && itemNaLoja(it)) return false;
-    if (f.anim && !itemAnimado(it)) return false;
+    if (f.anim && !itemAnimado(it, slug)) return false;
     if (f.cls && (it.cls || 0) !== f.cls) return false;
     return true;
   });

@@ -84,7 +84,9 @@ def montar_sheet(spr, obj, yp, layer):
             xp = d % max(1, g.px)
             yy = min(yp, g.py - 1)
             ly = min(layer, g.layers - 1)
-            img = render_group_860(spr, g, frame=fr, xp=xp, yp=yy, layer=ly)
+            img = render_group_860(spr, g, frame=fr, xp=xp, yp=yy, zp=0, layer=ly)
+            # zp=0 = a pe. Pose montada (zPattern=1) sai em
+            # extract_mounted_sheets.py como *.mounted.*.png.
             if img is None:
                 continue
             if img.getbbox():

@@ -62,6 +62,28 @@
     return BASE_VOC[v] || v;
   }
 
+  /* Idle balance: +15% base damage for Knight (incl. Elite Knight) and
+   * Sorcerer / Master Sorcerer. Applied on top of existing vocation tweaks
+   * (ex.: knight melee attack *1.3). Used for auto-attack AND spells. */
+  const IDLE_BASE_DMG_MUL = { knight: 1.15, sorcerer: 1.15 };
+
+  /* Spell-only idle extras: Monk +25% on attack spells (fist AA stays 1×).
+   * Composes with IDLE_BASE_DMG_MUL so Knight/Sorcerer spells stay at 1.15. */
+  const IDLE_SPELL_EXTRA_MUL = { monk: 1.25 };
+
+  function idleBaseDamageMul(voc) {
+    const base = baseVocName(voc);
+    const mul = IDLE_BASE_DMG_MUL[base];
+    return mul > 0 ? mul : 1;
+  }
+
+  function idleSpellDamageMul(voc) {
+    const base = baseVocName(voc);
+    const extra = IDLE_SPELL_EXTRA_MUL[base];
+    const e = extra > 0 ? extra : 1;
+    return idleBaseDamageMul(voc) * e;
+  }
+
   function spellAllowedForVoc(s, voc) {
     if (!s) return false;
     const vocs = s.vocs;
@@ -197,7 +219,9 @@
 
   const api = {
     BASE_VOC, PROMOTED_VOC, VOCATION_REGEN, FRIEND_HEALS, DEFAULT_SELF_HEAL,
-    baseVocName, spellAllowedForVoc, friendHealSpellIds, selfHealSpellIds,
+    IDLE_BASE_DMG_MUL, IDLE_SPELL_EXTRA_MUL, baseVocName,
+    idleBaseDamageMul, idleSpellDamageMul,
+    spellAllowedForVoc, friendHealSpellIds, selfHealSpellIds,
     resolveSpellId, sanitizePlayerSpells, vocationRegenSpec,
     applyVocationRegen, applyVocationRegenTo,
   };

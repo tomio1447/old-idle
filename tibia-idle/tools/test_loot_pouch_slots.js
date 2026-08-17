@@ -89,6 +89,9 @@ must(uiClear, 'Config da Loot Pouch sem botão/confirmação de limpar');
 must(uiSrc.includes('sellAllPouchAndPersist') && uiSrc.includes('accountSellInstanceLootPouch') &&
   uiSrc.includes('persistLootPouchSell'),
   'Sell All / venda unitária sem persistência online da Loot Pouch');
+must(uiSrc.includes('sellAllBagAndPersist') && uiSrc.includes('accountSellBag') &&
+  uiSrc.includes('persistBagSell') && uiSrc.includes('btn-bag-sell-all'),
+  'Sell All da mochila sem persistência online');
 
 const gameSrc = fs.readFileSync(path.join(game, 'js', 'game.js'), 'utf8');
 must(gameSrc.includes('sellAllPouchAndPersist') && gameSrc.includes('!onlineAuthorityCombat()'),

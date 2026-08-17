@@ -451,8 +451,10 @@ JsonStore.prototype.instanceReplaceForced = function(accountId,instanceId,meta,s
   });
   this._saveRuntime(false,true);return {ok:true,instance:row};
 };
-JsonStore.prototype.createAccount = function (login, hash, role, coins) {
+JsonStore.prototype.createAccount = function (login, hash, role, coins, email) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
+                email: String(email || "").slice(0, 120),
+                email_verified: 0, email_code: "", email_code_expires: 0,
                 role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
                 vip_until: 0, market_gold: 0,
                 created_at: new Date().toISOString() };
@@ -527,6 +529,28 @@ JsonStore.prototype.setAccountVipUntil = function (accountId, vipUntil) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
   a.vip_until = Math.max(0, Math.floor(Number(vipUntil) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountEmail = function (accountId, email) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.email = String(email || "").slice(0, 120);
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountEmailCode = function (accountId, code, expiresAt) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.email_code = String(code || "");
+  a.email_code_expires = Math.max(0, Math.floor(Number(expiresAt) || 0));
+  this._save();
+  return a;
+};
+JsonStore.prototype.setAccountEmailVerified = function (accountId, verified) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.email_verified = verified ? 1 : 0;
   this._save();
   return a;
 };
@@ -1186,11 +1210,14 @@ async function MysqlStore() {
       const rows = await this.query("SELECT * FROM accounts WHERE id = ?", [Number(id)]);
       return hydrateAccount(rows[0] || null);
     },
-    async createAccount(login, hash, role, coins) {
+    async createAccount(login, hash, role, coins, email) {
+      const em = String(email || "").slice(0, 120);
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, role, coins, gold, gold_migrated, vip_until, missions, missions_done) VALUES (?, ?, ?, ?, 0, 1, 0, '{}', '{}')",
-        [login, hash, role || "user", coins || 0]);
-      return { id: r.insertId, login, password_hash: hash, role: role || "user", coins: coins || 0,
+        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}')",
+        [login, hash, em, role || "user", coins || 0]);
+      return { id: r.insertId, login, password_hash: hash, email: em,
+        email_verified: 0, email_code: "", email_code_expires: 0,
+        role: role || "user", coins: coins || 0,
         gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {} };
     },
     async setAccountMissions(accountId, missions, missionsDone) {
@@ -1276,6 +1303,21 @@ async function MysqlStore() {
     async setAccountVipUntil(accountId, vipUntil) {
       await this.run("UPDATE accounts SET vip_until = ? WHERE id = ?",
         [Math.max(0, Math.floor(Number(vipUntil) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountEmail(accountId, email) {
+      await this.run("UPDATE accounts SET email = ? WHERE id = ?",
+        [String(email || "").slice(0, 120), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountEmailCode(accountId, code, expiresAt) {
+      await this.run("UPDATE accounts SET email_code = ?, email_code_expires = ? WHERE id = ?",
+        [String(code || ""), Math.max(0, Math.floor(Number(expiresAt) || 0)), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountEmailVerified(accountId, verified) {
+      await this.run("UPDATE accounts SET email_verified = ? WHERE id = ?",
+        [verified ? 1 : 0, Number(accountId)]);
       return this.findAccountById(accountId);
     },
     async migrateAccountGold(accountId) {
@@ -2278,6 +2320,13 @@ async function ensureSchema(pool) {
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB`);
+  // Verificação de e-mail (confirmação de conta): colunas adicionais migradas
+  // em instalações já existentes sem recriar a tabela.
+  for (const col of [
+    "ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0",
+    "ADD COLUMN email_code CHAR(6) DEFAULT NULL",
+    "ADD COLUMN email_code_expires BIGINT UNSIGNED NOT NULL DEFAULT 0",
+  ]) { try { await pool.query("ALTER TABLE accounts " + col); } catch (e) { /* já existe */ } }
   await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     account_id INT UNSIGNED NOT NULL,

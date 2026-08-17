@@ -8,6 +8,7 @@ let _storePayView = null; /* { order, pack, method } */
 let _storeSellQty = "";
 let _storeSellPrice = "";
 let _storeSellAnon = false;
+let _storeEmail = "";
 
 function storeEsc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -215,19 +216,31 @@ function renderStoreMethod(main, pack) {
   main.innerHTML = `
     <button type="button" class="sm mb4" id="store-back-packs">← Pacotes</button>
     <div class="small mb4" style="color:#ffe680">${storeEsc(pack.label)} · ${pack.total} TC</div>
+    <div class="tiny dim mb4">E-mail para receber o comprovante (obrigatório no Pix).</div>
+    <input type="email" id="store-pay-email" placeholder="seu@email.com" value="${storeEsc(_storeEmail)}"
+      style="width:100%;box-sizing:border-box;padding:6px 8px;background:#14120e;color:#c8c0a8;border:1px solid #16140f;margin-bottom:8px">
     <div class="tiny dim mb4">Escolha a forma de pagamento.</div>
     <div class="row" style="gap:8px;flex-wrap:wrap">
       <button type="button" class="sm primary" id="store-pay-pix">Pix (aprovação na hora) · ${storeBrl(pack.brl)}</button>
       <button type="button" class="sm primary" id="store-pay-card">Cartão de crédito (+10%) · ${storeBrl(cardBrl)}</button>
     </div>`;
   $("#store-back-packs").addEventListener("click", () => { _storePayView = null; renderStoreBuy(main); });
+  const emailInput = $("#store-pay-email");
+  if (emailInput) emailInput.addEventListener("input", (e) => { _storeEmail = e.target.value; });
   $("#store-pay-pix").addEventListener("click", () => startStoreCheckout(main, pack, "pix"));
   $("#store-pay-card").addEventListener("click", () => startStoreCheckout(main, pack, "card"));
 }
 
 async function startStoreCheckout(main, pack, method) {
+  const email = String(_storeEmail || "").trim();
+  if (method === "pix" && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    toast("Informe um e-mail válido para receber o comprovante do Pix.", "bad");
+    const input = $("#store-pay-email");
+    if (input && typeof input.focus === "function") input.focus();
+    return;
+  }
   main.innerHTML = `<div class="tiny dim">Abrindo pagamento...</div>`;
-  const r = await storeCheckout(sessionToken(), pack.id, method);
+  const r = await storeCheckout(sessionToken(), pack.id, method, email || undefined);
   if (!r.ok) {
     main.innerHTML = `<div class="tiny" style="color:#ff9a6a">${storeEsc(r.msg || "Falha no checkout")}</div>
       <button type="button" class="sm mt8" id="store-back-packs">← Voltar</button>`;

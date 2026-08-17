@@ -5602,6 +5602,7 @@ function initAccountLogin() {
           <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
         </div>` : ""}${cards}</div>
         <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
+        ${account.emailVerified ? "" : `<button class="full mt8" id="acc-verify-email">📧 Confirmar e-mail</button>`}
         <button class="full mt8" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
         <button class="danger full mt8" id="acc-logout">Logout</button>
       </div>`, true)) return;
@@ -5615,6 +5616,8 @@ function initAccountLogin() {
       if(summary)showIdentityRepair(token,account,characters,summary);
     }));
     $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
+    const verifyEmail = $("#acc-verify-email");
+    if (verifyEmail) verifyEmail.onclick = () => showEmailVerify(token, account, characters);
     const customize=$("#acc-customize-char");
     if(customize)customize.onclick=()=>{
       if(typeof G==="undefined"||!G||!G.p){msg("Entre em um personagem antes de personalizá-lo.");return;}
@@ -5632,6 +5635,8 @@ function initAccountLogin() {
           <input id="acc-new-login" name="username" maxlength="32" placeholder="escolha um login" autocomplete="username"></div>
         <div class="field"><label for="acc-new-password">Senha</label>
           <input id="acc-new-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="new-password"></div>
+        <div class="field"><label for="acc-new-email">E-mail (confirmação da conta)</label>
+          <input id="acc-new-email" type="email" maxlength="120" placeholder="seu@email.com" autocomplete="email"></div>
         <button class="primary full" id="acc-btn-register" type="submit">Criar conta</button>
         <div class="tiny dim center mt8" id="acc-register-msg"></div>
       </form>`)) return;
@@ -5642,11 +5647,13 @@ function initAccountLogin() {
       if (register.disabled) return;
       const login = ($("#acc-new-login").value || "").trim();
       const pass = $("#acc-new-password").value || "";
+      const email = ($("#acc-new-email").value || "").trim();
       const status = $("#acc-register-msg");
       if (!login || !pass) { status.textContent = "Informe login e senha."; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Informe um e-mail válido."; return; }
       register.disabled = true; status.textContent = "Criando conta...";
       try {
-        const result = await accountRegister(login, pass);
+        const result = await accountRegister(login, pass, email);
         if (!result.ok) { status.textContent = result.msg || "Falha ao criar conta."; return; }
         closeAccountModal();
         $("#acc-login").value = login; $("#acc-password").value = "";
@@ -5657,6 +5664,56 @@ function initAccountLogin() {
       }
     });
     $("#acc-new-login").focus();
+  }
+  function showEmailVerify(token, account, characters) {
+    let email = (account && account.email) || "";
+    if (!openAccountModal(`
+      <div class="panel-title">Confirmar e-mail
+        <span style="flex:1"></span><button class="sm" id="acc-email-back">← Voltar</button>
+      </div>
+      <div class="panel-body account-flow-body">
+        <div class="tiny dim mb4">Enviamos um código de 6 dígitos para o seu e-mail. Ele expira em 10 minutos.</div>
+        <div class="field"><label>E-mail</label>
+          <input id="acc-email-input" type="email" maxlength="120" placeholder="seu@email.com" value="${email}"></div>
+        <button class="full" id="acc-email-send">Enviar código</button>
+        <div class="field mt8"><label>Código de verificação</label>
+          <input id="acc-email-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
+        <button class="primary full mt8" id="acc-email-verify">Confirmar e-mail</button>
+        <div class="tiny dim center mt8" id="acc-email-msg"></div>
+      </div>`, true)) return;
+    $("#acc-email-back").onclick = () => showPicker(token, account, characters);
+    const status = $("#acc-email-msg");
+    const input = $("#acc-email-input");
+    const send = $("#acc-email-send");
+    send.onclick = async () => {
+      if (send.disabled) return;
+      email = (input.value || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Informe um e-mail válido."; return; }
+      send.disabled = true; status.textContent = "Enviando código...";
+      try {
+        const r = await accountEmailSendCode(token, email);
+        if (!r.ok) { status.textContent = r.msg || "Falha ao enviar o código."; return; }
+        status.textContent = r.alreadyVerified
+          ? "E-mail já confirmado."
+          : "Código enviado para " + email + "." + (r.devCode ? " (teste: " + r.devCode + ")" : "");
+        const codeInput = $("#acc-email-code");
+        if (codeInput && typeof codeInput.focus === "function") codeInput.focus();
+      } finally { send.disabled = false; }
+    };
+    const verify = $("#acc-email-verify");
+    verify.onclick = async () => {
+      if (verify.disabled) return;
+      const code = ($("#acc-email-code").value || "").trim();
+      verify.disabled = true; status.textContent = "Confirmando...";
+      try {
+        const r = await accountEmailVerify(token, code);
+        if (!r.ok) { status.textContent = r.msg || "Código incorreto."; return; }
+        status.textContent = "E-mail confirmado!";
+        const fresh = await accountMe(token);
+        if (fresh.ok) showPicker(token, fresh.account, fresh.characters || []);
+        else showPicker(token, Object.assign({}, account, { emailVerified: true }), characters);
+      } finally { verify.disabled = false; }
+    };
   }
 
   $("#acc-open-register").addEventListener("click", openRegisterModal);

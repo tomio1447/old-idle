@@ -21,7 +21,7 @@ must(demon.readUInt32BE(16)===192&&demon.readUInt32BE(20)===256,
 must(gameSrc.includes('$("#btn-hunts")')&&gameSrc.includes("openHuntsModal"),
   "botão HUNTS não abre o modal");
 must(html.includes("css/layout.css?v=")&&html.includes("js/ui.js?v=")&&
-     html.includes("js/city-ui.js?v=cidade-modal-v1"),
+     html.includes("js/city-ui.js?v="),
   "UI/CSS do catálogo sem cache-busting");
 must(css.includes("#hunts-modal-list .hunt-modal-card .mobs") &&
      css.includes("overflow: hidden") &&
@@ -40,7 +40,7 @@ const expected=[
  ["HUNTS 100–250",[]],
  ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas"]],
  ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
- ["SOULWAR 400+",["dark-thais","rotten-wasteland"]],
+ ["SOULWAR 400+",["dark-thais","rotten-wasteland","claustrophobic-inferno","ebb-and-flow"]],
 ];
 const start=ui.indexOf("const HUNT_MODAL_SECTIONS");
 const end=ui.indexOf("\nfunction openHuntInfoModal",start);
@@ -48,6 +48,7 @@ must(start>=0&&end>start,"bloco HUNT_MODAL_SECTIONS não encontrado");
 const root={innerHTML:""};
 const hunts={};
 for(const [,ids] of expected)for(const id of ids)hunts[id]={name:id,level:1,avgExp:10,monsters:["rat"]};
+hunts["ebb-and-flow"].comingSoon=true;
 // Uma hunt 7.4 existe no GAMEDATA, mas nunca pode aparecer no catálogo.
 hunts.spiders={name:"Aranhas 7.4",level:8,avgExp:5,monsters:["spider"]};
 const ctx={
@@ -74,4 +75,4 @@ must(/<span class="mobs"[^>]*>[\s\S]*?<\/span>\s*<span class="info"/.test(cardSa
 const mobsOnly=(cardSample[0].match(/<span class="mobs"[^>]*>[\s\S]*?<\/span>/)||[""])[0];
 must(!mobsOnly.includes('class="nm"')&&!mobsOnly.includes('class="meta"'),
   "texto da hunt vazou para a coluna de sprites");
-console.log("OK: botão Demon abre catálogo com 5 sessões e as 11 hunts permitidas.");
+console.log("OK: botão Demon abre catálogo com 5 sessões e as 13 hunts permitidas.");

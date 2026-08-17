@@ -313,17 +313,16 @@ function partyPendingInvites(p) {
   return d.invites.filter((i) => i.status === "pending" && String(i.toId) === id);
 }
 
-/* CONVIDAR (local): o convite fica PENDENTE — o jogador troca para o
- * personagem convidado e aceita de lá. Só o líder convida e só em
- * Cidade/Área de Treino (regra do dono). */
+/* ADICIONAR (local): entra direto na party — sem aceite. Só o líder, só
+ * em Cidade/Área de Treino, e só se o alvo NÃO estiver em party. */
 function partyInviteMember(p, memberId) {
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
-    return { ok: false, msg: "Use o modo online para convidar por nome." };
+    return { ok: false, msg: "Use o modo online para adicionar por nome." };
   }
   if (!partyIsLeaderLocal(p))
-    return { ok: false, msg: "Só o líder da party pode convidar." };
+    return { ok: false, msg: "Só o líder da party pode adicionar membros." };
   if (typeof partyCanInviteNow === "function" && !partyCanInviteNow())
-    return { ok: false, msg: "Para convidar você precisa estar na Cidade ou na Área de Treino." };
+    return { ok: false, msg: "Para adicionar você precisa estar na Cidade ou na Área de Treino." };
   let d = partyLocalData();
   if (!d) return { ok: false, msg: "Crie a party primeiro (botão Criar party)." };
   if (d.members.length >= 4)
@@ -333,16 +332,18 @@ function partyInviteMember(p, memberId) {
   if (!c) return { ok: false, msg: "Personagem não encontrado." };
   if (partyLocalMemberIds(d).indexOf(String(memberId)) !== -1)
     return { ok: false, msg: "Já está no party." };
-  if (d.invites.some((i) => i.status === "pending" && String(i.toId) === String(memberId)))
-    return { ok: false, msg: "Convite pendente — troque para o personagem e aceite." };
-  d.invites.push({
-    id: d.invites.reduce((m, i) => Math.max(m, i.id || 0), 0) + 1,
-    fromId: String(p.id || characterId(p)), fromName: p.name,
-    toId: String(memberId), toName: c.name,
-    status: "pending", createdAt: Date.now(),
+  // Limpa convite pendente legado (se houver) e adiciona direto.
+  d.invites = (d.invites || []).map((i) => {
+    if (i.status === "pending" && String(i.toId) === String(memberId))
+      return Object.assign({}, i, { status: "cancelled" });
+    return i;
+  });
+  d.members.push({
+    id: String(memberId), name: c.name, voc: c.voc, level: c.level,
+    expGained: 0, kills: 0, levelUps: 0,
   });
   partyLocalWrite(d);
-  return { ok: true, msg: "Convite enviado! Troque para o personagem e aceite pelo menu Party." };
+  return { ok: true, msg: c.name + " entrou na party." };
 }
 
 /* ACEITAR (local): o personagem convidado aceita o convite. Só em
@@ -547,6 +548,11 @@ function partyOnlineMode() {
 function partyCurrentZone() {
   if (typeof G === "undefined" || !G || !G.p) return { zone: "unknown" };
   if (G.training) return { zone: "training", training: G.training.mode || "academy" };
+  // World Boss é arena isolada — nunca vira zone=boss da party (evita follow
+  // indevido e 403 de requisitos de boss em POST /api/party/zone).
+  if (G.combat && (G.combat.worldBoss || (G.combat.boss && G.combat.boss.worldBoss))) {
+    return { zone: "city" };
+  }
   if (G.combat && G.combat.boss) return { zone: "boss", boss: G.combat.boss.id };
   if (G.p.hunt) return { zone: "hunt", hunt: G.p.hunt, instance: G.p.instanceMode || "non-pvp" };
   if (G.inCity) return { zone: "city" };
@@ -596,10 +602,23 @@ function partyIsLeaderAny(p) {
  * nos hooks do game.js e no início do jogo). Só o líder altera o estado da
  * party; membros só registram a própria zona (servidor). */
 async function partyReportZone(zoneInfo) {
-  if (!partyOnlineMode()) return;
+  if (!partyOnlineMode()) return { ok: true, skipped: true };
   try {
-    await accountPartyReportZone(Number(sessionCharId()), zoneInfo);
-  } catch (e) { /* offline/erro de rede: segue o jogo */ }
+    const info = zoneInfo || partyCurrentZone();
+    const r = await accountPartyReportZone(Number(sessionCharId()), info);
+    // 403 de requisitos de boss: toast (evita só "Failed to load resource").
+    // Outros 403 (auth) são raros e tratados pelo caller.
+    if (r && !r.ok && r.msg && Number(r.code) === 403 && info && info.zone === "boss") {
+      const key = String(r.msg);
+      const now = Date.now();
+      if (!partyReportZone._last403 || partyReportZone._last403.msg !== key ||
+          now - partyReportZone._last403.at > 8000) {
+        partyReportZone._last403 = { msg: key, at: now };
+        if (typeof toast === "function") toast(r.msg, "bad");
+      }
+    }
+    return r || { ok: false };
+  } catch (e) { /* offline/erro de rede: segue o jogo */ return { ok: false }; }
 }
 
 /* Poll do estado da party: espelha no save (para a UI) e aplica o
@@ -623,7 +642,10 @@ async function partySync() {
     if (PARTY_POLL_N % 3 === 0) {
       const inbox = await partyFetchInbox();
       if (inbox.ok && G && G.p) {
-        G.p._partyInvites = (inbox.invites || []).length;
+        const filtered = (typeof partyFilterStaleInbox === "function")
+          ? partyFilterStaleInbox(inbox.invites || [], st)
+          : (inbox.invites || []);
+        G.p._partyInvites = filtered.length;
         if (typeof renderPartyButton === "function") renderPartyButton(G.p);
         if (typeof renderPartyPanel === "function") renderPartyPanel(G.p);
       }
@@ -936,12 +958,29 @@ async function partyFetchInbox() {
 /* Cria a party online (char atual vira líder). */
 async function partyOnlineCreate() {
   if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
-  return await accountPartyCreate(Number(sessionCharId()));
+  const r = await accountPartyCreate(Number(sessionCharId()));
+  // Party nasce com leader_zone=unknown; sem este reporte o próximo invite
+  // vira 403 ("só pode convidar na Cidade/Treino") mesmo no templo.
+  if (r && r.ok) {
+    try { await partyReportZone(partyCurrentZone()); } catch (e) { /* ignore */ }
+  }
+  return r;
 }
 
-/* Convidar por nome (online). O SERVIDOR valida a zona do líder. */
+/* Adicionar por nome (online). O SERVIDOR valida a zona do líder.
+ * Entra direto — sem aceite. Só personagens fora de party. */
 async function partyOnlineInvite(name) {
   if (!partyOnlineMode()) return { ok: false, msg: "Modo online não configurado." };
+  const z = partyCurrentZone();
+  if (z.zone !== "city" && z.zone !== "training") {
+    return { ok: false, msg: "O líder só pode adicionar membros estando na Cidade (safe zone) ou Área de Treino" };
+  }
+  // Sincroniza leader_zone antes do add — UI local pode estar no templo
+  // enquanto o servidor ainda tem unknown/hunt/boss.
+  const zoneR = await partyReportZone(z);
+  if (zoneR && zoneR.ok === false && zoneR.code === 403) {
+    return { ok: false, msg: zoneR.msg || "Não foi possível atualizar a zona da party." };
+  }
   return await accountPartyInvite(Number(sessionCharId()), name);
 }
 
@@ -982,6 +1021,8 @@ function partyRestoreCharacterFull(p) {
     const mx = typeof maxStats === 'function' ? maxStats(p) : {hp: 100, mp: 10};
     p.hp = mx.hp;
     p.mp = mx.mp;
+    if (typeof clearPlayerCombatConditions === 'function') clearPlayerCombatConditions(p);
+    else p.conditions = {};
     return 1;
   } catch (e) { return 0; }
 }
@@ -995,6 +1036,8 @@ function partyCombatRestoreAll(reason) {
         const mx = typeof maxStats === 'function' ? maxStats(ent.p) : {hp: 100, mp: 10};
         ent.p.hp = mx.hp;
         ent.p.mp = mx.mp;
+        if (typeof clearPlayerCombatConditions === 'function') clearPlayerCombatConditions(ent.p);
+        else ent.p.conditions = {};
         ent.permadead = false;
         ent.reviveAt = 0;
         ent.deathPos = null;
@@ -1007,6 +1050,10 @@ function partyCombatRestoreAll(reason) {
       G.combat.deathPos = null;
       G.combat.deadAt = 0;
     }
+    if (typeof G !== 'undefined' && G && G.p) {
+      if (typeof clearPlayerCombatConditions === 'function') clearPlayerCombatConditions(G.p);
+      else G.p.conditions = {};
+    }
     if (typeof getCharacters === 'function') {
       const chars = getCharacters();
       for (const c of chars) {
@@ -1017,6 +1064,8 @@ function partyCombatRestoreAll(reason) {
           const mx = typeof maxStats === 'function' ? maxStats(c) : {hp: 100, mp: 10};
           c.hp = mx.hp;
           c.mp = mx.mp;
+          if (typeof clearPlayerCombatConditions === 'function') clearPlayerCombatConditions(c);
+          else c.conditions = {};
           if (typeof saveCharacterToRoster === 'function') saveCharacterToRoster(c);
         }
       }

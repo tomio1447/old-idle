@@ -35,6 +35,11 @@ ITEMS = {
   "spectral-horseshoe": 34072,
   "spectral-horse-tack": 34074,
   "bracelet-of-strengthening": 34076,
+  "hand": 33936,
+  "head": 33937,
+  "diabolic-skull": 34025,
+  "infernal-heart": 34139,
+  "infernal-robe": 34146,
 }
 
 os.makedirs(OUT, exist_ok=True)

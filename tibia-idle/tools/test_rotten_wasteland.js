@@ -109,6 +109,6 @@ for(const loot of base.loot){
   must(fs.existsSync(path.join(game,"assets","item",loot.item+".png")),"Hatred: loot sem sprite: "+loot.item);
 }
 const ui=fs.readFileSync(path.join(js,"ui.js"),"utf8");
-must(ui.includes('{ title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland"] }'),
+must(ui.includes('{ title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow"] }'),
   "Rotten Wasteland não aparece em Soulwar 400+");
 console.log("OK: Rotten Wasteland 30×30, 3 monstros, loot/attacks, missão 50 e Goshnar's Hatred validados.");

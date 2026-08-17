@@ -10,11 +10,13 @@ window.FX_OFFICIAL_ALIASES = {
   "claw-white": "tiger-clash-white",
   "death-echo": "death-echo-effect",
   "draw-blood": "blood-effect",
-  "energy-area": "energy-effect",
+  // AREA FIX: waves/beams/AoE precisam do strip DAT em assets/fx
+  // (CONST_ME_*AREA, 32px por SQM). Os GIFs da wiki (energy-effect,
+  // death-effect, fire-effect, cloud-effect) são outro recorte — a arte
+  // fica um ícone miúdo no centro do tile e a onda vira uma grade rígida.
+  // Mesma regra do ice-area abaixo.
   "energy-damage": "energy-shock-yellow",
-  "explosion-area": "explosion-effect",
   "explosion-hit": "explosion-hit-blue",
-  "fire-area": "fire-effect",
   "fire-attack": "fireball-effect",
   "fist-thousand": "thousand-fist-effect",
   "forked-glacier": "forked-glacier-effect",
@@ -31,9 +33,7 @@ window.FX_OFFICIAL_ALIASES = {
   "magic-blue": "blue-sparkles-effect",
   "magic-green": "green-sparkles-effect",
   "magic-red": "red-sparkles-effect",
-  "mort-area": "death-effect",
   "poff": "poof-effect",
-  "poison-area": "poison-effect-2",
   "stones": "stone-shower-effect",
   "teleport": "teleport-effect",
   "water-splash": "water-splash-effect",
@@ -46,16 +46,18 @@ window.FX_OFFICIAL_ALIASES = {
   // CONST_ME_BLOW_WHITE (Mystic Repulse / Lesser Mystic Repulse e bond
   // physical) precisa do strip classico assets/fx/blow-white.png (10
   // quadros). Sweeping Takedown e outro efeito (arma especial).
-  "big-clouds": "cloud-effect",
-  "small-clouds": "cloud-effect",
-  "block-hit": "block-effect",
+  // CONST_ME_BLOCKHIT (beam length=5 do Cobra Assassin / Sparky Beam) precisa
+  // do strip clássico assets/fx/block-hit.png (3 faíscas amarelas). O alias
+  // wiki "block-effect" aponta para Floating Block / elevador de pedra.
   "bubbles": "bubbles-effect",
   // CONST_ME_GREEN_RINGS (Wave T da Cobra Assassin) precisa usar o strip
   // clássico assets/fx/green-rings.png. Green Sparkles é outro efeito.
+  // CONST_ME_YELLOW_RINGS idem: assets/fx/yellow-rings.png (7 anéis amarelos).
+  // Yellow Sparkles é Magic Yellow / outro efeito — o alias errado fazia
+  // o FX cair no strip de sparkles (ou parecer tile/parede no crop).
   "groundshaker": "trembling-effect",
   "hearts": "hearts-effect",
   "hit-by-poison": "poison-effect-1",
-  "holy-area": "holy-cross-effect",
   "ice-tornado": "ice-tornado-effect",
   "lose-energy": "energy-shock-white",
   "mana-wisp": "blue-notes-effect",
@@ -67,7 +69,6 @@ window.FX_OFFICIAL_ALIASES = {
   "watercreature": "sea-serpent-effect",
   "white-energy-spark": "electrical-spark-effect",
   "yellow-energy": "yellow-electricity-effect",
-  "yellow-rings": "yellow-sparkles-effect",
   "blue-electricity": "blue-electricity-effect",
   "big-plants": "large-plant-effect",
   "plant-attack": "plant-effect",

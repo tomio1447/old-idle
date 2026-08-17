@@ -47,8 +47,22 @@ function ensureCombo(p) {
     if (s.kind === "spell") {
       if (s.id === "exori-dir-san") s.id = "exevo-dir-san";
       else if (s.id === "exori-dir-moe") s.id = "exevo-dir-moe";
+      // Alias antigos / nomes de item → slug de magia.
+      else if (s.id === "ethereal-spear" || s.id === "exori con") s.id = "exori-con";
+      else if (s.id === "strong-ethereal-spear" || s.id === "exori gran con")
+        s.id = "exori-gran-con";
     }
     s.min = Math.max(1, Math.min(9, parseInt(s.min, 10) || 1));
+    // Single-target nunca herda min>1 de save antigo / drag — isso fazia
+    // isMulti artificial e a magia nunca saía (hits ST = 1 < need).
+    if (s.kind === "spell" && typeof SPELLS !== "undefined") {
+      const sp = SPELLS[s.id];
+      const area = !!(sp && (sp.area || Number(sp.chain) > 1));
+      if (!area) s.min = 1;
+    } else if (s.kind === "rune" && typeof SUPPLIES !== "undefined") {
+      const ru = SUPPLIES[s.id];
+      if (!(ru && ru.area)) s.min = 1;
+    }
   }
   if (typeof CanaryVocation !== "undefined" && CanaryVocation.sanitizePlayerSpells
       && typeof SPELLS !== "undefined") {
@@ -73,7 +87,7 @@ function migrateComboFromShooter(p) {
     if (i === -1) return;
     // magia/runa de area entra pedindo 2 alvos, que e o uso tipico
     const area = kind === "spell"
-      ? !!(SPELLS[id] && SPELLS[id].area)
+      ? !!(SPELLS[id] && (SPELLS[id].area || Number(SPELLS[id].chain) > 1))
       : !!(SUPPLIES[id] && SUPPLIES[id].area);
     c[i] = { kind: kind, id: id, min: area ? 2 : 1 };
   };
@@ -187,7 +201,12 @@ function comboPronta(c, p, entrada, alvo, now) {
 function comboAlvosSuficientes(c, entrada, alvo) {
   if (!entrada || !(entrada.min > 1)) return true;
   let n = null;
-  if (typeof areaNameOf === "function" && typeof areaCount === "function") {
+  if (entrada.kind === "spell" && typeof monkSpellTargets === "function" &&
+      typeof MONKSPELLS !== "undefined" && MONKSPELLS[entrada.id] &&
+      MONKSPELLS[entrada.id].chain) {
+    n = monkSpellTargets(c.player, entrada.id, c, alvo).length;
+  }
+  if (n === null && typeof areaNameOf === "function" && typeof areaCount === "function") {
     const nome = areaNameOf(entrada.kind, entrada.id);
     if (nome && c && c.player) {
       n = areaCount(c, nome, c.player, alvo,
@@ -198,10 +217,14 @@ function comboAlvosSuficientes(c, entrada, alvo) {
   return n >= entrada.min;
 }
 
-function comboEscolhe(c, p, alvo, now) {
+function comboEscolhe(c, p, alvo, now, skipIds) {
   const lista = ensureCombo(p);
-  // Pack denso: não gasta SD/strikes se há AoE/wave/chain pronta que pegue
-  // 2+ (ou se a box melhor está a poucos SQMs — deixa o movimento chegar).
+  const skip = skipIds && typeof skipIds === "object" ? skipIds : null;
+  // A ORDEM dos slots é a prioridade absoluta. Pack denso NÃO pode
+  // silenciar single-target (#1 Strong Ethereal Spear / Ethereal Spear /
+  // SD / strikes): quem quer AoE no pack coloca a área primeiro com min>=2.
+  // Preferência de pack só evita gastar AoE com min=1 quando a matriz
+  // atual pega <2 e ainda há box (deixa o AUTO andar até o pack).
   const vivos = c && c.mobs ? c.mobs.filter((m) => m && m.hp > 0) : [];
   const multi = vivos.length > 1;
   let packDens = 0;
@@ -214,14 +237,19 @@ function comboEscolhe(c, p, alvo, now) {
   const preferPack = multi && packDens >= 2;
   const slotMulti = (entrada) => {
     if (!entrada) return false;
-    if (Number(entrada.min) > 1) return true;
+    // min>1 sozinho NÃO marca single-target como área.
     return comboEhArea(entrada);
   };
   const hitsNow = (entrada) => {
     if (!entrada) return 0;
     if (!slotMulti(entrada)) return alvo && alvo.hp > 0 ? 1 : 0;
     let n = null;
-    if (typeof areaNameOf === "function" && typeof areaCount === "function") {
+    if (entrada.kind === "spell" && typeof monkSpellTargets === "function" &&
+        typeof MONKSPELLS !== "undefined" && MONKSPELLS[entrada.id] &&
+        MONKSPELLS[entrada.id].chain) {
+      n = monkSpellTargets(c.player || p, entrada.id, c, alvo).length;
+    }
+    if (n === null && typeof areaNameOf === "function" && typeof areaCount === "function") {
       const nome = areaNameOf(entrada.kind, entrada.id);
       if (nome && c && c.player) {
         n = areaCount(c, nome, c.player, alvo,
@@ -231,30 +259,41 @@ function comboEscolhe(c, p, alvo, now) {
     if (n === null) n = comboAlvosNoRaio(c, alvo, comboRaio(entrada));
     return n;
   };
+  const skipped = (entrada) =>
+    !!(skip && entrada && skip[entrada.kind + ":" + entrada.id]);
   const spellPronta = (entrada) => {
     if (!entrada || entrada.kind === "rune") return false;
+    if (skipped(entrada)) return false;
     if (!comboPronta(c, p, entrada, alvo, now)) return false;
     const isMulti = slotMulti(entrada);
     const hits = hitsNow(entrada);
     const need = Math.max(1, Number(entrada.min) || 1);
-    if (preferPack && !isMulti) return false;
+    if (!isMulti) {
+      if (need > 1 && vivos.length < need) return false;
+      return true;
+    }
     // AoE/self: sem monstro na matriz (caldera vazia) nao esta "pronta".
-    if (isMulti && hits < need) return false;
-    if (preferPack && isMulti && hits < 2) return false;
+    if (hits < need) return false;
+    // AoE com min=1 em pack denso: exige 2 hits reais (senao deixa andar).
+    if (preferPack && need <= 1 && hits < 2) return false;
     if (!comboAlvosSuficientes(c, entrada, alvo)) return false;
     return true;
   };
   const spellReady = lista.some(spellPronta);
   for (const entrada of lista) {
     if (!entrada) continue;
+    if (skipped(entrada)) continue;
     if (entrada.kind === "rune" && spellReady) continue;
     if (!comboPronta(c, p, entrada, alvo, now)) continue;
     const isMulti = slotMulti(entrada);
     const hits = hitsNow(entrada);
     const need = Math.max(1, Number(entrada.min) || 1);
-    if (preferPack && !isMulti) continue;
-    if (isMulti && hits < need) continue;
-    if (preferPack && isMulti && hits < 2) continue;
+    if (!isMulti) {
+      if (need > 1 && vivos.length < need) continue;
+      return { kind: entrada.kind, id: entrada.id, entrada: entrada };
+    }
+    if (hits < need) continue;
+    if (preferPack && need <= 1 && hits < 2) continue;
     if (!comboAlvosSuficientes(c, entrada, alvo)) continue;
     return { kind: entrada.kind, id: entrada.id, entrada: entrada };
   }

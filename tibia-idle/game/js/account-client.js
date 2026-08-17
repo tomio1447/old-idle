@@ -1314,12 +1314,24 @@ function accountStopServerHealthMonitor(){
   if(ACCOUNT_SERVER_HEALTH_TIMER){clearTimeout(ACCOUNT_SERVER_HEALTH_TIMER);ACCOUNT_SERVER_HEALTH_TIMER=null;}
 }
 
-async function accountRegister(login, password) {
-  const r = await _api("POST", "/api/register", { login, password });
+async function accountRegister(login, password, email) {
+  const r = await _api("POST", "/api/register", { login, password, email: email || "" });
   if (r.data.ok) return { ok:true, msg:"Conta criada!" };
   if (r.code === 409 || r.data.error === "ACCOUNT_EXISTS")
     return { ok:false, exists:true, msg:"Conta já existe. Use a aba Entrar." };
   return { ok:false, msg:r.data.msg || "Falha ao criar conta" };
+}
+
+/* Solicita o envio do código de verificação de e-mail (6 dígitos). */
+async function accountEmailSendCode(token, email) {
+  const r = await _api("POST", "/api/account/email/send", { token, email: email || "" });
+  return r.data || { ok: false, msg: "Falha ao enviar o código" };
+}
+
+/* Confirma o código de verificação e marca o e-mail como confirmado. */
+async function accountEmailVerify(token, code) {
+  const r = await _api("POST", "/api/account/email/verify", { token, code: code || "" });
+  return r.data || { ok: false, msg: "Falha ao confirmar o código" };
 }
 
 async function accountLogin(login, password) {

@@ -53,7 +53,7 @@ const WD_CAMPOS_CANARY = [
   "el", "elDmg", "mdmg", "dmgMin", "dmgMax", "manaCost", "res",
   "sword", "axe", "club", "dist", "shield", "fist", "mag",
   "lifeLeech", "manaLeech", "cls", "aug", "cat", "id",
-  "af", "aw", "ah", "npcBuy", "npcSell", "range", "hit", "charges",
+  "af", "sf", "aw", "ah", "npcBuy", "npcSell", "range", "hit", "charges",
   "mantra", "bond",
 ];
 
@@ -63,16 +63,43 @@ function itemNaLoja(it) {
   return !!(it && (it.shop || (!it.drop && it.buy)));
 }
 
-/* O item tem sprite animada (tira <slug>_anim.png com `af` frames)? */
-function itemAnimado(it) {
-  return !!(it && it.af > 1);
+/* Canary/OTC: subtype visual de stackable (map_drawer / Cyclopedia).
+ * count 1→0, 2→1, 3→2, 4→3, 5–9→4, 10–24→5, 25–49→6, 50+→7. */
+function itemStackSubtype(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n <= 1) return 0;
+  if (n <= 2) return 1;
+  if (n <= 3) return 2;
+  if (n <= 4) return 3;
+  if (n < 10) return 4;
+  if (n < 25) return 5;
+  if (n < 50) return 6;
+  return 7;
 }
 
-/* Estilo inline que roda a animacao da tira de sprites.
- * A tira e um PNG unico de af*aw pixels: a animacao e so mover o
- * background-position em passos, sem JS por item e sem N requisicoes. */
-function estiloAnim(slug, it, tam) {
-  if (!itemAnimado(it)) return "";
+/* Tira <slug>_stack.png com `sf` frames de count (NAO anima no tempo). */
+function itemTemStackFrames(it) {
+  return !!(it && it.sf > 1);
+}
+
+/* O item tem sprite animada no tempo (tira <slug>_anim.png com `af` frames)?
+ * Stackables com frames de count usam `sf` — nao entram aqui.
+ * Alguns itens do client 15x marcam `af` sem ter o PNG da tira — lista abaixo. */
+const ITEM_ANIM_MISSING = new Set([
+  "plate-shield", "steel-shield", "amazon-shield", "phoenix-shield",
+  "scarab-amulet", "star-amulet", "demonbone-amulet", "rope", "native-armor",
+  "elven-legs", "crystal-ring", "wedding-ring", "ring-of-the-sky",
+  "crystal-necklace", "elven-brooch", "green-flask", "teddy-bear", "doll",
+  "red-backpack", "grey-backpack", "vase",
+]);
+
+function itemAnimado(it, slug) {
+  if (!(it && it.af > 1 && !itemTemStackFrames(it))) return false;
+  if (slug && ITEM_ANIM_MISSING.has(slug)) return false;
+  return true;
+}
+
+function itemSpriteBox(it, tam) {
   const px = tam || 32;
   // Nunca amplie a arte além do tamanho nativo do client 15x. `tam` é o
   // limite da caixa, não um tamanho obrigatório: moedas, gemas e joias
@@ -80,6 +107,30 @@ function estiloAnim(slug, it, tam) {
   const esc = Math.min(1, px / Math.max(it.aw || 32, it.ah || 32));
   const w = Math.max(1, Math.round((it.aw || 32) * esc));
   const h = Math.max(1, Math.round((it.ah || 32) * esc));
+  return { w: w, h: h };
+}
+
+/* Frame de pilha travado pelo count — Canary nao free-anima esses frames. */
+function estiloStack(slug, it, tam, count) {
+  if (!itemTemStackFrames(it)) return "";
+  const { w, h } = itemSpriteBox(it, tam);
+  const frames = it.sf | 0;
+  const frame = Math.min(itemStackSubtype(count), frames - 1);
+  const total = w * frames;
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  return `width:${w}px;height:${h}px;` +
+    `background-image:url(assets/item/${slug}_stack.png?v=${v});` +
+    `background-size:${total}px ${h}px;` +
+    `background-position:-${frame * w}px 0;` +
+    `background-repeat:no-repeat;image-rendering:pixelated;`;
+}
+
+/* Estilo inline que roda a animacao da tira de sprites.
+ * A tira e um PNG unico de af*aw pixels: a animacao e so mover o
+ * background-position em passos, sem JS por item e sem N requisicoes. */
+function estiloAnim(slug, it, tam) {
+  if (!itemAnimado(it, slug)) return "";
+  const { w, h } = itemSpriteBox(it, tam);
   const dur = (it.af * 0.15).toFixed(2);
   const total = w * it.af;
   // --anim-w e lido pelo @keyframes item-anim: sem ele o CSS so conseguiria
@@ -92,14 +143,15 @@ function estiloAnim(slug, it, tam) {
     `animation:item-anim ${dur}s steps(${it.af}) infinite;`;
 }
 
-/* <img> ou <div> animado, conforme o item.
+/* <img> ou <div> animado / travado por count, conforme o item.
  *
- * Aceita as DUAS assinaturas que a base de codigo usa:
- *   itemImg(slug)          -> inventário/bag/loot, tamanho nativo do PNG
- *   itemImg(slug, "cls")   -> chamada antiga do ui.js, 2o arg e uma classe
- *   itemImg(slug, 26)      -> Cyclopedia, 2o arg e o tamanho em pixels
- * Isso importa porque existia uma segunda itemImg em ui.js que sobrescrevia
- * esta (ui.js carrega depois) e deixava todo item animado estatico.
+ * Aceita as assinaturas que a base de codigo usa:
+ *   itemImg(slug)
+ *   itemImg(slug, "cls")
+ *   itemImg(slug, 26)
+ *   itemImg(slug, 26, "cls")
+ *   itemImg(slug, 26, "cls", count)   <- stack frame Canary
+ *   itemImg(slug, { size, cls, count })
  */
 
 /* Retorna a classe CSS de borda conforme a classificacao do item:
@@ -108,15 +160,26 @@ function itemClsBorder(slug) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
   return (it.cls && it.cls >= 2) ? "cls-" + it.cls : "";
 }
-function itemImg(slug, tam, cls) {
+function itemImg(slug, tam, cls, count) {
   const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
+  // 2o argumento objeto = { size, cls, count }
+  if (tam && typeof tam === "object") {
+    count = tam.count !== undefined ? tam.count : count;
+    cls = tam.cls || cls;
+    tam = tam.size || tam.tam || 0;
+  }
   // 2o argumento como string = classe CSS (assinatura antiga do ui.js)
   if (typeof tam === "string") { cls = tam; tam = 0; }
   // classe de classificacao (forja): cls-2 azul, cls-3 roxo, cls-4 amarelo
   const clsBorder = (it.cls && it.cls >= 2) ? `cls-${it.cls}` : "";
   const clsAll = [cls, clsBorder].filter(Boolean).join(" ");
   const px = tam || 32;
-  if (itemAnimado(it)) {
+  if (itemTemStackFrames(it)) {
+    const qty = count !== undefined && count !== null ? count : 1;
+    return `<div class="item-sprite ${clsAll}" title="${it.n || slug}"
+      style="${estiloStack(slug, it, px, qty)}"></div>`;
+  }
+  if (itemAnimado(it, slug)) {
     return `<div class="item-sprite ${clsAll}" title="${it.n || slug}"
       style="${estiloAnim(slug, it, px)}"></div>`;
   }
@@ -125,7 +188,8 @@ function itemImg(slug, tam, cls) {
   const dim = tam
     ? `max-width:${px}px;max-height:${px}px;width:auto;height:auto`
     : `width:auto;height:auto`;
-  return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png"
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png?v=${v}"
     alt="" loading="lazy" style="${dim}"
     onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\\.png(\\?|$)/,'.gif$1');}">`;
 }

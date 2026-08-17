@@ -162,7 +162,16 @@ function spellValues(p, s) {
     // sem formula no canary: estima pelo custo de mana, que e como o
     // proprio Tibia balanceia magias novas
     const base = Math.max(4, (s && s.mana ? s.mana : 20) * 0.9);
-    return { min: Math.floor(base * 0.7), max: Math.floor(base * 1.3) };
+    let min = Math.floor(base * 0.7), max = Math.floor(base * 1.3);
+    if (s && s.type === "attack" && typeof CanaryVocation !== "undefined" &&
+        CanaryVocation.idleSpellDamageMul) {
+      const mul = CanaryVocation.idleSpellDamageMul(p.voc);
+      if (mul !== 1) {
+        min = Math.max(0, Math.floor(min * mul));
+        max = Math.max(1, Math.floor(max * mul));
+      }
+    }
+    return { min: min, max: max };
   }
   const level = p.level || 1;
   let lo, hi;
@@ -194,7 +203,18 @@ function spellValues(p, s) {
   }
   lo = Math.max(0, lo);
   hi = Math.max(lo, hi);
-  return { min: Math.floor(lo), max: Math.floor(hi) };
+  let min = Math.floor(lo), max = Math.floor(hi);
+  // Idle balance: Knight/Sorcerer +15% e Monk +25% no dano base das magias
+  // de ataque (cura/suporte ficam de fora). Mesmo fator do servidor.
+  if (s && s.type === "attack" && typeof CanaryVocation !== "undefined" &&
+      CanaryVocation.idleSpellDamageMul) {
+    const mul = CanaryVocation.idleSpellDamageMul(p.voc);
+    if (mul !== 1) {
+      min = Math.max(0, Math.floor(min * mul));
+      max = Math.max(1, Math.floor(max * mul));
+    }
+  }
+  return { min: min, max: max };
 }
 
 /* Rola um valor dentro da faixa da formula */

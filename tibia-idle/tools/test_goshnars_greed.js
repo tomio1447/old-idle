@@ -16,23 +16,24 @@ for (const file of ["gamedata.js", "monsterdata.js", "monsters.js", "soulwar.js"
   "tileflags.js", "tilepatterndata.js"])
   vm.runInContext(fs.readFileSync(path.join(js, file), "utf8"), ctx, {filename:file});
 
-// --- mapa próprio z=7 em runtime 30×30 (nunca Rotten Wasteland)
+// --- mapa próprio z=7 em runtime 30×30 (Canary 22×18)
 const beta = fs.readFileSync(path.join(game, "beta-maps", "bossesroom", "goshnars_greed_room.otbm"));
 const runtime = fs.readFileSync(path.join(game, "maps", "goshnars_greed_room.otbm"));
 const rotten = fs.readFileSync(path.join(game, "maps", "rotten_wasteland.otbm"));
 must(beta.equals(runtime) && !runtime.equals(rotten), "Greed reutilizou o mapa da Rotten Wasteland");
 must(crypto.createHash("sha256").update(runtime).digest("hex") ===
-  "067b88f26d09ea4fb9631088cc6af7c7a094c39cd9c4964866835064ebe822f8",
+  "cc5df1e5b31bb4dea72072f4ca65cc21097e41ee807ff76b249c435481ea0510",
   "SHA da bossroom dedicada de Greed inesperado");
 const hunt = ctx.GAMEDATA.hunts["goshnars-greed-room"];
 must(hunt && hunt.otbm === "goshnars_greed_room" && hunt.otbmFloor === 7 &&
      hunt.otbmRuntimeWidth === 30 && hunt.otbmRuntimeHeight === 30,
   "hunt técnica de Goshnar não usa OTBM próprio/mundo 30×30");
-must(JSON.stringify(hunt.otbmSpawn) === JSON.stringify({x:10,y:12,z:7}) &&
-     JSON.stringify(hunt.otbmMobBounds) === JSON.stringify({x:10,y:2,w:1,h:1,z:7}),
-  "spawns locais da bossroom dedicada divergentes");
+must(JSON.stringify(hunt.otbmSpawn) === JSON.stringify({x:1053,y:1023,z:7}) &&
+     JSON.stringify(hunt.otbmMobBounds) === JSON.stringify({x:1053,y:1012,w:1,h:1,z:7}) &&
+     JSON.stringify(hunt.otbmFovBounds) === JSON.stringify({x:1042,y:1009,w:22,h:18,z:7}),
+  "spawns/FOV da bossroom dedicada divergentes");
 let map = OTBM.read(runtime, {z:7});
-must(map.w === 20 && map.h === 14 && Object.keys(map.cells).length === 280,
+must(map.w === 22 && map.h === 18 && Object.keys(map.cells).length === 392,
   "bossroom dedicada de Greed não foi preservada integralmente");
 const loader = fs.readFileSync(path.join(js, "otbmhunt.js"), "utf8");
 const zoneStart = loader.indexOf("function applyHuntOtbmZones");
@@ -44,7 +45,7 @@ map.idleTargetHeight = hunt.otbmRuntimeHeight;
 const hm = OTBM.huntMapFromOtbm(map, ctx.TILEFLAGS);
 must(hm.rows.length === 30 && hm.rows.every((row) => row.length === 30),
   "bossroom Goshnar não ficou 30×30");
-must(hm.spawn.x === 15 && hm.spawn.y === 20 && hm.mob[0].x === 15 && hm.mob[0].y === 10,
+must(hm.spawn.x === 15 && hm.spawn.y === 20 && hm.mob[0].x === 15 && hm.mob[0].y === 9,
   "player ou boss spawn runtime dedicado incorreto");
 const visualIds = new Set();
 Object.values(hm.leg).forEach((entry) => {
@@ -75,7 +76,7 @@ for (const [slug, expected] of Object.entries(expectedCombat)) {
     slug+": danos/magias do Canary divergentes");
 }
 
-// --- mini game: seis adds, 30% Greedbeast e janela exata de 40 segundos
+// --- mini game: seis adds, 60% Greedbeast e janela exata de 40 segundos
 ctx.huntMapBlocked = () => false;
 ctx.buildOccupancy = () => new Map();
 ctx.cellToScreen = (x, y) => ({x:(x+.5)/30,y:(y+.5)/30});
@@ -92,9 +93,9 @@ must(ctx.greedBossAdds(combat).every((add) => add.def.armor === 0 &&
   add.def.defense === 0 && add.def.mitigation === 0 &&
   !Object.keys(add.def.resist).length && !add.def.imune.length && add.def.skills.length),
   "adds nasceram com defesa/imunidade ou perderam as magias do Canary");
-must(ctx.greedRandomAddSlug(() => .299999) === "greedbeast" &&
-  ctx.greedRandomAddSlug(() => .30) !== "greedbeast",
-  "chance de nascimento da Greedbeast não é exatamente 30%");
+must(ctx.greedRandomAddSlug(() => .599999) === "greedbeast" &&
+  ctx.greedRandomAddSlug(() => .60) !== "greedbeast",
+  "chance de nascimento da Greedbeast não é exatamente 60%");
 must(combat.mobs[combat.mobs.length-1].boss,
   "boss imune ficou antes dos adds e impediu o auto-combate");
 must(!ctx.greedBossCanTakePlayerDamage(combat, bossMob) &&
@@ -117,7 +118,8 @@ must(combat.greed.immune && bossMob.greedImmune &&
 // --- missão Mirrored Nightmare recompensa e requisito obrigatório
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");
 const missionStart = gameSrc.indexOf("const MISSION_DEFS = {");
-const missionEnd = gameSrc.indexOf("\n\nfunction missionForHunt", missionStart);
+const missionEnd = gameSrc.indexOf("function missionForHunt", missionStart);
+must(missionStart >= 0 && missionEnd > missionStart, "MISSION_DEFS slice inválido");
 vm.runInContext(gameSrc.slice(missionStart, missionEnd) +
   "\nwindow.__MISSION_DEFS=MISSION_DEFS;", ctx);
 const mission = ctx.__MISSION_DEFS["dark-thais"];
@@ -125,8 +127,10 @@ must(mission && mission.tasks.length === 7 &&
      mission.tasks.some((task) => task.monster === "distorted-phantom") &&
      mission.completeReward.bossAccess === "goshnar-s-greed",
   "Mirrored Nightmare não recompensa acesso ao boss");
-const bossStart = gameSrc.indexOf("const BOSS_DEFS = {");
-const bossEnd = gameSrc.indexOf("\n\n/* Quivers", bossStart);
+const bossStart = gameSrc.indexOf("const MEGA_TEST_BYPASS");
+const bossDefsStart = gameSrc.indexOf("const BOSS_DEFS = {");
+const bossEnd = gameSrc.indexOf("/* Quivers", bossDefsStart);
+must(bossStart >= 0 && bossDefsStart > bossStart && bossEnd > bossDefsStart, "BOSS_DEFS slice inválido");
 ctx.BOSS_COOLDOWN = 0;
 vm.runInContext(gameSrc.slice(bossStart, bossEnd) + "\nwindow.__BOSS_DEFS=BOSS_DEFS;", ctx);
 const boss = ctx.__BOSS_DEFS["goshnar-s-greed"];
@@ -158,12 +162,13 @@ must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
      css.includes('right: 8px; bottom: 8px') && css.includes('width: 210px') &&
      fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
   "modal pequeno no canto inferior direito não foi configurado");
-must(html.includes("js/combat.js?v=boss-immunity-v1"), "combat sem cache-busting Greed v2");
-must(html.includes("js/render.js?v=interface-sharp-v1"), "render sem cache-busting visual");
-must(html.includes("js/soulwar.js?v=mirrored-nightmare-v1"), "soulwar sem cache-busting Mirrored Nightmare");
-must(html.includes("js/scarlett-boss.js?v=scarlett-qte-v4"),
+must(html.includes("js/combat.js?v=wb-shared-v1"), "combat sem cache-busting");
+must(html.includes("js/render.js?v=wave-fx-dat-v1"), "render sem cache-busting visual");
+must(html.includes("js/soulwar.js?v=greed-arena-60-v1"), "soulwar sem cache-busting Greed arena/60%");
+must(html.includes("js/yasir-prices.js?v=goshnar-yasir-v1"), "yasir-prices sem cache-busting");
+must(html.includes("js/scarlett-boss.js?v=scarlett-esteira-smooth-v1"),
   "gate compartilhado sem cache-busting");
-must(html.includes("css/layout.css?v=scarlett-qte-v4"),
+must(html.includes("css/layout.css?v=boot-load-screen-v1"),
   "CSS do modal Greedbeast sem cache-busting");
 
-console.log("OK: Goshnar's Greed — testes livres, adds sem defesa, Greedbeast 30% e vulnerabilidade de 40s.");
+console.log("OK: Goshnar's Greed — arena Canary 22×18, adds sem defesa, Greedbeast 60% e vulnerabilidade de 40s.");

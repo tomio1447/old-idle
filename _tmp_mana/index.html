@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Global-Idle — caçada automática</title>
+  <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
+  <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
+  <link rel="stylesheet" href="css/layout.css?v=wb-cancel-v1">
+  <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
+  <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
+  <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
+  <link rel="stylesheet" href="css/client-background.css">
+  <link rel="stylesheet" href="css/mobile.css?v=ranking-playeron-v1">
+  <link rel="stylesheet" href="css/chat.css?v=global-chat-v1">
+  <script>
+  /* Aplica modo salvo antes do paint para evitar flash. */
+  (function () {
+    try {
+      var m = localStorage.getItem("global-idle-ui-mode-v1");
+      if (m === "mobile" || m === "desktop") {
+        document.documentElement.setAttribute("data-ui-mode", m);
+      }
+    } catch (e) {}
+  })();
+  </script>
+</head>
+<body>
+
+<button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
+
+<!-- Aviso alpha (pré-login, todo page load) -->
+<div class="modal-bg" id="alpha-announce-modal" role="dialog" aria-modal="true" aria-labelledby="alpha-announce-title" aria-hidden="true">
+  <div class="modal panel alpha-announce-box">
+    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">⚠ SERVIDOR DE TESTE (ALPHA)</div>
+    <div class="panel-body">
+      <div class="brand-logo-wrap alpha-brand-logo">
+        <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
+      </div>
+      <p class="small center mb8" data-i18n="alpha.warn">
+        Este é um servidor de testes. Progresso, economia e estabilidade podem mudar a qualquer momento. O beta será anunciado em breve.
+      </p>
+      <div class="small center mb8">
+        <span data-i18n="alpha.discord">Discord:</span>
+        <a id="alpha-announce-discord" class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">https://discord.gg/bnbh3jtvBf</a>
+      </div>
+      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Atualizações recentes</div>
+      <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
+      <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
+      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
+        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Escolha Mobile / Desktop (primeira visita) -->
+<div class="modal-bg" id="ui-mode-modal" role="dialog" aria-modal="true" aria-labelledby="ui-mode-title">
+  <div class="modal panel ui-mode-box">
+    <div class="panel-title" id="ui-mode-title" data-i18n="uimode.title">Versão do jogo</div>
+    <div class="panel-body">
+      <div class="small dim center mb8" data-i18n="uimode.ask">Como você quer jogar neste dispositivo?</div>
+      <div class="ui-mode-choices">
+        <button type="button" class="sm" data-ui-mode-pick="mobile">
+          <span class="ui-mode-icon" aria-hidden="true">📱</span>
+          <span data-i18n="uimode.mobile">Mobile</span>
+        </button>
+        <button type="button" class="sm" data-ui-mode-pick="desktop">
+          <span class="ui-mode-icon" aria-hidden="true">🖥</span>
+          <span data-i18n="uimode.desktop">Desktop</span>
+        </button>
+      </div>
+      <div class="tiny dim center mt8" id="ui-mode-suggest"></div>
+      <div class="tiny dim center mt4" data-i18n="uimode.hint">Você pode trocar depois em CONFIG.</div>
+    </div>
+  </div>
+</div>
+
+<!-- =============================================== CLIENT BACKGROUND -->
+<div id="client-version-label"></div>
+
+<!-- =============================================== LOGIN -->
+<div id="login">
+  <div class="box panel">
+    <div class="panel-title login-brand-title">GLOBAL-IDLE</div>
+    <div class="panel-body">
+      <div class="brand-logo-wrap login-brand-hero">
+        <img class="brand-logo brand-logo--hero" src="assets/brand-logo.png?v=brand-v2" width="128" height="128" alt="Global Idle">
+      </div>
+
+      <div id="continue-box" class="panel-inset mb8" style="display:none;padding:8px">
+        <div class="small dim" data-i18n="login.saved">Personagem salvo</div>
+        <div class="row mt4" style="justify-content:space-between">
+          <div>
+            <div style="color:#d4af37;font-weight:bold" id="saved-name"></div>
+            <div class="tiny dim" id="saved-info"></div>
+          </div>
+          <button class="primary" id="btn-continue" data-i18n="login.continue">Continuar</button>
+        </div>
+      </div>
+
+      <!-- Conta (primeira tela no boot). O create local legado fica oculto. -->
+      <div id="account-login">
+        <!-- method=post + action=# + onsubmit: evita navegação nativa se
+             o JS ainda não anexou preventDefault (senão o browser POST em /). -->
+        <form id="account-login-form" method="post" action="#" onsubmit="return false;">
+          <div class="small dim center mb8" data-i18n="login.enter">Entre com sua conta para acessar seus personagens.</div>
+          <div class="field">
+            <label for="acc-login" data-i18n="login.user">Login</label>
+            <input id="acc-login" name="username" maxlength="32" placeholder="login" autocomplete="username">
+          </div>
+          <div class="field">
+            <label for="acc-password" data-i18n="login.pass">Senha</label>
+            <input id="acc-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
+          </div>
+          <button class="primary full mt8" id="acc-btn-login" type="submit" data-i18n="login.submit">Entrar</button>
+          <button class="full mt8" id="acc-open-register" type="button" data-i18n="login.createAccount">Criar conta</button>
+          <div class="tiny dim center mt8" id="acc-msg"></div>
+        </form>
+      </div>
+
+      <!-- Legado offline (só se !accountApiConfigured). Nunca no primeiro paint. -->
+      <div id="local-login" style="display:none" hidden>
+        <div class="field">
+          <label data-i18n="login.charName">Nome do personagem</label>
+          <input id="char-name" maxlength="20" placeholder="Ex: Bubble" autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label data-i18n="login.sex">Sexo</label>
+          <div class="row">
+            <button data-sex="male" class="primary sm" data-i18n="login.male">Masculino</button>
+            <button data-sex="female" class="sm" data-i18n="login.female">Feminino</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label data-i18n="login.vocation">Vocação</label>
+          <div class="voc-grid" id="voc-grid"></div>
+        </div>
+
+        <button class="primary full mt8" id="btn-create" data-i18n="login.createChar">Criar personagem e caçar</button>
+        <div class="tiny dim center mt8" data-i18n="login.localHint">
+          Identidade visual Global-Idle · progresso salvo no seu navegador
+        </div>
+      </div>
+
+      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
+        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- =============================================== APP -->
+<div id="app">
+
+  <div id="alpha-test-banner" class="alpha-test-banner" role="status">
+    <span class="alpha-test-banner-text">ALPHA-TEST // O BETA IRÁ SER ANUNCIADO EM BREVE // ACESSE NOSSO DISCORD PARA DUVIDAS/REPORTS/SUGESTÕES;</span>
+    <a class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">Discord</a>
+  </div>
+
+  <div class="topbar">
+    <span class="logo brand-logo-mark">
+      <img class="brand-logo brand-logo--topbar" src="assets/brand-logo.png?v=brand-v2" width="28" height="28" alt="">
+      <span>GLOBAL-IDLE</span>
+    </span>
+    <div class="row small">
+      <img src="assets/item/gold-coin.png" style="width:16px;height:16px">
+      <span class="gold-txt" id="gold">0</span>
+    </div>
+    <div class="row small" id="tibia-coins" title="Tibia Coins — saldo da conta (vale para todos os personagens)" data-i18n-title="title.tc">
+      <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt="Tibia Coins">
+      <span class="coin-txt" id="tibia-coins-n">0</span>
+    </div>
+    <div class="server-status online" id="server-status" hidden>
+      <span class="server-status-dot" aria-hidden="true"></span>
+      <span data-i18n="server.status">SERVER STATUS:</span>
+      <b id="server-status-text" data-i18n="server.on">SERVIDOR ON</b>
+      <button class="sm" id="btn-reconnect" type="button" hidden data-i18n="server.reconnect">Reconnect</button>
+    </div>
+    <div class="players-online" id="players-online" hidden title="Personagens online ou em caçada offline" data-i18n-title="players.onTitle">
+      <span data-i18n="players.onLabel">PLAYER ON:</span>
+      <b id="players-online-count">0</b>
+    </div>
+    <span class="spacer"></span>
+    <button class="sm topbar-sys-btn" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
+      <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
+      <span data-i18n="btn.wheel">WHEEL</span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
+      <img src="assets/ui/cyclopedia/charms/low-blow.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
+      <span data-i18n="btn.charms">CHARMS</span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
+      <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="topbar-btn-icon prey-btn-gif">
+      <span data-i18n="btn.prey">PREY</span><span id="prey-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
+      <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
+      <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-loyalty" title="Loyalty — pontos e ranks de lealdade" data-i18n-title="title.loyalty">
+      <span class="topbar-btn-emoji" aria-hidden="true">🏆</span>
+      <span data-i18n="btn.loyalty">LOYALTY</span>
+    </button>
+    <button class="sm" id="btn-switch" data-i18n="btn.switch">Trocar personagem</button>
+    <button class="sm" id="btn-cyclo">📖 <span data-i18n="btn.cyclo">Cyclopedia</span></button>
+    <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">🛠 <span data-i18n="btn.admin">Admin</span></button>
+    <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
+    <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
+  </div>
+  <div class="layout">
+
+    <!-- ============================ ESQUERDA -->
+    <div class="col col-left">
+
+      <div class="panel" data-collapse="char">
+        <div class="panel-title">
+          <span id="p-name">—</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="tiny dim" id="p-voc"></span>
+        </div>
+        <div class="panel-body">
+          <div class="row mb4" style="justify-content:space-between">
+            <span class="small dim" data-i18n="char.level">Nível</span>
+            <b style="color:#ffe680;font-size:15px" id="p-level">1</b>
+          </div>
+          <div class="tiny dim" data-i18n="char.hp">Vida</div>
+          <div class="bar mb4" id="bar-hp"><div class="fill hp"></div><div class="label"></div></div>
+          <div class="tiny dim" data-i18n="char.mp">Mana</div>
+          <div class="bar mb4" id="bar-mp"><div class="fill mp"></div><div class="label"></div></div>
+          <div class="tiny dim" data-i18n="char.exp">Experiência</div>
+          <div class="bar mb4" id="bar-exp"><div class="fill exp"></div><div class="label"></div></div>
+          <div id="cond-bar" class="cond-bar status-bar" style="display:none"></div>
+          <div id="monk-bar" class="monk-bar" style="display:none"></div>
+          <div class="tiny dim" data-i18n="char.stamina">Stamina</div>
+          <div class="bar" id="bar-sta"><div class="fill sta"></div><div class="label"></div></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="equip">
+        <div class="panel-title" data-i18n="panel.equip">Equipamento</div>
+        <div class="panel-body">
+          <div class="equip-grid" id="equip"></div>
+          <div class="status-bar" id="status-bar"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="bag">
+        <div class="panel-title" data-i18n="panel.bag">Mochila</div>
+        <div class="panel-body">
+          <div class="inv-grid" id="inv"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="supply-stash">
+        <div class="panel-title">
+          <span>Supply Stash</span>
+          <span style="flex:1"></span>
+          <span class="tiny dim" id="supply-stash-cap"></span>
+        </div>
+        <div class="panel-body">
+          <div class="inv-grid" id="supplystash"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="pouch">
+        <div class="panel-title">
+          <span data-i18n="panel.pouch">Loot Pouch</span>
+          <span style="flex:1"></span>
+          <button class="sm primary" id="btn-pouch-sell-all" data-i18n="btn.sellAll">Sell all</button>
+          <button class="sm" id="btn-lootpouch-config" data-i18n="btn.lootConfig">Config</button>
+        </div>
+        <div class="panel-body">
+          <div class="inv-grid" id="lootpouch"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="skills">
+        <div class="panel-title" data-i18n="panel.skills">Habilidades</div>
+        <div class="panel-body" id="skills"></div>
+      </div>
+
+      <div class="panel" data-collapse="attrs">
+        <div class="panel-title" data-i18n="panel.attrs">Atributos</div>
+        <div class="panel-body" id="stat-rows"></div>
+      </div>
+
+    </div>
+
+    <!-- ============================ MEIO -->
+    <div class="col col-mid">
+
+      <div id="scene-wrap">
+        <canvas id="scene"></canvas>
+        <div id="stance-badge" class="stance-badge"></div>
+        <div id="mission-box" class="mission-box" style="display:none"></div>
+        <div id="world-boss-box" class="world-boss-box" style="display:none"></div>
+        <div id="scarlett-qte" class="scarlett-qte" style="display:none" aria-live="assertive"></div>
+        <div id="spite-qte" class="spite-qte" style="display:none" aria-live="assertive"></div>
+        <div id="malice-qte" class="malice-qte" style="display:none" aria-live="assertive"></div>
+        <div id="mega-qte" class="mega-qte" style="display:none" aria-live="assertive"></div>
+        <div id="greed-minigame" class="greed-minigame" style="display:none" aria-live="polite"></div>
+        <div id="hatred-minigame" class="hatred-minigame" style="display:none" aria-live="polite"></div>
+        <div id="spite-minigame" class="spite-minigame" style="display:none" aria-live="polite"></div>
+        <div id="malice-minigame" class="malice-minigame" style="display:none" aria-live="polite"></div>
+        <div id="mega-minigame" class="mega-minigame" style="display:none" aria-live="polite"></div>
+        <!-- AUTO/SQM: fica na tela da caçada (antes só existia no título da
+             Mochila, fora do foco). OFF = clique no chão / WASD por SQM. -->
+        <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
+          <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
+          <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
+        </div>
+        <!-- PARTY (OTC): painel fixo no canto superior direito da tela do
+             jogo — lista os personagens da party com level, outfit, HP e
+             mana; clicar num membro da sua conta troca de personagem. -->
+        <div id="party-panel" class="party-panel" style="display:none">
+          <div class="party-panel-head" id="party-panel-head">
+            <span>👥 PARTY</span>
+            <span class="spacer" style="flex:1"></span>
+            <span class="party-panel-count" id="party-panel-count"></span>
+            <span class="party-panel-arrow" id="party-panel-arrow">▾</span>
+          </div>
+          <div class="party-panel-body" id="party-panel-body"></div>
+        </div>
+        <div id="player-states-strip" hidden aria-hidden="true" style="display:none"></div>
+      </div>
+
+      <!-- barra de cooldown, no mesmo formato do cliente oficial:
+           grupos sempre visiveis a esquerda, magias em cooldown a direita -->
+      <div id="cooldown-bar" class="cooldown-bar">
+        <div class="cd-groups" id="cd-groups"></div>
+        <div class="cd-sep"></div>
+        <div class="cd-spells" id="cd-spells"></div>
+      </div>
+
+      <div class="panel" data-collapse="log">
+        <div class="panel-title" data-i18n="panel.log">Registro da caçada</div>
+        <div class="panel-body" style="padding:2px">
+          <div class="list" id="log" style="max-height:230px"></div>
+        </div>
+      </div>
+
+      <div class="panel" data-collapse="helper">
+        <div class="tabs">
+          <div class="tab active" data-group="mid" data-panel="heal" data-i18n="tab.heal">Helper: Cura</div>
+          <div class="tab" data-group="mid" data-panel="heal-friend" style="display:none" data-i18n="tab.healFriend">Curar aliado</div>
+          <div class="tab" data-group="mid" data-panel="magic-shield" data-i18n="tab.magicShield">Escudo mágico</div>
+          <div class="tab" data-group="mid" data-panel="equipment" data-i18n="tab.equipment">Equipamento</div>
+          <div class="tab" data-group="mid" data-panel="atk" data-i18n="tab.attack">Ataque</div>
+          <div class="tab" data-group="mid" data-panel="combo" data-i18n="tab.combo">Combo</div>
+          <div class="tab" data-group="mid" data-panel="spells" data-i18n="tab.spells">Magias</div>
+          <div class="tab" data-group="mid" data-panel="refill" id="tab-refill" style="display:none" data-i18n="tab.refill">Refill</div>
+          <div class="tab" data-group="mid" data-panel="cfg" style="display:none" data-i18n="tab.cfg">Configurar</div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="heal">
+          <div id="helper-heal"></div>
+        </div>
+        <!-- Cura de aliados é isolada para Druid/Monk; nunca mistura as
+             magias exura sio com a configuração de autocura. -->
+        <div class="panel-body" data-panel-group="mid" data-panel="heal-friend" style="display:none">
+          <div id="helper-heal-friend-panel"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="magic-shield" style="display:none">
+          <div id="helper-magic-shield"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="equipment" style="display:none">
+          <div id="helper-equipment"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="atk" style="display:none">
+          <div id="helper-attack"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="combo" style="display:none">
+          <div id="helper-combo"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="spells" style="display:none">
+          <div id="helper-spells"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="refill" style="display:none">
+          <div id="helper-refill"></div>
+        </div>
+
+        <div class="panel-body" data-panel-group="mid" data-panel="cfg" style="display:none">
+          <div class="mb8">
+            <label class="small dim"><span data-i18n="helper.healAt">Curar quando a vida estiver abaixo de</span>
+              <b id="heal-at-val" style="color:#d4af37">90%</b></label>
+            <input type="range" id="heal-at" min="10" max="95" value="90">
+          </div>
+          <label class="toggle"><input type="checkbox" id="cfg-spell">
+            <span data-i18n="helper.useSpells">Usar magias de ataque</span></label>
+          <label class="toggle"><input type="checkbox" id="cfg-runes">
+            <span data-i18n="helper.useRunes">Usar runas e poções automaticamente</span></label>
+          <div class="mt8">
+            <label class="small dim" data-i18n="helper.barMode">Modo das barras do personagem</label>
+            <select id="bar-mode" style="width:100%;padding:4px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+              <option value="bars" data-i18n="helper.bars">BARMODE — nick + HP/Mana em barras</option>
+              <option value="arcs" data-i18n="helper.arcs">ARCS MODE — arcos de HP/Mana estilo Tibia Global</option>
+            </select>
+          </div>
+          <div class="mt8">
+            <label class="small dim" data-i18n="helper.lootFilter">Filtro de loot</label>
+            <select id="loot-filter" style="width:100%;padding:4px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+              <option value="all" data-i18n="helper.lootAll">Pegar tudo</option>
+              <option value="valuable" data-i18n="helper.lootValuable">Só itens valiosos (20+ gp)</option>
+              <option value="equip" data-i18n="helper.lootEquip">Só equipamentos</option>
+            </select>
+          </div>
+          <button class="danger full mt12" id="btn-reset" data-i18n="helper.reset">Apagar personagem</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================ ESQUERDA DA TELA -->
+    <div class="col col-right">
+
+      <nav class="left-side-actions" aria-label="Acessos de caçada" data-i18n-title="nav.hunts">
+        <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catálogo de Hunts" data-i18n-title="title.hunts">
+          <span class="hunts-demon-icon" aria-hidden="true"></span><span data-i18n="btn.hunts">HUNTS</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses" data-i18n-title="title.bosses">
+          <span class="bosses-megalomania-icon" aria-hidden="true"></span><span data-i18n="btn.bosses">BOSSES</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
+          <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-ranking" title="Abrir ranking de personagens" data-i18n-title="title.ranking">
+          <span class="ranking-btn-icon" aria-hidden="true"></span><span data-i18n="btn.ranking">RANKING</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-npcs" title="Abrir catálogo de NPCs" data-i18n-title="title.npcs">
+          <span class="npcs-btn-icon" aria-hidden="true"></span><span data-i18n="btn.npcs">NPCS</span>
+        </button>
+        <button class="sm" id="btn-training" title="Sistema de Treino — Exercise Dummy (25 TC por 5000 cargas) ou Treinador Online" data-i18n-title="title.training">
+          <img src="assets/ui/training/skill-trainer-all.gif" alt="" class="training-btn-gif">
+          <span data-i18n="btn.training">TREINO</span>
+        </button>
+      </nav>
+
+      <!-- Analytics permanecem na lateral e acompanham a caça sem abrir o
+           modal global nem cobrir a visão do jogador. -->
+      <div class="panel hunt-analytics-panel" data-collapse="analysers">
+        <div class="panel-title">
+          <span id="otc-analyser-title">📈 Hunt Session Analyser</span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="otc-live-badge" title="Atualização em tempo real"><i></i> LIVE</span>
+          <button type="button" class="otc-dmg-reset otc-session-reset" id="otc-analyser-session-reset"
+            data-otc-session-reset title="Resetar sessão" aria-label="Resetar sessão">↻</button>
+        </div>
+        <div class="panel-body otc-analytics-shell">
+          <div id="otc-analysers" class="otc-analyser-tabs" role="tablist" aria-label="Analytics da caçada"></div>
+          <div id="otc-analyser-content" class="otc-analyser-result" role="tabpanel" aria-live="polite"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Dock / menu mobile (visível só com data-ui-mode=mobile) -->
+<nav id="mobile-dock" hidden aria-label="Navegação mobile">
+  <button type="button" class="sm" data-mobile-tab="game" aria-pressed="true">
+    <span class="dock-ico" aria-hidden="true">⚔</span><span data-i18n="mobile.tab.game">Jogo</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="inv" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">🎒</span><span data-i18n="mobile.tab.inv">Itens</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="helper" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">♥</span><span data-i18n="mobile.tab.helper">Helper</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="analyse" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">📈</span><span data-i18n="mobile.tab.analyse">Stats</span>
+  </button>
+  <button type="button" class="sm" data-mobile-tab="menu" aria-pressed="false">
+    <span class="dock-ico" aria-hidden="true">☰</span><span data-i18n="mobile.tab.menu">Menu</span>
+  </button>
+</nav>
+<div id="mobile-menu-sheet" aria-hidden="true">
+  <div class="panel mobile-menu-panel">
+    <div class="panel-title">
+      <span data-i18n="mobile.menu.title">Funções</span>
+      <span style="flex:1"></span>
+      <button type="button" class="sm" id="mobile-menu-close">✕</button>
+    </div>
+    <div class="mobile-menu-actions" id="mobile-menu-actions"></div>
+  </div>
+</div>
+
+<div id="game-loading" style="display:none"><div class="gl-box"><b>GLOBAL-IDLE</b><div class="gl-text" data-i18n="loading">Carregando recursos...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
+<div id="tooltip"></div>
+<div id="toasts"></div>
+<div id="server-reconnect-banner" class="server-reconnect-banner" hidden>
+  <div class="server-reconnect-banner-inner">
+    <div class="server-power-badge off" id="server-power-badge" data-i18n="server.off">SERVIDOR OFF</div>
+    <strong id="server-reconnect-title" data-i18n="server.lostTitle">Conexão perdida</strong>
+    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.</p>
+    <button class="primary" id="btn-reconnect-banner" type="button" data-i18n="server.reconnect">Reconnect</button>
+    <div class="tiny dim mt8" id="server-reconnect-error" hidden></div>
+  </div>
+</div>
+<div id="maintenance-countdown" class="maintenance-countdown" hidden>
+  <div class="maintenance-countdown-inner panel">
+    <strong data-i18n="maint.title">Manutenção em breve</strong>
+    <p class="small" data-i18n="maint.msg">O servidor será desligado para atualização. Conecte-se novamente após o restart.</p>
+    <div class="maintenance-countdown-num" id="maintenance-countdown-num">30</div>
+    <div class="tiny dim" data-i18n="maint.unit">segundos</div>
+  </div>
+</div>
+<div class="modal-bg" id="modal"><div class="modal panel" id="modal-body"></div></div>
+
+<script src="js/gamedata.js?v=stack-count-frames-v1"></script>
+<script src="js/gamelib-const.js"></script>
+<script src="js/modulelib.js"></script>
+<script src="js/client-background.js"></script>
+<script src="js/canarydata.js"></script>
+<script src="js/spelldata.js"></script>
+<script src="js/appearancedata.js?v=mount-zpattern-v1"></script>
+<script src="js/avatardata.js"></script>
+<script src="js/supplydata.js"></script>
+<script src="js/runedata.js"></script>
+<script src="js/monstermovedata.js"></script>
+<script src="js/monsterdata.js?v=icecold-energy-weak-v1"></script>
+<script src="js/mobsheetdata.js"></script>
+<script src="js/idleanimdata.js?v=sex-looktype-v2"></script>
+<script src="js/creatureanchordata.js"></script>
+<script src="js/areadata.js?v=wave-origin-ahead-v2"></script>
+<script src="js/spelltargetdata.js?v=exori-self-aoe-v1"></script>
+<script src="js/spellfxdata.js?v=exeta-fx-v1"></script>
+<script src="js/hastedata.js"></script>
+<script src="js/monkspelldata.js"></script>
+<script src="js/quiverdata.js"></script>
+<script src="js/ammodata.js"></script>
+<script src="js/weapondata.js"></script>
+<!-- update 15.25.3a4a52: aplica os ajustes POR CIMA dos dados gerados,
+     por isso carrega depois de todos os *data.js e antes dos consumidores -->
+<script src="js/spelldata_1525.js?v=exori-self-aoe-v1"></script>
+<script src="js/tiledata.js"></script>
+<script src="js/tileflags.js"></script>
+<script src="js/imbuementdata.js"></script>
+<script src="js/wandshootdata.js?v=basic-fx-v1"></script>
+<script src="js/patch_clientfx.js?v=diamond-ethereal-missile-v1"></script>
+<script src="js/rates.js?v=loot-chance-not-qty-v1"></script>
+<script src="js/vip.js?v=account-gold-cap-vip-v1"></script>
+<script src="js/huntmapdata.js"></script>
+<script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>
+<script src="js/dark-thais-map.js"></script>
+<script src="js/otbm.js?v=cobra-loading-v17"></script>
+<script src="js/otbmhunt.js?v=cobra-loading-v17"></script>
+<script src="js/weapons.js?v=item-anim-missing-v1"></script>
+<script src="js/ammo.js?v=caldera-diamond-dmg-v1"></script>
+  <script src="js/combo.js?v=exori-con-st-prio-v1"></script>
+<script src="js/speed.js"></script>
+<script src="js/grid.js?v=knight-fx-combo-v1"></script>
+<script src="js/area.js?v=wave-from-caster-v1"></script>
+  <script src="js/gridai.js?v=boss-greed-target-v1"></script>
+<script src="js/buffs.js"></script>
+<script src="js/stances.js"></script>
+<script src="js/monk.js?v=monk-lesser-repulse-v1"></script>
+<script src="js/canary-vocation.js?v=idle-base-dmg-15-v1"></script>
+<script src="js/core.js?v=forked-chain-v1"></script>
+<script src="js/spells.js?v=idle-base-dmg-15-v1"></script>
+<script src="js/cooldown.js?v=cd-bar-v1"></script>
+<script src="js/augments.js"></script>
+<script src="js/supplies.js?v=potion-audit-v1"></script>
+<script src="js/outfit.js?v=sex-looktype-v2"></script>
+<script src="js/appearance.js?v=mount-zpattern-v1"></script>
+<script src="js/loyalty.js?v=loyalty-v1"></script>
+<script src="js/imbuement.js?v=imbue-slots-v1"></script>
+<script src="js/player.js?v=mana-supply-one-v1"></script>
+<script src="js/accessories.js?v=stack-count-frames-v1"></script>
+  <script src="js/combat.js?v=mana-supply-one-v1"></script>
+<script src="js/city.js?v=npc-sprites-canary-v1"></script>
+<script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
+<script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
+<script src="js/walker.js"></script>
+<script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
+<script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
+<script src="js/tilemap.js?v=wall-depth-v1"></script>
+<script src="js/effectdata.js?v=block-hit-fix-v1"></script>
+<script src="js/icondata.js?v=goshnar-taint-list-v1"></script>
+<script src="js/render.js?v=stack-count-frames-v1"></script>
+<script src="js/city-render.js?v=wall-depth-v1"></script>
+<script src="js/monsters.js"></script>
+<!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
+     GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
+<script src="js/patch_imbuement.js"></script>
+<script src="js/patch_amazon.js"></script>
+<!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
+<script src="js/hardcore-library.js?v=icecold-energy-weak-v1"></script>
+<script src="js/hard-hunts.js?v=loot-npc-prices-v1"></script>
+<script src="js/soulwar.js?v=mega-mp-fix-v3"></script>
+<script src="js/yasir-prices.js?v=goshnar-yasir-v1"></script>
+<script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
+<script src="js/bosstiary.js"></script>
+<script src="js/ui.js?v=mana-supply-one-v1"></script>
+<script src="js/i18n.js?v=wb-cancel-v1"></script>
+<script src="js/alpha-announce.js?v=alpha-announce-v1"></script>
+<script src="js/settings.js?v=settings-click-fix-v1"></script>
+<script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
+<script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
+<script src="js/cyclopedia-ui.js?v=malice-modal-anim-v1"></script>
+<script src="js/forgedata.js"></script>
+<script src="js/forge.js"></script>
+<script src="js/imbuement-ui.js?v=imbue-slots-v1"></script>
+<script src="js/forge-ui.js"></script>
+<script src="js/prey.js?v=prey-bestiary-v1"></script>
+<script src="js/prey-ui.js?v=prey-close-store-v1"></script>
+<script src="js/party.js?v=temple-clear-cond-v1"></script>
+<script src="js/party-ui.js?v=stack-count-frames-v1"></script>
+<script src="js/analyzers.js?v=stack-count-frames-v1"></script>
+<script src="js/wheeldata.js?v=wheel-otc-v2"></script>
+<script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
+<script src="js/wheel.js?v=wheel-otc-v2"></script>
+<script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
+<script src="js/tibiacoin.js"></script>
+<script src="js/server-config.js"></script>
+<script src="js/account-client.js?v=mega-mp-fix-v3"></script>
+<script src="js/chat.js?v=global-chat-v1"></script>
+<script src="js/marketdata.js"></script>
+<script src="js/market-ui.js?v=stack-count-frames-v1"></script>
+<script src="js/market-local.js"></script>
+<script src="js/reward-chest.js?v=stack-count-frames-v1"></script>
+<script src="js/training.js?v=party-checkpoint-v1"></script>
+<script src="js/training-ui.js"></script>
+<script src="js/accessorydata.js?v=charge-stack-destroy-v1"></script>
+<script src="js/supply-stash-data.js?v=charge-stack-destroy-v1"></script>
+<script src="js/supply-stash.js?v=loot-rules-v1"></script>
+<script src="js/admin.js?v=admin-vip-box-v1"></script>
+<script src="js/city-ui.js?v=temple-clear-cond-v1"></script>
+<script src="js/preload.js?v=mount-zpattern-v1"></script>
+<script src="js/game.js?v=mana-supply-one-v1"></script>
+<script src="js/scarlett-boss.js?v=scarlett-esteira-smooth-v1"></script>
+<script src="js/world-boss-ui.js?v=wb-cancel-v1"></script>
+<script src="js/megalomania-lobby.js?v=mega-invite-modal-v2"></script>
+</body>
+</html>

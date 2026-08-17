@@ -89,6 +89,18 @@ function creatureTileOrigin(centerX, centerY, width, height, tile, anchor, scale
   return { x: centerX - width / 2, y: centerY + tile / 2 - height };
 }
 
+/* MagicEffect / CONST_ME: mesma âncora de chão das criaturas (pé no fundo
+ * do SQM, centro horizontal). Centralizar em Y fazia strips 64px (divine
+ * barrage, critical hit) invadirem o tile SUL e parecerem "no SQM errado";
+ * 32px (blood, yellow-rings) coincidia por acaso com o centro. */
+function effectTileOrigin(centerX, centerY, drawW, drawH, tile) {
+  const t = Math.max(1, Number(tile) || 32);
+  return {
+    x: centerX - drawW / 2,
+    y: centerY + t / 2 - drawH,
+  };
+}
+
 function markMonsterAnchor(canvas, slug, meta) {
   if (!canvas || !meta) return canvas;
   const all = (typeof CREATURE_ANCHORS !== "undefined" && CREATURE_ANCHORS) || {};
@@ -141,7 +153,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "48";
+const ASSET_VERSION = "51";
 /* Teto absoluto de vida visual: strip/meta errado ou dt travado nunca
  * pode deixar magia/areafx/fala grudados no canvas. */
 const FX_MAX_LIFE_MS = 2800;
@@ -202,8 +214,17 @@ function monsterAnimationPhase(ent) {
  * soltos deixaram de existir quando cada criatura virou um sheet unico.
  * Como <img> nao recorta, usamos uma div com background-position: o mesmo
  * arquivo serve a tela e o canvas, sem duplicar arte.
+ *
+ * opts.walkAnim: em cards/modais de boss, percorre o ciclo MOVING sul quando
+ * o DAT nao tem idle real (ex.: Goshnar's Malice). Bestiário/caça default
+ * permanece estático nestes casos — só anima com grupo idle oficial.
  */
-function mobImg(slug, tam, extra) {
+function mobImg(slug, tam, extra, opts) {
+  if (extra && typeof extra === "object" && opts == null) {
+    opts = extra;
+    extra = "";
+  }
+  opts = opts || {};
   const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
     ? MOBSHEETS[slug] : null;
   const px = tam || 32;
@@ -213,8 +234,9 @@ function mobImg(slug, tam, extra) {
             ${extra || ""}"></div>`;
   }
   const idle = monsterIdleMeta(slug);
+  const walkAnim = !idle && !!opts.walkAnim && (meta.cols || 0) > 1;
   const visual = idle || meta;
-  const frames = idle ? idle.frames : 1;
+  const frames = idle ? idle.frames : (walkAnim ? Math.max(1, meta.cols || 1) : 1);
   // Mesmo quando estática, a imagem principal continua sendo um sheet com
   // `meta.cols` colunas. Reduzir o background para uma coluna comprimia
   // todas as poses dentro do modal.
@@ -223,9 +245,13 @@ function mobImg(slug, tam, extra) {
   const k = Math.min(px / visual.cw, px / visual.ch);
   const w = visual.cw * k, h = visual.ch * k;
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
-  const animated = idle ? " mob-img-animated" : "";
+  const animated = (idle || walkAnim) ? " mob-img-animated" : "";
   const sheetW = visual.cw * sourceFrames * k;
   const path = `assets/mob/${slug}${idle ? ".idle" : ""}.png?v=${v}`;
+  // Idle usa as durações do DAT; walk-anim de modal usa o ritmo moving
+  // típico dos Goshnar (300ms/quadro) para o ciclo não parecer corrida.
+  const duration = idle ? idle.duration
+    : (walkAnim ? Math.max(1, frames) * 300 : 0);
   return `<div class="mob-img${animated}" data-mob="${slug}" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;
       background-image:url('${path}');
@@ -233,15 +259,26 @@ function mobImg(slug, tam, extra) {
       background-position:0 -${(2 * h).toFixed(1)}px;
       --mob-sheet-width:${sheetW.toFixed(1)}px;
       --mob-sheet-frames:${frames};
-      --mob-sheet-duration:${idle ? idle.duration : 0}ms;
+      --mob-sheet-duration:${duration}ms;
       image-rendering:pixelated;${extra || ""}"></div>`;
 }
 
+/* Retrato de boss em modal/card: idle real quando existir; senão walk sul. */
+function bossMobImg(slug, tam, extra) {
+  return mobImg(slug, tam, extra, { walkAnim: true });
+}
+
+
+/* Skills Canary às vezes pedem "fire-wave"/"ice-wave"; o strip DAT é *-area. */
+const FX_NAME_REMAP = { "fire-wave": "fire-area", "ice-wave": "ice-area" };
+function resolveFxName(name) {
+  return FX_NAME_REMAP[name] || name;
+}
 
 function fxClientMeta(name) {
   const aliases = (typeof window !== "undefined" && window.FX_OFFICIAL_ALIASES) || {};
   const all = (typeof window !== "undefined" && window.CLIENT_EFFECTS) || {};
-  const key = aliases[name] || name;
+  const key = aliases[resolveFxName(name)] || resolveFxName(name);
   return all[key] || null;
 }
 
@@ -291,6 +328,7 @@ function fxAutoDurationMs(name, frames) {
 
 function fxEffectExpired(e, now) {
   if (!e) return true;
+  if ((Number(e.delayUntil) || 0) > now) return false;
   const dur = Math.max(1, Number(e.dur) || FX_MAX_LIFE_MS);
   const born = Number(e.born) || 0;
   if (born && (now - born) > dur + 200) return true;
@@ -374,6 +412,7 @@ const Sprites = {
   outfit(name, dir) { return this.get(`assets/outfit/${name}_${dir || "s"}.png`); },
   ground(scene) { return this.get(`assets/ground/${scene}.png`); },
   fx(name) {
+    name = resolveFxName(name);
     const meta = fxClientMeta(name);
     if (meta && meta.path) return this.get(meta.path);
     if (FX_EFFECT_FILES[name]) return this.get(FX_EFFECT_FILES[name]);
@@ -792,7 +831,8 @@ Renderer.prototype.drawSpeech = function (ctx, x, y, dt, hudScale) {
   drawCreatureSpeech(ctx, this.playerTalk, x, y, dt, hudScale);
 };
 
-Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
+Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale, comboKey, delayMs) {
+  name = resolveFxName(name);
   let n = fxFrameCount(name);
   if (!n) { name = "draw-blood"; n = fxFrameCount(name) || 4; }
   const meta = fxClientMeta(name);
@@ -813,9 +853,22 @@ Renderer.prototype.addEffect = function (x, y, name, customDurMs, customScale) {
   const custom = Number(customDurMs);
   const dur = Math.min(FX_MAX_LIFE_MS, Math.max(280,
     Number.isFinite(custom) && custom > 0 ? custom : autoDur));
-  this.effects.push({ x: x, y: y, name: name, t: 0, born: Date.now(),
+  const now = Date.now();
+  // Combo de impacto: mesmo alvo + mesmo FX na janela curta (party /
+  // online com ts espaçado) não empilha N draw-blood — um basta.
+  if (comboKey) {
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      const ef = this.effects[i];
+      if (ef.comboKey === comboKey && (now - (ef.born || 0)) < 380)
+        return ef;
+    }
+  }
+  const wait = Math.max(0, Number(delayMs) || 0);
+  this.effects.push({ x: x, y: y, name: name, t: 0, born: now + wait,
+                      delayUntil: wait ? now + wait : 0,
                       frames: n, dur: dur,
-                      scale: Math.max(0.1, Number(customScale) || 1) });
+                      scale: Math.max(0.1, Number(customScale) || 1),
+                      comboKey: comboKey || "" });
   // O teto era 20, o que TRUNCAVA area grande: Hell's Core cobre 45 casas e
   // as primeiras eram descartadas antes de aparecer. 160 cabe pack denso +
   // areafx; Crit/Fatal NÃO podem ser os primeiros a sair — senão um mas san
@@ -1727,6 +1780,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   const fxNow = Date.now();
   for (let i = this.effects.length - 1; i >= 0; i--) {
     const e = this.effects[i];
+    if ((Number(e.delayUntil) || 0) > fxNow) continue;
     e.t = (Number(e.t) || 0) + (Number(dt) || 0);
     if (fxEffectExpired(e, fxNow)) { this.effects.splice(i, 1); continue; }
     const img = Sprites.fx(e.name);
@@ -1738,9 +1792,11 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
     // parecia solta do grid.
     const sc = tibiaScale(W) * (e.scale || 1);
+    const tile = tilePx(W);
+    const drawW = fw * sc, drawH = img.naturalHeight * sc;
+    const origin = effectTileOrigin(e.x * W, e.y * H, drawW, drawH, tile);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
-                  e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
-                  fw * sc, img.naturalHeight * sc);
+                  origin.x, origin.y, drawW, drawH);
   }
   ctx.textAlign = "center";
   for (let i = this.floaters.length - 1; i >= 0; i--) {
@@ -1877,8 +1933,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
     : (typeof GRID_W !== "undefined" ? GRID_W : 21);
   const gridH = combat && combat.gridH ? combat.gridH
     : (typeof GRID_H !== "undefined" ? GRID_H : 13);
+  const mapFov = combat && combat.huntMap;
+  const fovW = mapFov && mapFov.fovWidth ? mapFov.fovWidth : undefined;
+  const fovH = mapFov && mapFov.fovHeight ? mapFov.fovHeight : undefined;
   const view = (typeof centeredGridViewport === "function")
-    ? centeredGridViewport(canvasW, canvasH, gridW, gridH)
+    ? centeredGridViewport(canvasW, canvasH, gridW, gridH, fovW, fovH)
     : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 
@@ -2125,6 +2184,7 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const fxNow = Date.now();
   for (let i = this.effects.length - 1; i >= 0; i--) {
     const e = this.effects[i];
+    if ((Number(e.delayUntil) || 0) > fxNow) continue;
     e.t = (Number(e.t) || 0) + (Number(dt) || 0);
     if (fxEffectExpired(e, fxNow)) { this.effects.splice(i, 1); continue; }
     const img = Sprites.fx(e.name);
@@ -2134,11 +2194,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const f = Math.min(e.frames - 1, Math.floor((e.t / Math.max(1, e.dur)) * e.frames));
     // mesma escala do resto do mapa: o efeito do client cobre 1 SQM. Com o
     // "2" fixo que estava aqui a explosao ficava do tamanho de 3 tiles e
-    // parecia solta do grid.
-    const sc = tibiaScale(W) * (e.scale || 1);
+    // parecia solta do grid. Âncora de chão (effectTileOrigin): 64px não
+    // derrapa para o SQM sul. Usa view.tile (FOV), não GRID_W — senão o
+    // FX fica menor/maior que o chão em mapas 30×30.
+    const tile = (view && view.tile) || tilePx(W);
+    const sc = (tile / TIBIA_SPRITE) * (e.scale || 1);
+    const drawW = fw * sc, drawH = img.naturalHeight * sc;
+    const origin = effectTileOrigin(e.x * W, e.y * H, drawW, drawH, tile);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
-                  e.x * W - fw * sc / 2, e.y * H - img.naturalHeight * sc / 2,
-                  fw * sc, img.naturalHeight * sc);
+                  origin.x, origin.y, drawW, drawH);
   }
 
   ctx.restore();

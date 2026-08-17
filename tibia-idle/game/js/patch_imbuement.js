@@ -3,9 +3,10 @@
  *
  * Itens: slug "mat-<clientId>", nome oficial do items.xml do Canary, sprite
  * extraida do client 8.60 (ids <= 19999) ou da TibiaWiki oficial (ids 15.x).
- * sell = 0 de proposito: o Sell all NUNCA vende material (ele so serve para
- * imbuar). npcvalue vem da TibiaWiki (referencia de valor, exibido em
- * tooltips).
+ * sell = 0 de proposito: Sell All / autoseller NUNCA vendem material
+ * (canSellLootPouchItem / sellAuthAllPouch pulam _imbMat). npcSell = IMB_MATS[].npc
+ * (TibiaWiki) habilita VENDER manual no menu da Loot Pouch; npc 0 fica
+ * unsellable.
  *
  * Drops: cada material cai APENAS de monstros que existem neste mundo E que
  * a TibiaWiki lista em "Dropped By". Chance por tier mais baixo em que o
@@ -97,7 +98,9 @@ if (typeof GAMEDATA !== "undefined") {
   for (const id of Object.keys(IMB_MATS)) {
     const m = IMB_MATS[id];
     GAMEDATA.items["mat-" + id] = {
-      n: m.name, s: "material", sell: 0, _imbMat: +id,
+      n: m.name, s: "material", sell: 0,
+      npcSell: Math.max(0, Math.floor(Number(m.npc) || 0)),
+      _imbMat: +id,
     };
     for (const mon of m.drops) {
       const M = GAMEDATA.monsters[mon];

@@ -11,6 +11,10 @@ const INVITE_TTL_MS = 2 * 60 * 1000;
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const MAX_SLOTS = 5;
 const MAX_CHARS_PER_ACCOUNT_24H = 2;
+// TEMP TEST: remove before release — bypass taints (client), templo/party/cooldown.
+// Máculas Soul War são gated no client (BOSS_DEFS/bossReadyInfo); este flag
+// também libera checks do lobby e é lido pelo authoritative_engine.
+const MEGA_TEST_BYPASS = true;
 
 function now() { return Date.now(); }
 function newId() { return crypto.randomBytes(16).toString("hex"); }
@@ -25,6 +29,23 @@ function createMegalomaniaLobbyController(opts) {
   const invites = new Map(); // inviteId -> invite
   const inboxByAccount = new Map(); // accountId -> Set(inviteId)
   const shareByAccount = new Map(); // accountId -> { lobbyId, ownerAccountId, instanceId }
+  const pendingIntentsByOwner = new Map(); // ownerAccountId -> intent[]
+
+  function queueIntent(ownerAccountId, intent) {
+    const oid = Number(ownerAccountId);
+    if (!oid || !intent) return;
+    if (!pendingIntentsByOwner.has(oid)) pendingIntentsByOwner.set(oid, []);
+    const list = pendingIntentsByOwner.get(oid);
+    list.push(intent);
+    if (list.length > 40) list.splice(0, list.length - 40);
+  }
+
+  function drainIntents(ownerAccountId) {
+    const oid = Number(ownerAccountId);
+    const list = pendingIntentsByOwner.get(oid) || [];
+    pendingIntentsByOwner.delete(oid);
+    return list;
+  }
 
   function lobbyPublic(lobby, viewerAccountId) {
     if (!lobby) return null;
@@ -56,22 +77,61 @@ function createMegalomaniaLobbyController(opts) {
     return id ? lobbies.get(id) : null;
   }
 
-  function detachAccount(accountId) {
+  /* Instância pode ficar na conta do líder original mesmo após ele sair
+   * (morte): convidados e publishInstance precisam achar o lobby pelo dono. */
+  function getLobbyByInstanceOwner(accountId) {
+    const aid = Number(accountId);
+    for (const lobby of lobbies.values()) {
+      if (lobby && Number(lobby.instanceOwnerAccountId) === aid) return lobby;
+    }
+    return null;
+  }
+
+  function remainingSlots(lobby) {
+    return (lobby && lobby.slots || []).filter(Boolean);
+  }
+
+  function reassignLeader(lobby) {
+    const left = remainingSlots(lobby);
+    if (!left.length) return null;
+    if (!left.some((s) => Number(s.accountId) === Number(lobby.leaderAccountId))) {
+      lobby.leaderAccountId = left[0].accountId;
+      lobby.leaderName = left[0].playerName || left[0].charName;
+    }
+    return left;
+  }
+
+  /* Remove a conta do lobby. Durante a luta (keepFighting): não encerra o
+   * lobby se ainda houver lutadores; só reatribui o líder visual. */
+  function detachAccount(accountId, optsIn) {
+    const opts = optsIn || {};
     const aid = Number(accountId);
     const lobbyId = byAccount.get(aid);
     byAccount.delete(aid);
     shareByAccount.delete(aid);
-    if (!lobbyId) return;
+    if (!lobbyId) return { lobby: null, remaining: 0, closed: false };
     const lobby = lobbies.get(lobbyId);
-    if (!lobby) return;
+    if (!lobby) return { lobby: null, remaining: 0, closed: false };
+    const wasLeader = Number(lobby.leaderAccountId) === aid;
     for (let i = 0; i < lobby.slots.length; i++) {
       if (lobby.slots[i] && Number(lobby.slots[i].accountId) === aid) lobby.slots[i] = null;
     }
-    if (Number(lobby.leaderAccountId) === aid || !lobby.slots.some(Boolean)) {
-      closeLobby(lobby, "leader-left");
-    } else {
-      publishLobby(lobby);
+    const left = reassignLeader(lobby);
+    if (!left || !left.length) {
+      closeLobby(lobby, opts.reason || "empty");
+      return { lobby: null, remaining: 0, closed: true };
     }
+    if (opts.keepFighting) {
+      publishLobby(lobby);
+      return { lobby, remaining: left.length, closed: false };
+    }
+    // Lobby aberto: líder sair dissolve (comportamento antigo).
+    if (wasLeader || opts.forceClose) {
+      closeLobby(lobby, opts.reason || "leader-left");
+      return { lobby: null, remaining: 0, closed: true };
+    }
+    publishLobby(lobby);
+    return { lobby, remaining: left.length, closed: false };
   }
 
   function closeLobby(lobby, reason) {
@@ -121,6 +181,8 @@ function createMegalomaniaLobbyController(opts) {
   }
 
   async function assertCanUseChar(db, accountId, character, ts) {
+    // TEMP TEST: remove before release
+    if (MEGA_TEST_BYPASS) return { ok: true };
     const aid = Number(accountId);
     const cid = Number(character.id);
     const usage = await accountMegaUsage(db, aid, ts);
@@ -132,6 +194,8 @@ function createMegalomaniaLobbyController(opts) {
   }
 
   async function assertTempleAndNoParty(db, accountId, character) {
+    // TEMP TEST: remove before release
+    if (MEGA_TEST_BYPASS) return { ok: true };
     const party = await db.partyFindByCharacter(Number(character.id));
     if (party) return { ok: false, msg: "O personagem não pode estar em Party." };
     const zone = character._megaZone || null;
@@ -158,9 +222,13 @@ function createMegalomaniaLobbyController(opts) {
   async function createLobby(db, acc, character, optsIn) {
     const ts = now();
     optsIn = optsIn || {};
-    if (!optsIn.inTemple) return { code: 403, body: { ok: false, msg: "É obrigatório estar no templo para abrir o lobby." } };
-    const party = await db.partyFindByCharacter(Number(character.id));
-    if (party) return { code: 403, body: { ok: false, msg: "Saia da Party antes de abrir o lobby do Megalomania." } };
+    // TEMP TEST: remove before release — templo/party liberados com MEGA_TEST_BYPASS.
+    if (!MEGA_TEST_BYPASS && !optsIn.inTemple)
+      return { code: 403, body: { ok: false, msg: "É obrigatório estar no templo para abrir o lobby." } };
+    if (!MEGA_TEST_BYPASS) {
+      const party = await db.partyFindByCharacter(Number(character.id));
+      if (party) return { code: 409, body: { ok: false, msg: "Saia da Party antes de abrir o lobby do Megalomania." } };
+    }
     const can = await assertCanUseChar(db, acc.id, character, ts);
     if (!can.ok) return { code: 403, body: { ok: false, msg: can.msg } };
     detachAccount(acc.id);
@@ -262,10 +330,13 @@ function createMegalomaniaLobbyController(opts) {
       invites.delete(inv.id);
       return { code: 410, body: { ok: false, msg: "Convite expirado." } };
     }
-    if (!optsIn.inTemple)
+    // TEMP TEST: remove before release — templo/party liberados com MEGA_TEST_BYPASS.
+    if (!MEGA_TEST_BYPASS && !optsIn.inTemple)
       return { code: 403, body: { ok: false, msg: "É obrigatório estar no templo para aceitar." } };
-    const party = await db.partyFindByCharacter(Number(character.id));
-    if (party) return { code: 403, body: { ok: false, msg: "Saia da Party antes de entrar no lobby." } };
+    if (!MEGA_TEST_BYPASS) {
+      const party = await db.partyFindByCharacter(Number(character.id));
+      if (party) return { code: 409, body: { ok: false, msg: "Saia da Party antes de entrar no lobby." } };
+    }
     if (Number(character.account_id) !== Number(acc.id))
       return { code: 403, body: { ok: false, msg: "Personagem não pertence à conta." } };
     const can = await assertCanUseChar(db, acc.id, character, now());
@@ -296,12 +367,102 @@ function createMegalomaniaLobbyController(opts) {
   async function leave(db, acc) {
     const lobby = getLobbyForAccount(acc.id);
     if (!lobby) return { code: 200, body: { ok: true, lobby: null } };
-    if (lobby.status === "fighting")
-      return { code: 409, body: { ok: false, msg: "Não é possível sair durante a luta." } };
-    const wasLeader = Number(lobby.leaderAccountId) === Number(acc.id);
-    detachAccount(acc.id);
-    if (wasLeader && lobbies.has(lobby.id)) closeLobby(lobby, "leader-left");
+    if (lobby.status === "fighting" || lobby.status === "starting")
+      return { code: 409, body: { ok: false, msg: "Não é possível sair durante a luta. (morte usa leave-fight)" } };
+    detachAccount(acc.id, { reason: "left" });
     return { code: 200, body: { ok: true, lobby: null } };
+  }
+
+  /* Morte / ejeção durante a luta: tira o jogador do lobby. Se ainda houver
+   * lutadores, transfere a instância para o novo líder (senão o combate
+   * congela — só o dono da row avança o tick). Se a sala esvaziar, o caller
+   * (rota leave-fight) deve encerrar a instância — senão fica um row “solo”
+   * com personagens externos e o próximo PUT estoura INSTANCE_CHARACTER_NOT_OWNED. */
+  async function leaveFight(db, acc) {
+    try {
+      const lobby = getLobbyForAccount(acc.id);
+      if (!lobby) {
+        return {
+          code: 200,
+          body: {
+            ok: true, lobby: null, remaining: 0, shouldEndInstance: true,
+            ownerAccountId: Number(acc.id), instanceId: null,
+          },
+        };
+      }
+      const wasOwner = Number(lobby.instanceOwnerAccountId || lobby.leaderAccountId) === Number(acc.id);
+      const oldOwnerId = Number(lobby.instanceOwnerAccountId || 0) || Number(acc.id);
+      const instanceId = lobby.instanceId ? String(lobby.instanceId) : null;
+      const result = detachAccount(acc.id, {
+        keepFighting: lobby.status === "fighting" || lobby.status === "starting",
+        reason: "death-leave",
+      });
+      publishAccount(acc.id, "mega-lobby", {
+        action: "left-fight",
+        lobby: null,
+        msg: "Você saiu do lobby Megalomania.",
+      });
+      const remaining = result.remaining || 0;
+      let transferredTo = null;
+      if (wasOwner && remaining > 0 && result.lobby && typeof db.instanceTransferOwner === "function") {
+        const successorId = Number(result.lobby.leaderAccountId);
+        if (successorId && successorId !== Number(acc.id)) {
+          try {
+            const tr = await db.instanceTransferOwner(oldOwnerId, successorId);
+            if (tr && tr.ok && tr.instance) {
+              result.lobby.instanceOwnerAccountId = successorId;
+              for (const s of result.lobby.slots || []) {
+                if (!s) continue;
+                shareByAccount.set(Number(s.accountId), {
+                  lobbyId: result.lobby.id,
+                  ownerAccountId: successorId,
+                  instanceId: String(result.lobby.instanceId || tr.instance.instance_id),
+                });
+              }
+              // Move intents pendentes do dono antigo para o novo.
+              const pending = drainIntents(oldOwnerId);
+              for (const intent of pending) queueIntent(successorId, intent);
+              transferredTo = successorId;
+              publishLobby(result.lobby);
+              publishAccount(successorId, "mega-lobby", {
+                action: "takeover",
+                lobby: lobbyPublic(result.lobby, successorId),
+                instanceId: String(tr.instance.instance_id),
+                msg: "Você assumiu o controle da sala Megalomania.",
+              });
+              if (typeof opts.publishInstance === "function") {
+                opts.publishInstance(successorId, tr.instance);
+              }
+            }
+          } catch (e) {
+            console.error("[mega-lobby] transfer ownership failed:", e && e.message);
+          }
+        }
+      }
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          lobby: null,
+          remaining,
+          wasOwner: !!wasOwner,
+          transferredTo,
+          shouldEndInstance: remaining === 0,
+          ownerAccountId: oldOwnerId,
+          instanceId,
+        },
+      };
+    } catch (e) {
+      console.error("[mega-lobby] leaveFight:", e && e.message);
+      return {
+        code: 200,
+        body: {
+          ok: true, lobby: null, remaining: 0, shouldEndInstance: true,
+          ownerAccountId: Number(acc && acc.id) || 0, instanceId: null,
+          softError: true,
+        },
+      };
+    }
   }
 
   async function kick(db, acc, targetAccountId) {
@@ -318,6 +479,7 @@ function createMegalomaniaLobbyController(opts) {
 
   function bindShare(lobby, instanceId, ownerAccountId) {
     lobby.instanceId = instanceId;
+    lobby.instanceOwnerAccountId = Number(ownerAccountId);
     lobby.status = "fighting";
     lobby.startedAt = now();
     for (const s of lobby.slots) {
@@ -353,12 +515,14 @@ function createMegalomaniaLobbyController(opts) {
       return { code: 403, body: { ok: false, msg: "Só o líder inicia a luta." } };
     const members = membersForStart(lobby);
     if (!members.length) return { code: 400, body: { ok: false, msg: "Lobby vazio." } };
-    // Revalida party/cooldown de todos
+    // Revalida party/cooldown de todos (TEMP TEST: MEGA_TEST_BYPASS pula)
     for (const m of members) {
       const character = await db.findCharacter(m.charId);
       if (!character) return { code: 404, body: { ok: false, msg: `Personagem ${m.charName} sumiu.` } };
-      const party = await db.partyFindByCharacter(m.charId);
-      if (party) return { code: 403, body: { ok: false, msg: `${m.charName} ainda está em Party.` } };
+      if (!MEGA_TEST_BYPASS) {
+        const party = await db.partyFindByCharacter(m.charId);
+        if (party) return { code: 409, body: { ok: false, msg: `${m.charName} ainda está em Party.` } };
+      }
       const can = await assertCanUseChar(db, m.accountId, character, now());
       if (!can.ok) return { code: 403, body: { ok: false, msg: `${m.charName}: ${can.msg}` } };
     }
@@ -429,10 +593,14 @@ function createMegalomaniaLobbyController(opts) {
   if (handle.unref) handle.unref();
 
   return {
-    createLobby, invite, acceptInvite, declineInvite, leave, kick, start,
+    createLobby, invite, acceptInvite, declineInvite, leave, leaveFight, kick, start,
     bindShare, sharedForAccount, stateFor, listInbox, markCharsUsed,
-    getLobbyForAccount, membersForStart, closeLobby, lobbies,
+    getLobbyForAccount, getLobbyByInstanceOwner, membersForStart, closeLobby, lobbies,
+    queueIntent, drainIntents,
   };
 }
 
-module.exports = { createMegalomaniaLobbyController, COOLDOWN_MS, MAX_SLOTS, MAX_CHARS_PER_ACCOUNT_24H };
+module.exports = {
+  createMegalomaniaLobbyController, COOLDOWN_MS, MAX_SLOTS, MAX_CHARS_PER_ACCOUNT_24H,
+  MEGA_TEST_BYPASS,
+};

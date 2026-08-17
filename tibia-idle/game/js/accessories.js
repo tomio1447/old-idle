@@ -12,6 +12,9 @@
 
 const ITEM_DRAG_TYPE = "application/x-tibia-idle-item";
 const MAGIC_SHIELD_SPELL_ID = "utamo-vita";
+/* Time-chargeables: 1 carga a cada 3s (Canary duration(s) → charges). */
+const ACCESSORY_CHARGE_MS = 3000;
+const ACCESSORY_TIME_SLOTS = ["ring", "amulet", "boots"];
 // Duração oficial (Update 12.55): 60s (antes era 200s). O shield moderno
 // absorve uma CAPACIDADE limitada de dano baseada em level/magic level.
 const MAGIC_SHIELD_DURATION_MS = 60 * 1000;
@@ -24,6 +27,13 @@ const MAGIC_SHIELD_POTION_CD_MS = 15 * 1000;
 const MAGIC_SHIELD_POTION_LVL = 14;
 
 const HELPER_EQUIP_UI = { slot: "amulet" };
+/* Modal picker (Baiak-style): kind = "emergency" | "normal". */
+const HELPER_EQUIP_PICKER = { kind: null, busca: "" };
+const ACCESSORY_CLS_LABEL = {
+  2: { text: "incomum", color: "#6a8ad8" },
+  3: { text: "raro", color: "#b870d8" },
+  4: { text: "boss", color: "#d4af37" },
+};
 
 /* --------------------------------------------------------- dados/patches */
 function patchAccessoryItems() {
@@ -47,13 +57,11 @@ patchAccessoryItems();
 /* ----------------------------------------------------------------------
  * SISTEMA DE CARGAS de anéis/amuletos (pedido do dono)
  * ----------------------------------------------------------------------
- * - `chargeMode: "time"`  -> 1 carga a cada 3s ENQUANTO EQUIPADO (o time
- *   ring de 200 cargas dura 10 min; anéis de 30 min têm 600, etc.);
- * - `chargeMode: "hits"`  -> 1 carga POR GOLPE recebido (o might ring de
- *   20 cargas absorve 20 golpes);
- * - carga zera -> o item QUEBRA (some do slot, não volta para a mochila).
- * O saldo parcial fica no personagem (p.ringCharges[slug]) para a troca
- * normal/emergencial do Helper não "recarregar" o anel de graça.
+ * - `chargeMode: "time"`  -> 1 carga a cada 3s ENQUANTO EQUIPADO
+ * - `chargeMode: "hits"`  -> 1 carga POR GOLPE recebido
+ * - carga zera -> DESTROI só o item equipado (não as cópias na bag/stash)
+ * - CHEIOS empilham; PARCIAIS são instâncias isoladas (sem ledger por slug)
+ * - `p.ringCharges[slug]` é legado: consumido UMA vez no próximo equip e limpo
  * ---------------------------------------------------------------------- */
 
 function accessoryChargesLedger(p) {
@@ -65,19 +73,28 @@ function accessoryDef(p, slug) {
   return (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
 }
 
-/* Cargas iniciais ao equipar: o saldo da última instância daquele slug
- * (p.ringCharges) ou a carga cheia do item. */
-function accessoryChargesOnEquip(p, slug) {
+/* Cargas ao equipar: prioridade instância > legado ringCharges (1×) > cheio. */
+function accessoryChargesOnEquip(p, slug, fromInst) {
   const it = accessoryDef(p, slug);
   if (!it || !it.charges) return null;
+  if (fromInst && fromInst.charges !== undefined && fromInst.charges !== null) {
+    return Math.min(it.charges, Math.max(0, Math.floor(Number(fromInst.charges) || 0)));
+  }
   const ledger = accessoryChargesLedger(p);
   const resto = parseInt(ledger[slug], 10);
-  return (resto > 0) ? Math.min(resto, it.charges) : it.charges;
+  if (resto > 0) {
+    // Consome o saldo legado UMA vez — não aplica às outras cópias.
+    delete ledger[slug];
+    return Math.min(resto, it.charges);
+  }
+  return it.charges;
 }
 
-/* Guarda o saldo ao desequipar (troca do Helper/unequip manual). */
+/* Legado: só grava se ainda não migrámos para instâncias parciais. */
 function rememberAccessoryCharges(p, slug, charges) {
   if (!slug || charges === undefined || charges === null) return;
+  // Chargeables stackáveis: NÃO usam ledger compartilhado (evita conflito).
+  if (typeof isChargeStackableAccessory === "function" && isChargeStackableAccessory(slug)) return;
   const ledger = accessoryChargesLedger(p);
   if (parseInt(charges, 10) > 0) ledger[slug] = parseInt(charges, 10);
   else delete ledger[slug];
@@ -95,6 +112,15 @@ function consumeAccessoryHitCharge(p) {
   }
 }
 
+/* Normaliza cargas do slot para inteiro >= 0 (evita NaN preso em 1). */
+function accessoryNormalizeCharges(e, it) {
+  let n = Math.floor(Number(e.charges));
+  if (!Number.isFinite(n)) n = Math.floor(Number(it && it.charges) || 0);
+  if (n < 0) n = 0;
+  e.charges = n;
+  return n;
+}
+
 /* Desconta uma carga do item equipado no slot. Devolve true se consumiu. */
 function accessoryConsumeCharge(p, slot) {
   const e = p.equip && p.equip[slot];
@@ -103,56 +129,106 @@ function accessoryConsumeCharge(p, slot) {
   if (!it || !it.charges) return false;
   if (e.charges === undefined) e.charges = it.charges;
   if (e.maxCharges === undefined) e.maxCharges = it.charges;
-  e.charges = Math.max(0, parseInt(e.charges, 10) - 1);
-  if (e.charges <= 0) {
+  let n = accessoryNormalizeCharges(e, it);
+  n -= 1;
+  if (n <= 0) {
+    e.charges = 0;
     accessoryBreak(p, slot);
     return true;
   }
+  e.charges = n;
   return true;
 }
 
-/* O item quebrou (cargas zeraram): sai do slot e some. */
+/* O item quebrou (cargas zeraram): DESTROI só esta cópia (equip + instância).
+ * Cópias na bag/stash/pouch NÃO são tocadas. Soft boots → worn no slot. */
 function accessoryBreak(p, slot) {
   const e = p.equip && p.equip[slot];
   if (!e || !e.item) return;
   const it = accessoryDef(p, e.item);
   const nome = it && it.n ? it.n : e.item;
-  const ledger = accessoryChargesLedger(p);
-  delete ledger[e.item];
-  delete p.equip[slot];
-  if (typeof addLog === "function") {
-    addLog("info", `<b style="color:#ff9090">${nome[0].toUpperCase() + nome.slice(1)} quebrou!</b> (cargas esgotadas)`);
+  const pretty = nome[0].toUpperCase() + nome.slice(1);
+  const slug = e.item;
+  const instId = e.instId || null;
+  const decay = it && (it.decayToSlug || (typeof it.decayTo === "string" ? it.decayTo : ""));
+  if (decay && typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[decay]) {
+    if (instId && typeof deleteItemInstance === "function") deleteItemInstance(p, instId);
+    p.equip[slot] = { item: decay, count: 1 };
+    if (typeof addLog === "function") {
+      addLog("info", `<b style="color:#ff9090">${pretty} se desgastou!</b>`);
+    }
+    if (typeof toast === "function") toast(`${pretty} se desgastou.`, "bad");
+  } else {
+    delete p.equip[slot];
+    // Remove APENAS a instância equipada — nunca bag[slug]/supplyStash[slug].
+    if (instId && typeof deleteItemInstance === "function") deleteItemInstance(p, instId);
+    if (typeof addLog === "function") {
+      addLog("info", `<b style="color:#ff9090">${pretty} quebrou!</b> (cargas esgotadas)`);
+    }
+    if (typeof toast === "function") toast(`${pretty} quebrou — cargas esgotadas.`, "bad");
   }
-  if (typeof toast === "function") toast(`${nome[0].toUpperCase() + nome.slice(1)} quebrou — cargas esgotadas.`, "bad");
-  // o Helper de equipamento tenta repor o item configurado na hora
+  // Legado: limpa saldo compartilhado deste slug (já não grava parciais novos).
+  const ledger = accessoryChargesLedger(p);
+  delete ledger[slug];
   if (typeof tryAccessoryHelper === "function") {
     try { tryAccessoryHelper(null, p, Date.now()); } catch (err) { /* segue */ }
   }
   if (typeof save === "function") save();
+  if (typeof renderEquip === "function") {
+    try { renderEquip(p); } catch (err) { /* UI opcional */ }
+  }
+  if (typeof renderInventory === "function") {
+    try { renderInventory(p); } catch (err) { /* UI opcional */ }
+  }
+  if (typeof renderSupplyStash === "function") {
+    try { renderSupplyStash(p); } catch (err) { /* UI opcional */ }
+  }
+  if (typeof refreshEquipChargeOverlays === "function") {
+    try { refreshEquipChargeOverlays(p); } catch (err) { /* UI opcional */ }
+  }
 }
 
 /* Tick de cargas por TEMPO (chamado do loop principal e do bg tick):
- * 1 carga a cada 3s para cada anel/amuleto equipado com cargas. */
+ * 1 carga a cada 3s. A última carga (1→0) DEVE destruir o item. */
 function tickAccessoryCharges(p, dt) {
-  if (!p || !p.equip || !dt) return;
-  for (const slot of ["ring", "amulet"]) {
+  if (!p || !p.equip || !(dt > 0)) return;
+  for (const slot of ACCESSORY_TIME_SLOTS) {
     const e = p.equip[slot];
     if (!e || !e.item) continue;
     const it = accessoryDef(p, e.item);
     if (!it || !it.charges || it.chargeMode !== "time") continue;
     if (e.charges === undefined) e.charges = it.charges;
     if (e.maxCharges === undefined) e.maxCharges = it.charges;
-    e._chargeAcc = (e._chargeAcc || 0) + dt;
-    const CHG_MS = 3000;   // 1 carga / 3s -> 200 cargas = 10 min (time ring)
-    while (e._chargeAcc >= CHG_MS) {
-      e._chargeAcc -= CHG_MS;
-      e.charges = Math.max(0, parseInt(e.charges, 10) - 1);
-      if (e.charges <= 0) {
-        accessoryBreak(p, slot);
-        break;
-      }
+    let n = accessoryNormalizeCharges(e, it);
+    if (n <= 0) {
+      accessoryBreak(p, slot);
+      continue;
+    }
+    e._chargeAcc = Math.max(0, Number(e._chargeAcc) || 0) + dt;
+    // n > 0: permite entrar com n===1 e sair com n===0 (não trava em 1).
+    while (n > 0 && e._chargeAcc >= ACCESSORY_CHARGE_MS) {
+      e._chargeAcc -= ACCESSORY_CHARGE_MS;
+      n -= 1;
+    }
+    e.charges = n;
+    // Segurança: tempo esgotado (float / acc) também destrói.
+    if (n <= 0 || (n * ACCESSORY_CHARGE_MS - e._chargeAcc) <= 0) {
+      e.charges = 0;
+      e._chargeAcc = 0;
+      accessoryBreak(p, slot);
     }
   }
+}
+
+/* Tempo restante em ms (time mode): charges*3s menos o acumulador parcial. */
+function accessoryRemainingMs(p, slot) {
+  const e = p.equip && p.equip[slot];
+  if (!e || !e.item) return 0;
+  const it = accessoryDef(p, e.item);
+  if (!it || !it.charges || it.chargeMode === "hits") return 0;
+  const now = e.charges === undefined ? it.charges : Math.max(0, parseInt(e.charges, 10) || 0);
+  const acc = Math.max(0, Number(e._chargeAcc) || 0);
+  return Math.max(0, now * ACCESSORY_CHARGE_MS - acc);
 }
 
 /* Cargas atuais do item equipado (para a UI). */
@@ -161,11 +237,17 @@ function accessoryChargesNow(p, slot) {
   if (!e || !e.item) return null;
   const it = accessoryDef(p, e.item);
   if (!it || !it.charges) return null;
+  const now = e.charges === undefined ? it.charges : e.charges;
+  const max = e.maxCharges || it.charges;
+  const mode = it.chargeMode || "time";
+  const remMs = mode === "hits" ? 0 : accessoryRemainingMs(p, slot);
   return {
-    now: e.charges === undefined ? it.charges : e.charges,
-    max: e.maxCharges || it.charges,
-    mode: it.chargeMode || "time",
+    now: now,
+    max: max,
+    mode: mode,
     slug: e.item,
+    remMs: remMs,
+    remSec: Math.max(0, Math.ceil(remMs / 1000)),
   };
 }
 
@@ -175,7 +257,7 @@ function ensureAccessoryConfig(p) {
   ["amulet", "ring"].forEach((slot) => {
     const c = p.config.equipHelper[slot] || {};
     p.config.equipHelper[slot] = {
-      enabled: c.enabled !== undefined ? !!c.enabled : true,
+      enabled: c.enabled !== undefined ? !!c.enabled : false,
       emergency: c.emergency || "",
       normal: c.normal || "",
       equipBelow: Math.max(1, Math.min(99, parseInt(c.equipBelow, 10) || 50)),
@@ -240,24 +322,60 @@ function canEquipItem(p, slug, targetSlot) {
 
 function stashEquippedItem(p, entry, preferred) {
   if (!entry || !entry.item) return true;
-  // sistema de cargas: guarda o saldo antes de devolver o item à mochila
-  if (entry.charges !== undefined) {
-    rememberAccessoryCharges(p, entry.item, entry.charges);
+  const it = GAMEDATA.items[entry.item];
+  const full = it && it.charges ? it.charges : 0;
+  const ch = entry.charges;
+  const partial = full && ch !== undefined && Math.floor(Number(ch)) > 0 && Math.floor(Number(ch)) < full;
+  const destBag = preferred === "bag";
+
+  // Parcial: volta como INSTÂNCIA com charges (nunca stack / nunca ledger).
+  if (partial && typeof isChargeStackableAccessory === "function" && isChargeStackableAccessory(entry.item)) {
+    if (!destBag) {
+      // Pouch/stash só aceitam cheios — força bag.
+      if (typeof toast === "function") toast("Item com cargas parciais vai para a mochila (não empilha).", "bad");
+    }
+    if (entry.instId && typeof findItemInstance === "function") {
+      const inst = findItemInstance(p, entry.instId);
+      if (inst) {
+        inst.charges = Math.floor(Number(ch));
+        inst.maxCharges = full;
+        delete p.equip[entry._slot || entry.slot];
+        return putBagItemInstance(p, inst);
+      }
+    }
+    delete p.equip[entry._slot || entry.slot];
+    return addItem(p, entry.item, 1, { charges: Math.floor(Number(ch)) });
   }
+
+  // Cheio / sem cargas: stack normal. Não grava ledger compartilhado.
   if (entry.instId && typeof takeEquippedItemInstance === "function") {
     const slot = (entry._slot || entry.slot || entry.s || "");
-    const inst = slot ? takeEquippedItemInstance(p, slot) : null;
-    if (inst) {
-      if (preferred === "bag") return putBagItemInstance(p, inst);
-      if (inst.tier > 0) {
-        if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
-        return false;
+    // Charge stackable sem itemUsesInstances: takeEquipped pode falhar — fallback abaixo.
+    if (slot && typeof itemUsesInstances === "function" && itemUsesInstances(entry.item)) {
+      const inst = takeEquippedItemInstance(p, slot);
+      if (inst) {
+        if (preferred === "bag") return putBagItemInstance(p, inst);
+        if (inst.tier > 0) {
+          if (typeof toast === "function") toast("Itens tierados não podem ir para a Loot Pouch.");
+          return false;
+        }
+        deleteItemInstance(p, inst.id);
+        return typeof addLootPouch === "function" ? addLootPouch(p, inst.slug, 1) : false;
       }
-      deleteItemInstance(p, inst.id);
-      return typeof addLootPouch === "function" ? addLootPouch(p, inst.slug, 1) : false;
     }
   }
-  if (preferred === "bag" && typeof addItem === "function" && addItem(p, entry.item, 1)) return true;
+  if (entry.instId && typeof deleteItemInstance === "function") {
+    // Chargeable full com instância órfã: remove inst e empilha.
+    deleteItemInstance(p, entry.instId);
+  } else if (entry._slot && Array.isArray(p.itemInstances)) {
+    const loc = "equip:" + entry._slot;
+    for (const inst of p.itemInstances.slice()) {
+      if (inst && inst.loc === loc && inst.slug === entry.item) {
+        deleteItemInstance(p, inst.id);
+      }
+    }
+  }
+  if (destBag && typeof addItem === "function" && addItem(p, entry.item, 1)) return true;
   if (typeof addLootPouch === "function") return addLootPouch(p, entry.item, 1);
   return typeof addItem === "function" ? addItem(p, entry.item, 1) : false;
 }
@@ -276,7 +394,18 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
 
   let takenInst = null;
   if (source === "bag") {
-    if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
+    if (instId && typeof takeBagItemInstance === "function") {
+      takenInst = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
+      if (!takenInst) return false;
+    } else if (typeof isChargeStackableAccessory === "function" && isChargeStackableAccessory(slug)) {
+      // Preferir stack CHEIA; senão uma instância parcial.
+      if ((p.bag[slug] || 0) > 0) {
+        if (!removeItem(p, slug, 1)) return false;
+      } else {
+        takenInst = takeBagItemInstance(p, slug, { highestTier: false });
+        if (!takenInst) return false;
+      }
+    } else if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
       takenInst = takeBagItemInstance(p, slug, { instId: instId, highestTier: true });
       if (!takenInst) return false;
     } else if (!removeItem(p, slug, 1)) return false;
@@ -315,16 +444,33 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
     }
   }
 
-  if (takenInst) equipEntryInstance(p, slot, takenInst);
-  else p.equip[slot] = { item: slug, count: 1 };
+  if (takenInst) {
+    if (typeof itemUsesInstances === "function" && itemUsesInstances(slug)) {
+      equipEntryInstance(p, slot, takenInst);
+      if (takenInst.charges !== undefined) {
+        p.equip[slot].charges = takenInst.charges;
+        p.equip[slot].maxCharges = takenInst.maxCharges || it.charges || takenInst.charges;
+      }
+    } else {
+      // Parcial chargeable: equipa com charges da instância e remove a inst.
+      p.equip[slot] = { item: slug, count: 1 };
+      if (takenInst.charges !== undefined) {
+        p.equip[slot].charges = takenInst.charges;
+        p.equip[slot].maxCharges = takenInst.maxCharges || it.charges || takenInst.charges;
+      }
+      if (typeof deleteItemInstance === "function") deleteItemInstance(p, takenInst.id);
+    }
+  } else {
+    p.equip[slot] = { item: slug, count: 1 };
+  }
 
-  // sistema de cargas: anel/amuleto equipa com o saldo da última instância
-  // (ou cheio) e o contador passa a drenar por tempo/golpe. Vale também
-  // para itens que usam instância (o equipEntryInstance não carrega cargas).
-  const cc = accessoryChargesOnEquip(p, p.equip[slot].item);
-  if (cc !== null && p.equip[slot].charges === undefined) {
-    p.equip[slot].charges = cc;
-    p.equip[slot].maxCharges = it.charges || cc;
+  // Cargas: instância parcial já aplicada; senão full (ou legado 1×).
+  if (p.equip[slot].charges === undefined) {
+    const cc = accessoryChargesOnEquip(p, p.equip[slot].item, null);
+    if (cc !== null) {
+      p.equip[slot].charges = cc;
+      p.equip[slot].maxCharges = it.charges || cc;
+    }
   }
 
   // Arma de duas mãos remove escudo/spellbook, mas mantém quiver (Tibia global).
@@ -344,10 +490,28 @@ function unequipToContainer(p, slot, dest) {
   if (slot === "backpack") { if (typeof toast === "function") toast("A bag padrão não pode ser removida."); return false; }
   if (slot === "ammo") { if (typeof setActiveAmmo === "function") setActiveAmmo(p, null); return true; }
   const e = p.equip[slot];
-  // sistema de cargas: guarda o saldo antes de devolver o item à mochila
-  if (e.charges !== undefined) rememberAccessoryCharges(p, e.item, e.charges);
+  const it = GAMEDATA.items[e.item];
+  const full = it && it.charges ? it.charges : 0;
+  const ch = e.charges;
+  const partial = full && ch !== undefined && Math.floor(Number(ch)) > 0 && Math.floor(Number(ch)) < full;
+  const chargeable = typeof isChargeStackableAccessory === "function" && isChargeStackableAccessory(e.item);
+
+  // Parcial chargeable → sempre bag como instância isolada (nunca pouch/stash stack).
+  if (chargeable && partial) {
+    if (dest !== "bag" && typeof toast === "function") {
+      toast("Cargas parciais não empilham — item voltou para a mochila.", "bad");
+    }
+    const ok = addItem(p, e.item, 1, { charges: Math.floor(Number(ch)) });
+    if (!ok) { if (typeof toast === "function") toast("Mochila cheia.", "bad"); return false; }
+    if (e.instId && typeof deleteItemInstance === "function") deleteItemInstance(p, e.instId);
+    delete p.equip[slot];
+    return true;
+  }
+
+  // Cheio / sem sistema de cargas: empilha. Sem ledger compartilhado.
   let ok = false;
-  if (e.instId && typeof takeEquippedItemInstance === "function") {
+  if (e.instId && typeof itemUsesInstances === "function" && itemUsesInstances(e.item) &&
+      typeof takeEquippedItemInstance === "function") {
     const inst = takeEquippedItemInstance(p, slot);
     if (!inst) return false;
     if (dest === "bag") ok = putBagItemInstance(p, inst);
@@ -367,7 +531,9 @@ function unequipToContainer(p, slot, dest) {
       return false;
     }
   } else {
+    if (e.instId && typeof deleteItemInstance === "function") deleteItemInstance(p, e.instId);
     if (dest === "bag") ok = addItem(p, e.item, 1);
+    else if (dest === "stash" && typeof addSupplyStash === "function") ok = addSupplyStash(p, e.item, 1);
     else ok = addLootPouch(p, e.item, 1);
     if (!ok) { if (typeof toast === "function") toast("Mochila cheia.", "bad"); return false; }
     delete p.equip[slot];
@@ -487,6 +653,14 @@ function accessoryAvailableCounts(p, slot) {
     const it = GAMEDATA.items[slug];
     if (it && it.s === slot && (p.bag[slug] || 0) > 0) out[slug] = (out[slug] || 0) + p.bag[slug];
   }
+  // Parciais chargeable ficam só em itemInstances (não entram em p.bag).
+  if (Array.isArray(p.itemInstances)) {
+    for (const inst of p.itemInstances) {
+      if (!inst || inst.loc !== "bag") continue;
+      const it = GAMEDATA.items[inst.slug];
+      if (it && it.s === slot) out[inst.slug] = (out[inst.slug] || 0) + 1;
+    }
+  }
   for (const slug in (p.lootPouch || {})) {
     const it = GAMEDATA.items[slug];
     if (it && it.s === slot && (p.lootPouch[slug] || 0) > 0) out[slug] = (out[slug] || 0) + p.lootPouch[slug];
@@ -502,6 +676,72 @@ function accessoryAvailableCounts(p, slot) {
   return out;
 }
 
+/* Helper: quanto resta do recurso (cargas OU tempo). Ambos usam `charges`;
+ * time ≈ charges×3s fora do slot. Menor fração = mais perto de esgotar. */
+function accessoryHelperRemainRatio(slug, charges) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug]) || null;
+  const full = it && it.charges ? Math.floor(Number(it.charges)) : 0;
+  if (!full) return 1;
+  let n = (charges === undefined || charges === null)
+    ? full
+    : Math.floor(Number(charges));
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  return Math.min(1, n / full);
+}
+
+/* Escolhe a cópia do slug com MENOS recurso restante (parcial antes de cheio).
+ * Empate: bag > pouch > stash. */
+function accessoryHelperPickSource(p, slug) {
+  if (!p || !slug) return null;
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug]) || null;
+  const full = it && it.charges ? Math.floor(Number(it.charges)) : 0;
+  const cands = [];
+  if (Array.isArray(p.itemInstances)) {
+    for (const inst of p.itemInstances) {
+      if (!inst || inst.loc !== "bag" || inst.slug !== slug) continue;
+      const ch = inst.charges !== undefined ? Math.floor(Number(inst.charges)) : full;
+      if (full && (!Number.isFinite(ch) || ch <= 0)) continue;
+      cands.push({
+        source: "bag",
+        instId: inst.id,
+        charges: Number.isFinite(ch) ? ch : full,
+        ratio: accessoryHelperRemainRatio(slug, ch),
+        locPri: 0,
+      });
+    }
+  }
+  if ((Number(p.bag && p.bag[slug]) || 0) > 0) {
+    cands.push({
+      source: "bag",
+      charges: full || null,
+      ratio: accessoryHelperRemainRatio(slug, full || null),
+      locPri: 0,
+    });
+  }
+  if ((Number(p.lootPouch && p.lootPouch[slug]) || 0) > 0) {
+    cands.push({
+      source: "pouch",
+      charges: full || null,
+      ratio: accessoryHelperRemainRatio(slug, full || null),
+      locPri: 1,
+    });
+  }
+  if ((Number(p.supplyStash && p.supplyStash[slug]) || 0) > 0) {
+    cands.push({
+      source: "stash",
+      charges: full || null,
+      ratio: accessoryHelperRemainRatio(slug, full || null),
+      locPri: 2,
+    });
+  }
+  if (!cands.length) return null;
+  cands.sort((a, b) =>
+    a.ratio - b.ratio ||
+    (Math.floor(Number(a.charges) || 0) - Math.floor(Number(b.charges) || 0)) ||
+    a.locPri - b.locPri);
+  return cands[0];
+}
+
 function accessoryItemList(p, slot, include) {
   const counts = accessoryAvailableCounts(p, slot);
   if (include) counts[include] = counts[include] || 0;
@@ -510,12 +750,168 @@ function accessoryItemList(p, slot, include) {
                     GAMEDATA.items[a].n.localeCompare(GAMEDATA.items[b].n));
 }
 
-function accessorySelectHtml(p, slot, value, id) {
-  const list = accessoryItemList(p, slot, value);
-  return `<select id="${id}" style="width:100%;padding:6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-    <option value="" ${!value ? "selected" : ""}>Nenhum</option>
-    ${list.map((slug) => `<option value="${slug}" ${value === slug ? "selected" : ""}>${GAMEDATA.items[slug].n}</option>`).join("")}
-  </select>`;
+function accessoryClsLabelHtml(slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug]) || null;
+  const lab = it && ACCESSORY_CLS_LABEL[it.cls];
+  if (!lab) return "";
+  return `<span style="color:${lab.color}">${lab.text}</span>`;
+}
+
+function accessoryPickerTriggerHtml(p, slot, value, kind) {
+  const counts = accessoryAvailableCounts(p, slot);
+  let icon, nome, meta;
+  if (value && GAMEDATA.items[value]) {
+    icon = typeof itemImg === "function" ? itemImg(value, 28) : "";
+    nome = typeof itemName === "function" ? itemName(value) : (GAMEDATA.items[value].n || value);
+    const q = counts[value] || 0;
+    const rar = accessoryClsLabelHtml(value);
+    meta = `${q}x` + (rar ? ` · ${rar}` : "");
+  } else {
+    icon = `<div class="helper-equip-empty-icon" aria-hidden="true">—</div>`;
+    nome = "Nenhum";
+    meta = "clique para escolher";
+  }
+  return `<button type="button" class="helper-equip-pick-btn" data-helper-equip-pick="${kind}"
+      title="Escolher ${kind === "emergency" ? "emergencial" : "padrão"}">
+    <span class="helper-equip-pick-icon">${icon}</span>
+    <span class="helper-equip-pick-text">
+      <span class="small">${nome}</span>
+      <span class="tiny dim">${meta}</span>
+    </span>
+    <span class="tiny dim helper-equip-pick-caret">▾</span>
+  </button>`;
+}
+
+function accessoryPickerKindLabel(kind) {
+  return kind === "emergency" ? "Emergencial" : "Padrão";
+}
+
+function accessoryPickerSlotLabel(slot) {
+  return slot === "ring" ? "Anel" : "Amuleto";
+}
+
+function openAccessoryHelperPicker(kind) {
+  const p = typeof G !== "undefined" ? G.p : null;
+  if (!p || (kind !== "emergency" && kind !== "normal")) return;
+  HELPER_EQUIP_PICKER.kind = kind;
+  HELPER_EQUIP_PICKER.busca = "";
+  desenhaAccessoryHelperPicker();
+  const modal = document.getElementById("modal");
+  if (modal) modal.classList.add("show");
+}
+
+function desenhaAccessoryHelperPicker() {
+  const p = typeof G !== "undefined" ? G.p : null;
+  const body = document.getElementById("modal-body");
+  if (!p || !body || !HELPER_EQUIP_PICKER.kind) return;
+  ensureAccessoryConfig(p);
+  const slot = HELPER_EQUIP_UI.slot || "amulet";
+  const cfg = p.config.equipHelper[slot];
+  const kind = HELPER_EQUIP_PICKER.kind;
+  const atual = kind === "emergency" ? (cfg.emergency || "") : (cfg.normal || "");
+  const busca = (HELPER_EQUIP_PICKER.busca || "").trim().toLowerCase();
+  const counts = accessoryAvailableCounts(p, slot);
+  let list = accessoryItemList(p, slot, atual);
+  if (busca) {
+    list = list.filter((slug) => {
+      const it = GAMEDATA.items[slug];
+      if (!it) return false;
+      const nome = (it.n || "").toLowerCase();
+      const idStr = String(it.id || "");
+      return nome.indexOf(busca) !== -1 ||
+        slug.indexOf(busca) !== -1 ||
+        idStr.indexOf(busca) !== -1;
+    });
+  }
+  const titulo = `${accessoryPickerSlotLabel(slot)} - ${accessoryPickerKindLabel(kind)}`;
+  const linhaNenhum = (() => {
+    const usando = !atual;
+    const btn = usando ? "Em uso" : "Remover";
+    return `<div class="shop-row helper-equip-pick-row ${usando ? "selected" : ""}">
+      <div class="helper-equip-empty-icon" aria-hidden="true">—</div>
+      <div style="flex:1;min-width:0">
+        <div class="small">Nenhum</div>
+        <div class="tiny dim">${usando ? "slot sem item configurado" : "limpar seleção"}</div>
+      </div>
+      <button type="button" class="sm ${usando ? "primary" : ""}" data-helper-equip-choose="">${btn}</button>
+    </div>`;
+  })();
+  const linhas = list.map((slug) => {
+    const it = GAMEDATA.items[slug];
+    const usando = atual === slug;
+    const q = counts[slug] || 0;
+    const rar = accessoryClsLabelHtml(slug);
+    const lvl = it.lvl ? `lvl ${it.lvl}` : "";
+    const meta = [q ? `${q}x` : "0x", lvl, rar].filter(Boolean).join(" · ");
+    return `<div class="shop-row helper-equip-pick-row ${usando ? "selected" : ""}">
+      ${typeof itemImg === "function" ? itemImg(slug, 30) : ""}
+      <div style="flex:1;min-width:0">
+        <div class="small">${typeof itemName === "function" ? itemName(slug) : it.n}</div>
+        <div class="tiny dim">${meta || "disponível"}</div>
+      </div>
+      <button type="button" class="sm ${usando ? "primary" : ""}" data-helper-equip-choose="${slug}">${
+        usando ? "Em uso" : "Usar"}</button>
+    </div>`;
+  }).join("");
+
+  body.innerHTML = `
+    <div class="panel-title">${titulo}
+      <span style="flex:1"></span>
+      <button type="button" class="sm" id="helper-equip-pick-x">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="row mb8" style="gap:6px;align-items:center">
+        <input id="helper-equip-pick-busca" placeholder="Buscar por nome ou id..."
+          value="${(HELPER_EQUIP_PICKER.busca || "").replace(/"/g, "&quot;")}"
+          style="flex:1;padding:6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      </div>
+      <div class="list helper-equip-pick-list" style="max-height:46vh">
+        ${linhaNenhum}${linhas || (busca
+          ? `<div class="dim tiny" style="padding:10px">Nada com esse filtro.</div>` : "")}
+      </div>
+      <div class="row mt8" style="gap:6px;align-items:center">
+        <span class="tiny dim">${cfg.enabled
+          ? "Ativo: Usar aplica o item agora conforme a vida."
+          : "Ativo desligado: só configura — marque Ativo para vestir."}</span>
+        <span style="flex:1"></span>
+        <button type="button" class="sm primary" id="helper-equip-pick-fechar">Fechar</button>
+      </div>
+    </div>`;
+
+  const fechar = () => {
+    const modal = document.getElementById("modal");
+    if (modal) modal.classList.remove("show");
+    HELPER_EQUIP_PICKER.kind = null;
+  };
+  const xBtn = document.getElementById("helper-equip-pick-x");
+  if (xBtn) xBtn.addEventListener("click", fechar);
+  const closeBtn = document.getElementById("helper-equip-pick-fechar");
+  if (closeBtn) closeBtn.addEventListener("click", fechar);
+  const inp = document.getElementById("helper-equip-pick-busca");
+  if (inp) {
+    inp.addEventListener("input", () => {
+      HELPER_EQUIP_PICKER.busca = inp.value;
+      desenhaAccessoryHelperPicker();
+      const n = document.getElementById("helper-equip-pick-busca");
+      if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+    });
+  }
+  body.querySelectorAll("[data-helper-equip-choose]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const slug = b.getAttribute("data-helper-equip-choose") || "";
+      if (kind === "emergency") cfg.emergency = slug;
+      else cfg.normal = slug;
+      if (cfg.enabled) applyAccessoryHelperSlotNow(p, slot);
+      if (typeof save === "function") save();
+      refreshAccessoryHelperVisuals(p);
+      desenhaAccessoryHelperPicker();
+      const el = document.getElementById("helper-equipment");
+      if (el && typeof renderEquipmentHelper === "function") {
+        el.innerHTML = renderEquipmentHelper(p);
+        if (typeof bindEquipmentHelper === "function") bindEquipmentHelper(p);
+      }
+    });
+  });
 }
 
 function accessoryEquipConfigured(p, slot, slug) {
@@ -525,9 +921,11 @@ function accessoryEquipConfigured(p, slot, slug) {
     if (p.equip && p.equip[slot]) return unequipToContainer(p, slot, "pouch");
     return true;
   }
-  if (p.bag && p.bag[slug] > 0) return equipItemFromContainer(p, slug, "bag", slot);
-  if (p.lootPouch && p.lootPouch[slug] > 0) return equipItemFromContainer(p, slug, "pouch", slot);
-  if (p.supplyStash && p.supplyStash[slug] > 0) return equipItemFromContainer(p, slug, "stash", slot);
+  // Helper: gasta primeiro a cópia com menos cargas / menos tempo restante.
+  const pick = accessoryHelperPickSource(p, slug);
+  if (pick) {
+    return equipItemFromContainer(p, slug, pick.source, slot, pick.instId || undefined);
+  }
   if (typeof toast === "function") {
     toast(`${itemName(slug)} não está na mochila, Loot Pouch nem Supply Stash.`, "bad");
   }
@@ -550,6 +948,51 @@ function tryAccessoryHelper(c, p, now) {
   }
 }
 
+/* Aplica imediatamente o item certo do helper (toggle Ativo ON / picker).
+ * Regra do toggle: HP baixo → emergencial; caso contrário → padrão. */
+function applyAccessoryHelperSlotNow(p, slot) {
+  ensureAccessoryConfig(p);
+  const cfg = p.config.equipHelper[slot];
+  if (!cfg || !cfg.enabled) return false;
+  const max = typeof maxStats === "function" ? maxStats(p) : { hp: p.maxHp || 1 };
+  const hpPct = max.hp ? (p.hp / max.hp) * 100 : 100;
+  if (hpPct <= cfg.equipBelow && cfg.emergency) {
+    return accessoryEquipConfigured(p, slot, cfg.emergency);
+  }
+  if (cfg.normal) return accessoryEquipConfigured(p, slot, cfg.normal);
+  return false;
+}
+
+/* Ao desligar Ativo: se o emergencial estiver vestido, devolve o padrão
+ * (ou desequipa se não houver padrão). Não mexe em itens que o jogador
+ * equipou manualmente fora do helper. */
+function releaseAccessoryHelperSlot(p, slot) {
+  ensureAccessoryConfig(p);
+  const cfg = p.config.equipHelper[slot];
+  if (!cfg) return false;
+  const cur = p.equip && p.equip[slot] ? p.equip[slot].item : "";
+  if (cfg.emergency && cur === cfg.emergency) {
+    return accessoryEquipConfigured(p, slot, cfg.normal || "");
+  }
+  return false;
+}
+
+function refreshAccessoryHelperVisuals(p) {
+  if (!p) return;
+  if (typeof renderEquip === "function") {
+    try { renderEquip(p); } catch (e) { /* UI opcional */ }
+  }
+  if (typeof renderBag === "function") {
+    try { renderBag(p); } catch (e) { /* UI opcional */ }
+  }
+  if (typeof renderLootPouch === "function") {
+    try { renderLootPouch(p); } catch (e) { /* UI opcional */ }
+  }
+  if (typeof renderSupplyStash === "function") {
+    try { renderSupplyStash(p); } catch (e) { /* UI opcional */ }
+  }
+}
+
 function renderEquipmentHelper(p) {
   ensureAccessoryConfig(p);
   const slot = HELPER_EQUIP_UI.slot || "amulet";
@@ -557,7 +1000,7 @@ function renderEquipmentHelper(p) {
   const counts = accessoryAvailableCounts(p, slot);
   const pouchIcons = Object.keys(counts).slice(0, 12).map((slug) =>
     `<div class="inv-item ${itemClsBorder(slug)}" style="width:34px;height:34px;cursor:default" title="${itemName(slug)} · ${counts[slug]}x">
-      ${itemImg(slug)}${counts[slug] > 1 ? `<span class="cnt">${counts[slug]}</span>` : ""}</div>`).join("");
+      ${itemImg(slug, 0, null, counts[slug])}${counts[slug] > 1 ? `<span class="cnt">${counts[slug]}</span>` : ""}</div>`).join("");
 
   return `
     <div class="row mb8" style="gap:6px">
@@ -574,23 +1017,30 @@ function renderEquipmentHelper(p) {
           ? itemName(p.equip[slot].item) : "";
         if (cg) {
           const modo = cg.mode === "hits" ? "por golpe recebido" : "por tempo (1 a cada 3s)";
-          return `<div class="tiny mb4">Equipado: <b>${eqNome}</b>
+          if (cg.mode === "hits") {
+            return `<div class="tiny mb4">Equipado: <b>${eqNome}</b>
             · <span class="charge-highlight" style="color:#ffe680">⚡ ${cg.now}/${cg.max} cargas</span>
             <span class="dim">(${modo})</span></div>`;
+          }
+          const t = typeof fmtShortDuration === "function"
+            ? fmtShortDuration(cg.remSec) : (cg.remSec + "s");
+          return `<div class="tiny mb4">Equipado: <b>${eqNome}</b>
+            · <span class="charge-highlight" style="color:#ffe680">⏱ ${t}</span>
+            <span class="dim">(${cg.now}/${cg.max} · ${modo})</span></div>`;
         }
         return eqNome ? `<div class="tiny mb4">Equipado: <b>${eqNome}</b></div>` : "";
       })()}
       <div class="row" style="gap:12px;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div class="tiny" style="color:#ff9090;font-weight:bold">EMERGENCIAL</div>
-          ${accessorySelectHtml(p, slot, cfg.emergency, "helper-equip-emergency")}
+          ${accessoryPickerTriggerHtml(p, slot, cfg.emergency, "emergency")}
           <label class="small dim mt8">Equipar com vida abaixo de (%)</label>
           <input id="helper-equip-below" type="number" min="1" max="99" value="${cfg.equipBelow}"
             style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
         </div>
         <div style="flex:1;min-width:0">
           <div class="tiny" style="color:#7ae87a;font-weight:bold">PADRÃO</div>
-          ${accessorySelectHtml(p, slot, cfg.normal, "helper-equip-normal")}
+          ${accessoryPickerTriggerHtml(p, slot, cfg.normal, "normal")}
           <label class="small dim mt8">Restaurar com vida acima de (%)</label>
           <input id="helper-equip-above" type="number" min="1" max="99" value="${cfg.restoreAbove}"
             style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
@@ -607,14 +1057,19 @@ function bindEquipmentHelper(p) {
   const rer = () => { const el = document.getElementById("helper-equipment"); if (el) { el.innerHTML = renderEquipmentHelper(p); bindEquipmentHelper(p); } };
   document.querySelectorAll("#helper-equipment [data-helper-equip-slot]").forEach((b) =>
     b.addEventListener("click", () => { HELPER_EQUIP_UI.slot = b.dataset.helperEquipSlot; rer(); }));
+  document.querySelectorAll("#helper-equipment [data-helper-equip-pick]").forEach((b) =>
+    b.addEventListener("click", () => openAccessoryHelperPicker(b.dataset.helperEquipPick)));
   const slot = HELPER_EQUIP_UI.slot || "amulet";
   const cfg = p.config.equipHelper[slot];
   const enabled = document.getElementById("helper-equip-enabled");
-  if (enabled) enabled.addEventListener("change", () => { cfg.enabled = enabled.checked; if (typeof save === "function") save(); rer(); });
-  const em = document.getElementById("helper-equip-emergency");
-  if (em) em.addEventListener("change", () => { cfg.emergency = em.value; if (typeof save === "function") save(); rer(); });
-  const no = document.getElementById("helper-equip-normal");
-  if (no) no.addEventListener("change", () => { cfg.normal = no.value; if (typeof save === "function") save(); rer(); });
+  if (enabled) enabled.addEventListener("change", () => {
+    cfg.enabled = enabled.checked;
+    if (cfg.enabled) applyAccessoryHelperSlotNow(p, slot);
+    else releaseAccessoryHelperSlot(p, slot);
+    if (typeof save === "function") save();
+    refreshAccessoryHelperVisuals(p);
+    rer();
+  });
   const below = document.getElementById("helper-equip-below");
   if (below) below.addEventListener("change", () => {
     cfg.equipBelow = Math.max(1, Math.min(99, parseInt(below.value, 10) || 50));
@@ -713,6 +1168,7 @@ function emitMagicShieldOn(c, p, source) {
 /* Canary: a potion força o mesmo manashield do utamo vita sem travar a
  * magia, o grupo Support nem o potionCd de 1s. Custa 50k e tem CD 15s. */
 function tryMagicShieldPotion(c, p, now, force) {
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   now = now || Date.now();
   if (!magicShieldPotionAllowed(p)) return false;
   if (!magicShieldPotionReady(p, now)) return false;
@@ -733,6 +1189,7 @@ function tryMagicShieldPotion(c, p, now, force) {
 }
 
 function tryMagicShield(c, p, now) {
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   ensureAccessoryConfig(p);
   const cfg = p.config.magicShield;
   const forceOnce = !!cfg.forceOnce;
@@ -914,8 +1371,10 @@ function bindMagicShieldHelper(p) {
     rh.enabled = true;
     rh.emergency = "energy-ring";
     rh.equipBelow = cfg.hpBelow || 50;
+    applyAccessoryHelperSlotNow(p, "ring");
     if (typeof toast === "function") toast("Energy Ring definido como anel emergencial.");
     if (typeof save === "function") save();
+    refreshAccessoryHelperVisuals(p);
     rer();
   });
   const usePot = document.getElementById("ms-use-potion");

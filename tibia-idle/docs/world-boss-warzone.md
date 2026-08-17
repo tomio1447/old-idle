@@ -1,11 +1,11 @@
-# World Boss / Warzone — especificação (skeleton)
+# World Boss / Warzone — especificação
 
-Status: **skeleton** (lobby + timers + stub de combate/loot). Mapas OTBM e drops raros finais entram depois.
+Status: **lobby + instância compartilhada multiplayer** (mapa placeholder 40×40). OTBM oficial e drops raros finais entram depois.
 
 ## Mapas (próximo passo)
 
 - Arena oficial OTBM chegará depois em **`beta-maps/bosses`** (validação do mapa oficial).
-- Por agora permanece o **mapa placeholder** 40×40 no cliente; **não bloqueia** testes de lobby/JOIN.
+- Por agora permanece o **mapa placeholder** 40×40; **não bloqueia** testes de lobby/JOIN/multiplayer.
 - Drops raros e arte dedicada do World Boss também ficam para depois dos OTBM.
 
 ## Visão geral
@@ -13,62 +13,67 @@ Status: **skeleton** (lobby + timers + stub de combate/loot). Mapas OTBM e drops
 - Rotação a cada **3h** (produção): escolhe **WZ1–WZ3** com peso igual (pode repetir).
 - Só **1 World Boss** ativo por vez.
 - Timeout de kill: **60 min** → fail para todos.
-- Todos os personagens do evento mortos → fail.
+- Wipe (todos caídos ao mesmo tempo) → fail (`party-wipe`).
+- Morte individual: **revive 30s** (não é permadeath de boss solo).
 
 ## Lobby (10 min)
 
 - Modal no canto superior direito (área do mission box): **`WARZONE N OPEN — JOIN`**.
-- Cabeçalho mostra o **sprite do boss** da warzone (`bossSprite` em `assets/mob/…`, stubs Canary).
+- Cabeçalho mostra o **sprite do boss** da warzone (`bossSprite` em `assets/mob/…`).
 - Máx. **30** personagens no lobby.
-- Máx. **2** chars por conta **por evento** (UI desabilita checkboxes além de 2; API rejeita `>2`).
+- Máx. **2** chars por conta **por evento**.
 - Em **30/30** → fecha e inicia imediatamente.
 - Fim do timer com **≥ `WB_MIN_START`** chars → inicia; abaixo → cancela.
   - Produção: **≥20** inicia; **≤19** cancela.
   - `TEST_SERVER=1`: default **`WB_MIN_START=2`**.
-- **JOIN**: escolhe até 2 chars da conta logada.
-- **LEAVE**: remove os dois chars; **cooldown de 30s** na conta.
-- Lobby mostra contagem + breakdown de vocações.
-- No start: **countdown 60s** com mensagem on-screen para quem entrou:
+- **JOIN** / **LEAVE** (LEAVE com cooldown de 30s).
+- No start: **countdown 60s** com mensagem on-screen.
 
-  > EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!
+## Instância compartilhada (como Megalomania / warzones)
 
-- Depois: **PT inteira** vai ao templo (limpa hunt/boss instance online); full HP/MP; se estiver em outro boss → perde/skip esse boss.
-- Só os **chars do JOIN** (máx. 2/conta) entram no mapa WB; demais membros da party ficam no templo.
-- Arena WB é instância **local isolada** (`worldBoss`), sem waves de hunt e sem `partyReportZone({ zone: "boss" })`.
-- Teleporte ao mapa → espera loaded → **10s** → spawn do boss.
+No fim do countdown o servidor:
 
-## Bosses / sprites (warzone)
+1. Escolhe o **host** = primeira conta do JOIN.
+2. Cria **uma** `account_instances` autoritativa no host com **todos** os chars JOIN (até 30).
+3. Liga `bindShare` conta → `{ ownerAccountId, instanceId }`.
+4. Envia SSE `teleport` com `instanceId` / `isHost`.
 
-| Warzone | Boss | bossSprite (assets/mob) |
-| ------- | ---- | ----------------------- |
-| WZ1 | The Deathstrike | `deathstrike` |
-| WZ2 | Gnomevil | `gnomevil` |
-| WZ3 | The Abyssador | `abyssador` |
+Clientes (host e convidados):
 
-Fluxo de entrada (obrigatório): **parar hunt** → **templo + full HP/MP** → party report `city` (PT inteira) → só os chars do JOIN entram na arena WB isolada (sem `startBoss` / sem follow de party para sala de boss / sem instância de hunt online).
+1. Parar hunt → templo + full HP/MP (`world-boss-prep`; host **não** encerra a sala WB).
+2. `accountLoadInstance` + `resumeIdleInstance` na sala compartilhada.
+3. Ticks online autoritativos (convidados avançam a row do host com `leaseAccountId`).
+4. Sem `startBoss` / sem arena local isolada / sem `partyReportZone({ zone: "boss" })`.
 
-## Combate (skeleton)
+Boss ids: `world-boss-wz1` | `world-boss-wz2` | `world-boss-wz3`  
+HP: **2.5M / 4M / 6M** (tabela warzone), não o HP do catálogo Canary stub.
 
-- Mapa placeholder grande/simples até chegar OTBM em `beta-maps/bosses`.
-- Câmera segue o personagem ativo.
-- Stack no mesmo SQM permitido; AoE por tile acerta todos no stack.
-- Helper controla chars; jogador pode mover **um** manualmente só para posicionar.
-- Morte: revive em **30s**; os **dois** chars mortos → templo + remove a conta do evento (fail só para ela).
-- Disconnect: continua offline/helper; ainda pode receber reward se o boss completar.
+## Bosses / sprites
+
+| Warzone | Boss | bossSprite | HP |
+| ------- | ---- | ---------- | -- |
+| WZ1 | The Deathstrike | `deathstrike` | 2.500.000 |
+| WZ2 | Gnomevil | `gnomevil` | 4.000.000 |
+| WZ3 | The Abyssador | `abyssador` | 6.000.000 |
+
+## Combate
+
+- Mapa placeholder até OTBM.
+- Stack no mesmo SQM permitido; AoE por tile.
+- Helper controla chars; jogador pode mover um manualmente.
+- Sem máculas Soul War no kill do WB.
+- Disconnect: worker avança se ninguém da warzone tiver lease; com alguém online, clients tickam.
 
 ## Score / loot (stub)
 
-Pesos de score:
+| Métrica | Peso |
+| ------- | ---- |
+| Damage dealt | 1.0 |
+| Heal to allies | 0.5 |
+| Damage taken | 0.25 |
 
-| Métrica            | Peso |
-| ------------------ | ---- |
-| Damage dealt       | 1.0  |
-| Heal to allies     | 0.5  |
-| Damage taken       | 0.25 |
-
-- Chance de rare por score: **depois**.
-- Sucesso WZ1–3: **3× `major-crystal-token`** por **conta** (se ≥1 char vivo), via **Reward Chest**.
-- Itens raros únicos: sem duplicar o mesmo item id para dois players (hook preparado; drops ainda stub).
+- Sucesso: **3× `major-crystal-token`** por conta (≥1 char vivo), via Reward Chest.
+- HP do boss é o da instância autoritativa (`syncSharedBoss`); `/report` só pontua.
 
 ## API
 
@@ -78,7 +83,7 @@ Pesos de score:
 | POST | `/api/world-boss/join` | `{ token, characterIds:[…] }` |
 | POST | `/api/world-boss/leave` | `{ token }` |
 | POST | `/api/world-boss/loaded` | mapa carregado |
-| POST | `/api/world-boss/report` | deltas de damage/heal/taken + deadCharIds |
+| POST | `/api/world-boss/report` | deltas de score (opcional) |
 | POST | `/api/world-boss/admin/force-open` | admin / `MAINTENANCE_TOKEN` / TEST_SERVER |
 | POST | `/api/world-boss/admin/force-close` | idem |
 
@@ -86,11 +91,9 @@ SSE: evento `world-boss` (broadcast + por conta).
 
 ## Env — timers de teste
 
-Com `TEST_SERVER=1` os defaults já são curtos. Override:
-
 | Variável | Produção default | Test default |
 | -------- | ---------------- | ------------ |
-| `WB_ROTATION_MS` | 10800000 (3h) | 180000 (3 min) |
+| `WB_ROTATION_MS` | **10800000 (3h)** | **10800000 (3h)** — override curto só se setar env |
 | `WB_LOBBY_MS` | 600000 (10 min) | 75000 |
 | `WB_COUNTDOWN_MS` | 60000 | 15000 |
 | `WB_SPAWN_DELAY_MS` | 10000 | 5000 |
@@ -101,31 +104,9 @@ Com `TEST_SERVER=1` os defaults já são curtos. Override:
 
 ## Forçar lobby (local :8001)
 
-Com servidor local (`TEST_SERVER=1`):
-
 ```powershell
 Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:8001/api/world-boss/admin/force-open" `
   -ContentType "application/json" -Body '{"warzoneId":"wz1"}'
 ```
 
-Opcional: `"warzoneId":"wz2"` / `"wz3"`. Sem body escolhe aleatório.
-
-Fechar:
-
-```powershell
-Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:8001/api/world-boss/admin/force-close" `
-  -ContentType "application/json" -Body '{}'
-```
-
-Em produção use header `x-maintenance-token` ou sessão admin.
-
-## Manutenção (`MAINTENANCE_MODE`)
-
-- Default **OFF** (local pode testar normalmente).
-- `MAINTENANCE_MODE=1` no `.env`:
-  - HTML de manutenção em `/` (mensagem PT + Discord clicável)
-  - `503` em `/api/login`, `/api/register`, `/api/lease/*`
-  - `/api/health`, `/api/maintenance`, `/api/admin/*` seguem disponíveis
-- Não apaga DB.
-
-Arquivos: `server/world_boss.js`, rotas em `server/server.js`, UI em `game/js/world-boss-ui.js`.
+Arquivos: `server/world_boss.js`, `server/server.js` (`createWorldBossSharedInstance`), `server/authoritative_engine.js`, UI em `game/js/world-boss-ui.js` + `BOSS_DEFS` em `game/js/game.js`.

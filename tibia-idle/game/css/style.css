@@ -1595,22 +1595,40 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   .forge-client-wallet { min-width: 70px; }
 }
 
-/* ============================ Sistema de Prey ============================ */
+/* ============================ Topbar + Prey (mirror layout.css) ============================ */
+.topbar-sys-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px !important;
+  box-sizing: border-box;
+  line-height: 1;
+  vertical-align: middle;
+}
 .topbar-btn-icon {
   width: 18px; height: 18px; object-fit: contain;
-  margin-right: 2px; flex: none;
+  margin: 0; flex: none;
   image-rendering: pixelated;
 }
-#btn-wheel,
-#btn-charms { display:inline-flex; align-items:center; gap:2px; white-space:nowrap; }
-
+.topbar-btn-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  font-size: 14px; line-height: 1;
+  flex: none;
+}
 .prey-btn-gif {
-  width: 16px; height: 28px; object-fit: contain;
-  margin-right: 2px; flex: none;
+  width: 18px !important; height: 18px !important;
+  object-fit: contain;
+  margin: 0; flex: none;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 3px rgba(255,214,90,.6));
 }
-#btn-prey { display:inline-flex; align-items:center; gap:2px; white-space:nowrap; }
 #btn-prey img.prey-btn-gif { display: inline-block; }
 
 
@@ -1753,14 +1771,30 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .prey-locked-title { font-weight: bold; font-size: 12px; }
 .prey-store-buttons {
   display: flex; flex-direction: column; gap: 4px; margin: 6px 0;
+  align-items: center;
 }
-.prey-store-btn { cursor: pointer; display: flex; justify-content: center; }
+.prey-store-btn {
+  cursor: pointer; display: block;
+  width: 204px; height: 67px;
+  overflow: hidden;
+  border: 0; padding: 0; background: transparent;
+}
+/* Assets *_test são sprite sheets (estado normal + pressionado empilhados).
+ * Mostra só a metade de cima; :active troca para a de baixo. */
 .prey-store-img {
-  image-rendering: pixelated; width: 195px; height: 64px;
-  transition: filter .12s;
+  image-rendering: pixelated;
+  display: block;
+  width: 204px;
+  height: 134px;
+  margin: 0;
+  transition: none;
+  pointer-events: none;
 }
-.prey-store-btn:hover .prey-store-img { filter: brightness(1.15); }
-.prey-store-btn:active .prey-store-img { filter: brightness(.9); }
+.prey-store-btn:hover .prey-store-img { filter: brightness(1.12); }
+.prey-store-btn:active .prey-store-img {
+  filter: none;
+  margin-top: -67px;
+}
 
 /* ============================ Sistema de Party ============================ */
 #btn-party { position: relative; }

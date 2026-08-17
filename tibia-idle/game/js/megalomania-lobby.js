@@ -4,6 +4,11 @@
  */
 "use strict";
 
+// Usa MEGA_TEST_BYPASS de game.js (não redeclarar const — quebra o parse deste script).
+function megaTestBypass() {
+  return typeof MEGA_TEST_BYPASS !== "undefined" && !!MEGA_TEST_BYPASS;
+}
+
 const MEGA_LOBBY_UI = {
   lobby: null,
   inbox: [],
@@ -12,6 +17,7 @@ const MEGA_LOBBY_UI = {
   inviteBtn: null,
   acceptModal: null,
   pendingInvite: null,
+  unsupported: false,
 };
 
 function megaLobbyInTemple() {
@@ -67,10 +73,95 @@ function megaLobbyRenderInviteBadge() {
   const n = (MEGA_LOBBY_UI.inbox || []).length;
   const btn = MEGA_LOBBY_UI.inviteBtn;
   if (!btn) return;
-  if (n > 0) {
+  // Badge só como atalho se o jogador fechou o modal sem responder.
+  if (n > 0 && !MEGA_LOBBY_UI.inviteModalOpen) {
     btn.style.display = "block";
     btn.innerHTML = "!" + (n > 1 ? `<span class="mega-lobby-invite-count">${n}</span>` : "");
   } else btn.style.display = "none";
+}
+
+/* Abre modal CENTRAL com Aceitar/Recusar (não o "!" na borda da tela). */
+function megaLobbyOpenInbox(opts) {
+  opts = opts || {};
+  const inbox = MEGA_LOBBY_UI.inbox || [];
+  if (!inbox.length) return;
+  const modal = $("#modal"), body = $("#modal-body");
+  if (!modal || !body) return;
+  // Não sobrescreve outro modal crítico se o jogador já estiver no meio de algo,
+  // salvo force (SSE de convite novo).
+  if (modal.classList.contains("show") && !opts.force && !MEGA_LOBBY_UI.inviteModalOpen) {
+    megaLobbyRenderInviteBadge();
+    return;
+  }
+  MEGA_LOBBY_UI.inviteModalOpen = true;
+  if (MEGA_LOBBY_UI.inviteBtn) MEGA_LOBBY_UI.inviteBtn.style.display = "none";
+
+  const rows = inbox.map((inv) => `
+    <div class="mega-invite-card">
+      <div class="mega-invite-card-title">Convite Megalomania</div>
+      <div class="mega-invite-card-body">
+        <b>${inv.fromName || "Jogador"}</b> convidou você para o lobby.
+        ${inv.toHintName ? `<div class="tiny dim mt4">Personagem sugerido: ${inv.toHintName}</div>` : ""}
+        <div class="tiny dim mt4">É preciso estar no templo e fora de Party para aceitar.</div>
+      </div>
+      <div class="mega-invite-card-actions">
+        <button type="button" class="sm primary" data-mega-accept="${inv.id}">Aceitar</button>
+        <button type="button" class="sm" data-mega-decline="${inv.id}">Recusar</button>
+      </div>
+    </div>`).join("");
+
+  body.innerHTML = `<div class="panel-title">MEGALOMANIA
+      <span style="flex:1"></span>
+      <button type="button" class="sm" id="mega-inbox-close" title="Fechar">✕</button>
+    </div>
+    <div class="panel-body mega-invite-modal-body">
+      ${rows}
+    </div>`;
+  modal.classList.add("show");
+  modal.classList.remove("wide", "modal-otc");
+
+  const closeInviteModal = () => {
+    MEGA_LOBBY_UI.inviteModalOpen = false;
+    modal.classList.remove("show");
+    megaLobbyRenderInviteBadge();
+  };
+  const closeBtn = $("#mega-inbox-close");
+  if (closeBtn) closeBtn.onclick = () => closeInviteModal();
+
+  body.querySelectorAll("[data-mega-accept]").forEach((btn) => {
+    btn.onclick = async () => {
+      MEGA_LOBBY_UI.inviteModalOpen = false;
+      modal.classList.remove("show");
+      await megaLobbyAccept(btn.getAttribute("data-mega-accept"));
+      megaLobbyRenderInviteBadge();
+    };
+  });
+  body.querySelectorAll("[data-mega-decline]").forEach((btn) => {
+    btn.onclick = async () => {
+      await megaLobbyApi("POST", "/api/mega-lobby/decline", {
+        invite_id: btn.getAttribute("data-mega-decline"),
+      });
+      MEGA_LOBBY_UI.inbox = (MEGA_LOBBY_UI.inbox || [])
+        .filter((i) => String(i.id) !== String(btn.getAttribute("data-mega-decline")));
+      if ((MEGA_LOBBY_UI.inbox || []).length) megaLobbyOpenInbox({ force: true });
+      else closeInviteModal();
+      if (typeof toast === "function") toast("Convite recusado.");
+    };
+  });
+}
+
+function megaLobbyNotifyInvites(prevIds) {
+  const inbox = MEGA_LOBBY_UI.inbox || [];
+  if (!inbox.length) {
+    megaLobbyRenderInviteBadge();
+    return;
+  }
+  const prev = prevIds || MEGA_LOBBY_UI._seenInviteIds || new Set();
+  const hasNew = inbox.some((inv) => !prev.has(String(inv.id)));
+  MEGA_LOBBY_UI._seenInviteIds = new Set(inbox.map((i) => String(i.id)));
+  if (hasNew || !MEGA_LOBBY_UI.inviteModalOpen) {
+    megaLobbyOpenInbox({ force: !!hasNew });
+  } else megaLobbyRenderInviteBadge();
 }
 
 function megaLobbySlotHtml(slot, index, isLeaderView) {
@@ -139,27 +230,76 @@ function megaLobbyRenderPanel() {
 }
 
 async function megaLobbyRefresh() {
+  if (MEGA_LOBBY_UI.unsupported) return;
   const r = await megaLobbyApi("GET", "/api/mega-lobby/state");
+  // Servidor antigo (sem rota) → 404. Para o poll pra não spammar rede/"ping".
+  if (r.status === 404 || r.status === 501) {
+    MEGA_LOBBY_UI.unsupported = true;
+    if (MEGA_LOBBY_UI.poll) {
+      clearInterval(MEGA_LOBBY_UI.poll);
+      MEGA_LOBBY_UI.poll = null;
+    }
+    return;
+  }
   if (!r.data || !r.data.ok) return;
   MEGA_LOBBY_UI.lobby = r.data.lobby || null;
   MEGA_LOBBY_UI.inbox = r.data.inbox || [];
-  megaLobbyRenderInviteBadge();
+  megaLobbyNotifyInvites();
   megaLobbyRenderPanel();
+  // Fallback: se perdeu o SSE "start", ainda entra pela poll.
+  megaLobbyMaybeFollowFromState(MEGA_LOBBY_UI.lobby);
+}
+
+function megaLobbyMaybeFollowFromState(lobby) {
+  if (!lobby || window.__MEGA_LOBBY_FOLLOW) return;
+  if (lobby.status !== "starting" && lobby.status !== "fighting") return;
+  if (lobby.youAreLeader) return;
+  if (typeof G !== "undefined" && G && G.combat && G.combat.boss &&
+      String(G.combat.boss.id) === "goshnar-s-megalomania") return;
+  const myChar = typeof sessionCharId === "function" ? Number(sessionCharId()) : 0;
+  const slot = (lobby.slots || []).find((s) => s && Number(s.charId) === myChar);
+  if (!slot && myChar) {
+    // Slot pelo account (char pode estar desatualizado na sessão).
+    const any = (lobby.slots || []).find((s) => s && Number(s.accountId) ===
+      Number((typeof sessionAccount === "function" && sessionAccount() || {}).id));
+    if (any) {
+      megaLobbyFollowStart({ followCharId: any.charId, lobby });
+      return;
+    }
+  }
+  if (slot) megaLobbyFollowStart({ followCharId: slot.charId, lobby });
+}
+
+async function megaLobbyEnsureNotInParty() {
+  // TEMP TEST: remove before release
+  if (megaTestBypass()) return true;
+  // `_partyOnline` pode estar stale antes do 1º poll — sincroniza para não
+  // disparar POST /api/mega-lobby/create → 403 "Saia da Party…".
+  try {
+    if (typeof partySync === "function") await partySync();
+    else if (typeof accountPartyState === "function" && typeof sessionCharId === "function") {
+      const charId = Number(sessionCharId());
+      if (charId) {
+        const r = await accountPartyState(charId);
+        if (r && r.ok && typeof G !== "undefined" && G && G.p) G.p._partyOnline = r.state;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  if ((typeof partyIsMember === "function" && partyIsMember()) ||
+      (typeof partyIsLeader === "function" && partyIsLeader())) {
+    if (typeof toast === "function") toast("Saia da Party antes de abrir o lobby do Megalomania.", "bad");
+    return false;
+  }
+  return true;
 }
 
 async function megaLobbyOpenFromBoss() {
-  if (!megaLobbyInTemple()) {
+  // TEMP TEST: remove before release — templo opcional com MEGA_TEST_BYPASS.
+  if (!megaTestBypass() && !megaLobbyInTemple()) {
     if (typeof toast === "function") toast("Vá ao templo para abrir o lobby do Megalomania.", "bad");
     return;
   }
-  if (typeof partyIsMember === "function" && partyIsMember()) {
-    if (typeof toast === "function") toast("Saia da Party antes de abrir o lobby.", "bad");
-    return;
-  }
-  if (typeof partyIsLeader === "function" && partyIsLeader()) {
-    if (typeof toast === "function") toast("Saia da Party antes de abrir o lobby.", "bad");
-    return;
-  }
+  if (!(await megaLobbyEnsureNotInParty())) return;
   const charId = typeof sessionCharId === "function" ? sessionCharId() : (G.p && G.p.id);
   if (!charId) {
     if (typeof toast === "function") toast("Selecione um personagem no templo.", "bad");
@@ -168,6 +308,7 @@ async function megaLobbyOpenFromBoss() {
   // Modal: confirmar personagem ativo
   const ok = await megaLobbyConfirmCharModal(charId, "Abrir lobby como líder");
   if (!ok) return;
+  if (!(await megaLobbyEnsureNotInParty())) return;
   const r = await megaLobbyApi("POST", "/api/mega-lobby/create", {
     char_id: Number(ok.charId),
     inTemple: true,
@@ -256,45 +397,81 @@ async function megaLobbyLeave() {
   megaLobbyRenderPanel();
 }
 
-function megaLobbyOpenInbox() {
-  const inbox = MEGA_LOBBY_UI.inbox || [];
-  if (!inbox.length) return;
-  const modal = $("#modal"), body = $("#modal-body");
-  if (!modal || !body) return;
-  body.innerHTML = `<div class="panel-title">Convites Megalomania
-    <button class="sm" id="mega-inbox-close">✕</button></div>
-    <div class="panel-body">${inbox.map((inv) => `
-      <div class="mega-lobby-inbox-row">
-        <div><b>${inv.fromName}</b> convidou você
-          <div class="tiny dim">dica: ${inv.toHintName || ""}</div></div>
-        <div class="mega-lobby-inbox-actions">
-          <button class="sm primary" data-mega-accept="${inv.id}">Aceitar</button>
-          <button class="sm" data-mega-decline="${inv.id}">Recusar</button>
-        </div>
-      </div>`).join("")}</div>`;
-  modal.classList.add("show");
-  $("#mega-inbox-close").onclick = () => modal.classList.remove("show");
-  body.querySelectorAll("[data-mega-accept]").forEach((btn) => {
-    btn.onclick = async () => {
-      modal.classList.remove("show");
-      await megaLobbyAccept(btn.getAttribute("data-mega-accept"));
+/* Morte / ejeção: sai do lobby mesmo em fighting. Retorna remaining.
+ * Cancela PUTs de instância enfileirados (epoch) ANTES do leave-fight para
+ * não correr com prepareInstanceState após o lobby fechar. */
+async function megaLobbyLeaveFight() {
+  try {
+    if (typeof ACCOUNT_INSTANCE_EPOCH === "number") {
+      try { ACCOUNT_INSTANCE_EPOCH += 1; } catch (e) { /* ignore */ }
+    }
+    if (typeof ACCOUNT_INSTANCE_CAN_CREATE !== "undefined") {
+      try { ACCOUNT_INSTANCE_CAN_CREATE = false; } catch (e) { /* ignore */ }
+    }
+    const lease = typeof accountLeaseFields === "function" ? accountLeaseFields() : {};
+    const r = await megaLobbyApi("POST", "/api/mega-lobby/leave-fight", lease || {});
+    MEGA_LOBBY_UI.lobby = null;
+    megaLobbyRenderPanel();
+    if (r && r.data && r.data.instanceEnded && typeof accountInstanceApply === "function") {
+      try { accountInstanceApply(null); } catch (e) { /* ignore */ }
+    }
+    return {
+      ok: !!(r && r.data && r.data.ok),
+      remaining: r && r.data ? Number(r.data.remaining) || 0 : 0,
+      shouldEndInstance: !(r && r.data) || r.data.shouldEndInstance !== false,
+      instanceEnded: !!(r && r.data && r.data.instanceEnded),
     };
-  });
-  body.querySelectorAll("[data-mega-decline]").forEach((btn) => {
-    btn.onclick = async () => {
-      await megaLobbyApi("POST", "/api/mega-lobby/decline", { invite_id: btn.getAttribute("data-mega-decline") });
-      await megaLobbyRefresh();
-      modal.classList.remove("show");
-      if (typeof toast === "function") toast("Convite recusado.");
-    };
-  });
+  } catch (e) {
+    return { ok: false, remaining: 0, shouldEndInstance: true, instanceEnded: false };
+  }
+}
+
+function megaLobbyIsActiveFight(c) {
+  const combat = c || (typeof G !== "undefined" ? G.combat : null);
+  if (combat && combat.boss && String(combat.boss.id) === "goshnar-s-megalomania") return true;
+  const lobby = MEGA_LOBBY_UI && MEGA_LOBBY_UI.lobby;
+  return !!(lobby && (lobby.status === "fighting" || lobby.status === "starting"));
+}
+
+/* Char atual morto e ainda há vivos na sala mega → ejetar e templo. */
+function megaLobbyShouldEjectOnDeath(c) {
+  if (!megaLobbyIsActiveFight(c)) return false;
+  const me = typeof sessionCharId === "function" ? String(sessionCharId() || "") : "";
+  if (!me || !c) return false;
+  const members = (c.players && c.players.length) ? c.players : (c.player ? [c.player] : []);
+  const mine = members.find((ent) => ent && String(ent.id) === me);
+  if (!mine || !(mine.permadead || (mine.p && mine.p.hp <= 0))) return false;
+  const othersAlive = members.some((ent) =>
+    ent && String(ent.id) !== me && ent.p && ent.p.hp > 0 && !ent.permadead && !ent.downUntil);
+  // Solo wipe também ejetar (lobby “Luta em andamento” no templo).
+  return true;
+}
+
+let MEGA_LOBBY_EJECTING = false;
+async function megaLobbyEjectDeadToTemple(c) {
+  if (MEGA_LOBBY_EJECTING) return;
+  if (!megaLobbyShouldEjectOnDeath(c)) return;
+  MEGA_LOBBY_EJECTING = true;
+  try {
+    await megaLobbyLeaveFight();
+    if (typeof stopHunt === "function") {
+      setTimeout(() => {
+        try { if (G && G.combat) stopHunt(true); } catch (e) { /* ignore */ }
+        MEGA_LOBBY_EJECTING = false;
+      }, 400);
+    } else MEGA_LOBBY_EJECTING = false;
+  } catch (e) {
+    MEGA_LOBBY_EJECTING = false;
+  }
 }
 
 async function megaLobbyAccept(inviteId) {
-  if (!megaLobbyInTemple()) {
+  // TEMP TEST: remove before release — templo opcional com MEGA_TEST_BYPASS.
+  if (!megaTestBypass() && !megaLobbyInTemple()) {
     if (typeof toast === "function") toast("Vá ao templo para aceitar o convite.", "bad");
     return;
   }
+  if (!(await megaLobbyEnsureNotInParty())) return;
   const picked = await megaLobbyConfirmCharModal(
     typeof sessionCharId === "function" ? sessionCharId() : null,
     "Aceitar convite — escolher personagem");
@@ -311,6 +488,7 @@ async function megaLobbyAccept(inviteId) {
   }
   MEGA_LOBBY_UI.lobby = r.data.lobby;
   MEGA_LOBBY_UI.inbox = (MEGA_LOBBY_UI.inbox || []).filter((i) => String(i.id) !== String(inviteId));
+  MEGA_LOBBY_UI.inviteModalOpen = false;
   megaLobbyRenderInviteBadge();
   megaLobbyRenderPanel();
   megaLobbyStartPoll();
@@ -318,7 +496,8 @@ async function megaLobbyAccept(inviteId) {
 }
 
 async function megaLobbyStartFight() {
-  if (!megaLobbyInTemple()) {
+  // TEMP TEST: remove before release — templo opcional com MEGA_TEST_BYPASS.
+  if (!megaTestBypass() && !megaLobbyInTemple()) {
     if (typeof toast === "function") toast("O líder precisa estar no templo.", "bad");
     return;
   }
@@ -342,19 +521,33 @@ async function megaLobbyBeginBossAsLeader(members) {
   }
   if (typeof startBoss === "function") {
     window.__MEGA_LOBBY_STARTING = true;
+    window.__MEGA_LOBBY_MEMBERS = Array.isArray(members) ? members.slice() : [];
     startBoss("goshnar-s-megalomania", false);
-    // Após persistência da instância, vincula o share.
-    setTimeout(async () => {
-      const id = typeof ACCOUNT_INSTANCE !== "undefined" && ACCOUNT_INSTANCE && ACCOUNT_INSTANCE.id;
-      if (id) {
-        await megaLobbyApi("POST", "/api/mega-lobby/bind", { instance_id: id });
-      }
+    // Aguarda o PUT criar ACCOUNT_INSTANCE.id e vincula o share (com lease).
+    megaLobbyBindWhenReady().finally(() => {
       window.__MEGA_LOBBY_STARTING = false;
-    }, 800);
+      window.__MEGA_LOBBY_MEMBERS = null;
+    });
   }
 }
 
+async function megaLobbyBindWhenReady() {
+  const lease = typeof accountLeaseFields === "function" ? accountLeaseFields() : {};
+  for (let i = 0; i < 40; i++) {
+    const id = typeof ACCOUNT_INSTANCE !== "undefined" && ACCOUNT_INSTANCE && ACCOUNT_INSTANCE.id;
+    if (id) {
+      const r = await megaLobbyApi("POST", "/api/mega-lobby/bind",
+        Object.assign({ instance_id: id }, lease));
+      if (r.data && r.data.ok) return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (typeof toast === "function") toast("Falha ao vincular a sala Megalomania.", "bad");
+  return false;
+}
+
 async function megaLobbyFollowStart(detail) {
+  if (window.__MEGA_LOBBY_FOLLOW) return;
   const followCharId = detail && detail.followCharId;
   if (followCharId && typeof switchCharacter === "function" &&
       Number(followCharId) !== Number(sessionCharId && sessionCharId())) {
@@ -367,20 +560,54 @@ async function megaLobbyFollowStart(detail) {
   window.__MEGA_LOBBY_FOLLOW = true;
   if (typeof toast === "function") toast("Aguardando a sala do líder…", "level");
   let tries = 0;
+  const maxTries = 120; // ~60s — líder ainda pode estar carregando OTBM
   const wait = setInterval(async () => {
     tries++;
     try {
       const r = await megaLobbyApi("GET", "/api/mega-lobby/state");
-      if (r.data && r.data.lobby && r.data.lobby.instanceId) {
-        clearInterval(wait);
-        const token = typeof sessionToken === "function" ? sessionToken() : "";
-        if (token && typeof accountLoadInstance === "function") {
-          await accountLoadInstance(token);
+      const instanceId = r.data && (
+        (r.data.lobby && r.data.lobby.instanceId) ||
+        (r.data.share && r.data.share.instanceId)
+      );
+      if (!instanceId) {
+        if (tries > maxTries) {
+          clearInterval(wait);
+          window.__MEGA_LOBBY_FOLLOW = false;
+          if (typeof toast === "function") toast("Timeout aguardando a sala Megalomania.", "bad");
         }
-        window.__MEGA_LOBBY_FOLLOW = false;
+        return;
       }
+      const token = typeof sessionToken === "function" ? sessionToken() : "";
+      const charId = (followCharId != null ? followCharId : null) ||
+        (typeof sessionCharId === "function" ? sessionCharId() : null);
+      if (!token || typeof accountLoadInstance !== "function") return;
+      const remote = await accountLoadInstance(token);
+      const belongs = !!(remote && remote.ok && remote.instance &&
+        typeof instanceIncludesCharacter === "function" &&
+        instanceIncludesCharacter(remote.instance, charId));
+      if (!belongs) {
+        if (tries > maxTries) {
+          clearInterval(wait);
+          window.__MEGA_LOBBY_FOLLOW = false;
+          if (typeof toast === "function")
+            toast("Timeout: personagem não entrou na sala compartilhada.", "bad");
+        }
+        return;
+      }
+      clearInterval(wait);
+      if (typeof resumeIdleInstance === "function") {
+        const session = Object.assign({}, remote.instance, {
+          activeCharacterId: String(charId || remote.instance.activeCharacterId || ""),
+        });
+        try {
+          localStorage.setItem("tibia-idle-active-instance-v1", JSON.stringify(session));
+        } catch (e) { /* ignore */ }
+        await resumeIdleInstance(session);
+        if (typeof toast === "function") toast("Entrou na sala Megalomania compartilhada!", "level");
+      }
+      window.__MEGA_LOBBY_FOLLOW = false;
     } catch (e) { /* ignore */ }
-    if (tries > 40) {
+    if (tries > maxTries && window.__MEGA_LOBBY_FOLLOW) {
       clearInterval(wait);
       window.__MEGA_LOBBY_FOLLOW = false;
       if (typeof toast === "function") toast("Timeout aguardando a sala Megalomania.", "bad");
@@ -389,6 +616,7 @@ async function megaLobbyFollowStart(detail) {
 }
 
 function megaLobbyStartPoll() {
+  if (MEGA_LOBBY_UI.unsupported) return;
   if (MEGA_LOBBY_UI.poll) return;
   MEGA_LOBBY_UI.poll = setInterval(() => { megaLobbyRefresh().catch(() => {}); }, 4000);
 }
@@ -399,7 +627,7 @@ function megaLobbyOnSync(event) {
     MEGA_LOBBY_UI.inbox = MEGA_LOBBY_UI.inbox || [];
     if (!MEGA_LOBBY_UI.inbox.some((i) => String(i.id) === String(data.invite.id)))
       MEGA_LOBBY_UI.inbox.push(data.invite);
-    megaLobbyRenderInviteBadge();
+    megaLobbyNotifyInvites();
     if (typeof toast === "function")
       toast(`Convite Megalomania de <b>${data.invite.fromName}</b>!`, "level");
   }
@@ -417,22 +645,52 @@ function megaLobbyOnSync(event) {
     megaLobbyRenderPanel();
     if (data.followCharId) megaLobbyFollowStart(data);
   }
-  if (data.action === "closed" || data.action === "kicked") {
+  if (data.action === "takeover") {
+    MEGA_LOBBY_UI.lobby = data.lobby || MEGA_LOBBY_UI.lobby;
+    megaLobbyRenderPanel();
+    if (typeof toast === "function") toast(data.msg || "Você assumiu a sala Megalomania.", "level");
+    // Passa a ser dono da row — recarrega a instância para começar a tickar.
+    (async () => {
+      try {
+        const token = typeof sessionToken === "function" ? sessionToken() : "";
+        if (!token || typeof accountLoadInstance !== "function") return;
+        const remote = await accountLoadInstance(token);
+        if (remote && remote.ok && remote.instance && typeof accountInstanceApply === "function") {
+          accountInstanceApply(remote.instance);
+        }
+        if (remote && remote.ok && remote.instance && typeof G !== "undefined" && G && G.combat &&
+            typeof resumeIdleInstance === "function" && !G.combat) {
+          await resumeIdleInstance(remote.instance);
+        }
+      } catch (e) { /* ignore */ }
+    })();
+  }
+  if (data.action === "closed" || data.action === "kicked" || data.action === "left-fight") {
     MEGA_LOBBY_UI.lobby = null;
     megaLobbyRenderPanel();
-    if (typeof toast === "function") toast(data.msg || "Lobby Megalomania encerrado.");
+    if (data.action !== "left-fight" && typeof toast === "function")
+      toast(data.msg || "Lobby Megalomania encerrado.");
   }
 }
 
 function megaLobbyBoot() {
   megaLobbyEnsureDom();
   if (typeof window !== "undefined") {
+    window.megaLobbyOpenFromBoss = megaLobbyOpenFromBoss;
+    window.megaLobbyStartFight = megaLobbyStartFight;
+    window.megaLobbyLeaveFight = megaLobbyLeaveFight;
+    window.megaLobbyEjectDeadToTemple = megaLobbyEjectDeadToTemple;
+    window.megaLobbyIsActiveFight = megaLobbyIsActiveFight;
     window.addEventListener("tibia-idle-sync-mega-lobby", megaLobbyOnSync);
   }
   setTimeout(() => megaLobbyRefresh().catch(() => {}), 1500);
 }
 
 if (typeof document !== "undefined") {
+  if (typeof window !== "undefined") {
+    window.megaLobbyOpenFromBoss = megaLobbyOpenFromBoss;
+    window.megaLobbyStartFight = megaLobbyStartFight;
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", megaLobbyBoot);
   else megaLobbyBoot();
 }

@@ -162,6 +162,7 @@ async function partySwitchToChar(id) {
   try { sessionStorage.setItem("tibia-idle-char", id); } catch (e) {}
   try { sessionStorage.setItem("tibia-idle-online-autoload", String(id)); } catch (e) {}
   if (typeof save === "function") save();
+  if (typeof armBootLoading === "function") armBootLoading("Carregando personagem...");
   location.reload();
   return true;
 }
@@ -237,7 +238,7 @@ function renderPartyPanel(p) {
 
   if (membros.length === 1) {
     body.innerHTML = `<div class="party-panel-empty">Você está sem party.<br>
-      Abra o menu 👥 PARTY para criar/convidar.</div>`;
+      Abra o menu 👥 PARTY para criar/adicionar.</div>`;
     return;
   }
 
@@ -398,12 +399,25 @@ async function refreshPartyOnline(p) {
     if (s.ok) st = s.state;
     if (inb.ok) invites = inb.invites || [];
   } catch (e) { /* rede */ }
+  invites = partyFilterStaleInbox(invites, st);
   if (G && G.p) {
     G.p._partyOnline = st;
     G.p._partyInvites = invites.length;
   }
   renderPartyModal(p, { st, inbox: invites });
   if (typeof renderPartyButton === "function") renderPartyButton(p);
+}
+
+/* Esconde convites cujo personagem convidado já está no roster atual. */
+function partyFilterStaleInbox(invites, st) {
+  const list = Array.isArray(invites) ? invites : [];
+  if (!st) return list;
+  const inParty = new Set();
+  if (st.leader && st.leader.id != null) inParty.add(Number(st.leader.id));
+  for (const m of st.members || []) {
+    if (m && m.id != null) inParty.add(Number(m.id));
+  }
+  return list.filter((i) => !inParty.has(Number(i.character_id)));
 }
 
 function renderPartyModal(p, online) {
@@ -425,8 +439,8 @@ function renderPartyModal(p, online) {
     box.innerHTML = `<div class="party-header"><b>👥 Party</b>
         <span class="tiny dim">personagens do seu save</span></div>
       <div class="dim small center" style="padding:10px">
-        Você não está em nenhuma party. Crie uma para convidar os outros
-        personagens do seu save — eles precisam ACEITAR o convite.</div>
+        Você não está em nenhuma party. Crie uma para adicionar os outros
+        personagens do seu save (entram direto, sem aceite).</div>
       <button class="primary full mt8" id="party-create-local">Criar party</button>
       <div class="tiny dim mt4">Ao criar, <b>${p.name}</b> vira o líder da party.
         O líder é fixo: trocar de personagem não move a liderança.</div>`;
@@ -486,7 +500,7 @@ function renderPartyModal(p, online) {
         ${souLider ? `<button class="sm" data-party-remove="${m.id}">Remover</button>` : ""}
       </div>`).join("") + `</div>`;
   } else if (souLider) {
-    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Convide personagens do seu save — eles precisam ACEITAR. (party máx. 5)</div>`;
+    h += `<div class="dim small center" style="padding:8px">Nenhum membro ainda. Adicione personagens do seu save (entram direto, sem aceite). Party máx. 5.</div>`;
   } else if (souMembro) {
     h += `<div class="dim small center" style="padding:8px">Você é membro do party de <b>${liderChar ? liderChar.name : (ld ? ld.leaderName : "")}</b>.</div>`;
   }
@@ -527,25 +541,25 @@ function renderPartyModal(p, online) {
     }
   }
 
-  // ---- convidar (só o líder, só em cidade/treino)
+  // ---- adicionar (só o líder, só em cidade/treino)
   if (souLider) {
     const disponiveis = partyAvailableMembers(p);
-    h += `<div class="party-invite-title tiny dim mt4">Convidar do seu save (${disponiveis.length}):</div>`;
+    h += `<div class="party-invite-title tiny dim mt4">Adicionar do seu save (${disponiveis.length}):</div>`;
     if (disponiveis.length) {
       h += `<div class="party-invite-grid">` + disponiveis.map((c) => `
         <div class="party-invite">
           <b>${c.name}</b> <span class="dim">${partyVocName(c.voc)} nv ${c.level}</span>
-          <button class="sm" data-party-invite="${c.id}" ${podeConvidar ? "" : "disabled"}>Convidar</button>
+          <button class="sm" data-party-invite="${c.id}" ${podeConvidar ? "" : "disabled"}>Adicionar</button>
         </div>`).join("") + `</div>`;
     } else {
-      h += `<div class="dim small center" style="padding:6px">Ninguém disponível (todos já convidados ou no party).</div>`;
+      h += `<div class="dim small center" style="padding:6px">Ninguém disponível (todos já estão no party).</div>`;
     }
     h += `<div class="tiny ${podeConvidar ? "dim" : ""}" style="color:${podeConvidar ? "" : "#ff9a6a"}">
         ${podeConvidar
-          ? "Você está em zona segura — pode convidar."
-          : "⚠️ O líder só pode convidar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
+          ? "Você está em zona segura — pode adicionar."
+          : "⚠️ O líder só pode adicionar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
       </div>
-      <div class="tiny dim">O convite fica PENDENTE: troque para o personagem convidado e aceite pelo menu Party.</div>`;
+      <div class="tiny dim">Entra direto na party — sem aceite. Só personagens que não estão em party.</div>`;
   }
 
   // ---- compartilhar exp (só para quem está na PT)
@@ -640,8 +654,9 @@ function renderPartyModal(p, online) {
   $$("#party-content [data-party-invite]").forEach((el) => {
     el.addEventListener("click", () => {
       const r = partyInviteMember(p, el.dataset.partyInvite);
-      toast(r && r.msg ? r.msg : (r.ok ? "Convidado!" : "Falha"), r && r.ok ? "level" : "bad");
+      toast(r && r.msg ? r.msg : (r.ok ? "Adicionado!" : "Falha"), r && r.ok ? "level" : "bad");
       renderPartyModal(p);
+      if (r && r.ok && typeof renderAll === "function") renderAll();
     });
   });
   $$("#party-content [data-party-accept]").forEach((el) => {
@@ -859,8 +874,8 @@ function openPartyAnalyserModal() {
   const renderTab = (tab) => {
     const out=$("#analyser-content"); if (!s) { out.innerHTML='<div class="dim center" style="padding:18px">Inicie uma caçada em party para começar a análise.</div>'; return; }
     const members=Object.entries(s.byMember||{}).map(([id,b])=>`<tr><td>${b.name|| (id==='leader'?p.name:'Membro')}</td><td>${n(b.exp)} <span class="dim">(${rate(b.exp)}/h)</span></td><td>${n(b.kills)}</td><td>${n(b.loot)}</td><td>${b.levelUps?'↑'+b.levelUps:'—'}</td></tr>`).join('')||'<tr><td colspan="5" class="dim">Aguardando kills.</td></tr>';
-    const loot=Object.entries(st.loot||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum loot ainda.</div>';
-    const supplies=Object.entries(st.supplyUsed||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum supply usado.</div>';
+    const loot=Object.entries(st.loot||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20,null,q)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum loot ainda.</div>';
+    const supplies=Object.entries(st.supplyUsed||{}).sort((a,b)=>b[1]-a[1]).map(([id,q])=>`<div class="pa-line">${itemImg(id,20,null,q)} <span>${itemName(id)}</span><b>${n(q)}</b></div>`).join('')||'<div class="dim">Nenhum supply usado.</div>';
     if(tab==='summary') out.innerHTML=`<div class="pa-grid"><div>⏱ Duração<b>${Math.floor(duration/60)}m ${duration%60}s</b></div><div>☠ Kills<b>${n(s.kills)}</b></div><div>✨ XP<b>${n(s.exp)}</b><small>${rate(s.exp)}/h</small></div><div>🪙 Gold<b>${n(st.gold)}</b><small>${rate(st.gold)}/h</small></div></div><div class="panel-inset mt8">Hunt: <b>${(GAMEDATA.hunts[s.huntId]||{}).name||s.huntId||'—'}</b> · Kills/h: <b>${rate(s.kills)}</b></div>`;
     else if(tab==='members') out.innerHTML=`<table class="pa-table"><thead><tr><th>Membro</th><th>XP</th><th>Kills</th><th>Loot</th><th>Level</th></tr></thead><tbody>${members}</tbody></table>`;
     else if(tab==='loot') out.innerHTML=`<div class="pa-list-title">🎒 Loot obtido · ${n(st.gold)} gp</div>${loot}`;
@@ -902,7 +917,8 @@ function partyOnlineHtml(p, st, inbox) {
         Você não está em nenhuma party.</div>
       <button class="primary full mt8" id="party-create">Criar party</button>
       <div class="tiny dim mt4">Ao criar, seu personagem vira o líder. Para
-        convidar, você precisa estar na <b>Cidade</b> ou na <b>Área de Treino</b>.</div>`;
+        adicionar, você precisa estar na <b>Cidade</b> ou na <b>Área de Treino</b>.
+        O membro entra direto (sem aceite), se não estiver em party.</div>`;
   } else {
     const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
     const currentId = typeof characterId === "function" ? characterId(p) : p.id;
@@ -928,17 +944,17 @@ function partyOnlineHtml(p, st, inbox) {
     h += `</div>`;
 
     if (st.isLeader) {
-      // ---- líder: convidar por nome (só em cidade/treino) ----
-      h += `<div class="party-invite-title tiny dim mt4">Convidar jogador (por nome do personagem):</div>
+      // ---- líder: adicionar por nome (só em cidade/treino)
+      h += `<div class="party-invite-title tiny dim mt4">Adicionar jogador (por nome do personagem):</div>
         <div class="row mb4" style="gap:4px">
           <input id="party-invite-name" maxlength="20" placeholder="Nome do personagem"
             style="flex:1;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-          <button class="sm primary" id="party-invite-btn" ${podeConvidar ? "" : "disabled"}>Convidar</button>
+          <button class="sm primary" id="party-invite-btn" ${podeConvidar ? "" : "disabled"}>Adicionar</button>
         </div>
         <div class="tiny ${podeConvidar ? "dim" : ""}" style="color:${podeConvidar ? "" : "#ff9a6a"}">
           ${podeConvidar
-            ? "Você está em zona segura — pode convidar."
-            : "⚠️ O líder só pode convidar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
+            ? "Você está em zona segura — pode adicionar (entra direto, sem aceite)."
+            : "⚠️ O líder só pode adicionar na <b>Cidade</b> (safe zone) ou na <b>Área de Treino</b>."}
         </div>`;
       h += `<button class="sm mt8" id="party-leave">Dissolver party</button>`;
     } else {
@@ -948,8 +964,8 @@ function partyOnlineHtml(p, st, inbox) {
     }
   }
 
-  // ---- inbox: convites pendentes (aceitar de qualquer personagem) ----
-  h += `<div class="party-invite-title tiny dim mt4">Inbox de convites:</div>`;
+  // Inbox legado (convites antigos ainda pendentes) — fluxo novo é add direto.
+  h += `<div class="party-invite-title tiny dim mt4">Inbox (legado):</div>`;
   if (!inbox.length) {
     h += `<div class="dim small center" style="padding:6px">Nenhum convite pendente.</div>`;
   } else {
@@ -965,8 +981,8 @@ function partyOnlineHtml(p, st, inbox) {
       </div>`).join("") + `</div>`;
   }
 
-  h += `<div class="tiny dim mt4">Troque de personagem (botão "Trocar
-    personagem") para aceitar o convite com o personagem convidado.</div>`;
+  h += `<div class="tiny dim mt4">Novos membros entram direto quando o líder adiciona.
+    Inbox acima só limpa convites antigos pendentes.</div>`;
   return h;
 }
 
@@ -986,8 +1002,11 @@ function bindPartyOnline(p, st, inbox) {
     const name = ($("#party-invite-name").value || "").trim();
     if (!name) { toast("Digite o nome do personagem"); return; }
     const r = await partyOnlineInvite(name);
-    toast(r.ok ? "Convite enviado!" : (r.msg || "Falha"), r.ok ? "level" : "bad");
-    if (r.ok) recarregar();
+    toast(r.ok ? (r.msg || "Adicionado à party!") : (r.msg || "Falha"), r.ok ? "level" : "bad");
+    if (r.ok) {
+      recarregar();
+      if (typeof renderAll === "function") renderAll();
+    }
   });
 
   const leave = $("#party-leave");
@@ -1013,21 +1032,39 @@ function bindPartyOnline(p, st, inbox) {
 
   $$("#party-content [data-party-accept]").forEach((el) =>
     el.addEventListener("click", async () => {
+      if (el.disabled) return;
       // REGRA: só aceita convite em Safe Zone (cidade) ou Área de Treino
       if (typeof partyCanInviteNow === "function" && !partyCanInviteNow()) {
         toast("Para aceitar um convite você precisa estar na Cidade ou na Área de Treino.", "bad");
         return;
       }
-      const r = await accountPartyAccept(el.dataset.partyAccept);
+      el.disabled = true;
+      let r;
+      try {
+        r = await accountPartyAccept(el.dataset.partyAccept);
+      } finally {
+        el.disabled = false;
+      }
       toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "level" : "bad");
-      if (r.ok) { recarregar(); renderAll(); }
+      // Sucesso ou convite já processado: limpa inbox stale / roster
+      if (r.ok || /já foi processado|já está na party/i.test(String(r.msg || ""))) {
+        recarregar();
+        if (r.ok && typeof renderAll === "function") renderAll();
+      }
     }));
 
   $$("#party-content [data-party-decline]").forEach((el) =>
     el.addEventListener("click", async () => {
-      const r = await accountPartyDecline(el.dataset.partyDecline);
+      if (el.disabled) return;
+      el.disabled = true;
+      let r;
+      try {
+        r = await accountPartyDecline(el.dataset.partyDecline);
+      } finally {
+        el.disabled = false;
+      }
       toast(r.ok ? r.msg : (r.msg || "Falha"), r.ok ? "" : "bad");
-      if (r.ok) recarregar();
+      if (r.ok || /já foi processado/i.test(String(r.msg || ""))) recarregar();
     }));
 }
 

@@ -161,7 +161,16 @@ async function checkout(db, body, req, opts) {
   const notify = notifyUrl(req);
   try {
     if (method === "pix") {
-      const email = String(body.email || acc.login + "@global-idle.local").slice(0, 120);
+      // O Mercado Pago exige um e-mail válido no payer do Pix. Nunca fabricar
+      // `login@dominio.local` — isso era recusado com 400 "payer.email must be
+      // a valid email" e o QR nunca era gerado. Prefere o e-mail enviado pelo
+      // cliente (coletado na STORE) e valida antes de chamar a API.
+      const email = String(body.email || acc.email || "").trim().slice(0, 120);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        await db.storeOrderUpdate(order.id, { status: "error", note: "payer.email ausente ou inválido" });
+        return { code: 400, body: { ok: false, orderId: order.id,
+          msg: "Informe um e-mail válido para receber o comprovante do Pix." } };
+      }
       const r = await httpsJson("POST", "/v1/payments", {
         transaction_amount: brl,
         description: pack.label + " — Global-Idle",

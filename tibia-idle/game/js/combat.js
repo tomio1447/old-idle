@@ -16,6 +16,120 @@ const SPAWN_BLINKS = 3;
  * (~2s) começa quando faltam 2s (T-2s), dentro desta janela de 4s. */
 const WAVE_CLEAR_RESPAWN_MS = 4000;
 const WAVE_TELEPORT_LEAD_MS = 2000;
+/* Boss rooms: delay antes do boss ficar atacável/visível (evita bug de câmera).
+ * Megalomania mantém 15s próprio (MEGA_BOSS_SPAWN_MS em soulwar.js). */
+const BOSS_SPAWN_DELAY_MS = 5000;
+function bossArenaSpawnDelayMs(bossId) {
+  if (String(bossId || "") === "goshnar-s-megalomania") {
+    return (typeof MEGA_BOSS_SPAWN_MS === "number" && MEGA_BOSS_SPAWN_MS > 0)
+      ? MEGA_BOSS_SPAWN_MS : 15000;
+  }
+  if (/^world-boss-wz[123]$/.test(String(bossId || ""))) {
+    const cfg = (typeof window !== "undefined" && window.GLOBAL_IDLE_SERVER_CONFIG) || {};
+    return cfg.testServer ? 5000 : 10000;
+  }
+  return BOSS_SPAWN_DELAY_MS;
+}
+function worldBossPlaceholderMap() {
+  const GROUND = 1101;
+  const w = 40, h = 40;
+  const cells = [];
+  const rows = [];
+  for (let y = 0; y < h; y++) {
+    const row = [];
+    for (let x = 0; x < w; x++) row.push({ ground: GROUND, items: [] });
+    cells.push(row);
+    rows.push(".".repeat(w));
+  }
+  return {
+    w, h, z: 7,
+    name: "World Boss Arena (placeholder)",
+    spawn: { x: 20, y: 28 },
+    boss: { x: 20, y: 16 },
+    cells,
+    rows,
+    leg: { ".": { v: [GROUND] } },
+    mob: [{ x: 20, y: 16 }],
+  };
+}
+function arenaBossSpawnPending(c) {
+  return !!(c && c.arenaBossSpawn && !c.arenaBossSpawn.spawned && c.arenaBossSpawn.pending);
+}
+function arenaBossDeferSpawn(c, bossMob, delayMs, now) {
+  if (!c || !bossMob) return false;
+  now = now || Date.now();
+  const wait = Math.max(0, Number(delayMs) || BOSS_SPAWN_DELAY_MS);
+  c.arenaBossSpawn = {
+    at: now + wait,
+    pending: bossMob,
+    spawned: false,
+    startedAt: now,
+    mechanicsBound: false,
+  };
+  c.mobs = (c.mobs || []).filter((m) => m !== bossMob);
+  if (c.events) {
+    c.events.push({
+      t: "boss-spawn-wait",
+      ms: wait,
+      at: c.arenaBossSpawn.at,
+      screen: true,
+    });
+  }
+  return true;
+}
+/* Mecânicas Soul War / Scarlett: só ligam quando o boss está em c.mobs
+ * (após BOSS_SPAWN_DELAY_MS). Init antecipado + defer limpava flags ou o
+ * servidor apagava o estado enquanto o boss ainda estava pending. */
+function arenaBossBindMechanics(c, now) {
+  if (!c || !c.boss) return false;
+  const bossLive = (c.mobs || []).find((m) => m && m.boss && m.hp > 0);
+  if (!bossLive) return false;
+  if (c.arenaBossSpawn && c.arenaBossSpawn.mechanicsBound) return false;
+  if (c.arenaBossSpawn) c.arenaBossSpawn.mechanicsBound = true;
+  now = now || Date.now();
+  const player = (c.player && c.player.p) || c.player ||
+    (typeof G !== "undefined" && G && G.p) || null;
+  const id = String(c.boss.id || "");
+  if (id === "scarlett-etzel" && typeof scarlettBossInit === "function" && !c.scarlett)
+    scarlettBossInit(c, player);
+  if (id === "goshnar-s-greed" && typeof greedBossInit === "function" && !c.greed)
+    greedBossInit(c, player);
+  if (id === "goshnar-s-hatred" && typeof hatredBossInit === "function" && !c.hatred)
+    hatredBossInit(c, player);
+  if (id === "goshnar-s-spite" && typeof spiteBossInit === "function" && !c.spite)
+    spiteBossInit(c, player);
+  if (id === "goshnar-s-malice" && typeof maliceBossInit === "function" && !c.malice)
+    maliceBossInit(c, player);
+  return true;
+}
+function arenaBossSpawnTick(c, now) {
+  if (!arenaBossSpawnPending(c)) return false;
+  now = now || Date.now();
+  const st = c.arenaBossSpawn;
+  const started = Number(st.startedAt) || 0;
+  const overdue = started > 0 && now >= started + bossArenaSpawnDelayMs(c.boss && c.boss.id) + 25000;
+  if (!overdue && now < (Number(st.at) || 0)) return false;
+  const boss = st.pending;
+  st.pending = null;
+  st.spawned = true;
+  if (boss) {
+    c.mobs = c.mobs || [];
+    c.mobs.unshift(boss);
+    if (c.events) {
+      c.events.push({
+        t: "spawn",
+        slug: boss.slug,
+        x: Number(boss.x) || 0.5,
+        y: Number(boss.y) || 0.5,
+        targetId: String(boss.id || ""),
+        screen: true,
+      });
+    }
+    if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(c);
+    arenaBossBindMechanics(c, now);
+  }
+  return true;
+}
 
 function huntMapSpawnBlocked() {
   return typeof G !== "undefined" && G && G.huntMapReady === false;
@@ -93,12 +207,16 @@ function huntMapCenterSpawn(map) {
   return { x: cx, y: cy };
 }
 
-function newCombat(player, huntId, instanceMode) {
-  const hunt = GAMEDATA.hunts[huntId];
+function newCombat(player, huntId, instanceMode, opts) {
+  opts = opts && typeof opts === "object" && !Array.isArray(opts) ? opts : {};
+  const hunt = (GAMEDATA.hunts && GAMEDATA.hunts[huntId]) || opts.hunt || {
+    name: "Hunt", monsters: [], pack: 0, packMin: 0, packMax: 0,
+  };
   const mode = instanceMode || player.instanceMode || "non-pvp";
   const pvp = mode === "pvp";
   /* mapa fechado da hunt (huntmapdata.js): paredes/agua bloqueiam o grid */
-  const huntMap = (typeof HUNTMAPS !== "undefined" && hunt.mapa) ? HUNTMAPS[hunt.mapa] : null;
+  const huntMap = opts.huntMap !== undefined ? opts.huntMap
+    : ((typeof HUNTMAPS !== "undefined" && hunt.mapa) ? HUNTMAPS[hunt.mapa] : null);
   // A instância adota a largura/altura REAL do mapa antes de calcular spawn,
   // posições normalizadas, colisão ou pathfinding. Sem mapa volta a 21×13.
   if (typeof setGridForMap === "function") setGridForMap(huntMap);
@@ -186,7 +304,7 @@ function newCombat(player, huntId, instanceMode) {
     out.huntMode = player.config.attackMode;
   }
   // PARTY COMBAT: o líder leva TODOS os membros para a mesma instância
-  maybeLoadPartyCombat(out, player, spx, spy);
+  if (!opts.skipParty) maybeLoadPartyCombat(out, player, spx, spy);
   return out;
 }
 
@@ -215,29 +333,42 @@ function maybeLoadPartyCombat(c, player, spx, spy) {
 }
 
 function newBossCombat(player, boss) {
-  const c = newCombat(player, boss.hunt || "rats", "non-pvp");
-  const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"];
+  const c = boss && boss.worldBoss
+    ? newCombat(player, null, "boss", {
+        huntMap: worldBossPlaceholderMap(),
+        skipParty: true,
+        hunt: { name: boss.name || "World Boss", monsters: [], pack: 0, packMin: 0, packMax: 0 },
+      })
+    : newCombat(player, boss.hunt || "rats", "non-pvp");
+  const base = (GAMEDATA.monsters && GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"]) || {};
   // Boss com stats DIRETOS do Canary (hp/exp/damage/armor/defense definidos
   // no BOSS_DEFS) não passa pelo multiplicador — usa os valores oficiais.
   // Loot: se o BOSS_DEFS não define o próprio, usa o loot real do monstro
   // base (merge do canary — ex.: Timira usa o loot oficial do .lua).
+  const scaled = (!boss.hp && typeof applyBossMultiplier === "function")
+    ? applyBossMultiplier(base, boss.mult || 10) : null;
   const def = Object.assign({}, base, {
     name: boss.name,
-    hp: boss.hp || applyBossMultiplier(base, boss.mult || 10).hp,
-    exp: boss.exp || applyBossMultiplier(base, boss.mult || 10).exp,
-    damage: boss.damage || applyBossMultiplier(base, boss.mult || 10).damage,
-    armor: boss.armor || applyBossMultiplier(base, boss.mult || 10).armor,
+    hp: boss.hp || (scaled && scaled.hp) || 1,
+    exp: boss.exp || (scaled && scaled.exp) || 0,
+    damage: boss.damage || (scaled && scaled.damage) || 0,
+    armor: boss.armor || (scaled && scaled.armor) || 0,
     defense: boss.defense || base.defense || 0,
     loot: (boss.loot && boss.loot.length) ? boss.loot : (base.loot || []),
     attackSpeed: boss.attackSpeed || base.attackSpeed || 2000,
   });
   c.boss = boss;
+  c.worldBoss = !!boss.worldBoss;
   c.bossDefeated = false;
   c.raidEnabled = false;
   c.instanceMode = "boss";
   c.expMul = 1;
   c.lootMul = 1;
   c.skillMul = 1;
+  if (boss.worldBoss) {
+    c.influencedChance = 0;
+    c.fiendishChance = 0;
+  }
   const bossMob = {
     slug: boss.sprite || boss.baseMonster || "cave-rat",
     def: def,
@@ -280,12 +411,13 @@ function newBossCombat(player, boss) {
   }
   c.mobs = [bossMob];
   resolveSQMOccupancy(c);
-  if (typeof scarlettBossInit === "function") scarlettBossInit(c, player);
-  if (typeof greedBossInit === "function") greedBossInit(c, player);
-  if (typeof hatredBossInit === "function") hatredBossInit(c, player);
-  if (typeof spiteBossInit === "function") spiteBossInit(c, player);
-  if (typeof maliceBossInit === "function") maliceBossInit(c, player);
-  if (typeof megaBossInit === "function") megaBossInit(c, player);
+  // Megalomania: 15s próprio (megaBossInit). Demais arenas: defer 5s e
+  // *BossInit só em arenaBossSpawnTick (quando o boss entra em c.mobs).
+  if (boss.id === "goshnar-s-megalomania") {
+    if (typeof megaBossInit === "function") megaBossInit(c, player);
+  } else {
+    arenaBossDeferSpawn(c, bossMob, bossArenaSpawnDelayMs(boss.id));
+  }
   return c;
 }
 
@@ -724,7 +856,10 @@ function densestPackTargetClient(c, caster, vivos) {
 function helperPriorityTarget(c, caster) {
   if (!c || !c.mobs || !c.mobs.length) return null;
   const from = caster || c.player;
-  if (c.boss) {
+  const vivos = c.mobs.filter((m) => m && m.hp > 0);
+  if (!vivos.length) return null;
+  const bossFight = !!(c.boss || c.worldBoss || vivos.some((m) => m.boss));
+  if (bossFight) {
     // Hatred exige controlar os summons; Hateful Soul tem prioridade por
     // zerar todos os contadores, depois vêm os Harvesters.
     if (c.hatred && c.hatred.active) {
@@ -732,13 +867,25 @@ function helperPriorityTarget(c, caster) {
       const summon=hateful||c.mobs.find(m=>m&&m.hatredSummon&&m.hp>0);
       if(summon)return summon;
     }
-    const boss = c.mobs.find((mob) => mob && mob.boss && mob.hp > 0);
-    const immune = !!((c.greed && c.greed.immune) ||
-      (c.scarlett && c.scarlett.immune) || (boss && boss.greedImmune));
+    // Greed ativo (boss imune): Helper SEMPRE foca Greedy Beasts — nunca o
+    // boss nem adds irrelevantes (Harvester/Soulsnatcher) enquanto houver beast.
+    if (c.greed && c.greed.immune) {
+      const beasts = vivos.filter((m) => m.slug === "greedbeast");
+      if (beasts.length)
+        return densestPackTargetClient(c, from, beasts) || beasts[0];
+      const adds = vivos.filter((m) => !m.boss);
+      if (adds.length) return densestPackTargetClient(c, from, adds) || adds[0];
+      return null;
+    }
+    const boss = vivos.find((mob) => mob.boss);
+    const immune = !!((c.scarlett && c.scarlett.immune) ||
+      (boss && (boss.greedImmune || boss.qteImmune || boss.megaImmune)));
     if (boss && !immune) return boss;
+    if (immune) {
+      const adds = vivos.filter((m) => !m.boss);
+      if (adds.length) return densestPackTargetClient(c, from, adds) || adds[0];
+    }
   }
-  const vivos = c.mobs.filter((m) => m && m.hp > 0);
-  if (!vivos.length) return null;
   return densestPackTargetClient(c, from, vivos) || vivos[0];
 }
 
@@ -955,21 +1102,148 @@ const CONDITIONS = {
   // protegido — só esperar acabar.
   agony:   { nome: "Agony",        el: "agony",  fx: "draw-blood",
              cor: "#9a6a3a", cure: null },
+  // Feared (Canary CONDITION_FEARED / TibiaWiki): foge da criatura que
+  // aplicou o efeito e não pode usar magias nem itens. Sem DoT.
+  feared:  { nome: "Feared",       el: "death",  fx: "mort-area",
+             cor: "#c9a0ff", cure: null, control: true },
+  // Rooted (Canary CONDITION_ROOTED / TibiaWiki): impede movimento por
+  // 3s. Magias e itens continuam liberados. Sem DoT.
+  rooted:  { nome: "Rooted",       el: "earth",  fx: "rooting-effect",
+             cor: "#8b6a3a", cure: null, control: true },
 };
 
+const FEAR_DURATION_TURNS = 3; // ~6s (CONDITION_TURN_MS = 2s)
+const EBB_FEAR_ON_HIT_CHANCE = 12; // % por hit na hunt Ebb and Flow
+// Canary root.lua: CONDITION_PARAM_TICKS = 3000. Com turnos de 2s usamos
+// `until` em ms para bater os 3s oficiais; turns=2 cobre a barra de status.
+const ROOT_DURATION_MS = 3000;
+const ROOT_DURATION_TURNS = 2;
+
 /* Aplica (ou renova) uma condition num alvo — monstro ou jogador. */
-function applyCondition(alvo, tipo, dmg, turns) {
-  if (!alvo || !CONDITIONS[tipo]) return;
-  if (alvo.hp !== undefined && alvo.hp <= 0) return;
+function applyCondition(alvo, tipo, dmg, turns, meta) {
+  if (!alvo || !CONDITIONS[tipo]) return false;
+  if (alvo.hp !== undefined && alvo.hp <= 0) return false;
   alvo.conditions = alvo.conditions || {};
   const cur = alvo.conditions[tipo];
+  const turnsN = Math.max(1, Math.floor(Number(turns) || 1));
+  const dmgN = Math.max(0, Math.floor(Number(dmg) || 0));
   if (cur) {
     // reaplicar mantem o pior dano e a maior duracao, como no servidor
-    cur.dmg = Math.max(cur.dmg, dmg);
-    cur.turns = Math.max(cur.turns, turns);
+    cur.dmg = Math.max(cur.dmg, dmgN);
+    cur.turns = Math.max(cur.turns, turnsN);
+    if (meta && typeof meta === "object") Object.assign(cur, meta);
   } else {
-    alvo.conditions[tipo] = { dmg: dmg, turns: turns, acc: 0 };
+    alvo.conditions[tipo] = Object.assign({ dmg: dmgN, turns: turnsN, acc: 0 }, meta || {});
   }
+  return true;
+}
+
+/* Fear do Canary: marca o jogador, conta na missão Ebb (15×) e emite HUD. */
+function applySoulwarFear(c, p, mob, now) {
+  if (!p || p.hp <= 0) return false;
+  if (hasCondition(p, "feared")) {
+    // Renova duração sem contar de novo na missão (já está sob Fear).
+    applyCondition(p, "feared", 0, FEAR_DURATION_TURNS, {
+      fromId: mob && mob.id != null ? String(mob.id) : null,
+      fromCx: mob && mob.cx, fromCy: mob && mob.cy,
+      since: now || Date.now(),
+    });
+    return false;
+  }
+  applyCondition(p, "feared", 0, FEAR_DURATION_TURNS, {
+    fromId: mob && mob.id != null ? String(mob.id) : null,
+    fromCx: mob && mob.cx, fromCy: mob && mob.cy,
+    since: now || Date.now(),
+  });
+  if (c && c.events) {
+    c.events.push({
+      t: "player-condition", tipo: "feared",
+      targetId: (p && p.id) || (c.player && c.player.id) || "player",
+      x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true,
+      fx: "mort-area",
+    });
+  }
+  if (typeof recordFearHit === "function") recordFearHit(p, 1);
+  if (typeof renderMission === "function") renderMission();
+  return true;
+}
+
+function tryEbbFearOnHit(c, p, mob) {
+  if (!c || !p || !mob) return false;
+  const hunt = c.hunt || (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts[c.huntId]);
+  if (!(hunt && hunt.soulWarFear) && c.huntId !== "ebb-and-flow") return false;
+  if (Math.random() * 100 >= EBB_FEAR_ON_HIT_CHANCE) return false;
+  return applySoulwarFear(c, p, mob, c._tickNow || Date.now());
+}
+
+function playerIsFeared(p) {
+  return hasCondition(p, "feared");
+}
+
+/* Posição da criatura que aplicou Fear (para fuga Canary). */
+function fearSourceEntity(c, p) {
+  const co = p && p.conditions && p.conditions.feared;
+  if (!co) return null;
+  if (co.fromId != null && c && c.mobs) {
+    const id = String(co.fromId);
+    const live = c.mobs.find((m) => m && m.hp > 0 && String(m.id) === id);
+    if (live && live.cx !== undefined) return live;
+  }
+  if (co.fromCx !== undefined && co.fromCy !== undefined)
+    return { cx: co.fromCx, cy: co.fromCy };
+  return null;
+}
+
+/* Rooted (Canary root.lua / Rotten Wasteland): trava o movimento por 3s. */
+function applySoulwarRoot(c, p, mob, now) {
+  if (!p || p.hp <= 0) return false;
+  now = now || Date.now();
+  const until = now + ROOT_DURATION_MS;
+  if (hasCondition(p, "rooted")) {
+    applyCondition(p, "rooted", 0, ROOT_DURATION_TURNS, { until: until });
+    return false;
+  }
+  applyCondition(p, "rooted", 0, ROOT_DURATION_TURNS, { until: until });
+  // Cancela passo em andamento (Canary: internalMoveCreature bloqueia).
+  if (c && c.players && c.players.length) {
+    for (const ent of c.players) {
+      if (ent && ent.p === p) {
+        ent.moving = false;
+        ent.stepT = 0;
+        if (typeof snapIdleToCell === "function") snapIdleToCell(ent);
+      }
+    }
+  } else if (c && c.player && c.player.p === p) {
+    c.player.moving = false;
+    c.player.stepT = 0;
+    if (typeof snapIdleToCell === "function") snapIdleToCell(c.player);
+  } else if (c && c.player && !c.player.p) {
+    c.player.moving = false;
+    c.player.stepT = 0;
+    if (typeof snapIdleToCell === "function") snapIdleToCell(c.player);
+  }
+  if (c && c.events) {
+    c.events.push({
+      t: "player-condition", tipo: "rooted",
+      targetId: (p && p.id) || (c.player && c.player.id) || "player",
+      x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true,
+      fx: "rooting-effect",
+    });
+  }
+  if (typeof renderStatusBar === "function") {
+    try { renderStatusBar(p); } catch (e) { /* UI opcional */ }
+  }
+  return true;
+}
+
+function playerIsRooted(p) {
+  if (!hasCondition(p, "rooted")) return false;
+  const co = p.conditions.rooted;
+  if (co && co.until && Date.now() >= co.until) {
+    clearCondition(p, "rooted");
+    return false;
+  }
+  return true;
 }
 
 /* compatibilidade: veneno continua tendo atalho proprio */
@@ -987,6 +1261,15 @@ function clearCondition(alvo, tipo) {
     return true;
   }
   return false;
+}
+
+/* Templo / retorno à cidade: limpa só conditions (poison/burn/…).
+ * Mantém buffs (p.buffs) e máculas Soul War (p.soulWarTaints). */
+function clearPlayerCombatConditions(p) {
+  if (!p) return false;
+  const had = !!(p.conditions && Object.keys(p.conditions).length);
+  p.conditions = {};
+  return had;
 }
 
 function conditionList(alvo) {
@@ -1008,6 +1291,7 @@ function tickConditions(c, p, dt) {
       while (co.acc >= CONDITION_TURN_MS && co.turns > 0 && m.hp > 0) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
+        if (def.control) continue; // Fear/Root etc. não drenam HP
         const dmg = Math.max(1, co.dmg);
         m.hp -= dmg;
         c.stats.damage += dmg;
@@ -1026,6 +1310,7 @@ function tickConditions(c, p, dt) {
       while (co.acc >= CONDITION_TURN_MS && co.turns > 0 && p.hp > 0) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
+        if (def && def.control) continue; // Fear/Root: só controla, sem DoT
         let dmg = Math.max(1, co.dmg);
         // Agony: true damage — o Magic Shield NÃO protege contra ele
         // (TibiaWiki: "can not be cured or protected against").
@@ -1045,6 +1330,7 @@ function tickConditions(c, p, dt) {
                         y: c.player ? c.player.y : 0.6, screen: true });
       }
       if (co.turns <= 0) delete p.conditions[tipo];
+      else if (co.until && Date.now() >= co.until) delete p.conditions[tipo];
     }
     if (p.hp <= 0) playerDeath(c, p);
   }
@@ -1921,15 +2207,22 @@ function tryCastSpell(c, p, target, now) {
   // Barra de COMBO: quando o jogador montou uma rotacao, ela manda em tudo.
   // A ordem dos slots e a prioridade e cada slot pode exigir um numero
   // minimo de alvos, entao a escolha ja considera o tamanho do pack.
+  // Se o #1 falhar no cast (alcance / escudo), tenta o proximo slot pronto
+  // — senao um ST fora de range engolia a rotacao inteira neste swing.
   if (typeof comboAtivo === "function" && comboAtivo(p)) {
-    const escolha = comboEscolhe(c, p, target, now);
-    if (!escolha) return false;
-    // o slot escolhido pode ser uma RUNA: nesse caso o disparo sai por
-    // tryUseRune, que sabe cobrar carga e desenhar o projetil da runa
-    if (escolha.kind === "rune") {
-      return tryUseRune(c, p, target, now, escolha.id);
+    const skip = Object.create(null);
+    const slots = typeof COMBO_SLOTS === "number" ? COMBO_SLOTS : 6;
+    for (let i = 0; i < slots; i++) {
+      const escolha = comboEscolhe(c, p, target, now, skip);
+      if (!escolha) return false;
+      skip[escolha.kind + ":" + escolha.id] = 1;
+      if (escolha.kind === "rune") {
+        if (tryUseRune(c, p, target, now, escolha.id)) return true;
+        continue;
+      }
+      if (castSpellById(c, p, target, now, escolha.id)) return true;
     }
-    return castSpellById(c, p, target, now, escolha.id);
+    return false;
   }
 
   const escolhidas = p.config.attackSpells;   // lista marcada no Helper
@@ -2020,6 +2313,8 @@ function tryCastSpell(c, p, target, now) {
  * barra de combo (ordem do jogador) e a selecao automatica antiga. O que
  * acontece DEPOIS de escolher e identico, entao mora aqui. */
 function castSpellById(c, p, target, now, id) {
+  // Feared (Canary): sem magias enquanto o controle estiver ativo.
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   const s = SPELLS[id];
   if (!s) return false;
   if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
@@ -2219,6 +2514,11 @@ function castSpellById(c, p, target, now, id) {
   if (!missMagia && modoMagia && !md) missMagia = ELEMENT_MISSILE[elemento] || "energy";
   // celulas cobertas pela area: o efeito visual precisa aparecer em TODAS,
   // nao so onde havia monstro. Era esse o bug de "a magia so pinta o alvo".
+  // Waves/beams: virar o sprite para o alvo; a matriz usa caster→alvo.
+  if (c.player && target && nomeArea && typeof areaSaiDoConjurador === "function"
+      && areaSaiDoConjurador(nomeArea, id) && typeof dirTo === "function") {
+    c.player.dir = dirTo(c.player, target);
+  }
   const areaTiles = nomeArea && typeof areaCells === "function"
     ? areaCells(nomeArea, c.player, target, id) : [];
 
@@ -2511,6 +2811,8 @@ function castSpellById(c, p, target, now, id) {
 
 /* Usa runa de ataque se configurado */
 function tryUseRune(c, p, target, now, forcada) {
+  // Feared: sem itens/runas (TibiaWiki Feared).
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   // `forcada` vem da barra de combo: o slot ja decidiu qual runa usar, entao
   // pula a escolha automatica abaixo.
   if (!forcada && typeof comboAtivo === "function" && comboAtivo(p)) {
@@ -2745,6 +3047,7 @@ function tryCriticalHeal(p) {
  *     magia: no Tibia da para beber a potion e soltar exura no mesmo segundo.
  */
 function tryHeal(c, p, now) {
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   const max = maxStats(p);
   const pct = (p.hp / max.hp) * 100;
   const spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
@@ -2909,6 +3212,7 @@ function tryHeal(c, p, now) {
  * helper (sem selecao, o personagem nao usa velocidade sozinho).
  */
 function tryHaste(c, p, now) {
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   if (typeof HASTEDATA === "undefined") return false;
   if (p.config && p.config.autoHaste === false) return false;
   // SO usa velocidade quando o jogador escolheu uma magia no helper
@@ -2944,6 +3248,7 @@ function tryHaste(c, p, now) {
 }
 
 function tryBuff(c, p, now) {
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   if (typeof BUFFS === "undefined") return false;
   const chave = p.config && p.config.buff;
   if (!chave || !BUFFS[chave]) return false;
@@ -2976,6 +3281,7 @@ const CURE_ORDEM = ["cursed", "fire", "energy", "bleed", "poison", "freezing"];
 function tryCureCondition(c, p, now) {
   // Exana só é automática quando o jogador habilitar explicitamente essa
   // automação; sem isso nenhuma magia não marcada no Helper é conjurada.
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   if (!p.config || !p.config.autoCure) return false;
   if (!p.conditions) return false;
   if (entCd(c, p, "cureCd") > now) return false;
@@ -3059,6 +3365,7 @@ function autoRestock() {
  * prioridade e o exeta res cobre quando ele está em cooldown. */
 function tryChallenge(c, p, now) {
   now = now || Date.now();
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   if (!c || !c.mobs || !c.mobs.length) return false;
   // só knight (e elite knight)
   if (p.voc !== "knight" && p.voc !== "elite knight") return false;
@@ -3125,6 +3432,7 @@ function doChallengeCast(c, p, now, id, s) {
 
 function tryMana(c, p, now) {
   now = now || Date.now();
+  if (typeof playerIsFeared === "function" && playerIsFeared(p)) return false;
   if (entCd(c, p, "potionCd") > now) return false;
   // Magic Shield (utamo vita): a POOL do escudo NÃO sobe com potion — só
   // recast. A mana do personagem (p.mp) continua bebendo normalmente, senão
@@ -3135,60 +3443,34 @@ function tryMana(c, p, now) {
   if (p.mp > max.mp * manaAt) return false;
   // "NÃO USAR POTIONS MANA" (helper) — noManaPotions / noPotions true = OFF
   if (p.config.noManaPotions || p.config.noPotions) return false;
-  if (p.config.manaSupply === "") return false;
-  const candidates = [];
-  if (p.config.manaSupply) {
-    candidates.push(p.config.manaSupply);
-    if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, p.config.manaSupply))
-      p.supplies = Object.assign({}, p.supplies, { [p.config.manaSupply]: 0 });
+  // Só 1 tipo ativo: sem seleção explícita, não bebe (sem fallback auto).
+  const slug = p.config.manaSupply;
+  if (!slug) return false;
+  const s = SUPPLIES[slug];
+  if (!s || !s.mana) return false;
+  if (typeof supplyAllowed === "function" && !supplyAllowed(p, slug)) return false;
+  if (!Object.prototype.hasOwnProperty.call(p.supplies || {}, slug))
+    p.supplies = Object.assign({}, p.supplies, { [slug]: 0 });
+  if (!(canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug))) return false;
+  const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
+  p.mp = Math.min(max.mp, p.mp + amount);
+  // spirit tambem cura HP no mesmo gole
+  let healAmount = 0;
+  if (s.both && s.heal) {
+    healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
+    p.hp = Math.min(max.hp, p.hp + healAmount);
   }
-  const selectedOk = p.config.manaSupply && typeof supplyAllowed === "function"
-    ? supplyAllowed(p, p.config.manaSupply) : !!p.config.manaSupply;
-  if (!selectedOk) {
-    const order = ["distilled-ultimate-mana-potion", "ultimate-mana-potion",
-      "distilled-superior-mana-potion", "superior-mana-potion",
-      "great-mana-potion", "strong-mana-potion", "mana-potion"];
-    for (const slug of order) if (candidates.indexOf(slug) === -1) candidates.push(slug);
+  entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
+  if (typeof forgeTryMomentum === "function") {
+    const momentum = forgeTryMomentum(p, now);
+    if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
   }
-  for (const slug of candidates) {
-    const s = SUPPLIES[slug];
-    if (!s || !(s.type === "mana" || (s.both && p.config.manaSupply === slug))) continue;
-    if (typeof supplyAllowed === "function" && !supplyAllowed(p, slug)) continue;
-    let drank = false;
-    if (canRechargeSupply(p, slug) && consumeSupplyCharge(c, p, slug)) drank = true;
-    else if (!selectedOk) {
-      const cost = typeof supplyPrice === "function" ? supplyPrice(s, p.level) : 50;
-      if ((p.supplies[slug] || 0) > 0) { p.supplies[slug]--; drank = true; }
-      else if (p.gold >= cost && typeof spendGold === "function" && spendGold(p, cost)) {
-        if (c && c.stats) {
-          c.stats.supplyCost += cost;
-          c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
-        }
-        drank = true;
-      }
-    }
-    if (!drank) continue;
-    const amount = Math.floor(s.mana[0] + Math.random() * (s.mana[1] - s.mana[0]));
-    p.mp = Math.min(max.mp, p.mp + amount);
-    // spirit tambem cura HP no mesmo gole
-    let healAmount = 0;
-    if (s.both && s.heal) {
-      healAmount = Math.floor(s.heal[0] + Math.random() * (s.heal[1] - s.heal[0]));
-      p.hp = Math.min(max.hp, p.hp + healAmount);
-    }
-    entCdSet(c, p, "potionCd", now + 1000);   // cooldown por personagem (party combat)
-    if (typeof forgeTryMomentum === "function") {
-      const momentum = forgeTryMomentum(p, now);
-      if (momentum) c.events.push({ t: "buff", nome: "Momentum" });
-    }
-    c.events.push({ t: "mana", amount: amount, supply: slug,
-                    heal: healAmount, drunk: 1 });
-    // o gole do Tibia: "Aahhh..." — nunca o nome da potion
-    c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
-                    supply: true, drunk: 1 });
-    return true;
-  }
-  return false;
+  c.events.push({ t: "mana", amount: amount, supply: slug,
+                  heal: healAmount, drunk: 1 });
+  // o gole do Tibia: "Aahhh..." — nunca o nome da potion
+  c.events.push({ t: "say", text: s.kind === "food" ? "Munch." : "Aahhh...",
+                  supply: true, drunk: 1 });
+  return true;
 }
 
 /* Monstro ataca o jogador */
@@ -3336,11 +3618,20 @@ function skillRadiusHas(cx0, cy0, r, px, py) {
 }
 
 /* Direcao cardinal da onda (getPrimaryDirection do Canary): eixo dominante.
- * Antes a onda saia numa linha DIAGONAL na direcao do alvo; no Tibia onda
- * so existe reta (N/S/L/O) — o caster vira e a onda varre o eixo. */
-function skillWaveDir(mob, pl) {
-  const dx = (pl.cx | 0) - (mob.cx | 0);
-  const dy = (pl.cy | 0) - (mob.cy | 0);
+ * Sempre do monstro → alvo. Nao usar mob.dir (pode estar travado no spawn). */
+function skillActorCell(ent, gw, gh) {
+  let cx = Number(ent && ent.cx), cy = Number(ent && ent.cy);
+  const w = Number(gw) || (typeof GRID_W !== "undefined" ? GRID_W : 30);
+  const h = Number(gh) || (typeof GRID_H !== "undefined" ? GRID_H : 30);
+  if (!Number.isFinite(cx))
+    cx = Math.floor((Number(ent && ent.x) || 0.5) * w);
+  if (!Number.isFinite(cy))
+    cy = Math.floor((Number(ent && ent.y) || 0.5) * h);
+  return { cx: cx | 0, cy: cy | 0 };
+}
+function skillWaveDir(mob, pl, gw, gh) {
+  const from = skillActorCell(mob, gw, gh), to = skillActorCell(pl, gw, gh);
+  const dx = to.cx - from.cx, dy = to.cy - from.cy;
   if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
   return dy >= 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
 }
@@ -3349,11 +3640,12 @@ function skillWaveDir(mob, pl) {
  * length, spread)). A boca abre com o spread: as `spread` primeiras casas
  * tem a largura cheia e a cada `spread` casas a boca encolhe 1 de cada
  * lado, terminando na ponta unica no ultimo SQM. */
-function skillWaveCells(mob, pl, len, spread) {
+function skillWaveCells(mob, pl, len, spread, gw, gh) {
   const out = [];
   len = Math.max(1, len | 0);
   spread = spread | 0;
-  const d = skillWaveDir(mob, pl);
+  const from = skillActorCell(mob, gw, gh);
+  const d = skillWaveDir(mob, pl, gw, gh);
   const cols = spread > 0 ? Math.floor((len - (len % spread)) / spread) * 2 + 1 : 1;
   const centro = Math.floor(cols / 2);
   let colSpread = cols;
@@ -3362,8 +3654,8 @@ function skillWaveCells(mob, pl, len, spread) {
     const maxOff = colSpread - 1 - centro;
     for (let h = minOff; h <= maxOff; h++) {
       out.push({
-        cx: (mob.cx | 0) + d.dx * y + (d.dy !== 0 ? h : 0),
-        cy: (mob.cy | 0) + d.dy * y + (d.dx !== 0 ? h : 0),
+        cx: from.cx + d.dx * y + (d.dy !== 0 ? h : 0),
+        cy: from.cy + d.dy * y + (d.dx !== 0 ? h : 0),
       });
     }
     if (spread > 0 && y % spread === 0) colSpread--;
@@ -3373,8 +3665,8 @@ function skillWaveCells(mob, pl, len, spread) {
 
 /* O alvo esta numa celula coberta pela onda reta? (dano fiel ao servidor:
  * so acerta quem a onda realmente cruza). */
-function skillWaveHas(mob, pl, len, spread, px, py) {
-  const cells = skillWaveCells(mob, pl, len, spread);
+function skillWaveHas(mob, pl, len, spread, px, py, gw, gh) {
+  const cells = skillWaveCells(mob, pl, len, spread, gw, gh);
   const k = (px | 0) + ":" + (py | 0);
   for (const q of cells) if (q.cx + ":" + q.cy === k) return true;
   return false;
@@ -3382,23 +3674,24 @@ function skillWaveHas(mob, pl, len, spread, px, py) {
 
 /* Matriz direcional compacta para spells nomeadas do Canary. Cada linha do
  * pattern é um passo à frente do caster e contém offsets laterais. */
-function skillPatternCells(mob, pl, pattern) {
+function skillPatternCells(mob, pl, pattern, gw, gh) {
   const out = [];
-  const d = skillWaveDir(mob, pl);
+  const from = skillActorCell(mob, gw, gh);
+  const d = skillWaveDir(mob, pl, gw, gh);
   for (let step = 0; step < (pattern || []).length; step++) {
     for (const side of pattern[step]) {
       out.push({
-        cx: (mob.cx | 0) + d.dx * (step + 1) + (d.dy !== 0 ? side : 0),
-        cy: (mob.cy | 0) + d.dy * (step + 1) + (d.dx !== 0 ? side : 0),
+        cx: from.cx + d.dx * (step + 1) + (d.dy !== 0 ? side : 0),
+        cy: from.cy + d.dy * (step + 1) + (d.dx !== 0 ? side : 0),
       });
     }
   }
   return out;
 }
 
-function skillPatternHas(mob, pl, pattern, px, py) {
+function skillPatternHas(mob, pl, pattern, px, py, gw, gh) {
   const key = (px | 0) + ":" + (py | 0);
-  return skillPatternCells(mob, pl, pattern)
+  return skillPatternCells(mob, pl, pattern, gw, gh)
     .some((q) => q.cx + ":" + q.cy === key);
 }
 
@@ -3406,9 +3699,10 @@ function skillPatternHas(mob, pl, pattern, px, py) {
 function mobSkillFx(c, mob, pl, sk) {
   const el = inferSkillElement(sk);
   const fx = sk.fx || (ELEMENTS[el] || ELEMENTS.physical).fx;
+  const gw = c && c.gridW, gh = c && c.gridH;
   if (sk.areaPattern && sk.areaPattern.length) {
     c.events.push({ t: "areafx",
-                    cells: skillPatternCells(mob, pl, sk.areaPattern),
+                    cells: skillPatternCells(mob, pl, sk.areaPattern, gw, gh),
                     fx: fx, screen: true });
     return;
   }
@@ -3416,15 +3710,16 @@ function mobSkillFx(c, mob, pl, sk) {
     // onda RETA (N/S/L/O) saindo do monstro, com a boca do spread — o
     // formato oficial do Canary (AreaCombat::setupArea(length, spread))
     c.events.push({ t: "areafx",
-                    cells: skillWaveCells(mob, pl, sk.length, sk.spread || 0),
+                    cells: skillWaveCells(mob, pl, sk.length, sk.spread || 0, gw, gh),
                     fx: fx, screen: true });
     return;
   }
   if (sk.radius) {
     // com alcance+alvo a explosao cai NO JOGADOR; senao, no proprio monstro
     const centro = sk.alvo && (sk.range || 1) > 1 ? pl : mob;
+    const cell = skillActorCell(centro, gw, gh);
     c.events.push({ t: "areafx",
-                    cells: skillRadiusCells(centro.cx, centro.cy, sk.radius),
+                    cells: skillRadiusCells(cell.cx, cell.cy, sk.radius),
                     fx: fx, screen: true });
     return;
   }
@@ -3555,7 +3850,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   // Matriz nomeada/direcional (ex.: explosion wave e wave t das Cobras).
   if (sk.areaPattern && typeof skillPatternHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (!skillPatternHas(mob, pl, sk.areaPattern, pl.cx, pl.cy)) return 0;
+    if (!skillPatternHas(mob, pl, sk.areaPattern, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) return 0;
   }
   // Explosao CENTRADA NO MONSTRO (radius sem `alvo`): o dano so entra se o
   // player estiver dentro do FORMATO OFICIAL (circulo do Canary, diamante
@@ -3570,7 +3865,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   // nao leva dano, como no servidor).
   if (sk.length && typeof skillWaveHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (!skillWaveHas(mob, pl, sk.length, sk.spread || 0, pl.cx, pl.cy)) return 0;
+    if (!skillWaveHas(mob, pl, sk.length, sk.spread || 0, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) return 0;
   }
 
   // condition aplicada pela magia (veneno/fogo/energia do *field e das
@@ -3620,6 +3915,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
                   // ice attack...) em vez do generico do elemento
                   fx: sk.fx || null,
                   projectile: bolt, missile: miss });
+  if (typeof tryEbbFearOnHit === "function") tryEbbFearOnHit(c, p, mob);
   return raw;
 }
 
@@ -3744,6 +4040,17 @@ function mobCastSkill(c, p, mob, now) {
     // bugadas
     if (!((sk.max || 0) > 0)) {
       mobSkillFx(c, mob, pl, sk);
+      const nomeLower = String(nomeFx || "").toLowerCase();
+      if (/soulwars\s*fear|^fear$|feared/.test(nomeLower)) {
+        applySoulwarFear(c, p, mob, now);
+        usou = true;
+        continue;
+      }
+      if (/^root$|^roots$|rooted|rooting/.test(nomeLower)) {
+        applySoulwarRoot(c, p, mob, now);
+        usou = true;
+        continue;
+      }
       const tipoEfeito = sk.campo || sk.cond;
       if (tipoEfeito && typeof CONDITIONS !== "undefined" &&
           CONDITIONS[tipoEfeito]) {
@@ -3984,6 +4291,7 @@ function mobAttack(c, p, mob) {
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                   screen: true, projectile: monsterAttackRange(mob) > 0.16,
                   missile: monsterMissile(mob) });
+  if (typeof tryEbbFearOnHit === "function") tryEbbFearOnHit(c, p, mob);
   return raw;
 }
 
@@ -4238,6 +4546,8 @@ function applyCharacterDeathConsequences(c, p, cause) {
   p.blessed = false;
   p.deaths = (p.deaths || 0) + 1;
   recordCombatSessionDeath(c, p);
+  if (typeof surviveMissionOnDeath === "function")
+    surviveMissionOnDeath((c && c.player && c.player.p) || p, c && c.huntId);
   const isPvp = !!(c && (c.pvp || c.instanceMode === "pvp"));
   const rate = isPvp ? (cause === "raid" ? .08 : .03) : 0;
   const lostExp = Math.floor((p.exp || 0) * rate);
@@ -4454,6 +4764,8 @@ function combatTick(c, p, dt, now) {
   now=now||Date.now();c._tickNow=now;
   c.stats.time += dt;
   p.playtime += dt;
+  // Spawn adiado antes das mecânicas (Hatred/Spite/Malice/Mega).
+  arenaBossSpawnTick(c, now);
   if (typeof scarlettBossTick === "function" && scarlettBossTick(c, now) === false) return;
   if (typeof greedBossTick === "function" && greedBossTick(c, now) === false) return;
   if (typeof hatredBossTick === "function" && hatredBossTick(c, now) === false) return;
@@ -4461,6 +4773,7 @@ function combatTick(c, p, dt, now) {
   if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
+  if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
 
   // Stamina temporariamente desativada: toda a party permanece em 42h.
   // A condição de encerramento por stamina continua prevista, mas não pode
@@ -4716,6 +5029,11 @@ function combatTick(c, p, dt, now) {
     if (typeof vipExpBonus === "function" && vipExpBonus() > 1) {
       exp = Math.floor(exp * vipExpBonus());
     }
+    // Loyalty: bônus % EXP do rank (Warden+)
+    if (typeof loyaltyExpMultiplier === "function") {
+      const loyaltyMul = loyaltyExpMultiplier(p);
+      if (loyaltyMul > 1) exp = Math.floor(exp * loyaltyMul);
+    }
     // Party — Shared Experience (TibiaWiki/Party): Exp = M * S / P * C.
     // O exp calculado já é o M*C do líder (stamina/prey); cada membro do
     // party recebe M*S/P aplicado de verdade no save dele (com level-up).
@@ -4760,7 +5078,7 @@ function combatTick(c, p, dt, now) {
     }
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
-                    charm: charmGanho, bossPts: bossGanho });
+                    charm: charmGanho, bossPts: bossGanho, boss: !!m.boss });
   }
   c.mobs = alive;
   // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /

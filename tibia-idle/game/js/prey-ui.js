@@ -143,6 +143,12 @@ function preyStoreBtnHtml(i) {
 /* ----------------------------------------------------------------------
  * Modal principal
  * ---------------------------------------------------------------------- */
+function closePreyModal() {
+  const modal = $("#modal");
+  if (!modal) return;
+  modal.classList.remove("show", "wide", "modal-otc");
+}
+
 function openPreyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
@@ -152,12 +158,15 @@ function openPreyModal() {
   $("#modal-body").innerHTML = `<div class="otc-win-title">🐾 Prey
       <span style="flex:1"></span>
       <span class="tiny dim" id="prey-hint">bônus por 2h · reroll grátis a cada 20h</span>
-      <button class="otc-win-x" id="prey-close" title="Fechar">✕</button>
+      <button type="button" class="otc-win-x" id="prey-close" title="Fechar">✕</button>
     </div>
     <div class="otc-win-body"><div id="prey-content"></div></div>`;
   $("#modal").classList.add("show", "wide", "modal-otc");
-  $("#prey-close").addEventListener("click", () => {
-    $("#modal").classList.remove("show", "wide", "modal-otc");
+  const closeBtn = $("#prey-close");
+  if (closeBtn) closeBtn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    closePreyModal();
   });
   renderPreyModal(p);
 }
@@ -249,8 +258,14 @@ function renderPreyModal(p) {
   h += `<div class="prey-help tiny dim mt4">
     Bônus: Dano +7~25% · Defesa −12~30% · Exp +13~40% · Loot +13~40% (chance de loot duplo).
     Defense gasta tempo extra ao tomar dano. Wildcards melhoram o bônus.
+  </div>
+  <div class="row mt8" style="justify-content:flex-end">
+    <button type="button" class="sm primary" id="prey-close-footer">Fechar</button>
   </div>`;
   box.innerHTML = h;
+
+  const closeFooter = $("#prey-close-footer");
+  if (closeFooter) closeFooter.addEventListener("click", () => closePreyModal());
 
   // ---- Handlers dos botões oficiais
   for (let i = 0; i < PREY_SLOT_COUNT; i++) {

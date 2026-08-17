@@ -326,41 +326,97 @@ function monkSpellDamage(p, id) {
   if (!md || !md.pow) return null;
   const skill = typeof effSkill === "function" ? effSkill(p, "fist") : 10;
   const atk = typeof spellAttackValue === "function" ? spellAttackValue(p) : 7;
-  const base = md.pow * (skill / 100) * (atk / 10) + flatDamageHealing(p.level || 1);
+  let base = md.pow * (skill / 100) * (atk / 10) + flatDamageHealing(p.level || 1);
+  // Idle balance: Monk +25% no dano base das magias (CanaryVocation).
+  if (typeof CanaryVocation !== "undefined" && CanaryVocation.idleSpellDamageMul) {
+    const mul = CanaryVocation.idleSpellDamageMul(p && p.voc);
+    if (mul !== 1) base *= mul;
+  }
   return { min: Math.floor(base - base / 10), max: Math.floor(base + base / 10) };
 }
 
 /* Alvos que a magia atinge, respeitando area e chain.
  *
- * Chain nao e area: o golpe SALTA de um alvo para o mais proximo ainda nao
- * atingido, ate acabar os saltos. E por isso que o Chained Penance pega 3
- * inimigos espalhados que uma area de mesmo tamanho nao pegaria.
- * Espelha o pickChainTargets() do servidor.
+ * Dois modos de chain (espelha spellChainTargets do servidor):
+ *   - salto ao vizinho mais proximo (Spiritual Outburst): alvo → hop…
+ *   - flood a partir dos adjacentes ao caster (Chained Penance / exori med
+ *     pug): todos os SQM adjacentes ao conjurador, depois BFS em ≤dist
+ *     (Chebyshev) de qualquer ja incluido, ate o cap / maxRange.
  */
 function monkSpellTargets(p, id, c, alvo) {
   const md = MONKSPELLS[id];
-  const saida = [alvo];
-  if (!md || !c || !c.mobs) return saida;
+  if (!md || !c || !c.mobs) return alvo ? [alvo] : [];
 
   if (md.chain) {
-    const passo = md.chain.dist;          // distancia do salto, em SQM
-    const vistos = new Set([alvo]);
+    const passo = Number(md.chain.dist) || 0;
+    const cap = Math.max(1, Math.floor(Number(md.chain.alvos) || 1));
+    const flood = !!md.chain.flood;
+    const seedAdj = !!md.chain.seedAdj;
+    const maxRange = Number(md.chain.maxRange) || 0;
+    const caster = c.player || p;
+    const saida = [];
+    const vistos = new Set();
+    const inRange = (m) => {
+      if (!maxRange || !caster) return true;
+      return sqmDist(m, caster) <= maxRange;
+    };
+
+    if (flood) {
+      // Semente: todos os monstros adjacentes (Chebyshev ≤1) ao caster.
+      if (seedAdj && caster) {
+        for (const m of c.mobs) {
+          if (!m || m.hp <= 0 || vistos.has(m)) continue;
+          if (sqmDist(m, caster) <= 1) {
+            saida.push(m);
+            vistos.add(m);
+            if (saida.length >= cap) return saida;
+          }
+        }
+      }
+      // Sem adjacente: cai no alvo primario (design anterior / idle).
+      if (!saida.length && alvo && alvo.hp > 0) {
+        saida.push(alvo);
+        vistos.add(alvo);
+      }
+      let i = 0;
+      while (i < saida.length && saida.length < cap) {
+        const atual = saida[i++];
+        for (const m of c.mobs) {
+          if (!m || m.hp <= 0 || vistos.has(m)) continue;
+          if (!inRange(m)) continue;
+          const d = sqmDist(m, atual);
+          if (passo && d > passo) continue;
+          saida.push(m);
+          vistos.add(m);
+          if (saida.length >= cap) break;
+        }
+      }
+      return saida.length ? saida : (alvo ? [alvo] : []);
+    }
+
+    // Chain classica: salta ao vizinho mais proximo ainda nao atingido.
+    if (alvo && alvo.hp > 0) {
+      saida.push(alvo);
+      vistos.add(alvo);
+    }
     let atual = alvo;
-    while (saida.length < md.chain.alvos) {
+    while (saida.length < cap && atual) {
       let perto = null, menor = Infinity;
       for (const m of c.mobs) {
-        if (m.hp <= 0 || vistos.has(m)) continue;
+        if (!m || m.hp <= 0 || vistos.has(m)) continue;
         const d = sqmDist(m, atual);
-        if (d <= passo && d < menor) { menor = d; perto = m; }
+        if (passo && d > passo) continue;
+        if (d < menor) { menor = d; perto = m; }
       }
-      if (!perto) break;                  // sem vizinho no alcance: para
+      if (!perto) break;
       saida.push(perto);
       vistos.add(perto);
-      atual = perto;                      // o proximo salto parte daqui
+      atual = perto;
     }
-    return saida;
+    return saida.length ? saida : (alvo ? [alvo] : []);
   }
 
+  const saida = alvo ? [alvo] : [];
   if (md.area && md.area.raio > 0) {
     const R = md.area.raio;               // raio ja vem em SQM
     for (const m of c.mobs) {

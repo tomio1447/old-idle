@@ -137,6 +137,36 @@ engine.tryAccessoryHelper({events:[],clock:now},emP,now);
 must(emP.equip.ring&&emP.equip.ring.item==="might-ring",
   "Helper de emergência não trocou o anel com HP baixo");
 
+// Helper deve vestir a cópia com MENOS cargas (parcial antes da stack cheia).
+const lowChargeP=basePlayer({
+  hp:100,equip:{},
+  bag:{"might-ring":2},
+  itemInstances:[{id:"partial-mr",slug:"might-ring",loc:"bag",tier:0,charges:3,maxCharges:20}],
+  config:{equipHelper:{ring:{enabled:true,emergency:"might-ring",normal:"",equipBelow:50,restoreAbove:80}}}});
+engine.tryAccessoryHelper({events:[],clock:now},lowChargeP,now);
+must(lowChargeP.equip.ring&&lowChargeP.equip.ring.item==="might-ring",
+  "Helper não equipou might-ring parcial");
+must(lowChargeP.equip.ring.charges===3,
+  "Helper deveria preferir a cópia com 3 cargas, veio "+(lowChargeP.equip.ring&&lowChargeP.equip.ring.charges));
+must((Number(lowChargeP.bag["might-ring"])||0)===2,
+  "Helper consumiu a stack cheia em vez da parcial");
+must(!(lowChargeP.itemInstances||[]).some((inst)=>inst&&inst.id==="partial-mr"),
+  "Instância parcial não foi consumida pelo helper");
+
+// Entre duas parciais, escolhe a de menor carga (time-ring: mesmo metrico de tempo).
+const twoPartialP=basePlayer({
+  hp:100,equip:{},
+  bag:{},
+  itemInstances:[
+    {id:"tr-hi",slug:"time-ring",loc:"bag",tier:0,charges:150,maxCharges:200},
+    {id:"tr-lo",slug:"time-ring",loc:"bag",tier:0,charges:40,maxCharges:200},
+  ],
+  config:{equipHelper:{ring:{enabled:true,emergency:"time-ring",normal:"",equipBelow:50,restoreAbove:80}}}});
+engine.tryAccessoryHelper({events:[],clock:now},twoPartialP,now);
+must(twoPartialP.equip.ring&&twoPartialP.equip.ring.charges===40,
+  "Helper deveria preferir time-ring com menos tempo/cargas (40), veio "+
+  (twoPartialP.equip.ring&&twoPartialP.equip.ring.charges));
+
 function partyHunt(players,mobs){
   return {v:1,savedAt:now,kind:"hunt",huntId:"rats",instanceMode:"non-pvp",activeCharacterId:String(players[0].id),
     members:players.map((p)=>({id:String(p.id),p:JSON.parse(JSON.stringify(p))})),

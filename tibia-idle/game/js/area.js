@@ -36,7 +36,18 @@ const AREADATA_MAP = (typeof window !== "undefined" && window.AREADATA)
  * AREA_ANCORA_ALVO e senao centrariam no inimigo). */
 const AREA_SELF_SPELLS = {
   "exori": 1, "exori-gran": 1, "exori-mas": 1, "exori-min": 1, "exori-scu": 1,
+  // Monk: Flurry / Sweeping / Front Sweep — saem do conjurador (Canary),
+  // mesmo com celulas "atras" no desenho ou needTarget no .lua.
+  "exori-mas-pug": 1, "exori-gran-mas-pug": 1, "exori-med-pug": 1,
+  "exori-infir-min": 1, "exori-mas-nia": 1, "exori-gran-mas-nia": 1,
 };
+
+/* Ondas / feixes / leques monk: a matriz gira com a facing e nasce no caster.
+ * A heuristica "atras do centro" falha em Flurry/Sweeping (tem SQMs laterais
+ * atras) e needTarget forcaria ancora no monstro — magia "voava" no alvo. */
+function areaDirecionalDoCaster(nome) {
+  return !!(nome && /(WAVE|BEAM|FLURRY|SWEEPING|SHORTWAVE|SQUAREWAVE|BALANCED_BRAWL|SPIRITUAL_OUTBURST)/i.test(nome));
+}
 
 function areaSaiDoConjurador(nome, spellId) {
   // 1) A FONTE DE VERDADE e o spell:isSelfTarget() do .lua. Divine Caldera
@@ -44,6 +55,7 @@ function areaSaiDoConjurador(nome, spellId) {
   //    simetricos que a heuristica abaixo classificaria como "no alvo",
   //    quando na verdade explodem em volta de QUEM LANCA.
   if (spellId && AREA_SELF_SPELLS[spellId]) return true;
+  if (areaDirecionalDoCaster(nome)) return true;
   if (spellId && typeof SPELLTARGET !== "undefined") {
     const st = SPELLTARGET[spellId];
     if (st) {
@@ -72,11 +84,11 @@ const AREA_ANCORA_ALVO = {
 
 /* Direcao do lance, em quatro quadrantes. A matriz so tem 4 rotacoes,
  * entao a diagonal cai no eixo dominante -- igual ao getArea().
- * Prefere a facing do caster (dir n/e/s/w) quando existe — waves/beams
- * saem sempre para onde ele esta virado. */
+ *
+ * Sempre do caster → alvo. Prefiar `origem.dir` travava waves no norte
+ * (dir inicial / passo autoritativo sem atualizar facing) e a onda virava
+ * uma coluna vertical de FX em vez do leque na direção do pack. */
 function areaDir(origem, alvo) {
-  const facing = origem && origem.dir;
-  if (facing === "n" || facing === "e" || facing === "s" || facing === "w") return facing;
   const dx = (alvo.cx || 0) - (origem.cx || 0);
   const dy = (alvo.cy || 0) - (origem.cy || 0);
   if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? "e" : "w";

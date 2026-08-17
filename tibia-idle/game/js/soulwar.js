@@ -21,6 +21,25 @@
   'spectral-horseshoe':{n:'spectral horseshoe',cid:34072,w:1.2},
   'spectral-horse-tack':{n:'spectral horse tack',cid:34074,w:.8},
   'bracelet-of-strengthening':{n:'bracelet of strengthening',cid:34076,w:1.5},
+  // Claustrophobic Inferno (items.xml do Canary).
+  'hand':{n:'hand',cid:33936,w:1.2},
+  'head':{n:'head',cid:33937,w:1.5},
+  'diabolic-skull':{n:'diabolic skull',cid:34025,w:2.1},
+  'infernal-heart':{n:'infernal heart',cid:34139,w:.75},
+  'infernal-robe':{n:'infernal robe',cid:34146,w:1.8},
+  // Ebb and Flow (items.xml do Canary).
+  'jaws':{n:'jaws',cid:34014,w:2},
+  'rod':{n:'rod',cid:33929,w:1.5},
+  'goblet-of-gloom':{n:'goblet of gloom',cid:34022,w:1.5},
+  'capricious-heart':{n:'capricious heart',cid:34138,w:.75},
+  'capricious-robe':{n:'capricious robe',cid:34145,w:1.8},
+  'hazardous-heart':{n:'hazardous heart',cid:34140,w:.75},
+  'hazardous-robe':{n:'hazardous robe',cid:34147,w:1.8},
+  'red-crystal-fragment':{n:'red crystal fragment',cid:16126,w:.15},
+  'onyx-chip':{n:'onyx chip',cid:22193,w:.2},
+  'magma-amulet':{n:'magma amulet',cid:817,w:5},
+  'ring-of-green-plasma':{n:'ring of green plasma',cid:23532,w:.9},
+  'warrior-s-axe':{n:"warrior's axe",cid:14040,w:88},
   // Ebb and Flow + Goshnar's Spite (items.xml do Canary).
   'figurine-of-spite':{n:'figurine of Spite',cid:33952,w:.44},
   'spites-spirit':{n:"Spite's spirit",cid:33926,w:.8},
@@ -31,15 +50,24 @@
   'malices-horn':{n:"Malice's horn",cid:33920,w:1.1},
   'malice-s-horn':{n:"Malice's horn",cid:33920,w:1.1},
   'figurine-of-malice':{n:'figurine of Malice',cid:34018,w:.44},
-  // Goshnar's Megalomania (items.xml do Canary).
+  // Goshnar's Cruelty + Megalomania (items.xml do Canary).
+  'cruelty-s-claw':{n:"Cruelty's claw",cid:33922,w:1.1},
+  'cruelty-s-chest':{n:"Cruelty's chest",cid:33923,w:1.4},
   'figurine-of-cruelty':{n:'figurine of Cruelty',cid:34019,w:.44},
   'figurine-of-megalomania':{n:'figurine of Megalomania',cid:33953,w:.44},
   'megalomania-s-skull':{n:"Megalomania's skull",cid:33925,w:1.1},
   'megalomania-s-essence':{n:"Megalomania's essence",cid:33928,w:.8},
  };
+ // sell/npcSell ficam a cargo de yasir-prices.js (Yasir/TibiaWiki). Aqui só
+ // garante metadados (nome/cid/peso) sem sobrescrever preço NPC já aplicado.
  for(const slug in serverLootItems){
-  if(!I[slug]) I[slug]=Object.assign({s:null,t:'loot',sell:1},serverLootItems[slug]);
-  else if(serverLootItems[slug].cid&&!I[slug].cid) I[slug].cid=serverLootItems[slug].cid;
+  if(!I[slug]) I[slug]=Object.assign({s:null,t:'loot',sell:0,npcSell:0},serverLootItems[slug]);
+  else{
+   const src=serverLootItems[slug];
+   if(src.cid&&!I[slug].cid) I[slug].cid=src.cid;
+   if(src.n&&!I[slug].n) I[slug].n=src.n;
+   if(src.w!=null&&I[slug].w==null) I[slug].w=src.w;
+  }
  }
  const souls=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];
  souls.forEach((id)=>{if(!I[id])I[id]={n:id.replace(/-/g,' '),s:'misc',t:'soulwar',sell:25000,w:35};});
@@ -75,7 +103,13 @@
  const rottenPoison=(M['rotten-golem']&&M['rotten-golem'].skills||[]).find(s=>s.n==='poison chain');
  if(rottenPoison)Object.assign(rottenPoison,{el:'earth',chain:3,fx:'energy-shock-green',range:7});
  for(const slug of ['rotten-golem','branchy-crawler']){
-  const root=(M[slug]&&M[slug].skills||[]).find(s=>s.n==='root');if(root)root.fx='rooting-effect';
+  const root=(M[slug]&&M[slug].skills||[]).find(s=>s.n==='root');
+  // Canary root.lua: CONDITION_ROOTED 3000ms, CONST_ME_ROOTS, needTarget.
+  // chance=1 no .lua (1% a cada 2s) — mantido; pack faz o root aparecer.
+  if(root) Object.assign(root,{
+   fx:'rooting-effect', range:root.range||7, alvo:1,
+   ch:Math.max(1, Number(root.ch)||1),
+  });
  }
  const mouldPoison=(M['mould-phantom']&&M['mould-phantom'].skills||[]).find(s=>s.n==='poison chain');
  if(mouldPoison)Object.assign(mouldPoison,{el:'earth',chain:3,fx:'energy-shock-green',range:7});
@@ -115,6 +149,7 @@
 
  // Mapa completo é mantido como mundo runtime 30×30. Os bounds descrevem
  // a FOV/source do arquivo entregue, não um crop do OTBM.
+ // Rooted (CONDITION_ROOTED / Canary root.lua) via spell "root" dos golems.
  GAMEDATA.hunts['rotten-wasteland']={
   name:'Rotten Wasteland',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
   otbm:'rotten_wasteland',otbmFloor:7,
@@ -125,36 +160,111 @@
   avgHp:27667,avgExp:18017,avgDamage:933,avgArmor:103,avgGold:170,
   respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,
   color:'#54652d',soulWarZone:true,soulWarZoneMonster:'rotten-golem',
+  soulWarRoot:true,
  };
 
- // Bossroom Canary: beta-maps/bossesroom/goshnar_hatred_room.otbm publicado
- // como maps/goshnars_hatred_room.otbm. Piso z=7 (1042,1009)..(1063,1026)
- // centralizado num mundo runtime 30×30; player ao sul do portal e boss no centro.
+ // Ebb and Flow — beta-maps/ebb&flow.otbm → maps/ebb_and_flow.otbm.
+ // OTBM z=7 (1041,1004)..(1067,1027) 27×24, mundo runtime 30×30.
+ // Câmera clássica 21×13 (não a sala inteira — FOV 27×24 gerava barras
+ // pretas e faixa escura da moldura void). Spawn no centro da sala
+ // (1052,1016); zona (1048,1012)..(1059,1020).
+ // Monstros oficiais (TibiaWiki): Bony Sea Devil, Capricious Phantom,
+ // Hazardous Phantom, Turbulent Elemental. Fear nos hits; 15× → Greed.
+ if(M['capricious-phantom']) M['capricious-phantom'].targetDistance=4;
+ if(M['hazardous-phantom']) M['hazardous-phantom'].targetDistance=4;
+ for(const slug of ['bony-sea-devil','capricious-phantom','hazardous-phantom']){
+  const iceChain=(M[slug]&&M[slug].skills||[])
+   .find(s=>String(s.n||'').toLowerCase()==='ice chain');
+  if(iceChain) Object.assign(iceChain,{el:'ice',chain:3,range:7,fx:'ice-attack'});
+ }
+ // Wiki: só Turbulent Elemental NÃO causa Fear. Boost nos outros três.
+ for(const slug of ['bony-sea-devil','capricious-phantom','hazardous-phantom']){
+  if(!M[slug]) continue;
+  M[slug].skills=M[slug].skills||[];
+  let fear=M[slug].skills.find(s=>String(s.n||'').toLowerCase()==='soulwars fear');
+  if(!fear){
+   fear={n:'soulwars fear',el:'physical',ch:15,alvo:1,range:7,min:0,max:0};
+   M[slug].skills.push(fear);
+  }else Object.assign(fear,{ch:Math.max(Number(fear.ch)||0,15),alvo:1,range:fear.range||7});
+ }
+ GAMEDATA.hunts['ebb-and-flow']={
+  name:'Ebb and Flow',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
+  otbm:'ebb_and_flow',otbmFloor:7,
+  otbmFovBounds:{x:1041,y:1004,w:27,h:24,z:7},
+  otbmFovWidth:21,otbmFovHeight:13,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1052,y:1016,z:7},
+  otbmMobBounds:{x:1048,y:1012,w:12,h:9,z:7},
+  monsters:['bony-sea-devil','capricious-phantom','hazardous-phantom','turbulent-elemental'],
+  avgHp:38000,avgExp:31048,avgDamage:950,avgArmor:101,avgGold:170,
+  respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,
+  color:'#2d5565',soulWarZone:true,soulWarZoneMonster:'bony-sea-devil',
+  soulWarFear:true,
+ };
+
+ // Claustrophobic Inferno — beta-maps/claustrophobic inferno.otbm →
+ // maps/claustrophobic_inferno.otbm. OTBM z=7 (1042,1008)..(1067,1026) 26×19.
+ // FOV câmera = sala inteira do Map Editor (26×19). Spawn (1050,1016);
+ // zona de monstros (1048,1014)..(1059,1022).
+ for(const slug of ['brachiodemon','infernal-demon']) if(M[slug]) M[slug].element='physical';
+ if(M['infernal-phantom']){
+  M['infernal-phantom'].element='fire';
+  M['infernal-phantom'].targetDistance=4;
+ }
+ const infernalChain=(M['infernal-phantom']&&M['infernal-phantom'].skills||[])
+  .find(s=>s.n==='extended fire chain');
+ if(infernalChain) Object.assign(infernalChain,{el:'fire',chain:3,range:7,fx:'fire-area'});
+ const infernalDeathChain=(M['infernal-demon']&&M['infernal-demon'].skills||[])
+  .find(s=>s.n==='death chain');
+ if(infernalDeathChain) Object.assign(infernalDeathChain,{el:'death',chain:3,fx:'mort-area',range:7});
+ GAMEDATA.hunts['claustrophobic-inferno']={
+  name:'Claustrophobic Inferno',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
+  otbm:'claustrophobic_inferno',otbmFloor:7,
+  otbmFovBounds:{x:1042,y:1008,w:26,h:19,z:7},
+  otbmFovWidth:26,otbmFovHeight:19,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1050,y:1016,z:7},
+  otbmMobBounds:{x:1048,y:1014,w:12,h:9,z:7},
+  monsters:['brachiodemon','infernal-demon','infernal-phantom'],
+  avgHp:27667,avgExp:16323,avgDamage:1067,avgArmor:107,avgGold:170,
+  respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,
+  color:'#6a2a1a',soulWarZone:true,soulWarZoneMonster:'brachiodemon',
+ };
+
+ // Bossroom Canary: beta-maps/bossesroom/goshnars_hatred_room.otbm publicado
+ // como maps/goshnars_hatred_room.otbm. OTBM z=7 (1042,1009)..(1063,1026)
+ // 22×18 → mundo runtime 30×30.
+ // Spawns: player sul (1052,1023), boss centro-norte (1052,1017).
+ // FOV câmera 22×15: cobre a sala e a distância player↔boss.
  GAMEDATA.hunts['goshnars-hatred-room']={
   name:"Goshnar's Hatred Room",hidden:true,level:400,minLevel:400,
   cat:'boss-room',scene:'soulwar',otbm:'goshnars_hatred_room',otbmFloor:7,
   otbmFovBounds:{x:1042,y:1009,w:22,h:18,z:7},
+  otbmFovWidth:22,otbmFovHeight:15,
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
   otbmSpawn:{x:1052,y:1023,z:7},
   otbmMobBounds:{x:1052,y:1017,w:1,h:1,z:7},
   monsters:['goshnar-s-hatred','dreadful-harvester','hateful-soul'],
   avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
-  respawn:1,pack:1,
+  respawn:1,pack:1,soulWarZone:true,soulWarZoneMonster:'rotten-golem',
  };
 
- // Bossroom integral: o mundo 30×30 mantém todo o piso z=7. A célula G
- // exclusiva posiciona Goshnar no norte; os adds usam as demais células
- // livres da sala e não dependem desta zona.
+ // Bossroom Canary: beta-maps/bossesroom/goshnars_greed_room.otbm publicado
+ // como maps/goshnars_greed_room.otbm. OTBM z=7 (1042,1009)..(1063,1026)
+ // 22×18 → mundo runtime 30×30.
+ // Spawns: player sul (1053,1023), boss norte (1053,1012).
+ // FOV câmera 22×15: cobre a sala e a distância player↔boss.
  GAMEDATA.hunts['goshnars-greed-room']={
   name:"Goshnar's Greed Room",hidden:true,level:550,minLevel:550,
   cat:'boss-room',scene:'soulwar',otbm:'goshnars_greed_room',otbmFloor:7,
-  otbmFovBounds:{x:0,y:0,w:20,h:14,z:7},
+  otbmFovBounds:{x:1042,y:1009,w:22,h:18,z:7},
+  otbmFovWidth:22,otbmFovHeight:15,
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
-  otbmSpawn:{x:10,y:12,z:7},
-  otbmMobBounds:{x:10,y:2,w:1,h:1,z:7},
+  otbmSpawn:{x:1053,y:1023,z:7},
+  otbmMobBounds:{x:1053,y:1012,w:1,h:1,z:7},
   monsters:['goshnar-s-greed','dreadful-harvester','soulsnatcher','greedbeast','powerful-soul'],
   avgHp:300000,avgExp:150000,avgDamage:1800,avgArmor:120,avgGold:100,
-  respawn:1,pack:1,
+  respawn:1,pack:1,soulWarZone:true,soulWarZoneMonster:'many-faces',
  };
 
  // Bossroom Canary: beta-maps/bossesroom/goshnar_spite_room.otbm publicado
@@ -244,10 +354,22 @@ function soulwarTaintState(p){
 }
 function soulwarTaintLevel(p){const st=soulwarTaintState(p);return st?Math.max(0,Math.min(5,st.level||0)):0;}
 function soulwarTaintInfo(p){const level=soulwarTaintLevel(p);return level?Object.assign({level},SOULWAR_TAINTS[level-1]):null;}
+/* Texto oficial (PT) das penalidades — só as máculas ativas (1..level). */
+const SOULWAR_TAINT_PENALTIES=[
+ '10% de chance de uma criatura teleportar perto de você',
+ '0,5% de chance de uma nova criatura surgir perto de você se você atingir outra criatura',
+ 'dano recebido aumentado em 15%',
+ '10% de chance de uma criatura se curar completamente em vez de morrer',
+ 'perda de 10% dos seus pontos de vida e da sua mana a cada 10 segundos',
+];
 function soulwarTaintTooltip(p){
  const level=soulwarTaintLevel(p);if(!level)return '';
- const penalties=['10% de chance de uma criatura teleportar até você','0,5% de chance de surgir outra criatura ao atacar','15% mais dano recebido','10% de chance de a criatura recuperar toda a vida ao morrer','Perda de 10% da vida e mana atuais a cada 10s'];
- return `Máculas de Goshnar ${level}/5 · ${penalties.slice(0,level).join(' · ')} · EXP +${Math.round((SOULWAR_TAINTS[level-1].exp-1)*1000)/10}%`;
+ const word=level===1?'penalidade':'penalidades';
+ const items=SOULWAR_TAINT_PENALTIES.slice(0,level).map((t)=>`<li>${t}</li>`).join('');
+ const exp=Math.round((SOULWAR_TAINTS[level-1].exp-1)*1000)/10;
+ return `<div class="tt-taint-head">Se você está nas covas do Goshnar, você sofre ${level} ${word}:</div>`+
+  `<ul class="tt-taint-list">${items}</ul>`+
+  `<div class="tt-taint-exp">EXP +${exp}%</div>`;
 }
 function soulwarGrantBossTaint(p,bossId){
  if(SOULWAR_TAINT_BOSSES.indexOf(bossId)===-1)return 0;
@@ -258,8 +380,11 @@ function soulwarGrantBossTaint(p,bossId){
  if(typeof toast==='function')toast(`${info.name} — mácula ${st.level}/5`,'death');
  return st.level;
 }
-/* Megalomania exige as 5 máculas ativas (todos os mini-bosses Soul War). */
+/* Megalomania exige as 5 máculas ativas (todos os mini-bosses Soul War).
+ * TEMP TEST: remove before release — MEGA_TEST_BYPASS libera o pré-requisito. */
 function soulwarHasAllBossTaints(p){
+ // TEMP TEST: remove before release
+ if(typeof MEGA_TEST_BYPASS!=="undefined"&&MEGA_TEST_BYPASS)return true;
  const st=soulwarTaintState(p);if(!st||soulwarTaintLevel(p)<5)return false;
  for(let i=0;i<SOULWAR_TAINT_BOSSES.length;i++)
   if(!st.bosses[SOULWAR_TAINT_BOSSES[i]])return false;
@@ -314,7 +439,7 @@ const GOSHNAR_GREED_ID='goshnar-s-greed';
 const GREED_ADDS=['dreadful-harvester','soulsnatcher','greedbeast','powerful-soul'];
 const GREED_MAX_ADDS=6;
 const GREED_KILLS_TO_OPEN=5;
-const GREEDBEAST_SPAWN_CHANCE=.30;
+const GREEDBEAST_SPAWN_CHANCE=.60;
 const GREED_VULNERABLE_MS=40000;
 
 function greedBossFight(c){return !!(c&&c.boss&&c.boss.id===GOSHNAR_GREED_ID);}
@@ -509,7 +634,14 @@ function hatredBossInit(c,player,randomFn,now){
 }
 function hatredBossTick(c,now){
  now=now||Date.now();if(!hatredBossFight(c)||!c.hatred)return true;const st=c.hatred;
- const boss=(c.mobs||[]).find(m=>m&&m.boss&&m.hp>0);if(!boss){hatredHideMinigame();return true;}
+ const boss=(c.mobs||[]).find(m=>m&&m.boss&&m.hp>0);
+ // Boss ainda no delay de arena: manter countdown, não ativar summons.
+ if(!boss){
+  if(typeof arenaBossSpawnPending==='function'&&arenaBossSpawnPending(c)){
+   hatredRenderMinigame(c,now);return true;
+  }
+  hatredHideMinigame();return true;
+ }
  hatredEnsureCounters(c);
  if(!st.active&&now>=st.nextActivationAt){
   st.active=true;st.nextCounterAt=now+HATRED_COUNTER_TICK;hatredFillSummons(c,st.randomFn,now);
@@ -777,7 +909,12 @@ function spiteBossHandleKill(c,mob,now){
 function spiteBossTick(c,now){
  now=now||Date.now();if(!spiteBossFight(c)||!c.spite)return true;
  const st=c.spite,boss=spiteBossMob(c);
- if(!boss||boss.hp<=0){spiteHideMinigame();spiteHideQte();return true;}
+ if(!boss||boss.hp<=0){
+  if(typeof arenaBossSpawnPending==='function'&&arenaBossSpawnPending(c)){
+   spiteRenderMinigame(c,now);return true;
+  }
+  spiteHideMinigame();spiteHideQte();return true;
+ }
  // Trash: processa respawns agendados e completa até o teto de 8.
  st.pendingRespawns=(st.pendingRespawns||[]).filter((job)=>{
   if(now<job.at)return true;
@@ -810,8 +947,9 @@ function spiteRenderOnline(c){
 
 /* ------------------------------------------------ Goshnar's Malice
  * Canary: createSoulWarWhiteTiles a cada 40s no onThink.
- * Idle: Maze QTE a cada 30s (matriz 30×30, azul→vermelho em 5s, blocos
- * caindo top→bottom). Falha = 6000 death em todos os players (explosão
+ * Idle: Maze QTE a cada 30s (matriz 30×30, azul→vermelho em 12s, blocos
+ * vindo de cima e de baixo). Meta vermelha em posição aleatória.
+ * Falha = 6000 death em todos os players (explosão
  * da maldição). Trash: Dreadful Harvester / Malicious Soul até 8,
  * respawn 20s. Sem CD de boss para testes. */
 const GOSHNAR_MALICE_ID='goshnar-s-malice';
@@ -819,11 +957,12 @@ const MALICE_TRASH=['dreadful-harvester','malicious-soul'];
 const MALICE_MAX_TRASH=8;
 const MALICE_TRASH_RESPAWN_MS=20000;
 const MALICE_QTE_INTERVAL=30000;
-const MALICE_QTE_DURATION=5000;
+const MALICE_QTE_DURATION=12000;
 const MALICE_QTE_SIZE=30;
 const MALICE_QTE_FAIL_DMG=6000;
-const MALICE_SLIDE_MS=280;
-const MALICE_BLOCK_COUNT=9;
+const MALICE_SLIDE_MS=140; // ~2× mais rápido que 280ms
+const MALICE_BLOCK_COUNT=10;
+const MALICE_GOAL_MIN_DIST=12;
 
 function maliceBossFight(c){return !!(c&&c.boss&&c.boss.id===GOSHNAR_MALICE_ID);}
 function maliceBossMob(c){return c&&c.mobs?c.mobs.find((m)=>m&&m.boss):null;}
@@ -834,7 +973,8 @@ function maliceHideMinigame(){const el=maliceMinigameElement();if(el){el.style.d
 function maliceHideQte(){
  const el=maliceQteElement();if(el){el.style.display='none';el.innerHTML='';el.className='malice-qte';}
  if(typeof document!=='undefined'&&document._maliceKeyHandler){
-  document.removeEventListener('keydown',document._maliceKeyHandler);
+  document.removeEventListener('keydown',document._maliceKeyHandler,true);
+  document.removeEventListener('keydown',document._maliceKeyHandler,false);
   document._maliceKeyHandler=null;
  }
 }
@@ -880,9 +1020,24 @@ function maliceCellBlocked(st,x,y){
  }
  return false;
 }
+function maliceRandomBoardPoint(rnd,N,avoid,minDist){
+ const dist=Math.max(1,Number(minDist)||MALICE_GOAL_MIN_DIST);
+ let x=1,y=1,guard=0;
+ do{
+  x=1+Math.floor(rnd()*(N-2));
+  y=1+Math.floor(rnd()*(N-2));
+  guard++;
+ }while(guard<80&&avoid&&(Math.abs(x-avoid.x)+Math.abs(y-avoid.y)<dist));
+ if(avoid&&(Math.abs(x-avoid.x)+Math.abs(y-avoid.y)<dist)){
+  x=Math.max(1,Math.min(N-2,N-1-avoid.x));
+  y=Math.max(1,Math.min(N-2,N-1-avoid.y));
+ }
+ return{x,y};
+}
 function maliceBuildMaze(randomFn){
  const rnd=randomFn||Math.random,N=MALICE_QTE_SIZE;
- const start={x:2,y:14},goal={x:27,y:14};
+ const start=maliceRandomBoardPoint(rnd,N,null,0);
+ const goal=maliceRandomBoardPoint(rnd,N,start,MALICE_GOAL_MIN_DIST);
  const blocks=[];
  const used=new Set();
  for(let i=0;i<MALICE_BLOCK_COUNT;i++){
@@ -890,24 +1045,39 @@ function maliceBuildMaze(randomFn){
   while((x===start.x||x===goal.x||used.has(x))&&guard++<40)x=1+Math.floor(rnd()*(N-2));
   used.add(x);
   const len=2+Math.floor(rnd()*3);
-  const y=-len-Math.floor(rnd()*12);
-  blocks.push({x,y,len});
+  const fromTop=rnd()<.5;
+  const dy=fromTop?1:-1;
+  const y=fromTop?(-len-Math.floor(rnd()*12)):(N+Math.floor(rnd()*12));
+  blocks.push({x,y,len,dy});
  }
  return {start,goal,px:start.x,py:start.y,blocks};
 }
 function maliceSlideBlocks(st){
  if(!st||!st.blocks)return false;
  let hit=false;
+ const N=MALICE_QTE_SIZE;
  for(const b of st.blocks){
-  b.y+=1;
+  const dy=b.dy===-1?-1:1;
+  b.dy=dy;
+  b.y+=dy;
   if(b.x===st.px&&st.py>=b.y&&st.py<b.y+(b.len||1))hit=true;
  }
- // Recicla blocos que saíram do tabuleiro.
+ // Recicla blocos que saíram — nunca na coluna do start/goal/jogador.
+ const forbidden=new Set();
+ if(st.start)forbidden.add(st.start.x);
+ if(st.goal)forbidden.add(st.goal.x);
+ if(Number.isFinite(Number(st.px)))forbidden.add(Number(st.px));
+ const rnd=st.randomFn||Math.random;
  for(const b of st.blocks){
-  if(b.y>=MALICE_QTE_SIZE){
-   b.y=-(b.len||1)-Math.floor(((st.randomFn||Math.random)())*8);
-   b.x=1+Math.floor(((st.randomFn||Math.random)())*(MALICE_QTE_SIZE-2));
-  }
+  const dy=b.dy===-1?-1:1;
+  const len=b.len||1;
+  const exited=dy>0?(b.y>=N):(b.y+len<=0);
+  if(!exited)continue;
+  b.dy=rnd()<.5?1:-1;
+  b.y=b.dy>0?(-len-Math.floor(rnd()*8)):(N+Math.floor(rnd()*8));
+  let x=1+Math.floor(rnd()*(N-2)),guard=0;
+  while(forbidden.has(x)&&guard++<40)x=1+Math.floor(rnd()*(N-2));
+  b.x=x;
  }
  return hit;
 }
@@ -955,20 +1125,45 @@ function maliceRenderMinigame(c,now){
  el.innerHTML=`<div class="malice-title">GOSHNAR'S MALICE</div>
   <div class="malice-row"><span>Trash</span><b>${trash.length}/${MALICE_MAX_TRASH}</b></div>
   <div class="malice-row"><span>Maze QTE</span><b>${qte}</b></div>
-  <small>Azul→vermelho em 5s · falha = 6000 death em todos · trash respawn 20s</small>`;
+  <small>Azul→vermelho (posição aleatória) · barras cima/baixo · falha = 6000 death</small>`;
+}
+function maliceUsesOnlineAuth(){
+ return typeof onlineAuthorityCombat==='function'&&onlineAuthorityCombat()&&
+  typeof accountInstanceActive==='function'&&accountInstanceActive();
+}
+function maliceQueueOnlineMove(c,nx,ny,now){
+ if(!c)return;
+ c._malicePendingMoves=Array.isArray(c._malicePendingMoves)?c._malicePendingMoves:[];
+ c._malicePendingMoves.push({x:nx,y:ny});
+ if(c._malicePendingMoves.length>48)c._malicePendingMoves.splice(0,c._malicePendingMoves.length-48);
+ c._malicePendingMoveAt=now||Date.now();
 }
 function maliceBindKeys(c){
  if(typeof document==='undefined')return;
- if(document._maliceKeyHandler)document.removeEventListener('keydown',document._maliceKeyHandler);
+ if(document._maliceKeyHandler){
+  document.removeEventListener('keydown',document._maliceKeyHandler,true);
+  document.removeEventListener('keydown',document._maliceKeyHandler,false);
+ }
  document._maliceKeyHandler=function(ev){
   if(!c||!c.malice||c.malice.qtePhase!=='active')return;
+  if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='TEXTAREA'||ev.target.tagName==='SELECT'))return;
   const map={ArrowUp:'n',ArrowDown:'s',ArrowLeft:'w',ArrowRight:'e',
    w:'n',W:'n',s:'s',S:'s',a:'w',A:'w',d:'e',D:'e'};
   const dir=map[ev.key];if(!dir)return;
   ev.preventDefault();
+  if(typeof ev.stopImmediatePropagation==='function')ev.stopImmediatePropagation();
   maliceMoveDir(c,dir,Date.now());
  };
- document.addEventListener('keydown',document._maliceKeyHandler);
+ // capture: antes do walk handler de game.js (AUTO off / SQM).
+ document.addEventListener('keydown',document._maliceKeyHandler,true);
+}
+function malicePaintCellClass(st,x,y){
+ let cls='malice-cell';
+ if(st.start&&x===st.start.x&&y===st.start.y)cls+=' start';
+ if(st.goal&&x===st.goal.x&&y===st.goal.y)cls+=' goal';
+ if(x===st.px&&y===st.py)cls+=' player';
+ if(maliceCellBlocked(st,x,y))cls+=' block';
+ return cls;
 }
 function maliceRenderQte(c,now){
  const el=maliceQteElement();if(!el||!c||!c.malice||c.malice.qtePhase!=='active'){maliceHideQte();return;}
@@ -976,23 +1171,33 @@ function maliceRenderQte(c,now){
  const N=MALICE_QTE_SIZE;
  const blockKey=(st.blocks||[]).map((b)=>b.x+','+b.y+','+(b.len||1)).join(';');
  const key=[st.px,st.py,left,blockKey].join('|');
- if(st.qteRenderKey===key&&el.className.indexOf('active')!==-1&&el.querySelector('.malice-qte-board'))return;
+ const board=el.querySelector('.malice-qte-board');
+ const title=el.querySelector('.malice-qte-title');
+ // Atualização incremental: não recrie 900 botões a cada slide (quebrava clique/WASD).
+ if(st.qteRenderKey&&board&&el.className.indexOf('active')!==-1&&
+    board.children.length===N*N){
+  if(title)title.textContent='LABIRINTO DA MALÍCIA — '+left+'s';
+  if(st.qteRenderKey!==key){
+   for(let i=0;i<board.children.length;i++){
+    const node=board.children[i];
+    const x=Number(node.getAttribute('data-mx')),y=Number(node.getAttribute('data-my'));
+    node.className=malicePaintCellClass(st,x,y);
+   }
+   st.qteRenderKey=key;
+  }
+  maliceBindKeys(c);return;
+ }
  st.qteRenderKey=key;
  el.style.display='block';el.className='malice-qte active';
  let cells='';
  for(let y=0;y<N;y++){
   for(let x=0;x<N;x++){
-   let cls='malice-cell';
-   if(x===st.start.x&&y===st.start.y)cls+=' start';
-   if(x===st.goal.x&&y===st.goal.y)cls+=' goal';
-   if(x===st.px&&y===st.py)cls+=' player';
-   if(maliceCellBlocked(st,x,y))cls+=' block';
-   cells+=`<button type="button" class="${cls}" data-mx="${x}" data-my="${y}"></button>`;
+   cells+=`<button type="button" class="${malicePaintCellClass(st,x,y)}" data-mx="${x}" data-my="${y}"></button>`;
   }
  }
  el.innerHTML=`<div class="malice-qte-title">LABIRINTO DA MALÍCIA — ${left}s</div>
   <div class="malice-qte-board" style="grid-template-columns:repeat(${N},1fr)">${cells}</div>
-  <div class="malice-qte-help">Clique adjacente ou WASD/setas · azul → vermelho · blocos caem</div>`;
+  <div class="malice-qte-help">Clique (passo) ou WASD/setas · azul → vermelho (aleatório) · barras cima/baixo</div>`;
  el.querySelectorAll('[data-mx]').forEach((node)=>{
   node.onclick=function(ev){
    ev.preventDefault();
@@ -1030,18 +1235,34 @@ function maliceResolveQte(c,success,now){
 function maliceTryMove(c,nx,ny,now){
  const st=c&&c.malice;if(!st||st.qtePhase!=='active')return false;
  const N=MALICE_QTE_SIZE;
+ nx=Math.floor(Number(nx));ny=Math.floor(Number(ny));
+ if(!Number.isFinite(nx)||!Number.isFinite(ny))return false;
  if(nx<0||ny<0||nx>=N||ny>=N)return false;
  if(Math.abs(nx-st.px)+Math.abs(ny-st.py)!==1)return false;
  if(maliceCellBlocked(st,nx,ny))return false;
- if(typeof onlineAuthorityCombat==='function'&&onlineAuthorityCombat()&&c){
-  c._malicePendingMove={x:nx,y:ny};c._malicePendingMoveAt=now||Date.now();
-  return true;
- }
+ now=now||Date.now();
+ // Sempre aplica local (feedback imediato). Online: enfileira intents adjacentes.
+ if(maliceUsesOnlineAuth())maliceQueueOnlineMove(c,nx,ny,now);
  st.px=nx;st.py=ny;
- if(nx===st.goal.x&&ny===st.goal.y){maliceResolveQte(c,true,now||Date.now());return true;}
- maliceRenderQte(c,now||Date.now());return true;
+ if(st.goal&&nx===st.goal.x&&ny===st.goal.y){maliceResolveQte(c,true,now);return true;}
+ maliceRenderQte(c,now);return true;
 }
-function maliceMoveTo(c,x,y,now){return maliceTryMove(c,x,y,now);}
+function maliceMoveTo(c,x,y,now){
+ const st=c&&c.malice;if(!st||st.qtePhase!=='active')return false;
+ x=Math.floor(Number(x));y=Math.floor(Number(y));
+ if(!Number.isFinite(x)||!Number.isFinite(y))return false;
+ if(x===st.px&&y===st.py)return false;
+ if(Math.abs(x-st.px)+Math.abs(y-st.py)===1)return maliceTryMove(c,x,y,now);
+ // Clique longe: um passo guloso em direção ao alvo (células minúsculas no 30×30).
+ const dx=Math.sign(x-st.px),dy=Math.sign(y-st.py);
+ const opts=Math.abs(x-st.px)>=Math.abs(y-st.py)
+  ?[[st.px+dx,st.py],[st.px,st.py+dy]]:[[st.px,st.py+dy],[st.px+dx,st.py]];
+ for(const step of opts){
+  if(maliceCellBlocked(st,step[0],step[1]))continue;
+  if(maliceTryMove(c,step[0],step[1],now))return true;
+ }
+ return false;
+}
 function maliceMoveDir(c,dir,now){
  const st=c&&c.malice;if(!st||st.qtePhase!=='active')return false;
  const d={n:[0,-1],s:[0,1],w:[-1,0],e:[1,0]}[dir];if(!d)return false;
@@ -1071,7 +1292,12 @@ function maliceBossHandleKill(c,mob,now){
 function maliceBossTick(c,now){
  now=now||Date.now();if(!maliceBossFight(c)||!c.malice)return true;
  const st=c.malice,boss=maliceBossMob(c);
- if(!boss||boss.hp<=0){maliceHideMinigame();maliceHideQte();return true;}
+ if(!boss||boss.hp<=0){
+  if(typeof arenaBossSpawnPending==='function'&&arenaBossSpawnPending(c)){
+   maliceRenderMinigame(c,now);return true;
+  }
+  maliceHideMinigame();maliceHideQte();return true;
+ }
  st.pendingRespawns=(st.pendingRespawns||[]).filter((job)=>{
   if(now<job.at)return true;
   if(maliceTrashMobs(c).length<MALICE_MAX_TRASH)
@@ -1093,7 +1319,10 @@ function maliceBossTick(c,now){
  maliceRenderMinigame(c,now);return true;
 }
 function maliceBossCleanup(c){
- if(c){delete c.malice;delete c._malicePendingMove;delete c._malicePendingMoveAt;}
+ if(c){
+  delete c.malice;delete c._malicePendingMove;delete c._malicePendingMoves;
+  delete c._malicePendingMoveAt;
+ }
  maliceHideMinigame();maliceHideQte();
 }
 function maliceRenderOnline(c){
@@ -1105,21 +1334,19 @@ function maliceRenderOnline(c){
 
 /* ------------------------------------------------ Goshnar's Megalomania
  * Boss final Soul War (lobby 1–5). Boss nasce 15s após o start.
- * QTE pessoal a cada 10–25s (Scarlett / Spite / pesca). Falha = 3000–6000 death.
+ * QTE pessoal a cada 10–25s (Scarlett / Spite). Falha = 3000–6000 death.
  * Bag You Desire: 0.15% (+50% vs mini-bosses). */
 const GOSHNAR_MEGA_ID='goshnar-s-megalomania';
 const MEGA_BOSS_SPAWN_MS=15000;
 const MEGA_PERSONAL_MIN_MS=10000;
 const MEGA_PERSONAL_MAX_MS=25000;
-const MEGA_QTE_TYPES=['scarlett','spite','fish'];
+const MEGA_QTE_TYPES=['scarlett','spite'];
 const MEGA_SCARLETT_KEYS=['up','down','left','right'];
-const MEGA_SCARLETT_LEAD_MS=1400;
-const MEGA_SCARLETT_NOTE_GAP=780;
-const MEGA_SCARLETT_WINDOW_MS=480;
+const MEGA_SCARLETT_LEAD_MS=1000;
+const MEGA_SCARLETT_NOTE_GAP=560;
+const MEGA_SCARLETT_WINDOW_MS=520;
 const MEGA_SPITE_BUBBLES=5;
 const MEGA_SPITE_QTE_MS=5000;
-const MEGA_FISH_NEED_MS=10000;
-const MEGA_FISH_TIMEOUT_MS=16000;
 const MEGA_FAIL_DMG_MIN=3000;
 const MEGA_FAIL_DMG_MAX=6000;
 const MEGA_FORM={
@@ -1202,10 +1429,29 @@ function megaSpawnBoss(c,now){
   boss=st.pendingBoss;delete st.pendingBoss;
   c.mobs=c.mobs||[];c.mobs.unshift(boss);
  }
- if(!boss){st.bossSpawned=true;return;}
+ if(!boss){
+  // Offline/local: reconstrói green se pending sumiu — nunca marque spawned vazio.
+  const slug=(typeof MEGA_FORM!=='undefined'&&MEGA_FORM.green)||'goshnar-s-megalomania-green';
+  const def=typeof GAMEDATA!=='undefined'&&GAMEDATA.monsters&&GAMEDATA.monsters[slug];
+  if(!def)return;
+  const seed=st._pendingSeed||{};
+  boss={id:String(seed.id||'mega-boss'),slug,boss:true,def:Object.assign({},def,{name:"Goshnar's Megalomania"}),
+   hp:Number(seed.hp)||def.hp||620000,maxHp:Number(seed.maxHp)||def.hp||620000,
+   cx:Number(seed.cx),cy:Number(seed.cy),x:Number(seed.x),y:Number(seed.y)};
+  if(!Number.isFinite(boss.cx)||!Number.isFinite(boss.cy)){
+   const mob=(c.huntMap&&c.huntMap.mob&&c.huntMap.mob[0])||null;
+   boss.cx=mob?Number(mob.x):15;boss.cy=mob?Number(mob.y):8;
+   const gw=Number(c.gridW)||30,gh=Number(c.gridH)||30;
+   boss.x=(boss.cx+.5)/gw;boss.y=(boss.cy+.5)/gh;
+  }
+  boss.sx=boss.x;boss.sy=boss.y;
+  boss.allowBlockedSpawn=true;boss.fixedSpawnCx=boss.cx;boss.fixedSpawnCy=boss.cy;
+  c.mobs=c.mobs||[];c.mobs.unshift(boss);
+ }
+ if(!boss)return;
  boss.maxHp=boss.maxHp||boss.hp||620000;
  megaApplyForm(c,'green',now);
- st.bossSpawned=true;st.immune=false;
+ st.bossSpawned=true;st.immune=false;delete st._pendingSeed;
  if(typeof addLog==='function')addLog('death',"Goshnar's Megalomania surgiu!");
  if(typeof toast==='function')toast("Megalomania surgiu!",'level');
  if(c.events)c.events.push({t:'spawn',slug:boss.slug,x:boss.x,y:boss.y,screen:true});
@@ -1247,21 +1493,14 @@ function megaBuildSpite(now,rnd){
  }));
  return{type:'spite',until:now+MEGA_SPITE_QTE_MS,bubbles,bubblesLeft:MEGA_SPITE_BUBBLES};
 }
-function megaBuildFish(now,rnd){
- const r=rnd||Math.random;
- return{
-  type:'fish',until:now+MEGA_FISH_TIMEOUT_MS,needMs:MEGA_FISH_NEED_MS,progress:0,
-  needle:.5,zone:.35+r()*.3,zoneW:.16+r()*.06,vel:(r()-.5)*.002,hold:false,steer:0,lastTick:now,
- };
-}
 function megaStartPersonal(c,playerId,now,randomFn){
  const st=c&&c.mega;if(!st)return null;
  const slot=megaPersonalSlot(c,playerId);if(!slot||slot.active)return null;
  const rnd=randomFn||st.randomFn||Math.random;
  const type=MEGA_QTE_TYPES[Math.min(MEGA_QTE_TYPES.length-1,Math.floor(rnd()*MEGA_QTE_TYPES.length))];
- const active=type==='scarlett'?megaBuildScarlett(now,rnd):
-  (type==='spite'?megaBuildSpite(now,rnd):megaBuildFish(now,rnd));
+ const active=type==='scarlett'?megaBuildScarlett(now,rnd):megaBuildSpite(now,rnd);
  slot.active=active;slot.nextAt=0;
+ delete st._qteRenderKey;
  if(c.events)c.events.push({t:'mega-qte',phase:'start',kind:type,playerId:String(playerId),screen:true});
  if(String(playerId)===megaLocalPlayerId(c)){
   if(typeof addLog==='function')addLog('death',"Megalomania: mecânica pessoal ("+type+")!");
@@ -1273,6 +1512,7 @@ function megaResolvePersonal(c,playerId,success,now){
  const st=c&&c.mega;if(!st)return;
  const slot=megaPersonalSlot(c,playerId);if(!slot||!slot.active)return;
  const kind=slot.active.type;slot.active=null;
+ delete st._qteRenderKey;
  slot.nextAt=megaNextPersonalAt(now||Date.now(),st.randomFn);
  if(success){
   if(String(playerId)===megaLocalPlayerId(c)){
@@ -1291,19 +1531,6 @@ function megaResolvePersonal(c,playerId,success,now){
  }
  if(c.events)c.events.push({t:'mega-qte',result:success?'success':'fail',kind,playerId:String(playerId),screen:true});
  if(String(playerId)===megaLocalPlayerId(c)){megaHideQte();megaRenderMinigame(c,now||Date.now());}
-}
-function megaTickFish(active,now,dt){
- if(!active||active.type!=='fish')return;
- const step=Math.max(16,Math.min(80,dt||(now-(active.lastTick||now))));
- active.lastTick=now;
- active.vel=(active.vel||0)+(Math.random()-.5)*.0008+(Number(active.steer)||0)*.0009;
- active.vel=Math.max(-.004,Math.min(.004,active.vel));
- active.needle=Math.max(0,Math.min(1,(active.needle||.5)+active.vel*step));
- if(active.needle<=0||active.needle>=1)active.vel*=-.55;
- const half=(active.zoneW||.16)/2;
- const inZone=Math.abs((active.needle||.5)-(active.zone||.5))<=half;
- if(active.hold&&inZone)active.progress=(active.progress||0)+step;
- else active.progress=Math.max(0,(active.progress||0)-step*.35);
 }
 function megaOnlineAuthority(){
  return typeof onlineAuthorityCombat==='function'&&onlineAuthorityCombat();
@@ -1328,7 +1555,18 @@ function megaInputSpite(c,index,now){
  const id=megaLocalPlayerId(c),slot=megaPersonalSlot(c,id);
  if(!slot||!slot.active||slot.active.type!=='spite')return false;
  if(megaOnlineAuthority()){
-  c._megaPendingIntent={kind:'spite',bubble:Number(index)};return true;
+  const bubble=(slot.active.bubbles||[])[index];
+  if(!bubble||bubble.popped)return false;
+  // Otimista local: evita rebuild apagar o clique e acumula intents.
+  bubble.popped=true;
+  slot.active.bubblesLeft=Math.max(0,(slot.active.bubblesLeft||1)-1);
+  c._megaPendingIntents=Array.isArray(c._megaPendingIntents)?c._megaPendingIntents:[];
+  c._megaPendingIntents.push({kind:'spite',bubble:Number(index)});
+  if(c._megaPendingIntents.length>16)c._megaPendingIntents.splice(0,c._megaPendingIntents.length-16);
+  c._megaPendingIntent={kind:'spite',bubble:Number(index)};
+  delete c.mega._qteRenderKey;
+  megaRenderQte(c,now||Date.now());
+  return true;
  }
  const bubble=(slot.active.bubbles||[])[index];
  if(!bubble||bubble.popped)return false;
@@ -1337,20 +1575,13 @@ function megaInputSpite(c,index,now){
  else megaRenderQte(c,now);
  return true;
 }
-function megaInputFish(c,patch){
- const id=megaLocalPlayerId(c),slot=megaPersonalSlot(c,id);
- if(!slot||!slot.active||slot.active.type!=='fish')return false;
- if(megaOnlineAuthority()){
-  c._megaPendingIntent=Object.assign({kind:'fish'},patch||{});return true;
- }
- if(patch&&typeof patch.hold==='boolean')slot.active.hold=patch.hold;
- if(patch&&Number.isFinite(Number(patch.steer)))slot.active.steer=Math.max(-1,Math.min(1,Number(patch.steer)));
- return true;
-}
 function megaBindKeys(c){
  if(typeof document==='undefined')return;
  if(document._megaKeyHandler)document.removeEventListener('keydown',document._megaKeyHandler);
- if(document._megaKeyUpHandler)document.removeEventListener('keyup',document._megaKeyUpHandler);
+ if(document._megaKeyUpHandler){
+  document.removeEventListener('keyup',document._megaKeyUpHandler);
+  document._megaKeyUpHandler=null;
+ }
  document._megaKeyHandler=function(ev){
   const id=megaLocalPlayerId(c),slot=megaPersonalSlot(c,id);
   if(!slot||!slot.active)return;
@@ -1360,21 +1591,9 @@ function megaBindKeys(c){
     w:'up',W:'up',s:'down',S:'down',a:'left',A:'left',d:'right',D:'right'};
    const dir=map[ev.key];if(!dir)return;
    ev.preventDefault();megaInputScarlett(c,dir,Date.now());
-  }else if(act.type==='fish'){
-   if(ev.code==='Space'||ev.key===' '){ev.preventDefault();megaInputFish(c,{hold:true});}
-   else if(ev.key==='a'||ev.key==='A'||ev.key==='ArrowLeft'){ev.preventDefault();megaInputFish(c,{steer:-1});}
-   else if(ev.key==='d'||ev.key==='D'||ev.key==='ArrowRight'){ev.preventDefault();megaInputFish(c,{steer:1});}
   }
  };
- document._megaKeyUpHandler=function(ev){
-  const id=megaLocalPlayerId(c),slot=megaPersonalSlot(c,id);
-  if(!slot||!slot.active||slot.active.type!=='fish')return;
-  if(ev.code==='Space'||ev.key===' ')megaInputFish(c,{hold:false});
-  if(ev.key==='a'||ev.key==='A'||ev.key==='ArrowLeft'||ev.key==='d'||ev.key==='D'||ev.key==='ArrowRight')
-   megaInputFish(c,{steer:0});
- };
  document.addEventListener('keydown',document._megaKeyHandler);
- document.addEventListener('keyup',document._megaKeyUpHandler);
 }
 function megaRenderMinigame(c,now){
  const el=megaMinigameElement();if(!el||!c||!c.mega)return;
@@ -1390,13 +1609,18 @@ function megaRenderMinigame(c,now){
  el.innerHTML=`<div class="mega-title">GOSHNAR'S MEGALOMANIA</div>
   <div class="mega-row"><span>Boss</span><b>${st.bossSpawned?'ATIVO':('nasce em '+spawnLeft+'s')}</b></div>
   <div class="mega-row"><span>Sua mecânica</span><b>${qte}</b></div>
-  <small>QTE pessoal 10–25s · Scarlett / Spite / pesca · falha 3k–6k death</small>`;
+  <small>QTE pessoal 10–25s · Scarlett / Spite · falha 3k–6k death</small>`;
 }
 function megaRenderQte(c,now){
  const el=megaQteElement();if(!el||!c||!c.mega){megaHideQte();return;}
  const slot=megaPersonalSlot(c,megaLocalPlayerId(c));
  if(!slot||!slot.active){megaHideQte();return;}
  const act=slot.active,left=Math.max(0,Math.ceil(((act.until||0)-now)/1000));
+ // Evita recriar o DOM a cada frame (cliques em bolhas morriam no rebuild).
+ const poppedMask=(act.bubbles||[]).map((b)=>b&&b.popped?1:0).join('');
+ const qteKey=[act.type,left,act.index||0,act.bubblesLeft||0,poppedMask].join('|');
+ if(c.mega._qteRenderKey===qteKey&&el.classList.contains('active'))return;
+ c.mega._qteRenderKey=qteKey;
  el.style.display='block';el.className='mega-qte active';
  if(act.type==='scarlett'){
   const notes=(act.notes||[]).map((note,i)=>{
@@ -1415,16 +1639,6 @@ function megaRenderQte(c,now){
   el.querySelectorAll('[data-bi]').forEach((node)=>{
    node.onclick=function(ev){ev.preventDefault();megaInputSpite(c,Number(node.getAttribute('data-bi')),Date.now());};
   });
- }else if(act.type==='fish'){
-  const pct=Math.min(100,Math.floor(100*(act.progress||0)/(act.needMs||MEGA_FISH_NEED_MS)));
-  const needle=((act.needle||.5)*100).toFixed(1);
-  const zw=Math.max(8,((act.zoneW||.16)*100));
-  const zoneLeft=Math.max(0,((act.zone||.5)*100)-zw/2);
-  el.innerHTML=`<div class="mega-qte-title">PESCA — ${pct}% · ${left}s</div>
-   <div class="mega-fish-bar"><i class="mega-fish-zone" style="left:${zoneLeft.toFixed(1)}%;width:${zw.toFixed(1)}%"></i>
-    <b class="mega-fish-needle" style="left:${needle}%"></b></div>
-   <div class="mega-fish-progress"><i style="width:${pct}%"></i></div>
-   <div class="mega-qte-help">Segure ESPAÇO + A/D para manter o indicador na zona verde (10s)</div>`;
  }
  megaBindKeys(c);
 }
@@ -1439,6 +1653,10 @@ function megaBossInit(c,player,randomFn,now){
   boss.maxHp=boss.maxHp||boss.hp||620000;
   boss.megaPendingSpawn=true;boss.qteImmune=true;boss.megaImmune=true;
   c.mega.pendingBoss=boss;
+  c.mega._pendingSeed={
+   id:String(boss.id||'mega-boss'),slug:String(boss.slug||''),
+   cx:boss.cx,cy:boss.cy,x:boss.x,y:boss.y,hp:boss.hp,maxHp:boss.maxHp
+  };
   c.mobs=(c.mobs||[]).filter((m)=>m!==boss);
  }
  megaEnsurePersonalSchedulers(c,now+MEGA_BOSS_SPAWN_MS,rnd);
@@ -1461,10 +1679,7 @@ function megaBossTick(c,now){
  for(const pid of Object.keys(st.personal||{})){
   const slot=st.personal[pid];if(!slot)continue;
   if(slot.active){
-   if(slot.active.type==='fish')megaTickFish(slot.active,now,48);
-   if(slot.active.type==='fish'&&(slot.active.progress||0)>=(slot.active.needMs||MEGA_FISH_NEED_MS))
-    megaResolvePersonal(c,pid,true,now);
-   else if(now>=(slot.active.until||0))megaResolvePersonal(c,pid,false,now);
+   if(now>=(slot.active.until||0))megaResolvePersonal(c,pid,false,now);
    else if(String(pid)===megaLocalPlayerId(c))megaRenderQte(c,now);
   }else if(now>=(slot.nextAt||0))megaStartPersonal(c,pid,now,st.randomFn);
  }

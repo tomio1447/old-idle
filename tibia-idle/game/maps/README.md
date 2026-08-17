@@ -129,16 +129,19 @@ nascer, 50.000 HP, dano escalado e zera todos os contadores.
 
 ## Goshnar's Greed
 
-`goshnars_greed_room.otbm` é uma boss room dedicada de 20×14, gerada por
-`tools/build_soulwar_boss_rooms.js`, sem reutilizar o terreno de Rotten
-Wasteland. O mapa é centralizado num mundo runtime 30×30; o player nasce em
-`(10,12)` (runtime `(15,20)`) e Goshnar em `(10,2)` (runtime `(15,10)`).
-Quatro ilhas laterais separam os pontos dos adds do corredor do boss.
-A recompensa da Mirrored Nightmare já registra o acesso, mas
-requisito e cooldown estão temporariamente desligados para testes. Durante a
-luta aparecem até seis adds sem defesa/imunidade; cada nascimento tem 30% de
-chance de ser Greedbeast. A cada cinco Greedbeasts mortos, o boss perde a
-imunidade durante 40 segundos.
+Fonte Canary: `beta-maps/bossesroom/goshnar_greed_room.otbm` (singular,
+igual Hatred/Spite). `tools/build_soulwar_boss_rooms.js` publica em
+`maps/goshnars_greed_room.otbm`. **Não** coloque só o nome publicado
+`goshnars_greed_room.otbm` se for o placeholder antigo — o build ignora o
+sintético 20×14 (~2.8KB, header `OTBM`) e, sem a fonte `goshnar_greed_room`,
+cai no placeholder (antes também sobrescrevia o beta).
+
+Enquanto a fonte Canary não existir, o runtime usa a sala sintética 20×14
+centralizada em mundo 30×30: player `(10,12)` → `(15,20)`, boss `(10,2)` →
+`(15,10)`. A recompensa da Mirrored Nightmare já registra o acesso; requisito
+e cooldown estão temporariamente desligados para testes. Durante a luta
+aparecem até seis adds; cada nascimento tem 30% de chance de ser Greedbeast.
+A cada cinco Greedbeasts mortos, o boss perde a imunidade por 40 segundos.
 
 ## Goshnar's Spite
 
@@ -171,7 +174,7 @@ câmera `22×15` segue o player na arena circular de mármore (~17–19 Ø
 centrada ~1052,1020).
 
 Canary usa white tiles a cada 40s; no idle o Maze QTE roda a cada 30s:
-matriz 30×30, azul→vermelho em 5s, blocos caindo top→bottom. Falha =
+matriz 30×30, azul→vermelho em 12s, blocos caindo top→bottom. Falha =
 6000 death em todos os players. Trash: Dreadful Harvester / Malicious
 Soul até 8, respawn 20s. Cooldown desligado para testes. Kill concede
 mácula Soul War.
@@ -191,3 +194,11 @@ Power** para abrir Green 70s (Blue burst 7s após 60s); depois volta a
 Purple. White tiles / Maze QTE a cada 40s — falha = 6000 death.
 Bag You Desire com **0.15%** (+50% vs mini-bosses em 0.1%). HP 620k /
 EXP 3M (forma Green). Cooldown desligado para testes.
+
+## Goshnar's Taints (UI)
+
+Máculas acumulativas (1–5) após derrotar os mini-bosses Soul War. Na
+barra de status, o tooltip usa o texto estilo Tibia: cabeçalho
+“Se você está nas covas do Goshnar, você sofre N penalidades:” + lista
+só das máculas ativas (teleporte, spawn ao atacar, +15% dano recebido,
+cura total ao morrer, perda 10% HP/mana a cada 10s).

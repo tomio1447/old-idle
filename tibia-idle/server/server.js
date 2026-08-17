@@ -48,11 +48,16 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const store = require("./store");
+const mailer = require("./mailer");
 
 const PORT = parseInt(process.env.PORT || "3333", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
 const TEST_SERVER = process.env.TEST_SERVER === "1";
+// Verificação de e-mail por código (confirmação de conta).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const EMAIL_VERIFY_REQUIRED = process.env.EMAIL_VERIFY_REQUIRED === "1";
+const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
 const LEASE_TTL_MS=Math.max(500,parseInt(process.env.LEASE_TTL_MS||"120000",10)||120000);
 const SESSION_TTL_MS=Math.max(1000,parseInt(process.env.SESSION_TTL_MS||"86400000",10)||86400000);
 const INSTANCE_WORKER_INTERVAL_MS=Math.max(100,parseInt(process.env.INSTANCE_WORKER_INTERVAL_MS||"1000",10)||1000);
@@ -457,6 +462,8 @@ function accountPublicView(acc){
   const vipUntil=Math.max(0,Math.floor(Number(acc&&acc.vip_until)||0));
   return {
     id:acc.id, login:acc.login, role:acc.role, coins:acc.coins||0,
+    email:String(acc&&acc.email||""),
+    emailVerified:!!(acc&&acc.email_verified),
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
@@ -504,8 +511,10 @@ async function ensureTestAccounts(db) {
 async function register(db, body) {
   const login = String(body.login || "").trim();
   const password = String(body.password || "");
+  const email = String(body.email || "").trim().slice(0, 120);
   if (login.length < 1 || login.length > 32) return { code: 400, body: { ok: false, msg: "Login inválido (1-32 caracteres)" } };
   if (password.length < 1) return { code: 400, body: { ok: false, msg: "Senha obrigatória" } };
+  if (email && !EMAIL_RE.test(email)) return { code: 400, body: { ok: false, msg: "E-mail inválido" } };
   const exist = await db.findAccountByLogin(login);
   // Duplicidade é erro de formulário, não falha de transporte. Responder
   // 200 evita o falso "Failed to load resource" no console; `ok:false`
@@ -513,7 +522,7 @@ async function register(db, body) {
   if (exist) return { code: 200, body: { ok: false, error: "ACCOUNT_EXISTS",
     msg: "Conta já existe. Use a aba Entrar." } };
   const hash = bcrypt.hashSync(password, SALT_ROUNDS);
-  const acc = await db.createAccount(login, hash, "user", 0);
+  const acc = await db.createAccount(login, hash, "user", 0, email);
   return { code: 201, body: { ok: true, id: acc.id, login: acc.login, role: acc.role } };
 }
 
@@ -681,6 +690,9 @@ async function createCharacter(db, body) {
   const token = body.token;
   const acc = await db.findAccountByToken(token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (EMAIL_VERIFY_REQUIRED && !acc.email_verified)
+    return { code: 403, body: { ok: false, error: "EMAIL_VERIFY_REQUIRED",
+      msg: "Confirme seu e-mail antes de criar um personagem." } };
   const name = String(body.name || "").trim();
   if (name.length < 2 || name.length > 20) return { code: 400, body: { ok: false, msg: "Nome inválido" } };
   if (await db.findCharacterByName(name)) return { code: 409, body: { ok: false, msg: "Nome já em uso" } };
@@ -2283,6 +2295,45 @@ async function setVip(db, body) {
   return { code: 200, body: { ok: true, vipUntil: until, vip: until > now } };
 }
 
+/* ------------------------- verificação de e-mail -------------------------
+ * O jogador cadastra o e-mail, recebe um código de 6 dígitos (10 min) e o
+ * confirma para autenticar a conta. `EMAIL_VERIFY_REQUIRED=1` passa a exigir
+ * e-mail confirmado antes de criar personagem. Em TEST_SERVER o código é
+ * devolvido como `devCode` (o mailer não envia de verdade). */
+async function requestEmailCode(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (acc.email_verified) return { code: 200, body: { ok: true, alreadyVerified: true, emailVerified: true } };
+  const email = String(body.email || acc.email || "").trim().slice(0, 120);
+  if (!EMAIL_RE.test(email)) return { code: 400, body: { ok: false, msg: "Informe um e-mail válido." } };
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + EMAIL_CODE_TTL_MS;
+  if (typeof db.setAccountEmail === "function") await db.setAccountEmail(acc.id, email);
+  if (typeof db.setAccountEmailCode === "function") await db.setAccountEmailCode(acc.id, code, expiresAt);
+  const sent = await mailer.sendVerificationCode(email, code, acc.login);
+  return { code: 200, body: {
+    ok: true,
+    emailSent: !!sent.ok,
+    mock: !!sent.mock,
+    msg: sent.ok ? "Código enviado para " + email + "." : "Falha ao enviar o e-mail. Configure o SMTP no servidor.",
+    ...(TEST_SERVER ? { devCode: code } : {}),
+  } };
+}
+async function verifyEmailCode(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (acc.email_verified) return { code: 200, body: { ok: true, alreadyVerified: true, emailVerified: true } };
+  const code = String(body.code || "").trim();
+  if (!/^\d{6}$/.test(code)) return { code: 400, body: { ok: false, msg: "Código inválido." } };
+  const stored = String(acc.email_code || "");
+  const expiresAt = Number(acc.email_code_expires) || 0;
+  if (!stored || expiresAt < Date.now()) return { code: 400, body: { ok: false, msg: "Código expirado. Solicite um novo." } };
+  if (code !== stored) return { code: 400, body: { ok: false, msg: "Código incorreto." } };
+  if (typeof db.setAccountEmailVerified === "function") await db.setAccountEmailVerified(acc.id, true);
+  if (typeof db.setAccountEmailCode === "function") await db.setAccountEmailCode(acc.id, "", 0);
+  return { code: 200, body: { ok: true, emailVerified: true } };
+}
+
 /* ------------------------------ MARKET P2P ------------------------------ */
 
 /* ====================== REGRAS OFICIAIS DO MARKET ======================
@@ -2873,6 +2924,14 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/account/missions"){
         const r=await updateAccountMissions(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/email/send"){
+        const limited=rateLimit(req,"email-send",10,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await requestEmailCode(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/email/verify"){
+        const limited=rateLimit(req,"email-verify",20,600000);if(limited)return send(res,limited.code,limited.body);
+        const r=await verifyEmailCode(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="GET"&&url==="/api/instance"){
         const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;

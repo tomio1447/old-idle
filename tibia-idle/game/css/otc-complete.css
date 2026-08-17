@@ -705,9 +705,11 @@ input:focus, textarea:focus, select:focus {
 .otc-win-title button, .otc-win-title .sm { pointer-events: auto; }
 .otc-win-x {
   pointer-events: auto;
-  width: 20px; height: 18px; line-height: 16px; text-align: center;
-  color: #fff; background: rgba(255,255,255,.08); border: 1px solid #000;
-  border-radius: 2px; cursor: pointer; font-size: 11px;
+  position: relative;
+  z-index: 2;
+  width: 22px; height: 20px; line-height: 18px; text-align: center;
+  color: #fff; background: rgba(255,255,255,.12); border: 1px solid #000;
+  border-radius: 2px; cursor: pointer; font-size: 12px; flex-shrink: 0;
 }
 .otc-win-x:hover { background: rgba(255,80,80,.45); }
 .otc-win-body {

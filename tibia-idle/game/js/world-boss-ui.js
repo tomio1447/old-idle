@@ -1,5 +1,5 @@
 /*
- * world-boss-ui.js — lobby JOIN/LEAVE, countdown overlay, combate stub.
+ * world-boss-ui.js — lobby JOIN/LEAVE, countdown overlay, shared instance enter.
  * Depende de account-client (API) e game.js (G, temple, helper).
  */
 "use strict";
@@ -11,6 +11,7 @@ let WB = {
   poll: null,
   timerTick: null,
   overlay: null,
+  chip: null,
   panel: null,
   combat: null,
   lastReportAt: 0,
@@ -18,6 +19,15 @@ let WB = {
   pendingHeal: 0,
   pendingTaken: 0,
   deadUntil: {},
+  /** Minimizado só durante o evento atual (warzoneId + janela do lobby). */
+  overlayMinimized: false,
+  overlayMinKey: null,
+  /** Fechado (Cancelar) — some overlay/chip até o próximo evento. */
+  overlayDismissed: false,
+  overlayDismissKey: null,
+  /** Painel JOIN fechado sem sair do evento. */
+  panelDismissed: false,
+  panelDismissKey: null,
 };
 
 function wbT(key, fallback) {
@@ -68,9 +78,126 @@ function wbEnsureDom() {
   overlay.id = "world-boss-overlay";
   overlay.className = "world-boss-overlay";
   overlay.style.display = "none";
-  overlay.innerHTML = `<div class="world-boss-overlay-msg" id="world-boss-overlay-msg"></div>`;
+  overlay.innerHTML = `
+    <div class="world-boss-overlay-card" role="dialog" aria-labelledby="world-boss-overlay-msg">
+      <div class="world-boss-overlay-head">
+        <span class="world-boss-overlay-title">${wbT("wb.warnTitle", "WORLD BOSS")}</span>
+        <button type="button" class="world-boss-overlay-min" id="wb-overlay-min"
+          title="${wbT("wb.minimize", "Minimizar")}" aria-label="${wbT("wb.minimize", "Minimizar")}">&minus;</button>
+        <button type="button" class="world-boss-overlay-close" id="wb-overlay-close"
+          title="${wbT("wb.cancel", "Cancelar")}" aria-label="${wbT("wb.cancel", "Cancelar")}">&times;</button>
+      </div>
+      <div class="world-boss-overlay-msg" id="world-boss-overlay-msg"></div>
+      <div class="world-boss-overlay-actions">
+        <button type="button" class="sm" id="wb-overlay-cancel">${wbT("wb.cancel", "Cancelar")}</button>
+      </div>
+    </div>`;
   document.body.appendChild(overlay);
   WB.overlay = overlay;
+
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.id = "world-boss-overlay-chip";
+  chip.className = "world-boss-overlay-chip";
+  chip.style.display = "none";
+  chip.title = wbT("wb.restore", "Restaurar aviso do World Boss");
+  document.body.appendChild(chip);
+  WB.chip = chip;
+
+  const minBtn = document.getElementById("wb-overlay-min");
+  if (minBtn) minBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); wbMinimizeOverlay(); };
+  const closeBtn = document.getElementById("wb-overlay-close");
+  if (closeBtn) closeBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); wbDismissOverlay(); };
+  const cancelBtn = document.getElementById("wb-overlay-cancel");
+  if (cancelBtn) cancelBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); wbDismissOverlay(); };
+  chip.onclick = (e) => { e.preventDefault(); e.stopPropagation(); wbRestoreOverlay(); };
+}
+
+function wbOverlayEventKey(ev) {
+  if (!ev) return null;
+  /* Uma chave por evento/warzone — persiste lobby→countdown→spawn. */
+  return String(ev.warzoneId || ev.bossName || "wb");
+}
+
+function wbSyncMinimizeKey(ev) {
+  const key = wbOverlayEventKey(ev);
+  if (!key) {
+    WB.overlayMinimized = false;
+    WB.overlayMinKey = null;
+    WB.overlayDismissed = false;
+    WB.overlayDismissKey = null;
+    WB.panelDismissed = false;
+    WB.panelDismissKey = null;
+    return;
+  }
+  if (WB.overlayMinKey !== key) {
+    WB.overlayMinKey = key;
+    WB.overlayMinimized = false;
+  }
+  if (WB.overlayDismissKey !== key) {
+    WB.overlayDismissKey = key;
+    WB.overlayDismissed = false;
+  }
+  if (WB.panelDismissKey !== key) {
+    WB.panelDismissKey = key;
+    WB.panelDismissed = false;
+  }
+}
+
+function wbMinimizeOverlay() {
+  const st = WB.state;
+  const ev = st && st.event;
+  wbSyncMinimizeKey(ev);
+  if (!ev) return;
+  WB.overlayMinimized = true;
+  WB.overlayDismissed = false;
+  wbRenderOverlay();
+}
+
+function wbDismissOverlay() {
+  const st = WB.state;
+  const ev = st && st.event;
+  wbSyncMinimizeKey(ev);
+  if (!ev) return;
+  WB.overlayDismissed = true;
+  WB.overlayMinimized = false;
+  wbHideOverlayUi();
+}
+
+function wbDismissPanel() {
+  const st = WB.state;
+  const ev = st && st.event;
+  wbSyncMinimizeKey(ev);
+  if (!ev) return;
+  WB.panelDismissed = true;
+  if (WB.panel) WB.panel.style.display = "none";
+}
+
+function wbRestoreOverlay() {
+  WB.overlayMinimized = false;
+  WB.overlayDismissed = false;
+  wbRenderOverlay();
+}
+
+function wbHideOverlayUi() {
+  if (WB.overlay) WB.overlay.style.display = "none";
+  if (WB.chip) WB.chip.style.display = "none";
+}
+
+function wbShowOverlayExpanded(msg) {
+  wbHideOverlayUi();
+  if (!WB.overlay) return;
+  const msgEl = document.getElementById("world-boss-overlay-msg");
+  if (msgEl) msgEl.textContent = msg;
+  WB.overlay.style.display = "flex";
+}
+
+function wbShowOverlayChip(msg) {
+  wbHideOverlayUi();
+  if (!WB.chip) return;
+  const short = String(msg || "").replace(/\s+/g, " ").trim();
+  WB.chip.textContent = short.length > 64 ? short.slice(0, 61) + "…" : short;
+  WB.chip.style.display = "block";
 }
 
 function wbVocLabel(v) {
@@ -95,7 +222,8 @@ function wbBossSpriteSlug(ev) {
 function wbBossSpriteHtml(ev, size) {
   const slug = wbBossSpriteSlug(ev);
   const px = size || 48;
-  if (typeof mobImg === "function") return mobImg(slug, px);
+  if (typeof bossMobImg === "function") return bossMobImg(slug, px);
+  if (typeof mobImg === "function") return mobImg(slug, px, "", { walkAnim: true });
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
   return `<img class="world-boss-sprite-img" src="assets/mob/${slug}.png?v=${v}" alt="" width="${px}" height="${px}" style="image-rendering:pixelated;object-fit:contain">`;
 }
@@ -119,6 +247,7 @@ function wbEnsurePanelShell() {
       <div class="world-boss-actions">
         <button type="button" class="sm primary" id="wb-join-btn" style="display:none">${wbT("wb.join", "JOIN")}</button>
         <button type="button" class="sm" id="wb-leave-btn" style="display:none">${wbT("wb.leave", "LEAVE")}</button>
+        <button type="button" class="sm" id="wb-close-btn">${wbT("wb.cancel", "Cancelar")}</button>
       </div>
       <div id="wb-join-picker" class="world-boss-picker" style="display:none"></div>
       <div class="tiny dim" id="wb-status"></div>
@@ -127,6 +256,8 @@ function wbEnsurePanelShell() {
   if (joinBtn) joinBtn.onclick = () => wbShowJoinPicker();
   const leaveBtn = document.getElementById("wb-leave-btn");
   if (leaveBtn) leaveBtn.onclick = () => wbLeave();
+  const closeBtn = document.getElementById("wb-close-btn");
+  if (closeBtn) closeBtn.onclick = () => wbDismissPanel();
 }
 
 function wbRenderPanel() {
@@ -134,6 +265,13 @@ function wbRenderPanel() {
   const st = WB.state;
   const ev = st && st.event;
   if (!ev || (ev.phase !== "lobby" && ev.phase !== "countdown")) {
+    WB.panelDismissed = false;
+    WB.panelDismissKey = null;
+    if (WB.panel) WB.panel.style.display = "none";
+    return;
+  }
+  wbSyncMinimizeKey(ev);
+  if (WB.panelDismissed) {
     if (WB.panel) WB.panel.style.display = "none";
     return;
   }
@@ -305,60 +443,68 @@ function wbRenderOverlay() {
   const st = WB.state;
   const ev = st && st.event;
   const you = st && st.you;
-  const msgEl = document.getElementById("world-boss-overlay-msg");
   if (!ev || !you || !you.joined) {
-    WB.overlay.style.display = "none";
+    WB.overlayMinimized = false;
+    WB.overlayMinKey = null;
+    WB.overlayDismissed = false;
+    WB.overlayDismissKey = null;
+    wbHideOverlayUi();
+    return;
+  }
+  wbSyncMinimizeKey(ev);
+  if (WB.overlayDismissed) {
+    wbHideOverlayUi();
+    return;
+  }
+
+  if (ev.phase === "lobby") {
+    const left = Math.max(0, Math.ceil(((ev.lobbyEndsAt || 0) - Date.now()) / 1000));
+    const msg = (ev.message || wbWarzoneTitle(ev))
+      + (left > 0 ? " (" + left + "s)" : "");
+    if (WB.overlayMinimized) wbShowOverlayChip(msg);
+    else wbShowOverlayExpanded(msg);
     return;
   }
   if (ev.phase === "countdown") {
-    WB.overlay.style.display = "flex";
     const left = Math.max(0, Math.ceil((ev.countdownEndsAt - Date.now()) / 1000));
-    msgEl.textContent = (ev.message || wbT("wb.prepMsg",
+    const msg = (ev.message || wbT("wb.prepMsg",
       "EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!"))
       + " (" + left + "s)";
+    if (WB.overlayMinimized) wbShowOverlayChip(msg);
+    else wbShowOverlayExpanded(msg);
     return;
   }
   if (ev.phase === "combat") {
     const now = Date.now();
     if (ev.spawnAt && now < ev.spawnAt) {
-      WB.overlay.style.display = "flex";
       const left = Math.max(0, Math.ceil((ev.spawnAt - now) / 1000));
-      msgEl.textContent = wbT("wb.spawnSoon", "Boss spawna em") + " " + left + "s";
+      const msg = wbT("wb.spawnSoon", "Boss spawna em") + " " + left + "s";
+      if (WB.overlayMinimized) wbShowOverlayChip(msg);
+      else wbShowOverlayExpanded(msg);
       return;
     }
-    WB.overlay.style.display = "none";
-    if (!WB.combat) wbEnterCombatStub(ev);
+    WB.overlayMinimized = false;
+    WB.overlayMinKey = null;
+    WB.overlayDismissed = false;
+    WB.overlayDismissKey = null;
+    wbHideOverlayUi();
+    if (!WB.combat) wbEnterSharedCombat(ev);
     return;
   }
-  WB.overlay.style.display = "none";
+  WB.overlayMinimized = false;
+  WB.overlayMinKey = null;
+  WB.overlayDismissed = false;
+  WB.overlayDismissKey = null;
+  wbHideOverlayUi();
 }
 
-function wbPlaceholderMap() {
-  const w = 40, h = 40;
-  const cells = [];
-  const rows = [];
-  for (let y = 0; y < h; y++) {
-    const row = [];
-    for (let x = 0; x < w; x++) row.push({ ground: 100, items: [] });
-    cells.push(row);
-    rows.push(".".repeat(w));
-  }
-  return {
-    w, h, z: 7,
-    name: "World Boss Arena (placeholder)",
-    spawn: { x: 20, y: 28 },
-    boss: { x: 20, y: 16 },
-    cells,
-    rows,
-    leg: { ".": { v: [100] } },
-    // Sem zona G de hunt — evita spawnWave achar spots de cobra/etc.
-    mob: [],
-  };
-}
-
-function wbJoinedIdSet() {
-  const chars = (WB.state && WB.state.you && WB.state.you.chars) || [];
-  return new Set(chars.map((c) => Number(c.id)).filter((n) => n > 0));
+function wbFollowCharId(ev) {
+  const fromYou = (WB.state && WB.state.you && WB.state.you.chars) || [];
+  const fromEv = (ev && Array.isArray(ev.chars) ? ev.chars : []) || [];
+  const chars = fromYou.length ? fromYou : fromEv;
+  const cur = typeof sessionCharId === "function" ? Number(sessionCharId()) : 0;
+  const match = chars.find((c) => Number(c.id) === cur);
+  return Number((match || chars[0] || {}).id) || cur || 0;
 }
 
 /* Templo + fim da instância online ANTES da arena WB (evita fusão hunt↔boss). */
@@ -413,181 +559,68 @@ async function wbPrepTempleFromHunt() {
   await new Promise((r) => setTimeout(r, 300));
 }
 
-function wbBuildIsolatedCombat(ev) {
-  const map = wbPlaceholderMap();
-  const bossId = "world-boss-" + (ev.warzoneId || "wz1");
-  const sprite = wbBossSpriteSlug(ev);
-  const bossName = ev.bossName || "World Boss";
-  const bossHp = Math.max(1, Math.floor(Number(ev.bossMaxHp || ev.bossHp) || 2500000));
-  const spawn = map.spawn || { x: 20, y: 28 };
-  const bossCell = map.boss || { x: 20, y: 16 };
-
-  if (typeof setGridSize === "function") setGridSize(map.w, map.h);
-  else if (typeof setGridForMap === "function") {
-    setGridForMap({ w: map.w, h: map.h, rows: Array.from({ length: map.h }, () => " ".repeat(map.w)) });
-  }
-
-  const gw = (typeof GRID_W !== "undefined" ? GRID_W : map.w) || map.w;
-  const gh = (typeof GRID_H !== "undefined" ? GRID_H : map.h) || map.h;
-
-  const bossDef = {
-    id: bossId,
-    name: bossName,
-    title: ev.warzoneName || ("Warzone " + wbWarzoneNumber(ev)),
-    hunt: null,
-    baseMonster: ev.baseMonster || sprite,
-    sprite,
-    hp: bossHp,
-    exp: 0,
-    damage: Math.max(80, Math.floor(bossHp / 8000)),
-    armor: 80,
-    defense: 80,
-    mult: 1,
-    requirement: null,
-    cooldown: 0,
-    loot: [],
-    worldBoss: true,
-  };
-
-  const def = {
-    name: bossName,
-    hp: bossHp,
-    exp: 0,
-    damage: bossDef.damage,
-    armor: bossDef.armor,
-    defense: bossDef.defense,
-    loot: [],
-    attackSpeed: 2000,
-  };
-
-  const bossMob = {
-    slug: sprite,
-    def,
-    boss: true,
-    worldBoss: true,
-    hp: bossHp,
-    maxHp: bossHp,
-    atkCd: 700,
-    id: "boss-" + bossId,
-    cx: bossCell.x,
-    cy: bossCell.y,
-    x: (bossCell.x + 0.5) / gw,
-    y: (bossCell.y + 0.5) / gh,
-    dir: "w",
-    moving: false,
-    attackAnim: 0,
-    speed: 0.00004,
-    spawnAt: Date.now(),
-  };
-
-  const c = {
-    huntId: null,
-    hunt: { name: "World Boss", monsters: [], pack: 0, packMin: 0, packMax: 0 },
-    huntMap: map,
-    gridW: gw,
-    gridH: gh,
-    camera: { x: gw / 2, y: gh / 2, locked: true },
-    instanceMode: "world-boss",
-    worldBoss: true,
-    pvp: false,
-    expMul: 1,
-    lootMul: 1,
-    skillMul: 1,
-    influencedChance: 0,
-    fiendishChance: 0,
-    raidEnabled: false,
-    raidCd: Infinity,
-    raidMode: "none",
-    mobs: [bossMob],
-    pendingSpawns: [],
-    wave: 0,
-    playerAtkCd: 0,
-    spellCd: {},
-    runeCd: 0,
-    healCd: 0,
-    potionCd: 0,
-    regenHp: 0,
-    regenMp: 0,
-    buffs: {},
-    player: {
-      cx: spawn.x, cy: spawn.y,
-      x: (spawn.x + 0.5) / gw, y: (spawn.y + 0.5) / gh,
-      dir: "n", moving: false, frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
-    },
-    stats: {
-      startedAt: Date.now(), kills: 0, exp: 0, rawExp: 0, rawHp: 0,
-      gold: 0, damage: 0, taken: 0, deaths: 0, blessCost: 0,
-      deathTrack: { startedAt: Date.now(), byPlayer: {} },
-      loot: {}, monsters: {},
-      supplyUsed: {}, supplyCost: 0, time: 0,
-    },
-    events: [],
-    delayedHits: [],
-    dead: false,
-    deadUntil: 0,
-    players: null,
-    boss: bossDef,
-    bossDefeated: false,
-  };
-
-  // Só chars do JOIN (máx. 2) — não arrasta a PT inteira da hunt.
-  const joined = wbJoinedIdSet();
-  try {
-    if (joined.size && typeof partyCombatLoad === "function" && G.p) {
-      const ents = partyCombatLoad(G.p) || [];
-      const filtered = ents.filter((ent) => {
-        const id = Number(ent && (ent.id || (ent.p && ent.p.id)));
-        return joined.has(id) || String(id) === String(G.p.id);
-      });
-      if (filtered.length >= 1) {
-        c.players = filtered;
-        c.players[0].p = G.p;
-        c.players[0].id = G.p.id || c.players[0].id;
-        c.player = c.players[0];
-        if (typeof partyCombatPlace === "function") partyCombatPlace(c, spawn.x, spawn.y);
-      }
-    }
-  } catch (e) { /* single player */ }
-
-  if (typeof resolveSQMOccupancy === "function") resolveSQMOccupancy(c);
-  return c;
-}
-
-async function wbEnterCombatStub(ev) {
-  if (WB.combat) return;
+async function wbEnterSharedCombat(ev) {
+  if (WB.combat || WB._entering) return;
+  WB._entering = true;
   WB.combat = {
     active: true,
-    warzoneId: ev.warzoneId,
-    bossName: ev.bossName,
+    warzoneId: ev && ev.warzoneId,
+    bossName: ev && ev.bossName,
     startedAt: Date.now(),
     exiting: false,
+    shared: true,
   };
   WB._lastBossHp = null;
-
   try {
-    await wbPrepTempleFromHunt();
-  } catch (e) {
-    console.warn("[world-boss] prep templo falhou", e);
-  }
-
-  // NÃO usar startBoss: ele faz partyReportZone(boss) e maybeLoadPartyCombat
-  // da PT inteira, e newBossCombat ancora em hunt ("rats"/mapa anterior).
-  const c = wbBuildIsolatedCombat(ev);
-  G.inCity = false;
-  if (G.p) {
-    G.p.hunt = null;
-    G.p.instanceMode = "world-boss";
-  }
-  G.combat = c;
-  G.huntMapReady = true;
-
-  // Sem persistActiveInstance / accountBeginInstance: combate local isolado.
-  if (typeof renderAll === "function") renderAll();
-
-  wbFetch("POST", "/api/world-boss/loaded", {}).catch(() => {});
-  if (typeof toast === "function") toast(wbT("wb.entered", "Você entrou na arena do World Boss"), "death");
-  if (typeof addLog === "function") {
-    addLog("death", "World Boss: <b>" + (ev.bossName || ev.warzoneId) + "</b> (arena isolada)");
+    try {
+      await wbPrepTempleFromHunt();
+    } catch (e) {
+      console.warn("[world-boss] prep templo falhou", e);
+    }
+    const charId = wbFollowCharId(ev);
+    if (charId) {
+      try {
+        sessionStorage.setItem("tibia-idle-char", String(charId));
+        if (typeof ACTIVE_CHARACTER_KEY !== "undefined")
+          localStorage.setItem(ACTIVE_CHARACTER_KEY, String(charId));
+        sessionStorage.setItem("tibia-idle-online-autoload", String(charId));
+      } catch (e) { /* ignore */ }
+    }
+    const token = typeof sessionToken === "function" ? sessionToken() : "";
+    let remote = null;
+    for (let i = 0; i < 80; i++) {
+      if (!token || typeof accountLoadInstance !== "function") break;
+      remote = await accountLoadInstance(token);
+      const inst = remote && remote.instance;
+      const belongs = !!(inst && typeof instanceIncludesCharacter === "function" &&
+        instanceIncludesCharacter(inst, charId || (G.p && G.p.id)));
+      if (belongs) break;
+      remote = null;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (!remote || !remote.instance) {
+      WB.combat = null;
+      if (typeof toast === "function")
+        toast(wbT("wb.timeout", "Timeout aguardando a instância do World Boss."), "bad");
+      return;
+    }
+    const session = Object.assign({}, remote.instance, {
+      activeCharacterId: String(charId || remote.instance.activeCharacterId || ""),
+    });
+    try {
+      localStorage.setItem("tibia-idle-active-instance-v1", JSON.stringify(session));
+    } catch (e) { /* ignore */ }
+    if (typeof resumeIdleInstance === "function") await resumeIdleInstance(session);
+    wbFetch("POST", "/api/world-boss/loaded", {}).catch(() => {});
+    if (typeof toast === "function")
+      toast(wbT("wb.entered", "Você entrou na arena do World Boss"), "death");
+    if (typeof addLog === "function") {
+      addLog("death", "World Boss: <b>" + ((ev && (ev.bossName || ev.warzoneId)) || "warzone") +
+        "</b> (instância compartilhada)");
+    }
+    if (typeof renderAll === "function") renderAll();
+  } finally {
+    WB._entering = false;
   }
 }
 
@@ -676,7 +709,12 @@ async function wbRefresh() {
 
 function wbOnSync(detail) {
   if (!detail) return;
-  if (detail.action === "teleport" || detail.action === "countdown") {
+  if (detail.action === "teleport") {
+    wbRefresh();
+    wbEnterSharedCombat(detail);
+    return;
+  }
+  if (detail.action === "countdown") {
     wbRefresh();
     return;
   }

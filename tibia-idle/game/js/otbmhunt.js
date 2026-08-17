@@ -176,6 +176,17 @@ if (typeof module !== "undefined" && module.exports) {
  * mapa atualizado. Se está na cidade, só limpa o cache (a próxima hunt
  * já vai buscar o mapa novo).
  */
+/* Invalida um OTBM em memória. Entrada de bossroom deve refetch: HUNTMAPS
+ * velho (mapa anterior / spawn vazio) sobrevive a soft navigation e só
+ * sumia no Ctrl+F5. */
+function invalidateHuntOtbmCache(otbmName) {
+  const name = String(otbmName || "");
+  if (!name) return;
+  const key = "otbm:" + name;
+  if (typeof HUNTMAPS !== "undefined") delete HUNTMAPS[key];
+  if (typeof OTBM_HUNT_CACHE !== "undefined") delete OTBM_HUNT_CACHE[name];
+}
+
 window.reloadMaps = function reloadMaps() {
   const cobraKey = "otbm:cobra_bastion";
   const precompiledCobra = typeof window !== "undefined"
@@ -192,6 +203,7 @@ window.reloadMaps = function reloadMaps() {
   }
   for (const k of Object.keys(OTBM_HUNT_CACHE)) delete OTBM_HUNT_CACHE[k];
   if (precompiledCobra) OTBM_HUNT_CACHE.cobra_bastion = cobraKey;
+
   // Limpa cache de sprites de tile
   if (typeof TileSprites !== "undefined" && TileSprites.cache) TileSprites.cache = {};
 

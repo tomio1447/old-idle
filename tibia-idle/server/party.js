@@ -1,15 +1,13 @@
 /*
- * party.js — Lógica de PARTY multiplayer (convites assíncronos + follow).
+ * party.js — Lógica de PARTY multiplayer (add direto + follow).
  *
  * Regras (manual do Tibia + pedido do dono do jogo):
- *   1. CONVITE: o LÍDER só pode convidar estando em Safe Zone (cidade) ou
- *      Área de Treino (academia / sala de exercise weapons). A zona do
- *      líder é mantida em parties.leader_zone pelas transições de mapa
- *      (POST /api/party/zone) e validada AQUI antes de criar o convite.
- *   2. INBOX: o convite fica PENDENTE no servidor. O jogador convidado
- *      pode trocar para o personagem (da conta dele), abrir a interface
- *      de Party e aceitar de lá (POST /api/party/accept).
- *   3. FOLLOW: quando o líder entra numa hunt (instância non-pvp/pvp) ou
+ *   1. ADICIONAR: o LÍDER adiciona o personagem direto na party (sem
+ *      convite/aceite), desde que o alvo NÃO esteja em nenhuma party.
+ *      Só pode adicionar estando em Safe Zone (cidade) ou Área de Treino
+ *      (academia / sala de exercise weapons). A zona do líder é mantida
+ *      em parties.leader_zone pelas transições de mapa (POST /api/party/zone).
+ *   2. FOLLOW: quando o líder entra numa hunt (instância non-pvp/pvp) ou
  *      numa sala de boss, o servidor gera um NONCE de uso único POR MEMBRO
  *      com o destino (hunt/instância/otbm/boss). O membro — online agora
  *      ou quando logar — recebe o destino via GET /api/party/state e
@@ -19,8 +17,8 @@
  * Segurança:
  *   - toda rota valida o token -> conta -> personagem (o personagem que
  *     age TEM que pertencer à conta autenticada);
- *   - o líder não pode convidar/ser convidado fora de safe zone;
- *   - cada personagem só pode estar em 1 party e ter 1 convite pendente
+ *   - o líder não pode adicionar fora de safe zone;
+ *   - cada personagem só pode estar em 1 party
  *     (UNIQUEs no banco + checagem explícita);
  *   - nonce de follow consumido atomicamente (UPDATE ... WHERE nonce = ?).
  */
@@ -188,15 +186,15 @@ async function partyInvite(db, body) {
 
   const party = await partyOf(db, char.id);
   if (!party || Number(party.leader_id) !== Number(char.id)) {
-    return { code: 403, body: { ok: false, msg: "Só o líder da party pode convidar" } };
+    return { code: 403, body: { ok: false, msg: "Só o líder da party pode adicionar membros" } };
   }
-  // REGRA DE ZONA: convidar só de cidade (safe zone) ou treino
+  // REGRA DE ZONA: adicionar só de cidade (safe zone) ou treino
   if (ZONES_CONVIDAR.indexOf(party.leader_zone) === -1) {
     return {
       code: 403,
       body: {
         ok: false,
-        msg: "O líder só pode convidar estando na Cidade (safe zone) ou Área de Treino",
+        msg: "O líder só pode adicionar membros estando na Cidade (safe zone) ou Área de Treino",
       },
     };
   }
@@ -206,36 +204,38 @@ async function partyInvite(db, body) {
   const target = await db.findCharacterByName(name);
   if (!target) return { code: 404, body: { ok: false, msg: "Personagem não encontrado" } };
   if (Number(target.id) === Number(char.id)) {
-    return { code: 400, body: { ok: false, msg: "Não pode se convidar" } };
+    return { code: 400, body: { ok: false, msg: "Não pode se adicionar" } };
   }
-  // alvo não pode estar em outra party
+  // APENAS personagens que NÃO estiverem em party
   const targetParty = await partyOf(db, target.id);
   if (targetParty) {
     return { code: 409, body: { ok: false, msg: target.name + " já está em uma party" } };
   }
-  // limite de membros (líder + 3 = 4 no total)
   const members = await db.partyMembers(party.id);
   if (members.length >= PARTY_MAX_MEMBERS - 1) {
     return { code: 400, body: { ok: false, msg: "Party cheia (máx. " + PARTY_MAX_MEMBERS + " personagens)" } };
   }
-  // um convite pendente por convidado (inbox não pode acumular spam)
-  const pendente = await db.pendingInviteFor(target.id);
-  if (pendente) {
-    return { code: 409, body: { ok: false, msg: target.name + " já tem um convite pendente" } };
-  }
 
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
-  const inv = await db.inviteCreate(party.id, char.id, target.id, expiresAt);
+  // Add direto — sem convite/aceite. Cancela inbox pendente legado do alvo.
+  try {
+    const pendente = await db.pendingInviteFor(target.id);
+    if (pendente && typeof db.inviteUpdate === "function") {
+      await db.inviteUpdate(pendente.id, { status: "cancelled" });
+    }
+  } catch (e) { /* ignore */ }
+
+  await db.partyAddMember(party.id, target.id);
   return {
-    code: 201,
+    code: 200,
     body: {
       ok: true,
-      invite: {
-        id: inv.id,
-        invitee_id: inv.invitee_id,
-        invitee_name: target.name,
-        expires_at: inv.expires_at,
+      added: true,
+      member: {
+        id: Number(target.id),
+        name: target.name,
+        account_id: Number(target.account_id),
       },
+      msg: target.name + " entrou na party.",
     },
   };
 }
@@ -250,6 +250,14 @@ async function partyInbox(db, token) {
   for (const c of chars) {
     const list = await db.invitesFor(c.id, "pending");
     for (const i of list) {
+      // Convite stale: personagem já é membro dessa party (ex.: accept
+      // adicionou o membro e falhou ao marcar accepted no UNIQUE antigo).
+      const cur = await partyOf(db, i.invitee_id);
+      if (cur && Number(cur.id) === Number(i.party_id)) {
+        try { await db.inviteUpdate(i.id, { status: "accepted" }); }
+        catch (e) { /* legado UNIQUE — some da inbox mesmo assim */ }
+        continue;
+      }
       invites.push({
         id: i.id,
         party_id: i.party_id,
@@ -328,15 +336,35 @@ async function partyAccept(db, body) {
     await db.inviteUpdate(inv.id, { status: "declined" });
     return { code: 409, body: { ok: false, msg: "Você já está em outra party" } };
   }
-  // party cheia? (líder + 3 = 4 no total)
+  // já está nesta party (convite stale após join parcial / re-open modal)
+  if (other && Number(other.id) === Number(party.id)) {
+    try { await db.inviteUpdate(inv.id, { status: "accepted" }); }
+    catch (e) { if (!isInviteUniqueConflict(e)) throw e; }
+    return {
+      code: 200,
+      body: { ok: true, msg: "Você já está na party de " + party.leader_name },
+    };
+  }
+  // party cheia? (líder + 4 = 5 no total)
   const members = await db.partyMembers(party.id);
   if (members.length >= PARTY_MAX_MEMBERS - 1) {
     await db.inviteUpdate(inv.id, { status: "declined" });
     return { code: 400, body: { ok: false, msg: "Party cheia (máx. " + PARTY_MAX_MEMBERS + " personagens)" } };
   }
   await db.partyAddMember(party.id, invitee.id);
-  await db.inviteUpdate(inv.id, { status: "accepted" });
+  try {
+    await db.inviteUpdate(inv.id, { status: "accepted" });
+  } catch (e) {
+    // Legado: UNIQUE (invitee_id, status) colidia com accepted anterior.
+    // Membro já entrou — tratar como sucesso e não explodir 500.
+    if (!isInviteUniqueConflict(e)) throw e;
+  }
   return { code: 200, body: { ok: true, msg: "Você entrou na party de " + party.leader_name } };
+}
+
+function isInviteUniqueConflict(err) {
+  const msg = String((err && err.message) || err || "");
+  return /Duplicate entry/i.test(msg) && /uq_invite_pending|-\w+'/i.test(msg);
 }
 
 /* POST /api/party/decline — recusa um convite. FIX: exige char_id */
@@ -475,6 +503,11 @@ async function partyReportZone(db, body) {
     // templo e instância. Isso não é requisição inválida nem deve poluir o
     // console com HTTP 400; simplesmente aguarde o próximo reporte completo.
     return {code:200,body:{ok:true,ignored:true,error:"ZONE_NOT_READY",msg:"Reporte de zona ignorado"}};
+  }
+  // World Boss / arenas isoladas: nunca viram follow de party nem disparam
+  // 403 de requisitos de boss (id sintético world-boss-*).
+  if (zone === "boss" && String(body.boss || "").toLowerCase().indexOf("world-boss") === 0) {
+    return {code:200,body:{ok:true,ignored:true,error:"WORLD_BOSS_ISOLATED",msg:"World Boss não usa party zone"}};
   }
   // grava a zona do personagem (qualquer membro reporta a própria)
   await db.setCharacterZone(char.id, zone);

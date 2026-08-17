@@ -101,16 +101,38 @@ must((sp.supplyStash["stone-skin-amulet"] || 0) === 1 &&
 must(!sp.lootPouch["stone-skin-amulet"] && !sp.lootPouch["sacred-tree-amulet"],
   "server: removidos da pouch");
 
+const bagP = {
+  bag: { "might-ring": 200, "sword": 1 },
+  lootPouch: {},
+  supplyStash: { "might-ring": 100 },
+  config: {},
+};
+must(engine.moveItemToSupplyStash(bagP, { source: "bag", slug: "might-ring" }),
+  "server: bag → stash move");
+must(!(bagP.bag["might-ring"]), "server: might-ring saiu da bag");
+must((bagP.bag.sword || 0) === 1, "server: outros itens da bag permanecem");
+must((bagP.supplyStash["might-ring"] || 0) === 300, "server: stash soma as cargas da bag");
+
 // Rotas HTTP documentadas
 const serverSrc = fs.readFileSync(path.join(root, "server", "server.js"), "utf8");
 must(serverSrc.includes("/api/instance/stash-move") && serverSrc.includes("/api/stash/move"),
   "server expõe stash-move");
 must(serverSrc.includes("moveItemToSupplyStash"), "server usa moveItemToSupplyStash");
+must(/STASH_MOVE_FAILED[\s\S]{0,500}bag:p\.bag\|\|\{\}/.test(serverSrc),
+  "stash/move devolve bag no snapshot da cidade");
 
 const uiSrc = fs.readFileSync(path.join(js, "ui.js"), "utf8");
 must(uiSrc.includes("persistMoveToSupplyStash"), "UI persiste move para stash");
+must(uiSrc.includes("if (result.bag) p.bag"), "UI aplica bag após move para stash");
+must(uiSrc.includes("renderInventory"), "UI redesenha a mochila após move para stash");
+
+const accSrc = fs.readFileSync(path.join(js, "account-client.js"), "utf8");
+must(accSrc.includes("if(r.data.bag)G.p.bag=r.data.bag||{}"),
+  "account-client aplica bag no /api/stash/move");
 
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-must(html.includes("js/supply-stash.js?v=pouch-destroy-stash-v1"), "cache-bust supply-stash");
+must(/js\/supply-stash\.js\?v=/.test(html), "cache-bust supply-stash");
+must(html.includes("js/ui.js?v=stash-move-sync-v1"), "cache-bust ui stash-move");
+must(html.includes("js/account-client.js?v=stash-move-sync-v1"), "cache-bust account-client stash-move");
 
 console.log("\nAll supply stash amulet move tests passed. CAP=", SUPPLY_STASH_CAP || 20);

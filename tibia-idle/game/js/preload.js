@@ -1,18 +1,50 @@
 /* preload.js — preparação visual antes de entrar no jogo. */
 "use strict";
+const BOOT_LOADING_KEY = "tibia-idle-boot-loading";
 let MAP_LOADING_GENERATION = 0;
 function currentMapLoadingGeneration(){return MAP_LOADING_GENERATION;}
+function bootLoadingText() {
+  try {
+    return sessionStorage.getItem(BOOT_LOADING_KEY) || "Carregando...";
+  } catch (e) { return "Carregando..."; }
+}
+function isBootLoadingArmed() {
+  try {
+    return !!(sessionStorage.getItem(BOOT_LOADING_KEY) ||
+      sessionStorage.getItem("tibia-idle-online-autoload") ||
+      sessionStorage.getItem("tibia-idle-autologin-v1"));
+  } catch (e) { return false; }
+}
+function armBootLoading(text) {
+  const label = text || "Carregando personagem...";
+  try { sessionStorage.setItem(BOOT_LOADING_KEY, label); } catch (e) {}
+  if (typeof document !== "undefined" && document.documentElement)
+    document.documentElement.classList.add("boot-loading");
+  showGameLoading(true, label, 0);
+}
+function clearBootLoadingFlag() {
+  try { sessionStorage.removeItem(BOOT_LOADING_KEY); } catch (e) {}
+  if (typeof document !== "undefined" && document.documentElement)
+    document.documentElement.classList.remove("boot-loading");
+}
 function showGameLoading(show, text, pct) {
-  const el = document.getElementById('game-loading');
-  if (!el) return;
-  el.style.display = show ? 'flex' : 'none';
-  const label = el.querySelector('.gl-text'), fill = el.querySelector('.gl-fill');
-  if (label) label.textContent = text || 'Carregando...';
-  if (fill) fill.style.width = Math.max(0, Math.min(100, pct || 0)) + '%';
+  const el = document.getElementById("game-loading");
+  const login = document.getElementById("login");
+  if (typeof document !== "undefined" && document.documentElement)
+    document.documentElement.classList.toggle("game-loading-on", !!show);
+  if (el) {
+    el.style.display = show ? "flex" : "none";
+    const label = el.querySelector(".gl-text"), fill = el.querySelector(".gl-fill");
+    if (label && text) label.textContent = text;
+    if (fill && pct !== undefined && pct !== null)
+      fill.style.width = Math.max(0, Math.min(100, pct || 0)) + "%";
+  }
+  if (show && login) login.style.display = "none";
+  if (!show) clearBootLoadingFlag();
 }
 function beginMapLoading(text) {
   MAP_LOADING_GENERATION++;
-  showGameLoading(true, text || 'Carregando mapa...', 0);
+  showGameLoading(true, text || "Carregando...", 0);
   return MAP_LOADING_GENERATION;
 }
 
@@ -35,21 +67,19 @@ function finishMapLoading() {
   const hide = () => {
     if (generation === MAP_LOADING_GENERATION) showGameLoading(false);
   };
-  // Mantém os dois frames para uma transição suave, mas não depende deles:
-  // DevTools aberto e abas em background podem suspender rAF indefinidamente.
-  if (typeof requestAnimationFrame === 'function') {
+  // Espera o primeiro paint da cena sob o overlay opaco, para o mapa/cidade
+  // não aparecerem incompletos.
+  if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(() => requestAnimationFrame(hide));
-    setTimeout(hide, 120);
+    setTimeout(hide, 180);
   } else setTimeout(hide, 0);
-  // Última barreira para o caso observado em 184/184. Se algum scheduler ou
-  // callback deixou o overlay visível na mesma geração, force o fechamento.
   setTimeout(() => {
-    const el = document.getElementById('game-loading');
-    if (el && el.style.display !== 'none' && generation === MAP_LOADING_GENERATION) {
-      console.warn('[preload] fallback hide forçado');
+    const el = document.getElementById("game-loading");
+    if (el && el.style.display !== "none" && generation === MAP_LOADING_GENERATION) {
+      console.warn("[preload] fallback hide forçado");
       showGameLoading(false);
     }
-  }, 350);
+  }, 400);
 }
 
 function preloadAssetPaths(paths, label, opts) {
@@ -232,6 +262,18 @@ function preloadGameAssets(p, label) {
       paths.add('assets/appearance/mount/' + mount.id + '.base.png');
       if (idleAnimationMeta('mounts', mount.id))
         paths.add('assets/appearance/mount/' + mount.id + '.idle.base.png');
+      // Pose montada (zPattern=1): sheets .mounted do cavaleiro.
+      if (appearance && appearance.mounted) {
+        const addons = appearance.sexo === 'avatar' ? 0 : ((p.outfit && p.outfit.addons) || 0);
+        const suffixes = [''];
+        if (addons & 1) suffixes.push('-a1');
+        if (addons & 2) suffixes.push('-a2');
+        for (const suffix of suffixes) {
+          paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.mounted.base.png');
+          if (appearance.sexo !== 'avatar')
+            paths.add('assets/appearance/outfit/' + appearance.id + suffix + '.mounted.mask.png');
+        }
+      }
     }
   }
   const hunt = p && typeof GAMEDATA !== 'undefined' && GAMEDATA.hunts && GAMEDATA.hunts[p.hunt];

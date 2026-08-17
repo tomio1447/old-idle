@@ -32,6 +32,19 @@ const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
 const MAJOR_CRYSTAL_TOKEN = "major-crystal-token";
 const MAJOR_CRYSTAL_PER_ACCOUNT = 3;
 const MAX_CHARS_PER_ACCOUNT = 2;
+const WORLD_BOSS_MAX_MEMBERS = 30;
+
+function bossIdForWarzone(warzoneId) {
+  const id = String(warzoneId || "wz1").toLowerCase();
+  return /^wz[123]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
+}
+function isWorldBossBossId(id) {
+  return /^world-boss-wz[123]$/.test(String(id || ""));
+}
+function warzoneIdFromBossId(bossId) {
+  const m = String(bossId || "").match(/^world-boss-(wz[123])$/);
+  return m ? m[1] : null;
+}
 
 function envMs(name, fallback) {
   const n = parseInt(process.env[name] || "", 10);
@@ -46,7 +59,8 @@ function createWorldBossController(opts) {
   opts = opts || {};
   const testServer = !!opts.testServer;
   const timers = {
-    rotationMs: envMs("WB_ROTATION_MS", testServer ? 180000 : 3 * 3600 * 1000),
+    // Rotação sempre 3h por padrão (mesmo com TEST_SERVER=1). Override: WB_ROTATION_MS.
+    rotationMs: envMs("WB_ROTATION_MS", 3 * 3600 * 1000),
     lobbyMs: envMs("WB_LOBBY_MS", testServer ? 75000 : 10 * 60 * 1000),
     countdownMs: envMs("WB_COUNTDOWN_MS", testServer ? 15000 : 60 * 1000),
     spawnDelayMs: envMs("WB_SPAWN_DELAY_MS", testServer ? 5000 : 10 * 1000),
@@ -62,6 +76,7 @@ function createWorldBossController(opts) {
   let nextRotationAt = Date.now() + timers.rotationMs;
   let tickHandle = null;
   const leaveCooldownUntil = new Map(); // accountId -> ts
+  const shareByAccount = new Map(); // accountId -> { eventId, ownerAccountId, instanceId }
   const publishAll = typeof opts.publishAll === "function" ? opts.publishAll : () => {};
   const publishAccount = typeof opts.publishAccount === "function" ? opts.publishAccount : () => {};
 
@@ -91,6 +106,68 @@ function createWorldBossController(opts) {
     let n = 0;
     for (const join of event.joins.values()) n += (join.chars || []).length;
     return n;
+  }
+
+  function joinedCharIds() {
+    if (!event) return [];
+    const ids = [];
+    for (const join of event.joins.values()) {
+      for (const c of join.chars || []) ids.push(Number(c.id));
+    }
+    return ids;
+  }
+
+  function joinedAccountIds() {
+    if (!event) return [];
+    return Array.from(event.joins.keys()).map(Number);
+  }
+
+  function membersForStart() {
+    if (!event) return [];
+    const out = [];
+    for (const [accountId, join] of event.joins) {
+      for (const c of join.chars || []) {
+        out.push({
+          accountId: Number(accountId),
+          charId: Number(c.id),
+          charName: c.name,
+          voc: c.voc,
+        });
+      }
+    }
+    return out;
+  }
+
+  function unbindAll() {
+    if (!event) {
+      shareByAccount.clear();
+      return;
+    }
+    for (const [accountId] of event.joins) shareByAccount.delete(Number(accountId));
+  }
+
+  function bindShare(instanceId, ownerAccountId) {
+    if (!event) return;
+    event.instanceId = String(instanceId);
+    event.hostAccountId = Number(ownerAccountId);
+    for (const [accountId] of event.joins) {
+      shareByAccount.set(Number(accountId), {
+        eventId: event.id,
+        ownerAccountId: Number(ownerAccountId),
+        instanceId: String(instanceId),
+      });
+    }
+  }
+
+  function sharedForAccount(accountId) {
+    return shareByAccount.get(Number(accountId)) || null;
+  }
+
+  function getEvent() { return event; }
+
+  function getEventByOwner(accountId) {
+    if (event && Number(event.hostAccountId) === Number(accountId)) return event;
+    return null;
   }
 
   function vocationBreakdown() {
@@ -147,6 +224,10 @@ function createWorldBossController(opts) {
       result: event.result || null,
       bossHp: event.bossHp,
       bossMaxHp: event.bossMaxHp,
+      bossId: bossIdForWarzone(event.warzoneId),
+      instanceId: event.instanceId || null,
+      hostAccountId: event.hostAccountId || null,
+      shared: true,
     };
     if (accountId != null && event.joins.has(Number(accountId))) {
       const join = event.joins.get(Number(accountId));
@@ -186,6 +267,8 @@ function createWorldBossController(opts) {
       result: null,
       rareAssigned: new Set(),
       reason: reason || "rotation",
+      hostAccountId: null,
+      instanceId: null,
     };
     nextRotationAt = event.lobbyEndsAt + timers.rotationMs;
     console.log("[world-boss] lobby open", wz.id, event.id, "reason=" + event.reason);
@@ -194,6 +277,7 @@ function createWorldBossController(opts) {
   }
 
   function clearEvent(result) {
+    unbindAll();
     if (event) {
       event.phase = "ended";
       event.result = result || event.result || { status: "ended" };
@@ -231,30 +315,73 @@ function createWorldBossController(opts) {
     broadcast();
   }
 
-  function beginCombat() {
-    if (!event || event.phase !== "countdown") return;
-    event.phase = "combat";
-    event.spawnAt = now() + timers.spawnDelayMs;
-    event.combatEndsAt = now() + timers.bossTimeoutMs;
+  function notifyTeleport() {
+    if (!event) return;
     const wz = warzoneById(event.warzoneId);
-    event.bossHp = wz.bossHp;
-    event.bossMaxHp = wz.bossHp;
-    console.log("[world-boss] combat", event.id);
+    const bossId = bossIdForWarzone(event.warzoneId);
     for (const [accountId, join] of event.joins) {
       join.loaded = false;
       publishAccount(accountId, "world-boss", {
         action: "teleport",
         warzoneId: event.warzoneId,
+        bossId,
         bossName: wz.bossName,
         bossSprite: wz.bossSprite || "dragon",
         baseMonster: wz.baseMonster || wz.bossSprite || "dragon",
         spawnAt: event.spawnAt,
         combatEndsAt: event.combatEndsAt,
         chars: join.chars,
+        instanceId: event.instanceId || null,
+        hostAccountId: event.hostAccountId || null,
+        isHost: Number(accountId) === Number(event.hostAccountId),
         map: { w: 40, h: 40, kind: "placeholder" },
       });
     }
     broadcast();
+  }
+
+  async function beginCombat() {
+    if (!event || event.phase !== "countdown" || event._startingCombat) return;
+    event._startingCombat = true;
+    event.phase = "combat";
+    event.spawnAt = now() + timers.spawnDelayMs;
+    event.combatEndsAt = now() + timers.bossTimeoutMs;
+    const wz = warzoneById(event.warzoneId);
+    event.bossHp = wz.bossHp;
+    event.bossMaxHp = wz.bossHp;
+    const host = joinedAccountIds()[0];
+    event.hostAccountId = host || null;
+    console.log("[world-boss] combat", event.id, "host=" + event.hostAccountId);
+    const eventId = event.id;
+    if (typeof opts.createSharedInstance === "function") {
+      try {
+        const created = await opts.createSharedInstance(event);
+        if (!event || event.id !== eventId || event.phase !== "combat") {
+          if (created && created.ok && typeof opts.endSharedInstance === "function") {
+            try { await opts.endSharedInstance(created.ownerAccountId, created.instanceId, "world-boss-cancelled"); }
+            catch (e) { console.error("[world-boss] cancel instance", e && e.message); }
+          }
+          return;
+        }
+        if (!created || !created.ok) {
+          console.error("[world-boss] shared instance failed", created && created.error);
+          event._startingCombat = false;
+          event.phase = "countdown";
+          finishFail("instance-create-failed");
+          return;
+        }
+        bindShare(created.instanceId, created.ownerAccountId);
+      } catch (e) {
+        console.error("[world-boss] shared instance", e && e.message);
+        if (event && event.id === eventId) {
+          event._startingCombat = false;
+          finishFail("instance-create-failed");
+        }
+        return;
+      }
+    }
+    if (!event || event.id !== eventId || event.phase !== "combat") return;
+    notifyTeleport();
   }
 
   async function grantSuccessRewards(db) {
@@ -301,20 +428,38 @@ function createWorldBossController(opts) {
   async function finishSuccess(db) {
     if (!event || event.phase !== "combat") return;
     console.log("[world-boss] success", event.id);
+    const host = event.hostAccountId, instanceId = event.instanceId;
     await grantSuccessRewards(db);
     for (const [accountId] of event.joins) {
       publishAccount(accountId, "world-boss", { action: "success", warzoneId: event.warzoneId });
     }
     clearEvent({ status: "success", warzoneId: event && event.warzoneId });
+    if (typeof opts.endSharedInstance === "function" && host) {
+      try { await opts.endSharedInstance(host, instanceId, "world-boss-success"); }
+      catch (e) { console.error("[world-boss] end instance", e && e.message); }
+    }
   }
 
   function finishFail(reason) {
     if (!event || (event.phase !== "combat" && event.phase !== "countdown")) return;
     console.log("[world-boss] fail", reason, event.id);
+    const host = event.hostAccountId, instanceId = event.instanceId;
     for (const [accountId] of event.joins) {
       publishAccount(accountId, "world-boss", { action: "fail", reason });
     }
     clearEvent({ status: "fail", reason });
+    if (typeof opts.endSharedInstance === "function" && host) {
+      Promise.resolve(opts.endSharedInstance(host, instanceId, "world-boss-fail")).catch((e) => {
+        console.error("[world-boss] end instance", e && e.message);
+      });
+    }
+  }
+
+  function onSharedEnded(reason) {
+    if (!event || event.phase !== "combat") return Promise.resolve();
+    if (reason === "boss-defeated") return finishSuccess(opts.getDb && opts.getDb());
+    finishFail(reason || "ended");
+    return Promise.resolve();
   }
 
   function allAccountsDead() {
@@ -345,10 +490,13 @@ function createWorldBossController(opts) {
       return;
     }
     if (event.phase === "countdown") {
-      if (t >= event.countdownEndsAt) beginCombat();
+      if (t >= event.countdownEndsAt) beginCombat().catch((e) => console.error("[world-boss] beginCombat", e));
       return;
     }
     if (event.phase === "combat") {
+      if (typeof opts.syncSharedBoss === "function") {
+        opts.syncSharedBoss(event).catch((e) => console.error("[world-boss] sync", e));
+      }
       if (event.bossHp <= 0) {
         finishSuccess(db).catch((e) => console.error("[world-boss] finishSuccess", e));
         return;
@@ -498,27 +646,14 @@ function createWorldBossController(opts) {
       + join.score.heal * SCORE_WEIGHTS.heal
       + join.score.taken * SCORE_WEIGHTS.taken;
 
-    if (dmg > 0) event.bossHp = Math.max(0, event.bossHp - dmg);
-
+    // HP vem da instância autoritativa (syncSharedBoss). Report só pontua.
     if (Array.isArray(body.deadCharIds)) {
       const deadSet = new Set(body.deadCharIds.map(Number));
       for (const c of join.chars) {
         if (deadSet.has(Number(c.id))) c.dead = true;
       }
     }
-    if (body.accountFailed || (join.chars.length && join.chars.every((c) => c.dead))) {
-      join.failed = true;
-      for (const c of join.chars) c.dead = true;
-      publishAccount(acc.id, "world-boss", { action: "account-failed", reason: "both-dead" });
-    }
-
-    if (event.bossHp <= 0) {
-      await finishSuccess(db);
-    } else if (allAccountsDead()) {
-      finishFail("all-dead");
-    } else {
-      broadcast();
-    }
+    broadcast();
     return { code: 200, body: publicState(acc.id) };
   }
 
@@ -533,7 +668,8 @@ function createWorldBossController(opts) {
   async function forceClose(db, body, authOk) {
     if (!authOk) return { code: 403, body: { ok: false, error: "FORBIDDEN" } };
     if (!event) return { code: 200, body: { ok: true, phase: "idle" } };
-    cancelLobby("force-close");
+    if (event.phase === "lobby") cancelLobby("force-close");
+    else finishFail("force-close");
     return { code: 200, body: { ok: true, phase: "idle" } };
   }
 
@@ -549,8 +685,13 @@ function createWorldBossController(opts) {
   return {
     start, stop, tick, publicState,
     join, leave, markLoaded, reportCombat, forceOpen, forceClose, stateFor,
+    bindShare, sharedForAccount, getEvent, getEventByOwner, onSharedEnded,
+    joinedCharIds, joinedAccountIds, membersForStart,
     timers, minStart, maxChars,
   };
 }
 
-module.exports = { createWorldBossController, WARZONES, MAJOR_CRYSTAL_TOKEN, SCORE_WEIGHTS };
+module.exports = {
+  createWorldBossController, WARZONES, MAJOR_CRYSTAL_TOKEN, SCORE_WEIGHTS,
+  bossIdForWarzone, isWorldBossBossId, warzoneIdFromBossId, WORLD_BOSS_MAX_MEMBERS,
+};
