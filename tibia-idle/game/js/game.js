@@ -183,6 +183,7 @@ function restoreCombatSessionState(fresh,session){
   const raw=session.state;if(!raw)return fresh;
   const c=raw;
   c.hunt=fresh.hunt;c.huntMap=fresh.huntMap;c.boss=fresh.boss;
+  c.worldBoss=!!(fresh.worldBoss||(fresh.boss&&fresh.boss.worldBoss)||c.worldBoss);
   // Preserva eventos do servidor (modo online). O step() do authoritative
   // engine gera eventos de dano/cura que drainEvents() processa em floaters.
   c.events=Array.isArray(c.events)?c.events:[];c.delayedHits=c.delayedHits||[];c.pendingSpawns=c.pendingSpawns||[];
@@ -261,7 +262,10 @@ function resumeIdleInstance(session){
           ended:!!(session.authority&&session.authority.ended),
           reason:session.authority&&session.authority.terminalReason||null}:
           advanceIdleInstance(elapsed,startAt,{silent:true});
-        if(G.combat){persistActiveInstance();G.inCity=false;}
+        if(G.combat){
+          if(!(boss&&boss.worldBoss))persistActiveInstance();
+          G.inCity=false;
+        }
         resolve({resumed:!!G.combat,ended:result.ended,elapsed});
       }catch(error){
         console.error("[idle] falha ao retomar instância",error);clearInstanceSession();G.combat=null;G.inCity=true;
@@ -389,7 +393,7 @@ function normalizePlayer(p) {
     manaAt: 50,
     healSpell: "",
     healSupply: "",
-    manaSupply: "mana-potion",
+    manaSupply: "",
     useRunes: true,
     autoRestock: false,
     manaTrain: null,
@@ -444,7 +448,10 @@ function normalizePlayer(p) {
   }
   if (p.config.manaSupply === "mana-fluid") p.config.manaSupply = "mana-potion";
   if (!Object.prototype.hasOwnProperty.call(p.supplies, "mana-potion")) p.supplies["mana-potion"] = 0;
-  if (p.config.manaSupply === undefined) p.config.manaSupply = "mana-potion";
+  // Sem seleção explícita = nenhuma potion de mana (jogador escolhe 1 no Helper).
+  // Saves antigos sem o campo nascem desativados — não forçar mana-potion.
+  if (p.config.manaSupply === undefined || p.config.manaSupply === null)
+    p.config.manaSupply = "";
   // Saves antigos que selecionaram algo que deixou de existir nao podem
   // quebrar o motor de cura/mana.
   if (p.config.manaSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.manaSupply])
@@ -452,10 +459,8 @@ function normalizePlayer(p) {
   if (p.config.healSupply && typeof SUPPLIES !== "undefined" && !SUPPLIES[p.config.healSupply])
     p.config.healSupply = "";
   if (p.config.manaSupply && typeof supplyAllowed === "function" && !supplyAllowed(p, p.config.manaSupply)) {
-    const manaOrder = ["distilled-ultimate-mana-potion", "ultimate-mana-potion",
-      "distilled-superior-mana-potion", "superior-mana-potion",
-      "great-mana-potion", "strong-mana-potion", "mana-potion"];
-    p.config.manaSupply = manaOrder.find((slug) => supplyAllowed(p, slug)) || "mana-potion";
+    // Potion selecionada ficou ilegal (nível/voc) — desativa; não auto-troca.
+    p.config.manaSupply = "";
   }
   // Garante chave de supply para a potion selecionada (CARGAS 0 + auto-buy).
   if (p.config.manaSupply && !Object.prototype.hasOwnProperty.call(p.supplies, p.config.manaSupply))
@@ -609,6 +614,10 @@ function computeOffline(p) {
   const modeMul = p.instanceMode === "pvp" ? 1.25 : 1;
   const kills = Math.floor(est.kills * hours * effRate);
   let exp = Math.floor(est.exp * hours * effRate * modeMul);
+  if (typeof loyaltyExpMultiplier === "function") {
+    const loyaltyMul = loyaltyExpMultiplier(p);
+    if (loyaltyMul > 1) exp = Math.floor(exp * loyaltyMul);
+  }
   let gold = Math.floor(est.gold * hours * effRate * modeMul);
 
   // supplies/ammo offline usam o mesmo modelo de cargas do combate online:
@@ -696,7 +705,7 @@ function showOfflineModal(r) {
                     (GAMEDATA.items[a] ? GAMEDATA.items[a].sell || 0 : 0))
     .slice(0, 24)
     .map((s) => `<div class="inv-item ${itemClsBorder(s)}" title="${itemName(s)}">
-        ${itemImg(s)}<span class="cnt">${r.loot[s]}</span></div>`).join("");
+        ${itemImg(s, 0, null, r.loot[s])}<span class="cnt">${r.loot[s]}</span></div>`).join("");
   const supRows = Object.keys(r.supplies).map((s) =>
     `<div class="stat-row"><span class="k">${SUPPLIES[s] ? SUPPLIES[s].name : itemName(s)}</span>
      <span class="v">-${r.supplies[s]}</span></div>`).join("");
@@ -761,8 +770,8 @@ const MISSION_DEFS = {
       { monster:"distorted-phantom", target:25, reward:{ supplies:[{slug:"ultimate-spirit-potion",count:3}] } },
     ],
     // A recompensa é permanente: concluir Mirrored Nightmare libera a porta
-    // da bossroom de Goshnar's Greed.
-    completeReward: { bossAccess:"goshnar-s-greed", bossName:"Goshnar's Greed" },
+    // da bossroom de Goshnar's Malice (Greed passa a Ebb and Flow / Fear).
+    completeReward: { bossAccess:"goshnar-s-malice", bossName:"Goshnar's Malice" },
   },
   "rotten-wasteland": {
     title: "Missão: Goshnar's Hatred",
@@ -771,6 +780,29 @@ const MISSION_DEFS = {
         reward:{ supplies:[{slug:"ultimate-health-potion",count:5}] } },
     ],
     completeReward:{bossAccess:"goshnar-s-hatred",bossName:"Goshnar's Hatred"},
+  },
+  // Missão Ebb and Flow: sobreviver a 15× Fear (CONDITION_FEARED / Canary).
+  // Compacto no HUD. Completar libera Goshnar's Greed.
+  "ebb-and-flow": {
+    title: "Missão: Ebb and Flow",
+    compact: true,
+    tasks: [
+      { counter:"fear", target:15, label:"Ser afetado por Fear",
+        reward:{ supplies:[{slug:"ultimate-mana-potion",count:5}] } },
+    ],
+    completeReward:{bossAccess:"goshnar-s-greed",bossName:"Goshnar's Greed"},
+  },
+  // Sobreviver 5 minutos sem morte na party. Qualquer morte zera o timer.
+  // Compacto no HUD (sem lista grande de tasks).
+  "claustrophobic-inferno": {
+    title: "Missão: Claustrophobic Inferno",
+    compact: true,
+    tasks: [
+      { counter:"survive", target:300, surviveSec:300,
+        label:"Sobreviver 5 min sem mortes na party",
+        reward:{ supplies:[{slug:"ultimate-health-potion",count:5}] } },
+    ],
+    completeReward:{bossAccess:"goshnar-s-megalomania",bossName:"Goshnar's Megalomania"},
   },
 };
 
@@ -873,19 +905,29 @@ function tryCompleteMissionRewards(p, huntId) {
   const def = missionForHunt(huntId);
   if (!def) return;
   const st = missionState(p, huntId);
+  const taskKey = (task) => task.monster || task.counter;
+  const taskLabel = (task) => {
+    if (task.label) return task.label;
+    if (task.monster && GAMEDATA.monsters[task.monster]) return GAMEDATA.monsters[task.monster].name;
+    return task.monster || task.counter || "objetivo";
+  };
   for (const task of def.tasks) {
-    if ((st.progress[task.monster] || 0) >= task.target && !st.claimed[task.monster]) {
+    const key = taskKey(task);
+    if (!key) continue;
+    if ((st.progress[key] || 0) >= task.target && !st.claimed[key]) {
       grantMissionReward(p, task.reward);
-      st.claimed[task.monster] = true;
-      addLog("level", `Missão: matou ${task.target}x <b>${GAMEDATA.monsters[task.monster] ? GAMEDATA.monsters[task.monster].name : task.monster}</b>. Recompensa: ${rewardText(task.reward)}.`);
+      st.claimed[key] = true;
+      addLog("level", `Missão: ${task.target}× <b>${taskLabel(task)}</b>. Recompensa: ${rewardText(task.reward)}.`);
       toast(`Missão concluída: <b>${rewardText(task.reward)}</b>`, "level");
     }
   }
-  const all = def.tasks.every((t) => st.claimed[t.monster]);
+  const all = def.tasks.every((t) => st.claimed[taskKey(t)]);
   if (all && !st.completeClaimed) {
     grantMissionReward(p, def.completeReward);
     st.completeClaimed = true;
-    addLog("level", `Missão de <b>${GAMEDATA.hunts[huntId].name}</b> completa. Recompensa final: ${rewardText(def.completeReward)}.`);
+    const huntName = (GAMEDATA.hunts[huntId] && GAMEDATA.hunts[huntId].name) ||
+      (def.title || huntId);
+    addLog("level", `Missão de <b>${huntName}</b> completa. Recompensa final: ${rewardText(def.completeReward)}.`);
     toast(`Missão completa! <b>${rewardText(def.completeReward)}</b>`, "level");
   }
   // Timira: completar a missão das Nagas LIBERA o cooldown do boss — pode
@@ -952,8 +994,99 @@ function renderMission() {
   G.p.missionsDone = G.p.missionsDone || {};
   if (G.p.missionsDone[huntId]) { box.style.display = "none"; return; }
   const st = missionState(G.p, huntId);
+  const surviveTask = def.tasks && def.tasks.find((t) => t.surviveSec || t.counter === "survive");
+  const fearTask = def.tasks && def.tasks.find((t) => t.counter === "fear");
+  if (def.compact && surviveTask) {
+    const target = surviveTask.surviveSec || surviveTask.target || 300;
+    const cur = Math.min(target, Number(st.progress.survive) || 0);
+    const done = cur >= target || !!st.completeClaimed;
+    box.style.display = "block";
+    box.classList.add("survive-compact");
+    box.classList.remove("fear-compact", "collapsed");
+    box.innerHTML = `
+      <div class="mission-head survive-head" title="Sobreviva 5 minutos sem mortes na party">
+        <span>Inferno</span>
+        <span class="spacer"></span>
+        <span class="survive-clock ${done ? "done" : ""}">${formatSurviveClock(cur)} / ${formatSurviveClock(target)}</span>
+        ${done ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão">OK</button>` : ""}
+      </div>`;
+    if (!box._missionBound) {
+      box._missionBound = true;
+      box.addEventListener("click", (e) => {
+        const id = G.combat && G.combat.huntId;
+        if (e.target.closest && e.target.closest("#mission-finish")) {
+          e.stopPropagation();
+          if (!id || !G.p) return;
+          G.p.missionsDone = G.p.missionsDone || {};
+          G.p.missionsDone[id] = true;
+          if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(G.p);
+          const title = (MISSION_DEFS[id] && MISSION_DEFS[id].title) || id;
+          addLog("info", `Missão <b>${title}</b> finalizada.`);
+          renderMission();
+          return;
+        }
+        if (e.target.closest && e.target.closest("#mission-toggle")) {
+          if (box.classList.contains("survive-compact") ||
+              box.classList.contains("fear-compact")) return;
+          G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
+          renderMission();
+        }
+      });
+    }
+    return;
+  }
+  if (def.compact && fearTask) {
+    const target = fearTask.target || 15;
+    const cur = Math.min(target, Number(st.progress.fear) || 0);
+    const done = cur >= target || !!st.completeClaimed;
+    box.style.display = "block";
+    box.classList.add("fear-compact");
+    box.classList.remove("survive-compact", "collapsed");
+    box.innerHTML = `
+      <div class="mission-head survive-head" title="Seja afetado por Fear 15 vezes">
+        <span>Ebb Fear</span>
+        <span class="spacer"></span>
+        <span class="survive-clock ${done ? "done" : ""}">${cur} / ${target}</span>
+        ${done ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão">OK</button>` : ""}
+      </div>`;
+    if (!box._missionBound) {
+      box._missionBound = true;
+      box.addEventListener("click", (e) => {
+        const id = G.combat && G.combat.huntId;
+        if (e.target.closest && e.target.closest("#mission-finish")) {
+          e.stopPropagation();
+          if (!id || !G.p) return;
+          G.p.missionsDone = G.p.missionsDone || {};
+          G.p.missionsDone[id] = true;
+          if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(G.p);
+          const title = (MISSION_DEFS[id] && MISSION_DEFS[id].title) || id;
+          addLog("info", `Missão <b>${title}</b> finalizada.`);
+          renderMission();
+          return;
+        }
+        if (e.target.closest && e.target.closest("#mission-toggle")) {
+          if (box.classList.contains("survive-compact") ||
+              box.classList.contains("fear-compact")) return;
+          G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
+          renderMission();
+        }
+      });
+    }
+    return;
+  }
+  box.classList.remove("survive-compact", "fear-compact");
   const collapsed = !!G.p.config.missionCollapsed;
-  const totalDone = def.tasks.filter((t) => (st.progress[t.monster] || 0) >= t.target).length;
+  const taskKey = (t) => t.monster || t.counter;
+  const taskLabel = (t) => {
+    if (t.label) return t.label;
+    if (t.monster && GAMEDATA.monsters[t.monster]) return GAMEDATA.monsters[t.monster].name;
+    if (t.counter === "fear") return "Fear (afetado)";
+    return t.monster || t.counter || "objetivo";
+  };
+  const totalDone = def.tasks.filter((t) => {
+    const key = taskKey(t);
+    return key ? (st.progress[key] || 0) >= t.target : false;
+  }).length;
   const completa = totalDone >= def.tasks.length;
   box.style.display = "block";
   // colapsada: só o cabeçalho fica visível — a classe remove o fundo preto
@@ -967,10 +1100,11 @@ function renderMission() {
     </div>
     ${collapsed ? "" : `<div class="mission-body">
       ${def.tasks.map((t) => {
-        const cur = Math.min(t.target, st.progress[t.monster] || 0);
+        const key = taskKey(t);
+        const cur = Math.min(t.target, key ? (st.progress[key] || 0) : 0);
         const done = cur >= t.target;
         const pct = (cur / t.target) * 100;
-        const name = GAMEDATA.monsters[t.monster] ? GAMEDATA.monsters[t.monster].name : t.monster;
+        const name = taskLabel(t);
         return `<div class="mission-row ${done ? "done" : ""}">
           <div style="flex:1"><b>${name}</b><div class="mission-progressbar"><div style="width:${pct}%"></div></div></div>
           <span>${cur}/${t.target}</span>
@@ -986,15 +1120,20 @@ function renderMission() {
   if (!box._missionBound) {
     box._missionBound = true;
     box.addEventListener("click", (e) => {
+      const id = G.combat && G.combat.huntId;
       // FINALIZAR vem ANTES do toggle: o botão fica dentro do cabeçalho
       // (que é o #mission-toggle), então a checagem precisa ser primeiro
       if (e.target.closest && e.target.closest("#mission-finish")) {
+        if (!id || !G.p) return;
         G.p.missionsDone = G.p.missionsDone || {};
-        G.p.missionsDone[huntId] = true;
+        G.p.missionsDone[id] = true;
         syncMissionsToAccount(G.p);
-        addLog("info", `Missão <b>${def.title}</b> finalizada.`);
+        const title = (MISSION_DEFS[id] && MISSION_DEFS[id].title) || id;
+        addLog("info", `Missão <b>${title}</b> finalizada.`);
         renderMission();
       } else if (e.target.closest && e.target.closest("#mission-toggle")) {
+        if (box.classList.contains("survive-compact") ||
+            box.classList.contains("fear-compact")) return;
         G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
         renderMission();
       }
@@ -1006,7 +1145,108 @@ function isMissionComplete(p, huntId) {
   const def = missionForHunt(huntId);
   if (!def) return false;
   const st = missionState(p, huntId);
-  return def.tasks.every((t) => (st.progress[t.monster] || 0) >= t.target);
+  return def.tasks.every((t) => {
+    const key = t.monster || t.counter;
+    return key ? (st.progress[key] || 0) >= t.target : false;
+  });
+}
+
+/* Contador de Fear (Ebb and Flow). Cada nova aplicação de Fear no jogador
+ * (não renovação) chama recordFearHit — 15× libera Goshnar's Greed. */
+function recordFearHit(p, count) {
+  if (!p) return false;
+  const n = Math.max(1, Math.floor(Number(count) || 1));
+  const huntId = "ebb-and-flow";
+  const def = MISSION_DEFS[huntId];
+  if (!def) return false;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[huntId]) return false;
+  const st = missionState(p, huntId);
+  if (st.completeClaimed) return false;
+  const task = def.tasks.find((t) => t.counter === "fear");
+  if (!task) return false;
+  if (st.claimed && st.claimed.fear && (st.progress.fear || 0) >= task.target) {
+    tryCompleteMissionRewards(p, huntId);
+    return false;
+  }
+  st.progress.fear = Math.min(task.target, (st.progress.fear || 0) + n);
+  tryCompleteMissionRewards(p, huntId);
+  if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
+  return true;
+}
+
+function surviveMissionDef(huntId) {
+  const def = MISSION_DEFS[huntId];
+  if (!def || !def.tasks) return null;
+  return def.tasks.find((t) => t.surviveSec || t.counter === "survive") || null;
+}
+
+function formatSurviveClock(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
+}
+
+/* Missão Claustrophobic Inferno: acumula segundos vivos. Qualquer morte
+ * na party zera o progresso (ver surviveMissionOnDeath). */
+function surviveMissionTick(c, p, dt) {
+  if (!c || !p || c.boss || c.dead) return;
+  const huntId = c.huntId;
+  const task = surviveMissionDef(huntId);
+  if (!task) return;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[huntId]) return;
+  const st = missionState(p, huntId);
+  if (st.completeClaimed) return;
+  const ents = (c.players && c.players.length) ? c.players : (c.player ? [c.player] : []);
+  for (const ent of ents) {
+    if (ent && ent.p && ent.p.hp <= 0) return;
+  }
+  const target = task.surviveSec || task.target || 300;
+  const before = Number(st.progress.survive) || 0;
+  if (before >= target) {
+    tryCompleteMissionRewards(p, huntId);
+    return;
+  }
+  const next = Math.min(target, before + Math.max(0, Number(dt) || 0) / 1000);
+  st.progress.survive = next;
+  if (next >= target) {
+    tryCompleteMissionRewards(p, huntId);
+    if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
+    if (typeof toast === "function")
+      toast("Missão Inferno completa! Acesso a Goshnar's Megalomania liberado.", "level");
+  }
+  const shown = Math.floor(next);
+  if (shown !== Math.floor(before) && typeof renderMission === "function") {
+    if (typeof requestAnimationFrame === "function") {
+      if (!G._missionRenderQueued) {
+        G._missionRenderQueued = true;
+        requestAnimationFrame(() => {
+          G._missionRenderQueued = false;
+          renderMission();
+        });
+      }
+    } else renderMission();
+  }
+}
+
+function surviveMissionOnDeath(p, huntId) {
+  if (!p) return;
+  const id = huntId || (typeof G !== "undefined" && G.combat && G.combat.huntId);
+  const task = surviveMissionDef(id);
+  if (!task) return;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[id]) return;
+  const st = missionState(p, id);
+  if (st.completeClaimed) return;
+  const had = Number(st.progress.survive) || 0;
+  st.progress.survive = 0;
+  if (st.claimed) delete st.claimed.survive;
+  if (had > 0 && typeof toast === "function")
+    toast("Missão Inferno: alguém morreu — timer zerado.", "bad");
+  if (typeof renderMission === "function") renderMission();
+  if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
 }
 
 /* ------------------------------------------------------------ bosses */
@@ -1014,6 +1254,8 @@ function isMissionComplete(p, huntId) {
 // Os dados originais continuam nas definições para serem reativados depois.
 const BOSS_REQUIREMENTS_ENABLED = false;
 const BOSS_COOLDOWNS_ENABLED = false;
+// TEMP TEST: remove before release — libera taints/requisitos do Megalomania.
+const MEGA_TEST_BYPASS = true;
 const BOSS_COOLDOWN = 0;
 const BOSS_DEFS = {
   "the-monster": {
@@ -1041,13 +1283,13 @@ const BOSS_DEFS = {
   },
   "goshnar-s-greed": {
     id:"goshnar-s-greed", name:"Goshnar's Greed",
-    title:"Boss de Mirrored Nightmare", hunt:"goshnars-greed-room",
+    title:"Boss de Ebb and Flow", hunt:"goshnars-greed-room",
     baseMonster:"goshnar-s-greed", sprite:"goshnar-s-greed",
     hp:300000, exp:150000, damage:5000, armor:160, defense:160,
     cooldown:BOSS_COOLDOWN,
     requirement:{
-      level:550, mission:"dark-thais", access:"goshnar-s-greed", enforced:false,
-      text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Greed",
+      level:400, mission:"ebb-and-flow", access:"goshnar-s-greed", enforced:false,
+      text:"Seja afetado por Fear 15× em Ebb and Flow para liberar Goshnar's Greed",
     },
     mechanic:"greedbeast-vulnerability",
   },
@@ -1058,32 +1300,32 @@ const BOSS_DEFS = {
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
     cooldown:0,
     requirement:{
-      mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:false,
+      level:400, mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:false,
       text:"Elimine 50 Rotten Golems em Rotten Wasteland para liberar Goshnar's Hatred",
     },
     mechanic:"dreads-torment",
   },
   "goshnar-s-spite": {
     id:"goshnar-s-spite",name:"Goshnar's Spite",
-    title:"Boss de Ebb and Flow",hunt:"goshnars-spite-room",
+    title:"Boss Soul War — Spite",hunt:"goshnars-spite-room",
     baseMonster:"goshnar-s-spite",sprite:"goshnar-s-spite",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
     cooldown:0,
     requirement:{
-      level:400,enforced:false,
-      text:"Boss de Ebb and Flow (cooldown desligado para testes)",
+      level:400, enforced:false,
+      text:"Requer nível 400+ (Soul War)",
     },
     mechanic:"searing-fire-bubble-qte",
   },
   "goshnar-s-malice": {
     id:"goshnar-s-malice",name:"Goshnar's Malice",
-    title:"Boss Soul War — Malice",hunt:"goshnars-malice-room",
+    title:"Boss de Mirrored Nightmare",hunt:"goshnars-malice-room",
     baseMonster:"goshnar-s-malice",sprite:"goshnar-s-malice",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
     cooldown:0,
     requirement:{
-      level:400,enforced:false,
-      text:"Boss de Soul War Malice (cooldown desligado para testes)",
+      level:400, mission:"dark-thais", access:"goshnar-s-malice", enforced:false,
+      text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Malice",
     },
     mechanic:"maze-qte-curse",
   },
@@ -1095,8 +1337,12 @@ const BOSS_DEFS = {
     hp:620000,exp:3000000,damage:2500,armor:55,defense:55,
     cooldown:0,
     requirement:{
-      allSoulWarTaints:true,enforced:true,
-      text:"Requer as 5 máculas Soul War ativas (Malice, Spite, Greed, Hatred e Cruelty)",
+      level:400,
+      mission:"claustrophobic-inferno",
+      access:"goshnar-s-megalomania",
+      // TEMP TEST: remove before release — enforced fica off com MEGA_TEST_BYPASS.
+      allSoulWarTaints:true,enforced:!MEGA_TEST_BYPASS,
+      text:"Sobreviva 5 min em Claustrophobic Inferno e tenha as 5 máculas Soul War",
     },
     mechanic:"aspect-phase-white-tiles",
   },
@@ -1122,6 +1368,7 @@ const BOSS_DEFS = {
     defense: 60,
     speed: 0.00007,
     requirement: {
+      level: 250,
       mission: "marapur-nagas",
       text: "Matar 25 Naga Archer, 25 Naga Warrior e 25 Makara no mapa das Nagas",
     },
@@ -1147,6 +1394,24 @@ const BOSS_DEFS = {
     requirement: { level: 250, text: "Requer nível 250+ (Ferumbras Ascendant)" },
     cooldown: BOSS_COOLDOWN,
     // loot integral: usa as 57 entradas importadas do MONSTERDATA do servidor.
+  },
+  "world-boss-wz1": {
+    id: "world-boss-wz1", name: "The Deathstrike", title: "World Boss — Warzone 1",
+    hunt: null, worldBoss: true, baseMonster: "deathstrike", sprite: "deathstrike",
+    hp: 2500000, exp: 0, damage: 312, armor: 80, defense: 80, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
+  },
+  "world-boss-wz2": {
+    id: "world-boss-wz2", name: "Gnomevil", title: "World Boss — Warzone 2",
+    hunt: null, worldBoss: true, baseMonster: "gnomevil", sprite: "gnomevil",
+    hp: 4000000, exp: 0, damage: 500, armor: 80, defense: 80, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
+  },
+  "world-boss-wz3": {
+    id: "world-boss-wz3", name: "The Abyssador", title: "World Boss — Warzone 3",
+    hunt: null, worldBoss: true, baseMonster: "abyssador", sprite: "abyssador",
+    hp: 6000000, exp: 0, damage: 750, armor: 80, defense: 80, cooldown: 0, loot: [],
+    requirement: { text: "Entra pelo lobby da Warzone" },
   },
 };
 
@@ -1198,7 +1463,9 @@ function bossState(p, id) {
 
 function bossReadyInfo(p, boss) {
   const enforceRequirement = boss.requirement &&
-    (BOSS_REQUIREMENTS_ENABLED || boss.requirement.enforced);
+    (BOSS_REQUIREMENTS_ENABLED || boss.requirement.enforced) &&
+    // TEMP TEST: remove before release
+    !(MEGA_TEST_BYPASS && boss.id === "goshnar-s-megalomania");
   if (enforceRequirement) {
     if (boss.requirement.level && p.level < boss.requirement.level)
       return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
@@ -1241,17 +1508,110 @@ function bossLootText(boss) {
     `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`);
 }
 
+function bossAccessChecklist(p, boss) {
+  const req = boss && boss.requirement;
+  if (!req) return [];
+  const items = [];
+  if (req.level)
+    items.push({ ok: (p.level || 0) >= req.level, label: "Nível " + req.level + "+" });
+  if (req.mission) {
+    const def = MISSION_DEFS[req.mission];
+    const title = def && def.title ? def.title.replace(/^Missão:\s*/i, "") : req.mission;
+    const done = !!(p.missionsDone && p.missionsDone[req.mission]) ||
+      isMissionComplete(p, req.mission);
+    let progress = "";
+    if (def && def.tasks && def.tasks.length && !done) {
+      const st = missionState(p, req.mission);
+      if (def.tasks.length === 1) {
+        const task = def.tasks[0];
+        const key = task.monster || task.counter;
+        const cur = key ? (st.progress[key] || 0) : 0;
+        if (task.surviveSec || task.counter === "survive") {
+          const target = task.surviveSec || task.target || 300;
+          progress = ` (${formatSurviveClock(cur)}/${formatSurviveClock(target)})`;
+        } else {
+          progress = ` (${Math.min(cur, task.target)}/${task.target})`;
+        }
+      } else {
+        const doneTasks = def.tasks.filter((t) => {
+          const key = t.monster || t.counter;
+          return key && (st.progress[key] || 0) >= t.target;
+        }).length;
+        progress = ` (${doneTasks}/${def.tasks.length})`;
+      }
+    }
+    items.push({ ok: done, label: title + progress });
+  }
+  if (req.access) {
+    p.bossAccess = p.bossAccess || {};
+    if (!p.bossAccess[req.access] && req.mission &&
+        (!!(p.missionsDone && p.missionsDone[req.mission]) || isMissionComplete(p, req.mission)))
+      p.bossAccess[req.access] = true;
+    items.push({ ok: !!p.bossAccess[req.access], label: "Acesso ao boss liberado" });
+  }
+  if (req.allSoulWarTaints) {
+    const ok = typeof soulwarHasAllBossTaints === "function" && soulwarHasAllBossTaints(p);
+    items.push({ ok: !!ok, label: "5 máculas Soul War ativas" });
+  }
+  return items;
+}
+
+/* Catálogo público de bosses — mesmo padrão do modal de hunts. */
+const BOSS_MODAL_SECTIONS = [
+  {
+    title: "BOSSES 250+",
+    minLevel: 250,
+    ids: ["timira-the-many-headed", "scarlett-etzel"],
+  },
+  {
+    title: "SOULWAR 400+",
+    minLevel: 400,
+    ids: [
+      "goshnar-s-malice",
+      "goshnar-s-spite",
+      "goshnar-s-greed",
+      "goshnar-s-hatred",
+      "goshnar-s-megalomania",
+    ],
+  },
+];
+
 function renderBosses(p) {
   const el = $("#bosses-modal-list");
   if (!el || !p) return;
-  el.innerHTML = `<div class="npc-quick boss-quick">${Object.keys(BOSS_DEFS).map((id) => {
+  const card = (id) => {
     const b = BOSS_DEFS[id];
+    if (!b || b.worldBoss) return "";
     const r = bossReadyInfo(p, b);
-    return `<button class="npc-btn boss-btn ${r.ok ? "" : "locked"}" data-boss-info="${id}" title="${b.name} — ${r.left ? "Cooldown" : r.reason}">
-      ${mobImg(b.sprite, 46)}
-      <span class="nb">${b.name}</span>
+    const checks = bossAccessChecklist(p, b);
+    const portrait = typeof bossMobImg === "function"
+      ? bossMobImg(b.sprite, 40) : mobImg(b.sprite, 40);
+    const checksHtml = checks.length
+      ? `<span class="boss-access-list">${checks.map((c) =>
+          `<span class="boss-access-item ${c.ok ? "ok" : "no"}">${c.ok ? "☑" : "☐"} ${c.label}</span>`
+        ).join("")}</span>`
+      : "";
+    return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card boss-modal-card ${r.ok ? "" : "locked"}" data-boss-info="${id}">
+      <span class="mobs" aria-hidden="true">${portrait}</span>
+      <span class="info">
+        <span class="nm">${b.name}</span>
+        <span class="meta">${b.title || ""}</span>
+        ${checksHtml}
+      </span>
+      <span class="risk ${r.ok ? "low" : "high"}">${r.left ? "Cooldown" : (r.ok ? "Disponível" : "Pendente")}</span>
     </button>`;
-  }).join("")}</div>`;
+  };
+  el.innerHTML = BOSS_MODAL_SECTIONS.map((section) => {
+    const levelOk = !section.minLevel || (p.level || 0) >= section.minLevel;
+    const cards = section.ids.map(card).filter(Boolean).join("");
+    const gate = section.minLevel
+      ? `<span class="boss-section-gate ${levelOk ? "ok" : "no"}">${levelOk ? "☑" : "☐"} Nível ${section.minLevel}+</span>`
+      : "";
+    return `<section class="hunt-modal-section boss-modal-section ${levelOk ? "" : "boss-section-locked"}">
+      <div class="hunt-cat-title">${section.title} ${gate}</div>
+      <div class="hunts-group">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
+    </section>`;
+  }).join("");
   $$("#bosses-modal-list [data-boss-info]").forEach((btn) =>
     btn.addEventListener("click", () => {
       const body = $("#modal-body");
@@ -1320,12 +1680,19 @@ function openBossModal(id) {
       aria-label="${title}">${itemImg(l.item, 28)}</div>`;
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
+  const checks = bossAccessChecklist(G.p, boss);
+  const checksHtml = checks.length
+    ? `<div class="boss-detail-access">${checks.map((c) =>
+        `<div class="boss-access-item ${c.ok ? "ok" : "no"}">${c.ok ? "☑" : "☐"} ${c.label}</div>`
+      ).join("")}</div>`
+    : "";
   const modalBox = $("#modal-body");
   modalBox.classList.remove("reward-modal-shell", "bosses-modal-shell", "hunts-modal-shell");
   modalBox.classList.add("boss-modal-shell");
+  const portrait = (typeof bossMobImg === "function" ? bossMobImg : mobImg);
   modalBox.innerHTML = `
     <div class="panel-title">
-      ${mobImg(boss.sprite, 24)}
+      ${portrait(boss.sprite, 24)}
       ${boss.name} — <span class="dim" style="font-weight:normal">${boss.title}</span>
       <span style="flex:1"></span><button class="sm" id="boss-close">✕</button>
     </div>
@@ -1334,8 +1701,9 @@ function openBossModal(id) {
         <span>Disponibilidade: <b style="color:${ready.ok ? "#9ce84a" : "#ff9a6a"}">${ready.reason}</b></span>
         <span>Vitórias: <b>${fmtFull(st.kills || 0)}</b></span>
       </div>
+      ${checksHtml}
       <div class="hunt-best-card boss-best-card">
-        <div class="hunt-best-sprite boss-best-sprite">${mobImg(boss.sprite, 76)}</div>
+        <div class="hunt-best-sprite boss-best-sprite">${portrait(boss.sprite, 76)}</div>
         <div class="hunt-best-name">${boss.name}</div>
         <div class="hunt-best-stat"><span>HP</span><b>${fmtFull(stats.hp)}</b></div>
         <div class="hunt-best-stat"><span>Exp</span><b>${fmtFull(stats.exp)}</b></div>
@@ -1364,6 +1732,17 @@ function openBossModal(id) {
   $("#boss-close").addEventListener("click", closeBossModal);
   $("#boss-fight").addEventListener("click", () => {
     closeBossModal();
+    // Megalomania: Fight sempre abre o lobby (nunca combate direto).
+    if (id === "goshnar-s-megalomania") {
+      const openLobby = (typeof megaLobbyOpenFromBoss === "function" && megaLobbyOpenFromBoss) ||
+        (typeof window !== "undefined" && window.megaLobbyOpenFromBoss);
+      if (typeof openLobby === "function") {
+        openLobby();
+        return;
+      }
+      toast("Lobby Megalomania indisponível. Recarregue a página.", "bad");
+      return;
+    }
     startBoss(id);
   });
 }
@@ -1372,10 +1751,21 @@ function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
-  // Megalomania: abre lobby no templo (exceto follow/start interno do lobby).
+  if (boss.worldBoss) {
+    toast("World Boss entra pelo lobby da Warzone.", "bad");
+    return;
+  }
+  // Megalomania: abre lobby antes do combate (bypass só libera taints/gates, não o lobby).
+  // `__MEGA_LOBBY_STARTING` / `__MEGA_LOBBY_FOLLOW` = start interno pós-lobby.
   if (id === "goshnar-s-megalomania" && !force && !window.__MEGA_LOBBY_STARTING &&
-      !window.__MEGA_LOBBY_FOLLOW && typeof megaLobbyOpenFromBoss === "function") {
-    megaLobbyOpenFromBoss();
+      !window.__MEGA_LOBBY_FOLLOW) {
+    const openLobby = (typeof megaLobbyOpenFromBoss === "function" && megaLobbyOpenFromBoss) ||
+      (typeof window !== "undefined" && window.megaLobbyOpenFromBoss);
+    if (typeof openLobby === "function") {
+      openLobby();
+      return;
+    }
+    toast("Lobby Megalomania indisponível. Recarregue a página.", "bad");
     return;
   }
   if(!force&&G.foreignInstance){
@@ -1396,6 +1786,9 @@ function startBoss(id, force, arenaReady) {
   const arena = bossArenaDefinition(boss);
   if (!arenaReady && arena && arena.otbm && typeof huntMapFromOtbmAsync === "function") {
     if (typeof beginMapLoading === "function") beginMapLoading(`Carregando ${boss.name}...`);
+    // Sempre rebaixa o OTBM da bossroom: cache em memória era a causa de
+    // "só funciona depois do Ctrl+F5" após troca de mapa/spawn.
+    if (typeof invalidateHuntOtbmCache === "function") invalidateHuntOtbmCache(arena.otbm);
     huntMapFromOtbmAsync(arena, () => {
       const assets = typeof preloadHuntMapAssets === "function"
         ? preloadHuntMapAssets(arena, `Preparando ${boss.name}`) : Promise.resolve();
@@ -1406,7 +1799,15 @@ function startBoss(id, force, arenaReady) {
   if (!arenaReady && typeof beginMapLoading === "function")
     beginMapLoading(`Carregando ${boss.name}...`);
   if (G.training) stopAcademy(false);
-  if (G.combat) stopHunt(true);
+  // skipPartyZone: evita returnHome da party no intervalo city→boss.
+  if (G.combat) stopHunt(true, { skipPartyZone: true });
+  // Sem G.combat local, mas com instância órfã no servidor: o PUT seguinte
+  // virava UPDATE da sala morta (sem arenaBossSpawn) → boss nunca nascia.
+  // Ctrl+F5 limpava ACCOUNT_INSTANCE e mascarava o bug.
+  else if (typeof accountInstanceActive === "function" && accountInstanceActive() &&
+           typeof accountEndInstance === "function" && typeof sessionToken === "function") {
+    accountEndInstance(sessionToken(), "boss-reentry").catch(() => {});
+  }
   const st = bossState(G.p, id);
   st.lastFight = BOSS_COOLDOWNS_ENABLED ? Date.now() : 0;
   // Esta reinicialização só faz parte da regra de requisito da Timira.
@@ -1420,9 +1821,25 @@ function startBoss(id, force, arenaReady) {
   G.p.instanceMode = "boss";
   if(typeof accountBeginInstance==="function")accountBeginInstance();
   G.combat = newBossCombat(G.p, boss);
+  G.combat.instanceStartedAt = Date.now();
   G.inCity = false;
   if(typeof persistActiveInstance==="function")persistActiveInstance();
-  addLog("death", `Você entrou no boss <b>${boss.name}</b>. Entrada liberada.`);
+  // Se o PUT de create falhar (409/epoch), o online não ticka e o boss fica
+  // forever em arenaBossSpawn.pending — re-tenta uma vez.
+  if (typeof accountLastInstancePromise === "function") {
+    const bossId = id;
+    accountLastInstancePromise().then((ok) => {
+      if (ok || !G.combat || !G.combat.boss || G.combat.boss.id !== bossId) return;
+      if (typeof accountInstanceActive === "function" && accountInstanceActive()) return;
+      if (typeof accountBeginInstance === "function") accountBeginInstance();
+      if (typeof persistActiveInstance === "function") persistActiveInstance();
+    }).catch(() => {});
+  }
+  const spawnWait=typeof bossArenaSpawnDelayMs==="function"?bossArenaSpawnDelayMs(id):5000;
+  if(id!=="goshnar-s-megalomania"&&spawnWait>0)
+    addLog("death", `Você entrou no boss <b>${boss.name}</b>. O boss surge em ${Math.round(spawnWait/1000)}s.`);
+  else
+    addLog("death", `Você entrou no boss <b>${boss.name}</b>. Entrada liberada.`);
   toast(`Boss: <b>${boss.name}</b>`, "death");
   // PARTY: enquanto a liberação temporária estiver ativa, o servidor recebe
   // cooldown zero e nenhum requisito de missão para todos os integrantes.
@@ -1443,6 +1860,8 @@ function startBoss(id, force, arenaReady) {
     partyReportZone(info);
   }
   renderAll();
+  if (typeof markHuntMapReady === "function") markHuntMapReady();
+  else G.huntMapReady = true;
   if (typeof finishMapLoading === "function") finishMapLoading();
 }
 
@@ -1504,6 +1923,10 @@ function startHunt(id, instanceMode, force) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const hu = GAMEDATA.hunts[id];
   if (!hu) return;
+  if (hu.comingSoon) {
+    toast((hu.name || "Esta hunt") + " chega em breve.", "bad");
+    return;
+  }
   if(!force&&G.foreignInstance){
     toast("Outro personagem da conta já possui uma instância ativa. Troque para ele antes de iniciar outra hunt.","bad");return;
   }
@@ -1540,7 +1963,7 @@ function startHuntAfterLease(id, instanceMode, force) {
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("entrada da hunt");
   // Toda troca de arena passa pelo checkpoint city. Além de limpar a
   // instância anterior, isso ordena a transição da party no servidor.
-  if(G.combat)stopHunt(true);
+  if(G.combat)stopHunt(true,{skipPartyZone:true});
   if (G.training) stopAcademy(false);
   if (typeof clearCombatVisualOverlays === "function") clearCombatVisualOverlays(null);
   G.inCity = false;
@@ -1592,6 +2015,7 @@ function startHuntAfterLease(id, instanceMode, force) {
     try {
       if(typeof accountBeginInstance==="function")accountBeginInstance();
       G.combat = newCombat(G.p, id, instanceMode);
+      G.combat.instanceStartedAt = Date.now();
       if (typeof markHuntMapReady === "function") markHuntMapReady();
       else G.huntMapReady = true;
       spawnWave(G.combat, G.p);
@@ -1659,6 +2083,7 @@ function startHuntAfterLease(id, instanceMode, force) {
                 G.combat.huntId !== id || G.combat.huntMap === integralMap) return;
             try {
               G.combat = newCombat(G.p, id, instanceMode);
+              G.combat.instanceStartedAt = Date.now();
               if (typeof markHuntMapReady === "function") markHuntMapReady();
               else G.huntMapReady = true;
               spawnWave(G.combat, G.p);
@@ -1700,7 +2125,16 @@ function resetTemplePlayerPosition() {
   if (G.renderer) G.renderer.npcHit = [];
 }
 
-function stopHunt(skipMapLoading) {
+function stopHunt(skipMapLoading, opts) {
+  opts = opts || {};
+  // Megalomania: ao voltar ao templo (morte/wipe), ejetar do lobby.
+  // Fire-and-forget: leave-fight no servidor já encerra a sala se vazia;
+  // epoch bump dentro de megaLobbyLeaveFight cancela PUTs em voo.
+  if (!opts.skipMegaLeave && typeof megaLobbyIsActiveFight === "function" && megaLobbyIsActiveFight(G.combat)) {
+    if (typeof megaLobbyLeaveFight === "function") {
+      megaLobbyLeaveFight().catch(() => {});
+    }
+  }
   G.huntMapReady = true;
   if (!skipMapLoading && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
@@ -1732,8 +2166,10 @@ function stopHunt(skipMapLoading) {
   G.inCity = true;
   resetTemplePlayerPosition();
   addLog("info", "Voltou para o <b style='color:#ffe680'>Templo Oficial de Thais</b>.");
-  // PARTY: líder voltou para a safe zone -> limpa follows pendentes
-  if (typeof partyReportZone === "function") partyReportZone({ zone: "city" });
+  // Transição interna hunt/boss→boss: não reporte city (gera returnHome e
+  // expulsa a party antes do zone=boss seguinte).
+  if (!opts.skipPartyZone && typeof partyReportZone === "function")
+    partyReportZone({ zone: "city" });
   renderAll();
   if (!skipMapLoading) {
     const templeReady = typeof preloadGameAssets === "function"
@@ -1825,9 +2261,9 @@ function combatVisualDescriptor(e) {
   return {key:kind+"|"+channel+"|"+target,kind,channel,amount};
 }
 
-/* Soma números equivalentes produzidos no mesmo tick. Efeitos/projéteis
- * continuam individuais; só o texto é agregado. Assim físico permanece um
- * número e gelo da Naga Sword + Avalanche vira um único total de gelo. */
+/* Soma números equivalentes no mesmo tick (mesmo alvo + mesmo elemento).
+ * O lead do grupo mostra o total; hits extras não geram floater/log/FX —
+ * assim vários físicos (party/dual/delayed) viram um combo como o gelo. */
 function aggregateCombatVisualEvents(events) {
   const groups=new Map(),byEvent=new Map();
   for (const event of events||[]) {
@@ -1837,6 +2273,34 @@ function aggregateCombatVisualEvents(events) {
     group.total+=d.amount;group.count++;byEvent.set(event,group);
   }
   return {groups,byEvent};
+}
+
+/* Log de hit: no mesmo alvo/elemento e janela curta, soma no último
+ * "sofreu N" em vez de N linhas (online com ts espaçado). */
+let _hitLogCombo = null;
+function addCombatHitLog(comboKey, alvo, col, amount, elName) {
+  if (typeof addLog !== "function") return;
+  const now = Date.now();
+  const box = typeof $ === "function" ? $("#log") : null;
+  const last = box && box.lastElementChild;
+  if (comboKey && _hitLogCombo && _hitLogCombo.key === comboKey &&
+      last && last === _hitLogCombo.el && last.classList.contains("hit") &&
+      (now - _hitLogCombo.at) < 400) {
+    _hitLogCombo.total += amount;
+    _hitLogCombo.at = now;
+    const span = last.querySelector("span:not(.time)");
+    if (span) {
+      span.innerHTML = `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(_hitLogCombo.total)}</b> (${elName}).`;
+    }
+    return;
+  }
+  addLog("hit", `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(amount)}</b> (${elName}).`);
+  _hitLogCombo = {
+    key: comboKey || "",
+    total: amount,
+    at: now,
+    el: box ? box.lastElementChild : null
+  };
 }
 
 function drainEvents() {
@@ -1920,24 +2384,28 @@ function drainEvents() {
           ? (vermelho ? "#c00000" : (raca ? raca.color : ELEMENTS.physical.color))
           : (ELEMENTS[visualElement] || ELEMENTS.physical).color;
         // `dual` marca a parte elemental de uma arma que bate nos dois
-        // tipos: desloca o numero para o lado para nao ficar por cima do
-        // numero fisico, ja que os dois saem no mesmo instante e tile.
-        const x = ex(e) + (e.dual ? 0.022 : 0), y = ey(e);
-        if (e.projectile && r.addProjectile)
+        // tipos: desloca o NUMERO para o lado para nao ficar por cima do
+        // numero fisico. Impacto/crit/projetil ficam no centro do SQM.
+        const x = ex(e), y = ey(e);
+        const shownDamage=visualAmount(e,e.dmg||0);
+        // Combo lead: só o primeiro hit do grupo (mesmo alvo+elemento)
+        // mostra número, log, projétil e impacto. Hits extras do tick
+        // (e janela curta online) entram no total sem poluir FX/log.
+        const isComboLead = shownDamage > 0;
+        if (isComboLead && e.projectile && r.addProjectile)
           r.addProjectile(e.sx || (c.player ? c.player.x : 0.18), e.sy || 0.62,
                           x, y, col, e.missile);
-        const shownDamage=visualAmount(e,e.dmg||0);
         // Todo dano nasce exatamente no alvo. Só a segunda parcela elemental
         // de arma híbrida (`dual`) recebe deslocamento para não cobrir o
         // número físico; magia elemental comum não deve flutuar à direita.
         const floaterX=ex(e)+(e.dual?0.022:0);
         const comboKey=e.targetId?("damage|"+visualElement+"|"+String(e.targetId)):null;
-        if (shownDamage > 0) r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage", comboKey);
-        if (shownDamage > 0 && typeof addLog === "function") {
+        if (isComboLead) {
+          r.addFloater(floaterX, y, "-" + fmtDmg(shownDamage), col, shownDamage > 200, true, "damage", comboKey);
           const elName=(ELEMENTS[visualElement]||ELEMENTS.physical).name;
           const alvo=typeof displayMonsterName==="function"
             ? displayMonsterName(e.mobSlug||e.spell||"alvo") : (e.mobSlug||e.spell||"alvo");
-          addLog("hit", `<b>${alvo}</b> sofreu <b style="color:${col}">${fmtDmg(shownDamage)}</b> (${elName}).`);
+          addCombatHitLog(comboKey, alvo, col, shownDamage, elName);
         }
         // e.fx vem do COMBAT_PARAM_EFFECT da runa (mort area, ice area,
         // stones...). Sem isso toda runa mostrava so o efeito generico do
@@ -1948,7 +2416,14 @@ function drainEvents() {
         const hitFx = e.fx || ((e.exori && ehFisico) ? "hit-area"
                     : (raca ? raca.fx
                        : (ELEMENTS[visualElement] || ELEMENTS.physical).fx));
-        r.addEffect(x, y, hitFx || "draw-blood");
+        // Impacto só no lead do combo; addEffect ainda dedupe por
+        // fx+alvo na janela curta (party online com ts espaçado).
+        if (isComboLead) {
+          const fxComboKey = e.targetId
+            ? ("fx|" + (hitFx || "draw-blood") + "|" + String(e.targetId))
+            : null;
+          r.addEffect(x, y, hitFx || "draw-blood", undefined, undefined, fxComboKey);
+        }
         // Crítico e Fatal permanecem pelo mesmo tempo. O conteúdo visível do
         // Critical Hit ocupa ~37px dentro do frame 64px, contra ~53px do
         // Onslaught; 1.45x iguala o tamanho percebido sem trocar a sprite.
@@ -2186,6 +2661,16 @@ function drainEvents() {
       case "cast":
         r.addEffect(e.screen ? e.x : 0.3, e.screen ? e.y : 0.5, e.area ? "explosion-area" : "magic-blue");
         break;
+      case "break": {
+        const nome = e.name || e.item || "item";
+        addLog("info", `<b style="color:#ff9090">${nome}</b> quebrou (cargas esgotadas).`);
+        if (typeof renderEquip === "function") renderEquip(G.p);
+        if (typeof refreshEquipChargeOverlays === "function") refreshEquipChargeOverlays(G.p);
+        // Helper pode ter puxado outra cópia da Supply Stash — atualiza o badge.
+        if (typeof renderSupplyStash === "function") renderSupplyStash(G.p);
+        if (typeof renderInventory === "function") renderInventory(G.p);
+        break;
+      }
       case "player-condition": {
         const d = CONDITIONS[e.tipo];
         if (d) addLog("death", `Você está <b style="color:${d.cor}">${d.nome}</b>!`);
@@ -2274,6 +2759,13 @@ function drainEvents() {
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.transcendence = (fdc.transcendence || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
+          if (typeof avatarActivate === "function") {
+            const wanted = e.whoId !== undefined && e.whoId !== null ? String(e.whoId) : "";
+            const who = wanted && Array.isArray(c.players)
+              ? c.players.find((pl) => String(pl.id || (pl.p && pl.p.id) || "") === wanted)
+              : null;
+            avatarActivate((who && who.p) || G.p, Date.now());
+          }
         }
         break;
       }
@@ -2289,33 +2781,46 @@ function drainEvents() {
       case "areafx": {
         // pinta o efeito em TODAS as casas cobertas pela matriz, nao so onde
         // havia monstro. Sem isso a magia de area parecia acertar um alvo so.
+        // Células absolutas (cx/cy) → centro exato do SQM via cellToScreen.
+        // NÃO reancorar no caster quando o alvo sumiu: isso pintava exevo dir
+        // san / barrage inteiro no SQM do jogador. AoE do Tibia fica no tile
+        // do cast, não segue interpolação do alvo.
         const gw=Number(c&&c.gridW)||(typeof GRID_W!=="undefined"?GRID_W:21);
         const gh=Number(c&&c.gridH)||(typeof GRID_H!=="undefined"?GRID_H:13);
-        const idOf=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
-        const wantedWho=e.whoId!==undefined&&e.whoId!==null?String(e.whoId):"";
-        const caster=wantedWho&&c&&Array.isArray(c.players)
-          ? (c.players.find((x)=>idOf(x)===wantedWho)||null) : (c&&c.player)||null;
-        const wantedTgt=e.targetId!==undefined&&e.targetId!==null?String(e.targetId):"";
-        const target=wantedTgt&&c&&Array.isArray(c.mobs)
-          ? (c.mobs.find((m)=>idOf(m)===wantedTgt)||null) : null;
-        // Self-AoE (exori, mas san…): NUNCA cair no target — senao a box
-        // pinta centrada no inimigo mesmo com anchor:"caster"/base do knight.
-        const anchor=e.anchor==="target"
-          ?(target||caster)
-          :(caster||(c&&c.player)||null);
-        const base=e.base;
-        for (const cel of (e.cells || [])) {
+        const cells = e.cells || [];
+        let ox = null, oy = null;
+        if (e.base && Number.isFinite(Number(e.base.cx)) && Number.isFinite(Number(e.base.cy))) {
+          ox = Number(e.base.cx); oy = Number(e.base.cy);
+        } else {
+          const wanted = String(e.sourceId || e.whoId || "");
+          const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
+          const src = wanted && c ? (
+            (Array.isArray(c.mobs) && c.mobs.find((m) => idOf(m) === wanted)) ||
+            (Array.isArray(c.players) && c.players.find((p) => idOf(p) === wanted)) ||
+            (c.player && idOf(c.player) === wanted ? c.player : null) ||
+            null
+          ) : null;
+          if (src && Number.isFinite(Number(src.cx)) && Number.isFinite(Number(src.cy))) {
+            ox = Number(src.cx); oy = Number(src.cy);
+          }
+        }
+        // Chain path já vem com ts por hop — não empilhar outro stagger.
+        const stagger = !e.chainPath && ox != null;
+        for (const cel of cells) {
           let pos=null;
-          if (anchor&&base&&Number.isFinite(Number(anchor.x))&&Number.isFinite(Number(base.cx))) {
-            pos={x:Number(anchor.x)+(Number(cel.cx)-Number(base.cx))/gw,
-                 y:Number(anchor.y)+(Number(cel.cy)-Number(base.cy))/gh};
+          if (cel&&Number.isFinite(Number(cel.cx))&&Number.isFinite(Number(cel.cy))
+              && typeof cellToScreen==="function") {
+            pos=cellToScreen(Number(cel.cx), Number(cel.cy), gw, gh);
           } else if (cel&&cel.x!=null&&cel.y!=null) {
             pos={x:Number(cel.x),y:Number(cel.y)};
-          } else if (typeof cellToScreen==="function") {
-            pos=cellToScreen(cel.cx, cel.cy, gw, gh);
           }
           if (!pos) continue;
-          r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
+          let delay = 0;
+          if (stagger && Number.isFinite(Number(cel.cx)) && Number.isFinite(Number(cel.cy))) {
+            const dist = Math.max(Math.abs(Number(cel.cx) - ox), Math.abs(Number(cel.cy) - oy));
+            delay = dist * 50;
+          }
+          r.addEffect(pos.x, pos.y, e.fx || "explosion-area", undefined, undefined, undefined, delay);
         }
         break;
       }
@@ -2431,14 +2936,19 @@ function drainEvents() {
           G.p.kills = G.p.kills || {};
           G.p.kills[e.mob] = (G.p.kills[e.mob] || 0) + 1;
         }
-        if (c.boss) {
+        // Só anuncia derrota quando o monstro morto É o boss (e.boss).
+        // Em salas Goshnar/Soul War, adds (harvesters, souls, etc.) também
+        // geram "kill" com c.boss setado — não devem disparar o toast.
+        if (e.boss && c.boss) {
+          c.bossDefeated = true;
           const isWorldBoss = !!(c.worldBoss || c.boss.worldBoss);
           if (!onlineAuth && !isWorldBoss) {
             const st = bossState(G.p, c.boss.id);
             st.kills = (st.kills || 0) + 1;
           }
           // World Boss: toast único vem de world-boss-ui (wbExitCombat).
-          if (!isWorldBoss) {
+          if (!isWorldBoss && !c._bossDefeatAnnounced) {
+            c._bossDefeatAnnounced = true;
             addLog("level", `Boss <b>${c.boss.name}</b> derrotado!`);
             toast(`Boss derrotado: <b>${c.boss.name}</b>`, "level");
             renderBosses(G.p);
@@ -2446,7 +2956,7 @@ function drainEvents() {
               if (G.combat === c && c.bossDefeated) stopHunt();
             }, 2500);
           }
-        } else {
+        } else if (!c.boss) {
           handleMissionKill(G.p, c.huntId, e.mob);
         }
         break;
@@ -2836,10 +3346,18 @@ let ONLINE_AUTH_TICKING=false,ONLINE_AUTH_ACC=0,ONLINE_SESSION_INVALID=false;
 let ONLINE_AUTH_APPLIED_VERSION=0,ONLINE_AUTH_APPLIED_INSTANCE="";
 let SERVER_CONNECTION_ONLINE=true,SERVER_STATUS_BOUND=false;
 function onlineAuthorityCombat(){
-  // World Boss skeleton: combate local isolado — não misturar com tick/hunt online.
-  if(G&&G.combat&&(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss)))return false;
   return !!(!ONLINE_SESSION_INVALID&&G&&G.combat&&typeof accountApiConfigured==="function"&&accountApiConfigured()&&
     typeof accountTickInstance==="function");
+}
+/* Entrada de hunt/boss ainda sem id ativo no servidor: o tombstone "ended"
+ * da instância anterior NÃO pode chamar stopHunt (kick instantâneo). */
+function combatInstanceEntryPending(){
+  if(typeof accountInstanceCreating==="function"&&accountInstanceCreating())return true;
+  const c=G&&G.combat;
+  if(!c)return false;
+  const started=Number(c.instanceStartedAt)||0;
+  if(!started||(Date.now()-started)>12000)return false;
+  return typeof accountInstanceActive!=="function"||!accountInstanceActive();
 }
 /* FX/fala/projéteis do canvas + speech nas entidades. Sem isso, reconnect
  * ou troca de hunt deixava areafx/palavras mágicas congelados na tela. */
@@ -3102,7 +3620,6 @@ function resetOnlineRuntimeClocks(){
 }
 async function requestOnlineRuntimeRecovery(options){
   const force=!!(options&&options.force);
-  if(G&&G.combat&&(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss)))return false;
   if(ONLINE_RUNTIME_RECOVERING||!onlineAuthorityCombat()||Date.now()<ONLINE_RUNTIME_RETRY_AT)return false;
   // Sem force: não martelar lease/API enquanto o banner Reconnect está ativo.
   if(!force){
@@ -3142,10 +3659,20 @@ async function requestOnlineRuntimeRecovery(options){
       return !!applied;
     }
     if(remote&&remote.ok&&remote.lastStatus==="ended"){
+      // Instância nova ainda em PUT: ignore o "ended" da anterior e recria.
+      if(combatInstanceEntryPending()){
+        if(typeof accountBeginInstance==="function"&&typeof persistActiveInstance==="function"){
+          accountBeginInstance();persistActiveInstance();
+        }
+        return false;
+      }
       if(G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))){
         clearInstanceSession(remote.terminalReason||"remote-ended",true);
         setTimeout(()=>{if(G.combat)stopHunt(true);},0);
-      }else if(G.combat)clearInstanceSession(remote.terminalReason||"remote-ended",true);
+      }else if(G.combat){
+        if(typeof wbExitCombat==="function")wbExitCombat("fail");
+        else clearInstanceSession(remote.terminalReason||"remote-ended",true);
+      }
       return false;
     }
     // Storage reiniciado sem tombstone: restaure o checkpoint que permaneceu
@@ -3291,6 +3818,13 @@ function scheduleOnlineAuthorityEvents(events,receivedAt){
 function applyOnlineAuthorityState(descriptor,terminalReason,version){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat;
+  const incomingProbe=(descriptor.state&&(descriptor.state.players||descriptor.state.mobs||
+    descriptor.state.events))?descriptor.state:descriptor;
+  const incomingWb=!!(descriptor.worldBoss||incomingProbe&&incomingProbe.worldBoss||
+    /^world-boss-wz[123]$/.test(String(descriptor.bossId||incomingProbe&&incomingProbe.bossId||"")));
+  const localWb=!!(previous.worldBoss||(previous.boss&&previous.boss.worldBoss));
+  if(incomingWb&&!localWb)return false;
+  if(localWb&&!incomingWb&&!terminalReason)return false;
   const incomingVersion=Number(version!==undefined&&version!==null?version:descriptor.version);
   const instanceId=String(descriptor.id||descriptor.instanceId||
     (typeof ACCOUNT_INSTANCE!=="undefined"&&ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.id)||
@@ -3357,7 +3891,12 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
         localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone,
         localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
         localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
-        localBestiary=playerRef.bestiary;
+        localBestiary=playerRef.bestiary,
+        localLootConfig=(playerRef.lootConfig&&typeof playerRef.lootConfig==="object"&&
+          !Array.isArray(playerRef.lootConfig))?{
+            noCollect:Array.isArray(playerRef.lootConfig.noCollect)?playerRef.lootConfig.noCollect.slice():[],
+            noSell:Array.isArray(playerRef.lootConfig.noSell)?playerRef.lootConfig.noSell.slice():[],
+          }:null;
       Object.assign(playerRef,remote.p);local.p=playerRef;
       /* Charms/bestiary: não deixar snapshot remoto vazio apagar unlock local. */
       playerRef.charms=Object.assign({}, remote.p.charms||{}, localCharms||{});
@@ -3383,6 +3922,24 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
           !Array.isArray(localConfig.autoSupplyStash))?localConfig.autoSupplyStash:{};
         playerRef.config.autoSupplyStash=Object.assign({},remoteAuto,localAuto);
       }
+      // lootConfig: união remote ∪ local (antes do assign) — NÃO COLETAR
+      // não some com snapshot atrasado após toggle no cliente.
+      const mergeLootRules=(a,b)=>{
+        const out=[];const seen=new Set();
+        for(const list of [Array.isArray(a)?a:[],Array.isArray(b)?b:[]]){
+          for(const raw of list){
+            const rule=String(raw||"").trim().toLowerCase();
+            if(!rule||seen.has(rule))continue;seen.add(rule);out.push(rule);
+          }
+        }
+        return out;
+      };
+      const remoteLoot=(remote.p.lootConfig&&typeof remote.p.lootConfig==="object"&&
+        !Array.isArray(remote.p.lootConfig))?remote.p.lootConfig:{};
+      playerRef.lootConfig={
+        noCollect:mergeLootRules(remoteLoot.noCollect,localLootConfig&&localLootConfig.noCollect),
+        noSell:mergeLootRules(remoteLoot.noSell,localLootConfig&&localLootConfig.noSell),
+      };
       if(localStances&&typeof localStances==="object")playerRef.stances=localStances;
       if(localPrey&&typeof localPrey==="object")playerRef.prey=localPrey;
       if(localMissions&&typeof localMissions==="object")
@@ -3416,10 +3973,49 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
 
   // Atualiza escalares/mecânicas no próprio objeto, mas reconcilia criaturas
   // separadamente para manter referências, posição e identidade visual.
+  const keepMalicePx=previous.malice&&previous.malice.qtePhase==="active"&&
+    Array.isArray(previous._malicePendingMoves)&&previous._malicePendingMoves.length>0
+    ?{px:previous.malice.px,py:previous.malice.py}:null;
+  // Esteira Scarlett: raf/notes/DOM vivem só no cliente. O snapshot a cada
+  // ~200ms substituía c.scarlett e reiniciava a animação (efeito lagado).
+  const keepScarlettVisual=previous.scarlett?{
+    raf:previous.scarlett.raf||0,
+    _trackBuilt:!!previous.scarlett._trackBuilt,
+    _localSig:previous.scarlett._localSig||null,
+    _wallOffset:previous.scarlett._wallOffset,
+    notes:previous.scarlett.notes,
+    _noteNodes:previous.scarlett._noteNodes||null,
+    _trackEl:previous.scarlett._trackEl||null,
+    _titleEl:previous.scarlett._titleEl||null,
+    _titleIndex:previous.scarlett._titleIndex,
+    _successBannerUntil:previous.scarlett._successBannerUntil,
+    lastBlockFx:Number(previous.scarlett.lastBlockFx)||0,
+    qteStartedAt:Number(previous.scarlett.qteStartedAt)||0
+  }:null;
   for(const key of Object.keys(incoming))
     if(key!=="players"&&key!=="player"&&key!=="mobs"&&key!=="events"&&
        key!=="hunt"&&key!=="huntMap"&&key!=="boss"&&key!=="stats"&&
        key!=="pendingSpawns"&&key!=="_heldAuthorityMobs")previous[key]=incoming[key];
+  // Maze QTE: não sobrescreva a posição otimista enquanto há passos enfileirados.
+  if(keepMalicePx&&previous.malice&&previous.malice.qtePhase==="active"){
+    previous.malice.px=keepMalicePx.px;previous.malice.py=keepMalicePx.py;
+  }
+  if(keepScarlettVisual&&previous.scarlett){
+    previous.scarlett.raf=keepScarlettVisual.raf;
+    previous.scarlett._trackBuilt=keepScarlettVisual._trackBuilt;
+    previous.scarlett._localSig=keepScarlettVisual._localSig;
+    previous.scarlett._wallOffset=keepScarlettVisual._wallOffset;
+    previous.scarlett._noteNodes=keepScarlettVisual._noteNodes;
+    previous.scarlett._trackEl=keepScarlettVisual._trackEl;
+    previous.scarlett._titleEl=keepScarlettVisual._titleEl;
+    previous.scarlett._titleIndex=keepScarlettVisual._titleIndex;
+    previous.scarlett._successBannerUntil=keepScarlettVisual._successBannerUntil;
+    previous.scarlett.lastBlockFx=keepScarlettVisual.lastBlockFx;
+    const sameQte=previous.scarlett.phase==="qte"&&
+      Number(previous.scarlett.qteStartedAt||0)===keepScarlettVisual.qteStartedAt&&
+      Array.isArray(keepScarlettVisual.notes)&&keepScarlettVisual.notes.length;
+    if(sameQte)previous.scarlett.notes=keepScarlettVisual.notes;
+  }
   if(typeof setGridSize==="function"){
     const gw=Number(previous.gridW)||Number(incoming.gridW);
     const gh=Number(previous.gridH)||Number(incoming.gridH);
@@ -3495,7 +4091,8 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   }else{
     for(let index=0;index<remoteMobs.length;index++){
       const remote=remoteMobs[index],id=entityId(remote),local=localMobsById.get(id);
-      if(!local&&(previewIds.has(id)||((previous.pendingSpawns||[]).length&&!previousMobs.length)))
+      // pendingSpawns (blink) não pode engolir o boss autoritativo.
+      if(!local&&!remote.boss&&(previewIds.has(id)||((previous.pendingSpawns||[]).length&&!previousMobs.length)))
         continue;
       const merged=mergeEntity(local,remote,false),fallback=local||previousMobs[index%Math.max(1,previousMobs.length)]||previous.player;
       reconciledMobs.push(ensurePosition(merged,fallback,index));
@@ -3559,12 +4156,20 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     ONLINE_AUTH_APPLIED_VERSION=incomingVersion;
     if(instanceId)ONLINE_AUTH_APPLIED_INSTANCE=instanceId;
   }
+  // Megalomania: morreu — sai do lobby e volta ao templo (também no wipe).
+  if(typeof megaLobbyEjectDeadToTemple==="function"&&previous){
+    if(terminalReason){
+      // Wipe/terminal: leave-fight encerra a sala; stopHunt abaixo já volta ao templo.
+      megaLobbyLeaveFight().catch(()=>{});
+    }else megaLobbyEjectDeadToTemple(previous);
+  }
   if(terminalReason){
+    if(combatInstanceEntryPending())return true;
     clearInstanceSession(terminalReason,true);
     setTimeout(()=>{
       if(!G.combat)return;
       if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
-      stopHunt(true);
+      stopHunt(true,{skipMegaLeave:true});
     },0);
   }
   // O loop redesenha canvas/HUD; não reconstrua party/modal a cada snapshot.
@@ -3580,6 +4185,7 @@ function requestOnlineAuthorityTick(){
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason,
       result.version);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
+      if(combatInstanceEntryPending())return;
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
     }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
   }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
@@ -3602,6 +4208,8 @@ if(typeof window!=="undefined"){
       const confirmedEnded=detail.lastStatus==="ended"||
         (remote.status==="ended"&&remote.matchesCurrent);
       if(G.combat&&confirmedEnded){
+        // Não derrube arena recém-criada pelo tombstone da instância anterior.
+        if(combatInstanceEntryPending())return;
         clearInstanceSession(remote.terminalReason||detail.terminalReason||"shared-ended",true);
         // Não derrubar arena World Boss ao encerrar a hunt anterior.
         if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
@@ -3715,10 +4323,13 @@ function loop(ts) {
         const ents = G.combat.players && G.combat.players.length > 1 ? G.combat.players : [{ p: G.p }];
         for (const ent of ents) if (ent.p) imbTickAll(ent.p, dt);
       }
-      // CARGAS de anéis/amuletos por TEMPO (time ring: 1 carga/3s equipado)
-      if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
+      // Online: cargas por tempo são autoritativas no servidor. Tick local
+      // competia com o snapshot e podia “prender” o item em 1 carga.
       // Revive de party members caídos (visual)
       reviveDownedParty(G.combat,Date.now(),false);
+      // Missão sobrevivência (Claustrophobic Inferno): no online o combate
+      // autoritativo não chama combatTick local — avança o timer aqui.
+      if (typeof surviveMissionTick === "function") surviveMissionTick(G.combat, G.p, dt);
       G._partyHudAt=(G._partyHudAt||0)+dt;
       if(G._partyHudAt>=250){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{
@@ -3750,8 +4361,11 @@ function loop(ts) {
     } else if (typeof updateCombatMovement === "function") {
       updateCombatMovement(G.combat, G.p, dt);
     }
-    // CARGAS de anéis/amuletos por TEMPO (time ring: 1 carga/3s equipado)
-    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
+    // CARGAS de anéis/amuletos/boots por TEMPO (1 carga/3s) — todos da party
+    if (typeof tickAccessoryCharges === "function") {
+      const ents = G.combat.players && G.combat.players.length > 1 ? G.combat.players : [{ p: G.p }];
+      for (const ent of ents) if (ent.p) tickAccessoryCharges(ent.p, dt);
+    }
     drainEvents();
     // HP/MP da party são entidades vivas; atualiza o painel em tempo real
     // mesmo quando outro membro está selecionado. Usamos a versão leve
@@ -3835,6 +4449,8 @@ function loop(ts) {
     // Na cidade a stamina também permanece temporariamente cheia.
     G.p.stamina = FULL_STAMINA_SECONDS;
     regenInCity(G.p, dt);
+    // Soft boots / time rings: duração só com item EQUIPado (Canary stopduration).
+    if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);
     tickManaTrain(G.p, dt);
     // caminhada: ao chegar num NPC, abre o dialogo dele
     const reached = G.walker.update(dt);
@@ -3851,6 +4467,7 @@ function loop(ts) {
     renderStats(G.p);
     renderTopbar(G.p);
     if (typeof renderStatusBar === "function") renderStatusBar(G.p);
+    if (typeof refreshEquipChargeOverlays === "function") refreshEquipChargeOverlays(G.p);
     if (typeof renderPlayerStates === "function") renderPlayerStates(G.p);
     // selo da postura ativa no canto superior esquerdo da cena
     if (typeof renderStanceBadge === "function") renderStanceBadge(G.p);
@@ -3874,6 +4491,7 @@ function loop(ts) {
 /* ------------------------------------------------------------ render */
 function renderAll() {
   const p = G.p;
+  if (!p) return;
   renderStats(p);
   renderSkills(p);
   renderEquip(p);
@@ -3894,6 +4512,7 @@ function renderAll() {
   if (typeof renderStanceBadge === "function") renderStanceBadge(p);
   if (typeof renderPreyButton === "function") renderPreyButton(p);
   if (typeof renderPartyButton === "function") renderPartyButton(p);
+  if (typeof renderRewardButton === "function") renderRewardButton(p);
   // painel de party estilo OTC (canto superior direito da tela do jogo)
   if (typeof renderPartyPanel === "function") renderPartyPanel(p);
   // OTClient HUD: combat modes, player states (o hud-panel com HP/MP/Lv foi
@@ -4103,6 +4722,16 @@ function bindControls() {
     if (typeof openNpcsModal === "function") openNpcsModal();
   });
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
+  const btnStore = $("#btn-store");
+  if (btnStore) btnStore.addEventListener("click", () => {
+    if (typeof openStoreModal === "function") openStoreModal();
+  });
+  const tcBar = $("#tibia-coins");
+  if (tcBar && typeof openStoreModal === "function") {
+    tcBar.style.cursor = "pointer";
+    tcBar.addEventListener("click", () => openStoreModal("coins"));
+  }
+  if (typeof bootStoreFromQuery === "function") bootStoreFromQuery();
   /* Market / Reward / Forge / Depot / Imbuements: só via modal CIDADE (e Cyclopedia). */
   const btnWheel = $("#btn-wheel");
   if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
@@ -4114,6 +4743,7 @@ function bindControls() {
   // jogo continuar de pe se o arquivo for removido numa build de producao
   if (typeof bindPreyButton === "function") bindPreyButton();
   if (typeof bindPartyButton === "function") bindPartyButton();
+  if (typeof bindLoyaltyButton === "function") bindLoyaltyButton();
   if (typeof bindTrainingButton === "function") bindTrainingButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
@@ -4121,8 +4751,10 @@ function bindControls() {
       window.GLOBAL_IDLE_SERVER_CONFIG) || {};
     const account = sessionAccount();
     const onlineMode = typeof accountApiConfigured === "function" && accountApiConfigured();
-    // TEMPORARIO: painel admin liberado para todos (testes)
-    const adminAllowed = true;
+    // Offline, TEST_SERVER, ou role admin: painel liberado. Em produção online
+    // sem testServer, só contas admin. Grants no servidor também checam ownership.
+    const adminAllowed = !onlineMode || !!serverCfg.testServer ||
+      !!(account && account.role === "admin");
     if (typeof openAdmin === "function" && adminAllowed) {
       btnAdmin.addEventListener("click", () => openAdmin());
     } else {
@@ -4184,6 +4816,8 @@ function bindControls() {
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
     const k = KEYMAP[e.key];
     if (!k) return;
+    // Labirinto Malice QTE: WASD/setas são do minigame (handler em capture).
+    if (G.combat && G.combat.malice && G.combat.malice.qtePhase === "active") return;
     if (G.combat) {
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
       G.walkKeys[k] = true;
@@ -4533,6 +5167,7 @@ function openCharacterModal() {
     save();
     localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
     sessionStorage.setItem(AUTOLOGIN_KEY, id);
+    if (typeof armBootLoading === "function") armBootLoading("Carregando personagem...");
     location.reload();
   }));
   $("#char-new-toggle").addEventListener("click", () => {
@@ -4544,6 +5179,7 @@ function openCharacterModal() {
     if (name.length < 2) { toast("Digite um nome válido"); return; }
     const np = createCharacter(name, $("#new-char-voc").value, $("#new-char-sex").value);
     sessionStorage.setItem(AUTOLOGIN_KEY, characterId(np));
+    if (typeof armBootLoading === "function") armBootLoading("Carregando personagem...");
     location.reload();
   });
 }
@@ -4727,6 +5363,8 @@ function initAccountLogin() {
       }
       if (typeof save === "function") save();
       try { sessionStorage.setItem("tibia-idle-online-autoload", String(summary.id)); } catch (e) {}
+      if (typeof armBootLoading === "function")
+        armBootLoading("Carregando " + (summary.name || "personagem") + "...");
       location.reload(); return true;
     }
     if(!leaseReady&&typeof accountAcquireLease==="function"){
@@ -4742,10 +5380,15 @@ function initAccountLogin() {
       }
     }
     msg("Carregando <b>" + summary.name + "</b>...");
+    if (typeof showGameLoading === "function")
+      showGameLoading(true, "Carregando " + (summary.name || "personagem") + "...", 0);
+    closeAccountModal();
     const loaded = typeof accountLoadCharacter === "function"
       ? await accountLoadCharacter(token, summary.id) : { ok:false };
     if (!loaded.ok || !loaded.character) {
       if(typeof accountReleaseLease==="function")await accountReleaseLease(token);
+      if (typeof showGameLoading === "function") showGameLoading(false);
+      const login = $("#login"); if (login) login.style.display = "";
       msg(loaded.msg || "Não foi possível carregar o personagem.");
       return;
     }
@@ -4760,7 +5403,6 @@ function initAccountLogin() {
       level:Number(character.level) || raw.level || 1,
     }));
     try { sessionStorage.setItem("tibia-idle-char", String(character.id)); } catch (e) {}
-    closeAccountModal();
     startGame(p);
   }
   function paintCreatorVocations() {
@@ -4935,6 +5577,8 @@ function initAccountLogin() {
     if(typeof syncVipFromAccount==="function")syncVipFromAccount(account);
     if(typeof accountSetGold==="function"&&account&&account.gold!==undefined)
       accountSetGold(Math.max(0,Number(account.gold)||0));
+    if(typeof accountSetCoins==="function"&&account&&account.coins!==undefined)
+      accountSetCoins(Math.max(0,Number(account.coins)||0));
     if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
     const cards = characters.length ? characters.map((c) => `
       <button class="account-character-card ${c.identityMismatch?"identity-mismatch":""}"
@@ -5035,20 +5679,30 @@ function initAccountLogin() {
     }
   });
 
-  // Sessão existente em refresh: reabre diretamente o modal de personagens.
+  // Sessão existente em refresh: cobre a tela e entra direto no personagem
+  // autoload (troca) — nunca mostra o formulário de login no meio.
   const token = sessionToken();
   if (token && acc) {
-    msg("Reconectando...");
+    let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";}catch(e){}
+    const bootLoad = typeof isBootLoadingArmed === "function" && isBootLoadingArmed();
+    if (autoId || bootLoad) {
+      if (typeof showGameLoading === "function")
+        showGameLoading(true, (typeof bootLoadingText === "function" && bootLoadingText()) || "Carregando personagem...", 0);
+    } else {
+      msg("Reconectando...");
+    }
     const bootGen=++accountBootGeneration;
     accountMe(token).then((result) => {
       if (bootGen!==accountBootGeneration) return;
       if (result.ok) {
         msg("");if(typeof accountStartSync==="function")accountStartSync(token).catch(()=>{});
-        let autoId="";try{autoId=sessionStorage.getItem("tibia-idle-online-autoload")||"";
-          sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
+        try{sessionStorage.removeItem("tibia-idle-online-autoload");}catch(e){}
         const target=(result.characters||[]).find(c=>String(c.id)===String(autoId));
         if(target)enterCharacter(sessionToken()||token,target);
-        else showPicker(sessionToken()||token, result.account, result.characters || []);
+        else {
+          if (typeof showGameLoading === "function") showGameLoading(false);
+          showPicker(sessionToken()||token, result.account, result.characters || []);
+        }
       } else { logoutAccount(); msg("Sessão expirada — faça login novamente."); }
     });
   }

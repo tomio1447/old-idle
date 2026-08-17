@@ -9,9 +9,9 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=malice-boss-v1">
-  <link rel="stylesheet" href="css/otc-complete.css?v=settings-click-fix-v1">
-  <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-v1">
+  <link rel="stylesheet" href="css/layout.css?v=store-mp-v1">
+  <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
+  <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
   <link rel="stylesheet" href="css/client-background.css">
   <link rel="stylesheet" href="css/mobile.css?v=ranking-playeron-v1">
@@ -25,10 +25,20 @@
         document.documentElement.setAttribute("data-ui-mode", m);
       }
     } catch (e) {}
+    /* Troca de personagem / autoload: cobre login e mapa no primeiro paint. */
+    try {
+      if (sessionStorage.getItem("tibia-idle-boot-loading") ||
+          sessionStorage.getItem("tibia-idle-online-autoload") ||
+          sessionStorage.getItem("tibia-idle-autologin-v1")) {
+        document.documentElement.classList.add("boot-loading");
+      }
+    } catch (e) {}
   })();
   </script>
 </head>
 <body>
+
+<div id="game-loading" aria-live="polite"><div class="gl-box"><b>GLOBAL-IDLE</b><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
 
 <button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
 
@@ -187,20 +197,29 @@
       <b id="players-online-count">0</b>
     </div>
     <span class="spacer"></span>
-    <button class="sm" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
+    <button class="sm topbar-sys-btn" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
       <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.wheel">WHEEL</span>
     </button>
-    <button class="sm" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
+    <button class="sm topbar-sys-btn" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
       <img src="assets/ui/cyclopedia/charms/low-blow.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.charms">CHARMS</span>
     </button>
-    <button class="sm" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
-      <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="prey-btn-gif">
+    <button class="sm topbar-sys-btn" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
+      <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="topbar-btn-icon prey-btn-gif">
       <span data-i18n="btn.prey">PREY</span><span id="prey-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
-      👥 <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
+    <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
+      <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
+      <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-loyalty" title="Loyalty — pontos e ranks de lealdade" data-i18n-title="title.loyalty">
+      <span class="topbar-btn-emoji" aria-hidden="true">🏆</span>
+      <span data-i18n="btn.loyalty">LOYALTY</span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-store" title="STORE — Tibia Coins, VIP e vender coins" data-i18n-title="title.store">
+      <img src="assets/ui/coins/tibia-coins.gif" alt="" class="topbar-btn-icon coin-gif" width="18" height="18">
+      <span data-i18n="btn.store">STORE</span>
     </button>
     <button class="sm" id="btn-switch" data-i18n="btn.switch">Trocar personagem</button>
     <button class="sm" id="btn-cyclo">📖 <span data-i18n="btn.cyclo">Cyclopedia</span></button>
@@ -322,7 +341,7 @@
           </div>
           <div class="party-panel-body" id="party-panel-body"></div>
         </div>
-        <div id="player-states-strip" style="position:absolute;bottom:30px;left:4px;z-index:5"></div>
+        <div id="player-states-strip" hidden aria-hidden="true" style="display:none"></div>
       </div>
 
       <!-- barra de cooldown, no mesmo formato do cliente oficial:
@@ -492,7 +511,6 @@
   </div>
 </div>
 
-<div id="game-loading" style="display:none"><div class="gl-box"><b>GLOBAL-IDLE</b><div class="gl-text" data-i18n="loading">Carregando recursos...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
 <div id="tooltip"></div>
 <div id="toasts"></div>
 <div id="server-reconnect-banner" class="server-reconnect-banner" hidden>
@@ -514,18 +532,18 @@
 </div>
 <div class="modal-bg" id="modal"><div class="modal panel" id="modal-body"></div></div>
 
-<script src="js/gamedata.js?v=creature-product-npc-prices-v1"></script>
+<script src="js/gamedata.js?v=stack-count-frames-v1"></script>
 <script src="js/gamelib-const.js"></script>
 <script src="js/modulelib.js"></script>
 <script src="js/client-background.js"></script>
 <script src="js/canarydata.js"></script>
 <script src="js/spelldata.js"></script>
-<script src="js/appearancedata.js?v=sex-looktype-v2"></script>
+<script src="js/appearancedata.js?v=mount-zpattern-v1"></script>
 <script src="js/avatardata.js"></script>
 <script src="js/supplydata.js"></script>
 <script src="js/runedata.js"></script>
 <script src="js/monstermovedata.js"></script>
-<script src="js/monsterdata.js?v=prey-bestiary-v1"></script>
+<script src="js/monsterdata.js?v=icecold-energy-weak-v1"></script>
 <script src="js/mobsheetdata.js"></script>
 <script src="js/idleanimdata.js?v=sex-looktype-v2"></script>
 <script src="js/creatureanchordata.js"></script>
@@ -539,102 +557,105 @@
 <script src="js/weapondata.js"></script>
 <!-- update 15.25.3a4a52: aplica os ajustes POR CIMA dos dados gerados,
      por isso carrega depois de todos os *data.js e antes dos consumidores -->
-<script src="js/spelldata_1525.js?v=exori-self-aoe-v1"></script>
+<script src="js/spelldata_1525.js?v=monk-chain-flood-v1"></script>
 <script src="js/tiledata.js"></script>
 <script src="js/tileflags.js"></script>
 <script src="js/imbuementdata.js"></script>
 <script src="js/wandshootdata.js?v=basic-fx-v1"></script>
-<script src="js/patch_clientfx.js?v=caldera-diamond-dmg-v1"></script>
+<script src="js/patch_clientfx.js?v=diamond-ethereal-missile-v1"></script>
 <script src="js/rates.js?v=loot-chance-not-qty-v1"></script>
 <script src="js/vip.js?v=account-gold-cap-vip-v1"></script>
 <script src="js/huntmapdata.js"></script>
 <script src="js/cobra-bastion-map.js?v=cobra-loading-v17"></script>
 <script src="js/dark-thais-map.js"></script>
 <script src="js/otbm.js?v=cobra-loading-v17"></script>
-<script src="js/otbmhunt.js?v=cobra-loading-v17"></script>
-<script src="js/weapons.js?v=npc-shops-v1"></script>
+<script src="js/otbmhunt.js?v=boss-otbm-invalidate-v1"></script>
+<script src="js/weapons.js?v=item-anim-missing-v1"></script>
 <script src="js/ammo.js?v=caldera-diamond-dmg-v1"></script>
-  <script src="js/combo.js?v=mas-san-range-v1"></script>
+  <script src="js/combo.js?v=monk-chain-flood-v1"></script>
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=knight-fx-combo-v1"></script>
-<script src="js/area.js?v=wave-origin-ahead-v2"></script>
-  <script src="js/gridai.js?v=mob-retarget-v1"></script>
+<script src="js/area.js?v=wave-aim-target-v1"></script>
+  <script src="js/gridai.js?v=rotten-rooted-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
-<script src="js/monk.js?v=monk-lesser-repulse-v1"></script>
-<script src="js/canary-vocation.js?v=voc-filter-regen-v1"></script>
+<script src="js/monk.js?v=monk-chain-flood-v1"></script>
+<script src="js/canary-vocation.js?v=monk-spell-dmg-25-v1"></script>
 <script src="js/core.js?v=forked-chain-v1"></script>
-<script src="js/spells.js?v=voc-filter-regen-v1"></script>
+<script src="js/spells.js?v=monk-spell-dmg-25-v1"></script>
 <script src="js/cooldown.js?v=cd-bar-v1"></script>
 <script src="js/augments.js"></script>
 <script src="js/supplies.js?v=potion-audit-v1"></script>
 <script src="js/outfit.js?v=sex-looktype-v2"></script>
-<script src="js/appearance.js?v=sex-looktype-v2"></script>
+<script src="js/appearance.js?v=mount-zpattern-v1"></script>
+<script src="js/loyalty.js?v=loyalty-v1"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=pouch-sell-safe-v1"></script>
-<script src="js/accessories.js?v=stash-multi-v1"></script>
-  <script src="js/combat.js?v=malice-boss-v1"></script>
+<script src="js/player.js?v=imb-mat-sell-v1"></script>
+<script src="js/accessories.js?v=ebb-and-flow-v1"></script>
+  <script src="js/combat.js?v=rotten-rooted-v1"></script>
 <script src="js/city.js?v=npc-sprites-canary-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
 <script src="js/walker.js"></script>
-<script src="js/tileanimdata.js?v=cobra-loading-v17"></script>
-<script src="js/tilepatterndata.js?v=cobra-loading-v17"></script>
+<script src="js/tileanimdata.js?v=ebb-and-flow-v1"></script>
+<script src="js/tilepatterndata.js?v=ebb-and-flow-v1"></script>
 <script src="js/tilemap.js?v=wall-depth-v1"></script>
-<script src="js/effectdata.js?v=blow-white-fix-v1"></script>
-<script src="js/icondata.js?v=expose-weakness-v1"></script>
-<script src="js/render.js?v=wall-depth-v2"></script>
+<script src="js/effectdata.js?v=wave-fx-dat-v1"></script>
+<script src="js/icondata.js?v=rotten-rooted-v1"></script>
+<script src="js/render.js?v=ebb-and-flow-v1"></script>
 <script src="js/city-render.js?v=wall-depth-v1"></script>
 <script src="js/monsters.js"></script>
 <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
      GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
-<script src="js/patch_imbuement.js"></script>
+<script src="js/patch_imbuement.js?v=imb-mat-sell-v1"></script>
 <script src="js/patch_amazon.js"></script>
 <!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
-<script src="js/hardcore-library.js?v=library-canary-dmg-v1"></script>
+<script src="js/hardcore-library.js?v=icecold-energy-weak-v1"></script>
 <script src="js/hard-hunts.js?v=loot-npc-prices-v1"></script>
-<script src="js/soulwar.js?v=mega-lobby-v1"></script>
+<script src="js/soulwar.js?v=ebb-monsters-fov-v1"></script>
+<script src="js/yasir-prices.js?v=goshnar-yasir-v1"></script>
 <script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=pouch-destroy-stash-v1"></script>
-<script src="js/i18n.js?v=topbar-wod-charms-v1"></script>
-<script src="js/alpha-announce.js?v=alpha-announce-v1"></script>
+<script src="js/ui.js?v=rotten-rooted-v1"></script>
+<script src="js/i18n.js?v=store-mp-v1"></script>
+<script src="js/alpha-announce.js?v=store-mp-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
-<script src="js/otc-hud.js?v=cond-bar-v1"></script>
-<script src="js/cyclopedia-ui.js?v=npcs-modal-v1"></script>
-<script src="js/forgedata.js"></script>
-<script src="js/forge.js"></script>
+<script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
+<script src="js/cyclopedia-ui.js?v=malice-modal-anim-v1"></script>
+<script src="js/forgedata.js?v=forge-canary-procs-v1"></script>
+<script src="js/forge.js?v=forge-canary-procs-v1"></script>
 <script src="js/imbuement-ui.js?v=imbue-slots-v1"></script>
 <script src="js/forge-ui.js"></script>
 <script src="js/prey.js?v=prey-bestiary-v1"></script>
-<script src="js/prey-ui.js?v=prey-bestiary-v1"></script>
-<script src="js/party.js?v=helper-only-spells-v1"></script>
-<script src="js/party-ui.js?v=helper-only-spells-v1"></script>
-<script src="js/analyzers.js?v=taken-session-total-v1"></script>
+<script src="js/prey-ui.js?v=prey-close-store-v1"></script>
+<script src="js/party.js?v=temple-clear-cond-v1"></script>
+<script src="js/party-ui.js?v=boot-load-screen-v1"></script>
+<script src="js/analyzers.js?v=stack-count-frames-v1"></script>
 <script src="js/wheeldata.js?v=wheel-otc-v2"></script>
 <script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
 <script src="js/wheel.js?v=wheel-otc-v2"></script>
 <script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
-<script src="js/account-client.js?v=malice-boss-v1"></script>
+<script src="js/account-client.js?v=store-mp-v1"></script>
 <script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
-<script src="js/market-ui.js"></script>
+<script src="js/market-ui.js?v=stack-count-frames-v1"></script>
+<script src="js/store-ui.js?v=store-mp-v1"></script>
 <script src="js/market-local.js"></script>
-<script src="js/reward-chest.js?v=reward-online-v1"></script>
+<script src="js/reward-chest.js?v=stack-count-frames-v1"></script>
 <script src="js/training.js?v=party-checkpoint-v1"></script>
 <script src="js/training-ui.js"></script>
-<script src="js/accessorydata.js"></script>
-<script src="js/supply-stash-data.js?v=stash-multi-v1"></script>
-<script src="js/supply-stash.js?v=pouch-destroy-stash-v1"></script>
-<script src="js/admin.js?v=admin-no-rme-mundo-v1"></script>
-<script src="js/city-ui.js?v=ranking-playeron-v1"></script>
-<script src="js/preload.js?v=sex-looktype-v2"></script>
-<script src="js/game.js?v=malice-boss-v1"></script>
-<script src="js/scarlett-boss.js?v=scarlett-qte-v4"></script>
-<script src="js/world-boss-ui.js?v=wb-isolate-v1"></script>
-<script src="js/megalomania-lobby.js?v=mega-lobby-v1"></script>
+<script src="js/accessorydata.js?v=charge-stack-destroy-v1"></script>
+<script src="js/supply-stash-data.js?v=charge-stack-destroy-v1"></script>
+<script src="js/supply-stash.js?v=loot-rules-v1"></script>
+<script src="js/admin.js?v=store-mp-v1"></script>
+<script src="js/city-ui.js?v=temple-clear-cond-v1"></script>
+<script src="js/preload.js?v=boot-load-screen-v1"></script>
+<script src="js/game.js?v=store-mp-v1"></script>
+<script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
+<script src="js/world-boss-ui.js?v=wb-shared-v1"></script>
+<script src="js/megalomania-lobby.js?v=mega-death-cleanup-v1"></script>
 </body>
 </html>

@@ -96,6 +96,11 @@ function JsonStore() {
     this.market = [];
   }
   this._marketSeq = (this.market || []).reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
+  const storeData = this._load("store.json", null);
+  this.storeOrders = Array.isArray(storeData && storeData.orders) ? storeData.orders : [];
+  this.coinLedger = Array.isArray(storeData && storeData.ledger) ? storeData.ledger : [];
+  this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
+  this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
   const snapBefore = (this.snapshots || []).length;
   this._pruneSnapshots();
@@ -127,6 +132,11 @@ JsonStore.prototype._save = function () {
     JSON.stringify({ offers: this.market || [],
                      marketStats: this.marketStats || {},
                      marketHistoryArr: this.marketHistoryArr || [] }, null, 1));
+  this._saveStore();
+};
+JsonStore.prototype._saveStore = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "store.json"),
+    JSON.stringify({ orders: this.storeOrders || [], ledger: this.coinLedger || [] }, null, 1));
 };
 JsonStore.prototype._pruneSnapshots = function () {
   const list = Array.isArray(this.snapshots) ? this.snapshots : [];
@@ -314,6 +324,15 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,skipped:"inactive"};
   const lease=(this.leases||[]).find((item)=>Number(item.account_id)===Number(accountId));
   if(lease&&new Date(lease.expires_at).getTime()>now)return {ok:false,skipped:"leased"};
+  if(/^world-boss-wz[123]$/.test(String(row.boss_id||""))){
+    const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
+    const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds():[];
+    const memberLeased=ids.some((id)=>{
+      const item=(this.leases||[]).find((entry)=>Number(entry.account_id)===Number(id));
+      return item&&new Date(item.expires_at).getTime()>now;
+    });
+    if(memberLeased)return {ok:false,skipped:"wb-member-leased"};
+  }
   const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
   const elapsed=Math.min(Math.max(0,now-cursor),Math.max(1,Number(maxStep)||3600000));
   if(elapsed<Math.max(1,Number(minStep)||500))return {ok:false,skipped:"not-due"};
@@ -330,8 +349,9 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   row.updated_at=new Date(now).toISOString();this._saveRuntime(true);
   return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version),terminalReason:next.terminalReason||null};
 };
-JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,now,maxStep,advanceState,lease){
-  if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))return {ok:false,error:"LEASE_REQUIRED"};
+JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,now,maxStep,advanceState,lease,opts){
+  const leaseAcc=(opts&&opts.leaseAccountId!=null)?opts.leaseAccountId:accountId;
+  if(!this.leaseValidate(leaseAcc,lease.holderId,lease.secretHash,lease.now))return {ok:false,error:"LEASE_REQUIRED"};
   const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
   if(expectedVersion!==null&&expectedVersion!==undefined&&Number(row.version)!==Number(expectedVersion))
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
@@ -349,6 +369,39 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   row.updated_at=row.saved_at;this._saveRuntime(true);return {ok:true,instance:row,characters:changed,elapsed,
     terminalReason:next.terminalReason||null};
 };
+JsonStore.prototype.instanceTransferOwner = function(fromAccountId, toAccountId) {
+  const fromId = Number(fromAccountId), toId = Number(toAccountId);
+  if (!fromId || !toId || fromId === toId) return { ok: false, error: "INVALID_TRANSFER" };
+  const from = this.instanceGet(fromId);
+  if (!from || from.status !== "active") return { ok: false, error: "NO_INSTANCE" };
+  let to = this.instanceGet(toId);
+  if (to && to.status === "active") {
+    to.status = "ended";
+    to.terminal_reason = "mega-replaced-by-transfer";
+    to.ended_at = new Date().toISOString();
+    to.updated_at = to.ended_at;
+  }
+  if (!to) {
+    to = { account_id: toId };
+    this.instances = this.instances || [];
+    this.instances.push(to);
+  }
+  const keep = ["instance_id", "version", "kind", "hunt_id", "boss_id", "instance_mode",
+    "party_id", "party_version", "active_character_id", "state", "saved_at", "started_at",
+    "worker_cursor_at", "worker_total_ms"];
+  for (const key of keep) if (from[key] !== undefined) to[key] = from[key];
+  to.account_id = toId;
+  to.status = "active";
+  to.terminal_reason = null;
+  to.ended_at = null;
+  to.updated_at = new Date().toISOString();
+  from.status = "ended";
+  from.terminal_reason = "mega-ownership-transferred";
+  from.ended_at = to.updated_at;
+  from.updated_at = to.updated_at;
+  this._saveRuntime(true);
+  return { ok: true, instance: to, fromAccountId: fromId, toAccountId: toId };
+};
 JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,reason,lease){
   if(!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
     return {ok:false,error:"LEASE_REQUIRED"};
@@ -358,6 +411,44 @@ JsonStore.prototype.instanceEnd = function(accountId,instanceId,expectedVersion,
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
   row.version=Number(row.version)+1;row.status="ended";row.terminal_reason=reason;
   row.ended_at=new Date(lease.now).toISOString();row.updated_at=row.ended_at;
+  this._saveRuntime(false,true);return {ok:true,instance:row};
+};
+/* Encerra sala Megalomania sem lease: lobby já vazio após leaveFight.
+ * Evita row ativo multi-conta órfão → INSTANCE_CHARACTER_NOT_OWNED no PUT. */
+JsonStore.prototype.instanceEndMegaOrphan = function(accountId,instanceId,reason){
+  const row=this.instanceGet(accountId);
+  if(!row||row.status!=="active")return {ok:true,instance:row||null,alreadyEnded:true};
+  if(String(row.boss_id||"")!=="goshnar-s-megalomania")
+    return {ok:false,error:"NOT_MEGA_INSTANCE"};
+  if(instanceId&&String(row.instance_id)!==String(instanceId))
+    return {ok:false,error:"INSTANCE_ID_MISMATCH",instance:row};
+  const now=new Date().toISOString();
+  row.version=Number(row.version)+1;row.status="ended";
+  row.terminal_reason=reason||"mega-lobby-empty";
+  row.ended_at=now;row.updated_at=now;
+  this._saveRuntime(false,true);return {ok:true,instance:row};
+};
+/* World Boss / prep: encerra a row sem lease (hunts dos JOIN + sala WB). */
+JsonStore.prototype.instanceEndForced = function(accountId,reason){
+  const row=this.instanceGet(accountId);
+  if(!row||row.status!=="active")return {ok:true,instance:row||null,alreadyEnded:true};
+  const now=new Date().toISOString();
+  row.version=Number(row.version)+1;row.status="ended";
+  row.terminal_reason=reason||"forced-end";
+  row.ended_at=now;row.updated_at=now;
+  this._saveRuntime(false,true);return {ok:true,instance:row};
+};
+JsonStore.prototype.instanceReplaceForced = function(accountId,instanceId,meta,state){
+  this.instances=this.instances||[];
+  let row=this.instanceGet(accountId);
+  const nowIso=new Date().toISOString();
+  const savedAt=meta.saved_at||nowIso;
+  const startedAt=meta.started_at||meta.startedAt||savedAt||nowIso;
+  if(!row){row={account_id:Number(accountId)};this.instances.push(row);}
+  Object.assign(row,meta,{
+    instance_id:instanceId,version:1,state,status:"active",ended_at:null,terminal_reason:null,
+    worker_cursor_at:savedAt,worker_total_ms:0,updated_at:nowIso,saved_at:savedAt,started_at:startedAt,
+  });
   this._saveRuntime(false,true);return {ok:true,instance:row};
 };
 JsonStore.prototype.createAccount = function (login, hash, role, coins) {
@@ -373,6 +464,53 @@ JsonStore.prototype.updateCoins = function (id, coins) {
   const a = this.findAccountById(id);
   if (a) { a.coins = Math.max(0, coins); this._save(); return a; }
   return null;
+};
+JsonStore.prototype.storeOrderInsert = function (row) {
+  const order = Object.assign({ id: ++this._storeOrderSeq }, row || {});
+  this.storeOrders = this.storeOrders || [];
+  this.storeOrders.push(order);
+  this._saveStore();
+  return order;
+};
+JsonStore.prototype.storeOrderGet = function (id) {
+  return (this.storeOrders || []).find((o) => String(o.id) === String(id)) || null;
+};
+JsonStore.prototype.storeOrderUpdate = function (id, patch) {
+  const order = this.storeOrderGet(id);
+  if (!order) return null;
+  Object.assign(order, patch || {});
+  this._saveStore();
+  return order;
+};
+JsonStore.prototype.storeOrderList = function (limit) {
+  const n = Math.max(1, Math.min(500, Number(limit) || 100));
+  return (this.storeOrders || []).slice().sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
+};
+JsonStore.prototype.storeOrdersByAccount = function (accountId, limit) {
+  const n = Math.max(1, Math.min(200, Number(limit) || 40));
+  return (this.storeOrders || []).filter((o) => Number(o.accountId) === Number(accountId))
+    .sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
+};
+JsonStore.prototype.coinLedgerAdd = function (row) {
+  const entry = Object.assign({ id: ++this._coinLedgerSeq }, row || {});
+  this.coinLedger = this.coinLedger || [];
+  this.coinLedger.push(entry);
+  if (this.coinLedger.length > 5000) this.coinLedger = this.coinLedger.slice(-4000);
+  this._saveStore();
+  return entry;
+};
+JsonStore.prototype.coinLedgerList = function (opts) {
+  opts = opts || {};
+  let list = this.coinLedger || [];
+  if (opts.accountId != null) list = list.filter((r) => Number(r.accountId) === Number(opts.accountId));
+  const n = Math.max(1, Math.min(500, Number(opts.limit) || 100));
+  return list.slice().sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
+};
+JsonStore.prototype.listAccountCoinSummaries = function () {
+  return (this.accounts || []).map((a) => ({
+    id: a.id, login: a.login, coins: Number(a.coins) || 0,
+    vipUntil: Number(a.vip_until) || 0, role: a.role || "user",
+  })).sort((a, b) => b.coins - a.coins);
 };
 JsonStore.prototype.accountGold = function (accountId) {
   const a = this.findAccountById(accountId);
@@ -973,6 +1111,26 @@ async function MysqlStore() {
     }
     return out;
   }
+  function hydrateStoreOrder(row) {
+    if (!row) return null;
+    return {
+      id: row.id, accountId: row.account_id, login: row.login, packId: row.pack_id,
+      method: row.method, brl: Number(row.brl) || 0, coins: Number(row.coins) || 0,
+      status: row.status, mpId: row.mp_id || "", pixQr: row.pix_qr || "", pixCopy: row.pix_copy || "",
+      checkoutUrl: row.checkout_url || "", note: row.note || "",
+      paidAt: row.paid_at ? new Date(row.paid_at).toISOString() : "",
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : "",
+    };
+  }
+  function hydrateLedger(row) {
+    if (!row) return null;
+    return {
+      id: row.id, accountId: row.account_id, login: row.login, kind: row.kind,
+      delta: Number(row.delta) || 0, coinsAfter: Number(row.coins_after) || 0,
+      brlCents: Number(row.brl_cents) || 0, ref: row.ref || "", note: row.note || "",
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : "",
+    };
+  }
 
   async function lockValidLease(conn,accountId,lease){
     if(!lease)return true;
@@ -1046,6 +1204,65 @@ async function MysqlStore() {
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
+    },
+    async storeOrderInsert(row) {
+      const r = await this.run(
+        `INSERT INTO store_orders (account_id, login, pack_id, method, brl, coins, status, mp_id, pix_qr, pix_copy, checkout_url, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [Number(row.accountId), String(row.login || ""), String(row.packId || ""), String(row.method || "pix"),
+         Number(row.brl) || 0, Number(row.coins) || 0, String(row.status || "pending"), String(row.mpId || ""),
+         String(row.pixQr || ""), String(row.pixCopy || ""), String(row.checkoutUrl || ""), String(row.note || "")]);
+      return this.storeOrderGet(r.insertId);
+    },
+    async storeOrderGet(id) {
+      const rows = await this.query("SELECT * FROM store_orders WHERE id = ?", [Number(id)]);
+      return rows[0] ? hydrateStoreOrder(rows[0]) : null;
+    },
+    async storeOrderUpdate(id, patch) {
+      const cur = await this.storeOrderGet(id);
+      if (!cur) return null;
+      const next = Object.assign({}, cur, patch || {});
+      await this.run(
+        `UPDATE store_orders SET status=?, mp_id=?, pix_qr=?, pix_copy=?, checkout_url=?, coins=?, note=?, paid_at=? WHERE id=?`,
+        [next.status || cur.status, String(next.mpId || ""), String(next.pixQr || ""), String(next.pixCopy || ""),
+         String(next.checkoutUrl || ""), Number(next.coins) || 0, String(next.note || ""),
+         next.paidAt ? new Date(next.paidAt) : null, Number(id)]);
+      return this.storeOrderGet(id);
+    },
+    async storeOrderList(limit) {
+      const n = Math.max(1, Math.min(500, Number(limit) || 100));
+      const rows = await this.query("SELECT * FROM store_orders ORDER BY id DESC LIMIT ?", [n]);
+      return rows.map(hydrateStoreOrder);
+    },
+    async storeOrdersByAccount(accountId, limit) {
+      const n = Math.max(1, Math.min(200, Number(limit) || 40));
+      const rows = await this.query("SELECT * FROM store_orders WHERE account_id=? ORDER BY id DESC LIMIT ?",
+        [Number(accountId), n]);
+      return rows.map(hydrateStoreOrder);
+    },
+    async coinLedgerAdd(row) {
+      const r = await this.run(
+        `INSERT INTO coin_ledger (account_id, login, kind, delta, coins_after, brl_cents, ref, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [Number(row.accountId), String(row.login || ""), String(row.kind || "other"),
+         Math.floor(Number(row.delta) || 0), Math.max(0, Math.floor(Number(row.coinsAfter) || 0)),
+         Math.max(0, Math.floor(Number(row.brlCents) || 0)), String(row.ref || ""), String(row.note || "").slice(0, 180)]);
+      return { id: r.insertId };
+    },
+    async coinLedgerList(opts) {
+      opts = opts || {};
+      const n = Math.max(1, Math.min(500, Number(opts.limit) || 100));
+      const rows = opts.accountId != null
+        ? await this.query("SELECT * FROM coin_ledger WHERE account_id=? ORDER BY id DESC LIMIT ?", [Number(opts.accountId), n])
+        : await this.query("SELECT * FROM coin_ledger ORDER BY id DESC LIMIT ?", [n]);
+      return rows.map(hydrateLedger);
+    },
+    async listAccountCoinSummaries() {
+      const rows = await this.query("SELECT id, login, coins, vip_until, role FROM accounts ORDER BY coins DESC LIMIT 500");
+      return rows.map((a) => ({
+        id: a.id, login: a.login, coins: Number(a.coins) || 0,
+        vipUntil: Number(a.vip_until) || 0, role: a.role || "user",
+      }));
     },
     async accountGold(accountId) {
       const rows = await this.query("SELECT gold FROM accounts WHERE id = ?", [Number(accountId)]);
@@ -1369,6 +1586,19 @@ async function MysqlStore() {
         const row=rows[0];if(!row||row.status!=="active"){
           await conn.rollback();return {ok:false,skipped:"inactive"};
         }
+        if(/^world-boss-wz[123]$/.test(String(row.boss_id||""))){
+          const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
+          const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds().map(Number).filter((id)=>id>0):[];
+          if(ids.length){
+            const marks=ids.map(()=>"?").join(",");
+            const [live]=await conn.query(
+              `SELECT account_id FROM account_leases WHERE account_id IN (${marks}) AND expires_at>? LIMIT 1`,
+              ids.concat([new Date(now)]));
+            if(live&&live.length){
+              await conn.rollback();return {ok:false,skipped:"wb-member-leased"};
+            }
+          }
+        }
         const cursor=new Date(row.worker_cursor_at||row.saved_at).getTime()||now;
         const elapsed=Math.min(Math.max(0,now-cursor),Math.max(1,Number(maxStep)||3600000));
         if(elapsed<Math.max(1,Number(minStep)||500)){
@@ -1392,11 +1622,12 @@ async function MysqlStore() {
         try{await conn.query("SELECT RELEASE_LOCK(?)",[lockName]);}catch(e){}conn.release();
       }
     },
-    async instanceAuthorityTick(accountId,expectedVersion,now,maxStep,advanceState,lease){
+    async instanceAuthorityTick(accountId,expectedVersion,now,maxStep,advanceState,lease,opts){
       const conn=await pool.getConnection();
+      const leaseAcc=(opts&&opts.leaseAccountId!=null)?opts.leaseAccountId:accountId;
       try{
         await conn.beginTransaction();
-        if(!await lockValidLease(conn,accountId,lease)){
+        if(!await lockValidLease(conn,leaseAcc,lease)){
           await conn.rollback();return {ok:false,error:"LEASE_REQUIRED"};
         }
         const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
@@ -1465,6 +1696,123 @@ async function MysqlStore() {
         current.version=Number(current.version)+1;current.status="ended";current.terminal_reason=reason;
         current.ended_at=new Date(lease.now);await conn.commit();return {ok:true,instance:current};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceEndMegaOrphan(accountId,instanceId,reason){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const [rows]=await conn.query(
+          "SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const current=rows[0]||null;
+        if(!current||current.status!=="active"){
+          await conn.commit();return {ok:true,instance:current,alreadyEnded:true};
+        }
+        if(String(current.boss_id||"")!=="goshnar-s-megalomania"){
+          await conn.rollback();return {ok:false,error:"NOT_MEGA_INSTANCE",instance:current};
+        }
+        if(instanceId&&String(current.instance_id)!==String(instanceId)){
+          await conn.rollback();return {ok:false,error:"INSTANCE_ID_MISMATCH",instance:current};
+        }
+        const now=new Date();
+        await conn.query(
+          "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
+          [reason||"mega-lobby-empty",now,now,Number(accountId)]);
+        current.version=Number(current.version)+1;current.status="ended";
+        current.terminal_reason=reason||"mega-lobby-empty";current.ended_at=now;
+        await conn.commit();return {ok:true,instance:current};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceEndForced(accountId,reason){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const [rows]=await conn.query(
+          "SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
+        const current=rows[0]||null;
+        if(!current||current.status!=="active"){
+          await conn.commit();return {ok:true,instance:current,alreadyEnded:true};
+        }
+        const now=new Date();
+        await conn.query(
+          "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
+          [reason||"forced-end",now,now,Number(accountId)]);
+        current.version=Number(current.version)+1;current.status="ended";
+        current.terminal_reason=reason||"forced-end";current.ended_at=now;
+        await conn.commit();return {ok:true,instance:current};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceReplaceForced(accountId,instanceId,meta,state){
+      const conn=await pool.getConnection();
+      try{
+        await conn.beginTransaction();
+        const savedAt=meta.saved_at||new Date();
+        const startedAt=meta.started_at||meta.startedAt||savedAt||new Date();
+        await conn.query(
+          `INSERT INTO account_instances
+           (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
+            party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
+           VALUES (?,?,1,'active',?,?,?,?,?,?,?,?,?,?,?,0)
+           ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=1,status='active',kind=VALUES(kind),
+            hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),instance_mode=VALUES(instance_mode),
+            party_id=NULL,party_version=NULL,
+            active_character_id=VALUES(active_character_id),state=VALUES(state),saved_at=VALUES(saved_at),
+            started_at=VALUES(started_at),worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=0,
+            ended_at=NULL,terminal_reason=NULL`,
+          [Number(accountId),instanceId,meta.kind,meta.hunt_id||null,meta.boss_id,meta.instance_mode,
+           null,null,meta.active_character_id,state,savedAt,startedAt,savedAt]);
+        const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(accountId)]);
+        await conn.commit();return {ok:true,instance:saved[0]};
+      }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
+    },
+    async instanceTransferOwner(fromAccountId, toAccountId) {
+      const fromId = Number(fromAccountId), toId = Number(toAccountId);
+      if (!fromId || !toId || fromId === toId) return { ok: false, error: "INVALID_TRANSFER" };
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [fromRows] = await conn.query(
+          "SELECT * FROM account_instances WHERE account_id=? FOR UPDATE", [fromId]);
+        const from = fromRows[0];
+        if (!from || from.status !== "active") {
+          await conn.rollback();
+          return { ok: false, error: "NO_INSTANCE" };
+        }
+        const [toRows] = await conn.query(
+          "SELECT * FROM account_instances WHERE account_id=? FOR UPDATE", [toId]);
+        const existing = toRows[0];
+        if (existing && existing.status === "active") {
+          await conn.query(
+            "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
+            ["mega-replaced-by-transfer", new Date(), new Date(), toId]);
+        }
+        await conn.query(
+          `INSERT INTO account_instances
+            (account_id,instance_id,version,status,kind,hunt_id,boss_id,instance_mode,party_id,
+             party_version,active_character_id,state,saved_at,started_at,worker_cursor_at,worker_total_ms)
+           VALUES (?,?,?, 'active',?,?,?,?,?,?,?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE instance_id=VALUES(instance_id),version=VALUES(version),status='active',
+             kind=VALUES(kind),hunt_id=VALUES(hunt_id),boss_id=VALUES(boss_id),
+             instance_mode=VALUES(instance_mode),party_id=VALUES(party_id),
+             party_version=VALUES(party_version),active_character_id=VALUES(active_character_id),
+             state=VALUES(state),saved_at=VALUES(saved_at),started_at=VALUES(started_at),
+             worker_cursor_at=VALUES(worker_cursor_at),worker_total_ms=VALUES(worker_total_ms),
+             ended_at=NULL,terminal_reason=NULL`,
+          [toId, from.instance_id, from.version, from.kind, from.hunt_id, from.boss_id,
+           from.instance_mode, from.party_id, from.party_version, from.active_character_id,
+           from.state, from.saved_at, from.started_at, from.worker_cursor_at,
+           Number(from.worker_total_ms) || 0]);
+        await conn.query(
+          "UPDATE account_instances SET version=version+1,status='ended',terminal_reason=?,ended_at=?,updated_at=? WHERE account_id=?",
+          ["mega-ownership-transferred", new Date(), new Date(), fromId]);
+        const [saved] = await conn.query("SELECT * FROM account_instances WHERE account_id=?", [toId]);
+        await conn.commit();
+        return { ok: true, instance: saved[0], fromAccountId: fromId, toAccountId: toId };
+      } catch (error) {
+        try { await conn.rollback(); } catch (e) {}
+        throw error;
+      } finally {
+        conn.release();
+      }
     },
 
     // ---- MARKET P2P ----
@@ -2064,11 +2412,39 @@ async function ensureSchema(pool) {
     invitee_id INT UNSIGNED NOT NULL,
     status ENUM('pending','accepted','declined','expired','cancelled')
       NOT NULL DEFAULT 'pending',
+    pending_invitee_id INT UNSIGNED
+      GENERATED ALWAYS AS (IF(status = 'pending', invitee_id, NULL)) STORED,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NULL,
-    UNIQUE KEY uq_invite_pending (invitee_id, status),
+    UNIQUE KEY uq_invite_pending (pending_invitee_id),
     INDEX idx_invites_party (party_id, status)
   ) ENGINE=InnoDB`);
+
+  // uq_invite_pending antigo era (invitee_id, status): só 1 linha 'accepted'
+  // (e 1 'declined'/etc) por personagem. Re-aceitar após sair da party
+  // falhava com Duplicate entry 'N-accepted' depois do INSERT do membro.
+  // Índice parcial via coluna gerada: UNIQUE só enquanto status='pending'.
+  try {
+    const [idxCols] = await pool.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'party_invites'
+         AND INDEX_NAME = 'uq_invite_pending'
+       ORDER BY SEQ_IN_INDEX`);
+    const cols = (idxCols || []).map((r) => r.COLUMN_NAME);
+    if (cols.length && !(cols.length === 1 && cols[0] === "pending_invitee_id")) {
+      await pool.query("ALTER TABLE party_invites DROP INDEX uq_invite_pending");
+    }
+  } catch (e) { /* sem índice / sem permissão de schema */ }
+  try {
+    await pool.query(
+      `ALTER TABLE party_invites
+         ADD COLUMN pending_invitee_id INT UNSIGNED
+           GENERATED ALWAYS AS (IF(status = 'pending', invitee_id, NULL)) STORED`);
+  } catch (e) { /* já existe */ }
+  try {
+    await pool.query(
+      "ALTER TABLE party_invites ADD UNIQUE KEY uq_invite_pending (pending_invitee_id)");
+  } catch (e) { /* já existe */ }
 
   // Migração das parties anteriores ao modelo account-owned. A conta do
   // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.
@@ -2173,6 +2549,39 @@ async function ensureSchema(pool) {
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_history_created (created_at),
     INDEX idx_history_item (slug, created_at)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS store_orders (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    login VARCHAR(64) NOT NULL DEFAULT '',
+    pack_id VARCHAR(32) NOT NULL,
+    method VARCHAR(16) NOT NULL DEFAULT 'pix',
+    brl DECIMAL(10,2) NOT NULL DEFAULT 0,
+    coins INT UNSIGNED NOT NULL DEFAULT 0,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    mp_id VARCHAR(64) NOT NULL DEFAULT '',
+    pix_qr MEDIUMTEXT,
+    pix_copy TEXT,
+    checkout_url TEXT,
+    note VARCHAR(400) DEFAULT '',
+    paid_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_store_acc (account_id, created_at),
+    INDEX idx_store_status (status, created_at)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS coin_ledger (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    login VARCHAR(64) NOT NULL DEFAULT '',
+    kind VARCHAR(16) NOT NULL DEFAULT 'other',
+    delta INT NOT NULL DEFAULT 0,
+    coins_after INT UNSIGNED NOT NULL DEFAULT 0,
+    brl_cents INT UNSIGNED NOT NULL DEFAULT 0,
+    ref VARCHAR(64) NOT NULL DEFAULT '',
+    note VARCHAR(180) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ledger_acc (account_id, created_at),
+    INDEX idx_ledger_kind (kind, created_at)
   ) ENGINE=InnoDB`);
 }
 

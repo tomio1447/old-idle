@@ -35,6 +35,7 @@ const ADMIN_TABS = [
   { id: "equip", nome: "🛡 Equipamento" },
   { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
+  { id: "store", nome: "💰 Faturamento" },
 ];
 
 /* Registra o que foi feito, para o usuario ver que a acao pegou */
@@ -45,12 +46,45 @@ function adminLog(msg) {
 
 /* Aplica a mudanca e atualiza tudo de uma vez.
  * Centralizado porque esquecer o renderAll() faz o painel parecer quebrado
- * mesmo quando o estado mudou. */
+ * mesmo quando o estado mudou.
+ *
+ * Online: usa accountAdminSaveCharacter (admin_grant) para gravar level/exp/
+ * skills/gold/bag/etc. no MySQL e no authority da instância — o autosave
+ * comum protege esses campos e, em combate, nem chega a enviar o PUT. */
 function adminAplicar(msg) {
   if (msg) adminLog(msg);
-  if (typeof save === "function") save();
+  adminPersist().catch((err) => {
+    console.warn("[admin] persistência falhou", err);
+    if (typeof toast === "function") toast("Falha ao salvar grant admin no servidor", "bad");
+  });
+}
+
+async function adminPersist() {
+  const p = typeof G !== "undefined" && G ? G.p : null;
+  if (p && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+  try {
+    if (p) {
+      localStorage.setItem(typeof SAVE_KEY !== "undefined" ? SAVE_KEY : "tibia-idle-save-v1",
+        JSON.stringify({ v: 1, p: p, session: null }));
+    }
+  } catch (e) {}
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof accountAdminSaveCharacter === "function" && p && p.id) {
+    const tok = typeof sessionToken === "function" ? sessionToken() : "";
+    if (tok) {
+      const ok = await accountAdminSaveCharacter(tok, String(p.id), p);
+      if (!ok && typeof toast === "function") {
+        const detail = (typeof accountAdminGrantLastError === "function" &&
+          accountAdminGrantLastError()) || "";
+        toast(detail || "Servidor recusou o grant admin. Recarregue e tente de novo.", "bad");
+      }
+    }
+  } else if (typeof save === "function") {
+    save();
+  }
   if (typeof renderAll === "function") renderAll();
   renderAdminContent();
+  return true;
 }
 
 /* ------------------------------------------------------------- abertura */
@@ -109,7 +143,7 @@ function renderAdminContent() {
     char: renderAdminChar, coins: renderAdminCoins,
     skills: renderAdminSkills,
     items: renderAdminItems, loot: renderAdminLoot, imb: renderAdminImbuements, equip: renderAdminEquip,
-    forge: renderAdminForge, mobs: renderAdminMobs,
+    forge: renderAdminForge, mobs: renderAdminMobs, store: renderAdminStore,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
   renderAdminLog();
@@ -159,9 +193,7 @@ function renderAdminCoins(p, el) {
       const acc=typeof sessionAccount==="function"?sessionAccount():null;
       const amount=reset?-(acc&&acc.coins||0):n;
       const result=await accountAddCoins(sessionToken(),amount);
-      if(!result.ok){toast("Servidor recusou a alteração de Coins","bad");return null;}
-      if(acc){acc.coins=result.coins;sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));}
-      if(typeof accountSetCoins==="function")accountSetCoins(result.coins);
+      if(!result.ok){toast(result.msg||"Servidor recusou a alteração de Coins","bad");return null;}
       return result.coins;
     }
     return typeof accountSetCoins==="function"
@@ -181,6 +213,61 @@ function renderAdminCoins(p, el) {
         ? `+${fmtFull(n)} Tibia Coins na conta (saldo: ${fmtFull(total)})`
         : "Tibia Coins zerados");
     }));
+}
+
+function storeFmtWhen(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? d.toLocaleString("pt-BR") : "—";
+}
+function storeFmtBrl(n) {
+  return "R$ " + (Number(n) || 0).toFixed(2).replace(".", ",");
+}
+
+async function renderAdminStore(p, el) {
+  el.innerHTML = `<div class="tiny dim">Carregando faturamento da STORE...</div>`;
+  if (typeof storeAdminSummary !== "function") {
+    el.innerHTML = `<div class="tiny" style="color:#ff9a6a">Cliente da STORE ausente.</div>`;
+    return;
+  }
+  const r = await storeAdminSummary(sessionToken());
+  if (!r.ok) {
+    el.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Sem permissão"}</div>
+      <div class="tiny dim mt4">A aba Faturamento lista quem comprou Tibia Coins, o valor em R$ e o ledger (compra, VIP, ajuste admin).</div>`;
+    return;
+  }
+  const t = r.totals || {};
+  const accounts = r.accounts || [];
+  const orders = r.orders || [];
+  const ledger = r.ledger || [];
+  el.innerHTML = `
+    <div class="tiny dim mb4">Controle de Tibia Coins: compras Mercado Pago, gastos de VIP e ajustes manuais.</div>
+    <div class="admin-grid mb4">
+      <div class="admin-card"><div class="admin-card-t">Faturamento</div><b style="color:#ffe680">${storeFmtBrl(t.revenueBrl)}</b></div>
+      <div class="admin-card"><div class="admin-card-t">TC vendidos</div><b>${t.coinsSold || 0}</b></div>
+      <div class="admin-card"><div class="admin-card-t">TC gastos (VIP)</div><b>${t.coinsSpent || 0}</b></div>
+      <div class="admin-card"><div class="admin-card-t">Ajustes admin</div><b>${t.coinsGranted || 0}</b></div>
+      <div class="admin-card"><div class="admin-card-t">Pendentes</div><b>${t.pendingOrders || 0}</b></div>
+      <div class="admin-card"><div class="admin-card-t">Mercado Pago</div><b>${r.mpConfigured ? "ligado" : "off"}</b></div>
+    </div>
+    <div class="admin-card-t">Saldos por conta</div>
+    <div style="max-height:180px;overflow:auto" class="mb4">
+      <table class="admin-tbl"><thead><tr><th>Login</th><th>TC</th><th>VIP</th></tr></thead><tbody>
+        ${accounts.map((a) => `<tr><td>${String(a.login || "").replace(/[<>]/g, "")}</td><td>${a.coins}</td><td>${a.vipUntil > Date.now() ? storeFmtWhen(a.vipUntil) : "—"}</td></tr>`).join("")}
+      </tbody></table>
+    </div>
+    <div class="admin-card-t">Pedidos</div>
+    <div style="max-height:180px;overflow:auto" class="mb4">
+      <table class="admin-tbl"><thead><tr><th>#</th><th>Login</th><th>Pacote</th><th>R$</th><th>Status</th><th>Quando</th></tr></thead><tbody>
+        ${orders.map((o) => `<tr><td>${o.id}</td><td>${String(o.login || "").replace(/[<>]/g, "")}</td><td>${o.packId} · ${o.method}</td><td>${storeFmtBrl(o.brl)}</td><td>${o.status}</td><td>${storeFmtWhen(o.createdAt)}</td></tr>`).join("")}
+      </tbody></table>
+    </div>
+    <div class="admin-card-t">Ledger</div>
+    <div style="max-height:180px;overflow:auto">
+      <table class="admin-tbl"><thead><tr><th>Login</th><th>Tipo</th><th>Δ TC</th><th>R$</th><th>Nota</th><th>Quando</th></tr></thead><tbody>
+        ${ledger.map((l) => `<tr><td>${String(l.login || "").replace(/[<>]/g, "")}</td><td>${l.kind}</td><td>${l.delta}</td><td>${storeFmtBrl((l.brlCents || 0) / 100)}</td><td>${String(l.note || "").replace(/[<>]/g, "")}</td><td>${storeFmtWhen(l.createdAt)}</td></tr>`).join("")}
+      </tbody></table>
+    </div>`;
 }
 
 /* ------------------------------------------------------ aba: personagem */
@@ -255,6 +342,28 @@ function renderAdminChar(p, el) {
         </div>
         <div class="tiny dim mt4">
           Trocar a vocação recalcula HP/mana e mantém as skills.
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-t">VIP da conta</div>
+        <div class="stat-row"><span class="k">Status</span>
+          <span class="v" id="adm-vip-status">${typeof isVip === "function" && isVip()
+            ? `<b style="color:#9ce84a">ATIVO</b> · ${typeof fmtVipTime === "function" ? fmtVipTime() : ""}`
+            : `<span class="dim">inativo</span>`}</span></div>
+        <div class="row" style="gap:6px;align-items:center;margin-top:6px">
+          <input type="number" id="adm-vip-days" value="30" min="1" max="3650"
+                 class="admin-in" style="width:90px" title="Dias de VIP">
+          <button class="sm primary" id="adm-vip-add">Adicionar dias</button>
+        </div>
+        <div class="admin-quick">
+          ${[7, 30, 90, 365].map((n) =>
+            `<button class="sm" data-vip-days="${n}">+${n}d</button>`).join("")}
+          <button class="sm" id="adm-vip-clear">Remover VIP</button>
+        </div>
+        <div class="tiny dim mt4">
+          VIP fica na <b>conta</b> (vale para todos os personagens).
+          Benefícios: revive 15s, +10% EXP, autoseller, controle manual SQM, etc.
         </div>
       </div>
 
@@ -343,6 +452,42 @@ function renderAdminChar(p, el) {
       p.gold = n === 0 ? 0 : p.gold + n;
       adminAplicar(`gold → ${fmtFull(p.gold)}`);
     }));
+
+  const applyVipDays = async (days, clear) => {
+    if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+        typeof accountAddVipDays === "function" && typeof sessionToken === "function") {
+      const result = await accountAddVipDays(sessionToken(), clear ? 0 : days, !!clear);
+      if (!result.ok) { toast(result.msg || "Servidor recusou o VIP", "bad"); return; }
+      if (p) p.vipUntil = result.vipUntil || 0;
+      adminAplicar(clear
+        ? "VIP removido da conta"
+        : `VIP +${days}d (resta: ${typeof fmtVipTime === "function" ? fmtVipTime() : ""})`);
+      return;
+    }
+    if (clear) {
+      if (typeof deactivateVip === "function") deactivateVip();
+      if (p) p.vipUntil = 0;
+      adminAplicar("VIP removido (local)");
+      return;
+    }
+    if (typeof activateVip === "function") activateVip(days);
+    if (p && typeof sessionVipUntil === "function") p.vipUntil = sessionVipUntil();
+    adminAplicar(`VIP +${days}d (local · resta: ${typeof fmtVipTime === "function" ? fmtVipTime() : ""})`);
+  };
+  const vipAddBtn = $("#adm-vip-add");
+  if (vipAddBtn) vipAddBtn.addEventListener("click", async () => {
+    const n = parseInt(($("#adm-vip-days") || {}).value, 10);
+    if (!Number.isFinite(n) || n <= 0) { toast("Dias inválidos"); return; }
+    await applyVipDays(n, false);
+  });
+  $$("#admin-content [data-vip-days]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      await applyVipDays(parseInt(b.dataset.vipDays, 10), false);
+    }));
+  const vipClear = $("#adm-vip-clear");
+  if (vipClear) vipClear.addEventListener("click", async () => {
+    await applyVipDays(0, true);
+  });
 
   $$("#admin-content [data-voc]").forEach((b) =>
     b.addEventListener("click", async () => {

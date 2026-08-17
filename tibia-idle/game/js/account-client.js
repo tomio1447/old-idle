@@ -12,6 +12,7 @@
  *   accountLogin(login, pass)     -> {ok, token, account, characters}
  *   accountCreateCharacter(token, name, voc, data)
  *   accountSaveCharacter(token, charId, p)
+ *   accountAdminSaveCharacter(token, charId, p)  // grant admin completo
  *   accountAddCoins(token, amount)
  */
 "use strict";
@@ -335,6 +336,11 @@ function accountQueueInstance(task){
 }
 function accountLastInstancePromise(){return ACCOUNT_INSTANCE_LAST_PROMISE.catch(()=>false);}
 function accountInstanceActive(){return !!(ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active");}
+/* True enquanto a aba acabou de pedir uma instância nova e o PUT ainda não
+ * confirmou id/status=active. Recovery/SSE "ended" não podem derrubar a arena. */
+function accountInstanceCreating(){
+  return !!(ACCOUNT_INSTANCE_CAN_CREATE&&!accountInstanceActive());
+}
 function accountInstanceApply(instance){
   if(!instance){ACCOUNT_INSTANCE={id:"",version:0,status:null};ACCOUNT_INSTANCE_CAN_CREATE=false;return;}
   ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active"};
@@ -380,6 +386,9 @@ function accountNormalizeInstanceMembers(state){
 function accountSaveInstance(token,state){
   const epoch=ACCOUNT_INSTANCE_EPOCH;state=accountNormalizeInstanceMembers(state);
   return accountQueueInstance(async()=>{
+    // Grants admin (e outros PUTs) podem estar na fila de save: espere para
+    // prepareInstanceState ler o snapshot MySQL já atualizado.
+    if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
     if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
     if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
     const r=await _api("PUT","/api/instance",Object.assign({token,char_id:state.activeCharacterId||
@@ -468,11 +477,28 @@ function accountAuthorityVisualState(){
     combat._spitePendingBubble=null;combat._spitePendingBubbleAt=0;
     combat._spitePendingStomp=false;combat._spitePendingStompAt=0;
   }
-  if(combat._malicePendingMove&&typeof combat._malicePendingMove==="object"){
+  if(combat._malicePendingMoves&&Array.isArray(combat._malicePendingMoves)&&combat._malicePendingMoves.length){
+    const moves=combat._malicePendingMoves.splice(0,Math.min(16,combat._malicePendingMoves.length))
+      .map((m)=>({x:Math.floor(Number(m&&m.x)),y:Math.floor(Number(m&&m.y))}))
+      .filter((m)=>Number.isFinite(m.x)&&Number.isFinite(m.y));
+    if(moves.length)out.maliceIntent={moves:moves};
+    if(!combat._malicePendingMoves.length)combat._malicePendingMoveAt=0;
+  }else if(combat._malicePendingMove&&typeof combat._malicePendingMove==="object"){
     out.maliceIntent={x:Number(combat._malicePendingMove.x),y:Number(combat._malicePendingMove.y)};
     combat._malicePendingMove=null;combat._malicePendingMoveAt=0;
   }
-  if(combat._megaPendingIntent&&typeof combat._megaPendingIntent==="object"){
+  if(combat._megaPendingIntents&&Array.isArray(combat._megaPendingIntents)&&combat._megaPendingIntents.length){
+    const queued=combat._megaPendingIntents.splice(0,Math.min(16,combat._megaPendingIntents.length))
+      .map((intent)=>Object.assign({},intent))
+      .filter((intent)=>intent&&intent.kind);
+    for(const intent of queued){
+      if(!intent.playerId&&typeof sessionCharId==="function")
+        intent.playerId=String(sessionCharId()||"");
+    }
+    if(queued.length===1)out.megaIntent=queued[0];
+    else if(queued.length>1){out.megaIntent=queued[0];out.megaIntents=queued.slice(1);}
+    combat._megaPendingIntent=null;
+  }else if(combat._megaPendingIntent&&typeof combat._megaPendingIntent==="object"){
     out.megaIntent=Object.assign({},combat._megaPendingIntent);
     if(!out.megaIntent.playerId&&typeof sessionCharId==="function")
       out.megaIntent.playerId=String(sessionCharId()||"");
@@ -601,6 +627,58 @@ function accountSellInstanceLootPouch(token,charId,slug){
     return {ok:false,msg:r.data.msg||"Não foi possível vender a Loot Pouch"};
   });
 }
+/** Vende mochila (sell all ou slug/inst). gold/bag autoritativos — PUT comum não credita gold. */
+function accountSellBag(token,charId,opts){
+  opts=opts||{};
+  const slug=opts.slug!=null&&opts.slug!==""?String(opts.slug):"";
+  const instId=opts.instId!=null&&opts.instId!==""?String(opts.instId):"";
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(slug)body.slug=slug;
+      if(instId)body.inst_id=instId;
+      const r=await _api("POST","/api/instance/bag-sell",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,gold:Number(r.data.gold)||0,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível vender a mochila"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(slug)body.slug=slug;
+    if(instId)body.inst_id=instId;
+    const r=await _api("POST","/api/bag/sell",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+        if(r.data.goldBalance!=null)G.p.gold=Math.max(0,Math.floor(Number(r.data.goldBalance)||0));
+        else if(r.data.character&&r.data.character.data&&r.data.character.data.gold!=null)
+          G.p.gold=Math.max(0,Math.floor(Number(r.data.character.data.gold)||0));
+      }
+      return {ok:true,gold:Number(r.data.gold)||0,bag:r.data.bag,itemInstances:r.data.itemInstances,
+        saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível vender a mochila",code:r.code};
+  });
+}
 /** Move pouch/bag → Supply Stash com persistência (instância ou personagem na cidade). */
 function accountMoveToSupplyStash(token,charId,opts){
   opts=opts||{};
@@ -634,16 +712,165 @@ function accountMoveToSupplyStash(token,charId,opts){
     const r=await _api("POST","/api/stash/move",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
-      if(r.data.lootPouch&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
-        G.p.lootPouch=r.data.lootPouch||{};
-        G.p.supplyStash=r.data.supplyStash||{};
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
       }
       return {ok:true,lootPouch:r.data.lootPouch,supplyStash:r.data.supplyStash,
-        saveVersion:r.data.saveVersion};
+        bag:r.data.bag,itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível mover para a Supply Stash",code:r.code};
+  });
+}
+/** Retira da Supply Stash (bag/pouch/destroy). supplyStash é protected no PUT. */
+function accountWithdrawFromSupplyStash(token,charId,opts){
+  opts=opts||{};
+  const slug=String(opts.slug||"");
+  const dest=String(opts.dest||"bag");
+  const qty=opts.qty!=null?Number(opts.qty):null;
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,dest,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+      const r=await _api("POST","/api/instance/stash-withdraw",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível retirar da Supply Stash"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,dest,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+    const r=await _api("POST","/api/stash/withdraw",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,supplyStash:r.data.supplyStash,lootPouch:r.data.lootPouch,
+        bag:r.data.bag,itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível retirar da Supply Stash",code:r.code};
+  });
+}
+/** Equipa 1 item da Supply Stash (supplyStash protected no PUT). */
+function accountEquipFromSupplyStash(token,charId,opts){
+  opts=opts||{};
+  const slug=String(opts.slug||"");
+  const slot=opts.slot!=null?String(opts.slot):"";
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(slot)body.slot=slot;
+      const r=await _api("POST","/api/instance/stash-equip",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível equipar da Supply Stash"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(slot)body.slot=slot;
+    const r=await _api("POST","/api/stash/equip",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
+        if(r.data.equip)G.p.equip=r.data.equip||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,supplyStash:r.data.supplyStash,equip:r.data.equip,
+        bag:r.data.bag,itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível equipar da Supply Stash",code:r.code};
+  });
+}
+/** Move Loot Pouch → backpack com persistência (lootPouch é protected no PUT). */
+function accountMovePouchToBag(token,charId,opts){
+  opts=opts||{};
+  const slug=String(opts.slug||"");
+  const qty=opts.qty!=null?Number(opts.qty):null;
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+      const r=await _api("POST","/api/instance/pouch-to-bag",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível mover para a backpack"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+    const r=await _api("POST","/api/pouch/to-bag",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,lootPouch:r.data.lootPouch,bag:r.data.bag,
+        itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível mover para a backpack",code:r.code};
   });
 }
 /** Persiste Auto Supply Stash (online: instância em combate ou personagem na cidade). */
@@ -686,6 +913,48 @@ function accountSetAutoSupplyStash(token,charId,slug,on){
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
     return {ok:false,msg:r.data.msg||"Não foi possível salvar Auto Supply Stash",code:r.code};
+  });
+}
+/** Persiste lootConfig (NÃO COLETAR / NÃO VENDER) online. */
+function accountSetLootConfig(token,charId,lootConfig){
+  lootConfig=lootConfig&&typeof lootConfig==="object"&&!Array.isArray(lootConfig)
+    ?lootConfig:{noCollect:[],noSell:[]};
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),lootConfig,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      const r=await _api("POST","/api/instance/loot-config",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,lootConfig:r.data.lootConfig||lootConfig,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível salvar loot config"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),lootConfig,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/loot/config",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(r.data.lootConfig&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        G.p.lootConfig=r.data.lootConfig||{noCollect:[],noSell:[]};
+      }
+      return {ok:true,lootConfig:r.data.lootConfig,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível salvar loot config",code:r.code};
   });
 }
 function accountRefreshInstance(token){
@@ -1065,6 +1334,8 @@ async function accountLogin(login, password) {
     if(typeof syncVipFromAccount==="function")syncVipFromAccount(r.data.account);
     if(typeof accountSetGold==="function"&&r.data.account.gold!==undefined)
       accountSetGold(Math.max(0,Number(r.data.account.gold)||0));
+    if(typeof accountSetCoins==="function"&&r.data.account.coins!==undefined)
+      accountSetCoins(Math.max(0,Number(r.data.account.coins)||0));
   }
   return {
     ok: true,
@@ -1143,6 +1414,75 @@ async function accountSaveCharacter(token, charId, p) {
   });
 }
 
+/* Painel Admin: grava snapshot completo (level/exp/skills/gold/bag/…) e, se
+ * houver instância ativa, atualiza o authority antes do MySQL do personagem.
+ * Diferente do autosave comum — que ignora progressão protegida e no-op em
+ * combate online. */
+let ACCOUNT_ADMIN_GRANT_LAST_ERROR="";
+function accountAdminGrantLastError(){return ACCOUNT_ADMIN_GRANT_LAST_ERROR||"";}
+async function accountAdminSaveCharacter(token, charId, p) {
+  const id=String(charId);
+  ACCOUNT_ADMIN_GRANT_LAST_ERROR="";
+  return accountQueueSave(async()=>{
+    if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation()){
+      ACCOUNT_ADMIN_GRANT_LAST_ERROR="Sessão sem controle (lease) para gravar o grant.";
+      return false;
+    }
+    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
+    let cache=await accountEnsureVersions(token,[id]);
+    let summary=cache.find((c)=>String(c.id)===id);
+    if(!summary||!Number.isSafeInteger(Number(summary.saveVersion))){
+      ACCOUNT_ADMIN_GRANT_LAST_ERROR="Versão do personagem desconhecida. Recarregue.";
+      return false;
+    }
+    const putOnce=(expected)=>_api("PUT","/api/characters/"+encodeURIComponent(id),
+      Object.assign({token,expected_version:Number(expected),admin_grant:true},
+        accountLeaseFields(),accountSavePayload(p)));
+    let r=await putOnce(summary.saveVersion);
+    const applyOk=(data)=>{
+      if(data.character)accountMergeCharacterCache([data.character]);
+      if(data.instance)accountInstanceApply(data.instance);
+      if(data.account){
+        try{
+          const raw=sessionStorage.getItem("tibia-idle-account"),acc=raw?JSON.parse(raw):null;
+          if(acc){
+            if(data.account.coins!==undefined)acc.coins=Math.max(0,Number(data.account.coins)||0);
+            if(data.account.gold!==undefined)acc.gold=Math.max(0,Number(data.account.gold)||0);
+            if(data.account.vipUntil!==undefined)acc.vipUntil=data.account.vipUntil;
+            sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));
+          }
+        }catch(e){}
+        if(typeof syncVipFromAccount==="function")syncVipFromAccount(data.account);
+        if(typeof accountSetCoins==="function"&&data.account.coins!==undefined)
+          accountSetCoins(Math.max(0,Number(data.account.coins)||0));
+        if(typeof accountSetGold==="function"&&data.account.gold!==undefined)
+          accountSetGold(Math.max(0,Number(data.account.gold)||0));
+      }
+      return true;
+    };
+    if(r.data.ok)return applyOk(r.data);
+    if(r.code===409&&r.data.error==="SAVE_VERSION_CONFLICT"){
+      if(r.data.characters&&r.data.characters.length)accountMergeCharacterCache(r.data.characters);
+      else{await accountSyncRefreshCharacters(token);}
+      cache=accountCharacterCacheRead();
+      summary=cache.find((c)=>String(c.id)===id);
+      if(summary&&Number.isSafeInteger(Number(summary.saveVersion))){
+        r=await putOnce(summary.saveVersion);
+        if(r.data.ok)return applyOk(r.data);
+      }
+    }
+    ACCOUNT_ADMIN_GRANT_LAST_ERROR=String((r.data&&(r.data.msg||r.data.error))||
+      ("HTTP "+r.code+" ao gravar grant admin"));
+    if(r.code===409){
+      if(r.data.instance)accountInstanceApply(r.data.instance);
+      accountSaveConflict([id],r.data.characters||[],r.data.msg);return false;
+    }
+    if(r.code===428)accountSaveConflict([id],[],r.data.msg);
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    return false;
+  });
+}
+
 async function accountSaveParty(token,state,players){
   const ids=(players||[]).filter((ent)=>ent&&ent.p).map((ent)=>String(ent.id));
   return accountQueueSave(async()=>{
@@ -1195,7 +1535,29 @@ async function accountRepairCharacter(token,charId,voc,data){
 
 async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });
-  return r.data.ok ? { ok: true, coins: r.data.coins } : { ok: false };
+  if(!r.data.ok)return { ok: false, msg:r.data.msg||r.data.error||"Falha ao alterar Tibia Coins" };
+  const coins=Math.max(0,Number(r.data.coins)||0);
+  try{
+    const raw=sessionStorage.getItem("tibia-idle-account"),acc=raw?JSON.parse(raw):null;
+    if(acc){acc.coins=coins;sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));}
+  }catch(e){}
+  if(typeof accountSetCoins==="function")accountSetCoins(coins);
+  if(typeof renderCoinBalance==="function")renderCoinBalance();
+  return { ok: true, coins };
+}
+
+/* Admin/test: adiciona dias de VIP na conta (ou clear=true remove). */
+async function accountAddVipDays(token, days, clear) {
+  const r = await _api("POST", "/api/vip", {
+    token, days: clear ? 0 : Math.max(0, Math.floor(Number(days) || 0)), clear: !!clear,
+  });
+  if (!r.data.ok) return { ok: false, msg: r.data.msg || r.data.error || "Falha ao alterar VIP" };
+  const vipUntil = Math.max(0, Math.floor(Number(r.data.vipUntil) || 0));
+  if (typeof syncVipFromAccount === "function") syncVipFromAccount({ vipUntil, vip: vipUntil > Date.now() });
+  try {
+    if (typeof G !== "undefined" && G && G.p) G.p.vipUntil = vipUntil;
+  } catch (e) {}
+  return { ok: true, vipUntil, vip: !!r.data.vip };
 }
 async function accountUpdateMissions(token, missions, missionsDone) {
   const r = await _api("POST", "/api/account/missions", { token, missions, missionsDone });
@@ -1300,6 +1662,59 @@ async function marketBank(token) {
   return {ok:false,msg:r.data.msg};
 }
 
+function storeApplyCoins(coins) {
+  const n = Math.max(0, Math.floor(Number(coins) || 0));
+  try {
+    const raw = sessionStorage.getItem("tibia-idle-account");
+    const acc = raw ? JSON.parse(raw) : null;
+    if (acc) {
+      acc.coins = n;
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  } catch (e) {}
+  if (typeof accountSetCoins === "function") accountSetCoins(n);
+  if (typeof renderCoinBalance === "function") renderCoinBalance();
+  return n;
+}
+
+async function storeCatalog() {
+  const r = await _api("GET", "/api/store/catalog");
+  return r.data && r.data.ok ? r.data : { ok: false, msg: (r.data && r.data.msg) || "Falha ao carregar a loja" };
+}
+async function storeCheckout(token, packId, method, email) {
+  const r = await _api("POST", "/api/store/checkout", { token, packId, method, email });
+  return r.data || { ok: false, msg: "Falha no checkout" };
+}
+async function storeOrderStatus(token, orderId) {
+  const r = await _api("GET", "/api/store/orders/" + encodeURIComponent(orderId), null, token);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  return r.data || { ok: false, msg: "Pedido não encontrado" };
+}
+async function storeSimulatePay(token, orderId) {
+  const r = await _api("POST", "/api/store/simulate", { token, orderId });
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  return r.data || { ok: false, msg: "Falha ao simular" };
+}
+async function storeBuyVip(token, packId) {
+  const r = await _api("POST", "/api/store/vip", { token, packId });
+  if (r.data && r.data.ok) {
+    if (r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (typeof syncVipFromAccount === "function")
+      syncVipFromAccount({ vipUntil: r.data.vipUntil, vip: r.data.vip });
+    try { if (typeof G !== "undefined" && G && G.p) G.p.vipUntil = r.data.vipUntil; } catch (e) {}
+  }
+  return r.data || { ok: false, msg: "Falha ao comprar VIP" };
+}
+async function storeHistory(token) {
+  const r = await _api("GET", "/api/store/history", null, token);
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  return r.data || { ok: false, msg: "Falha ao carregar histórico" };
+}
+async function storeAdminSummary(token) {
+  const r = await _api("GET", "/api/store/admin", null, token);
+  return r.data || { ok: false, msg: "Falha ao carregar o faturamento" };
+}
+
 /* ------------------------------ PARTY (multiplayer) ------------------------------
  * Convites assíncronos + follow. API crua (accountParty*) — os wrappers de
  * alto nível vivem em js/party.js (partyOnlineCreate/Invite/Leave etc.).
@@ -1315,7 +1730,16 @@ async function accountPartyCreate(charId) {
 
 async function accountPartyInvite(charId, inviteeName) {
   const r = await _api("POST", "/api/party/invite", { token: sessionToken(), char_id: charId, invitee_name: inviteeName });
-  return r.data.ok ? { ok: true, invite: r.data.invite } : { ok: false, msg: r.data.msg };
+  if (r.data.ok) {
+    return {
+      ok: true,
+      added: !!r.data.added,
+      member: r.data.member || null,
+      msg: r.data.msg || "Membro adicionado.",
+      invite: r.data.invite || null,
+    };
+  }
+  return { ok: false, msg: r.data.msg };
 }
 
 async function accountPartyInbox() {
@@ -1327,14 +1751,28 @@ async function accountPartyAccept(inviteId) {
   const r = await _api("POST", "/api/party/accept", {
     token:sessionToken(),char_id:Number(sessionCharId()),invite_id:inviteId,
   });
-  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+  if (r.data.ok) return { ok: true, msg: r.data.msg };
+  return { ok: false, msg: partyInviteClientMsg(r.data.msg) };
 }
 
 async function accountPartyDecline(inviteId) {
   const r = await _api("POST", "/api/party/decline", {
     token:sessionToken(),char_id:Number(sessionCharId()),invite_id:inviteId,
   });
-  return r.data.ok ? { ok: true, msg: r.data.msg } : { ok: false, msg: r.data.msg };
+  if (r.data.ok) return { ok: true, msg: r.data.msg };
+  return { ok: false, msg: partyInviteClientMsg(r.data.msg) };
+}
+
+function partyInviteClientMsg(raw) {
+  const msg = String(raw || "");
+  if (/Duplicate entry/i.test(msg) &&
+      (/uq_invite_pending/i.test(msg) || /'\d+-(accepted|declined|expired|cancelled|pending)'/i.test(msg))) {
+    return "Este convite já foi processado. Atualize a party.";
+  }
+  if (/Erro interno:/i.test(msg) && /Duplicate entry/i.test(msg)) {
+    return "Este convite já foi processado. Atualize a party.";
+  }
+  return msg || "Falha";
 }
 
 async function accountPartyLeave(charId) {

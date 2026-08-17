@@ -6,11 +6,11 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
-  "CAP/loot: chance de loot e correções de capacidade",
-  "Combate: FX de crítico AoE / fatal e limpeza de overlays",
-  "Online: reconnect com status SERVIDOR ON/OFF e aviso de manutenção",
-  "Deploy: domínio global-idle.com + sync Oracle",
-  "NPCs: Enpa Deia Pema, Gnomally e King Tibianus",
+  "STORE: compre Tibia Coins (Pix ou cartão), VIP e venda coins (beta)",
+  "Soul War: hunt Ebb and Flow",
+  "Soul War: Rooted na Rotten Wasteland",
+  "Soul War: Claustrophobic Inferno",
+  "Bosses Soul War: Greed, Hatred, Spite e Malice",
 ];
 
 function alphaDiscordLinkHtml(label) {
