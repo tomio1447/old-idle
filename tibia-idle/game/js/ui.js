@@ -114,6 +114,48 @@ function bindFullItemTooltip(el, slug, extra, slot, instId) {
   el.addEventListener("mouseleave", hideTip);
 }
 
+/* Linha de resistência no estilo TibiaWiki: ícone oficial do elemento
+ * (assets/ui/damage) + valor assinado (0%, +10%, -5%, 100% imune) + barra.
+ * Fraqueza em vermelho, resistência em verde, imune em verde-claro,
+ * neutro em cinza. Usada no modal de bosses e nas hunts. */
+function resistRowHtml(el, value) {
+  const info = ELEMENTS[el] || ELEMENTS.physical;
+  const v = Number(value) || 0;
+  const weak = v < 0, immune = v >= 100;
+  const pct = (immune ? "" : v > 0 ? "+" : "") + v + "%";
+  const color = weak ? "#e85b52" : immune ? "#37d45b" : (v > 0 ? "#80d64a" : "#9a948a");
+  const width = Math.max(8, Math.min(100, 50 + v / 2));
+  const icon = typeof dmgIconImg === "function" ? dmgIconImg(el, 13) : "";
+  const label = `${info.name}: ${pct}` + (immune ? " — imune" : weak ? " — fraqueza" : "");
+  return `<div class="hunt-best-res resist-row ${weak ? "weak" : immune ? "immune" : v > 0 ? "strong" : "neutral"}"
+    title="${label}">
+    <span class="resist-icon">${icon}</span>
+    <span class="resist-val" style="color:${color}">${pct}</span>
+    <i><b style="width:${width}%;background:${color}"></b></i>
+  </div>`;
+}
+
+/* Tooltip de drop (boss/hunt): NOME do item + % de chance em destaque logo
+ * abaixo do nome, seguido do corpo do tooltip completo do item (sem repetir
+ * o nome). Garante nome+chance mesmo quando o item não está no catálogo. */
+function dropTooltipHtml(slug, bossName, drop) {
+  const it = GAMEDATA.items[slug];
+  const name = (it && it.n) ? it.n : slug;
+  const chance = Number(drop && drop.chance);
+  const max = Math.max(1, Number(drop && drop.max) || 1);
+  let h = `<div class="tt-name">${name}</div>`;
+  h += `<div class="tt-stat" style="color:#dab0ff">Drop de ${bossName || "boss"} · ${
+    Number.isFinite(chance) ? chance : "?"}% de chance${max > 1 ? ` · até ${max}x` : ""}</div>`;
+  try {
+    if (typeof itemTip === "function" && it) {
+      const full = itemTip(slug, "");
+      const endName = full.indexOf("</div>");
+      if (endName !== -1) h += full.slice(endName + 6);
+    }
+  } catch (e) { /* o cabeçalho nome+chance já está montado */ }
+  return h;
+}
+
 /* Tooltip completo de um item.
  *
  * Mostra na ordem do client: ataque (fisico + elemento), bonus de skill,
@@ -986,19 +1028,14 @@ function openHuntInfoModal(id) {
     const m = GAMEDATA.monsters[slug];
     if (!m) return "";
     const elements = ["physical", "earth", "energy", "fire", "ice", "holy", "death"];
-    const resistHtml = elements.map((el) => {
-      const v = (m.resist && m.resist[el]) || 0;
-      const base = ELEMENTS[el] || ELEMENTS.physical;
-      // resistência positiva preenche em verde; fraqueza fica curta/vermelha.
-      const width = Math.max(8, Math.min(100, 50 + v / 2));
-      const col = v < 0 ? "#e85b52" : (v >= 100 ? "#37d45b" : "#80d64a");
-      return `<div class="hunt-best-res" title="${base.name}: ${v > 0 ? "+" : ""}${v}%">
-        <span>${base.icon || "◆"}</span><i><b style="width:${width}%;background:${col}"></b></i></div>`;
-    }).join("");
+    const resistHtml = elements.map((el) =>
+      resistRowHtml(el, (m.resist && m.resist[el]) || 0)).join("");
     const lootHtml = (m.loot || []).map((l) => {
       const it = GAMEDATA.items[l.item];
       const label = `${it ? it.n : l.item} · ${l.chance}% chance${l.max > 1 ? ` · até ${l.max}` : ""}`;
-      return `<div class="hunt-loot-slot" title="${label}">${itemImg(l.item, 28)}</div>`;
+      return `<div class="hunt-loot-slot" data-hunt-drop="${l.item}"
+        data-hunt-chance="${l.chance}" data-hunt-max="${l.max || 1}"
+        title="${label}">${itemImg(l.item, 28)}</div>`;
     }).join("") || `<span class="tiny dim">—</span>`;
     return `<div class="hunt-best-card">
       <div class="hunt-best-sprite">${mobImg(slug, 58)}</div>
@@ -1042,6 +1079,16 @@ function openHuntInfoModal(id) {
   const close = () => $("#modal").classList.remove("show", "wide");
   $("#huntinfo-close").addEventListener("click", close);
   $("#huntinfo-cancel").addEventListener("click", close);
+  // Tooltip dos drops: nome do item + % de chance (mesmo padrão do boss).
+  $$("#modal-body [data-hunt-drop]").forEach((el) => {
+    const drop = {
+      chance: Number(el.dataset.huntChance) || 0,
+      max: Math.max(1, Number(el.dataset.huntMax) || 1),
+    };
+    el.addEventListener("mouseenter", () =>
+      showTip(dropTooltipHtml(el.dataset.huntDrop, hu.name, drop)));
+    el.addEventListener("mouseleave", hideTip);
+  });
   if (!soon) {
     $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
   }

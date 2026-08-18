@@ -3540,12 +3540,15 @@ function skillPatternCells(mob,pl,pattern,auth){
       cy:from.cy+d.dy*(step+1)+(d.dx!==0?side:0)});
   return out;
 }
-function mobSkillRangeSQM(sk){
+function mobSkillRangeSQM(sk,mob){
   if((sk.range||0)>0)return Math.min(7,sk.range);
   if(sk.areaPattern&&sk.areaPattern.length)return sk.areaPattern.length;
   if(sk.length)return sk.length;
-  if(sk.range===undefined||sk.range===null)return 99;
   if(sk.radius)return Math.max(1,sk.radius);
+  // Sem range declarado: usa o alcance de ATAQUE do proprio monstro
+  // (melee = 1 SQM). O "range==0 = sem limite" antigo deixava o hit melee
+  // basico acertar o jogador de qualquer distancia.
+  if(sk.range===undefined||sk.range===null)return mobMeleeRangeSQM(mob);
   return 1;
 }
 function mobSkillCells(mob,sk,victim,auth){
@@ -3627,7 +3630,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     if(/invisib/i.test(nomeFx))continue;
     if(/summon/i.test(nomeFx)){
       if(auth.bossId==="ferumbras-mortal-shell"&&mob.boss){
-        if(dist>mobSkillRangeSQM(sk))continue;
+        if(dist>mobSkillRangeSQM(sk,mob))continue;
         if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
         mob.skillCds[key]=now+(sk.int||2000);
         tryFerumbrasSummon(auth,mob,now,stepTs);
@@ -3639,7 +3642,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
       if(/electrif/i.test(nomeFx))sk.cond="energy";
       else if(/paralyz/i.test(nomeFx))sk.cond="freezing";
     }
-    if(dist>mobSkillRangeSQM(sk))continue;
+    if(dist>mobSkillRangeSQM(sk,mob))continue;
     if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
     mob.skillCds[key]=now+(sk.int||2000);
     // Wave/beam: sprite e geometria apontam para o alvo (não para dir travada).
@@ -6201,6 +6204,12 @@ function step(auth,now,opts){if(auth.ended)return;
 
       // ATAQUE BÁSICO: independente do group CD de magia/runa (Tibia auto-attack).
       if(!acted){
+        // ALCANCE DO MELEE: ataque básico corpo-a-corpo (range 1) NÃO pode
+        // acertar de longe — o personagem anda até o alvo antes de bater.
+        // Sem este gate o knight derrubava mobs do outro lado da sala.
+        const fromGate=entityGridCell(item,auth),toGate=entityGridCell(primaryTarget,auth);
+        const sqmGate=Math.max(Math.abs(fromGate.cx-toGate.cx),Math.abs(fromGate.cy-toGate.cy));
+        if(sqmGate>playerAttackRangeSQM(p)){hitIdx++;continue;}
         if(primaryTarget.greedImmune||primaryTarget.qteImmune){
           if(!auth._immuneFx||now-auth._immuneFx>500){
             auth._immuneFx=now;const blocked=entityPosition(primaryTarget,.5,.5);
@@ -6768,6 +6777,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
   authorityStepDuration,advanceAuthorityMovement,
   applyCondition,applyResist,applyMonsterMitigation,applyOutgoingDamage,playerWeaponProfile,CONDITIONS,
+  mobSkillRangeSQM,
   stanceTotals,stanceConvert,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
   imbAllowedCats,imbCombatTotals,tryChallenge,playerAttackInterval,addExp,syncPlayerProgress,
   consumeDistanceAmmo,tryUseRune,RUNEDATA,

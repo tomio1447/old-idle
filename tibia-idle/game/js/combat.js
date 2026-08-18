@@ -3566,24 +3566,27 @@ function monsterThinkYell(mob, dt) {
 
 /* Alcance da habilidade em SQM (o canUseAttack compara Chebyshev).
  *
- * Regra do Canary (Monster::canUseSpell): `range == 0` (ausente no .lua)
- * significa SEM limite de distancia — o basic_attack/auto attack de muitos
- * monstros nao declara range e acerta de qualquer distancia. Antes o jogo
- * tratava range ausente como 1 e o bicho so "atacava de colado", o que
- * parecia magia bugada.
- *
  *  - range explicito > 0  -> usa o range (teto 7, alcance do grid)
- *  - range ausente        -> 99 (sem limite)
  *  - length (onda)        -> comprimento da onda
  *  - radius (explosao)    -> raio (o dano da explosao centrada no mob so
  *                            acerta dentro do raio — checado no mobSkillHit)
+ *  - range ausente        -> alcance de ATAQUE do proprio monstro
+ *                            (monsterRangeSQM): monstro melee so acerta de
+ *                            colado (1 SQM), monstro ranged mantem o alcance
+ *                            dele. O "range == 0 = sem limite" do Canary
+ *                            deixava o hit melee basico de muitos monstros
+ *                            acertar o jogador de qualquer distancia.
  */
-function mobSkillRangeSQM(sk) {
+function mobSkillRangeSQM(sk, mob) {
   if ((sk.range || 0) > 0) return Math.min(7, sk.range);
   if (sk.areaPattern && sk.areaPattern.length) return sk.areaPattern.length;
   if (sk.length) return sk.length;                    // onda
-  if (sk.range === undefined || sk.range === null) return 99;  // sem limite
   if (sk.radius) return Math.max(1, sk.radius);       // explosao (propria ou no alvo)
+  if (sk.range === undefined || sk.range === null) {
+    // Sem range declarado: usa o alcance de ataque do monstro (melee = 1).
+    return typeof monsterRangeSQM === "function"
+      ? monsterRangeSQM(mob || { def: {} }) : 1;
+  }
   return 1;                                           // sem dado: colado
 }
 
@@ -4057,7 +4060,7 @@ function mobCastSkill(c, p, mob, now) {
       if (/electrif/i.test(nomeFx)) sk.cond = "energy";
       else if (/paralyz/i.test(nomeFx)) sk.cond = "freezing";
     }
-    if (dist > mobSkillRangeSQM(sk)) continue;
+    if (dist > mobSkillRangeSQM(sk, mob)) continue;
     if (Math.random() * 100 >= (sk.ch === undefined ? 15 : sk.ch)) continue;
     mob.skillCds[key] = now + (sk.int || 2000);
     mob.attackAnim = 220;

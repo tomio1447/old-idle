@@ -1689,21 +1689,17 @@ function openBossModal(id) {
   const drops = bossLootReal(boss);
   const stats = bossStats(boss);
   const base = GAMEDATA.monsters[boss.baseMonster || boss.sprite] || {};
+  // Overrides do BOSS_DEFS (ex.: The Unwelcome neutro) vencem o monstro base.
+  const bossResist = Object.assign({}, base.resist || {}, boss.resist || {});
   const elements = ["physical", "earth", "energy", "fire", "ice", "holy", "death"];
-  const resistHtml = elements.map((el) => {
-    const value = (base.resist && base.resist[el]) || 0;
-    const info = ELEMENTS[el] || ELEMENTS.physical;
-    const width = Math.max(8, Math.min(100, 50 + value / 2));
-    const color = value < 0 ? "#e85b52" : (value >= 100 ? "#37d45b" : "#80d64a");
-    return `<div class="hunt-best-res" title="${info.name}: ${value > 0 ? "+" : ""}${value}%">
-      <span>${info.icon || "◆"}</span><i><b style="width:${width}%;background:${color}"></b></i></div>`;
-  }).join("");
+  const resistHtml = elements.map((el) =>
+    resistRowHtml(el, bossResist[el] || 0)).join("");
   const lootHtml = drops.map((l) => {
     const name = itemName(l.item);
     const title = `${name} · ${l.chance}% de chance${l.max > 1 ? ` · até ${l.max}x` : ""}`;
     const border = typeof itemClsBorder === "function" ? itemClsBorder(l.item) : "";
     return `<div class="hunt-loot-slot ${border}" data-boss-drop="${l.item}"
-      aria-label="${title}">${itemImg(l.item, 28)}</div>`;
+      title="${title}" aria-label="${title}">${itemImg(l.item, 28)}</div>`;
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
   const checks = bossAccessChecklist(G.p, boss);
@@ -1744,10 +1740,16 @@ function openBossModal(id) {
     </div>`;
   $$("#modal-body [data-boss-drop]").forEach((el, index) => {
     const drop = drops[index];
-    if (!drop || typeof bindFullItemTooltip !== "function") return;
-    bindFullItemTooltip(el, drop.item,
-      `Drop de ${boss.name} · ${drop.chance}% de chance${
-        drop.max > 1 ? ` · até ${drop.max}x` : ""}`);
+    if (!drop) return;
+    // Tooltip garantido com NOME + % de chance (cabeçalho) + corpo completo
+    // do item (itemTip). Não depende de bindFullItemTooltip.
+    el.addEventListener("mouseenter", () => {
+      if (typeof dropTooltipHtml === "function" && typeof showTip === "function")
+        showTip(dropTooltipHtml(drop.item, boss.name, drop));
+    });
+    el.addEventListener("mouseleave", () => {
+      if (typeof hideTip === "function") hideTip();
+    });
   });
   const closeBossModal = () => {
     if (typeof hideTip === "function") hideTip();

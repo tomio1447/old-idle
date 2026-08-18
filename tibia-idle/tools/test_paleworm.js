@@ -144,7 +144,7 @@ must(gameSrc.includes("function feastBossesKilled")&&gameSrc.includes("boss.requ
 must(gameSrc.includes('id === "the-pale-worm"')&&gameSrc.includes("paleLobbyOpenFromBoss")&&
   gameSrc.includes("__PALE_LOBBY_STARTING"),
   "startBoss/modal não abrem o lobby do Pale Worm");
-must(indexSrc.includes("js/pale-worm-lobby.js?v=paleworm-v1")&&indexSrc.includes("js/game.js?v=paleworm-v1"),
+must(indexSrc.includes("js/pale-worm-lobby.js?v=")&&indexSrc.includes("js/game.js?v="),
   "cache-bust/script do Pale Worm ausente no index.html");
 must(accSrc.includes('type==="pale-lobby"')&&accSrc.includes('"pale-lobby",'),
   "SSE do account-client não despacha pale-lobby");
