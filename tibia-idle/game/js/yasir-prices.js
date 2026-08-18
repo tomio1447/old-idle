@@ -61,6 +61,10 @@
     "crawlers-essence": { n: "crawler's essence", cid: 33982, w: 0.45, sell: 3700 },
     "roots": { n: "roots", cid: 33938, w: 0.9, sell: 1200 },
     "mould-heart": { n: "mould heart", cid: 34141, w: 0.75, sell: 2100 },
+    // Claustrophobic Inferno (brachiodemon / infernal phantom).
+    "hand": { n: "hand", cid: 33936, w: 1.2, sell: 1450 },
+    "head": { n: "head", cid: 33937, w: 1.5, sell: 3500 },
+    "infernal-heart": { n: "infernal heart", cid: 34139, w: 0.75, sell: 2100 },
   };
 
   Object.keys(YASIR_SOULWAR_LOOT).forEach((slug) => {

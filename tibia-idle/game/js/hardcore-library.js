@@ -20,7 +20,7 @@
   const materials = {
     "book-page":       { n: "book page", s: "misc", t: "loot", sell: 180, w: 1 },
     "glowing-rune":   { n: "glowing rune", s: "misc", t: "loot", sell: 420, w: 1 },
-    "silken-bookmark":{ n: "silken bookmark", s: "misc", t: "loot", sell: 950, w: 1 },
+    "silken-bookmark":{ n: "silken bookmark", s: "misc", t: "loot", sell: 1300, w: 1 },
     "frosty-heart":   { n: "frosty heart", s: "misc", t: "loot", sell: 2100, w: 3 },
     "energy-ball":    { n: "energy ball", s: "misc", t: "loot", sell: 1800, w: 2 },
     "quill":           { n: "quill", s: "misc", t: "loot", sell: 240, w: 1 },
