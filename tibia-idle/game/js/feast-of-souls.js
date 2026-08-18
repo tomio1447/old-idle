@@ -1,16 +1,14 @@
 /*
- * dread-maiden.js — The Dread Maiden, primeiro boss da categoria
- * FEAST OF SOULS.
+ * feast-of-souls.js — categoria FEAST OF SOULS (nível 250+).
  *
- * Boss simples, sem mecânica: HP/EXP/dano/armor/skills vêm diretos do
- * Canary (monsterdata.js / canarymonsters.json) — hits de death, dread
- * rcircle e heals do monstro base, nada de QTE nem fases. Este patch só:
+ * Bosses simples, sem mecânica: HP/EXP/dano/armor/skills vêm diretos do
+ * Canary (monsterdata.js / canarymonsters.json) — nada de QTE nem fases.
+ * Este patch só:
  *
  *   (1) garante os itens do loot oficial que faltavam no recorte antigo;
- *   (2) registra a hunt técnica invisível da bossroom
- *       (game/maps/thedreadmaidenroom.otbm, publicado a partir de
- *       beta-maps/thedreadmaidenroom.otbm);
- *   (3) adiciona o boss ao BOSS_DEFS com o cooldown oficial de 16h.
+ *   (2) registra as hunts técnicas invisíveis das bossrooms
+ *       (game/maps/<room>.otbm, publicados a partir de beta-maps/);
+ *   (3) adiciona os bosses ao BOSS_DEFS com o cooldown oficial de 16h.
  *
  * Cooldown: o valor de 16h fica registrado no def (cooldownMs), mas a
  * APLICAÇÃO continua dependendo do switch global BOSS_COOLDOWNS_ENABLED
@@ -24,10 +22,33 @@
  */
 "use strict";
 
-const DREAD_MAIDEN_ID = "the-dread-maiden";
-const DREAD_MAIDEN_COOLDOWN_MS = 16 * 60 * 60 * 1000; // 16 horas (Canary)
+/* 16 horas (Canary) — todos os bosses da categoria. */
+const FEAST_OF_SOULS_COOLDOWN_MS = 16 * 60 * 60 * 1000;
 
-(function registerDreadMaiden() {
+/* Salas: arquivo OTBM publicado + coordenadas absolutas do RME/Canary
+ * (applyHuntOtbmZones converte para o recorte local no runtime). */
+const FEAST_OF_SOULS_ROOMS = {
+  "the-dread-maiden": {
+    otbm: "thedreadmaidenroom",
+    name: "The Dread Maiden's Room",
+    spawn: { x: 1046, y: 1015, z: 7 },
+    boss: { x: 1056, y: 1015, z: 7 },
+  },
+  "the-fear-feaster": {
+    otbm: "thefearfaster",
+    name: "The Fear Feaster's Room",
+    spawn: { x: 1045, y: 1013, z: 7 },
+    boss: { x: 1053, y: 1013, z: 7 },
+  },
+  "the-unwelcome": {
+    otbm: "theunwelcomeroom",
+    name: "The Unwelcome's Room",
+    spawn: { x: 1044, y: 1011, z: 7 },
+    boss: { x: 1054, y: 1011, z: 7 },
+  },
+};
+
+(function registerFeastOfSouls() {
   if (typeof GAMEDATA === "undefined") return;
   const items = GAMEDATA.items || (GAMEDATA.items = {});
 
@@ -36,7 +57,10 @@ const DREAD_MAIDEN_COOLDOWN_MS = 16 * 60 * 60 * 1000; // 16 horas (Canary)
    * com sell 0 e o Sell All / autoseller pulam, como no restante do jogo.
    * Entradas que já existem no jogo (white-gem vem do soulwar.js com
    * sell 0; giant-amethyst do gamedata com sell 1) têm o preço oficial
-   * aplicado por cima, igual ao padrão do yasir-prices.js. */
+   * aplicado por cima, igual ao padrão do yasir-prices.js. Equipamentos
+   * reais (ghost-chestplate, fabulous-legs, soulful-legs, spooky-hood,
+   * pair-of-nightmare-boots) já vêm do WEAPONDATA — nunca são rebaixados
+   * a loot aqui. */
   const lootItems = {
     "diamond":            { n: "diamond", s: null, t: "loot", cid: 32770, sell: 15000, npcSell: 15000, w: 0.1 },
     "moonstone":          { n: "moonstone", s: null, t: "loot", cid: 32771, sell: 13000, npcSell: 13000, w: 0.1 },
@@ -52,6 +76,10 @@ const DREAD_MAIDEN_COOLDOWN_MS = 16 * 60 * 60 * 1000; // 16 horas (Canary)
     "soulforged-lantern": { n: "soulforged lantern", s: null, t: "loot", cid: 32591, sell: 0, npcSell: 0, w: 30 },
     "ghost-claw":         { n: "ghost claw", s: null, t: "loot", cid: 32631, sell: 0, npcSell: 0, w: 7.3 },
     "giant-amethyst":     { n: "giant amethyst", s: null, t: "loot", cid: 32622, sell: 60000, npcSell: 60000, w: 1.7 },
+    // Fear Feaster / Unwelcome (compartilham a base do loot da categoria)
+    "grimace":               { n: "grimace", s: null, t: "loot", cid: 32593, sell: 120000, npcSell: 120000, w: 0.6 },
+    "amber-with-a-dragonfly":{ n: "amber with a dragonfly", s: null, t: "loot", cid: 32625, sell: 56000, npcSell: 56000, w: 1 },
+    "bloody-tears":          { n: "bloody tears", s: null, t: "loot", cid: 32594, sell: 70000, npcSell: 70000, w: 0.2 },
   };
   for (const slug in lootItems) {
     const def = lootItems[slug];
@@ -64,47 +92,46 @@ const DREAD_MAIDEN_COOLDOWN_MS = 16 * 60 * 60 * 1000; // 16 horas (Canary)
       if (def.w != null && items[slug].w == null) items[slug].w = def.w;
     }
   }
-  // Potions ultimate-spirit/supreme-health já são injetadas por
-  // scarlett-boss.js (sell 1, mesmo valor usado hoje no jogo): nada a fazer.
 
-  /* Hunt técnica invisível: fornece arena/colisão para newBossCombat.
-   * Coordenadas absolutas do RME/Canary (z 7); applyHuntOtbmZones converte
-   * para o recorte local do OTBM. Centro do mapa = (1051,1015). */
+  /* Hunts técnicas invisíveis: fornecem arena/colisão para newBossCombat. */
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
-  GAMEDATA.hunts["the-dread-maiden-room"] = {
-    name: "The Dread Maiden's Room",
-    hidden: true,
-    level: 250,
-    minLevel: 250,
-    monsters: [DREAD_MAIDEN_ID],
-    color: "#8a5a9a",
-    scene: "palace",
-    otbm: "thedreadmaidenroom",
-    otbmFloor: 7,
-    otbmSpawn: { x: 1046, y: 1015, z: 7 },       // spawn do jogador
-    otbmMobBounds: { x: 1056, y: 1015, w: 1, h: 1, z: 7 }, // spawn do boss
-    avgHp: 300000,
-    avgExp: 72000,
-    avgDamage: 600,
-    avgArmor: 170,
-    avgGold: 100,
-    respawn: 1,
-    pack: 1,
-    cat: "boss-room",
-  };
+  for (const id in FEAST_OF_SOULS_ROOMS) {
+    const room = FEAST_OF_SOULS_ROOMS[id];
+    GAMEDATA.hunts[id + "-room"] = {
+      name: room.name,
+      hidden: true,
+      level: 250,
+      minLevel: 250,
+      monsters: [id],
+      color: "#8a5a9a",
+      scene: "palace",
+      otbm: room.otbm,
+      otbmFloor: 7,
+      otbmSpawn: room.spawn,                          // spawn do jogador
+      otbmMobBounds: Object.assign({ w: 1, h: 1 }, room.boss), // spawn do boss
+      avgHp: 300000,
+      avgExp: 30000,
+      avgDamage: 1050,
+      avgArmor: 160,
+      avgGold: 100,
+      respawn: 1,
+      pack: 1,
+      cat: "boss-room",
+    };
+  }
 
   if (typeof BOSS_DEFS === "undefined") return;
 
   /* Stats DIRETOS do Canary (newBossCombat usa hp/exp/damage/armor/defense
    * quando presentes) — skills/resist/loot vêm do monstro base no
-   * monsterdata. Sem mechanic própria: boss de hits simples. */
-  BOSS_DEFS[DREAD_MAIDEN_ID] = {
-    id: DREAD_MAIDEN_ID,
+   * monsterdata. Sem mechanic própria: bosses de hits simples. */
+  BOSS_DEFS["the-dread-maiden"] = {
+    id: "the-dread-maiden",
     name: "The Dread Maiden",
     title: "Boss Feast of Souls",
     hunt: "the-dread-maiden-room",
-    baseMonster: DREAD_MAIDEN_ID,
-    sprite: DREAD_MAIDEN_ID,
+    baseMonster: "the-dread-maiden",
+    sprite: "the-dread-maiden",
     hp: 300000,
     exp: 72000,
     damage: 600,
@@ -112,8 +139,42 @@ const DREAD_MAIDEN_COOLDOWN_MS = 16 * 60 * 60 * 1000; // 16 horas (Canary)
     defense: 170,
     speed: 0.00007,
     requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
-    cooldown: DREAD_MAIDEN_COOLDOWN_MS,
+    cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
     // Sem lista própria de loot: bossLootReal usa o loot integral do
     // MONSTERDATA (Canary), igual à Timira.
+  };
+
+  BOSS_DEFS["the-fear-feaster"] = {
+    id: "the-fear-feaster",
+    name: "The Fear Feaster",
+    title: "Boss Feast of Souls",
+    hunt: "the-fear-feaster-room",
+    baseMonster: "the-fear-feaster",
+    sprite: "the-fear-feaster",
+    hp: 300000,
+    exp: 30000,
+    damage: 1050,
+    armor: 160,
+    defense: 170,
+    speed: 0.00007,
+    requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
+    cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
+  };
+
+  BOSS_DEFS["the-unwelcome"] = {
+    id: "the-unwelcome",
+    name: "The Unwelcome",
+    title: "Boss Feast of Souls",
+    hunt: "the-unwelcome-room",
+    baseMonster: "the-unwelcome",
+    sprite: "the-unwelcome",
+    hp: 300000,
+    exp: 30000,
+    damage: 1050,
+    armor: 10,
+    defense: 15,
+    speed: 0.00007,
+    requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
+    cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
   };
 })();

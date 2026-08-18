@@ -1566,7 +1566,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "FEAST OF SOULS",
     minLevel: 250,
-    ids: ["the-dread-maiden"],
+    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome"],
   },
   {
     title: "SOULWAR 400+",
@@ -4733,6 +4733,8 @@ function bindControls() {
   if (typeof bindPartyButton === "function") bindPartyButton();
   if (typeof bindLoyaltyButton === "function") bindLoyaltyButton();
   if (typeof bindTrainingButton === "function") bindTrainingButton();
+  // Reward Chest: botão da topbar (badge = bosses com drops pendentes).
+  if (typeof bindRewardButton === "function") bindRewardButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
     const serverCfg = (typeof window !== "undefined" &&
