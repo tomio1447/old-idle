@@ -207,8 +207,9 @@
 
  // Claustrophobic Inferno — beta-maps/claustrophobic inferno.otbm →
  // maps/claustrophobic_inferno.otbm. OTBM z=7 (1042,1008)..(1067,1026) 26×19.
- // FOV câmera = sala inteira do Map Editor (26×19). Spawn (1050,1016);
- // zona de monstros (1048,1014)..(1059,1022).
+ // Câmera no padrão da Mirrored Nightmare (20×12): a FOV da sala inteira
+ // (26×19) deixava o mapa com zoom-out excessivo. Spawn (1050,1016) e
+ // zona de monstros (1048,1014)..(1059,1022) continuam nos mesmos lugares.
  for(const slug of ['brachiodemon','infernal-demon']) if(M[slug]) M[slug].element='physical';
  if(M['infernal-phantom']){
   M['infernal-phantom'].element='fire';
@@ -224,7 +225,7 @@
   name:'Claustrophobic Inferno',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
   otbm:'claustrophobic_inferno',otbmFloor:7,
   otbmFovBounds:{x:1042,y:1008,w:26,h:19,z:7},
-  otbmFovWidth:26,otbmFovHeight:19,
+  otbmFovWidth:20,otbmFovHeight:12,
   otbmRuntimeWidth:30,otbmRuntimeHeight:30,
   otbmSpawn:{x:1050,y:1016,z:7},
   otbmMobBounds:{x:1048,y:1014,w:12,h:9,z:7},
