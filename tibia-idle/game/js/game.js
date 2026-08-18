@@ -1564,6 +1564,11 @@ const BOSS_MODAL_SECTIONS = [
     ids: ["timira-the-many-headed", "scarlett-etzel"],
   },
   {
+    title: "FEAST OF SOULS",
+    minLevel: 250,
+    ids: ["the-dread-maiden"],
+  },
+  {
     title: "SOULWAR 400+",
     minLevel: 400,
     ids: [

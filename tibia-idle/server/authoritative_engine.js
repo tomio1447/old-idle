@@ -402,6 +402,9 @@ try{
   // Secret Library: itens de loot (silken bookmark, book page, glowing rune
   // etc.) — sem isso o Sell All online não precifica e pula esses drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"hardcore-library.js"),"utf8"),sandbox);}catch(_hl){/* opcional */}
+  // The Dread Maiden (Feast of Souls): itens do loot oficial + hunt da
+  // bossroom — sem isso o Sell All online não precifica esses drops.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"dread-maiden.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);
@@ -474,6 +477,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "goshnars-malice-room":{monsters:["goshnar-s-malice","dreadful-harvester","malicious-soul"],soulWarZone:true,soulWarZoneMonster:"dreadful-harvester"},
   "goshnars-megalomania-room":{monsters:["goshnar-s-megalomania-purple","goshnar-s-megalomania-green","goshnar-s-megalomania-blue","aspect-of-power"],soulWarZone:true,soulWarZoneMonster:"aspect-of-power"},
   "scarlett-room":{monsters:["scarlett-etzel"]},
+  "the-dread-maiden-room":{monsters:["the-dread-maiden"]},
 });
 for(const slug of ["marapur-nagas","dt-seal"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
