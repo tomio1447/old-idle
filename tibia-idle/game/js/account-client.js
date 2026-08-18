@@ -1086,6 +1086,7 @@ async function accountStartSyncNow(token,generation){
     if(type==="party"||type==="party-inbox"){accountSyncDispatch("party",data);return;}
     if(type==="mega-lobby"){accountSyncDispatch("mega-lobby",data);return;}
     if(type==="pale-lobby"){accountSyncDispatch("pale-lobby",data);return;}
+    if(type==="temple"){accountSyncDispatch("temple",data);return;}
     if(type==="snapshot-required"){
       accountSyncRefreshCharacters(token);accountRefreshInstance(token).then((fresh)=>accountSyncDispatch("instance",fresh));
       accountSyncDispatch("party",data);
@@ -1100,7 +1101,7 @@ async function accountStartSyncNow(token,generation){
     }
     if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
   };
-  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss"])
+  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","temple","snapshot-required","sync-expired","maintenance","world-boss"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};

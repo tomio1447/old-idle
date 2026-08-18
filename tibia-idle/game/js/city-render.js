@@ -64,6 +64,7 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker, hoverNp
   // Profundidade Tibia: paredes e criaturas intercaladas por SQM (Y depois X).
   // À direita da parede o personagem cobre; à esquerda a parede cobre.
   this.npcHit = [];
+  this.templeHit = []; // jogadores do templo multijogador (hit-test do clique)
   const depthDrawables = [];
   const pTx = Math.max(0, Math.min(MAP_W - 1, Math.floor(walker.px / TILE)));
   const pTy = Math.max(0, Math.min(MAP_H - 1, Math.floor(walker.py / TILE)));
@@ -129,6 +130,61 @@ Renderer.prototype.drawOfficialTempleMap = function (player, dt, walker, hoverNp
         // Hit-test em coordenadas de tela (canvas), fora do translate.
         this.npcHit.push({ id: entry.id, x: screenX, y: screenY, w: 48, h: 64 });
       },
+    });
+  }
+
+  // Jogadores do templo multijogador: mesmo pipeline de outfit do jogador
+  // local (outfit 15x -> clássico), sombra, label nome + vocação/nível e
+  // hit-test para o menu de interação.
+  if (typeof G !== "undefined" && G && G.templePlayers) {
+    G.templePlayers.forEach((rp, pid) => {
+      if (!rp) return;
+      const frameNow = Date.now();
+      const pos = typeof templeMpLerp === "function"
+        ? templeMpLerp(rp, frameNow)
+        : { x: rp.tx, y: rp.ty, moving: !!rp.moving };
+      const rx = (pos.x + 0.5) * TILE, ry = (pos.y + 0.5) * TILE;
+      const rTx = Math.max(0, Math.min(MAP_W - 1, Math.floor(pos.x)));
+      const rTy = Math.max(0, Math.min(MAP_H - 1, Math.floor(pos.y)));
+      depthDrawables.push({
+        tx: rTx, ty: rTy, footY: ry, order: 2,
+        draw: () => {
+          const sx = rx * S, sy = ry * S;
+          const screenX = sx - camX, screenY = sy - camY;
+          if (screenX < -80 || screenX > W + 80 || screenY < -80 || screenY > H + 80) return;
+          const fake = { voc: rp.voc || "none", sex: rp.sex || "male",
+            outfit: rp.outfit || {}, wardrobe: {} };
+          const pimg = OutfitRenderer.forPlayer(fake, rp.dir || "s", pos.moving ? 1 : 0);
+          if (!spriteReady(pimg)) return;
+          const w = spriteW(pimg) * S, h = spriteH(pimg) * S;
+          const origin = creatureTileOrigin(sx, sy, w, h, TS, pimg._spriteAnchor, S);
+          ctx.fillStyle = "rgba(0,0,0,.4)";
+          ctx.beginPath();
+          ctx.ellipse(sx, sy + TS / 2, w * 0.3, Math.max(2, TS * 0.08), 0, 0, 7);
+          ctx.fill();
+          ctx.drawImage(pimg, origin.x, origin.y, w, h);
+          // Label: nome em cima, vocação + nível embaixo.
+          const hsLabel = cityHudScale(this.c);
+          ctx.font = cityHudFont(10, this.c, true);
+          ctx.textAlign = "center";
+          const sub = (typeof templeMpVocName === "function"
+            ? templeMpVocName(rp.voc) : (rp.voc || "?")) + " " + (rp.level | 0);
+          const tw = Math.max(ctx.measureText(rp.name || "?").width,
+            ctx.measureText(sub).width) + 10 * hsLabel;
+          const by = sy - h / 2 - 24 * hsLabel;
+          ctx.fillStyle = "rgba(16,15,12,.88)";
+          ctx.fillRect(sx - tw / 2, by, tw, 24 * hsLabel);
+          ctx.strokeStyle = "rgba(120,140,190,.55)";
+          ctx.strokeRect(sx - tw / 2, by, tw, 24 * hsLabel);
+          ctx.fillStyle = "#cfe0ff";
+          ctx.fillText(rp.name || "?", sx, by + 10 * hsLabel);
+          ctx.fillStyle = "#9a948a";
+          ctx.fillText(sub, sx, by + 20 * hsLabel);
+        },
+      });
+      this.templeHit.push({
+        id: String(pid), x: rx * S - camX, y: ry * S - camY, w: 48, h: 72,
+      });
     });
   }
 

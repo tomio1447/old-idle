@@ -2912,6 +2912,14 @@ async function main() {
   });
   global.__PALE_LOBBY=PALE_LOBBY;
 
+  const { createTemplePresence }=require("./temple");
+  const TEMPLE_PRESENCE=createTemplePresence({
+    getDb:()=>db,
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+  });
+  global.__TEMPLE_PRESENCE=TEMPLE_PRESENCE;
+  TEMPLE_PRESENCE.start();
+
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
@@ -3596,6 +3604,18 @@ async function main() {
         if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
         const r=await PALE_LOBBY.declineInvite(db,acc,body.invite_id);
         return send(res,r.code,r.body);
+      }
+      /* -------- Presença multijogador no templo (cidade) -------- */
+      if(req.method==="POST"&&url==="/api/temple/presence"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=TEMPLE_PRESENCE.heartbeat(db,acc,body);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/temple/leave"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        return send(res,200,{ok:true,left:TEMPLE_PRESENCE.leave(acc.id)});
       }
       if(req.method==="POST"&&url==="/api/pale-lobby/leave"){
         const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
