@@ -66,6 +66,13 @@ for(const [,ids] of expected)for(const id of ids)
   must(root.innerHTML.includes(`data-hunt="${id}"`),id+" ausente do modal");
 must(!root.innerHTML.includes('data-hunt="spiders"')&&root.innerHTML.includes("Em breve"),
   "hunt 7.4 vazou para o modal ou seção vazia não foi mantida");
+must(root.innerHTML.includes("accordion-section") &&
+     root.innerHTML.includes('class="hunts-group collapsed"') &&
+     root.innerHTML.includes("accordion-head"),
+  "abas de categoria sem markup de accordion");
+must((root.innerHTML.match(/hunts-group collapsed/g) || []).length === expected.length &&
+     !root.innerHTML.includes('aria-expanded="true"'),
+  "alguma aba de categoria não está minimizada por padrão");
 must(root.innerHTML.includes('class="mobs"')&&root.innerHTML.includes('class="info"'),
   "card sem regiões sprites e texto");
 const cardSample=root.innerHTML.match(/<button class="hunt-card[^"]*"[\s\S]*?<\/button>/);

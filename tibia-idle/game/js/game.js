@@ -1633,11 +1633,13 @@ function renderBosses(p) {
     const gate = section.minLevel
       ? `<span class="boss-section-gate ${levelOk ? "ok" : "no"}">${levelOk ? "☑" : "☐"} Nível ${section.minLevel}+</span>`
       : "";
-    return `<section class="hunt-modal-section boss-modal-section ${levelOk ? "" : "boss-section-locked"}">
-      <div class="hunt-cat-title">${section.title} ${gate}</div>
-      <div class="hunts-group">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
+    return `<section class="hunt-modal-section boss-modal-section accordion-section ${levelOk ? "" : "boss-section-locked"}">
+      <div class="hunt-cat-title accordion-head" role="button" tabindex="0"
+        aria-expanded="false">${section.title} ${gate}</div>
+      <div class="hunts-group collapsed">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
     </section>`;
   }).join("");
+  if (typeof bindCatalogAccordion === "function") bindCatalogAccordion(el, "accordion");
   $$("#bosses-modal-list [data-boss-info]").forEach((btn) =>
     btn.addEventListener("click", () => {
       const body = $("#modal-body");

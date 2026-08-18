@@ -921,6 +921,45 @@ function paintAutoWalkButton(p) {
   }
 }
 
+/* Abas de categoria (accordion) dos catálogos HUNTS e BOSSES:
+ * todas minimizadas por padrão (lista de títulos); expandir uma aba
+ * minimiza as demais.
+ * mode "accordion" = uma aberta por vez; mode "multi" = várias podem
+ * abrir sem fechar as outras (usado pela busca do modal de hunts). */
+function bindCatalogAccordion(root, mode) {
+  const sections = Array.prototype.slice.call(root.querySelectorAll(".accordion-section"));
+  const setOpen = (sec, open) => {
+    sec.classList.toggle("open", !!open);
+    const head = sec.querySelector(".hunt-cat-title");
+    const group = sec.querySelector(".hunts-group");
+    if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+    if (group) group.classList.toggle("collapsed", !open);
+  };
+  const open = (sec) => {
+    if (mode !== "multi") sections.forEach((s) => setOpen(s, false));
+    setOpen(sec, true);
+  };
+  const toggle = (sec) => {
+    if (mode !== "multi" && sec.classList.contains("open")) setOpen(sec, false);
+    else open(sec);
+  };
+  sections.forEach((sec) => {
+    const head = sec.querySelector(".hunt-cat-title");
+    if (!head) return;
+    head.addEventListener("click", (ev) => {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      toggle(sec);
+    });
+    head.addEventListener("keydown", (ev) => {
+      if (ev && (ev.key === "Enter" || ev.key === " ")) {
+        ev.preventDefault();
+        toggle(sec);
+      }
+    });
+  });
+  return { sections, setOpen, open, toggle };
+}
+
 const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp"] },
   { title: "HUNTS 100–250", ids: [] },
@@ -968,11 +1007,22 @@ function renderHunts(p) {
   };
   root.innerHTML = HUNT_MODAL_SECTIONS.map((section) => {
     const cards = section.ids.map(card).filter(Boolean).join("");
-    return `<section class="hunt-modal-section">
-      <div class="hunt-cat-title">${section.title}</div>
-      <div class="hunts-group">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
+    // Busca ativa: abas sem resultado somem; caso contrário, seção vazia
+    // mantém o aviso "Em breve".
+    if (busca && !cards) return "";
+    return `<section class="hunt-modal-section accordion-section">
+      <div class="hunt-cat-title accordion-head" role="button" tabindex="0"
+        aria-expanded="false">${section.title}</div>
+      <div class="hunts-group collapsed">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
     </section>`;
   }).join("");
+  if (typeof bindCatalogAccordion === "function") {
+    const acc = bindCatalogAccordion(root, busca ? "multi" : "accordion");
+    // Busca ativa: abre automaticamente as abas que têm resultados.
+    if (busca) acc.sections.forEach((sec) => {
+      if (sec.querySelector(".hunt-modal-card")) acc.open(sec);
+    });
+  }
   $$("#hunts-modal-list [data-hunt]").forEach((el) => {
     el.addEventListener("click", () => {
       const modalBox = $("#modal-body");

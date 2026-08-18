@@ -2021,6 +2021,27 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .hunt-cat-title:first-child { margin-top: 0; }
 .hunt-cat-title.locked { color: #8a8270; border-bottom-color: rgba(138,130,112,.25); }
 .hunts-group.locked { filter: grayscale(.8); }
+/* Abas de categoria (HUNTS/BOSSES): lista vertical, padrão minimizado;
+ * expandir uma aba minimiza as demais. */
+#hunts-modal-list,
+#bosses-modal-list { display: flex; flex-direction: column; gap: 8px; }
+.accordion-section .hunt-cat-title {
+  cursor: pointer; user-select: none; margin: 0; padding: 6px 10px;
+  background: #17191e; border: 1px solid #2c2b24;
+  border-left: 3px solid rgba(212,175,55,.4); border-radius: 2px;
+  transition: background .12s, border-color .12s;
+}
+.accordion-section .hunt-cat-title:hover { background: #1f2018; }
+.accordion-section .hunt-cat-title::before {
+  content: "▸"; width: 12px; flex: none; text-align: center;
+  color: #8a8270; transition: transform .12s;
+}
+.accordion-section.open .hunt-cat-title::before { transform: rotate(90deg); color: var(--gold, #d4af37); }
+.accordion-section.open .hunt-cat-title { border-left-color: var(--gold, #d4af37); }
+.accordion-section .hunts-group { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 8px 2px 2px; }
+.accordion-section .hunts-group.collapsed { display: none; }
+.accordion-section .hunt-section-empty { grid-column: 1 / -1; }
+@media (max-width: 720px) { .accordion-section .hunts-group { grid-template-columns: 1fr; } }
 .hunt-card .mobs { display: flex; gap: 1px; width: 68px; flex: none; }
 .hunt-card .mobs img { width: 22px; height: 22px; object-fit: contain; }
 .hunt-card .info { flex: 1; min-width: 0; }
