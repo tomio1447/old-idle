@@ -1267,6 +1267,18 @@ function pouchItemCount(p) {
   return n;
 }
 
+/* Cooldown entre vendas automáticas da Loot Pouch: 5 min normal, 2 min VIP. */
+const POUCH_AUTOSELL_CD_MS = 5 * 60 * 1000;
+const POUCH_AUTOSELL_CD_VIP_MS = 2 * 60 * 1000;
+function pouchAutoSellCooldownMs(p) {
+  const vip = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
+  return vip ? POUCH_AUTOSELL_CD_VIP_MS : POUCH_AUTOSELL_CD_MS;
+}
+function pouchAutoSellReady(p, now) {
+  const at = Number((p && p._pouchAutoSellAt) || 0);
+  return ((now || Date.now()) - at) >= pouchAutoSellCooldownMs(p);
+}
+
 /* Esvazia a Loot Pouch do personagem. Não mexe em ouro/moedas da conta. */
 function clearLootPouch(p) {
   if (!p) return 0;

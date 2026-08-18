@@ -2075,27 +2075,33 @@ function renderLootPouch(p) {
   const sellBtn = $("#btn-pouch-sell-all");
   if (sellBtn) sellBtn.disabled = !entries.some((s) =>
     typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
-  // Autoseller: vende TUDO automaticamente quando a pouch atingir X%.
-  // Respeita as regras do seller (lista "NÃO VENDER" e itens sem valor). VIP only.
-  const vipOk = typeof vipAutoSellAllowed !== "function" || vipAutoSellAllowed();
-  if (!vipOk && p.config.pouchAutoSell) p.config.pouchAutoSell = false;
-  const asOn = !!p.config.pouchAutoSell && vipOk;
+  // Autoseller: vende TUDO automaticamente quando a pouch atingir o total de
+  // itens configurado. Respeita as regras do seller (lista "NÃO VENDER" e
+  // itens sem valor). Cooldown entre vendas: 5 min; VIP 2 min.
+  const vipOk = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
+  const asOn = !!p.config.pouchAutoSell;
   const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
   const asFill = pouchFillPct(p);
   const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
+  const cdMs = typeof pouchAutoSellCooldownMs === "function" ? pouchAutoSellCooldownMs(p) : POUCH_AUTOSELL_CD_MS;
+  const lastAt = Number(p._pouchAutoSellAt) || 0;
+  const restante = Math.max(0, cdMs - (Date.now() - lastAt));
+  const cdTxt = restante > 0
+    ? `próxima venda em ${restante >= 60000 ? Math.ceil(restante / 60000) + "m" : Math.max(1, Math.ceil(restante / 1000)) + "s"}`
+    : `entre vendas: ${vipOk ? "2 min" : "5 min"}`;
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
-        <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "" : "(VIP)"}</span>
-        <span class="tiny dim">${pouchSlots} stacks · ${asFill} itens · vende em ${asPct} itens</span>
-        <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell" ${vipOk ? "" : "disabled title=\"Exclusivo VIP\""}>${asOn ? "ATIVO — desligar" : (vipOk ? "LIGAR" : "VIP")}</button>
+        <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "VIP" : ""}</span>
+        <span class="tiny dim">${pouchSlots} stacks · ${asFill} itens · vende em ${asPct} itens · ${cdTxt}</span>
+        <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
       </div>
       <div class="row mt4" style="align-items:center;gap:6px">
         <input type="range" id="pouch-autosell-pct" min="10" max="100" step="5" value="${asPct}"
           style="flex:1" ${asOn ? "" : "disabled"}>
         <span class="tiny" style="width:auto;text-align:right;color:#d4af37">${asPct} itens</span>
       </div>
-      <div class="tiny dim mt4">Sem limite de slots. Ao somar ${asPct} itens, vende apenas itens liberados; classificações 3 e 4 ficam protegidas.</div>
+      <div class="tiny dim mt4">Sem limite de slots. Ao somar ${asPct} itens, vende apenas itens liberados (a cada 5 min; VIP 2 min); classificações 3 e 4 ficam protegidas.</div>
     </div>`;
   const btnAs = $("#btn-pouch-autosell");
   if (btnAs && !btnAs._bound) {
@@ -2293,15 +2299,10 @@ function bindPouchAutoseller(p) {
   if (btn && !btn._bound) {
     btn._bound = true;
     btn.addEventListener("click", () => {
-      if (typeof vipAutoSellAllowed === "function" && !vipAutoSellAllowed()) {
-        p.config.pouchAutoSell = false;
-        toast("Autoseller é exclusivo VIP.", "bad");
-        renderLootPouch(p);
-        return;
-      }
       p.config.pouchAutoSell = !p.config.pouchAutoSell;
+      const vipOk = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
       toast(p.config.pouchAutoSell
-        ? `Autoseller LIGADO — vende itens liberados quando a pouch somar ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct} itens (classes 3/4 protegidas)`
+        ? `Autoseller LIGADO — vende itens liberados quando a pouch somar ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct} itens (a cada ${vipOk ? "2" : "5"} min; classes 3/4 protegidas)`
         : "Autoseller desligado");
       renderLootPouch(p);
     });
