@@ -404,7 +404,7 @@ try{
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"hardcore-library.js"),"utf8"),sandbox);}catch(_hl){/* opcional */}
   // The Dread Maiden (Feast of Souls): itens do loot oficial + hunt da
   // bossroom — sem isso o Sell All online não precifica esses drops.
-  try{vm.runInNewContext(fs.readFileSync(path.join(js,"dread-maiden.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"feast-of-souls.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);
@@ -478,6 +478,8 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "goshnars-megalomania-room":{monsters:["goshnar-s-megalomania-purple","goshnar-s-megalomania-green","goshnar-s-megalomania-blue","aspect-of-power"],soulWarZone:true,soulWarZoneMonster:"aspect-of-power"},
   "scarlett-room":{monsters:["scarlett-etzel"]},
   "the-dread-maiden-room":{monsters:["the-dread-maiden"]},
+  "the-fear-feaster-room":{monsters:["the-fear-feaster"]},
+  "the-unwelcome-room":{monsters:["the-unwelcome"]},
 });
 for(const slug of ["marapur-nagas","dt-seal"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
