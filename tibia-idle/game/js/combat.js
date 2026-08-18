@@ -2460,7 +2460,9 @@ function castSpellById(c, p, target, now, id) {
   }
   // a magia encadeia (monk ou generica)? guia o visual do projetil, que
   // sai do alvo ANTERIOR em vez do jogador, e o evento de raio em cadeia.
-  const ehChain = (md && md.chain) || (s.chain && s.chain > 1);
+  // Magia com MATRIZ DE AREA nunca encadeia: a area manda nos alvos e no
+  // visual (exori/exori gran batem na box sem ativar corrente).
+  const ehChain = !nomeArea && ((md && md.chain) || (s.chain && s.chain > 1));
   // fracao do re-strike do 15.25: Death Echo tem 0.5 na propria magia e o
   // Spiritual Outburst do Monk ganhou o mesmo no MONKSPELLDATA
   const echoFrac = s.echo || (md && md.echo) || 0;

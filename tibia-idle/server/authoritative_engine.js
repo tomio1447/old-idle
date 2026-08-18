@@ -5906,7 +5906,9 @@ function step(auth,now,opts){if(auth.ended)return;
               missile=converted? (magical?(ELEMENT_MISSILE[el]||"energy"):null)
                 :(visual.missile||(magical?(ELEMENT_MISSILE[el]||"energy"):null)),
               projectile=!!missile&&spellReach(s)>1,castVisualTs=visualTs;
-            const ehChain=Number(s.chain)>1||!!(md&&md.chain);
+            // Magia com MATRIZ DE AREA nunca encadeia: a area manda nos
+            // alvos e no visual (exori/exori gran batem na box sem corrente).
+            const ehChain=!areaName&&(Number(s.chain)>1||!!(md&&md.chain));
             const chainFx=(md&&md.chainFx)||s.chainFx||null;
             for(let ti=0;ti<targets.length;ti++){
               const tgt=targets[ti];

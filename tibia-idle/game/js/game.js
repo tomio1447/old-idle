@@ -2785,27 +2785,16 @@ function drainEvents() {
         // NÃO reancorar no caster quando o alvo sumiu: isso pintava exevo dir
         // san / barrage inteiro no SQM do jogador. AoE do Tibia fica no tile
         // do cast, não segue interpolação do alvo.
+        //
+        // Dano e renderização da área são SIMULTÂNEOS: todos os SQMs nascem
+        // no mesmo instante. O antigo stagger por distância do caster
+        // (dist*50ms) fazia a animação "carregar em ondas" a partir do
+        // centro — parecia uma corrente saindo do jogador. Chain de verdade
+        // continua com o stagger próprio: os eventos chainPath já chegam
+        // com ts por hop e são liberados no tempo de cada salto.
         const gw=Number(c&&c.gridW)||(typeof GRID_W!=="undefined"?GRID_W:21);
         const gh=Number(c&&c.gridH)||(typeof GRID_H!=="undefined"?GRID_H:13);
         const cells = e.cells || [];
-        let ox = null, oy = null;
-        if (e.base && Number.isFinite(Number(e.base.cx)) && Number.isFinite(Number(e.base.cy))) {
-          ox = Number(e.base.cx); oy = Number(e.base.cy);
-        } else {
-          const wanted = String(e.sourceId || e.whoId || "");
-          const idOf = (ent) => String(ent && (ent.id !== undefined ? ent.id : (ent.p && ent.p.id)) || "");
-          const src = wanted && c ? (
-            (Array.isArray(c.mobs) && c.mobs.find((m) => idOf(m) === wanted)) ||
-            (Array.isArray(c.players) && c.players.find((p) => idOf(p) === wanted)) ||
-            (c.player && idOf(c.player) === wanted ? c.player : null) ||
-            null
-          ) : null;
-          if (src && Number.isFinite(Number(src.cx)) && Number.isFinite(Number(src.cy))) {
-            ox = Number(src.cx); oy = Number(src.cy);
-          }
-        }
-        // Chain path já vem com ts por hop — não empilhar outro stagger.
-        const stagger = !e.chainPath && ox != null;
         for (const cel of cells) {
           let pos=null;
           if (cel&&Number.isFinite(Number(cel.cx))&&Number.isFinite(Number(cel.cy))
@@ -2815,12 +2804,7 @@ function drainEvents() {
             pos={x:Number(cel.x),y:Number(cel.y)};
           }
           if (!pos) continue;
-          let delay = 0;
-          if (stagger && Number.isFinite(Number(cel.cx)) && Number.isFinite(Number(cel.cy))) {
-            const dist = Math.max(Math.abs(Number(cel.cx) - ox), Math.abs(Number(cel.cy) - oy));
-            delay = dist * 50;
-          }
-          r.addEffect(pos.x, pos.y, e.fx || "explosion-area", undefined, undefined, undefined, delay);
+          r.addEffect(pos.x, pos.y, e.fx || "explosion-area");
         }
         break;
       }
