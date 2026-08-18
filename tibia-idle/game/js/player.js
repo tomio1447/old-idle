@@ -749,11 +749,13 @@ function setActiveAmmo(p, slug, persistOnline) {
   const it = GAMEDATA.items[slug];
   if (!it || it.s !== "ammo") return null;
   p.equip.ammo = { item: slug, count: Infinity };
-  // mantem a config do helper coerente: so um tipo fica marcado
+  // Estado da última munição usada POR TIPO: bow re-equipa a última arrow e
+  // crossbow a última bolt. Cada campo lembra só o próprio tipo — nunca
+  // apaga o outro (trocar para bolt não pode perder a arrow preferida).
   if (p.config) {
     const isBolt = slug.indexOf("bolt") !== -1;
-    p.config.refillArrow = isBolt ? "" : slug;
-    p.config.refillBolt = isBolt ? slug : "";
+    if (isBolt) p.config.refillBolt = slug;
+    else p.config.refillArrow = slug;
   }
   // Em combate online o próximo tick substitui o snapshot local. Seleções
   // explícitas precisam passar pela autoridade para não voltar à munição
@@ -764,6 +766,29 @@ function setActiveAmmo(p, slug, persistOnline) {
       if(!result.ok&&typeof toast==="function")toast(result.msg||"Não foi possível trocar a munição","bad");
     }).catch(()=>{});
   return p.equip.ammo;
+}
+
+/* Ao equipar bow/crossbow, seleciona a munição do tipo certo usando a última
+ * usada daquele tipo (estado em config.refillArrow / config.refillBolt — o
+ * mesmo que setActiveAmmo mantém). Sem registro anterior, cai na arrow/bolt
+ * base. Armas de arremesso, munição de nível alto ou falta de quiver não
+ * trocam nada. No combate online a troca segue pelo endpoint de munição. */
+function autoSelectAmmoForWeapon(p, slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[slug] : null;
+  if (!p || !it) return null;
+  const kind = typeof weaponAmmoKind === "function" ? weaponAmmoKind(it, slug) : null;
+  if (!kind) return null;
+  const cfg = p.config || (p.config = {});
+  const want = kind === "bolt" ? cfg.refillBolt : cfg.refillArrow;
+  const ammoSlug = want || (kind === "bolt" ? "bolt" : "arrow");
+  const am = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) ? GAMEDATA.items[ammoSlug] : null;
+  if (!am || am.s !== "ammo") return null;
+  if ((am.lvl || 1) > (p.level || 1)) return null;
+  if (typeof equippedQuiver === "function" && !equippedQuiver(p)) return null;
+  if (typeof ammoCompatibleWithWeapon === "function" &&
+      !ammoCompatibleWithWeapon(am, { item: slug })) return null;
+  setActiveAmmo(p, ammoSlug, true);
+  return ammoSlug;
 }
 
 /* Move munição legada que estava ocupando slots da bag para o contador */
