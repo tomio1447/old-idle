@@ -407,7 +407,7 @@ function normalizePlayer(p) {
     missionCollapsed: false,
     noPotions: false,          // Helper: "NÃO USAR POTIONS"
     pouchAutoSell: false,     // Loot Pouch: autoseller ligado/desligado
-    pouchAutoSellPct: 80,     // Loot Pouch: % de enchimento p/ vender tudo
+    pouchAutoSellPct: 80,     // Loot Pouch: gatilho do autoseller (total de itens)
     spellAttack: true,
     autoRetreat: true,
     autoWalk: true,
@@ -4249,15 +4249,13 @@ function startBackgroundTick() {
   }, 200);
 }
 
-/* Loot Pouch: autoseller mede o limiar de 50 stacks, não a quantidade.
- * A coleta pode passar desse limiar sem descartar drops; o percentual fica
- * em 100% até que itens vendáveis sejam removidos. */
+/* Loot Pouch: sem limite de slots. O autoseller dispara pela QUANTIDADE
+ * total de itens (pouchAutoSellPct vira um piso de itens, ex.: 80). */
 function pouchFillPct(p) {
-  const cap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
-  const used = typeof lootPouchSlotsUsed === "function"
-    ? lootPouchSlotsUsed(p)
-    : Object.keys((p && p.lootPouch) || {}).filter((s) => p.lootPouch[s] > 0).length;
-  return Math.min(100, Math.round((used / cap) * 100));
+  return typeof pouchItemCount === "function"
+    ? pouchItemCount(p)
+    : Object.keys((p && p.lootPouch) || {}).reduce(
+        (acc, s) => acc + Math.max(0, Math.floor(Number(p.lootPouch[s]) || 0)), 0);
 }
 
 function loop(ts) {
@@ -4389,12 +4387,12 @@ function loop(ts) {
         G._pouchTick = (G._pouchTick || 0) + dt;
         if (G._pouchTick >= 2000) {
           G._pouchTick = 0;
-          const pct = pouchFillPct(G.p);
-          if (pct >= (G.p.config.pouchAutoSellPct || 80)) {
+          const itens = pouchFillPct(G.p);
+          if (itens >= (G.p.config.pouchAutoSellPct || 80)) {
             const r = sellAllPouch(G.p);
             if (r.kinds) {
               if (typeof save === "function") save();
-              addLog("sell", `Autoseller: Loot Pouch em <b>${pct}%</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
+              addLog("sell", `Autoseller: Loot Pouch com <b>${itens} itens</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
               if (typeof renderLootPouch === "function") renderLootPouch(G.p);
             }
           }

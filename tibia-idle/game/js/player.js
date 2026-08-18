@@ -1242,13 +1242,13 @@ function shouldGoLootPouch(slug) {
   return true;
 }
 
-// Os 50 slots são o LIMIAR visual/autoseller, não um bloqueio de coleta.
-// Loot nunca pode desaparecer silenciosamente quando a pouch chega a 100%.
-const LOOT_POUCH_MAX_SLOTS = 50;
+// A Loot Pouch não tem limite de slots: a coleta é ilimitada e nunca
+// bloqueia nem descarta loot. O número de stacks é só informativo; o
+// autoseller usa a QUANTIDADE total de itens como gatilho.
 function lootPouchSlotsUsed(p) {
   // 1 slot por stack (slug com quantidade > 0). A pouch guarda contagens
   // empilhadas — não multiplique por count de equipamentos, senão o HUD
-  // mostra ocupação absurda (ex.: 21007/50) e o autoseller fica “travado”.
+  // mostra uma contagem absurda de stacks.
   let slots = 0;
   for (const slug of Object.keys((p && p.lootPouch) || {})) {
     const count = p.lootPouch[slug] || 0;
@@ -1257,7 +1257,15 @@ function lootPouchSlotsUsed(p) {
   }
   return slots;
 }
-function lootPouchSlotsFree(p) { return Math.max(0, LOOT_POUCH_MAX_SLOTS - lootPouchSlotsUsed(p)); }
+
+/* Quantidade total de itens na pouch (soma das contagens). Gatilho do autoseller. */
+function pouchItemCount(p) {
+  let n = 0;
+  for (const slug of Object.keys((p && p.lootPouch) || {})) {
+    n += Math.max(0, Math.floor(Number(p.lootPouch[slug]) || 0));
+  }
+  return n;
+}
 
 /* Esvazia a Loot Pouch do personagem. Não mexe em ouro/moedas da conta. */
 function clearLootPouch(p) {

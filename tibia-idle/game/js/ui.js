@@ -2083,21 +2083,19 @@ function renderLootPouch(p) {
   const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
   const asFill = pouchFillPct(p);
   const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
-  const pouchCap = typeof LOOT_POUCH_MAX_SLOTS !== "undefined" ? LOOT_POUCH_MAX_SLOTS : 50;
-  const pouchOverflow = Math.max(0, pouchSlots - pouchCap);
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
         <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "" : "(VIP)"}</span>
-        <span class="tiny dim">slots ${pouchSlots}/${pouchCap}${pouchOverflow ? ` · overflow seguro +${pouchOverflow}` : ""} · ${asFill}% / vende em ${asPct}%</span>
+        <span class="tiny dim">${pouchSlots} stacks · ${asFill} itens · vende em ${asPct} itens</span>
         <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell" ${vipOk ? "" : "disabled title=\"Exclusivo VIP\""}>${asOn ? "ATIVO — desligar" : (vipOk ? "LIGAR" : "VIP")}</button>
       </div>
       <div class="row mt4" style="align-items:center;gap:6px">
         <input type="range" id="pouch-autosell-pct" min="10" max="100" step="5" value="${asPct}"
           style="flex:1" ${asOn ? "" : "disabled"}>
-        <span class="tiny" style="width:34px;text-align:right;color:#d4af37">${asPct}%</span>
+        <span class="tiny" style="width:auto;text-align:right;color:#d4af37">${asPct} itens</span>
       </div>
-      <div class="tiny dim mt4">Ao atingir ${asPct}%, vende apenas itens liberados; classificações 3 e 4 ficam protegidas.</div>
+      <div class="tiny dim mt4">Sem limite de slots. Ao somar ${asPct} itens, vende apenas itens liberados; classificações 3 e 4 ficam protegidas.</div>
     </div>`;
   const btnAs = $("#btn-pouch-autosell");
   if (btnAs && !btnAs._bound) {
@@ -2303,7 +2301,7 @@ function bindPouchAutoseller(p) {
       }
       p.config.pouchAutoSell = !p.config.pouchAutoSell;
       toast(p.config.pouchAutoSell
-        ? `Autoseller LIGADO — vende itens liberados em ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct}% (classes 3/4 protegidas)`
+        ? `Autoseller LIGADO — vende itens liberados quando a pouch somar ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct} itens (classes 3/4 protegidas)`
         : "Autoseller desligado");
       renderLootPouch(p);
     });
@@ -2314,7 +2312,7 @@ function bindPouchAutoseller(p) {
       p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;
       // atualiza o rótulo sem re-renderizar (evita perder o arrasto)
       const label = slider.parentElement && slider.parentElement.querySelector("span.tiny");
-      if (label) label.textContent = p.config.pouchAutoSellPct + "%";
+      if (label) label.textContent = p.config.pouchAutoSellPct + " itens";
     });
     slider.addEventListener("change", () => {
       p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;

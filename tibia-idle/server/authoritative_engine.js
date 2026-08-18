@@ -399,6 +399,9 @@ try{
   // online precisa de greed-s-arm / figurines etc. no catálogo ITEMS.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"soulwar.js"),"utf8"),sandbox);}catch(_sw){/* opcional */}
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"yasir-prices.js"),"utf8"),sandbox);}catch(_yp){/* opcional */}
+  // Secret Library: itens de loot (silken bookmark, book page, glowing rune
+  // etc.) — sem isso o Sell All online não precifica e pula esses drops.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"hardcore-library.js"),"utf8"),sandbox);}catch(_hl){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);
@@ -1234,9 +1237,11 @@ function setAuthAutoSupplyStash(p,slug,on){
   else delete p.config.autoSupplyStash[slug];
   return true;
 }
+/* Loot Pouch sem limite de slots: gatilho do autoseller = QUANTIDADE total
+ * de itens (soma das contagens), mesma regra do cliente. */
 function lootPouchFillPct(p){
-  let used=0;for(const slug of Object.keys(p.lootPouch||{}))if((p.lootPouch[slug]||0)>0)used+=1;
-  return Math.min(100,Math.round((used/50)*100));
+  let n=0;for(const slug of Object.keys(p.lootPouch||{}))n+=Math.max(0,Math.floor(Number(p.lootPouch[slug])||0));
+  return n;
 }
 function tryAuthAutoSell(auth,item,now){
   const p=item&&item.p;if(!p||!p.config||!p.config.pouchAutoSell)return;
