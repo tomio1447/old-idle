@@ -1698,8 +1698,12 @@ function openBossModal(id) {
     const name = itemName(l.item);
     const title = `${name} · ${l.chance}% de chance${l.max > 1 ? ` · até ${l.max}x` : ""}`;
     const border = typeof itemClsBorder === "function" ? itemClsBorder(l.item) : "";
-    return `<div class="hunt-loot-slot ${border}" data-boss-drop="${l.item}"
-      title="${title}" aria-label="${title}">${itemImg(l.item, 28)}</div>`;
+    // % de drop SEMPRE visível (TibiaWiki): label fixo embaixo do ícone,
+    // além do tooltip completo no hover.
+    const pct = Number(l.chance) || 0;
+    return `<div class="hunt-loot-slot loot-with-chance ${border}" data-boss-drop="${l.item}"
+      title="${title}" aria-label="${title}">${itemImg(l.item, 28)}
+      <span class="loot-chance">${pct}%</span></div>`;
   }).join("") || `<span class="tiny dim">Sem loot.</span>`;
 
   const checks = bossAccessChecklist(G.p, boss);

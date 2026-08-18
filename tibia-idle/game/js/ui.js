@@ -1033,9 +1033,10 @@ function openHuntInfoModal(id) {
     const lootHtml = (m.loot || []).map((l) => {
       const it = GAMEDATA.items[l.item];
       const label = `${it ? it.n : l.item} · ${l.chance}% chance${l.max > 1 ? ` · até ${l.max}` : ""}`;
-      return `<div class="hunt-loot-slot" data-hunt-drop="${l.item}"
+      return `<div class="hunt-loot-slot loot-with-chance" data-hunt-drop="${l.item}"
         data-hunt-chance="${l.chance}" data-hunt-max="${l.max || 1}"
-        title="${label}">${itemImg(l.item, 28)}</div>`;
+        title="${label}">${itemImg(l.item, 28)}
+        <span class="loot-chance">${Number(l.chance) || 0}%</span></div>`;
     }).join("") || `<span class="tiny dim">—</span>`;
     return `<div class="hunt-best-card">
       <div class="hunt-best-sprite">${mobImg(slug, 58)}</div>
