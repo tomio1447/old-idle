@@ -596,6 +596,13 @@ function renderEquip(p) {
       const slot = el.dataset.slot;
       if (slot === "backpack") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
       if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
+      // Instância online: desequip autoritativo (senão o tick restaura o slot).
+      if (typeof persistUnequipFromContainer === "function" &&
+          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+        persistUnequipFromContainer(G.p, slot, "bag");
+        hideTip();
+        return;
+      }
       if (typeof unequipToContainer === "function") {
         if (!unequipToContainer(G.p, slot, "bag")) return;
       } else {
@@ -1193,6 +1200,14 @@ function equipFromBag(p, slug, instId) {
     const chk = canEquipItem(p, slug, it.s);
     if (!chk.ok) { toast(chk.msg, ""); return false; }
   } else if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  // Equip com persistência: em instância online vai pela autoridade (senão o
+  // tick de 200ms restaura a arma anterior) e em ambos os caminhos aplica a
+  // munição automática do tipo da arma (bow→arrow, crossbow→bolt). Munição
+  // continua no fluxo do setActiveAmmo, que já persiste pela API própria.
+  if (it.s !== "ammo" && typeof persistEquipFromContainer === "function") {
+    persistEquipFromContainer(p, slug, "bag", it.s, instId);
+    return true;
+  }
   if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "bag", it.s, instId);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
@@ -1483,6 +1498,12 @@ function equipFromPouch(p, slug) {
     const chk = canEquipItem(p, slug, it.s);
     if (!chk.ok) { toast(chk.msg, ""); return false; }
   } else if (it.lvl && p.level < it.lvl) { toast(`Requer nível ${it.lvl}`, ""); return false; }
+  // Equip com persistência (instância online: autoritativo; sempre aplica a
+  // munição automática do tipo da arma).
+  if (it.s !== "ammo" && typeof persistEquipFromContainer === "function") {
+    persistEquipFromContainer(p, slug, "pouch", it.s);
+    return true;
+  }
   if (typeof equipItemFromContainer === "function") return equipItemFromContainer(p, slug, "pouch", it.s);
   if (it.s === "ammo") {
     if (!equippedQuiver(p)) { toast("Equipe um quiver antes de selecionar munição."); return false; }
@@ -1739,6 +1760,72 @@ function persistMoveToSupplyStash(p, payload) {
   if (typeof save === "function") save();
   if (typeof renderAll === "function") renderAll();
   return Promise.resolve({ ok: true, local: true });
+}
+
+/* Equipa 1 item da bag/Loot Pouch com persistência. Em instância online o
+ * equip precisa passar pela autoridade (/api/instance/equip) — sem isso o
+ * tick de 200ms restaurava o snapshot e a arma "voltava" (falcon bow).
+ * Fora do combate o caminho local + save continua. A munição automática por
+ * tipo de arma (bow→arrow, crossbow→bolt) é aplicada nos dois caminhos
+ * (no online o servidor já faz; aqui o setActiveAmmo persiste pela API). */
+function persistEquipFromContainer(p, slug, source, slot, instId) {
+  const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
+    typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
+  if (online) {
+    return accountEquipInstanceItem(sessionToken(), p.id, { slug, source, slot, instId }).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function") {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        }
+        const it = GAMEDATA.items[slug];
+        toast(`Equipou <b>${it && it.n ? it.n : slug}</b>`);
+        if (typeof renderAll === "function") renderAll();
+        return true;
+      }
+      toast((result && result.msg) || "Não foi possível equipar.", "bad");
+      return false;
+    }).catch(() => {
+      toast("Não foi possível equipar.", "bad");
+      return false;
+    });
+  }
+  const ok = typeof equipItemFromContainer === "function" &&
+    equipItemFromContainer(p, slug, source, slot, instId);
+  if (ok) {
+    if (typeof autoSelectAmmoForWeapon === "function") autoSelectAmmoForWeapon(p, slug);
+    if (typeof save === "function") save();
+    if (typeof renderAll === "function") renderAll();
+  }
+  return Promise.resolve(ok);
+}
+
+/* Desequipa 1 slot com persistência (mesmo racional do equip: sem a rota
+ * autoritativa o tick restaura o item no slot). */
+function persistUnequipFromContainer(p, slot, dest) {
+  const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
+    typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
+  if (online) {
+    return accountEquipInstanceItem(sessionToken(), p.id, { unequip: true, slot, dest }).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function") {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        }
+        if (typeof renderAll === "function") renderAll();
+        return true;
+      }
+      toast((result && result.msg) || "Não foi possível desequipar.", "bad");
+      return false;
+    }).catch(() => {
+      toast("Não foi possível desequipar.", "bad");
+      return false;
+    });
+  }
+  const ok = typeof unequipToContainer === "function" && unequipToContainer(p, slot, dest || "bag");
+  if (ok && typeof save === "function") save();
+  if (ok && typeof renderAll === "function") renderAll();
+  return Promise.resolve(ok);
 }
 
 /* Equipa 1 item da Supply Stash com persistência (supplyStash protected no PUT). */

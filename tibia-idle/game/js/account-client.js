@@ -555,6 +555,31 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
     return {ok:false,msg:r.data.msg||"Não foi possível trocar a munição"};
   });
 }
+/* Equipa/desequipa um item da bag ou Loot Pouch na instância ativa. Sem isso
+ * o tick autoritativo (200ms) restaura o equipamento anterior — o falcon bow
+ * "voltava" depois de equipar o crossbow. */
+function accountEquipInstanceItem(token,charId,opts){
+  opts=opts||{};
+  return accountQueueInstance(async()=>{
+    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+    const r=await _api("POST","/api/instance/equip",Object.assign({
+      token,char_id:Number(charId),
+      unequip:!!opts.unequip,
+      slug:String(opts.slug||""),
+      slot:String(opts.slot||""),
+      source:String(opts.source||"bag"),
+      dest:String(opts.dest||"bag"),
+      inst_id:opts.instId?String(opts.instId):null,
+      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+    if(r.data.ok){
+      accountInstanceApply(r.data.instance);
+      return {ok:true,state:r.data.instance&&r.data.instance.state,
+        version:r.data.instance&&r.data.instance.version};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+    return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
+  });
+}
 function accountClearInstanceLootPouch(token,charId){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};

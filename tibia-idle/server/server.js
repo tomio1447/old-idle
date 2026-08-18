@@ -45,7 +45,8 @@ const {
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, setAuthAutoSupplyStash, setAuthLootConfig,
-  moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag } = require("./authoritative_engine");
+  moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag,
+  equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const store = require("./store");
 const mailer = require("./mailer");
@@ -1672,7 +1673,10 @@ async function selectInstanceAmmo(db,body){
     if((Number(ammo.lvl!==undefined?ammo.lvl:ammo.level)||0)>(Number(p.level)||1)){rejection="Nível insuficiente para esta munição";return null;}
     if(!quiver||(quiver.t!=="quiver"&&quiver.type!=="quiver")){rejection="Equipe um quiver antes de selecionar munição";return null;}
     p.equip=p.equip||{};p.equip.ammo={item:slug,count:null};p.config=p.config||{};p.config.ammoAuto=!!body.ammo_auto;
-    const bolt=/bolt/.test(slug);p.config.refillArrow=bolt?"":slug;p.config.refillBolt=bolt?slug:"";
+    // Última munição POR TIPO (bow→arrow, crossbow→bolt): só o tipo usado é
+    // atualizado — trocar de bolt não pode apagar a última arrow preferida.
+    const bolt=/bolt/.test(slug);
+    if(bolt)p.config.refillBolt=slug;else p.config.refillArrow=slug;
     descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
   },lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
@@ -2083,6 +2087,64 @@ async function equipSupplyStashItem(db,body){
   return {code:200,body:Object.assign({},persisted.body,{ok:true,
     supplyStash:p.supplyStash||{},equip:p.equip||{},bag:p.bag||{},
     itemInstances:p.itemInstances||[]})};
+}
+
+/** Equipa/desequipa um item da bag ou Loot Pouch (autoritativo). Sem isso a
+ * troca de equipamento durante o combate online era sobrescrita pelo tick
+ * seguinte (snapshot do servidor) e a arma "voltava" sozinha. */
+async function equipInstanceItem(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id);
+  const unequip=!!body.unequip;
+  const slug=unequip?String(body.slot||""):String(body.slug||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_EQUIP",msg:"Equipamento inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_EQUIP",msg:"Instância inválida para equipar"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      let r;
+      if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
+      else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
+        {instId:body.inst_id?String(body.inst_id):null});
+      if(!r||!r.ok){rejection=(r&&r.msg)||"Não foi possível equipar";return null;}
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível equipar",
+        instance:instanceSummary(result.instance,true)}};
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"equip",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,equipped:unequip?null:String(body.slug||""),
+      slot:unequip?String(body.slot||""):null,instance:instanceSummary(result.instance,true)}};
+  }
+  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
+  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let r;
+  if(unequip)r=unequipFromContainerAuth(p,String(body.slot||""),String(body.dest||"bag"));
+  else r=equipFromContainerAuth(p,String(body.slug||""),String(body.source||"bag"),
+    {instId:body.inst_id?String(body.inst_id):null});
+  if(!r||!r.ok)
+    return {code:400,body:{ok:false,error:"EQUIP_FAILED",msg:(r&&r.msg)||"Não foi possível equipar"}};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,
+    equip:p.equip||{},bag:p.bag||{},lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
 }
 
 /** Move Loot Pouch → backpack (autoritativo). lootPouch é protected no PUT. */
@@ -2945,6 +3007,9 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/instance/ammo"){
         const r=await selectInstanceAmmo(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/instance/equip"){
+        const r=await equipInstanceItem(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/pouch-clear"){
         const r=await clearInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
