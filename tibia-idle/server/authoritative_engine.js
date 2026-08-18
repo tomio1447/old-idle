@@ -4059,6 +4059,157 @@ function equipFromSupplyStash(p,slug,targetSlot){
   if(charges!=null){p.equip[slot].charges=charges;p.equip[slot].maxCharges=it.charges||charges;}
   return true;
 }
+
+/* ----------------------------------------------- equip em instância online
+ * O PUT da instância protege equip/lootPouch: troca de equipamento durante o
+ * combate precisa passar pela autoridade, senão o tick (200ms) restaura o
+ * snapshot anterior — era isso que "forçava" o falcon bow de volta no RP.
+ * Espelha equipItemFromContainer do cliente sem recriar o modelo completo de
+ * instâncias: a instância equipada só muda de `loc` (bag <-> equip:<slot>),
+ * preservando id/tier para o cliente não perder a forja ao receber o tick. */
+
+/* Cabe 1 unidade no bag? (mesma regra de authAddItemToBag, sem mexer no p) */
+function authCanAddToBag(p,slug){
+  if(!p||!slug)return false;
+  const weight=itemUnitWeight(slug);
+  if(weight>freeCapacity(p)+1e-9)return false;
+  if(authItemNeedsBagInstance(slug))return authBagUsedSlots(p)<authBagSlots(p);
+  const had=(Number(p.bag&&p.bag[slug])||0)>0;
+  return had||authBagUsedSlots(p)<authBagSlots(p);
+}
+
+/* Guarda o item equipado no destino. Preserva instância/tier (loc bag) —
+ * nunca deleta a instância de um item tierado, igual ao cliente. */
+function stashEquippedAuth(p,slot,dest){
+  const e=p.equip&&p.equip[slot];
+  if(!e||!e.item){if(p.equip)delete p.equip[slot];return true;}
+  const inst=e.instId&&Array.isArray(p.itemInstances)
+    ?p.itemInstances.find((i)=>i&&String(i.id)===String(e.instId)):null;
+  delete p.equip[slot];
+  if(inst){
+    if(dest==="bag"||Number(inst.tier)>0){
+      inst.loc="bag";
+      p.bag=p.bag||{};p.bag[e.item]=(Number(p.bag[e.item])||0)+1;
+      return true;
+    }
+    // pouch só aceita sem tier: instância tier 0 vira stack na pouch
+    p.itemInstances=p.itemInstances.filter((i)=>i!==inst);
+    p.lootPouch=p.lootPouch||{};
+    p.lootPouch[e.item]=(Number(p.lootPouch[e.item])||0)+1;
+    return true;
+  }
+  if(dest==="bag"){
+    if(!authAddItemToBag(p,e.item,1)){p.equip[slot]=e;return false;}
+    return true;
+  }
+  p.lootPouch=p.lootPouch||{};
+  p.lootPouch[e.item]=(Number(p.lootPouch[e.item])||0)+1;
+  return true;
+}
+
+/* Troca de equipamento com fonte bag/pouch (espelho do equipItemFromContainer).
+ * Também aplica a munição automática por tipo de arma (autoAmmoForWeaponAuth). */
+function equipFromContainerAuth(p,slug,source,opts){
+  opts=opts||{};
+  const it=ITEMS[slug];
+  if(!p||!it||!it.s)return {ok:false,msg:"Esse item não é equipável"};
+  const slot=String(it.s);
+  if(slot==="ammo")return {ok:false,msg:"Use a seleção de munição do quiver"};
+  const lvl=Number(it.lvl!==undefined?it.lvl:it.level)||0;
+  if(lvl>(Number(p.level)||1))return {ok:false,msg:"Nível insuficiente"};
+  if(Array.isArray(it.vocs)&&it.vocs.length&&it.vocs.indexOf(String(p.voc))===-1)
+    return {ok:false,msg:"Vocação incompatível"};
+  if((it.t==="quiver"||it.type==="quiver"||it.s==="quiver")&&String(p.voc)!=="paladin")
+    return {ok:false,msg:"Somente paladins podem equipar quiver"};
+  if(slot==="shield"&&it.t!=="quiver"){
+    const w=p.equip&&p.equip.weapon,wi=w&&ITEMS[w.item];
+    if(wi&&wi.th)return {ok:false,msg:"Arma de duas mãos impede escudo/spellbook"};
+  }
+  // Arma 2H também devolve o escudo (não o quiver) — valida espaço antes.
+  const old=p.equip&&p.equip[slot];
+  const shieldBack=slot==="weapon"&&it.th&&p.equip&&p.equip.shield&&(()=>{
+    const sh=ITEMS[p.equip.shield.item];
+    return !sh||(sh.t!=="quiver"&&sh.type!=="quiver"&&sh.s!=="quiver");
+  })()?p.equip.shield:null;
+  const fromPouch=source==="pouch";
+  const toStash=[];
+  if(old&&old.item&&old.item!==slug)toStash.push({slot:slot,entry:old});
+  if(shieldBack)toStash.push({slot:"shield",entry:shieldBack});
+  for(const s of toStash){
+    const toBag=!fromPouch||s.entry.instId;
+    if(toBag&&!authCanAddToBag(p,s.entry.item))
+      return {ok:false,msg:"Mochila cheia para guardar o item anterior"};
+  }
+  // retira o novo do bag/pouch
+  let takenInst=null;
+  if(fromPouch){
+    const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
+    if(n<=0)return {ok:false,msg:"Item não está na Loot Pouch"};
+    if(n>1)p.lootPouch[slug]=n-1;else delete p.lootPouch[slug];
+  }else{
+    const n=Number(p.bag&&p.bag[slug])||0;
+    if(n<=0)return {ok:false,msg:"Item não está na mochila"};
+    if(authItemNeedsBagInstance(slug)){
+      const arr=p.itemInstances||[];
+      const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
+        (!opts.instId||String(inst.id)===String(opts.instId)));
+      if(idx<0)return {ok:false,msg:"Item não está na mochila"};
+      takenInst=arr[idx];
+      p.itemInstances=arr.filter((_,i)=>i!==idx);
+    }
+    if(n>1)p.bag[slug]=n-1;else delete p.bag[slug];
+  }
+  for(const s of toStash){
+    if(!stashEquippedAuth(p,s.slot,fromPouch?"pouch":"bag")){
+      // rollback do item retirado
+      if(fromPouch)p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+1;
+      else{p.bag[slug]=(Number(p.bag[slug])||0)+1;if(takenInst)p.itemInstances.push(takenInst);}
+      return {ok:false,msg:"Não foi possível guardar o item anterior"};
+    }
+  }
+  p.equip=p.equip||{};
+  p.equip[slot]={item:slug,count:1};
+  if(takenInst){
+    takenInst.loc="equip:"+slot;
+    p.itemInstances=p.itemInstances||[];
+    p.itemInstances.push(takenInst);
+    p.equip[slot].instId=takenInst.id;
+    p.equip[slot].tier=takenInst.tier||0;
+  }
+  autoAmmoForWeaponAuth(p,slug,it);
+  return {ok:true};
+}
+
+function unequipFromContainerAuth(p,slot,dest){
+  if(!p||!slot||slot==="backpack"||slot==="ammo")return {ok:false,msg:"Slot não pode ser removido"};
+  if(!p.equip||!p.equip[slot])return {ok:false,msg:"Nada equipado neste slot"};
+  const ok=stashEquippedAuth(p,String(slot),dest||"bag");
+  return {ok:ok,msg:ok?"":"Não foi possível guardar o item"};
+}
+
+/* Ao equipar bow/crossbow, seleciona a munição do tipo certo usando a última
+ * usada daquele tipo (config.refillArrow / refillBolt — o estado pedido pelo
+ * jogador). Sem registro anterior cai na arrow/bolt base. Armas de arremesso
+ * e personagens sem quiver não mudam de munição. */
+function autoAmmoForWeaponAuth(p,slug,it){
+  if(!p||!it)return;
+  const kind=weaponAmmoKind(it,slug);
+  if(!kind)return;
+  if(!equippedQuiver(p))return;
+  const cfg=p.config=p.config||{};
+  const want=kind==="bolt"?cfg.refillBolt:cfg.refillArrow;
+  const ammoSlug=want||(kind==="bolt"?"bolt":"arrow");
+  const am=ITEMS[ammoSlug];
+  if(!am||!(am.s==="ammo"||am.slot==="ammo"||am.type==="ammo"))return;
+  const amLvl=Number(am.lvl!==undefined?am.lvl:am.level)||0;
+  if(amLvl>(Number(p.level)||1))return;
+  if(!ammoCompatibleWithWeapon(am,slug))return;
+  p.equip=p.equip||{};
+  p.equip.ammo={item:ammoSlug,count:null};
+  if(kind==="arrow"){cfg.refillArrow=ammoSlug;if(!cfg.refillBolt)cfg.refillBolt="";}
+  else{cfg.refillBolt=ammoSlug;if(!cfg.refillArrow)cfg.refillArrow="";}
+  return ammoSlug;
+}
 function creditHuntLoot(p,slug,count){
   if(!p||!slug)return {ok:false,discarded:true};
   count=Math.max(1,Math.floor(Number(count)||1));
@@ -6601,6 +6752,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   tickAccessoryCharges,tryAccessoryHelper,consumeAccessoryHitCharge,energyRingOn,
   isAutoSupplyStash,addSupplyStash,ensureSupplyStash,isSupplyStashableItem,moveItemToSupplyStash,
   moveItemFromSupplyStash,equipFromSupplyStash,removeSupplyStashCount,creditHuntLoot,
+  equipFromContainerAuth,unequipFromContainerAuth,stashEquippedAuth,authCanAddToBag,autoAmmoForWeaponAuth,
   nextComboSpell,playerSpellList,spellValues,spellVisual,absorbIncomingDamage,authorityPlayerTarget,
   authorityMobTarget,authorityMobHasFollowPath,authorityFindPathStep,authorityCellBlocked,
   densestPackTarget,mobClusterDensity,packOpportunity,spellIsMultiHit,runeIsMultiHit,
