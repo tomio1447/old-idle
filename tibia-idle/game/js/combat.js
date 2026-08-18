@@ -357,6 +357,10 @@ function newBossCombat(player, boss) {
     loot: (boss.loot && boss.loot.length) ? boss.loot : (base.loot || []),
     attackSpeed: boss.attackSpeed || base.attackSpeed || 2000,
   });
+  // Overrides do BOSS_DEFS sobre o def do monstro base (The Unwelcome:
+  // resist neutra + mecânica de absorção de death).
+  if (boss.resist) def.resist = Object.assign({}, base.resist || {}, boss.resist);
+  if (boss.deathAbsorbs) def.deathAbsorbs = true;
   c.boss = boss;
   c.worldBoss = !!boss.worldBoss;
   c.bossDefeated = false;
@@ -1292,11 +1296,13 @@ function tickConditions(c, p, dt) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
         if (def.control) continue; // Fear/Root etc. não drenam HP
-        const dmg = Math.max(1, co.dmg);
-        m.hp -= dmg;
-        c.stats.damage += dmg;
-        c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y, targetId:m.id,
-                        screen: true, el: def.el, condition: tipo });
+        const dmg = unwelcomeAbsorbDeath(m, def.el, Math.max(1, co.dmg), c);
+        if (dmg > 0) {
+          m.hp -= dmg;
+          c.stats.damage += dmg;
+          c.events.push({ t: "hit", dmg: dmg, x: m.x, y: m.y, targetId:m.id,
+                          screen: true, el: def.el, condition: tipo });
+        }
       }
       if (co.turns <= 0) delete m.conditions[tipo];
     }
@@ -1706,6 +1712,22 @@ function applyPierceToResist(pc, piercePct) {
   return -novo;
 }
 
+/* The Unwelcome (Feast of Souls): imune a dano de death — o golpe zera e o
+ * boss CURA 200% do dano de death que sofreria (pré-resistência). Espelho
+ * do servidor em authoritative_engine.js (applyOutgoingDamage). */
+function unwelcomeAbsorbDeath(mob, element, dmg, c) {
+  if (!mob || !(dmg > 0) || element !== "death") return dmg;
+  if (!(mob.def && mob.def.deathAbsorbs)) return dmg;
+  const cap = Number(mob.def.hp || mob.maxHp) || 0;
+  const heal = cap > 0 ? Math.min(dmg * 2, Math.max(0, cap - mob.hp)) : dmg * 2;
+  mob.hp += heal;
+  if (c && c.events) {
+    c.events.push({ t: "mobheal", x: mob.x, y: mob.y, targetId: mob.id,
+                    heal, screen: true, absorb: 1 });
+  }
+  return 0;
+}
+
 function applyResist(mob, element, dano, piercePct) {
   // Agony é "true damage": não pode ser mitigado nem reduzido por
   // resistência (TibiaWiki: "Can not be mitigated or reduced").
@@ -2036,9 +2058,9 @@ function playerAttack(c, p, target) {
       const elemBruto = Math.max(1, raw - fisBruto);
       // a resistencia ja foi aplicada com o elemento fisico no rollDamage,
       // entao aqui so a parte elemental precisa ser reavaliada
-      const elemFinal = Math.max(1,
+      const elemFinal = unwelcomeAbsorbDeath(target, parte2, Math.max(1,
         applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto),
-                         playerPiercePct(p, parte2)));
+                         playerPiercePct(p, parte2))), c);
       target.hp -= fisBruto + elemFinal;
       c.stats.damage += fisBruto + elemFinal;
       // dano fisico: efeito da raca (sangue / hit-area / veneno), nao slash cinza
@@ -2053,8 +2075,9 @@ function playerAttack(c, p, target) {
                       projectile: false, el: parte2, dual: 1,
                       fx: (ELEMENTS[parte2] || ELEMENTS.physical).fx });
     } else {
-      target.hp -= raw;
-      c.stats.damage += raw;
+      const effRaw = unwelcomeAbsorbDeath(target, element, raw, c);
+      target.hp -= effRaw;
+      c.stats.damage += effRaw;
       const race = target.def && target.def.race;
       const hitFx = ammo && ammo.areaFx
         ? ammo.areaFx
@@ -2065,7 +2088,7 @@ function playerAttack(c, p, target) {
             : (element === "physical"
               ? racePhysicalFx(race)
               : ((ELEMENTS[element] || ELEMENTS.physical).fx))));
-      c.events.push({ t: "hit", dmg: raw, x: target.x, y: target.y, targetId:target.id,
+      c.events.push({ t: "hit", dmg: effRaw, x: target.x, y: target.y, targetId:target.id,
                       sx: pos.x, sy: pos.y, screen: true,
                       projectile: isDist || isMagic, el: element, crit: critou, fatal: fatalou,
                       race: race, fx: hitFx,
@@ -2095,7 +2118,7 @@ function playerAttack(c, p, target) {
       if (m === target || m.hp <= 0) continue;
       if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, m)) continue;
       if (sqmDist(m, target) > 1) continue;   // so os 8 tiles vizinhos
-      const corte = Math.max(1, Math.floor(rollDamage(false) * 0.5));
+      const corte = unwelcomeAbsorbDeath(m, element, Math.max(1, Math.floor(rollDamage(false) * 0.5)), c);
       m.hp -= corte;
       c.stats.damage += corte;
       // crippling stance tambem marca quem tomou o respingo
@@ -2166,6 +2189,7 @@ function playerAttack(c, p, target) {
         // Crit/Fatal do swing principal valem para toda a explosao.
         let splash = Math.max(1, Math.floor(rollDamage(false)));
         if (extraPct > 0) splash = Math.max(1, Math.floor(splash * (1 + extraPct / 100)));
+        splash = unwelcomeAbsorbDeath(m, element, splash, c);
         m.hp -= splash;
         c.stats.damage += splash;
         // crippling stance tambem marca quem estava na area da flecha
@@ -2660,10 +2684,10 @@ function castSpellById(c, p, target, now, id) {
       const ele = Math.max(1, dmg - fis);
       const fisFinal = applyMonsterMitigation(t, elemento,
         applyResist(t, elemento, fis, playerPiercePct(p, elemento)));
-      const eleFinal = Math.max(1,
+      const eleFinal = unwelcomeAbsorbDeath(t, armaEl.el, Math.max(1,
         applyMonsterMitigation(t, armaEl.el,
           applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele),
-                      playerPiercePct(p, armaEl.el))));
+                      playerPiercePct(p, armaEl.el)))), c);
       t.hp -= fisFinal + eleFinal;
       c.stats.damage += fisFinal + eleFinal;
       // Augments de life/mana leech (TibiaWiki): leech extra da spell.
@@ -2704,7 +2728,8 @@ function castSpellById(c, p, target, now, id) {
                       fx: (ELEMENTS[armaEl.el] || ELEMENTS.physical).fx });
       return;
     }
-    dmg = applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento)));
+    dmg = unwelcomeAbsorbDeath(t, elemento,
+      applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento))), c);
     t.hp -= dmg;
     c.stats.damage += dmg;
     // Augments de life/mana leech (TibiaWiki): leech extra da spell.
@@ -2923,8 +2948,9 @@ function tryUseRune(c, p, target, now, forcada) {
       if (typeof applyCharmDamage === "function") {
         dmg = applyCharmDamage(p, s.element, Math.max(1, dmg));
       }
-      dmg = applyMonsterMitigation(alvo, s.element,
-        applyResist(alvo, s.element, Math.max(1, dmg), playerPiercePct(p, s.element)));
+      dmg = unwelcomeAbsorbDeath(alvo, s.element,
+        applyMonsterMitigation(alvo, s.element,
+          applyResist(alvo, s.element, Math.max(1, dmg), playerPiercePct(p, s.element))), c);
       alvo.hp -= dmg;
       c.stats.damage += dmg;
       total += dmg;
@@ -4960,7 +4986,7 @@ function combatTick(c, p, dt, now) {
       const mob = c.mobs.find((m) => m.id === h.mobId);
       if (mob && mob.hp > 0 &&
           (typeof bossCanTakePlayerDamage !== "function" || bossCanTakePlayerDamage(c, mob))) {
-        const dmg = Math.max(1, h.dmg);
+        const dmg = unwelcomeAbsorbDeath(mob, h.el, Math.max(1, h.dmg), c);
         mob.hp -= dmg;
         c.stats.damage += dmg;
         c.events.push({ t: "hit", dmg: dmg, x: mob.x, y: mob.y, targetId:mob.id,

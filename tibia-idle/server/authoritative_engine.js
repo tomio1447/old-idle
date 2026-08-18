@@ -480,6 +480,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "the-dread-maiden-room":{monsters:["the-dread-maiden"]},
   "the-fear-feaster-room":{monsters:["the-fear-feaster"]},
   "the-unwelcome-room":{monsters:["the-unwelcome"]},
+  "the-pale-worm-room":{monsters:["the-pale-worm"]},
 });
 for(const slug of ["marapur-nagas","dt-seal"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
@@ -1816,6 +1817,22 @@ function applyOutgoingDamage(mob,element,dmg,now){
     return out;
   }
   if(mob&&(mob.greedImmune||mob.qteImmune))return 0;
+  // The Unwelcome: imune a death — cura 200% do dano de death que sofreria
+  // (pré-resistência). Espelho do cliente (combat.js unwelcomeAbsorbDeath).
+  if(mob&&mob.def&&mob.def.deathAbsorbs&&(element||"physical")==="death"&&dmg>0){
+    const cap=Number(mob.def.hp||mob.maxHp)||0;
+    const heal=cap>0?Math.min(dmg*2,Math.max(0,cap-mob.hp)):dmg*2;
+    if(heal>0){
+      mob.hp+=heal;
+      const auth=mob._auth||null;
+      if(auth){
+        auth.events=auth.events||[];
+        auth.events.push({t:"mobheal",heal,x:Number(mob.x)||.5,y:Number(mob.y)||.5,
+          targetId:String(mob.id||""),screen:true,absorb:1,ts:now||auth.clock||Date.now()});
+      }
+    }
+    return 0;
+  }
   let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
   if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
     out=Math.max(1,Math.floor(out*Number(mob.spiteDamageTakenMul)));
@@ -3354,6 +3371,17 @@ function tickEntityConditions(auth,alvo,kind,item){
       let dmg=Math.max(1,Math.floor(Number(co.dmg)||0));
       if(kind==="player"&&item&&def.el!=="agony")dmg=absorbMagicShield(auth,item,alvo,dmg,now,pos,def.el);
       if(dmg<=0)continue;
+      // The Unwelcome: DoT de death também é absorvido (imune + cura 200%).
+      if(kind!=="player"&&alvo&&alvo.def&&alvo.def.deathAbsorbs&&(def.el||"physical")==="death"){
+        const cap=Number(alvo.def.hp||alvo.maxHp)||0;
+        const heal=cap>0?Math.min(dmg*2,Math.max(0,cap-alvo.hp)):dmg*2;
+        if(heal>0){
+          alvo.hp+=heal;
+          auth.events.push({t:"mobheal",heal,x:pos.x,y:pos.y,
+            targetId:String(alvo.id),screen:true,absorb:1,ts:now});
+        }
+        continue;
+      }
       alvo.hp=Math.max(0,alvo.hp-dmg);
       if(kind==="player"){
         auth.events.push({t:"taken",dmg,el:def.el,fx:def.fx,condition:tipo,x:pos.x,y:pos.y,
@@ -3788,6 +3816,10 @@ function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!d
     damage:Math.max(0,Math.floor((Number(def.damage)||0)*(stacks?1+stacks*.08:1))),
     exp:Math.max(0,Math.floor((Number(def.exp)||0)*(stacks?1+stacks*.25:1))),
     attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def:useDef};
+  // Referência ao auth para eventos (mobheal do Unwelcome etc.) — NÃO
+  // enumerável: JSON.stringify do estado serializa mobs e um ciclo
+  // auth→mob→auth quebraria o save da instância.
+  Object.defineProperty(mob,"_auth",{value:auth,enumerable:false,writable:true,configurable:true});
   if(source&&Number(source.maxHp||source.hp)>0){
     const forced=Math.max(1,Math.floor(Number(source.maxHp||source.hp)));
     mob.hp=forced;mob.maxHp=forced;
@@ -6456,7 +6488,16 @@ function initializeAuthority(descriptor,instanceId,now){
       }
     }
     if(!boss)boss=auth.mobs[0];
-    if(boss)boss.boss=true;const leader=players[0]&&players[0].p;
+    if(boss)boss.boss=true;
+    // The Unwelcome (Feast of Souls): neutro em todos os elementos e imune
+    // a death (cura 200% do dano que sofreria) — mesmo def do cliente.
+    if(boss&&String(auth.bossId||"")==="the-unwelcome"){
+      boss.def=Object.assign({},boss.def,{
+        resist:{physical:0,energy:0,earth:0,fire:0,ice:0,holy:0,death:0,lifedrain:0,manadrain:0,drown:0},
+        deathAbsorbs:true,
+      });
+    }
+    const leader=players[0]&&players[0].p;
     if(leader&&auth.bossId){leader.bosses[auth.bossId]=leader.bosses[auth.bossId]||{};leader.bosses[auth.bossId].lastFight=auth.clock;}
     if(auth.bossId==="goshnar-s-megalomania"){
       auth.mega={bossSpawnAt:auth.clock+MEGA_BOSS_SPAWN_MS,bossSpawned:false,pendingBoss:null,
@@ -6726,7 +6767,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
   authorityStepDuration,advanceAuthorityMovement,
-  applyCondition,applyResist,applyMonsterMitigation,playerWeaponProfile,CONDITIONS,
+  applyCondition,applyResist,applyMonsterMitigation,applyOutgoingDamage,playerWeaponProfile,CONDITIONS,
   stanceTotals,stanceConvert,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
   imbAllowedCats,imbCombatTotals,tryChallenge,playerAttackInterval,addExp,syncPlayerProgress,
   consumeDistanceAmmo,tryUseRune,RUNEDATA,

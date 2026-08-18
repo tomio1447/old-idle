@@ -1193,6 +1193,30 @@ async function prepareInstanceState(db,acc,input){
       }
     }
   }
+  // Lobby Pale Worm: líder cria a sala com TODOS os chars do lobby (1–9
+  // contas), igual ao fluxo do Megalomania.
+  {
+    const paleCtrlEarly=typeof global.__PALE_LOBBY!=="undefined"?global.__PALE_LOBBY:null;
+    const paleLobbyEarly=paleCtrlEarly&&typeof paleCtrlEarly.getLobbyForAccount==="function"
+      ?paleCtrlEarly.getLobbyForAccount(acc.id):null;
+    if(paleLobbyEarly&&Number(paleLobbyEarly.leaderAccountId)===Number(acc.id)&&
+       String(bossId||"")==="the-pale-worm"&&
+       (paleLobbyEarly.status==="open"||paleLobbyEarly.status==="starting"||paleLobbyEarly.status==="fighting")){
+      const order=(paleLobbyEarly.slots||[]).filter(Boolean).map((s)=>Number(s.charId));
+      if(order.length){
+        const expanded=[];
+        for(const id of order){
+          const supplied=members.find((member)=>Number(member&&member.id)===id);
+          if(supplied)expanded.push(supplied);
+          else{
+            const row=await db.findCharacter(id);
+            if(row)expanded.push({id:String(id),p:{}});
+          }
+        }
+        if(expanded.length){members=expanded;input.members=members;}
+      }
+    }
+  }
   {
     const wbCtrlEarly=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
     if(isWorldBossBossId(bossId)&&wbCtrlEarly&&typeof wbCtrlEarly.joinedCharIds==="function"){
@@ -1211,7 +1235,8 @@ async function prepareInstanceState(db,acc,input){
       }
     }
   }
-  const maxMembers=isWorldBossBossId(bossId)?WORLD_BOSS_MAX_MEMBERS:5;
+  const maxMembers=isWorldBossBossId(bossId)?WORLD_BOSS_MAX_MEMBERS:
+    (String(bossId||"")==="the-pale-worm"?9:5);
   if(!members.length||members.length>maxMembers)return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros da instância inválidos"}}};
   const ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
@@ -1325,6 +1350,35 @@ async function prepareInstanceState(db,acc,input){
     }
   }
   const megaOk=megaRosterOk||megaContinueOk;
+  // Pale Worm: mesmo modelo de roster do Megalomania (1–9 contas).
+  const paleCtrl2=typeof global.__PALE_LOBBY!=="undefined"?global.__PALE_LOBBY:null;
+  const paleLobby2=paleCtrl2&&typeof paleCtrl2.getLobbyForAccount==="function"
+    ?paleCtrl2.getLobbyForAccount(acc.id):null;
+  const paleIds=paleLobby2
+    ?new Set((paleLobby2.slots||[]).filter(Boolean).map((s)=>Number(s.charId)))
+    :null;
+  const paleRosterOk=!!(paleLobby2&&paleIds&&ids.every((id)=>paleIds.has(Number(id)))&&
+    Number(paleLobby2.leaderAccountId)===Number(acc.id)&&
+    (paleLobby2.status==="open"||paleLobby2.status==="starting"||paleLobby2.status==="fighting"));
+  let paleContinueOk=false;
+  if(!paleRosterOk&&!party&&String(bossId||"")==="the-pale-worm"&&paleCtrl2){
+    const cur=await db.instanceGet(acc.id);
+    if(cur&&cur.status==="active"&&String(cur.boss_id||"")==="the-pale-worm"){
+      const curIds=instanceMemberIdSet(cur);
+      if(curIds&&ids.every((id)=>curIds.has(Number(id))))paleContinueOk=true;
+    }
+    if(!paleContinueOk){
+      const ownedLobby=typeof paleCtrl2.getLobbyByInstanceOwner==="function"
+        ?paleCtrl2.getLobbyByInstanceOwner(acc.id):null;
+      if(ownedLobby&&(ownedLobby.status==="fighting"||ownedLobby.status==="starting")){
+        const slotIds=new Set((ownedLobby.slots||[]).filter(Boolean).map((s)=>Number(s.charId)));
+        const curIds=cur&&cur.status==="active"?instanceMemberIdSet(cur):null;
+        if(ids.every((id)=>slotIds.has(Number(id))||(curIds&&curIds.has(Number(id)))))
+          paleContinueOk=true;
+      }
+    }
+  }
+  const paleOk=paleRosterOk||paleContinueOk;
   const wbCtrl=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
   const wbShare=wbCtrl&&typeof wbCtrl.sharedForAccount==="function"?wbCtrl.sharedForAccount(acc.id):null;
   const wbIds=wbCtrl&&typeof wbCtrl.joinedCharIds==="function"?new Set(wbCtrl.joinedCharIds().map(Number)):null;
@@ -1333,8 +1387,8 @@ async function prepareInstanceState(db,acc,input){
   // A instância pertence ao roster, não à conta individual. Portanto uma
   // party entre contas também precisa enviar líder + todos os membros na
   // mesma ordem; somente o personagem ativo precisa pertencer ao requester.
-  // Lobby Megalomania permite 1–5 contas sem Party. World Boss até 30.
-  if(!party&&!megaOk&&!worldBossOk&&rows.some((row)=>Number(row.account_id)!==Number(acc.id)))
+  // Lobby Megalomania permite 1–5 contas sem Party. Pale Worm 1–9. World Boss até 30.
+  if(!party&&!megaOk&&!paleOk&&!worldBossOk&&rows.some((row)=>Number(row.account_id)!==Number(acc.id)))
     return {error:{code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Instância solo contém personagem externo"}}};
   if(ids.length>1||party){
     if(worldBossOk){
@@ -1343,7 +1397,7 @@ async function prepareInstanceState(db,acc,input){
       if(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))
         return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
       partyId=Number(party.id);partyVersion=Number(party.roster_version);
-    }else if(!megaOk){
+    }else if(!megaOk&&!paleOk){
       return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
     }
   }
@@ -2843,6 +2897,21 @@ async function main() {
   });
   global.__MEGA_LOBBY=MEGA_LOBBY;
 
+  const { createPaleWormLobbyController }=require("./pale_worm_lobby");
+  const PALE_LOBBY=createPaleWormLobbyController({
+    getDb:()=>db,
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+    publishInstance:async(accountId,row)=>{
+      if(!row)return;
+      try{
+        await publishInstanceForRow(db,row,{
+          id:row.instance_id,version:Number(row.version)||1,status:row.status||"active",
+          source:"pale-takeover",holderId:""});
+      }catch(e){console.error("[pale-lobby] publish takeover:",e&&e.message);}
+    },
+  });
+  global.__PALE_LOBBY=PALE_LOBBY;
+
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
@@ -3487,6 +3556,162 @@ async function main() {
         MEGA_LOBBY.bindShare(lobby,String(body.instance_id),acc.id);
         await MEGA_LOBBY.markCharsUsed(db,MEGA_LOBBY.membersForStart(lobby));
         return send(res,200,{ok:true,lobby:MEGA_LOBBY.stateFor(acc.id).lobby});
+      }
+
+      /* -------- Pale Worm lobby (1–9 jogadores, 1 char cada) -------- */
+      if(req.method==="GET"&&url==="/api/pale-lobby/state"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const acc=await db.findAccountByToken(token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        return send(res,200,PALE_LOBBY.stateFor(acc.id));
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/create"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const character=await db.findCharacter(Number(body.char_id));
+        if(!character||Number(character.account_id)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Personagem inválido"});
+        const r=await PALE_LOBBY.createLobby(db,acc,character,{
+          inTemple:!!body.inTemple,playerName:body.playerName||character.name});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/invite"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PALE_LOBBY.invite(db,acc,body.invitee_name||body.name);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/accept"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const character=await db.findCharacter(Number(body.char_id));
+        if(!character||Number(character.account_id)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Personagem inválido"});
+        const r=await PALE_LOBBY.acceptInvite(db,acc,body.invite_id,character,{
+          inTemple:!!body.inTemple,playerName:body.playerName||character.name});
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/decline"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PALE_LOBBY.declineInvite(db,acc,body.invite_id);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/leave"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PALE_LOBBY.leave(db,acc);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/leave-fight"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        let r;
+        try{r=await PALE_LOBBY.leaveFight(db,acc);}
+        catch(e){
+          console.error("[pale-lobby] leave-fight:",e&&e.message);
+          return send(res,500,{ok:false,msg:"Falha ao sair da luta."});
+        }
+        // Último lutador saiu (morte/wipe): encerra a instância no servidor.
+        if(r&&r.body&&r.body.shouldEndInstance&&typeof db.instanceEndMegaOrphan==="function"){
+          try{
+            const ownerId=Number(r.body.ownerAccountId)||Number(acc.id);
+            const ended=await db.instanceEndMegaOrphan(ownerId,r.body.instanceId||null,"pale-lobby-empty");
+            if(ended&&ended.ok&&ended.instance){
+              r.body.instanceEnded=true;
+              try{
+                await publishInstanceForRow(db,ended.instance,{
+                  id:ended.instance.instance_id,version:Number(ended.instance.version)||1,
+                  status:"ended",terminalReason:"pale-lobby-empty",source:"pale-leave-fight",
+                  holderId:String(body.holder_id||"")});
+              }catch(pubErr){/* best-effort sync */}
+            }
+          }catch(e){
+            console.error("[pale-lobby] leave-fight end instance:",e&&e.message);
+          }
+        }
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/kick"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PALE_LOBBY.kick(db,acc,body.target_account_id);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/start"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const r=await PALE_LOBBY.start(db,acc);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/pale-lobby/bind"){
+        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const denied=await requireLease(db,acc,body);if(denied)return send(res,denied.code,denied.body);
+        const lobby=PALE_LOBBY.getLobbyForAccount(acc.id);
+        if(!lobby||Number(lobby.leaderAccountId)!==Number(acc.id))
+          return send(res,403,{ok:false,msg:"Só o líder vincula a instância"});
+        if(!body.instance_id)return send(res,400,{ok:false,msg:"instance_id obrigatório"});
+        const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+        // Expande membros ANTES do bindShare — convidados que carregam a
+        // instância compartilhada já precisam estar em authority.players.
+        try{
+          const row=await db.instanceGet(acc.id);
+          if(row&&row.state&&String(row.instance_id)===String(body.instance_id)){
+            let state=typeof row.state==="string"?JSON.parse(row.state):row.state;
+            if(state&&state.authority){
+              const auth=state.authority;
+              auth.players=auth.players||[];
+              const have=new Set(auth.players.map((p)=>Number(p.id)));
+              const memberIds=[];
+              for(const m of PALE_LOBBY.membersForStart(lobby)){
+                memberIds.push(Number(m.charId));
+                if(have.has(Number(m.charId)))continue;
+                const character=await db.findCharacter(m.charId);if(!character)continue;
+                let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+                data=Object.assign({},data,{id:String(character.id),name:character.name,voc:character.voc,level:Number(character.level)||1});
+                const ownerAcc=await db.findAccountById(character.account_id);
+                data.gold=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.gold)||0));
+                data.vipUntil=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.vip_until)||0));
+                data.accountId=Number(character.account_id);
+                if(Number(character.hp)>0)data.hp=Number(character.hp);
+                if(Number(character.mp)>=0)data.mp=Number(character.mp);
+                const leader=auth.players[0]||{};
+                auth.players.push({
+                  id:String(character.id),p:data,hp:data.hp,mp:data.mp,
+                  accountId:Number(character.account_id),
+                  x:Number(leader.x)||.5,y:Number(leader.y)||.6,
+                  cx:Number(leader.cx)||15,cy:Number(leader.cy)||16,dir:leader.dir||"n"
+                });
+                have.add(Number(m.charId));
+              }
+              state.members=auth.players.map((p)=>({id:p.id,p:p.p,hp:p.hp,mp:p.mp,accountId:p.accountId||(p.p&&p.p.accountId)}));
+              state=materializeAuthority(state);
+              const saved=await db.instanceSave(acc.id,row.instance_id,row.version,{
+                kind:row.kind,hunt_id:row.hunt_id,boss_id:row.boss_id,instance_mode:row.instance_mode,
+                party_id:row.party_id,party_version:row.party_version,
+                member_ids:memberIds.length?memberIds:auth.players.map((p)=>Number(p.id)),
+                active_character_id:Number(row.active_character_id)||Number(auth.players[0]&&auth.players[0].id),
+                saved_at:new Date(),started_at:row.started_at||new Date()
+              },JSON.stringify(state),lease);
+              if(saved&&saved.ok&&saved.instance){
+                await publishInstanceForRow(db,saved.instance,{
+                  id:saved.instance.instance_id,version:Number(saved.instance.version),
+                  status:saved.instance.status,source:"pale-bind",holderId:String(body.holder_id||"")
+                });
+              }else if(saved&&!saved.ok){
+                console.error("[pale-lobby] expand save failed:",saved.error);
+                return send(res,409,{ok:false,msg:"Falha ao expandir o roster da sala. Tente de novo.",
+                  error:saved.error});
+              }
+            }
+          }
+        }catch(e){
+          console.error("[pale-lobby] expand players:",e.message);
+          return send(res,500,{ok:false,msg:"Erro ao preparar a sala compartilhada."});
+        }
+        PALE_LOBBY.bindShare(lobby,String(body.instance_id),acc.id);
+        return send(res,200,{ok:true,lobby:PALE_LOBBY.stateFor(acc.id).lobby});
       }
       send(res, 404, { ok: false, msg: "Rota não encontrada" });
     } catch (e) {

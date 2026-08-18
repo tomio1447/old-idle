@@ -1475,6 +1475,10 @@ function bossReadyInfo(p, boss) {
       const ok = typeof soulwarHasAllBossTaints === "function" && soulwarHasAllBossTaints(p);
       if (!ok) return { ok: false, reason: boss.requirement.text, left: 0 };
     }
+    if (boss.requirement.killsRequired &&
+        !feastBossesKilled(p, boss.requirement.killsRequired)) {
+      return { ok: false, reason: boss.requirement.text, left: 0 };
+    }
     if (boss.requirement.access) {
       p.bossAccess = p.bossAccess || {};
       // Migração para personagens que já concluíram Mirrored Nightmare antes
@@ -1508,12 +1512,29 @@ function bossLootText(boss) {
     `${l.chance}% ${l.max > 1 ? "até " + l.max + "x " : ""}${itemName(l.item)}`);
 }
 
+/* The Pale Worm: matou os outros bosses listados no requirement? */
+function feastBossesKilled(p, ids) {
+  if (!p || !Array.isArray(ids)) return false;
+  for (const id of ids) {
+    const st = p.bosses && p.bosses[id];
+    if (!st || !(Number(st.kills) > 0)) return false;
+  }
+  return true;
+}
+
 function bossAccessChecklist(p, boss) {
   const req = boss && boss.requirement;
   if (!req) return [];
   const items = [];
   if (req.level)
     items.push({ ok: (p.level || 0) >= req.level, label: "Nível " + req.level + "+" });
+  if (req.killsRequired && Array.isArray(req.killsRequired)) {
+    for (const id of req.killsRequired) {
+      const st = p.bosses && p.bosses[id];
+      const name = (BOSS_DEFS[id] && BOSS_DEFS[id].name) || id;
+      items.push({ ok: !!(st && (Number(st.kills) > 0)), label: name });
+    }
+  }
   if (req.mission) {
     const def = MISSION_DEFS[req.mission];
     const title = def && def.title ? def.title.replace(/^Missão:\s*/i, "") : req.mission;
@@ -1566,7 +1587,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "FEAST OF SOULS",
     minLevel: 250,
-    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome"],
+    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "the-pale-worm"],
   },
   {
     title: "SOULWAR 400+",
@@ -1748,6 +1769,17 @@ function openBossModal(id) {
       toast("Lobby Megalomania indisponível. Recarregue a página.", "bad");
       return;
     }
+    // The Pale Worm: Fight sempre abre o lobby 1–9 (nunca combate direto).
+    if (id === "the-pale-worm") {
+      const openLobby = (typeof paleLobbyOpenFromBoss === "function" && paleLobbyOpenFromBoss) ||
+        (typeof window !== "undefined" && window.paleLobbyOpenFromBoss);
+      if (typeof openLobby === "function") {
+        openLobby();
+        return;
+      }
+      toast("Lobby do Pale Worm indisponível. Recarregue a página.", "bad");
+      return;
+    }
     startBoss(id);
   });
 }
@@ -1771,6 +1803,18 @@ function startBoss(id, force, arenaReady) {
       return;
     }
     toast("Lobby Megalomania indisponível. Recarregue a página.", "bad");
+    return;
+  }
+  // The Pale Worm: igual ao Megalomania — sempre passa pelo lobby 1–9.
+  if (id === "the-pale-worm" && !force && !window.__PALE_LOBBY_STARTING &&
+      !window.__PALE_LOBBY_FOLLOW) {
+    const openLobby = (typeof paleLobbyOpenFromBoss === "function" && paleLobbyOpenFromBoss) ||
+      (typeof window !== "undefined" && window.paleLobbyOpenFromBoss);
+    if (typeof openLobby === "function") {
+      openLobby();
+      return;
+    }
+    toast("Lobby do Pale Worm indisponível. Recarregue a página.", "bad");
     return;
   }
   if(!force&&G.foreignInstance){
@@ -2138,6 +2182,12 @@ function stopHunt(skipMapLoading, opts) {
   if (!opts.skipMegaLeave && typeof megaLobbyIsActiveFight === "function" && megaLobbyIsActiveFight(G.combat)) {
     if (typeof megaLobbyLeaveFight === "function") {
       megaLobbyLeaveFight().catch(() => {});
+    }
+  }
+  // Pale Worm: mesma ejeção de lobby ao voltar ao templo (morte/wipe).
+  if (!opts.skipMegaLeave && typeof paleLobbyIsActiveFight === "function" && paleLobbyIsActiveFight(G.combat)) {
+    if (typeof paleLobbyLeaveFight === "function") {
+      paleLobbyLeaveFight().catch(() => {});
     }
   }
   G.huntMapReady = true;
@@ -4151,6 +4201,12 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
       // Wipe/terminal: leave-fight encerra a sala; stopHunt abaixo já volta ao templo.
       megaLobbyLeaveFight().catch(()=>{});
     }else megaLobbyEjectDeadToTemple(previous);
+  }
+  // Pale Worm: idem (ejeção do lobby em morte/wipe).
+  if(typeof paleLobbyEjectDeadToTemple==="function"&&previous){
+    if(terminalReason){
+      paleLobbyLeaveFight().catch(()=>{});
+    }else paleLobbyEjectDeadToTemple(previous);
   }
   if(terminalReason){
     if(combatInstanceEntryPending())return true;

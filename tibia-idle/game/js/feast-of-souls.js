@@ -46,6 +46,20 @@ const FEAST_OF_SOULS_ROOMS = {
     spawn: { x: 1044, y: 1011, z: 7 },
     boss: { x: 1054, y: 1011, z: 7 },
   },
+  "the-pale-worm": {
+    otbm: "thepalewormroom",
+    name: "The Pale Worm's Room",
+    spawn: { x: 1041, y: 1010, z: 7 },
+    boss: { x: 1051, y: 1015, z: 7 },
+  },
+};
+
+/* The Unwelcome: neutro em TODOS os elementos (0%), exceto death — imune
+ * e CURA 200% do dano de death que sofreria (mecânica aplicada em
+ * combat.js / authoritative_engine.js via def.deathAbsorbs). */
+const FEAST_UNWELCOME_NEUTRAL_RESIST = {
+  physical: 0, energy: 0, earth: 0, fire: 0, ice: 0, holy: 0,
+  death: 0, lifedrain: 0, manadrain: 0, drown: 0,
 };
 
 (function registerFeastOfSouls() {
@@ -80,6 +94,10 @@ const FEAST_OF_SOULS_ROOMS = {
     "grimace":               { n: "grimace", s: null, t: "loot", cid: 32593, sell: 120000, npcSell: 120000, w: 0.6 },
     "amber-with-a-dragonfly":{ n: "amber with a dragonfly", s: null, t: "loot", cid: 32625, sell: 56000, npcSell: 56000, w: 1 },
     "bloody-tears":          { n: "bloody tears", s: null, t: "loot", cid: 32594, sell: 70000, npcSell: 70000, w: 0.2 },
+    // The Pale Worm (exclusivos)
+    "pale-worm-s-scalp":     { n: "pale worm's scalp", s: null, t: "loot", cid: 32598, sell: 489000, npcSell: 489000, w: 0.75 },
+    "spectral-scrap-of-cloth":{ n: "spectral scrap of cloth", s: null, t: "loot", cid: 32629, sell: 0, npcSell: 0, w: 3.5 },
+    "ghost-backpack":        { n: "ghost backpack", s: null, t: "loot", cid: 32620, sell: 0, npcSell: 0, w: 5 },
   };
   for (const slug in lootItems) {
     const def = lootItems[slug];
@@ -174,7 +192,35 @@ const FEAST_OF_SOULS_ROOMS = {
     armor: 10,
     defense: 15,
     speed: 0.00007,
+    // Neutro em todos os elementos (0%). Mecânica: imune a death e cura
+    // 200% do dano de death que sofreria (deathAbsorbs em combat.js/engine).
+    resist: FEAST_UNWELCOME_NEUTRAL_RESIST,
+    deathAbsorbs: true,
     requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
+    cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
+  };
+
+  /* The Pale Worm — último boss do Feast of Souls. Lobby 1–9 jogadores
+   * (pale-worm-lobby.js); acesso exige ter matado os outros 3. */
+  BOSS_DEFS["the-pale-worm"] = {
+    id: "the-pale-worm",
+    name: "The Pale Worm",
+    title: "Boss final Feast of Souls (lobby 1–9)",
+    hunt: "the-pale-worm-room",
+    baseMonster: "the-pale-worm",
+    sprite: "the-pale-worm",
+    hp: 420000,
+    exp: 30000,
+    damage: 1050,
+    armor: 150,
+    defense: 150,
+    speed: 0.00007,
+    requirement: {
+      level: 250,
+      enforced: true,
+      killsRequired: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome"],
+      text: "Mate The Dread Maiden, The Fear Feaster e The Unwelcome para acessar o Pale Worm",
+    },
     cooldown: FEAST_OF_SOULS_COOLDOWN_MS,
   };
 })();
