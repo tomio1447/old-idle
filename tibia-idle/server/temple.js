@@ -100,15 +100,32 @@ function createTemplePresence(opts) {
    * conta e nunca 403 para uma conta válida. */
   function resolveCharacter(db, accountId, charId) {
     const aid = Number(accountId);
-    const chars = db && typeof db.charactersOf === "function"
-      ? db.charactersOf(aid)
-      : (db && Array.isArray(db.characters)
-        ? db.characters.filter((c) => Number(c.account_id) === aid) : []);
-    if (!chars.length) return null;
+    const sameAccount = (c) => c &&
+      (String(c.account_id) === String(aid) || Number(c.account_id) === aid);
+    // 1) char_id explícito: findCharacter existe em qualquer backend e
+    //    tolera saves com account_id numérico ou string.
     if (charId) {
-      const hit = chars.find((c) => Number(c.id) === Number(charId));
-      if (hit) return hit;
+      try {
+        const hit = db && typeof db.findCharacter === "function"
+          ? db.findCharacter(Number(charId)) : null;
+        if (hit && sameAccount(hit)) return hit;
+      } catch (e) { /* backend sem findCharacter: segue para a listagem */ }
     }
+    // 2) listagem da conta (charactersOf), com fallback para o array bruto
+    //    e tolerância a tipos (dados antigos com account_id string).
+    let chars = [];
+    try {
+      if (db && typeof db.charactersOf === "function") chars = db.charactersOf(aid) || [];
+    } catch (e) { chars = []; }
+    if (!chars.length && db && Array.isArray(db.characters))
+      chars = db.characters.filter(sameAccount);
+    const seen = new Set();
+    chars = chars.filter((c) => {
+      const k = String(c && c.id);
+      if (!k || seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    if (!chars.length) return null;
     const inCity = chars.find((c) => String(c.zone || "").toLowerCase() === "city");
     if (inCity) return inCity;
     const byFresh = chars.slice().sort((a, b) =>
@@ -121,8 +138,11 @@ function createTemplePresence(opts) {
     if (!aid) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
     body = body || {};
     const character = resolveCharacter(db, aid, Number(body.char_id) || 0);
+    // Conta válida sem personagem nenhum: responde OK e PULA a presença.
+    // 404 aqui só gerava ruído no console do jogador (a VM logava a cada
+    // 30s) — presença é opcional, não é erro.
     if (!character)
-      return { code: 404, body: { ok: false, msg: "Conta sem personagens" } };
+      return { code: 200, body: { ok: true, skipped: "no-character", players: snapshotFor(aid) } };
     const prev = entries.get(aid), nowMs = Date.now();
     if (prev && nowMs - prev.updatedAt < HEARTBEAT_MIN_MS)
       return { code: 200, body: { ok: true, throttled: true, players: snapshotFor(aid) } };

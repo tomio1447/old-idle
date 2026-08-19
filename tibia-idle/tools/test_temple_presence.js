@@ -77,9 +77,21 @@ function fakeChar(id, accountId, over) {
   const char33 = snap11.find((pl) => pl.name && pl.name.indexOf("Char") === 0 && (pl.name === "Char3" || pl.name === "Char4"));
   must(char33 && char33.name === "Char3", "fallback deveria preferir o personagem na zona cidade");
 
-  // conta sem personagens -> 404 (nunca 403 para conta válida)
+  // conta sem personagens -> 200 ok com skipped (sem 404/ruído no console)
   const r5 = tp.heartbeat(db, { id: 99 }, { char_id: 3, x: 2, y: 2, dir: "w", moving: false });
-  must(r5.code === 404 && !r5.body.ok, "conta sem personagens deveria dar 404, não 403");
+  must(r5.code === 200 && r5.body.ok && r5.body.skipped === "no-character",
+    "conta sem personagens deveria responder ok/skipped, não 404");
+  must(tp.size() === 3, "conta sem personagens não pode criar presença");
+
+  // backend sem charactersOf (deploy com db antigo/diferente): char_id válido
+  // via findCharacter + account_id string (dados antigos) ainda funciona.
+  const db2 = {
+    chars: [{ id: 5, account_id: "11", name: "Char5", voc: "sorcerer", level: 9, zone: "unknown", updated_at: "2026-01-03T00:00:00Z", data: JSON.stringify({ sex: "male", outfit: {} }) }],
+    findCharacter(id) { return this.chars.find((c) => Number(c.id) === Number(id)) || null; },
+  };
+  const rLegacy = tp.heartbeat(db2, { id: 11 }, { char_id: 5, x: 1, y: 1, dir: "s", moving: false });
+  must(rLegacy.code === 200 && rLegacy.body.ok,
+    "findCharacter com account_id string deveria resolver (backend sem charactersOf)");
 
   // publish: broadcast para os presentes
   published.length = 0;
@@ -216,6 +228,16 @@ timers.forEach((fn) => fn());
 await flush();
 must(calls.length === 4 && calls[3].body.char_id === "1",
   "char_id válido da conta deveria ser mantido");
+
+// cache da conta VAZIO (conta sem personagens): heartbeat pula
+// silenciosamente — nada de 404 "Conta sem personagens" no console.
+cacheMode = [];
+ctx.G.walker.px = 384;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === 4, "com cache vazio o heartbeat não pode chamar o servidor");
+cacheMode = null;
 
 // sem token (pré-login) o heartbeat nem chama — nada de 401 em loop
 const beforeNoToken = calls.length;
