@@ -636,6 +636,49 @@ function accountDestroyLootPouchItem(token,charId,slug){
     return {ok:false,msg:r.data.msg||"Não foi possível destruir o item",code:r.code};
   });
 }
+/** Abre a Bag You Desire (online): remove 1 da pouch e sorteia 1 item Soul War
+ * para o Depot — a pouch é protected no PUT comum, sem API a bag "voltava". */
+function accountOpenBagYouDesire(token, charId) {
+  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  if (onlineCombat && ACCOUNT_INSTANCE.id && ACCOUNT_INSTANCE.status === "active") {
+    return accountQueueInstance(async () => {
+      if (!accountLeaseAllowsSimulation()) return { ok: false };
+      const body = Object.assign({ token, char_id: Number(charId),
+        instance_id: ACCOUNT_INSTANCE.id, expected_version: ACCOUNT_INSTANCE.version }, accountLeaseFields());
+      const r = await _api("POST", "/api/instance/open-bag-you-desire", body);
+      if (r.data.ok) {
+        accountInstanceApply(r.data.instance);
+        return { ok: true, item: r.data.item, state: r.data.instance && r.data.instance.state,
+          version: r.data.instance && r.data.instance.version };
+      }
+      if (r.code === 423) accountLeaseMarkLost(r.data.msg); if (r.data.instance) accountInstanceApply(r.data.instance);
+      return { ok: false, msg: r.data.msg || "Não foi possível abrir a Bag You Desire" };
+    });
+  }
+  return accountQueueSave(async () => {
+    if (!accountLeaseAllowsSimulation()) return { ok: false };
+    const id = String(charId || "");
+    const cache = await accountEnsureVersions(token, [id]);
+    const summary = cache.find((c) => String(c.id) === id);
+    const body = Object.assign({
+      token, char_id: Number(charId),
+      expected_version: Number(summary && summary.saveVersion) || 0,
+    }, accountLeaseFields());
+    const r = await _api("POST", "/api/pouch/open-bag-you-desire", body);
+    if (r.data.ok) {
+      if (r.data.character) accountMergeCharacterCache([r.data.character]);
+      if (typeof G !== "undefined" && G.p && String(G.p.id) === id) {
+        if (r.data.lootPouch) G.p.lootPouch = r.data.lootPouch || {};
+        if (r.data.depot) G.p.depot = r.data.depot || [];
+      }
+      return { ok: true, item: r.data.item, lootPouch: r.data.lootPouch, depot: r.data.depot,
+        saveVersion: r.data.saveVersion };
+    }
+    if (r.code === 423) accountLeaseMarkLost(r.data.msg);
+    if (r.code === 409) accountSaveConflict([id], r.data.characters || [], r.data.msg);
+    return { ok: false, msg: r.data.msg || "Não foi possível abrir a Bag You Desire", code: r.code };
+  });
+}
 function accountSellInstanceLootPouch(token,charId,slug){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};

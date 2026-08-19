@@ -2526,12 +2526,38 @@ function openPouchItemMenu(p, slug, x, y) {
       label: "Abrir",
       hint: "item Soul War aleatório → Depot",
       action: () => {
-        const item = typeof soulwarOpenBag === "function" ? soulwarOpenBag(p) : null;
-        if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
-        removeLootPouch(p, slug, 1);
-        addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
-        toast(`Bag aberta: <b>${itemName(item)}</b> foi para o Depot.`);
-        renderAll();
+        const openLocal = () => {
+          const depot = Array.isArray(p.depot) ? p.depot : [];
+          if (depot.length >= 30) { toast("Depot cheio (30 slots).", "bad"); return; }
+          const item = typeof soulwarOpenBag === "function" ? soulwarOpenBag(p) : null;
+          if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
+          removeLootPouch(p, slug, 1);
+          addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
+          toast(`Bag aberta: <b>${itemName(item)}</b> foi para o Depot.`);
+          renderAll();
+        };
+        // Conta online: lootPouch é protected no PUT — sem API a bag "volta"
+        // para a pouch no próximo estado do servidor (e o item duplica no depot).
+        if (typeof sessionToken === "function" && sessionToken() && p && p.id &&
+            typeof accountOpenBagYouDesire === "function") {
+          accountOpenBagYouDesire(sessionToken(), p.id).then((result) => {
+            if (result && result.ok) {
+              if (result.state && typeof applyOnlineAuthorityState === "function")
+                applyOnlineAuthorityState(result.state, null, result.version);
+              else if (result.lootPouch) {
+                p.lootPouch = result.lootPouch || {};
+                if (result.depot) p.depot = result.depot || [];
+              }
+              addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(result.item)}</b> no Depot.`);
+              toast(`Bag aberta: <b>${itemName(result.item)}</b> foi para o Depot.`);
+              renderAll();
+            } else {
+              toast((result && result.msg) || "Não foi possível abrir a bag.", "bad");
+            }
+          });
+          return;
+        }
+        openLocal();
       },
     }] : []),
     // equipavel? equipa direto da pouch (o antigo volta para a pouch)

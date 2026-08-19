@@ -44,7 +44,7 @@ const {
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
-  sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, setAuthAutoSupplyStash, setAuthLootConfig,
+  sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
@@ -1777,6 +1777,54 @@ async function clearInstanceLootPouch(db,body){
 
 /** Destroy um item da pouch (ou limpa via slug ausente só em clear). Em combate = instância;
  * na cidade grava o personagem (lootPouch é protected no PUT comum). */
+
+/** Abre a Bag You Desire com persistência autoritativa (instância ou cidade). */
+async function openBagYouDesire(db, body) {
+  const acc = await db.findAccountByToken(body.token); if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const denied = await requireLease(db, acc, body); if (denied) return denied;
+  const charId = Number(body.char_id);
+  if (!Number.isSafeInteger(charId) || charId <= 0)
+    return { code: 400, body: { ok: false, error: "INVALID_BAG_OPEN", msg: "Abertura da Bag You Desire inválida" } };
+  const character = await db.findCharacter(charId);
+  if (!character || Number(character.account_id) !== Number(acc.id))
+    return { code: 403, body: { ok: false, error: "INSTANCE_CHARACTER_NOT_OWNED", msg: "Personagem não pertence à conta" } };
+  const lease = { holderId: String(body.holder_id), secretHash: leaseHash(body.lease_token), now: Date.now() };
+  const resolved = await resolveInstanceRow(db, acc, charId); if (resolved.error) return resolved.error;
+  const row = resolved.row;
+  if (row && row.status === "active") {
+    const expected = Number(body.expected_version), instanceId = String(body.instance_id || "");
+    if (!Number.isSafeInteger(expected) || expected < 1 || !/^[a-f0-9]{64}$/.test(instanceId))
+      return { code: 400, body: { ok: false, error: "INVALID_BAG_OPEN", msg: "Instância inválida para abrir a bag" } };
+    if (String(row.instance_id) !== instanceId)
+      return { code: 409, body: { ok: false, error: "INSTANCE_NOT_ACTIVE", msg: "Instância ativa não encontrada" } };
+    let rejection = null, item = null;
+    const result = await db.instancePatchState(row.account_id, acc.id, instanceId, expected, (serialized) => {
+      let descriptor = null; try { descriptor = typeof serialized === "string" ? JSON.parse(serialized) : cloneJson(serialized); } catch (e) { return null; }
+      const entry = descriptor.authority && descriptor.authority.players &&
+        descriptor.authority.players.find((en) => String(en.id) === String(charId));
+      if (!entry || !entry.p) { rejection = "Personagem não participa desta instância"; return null; }
+      const r = openAuthBagYouDesire(entry.p);
+      if (!r.ok) { rejection = r.msg; return null; }
+      item = r.item;
+      descriptor = materializeAuthority(descriptor); return JSON.stringify(descriptor);
+    }, lease);
+    if (!result.ok) return { code: result.error === "LEASE_REQUIRED" ? 423 : result.error === "INSTANCE_PATCH_REJECTED" ? 400 : 409,
+      body: { ok: false, error: result.error, msg: rejection || "Não foi possível abrir a Bag You Desire",
+        instance: instanceSummary(result.instance, true) } };
+    await publishInstanceForRow(db, result.instance, { id: result.instance.instance_id, version: Number(result.instance.version),
+      status: result.instance.status, source: "bag-you-desire", holderId: String(body.holder_id || "") });
+    return { code: 200, body: { ok: true, item: item, instance: instanceSummary(result.instance, true) } };
+  }
+  let p = character.data; if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
+  p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
+  const r = openAuthBagYouDesire(p);
+  if (!r.ok) return { code: 400, body: { ok: false, error: "BAG_OPEN_FAILED", msg: r.msg } };
+  const persisted = await persistClaimedPlayer(db, acc, character, p, lease);
+  if (persisted.code !== 200) return persisted;
+  return { code: 200, body: Object.assign({}, persisted.body, { ok: true, item: r.item,
+    lootPouch: p.lootPouch || {}, depot: p.depot || [] }) };
+}
+
 async function destroyLootPouchItem(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
@@ -3086,6 +3134,10 @@ async function main() {
       if((req.method==="POST"&&url==="/api/instance/pouch-destroy")||
          (req.method==="POST"&&url==="/api/pouch/destroy")){
         const r=await destroyLootPouchItem(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if((req.method==="POST"&&url==="/api/instance/open-bag-you-desire")||
+         (req.method==="POST"&&url==="/api/pouch/open-bag-you-desire")){
+        const r=await openBagYouDesire(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/instance/pouch-sell"){
         const r=await sellInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);

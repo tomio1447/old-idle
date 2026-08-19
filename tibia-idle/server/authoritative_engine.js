@@ -1184,6 +1184,26 @@ function destroyAuthPouchItem(p,slug){
   delete p.lootPouch[slug];
   return count;
 }
+/** Pool oficial da Bag You Desire — sincronizado com window.soulwarOpenBag do
+ * cliente (soulwar.js). */
+const SOUL_BAG_POOL=["soulbastion","soulbleeder","soulcrusher","soulcutter","soulhexer",
+  "soulmaimer","soulpiercer","soulshredder","soulshroud","soulstrider","soulmantle",
+  "pair-of-soulwalkers","soulbiter","soulful-legs","soulshell"];
+/** Abre uma Bag You Desire: remove 1 da Loot Pouch e sorteia 1 item Soul War
+ * para o Depot (cap de 30 slots). */
+function openAuthBagYouDesire(p){
+  if(!p)return {ok:false,msg:"Personagem inválido"};
+  p.lootPouch=p.lootPouch||{};
+  const count=Math.max(0,Math.floor(Number(p.lootPouch["bag-you-desire"])||0));
+  if(count<=0)return {ok:false,msg:"Bag You Desire não encontrada na Loot Pouch"};
+  p.depot=Array.isArray(p.depot)?p.depot:[];
+  if(p.depot.length>=30)return {ok:false,msg:"Depot cheio (30 slots)"};
+  if(count<=1)delete p.lootPouch["bag-you-desire"];
+  else p.lootPouch["bag-you-desire"]=count-1;
+  const item=SOUL_BAG_POOL[Math.floor(Math.random()*SOUL_BAG_POOL.length)];
+  p.depot.push(item);
+  return {ok:true,item:item};
+}
 /** Itens que ocupam 1 slot/instância na bag (armas, armaduras…). */
 function authItemNeedsBagInstance(slug){
   const it=ITEMS[slug];
@@ -5368,6 +5388,16 @@ function huntWaveSize(auth){
 function spawnHuntWave(auth,now,opts){
   opts=opts||{};
   if(!auth||auth.kind==="boss"||auth.ended||auth.greed)return;
+  // Pool completo a cada onda: o pool inicial era montado só com os slugs da
+  // 1ª leva do cliente e ficava CONGELADO pelo resto da instância — monstro
+  // ausente da primeira leva (ex.: paladin-s-apparition na Mirrored
+  // Nightmare) nunca mais spawnava, mesmo estando na lista do hunt.
+  const hunt=HUNTS[auth.huntId];
+  if(hunt&&Array.isArray(hunt.monsters)){
+    for(const slug of hunt.monsters){
+      if(!auth.spawnPool.includes(slug)&&monsterDef(slug))auth.spawnPool.push(slug);
+    }
+  }
   const living=(auth.mobs||[]).filter((m)=>m&&m.hp>0);
   if(!opts.force&&(living.length||(auth.pendingSpawns&&auth.pendingSpawns.length)))return;
   auth.mobs=living;
@@ -6776,6 +6806,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
   normalizeVisualState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
+  spawnHuntWave,openAuthBagYouDesire,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
   authorityStepDuration,advanceAuthorityMovement,
