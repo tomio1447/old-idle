@@ -20,6 +20,9 @@ const TEMPLE_MP = {
   lastSig: "",
   timer: null,
   menu: null,
+  errorBackoffUntil: 0, // até quando NÃO tentar novo heartbeat (401/403)
+  errorCharId: "",
+  errorLogged: false,
 };
 
 const TEMPLE_MP_HB_MS = 1200;        // throttle do heartbeat por conta
@@ -27,6 +30,7 @@ const TEMPLE_MP_KEEPALIVE_MS = 4000; // parado, reenvia só para manter vivo
 const TEMPLE_MP_STALE_MS = 8000;     // sem snapshot -> some do mapa (TTL servidor)
 const TEMPLE_MP_LERP_MS = 380;       // suavização do passo remoto
 const TEMPLE_MP_MISS_LIMIT = 2;      // snapshots sem o jogador antes de remover
+const TEMPLE_MP_ERROR_BACKOFF_MS = 30000; // 401/403: 30s entre tentativas
 
 function templeMpApi(method, path, body) {
   const token = typeof sessionToken === "function" ? sessionToken() : "";
@@ -112,6 +116,19 @@ function templeMpLerp(pl, now) {
   return { x, y, moving: t < 1 ? true : !!pl.moving };
 }
 
+function templeMpCharId() {
+  // Fonte mais confiável = personagem carregado (G.p). Na VM, fluxos de
+  // auto-resume/troca de personagem podem deixar o sessionStorage vazio ou
+  // com id antigo, e o heartbeat mandava char_id errado (403 do servidor).
+  const gid = typeof G !== "undefined" && G && G.p && G.p.id;
+  if (gid !== undefined && gid !== null && String(gid) !== "") return gid;
+  if (typeof sessionCharId === "function") {
+    const s = sessionCharId();
+    if (s && String(s) !== "") return s;
+  }
+  return "";
+}
+
 async function templeMpHeartbeat(force) {
   if (!templeMpInTemple()) return;
   const now = Date.now();
@@ -119,21 +136,44 @@ async function templeMpHeartbeat(force) {
   const keepalive = now - TEMPLE_MP.lastHbAt >= TEMPLE_MP_KEEPALIVE_MS;
   if (!force && !keepalive && sig === TEMPLE_MP.lastSig) return; // parado
   if (!force && now - TEMPLE_MP.lastHbAt < TEMPLE_MP_HB_MS) return;
+  // Sem personagem confiável, não bate no servidor (evita 403 repetido).
+  const cid = templeMpCharId();
+  if (String(cid) === "" && !force) return;
+  // Erro de auth/personagem recente: espera antes de tentar de novo
+  // (o navegador logaria cada 403; com o backoff fica 1 por 30s no máximo).
+  if (!force && TEMPLE_MP.errorBackoffUntil > now) return;
+  if (String(cid) !== String(TEMPLE_MP.errorCharId)) {
+    TEMPLE_MP.errorBackoffUntil = 0;
+    TEMPLE_MP.errorCharId = String(cid);
+  }
   TEMPLE_MP.lastHbAt = now;
   TEMPLE_MP.lastSig = sig;
   const t = templeMpTile();
   const r = await templeMpApi("POST", "/api/temple/presence", {
-    char_id: typeof sessionCharId === "function" ? sessionCharId() : (G.p && G.p.id),
+    char_id: cid,
     x: t.x, y: t.y, dir: G.walker.dir || "s", moving: !!G.walker.moving,
   });
-  if (r && r.ok && Array.isArray(r.players)) templeMpApply(r.players);
+  if (r && r.ok && Array.isArray(r.players)) {
+    TEMPLE_MP.errorBackoffUntil = 0;
+    templeMpApply(r.players);
+  } else if (r && !r.ok) {
+    TEMPLE_MP.errorBackoffUntil = now + TEMPLE_MP_ERROR_BACKOFF_MS;
+    if (!TEMPLE_MP.errorLogged) {
+      TEMPLE_MP.errorLogged = true;
+      console.warn("[temple-mp] presença recusada:", r.msg || r.error || r.code, "— nova tentativa em", Math.round(TEMPLE_MP_ERROR_BACKOFF_MS / 1000) + "s");
+    }
+  }
 }
 
 /* Loop 1x/s: heartbeat quando está no templo, /leave quando saiu, prune. */
 function templeMpTick() {
   if (typeof G === "undefined" || !G) return;
   if (templeMpInTemple()) {
-    if (!TEMPLE_MP.inTemple) { TEMPLE_MP.inTemple = true; TEMPLE_MP.lastSig = ""; }
+    if (!TEMPLE_MP.inTemple) {
+      TEMPLE_MP.inTemple = true;
+      TEMPLE_MP.lastSig = "";
+      TEMPLE_MP.errorLogged = false;
+    }
     templeMpHeartbeat().catch(() => {});
   } else if (TEMPLE_MP.inTemple) {
     TEMPLE_MP.inTemple = false;

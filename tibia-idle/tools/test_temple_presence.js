@@ -87,7 +87,7 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 must(accountSrc.includes('if(type==="temple"){accountSyncDispatch("temple",data);return;}') &&
      accountSrc.includes('"mega-lobby","pale-lobby","temple","snapshot-required"'),
   "SSE do tipo temple não registrado no account-client");
-must(html.includes('js/temple-mp.js?v=temple-mp-v1') && html.includes("css/layout.css?v="),
+must(html.includes('js/temple-mp.js?v=temple-mp-v') && html.includes("css/layout.css?v="),
   "temple-mp.js ou cache-bust do CSS ausente no index");
 must(citySrc.includes("this.templeHit = []") && citySrc.includes("G.templePlayers.forEach") &&
      citySrc.includes("OutfitRenderer.forPlayer(fake"),
@@ -109,6 +109,7 @@ must(css.includes(".temple-player-menu {") && css.includes(".temple-player-menu-
 const calls = [];
 const timers = [];
 let templeListener = null;
+let fetchMode = "ok"; // "ok" | "denied"
 const ctx = {
   window: {
     location: { origin: "http://x" },
@@ -119,6 +120,7 @@ const ctx = {
   clearInterval() {},
   fetch: async (url, opts) => {
     calls.push({ url, body: opts && opts.body ? JSON.parse(opts.body) : null });
+    if (fetchMode === "denied") return { json: async () => ({ ok: false, code: 403, msg: "Personagem inválido" }) };
     // primeira resposta devolve um jogador; as seguintes, templo vazio
     const players = calls.length === 1
       ? [{ charId: 2, name: "Char2", voc: "druid", level: 90, sex: "female", outfit: { type: "druid" }, x: 4, y: 4, dir: "n", moving: false }]
@@ -126,7 +128,9 @@ const ctx = {
     return { json: async () => ({ ok: true, players }) };
   },
   sessionToken: () => "tok",
-  sessionCharId: () => "1",
+  // Simula a VM: sessão vazia (auto-resume/troca de char) — o char_id tem
+  // que vir do personagem carregado (G.p.id), senão o servidor devolve 403.
+  sessionCharId: () => "",
   accountApiUrl: () => "http://x",
   G: { inCity: true, p: { id: 1 }, walker: { px: 160, py: 160, dir: "s", moving: false }, combat: null, training: null },
   CITY: {},
@@ -134,6 +138,9 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(templeSrc, ctx, { filename: "temple-mp.js" });
+
+(async () => {
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 must(ctx.G.templePlayers && vm.runInContext("G.templePlayers instanceof Map", ctx),
   "G.templePlayers não é o Map de presença");
@@ -147,13 +154,38 @@ ctx.G.templePlayers.get("2").moveAt = Date.now() - 190;
 const pos = vm.runInContext("templeMpLerp(G.templePlayers.get('2'), Date.now())", ctx);
 must(pos.x >= 3 && pos.x <= 4, "lerp deveria caminhar até o alvo");
 
-// heartbeat via tick manual
+// heartbeat via tick manual — char_id vem de G.p.id (sessão vazia, caso VM)
 timers.forEach((fn) => fn()); // roda templeMpTick (inTemple)
+await flush();
 must(calls.length === 1 && calls[0].url === "http://x/api/temple/presence" &&
      calls[0].body.token === "tok" &&
      calls[0].body.x === 5 && calls[0].body.y === 5 && calls[0].body.dir === "s" &&
-     calls[0].body.char_id === "1",
-  "heartbeat não enviou token/posição/char corretos (tile 160/32=5)");
+     calls[0].body.char_id === 1,
+  "heartbeat não enviou token/posição/char corretos (char_id = G.p.id, tile 160/32=5)");
+
+// 403 (Personagem inválido): backoff — não fica batendo a cada tick
+fetchMode = "denied";
+ctx.G.walker.px = 192; // move (tile 6) para o heartbeat disparar
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn()); // tenta e falha (403)
+await flush();
+const afterDenied = calls.length;
+must(afterDenied === 2, "403 não gerou nova tentativa de heartbeat");
+must(vm.runInContext("TEMPLE_MP.errorBackoffUntil > Date.now()", ctx),
+  "403 não ativou o backoff");
+ctx.G.walker.px = 224;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === afterDenied, "403 sem backoff — heartbeat continuou batendo");
+vm.runInContext("TEMPLE_MP.errorBackoffUntil = 0", ctx); // backoff expira
+fetchMode = "ok";
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === afterDenied + 1, "heartbeat não voltou após o backoff");
 
 // sair do templo -> leave + limpa
 ctx.G.inCity = false;
@@ -175,5 +207,7 @@ must(vm.runInContext('templeMpVocName("druid")', ctx) === "Druid" &&
      vm.runInContext('templeMpVocName("knight")', ctx) === "Knight" &&
      vm.runInContext('templeMpVocName("monk")', ctx) === "Monk",
   "templeMpVocName errado");
+
+})().catch((e) => { console.error(e && e.message); process.exit(1); });
 
 console.log("ok: templo multijogador — heartbeat/leave/prune no servidor, snapshot->G.templePlayers, lerp e menu no cliente");
