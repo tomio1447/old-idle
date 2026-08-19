@@ -3963,3 +3963,35 @@ body.fullhd .scene-overlay { font-size: 13px; }
     border-right: 0; border-bottom: 1px solid #2a2620; padding-right: 0; padding-bottom: 8px;
   }
 }
+
+/* Presets do Helper: botões de troca rápida (até 5 por personagem) */
+#helper-presets { padding: 0; }
+.helper-presets-row {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  padding: 4px 6px; background: #17191e;
+  border-bottom: 1px solid #2c2b24;
+}
+.helper-preset-wrap {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid #3a372c; border-radius: 3px; overflow: hidden;
+}
+.helper-preset-wrap.active { border-color: var(--gold, #d4af37); }
+.helper-preset-btn {
+  background: #1d1c17; color: #c8c0a8; border: 0;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-wrap.active .helper-preset-btn { color: #ffe680; font-weight: bold; }
+.helper-preset-btn:hover { background: #26241c; }
+.helper-preset-del {
+  background: #1d1c17; color: #8a8270; border: 0;
+  border-left: 1px solid #3a372c; padding: 4px 5px;
+  font-size: 9px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-del:hover { color: #ff9090; background: #2a1a18; }
+.helper-preset-new {
+  margin-left: auto; background: transparent; color: #9ce84a;
+  border: 1px dashed #3a5a2e; border-radius: 3px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-new:hover { background: #1a2415; }
+.helper-preset-new:disabled { opacity: .45; cursor: not-allowed; }

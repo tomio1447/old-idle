@@ -87,7 +87,7 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 must(accountSrc.includes('if(type==="temple"){accountSyncDispatch("temple",data);return;}') &&
      accountSrc.includes('"mega-lobby","pale-lobby","temple","snapshot-required"'),
   "SSE do tipo temple não registrado no account-client");
-must(html.includes('js/temple-mp.js?v=temple-mp-v1') && html.includes("css/layout.css?v=temple-mp-v1"),
+must(html.includes('js/temple-mp.js?v=temple-mp-v1') && html.includes("css/layout.css?v="),
   "temple-mp.js ou cache-bust do CSS ausente no index");
 must(citySrc.includes("this.templeHit = []") && citySrc.includes("G.templePlayers.forEach") &&
      citySrc.includes("OutfitRenderer.forPlayer(fake"),

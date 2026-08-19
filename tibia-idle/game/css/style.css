@@ -2089,3 +2089,35 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .hunt-best-stat{display:flex;justify-content:space-between;padding:1px 4px;font-size:11px}.hunt-best-stat span{color:#c8c0a8}.hunt-best-stat b{color:#f0f0e8}.hunt-best-title{font-size:10px;font-weight:bold;text-align:left;margin:7px 2px 3px;color:#ded8c8}
 .hunt-best-res{height:16px;display:flex;align-items:center;gap:4px;font-size:10px}.hunt-best-res .resist-icon{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex:none}.hunt-best-res .resist-icon img{width:13px;height:13px;image-rendering:pixelated}.hunt-best-res .resist-val{width:40px;text-align:right;font-weight:bold;flex:none;font-variant-numeric:tabular-nums}.hunt-best-res i{height:6px;flex:1;background:#121212;border-radius:2px;overflow:hidden}.hunt-best-res b{height:100%;display:block;border-radius:2px}
 .hunt-best-loot{display:grid;grid-template-columns:repeat(4,32px);gap:4px;justify-content:center;margin-top:8px}.hunt-loot-slot{position:relative;width:30px;height:30px;background:#151515;border:1px solid #555;display:flex;align-items:center;justify-content:center;cursor:help}.hunt-loot-slot img{max-width:28px;max-height:28px;image-rendering:pixelated}.hunt-loot-slot .loot-chance{position:absolute;left:0;right:0;bottom:0;font-size:7px;line-height:1.2;text-align:center;color:#efe9d6;background:rgba(8,8,8,.85);padding:1px 0;pointer-events:none;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+
+/* Presets do Helper: botões de troca rápida (até 5 por personagem) */
+#helper-presets { padding: 0; }
+.helper-presets-row {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  padding: 4px 6px; background: #17191e;
+  border-bottom: 1px solid #2c2b24;
+}
+.helper-preset-wrap {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid #3a372c; border-radius: 3px; overflow: hidden;
+}
+.helper-preset-wrap.active { border-color: var(--gold, #d4af37); }
+.helper-preset-btn {
+  background: #1d1c17; color: #c8c0a8; border: 0;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-wrap.active .helper-preset-btn { color: #ffe680; font-weight: bold; }
+.helper-preset-btn:hover { background: #26241c; }
+.helper-preset-del {
+  background: #1d1c17; color: #8a8270; border: 0;
+  border-left: 1px solid #3a372c; padding: 4px 5px;
+  font-size: 9px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-del:hover { color: #ff9090; background: #2a1a18; }
+.helper-preset-new {
+  margin-left: auto; background: transparent; color: #9ce84a;
+  border: 1px dashed #3a5a2e; border-radius: 3px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; line-height: 1.2;
+}
+.helper-preset-new:hover { background: #1a2415; }
+.helper-preset-new:disabled { opacity: .45; cursor: not-allowed; }

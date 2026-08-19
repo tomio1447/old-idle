@@ -3019,6 +3019,7 @@ function renderHastePicker(p) {
 }
 
 function renderHelper(p) {
+  if (typeof renderHelperPresets === "function") renderHelperPresets(p);
   const healEl = $("#helper-heal");
   const magicEl = $("#helper-magic-shield");
   const equipHelperEl = $("#helper-equipment");
