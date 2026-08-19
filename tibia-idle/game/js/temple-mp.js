@@ -117,15 +117,16 @@ function templeMpLerp(pl, now) {
 }
 
 function templeMpCharId() {
-  // Fonte mais confiável = personagem carregado (G.p). Na VM, fluxos de
-  // auto-resume/troca de personagem podem deixar o sessionStorage vazio ou
-  // com id antigo, e o heartbeat mandava char_id errado (403 do servidor).
-  const gid = typeof G !== "undefined" && G && G.p && G.p.id;
-  if (gid !== undefined && gid !== null && String(gid) !== "") return gid;
+  // Prioridade = personagem ativo da sessão online (só é gravado numa
+  // entrada bem-sucedida); fallback = personagem carregado (G.p). Em
+  // auto-resume/troca bloqueada a sessão pode estar vazia E o G.p ser um
+  // save legado — nesse caso o servidor resolve pela conta (temple.js).
   if (typeof sessionCharId === "function") {
     const s = sessionCharId();
     if (s && String(s) !== "") return s;
   }
+  const gid = typeof G !== "undefined" && G && G.p && G.p.id;
+  if (gid !== undefined && gid !== null && String(gid) !== "") return gid;
   return "";
 }
 
@@ -136,7 +137,9 @@ async function templeMpHeartbeat(force) {
   const keepalive = now - TEMPLE_MP.lastHbAt >= TEMPLE_MP_KEEPALIVE_MS;
   if (!force && !keepalive && sig === TEMPLE_MP.lastSig) return; // parado
   if (!force && now - TEMPLE_MP.lastHbAt < TEMPLE_MP_HB_MS) return;
-  // Sem personagem confiável, não bate no servidor (evita 403 repetido).
+  // Sem token de sessão ou personagem, não bate no servidor (evita 401/403).
+  const token = typeof sessionToken === "function" ? sessionToken() : "";
+  if (!force && String(token) === "") return;
   const cid = templeMpCharId();
   if (String(cid) === "" && !force) return;
   // Erro de auth/personagem recente: espera antes de tentar de novo
