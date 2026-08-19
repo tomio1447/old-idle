@@ -6,10 +6,15 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "Templo multiplayer: veja outros jogadores na cidade, convide com clique",
+  "Presets do Helper: salve até 5 configurações e troque rapidamente",
+  "Feast of Souls: bosses The Dread Maiden, Fear Feaster, Unwelcome e Pale Worm",
+  "Loot Pouch com autoseller (5 min; VIP 2 min) e Sell All ajustado",
+  "Chance de drop sempre visível; Naga Katar (0.2%) e Cobra BO (1%)",
+  "Resists de boss com ícones/valores e tooltip de loot com nome + chance",
+  "Melee não ataca à distância; modais de hunts/bosses em abas",
   "STORE: compre Tibia Coins (Pix ou cartão), VIP e venda coins (beta)",
-  "Soul War: hunt Ebb and Flow",
-  "Soul War: Rooted na Rotten Wasteland",
-  "Soul War: Claustrophobic Inferno",
+  "Soul War: Ebb and Flow, Rotten Wasteland, Claustrophobic Inferno",
   "Bosses Soul War: Greed, Hatred, Spite e Malice",
 ];
 
