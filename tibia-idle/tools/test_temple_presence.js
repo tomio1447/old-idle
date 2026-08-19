@@ -110,6 +110,7 @@ function fakeChar(id, accountId, over) {
 const templeSrc = fs.readFileSync(path.join(js, "temple-mp.js"), "utf8");
 const citySrc = fs.readFileSync(path.join(js, "city-render.js"), "utf8");
 const renderSrc = fs.readFileSync(path.join(js, "render.js"), "utf8");
+const serverSrc = fs.readFileSync(path.join(__dirname, "..", "server", "server.js"), "utf8");
 const gameSrc = fs.readFileSync(path.join(js, "game.js"), "utf8");
 const accountSrc = fs.readFileSync(path.join(js, "account-client.js"), "utf8");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
@@ -118,6 +119,9 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 must(accountSrc.includes('if(type==="temple"){accountSyncDispatch("temple",data);return;}') &&
      accountSrc.includes('"mega-lobby","pale-lobby","temple","snapshot-required"'),
   "SSE do tipo temple não registrado no account-client");
+must(templeSrc.includes("let TEMPLE_MP_ENABLED = false") &&
+     serverSrc.includes("TEMPLE_PRESENCE_ENABLED=false"),
+  "templo multijogador deveria estar DESATIVADO por padrão (flags cliente+servidor)");
 must(html.includes('js/temple-mp.js?v=temple-mp-v') && html.includes("css/layout.css?v="),
   "temple-mp.js ou cache-bust do CSS ausente no index");
 must(citySrc.includes("this.templeHit = []") && citySrc.includes("G.templePlayers.forEach") &&
@@ -135,6 +139,31 @@ must(templeSrc.includes('"/api/temple/presence"') && templeSrc.includes('"/api/t
   "heartbeat/leave/SSE ausentes no temple-mp");
 must(css.includes(".temple-player-menu {") && css.includes(".temple-player-menu-item:hover"),
   "CSS do menu de interação ausente");
+
+/* ---------------- cliente: desativado por padrão = inerte ---------------- */
+{
+  const noCalls = [];
+  const noCtx = {
+    window: { location: { origin: "http://x" }, addEventListener() { throw new Error("listener não deveria registrar com flag off"); } },
+    document: undefined,
+    setInterval() { throw new Error("timer não deveria iniciar com flag off"); },
+    clearInterval() {},
+    fetch: async () => { noCalls.push(1); return { json: async () => ({ ok: true, players: [] }) }; },
+    sessionToken: () => "tok", sessionCharId: () => "1",
+    accountApiUrl: () => "http://x",
+    accountCharacterCacheRead: () => null,
+    G: { inCity: true, p: { id: 1 }, walker: { px: 160, py: 160, dir: "s", moving: false }, combat: null, training: null },
+    CITY: {}, console,
+  };
+  vm.createContext(noCtx);
+  vm.runInContext(templeSrc, noCtx, { filename: "temple-mp.js" });
+  // flag off: boot não registrou nada; tick não chama; players não anexado
+  vm.runInContext("templeMpTick()", noCtx);
+  must(noCalls.length === 0, "com flag off o tick não pode enviar heartbeat");
+  must(noCtx.G.templePlayers === undefined, "com flag off G.templePlayers não deve existir");
+  vm.runInContext("templeMpApply([{charId:2,name:'X',voc:'knight',level:1,sex:'male',outfit:{},x:1,y:1,dir:'s',moving:false}])", noCtx);
+  must(vm.runInContext("TEMPLE_MP.players.size", noCtx) === 0, "com flag off snapshots não devem popular players");
+}
 
 /* ---------------- cliente: lógica real em vm ---------------- */
 const calls = [];
@@ -173,6 +202,8 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext(templeSrc, ctx, { filename: "temple-mp.js" });
+// harness liga o flag e inicia o módulo (o jogo real nasce desativado)
+vm.runInContext("TEMPLE_MP_ENABLED = true; templeMpStart();", ctx);
 
 (async () => {
 const flush = () => new Promise((r) => setTimeout(r, 0));
