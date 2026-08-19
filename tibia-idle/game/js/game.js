@@ -2760,14 +2760,6 @@ function drainEvents() {
         renderStats(G.p);
         break;
       }
-      case "buff": {
-        // Forge buffs (Momentum/Transcendence/Onslaught/Ruse) do servidor
-        const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
-        r.addFloater(px, py - 0.10, e.nome + "!", "#ffe680", true);
-        r.addEffect(px, py, "magic-blue");
-        addLog("skill", `<b>${e.nome}</b> ativado!`);
-        break;
-      }
       case "cured":
         addLog("skill", `Curou <b>${e.nome}</b>.`);
         renderStats(G.p);
@@ -2809,17 +2801,15 @@ function drainEvents() {
       }
       case "buff": {
         addLog("skill", `Buff ativo: <b>${e.nome}</b>`);
-        // Momentum (helmet): redução de cooldowns
+        const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
+        // Momentum (helmet): ampulheta do Canary, sem texto flutuante
         if (e.nome === "Momentum") {
-          const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
-          const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
           r.addEffect(px, py, "momentum-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
           fdc.momentum = (fdc.momentum || 0) + 1;
           window.FORGE_DEBUG_COUNT = fdc;
         } else if (e.nome === "Transcendence") {
-          const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
-          const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.6);
           r.addFloater(px, py - 0.18, "AVATAR!", "#d79cff");
           const avatarFx = (typeof CLIENT_EFFECTS !== "undefined" && CLIENT_EFFECTS["avatar-effect"])
             ? "avatar-effect" : "magic-blue";
@@ -2834,6 +2824,11 @@ function drainEvents() {
               : null;
             avatarActivate((who && who.p) || G.p, Date.now());
           }
+        } else {
+          // Outros buffs (haste, utamo, etc): texto + efeito genérico
+          const sx = e.screen ? e.x : 0.13, sy = e.screen ? e.y : 0.6;
+          r.addFloater(sx, sy - 0.10, e.nome + "!", "#ffe680", true);
+          r.addEffect(sx, sy, "magic-blue");
         }
         break;
       }

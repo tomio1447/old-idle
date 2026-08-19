@@ -2533,7 +2533,8 @@ function openPouchItemMenu(p, slug, x, y) {
           if (!item) { toast("Não foi possível abrir a bag.", "bad"); return; }
           removeLootPouch(p, slug, 1);
           addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(item)}</b> no Depot.`);
-          toast(`Bag aberta: <b>${itemName(item)}</b> foi para o Depot.`);
+          const bagImg = typeof itemImg === "function" ? itemImg(item, 24) : "";
+          toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg}<span>Bag You Desire:<br><b>${itemName(item)}</b> no Depot</span></span>`, "rare");
           renderAll();
         };
         // Conta online: lootPouch é protected no PUT — sem API a bag "volta"
@@ -2549,7 +2550,8 @@ function openPouchItemMenu(p, slug, x, y) {
                 if (result.depot) p.depot = result.depot || [];
               }
               addLog("loot", `Abriu <b>Bag You Desire</b> e recebeu <b>${itemName(result.item)}</b> no Depot.`);
-              toast(`Bag aberta: <b>${itemName(result.item)}</b> foi para o Depot.`);
+              const bagImg2 = typeof itemImg === "function" ? itemImg(result.item, 24) : "";
+              toast(`<span style="display:flex;align-items:center;gap:6px">${bagImg2}<span>Bag You Desire:<br><b>${itemName(result.item)}</b> no Depot</span></span>`, "rare");
               renderAll();
             } else {
               toast((result && result.msg) || "Não foi possível abrir a bag.", "bad");
