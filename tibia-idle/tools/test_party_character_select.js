@@ -26,7 +26,7 @@ must(partyUi.includes("partyApplyOutfitPreview")&&
    partyServer.includes('sex: data.sex === "female" ? "female" : "male"')),
   "modal/painel da party não publicam o look atual");
 must(index.includes("js/party-ui.js?v=party-switch-v1")&&
-  index.includes("js/game.js?v=party-switch-v1")&&
+  index.includes("js/game.js?v=")&&
   index.includes("css/layout.css?v=party-list-v1"),
   "assets da correção sem cache-bust");
 

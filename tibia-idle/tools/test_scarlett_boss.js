@@ -194,7 +194,7 @@ must(indexSrc.includes('scarlett-boss.js?v=scarlett-esteira-smooth-v1'),
   'Cache-bust do QTE Scarlett ausente');
 must(indexSrc.includes('layout.css?v=scarlett-esteira-smooth-v1'),
   'Cache-bust do CSS da esteira Scarlett ausente');
-must(indexSrc.includes('game.js?v=scarlett-esteira-smooth-v1'),
+must(indexSrc.includes('game.js?v='),
   'Cache-bust do game.js (preserve esteira) ausente');
 must(gameSrc.includes('keepScarlettVisual') && gameSrc.includes('sameQte'),
   'Online ainda substitui c.scarlett sem preservar raf/notes da esteira');

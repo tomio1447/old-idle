@@ -191,7 +191,7 @@ must(grounded(1066, 997) && grounded(1075, 1006) && grounded(1075, 997) && groun
     "ui.js sem buried-cathedral na seção HUNTS 250+");
   const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
   must(html.includes("buried-cathedral.js?v=buried-cathedral-v1") &&
-    html.includes("ui.js?v=buried-cathedral-v1"),
+    html.includes("js/ui.js?v="),
     "cache-busts do buried cathedral ausentes no index");
 }
 

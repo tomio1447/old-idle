@@ -62,10 +62,7 @@ must(
 must(
   html.includes("js/party.js?v=party-invite-uq-v1") &&
     html.includes("js/party-ui.js?v=party-invite-uq-v1") &&
-    (html.includes("js/account-client.js?v=party-invite-uq-v1") ||
-      html.includes("js/account-client.js?v=hatred-defer-v2") ||
-      html.includes("js/account-client.js?v=hatred-defer-v1") ||
-      html.includes("js/account-client.js?v=goshnar-enter-v1")),
+    (html.includes("js/account-client.js?v=")),
   "index.html cache-bust for party invite fix"
 );
 

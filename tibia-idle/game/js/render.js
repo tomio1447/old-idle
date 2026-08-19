@@ -153,7 +153,7 @@ function drawMonsterSprite(ctx, img, x, y, w, h) {
  * atualizar uma sprite no repositorio nao chegava em quem ja tinha aberto o
  * jogo — a arte antiga continuava aparecendo ate limpar o cache na mao.
  * Subir esse numero a cada lote de sprites novas forca o download. */
-const ASSET_VERSION = "51";
+const ASSET_VERSION = "52";
 /* Teto absoluto de vida visual: strip/meta errado ou dt travado nunca
  * pode deixar magia/areafx/fala grudados no canvas. */
 const FX_MAX_LIFE_MS = 2800;

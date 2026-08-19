@@ -3892,7 +3892,9 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     "stepT","stepDur","speedPts","walkFrames","_walkFramesSlug","nextStepAt","attackAnim","target",
     "path","pathIndex","moveFrom","moveTo","moveProgress","speech"];
   const entityId=(ent)=>String(ent&&(ent.id!==undefined?ent.id:(ent.p&&ent.p.id))||"");
-  const localActiveId=entityId(previous.player),previousPlayers=Array.isArray(previous.players)?previous.players:[],
+  const localActiveId=entityId(previous.player),
+    previousPlayers=Array.isArray(previous.players)&&previous.players.length?previous.players:
+      (previous.player&&previous.player.p?[previous.player]:[]),
     previousMobs=Array.isArray(previous.mobs)?previous.mobs:[];
   // Não passe por restoreCombatSessionState/normalizePlayer a cada segundo:
   // isso clona saves enormes (lootPouch/missões) e congela a aba. O nested

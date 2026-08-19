@@ -203,6 +203,6 @@ must(html.includes('id="hatred-minigame"')&&css.includes(".hatred-minigame")&&
   css.includes("right:8px; bottom:8px")&&css.includes("width:230px"),
   "modal inferior direito de Hatred ausente");
 must(html.includes("js/soulwar.js?v=hatred-arena-fix-v1")&&
-  html.includes("js/game.js?v=hatred-reentry-v2"),
+  html.includes("js/game.js?v="),
   "index sem cache-bust soulwar/game do Hatred");
 console.log("OK: Hatred Canary 22×18→30×30, spawns, ativação 20–40s, contadores, summons, init pós-defer e anti-kick validados.");

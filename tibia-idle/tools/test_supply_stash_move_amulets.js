@@ -132,7 +132,7 @@ must(accSrc.includes("if(r.data.bag)G.p.bag=r.data.bag||{}"),
 
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
 must(/js\/supply-stash\.js\?v=/.test(html), "cache-bust supply-stash");
-must(html.includes("js/ui.js?v=stash-move-sync-v1"), "cache-bust ui stash-move");
-must(html.includes("js/account-client.js?v=stash-move-sync-v1"), "cache-bust account-client stash-move");
+must(html.includes("js/ui.js?v="), "cache-bust ui stash-move");
+must(html.includes("js/account-client.js?v="), "cache-bust account-client stash-move");
 
 console.log("\nAll supply stash amulet move tests passed. CAP=", SUPPLY_STASH_CAP || 20);

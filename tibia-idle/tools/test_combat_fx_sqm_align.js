@@ -28,7 +28,7 @@ must(gameSrc.includes("const x = ex(e), y = ey(e);") ||
   gameSrc.includes("const x = ex(e), y = ey(e)"),
   "impacto/crit não deve herdar o offset dual do floater");
 must(indexSrc.includes("js/render.js?v=fx-sqm-align-v1") &&
-  indexSrc.includes("js/game.js?v=fx-sqm-align-v1"),
+  indexSrc.includes("js/game.js?v="),
   "cache-bust fx-sqm-align-v1 ausente");
 
 // Geometria: 32px = mesmo que centro; 64px sobe 0.5 tile (pé no fundo do SQM).

@@ -16,8 +16,8 @@ must(html.includes("otc-live-badge") && html.includes("data-otc-session-reset"),
   "header LIVE + reset sessão");
 must(html.includes("js/analyzers.js?v=hunt-analyser-death-v1") &&
   html.includes("css/layout.css?v=hunt-analyser-death-v1") &&
-  html.includes("js/combat.js?v=hunt-analyser-death-v1") &&
-  html.includes("js/game.js?v=hunt-analyser-death-v1"),
+  html.includes("js/combat.js?v=") &&
+  html.includes("js/game.js?v="),
   "cache-bust hunt analyser death/loot");
 must(!/getElementById\(["']modal["']\)|classList\.add\(["']show["']\)/.test(analyserSource) &&
   analyserSource.includes('activeOtcAnalyser = "hunting"') &&

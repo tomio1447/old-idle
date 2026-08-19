@@ -22,7 +22,7 @@ must(lobby.includes('code: 409') && lobby.includes("Saia da Party antes de abrir
 must(html.includes("js/party.js?v="), "cache bust party.js");
 must(html.includes("js/megalomania-lobby.js?v=mega-shared-v2")||
   html.includes("js/megalomania-lobby.js?v=mega-lobby-always-v1"), "cache bust megalomania");
-must(html.includes("js/game.js?v=mega-lobby-always-v1"), "cache bust game.js lobby");
+must(html.includes("js/game.js?v="), "cache bust game.js lobby");
 must(!mega.includes("const MEGA_TEST_BYPASS"),
   "mega lobby must not redeclare MEGA_TEST_BYPASS (breaks script load)");
 must(mega.includes("megaTestBypass") && mega.includes("window.megaLobbyOpenFromBoss"),

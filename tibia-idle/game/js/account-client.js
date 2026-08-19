@@ -413,11 +413,13 @@ function accountAuthorityVisualState(){
   const combat=typeof G!=="undefined"&&G&&G.combat;if(!combat)return null;
   const gw=Number(combat.gridW)||(typeof GRID_W!=="undefined"?GRID_W:30);
   const gh=Number(combat.gridH)||(typeof GRID_H!=="undefined"?GRID_H:30);
-  const collect=(list,limit)=>{
+  const collect=(list,limit,kind)=>{
     const out=[];
     for(const ent of Array.isArray(list)?list:[]){
       if(!ent||out.length>=limit)break;
-      const id=String(ent.id!==undefined?ent.id:(ent.p&&ent.p.id)||"");
+      const liveP=ent.p||(typeof G!=="undefined"&&G&&G.combat&&G.combat.player===ent&&G.p)||null;
+      const id=String(ent.id!==undefined&&ent.id!==null&&ent.id!==""?ent.id:
+        (liveP&&liveP.id)||(typeof G!=="undefined"&&G&&G.p&&G.p.id)||"");
       if(ent.x===null||ent.x===undefined||ent.y===null||ent.y===undefined)continue;
       const x=Number(ent.x),y=Number(ent.y);if(!id||!Number.isFinite(x)||!Number.isFinite(y))continue;
       const visual={id,x,y},cx=ent.cx===null||ent.cx===undefined?NaN:Number(ent.cx),
@@ -427,26 +429,28 @@ function accountAuthorityVisualState(){
       if(Number.isFinite(visual.cx)&&gw>0)visual.x=(visual.cx+.5)/gw;
       if(Number.isFinite(visual.cy)&&gh>0)visual.y=(visual.cy+.5)/gh;
       const activeId=typeof sessionCharId==="function"?String(sessionCharId()||""):"";
-      const isSelf=!activeId||id===activeId;
-      if(isSelf&&ent.p&&ent.p.config&&Array.isArray(ent.p.config.combo))visual.combo=ent.p.config.combo;
-      if(isSelf&&ent.p&&ent.p.stances&&typeof ent.p.stances==="object")visual.stances=ent.p.stances;
+      const isSelf=kind==="player"&&(!activeId||id===activeId||
+        (typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id));
+      const cfgSrc=isSelf&&liveP&&liveP.config?liveP:(isSelf&&typeof G!=="undefined"&&G&&G.p&&G.p.config?G.p:null);
+      if(isSelf&&cfgSrc&&cfgSrc.config&&Array.isArray(cfgSrc.config.combo))visual.combo=cfgSrc.config.combo;
+      if(isSelf&&cfgSrc&&cfgSrc.stances&&typeof cfgSrc.stances==="object")visual.stances=cfgSrc.stances;
       /* Envia as demais configurações do Helper a cada tick para que mudanças
        * durante o combate online passem a valer na autoridade sem precisar
        * sair para o templo. Campos já transmitidos por combo/stances/challenge
        * são omitidos para evitar conflito/sanitização duplicada. */
-      if(isSelf&&ent.p&&ent.p.config&&typeof HELPER_PRESET_CONFIG_FIELDS!=="undefined"&&
+      if(isSelf&&cfgSrc&&cfgSrc.config&&typeof HELPER_PRESET_CONFIG_FIELDS!=="undefined"&&
          typeof helperPresetClone==="function"){
         const cfg={},skip={combo:1,stances:1,autoWalk:1,attackMode:1,kiteDistance:1,
           exetaRes:1,exetaAmpRes:1};
         for(const k of HELPER_PRESET_CONFIG_FIELDS){
           if(skip[k])continue;
-          if(ent.p.config[k]!==undefined)cfg[k]=helperPresetClone(ent.p.config[k]);
+          if(cfgSrc.config[k]!==undefined)cfg[k]=helperPresetClone(cfgSrc.config[k]);
         }
         if(Object.keys(cfg).length)visual.cfg=cfg;
       }
-      if(ent.p&&ent.p.config){
-        const mode=ent.p.config.attackMode||(combat&&combat.huntMode)||"kiting";
-        visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(ent.p):ent.p.config.autoWalk!==false;
+      if(cfgSrc&&cfgSrc.config){
+        const mode=cfgSrc.config.attackMode||(combat&&combat.huntMode)||"kiting";
+        visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(cfgSrc):cfgSrc.config.autoWalk!==false;
         if(typeof vipManualControlAllowed==="function"&&!vipManualControlAllowed()){
           visual.autoWalk=true;
         }
@@ -463,17 +467,17 @@ function accountAuthorityVisualState(){
         }
         if(!visual.autoWalk&&isSelf&&dir)visual.walkIntent={dx:dir.dx,dy:dir.dy};
         visual.challenge={
-          res:!!ent.p.config.exetaRes,amp:!!ent.p.config.exetaAmpRes,
+          res:!!cfgSrc.config.exetaRes,amp:!!cfgSrc.config.exetaAmpRes,
           box:mode==="box",
           huntMode:mode==="box"||mode==="safe"||mode==="kiting"?mode:"kiting",
-          kiteDistance:Math.max(1,Math.min(5,Number(ent.p.config.kiteDistance)||3))};
+          kiteDistance:Math.max(1,Math.min(5,Number(cfgSrc.config.kiteDistance)||3))};
       }
       out.push(visual);
     }
     return out;
   };
   const players=Array.isArray(combat.players)&&combat.players.length?combat.players:(combat.player?[combat.player]:[]);
-  const out={players:collect(players,8),mobs:collect(combat.mobs,64)};
+  const out={players:collect(players,8,"player"),mobs:collect(combat.mobs,64,"mob")};
   if(combat._scarlettPendingDir){
     const intent={dir:String(combat._scarlettPendingDir)};
     const pressAuth=Number(combat._scarlettPendingPressAuth);

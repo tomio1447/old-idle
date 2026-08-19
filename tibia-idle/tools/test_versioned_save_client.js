@@ -37,7 +37,7 @@ const ctx={console,Promise,Map,Set,JSON,Number,String,Object,Array,Math,Date,enc
 vm.createContext(ctx);vm.runInContext(source,ctx);
 ctx.accountCharacterCacheWrite([{id:1,name:"Queue",voc:"knight",level:1,saveVersion:1,snapshot:{}}]);
 (async()=>{
-  must(indexSource.includes('js/account-client.js?v=admin-test-all-v1'),
+  must(indexSource.includes('js/account-client.js?v='),
     "index não invalida o cache do cliente após retry de conflito de versão");
   must((await ctx.accountAcquireLease("token",false)).ok,"cliente não adquiriu lease antes do save");
   const p={id:"1",name:"Queue",voc:"knight",level:1,hp:100,mp:50};

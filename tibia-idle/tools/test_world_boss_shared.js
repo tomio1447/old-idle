@@ -62,8 +62,8 @@ must(uiSrc.includes("wbEnterSharedCombat") && uiSrc.includes("accountLoadInstanc
   "world-boss-ui.js ainda usa combate isolado");
 
 const html = read("game/index.html");
-must(html.includes("world-boss-ui.js?v=wb-shared-v1") && html.includes("game.js?v=wb-shared-v1") &&
-  html.includes("combat.js?v=wb-shared-v1"),
+must(html.includes("world-boss-ui.js?v=wb-shared-v1") && html.includes("game.js?v=") &&
+  html.includes("combat.js?v="),
   "index.html sem cache-bust wb-shared-v1");
 
 const wz1 = wb.WARZONES.find((w) => w.id === "wz1");

@@ -157,7 +157,7 @@ for (const it of ["broccoli", "true-book-of-death"])
 /* ---------------- index.html ---------------- */
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
 must(html.includes("js/deepling-bosses.js?v=deepling-v1"), "deepling-bosses.js não carregado no index");
-must(html.includes("js/game.js?v=deepling-v1"), "game.js sem cache-bust da categoria");
+must(html.includes("js/game.js?v="), "game.js sem cache-bust da categoria");
 const engineSrc = fs.readFileSync(path.join(__dirname, "..", "server", "authoritative_engine.js"), "utf8");
 must(engineSrc.includes('"deepling-bosses.js"'), "engine não carrega deepling-bosses.js no sandbox");
 

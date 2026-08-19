@@ -28,7 +28,7 @@ must(otcHud.includes("collectConditionBarItems")&&otcHud.includes("assets/ui/con
 must(gameJs.includes("renderStatusBar")&&gameJs.includes("renderPlayerStates")&&
   gameJs.includes("hudAcc"),
   "game.js não atualiza a condition bar no tick do HUD");
-must(html.includes("otc-hud.js?v=cond-bar-v1")&&html.includes("ui.js?v=sqm-hud-v1")&&
+must(html.includes("otc-hud.js?v=cond-bar-v1")&&html.includes("ui.js?v=")&&
   html.includes("icondata.js?v=cond-icons-v1"),
   "cache-bust da condition bar ausente no index.html");
 

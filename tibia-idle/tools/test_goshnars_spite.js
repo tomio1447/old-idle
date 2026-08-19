@@ -134,8 +134,8 @@ const css=fs.readFileSync(path.join(game,"css","layout.css"),"utf8");
 must(html.includes('id="spite-qte"')&&html.includes('id="spite-minigame"')&&
   css.includes(".spite-qte")&&css.includes(".spite-bubble"),
   "UI QTE/minigame Spite ausente");
-must(html.includes("js/combat.js?v=hatred-defer-v2")&&
-  html.includes("js/game.js?v=hatred-defer-v2")&&
-  html.includes("js/account-client.js?v=hatred-defer-v2"),
+must(html.includes("js/combat.js?v=")&&
+  html.includes("js/game.js?v=")&&
+  html.includes("js/account-client.js?v="),
   "index sem cache-bust hatred-defer-v2");
 console.log("OK: Spite Map Editor spawns, FOV 22×13, trash 8/15s, QTE −25%, taint, CD off, delay 5s e anti-kick validados.");

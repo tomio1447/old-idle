@@ -119,9 +119,39 @@ function helperPresetApply(p, preset) {
     else fail++;
   }
   p.helperActivePreset = preset.id;
+  helperSyncLiveCombat(p);
   let msg = `Preset <b>${helperPresetEsc(preset.name)}</b> aplicado.`;
   if (fail) msg += ` ${fail} stance(s) não ativaram (mana/cooldown).`;
   return msg;
+}
+
+/* Empurra o Helper atual para a instância em curso: o combate online
+ * clona o personagem na entrada, então mudar p.config no painel não
+ * alterava huntMode nem o ponteiro combat.player.p até um PUT novo. */
+function helperSyncLiveCombat(p) {
+  if (!p || typeof G === "undefined" || !G || !G.combat) return;
+  const c = G.combat;
+  const sameId = (ent) => {
+    if (!ent) return false;
+    if (p.id == null) return ent === c.player;
+    const eid = ent.id != null ? ent.id : (ent.p && ent.p.id);
+    return eid != null && String(eid) === String(p.id);
+  };
+  if (Array.isArray(c.players)) {
+    for (const ent of c.players) {
+      if (sameId(ent)) {
+        ent.p = p;
+        if (p.id != null) ent.id = p.id;
+      }
+    }
+  }
+  if (c.player && (sameId(c.player) || !c.player.p || c.player.p === p)) {
+    c.player.p = p;
+    if (p.id != null) c.player.id = p.id;
+  }
+  const mode = p.config && String(p.config.attackMode || "");
+  if (mode === "box" || mode === "safe") c.huntMode = mode;
+  else if (c.huntMode === "box" || c.huntMode === "safe") c.huntMode = "";
 }
 
 /* Novo preset a partir da configuração ATUAL do Helper. */
@@ -154,6 +184,7 @@ function renderHelperPresets(p) {
   const el = document.getElementById("helper-presets");
   if (!el || !p) return;
   helperPresetSyncActive(p);
+  helperSyncLiveCombat(p);
   const list = helperPresetsOf(p);
   const active = p.helperActivePreset;
   el.innerHTML = `<div class="helper-presets-row">` +

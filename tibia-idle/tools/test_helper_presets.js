@@ -21,12 +21,13 @@ const css = fs.readFileSync(path.join(game, "css", "layout.css"), "utf8");
 
 /* ---------------- estático ---------------- */
 must(html.includes('id="helper-presets"') &&
-     html.includes('js/helper-presets.js?v=helper-presets-v1'),
+     html.includes('js/helper-presets.js?v=helper-live-v1'),
   "container/script dos presets ausente no index");
 must(html.includes("css/layout.css?v=helper-presets-v1"),
   "cache-bust do CSS dos presets ausente");
-must(ui.includes('if (typeof renderHelperPresets === "function") renderHelperPresets(p);'),
-  "renderHelper não renderiza a barra de presets");
+must(ui.includes('if (typeof helperSyncLiveCombat === "function") helperSyncLiveCombat(p);') &&
+     ui.includes('if (typeof renderHelperPresets === "function") renderHelperPresets(p);'),
+  "renderHelper não sincroniza o Helper na instância nem renderiza a barra de presets");
 must(css.includes(".helper-presets-row") && css.includes(".helper-preset-new") &&
      css.includes(".helper-preset-del"),
   "CSS da barra de presets ausente");
@@ -47,6 +48,7 @@ const ctx = {
   save: () => { saved++; },
   renderHelper: () => { rendered++; },
   renderStats: () => {}, renderStanceBadge: () => {},
+  G: { combat: { huntMode: "box", player: { id: "1", p: null } } },
   toggleStance: (p, id) => {
     stanceCalls.push(id);
     if (id === "stance-fail") return false;       // simula mana/cooldown
@@ -122,6 +124,16 @@ must(stanceCalls.indexOf("stance-a") !== -1 && stanceCalls.indexOf("stance-fail"
 must(msg.indexOf("não ativaram") !== -1, "aviso de stance falha ausente");
 must(!("lang" in p.config) || p.config.lang === "pt", "apply mexeu em campo fora do preset");
 
+// 3b) apply/sync live: huntMode e ponteiro combat.player.p atualizam na hora
+must(ctx.G.combat.huntMode === "box", "apply box não atualizou huntMode da instância");
+p.config.attackMode = "kiting";
+vm.runInContext("helperSyncLiveCombat(this.p)", Object.assign(ctx, { p }));
+must(ctx.G.combat.huntMode === "", "trocar para kiting deveria limpar huntMode da instância");
+must(ctx.G.combat.player.p === p, "combat.player.p deveria apontar para o save vivo");
+p.config.attackMode = "box";
+vm.runInContext("helperSyncLiveCombat(this.p)", Object.assign(ctx, { p }));
+must(ctx.G.combat.huntMode === "box", "voltar para box deveria restaurar huntMode");
+
 // 4) máximo de 5 presets
 let p2 = mkPlayer();
 for (let i = 0; i < 5; i++) {
@@ -165,4 +177,35 @@ vm.runInContext('helperPresetCreate(this.p, "A1")', Object.assign(ctx, { p: pA }
 must(pA.helperPresets.length === 1 && !(pB.helperPresets && pB.helperPresets.length),
   "presets não são por personagem");
 
-console.log("ok: presets do Helper — criar/aplicar/sincronizar/apagar, limite de 5, por personagem, stances best-effort e barra com New preset");
+/* Autoridade: cfg + challenge kiting no mesmo tick, sem PUT de instância. */
+{
+  const engine = require("../server/authoritative_engine");
+  const pAuth = {
+    id: "1", name: "Live", voc: "knight", level: 100, hp: 2000, mp: 500, gold: 0,
+    skills: { sword: 80, axe: 10, club: 10, dist: 10, fist: 10, shield: 50 },
+    equip: {}, supplies: {}, lootPouch: {}, kills: {}, bosses: {},
+    config: { attackMode: "box", healSpellAt: 90, healItemAt: 40, manaAt: 30 },
+  };
+  const member = { id: "1", p: JSON.parse(JSON.stringify(pAuth)) };
+  const desc = {
+    v: 1, savedAt: 1000, kind: "hunt", huntId: "rats", instanceMode: "non-pvp",
+    activeCharacterId: "1", members: [member],
+    state: { players: [{ id: "1", p: member.p }], mobs: [], events: [], gridW: 30, gridH: 30 },
+  };
+  const init = engine.initializeAuthority(desc, "e".repeat(64), 1000);
+  must(init.authority.huntMode === "box", "autoridade deveria nascer em box");
+  const advanced = JSON.parse(engine.advanceAuthorityState(JSON.stringify(init), 200, 1200, {
+    players: [{
+      id: "1", x: 0.5, y: 0.5, cx: 15, cy: 15,
+      cfg: { healSpellAt: 22, manaAt: 88 },
+      challenge: { res: false, amp: false, huntMode: "kiting", kiteDistance: 4 },
+    }],
+    mobs: [],
+  }).state);
+  const live = advanced.authority.players[0].p.config;
+  must(live.healSpellAt === 22 && live.manaAt === 88, "tick não aplicou cfg do Helper: " + JSON.stringify(live));
+  must(live.attackMode === "kiting", "tick não aplicou attackMode kiting");
+  must(advanced.authority.huntMode === "", "kiting deveria limpar huntMode da autoridade");
+}
+
+console.log("ok: presets do Helper — criar/aplicar/sincronizar/apagar, limite de 5, por personagem, stances best-effort, barra com New preset e sync live na instância");

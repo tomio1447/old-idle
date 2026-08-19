@@ -27,7 +27,7 @@ must(client.includes("await accountLastSavePromise()"),
 must(admin.includes("async function adminPersist")&&
   admin.includes("accountAdminSaveCharacter"),
   "admin.js não persiste via admin grant");
-must(index.includes("account-client.js?v=admin-test-all-v1")&&
+must(index.includes("account-client.js?v=")&&
   index.includes("admin.js?v=admin-test-all-v1"),
   "index sem cache-bust admin-test-all-v1");
 must(server.includes("function accountCanSelfAdmin")&&

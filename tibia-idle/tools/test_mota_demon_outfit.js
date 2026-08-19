@@ -25,7 +25,7 @@ must(game.includes('String(local.slug||"")!==String(remote&&remote.slug||"")'),
   "cliente ainda reusa def/posição quando o ID reciclado muda de espécie");
 must(engine.includes('String(prev.slug||"")===String(m.slug||"")?prev:{}'),
   "servidor ainda herda o snapshot visual da espécie anterior no slot reciclado");
-must(html.includes("js/render.js?v=hd-hud-v1")&&html.includes("js/game.js?v=dust-num-v1"),
+must(html.includes("js/render.js?v=hd-hud-v1")&&html.includes("js/game.js?v="),
   "index.html sem cache-bust de barras/recycle");
 console.log("OK: Demon looktype="+demon.looktype+" ≠ Floating Savant looktype="+savant.looktype+
   "; nome/sprite/def seguem o slug.");

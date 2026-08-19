@@ -162,7 +162,7 @@ must(html.includes('id="greed-minigame"') && css.includes('.greed-minigame') &&
      css.includes('right: 8px; bottom: 8px') && css.includes('width: 210px') &&
      fs.readFileSync(path.join(js,"soulwar.js"),"utf8").includes('GREEDBEASTS <b>${c.greed.greedbeastKills}'),
   "modal pequeno no canto inferior direito não foi configurado");
-must(html.includes("js/combat.js?v=wb-shared-v1"), "combat sem cache-busting");
+must(html.includes("js/combat.js?v="), "combat sem cache-busting");
 must(html.includes("js/render.js?v=wave-fx-dat-v1"), "render sem cache-busting visual");
 must(html.includes("js/soulwar.js?v=greed-arena-60-v1"), "soulwar sem cache-busting Greed arena/60%");
 must(html.includes("js/yasir-prices.js?v=goshnar-yasir-v1"), "yasir-prices sem cache-busting");

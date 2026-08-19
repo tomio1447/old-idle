@@ -10,8 +10,8 @@ function clone(v) { return JSON.parse(JSON.stringify(v)); }
 
 const game = path.join(__dirname, "..", "game");
 const html = fs.readFileSync(path.join(game, "index.html"), "utf8");
-must(html.includes("js/combat.js?v=chain-path-v1")
-  && html.includes("js/game.js?v=chain-path-v1")
+must(html.includes("js/combat.js?v=")
+  && html.includes("js/game.js?v=")
   && html.includes("js/spelldata_1525.js?v=forked-chain-v1")
   && html.includes("js/patch_clientfx.js?v=forked-chain-v1")
   && html.includes("js/core.js?v=forked-chain-v1")

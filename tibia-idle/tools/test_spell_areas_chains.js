@@ -186,6 +186,28 @@ must(waveCells.length === 11, "WAVE4 leste deveria ter 11 SQMs (origem pulada), 
 must(extrema(waveCells).maxFwd === 3 && extrema(waveCells).maxLat === 2,
   "WAVE4 length×width Canary é 3×5 no fim, não " + JSON.stringify(extrema(waveCells)));
 
+{
+  const caster = cell(10, 10), aim = cell(20, 10);
+  const mobWave = engine.skillWaveCells(caster, aim, 4, 2, auth);
+  must(mobWave.length === 16, "onda de monstro len4/spread2 deveria ter 16 SQMs, obteve " + mobWave.length);
+  const ponta = mobWave.filter((c) => c.cx === 14);
+  const base = mobWave.filter((c) => c.cx === 11);
+  must(ponta.length === 5 && ponta.every((c) => c.cy >= 8 && c.cy <= 12),
+    "onda de monstro deveria abrir na ponta como a WAVE do player");
+  must(base.length === 3 && base.every((c) => c.cy >= 9 && c.cy <= 11),
+    "onda de monstro deveria ser estreita junto do caster");
+  const beam5 = engine.skillWaveCells(caster, aim, 5, 0, auth);
+  must(beam5.length === 4 && beam5.every((c) => c.cy === 10 && c.cx >= 11 && c.cx <= 14),
+    "beam de monstro length=5 deveria usar AREA_BEAM5 (4 SQMs à frente)");
+  const facingN = engine.skillWaveCells(Object.assign({}, caster, { dir: "n" }), aim, 4, 2, auth);
+  must(facingN.length === 16 && facingN.every((c) => c.cy < 10),
+    "onda de monstro virado ao norte deve ir para o norte, não para o alvo a leste: " +
+    JSON.stringify(facingN.slice(0, 4)));
+  const beamW = engine.skillWaveCells(Object.assign({}, caster, { dir: "w" }), aim, 5, 0, auth);
+  must(beamW.length === 4 && beamW.every((c) => c.cy === 10 && c.cx >= 6 && c.cx <= 9),
+    "beam de monstro virado a oeste deve seguir o facing, não o alvo a leste");
+}
+
 const energyWave = engine.ALL_SPELLS["exevo-vis-hur"];
 must(energyWave && energyWave.area === "AREA_SQUAREWAVE5"
   && engine.SPELL_TARGET["exevo-vis-hur"].areaNome === "AREA_SQUAREWAVE5",

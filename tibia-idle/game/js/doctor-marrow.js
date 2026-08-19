@@ -3,6 +3,7 @@
  * Boss simples sem mecânica própria: usa o monstro base do Canary
  * (monsterdata.js) para stats, skills, resistências.
  * A sala foi mapeada em doctormarrow_room.otbm.
+ * Outfit Canary looktype 1611: lookHead 57, lookBody 0, lookLegs 0, lookFeet 95.
  * O loot é importado do The Monster (criatura final da luta).
  * Cooldown oficial: 16h (aplicado quando BOSS_COOLDOWNS_ENABLED for ligado).
  */

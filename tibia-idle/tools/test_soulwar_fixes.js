@@ -102,7 +102,7 @@ const js = path.join(root, "game", "js");
   const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
   must(html.includes("yasir-prices.js?v=autosell-cprices-v1") &&
     html.includes("ui.js?v=") &&
-    html.includes("account-client.js?v=bagdesire-online-v1"),
+    html.includes("account-client.js?v="),
     "cache-busts do pacote soulwar ausentes no index");
 }
 

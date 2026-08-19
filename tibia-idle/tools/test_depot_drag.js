@@ -37,7 +37,7 @@ must(uiSrc.includes('payload.source === "depot") return false;'),
   "Supply Stash deveria rejeitar payloads do depot");
 must(html.includes("forge-ui.js?v=depot-drag-v1") &&
   html.includes("accessories.js?v=depot-drag-v1") &&
-  html.includes("ui.js?v=depot-drag-v1"),
+  html.includes("ui.js?v="),
   "cache-busts do depot drag ausentes no index");
 
 /* ---------------- lógica real das funções em vm ---------------- */

@@ -444,6 +444,31 @@ function huntWaveSize(hunt, randomValue) {
     : (hunt.pack || 3);
 }
 
+function pickHuntMonsterSlug(hunt) {
+  const list = (hunt && hunt.monsters) || [];
+  const weights = hunt && hunt.spawnWeights;
+  if (weights && typeof weights === "object") {
+    const rows = [];
+    let total = 0;
+    for (const slug of list) {
+      const n = Number(weights[slug]);
+      if (!(n > 0)) continue;
+      rows.push({ slug: slug, n: n });
+      total += n;
+    }
+    if (total > 0) {
+      let r = Math.random() * total;
+      for (const row of rows) {
+        r -= row.n;
+        if (r < 0) return row.slug;
+      }
+      return rows[rows.length - 1].slug;
+    }
+  }
+  if (!list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 function spawnWave(c, p) {
   if (huntMapSpawnBlocked()) return;
   const spawnNow=(c&&c._tickNow)||Date.now();
@@ -480,7 +505,7 @@ function spawnWave(c, p) {
   // arena além do pack enquanto a animação de teleporte roda. A condição
   // le a fila a cada iteracao (naFila cresce a cada push).
   while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < pack) {
-    const slug = c.hunt.monsters[Math.floor(Math.random() * c.hunt.monsters.length)];
+    const slug = pickHuntMonsterSlug(c.hunt);
     const base = GAMEDATA.monsters[slug];
     if (!base) break;
     const fiendish = Math.random() < (c.fiendishChance || FIENDISH_BASE_CHANCE);
@@ -3669,8 +3694,8 @@ function skillRadiusHas(cx0, cy0, r, px, py) {
   return v > 0 && v <= (r | 0);
 }
 
-/* Direcao cardinal da onda (getPrimaryDirection do Canary): eixo dominante.
- * Sempre do monstro → alvo. Nao usar mob.dir (pode estar travado no spawn). */
+/* Direcao cardinal da onda: a que o monstro ESTÁ VIRADO (sprite).
+ * Sem dir válida, cai no eixo dominante até o alvo. */
 function skillActorCell(ent, gw, gh) {
   let cx = Number(ent && ent.cx), cy = Number(ent && ent.cy);
   const w = Number(gw) || (typeof GRID_W !== "undefined" ? GRID_W : 30);
@@ -3684,7 +3709,17 @@ function skillActorCell(ent, gw, gh) {
     cy: Math.max(0, Math.min(h - 1, Math.round(cy))),
   };
 }
+function skillCardinalVec(dir) {
+  const d = String(dir || "").toLowerCase();
+  if (d === "e") return { dx: 1, dy: 0 };
+  if (d === "w") return { dx: -1, dy: 0 };
+  if (d === "n") return { dx: 0, dy: -1 };
+  if (d === "s") return { dx: 0, dy: 1 };
+  return null;
+}
 function skillWaveDir(mob, pl, gw, gh) {
+  const faced = skillCardinalVec(mob && mob.dir);
+  if (faced) return faced;
   const from = skillActorCell(mob, gw, gh), to = skillActorCell(pl, gw, gh);
   if (typeof areaDir === "function") {
     const d = areaDir(from, to);
@@ -3703,15 +3738,16 @@ function skillWaveDir(mob, pl, gw, gh) {
  * longe, igual AREA_WAVE4. O loop antigo começava largo no caster. */
 function skillWaveCells(mob, pl, len, spread, gw, gh) {
   const from = skillActorCell(mob, gw, gh);
-  const to = skillActorCell(pl, gw, gh);
   len = Math.max(1, len | 0);
   spread = spread | 0;
+  const d = skillWaveDir(mob, pl, gw, gh);
   if (!spread && typeof areaCells === "function") {
-    const mapped = areaCells("AREA_BEAM" + len, from, to);
+    const mapped = areaCells("AREA_BEAM" + len, from, {
+      cx: from.cx + d.dx, cy: from.cy + d.dy
+    });
     if (mapped && mapped.length) return mapped;
   }
   const out = [];
-  const d = skillWaveDir(mob, pl, gw, gh);
   const cols = spread > 0 ? Math.floor((len - (len % spread)) / spread) * 2 + 1 : 1;
   const centro = Math.floor(cols / 2);
   let colSpread = cols;

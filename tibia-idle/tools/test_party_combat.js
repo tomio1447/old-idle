@@ -70,19 +70,21 @@ setTimeout(() => {
       {
         // monstro em (5,5), alvo a LESTE -> onda vai reta no eixo X
         const cells = skillWaveCells({ cx: 5, cy: 5 }, { cx: 9, cy: 5 }, 4, 2);
-        // formato oficial len4/spread2 (Canary setupArea): x=6..7 com boca 5
-        // (cy 3..7), x=8..9 boca 3 (cy 4..6) — total 5+5+3+3 = 16
+        // Igual às waves do jogador (AREA_WAVE*): boca LARGA na ponta,
+        // estreita perto do caster. len4/spread2: x=9 boca 5 (cy 3..7),
+        // x=8 boca 5, x=7..6 boca 3 — total 5+5+3+3 = 16
         if (cells.length !== 16) fail("onda len4/spread2 deveria ter 16 células, tem " + cells.length);
         const xOk = cells.every(q => q.cx >= 6 && q.cx <= 9);
         if (!xOk) fail("onda LESTE deveria ser reta (x 6..9), veio " + JSON.stringify(cells));
         const ponta = cells.filter(q => q.cx === 9);
-        if (ponta.length !== 3 || ponta.some(q => q.cy < 4 || q.cy > 6))
-          fail("fim da onda deveria ter boca 3 centrada no eixo");
+        if (ponta.length !== 5 || ponta.some(q => q.cy < 3 || q.cy > 7))
+          fail("fim da onda deveria ter boca 5 centrada no eixo (como AREA_WAVE do player)");
+        const perto = cells.filter(q => q.cx === 6);
+        if (perto.length !== 3 || perto.some(q => q.cy < 4 || q.cy > 6))
+          fail("base da onda deveria ser estreita junto do caster");
         if (!skillWaveHas({ cx: 5, cy: 5 }, { cx: 9, cy: 5 }, 4, 2, 8, 5)) fail("alvo alinhado deveria ser atingido");
-        if (skillWaveHas({ cx: 5, cy: 5 }, { cx: 9, cy: 7 }, 4, 2, 9, 7)) fail("alvo fora da boca da onda NÃO deveria ser atingido");
-        // e o dano da explosão/onda passa pela MESMA checagem no mobSkillHit:
-        // o alvo (pl) fora do formato não leva dano (fiel ao servidor)
-        if (skillWaveHas({ cx: 5, cy: 5 }, { cx: 9, cy: 7 }, 4, 2, 8, 7)) fail("borda superior da boca NÃO deveria atingir fora");
+        if (skillWaveHas({ cx: 5, cy: 5 }, { cx: 9, cy: 5 }, 4, 2, 9, 8)) fail("alvo fora da boca da onda NÃO deveria ser atingido");
+        if (skillWaveHas({ cx: 5, cy: 5 }, { cx: 9, cy: 7 }, 4, 2, 6, 8)) fail("borda junto do caster NÃO deveria atingir fora");
         // alvo DIAGONAL (dx=3, dy=-5 -> eixo dominante vertical): a onda sobe
         // RETO para o norte (cy < 5), com boca do spread em cx 3..7 — nunca
         // uma linha diagonal em direção ao alvo
