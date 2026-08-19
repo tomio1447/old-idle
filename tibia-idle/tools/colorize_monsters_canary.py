@@ -144,9 +144,15 @@ CANARY_COLORS = {
     "cobra-assassin": (2, 2, 77, 19),
     # Buried Cathedral boss
     "faceless-bane":  (0, 2, 95, 97),
+    # Cradle of Monsters: looktype 1611, cores oficiais do Canary.
+    "doctor-marrow":  (57, 0, 0, 95),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
+    # Roshamuul: looktypes 584/594/585, cores 0 (sprite nativo do DAT).
+    "guzzlemaw": None,
+    "frazzlemaw": None,
+    "silencer": None,
 }
 
 # monstros com looktype "sem mascara" que ainda assim devem ser regerados com
@@ -165,7 +171,9 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "rage-squid", "squid-warden", "soulsnatcher", "floating-savant", "fury",
                "cobra-vizier", "cobra-scout",
                "cobra-assassin",
-               "faceless-bane"}
+               "faceless-bane",
+               "doctor-marrow",
+               "guzzlemaw", "frazzlemaw", "silencer"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,

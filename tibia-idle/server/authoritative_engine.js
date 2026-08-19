@@ -416,6 +416,7 @@ try{
   // Ingol Terrain: creature products (harpy feathers, liodile fang etc.) +
   // hunt 250+ — sem isso o Sell All online não precifica os drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"ingol-terrain.js"),"utf8"),sandbox);}catch(_ig){/* opcional */}
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"roshamuul.js"),"utf8"),sandbox);}catch(_rh){/* opcional */}
   // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
@@ -479,6 +480,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10},
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
   "ingol-terrain":{monsters:["harpy","crape-man","liodile","boar-man","carnivostrich"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"],cat:"hard",pack:10,packMin:6,packMax:10,spawnWeights:{guzzlemaw:40,frazzlemaw:40,silencer:20}},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
@@ -535,7 +537,7 @@ function clone(v){return JSON.parse(JSON.stringify(v||{}));}
 function clonePlayerState(p){const out=clone(p||{});out.conditions=out.conditions&&typeof out.conditions==="object"?out.conditions:{};return out;}
 function finitePosition(value,fallback){const n=Number(value);return Number.isFinite(n)?n:fallback;}
 function entityPosition(entity,fallbackX,fallbackY){return{x:finitePosition(entity&&entity.x,fallbackX),y:finitePosition(entity&&entity.y,fallbackY)};}
-function entityVisual(entity){const out={};for(const key of ["cx","cy","x","y","sx","sy"])
+function entityVisual(entity){const out={};for(const key of ["cx","cy","x","y","sx","sy","dir"])
   if(entity&&entity[key]!==undefined)out[key]=entity[key];return out;}
 const TRANSIENT_VISUAL_KEYS=["tx","ty","moving","frame","walkT","stepT","stepDur","nextStepAt","attackAnim",
   "target","path","pathIndex","moveFrom","moveTo","moveProgress"];
@@ -3569,18 +3571,31 @@ function skillRadiusCells(cx0,cy0,r){
   }
   return out;
 }
-function skillWaveDir(fromCell,toCell){
-  const d=spellAreaDirection(fromCell,toCell);
+function skillCardinalVec(dir){
+  const d=String(dir||"").toLowerCase();
+  if(d==="e")return{dx:1,dy:0};
+  if(d==="w")return{dx:-1,dy:0};
+  if(d==="n")return{dx:0,dy:-1};
+  if(d==="s")return{dx:0,dy:1};
+  return null;
+}
+function skillWaveDir(mob,pl,auth){
+  const faced=skillCardinalVec(mob&&mob.dir);
+  if(faced)return faced;
+  const from=entityGridCell(mob,auth),to=entityGridCell(pl,auth);
+  const d=spellAreaDirection(from,to);
   return d==="e"?{dx:1,dy:0}:d==="w"?{dx:-1,dy:0}:d==="n"?{dx:0,dy:-1}:{dx:0,dy:1};
 }
 function skillWaveCells(mob,pl,len,spread,auth){
-  const from=entityGridCell(mob,auth),to=entityGridCell(pl,auth);
+  const from=entityGridCell(mob,auth);
+  const d=skillWaveDir(mob,pl,auth);
   len=Math.max(1,len|0);spread=spread|0;
   if(!spread){
-    const beam=spellAreaCells(auth,{area:"AREA_BEAM"+len},from,to);
+    const aim={cx:from.cx+d.dx,cy:from.cy+d.dy};
+    const beam=spellAreaCells(auth,{area:"AREA_BEAM"+len},from,aim);
     if(beam&&beam.length)return beam;
   }
-  const out=[],d=skillWaveDir(from,to),
+  const out=[],
     cols=spread>0?Math.floor((len-(len%spread))/spread)*2+1:1,
     centro=Math.floor(cols/2);let colSpread=cols;
   for(let y=1;y<=len;y++){
@@ -3592,7 +3607,7 @@ function skillWaveCells(mob,pl,len,spread,auth){
   return out;
 }
 function skillPatternCells(mob,pl,pattern,auth){
-  const out=[],from=entityGridCell(mob,auth),to=entityGridCell(pl,auth),d=skillWaveDir(from,to);
+  const out=[],from=entityGridCell(mob,auth),d=skillWaveDir(mob,pl,auth);
   for(let step=0;step<(pattern||[]).length;step++)for(const side of pattern[step]||[])
     out.push({cx:from.cx+d.dx*(step+1)+(d.dy!==0?side:0),
       cy:from.cy+d.dy*(step+1)+(d.dx!==0?side:0)});
@@ -3703,8 +3718,6 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     if(dist>mobSkillRangeSQM(sk,mob))continue;
     if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
     mob.skillCds[key]=now+(sk.int||2000);
-    // Wave/beam: sprite e geometria apontam para o alvo (não para dir travada).
-    if(sk.length||(sk.areaPattern&&sk.areaPattern.length))faceTowardCell(mob,victim,auth);
     const el=inferSkillElement(sk);
     pushFx(sk);
     if(!((sk.max||0)>0)){
@@ -3904,6 +3917,7 @@ function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!d
   else{cx=Math.floor(w/2)+spread[0]*(1+ring);cy=Math.floor(h/2)+spread[1]*(1+ring);}
   const cell=claimSpawnCell(auth,cx,cy);mob.cx=cell.cx;mob.cy=cell.cy;
   mob.x=(mob.cx+.5)/w;mob.y=(mob.cy+.5)/h;mob.sx=mob.x;mob.sy=mob.y;
+  mob.dir="w";
   return mob;}
 function partyCanShareExp(players){players=Array.isArray(players)?players:[];if(players.length<2)return false;
   const levels=players.map((item)=>Math.max(1,Number(item&&item.p&&item.p.level)||1));
@@ -5427,6 +5441,25 @@ function huntWaveSize(auth){
   if(minPack&&maxPack)return minPack+roll(auth,0,maxPack-minPack);
   return Math.max(1,Number(hunt.pack)||Number(auth&&auth.pack)||3);
 }
+function pickHuntSpawnSlug(auth){
+  const hunt=HUNTS[auth&&auth.huntId],pool=auth&&auth.spawnPool||[];
+  const weights=hunt&&hunt.spawnWeights;
+  if(weights&&typeof weights==="object"){
+    const rows=[];let total=0;
+    for(const slug of (hunt.monsters||[])){
+      const n=Number(weights[slug]);
+      if(!(n>0)||!monsterDef(slug))continue;
+      rows.push({slug,n});total+=n;
+    }
+    if(total>0){
+      let r=roll(auth,0,total-1);
+      for(const row of rows){if(r<row.n)return row.slug;r-=row.n;}
+      return rows[rows.length-1].slug;
+    }
+  }
+  if(!pool.length)return null;
+  return pool[roll(auth,0,pool.length-1)];
+}
 function spawnHuntWave(auth,now,opts){
   opts=opts||{};
   if(!auth||auth.kind==="boss"||auth.ended||auth.greed)return;
@@ -5453,7 +5486,8 @@ function spawnHuntWave(auth,now,opts){
   now=now||auth.clock;
   for(let i=0;i<count;i++){
     const id=auth.spawnIds[i];if(occupied.has(id)||!auth.spawnPool.length)continue;
-    const slug=auth.spawnPool[roll(auth,0,auth.spawnPool.length-1)],m=makeMob(auth,slug,false,id,null,i);
+    const slug=pickHuntSpawnSlug(auth);if(!slug)break;
+    const m=makeMob(auth,slug,false,id,null,i);
     if(!m)break;
     occupied.add(id);
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
@@ -6855,7 +6889,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
   normalizeVisualState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
-  spawnHuntWave,openAuthBagYouDesire,
+  spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
