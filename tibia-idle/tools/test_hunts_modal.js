@@ -39,6 +39,7 @@ const expected=[
  ["HUNTS LEVEL 0–100",["rats","amazon-camp"]],
  ["HUNTS 100–250",[]],
  ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas","buried-cathedral","ingol-terrain","roshamuul","prison-1","prison-2","prison-3"]],
+ ["FERUMBRAS ASCENDANT",["dt-seal","juggerseal"]],
  ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
  ["SOULWAR 400+",["dark-thais","rotten-wasteland","claustrophobic-inferno","ebb-and-flow"]],
 ];
@@ -82,4 +83,4 @@ must(/<span class="mobs"[^>]*>[\s\S]*?<\/span>\s*<span class="info"/.test(cardSa
 const mobsOnly=(cardSample[0].match(/<span class="mobs"[^>]*>[\s\S]*?<\/span>/)||[""])[0];
 must(!mobsOnly.includes('class="nm"')&&!mobsOnly.includes('class="meta"'),
   "texto da hunt vazou para a coluna de sprites");
-console.log("OK: botão Demon abre catálogo com 5 sessões e as hunts permitidas.");
+console.log("OK: botão Demon abre catálogo com "+expected.length+" sessões e as hunts permitidas.");

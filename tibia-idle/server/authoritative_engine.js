@@ -509,7 +509,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "the-unwelcome-room":{monsters:["the-unwelcome"]},
   "the-pale-worm-room":{monsters:["the-pale-worm"]},
 });
-for(const slug of ["marapur-nagas","dt-seal"]){
+for(const slug of ["marapur-nagas","dt-seal","juggerseal"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
 }
 const VOC={none:{hp:5,mp:5,cap:10,magic:3.0},knight:{hp:15,mp:5,cap:25,magic:3.0},paladin:{hp:10,mp:15,cap:20,magic:1.4},

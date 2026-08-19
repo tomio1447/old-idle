@@ -107,6 +107,7 @@
   }));
   const dtSeal = GAMEDATA.hunts["dt-seal"];
   if (dtSeal) harden(Object.assign(dtSeal, {
+    name: "Grounds of Damnation (Tafariel)",
     otbm: "dt_seal",
     otbmFloor: 7,
     otbmFovBounds: { x: 1009, y: 1010, w: 19, h: 15, z: 7 },
@@ -114,6 +115,17 @@
     otbmRuntimeHeight: 30,
     otbmSpawn: { x: 1018, y: 1018, z: 7 },
     otbmMobBounds: { x: 1006, y: 1008, w: 25, h: 21, z: 7 },
+  }));
+
+  const juggerSeal = GAMEDATA.hunts["juggerseal"];
+  if (juggerSeal) harden(Object.assign(juggerSeal, {
+    otbm: "juggerseal",
+    otbmFloor: 7,
+    otbmFovBounds: { x: 1065, y: 994, w: 19, h: 15, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
+    otbmSpawn: { x: 1074, y: 1005, z: 7 },
+    otbmMobBounds: { x: 1070, y: 996, w: 11, h: 10, z: 7 },
   }));
 
   GAMEDATA.hunts["mota-extension"] = harden({

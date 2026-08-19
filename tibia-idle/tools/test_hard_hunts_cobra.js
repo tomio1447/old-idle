@@ -21,7 +21,7 @@ for (const file of [
 
 const uiSource = fs.readFileSync(path.join(js, 'ui.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(game, 'index.html'), 'utf8');
-must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul"] }') &&
+must(uiSource.includes('{ title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3"] }') &&
      uiSource.includes('${packLabel}</b> criaturas'),
   'Cobra/range HARD não aparece na sessão 250+ do modal');
 must(indexSource.includes('<script src="js/hard-hunts.js?v=loot-npc-prices-v1"></script>'),
