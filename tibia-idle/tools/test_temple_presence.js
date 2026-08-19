@@ -17,16 +17,25 @@ const { createTemplePresence, PRESENCE_TTL_MS } = require("../server/temple.js")
 
 function fakeChar(id, accountId, over) {
   const outfit = Object.assign({ type: "knight", appearance: "", colors: [40, 60, 80, 90], addons: 1, mount: "" }, (over && over.outfit) || {});
+  const extra = Object.assign({ sex: "male", outfit }, over || {});
   return {
     id, account_id: accountId,
-    name: "Char" + id, voc: "knight", level: 123,
-    data: JSON.stringify(Object.assign({ sex: "male", outfit }, over || {})),
+    name: "Char" + id, voc: extra.voc || "knight", level: 123,
+    zone: extra.zone || "unknown",
+    updated_at: extra.updatedAt || new Date(id * 1000).toISOString(),
+    data: JSON.stringify(extra),
   };
 }
 {
   const published = [];
   const db = {
-    chars: [fakeChar(1, 11), fakeChar(2, 22, { sex: "female", outfit: { type: "druid", appearance: "x", colors: [1, 2], addons: 99, mount: "m" } })],
+    chars: [
+      fakeChar(1, 11),
+      fakeChar(2, 22, { sex: "female", outfit: { type: "druid", appearance: "x", colors: [1, 2], addons: 99, mount: "m" } }),
+      fakeChar(3, 33, { zone: "city", updatedAt: "2026-01-01T00:00:00Z" }),
+      fakeChar(4, 33, { zone: "hunt", updatedAt: "2026-01-02T00:00:00Z" }),
+    ],
+    charactersOf(accountId) { return this.chars.filter((c) => c.account_id === Number(accountId)); },
     findCharacter(id) { return this.chars.find((c) => c.id === Number(id)); },
   };
   const tp = createTemplePresence({ getDb: () => db, publishAccount: (aid, type, data) => published.push({ aid, type, data }) });
@@ -50,29 +59,39 @@ function fakeChar(id, accountId, over) {
   const r3 = tp.heartbeat(db, { id: 11 }, { char_id: 1, x: 5, y: 6, dir: "e", moving: true });
   must(r3.body.throttled === true, "heartbeat repetido deveria ser throttled");
 
-  // personagem de outra conta
+  // char_id de OUTRA conta: nunca 403 — resolve pelo personagem da PRÓPRIA
+  // conta (o token é quem manda). A presença da conta 11 continua Char1.
   const r4 = tp.heartbeat(db, { id: 11 }, { char_id: 2, x: 1, y: 1, dir: "s", moving: false });
-  must(r4.code === 403, "heartbeat com personagem de outra conta deveria dar 403");
+  must(r4.code === 200 && r4.body.ok, "char_id de outra conta deveria resolver pela própria conta (sem 403)");
+  must(tp.snapshotFor(22).length === 1 && tp.snapshotFor(22)[0].name === "Char1",
+    "fallback vazou personagem de outra conta");
 
-  // publish: broadcast para os dois presentes
+  // char_id ausente (caso VM: sessão vazia) -> personagem da conta
+  const rMissing = tp.heartbeat(db, { id: 22 }, { x: 3, y: 3, dir: "n", moving: false });
+  must(rMissing.code === 200 && rMissing.body.ok, "heartbeat sem char_id deveria resolver pela conta");
+
+  // fallback por zona: conta 33 tem Char3 (city) e Char4 (hunt)
+  const rCity = tp.heartbeat(db, { id: 33 }, { x: 2, y: 2, dir: "w", moving: false });
+  must(rCity.code === 200 && rCity.body.ok, "heartbeat da conta 33 falhou");
+  const snap11 = tp.snapshotFor(11);
+  const char33 = snap11.find((pl) => pl.name && pl.name.indexOf("Char") === 0 && (pl.name === "Char3" || pl.name === "Char4"));
+  must(char33 && char33.name === "Char3", "fallback deveria preferir o personagem na zona cidade");
+
+  // conta sem personagens -> 404 (nunca 403 para conta válida)
+  const r5 = tp.heartbeat(db, { id: 99 }, { char_id: 3, x: 2, y: 2, dir: "w", moving: false });
+  must(r5.code === 404 && !r5.body.ok, "conta sem personagens deveria dar 404, não 403");
+
+  // publish: broadcast para os presentes
   published.length = 0;
   tp.publish();
-  must(published.length === 2 && published.every((p) => p.type === "temple" && Array.isArray(p.data.players)),
+  must(published.length === 3 && published.every((p) => p.type === "temple" && Array.isArray(p.data.players)),
     "publish não mandou snapshot para todos os presentes");
   const to11 = published.find((p) => p.aid === 11).data.players;
-  must(to11.length === 1 && to11[0].name === "Char2", "publish vazou o próprio jogador");
+  must(to11.some((pl) => pl.name === "Char2"), "publish vazou o jogador da conta 22");
 
   // leave
   tp.leave(11);
-  must(tp.size() === 1 && tp.snapshotFor(22).length === 0, "leave não removeu a presença");
-
-  // expiry
-  const entries2 = [22];
-  must(entries2.length === 1, "sanity");
-  // simula heartbeat velho via monkeypatch direto no controller: publish já prune
-  const r5 = tp.heartbeat(db, { id: 33 }, { char_id: 3, x: 2, y: 2, dir: "w", moving: false });
-  must(r5.code === 403, "personagem inexistente deveria dar 403");
-  must(tp.size() === 1, "heartbeat inválido não pode criar presença");
+  must(tp.size() === 2 && tp.snapshotFor(22).length === 1, "leave não removeu a presença");
 }
 
 /* ---------------- cliente: arquivos e marcação ---------------- */
@@ -110,6 +129,8 @@ const calls = [];
 const timers = [];
 let templeListener = null;
 let fetchMode = "ok"; // "ok" | "denied"
+let tokenMode = "tok";
+let sessionCharMode = "";
 const ctx = {
   window: {
     location: { origin: "http://x" },
@@ -127,10 +148,10 @@ const ctx = {
       : [];
     return { json: async () => ({ ok: true, players }) };
   },
-  sessionToken: () => "tok",
-  // Simula a VM: sessão vazia (auto-resume/troca de char) — o char_id tem
-  // que vir do personagem carregado (G.p.id), senão o servidor devolve 403.
-  sessionCharId: () => "",
+  sessionToken: () => tokenMode,
+  // Simula a VM: sessão vazia (auto-resume/troca de char) — o char_id cai
+  // para o personagem carregado (G.p.id) e o servidor resolve pela conta.
+  sessionCharId: () => sessionCharMode,
   accountApiUrl: () => "http://x",
   G: { inCity: true, p: { id: 1 }, walker: { px: 160, py: 160, dir: "s", moving: false }, combat: null, training: null },
   CITY: {},
@@ -163,14 +184,35 @@ must(calls.length === 1 && calls[0].url === "http://x/api/temple/presence" &&
      calls[0].body.char_id === 1,
   "heartbeat não enviou token/posição/char corretos (char_id = G.p.id, tile 160/32=5)");
 
+// sessão presente (entrada online OK) tem prioridade sobre G.p.id
+sessionCharMode = "7";
+ctx.G.walker.px = 256;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === 2 && calls[1].body.char_id === "7",
+  "com sessão presente o char_id deveria vir da sessão");
+
+// sem token (pré-login) o heartbeat nem chama — nada de 401 em loop
+tokenMode = "";
+sessionCharMode = "";
+ctx.G.walker.px = 288;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === 2, "sem token o heartbeat não pode chamar o servidor");
+tokenMode = "tok";
+sessionCharMode = "";
+
 // 403 (Personagem inválido): backoff — não fica batendo a cada tick
+const beforeDenied = calls.length;
 fetchMode = "denied";
 ctx.G.walker.px = 192; // move (tile 6) para o heartbeat disparar
 vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
 timers.forEach((fn) => fn()); // tenta e falha (403)
 await flush();
 const afterDenied = calls.length;
-must(afterDenied === 2, "403 não gerou nova tentativa de heartbeat");
+must(afterDenied === beforeDenied + 1, "403 não gerou nova tentativa de heartbeat");
 must(vm.runInContext("TEMPLE_MP.errorBackoffUntil > Date.now()", ctx),
   "403 não ativou o backoff");
 ctx.G.walker.px = 224;

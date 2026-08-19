@@ -92,14 +92,37 @@ function createTemplePresence(opts) {
     return sent;
   }
 
+  /* Personagem da conta para a presença. char_id é só uma dica: o que
+   * vale é a CONTA autenticada pelo token. Se o id não existir (ou for
+   * de outra conta — saves legados, auto-resume bloqueado por lease etc.),
+   * cai no personagem ativo da conta: quem reportou zona cidade ou, na
+   * dúvida, o personagem mais recente. Nunca vaza personagem de outra
+   * conta e nunca 403 para uma conta válida. */
+  function resolveCharacter(db, accountId, charId) {
+    const aid = Number(accountId);
+    const chars = db && typeof db.charactersOf === "function"
+      ? db.charactersOf(aid)
+      : (db && Array.isArray(db.characters)
+        ? db.characters.filter((c) => Number(c.account_id) === aid) : []);
+    if (!chars.length) return null;
+    if (charId) {
+      const hit = chars.find((c) => Number(c.id) === Number(charId));
+      if (hit) return hit;
+    }
+    const inCity = chars.find((c) => String(c.zone || "").toLowerCase() === "city");
+    if (inCity) return inCity;
+    const byFresh = chars.slice().sort((a, b) =>
+      new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime());
+    return byFresh[0] || null;
+  }
+
   function heartbeat(db, acc, body) {
     const aid = Number(acc && acc.id);
     if (!aid) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
     body = body || {};
-    const charId = Number(body.char_id);
-    const character = charId ? (db && db.findCharacter ? db.findCharacter(charId) : null) : null;
-    if (!character || Number(character.account_id) !== aid)
-      return { code: 403, body: { ok: false, msg: "Personagem inválido" } };
+    const character = resolveCharacter(db, aid, Number(body.char_id) || 0);
+    if (!character)
+      return { code: 404, body: { ok: false, msg: "Conta sem personagens" } };
     const prev = entries.get(aid), nowMs = Date.now();
     if (prev && nowMs - prev.updatedAt < HEARTBEAT_MIN_MS)
       return { code: 200, body: { ok: true, throttled: true, players: snapshotFor(aid) } };
