@@ -10,7 +10,7 @@
  * 4. Loot: todo item dos 8 monstros está no catálogo (itens novos com
  *    preço oficial da TibiaWiki; trash/quest ficam sell 0).
  * 5. Sprites: PNGs físicos de mobs, de todos os tiles usados pelo mapa e
- *    dos 13 itens de loot novos.
+ *    dos 14 itens de loot novos.
  */
 "use strict";
 const fs = require("fs"), path = require("path"), vm = require("vm");
@@ -164,6 +164,7 @@ const PRISON_LOOT = [
   "silver-goblet", "skeleton-decoration", "slightly-rusted-armor", "unholy-bone",
   "dirty-cape", "piece-of-royal-steel", "piece-of-hell-steel", "piece-of-draconian-steel",
   "demon-dust", "golden-figurine", "bunch-of-wheat", "bundle-of-cursed-straw", "closed-trap",
+  "onyx-arrow",
 ];
 
 console.log("ok: the prison (3 andares 250+ — mesmo mapa, composições Canary por andar, loot e sprites)");

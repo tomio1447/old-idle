@@ -58,6 +58,10 @@ const PRISON_LOOT_ITEMS = {
   "bunch-of-wheat":              { n: "bunch of wheat", s: null, t: "loot", cid: 3605, w: 12.50, sell: 0, npcSell: 0 },
   "bundle-of-cursed-straw":      { n: "bundle of cursed straw", s: null, t: "loot", cid: 9688, w: 2.27, sell: 800, npcSell: 800 },
   "closed-trap":                 { n: "closed trap", s: null, t: "loot", cid: 3481, w: 21.00, sell: 75, npcSell: 75 },
+  // Munição dropada por plaguesmith/juggernaut: o extrator de itens cria
+  // fichas com s:"weapon" quando o items.xml tem attack — aqui garantimos a
+  // ficha de munição (mesma convenção de arrow/bolt/power-bolt).
+  "onyx-arrow":                  { n: "onyx arrow", s: "ammo", t: "ammo", cid: 7365, w: 0.70, atk: 38, sell: 7, npcSell: 0 },
 };
 
 /* Médias Canary por andar (hp/exp/dano/armor — média aritmética). */
@@ -79,6 +83,9 @@ const PRISON_AVG = {
       if (def.npcSell != null) items[slug].npcSell = def.npcSell;
       if (def.cid != null && items[slug].cid == null) items[slug].cid = def.cid;
       if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+      if (def.s != null) items[slug].s = def.s;
+      if (def.t != null) items[slug].t = def.t;
+      if (def.atk != null) items[slug].atk = def.atk;
     }
   }
 
