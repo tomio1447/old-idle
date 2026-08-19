@@ -140,12 +140,15 @@ function templeMpCharIdSafe() {
   const raw = templeMpCharId();
   let chars = null;
   if (typeof accountCharacterCacheRead === "function") {
-    try { chars = accountCharacterCacheRead(); } catch (e) { chars = []; }
+    try { chars = accountCharacterCacheRead(); } catch (e) { chars = null; }
   }
-  if (!Array.isArray(chars) || !chars.length) return raw; // sem cache: servidor resolve
+  if (chars === null) return raw; // sem cache: servidor resolve pela conta
+  // Cache da conta vazio = conta sem personagens (token de conta nova/
+  // vazia com save legado na tela): pula o heartbeat, sem 404 no console.
+  if (!Array.isArray(chars) || !chars.length) return "";
   if (raw && chars.some((c) => String(c && c.id) === String(raw))) return String(raw);
   // id fora da conta (save legado): usa personagem válido da conta, com a
-  // mesma preferência do servidor novo (zona cidade > primeiro).
+  // mesma preferência do servidor (zona cidade > primeiro).
   const city = chars.find((c) => String((c && c.zone) || "").toLowerCase() === "city");
   const fallback = city || chars[0];
   return fallback && fallback.id != null ? String(fallback.id) : raw;
