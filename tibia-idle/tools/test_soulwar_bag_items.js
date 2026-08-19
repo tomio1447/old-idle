@@ -50,9 +50,16 @@ for (const slug of BROKEN)
 const staging = path.join(__dirname, "..", "dist-patch", "_staging", "game", "js", "soulwar.js");
 if (fs.existsSync(staging)) {
   const stg = fs.readFileSync(staging, "utf8");
-  must(stg.includes("'soulbastion'") && stg.includes("'pair-of-soulwalkers'") &&
-       !stg.includes("'soul-bastion'"),
-    "staging do soulwar.js sem o fix do pool");
+  const stgLists = [...stg.matchAll(/\[([^\]]*soul[^\]]*)\]/g)]
+    .map((m) => m[1].split(",").map((x) => x.trim().replace(/['"]/g, "")).filter(Boolean));
+  const stgPools = stgLists.filter((l) => l.length === 15 && l.indexOf("soulbleeder") !== -1);
+  must(stgPools.length === 2, "staging sem os 2 pools de 15 itens");
+  for (const pool of stgPools) {
+    for (const slug of BROKEN)
+      must(pool.indexOf(slug) === -1, "staging ainda tem slug quebrado no pool: " + slug);
+    must(pool.indexOf("soulbastion") !== -1 && pool.indexOf("pair-of-soulwalkers") !== -1,
+      "staging sem os slugs oficiais do Canary no pool");
+  }
 }
 
 /* ---------------- catálogo (ordem real: weapondata -> weapons -> soulwar) ---------------- */
