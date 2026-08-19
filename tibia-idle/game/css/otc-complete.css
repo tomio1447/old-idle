@@ -460,7 +460,7 @@ input:focus, textarea:focus, select:focus {
 
 /* ═══════════════════ TOOLTIP ═══════════════════ */
 #tooltip {
-  position: fixed; z-index: 100;
+  position: fixed; z-index: 999;
   background: #1a1c22;
   border: 2px solid;
   border-color: #c0a040 #3a3010 #3a3010 #c0a040;
@@ -529,7 +529,7 @@ input:focus, textarea:focus, select:focus {
 
 /* ═══════════════════ CONTEXT MENU ═══════════════════ */
 .ctx-menu {
-  position: fixed; z-index: 250;
+  position: fixed; z-index: 400;
   background: var(--otc-panel);
   border: 2px solid;
   border-color: var(--otc-border-out) var(--otc-border-in) var(--otc-border-in) var(--otc-border-out);
