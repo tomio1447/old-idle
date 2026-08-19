@@ -105,6 +105,17 @@
     avgDamage: 468,
     avgArmor: 72,
   }));
+  const ferumbrasWay = GAMEDATA.hunts["ferumbras-way"];
+  if (ferumbrasWay) harden(Object.assign(ferumbrasWay, {
+    otbm: "ferumbrasway",
+    otbmFloor: 7,
+    otbmFovBounds: { x: 1063, y: 990, w: 19, h: 15, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
+    otbmSpawn: { x: 1069, y: 1001, z: 7 },
+    otbmMobBounds: { x: 1068, y: 995, w: 10, h: 9, z: 7 },
+  }));
+
   const dtSeal = GAMEDATA.hunts["dt-seal"];
   if (dtSeal) harden(Object.assign(dtSeal, {
     name: "Grounds of Damnation (Tafariel)",

@@ -39,7 +39,7 @@ const expected=[
  ["HUNTS LEVEL 0–100",["rats","amazon-camp"]],
  ["HUNTS 100–250",[]],
  ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas","buried-cathedral","ingol-terrain","roshamuul","prison-1","prison-2","prison-3"]],
- ["FERUMBRAS ASCENDANT",["dt-seal","juggerseal"]],
+ ["FERUMBRAS ASCENDANT",["ferumbras-way","dt-seal","juggerseal"]],
  ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
  ["SOULWAR 400+",["dark-thais","rotten-wasteland","claustrophobic-inferno","ebb-and-flow"]],
 ];
