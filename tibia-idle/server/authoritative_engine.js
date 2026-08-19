@@ -6,6 +6,8 @@ let WAND_SHOOT={};
 try{WAND_SHOOT=require(path.join(__dirname,"..","game","js","wandshootdata.js"))||{};}
 catch(e){WAND_SHOOT={};}
 const CanaryVocation=require(path.join(__dirname,"..","game","js","canary-vocation.js"));
+let HELPER_PRESET_CONFIG_FIELDS=[];
+try{const hp=require(path.join(__dirname,"..","game","js","helper-presets.js"));HELPER_PRESET_CONFIG_FIELDS=Array.isArray(hp.HELPER_PRESET_CONFIG_FIELDS)?hp.HELPER_PRESET_CONFIG_FIELDS:[];}catch(e){HELPER_PRESET_CONFIG_FIELDS=[];}
 const Loyalty=require(path.join(__dirname,"..","game","js","loyalty.js"));
 const loyaltySkillBonus=Loyalty.loyaltySkillBonus;
 const loyaltyExpMultiplier=Loyalty.loyaltyExpMultiplier;
@@ -793,6 +795,7 @@ function normalizeVisualState(raw,auth){
       if(input.combo)item.combo=sanitizeCombo(input.combo);
       if(input.stances&&typeof input.stances==="object")item.stances=input.stances;
       if(typeof input.autoWalk==="boolean")item.autoWalk=input.autoWalk;
+      if(input.cfg&&typeof input.cfg==="object")item.cfg=input.cfg;
       const wdx=Number(input.walkIntent&&input.walkIntent.dx),wdy=Number(input.walkIntent&&input.walkIntent.dy);
       if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
         item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
@@ -894,6 +897,17 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       if(mode==="box"||mode==="safe"||mode==="kiting")item.p.config.attackMode=mode;
       if(challenge.kiteDistance)item.p.config.kiteDistance=challenge.kiteDistance;
       if(mode==="box"||mode==="safe")auth.huntMode=mode;}
+    /* Aplica as demais configurações do Helper enviadas pelo cliente no tick.
+     * Whitelist evita que campos estranhos entrem na autoridade. */
+    if(pos.cfg&&typeof pos.cfg==="object"){
+      item.p=item.p||{};item.p.config=item.p.config||{};
+      const allowed=new Set(HELPER_PRESET_CONFIG_FIELDS);
+      for(const k of Object.keys(pos.cfg)){
+        if(!allowed.has(k))continue;
+        const v=pos.cfg[k];
+        if(v!==undefined)item.p.config[k]=v;
+      }
+    }
   }}
   const clock=Number(auth.clock)||0;
   for(const mob of auth.mobs||[]){

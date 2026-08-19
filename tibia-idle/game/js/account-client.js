@@ -430,6 +430,20 @@ function accountAuthorityVisualState(){
       const isSelf=!activeId||id===activeId;
       if(isSelf&&ent.p&&ent.p.config&&Array.isArray(ent.p.config.combo))visual.combo=ent.p.config.combo;
       if(isSelf&&ent.p&&ent.p.stances&&typeof ent.p.stances==="object")visual.stances=ent.p.stances;
+      /* Envia as demais configurações do Helper a cada tick para que mudanças
+       * durante o combate online passem a valer na autoridade sem precisar
+       * sair para o templo. Campos já transmitidos por combo/stances/challenge
+       * são omitidos para evitar conflito/sanitização duplicada. */
+      if(isSelf&&ent.p&&ent.p.config&&typeof HELPER_PRESET_CONFIG_FIELDS!=="undefined"&&
+         typeof helperPresetClone==="function"){
+        const cfg={},skip={combo:1,stances:1,autoWalk:1,attackMode:1,kiteDistance:1,
+          exetaRes:1,exetaAmpRes:1};
+        for(const k of HELPER_PRESET_CONFIG_FIELDS){
+          if(skip[k])continue;
+          if(ent.p.config[k]!==undefined)cfg[k]=helperPresetClone(ent.p.config[k]);
+        }
+        if(Object.keys(cfg).length)visual.cfg=cfg;
+      }
       if(ent.p&&ent.p.config){
         const mode=ent.p.config.attackMode||(combat&&combat.huntMode)||"kiting";
         visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(ent.p):ent.p.config.autoWalk!==false;

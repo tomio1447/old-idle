@@ -221,3 +221,8 @@ function renderHelperPresets(p) {
     if (typeof renderHelper === "function") renderHelper(p);
   });
 }
+
+/* Exporta constantes para o servidor Node poder manter a mesma whitelist. */
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { HELPER_PRESET_CONFIG_FIELDS, HELPER_PRESETS_MAX };
+}
