@@ -498,7 +498,13 @@ function spawnWave(c, p) {
       fiendish: fiendish,
       sinisterStacks: stacks,
       hp: m.hp, maxHp: m.hp,
-      atkCd: 400 + Math.random() * 1200,
+      /* Tempo de reação + fase aleatória para mobs da mesma onda não
+       * atacarem todos juntos (evita o efeito "combo"). */
+      atkCd: (()=>{
+        const as=Math.max(500,Number(m.attackSpeed)||2000);
+        const min=Math.floor(as*0.15);
+        return min+Math.random()*(as-min);
+      })(),
       id: Math.random().toString(36).slice(2, 8),
       dir: "w",
       moving: false,

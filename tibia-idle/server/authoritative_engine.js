@@ -3858,11 +3858,18 @@ function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!d
     stacks=fiendish?15:(influenced?roll(auth,1,5):0);}
   const mult=stacks?1.35+stacks*.15:1,hp=Math.max(1,Math.floor((Number(def.hp)||1)*mult));
   const useDef=stripGreedDef?Object.assign({},def,{armor:0,defense:0,mitigation:0,resist:{},imune:[]}):def;
+  const attackSpeed=Math.max(500,Number(def.attackSpeed)||2000);
+  /* Cada monstro nasce com um offset aleatório no relógio de ataque, para
+   * que mobs da mesma onda não ataquem todos no mesmo tick (efeito "combo").
+   * O offset funciona como tempo de reação inicial (mínimo 15% do intervalo)
+   * e mantém uma fase própria em todos os ataques seguintes. */
+  const reactionMin=Math.floor(attackSpeed*0.15);
+  const reactionOffset=reactionMin+Math.floor(random(auth)*(attackSpeed-reactionMin));
   const mob={id:id||("srv-"+sequence),slug:String(slug),boss:!!boss,influenced,fiendish,sinisterStacks:stacks,
     hp,maxHp:hp,armor:stripGreedDef||greedAdd?0:Math.max(0,Math.floor((Number(def.armor)||0)*(stacks?1+stacks*.05:1))),
     damage:Math.max(0,Math.floor((Number(def.damage)||0)*(stacks?1+stacks*.08:1))),
     exp:Math.max(0,Math.floor((Number(def.exp)||0)*(stacks?1+stacks*.25:1))),
-    attackSpeed:Math.max(500,Number(def.attackSpeed)||2000),attackAcc:0,def:useDef};
+    attackSpeed,attackAcc:reactionOffset,def:useDef};
   // Referência ao auth para eventos (mobheal do Unwelcome etc.) — NÃO
   // enumerável: JSON.stringify do estado serializa mobs e um ciclo
   // auth→mob→auth quebraria o save da instância.
