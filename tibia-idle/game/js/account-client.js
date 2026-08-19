@@ -555,6 +555,7 @@ function accountClaimRewardChest(token,charId,opts){
     const r=await _api("POST","/api/reward/claim",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       return {ok:true,rewardChest:r.data.rewardChest||{},rewardChestBundles:r.data.rewardChestBundles||[],
         lootPouch:r.data.lootPouch||{},supplyStash:r.data.supplyStash||{},saveVersion:r.data.saveVersion};
     }
@@ -642,6 +643,7 @@ function accountDestroyLootPouchItem(token,charId,slug){
     const r=await _api("POST","/api/pouch/destroy",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(r.data.lootPouch&&typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         G.p.lootPouch=r.data.lootPouch||{};
         if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
@@ -685,6 +687,7 @@ function accountOpenBagYouDesire(token, charId) {
     const r = await _api("POST", "/api/pouch/open-bag-you-desire", body);
     if (r.data.ok) {
       if (r.data.character) accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if (typeof G !== "undefined" && G.p && String(G.p.id) === id) {
         if (r.data.lootPouch) G.p.lootPouch = r.data.lootPouch || {};
         if (r.data.depot) G.p.depot = r.data.depot || [];
@@ -750,6 +753,7 @@ function accountSellBag(token,charId,opts){
     const r=await _api("POST","/api/bag/sell",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         if(r.data.bag)G.p.bag=r.data.bag||{};
         if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
@@ -798,6 +802,7 @@ function accountMoveToSupplyStash(token,charId,opts){
     const r=await _api("POST","/api/stash/move",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
         if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
@@ -848,6 +853,7 @@ function accountWithdrawFromSupplyStash(token,charId,opts){
     const r=await _api("POST","/api/stash/withdraw",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
         if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
@@ -897,6 +903,7 @@ function accountEquipFromSupplyStash(token,charId,opts){
     const r=await _api("POST","/api/stash/equip",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         if(r.data.supplyStash)G.p.supplyStash=r.data.supplyStash||{};
         if(r.data.equip)G.p.equip=r.data.equip||{};
@@ -946,6 +953,7 @@ function accountMovePouchToBag(token,charId,opts){
     const r=await _api("POST","/api/pouch/to-bag",body);
     if(r.data.ok){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
       if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
         if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
         if(r.data.bag)G.p.bag=r.data.bag||{};
@@ -1452,6 +1460,31 @@ async function accountLogout(token){
   const r=await _api("POST","/api/logout",{token});return !!r.data.ok;
 }
 
+/* Aplica o inventário da conta (bag/lootPouch/depot/reward chest) no player
+ * atual. Espelha o applySharedToPlayer do servidor: instâncias equipadas
+ * (loc "equip:*") continuam por personagem. */
+function accountApplySharedInventory(shared) {
+  if (!shared || typeof shared !== "object" || typeof G === "undefined" || !G.p) return;
+  const p = G.p;
+  if (shared.bag && typeof shared.bag === "object" && !Array.isArray(shared.bag)) p.bag = Object.assign({}, shared.bag);
+  if (shared.lootPouch && typeof shared.lootPouch === "object" && !Array.isArray(shared.lootPouch)) p.lootPouch = Object.assign({}, shared.lootPouch);
+  if (Array.isArray(shared.depot)) p.depot = shared.depot.slice();
+  if (shared.rewardChest && typeof shared.rewardChest === "object" && !Array.isArray(shared.rewardChest)) p.rewardChest = Object.assign({}, shared.rewardChest);
+  if (Array.isArray(shared.rewardChestBundles)) p.rewardChestBundles = shared.rewardChestBundles.slice();
+  if (Array.isArray(shared.itemInstances)) {
+    const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
+      .filter((i) => i && typeof i === "object" && String(i.loc || "").indexOf("equip:") === 0);
+    p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
+  }
+  if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
+  p._sharedInv = 1;
+}
+/* Se a resposta de uma API de containers trouxer sharedInventory, aplica. */
+function accountMaybeApplyShared(data) {
+  if (data && data.sharedInventory) accountApplySharedInventory(data.sharedInventory);
+  return data;
+}
+
 async function accountLoadCharacter(token, charId) {
   const r = await _api("GET", "/api/characters/" + encodeURIComponent(charId), null, token);
   if(r.data.ok){
@@ -1459,8 +1492,10 @@ async function accountLoadCharacter(token, charId) {
     try{snapshot=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
     accountMergeCharacterCache([{id:character.id,name:character.name,voc:character.voc,
       level:character.level,saveVersion:character.saveVersion,sex:snapshot.sex||"male",
-      outfit:snapshot.outfit||null,snapshot}]);
-    return {ok:true,character};
+      outfit:snapshot.outfit||null,snapshot,sharedInventory:r.data.sharedInventory||null}]);
+    if (r.data.sharedInventory && typeof G !== "undefined" && G.p && String(G.p.id) === String(character.id))
+      accountApplySharedInventory(r.data.sharedInventory);
+    return {ok:true,character,sharedInventory:r.data.sharedInventory||null};
   }
   return {ok:false,msg:r.data.msg||"Falha ao carregar personagem"};
 }
@@ -1490,7 +1525,7 @@ async function accountSaveCharacter(token, charId, p) {
     const putOnce=(expected)=>_api("PUT","/api/characters/"+encodeURIComponent(id),
       Object.assign({token,expected_version:Number(expected)},accountLeaseFields(),accountSavePayload(p)));
     let r=await putOnce(summary.saveVersion);
-    if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
+    if(r.data.ok){accountMergeCharacterCache([r.data.character]);accountMaybeApplyShared(r.data);return true;}
     // Corrida benigna (tick final, market, claim): atualize a revisão e tente
     // uma vez. Só bloqueie a aba se o retry também perder — aí há sessão
     // concorrente de verdade. Gold/inventário protegidos no servidor.
@@ -1501,7 +1536,7 @@ async function accountSaveCharacter(token, charId, p) {
       summary=cache.find((c)=>String(c.id)===id);
       if(summary&&Number.isSafeInteger(Number(summary.saveVersion))){
         r=await putOnce(summary.saveVersion);
-        if(r.data.ok){accountMergeCharacterCache([r.data.character]);return true;}
+        if(r.data.ok){accountMergeCharacterCache([r.data.character]);accountMaybeApplyShared(r.data);return true;}
       }
     }
     if(r.code===409){

@@ -341,8 +341,31 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
+  // Inventário da conta: tick terminal extrai containers para o shared.
+  const sharedByAcc=new Map(),sharedMirror=new Map();
+  if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+    const tickInstanceId=String(row.instance_id||"");
+    for(const projection of next.characters||[]){
+      const c=this.findCharacter(projection.id);if(!c)continue;
+      const aid=Number(c.account_id);if(!aid)continue;
+      if(aid!==Number(accountId)){
+        const ownInst=this.instanceGet(aid);
+        if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
+      }
+      let shared=sharedByAcc.get(aid);
+      if(!shared){
+        const a=this.findAccountById(aid);
+        let s=a&&a.shared_inventory;
+        if(typeof s==="string"){try{s=JSON.parse(s);}catch(e){s=null;}}
+        shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
+        if(a)a.shared_inventory=shared;
+        sharedByAcc.set(aid,shared);
+      }
+      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+    }
+  }
   for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
-    if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    if(!c)continue;c.data=sharedMirror.get(Number(projection.id))||projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
   if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
@@ -361,8 +384,31 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
+  // Inventário da conta: tick terminal extrai containers para o shared.
+  const sharedByAcc=new Map(),sharedMirror=new Map();
+  if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+    const tickInstanceId=String(row.instance_id||"");
+    for(const projection of next.characters||[]){
+      const c=this.findCharacter(projection.id);if(!c)continue;
+      const aid=Number(c.account_id);if(!aid)continue;
+      if(aid!==Number(accountId)){
+        const ownInst=this.instanceGet(aid);
+        if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
+      }
+      let shared=sharedByAcc.get(aid);
+      if(!shared){
+        const a=this.findAccountById(aid);
+        let s=a&&a.shared_inventory;
+        if(typeof s==="string"){try{s=JSON.parse(s);}catch(e){s=null;}}
+        shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
+        if(a)a.shared_inventory=shared;
+        sharedByAcc.set(aid,shared);
+      }
+      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+    }
+  }
   const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
-    if(!c)continue;c.data=projection.data;c.level=projection.level;c.voc=projection.voc;
+    if(!c)continue;c.data=sharedMirror.get(Number(projection.id))||projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
   if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
@@ -517,6 +563,59 @@ JsonStore.prototype.listAccountCoinSummaries = function () {
 JsonStore.prototype.accountGold = function (accountId) {
   const a = this.findAccountById(accountId);
   return a ? Math.max(0, Math.floor(Number(a.gold) || 0)) : 0;
+};
+
+/* ---- inventário compartilhado da conta (bag/pouch/depot/reward chest) ---- */
+const SharedInv = (() => {
+  try { return require("./shared_inventory"); } catch (e) { return null; }
+})();
+function sharedInvMergeChars(store, accountId) {
+  if (!SharedInv) return SharedInv.emptySharedInventory();
+  let chars = [];
+  try { chars = store.charactersOf(accountId); } catch (e) { chars = []; }
+  return SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars);
+}
+/* Extrai os containers do data de um personagem para o shared da conta e
+ * devolve o data com o mirror aplicado (o data salvo sempre espelha o shared).
+ * rewardChest é sempre server-owned (muda só via /api/reward/claim), então é
+ * preservado do shared. lootPouch é autoritativo no tick terminal da instância
+ * (loot do combate) e preservado nos saves de cidade (muda via APIs de pouch). */
+function sharedInvExtractMirror(shared, data, terminal) {
+  if (!SharedInv) return data;
+  const p = typeof data === "string"
+    ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })()
+    : data;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return data;
+  const keep = {
+    lootPouch: Object.assign({}, shared.lootPouch),
+    rewardChest: Object.assign({}, shared.rewardChest),
+    rewardChestBundles: Array.isArray(shared.rewardChestBundles) ? shared.rewardChestBundles.slice() : [],
+  };
+  SharedInv.extractSharedFromPlayer(p, shared);
+  if (!terminal) shared.lootPouch = keep.lootPouch;
+  shared.rewardChest = keep.rewardChest;
+  shared.rewardChestBundles = keep.rewardChestBundles;
+  SharedInv.applySharedToPlayer(p, shared);
+  return typeof data === "string" ? JSON.stringify(p) : p;
+}
+JsonStore.prototype.accountSharedInventory = function (accountId) {
+  const a = this.findAccountById(accountId);
+  if (!a) return SharedInv ? SharedInv.emptySharedInventory() : {};
+  let s = a.shared_inventory;
+  if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
+  if (!SharedInv || !SharedInv.isSharedInventory(s)) {
+    s = sharedInvMergeChars(this, accountId);
+    a.shared_inventory = s;
+    this._save();
+  }
+  return SharedInv.normalizeSharedInventory(s);
+};
+JsonStore.prototype.setAccountSharedInventory = function (accountId, s) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.shared_inventory = SharedInv ? SharedInv.normalizeSharedInventory(s) : s;
+  this._save();
+  return a;
 };
 JsonStore.prototype.setAccountGold = function (accountId, gold) {
   const a = this.findAccountById(accountId);
@@ -1228,6 +1327,26 @@ async function MysqlStore() {
         [JSON.stringify(m), JSON.stringify(d), Number(accountId)]);
       return this.findAccountById(accountId);
     },
+    /* ---- inventário compartilhado da conta (bag/pouch/depot/reward) ---- */
+    async accountSharedInventory(accountId) {
+      const rows = await this.query("SELECT shared_inventory FROM accounts WHERE id = ?", [Number(accountId)]);
+      let s = rows[0] ? rows[0].shared_inventory : null;
+      if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
+      if (!s || s.v !== 1) {
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        s = SharedInv ? SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars)
+          : { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
+        await this.setAccountSharedInventory(Number(accountId), s);
+      }
+      return s;
+    },
+    async setAccountSharedInventory(accountId, s) {
+      const empty = { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
+      await this.run("UPDATE accounts SET shared_inventory = ? WHERE id = ?",
+        [JSON.stringify(s || empty), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
@@ -1648,11 +1767,38 @@ async function MysqlStore() {
         }
         const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        // Inventário da conta: tick terminal extrai containers para o shared
+        // (o worker só roda sem lease; instância própria concorrente é rara,
+        // mas contas de convidados com instância ativa são preservadas).
+        const sharedByAcc=new Map(),sharedMirror=new Map();
+        if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+          const tickInstanceId=String(row.instance_id||"");
+          for(const projection of next.characters||[]){
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
+            if(aid!==Number(accountId)){
+              const [instRows]=await conn.query(
+                "SELECT instance_id FROM account_instances WHERE account_id=? AND status='active' LIMIT 1",[aid]);
+              if(instRows.length&&String(instRows[0].instance_id)!==tickInstanceId)continue;
+            }
+            let shared=sharedByAcc.get(aid);
+            if(!shared){
+              let s=null;
+              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
+              if(srows[0]&&srows[0].shared_inventory){try{s=JSON.parse(srows[0].shared_inventory);}catch(e){}}
+              shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
+              sharedByAcc.set(aid,shared);
+            }
+            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+          }
+        }
         for(const projection of next.characters||[])await conn.query(
           `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
            WHERE id=?`,
-          [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
-           projection.max_mp,Number(projection.id)]);
+          [sharedMirror.get(Number(projection.id))||projection.data,projection.level,projection.voc,projection.hp,
+           projection.mp,projection.max_hp,projection.max_mp,Number(projection.id)]);
+        for(const [aid,shared] of sharedByAcc.entries())
+          await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
         await conn.query(
           `UPDATE account_instances SET state=?,version=version+1,saved_at=?,worker_cursor_at=?,
              worker_total_ms=worker_total_ms+?,status=?,terminal_reason=?,ended_at=? WHERE account_id=?`,
@@ -1683,11 +1829,40 @@ async function MysqlStore() {
         const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
         if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
         const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
+        // personagens para accounts.shared_inventory e espelha o shared no data
+        // salvo de cada um (containers são da conta, não do personagem).
+        const sharedByAcc=new Map(),sharedMirror=new Map();
+        if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+          const tickInstanceId=String(row.instance_id||"");
+          for(const projection of next.characters||[]){
+            const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const aid=acctRows[0]?Number(acctRows[0].account_id):null;if(!aid)continue;
+            if(aid!==Number(accountId)){
+              // Convidado: preserva se a conta tiver OUTRA instância ativa
+              // (corrida rara: 2 chars da mesma conta em instâncias distintas).
+              const [instRows]=await conn.query(
+                "SELECT instance_id FROM account_instances WHERE account_id=? AND status='active' LIMIT 1",[aid]);
+              if(instRows.length&&String(instRows[0].instance_id)!==tickInstanceId)continue;
+            }
+            let shared=sharedByAcc.get(aid);
+            if(!shared){
+              let s=null;
+              const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
+              if(srows[0]&&srows[0].shared_inventory){try{s=JSON.parse(srows[0].shared_inventory);}catch(e){}}
+              shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
+              sharedByAcc.set(aid,shared);
+            }
+            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+          }
+        }
         for(const projection of next.characters||[])await conn.query(
           `UPDATE characters SET data=?,level=?,voc=?,hp=?,mp=?,max_hp=?,max_mp=?,save_version=save_version+1
            WHERE id=?`,
-          [projection.data,projection.level,projection.voc,projection.hp,projection.mp,projection.max_hp,
-           projection.max_mp,Number(projection.id)]);
+          [sharedMirror.get(Number(projection.id))||projection.data,projection.level,projection.voc,projection.hp,projection.mp,
+           projection.max_hp,projection.max_mp,Number(projection.id)]);
+        for(const [aid,shared] of sharedByAcc.entries())
+          await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
         // Gold é por conta: propaga o saldo autoritativo para accounts.gold.
         const walletByAcc=new Map();
         for(const projection of next.characters||[]){
@@ -2553,6 +2728,8 @@ async function ensureSchema(pool) {
   try { await pool.query("ALTER TABLE accounts ADD COLUMN missions MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN missions_done MEDIUMTEXT NULL"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN shared_inventory MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

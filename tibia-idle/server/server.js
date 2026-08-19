@@ -48,6 +48,10 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
+// Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
+// os personagens). Pure module — db.js persiste accounts.shared_inventory.
+let SharedInv = null;
+try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null; }
 const store = require("./store");
 const mailer = require("./mailer");
 
@@ -727,10 +731,17 @@ async function loadCharacter(db, token, id) {
   if (!character || Number(character.account_id) !== Number(acc.id))
     return { code:404, body:{ok:false,msg:"Personagem não encontrado"} };
   let data = character.data;
+  let sharedInventory = null;
   try {
     const parsed = typeof data === "string" ? JSON.parse(data) : (data || {});
     parsed.gold = Math.max(0, Math.floor(Number(acc.gold) || 0));
     parsed.vipUntil = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
+    // Inventário da conta: bag/lootPouch/depot/reward chest são compartilhados
+    // por todos os personagens — injeta o shared por cima do save individual.
+    if (SharedInv && typeof db.accountSharedInventory === "function") {
+      sharedInventory = await db.accountSharedInventory(acc.id);
+      SharedInv.applySharedToPlayer(parsed, sharedInventory);
+    }
     data = JSON.stringify(parsed);
   } catch (e) {}
   return {
@@ -743,6 +754,7 @@ async function loadCharacter(db, token, id) {
         level:character.level, saveVersion:Number(character.save_version)||0,
         data,
       },
+      ...(sharedInventory ? { sharedInventory } : {}),
     },
   };
 }
@@ -837,7 +849,53 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
   const player=protectedPlayer(descriptor,prepared.save.id);if(!player)return prepared;
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
   prepared.save.voc=String(player.voc||prepared.save.voc);prepared.save.extra.hp=Math.max(0,Number(player.hp)||0);
-  prepared.save.extra.mp=Math.max(0,Number(player.mp)||0);return prepared;
+  prepared.save.extra.mp=Math.max(0,Number(player.mp)||0);
+  // Snapshot do servidor: containers vêm todos da instância (que foi
+  // hidratada do shared) — a extração abaixo é "autoritativa".
+  prepared.authoritativeInstance=true;
+  return prepared;
+}
+
+/* Move os 4 containers do player para o inventário da conta e espelha o
+ * shared de volta no save do personagem (mirror). Em save COMUM (cidade),
+ * bag/depot/itemInstances vêm do cliente (o PUT é o canal de persistência
+ * do depot), mas lootPouch/rewardChest permanecem do shared (server-owned). */
+async function splitSharedInventory(db, acc, p, authoritative) {
+  if (!SharedInv || typeof db.accountSharedInventory !== "function") return null;
+  const shared = await db.accountSharedInventory(acc.id);
+  if (authoritative) {
+    SharedInv.extractSharedFromPlayer(p, shared);
+  } else {
+    const keep = {
+      lootPouch: Object.assign({}, shared.lootPouch),
+      rewardChest: Object.assign({}, shared.rewardChest),
+      rewardChestBundles: shared.rewardChestBundles.slice(),
+    };
+    SharedInv.extractSharedFromPlayer(p, shared);
+    shared.lootPouch = keep.lootPouch;
+    shared.rewardChest = keep.rewardChest;
+    shared.rewardChestBundles = keep.rewardChestBundles;
+  }
+  if (typeof db.setAccountSharedInventory === "function")
+    await db.setAccountSharedInventory(acc.id, shared);
+  SharedInv.applySharedToPlayer(p, shared);
+  return shared;
+}
+
+/* Carrega o player de cidade a partir do mirror do personagem, hidratado com
+ * o shared da conta. Toda operação de container em cidade muta este player e
+ * persiste via persistClaimedPlayer (extração autoritativa). */
+async function loadCityPlayer(db, acc, character) {
+  let p = character.data;
+  if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
+  p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
+  if (SharedInv && typeof db.accountSharedInventory === "function") {
+    try {
+      const shared = await db.accountSharedInventory(acc.id);
+      SharedInv.applySharedToPlayer(p, shared);
+    } catch (e) { /* shared opcional */ }
+  }
+  return p;
 }
 
 function saveConflictResponse(result){
@@ -886,6 +944,14 @@ async function saveCharacter(db, body, id) {
   }else{
     prepared=await enforceAuthoritativeProgress(db,acc.id,prepared);
   }
+  // Inventário da conta: extrai bag/lootPouch/depot/reward chest do save para
+  // o shared e espelha o shared no personagem (todos os chars compartilham).
+  let sharedInventory=null;
+  if(SharedInv&&typeof db.accountSharedInventory==="function"){
+    let player={};try{player=JSON.parse(prepared.save.data);}catch(e){player={};}
+    sharedInventory=await splitSharedInventory(db,acc,player,!!prepared.authoritativeInstance);
+    prepared.save.data=JSON.stringify(player);
+  }
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
   if(!result.ok)return saveConflictResponse(result);
   const updated=result.characters[0];
@@ -897,7 +963,8 @@ async function saveCharacter(db, body, id) {
   const account=await ensureAccountWallet(db,acc);
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),
     character:accountCharacterSummary(updated),account:accountPublicView(account),
-    instance:patchedInstance?instanceSummary(patchedInstance,false):null}};
+    instance:patchedInstance?instanceSummary(patchedInstance,false):null,
+    ...(sharedInventory?{sharedInventory}:{})}};
 }
 
 function applyRewardChestClaim(p,body){
@@ -912,6 +979,11 @@ function applyRewardChestClaim(p,body){
 }
 
 async function persistClaimedPlayer(db,acc,character,p,lease){
+  // Inventário da conta: operações de cidade mudam o shared (pouch/depot/
+  // reward); o save do personagem vira mirror do shared.
+  let sharedInventory=null;
+  if(SharedInv&&typeof db.accountSharedInventory==="function")
+    sharedInventory=await splitSharedInventory(db,acc,p,true);
   const result=await db.saveCharactersVersioned(acc.id,[{
     id:Number(character.id),expectedVersion:Number(character.save_version),voc:character.voc,
     level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
@@ -925,7 +997,8 @@ async function persistClaimedPlayer(db,acc,character,p,lease){
   rewardChestEnsure(p);
   return {code:200,body:{ok:true,claimed:true,saveVersion:Number(updated.save_version),
     character:accountCharacterSummary(updated),rewardChest:p.rewardChest||{},
-    rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{}}};
+    rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{},
+    ...(sharedInventory?{sharedInventory}:{})}};
 }
 
 async function claimRewardChest(db,body){
@@ -972,8 +1045,7 @@ async function claimRewardChest(db,body){
       return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível recolher a recompensa",
         instance:instanceSummary(last.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"?p:{};
+  let p=await loadCityPlayer(db,acc,character);
   applyRewardChestClaim(p,body);
   return persistClaimedPlayer(db,acc,character,p,lease);
 }
@@ -1262,6 +1334,14 @@ async function prepareInstanceState(db,acc,input){
     canonical.vipUntil=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.vip_until)||0));
     canonical.accountId=Number(c.account_id);
     if(Number(c.hp)>0)canonical.hp=Number(c.hp);if(Number(c.mp)>=0)canonical.mp=Number(c.mp);
+    // Inventário da conta: hidrata bag/lootPouch/depot/reward chest do shared
+    // no membro (a instância combate com os containers compartilhados).
+    if(SharedInv&&typeof db.accountSharedInventory==="function"){
+      try{
+        const shared=await db.accountSharedInventory(Number(c.account_id));
+        SharedInv.applySharedToPlayer(canonical,shared);
+      }catch(e){/* shared opcional */}
+    }
     // Preferências de loot do snapshot do cliente: o DB pode estar atrasado
     // (toggle local antes do PUT). Não é progresso econômico — só autoloot.
     const clientP=player&&typeof player==="object"&&!Array.isArray(player)?player:{};
@@ -1860,8 +1940,7 @@ async function destroyLootPouchItem(db,body){
       status:result.instance.status,source:"pouch-destroy",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,destroyed,slug,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   const destroyed=destroyAuthPouchItem(p,slug);
   if(!destroyed)
     return {code:400,body:{ok:false,error:"POUCH_ITEM_MISSING",msg:"Item não encontrado na Loot Pouch"}};
@@ -1906,8 +1985,7 @@ async function setAutoSupplyStashPreference(db,body){
       status:result.instance.status,source:"stash-auto",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,slug,on,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!setAuthAutoSupplyStash(p,slug,on))
     return {code:400,body:{ok:false,error:"STASH_AUTO_FAILED",msg:"Item não pode usar Auto Supply Stash"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -1953,8 +2031,7 @@ async function setLootConfigPreference(db,body){
       status:result.instance.status,source:"loot-config",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,lootConfig,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!setAuthLootConfig(p,lootConfig))
     return {code:400,body:{ok:false,error:"LOOT_CONFIG_FAILED",msg:"Não foi possível salvar loot config"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -2034,8 +2111,7 @@ async function sellBagItems(db,body){
       status:result.instance.status,source:"bag-sell",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,gold:soldGold,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   const soldGold=slug?sellAuthBagItem(p,slug,instId||null):sellAuthAllBag(p);
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
   if(persisted.code!==200)return persisted;
@@ -2081,8 +2157,7 @@ async function moveToSupplyStash(db,body){
       status:result.instance.status,source:"stash-move",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!moveItemToSupplyStash(p,{source,slug}))
     return {code:400,body:{ok:false,error:"STASH_MOVE_FAILED",msg:"Não foi possível mover o item (stash cheia ou item ausente)"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -2134,8 +2209,7 @@ async function withdrawFromSupplyStash(db,body){
       status:result.instance.status,source:"stash-withdraw",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!moveItemFromSupplyStash(p,payload))
     return {code:400,body:{ok:false,error:"STASH_WITHDRAW_FAILED",msg:"Não foi possível retirar o item (ausente ou mochila cheia)"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -2180,8 +2254,7 @@ async function equipSupplyStashItem(db,body){
       status:result.instance.status,source:"stash-equip",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!equipFromSupplyStash(p,slug,slot||undefined))
     return {code:400,body:{ok:false,error:"STASH_EQUIP_FAILED",msg:"Não foi possível equipar (stash vazia, vocação ou nível)"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
@@ -2235,8 +2308,7 @@ async function equipInstanceItem(db,body){
     return {code:200,body:{ok:true,equipped:unequip?null:String(body.slug||""),
       slot:unequip?String(body.slot||""):null,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   let r;
   if(unequip)r=unequipFromContainerAuth(p,String(body.slot||""),String(body.dest||"bag"));
   else r=equipFromContainerAuth(p,String(body.slug||""),String(body.source||"bag"),
@@ -2288,8 +2360,7 @@ async function movePouchToBag(db,body){
       status:result.instance.status,source:"pouch-to-bag",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
   }
-  let p=character.data;if(typeof p==="string"){try{p=JSON.parse(p);}catch(e){p={};}}
-  p=p&&typeof p==="object"&&!Array.isArray(p)?cloneJson(p):{};
+  let p=await loadCityPlayer(db,acc,character);
   if(!moveLootPouchToBag(p,slug,qty))
     return {code:400,body:{ok:false,error:"POUCH_TO_BAG_FAILED",msg:"Não foi possível mover (mochila cheia, CAP ou item ausente)"}};
   const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
