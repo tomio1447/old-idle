@@ -546,6 +546,15 @@ function unequipToContainer(p, slot, dest) {
 
 function moveItemToBag(p, payload) {
   if (!payload) return false;
+  if (payload.source === "depot") {
+    if (typeof depotRetrieve !== "function") return false;
+    const r = depotRetrieve(p, payload.ref);
+    if (!r || !r.ok) {
+      if (r && r.msg && typeof toast === "function") toast(r.msg, "bad");
+      return false;
+    }
+    return true;
+  }
   if (payload.source === "pouch") {
     const count = p.lootPouch && p.lootPouch[payload.slug] ? p.lootPouch[payload.slug] : 0;
     if (count <= 0) return false;
@@ -592,6 +601,15 @@ function moveItemToPouch(p, payload) {
 function moveItemToEquip(p, payload, slot) {
   if (!payload) return false;
   if (payload.source === "equip") return false;
+  if (payload.source === "depot") {
+    if (typeof depotEquip !== "function") return false;
+    const r = depotEquip(p, payload.ref);
+    if (!r || !r.ok) {
+      if (r && r.msg && typeof toast === "function") toast(r.msg, "bad");
+      return false;
+    }
+    return true;
+  }
   return equipItemFromContainer(p, payload.slug, payload.source, slot, payload.instId);
 }
 

@@ -421,7 +421,7 @@ function renderDepotStoreList(p) {
 
 function renderDepotGrid(p) {
   var total = 30;
-  var html = '<div class="inv-grid">';
+  var html = '<div class="inv-grid" id="depot-grid">';
   for (var i = 0; i < total; i++) {
     var ref = p.depot[i];
     var slug = forgeStoredSlug(p, ref);
@@ -494,20 +494,43 @@ function bindDepotModal() {
   });
 
   body.querySelectorAll('[data-depot-ref]').forEach(function(el) {
+    var ref = el.dataset.depotRef;
+    var slug = forgeStoredSlug(G.p, ref);
     el.addEventListener('click', function() {
-      openDepotItemMenu(G.p, el.dataset.depotRef, el);
+      openDepotItemMenu(G.p, ref, el);
     });
     el.addEventListener('contextmenu', function(ev) {
       ev.preventDefault();
-      openDepotItemMenu(G.p, el.dataset.depotRef, el);
+      openDepotItemMenu(G.p, ref, el);
     });
     el.addEventListener('mouseenter', function() {
-      if (typeof showTip === 'function') showTip(itemTip(forgeStoredSlug(G.p, el.dataset.depotRef), 'Clique para opções'));
+      if (typeof showTip === 'function') showTip(itemTip(slug, 'Arraste para mochila/equip · Clique para opções'));
     });
     el.addEventListener('mouseleave', function() {
       if (typeof hideTip === 'function') hideTip();
     });
+    // Mover por drag & drop como nos outros containers (mochila/pouch/stash).
+    if (typeof bindItemDrag === 'function' && slug) {
+      bindItemDrag(el, { source: 'depot', slug: slug, ref: ref });
+      el.addEventListener('dragend', function() {
+        // re-renderiza o depot se o modal continuar aberto (drop fora do grid)
+        var body = forgeModalBody();
+        if (body && body.querySelector('[data-depot-ref]')) openDepotModal();
+      });
+    }
   });
+
+  // Soltar item da mochila/equip no grid = guardar no Depot.
+  var depotGrid = body.querySelector('#depot-grid');
+  if (depotGrid && typeof bindDrop === 'function') {
+    bindDrop(depotGrid, function(payload) {
+      if (!payload || (payload.source !== 'bag' && payload.source !== 'equip') || !payload.slug) return false;
+      var r = depotStore(G.p, payload.instId || payload.slug);
+      if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
+      if (r.ok) openDepotModal();
+      return r.ok;
+    });
+  }
 
   body.querySelectorAll('[data-exa-ref]').forEach(function(el) {
     el.addEventListener('click', function() {

@@ -2343,7 +2343,7 @@ function renderSupplyStash(p) {
   if (typeof bindDrop === "function" && !box.dataset.dropBound) {
     box.dataset.dropBound = "1";
     bindDrop(box, (payload) => {
-      if (!payload || !payload.slug) return false;
+      if (!payload || !payload.slug || payload.source === "depot") return false;
       if (typeof persistMoveToSupplyStash === "function") {
         persistMoveToSupplyStash(G.p, {
           source: payload.source || "pouch",
