@@ -174,6 +174,8 @@ function spellValues(p, s) {
     return { min: min, max: max };
   }
   const level = p.level || 1;
+  const lvlMul = (typeof CanaryVocation !== "undefined" && CanaryVocation.knightSpellLevelMul)
+    ? CanaryVocation.knightSpellLevelMul(p && p.voc, s) : 1;
   let lo, hi;
   if (f.modo === "magic") {
     let ml = typeof effMagic === "function" ? effMagic(p) : (p.ml || 0);
@@ -189,17 +191,17 @@ function spellValues(p, s) {
         typeof effSkill === "function") {
       ml += Math.floor(effSkill(p, "shield") / 4);
     }
-    lo = (f.lvlMin || 0) * level + (f.mlMin || 0) * ml + (f.flatMin || 0);
-    hi = (f.lvlMax || 0) * level + (f.mlMax || 0) * ml + (f.flatMax || 0);
+    lo = (f.lvlMin || 0) * level * lvlMul + (f.mlMin || 0) * ml + (f.flatMin || 0);
+    hi = (f.lvlMax || 0) * level * lvlMul + (f.mlMax || 0) * ml + (f.flatMax || 0);
   } else {
     const skill = typeof effSkill === "function"
       ? effSkill(p, spellSkillFor(p, s)) : (p.skills ? p.skills.fist : 10);
     const atk = spellAttackValue(p, s);
     const sa = skill * atk;
     lo = (f.saMin || 0) * sa + (f.skMin || 0) * skill + (f.atMin || 0) * atk +
-         (f.lvlMin || 0) * level + (f.flatMin || 0);
+         (f.lvlMin || 0) * level * lvlMul + (f.flatMin || 0);
     hi = (f.saMax || 0) * sa + (f.skMax || 0) * skill + (f.atMax || 0) * atk +
-         (f.lvlMax || 0) * level + (f.flatMax || 0);
+         (f.lvlMax || 0) * level * lvlMul + (f.flatMax || 0);
   }
   lo = Math.max(0, lo);
   hi = Math.max(lo, hi);

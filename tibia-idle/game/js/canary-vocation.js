@@ -70,6 +70,8 @@
   /* Spell-only idle extras: Monk +25% on attack spells (fist AA stays 1×).
    * Composes with IDLE_BASE_DMG_MUL so Knight/Sorcerer spells stay at 1.15. */
   const IDLE_SPELL_EXTRA_MUL = { monk: 1.25 };
+  /* Knight attack spells: +25% no termo de level da fórmula (lvlMin/lvlMax). */
+  const KNIGHT_SPELL_LEVEL_MUL = 1.25;
 
   function idleBaseDamageMul(voc) {
     const base = baseVocName(voc);
@@ -82,6 +84,11 @@
     const extra = IDLE_SPELL_EXTRA_MUL[base];
     const e = extra > 0 ? extra : 1;
     return idleBaseDamageMul(voc) * e;
+  }
+
+  function knightSpellLevelMul(voc, s) {
+    if (!s || s.type !== "attack") return 1;
+    return baseVocName(voc) === "knight" ? KNIGHT_SPELL_LEVEL_MUL : 1;
   }
 
   function spellAllowedForVoc(s, voc) {
@@ -219,8 +226,8 @@
 
   const api = {
     BASE_VOC, PROMOTED_VOC, VOCATION_REGEN, FRIEND_HEALS, DEFAULT_SELF_HEAL,
-    IDLE_BASE_DMG_MUL, IDLE_SPELL_EXTRA_MUL, baseVocName,
-    idleBaseDamageMul, idleSpellDamageMul,
+    IDLE_BASE_DMG_MUL, IDLE_SPELL_EXTRA_MUL, KNIGHT_SPELL_LEVEL_MUL, baseVocName,
+    idleBaseDamageMul, idleSpellDamageMul, knightSpellLevelMul,
     spellAllowedForVoc, friendHealSpellIds, selfHealSpellIds,
     resolveSpellId, sanitizePlayerSpells, vocationRegenSpec,
     applyVocationRegen, applyVocationRegenTo,

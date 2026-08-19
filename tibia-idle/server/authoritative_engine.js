@@ -413,6 +413,9 @@ try{
   // Buried Cathedral: itens de loot (ectoplasms, hexagonal ruby etc.) +
   // hunt 250+ — sem isso o Sell All online não precifica os drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"buried-cathedral.js"),"utf8"),sandbox);}catch(_bc){/* opcional */}
+  // Ingol Terrain: creature products (harpy feathers, liodile fang etc.) +
+  // hunt 250+ — sem isso o Sell All online não precifica os drops.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"ingol-terrain.js"),"utf8"),sandbox);}catch(_ig){/* opcional */}
   // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
@@ -475,6 +478,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"],cat:"hard",pack:10,packMin:6,packMax:10},
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10},
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "ingol-terrain":{monsters:["harpy","crape-man","liodile","boar-man","carnivostrich"],cat:"hard",pack:10,packMin:6,packMax:10},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
@@ -899,7 +903,8 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       const mode=challenge.huntMode||(challenge.box?"box":"");
       if(mode==="box"||mode==="safe"||mode==="kiting")item.p.config.attackMode=mode;
       if(challenge.kiteDistance)item.p.config.kiteDistance=challenge.kiteDistance;
-      if(mode==="box"||mode==="safe")auth.huntMode=mode;}
+      if(mode==="box"||mode==="safe")auth.huntMode=mode;
+      else if(mode==="kiting")auth.huntMode="";}
     /* Aplica as demais configurações do Helper enviadas pelo cliente no tick.
      * Whitelist evita que campos estranhos entrem na autoridade. */
     if(pos.cfg&&typeof pos.cfg==="object"){
@@ -908,7 +913,8 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
       for(const k of Object.keys(pos.cfg)){
         if(!allowed.has(k))continue;
         const v=pos.cfg[k];
-        if(v!==undefined)item.p.config[k]=v;
+        if(v===undefined)continue;
+        item.p.config[k]=(v&&typeof v==="object")?JSON.parse(JSON.stringify(v)):v;
       }
     }
   }}
@@ -2003,13 +2009,15 @@ function spellValues(auth,p,s){
     const f=s&&s.f;
     if(!f){const base=Math.max(4,(s&&s.mana?s.mana:20)*.9);min=Math.floor(base*.7);max=Math.floor(base*1.3);}
     else{
-      const level=Number(p.level)||1;let lo,hi;
+      const level=Number(p.level)||1;
+      const lvlMul=CanaryVocation.knightSpellLevelMul?CanaryVocation.knightSpellLevelMul(p&&p.voc,s):1;
+      let lo,hi;
       if(f.modo==="magic"){const ml=stanceMLBonus(p,s,(Number(p.ml)||0)+gearSkillBonus(p,"mag"));
-        lo=(f.lvlMin||0)*level+(f.mlMin||0)*ml+(f.flatMin||0);
-        hi=(f.lvlMax||0)*level+(f.mlMax||0)*ml+(f.flatMax||0);
+        lo=(f.lvlMin||0)*level*lvlMul+(f.mlMin||0)*ml+(f.flatMin||0);
+        hi=(f.lvlMax||0)*level*lvlMul+(f.mlMax||0)*ml+(f.flatMax||0);
       }else{const skill=stanceSkill(p,spellSkillFor(p,s));const atk=spellAttackValue(p,s);const sa=skill*atk;
-        lo=(f.saMin||0)*sa+(f.skMin||0)*skill+(f.atMin||0)*atk+(f.lvlMin||0)*level+(f.flatMin||0);
-        hi=(f.saMax||0)*sa+(f.skMax||0)*skill+(f.atMax||0)*atk+(f.lvlMax||0)*level+(f.flatMax||0);}
+        lo=(f.saMin||0)*sa+(f.skMin||0)*skill+(f.atMin||0)*atk+(f.lvlMin||0)*level*lvlMul+(f.flatMin||0);
+        hi=(f.saMax||0)*sa+(f.skMax||0)*skill+(f.atMax||0)*atk+(f.lvlMax||0)*level*lvlMul+(f.flatMax||0);}
       lo=Math.max(0,lo);hi=Math.max(lo,hi);
       min=Math.floor(lo);max=Math.floor(hi);
     }
@@ -3562,20 +3570,23 @@ function skillRadiusCells(cx0,cy0,r){
   return out;
 }
 function skillWaveDir(fromCell,toCell){
-  const dx=(Number(toCell&&toCell.cx)||0)-(Number(fromCell&&fromCell.cx)||0),
-    dy=(Number(toCell&&toCell.cy)||0)-(Number(fromCell&&fromCell.cy)||0);
-  if(Math.abs(dx)>Math.abs(dy))return dx>=0?{dx:1,dy:0}:{dx:-1,dy:0};
-  return dy>=0?{dx:0,dy:1}:{dx:0,dy:-1};
+  const d=spellAreaDirection(fromCell,toCell);
+  return d==="e"?{dx:1,dy:0}:d==="w"?{dx:-1,dy:0}:d==="n"?{dx:0,dy:-1}:{dx:0,dy:1};
 }
 function skillWaveCells(mob,pl,len,spread,auth){
-  const out=[];len=Math.max(1,len|0);spread=spread|0;
-  const from=entityGridCell(mob,auth),to=entityGridCell(pl,auth),d=skillWaveDir(from,to),
+  const from=entityGridCell(mob,auth),to=entityGridCell(pl,auth);
+  len=Math.max(1,len|0);spread=spread|0;
+  if(!spread){
+    const beam=spellAreaCells(auth,{area:"AREA_BEAM"+len},from,to);
+    if(beam&&beam.length)return beam;
+  }
+  const out=[],d=skillWaveDir(from,to),
     cols=spread>0?Math.floor((len-(len%spread))/spread)*2+1:1,
     centro=Math.floor(cols/2);let colSpread=cols;
   for(let y=1;y<=len;y++){
-    const minOff=cols-colSpread-centro,maxOff=colSpread-1-centro;
+    const dist=len-y+1,minOff=cols-colSpread-centro,maxOff=colSpread-1-centro;
     for(let h=minOff;h<=maxOff;h++)out.push({
-      cx:from.cx+d.dx*y+(d.dy!==0?h:0),cy:from.cy+d.dy*y+(d.dx!==0?h:0)});
+      cx:from.cx+d.dx*dist+(d.dy!==0?h:0),cy:from.cy+d.dy*dist+(d.dx!==0?h:0)});
     if(spread>0&&y%spread===0)colSpread--;
   }
   return out;
@@ -6170,6 +6181,8 @@ function step(auth,now,opts){if(auth.ended)return;
             // alvos e no visual (exori/exori gran batem na box sem corrente).
             const ehChain=!areaName&&(Number(s.chain)>1||!!(md&&md.chain));
             const chainFx=(md&&md.chainFx)||s.chainFx||null;
+            const knightAreaShare=!!(areaName&&KNIGHT_EXORI.has(s.id));
+            let sharedKnightDmg=null;
             for(let ti=0;ti<targets.length;ti++){
               const tgt=targets[ti];
               if(tgt.greedImmune||tgt.qteImmune){
@@ -6180,11 +6193,16 @@ function step(auth,now,opts){if(auth.ended)return;
                 }
                 continue;
               }
-              let dmg=boostSpellDamage(p,s,Math.max(1,Math.floor(rollSpell(auth,p,s)*monkMult)));
-              if(stOut.dmgDealt!==1)dmg=Math.max(1,Math.floor(dmg*stOut.dmgDealt));
-              if(elPct)dmg=Math.max(1,Math.floor(dmg*(1+elPct/100)));
+              let dmg;
+              if(knightAreaShare&&sharedKnightDmg!=null)dmg=sharedKnightDmg;
+              else{
+                dmg=boostSpellDamage(p,s,Math.max(1,Math.floor(rollSpell(auth,p,s)*monkMult)));
+                if(stOut.dmgDealt!==1)dmg=Math.max(1,Math.floor(dmg*stOut.dmgDealt));
+                if(elPct)dmg=Math.max(1,Math.floor(dmg*(1+elPct/100)));
+                if(extraPct)dmg=Math.floor(dmg*(1+extraPct/100));
+                if(knightAreaShare)sharedKnightDmg=dmg;
+              }
               let finalDmg=dmg;
-              if(extraPct)finalDmg=Math.floor(finalDmg*(1+extraPct/100));
               const armaEl=spellWeaponElement(p,s);
               const target=entityPosition(tgt,.5,.5);
               const hop=ehChain&&ti>0,prev=hop?targets[ti-1]:item,prevPos=entityPosition(prev,source.x,source.y);
@@ -6195,14 +6213,14 @@ function step(auth,now,opts){if(auth.ended)return;
                 exori:KNIGHT_EXORI.has(s.id)?1:0,chain:hop?1:0,fromId:hop?String(prev.id):undefined,screen:true};
               if(armaEl&&!elementalBond(p)){
                 const parts=splitDualParts(finalDmg,armaEl.propFisica);
-                const fisFinal=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now);
-                const eleFinal=applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now);
+                const fisFinal=knightAreaShare?parts.fis:applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now);
+                const eleFinal=knightAreaShare?parts.ele:applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now);
                 const dealt=fisFinal+eleFinal;tgt.hp-=dealt;afterPlayerHit(auth,p,tgt,dealt,now);
                 auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
                 if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:armaEl.el,fx:ELEMENT_FX[armaEl.el]||fx,dual:1,projectile:false,missile:null},hitBase,{crit:false,fatal:false}));
                 if(echoFrac&&dealt>0){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(dealt*echoFrac)),el,fx,whoId:item.id});}
               }else{
-                finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now);
+                if(!knightAreaShare)finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now);
                 if(finalDmg>0){tgt.hp-=finalDmg;afterPlayerHit(auth,p,tgt,finalDmg,now);
                   if(echoFrac){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(finalDmg*echoFrac)),el,fx,whoId:item.id});}}
                 auth.events.push(Object.assign({t:"hit",dmg:finalDmg,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
@@ -6839,6 +6857,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   normalizeVisualState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
   spawnHuntWave,openAuthBagYouDesire,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
+  skillWaveCells,
   bresenhamCells,spellChainPathCells,spellChainVisualPath,
   authorityStepDuration,advanceAuthorityMovement,
   applyCondition,applyResist,applyMonsterMitigation,applyOutgoingDamage,playerWeaponProfile,CONDITIONS,

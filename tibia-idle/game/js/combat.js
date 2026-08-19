@@ -280,10 +280,13 @@ function newCombat(player, huntId, instanceMode, opts) {
     player: {
       // celula inicial: marcador "S" do mapa (ou canto esquerdo sem mapa).
       // x/y sao derivados dela e servem so para o render -- a verdade e
-      // (cx, cy).
+      // (cx, cy). `p` aponta para o save vivo: o Helper muta esse objeto
+      // e a autoridade precisa do mesmo ponteiro no tick visual.
       cx: spx, cy: spy,
       x: (spx + 0.5) / GRID_W, y: (spy + 0.5) / GRID_H, dir: "e", moving: false,
       frame: 0, walkT: 0, attackAnim: 0, speedPts: 110,
+      p: player,
+      id: player && player.id != null ? player.id : undefined,
     },
     stats: {
       startedAt: Date.now(), kills: 0, exp: 0, rawExp: 0, rawHp: 0,
@@ -2628,10 +2631,17 @@ function castSpellById(c, p, target, now, id) {
     }
   }
 
+  // Knight AoE (exori / gran / mas / min): UM roll por cast, mesmo dano
+  // em todos os monstros da área (sem re-rolar nem variar por resist).
+  const shareKnightArea = !!(nomeArea && ehExori);
+  let knightAreaDmg = null;
+
   targets.forEach((t, idx) => {
     if (typeof bossCanTakePlayerDamage === "function" && !bossCanTakePlayerDamage(c, t)) return;
     let dmg;
-    if (faixaMonk) {
+    if (shareKnightArea && knightAreaDmg != null) {
+      dmg = knightAreaDmg;
+    } else if (faixaMonk) {
       dmg = faixaMonk.min +
             Math.floor(Math.random() * (faixaMonk.max - faixaMonk.min + 1));
       // sweeping takedown bate 75% fora do quadrado central
@@ -2639,6 +2649,7 @@ function castSpellById(c, p, target, now, id) {
     } else {
       dmg = rollSpell(p, s);
     }
+    if (!(shareKnightArea && knightAreaDmg != null)) {
     // Augment "base damage" (Impact): +% sobre o dano base, antes de
     // stances/forja/crítico (regra oficial confirmada em 17/05/2024).
     if (aug && aug.baseDmg > 0) {
@@ -2673,11 +2684,15 @@ function castSpellById(c, p, target, now, id) {
     if (typeof wheelDamageMul === "function" && p.wheel) {
       dmg = Math.max(1, Math.floor(dmg * wheelDamageMul(p)));
     }
-    if (typeof spiteIncomingDamageMultiplier === "function") {
+    if (!shareKnightArea && typeof spiteIncomingDamageMultiplier === "function") {
       const spiteMul = spiteIncomingDamageMultiplier(c, t);
       if (spiteMul !== 1) dmg = Math.max(1, Math.floor(dmg * spiteMul));
     }
     dmg = applyCharmDamage(p, elemento, dmg);
+    if (shareKnightArea) knightAreaDmg = dmg;
+    }
+    const critSt = castCrit;
+    const fatalSpell = castFatal;
     // Magia de skill com arma elemental: o servidor manda o golpe em duas
     // partes (damage.primary do weapon->getWeaponDamage e damage.secondary
     // do weapon->getElementType), entao um knight de naga sword ve exori
@@ -2688,9 +2703,9 @@ function castSpellById(c, p, target, now, id) {
     if (armaEl) {
       const fis = Math.max(1, Math.round(dmg * armaEl.propFisica));
       const ele = Math.max(1, dmg - fis);
-      const fisFinal = applyMonsterMitigation(t, elemento,
+      const fisFinal = shareKnightArea ? fis : applyMonsterMitigation(t, elemento,
         applyResist(t, elemento, fis, playerPiercePct(p, elemento)));
-      const eleFinal = unwelcomeAbsorbDeath(t, armaEl.el, Math.max(1,
+      const eleFinal = shareKnightArea ? ele : unwelcomeAbsorbDeath(t, armaEl.el, Math.max(1,
         applyMonsterMitigation(t, armaEl.el,
           applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele),
                       playerPiercePct(p, armaEl.el)))), c);
@@ -2734,7 +2749,7 @@ function castSpellById(c, p, target, now, id) {
                       fx: (ELEMENTS[armaEl.el] || ELEMENTS.physical).fx });
       return;
     }
-    dmg = unwelcomeAbsorbDeath(t, elemento,
+    dmg = shareKnightArea ? dmg : unwelcomeAbsorbDeath(t, elemento,
       applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento))), c);
     t.hp -= dmg;
     c.stats.damage += dmg;
@@ -3664,35 +3679,50 @@ function skillActorCell(ent, gw, gh) {
     cx = Math.floor((Number(ent && ent.x) || 0.5) * w);
   if (!Number.isFinite(cy))
     cy = Math.floor((Number(ent && ent.y) || 0.5) * h);
-  return { cx: cx | 0, cy: cy | 0 };
+  return {
+    cx: Math.max(0, Math.min(w - 1, Math.round(cx))),
+    cy: Math.max(0, Math.min(h - 1, Math.round(cy))),
+  };
 }
 function skillWaveDir(mob, pl, gw, gh) {
   const from = skillActorCell(mob, gw, gh), to = skillActorCell(pl, gw, gh);
+  if (typeof areaDir === "function") {
+    const d = areaDir(from, to);
+    return d === "e" ? { dx: 1, dy: 0 } : d === "w" ? { dx: -1, dy: 0 }
+      : d === "n" ? { dx: 0, dy: -1 } : { dx: 0, dy: 1 };
+  }
   const dx = to.cx - from.cx, dy = to.cy - from.cy;
   if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
-  return dy >= 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
+  if (dy !== 0) return dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
+  return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
 }
 
-/* Celulas de uma onda: a RETA oficial do Canary (AreaCombat::setupArea(
- * length, spread)). A boca abre com o spread: as `spread` primeiras casas
- * tem a largura cheia e a cada `spread` casas a boca encolhe 1 de cada
- * lado, terminando na ponta unica no ultimo SQM. */
+/* Celulas de uma onda: mesma ancora/rotação das magias do jogador
+ * (area.js): sai do caster na direção do alvo, pula o SQM de origem e
+ * ABRE na ponta — AreaCombat::setupArea (length, spread) com a boca
+ * longe, igual AREA_WAVE4. O loop antigo começava largo no caster. */
 function skillWaveCells(mob, pl, len, spread, gw, gh) {
-  const out = [];
+  const from = skillActorCell(mob, gw, gh);
+  const to = skillActorCell(pl, gw, gh);
   len = Math.max(1, len | 0);
   spread = spread | 0;
-  const from = skillActorCell(mob, gw, gh);
+  if (!spread && typeof areaCells === "function") {
+    const mapped = areaCells("AREA_BEAM" + len, from, to);
+    if (mapped && mapped.length) return mapped;
+  }
+  const out = [];
   const d = skillWaveDir(mob, pl, gw, gh);
   const cols = spread > 0 ? Math.floor((len - (len % spread)) / spread) * 2 + 1 : 1;
   const centro = Math.floor(cols / 2);
   let colSpread = cols;
   for (let y = 1; y <= len; y++) {
+    const dist = len - y + 1;
     const minOff = cols - colSpread - centro;
     const maxOff = colSpread - 1 - centro;
     for (let h = minOff; h <= maxOff; h++) {
       out.push({
-        cx: from.cx + d.dx * y + (d.dy !== 0 ? h : 0),
-        cy: from.cy + d.dy * y + (d.dx !== 0 ? h : 0),
+        cx: from.cx + d.dx * dist + (d.dy !== 0 ? h : 0),
+        cy: from.cy + d.dy * dist + (d.dx !== 0 ? h : 0),
       });
     }
     if (spread > 0 && y % spread === 0) colSpread--;
@@ -3744,8 +3774,7 @@ function mobSkillFx(c, mob, pl, sk) {
     return;
   }
   if (sk.length) {
-    // onda RETA (N/S/L/O) saindo do monstro, com a boca do spread — o
-    // formato oficial do Canary (AreaCombat::setupArea(length, spread))
+    // onda RETA saindo do monstro, boca na ponta — igual AREA_WAVE do player
     c.events.push({ t: "areafx",
                     cells: skillWaveCells(mob, pl, sk.length, sk.spread || 0, gw, gh),
                     fx: fx, screen: true });

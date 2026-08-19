@@ -164,4 +164,39 @@ must(physGroup&&physGroup.total===95&&physGroup.count===2&&
   iceGroup&&iceGroup.total===150&&grouped.groups.size===2,
   "combo visual não somou físico/gelo de dois personagens");
 
+must(engine.CanaryVocation.KNIGHT_SPELL_LEVEL_MUL===1.25&&
+  engine.CanaryVocation.knightSpellLevelMul("knight",{type:"attack"})===1.25&&
+  engine.CanaryVocation.knightSpellLevelMul("elite knight",{type:"attack"})===1.25&&
+  engine.CanaryVocation.knightSpellLevelMul("sorcerer",{type:"attack"})===1&&
+  engine.CanaryVocation.knightSpellLevelMul("knight",{type:"heal"})===1,
+  "knightSpellLevelMul deveria ser +25% só em magia de ataque de knight");
+const exori=engine.ALL_SPELLS.exori;
+must(exori&&exori.f&&exori.f.lvlMin>0,"exori sem termo de level");
+const pLvl={voc:"knight",level:100,skills:{sword:80,axe:10,club:10,dist:10,fist:10,shield:40},
+  ml:0,equip:{weapon:{item:"sword"}}};
+const vKnight=engine.spellValues(null,pLvl,exori);
+const vSorc=engine.spellValues(null,Object.assign({},pLvl,{voc:"sorcerer"}),exori);
+must(vKnight.min>vSorc.min&&vKnight.max>vSorc.max,
+  "exori de knight deveria ficar acima do mesmo resto sem o +25% de level: "+
+  JSON.stringify({k:vKnight,s:vSorc}));
+
+const aoeDesc=descriptor([knight(20)],[
+  {id:"soft",slug:"rat",cx:11,cy:10,x:11.5/30,y:10.5/30},
+  {id:"hard",slug:"rat",cx:10,cy:11,x:10.5/30,y:11.5/30},
+]);
+const aoeLive=prep(engine.initializeAuthority(aoeDesc,"20".repeat(16),1000));
+const hard=aoeLive.authority.mobs.find((m)=>String(m.id)==="hard");
+must(hard,"rato hard ausente");
+hard.def=Object.assign({},hard.def,{armor:80,defense:80});
+const aoe=JSON.parse(engine.advanceAuthorityState(JSON.stringify(aoeLive),1000,2000).state);
+const aoeHits=(aoe.state.events||[]).filter((e)=>e.t==="hit"&&e.exori===1&&!e.dual);
+const aoeBy={};
+for(const h of aoeHits){
+  const id=String(h.targetId||h.mobId);
+  aoeBy[id]=(aoeBy[id]||0)+Number(h.dmg||0);
+}
+const aoeVals=Object.values(aoeBy);
+must(aoeVals.length>=2&&aoeVals.every((n)=>n===aoeVals[0]),
+  "exori deveria aplicar o mesmo dano em todos os monstros da área: "+JSON.stringify(aoeBy));
+
 console.log("OK: magias de knight com areafx no caster; combo físico+gelo; wands/rods/punhos.");
