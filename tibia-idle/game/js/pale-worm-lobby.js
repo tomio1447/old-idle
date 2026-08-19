@@ -16,6 +16,7 @@ const PALE_LOBBY_UI = {
   inviteBtn: null,
   unsupported: false,
   inviteModalOpen: false,
+  authBackoffUntil: 0, // 401 recente: segura o poll por 30s (evita spam no console)
 };
 
 function paleLobbyInTemple() {
@@ -227,7 +228,19 @@ function paleLobbyRenderPanel() {
 
 async function paleLobbyRefresh() {
   if (PALE_LOBBY_UI.unsupported) return;
+  // Sessão ausente: não chama o servidor — sem isso cada tick do poll (4s)
+  // virava um 401 "Failed to load resource" no console (caso clássico da VM
+  // com sessão expirada). Quando o jogador loga, o próprio tick retoma.
+  const token = typeof sessionToken === "function" ? sessionToken() : "";
+  if (!token) return;
+  // 401 recente: segura o poll por 30s e volta a tentar depois (cobre
+  // relogin sem recarregar a página, sem spam de requisições).
+  if (Date.now() < (PALE_LOBBY_UI.authBackoffUntil || 0)) return;
   const r = await paleLobbyApi("GET", "/api/pale-lobby/state");
+  if (r.status === 401) {
+    PALE_LOBBY_UI.authBackoffUntil = Date.now() + 30000;
+    return;
+  }
   // Servidor antigo (sem rota) → 404. Para o poll pra não spammar rede/"ping".
   if (r.status === 404 || r.status === 501) {
     PALE_LOBBY_UI.unsupported = true;
