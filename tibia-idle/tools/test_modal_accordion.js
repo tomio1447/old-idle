@@ -23,7 +23,7 @@ must(css.includes("#bosses-modal-list { display: flex; flex-direction: column;")
      css.includes(".accordion-section .hunt-cat-title::before") &&
      css.includes('content: "▸"'),
   "CSS das abas de categoria ausente ou incompleto");
-for (const ref of ['css/layout.css?v=', 'js/ui.js?v=helper-live-v1', 'js/game.js?v='])
+for (const ref of ['css/layout.css?v=', 'js/ui.js?v=roshamuul-v1', 'js/game.js?v='])
   must(html.includes(ref), "cache-bust ausente: " + ref);
 
 /* ---------- lógica real do accordion (vm + DOM fake) ---------- */
