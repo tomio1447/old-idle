@@ -1587,7 +1587,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 250+",
     minLevel: 250,
-    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane"],
+    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow"],
   },
   {
     title: "FEAST OF SOULS",
