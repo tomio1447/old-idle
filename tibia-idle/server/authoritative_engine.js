@@ -405,6 +405,9 @@ try{
   // The Dread Maiden (Feast of Souls): itens do loot oficial + hunt da
   // bossroom — sem isso o Sell All online não precifica esses drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"feast-of-souls.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
+  // Deeplings World Change: itens de loot (broccoli, true book of death) +
+  // hunt da bossroom — sem isso o Sell All online não precifica os drops.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"deepling-bosses.js"),"utf8"),sandbox);}catch(_dp){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);

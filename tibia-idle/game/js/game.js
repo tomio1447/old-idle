@@ -1580,6 +1580,11 @@ function bossAccessChecklist(p, boss) {
 /* Catálogo público de bosses — mesmo padrão do modal de hunts. */
 const BOSS_MODAL_SECTIONS = [
   {
+    title: "DEEPLING WORLD",
+    minLevel: 150,
+    ids: ["jaul", "obujos", "tanjis", "brokul"],
+  },
+  {
     title: "BOSSES 250+",
     minLevel: 250,
     ids: ["timira-the-many-headed", "scarlett-etzel"],
