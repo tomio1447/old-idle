@@ -47,7 +47,7 @@ const BURIED_LOOT_ITEMS = {
   "hexagonal-ruby":            { n: "hexagonal ruby", s: null, t: "loot", cid: 30180, w: 1.25, sell: 30000, npcSell: 30000 },
   "prismatic-quartz":          { n: "prismatic quartz", s: null, t: "loot", cid: 24962, w: 1.20, sell: 450, npcSell: 450 },
   "small-enchanted-emerald":   { n: "small enchanted emerald", s: null, t: "loot", cid: 677, w: 0.10, sell: 250, npcSell: 250 },
-  "essence-of-a-bad-dream":    { n: "essence of a bad dream", s: null, t: "loot", cid: null, w: 0.95, sell: 360, npcSell: 360 },
+  "essence-of-a-bad-dream":    { n: "essence of a bad dream", s: null, t: "loot", cid: 10306, w: 0.95, sell: 360, npcSell: 360 },
 };
 
 /* Médias das 4 criaturas (Canary: hp/exp/dano/armor). */
