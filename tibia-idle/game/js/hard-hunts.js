@@ -116,6 +116,17 @@
     otbmMobBounds: { x: 1068, y: 995, w: 10, h: 9, z: 7 },
   }));
 
+  const catacombsOramond = GAMEDATA.hunts["catacombs-oramond"];
+  if (catacombsOramond) harden(Object.assign(catacombsOramond, {
+    otbm: "catacombs",
+    otbmFloor: 7,
+    otbmFovBounds: { x: 1064, y: 1013, w: 19, h: 15, z: 7 },
+    otbmRuntimeWidth: 30,
+    otbmRuntimeHeight: 30,
+    otbmSpawn: { x: 1066, y: 1020, z: 7 },
+    otbmMobBounds: { x: 1066, y: 1014, w: 16, h: 13, z: 7 },
+  }));
+
   const dtSeal = GAMEDATA.hunts["dt-seal"];
   if (dtSeal) harden(Object.assign(dtSeal, {
     name: "Grounds of Damnation (Tafariel)",

@@ -509,7 +509,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "the-unwelcome-room":{monsters:["the-unwelcome"]},
   "the-pale-worm-room":{monsters:["the-pale-worm"]},
 });
-for(const slug of ["marapur-nagas","dt-seal","juggerseal","ferumbras-way"]){
+for(const slug of ["marapur-nagas","dt-seal","juggerseal","ferumbras-way","catacombs-oramond"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});
 }
 if(HUNTS["ferumbras-way"])HUNTS["ferumbras-way"].spawnWeights={"grimeleech":33,"vexclaw":33,"demon":25,"hellflayer":13};
