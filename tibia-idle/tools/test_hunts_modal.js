@@ -38,7 +38,7 @@ must(cityUi.includes("data-open-hunts-catalog")&&!cityUi.includes("Object.keys(G
 const expected=[
  ["HUNTS LEVEL 0–100",["rats","amazon-camp"]],
  ["HUNTS 100–250",[]],
- ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas"]],
+ ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas","buried-cathedral"]],
  ["LIBRARY SESSION 400+",["library-fire","library-energy","library-ice","library-earth"]],
  ["SOULWAR 400+",["dark-thais","rotten-wasteland","claustrophobic-inferno","ebb-and-flow"]],
 ];
