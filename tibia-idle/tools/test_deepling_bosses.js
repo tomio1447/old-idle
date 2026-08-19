@@ -126,6 +126,28 @@ must(walk(1046, 1008), "playerspawn {1046,1008} bloqueado");
 must(walk(1047, 998), "bossspawn {1047,998} bloqueado");
 must(walk(1047, 1003), "centro {1047,1003} bloqueado");
 
+/* TODOS os tiles usados pelo mapa têm sprite físico (regressão dos 404s
+ * de assets/tiles — o mapa Deepling usava 48 ids sem PNG no jogo). */
+{
+  const used = new Set();
+  Object.values(map.cells).forEach((c) => {
+    if (c.g) used.add(c.g);
+    (c.items || []).forEach((id) => used.add(id));
+  });
+  const missingPng = [];
+  for (const id of used)
+    if (!fs.existsSync(path.join(game, "assets", "tiles", id + ".png")))
+      missingPng.push(id);
+  must(missingPng.length === 0,
+    "tiles do deeplinsroom sem PNG em assets/tiles: " + missingPng.join(", "));
+  // o catálogo do editor (known_tiles) também precisa listar os ids
+  const rmeCtx = { window: {} }; rmeCtx.window = rmeCtx; vm.createContext(rmeCtx);
+  vm.runInContext(fs.readFileSync(path.join(game, "rme", "data", "known_tiles.js"), "utf8"), rmeCtx);
+  const unlisted = OTBM.missingTiles(map, rmeCtx.RME_KNOWN_TILES);
+  must(unlisted.length === 0,
+    "tiles do deeplinsroom fora do catálogo RME: " + unlisted.join(", "));
+}
+
 /* ---------------- sprites ---------------- */
 for (const id of Object.keys(EXPECTED))
   must(fs.existsSync(path.join(game, "assets", "mob", id + ".png")), "sprite do boss " + id + " ausente");
