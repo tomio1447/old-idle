@@ -69,8 +69,12 @@
    if(src.w!=null&&I[slug].w==null) I[slug].w=src.w;
   }
  }
- const souls=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];
+ const souls=['soulbastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','pair-of-soulwalkers','soulbiter','soulful-legs','soulshell'];
  souls.forEach((id)=>{if(!I[id])I[id]={n:id.replace(/-/g,' '),s:'misc',t:'soulwar',sell:25000,w:35};});
+ // Saves antigos podem ter os slugs legados no depot (pool anterior).
+ // Mantém o nome bonito; os sprites vêm dos aliases em assets/item.
+ const legacySouls=['soul-bastion','soulwalkers','soulcrown'];
+ legacySouls.forEach((id)=>{if(!I[id])I[id]={n:id.replace(/-/g,' '),s:'misc',t:'soulwar',sell:25000,w:35};});
  const loot=[{chance:100,max:18,item:'platinum-coin'},{chance:28,max:4,item:'ultimate-health-potion'},{chance:28,max:4,item:'ultimate-mana-potion'},{chance:10,max:1,item:'bag-you-desire'}];
  const ap=(n,hp,exp,el,skill)=>({name:n,hp,exp,damage:900,armor:85,defense:65,element:el,attackSpeed:2000,mitigation:2.5,resist:{physical:0,fire:10,ice:10,energy:10,earth:10,death:10,holy:10},skills:[{el,min:900,max:1300,int:2000,ch:30,range:6,fx:skill,miss:el},{el,min:800,max:1150,int:3000,ch:22,radius:2,fx:skill}],loot:loot.slice()});
  M['knight-s-apparition']=ap("Knight's Apparition",25000,18500,'physical','hit-area');
@@ -326,7 +330,7 @@
   avgHp:620000,avgExp:3000000,avgDamage:2500,avgArmor:55,avgGold:100,
   respawn:1,pack:1,soulWarZone:true,soulWarZoneMonster:'aspect-of-power',
  };
- window.soulwarOpenBag=function(p){const pool=['soul-bastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','soulwalkers','soulbiter','soulful-legs','soulcrown'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p){p.depot=p.depot||[];p.depot.push(item);return item;}return null;};
+ window.soulwarOpenBag=function(p){const pool=['soulbastion','soulbleeder','soulcrusher','soulcutter','soulhexer','soulmaimer','soulpiercer','soulshredder','soulshroud','soulstrider','soulmantle','pair-of-soulwalkers','soulbiter','soulful-legs','soulshell'];const item=pool[Math.floor(Math.random()*pool.length)]; if(p){p.depot=p.depot||[];p.depot.push(item);return item;}return null;};
 })();
 /* Mirror Image do Canary: no primeiro dano revela a Apparition da vocação
    que a atacou, preservando posição e vida restante proporcional. */
