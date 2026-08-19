@@ -963,7 +963,7 @@ function bindCatalogAccordion(root, mode) {
 const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp"] },
   { title: "HUNTS 100–250", ids: [] },
-  { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul"] },
+  { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
   { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow"] },
 ];

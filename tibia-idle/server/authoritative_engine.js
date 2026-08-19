@@ -417,6 +417,9 @@ try{
   // hunt 250+ — sem isso o Sell All online não precifica os drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"ingol-terrain.js"),"utf8"),sandbox);}catch(_ig){/* opcional */}
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"roshamuul.js"),"utf8"),sandbox);}catch(_rh){/* opcional */}
+  // The Prison (Roshamuul): 3 andares 250+ + itens de loot (unholy bone,
+  // skeleton decoration etc.) — sem isso o Sell All online não precifica.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"prison.js"),"utf8"),sandbox);}catch(_pr){/* opcional */}
   // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
@@ -481,6 +484,9 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
   "ingol-terrain":{monsters:["harpy","crape-man","liodile","boar-man","carnivostrich"],cat:"hard",pack:10,packMin:6,packMax:10},
   "roshamuul":{monsters:["guzzlemaw","frazzlemaw","silencer"],cat:"hard",pack:10,packMin:6,packMax:10,spawnWeights:{guzzlemaw:40,frazzlemaw:40,silencer:20}},
+  "prison-1":{monsters:["lost-soul","plaguesmith","demon-outcast","betrayed-wraith","dark-torturer"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "prison-2":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "prison-3":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker","plaguesmith","juggernaut"],cat:"hard",pack:10,packMin:6,packMax:10},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
