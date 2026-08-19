@@ -2313,16 +2313,6 @@ Renderer.prototype.npcAt = function (mx, my) {
   return null;
 };
 
-/* Retorna o charId do jogador do templo multijogador sob as coordenadas */
-Renderer.prototype.templePlayerAt = function (mx, my) {
-  if (!this.templeHit) return null;
-  for (const h of this.templeHit) {
-    if (mx >= h.x - h.w / 2 && mx <= h.x + h.w / 2 &&
-        my >= h.y - h.h / 2 - 20 && my <= h.y + h.h / 2) return h.id;
-  }
-  return null;
-};
-
 /* mantido por compatibilidade: o outfit real vem de playerOutfit() */
 Renderer.prototype.outfitFor = function (p) {
   return playerOutfit(p).name;

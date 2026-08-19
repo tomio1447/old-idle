@@ -4833,11 +4833,9 @@ function bindControls() {
       return;
     }
     const { mx, my } = canvasPos(e);
-    const pid = G.renderer.templePlayerAt(mx, my);
     const id = G.renderer.npcAt(mx, my);
     G.hoverNpc = id;
-    G.hoverTemplePlayer = pid || null;
-    cv.style.cursor = (id || pid) ? "pointer" : "default";
+    cv.style.cursor = id ? "pointer" : "default";
   });
   cv.addEventListener("mouseleave", () => { G.hoverNpc = null; });
   cv.addEventListener("click", (e) => {
@@ -4851,13 +4849,6 @@ function bindControls() {
     }
     if (!G.inCity) return;
     const { mx, my } = canvasPos(e);
-    // Jogador do templo multijogador: abre o menu de interação (convite
-    // para lobby / mensagem private), sem caminhar até o ponto.
-    const pid = G.renderer.templePlayerAt(mx, my);
-    if (pid) {
-      if (typeof templeMpOpenMenu === "function") templeMpOpenMenu(pid, e.clientX, e.clientY);
-      return;
-    }
     const id = G.renderer.npcAt(mx, my);
     if (id) {
       // caminha ate o NPC; se ja estiver do lado, abre na hora

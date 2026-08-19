@@ -3291,28 +3291,6 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .accordion-section .hunts-group.collapsed { display: none; }
 .accordion-section .hunt-section-empty { grid-column: 1 / -1; }
 @media (max-width: 720px) { .accordion-section .hunts-group { grid-template-columns: 1fr; } }
-/* Menu de interação com jogadores do templo multijogador */
-.temple-player-menu {
-  position: fixed; z-index: 400;
-  min-width: 210px; max-width: 260px;
-  background: #14120e; border: 1px solid #3a372c;
-  border-radius: 3px; box-shadow: 0 6px 22px rgba(0,0,0,.55);
-  padding: 4px; font-size: 11px; color: #c8c0a8;
-}
-.temple-player-menu-head {
-  padding: 5px 8px; font-weight: bold; color: #cfe0ff;
-  border-bottom: 1px solid #2c2b24; margin-bottom: 3px;
-  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
-}
-.temple-player-menu-meta { font-weight: normal; font-size: 10px; color: #9a948a; }
-.temple-player-menu-item {
-  display: block; width: 100%; text-align: left;
-  background: transparent; color: #c8c0a8; border: 0;
-  padding: 6px 8px; margin: 0; border-radius: 2px;
-  font-size: 11px; cursor: pointer;
-}
-.temple-player-menu-item:hover { background: #1f2018; color: #ffe680; }
-
 .hunt-card .mobs { display: flex; gap: 1px; width: 68px; flex: none; }
 .hunt-card .mobs img { width: 22px; height: 22px; object-fit: contain; }
 .hunt-card .info { flex: 1; min-width: 0; }

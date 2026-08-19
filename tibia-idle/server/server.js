@@ -2912,20 +2912,6 @@ async function main() {
   });
   global.__PALE_LOBBY=PALE_LOBBY;
 
-  const { createTemplePresence }=require("./temple");
-  /* FEATURE FLAG — templo multijogador DESATIVADO por enquanto (mesma chave
-   * do cliente temple-mp.js: TEMPLE_MP_ENABLED). Com false, as rotas
-   * respondem 200 silencioso e nada é publicado; nenhum erro vai pro
-   * console de clientes antigos em cache. Para religar: true nos dois. */
-  const TEMPLE_PRESENCE_ENABLED=false;
-  const TEMPLE_PRESENCE=createTemplePresence({
-    getDb:()=>db,
-    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
-  });
-  global.__TEMPLE_PRESENCE=TEMPLE_PRESENCE;
-  global.__TEMPLE_PRESENCE_ENABLED=TEMPLE_PRESENCE_ENABLED;
-  if(TEMPLE_PRESENCE_ENABLED)TEMPLE_PRESENCE.start();
-
   const maintenance=setInterval(()=>{Promise.resolve(db.pruneExpiredSessions&&db.pruneExpiredSessions(Date.now())).catch(()=>{});
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
@@ -3610,20 +3596,6 @@ async function main() {
         if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
         const r=await PALE_LOBBY.declineInvite(db,acc,body.invite_id);
         return send(res,r.code,r.body);
-      }
-      /* -------- Presença multijogador no templo (cidade) --------
-       * Desativada por enquanto: responde 200 silencioso (até para
-       * clientes antigos em cache), sem 401/404/403 no console. */
-      if(req.method==="POST"&&(url==="/api/temple/presence"||url==="/api/temple/leave")){
-        if(!TEMPLE_PRESENCE_ENABLED)
-          return send(res,200,{ok:true,disabled:true,players:[]});
-        const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
-        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
-        if(url==="/api/temple/presence"){
-          const r=TEMPLE_PRESENCE.heartbeat(db,acc,body);
-          return send(res,r.code,r.body);
-        }
-        return send(res,200,{ok:true,left:TEMPLE_PRESENCE.leave(acc.id)});
       }
       if(req.method==="POST"&&url==="/api/pale-lobby/leave"){
         const body=await readBody(req);const acc=await db.findAccountByToken(body.token);
