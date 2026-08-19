@@ -130,6 +130,27 @@ function templeMpCharId() {
   return "";
 }
 
+/* char_id validado contra a conta logada. Contra o servidor NOVO o id é
+ * só uma dica (ele resolve pela conta); mas contra um servidor ANTIGO
+ * (deploy desatualizado na VM) um id fora da conta gera 403 "Personagem
+ * inválido". Aqui, se o cache de personagens da conta existir, garantimos
+ * um id que pertence a ela — mesmo quando o personagem carregado é um
+ * save legado que não existe mais no banco. */
+function templeMpCharIdSafe() {
+  const raw = templeMpCharId();
+  let chars = null;
+  if (typeof accountCharacterCacheRead === "function") {
+    try { chars = accountCharacterCacheRead(); } catch (e) { chars = []; }
+  }
+  if (!Array.isArray(chars) || !chars.length) return raw; // sem cache: servidor resolve
+  if (raw && chars.some((c) => String(c && c.id) === String(raw))) return String(raw);
+  // id fora da conta (save legado): usa personagem válido da conta, com a
+  // mesma preferência do servidor novo (zona cidade > primeiro).
+  const city = chars.find((c) => String((c && c.zone) || "").toLowerCase() === "city");
+  const fallback = city || chars[0];
+  return fallback && fallback.id != null ? String(fallback.id) : raw;
+}
+
 async function templeMpHeartbeat(force) {
   if (!templeMpInTemple()) return;
   const now = Date.now();
@@ -140,7 +161,7 @@ async function templeMpHeartbeat(force) {
   // Sem token de sessão ou personagem, não bate no servidor (evita 401/403).
   const token = typeof sessionToken === "function" ? sessionToken() : "";
   if (!force && String(token) === "") return;
-  const cid = templeMpCharId();
+  const cid = templeMpCharIdSafe();
   if (String(cid) === "" && !force) return;
   // Erro de auth/personagem recente: espera antes de tentar de novo
   // (o navegador logaria cada 403; com o backoff fica 1 por 30s no máximo).

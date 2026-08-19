@@ -131,6 +131,7 @@ let templeListener = null;
 let fetchMode = "ok"; // "ok" | "denied"
 let tokenMode = "tok";
 let sessionCharMode = "";
+let cacheMode = null; // null = sem cache; [] = cache vazio; lista = chars da conta
 const ctx = {
   window: {
     location: { origin: "http://x" },
@@ -149,6 +150,7 @@ const ctx = {
     return { json: async () => ({ ok: true, players }) };
   },
   sessionToken: () => tokenMode,
+  accountCharacterCacheRead: () => cacheMode,
   // Simula a VM: sessão vazia (auto-resume/troca de char) — o char_id cai
   // para o personagem carregado (G.p.id) e o servidor resolve pela conta.
   sessionCharId: () => sessionCharMode,
@@ -193,14 +195,37 @@ await flush();
 must(calls.length === 2 && calls[1].body.char_id === "7",
   "com sessão presente o char_id deveria vir da sessão");
 
+// cache da conta sem o id do personagem carregado (save legado na VM):
+// o heartbeat manda um id VÁLIDO da conta (prefere zona city), então até
+// o servidor antigo aceita — nada de 403 "Personagem inválido".
+cacheMode = [{ id: 9, zone: "hunt" }, { id: 10, zone: "city" }];
+sessionCharMode = "";
+ctx.G.p.id = 1; // id legado, fora da conta
+ctx.G.walker.px = 320;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === 3 && calls[2].body.char_id === "10",
+  "com cache da conta o char_id deveria ser um id válido da conta (zona city)");
+
+// id carregado pertence à conta -> usa ele
+cacheMode = [{ id: 1, zone: "hunt" }, { id: 10, zone: "city" }];
+ctx.G.walker.px = 352;
+vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
+timers.forEach((fn) => fn());
+await flush();
+must(calls.length === 4 && calls[3].body.char_id === "1",
+  "char_id válido da conta deveria ser mantido");
+
 // sem token (pré-login) o heartbeat nem chama — nada de 401 em loop
+const beforeNoToken = calls.length;
 tokenMode = "";
 sessionCharMode = "";
 ctx.G.walker.px = 288;
 vm.runInContext("TEMPLE_MP.lastHbAt = Date.now() - 2000", ctx);
 timers.forEach((fn) => fn());
 await flush();
-must(calls.length === 2, "sem token o heartbeat não pode chamar o servidor");
+must(calls.length === beforeNoToken, "sem token o heartbeat não pode chamar o servidor");
 tokenMode = "tok";
 sessionCharMode = "";
 
