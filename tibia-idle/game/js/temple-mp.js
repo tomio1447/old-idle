@@ -15,6 +15,7 @@
 
 const TEMPLE_MP = {
   players: new Map(),   // charId -> entrada de presença (com fx/fy p/ lerp)
+  started: false,
   inTemple: false,
   lastHbAt: 0,
   lastSig: "",
@@ -31,6 +32,11 @@ const TEMPLE_MP_STALE_MS = 8000;     // sem snapshot -> some do mapa (TTL servid
 const TEMPLE_MP_LERP_MS = 380;       // suavização do passo remoto
 const TEMPLE_MP_MISS_LIMIT = 2;      // snapshots sem o jogador antes de remover
 const TEMPLE_MP_ERROR_BACKOFF_MS = 30000; // 401/403: 30s entre tentativas
+/* FEATURE FLAG — templo multijogador DESATIVADO por enquanto.
+ * Com false, o módulo não envia heartbeat, ignora snapshots do SSE e não
+ * renderiza jogadores. Para religar: mudar para true aqui e no servidor
+ * (server.js: TEMPLE_PRESENCE_ENABLED). */
+let TEMPLE_MP_ENABLED = false;
 
 function templeMpApi(method, path, body) {
   const token = typeof sessionToken === "function" ? sessionToken() : "";
@@ -83,6 +89,7 @@ function templeMpEscape(s) {
 
 /* Aplica um snapshot de presença vindo do servidor (SSE ou heartbeat). */
 function templeMpApply(list) {
+  if (!TEMPLE_MP_ENABLED) return;
   const now = Date.now();
   const myChar = typeof sessionCharId === "function" ? String(sessionCharId()) : "";
   const seen = new Set();
@@ -194,6 +201,7 @@ async function templeMpHeartbeat(force) {
 
 /* Loop 1x/s: heartbeat quando está no templo, /leave quando saiu, prune. */
 function templeMpTick() {
+  if (!TEMPLE_MP_ENABLED) return;
   if (typeof G === "undefined" || !G) return;
   if (templeMpInTemple()) {
     if (!TEMPLE_MP.inTemple) {
@@ -297,8 +305,11 @@ TEMPLE_MP.menuName = function () {
 };
 
 /* -------- boot -------- */
-(function templeMpBoot() {
-  if (typeof window === "undefined") return;
+/* Liga o módulo (listener SSE + timer). O flag TEMPLE_MP_ENABLED é a chave
+ * única: com false, nada é registrado e nenhuma requisição é enviada. */
+function templeMpStart() {
+  if (typeof window === "undefined" || !TEMPLE_MP_ENABLED || TEMPLE_MP.started) return;
+  TEMPLE_MP.started = true;
   window.addEventListener("tibia-idle-sync-temple", (ev) => {
     const d = (ev && ev.detail) || {};
     if (Array.isArray(d.players)) templeMpApply(d.players);
@@ -306,4 +317,6 @@ TEMPLE_MP.menuName = function () {
   if (typeof G !== "undefined" && G) G.templePlayers = TEMPLE_MP.players;
   if (!TEMPLE_MP.timer)
     TEMPLE_MP.timer = setInterval(templeMpTick, 1000);
-})();
+}
+
+(function templeMpBoot() { templeMpStart(); })();
