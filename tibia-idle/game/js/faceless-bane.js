@@ -26,8 +26,33 @@ const FACELESS_BANE_STATS = {
   defense: 5,
 };
 
+/* Itens do loot do Canary que faltavam no catálogo (usados no boss modal
+ * e no Sell All online). Sem NPC comprador no Canary → sell 0. */
+const FACELESS_LOOT_ITEMS = {
+  "book-backpack":          { n: "book backpack", s: null, t: "loot", cid: 28571, w: 18.00, sell: 0, npcSell: 0 },
+  "ectoplasmic-shield":     { n: "ectoplasmic shield", s: null, t: "loot", cid: 29430, w: 58.00, sell: 0, npcSell: 0 },
+  "enchanted-pendulet":     { n: "enchanted pendulet", s: null, t: "loot", cid: 30345, w: 6.50, sell: 0, npcSell: 0 },
+  "lightning-pendant":      { n: "lightning pendant", s: null, t: "loot", cid: 816, w: 5.00, sell: 0, npcSell: 0 },
+  "red-crystal-fragment":   { n: "red crystal fragment", s: null, t: "loot", cid: 16126, w: 0.15, sell: 0, npcSell: 0 },
+  "spirit-guide":           { n: "spirit guide", s: null, t: "loot", cid: 29431, w: 18.00, sell: 0, npcSell: 0 },
+  // hexagonal-ruby já vem do buried-cathedral.js; mantém o merge se ausente.
+  "hexagonal-ruby":         { n: "hexagonal ruby", s: null, t: "loot", cid: 30180, w: 1.25, sell: 30000, npcSell: 30000 },
+};
+
 (function registerFacelessBane() {
   if (typeof GAMEDATA === "undefined") return;
+
+  const items = GAMEDATA.items || (GAMEDATA.items = {});
+  for (const slug in FACELESS_LOOT_ITEMS) {
+    const def = FACELESS_LOOT_ITEMS[slug];
+    if (!items[slug]) items[slug] = def;
+    else {
+      if (def.sell != null) items[slug].sell = def.sell;
+      if (def.npcSell != null) items[slug].npcSell = def.npcSell;
+      if (def.cid != null && items[slug].cid == null) items[slug].cid = def.cid;
+      if (def.w != null && items[slug].w == null) items[slug].w = def.w;
+    }
+  }
 
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
   GAMEDATA.hunts["faceless-bane-room"] = {
