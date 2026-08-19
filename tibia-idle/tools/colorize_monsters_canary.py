@@ -142,6 +142,8 @@ CANARY_COLORS = {
     "cobra-vizier":   (19, 19, 67, 78),
     "cobra-scout":    (1, 1, 102, 78),
     "cobra-assassin": (2, 2, 77, 19),
+    # Buried Cathedral boss
+    "faceless-bane":  (0, 2, 95, 97),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -162,7 +164,8 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
                "rage-squid", "squid-warden", "soulsnatcher", "floating-savant", "fury",
                "cobra-vizier", "cobra-scout",
-               "cobra-assassin"}
+               "cobra-assassin",
+               "faceless-bane"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,

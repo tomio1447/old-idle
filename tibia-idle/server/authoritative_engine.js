@@ -411,6 +411,8 @@ try{
   // Buried Cathedral: itens de loot (ectoplasms, hexagonal ruby etc.) +
   // hunt 250+ — sem isso o Sell All online não precifica os drops.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"buried-cathedral.js"),"utf8"),sandbox);}catch(_bc){/* opcional */}
+  // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
   sandbox.WEAPONDATA=sandbox.window.WEAPONDATA;
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapons.js"),"utf8"),sandbox);
@@ -469,6 +471,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "mota-extension":{monsters:["floating-savant","retching-horror","fury","hellhound","demon"],cat:"hard",pack:10,packMin:6,packMax:10},
   "cobra-bastion":{monsters:["cobra-vizier","cobra-scout","cobra-assassin"],cat:"hard",pack:10,packMin:6,packMax:10},
   "buried-cathedral":{monsters:["ripper-spectre","gazer-spectre","burster-spectre","arachnophobica"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "faceless-bane-room":{monsters:["faceless-bane"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
   "library-fire":{monsters:["burning-book","rage-squid","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
   "library-energy":{monsters:["energetic-book","biting-book"],cat:"hardcore",pack:12,packMin:10,packMax:12},
