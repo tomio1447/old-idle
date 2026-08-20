@@ -506,7 +506,7 @@ function spawnWave(c, p) {
   // le a fila a cada iteracao (naFila cresce a cada push).
   while (c.mobs.length + (c.pendingSpawns ? c.pendingSpawns.length : 0) < pack) {
     const slug = pickHuntMonsterSlug(c.hunt);
-    const base = GAMEDATA.monsters[slug];
+    const base = GAMEDATA.monsters[slug] || (typeof MONSTERDATA !== "undefined" && MONSTERDATA[slug]);
     if (!base) break;
     const fiendish = Math.random() < (c.fiendishChance || FIENDISH_BASE_CHANCE);
     const influenced = !fiendish && (Math.random() < (c.influencedChance || INFLUENCED_BASE_CHANCE));

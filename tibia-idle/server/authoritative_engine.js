@@ -391,6 +391,12 @@ try{
   const sandbox={window:{},console};
   vm.runInNewContext(fs.readFileSync(path.join(js,"gamedata.js"),"utf8"),sandbox);
   sandbox.GAMEDATA=sandbox.window.GAMEDATA;
+  // Canary full monster dump: as hunts do 15.x usam MONSTERDATA para spawn
+  // e loot, mas o gamedata base só traz os 102 monstros clássicos.
+  try{
+    vm.runInNewContext(fs.readFileSync(path.join(js,"monsterdata.js"),"utf8"),sandbox);
+    sandbox.MONSTERDATA=sandbox.window.MONSTERDATA;
+  }catch(_md){sandbox.MONSTERDATA={};}
   // hard-hunts registra loot Cobra/MOTA (preços NPC) ausente do gamedata base —
   // sem isso Sell All online não encontra o item e a pouch “trava”.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"hard-hunts.js"),"utf8"),sandbox);}catch(_hh){/* opcional */}
