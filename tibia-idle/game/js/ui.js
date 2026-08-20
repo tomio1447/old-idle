@@ -1868,6 +1868,7 @@ function persistMoveToSupplyStash(p, payload) {
  * tipo de arma (bow→arrow, crossbow→bolt) é aplicada nos dois caminhos
  * (no online o servidor já faz; aqui o setActiveAmmo persiste pela API). */
 function persistEquipFromContainer(p, slug, source, slot, instId) {
+  if (!slug || !slot) { toast("Item/slot inválido para equipar."); return Promise.resolve(false); }
   const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
     typeof accountApiConfigured === "function" && accountApiConfigured() &&
     typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
@@ -1902,6 +1903,7 @@ function persistEquipFromContainer(p, slug, source, slot, instId) {
 /* Desequipa 1 slot com persistência (mesmo racional do equip: sem a rota
  * autoritativa o tick restaura o item no slot). */
 function persistUnequipFromContainer(p, slot, dest) {
+  if (!slot) { toast("Slot inválido para desequipar."); return Promise.resolve(false); }
   const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
     typeof accountApiConfigured === "function" && accountApiConfigured() &&
     typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
