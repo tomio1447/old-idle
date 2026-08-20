@@ -491,9 +491,9 @@ function renderPartyModal(p, online) {
 
   if (pt.members.length) {
     h += `<div class="party-members">` + pt.members.map((m, i) => `
-      <div class="party-member">
+      <div class="party-member" data-party-switch="${m.id}">
         <span class="party-member-voc">${partyVocName(m.voc)}</span>
-        <b>${m.name}</b>
+        <b class="party-member-name" data-party-switch="${m.id}">${m.name}</b>
         <span class="dim">nv ${m.level}</span>
         <span class="party-exp">+${fmtFull(m.expGained || 0)} xp</span>
         ${m.levelUps ? `<span style="color:#9ce84a">↑${m.levelUps} lvl</span>` : ""}
@@ -700,6 +700,43 @@ function renderPartyModal(p, online) {
   // botão "Abrir completo" do Analyser (modal completo)
   const analFull = $("#party-content [data-analyser-full]");
   if (analFull) analFull.addEventListener("click", () => openPartyAnalyserModal());
+
+  // trocar para personagem da party (modo local) ou abrir picker (online)
+  $$("#party-content [data-party-switch]").forEach((el) => {
+    el.addEventListener("click", () => partySwitchToCharacter(el.dataset.partySwitch));
+  });
+}
+
+function partySwitchToCharacter(id) {
+  const targetId = String(id);
+  if (G.p && String(G.p.id || characterId(G.p)) === targetId) {
+    toast("Você já está neste personagem.");
+    $("#modal").classList.remove("show", "wide");
+    openHelperPanel();
+    return;
+  }
+  // modo online: nao troca automaticamente (precisa de lease/reload), abre picker
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    if (typeof window.openAccountCharacterPicker === "function") window.openAccountCharacterPicker();
+    return;
+  }
+  // modo local: troca diretamente pelo roster
+  const chars = typeof getCharacters === "function" ? getCharacters() : [];
+  const next = chars.find((c) => String(c.id || characterId(c)) === targetId);
+  if (!next) { toast("Personagem nao encontrado no save."); return; }
+  if (typeof save === "function") save();
+  G.p = next;
+  try { localStorage.setItem(ACTIVE_CHARACTER_KEY, targetId); } catch (e) {}
+  if (typeof save === "function") save();
+  if (typeof renderAll === "function") renderAll();
+  $("#modal").classList.remove("show", "wide");
+  openHelperPanel();
+}
+
+function openHelperPanel() {
+  if (typeof setMobileTab === "function") setMobileTab("helper");
+  const panel = document.querySelector('[data-collapse="helper"]');
+  if (panel && typeof panel.scrollIntoView === "function") panel.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 /* ------------------------------------------------------------------ */
