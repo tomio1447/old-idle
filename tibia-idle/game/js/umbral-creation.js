@@ -512,29 +512,9 @@ function tryUmbralCraft(p, tab, from, to, price) {
   if (!p.bag || (p.bag[from] || 0) < 1) return { ok: false, msg: `Missing ${itemName(from)}.` };
   if ((p.bag["cluster-of-solace"] || 0) < price) return { ok: false, msg: `Not enough Clusters of Solace.` };
 
-  // Success chance: craft 60%, transform 50%
-  const chance = tab === "craft" ? 0.60 : 0.50;
-  const success = Math.random() < chance;
-
+  // Umbral creation always succeeds on this server.
   removeItem(p, "cluster-of-solace", price);
-
-  if (success) {
-    removeItem(p, from, 1);
-    addItem(p, to, 1);
-    return { ok: true, msg: `You successfully crafted <b>${itemName(to)}</b>!` };
-  }
-
-  // On failure: lose the source item, but maybe return a lower tier for transform
-  if (tab === "transform") {
-    // 50% chance to degrade from umbral to crude, else lose completely
-    if (Math.random() < 0.5) {
-      const lower = from.replace("umbral-", "crude-umbral-");
-      removeItem(p, from, 1);
-      if (GAMEDATA.items[lower]) addItem(p, lower, 1);
-      return { ok: false, msg: `The transformation failed! Your ${itemName(from)} reverted to <b>${itemName(lower)}</b>.` };
-    }
-  }
-
   removeItem(p, from, 1);
-  return { ok: false, msg: `The craft failed and <b>${itemName(from)}</b> was lost.` };
+  addItem(p, to, 1);
+  return { ok: true, msg: `You successfully crafted <b>${itemName(to)}</b>!` };
 }
