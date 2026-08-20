@@ -363,9 +363,24 @@ function tutorialTick() {
   const vocMap = tutorialDistinctVocMap(chars);
   const distinctCount = Object.keys(vocMap).length;
   if (distinctCount < 4) {
+    // Criador de personagem aberto: nao bloqueia — so o banner informativo
+    // (tutorialPatchVocationScreen) ja guia. Deixa o jogador preencher.
+    const creatorOpen = document.getElementById("acc-char-name") || document.getElementById("new-char-name");
+    if (creatorOpen) { tutorialHideOverlay(); return; }
+    // Picker de personagens aberto: destaca o botao real "Criar personagem"
+    // e oferece um botao "OK" no balao que tambem aciona a criacao.
+    const createBtn = document.getElementById("acc-open-create-char");
+    if (createBtn) {
+      const clickCreate = () => { try { createBtn.click(); } catch (e) {} };
+      tutorialRender(createBtn.getBoundingClientRect(),
+        `Crie personagens com vocações diferentes (<b>${distinctCount}/4</b>). Clique em <b>Criar personagem</b> (ou OK) para adicionar o próximo.`,
+        [{ label: "OK", primary: true, onClick: clickCreate }]);
+      return;
+    }
+    // Nenhuma tela aberta: balao central com botao que abre o picker.
     tutorialRender(null,
       `Crie personagens com vocações diferentes (<b>${distinctCount}/4</b>) para continuar o tutorial.`,
-      [{ label: "Trocar/criar personagem", primary: true,
+      [{ label: "Criar personagem", primary: true,
         onClick: () => { if (typeof window.openAccountCharacterPicker === "function") window.openAccountCharacterPicker(); } }]);
     return;
   }
