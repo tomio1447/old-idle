@@ -120,7 +120,7 @@
   if (catacombsOramond) harden(Object.assign(catacombsOramond, {
     otbm: "catacombs",
     otbmFloor: 7,
-    otbmFovBounds: { x: 1064, y: 1013, w: 19, h: 15, z: 7 },
+    otbmFovBounds: { x: 1069, y: 1013, w: 19, h: 15, z: 7 },
     otbmRuntimeWidth: 30,
     otbmRuntimeHeight: 30,
     otbmSpawn: { x: 1066, y: 1020, z: 7 },
