@@ -2,9 +2,11 @@
 
 Pasta local: `C:\Users\Tomio\Desktop\ot-idle` (no git bash: `/c/Users/Tomio/Desktop/ot-idle`)
 
-O código da Salamander's Cave (hunt 0–100) está na arena (`arena/01a01237-old-idle`).
-Faltam os sprites: **83 tiles do mapa** + **7 itens de loot novos**, extraídos
-do client 15.x na SUA máquina, e depois o push para a main + deploy na VM.
+O código da Salamander's Cave (hunt 0–100) **já está na main**. O que falta
+são os sprites: **83 tiles do mapa** (só existem dentro do client 15.x —
+extração na SUA máquina) e **8 itens de loot** (dá pra baixar os sprites
+oficiais da wiki, sem precisar do client). Os 404 no console são exatamente
+esses arquivos — nada no código está quebrado.
 
 ---
 
@@ -72,9 +74,19 @@ Esperado: extrai ~83 PNGs em `game/assets/tiles/`, patterns em
 
 ---
 
-## PASSO 5 — Extrair os sprites dos itens de loot
+## PASSO 5 — Sprites dos itens de loot (2 opções)
 
-Primeiro confira os caminhos do DAT/SPR no topo da ferramenta:
+**Opção A (rápida, sem client):** baixa os sprites oficiais da wiki
+(TibiaWiki/Fandom, 32×32 do client) e grava os PNGs direto:
+
+```bash
+python3 tools/fetch_salamander_item_sprites.py
+```
+
+Esperado: `ok: swampling-moss ...` para os 8 itens e `prontos: 8 de 8`.
+
+**Opção B (via client, como na Prison):** confira os caminhos do DAT/SPR no
+topo da ferramenta:
 
 ```bash
 grep -n "^DAT\|^SPR" tools/add_missing_loot_items.py
