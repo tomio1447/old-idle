@@ -1319,7 +1319,7 @@ function addLootPouch(p, slug, count) {
     creditCurrency(p, slug, count);
     return true;
   }
-  p.lootPouch = p.lootPouch || {};
+  const lp = p.lootPouch || {};
   const weight = (typeof itemUnitWeight === "function" ? itemUnitWeight(slug) : 0.1) * count;
   if (typeof freeCapacity === "function" && weight > freeCapacity(p) + 1e-9) {
     if (typeof addLog === "function") addLog("death", typeof capacityMessage === "function" ? capacityMessage() : "You cannot carry more.");
@@ -1328,7 +1328,8 @@ function addLootPouch(p, slug, count) {
   // Aceita overflow acima dos 50 slots. O percentual continua em 100% e o
   // autoseller tenta liberar itens vendáveis, mas classes protegidas e novos
   // drops permanecem seguros na pouch.
-  p.lootPouch[slug] = (p.lootPouch[slug] || 0) + count;
+  lp[slug] = (lp[slug] || 0) + count;
+  p.lootPouch = lp;
   return true;
 }
 

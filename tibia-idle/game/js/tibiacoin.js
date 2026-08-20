@@ -18,10 +18,11 @@ function accountLoad() {
     if (raw) acc = JSON.parse(raw);
   } catch (e) { acc = null; }
   if (!acc || typeof acc !== "object" || typeof acc.coins !== "number") {
-    acc = { v: 1, coins: 0, gold: 0, goldMigrated: false };
+    acc = { v: 1, coins: 0, gold: 0, goldMigrated: false, lootPouch: {} };
   }
   acc.coins = Math.max(0, Math.floor(acc.coins) || 0);
   acc.gold = Math.max(0, Math.floor(acc.gold) || 0);
+  if (!acc.lootPouch || typeof acc.lootPouch !== "object") acc.lootPouch = {};
   return acc;
 }
 
@@ -49,6 +50,23 @@ function bindAccountGold(p) {
   Object.defineProperty(p, "gold", { enumerable: true, configurable: true,
     get: () => accountGold(), set: (v) => accountSetGold(v) });
   p._accountGoldBound = true;
+}
+
+// Loot Pouch também é compartilhado por todos os personagens da conta.
+function accountLootPouch() {
+  return accountLoad().lootPouch;
+}
+function accountSetLootPouch(pouch) {
+  const acc = accountLoad();
+  acc.lootPouch = (pouch && typeof pouch === "object") ? pouch : {};
+  accountSave(acc);
+  return acc.lootPouch;
+}
+function bindAccountLootPouch(p) {
+  if (!p || p._accountPouchBound || typeof Object.defineProperty !== "function") return;
+  Object.defineProperty(p, "lootPouch", { enumerable: true, configurable: true,
+    get: () => accountLootPouch(), set: (v) => accountSetLootPouch(v) });
+  p._accountPouchBound = true;
 }
 
 /* Adiciona coins à conta (só valores positivos; retorna o novo saldo). */
