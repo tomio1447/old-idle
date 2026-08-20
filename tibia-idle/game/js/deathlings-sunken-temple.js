@@ -92,4 +92,19 @@ const DEATHLINGS_AVG = { hp: 7200, exp: 6350, damage: 300, armor: 72, gold: 45 }
     avgGold: DEATHLINGS_AVG.gold,
     respawn: 0.8,
   };
+
+  /* Missão Deathlings - Sunken Temple: sobreviver 5 minutos (300s) sem
+   * mortes na party libera a montaria Manta Ray para todos os personagens
+   * da conta. */
+  if (typeof MISSION_DEFS !== "undefined") {
+    MISSION_DEFS["deathlings-sunken-temple"] = {
+      title: "Missão: Deathlings Sunken Temple",
+      compact: true,
+      tasks: [
+        { counter: "survive", surviveSec: 300, target: 300,
+          label: "Sobreviver 5 min sem mortes na party" },
+      ],
+      completeReward: { accountMount: "manta-ray" },
+    };
+  }
 })();

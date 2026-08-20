@@ -881,6 +881,10 @@ function rewardText(reward) {
   (reward.supplies || []).forEach((r) => out.push((r.count || 1) + " carga(s) " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
   if (reward.bossAccess)
     out.push("Acesso ao boss " + (reward.bossName || reward.bossAccess));
+  if (reward.mount || reward.accountMount) {
+    const m = (typeof APP_MOUNT !== "undefined" && APP_MOUNT[reward.mount || reward.accountMount]) || {};
+    out.push("Montaria " + (m.nome || reward.mount || reward.accountMount));
+  }
   return out.join(" · ") || "—";
 }
 
@@ -897,6 +901,25 @@ function grantMissionReward(p, reward) {
   if (reward.bossAccess) {
     p.bossAccess = p.bossAccess || {};
     p.bossAccess[reward.bossAccess] = true;
+  }
+  if (reward.mount) {
+    ensureWardrobe(p);
+    p.wardrobe.mounts[reward.mount] = true;
+  }
+  if (reward.accountMount) {
+    ensureWardrobe(p);
+    p.wardrobe.mounts[reward.accountMount] = true;
+    try {
+      const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+      if (acc) {
+        acc.mounts = acc.mounts || {};
+        acc.mounts[reward.accountMount] = true;
+        sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+        const token = sessionToken();
+        if (token && typeof accountUpdateMissions === "function")
+          accountUpdateMissions(token, p.missions, p.missionsDone);
+      }
+    } catch (e) { /* offline */ }
   }
   return true;
 }
@@ -945,31 +968,22 @@ function tryCompleteMissionRewards(p, huntId) {
 
 function handleMissionKill(p, huntId, monster) {
   const def = missionForHunt(huntId);
-  if (!def || !def.tasks.some((t) => t.monster === monster)) return;
+  if (!def) return;
+  const matches = def.tasks.filter((t) =>
+    (t.monster && t.monster === monster) ||
+    (t.counter && t.counter === "kills" && !t.monster));
+  if (!matches.length) return;
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
   if (st.completeClaimed) return;
-  const task = def.tasks.find((t) => t.monster === monster);
-  if (st.claimed && st.claimed[task.monster] && (st.progress[monster] || 0) >= task.target) {
-    tryCompleteMissionRewards(p, huntId);
-    syncMissionsToAccount(p);
-    if (typeof requestAnimationFrame === "function") {
-      if (!G._missionRenderQueued) {
-        G._missionRenderQueued = true;
-        requestAnimationFrame(() => {
-          G._missionRenderQueued = false;
-          renderMission();
-        });
-      }
-    } else renderMission();
-    return;
+  for (const task of matches) {
+    const key = task.monster || task.counter;
+    if (st.claimed && st.claimed[key] && (st.progress[key] || 0) >= task.target) continue;
+    st.progress[key] = Math.min(task.target, (st.progress[key] || 0) + 1);
   }
-  st.progress[monster] = Math.min(task.target, (st.progress[monster] || 0) + 1);
   tryCompleteMissionRewards(p, huntId);
   syncMissionsToAccount(p);
-  // innerHTML da missão no mesmo frame do kill (e do wave-clear) causa hitch;
-  // redesenha no próximo frame.
   if (typeof requestAnimationFrame === "function") {
     if (!G._missionRenderQueued) {
       G._missionRenderQueued = true;

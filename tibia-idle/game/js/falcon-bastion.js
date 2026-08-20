@@ -115,4 +115,26 @@ const FALCON_BASTION_AVG = { hp: 8750, exp: 6600, damage: 325, armor: 57, gold: 
     avgGold: FALCON_BASTION_AVG.gold,
     respawn: 0.9,
   };
+
+  /* Missão Falcon Bastion: eliminar 150 Falcon Knight e 150 Falcon Paladin
+   * libera o acesso ao boss Grand Master Oberon. */
+  if (typeof MISSION_DEFS !== "undefined") {
+    MISSION_DEFS["falcon-bastion"] = {
+      title: "Missão: Falcon Bastion",
+      tasks: [
+        { monster: "falcon-knight", target: 150, reward: { supplies: [{ slug: "ultimate-health-potion", count: 5 }] } },
+        { monster: "falcon-paladin", target: 150, reward: { supplies: [{ slug: "ultimate-spirit-potion", count: 5 }] } },
+      ],
+      completeReward: { bossAccess: "grand-master-oberon", bossName: "Grand Master Oberon" },
+    };
+  }
+
+  /* Requisito do boss Oberon: concluir a missão de Falcon Bastion. */
+  if (typeof BOSS_DEFS !== "undefined" && BOSS_DEFS["grand-master-oberon"]) {
+    BOSS_DEFS["grand-master-oberon"].requirement = {
+      level: 250,
+      mission: "falcon-bastion",
+      text: "Requer nível 250+ e a missão de Falcon Bastion completa.",
+    };
+  }
 })();

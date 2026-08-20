@@ -82,4 +82,28 @@ const DEEPLINGS_DEEPER_AVG = { hp: 2667, exp: 2600, damage: 400, armor: 49, gold
     avgGold: DEEPLINGS_DEEPER_AVG.gold,
     respawn: 0.8,
   };
+
+  /* Missão Deeplings Deeper: eliminar 500 monstros do mapa libera acesso
+   * aos bosses Tanjis, Obujos e Brokul. */
+  if (typeof MISSION_DEFS !== "undefined") {
+    MISSION_DEFS["deeplings-deeper"] = {
+      title: "Missão: Deeplings Deeper",
+      tasks: [
+        { counter: "kills", target: 500, label: "Eliminar monstros Deepling" },
+      ],
+      completeReward: { bossAccess: "tanjis-obujos-brokul", bossName: "Tanjis, Obujos e Brokul" },
+    };
+  }
+
+  if (typeof BOSS_DEFS !== "undefined") {
+    for (const id of ["tanjis", "obujos", "brokul"]) {
+      if (BOSS_DEFS[id]) {
+        BOSS_DEFS[id].requirement = {
+          level: 150,
+          mission: "deeplings-deeper",
+          text: "Requer nível 150+ e a missão de Deeplings Deeper completa.",
+        };
+      }
+    }
+  }
 })();

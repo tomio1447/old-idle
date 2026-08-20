@@ -251,7 +251,12 @@ function ownedAddons(p, id) {
 
 function ownsMount(p, id) {
   ensureWardrobe(p);
-  return !!p.wardrobe.mounts[id];
+  if (p.wardrobe.mounts[id]) return true;
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    if (acc && acc.mounts && acc.mounts[id]) return true;
+  } catch (e) { /* offline */ }
+  return false;
 }
 
 /* Compra: devolve {ok, erro} para a UI mostrar o motivo */
