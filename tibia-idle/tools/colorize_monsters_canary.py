@@ -146,6 +146,13 @@ CANARY_COLORS = {
     "faceless-bane":  (0, 2, 95, 97),
     # Cradle of Monsters: looktype 1611, cores oficiais do Canary.
     "doctor-marrow":  (57, 0, 0, 95),
+    # Falcon Bastion: looktype 1071 (Preceptor Lazare 1078) oficiais.
+    "falcon-knight":              (57, 96, 38, 105),
+    "falcon-paladin":             (57, 96, 38, 105),
+    "grand-commander-soeren":     (57, 96, 76, 105),
+    "preceptor-lazare":           (0, 0, 0, 0),
+    "grand-chaplain-gaunder":     (57, 96, 23, 105),
+    "grand-canon-dominus":        (57, 96, 96, 105),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -173,11 +180,19 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "cobra-assassin",
                "faceless-bane",
                "doctor-marrow",
+               "falcon-knight", "falcon-paladin",
+               "grand-commander-soeren", "preceptor-lazare",
+               "grand-chaplain-gaunder", "grand-canon-dominus",
                "guzzlemaw", "frazzlemaw", "silencer"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
-                  "fury": 1}
+                  "fury": 1,
+                  "falcon-knight": 1, "falcon-paladin": 2,
+                  "grand-commander-soeren": 2,
+                  "preceptor-lazare": 0,
+                  "grand-chaplain-gaunder": 1,
+                  "grand-canon-dominus": 0}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 
