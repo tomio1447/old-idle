@@ -344,23 +344,39 @@ function npcOberonTraderHtml(p) {
   const wingsPrice = 5000000;
   const canBuyWings = p.gold >= wingsPrice;
 
+  const ingRow = (slug, have) => `
+    <div class="shop-row" style="align-items:center;gap:6px">
+      ${typeof itemImg === "function" ? itemImg(slug, { size: 32 }) : ""}
+      <span style="color:${have ? '#9ce84a' : '#e85b52'}">1x ${itemName(slug)}</span>
+    </div>`;
+
   return `
-    <div class="small dim mb8">"Trago-me os itens certos e forjarei para você um escudo de verdade."</div>
+    <div class="small dim mb8">"Traga-me os itens certos e forjarei para você um escudo de verdade."</div>
     <div class="mb8" style="border:1px solid #2a2822;padding:8px;background:#14120e">
       <div class="small mb4" style="color:#ffe680">Trocar Falcon Escutcheon</div>
-      <div class="tiny dim mb4">Requer na mochila:</div>
-      <div class="row wrap" style="gap:8px">
-        <span style="color:${haveShield ? '#9ce84a' : '#e85b52'}">1x Falcon Shield</span>
-        <span style="color:${haveGrant ? '#9ce84a' : '#e85b52'}">1x Grant of Arms</span>
-        <span style="color:${haveCloth ? '#9ce84a' : '#e85b52'}">1x Patch of Fine Cloth</span>
+      <div class="tiny dim mb4">Você receberá:</div>
+      <div class="shop-row mb4" style="align-items:center;gap:6px">
+        ${typeof itemImg === "function" ? itemImg("falcon-escutcheon", { size: 32 }) : ""}
+        <span style="color:#ffe680">1x Falcon Escutcheon</span>
       </div>
+      <div class="tiny dim mb4">Requer na mochila:</div>
+      ${ingRow("falcon-shield", haveShield)}
+      ${ingRow("grant-of-arms", haveGrant)}
+      ${ingRow("patch-of-fine-cloth", haveCloth)}
       <button class="sm mt8 primary" data-oberon-trade ${canTrade ? "" : "disabled"}>
         Forjar Falcon Escutcheon
       </button>
     </div>
     <div style="border:1px solid #2a2822;padding:8px;background:#14120e">
       <div class="small mb4" style="color:#ffe680">Comprar Roasted Dragon Wings</div>
-      <div class="tiny dim mb4">Preço: <span class="gold-txt">${fmtFull(wingsPrice)} gp</span></div>
+      <div class="shop-row" style="align-items:center;gap:6px">
+        ${typeof itemImg === "function" ? itemImg("roasted-dragon-wings", { size: 32 }) : ""}
+        <span class="tiny dim">Você receberá: <b>Roasted Dragon Wings</b></span>
+      </div>
+      <div class="shop-row mb4" style="align-items:center;gap:6px">
+        ${typeof itemImg === "function" ? itemImg("gold-coin", { size: 32 }) : ""}
+        <span class="gold-txt">(GP) ${fmtFull(wingsPrice)}</span>
+      </div>
       <button class="sm primary" data-oberon-buy-wings ${canBuyWings ? "" : "disabled"}>
         Comprar 1x Roasted Dragon Wings
       </button>
