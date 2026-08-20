@@ -1386,6 +1386,7 @@ function sellBagItem(p, slug, instId) {
   p.gold += value;
   addLog("sell", `Vendeu ${count}x ${it.n} por <span class="gold-txt">${fmtFull(value)} gp</span>`);
   delete p.bag[slug];
+  if (typeof save === "function") save();
   return value;
 }
 
@@ -1439,6 +1440,7 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
         delete p.bag[slug];
       }
       addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
+      if (typeof save === "function") save();
       refresh();
     },
   });
@@ -1492,6 +1494,7 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
         delete p.bag[slug];
       }
       addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
+      if (typeof save === "function") save();
       refresh();
     },
   });
