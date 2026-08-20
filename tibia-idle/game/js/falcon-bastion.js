@@ -34,7 +34,7 @@ const FALCON_BASTION_ITEMS = {
   "falcon-coif":              { n: "falcon coif", s: "helmet", t: "helmet", cid: 28715, w: 2.80, sell: 0, npcSell: 0, arm: 10, lvl: 300, vocs: ["knight", "elite knight", "paladin", "royal paladin"], imbSlots: 2 },
   "falcon-bow":               { n: "falcon bow", s: "distance", t: "distance", cid: 28718, w: 3.50, sell: 0, npcSell: 0, atk: 7, range: 6, hitchance: 5, lvl: 300, vocs: ["paladin", "royal paladin"], th: true, imbSlots: 3 },
   "falcon-rod":               { n: "falcon rod", s: "rod", t: "rod", cid: 28716, w: 3.70, sell: 0, npcSell: 0, mdmg: 94, range: 5, ml: 3, lvl: 300, vocs: ["druid", "elder druid"], imbSlots: 2 },
-  "falcon-greaves":           { n: "falcon greaves", s: "legs", t: "legs", cid: 28720, w: 3.60, sell: 0, npcSell: 0, arm: 10, lvl: 300, vocs: ["knight", "elite knight", "paladin", "royal paladin"], imbSlots: 2 },
+  "falcon-greaves":           { n: "falcon greaves", s: "legs", t: "legs", cid: 28720, w: 3.60, sell: 0, npcSell: 0, arm: 10, lvl: 300, vocs: ["knight", "elite knight", "paladin", "royal paladin"], imbSlots: 1 },
   "falcon-battleaxe":         { n: "falcon battleaxe", s: "axe", t: "axe", cid: 28724, w: 9.50, sell: 0, npcSell: 0, atk: 10, def: 33, lvl: 300, vocs: ["knight", "elite knight"], th: true, imbSlots: 2 },
   "falcon-longsword":         { n: "falcon longsword", s: "sword", t: "sword", cid: 28723, w: 8.20, sell: 0, npcSell: 0, atk: 56, def: 34, lvl: 300, vocs: ["knight", "elite knight"], th: true, imbSlots: 2 },
   "falcon-mace":              { n: "falcon mace", s: "club", t: "club", cid: 28725, w: 6.80, sell: 0, npcSell: 0, atk: 11, def: 33, lvl: 300, vocs: ["knight", "elite knight"], imbSlots: 2 },
