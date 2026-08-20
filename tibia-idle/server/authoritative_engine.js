@@ -433,6 +433,11 @@ try{
   if(typeof sandbox.fundirWeaponData==="function")sandbox.fundirWeaponData();
   vm.runInNewContext(fs.readFileSync(path.join(js,"accessorydata.js"),"utf8"),sandbox);
   vm.runInNewContext(fs.readFileSync(path.join(js,"supply-stash-data.js"),"utf8"),sandbox);
+  // Dawnport starter items (scorcher, chiller, spellbook, simple-jo-staff):
+  // supplies.js registra os itens extras em GAMEDATA; sem isso o servidor
+  // nao conhece a arma dos magos recém-criados.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"supplydata.js"),"utf8"),sandbox);}catch(_sd){/* opcional */}
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"supplies.js"),"utf8"),sandbox);}catch(_sp){/* opcional */}
   const gd=sandbox.GAMEDATA&&sandbox.GAMEDATA.items||{};
   for(const slug of Object.keys(gd)){
     const src=gd[slug]||{},cur=ITEMS[slug]||{};

@@ -423,10 +423,10 @@ function giveStartingItems(p) {
 const START_EXTRA_ITEMS = {
   "scorcher": { n: "the scorcher", s: "weapon", t: "magic", mdmg: 8, mag: 0,
                 sell: 500, buy: 500, w: 15.0, range: 3, el: "fire",
-                voc: ["sorcerer"] },
+                vocs: ["sorcerer"] },
   "chiller": { n: "the chiller", s: "weapon", t: "magic", mdmg: 8, mag: 0,
                sell: 500, buy: 500, w: 15.0, range: 3, el: "ice",
-               voc: ["druid"] },
+               vocs: ["druid"] },
   // weaponType "fist" no items.xml do canary: a jo staff treina PUNHO, nao
   // clava. Estava como club, entao o monk nao subia fist e o dano saia pela
   // skill errada.
