@@ -961,7 +961,7 @@ function bindCatalogAccordion(root, mode) {
 }
 
 const HUNT_MODAL_SECTIONS = [
-  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp"] },
+  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "salamander-cave"] },
   { title: "HUNTS 100–250", ids: ["minotaur-oramond-east"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },

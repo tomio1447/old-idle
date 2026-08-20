@@ -420,6 +420,9 @@ try{
   // The Prison (Roshamuul): 3 andares 250+ + itens de loot (unholy bone,
   // skeleton decoration etc.) — sem isso o Sell All online não precifica.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"prison.js"),"utf8"),sandbox);}catch(_pr){/* opcional */}
+  // Salamander's Cave (Venore): hunt 0–100 + itens de loot (swampling moss,
+  // damselfly wing etc.) — sem isso o Sell All online não precifica.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"salamander-cave.js"),"utf8"),sandbox);}catch(_sc){/* opcional */}
   // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
@@ -487,6 +490,7 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "prison-1":{monsters:["lost-soul","plaguesmith","demon-outcast","betrayed-wraith","dark-torturer"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-2":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-3":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker","plaguesmith","juggernaut"],cat:"hard",pack:10,packMin:6,packMax:10},
+  "salamander-cave":{monsters:["emerald-damselfly","marsh-stalker","swampling","salamander"],cat:"aventureiro",pack:4},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},

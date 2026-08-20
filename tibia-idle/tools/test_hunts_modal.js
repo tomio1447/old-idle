@@ -36,7 +36,7 @@ must(cityUi.includes("data-open-hunts-catalog")&&!cityUi.includes("Object.keys(G
   "NPC de viagens ainda expõe a lista completa 7.4");
 
 const expected=[
- ["HUNTS LEVEL 0–100",["rats","amazon-camp"]],
+ ["HUNTS LEVEL 0–100",["rats","amazon-camp","salamander-cave"]],
  ["HUNTS 100–250",["minotaur-oramond-east"]],
  ["HUNTS 250+",["mota-extension","cobra-bastion","marapur-nagas","buried-cathedral","ingol-terrain","roshamuul","prison-1","prison-2","prison-3","catacombs-oramond"]],
  ["FERUMBRAS ASCENDANT",["ferumbras-way","dt-seal","juggerseal"]],
