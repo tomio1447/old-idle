@@ -344,6 +344,26 @@ function tutorialGrantExerciseIfDue(p) {
     toast("Tutorial concluído: +1500 cargas de cada exercise weapon!", "level");
   if (typeof save === "function") save();
 }
+function tutorialShowCompletionModal() {
+  const modal = $("#modal"), body = $("#modal-body");
+  if (!modal || !body) return;
+  body.innerHTML = `
+    <div class="panel-title">Tutorial concluído!</div>
+    <div class="panel-body" style="text-align:center;padding:24px 16px">
+      <div style="font-size:22px;color:#9ce84a;margin-bottom:10px">VOCÊ CONCLUIU O TUTORIAL</div>
+      <div style="font-size:16px;color:#e8d24a;margin-bottom:20px">
+        VOCÊ RECEBEU <b>${TUTORIAL_VIP_DAYS} DIAS DE VIP</b> NA SUA CONTA!
+      </div>
+      <div class="tiny dim" style="margin-bottom:16px">
+        As exercise weapons já foram adicionadas aos seus personagens.
+      </div>
+      <button class="primary full" id="tutorial-reward-ok">OK</button>
+    </div>`;
+  modal.classList.add("show", "wide");
+  $("#tutorial-reward-ok").addEventListener("click", () => {
+    modal.classList.remove("show", "wide");
+  });
+}
 function tutorialClaimReward(state) {
   if (TUTORIAL_CLAIMING || state.rewardGranted) return;
   const token = (typeof sessionToken === "function") ? sessionToken() : "";
@@ -357,6 +377,7 @@ function tutorialClaimReward(state) {
         toast(`Tutorial concluído! +${TUTORIAL_VIP_DAYS} dias de VIP na conta.`, "level");
       if (typeof G !== "undefined" && G && G.p) tutorialGrantExerciseIfDue(G.p);
       tutorialHideOverlay();
+      tutorialShowCompletionModal();
     }
   }).finally(() => { TUTORIAL_CLAIMING = false; });
 }
