@@ -236,6 +236,19 @@
     <!-- ============================ ESQUERDA -->
     <div class="col col-left">
 
+      <div class="panel" data-collapse="equip">
+        <div class="panel-title" data-i18n="panel.equip">Equipamento</div>
+        <div class="panel-body">
+          <div class="equip-grid" id="equip"></div>
+          <div class="status-bar" id="status-bar"></div>
+        </div>
+      </div>
+
+      <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
+        <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
+        <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
+      </div>
+
       <div class="panel" data-collapse="char">
         <div class="panel-title">
           <span id="p-name">—</span>
@@ -253,18 +266,8 @@
           <div class="bar mb4" id="bar-mp"><div class="fill mp"></div><div class="label"></div></div>
           <div class="tiny dim" data-i18n="char.exp">Experiência</div>
           <div class="bar mb4" id="bar-exp"><div class="fill exp"></div><div class="label"></div></div>
-          <div id="cond-bar" class="cond-bar status-bar" style="display:none"></div>
-          <div id="monk-bar" class="monk-bar" style="display:none"></div>
           <div class="tiny dim" data-i18n="char.stamina">Stamina</div>
           <div class="bar" id="bar-sta"><div class="fill sta"></div><div class="label"></div></div>
-        </div>
-      </div>
-
-      <div class="panel" data-collapse="equip">
-        <div class="panel-title" data-i18n="panel.equip">Equipamento</div>
-        <div class="panel-body">
-          <div class="equip-grid" id="equip"></div>
-          <div class="status-bar" id="status-bar"></div>
         </div>
       </div>
 
@@ -327,12 +330,6 @@
         <div id="spite-minigame" class="spite-minigame" style="display:none" aria-live="polite"></div>
         <div id="malice-minigame" class="malice-minigame" style="display:none" aria-live="polite"></div>
         <div id="mega-minigame" class="mega-minigame" style="display:none" aria-live="polite"></div>
-        <!-- AUTO/SQM: fica na tela da caçada (antes só existia no título da
-             Mochila, fora do foco). OFF = clique no chão / WASD por SQM. -->
-        <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
-          <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
-          <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
-        </div>
         <!-- PARTY (OTC): painel fixo no canto superior direito da tela do
              jogo — lista os personagens da party com level, outfit, HP e
              mana; clicar num membro da sua conta troca de personagem. -->
