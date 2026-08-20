@@ -20,9 +20,9 @@
 const DEATHLINGS_SUNKEN_TEMPLE = {
   otbm: "deeplingstairs",
   name: "Deathlings - Sunken Temple",
-  center: { x: 1061, y: 1001, z: 7 },
-  spawn: { x: 1069, y: 1003, z: 7 },
-  mob: { x: 1055, y: 998, w: 12, h: 9, z: 7 },
+  center: { x: 1058, y: 1000, z: 7 },
+  spawn: { x: 1058, y: 1001, z: 7 },
+  mob: { x: 1052, y: 1000, w: 12, h: 6, z: 7 },
 };
 
 /* Itens de loot do Canary que faltavam no catálogo (TibiaWiki / items.xml).
@@ -74,13 +74,13 @@ const DEATHLINGS_AVG = { hp: 7200, exp: 6350, damage: 300, armor: 72, gold: 45 }
     level: 250,
     minLevel: 250,
     cat: "aventureiro",
-    pack: 4,
+    pack: 8,
     monsters: ["deathling-spellsinger", "deathling-scout"],
     color: "#3a6a7a",
     scene: "cave",
     otbm: DEATHLINGS_SUNKEN_TEMPLE.otbm,
     otbmFloor: 7,
-    otbmFovBounds: { x: 1053, y: 995, w: 20, h: 15, z: 7 },
+    otbmFovBounds: { x: 1050, y: 997, w: 18, h: 13, z: 7 },
     otbmRuntimeWidth: 30,
     otbmRuntimeHeight: 30,
     otbmSpawn: DEATHLINGS_SUNKEN_TEMPLE.spawn,
