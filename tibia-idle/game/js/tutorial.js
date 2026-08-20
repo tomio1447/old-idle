@@ -289,6 +289,15 @@ function tutorialRenderHelperStep(state, pendingId, chars) {
   const inRats = typeof G !== "undefined" && G && G.combat && G.combat.huntId === "rats";
   if (String(G.p.id) !== String(pendingId)) {
     const name = tutorialCharName(pendingId, chars);
+    // Modal de Party ja aberto: destaca o membro pendente.
+    const partyOpen = document.getElementById("modal") && document.getElementById("modal").classList.contains("show");
+    const member = partyOpen && document.querySelector(`#party-content [data-party-switch="${pendingId}"]`);
+    if (member) {
+      tutorialRender(member.getBoundingClientRect(),
+        `Clique em <b>${name}</b> na Party para trocar para ele e abrir o Helper.`, []);
+      return;
+    }
+    if (partyOpen) { tutorialHideOverlay(); return; }
     tutorialRender(null,
       `Use a <b>Party</b> para trocar para <b>${name}</b> e configurar o Helper dela(e).`,
       [{ label: "Abrir Party", primary: true, onClick: () => { if (typeof openPartyModal === "function") openPartyModal(); } }]);
