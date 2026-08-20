@@ -33,7 +33,7 @@ const ELF_YALAHAR_AVG = { hp: 160, exp: 97, damage: 27, armor: 9, gold: 30 };
     avgArmor: ELF_YALAHAR_AVG.armor,
     avgGold: ELF_YALAHAR_AVG.gold,
     respawn: 1,
-    pack: 1,
+    pack: 4,
     cat: "hunt",
     party: true,
   };

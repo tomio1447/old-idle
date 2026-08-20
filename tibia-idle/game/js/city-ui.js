@@ -443,9 +443,12 @@ function openNpc(id) {
     case "umbral-creation": body = npcUmbralCreationHtml(p); break;
   }
 
+  const npcTitleSprite = npc.sprite === "umbral-creation"
+    ? `<span class="npc-anim-guzzlemaw" role="img" aria-label="${npc.name}" style="transform:scale(0.4);width:40px;height:40px;display:inline-block"></span>`
+    : `<img src="assets/npc/${npc.sprite}_s.png" style="height:22px" alt="">`;
   $("#modal-body").innerHTML = `
     <div class="panel-title">
-      <img src="assets/npc/${npc.sprite}_s.png" style="height:22px">
+      ${npcTitleSprite}
       ${npc.name} — <span class="dim" style="font-weight:normal">${npc.role}</span>
       <span style="flex:1"></span>
       <button class="sm" id="npc-close">✕</button>
@@ -1430,7 +1433,7 @@ function bindNpc(id, type) {
   // Umbral Creation: craft
   $$("#npc-content [data-umbral-craft]").forEach((b) =>
     b.addEventListener("click", () => {
-      const r = tryUmbralCraft(p, b.dataset.umbralCraft, b.dataset.umbralFrom, b.dataset.umbralTo, parseInt(b.dataset.umbralPrice, 10));
+      const r = tryUmbralCraft(p, b.dataset.umbralCraft, b.dataset.umbralTo, b.dataset.umbralFrom, b.dataset.umbralDream, b.dataset.umbralCluster);
       toast(r.msg, r.ok ? "level" : "death");
       if (r.ok) addLog("skill", r.msg);
       else addLog("death", r.msg);
