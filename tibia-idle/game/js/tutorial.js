@@ -243,6 +243,15 @@ function tutorialRenderPartyStep(state) {
 
 /* ------------------------------------------------------- fase: hunt */
 function tutorialRenderHuntEntryStep() {
+  // Modal de escolha de instância (PVP/NON-PVP): destaca NON-PVP.
+  const nonPvp = document.querySelector('[data-instance="non-pvp"]');
+  if (nonPvp) {
+    const click = () => { try { nonPvp.click(); } catch (e) {} };
+    tutorialRender(nonPvp.getBoundingClientRect(),
+      "Escolha a instância <b>NON-PVP</b> para começar a caçar com segurança.",
+      [{ label: "OK", primary: true, onClick: click }]);
+    return;
+  }
   const goBtn = document.getElementById("huntinfo-go");
   if (goBtn) {
     tutorialRender(goBtn.getBoundingClientRect(),
