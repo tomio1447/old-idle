@@ -34,7 +34,7 @@ const NPC_MODAL_CATALOG = [
     name: "Oberon Trader",
     role: "Falcon Forge",
     sprite: "oberon-trader",
-    descKey: "npc.desc.oberon-trader",
+    desc: "Troca itens de Falcon Forge e vende Roasted Dragon Wings.",
   },
 ];
 
@@ -387,10 +387,13 @@ function renderNpcsCatalog() {
   root.innerHTML = `<section class="hunt-modal-section npcs-modal-section">
     <div class="hunt-cat-title">${typeof t === "function" ? t("npc.catalogTitle") : "Serviços"}</div>
     <div class="hunts-group">${NPC_MODAL_CATALOG.map((entry) => {
-      const desc = typeof t === "function" ? t(entry.descKey) : entry.descKey;
+      const desc = entry.desc || (typeof t === "function" ? t(entry.descKey) : entry.descKey);
+      const spriteHtml = entry.sprite === "oberon-trader"
+        ? `<span class="npc-anim-oberon" role="img" aria-label="${entry.name}"></span>`
+        : `<img src="assets/npc/${entry.sprite}_s.png" alt="" class="npc-modal-sprite">`;
       return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card npc-modal-card" data-npc-shop="${entry.shop}">
         <span class="mobs" aria-hidden="true">
-          <img src="assets/npc/${entry.sprite}_s.png" alt="" class="npc-modal-sprite">
+          ${spriteHtml}
         </span>
         <span class="info">
           <span class="nm">${entry.name}</span>

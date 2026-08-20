@@ -1297,6 +1297,20 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 #cidade-modal-list .cidade-modal-sprite {
   width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated;
 }
+.npc-anim-oberon {
+  display: inline-block;
+  width: 45px;
+  height: 43px;
+  background: url("../assets/npc/oberon-trader.png") -39px -80px no-repeat;
+  background-size: 369px 164px;
+  image-rendering: pixelated;
+  animation: oberon-idle 0.8s steps(1) infinite;
+}
+@keyframes oberon-idle {
+  0%, 100% { background-position-x: -39px; }
+  33% { background-position-x: -162px; }
+  66% { background-position-x: -285px; }
+}
 #hunts-modal-list .hunt-modal-card .mobs .hunt-modal-mob {
   flex: 0 0 auto; max-width: 28px; overflow: hidden;
 }
