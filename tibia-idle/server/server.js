@@ -290,6 +290,67 @@ async function updateAccountMissions(db,body){
   }
   return {code:200,body:{ok:true,missions,missionsDone}};
 }
+async function updateAccountTutorial(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  // Progresso do tutorial de onboarding é por conta (igual às missões):
+  // o cliente envia o estado completo a cada mudança de fase.
+  const tutorial=body.tutorial&&typeof body.tutorial==="object"&&!Array.isArray(body.tutorial)?body.tutorial:{};
+  if(typeof db.setAccountTutorial==="function"){
+    await db.setAccountTutorial(acc.id,tutorial);
+  }else{
+    acc.tutorial=tutorial;
+    if(typeof db._save==="function")db._save();
+  }
+  return {code:200,body:{ok:true,tutorial}};
+}
+const TUTORIAL_VOCATIONS=["knight","paladin","druid","sorcerer","monk"];
+const TUTORIAL_VIP_DAYS=3;
+const TUTORIAL_EXERCISE_CHARGES=1500;
+/* Recompensa única de conclusão do tutorial: 3 dias de VIP na conta + 1500
+ * cargas de cada exercise weapon nos 4 personagens do tutorial. VIP é
+ * aplicado aqui (é por conta); as cargas de exercise weapon são creditadas
+ * no cliente na próxima vez que cada personagem carregar (dado por
+ * personagem), então só devolvemos os charIds para o cliente aplicar. */
+async function claimTutorialReward(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const tutorial=acc.tutorial&&typeof acc.tutorial==="object"?acc.tutorial:{};
+  if(tutorial.rewardGranted)
+    return {code:200,body:{ok:true,already:true,vipUntil:Math.max(0,Math.floor(Number(acc.vip_until)||0)),
+      charIds:Array.isArray(tutorial.charIds)?tutorial.charIds:[]}};
+  const charIds=Array.isArray(tutorial.charIds)?tutorial.charIds.map(String):[];
+  if(charIds.length<4)
+    return {code:400,body:{ok:false,msg:"Tutorial incompleto: faltam personagens."}};
+  const helperDone=tutorial.helperDone&&typeof tutorial.helperDone==="object"?tutorial.helperDone:{};
+  const allHelperDone=charIds.every((id)=>!!helperDone[id]);
+  if(!tutorial.partyDone||!tutorial.huntEntered||!allHelperDone)
+    return {code:400,body:{ok:false,msg:"Tutorial incompleto: termine a party/hunt/helper antes."}};
+  // Confere no servidor que os personagens realmente existem e cobrem
+  // vocações distintas (evita reivindicar com ids inventados).
+  let chars=[];
+  try{chars=await db.charactersOf(acc.id);}catch(e){chars=[];}
+  const byId={};for(const c of chars)byId[String(c.id)]=c;
+  const vocsSeen=new Set();
+  for(const id of charIds){
+    const c=byId[id];
+    if(!c||!TUTORIAL_VOCATIONS.includes(c.voc))
+      return {code:400,body:{ok:false,msg:"Personagem do tutorial inválido."}};
+    vocsSeen.add(c.voc);
+  }
+  if(vocsSeen.size<4)
+    return {code:400,body:{ok:false,msg:"Os personagens do tutorial precisam ter 4 vocações diferentes."}};
+  const now=Date.now();
+  const cur=Math.max(0,Math.floor(Number(acc.vip_until)||0));
+  const vipUntil=Math.max(cur,now)+TUTORIAL_VIP_DAYS*24*3600*1000;
+  if(typeof db.setAccountVipUntil==="function")await db.setAccountVipUntil(acc.id,vipUntil);
+  else if(typeof db.run==="function")await db.run("UPDATE accounts SET vip_until = ? WHERE id = ?",[vipUntil,Number(acc.id)]);
+  const newTutorial=Object.assign({},tutorial,{rewardGranted:true,rewardGrantedAt:now});
+  if(typeof db.setAccountTutorial==="function")await db.setAccountTutorial(acc.id,newTutorial);
+  else{acc.tutorial=newTutorial;if(typeof db._save==="function")db._save();}
+  return {code:200,body:{ok:true,vipUntil,vip:vipUntil>now,charIds,
+    exerciseCharges:TUTORIAL_EXERCISE_CHARGES,tutorial:newTutorial}};
+}
 async function requireLease(db,acc,body){
   const holder=String(body.holder_id||""),secret=String(body.lease_token||"");
   const valid=validLeaseHolder(holder)&&secret.length===64&&
@@ -472,6 +533,7 @@ function accountPublicView(acc){
     gold:Math.max(0,Math.floor(Number(acc.gold)||0)),
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
+    tutorial:acc.tutorial||{},
   };
 }
 async function ensureAccountWallet(db,acc){
@@ -3174,6 +3236,12 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/account/missions"){
         const r=await updateAccountMissions(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/tutorial"){
+        const r=await updateAccountTutorial(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/account/tutorial/claim"){
+        const r=await claimTutorialReward(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/account/email/send"){
         const limited=rateLimit(req,"email-send",10,600000);if(limited)return send(res,limited.code,limited.body);

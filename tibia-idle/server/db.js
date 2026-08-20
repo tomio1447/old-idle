@@ -662,6 +662,17 @@ JsonStore.prototype.setAccountMissions = function (accountId, missions, missions
   this._save();
   return a;
 };
+/* Estado do tutorial de onboarding (por conta): vocações escolhidas,
+ * personagens do tutorial (charIds), party/hunt/helper concluídos e se a
+ * recompensa final já foi entregue. Mesmo padrão do missions/missionsDone
+ * — o cliente envia o estado completo. */
+JsonStore.prototype.setAccountTutorial = function (accountId, tutorial) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.tutorial = tutorial && typeof tutorial === "object" && !Array.isArray(tutorial) ? tutorial : {};
+  this._save();
+  return a;
+};
 /* Soma gold dos personagens para a conta uma vez; espelha o saldo nos chars. */
 JsonStore.prototype.migrateAccountGold = function (accountId) {
   const a = this.findAccountById(accountId);
@@ -1225,7 +1236,7 @@ async function MysqlStore() {
   function hydrateAccount(row) {
     if (!row) return null;
     const out = Object.assign({}, row);
-    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"]]) {
+    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"], ["tutorial", "tutorial"]]) {
       let v = row[col];
       if (typeof v === "string") {
         try { v = JSON.parse(v); } catch (e) { v = {}; }
@@ -1312,12 +1323,12 @@ async function MysqlStore() {
     async createAccount(login, hash, role, coins, email) {
       const em = String(email || "").slice(0, 120);
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}')",
+        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done, tutorial) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}', '{}')",
         [login, hash, em, role || "user", coins || 0]);
       return { id: r.insertId, login, password_hash: hash, email: em,
         email_verified: 0, email_code: "", email_code_expires: 0,
         role: role || "user", coins: coins || 0,
-        gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {} };
+        gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {} };
     },
     async setAccountMissions(accountId, missions, missionsDone) {
       const m = missions && typeof missions === "object" && !Array.isArray(missions) ? missions : {};
@@ -1325,6 +1336,12 @@ async function MysqlStore() {
       await this.run(
         "UPDATE accounts SET missions = ?, missions_done = ? WHERE id = ?",
         [JSON.stringify(m), JSON.stringify(d), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    async setAccountTutorial(accountId, tutorial) {
+      const t = tutorial && typeof tutorial === "object" && !Array.isArray(tutorial) ? tutorial : {};
+      await this.run("UPDATE accounts SET tutorial = ? WHERE id = ?",
+        [JSON.stringify(t), Number(accountId)]);
       return this.findAccountById(accountId);
     },
     /* ---- inventário compartilhado da conta (bag/pouch/depot/reward) ---- */
@@ -2730,6 +2747,8 @@ async function ensureSchema(pool) {
   try { await pool.query("ALTER TABLE accounts ADD COLUMN missions_done MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN shared_inventory MEDIUMTEXT NULL"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN tutorial MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

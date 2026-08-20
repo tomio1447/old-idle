@@ -1698,6 +1698,24 @@ async function accountUpdateMissions(token, missions, missionsDone) {
   return r.data.ok ? { ok: true, missions: r.data.missions, missionsDone: r.data.missionsDone } : { ok: false };
 }
 
+/* Tutorial de onboarding (por conta): estado completo enviado a cada
+ * mudança de fase — mesmo padrão do accountUpdateMissions. */
+async function accountUpdateTutorial(token, tutorial) {
+  const r = await _api("POST", "/api/account/tutorial", { token, tutorial });
+  return r.data.ok ? { ok: true, tutorial: r.data.tutorial } : { ok: false };
+}
+/* Reivindica a recompensa única de conclusão do tutorial (3 dias de VIP +
+ * exercise weapons). O servidor confere charIds/vocações antes de conceder. */
+async function accountClaimTutorialReward(token) {
+  const r = await _api("POST", "/api/account/tutorial/claim", { token });
+  if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha ao reivindicar recompensa" };
+  const vipUntil = Math.max(0, Math.floor(Number(r.data.vipUntil) || 0));
+  if (typeof syncVipFromAccount === "function") syncVipFromAccount({ vipUntil, vip: vipUntil > Date.now() });
+  try { if (typeof G !== "undefined" && G && G.p) G.p.vipUntil = vipUntil; } catch (e) {}
+  return { ok: true, vipUntil, charIds: r.data.charIds || [],
+    exerciseCharges: r.data.exerciseCharges || 0, tutorial: r.data.tutorial || null, already: !!r.data.already };
+}
+
 function accountApplyServerBalances(data){
   data=data||{};
   if(data.character){accountMergeCharacterCache([data.character]);

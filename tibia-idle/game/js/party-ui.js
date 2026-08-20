@@ -944,7 +944,25 @@ function partyOnlineHtml(p, st, inbox) {
     h += `</div>`;
 
     if (st.isLeader) {
-      // ---- líder: adicionar por nome (só em cidade/treino)
+      // ---- líder: personagens da própria conta, um botão Invite por linha
+      // (mais rápido que digitar o nome — útil sobretudo no tutorial).
+      const accChars = (typeof accountCharacterCacheRead === "function")
+        ? accountCharacterCacheRead() : [];
+      const memberIds = new Set([String(st.leader.id)].concat(st.members.map((m) => String(m.id))));
+      const invitable = accChars.filter((c) => !memberIds.has(String(c.id)));
+      if (invitable.length) {
+        h += `<div class="party-invite-title tiny dim mt4">Personagens da sua conta:</div>
+          <div class="party-account-char-list">` + invitable.map((c) => `
+            <div class="party-account-char-row">
+              <span class="party-account-char-ico" aria-hidden="true">🧙</span>
+              <b>${c.name}</b><span class="dim tiny">${voc(c.voc || "knight")} · nv ${Number(c.level) || 1}</span>
+              <span style="flex:1"></span>
+              <button class="sm primary" data-invite-account-char="${c.id}"
+                data-invite-account-name="${String(c.name || "").replace(/"/g, "&quot;")}"
+                ${podeConvidar ? "" : "disabled"}>Invite</button>
+            </div>`).join("") + `</div>`;
+      }
+      // ---- adicionar por nome (qualquer personagem, só em cidade/treino)
       h += `<div class="party-invite-title tiny dim mt4">Adicionar jogador (por nome do personagem):</div>
         <div class="row mb4" style="gap:4px">
           <input id="party-invite-name" maxlength="20" placeholder="Nome do personagem"
@@ -1008,6 +1026,20 @@ function bindPartyOnline(p, st, inbox) {
       if (typeof renderAll === "function") renderAll();
     }
   });
+
+  $$("#party-content [data-invite-account-char]").forEach((btn) => btn.addEventListener("click", async () => {
+    const name = btn.dataset.inviteAccountName;
+    if (!name || btn.disabled) return;
+    btn.disabled = true;
+    const r = await partyOnlineInvite(name);
+    toast(r.ok ? (r.msg || (name + " entrou na party!")) : (r.msg || "Falha"), r.ok ? "level" : "bad");
+    if (r.ok) {
+      recarregar();
+      if (typeof renderAll === "function") renderAll();
+    } else {
+      btn.disabled = false;
+    }
+  }));
 
   const leave = $("#party-leave");
   if (leave) leave.addEventListener("click", async () => {
