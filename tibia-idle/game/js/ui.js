@@ -1360,6 +1360,50 @@ function equipFromBag(p, slug, instId) {
   return true;
 }
 
+/* Move e equipa um item em outro personagem da conta/party.
+ * Requer que o item esteja na mochila do personagem atual. Offline/local. */
+function equipOnOtherCharacter(from, to, slug, instId) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !it.s) return false;
+  if (to === from) return equipFromBag(from, slug, instId);
+  const slot = it.s;
+  const chk = typeof canEquipItem === "function" ? canEquipItem(to, slug, slot) : { ok: true };
+  if (!chk.ok) { toast(`${to.name}: ${chk.msg}`); return false; }
+
+  if (instId) {
+    if (typeof takeBagItemInstance !== "function") return false;
+    const taken = takeBagItemInstance(from, slug, { instId: instId, highestTier: false });
+    if (!taken) return false;
+    if (typeof putBagItemInstance !== "function" || !putBagItemInstance(to, taken)) {
+      putBagItemInstance(from, taken);
+      toast("Mochila do destino cheia.");
+      return false;
+    }
+    if (typeof equipItemFromContainer !== "function" || !equipItemFromContainer(to, slug, "bag", slot, taken.id)) {
+      putBagItemInstance(from, taken);
+      toast(`${to.name} não conseguiu equipar o item.`);
+      return false;
+    }
+  } else {
+    if (!from.bag || from.bag[slug] < 1) return false;
+    from.bag[slug] -= 1;
+    if (from.bag[slug] === 0) delete from.bag[slug];
+    to.bag[slug] = (to.bag[slug] || 0) + 1;
+    if (typeof equipItemFromContainer !== "function" || !equipItemFromContainer(to, slug, "bag", slot)) {
+      to.bag[slug] -= 1;
+      if (to.bag[slug] === 0) delete to.bag[slug];
+      from.bag[slug] = (from.bag[slug] || 0) + 1;
+      toast(`${to.name} não conseguiu equipar o item.`);
+      return false;
+    }
+  }
+
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(to);
+  if (typeof save === "function") save();
+  toast(`${it.n} equipado em <b>${to.name}</b>`);
+  return true;
+}
+
 /* Vende um item da mochila (unica via de venda manual fora da Loot Pouch) */
 function sellBagItem(p, slug, instId) {
   const it = GAMEDATA.items[slug];
@@ -1406,6 +1450,17 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
       label: it.s === "ammo" ? "Selecionar munição" : "Equipar",
       action: () => { if (equipFromBag(p, slug, instId)) refresh(); },
     });
+    const partyChars = (typeof getCharacters === "function" ? getCharacters() : []).filter((c) => c !== p);
+    for (const other of partyChars) {
+      const chk = (typeof canEquipItem === "function" ? canEquipItem(other, slug, it.s) : { ok: true });
+      if (chk.ok) {
+        opts.push({
+          label: `Equipar em ${other.name}`,
+          hint: `lvl ${other.level} · ${other.voc}`,
+          action: () => { if (equipOnOtherCharacter(p, other, slug, instId)) refresh(); },
+        });
+      }
+    }
   }
   // moedas viram gold direto; o resto só é vendido pela Loot Pouch
   if (currencyValue(slug)) {
