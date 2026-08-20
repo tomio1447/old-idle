@@ -1708,6 +1708,7 @@ function sellPouchItem(p, slug) {
   p.gold = Math.max(0, (Number(p.gold) || 0) + value);
   addLog("sell", `Vendeu ${count}x ${it.n} do Loot Pouch por <span class="gold-txt">${fmtFull(value)} gp</span>`);
   delete p.lootPouch[slug];
+  p.lootPouch = p.lootPouch;
   return value;
 }
 

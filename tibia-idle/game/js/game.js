@@ -284,6 +284,7 @@ function save() {
   if (!G.p) return false;
   try {
     G.p.stamina=FULL_STAMINA_SECONDS;
+    if (typeof accountSetLootPouch === "function" && G.p.lootPouch) accountSetLootPouch(G.p.lootPouch);
     saveCharacterToRoster(G.p);
     const activeSession=G.combat?persistActiveInstance():null;
     if(!G.combat)clearInstanceSession(G.foreignInstance?"foreign-instance":"no-combat",!!G.foreignInstance);
@@ -483,6 +484,15 @@ function normalizePlayer(p) {
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   if (typeof bindAccountGold === "function") bindAccountGold(p);
+  // Migracao da loot pouch: itens antigos dos personagens vao para a conta.
+  const oldPouch = p.lootPouch || {};
+  p.lootPouch = p.lootPouch || {};
+  if (typeof bindAccountLootPouch === "function") bindAccountLootPouch(p);
+  if (Object.keys(oldPouch).length && typeof accountSetLootPouch === "function") {
+    const merged = Object.assign({}, accountLootPouch(), oldPouch);
+    accountSetLootPouch(merged);
+    p.lootPouch = merged;
+  }
   p.bank = p.bank || 0;
   p.promoted = !!p.promoted;
   p.promotedAt = p.promotedAt || null;
