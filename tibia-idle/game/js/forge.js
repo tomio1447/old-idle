@@ -124,7 +124,8 @@ function forgeHasImbuementOnEquippedRef(p, ref) {
     if (!eq) continue;
     if (resolved.inst && eq.instId !== resolved.inst.id) continue;
     if (!resolved.inst && eq.item !== resolved.slug) continue;
-    var key = "equip:" + slot;
+    var instId = eq.instId || null;
+    var key = instId ? "inst:" + instId : "equip:" + slot;
     if (p.imbuements[key] && p.imbuements[key].length) return true;
   }
   return false;

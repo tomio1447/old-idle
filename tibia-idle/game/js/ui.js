@@ -164,7 +164,8 @@ function dropTooltipHtml(slug, bossName, drop) {
  * o nome do imbuement e quanto tempo falta.
  *
  * `slot` e opcional: so quando o item esta EQUIPADO da para saber quais
- * imbuements ele carrega, porque eles moram em p.imbuements["equip:<slot>"].
+ * imbuements ele carrega, porque eles moram na instancia do item
+ * (p.imbuements["inst:<instId>"]) quando houver instancia.
  */
 function itemTip(slug, extra, slot, instId) {
   const it = GAMEDATA.items[slug];

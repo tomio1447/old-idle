@@ -84,14 +84,20 @@ function imbRestante(im) {
 function imbExpirado(im) {
   return im ? imbRestante(im) <= 0 : false;
 }
-/* Tick global: desconta dt de TODOS os imbuements do jogador. Chamado pelo
- * game loop apenas enquanto houver combate ativo. */
+/* Tick global: desconta dt de TODOS os imbuements ativos do jogador.
+ * Agora eles estao na instancia do item (chave inst:<instId>), mas so
+ * descontam tempo enquanto a instancia estiver equipada. */
 function imbTickAll(p, dt) {
   if (!p || !p.imbuements || !p.equip) return;
+  const instMap = {};
+  for (const slot of Object.keys(p.equip || {})) {
+    const e = p.equip[slot];
+    if (e && e.instId) instMap[e.instId] = slot;
+  }
   for (const k of Object.keys(p.imbuements)) {
-    // A chave é equip:<slot>. Se o item saiu daquele slot, o relógio para.
-    const slot = k.indexOf("equip:") === 0 ? k.slice(6) : null;
-    if (!slot || !p.equip[slot]) continue;
+    if (k.indexOf("inst:") !== 0) continue;
+    const instId = k.slice(5);
+    if (!instMap[instId]) continue;
     for (const im of p.imbuements[k])
       if (imbRestante(im) > 0) im.rest = Math.max(0, imbRestante(im) - dt);
   }
@@ -183,27 +189,35 @@ function imbKeyAllowedOn(slot, itemSlug, key) {
   return !!(g && imbCatAllowedOn(slot, itemSlug, g.cat));
 }
 
-/* ---------- alvo: slots do equipamento que aceitam imbuement ---------- */
+/* ---------- alvo: imbuements agora moram no item (instId), nao no slot ---------- */
 function imbSlotsOf(slug) {
   const it = GAMEDATA.items[slug];
   return it && it.imbSlots ? it.imbSlots : 0;
 }
-function imbStoreKey(slot) { return "equip:" + slot; }
+function imbStoreKey(slot, instId) { return instId ? "inst:" + instId : "equip:" + slot; }
+function imbSlotInstId(p, slot) {
+  const e = p && p.equip && p.equip[slot];
+  return e && e.instId ? e.instId : null;
+}
 function imbOf(p, slot) {
   p.imbuements = p.imbuements || {};
   imbMigrateLegacy(p);
-  return p.imbuements[imbStoreKey(slot)] || [];
+  const instId = imbSlotInstId(p, slot);
+  // fallback antigo: sem instId ainda usa slot (itens sem instancia)
+  return p.imbuements[imbStoreKey(slot, instId)] || [];
 }
 
 /* Saves antigos guardavam {cat, tier(0-based), sub, ate}; agora e
- * {key, tier(1-based, id da base), rest}. Converte uma unica vez. */
+ * {key, tier(1-based, id da base), rest}. Converte uma unica vez.
+ * Alem disso, migra chaves "equip:<slot>" legadas para "inst:<instId>"
+ * quando o slot tiver uma instancia. */
 function imbMigrateLegacy(p) {
   if (p._imbMigrated) return;
   p._imbMigrated = true;
   if (!p.imbuements || typeof IMBDATA === "undefined") return;
+  const out = {};
   for (const k of Object.keys(p.imbuements)) {
-    const lista = p.imbuements[k] || [];
-    p.imbuements[k] = lista.map((im) => {
+    const lista = (p.imbuements[k] || []).map((im) => {
       if (im.key !== undefined) return im;
       let key = null;
       for (const gk of Object.keys(IMBDATA.imbs)) {
@@ -217,7 +231,20 @@ function imbMigrateLegacy(p) {
       const rest = im.ate ? Math.max(0, im.ate - Date.now()) : IMB_DURACAO_MS;
       return { key: key, tier: (im.tier || 0) + 1, rest: rest };
     }).filter(Boolean);
+    if (!lista.length) continue;
+    if (k.indexOf("equip:") === 0) {
+      const slot = k.slice(6);
+      const instId = imbSlotInstId(p, slot);
+      if (instId) {
+        out["inst:" + instId] = (out["inst:" + instId] || []).concat(lista);
+      } else {
+        out[k] = lista;
+      }
+    } else {
+      out[k] = lista;
+    }
   }
+  p.imbuements = out;
 }
 
 /* ---------- custo em materiais (do XML oficial) ---------- */
@@ -286,9 +313,10 @@ function imbAdd(p, slot, key, tier, protection) {
              msg: "A imbuiação FALHOU! Os materiais e o gold foram perdidos (" +
                   custo.pct + "% de chance)." };
 
+  const instId = e.instId || null;
   const nova = lista.concat([{ key: key, tier: tier, rest: IMB_DURACAO_MS }]);
   p.imbuements = p.imbuements || {};
-  p.imbuements[imbStoreKey(slot)] = nova;
+  p.imbuements[imbStoreKey(slot, instId)] = nova;
   return { ok: true, msg: `${g.name} ${IMB_TIER_NOME[tier - 1]} aplicado!`,
            cost: custo.price };
 }
@@ -296,13 +324,14 @@ function imbAdd(p, slot, key, tier, protection) {
 /* Remover custa 15000 gp (removecost oficial) */
 function imbRemove(p, slot, idx) {
   const custo = (typeof IMBDATA !== "undefined") ? IMBDATA.bases[1].remove : 15000;
+  const instId = imbSlotInstId(p, slot);
   const lista = imbOf(p, slot).slice();
   if (idx < 0 || idx >= lista.length) return { ok: false, msg: "Nada a remover." };
   if (p.gold < custo)
     return { ok: false, msg: `Remover custa ${fmtFull(custo)} gp.` };
   p.gold -= custo;
   lista.splice(idx, 1);
-  p.imbuements[imbStoreKey(slot)] = lista;
+  p.imbuements[imbStoreKey(slot, instId)] = lista;
   return { ok: true, msg: "Imbuement removido.", cost: custo };
 }
 
