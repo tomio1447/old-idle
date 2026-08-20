@@ -36,6 +36,13 @@ const NPC_MODAL_CATALOG = [
     sprite: "oberon-trader",
     desc: "Troca itens de Falcon Forge e vende Roasted Dragon Wings.",
   },
+  {
+    shop: "umbral-creation",
+    name: "Umbral Creation",
+    role: "Roshamuul Forge",
+    sprite: "umbral-creation",
+    desc: "Cria, melhora e transforma itens Umbral.",
+  },
 ];
 
 /* Serviços do templo (Cyclopedia CIDADE) — modal paralelo ao NPCS. */
@@ -390,6 +397,8 @@ function renderNpcsCatalog() {
       const desc = entry.desc || (typeof t === "function" ? t(entry.descKey) : entry.descKey);
       const spriteHtml = entry.sprite === "oberon-trader"
         ? `<span class="npc-anim-oberon" role="img" aria-label="${entry.name}"></span>`
+        : entry.sprite === "umbral-creation"
+        ? `<span class="npc-anim-guzzlemaw" role="img" aria-label="${entry.name}"></span>`
         : `<img src="assets/npc/${entry.sprite}_s.png" alt="" class="npc-modal-sprite">`;
       return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card npc-modal-card" data-npc-shop="${entry.shop}">
         <span class="mobs" aria-hidden="true">
@@ -431,6 +440,7 @@ function openNpc(id) {
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
+    case "umbral-creation": body = npcUmbralCreationHtml(p); break;
   }
 
   $("#modal-body").innerHTML = `
@@ -473,6 +483,7 @@ function refreshNpc(id) {
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
     case "oberon-trader": body = npcOberonTraderHtml(p); break;
+    case "umbral-creation": body = npcUmbralCreationHtml(p); break;
   }
   $("#npc-content").innerHTML = body;
   bindNpc(id, npc.type);
@@ -1405,4 +1416,26 @@ function bindNpc(id, type) {
       if (typeof openHuntsModal === "function") openHuntsModal();
     });
   });
+
+  // Umbral Creation: tabs
+  $$("#npc-content [data-umbral-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const id = tab.dataset.umbralTab;
+      $$("#npc-content [data-umbral-tab]").forEach((t) => t.classList.toggle("active", t === tab));
+      $$("#npc-content [data-umbral-panel]").forEach((p) => {
+        p.style.display = p.dataset.umbralPanel === id ? "" : "none";
+      });
+    });
+  });
+  // Umbral Creation: craft
+  $$("#npc-content [data-umbral-craft]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = tryUmbralCraft(p, b.dataset.umbralCraft, b.dataset.umbralFrom, b.dataset.umbralTo, parseInt(b.dataset.umbralPrice, 10));
+      toast(r.msg, r.ok ? "level" : "death");
+      if (r.ok) addLog("skill", r.msg);
+      else addLog("death", r.msg);
+      hideTip();
+      refreshNpc(id);
+      renderAll();
+    }));
 }
