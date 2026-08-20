@@ -1319,21 +1319,14 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background-size: 900% 400%;
   background-position: 0% 66.66%;
   image-rendering: pixelated;
-  animation: guzzlemaw-idle 1.2s steps(1) infinite;
+  animation: guzzlemaw-walk 0.9s steps(1) infinite;
   transform: scale(0.7);
   transform-origin: center;
 }
-@keyframes guzzlemaw-idle {
-  0% { background-position-x: 0%; }
-  11% { background-position-x: 11.11%; }
-  22% { background-position-x: 22.22%; }
-  33% { background-position-x: 33.33%; }
-  44% { background-position-x: 44.44%; }
-  55% { background-position-x: 55.55%; }
-  66% { background-position-x: 66.66%; }
-  77% { background-position-x: 77.77%; }
-  88% { background-position-x: 88.88%; }
-  100% { background-position-x: 0%; }
+@keyframes guzzlemaw-walk {
+  0%, 100% { background-position-x: 0%; }
+  33% { background-position-x: 11.11%; }
+  66% { background-position-x: 22.22%; }
 }
 .umbral-tabs .umbral-tab {
   padding: 6px 10px;
@@ -1357,6 +1350,15 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .umbral-recipe-res {
   display: flex; align-items: center; gap: 4px;
 }
+.umbral-mat-anim {
+  animation: umbral-mat-pulse 1.4s ease-in-out infinite;
+}
+@keyframes umbral-mat-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 1px currentColor); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 4px currentColor); }
+}
+.umbral-mat-dream-matter { color: #9b59b6; }
+.umbral-mat-cluster-of-solace { color: #f1c40f; }
 #hunts-modal-list .hunt-modal-card .mobs .hunt-modal-mob {
   flex: 0 0 auto; max-width: 28px; overflow: hidden;
 }

@@ -320,7 +320,6 @@ const UMBRAL_ITEMS = {
   }
 };
 
-/* Ordem de cada grupo. */
 const UMBRAL_BASES = [
   "blade",
   "slayer",
@@ -333,8 +332,43 @@ const UMBRAL_BASES = [
   "spellbook"
 ];
 
+/* 1 Dream Matter + 50 Clusters of Solace -> Crude Umbral item */
 const UMBRAL_CRAFT = {
-  clusters: 75,
+  cost: { "dream-matter": 1, "cluster-of-solace": 50 },
+  recipes: [
+  {
+    "to": "crude-umbral-blade"
+  },
+  {
+    "to": "crude-umbral-slayer"
+  },
+  {
+    "to": "crude-umbral-axe"
+  },
+  {
+    "to": "crude-umbral-chopper"
+  },
+  {
+    "to": "crude-umbral-mace"
+  },
+  {
+    "to": "crude-umbral-hammer"
+  },
+  {
+    "to": "crude-umbral-bow"
+  },
+  {
+    "to": "crude-umbral-crossbow"
+  },
+  {
+    "to": "crude-umbral-spellbook"
+  }
+]
+};
+
+/* 1 Crude Umbral item + 75 Clusters -> Umbral item */
+const UMBRAL_IMPROVE = {
+  cost: { "cluster-of-solace": 75 },
   recipes: [
   {
     "from": "crude-umbral-blade",
@@ -375,8 +409,9 @@ const UMBRAL_CRAFT = {
 ]
 };
 
-const UMBRAL_TRANSFORM = {
-  clusters: 150,
+/* 1 Umbral item + 150 Clusters -> Master Umbral item */
+const UMBRAL_MASTER = {
+  cost: { "cluster-of-solace": 150 },
   recipes: [
   {
     "from": "umbral-blade",
@@ -417,20 +452,6 @@ const UMBRAL_TRANSFORM = {
 ]
 };
 
-const UMBRAL_MASTER = {
-  slugs: [
-  "umbral-masterblade",
-  "umbral-master-slayer",
-  "umbral-master-axe",
-  "umbral-master-chopper",
-  "umbral-master-mace",
-  "umbral-master-hammer",
-  "umbral-master-bow",
-  "umbral-master-crossbow",
-  "umbral-master-spellbook"
-]
-};
-
 (function registerUmbralCreation() {
   if (typeof GAMEDATA === "undefined" || !GAMEDATA.items) return;
   for (const slug in UMBRAL_ITEMS) {
@@ -438,40 +459,56 @@ const UMBRAL_MASTER = {
   }
 })();
 
-/* Registra o NPC no catalogo global (city.js ja deve existir). */
 (function registerUmbralNpc() {
   if (typeof NPCS === "undefined") return;
-  NPCS["umbral-creation"] = {
-    name: "Umbral Creation",
-    role: "Roshamuul Forge",
-    sprite: "umbral-creation",
-    greet: "I can shape umbral items for you, if you bring the right materials.",
-    type: "umbral-creation",
-  };
+  if (!NPCS["umbral-creation"]) {
+    NPCS["umbral-creation"] = {
+      name: "Umbral Creation",
+      role: "Roshamuul Forge",
+      sprite: "umbral-creation",
+      greet: "Use o poder umbral para forjar equipamentos superiores.",
+      type: "umbral-creation",
+    };
+  }
 })();
 
 function npcUmbralCreationHtml(p) {
-  const renderRecipe = (r, tab, price) => {
-    const haveFrom = (p.bag && p.bag[r.from] || 0) >= 1;
-    const haveClusters = (p.bag && p.bag["cluster-of-solace"] || 0) >= price;
-    const canCraft = haveFrom && haveClusters;
-    const missingCls = price - (p.bag && p.bag["cluster-of-solace"] || 0);
+  const renderRecipe = (r, tab, cost) => {
+    let canCraft = true;
+    let reqHtml = "";
+    const from = r.from || null;
+    const to = r.to;
+
+    for (const [mat, qty] of Object.entries(cost)) {
+      const have = (p.bag && p.bag[mat] || 0) >= qty;
+      canCraft = canCraft && have;
+      reqHtml += `<div class="umbral-recipe-ing">
+        ${mat === "dream-matter" || mat === "cluster-of-solace" ? "" : (typeof itemImg === "function" ? itemImg(mat, { size: 32 }) : "")}
+        <span class="tiny" style="color:${have ? '#9ce84a' : '#e85b52'}">${qty}x ${itemName(mat)}</span>
+      </div>`;
+    }
+
+    let sourceHtml = "";
+    if (from) {
+      const haveFrom = (p.bag && p.bag[from] || 0) >= 1;
+      canCraft = canCraft && haveFrom;
+      sourceHtml = `<div class="umbral-recipe-ing">
+        ${typeof itemImg === "function" ? itemImg(from, { size: 32 }) : ""}
+        <span class="tiny" style="color:${haveFrom ? '#9ce84a' : '#e85b52'}">1x ${itemName(from)}</span>
+      </div><span class="tiny dim">+</span>`;
+    }
+
     return `
       <div class="shop-row umbral-recipe" style="align-items:center;gap:8px;flex-wrap:wrap">
-        <div class="umbral-recipe-ing">
-          ${typeof itemImg === "function" ? itemImg(r.from, { size: 32 }) : ""}
-          <span class="tiny" style="color:${haveFrom ? '#9ce84a' : '#e85b52'}">1x ${itemName(r.from)}</span>
-        </div>
-        <span class="tiny dim">+</span>
-        <div class="umbral-recipe-ing">
-          <span class="tiny" style="color:${haveClusters ? '#9ce84a' : '#e85b52'}">${price}x Cluster of Solace</span>
-        </div>
+        ${sourceHtml}
+        ${reqHtml}
         <span class="tiny dim">=</span>
         <div class="umbral-recipe-res">
-          ${typeof itemImg === "function" ? itemImg(r.to, { size: 32 }) : ""}
-          <span class="tiny" style="color:#ffe680">1x ${itemName(r.to)}</span>
+          ${typeof itemImg === "function" ? itemImg(to, { size: 32 }) : ""}
+          <span class="tiny" style="color:#ffe680">1x ${itemName(to)}</span>
         </div>
-        <button class="sm primary" data-umbral-craft="${tab}" data-umbral-from="${r.from}" data-umbral-to="${r.to}" data-umbral-price="${price}" ${canCraft ? "" : "disabled"}>
+        <button class="sm primary" data-umbral-craft="${tab}" data-umbral-to="${to}" data-umbral-from="${from || ''}"
+          data-umbral-dream="${cost['dream-matter'] || 0}" data-umbral-cluster="${cost['cluster-of-solace'] || 0}" ${canCraft ? "" : "disabled"}>
           Craft
         </button>
       </div>`;
@@ -480,41 +517,44 @@ function npcUmbralCreationHtml(p) {
   const tabBtn = (id, label, active) => `
     <div class="umbral-tab ${active ? 'active' : ''}" data-umbral-tab="${id}">${label}</div>`;
 
-  const craftRows = UMBRAL_CRAFT.recipes.map((r) => renderRecipe(r, "craft", UMBRAL_CRAFT.clusters)).join("");
-  const transformRows = UMBRAL_TRANSFORM.recipes.map((r) => renderRecipe(r, "transform", UMBRAL_TRANSFORM.clusters)).join("");
-  const masterRows = UMBRAL_MASTER.slugs.map((slug) => `
-    <div class="shop-row" style="align-items:center;gap:8px">
-      ${typeof itemImg === "function" ? itemImg(slug, { size: 32 }) : ""}
-      <span class="tiny" style="color:#d4af37">${itemName(slug)}</span>
-    </div>`).join("");
+  const craftRows = UMBRAL_CRAFT.recipes.map((r) => renderRecipe(r, "craft", UMBRAL_CRAFT.cost)).join("");
+  const improveRows = UMBRAL_IMPROVE.recipes.map((r) => renderRecipe(r, "improve", UMBRAL_IMPROVE.cost)).join("");
+  const masterRows = UMBRAL_MASTER.recipes.map((r) => renderRecipe(r, "master", UMBRAL_MASTER.cost)).join("");
 
   return `
     <div class="umbral-tabs row" style="gap:4px;margin-bottom:10px">
       ${tabBtn("craft", "Craft Umbral", true)}
-      ${tabBtn("transform", "Umbral Transformation", false)}
+      ${tabBtn("improve", "Upgrade to Umbral", false)}
       ${tabBtn("master", "Master Umbral", false)}
     </div>
     <div data-umbral-panel="craft" class="umbral-panel">
-      <div class="small mb8 dim">Combine a Crude Umbral item with Clusters of Solace to forge an Umbral piece.</div>
+      <div class="small mb8 dim">Combine 1 Dream Matter + 50 Clusters of Solace to create a Crude Umbral item of your choice.</div>
       ${craftRows}
     </div>
-    <div data-umbral-panel="transform" class="umbral-panel" style="display:none">
-      <div class="small mb8 dim">Transform an Umbral item into its Master version using Clusters of Solace.</div>
-      ${transformRows}
+    <div data-umbral-panel="improve" class="umbral-panel" style="display:none">
+      <div class="small mb8 dim">Upgrade a Crude Umbral item to its Umbral version with 75 Clusters of Solace.</div>
+      ${improveRows}
     </div>
     <div data-umbral-panel="master" class="umbral-panel" style="display:none">
-      <div class="small mb8 dim">Available Master Umbral equipment.</div>
+      <div class="small mb8 dim">Transform an Umbral item into its Master version with 150 Clusters of Solace.</div>
       ${masterRows}
     </div>`;
 }
 
-function tryUmbralCraft(p, tab, from, to, price) {
-  if (!p.bag || (p.bag[from] || 0) < 1) return { ok: false, msg: `Missing ${itemName(from)}.` };
-  if ((p.bag["cluster-of-solace"] || 0) < price) return { ok: false, msg: `Not enough Clusters of Solace.` };
+function tryUmbralCraft(p, tab, to, from, dream, cluster) {
+  const cost = {};
+  if (dream) cost["dream-matter"] = Number(dream);
+  if (cluster) cost["cluster-of-solace"] = Number(cluster);
 
-  // Umbral creation always succeeds on this server.
-  removeItem(p, "cluster-of-solace", price);
-  removeItem(p, from, 1);
+  if (from && (!p.bag || (p.bag[from] || 0) < 1)) return { ok: false, msg: `Missing ${itemName(from)}.` };
+  for (const [mat, qty] of Object.entries(cost)) {
+    if ((p.bag[mat] || 0) < qty) return { ok: false, msg: `Not enough ${itemName(mat)}.` };
+  }
+
+  for (const [mat, qty] of Object.entries(cost)) removeItem(p, mat, qty);
+  if (from) removeItem(p, from, 1);
   addItem(p, to, 1);
-  return { ok: true, msg: `You successfully crafted <b>${itemName(to)}</b>!` };
+
+  const action = tab === "craft" ? "created" : (tab === "improve" ? "improved" : "mastered");
+  return { ok: true, msg: `You ${action} <b>${itemName(to)}</b>!` };
 }

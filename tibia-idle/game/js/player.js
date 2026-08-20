@@ -1330,6 +1330,7 @@ function addLootPouch(p, slug, count) {
   // drops permanecem seguros na pouch.
   lp[slug] = (lp[slug] || 0) + count;
   p.lootPouch = lp;
+  if (typeof renderLootPouch === "function") renderLootPouch(p);
   return true;
 }
 
@@ -1361,9 +1362,12 @@ function canSellLootPouchItem(p, slug) {
 
 function removeLootPouch(p, slug, count) {
   count = count || 1;
-  if (!p.lootPouch || !p.lootPouch[slug]) return false;
-  p.lootPouch[slug] -= count;
-  if (p.lootPouch[slug] <= 0) delete p.lootPouch[slug];
+  const lp = p.lootPouch || {};
+  if (!lp[slug]) return false;
+  lp[slug] -= count;
+  if (lp[slug] <= 0) delete lp[slug];
+  p.lootPouch = lp;
+  if (typeof renderLootPouch === "function") renderLootPouch(p);
   return true;
 }
 
