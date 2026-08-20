@@ -522,6 +522,7 @@ function spawnWave(c, p) {
     }
     const mob = {
       slug: slug, def: m,
+      boss: !!(c.hunt && c.hunt.bossMobs && c.hunt.bossMobs.indexOf(slug) !== -1),
       influenced: influenced,
       fiendish: fiendish,
       sinisterStacks: stacks,
