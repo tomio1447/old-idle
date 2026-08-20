@@ -4874,6 +4874,7 @@ function combatTick(c, p, dt, now) {
   if (typeof spiteBossTick === "function" && spiteBossTick(c, now) === false) return;
   if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
+  if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
   if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
 
@@ -5115,6 +5116,8 @@ function combatTick(c, p, dt, now) {
       maliceBossHandleKill(c, m, now);
     if (typeof megaBossHandleKill === "function")
       megaBossHandleKill(c, m, now);
+    if (typeof oberonBossHandleKill === "function" && oberonBossHandleKill(c, m, now))
+      { alive.push(m); continue; }
     // Raw XP/HP é registrado antes de stage, PvP, Prey, VIP, taints e party.
     recordRawMonsterStats(c, m);
     // recompensa

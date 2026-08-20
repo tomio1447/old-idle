@@ -29,6 +29,13 @@ const NPC_MODAL_CATALOG = [
     sprite: "enpa-deia-pema",
     descKey: "npc.desc.enpa",
   },
+  {
+    shop: "oberon-trader",
+    name: "Oberon Trader",
+    role: "Falcon Forge",
+    sprite: "oberon-trader",
+    descKey: "npc.desc.oberon-trader",
+  },
 ];
 
 /* Serviços do templo (Cyclopedia CIDADE) — modal paralelo ao NPCS. */
@@ -420,6 +427,7 @@ function openNpc(id) {
     case "train":  body = npcTrain(p); break;
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
+    case "oberon-trader": body = npcOberonTraderHtml(p); break;
   }
 
   $("#modal-body").innerHTML = `
@@ -461,6 +469,7 @@ function refreshNpc(id) {
     case "train":  body = npcTrain(p); break;
     case "inn":    body = npcInn(p); break;
     case "travel": body = npcTravel(p); break;
+    case "oberon-trader": body = npcOberonTraderHtml(p); break;
   }
   $("#npc-content").innerHTML = body;
   bindNpc(id, npc.type);
@@ -1279,6 +1288,28 @@ function bindNpc(id, type) {
       row.addEventListener("contextmenu", openMenu);
     });
   }
+
+  // oberon trader
+  $$("#npc-content [data-oberon-trade]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = oberonTraderExchange(p);
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, "level");
+      addLog("sell", r.msg);
+      hideTip();
+      refreshNpc(id);
+      renderAll();
+    }));
+  $$("#npc-content [data-oberon-buy-wings]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const r = oberonTraderBuyWings(p);
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, "level");
+      addLog("sell", r.msg);
+      hideTip();
+      refreshNpc(id);
+      renderAll();
+    }));
 
   // banco
   $$("#npc-content [data-dep]").forEach((b) =>

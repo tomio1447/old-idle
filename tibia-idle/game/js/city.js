@@ -62,6 +62,11 @@ const NPCS = {
     greet: "Major crystalline tokens? Eu troco por equipamentos gnômicos.",
     type: "tokenbarter", shopId: "gnomally",
   },
+  "oberon-trader": {
+    name: "Oberon Trader", role: "Falcon Forge", sprite: "oberon-trader",
+    greet: "Traga-me os itens e eu forjarei um escudo digno de um cavaleiro Falcon.",
+    type: "oberon-trader",
+  },
 };
 
 /* Visual de cada exercise weapon ao ser USADA no dummy — simula o

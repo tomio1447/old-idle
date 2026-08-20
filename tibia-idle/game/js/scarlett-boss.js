@@ -473,6 +473,10 @@ function scarlettBossEnforceThreshold(c, now) {
 }
 
 function bossCanTakePlayerDamage(c, target) {
+  if (typeof oberonBossCanTakePlayerDamage === "function" &&
+      !oberonBossCanTakePlayerDamage(c, target)) {
+    return false;
+  }
   if (typeof greedBossCanTakePlayerDamage === "function" &&
       !greedBossCanTakePlayerDamage(c, target)) {
     const nowGreed = Date.now();
