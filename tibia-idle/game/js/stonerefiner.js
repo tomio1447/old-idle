@@ -57,8 +57,8 @@ const STONEREFINER_AVG = { hp: 800, exp: 500, damage: 100, armor: 20, gold: 202.
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
   GAMEDATA.hunts["stonerefiner"] = {
     name: STONEREFINER.name,
-    level: 80,
-    minLevel: 80,
+    level: 35,
+    minLevel: 35,
     cat: "aventureiro",
     pack: 5,
     monsters: ["stonerefiner"],
