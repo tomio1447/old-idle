@@ -490,20 +490,29 @@ function otcAnalyserResetDeathTrack(c) {
   c.stats.deathTrack = { startedAt: Date.now(), byPlayer: {} };
 }
 
-/** Reset da sessão no header do painel (entre LIVE e minimizar). */
+/** Reset da sessão no header do painel (entre LIVE e minimizar): zera TODOS os analisadores. */
 function otcAnalyserResetSession() {
-  const kind = activeOtcAnalyser === "taken" ? "taken" : "damage";
-  if (activeOtcAnalyser === "damage" || activeOtcAnalyser === "taken") {
-    otcAnalyserResetTrack(kind);
-    return;
-  }
   const c = (typeof G !== "undefined" && G) ? G.combat : null;
   if (!c || !c.stats) return;
-  c.stats.damageTrack = { startedAt: Date.now(), byPlayer: {} };
-  c.stats.takenTrack = { startedAt: Date.now(), byPlayer: {} };
+  const now = Date.now();
+  c.stats.startedAt = now;
+  c.stats.kills = 0;
+  c.stats.exp = 0;
+  c.stats.rawExp = 0;
+  c.stats.rawHp = 0;
+  c.stats.gold = 0;
   c.stats.damage = 0;
   c.stats.taken = 0;
-  otcAnalyserResetDeathTrack(c);
+  c.stats.deaths = 0;
+  c.stats.blessCost = 0;
+  c.stats.time = 0;
+  c.stats.deathTrack = { startedAt: now, byPlayer: {} };
+  c.stats.damageTrack = { startedAt: now, byPlayer: {} };
+  c.stats.takenTrack = { startedAt: now, byPlayer: {} };
+  c.stats.loot = {};
+  c.stats.monsters = {};
+  c.stats.supplyUsed = {};
+  c.stats.supplyCost = 0;
   if (typeof document !== "undefined") renderOtcAnalyser();
 }
 
