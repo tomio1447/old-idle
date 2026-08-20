@@ -461,7 +461,8 @@ function renderStats(p) {
     ["Mortes", p.deaths],
     ["Kills totais", fmtFull(p.totalKills)],
   ];
-  $("#stat-rows").innerHTML = rows.map(
+  const statRows = $("#stat-rows");
+  if (statRows) statRows.innerHTML = rows.map(
     (r) => `<div class="stat-row"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`
   ).join("");
 }
