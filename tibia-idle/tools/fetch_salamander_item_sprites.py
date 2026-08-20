@@ -52,8 +52,10 @@ def main():
         except Exception as e:
             print("ERRO baixando %s: %s" % (slug, e))
             continue
-        if data[:6] not in (b"GIF89a", b"GIF87a"):
-            print("ERRO %s: resposta não é GIF (%d bytes)" % (slug, len(data)))
+        is_gif = data[:6] in (b"GIF89a", b"GIF87a")
+        is_webp = data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+        if not (is_gif or is_webp):
+            print("ERRO %s: resposta não é GIF/WebP (%d bytes)" % (slug, len(data)))
             continue
         try:
             img = Image.open(__import__("io").BytesIO(data))
