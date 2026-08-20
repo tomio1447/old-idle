@@ -153,6 +153,8 @@ CANARY_COLORS = {
     "preceptor-lazare":           (0, 0, 0, 0),
     "grand-chaplain-gaunder":     (57, 96, 23, 105),
     "grand-canon-dominus":        (57, 96, 96, 105),
+    # Grand Master Oberon: looktype 1072 oficiais.
+    "grand-master-oberon":        (21, 96, 21, 105),
     "giant-spider":  None,
     "stone-golem":   None,
     "crypt-shambler": None,
@@ -183,6 +185,7 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "falcon-knight", "falcon-paladin",
                "grand-commander-soeren", "preceptor-lazare",
                "grand-chaplain-gaunder", "grand-canon-dominus",
+               "grand-master-oberon",
                "guzzlemaw", "frazzlemaw", "silencer"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
@@ -192,7 +195,8 @@ CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "grand-commander-soeren": 2,
                   "preceptor-lazare": 0,
                   "grand-chaplain-gaunder": 1,
-                  "grand-canon-dominus": 0}
+                  "grand-canon-dominus": 0,
+                  "grand-master-oberon": 1}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 
