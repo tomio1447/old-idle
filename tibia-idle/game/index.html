@@ -236,19 +236,6 @@
     <!-- ============================ ESQUERDA -->
     <div class="col col-left">
 
-      <div class="panel" data-collapse="equip">
-        <div class="panel-title" data-i18n="panel.equip">Equipamento</div>
-        <div class="panel-body">
-          <div class="equip-grid" id="equip"></div>
-          <div class="status-bar" id="status-bar"></div>
-        </div>
-      </div>
-
-      <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
-        <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
-        <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
-      </div>
-
       <div class="panel" data-collapse="char">
         <div class="panel-title">
           <span id="p-name">—</span>
@@ -268,6 +255,19 @@
           <div class="bar mb4" id="bar-exp"><div class="fill exp"></div><div class="label"></div></div>
           <div class="tiny dim" data-i18n="char.stamina">Stamina</div>
           <div class="bar" id="bar-sta"><div class="fill sta"></div><div class="label"></div></div>
+        </div>
+      </div>
+
+      <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
+        <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
+        <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
+      </div>
+
+      <div class="panel" data-collapse="equip">
+        <div class="panel-title" data-i18n="panel.equip">Equipamento</div>
+        <div class="panel-body">
+          <div class="equip-grid" id="equip"></div>
+          <div class="status-bar" id="status-bar"></div>
         </div>
       </div>
 
@@ -299,16 +299,6 @@
         <div class="panel-body">
           <div class="inv-grid" id="lootpouch"></div>
         </div>
-      </div>
-
-      <div class="panel" data-collapse="skills">
-        <div class="panel-title" data-i18n="panel.skills">Habilidades</div>
-        <div class="panel-body" id="skills"></div>
-      </div>
-
-      <div class="panel" data-collapse="attrs">
-        <div class="panel-title" data-i18n="panel.attrs">Atributos</div>
-        <div class="panel-body" id="stat-rows"></div>
       </div>
 
     </div>
@@ -462,6 +452,11 @@
           <span data-i18n="btn.training">TREINO</span>
         </button>
       </nav>
+
+      <div class="panel" data-collapse="skills">
+        <div class="panel-title" data-i18n="panel.skills">Habilidades</div>
+        <div class="panel-body" id="skills"></div>
+      </div>
 
       <!-- Analytics permanecem na lateral e acompanham a caça sem abrir o
            modal global nem cobrir a visão do jogador. -->
