@@ -120,11 +120,15 @@
   if (catacombsOramond) harden(Object.assign(catacombsOramond, {
     otbm: "catacombs",
     otbmFloor: 7,
-    otbmFovBounds: { x: 1057, y: 1013, w: 19, h: 15, z: 7 },
+    // Alinhado com o mapa publicado (catacombs.otbm, piso z=7): a sala ocupa
+    // exatamente os bounds {1063,1011}..{1083,1029}. O FOV = bounds do mapa,
+    // o spawn cai no centro do piso (1074,1020) e a zona de monstros fica
+    // 1 célula de margem das paredes de 1128 (x 1063..1064 / y 1011..1012).
+    otbmFovBounds: { x: 1063, y: 1011, w: 21, h: 19, z: 7 },
     otbmRuntimeWidth: 30,
     otbmRuntimeHeight: 30,
-    otbmSpawn: { x: 1066, y: 1020, z: 7 },
-    otbmMobBounds: { x: 1066, y: 1014, w: 16, h: 13, z: 7 },
+    otbmSpawn: { x: 1074, y: 1020, z: 7 },
+    otbmMobBounds: { x: 1066, y: 1014, w: 17, h: 14, z: 7 },
   }));
 
   const dtSeal = GAMEDATA.hunts["dt-seal"];

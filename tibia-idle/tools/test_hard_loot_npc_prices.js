@@ -9,9 +9,9 @@ function must(ok, msg) { if (!ok) throw new Error(msg); }
 const root = path.join(__dirname, "..");
 const js = path.join(root, "game", "js");
 const html = fs.readFileSync(path.join(root, "game", "index.html"), "utf8");
-must(html.includes("hard-hunts.js?v=loot-npc-prices-v1"), "cache-bust hard-hunts");
-must(html.includes("yasir-prices.js?v=goshnar-yasir-v1"), "cache-bust yasir-prices");
-must(html.includes("soulwar.js?v=yasir-loot-meta-v1"), "cache-bust soulwar");
+must(html.includes("hard-hunts.js?v=catacombs-align-v1"), "cache-bust hard-hunts");
+must(html.includes("yasir-prices.js?v=autosell-cprices-v1"), "cache-bust yasir-prices");
+must(html.includes("soulwar.js?v=soulbag-fix-v1"), "cache-bust soulwar");
 
 const sandbox = { window: {}, console };
 vm.runInNewContext(fs.readFileSync(path.join(js, "gamedata.js"), "utf8"), sandbox);

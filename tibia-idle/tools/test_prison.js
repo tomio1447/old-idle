@@ -28,6 +28,15 @@ const FLOORS = [
 ];
 const ALL_MOBS = [...new Set(FLOORS.flatMap((f) => f.mobs))];
 
+/* itens novos do catálogo (para o check de PNG acima) */
+const PRISON_LOOT = [
+  "silver-goblet", "skeleton-decoration", "slightly-rusted-armor", "unholy-bone",
+  "dirty-cape", "piece-of-royal-steel", "piece-of-hell-steel", "piece-of-draconian-steel",
+  "demon-dust", "golden-figurine", "bunch-of-wheat", "bundle-of-cursed-straw", "closed-trap",
+  "onyx-arrow",
+];
+
+
 /* ---------------- 1) OTBM publicado + geometria ---------------- */
 {
   const beta = fs.readFileSync(path.join(game, "beta-maps", "prisonroshamuul.otbm"));
@@ -143,7 +152,7 @@ const ALL_MOBS = [...new Set(FLOORS.flatMap((f) => f.mobs))];
   for (const slug of ALL_MOBS)
     must(fs.existsSync(path.join(game, "assets", "mob", slug + ".png")),
       "sprite do monstro ausente: " + slug);
-  for (const slug of Object.keys(PRISON_LOOT))
+  for (const slug of PRISON_LOOT)
     must(fs.existsSync(path.join(game, "assets", "item", slug + ".png")),
       "sprite do item de loot ausente: " + slug);
 }
@@ -159,12 +168,6 @@ const ALL_MOBS = [...new Set(FLOORS.flatMap((f) => f.mobs))];
     "cache-busts da prison ausentes no index");
 }
 
-/* itens novos do catálogo (para o check de PNG acima) */
-const PRISON_LOOT = [
-  "silver-goblet", "skeleton-decoration", "slightly-rusted-armor", "unholy-bone",
-  "dirty-cape", "piece-of-royal-steel", "piece-of-hell-steel", "piece-of-draconian-steel",
-  "demon-dust", "golden-figurine", "bunch-of-wheat", "bundle-of-cursed-straw", "closed-trap",
-  "onyx-arrow",
-];
+
 
 console.log("ok: the prison (3 andares 250+ — mesmo mapa, composições Canary por andar, loot e sprites)");
