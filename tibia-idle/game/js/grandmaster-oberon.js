@@ -81,6 +81,26 @@ const OBERON_DEBATE = [
 
 /* Itens que faltavam no catálogo: Falcon Escutcheon, ingredientes e o
  * roasted dragon wings vendido pelo NPC. */
+const OBERON_LOOT = [
+  { chance: 30,  max: 1, item: "bone" },
+  { chance: 30,  max: 1, item: "brass-shield" },
+  { chance: 23,  max: 1, item: "viking-helmet" },
+  { chance: 3,   max: 1, item: "patch-of-fine-cloth" },
+  { chance: 3,   max: 1, item: "grant-of-arms" },
+  { chance: 0.5, max: 1, item: "falcon-battleaxe" },
+  { chance: 0.5, max: 1, item: "falcon-longsword" },
+  { chance: 0.5, max: 1, item: "falcon-mace" },
+  { chance: 0.5, max: 1, item: "falcon-bow" },
+  { chance: 0.5, max: 1, item: "falcon-circlet" },
+  { chance: 0.5, max: 1, item: "falcon-coif" },
+  { chance: 0.5, max: 1, item: "falcon-rod" },
+  { chance: 0.5, max: 1, item: "falcon-wand" },
+  { chance: 0.5, max: 1, item: "falcon-sai" },
+  { chance: 0.5, max: 1, item: "falcon-greaves" },
+  { chance: 0.5, max: 1, item: "falcon-plate" },
+  { chance: 0.3, max: 1, item: "falcon-shield" },
+];
+
 const OBERON_ITEMS = {
   "falcon-escutcheon": { n: "falcon escutcheon", s: "shield", t: "shield", cid: 28722, w: 56.00, sell: 0, npcSell: 0, def: 51, lvl: 300, th: true },
   "falcon-shield":     { n: "falcon shield", s: "shield", t: "shield", cid: 28721, w: 51.00, sell: 0, npcSell: 0, def: 45, lvl: 200 },
@@ -147,6 +167,7 @@ const OBERON_ITEMS = {
     armor: OBERON_STATS.armor,
     defense: OBERON_STATS.defense,
     speed: 0.00004,
+    loot: OBERON_LOOT,
     requirement: {
       level: 250,
       text: "Requer nível 250+ (Falcon Bastion)",
