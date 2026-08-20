@@ -432,6 +432,8 @@ try{
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"leiden.js"),"utf8"),sandbox);}catch(_ld){/* opcional */}
   // Deathlings - Sunken Temple: hunt 250+ (Deathling Spellsinger / Scout).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"deathlings-sunken-temple.js"),"utf8"),sandbox);}catch(_dt){/* opcional */}
+  // Deeplings Deeper: hunt 100–250 (Deepling Guard / Warrior / Tyrant).
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"deeplings-deeper.js"),"utf8"),sandbox);}catch(_dd){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"doctor-marrow.js"),"utf8"),sandbox);}catch(_dm){/* opcional */}
   vm.runInNewContext(fs.readFileSync(path.join(js,"weapondata.js"),"utf8"),sandbox);
