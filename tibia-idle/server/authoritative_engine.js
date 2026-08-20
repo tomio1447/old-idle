@@ -423,6 +423,9 @@ try{
   // Salamander's Cave (Venore): hunt 0–100 + itens de loot (swampling moss,
   // damselfly wing etc.) — sem isso o Sell All online não precifica.
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"salamander-cave.js"),"utf8"),sandbox);}catch(_sc){/* opcional */}
+  // Stonerefiner (Corym Mines): hunt 1–100 + itens de loot (rare earth,
+  // poisonous slime etc.) — sem isso o Sell All online não precifica.
+  try{vm.runInNewContext(fs.readFileSync(path.join(js,"stonerefiner.js"),"utf8"),sandbox);}catch(_st){/* opcional */}
   // Faceless Bane: boss simples da Buried Cathedral (acesso pela missão).
   try{vm.runInNewContext(fs.readFileSync(path.join(js,"faceless-bane.js"),"utf8"),sandbox);}catch(_fb){/* opcional */}
   // Doctor Marrow: boss de The Cradle of Monsters (nível 250+).
