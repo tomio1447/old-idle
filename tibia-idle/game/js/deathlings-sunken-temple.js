@@ -18,7 +18,7 @@
 "use strict";
 
 const DEATHLINGS_SUNKEN_TEMPLE = {
-  otbm: "deathlingsunkentemple",
+  otbm: "deeplingstairs",
   name: "Deathlings - Sunken Temple",
   center: { x: 1061, y: 1001, z: 7 },
   spawn: { x: 1069, y: 1003, z: 7 },
