@@ -367,9 +367,13 @@ function tutorialShowCompletionModal() {
 function tutorialClaimReward(state) {
   if (TUTORIAL_CLAIMING || state.rewardGranted) return;
   const token = (typeof sessionToken === "function") ? sessionToken() : "";
-  if (!token || typeof accountClaimTutorialReward !== "function") return;
+  if (!token || typeof accountClaimTutorialReward !== "function" ||
+      typeof accountUpdateTutorial !== "function") return;
   TUTORIAL_CLAIMING = true;
-  accountClaimTutorialReward(token).then((r) => {
+  // Garante que o servidor esteja sincronizado com o estado atual antes de reivindicar.
+  accountUpdateTutorial(token, state).then(() => {
+    return accountClaimTutorialReward(token, state);
+  }).then((r) => {
     if (r && r.ok) {
       state.rewardGranted = true;
       tutorialSaveState(state);
@@ -378,8 +382,10 @@ function tutorialClaimReward(state) {
       if (typeof G !== "undefined" && G && G.p) tutorialGrantExerciseIfDue(G.p);
       tutorialHideOverlay();
       tutorialShowCompletionModal();
+    } else if (r && r.msg && typeof toast === "function") {
+      toast(r.msg, "bad");
     }
-  }).finally(() => { TUTORIAL_CLAIMING = false; });
+  }).catch(() => {}).finally(() => { TUTORIAL_CLAIMING = false; });
 }
 
 /* --------------------------------------------------------------- tick */

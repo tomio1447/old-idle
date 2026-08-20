@@ -1706,8 +1706,8 @@ async function accountUpdateTutorial(token, tutorial) {
 }
 /* Reivindica a recompensa única de conclusão do tutorial (3 dias de VIP +
  * exercise weapons). O servidor confere charIds/vocações antes de conceder. */
-async function accountClaimTutorialReward(token) {
-  const r = await _api("POST", "/api/account/tutorial/claim", { token });
+async function accountClaimTutorialReward(token, tutorial) {
+  const r = await _api("POST", "/api/account/tutorial/claim", { token, tutorial });
   if (!r.data.ok) return { ok: false, msg: r.data.msg || "Falha ao reivindicar recompensa" };
   const vipUntil = Math.max(0, Math.floor(Number(r.data.vipUntil) || 0));
   if (typeof syncVipFromAccount === "function") syncVipFromAccount({ vipUntil, vip: vipUntil > Date.now() });

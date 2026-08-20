@@ -315,7 +315,12 @@ const TUTORIAL_EXERCISE_CHARGES=1500;
 async function claimTutorialReward(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
-  const tutorial=acc.tutorial&&typeof acc.tutorial==="object"?acc.tutorial:{};
+  // O cliente envia o tutorial state atual para evitar condicao de corrida
+  // com o POST anterior de atualizacao. Se for valido, usa ele.
+  const clientTutorial=body.tutorial&&typeof body.tutorial==="object"&&!Array.isArray(body.tutorial)?body.tutorial:null;
+  let tutorial=(acc.tutorial&&typeof acc.tutorial==="object"?acc.tutorial:{});
+  if(clientTutorial&&clientTutorial.charIds&&clientTutorial.helperDone&&clientTutorial.partyDone&&clientTutorial.huntEntered)
+    tutorial=clientTutorial;
   if(tutorial.rewardGranted)
     return {code:200,body:{ok:true,already:true,vipUntil:Math.max(0,Math.floor(Number(acc.vip_until)||0)),
       charIds:Array.isArray(tutorial.charIds)?tutorial.charIds:[]}};
