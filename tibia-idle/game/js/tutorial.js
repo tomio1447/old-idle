@@ -315,17 +315,17 @@ function tutorialRenderHelperStep(state, pendingId, chars) {
     return;
   }
   const target = tutorialFirstVisible(['[data-collapse="helper"]', '[data-mobile-tab="helper"]']);
-  const doneBtn = { label: "Já configurei", primary: true, onClick: () => {
+  const doneBtn = { label: "OK, entendi", primary: true, onClick: () => {
     state.helperDone[String(pendingId)] = true;
     tutorialSaveState(state);
   } };
   if (target) {
     tutorialRender(target.getBoundingClientRect(),
-      `Ajuste o <b>Helper</b> (cura, ataque, etc.) de <b>${G.p.name}</b> — ele joga sozinho a partir daqui.`,
+      `Este é o <b>Helper</b> de <b>${G.p.name}</b>. Use OK para confirmar que viu. Depois ele joga sozinho.`,
       [doneBtn]);
   } else {
     tutorialRender(null,
-      `Abra o painel <b>Helper</b> e ajuste a cura/ataque de <b>${G.p.name}</b>.`, [doneBtn]);
+      `Clique em OK após ver o painel <b>Helper</b> de <b>${G.p.name}</b>.`, [doneBtn]);
   }
 }
 
