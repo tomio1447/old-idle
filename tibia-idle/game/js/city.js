@@ -67,6 +67,11 @@ const NPCS = {
     greet: "Traga-me os itens e eu forjarei um escudo digno de um cavaleiro Falcon.",
     type: "oberon-trader",
   },
+  "umbral-creation": {
+    name: "Umbral Creation", role: "Roshamuul Forge", sprite: "umbral-creation",
+    greet: "Use o poder umbral para forjar equipamentos superiores.",
+    type: "umbral-creation",
+  },
 };
 
 /* Visual de cada exercise weapon ao ser USADA no dummy — simula o

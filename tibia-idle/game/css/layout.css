@@ -1311,6 +1311,52 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   33% { background-position-x: -162px; }
   66% { background-position-x: -285px; }
 }
+.npc-anim-guzzlemaw {
+  display: inline-block;
+  width: 63px;
+  height: 63px;
+  background: url("../assets/mob/guzzlemaw.png") 0 0 no-repeat;
+  background-size: 900% 400%;
+  background-position: 0% 66.66%;
+  image-rendering: pixelated;
+  animation: guzzlemaw-idle 1.2s steps(1) infinite;
+  transform: scale(0.7);
+  transform-origin: center;
+}
+@keyframes guzzlemaw-idle {
+  0% { background-position-x: 0%; }
+  11% { background-position-x: 11.11%; }
+  22% { background-position-x: 22.22%; }
+  33% { background-position-x: 33.33%; }
+  44% { background-position-x: 44.44%; }
+  55% { background-position-x: 55.55%; }
+  66% { background-position-x: 66.66%; }
+  77% { background-position-x: 77.77%; }
+  88% { background-position-x: 88.88%; }
+  100% { background-position-x: 0%; }
+}
+.umbral-tabs .umbral-tab {
+  padding: 6px 10px;
+  border: 1px solid #2a2822;
+  background: #14120e;
+  color: #8a8272;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+}
+.umbral-tabs .umbral-tab.active {
+  background: #2a1a3a;
+  color: #d4af37;
+  border-color: #5a3a7a;
+}
+.umbral-recipe {
+  border-bottom: 1px solid #2a2822;
+  padding: 6px 0;
+}
+.umbral-recipe-ing,
+.umbral-recipe-res {
+  display: flex; align-items: center; gap: 4px;
+}
 #hunts-modal-list .hunt-modal-card .mobs .hunt-modal-mob {
   flex: 0 0 auto; max-width: 28px; overflow: hidden;
 }
