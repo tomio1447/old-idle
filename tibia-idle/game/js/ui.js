@@ -1364,13 +1364,31 @@ function equipFromBag(p, slug, instId) {
 /* Move e equipa um item do LOOT POUCH em outro personagem da party.
  * O item sai da pouch do personagem atual, vai para a bag do destino e é
  * equipado nele (equipOnOtherCharacter exige o item na `bag`, então não
- * serve para itens que estão na pouch — onde todos os drops caem). */
+ * serve para itens que estão na pouch — onde todos os drops caem).
+ * Conta online: passa pela autoridade (/api/characters/equip-other), que
+ * tira o item do shared e equipa o alvo — mutação local não persistia. */
 function equipOnOtherCharacterPouch(from, to, slug) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
   const slot = it.s;
   const chk = typeof canEquipItem === "function" ? canEquipItem(to, slug, slot) : { ok: true };
   if (!chk.ok) { toast(`${to.name}: ${chk.msg}`); return false; }
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && sessionToken() && from && to &&
+      typeof accountEquipOnOtherCharacter === "function") {
+    const sourceId = from.id ? String(from.id) : (typeof sessionCharId === "function" ? sessionCharId() : "");
+    const targetId = String(to.id || "");
+    if (!sourceId || !targetId) return false;
+    return accountEquipOnOtherCharacter(sessionToken(), sourceId, targetId, slug, "pouch", null)
+      .then((result) => {
+        if (result && result.ok) {
+          toast(`${it.n} equipado em <b>${to.name}</b>`);
+          return true;
+        }
+        toast((result && result.msg) || `${to.name} não conseguiu equipar o item.`, "bad");
+        return false;
+      });
+  }
   if (!from.lootPouch || from.lootPouch[slug] < 1) return false;
   from.lootPouch[slug] -= 1;
   if (from.lootPouch[slug] === 0) delete from.lootPouch[slug];
@@ -1416,10 +1434,14 @@ function partyEquipMenuOptions(p, slug, instId, fromPouch) {
       label: `Equipar em ${other.name || oid}`,
       hint: `lvl ${other.level} · ${other.voc || ""}`,
       action: () => {
-        const ok = fromPouch
+        // Online o equip é assíncrono (API autoritativa) — Promise.resolve
+        // cobre os dois caminhos (local síncrono e remoto).
+        const result = fromPouch
           ? equipOnOtherCharacterPouch(p, other, slug)
           : equipOnOtherCharacter(p, other, slug, instId);
-        if (ok && typeof renderAll === "function") renderAll();
+        Promise.resolve(result).then((ok) => {
+          if (ok && typeof renderAll === "function") renderAll();
+        });
       },
     });
   }
@@ -1427,7 +1449,12 @@ function partyEquipMenuOptions(p, slug, instId, fromPouch) {
 }
 
 /* Move e equipa um item em outro personagem da conta/party.
- * Requer que o item esteja na mochila do personagem atual. Offline/local. */
+ * Requer que o item esteja na mochila do personagem atual. Offline/local.
+ * Conta online: o backpack é compartilhado no SERVIDOR — a operação passa
+ * por /api/characters/equip-other (tira o item do shared, equipa o alvo e
+ * devolve o shared + equip do alvo). Sem isso o toast dizia "equipado" mas
+ * nada persistia: o item não aparecia no personagem alvo e a mochila
+ * "voltava" no próximo estado do servidor. */
 function equipOnOtherCharacter(from, to, slug, instId) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
@@ -1435,6 +1462,23 @@ function equipOnOtherCharacter(from, to, slug, instId) {
   const slot = it.s;
   const chk = typeof canEquipItem === "function" ? canEquipItem(to, slug, slot) : { ok: true };
   if (!chk.ok) { toast(`${to.name}: ${chk.msg}`); return false; }
+
+  if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && sessionToken() && from && to &&
+      typeof accountEquipOnOtherCharacter === "function") {
+    const sourceId = from.id ? String(from.id) : (typeof sessionCharId === "function" ? sessionCharId() : "");
+    const targetId = String(to.id || "");
+    if (!sourceId || !targetId) return false;
+    return accountEquipOnOtherCharacter(sessionToken(), sourceId, targetId, slug, "bag", instId || null)
+      .then((result) => {
+        if (result && result.ok) {
+          toast(`${it.n} equipado em <b>${to.name}</b>`);
+          return true;
+        }
+        toast((result && result.msg) || `${to.name} não conseguiu equipar o item.`, "bad");
+        return false;
+      });
+  }
 
   if (instId) {
     if (typeof takeBagItemInstance !== "function") return false;

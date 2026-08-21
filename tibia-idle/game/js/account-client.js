@@ -525,6 +525,13 @@ function accountAuthorityVisualState(){
     out.megaIntent={x:Number(combat._megaPendingMove.x),y:Number(combat._megaPendingMove.y)};
     combat._megaPendingMove=null;combat._megaPendingMoveAt=0;
   }
+  // Grand Master Oberon: resposta do debate escolhida no modal. O servidor
+  // julga o texto contra a resposta correta (nunca enviada ao cliente).
+  if(combat._oberonPendingAnswer!==undefined&&combat._oberonPendingAnswer!==null){
+    const answer=String(combat._oberonPendingAnswer||"");
+    out.oberonIntent=answer?{answer:answer}:{skip:true};
+    combat._oberonPendingAnswer=null;combat._oberonPendingAt=0;
+  }
   return out;
 }
 function accountTickInstance(token){
@@ -597,6 +604,57 @@ function accountEquipInstanceItem(token,charId,opts){
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
     return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
+  });
+}
+/* Equipa 1 item da conta (backpack/Loot Pouch COMPARTILHADOS) em OUTRO
+ * personagem da conta. Online a operação precisa passar pela autoridade —
+ * sem isso o "Equipar em <char>" mostrava sucesso mas nada persistia no
+ * servidor (o equip do alvo nunca era salvo e o item sumia da mochila). */
+function accountEquipOnOtherCharacter(token,sourceId,targetId,slug,source,instId){
+  source=String(source||"bag")==="pouch"?"pouch":"bag";
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(targetId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(sourceId),target_id:Number(targetId),
+      slug:String(slug||""),source,
+      inst_id:instId?String(instId):null,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/characters/equip-other",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(r.data.instance&&typeof accountInstanceApply==="function")
+        accountInstanceApply(r.data.instance);
+      // Reflete o resultado no roster local (equip/bag do alvo) para a UI da
+      // party e os menus "Equipar em" mostrarem o estado novo já.
+      try{
+        if(typeof getCharacters==="function"){
+          const roster=getCharacters();
+          const tgt=roster.find((c)=>String(c.id)===id);
+          if(tgt){
+            if(r.data.equip)tgt.equip=r.data.equip;
+            if(r.data.bag)tgt.bag=r.data.bag;
+            if(r.data.lootPouch)tgt.lootPouch=r.data.lootPouch;
+            if(r.data.itemInstances)tgt.itemInstances=r.data.itemInstances;
+            if(typeof saveCharacterToRoster==="function")saveCharacterToRoster(tgt);
+            // saveCharacterToRoster marca o alvo como ativo no storage; o
+            // personagem ativo continua sendo o da sessão.
+            try{
+              if(typeof G!=="undefined"&&G&&G.p&&G.p.id)
+                localStorage.setItem("tibia-idle-active-character-v1",String(G.p.id));
+            }catch(e){/* storage opcional */}
+          }
+        }
+      }catch(e){/* roster é best-effort */}
+      return {ok:true,sharedInventory:r.data.sharedInventory||null};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível equipar",code:r.code};
   });
 }
 function accountClearInstanceLootPouch(token,charId){

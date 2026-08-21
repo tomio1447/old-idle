@@ -4236,6 +4236,25 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     }
   }
   G.combat=previous;
+  // Grand Master Oberon (online): o servidor é autoritativo — o modal do
+  // debate abre a partir do estado (state.oberon) e a réplica escolhida
+  // volta no próximo tick via oberonIntent. O servidor nunca envia a
+  // resposta correta, só a frase + opções embaralhadas.
+  try{
+    const obState=incoming&&incoming.oberon;
+    if(obState&&obState.pending&&obState.question&&obState.question.phrase&&
+       Array.isArray(obState.question.options)&&obState.question.options.length>=2&&
+       typeof oberonOpenDebateModalRemote==="function"&&!previous._oberonModalOpen){
+      previous._oberonModalOpen=true;
+      const bossMob=(previous.mobs||[]).find((m)=>m&&m.boss)||null;
+      oberonOpenDebateModalRemote(bossMob,obState.question,(chosen)=>{
+        previous._oberonModalOpen=false;
+        previous._oberonPendingAnswer=String(chosen||"");
+        previous._oberonPendingAt=Date.now();
+        if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
+      });
+    }
+  }catch(e){/* modal é opcional — nunca pode quebrar o tick */}
   if(Number.isFinite(incomingVersion)&&incomingVersion>0){
     ONLINE_AUTH_APPLIED_VERSION=incomingVersion;
     if(instanceId)ONLINE_AUTH_APPLIED_INSTANCE=instanceId;
