@@ -1312,6 +1312,26 @@ function clearLootPouch(p) {
   return before;
 }
 
+/* Limpa a Loot Pouch de TODOS os personagens da conta e do snapshot
+ * individual, garantindo que nenhum personagem restaure itens antigos. */
+function clearAllLootPouches() {
+  if (typeof accountSetLootPouch === "function") accountSetLootPouch({});
+  if (typeof readRoster !== "function") return 0;
+  const roster = readRoster();
+  let count = 0;
+  for (const id of Object.keys(roster)) {
+    const entry = roster[id];
+    if (!entry || !entry.p) continue;
+    const p = entry.p;
+    if (typeof normalizePlayer === "function") normalizePlayer(p);
+    if (p.lootPouch) p.lootPouch = {};
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+    count++;
+  }
+  if (typeof save === "function" && typeof G !== "undefined" && G.p) save();
+  return count;
+}
+
 function addLootPouch(p, slug, count) {
   count = Math.max(1, Math.floor(Number(count) || 1));
   // Moedas nunca entram na pouch — vão direto para o balance da conta.
