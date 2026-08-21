@@ -149,7 +149,8 @@ must(db2.accountSharedInventory(acc.id).bag["health-potion"] === 42, "shared per
       bag: { "health-potion": 4, "loot-item": 2 },
       lootPouch: { "gold-coin": 123 },
       depot: [],
-      rewardChest: { fake: "stale" }, rewardChestBundles: [],
+      rewardChest: { fake: "stale", "bag-you-desire": 1 },
+      rewardChestBundles: [{ id: "boss-1", bossId: "timira", name: "Timira", items: { "bag-you-desire": 1 } }],
       itemInstances: [
         { id: "i-1", slug: "loot-item", loc: "bag", tier: 0 },
         { id: "i-2", slug: "axe", loc: "equip:weapon", tier: 0 },
@@ -174,7 +175,12 @@ must(db2.accountSharedInventory(acc.id).bag["health-potion"] === 42, "shared per
   must(mirrorData.bag["loot-item"] === 2 && mirrorData.lootPouch["gold-coin"] === 123, "mirror do char espelha o shared");
   must(mirrorData.itemInstances.some((i) => i.loc === "equip:weapon"), "equipada continua no data do char");
   // rewardChest é server-owned: o valor fake/stale do projection NÃO vaza
+  // rewardChest stale (não-numérico) NÃO vaza; loot real de boss SIM persiste.
   must(!after.rewardChest || !after.rewardChest.fake, "rewardChest do shared é preservado no tick");
+  must(after.rewardChest["bag-you-desire"] === 1, "loot de boss entra no reward chest compartilhado");
+  must(Array.isArray(after.rewardChestBundles) && after.rewardChestBundles.some((b) => b && b.items && b.items["bag-you-desire"] === 1),
+    "pacote do boss persiste no shared");
+  must(mirrorData.rewardChest["bag-you-desire"] === 1, "mirror do char mostra o loot de boss");
 }
 
 /* convidado com OUTRA instância ativa não tem o shared sobrescrito no tick */

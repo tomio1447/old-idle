@@ -575,6 +575,41 @@ function sharedInvMergeChars(store, accountId) {
   try { chars = store.charactersOf(accountId); } catch (e) { chars = []; }
   return SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars);
 }
+/* Une drops reais de boss no shared. Só conta numérica + pacotes com itens —
+ * ignora lixo stale (ex.: { fake:"stale" }) de projections de cidade. */
+function mergeTerminalRewardChest(shared, fromPlayer) {
+  if (!shared || !fromPlayer) return;
+  shared.rewardChest = shared.rewardChest && typeof shared.rewardChest === "object" && !Array.isArray(shared.rewardChest)
+    ? shared.rewardChest : {};
+  shared.rewardChestBundles = Array.isArray(shared.rewardChestBundles) ? shared.rewardChestBundles : [];
+  const chest = fromPlayer.rewardChest;
+  if (chest && typeof chest === "object" && !Array.isArray(chest)) {
+    for (const slug of Object.keys(chest)) {
+      const n = Math.max(0, Math.floor(Number(chest[slug]) || 0));
+      if (!n) continue;
+      shared.rewardChest[slug] = (Number(shared.rewardChest[slug]) || 0) + n;
+    }
+  }
+  for (const bundle of Array.isArray(fromPlayer.rewardChestBundles) ? fromPlayer.rewardChestBundles : []) {
+    if (!bundle || typeof bundle !== "object") continue;
+    const items = bundle.items && typeof bundle.items === "object" && !Array.isArray(bundle.items) ? bundle.items : {};
+    const live = {};
+    for (const slug of Object.keys(items)) {
+      const n = Math.max(0, Math.floor(Number(items[slug]) || 0));
+      if (n) live[slug] = n;
+    }
+    if (!Object.keys(live).length) continue;
+    const id = String(bundle.id || bundle.bundleId || "");
+    const existing = id ? shared.rewardChestBundles.find((b) => b && String(b.id) === id) : null;
+    if (existing) {
+      existing.items = existing.items && typeof existing.items === "object" ? existing.items : {};
+      for (const slug of Object.keys(live))
+        existing.items[slug] = Math.max(Number(existing.items[slug]) || 0, live[slug]);
+    } else {
+      shared.rewardChestBundles.push(Object.assign({}, bundle, { items: Object.assign({}, live) }));
+    }
+  }
+}
 /* Extrai os containers do data de um personagem para o shared da conta e
  * devolve o data com o mirror aplicado (o data salvo sempre espelha o shared).
  * rewardChest é sempre server-owned (muda só via /api/reward/claim), então é
@@ -591,10 +626,19 @@ function sharedInvExtractMirror(shared, data, terminal) {
     rewardChest: Object.assign({}, shared.rewardChest),
     rewardChestBundles: Array.isArray(shared.rewardChestBundles) ? shared.rewardChestBundles.slice() : [],
   };
+  const fromPlayer = {
+    rewardChest: (p.rewardChest && typeof p.rewardChest === "object" && !Array.isArray(p.rewardChest))
+      ? Object.assign({}, p.rewardChest) : {},
+    rewardChestBundles: Array.isArray(p.rewardChestBundles)
+      ? p.rewardChestBundles.map((b) => Object.assign({}, b, {
+          items: b && b.items && typeof b.items === "object" ? Object.assign({}, b.items) : {},
+        })) : [],
+  };
   SharedInv.extractSharedFromPlayer(p, shared);
   if (!terminal) shared.lootPouch = keep.lootPouch;
   shared.rewardChest = keep.rewardChest;
   shared.rewardChestBundles = keep.rewardChestBundles;
+  if (terminal) mergeTerminalRewardChest(shared, fromPlayer);
   SharedInv.applySharedToPlayer(p, shared);
   return typeof data === "string" ? JSON.stringify(p) : p;
 }

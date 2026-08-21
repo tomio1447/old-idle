@@ -5441,7 +5441,8 @@ function syncBossImmunityFlags(auth){
   for(const m of auth.mobs||[]){
     if(!m.boss){m.greedImmune=false;m.qteImmune=false;m.megaImmune=false;continue;}
     m.greedImmune=!!(auth.greed&&auth.greed.immune);
-    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune);
+    m.qteImmune=!!(auth.scarlett&&auth.scarlett.immune)||!!(auth.mega&&auth.mega.immune)||
+      !!(auth.oberon&&auth.oberon.invulnerable);
     m.megaImmune=!!(auth.mega&&auth.mega.immune);
   }
 }
