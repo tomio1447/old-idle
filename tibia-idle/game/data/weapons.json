@@ -2301,9 +2301,7 @@
    "w": 17.0
   },
   "assassin-star": {
-   "ah": 31,
    "atk": 65,
-   "aw": 30,
    "cat": "distance",
    "id": 7368,
    "lvl": 80,
@@ -14430,9 +14428,7 @@
    "w": 75.0
   },
   "leaf-star": {
-   "ah": 30,
    "atk": 48,
-   "aw": 29,
    "cat": "distance",
    "drop": 1,
    "el": "earth",
@@ -22179,9 +22175,7 @@
    "w": 65.0
   },
   "small-stone": {
-   "ah": 27,
    "atk": 5,
-   "aw": 28,
    "cat": "distance",
    "drop": 1,
    "id": 1781,
@@ -22253,8 +22247,6 @@
    "w": 19.0
   },
   "snowball": {
-   "ah": 32,
-   "aw": 32,
    "cat": "distance",
    "drop": 1,
    "id": 2992,
@@ -24650,9 +24642,7 @@
    "w": 0.8
   },
   "throwing-knife": {
-   "ah": 31,
    "atk": 25,
-   "aw": 32,
    "cat": "distance",
    "id": 3298,
    "n": "throwing knife",
@@ -24667,9 +24657,7 @@
    "w": 5.0
   },
   "throwing-star": {
-   "ah": 31,
    "atk": 30,
-   "aw": 30,
    "cat": "distance",
    "id": 3287,
    "n": "throwing star",
@@ -26067,9 +26055,7 @@
    "w": 52.0
   },
   "viper-star": {
-   "ah": 31,
    "atk": 28,
-   "aw": 30,
    "cat": "distance",
    "drop": 1,
    "hit": 80,

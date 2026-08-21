@@ -68,8 +68,12 @@ function rewardChestItems(p, bundleId) {
   for (const slug in source) {
     const count = source[slug];
     if (count <= 0) continue;
-    const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items)
+    let it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items)
       ? GAMEDATA.items[slug] : null;
+
+    // Fallback para itens que ainda nao estao no gamedata central (ex: Oberon)
+    if (!it) it = { n: slug.replace(/-/g, " "), t: "loot" };
+
     out.push({ slug, count, it });
   }
   out.sort((a,b) => ((a.it && a.it.n) || a.slug)
