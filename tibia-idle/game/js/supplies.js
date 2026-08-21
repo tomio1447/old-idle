@@ -221,7 +221,7 @@ const SUPPLIES = {};
   // ---- comida, que o canary trata em outro lugar
   SUPPLIES["brown-mushroom"] = {
     name: "Brown Mushroom", sprite: "brown-mushroom", price: 50,
-    mana: [50, 100], scale: 1.2, type: "mana", tier: 1, lvl: 1,
+    type: "food", tier: 1, lvl: 1,
     vocs: ["sorcerer", "druid", "paladin", "knight", "monk"], kind: "food",
   };
   SUPPLIES["dragon-ham"] = {

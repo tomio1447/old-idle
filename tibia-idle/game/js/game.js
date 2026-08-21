@@ -2997,13 +2997,18 @@ function drainEvents() {
           // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
           // esquerda) e sem a mensagem verde que sobe na tela. O loot fica
           // apenas no log do painel (abaixo).
-          const txt = e.loot.map((l) => {
-            const it = GAMEDATA.items[l.item];
-            const rare = it && (it.sell || 0) >= 500;
-            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
-            return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
-          }).join(", ");
-          addLog("loot", `Loot: ${txt}`);
+          // Filtra entradas inválidas/vazias ("nothing"): boss que não dropou
+          // nada NÃO pode gerar a notificação "Loot: nothing".
+          const valid = e.loot.filter((l) => l && l.item && (Number(l.count) || 0) > 0);
+          if (valid.length) {
+            const txt = valid.map((l) => {
+              const it = GAMEDATA.items[l.item];
+              const rare = it && (it.sell || 0) >= 500;
+              const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
+              return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
+            }).join(", ");
+            addLog("loot", `Loot: ${txt}`);
+          }
         }
         // Bestiário/bosstiário: no modo local isto roda dentro de combatTick
         // (combat.js). No online, o evento kill é a única oportunidade de

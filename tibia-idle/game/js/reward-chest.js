@@ -236,7 +236,14 @@ function openRewardChest(bundleId) {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
   const bundles = rewardChestBundleList(p);
-  const bundle = bundleId ? rewardChestFindBundle(p, bundleId) : null;
+  let bundle = bundleId ? rewardChestFindBundle(p, bundleId) : null;
+  // Bundle de boss que não dropou NADA não pode abrir como "Loot: nothing":
+  // remove da lista (idempotente — o servidor também limpa em claims).
+  if (bundle && !Object.keys(bundle.items || {}).some((slug) => (bundle.items[slug] || 0) > 0)) {
+    p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b !== bundle);
+    if (typeof save === "function") save();
+    bundle = null;
+  }
   const itens = bundle ? rewardChestItems(p, bundle.id) : [];
   const total = itens.reduce((sum,i) => sum + i.count, 0);
   const box = $("#modal-body");

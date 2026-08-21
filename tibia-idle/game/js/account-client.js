@@ -852,6 +852,54 @@ function accountSellLootPouch(token,charId,slug){
 function accountSellInstanceLootPouch(token,charId,slug){
   return accountSellLootPouch(token,charId,slug);
 }
+/* Destrói um item da mochila com persistência (instância ou cidade). Sem a
+ * API o item "voltava": a bag é compartilhada e o PUT comum não persiste a
+ * destruição. Espelho do accountDestroyLootPouchItem. */
+function accountDestroyBagItem(token,charId,slug,instId){
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(instId)body.inst_id=String(instId);
+      const r=await _api("POST","/api/instance/bag-destroy",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        accountMaybeApplyShared(r.data);
+        return {ok:true,destroyed:Number(r.data.destroyed)||0,
+          state:r.data.instance&&r.data.instance.state,version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível destruir o item"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(instId)body.inst_id=String(instId);
+    const r=await _api("POST","/api/bag/destroy",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,destroyed:Number(r.data.destroyed)||0,bag:r.data.bag||{},
+        itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível destruir o item",code:r.code};
+  });
+}
 /** Vende mochila (sell all ou slug/inst). gold/bag autoritativos — PUT comum não credita gold. */
 function accountSellBag(token,charId,opts){
   opts=opts||{};

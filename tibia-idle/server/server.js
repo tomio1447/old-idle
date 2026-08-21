@@ -46,6 +46,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
+  destroyAuthBagItem,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 // Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
@@ -2729,6 +2730,63 @@ async function moveBagToPouch(db,body){
     lootPouch:p.lootPouch||{},bag:p.bag||{},itemInstances:p.itemInstances||[]})};
 }
 
+/** Destrói um item da mochila (autoritativo). A bag é compartilhada e o PUT
+ * comum não persiste a destruição (em combate o tick restaura; na cidade o
+ * shared volta) — o item "voltava" para a backpack. Espelho do pouch-destroy. */
+async function destroyBagItem(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),slug=String(body.slug||"");
+  const instId=body.inst_id?String(body.inst_id):null;
+  if(!Number.isSafeInteger(charId)||charId<=0||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_BAG_DESTROY",msg:"Destruição da mochila inválida"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_BAG_DESTROY",msg:"Instância inválida para destruir item"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null,destroyed=0,synced=null;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={pouch:Object.assign({},item.p.lootPouch||{}),bag:Object.assign({},item.p.bag||{})};
+      destroyed=destroyAuthBagItem(item.p,slug,instId);
+      if(!destroyed){rejection="Item não encontrado na mochila";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível destruir o item",
+        instance:instanceSummary(result.instance,true)}};
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"bag-destroy",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,destroyed,slug,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
+  }
+  let p=await loadCityPlayer(db,acc,character);
+  const destroyed=destroyAuthBagItem(p,slug,instId);
+  if(!destroyed)
+    return {code:400,body:{ok:false,error:"BAG_ITEM_MISSING",msg:"Item não encontrado na mochila"}};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,destroyed,slug,
+    bag:p.bag||{},itemInstances:p.itemInstances||[]})};
+}
+
 async function movePouchToBag(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
@@ -3718,6 +3776,10 @@ async function main() {
       if((req.method==="POST"&&url==="/api/instance/bag-to-pouch")||
          (req.method==="POST"&&url==="/api/pouch/from-bag")){
         const r=await moveBagToPouch(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if((req.method==="POST"&&url==="/api/instance/bag-destroy")||
+         (req.method==="POST"&&url==="/api/bag/destroy")){
+        const r=await destroyBagItem(db,await readBody(req));return send(res,r.code,r.body);
       }
       if((req.method==="POST"&&url==="/api/instance/stash-auto")||
          (req.method==="POST"&&url==="/api/stash/auto")){

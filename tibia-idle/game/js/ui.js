@@ -1707,6 +1707,28 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
     danger: true,
     action: () => {
       if (!confirm(`Destruir ${count}x ${it.n}? Isso não pode ser desfeito.`)) return;
+      // Conta online: bag é compartilhada e o PUT comum não persiste a
+      // destruição — sem a API o item "voltava" para a backpack.
+      if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof accountDestroyBagItem === "function" &&
+          typeof sessionToken === "function" && sessionToken() && p && p.id) {
+        accountDestroyBagItem(sessionToken(), p.id, slug, instId || null).then((result) => {
+          if (result && result.ok) {
+            if (result.state && typeof applyOnlineAuthorityState === "function" &&
+                typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+              applyOnlineAuthorityState(result.state, null, result.version);
+            } else {
+              if (result.bag) p.bag = result.bag || {};
+              if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+            }
+            addLog("info", `Destruiu ${count}x <b>${it.n}</b>.`);
+          } else {
+            toast((result && result.msg) || "Não foi possível destruir o item.", "bad");
+          }
+          if (typeof renderAll === "function") renderAll();
+        });
+        return;
+      }
       if (instId && typeof takeBagItemInstance === "function") {
         const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
         if (!taken) return;
