@@ -1,8 +1,14 @@
 /* leiden.js — Boss Leiden (categoria BOSSES 1–250).
  *
- * Boss simples sem mecânica própria: usa o monstro base do Canary
- * (monsterdata.js) para skills, resistências e loot. Stats customizados
- * para o range 150+ (HP reduzido, exp ajustada).
+ * Usa o monstro base do Canary (monsterdata.js / canarymonsters.json) com a
+ * composição oficial (TibiaWiki — Cults of Tibia Quest):
+ *   - Habilidades: melee (0–600+), Death Strike (400–600, alvo único),
+ *     Death Beam (500–800, onda), Summon 1–2 Barkless Fanatic;
+ *   - CURA com qualquer dano ELEMENTAL (death/holy/ice/fire/energy/earth
+ *     -100%): só dano físico (ou melee) fere o boss — mecânica fiel;
+ *   - Loot: o Canary não tem loot registrado para o Leiden (wiki sem dados);
+ *     mantemos só moedas (platinum/gold) como recompensa do range 150+.
+ * Stats customizados para o range 150+ (HP reduzido, exp ajustada).
  *
  * Coordenadas absolutas do RME:
  *   centerroom  {1060,1003,7}

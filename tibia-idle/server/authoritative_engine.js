@@ -1357,6 +1357,31 @@ function moveLootPouchToBag(p,slug,qty){
   }
   return true;
 }
+/* MOVE backpack → Loot Pouch (autoritativo, espelho do moveLootPouchToBag).
+ * Itens com instância (imbSlots etc.): remove 1 instância da bag (tierado
+ * fica na bag) e soma na pouch. Stacks normais: move qty (padrão tudo). */
+function moveBagToPouchAuth(p,slug,qty,instId){
+  if(!p||!slug)return false;
+  p.bag=p.bag||{};p.lootPouch=p.lootPouch||{};
+  if(authItemNeedsBagInstance(slug)){
+    const arr=p.itemInstances||[];
+    const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
+      (!instId||String(inst.id)===String(instId)));
+    if(idx<0)return false;
+    const inst=arr[idx];
+    if(Number(inst.tier)>0)return false;
+    p.itemInstances=arr.filter((_,i)=>i!==idx);
+    p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+1;
+    return true;
+  }
+  const have=Math.max(0,Math.floor(Number(p.bag[slug])||0));
+  if(have<=0)return false;
+  const count=qty==null?have:Math.max(1,Math.min(have,Math.floor(Number(qty)||have)));
+  p.bag[slug]-=count;
+  if(p.bag[slug]<=0)delete p.bag[slug];
+  p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+count;
+  return true;
+}
 /** Liga/desliga Auto Supply Stash por item na autoridade. */
 function setAuthAutoSupplyStash(p,slug,on){
   if(!p||!slug||!isSupplyStashableItem(slug))return false;
@@ -1953,6 +1978,26 @@ function applyOutgoingDamage(mob,element,dmg,now){
       }
     }
     return 0;
+  }
+  // Absorção por elemento (def.absorbs = {elemento: %}): o monstro CURA o
+  // percentual do dano que sofreria (Canary: Leiden cura com qualquer dano
+  // elemental — death/holy/ice/fire/energy/earth -100%).
+  if(mob&&mob.def&&mob.def.absorbs&&dmg>0){
+    const pct=Number(mob.def.absorbs[element||"physical"])||0;
+    if(pct>0){
+      const cap=Number(mob.maxHp||mob.def.hp)||0;
+      const heal=cap>0?Math.min(Math.floor(dmg*pct/100),Math.max(0,cap-mob.hp)):Math.floor(dmg*pct/100);
+      if(heal>0){
+        mob.hp+=heal;
+        const auth=mob._auth||null;
+        if(auth){
+          auth.events=auth.events||[];
+          auth.events.push({t:"mobheal",heal,x:Number(mob.x)||.5,y:Number(mob.y)||.5,
+            targetId:String(mob.id||""),screen:true,absorb:1,ts:now||auth.clock||Date.now()});
+        }
+      }
+      return 0;
+    }
   }
   let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
   if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
@@ -3799,11 +3844,25 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     if((mob.skillCds[key]||0)>now)continue;
     if(/invisib/i.test(nomeFx))continue;
     if(/summon/i.test(nomeFx)){
-      if(auth.bossId==="ferumbras-mortal-shell"&&mob.boss){
-        if(dist>mobSkillRangeSQM(sk,mob))continue;
+      // Summon genérico do Canary (ex.: Leiden invoca 1-2 Barkless Fanatic).
+      // O skill carrega summonSlug/summonCount quando o import encontra o
+      // <summon name="..."/> no XML do monstro.
+      if(sk.summonSlug&&monsterDef(sk.summonSlug)){
         if(random(auth)*100>=(sk.ch===undefined?15:sk.ch))continue;
         mob.skillCds[key]=now+(sk.int||2000);
-        tryFerumbrasSummon(auth,mob,now,stepTs);
+        const count=Math.max(1,Number(sk.summonCount)||1);
+        for(let n=0;n<count;n++){
+          const add=makeMob(auth,String(sk.summonSlug),false);
+          if(!add)break;
+          const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
+          const cell=claimSpawnCell(auth,Math.floor(w/2)+((n%3)-1),Math.floor(h/2)+Math.floor(n/3));
+          add.cx=cell.cx;add.cy=cell.cy;
+          add.x=(add.cx+.5)/w;add.y=(add.cy+.5)/h;add.sx=add.x;add.sy=add.y;
+          auth.mobs=auth.mobs||[];auth.mobs.unshift(add);
+          auth.events=auth.events||[];
+          auth.events.push({t:"spawn",slug:String(sk.summonSlug),x:add.x,y:add.y,
+            targetId:String(add.id),screen:true,ts:stepTs});
+        }
       }
       continue;
     }
@@ -7148,7 +7207,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   CURRENCY_GOLD,
   shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,setAuthAutoSupplyStash,setAuthLootConfig,
   ensureLootConfig,isAuthNoCollect,isAuthNoSell,tryAuthAutoSell,
-  moveLootPouchToBag,authAddItemToBag,
+  moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,
   playerCritChancePct,playerCritExtraPct,rollPlayerCrit,imbCombatTotals,charmTotals,applyCharmDamage,
   tryCharmOffensive,buyCharm,assignCharm,clearCharm,afterPlayerHit,

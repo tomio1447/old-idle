@@ -1103,6 +1103,61 @@ function accountMovePouchToBag(token,charId,opts){
     return {ok:false,msg:r.data.msg||"Não foi possível mover para a backpack",code:r.code};
   });
 }
+/* Move backpack → Loot Pouch com persistência (espelho do accountMovePouchToBag).
+ * Sem a API o movimento local "voltava": a bag é compartilhada e o PUT comum
+ * não persiste a mudança durante combate online / restaura o shared. */
+function accountMoveBagToPouch(token,charId,opts){
+  opts=opts||{};
+  const slug=String(opts.slug||"");
+  const qty=opts.qty!=null?Number(opts.qty):null;
+  const instId=opts.instId!=null&&opts.instId!==""?String(opts.instId):"";
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),slug,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+      if(instId)body.inst_id=instId;
+      const r=await _api("POST","/api/instance/bag-to-pouch",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        accountMaybeApplyShared(r.data);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível mover para a Loot Pouch"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),slug,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    if(qty!=null&&Number.isFinite(qty))body.qty=qty;
+    if(instId)body.inst_id=instId;
+    const r=await _api("POST","/api/pouch/from-bag",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,lootPouch:r.data.lootPouch,bag:r.data.bag,
+        itemInstances:r.data.itemInstances,saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível mover para a Loot Pouch",code:r.code};
+  });
+}
 /** Persiste Auto Supply Stash (online: instância em combate ou personagem na cidade). */
 function accountSetAutoSupplyStash(token,charId,slug,on){
   slug=String(slug||"");
