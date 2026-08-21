@@ -46,9 +46,9 @@ function JsonStore() {
   for(const c of this.characters){
     if(!Number.isSafeInteger(Number(c.save_version))||Number(c.save_version)<1)c.save_version=1;
   }
-  this.sessions = this._load("sessions.json", []);
-  this.leases = this._load("leases.json", []);
-  this.instances = this._load("instances.json", []);
+  this.sessions = Array.isArray(this._load("sessions.json", [])) ? this._load("sessions.json", []) : [];
+  this.leases = Array.isArray(this._load("leases.json", [])) ? this._load("leases.json", []) : [];
+  this.instances = Array.isArray(this._load("instances.json", [])) ? this._load("instances.json", []) : [];
   // null = parse falhou (arquivo truncado a meio de um _save antigo de 50MB+).
   // Reescreva no boot para não deixar lixo gigante no disco.
   const loadedSnapshots = this._load("snapshots.json", null);
