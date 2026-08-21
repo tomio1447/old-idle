@@ -668,10 +668,18 @@
   "slot": "armor",
   "type": "armor",
   "armor": 17,
-  "mag": 1,
   "level": 60,
   "weight": 85.0,
-  "sell": 1216
+  "sell": 1216,
+  "lifeLeech": 3,
+  "res": {
+   "death": 3,
+   "earth": 3,
+   "fire": 3,
+   "ice": 3,
+   "energy": 3,
+   "holy": 3
+  }
  },
  "demon-armor": {
   "id": 2494,
@@ -1485,7 +1493,6 @@
   "sprite": "platinum-amulet",
   "slot": "amulet",
   "type": "accessory",
-  "prot": 18,
   "armor": 2,
   "weight": 6.0,
   "sell": 672

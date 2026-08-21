@@ -1282,6 +1282,41 @@ function destroyAuthPouchItem(p,slug){
   delete p.lootPouch[slug];
   return count;
 }
+/* Destrói um stack/instância da mochila (autoritativo). Suporta instâncias
+ * (slug+instId remove 1 instância) e stacks (só slug remove tudo). */
+function destroyAuthBagItem(p,slug,instId){
+  if(!p||!slug)return 0;
+  if(authItemNeedsBagInstance(slug)){
+    const arr=p.itemInstances||[];
+    if(instId){
+      const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
+        String(inst.id)===String(instId));
+      if(idx<0)return 0;
+      p.itemInstances=arr.filter((_,i)=>i!==idx);
+      p.bag=p.bag||{};
+      p.bag[slug]=Math.max(0,(Number(p.bag[slug])||0)-1);
+      if(!p.bag[slug])delete p.bag[slug];
+      return 1;
+    }
+    // Sem instId: destrói TODAS as instâncias do slug na bag (stack inteiro).
+    const removed=arr.filter((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)).length;
+    if(removed){
+      p.itemInstances=arr.filter((inst)=>!(inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)));
+      if(p.bag)delete p.bag[slug];
+      return removed;
+    }
+    // Mirror/legado: count na bag sem instâncias (ex.: grant admin) — apaga o
+    // count mesmo assim (o item some do inventário).
+    const count=Math.max(0,Math.floor(Number(p.bag&&p.bag[slug])||0));
+    if(count<=0)return 0;
+    delete p.bag[slug];
+    return count;
+  }
+  const count=Math.max(0,Math.floor(Number(p.bag&&p.bag[slug])||0));
+  if(count<=0)return 0;
+  delete p.bag[slug];
+  return count;
+}
 /** Pool oficial da Bag You Desire — sincronizado com window.soulwarOpenBag do
  * cliente (soulwar.js). */
 const SOUL_BAG_POOL=["soulbastion","soulbleeder","soulcrusher","soulcutter","soulhexer",
@@ -7205,7 +7240,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   CURRENCY_GOLD,
-  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,setAuthAutoSupplyStash,setAuthLootConfig,
+  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
   ensureLootConfig,isAuthNoCollect,isAuthNoSell,tryAuthAutoSell,
   moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,

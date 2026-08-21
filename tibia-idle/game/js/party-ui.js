@@ -95,10 +95,20 @@ function partyApplyOutfitPreview(host, member, size, tries) {
     ? G.combat.players.find((e) => String(e && (e.id || (e.p && e.p.id))) === id) : null;
   if (live && live.p) source = live.p;
   else if (typeof G !== "undefined" && G && G.p && String(G.p.id) === id) source = G.p;
+  else if (typeof resolvePlayerById === "function") {
+    // Roster local (getCharacters) é a fonte MAIS fresca fora de combate:
+    // o save local já tem o outfit novo na hora, antes do poll/SSE chegar.
+    const resolved = resolvePlayerById(id);
+    if (resolved && resolved.outfit) source = resolved;
+  }
   const cached = typeof accountCharacterCacheRead === "function" ? accountCharacterCacheRead() : [];
   const summary = (cached || []).find((c) => String(c.id) === id) || null;
-  const outfit = source.outfit||summary&&summary.outfit||member.outfit
-    || (summary && summary.snapshot && summary.snapshot.outfit) || null;
+  // Ordem: fonte viva → snapshot local salvo (save() atualiza na hora) →
+  // membro → summary do servidor. O summary.outfit do /api/me pode ficar
+  // atrás do save local e travava a miniatura na outfit antiga.
+  const outfit = source.outfit
+    || (summary && summary.snapshot && summary.snapshot.outfit) || member.outfit
+    || summary&&summary.outfit || null;
   const preview = {
     id: source.id || member.id,
     name: source.name || member.name,
