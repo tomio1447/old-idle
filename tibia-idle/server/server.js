@@ -650,12 +650,20 @@ async function me(db, token) {
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
   acc = await ensureAccountWallet(db, acc);
   const characters = await db.charactersOf(acc.id);
+  // Inventário DA CONTA (pouch única etc.): inclui no /api/me para o SSE
+  // ("character") e o poll atualizarem o cliente em tempo real.
+  let sharedInventory = null;
+  try {
+    if (SharedInv && typeof db.accountSharedInventory === "function")
+      sharedInventory = await db.accountSharedInventory(acc.id);
+  } catch (e) { /* opcional */ }
   return {
     code: 200,
     body: {
       ok: true,
       account: accountPublicView(acc),
       characters: characters.map(accountCharacterSummary),
+      ...(sharedInventory ? { sharedInventory } : {}),
     },
   };
 }
@@ -2224,7 +2232,10 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
 }
 
 /* Grava o resultado sincronizado de uma mutação de pouch no shared da conta
- * (accounts.shared_inventory) — roda DEPOIS do patch da instância. */
+ * (accounts.shared_inventory) — roda DEPOIS do patch da instância. Publica um
+ * evento "character" para o SSE avisar as OUTRAS abas/dispositivos da conta
+ * (o cliente re-busca /api/me, que agora traz o sharedInventory, e aplica em
+ * tempo real). */
 async function persistSharedPouchSync(db,acc,synced){
   if(!synced||!SharedInv||typeof db.accountSharedInventory!=="function")return;
   try{
@@ -2234,6 +2245,7 @@ async function persistSharedPouchSync(db,acc,synced){
     if(Array.isArray(synced.instances))
       shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
     await db.setAccountSharedInventory(acc.id,shared);
+    try{publishSync(acc.id,"character",{id:null,saveVersion:0,source:"pouch-shared"});}catch(e){}
   }catch(e){console.warn("[pouch] falha ao sincronizar shared:",e&&e.message);}
 }
 
