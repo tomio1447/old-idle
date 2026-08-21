@@ -604,7 +604,44 @@ function sharedInvMergeChars(store, accountId) {
   if (!SharedInv) return SharedInv.emptySharedInventory();
   let chars = [];
   try { chars = store.charactersOf(accountId); } catch (e) { chars = []; }
-  return SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars);
+  const s = SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars);
+  s.legacyPouchDone = 1;
+  return s;
+}
+/* Consolida lootPouches legadas de personagens ANTIGOS na pouch ÚNICA da
+ * conta (a pouch é compartilhada entre todos os personagens). Saves antigos
+ * (pré-inventário compartilhado, ou contas cujo shared foi criado antes da
+ * pouch entrar no shared) podem ter itens presos no data de cada personagem.
+ * Regra idempotente: se o data do char é ESPELHO do shared (igual), pula —
+ * não duplica. Senão soma o excesso do char no shared. Após a primeira
+ * consolidação os saves passam a espelhar o shared e o merge não roda mais
+ * (flag legacyPouchDone no próprio shared). Retorna true se mudou algo. */
+function mergeLegacyCharPouches(shared, chars) {
+  if (!SharedInv || !shared || typeof shared !== "object") return false;
+  shared.lootPouch = shared.lootPouch && typeof shared.lootPouch === "object" && !Array.isArray(shared.lootPouch)
+    ? shared.lootPouch : {};
+  const pouchEq = (a, b) => {
+    const ka = Object.keys(a || {}).filter((k) => (Number(a[k]) || 0) > 0).sort();
+    const kb = Object.keys(b || {}).filter((k) => (Number(b[k]) || 0) > 0).sort();
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Number(a[k]) === Number(b[k]));
+  };
+  let changed = false;
+  for (const c of Array.isArray(chars) ? chars : []) {
+    let d = null;
+    try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = null; }
+    if (!d || typeof d !== "object" || Array.isArray(d)) continue;
+    const pouch = d.lootPouch;
+    if (!pouch || typeof pouch !== "object" || Array.isArray(pouch)) continue;
+    if (pouchEq(pouch, shared.lootPouch)) continue; // espelho — nada a fazer
+    for (const slug of Object.keys(pouch)) {
+      const n = Math.max(0, Math.floor(Number(pouch[slug]) || 0));
+      if (!n) continue;
+      shared.lootPouch[slug] = (Number(shared.lootPouch[slug]) || 0) + n;
+      changed = true;
+    }
+  }
+  return changed;
 }
 /* Une drops reais de boss no shared. Só conta numérica + pacotes com itens —
  * ignora lixo stale (ex.: { fake:"stale" }) de projections de cidade. */
@@ -680,6 +717,16 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
   if (typeof s === "string") { try { s = JSON.parse(s); } catch (e) { s = null; } }
   if (!SharedInv || !SharedInv.isSharedInventory(s)) {
     s = sharedInvMergeChars(this, accountId);
+    a.shared_inventory = s;
+    this._save();
+  } else if (!s.legacyPouchDone) {
+    // Conta antiga: une pouches legadas dos personagens na pouch única da
+    // conta (idempotente — espelhos não são somados). Persiste o flag para
+    // não refazer a varredura a cada request.
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    mergeLegacyCharPouches(s, chars);
+    s.legacyPouchDone = 1;
     a.shared_inventory = s;
     this._save();
   }
@@ -1429,6 +1476,15 @@ async function MysqlStore() {
         try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
         s = SharedInv ? SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars)
           : { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
+        s.legacyPouchDone = 1;
+        await this.setAccountSharedInventory(Number(accountId), s);
+      } else if (!s.legacyPouchDone) {
+        // Conta antiga: une pouches legadas dos personagens na pouch única da
+        // conta (idempotente — espelhos não são somados).
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        mergeLegacyCharPouches(s, chars);
+        s.legacyPouchDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       }
       return s;

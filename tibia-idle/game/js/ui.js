@@ -2078,19 +2078,50 @@ function persistMoveToSupplyStash(p, payload) {
  * (no online o servidor já faz; aqui o setActiveAmmo persiste pela API). */
 function persistEquipFromContainer(p, slug, source, slot, instId) {
   if (!slug || !slot) { toast("Item/slot inválido para equipar."); return Promise.resolve(false); }
-  const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
-    typeof accountApiConfigured === "function" && accountApiConfigured() &&
-    typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
-  if (online) {
-    return accountEquipInstanceItem(sessionToken(), p.id, { slug, source, slot, instId }).then((result) => {
+  const inCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountEquipItem === "function" && typeof sessionToken === "function" && p && p.id;
+  if (useAccount) {
+    // Preview IMEDIATO fora de combate (cidade): equipa no cliente na hora e
+    // a API confirma/persiste (evita o equip "atrasado"/perdido ao trocar de
+    // personagem — o PUT comum não persiste pouch/bag protegidos). Em combate
+    // a autoridade decide (o tick restaura qualquer preview).
+    let optimistic = false;
+    if (!inCombat && typeof equipItemFromContainer === "function") {
+      try {
+        optimistic = !!equipItemFromContainer(p, slug, source, slot, instId);
+        if (optimistic) {
+          if (typeof autoSelectAmmoForWeapon === "function") autoSelectAmmoForWeapon(p, slug);
+          if (typeof renderAll === "function") renderAll();
+        }
+      } catch (e) { optimistic = false; }
+    }
+    return accountEquipItem(sessionToken(), p.id, { slug, source, slot, instId }).then((result) => {
       if (result && result.ok) {
-        if (result.state && typeof applyOnlineAuthorityState === "function") {
+        if (result.state && typeof applyOnlineAuthorityState === "function" && inCombat) {
           applyOnlineAuthorityState(result.state, null, result.version);
         }
         const it = GAMEDATA.items[slug];
         toast(`Equipou <b>${it && it.n ? it.n : slug}</b>`);
         if (typeof renderAll === "function") renderAll();
         return true;
+      }
+      // Falha: fora de combate restaura do último snapshot conhecido do cache
+      // (o preview otimista fica sem persistência); em combate o próximo tick
+      // já reverte.
+      if (!inCombat && optimistic && typeof accountCharacterCacheRead === "function") {
+        try {
+          const cache = accountCharacterCacheRead();
+          const summary = cache.find((c) => String(c.id) === String(p.id));
+          const snap = summary && summary.snapshot;
+          if (snap) {
+            p.equip = snap.equip || p.equip;
+            p.bag = snap.bag || p.bag;
+            p.lootPouch = snap.lootPouch || p.lootPouch;
+            p.itemInstances = snap.itemInstances || p.itemInstances;
+          }
+        } catch (e) { /* restauração best-effort */ }
+        if (typeof renderAll === "function") renderAll();
       }
       toast((result && result.msg) || "Não foi possível equipar.", "bad");
       return false;
@@ -2113,17 +2144,39 @@ function persistEquipFromContainer(p, slug, source, slot, instId) {
  * autoritativa o tick restaura o item no slot). */
 function persistUnequipFromContainer(p, slot, dest) {
   if (!slot) { toast("Slot inválido para desequipar."); return Promise.resolve(false); }
-  const online = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat() &&
-    typeof accountApiConfigured === "function" && accountApiConfigured() &&
-    typeof accountEquipInstanceItem === "function" && typeof sessionToken === "function" && p && p.id;
-  if (online) {
-    return accountEquipInstanceItem(sessionToken(), p.id, { unequip: true, slot, dest }).then((result) => {
+  const inCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountEquipItem === "function" && typeof sessionToken === "function" && p && p.id;
+  if (useAccount) {
+    // Preview imediato fora de combate (cidade), igual ao equip.
+    let optimistic = false;
+    if (!inCombat && typeof unequipToContainer === "function") {
+      try {
+        optimistic = !!unequipToContainer(p, slot, dest || "bag");
+        if (optimistic && typeof renderAll === "function") renderAll();
+      } catch (e) { optimistic = false; }
+    }
+    return accountEquipItem(sessionToken(), p.id, { unequip: true, slot, dest }).then((result) => {
       if (result && result.ok) {
-        if (result.state && typeof applyOnlineAuthorityState === "function") {
+        if (result.state && typeof applyOnlineAuthorityState === "function" && inCombat) {
           applyOnlineAuthorityState(result.state, null, result.version);
         }
         if (typeof renderAll === "function") renderAll();
         return true;
+      }
+      if (!inCombat && optimistic && typeof accountCharacterCacheRead === "function") {
+        try {
+          const cache = accountCharacterCacheRead();
+          const summary = cache.find((c) => String(c.id) === String(p.id));
+          const snap = summary && summary.snapshot;
+          if (snap) {
+            p.equip = snap.equip || p.equip;
+            p.bag = snap.bag || p.bag;
+            p.lootPouch = snap.lootPouch || p.lootPouch;
+            p.itemInstances = snap.itemInstances || p.itemInstances;
+          }
+        } catch (e) { /* restauração best-effort */ }
+        if (typeof renderAll === "function") renderAll();
       }
       toast((result && result.msg) || "Não foi possível desequipar.", "bad");
       return false;

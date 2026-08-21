@@ -584,10 +584,40 @@ function accountSelectInstanceAmmo(token,charId,slug,automatic){
 /* Equipa/desequipa um item da bag ou Loot Pouch na instância ativa. Sem isso
  * o tick autoritativo (200ms) restaura o equipamento anterior — o falcon bow
  * "voltava" depois de equipar o crossbow. */
-function accountEquipInstanceItem(token,charId,opts){
+/* Equipa/desequipa com persistência autoritativa. Em combate usa a instância
+ * (/api/instance/equip com instance_id); na CIDADE usa a MESMA rota no
+ * caminho de save (expected_version = saveVersion). Sem a API de cidade o
+ * equip que consumia a pouch "atrasava"/se perdia: o PUT comum não persiste
+ * pouch/bag protegidos e uma troca rápida de personagem revertia o item. */
+function accountEquipItem(token,charId,opts){
   opts=opts||{};
-  return accountQueueInstance(async()=>{
-    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const r=await _api("POST","/api/instance/equip",Object.assign({
+        token,char_id:Number(charId),
+        unequip:!!opts.unequip,
+        slug:String(opts.slug||""),
+        slot:String(opts.slot||""),
+        source:String(opts.source||"bag"),
+        dest:String(opts.dest||"bag"),
+        inst_id:opts.instId?String(opts.instId):null,
+        instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        return {ok:true,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
     const r=await _api("POST","/api/instance/equip",Object.assign({
       token,char_id:Number(charId),
       unequip:!!opts.unequip,
@@ -596,15 +626,26 @@ function accountEquipInstanceItem(token,charId,opts){
       source:String(opts.source||"bag"),
       dest:String(opts.dest||"bag"),
       inst_id:opts.instId?String(opts.instId):null,
-      instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields()));
     if(r.data.ok){
-      accountInstanceApply(r.data.instance);
-      return {ok:true,state:r.data.instance&&r.data.instance.state,
-        version:r.data.instance&&r.data.instance.version};
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
+        if(r.data.equip)G.p.equip=r.data.equip||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,saveVersion:r.data.saveVersion};
     }
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
-    return {ok:false,msg:r.data.msg||"Não foi possível equipar"};
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível equipar",code:r.code};
   });
+}
+function accountEquipInstanceItem(token,charId,opts){
+  return accountEquipItem(token,charId,opts);
 }
 /* Equipa 1 item da conta (backpack/Loot Pouch COMPARTILHADOS) em OUTRO
  * personagem da conta. Online a operação precisa passar pela autoridade —
@@ -1187,7 +1228,23 @@ function accountSyncDispatch(type,detail){try{window.dispatchEvent(new CustomEve
 async function accountSyncRefreshCharacters(token){
   if(ACCOUNT_SYNC.charRefresh)return ACCOUNT_SYNC.charRefresh;
   ACCOUNT_SYNC.charRefresh=accountMe(token).then((fresh)=>{
-    if(fresh.ok){accountCharacterCacheWrite(fresh.characters||[]);accountSyncDispatch("character",fresh);}
+    if(fresh.ok){
+      accountCharacterCacheWrite(fresh.characters||[]);
+      // TEMPO REAL da pouch da conta: /api/me traz o sharedInventory (pouch
+      // única). Fora de combate aplica no personagem ativo e re-renderiza a
+      // Loot Pouch — assim uma venda/movimentação feita em outra aba ou por
+      // outro personagem aparece na hora, sem recarregar.
+      try{
+        if(fresh.sharedInventory&&typeof G!=="undefined"&&G&&G.p&&
+           !(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat())){
+          accountApplySharedInventory(fresh.sharedInventory);
+          if(typeof renderLootPouch==="function")renderLootPouch(G.p);
+          if(typeof renderInventory==="function")renderInventory(G.p);
+          if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();
+        }
+      }catch(e){/* aplicação em tempo real é best-effort */}
+      accountSyncDispatch("character",fresh);
+    }
     return fresh;
   }).finally(()=>{ACCOUNT_SYNC.charRefresh=null;});return ACCOUNT_SYNC.charRefresh;
 }
