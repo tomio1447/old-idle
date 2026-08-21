@@ -66,6 +66,11 @@ const OBERON_DEBATE = [
   },
 ];
 
+/* Expõe o banco de perguntas para o servidor (vm sandbox do
+ * authoritative_engine). O servidor julga a resposta do debate com a MESMA
+ * lista do cliente — se as cópias divergissem, nenhuma resposta acertaria. */
+if (typeof window !== "undefined") window.OBERON_DEBATE = OBERON_DEBATE;
+
 /* Tabela de Loot corrigida para dropar o item correto do gamedata */
 const OBERON_LOOT = [
   { chance: 30,  max: 1, item: "bone" },
@@ -227,10 +232,48 @@ function oberonSpawnHelpers(c, player, now) {
   }
 }
 
-function oberonOpenDebateModal(boss, question, onAnswer) {
+/* Renderiza o modal de debate a partir de um payload {phrase, options}.
+ * Usado pelo fluxo LOCAL (opções montadas com OBERON_DEBATE) e pelo fluxo
+ * ONLINE (opções enviadas pelo servidor — que nunca envia a resposta certa).
+ * `onAnswer` recebe o TEXTO da réplica escolhida ("" se fechou o modal). */
+function oberonOpenDebateModalRemote(boss, payload, onAnswer) {
   const modal = document.getElementById("modal");
   const body = document.getElementById("modal-body");
-  if (!modal || !body) { if (onAnswer) onAnswer(false); return; }
+  if (!modal || !body || !payload) { if (onAnswer) onAnswer(""); return; }
+
+  const phrase = String(payload.phrase || "");
+  const options = Array.isArray(payload.options)
+    ? payload.options.map((o) => String(o)).filter(Boolean).slice(0, 6) : [];
+  if (!phrase || options.length < 2) { if (onAnswer) onAnswer(""); return; }
+
+  body.classList.remove(...(body.className.match(/\S+/g) || []).filter((s) => s.endsWith("-modal-shell")));
+  body.classList.add("boss-modal-shell");
+  body.innerHTML = `
+    <div class="panel-title">
+      <span style="color:#ffe680">Grand Master Oberon</span>
+      <button class="sm" id="oberon-debate-close" style="margin-left:auto">✕</button>
+    </div>
+    <div class="panel-body" style="text-align:center;max-width:420px">
+      <div class="mb8" style="font-style:italic;color:#d0b0ff">"${phrase}"</div>
+      <div class="small dim mb8">Escolha a réplica correta para quebrar a invulnerabilidade.</div>
+      <div id="oberon-debate-options" class="list" style="text-align:left;gap:6px;display:flex;flex-direction:column">
+        ${options.map((a, i) => `<button class="sm" data-oberon-answer="${i}" style="white-space:normal;height:auto;line-height:1.3;padding:8px">${a}</button>`).join("")}
+      </div>
+    </div>`;
+  modal.classList.add("show");
+
+  const close = (value) => {
+    modal.classList.remove("show");
+    body.classList.remove("boss-modal-shell");
+    if (onAnswer) onAnswer(value);
+  };
+  document.getElementById("oberon-debate-close").addEventListener("click", () => close(""));
+  document.querySelectorAll("#oberon-debate-options [data-oberon-answer]").forEach((btn) =>
+    btn.addEventListener("click", () => close(options[Number(btn.dataset.oberonAnswer)])));
+}
+
+function oberonOpenDebateModal(boss, question, onAnswer) {
+  if (!question) { if (onAnswer) onAnswer(false); return; }
 
   const answers = [question.answer];
   const wrong = OBERON_DEBATE
@@ -241,34 +284,9 @@ function oberonOpenDebateModal(boss, question, onAnswer) {
   answers.push(...wrong);
   answers.sort(() => Math.random() - 0.5);
 
-  body.classList.remove(...(body.className.match(/\S+/g) || []).filter((s) => s.endsWith("-modal-shell")));
-  body.classList.add("boss-modal-shell");
-  body.innerHTML = `
-    <div class="panel-title">
-      <span style="color:#ffe680">Grand Master Oberon</span>
-      <button class="sm" id="oberon-debate-close" style="margin-left:auto">✕</button>
-    </div>
-    <div class="panel-body" style="text-align:center;max-width:420px">
-      <div class="mb8" style="font-style:italic;color:#d0b0ff">"${question.phrase}"</div>
-      <div class="small dim mb8">Escolha a réplica correta para quebrar a invulnerabilidade.</div>
-      <div id="oberon-debate-options" class="list" style="text-align:left;gap:6px;display:flex;flex-direction:column">
-        ${answers.map((a, i) => `<button class="sm" data-oberon-answer="${i}" style="white-space:normal;height:auto;line-height:1.3;padding:8px">${a}</button>`).join("")}
-      </div>
-    </div>`;
-  modal.classList.add("show");
-
-  const close = () => {
-    modal.classList.remove("show");
-    body.classList.remove("boss-modal-shell");
-  };
-  document.getElementById("oberon-debate-close").addEventListener("click", () => { close(); if (onAnswer) onAnswer(false); });
-  document.querySelectorAll("#oberon-debate-options [data-oberon-answer]").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      const i = Number(btn.dataset.oberonAnswer);
-      const correct = answers[i] === question.answer;
-      close();
-      if (onAnswer) onAnswer(correct);
-    }));
+  oberonOpenDebateModalRemote(boss, { phrase: question.phrase, options: answers }, (chosen) => {
+    if (onAnswer) onAnswer(!!chosen && chosen === question.answer);
+  });
 }
 
 function oberonBossAsk(c, player, now) {

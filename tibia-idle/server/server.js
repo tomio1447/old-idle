@@ -2388,6 +2388,112 @@ async function equipInstanceItem(db,body){
     equip:p.equip||{},bag:p.bag||{},lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
 }
 
+/* Remove 1 unidade do item compartilhado das cópias dos membros da
+ * instância (bag/pouch). Os membros carregam cópias do shared desde o
+ * início da instância; sem remover, a extração terminal "ressuscitaria" o
+ * item no inventário da conta depois do equip em outro personagem. */
+function removeSharedItemFromMember(p,slug,instId,source){
+  if(!p||!slug)return;
+  const tryRemove=(key)=>{
+    const n=Number(p[key]&&p[key][slug])||0;
+    if(n>0){p[key][slug]=n-1;if(p[key][slug]<=0)delete p[key][slug];return true;}
+    return false;
+  };
+  const orders=source==="pouch"?["lootPouch","bag"]:["bag","lootPouch"];
+  for(const key of orders)if(tryRemove(key))break;
+  if(instId&&Array.isArray(p.itemInstances)){
+    const idx=p.itemInstances.findIndex((i)=>i&&String(i.id)===String(instId)&&String(i.loc)==="bag");
+    if(idx>=0)p.itemInstances.splice(idx,1);
+  }
+}
+
+/* Equipa 1 item da conta (backpack/Loot Pouch compartilhados) em OUTRO
+ * personagem da conta (autoritativo). Sem esta rota o "Equipar em <char>"
+ * online só mexia no estado local: o toast dizia "equipado" mas o item não
+ * ia para o inventário do alvo (e sumia do shared no próximo save). */
+async function equipOtherCharacterItem(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const sourceId=Number(body.char_id),targetId=Number(body.target_id);
+  const slug=String(body.slug||"");
+  const source=String(body.source||"bag")==="pouch"?"pouch":"bag";
+  const instId=body.inst_id?String(body.inst_id):null;
+  if(!Number.isSafeInteger(sourceId)||sourceId<=0||!Number.isSafeInteger(targetId)||targetId<=0||
+     targetId===sourceId||!slug)
+    return {code:400,body:{ok:false,error:"INVALID_EQUIP_OTHER",msg:"Equipar em outro personagem inválido"}};
+  const sourceChar=await db.findCharacter(sourceId);
+  if(!sourceChar||Number(sourceChar.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const targetChar=await db.findCharacter(targetId);
+  if(!targetChar||Number(targetChar.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"TARGET_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,sourceId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const state=typeof row.state==="string"?(()=>{try{return JSON.parse(row.state);}catch(e){return null;}})():row.state;
+    const players=(state&&state.authority&&state.authority.players)||[];
+    const targetInInstance=players.some((item)=>String(item&&item.id)===String(targetId));
+    if(!targetInInstance)
+      return {code:409,body:{ok:false,error:"TARGET_IN_ACTIVE_INSTANCE",
+        msg:"O personagem alvo está em uma caçada ativa — finalize a caçada (ou equipe por ele diretamente) antes de equipar itens nele."}};
+    // Alvo participa da instância: equipa na própria autoridade (a cópia do
+    // shared fica no state; a extração terminal reconcilia o shared).
+    let rejection=null;
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await db.instanceGet(Number(row.account_id));
+      if(!current||current.status!=="active")
+        return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+      const result=await db.instancePatchState(Number(current.account_id),acc.id,String(current.instance_id),
+        Number(current.version),(serialized)=>{
+          let descriptor=null;
+          try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+          const entries=(descriptor.authority&&descriptor.authority.players)||[];
+          const targetEntry=entries.find((item)=>String(item&&item.id)===String(targetId));
+          if(!targetEntry||!targetEntry.p){rejection="O personagem alvo não participa desta instância";return null;}
+          const _r=equipFromContainerAuth(targetEntry.p,slug,source,{instId});
+          if(!_r||!_r.ok){
+            rejection=(last&&last.msg)||"Não foi possível equipar (item não está na mochila/pouch, vocação ou nível)";
+            return null;
+          }
+          // Remove o item das cópias dos demais membros para a extração
+          // terminal não devolver o item ao shared (duplicação).
+          for(const entry of entries){
+            if(entry===targetEntry||!entry||!entry.p)continue;
+            removeSharedItemFromMember(entry.p,slug,instId,source);
+          }
+          descriptor=materializeAuthority(descriptor);
+          return JSON.stringify(descriptor);
+        },lease);
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,
+          version:Number(result.instance.version),status:result.instance.status,source:"equip-other",
+          holderId:String(body.holder_id||"")});
+        return {code:200,body:{ok:true,equipped:slug,slot:null,instance:instanceSummary(result.instance,true)}};
+      }
+      if(result.error==="LEASE_REQUIRED")
+        return {code:423,body:{ok:false,error:"LEASE_REQUIRED",msg:"O controle desta conta foi transferido antes do equip terminar."}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")
+        return {code:400,body:{ok:false,error:result.error,msg:rejection||"Não foi possível equipar",
+          instance:instanceSummary(result.instance,true)}};
+      last=result;
+    }
+    return {code:409,body:{ok:false,error:"INSTANCE_VERSION_CONFLICT",msg:"A instância foi alterada por outra sessão.",
+      instance:last&&instanceSummary(last.instance,true)}};
+  }
+  // Caminho de cidade: hidrata o alvo com o shared, equipa e persiste
+  // (o shared é extraído de volta + mirror no save do alvo).
+  let p=await loadCityPlayer(db,acc,targetChar);
+  const r=equipFromContainerAuth(p,slug,source,{instId});
+  if(!r||!r.ok)
+    return {code:400,body:{ok:false,error:"EQUIP_FAILED",msg:(r&&r.msg)||"Não foi possível equipar"}};
+  const persisted=await persistClaimedPlayer(db,acc,targetChar,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,
+    equip:p.equip||{},bag:p.bag||{},lootPouch:p.lootPouch||{},itemInstances:p.itemInstances||[]})};
+}
+
 /** Move Loot Pouch → backpack (autoritativo). lootPouch é protected no PUT. */
 async function movePouchToBag(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -3320,6 +3426,10 @@ async function main() {
       if (req.method === "POST" && url === "/api/characters") {
         const body = await readBody(req);
         const r = await createCharacter(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/characters/equip-other") {
+        const r = await equipOtherCharacterItem(db, await readBody(req));
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url.startsWith("/api/characters/")) {
