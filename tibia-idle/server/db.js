@@ -497,6 +497,37 @@ JsonStore.prototype.instanceReplaceForced = function(accountId,instanceId,meta,s
   });
   this._saveRuntime(false,true);return {ok:true,instance:row};
 };
+/* Limpeza de BOOT: o processo anterior morreu — todos os holders de lease
+ * morreram com ele. Sem expirar os registros persistidos, o acquire da aba
+ * retornava 409 (LEASE_HELD) por até LEASE_TTL_MS após um restart, porque o
+ * registro antigo ainda estava "ativo" no disco com holder/segredo antigos. */
+JsonStore.prototype.expireAllLeases = function () {
+  const before=(this.leases||[]).length;
+  if(before){this.leases=[];this._saveLeases();}
+  return before;
+};
+/* Limpeza de BOOT: encerra todas as instâncias ainda marcadas como ativas.
+ * O estado autoritativo do processo anterior não existe mais; os personagens
+ * já foram persistidos no último tick/checkpoint, então não há perda além do
+ * progresso do downtime (que ninguém jogou). O cliente vê status "ended" +
+ * terminalReason no próximo GET e volta ao templo sem travar. */
+JsonStore.prototype.endAllInstances = function (reason) {
+  const nowIso=new Date().toISOString();
+  const clean=String(reason||"server-restart").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"server-restart";
+  let count=0;
+  for(const row of this.instances||[]){
+    if(row.status!=="active")continue;
+    row.version=Number(row.version)+1;
+    row.status="ended";
+    row.terminal_reason=clean;
+    row.ended_at=nowIso;
+    row.updated_at=nowIso;
+    row.worker_cursor_at=nowIso;
+    count++;
+  }
+  if(count)this._saveRuntime(false,true);
+  return count;
+};
 JsonStore.prototype.createAccount = function (login, hash, role, coins, email) {
   const acc = { id: this._nextId(this.accounts), login, password_hash: hash,
                 email: String(email || "").slice(0, 120),
@@ -1646,6 +1677,18 @@ async function MysqlStore() {
     },
     async revokeSession(token){const result=await this.run("DELETE FROM sessions WHERE token=?",[String(token)]);return result.affectedRows>0;},
     async pruneExpiredSessions(now){const result=await this.run("DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at<=?",[new Date(now)]);return result.affectedRows;},
+    /* Limpeza de BOOT (ver JsonStore.expireAllLeases/endAllInstances). */
+    async expireAllLeases(){
+      const result=await this.run("DELETE FROM account_leases");
+      return result.affectedRows||0;
+    },
+    async endAllInstances(reason){
+      const clean=String(reason||"server-restart").replace(/[^a-z0-9_-]/gi,"").slice(0,40)||"server-restart";
+      const result=await this.run(
+        "UPDATE account_instances SET status='ended', terminal_reason=?, ended_at=NOW(), "+
+        "worker_cursor_at=NOW(), version=version+1, updated_at=NOW() WHERE status='active'",[clean]);
+      return result.affectedRows||0;
+    },
     async leaseAcquire(accountId,holderId,previousHolderId,presentedHash,newHash,now,expiresAt){
       const conn=await pool.getConnection(),lockName="idle-lease-"+Number(accountId);
       try{
