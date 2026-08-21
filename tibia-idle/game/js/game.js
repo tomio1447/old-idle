@@ -484,14 +484,20 @@ function normalizePlayer(p) {
   if (!p.equip.backpack) p.equip.backpack = { item: "bag", count: 1 };
   p.gold = Math.max(0, Math.floor(p.gold || 0));
   if (typeof bindAccountGold === "function") bindAccountGold(p);
-  // Migracao da loot pouch: itens antigos dos personagens vao para a conta.
+  // Migracao da loot pouch: itens antigos dos personagens vao para a conta
+  // uma unica vez. Se a conta ja tem conteudo (limpo ou preenchido), o
+  // oldPouch do personagem e descartado para nao restaurar dados antigos.
   const oldPouch = p.lootPouch || {};
   p.lootPouch = p.lootPouch || {};
   if (typeof bindAccountLootPouch === "function") bindAccountLootPouch(p);
-  if (Object.keys(oldPouch).length && typeof accountSetLootPouch === "function") {
-    const merged = Object.assign({}, accountLootPouch(), oldPouch);
-    accountSetLootPouch(merged);
-    p.lootPouch = merged;
+  if (typeof accountSetLootPouch === "function") {
+    const currentPouch = accountLootPouch() || {};
+    if (Object.keys(oldPouch).length && !Object.keys(currentPouch).length) {
+      accountSetLootPouch(oldPouch);
+      p.lootPouch = oldPouch;
+    } else {
+      p.lootPouch = currentPouch;
+    }
   }
   p.bank = p.bank || 0;
   p.promoted = !!p.promoted;
