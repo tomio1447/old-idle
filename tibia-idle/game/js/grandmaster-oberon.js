@@ -5,16 +5,6 @@
  * escolhe 1 entre 4 réplicas; a correta quebra a invulnerabilidade, spawna
  * 2 Falcon Knights + 2 Falcon Paladins e o combate continua normalmente. Se
  * errar, ele fica invulnerável por 10s e uma nova pergunta é oferecida.
- *
- * NPC Oberon Trader:
- *   - Troca Falcon Escutcheon por: 1 Falcon Shield + 1 Grant of Arms + 1 Patch
- *     of Fine Cloth (o jogador precisa ter os itens na mochila).
- *   - Vende Roasted Dragon Wings por 5.000.000 gp.
- *
- * Sala:
- *   centeroom  {1057,999,7}
- *   playerspawn {1057,1001,7}
- *   bosspawn   {1057,996,7}
  */
 "use strict";
 
@@ -26,8 +16,7 @@ const OBERON_ROOM = {
   boss: { x: 1057, y: 996, z: 7 },
 };
 
-/* Stats oficiais do Canary para Grand Master Oberon (60k HP, 20k exp,
- * 1.400 damage, 82 armor, 60 defense, holy/earth/death skills). */
+/* Stats oficiais do Canary para Grand Master Oberon */
 const OBERON_STATS = {
   name: "Grand Master Oberon",
   hp: 60000,
@@ -37,9 +26,7 @@ const OBERON_STATS = {
   defense: 60,
 };
 
-/* Debate: frases de Oberon e a réplica correta do jogador.
- * Cada fase usa uma frase em ordem; a resposta correta vem desta lista.
- * As 3 alternativas erradas são as demais respostas corretas embaralhadas. */
+/* Debate: frases de Oberon e a réplica correta do jogador. */
 const OBERON_DEBATE = [
   {
     phrase: "The world will suffer for its idle laziness!",
@@ -79,12 +66,12 @@ const OBERON_DEBATE = [
   },
 ];
 
-/* Itens que faltavam no catálogo: Falcon Escutcheon, ingredientes e o
- * roasted dragon wings vendido pelo NPC. */
+/* Tabela de Loot corrigida para dropar o item correto do gamedata */
 const OBERON_LOOT = [
   { chance: 30,  max: 1, item: "bone" },
   { chance: 30,  max: 1, item: "brass-shield" },
   { chance: 23,  max: 1, item: "viking-helmet" },
+  { chance: 8.5, max: 1, item: "spatial-warp-almanac" }, // <-- Chance de drop ajustada e corrigida
   { chance: 3,   max: 1, item: "patch-of-fine-cloth" },
   { chance: 3,   max: 1, item: "grant-of-arms" },
   { chance: 0.5, max: 1, item: "falcon-battleaxe" },
@@ -96,16 +83,17 @@ const OBERON_LOOT = [
   { chance: 0.5, max: 1, item: "falcon-rod" },
   { chance: 0.5, max: 1, item: "falcon-wand" },
   { chance: 0.5, max: 1, item: "falcon-sai" },
-  { chance: 0.5, max: 1, item: "falcon-greaves" },
+  { chance: 0.3, max: 1, item: "falcon-greaves" },
   { chance: 0.5, max: 1, item: "falcon-plate" },
-  { chance: 0.3, max: 1, item: "falcon-shield" },
+  { chance: 0.5, max: 1, item: "falcon-shield" },
 ];
 
 const OBERON_ITEMS = {
-  "falcon-escutcheon": { n: "falcon escutcheon", s: "shield", t: "shield", cid: 28722, w: 56.00, sell: 0, npcSell: 0, def: 51, lvl: 300, th: true },
-  "falcon-shield":     { n: "falcon shield", s: "shield", t: "shield", cid: 28721, w: 51.00, sell: 0, npcSell: 0, def: 45, lvl: 200 },
-  "grant-of-arms":     { n: "grant of arms", s: null, t: "loot", cid: 28824, w: 0.20, sell: 0, npcSell: 0 },
-  "patch-of-fine-cloth": { n: "patch of fine cloth", s: null, t: "loot", cid: 28821, w: 0.20, sell: 0, npcSell: 0 },
+  "spatial-warp-almanac": { n: "the spatial warp almanac", s: null, t: "loot", cid: 28865, w: 2.00, sell: 200, npcSell: 200 },
+  "falcon-escutcheon":    { n: "falcon escutcheon", s: "shield", t: "shield", cid: 28722, w: 56.00, sell: 0, npcSell: 0, def: 51, lvl: 300, th: true },
+  "falcon-shield":        { n: "falcon shield", s: "shield", t: "shield", cid: 28721, w: 51.00, sell: 0, npcSell: 0, def: 45, lvl: 200 },
+  "grant-of-arms":        { n: "grant of arms", s: null, t: "loot", cid: 28824, w: 0.20, sell: 0, npcSell: 0 },
+  "patch-of-fine-cloth":  { n: "patch of fine cloth", s: null, t: "loot", cid: 28821, w: 0.20, sell: 0, npcSell: 0 },
   "roasted-dragon-wings": { n: "roasted dragon wings", s: null, t: "food", cid: 9081, w: 0.60, sell: 0, npcSell: 0 },
 };
 
@@ -177,17 +165,26 @@ const OBERON_ITEMS = {
   };
 })();
 
-/* ===================================================== mecânica do debate
- * Todas as funções abaixo rodam no cliente; o servidor autoritativo confia
- * no cliente para a mecânica visual (o combate idle não envia inputs de
- * resposta para o servidor). */
+/* ===================================================== mecânica do debate */
+
+function isOberonCombat(c) {
+  if (!c) return false;
+  if (c.boss && (c.boss.id === "grand-master-oberon" || c.boss === "grand-master-oberon")) return true;
+  if (c.huntId === "grand-master-oberon-room" || (c.hunt && c.hunt.id === "grand-master-oberon-room")) return true;
+  return false;
+}
+
+function getOberonMob(c) {
+  if (!c || !c.mobs) return null;
+  return c.mobs.find((m) => m && (m.boss || m.slug === "grand-master-oberon" || m.id === "grand-master-oberon")) || null;
+}
 
 function oberonBossState(c) {
   if (!c) return null;
   if (!c.oberon) {
     c.oberon = {
       lives: 4,
-      phase: 0,          // índice da pergunta atual em OBERON_DEBATE
+      phase: 0,
       invulnerable: false,
       pending: false,
       nextAt: 0,
@@ -200,13 +197,13 @@ function oberonBossInit(c, player) {
   if (!c || c.oberonInit) return;
   c.oberonInit = true;
   oberonBossState(c);
-  const boss = (c.mobs || []).find((m) => m.boss);
+  const boss = getOberonMob(c);
   if (boss) boss.oberonInvulnerable = false;
 }
 
 function oberonBossCanTakeDamage(c, mob) {
-  if (!mob || !mob.boss) return true;
-  if (c && c.boss && c.boss.id === "grand-master-oberon") {
+  if (!mob) return true;
+  if (isOberonCombat(c) && (mob.boss || mob.slug === "grand-master-oberon")) {
     return !mob.oberonInvulnerable;
   }
   return true;
@@ -214,8 +211,7 @@ function oberonBossCanTakeDamage(c, mob) {
 
 function oberonSpawnHelpers(c, player, now) {
   if (!c || !c.huntMap) return;
-  // 2 Falcon Knights + 2 Falcon Paladins próximos ao boss
-  const boss = (c.mobs || []).find((m) => m.boss);
+  const boss = getOberonMob(c);
   const bx = boss ? (boss.cx || 10) : 10;
   const by = boss ? (boss.cy || 10) : 10;
   const helpers = [
@@ -231,7 +227,6 @@ function oberonSpawnHelpers(c, player, now) {
   }
 }
 
-/* Abre o modal de debate. `onAnswer` é true/false. */
 function oberonOpenDebateModal(boss, question, onAnswer) {
   const modal = document.getElementById("modal");
   const body = document.getElementById("modal-body");
@@ -266,8 +261,8 @@ function oberonOpenDebateModal(boss, question, onAnswer) {
     modal.classList.remove("show");
     body.classList.remove("boss-modal-shell");
   };
-  $("#oberon-debate-close").addEventListener("click", () => { close(); if (onAnswer) onAnswer(false); });
-  $$("#oberon-debate-options [data-oberon-answer]").forEach((btn) =>
+  document.getElementById("oberon-debate-close").addEventListener("click", () => { close(); if (onAnswer) onAnswer(false); });
+  document.querySelectorAll("#oberon-debate-options [data-oberon-answer]").forEach((btn) =>
     btn.addEventListener("click", () => {
       const i = Number(btn.dataset.oberonAnswer);
       const correct = answers[i] === question.answer;
@@ -278,7 +273,7 @@ function oberonOpenDebateModal(boss, question, onAnswer) {
 
 function oberonBossAsk(c, player, now) {
   const st = oberonBossState(c);
-  const boss = (c.mobs || []).find((m) => m.boss);
+  const boss = getOberonMob(c);
   if (!st || !boss || st.pending || st.phase >= OBERON_DEBATE.length) return;
 
   st.pending = true;
@@ -295,7 +290,7 @@ function oberonBossAsk(c, player, now) {
       oberonSpawnHelpers(c, player, Date.now());
       if (st.lives <= 0 && boss) {
         boss.oberonInvulnerable = false;
-        boss.hp = 0; // permite a morte real no próximo tick
+        boss.hp = 0; // Permite morrer de verdade
       }
     } else {
       st.nextAt = Date.now() + 10000;
@@ -304,13 +299,15 @@ function oberonBossAsk(c, player, now) {
 }
 
 function oberonBossTick(c, p, dt, now) {
-  if (!c || !c.boss || c.boss.id !== "grand-master-oberon") return true;
+  const tickDebug = isOberonCombat(c);
+  if (typeof addLog === "function" && tickDebug) addLog("info", `[Oberon] tick ativo. boss.hp=${(getOberonMob(c)||{}).hp} lives=${(c.oberon||{}).lives} inv=${(c.oberon||{}).invulnerable}`);
+  if (!tickDebug) return true;
   oberonBossInit(c, p);
   const st = oberonBossState(c);
-  const boss = (c.mobs || []).find((m) => m.boss);
-  if (!boss || !st) return true;
+  const boss = getOberonMob(c);
+  if (!boss || !st) { if (typeof addLog === "function") addLog("bad", "[Oberon] boss ou estado nulo"); return true; }
 
-  // Se o boss zerou HP e ainda tem vidas: revive e fica invulnerável
+  // Se o boss zerou o HP e ainda tem vidas: resgata, cura e abre o debate
   if (boss.hp <= 0 && st.lives > 0 && !st.invulnerable) {
     boss.hp = boss.maxHp || OBERON_STATS.hp;
     st.invulnerable = true;
@@ -318,13 +315,13 @@ function oberonBossTick(c, p, dt, now) {
     oberonBossAsk(c, p, now);
   }
 
-  // Após 10s de erro, reabre a pergunta
+  // Se errou a resposta, reabre após 10 segundos
   if (st.invulnerable && !st.pending && st.nextAt && now >= st.nextAt) {
     st.nextAt = 0;
     oberonBossAsk(c, p, now);
   }
 
-  // Mantém o boss vivo enquanto estiver invulnerável
+  // Garante imortalidade enquanto debate
   if (st.invulnerable && boss.hp <= 0) {
     boss.hp = Math.max(1, boss.maxHp || OBERON_STATS.hp);
   }
@@ -332,8 +329,26 @@ function oberonBossTick(c, p, dt, now) {
   return true;
 }
 
-/* ===================================================== NPC Oberon Trader
- * Troca Falcon Escutcheon por ingredientes + vende Roasted Dragon Wings. */
+function oberonBossHandleKill(c, m, now) {
+  if (typeof addLog === "function") addLog("info", `[Oberon] kill trigger. combat=${isOberonCombat(c)} slug=${m && m.slug} boss=${m && m.boss} hp=${m && m.hp}`);
+  if (!isOberonCombat(c) || !m) return false;
+  const boss = getOberonMob(c);
+  if (m !== boss && !m.boss && m.slug !== "grand-master-oberon") { if (typeof addLog === "function") addLog("info", "[Oberon] morte ignorada (nao e o boss)"); return false; }
+
+  const st = oberonBossState(c);
+  if (m.oberonInvulnerable || (st && st.invulnerable)) return true; // Impede morte real
+
+  if (st && st.lives > 0) {
+    m.hp = m.maxHp || OBERON_STATS.hp;
+    m.oberonInvulnerable = true;
+    st.invulnerable = true;
+    oberonBossAsk(c, (c.player && c.player.p) || (typeof G !== "undefined" && G.p), now);
+    return true; // Retorna true para a engine de combate abortar a morte
+  }
+  return false;
+}
+
+/* ===================================================== NPC Oberon Trader */
 
 function npcOberonTraderHtml(p) {
   const haveShield = (p.bag && p.bag["falcon-shield"] || 0) >= 1;
@@ -401,16 +416,38 @@ function oberonTraderBuyWings(p) {
   return { ok: true, msg: `Você comprou <b>${itemName("roasted-dragon-wings")}</b>.` };
 }
 
-function oberonBossHandleKill(c, m, now) {
-  if (!c || !c.boss || c.boss.id !== "grand-master-oberon" || !m) return false;
-  if (m.oberonInvulnerable) return true; // impede morte enquanto invulnerável
-  // Se for o boss principal e ainda restam vidas, impede a morte
-  if (m.boss && c.oberon && c.oberon.lives > 0) {
-    m.hp = m.maxHp || OBERON_STATS.hp;
-    m.oberonInvulnerable = true;
-    c.oberon.invulnerable = true;
-    oberonBossAsk(c, (c.player && c.player.p) || (typeof G !== "undefined" && G.p), now);
-    return true;
-  }
-  return false;
-}
+/* ===================================================== AUTO-HOOKS (MONKEY PATCH)
+ * Este bloco de código se injeta dinamicamente nas funções centrais de combate do jogo,
+ * garantindo que a imortalidade e o debate ativem sem precisar alterar outros arquivos.
+ */
+(function injectOberonMechanics() {
+  if (typeof window === "undefined") return;
+
+  // Intercepta o loop de combate (tick de turnos)
+  const originalCombatTick = window.combatTick;
+  window.combatTick = function (c, dt) {
+    if (isOberonCombat(c)) {
+      oberonBossTick(c, G.p, dt, Date.now());
+    }
+    if (originalCombatTick) {
+      return originalCombatTick.apply(this, arguments);
+    }
+  };
+
+  // Intercepta o dano que causaria a morte do boss
+  const originalKillMob = window.killMob || window.handleMobDeath;
+  const deathFunc = function (c, mob, now) {
+    if (isOberonCombat(c) && mob) {
+      const activeNow = now || Date.now();
+      if (oberonBossHandleKill(c, mob, activeNow)) {
+        return; // Aborta a execução da morte! O boss revive.
+      }
+    }
+    if (originalKillMob) {
+      return originalKillMob.apply(this, arguments);
+    }
+  };
+
+  if (window.killMob) window.killMob = deathFunc;
+  else if (window.handleMobDeath) window.handleMobDeath = deathFunc;
+})();
