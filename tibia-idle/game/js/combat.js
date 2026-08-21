@@ -1331,7 +1331,7 @@ function tickConditions(c, p, dt) {
         co.acc -= CONDITION_TURN_MS;
         co.turns--;
         if (def.control) continue; // Fear/Root etc. não drenam HP
-        const dmg = unwelcomeAbsorbDeath(m, def.el, Math.max(1, co.dmg), c);
+        const dmg = mobAbsorbElement(m, def.el, unwelcomeAbsorbDeath(m, def.el, Math.max(1, co.dmg), c), c);
         if (dmg > 0) {
           m.hp -= dmg;
           c.stats.damage += dmg;
@@ -1763,6 +1763,28 @@ function unwelcomeAbsorbDeath(mob, element, dmg, c) {
   return 0;
 }
 
+/* Absorção por elemento (def.absorbs = {elemento: %}): o monstro CURA o
+ * percentual do dano que sofreria e o golpe não entra. Canary: Leiden cura
+ * com qualquer dano elemental (death/holy/ice/fire/energy/earth -100%).
+ * Espelho do servidor em authoritative_engine.js (applyOutgoingDamage). */
+function mobAbsorbElement(mob, element, dmg, c) {
+  if (!mob || !(dmg > 0) || !element) return dmg;
+  if (!(mob.def && mob.def.absorbs)) return dmg;
+  const pct = Number(mob.def.absorbs[element]) || 0;
+  if (pct <= 0) return dmg;
+  const cap = Number(mob.maxHp || (mob.def && mob.def.hp)) || 0;
+  const heal = cap > 0 ? Math.min(Math.floor(dmg * pct / 100), Math.max(0, cap - mob.hp))
+                       : Math.floor(dmg * pct / 100);
+  if (heal > 0) {
+    mob.hp += heal;
+    if (c && c.events) {
+      c.events.push({ t: "mobheal", x: mob.x, y: mob.y, targetId: mob.id,
+                      heal, screen: true, absorb: 1 });
+    }
+  }
+  return 0;
+}
+
 function applyResist(mob, element, dano, piercePct) {
   // Agony é "true damage": não pode ser mitigado nem reduzido por
   // resistência (TibiaWiki: "Can not be mitigated or reduced").
@@ -2093,9 +2115,9 @@ function playerAttack(c, p, target) {
       const elemBruto = Math.max(1, raw - fisBruto);
       // a resistencia ja foi aplicada com o elemento fisico no rollDamage,
       // entao aqui so a parte elemental precisa ser reavaliada
-      const elemFinal = unwelcomeAbsorbDeath(target, parte2, Math.max(1,
+      const elemFinal = mobAbsorbElement(target, parte2, unwelcomeAbsorbDeath(target, parte2, Math.max(1,
         applyResist(target, parte2, applyCharmDamage(p, parte2, elemBruto),
-                         playerPiercePct(p, parte2))), c);
+                         playerPiercePct(p, parte2))), c), c);
       target.hp -= fisBruto + elemFinal;
       c.stats.damage += fisBruto + elemFinal;
       // dano fisico: efeito da raca (sangue / hit-area / veneno), nao slash cinza
@@ -4135,6 +4157,21 @@ function mobCastSkill(c, p, mob, now) {
     const nomeFx = sk.n || "";
     // removido a pedido: invisibilidade (warlock, stalker, ferumbras...)
     if (/invisib/i.test(nomeFx)) continue;
+    // Summon genérico do Canary (ex.: Leiden invoca 1-2 Barkless Fanatic).
+    // O skill carrega summonSlug/summonCount quando o import encontra o
+    // <summon name="..."/> no XML do monstro. Espelho do servidor.
+    if (/summon/i.test(nomeFx) && sk.summonSlug &&
+        typeof spawnMobAt === "function" && c && c.huntMap) {
+      const count = Math.max(1, Number(sk.summonCount) || 1);
+      for (let n = 0; n < count; n++) {
+        const bx = Number.isFinite(Number(mob.cx)) ? Number(mob.cx) : Math.floor((c.gridW || 30) / 2);
+        const by = Number.isFinite(Number(mob.cy)) ? Number(mob.cy) : Math.floor((c.gridH || 30) / 2);
+        spawnMobAt(c, String(sk.summonSlug), bx + ((n % 3) - 1), by + Math.floor(n / 3), { bossHelper: true, now: now });
+      }
+      mob.skillCds[key] = now + (sk.int || 2000);
+      usou = true;
+      continue;
+    }
     // sem correspondente no idle solo: ver o cabecalho do bloco
     if (/summon|challenge|outfit|skill reducer|cancel invisib/i.test(nomeFx)) continue;
     // magias de nome com efeito implicito (o parser so pega o nome, sem

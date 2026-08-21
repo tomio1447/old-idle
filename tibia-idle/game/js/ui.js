@@ -1626,6 +1626,31 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
         toast("Itens tierados precisam ficar em bag/depot/equip. Não mova para a Loot Pouch.");
         return;
       }
+      // Conta online: bag é compartilhada e o PUT comum não persiste o
+      // movimento (em combate o tick restaura; na cidade o shared volta) —
+      // usa a API autoritativa, senão o item "voltava" para a backpack.
+      if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof accountMoveBagToPouch === "function" &&
+          typeof sessionToken === "function" && sessionToken() && p && p.id) {
+        accountMoveBagToPouch(sessionToken(), p.id, { slug, qty: instId ? 1 : count, instId: instId || null })
+          .then((result) => {
+            if (result && result.ok) {
+              if (result.state && typeof applyOnlineAuthorityState === "function" &&
+                  typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+                applyOnlineAuthorityState(result.state, null, result.version);
+              } else {
+                if (result.lootPouch) p.lootPouch = result.lootPouch || {};
+                if (result.bag) p.bag = result.bag || {};
+                if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+              }
+              addLog("info", `Moveu <b>${it.n}</b> para a Loot Pouch.`);
+            } else {
+              toast((result && result.msg) || "Não foi possível mover para a Loot Pouch.", "bad");
+            }
+            if (typeof renderAll === "function") renderAll();
+          });
+        return;
+      }
       if (instId && typeof takeBagItemInstance === "function") {
         const taken = takeBagItemInstance(p, slug, { instId: instId, highestTier: false });
         if (!taken) return;
@@ -2520,6 +2545,35 @@ function renderLootPouch(p) {
   if (typeof bindDrop === "function" && !box.dataset.dropBound) {
     box.dataset.dropBound = "1";
     bindDrop(box, (payload) => {
+      // ONLINE: bag→pouch precisa da API autoritativa (a bag é compartilhada
+      // e o PUT comum não persiste o movimento — o item "voltava").
+      if (payload && payload.source === "bag" &&
+          typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof accountMoveBagToPouch === "function" &&
+          typeof sessionToken === "function" && G.p && G.p.id) {
+        const instId = payload.instId || null;
+        const qty = instId ? 1 : ((G.p.bag && G.p.bag[payload.slug]) || 0);
+        if (qty <= 0) return false;
+        accountMoveBagToPouch(sessionToken(), G.p.id, { slug: payload.slug, qty, instId }).then((result) => {
+          if (result && result.ok) {
+            if (result.state && typeof applyOnlineAuthorityState === "function" &&
+                typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+              applyOnlineAuthorityState(result.state, null, result.version);
+            } else {
+              if (result.lootPouch) G.p.lootPouch = result.lootPouch || {};
+              if (result.bag) G.p.bag = result.bag || {};
+              if (result.itemInstances) G.p.itemInstances = result.itemInstances || [];
+            }
+            if (typeof addLog === "function")
+              addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a Loot Pouch.`);
+          } else {
+            if (typeof toast === "function")
+              toast((result && result.msg) || "Não foi possível mover para a Loot Pouch.", "bad");
+          }
+          if (typeof renderAll === "function") renderAll();
+        });
+        return false; // async — bindDrop não duplica o move
+      }
       const ok = typeof moveItemToPouch === "function" && moveItemToPouch(G.p, payload);
       if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a Loot Pouch.`);
       return ok;
@@ -2834,14 +2888,9 @@ function openPouchItemMenu(p, slug, x, y) {
         openLocal();
       },
     }] : []),
-    // equipavel? equipa direto da pouch (o antigo volta para a pouch)
-    ...(it.s ? [{
-      label: "Equipar",
-      hint: it.s,
-      disabled: !!(it.lvl && p.level < it.lvl),
-      action: () => { if (equipFromPouch(p, slug)) renderAll(); },
-    }] : []),
-    // equipar em outro personagem da PT (quem tiver os requisitos)
+    // Equipar direto da pouch foi REMOVIDO (pedido do jogador): itens da
+    // Loot Pouch são movidos para a backpack/equipados via "Equipar em
+    // <personagem>" (que usa o caminho autoritativo do inventário da conta).
     ...partyEquipMenuOptions(p, slug, null, true),
     {
       label: "Mover para backpack",
