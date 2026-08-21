@@ -617,6 +617,15 @@ function renderEquip(p) {
         persistEquipFromSupplyStash(G.p, payload.slug, slotDrop);
         return false;
       }
+      // Online em combate: pouch→equip precisa do equip autoritativo (senão o
+      // tick restaura a pouch e o item "volta"). Fora de combate o caminho
+      // local+save continua (bag/equip são do cliente no PUT de cidade).
+      if (payload && (payload.source === "pouch" || payload.source === "bag") &&
+          typeof persistEquipFromContainer === "function" &&
+          typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+        persistEquipFromContainer(G.p, payload.slug, payload.source, slotDrop, payload.instId || null);
+        return false;
+      }
       return typeof moveItemToEquip === "function" && moveItemToEquip(G.p, payload, slotDrop);
     });
     }
@@ -1265,6 +1274,36 @@ function renderInventory(p) {
             addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
         });
         return false;
+      }
+      // ONLINE (combate ou cidade): pouch→bag precisa da API autoritativa — a
+      // pouch é server-owned e o PUT comum a restaurava: o item "voltava" e o
+      // jogo parecia travar (o drag não persistia; depois o "Equipar em X"
+      // falhava com item ausente no servidor).
+      if (payload && payload.source === "pouch" &&
+          typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof accountMovePouchToBag === "function" &&
+          typeof sessionToken === "function" && G.p && G.p.id) {
+        const count = (G.p.lootPouch && G.p.lootPouch[payload.slug]) || 0;
+        if (count <= 0) return false;
+        accountMovePouchToBag(sessionToken(), G.p.id, { slug: payload.slug, qty: count }).then((result) => {
+          if (result && result.ok) {
+            if (result.state && typeof applyOnlineAuthorityState === "function" &&
+                typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+              applyOnlineAuthorityState(result.state, null, result.version);
+            } else {
+              if (result.lootPouch) G.p.lootPouch = result.lootPouch || {};
+              if (result.bag) G.p.bag = result.bag || {};
+              if (result.itemInstances) G.p.itemInstances = result.itemInstances || [];
+            }
+            if (typeof addLog === "function")
+              addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
+          } else {
+            if (typeof toast === "function")
+              toast((result && result.msg) || "Não foi possível mover para a mochila.", "bad");
+          }
+          if (typeof renderAll === "function") renderAll();
+        });
+        return false; // async — bindDrop não duplica o move
       }
       const ok = typeof moveItemToBag === "function" && moveItemToBag(G.p, payload);
       if (ok) addLog("info", `Moveu <b>${itemName(payload.slug)}</b> para a mochila.`);
