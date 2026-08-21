@@ -4487,23 +4487,34 @@ function loop(ts) {
       }
     }
     }
-    // Autoseller da Loot Pouch: só local/offline. Online a autoridade vende
-    // no tick — vender aqui mutava o cliente e o snapshot restaurava a pouch.
-    // Cooldown entre vendas: 5 min; VIP 2 min (pouchAutoSellReady).
-    if (G.p && G.p.config && G.p.config.pouchAutoSell) {
-      if (!onlineAuthorityCombat() && typeof sellAllPouch === "function") {
+    // Autoseller da Loot Pouch. Online a venda precisa passar pela API
+    // (instância ou cidade — sem isso a pouch "voltava" cheia e o ouro não
+    // persistia). Offline vende local + save. Cooldown: 5 min; VIP 2 min.
+    // Durante combate online a autoridade vende no tick — não duplica aqui.
+    if (G.p && G.p.config && G.p.config.pouchAutoSell &&
+        !(typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat())) {
+      const onlineAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+        typeof sessionToken === "function" && sessionToken() && G.p.id;
+      if (typeof sellAllPouchAndPersist === "function" || typeof sellAllPouch === "function") {
         G._pouchTick = (G._pouchTick || 0) + dt;
         if (G._pouchTick >= 2000) {
           G._pouchTick = 0;
           const itens = pouchFillPct(G.p);
           if (itens >= (G.p.config.pouchAutoSellPct || 80) &&
               (typeof pouchAutoSellReady !== "function" || pouchAutoSellReady(G.p, Date.now()))) {
-            const r = sellAllPouch(G.p);
-            if (r.kinds) {
-              G.p._pouchAutoSellAt = Date.now();
-              if (typeof save === "function") save();
-              addLog("sell", `Autoseller: Loot Pouch com <b>${itens} itens</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
-              if (typeof renderLootPouch === "function") renderLootPouch(G.p);
+            G.p._pouchAutoSellAt = Date.now();
+            if (onlineAccount && typeof sellAllPouchAndPersist === "function") {
+              sellAllPouchAndPersist(G.p).then((r) => {
+                if (r && r.ok && (Number(r.gold) || 0) > 0 && typeof addLog === "function")
+                  addLog("sell", `Autoseller: Loot Pouch com <b>${itens} itens</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
+              });
+            } else if (typeof sellAllPouch === "function") {
+              const r = sellAllPouch(G.p);
+              if (r.kinds) {
+                if (typeof save === "function") save();
+                addLog("sell", `Autoseller: Loot Pouch com <b>${itens} itens</b> — vendeu tudo por <b>${fmtFull(r.gold)} gp</b>.`);
+                if (typeof renderLootPouch === "function") renderLootPouch(G.p);
+              }
             }
           }
         }

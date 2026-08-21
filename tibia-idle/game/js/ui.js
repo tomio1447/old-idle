@@ -1813,18 +1813,27 @@ function sellPouchItem(p, slug) {
   return value;
 }
 
-/* Persiste venda da pouch: online em combate usa patch autoritativo (senão o
- * tick restaura o lootPouch antigo). Offline/cidade grava o save local. */
+/* Persiste venda da pouch. Online (combate ou cidade) usa a API autoritativa
+ * — sem ela a venda local "voltava": a pouch é server-owned e o PUT comum
+ * restaurava os itens ao trocar de personagem/reload. Offline grava local. */
 function persistLootPouchSell(p, options) {
   const opts = options || {};
-  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
-  if (onlineCombat && typeof accountSellInstanceLootPouch === "function" &&
-      typeof sessionToken === "function" && p && p.id) {
-    return accountSellInstanceLootPouch(sessionToken(), p.id, opts.slug || null).then((result) => {
-      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function")
-        applyOnlineAuthorityState(result.state, null, result.version);
-      else if (!result || !result.ok)
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSellLootPouch === "function" && typeof sessionToken === "function" && p && p.id;
+  if (useAccount) {
+    return accountSellLootPouch(sessionToken(), p.id, opts.slug || null).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.lootPouch) {
+          p.lootPouch = result.lootPouch || {};
+          if (result.bag) p.bag = result.bag || {};
+          if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+        }
+      } else {
         toast((result && result.msg) || "Não foi possível vender a Loot Pouch online.", "bad");
+      }
       if (typeof renderAll === "function") renderAll();
       else if (typeof renderLootPouch === "function") renderLootPouch(p);
       return result || { ok: false };
@@ -2219,9 +2228,9 @@ function sellAllPouch(p) {
  * servidor vende (evita ouro/pouch reaparecer no próximo tick/autosave). */
 function sellAllPouchAndPersist(p) {
   if (!p) return Promise.resolve({ gold: 0, kinds: 0, ok: false });
-  const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
-  if (onlineCombat && typeof accountSellInstanceLootPouch === "function" &&
-      typeof sessionToken === "function" && p.id) {
+  const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof accountSellLootPouch === "function" && typeof sessionToken === "function" && p.id;
+  if (useAccount) {
     const beforeKeys = Object.keys(p.lootPouch || {}).filter((slug) => {
       if ((p.lootPouch[slug] || 0) <= 0) return false;
       if (typeof canSellLootPouchItem === "function") return canSellLootPouchItem(p, slug);
@@ -2232,10 +2241,17 @@ function sellAllPouchAndPersist(p) {
       return pouchUnitSellPrice(it) > 0;
     });
     if (!beforeKeys.length) return Promise.resolve({ gold: 0, kinds: 0, ok: true });
-    return accountSellInstanceLootPouch(sessionToken(), p.id, null).then((result) => {
-      if (result && result.ok && result.state && typeof applyOnlineAuthorityState === "function")
-        applyOnlineAuthorityState(result.state, null, result.version);
-      else if (!result || !result.ok) {
+    return accountSellLootPouch(sessionToken(), p.id, null).then((result) => {
+      if (result && result.ok) {
+        if (result.state && typeof applyOnlineAuthorityState === "function" &&
+            typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat()) {
+          applyOnlineAuthorityState(result.state, null, result.version);
+        } else if (result.lootPouch) {
+          p.lootPouch = result.lootPouch || {};
+          if (result.bag) p.bag = result.bag || {};
+          if (result.itemInstances) p.itemInstances = result.itemInstances || [];
+        }
+      } else {
         toast((result && result.msg) || "Não foi possível vender a Loot Pouch online.", "bad");
         return { gold: 0, kinds: 0, ok: false };
       }
@@ -2847,8 +2863,10 @@ function openPouchItemMenu(p, slug, x, y) {
       hint: (typeof isImbueMatItem === "function" && isImbueMatItem(it, slug))
         ? "material de imbue" : undefined,
       action: () => {
-        const onlineCombat = typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat();
-        if (onlineCombat && typeof persistLootPouchSell === "function") {
+        const useAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+          typeof sessionToken === "function" && sessionToken() && p && p.id &&
+          typeof persistLootPouchSell === "function";
+        if (useAccount) {
           persistLootPouchSell(p, { slug }).then((result) => {
             if (result && result.ok && (Number(result.gold) || 0) > 0 && typeof addLog === "function") {
               const it2 = GAMEDATA.items[slug];
