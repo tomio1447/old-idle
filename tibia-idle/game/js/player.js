@@ -1521,5 +1521,5 @@ function itemUnitWeight(slug) {
   const w = Number(it && it.w);
   return Number.isFinite(w) && w >= 0 ? w : 0.1;
 }
-i f   ( t y p e o f   w i n d o w   ! = =   " u n d e f i n e d " )   w i n d o w . c l e a r A l l L o o t P o u c h e s   =   c l e a r A l l L o o t P o u c h e s ;  
- 
+if (typeof window !== "undefined") window.clearAllLootPouches = clearAllLootPouches;
+
