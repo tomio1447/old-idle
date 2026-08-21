@@ -2905,6 +2905,25 @@ function accessoryVocOk(p,it){
     return mine===want||mine.indexOf(want)>=0||want.indexOf(mine)>=0;
   });
 }
+/* Mesma regra do cliente (itemVocationAllowed): normaliza os nomes e aceita a
+ * vocação base + o nome promovido (knight→elite knight, paladin→royal
+ * paladin, druid→elder druid, sorcerer→master sorcerer, monk→exalted monk).
+ * O check antigo comparava a string exata de p.voc contra it.vocs e
+ * rejeitava "elite knight"/"royal paladin" quando o save trazia o nome
+ * promovido (e era insensível a maiúsculas). */
+const VOC_PROMOTED_MAP={knight:"eliteknight",paladin:"royalpaladin",druid:"elderdruid",
+  sorcerer:"mastersorcerer",monk:"exaltedmonk"};
+const VOC_BASE_OF_PROMOTED={eliteknight:"knight",royalpaladin:"paladin",elderdruid:"druid",
+  mastersorcerer:"sorcerer",exaltedmonk:"monk"};
+function authVocAllowed(p,it){
+  if(!it||!Array.isArray(it.vocs)||!it.vocs.length)return true;
+  const base=String(p&&p.voc||"").toLowerCase().replace(/[^a-z]/g,"");
+  if(!base)return false;
+  const mine=new Set([base]);
+  if(VOC_PROMOTED_MAP[base])mine.add(VOC_PROMOTED_MAP[base]);
+  if(VOC_BASE_OF_PROMOTED[base])mine.add(VOC_BASE_OF_PROMOTED[base]);
+  return it.vocs.some((v)=>mine.has(String(v||"").toLowerCase().replace(/[^a-z]/g,"")));
+}
 function energyRingOn(p){
   const e=p&&p.equip&&p.equip.ring;if(!e||e.item!=="energy-ring")return false;
   return accessoryVocOk(p,ITEMS["energy-ring"]);
@@ -3308,7 +3327,7 @@ function potionAllowed(p,slug,pot){
   if(!pot)return false;
   if((Number(pot.lvl)||1)>Number(p.level||1))return false;
   const vocs=pot.vocs;
-  if(Array.isArray(vocs)&&vocs.length&&vocs.indexOf(p.voc)===-1)return false;
+  if(Array.isArray(vocs)&&vocs.length&&!authVocAllowed(p,pot))return false;
   return true;
 }
 
@@ -4297,37 +4316,15 @@ function equipFromContainerAuth(p,slug,source,opts){
   if(!p||!it||!it.s)return {ok:false,msg:"Esse item não é equipável"};
   const slot=String(it.s);
   if(slot==="ammo")return {ok:false,msg:"Use a seleção de munição do quiver"};
-  const lvl=Number(it.lvl!==undefined?it.lvl:it.level)||0;
-  if(lvl>(Number(p.level)||1))return {ok:false,msg:"Nível insuficiente"};
-  if(Array.isArray(it.vocs)&&it.vocs.length&&it.vocs.indexOf(String(p.voc))===-1)
-    return {ok:false,msg:"Vocação incompatível"};
-  if((it.t==="quiver"||it.type==="quiver"||it.s==="quiver")&&String(p.voc)!=="paladin")
-    return {ok:false,msg:"Somente paladins podem equipar quiver"};
-  if(slot==="shield"&&it.t!=="quiver"){
-    const w=p.equip&&p.equip.weapon,wi=w&&ITEMS[w.item];
-    if(wi&&wi.th)return {ok:false,msg:"Arma de duas mãos impede escudo/spellbook"};
-  }
-  // Arma 2H também devolve o escudo (não o quiver) — valida espaço antes.
-  const old=p.equip&&p.equip[slot];
-  const shieldBack=slot==="weapon"&&it.th&&p.equip&&p.equip.shield&&(()=>{
-    const sh=ITEMS[p.equip.shield.item];
-    return !sh||(sh.t!=="quiver"&&sh.type!=="quiver"&&sh.s!=="quiver");
-  })()?p.equip.shield:null;
   const fromPouch=source==="pouch";
-  const toStash=[];
-  if(old&&old.item&&old.item!==slug)toStash.push({slot:slot,entry:old});
-  if(shieldBack)toStash.push({slot:"shield",entry:shieldBack});
-  for(const s of toStash){
-    const toBag=!fromPouch||s.entry.instId;
-    if(toBag&&!authCanAddToBag(p,s.entry.item))
-      return {ok:false,msg:"Mochila cheia para guardar o item anterior"};
-  }
-  // retira o novo do bag/pouch
+  // Presença ANTES dos requisitos: se o item não está no container informado
+  // (ex.: drag de pouch→bag que ainda não persistiu no servidor), o erro
+  // verdadeiro é "item não está na mochila/pouch" — não "vocação/nível".
+  // Isso evitava o toast enganoso de "Vocação incompatível" em desync.
   let takenInst=null;
   if(fromPouch){
     const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
     if(n<=0)return {ok:false,msg:"Item não está na Loot Pouch"};
-    if(n>1)p.lootPouch[slug]=n-1;else delete p.lootPouch[slug];
   }else{
     const n=Number(p.bag&&p.bag[slug])||0;
     if(n<=0)return {ok:false,msg:"Item não está na mochila"};
@@ -4339,6 +4336,38 @@ function equipFromContainerAuth(p,slug,source,opts){
       takenInst=arr[idx];
       p.itemInstances=arr.filter((_,i)=>i!==idx);
     }
+  }
+  const lvl=Number(it.lvl!==undefined?it.lvl:it.level)||0;
+  if(lvl>(Number(p.level)||1))return {ok:false,msg:"Nível insuficiente"};
+  if(!authVocAllowed(p,it))
+    return {ok:false,msg:"Vocação incompatível"};
+  const vocNorm=String(p&&p.voc||"").toLowerCase().replace(/[^a-z]/g,"");
+  if((it.t==="quiver"||it.type==="quiver"||it.s==="quiver")&&vocNorm!=="paladin"&&vocNorm!=="royalpaladin")
+    return {ok:false,msg:"Somente paladins podem equipar quiver"};
+  if(slot==="shield"&&it.t!=="quiver"){
+    const w=p.equip&&p.equip.weapon,wi=w&&ITEMS[w.item];
+    if(wi&&wi.th)return {ok:false,msg:"Arma de duas mãos impede escudo/spellbook"};
+  }
+  // Arma 2H também devolve o escudo (não o quiver) — valida espaço antes.
+  const old=p.equip&&p.equip[slot];
+  const shieldBack=slot==="weapon"&&it.th&&p.equip&&p.equip.shield&&(()=>{
+    const sh=ITEMS[p.equip.shield.item];
+    return !sh||(sh.t!=="quiver"&&sh.type!=="quiver"&&sh.s!=="quiver");
+  })()?p.equip.shield:null;
+  const toStash=[];
+  if(old&&old.item&&old.item!==slug)toStash.push({slot:slot,entry:old});
+  if(shieldBack)toStash.push({slot:"shield",entry:shieldBack});
+  for(const s of toStash){
+    const toBag=!fromPouch||s.entry.instId;
+    if(toBag&&!authCanAddToBag(p,s.entry.item))
+      return {ok:false,msg:"Mochila cheia para guardar o item anterior"};
+  }
+  // retira o novo do bag/pouch (presença já validada acima)
+  if(fromPouch){
+    const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
+    if(n>1)p.lootPouch[slug]=n-1;else delete p.lootPouch[slug];
+  }else{
+    const n=Number(p.bag&&p.bag[slug])||0;
     if(n>1)p.bag[slug]=n-1;else delete p.bag[slug];
   }
   for(const s of toStash){
