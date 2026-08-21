@@ -1377,9 +1377,46 @@ async function prepareInstanceState(db,acc,input){
   const maxMembers=isWorldBossBossId(bossId)?WORLD_BOSS_MAX_MEMBERS:
     (String(bossId||"")==="the-pale-worm"?9:5);
   if(!members.length||members.length>maxMembers)return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros da instância inválidos"}}};
-  const ids=members.map((member)=>Number(member&&member.id));
+  let ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros duplicados ou inválidos"}}};
+  const activeId=Number(input.activeCharacterId);
+  if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
+  // Party/ordem ANTES da hidratação (o rebuild de tolerância abaixo adiciona
+  // membros que o checkpoint não trouxe — eles precisam do p canônico do banco).
+  const party=await db.partyFindByCharacter(activeId);
+  const partyMembers=party?await db.partyMembers(party.id):[];
+  const partyOrder=party?[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id))):[];
+  if(party&&(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))){
+    // Tolerância de composição/ordem: o roster da party pode ter mudado depois
+    // que a instância foi criada (membro entrou/saiu/reordenou) e o snapshot
+    // do cliente pode estar um passo atrás — sem isso o PUT de checkpoint
+    // virava 409 infinito ("Composição/ordem da instância difere da party") e
+    // a aba nunca mais sincronizava (nem a recriação após restart, quando o
+    // líder não tem o snapshot do membro recém-convidado).
+    // Regra: o conjunto aceito é a party atual ∪ os membros que já estão na
+    // instância ativa (espelho do megaContinueOk do Megalomania). Quem não
+    // pertence a nenhum dos dois (char estranho) continua rejeitado.
+    const cur=await db.instanceGet(acc.id);
+    const curIds=cur&&cur.status==="active"?instanceMemberIdSet(cur):null;
+    const accepted=new Set(partyOrder);
+    if(curIds)for(const id of curIds)accepted.add(id);
+    if(ids.some((id)=>!accepted.has(id)))
+      return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",
+        msg:"Composição/ordem da instância difere da party"}}};
+    // Reconstrói na ordem da party (líder + membros por posição), completando
+    // do banco (p:{}) quem o cliente não trouxe — o loop de hidratação abaixo
+    // substitui o p canônico de cada membro. Membros da instância que saíram
+    // da party permanecem no final enquanto a luta estiver ativa.
+    const byId=new Map(members.map((m)=>[Number(m&&m.id),m]));
+    const rebuilt=[];
+    for(const id of partyOrder)rebuilt.push(byId.get(id)||{id:String(id),p:{}});
+    if(curIds)for(const id of curIds)
+      if(!partyOrder.includes(id)&&rebuilt.length<maxMembers)
+        rebuilt.push(byId.get(id)||{id:String(id),p:{}});
+    members=rebuilt;ids=members.map((m)=>Number(m&&m.id));
+    input.members=members;
+  }
   const rows=[];
   const accountCache=new Map();
   for(let index=0;index<ids.length;index++){
@@ -1440,8 +1477,6 @@ async function prepareInstanceState(db,acc,input){
     }
     member.p=canonical;member.hp=canonical.hp;member.mp=canonical.mp;member.accountId=Number(c.account_id);rows.push(c);
   }
-  const activeId=Number(input.activeCharacterId);
-  if(!ids.includes(activeId))return {error:{code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo fora da instância"}}};
   const activeRow=rows[ids.indexOf(activeId)];
   if(!activeRow||Number(activeRow.account_id)!==Number(acc.id))return {error:{code:403,body:{ok:false,error:"INSTANCE_ACTIVE_NOT_OWNED",
     msg:"O personagem ativo não pertence à conta"}}};
@@ -1464,8 +1499,6 @@ async function prepareInstanceState(db,acc,input){
     });
   }
   let partyId=null,partyVersion=null;
-  const party=await db.partyFindByCharacter(activeId),partyMembers=party?await db.partyMembers(party.id):[];
-  const partyOrder=party?[Number(party.leader_id)].concat(partyMembers.map((m)=>Number(m.id))):[];
   const megaCtrl=typeof global.__MEGA_LOBBY!=="undefined"?global.__MEGA_LOBBY:null;
   const megaLobby=megaCtrl&&typeof megaCtrl.getLobbyForAccount==="function"
     ?megaCtrl.getLobbyForAccount(acc.id):null;
@@ -1541,8 +1574,13 @@ async function prepareInstanceState(db,acc,input){
     if(worldBossOk){
       partyId=null;partyVersion=null;
     }else if(party){
+      // A tolerância de composição/ordem rodou ANTES da hidratação (bloco
+      // acima). Aqui a ordem já está normalizada para a party — só resta
+      // vincular o registro. Se ainda houver divergência (criação sem
+      // instância ativa, composição estranha), mantém a rejeição estrita.
       if(partyOrder.length!==ids.length||partyOrder.some((id,index)=>id!==ids[index]))
-        return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",msg:"Composição/ordem da instância difere da party"}}};
+        return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_MISMATCH",
+          msg:"Composição/ordem da instância difere da party"}}};
       partyId=Number(party.id);partyVersion=Number(party.roster_version);
     }else if(!megaOk&&!paleOk){
       return {error:{code:409,body:{ok:false,error:"INSTANCE_PARTY_REQUIRED",msg:"Party não encontrada"}}};
