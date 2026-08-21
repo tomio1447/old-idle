@@ -1413,6 +1413,40 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   width:min(920px,calc(100vw - 32px));
   max-height:calc(100vh - 32px); overflow:hidden;
 }
+
+/* Modal do debate do Grand Master Oberon: bordas escuras, fundo quase
+ * transparente (opacidade bem baixa) e texto amarelo — o jogador acompanha a
+ * luta acontecendo atrás do modal enquanto lê a pergunta. Centralizado no
+ * meio da tela (o .modal-bg já é flex center; margin:auto reforça). */
+.modal-bg .modal.oberon-debate-shell {
+  width:min(460px,92vw);
+  max-height:calc(100vh - 48px);
+  margin:auto;
+  background:rgba(10,8,2,.28);
+  border:2px solid #1c1608;
+  border-radius:10px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.65), 0 10px 34px rgba(0,0,0,.55);
+  -webkit-backdrop-filter:blur(2px);
+  backdrop-filter:blur(2px);
+  color:#ffd700;
+}
+.modal-bg .modal.oberon-debate-shell .panel-title {
+  background:rgba(22,18,5,.5);
+  border-bottom:1px solid #3a2f10;
+  color:#ffd700;
+}
+.modal-bg .modal.oberon-debate-shell .panel-title button { color:#ffd700; }
+.modal-bg .modal.oberon-debate-shell .panel-body { color:#ffe680; }
+.modal-bg .modal.oberon-debate-shell .small.dim { color:#e8c94a; }
+.modal-bg .modal.oberon-debate-shell button[data-oberon-answer] {
+  background:rgba(28,22,7,.5);
+  border:1px solid #4a3d14;
+  color:#ffd700;
+}
+.modal-bg .modal.oberon-debate-shell button[data-oberon-answer]:hover {
+  background:rgba(58,46,12,.62);
+  border-color:#ffd700;
+}
 .boss-detail-body { min-width:0; }
 .boss-detail-summary {
   display:flex; flex-wrap:wrap; gap:7px 18px; margin-bottom:8px; padding:6px 8px;

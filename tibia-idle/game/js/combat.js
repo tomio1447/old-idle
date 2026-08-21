@@ -3719,15 +3719,27 @@ function skillCardinalVec(dir) {
   return null;
 }
 function skillWaveDir(mob, pl, gw, gh) {
+  // Se há alvo em combate, a magia sai na direção DELE. O mob.dir fica preso
+  // no spawn/movimento (bosses parados tipo Jaul/Obujos nascem com dir "w"):
+  // usar ele primeiro fazia ondas/beams irem para o lado errado — efeito
+  // visual aparecia, mas o dano nunca era contabilizado (nada no alvo).
+  if (pl) {
+    const from = skillActorCell(mob, gw, gh), to = skillActorCell(pl, gw, gh);
+    const dx = to.cx - from.cx, dy = to.cy - from.cy;
+    if (dx !== 0 || dy !== 0) {
+      if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
+      return dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
+    }
+  }
   const faced = skillCardinalVec(mob && mob.dir);
   if (faced) return faced;
-  const from = skillActorCell(mob, gw, gh), to = skillActorCell(pl, gw, gh);
+  const from2 = skillActorCell(mob, gw, gh), to2 = skillActorCell(pl, gw, gh);
   if (typeof areaDir === "function") {
-    const d = areaDir(from, to);
+    const d = areaDir(from2, to2);
     return d === "e" ? { dx: 1, dy: 0 } : d === "w" ? { dx: -1, dy: 0 }
       : d === "n" ? { dx: 0, dy: -1 } : { dx: 0, dy: 1 };
   }
-  const dx = to.cx - from.cx, dy = to.cy - from.cy;
+  const dx = to2.cx - from2.cx, dy = to2.cy - from2.cy;
   if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
   if (dy !== 0) return dy > 0 ? { dx: 0, dy: 1 } : { dx: 0, dy: -1 };
   return dx >= 0 ? { dx: 1, dy: 0 } : { dx: -1, dy: 0 };
