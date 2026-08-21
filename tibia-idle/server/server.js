@@ -3179,6 +3179,27 @@ async function main() {
 
   await ensureTestAccounts(db);
 
+  // Limpeza de BOOT: o processo anterior morreu — os holders de lease e as
+  // instâncias ativas não existem mais.
+  // 1) Expira leases persistidos: sem isso o acquire da aba retornava 409
+  //    (LEASE_HELD) por até LEASE_TTL_MS após o restart (o registro antigo
+  //    continuava "ativo" no disco com holder/segredo do processo morto) e a
+  //    sessão não reconectava.
+  // 2) Encerra instâncias ativas órfãs (padrão; END_INSTANCES_ON_BOOT=0
+  //    mantém o comportamento antigo de retomar a caçada após o restart).
+  if(typeof db.expireAllLeases==="function"){
+    try{
+      const expired=await db.expireAllLeases();
+      if(expired>0)console.log("[boot] leases expirados do processo anterior:",expired);
+    }catch(e){console.warn("[boot] falha ao expirar leases:",e&&e.message);}
+  }
+  if(process.env.END_INSTANCES_ON_BOOT!=="0"&&typeof db.endAllInstances==="function"){
+    try{
+      const ended=await db.endAllInstances("server-restart");
+      if(ended>0)console.log("[boot] instâncias ativas encerradas (server-restart):",ended);
+    }catch(e){console.warn("[boot] falha ao encerrar instâncias do restart:",e&&e.message);}
+  }
+
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
   CHAT_BUS=new ChatBus({historyLimit:200,ticketTtlMs:10*60*1000,sendLimit:8,sendWindowMs:10000});
   CHAT_BUS.post({
