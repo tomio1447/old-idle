@@ -235,7 +235,9 @@ function oberonSpawnHelpers(c, player, now) {
 /* Renderiza o modal de debate a partir de um payload {phrase, options}.
  * Usado pelo fluxo LOCAL (opções montadas com OBERON_DEBATE) e pelo fluxo
  * ONLINE (opções enviadas pelo servidor — que nunca envia a resposta certa).
- * `onAnswer` recebe o TEXTO da réplica escolhida ("" se fechou o modal). */
+ * `onAnswer` recebe o TEXTO da réplica escolhida ("" se fechou o modal).
+ * Visual dedicado (.oberon-debate-shell): bordas escuras, fundo quase
+ * transparente e texto amarelo — dá para acompanhar a luta atrás do modal. */
 function oberonOpenDebateModalRemote(boss, payload, onAnswer) {
   const modal = document.getElementById("modal");
   const body = document.getElementById("modal-body");
@@ -247,15 +249,15 @@ function oberonOpenDebateModalRemote(boss, payload, onAnswer) {
   if (!phrase || options.length < 2) { if (onAnswer) onAnswer(""); return; }
 
   body.classList.remove(...(body.className.match(/\S+/g) || []).filter((s) => s.endsWith("-modal-shell")));
-  body.classList.add("boss-modal-shell");
+  body.classList.add("oberon-debate-shell");
   body.innerHTML = `
     <div class="panel-title">
-      <span style="color:#ffe680">Grand Master Oberon</span>
+      <span style="color:#ffd700">Grand Master Oberon</span>
       <button class="sm" id="oberon-debate-close" style="margin-left:auto">✕</button>
     </div>
-    <div class="panel-body" style="text-align:center;max-width:420px">
-      <div class="mb8" style="font-style:italic;color:#d0b0ff">"${phrase}"</div>
-      <div class="small dim mb8">Escolha a réplica correta para quebrar a invulnerabilidade.</div>
+    <div class="panel-body" style="text-align:center;max-width:440px">
+      <div class="mb8" style="font-style:italic;color:#ffd700">"${phrase}"</div>
+      <div class="small dim mb8" style="color:#e8c94a">Escolha a réplica correta para quebrar a invulnerabilidade.</div>
       <div id="oberon-debate-options" class="list" style="text-align:left;gap:6px;display:flex;flex-direction:column">
         ${options.map((a, i) => `<button class="sm" data-oberon-answer="${i}" style="white-space:normal;height:auto;line-height:1.3;padding:8px">${a}</button>`).join("")}
       </div>
@@ -264,7 +266,7 @@ function oberonOpenDebateModalRemote(boss, payload, onAnswer) {
 
   const close = (value) => {
     modal.classList.remove("show");
-    body.classList.remove("boss-modal-shell");
+    body.classList.remove("oberon-debate-shell");
     if (onAnswer) onAnswer(value);
   };
   document.getElementById("oberon-debate-close").addEventListener("click", () => close(""));
