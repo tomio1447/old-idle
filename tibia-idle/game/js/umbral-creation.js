@@ -483,7 +483,7 @@ function npcUmbralCreationHtml(p) {
       const have = (p.bag && p.bag[mat] || 0) >= qty;
       canCraft = canCraft && have;
       reqHtml += `<div class="umbral-recipe-ing">
-        ${mat === "dream-matter" || mat === "cluster-of-solace" ? "" : (typeof itemImg === "function" ? itemImg(mat, { size: 32 }) : "")}
+        ${typeof itemImg === "function" ? itemImg(mat, { size: 32 }) : ""}
         <span class="tiny" style="color:${have ? '#9ce84a' : '#e85b52'}">${qty}x ${itemName(mat)}</span>
       </div>`;
     }

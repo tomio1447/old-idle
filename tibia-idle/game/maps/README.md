@@ -195,6 +195,31 @@ Purple. White tiles / Maze QTE a cada 40s — falha = 6000 death.
 Bag You Desire com **0.15%** (+50% vs mini-bosses em 0.1%). HP 620k /
 EXP 3M (forma Green). Cooldown desligado para testes.
 
+## Elf Yalahar
+
+`elfyalahar.otbm` (piso `z=7`, 22×17, limites `(1048,988)..(1069,1004)`)
+é publicado integralmente a partir de `beta-maps/elfyalahar.otbm`. A hunt
+`elf-yalahar` (nível 1) é registrada em `js/elf-yalahar.js` com
+`otbmSpawn` e `otbmMobBounds`.
+
+A verificação de sprites (`import_otbm_sprites.py` / `missingTiles`)
+apontava **10 tiles sem sprite** em `game/assets/tiles/`, que renderizavam
+como buracos no mapa. Foram resolvidos assim:
+
+- **Extraídos do client 7.4** (`base/data/74`): `572` (wooden floor),
+  `1594` (grass archway), `2713` (flowery wall).
+- **Substituídos por sprites equivalentes já existentes** (tiles
+  decorativos de chão de grama, sem colisão): `4605/4606/4607/4608`
+  (grass) e `4746` (grass) usam a grama `106`; `5258` (stairs) usa a
+  escada `413`; `6225` (flowers) usa a flor `102`.
+
+Todos os ids do mapa agora têm PNG em `assets/tiles/` (0 faltantes) e o
+`rme/data/known_tiles.js` foi regerado a partir da pasta real de tiles.
+Nota: como o client 15.x/8.60 extraído não está disponível no ambiente,
+os 7 ids substituídos usam o sprite clássico equivalente — se preferir o
+pixel exato do 15.x, rode `import_otbm_sprites.py` apontando o
+`TIBIA860` para o client 15.x extraído e ele sobrescreve os PNGs.
+
 ## Goshnar's Taints (UI)
 
 Máculas acumulativas (1–5) após derrotar os mini-bosses Soul War. Na
