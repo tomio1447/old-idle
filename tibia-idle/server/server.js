@@ -1938,12 +1938,13 @@ async function clearInstanceLootPouch(db,body){
   const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
   const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
     return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;let destroyed=0;
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};let rejection=null;let destroyed=0;let synced=null;
   const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
     let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
     const item=descriptor.authority&&descriptor.authority.players&&
       descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
     if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+    const preSnapshot={pouch:Object.assign({},item.p.lootPouch||{}),bag:Object.assign({},item.p.bag||{})};
     if(slug){
       destroyed=destroyAuthPouchItem(item.p,slug);
       if(!destroyed){rejection="Item não encontrado na Loot Pouch";return null;}
@@ -1951,13 +1952,20 @@ async function clearInstanceLootPouch(db,body){
       item.p.lootPouch={};
       destroyed=-1;
     }
+    synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
     descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
   },lease);
   if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
     body:{ok:false,error:result.error,msg:rejection||"Não foi possível limpar a Loot Pouch",instance:instanceSummary(result.instance,true)}};
+  let sharedSync=null;
+  if(synced){
+    await persistSharedPouchSync(db,acc,synced);
+    try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+  }
   await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,source:slug?"pouch-destroy":"pouch-clear",holderId:String(body.holder_id||"")});
-  return {code:200,body:{ok:true,destroyed:destroyed,slug:slug||null,instance:instanceSummary(result.instance,true)}};
+  return {code:200,body:{ok:true,destroyed:destroyed,slug:slug||null,instance:instanceSummary(result.instance,true),
+    ...(sharedSync?{sharedInventory:sharedSync}:{})}};
 }
 
 /** Destroy um item da pouch (ou limpa via slug ausente só em clear). Em combate = instância;
@@ -2028,22 +2036,30 @@ async function destroyLootPouchItem(db,body){
       return {code:400,body:{ok:false,error:"INVALID_POUCH_DESTROY",msg:"Instância inválida para destruir item"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null,destroyed=0;
+    let rejection=null,destroyed=0,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={pouch:Object.assign({},item.p.lootPouch||{}),bag:Object.assign({},item.p.bag||{})};
       destroyed=destroyAuthPouchItem(item.p,slug);
       if(!destroyed){rejection="Item não encontrado na Loot Pouch";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível destruir o item",
         instance:instanceSummary(result.instance,true)}};
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"pouch-destroy",holderId:String(body.holder_id||"")});
-    return {code:200,body:{ok:true,destroyed,slug,instance:instanceSummary(result.instance,true)}};
+    return {code:200,body:{ok:true,destroyed,slug,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   const destroyed=destroyAuthPouchItem(p,slug);
@@ -2144,34 +2160,143 @@ async function setLootConfigPreference(db,body){
   return {code:200,body:Object.assign({},persisted.body,{ok:true,lootConfig:p.lootConfig||{noCollect:[],noSell:[]}})};
 }
 
+/* Depois de uma mutação de Loot Pouch/backpack feita por um membro DENTRO da
+ * instância (vender, limpar, destruir, mover p/ mochila), sincroniza o
+ * inventário compartilhado da conta do executor:
+ * - aplica o delta da mutação na cópia do LÍDER quando ele for da mesma conta
+ *   (todos os drops da instância caem na pouch do líder — sem isso a extração
+ *   terminal pegava a cópia do líder ainda cheia e "ressuscitava" os itens
+ *   vendidos);
+ * - espelha pouch/bag/instâncias (não equipadas) finais em TODAS as cópias
+ *   dos membros da mesma conta — a pouch é DA CONTA, então trocar de
+ *   personagem no meio da instância não pode mostrar os itens vendidos;
+ * - devolve {pouch,bag,instances} finais para gravar no shared da conta.
+ * preSnapshot: {pouch:{slug:qtd}, bag:{slug:qtd}} da cópia do executor ANTES
+ * da mutação. Roda dentro do patch da instância (síncrono). */
+function syncInstancePouchCopies(players,charId,preSnapshot){
+  const seller=Array.isArray(players)?players.find((e)=>e&&String(e.id)===String(charId)):null;
+  if(!seller||!seller.p)return null;
+  const sellerAcc=Number(seller.accountId||(seller.p&&seller.p.accountId)||0);
+  if(!sellerAcc)return null;
+  const deltaOf=(pre,post)=>{
+    const out={};
+    for(const slug of Object.keys(pre||{})){
+      const d=(Number(post&&post[slug])||0)-(Number(pre[slug])||0);
+      if(d)out[slug]=d;
+    }
+    return out;
+  };
+  const applyDelta=(container,deltas)=>{
+    container=container||{};
+    for(const slug of Object.keys(deltas)){
+      const n=Math.max(0,(Number(container[slug])||0)+deltas[slug]);
+      if(n>0)container[slug]=n;else delete container[slug];
+    }
+    return container;
+  };
+  const pouchDelta=deltaOf(preSnapshot.pouch,seller.p.lootPouch);
+  const bagDelta=deltaOf(preSnapshot.bag,seller.p.bag);
+  const leader=Array.isArray(players)?players[0]:null;
+  let live=seller;
+  if(leader&&leader.p&&leader!==seller&&
+     Number(leader.accountId||(leader.p&&leader.p.accountId)||0)===sellerAcc){
+    live=leader;
+    leader.p.lootPouch=applyDelta(leader.p.lootPouch||{},pouchDelta);
+    leader.p.bag=applyDelta(leader.p.bag||{},bagDelta);
+  }
+  const finalPouch=Object.assign({},live.p.lootPouch||{});
+  const finalBag=Object.assign({},live.p.bag||{});
+  // Instâncias compartilhadas (bag/depot): a fonte da mutação é a cópia do
+  // executor (pode ter ganho instâncias novas ao mover para a mochila).
+  const finalInsts=(Array.isArray(seller.p.itemInstances)?seller.p.itemInstances:[])
+    .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")!==0)
+    .map((i)=>Object.assign({},i));
+  for(const entry of players){
+    if(!entry||!entry.p)continue;
+    if(Number(entry.accountId||(entry.p&&entry.p.accountId)||0)!==sellerAcc)continue;
+    entry.p.lootPouch=Object.assign({},finalPouch);
+    entry.p.bag=Object.assign({},finalBag);
+    const ownEquip=(Array.isArray(entry.p.itemInstances)?entry.p.itemInstances:[])
+      .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")===0);
+    entry.p.itemInstances=finalInsts.map((i)=>Object.assign({},i)).concat(ownEquip);
+  }
+  return {pouch:finalPouch,bag:finalBag,instances:finalInsts};
+}
+
+/* Grava o resultado sincronizado de uma mutação de pouch no shared da conta
+ * (accounts.shared_inventory) — roda DEPOIS do patch da instância. */
+async function persistSharedPouchSync(db,acc,synced){
+  if(!synced||!SharedInv||typeof db.accountSharedInventory!=="function")return;
+  try{
+    const shared=await db.accountSharedInventory(acc.id);
+    shared.lootPouch=Object.assign({},synced.pouch||{});
+    if(synced.bag)shared.bag=Object.assign({},synced.bag||{});
+    if(Array.isArray(synced.instances))
+      shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
+    await db.setAccountSharedInventory(acc.id,shared);
+  }catch(e){console.warn("[pouch] falha ao sincronizar shared:",e&&e.message);}
+}
+
 async function sellInstanceLootPouch(db,body){
   const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const denied=await requireLease(db,acc,body);if(denied)return denied;
-  const charId=Number(body.char_id),expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+  const charId=Number(body.char_id);
   const slug=body.slug!=null&&body.slug!==""?String(body.slug):"";
-  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+  if(!Number.isSafeInteger(charId)||charId<=0)
     return {code:400,body:{ok:false,error:"INVALID_POUCH_SELL",msg:"Venda da Loot Pouch inválida"}};
   const character=await db.findCharacter(charId);
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
-  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
-  const row=resolved.row;if(!row||row.status!=="active"||String(row.instance_id)!==instanceId)
-    return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  let rejection=null,soldGold=0;
-  const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
-    let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
-    const item=descriptor.authority&&descriptor.authority.players&&
-      descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
-    if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
-    soldGold=slug?sellAuthPouchItem(item.p,slug):sellAuthAllPouch(item.p);
-    descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
-  },lease);
-  if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
-    body:{ok:false,error:result.error,msg:rejection||"Não foi possível vender a Loot Pouch",instance:instanceSummary(result.instance,true)}};
-  await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
-    status:result.instance.status,source:"pouch-sell",holderId:String(body.holder_id||"")});
-  return {code:200,body:{ok:true,gold:soldGold,instance:instanceSummary(result.instance,true)}};
+  const resolved=await resolveInstanceRow(db,acc,charId);if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    const expected=Number(body.expected_version),instanceId=String(body.instance_id||"");
+    if(!Number.isSafeInteger(expected)||expected<1||!/^[a-f0-9]{64}$/.test(instanceId))
+      return {code:400,body:{ok:false,error:"INVALID_POUCH_SELL",msg:"Instância inválida para vender a Loot Pouch"}};
+    if(String(row.instance_id)!==instanceId)
+      return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
+    let rejection=null,soldGold=0,synced=null;
+    const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
+      let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+      const item=descriptor.authority&&descriptor.authority.players&&
+        descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+      if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
+      soldGold=slug?sellAuthPouchItem(item.p,slug):sellAuthAllPouch(item.p);
+      // A pouch é DA CONTA: espelha o resultado em todas as cópias da mesma
+      // conta + aplica o delta na cópia do líder (fonte viva do loot).
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
+      descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+    },lease);
+    if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
+      body:{ok:false,error:result.error,msg:rejection||"Não foi possível vender a Loot Pouch",instance:instanceSummary(result.instance,true)}};
+    // Grava a pouch vazia no shared da conta IMEDIATAMENTE (troca de
+    // personagem/reload não pode "ressuscitar" os itens vendidos).
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{
+        sharedSync=await db.accountSharedInventory(acc.id);
+      }catch(e){/* opcional */}
+    }
+    await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+      status:result.instance.status,source:"pouch-sell",holderId:String(body.holder_id||"")});
+    return {code:200,body:{ok:true,gold:soldGold,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
+  }
+  // Cidade: a pouch é server-owned (protected no PUT comum) — vende no
+  // player hidratado e persiste via persistClaimedPlayer (extração
+  // autoritativa atualiza o shared + mirror no save do personagem).
+  let p=await loadCityPlayer(db,acc,character);
+  const gold=slug?sellAuthPouchItem(p,slug):sellAuthAllPouch(p);
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,gold,
+    lootPouch:p.lootPouch||{},bag:p.bag||{},itemInstances:p.itemInstances||[]})};
 }
 
 /**
@@ -2552,24 +2677,35 @@ async function movePouchToBag(db,body){
       return {code:400,body:{ok:false,error:"INVALID_POUCH_TO_BAG",msg:"Instância inválida para o movimento"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null;
+    let rejection=null,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
       if(!moveLootPouchToBag(item.p,slug,qty)){
         rejection="Não foi possível mover (mochila cheia, CAP ou item ausente na pouch)";
         return null;
       }
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível mover para a backpack",
         instance:instanceSummary(result.instance,true)}};
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"pouch-to-bag",holderId:String(body.holder_id||"")});
-    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   if(!moveLootPouchToBag(p,slug,qty))
@@ -2641,12 +2777,48 @@ async function endInstance(db,body){
   let endedCharacters=[];
   if(resolved.row&&resolved.row.status==="active"){
     try{
-      const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,advanceAuthorityState,lease);
+      // Tick final: além de avançar o estado, um encerramento NORMAL (sem
+      // terminalReason da autoridade — ex.: "returned-city") precisa extrair
+      // os containers finais (loot da Loot Pouch, bag etc.) para o shared da
+      // conta. Sem isso o loot ficava só no save do personagem e o shared
+      // antigo o "mascarava" ao trocar de personagem/reload (e a venda da
+      // pouch parecia nunca acontecer).
+      const finalizeEndState=(serialized,elapsed,checkpointAt)=>{
+        const out=advanceAuthorityState(serialized,elapsed,checkpointAt);
+        if(out&&!out.terminalReason){
+          try{
+            let descriptor=typeof out.state==="string"?JSON.parse(out.state):out.state;
+            const auth=descriptor&&descriptor.authority;
+            if(auth&&!auth.ended){
+              auth.ended=true;
+              auth.terminalReason="finished";
+              descriptor=materializeAuthority(descriptor);
+              out.state=JSON.stringify(descriptor);
+              out.terminalReason="finished";
+            }
+          }catch(e){/* sem extração final é aceitável (end continua) */}
+        }
+        return out;
+      };
+      const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,finalizeEndState,lease);
       if(tickResult.ok&&tickResult.instance){
         // Atualiza expected version para o end usar a versão pós-tick
         const ticked=await db.instanceGet(ownerId);
         if(ticked)expected=Number(ticked.version);
         endedCharacters=Array.isArray(tickResult.characters)?tickResult.characters:[];
+        // Tick final no-op (elapsed<50 entre o último tick e o end): o
+        // instanceAuthorityTick volta sem characters e a extração terminal
+        // (loot da pouch → shared) não roda. Force um segundo avanço com o
+        // relógio +100ms — 0 steps de simulação, mas o fluxo de extração
+        // executa (terminalReason "finished" via finalizeEndState).
+        if(!endedCharacters.length){
+          const retry=await db.instanceAuthorityTick(ownerId,expected,Date.now()+100,3600000,finalizeEndState,lease);
+          if(retry.ok&&retry.instance){
+            const ticked2=await db.instanceGet(ownerId);
+            if(ticked2)expected=Number(ticked2.version);
+            endedCharacters=Array.isArray(retry.characters)?retry.characters:[];
+          }
+        }
       }
     }catch(e){/* tick final é best-effort; o end ainda roda */}
   }
@@ -3448,7 +3620,8 @@ async function main() {
          (req.method==="POST"&&url==="/api/pouch/open-bag-you-desire")){
         const r=await openBagYouDesire(db,await readBody(req));return send(res,r.code,r.body);
       }
-      if(req.method==="POST"&&url==="/api/instance/pouch-sell"){
+      if((req.method==="POST"&&url==="/api/instance/pouch-sell")||
+         (req.method==="POST"&&url==="/api/pouch/sell")){
         const r=await sellInstanceLootPouch(db,await readBody(req));return send(res,r.code,r.body);
       }
       if((req.method==="POST"&&url==="/api/instance/bag-sell")||

@@ -758,21 +758,58 @@ function accountOpenBagYouDesire(token, charId) {
     return { ok: false, msg: r.data.msg || "Não foi possível abrir a Bag You Desire", code: r.code };
   });
 }
-function accountSellInstanceLootPouch(token,charId,slug){
-  return accountQueueInstance(async()=>{
-    if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
-    const body=Object.assign({token,char_id:Number(charId),instance_id:ACCOUNT_INSTANCE.id,
-      expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
-    if(slug)body.slug=String(slug);
-    const r=await _api("POST","/api/instance/pouch-sell",body);
+/* Vende a Loot Pouch (tudo ou 1 slug) com persistência autoritativa.
+ * Em combate online usa a instância (/api/instance/pouch-sell); na cidade usa
+ * /api/pouch/sell (a pouch é server-owned no PUT comum — sem a API a venda
+ * local "voltava" ao trocar de personagem/reload). */
+function accountSellLootPouch(token,charId,slug){
+  const onlineCombat=typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat();
+  if(onlineCombat&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    return accountQueueInstance(async()=>{
+      if(!accountLeaseAllowsSimulation())return {ok:false};
+      const body=Object.assign({token,char_id:Number(charId),instance_id:ACCOUNT_INSTANCE.id,
+        expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
+      if(slug)body.slug=String(slug);
+      const r=await _api("POST","/api/instance/pouch-sell",body);
+      if(r.data.ok){
+        accountInstanceApply(r.data.instance);
+        accountMaybeApplyShared(r.data);
+        return {ok:true,gold:Number(r.data.gold)||0,state:r.data.instance&&r.data.instance.state,
+          version:r.data.instance&&r.data.instance.version};
+      }
+      if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
+      return {ok:false,msg:r.data.msg||"Não foi possível vender a Loot Pouch"};
+    });
+  }
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),
+      slug:slug?String(slug):null,
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/pouch/sell",body);
     if(r.data.ok){
-      accountInstanceApply(r.data.instance);
-      return {ok:true,gold:Number(r.data.gold)||0,state:r.data.instance&&r.data.instance.state,
-        version:r.data.instance&&r.data.instance.version};
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
+        if(r.data.lootPouch)G.p.lootPouch=r.data.lootPouch||{};
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+      }
+      return {ok:true,gold:Number(r.data.gold)||0,lootPouch:r.data.lootPouch||{},
+        saveVersion:r.data.saveVersion};
     }
-    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.data.instance)accountInstanceApply(r.data.instance);
-    return {ok:false,msg:r.data.msg||"Não foi possível vender a Loot Pouch"};
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível vender a Loot Pouch",code:r.code};
   });
+}
+function accountSellInstanceLootPouch(token,charId,slug){
+  return accountSellLootPouch(token,charId,slug);
 }
 /** Vende mochila (sell all ou slug/inst). gold/bag autoritativos — PUT comum não credita gold. */
 function accountSellBag(token,charId,opts){
