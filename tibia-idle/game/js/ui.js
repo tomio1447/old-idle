@@ -1397,10 +1397,16 @@ function equipOnOtherCharacterPouch(from, to, slug) {
  * caem) em vez da mochila. */
 function partyEquipMenuOptions(p, slug, instId, fromPouch) {
   const it = GAMEDATA.items[slug];
-  if (!it || !it.s || typeof getCharacters !== "function") return [];
+  if (!it || !it.s) return [];
   const activeId = String((typeof characterId === "function" ? characterId(p) : (p && p.id)) || "");
+  // Sempre pega os personagens da conta, nunca todos do roster/party.
+  const accountChars = (typeof accountCharacterCacheRead === "function" && accountCharacterCacheRead())
+    || (typeof G !== "undefined" && G.accountChars)
+    || [];
+  const roster = typeof getCharacters === "function" ? getCharacters() : [];
+  const source = accountChars.length ? roster.filter((c) => accountChars.some((a) => String(a.id) === String(c.id))) : roster;
   const opts = [];
-  for (const other of getCharacters()) {
+  for (const other of source) {
     const oid = String((typeof characterId === "function" ? characterId(other) : (other && other.id)) || "");
     if (!oid || oid === activeId) continue;   // nunca equipa "em si mesmo"
     const chk = (typeof canEquipItem === "function"
@@ -1448,6 +1454,7 @@ function equipOnOtherCharacter(from, to, slug, instId) {
     if (!from.bag || from.bag[slug] < 1) return false;
     from.bag[slug] -= 1;
     if (from.bag[slug] === 0) delete from.bag[slug];
+    to.bag = to.bag || {};
     to.bag[slug] = (to.bag[slug] || 0) + 1;
     if (typeof equipItemFromContainer !== "function" || !equipItemFromContainer(to, slug, "bag", slot)) {
       to.bag[slug] -= 1;
