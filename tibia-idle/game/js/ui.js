@@ -1361,6 +1361,65 @@ function equipFromBag(p, slug, instId) {
   return true;
 }
 
+/* Move e equipa um item do LOOT POUCH em outro personagem da party.
+ * O item sai da pouch do personagem atual, vai para a bag do destino e é
+ * equipado nele (equipOnOtherCharacter exige o item na `bag`, então não
+ * serve para itens que estão na pouch — onde todos os drops caem). */
+function equipOnOtherCharacterPouch(from, to, slug) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !it.s) return false;
+  const slot = it.s;
+  const chk = typeof canEquipItem === "function" ? canEquipItem(to, slug, slot) : { ok: true };
+  if (!chk.ok) { toast(`${to.name}: ${chk.msg}`); return false; }
+  if (!from.lootPouch || from.lootPouch[slug] < 1) return false;
+  from.lootPouch[slug] -= 1;
+  if (from.lootPouch[slug] === 0) delete from.lootPouch[slug];
+  to.bag = to.bag || {};
+  to.bag[slug] = (to.bag[slug] || 0) + 1;
+  if (typeof equipItemFromContainer !== "function" || !equipItemFromContainer(to, slug, "bag", slot)) {
+    to.bag[slug] -= 1;
+    if (to.bag[slug] === 0) delete to.bag[slug];
+    from.lootPouch[slug] = (from.lootPouch[slug] || 0) + 1;
+    toast(`${to.name} não conseguiu equipar o item.`);
+    return false;
+  }
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(to);
+  if (typeof save === "function") save();
+  toast(`${it.n} equipado em <b>${to.name}</b>`);
+  return true;
+}
+
+/* Opções "Equipar em <personagem>" para os membros da party/roster que
+ * atendem aos requisitos do item. Filtra por id (e não por referência de
+ * objeto: getCharacters() devolve cópias normalizadas, então `c !== p`
+ * sempre seria true e o personagem ATIVO também entraria na lista).
+ * `fromPouch` usa o caminho que tira o item da Loot Pouch (onde os drops
+ * caem) em vez da mochila. */
+function partyEquipMenuOptions(p, slug, instId, fromPouch) {
+  const it = GAMEDATA.items[slug];
+  if (!it || !it.s || typeof getCharacters !== "function") return [];
+  const activeId = String((typeof characterId === "function" ? characterId(p) : (p && p.id)) || "");
+  const opts = [];
+  for (const other of getCharacters()) {
+    const oid = String((typeof characterId === "function" ? characterId(other) : (other && other.id)) || "");
+    if (!oid || oid === activeId) continue;   // nunca equipa "em si mesmo"
+    const chk = (typeof canEquipItem === "function"
+      ? canEquipItem(other, slug, it.s) : { ok: true });
+    if (!chk.ok) continue;                    // só quem tem os requisitos
+    opts.push({
+      label: `Equipar em ${other.name || oid}`,
+      hint: `lvl ${other.level} · ${other.voc || ""}`,
+      action: () => {
+        const ok = fromPouch
+          ? equipOnOtherCharacterPouch(p, other, slug)
+          : equipOnOtherCharacter(p, other, slug, instId);
+        if (ok && typeof renderAll === "function") renderAll();
+      },
+    });
+  }
+  return opts;
+}
+
 /* Move e equipa um item em outro personagem da conta/party.
  * Requer que o item esteja na mochila do personagem atual. Offline/local. */
 function equipOnOtherCharacter(from, to, slug, instId) {
@@ -1451,17 +1510,7 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
       label: it.s === "ammo" ? "Selecionar munição" : "Equipar",
       action: () => { if (equipFromBag(p, slug, instId)) refresh(); },
     });
-    const partyChars = (typeof getCharacters === "function" ? getCharacters() : []).filter((c) => c !== p);
-    for (const other of partyChars) {
-      const chk = (typeof canEquipItem === "function" ? canEquipItem(other, slug, it.s) : { ok: true });
-      if (chk.ok) {
-        opts.push({
-          label: `Equipar em ${other.name}`,
-          hint: `lvl ${other.level} · ${other.voc}`,
-          action: () => { if (equipOnOtherCharacter(p, other, slug, instId)) refresh(); },
-        });
-      }
-    }
+    opts.push(...partyEquipMenuOptions(p, slug, instId, false));
   }
   // moedas viram gold direto; o resto só é vendido pela Loot Pouch
   if (currencyValue(slug)) {
@@ -2633,6 +2682,8 @@ function openPouchItemMenu(p, slug, x, y) {
       disabled: !!(it.lvl && p.level < it.lvl),
       action: () => { if (equipFromPouch(p, slug)) renderAll(); },
     }] : []),
+    // equipar em outro personagem da PT (quem tiver os requisitos)
+    ...partyEquipMenuOptions(p, slug, null, true),
     {
       label: "Mover para backpack",
       action: () => {
