@@ -4245,19 +4245,32 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   // debate abre a partir do estado (state.oberon) e a réplica escolhida
   // volta no próximo tick via oberonIntent. O servidor nunca envia a
   // resposta correta, só a frase + opções embaralhadas.
+  // Auto-recuperação: se o modal foi fechado por fora (ESC/closeModal) o
+  // callback de resposta nunca roda e `_oberonModalOpen` ficaria preso em
+  // true — a 2ª pergunta (2ª morte do boss) nunca abriria. Reabre quando a
+  // PERGUNTA muda e libera o flag sempre que o debate encerra no servidor.
   try{
     const obState=incoming&&incoming.oberon;
     if(obState&&obState.pending&&obState.question&&obState.question.phrase&&
        Array.isArray(obState.question.options)&&obState.question.options.length>=2&&
-       typeof oberonOpenDebateModalRemote==="function"&&!previous._oberonModalOpen){
-      previous._oberonModalOpen=true;
-      const bossMob=(previous.mobs||[]).find((m)=>m&&m.boss)||null;
-      oberonOpenDebateModalRemote(bossMob,obState.question,(chosen)=>{
-        previous._oberonModalOpen=false;
-        previous._oberonPendingAnswer=String(chosen||"");
-        previous._oberonPendingAt=Date.now();
-        if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
-      });
+       typeof oberonOpenDebateModalRemote==="function"){
+      const phrase=String(obState.question.phrase);
+      const changed=previous._oberonQuestionPhrase!==phrase;
+      if(!previous._oberonModalOpen||changed){
+        previous._oberonModalOpen=true;
+        previous._oberonQuestionPhrase=phrase;
+        const bossMob=(previous.mobs||[]).find((m)=>m&&m.boss)||null;
+        oberonOpenDebateModalRemote(bossMob,obState.question,(chosen)=>{
+          previous._oberonModalOpen=false;
+          previous._oberonPendingAnswer=String(chosen||"");
+          previous._oberonPendingAt=Date.now();
+          if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
+        });
+      }
+    }else if(obState&&!obState.pending&&!obState.question){
+      // Debate encerrado (resposta julgada ou erro): libera o flag para a
+      // próxima pergunta abrir normalmente.
+      previous._oberonModalOpen=false;
     }
   }catch(e){/* modal é opcional — nunca pode quebrar o tick */}
   if(Number.isFinite(incomingVersion)&&incomingVersion>0){
@@ -4910,6 +4923,10 @@ function bindControls() {
     cv.style.cursor = id ? "pointer" : "default";
   });
   cv.addEventListener("mouseleave", () => { G.hoverNpc = null; });
+  // Botão direito na área do jogo: NUNCA abre o menu nativo do navegador
+  // (atrapalha a luta). Os menus internos (item/pouch/stash) previnem e
+  // param a propagação nos próprios elementos; aqui só bloqueia o default.
+  cv.addEventListener("contextmenu", (e) => e.preventDefault());
   cv.addEventListener("click", (e) => {
     if (G.combat) {
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
@@ -4962,6 +4979,17 @@ function bindControls() {
     }
   });
   window.addEventListener("blur", () => { G.walker.keys = {}; G.walkKeys = {}; });
+
+  // Botão direito em QUALQUER lugar da tela do jogo não pode abrir o menu
+  // nativo do navegador. Os menus internos (item/pouch/stash) já chamam
+  // preventDefault + stopPropagation; este listener cobre o resto (canvas,
+  // HUD, painéis). Campos de texto continuam com o menu nativo (copiar/colar).
+  document.addEventListener("contextmenu", (e) => {
+    if (e.defaultPrevented) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    e.preventDefault();
+  });
 
   // ESC fecha o modal aberto (e o context menu), como no client do Tibia.
   // O handler roda mesmo com foco em input, para o jogador nunca ficar

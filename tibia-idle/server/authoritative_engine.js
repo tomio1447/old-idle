@@ -1015,7 +1015,10 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     }
   }
   // Grand Master Oberon: réplica escolhida no modal (ou skip ao fechar).
-  if(auth.oberon&&visual.oberonIntent){
+  // Só aceita a réplica com o debate ABERTO (pending): uma resposta atrasada
+  // de um debate já encerrado não pode ser julgada contra a pergunta nova
+  // (2ª morte abre a 2ª pergunta; uma intent velha viraria "wrong" e travaria).
+  if(auth.oberon&&auth.oberon.pending&&visual.oberonIntent){
     auth.oberon.pendingIntent=visual.oberonIntent.skip
       ?{skip:true}
       :{answer:String(visual.oberonIntent.answer||"")};

@@ -33,7 +33,7 @@ const FACELESS_LOOT_ITEMS = {
   "ectoplasmic-shield":     { n: "ectoplasmic shield", s: null, t: "loot", cid: 29430, w: 58.00, sell: 0, npcSell: 0 },
   "enchanted-pendulet":     { n: "enchanted pendulet", s: null, t: "loot", cid: 30345, w: 6.50, sell: 0, npcSell: 0 },
   "lightning-pendant":      { n: "lightning pendant", s: null, t: "loot", cid: 816, w: 5.00, sell: 0, npcSell: 0 },
-  "red-crystal-fragment":   { n: "red crystal fragment", s: null, t: "loot", cid: 16126, w: 0.15, sell: 0, npcSell: 0 },
+  "red-crystal-fragment":   { n: "red crystal fragment", s: null, t: "loot", cid: 16126, w: 0.15, sell: 800, npcSell: 800 },
   "spirit-guide":           { n: "spirit guide", s: null, t: "loot", cid: 29431, w: 18.00, sell: 0, npcSell: 0 },
   // hexagonal-ruby já vem do buried-cathedral.js; mantém o merge se ausente.
   "hexagonal-ruby":         { n: "hexagonal ruby", s: null, t: "loot", cid: 30180, w: 1.25, sell: 30000, npcSell: 30000 },

@@ -29,7 +29,7 @@ const ROSHAMUUL_LOOT_ITEMS = {
   "banana-skin":                   { n: "banana skin", s: null, t: "loot", cid: 3104, w: 0.30, sell: 1, npcSell: 1 },
   "piece-of-iron":                 { n: "piece of iron", s: null, t: "loot", cid: 3110, w: 0.20, sell: 10, npcSell: 10 },
   "traditional-sai":               { n: "traditional sai", s: "weapon", t: "sword", cid: 10389, w: 50.00, sell: 0, npcSell: 0, atk: 28, def: 15, th: true },
-  "brown-crystal-splinter":        { n: "brown crystal splinter", s: null, t: "loot", cid: 16123, w: 0.10, sell: 400, npcSell: 400 },
+  "brown-crystal-splinter":        { n: "brown crystal splinter", s: null, t: "loot", cid: 16123, w: 0.10, sell: 800, npcSell: 800 },
   "red-crystal-fragment":          { n: "red crystal fragment", s: null, t: "loot", cid: 16126, w: 0.15, sell: 800, npcSell: 800 },
   "crystal-rubbish":               { n: "crystal rubbish", s: null, t: "loot", cid: 16279, w: 9.80, sell: 0, npcSell: 0 },
   "cluster-of-solace":             { n: "cluster of solace", s: null, t: "loot", cid: 20062, w: 2.80, sell: 0, npcSell: 0 },
