@@ -560,6 +560,24 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "the-fear-feaster-room":{monsters:["the-fear-feaster"]},
   "the-unwelcome-room":{monsters:["the-unwelcome"]},
   "the-pale-worm-room":{monsters:["the-pale-worm"]},
+  /* Hunts registradas só no cliente (gamedata.js/arquivos próprios): sem
+   * entrada aqui HUNTS[slug] ficava undefined — o pool congelava nas
+   * espécies da 1ª wave (monstros ausentes dela nunca nasciam) e os
+   * spawnWeights do ferumbras-way nunca aplicavam. Os 5 de Ferumbras/
+   * Catacombs/Marapur recebem hard 6-10 no loop logo abaixo (intento
+   * original dos guards que antes eram no-ops). */
+  "marapur-nagas":{monsters:["naga-archer","naga-warrior","makara"],cat:"hard",pack:8},
+  "dt-seal":{monsters:["vexclaw","grimeleech","dark-torturer"],cat:"hard",pack:8},
+  "juggerseal":{monsters:["vexclaw","juggernaut","hellflayer"],cat:"hard",pack:8},
+  "ferumbras-way":{monsters:["grimeleech","vexclaw","demon","hellflayer"],cat:"hard",pack:8},
+  "catacombs-oramond":{monsters:["demon","destroyer","hellspawn","grim-reaper","dark-torturer","hellhound"],cat:"hard",pack:8},
+  "minotaur-oramond-east":{monsters:["minotaur-hunter","execowtioner","minotaur-amazon","mooh-tah-warrior","moohtant","worm-priestess"],cat:"medium",pack:6,packMin:6,packMax:10},
+  "deathlings-sunken-temple":{monsters:["deathling-spellsinger","deathling-scout"],cat:"aventureiro",pack:8},
+  "deeplings-deeper":{monsters:["deepling-guard","deepling-warrior","deepling-tyrant"],cat:"aventureiro",pack:7},
+  "elf-yalahar":{monsters:["elf","elf-scout","elf-arcanist"],cat:"aventureiro",pack:4},
+  "grand-master-oberon-room":{monsters:["grand-master-oberon"]},
+  "leiden-room":{monsters:["leiden"]},
+  "stonerefiner":{monsters:["stonerefiner"],cat:"aventureiro",pack:5},
 });
 for(const slug of ["marapur-nagas","dt-seal","juggerseal","ferumbras-way","catacombs-oramond","minotaur-oramond-east"]){
   if(HUNTS[slug])Object.assign(HUNTS[slug],{cat:"hard",pack:10,packMin:6,packMax:10});

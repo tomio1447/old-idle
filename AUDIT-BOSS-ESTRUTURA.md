@@ -103,8 +103,16 @@ Duplicações client/server (mesma mecânica escrita 2x):
 ### C. Não feito (pendências conscientes)
 - Unificação das duplicações client/server das mecânicas (Scarlett/Oberon/soulwar) — refactor maior,
   sem ganho de jogador imediato; manter como follow-up.
-- `ferumbras-way` não registrado no HUNTS do servidor (pesos 33/33/25/13 nunca aplicam lá — lacuna
-  pré-existente detectada no turno anterior, funciona via fallback uniforme do pool).
+
+### D. Follow-up feito (2026-08-22, turno seguinte)
+- **Hunts que só existiam no cliente agora registradas no HUNTS do servidor**: marapur-nagas,
+  dt-seal, juggerseal, ferumbras-way, catacombs-oramond, minotaur-oramond-east,
+  deathlings-sunken-temple, deeplings-deeper, elf-yalahar, grand-master-oberon-room, leiden-room,
+  stonerefiner. Antes HUNTS[slug] era undefined: o pool congelava nas espécies da 1ª wave
+  (monstros ausentes dela nunca nasciam — ex.: minotaur-oramond-east só via quem veio na leva 1) e
+  os spawnWeights 33/33/25/13 do ferumbras-way nunca aplicavam (guards das linhas 564-568 eram
+  no-ops). Validado: pesos do ferumbras-way ~31,7/31,7/24,0/12,5 (33/104 cada, proporção correta),
+  pool do minotaur cobre as 6 espécies, waves 6-10 nos cinco hunts hard.
 
 ### Provas (rodar de novo a qualquer momento)
 - `tibia-idle/server/_test_radius_pairs.js` — 0 casts fantasma pós-fix (era 30/30)
