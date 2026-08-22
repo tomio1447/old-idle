@@ -1083,14 +1083,20 @@ async function persistClaimedPlayer(db,acc,character,p,lease){
  * sobrescrevia com promoted=false — a promoção "não pegava" e o botão
  * voltava habilitado (dava para pagar de novo). */
 const PROMOTION_PRICE=20000,PROMOTION_LEVEL=20;
-function applyCharacterPromotion(p){
+function applyCharacterPromotion(p,goldSource){
   if(!p||typeof p!=="object")return {ok:false,code:400,error:"PROMOTION_INVALID",msg:"Personagem inválido"};
   if(p.promoted)return {ok:false,code:409,error:"ALREADY_PROMOTED",msg:"Personagem já promovido"};
   if((Number(p.level)||0)<PROMOTION_LEVEL)
     return {ok:false,code:400,error:"PROMOTION_LEVEL",msg:"Requer nível "+PROMOTION_LEVEL};
-  if((Number(p.gold)||0)<PROMOTION_PRICE)
+  /* Gold é o WALLET DA CONTA: na cidade a fonte é acc.gold (o gold do save
+   * do char é só espelho — ver loadCharacter); na instância item.p.gold já
+   * é o getter do wallet. Sem isso a promoção cobrava do espelho stale e o
+   * jogador pagava com gold que não existe (ou era bloqueado à toa). */
+  const gold=arguments.length>1?Math.max(0,Math.floor(Number(goldSource)||0))
+    :Math.max(0,Math.floor(Number(p.gold)||0));
+  if(gold<PROMOTION_PRICE)
     return {ok:false,code:400,error:"PROMOTION_GOLD",msg:"Requer "+PROMOTION_PRICE+" gp"};
-  p.gold=Math.max(0,Math.floor(Number(p.gold)||0)-PROMOTION_PRICE);
+  p.gold=gold-PROMOTION_PRICE;
   p.promoted=true;
   p.promotedAt=Date.now();
   return {ok:true};
@@ -1162,8 +1168,13 @@ async function promoteCharacterApi(db,body){
         instance:instanceSummary(last.instance,true)}};
   }
   let p=await loadCityPlayer(db,acc,character);
-  const applied=applyCharacterPromotion(p);
+  const walletGold=Math.max(0,Math.floor(Number(acc.gold)||0));
+  const applied=applyCharacterPromotion(p,walletGold);
   if(!applied.ok)return {code:applied.code,body:{ok:false,error:applied.error,msg:applied.msg}};
+  /* Cidade: debita o WALLET da conta direto (o sync do gold só roda no tick
+   * de instância — sem isso o espelho do save não voltava pra acc.gold). */
+  if(typeof db.setAccountGold==="function")
+    await db.setAccountGold(acc.id,Math.max(0,walletGold-PROMOTION_PRICE));
   return persistPromotedPlayer(db,acc,character,p,lease);
 }
 
