@@ -1888,6 +1888,13 @@ async function tickInstance(db,body){
   await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
     status:result.instance.status,terminalReason:result.terminalReason||null,source:"tick",holderId:String(body.holder_id||""),
     characterVersions:(result.characters||[]).map((c)=>({id:Number(c.id),saveVersion:Number(c.save_version)}))});
+  // Terminal de boss fight: publica "character" para TODAS as abas/personagens
+  // da conta re-buscarem /api/me — o shared (rewardChest do boss derrotado)
+  // é aplicado e o badge "!" do Reward Chest aparece para todos, e o loot do
+  // reward é o mesmo (compartilhado pela conta).
+  if(result.terminalReason){
+    try{publishSync(acc.id,"character",{id:null,saveVersion:0,source:"instance-terminal"});}catch(e){/* opcional */}
+  }
   const responseInstance=instanceSummary(result.instance,true);
   if((resolved.party||resolved.worldBoss)&&resolved.character&&responseInstance.state&&responseInstance.state.members&&
     responseInstance.state.members.some((member)=>String(member.id)===String(resolved.character.id)))

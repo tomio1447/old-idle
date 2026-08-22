@@ -1747,6 +1747,12 @@ function accountApplySharedInventory(shared) {
   }
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
   p._sharedInv = 1;
+  // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
+  // SSE de outra aba, /api/me), atualiza o badge "!" — todos os personagens
+  // da conta veem a notificação de boss derrotado com loot pendente.
+  if (typeof renderRewardButton === "function") {
+    try { renderRewardButton(p); } catch (e) { /* badge opcional */ }
+  }
 }
 /* Se a resposta de uma API de containers trouxer sharedInventory, aplica. */
 function accountMaybeApplyShared(data) {

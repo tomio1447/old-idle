@@ -6757,11 +6757,12 @@ function step(auth,now,opts){if(auth.ended)return;
   const survivors=[],dead=[];
   for(const mob of auth.mobs||[]){
     if(mob.hp>0){survivors.push(mob);continue;}
-    // Grand Master Oberon: precisa ser derrotado 4x. Ao zerar o HP ele
-    // revive invulnerável e abre o debate (a réplica vem no próximo tick);
-    // só a 4ª vida (lives=0) permite a morte real e o boss-defeated.
+    // Grand Master Oberon: precisa ser derrotado 4x. Enquanto restar MAIS de
+    // 1 vida (lives>1), ao zerar o HP ele revive invulnerável e abre o debate
+    // (a réplica vem no próximo tick). A ÚLTIMA vida (lives=1) é morte
+    // DIRETA — o modal NÃO é ativado na 4ª morte (pedido do dono).
     if(mob.boss&&(mob.slug==="grand-master-oberon"||String(mob.id)==="grand-master-oberon")&&
-       auth.oberon&&Number(auth.oberon.lives)>0&&!auth.oberon.invulnerable){
+       auth.oberon&&Number(auth.oberon.lives)>1&&!auth.oberon.invulnerable){
       mob.hp=Number(mob.maxHp)||60000;
       auth.oberon.invulnerable=true;
       auth.oberon.pending=true;
