@@ -6408,12 +6408,20 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
     let raw=Math.max(1,roll(auth,Math.floor(lo),Math.floor(hi)));
     if(runeExtra)raw=Math.max(1,Math.floor(raw*(1+runeExtra/100)));
     const dmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
+    const pos=entityPosition(tgt,.5,.5);
     if(dmg>0){tgt.hp-=dmg;afterPlayerHit(auth,p,tgt,dmg,now);
-      const pos=entityPosition(tgt,.5,.5);
       auth.events.push({t:"hit",dmg,el,fx,projectile:tgt===primary,missile:tgt===primary?missile:null,rune:rd.nome||id,
         crit:isCrit,fatal:isFatal,
         x:pos.x,y:pos.y,race:tgt.def&&tgt.def.race||"blood",mobId:String(tgt.id),targetId:String(tgt.id),
         mobSlug:tgt.slug,whoId:String(item.id),sx:source.x,sy:source.y,ts:visualTs+hitN*20});}
+    else{
+      // IMUNE ao elemento (resist 100 / imune — ex.: Dread Maiden + SD):
+      // a runa é consumida, o projétil voa e o impacto é o POFF (Canary).
+      auth.events.push({t:"hit",dmg:0,immune:true,el,fx:"poff",projectile:tgt===primary,missile:tgt===primary?missile:null,
+        rune:rd.nome||id,crit:isCrit,fatal:isFatal,
+        x:pos.x,y:pos.y,race:tgt.def&&tgt.def.race||"blood",mobId:String(tgt.id),targetId:String(tgt.id),
+        mobSlug:tgt.slug,whoId:String(item.id),sx:source.x,sy:source.y,ts:visualTs+hitN*20});
+    }
     if(rd.cond)applyCondition(tgt,rd.cond.tipo||rd.cond,rd.cond.dano||Math.max(1,Math.floor(lo*.1)),rd.cond.golpes||4);
     stanceApplyDebuffs(p,tgt,now);hitN++;
   }
@@ -6562,14 +6570,19 @@ function step(auth,now,opts){if(auth.ended)return;
                 const fisFinal=knightAreaShare?parts.fis:applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now);
                 const eleFinal=knightAreaShare?parts.ele:applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now);
                 const dealt=fisFinal+eleFinal;tgt.hp-=dealt;afterPlayerHit(auth,p,tgt,dealt,now);
-                auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
+                auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el,fx:dealt>0?fx:"poff",projectile:fireProj,missile:fireProj?missile:null,
+                  ...(dealt<=0?{immune:true}:{})},hitBase));
                 if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:armaEl.el,fx:ELEMENT_FX[armaEl.el]||fx,dual:1,projectile:false,missile:null},hitBase,{crit:false,fatal:false}));
                 if(echoFrac&&dealt>0){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(dealt*echoFrac)),el,fx,whoId:item.id});}
               }else{
                 if(!knightAreaShare)finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now);
                 if(finalDmg>0){tgt.hp-=finalDmg;afterPlayerHit(auth,p,tgt,finalDmg,now);
                   if(echoFrac){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(finalDmg*echoFrac)),el,fx,whoId:item.id});}}
-                auth.events.push(Object.assign({t:"hit",dmg:finalDmg,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
+                // Imune (resist 100 / imune): a magia voa e o impacto é o
+                // POFF — sem dano, como no Canary.
+                auth.events.push(Object.assign({t:"hit",dmg:finalDmg,el,fx:finalDmg>0?fx:"poff",
+                  projectile:fireProj,missile:fireProj?missile:null,
+                  ...(finalDmg<=0?{immune:true}:{})},hitBase));
               }
               if(s.cond)applyCondition(tgt,s.cond.tipo||s.cond,s.cond.dano||Math.max(1,Math.floor(finalDmg*.1)),s.cond.golpes||4);
               stanceApplyDebuffs(p,tgt,now);
@@ -6699,11 +6712,21 @@ function step(auth,now,opts){if(auth.ended)return;
                 projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));
               if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:convEl,fx:ELEMENT_FX[convEl]||ELEMENT_FX.physical,
                 dual:1,projectile:false,missile:null},base,{crit:false,fatal:false}));
+              if(fisFinal<=0&&eleFinal<=0)
+                auth.events.push(Object.assign({t:"hit",dmg:0,immune:true,el:convEl,fx:"poff",
+                  projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base,{crit:false,fatal:false}));
             }else{
               raw=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
               if(raw>0){tgt.hp-=raw;afterPlayerHit(auth,p,tgt,raw,now);
                 auth.events.push(Object.assign({t:"hit",dmg:raw,el,fx:basicHitFx(p,profile,tgt,el,ammoIt),
                   projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));}
+              else{
+                // IMUNE ao elemento (resist 100 / imune): como no Canary o
+                // projétil voa e o impacto é o POFF — sem dano (a munição/
+                // magia ainda é consumida).
+                auth.events.push(Object.assign({t:"hit",dmg:0,immune:true,el,fx:"poff",
+                  projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));
+              }
             }
             stanceApplyDebuffs(p,tgt,now);
             if(!splash&&ammoIt&&ammoIt.poison)applyCondition(tgt,"poison",ammoIt.poison.dmg||ammoIt.poison,ammoIt.poison.turns||5);

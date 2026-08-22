@@ -2471,6 +2471,20 @@ function drainEvents() {
   for (const e of ready) {
     switch (e.t) {
       case "hit": {
+        // Imune ao elemento (resist 100 / array `imune` — ex.: The Dread
+        // Maiden + SD): como no Canary, o projétil VOIA e o impacto é o
+        // POFF (puff) — a magia/munição é consumida mas não causa dano,
+        // sem número flutuante. O servidor/cliente marcam `immune` (ou
+        // enviam dmg 0).
+        const hitDmg=Number(e.dmg)||0;
+        if(hitDmg<=0||e.immune){
+          const hx=ex(e),hy=ey(e);
+          if(e.projectile&&r.addProjectile)
+            r.addProjectile(e.sx||(c.player?c.player.x:hx),e.sy||(c.player?c.player.y:hy),
+                            hx,hy,"#a0a0a0",e.missile);
+          r.addEffect(hx,hy,e.fx||"poff");
+          break;
+        }
         // Cor do NUMERO de dano: fisico em VERMELHO contra criaturas de
         // SANGUE e contra PLAYERS (como o Tibia clássico) — a raca define a
         // cor (blood = vermelho) e o efeito. As demais racas seguem o esquema

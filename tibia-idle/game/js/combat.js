@@ -2166,6 +2166,15 @@ function playerAttack(c, p, target) {
   } else if (errou) {
     // o projetil ainda voa, mas cai na casa desviada
     c.events.push({ t: "miss", x: target.x, y: target.y, fx: "poff" });
+  } else if (raw <= 0) {
+    // IMUNE ao elemento (resist 100 ou array `imune` — ex.: The Dread
+    // Maiden + SD): como no Canary, o projétil VOIA e o impacto é o POFF —
+    // a magia/munição é consumida mas não causa dano nem mostra número.
+    c.events.push({ t: "hit", dmg: 0, immune: true,
+                    x: target.x, y: target.y, targetId: target.id,
+                    sx: pos.x, sy: pos.y, screen: true,
+                    projectile: isDist || isMagic, el: element,
+                    missile: (isDist || isMagic) ? playerMissile(p, element) : null });
   }
 
   // Cleave (15.x): certas armas atingem alvos adjacentes por 50% do dano
