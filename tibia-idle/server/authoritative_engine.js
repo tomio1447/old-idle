@@ -1107,6 +1107,50 @@ function shareAccountGoldWallets(auth){
       });
     }catch(e){item.p.gold=wallet.gold;}
   }
+  shareAccountForgeWallets(auth);
+}
+/* A forja é DA CONTA: dust/dustLimit/slivers/exaltedCores são um wallet
+ * único por conta (mesmo modelo do gold). O crédito do kill entra só no
+ * líder (reward()), mas o wallet propaga para TODOS os membros da mesma
+ * conta em tempo real — antes o contador da forja só mexia no personagem
+ * líder e os outros personagens da conta ficavam congelados. O save extrai
+ * valores IDÊNTICOS de qualquer cópia: um crédito por kill, sem duplicar. */
+function shareAccountForgeWallets(auth){
+  if(!auth||!Array.isArray(auth.players))return;
+  const wallets=auth.wallets&&typeof auth.wallets==="object"?auth.wallets:{};
+  auth.wallets=wallets;
+  for(const item of auth.players){
+    if(!item||!item.p)continue;
+    const aid=String(item.accountId||item.p.accountId||("solo:"+item.id));
+    if(!wallets[aid])wallets[aid]={};
+    const wallet=wallets[aid];
+    if(!wallet.forge){
+      wallet.forge={dust:Math.max(0,Math.floor(Number(item.p.dust)||0)),
+        dustLimit:Math.max(100,Math.min(325,Math.floor(Number(item.p.dustLimit)||100))),
+        slivers:Math.max(0,Math.floor(Number(item.p.slivers)||0)),
+        exaltedCores:Math.max(0,Math.floor(Number(item.p.exaltedCores)||0))};
+    }else{
+      // Reidratação (JSON round-trip do snapshot): mantém o maior valor de
+      // cada campo entre wallet e p — snapshot atrasado não zera a conta.
+      const cur=wallet.forge;
+      cur.dustLimit=Math.max(cur.dustLimit,Math.floor(Number(item.p.dustLimit)||0));
+      cur.dust=Math.max(cur.dust,Math.floor(Number(item.p.dust)||0));
+      cur.slivers=Math.max(cur.slivers,Math.floor(Number(item.p.slivers)||0));
+      cur.exaltedCores=Math.max(cur.exaltedCores,Math.floor(Number(item.p.exaltedCores)||0));
+    }
+    const forge=wallet.forge;
+    const bind=(key,clamp)=>{
+      try{
+        Object.defineProperty(item.p,key,{configurable:true,enumerable:true,
+          get(){return forge[key];},
+          set(v){forge[key]=clamp(Math.floor(Number(v)||0));}});
+      }catch(e){item.p[key]=forge[key];}
+    };
+    bind("dust",(v)=>Math.max(0,v));
+    bind("slivers",(v)=>Math.max(0,v));
+    bind("exaltedCores",(v)=>Math.max(0,v));
+    bind("dustLimit",(v)=>Math.max(100,Math.min(325,v)));
+  }
 }
 function pouchUnitSellPrice(it){
   if(!it)return 0;

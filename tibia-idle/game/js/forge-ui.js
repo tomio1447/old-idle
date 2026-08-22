@@ -302,6 +302,20 @@ function openForgeModal() {
   bindForgeModal();
 }
 
+var FORGE_LAST_LIVE_REFRESH = 0;
+/* Re-render ao vivo do modal ABERTO: kills de influenced/fiendish (evento
+ * "dust") e o sync da forja DA CONTA (accountApplySharedInventory)
+ * atualizam dust/slivers/cores — antes o contador do modal só mudava ao
+ * fechar e reabrir. Throttle de 400ms para não rebindar a cada evento. */
+function forgeRefreshOpenModal() {
+  var modal = forgeModalRoot();
+  if (!modal || !modal.classList.contains("show") || !modal.classList.contains("forge-modal-shell")) return;
+  var now = Date.now();
+  if (now - FORGE_LAST_LIVE_REFRESH < 400) return;
+  FORGE_LAST_LIVE_REFRESH = now;
+  openForgeModal();
+}
+
 function bindForgeModal() {
   var body = forgeModalBody();
   if (!body) return;
