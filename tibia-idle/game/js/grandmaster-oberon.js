@@ -327,8 +327,10 @@ function oberonBossTick(c, p, dt, now) {
   const boss = getOberonMob(c);
   if (!boss || !st) { if (typeof addLog === "function") addLog("bad", "[Oberon] boss ou estado nulo"); return true; }
 
-  // Se o boss zerou o HP e ainda tem vidas: resgata, cura e abre o debate
-  if (boss.hp <= 0 && st.lives > 0 && !st.invulnerable) {
+  // Se o boss zerou o HP e ainda tem MAIS de 1 vida: resgata, cura e abre o
+  // debate. A ÚLTIMA vida (lives=1) é morte direta — o modal não é ativado
+  // na 4ª morte (pedido do dono).
+  if (boss.hp <= 0 && st.lives > 1 && !st.invulnerable) {
     boss.hp = boss.maxHp || OBERON_STATS.hp;
     st.invulnerable = true;
     boss.oberonInvulnerable = true;
@@ -358,7 +360,8 @@ function oberonBossHandleKill(c, m, now) {
   const st = oberonBossState(c);
   if (m.oberonInvulnerable || (st && st.invulnerable)) return true; // Impede morte real
 
-  if (st && st.lives > 0) {
+  // Só revive+debate com MAIS de 1 vida; a última (lives=1) morre direto.
+  if (st && st.lives > 1) {
     m.hp = m.maxHp || OBERON_STATS.hp;
     m.oberonInvulnerable = true;
     st.invulnerable = true;
