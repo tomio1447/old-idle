@@ -476,12 +476,13 @@ const UMBRAL_MASTER = {
 
 function npcUmbralCreationHtml(p) {
   // Ícone + badge de quantidade (sem o texto do nome — menos poluição visual;
-  // o nome fica no tooltip do ícone).
+  // o nome fica no tooltip do ícone). A quantidade aparece UMA vez, no badge
+  // do canto do ícone (como o contador de stacks da backpack); ícone sem
+  // recursos suficientes fica esmaecido (umbral-icon-miss).
   const icon = (slug, qty, ok) => `
-    <div class="umbral-icon" title="${qty}x ${itemName(slug)}" style="position:relative;display:inline-block">
+    <div class="umbral-icon ${ok ? "" : "umbral-icon-miss"}" title="${qty}x ${itemName(slug)}" style="position:relative;display:inline-block">
       ${typeof itemImg === "function" ? itemImg(slug, { size: 32 }) : ""}
       ${qty > 1 ? `<span class="cnt" style="position:absolute;right:-4px;bottom:-2px">${qty}</span>` : ""}
-      <span class="tiny" style="display:block;text-align:center;color:${ok ? '#9ce84a' : '#e85b52'};font-weight:bold">${qty}x</span>
     </div>`;
 
   const renderRecipe = (r, tab, cost) => {
