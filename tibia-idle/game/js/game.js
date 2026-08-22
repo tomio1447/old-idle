@@ -2481,10 +2481,10 @@ function drainEvents() {
           ? (typeof fisicoPorRaca === "function" ? fisicoPorRaca(e.race) : null)
           : null;
         // blood (e sem raca conhecida) -> VERMELHO; players -> VERMELHO
-        const vermelho = (ehFisico && raca && raca.color === "#c00000") ||
+        const vermelho = (ehFisico && raca && raca.color === "#ff6b6b") ||
                          (ehFisico && e.race === "player");
         const col = ehFisico
-          ? (vermelho ? "#c00000" : (raca ? raca.color : ELEMENTS.physical.color))
+          ? (vermelho ? "#ff6b6b" : (raca ? raca.color : ELEMENTS.physical.color))
           : (ELEMENTS[visualElement] || ELEMENTS.physical).color;
         // `dual` marca a parte elemental de uma arma que bate nos dois
         // tipos: desloca o NUMERO para o lado para nao ficar por cima do
@@ -2558,8 +2558,8 @@ function drainEvents() {
       case "manabuffer": {
         // Mana Buffer do 15.25: o golpe letal sai da mana em vez da vida
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
-        r.addFloater(px, py - 0.09, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
-        r.addFloater(px, py - 0.02, "mana buffer!", "#9ac0e8");
+        r.addFloater(px, py, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
+        r.addFloater(px, py, "mana buffer!", "#9ac0e8");
         r.addEffect(px, py, "magic-blue");
         r.playerFlash = 90;
         addLog("skill", `Mana Buffer absorveu <b>${fmtFull(e.vida)}</b> de dano por <b>${fmtFull(e.mana)}</b> mana.`);
@@ -2570,7 +2570,7 @@ function drainEvents() {
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
         // 12.55+: mostra a capacidade do escudo (o "bônus" que o mage ganha
         // na mana) no cast
-        r.addFloater(px, py - 0.10, e.cap ? "Magic Shield · ⚡" + fmt(e.cap) : "Magic Shield", "#7ec8ff");
+        r.addFloater(px, py, e.cap ? "Magic Shield · ⚡" + fmt(e.cap) : "Magic Shield", "#7ec8ff");
         // O cast mantém o brilho azul oficial e adiciona o pulso roxo
         // persistente usado pelo OTC para diferenciar o Mana Shield.
         r.addEffect(px, py, "magic-blue");
@@ -2583,9 +2583,9 @@ function drainEvents() {
         // (12.55+): drena a POOL do escudo — mostra o restante.
         if (e.source === "Magic Shield" && e.pool !== undefined) {
           // Absorção do Utamo Vita: número puro roxo, sem texto extra.
-          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana), "#a64dff");
+          r.addFloater(px, py, "-" + fmtFull(e.mana), "#a64dff");
         } else {
-          r.addFloater(px, py - 0.10, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
+          r.addFloater(px, py, "-" + fmtFull(e.mana) + " mana", "#6a8aff");
         }
         r.addEffect(px, py, "magic-blue");
         // escudo quebrou (pool zerou): aviso
@@ -2598,7 +2598,7 @@ function drainEvents() {
         // as wands/rods do 15.25 devolvem mana a cada ataque
         const px = e.screen ? e.x : 0.13, py = e.screen ? e.y : 0.6;
         if (e.amount > 0)
-          r.addFloater(px + 0.03, py - 0.14, "+" + fmtFull(e.amount), "#168cff", false, true, "restore");
+          r.addFloater(px, py, "+" + fmtFull(e.amount), "#168cff", false, true, "restore");
         r.addEffect(px, py, "mana-wisp");
         break;
       }
@@ -2607,7 +2607,7 @@ function drainEvents() {
         // Os floaters sobem NO SQM da entidade (player ou mob alvo) — a
         // posição vem do evento; o pequeno offset em y coloca o texto
         // sobre a cabeça, como os demais números.
-        const mx = ex(e), my = ey(e) - 0.06;
+        const mx = ex(e), my = ey(e);
         if (e.ruse) {
           r.addEffect(mx, ey(e), "ruse-effect", 1000);
           const fdc = window.FORGE_DEBUG_COUNT || { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
@@ -2625,7 +2625,7 @@ function drainEvents() {
       }
       case "dust": {
         const px = e.screen ? (e.x || 0.13) : (c.player ? c.player.x : 0.13);
-        const py = e.screen ? ((e.y || 0.5) - 0.12) : (c.player ? c.player.y - 0.12 : 0.5);
+        const py = e.screen ? (e.y || 0.5) : (c.player ? c.player.y : 0.5);
         const dustN = Number(e.dust) || 0;
         if (dustN > 0) r.addFloater(px, py, "+" + fmtDmg(dustN) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
         if (e.slivers) r.addFloater(px + 0.03, py + 0.04, "+" + fmtDmg(e.slivers) + " slivers", "#ffe680");
@@ -2646,7 +2646,7 @@ function drainEvents() {
           if (e.projectile && r.addProjectile)
             r.addProjectile(e.sx, e.sy, bx, by, "#9ac0e8", e.missile);
           r.addEffect(bx, by, e.fx || "block-hit");
-          r.addFloater(bx, by - 0.07, "bloqueou", "#9ac0e8");
+          r.addFloater(bx, by, "bloqueou", "#9ac0e8");
           break;
         }
         // O dano físico RECEBIDO por player usa sangue vermelho no client.
@@ -2656,7 +2656,7 @@ function drainEvents() {
         if (e.projectile && r.addProjectile)
           r.addProjectile(e.sx, e.sy, e.x, e.y, col, e.missile);
         const shownTaken=visualAmount(e,takenDmg);
-        if(shownTaken>0)r.addFloater(e.screen ? e.x : 0.13, e.screen ? e.y - 0.07 : 0.55, "-" + fmtDmg(shownTaken), col, false, true, "damage");
+        if(shownTaken>0)r.addFloater(ex(e), ey(e), "-" + fmtDmg(shownTaken), col, false, true, "damage");
         // e.fx = COMBAT_PARAM_EFFECT da habilidade do monstro (fire-area do
         // demon, mort area do lich...) — sem, cai o generico do elemento
         r.addEffect(e.screen ? e.x : 0.13, e.screen ? e.y : 0.6,
@@ -2667,7 +2667,7 @@ function drainEvents() {
       case "mobheal": {
         // cura defensiva do proprio monstro (bloco defenses do .lua)
         const shownHeal=visualAmount(e,e.heal||0);
-        if(shownHeal>0)r.addFloater(ex(e), ey(e) - 0.06, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
+        if(shownHeal>0)r.addFloater(ex(e), ey(e), "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         r.addEffect(ex(e), ey(e), e.fx || "magic-green");
         break;
       }
@@ -2685,7 +2685,7 @@ function drainEvents() {
         // CONST_ME_BLOCKHIT: o floater sozinho não basta — precisa do sprite.
         if (!e.magicShield) {
           r.addEffect(bx, by, e.fx || "block-hit");
-          r.addFloater(bx, by - 0.07, "bloqueou", "#9ac0e8");
+          r.addFloater(bx, by, "bloqueou", "#9ac0e8");
         }
         break;
       }
@@ -2693,14 +2693,14 @@ function drainEvents() {
         // HEAL FRIEND: cura aplicada em um aliado da party (exura sio /
         // gran sio / gran mas res). Mostra o +HP sobre o personagem.
         const px = e.screen ? e.x : (c.player ? c.player.x : 0.13);
-        const py = e.screen ? e.y - 0.12 : (c.player ? c.player.y - 0.12 : 0.5);
+        const py = e.screen ? e.y : (c.player ? c.player.y : 0.5);
         const shownHeal=visualAmount(e,e.amount||0);
         if(shownHeal>0)r.addFloater(px, py, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), e.mass ? "magic-green" : "green-rings");
         // Critical Heal do Druid (10% base): efeito azul oficial em cima
         // do personagem que casta + texto CRITICAL!
         if (e.crit) {
-          r.addFloater(px, py - 0.16, "CRITICAL!", "#7ec8ff");
+          r.addFloater(px, py, "CRITICAL!", "#7ec8ff");
           r.addEffect(px, e.screen ? e.y : (c.player ? c.player.y : 0.6), "critical-heal-effect", 800);
         }
         // A fala (exura sio "Nome") vem no evento `say` do caster, como no
@@ -2711,7 +2711,7 @@ function drainEvents() {
       }
       case "heal": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
-        const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.5);
         const shownHeal=visualAmount(e,e.amount||0);
         if(shownHeal>0)r.addFloater(px, py, "+" + fmtFull(shownHeal), "#00e65a", false, true, "restore");
         // Critical Heal (Vocation Adjustments 2026): SOMENTE a animação AZUL
@@ -2730,7 +2730,7 @@ function drainEvents() {
       }
       case "mana": {
         const px = e.x !== undefined ? e.x : (c.player ? c.player.x : 0.13);
-        const py = e.y !== undefined ? e.y : (c.player ? c.player.y - 0.12 : 0.5);
+        const py = e.y !== undefined ? e.y : (c.player ? c.player.y : 0.5);
         r.addFloater(px, py, "+" + fmtFull(e.amount), "#168cff", false, true, "restore");
         // spirit potion bebida como mana tambem mostra a cura
         if (e.heal) r.addFloater(px + 0.03, py + 0.04, "+" + fmtFull(e.heal), "#00e65a", false, true, "restore");
@@ -2789,7 +2789,7 @@ function drainEvents() {
         const d = typeof CONDITIONS !== "undefined" && (CONDITIONS[tipo] || CONDITIONS[e.el]);
         const el = (d && d.el) || e.el || "physical";
         const col = (typeof ELEMENTS !== "undefined" && ELEMENTS[el]) ? ELEMENTS[el].color : "#ff6b6b";
-        if (e.dmg > 0) r.addFloater(px, py - 0.07, "-" + fmtDmg(e.dmg), col, false, true, "damage");
+        if (e.dmg > 0) r.addFloater(px, py, "-" + fmtDmg(e.dmg), col, false, true, "damage");
         r.addEffect(px, py, (d && d.fx) || (typeof ELEMENTS !== "undefined" && ELEMENTS[el] && ELEMENTS[el].fx) || "draw-blood");
         if (d) addLog("death", `<b style="color:${d.cor}">${d.nome}</b> causou <b>${e.dmg}</b> de dano.`);
         renderStats(G.p);
