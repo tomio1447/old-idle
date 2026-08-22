@@ -581,6 +581,28 @@ function accountClaimRewardChest(token,charId,opts){
     return {ok:false,msg:r.data.msg||"Não foi possível recolher",code:r.code,error:r.data.error};
   });
 }
+/* Promoção do King Tibianus — autoritativa no servidor (a mutação local
+ * sumia no refresh do cache / era sobrescrita pelo tick da instância). */
+function accountPromoteCharacter(token,charId){
+  return accountQueueSave(async()=>{
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({
+      token,char_id:Number(charId),
+      expected_version:Number(summary&&summary.saveVersion)||0,
+    },accountLeaseFields());
+    const r=await _api("POST","/api/promote",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      return {ok:true,promoted:!!r.data.promoted,character:r.data.character||null};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível promover",code:r.code,error:r.data.error};
+  });
+}
 function accountSelectInstanceAmmo(token,charId,slug,automatic){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};
