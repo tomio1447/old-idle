@@ -141,6 +141,48 @@ function extractSharedFromPlayer(p, shared) {
   return normalizeSharedInventory(shared);
 }
 
+/* Merge (não sobrescreve) os containers de um player no shared — usado no
+ * tick TERMINAL de instância com múltiplos personagens da mesma conta.
+ *
+ * Cada personagem carrega uma CÓPIA do shared desde o início da instância;
+ * durante a luta as cópias podem divergir (desequipar adiciona na bag da
+ * cópia, equipar remove, etc.). O extractSharedFromPlayer SOBRESCREVIA o
+ * shared com a bag do ÚLTIMO personagem processado — itens adicionados em
+ * outras cópias (ex.: item desequipado) SUMIAM ao final da boss fight.
+ *
+ * Regras do merge:
+ *   - bag/lootPouch: por slug, fica o MAIOR valor (nunca perde o que foi
+ *     adicionado em qualquer cópia; com a sincronização em tempo real das
+ *     cópias, removidos/equipados também não ressuscitam);
+ *   - itemInstances compartilhadas (loc != equip:*): união por id;
+ *   - depot/rewardChest são server-owned e preservados do shared.
+ */
+function mergeSharedFromPlayer(p, shared) {
+  shared = normalizeSharedInventory(shared);
+  if (!p || typeof p !== "object") return shared;
+  for (const key of ["bag", "lootPouch"]) {
+    const src = (p[key] && typeof p[key] === "object" && !Array.isArray(p[key])) ? p[key] : {};
+    const dst = (shared[key] && typeof shared[key] === "object" && !Array.isArray(shared[key])) ? shared[key] : {};
+    for (const slug of Object.keys(src)) {
+      const n = Math.max(0, Math.floor(Number(src[slug]) || 0));
+      if (n > 0) dst[slug] = Math.max(Number(dst[slug]) || 0, n);
+    }
+    shared[key] = dst;
+  }
+  const byId = new Map((shared.itemInstances || []).map((i) => [String(i && i.id), i]));
+  for (const inst of Array.isArray(p.itemInstances) ? p.itemInstances : []) {
+    if (!inst || typeof inst !== "object" || !inst.slug) continue;
+    if (String(inst.loc || "").startsWith("equip:")) continue;
+    const id = String(inst.id || "");
+    if (id && byId.has(id)) continue;
+    const copy = Object.assign({}, inst);
+    byId.set(id, copy);
+    shared.itemInstances.push(copy);
+  }
+  shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  return normalizeSharedInventory(shared);
+}
+
 module.exports = {
   SHARED_CONTAINERS,
   emptySharedInventory,
@@ -149,5 +191,6 @@ module.exports = {
   mergeCharContainers,
   applySharedToPlayer,
   extractSharedFromPlayer,
+  mergeSharedFromPlayer,
   charDataOf,
 };
