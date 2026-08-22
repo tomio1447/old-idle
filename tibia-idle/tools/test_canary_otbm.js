@@ -17,6 +17,13 @@ const maps = [
     // Sprites introduzidas pela atualização gráfica de 83103680.
     requiredIds: [7107, 28291, 28325],
   },
+  {
+    // Elf Yalahar (recriada no padrão 15.x): a sala já foi publicada com
+    // PNGs do client 7.4 — esta regressão falha se algum ID do mapa ficar
+    // sem PNG físico ou fora do catálogo após a reimportação.
+    name: 'elfyalahar', w: 22, h: 17, cells: 374, z: 7,
+    runtimeW: 24, runtimeH: 17,
+  },
 ];
 const sandbox = { window: {} }; sandbox.window = sandbox; vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(game, 'rme', 'data', 'known_tiles.js'), 'utf8'), sandbox);
@@ -31,7 +38,7 @@ for (const spec of maps) {
   if (!sourceBytes.equals(runtimeBytes))
     throw Error(spec.name + ': versão beta ainda não foi publicada em game/maps');
 
-  const map = OTBM.read(runtimeBytes);
+  const map = OTBM.read(runtimeBytes, spec.z !== undefined ? { z: spec.z } : undefined);
   if (map.z !== spec.z || map.w !== spec.w || map.h !== spec.h ||
       Object.keys(map.cells).length !== spec.cells)
     throw Error(`${spec.name}: mapa fonte inesperado z=${map.z}, ${map.w}x${map.h}, ${Object.keys(map.cells).length} cells`);
