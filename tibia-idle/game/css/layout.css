@@ -1350,6 +1350,10 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .umbral-recipe-res {
   display: flex; align-items: center; gap: 4px;
 }
+.umbral-icon-miss {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
 .umbral-mat-anim {
   animation: umbral-mat-pulse 1.4s ease-in-out infinite;
 }

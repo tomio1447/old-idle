@@ -1,9 +1,11 @@
 /* doctor-marrow.js — Boss Doctor Marrow (Cradle of Monsters, nível 250+).
  *
  * Boss simples sem mecânica própria: usa o monstro base do Canary
- * (monsterdata.js) para stats, skills, resistências.
+ * (monsterdata.js) apenas para stats (hp/dano/armor/defense) — sem skills,
+ * sem absorbs, sem summon (ficha simplificada no canarymonsters.json).
  * A sala foi mapeada em doctormarrow_room.otbm.
- * Outfit Canary looktype 1611: lookHead 57, lookBody 0, lookLegs 0, lookFeet 95.
+ * Outfit Canary looktype 1611: lookHead 57, lookBody 0, lookLegs 0, lookFeet 95
+ * (cabelo cinza, jaleco branco, sapatos escuros — aplicados no sheet).
  * O loot é importado do The Monster (criatura final da luta).
  * Cooldown oficial: 16h (aplicado quando BOSS_COOLDOWNS_ENABLED for ligado).
  */
