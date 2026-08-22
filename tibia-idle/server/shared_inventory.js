@@ -154,7 +154,7 @@ function extractSharedFromPlayer(p, shared) {
  *   - bag/lootPouch: por slug, fica o MAIOR valor (nunca perde o que foi
  *     adicionado em qualquer cópia; com a sincronização em tempo real das
  *     cópias, removidos/equipados também não ressuscitam);
- *   - itemInstances compartilhadas (loc != equip:*): união por id;
+ *   - itemInstances compartilhadas (loc != equip:*) : união por id;
  *   - depot/rewardChest são server-owned e preservados do shared.
  */
 function mergeSharedFromPlayer(p, shared) {
@@ -183,6 +183,41 @@ function mergeSharedFromPlayer(p, shared) {
   return normalizeSharedInventory(shared);
 }
 
+/* Terminal de instância — arquitetura FIXA do jogo (backpack/lootPouch são
+ * DA CONTA, não da instância). O shared é atualizado em tempo real pelas
+ * APIs de mutação durante a luta (equip/desequip/vender/mover/stash já
+ * persistem nele). Aqui só se soma o que a cópia do LÍDER (players[0] —
+ * todo o loot de hunt vai para ele) tem a MAIS que o shared — ou seja, o
+ * LOOT GANHO EM COMBATE que ainda não foi persistido:
+ *   gained[slug] = max(0, leader[slug] - shared[slug])
+ * Isso NUNCA duplica: mutações em tempo real já fizeram shared = leader, e
+ * vendas/movimentos deixam o delta em 0. Instâncias compartilhadas do líder
+ * são unidas por id (id único → sem duplicar). Nada é sobrescrito. */
+function mergeTerminalDelta(shared, p) {
+  shared = normalizeSharedInventory(shared);
+  if (!p || typeof p !== "object") return shared;
+  for (const key of ["bag", "lootPouch"]) {
+    const cur = (p[key] && typeof p[key] === "object" && !Array.isArray(p[key])) ? p[key] : {};
+    const dst = (shared[key] && typeof shared[key] === "object" && !Array.isArray(shared[key])) ? shared[key] : {};
+    for (const slug of Object.keys(cur)) {
+      const gained = Math.max(0, Math.floor(Number(cur[slug]) || 0) - Math.floor(Number(dst[slug]) || 0));
+      if (gained > 0) dst[slug] = (Number(dst[slug]) || 0) + gained;
+    }
+    shared[key] = dst;
+  }
+  const byId = new Map((shared.itemInstances || []).map((i) => [String(i && i.id), i]));
+  for (const inst of Array.isArray(p.itemInstances) ? p.itemInstances : []) {
+    if (!inst || typeof inst !== "object" || !inst.slug) continue;
+    if (String(inst.loc || "").startsWith("equip:")) continue;
+    const id = String(inst.id || "");
+    if (id && byId.has(id)) continue;
+    byId.set(id, Object.assign({}, inst));
+    shared.itemInstances.push(Object.assign({}, inst));
+  }
+  shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  return normalizeSharedInventory(shared);
+}
+
 module.exports = {
   SHARED_CONTAINERS,
   emptySharedInventory,
@@ -192,5 +227,6 @@ module.exports = {
   applySharedToPlayer,
   extractSharedFromPlayer,
   mergeSharedFromPlayer,
+  mergeTerminalDelta,
   charDataOf,
 };

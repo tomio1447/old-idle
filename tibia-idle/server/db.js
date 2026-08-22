@@ -361,7 +361,15 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
         if(a)a.shared_inventory=shared;
         sharedByAcc.set(aid,shared);
       }
-      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+      let leaderId=null;
+      try{
+        const st=typeof next.state==="string"?JSON.parse(next.state):(next.state||{});
+        const auth=st&&st.authority;
+        if(auth&&Array.isArray(auth.players)&&auth.players[0]){
+          leaderId=String(auth.players[0].id!==undefined?auth.players[0].id:(auth.players[0].p&&auth.players[0].p.id)||"");
+        }
+      }catch(e){/* leaderId opcional */}
+      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,leaderId));
     }
   }
   for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -404,7 +412,15 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
         if(a)a.shared_inventory=shared;
         sharedByAcc.set(aid,shared);
       }
-      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+      let leaderId=null;
+      try{
+        const st=typeof next.state==="string"?JSON.parse(next.state):(next.state||{});
+        const auth=st&&st.authority;
+        if(auth&&Array.isArray(auth.players)&&auth.players[0]){
+          leaderId=String(auth.players[0].id!==undefined?auth.players[0].id:(auth.players[0].p&&auth.players[0].p.id)||"");
+        }
+      }catch(e){/* leaderId opcional */}
+      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,leaderId));
     }
   }
   const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -683,7 +699,7 @@ function mergeTerminalRewardChest(shared, fromPlayer) {
  * rewardChest é sempre server-owned (muda só via /api/reward/claim), então é
  * preservado do shared. lootPouch é autoritativo no tick terminal da instância
  * (loot do combate) e preservado nos saves de cidade (muda via APIs de pouch). */
-function sharedInvExtractMirror(shared, data, terminal) {
+function sharedInvExtractMirror(shared, data, terminal, leaderId, base) {
   if (!SharedInv) return data;
   const p = typeof data === "string"
     ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })()
@@ -703,14 +719,15 @@ function sharedInvExtractMirror(shared, data, terminal) {
         })) : [],
   };
   if (terminal) {
-    // Terminal de instância com múltiplos personagens da conta: cada cópia
-    // pode ter divergido da outra durante a luta (desequipar/equipar em
-    // personagens diferentes). O extractSharedFromPlayer SOBRESCREVIA o
-    // shared com a bag do ÚLTIMO personagem processado — itens adicionados
-    // em outras cópias (ex.: item desequipado) SUMIAM ao final da boss
-    // fight. O merge preserva o maior valor por slug e une instâncias por
-    // id; o loot do combate (lootPouch da cópia) é somado ao que já havia.
-    SharedInv.mergeSharedFromPlayer(p, shared);
+    // Terminal de instância — arquitetura FIXA do jogo: o shared (bag/
+    // lootPouch da CONTA) é atualizado em tempo real pelas APIs de mutação
+    // durante a luta; a instância NÃO reconcilia cópias. Aqui só o LÍDER
+    // (p.id === leaderId) soma o loot de combate que ainda não foi
+    // persistido (leader[slug] - shared[slug]); personagens não-líder
+    // apenas espelham o shared no save.
+    if (String(p.id) === String(leaderId)) {
+      SharedInv.mergeTerminalDelta(shared, p);
+    }
   } else {
     SharedInv.extractSharedFromPlayer(p, shared);
     shared.lootPouch = keep.lootPouch;
@@ -1960,7 +1977,15 @@ async function MysqlStore() {
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
             }
-            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+            let leaderId=null;
+            try{
+              const st=typeof next.state==="string"?JSON.parse(next.state):(next.state||{});
+              const auth=st&&st.authority;
+              if(auth&&Array.isArray(auth.players)&&auth.players[0]){
+                leaderId=String(auth.players[0].id!==undefined?auth.players[0].id:(auth.players[0].p&&auth.players[0].p.id)||"");
+              }
+            }catch(e){/* leaderId opcional */}
+            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,leaderId));
           }
         }
         for(const projection of next.characters||[])await conn.query(
@@ -2024,7 +2049,15 @@ async function MysqlStore() {
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
             }
-            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+            let leaderId=null;
+            try{
+              const st=typeof next.state==="string"?JSON.parse(next.state):(next.state||{});
+              const auth=st&&st.authority;
+              if(auth&&Array.isArray(auth.players)&&auth.players[0]){
+                leaderId=String(auth.players[0].id!==undefined?auth.players[0].id:(auth.players[0].p&&auth.players[0].p.id)||"");
+              }
+            }catch(e){/* leaderId opcional */}
+            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,leaderId));
           }
         }
         for(const projection of next.characters||[])await conn.query(
