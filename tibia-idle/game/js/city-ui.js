@@ -1067,7 +1067,7 @@ function promotionEligibility(p) {
   return { ok: true, msg: "Pronto" };
 }
 
-function promoteCharacterById(id) {
+async function promoteCharacterById(id) {
   const currentId = G.p ? characterId(G.p) : null;
   const wanted = String(id);
   let target = null;
@@ -1076,6 +1076,23 @@ function promoteCharacterById(id) {
   if (!target) return { ok: false, msg: "Personagem não encontrado." };
   const check = promotionEligibility(target);
   if (!check.ok) return check;
+  /* ONLINE a promoção é autoritativa no SERVIDOR: a mutação local sumia no
+   * refresh do cache do /api/me e o tick da instância ativa sobrescrevia
+   * com promoted=false (a promoção "não pegava" ao fechar o modal). */
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured()
+    && typeof sessionToken === "function" && !!sessionToken()
+    && typeof accountPromoteCharacter === "function";
+  if (online) {
+    const r = await accountPromoteCharacter(sessionToken(), wanted);
+    if (!r.ok) return { ok: false, msg: r.msg || "Falha ao promover." };
+    target.promoted = true;
+    target.promotedAt = Date.now();
+    target.gold = Math.max(0, (Number(target.gold) || 0) - PROMOTION_PRICE);
+    saveCharacterToRoster(target);
+    if (String(currentId) === wanted) G.p = target;
+    return { ok: true, msg: `${target.name} agora é ${vocationName(target)}!` };
+  }
+  /* OFFLINE: fluxo local (roster do localStorage). */
   if (!spendGold(target, PROMOTION_PRICE)) return { ok: false, msg: "Ouro insuficiente." };
   target.promoted = true;
   target.promotedAt = Date.now();
@@ -1364,8 +1381,9 @@ function bindNpc(id, type) {
 
   // promoção King Tibianus
   $$("#npc-content [data-promote-char]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const r = promoteCharacterById(b.dataset.promoteChar);
+    b.addEventListener("click", async () => {
+      b.disabled = true; /* evita double-click/double-pagamento enquanto o servidor responde */
+      const r = await promoteCharacterById(b.dataset.promoteChar);
       toast(r.msg, r.ok ? "level" : "");
       if (r.ok) addLog("level", r.msg);
       refreshNpc(id);
