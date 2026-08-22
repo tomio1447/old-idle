@@ -362,9 +362,10 @@ async function accountLoadInstance(token){
       expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
       accountInstanceApply(tick.data.instance||null);
-      // Resposta do debate entregue (ver accountTickInstance).
-      const combat=typeof G!=="undefined"&&G&&G.combat;
-      if(combat&&combat._oberonPendingAnswer!==undefined)combat._oberonPendingAnswer=null;
+      // A resposta do debate NÃO é limpa aqui: este tick pode não ter
+      // carregado a resposta (corrida — o visual_state foi montado antes do
+      // clique) e o servidor só a julga quando o debate processa. A limpeza
+      // acontece no applyOnlineAuthorityState ao ver o debate sem pending.
       return {ok:true,instance:tick.data.instance&&tick.data.instance.state||null,
         meta:tick.data.instance||null,lastStatus:tick.data.instance?null:"ended"};}
     // Em caso de corrida com worker/SSE, use o snapshot GET já validado; a
@@ -546,10 +547,10 @@ function accountTickInstance(token){
       char_id:typeof sessionCharId==="function"?sessionCharId():null,
       expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
-      // A resposta do debate foi entregue ao servidor neste tick — só agora
-      // pode ser descartada (tick falho mantém a resposta para reenvio).
-      const combat=typeof G!=="undefined"&&G&&G.combat;
-      if(combat&&combat._oberonPendingAnswer!==undefined)combat._oberonPendingAnswer=null;
+      // A resposta do debate NÃO é limpa aqui: este tick pode não ter
+      // carregado a resposta (corrida — o visual_state foi montado antes do
+      // clique) e o servidor só a julga quando o debate processa. A limpeza
+      // acontece no applyOnlineAuthorityState ao ver o debate sem pending.
       return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,
         elapsed:r.data.elapsed||0,version:ACCOUNT_INSTANCE.version,instanceId:ACCOUNT_INSTANCE.id};}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
