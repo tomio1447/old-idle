@@ -2530,26 +2530,44 @@ async function equipInstanceItem(db,body){
       return {code:400,body:{ok:false,error:"INVALID_EQUIP",msg:"Instância inválida para equipar"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null;
+    let rejection=null,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      // A bag é DA CONTA: guarda o estado antes da mutação para propagar o
+      // delta às cópias dos demais personagens e gravar no shared — sem
+      // isto, desequipar em um personagem não aparecia na bag de outro e o
+      // tick terminal sobrescrevia o shared com a última cópia (itens
+      // sumiam ao final da boss fight).
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
       let r;
       if(unequip)r=unequipFromContainerAuth(item.p,String(body.slot||""),String(body.dest||"bag"));
       else r=equipFromContainerAuth(item.p,String(body.slug||""),String(body.source||"bag"),
         {instId:body.inst_id?String(body.inst_id):null});
       if(!r||!r.ok){rejection=(r&&r.msg)||"Não foi possível equipar";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível equipar",
         instance:instanceSummary(result.instance,true)}};
+    // Grava a bag sincronizada no shared IMEDIATAMENTE (troca de personagem
+    // durante a boss fight não pode perder o item desequipado).
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"equip",holderId:String(body.holder_id||"")});
     return {code:200,body:{ok:true,equipped:unequip?null:String(body.slug||""),
-      slot:unequip?String(body.slot||""):null,instance:instanceSummary(result.instance,true)}};
+      slot:unequip?String(body.slot||""):null,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   let r;
@@ -2617,6 +2635,7 @@ async function equipOtherCharacterItem(db,body){
     // shared fica no state; a extração terminal reconcilia o shared).
     let rejection=null;
     let last=null;
+    let synced=null;
     for(let attempt=0;attempt<4;attempt++){
       const current=attempt===0?row:await db.instanceGet(Number(row.account_id));
       if(!current||current.status!=="active")
@@ -2628,6 +2647,10 @@ async function equipOtherCharacterItem(db,body){
           const entries=(descriptor.authority&&descriptor.authority.players)||[];
           const targetEntry=entries.find((item)=>String(item&&item.id)===String(targetId));
           if(!targetEntry||!targetEntry.p){rejection="O personagem alvo não participa desta instância";return null;}
+          const preSnapshot={
+            pouch:Object.assign({},targetEntry.p.lootPouch||{}),
+            bag:Object.assign({},targetEntry.p.bag||{}),
+          };
           const _r=equipFromContainerAuth(targetEntry.p,slug,source,{instId});
           if(!_r||!_r.ok){
             rejection=(last&&last.msg)||"Não foi possível equipar (item não está na mochila/pouch, vocação ou nível)";
@@ -2639,14 +2662,22 @@ async function equipOtherCharacterItem(db,body){
             if(entry===targetEntry||!entry||!entry.p)continue;
             removeSharedItemFromMember(entry.p,slug,instId,source);
           }
+          // Sincroniza as cópias + shared: o item saiu da bag da conta.
+          synced=syncInstancePouchCopies(entries,targetId,preSnapshot);
           descriptor=materializeAuthority(descriptor);
           return JSON.stringify(descriptor);
         },lease);
       if(result.ok){
+        let sharedSync=null;
+        if(synced){
+          await persistSharedPouchSync(db,acc,synced);
+          try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+        }
         await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,
           version:Number(result.instance.version),status:result.instance.status,source:"equip-other",
           holderId:String(body.holder_id||"")});
-        return {code:200,body:{ok:true,equipped:slug,slot:null,instance:instanceSummary(result.instance,true)}};
+        return {code:200,body:{ok:true,equipped:slug,slot:null,instance:instanceSummary(result.instance,true),
+          ...(sharedSync?{sharedInventory:sharedSync}:{})}};
       }
       if(result.error==="LEASE_REQUIRED")
         return {code:423,body:{ok:false,error:"LEASE_REQUIRED",msg:"O controle desta conta foi transferido antes do equip terminar."}};

@@ -702,8 +702,19 @@ function sharedInvExtractMirror(shared, data, terminal) {
           items: b && b.items && typeof b.items === "object" ? Object.assign({}, b.items) : {},
         })) : [],
   };
-  SharedInv.extractSharedFromPlayer(p, shared);
-  if (!terminal) shared.lootPouch = keep.lootPouch;
+  if (terminal) {
+    // Terminal de instância com múltiplos personagens da conta: cada cópia
+    // pode ter divergido da outra durante a luta (desequipar/equipar em
+    // personagens diferentes). O extractSharedFromPlayer SOBRESCREVIA o
+    // shared com a bag do ÚLTIMO personagem processado — itens adicionados
+    // em outras cópias (ex.: item desequipado) SUMIAM ao final da boss
+    // fight. O merge preserva o maior valor por slug e une instâncias por
+    // id; o loot do combate (lootPouch da cópia) é somado ao que já havia.
+    SharedInv.mergeSharedFromPlayer(p, shared);
+  } else {
+    SharedInv.extractSharedFromPlayer(p, shared);
+    shared.lootPouch = keep.lootPouch;
+  }
   shared.rewardChest = keep.rewardChest;
   shared.rewardChestBundles = keep.rewardChestBundles;
   if (terminal) mergeTerminalRewardChest(shared, fromPlayer);

@@ -616,6 +616,10 @@ function accountEquipItem(token,charId,opts){
         instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields()));
       if(r.data.ok){
         accountInstanceApply(r.data.instance);
+        // A bag é da conta: o servidor sincronizou o shared com o delta do
+        // equip/desequip — aplica para a troca de personagem (e o /api/me
+        // de outras abas) ver o item desequipado na backpack.
+        if(r.data.sharedInventory)accountApplySharedInventory(r.data.sharedInventory);
         return {ok:true,state:r.data.instance&&r.data.instance.state,
           version:r.data.instance&&r.data.instance.version};
       }
