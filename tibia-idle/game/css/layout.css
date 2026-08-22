@@ -1841,6 +1841,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .toast.level { border-color: #ffe680; color: #ffe680; }
 .toast.death { border-color: var(--red); color: #ff9090; }
 .toast.rare { border-color: #b060ff; color: #dab0ff; }
+.toast.loot { border-color: #9ce84a; color: #c6f59a; }
 @keyframes slidein { from { transform: translateX(30px); opacity: 0; } }
 
 /* menu de contexto (loot pouch / itens) */
