@@ -536,8 +536,9 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "salamander-cave":{monsters:["emerald-damselfly","marsh-stalker","swampling","salamander"],cat:"aventureiro",pack:4},
   "falcon-bastion":{monsters:["falcon-knight","falcon-paladin"],cat:"hard",pack:7,packMin:6,packMax:8,
     bossMobs:["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"],
-    spawnWeights:{"falcon-knight":49.95,"falcon-paladin":49.95,
-      "grand-commander-soeren":0.025,"preceptor-lazare":0.025,"grand-chaplain-gaunder":0.025,"grand-canon-dominus":0.025}},
+    spawnWeights:{/* 5% por slot de spawn: 1,25% para cada um dos 4 mini bosses */
+      "falcon-knight":47.5,"falcon-paladin":47.5,
+      "grand-commander-soeren":1.25,"preceptor-lazare":1.25,"grand-chaplain-gaunder":1.25,"grand-canon-dominus":1.25}},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
@@ -5786,7 +5787,10 @@ function pickHuntSpawnSlug(auth){
       rows.push({slug,n});total+=n;
     }
     if(total>0){
-      let r=roll(auth,0,total-1);
+      // Roll FRACIONÁRIO em [0,total): o roll() inteiro (Math.floor) nunca
+      // atingia a faixa cumulativa final dos pesos quebrados (99.95→100),
+      // logo os mini bosses do Falcon Bastion tinham 0% de chance real.
+      let r=random(auth)*total;
       for(const row of rows){if(r<row.n)return row.slug;r-=row.n;}
       return rows[rows.length-1].slug;
     }
