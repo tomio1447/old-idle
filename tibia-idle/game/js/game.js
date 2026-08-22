@@ -3979,6 +3979,10 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     const visual={};for(const key of visualKeys)if(local[key]!==undefined)visual[key]=local[key];
     const playerRef=isPlayer&&local.p&&typeof local.p==="object"?local.p:null;
     const localDef=local.def;
+    // HP anterior do player para a garantia de dano visível (sync de dano):
+    // se o snapshot reduzir o HP e o evento taken correspondente for perdido
+    // (dedupe de versão/409/rede), o drainEvents exibe o dano mesmo assim.
+    if(playerRef)local._hpBeforeMerge=Number(playerRef.hp)||0;
     // O snapshot do servidor também carrega posição DENTRO de `p` (o save do
     // personagem). Sem preservar aqui, `Object.assign(playerRef,remote.p)`
     // devolvia o char ao tile de spawn a cada tick: a party inteira piscava
@@ -4157,6 +4161,37 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   }
   if(Array.isArray(previous.players)){previous.players.splice(0,previous.players.length,...reconciledPlayers);}
   else previous.players=reconciledPlayers;
+  // Garantia de dano visível (bug "animação de área aparece mas o personagem
+  // não sofre dano"): se o snapshot reduziu o HP de um player e NÃO há evento
+  // taken para ele neste lote (perdido por dedupe de versão / 409 / rede),
+  // empilha um taken sintético — o drainEvents exibe floater, log e efeito.
+  // Sem isto o HP baixava silenciosamente e a luta parecia "sem dano".
+  if(Array.isArray(incoming.events)&&incoming.events.length){
+    const takenTargets=new Set();
+    for(const ev of incoming.events){
+      if(ev&&ev.t==="taken"&&ev.targetId!==undefined&&ev.targetId!==null)
+        takenTargets.add(String(ev.targetId));
+    }
+    for(const ent of reconciledPlayers){
+      if(!ent||!ent.p)continue;
+      const id=entityId(ent);
+      if(!id||takenTargets.has(id))continue;
+      const before=Number(ent._hpBeforeMerge);
+      if(!Number.isFinite(before)||before<=0)continue;
+      const after=Number(ent.p.hp)||0;
+      const missing=Math.floor(before-after);
+      if(missing>0&&after>=0){
+        previous.events=previous.events||[];
+        previous.events.push({t:"taken",dmg:missing,el:"physical",targetId:id,
+          x:Number(ent.x),y:Number(ent.y),screen:true,fx:null,ts:Date.now()+10,synthetic:true});
+        if(typeof addCombatHitLog==="function"){
+          try{addCombatHitLog("sync|"+id,(ent.p.name||"Alvo"),"#ff6b6b",missing,"physical");}
+          catch(_e){/* log opcional */}
+        }
+      }
+    }
+  }
+  for(const ent of reconciledPlayers){if(ent)delete ent._hpBeforeMerge;}
   const authClock=Number(incoming.authClock);
   if(Number.isFinite(authClock)){
     previous.authClock=authClock;
