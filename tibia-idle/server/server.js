@@ -1077,6 +1077,107 @@ async function persistClaimedPlayer(db,acc,character,p,lease){
     ...(sharedInventory?{sharedInventory}:{})}};
 }
 
+/* Promoção do King Tibianus — autoritativa no SERVIDOR. O client antigo só
+ * mutava o objeto local (promoted=true): para personagem não-ativo a flag
+ * sumia no próximo refresh do cache, e para o ativo o tick da instância
+ * sobrescrevia com promoted=false — a promoção "não pegava" e o botão
+ * voltava habilitado (dava para pagar de novo). */
+const PROMOTION_PRICE=20000,PROMOTION_LEVEL=20;
+function applyCharacterPromotion(p,goldSource){
+  if(!p||typeof p!=="object")return {ok:false,code:400,error:"PROMOTION_INVALID",msg:"Personagem inválido"};
+  if(p.promoted)return {ok:false,code:409,error:"ALREADY_PROMOTED",msg:"Personagem já promovido"};
+  if((Number(p.level)||0)<PROMOTION_LEVEL)
+    return {ok:false,code:400,error:"PROMOTION_LEVEL",msg:"Requer nível "+PROMOTION_LEVEL};
+  /* Gold é o WALLET DA CONTA: na cidade a fonte é acc.gold (o gold do save
+   * do char é só espelho — ver loadCharacter); na instância item.p.gold já
+   * é o getter do wallet. Sem isso a promoção cobrava do espelho stale e o
+   * jogador pagava com gold que não existe (ou era bloqueado à toa). */
+  const gold=arguments.length>1?Math.max(0,Math.floor(Number(goldSource)||0))
+    :Math.max(0,Math.floor(Number(p.gold)||0));
+  if(gold<PROMOTION_PRICE)
+    return {ok:false,code:400,error:"PROMOTION_GOLD",msg:"Requer "+PROMOTION_PRICE+" gp"};
+  p.gold=gold-PROMOTION_PRICE;
+  p.promoted=true;
+  p.promotedAt=Date.now();
+  return {ok:true};
+}
+async function persistPromotedPlayer(db,acc,character,p,lease){
+  let sharedInventory=null;
+  if(SharedInv&&typeof db.accountSharedInventory==="function")
+    sharedInventory=await splitSharedInventory(db,acc,p,true);
+  const result=await db.saveCharactersVersioned(acc.id,[{
+    id:Number(character.id),expectedVersion:Number(character.save_version),voc:character.voc,
+    level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
+    extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
+  }],lease);
+  if(!result.ok)return saveConflictResponse(result);
+  const updated=result.characters[0];
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"promote",updated,false);
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"promote"});
+  await publishPartyForCharacters(db,[updated.id],"promote");
+  return {code:200,body:{ok:true,promoted:true,saveVersion:Number(updated.save_version),
+    character:accountCharacterSummary(updated),
+    ...(sharedInventory?{sharedInventory}:{})}};
+}
+async function promoteCharacterApi(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id!==undefined?body.char_id:body.id);
+  if(!Number.isSafeInteger(charId)||charId<=0)
+    return {code:400,body:{ok:false,error:"INVALID_PROMOTION",msg:"Personagem inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);
+  if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    // Personagem em instância ativa: promove DENTRO do snapshot autoritativo
+    // (senão o próximo tick sobrescreve com promoted=false).
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active")break;
+      let check=null,promotedPlayer=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p)return null;
+        const r=applyCharacterPromotion(item.p);
+        if(!r.ok){check=r;return null;}
+        promotedPlayer=cloneJson(item.p);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(check)return {code:check.code,body:{ok:false,error:check.error,msg:check.msg}};
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+          status:result.instance.status,source:"promote",holderId:String(body.holder_id||"")});
+        const fresh=await db.findCharacter(charId);
+        return persistPromotedPlayer(db,acc,fresh||character,promotedPlayer,lease);
+      }
+      if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a promoção"}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+    }
+    if(last&&last.error==="INSTANCE_NOT_ACTIVE"){/* cai no save do personagem */}
+    else if(last&&!last.ok)
+      return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível promover",
+        instance:instanceSummary(last.instance,true)}};
+  }
+  let p=await loadCityPlayer(db,acc,character);
+  const walletGold=Math.max(0,Math.floor(Number(acc.gold)||0));
+  const applied=applyCharacterPromotion(p,walletGold);
+  if(!applied.ok)return {code:applied.code,body:{ok:false,error:applied.error,msg:applied.msg}};
+  /* Cidade: debita o WALLET da conta direto (o sync do gold só roda no tick
+   * de instância — sem isso o espelho do save não voltava pra acc.gold). */
+  if(typeof db.setAccountGold==="function")
+    await db.setAccountGold(acc.id,Math.max(0,walletGold-PROMOTION_PRICE));
+  return persistPromotedPlayer(db,acc,character,p,lease);
+}
+
 async function claimRewardChest(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
