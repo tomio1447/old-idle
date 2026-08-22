@@ -42,7 +42,7 @@ const BURIED_LOOT_ITEMS = {
   "red-ectoplasm":             { n: "red ectoplasm", s: null, t: "loot", cid: 30084, w: 1.00, sell: 0, npcSell: 0 },
   "blue-ectoplasm":            { n: "blue ectoplasm", s: null, t: "loot", cid: 30082, w: 1.00, sell: 0, npcSell: 0 },
   "golden-idol-of-tukh":       { n: "golden idol of Tukh", s: null, t: "loot", cid: 29299, w: 20.00, sell: 0, npcSell: 0 },
-  "brown-crystal-splinter":    { n: "brown crystal splinter", s: null, t: "loot", cid: 16123, w: 0.10, sell: 400, npcSell: 400 },
+  "brown-crystal-splinter":    { n: "brown crystal splinter", s: null, t: "loot", cid: 16123, w: 0.10, sell: 800, npcSell: 800 },
   "coral-brooch":              { n: "coral brooch", s: null, t: "loot", cid: 24391, w: 0.80, sell: 750, npcSell: 750 },
   "hexagonal-ruby":            { n: "hexagonal ruby", s: null, t: "loot", cid: 30180, w: 1.25, sell: 30000, npcSell: 30000 },
   "prismatic-quartz":          { n: "prismatic quartz", s: null, t: "loot", cid: 24962, w: 1.20, sell: 450, npcSell: 450 },

@@ -362,6 +362,9 @@ async function accountLoadInstance(token){
       expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(tick.data&&tick.data.ok){if(tick.data.characters)accountMergeCharacterCache(tick.data.characters);
       accountInstanceApply(tick.data.instance||null);
+      // Resposta do debate entregue (ver accountTickInstance).
+      const combat=typeof G!=="undefined"&&G&&G.combat;
+      if(combat&&combat._oberonPendingAnswer!==undefined)combat._oberonPendingAnswer=null;
       return {ok:true,instance:tick.data.instance&&tick.data.instance.state||null,
         meta:tick.data.instance||null,lastStatus:tick.data.instance?null:"ended"};}
     // Em caso de corrida com worker/SSE, use o snapshot GET já validado; a
@@ -527,10 +530,12 @@ function accountAuthorityVisualState(){
   }
   // Grand Master Oberon: resposta do debate escolhida no modal. O servidor
   // julga o texto contra a resposta correta (nunca enviada ao cliente).
+  // NÃO limpa aqui: se o tick que carrega a resposta falhar (rede/409), a
+  // resposta é reenviada no próximo tick — só é descartada após sucesso
+  // (ver accountTickInstance/accountLoadInstance).
   if(combat._oberonPendingAnswer!==undefined&&combat._oberonPendingAnswer!==null){
     const answer=String(combat._oberonPendingAnswer||"");
     out.oberonIntent=answer?{answer:answer}:{skip:true};
-    combat._oberonPendingAnswer=null;combat._oberonPendingAt=0;
   }
   return out;
 }
@@ -541,6 +546,10 @@ function accountTickInstance(token){
       char_id:typeof sessionCharId==="function"?sessionCharId():null,
       expected_version:ACCOUNT_INSTANCE.version,visual_state:accountAuthorityVisualState()},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);if(r.data.characters)accountMergeCharacterCache(r.data.characters);
+      // A resposta do debate foi entregue ao servidor neste tick — só agora
+      // pode ser descartada (tick falho mantém a resposta para reenvio).
+      const combat=typeof G!=="undefined"&&G&&G.combat;
+      if(combat&&combat._oberonPendingAnswer!==undefined)combat._oberonPendingAnswer=null;
       return {ok:true,state:r.data.instance&&r.data.instance.state,terminalReason:r.data.terminalReason||null,
         elapsed:r.data.elapsed||0,version:ACCOUNT_INSTANCE.version,instanceId:ACCOUNT_INSTANCE.id};}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
