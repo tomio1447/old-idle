@@ -2993,21 +2993,36 @@ function drainEvents() {
         r.addFloater(x, y - 0.06, "+" + fmtDmg(shownExp) + " xp", "#ffffff");
         r.addEffect(x, y, "poff");
         addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(shownExp)} xp</span>`);
-        if (e.loot && e.loot.length) {
-          // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
-          // esquerda) e sem a mensagem verde que sobe na tela. O loot fica
-          // apenas no log do painel (abaixo).
-          // Filtra entradas inválidas/vazias ("nothing"): boss que não dropou
-          // nada NÃO pode gerar a notificação "Loot: nothing".
-          const valid = e.loot.filter((l) => l && l.item && (Number(l.count) || 0) > 0);
-          if (valid.length) {
-            const txt = valid.map((l) => {
-              const it = GAMEDATA.items[l.item];
-              const rare = it && (it.sell || 0) >= 500;
-              const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
-              return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
-            }).join(", ");
+        // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
+        // esquerda) e sem a mensagem verde que sobe na tela para loot comum.
+        // Para BOSS o dono pediu a mensagem NA TELA informando o loot, no
+        // formato "Loot from <boss>: <itens>" (ex.: Loot from The Grandmaster
+        // Oberon: a piece of fine cloth, a falcon plate), e notificação
+        // mesmo quando o boss não dropa NADA (sem o feio "Loot: nothing").
+        const isWorldBossKill = !!(c.worldBoss || (c.boss && c.boss.worldBoss));
+        const bossName = e.boss ? (e.name || (c.boss && c.boss.name) || "Boss") : null;
+        const valid = (e.loot || []).filter((l) => l && l.item && (Number(l.count) || 0) > 0);
+        if (valid.length) {
+          const txt = valid.map((l) => {
+            const it = GAMEDATA.items[l.item];
+            const rare = it && (it.sell || 0) >= 500;
+            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
+            return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
+          }).join(", ");
+          if (bossName) {
+            // Boss: mensagem na tela (toast) + log, no formato pedido.
+            addLog("loot", `Loot from <b>${bossName}</b>: ${txt}`);
+            if (typeof toast === "function" && !isWorldBossKill) {
+              toast(`Loot de <b>${bossName}</b>: ${txt}`, "loot");
+            }
+          } else {
             addLog("loot", `Loot: ${txt}`);
+          }
+        } else if (bossName) {
+          // Boss sem drop: notificação mesmo ao não dropar nada.
+          addLog("loot", `O boss <b>${bossName}</b> não dropou nada.`);
+          if (typeof toast === "function" && !isWorldBossKill) {
+            toast(`O boss <b>${bossName}</b> não dropou nada.`, "loot");
           }
         }
         // Bestiário/bosstiário: no modo local isto roda dentro de combatTick

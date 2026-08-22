@@ -178,6 +178,7 @@ button.danger {
 .toast.level { border-color: var(--gi-gold); color: var(--gi-gold-light); }
 .toast.death { border-color: var(--gi-danger); color: #fca5a5; }
 .toast.rare { border-color: #a78bfa; color: #c4b5fd; }
+.toast.loot { border-color: #9ce84a; color: #c6f59a; }
 
 /* -------------------------- cidade / NPCs */
 .npc-quick .npc-btn {
