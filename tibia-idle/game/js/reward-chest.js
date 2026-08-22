@@ -50,8 +50,10 @@ function rewardChestBundleList(p) {
     });
     p.rewardChestLegacyMigrated = true;
   }
+  // Inclui bundles VAZIOS: boss derrotado sem drop entrega um baú vazio
+  // (pedido do dono) — o jogador vê a notificação e pode abrir/recolher.
   return p.rewardChestBundles.filter((b) => b && b.items &&
-    Object.keys(b.items).some((slug) => b.items[slug] > 0));
+    typeof b.items === "object" && !Array.isArray(b.items));
 }
 
 function rewardChestFindBundle(p, id) {
@@ -227,7 +229,7 @@ function rewardBossCard(bundle) {
                   title="Abrir recompensa de ${bundle.name}">
     <span class="reward-boss-sprite">${sprite}</span>
     <span class="reward-boss-chest"><img src="assets/item/reward-chest.png" alt="Reward Chest"></span>
-    <b>${bundle.name}</b><small>${fmtFull(count)} item(ns) · clique para abrir</small>
+    <b>${bundle.name}</b><small>${count > 0 ? `${fmtFull(count)} item(ns) · clique para abrir` : "baú vazio · clique para abrir"}</small>
   </button>`;
 }
 
@@ -237,13 +239,8 @@ function openRewardChest(bundleId) {
   if (!p) { toast("Crie um personagem primeiro"); return; }
   const bundles = rewardChestBundleList(p);
   let bundle = bundleId ? rewardChestFindBundle(p, bundleId) : null;
-  // Bundle de boss que não dropou NADA não pode abrir como "Loot: nothing":
-  // remove da lista (idempotente — o servidor também limpa em claims).
-  if (bundle && !Object.keys(bundle.items || {}).some((slug) => (bundle.items[slug] || 0) > 0)) {
-    p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b !== bundle);
-    if (typeof save === "function") save();
-    bundle = null;
-  }
+  // Bundle vazio (boss sem drop) é MANTIDO: o baú vazio é entregue e o
+  // jogador o remove ao recolher (pedido do dono).
   const itens = bundle ? rewardChestItems(p, bundle.id) : [];
   const total = itens.reduce((sum,i) => sum + i.count, 0);
   const box = $("#modal-body");
@@ -265,9 +262,10 @@ function openRewardChest(bundleId) {
             ? (typeof bossMobImg === "function" ? bossMobImg(bundle.sprite, 54)
               : mobImg(bundle.sprite, 54))
             : "🎁"}</span>
-          <div><b>${bundle.name}</b><small>${itens.length} tipos · ${fmtFull(total)} itens</small></div>
+          <div><b>${bundle.name}</b><small>${itens.length ? `${itens.length} tipos · ${fmtFull(total)} itens` : "baú vazio — o boss não dropou nada"}</small></div>
           <button class="primary sm" id="reward-claim-all">RECOLHER TUDO</button>
         </div>
+        ${itens.length ? `
         <div class="reward-slot-grid">
           ${itens.map((i) => `<button class="reward-slot ${typeof itemClsBorder === "function" ? itemClsBorder(i.slug) : ""}"
                     data-reward-claim="${i.slug}" aria-label="${i.it ? i.it.n : i.slug} · ${fmtFull(i.count)}x">
@@ -275,7 +273,9 @@ function openRewardChest(bundleId) {
               <b class="reward-slot-count">${fmtFull(i.count)}</b>
             </button>`).join("")}
         </div>
-        <div class="reward-footer">Clique em um slot para enviar o item à Loot Pouch.</div>`
+        <div class="reward-footer">Clique em um slot para enviar o item à Loot Pouch.</div>
+        ` : `<div class="reward-empty"><span>🎁</span><b>Baú vazio</b>
+           <small>${bundle.name} foi derrotado, mas não dropou nada. Recolha para remover.</small></div>`}`
       : bundles.length ? `
         <div class="reward-boss-help">Escolha o boss para abrir sua recompensa.</div>
         <div class="reward-boss-grid">${bundles.map(rewardBossCard).join("")}</div>`
