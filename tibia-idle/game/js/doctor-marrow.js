@@ -1,8 +1,8 @@
 /* doctor-marrow.js — Boss Doctor Marrow (Cradle of Monsters, nível 250+).
  *
- * Boss simples sem mecânica própria: usa o monstro base do Canary
- * (monsterdata.js) apenas para stats (hp/dano/armor/defense) — sem skills,
- * sem absorbs, sem summon (ficha simplificada no canarymonsters.json).
+ * Boss simples (sem mecânica própria), ficha da TibiaWiki:
+ *   - Físico: corpo a corpo (0–2900)
+ *   - Energy: Energy Chain (400–1500)
  * A sala foi mapeada em doctormarrow_room.otbm.
  * Outfit Canary looktype 1611: lookHead 57, lookBody 0, lookLegs 0, lookFeet 95
  * (cabelo cinza, jaleco branco, sapatos escuros — aplicados no sheet).
@@ -25,7 +25,7 @@ const DOCTOR_MARROW_STATS = {
   name: "Doctor Marrow",
   hp: 120000,
   exp: 30000,
-  damage: 2800,
+  damage: 2900,
   armor: 59,
   defense: 54,
 };
