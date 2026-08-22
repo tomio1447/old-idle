@@ -277,7 +277,11 @@ const ATTACK_SPEED = { melee: 1200, distance: 1200, magic: 1200 };
  * verde, e assim por diante. O jogo usava cinza para todos.
  */
 const RACE_FISICO = {
-  blood: { color: "#c00000", fx: "draw-blood" },
+  // Vermelho CLARO (pedido do dono): o antigo #c00000 era quase idêntico ao
+  // vermelho-escuro do death (#8b0000) — físico e death pareciam a mesma cor.
+  // #ff6b6b é o mesmo tom do ELEMENTS.physical (dano recebido) e fica
+  // claramente mais claro que o death.
+  blood: { color: "#ff6b6b", fx: "draw-blood" },
   venom: { color: "#5ac85a", fx: "hit-by-poison" },
   undead: { color: "#c8c8c8", fx: "hit-area" },
   ink: { color: "#c8c8c8", fx: "hit-area" },
