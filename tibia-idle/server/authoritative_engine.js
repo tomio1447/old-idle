@@ -981,12 +981,16 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
     }
   }}
   const clock=Number(auth.clock)||0;
+  // Posição dos MOBS é autoritativa no servidor (advanceAuthorityMovement
+  // move todo mob com pathfinding próprio). Aplicar a posição prevista do
+  // cliente fazia o boss "voltar" para onde o cliente o mostrava (1 tick
+  // atrás, interpolação/predição) — as spells saíam da posição travada e o
+  // mob ficava dessincronizado do dano. Só o Challenge (puxar para o
+  // knight) continua usando a posição enviada pelo cliente.
   for(const mob of auth.mobs||[]){
     const pos=mobs.get(String(mob.id));if(!pos)continue;
-    // Enquanto o Challenge puxa o bicho para o knight, a predição ranged do
-    // cliente não pode devolver o alvo à distância de tiro a cada tick.
-    if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)continue;
-    applyPose(mob,pos);
+    if((Number(mob.challengedUntil)||0)>clock||(Number(mob.forceMeleeUntil)||0)>clock)
+      applyPose(mob,pos);
   }
   if(auth.scarlett&&visual.scarlettIntent&&visual.scarlettIntent.dir){
     const pi={dir:visual.scarlettIntent.dir};

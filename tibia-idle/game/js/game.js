@@ -4295,6 +4295,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   // debate abre a partir do estado (state.oberon) e a réplica escolhida
   // volta no próximo tick via oberonIntent. O servidor nunca envia a
   // resposta correta, só a frase + opções embaralhadas.
+  // Regras anti-reabertura (bug "modal reabre instantaneamente ao clicar"):
+  //  - Depois de escolher a réplica (_oberonPendingAnswer setado) o modal
+  //    NUNCA reabre — o snapshot pode voltar 1 tick atrás (tick disparado
+  //    antes do clique ainda pendente) e o modal "piscava" de novo, o
+  //    jogador clicava várias vezes e as respostas se sobrescreviam.
+  //  - A resposta só é descartada quando o servidor processa (state sem
+  //    pending) — nunca num tick ok sem a resposta (corrida do visual_state).
+  //  - Timeout de segurança: se o servidor não processar em 6s, descarta a
+  //    resposta velha e reabre (envio pode ter sido perdido de verdade).
   // Auto-recuperação: se o modal foi fechado por fora (ESC/closeModal) o
   // callback de resposta nunca roda e `_oberonModalOpen` ficaria preso em
   // true — a 2ª pergunta (2ª morte do boss) nunca abriria. Reabre quando a
@@ -4306,7 +4315,16 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
        typeof oberonOpenDebateModalRemote==="function"){
       const phrase=String(obState.question.phrase);
       const changed=previous._oberonQuestionPhrase!==phrase;
-      if(!previous._oberonModalOpen||changed){
+      let answered=previous._oberonPendingAnswer!==undefined&&previous._oberonPendingAnswer!==null;
+      // Resposta escolhida aguardando o servidor: descarta apenas se passou
+      // do timeout (6s) — o envio pode ter sido perdido de verdade. Após
+      // descartar, reavalia `answered` para o modal poder reabrir.
+      if(answered&&previous._oberonPendingAt&&(Date.now()-Number(previous._oberonPendingAt))>6000){
+        previous._oberonPendingAnswer=null;
+        previous._oberonPendingAt=0;
+        answered=false;
+      }
+      if(!answered&&(!previous._oberonModalOpen||changed)){
         previous._oberonModalOpen=true;
         previous._oberonQuestionPhrase=phrase;
         const bossMob=(previous.mobs||[]).find((m)=>m&&m.boss)||null;
@@ -4317,10 +4335,15 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
           if(typeof requestOnlineAuthorityTick==="function")requestOnlineAuthorityTick();
         });
       }
-    }else if(obState&&!obState.pending&&!obState.question){
-      // Debate encerrado (resposta julgada ou erro): libera o flag para a
-      // próxima pergunta abrir normalmente.
+    }else if(obState&&!obState.pending){
+      // Debate processado pelo servidor (certo ou errado): a resposta foi
+      // entregue — libera tudo. Sem pergunta (acerto) zera a frase para a
+      // próxima pergunta abrir como "nova"; com pergunta (erro, reabre em
+      // 10s) mantém a frase para a reabertura.
       previous._oberonModalOpen=false;
+      previous._oberonPendingAnswer=null;
+      previous._oberonPendingAt=0;
+      if(!obState.question)previous._oberonQuestionPhrase=null;
     }
   }catch(e){/* modal é opcional — nunca pode quebrar o tick */}
   if(Number.isFinite(incomingVersion)&&incomingVersion>0){
