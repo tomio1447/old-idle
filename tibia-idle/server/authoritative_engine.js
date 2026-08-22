@@ -1533,7 +1533,8 @@ function weaponAmmoKind(wp,slug){
   const explicit=wp.ammoKind||wp.ammoType||wp.ammotype;
   if(explicit){const k=String(explicit).toLowerCase();return k==="bolt"?"bolt":k==="arrow"?"arrow":null;}
   const id=String(slug||"");
-  if(/crossbow|arbalest|bolter|spitter|ironworker|devileye/.test(id))return "bolt";
+  if(/soulbleeder|soulpiercer|thorn-spitter/.test(id))return "arrow";
+  if(/crossbow|arbalest|bolter|ironworker|devileye/.test(id))return "bolt";
   if(/bow/.test(id)&&!/crossbow/.test(id))return "arrow";
   return null;}
 function ammoCompatibleWithWeapon(ammoIt,weaponSlug){
