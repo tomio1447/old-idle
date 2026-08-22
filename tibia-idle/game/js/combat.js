@@ -3870,6 +3870,35 @@ function mobSkillFx(c, mob, pl, sk) {
                   missile: sk.miss || ELEMENT_MISSILE[el] || null });
 }
 
+/* Vítimas de uma skill em área: células da forma ancoradas no ALVO PRIMÁRIO
+ * (explosões alvo+range) ou no próprio monstro — o mesmo cálculo do servidor
+ * (runMobSkills). Antes o client só atingia o alvo primário: em party o FX
+ * pintava a área inteira e os outros membros não levavam dano nenhum. */
+function mobSkillAreaVictims(c, mob, pl, sk) {
+  const list = (c && c.players && c.players.length ? c.players : (pl ? [pl] : []))
+    .filter((ent) => ent && ent.p && ent.p.hp > 0);
+  if (!list.length) return [];
+  const gw = c && c.gridW, gh = c && c.gridH;
+  const hasCell = (ent) => !!(ent && ent.cx !== undefined && mob && mob.cx !== undefined);
+  if (sk.areaPattern && sk.areaPattern.length && typeof skillPatternHas === "function") {
+    if (!hasCell(pl)) return [pl];
+    return list.filter((ent) => hasCell(ent) &&
+      skillPatternHas(mob, pl, sk.areaPattern, ent.cx, ent.cy, gw, gh));
+  }
+  if (sk.length && typeof skillWaveHas === "function") {
+    if (!hasCell(pl)) return [pl];
+    return list.filter((ent) => hasCell(ent) &&
+      skillWaveHas(mob, pl, sk.length, sk.spread || 0, ent.cx, ent.cy, gw, gh));
+  }
+  if (sk.radius && typeof skillRadiusHas === "function") {
+    const centro = (sk.alvo && (sk.range || 1) > 1) ? pl : mob;
+    if (!hasCell(centro)) return [pl];
+    return list.filter((ent) => hasCell(ent) &&
+      skillRadiusHas(centro.cx, centro.cy, sk.radius, ent.cx, ent.cy));
+  }
+  return [pl];
+}
+
 /* O dano da habilidade. O corpo-a-corpo passa por armor/defense/shielding
  * (meleeCombat do servidor); o dano de SPELL nao passa — o Combat executa
  * com block type None e o que segura o dano sao as RESISTENCIAS:
@@ -4228,6 +4257,18 @@ function mobCastSkill(c, p, mob, now) {
       for (const ent of victims) { if (!ent || !ent.p) continue; mob.target = ent; mobSkillHit(c, ent.p, mob, sk, rawSkill); }
       mob.target = original;
       c.events.push({ t:'chain', n:victims.length, x:pl.x, y:pl.y, screen:true, fx:sk.fx || 'ice-attack' });
+    } else if ((sk.radius || sk.length || (sk.areaPattern && sk.areaPattern.length)) &&
+               c.players && c.players.length > 1) {
+      // AOE por células (espelho do servidor): TODOS os membros dentro da
+      // forma levam o dano — antes só o alvo primário era atingido.
+      const original = mob.target;
+      const areaVictims = mobSkillAreaVictims(c, mob, pl, sk);
+      for (const ent of areaVictims) {
+        if (!ent || !ent.p) continue;
+        mob.target = ent;
+        mobSkillHit(c, ent.p, mob, sk, rawSkill);
+      }
+      mob.target = original;
     } else mobSkillHit(c, p, mob, sk, rawSkill);
     usou = true;
   }
