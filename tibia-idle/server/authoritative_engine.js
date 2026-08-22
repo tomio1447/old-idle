@@ -3319,22 +3319,28 @@ function playerResistPct(p,element){
   }
   return total;
 }
+/* Dano absorvido pelo magic shield no ÚLTIMO absorb — lido pelos emissores
+ * de "taken" para contabilizar no analyser (damage taken inclui o que o
+ * shield/mana pagou, igual ao HP). Module-scope: não polui o snapshot. */
+let LAST_SHIELD_ABSORB=0;
 function absorbMagicShield(auth,item,p,dmg,now,pos,element){
+  LAST_SHIELD_ABSORB=0;
   if(element==="agony"||dmg<=0||!magicShieldActive(p,now))return dmg;
   if(energyRingOn(p)){
     const mana=Math.min(Math.max(0,Math.floor(p.mp||0)),dmg);if(mana<=0)return dmg;
-    p.mp-=mana;const rest=dmg-mana;
+    p.mp-=mana;LAST_SHIELD_ABSORB=mana;const rest=dmg-mana;
     auth.events.push({t:"magic-shield",mana,rest,targetId:String(item.id),x:pos.x,y:pos.y,screen:true,source:"Energy Ring",ts:now});
     return rest;
   }
   const pool=Math.max(0,Math.floor(p.magicShieldPool||0));if(pool<=0)return dmg;
-  const absorvido=Math.min(pool,dmg);p.magicShieldPool=pool-absorvido;const rest=dmg-absorvido;
+  const absorvido=Math.min(pool,dmg);p.magicShieldPool=pool-absorvido;LAST_SHIELD_ABSORB=absorvido;const rest=dmg-absorvido;
   auth.events.push({t:"magic-shield",mana:absorvido,rest,pool:p.magicShieldPool,cap:p.magicShieldCap||0,
     targetId:String(item.id),x:pos.x,y:pos.y,screen:true,source:"Magic Shield",ts:now});
   if(p.magicShieldPool<=0)p.magicShieldUntil=0;
   return rest;
 }
 function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
+  LAST_SHIELD_ABSORB=0;
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
   if(dmg<=0)return 0;
   const attackerSlug=mob&&mob.slug||null;
@@ -3647,7 +3653,18 @@ function tickEntityConditions(auth,alvo,kind,item){
     while(co.acc>=CONDITION_TURN_MS&&co.turns>0&&alvo.hp>0){
       co.acc-=CONDITION_TURN_MS;co.turns--;
       let dmg=Math.max(1,Math.floor(Number(co.dmg)||0));
-      if(kind==="player"&&item&&def.el!=="agony")dmg=absorbMagicShield(auth,item,alvo,dmg,now,pos,def.el);
+      let shieldTakenDot=0;
+      if(kind==="player"&&item&&def.el!=="agony"){
+        const preShield=dmg;
+        dmg=absorbMagicShield(auth,item,alvo,dmg,now,pos,def.el);
+        shieldTakenDot=LAST_SHIELD_ABSORB;LAST_SHIELD_ABSORB=0;
+        if(dmg<=0&&shieldTakenDot>0){
+          /* DoT 100% absorvido pelo shield: conta no analyser mesmo assim. */
+          auth.events.push({t:"taken",dmg:shieldTakenDot,shield:shieldTakenDot,el:def.el,fx:def.fx,
+            condition:tipo,x:pos.x,y:pos.y,targetId:String(item.id),screen:true,ts:now});
+        }
+        void preShield;
+      }
       if(dmg<=0)continue;
       // The Unwelcome: DoT de death também é absorvido (imune + cura 200%).
       if(kind!=="player"&&alvo&&alvo.def&&alvo.def.deathAbsorbs&&(def.el||"physical")==="death"){
@@ -3662,7 +3679,7 @@ function tickEntityConditions(auth,alvo,kind,item){
       }
       alvo.hp=Math.max(0,alvo.hp-dmg);
       if(kind==="player"){
-        auth.events.push({t:"taken",dmg,el:def.el,fx:def.fx,condition:tipo,x:pos.x,y:pos.y,
+        auth.events.push({t:"taken",dmg:dmg+shieldTakenDot,shield:shieldTakenDot||0,el:def.el,fx:def.fx,condition:tipo,x:pos.x,y:pos.y,
           targetId:String(item&&item.id||""),screen:true,ts:now});
       }else{
         auth.events.push({t:"hit",dmg,el:def.el,fx:def.fx,condition:tipo,x:pos.x,y:pos.y,
@@ -3906,9 +3923,12 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     }
     if(el!=="agony"&&skillUsesMeleeBlock(sk))dmg=mitigateIncoming(auth,dmg,item.p);
     dmg=absorbIncomingDamage(auth,item,item.p,dmg,now,pos,el==="agony"?"agony":el,mob);
+    /* Analyser: damage taken inclui o que o magic shield/mana pagou — o
+     * evento "taken" carrega HP+shield (o HP só perde a parte `dmg`). */
+    const shieldTakenSkill=LAST_SHIELD_ABSORB;LAST_SHIELD_ABSORB=0;
     item.p.hp-=dmg;
     if(lifeDrain&&dmg>0)mob.hp=Math.min(mob.maxHp||mob.hp,mob.hp+dmg);
-    auth.events.push({t:"taken",dmg:dmg,x:pos.x,y:pos.y,targetId:String(item.id),
+    auth.events.push({t:"taken",dmg:dmg+shieldTakenSkill,shield:shieldTakenSkill||0,x:pos.x,y:pos.y,targetId:String(item.id),
       sx:source.x,sy:source.y,sourceId:String(mob.id),el:el,screen:true,fx:sk.fx||ELEMENT_FX[el]||ELEMENT_FX.physical,
       projectile:!!sk.miss,missile:sk.miss||null,ts:stepTs+mobHitIdx*200});
     if(item.p.hp<=0){authMarkPlayerDeath(auth,item,now);
@@ -4093,10 +4113,11 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
   const element=el||"physical";
   if(element==="physical")dmg=mitigateIncoming(auth,dmg,victim.p);
   dmg=absorbIncomingDamage(auth,victim,victim.p,dmg,now,pos,element,null);
+  const shieldTakenPvp=LAST_SHIELD_ABSORB;LAST_SHIELD_ABSORB=0;
   victim.p.hp=Math.max(0,(Number(victim.p.hp)||0)-dmg);
   auth.lastDamageSource="player-raid";
   auth.events=auth.events||[];
-  auth.events.push({t:"taken",dmg,x:pos.x,y:pos.y,targetId:String(victim.id),
+  auth.events.push({t:"taken",dmg:dmg+shieldTakenPvp,shield:shieldTakenPvp||0,x:pos.x,y:pos.y,targetId:String(victim.id),
     sx:source.x,sy:source.y,sourceId:String(attacker.id),el:element,screen:true,pvp:true,ts:now});
   if(victim.p.hp<=0){authMarkPlayerDeath(auth,victim,now);
     auth.events.push({t:"death",x:pos.x,y:pos.y,targetId:String(victim.id),
@@ -6924,8 +6945,15 @@ function step(auth,now,opts){if(auth.ended)return;
         const ranged=(Number(mob.def&&mob.def.targetDistance)||1)>1;
         const evBefore=auth.events.length;
         damage=absorbIncomingDamage(auth,victim,victim.p,damage,now,target,el,mob);
+        const shieldTakenMelee=LAST_SHIELD_ABSORB;LAST_SHIELD_ABSORB=0;
         if(damage<=0){
           // dodge/dazzle ja emitiu miss; mitigacao total → block (nao taken 0).
+          // Dano 100% absorvido pelo magic shield CONTA no analyser (taken).
+          if(shieldTakenMelee>0){
+            auth.events.push({t:"taken",dmg:shieldTakenMelee,shield:shieldTakenMelee,x:target.x,y:target.y,
+              targetId:String(victim.id),sx:source.x,sy:source.y,sourceId:String(mob.id),el,
+              screen:true,ts:mobVisualTs});
+          }
           const alreadyMiss=auth.events.slice(evBefore).some((ev)=>ev&&ev.t==="miss");
           if(!alreadyMiss){
             auth.events.push({t:"block",x:target.x,y:target.y,targetId:String(victim.id),
@@ -6935,7 +6963,7 @@ function step(auth,now,opts){if(auth.ended)return;
           }
         }else{
         victim.p.hp-=damage;
-        auth.events.push({t:"taken",dmg:damage,x:target.x,y:target.y,targetId:String(victim.id),
+        auth.events.push({t:"taken",dmg:damage+shieldTakenMelee,shield:shieldTakenMelee||0,x:target.x,y:target.y,targetId:String(victim.id),
           sx:source.x,sy:source.y,sourceId:String(mob.id),el,fx:ELEMENT_FX[el]||ELEMENT_FX.physical,
           projectile:ranged,missile:ranged?(ELEMENT_MISSILE[el]||"small-stone"):null,
           screen:true,ts:mobVisualTs});
