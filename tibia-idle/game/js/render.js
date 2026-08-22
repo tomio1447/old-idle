@@ -1181,6 +1181,22 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   g.addColorStop(1, "#7c0808");
   ctx.fillStyle = g;
   ctx.fillRect(x, y + 17 * s, bw * pct, bh);
+  // Marcos das mecânicas de HP: gates da Scarlett (75/50/25). O "degrau" da
+  // barra é mecânica (imunidade até a dança), não barra bugada — os marcos
+  // deixam isso visível. O preenchimento continua sendo o HP real.
+  const scarlettGates = (combat.scarlett && Array.isArray(combat.scarlett.thresholds) &&
+    combat.scarlett.thresholds.length) ? combat.scarlett.thresholds
+    : (combat.boss && String(combat.boss.id) === "scarlett-etzel" ? [0.75, 0.5, 0.25] : null);
+  if (scarlettGates) {
+    for (const gate of scarlettGates) {
+      if (!(gate > 0 && gate < 1)) continue;
+      const gx = Math.round(x + bw * gate);
+      ctx.fillStyle = "rgba(0,0,0,.6)";
+      ctx.fillRect(gx - 1 * s, y + 17 * s, 2 * s, bh);
+      ctx.fillStyle = "#e8c96a";
+      ctx.fillRect(gx - 0.5 * s, y + 17 * s, 1 * s, bh);
+    }
+  }
   ctx.strokeStyle = "#000";
   ctx.strokeRect(x, y + 17 * s, bw, bh);
   ctx.font = hudFont(13, s, true);
@@ -1188,7 +1204,26 @@ function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
   // nome do boss na cor da vida tambem — mesma regra dos monstros da arena
   ctx.fillStyle = tibiaHpColor(pct);
   ctx.fillText(boss.def.name, center, y + 11 * s);
+  // Sinalização de mecânica na barra: vidas do Oberon (esquerda) e imunidade
+  // ativa (direita) — Scarlett/greed/mega/oberon publicam essas flags nos mobs
+  // (offline) e o snapshot online as traz no materializeAuthority.
   ctx.font = hudFont(10, s, true);
+  const oberon = combat.oberon && Number(combat.oberon.lives) > 0 ? combat.oberon : null;
+  const immuneLabel = boss.greedImmune ? "IMUNE — MATAR GREEDBEASTS"
+    : boss.megaImmune ? "IMUNE — MATAR ASPECTS"
+    : (oberon && (oberon.invulnerable || boss.qteImmune)) ? "IMUNE — DEBATE"
+    : boss.qteImmune ? "IMUNE — DANÇA RÍTMICA" : null;
+  if (oberon) {
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffd77a";
+    ctx.fillText("VIDAS " + Math.max(1, Number(oberon.lives) || 1), x, y + 11 * s);
+  }
+  if (immuneLabel) {
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#ffd77a";
+    ctx.fillText(immuneLabel, x + bw, y + 11 * s);
+  }
+  ctx.textAlign = "center";
   ctx.fillStyle = "#fff";
   ctx.fillText(`${Math.ceil(boss.hp)} / ${boss.maxHp}`, center, y + 31 * s);
   ctx.restore();

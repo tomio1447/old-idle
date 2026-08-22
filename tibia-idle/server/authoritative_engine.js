@@ -3933,7 +3933,18 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     }
     const raw=sk.min<sk.max?roll(auth,Number(sk.min)||0,Number(sk.max)||0):Number(sk.min)||0;
     const cells=mobSkillCells(mob,sk,victim,auth);
-    const victims=cells.length?(auth.players||[]).filter((item)=>item.p&&item.p.hp>0&&!item.downUntil&&mobSkillHitsTarget(mob,sk,item,auth)):[victim];
+    // Vítimas por PERTENCIMENTO às células da área (âncora = alvo primário ou
+    // o próprio monstro — exatamente o FX pintado no areafx). O filtro antigo
+    // chamava mobSkillHitsTarget por candidato, que REANCORAVA a explosão em
+    // cada um (o centro do candidato sempre vale 1 na matriz de raio): skill
+    // radius-alvo acertava jogadores a QUALQUER distância, muito além da área
+    // visível — dano fantasma do outro lado do mapa em party.
+    const areaKeys=cells.length?new Set(cells.map((c)=>c.cx+":"+c.cy)):null;
+    const victims=areaKeys?(auth.players||[]).filter((item)=>{
+      if(!item||!item.p||item.p.hp<=0||item.downUntil)return false;
+      const cell=entityGridCell(item,auth);
+      return areaKeys.has(cell.cx+":"+cell.cy);
+    }):[victim];
     for(const item of victims)hitPlayer(item,sk,raw,el);
     const campo=sk.campo||sk.cond;
     if(campo&&raw>0)for(const item of victims)applyCondition(item.p,campo,Math.max(1,Math.floor(raw*.1)),4,auth,item);
