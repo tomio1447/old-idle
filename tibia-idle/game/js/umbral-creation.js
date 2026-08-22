@@ -303,20 +303,22 @@ const UMBRAL_ITEMS = {
     "mag": 5
   },
   "cluster-of-solace": {
-    "n": "Cluster of Solace",
-    "s": "loot",
+    "n": "cluster of solace",
+    "s": null,
     "t": "loot",
     "cid": 20062,
-    "w": 28,
-    "sell": 0
+    "w": 2.80,
+    "sell": 0,
+    "npcSell": 0
   },
   "dream-matter": {
-    "n": "Dream Matter",
-    "s": "loot",
+    "n": "dream matter",
+    "s": null,
     "t": "loot",
     "cid": 20063,
-    "w": 39,
-    "sell": 0
+    "w": 3.90,
+    "sell": 0,
+    "npcSell": 0
   }
 };
 
@@ -473,6 +475,15 @@ const UMBRAL_MASTER = {
 })();
 
 function npcUmbralCreationHtml(p) {
+  // Ícone + badge de quantidade (sem o texto do nome — menos poluição visual;
+  // o nome fica no tooltip do ícone).
+  const icon = (slug, qty, ok) => `
+    <div class="umbral-icon" title="${qty}x ${itemName(slug)}" style="position:relative;display:inline-block">
+      ${typeof itemImg === "function" ? itemImg(slug, { size: 32 }) : ""}
+      ${qty > 1 ? `<span class="cnt" style="position:absolute;right:-4px;bottom:-2px">${qty}</span>` : ""}
+      <span class="tiny" style="display:block;text-align:center;color:${ok ? '#9ce84a' : '#e85b52'};font-weight:bold">${qty}x</span>
+    </div>`;
+
   const renderRecipe = (r, tab, cost) => {
     let canCraft = true;
     let reqHtml = "";
@@ -482,20 +493,14 @@ function npcUmbralCreationHtml(p) {
     for (const [mat, qty] of Object.entries(cost)) {
       const have = (p.bag && p.bag[mat] || 0) >= qty;
       canCraft = canCraft && have;
-      reqHtml += `<div class="umbral-recipe-ing">
-        ${typeof itemImg === "function" ? itemImg(mat, { size: 32 }) : ""}
-        <span class="tiny" style="color:${have ? '#9ce84a' : '#e85b52'}">${qty}x ${itemName(mat)}</span>
-      </div>`;
+      reqHtml += `<div class="umbral-recipe-ing">${icon(mat, qty, have)}</div>`;
     }
 
     let sourceHtml = "";
     if (from) {
       const haveFrom = (p.bag && p.bag[from] || 0) >= 1;
       canCraft = canCraft && haveFrom;
-      sourceHtml = `<div class="umbral-recipe-ing">
-        ${typeof itemImg === "function" ? itemImg(from, { size: 32 }) : ""}
-        <span class="tiny" style="color:${haveFrom ? '#9ce84a' : '#e85b52'}">1x ${itemName(from)}</span>
-      </div><span class="tiny dim">+</span>`;
+      sourceHtml = `<div class="umbral-recipe-ing">${icon(from, 1, haveFrom)}</div><span class="tiny dim">+</span>`;
     }
 
     return `
@@ -503,10 +508,7 @@ function npcUmbralCreationHtml(p) {
         ${sourceHtml}
         ${reqHtml}
         <span class="tiny dim">=</span>
-        <div class="umbral-recipe-res">
-          ${typeof itemImg === "function" ? itemImg(to, { size: 32 }) : ""}
-          <span class="tiny" style="color:#ffe680">1x ${itemName(to)}</span>
-        </div>
+        <div class="umbral-recipe-res">${icon(to, 1, true)}</div>
         <button class="sm primary" data-umbral-craft="${tab}" data-umbral-to="${to}" data-umbral-from="${from || ''}"
           data-umbral-dream="${cost['dream-matter'] || 0}" data-umbral-cluster="${cost['cluster-of-solace'] || 0}" ${canCraft ? "" : "disabled"}>
           Craft
