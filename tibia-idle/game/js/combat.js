@@ -1358,6 +1358,7 @@ function tickConditions(c, p, dt) {
         let dmg = Math.max(1, co.dmg);
         // Agony: true damage — o Magic Shield NÃO protege contra ele
         // (TibiaWiki: "can not be cured or protected against").
+        const preShieldDot = dmg;
         if (def.el !== "agony" && typeof applyMagicShieldAbsorb === "function") {
           dmg = applyMagicShieldAbsorb(c, p, dmg, {
             el: def.el,
@@ -1365,10 +1366,21 @@ function tickConditions(c, p, dt) {
             y: c.player ? c.player.y : 0.6,
           });
         }
-        if (dmg <= 0) continue;
+        const shieldTakenDot = Math.max(0, preShieldDot - dmg);
+        if (dmg <= 0) {
+          // Analyser: DoT 100% absorvido pelo shield conta como taken.
+          if (shieldTakenDot > 0) {
+            c.stats.taken += shieldTakenDot;
+            c.events.push({ t: "taken", dmg: shieldTakenDot, shield: shieldTakenDot,
+              el: def.el, condition: tipo,
+              targetId: (p && p.id) || (c.player && c.player.id) || "player",
+              x: c.player ? c.player.x : 0.13, y: c.player ? c.player.y : 0.6, screen: true });
+          }
+          continue;
+        }
         p.hp -= dmg;
-        c.stats.taken += dmg;
-        c.events.push({ t: "taken", dmg: dmg, el: def.el, condition: tipo,
+        c.stats.taken += dmg + shieldTakenDot;
+        c.events.push({ t: "taken", dmg: dmg + shieldTakenDot, shield: shieldTakenDot || 0, el: def.el, condition: tipo,
                         targetId:(p&&p.id)||(c.player&&c.player.id)||"player",
                         x: c.player ? c.player.x : 0.13,
                         y: c.player ? c.player.y : 0.6, screen: true });
@@ -3994,12 +4006,24 @@ function mobSkillHit(c, p, mob, sk, dmg) {
 
 
   }
+  const preShield = raw;
   if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
     raw = applyMagicShieldAbsorb(c, p, raw, {
       el: tipoEl,
       x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
     });
   }
+  /* Analyser: o que o magic shield/energy ring pagou também é damage
+   * taken — espelho do servidor. Emitido mesmo quando o resto do golpe
+   * não chega no HP (absorção total ou fora do shape). */
+  const shieldTaken = Math.max(0, preShield - raw);
+  const shieldOnlyTaken = () => {
+    if (shieldTaken <= 0) return;
+    c.stats.taken += shieldTaken;
+    c.events.push({ t: "taken", dmg: shieldTaken, shield: shieldTaken, el: tipoEl,
+      targetId: (tgt && tgt.id) || (p && p.id) || "player",
+      x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true, fx: sk.fx || null });
+  };
   if (raw > 0) {
     if ((p.voc === "sorcerer" || p.voc === "druid") && raw >= p.hp && p.hp > 0) {
       const excesso = raw - p.hp + 1;
@@ -4019,7 +4043,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   // Matriz nomeada/direcional (ex.: explosion wave e wave t das Cobras).
   if (sk.areaPattern && typeof skillPatternHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (!skillPatternHas(mob, pl, sk.areaPattern, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) return 0;
+    if (!skillPatternHas(mob, pl, sk.areaPattern, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) { shieldOnlyTaken(); return 0; }
   }
   // Explosao CENTRADA NO MONSTRO (radius sem `alvo`): o dano so entra se o
   // player estiver dentro do FORMATO OFICIAL (circulo do Canary, diamante
@@ -4027,14 +4051,14 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   // QUADRADO cheio e deixava a death explosion do grimeleech "quadrada".
   if (sk.radius && !sk.alvo && typeof skillRadiusHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (!skillRadiusHas(mob.cx, mob.cy, sk.radius, pl.cx, pl.cy)) return 0;
+    if (!skillRadiusHas(mob.cx, mob.cy, sk.radius, pl.cx, pl.cy)) { shieldOnlyTaken(); return 0; }
   }
   // ONDA: o dano so entra se o alvo estiver numa celula coberta pela onda
   // RETA (a onda vai no eixo dominante; quem esta na diagonal fora dela
   // nao leva dano, como no servidor).
   if (sk.length && typeof skillWaveHas === "function" &&
       pl.cx !== undefined && mob.cx !== undefined) {
-    if (!skillWaveHas(mob, pl, sk.length, sk.spread || 0, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) return 0;
+    if (!skillWaveHas(mob, pl, sk.length, sk.spread || 0, pl.cx, pl.cy, c && c.gridW, c && c.gridH)) { shieldOnlyTaken(); return 0; }
   }
 
   // condition aplicada pela magia (veneno/fogo/energia do *field e das
@@ -4049,6 +4073,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
   const bolt = !sk.radius && !sk.areaPattern && ((sk.range || 1) > 1 || !!sk.length);
   const miss = sk.miss || ELEMENT_MISSILE[sk.el || "physical"] || null;
   if (raw <= 0) {
+    shieldOnlyTaken();
     c.events.push({ t: "block", x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                     screen: true, mantra: true, fx: "block-hit",
                     projectile: bolt, missile: miss });
@@ -4071,13 +4096,13 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     return drenado;
   }
   p.hp -= raw;
-  c.stats.taken += raw;
-  if (tgt) tgt.taken = (tgt.taken || 0) + raw;
+  c.stats.taken += raw + shieldTaken;
+  if (tgt) tgt.taken = (tgt.taken || 0) + raw + shieldTaken;
   if (ehLifeDrain && mob.hp > 0) {
     // Life Drain: remove HP e transfere ao atacante (cura o mob).
     mob.hp = Math.min(mob.def.hp || mob.maxHp, mob.hp + raw);
   }
-  c.events.push({ t: "taken", dmg: raw, el: tipoEl,
+  c.events.push({ t: "taken", dmg: raw + shieldTaken, shield: shieldTaken || 0, el: tipoEl,
                   targetId:(tgt&&tgt.id)||(p&&p.id)||"player",
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true,
                   // COMBAT_PARAM_EFFECT do .lua (fire-area, mort area,
@@ -4448,13 +4473,25 @@ function mobAttack(c, p, mob) {
   }
 
   // Magic Shield / Energy Ring: absorve dano com mana antes de chegar na vida.
+  const preShieldMelee = raw;
   if (raw > 0 && typeof applyMagicShieldAbsorb === "function") {
     raw = applyMagicShieldAbsorb(c, p, raw, {
       el: mob.def.element,
       x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
     });
-    if (raw <= 0) return 0;
+    if (raw <= 0) {
+      // Analyser: absorção total pelo shield também é damage taken.
+      const absorbedMelee = Math.max(0, preShieldMelee - raw);
+      if (absorbedMelee > 0) {
+        c.stats.taken += absorbedMelee;
+        c.events.push({ t: "taken", dmg: absorbedMelee, shield: absorbedMelee,
+          el: mob.def.element, targetId: (tgt && tgt.id) || (p && p.id) || "player",
+          x: pl.x, y: pl.y, sx: mob.x, sy: mob.y, screen: true });
+      }
+      return 0;
+    }
   }
+  const shieldTakenMelee = Math.max(0, preShieldMelee - raw);
 
   // Mana Buffer (15.25, so Sorcerer/Druid): diante de um golpe LETAL o
   // dano excedente sai da MANA, nao da vida — 8 de mana por ponto de vida
@@ -4478,11 +4515,11 @@ function mobAttack(c, p, mob) {
   }
 
   p.hp -= raw;
-  c.stats.taken += raw;
-  if (tgt) tgt.taken = (tgt.taken || 0) + raw;
+  c.stats.taken += raw + shieldTakenMelee;
+  if (tgt) tgt.taken = (tgt.taken || 0) + raw + shieldTakenMelee;
   applyMonsterCondition(c, p, mob);
   addSkillTries(p, "shield", combatSkillGain(c, 1));
-  c.events.push({ t: "taken", dmg: raw, el: mob.def.element,
+  c.events.push({ t: "taken", dmg: raw + shieldTakenMelee, shield: shieldTakenMelee || 0, el: mob.def.element,
                   targetId:(tgt&&tgt.id)||(p&&p.id)||"player",
                   x: pl.x, y: pl.y, sx: mob.x, sy: mob.y,
                   screen: true, projectile: monsterAttackRange(mob) > 0.16,
