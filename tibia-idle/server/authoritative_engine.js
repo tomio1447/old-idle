@@ -577,6 +577,12 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "elf-yalahar":{monsters:["elf","elf-scout","elf-arcanist"],cat:"aventureiro",pack:4},
   "grand-master-oberon-room":{monsters:["grand-master-oberon"]},
   "leiden-room":{monsters:["leiden"]},
+  /* Salas técnicas ocultas dos bosses Deeplings World Change (arena
+   * compartilhada deeplinsroom — deepling-bosses.js registra no client). */
+  "jaul-room":{monsters:["jaul"]},
+  "obujos-room":{monsters:["obujos"]},
+  "tanjis-room":{monsters:["tanjis"]},
+  "brokul-room":{monsters:["brokul"]},
   "stonerefiner":{monsters:["stonerefiner"],cat:"aventureiro",pack:5},
 });
 for(const slug of ["marapur-nagas","dt-seal","juggerseal","ferumbras-way","catacombs-oramond","minotaur-oramond-east"]){
