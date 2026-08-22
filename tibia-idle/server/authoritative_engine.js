@@ -6241,86 +6241,32 @@ function advanceAuthorityMovement(auth,now,opts){
   const livingPlayers=(auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil);
   const livingMobs=(auth.mobs||[]).filter((m)=>m&&m.hp>0);
   if(!livingPlayers.length)return;
+  // Players são movidos PELO CLIENTE (updateGridMovement a 60fps), que manda
+  // a posição via visual_state. O servidor NÃO move players — fazer isso
+  // brigava com a interpolação do cliente e causava rubber-banding/travamento.
+  // Apenas mobs têm movimento autoritativo no servidor.
+  if(opts&&opts.freezeMobs)return;
   const occ=authorityOccupancy(auth);
   const walkToward=(ent,gx,gy,td,isPlayer)=>{
     const dt=Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);
-    ent.walkAcc=Number(ent.walkAcc)||(Math.abs(Number(ent.id)||0)%180);
+    ent.walkAcc=Number(ent.walkAcc)||(Math.abs(Number(ent.id)||0)%500);
     ent.walkAcc+=dt;
-    ent.walkStepsWindow=ent.walkStepsWindow&&typeof ent.walkStepsWindow==="object"?ent.walkStepsWindow:{at:0,n:0};
-    if(now-ent.walkStepsWindow.at>=1000){ent.walkStepsWindow={at:now,n:0};}
     let steps=0;
-    while(ent.walkAcc>=80&&steps<1&&ent.walkStepsWindow.n<1){
+    // Permite até 4 passos por tick (200ms). O rate-limiting real é o
+    // walkAcc/dur (fórmula Canary), que dá passos proporcionais à speed.
+    while(ent.walkAcc>=AUTH_BEAT&&steps<4){
       const here=entityGridCell(ent,auth),d=chebyshevCells(here,{cx:gx,cy:gy});
       let dir=null;
       if(d>td)dir=authorityStepToward(auth,occ,ent,gx,gy);
       else if(d<td)dir=authorityStepAway(auth,occ,ent,{cx:gx,cy:gy});
-      const nearby=d<=1,dur=authorityStepDuration(authoritySpeedPts(ent,isPlayer,now),!!(dir&&dir.diag),nearby);
+      // O ×2 do Canary (WALK_TARGET_NEARBY_EXTRA_COST) aplica ao dance step,
+      // não à perseguição direta.
+      const dur=authorityStepDuration(authoritySpeedPts(ent,isPlayer,now),!!(dir&&dir.diag),false);
       if(!dir){ent.walkAcc=Math.min(ent.walkAcc,dur);break;}
       if(ent.walkAcc<dur)break;
-      authorityApplyStep(auth,ent,dir,occ);ent.walkAcc-=dur;steps++;ent.walkStepsWindow.n++;
+      authorityApplyStep(auth,ent,dir,occ);ent.walkAcc-=dur;steps++;
     }
   };
-  if(!(opts&&opts.freezePlayers))for(const item of livingPlayers){
-    // Manual SQM/WASD exige VIP; sem VIP a autoridade força AUTO.
-    if(item.p&&!accountIsVip(item.p)){
-      item.p.config=item.p.config||{};item.p.config.autoWalk=true;delete item.walkIntent;
-    }
-    const auto=!(item.p&&item.p.config)||item.p.config.autoWalk!==false;
-    if(!auto){
-      const intent=item.walkIntent,dir=intent&&AUTH_STEP_DIRS.find((d)=>d.dx===intent.dx&&d.dy===intent.dy);
-      if(dir){
-        const dt=Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);
-        item.walkAcc=Number(item.walkAcc)||0;item.walkAcc+=dt;
-        const here=entityGridCell(item,auth);
-        const dur=authorityStepDuration(authoritySpeedPts(item,true,now),!!dir.diag,false);
-        if(authorityStepFree(auth,occ,here.cx,here.cy,dir)&&item.walkAcc>=dur){
-          authorityApplyStep(auth,item,dir,occ);item.walkAcc-=dur;
-        }else item.walkAcc=Math.min(item.walkAcc,dur);
-      }
-      continue;
-    }
-    const mode=huntModeOf(auth,item);
-    if(mode==="box"||mode==="safe"){
-      const alvo=pickFormationCell(auth,item,now,mode==="box"?boxTargetCell:safeTargetCell);
-      if(alvo){
-        const here=entityGridCell(item,auth);
-        if(here.cx!==alvo.cx||here.cy!==alvo.cy)walkToward(item,alvo.cx,alvo.cy,0,true);
-        else{
-          // Parado no BOX: facing para o foco da formação (knight/pack),
-          // para waves/flurry saírem da frente do caster — não do monstro.
-          const knight=boxKnightEnt(auth);
-          const focus=knight&&item!==knight?entityGridCell(knight,auth)
-            :(authorityPlayerTarget(auth,item,livingMobs)||densestPackTarget(auth,item,livingMobs)||livingMobs[0]);
-          if(focus){
-            const fc=focus.cx!=null?focus:entityGridCell(focus,auth);
-            const dx=fc.cx-here.cx,dy=fc.cy-here.cy;
-            if(Math.abs(dx)>Math.abs(dy))item.dir=dx>=0?"e":"w";
-            else if(dy!==0)item.dir=dy>0?"s":"n";
-          }
-        }
-      }
-      continue;
-    }
-    const goal=authorityPlayerTarget(auth,item,livingMobs)||densestPackTarget(auth,item,livingMobs)||livingMobs.slice().sort((a,b)=>authorityVisualDistance(item,a,auth)-authorityVisualDistance(item,b,auth))[0];
-    if(!goal)continue;
-    const alcance=playerAttackRangeSQM(item.p);
-    const here=entityGridCell(item,auth),to=entityGridCell(goal,auth),dist=chebyshevCells(here,to);
-    if(mode==="kiting"&&alcance>1){
-      const querido=Math.max(1,Math.min(alcance,Number(item.p.config&&item.p.config.kiteDistance)||3));
-      if(dist!==querido)walkToward(item,to.cx,to.cy,querido,true);
-    }else if(dist>alcance)walkToward(item,to.cx,to.cy,alcance,true);
-    else{
-      // Já no alcance do singleton: se há pack denso a poucos SQMs, anda
-      // até a box em vez de queimar CD de SD/exori no isolado.
-      const opp=packOpportunity(auth,item,livingMobs);
-      if(opp.density>=2&&opp.mob&&opp.dist<=PACK_SEARCH_R){
-        const packCell=entityGridCell(opp.mob,auth);
-        const packDist=chebyshevCells(here,packCell);
-        const hereDens=boxCountMobs(auth,here.cx,here.cy,PACK_CLUSTER_R);
-        if(packDist>0&&opp.density>=hereDens+2)walkToward(item,packCell.cx,packCell.cy,Math.min(alcance,1),true);
-      }
-    }
-  }
   for(const mob of livingMobs){
     const victim=authorityMobTarget(auth,mob);if(!victim)continue;
     // Sem rota (hasFollowPath=false) o Canary não insiste no follow — vagueia
@@ -6333,13 +6279,12 @@ function advanceAuthorityMovement(auth,now,opts){
       const via=authorityFindPathStep(auth,mob,to.cx,to.cy,occ,mob);
       if(via){
         const dt=Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);
-        mob.walkAcc=Number(mob.walkAcc)||(Math.abs(Number(mob.id)||0)%180);
+        mob.walkAcc=Number(mob.walkAcc)||(Math.abs(Number(mob.id)||0)%500);
         mob.walkAcc+=dt;
-        mob.walkStepsWindow=mob.walkStepsWindow&&typeof mob.walkStepsWindow==="object"?mob.walkStepsWindow:{at:0,n:0};
-        if(now-mob.walkStepsWindow.at>=1000){mob.walkStepsWindow={at:now,n:0};}
-        const nearby=d<=1,dur=authorityStepDuration(authoritySpeedPts(mob,false,now),!!via.diag,nearby);
-        if(mob.walkStepsWindow.n<1&&mob.walkAcc>=dur&&authorityStepFree(auth,occ,here.cx,here.cy,via)){
-          authorityApplyStep(auth,mob,via,occ);mob.walkAcc-=dur;mob.walkStepsWindow.n++;
+        // Dance-step ×2 não aplica à perseguição.
+        const dur=authorityStepDuration(authoritySpeedPts(mob,false,now),!!via.diag,false);
+        if(mob.walkAcc>=dur&&authorityStepFree(auth,occ,here.cx,here.cy,via)){
+          authorityApplyStep(auth,mob,via,occ);mob.walkAcc-=dur;
         }else mob.walkAcc=Math.min(mob.walkAcc,dur);
         continue;
       }
