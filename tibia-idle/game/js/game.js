@@ -2630,6 +2630,10 @@ function drainEvents() {
         if (dustN > 0) r.addFloater(px, py, "+" + fmtDmg(dustN) + " dust", e.fiendish ? "#c78cff" : "#66c7ff");
         if (e.slivers) r.addFloater(px + 0.03, py + 0.04, "+" + fmtDmg(e.slivers) + " slivers", "#ffe680");
         if (e.overflow) addLog("info", `Dust no limite: <b>${fmtFull(e.overflow)}</b> perdido.`);
+        /* Forja aberta durante a hunt: contador acompanha o crédito em
+         * tempo real (dust/slivers são da CONTA — o wallet do servidor
+         * sincroniza todos os personagens da mesma conta). */
+        if (typeof forgeRefreshOpenModal === "function") forgeRefreshOpenModal();
         break;
       }
       case "range":

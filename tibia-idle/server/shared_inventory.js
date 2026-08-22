@@ -6,9 +6,18 @@
  * instâncias EQUIPADAS (loc "equip:*") continuam por personagem, porque o
  * equipamento é individual.
  *
+ * A FORJA (dust/dustLimit/slivers/exaltedCores) também é da conta —
+ * mesmas regras da pouch: todos os personagens compartilham o mesmo
+ * storage e o crédito de kill da PT entra UMA vez (sem duplicar).
+ *
  * Formato do shared (gravado em accounts.shared_inventory):
  *   { v:1, seq:0, bag:{}, lootPouch:{}, depot:[], itemInstances:[],
- *     rewardChest:{}, rewardChestBundles:[] }
+ *     rewardChest:{}, rewardChestBundles:[],
+ *     forge:{ dust, dustLimit, slivers, exaltedCores } }
+ *
+ * forge ausente (null) = conta criada antes da forja entrar no shared:
+ * NÃO padronizar em zero (zeraria o dust dos personagens) — o getter do
+ * db adota a soma dos personagens na primeira hidratação.
  *
  * Pure module (sem I/O): o db.js persiste, o server.js aplica/extrai e os
  * testes exercitam as funções diretamente.
@@ -17,9 +26,22 @@
 
 const SHARED_CONTAINERS = ["bag", "lootPouch", "depot", "rewardChest", "rewardChestBundles"];
 
+function normalizeForge(f) {
+  f = f && typeof f === "object" && !Array.isArray(f) ? f : {};
+  const limit = Math.max(100, Math.min(325, Math.floor(Number(f.dustLimit) || 100)));
+  const dust = Math.max(0, Math.min(limit, Math.floor(Number(f.dust) || 0)));
+  return {
+    dust,
+    dustLimit: limit,
+    slivers: Math.max(0, Math.floor(Number(f.slivers) || 0)),
+    exaltedCores: Math.max(0, Math.floor(Number(f.exaltedCores) || 0)),
+  };
+}
+
 function emptySharedInventory() {
   return { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [],
-    itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
+    itemInstances: [], rewardChest: {}, rewardChestBundles: [],
+    forge: normalizeForge(null) };
 }
 
 function isSharedInventory(s) {
@@ -35,6 +57,8 @@ function normalizeSharedInventory(s) {
   s.itemInstances = Array.isArray(s.itemInstances) ? s.itemInstances : [];
   s.rewardChest = s.rewardChest && typeof s.rewardChest === "object" && !Array.isArray(s.rewardChest) ? s.rewardChest : {};
   s.rewardChestBundles = Array.isArray(s.rewardChestBundles) ? s.rewardChestBundles : [];
+  /* forge null permanece null (marcador de conta legada — adoção no db). */
+  s.forge = s.forge === undefined || s.forge === null ? null : normalizeForge(s.forge);
   return s;
 }
 
@@ -94,7 +118,33 @@ function mergeCharContainers(shared, characters) {
     for (const bundle of (Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles : []))
       if (bundle && typeof bundle === "object") shared.rewardChestBundles.push(Object.assign({}, bundle));
   }
+  /* Migração completa de conta: a forja dos personagens entra junto. */
+  adoptCharForge(shared, characters);
   return normalizeSharedInventory(shared);
+}
+
+/* Adota a forja dos personagens no shared (conta legada: dust/slivers eram
+ * por personagem). Soma tudo — dust total respeita o maior dustLimit visto.
+ * Idempotente: chamada só quando shared.forge ainda não existe. */
+function adoptCharForge(shared, characters) {
+  shared = normalizeSharedInventory(shared);
+  const base = shared.forge || normalizeForge(null);
+  const acc = {
+    dust: base.dust,
+    dustLimit: base.dustLimit,
+    slivers: base.slivers,
+    exaltedCores: base.exaltedCores,
+  };
+  for (const character of Array.isArray(characters) ? characters : []) {
+    const p = charDataOf(character);
+    if (!p || p._sharedInv === 1) continue; /* mirror do shared — não soma */
+    acc.dustLimit = Math.max(acc.dustLimit, Math.max(100, Math.min(325, Math.floor(Number(p.dustLimit) || 100))));
+    acc.dust += Math.max(0, Math.floor(Number(p.dust) || 0));
+    acc.slivers += Math.max(0, Math.floor(Number(p.slivers) || 0));
+    acc.exaltedCores += Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
+  }
+  shared.forge = normalizeForge(acc);
+  return shared;
 }
 
 /* Aplica o shared num player (virtual): containers viram os da conta e o
@@ -113,6 +163,16 @@ function applySharedToPlayer(p, shared) {
     .filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
   p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
+  /* Forja DA CONTA: legacy (forge null) adota o que o personagem já tem na
+   * primeira hidratação — nunca zera o dust/slivers existente. */
+  if (!shared.forge) {
+    shared.forge = normalizeForge({ dust: p.dust, dustLimit: p.dustLimit,
+      slivers: p.slivers, exaltedCores: p.exaltedCores });
+  }
+  p.dust = shared.forge.dust;
+  p.dustLimit = shared.forge.dustLimit;
+  p.slivers = shared.forge.slivers;
+  p.exaltedCores = shared.forge.exaltedCores;
   p._sharedInv = 1;
   return p;
 }
@@ -127,6 +187,10 @@ function extractSharedFromPlayer(p, shared) {
   shared.depot = Array.isArray(p.depot) ? p.depot.slice() : [];
   shared.rewardChest = (p.rewardChest && typeof p.rewardChest === "object" && !Array.isArray(p.rewardChest)) ? p.rewardChest : {};
   shared.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles.slice() : [];
+  /* Forja: o p é a fonte (crédito do kill no líder/mutação do modal) —
+   * grava no shared da conta; o apply logo em seguida devolve o mirror. */
+  shared.forge = normalizeForge({ dust: p.dust, dustLimit: p.dustLimit,
+    slivers: p.slivers, exaltedCores: p.exaltedCores });
   const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   shared.itemInstances = insts
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
@@ -137,6 +201,10 @@ function extractSharedFromPlayer(p, shared) {
   p.depot = [];
   p.rewardChest = {};
   p.rewardChestBundles = [];
+  p.dust = 0;
+  p.dustLimit = 100;
+  p.slivers = 0;
+  p.exaltedCores = 0;
   p.itemInstances = insts.filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
   return normalizeSharedInventory(shared);
 }
@@ -169,6 +237,19 @@ function mergeSharedFromPlayer(p, shared) {
     }
     shared[key] = dst;
   }
+  /* Forja no terminal multi-personagem: cópias da mesma conta podem divergir
+   * (o líder ganha o crédito; outra cópia gasta no modal) — fica o MAIOR
+   * valor de cada campo, como a bag (nunca perde o que foi adicionado). */
+  const f = normalizeForge({ dust: p.dust, dustLimit: p.dustLimit,
+    slivers: p.slivers, exaltedCores: p.exaltedCores });
+  if (!shared.forge) shared.forge = f;
+  else {
+    const cur = shared.forge;
+    cur.dustLimit = Math.max(cur.dustLimit, f.dustLimit);
+    cur.dust = Math.max(cur.dust, f.dust);
+    cur.slivers = Math.max(cur.slivers, f.slivers);
+    cur.exaltedCores = Math.max(cur.exaltedCores, f.exaltedCores);
+  }
   const byId = new Map((shared.itemInstances || []).map((i) => [String(i && i.id), i]));
   for (const inst of Array.isArray(p.itemInstances) ? p.itemInstances : []) {
     if (!inst || typeof inst !== "object" || !inst.slug) continue;
@@ -185,10 +266,12 @@ function mergeSharedFromPlayer(p, shared) {
 
 module.exports = {
   SHARED_CONTAINERS,
+  normalizeForge,
   emptySharedInventory,
   isSharedInventory,
   normalizeSharedInventory,
   mergeCharContainers,
+  adoptCharForge,
   applySharedToPlayer,
   extractSharedFromPlayer,
   mergeSharedFromPlayer,

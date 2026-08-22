@@ -741,6 +741,17 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
     a.shared_inventory = s;
     this._save();
   }
+  if (SharedInv && !s.forge) {
+    // Conta criada antes da forja entrar no shared (dust/slivers eram por
+    // personagem): soma a forja de TODOS os personagens uma única vez —
+    // depois disso o forge é da conta e todos os personagens o espelham
+    // (crédito de kill da PT entra UMA vez, sem duplicar).
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    SharedInv.adoptCharForge(s, chars);
+    a.shared_inventory = s;
+    this._save();
+  }
   return SharedInv.normalizeSharedInventory(s);
 };
 JsonStore.prototype.setAccountSharedInventory = function (accountId, s) {

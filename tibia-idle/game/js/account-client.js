@@ -1746,6 +1746,19 @@ function accountApplySharedInventory(shared) {
     p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
   }
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
+  /* Forja DA CONTA (dust/slivers/cores compartilhados por todos os
+   * personagens — igual pouch/depot/reward chest). Legacy (sem forge no
+   * shared) mantém o que o personagem já tem; o servidor adota na 1ª
+   * hidratação da conta. */
+  if (shared.forge && typeof shared.forge === "object") {
+    p.dust = Math.max(0, Math.floor(Number(shared.forge.dust) || 0));
+    p.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(shared.forge.dustLimit) || 100)));
+    p.slivers = Math.max(0, Math.floor(Number(shared.forge.slivers) || 0));
+    p.exaltedCores = Math.max(0, Math.floor(Number(shared.forge.exaltedCores) || 0));
+    if (typeof forgeRefreshOpenModal === "function") {
+      try { forgeRefreshOpenModal(); } catch (e) { /* UI opcional */ }
+    }
+  }
   p._sharedInv = 1;
   // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
   // SSE de outra aba, /api/me), atualiza o badge "!" — todos os personagens
