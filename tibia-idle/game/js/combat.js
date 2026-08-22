@@ -445,7 +445,10 @@ function huntWaveSize(hunt, randomValue) {
 }
 
 function pickHuntMonsterSlug(hunt) {
-  const list = (hunt && hunt.monsters) || [];
+  // Inclui os bossMobs da hunt (ex.: 4 mini bosses do Falcon Bastion com
+  // peso próprio em spawnWeights) — antes só hunt.monsters era sorteado e
+  // os mini bosses nunca spawnavam.
+  const list = ((hunt && hunt.monsters) || []).concat((hunt && hunt.bossMobs) || []);
   const weights = hunt && hunt.spawnWeights;
   if (weights && typeof weights === "object") {
     const rows = [];
@@ -4474,7 +4477,10 @@ function rollLoot(c, p, mob) {
   let rewardSource = null;
   if (mob.boss) {
     const bossId = (c.boss && c.boss.id) || mob.slug;
-    if (!c.rewardBundleId)
+    // Boss de arena (c.boss): um bundle por luta. Mini boss de HUNT (sem
+    // c.boss): bundle PRÓPRIO por morte — o Reward Chest lista cada boss
+    // derrotado separadamente.
+    if (mob.boss && (!c.boss || !c.rewardBundleId))
       c.rewardBundleId = bossId + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,7);
     rewardSource = {
       bundleId:c.rewardBundleId, bossId,
@@ -5214,7 +5220,10 @@ function combatTick(c, p, dt, now) {
     c.stats.kills++;
     p.totalKills++;
     p.kills[m.slug] = (p.kills[m.slug] || 0) + 1;
-    if (m.boss) c.bossDefeated = true;
+    // Só boss de ARENA (c.boss) encerra a luta; mini boss de HUNT
+    // (m.boss sem c.boss — ex.: os 4 mini bosses do Falcon Bastion) não
+    // marca bossDefeated, senão o save encerraria a caçada.
+    if (m.boss && c.boss) c.bossDefeated = true;
     // bestiario da Cyclopedia: cada abate conta e pode render charm points
     let charmGanho = 0;
     if (typeof bestiaryKill === "function") {

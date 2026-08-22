@@ -534,6 +534,10 @@ const HUNTS=Object.assign(read("hunts.json"),{
   "prison-2":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker"],cat:"hard",pack:10,packMin:6,packMax:10},
   "prison-3":{monsters:["lost-soul","hellhound","demon-outcast","betrayed-wraith","dark-torturer","blightwalker","plaguesmith","juggernaut"],cat:"hard",pack:10,packMin:6,packMax:10},
   "salamander-cave":{monsters:["emerald-damselfly","marsh-stalker","swampling","salamander"],cat:"aventureiro",pack:4},
+  "falcon-bastion":{monsters:["falcon-knight","falcon-paladin"],cat:"hard",pack:7,packMin:6,packMax:8,
+    bossMobs:["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"],
+    spawnWeights:{"falcon-knight":49.95,"falcon-paladin":49.95,
+      "grand-commander-soeren":0.025,"preceptor-lazare":0.025,"grand-chaplain-gaunder":0.025,"grand-canon-dominus":0.025}},
   "faceless-bane-room":{monsters:["faceless-bane"]},
   "doctor-marrow-room":{monsters:["doctor-marrow"]},
   "timira-room":{monsters:["timira-the-many-headed"]},
@@ -4785,12 +4789,14 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   const preyLoot=preyLootBonus(leader,mob.slug);
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
   const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100);
-  if(!auth.rewardBundleId&&mob.boss)
+  if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
-  const bossMeta=monsterDef(auth.bossId||mob.slug)||mob.def||{};
+  // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada
+  // boss derrotado separadamente). Boss de arena mantém o bundle da luta.
+  const bossMeta=monsterDef(mob.slug)||mob.def||{};
   const rewardSource=mob.boss?{
     bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
-    name:bossMeta.name||auth.bossId||mob.slug,sprite:auth.bossId||mob.slug}:null;
+    name:bossMeta.name||mob.slug,sprite:auth.kind==="hunt"?mob.slug:(auth.bossId||mob.slug)}:null;
   for(const entry of mob.def.loot||[]){
     const chance=Math.min(100,(Number(entry.chance)||0)*chanceMult);
     if(random(auth)*100>chance)continue;
@@ -4810,6 +4816,19 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
       if(credited&&credited.gold)auth.stats.gold=(Number(auth.stats.gold)||0)+credited.gold;
     }
     auth.stats.loot[entry.item]=(Number(auth.stats.loot[entry.item])||0)+count;
+  }
+  // Boss sem NENHUM drop ainda entrega um BAÚ VAZIO no Reward Chest (o
+  // jogador vê que o boss foi derrotado e pode abrir/recolher o bundle).
+  if(mob.boss&&rewardSource&&leader){
+    const bundleId=String(rewardSource.bundleId||"");
+    const bundles=leader.rewardChestBundles||(leader.rewardChestBundles=[]);
+    let bundle=bundles.find((b)=>b&&String(b.id)===bundleId);
+    if(!bundle){
+      bundle={id:bundleId,bossId:rewardSource.bossId||null,
+        name:rewardSource.name||mob.slug,sprite:rewardSource.sprite||mob.slug,
+        createdAt:Date.now(),items:{}};
+      bundles.push(bundle);
+    }
   }
   if(mob.influenced||mob.fiendish){
     const stacks=mob.fiendish?15:Math.max(1,Number(mob.sinisterStacks)||1);let dust=0;
@@ -5756,8 +5775,12 @@ function pickHuntSpawnSlug(auth){
   const hunt=HUNTS[auth&&auth.huntId],pool=auth&&auth.spawnPool||[];
   const weights=hunt&&hunt.spawnWeights;
   if(weights&&typeof weights==="object"){
+    // Inclui os bossMobs da hunt (ex.: 4 mini bosses do Falcon Bastion com
+    // peso próprio em spawnWeights) — antes só hunt.monsters era sorteado e
+    // os mini bosses NUNCA spawnavam.
+    const slugs=(hunt.monsters||[]).concat(hunt.bossMobs||[]);
     const rows=[];let total=0;
-    for(const slug of (hunt.monsters||[])){
+    for(const slug of slugs){
       const n=Number(weights[slug]);
       if(!(n>0)||!monsterDef(slug))continue;
       rows.push({slug,n});total+=n;
@@ -5783,6 +5806,13 @@ function spawnHuntWave(auth,now,opts){
     for(const slug of hunt.monsters){
       if(!auth.spawnPool.includes(slug)&&monsterDef(slug))auth.spawnPool.push(slug);
     }
+    // BossMobs (mini bosses) também entram no pool — spawn raro com o peso
+    // declarado em spawnWeights.
+    if(Array.isArray(hunt.bossMobs)){
+      for(const slug of hunt.bossMobs){
+        if(!auth.spawnPool.includes(slug)&&monsterDef(slug))auth.spawnPool.push(slug);
+      }
+    }
   }
   const living=(auth.mobs||[]).filter((m)=>m&&m.hp>0);
   if(!opts.force&&(living.length||(auth.pendingSpawns&&auth.pendingSpawns.length)))return;
@@ -5798,7 +5828,10 @@ function spawnHuntWave(auth,now,opts){
   for(let i=0;i<count;i++){
     const id=auth.spawnIds[i];if(occupied.has(id)||!auth.spawnPool.length)continue;
     const slug=pickHuntSpawnSlug(auth);if(!slug)break;
-    const m=makeMob(auth,slug,false,id,null,i);
+    // Mini bosses da hunt (hunt.bossMobs) nascem com boss:true — o loot
+    // deles vai para o Reward Chest (não para a Loot Pouch).
+    const isMiniBoss=!!(hunt&&Array.isArray(hunt.bossMobs)&&hunt.bossMobs.indexOf(slug)!==-1);
+    const m=makeMob(auth,slug,isMiniBoss,id,null,i);
     if(!m)break;
     occupied.add(id);
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
@@ -6788,9 +6821,18 @@ function step(auth,now,opts){if(auth.ended)return;
       loot:lootDrops,x:deadPos.x,y:deadPos.y,
       screen:true,boss:!!mob.boss,influenced:!!mob.influenced,fiendish:!!mob.fiendish,
       ts:stepTs+800});
-    if(mob.boss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;
-      if(leader){leader.p.bosses[auth.bossId]=leader.p.bosses[auth.bossId]||{};leader.p.bosses[auth.bossId].kills=(leader.p.bosses[auth.bossId].kills||0)+1;}
-      if(!authIsWorldBoss(auth))for(const item of auth.players)soulwarGrantBossTaint(item.p,auth.bossId||mob.slug,now);}
+    if(mob.boss){
+      const isHuntMiniBoss=auth.kind==="hunt";
+      // Boss de arena (kind=boss) encerra a luta; mini boss de HUNT não —
+      // a caçada continua, só o loot vai para o Reward Chest.
+      if(!isHuntMiniBoss){auth.ended=true;auth.terminalReason="boss-defeated";auth.bossDefeated=true;}
+      if(leader){
+        const bossKey=auth.bossId||mob.slug;
+        leader.p.bosses[bossKey]=leader.p.bosses[bossKey]||{};
+        leader.p.bosses[bossKey].kills=(Number(leader.p.bosses[bossKey].kills)||0)+1;
+      }
+      if(!isHuntMiniBoss&&!authIsWorldBoss(auth))for(const item of auth.players)soulwarGrantBossTaint(item.p,auth.bossId||mob.slug,now);
+    }
   }
 
   /* ---------- ATAQUE DOS MONSTROS (melee + skills) ---------- */
