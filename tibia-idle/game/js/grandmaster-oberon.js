@@ -214,11 +214,22 @@ function oberonBossCanTakeDamage(c, mob) {
   return true;
 }
 
+const OBERON_MINI_BOSS_CHANCE = 0.10;
+const OBERON_MINI_BOSSES = ["grand-commander-soeren", "preceptor-lazare", "grand-chaplain-gaunder", "grand-canon-dominus"];
+
 function oberonSpawnHelpers(c, player, now) {
   if (!c || !c.huntMap) return;
   const boss = getOberonMob(c);
   const bx = boss ? (boss.cx || 10) : 10;
   const by = boss ? (boss.cy || 10) : 10;
+  // 10% de chance de nascer 1 mini boss do Falcon Bastion em vez dos helpers
+  if (Math.random() < OBERON_MINI_BOSS_CHANCE) {
+    const slug = OBERON_MINI_BOSSES[Math.floor(Math.random() * OBERON_MINI_BOSSES.length)];
+    if (typeof spawnMobAt === "function") {
+      spawnMobAt(c, slug, bx, by, { boss: true, bossHelper: true, now: now });
+    }
+    return;
+  }
   const helpers = [
     { slug: "falcon-knight", x: bx - 1, y: by },
     { slug: "falcon-knight", x: bx + 1, y: by },

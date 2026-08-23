@@ -5664,6 +5664,8 @@ function oberonDebateQuestion(auth,st){
 }
 /* Spawna os ajudantes de Oberon ao redor do boss (2 Falcon Knights + 2
  * Falcon Paladins), espelhando o cliente (oberonSpawnHelpers). */
+const OBERON_MINI_BOSS_CHANCE=0.10;
+const OBERON_MINI_BOSSES=["grand-commander-soeren","preceptor-lazare","grand-chaplain-gaunder","grand-canon-dominus"];
 function oberonSpawnHelpersAuth(auth,now){
   if(!auth||!Array.isArray(auth.mobs))return;
   const boss=auth.mobs.find((m)=>m&&m.boss&&(m.slug==="grand-master-oberon"||String(m.id)==="grand-master-oberon"));
@@ -5671,6 +5673,19 @@ function oberonSpawnHelpersAuth(auth,now){
   const w=Number(auth.gridW)||30,h=Number(auth.gridH)||30;
   const bx=Number.isFinite(Number(boss.cx))?Number(boss.cx):Math.floor(w/2);
   const by=Number.isFinite(Number(boss.cy))?Number(boss.cy):Math.floor(h/2);
+  // 10% de chance de nascer 1 mini boss do Falcon Bastion em vez dos helpers
+  if(random(auth)<OBERON_MINI_BOSS_CHANCE){
+    const slug=OBERON_MINI_BOSSES[Math.floor(random(auth)*OBERON_MINI_BOSSES.length)];
+    const add=makeMob(auth,slug,true);
+    if(!add)return;
+    const cell=claimSpawnCell(auth,bx,by);
+    add.cx=cell.cx;add.cy=cell.cy;
+    add.x=(add.cx+.5)/w;add.y=(add.cy+.5)/h;add.sx=add.x;add.sy=add.y;
+    auth.mobs.unshift(add);
+    auth.events=auth.events||[];
+    auth.events.push({t:"spawn",slug:slug,x:add.x,y:add.y,targetId:String(add.id),screen:true,ts:now||auth.clock});
+    return;
+  }
   const helpers=[
     {slug:"falcon-knight",cx:bx-1,cy:by},
     {slug:"falcon-knight",cx:bx+1,cy:by},
