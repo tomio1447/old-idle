@@ -1057,6 +1057,8 @@ function weaponAmmoKind(wp, slug) {
     return k === "bolt" ? "bolt" : k === "arrow" ? "arrow" : null;
   }
   const id = String(slug || wp.sprite || "");
+  // Arcos que atiram flechas mas não têm "bow" no slug
+  if (/soulbleeder|soulpiercer|thorn-spitter/.test(id)) return "arrow";
   if (/crossbow|arbalest|bolter|spitter|ironworker|devileye/.test(id)) return "bolt";
   if (/bow/.test(id) && !/crossbow/.test(id)) return "arrow";
   return null;
