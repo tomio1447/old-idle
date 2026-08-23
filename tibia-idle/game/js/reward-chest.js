@@ -208,7 +208,7 @@ function renderRewardButton(p) {
   if (btn && badge) {
     // Reserva o espaço do badge mesmo vazio para os botões da topbar não
     // saltarem para o lado quando uma recompensa é aberta ou recolhida.
-    badge.textContent = n || "0";
+    badge.textContent = n ? (n > 1 ? `! ${n}` : "!") : "0";
     badge.style.display = "inline-block";
     badge.style.visibility = n ? "visible" : "hidden";
     badge.setAttribute("aria-hidden", n ? "false" : "true");
