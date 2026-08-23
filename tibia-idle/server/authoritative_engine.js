@@ -1533,8 +1533,10 @@ function weaponAmmoKind(wp,slug){
   const explicit=wp.ammoKind||wp.ammoType||wp.ammotype;
   if(explicit){const k=String(explicit).toLowerCase();return k==="bolt"?"bolt":k==="arrow"?"arrow":null;}
   const id=String(slug||"");
-  if(/soulbleeder|soulpiercer|thorn-spitter/.test(id))return "arrow";
-  if(/crossbow|arbalest|bolter|ironworker|devileye/.test(id))return "bolt";
+  // Bows especiais sem a palavra 'bow' no slug
+  if(/soulbleeder|thorn-spitter|crypt-spine/.test(id))return "arrow";
+  // Crossbows/bestas e armas de bolt sem a palavra 'crossbow' no slug
+  if(/soulpiercer|crossbow|arbalest|bolter|ironworker|devileye/.test(id))return "bolt";
   if(/bow/.test(id)&&!/crossbow/.test(id))return "arrow";
   return null;}
 function ammoCompatibleWithWeapon(ammoIt,weaponSlug){
