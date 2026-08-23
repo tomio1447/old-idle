@@ -653,6 +653,9 @@ function cycloBestiaryDetail(p, el, slug) {
 
 function renderCycloBosstiary(p, el) {
   ensureBosstiary(p);
+  if (CYCLO.bossSel && GAMEDATA.monsters[CYCLO.bossSel]) {
+    return cycloBossDetail(p, el, CYCLO.bossSel);
+  }
   const cat = CYCLO.bossFiltro || "todos";
   const ls = bosstiaryList(cat);
   const rs = bosstiarySummary(p);
@@ -727,6 +730,89 @@ function renderCycloBosstiary(p, el) {
       CYCLO.bossPag = parseInt(b.dataset.bossPag, 10);
       renderCycloBosstiary(p, el);
     }));
+  el.querySelectorAll("[data-boss-ficha]").forEach((c) =>
+    c.addEventListener("click", () => {
+      CYCLO.bossSel = c.dataset.bossFicha;
+      renderCycloBosstiary(p, el);
+    }));
+}
+
+/* Ficha de boss no molde do bestiário: info permanente (vida, exp, dano,
+ * armadura, velocidade, resistências) e loot, como no modal de boss.
+ * Acima do painel vai o progresso do Bosstiary (kills, categoria, pontos). */
+function cycloBossDetail(p, el, slug) {
+  const m = GAMEDATA.monsters[slug];
+  const pr = bosstiaryProgress(p, slug);
+  const elements = ["physical","earth","energy","fire","ice","holy","death"];
+  const resistRows = elements.map((e) => {
+    const v = (m.resist && m.resist[e]) || 0;
+    if (!v) return "";
+    const c = v > 0 ? "#9ce84a" : "#ff9090";
+    const d = (typeof ELEMENTS !== "undefined" && ELEMENTS[e]) || { name: e, color: "#ccc" };
+    return `<div class="stat-row">
+      <span class="k" style="color:${d.color}">
+        ${typeof dmgIconImg === "function" ? dmgIconImg(e, 10) : ""}${d.name}</span>
+      <span class="v" style="color:${c}">${v > 0 ? "+" : ""}${v}%</span>
+    </div>`;
+  }).join("");
+  const lootRows = (m.loot || []).filter((l) => l.item).map((l) => {
+    const it = GAMEDATA.items[l.item];
+    const border = typeof itemClsBorder === "function" ? itemClsBorder(l.item) : "";
+    const title = `${itemName(l.item)} · ${l.chance}%${l.max > 1 ? " · até " + l.max + "x" : ""}`;
+    return `<div class="stat-row" data-boss-drop="${l.item}" title="${title}" style="cursor:help">
+      <span class="k">${itemImg(l.item, 14)} ${it ? it.n : l.item}</span>
+      <span class="v">${l.chance}%${l.max > 1 ? " ·até " + l.max : ""}</span>
+    </div>`;
+  }).join("");
+  const ganhos = (Math.min(pr.kills, pr.alvo) - Math.min(Math.max(0, pr.kills - 1), pr.alvo)) * pr.cat.pts;
+  el.innerHTML = `
+    <div class="row mb8" style="gap:6px;align-items:center">
+      <button class="sm" id="boss-voltar">← Voltar</button>
+      <b style="color:#d4af37">${m.name}</b>
+      <span style="flex:1"></span>
+      <span class="tiny dim">${pr.cat.nome} · ${pr.kills} / ${pr.alvo} abates</span>
+    </div>
+    <div class="cyclo-cols">
+      <div>
+        <div class="app-img" style="width:64px;height:64px;margin-bottom:8px">
+          ${typeof bossMobImg === "function"
+            ? bossMobImg(slug, 64) : mobImg(slug, 64)}
+        </div>
+        ${linhaStat("Vida", fmtFull(m.hp || 0))}
+        ${linhaStat("Experiência", fmtFull(m.exp || 0))}
+        ${linhaStat("Dano base", m.damage || 0)}
+        ${linhaStat("Armadura", m.armor || 0)}
+        ${linhaStat("Velocidade", m.speed || "—")}
+        ${m.element ? linhaStat("Elemento", m.element) : ""}
+        <div class="small dim mt8 mb4">Progresso do Bosstiário</div>
+        <div class="best-bar big"><div style="width:${(pr.pct*100).toFixed(0)}%;background:${pr.cat.cor}"></div></div>
+        <div class="tiny dim mt4">
+          ${pr.completo ? "Bosstiário completo!" : `${pr.kills} / ${pr.alvo} para completar`}
+          · ${pr.cat.pts} pts/abate
+        </div>
+      </div>
+      <div>
+        <div class="small dim mb4">Resistências</div>
+        ${resistRows || `<div class="tiny dim">Nenhuma resistência.</div>`}
+        <div class="small dim mt8 mb4">Loot</div>
+        ${lootRows || `<div class="tiny dim">Sem loot.</div>`}
+      </div>
+    </div>`;
+  $("#boss-voltar").addEventListener("click", () => {
+    CYCLO.bossSel = null;
+    renderCycloBosstiary(p, el);
+  });
+  // tooltips dos drops (igual ao modal do boss)
+  el.querySelectorAll("[data-boss-drop]").forEach((row) => {
+    const slug = row.dataset.bossDrop;
+    row.addEventListener("mouseenter", () => {
+      if (typeof showTip === "function" && typeof itemTip === "function")
+        showTip(itemTip(slug, "Drop de " + m.name));
+    });
+    row.addEventListener("mouseleave", () => {
+      if (typeof hideTip === "function") hideTip();
+    });
+  });
 }
 
 /* ---------------------------------------------------------------- charms */
