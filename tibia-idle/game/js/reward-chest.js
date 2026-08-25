@@ -219,17 +219,27 @@ function renderRewardButton(p) {
   if (typeof renderCidadeRewardNotify === "function") renderCidadeRewardNotify(p);
 }
 
+function rewardChestDeleteBundle(p, bundleId) {
+  if (!p || !bundleId) return;
+  const bundle = rewardChestFindBundle(p, bundleId);
+  if (!bundle) return;
+  p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b !== bundle);
+  if (typeof save === "function") save();
+  if (typeof renderRewardButton === "function") renderRewardButton(p);
+}
+
 function rewardBossCard(bundle) {
   const count = Object.values(bundle.items || {}).reduce((sum,n) => sum + n, 0);
+  const empty = count <= 0;
   const portrait = typeof bossMobImg === "function" ? bossMobImg
     : (typeof mobImg === "function" ? mobImg : null);
   const sprite = bundle.sprite && portrait
     ? portrait(bundle.sprite, 84) : `<img src="assets/item/reward-chest.png" alt="">`;
   return `<button class="reward-boss-card" data-reward-boss="${bundle.id}"
-                  title="Abrir recompensa de ${bundle.name}">
+                  title="${empty ? 'Apagar registro de ' : 'Abrir recompensa de '}${bundle.name}">
     <span class="reward-boss-sprite">${sprite}</span>
     <span class="reward-boss-chest"><img src="assets/item/reward-chest.png" alt="Reward Chest"></span>
-    <b>${bundle.name}</b><small>${count > 0 ? `${fmtFull(count)} item(ns) · clique para abrir` : "baú vazio · clique para abrir"}</small>
+    <b>${empty ? '! ' : ''}${bundle.name}</b><small>${empty ? 'NOTHING · clique para apagar' : `${fmtFull(count)} item(ns) · clique para abrir`}</small>
   </button>`;
 }
 
@@ -262,8 +272,8 @@ function openRewardChest(bundleId) {
             ? (typeof bossMobImg === "function" ? bossMobImg(bundle.sprite, 54)
               : mobImg(bundle.sprite, 54))
             : "🎁"}</span>
-          <div><b>${bundle.name}</b><small>${itens.length ? `${itens.length} tipos · ${fmtFull(total)} itens` : "baú vazio — o boss não dropou nada"}</small></div>
-          <button class="primary sm" id="reward-claim-all">RECOLHER TUDO</button>
+          <div><b>${bundle.name}</b><small>${itens.length ? `${itens.length} tipos · ${fmtFull(total)} itens` : "NOTHING — o boss não dropou nada"}</small></div>
+          <button class="primary sm" id="reward-claim-all">${itens.length ? 'RECOLHER TUDO' : 'APAGAR'}</button>
         </div>
         ${itens.length ? `
         <div class="reward-slot-grid">
@@ -274,8 +284,8 @@ function openRewardChest(bundleId) {
             </button>`).join("")}
         </div>
         <div class="reward-footer">Clique em um slot para enviar o item à Loot Pouch.</div>
-        ` : `<div class="reward-empty"><span>🎁</span><b>Baú vazio</b>
-           <small>${bundle.name} foi derrotado, mas não dropou nada. Recolha para remover.</small></div>`}`
+        ` : `<div class="reward-empty"><span>🎁</span><b>NOTHING</b>
+           <small>${bundle.name} foi derrotado, mas não dropou nada. Apague para remover.</small></div>`}`
       : bundles.length ? `
         <div class="reward-boss-help">Escolha o boss para abrir sua recompensa.</div>
         <div class="reward-boss-grid">${bundles.map(rewardBossCard).join("")}</div>`
@@ -300,6 +310,13 @@ function openRewardChest(bundleId) {
   const all = $("#reward-claim-all");
   if (all && bundle) all.addEventListener("click", () => {
     if (typeof hideTip === "function") hideTip();
+    const count = Object.values(bundle.items || {}).reduce((sum,n) => sum + n, 0);
+    if (count <= 0) {
+      rewardChestDeleteBundle(p, bundle.id);
+      toast(`Registro de <b>${bundle.name}</b> apagado.`);
+      openRewardChest();
+      return;
+    }
     const result = rewardChestClaimBundle(p, bundle.id);
     const done = (n) => {
       toast(`Recolhido <b>${n === true ? "os itens" : n}</b> tipo(s) para a Loot Pouch.`);
