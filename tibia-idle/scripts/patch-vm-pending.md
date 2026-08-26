@@ -7,6 +7,6 @@ Canonical notes:
 - `tibia-idle/dist-patch/README.md` (older Aug-16 inventory; still useful for excludes)
 - Deploy script: `scripts/deploy-oracle-alpha.ps1` (or manual tar/scp)
 
-**This wave includes:** Ebb and Flow + Fear, Rotten Rooted, Claustrophobic Inferno, Soul War boss rooms, alpha patch notes.
+**This wave includes:** Ebb and Flow + Fear, Rotten Rooted, Claustrophobic Inferno, Soul War boss rooms, alpha patch notes, plus new hunts: Ankrahmun Tombs, Mutateds Yalahar, Lizard Chosen Tower and Elder Wyrm Darashia.
 
 Preserve `/opt/global-idle/.env` and `server/.env` / `server/data`.

@@ -634,7 +634,7 @@ function renderEquip(p) {
     if (typeof bindItemDrag === "function") bindItemDrag(el, { source: "equip", slug: slug, slot: slotDrop, instId: p.equip[slotDrop] && p.equip[slotDrop].instId ? p.equip[slotDrop].instId : null });
     el.addEventListener("mouseenter", () => {
       const slot = el.dataset.slot;
-      const extra = slot === "backpack" ? `Bag padrão · ${bagSlots(p)} slots` :
+      const extra = slot === "backpack" ? `${GAMEDATA.items[slug] ? GAMEDATA.items[slug].n : "Bag"} · ${bagSlots(p)} slots` :
         slot === "shield" && (GAMEDATA.items[slug] || {}).t === "quiver"
           ? `Aljava na mão secundária. Munição: ${p.equip.ammo ? itemName(p.equip.ammo.item) + " · " + fmtFull(ammoPrice(p.equip.ammo.item)) + " gp/tiro" : "nenhuma"}` :
         slot === "extra" ? "Extra Slot: ferramentas bônus com resistência elemental" :
@@ -647,7 +647,14 @@ function renderEquip(p) {
     el.addEventListener("mouseleave", hideTip);
     el.addEventListener("click", () => {
       const slot = el.dataset.slot;
-      if (slot === "backpack") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
+      if (slot === "backpack") {
+        const bp = p.equip && p.equip.backpack;
+        if (!bp || bp.item === "bag") { toast("A bag padrão de 8 slots não pode ser removida."); return; }
+        if (typeof unequipToContainer === "function" && unequipToContainer(p, "backpack", "bag")) {
+          renderAll();
+        }
+        return;
+      }
       if (slot === "ammo") { setActiveAmmo(G.p, null); hideTip(); renderAll(); return; }
       // Instância online: desequip autoritativo (senão o tick restaura o slot).
       if (typeof persistUnequipFromContainer === "function" &&
@@ -972,12 +979,12 @@ function bindCatalogAccordion(root, mode) {
 }
 
 const HUNT_MODAL_SECTIONS = [
-  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "stonerefiner"] },
-  { title: "HUNTS 100–250", ids: ["minotaur-oramond-east", "deeplings-deeper"] },
+  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "meriana-island", "mutateds-yalahar"] },
+  { title: "HUNTS 100–250", ids: ["lizard-chosen-tower", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond", "deathlings-sunken-temple", "falcon-bastion"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
-  { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow"] },
+  { title: "SOULWAR 400+", ids: ["dark-thais", "rotten-wasteland", "claustrophobic-inferno", "ebb-and-flow", "furious-crate"] },
 ];
 
 const HUNT_UI = { busca: "" };
@@ -3479,26 +3486,28 @@ function renderHelper(p) {
     };
     healEl.innerHTML = `
       <div class="mb8">
-        <label class="small dim">Usar magia de cura abaixo de (%)</label>
-        <input id="helper-heal-spell-at" type="number" min="1" max="99" value="${p.config.healSpellAt}"
-          style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <div class="small" style="font-weight:bold;color:#d4af37">HEAL CONDITION</div>
+        <div class="tiny dim">Defina a % de HP de cada cura. O Helper usa a primeira da lista pronta, respeitando cooldown.</div>
       </div>
-      <div class="small dim mt8 mb4">Magias de cura</div>
-      <div class="list" style="max-height:115px">${heals.map((id) => {
+      <div class="list helper-heal-spell-list" style="border:1px solid #2a251c;border-radius:4px;padding:4px;margin-bottom:8px">${heals.map((id, idx) => {
         const s = SPELLS[id], ok = p.level >= s.lvl;
-        const selected = p.config.healSpell === id;
-        // a faixa vem da formula do canary avaliada neste personagem
-        const faixa = ok && typeof spellRangeText === "function"
-          ? spellRangeText(p, s) : "";
-        return `<div class="shop-row ${selected ? "selected" : ""}" style="opacity:${ok ? 1 : .45}">
-          ${spellIcon(s)}
-          <div style="flex:1;min-width:0">
-            <div class="small">${s.name}
-              ${faixa ? `<span style="color:#7ae87a">· ${faixa} hp</span>` : ""}</div>
-            <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl} · cd ${Math.round(s.cd / 1000)}s</div>
+        const cfg = (p.config.healSpells || []).find((x) => x && x.id === id);
+        const active = !!cfg;
+        const at = cfg ? cfg.at : 0;
+        const faixa = ok && typeof spellRangeText === "function" ? spellRangeText(p, s) : "";
+        return `<div class="helper-heal-spell-row ${active ? "selected" : ""}" style="opacity:${ok ? 1 : .45};padding:6px 4px;border-bottom:1px solid #2a251c">
+          <div class="row" style="align-items:center;gap:8px">
+            ${spellIcon(s)}
+            <div style="flex:1;min-width:0">
+              <div class="small">${s.name} ${active && faixa ? `<span style="color:#7ae87a">· ${faixa} hp</span>` : ""}</div>
+              <div class="tiny dim">${s.words ? `<b>${s.words}</b> · ` : ""}${s.mana} mana · nv ${s.lvl} · cd ${Math.round(s.cd / 1000)}s</div>
+            </div>
+            <div class="row" style="align-items:center;gap:6px">
+              <button class="sm ${active ? "primary" : ""}" data-heal-spell-toggle="${id}" ${ok ? "" : "disabled"} title="Ativar/desativar cura">${active ? "ON" : "OFF"}</button>
+              <input type="number" min="1" max="99" value="${at}" data-heal-spell-at="${id}" ${active && ok ? "" : "disabled"}
+                style="width:50px;padding:4px;background:#14120e;color:#c8c0a8;border:1px solid #16140f;text-align:center">
+            </div>
           </div>
-          <button class="sm ${selected ? "primary" : ""}" data-heal-spell="${id}" ${ok ? "" : "disabled"}>
-            ${selected ? "Selecionada" : "Selecionar Spell"}</button>
         </div>`;
       }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
       <div class="mt8">
@@ -3513,7 +3522,7 @@ function renderHelper(p) {
         </button>
       </div>
       <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map((slug) => supplyRow(slug, "heal")).join("")}</div>
+      <div class="list" style="${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map((slug) => supplyRow(slug, "heal")).join("")}</div>
       <div class="mt8">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
@@ -3522,7 +3531,7 @@ function renderHelper(p) {
       <div class="row mt8 mb4" style="justify-content:space-between"><span class="small ${p.config.noManaPotions ? "" : "dim"}" style="${p.config.noManaPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions de mana</span><button class="sm ${p.config.noManaPotions ? "danger" : ""}" id="helper-no-mana-potions">${p.config.noManaPotions ? "MANA OFF — reativar" : "NÃO USAR POTIONS MANA"}</button></div>
       <div class="tiny dim mb4">Só 1 potion de mana ativa. Por padrão todas desativadas — escolha qual usar.</div>
       <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
-      <div class="list" style="max-height:210px;${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map((slug) => supplyRow(slug, "mana")).join("")}</div>`;
+      <div class="list" style="${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map((slug) => supplyRow(slug, "mana")).join("")}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -3538,11 +3547,38 @@ function renderHelper(p) {
         if (healVal) healVal.textContent = p.config.healAt + "%";
       });
     });
-    $$("#helper-heal [data-heal-spell]").forEach((b) => b.addEventListener("click", () => {
-      p.config.healSpell = b.dataset.healSpell;
-      toast(`Spell de cura selecionada: <b>${SPELLS[p.config.healSpell].name}</b>`);
+    $$("#helper-heal [data-heal-spell-toggle]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.healSpellToggle;
+      const spells = p.config.healSpells = p.config.healSpells || [];
+      const i = spells.findIndex((x) => x && x.id === id);
+      if (i >= 0) {
+        spells.splice(i, 1);
+        toast(`Cura <b>${SPELLS[id].name}</b> desativada`);
+      } else {
+        spells.push({ id: id, at: p.config.healSpellAt || p.config.healAt || 50 });
+        toast(`Cura <b>${SPELLS[id].name}</b> ativada`);
+      }
+      // manter compat com saves/presets antigos que usam healSpell
+      p.config.healSpell = spells.length ? spells[0].id : "";
       renderHelper(p);
     }));
+    $$("#helper-heal [data-heal-spell-at]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const id = input.dataset.healSpellAt;
+        const val = Math.max(1, Math.min(99, parseInt(input.value, 10) || 1));
+        input.value = val;
+        const cfg = (p.config.healSpells || []).find((x) => x && x.id === id);
+        if (cfg) {
+          cfg.at = val;
+          p.config.healSpellAt = val;
+          p.config.healAt = Math.max(p.config.healSpellAt, p.config.healItemAt);
+          const healAt = $("#heal-at"), healVal = $("#heal-at-val");
+          if (healAt) healAt.value = p.config.healAt;
+          if (healVal) healVal.textContent = p.config.healAt + "%";
+        }
+        renderHelper(p);
+      });
+    });
     const noPotBtn = $("#helper-no-potions");
     if (noPotBtn) noPotBtn.addEventListener("click", () => {
       p.config.noHealthPotions = !p.config.noHealthPotions;

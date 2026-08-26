@@ -16,6 +16,8 @@ const ALPHA_ANNOUNCE_UPDATES = [
   "STORE: compre Tibia Coins (Pix ou cartão), VIP e venda coins (beta)",
   "Soul War: Ebb and Flow, Rotten Wasteland, Claustrophobic Inferno",
   "Bosses Soul War: Greed, Hatred, Spite e Malice",
+  "Hunts 1-100: Ankrahmun Tombs e Mutateds Yalahar",
+  "Hunts 100-150: Lizard Chosen Tower e Elder Wyrm Darashia",
 ];
 
 function alphaDiscordLinkHtml(label) {

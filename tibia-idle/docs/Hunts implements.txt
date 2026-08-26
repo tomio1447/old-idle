@@ -1,0 +1,427 @@
+HUNTS IMPLEMENTS — GUIA PARA IA BURRA (E HUMANOS TAMBÉM)
+=========================================================
+Este arquivo descreve passo a passo como colocar uma nova hunt no jogo,
+importando tudo do Canary (monstros, itens, spells, sprites) e montando o
+mapa OTBM para o renderizador web.
+Siga na ordem. Se um passo falhar, pare e resolva antes de continuar.
+
+
+1. ARQUITETURA GERAL (o que precisa existir no final)
+-----------------------------------------------------
+Para cada hunt nova precisamos de:
+
+  A) Mapa OTBM:          game/maps/<nome>.otbm
+  B) Tile sprites:        game/assets/tiles/<id>.png   (todos os ids usados)
+  C) Monstros da hunt:   game/js/monsterdata.js       (stats + loot)
+  D) Sprites de monstros: game/assets/mob/<slug>.png e <slug>_<dir>.png
+  E) Itens de loot:       game/js/gamedata.js          (precos + sprites)
+  F) Spells (se usarem): game/js/spells.js            (dano/cura)
+  G) Definição da hunt:  game/js/<hunt>.js
+  H) Registro no jogo:    game/index.html + game/js/ui.js
+
+Pastas importantes:
+  game/beta-maps/       → mapas .otbm recebidos do RME/Canary
+  game/maps/            → mapas .otbm prontos para o jogo
+  game/assets/tiles/    → sprites de chão/parede/objetos
+  game/assets/mob/      → spritesheets de monstros
+  game/assets/item/     → sprites de itens (loot/equipamentos)
+  game/assets/appearance/ → sprites de outfits, montarias, addons
+  game/data/            → canarymonsters.json, mobsheets.json, etc.
+  game/js/              → codigo do jogo e definicoes de hunt
+  tools/                → scripts Python que geram os assets
+
+
+2. IMPORTAR MONSTROS DO CANARY
+-------------------------------
+O jogo ja le os monstros de:
+  game/data/canarymonsters.json
+
+Esse JSON e gerado a partir dos arquivos .lua do datapack Canary/OTSBR.
+Se um monstro ainda nao estiver no JSON, voce precisa:
+
+  a) Achar o .lua dele no repositorio Canary:
+     data-otservbr-global/monster/<categoria>/<nome_monstro>.lua
+     Exemplo: data-otservbr-global/monster/reptiles/lizard_chosen.lua
+
+  b) Copiar os campos principais para o JSON, usando o mesmo slug
+     (minusculo, tracos no lugar de espacos):
+       - name, hp, exp, speed, armor, defense, damage, attackSpeed
+       - looktype, lookHead, lookBody, lookLegs, lookFeet, lookAddons
+       - race, raceId, element, mitigation, resist
+       - loot [] com {id, chance, maxCount}
+       - skills / defSkills (ataques e curas automaticas)
+       - best (bestiary)
+       - voices
+
+  c) Converter os loot ids do Canary para slugs do jogo. Use o mapeamento
+     do gamedata.js (chaves numericas 'cid' = client id do item).
+     Exemplo de mapeamento rapido:
+       python -c "import json; g=json.load(open('game/data/gamedata.json')); print({v['cid']:k for k,v in g['items'].items()})"
+     (na pratica o build_canary_js.py ja faz isso automaticamente)
+
+  d) Se o monstro nao aparece no canarymonsters.json, execute:
+       python tools/build_monsters.py
+     ou, se quiser regenerar tudo:
+       python tools/import_canary.py
+
+     Esses scripts leem os .lua do datapack e escrevem:
+       game/data/canarymonsters.json
+       game/js/monsterdata.js
+
+
+3. IMPORTAR / EXTRAI SPRITES DE MONSTROS (com animacao)
+-------------------------------------------------------
+Todos os monstros usam looktypes do Tibia.dat/Tibia.spr (versao 15.x com
+8.60 interno). O DAT esta em:
+  refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.dat
+  refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.spr
+
+Existem 3 scripts principais:
+
+  3.1 EXTRAS DE MONSTROS QUE AINDO NAO TEM SPRITE
+      tools/extract_monster_sprites.py
+      Uso: python tools/extract_monster_sprites.py refs/15.x-with-8.60-main/15.x-with-8.60-main game
+      O que faz:
+        - Le canarymonsters.json
+        - Para cada monstro SEM sprite em game/assets/mob/
+        - Renderiza todas as direcoes (N,E,S,W) e todos os frames de
+          caminhada (idle + walk) a partir do DAT
+        - Salva:
+            game/assets/mob/<slug>_<dir>.png     (parado)
+            game/assets/mob/<slug>_<dir>1.png    (passo 1)
+            game/assets/mob/<slug>_<dir>2.png    (passo 2)
+            ... ate 12 frames se existirem
+      Monstros humanoides com mascara de outfit saem brancos/cinzentos aqui.
+
+  3.2 COLORIZAR HUMANOIDES E OUTROS COM MASCARA
+      tools/colorize_monsters_canary.py
+      Uso: python tools/colorize_monsters_canary.py refs/15.x-with-8.60-main/15.x-with-8.60-main game
+      O que faz:
+        - Le looktype + cores oficiais (lookHead/Body/Legs/Feet) do Canary
+        - Aplica a mascara do DAT com a paleta oficial de 132 cores
+        - Gera um spritesheet compacto:
+            game/assets/mob/<slug>.png
+          com todas as direcoes e frames numa unica imagem.
+        - Atualiza:
+            game/data/mobsheets.json
+            game/js/mobsheetdata.js
+      Para adicionar um novo humanoide:
+        - Edite CANARY_COLORS e FORCE_REGEN no colorize_monsters_canary.py
+        - Rode o script
+        - Confira o PNG gerado em game/assets/mob/
+
+  3.3 EXTRAS DE OUTFITS/JOGADORES
+      tools/extract_860.py  (regenera TUDO: outfits, mobs, itens)
+      tools/extract_idle_sprites.py  (idle + addons + montarias)
+      tools/extract_appearances.py   (base + mask para colorizacao)
+
+  Dica: depois de rodar qualquer extrator, verifique se o jogo consegue
+  carregar abrindo o DevTools (F12) e olhando a aba Network/Console.
+
+
+4. IMPORTAR ITENS DE LOOT / EQUIPAMENTOS
+-----------------------------------------
+Se o loot de um monstro contem um item que ainda nao existe:
+
+  a) Achar o id (client id) do item no Canary items.xml ou no .lua do loot.
+
+  b) Se o item ja existe em game/js/gamedata.js mas o sprite falta:
+       python tools/extract_860.py refs/15.x-with-8.60-main/15.x-with-8.60-main game
+     ou, para apenas um item especifico:
+       python -c "
+       import sys; sys.path.insert(0,'tools')
+       from tibia_assets_860 import Dat860, Spr860, render_item_860
+       from PIL import Image
+       dat=Dat860('refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.dat'); spr=Spr860('refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.spr')
+       cid=1234
+       img=render_item_860(dat,spr,cid)
+       if img: img.crop(img.getbbox()).save(f'game/assets/item/{cid}.png')
+       "
+     Renomeie o PNG para o slug correto usado em gamedata.js.
+
+  c) Se o item NAO existe em gamedata.js:
+       python tools/add_gamedata_items.py  -- ajuda a adicionar lote
+     ou edite manualmente game/js/gamedata.js adicionando:
+       "<slug>": { "name": "...", "cid": 1234, "t": "...", ... }
+
+
+5. IMPORTAR SPELLS (se a hunt tiver magias novas)
+-------------------------------------------------
+As magias ficam em game/js/spells.js. Cada spell tem:
+  id, name, words, type, element, lvl, mana, cd, vocs, range, fx, etc.
+
+Para copiar uma spell do Canary:
+  - Abra o arquivo .lua de magia em data-otservbr-global/scripts/spells/...
+  - Ou consulte a wiki para os parametros oficiais.
+  - Adicione o objeto em game/js/spells.js no formato existente.
+
+Se a spell tiver um icone/effect visual novo, voce tambem precisa extrair o
+efeito do DAT (tools/extract_fx_860.py) e registrar o sprite em
+assets/effects/.
+
+
+6. MONTAR O MAPA OTBM
+---------------------
+6.1 COLOCAR O ARQUIVO
+  O mapa vem do RME (Remere's Map Editor) ou do datapack Canary.
+  Copie o .otbm para:
+    game/beta-maps/<nome>.otbm
+  Depois mova/copie para:
+    game/maps/<nome>.otbm
+
+6.2 LER E ANALISAR O MAPA
+  Execute no terminal (dentro de ot-idle/):
+    node -e "
+    const fs=require('fs');
+    const OTBM=require('./tibia-idle/game/js/otbm.js');
+    const map=OTBM.read(fs.readFileSync('./tibia-idle/game/maps/<nome>.otbm').buffer,{z:7});
+    console.log('tamanho', map.w, map.h, 'celulas', Object.keys(map.cells).length);
+    console.log('bounds', map.sourceBounds);
+    const ids=new Set();
+    Object.values(map.cells).forEach(c=>{ if(c.g) ids.add(c.g); (c.items||[]).forEach(i=>ids.add(i)); });
+    console.log('tile ids', [...ids].sort((a,b)=>a-b));
+    "
+
+  Guarde os valores:
+    - map.w / map.h        (largura/altura em tiles)
+    - sourceBounds         (coordenadas absolutas do mundo OTBM)
+    - tile ids             (todos os sprites que precisam ser extraidos)
+
+6.3 EXTRAIR OS TILES
+  Use o script automatico para extrair apenas os tiles que faltam:
+    TIBIA860=C:/Users/Tomio/Desktop/ot-idle/refs/15.x-with-8.60-main/15.x-with-8.60-main \
+      python tools/import_otbm_sprites.py tibia-idle/game/maps/<nome>.otbm
+
+  Ele ja:
+    - le o .otbm, detecta todos os tile ids usados
+    - gera os PNGs em game/assets/tiles/<id>.png
+    - cria os pattern sheets (paredes/grounds com variacoes X/Y)
+    - atualiza js/tiledata.js com os nomes oficiais
+    - atualiza rme/data/known_tiles.js
+
+  Se quiser extrair um id especifico manualmente:
+    python -c "
+    import sys; sys.path.insert(0,'tibia-idle/tools')
+    from tibia_assets_860 import Dat860, Spr860, render_item_860
+    from PIL import Image
+    import os
+    OUT='tibia-idle/game/assets/tiles'
+    dat=Dat860('refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.dat')
+    spr=Spr860('refs/15.x-with-8.60-main/15.x-with-8.60-main/Tibia.spr')
+    ids=[...]   # cole os ids aqui
+    for cid in ids:
+      img=render_item_860(dat,spr,cid)
+      if img:
+        img.crop(img.getbbox()).save(os.path.join(OUT,f'{cid}.png'))
+        print('ok', cid)
+    "
+
+  Se o id for 0 ou nao gerar imagem, ignore — e provavelmente um tile vazio.
+  No Windows, ajuste as barras ou use paths absolutos; o exemplo acima usa
+  o repositorio 15.x-with-8.60-main, que e a fonte real do DAT/SPR 8.60.
+
+6.4 VERIFICAR COLISAO
+  O jogo usa TILEFLAGS para saber se um tile e bloqueavel.
+    node -e "
+    const fs=require('fs');
+    const vm=require('vm');
+    const ctx={window:{}}; vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync('./tibia-idle/game/js/tileflags.js','utf8'), ctx);
+    const tileflags=ctx.window.TILEFLAGS;
+    const OTBM=require('./tibia-idle/game/js/otbm.js');
+    const map=OTBM.read(fs.readFileSync('./tibia-idle/game/maps/<nome>.otbm').buffer,{z:7});
+    const hm=OTBM.huntMapFromOtbm(map, tileflags);
+    for(let y=0;y<hm.rows.length;y++)
+      console.log(y.toString().padStart(2,'0'), hm.rows[y].split('').map(c=>hm.leg[c].bloc?'#':'.').join(''));
+    "
+
+  O '#' e parede, '.' e andavel. Confira se o centro da sala e aberto.
+
+6.5 FOV (campo de visao)
+  Defina na hunt:
+    otbmFovBounds: { x: <minX>, y: <minY>, w: <largura>, h: <altura>, z: 7 }
+  O FOV e a janela da camera. Comece com o tamanho total do mapa e, se
+  quiser focar numa sala, reduza as dimensoes em torno do playerSpawn.
+
+
+7. CRIAR O ARQUIVO DA HUNT
+--------------------------
+Crie game/js/<nome-da-hunt>.js seguindo este modelo:
+
+"use strict";
+(function registerXxx() {
+  if (typeof GAMEDATA === "undefined") return;
+  if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
+  GAMEDATA.hunts["<slug-unico>"] = {
+    name: "Nome Bonito",
+    level: <min level para entrar>,
+    minLevel: <level recomendado>,
+    cat: "aventureiro",   // ou "guerreiro", "mago", "cacador", etc.
+    pack: 1,               // quantos packs aparecem ao mesmo tempo
+    packMin: 3,            // minimo de monstros por pack
+    packMax: 5,            // maximo de monstros por pack
+    monsters: ["slug1", "slug2", "slug3"],
+    color: "#cor-hex",
+    scene: "cave",         // cave, forest, desert, etc. (efeito visual)
+    otbm: "<nome-do-arquivo-sem-extensao>",
+    otbmFloor: 7,
+    otbmFovBounds: { x: ..., y: ..., w: ..., h: ..., z: 7 },
+    otbmFovWidth: ...,
+    otbmFovHeight: ...,
+    otbmRuntimeWidth: 24,    // padrao do jogo (grid de combate)
+    otbmRuntimeHeight: 15, // padrao do jogo
+    otbmSpawn: { x: ..., y: ..., z: 7 },       // playerSpawnPos
+    otbmMobBounds: { x: ..., y: ..., w: ..., h: ..., z: 7 }, // onde os monstros nascem
+    avgHp: ..., avgExp: ..., avgDamage: ..., avgArmor: ..., avgGold: ...,
+    respawn: 0.8,           // taxa de respawn (0 a 1)
+  };
+})();
+
+Como calcular as coordenadas:
+  - sourceBounds.minX e minY sao a origem do mapa.
+  - playerSpawn (x,y) e dado pelo centerroom.
+  - mobBounds e geralmente uma area quadrada/retangular dentro do mapa.
+    Converta coordenadas absolutas para relativas:
+      relX = absX - sourceBounds.minX
+      relY = absY - sourceBounds.minY
+
+As medias (avgHp, avgExp, ...) sao medias dos monstros listados, ponderando
+por quantas vezes cada um aparece. Use:
+  avgHp = soma(hp) / n
+  avgExp = soma(exp) / n
+  avgDamage = soma(damage) / n
+  avgArmor = soma(armor) / n
+  avgGold = media aproximada do gold que cada monstro dropa.
+
+
+8. REGISTRAR A HUNT NO JOGO
+---------------------------
+8.1 Em game/index.html, adicione o script ANTES de game.js (ou onde estao os
+    outros hunt scripts):
+    <script src="js/<nome-da-hunt>.js?v=<nome>-v1"></script>
+
+8.2 Em game/js/ui.js, adicione o slug da hunt no grupo correto:
+    procure a lista de hunts e insira, ex.:
+      { title: "HUNTS LEVEL 100-150", ids: [..., "<slug-unico>"] },
+
+8.3 Recarregue o jogo (Ctrl+Shift+R) e verifique se aparece no menu de hunts.
+
+
+9. VERIFICACAO FINAL
+--------------------
+Antes de considerar pronto:
+
+  [ ] Mapa .otbm existe em game/maps/
+  [ ] Todos os tile ids do mapa tem PNG em game/assets/tiles/
+  [ ] Monstros da hunt existem em game/data/canarymonsters.json
+  [ ] Monstros da hunt existem em game/js/monsterdata.js
+  [ ] Sprites dos monstros existem em game/assets/mob/
+  [ ] Loot dos monstros existe em game/js/gamedata.js (itens + sprites)
+  [ ] Hunt .js foi criado e registrado em index.html
+  [ ] Hunt aparece na UI em game/js/ui.js
+  [ ] Nenhum erro no console (F12) ao abrir o jogo
+  [ ] Nenhum erro no console ao entrar na hunt
+
+
+10. SCRIPTS UTEIS PARA EXTRAIR EM MASSA
+----------------------------------------
+10.1 Extrair todos os tiles faltantes de um (ou mais) mapa(s):
+  python tools/import_otbm_sprites.py tibia-idle/game/maps/<nome>.otbm [...]
+  (le o .otbm, lista os ids usados, extrai sprites e atualiza tiledata.js)
+
+  Para extrair TODOS os tiles do client (lento, use so quando necessario):
+    TIBIA860=refs/15.x-with-8.60-main/15.x-with-8.60-main python tools/extract_all_tiles.py
+
+10.2 Extrair todos os itens faltantes dos loots:
+  python tools/add_missing_loot_items.py \
+    C:/Users/Tomio/Desktop/ot-idle/tibia-idle/tools/data/canary-items.xml \
+    C:/Users/Tomio/Desktop/ot-idle/tibia-idle/game
+  (le canarymonsters.json, descobre loots sem ficha, adiciona em gamedata.js
+   e extrai os sprites automaticamente)
+
+  Para adicionar um lote especifico de equipamentos/loot, use como base:
+    tools/add_new_items.py
+  Para adicionar poucos itens com ids conhecidos, siga o modelo de:
+    add_<hunt>_items.py na raiz do projeto (ex: add_wyrm_items.py).
+
+10.3 Verificar assets quebrados:
+  node tools/test_appearance_assets.js
+  node tools/test_idle_animations.js
+
+10.4 Colorizar monstros humanoides (outfits com cores oficiais do Canary):
+  python tools/colorize_monsters_canary.py \
+    refs/15.x-with-8.60-main/15.x-with-8.60-main tibia-idle/game
+
+  Esse e o passo essencial para verificar outfits com cores: ele aplica
+  lookHead/lookBody/lookLegs/lookFeets oficiais do .lua usando a paleta de
+  132 cores do client. Se um monstro humanoide aparecer branco/cinza no jogo,
+  adicione-o ao dicionario CANARY_COLORS do script e rode novamente.
+
+10.5 Atualizar mobsheets apos colorizar:
+  python tools/colorize_monsters_canary.py refs/15.x-with-8.60-main/15.x-with-8.60-main tibia-idle/game
+  (ja gera data/mobsheets.json + js/mobsheetdata.js automaticamente)
+
+10.6 MAPAS EXISTENTES (para verificar se todos os mapas estao registrados)
+--------------------------------------------------------------------------
+Mapas atualmente em tibia-idle/game/maps/:
+  amazon_camp.otbm, ankrahmun_tombs.otbm, buried_cathedral.otbm,
+  catacombs.otbm, claustrophobic_inferno.otbm, cobra_bastion.otbm,
+  deathlingsunkentemple.otbm, deeplingstairs.otbm, deeplinsroom.otbm,
+  doctormarrow_room.otbm, dt_seal.otbm, ebb_and_flow.otbm,
+  elder_wyrm_darashia.otbm, elfyalahar.otbm, facelessroom.otbm,
+  falconbastion.otbm, ferumbrasway.otbm, furious_crate.otbm,
+  goshars_malice_room.otbm, goshnars_cruelty_room.otbm,
+  goshnars_greed_room.otbm, goshnars_hatred_room.otbm,
+  goshnars_megalomania.otbm, goshnars_spite_room.otbm,
+  herocave_edron.otbm, ingolterrain.otbm, juggerseal.otbm,
+  leidenroom.otbm, livraria_fire.otbm, livraria_fire2.otbm,
+  livraria_ice.otbm, lizardchosen.otbm, marapur_nagas.otbm,
+  minosoramond.otbm, mirrored_nightmare_sw.otbm, nagas_marapur.otbm,
+  oberonroom.otbm, prisonroshamuul.otbm, rookgaard_sewers.otbm,
+  rookrat.otbm, roshamuul.otbm, rotten_wasteland.otbm,
+  "sala de exercise weapons.otbm", salamandercave.otbm, scarlet_room.otbm,
+  stonerefiner.otbm, templo.otbm, thedreadmaidenroom.otbm,
+  thefearfaster.otbm, thepalewormroom.otbm, theunwelcomeroom.otbm,
+  timiraroom.otbm, MOTA.otbm
+
+Use esse mapa-mentai para verificar se uma hunt nova ja tem o arquivo .otbm
+registrado e se todos os mapas ativos estao documentados em index.html/ui.js.
+
+
+11. DICAS PARA IA BURRA
+-----------------------
+- Nunca invente ids numericos. Sempre use os client ids do Canary.
+- Nunca crie sprites vazios. Se render_item_860 retornar None, ignore.
+- Sempre rode node -c <arquivo.js> para verificar sintaxe.
+- Sempre recarregue com Ctrl+Shift+R para limpar cache.
+- Se um monstro aparecer branco, ele provavelmente e humanoide e precisa de
+  colorizacao pelo colorize_monsters_canary.py.
+- Se a hunt nao aparecer no menu, verifique se o slug em ui.js e o mesmo do
+  GAMEDATA.hunts.
+- Se o personagem nascer dentro de parede, otbmSpawn esta errado.
+- Se os monstros nascerem fora da sala, otbmMobBounds esta errado.
+- Se os tiles aparecerem pretos, o sprite com aquele id nao existe em
+  assets/tiles/.
+
+
+12. EXEMPLO RESUMIDO — ADICIONAR HUNT "Lizard Chosen Tower"
+-------------------------------------------------------------
+Passos que seriam feitos para a hunt lizardchosen.otbm:
+
+  1. Copiar game/beta-maps/lizardchosen.otbm → game/maps/lizardchosen.otbm
+  2. node + otbm.js para ler bounds, tile ids e colisao.
+  3. Extrair tiles faltantes para game/assets/tiles/
+  4. Garantir que os monstros existem:
+       lizard-chosen, lizard-magistratus, lizard-legionnaire,
+       lizard-high-guard, lizard-dragon-priest
+     Se nao existirem, copiar do canarymonsters.json ou importar.
+  5. Extrair sprites dos monstros:
+       python tools/extract_monster_sprites.py refs/15.x-with-8.60-main/15.x-with-8.60-main game
+       (se algum for humanoide, colorizar)
+  6. Criar game/js/lizard-chosen-tower.js com as coordenadas do centerroom
+     e monsterpawn.
+  7. Registrar em index.html e ui.js.
+  8. Reiniciar o servidor e testar.
+
+
+FIM DO GUIA.

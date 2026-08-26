@@ -122,6 +122,10 @@ CANARY_COLORS = {
     # --- misc hunts
     "hunter":        (113, 114, 39, 115),
     "wild-warrior":  (113, 39, 113, 115),
+    # --- Old Fortress / Edron (looktype 131 e 268, mesma base com cores distintas)
+    "vicious-squire":   (97, 24, 73, 116),
+    "vile-grandmaster": (59, 19, 95, 94),
+    "renegade-knight":  (97, 113, 76, 98),
     # Soul War: appearances que usam o mesmo sistema de máscara/paleta.
     "knight-s-apparition": (19, 76, 74, 114),
     "paladin-s-apparition": (57, 42, 114, 114),
@@ -186,7 +190,8 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "grand-commander-soeren", "preceptor-lazare",
                "grand-chaplain-gaunder", "grand-canon-dominus",
                "grand-master-oberon",
-               "guzzlemaw", "frazzlemaw", "silencer"}
+               "guzzlemaw", "frazzlemaw", "silencer",
+               "vicious-squire", "vile-grandmaster", "renegade-knight"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
@@ -196,7 +201,10 @@ CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "preceptor-lazare": 0,
                   "grand-chaplain-gaunder": 1,
                   "grand-canon-dominus": 0,
-                  "grand-master-oberon": 1}
+                  "grand-master-oberon": 1,
+                  "vicious-squire": 1,
+                  "vile-grandmaster": 1,
+                  "renegade-knight": 2}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
 

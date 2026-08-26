@@ -10,3 +10,12 @@ tibia-idle/server/.env
 tibia-idle/server/my.cnf
 tibia-idle/dist/
 tibia-idle/.env
+tibia-idle/game/beta-maps/
+tibia-idle/game/beta-maps/*
+_tmp_*.py
+tmp_*.py
+add_*_items.py
+add_*.py
+.idea/
+*.exe
+Dream_Matter.gif
