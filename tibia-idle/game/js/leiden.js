@@ -33,11 +33,38 @@ const LEIDEN_STATS = {
   defense: 45,
 };
 
-/* Loot básico do boss (Canary original não tem loot na forma Leiden;
- * adicionamos recompensa em moedas para o range 150+). */
+/* Loot do Leiden = mesmo do Ravenous Hunger (canarymonsters.json). */
 const LEIDEN_LOOT = [
-  { item: "platinum-coin", chance: 80, max: 10 },
-  { item: "gold-coin", chance: 60, max: 50 },
+  { item: "bed-of-nails", chance: 67, max: 1 },
+  { item: "small-sapphire", chance: 21, max: 10 },
+  { item: "great-spirit-potion", chance: 33.23, max: 5 },
+  { item: "yellow-gem", chance: 12, max: 1 },
+  { item: "giant-shimmering-pearl", chance: 5, max: 1 },
+  { item: "platinum-coin", chance: 68.299, max: 30 },
+  { item: "lightning-legs", chance: 18, max: 1 },
+  { item: "sacred-tree-amulet", chance: 15, max: 1 },
+  { item: "wood-cape", chance: 9, max: 1 },
+  { item: "gold-token", chance: 1.532, max: 1 },
+  { item: "gold-coin", chance: 100, max: 200 },
+  { item: "small-emerald", chance: 19, max: 10 },
+  { item: "great-mana-potion", chance: 31.23, max: 5 },
+  { item: "red-gem", chance: 12, max: 1 },
+  { item: "oriental-shoes", chance: 11, max: 1 },
+  { item: "torn-shirt", chance: 42, max: 1 },
+  { item: "fig-leaf", chance: 32, max: 1 },
+  { item: "luminous-orb", chance: 35, max: 1 },
+  { item: "wooden-spellbook", chance: 4.5, max: 1 },
+  { item: "elven-legs", chance: 16, max: 1 },
+  { item: "small-diamond", chance: 21, max: 10 },
+  { item: "ultimate-health-potion", chance: 28.23, max: 5 },
+  { item: "energy-bar", chance: 53, max: 5 },
+  { item: "green-gem", chance: 12, max: 1 },
+  { item: "broken-key-ring", chance: 4, max: 1 },
+  { item: "muck-rod", chance: 10, max: 1 },
+  { item: "mysterious-remains", chance: 100, max: 1 },
+  { item: "cobra-crown", chance: 0.4, max: 1 },
+  { item: "silver-token", chance: 2.5, max: 1 },
+  { item: "elven-mail", chance: 3, max: 1 },
 ];
 
 (function registerLeiden() {
