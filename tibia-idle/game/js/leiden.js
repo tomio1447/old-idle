@@ -115,4 +115,20 @@ const LEIDEN_LOOT = [
     cooldown: 0,
     loot: LEIDEN_LOOT,
   };
+
+  /* Registra nomes/pesos dos itens novos do Ravenous Hunger que ainda não
+   * possuem sprite, para que tooltips e Loot Pouch funcionem corretamente. */
+  const items = GAMEDATA.items || (GAMEDATA.items = {});
+  const LEIDEN_ITEMS = {
+    "bed-of-nails":        { n: "Bed of Nails",        w: 2.50 },
+    "gold-token":            { n: "Gold Token",          w: 0.20 },
+    "torn-shirt":            { n: "Torn Shirt",          w: 1.10 },
+    "fig-leaf":              { n: "Fig Leaf",            w: 0.90 },
+    "luminous-orb":          { n: "Luminous Orb",        w: 0.94 },
+    "broken-key-ring":       { n: "Broken Key Ring",     w: 0.80 },
+    "mysterious-remains":    { n: "Mysterious Remains",  w: 30.00 },
+  };
+  for (const slug in LEIDEN_ITEMS) {
+    if (!items[slug]) items[slug] = Object.assign({}, LEIDEN_ITEMS[slug]);
+  }
 })();

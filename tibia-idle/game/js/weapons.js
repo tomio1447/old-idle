@@ -191,7 +191,7 @@ function itemImg(slug, tam, cls, count) {
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
   return `<img class="item-sprite ${clsAll}" src="assets/item/${slug}.png?v=${v}"
     alt="" loading="lazy" style="${dim}"
-    onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\\.png(\\?|$)/,'.gif$1');}">`;
+    onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\\.png(\\?|$)/,'.gif$1');}else if(this.dataset.fb==='1'){this.dataset.fb=2;this.src='assets/item/unknown.png?v=${v}';}">`;
 }
 
 /* A vocacao pode usar o item? (nivel + restricao de vocacao) */
