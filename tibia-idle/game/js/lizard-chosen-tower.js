@@ -1,8 +1,7 @@
 /* lizard-chosen-tower.js — HUNT LIZARD CHOSEN TOWER (hunts level 100-150).
  *
  * Monstros do Canary (Zao):
- *   lizard-chosen, lizard-dragon-priest,
- *   lizard-high-guard, lizard-legionnaire, lizard-zaogun.
+ *   lizard-chosen.
  *
  * Mapa: lizardchosen.otbm
  *   bounds: {1008,1015,7} .. {1028,1033,7}
@@ -23,8 +22,7 @@
     pack: 5,
     packMin: 5,
     packMax: 8,
-    monsters: ["lizard-chosen", "lizard-dragon-priest",
-               "lizard-high-guard", "lizard-legionnaire", "lizard-zaogun"],
+    monsters: ["lizard-chosen"],
     color: "#4a6a3a",
     scene: "cave",
     otbm: "lizardchosen",

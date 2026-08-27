@@ -209,6 +209,29 @@
   soulWarFear:true,
  };
 
+ // Furious Crate — beta-maps/furiouscrater.otbm → maps/furious_crate.otbm.
+ // OTBM z=7 (1048,988)..(1070,1002) 23×15, mundo runtime 30×30.
+ // Spawn (1060,998); zona de monstros (1056,992)..(1067,999).
+ // Monstros oficiais: Courage Leech, Cloak of Terror, Vibrant Phantom.
+ // Missão: matar 10 monstros fiendish/influenced → desbloqueia Goshnar's Cruelty.
+ for(const slug of ['courage-leech','cloak-of-terror','vibrant-phantom']){
+  if(M[slug]) M[slug].element='energy';
+ }
+ GAMEDATA.hunts['furious-crate']={
+  name:'Furious Crate',level:400,minLevel:400,cat:'hardcore',scene:'soulwar',
+  otbm:'furious_crate',otbmFloor:7,
+  otbmFovBounds:{x:1048,y:988,w:23,h:15,z:7},
+  otbmFovWidth:20,otbmFovHeight:12,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1060,y:998,z:7},
+  otbmMobBounds:{x:1056,y:992,w:12,h:8,z:7},
+  monsters:['courage-leech','cloak-of-terror','vibrant-phantom'],
+  avgHp:27333,avgExp:19433,avgDamage:833,avgArmor:102,avgGold:170,
+  respawn:.7,pack:10,packMin:8,packMax:10,influencedMul:2,fiendishMul:2,
+  color:'#4a3a5a',soulWarZone:true,soulWarZoneMonster:'courage-leech',
+  soulWarFear:true,
+ };
+
  // Claustrophobic Inferno — beta-maps/claustrophobic inferno.otbm →
  // maps/claustrophobic_inferno.otbm. OTBM z=7 (1042,1008)..(1067,1026) 26×19.
  // Câmera no padrão da Mirrored Nightmare (20×12): a FOV da sala inteira
@@ -312,6 +335,24 @@
   monsters:['goshnar-s-malice','dreadful-harvester','malicious-soul'],
   avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
   respawn:1,pack:1,soulWarZone:true,soulWarZoneMonster:'dreadful-harvester',
+ };
+
+ // Bossroom Canary: beta-maps/bossesroom/goshnars_cruelty.otbm publicado
+ // como maps/goshnars_cruelty_room.otbm. OTBM z=7 (1012,1015)..(1033,1036)
+ // 22×22 → mundo runtime 30×30.
+ // Spawns: player sul (1022,1033), boss centro-norte (1023,1019).
+ // FOV câmera 22×15: cobre a arena e a distância player↔boss.
+ GAMEDATA.hunts['goshnars-cruelty-room']={
+  name:"Goshnar's Cruelty Room",hidden:true,level:400,minLevel:400,
+  cat:'boss-room',scene:'soulwar',otbm:'goshnars_cruelty_room',otbmFloor:7,
+  otbmFovBounds:{x:1012,y:1015,w:22,h:22,z:7},
+  otbmFovWidth:22,otbmFovHeight:15,
+  otbmRuntimeWidth:30,otbmRuntimeHeight:30,
+  otbmSpawn:{x:1022,y:1033,z:7},
+  otbmMobBounds:{x:1023,y:1019,w:1,h:1,z:7},
+  monsters:['goshnar-s-cruelty'],
+  avgHp:300000,avgExp:75000,avgDamage:5000,avgArmor:160,avgGold:100,
+  respawn:1,pack:1,soulWarZone:true,soulWarZoneMonster:'goshnar-s-cruelty',
  };
 
  // Bossroom Canary: maps/goshnars_megalomania.otbm (z=7 24×21,
@@ -1339,6 +1380,62 @@ function maliceRenderOnline(c){
  if(c.malice.qtePhase==='active')maliceRenderQte(c,now);else maliceHideQte();
  maliceRenderMinigame(c,now);
 }
+
+/* ------------------------------------------------ Goshnar's Cruelty
+ * O boss muda de elemento a cada 20s. Enquanto estiver em um elemento,
+ * recebe -90% de dano desse elemento (e -30% do oposto, se houver). */
+const CRUELTY_ID='goshnar-s-cruelty';
+const CRUELTY_SHIFT_MS=20000;
+const CRUELTY_ELEMENTS=['fire','ice','energy','earth','death','holy'];
+const CRUELTY_ELEMENT_ICONS={fire:'cond-burning',ice:'cond-freezing',energy:'cond-electrified',earth:'cond-poisoned',death:'cond-cursed',holy:'cond-blessed'};
+function crueltyBossFight(c){return !!(c&&c.boss&&c.boss.id===CRUELTY_ID);}
+function crueltyBossMob(c){return c&&c.mobs?c.mobs.find((m)=>m&&m.boss):null;}
+function crueltyMinigameElement(){return typeof document!=='undefined'?document.getElementById('cruelty-minigame'):null;}
+function crueltyHideMinigame(){const el=crueltyMinigameElement();if(el){el.style.display='none';el.innerHTML='';}}
+function crueltyElementName(el){return ({fire:'Fogo',ice:'Gelo',energy:'Energia',earth:'Terra',death:'Morte',holy:'Sagrado'}[el]||el);}
+function crueltyApplyElement(c,el,now){
+ const st=c&&c.cruelty;if(!st)return;
+ const boss=crueltyBossMob(c);if(!boss)return;
+ const base=GAMEDATA.monsters[boss.baseMonster||boss.slug||CRUELTY_ID]||{};
+ const resist=Object.assign({},base.resist||{},boss.def&&boss.def.resist||{});
+ // +90% resist no elemento atual; remove bônus antigo
+ for(const k of CRUELTY_ELEMENTS){
+  if(k===el) resist[k]=90;
+  else if(resist[k]>80) resist[k]=0; // remove imunidade anterior
+ }
+ boss.def.resist=resist;
+ boss.def.element=el;
+ st.element=el;st.since=now;
+ if(c.events)c.events.push({t:'effect',x:boss.x,y:boss.y,screen:true,fx:el==='death'?'mort-area':el+'-area'});
+ if(typeof addLog==='function')addLog('info',`Goshnar's Cruelty absorve ${crueltyElementName(el)}! Dano ${crueltyElementName(el)} reduzido.`);
+}
+function crueltyRenderMinigame(c){
+ const el=crueltyMinigameElement();if(!el||!c||!c.cruelty)return;
+ const st=c.cruelty;
+ el.style.display='block';
+ el.innerHTML=`CRUELTY: <b>${crueltyElementName(st.element).toUpperCase()}</b>`;
+}
+function crueltyBossInit(c,player,randomFn){
+ if(!crueltyBossFight(c))return c;
+ const now=Date.now();
+ c.cruelty={element:'physical',nextShiftAt:now+CRUELTY_SHIFT_MS,randomFn:randomFn||Math.random};
+ crueltyApplyElement(c,'physical',now);
+ crueltyRenderMinigame(c);
+ return c;
+}
+function crueltyBossTick(c,now){
+ now=now||Date.now();if(!crueltyBossFight(c)||!c.cruelty)return true;
+ const st=c.cruelty,boss=crueltyBossMob(c);
+ if(!boss||boss.hp<=0){crueltyHideMinigame();return true;}
+ if(now>=st.nextShiftAt){
+  const next=CRUELTY_ELEMENTS[Math.floor(st.randomFn()*CRUELTY_ELEMENTS.length)];
+  crueltyApplyElement(c,next,now);
+  st.nextShiftAt=now+CRUELTY_SHIFT_MS;
+ }
+ crueltyRenderMinigame(c);
+ return true;
+}
+function crueltyBossCleanup(c){if(c)delete c.cruelty;crueltyHideMinigame();}
 
 /* ------------------------------------------------ Goshnar's Megalomania
  * Boss final Soul War (lobby 1–5). Boss nasce 15s após o start.

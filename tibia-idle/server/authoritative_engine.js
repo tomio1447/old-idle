@@ -4437,6 +4437,7 @@ function equipFromContainerAuth(p,slug,source,opts){
   const slot=String(it.s);
   if(slot==="ammo")return {ok:false,msg:"Use a seleção de munição do quiver"};
   const fromPouch=source==="pouch";
+  if(fromPouch)return {ok:false,msg:"Mova o item da Loot Pouch para a mochila antes de equipar"};
   // Presença ANTES dos requisitos: se o item não está no container informado
   // (ex.: drag de pouch→bag que ainda não persistiu no servidor), o erro
   // verdadeiro é "item não está na mochila/pouch" — não "vocação/nível".
@@ -4475,7 +4476,8 @@ function equipFromContainerAuth(p,slug,source,opts){
     return !sh||(sh.t!=="quiver"&&sh.type!=="quiver"&&sh.s!=="quiver");
   })()?p.equip.shield:null;
   const toStash=[];
-  if(old&&old.item&&old.item!==slug)toStash.push({slot:slot,entry:old});
+  const oldIsDefaultBackpack=slot==="backpack"&&old&&old.item==="bag";
+  if(old&&old.item&&old.item!==slug&&!oldIsDefaultBackpack)toStash.push({slot:slot,entry:old});
   if(shieldBack)toStash.push({slot:"shield",entry:shieldBack});
   for(const s of toStash){
     const toBag=!fromPouch||s.entry.instId;

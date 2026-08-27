@@ -980,7 +980,7 @@ function bindCatalogAccordion(root, mode) {
 
 const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "meriana-island", "mutateds-yalahar"] },
-  { title: "HUNTS 100–250", ids: ["lizard-chosen-tower", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
+  { title: "HUNTS 100–250", ids: ["lizard-chosen-tower", "ghastly-dragons", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond", "deathlings-sunken-temple", "falcon-bastion"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
@@ -1414,6 +1414,9 @@ function equipFromBag(p, slug, instId) {
  * Conta online: passa pela autoridade (/api/characters/equip-other), que
  * tira o item do shared e equipa o alvo — mutação local não persistia. */
 function equipOnOtherCharacterPouch(from, to, slug) {
+  // Loot Pouch não equipa diretamente: mover para a mochila primeiro.
+  if (typeof toast === "function") toast("Mova o item para a mochila antes de equipar.", "bad");
+  return false;
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return false;
   const slot = it.s;
@@ -1462,6 +1465,7 @@ function equipOnOtherCharacterPouch(from, to, slug) {
 function partyEquipMenuOptions(p, slug, instId, fromPouch) {
   const it = GAMEDATA.items[slug];
   if (!it || !it.s) return [];
+  if (fromPouch) return []; // Loot Pouch não equipa diretamente: mover para a mochila primeiro.
   const activeId = String((typeof characterId === "function" ? characterId(p) : (p && p.id)) || "");
   // Sempre pega os personagens da conta, nunca todos do roster/party.
   const accountChars = (typeof accountCharacterCacheRead === "function" && accountCharacterCacheRead())
@@ -2917,10 +2921,9 @@ function openPouchItemMenu(p, slug, x, y) {
         openLocal();
       },
     }] : []),
-    // Equipar direto da pouch foi REMOVIDO (pedido do jogador): itens da
-    // Loot Pouch são movidos para a backpack/equipados via "Equipar em
-    // <personagem>" (que usa o caminho autoritativo do inventário da conta).
-    ...partyEquipMenuOptions(p, slug, null, true),
+    // Equipar direto da pouch foi REMOVIDO: itens só podem ser equipados
+    // a partir da mochila. Primeiro mova da Loot Pouch para a backpack.
+
     {
       label: "Mover para backpack",
       action: () => {

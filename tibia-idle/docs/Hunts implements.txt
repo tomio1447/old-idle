@@ -243,6 +243,26 @@ assets/effects/.
   O FOV e a janela da camera. Comece com o tamanho total do mapa e, se
   quiser focar numa sala, reduza as dimensoes em torno do playerSpawn.
 
+  Padrao recomendado (mesmo da Mirrored Nightmare):
+    otbmFovWidth: 20,    otbmFovHeight: 12,
+    otbmRuntimeWidth: 30, otbmRuntimeHeight: 30,
+  Centralize o FOV no playerSpawn: x = spawnX - 10, y = spawnY - 6.
+
+
+6.6 TILES SEM SPRITE NO CLIENT 8.60
+-----------------------------------
+  Alguns ids usados pelo Canary Map Editor (ex: 8770 sand, 7109 geyser)
+  nao tem sprite no client 8.60/15.x-with-8.60-main. Isso gera tiles
+  brancos ou manchas claras no jogo. Verifique no RME: se o tile for um
+  chao/ground, substitua o id no .otbm por um ground equivalente que
+  exista no client (ex: 10171 sand, 104 sand, 231 sand). Para itens sem
+  sprite (ex: geyser), remova o id do mapa ou substitua por um item
+  decorativo compativel.
+
+  Recomendacao: depois de editar o .otbm, rode
+    python tools/import_otbm_sprites.py game/maps/<mapa>.otbm
+  e confira que a saida termina com "faltam sprites: 0 -> []". Se sobrarem
+  ids sem sprite, resolva no mapa antes de subir.
 
 7. CRIAR O ARQUIVO DA HUNT
 --------------------------

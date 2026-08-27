@@ -100,6 +100,8 @@ function arenaBossBindMechanics(c, now) {
     spiteBossInit(c, player);
   if (id === "goshnar-s-malice" && typeof maliceBossInit === "function" && !c.malice)
     maliceBossInit(c, player);
+  if (id === "goshnar-s-cruelty" && typeof crueltyBossInit === "function" && !c.cruelty)
+    crueltyBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -3156,27 +3158,34 @@ function tryHeal(c, p, now) {
   const itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
   if (pct > Math.max(spellAt, itemAt)) return false;
 
-  // 1. magia de cura: usa apenas se o HP estiver no limite configurado para spell.
-  if (pct <= spellAt && !(entCd(c, p, "healCd") > now)) {
-    const heals = [];
-    const selectedHealSpell = p.config.healSpell;
-    if (selectedHealSpell) {
-      const s = SPELLS[selectedHealSpell];
-      const friendOnly = typeof healFriendSpells === "function" && healFriendSpells(p).includes(selectedHealSpell);
-      // Exura Sio/Gran Sio são spells de alvo: nunca entram na autocura.
-      if (!friendOnly && s && s.type === "heal"
-          && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) &&
-          p.level >= s.lvl && p.mp >= s.mana &&
-          cdReady(p, selectedHealSpell, now)) heals.push([selectedHealSpell, s]);
-    } // sem spell selecionada: não faz fallback automático
+  // 1. magia de cura: HEAL CONDITION — percorre a lista de spells configurada
+  // (healSpells) ordenada por threshold crescente. A primeira cuja % de HP seja
+  // atingida, que a vocação possa usar, que tenha mana e que esteja fora de
+  // cooldown é lançada. Se a mais forte estiver em cooldown, o Helper cai
+  // para a próxima da condição, respeitando o cooldown global healCd (1s).
+  if (!(entCd(c, p, "healCd") > now)) {
+    const spells = Array.isArray(p.config.healSpells) ? p.config.healSpells.slice() : [];
+    // compat com saves antigos que ainda usam healSpell/healSpellAt
+    if (!spells.length && p.config.healSpell && SPELLS[p.config.healSpell]) {
+      spells.push({ id: p.config.healSpell, at: p.config.healSpellAt || p.config.healAt || 90 });
+    }
+    spells.sort((a, b) => (a && a.at || 99) - (b && b.at || 99));
+    let chosenHeal = null;
+    for (const cfg of spells) {
+      if (!cfg || !cfg.id || pct > (cfg.at || 99)) continue;
+      const idCura = cfg.id;
+      const s = SPELLS[idCura];
+      if (!s || s.type !== "heal") continue;
+      const friendOnly = typeof healFriendSpells === "function" && healFriendSpells(p).includes(idCura);
+      if (friendOnly) continue;
+      const allowed = typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1;
+      if (!allowed || p.level < s.lvl || p.mp < s.mana || !cdReady(p, idCura, now)) continue;
+      chosenHeal = [idCura, s];
+      break;
+    }
 
-    if (heals.length) {
-      // sem selecao manual: usa a cura que mais restaura NESTE personagem,
-      // calculada pela formula do canary e nao por um peso fixo
-      if (!selectedHealSpell) {
-        heals.sort((a, b) => spellValues(p, b[1]).max - spellValues(p, a[1]).max);
-      }
-      const [idCura, s] = heals[0];
+    if (chosenHeal) {
+      const [idCura, s] = chosenHeal;
       let amount = Math.max(1, rollSpell(p, s));
       // Augment "base healing" (TibiaWiki): +% sobre a cura base da spell,
       // antes de stances/crítico (regra oficial de 17/05/2024).
@@ -3225,7 +3234,7 @@ function tryHeal(c, p, now) {
       p.hp = Math.min(max.hp, p.hp + amount);
       entCdSet(c, p, "healCd", now + 1000);
       c.events.push({ t: "heal", amount: amount, targetId:p.id||"player", spell: s.name, crit: ch.crit, critExtraPct: ch.extraPct });
-      c.events.push({ t: "say", text: spellWords(selectedHealSpell || heals[0][0], s) });
+      c.events.push({ t: "say", text: spellWords(idCura, s) });
       return true;
     }
   }
@@ -3415,18 +3424,16 @@ function tryCureCondition(c, p, now) {
 
 /* Existe alguma forma de cura disponivel agora? (spell com mana ou runa) */
 function canHeal(c, p) {
-  if (p.config.healSpell) {
-    const s = SPELLS[p.config.healSpell];
+  const spells = Array.isArray(p.config.healSpells) ? p.config.healSpells.slice() : [];
+  if (!spells.length && p.config.healSpell && SPELLS[p.config.healSpell]) {
+    spells.push({ id: p.config.healSpell, at: p.config.healSpellAt || p.config.healAt || 90 });
+  }
+  for (const cfg of spells) {
+    if (!cfg || !cfg.id) continue;
+    const s = SPELLS[cfg.id];
     if (s && s.type === "heal"
         && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) &&
         p.level >= s.lvl && p.mp >= s.mana) return true;
-  } else {
-    for (const id in SPELLS) {
-      const s = SPELLS[id];
-      if (s.type !== "heal") continue;
-      if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) === -1) continue;
-      if (p.level >= s.lvl && p.mp >= s.mana) return true;
-    }
   }
   if (p.config.useRunes) {
     if (p.config.healSupply) {
@@ -4931,6 +4938,7 @@ function combatTick(c, p, dt, now) {
   if (typeof hatredBossTick === "function" && hatredBossTick(c, now) === false) return;
   if (typeof spiteBossTick === "function" && spiteBossTick(c, now) === false) return;
   if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
+  if (typeof crueltyBossTick === "function" && crueltyBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
@@ -5244,7 +5252,8 @@ function combatTick(c, p, dt, now) {
     }
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
-                    charm: charmGanho, bossPts: bossGanho, boss: !!m.boss });
+                    charm: charmGanho, bossPts: bossGanho, boss: !!m.boss,
+                    fiendish: !!m.fiendish, influenced: !!m.influenced });
   }
   c.mobs = alive;
   // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /

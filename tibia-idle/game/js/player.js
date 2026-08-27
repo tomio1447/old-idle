@@ -712,8 +712,51 @@ function expProgress(p) {
 
 /* --------------------------------------------------- inventario */
 
+/* Slots de cada backpack conhecida. O default (bag) vale 8.
+ * Usado por bagSlots para somar a capacidade de toda a party. */
+function backpackSlotsFor(slug) {
+  const it = typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug];
+  if (it && typeof it.slots === "number") return it.slots;
+  return 8;
+}
+
 function bagSlots(p) {
-  return p.bagSlots || 8;
+  if (!p) return 8;
+  const partyMembers = [p];
+  const myId = String(p.id || (typeof characterId === "function" ? characterId(p) : "") || "");
+  // Modo local: soma todos os personagens da party (líder + membros).
+  if (typeof partyLocalData === "function" && typeof getCharacters === "function" &&
+      !(typeof partyOnlineMode === "function" && partyOnlineMode())) {
+    try {
+      const d = partyLocalData();
+      if (d) {
+        const chars = getCharacters();
+        for (const id of (d.members || []).map((m) => String(m.id))) {
+          if (id === myId) continue;
+          const c = chars.find((x) => String(x.id || (typeof characterId === "function" ? characterId(x) : "")) === id);
+          if (c) partyMembers.push(c);
+        }
+      }
+    } catch (e) { /* fallback: só conta o próprio personagem */ }
+  }
+  // Modo online em instância: soma os jogadores vivos na mesma arena.
+  if (typeof partyOnlineMode === "function" && partyOnlineMode() &&
+      typeof G !== "undefined" && G && G.combat && Array.isArray(G.combat.players)) {
+    for (const ent of G.combat.players) {
+      const pp = ent && ent.p;
+      if (!pp) continue;
+      const id = String(pp.id || (typeof characterId === "function" ? characterId(pp) : "") || "");
+      if (id === myId || partyMembers.some((x) => String(x.id || "") === id)) continue;
+      partyMembers.push(pp);
+    }
+  }
+  let total = 0;
+  for (const c of partyMembers) {
+    const bp = c.equip && c.equip.backpack;
+    const slug = bp && bp.item ? bp.item : "bag";
+    total += backpackSlotsFor(slug);
+  }
+  return total || 8;
 }
 
 /* ---------------------------------------------------- municao (contador)

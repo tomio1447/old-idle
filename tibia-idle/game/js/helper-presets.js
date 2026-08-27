@@ -17,8 +17,8 @@ const HELPER_PRESETS_MAX = 5;
  * (preferências de UI como idioma/tema continuam por personagem, fora dos
  * presets). */
 const HELPER_PRESET_CONFIG_FIELDS = [
-  // Cura (spell, % de HP, potions de HP e mana)
-  "healSpellAt", "healItemAt", "healAt", "manaAt",
+  // Cura (spells com thresholds, % de HP, potions de HP e mana)
+  "healSpells", "healSpellAt", "healItemAt", "healAt", "manaAt",
   "healSpell", "healSupply", "manaSupply",
   "noHealthPotions", "noManaPotions", "noPotions",
   // Escudo mágico e equipamento automático

@@ -410,7 +410,8 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
       if (!takenInst) return false;
     } else if (!removeItem(p, slug, 1)) return false;
   } else if (source === "pouch") {
-    if (!removeLootPouch(p, slug, 1)) return false;
+    if (typeof toast === "function") toast("Mova o item para a mochila antes de equipar.", "bad");
+    return false;
   } else if (source === "stash") {
     if (typeof removeSupplyStash !== "function" || !removeSupplyStash(p, slug, 1)) return false;
   } else if (source === "equip") {
@@ -418,8 +419,9 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
   }
 
   const old = p.equip[slot];
+  const oldIsDefaultBackpack = slot === "backpack" && old && old.item === "bag";
   let oldInst = null;
-  if (old && old.item !== slug) {
+  if (old && old.item !== slug && !oldIsDefaultBackpack) {
     if (old.instId && typeof takeEquippedItemInstance === "function") {
       oldInst = takeEquippedItemInstance(p, slot);
       if (source === "bag") {
@@ -487,7 +489,17 @@ function equipItemFromContainer(p, slug, source, targetSlot, instId) {
 
 function unequipToContainer(p, slot, dest) {
   if (!p.equip || !p.equip[slot]) return false;
-  if (slot === "backpack") { if (typeof toast === "function") toast("A bag padrão não pode ser removida."); return false; }
+  if (slot === "backpack") {
+    const e = p.equip[slot];
+    if (!e || e.item === "bag") { if (typeof toast === "function") toast("A bag padrão não pode ser removida."); return false; }
+    // Troca a backpack especial pela bag padrão; a antiga volta para a mochila.
+    if (typeof addItem === "function" && !addItem(p, e.item, 1)) {
+      if (typeof toast === "function") toast("Mochila cheia — não cabe a backpack antiga.");
+      return false;
+    }
+    p.equip[slot] = { item: "bag", count: 1 };
+    return true;
+  }
   if (slot === "ammo") { if (typeof setActiveAmmo === "function") setActiveAmmo(p, null); return true; }
   const e = p.equip[slot];
   const it = GAMEDATA.items[e.item];

@@ -316,12 +316,28 @@ def main():
     if os.path.exists(dat_path) and os.path.exists(spr_path):
         dat = Dat860(dat_path)
         spr = Spr860(spr_path)
+
+    # Fallback: outro client (ex: RME 760) com ids que nao existem no client
+    # principal. Usado para tiles modernos do Canary Map Editor que nao tem
+    # sprite no 8.60/15.x with-8.60-main.
+    fallback_dat = fallback_spr = None
+    fallback_src = os.environ.get("TIBIAFALLBACK")
+    if fallback_src and os.path.exists(os.path.join(fallback_src, "Tibia.dat")):
+        fallback_dat = Dat860(
+            os.path.join(fallback_src, "Tibia.dat"),
+            extended=False, frame_durations=False, frame_groups=False)
+        fallback_spr = Spr860(
+            os.path.join(fallback_src, "Tibia.spr"), extended=False)
+
     criar = []
     if falta:
         if dat is None or spr is None:
             raise RuntimeError("Tibia.dat/Tibia.spr ausentes em " + SRC)
         for cid in falta:
             img = render_item_860(dat, spr, cid)
+            if img is None or not img.getbbox():
+                if fallback_dat and fallback_spr:
+                    img = render_item_860(fallback_dat, fallback_spr, cid)
             if img is None or not img.getbbox():
                 print("  %d: sem sprite no client (N/A), pulando" % cid)
                 continue

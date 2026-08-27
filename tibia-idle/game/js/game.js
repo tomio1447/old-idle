@@ -432,6 +432,19 @@ function normalizePlayer(p) {
   p.config.healSpellAt = Math.max(1, Math.min(99, parseInt(p.config.healSpellAt === undefined ? p.config.healAt : p.config.healSpellAt, 10) || 90));
   p.config.healItemAt = Math.max(1, Math.min(99, parseInt(p.config.healItemAt === undefined ? p.config.healAt : p.config.healItemAt, 10) || 60));
   p.config.healAt = Math.max(p.config.healSpellAt, p.config.healItemAt);
+  // Migracao v2026.?? — cura unica vira HEAL CONDITION: lista de spells
+  // com thresholds. Mantem compat com saves antigos (healSpell + healSpellAt).
+  if (!Array.isArray(p.config.healSpells)) {
+    const spells = [];
+    if (p.config.healSpell && SPELLS && SPELLS[p.config.healSpell]) {
+      spells.push({ id: p.config.healSpell, at: p.config.healSpellAt || p.config.healAt || 90 });
+    }
+    p.config.healSpells = spells;
+  }
+  // Garante objetos validos e at entre 1 e 99.
+  p.config.healSpells = p.config.healSpells
+    .filter((x) => x && x.id && SPELLS && SPELLS[x.id])
+    .map((x) => ({ id: x.id, at: Math.max(1, Math.min(99, parseInt(x.at, 10) || 90)) }));
   p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(p.config.kiteDistance, 10) || 3));
   // paladino sempre tem uma munição padrão selecionada
   if (p.voc === "paladin" && !p.config.refillArrow && !p.config.refillBolt)
@@ -820,6 +833,18 @@ const MISSION_DEFS = {
     ],
     completeReward:{bossAccess:"goshnar-s-megalomania",bossName:"Goshnar's Megalomania"},
   },
+  // Furious Crate: eliminar 10 monstros fiendish ou influenced. Ao completar,
+  // libera o acesso ao boss Goshnar's Cruelty.
+  "furious-crate": {
+    title: "Missão: Furious Crate",
+    compact: true,
+    tasks: [
+      { counter:"fiendish-influenced", target:10,
+        label:"Eliminar 10 monstros fiendish ou influenced",
+        reward:{ supplies:[{slug:"ultimate-health-potion",count:5}] } },
+    ],
+    completeReward:{bossAccess:"goshnar-s-cruelty",bossName:"Goshnar's Cruelty"},
+  },
 };
 
 function missionForHunt(id) {
@@ -982,12 +1007,14 @@ function tryCompleteMissionRewards(p, huntId) {
   }
 }
 
-function handleMissionKill(p, huntId, monster) {
+function handleMissionKill(p, huntId, monster, meta) {
   const def = missionForHunt(huntId);
   if (!def) return;
   const matches = def.tasks.filter((t) =>
     (t.monster && t.monster === monster) ||
-    (t.counter && t.counter === "kills" && !t.monster));
+    (t.counter && t.counter === "kills" && !t.monster) ||
+    (t.counter && t.counter === "fiendish-influenced" &&
+      meta && (meta.fiendish || meta.influenced)));
   if (!matches.length) return;
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
@@ -1030,14 +1057,21 @@ function renderMission() {
     const target = surviveTask.surviveSec || surviveTask.target || 300;
     const cur = Math.min(target, Number(st.progress.survive) || 0);
     const done = cur >= target || !!st.completeClaimed;
+    const collapsed = !!G.p.config.missionCollapsed;
     box.style.display = "block";
     box.classList.add("survive-compact");
-    box.classList.remove("fear-compact", "collapsed");
+    box.classList.remove("fear-compact");
+    box.classList.toggle("collapsed", collapsed);
+    const arrow = collapsed ? "▸" : "▾";
+    const counterHtml = collapsed
+      ? ""
+      : `<span class="survive-clock ${done ? "done" : ""}">${formatSurviveClock(cur)} / ${formatSurviveClock(target)}</span>`;
     box.innerHTML = `
-      <div class="mission-head survive-head" title="Sobreviva 5 minutos sem mortes na party">
+      <div class="mission-head survive-head" id="mission-toggle" title="Sobreviva 5 minutos sem mortes na party">
+        <span>${arrow}</span>
         <span>Inferno</span>
         <span class="spacer"></span>
-        <span class="survive-clock ${done ? "done" : ""}">${formatSurviveClock(cur)} / ${formatSurviveClock(target)}</span>
+        ${counterHtml}
         ${done ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão">OK</button>` : ""}
       </div>`;
     if (!box._missionBound) {
@@ -1056,8 +1090,6 @@ function renderMission() {
           return;
         }
         if (e.target.closest && e.target.closest("#mission-toggle")) {
-          if (box.classList.contains("survive-compact") ||
-              box.classList.contains("fear-compact")) return;
           G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
           renderMission();
         }
@@ -1069,14 +1101,21 @@ function renderMission() {
     const target = fearTask.target || 15;
     const cur = Math.min(target, Number(st.progress.fear) || 0);
     const done = cur >= target || !!st.completeClaimed;
+    const collapsed = !!G.p.config.missionCollapsed;
     box.style.display = "block";
     box.classList.add("fear-compact");
-    box.classList.remove("survive-compact", "collapsed");
+    box.classList.remove("survive-compact");
+    box.classList.toggle("collapsed", collapsed);
+    const arrow = collapsed ? "▸" : "▾";
+    const counterHtml = collapsed
+      ? ""
+      : `<span class="survive-clock ${done ? "done" : ""}">${cur} / ${target}</span>`;
     box.innerHTML = `
-      <div class="mission-head survive-head" title="Seja afetado por Fear 15 vezes">
+      <div class="mission-head survive-head" id="mission-toggle" title="Seja afetado por Fear 15 vezes">
+        <span>${arrow}</span>
         <span>Ebb Fear</span>
         <span class="spacer"></span>
-        <span class="survive-clock ${done ? "done" : ""}">${cur} / ${target}</span>
+        ${counterHtml}
         ${done ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão">OK</button>` : ""}
       </div>`;
     if (!box._missionBound) {
@@ -1095,8 +1134,55 @@ function renderMission() {
           return;
         }
         if (e.target.closest && e.target.closest("#mission-toggle")) {
-          if (box.classList.contains("survive-compact") ||
-              box.classList.contains("fear-compact")) return;
+          G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
+          renderMission();
+        }
+      });
+    }
+    return;
+  }
+  // Counter compacto genérico (ex: fiendish/influenced).
+  const counterTask = def.compact && def.tasks && def.tasks.find((t) => t.counter && t.counter !== "survive" && t.counter !== "fear");
+  if (counterTask) {
+    const key = counterTask.counter;
+    const target = counterTask.target || 10;
+    const cur = Math.min(target, Number(st.progress[key]) || 0);
+    const done = cur >= target || !!st.completeClaimed;
+    const title = counterTask.label || key;
+    const shortLabel = title.length > 22 ? title.slice(0, 22) + "…" : title;
+    const collapsed = !!G.p.config.missionCollapsed;
+    box.style.display = "block";
+    box.classList.add("fear-compact");
+    box.classList.remove("survive-compact");
+    box.classList.toggle("collapsed", collapsed);
+    const arrow = collapsed ? "▸" : "▾";
+    const counterHtml = collapsed
+      ? ""
+      : `<span class="survive-clock ${done ? "done" : ""}">${cur} / ${target}</span>`;
+    box.innerHTML = `
+      <div class="mission-head survive-head" id="mission-toggle" title="${title}">
+        <span>${arrow}</span>
+        <span>${shortLabel}</span>
+        <span class="spacer"></span>
+        ${counterHtml}
+        ${done ? `<button class="sm primary" id="mission-finish" title="Encerrar a missão">OK</button>` : ""}
+      </div>`;
+    if (!box._missionBound) {
+      box._missionBound = true;
+      box.addEventListener("click", (e) => {
+        const id = G.combat && G.combat.huntId;
+        if (e.target.closest && e.target.closest("#mission-finish")) {
+          e.stopPropagation();
+          if (!id || !G.p) return;
+          G.p.missionsDone = G.p.missionsDone || {};
+          G.p.missionsDone[id] = true;
+          if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(G.p);
+          const title = (MISSION_DEFS[id] && MISSION_DEFS[id].title) || id;
+          addLog("info", `Missão <b>${title}</b> finalizada.`);
+          renderMission();
+          return;
+        }
+        if (e.target.closest && e.target.closest("#mission-toggle")) {
           G.p.config.missionCollapsed = !G.p.config.missionCollapsed;
           renderMission();
         }
@@ -1359,6 +1445,18 @@ const BOSS_DEFS = {
     },
     mechanic:"maze-qte-curse",
   },
+  "goshnar-s-cruelty": {
+    id:"goshnar-s-cruelty", name:"Goshnar's Cruelty",
+    title:"Boss de Furious Crate", hunt:"goshnars-cruelty-room",
+    baseMonster:"goshnar-s-cruelty", sprite:"goshnar-s-cruelty",
+    hp:300000, exp:75000, damage:5000, armor:160, defense:160,
+    cooldown:0,
+    requirement:{
+      level:400, mission:"furious-crate", access:"goshnar-s-cruelty", enforced:false,
+      text:"Elimine 10 monstros fiendish/influenced em Furious Crate para acessar Goshnar's Cruelty",
+    },
+    mechanic:"cruelty-elemental-shift",
+  },
   "goshnar-s-megalomania": {
     id:"goshnar-s-megalomania",name:"Goshnar's Megalomania",
     title:"Boss final Soul War",hunt:"goshnars-megalomania-room",
@@ -1453,6 +1551,7 @@ const SOULWAR_BOSS_ROOMS={
   "goshnar-s-hatred":{hunt:"goshnars-hatred-room",otbm:"goshnars_hatred_room"},
   "goshnar-s-spite":{hunt:"goshnars-spite-room",otbm:"goshnars_spite_room"},
   "goshnar-s-malice":{hunt:"goshnars-malice-room",otbm:"goshars_malice_room"},
+  "goshnar-s-cruelty":{hunt:"goshnars-cruelty-room",otbm:"goshnars_cruelty_room"},
   "goshnar-s-megalomania":{hunt:"goshnars-megalomania-room",otbm:"goshnars_megalomania"},
 };
 function bossArenaDefinition(boss){
@@ -1637,6 +1736,7 @@ const BOSS_MODAL_SECTIONS = [
       "goshnar-s-spite",
       "goshnar-s-greed",
       "goshnar-s-hatred",
+      "goshnar-s-cruelty",
       "goshnar-s-megalomania",
     ],
   },
@@ -2260,6 +2360,7 @@ function stopHunt(skipMapLoading, opts) {
   if (typeof hatredBossCleanup === "function" && G.combat) hatredBossCleanup(G.combat);
   if (typeof spiteBossCleanup === "function" && G.combat) spiteBossCleanup(G.combat);
   if (typeof maliceBossCleanup === "function" && G.combat) maliceBossCleanup(G.combat);
+  if (typeof crueltyBossCleanup === "function" && G.combat) crueltyBossCleanup(G.combat);
   if (typeof megaBossCleanup === "function" && G.combat) megaBossCleanup(G.combat);
   G.combat = null;
   ONLINE_AUTH_APPLIED_VERSION=0;ONLINE_AUTH_APPLIED_INSTANCE="";
@@ -3059,7 +3160,7 @@ function drainEvents() {
             }, 2500);
           }
         } else if (!c.boss) {
-          handleMissionKill(G.p, c.huntId, e.mob);
+          handleMissionKill(G.p, c.huntId, e.mob, { fiendish: e.fiendish, influenced: e.influenced });
         }
         break;
       }
@@ -3254,6 +3355,7 @@ function cleanupEncounterState(c){
   if(typeof hatredBossCleanup==="function")hatredBossCleanup(c);
   if(typeof spiteBossCleanup==="function")spiteBossCleanup(c);
   if(typeof maliceBossCleanup==="function")maliceBossCleanup(c);
+  if(typeof crueltyBossCleanup==="function")crueltyBossCleanup(c);
   if(typeof megaBossCleanup==="function")megaBossCleanup(c);
 }
 
