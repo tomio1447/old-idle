@@ -1844,19 +1844,13 @@ function drawAcademyMember(renderer, ctx, W, H, tile, hudS, training, member, lo
   if (!p) return;
 
   const px = m.playerPos.x * W, py = m.playerPos.y * H;
-  let lungeX = 0, lungeY = 0, atkFrame = 0;
+  let atkFrame = 0;
   if (m.lungeT > 0) {
     const prog = 1 - m.lungeT / 230;
-    const mag = W * 0.02 * ((m.proj && m.proj.lunge) || 1);
-    const alvo = (m.proj && m.proj.to) || training.dummyPos || { x: 0.5625, y: 0.472222 };
-    const fromX = m.playerPos.x, fromY = m.playerPos.y;
-    const dx = alvo.x - fromX, dy = alvo.y - fromY;
-    const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy));
-    lungeX = (dx / len) * mag; lungeY = (dy / len) * mag;
     atkFrame = (Math.floor(prog * 6) % 2) + 1;
     m.lungeT = Math.max(0, m.lungeT - dt);
   }
-  const pxF = px + lungeX, pyF = py + lungeY;
+  const pxF = px, pyF = py;
   const facing = m.facing || "s";
   const pimg = OutfitRenderer.forPlayer(p, facing, 0);
   const pimgAtk = (atkFrame && spriteReady(pimg))
