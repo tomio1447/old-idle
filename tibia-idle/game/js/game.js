@@ -1738,7 +1738,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 1–250",
     minLevel: 150,
-    ids: ["leiden", "tentugly"],
+    ids: ["leiden", "tentugly-s-head"],
   },
   {
     title: "DEEPLING WORLD",

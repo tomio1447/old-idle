@@ -4,7 +4,7 @@
  */
 "use strict";
 
-const TENTUGLY_ID = "tentugly";
+const TENTUGLY_ID = "tentugly-s-head";
 const TENTUGLY_ROOM = {
   otbm: "tentuglyroom",
   name: "Tentugly's Room",
@@ -16,35 +16,8 @@ const TENTUGLY_ROOM = {
 (function registerTentugly() {
   if (typeof GAMEDATA === "undefined") return;
 
-  const sheetBase = (typeof MOBSHEETS !== "undefined" && MOBSHEETS["the-rootkraken"])
-    ? MOBSHEETS["the-rootkraken"]
-    : { cw: 64, ch: 64, cols: 9, rows: 4 };
-
   if (typeof MOBSHEETS !== "undefined" && !MOBSHEETS[TENTUGLY_ID]) {
-    MOBSHEETS[TENTUGLY_ID] = Object.assign({}, sheetBase);
-  }
-
-  if (!GAMEDATA.monsters) GAMEDATA.monsters = {};
-  if (!GAMEDATA.monsters[TENTUGLY_ID]) {
-    GAMEDATA.monsters[TENTUGLY_ID] = {
-      name: "Tentugly",
-      hp: 75000,
-      exp: 40000,
-      speed: 160,
-      armor: 60,
-      defense: 60,
-      damage: 2000,
-      element: "physical",
-      attackSpeed: 2000,
-      mitigation: 2.5,
-      resist: { physical: 0, earth: 0, energy: 0, fire: 0, ice: 0, holy: 0, death: 0 },
-      looktype: 0,
-      race: "blood",
-      targetDistance: 1,
-      staticAttack: 90,
-      boss: true,
-      loot: [],
-    };
+    MOBSHEETS[TENTUGLY_ID] = { cw: 64, ch: 64, cols: 1, rows: 1 };
   }
 
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
@@ -74,10 +47,11 @@ const TENTUGLY_ROOM = {
   if (typeof BOSS_DEFS === "undefined") return;
   BOSS_DEFS[TENTUGLY_ID] = {
     id: TENTUGLY_ID,
-    name: "Tentugly",
+    name: "Tentugly's Head",
     title: "Boss do Kraken",
     hunt: "tentugly-room",
     sprite: TENTUGLY_ID,
+    baseMonster: TENTUGLY_ID,
     hp: 75000,
     exp: 40000,
     damage: 2000,
