@@ -874,7 +874,11 @@ function npcYana(p) {
       <img src="assets/item/mat-${item.cid}.png" width="24" height="24" alt=""><b>${item.count}×</b>
       <span class="dim">${typeof itemName === "function" ? itemName(item.slug) : item.slug}</span></div>`).join("");
     return `<article class="panel" style="padding:10px;display:flex;flex-direction:column;gap:8px">
-      <div><b>${offer.name}${offer.sub ? " — " + offer.sub : ""}</b><div class="tiny dim">${offer.category} · ${offer.tierName}</div></div>
+      <div>
+        <div style="font-size:15px;font-weight:bold;color:#ffe680">${offer.tierName}</div>
+        <div class="small" style="color:#d4af37">${offer.name}</div>
+        <div class="tiny dim">${offer.category}</div>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px">${mats}</div>
       <button class="sm ${can ? "primary" : ""}" data-yana-buy="${offer.id}" ${can ? "" : "disabled"}>
         Comprar · ${offer.cost} <img src="assets/item/gold-token.png" width="16" height="16" alt=""> Gold Tokens
