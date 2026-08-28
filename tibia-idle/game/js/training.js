@@ -92,14 +92,22 @@ function trainingPartyPlayers() {
 }
 
 function trainingLocalPoint(map, abs) {
-  if (!map) return abs === TRAINING_DUMMY_ABS ? {x:.55,y:.68} : {x:.35+(abs.x-1011)*.07,y:.58};
-  const b = map.sourceBounds || {};
-  const ox = Number(b.x !== undefined ? b.x : b.minX) || 0, oy = Number(b.y !== undefined ? b.y : b.minY) || 0;
-  return cellCenter({ x: abs.x - ox, y: abs.y - oy });
+  // bounds oficiais da exercisearea: x=1000..1023, y=1014..1031
+  const DEFAULT_BOUNDS = { minX: 1000, minY: 1014, maxX: 1023, maxY: 1031 };
+  const b = (map && map.sourceBounds) || DEFAULT_BOUNDS;
+  const ox = Number(b.x !== undefined ? b.x : b.minX) || DEFAULT_BOUNDS.minX;
+  const oy = Number(b.y !== undefined ? b.y : b.minY) || DEFAULT_BOUNDS.minY;
+  // dimensões reais do mapa; fallback = bounds oficiais (24×18)
+  let w = Number(map && map.w);
+  let h = Number(map && map.h);
+  if (!Number.isFinite(w) || w <= 0) w = DEFAULT_BOUNDS.maxX - DEFAULT_BOUNDS.minX + 1;
+  if (!Number.isFinite(h) || h <= 0) h = DEFAULT_BOUNDS.maxY - DEFAULT_BOUNDS.minY + 1;
+  return { x: (abs.x - ox + 0.5) / w, y: (abs.y - oy + 0.5) / h };
 }
 function buildTrainingMember(p, index, map) {
   const s = ensureTraining(p), pos = trainingLocalPoint(map, TRAINING_QUEUE_ABS[index]);
-  return { id:String(p.id), p, playerPos:pos, facing:"s", skill:s.skill, weapon:s.weapon,
+  const isLocal = !!(typeof G !== "undefined" && G && G.p && String(G.p.id) === String(p.id));
+  return { id:String(p.id), p, isLocal, playerPos:pos, facing:"s", skill:s.skill, weapon:s.weapon,
     hitCd:500 + index * 120, proj:null, lungeT:0, stats:{hits:0,skillUps:0,shieldUps:0,manaSpent:0}, events:[] };
 }
 

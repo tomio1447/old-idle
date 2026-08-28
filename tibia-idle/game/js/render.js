@@ -1819,34 +1819,229 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 };
 
-const drawLegacyAcademy = Renderer.prototype.drawAcademy;
-Renderer.prototype.drawAcademy = function(training, player, dt) {
-  if (!training.members) return drawLegacyAcademy.call(this, training, player, dt);
-  const ctx=this.ctx,W=this.c.width,H=this.c.height,hudS=canvasHudScale(this.c),tile=tilePx(W);
-  ctx.clearRect(0,0,W,H);
-  if (training.huntMap && training.huntMap.rows) drawTileCharMap(ctx,training.huntMap,W,H,GRID_W,GRID_H);
-  else { ctx.fillStyle="#171719";ctx.fillRect(0,0,W,H); }
-  ctx.textAlign="left";ctx.font=hudFont(14,hudS,true);ctx.fillStyle="#ffe680";
-  ctx.fillText("Área de Treino",12*hudS,24*hudS);
-  const entities=(training.members||[]).slice().sort((a,b)=>a.playerPos.y-b.playerPos.y);
-  for(const m of entities){
-    let px=m.playerPos.x*W,py=m.playerPos.y*H,frame=0;
-    if(m.lungeT>0){frame=(Math.floor((230-m.lungeT)/45)%2)+1;m.lungeT=Math.max(0,m.lungeT-dt);}
-    const img=OutfitRenderer.forPlayer(m.p,"s",frame)||OutfitRenderer.forPlayer(m.p,"s",0);
-    if(spriteReady(img)){
-      const sc=tibiaScale(W),w=spriteW(img)*sc,h=spriteH(img)*sc,o=creatureTileOrigin(px,py,w,h,tile,img._spriteAnchor,sc);
-      ctx.fillStyle="rgba(0,0,0,.4)";ctx.beginPath();ctx.ellipse(px,py+tile/2,w*.32,Math.max(2,tile*.08),0,0,7);ctx.fill();
-      ctx.drawImage(img,o.x,o.y,w,h);drawPlayerStatus(ctx,px,o.y-14,py+tile/2,m.p,(m.p.config||{}).barMode,Math.max(26,w*.42));
-      ctx.textAlign="center";ctx.font=hudFont(9,hudS,true);ctx.fillStyle="#fff";ctx.fillText(m.p.name||"Personagem",px,o.y-18*hudS);
+/* Fallback visual de personagem enquanto outfit/sprite ainda carrega.
+ * Desenha uma silhueta colorida por vocação + sombra, nunca deixa o tile vazio. */
+function drawAcademyMemberFallback(ctx, px, py, tile, p) {
+  const w = Math.max(16, tile * 0.45), h = Math.max(26, tile * 0.75);
+  const vocColor = { knight: "#c8a070", paladin: "#70c870", sorcerer: "#7070c8", druid: "#c870c8" }[p && p.voc] || "#a8a090";
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(0,0,0,.45)";
+  ctx.beginPath(); ctx.ellipse(px, py + tile / 2, w * 0.45, Math.max(2, tile * 0.08), 0, 0, 7); ctx.fill();
+  ctx.fillStyle = vocColor;
+  ctx.fillRect(px - w / 2, py - h / 2, w, h);
+  ctx.strokeStyle = "#d4af37"; ctx.lineWidth = 1;
+  ctx.strokeRect(px - w / 2, py - h / 2, w, h);
+  ctx.fillStyle = "#111";
+  ctx.beginPath(); ctx.arc(px, py - h * 0.2, w * 0.18, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawAcademyMember(renderer, ctx, W, H, tile, hudS, training, member, localPlayer, dt) {
+  const m = member;
+  const isLocal = m.isLocal || !!(typeof G !== "undefined" && G && G.p && String(G.p.id) === String(m.id));
+  const p = isLocal ? (localPlayer || (typeof G !== "undefined" && G.p) || m.p) : m.p;
+  if (!p) return;
+
+  const px = m.playerPos.x * W, py = m.playerPos.y * H;
+  let lungeX = 0, lungeY = 0, atkFrame = 0;
+  if (m.lungeT > 0) {
+    const prog = 1 - m.lungeT / 230;
+    const mag = W * 0.02 * ((m.proj && m.proj.lunge) || 1);
+    const alvo = (m.proj && m.proj.to) || training.dummyPos || { x: 0.5625, y: 0.472222 };
+    const fromX = m.playerPos.x, fromY = m.playerPos.y;
+    const dx = alvo.x - fromX, dy = alvo.y - fromY;
+    const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy));
+    lungeX = (dx / len) * mag; lungeY = (dy / len) * mag;
+    atkFrame = (Math.floor(prog * 6) % 2) + 1;
+    m.lungeT = Math.max(0, m.lungeT - dt);
+  }
+  const pxF = px + lungeX, pyF = py + lungeY;
+  const facing = m.facing || "s";
+  const pimg = OutfitRenderer.forPlayer(p, facing, 0);
+  const pimgAtk = (atkFrame && spriteReady(pimg))
+    ? (OutfitRenderer.forPlayer(p, facing, atkFrame) || pimg) : pimg;
+
+  if (spriteReady(pimgAtk)) {
+    const sc = tibiaScale(W);
+    const w = spriteW(pimgAtk) * sc, h = spriteH(pimgAtk) * sc;
+    const origin = creatureTileOrigin(pxF, pyF, w, h, tile, pimgAtk._spriteAnchor, sc);
+    const footY = pyF + tile / 2;
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    ctx.beginPath(); ctx.ellipse(pxF, footY, w * 0.34, Math.max(2, tile * 0.08), 0, 0, 7); ctx.fill();
+    ctx.drawImage(pimgAtk, origin.x, origin.y, w, h);
+    // Só exibe barras para o personagem local ou quem tenha hp/mp populado.
+    if (Number.isFinite(p.hp) && Number.isFinite(p.mp)) {
+      drawPlayerStatus(ctx, pxF, origin.y - 14, footY, p, (p.config || {}).barMode, Math.max(26, w * 0.42));
     }
-    if(m.proj){
-      const pr=m.proj;pr.t+=dt;const progress=Math.min(1,pr.t/pr.dur),x=(pr.from.x+(pr.to.x-pr.from.x)*progress)*W,y=(pr.from.y+(pr.to.y-pr.from.y)*progress)*H;
-      if(pr.missile){const missile=Sprites.missile(pr.missile,pr.dir||"s");if(spriteReady(missile)){const sc=tibiaScale(W);ctx.drawImage(missile,x-missile.naturalWidth*sc/2,y-missile.naturalHeight*sc/2,missile.naturalWidth*sc,missile.naturalHeight*sc);}}
-      if(progress>=1){this.addEffect(pr.to.x,pr.to.y,pr.fx||"hit-area");m.proj=null;}
+    if (isLocal) renderer.drawSpeech(ctx, pxF, origin.y - 14, dt);
+
+    if (training.mode === "exercise" && m.lungeT > 0 && m.weapon === "exercise-shield" && !(m.proj && m.proj.missile)) {
+      const simg = Sprites.get("assets/ui/training/exercise-shield.gif");
+      if (simg && simg.complete && simg.naturalWidth) {
+        const ws = tile * 0.85, hs = tile * 0.85;
+        const sdx = (facing === "w") ? -0.5 : ((facing === "e") ? 0.45 : 0);
+        const sdy = (facing === "n") ? -0.7 : 0.15;
+        ctx.save(); ctx.globalAlpha = 0.95;
+        ctx.drawImage(simg, pxF + sdx * ws - ws / 2, pyF + sdy * ws - hs / 2, ws, hs);
+        ctx.restore();
+      }
+    }
+  } else {
+    drawAcademyMemberFallback(ctx, pxF, pyF, tile, p);
+  }
+
+  ctx.textAlign = "center";
+  ctx.font = hudFont(9, hudS, true);
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  ctx.fillText(p.name || "Personagem", pxF + 1, pyF - tile * 1.05);
+  ctx.fillStyle = isLocal ? "#ffe680" : "#fff";
+  ctx.fillText(p.name || "Personagem", pxF, pyF - tile * 1.05 - 1);
+}
+
+function drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos) {
+  const isDummy = training.mode === "dummy" || training.mode === "exercise";
+  const temMapa = !!(training.huntMap && training.huntMap.rows);
+  const tx = dummyPos.x * W, ty = dummyPos.y * H;
+  if (!isDummy) return;
+  if (!temMapa) {
+    const dimg = Sprites.get("assets/ui/training/ferumbras-dummy.gif");
+    const scDummy = 1.5;
+    if (dimg && dimg.complete && dimg.naturalWidth) {
+      const w = dimg.naturalWidth * scDummy, h = dimg.naturalHeight * scDummy;
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.beginPath(); ctx.ellipse(tx, ty + 12, w * 0.36, 9, 0, 0, 7); ctx.fill();
+      ctx.drawImage(dimg, tx - w / 2, ty - h + 10, w, h);
+    } else {
+      ctx.fillStyle = "rgba(0,0,0,.5)";
+      ctx.fillRect(tx - 20, ty - 52, 40, 58);
     }
   }
-  const d=training.dummyPos;if(d){const x=d.x*W,y=d.y*H;ctx.textAlign="center";ctx.font=hudFont(11,hudS,true);ctx.fillStyle="#ddd";ctx.fillText("Exercise Dummy",x,y-tile*1.4);}
-  const now=Date.now();for(let i=this.effects.length-1;i>=0;i--){const e=this.effects[i];e.t=(e.t||0)+dt;if(fxEffectExpired(e,now)){this.effects.splice(i,1);continue;}const img=Sprites.fx(e.name);if(!spriteReady(img))continue;const meta=fxClientMeta(e.name),fw=fxStripCellWidth(img,e.frames,meta),f=Math.min(e.frames-1,Math.floor((e.t/e.dur)*e.frames)),sc=tibiaScale(W),o=effectTileOrigin(e.x*W,e.y*H,fw*sc,img.naturalHeight*sc,tile);ctx.drawImage(img,f*fw,0,fw,img.naturalHeight,o.x,o.y,fw*sc,img.naturalHeight*sc);}
+  ctx.textAlign = "center";
+  ctx.font = hudFont(12, hudS, true);
+  ctx.fillStyle = "rgba(0,0,0,.85)";
+  ctx.fillText("Statue of Suon", tx + 1, ty - 90 * hudS);
+  ctx.fillStyle = "#d8d8dc";
+  ctx.fillText("Statue of Suon", tx, ty - 91 * hudS);
+}
+
+function drawAcademyProj(renderer, ctx, W, H, tile, member, dt) {
+  const pr = member.proj;
+  pr.t += dt;
+  const p = Math.min(1, pr.t / pr.dur);
+  const ex = (pr.from.x + (pr.to.x - pr.from.x) * p) * W;
+  const ey = (pr.from.y + (pr.to.y - pr.from.y) * p) * H;
+  const tx = pr.to.x * W, ty = pr.to.y * H;
+
+  ctx.strokeStyle = "rgba(255, 225, 90, .95)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(tx - tile * 0.42, ty - tile * 0.52, tile * 0.84, tile * 1.0);
+
+  const hasMissile = !!pr.missile && pr.missile !== "weapon";
+  if (hasMissile) {
+    const mimg = Sprites.missile(pr.missile, pr.dir || missileDir(pr.from.x, pr.from.y, pr.to.x, pr.to.y));
+    if (mimg && mimg.complete && mimg.naturalWidth) {
+      const sc = tibiaScale(W);
+      const mw = mimg.naturalWidth * sc, mh = mimg.naturalHeight * sc;
+      ctx.save();
+      ctx.translate(ex, ey - mh * 0.25);
+      if (pr.kind === "melee") ctx.rotate(Math.sin(p * Math.PI * 3) * 0.9);
+      ctx.drawImage(mimg, -mw / 2, -mh / 2, mw, mh);
+      ctx.restore();
+      ctx.fillStyle = "rgba(0,0,0,.3)";
+      ctx.beginPath(); ctx.ellipse(ex, ey + mh * 0.3, mw * 0.22, 4, 0, 0, 7); ctx.fill();
+    } else {
+      ctx.strokeStyle = "#ffe680";
+      ctx.globalAlpha = 0.35 + (1 - p) * 0.45;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo((pr.from.x + (pr.to.x - pr.from.x) * Math.max(0, p - 0.18)) * W,
+                 (pr.from.y + (pr.to.y - pr.from.y) * Math.max(0, p - 0.18)) * H);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.fillStyle = "#ffe680";
+      ctx.beginPath(); ctx.arc(ex, ey, 3, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  } else if (pr.kind === "fist") {
+    const fpx = (pr.from.x + (pr.to.x - pr.from.x) * Math.max(0, p - 0.25)) * W;
+    const fpy = (pr.from.y + (pr.to.y - pr.from.y) * Math.max(0, p - 0.25)) * H;
+    ctx.strokeStyle = "rgba(255, 220, 120, .5)";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(fpx, fpy); ctx.lineTo(ex, ey); ctx.stroke();
+  }
+
+  if (p >= 1 && !pr.hitFx) {
+    pr.hitFx = true;
+    renderer.addEffect(pr.to.x, pr.to.y, pr.fx || "block-hit");
+    member.proj = null;
+  }
+}
+
+const drawLegacyAcademy = Renderer.prototype.drawAcademy;
+Renderer.prototype.drawAcademy = function(training, player, dt) {
+  if (!training || !training.members) return drawLegacyAcademy.call(this, training, player, dt);
+  const ctx = this.ctx, W = this.c.width, H = this.c.height;
+  const hudS = canvasHudScale(this.c), tile = tilePx(W);
+  ctx.clearRect(0, 0, W, H);
+
+  const map = training.huntMap;
+  const temMapa = !!(map && map.rows);
+  if (temMapa) {
+    const cols = Number(map.w) || (typeof GRID_W !== "undefined" ? GRID_W : 21);
+    const rows = Number(map.h) || (typeof GRID_H !== "undefined" ? GRID_H : 13);
+    drawTileCharMap(ctx, map, W, H, cols, rows);
+  } else {
+    ctx.fillStyle = "#171719";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.textAlign = "left";
+  ctx.font = hudFont(14, hudS, true);
+  ctx.fillStyle = "#ffe680";
+  ctx.fillText("Área de Treino", 12 * hudS, 24 * hudS);
+
+  const dummyPos = training.dummyPos || { x: 0.5625, y: 0.472222 };
+  drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos);
+
+  const entities = (training.members || []).slice().sort((a, b) => a.playerPos.y - b.playerPos.y);
+  for (const m of entities) drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt);
+  for (const m of entities) {
+    if (m.proj) drawAcademyProj(this, ctx, W, H, tile, m, dt);
+  }
+
+  const fxNow = Date.now();
+  for (let i = this.effects.length - 1; i >= 0; i--) {
+    const e = this.effects[i];
+    if ((Number(e.delayUntil) || 0) > fxNow) continue;
+    e.t = (Number(e.t) || 0) + (Number(dt) || 0);
+    if (fxEffectExpired(e, fxNow)) { this.effects.splice(i, 1); continue; }
+    const img = Sprites.fx(e.name);
+    if (!img || !img.complete || !img.naturalWidth) continue;
+    const meta = fxClientMeta(e.name);
+    const fw = fxStripCellWidth(img, e.frames, meta);
+    const f = Math.min(e.frames - 1, Math.floor((e.t / e.dur) * e.frames));
+    const sc = tibiaScale(W) * (e.scale || 1);
+    const o = effectTileOrigin(e.x * W, e.y * H, fw * sc, img.naturalHeight * sc, tile);
+    ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight, o.x, o.y, fw * sc, img.naturalHeight * sc);
+  }
+
+  ctx.textAlign = "center";
+  for (let i = this.floaters.length - 1; i >= 0; i--) {
+    const f = this.floaters[i];
+    f.life -= dt;
+    if (f.life <= 0) { this.floaters.splice(i, 1); continue; }
+    const p = 1 - f.life / f.max;
+    const alpha = floaterAlpha(p);
+    ctx.globalAlpha = alpha;
+    ctx.font = floaterFont(f, hudS);
+    ctx.lineWidth = (f.kind ? 2 : (f.small ? 1.5 : 2)) * hudS;
+    ctx.strokeStyle = "rgba(0,0,0,.85)";
+    ctx.strokeText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
+    ctx.globalAlpha = 1;
+  }
 };
 
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */
