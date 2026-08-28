@@ -1038,6 +1038,33 @@ function handleMissionKill(p, huntId, monster, meta) {
   } else renderMission();
 }
 
+function handleMissionCounter(p, huntId, counter, amount) {
+  const def = missionForHunt(huntId);
+  if (!def || !def.tasks) return;
+  const matches = def.tasks.filter((t) => t.counter === counter);
+  if (!matches.length) return;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[huntId]) return;
+  const st = missionState(p, huntId);
+  if (st.completeClaimed) return;
+  for (const task of matches) {
+    const key = task.counter;
+    if (st.claimed && st.claimed[key] && (st.progress[key] || 0) >= task.target) continue;
+    st.progress[key] = Math.min(task.target, (st.progress[key] || 0) + Math.max(0, Number(amount) || 1));
+  }
+  tryCompleteMissionRewards(p, huntId);
+  syncMissionsToAccount(p);
+  if (typeof requestAnimationFrame === "function") {
+    if (!G._missionRenderQueued) {
+      G._missionRenderQueued = true;
+      requestAnimationFrame(() => {
+        G._missionRenderQueued = false;
+        renderMission();
+      });
+    }
+  } else renderMission();
+}
+
 function renderMission() {
   const box = $("#mission-box");
   if (!box || !G.p || !G.combat || G.training || G.combat.boss) {

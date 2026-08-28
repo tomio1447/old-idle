@@ -4527,10 +4527,12 @@ function rollLoot(c, p, mob) {
       const g = Math.floor(count * goldStage(c.hunt.level));
       p.gold += g;
       c.stats.gold += g;
+      if (typeof handleMissionCounter === "function") handleMissionCounter(p, c.huntId, "gold", g);
     } else if (currencyValue(l.item)) {
       const g = creditCurrency(p, l.item, count);
       c.stats.gold += g;
       c.stats.loot[l.item] = (c.stats.loot[l.item] || 0) + count;
+      if (typeof handleMissionCounter === "function") handleMissionCounter(p, c.huntId, "gold", g);
       got.push({ item: l.item, count: count });
       continue;
     } else if (SUPPLIES[l.item]) {
