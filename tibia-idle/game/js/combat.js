@@ -102,6 +102,8 @@ function arenaBossBindMechanics(c, now) {
     maliceBossInit(c, player);
   if (id === "goshnar-s-cruelty" && typeof crueltyBossInit === "function" && !c.cruelty)
     crueltyBossInit(c, player);
+  if (id === "ratmiral-blackwhiskers" && typeof ratmiralBossInit === "function" && !c.ratmiral)
+    ratmiralBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -4939,6 +4941,7 @@ function combatTick(c, p, dt, now) {
   if (typeof spiteBossTick === "function" && spiteBossTick(c, now) === false) return;
   if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
   if (typeof crueltyBossTick === "function" && crueltyBossTick(c, now) === false) return;
+  if (typeof ratmiralBossTick === "function" && ratmiralBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
