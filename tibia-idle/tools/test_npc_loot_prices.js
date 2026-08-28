@@ -11,6 +11,7 @@ vm.createContext(context);
 for (const file of [
   "js/gamedata.js",
   "js/yasir-prices.js",
+  "js/tentugly-boss.js",
   "js/pirat-lower.js",
   "js/roshamuul.js",
   "js/buried-cathedral.js",
@@ -47,6 +48,16 @@ const expected = {
   "wand-of-voodoo": 4400,
   "garlic-necklace": 50,
   "bat-wing": 50,
+  "cheesy-key": 0,
+  "golden-sea-horse-figurine": 0,
+  "plushie-of-tentugly": 0,
+  "golden-dustbin": 7000,
+  "golden-skull": 9000,
+  "golden-cheese-wedge": 6000,
+  "tiara": 11000,
+  "tentacle-of-tentugly": 27000,
+  "tentugly-s-eye": 52000,
+  "tentugly-s-jaws": 80000,
 };
 
 for (const [slug, price] of Object.entries(expected)) {
@@ -54,5 +65,9 @@ for (const [slug, price] of Object.entries(expected)) {
   assert.ok(item, `${slug} deve existir`);
   assert.strictEqual(item.sell, price, `${slug}.sell`);
   assert.strictEqual(item.npcSell, price, `${slug}.npcSell`);
+  if (["cheesy-key", "golden-sea-horse-figurine", "plushie-of-tentugly", "golden-dustbin", "golden-skull", "golden-cheese-wedge", "tiara", "tentacle-of-tentugly", "tentugly-s-eye", "tentugly-s-jaws"].includes(slug)) {
+    assert.ok(fs.existsSync(path.join(game, "assets", "item", `${slug}.png`)), `${slug}.png deve existir`);
+  }
 }
+assert.ok(fs.existsSync(path.join(game, "assets", "mob", "tentugly-s-head.png")), "sprite do Tentugly's Head deve existir");
 console.log(`${Object.keys(expected).length} preços de loot validados.`);

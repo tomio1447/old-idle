@@ -394,7 +394,7 @@ function newBossCombat(player, boss) {
     dir: "w",
     moving: false,
     attackAnim: 0,
-    speed: boss.speed || 0.000055,
+    speed: boss.speed == null ? 0.000055 : boss.speed,
     spawnAt: Date.now(),
   };
   // Sala OTBM pode declarar a célula exata do boss na zona G.
@@ -419,6 +419,11 @@ function newBossCombat(player, boss) {
   if(boss.id==="goshnar-s-megalomania"){
     bossMob.allowBlockedSpawn=true;bossMob.fixedSpawnCx=bossMob.cx;bossMob.fixedSpawnCy=bossMob.cy;
     bossMob.qteImmune=true;bossMob.megaImmune=true;
+  }
+  if (boss.fixedSpawn) {
+    bossMob.allowBlockedSpawn = true;
+    bossMob.fixedSpawnCx = bossMob.cx;
+    bossMob.fixedSpawnCy = bossMob.cy;
   }
   c.mobs = [bossMob];
   resolveSQMOccupancy(c);

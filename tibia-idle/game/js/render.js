@@ -244,6 +244,7 @@ function mobImg(slug, tam, extra, opts) {
   // a celula do sul e a linha 2; escala para caber na caixa pedida
   const k = Math.min(px / visual.cw, px / visual.ch);
   const w = visual.cw * k, h = visual.ch * k;
+  const row = Math.min(2, Math.max(0, (visual.rows || 4) - 1));
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
   const animated = (idle || walkAnim) ? " mob-img-animated" : "";
   const sheetW = visual.cw * sourceFrames * k;
@@ -255,8 +256,8 @@ function mobImg(slug, tam, extra, opts) {
   return `<div class="mob-img${animated}" data-mob="${slug}" style="width:${w.toFixed(1)}px;
       height:${h.toFixed(1)}px;
       background-image:url('${path}');
-      background-size:${sheetW.toFixed(1)}px ${(visual.ch * 4 * k).toFixed(1)}px;
-      background-position:0 -${(2 * h).toFixed(1)}px;
+      background-size:${sheetW.toFixed(1)}px ${(visual.ch * (visual.rows || 4) * k).toFixed(1)}px;
+      background-position:0 -${(row * h).toFixed(1)}px;
       --mob-sheet-width:${sheetW.toFixed(1)}px;
       --mob-sheet-frames:${frames};
       --mob-sheet-duration:${duration}ms;
@@ -363,7 +364,8 @@ const Sprites = {
     const meta = (typeof MOBSHEETS !== "undefined" && MOBSHEETS)
       ? MOBSHEETS[slug] : null;
     if (!meta) return null;
-    const linha = MOB_DIR_ROW[dir] === undefined ? 2 : MOB_DIR_ROW[dir];
+    const requestedRow = MOB_DIR_ROW[dir] === undefined ? 2 : MOB_DIR_ROW[dir];
+    const linha = Math.min(requestedRow, Math.max(0, (meta.rows || 4) - 1));
     const col = Math.max(0, Math.min((meta.cols || 3) - 1, pose | 0));
     const k = slug + "|" + linha + "|" + col;
     if (this.mobCache[k] !== undefined) return this.mobCache[k];
