@@ -2395,6 +2395,7 @@ function goToCity() {
 }
 
 function startAcademy() {
+  if (typeof startTrainingArea === "function") { startTrainingArea(); return; }
   if (!G.p) return;
   if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("training room");
   if (G.combat) stopHunt(true);
@@ -2419,6 +2420,8 @@ function stopAcademy(log) {
     partyCombatRestoreAll("retorno do treino");
   if (returningToTemple && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
+  if (G.training.members && typeof saveCharacterToRoster === "function")
+    for (const member of G.training.members) if (member.p && !member.p.remoteTraining) saveCharacterToRoster(member.p);
   G.training = null;
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
@@ -4743,7 +4746,8 @@ function loop(ts) {
     // Stamina temporariamente fixa em 42h também durante o treino.
     const tr = G.training;
     G.p.stamina = FULL_STAMINA_SECONDS;
-    academyTrainingTick(tr, G.p, dt, Date.now());
+    if (tr.members) trainingPartyTick(tr, dt, Date.now());
+    else academyTrainingTick(tr, G.p, dt, Date.now());
     drainAcademyEvents();
     if (JSON.stringify(G.p.skills) + G.p.ml !== beforeSkills) {
       renderSkills(G.p);
@@ -4793,7 +4797,12 @@ function loop(ts) {
 
   // autosave a cada 20s
   G.saveTimer += dt;
-  if (G.saveTimer > 20000) { G.saveTimer = 0; save(); }
+  if (G.saveTimer > 20000) {
+    G.saveTimer = 0;
+    if (G.training && G.training.members && typeof saveCharacterToRoster === "function")
+      for (const member of G.training.members) if (member.p && !member.p.remoteTraining) saveCharacterToRoster(member.p);
+    save();
+  }
   // Prey: o timer de 2h decrementa enquanto o personagem está caçando
   if (G.combat && typeof preyTick === "function") {
     preyTick(G.p, dt);
@@ -4816,6 +4825,7 @@ function renderAll() {
   renderSpells(p);
   renderHelper(p);
   renderMission();
+  if (typeof renderTrainingPanel === "function") renderTrainingPanel();
   renderNpcQuick();
   renderBosses(p);
   renderTopbar(p);
@@ -4895,18 +4905,7 @@ async function startGameReady(p) {
   G.renderer.resize();
   G.walker = new CityWalker();
 
-  // Migração: garante exercise weapon charges grátis para personagens antigos
-  if (typeof ensureTraining === "function") {
-    ensureTraining(p);
-    const freeWeapon = p.voc === "knight" ? "exercise-sword"
-      : p.voc === "paladin" ? "exercise-bow"
-      : p.voc === "sorcerer" ? "exercise-wand"
-      : p.voc === "druid" ? "exercise-rod"
-      : p.voc === "monk" ? "exercise-wraps"
-      : "exercise-sword";
-    if (!p.exercise[freeWeapon]) p.exercise[freeWeapon] = 5000;
-    if (!p.exercise["exercise-shield"]) p.exercise["exercise-shield"] = 5000;
-  }
+  if (typeof ensureTraining === "function") ensureTraining(p);
 
   $("#login").style.display = "none";
   $("#app").classList.add("ready");
@@ -5303,29 +5302,7 @@ function giveStarterKit(p, options) {
     // simple arrow ativa por padrao: e a municao que vem no kit
     if (!p.equip.ammo) setActiveAmmo(p, "simple-arrow");
   }
-  // Kit de treino: 5000 cargas gratis da exercise weapon da vocação
-  // + 25 Tibia Coins para comprar mais cargas
-  if (typeof ensureTraining === "function") {
-    ensureTraining(p);
-    const freeWeapon = p.voc === "knight" ? "exercise-sword"
-      : p.voc === "paladin" ? "exercise-bow"
-      : p.voc === "sorcerer" ? "exercise-wand"
-      : p.voc === "druid" ? "exercise-rod"
-      : p.voc === "monk" ? "exercise-wraps"
-      : "exercise-sword";
-    if (p.exercise[freeWeapon] === undefined || p.exercise[freeWeapon] === 0) {
-      p.exercise[freeWeapon] = 5000;
-    }
-    // Também dá 5000 cargas de exercise shield para todos
-    if (p.exercise["exercise-shield"] === undefined || p.exercise["exercise-shield"] === 0) {
-      p.exercise["exercise-shield"] = 5000;
-    }
-  }
-  if (!options.skipCoins && typeof accountAddCoins === "function") {
-    if (typeof accountApiConfigured === "function" && accountApiConfigured())
-      accountAddCoins(typeof sessionToken === "function" ? sessionToken() : "", 25);
-    else accountAddCoins(25);
-  }
+  if (typeof ensureTraining === "function") ensureTraining(p);
   return p;
 }
 

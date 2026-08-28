@@ -979,8 +979,9 @@ function bindCatalogAccordion(root, mode) {
 }
 
 const HUNT_MODAL_SECTIONS = [
-  { title: "HUNTS LEVEL 0–100", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "meriana-island", "mutateds-yalahar"] },
-  { title: "HUNTS 100–250", ids: ["lizard-chosen-tower", "ghastly-dragons", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
+  { title: "HUNTS 1–50", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "meriana-island"] },
+  { title: "HUNTS 50–100", ids: ["stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "mutateds-yalahar", "lizardstown"] },
+  { title: "HUNTS 100–250", ids: ["lizard-chosen-tower", "ghastly-dragons", "draken-walls", "drakens-castle", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond", "deathlings-sunken-temple", "falcon-bastion"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
@@ -1122,7 +1123,9 @@ function openHuntInfoModal(id) {
   const starsHtml = typeof huntStarsHtml === "function" ? huntStarsHtml(stars) : "";
   const soon = !!hu.comingSoon;
   $("#modal-body").innerHTML = `
-    <div class="panel-title">${hu.name}
+    <div class="panel-title">
+      <button class="sm" id="huntinfo-back">← Voltar</button>
+      <span style="margin-left:6px">${hu.name}</span>
       <span style="margin-left:8px">${starsHtml}</span>
       <span class="tiny dim" style="margin-left:6px">nv recomendado ${hu.level}</span>
       <span style="flex:1"></span>
@@ -1149,6 +1152,7 @@ function openHuntInfoModal(id) {
   const close = () => $("#modal").classList.remove("show", "wide");
   $("#huntinfo-close").addEventListener("click", close);
   $("#huntinfo-cancel").addEventListener("click", close);
+  $("#huntinfo-back").addEventListener("click", () => { openHuntsModal(); });
   // Tooltip dos drops: nome do item + % de chance (mesmo padrão do boss).
   $$("#modal-body [data-hunt-drop]").forEach((el) => {
     const drop = {
@@ -1162,7 +1166,8 @@ function openHuntInfoModal(id) {
   if (!soon) {
     $("#huntinfo-go").addEventListener("click", () => { close(); startHunt(id); });
   }
-  $("#modal").classList.add("show", "wide");
+  $("#modal").classList.add("show");
+  if (hu.monsters && hu.monsters.length > 2) $("#modal").classList.add("wide");
 }
 
 /* Avalia o risco de uma hunt para o personagem */

@@ -1819,6 +1819,36 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   }
 };
 
+const drawLegacyAcademy = Renderer.prototype.drawAcademy;
+Renderer.prototype.drawAcademy = function(training, player, dt) {
+  if (!training.members) return drawLegacyAcademy.call(this, training, player, dt);
+  const ctx=this.ctx,W=this.c.width,H=this.c.height,hudS=canvasHudScale(this.c),tile=tilePx(W);
+  ctx.clearRect(0,0,W,H);
+  if (training.huntMap && training.huntMap.rows) drawTileCharMap(ctx,training.huntMap,W,H,GRID_W,GRID_H);
+  else { ctx.fillStyle="#171719";ctx.fillRect(0,0,W,H); }
+  ctx.textAlign="left";ctx.font=hudFont(14,hudS,true);ctx.fillStyle="#ffe680";
+  ctx.fillText("Área de Treino",12*hudS,24*hudS);
+  const entities=(training.members||[]).slice().sort((a,b)=>a.playerPos.y-b.playerPos.y);
+  for(const m of entities){
+    let px=m.playerPos.x*W,py=m.playerPos.y*H,frame=0;
+    if(m.lungeT>0){frame=(Math.floor((230-m.lungeT)/45)%2)+1;m.lungeT=Math.max(0,m.lungeT-dt);}
+    const img=OutfitRenderer.forPlayer(m.p,"s",frame)||OutfitRenderer.forPlayer(m.p,"s",0);
+    if(spriteReady(img)){
+      const sc=tibiaScale(W),w=spriteW(img)*sc,h=spriteH(img)*sc,o=creatureTileOrigin(px,py,w,h,tile,img._spriteAnchor,sc);
+      ctx.fillStyle="rgba(0,0,0,.4)";ctx.beginPath();ctx.ellipse(px,py+tile/2,w*.32,Math.max(2,tile*.08),0,0,7);ctx.fill();
+      ctx.drawImage(img,o.x,o.y,w,h);drawPlayerStatus(ctx,px,o.y-14,py+tile/2,m.p,(m.p.config||{}).barMode,Math.max(26,w*.42));
+      ctx.textAlign="center";ctx.font=hudFont(9,hudS,true);ctx.fillStyle="#fff";ctx.fillText(m.p.name||"Personagem",px,o.y-18*hudS);
+    }
+    if(m.proj){
+      const pr=m.proj;pr.t+=dt;const progress=Math.min(1,pr.t/pr.dur),x=(pr.from.x+(pr.to.x-pr.from.x)*progress)*W,y=(pr.from.y+(pr.to.y-pr.from.y)*progress)*H;
+      if(pr.missile){const missile=Sprites.missile(pr.missile,pr.dir||"s");if(spriteReady(missile)){const sc=tibiaScale(W);ctx.drawImage(missile,x-missile.naturalWidth*sc/2,y-missile.naturalHeight*sc/2,missile.naturalWidth*sc,missile.naturalHeight*sc);}}
+      if(progress>=1){this.addEffect(pr.to.x,pr.to.y,pr.fx||"hit-area");m.proj=null;}
+    }
+  }
+  const d=training.dummyPos;if(d){const x=d.x*W,y=d.y*H;ctx.textAlign="center";ctx.font=hudFont(11,hudS,true);ctx.fillStyle="#ddd";ctx.fillText("Exercise Dummy",x,y-tile*1.4);}
+  const now=Date.now();for(let i=this.effects.length-1;i>=0;i--){const e=this.effects[i];e.t=(e.t||0)+dt;if(fxEffectExpired(e,now)){this.effects.splice(i,1);continue;}const img=Sprites.fx(e.name);if(!spriteReady(img))continue;const meta=fxClientMeta(e.name),fw=fxStripCellWidth(img,e.frames,meta),f=Math.min(e.frames-1,Math.floor((e.t/e.dur)*e.frames)),sc=tibiaScale(W),o=effectTileOrigin(e.x*W,e.y*H,fw*sc,img.naturalHeight*sc,tile);ctx.drawImage(img,f*fw,0,fw,img.naturalHeight,o.x,o.y,fw*sc,img.naturalHeight*sc);}
+};
+
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */
 function drawPlayerCorpse(ctx, W, H, ent, p, until, startedAt, permanent) {
   if (!ent || !p || (!until && !permanent)) return;

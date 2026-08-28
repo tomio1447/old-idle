@@ -35,6 +35,7 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
+const { YANA_CATALOG, applyYanaPurchase } = require("./yana_catalog");
 const party = require("./party");   // lógica de PARTY multiplayer
 const { startInstanceWorker } = require("./instance_worker");
 const { SyncBus } = require("./sync_bus");
@@ -852,7 +853,7 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
   if(opts.adminGrant){
@@ -1043,6 +1044,34 @@ async function saveCharacter(db, body, id) {
     ...(sharedInventory?{sharedInventory}:{})}};
 }
 
+const TRAINING_STORE={exercise:{charges:14470,gold:10000000,tc:0,bonus:1.25},lasting:{charges:20000,gold:0,tc:150,bonus:1.5}};
+async function buyTrainingPlan(db,body){
+  let acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const plan=TRAINING_STORE[String(body.plan||"")];if(!plan)return {code:400,body:{ok:false,msg:"Modalidade inválida"}};
+  const character=await db.findCharacter(Number(body.char_id));if(!character||Number(character.account_id)!==Number(acc.id))return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const expected=Number(body.expected_version);if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,msg:"Atualize o personagem antes da compra"}};
+  acc=await ensureAccountWallet(db,acc);const gold=Math.max(0,Math.floor(Number(acc.gold)||0)),coins=Math.max(0,Math.floor(Number(acc.coins)||0));
+  if(plan.gold&&gold<plan.gold)return {code:409,body:{ok:false,msg:"Gold insuficiente"}};
+  if(plan.tc&&coins<plan.tc)return {code:409,body:{ok:false,msg:"Tibia Coins insuficientes"}};
+  let p={};try{p=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+  const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
+  const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
+  if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
+  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0));
+  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0));
+  balances[String(body.plan)]+=plan.charges;
+  p.trainingExercise={skill:["sword","axe","club","dist","magic","shield","fist"].includes(prior.skill)?prior.skill:"sword",activePlan:String(body.plan),balances,active:true};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const result=await db.saveCharactersVersioned(acc.id,[{id:Number(character.id),expectedVersion:expected,voc:character.voc,level:Math.max(1,Number(character.level)||1),data:JSON.stringify(p),extra:{hp:Number(p.hp)||0,mp:Number(p.mp)||0}}],lease);
+  if(!result.ok)return saveConflictResponse(result);
+  if(plan.gold&&typeof db.setAccountGold==="function")await db.setAccountGold(acc.id,gold-plan.gold);
+  if(plan.tc)await db.updateCoins(acc.id,coins-plan.tc);
+  const updated=result.characters[0],fresh=await ensureAccountWallet(db,await db.findAccountById(acc.id));
+  publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"training-purchase"});
+  return {code:200,body:{ok:true,msg:`${plan.charges} cargas adquiridas.`,trainingExercise:p.trainingExercise,character:accountCharacterSummary(updated),account:accountPublicView(fresh)}};
+}
+
 function applyRewardChestClaim(p,body){
   rewardChestEnsure(p);
   if(body&&body.all)return rewardChestClaimAll(p);
@@ -1052,6 +1081,31 @@ function applyRewardChestClaim(p,body){
   if(bundleId)return rewardChestClaimBundle(p,bundleId);
   if(slug)return rewardChestClaimOne(p,slug,null)?1:0;
   return 0;
+}
+
+async function buyYanaPackage(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version);
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||typeof body.offer_id!=="string")
+    return {code:400,body:{ok:false,error:"YANA_INVALID_PURCHASE",msg:"Compra inválida."}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  if(Number(character.save_version)!==expected)
+    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character)]}};
+  const active=await resolveInstanceRow(db,acc,charId);
+  if(active.error)return active.error;
+  if(active.row&&active.row.status==="active")
+    return {code:409,body:{ok:false,error:"YANA_IN_INSTANCE",msg:"Yana só atende no templo."}};
+  const p=await loadCityPlayer(db,acc,character);
+  const purchase=applyYanaPurchase(p,body.offer_id);
+  if(!purchase.ok)return {code:400,body:purchase};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,offerId:purchase.offer.id,
+    goldTokens:purchase.goldTokens,lootPouch:p.lootPouch||{},bag:p.bag||{}})};
 }
 
 async function persistClaimedPlayer(db,acc,character,p,lease){
@@ -3960,6 +4014,15 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/reward/claim") {
         const r = await claimRewardChest(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/training/buy") {
+        const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/npcs/yana/catalog") {
+        return send(res,200,{ok:true,offers:YANA_CATALOG});
+      }
+      if (req.method === "POST" && url === "/api/npcs/yana/buy") {
+        const r=await buyYanaPackage(db,await readBody(req));return send(res,r.code,r.body);
       }
       if (req.method === "POST" && url === "/api/coins") {
         const body = await readBody(req);

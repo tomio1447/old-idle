@@ -62,6 +62,11 @@ const NPCS = {
     greet: "Major crystalline tokens? Eu troco por equipamentos gnômicos.",
     type: "tokenbarter", shopId: "gnomally",
   },
+  yana: {
+    name: "Yana", role: "Imbuement Materials", sprite: "magicshop",
+    greet: "Gold Tokens abrem caminho para imbuements poderosos.",
+    type: "yana",
+  },
   "oberon-trader": {
     name: "Oberon Trader", role: "Falcon Forge", sprite: "oberon-trader",
     greet: "Traga-me os itens e eu forjarei um escudo digno de um cavaleiro Falcon.",
@@ -610,101 +615,46 @@ function trainingWeaponFx(t, p) {
   return EXERCISE_FX["exercise-sword"] || { kind: "melee", missile: "whirlwind-sword", fx: "hit-area", lunge: 1 };
 }
 
-function academyTrainingTick(t, p, dt, now) {
-  t.time += dt;
-  academyAutoConjureTick(t, p, dt);
-  t.hitCd -= dt;
-  if (t.hitCd > 0) return;
-
-  const st = academyStatus(p);
-  // no modo dummy a skill vem da exercise weapon (não do equipamento)
-  if (t.mode === "dummy" && t.weapon && EXERCISE_WEAPONS && EXERCISE_WEAPONS[t.weapon]) {
-    t.skill = EXERCISE_WEAPONS[t.weapon].skill;
-  } else {
-    t.skill = st.skill;
+function academyTrainingTick(t, p, dt, now, dummyPos) {
+  if (!t || !p || p.remoteTraining) return;
+  const state = ensureTraining(p);
+  t.hitCd = (Number(t.hitCd) || 0) - dt;
+  if (!state.active || t.hitCd > 0) return;
+  const plan = trainingPlan(p);
+  if (plan.id !== "free" && state.balances[plan.id] <= 0) {
+    state.activePlan = "free";
+    t.events.push({type:"msg",msg:`${plan.name} sem cargas — retornando ao treino grátis.`});
   }
-  if (!st.ok && t.mode !== "dummy") {
-    if (now - t.lastMsg > 3000) {
-      t.events.push({ type: "msg", msg: st.msg });
-      t.lastMsg = now;
-    }
-    t.hitCd = 1000;
-    return;
-  }
-
-  // dummy: consome 1 carga por golpe; sem cargas o treino para
-  if (t.mode === "dummy" && t.weapon) {
-    ensureTraining(p);
-    if ((p.exercise[t.weapon] || 0) <= 0) {
-      const w = EXERCISE_WEAPONS[t.weapon];
-      t.events.push({ type: "msg", msg: `${w ? w.name : "Exercise weapon"} sem cargas — treino encerrado.` });
-      if (typeof stopAcademy === "function") stopAcademy(false);
-      return;
-    }
-    p.exercise[t.weapon] -= 1;
-    if (p.exercise[t.weapon] < 0) p.exercise[t.weapon] = 0;
-  }
-
+  const activePlan = trainingPlan(p);
+  t.skill = state.skill;
+  t.weapon = state.weapon = trainingWeaponForSkill(state.skill, p);
+  if (activePlan.id !== "free") state.balances[activePlan.id] = Math.max(0, state.balances[activePlan.id] - 1);
+  const rate = activePlan.bonus;
   let skillUp = false;
-  let dmg = 0;
-  const rate = dummyRate(p);
   if (t.skill === "magic") {
-    // magia: o servidor conta mana spent, sem exigir mana do jogador
-    const ganho = Math.floor(EXERCISE_MANA * rate);
-    t.stats.manaSpent += ganho;
-    skillUp = addManaSpent(p, ganho);
-  } else if (t.skill === "shield") {
-    // exercise shield: só shielding (o próprio golpe de escudo)
-    skillUp = addSkillTries(p, "shield", EXERCISE_TRIES * rate);
-  } else if (t.skill === "dist") {
-    // sem exigir municao: o treino aqui nao consome arrows
-    const d = playerDamage(p);
-    dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.85));
-    skillUp = addSkillTries(p, "dist", EXERCISE_TRIES * rate);
+    const gain = Math.floor(EXERCISE_MANA * rate);
+    t.stats.manaSpent += gain;
+    skillUp = addManaSpent(p, gain);
   } else {
-    if (p.voc === "knight" || p.voc === "monk") {
-      const d = playerDamage(p);
-      dmg = Math.max(1, Math.floor((d.min + Math.random() * (d.max - d.min)) * 0.9));
-    }
     skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
   }
-
-  const shieldUp = t.skill === "shield" ? false
-    : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
-  t.hits++;
-  t.stats.hits++;
-  t.stats.damage += dmg;
-  if (skillUp) t.stats.skillUps++;
-  if (shieldUp) t.stats.shieldUps++;
-  t.events.push({ type: "hit", skill: t.skill, dmg: dmg, mode: t.mode,
-                  weapon: t.weapon,
-                  skillUp: skillUp, shieldUp: shieldUp });
-  // Animação do golpe: dummy E treiner usam os mesmos efeitos Canary
-  // (hit-area / projétil da exercise weapon) a cada tick.
-  if (t.playerPos && t.dummyPos) {
-    const ef = trainingWeaponFx(t, p);
-    const ddx = t.dummyPos.x - t.playerPos.x;
-    const ddy = t.dummyPos.y - t.playerPos.y;
-    t.facing = dirFromDelta(ddx, ddy);
-    t.proj = {
-      t: 0,
-      dur: (ef.kind === "ranged" || ef.kind === "cast") ? 340 : 260,
-      from: { x: t.playerPos.x, y: t.playerPos.y },
-      to: { x: t.dummyPos.x, y: t.dummyPos.y },
-      weapon: t.weapon,
-      kind: ef.kind,
-      missile: ef.missile,
-      fx: ef.fx,
-      lunge: ef.lunge || 1,
-      dir: missileDir ? missileDir(t.playerPos.x, t.playerPos.y,
-                                  t.dummyPos.x, t.dummyPos.y) : "e",
-    };
-    t.projHitFx = false;
-    t.lungeT = 230;
-  } else {
-    t.lungeT = 180;
+  const shieldUp = t.skill === "shield" ? false : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
+  t.stats.hits++; if (skillUp) t.stats.skillUps++; if (shieldUp) t.stats.shieldUps++;
+  const target = dummyPos || t.dummyPos;
+  if (t.playerPos && target) {
+    const ef = trainingWeaponFx({mode:"dummy",weapon:t.weapon,skill:t.skill}, p);
+    t.facing = "s";
+    t.proj={t:0,dur:(ef.kind==="ranged"||ef.kind==="cast")?340:260,
+      from:{x:t.playerPos.x,y:t.playerPos.y},to:{x:target.x,y:target.y},weapon:t.weapon,
+      kind:ef.kind,missile:ef.missile,fx:ef.fx,lunge:ef.lunge||1,
+      dir:missileDir?missileDir(t.playerPos.x,t.playerPos.y,target.x,target.y):"s"};
+    t.lungeT=230;
   }
-  t.hitCd = academyAttackDelay(t, p);
+  t.hitCd=academyAttackDelay(t,p);
+}
+
+function trainingPartyTick(training, dt, now) {
+  for (const member of training.members || []) academyTrainingTick(member, member.p, dt, now, training.dummyPos);
 }
 
 /* ------------------------------------------------------------ acoes */

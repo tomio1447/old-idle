@@ -5,6 +5,8 @@
 
 let shopFilter = "";
 let shopSlot = "all";
+let yanaCategory = "all";
+let yanaTier = 0;
 
 /* Catálogo do modal NPCS (mesmo estilo de cards do modal HUNTS). */
 const NPC_MODAL_CATALOG = [
@@ -21,6 +23,13 @@ const NPC_MODAL_CATALOG = [
     role: "Trocas Crystalline",
     sprite: "gnomally",
     descKey: "npc.desc.gnomally",
+  },
+  {
+    shop: "yana",
+    name: "Yana",
+    role: "Imbuement Materials",
+    sprite: "magicshop",
+    desc: "Troca Gold Tokens por pacotes oficiais de materiais de imbuement.",
   },
   {
     shop: "enpa",
@@ -432,6 +441,7 @@ function openNpc(id) {
     case "sell":   body = npcSell(p); break;
     case "npcbuy": body = npcBuyOnly(p, npc.shopId || id); break;
     case "tokenbarter": body = npcTokenBarter(p, npc.shopId || id); break;
+    case "yana": body = npcYana(p); break;
     case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
@@ -478,6 +488,7 @@ function refreshNpc(id) {
     case "sell":   body = npcSell(p); break;
     case "npcbuy": body = npcBuyOnly(p, npc.shopId || id); break;
     case "tokenbarter": body = npcTokenBarter(p, npc.shopId || id); break;
+    case "yana": body = npcYana(p); break;
     case "upgrade": body = npcUpgrade(p); break;
     case "bank":   body = npcBank(p); break;
     case "temple": body = npcTemple(p); break;
@@ -846,6 +857,36 @@ function npcTokenBarter(p, shopId) {
       '<div class="dim small center" style="padding:16px">Nenhuma oferta</div>'}</div>`;
 }
 
+/* ---------------------------------------------------------- Yana */
+function npcYana(p) {
+  const offers = typeof yanaCatalog === "function" ? yanaCatalog() : [];
+  const have = typeof yanaGoldTokenCount === "function" ? yanaGoldTokenCount(p) : 0;
+  const categories = Array.from(new Set(offers.map((offer) => offer.category)));
+  const filtered = offers.filter((offer) => (yanaCategory === "all" || offer.category === yanaCategory) &&
+    (!yanaTier || offer.tier === yanaTier));
+  const tierButtons = [0, 1, 2, 3].map((tier) => `<button class="sm ${yanaTier === tier ? "primary" : ""}"
+    data-yana-tier="${tier}">${tier ? IMBDATA.bases[tier].name : "Todos"}</button>`).join("");
+  const categoryOptions = [`<option value="all">Todas as categorias</option>`].concat(categories.map((category) =>
+    `<option value="${category}" ${yanaCategory === category ? "selected" : ""}>${category}</option>`)).join("");
+  const cards = filtered.map((offer) => {
+    const can = have >= offer.cost;
+    const mats = offer.items.map((item) => `<div class="row tiny" style="gap:5px;align-items:center" data-tip="${item.slug}">
+      <img src="assets/item/mat-${item.cid}.png" width="24" height="24" alt=""><b>${item.count}×</b>
+      <span class="dim">${typeof itemName === "function" ? itemName(item.slug) : item.slug}</span></div>`).join("");
+    return `<article class="panel" style="padding:10px;display:flex;flex-direction:column;gap:8px">
+      <div><b>${offer.name}${offer.sub ? " — " + offer.sub : ""}</b><div class="tiny dim">${offer.category} · ${offer.tierName}</div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:5px">${mats}</div>
+      <button class="sm ${can ? "primary" : ""}" data-yana-buy="${offer.id}" ${can ? "" : "disabled"}>
+        Comprar · ${offer.cost} <img src="assets/item/gold-token.png" width="16" height="16" alt=""> Gold Tokens
+      </button></article>`;
+  }).join("");
+  return `<div class="panel" style="padding:10px;margin-bottom:8px;background:linear-gradient(135deg,rgba(98,72,34,.35),rgba(30,25,20,.15))">
+    <div class="row" style="justify-content:space-between;align-items:center"><div><b>Pacotes de Imbuement</b><div class="tiny dim">Materiais oficiais entregues na Loot Pouch</div></div>
+    <div class="row" style="gap:6px;align-items:center"><img src="assets/item/gold-token.png" width="26" height="26" alt="Gold Token"><b class="gold-txt">${fmtFull(have)}</b><span class="tiny">Gold Tokens</span></div></div></div>
+    <div class="row mb8" style="gap:6px;flex-wrap:wrap"><select id="yana-category" class="small">${categoryOptions}</select>${tierButtons}</div>
+    <div style="max-height:390px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:8px">${cards || '<div class="dim center">Nenhum pacote neste filtro.</div>'}</div>`;
+}
+
 /* ---------------------------------------------------------- supplies */
 function npcSupply(p) {
   const rows = Object.keys(SUPPLIES).map((slug) => {
@@ -1110,58 +1151,8 @@ function npcPromotion() {
 
 /* ---------------------------------------------------------- academia */
 function npcTrain(p) {
-  const st = academyStatus(p);
-  const skillTxt = st.skill === "magic" ? "Magic Level (65 mana por hit)" :
-    st.skill ? SKILL_NAMES[st.skill] : "aguardando equipamento";
-  const weapon = p.equip.weapon ? itemName(p.equip.weapon.item) : "nenhuma";
-  const ammo = p.equip.ammo ? `${itemName(p.equip.ammo.item)} (${ammoCount(p, p.equip.ammo.item)})` : "nenhuma";
-
-  const dummyId = (p.config && p.config.dummy) || "exercise";
-  const dummy = EXERCISE_DUMMIES[dummyId] || EXERCISE_DUMMIES.exercise;
-  const rate = dummy.rate / 100;
-  const isMagic = st.skill === "magic";
-  const porGolpe = isMagic
-    ? `${Math.floor(EXERCISE_MANA * rate)} mana spent`
-    : `${(EXERCISE_TRIES * rate).toFixed(1)} tries`;
-  const intervalo = (exerciseInterval(p) / 1000).toFixed(1);
-
-  return goldLine(p) + `
-    <div class="panel-inset mb8" style="padding:8px">
-      <div class="stat-row"><span class="k">Sala</span><span class="v">Safezone</span></div>
-      <div class="stat-row"><span class="k">Dummy</span><span class="v">${dummy.name}</span></div>
-      <div class="stat-row"><span class="k">Vocação</span><span class="v">${vocationName(p)}</span></div>
-      <div class="stat-row"><span class="k">Skill treinada</span><span class="v">${skillTxt}</span></div>
-      <div class="stat-row"><span class="k">Por golpe</span><span class="v" style="color:#9ce84a">${porGolpe}</span></div>
-      <div class="stat-row"><span class="k">Intervalo</span><span class="v">${intervalo}s</span></div>
-      <div class="stat-row"><span class="k">Taxa do dummy</span><span class="v">${dummy.rate}%</span></div>
-      <div class="stat-row"><span class="k">Shielding</span><span class="v">Todos os hits</span></div>
-      <div class="stat-row"><span class="k">Weapon</span><span class="v">${weapon}</span></div>
-    </div>
-    <div class="small dim mb4">Exercise dummy</div>
-    <div class="row wrap mb8" style="gap:4px">
-      ${Object.keys(EXERCISE_DUMMIES).map((id) => {
-        const d = EXERCISE_DUMMIES[id];
-        const dono = id === "exercise" || (p.dummies && p.dummies[id]);
-        const sel = id === dummyId;
-        return `<button class="sm ${sel ? "primary" : ""}" data-dummy="${id}"
-          title="${dono ? `taxa ${d.rate}%` : `comprar por ${fmtFull(d.price)} gp`}">
-          ${d.name.replace(" Exercise Dummy", "").replace("Exercise Dummy", "Básico")}
-          ${dono ? "" : `· ${fmtFull(d.price)}`}</button>`;
-      }).join("")}
-    </div>
-    <div class="tiny dim mb8">
-      Fórmula do Canary: <b>${isMagic ? "600" : "7"} × taxa</b> por golpe, a cada
-      <b>baseAttackSpeed / rateExerciseTrainingSpeed</b>. Não é preciso ter a
-      exercise weapon — treina com o equipamento atual.
-    </div>
-    ${st.ok ? "" : `<div class="small mb8" style="color:#ffb060">${st.msg}</div>`}
-    <button class="primary full mb8" id="academy-enter">Teleportar para Academia</button>
-    <button class="full" id="academy-conjure-list">Abrir conjure</button>
-    <div class="tiny dim mt8">
-      Dentro da academia você bate no exercise dummy em safezone. A skill treinada
-      segue a arma equipada — sem arma, treina punho. Mages acumulam mana spent
-      sem gastar mana, distance não consome munição, e todos ganham shielding.
-    </div>`;
+  const members=typeof trainingPartyPlayers==="function"?trainingPartyPlayers():[p];
+  return `<div class="panel-inset mb8" style="padding:8px"><div class="stat-row"><span class="k">Local</span><span class="v">Área de Treino</span></div><div class="stat-row"><span class="k">Party atual</span><span class="v">${members.length} personagem(ns)</span></div><div class="stat-row"><span class="k">Arma inicial</span><span class="v" style="color:#9ce84a">Training Exercise Weapon infinita</span></div></div><div class="tiny dim mb8">Toda a party entra em fila e cada personagem escolhe explicitamente sua skill, arma e modalidade no painel de treino.</div><button class="primary full" id="academy-enter">Entrar na Área de Treino</button>`;
 }
 
 /* ---------------------------------------------------------- estalagem */
@@ -1263,6 +1254,25 @@ function bindNpc(id, type) {
       refreshNpc(id);
       renderAll();
     }));
+
+  const yanaCategorySelect = $("#yana-category");
+  if (yanaCategorySelect) yanaCategorySelect.addEventListener("change", (e) => { yanaCategory = e.target.value; refreshNpc(id); });
+  $$("#npc-content [data-yana-tier]").forEach((b) => b.addEventListener("click", () => {
+    yanaTier = parseInt(b.dataset.yanaTier, 10) || 0; refreshNpc(id);
+  }));
+  $$("#npc-content [data-yana-buy]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const offerId = b.dataset.yanaBuy;
+    const online = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+      typeof sessionToken === "function" && !!sessionToken();
+    const r = online && typeof accountBuyYanaPackage === "function"
+      ? await accountBuyYanaPackage(sessionToken(), typeof sessionCharId === "function" ? sessionCharId() : null, offerId)
+      : (typeof buyYanaPackageLocal === "function" ? buyYanaPackageLocal(p, offerId) : { ok:false, msg:"Compra indisponível." });
+    if (!r.ok) { toast(r.msg || "Compra não concluída."); refreshNpc(id); return; }
+    toast("Pacote de imbuement entregue na Loot Pouch.", "level");
+    addLog("sell", "Comprou pacote de materiais da Yana com Gold Tokens");
+    refreshNpc(id); renderAll();
+  }));
 
   // supplies
   $$("#npc-content [data-buy-sup]").forEach((b) =>
@@ -1378,31 +1388,6 @@ function bindNpc(id, type) {
     $("#modal").classList.remove("show");
     startAcademy();
   });
-  // escolher / comprar exercise dummy
-  $$("#npc-content [data-dummy]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const id = b.dataset.dummy;
-      const d = EXERCISE_DUMMIES[id];
-      if (!d) return;
-      p.dummies = p.dummies || {};
-      const dono = id === "exercise" || p.dummies[id];
-      if (!dono) {
-        if (p.gold < d.price) { toast(`Faltam ${fmtFull(d.price - p.gold)} gp.`); return; }
-        p.gold -= d.price;
-        p.dummies[id] = 1;
-        addLog("sell", `Comprou <b>${d.name}</b> por <span class="gold-txt">${fmtFull(d.price)} gp</span>`);
-      }
-      p.config.dummy = id;
-      toast(`Treinando no <b>${d.name}</b> (${d.rate}%)`);
-      refreshNpc(G.activeNpc || "trainer");
-      renderAll();
-    }));
-
-  const academyConjure = $("#academy-conjure-list");
-  if (academyConjure) academyConjure.addEventListener("click", () => {
-    openAcademyConjureModal(true);
-  });
-
   // estalagem
   $$("#npc-content [data-rest]").forEach((b) =>
     b.addEventListener("click", () => {

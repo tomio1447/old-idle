@@ -141,6 +141,44 @@ function buyNpcCatalogItem(p, shopId, slug) {
   return { ok: true };
 }
 
+function yanaCatalog() {
+  if (typeof IMBDATA === "undefined") return [];
+  const groups = IMBDATA.groups || IMBDATA.imbs || {};
+  const out = [];
+  Object.keys(groups).forEach((key, index) => {
+    const group = groups[key] || {};
+    for (let tier = 1; tier <= 3; tier++) {
+      const rows = group.tiers && group.tiers[tier] && group.tiers[tier].items;
+      if (!Array.isArray(rows) || !rows.length) continue;
+      out.push({ id: "imb-" + index + "-t" + tier, key, name: group.name || key, sub: group.sub || "",
+        categoryId: Number(group.cat), category: IMBDATA.categories[group.cat] || "Imbuement", tier,
+        tierName: IMBDATA.bases[tier] && IMBDATA.bases[tier].name || String(tier), cost: tier * 2,
+        items: rows.map((row) => ({ cid: Number(row[0]), count: Number(row[1]), slug: "mat-" + Number(row[0]) })) });
+    }
+  });
+  return out;
+}
+
+function yanaGoldTokenCount(p) {
+  return Math.max(0, Math.floor(Number(p && p.lootPouch && p.lootPouch["gold-token"]) || 0)) +
+    Math.max(0, Math.floor(Number(p && p.bag && p.bag["gold-token"]) || 0));
+}
+
+function buyYanaPackageLocal(p, offerId) {
+  const offer = yanaCatalog().find((entry) => entry.id === offerId);
+  if (!p || !offer) return { ok: false, msg: "Pacote inválido." };
+  if (yanaGoldTokenCount(p) < offer.cost) return { ok: false, msg: "Gold Tokens insuficientes." };
+  p.lootPouch = p.lootPouch || {}; p.bag = p.bag || {};
+  let left = offer.cost;
+  [p.lootPouch, p.bag].forEach((container) => {
+    const take = Math.min(left, Math.max(0, Math.floor(Number(container["gold-token"]) || 0)));
+    if (!take) return; container["gold-token"] -= take; left -= take;
+    if (container["gold-token"] <= 0) delete container["gold-token"];
+  });
+  offer.items.forEach((item) => { p.lootPouch[item.slug] = (p.lootPouch[item.slug] || 0) + item.count; });
+  return { ok: true, offer, goldTokens: yanaGoldTokenCount(p) };
+}
+
 function exchangeNpcBarter(p, shopId, index) {
   const shop = npcShopDef(shopId);
   if (!shop || shop.currency === "gold")
@@ -202,5 +240,8 @@ ensureNpcShopItems();
   g.bagTokenCount = bagTokenCount;
   g.buyNpcCatalogItem = buyNpcCatalogItem;
   g.exchangeNpcBarter = exchangeNpcBarter;
+  g.yanaCatalog = yanaCatalog;
+  g.yanaGoldTokenCount = yanaGoldTokenCount;
+  g.buyYanaPackageLocal = buyYanaPackageLocal;
   g.npcOutfitIdForPlayer = npcOutfitIdForPlayer;
 })(typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : null));

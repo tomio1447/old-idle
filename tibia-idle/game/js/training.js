@@ -1,169 +1,133 @@
-/* training.js — Sistema de Treino (Skill Trainer da TibiaWiki).
- *
- * Dois modos de treino:
- *   - DUMMY  (Exercise Dummy): consome cargas de exercise weapons
- *     compradas por Tibia Coins (25 TC = 5000 cargas). Golpes com a mesma
- *     fórmula de skill tick do Canary (7 tries / 600 mana spent por golpe).
- *   - ONLINE (Skill Trainer / Treiner): o treino antigo da academia, sem custo.
- *
- * A stamina está temporariamente desativada e permanece sempre em 42h.
- *
- * O GIF do botão é o oficial do Skill Trainer (All) da TibiaWiki; os GIFs
- * das exercise weapons também são os oficiais (64x64 animadas, 5 frames cada, upscaling nearest-neighbor da TibiaWiki).
- */
 "use strict";
 
 const TRAINING_ICON_PATH = "assets/ui/training/";
-
-/* As 8 exercise weapons oficiais. `skill` é a skill treinada no dummy:
- * sword/axe/club -> melee, bow -> distance, rod/wand -> magic level
- * (mana spent), shield -> shielding, wraps -> fist (monk). Preço/cargas
- * seguem o pedido: 25 Tibia Coins = 5000 cargas. */
+const TRAINING_MAP_OTBM = "exercisearea";
+const TRAINING_DUMMY_ITEM_ID = 30616;
+const TRAINING_DUMMY_ABS = { x: 1013, y: 1022, z: 7 };
+const TRAINING_QUEUE_ABS = [1011, 1012, 1013, 1014].map((x) => ({ x, y: 1021, z: 7 }));
+const TRAINING_SKILLS = ["sword", "axe", "club", "dist", "magic", "shield", "fist"];
+const TRAINING_PLANS = {
+  free: { id: "free", name: "Training Exercise Weapon", charges: Infinity, bonus: 1, gold: 0, tc: 0 },
+  exercise: { id: "exercise", name: "Exercise Weapon", charges: 14470, bonus: 1.25, gold: 10000000, tc: 0 },
+  lasting: { id: "lasting", name: "Lasting Exercise Weapon", charges: 20000, bonus: 1.5, gold: 0, tc: 150 },
+};
 const EXERCISE_WEAPONS = {
-  "exercise-sword": { name: "Exercise Sword", skill: "sword",
-                      tc: 25, charges: 5000, icon: "exercise-sword.gif" },
-  "exercise-axe":   { name: "Exercise Axe",   skill: "axe",
-                      tc: 25, charges: 5000, icon: "exercise-axe.gif" },
-  "exercise-club":  { name: "Exercise Club",  skill: "club",
-                      tc: 25, charges: 5000, icon: "exercise-club.gif" },
-  "exercise-bow":   { name: "Exercise Bow",   skill: "dist",
-                      tc: 25, charges: 5000, icon: "exercise-bow.gif" },
-  "exercise-rod":   { name: "Exercise Rod",   skill: "magic",
-                      tc: 25, charges: 5000, icon: "exercise-rod.gif" },
-  "exercise-wand":  { name: "Exercise Wand",  skill: "magic",
-                      tc: 25, charges: 5000, icon: "exercise-wand.gif" },
-  "exercise-shield": { name: "Exercise Shield", skill: "shield",
-                      tc: 25, charges: 5000, icon: "exercise-shield.gif" },
-  "exercise-wraps": { name: "Exercise Wraps", skill: "fist",
-                      tc: 25, charges: 5000, icon: "exercise-wraps.gif" },
+  "exercise-sword": { name: "Exercise Sword", skill: "sword", icon: "exercise-sword.gif" },
+  "exercise-axe": { name: "Exercise Axe", skill: "axe", icon: "exercise-axe.gif" },
+  "exercise-club": { name: "Exercise Club", skill: "club", icon: "exercise-club.gif" },
+  "exercise-bow": { name: "Exercise Bow", skill: "dist", icon: "exercise-bow.gif" },
+  "exercise-rod": { name: "Exercise Rod", skill: "magic", icon: "exercise-rod.gif" },
+  "exercise-wand": { name: "Exercise Wand", skill: "magic", icon: "exercise-wand.gif" },
+  "exercise-shield": { name: "Exercise Shield", skill: "shield", icon: "exercise-shield.gif" },
+  "exercise-wraps": { name: "Exercise Wraps", skill: "fist", icon: "exercise-wraps.gif" },
 };
 
-/* Garante o estado das exercise weapons no save: p.exercise[id] = cargas */
+function trainingWeaponForSkill(skill, p) {
+  if (skill === "magic") return p && p.voc === "druid" ? "exercise-rod" : "exercise-wand";
+  return { sword:"exercise-sword", axe:"exercise-axe", club:"exercise-club", dist:"exercise-bow",
+    shield:"exercise-shield", fist:"exercise-wraps" }[skill] || "exercise-sword";
+}
+
 function ensureTraining(p) {
-  if (!p.exercise || typeof p.exercise !== "object") p.exercise = {};
-  for (const id in EXERCISE_WEAPONS) {
-    const n = Math.floor(p.exercise[id] || 0);
-    p.exercise[id] = Math.max(0, n);
-  }
-  return p.exercise;
+  if (!p.trainingExercise || typeof p.trainingExercise !== "object") p.trainingExercise = {};
+  const s = p.trainingExercise;
+  if (TRAINING_SKILLS.indexOf(s.skill) < 0) s.skill = "sword";
+  if (!TRAINING_PLANS[s.activePlan]) s.activePlan = TRAINING_PLANS[s.plan] ? s.plan : "free";
+  if (!s.balances || typeof s.balances !== "object") s.balances = {};
+  if (s.plan && s.plan !== "free" && s.charges != null && s.balances[s.plan] == null)
+    s.balances[s.plan] = s.charges;
+  s.balances.exercise = Math.max(0, Math.floor(Number(s.balances.exercise) || 0));
+  s.balances.lasting = Math.max(0, Math.floor(Number(s.balances.lasting) || 0));
+  delete s.plan;
+  delete s.charges;
+  s.weapon = trainingWeaponForSkill(s.skill, p);
+  s.active = s.active !== false;
+  if (p.exercise) delete p.exercise;
+  return s;
 }
 
-/* Cargas atuais de uma exercise weapon. */
-function exerciseCharges(p, id) {
-  ensureTraining(p);
-  return p.exercise[id] || 0;
+function exerciseCharges(p) {
+  const s = ensureTraining(p);
+  return s.activePlan === "free" ? Infinity : s.balances[s.activePlan];
 }
-
-/* Custo total de TC para comprar o pacote de uma weapon. */
-function exerciseTcPrice(id) {
-  const w = EXERCISE_WEAPONS[id];
-  return w ? w.tc : 25;
-}
-
-/* Compra 5000x cargas de uma exercise weapon por 25 Tibia Coins.
- * Retorna { ok, msg, charges }. */
-function buyExerciseCharges(p, id) {
-  const w = EXERCISE_WEAPONS[id];
-  if (!w) return { ok: false, msg: "Exercise weapon desconhecida." };
-  const price = w.tc;
-  if (typeof accountCoins !== "function" || accountCoins() < price) {
-    return { ok: false, msg: `Faltam ${price} Tibia Coins. Compre no painel Admin → Coins.` };
-  }
-  accountSpendCoins(price);
-  ensureTraining(p);
-  p.exercise[id] += w.charges;
-  return { ok: true, msg: `+${fmtFull(w.charges)} cargas de ${w.name} (-${price} TC).`,
-           charges: p.exercise[id] };
-}
-
-/* API legada mantida para compatibilidade. Enquanto a stamina estiver
- * desativada, o loop ignora esta taxa e força 42h em todos os modos. */
-function trainingStaminaRate(t) {
-  return (t && t.mode === "dummy") ? (1 / 3) : 1.0;
-}
-
-/* Nome do mapa .otbm da sala de exercise weapons (commit 0553abd). */
-const TRAINING_MAP_OTBM = "sala de exercise weapons";
-
-/* Overlay de loading curto ao entrar na sala (some quando o mapa chega). */
-function showTrainingLoading() {
-  let el = document.getElementById("training-loading");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "training-loading";
-    el.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;" +
-      "align-items:center;justify-content:center;background:rgba(0,0,0,.72);" +
-      "font:bold 16px Verdana;color:#ffe680;letter-spacing:.05em;";
-    document.body.appendChild(el);
-  }
-  el.style.display = "flex";
-  el.innerHTML = "⏳ Carregando sala de exercise weapons...";
-}
-
-function hideTrainingLoading() {
-  const el = document.getElementById("training-loading");
-  if (el) el.style.display = "none";
-}
-
-/* Inicia o treino com exercise weapon no Ferumbras Exercise Dummy.
- * Consome 1 carga por golpe; sem cargas, o treino para.
- * O mapa .otbm da sala é carregado de forma assíncrona (loading curto);
- * se falhar, cai no cenário procedural (comportamento anterior). */
-function startDummyTraining(p, weaponId) {
-  if (!EXERCISE_WEAPONS[weaponId]) return { ok: false, msg: "Escolha uma exercise weapon." };
-  ensureTraining(p);
-  if ((p.exercise[weaponId] || 0) <= 0) {
-    return { ok: false, msg: "Sem cargas. Compre 5000x por 25 Tibia Coins." };
-  }
-  if (typeof partyCombatRestoreAll === "function") partyCombatRestoreAll("training room");
-  if (G.combat) stopHunt();
-  if (G.training) stopAcademy(false);
-  showTrainingLoading();
-  const w = EXERCISE_WEAPONS[weaponId];
-
-  const entrar = (huntMap) => {
-    hideTrainingLoading();
-    G.training = newAcademyTraining(p, "dummy", weaponId, huntMap || null);
-    G.inCity = false;
-    G.p.hunt = null;
-    G.combat = null;
-    addLog("info", `Treino com <b>${w.name}</b> no Ferumbras Exercise Dummy (stamina sempre cheia).`);
-    toast(`Ferumbras Dummy: <b>${w.name}</b> ativa`, "level");
-    // PARTY: sala de exercise weapons conta como Área de Treino (pode convidar)
-    if (typeof partyReportZone === "function") partyReportZone({ zone: "training", training: "dummy" });
-    renderAll();
-  };
-
-  // carrega o mapa .otbm da sala (fetch + cache) com loading curto
-  const pseudo = { otbm: TRAINING_MAP_OTBM };
-  if (typeof huntMapFromOtbmAsync === "function") {
-    let pronto = false;
-    const t0 = Date.now();
-    const fallback = setTimeout(() => { if (!pronto) entrar(null); }, 4000);
-    huntMapFromOtbmAsync(pseudo, () => {
-      pronto = true;
-      clearTimeout(fallback);
-      const key = "otbm:" + TRAINING_MAP_OTBM;
-      const hm = (typeof HUNTMAPS !== "undefined" && HUNTMAPS[key]) ? HUNTMAPS[key] : null;
-      entrar(hm);
-    });
-  } else {
-    entrar(null);
-  }
-  return { ok: true, msg: "" };
-}
-
-/* Inicia o treino online com o Treiner (sem custo, regen 1:1). */
-function startOnlineTraining(p) {
-  if (typeof startAcademy !== "function") return { ok: false, msg: "" };
-  startAcademy();
-  return { ok: true, msg: "" };
-}
-
-/* Nome amigável da skill treinada por uma exercise weapon. */
 function exerciseSkillName(id) {
   const w = EXERCISE_WEAPONS[id];
-  if (!w) return "";
-  return w.skill === "magic" ? "Magic Level"
-    : (SKILL_NAMES[w.skill] || w.skill);
+  return w ? (w.skill === "magic" ? "Magic Level" : (SKILL_NAMES[w.skill] || w.skill)) : "";
 }
+function trainingPlan(p) { return TRAINING_PLANS[ensureTraining(p).activePlan] || TRAINING_PLANS.free; }
+
+async function buyTrainingPlan(p, planId) {
+  const plan = TRAINING_PLANS[planId];
+  if (!plan || plan.id === "free") return { ok:false, msg:"Modalidade inválida." };
+  if (typeof partyOnlineMode === "function" && partyOnlineMode() && typeof accountBuyTrainingPlan === "function") {
+    return accountBuyTrainingPlan(sessionToken(), p.id, planId);
+  }
+  if (plan.gold && (Number(p.gold) || 0) < plan.gold) return { ok:false, msg:"Gold insuficiente." };
+  if (plan.tc && (typeof accountCoins !== "function" || accountCoins() < plan.tc)) return { ok:false, msg:"Tibia Coins insuficientes." };
+  if (plan.gold) p.gold = Math.max(0, Number(p.gold) - plan.gold);
+  if (plan.tc) accountSpendCoins(plan.tc);
+  const s = ensureTraining(p); s.activePlan = planId; s.balances[planId] += plan.charges; s.active = true;
+  if (typeof save === "function") save();
+  return { ok:true, msg:`${plan.name}: +${fmtFull(plan.charges)} cargas.`, trainingExercise:s };
+}
+
+function trainingPartyPlayers() {
+  const byId = new Map();
+  const add = (p) => { if (p && p.id != null && !byId.has(String(p.id))) { ensureTraining(p); byId.set(String(p.id), p); } };
+  add(G.p);
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = G.p && G.p._partyOnline;
+    for (const row of [st && st.leader].concat((st && st.members) || [])) {
+      if (!row) continue;
+      const local = typeof getCharacters === "function" ? getCharacters().find((p) => String(p.id) === String(row.id)) : null;
+      add(local || Object.assign({ skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10}, skillTries:{}, ml:0,
+        manaSpent:0, config:{}, stamina:42*3600, remoteTraining:true }, row));
+    }
+  } else if (typeof partyLocalData === "function") {
+    const d = partyLocalData();
+    const ids = typeof partyLocalMemberIds === "function" ? partyLocalMemberIds(d) : [];
+    for (const p of (typeof getCharacters === "function" ? getCharacters() : [])) if (ids.indexOf(String(p.id)) >= 0) add(p);
+  }
+  return Array.from(byId.values()).slice(0, 4);
+}
+
+function trainingLocalPoint(map, abs) {
+  if (!map) return abs === TRAINING_DUMMY_ABS ? {x:.55,y:.68} : {x:.35+(abs.x-1011)*.07,y:.58};
+  const b = map.sourceBounds || {};
+  const ox = Number(b.x !== undefined ? b.x : b.minX) || 0, oy = Number(b.y !== undefined ? b.y : b.minY) || 0;
+  return cellCenter({ x: abs.x - ox, y: abs.y - oy });
+}
+function buildTrainingMember(p, index, map) {
+  const s = ensureTraining(p), pos = trainingLocalPoint(map, TRAINING_QUEUE_ABS[index]);
+  return { id:String(p.id), p, playerPos:pos, facing:"s", skill:s.skill, weapon:s.weapon,
+    hitCd:500 + index * 120, proj:null, lungeT:0, stats:{hits:0,skillUps:0,shieldUps:0,manaSpent:0}, events:[] };
+}
+
+function showTrainingLoading() {
+  let el = document.getElementById("training-loading");
+  if (!el) { el=document.createElement("div"); el.id="training-loading"; el.style.cssText="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);font:bold 16px Verdana;color:#ffe680"; document.body.appendChild(el); }
+  el.style.display="flex"; el.textContent="Carregando área de treino...";
+}
+function hideTrainingLoading(){const el=document.getElementById("training-loading");if(el)el.style.display="none";}
+
+function startTrainingArea() {
+  if (!G.p) return {ok:false,msg:"Crie um personagem primeiro."};
+  if (G.combat) stopHunt(true);
+  if (G.training) return {ok:true,msg:""};
+  showTrainingLoading();
+  const enter = (map) => {
+    hideTrainingLoading();
+    if (typeof setGridForMap === "function") setGridForMap(map);
+    const players=trainingPartyPlayers();
+    G.training={training:true,mode:"exercise",huntMap:map,members:players.map((p,i)=>buildTrainingMember(p,i,map)),
+      dummyItemId:TRAINING_DUMMY_ITEM_ID,dummyPos:trainingLocalPoint(map,TRAINING_DUMMY_ABS),events:[]};
+    G.inCity=false;G.p.hunt=null;G.combat=null;G.walkKeys={};
+    if (typeof partyReportZone === "function") partyReportZone({zone:"training",training:"exercise"});
+    addLog("info", `A party entrou na <b>Área de Treino</b> (${players.length} personagem(ns)).`);
+    renderAll();
+  };
+  if (typeof huntMapFromOtbmAsync === "function") huntMapFromOtbmAsync({otbm:TRAINING_MAP_OTBM},()=>enter(HUNTMAPS["otbm:"+TRAINING_MAP_OTBM]||null));
+  else enter(null);
+  return {ok:true,msg:""};
+}
+function startDummyTraining(){return startTrainingArea();}

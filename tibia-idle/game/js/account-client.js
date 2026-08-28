@@ -813,6 +813,35 @@ function accountOpenBagYouDesire(token, charId) {
     return { ok: false, msg: r.data.msg || "Não foi possível abrir a Bag You Desire", code: r.code };
   });
 }
+function accountBuyTrainingPlan(token,charId,plan){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),plan:String(plan),expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/training/buy",body);
+    if(r.data.ok){if(r.data.character)accountMergeCharacterCache([r.data.character]);if(r.data.account){if(typeof accountSetGold==="function")accountSetGold(r.data.account.gold);if(typeof accountSetCoins==="function")accountSetCoins(r.data.account.coins);}return {ok:true,msg:r.data.msg,trainingExercise:r.data.trainingExercise};}
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível comprar a exercise weapon",code:r.code};
+  });
+}
+
+function accountBuyYanaPackage(token,charId,offerId){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),offer_id:String(offerId),expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/npcs/yana/buy",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof accountMaybeApplyShared==="function")accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G.p){G.p.lootPouch=r.data.lootPouch||G.p.lootPouch;G.p.bag=r.data.bag||G.p.bag;}
+      return {ok:true,goldTokens:r.data.goldTokens};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível comprar o pacote",code:r.code};
+  });
+}
+
 /* Vende a Loot Pouch (tudo ou 1 slug) com persistência autoritativa.
  * Em combate online usa a instância (/api/instance/pouch-sell); na cidade usa
  * /api/pouch/sell (a pouch é server-owned no PUT comum — sem a API a venda

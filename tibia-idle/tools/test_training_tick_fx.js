@@ -1,66 +1,26 @@
-/* Treino: ticks do dummy e do Treiner usam as mesmas animações Canary. */
 "use strict";
 const fs=require("fs"),path=require("path"),vm=require("vm");
 const game=path.join(__dirname,"..","game");
 function must(ok,msg){if(!ok)throw Error(msg);}
-
-const citySrc=fs.readFileSync(path.join(game,"js","city.js"),"utf8");
-const trainSrc=fs.readFileSync(path.join(game,"js","training.js"),"utf8");
-const ctx={
-  console, SKILL_NAMES:{sword:"Sword",axe:"Axe",club:"Club",
-    dist:"Distance",shield:"Shielding",fist:"Fist",magic:"Magic Level"},
-  VOCATIONS:{knight:{attackSpeed:2000}},
-  academyStatus(){return {ok:true,skill:"sword"};},
-  dummyRate(){return 1;}, addSkillTries(){return false;}, addManaSpent(){return false;},
-  playerDamage(){return {min:10,max:20};}, stopAcademy(){},
-  academyAttackDelay(t,p){return 2000;},
-  missileDir(){return "e";}, cellCenter(cell){return {x:(cell.x+0.5)/21,y:(cell.y+0.5)/13};},
-  setGridForMap(){}, huntMapFromOtbmAsync(){}, HUNTMAPS:{}, G:{},
-  vipExerciseSpeed(){return 1;},
-};
+const ctx={console,Date,Math,Infinity,SKILL_NAMES:{sword:"Sword",axe:"Axe",club:"Club",dist:"Distance",shield:"Shielding",fist:"Fist"},VOCATIONS:{knight:{attackSpeed:2000}},
+  vipExerciseSpeed(){return 1;},cellCenter(c){return{x:(c.x+.5)/20,y:(c.y+.5)/20};},weaponSkill(){return"sword";},academyStatus(){return{ok:true,skill:"sword"};},
+  addSkillTries(p,s,n){p.gains=(p.gains||0)+n;return false;},addManaSpent(p,n){p.gains=(p.gains||0)+n;return false;},playerDamage(){return{min:1,max:2};},missileDir(){return"s";},G:{}};
 vm.createContext(ctx);
-vm.runInContext(trainSrc,ctx,{filename:"training.js"});
-vm.runInContext(citySrc,ctx,{filename:"city.js"});
-ctx.academyStatus=function(){return {ok:true,skill:"sword"};};
-ctx.weaponSkill=function(){return "sword";};
-ctx.dummyRate=function(){return 1;};
-ctx.academyAttackDelay=function(){return 2000;};
-ctx.EXERCISE_WEAPONS=ctx.EXERCISE_WEAPONS||{
-  "exercise-sword":{skill:"sword"},"exercise-axe":{skill:"axe"},
-  "exercise-club":{skill:"club"},"exercise-bow":{skill:"dist"},
-  "exercise-rod":{skill:"magic"},"exercise-wand":{skill:"magic"},
-  "exercise-shield":{skill:"shield"},"exercise-wraps":{skill:"fist"},
-};
-
-must(typeof ctx.trainingWeaponFx==="function","trainingWeaponFx ausente");
-must(ctx.trainingWeaponFx({mode:"dummy",weapon:"exercise-sword"}).fx==="hit-area",
-  "espada do dummy não usa hit-area Canary");
-must(ctx.trainingWeaponFx({mode:"dummy",weapon:"exercise-bow"}).missile==="arrow",
-  "arco do dummy não usa flecha Canary");
-must(ctx.trainingWeaponFx({mode:"online",skill:"sword"},{voc:"knight"}).fx==="hit-area",
-  "treino online não reusa hit-area da exercise sword");
-must(ctx.trainingWeaponFx({mode:"online",skill:"magic"},{voc:"druid"}).fx==="ice-attack",
-  "druid online não usa ice-attack da rod");
-
-const p={voc:"knight",level:50,ml:10,mp:1000,stamina:42*3600,config:{},
-  exercise:{},skills:{sword:10,axe:10,club:10,dist:10,shield:10,fist:10}};
-ctx.ensureTraining(p);
-for(const id in ctx.EXERCISE_WEAPONS)p.exercise[id]=5000;
-
-const dummy=ctx.newAcademyTraining(p,"dummy","exercise-club",null);
-dummy.hitCd=0;
-ctx.academyTrainingTick(dummy,p,100,Date.now());
-must(dummy.proj&&dummy.proj.fx==="hit-area"&&dummy.proj.missile==="whirlwind-club",
-  "tick dummy club sem animação Canary");
-must(p.exercise["exercise-club"]===4999,"dummy não consumiu 1 carga");
-
-const online=ctx.newAcademyTraining(p,"online",null,null);
-online.hitCd=0;
-const charges=p.exercise["exercise-sword"];
-ctx.academyTrainingTick(online,p,100,Date.now());
-must(online.proj&&online.proj.fx==="hit-area",
-  "tick online sem hit-area Canary");
-must(online.lungeT>0,"tick online sem lunge");
-must(p.exercise["exercise-sword"]===charges,"treino online consumiu carga de dummy");
-
-console.log("OK: treino dummy/online usa hit-area Canary nos ticks.");
+vm.runInContext(fs.readFileSync(path.join(game,"js","training.js"),"utf8"),ctx,{filename:"training.js"});
+vm.runInContext(fs.readFileSync(path.join(game,"js","city.js"),"utf8"),ctx,{filename:"city.js"});
+const mk=(id)=>({id:String(id),name:"P"+id,voc:"knight",skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},skillTries:{},ml:0,manaSpent:0,config:{}});
+const a=mk(1),b=mk(2);ctx.ensureTraining(a);ctx.ensureTraining(b);
+must(a.trainingExercise.activePlan==="free"&&ctx.exerciseCharges(a)===Infinity,"entrada não concede arma grátis infinita");
+a.trainingExercise.skill="club";a.trainingExercise.activePlan="exercise";a.trainingExercise.balances.exercise=2;
+b.trainingExercise.skill="magic";b.trainingExercise.activePlan="lasting";b.trainingExercise.balances.lasting=2;
+const dummy=vm.runInContext("TRAINING_DUMMY_ABS",ctx),queue=vm.runInContext("TRAINING_QUEUE_ABS",ctx),dummyId=vm.runInContext("TRAINING_DUMMY_ITEM_ID",ctx);
+const map={sourceBounds:{x:1000,y:1000}},ma=ctx.buildTrainingMember(a,0,map),mb=ctx.buildTrainingMember(b,1,map),tr={members:[ma,mb],dummyPos:ctx.trainingLocalPoint(map,dummy)};
+ma.hitCd=mb.hitCd=0;ctx.trainingPartyTick(tr,100,Date.now());
+must(a.trainingExercise.balances.exercise===1&&b.trainingExercise.balances.lasting===1,"cargas não são exclusivas por personagem");
+must(a.gains===7*1.25*2,"bônus de 125% ou shielding incorreto");
+must(b.gains===600*1.5+7*1.5,"bônus de 150% mágico incorreto");
+must(ma.facing==="s"&&mb.facing==="s","fila não está virada ao sul");
+must(ma.proj&&ma.proj.fx===vm.runInContext('EXERCISE_FX["exercise-club"].fx',ctx),"EXERCISE_FX não reutilizado");
+must(dummyId===30616&&dummy.x===1013&&dummy.y===1022,"dummy incorreto");
+must(queue.map(p=>p.x).join(",")==="1011,1012,1013,1014"&&queue.every(p=>p.y===1021&&p.z===7),"fila absoluta incorreta");
+console.log("OK: treino multi-personagem, planos, cargas, posições e FX.");
