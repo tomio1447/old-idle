@@ -16,6 +16,22 @@
 (function registerPiratLower() {
   if (typeof GAMEDATA === "undefined") return;
 
+  if (!GAMEDATA.items) GAMEDATA.items = {};
+  const piratItems = {
+    "grappling-hook":          { n: "grappling hook",          s: null, t: "loot", w: 6.20, cid: 5800,  sell: 0, npcSell: 0 },
+    "cheese-cutter":           { n: "cheese cutter",           s: null, t: "loot", w: 0.45, cid: 17817, sell: 0, npcSell: 0 },
+    "soft-cheese":             { n: "soft cheese",             s: null, t: "loot", w: 5.00, cid: 17820, sell: 0, npcSell: 0 },
+    "rat-cheese":              { n: "rat cheese",              s: null, t: "loot", w: 3.00, cid: 17821, sell: 0, npcSell: 0 },
+    "small-treasure-chest":    { n: "small treasure chest",    s: null, t: "loot", w: 8.00, cid: 35571, sell: 0, npcSell: 0 },
+    "pirate-coin":             { n: "pirate coin",             s: null, t: "loot", w: 0.40, cid: 35572, sell: 0, npcSell: 0 },
+    "pirat-s-tail":            { n: "pirat's tail",            s: null, t: "loot", w: 1.90, cid: 35573, sell: 0, npcSell: 0 },
+    "shark-fins":              { n: "shark fins",              s: null, t: "loot", w: 6.20, cid: 35574, sell: 0, npcSell: 0 },
+    "mouldy-powder":           { n: "mouldy powder",           s: null, t: "loot", w: 1.70, cid: 35596, sell: 0, npcSell: 0 },
+  };
+  for (const slug in piratItems) {
+    if (!GAMEDATA.items[slug]) GAMEDATA.items[slug] = piratItems[slug];
+  }
+
   if (!GAMEDATA.hunts) GAMEDATA.hunts = {};
   GAMEDATA.hunts["pirat-lower"] = {
     name: "Pirat Lower",
