@@ -1711,7 +1711,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "BOSSES 1–250",
     minLevel: 150,
-    ids: ["leiden"],
+    ids: ["leiden", "tentugly"],
   },
   {
     title: "DEEPLING WORLD",
@@ -3151,6 +3151,13 @@ function drainEvents() {
           if (!onlineAuth && !isWorldBoss) {
             const st = bossState(G.p, c.boss.id);
             st.kills = (st.kills || 0) + 1;
+          }
+          if (c.boss.accountMount && !c._accountMountGranted) {
+            c._accountMountGranted = true;
+            grantMissionReward(G.p, { accountMount: c.boss.accountMount });
+            const mount = (typeof APP_MOUNT !== "undefined" && APP_MOUNT[c.boss.accountMount]) || {};
+            addLog("level", `Montaria <b>${mount.nome || c.boss.accountMount}</b> desbloqueada para a conta!`);
+            toast(`Montaria desbloqueada: <b>${mount.nome || c.boss.accountMount}</b>`, "level");
           }
           // World Boss: toast único vem de world-boss-ui (wbExitCombat).
           if (!isWorldBoss && !c._bossDefeatAnnounced) {
