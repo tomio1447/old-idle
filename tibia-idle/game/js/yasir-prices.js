@@ -69,16 +69,46 @@
     "infernal-robe": { n: "infernal robe", cid: 34146, w: 1.8, sell: 1200 },
   };
 
-  Object.keys(YASIR_SOULWAR_LOOT).forEach((slug) => {
-    registerLootItem(slug, YASIR_SOULWAR_LOOT[slug]);
-  });
+  const NPC_LOOT_PRICES = {
+    "assassin-dagger": { sell: 20000 },
+    "haunted-blade": { sell: 8000 },
+    "nightmare-blade": { sell: 35000 },
+    "stealth-ring": { sell: 200 },
+    "boots-of-haste": { sell: 30000 },
+    "diamond-sceptre": { sell: 3000 },
+    "titan-axe": { sell: 4000 },
+    "shadow-sceptre": { sell: 10000 },
+    "glorious-axe": { sell: 3000 },
+    "terra-mantle": { sell: 11000 },
+    "terra-legs": { sell: 11000 },
+    "terra-boots": { sell: 2500 },
+    "magma-boots": { sell: 2500 },
+    "lightning-boots": { sell: 2500 },
+    "ice-rapier": { sell: 1000 },
+    "knight-axe": { sell: 2000 },
+    "crystal-sword": { sell: 600 },
+    "knight-armor": { sell: 5000 },
+    "fire-sword": { sell: 4000 },
+    "wand-of-inferno": { sell: 3000 },
+    "wand-of-starstorm": { sell: 3600 },
+    "wand-of-voodoo": { sell: 4400 },
+    "garlic-necklace": { sell: 50 },
+    "bat-wing": { sell: 50 },
+  };
+
+  const applyPrices = () => {
+    Object.keys(YASIR_SOULWAR_LOOT).forEach((slug) => {
+      registerLootItem(slug, YASIR_SOULWAR_LOOT[slug]);
+    });
+    Object.keys(NPC_LOOT_PRICES).forEach((slug) => {
+      registerLootItem(slug, NPC_LOOT_PRICES[slug]);
+    });
+  };
+  applyPrices();
 
   if (global) {
     global.YASIR_SOULWAR_LOOT = YASIR_SOULWAR_LOOT;
-    global.applyYasirNpcPrices = function reapply() {
-      Object.keys(YASIR_SOULWAR_LOOT).forEach((slug) => {
-        registerLootItem(slug, YASIR_SOULWAR_LOOT[slug]);
-      });
-    };
+    global.NPC_LOOT_PRICES = NPC_LOOT_PRICES;
+    global.applyYasirNpcPrices = applyPrices;
   }
 })(typeof window !== "undefined" ? window : (typeof global !== "undefined" ? global : null));
