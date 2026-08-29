@@ -981,7 +981,7 @@ function bindCatalogAccordion(root, mode) {
 const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS 1–50", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "meriana-island"] },
   { title: "HUNTS 50–100", ids: ["stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "mutateds-yalahar", "lizardstown"] },
-  { title: "HUNTS 100–250", ids: ["exotic-cave", "pirat-lower", "lizard-chosen-tower", "ghastly-dragons", "draken-walls", "drakens-castle", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
+  { title: "HUNTS 100–250", ids: ["the-void", "exotic-cave", "pirat-lower", "lizard-chosen-tower", "ghastly-dragons", "draken-walls", "drakens-castle", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond", "deathlings-sunken-temple", "falcon-bastion"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },
   { title: "LIBRARY SESSION 400+", ids: ["library-fire", "library-energy", "library-ice", "library-earth"] },
@@ -1090,6 +1090,7 @@ function openHuntInfoModal(id) {
   const p = G.p;
   const hu = GAMEDATA.hunts[id];
   if (!hu || !p) return;
+  if (hu.floors && hu.floors.length) { openHuntFloorSelection(id); return; }
   const risk = huntRisk(p, hu);
   const modo = G.combat ? G.combat.instanceMode : (p.instanceMode || "non-pvp");
   const packLabel = (hu.packMin && hu.packMax) ? `${hu.packMin}–${hu.packMax}` : (hu.pack || 3);
@@ -1168,6 +1169,62 @@ function openHuntInfoModal(id) {
   }
   $("#modal").classList.add("show");
   if (hu.monsters && hu.monsters.length > 2) $("#modal").classList.add("wide");
+}
+
+/* Modal de seleção de andar para hunts com múltiplos floors */
+function openHuntFloorSelection(id) {
+  const p = G.p;
+  const hu = GAMEDATA.hunts[id];
+  if (!hu || !p || !hu.floors || !hu.floors.length) return;
+  const floors = hu.floors.map((fid) => {
+    const f = GAMEDATA.hunts[fid];
+    if (!f) return null;
+    const risk = huntRisk(p, f);
+    const stars = typeof huntStars === "function" ? huntStars(f) : 1;
+    const starsHtml = typeof huntStarsHtml === "function" ? huntStarsHtml(stars) : `★${stars}`;
+    const pack = (f.packMin && f.packMax) ? `${f.packMin}–${f.packMax}` : (f.pack || 3);
+    const mobs = (f.monsters || []).slice(0, 4).map((m) => {
+      const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 1;
+      return `<span class="hunt-modal-mob">${mobImg(m, 24, st ? "" : "filter:brightness(0);")}</span>`;
+    }).join("");
+    return { fid, f, risk, starsHtml, pack, mobs };
+  }).filter(Boolean);
+
+  const close = () => $("#modal").classList.remove("show", "wide");
+  const cards = floors.map(({ fid, f, risk, starsHtml, pack, mobs }) => `
+    <div class="hunt-best-card hunt-floor-card" data-hunt-floor="${fid}">
+      <div class="hunt-best-name">${f.name} ${starsHtml}</div>
+      <div class="huntinfo-summary row wrap" style="gap:10px;margin:6px 0">
+        <span class="tiny dim">Pack <b>${pack}</b></span>
+        <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(f.avgExp * 3600 / 60)}</b></span>
+        <span class="tiny dim">Respawn <b>${f.respawn || 0.8}s</b></span>
+      </div>
+      <div class="tiny dim" style="margin-bottom:6px">${(hu.floorData || []).find(d => d.id === fid)?.desc || ""}</div>
+      <div class="hunt-modal-mobs" style="margin-bottom:8px">${mobs}</div>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="risk ${risk.cls}">${risk.txt}</span>
+        <button class="primary sm" data-start-floor="${fid}">⚔ Caçar aqui</button>
+      </div>
+    </div>
+  `).join("");
+
+  $("#modal-body").innerHTML = `
+    <div class="panel-title">
+      <button class="sm" id="hunt-floor-back">← Voltar</button>
+      <span style="margin-left:6px">${hu.name}</span>
+      <span style="flex:1"></span>
+      <button class="sm" id="hunt-floor-close">✕</button>
+    </div>
+    <div class="panel-body"><div class="hunt-monsters">${cards}</div></div>
+  `;
+
+  $("#hunt-floor-close").addEventListener("click", close);
+  $("#hunt-floor-back").addEventListener("click", () => { openHuntsModal(); });
+  $$("#modal-body [data-start-floor]").forEach((btn) => {
+    btn.addEventListener("click", () => { close(); startHunt(btn.dataset.startFloor); });
+  });
+  $("#modal").classList.add("show");
+  if (floors.length > 1) $("#modal").classList.add("wide");
 }
 
 /* Avalia o risco de uma hunt para o personagem */
@@ -3431,7 +3488,7 @@ function renderHelper(p) {
   const comboEl = $("#helper-combo");
   if (healEl) {
     // A aba Cura contém somente autocura. Spells de aliado (exura sio,
-    // Restore Friend, Mass Healing) vivem exclusivamente em Curar aliado.
+    // exura gran sio, Mass Healing) vivem exclusivamente em Curar aliado.
     const friendHealIds = new Set(typeof healFriendSpells === "function"
       ? healFriendSpells(p)
       : ((typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)

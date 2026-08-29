@@ -59,6 +59,29 @@ const RATMIRAL_ROOM = {
     cat: "boss-room",
   };
 
+  if (!GAMEDATA.items) GAMEDATA.items = {};
+  const ratmiralItems = {
+    "bamboo-stick": { n: "bamboo stick", s: null, t: "loot", cid: 11445, sell: 30, npcSell: 30 },
+    "soap": { n: "soap", s: null, t: "loot", cid: 35595, sell: 0, npcSell: 0 },
+    "scrubbing-brush": { n: "scrubbing brush", s: null, t: "loot", cid: 35695, sell: 0, npcSell: 0 },
+    "cheesy-membership-card": { n: "cheesy membership card", s: null, t: "loot", cid: 35614, sell: 120000, npcSell: 120000 },
+    "ratmiral-s-hat": { n: "Ratmiral's hat", s: "head", t: "armor", cid: 35613, sell: 150000, npcSell: 150000 },
+  };
+  for (const slug in ratmiralItems) {
+    if (!GAMEDATA.items[slug]) GAMEDATA.items[slug] = ratmiralItems[slug];
+    else {
+      GAMEDATA.items[slug].sell = ratmiralItems[slug].sell;
+      GAMEDATA.items[slug].npcSell = ratmiralItems[slug].npcSell;
+      if (GAMEDATA.items[slug].cid == null) GAMEDATA.items[slug].cid = ratmiralItems[slug].cid;
+    }
+  }
+
+  const base = (typeof MONSTERDATA !== "undefined" && MONSTERDATA[RATMIRAL_ID]) ||
+    (GAMEDATA.monsters && GAMEDATA.monsters[RATMIRAL_ID]);
+  if (base && base.loot && !base.loot.some((x) => x && x.item === "bamboo-stick")) {
+    base.loot.push({ chance: 50, max: 1, item: "bamboo-stick" });
+  }
+
   if (typeof BOSS_DEFS === "undefined") return;
   BOSS_DEFS[RATMIRAL_ID] = {
     id: RATMIRAL_ID,

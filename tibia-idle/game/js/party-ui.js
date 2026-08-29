@@ -760,7 +760,7 @@ function healFriendSpells(p) {
   const list = (typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
     ? CanaryVocation.friendHealSpellIds(p.voc)
     : ((p.voc === "druid" || p.voc === "elder druid")
-      ? ["exura-sio", "exura-gran-sio", "exura-gran-tio-sio", "exura-gran-mas-res"]
+      ? ["exura-sio", "exura-gran-sio", "exura-gran-mas-res"]
       : ((p.voc === "monk" || p.voc === "exalted monk") ? ["exura-tio-sio"] : []));
   for (const id of list) {
     if (SPELLS[id] && p.level >= (SPELLS[id].lvl || 1)) ids.push(id);

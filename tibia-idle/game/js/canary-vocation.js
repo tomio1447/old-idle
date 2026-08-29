@@ -26,7 +26,7 @@
     "exalted monk": { hpTicks: 4000, hpAmount: 1, mpTicks: 6000, mpAmount: 2 },
   };
   const FRIEND_HEALS = {
-    druid: ["exura-gran-mas-res", "exura-gran-tio-sio", "exura-gran-sio", "exura-sio"],
+    druid: ["exura-gran-mas-res", "exura-gran-sio", "exura-sio"],
     monk: ["exura-tio-sio"],
   };
   const DEFAULT_SELF_HEAL = {
@@ -39,7 +39,6 @@
     "exura-mas-nia": { druid: "exura-gran-mas-res", monk: "exura-tio-sio" },
     "exura-sio": { monk: "exura-tio-sio", druid: "exura-sio" },
     "exura-gran-sio": { monk: "exura-tio-sio", druid: "exura-gran-sio" },
-    "exura-gran-tio-sio": { monk: "exura-tio-sio", druid: "exura-gran-tio-sio" },
     "exura-gran-mas-res": { monk: "exura-tio-sio", druid: "exura-gran-mas-res" },
   };
   const SELF_HEAL_REPLACE = {
@@ -53,7 +52,6 @@
     },
     "exura-sio": { druid: "exura-vita", monk: "exura-gran" },
     "exura-gran-sio": { druid: "exura-vita", monk: "exura-gran" },
-    "exura-gran-tio-sio": { druid: "exura-vita", monk: "exura-gran" },
     "exura-gran-mas-res": { druid: "exura-vita", monk: "exura-gran" },
   };
 

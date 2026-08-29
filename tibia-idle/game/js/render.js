@@ -2147,6 +2147,12 @@ function drawSinisterDust(ctx,ent,cx,cy,tile,now){
   ctx.restore();
 }
 
+function bossSpawnCountdownSeconds(combat, now) {
+  const spawn = combat && combat.arenaBossSpawn;
+  if (!spawn || spawn.spawned || !spawn.pending) return null;
+  return Math.max(0, Math.ceil(((Number(spawn.at) || 0) - (Number(now) || Date.now())) / 1000));
+}
+
 Renderer.prototype.draw = function (combat, player, dt) {
   const ctx = this.ctx;
   const canvasW = this.c.width, canvasH = this.c.height;
@@ -2522,6 +2528,30 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.fillText("Escolha uma caçada para começar", W / 2, H / 2);
   }
   ctx.restore(); // câmera/clip central da instância
+
+  const bossSpawnLeft = bossSpawnCountdownSeconds(combat, Date.now());
+  if (bossSpawnLeft !== null) {
+    const hudS = canvasHudScale(this.c);
+    const label = `Boss nasce em ${bossSpawnLeft}s`;
+    ctx.save();
+    ctx.font = hudFont(16, hudS, true);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const width = ctx.measureText(label).width + 24 * hudS;
+    const x = canvasW / 2 - width / 2;
+    const y = 12 * hudS;
+    ctx.fillStyle = "rgba(8,8,8,.82)";
+    ctx.fillRect(x, y, width, 30 * hudS);
+    ctx.strokeStyle = "#6f5b32";
+    ctx.lineWidth = Math.max(1, hudS);
+    ctx.strokeRect(x, y, width, 30 * hudS);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 3 * hudS;
+    ctx.strokeText(label, canvasW / 2, y + 5 * hudS);
+    ctx.fillStyle = "#ffd36a";
+    ctx.fillText(label, canvasW / 2, y + 5 * hudS);
+    ctx.restore();
+  }
 };
 
 /* Retorna o id do NPC sob as coordenadas do canvas */

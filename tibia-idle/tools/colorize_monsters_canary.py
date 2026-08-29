@@ -166,6 +166,9 @@ CANARY_COLORS = {
     "guzzlemaw": None,
     "frazzlemaw": None,
     "silencer": None,
+    # Dream Courts: Izcandar compartilha looktype 1137, cores oficiais distintas.
+    "izcandar-champion-of-summer": (43, 78, 43, 43),
+    "izcandar-champion-of-winter": (48, 38, 48, 48),
 }
 
 # monstros com looktype "sem mascara" que ainda assim devem ser regerados com
@@ -191,7 +194,8 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "grand-chaplain-gaunder", "grand-canon-dominus",
                "grand-master-oberon",
                "guzzlemaw", "frazzlemaw", "silencer",
-               "vicious-squire", "vile-grandmaster", "renegade-knight"}
+               "vicious-squire", "vile-grandmaster", "renegade-knight",
+               "izcandar-champion-of-summer", "izcandar-champion-of-winter"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
@@ -204,9 +208,37 @@ CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "grand-master-oberon": 1,
                   "vicious-squire": 1,
                   "vile-grandmaster": 1,
-                  "renegade-knight": 2}
+                  "renegade-knight": 2,
+                  "izcandar-champion-of-summer": 3,
+                  "izcandar-champion-of-winter": 3}
 
 DIRS = (("n", 0), ("e", 1), ("s", 2), ("w", 3))
+
+
+def load_canary_looks(root):
+    looks = {}
+    if not root or not os.path.isdir(root):
+        return looks
+    keys = ("lookHead", "lookBody", "lookLegs", "lookFeet")
+    for directory, _subdirs, files in os.walk(root):
+        for name in files:
+            if not name.endswith(".lua"):
+                continue
+            text = open(os.path.join(directory, name), encoding="utf-8", errors="ignore").read()
+            block_match = re.search(r"monster\.outfit\s*=\s*\{(.*?)\}", text, re.S)
+            if not block_match:
+                continue
+            block = block_match.group(1)
+            matches = [re.search(r"\b%s\s*=\s*(\d+)" % key, block) for key in keys]
+            if not all(matches):
+                continue
+            addon = re.search(r"\blookAddons\s*=\s*(\d+)", block)
+            slug = os.path.splitext(name)[0].replace("_", "-").lower()
+            looks[slug] = {
+                "colors": tuple(int(match.group(1)) for match in matches),
+                "addon": int(addon.group(1)) if addon else 0,
+            }
+    return looks
 
 
 def ler_looktypes():
@@ -323,6 +355,8 @@ def main():
     dat = Dat860(os.path.join(SRC, "Tibia.dat"))
     spr = Spr860(os.path.join(SRC, "Tibia.spr"))
     looktypes = ler_looktypes()
+    default_canary = os.path.normpath(os.path.join(GAME, "..", "..", "refs", "canary-main", "data-otservbr-global", "monster"))
+    canary_looks = load_canary_looks(os.environ.get("CANARY_MONSTERS", default_canary))
 
     dest = os.path.join(GAME, "assets", "mob")
     meta_path = os.path.join(GAME, "data", "mobsheets.json")
@@ -332,18 +366,20 @@ def main():
 
     # Slugs opcionais depois de SRC/GAME permitem regenerar só uma hunt.
     only = set(sys.argv[3:])
-    targets = FORCE_REGEN & only if only else FORCE_REGEN
+    targets = only if only else FORCE_REGEN
     feitos = 0
     for slug in sorted(targets):
         lt = looktypes.get(slug)
         if not lt:
             print("  sem looktype:", slug)
             continue
-        colors = CANARY_COLORS.get(slug)
+        official = canary_looks.get(slug)
+        colors = official["colors"] if official else CANARY_COLORS.get(slug)
+        addons = official["addon"] if official else CANARY_ADDONS.get(slug, 0)
         rgb_colors = None
         if colors is not None:
             rgb_colors = tuple(hex_to_rgb(PALETTE[c % len(PALETTE)]) for c in colors)
-        res = gerar_sheet(dat, spr, lt, rgb_colors, CANARY_ADDONS.get(slug, 0))
+        res = gerar_sheet(dat, spr, lt, rgb_colors, addons)
         if res is None:
             print("  falhou:", slug, "looktype", lt)
             continue
@@ -352,7 +388,7 @@ def main():
         meta[slug] = {"cw": cw, "ch": ch, "cols": cols, "rows": 4}
         feitos += 1
         print("  ok:", slug, "looktype", lt, "cores", colors,
-              "addon", CANARY_ADDONS.get(slug, 0), "cols", cols,
+              "addon", addons, "cols", cols,
               "cw", cw, "ch", ch)
 
     # Não reduza sheets existentes a três colunas. Alguns outfits do cliente

@@ -473,6 +473,10 @@ function scarlettBossEnforceThreshold(c, now) {
 }
 
 function bossCanTakePlayerDamage(c, target) {
+  if (typeof brainheadBossCanTakePlayerDamage === "function" &&
+      !brainheadBossCanTakePlayerDamage(c, target)) {
+    return false;
+  }
   if (typeof oberonBossCanTakePlayerDamage === "function" &&
       !oberonBossCanTakePlayerDamage(c, target)) {
     return false;

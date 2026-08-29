@@ -460,6 +460,8 @@
       16249: true, // marcador invisível Canary já usado na Cobra
       20661: true, // marcador sem pixels presente no novo DT Seal
       8416: true,  // steam (vapor decorativo): sem sprite no client 15.x
+      10526: true, // decoração Canary Brain Grounds (sem sprite 8.60)
+      10532: true, // decoração Canary Brain Grounds (sem sprite 8.60)
     };
     var CH = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" +
              "0123456789<>[](){}.,;:!@$%&*^_+-=?~|";

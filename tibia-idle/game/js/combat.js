@@ -104,6 +104,10 @@ function arenaBossBindMechanics(c, now) {
     crueltyBossInit(c, player);
   if (id === "ratmiral-blackwhiskers" && typeof ratmiralBossInit === "function" && !c.ratmiral)
     ratmiralBossInit(c, player);
+  if (typeof heartBossInit === "function" && !c.heartDestruction)
+    heartBossInit(c, player);
+  if (id === "brain-head" && typeof brainheadBossInit === "function" && !c.brainHead)
+    brainheadBossInit(c, player);
   return true;
 }
 function arenaBossSpawnTick(c, now) {
@@ -385,6 +389,8 @@ function newBossCombat(player, boss) {
     def: def,
     boss: true,
     greedImmune: boss.id === "goshnar-s-greed",
+    qteImmune: boss.id === "brain-head",
+    fixedSpawn: !!boss.fixedSpawn,
     hp: def.hp,
     maxHp: def.hp,
     atkCd: 700,
@@ -910,6 +916,13 @@ function helperPriorityTarget(c, caster) {
   const vivos = c.mobs.filter((m) => m && m.hp > 0);
   if (!vivos.length) return null;
   const bossFight = !!(c.boss || c.worldBoss || vivos.some((m) => m.boss));
+  if (c.brainHead && c.brainHead.immune) {
+    const cerebellaAlive = typeof brainheadCerebellumAlive === "function"
+      ? brainheadCerebellumAlive(c) : true;
+    const cerebella = vivos.filter((m) => m.cerebellum && m.hp > 0);
+    if (cerebellaAlive && cerebella.length)
+      return cerebella.sort((a, b) => helperMobDist(from, a) - helperMobDist(from, b))[0];
+  }
   if (bossFight) {
     // Hatred exige controlar os summons; Hateful Soul tem prioridade por
     // zerar todos os contadores, depois vêm os Harvesters.
@@ -988,7 +1001,9 @@ function updateCombatMovement(c, p, dt) {
       x: pl.x + 0.012 * Math.min(i, 3),
       y: clamp(pl.y + (i - (c.mobs.length - 1) / 2) * 0.055, 0.26, 0.76),
     };
-    movePoint(m, laneTarget, m.speed || 0.00005, dt, range * 0.90);
+    const mobSpeed = m.speed == null ? 0.00005 : Number(m.speed);
+    if (mobSpeed > 0 && !m.fixedSpawn) movePoint(m, laneTarget, mobSpeed, dt, range * 0.90);
+    else m.moving = false;
     if (!m.moving) m.dir = faceDir(m, pl);
   });
   resolveSQMOccupancy(c);
@@ -4179,16 +4194,26 @@ function mobCastSkill(c, p, mob, now) {
     // Summon genérico do Canary (ex.: Leiden invoca 1-2 Barkless Fanatic).
     // O skill carrega summonSlug/summonCount quando o import encontra o
     // <summon name="..."/> no XML do monstro. Espelho do servidor.
-    if (/summon/i.test(nomeFx) && sk.summonSlug &&
+    // Suporte a multiplos slugs e limite maximo de summons vivos (ex.: Drume).
+    if (/summon/i.test(nomeFx) && (sk.summonSlug || sk.summonSlugs) &&
         typeof spawnMobAt === "function" && c && c.huntMap) {
-      const count = Math.max(1, Number(sk.summonCount) || 1);
+      const slugs = sk.summonSlugs && sk.summonSlugs.length ? sk.summonSlugs : [sk.summonSlug];
+      const cap = Number(sk.summonMax) || 0;
+      let current = 0;
+      if (cap > 0 && c.mobs) {
+        current = c.mobs.filter((m2) => m2 && m2.hp > 0 && m2.bossHelper &&
+          slugs.indexOf(m2.slug) !== -1).length;
+      }
+      let count = Math.max(1, Number(sk.summonCount) || 1);
+      if (cap > 0) count = Math.min(count, cap - current);
+      const bx = Number.isFinite(Number(mob.cx)) ? Number(mob.cx) : Math.floor((c.gridW || 30) / 2);
+      const by = Number.isFinite(Number(mob.cy)) ? Number(mob.cy) : Math.floor((c.gridH || 30) / 2);
       for (let n = 0; n < count; n++) {
-        const bx = Number.isFinite(Number(mob.cx)) ? Number(mob.cx) : Math.floor((c.gridW || 30) / 2);
-        const by = Number.isFinite(Number(mob.cy)) ? Number(mob.cy) : Math.floor((c.gridH || 30) / 2);
-        spawnMobAt(c, String(sk.summonSlug), bx + ((n % 3) - 1), by + Math.floor(n / 3), { bossHelper: true, now: now });
+        const slug = slugs.length > 1 ? slugs[Math.floor(Math.random() * slugs.length)] : slugs[0];
+        spawnMobAt(c, String(slug), bx + ((n % 3) - 1), by + Math.floor(n / 3), { bossHelper: true, now: now });
       }
       mob.skillCds[key] = now + (sk.int || 2000);
-      usou = true;
+      if (count > 0) usou = true;
       continue;
     }
     // sem correspondente no idle solo: ver o cabecalho do bloco
@@ -4949,6 +4974,7 @@ function combatTick(c, p, dt, now) {
   if (typeof maliceBossTick === "function" && maliceBossTick(c, now) === false) return;
   if (typeof crueltyBossTick === "function" && crueltyBossTick(c, now) === false) return;
   if (typeof ratmiralBossTick === "function" && ratmiralBossTick(c, now) === false) return;
+  if (typeof heartBossTick === "function" && heartBossTick(c, now) === false) return;
   if (typeof megaBossTick === "function" && megaBossTick(c, now) === false) return;
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);

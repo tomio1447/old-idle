@@ -121,11 +121,24 @@ if (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts["amazon-
   GAMEDATA.hunts["amazon-camp"].mapa = "amazon-camp";
 
 /* Consulta de colisao do mapa (usada pelo grid.js) */
+function huntMapFovBounds(map) {
+  if (!map || !map.rows || !map.rows.length) return null;
+  const height = map.rows.length;
+  let width = 0;
+  for (const row of map.rows) width = Math.max(width, row ? row.length : 0);
+  const fovWidth = Math.min(width, Math.max(1, Math.floor(Number(map.fovWidth) || 21)));
+  const fovHeight = Math.min(height, Math.max(1, Math.floor(Number(map.fovHeight) || 13)));
+  const x = Math.floor((width - fovWidth) / 2);
+  const y = Math.floor((height - fovHeight) / 2);
+  return { x, y, maxX: x + fovWidth - 1, maxY: y + fovHeight - 1 };
+}
 function huntMapBlocked(map, cx, cy) {
   if (!map || !map.rows) return false;
   if (cy < 0 || cy >= map.rows.length) return true;
   const row = map.rows[cy];
   if (!row || cx < 0 || cx >= row.length) return true;
+  const fov = huntMapFovBounds(map);
+  if (fov && (cx < fov.x || cy < fov.y || cx > fov.maxX || cy > fov.maxY)) return true;
   if (map.footprintBlocked && map.footprintBlocked[cx + ":" + cy]) return true;
   const L = map.leg && map.leg[row[cx]];
   return !!(L && L.bloc);

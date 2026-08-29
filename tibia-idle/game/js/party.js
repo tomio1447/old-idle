@@ -842,7 +842,7 @@ function healFriendConfig(p) {
   const voc = String(p.voc || '').toLowerCase();
   const ids = (typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
     ? CanaryVocation.friendHealSpellIds(voc)
-    : (/druid/.test(voc) ? ['exura-sio','exura-gran-sio','exura-gran-mas-res','exura-gran-tio-sio'] :
+    : (/druid/.test(voc) ? ['exura-sio','exura-gran-sio','exura-gran-mas-res'] :
       /monk/.test(voc) ? ['exura-tio-sio'] : []);
   old.priority = old.priority === 'self' ? 'self' : 'friend';
   // UI legado ainda edita estes dois mapas; eles são a fonte de verdade para não perder cliques.

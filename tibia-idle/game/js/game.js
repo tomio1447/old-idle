@@ -87,6 +87,10 @@ function persistActiveInstance() {
   const c=G.combat;
   if(!c||c.instanceFinished||c.bossDefeated){clearInstanceSession(c&&c.bossDefeated?"boss-defeated":"finished");return null;}
   const savedAt=Date.now(),participants=combatSessionParticipants(c);
+  if(c.huntMap&&typeof mapBlockKeys==="function"){
+    c.blockedCells={};
+    for(const key of mapBlockKeys(c))c.blockedCells[key]=true;
+  }
   for(const ent of participants)if(ent.p)ent.p.stamina=FULL_STAMINA_SECONDS;
   const descriptor={
     v:1,savedAt,startedAt:c.instanceStartedAt||(c.instanceStartedAt=savedAt),
@@ -1741,19 +1745,29 @@ const BOSS_MODAL_SECTIONS = [
     ids: ["leiden", "tentugly-s-head"],
   },
   {
+    title: "HEART OF DESTRUCTION 150+",
+    minLevel: 150,
+    ids: ["aftershock", "anomaly", "eradicator", "outburst", "realityquake", "rupture", "world-devourer"],
+  },
+  {
     title: "DEEPLING WORLD",
     minLevel: 150,
     ids: ["jaul", "obujos", "tanjis", "brokul"],
   },
   {
+    title: "DREAM COURTS 200+",
+    minLevel: 200,
+    ids: ["plagueroot", "alptramun", "izcandar-champion-of-summer", "izcandar-champion-of-winter", "malofur-mangrinder", "maxxenius"],
+  },
+  {
     title: "BOSSES 250+",
     minLevel: 250,
-    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow", "grand-master-oberon", "ratmiral-blackwhiskers"],
+    ids: ["timira-the-many-headed", "scarlett-etzel", "faceless-bane", "doctor-marrow", "grand-master-oberon", "ratmiral-blackwhiskers", "the-brainstealer", "drume"],
   },
   {
     title: "FEAST OF SOULS",
     minLevel: 250,
-    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "the-pale-worm"],
+    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "the-pale-worm", "brain-head"],
   },
   {
     title: "SOULWAR 400+",
