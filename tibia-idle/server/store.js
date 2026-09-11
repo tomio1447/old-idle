@@ -330,7 +330,7 @@ async function adminSummary(db, token, opts) {
   opts = opts || {};
   const acc = await db.findAccountByToken(token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
-  if (acc.role !== "admin" && !opts.testServer)
+  if (acc.role !== "admin")
     return { code: 403, body: { ok: false, msg: "Só o administrador vê o faturamento." } };
   const ledger = typeof db.coinLedgerList === "function" ? await db.coinLedgerList({ limit: 200 }) : [];
   const orders = typeof db.storeOrderList === "function" ? await db.storeOrderList(200) : [];

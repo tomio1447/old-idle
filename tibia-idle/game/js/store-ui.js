@@ -27,9 +27,8 @@ function storeWhen(iso) {
 function storeIsAdmin() {
   try {
     const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
-    if (acc && acc.role === "admin") return true;
-  } catch (e) {}
-  return storeTestServer();
+    return !!(acc && acc.role === "admin");
+  } catch (e) { return false; }
 }
 function storeTestServer() {
   const cfg = (typeof window !== "undefined" && window.GLOBAL_IDLE_SERVER_CONFIG) || {};

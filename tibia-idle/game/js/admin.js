@@ -92,6 +92,14 @@ async function adminPersist() {
 function openAdmin(aba) {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
+  // Só a conta admin (role=admin — em TEST_SERVER, a conta "1"). Offline não
+  // há conta, então o painel continua livre para debug local.
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+  if (online && !(acc && acc.role === "admin")) {
+    if (typeof toast === "function") toast("Painel restrito ao administrador.", "bad");
+    return;
+  }
   if (aba) ADMIN.aba = aba;
 
   $("#modal-body").innerHTML = `

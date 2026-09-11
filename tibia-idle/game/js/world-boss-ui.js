@@ -236,7 +236,7 @@ const WB_MAX_PER_ACCOUNT = 1;
 function wbEnsurePanelShell() {
   wbEnsureDom();
   if (!WB.panel) return;
-  if (WB.panel.querySelector(".wb-lobby-card")) return;
+  if (WB.panel.querySelector(".wb-lobby-card") && WB.panel.querySelector("#wb-boss-img")) return;
   WB.panel.innerHTML = `
     <div class="wb-lobby-card">
       <div class="wb-lobby-header" id="wb-lobby-head">
@@ -246,9 +246,16 @@ function wbEnsurePanelShell() {
         <button type="button" class="sm" id="wb-close-btn" title="Cancelar">✕</button>
       </div>
       <div class="wb-lobby-body" id="wb-lobby-body">
+        <div class="wb-lobby-boss">
+          <div class="wb-lobby-boss-img" id="wb-boss-img"></div>
+          <div class="wb-lobby-boss-name" id="wb-boss-fullname"></div>
+        </div>
         <div class="wb-lobby-sub" id="wb-lobby-sub"></div>
         <div class="wb-lobby-slots" id="wb-participants"></div>
         <div class="wb-lobby-actions">
+          <button type="button" class="sm primary" id="wb-fight-btn" style="display:none">FIGHT</button>
+          <button type="button" class="sm" id="wb-toggle-invite-btn" style="display:none">INVITE ON</button>
+          <button type="button" class="sm" id="wb-invite-name-btn" style="display:none">INVITE</button>
           <button type="button" class="sm primary" id="wb-join-btn" style="display:none">${wbT("wb.join", "JOIN")}</button>
           <button type="button" class="sm" id="wb-leave-btn" style="display:none">${wbT("wb.leave", "LEAVE")}</button>
         </div>
@@ -263,9 +270,13 @@ function wbEnsurePanelShell() {
   const closeBtn = document.getElementById("wb-close-btn");
   if (closeBtn) closeBtn.onclick = () => wbDismissPanel();
   const minBtn = document.getElementById("wb-lobby-min");
-  if (minBtn) minBtn.onclick = () => { WB.panelCollapsed = !WB.panelCollapsed; wbRenderPanel(); };
-  const head = document.getElementById("wb-lobby-head");
-  if (head) head.onclick = (e) => { if (e.target === head || e.target.id === "wb-head-text") { WB.panelCollapsed = !WB.panelCollapsed; wbRenderPanel(); } };
+  if (minBtn) minBtn.onclick = (e) => { e.stopPropagation(); WB.panelCollapsed = !WB.panelCollapsed; wbRenderPanel(); };
+  const fightBtn = document.getElementById("wb-fight-btn");
+  if (fightBtn) fightBtn.onclick = (e) => { e.stopPropagation(); wbFight(); };
+  const toggleInviteBtn = document.getElementById("wb-toggle-invite-btn");
+  if (toggleInviteBtn) toggleInviteBtn.onclick = (e) => { e.stopPropagation(); wbToggleInvite(); };
+  const inviteNameBtn = document.getElementById("wb-invite-name-btn");
+  if (inviteNameBtn) inviteNameBtn.onclick = (e) => { e.stopPropagation(); wbInviteByName(); };
 }
 
 function wbApplyLobbyAccessLock(locked) {
@@ -297,6 +308,7 @@ function wbRenderPanel() {
   const st = WB.state;
   const ev = st && st.event;
   const joined = !!(st && st.you && st.you.joined);
+  const isHost = !!(st && st.you && st.you.isHost);
   wbApplyLobbyAccessLock(joined && !!ev && (ev.phase === "lobby" || ev.phase === "countdown"));
   if (!ev || (ev.phase !== "lobby" && ev.phase !== "countdown")) {
     WB.panelDismissed = false;
@@ -311,18 +323,22 @@ function wbRenderPanel() {
     if (WB.panel) WB.panel.style.display = "none";
     return;
   }
-  const endsAt = ev.phase === "lobby" ? ev.lobbyEndsAt : ev.countdownEndsAt;
-  const leftSec = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
   const title = ev.phase === "lobby"
-    ? (ev.bossName || ev.warzoneName || "WORLD BOSS").toUpperCase() + " — LOBBY"
+    ? (ev.warzoneName || ev.bossName || "WORLD BOSS").toUpperCase()
     : wbT("wb.countdownTitle", "WORLD BOSS — COUNTDOWN").toUpperCase();
-  const typeLabel = ev.lobbyType === "closed" ? "Fechado" : "Aberto";
-  const sub = `${ev.charCount || 0}/${ev.maxChars || 5} · ${typeLabel} · ${leftSec}s`;
+  const sub = ev.phase === "lobby"
+    ? `${ev.charCount || 0}/${ev.maxChars || 5} · Aguardando líder`
+    : `${ev.charCount || 0}/${ev.maxChars || 5} · ${Math.max(0, Math.ceil((ev.countdownEndsAt - Date.now()) / 1000))}s`;
 
   WB.panel.style.display = "";
 
   const headText = document.getElementById("wb-head-text");
+  const bossImg = document.getElementById("wb-boss-img");
+  const bossFullname = document.getElementById("wb-boss-fullname");
   const subEl = document.getElementById("wb-lobby-sub");
+  const fightBtn = document.getElementById("wb-fight-btn");
+  const toggleInviteBtn = document.getElementById("wb-toggle-invite-btn");
+  const inviteNameBtn = document.getElementById("wb-invite-name-btn");
   const joinBtn = document.getElementById("wb-join-btn");
   const leaveBtn = document.getElementById("wb-leave-btn");
   const picker = document.getElementById("wb-join-picker");
@@ -330,12 +346,25 @@ function wbRenderPanel() {
   const minBtn = document.getElementById("wb-lobby-min");
 
   if (headText) headText.textContent = title;
+  if (bossImg) bossImg.innerHTML = wbBossSpriteHtml(ev, 56);
+  if (bossFullname) bossFullname.textContent = ev.bossName || ev.warzoneName || "World Boss";
   if (subEl) subEl.textContent = sub;
   if (body) body.style.display = WB.panelCollapsed ? "none" : "";
   if (minBtn) minBtn.textContent = WB.panelCollapsed ? "▸" : "▾";
 
+  const showFight = isHost && ev.phase === "lobby";
+  const showToggleInvite = isHost && ev.phase === "lobby";
+  const showInviteName = joined && ev.phase === "lobby" && (isHost || ev.inviteOpen);
   const showJoin = !joined && ev.phase === "lobby";
   const showLeave = joined && ev.phase === "lobby";
+
+  if (fightBtn) fightBtn.style.display = showFight ? "" : "none";
+  if (toggleInviteBtn) {
+    toggleInviteBtn.style.display = showToggleInvite ? "" : "none";
+    toggleInviteBtn.textContent = ev.inviteOpen ? "INVITE ON" : "INVITE OFF";
+    toggleInviteBtn.className = "sm " + (ev.inviteOpen ? "wb-invite-on" : "wb-invite-off");
+  }
+  if (inviteNameBtn) inviteNameBtn.style.display = showInviteName ? "" : "none";
   if (joinBtn) joinBtn.style.display = showJoin ? "" : "none";
   if (leaveBtn) leaveBtn.style.display = showLeave ? "" : "none";
   if (picker && (!showJoin || joined)) {
@@ -484,6 +513,66 @@ async function wbLeave() {
     WB.state = r.data;
     wbRenderPanel();
     wbRenderOverlay();
+  } finally { WB.busy = false; }
+}
+
+async function wbFight() {
+  if (WB.busy) return;
+  WB.busy = true;
+  try {
+    const r = await wbFetch("POST", "/api/world-boss/start", {});
+    if (!r.data.ok && r.status >= 400) {
+      if (typeof toast === "function") toast(r.data.msg || "FIGHT falhou", "bad");
+      return;
+    }
+    WB.state = r.data;
+    wbRenderPanel();
+    wbRenderOverlay();
+    if (typeof toast === "function") toast(wbT("wb.fight", "Líder iniciou a luta"), "ok");
+  } finally { WB.busy = false; }
+}
+
+async function wbToggleInvite() {
+  if (WB.busy) return;
+  WB.busy = true;
+  try {
+    const r = await wbFetch("POST", "/api/world-boss/toggle-invite", {});
+    if (!r.data.ok && r.status >= 400) {
+      if (typeof toast === "function") toast(r.data.msg || "Toggle falhou", "bad");
+      return;
+    }
+    WB.state = r.data;
+    wbRenderPanel();
+    wbRenderOverlay();
+  } finally { WB.busy = false; }
+}
+
+async function wbInviteByName() {
+  if (WB.busy) return;
+  const name = window.prompt(wbT("wb.invitePrompt", "Nome do personagem para convidar:"));
+  if (!name || !name.trim()) return;
+  WB.busy = true;
+  try {
+    const lookup = await wbFetch("POST", "/api/world-boss/invite", { characterName: name.trim(), preview: true });
+    if (!lookup.data.ok) {
+      if (typeof toast === "function") toast(lookup.data.msg || "Personagem não encontrado", "bad");
+      return;
+    }
+    const info = lookup.data.preview;
+    const confirmMsg = wbT("wb.inviteConfirm", "Convidar {name} (lvl {level} · {voc})?")
+      .replace("{name}", info.name)
+      .replace("{level}", info.level)
+      .replace("{voc}", wbVocLabel(info.voc));
+    if (!window.confirm(confirmMsg)) return;
+    const r = await wbFetch("POST", "/api/world-boss/invite", { characterName: name.trim() });
+    if (!r.data.ok && r.status >= 400) {
+      if (typeof toast === "function") toast(r.data.msg || "Convite falhou", "bad");
+      return;
+    }
+    WB.state = r.data;
+    wbRenderPanel();
+    wbRenderOverlay();
+    if (typeof toast === "function") toast(wbT("wb.inviteSent", "Convite enviado para {name}").replace("{name}", info.name), "ok");
   } finally { WB.busy = false; }
 }
 

@@ -44,6 +44,7 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
+  sanitizeHelperPresets,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
@@ -201,11 +202,11 @@ function bodyWithSessionToken(req,body){
   return body;
 }
 
-/* Alpha/test: qualquer conta autenticada pode usar grants Admin nos próprios
- * personagens (ownership é checada nas rotas). Em produção (TEST_SERVER=0)
- * só role admin. Bundles cross-account continuam admin-only. */
+/* Grants Admin só para contas com role=admin — mesmo em TEST_SERVER, onde só
+ * a conta "1" é promovida no seed. Ownership do personagem é checada nas rotas.
+ * Bundles cross-account continuam admin-only. */
 function accountCanSelfAdmin(acc){
-  return !!(acc&&(acc.role==="admin"||TEST_SERVER));
+  return !!(acc&&acc.role==="admin");
 }
 
 function hardenedHeaders(res){const headers={
@@ -556,28 +557,28 @@ async function ensureTestAccounts(db) {
   if (!TEST_SERVER) return;
   const vipYear=Date.now()+365*24*3600*1000;
   for (const credential of [
-    { login:"1", password:"1" },
-    { login:"2", password:"2" },
+    { login:"1", password:"1", role:"admin" },
+    { login:"2", password:"2", role:"user" },
   ]) {
     const hash = bcrypt.hashSync(credential.password, SALT_ROUNDS);
     const existing = await db.findAccountByLogin(credential.login);
     if (!existing) {
-      const created=await db.createAccount(credential.login, hash, "admin", 1000);
+      const created=await db.createAccount(credential.login, hash, credential.role, 1000);
       if(typeof db.setAccountVipUntil==="function")await db.setAccountVipUntil(created.id,vipYear);
     } else if (typeof db.run === "function") {
-      await db.run("UPDATE accounts SET password_hash = ?, role = 'admin' WHERE id = ?", [hash, existing.id]);
+      await db.run("UPDATE accounts SET password_hash = ?, role = ? WHERE id = ?", [hash, credential.role, existing.id]);
       if(typeof db.setAccountVipUntil==="function")await db.setAccountVipUntil(existing.id,vipYear);
       if(typeof db.migrateAccountGold==="function")await db.migrateAccountGold(existing.id);
     } else {
       existing.password_hash = hash;
-      existing.role = "admin";
+      existing.role = credential.role;
       existing.coins = Math.max(1000, existing.coins || 0);
       existing.vip_until = Math.max(Number(existing.vip_until)||0, vipYear);
       db._save();
       if(typeof db.migrateAccountGold==="function")db.migrateAccountGold(existing.id);
     }
   }
-  console.log("[test-server] contas liberadas: 1/1 e 2/2; Admin+VIP habilitado; grants Admin liberados para todas as contas nos próprios chars");
+  console.log("[test-server] contas liberadas: 1/1 (admin+VIP) e 2/2 (user+VIP); painel Admin só na conta 1");
 }
 
 /* ------------------------------ rotas ------------------------------ */
@@ -924,6 +925,15 @@ async function enforceAuthoritativeProgress(db,accountId,prepared){
   if(!row||row.status!=="active")return prepared;
   let descriptor=null;try{descriptor=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
   const player=protectedPlayer(descriptor,prepared.save.id);if(!player)return prepared;
+  // Presets do Helper são preferências do cliente: a autoridade só os recebe
+  // via tick. Um save entre a criação do preset e o próximo tick regravaria a
+  // lista antiga do snapshot — preserva a versão enviada no payload.
+  let sentPrefs=null;try{sentPrefs=JSON.parse(prepared.save.data);}catch(e){sentPrefs=null;}
+  if(sentPrefs&&typeof sentPrefs==="object"&&!Array.isArray(sentPrefs)){
+    if(sentPrefs.helperPresets!==undefined)player.helperPresets=sanitizeHelperPresets(sentPrefs.helperPresets);
+    if(sentPrefs.helperActivePreset!==undefined)
+      player.helperActivePreset=sentPrefs.helperActivePreset?String(sentPrefs.helperActivePreset).slice(0,64):null;
+  }
   prepared.save.data=JSON.stringify(player);prepared.save.level=Math.max(1,Number(player.level)||1);
   prepared.save.voc=String(player.voc||prepared.save.voc);prepared.save.extra.hp=Math.max(0,Number(player.hp)||0);
   prepared.save.extra.mp=Math.max(0,Number(player.mp)||0);
@@ -1108,7 +1118,7 @@ async function buyYanaPackage(db,body){
     goldTokens:purchase.goldTokens,lootPouch:p.lootPouch||{},bag:p.bag||{}})};
 }
 
-async function persistClaimedPlayer(db,acc,character,p,lease){
+async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
   // Inventário da conta: operações de cidade mudam o shared (pouch/depot/
   // reward); o save do personagem vira mirror do shared.
   let sharedInventory=null;
@@ -1125,7 +1135,7 @@ async function persistClaimedPlayer(db,acc,character,p,lease){
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"reward-claim"});
   await publishPartyForCharacters(db,[updated.id],"reward-claim");
   rewardChestEnsure(p);
-  return {code:200,body:{ok:true,claimed:true,saveVersion:Number(updated.save_version),
+  return {code:200,body:{ok:true,claimed:true,claimedCount:Number(claimedCount)||0,saveVersion:Number(updated.save_version),
     character:accountCharacterSummary(updated),rewardChest:p.rewardChest||{},
     rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{},
     ...(sharedInventory?{sharedInventory}:{})}};
@@ -1246,6 +1256,7 @@ async function claimRewardChest(db,body){
   const resolved=await resolveInstanceRow(db,acc,charId);
   if(resolved.error)return resolved.error;
   const row=resolved.row;
+  let claimedCount=0;
   if(row&&row.status==="active"){
     let last=null;
     for(let attempt=0;attempt<4;attempt++){
@@ -1257,7 +1268,7 @@ async function claimRewardChest(db,body){
         const item=descriptor.authority&&descriptor.authority.players&&
           descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
         if(!item||!item.p)return null;
-        applyRewardChestClaim(item.p,body);
+        claimedCount=applyRewardChestClaim(item.p,body);
         claimedPlayer=cloneJson(item.p);
         descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
       },lease);
@@ -1266,7 +1277,7 @@ async function claimRewardChest(db,body){
         await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
           status:result.instance.status,source:"reward-claim",holderId:String(body.holder_id||"")});
         const fresh=await db.findCharacter(charId);
-        return persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease);
+        return persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease,claimedCount);
       }
       if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
       if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
@@ -1277,8 +1288,8 @@ async function claimRewardChest(db,body){
         instance:instanceSummary(last.instance,true)}};
   }
   let p=await loadCityPlayer(db,acc,character);
-  applyRewardChestClaim(p,body);
-  return persistClaimedPlayer(db,acc,character,p,lease);
+  claimedCount=applyRewardChestClaim(p,body);
+  return persistClaimedPlayer(db,acc,character,p,lease,claimedCount);
 }
 
 async function savePartyCharacters(db,body){
@@ -4262,6 +4273,16 @@ async function main() {
       if(req.method==="POST"&&url==="/api/world-boss/invite"){
         const limited=rateLimit(req,"wb-invite",30,60000);if(limited)return send(res,limited.code,limited.body);
         const r=await WORLD_BOSS.invite(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/start"){
+        const limited=rateLimit(req,"wb-start",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.startFight(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/toggle-invite"){
+        const limited=rateLimit(req,"wb-toggle",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.toggleInvite(db,bodyWithSessionToken(req,await readBody(req)));
         return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/world-boss/admin/force-open"){

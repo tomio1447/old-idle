@@ -452,6 +452,13 @@ function accountAuthorityVisualState(){
         }
         if(Object.keys(cfg).length)visual.cfg=cfg;
       }
+      /* Presets do Helper são salvos no personagem, mas a autoridade só os
+       * conhece pelo snapshot do início da instância. Sem espelhá-los aqui,
+       * um preset criado em combate some quando o tick regrava item.p. */
+      if(isSelf&&cfgSrc&&typeof helperPresetClone==="function"){
+        if(Array.isArray(cfgSrc.helperPresets))visual.helperPresets=helperPresetClone(cfgSrc.helperPresets);
+        visual.helperActivePreset=cfgSrc.helperActivePreset?String(cfgSrc.helperActivePreset):null;
+      }
       if(cfgSrc&&cfgSrc.config){
         const mode=cfgSrc.config.attackMode||(combat&&combat.huntMode)||"kiting";
         visual.autoWalk=typeof playerAutoWalkOn==="function"?playerAutoWalkOn(cfgSrc):cfgSrc.config.autoWalk!==false;
@@ -574,7 +581,8 @@ function accountClaimRewardChest(token,charId,opts){
       if(r.data.character)accountMergeCharacterCache([r.data.character]);
       accountMaybeApplyShared(r.data);
       return {ok:true,rewardChest:r.data.rewardChest||{},rewardChestBundles:r.data.rewardChestBundles||[],
-        lootPouch:r.data.lootPouch||{},supplyStash:r.data.supplyStash||{},saveVersion:r.data.saveVersion};
+        lootPouch:r.data.lootPouch||{},supplyStash:r.data.supplyStash||{},saveVersion:r.data.saveVersion,
+        claimedCount:r.data.claimedCount||0};
     }
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);

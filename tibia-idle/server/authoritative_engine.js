@@ -6,8 +6,11 @@ let WAND_SHOOT={};
 try{WAND_SHOOT=require(path.join(__dirname,"..","game","js","wandshootdata.js"))||{};}
 catch(e){WAND_SHOOT={};}
 const CanaryVocation=require(path.join(__dirname,"..","game","js","canary-vocation.js"));
-let HELPER_PRESET_CONFIG_FIELDS=[];
-try{const hp=require(path.join(__dirname,"..","game","js","helper-presets.js"));HELPER_PRESET_CONFIG_FIELDS=Array.isArray(hp.HELPER_PRESET_CONFIG_FIELDS)?hp.HELPER_PRESET_CONFIG_FIELDS:[];}catch(e){HELPER_PRESET_CONFIG_FIELDS=[];}
+let HELPER_PRESET_CONFIG_FIELDS=[],HELPER_PRESETS_MAX=5;
+try{const hp=require(path.join(__dirname,"..","game","js","helper-presets.js"));
+  HELPER_PRESET_CONFIG_FIELDS=Array.isArray(hp.HELPER_PRESET_CONFIG_FIELDS)?hp.HELPER_PRESET_CONFIG_FIELDS:[];
+  HELPER_PRESETS_MAX=Math.max(1,Math.floor(Number(hp.HELPER_PRESETS_MAX)||5));
+}catch(e){HELPER_PRESET_CONFIG_FIELDS=[];}
 const Loyalty=require(path.join(__dirname,"..","game","js","loyalty.js"));
 const loyaltySkillBonus=Loyalty.loyaltySkillBonus;
 const loyaltyExpMultiplier=Loyalty.loyaltyExpMultiplier;
@@ -847,6 +850,24 @@ function sanitizeCombo(raw,voc){
   while(out.length<6)out.push(null);
   return out;
 }
+/* Presets do Helper trafegam pelo visual_state (preferências do cliente).
+ * Sanitiza estrutura e limita config à mesma whitelist do cfg do tick. */
+function sanitizeHelperPresets(raw){
+  const out=[],allowed=new Set(HELPER_PRESET_CONFIG_FIELDS);
+  for(const pr of Array.isArray(raw)?raw:[]){
+    if(out.length>=HELPER_PRESETS_MAX)break;
+    if(!pr||typeof pr!=="object"||Array.isArray(pr))continue;
+    const id=String(pr.id||"").slice(0,64);if(!id)continue;
+    const config={},src=pr.config&&typeof pr.config==="object"&&!Array.isArray(pr.config)?pr.config:{};
+    for(const k of Object.keys(src)){
+      if(!allowed.has(k))continue;const v=src[k];if(v===undefined)continue;
+      config[k]=(v&&typeof v==="object")?JSON.parse(JSON.stringify(v)):v;
+    }
+    out.push({id,name:String(pr.name||"").slice(0,16),config,
+      stances:(Array.isArray(pr.stances)?pr.stances:[]).slice(0,32).map((s)=>String(s))});
+  }
+  return out;
+}
 function normalizeVisualState(raw,auth){
   auth=auth||{};const normalize=(list,limit)=>{const out=[];
     for(const input of Array.isArray(list)?list:[]){if(out.length>=limit)break;
@@ -864,6 +885,9 @@ function normalizeVisualState(raw,auth){
       if(input.stances&&typeof input.stances==="object")item.stances=input.stances;
       if(typeof input.autoWalk==="boolean")item.autoWalk=input.autoWalk;
       if(input.cfg&&typeof input.cfg==="object")item.cfg=input.cfg;
+      if(input.helperPresets!==undefined)item.helperPresets=sanitizeHelperPresets(input.helperPresets);
+      if(input.helperActivePreset!==undefined)
+        item.helperActivePreset=input.helperActivePreset?String(input.helperActivePreset).slice(0,64):null;
       const wdx=Number(input.walkIntent&&input.walkIntent.dx),wdy=Number(input.walkIntent&&input.walkIntent.dy);
       if(Number.isFinite(wdx)&&Number.isFinite(wdy)&&(wdx||wdy)){
         item.walkIntent={dx:Math.max(-1,Math.min(1,Math.round(wdx))),dy:Math.max(-1,Math.min(1,Math.round(wdy)))};
@@ -983,6 +1007,10 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
         item.p.config[k]=(v&&typeof v==="object")?JSON.parse(JSON.stringify(v)):v;
       }
     }
+    /* helperPresets são preferências do cliente salvas no personagem — sem
+     * este espelho, o snapshot da instância regrava a lista antiga no save. */
+    if(pos.helperPresets!==undefined){item.p=item.p||{};item.p.helperPresets=pos.helperPresets;}
+    if(pos.helperActivePreset!==undefined){item.p=item.p||{};item.p.helperActivePreset=pos.helperActivePreset;}
   }}
   const clock=Number(auth.clock)||0;
   // Posição dos MOBS é autoritativa no servidor (advanceAuthorityMovement
@@ -4245,9 +4273,14 @@ function rewardChestRemoveBundleIfEmpty(p,bundle){
   p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b!==bundle);
 }
 function rewardChestAddPouch(p,slug,count){
-  if(!p||!slug||!(count>0))return;
+  if(!p||!slug||!(count>0))return 0;
+  const unit=itemUnitWeight(slug);
+  const fit=unit>0?Math.floor(freeCapacity(p)/unit):0;
+  const n=Math.min(Math.floor(count),fit);
+  if(n<=0)return 0;
   p.lootPouch=p.lootPouch||{};
-  p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+count;
+  p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+n;
+  return n;
 }
 const CURRENCY_GOLD={"gold-coin":1,"platinum-coin":100,"crystal-coin":10000};
 const SUPPLY_STASH_MAX_SLOTS=20;
@@ -4571,14 +4604,26 @@ function rewardChestClaimOne(p,slug,bundleId){
     const bundle=(p.rewardChestBundles||[]).find((b)=>String(b.id)===String(bundleId));
     if(!bundle||!bundle.items||!bundle.items[slug])return false;
     count=Number(bundle.items[slug])||0;if(!count)return false;
-    delete bundle.items[slug];rewardChestRemoveBundleIfEmpty(p,bundle);
+    const n=rewardChestAddPouch(p,slug,count);if(n<=0)return false;
+    bundle.items[slug]=count-n;
+    if(bundle.items[slug]<=0)delete bundle.items[slug];
+    rewardChestRemoveBundleIfEmpty(p,bundle);
   }else{
     count=Number(p.rewardChest[slug])||0;if(!count)return false;
-    for(const bundle of p.rewardChestBundles||[])if(bundle&&bundle.items)delete bundle.items[slug];
+    const n=rewardChestAddPouch(p,slug,count);if(n<=0)return false;
+    let remaining=n;
+    for(const bundle of p.rewardChestBundles||[]){
+      if(remaining<=0)break;
+      const bcount=Number(bundle.items[slug])||0;
+      if(bcount<=0)continue;
+      const take=Math.min(bcount,remaining);
+      bundle.items[slug]-=take;
+      if(bundle.items[slug]<=0)delete bundle.items[slug];
+      remaining-=take;
+    }
     p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b&&b.items&&Object.keys(b.items).some((k)=>b.items[k]>0));
   }
-  rewardChestAddPouch(p,slug,count);
-  p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-count);
+  p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-n);
   if(!p.rewardChest[slug])delete p.rewardChest[slug];
   return true;
 }
@@ -4589,24 +4634,45 @@ function rewardChestClaimBundle(p,bundleId){
   let types=0;
   for(const slug of Object.keys(bundle.items||{})){
     const count=Number(bundle.items[slug])||0;if(count<=0)continue;
-    rewardChestAddPouch(p,slug,count);
-    p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-count);
+    const n=rewardChestAddPouch(p,slug,count);
+    if(n<=0)continue;
+    bundle.items[slug]=count-n;
+    if(bundle.items[slug]<=0)delete bundle.items[slug];
+    p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-n);
     if(!p.rewardChest[slug])delete p.rewardChest[slug];
     types++;
   }
-  bundle.items={};rewardChestRemoveBundleIfEmpty(p,bundle);
+  rewardChestRemoveBundleIfEmpty(p,bundle);
   return types;
 }
+const REWARD_CLAIM_MAX_ITEMS=100;
 function rewardChestClaimAll(p){
   if(!p)return 0;
   rewardChestEnsure(p);
-  let n=0;
+  let types=0,total=0;
   for(const slug of Object.keys(p.rewardChest||{})){
     const count=Number(p.rewardChest[slug])||0;if(count<=0)continue;
-    rewardChestAddPouch(p,slug,count);n++;
+    const want=Math.min(count,REWARD_CLAIM_MAX_ITEMS-total);
+    if(want<=0)break;
+    const n=rewardChestAddPouch(p,slug,want);
+    if(n<=0)continue;
+    p.rewardChest[slug]=count-n;
+    if(!p.rewardChest[slug])delete p.rewardChest[slug];
+    let remaining=n;
+    for(const bundle of p.rewardChestBundles||[]){
+      if(remaining<=0)break;
+      const bcount=Number(bundle.items[slug])||0;
+      if(bcount<=0)continue;
+      const take=Math.min(bcount,remaining);
+      bundle.items[slug]-=take;
+      if(bundle.items[slug]<=0)delete bundle.items[slug];
+      remaining-=take;
+    }
+    types++;total+=n;
+    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
   }
-  p.rewardChest={};p.rewardChestBundles=[];
-  return n;
+  p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b&&b.items&&Object.keys(b.items).some((k)=>b.items[k]>0));
+  return total;
 }
 /* Goshnar's Taints — port do soulwar.js (idle). Só atuam em Soul War zones /
  * bosses Goshnar e expiram 14 dias após a primeira mácula. */
@@ -7292,7 +7358,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
 }
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,
-  normalizeVisualState,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
+  normalizeVisualState,sanitizeHelperPresets,blessingPrice,recordAuthSessionDeath,recordAuthSessionBless,partyCanShareExp,partyExpBonusPct,partyExpShare,MONSTERS,ITEMS,ALL_SPELLS,
   spawnHuntWave,pickHuntSpawnSlug,openAuthBagYouDesire,
   MONKSPELLDATA,AREA_DATA,SPELL_TARGET,spellAreaCells,spellAreaTargets,spellChainTargets,
   skillWaveCells,

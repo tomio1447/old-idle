@@ -91,6 +91,34 @@ function centeredGridViewport(canvasWidth, canvasHeight, cols, rows, fovCols, fo
   };
 }
 
+/* Viewport do combate em uso. Igual ao centeredGridViewport, mas em World
+ * Boss a câmera SEGUE o personagem local: mapas como a sala do Pale Worm
+ * (32×24) são maiores que a FOV de 21×13 e o centro geométrico deixava o
+ * jogador fora da tela. A janela segue o player, presa às bordas do mapa. */
+function combatViewport(canvasWidth, canvasHeight, combat) {
+  const cols = combat && combat.gridW ? combat.gridW
+    : (typeof GRID_W !== "undefined" ? GRID_W : DEFAULT_GRID_W);
+  const rows = combat && combat.gridH ? combat.gridH
+    : (typeof GRID_H !== "undefined" ? GRID_H : DEFAULT_GRID_H);
+  const map = combat && combat.huntMap;
+  const view = centeredGridViewport(canvasWidth, canvasHeight, cols, rows,
+    map && map.fovWidth ? map.fovWidth : undefined,
+    map && map.fovHeight ? map.fovHeight : undefined);
+  const wb = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss));
+  const focus = wb ? combat.player : null;
+  if (focus && Number.isFinite(focus.x) && Number.isFinite(focus.y)) {
+    if (view.width > canvasWidth) {
+      view.x = Math.max(canvasWidth - view.width,
+        Math.min(0, canvasWidth / 2 - focus.x * view.width));
+    }
+    if (view.height > canvasHeight) {
+      view.y = Math.max(canvasHeight - view.height,
+        Math.min(0, canvasHeight / 2 - focus.y * view.height));
+    }
+  }
+  return view;
+}
+
 /* Constantes de movimento do Canary */
 const SERVER_BEAT = 50;                 // game.hpp: todo passo alinha em 50ms
 const WALK_DIAGONAL_EXTRA_COST = 3;     // creature.hpp
@@ -408,10 +436,12 @@ function combatKeyDir(keys) {
   return null;
 }
 
-function canvasToCombatCell(mx, my, canvasW, canvasH) {
-  const view = typeof centeredGridViewport === "function"
-    ? centeredGridViewport(canvasW, canvasH, GRID_W, GRID_H)
-    : { x: 0, y: 0, width: canvasW, height: canvasH };
+function canvasToCombatCell(mx, my, canvasW, canvasH, combat) {
+  const view = typeof combatViewport === "function"
+    ? combatViewport(canvasW, canvasH, combat || null)
+    : (typeof centeredGridViewport === "function"
+      ? centeredGridViewport(canvasW, canvasH, GRID_W, GRID_H)
+      : { x: 0, y: 0, width: canvasW, height: canvasH });
   const nx = view.width ? (mx - view.x) / view.width : 0.5;
   const ny = view.height ? (my - view.y) / view.height : 0.5;
   return screenToCell(nx, ny);

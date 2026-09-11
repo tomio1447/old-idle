@@ -4152,6 +4152,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
     if(playerRef&&remote&&remote.p){
       const localConfig=playerRef.config,localCombo=localConfig&&localConfig.combo,localStances=playerRef.stances,
         localPrey=playerRef.prey,localMissions=playerRef.missions,localMissionsDone=playerRef.missionsDone,
+        localHelperPresets=playerRef.helperPresets,localHelperActivePreset=playerRef.helperActivePreset,
         localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
         localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
         localBestiary=playerRef.bestiary,
@@ -4204,6 +4205,11 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
         noSell:mergeLootRules(remoteLoot.noSell,localLootConfig&&localLootConfig.noSell),
       };
       if(localStances&&typeof localStances==="object")playerRef.stances=localStances;
+      /* Presets do Helper são client-owned: o snapshot do servidor só os
+       * espelha (via visual_state). Sem preservar o local, um tick gerado
+       * antes do "New preset" regravava a lista antiga por cima. */
+      if(localHelperPresets!==undefined)playerRef.helperPresets=localHelperPresets;
+      if(localHelperActivePreset!==undefined)playerRef.helperActivePreset=localHelperActivePreset;
       if(localPrey&&typeof localPrey==="object")playerRef.prey=localPrey;
       if(localMissions&&typeof localMissions==="object")
         playerRef.missions=mergeMissionMaps(remote.p.missions,localMissions);
@@ -5114,14 +5120,12 @@ function bindControls() {
   if (typeof bindRewardButton === "function") bindRewardButton();
   const btnAdmin = $("#btn-admin");
   if (btnAdmin) {
-    const serverCfg = (typeof window !== "undefined" &&
-      window.GLOBAL_IDLE_SERVER_CONFIG) || {};
     const account = sessionAccount();
     const onlineMode = typeof accountApiConfigured === "function" && accountApiConfigured();
-    // Offline, TEST_SERVER, ou role admin: painel liberado. Em produção online
-    // sem testServer, só contas admin. Grants no servidor também checam ownership.
-    const adminAllowed = !onlineMode || !!serverCfg.testServer ||
-      !!(account && account.role === "admin");
+    // Painel Admin só para contas com role=admin (em TEST_SERVER, só a conta
+    // "1" tem esse role — as demais contas de teste ficam sem o painel).
+    // Offline (sem API) não existe conta: painel continua livre para debug.
+    const adminAllowed = !onlineMode || !!(account && account.role === "admin");
     if (typeof openAdmin === "function" && adminAllowed) {
       btnAdmin.addEventListener("click", () => openAdmin());
     } else {
@@ -5160,7 +5164,7 @@ function bindControls() {
       if (typeof playerAutoWalkOn === "function" && playerAutoWalkOn(G.p)) return;
       const { mx, my } = canvasPos(e);
       if (typeof canvasToCombatCell === "function" && G.combat.player) {
-        G.combat.player.walkGoal = canvasToCombatCell(mx, my, cv.width, cv.height);
+        G.combat.player.walkGoal = canvasToCombatCell(mx, my, cv.width, cv.height, G.combat);
       }
       return;
     }

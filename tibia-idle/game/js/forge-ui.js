@@ -117,8 +117,8 @@ function forgeClientTierPreview(info) {
   return '<div class="forge-client-tier-preview">'
     + '<div class="forge-client-equip-slot ' + tierClass + '">'
     + (itemSlug ? itemImg(itemSlug, 38) : '')
-    + '</div>'
     + (next ? '<span class="forge-client-tier-badge">' + next + '</span>' : '')
+    + '</div>'
     + '</div>';
 }
 
@@ -285,7 +285,7 @@ function renderForgeModal() {
     + forgeClientTabHtml()
     + '<div class="forge-client-main">' + content + '</div>'
     + '<div class="forge-client-footer">'
-    +   '<div class="forge-client-wallet gold"><img class="forge-wallet-icon" src="assets/item/gold-coin.png" alt=""><span>' + fmtFull(p.gold || 0) + '</span></div>'
+    +   '<div class="forge-client-wallet gold"><img class="forge-wallet-icon" src="assets/item/gold-coin.png" alt=""><span>' + fmtFull((typeof accountGold === "function" ? accountGold() : (p.gold || 0))) + '</span></div>'
     +   '<div class="forge-client-wallet dust"><img class="forge-wallet-icon" src="assets/item/dust.gif" alt=""><span>' + fmtFull(p.dust || 0) + '/' + fmtFull(p.dustLimit || 100) + '</span></div>'
     +   '<div class="forge-client-wallet slivers"><img class="forge-wallet-icon" src="assets/item/sliver.gif" alt=""><span>' + fmtFull(p.slivers || 0) + '</span></div>'
     +   '<div class="forge-client-wallet cores"><img class="forge-wallet-icon" src="assets/item/exalted-core.gif" alt=""><span>' + fmtFull(p.exaltedCores || 0) + '</span></div>'

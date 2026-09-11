@@ -2163,9 +2163,11 @@ Renderer.prototype.draw = function (combat, player, dt) {
   const mapFov = combat && combat.huntMap;
   const fovW = mapFov && mapFov.fovWidth ? mapFov.fovWidth : undefined;
   const fovH = mapFov && mapFov.fovHeight ? mapFov.fovHeight : undefined;
-  const view = (typeof centeredGridViewport === "function")
-    ? centeredGridViewport(canvasW, canvasH, gridW, gridH, fovW, fovH)
-    : { x: 0, y: 0, width: canvasW, height: canvasH };
+  const view = (typeof combatViewport === "function")
+    ? combatViewport(canvasW, canvasH, combat)
+    : (typeof centeredGridViewport === "function")
+      ? centeredGridViewport(canvasW, canvasH, gridW, gridH, fovW, fovH)
+      : { x: 0, y: 0, width: canvasW, height: canvasH };
   const W = view.width, H = view.height;
 
   // Fala/FX envelhecem mesmo fora do FOV ou com entidade sem draw neste frame.
@@ -2330,51 +2332,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
       drawSinisterDust(ctx, info.ent, info.cx, info.cy, info.tile, Date.now());
   }
 
-  // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
-  // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
-  drawBossBar(ctx, canvasW, combat, -view.x, -view.y, canvasHudScale(this.c));
-
-  // --- informações: segunda passagem, sempre acima de TODAS as sprites.
-  // OTC Creature::drawInformation: nome+HP no dest interpolado da própria
-  // criatura, mesma ordem bottom-up das outfits. Sem empilhar labels.
-  const hudS = canvasHudScale(this.c);
-  for (const info of entityInfo) {
-    const layout = layoutCreatureInformation(info, W, H, hudS);
-    const barY = layout.barY, nameY = layout.nameY, y = layout.nameY;
-    const nameX = layout.nameX, barX = layout.barX;
-    if (info.e.kind === 'monster') {
-      drawTibiaBar(ctx, barX, barY, info.hpPct, tibiaHpColor(info.hpPct), hudS);
-      drawNameText(ctx, nameX, nameY, info.name, tibiaHpColor(info.hpPct), hudS);
-      drawSinisterCreatureIcon(ctx,info.ent,barX,barY,hudS);
-      const iconSize = 9 * hudS;
-      let iconX = Math.round(info.cx + info.w/2 + 3 * hudS);
-      const iconY = Math.round(info.top + info.h*.35);
-      const atkIcon = typeof monsterAttackTypeIcon === "function" ? monsterAttackTypeIcon(info.ent) : "";
-      if (atkIcon) {
-        drawWikiIcon(ctx, atkIcon, iconX, iconY, iconSize);
-        iconX += iconSize + 2 * hudS;
-      }
-      const nowHud = Date.now();
-      if (info.ent.sapStrUntil && info.ent.sapStrUntil > nowHud) {
-        drawWikiIcon(ctx, "sap-strength", iconX, iconY, iconSize);
-        iconX += iconSize + 2 * hudS;
-      }
-      if (info.ent.exposeUntil && info.ent.exposeUntil > nowHud)
-        drawWikiIcon(ctx, "expose-weakness", iconX, iconY, iconSize);
-    } else {
-      drawNameBars(ctx, nameX, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY, barX, hudS);
-    }
-    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
-    else if (info.e.kind === 'player') {
-      // Cada personagem tem a própria fila (creatureSay no caster). O
-      // playerTalk do renderer só cobre o fallback addSpeech sem whoId.
-      // dt=null: ageCombatSpeech já consumiu o frame (evita half-life).
-      drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
-      if (combat && combat.player && info.ent === combat.player) this.drawSpeech(ctx, info.cx, y, null, hudS);
-    } else drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
-  }
-
   // --- projeteis / ataques a distancia
+  // Míssil e animação de magia são coisas do MUNDO (como no client): ficam
+  // por cima das sprites, mas NUNCA por cima de healthbar, nome, fala de
+  // spell (cast) ou número de dano/cura — a camada de informação vem depois.
   for (let i = this.projectiles.length - 1; i >= 0; i--) {
     const p = this.projectiles[i];
     p.t += dt;
@@ -2430,6 +2391,50 @@ Renderer.prototype.draw = function (combat, player, dt) {
     const origin = effectTileOrigin(e.x * W, e.y * H, drawW, drawH, tile);
     ctx.drawImage(img, f * fw, 0, fw, img.naturalHeight,
                   origin.x, origin.y, drawW, drawH);
+  }
+
+  // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
+  // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
+  drawBossBar(ctx, canvasW, combat, -view.x, -view.y, canvasHudScale(this.c));
+
+  // --- informações: segunda passagem, sempre acima de TODAS as sprites.
+  // OTC Creature::drawInformation: nome+HP no dest interpolado da própria
+  // criatura, mesma ordem bottom-up das outfits. Sem empilhar labels.
+  const hudS = canvasHudScale(this.c);
+  for (const info of entityInfo) {
+    const layout = layoutCreatureInformation(info, W, H, hudS);
+    const barY = layout.barY, nameY = layout.nameY, y = layout.nameY;
+    const nameX = layout.nameX, barX = layout.barX;
+    if (info.e.kind === 'monster') {
+      drawTibiaBar(ctx, barX, barY, info.hpPct, tibiaHpColor(info.hpPct), hudS);
+      drawNameText(ctx, nameX, nameY, info.name, tibiaHpColor(info.hpPct), hudS);
+      drawSinisterCreatureIcon(ctx,info.ent,barX,barY,hudS);
+      const iconSize = 9 * hudS;
+      let iconX = Math.round(info.cx + info.w/2 + 3 * hudS);
+      const iconY = Math.round(info.top + info.h*.35);
+      const atkIcon = typeof monsterAttackTypeIcon === "function" ? monsterAttackTypeIcon(info.ent) : "";
+      if (atkIcon) {
+        drawWikiIcon(ctx, atkIcon, iconX, iconY, iconSize);
+        iconX += iconSize + 2 * hudS;
+      }
+      const nowHud = Date.now();
+      if (info.ent.sapStrUntil && info.ent.sapStrUntil > nowHud) {
+        drawWikiIcon(ctx, "sap-strength", iconX, iconY, iconSize);
+        iconX += iconSize + 2 * hudS;
+      }
+      if (info.ent.exposeUntil && info.ent.exposeUntil > nowHud)
+        drawWikiIcon(ctx, "expose-weakness", iconX, iconY, iconSize);
+    } else {
+      drawNameBars(ctx, nameX, nameY, info.name, info.hpPct, info.mpPct, info.shieldPct, barY, barX, hudS);
+    }
+    if (info.e.kind === 'monster') drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
+    else if (info.e.kind === 'player') {
+      // Cada personagem tem a própria fila (creatureSay no caster). O
+      // playerTalk do renderer só cobre o fallback addSpeech sem whoId.
+      // dt=null: ageCombatSpeech já consumiu o frame (evita half-life).
+      drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
+      if (combat && combat.player && info.ent === combat.player) this.drawSpeech(ctx, info.cx, y, null, hudS);
+    } else drawCreatureSpeech(ctx, info.ent, info.cx, y, null, hudS);
   }
 
   ctx.restore();

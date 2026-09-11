@@ -182,7 +182,8 @@ function forgeCanFuse(p, ref, useCore) {
 
   var gold = forgeFusionGoldCost(info.slug, info.tier);
   if (!gold) return { ok: false, msg: "Custo de fusão não definido para este tier/classificação." };
-  if (p.gold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - p.gold) + " gp." };
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - haveGold) + " gp." };
   if ((p.dust || 0) < FORGE_FUSION.dustCost) return { ok: false, msg: "Faltam " + (FORGE_FUSION.dustCost - (p.dust || 0)) + " Dust." };
   if (useCore && (p.exaltedCores || 0) < 1) return { ok: false, msg: "Falta 1 Exalted Core." };
 
@@ -203,7 +204,8 @@ function forgeFuse(p, ref, useCore) {
   var chk = forgeCanFuse(p, ref, useCore);
   if (!chk.ok) return chk;
 
-  p.gold -= chk.gold;
+  if (typeof accountSpendGold === "function") accountSpendGold(chk.gold);
+  else p.gold = Math.max(0, (p.gold || 0) - chk.gold);
   p.dust -= chk.dust;
   if (chk.useCore) p.exaltedCores -= 1;
 
@@ -276,7 +278,8 @@ function forgeCanTransfer(p, donorRef, targetRef) {
 
   var gold = forgeTransferGoldCost(donor.slug, donor.tier);
   if (!gold) return { ok: false, msg: "Custo de transferência não definido para este item." };
-  if (p.gold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - p.gold) + " gp." };
+  var haveGold = typeof accountGold === "function" ? accountGold() : (p.gold || 0);
+  if (haveGold < gold) return { ok: false, msg: "Faltam " + fmtFull(gold - haveGold) + " gp." };
   if ((p.dust || 0) < FORGE_TRANSFER.dustCost) return { ok: false, msg: "Faltam " + (FORGE_TRANSFER.dustCost - (p.dust || 0)) + " Dust." };
   if ((p.exaltedCores || 0) < FORGE_TRANSFER.coreCost) return { ok: false, msg: "Falta 1 Exalted Core." };
 
@@ -295,7 +298,8 @@ function forgeTransfer(p, donorRef, targetRef) {
   var chk = forgeCanTransfer(p, donorRef, targetRef);
   if (!chk.ok) return chk;
 
-  p.gold -= chk.gold;
+  if (typeof accountSpendGold === "function") accountSpendGold(chk.gold);
+  else p.gold = Math.max(0, (p.gold || 0) - chk.gold);
   p.dust -= chk.dust;
   p.exaltedCores -= chk.cores;
   var donorInst = findItemInstance(p, chk.donor.instanceId);
