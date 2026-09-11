@@ -324,7 +324,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,skipped:"inactive"};
   const lease=(this.leases||[]).find((item)=>Number(item.account_id)===Number(accountId));
   if(lease&&new Date(lease.expires_at).getTime()>now)return {ok:false,skipped:"leased"};
-  if(/^world-boss-wz[123]$/.test(String(row.boss_id||""))){
+  if(/^world-boss-wz[1-6]$/.test(String(row.boss_id||""))){
     const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
     const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds():[];
     const memberLeased=ids.some((id)=>{
@@ -989,23 +989,23 @@ JsonStore.prototype.sellerOffers = function (sellerId) {
 };
 JsonStore.prototype.accountMarketGold = function (accountId) {
   const a = this.findAccountById(accountId);
-  return a ? (a.market_gold || 0) : 0;
+  return a ? (a.gold || 0) : 0;
 };
 JsonStore.prototype.addAccountMarketGold = function (accountId, amount) {
   const a = this.findAccountById(accountId);
-  if (a) { a.market_gold = (a.market_gold || 0) + Math.max(0, amount); this._save(); }
+  if (a) { a.gold = (a.gold || 0) + Math.max(0, amount); this._save(); }
 };
 JsonStore.prototype.payMarketFee = function (accountId, amount) {
   const a = this.findAccountById(accountId);
-  if (!a || (a.market_gold || 0) < amount) return false;
-  a.market_gold = (a.market_gold || 0) - amount;
+  if (!a || (a.gold || 0) < amount) return false;
+  a.gold = (a.gold || 0) - amount;
   this._save();
   return true;
 };
 JsonStore.prototype.refundMarketFee = function (accountId, amount) {
   const a = this.findAccountById(accountId);
   if (!a) return;
-  a.market_gold = (a.market_gold || 0) + amount;
+  a.gold = (a.gold || 0) + amount;
   this._save();
 };
 JsonStore.prototype.payMarketGold = function (accountId, amount) {
@@ -1019,10 +1019,10 @@ JsonStore.prototype.marketTransferGold=function(accountId,charId,expectedVersion
   const account=this.migrateAccountGold(accountId),character=this.findCharacter(charId);
   if(!account||!character||Number(character.account_id)!==Number(accountId))return {ok:false,error:"CHARACTER_NOT_FOUND"};
   if(Number(character.save_version)!==Number(expectedVersion))return {ok:false,error:"SAVE_VERSION_CONFLICT",character};
+  account.gold=Math.max(0,Math.floor(Number(account.gold)||0));
+  // O market nao usa mais banco separado: o saldo e o account.gold compartilhado.
+  // Deposit/withdraw sao no-ops, apenas sinaliza ok para compatibilidade com UI antiga.
   let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-  account.gold=Math.max(0,Math.floor(Number(account.gold)||0));account.market_gold=Math.max(0,Number(account.market_gold)||0);
-  if(direction==="deposit"){if(account.gold<amount)return {ok:false,error:"CHARACTER_GOLD_LOW"};account.gold-=amount;account.market_gold+=amount;}
-  else{if(account.market_gold<amount)return {ok:false,error:"BANK_GOLD_LOW"};account.market_gold-=amount;account.gold+=amount;}
   data.gold=account.gold;
   character.data=JSON.stringify(data);character.save_version=Number(character.save_version)+1;character.updated_at=new Date(lease.now).toISOString();
   for(const sibling of this.charactersOf(accountId)){
@@ -1030,7 +1030,7 @@ JsonStore.prototype.marketTransferGold=function(accountId,charId,expectedVersion
     let sd={};try{sd=typeof sibling.data==="string"?JSON.parse(sibling.data):(sibling.data||{});}catch(e){sd={};}
     sd.gold=account.gold;sibling.data=JSON.stringify(sd);
   }
-  this._save();return {ok:true,character,bank:account.market_gold,gold:account.gold};
+  this._save();return {ok:true,character,bank:account.gold,gold:account.gold};
 };
 JsonStore.prototype.recordSale = function (slug, tier, price) {
   this.marketStats = this.marketStats || {};
@@ -1918,7 +1918,7 @@ async function MysqlStore() {
         const row=rows[0];if(!row||row.status!=="active"){
           await conn.rollback();return {ok:false,skipped:"inactive"};
         }
-        if(/^world-boss-wz[123]$/.test(String(row.boss_id||""))){
+        if(/^world-boss-wz[1-6]$/.test(String(row.boss_id||""))){
           const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
           const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds().map(Number).filter((id)=>id>0):[];
           if(ids.length){
@@ -2245,27 +2245,27 @@ async function MysqlStore() {
         [Number(sellerId)]);
     },
     async accountMarketGold(accountId) {
-      const rows = await this.query("SELECT market_gold FROM accounts WHERE id = ?", [Number(accountId)]);
-      return rows[0] ? (rows[0].market_gold || 0) : 0;
+      const rows = await this.query("SELECT gold FROM accounts WHERE id = ?", [Number(accountId)]);
+      return rows[0] ? (rows[0].gold || 0) : 0;
     },
     async addAccountMarketGold(accountId, amount) {
-      await this.run("UPDATE accounts SET market_gold = market_gold + ? WHERE id = ?",
+      await this.run("UPDATE accounts SET gold = gold + ? WHERE id = ?",
         [Math.max(0, amount), Number(accountId)]);
     },
     async payMarketFee(accountId, amount) {
-      // fee sai do market_gold (banco do jogador); retorna false se insuficiente
+      // fee e reservas de market saem do gold compartilhado da conta (sem banco separado)
       const r = await this.run(
-        "UPDATE accounts SET market_gold = market_gold - ? WHERE id = ? AND market_gold >= ?",
+        "UPDATE accounts SET gold = gold - ? WHERE id = ? AND gold >= ?",
         [amount, Number(accountId), amount]);
       return r.affectedRows > 0;
     },
     async refundMarketFee(accountId, amount) {
-      await this.run("UPDATE accounts SET market_gold = market_gold + ? WHERE id = ?",
+      await this.run("UPDATE accounts SET gold = gold + ? WHERE id = ?",
         [amount, Number(accountId)]);
     },
     async payMarketGold(accountId, amount) {
       const r = await this.run(
-        "UPDATE accounts SET market_gold = market_gold - ? WHERE id = ? AND market_gold >= ?",
+        "UPDATE accounts SET gold = gold - ? WHERE id = ? AND gold >= ?",
         [amount, Number(accountId), amount]);
       return r.affectedRows > 0;
     },
@@ -2287,11 +2287,10 @@ async function MysqlStore() {
           }
         }
         let data={};try{data=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
-        let bank=Math.max(0,Number(account.market_gold)||0);
-        if(direction==="deposit"){if(pocket<amount){await conn.rollback();return {ok:false,error:"CHARACTER_GOLD_LOW"};}pocket-=amount;bank+=amount;}
-        else{if(bank<amount){await conn.rollback();return {ok:false,error:"BANK_GOLD_LOW"};}bank-=amount;pocket+=amount;}
-        await conn.query("UPDATE accounts SET market_gold=?, gold=?, gold_migrated=1 WHERE id=?",[bank,pocket,Number(accountId)]);
+        // O market nao usa mais banco separado; deposit/withdraw sao compatibilidade.
+        const bank=pocket;
         data.gold=pocket;
+        await conn.query("UPDATE accounts SET gold=?, gold_migrated=1 WHERE id=?",[pocket,Number(accountId)]);
         await conn.query("UPDATE characters SET data=?,save_version=save_version+1 WHERE id=? AND account_id=?",
           [JSON.stringify(data),Number(charId),Number(accountId)]);
         const [siblings]=await conn.query("SELECT id, data FROM characters WHERE account_id=? AND id<>?",[Number(accountId),Number(charId)]);

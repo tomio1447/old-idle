@@ -135,8 +135,7 @@
       if (!alvo) return null;
       const q = Math.min(o.qty, alvo.qty);
       const total = (Number(o.price) || 0) * q;
-      // gold: comprador paga, vendedor recebe (banco local)
-      bancoSet(alvo.seller_id, bancoDe(alvo.seller_id) - total);
+      // gold já está travado na oferta de compra; credita só o vendedor
       bancoSet(o.seller_id, bancoDe(o.seller_id) + total);
       // consome a buy offer (inteira ou parcial)
       alvo.qty -= q;
@@ -159,8 +158,7 @@
       if (!alvo) return null;
       const q = Math.min(o.qty, alvo.qty);
       const total = (Number(alvo.price) || 0) * q;
-      // gold: comprador paga, vendedor recebe
-      bancoSet(o.seller_id, bancoDe(o.seller_id) - total);
+      // gold já está travado na oferta de compra; credita só o vendedor
       bancoSet(alvo.seller_id, bancoDe(alvo.seller_id) + total);
       // o ITEM da sell offer vai para o comprador: limpa o pending do
       // vendedor (o market-ui guardou o item no _mPendingRefund ao vender)
@@ -184,13 +182,29 @@
   /* ----- API local (mesma assinatura do account-client) ----- */
 
   async function localCreateOffer(body) {
+    const me = charIdAtual();
+    if (body.kind === "coins") {
+      const qty = Math.max(1, Math.floor(Number(body.qty) || 1));
+      if (typeof accountSpendCoins === "function" && !accountSpendCoins(qty)) {
+        return { ok: false, msg: "Tibia Coins insuficientes" };
+      }
+    }
+    if (body.kind === "buy") {
+      const price = Math.max(1, Math.floor(Number(body.price) || 0));
+      const qty = Math.max(1, Math.floor(Number(body.qty) || 1));
+      const total = price * qty;
+      if (bancoDe(me) < total) return { ok: false, msg: "Ouro insuficiente no banco" };
+      bancoSet(me, bancoDe(me) - total);
+    }
     const o = novaOferta(body);
     const m = tentarMatch(o);
     write(read());
     if (m) {
-      return { ok: true, offer: { id: o.id }, matched: m.matched };
+      return { ok: true, offer: { id: o.id }, matched: m.matched,
+        bank: bancoDe(me), coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0 };
     }
-    return { ok: true, offer: { id: o.id } };
+    return { ok: true, offer: { id: o.id },
+      bank: bancoDe(me), coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0 };
   }
 
   async function localListOffers(filtro) {
@@ -229,34 +243,29 @@
       o.status = "expired"; write(d);
       return { ok: false, msg: "Oferta expirada" };
     }
-    if (o.kind === "item" || o.kind === "buy") {
+    if (o.kind === "item") {
       const q = body.qty ? Math.min(Number(body.qty) || 1, o.qty) : o.qty;
       const total = (Number(o.price) || 0) * q;
-      // o market-ui debita do _mBank (banco do comprador) — aqui confirma o
-      // saldo e credita no banco do vendedor
+      // comprador (ator) paga; vendedor recebe
       if (bancoDe(buyerId) < total) return { ok: false, msg: "Ouro insuficiente no banco" };
       bancoSet(buyerId, bancoDe(buyerId) - total);
       bancoSet(o.seller_id, bancoDe(o.seller_id) + total);
-      // item: se kind "item" (sell offer), vai pro depot do comprador; se
-      // kind "buy" (o comprador aceitou vender p/ a oferta), o item sai do
-      // depot do VENDEDOR (market-ui remove) e o gold vai p/ ele
-      if (typeof _mPendingRefund !== "undefined" && _mPendingRefund && o.kind === "item") {
+      if (typeof _mPendingRefund !== "undefined" && _mPendingRefund) {
         delete _mPendingRefund[o.id];
       }
-      const itemData = o.kind === "item"
-        ? { slug: o.slug, tier: o.tier, qty: q } : null;
       o.qty -= q;
       if (o.qty <= 0) o.status = "sold";
-      // histórico: kind item = compra normal; kind buy = vendeu p/ oferta
       addHistory(d, { seller_id: o.seller_id, seller_name: o.seller_name,
                      buyer_id: buyerId, buyer_name: body.buyer_name || nomeAtual(),
-                     kind: o.kind, slug: o.slug, tier: o.tier, qty: q,
+                     kind: "item", slug: o.slug, tier: o.tier, qty: q,
                      price: total, price_tc: o.price_tc ? 1 : 0 });
       write(d);
       return {
         ok: true,
+        bank: bancoDe(buyerId),
+        coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0,
         data: {
-          item: itemData,
+          item: { slug: o.slug, tier: o.tier, qty: q },
           total: total,
           price: Number(o.price),
           price_tc: o.price_tc ? 1 : 0,
@@ -264,7 +273,31 @@
         },
       };
     }
+    if (o.kind === "buy") {
+      const q = body.qty ? Math.min(Number(body.qty) || 1, o.qty) : o.qty;
+      const total = (Number(o.price) || 0) * q;
+      // o ator vende o item para o comprador da oferta (gold já travado)
+      bancoSet(buyerId, bancoDe(buyerId) + total);
+      o.qty -= q;
+      if (o.qty <= 0) o.status = "sold";
+      addHistory(d, { seller_id: buyerId, seller_name: body.buyer_name || nomeAtual(),
+                     buyer_id: o.seller_id, buyer_name: o.seller_name,
+                     kind: "item", slug: o.slug, tier: o.tier, qty: q,
+                     price: total, price_tc: 0 });
+      write(d);
+      return {
+        ok: true,
+        bank: bancoDe(buyerId),
+        coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0,
+        data: {
+          total: total,
+          price: Number(o.price),
+          seller_name: o.seller_name,
+        },
+      };
+    }
     if (o.kind === "coins") {
+      if (typeof accountAddCoins === "function") accountAddCoins(o.qty);
       const total = (Number(o.price) || 0) * o.qty;
       if (bancoDe(buyerId) < total) return { ok: false, msg: "Ouro insuficiente no banco" };
       bancoSet(buyerId, bancoDe(buyerId) - total);
@@ -277,6 +310,8 @@
       write(d);
       return {
         ok: true,
+        bank: bancoDe(buyerId),
+        coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0,
         data: { coins: o.qty, total: total, price: Number(o.price), price_tc: 1, seller_name: o.seller_name },
       };
     }
@@ -300,11 +335,13 @@
     }
     if (o.kind === "coins" && o.price_tc) {
       refundCoins = o.qty;
+      if (typeof accountAddCoins === "function") accountAddCoins(refundCoins);
     }
     // kind "item": o item volta via _mPendingRefund (marketRefundItem no UI)
     o.status = "cancelled";
     write(d);
-    return { ok: true, refundGold, refundCoins };
+    return { ok: true, refundGold, refundCoins, bank: bancoDe(me),
+      coinBalance: (typeof accountCoins === "function") ? accountCoins() : 0 };
   }
 
   async function localClaimGold(token) {
@@ -312,10 +349,18 @@
     return { ok: true, gold: 0 };
   }
 
+  function localCoinBalance() {
+    return (typeof accountCoins === "function") ? accountCoins() : 0;
+  }
+
   async function localDeposit(token, amount) {
     const me = charIdAtual();
-    bancoSet(me, bancoDe(me) + Math.max(0, Math.floor(Number(amount) || 0)));
-    return { ok: true, bank: bancoDe(me) };
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (typeof accountSpendGold === "function" && !accountSpendGold(n)) {
+      return { ok: false, msg: "Gold insuficiente" };
+    }
+    bancoSet(me, bancoDe(me) + n);
+    return { ok: true, bank: bancoDe(me), coinBalance: localCoinBalance(), gold: (typeof accountGold === "function") ? accountGold() : 0 };
   }
 
   async function localWithdraw(token, amount) {
@@ -324,11 +369,12 @@
     const saldo = bancoDe(me);
     const sacar = Math.min(n, saldo);
     bancoSet(me, saldo - sacar);
-    return { ok: true, bank: bancoDe(me), amount: sacar };
+    if (typeof accountAddGold === "function") accountAddGold(sacar);
+    return { ok: true, bank: bancoDe(me), amount: sacar, coinBalance: localCoinBalance(), gold: (typeof accountGold === "function") ? accountGold() : 0 };
   }
 
   async function localBank(token) {
-    return { ok: true, bank: bancoDe(charIdAtual()) };
+    return { ok: true, bank: bancoDe(charIdAtual()), coinBalance: localCoinBalance() };
   }
 
   async function localAddCoins(token, amount) {

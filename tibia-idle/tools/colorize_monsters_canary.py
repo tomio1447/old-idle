@@ -169,6 +169,9 @@ CANARY_COLORS = {
     # Dream Courts: Izcandar compartilha looktype 1137, cores oficiais distintas.
     "izcandar-champion-of-summer": (43, 78, 43, 43),
     "izcandar-champion-of-winter": (48, 38, 48, 48),
+    "acolyte-of-the-cult": (95, 100, 100, 19),
+    "adept-of-the-cult": (95, 94, 94, 19),
+    "enlightened-of-the-cult": (0, 0, 0, 0),
 }
 
 # monstros com looktype "sem mascara" que ainda assim devem ser regerados com
@@ -195,7 +198,8 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "grand-master-oberon",
                "guzzlemaw", "frazzlemaw", "silencer",
                "vicious-squire", "vile-grandmaster", "renegade-knight",
-               "izcandar-champion-of-summer", "izcandar-champion-of-winter"}
+               "izcandar-champion-of-summer", "izcandar-champion-of-winter",
+               "acolyte-of-the-cult", "adept-of-the-cult", "enlightened-of-the-cult"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
 CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,

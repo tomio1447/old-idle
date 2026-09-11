@@ -51,7 +51,9 @@ function openTrainingModal(charId) {
     const have = row.id === "free" ? Infinity : (state.balances[row.id] || 0);
     const price = row.id === "free" ? "grátis" : (row.gold ? `${fmtFull(row.gold)} gp` : `${row.tc} TC`);
     const charges = row.id === "free" ? "∞" : fmtFull(row.charges);
+    const icon = trainingPlanIcon(p, row.id);
     return `<button class="tr-plan-card ${active ? "sel" : ""}" data-tr-plan="${row.id}" type="button">
+      <img src="${icon}" class="tr-plan-icon" alt="">
       <span class="tr-plan-title">${row.name}</span>
       <span class="tr-plan-bonus">${Math.round(row.bonus * 100)}% eficácia</span>
       <span class="tr-plan-meta">${trainingChargesLabel(have)} cargas · pacote ${charges}</span>

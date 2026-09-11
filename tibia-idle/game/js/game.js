@@ -1747,7 +1747,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "HEART OF DESTRUCTION 150+",
     minLevel: 150,
-    ids: ["aftershock", "anomaly", "eradicator", "outburst", "realityquake", "rupture", "world-devourer"],
+    ids: ["aftershock", "anomaly", "eradicator", "outburst", "realityquake", "rupture"],
   },
   {
     title: "DEEPLING WORLD",
@@ -1767,7 +1767,7 @@ const BOSS_MODAL_SECTIONS = [
   {
     title: "FEAST OF SOULS",
     minLevel: 250,
-    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "the-pale-worm", "brain-head"],
+    ids: ["the-dread-maiden", "the-fear-feaster", "the-unwelcome", "brain-head"],
   },
   {
     title: "SOULWAR 400+",
@@ -1778,7 +1778,6 @@ const BOSS_MODAL_SECTIONS = [
       "goshnar-s-greed",
       "goshnar-s-hatred",
       "goshnar-s-cruelty",
-      "goshnar-s-megalomania",
     ],
   },
 ];
@@ -2442,6 +2441,8 @@ function startAcademy() {
   if (G.combat) stopHunt(true);
   if (typeof beginMapLoading === "function") beginMapLoading("Carregando academia...");
   G.training = newAcademyTraining(G.p);
+  G.p.trainingActive = true;
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(G.p);
   G.inCity = false;
   G.p.hunt = null;
   G.combat = null;
@@ -2462,7 +2463,10 @@ function stopAcademy(log) {
   if (returningToTemple && typeof beginMapLoading === "function")
     beginMapLoading("Retornando ao Templo Oficial...");
   if (G.training.members && typeof saveCharacterToRoster === "function")
-    for (const member of G.training.members) if (member.p && !member.p.remoteTraining) saveCharacterToRoster(member.p);
+    for (const member of G.training.members) if (member.p && !member.p.remoteTraining) {
+      member.p.trainingActive = false;
+      saveCharacterToRoster(member.p);
+    }
   G.training = null;
   if (typeof resetGridSize === "function") resetGridSize();
   G.inCity = true;
@@ -5057,7 +5061,13 @@ async function startGameReady(p) {
     if(mx){p.hp=mx.hp;p.mp=mx.mp;}
   }
   if(instanceSession)resumeIdleInstance(instanceSession).then(startRuntime);
-  else startRuntime(null);
+  else if (p.trainingActive && typeof startTrainingArea === "function") {
+    // personagem estava treinando: reentra direto na area de treino
+    startTrainingArea();
+    startRuntime(null);
+  } else {
+    startRuntime(null);
+  }
 }
 
 function bindControls() {
@@ -5092,8 +5102,7 @@ function bindControls() {
   }
   if (typeof bootStoreFromQuery === "function") bootStoreFromQuery();
   /* Market / Reward / Forge / Depot / Imbuements: só via modal CIDADE (e Cyclopedia). */
-  const btnWheel = $("#btn-wheel");
-  if (btnWheel) btnWheel.addEventListener("click", () => { if (typeof openWheelModal === "function") openWheelModal(); });
+  /* Wheel attach é responsabilidade de wheel-modal.js (evita listener duplicado) */
   const btnCharms = $("#btn-charms");
   if (btnCharms) btnCharms.addEventListener("click", () => {
     if (typeof openCyclopedia === "function") openCyclopedia("charms");
@@ -5363,14 +5372,16 @@ function createCharacter(name, voc, sex) {
 }
 
 /* Desenha o retrato de cada personagem na lista, com o outfit atual dele.
-   Os sprites podem ainda estar carregando, então tenta de novo por alguns frames. */
+   Os sprites podem ainda estar carregando, então tenta de novo por alguns frames.
+   Após 16 tentativas aceita o corpo sem montaria para não deixar o slot vazio. */
 function paintCharPortraits(chars, tries) {
   tries = tries === undefined ? 24 : tries;
+  const allowUnmounted = tries <= 8;
   let missing = false;
   for (const c of chars) {
     const box = document.querySelector(`[data-portrait="${c.id}"]`);
     if (!box || box.dataset.done) continue;
-    const url = OutfitRenderer.preview(c, "s");
+    const url = OutfitRenderer.preview(c, "s", allowUnmounted);
     if (url) {
       box.innerHTML = `<img src="${url}" alt="">`;
       box.dataset.done = "1";
@@ -5658,13 +5669,14 @@ function initAccountLogin() {
   }
   function paintAccountPortraits(characters, tries) {
     tries = tries === undefined ? 25 : tries;
+    const allowUnmounted = tries <= 8;
     let pending = false;
     for (const c of characters) {
       const host = document.querySelector(`[data-account-portrait="${c.id}"]`);
       if (!host || host.dataset.done === "1") continue;
       const preview = accountCharacterPreview(c);
       const cv = typeof AppearanceRenderer !== "undefined"
-        ? AppearanceRenderer.preview(preview, "s") : null;
+        ? AppearanceRenderer.preview(preview, "s", allowUnmounted) : null;
       if (cv) {
         cv.style.width = "48px"; cv.style.height = "48px";
         cv.style.imageRendering = "pixelated";

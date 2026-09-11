@@ -26,23 +26,35 @@ const WARZONES = [
     id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: 6000000,
     bossSprite: "abyssador", baseMonster: "abyssador",
   },
+  {
+    id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: 8000000,
+    bossSprite: "the-baron-from-below", baseMonster: "the-baron-from-below",
+  },
+  {
+    id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: 10000000,
+    bossSprite: "the-count-of-the-core", baseMonster: "the-count-of-the-core",
+  },
+  {
+    id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: 12000000,
+    bossSprite: "the-duke-of-the-depths", baseMonster: "the-duke-of-the-depths",
+  },
 ];
 
 const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
 const MAJOR_CRYSTAL_TOKEN = "major-crystal-token";
 const MAJOR_CRYSTAL_PER_ACCOUNT = 3;
-const MAX_CHARS_PER_ACCOUNT = 2;
-const WORLD_BOSS_MAX_MEMBERS = 30;
+const MAX_CHARS_PER_ACCOUNT = 1;
+const WORLD_BOSS_MAX_MEMBERS = 20;
 
 function bossIdForWarzone(warzoneId) {
   const id = String(warzoneId || "wz1").toLowerCase();
-  return /^wz[123]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
+  return /^wz[1-6]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
 }
 function isWorldBossBossId(id) {
-  return /^world-boss-wz[123]$/.test(String(id || ""));
+  return /^world-boss-wz[1-6]$/.test(String(id || ""));
 }
 function warzoneIdFromBossId(bossId) {
-  const m = String(bossId || "").match(/^world-boss-(wz[123])$/);
+  const m = String(bossId || "").match(/^world-boss-(wz[1-6])$/);
   return m ? m[1] : null;
 }
 
@@ -69,13 +81,14 @@ function createWorldBossController(opts) {
   };
   // TEST_SERVER: mínimo 2 chars para iniciar (join de 1 conta com 2 chars, ou 2 contas).
   // Produção: ≥20 no fim do timer; lotação 30 inicia na hora. Override: WB_MIN_START.
-  const minStart = envInt("WB_MIN_START", testServer ? 2 : 20);
-  const maxChars = envInt("WB_MAX_CHARS", 30);
+  const minStart = envInt("WB_MIN_START", 1);
+  const maxChars = envInt("WB_MAX_CHARS", 20);
 
   let event = null;
   let nextRotationAt = Date.now() + timers.rotationMs;
   let tickHandle = null;
   const leaveCooldownUntil = new Map(); // accountId -> ts
+  const charCooldownUntil = new Map(); // characterId -> ts
   const shareByAccount = new Map(); // accountId -> { eventId, ownerAccountId, instanceId }
   const publishAll = typeof opts.publishAll === "function" ? opts.publishAll : () => {};
   const publishAccount = typeof opts.publishAccount === "function" ? opts.publishAccount : () => {};
@@ -207,6 +220,7 @@ function createWorldBossController(opts) {
       bossName: wz.bossName,
       bossSprite: wz.bossSprite || "dragon",
       baseMonster: wz.baseMonster || wz.bossSprite || "dragon",
+      lobbyType: event.lobbyType,
       phase: event.phase,
       openedAt: event.openedAt,
       lobbyEndsAt: event.lobbyEndsAt || 0,
@@ -218,6 +232,12 @@ function createWorldBossController(opts) {
       maxPerAccount: MAX_CHARS_PER_ACCOUNT,
       minStart,
       vocations: vocationBreakdown(),
+      participants: Array.from(event.joins.entries()).flatMap(([accountId, join]) =>
+        (join.chars || []).map((c) => ({
+          accountId: Number(accountId), id: Number(c.id), name: c.name,
+          voc: c.voc, level: Number(c.level) || 1,
+          host: Number(accountId) === Number(event.hostAccountId),
+        }))),
       message: event.phase === "countdown"
         ? "EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!"
         : null,
@@ -247,7 +267,7 @@ function createWorldBossController(opts) {
     publishAll("world-boss", snap.event || { phase: "idle", nextRotationAt });
   }
 
-  function openLobby(warzoneId, reason) {
+  function openLobby(warzoneId, reason, lobbyType, ownerAccountId) {
     if (event && event.phase !== "idle" && event.phase !== "ended") {
       return { ok: false, error: "EVENT_ACTIVE", msg: "Já existe um World Boss em andamento." };
     }
@@ -256,6 +276,7 @@ function createWorldBossController(opts) {
       id: "wb-" + Date.now().toString(36),
       warzoneId: wz.id,
       phase: "lobby",
+      lobbyType: String(lobbyType || "open").toLowerCase(),
       openedAt: now(),
       lobbyEndsAt: now() + timers.lobbyMs,
       countdownEndsAt: 0,
@@ -267,11 +288,14 @@ function createWorldBossController(opts) {
       result: null,
       rareAssigned: new Set(),
       reason: reason || "rotation",
-      hostAccountId: null,
+      hostAccountId: Number(ownerAccountId) || null,
       instanceId: null,
+      invited: new Set(),
     };
+    if (event.lobbyType !== "open" && event.lobbyType !== "closed") event.lobbyType = "open";
+    if (event.hostAccountId) event.invited.add(event.hostAccountId);
     nextRotationAt = event.lobbyEndsAt + timers.rotationMs;
-    console.log("[world-boss] lobby open", wz.id, event.id, "reason=" + event.reason);
+    console.log("[world-boss] lobby open", wz.id, event.id, "reason=" + event.reason, "type=" + event.lobbyType, "owner=" + event.hostAccountId);
     broadcast();
     return { ok: true, state: publicState(null) };
   }
@@ -425,10 +449,18 @@ function createWorldBossController(opts) {
     }
   }
 
+  function applyCharCooldown() {
+    const cd = now() + 16 * 3600 * 1000;
+    for (const join of (event && event.joins ? event.joins.values() : [])) {
+      for (const c of (join.chars || [])) charCooldownUntil.set(Number(c.id), cd);
+    }
+  }
+
   async function finishSuccess(db) {
     if (!event || event.phase !== "combat") return;
     console.log("[world-boss] success", event.id);
     const host = event.hostAccountId, instanceId = event.instanceId;
+    applyCharCooldown();
     await grantSuccessRewards(db);
     for (const [accountId] of event.joins) {
       publishAccount(accountId, "world-boss", { action: "success", warzoneId: event.warzoneId });
@@ -444,6 +476,7 @@ function createWorldBossController(opts) {
     if (!event || (event.phase !== "combat" && event.phase !== "countdown")) return;
     console.log("[world-boss] fail", reason, event.id);
     const host = event.hostAccountId, instanceId = event.instanceId;
+    applyCharCooldown();
     for (const [accountId] of event.joins) {
       publishAccount(accountId, "world-boss", { action: "fail", reason });
     }
@@ -539,6 +572,9 @@ function createWorldBossController(opts) {
     if (!event || event.phase !== "lobby") {
       return { code: 409, body: { ok: false, error: "LOBBY_CLOSED", msg: "Lobby do World Boss fechado." } };
     }
+    if (event.lobbyType === "closed" && !event.invited.has(Number(acc.id))) {
+      return { code: 403, body: { ok: false, error: "INVITE_REQUIRED", msg: "Este lobby é fechado. Apenas jogadores convidados podem entrar." } };
+    }
     const t = now();
     const cd = leaveCooldownUntil.get(Number(acc.id)) || 0;
     if (cd > t) {
@@ -565,16 +601,21 @@ function createWorldBossController(opts) {
     }
     ids = uniqueIds;
     if (!ids.length) {
-      return { code: 400, body: { ok: false, error: "NO_CHARS", msg: "Selecione 1 ou 2 personagens." } };
+      return { code: 400, body: { ok: false, error: "NO_CHARS", msg: "Selecione 1 personagem." } };
     }
     if (charCount() + ids.length > maxChars) {
-      return { code: 409, body: { ok: false, error: "LOBBY_FULL", msg: "Lobby lotado (30/30)." } };
+      return { code: 409, body: { ok: false, error: "LOBBY_FULL", msg: "Lobby lotado (" + maxChars + "/" + maxChars + ")." } };
     }
     const chars = [];
     for (const id of ids) {
       const character = await db.findCharacter(id);
       if (!character || Number(character.account_id) !== Number(acc.id)) {
         return { code: 403, body: { ok: false, error: "CHAR_NOT_OWNED", msg: "Personagem inválido." } };
+      }
+      const cd = charCooldownUntil.get(Number(character.id)) || 0;
+      if (cd > now()) {
+        const min = Math.ceil((cd - now()) / 60000);
+        return { code: 429, body: { ok: false, error: "CHAR_COOLDOWN", msg: `Personagem em cooldown (${Math.floor(min/60)}h ${min%60}m restantes).` } };
       }
       let data = character.data;
       if (typeof data === "string") {
@@ -584,6 +625,7 @@ function createWorldBossController(opts) {
         id: Number(character.id),
         name: String((data && data.name) || character.name || "?"),
         voc: String((data && data.voc) || character.voc || "none"),
+        level: Math.max(1, Number((data && data.level) || character.level) || 1),
         dead: false,
       });
     }
@@ -657,6 +699,65 @@ function createWorldBossController(opts) {
     return { code: 200, body: publicState(acc.id) };
   }
 
+  async function createLobby(db, body) {
+    const acc = await db.findAccountByToken(body && body.token);
+    if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+    const warzoneId = String(body && (body.warzoneId || body.warzone) || "").toLowerCase();
+    if (!WARZONES.some((w) => w.id === warzoneId)) {
+      return { code: 400, body: { ok: false, error: "INVALID_WARZONE", msg: "Warzone inválida." } };
+    }
+    const lobbyType = String(body && body.lobbyType || "open").toLowerCase();
+    if (event && event.phase !== "idle" && event.phase !== "ended") {
+      return { code: 409, body: { ok: false, error: "EVENT_ACTIVE", msg: "Já existe um lobby ativo." } };
+    }
+    const r = openLobby(warzoneId || null, "create", lobbyType, acc.id);
+    if (!r.ok) return { code: 409, body: r };
+    return { code: 200, body: publicState(acc.id) };
+  }
+
+  async function autoJoin(db, body) {
+    const acc = await db.findAccountByToken(body && body.token);
+    if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+    const t = now();
+    const cd = leaveCooldownUntil.get(Number(acc.id)) || 0;
+    if (cd > t) {
+      return { code: 429, body: { ok: false, error: "LEAVE_COOLDOWN",
+        msg: "Aguarde o cooldown de leave.", retryAfterMs: cd - t } };
+    }
+    if (event && event.lobbyType === "closed" && !event.invited.has(Number(acc.id))) {
+      return { code: 403, body: { ok: false, error: "INVITE_REQUIRED", msg: "Lobby fechado. Convite necessário." } };
+    }
+    if (!event || event.phase !== "lobby") {
+      return { code: 404, body: { ok: false, error: "NO_OPEN_LOBBY", msg: "Nenhum lobby aberto." } };
+    }
+    const requestedWarzone = String(body && (body.warzoneId || body.warzone) || "").toLowerCase();
+    if (requestedWarzone && requestedWarzone !== event.warzoneId) {
+      return { code: 409, body: { ok: false, error: "WRONG_WARZONE", msg: "O lobby ativo pertence a outra Warzone." } };
+    }
+    const charId = Number(body && (body.characterId || body.character_id || body.characterIds && body.characterIds[0]));
+    if (!Number.isSafeInteger(charId) || charId <= 0) {
+      return { code: 400, body: { ok: false, error: "NO_CHAR", msg: "Selecione 1 personagem." } };
+    }
+    return join(db, { token: body.token, characterIds: [charId] });
+  }
+
+  async function invite(db, body) {
+    const acc = await db.findAccountByToken(body && body.token);
+    if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+    if (!event || event.phase !== "lobby") {
+      return { code: 409, body: { ok: false, error: "NO_LOBBY", msg: "Nenhum lobby aberto." } };
+    }
+    if (Number(event.hostAccountId) !== Number(acc.id)) {
+      return { code: 403, body: { ok: false, error: "NOT_OWNER", msg: "Somente o dono do lobby pode convidar." } };
+    }
+    const targetAccountId = Number(body && body.accountId);
+    if (!Number.isSafeInteger(targetAccountId) || targetAccountId <= 0) {
+      return { code: 400, body: { ok: false, error: "INVALID_ACCOUNT", msg: "ID da conta inválido." } };
+    }
+    event.invited.add(targetAccountId);
+    return { code: 200, body: { ok: true, state: publicState(acc.id) } };
+  }
+
   async function forceOpen(db, body, authOk) {
     if (!authOk) return { code: 403, body: { ok: false, error: "FORBIDDEN" } };
     const wz = body && (body.warzoneId || body.warzone);
@@ -685,6 +786,7 @@ function createWorldBossController(opts) {
   return {
     start, stop, tick, publicState,
     join, leave, markLoaded, reportCombat, forceOpen, forceClose, stateFor,
+    createLobby, autoJoin, invite,
     bindShare, sharedForAccount, getEvent, getEventByOwner, onSharedEnded,
     joinedCharIds, joinedAccountIds, membersForStart,
     timers, minStart, maxChars,

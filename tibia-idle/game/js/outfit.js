@@ -219,10 +219,10 @@ const OutfitRenderer = {
   },
 
   /* Data URL de uma prévia (usada na lista de personagens) */
-  preview(p, dir) {
+  preview(p, dir, allowUnmounted) {
     const o = playerOutfit(p);
     if (typeof AppearanceRenderer !== "undefined") {
-      const nv = AppearanceRenderer.preview(p, dir || "s");
+      const nv = AppearanceRenderer.preview(p, dir || "s", allowUnmounted);
       if (nv) { try { return nv.toDataURL(); } catch (e) { return null; } }
       return null;
     }

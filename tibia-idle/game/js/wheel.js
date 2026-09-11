@@ -44,6 +44,7 @@ function ensureWheel(p) {
   if (!p) return;
   if (!p.wheel || typeof p.wheel !== "object") p.wheel = {};
   if (!p.wheel.slots || typeof p.wheel.slots !== "object") p.wheel.slots = {};
+  if (!Array.isArray(p.wheel.uiSlots) || p.wheel.uiSlots.length !== 36) p.wheel.uiSlots = new Array(36).fill(0);
   if (!p.wheel.scrolls || typeof p.wheel.scrolls !== "object") p.wheel.scrolls = {};
   if (!p.wheel.giftOfLifeAt) p.wheel.giftOfLifeAt = 0;
   if (typeof _ensureWheelGems === "function") _ensureWheelGems(p);

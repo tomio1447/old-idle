@@ -980,7 +980,7 @@ function bindCatalogAccordion(root, mode) {
 
 const HUNT_MODAL_SECTIONS = [
   { title: "HUNTS 1–50", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "meriana-island"] },
-  { title: "HUNTS 50–100", ids: ["stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "mutateds-yalahar", "lizardstown"] },
+  { title: "HUNTS 50–100", ids: ["stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "mutateds-yalahar", "lizardstown", "feyrist-nightmare", "cemetery-yalahar", "cults-yalahar", "bog-yalahar"] },
   { title: "HUNTS 100–250", ids: ["the-void", "exotic-cave", "pirat-lower", "lizard-chosen-tower", "ghastly-dragons", "draken-walls", "drakens-castle", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },
   { title: "HUNTS 250+", ids: ["mota-extension", "cobra-bastion", "marapur-nagas", "buried-cathedral", "ingol-terrain", "roshamuul", "prison-1", "prison-2", "prison-3", "catacombs-oramond", "deathlings-sunken-temple", "falcon-bastion"] },
   { title: "FERUMBRAS ASCENDANT", ids: ["ferumbras-way", "dt-seal", "juggerseal"] },
@@ -1044,11 +1044,7 @@ function renderHunts(p) {
     });
   }
   $$("#hunts-modal-list [data-hunt]").forEach((el) => {
-    el.addEventListener("click", () => {
-      const modalBox = $("#modal-body");
-      if (modalBox) modalBox.classList.remove("hunts-modal-shell");
-      openHuntInfoModal(el.dataset.hunt);
-    });
+    el.addEventListener("click", () => openHuntInfoModal(el.dataset.hunt));
   });
 }
 
@@ -1123,7 +1119,9 @@ function openHuntInfoModal(id) {
   const stars = typeof huntStars === "function" ? huntStars(hu) : 1;
   const starsHtml = typeof huntStarsHtml === "function" ? huntStarsHtml(stars) : "";
   const soon = !!hu.comingSoon;
-  $("#modal-body").innerHTML = `
+  const modalBody = $("#modal-body");
+  modalBody.classList.add("hunts-modal-shell");
+  modalBody.innerHTML = `
     <div class="panel-title">
       <button class="sm" id="huntinfo-back">← Voltar</button>
       <span style="margin-left:6px">${hu.name}</span>
@@ -1150,7 +1148,10 @@ function openHuntInfoModal(id) {
       </div>
     </div>`;
 
-  const close = () => $("#modal").classList.remove("show", "wide");
+  const close = () => {
+    $("#modal").classList.remove("show", "wide");
+    modalBody.classList.remove("hunts-modal-shell");
+  };
   $("#huntinfo-close").addEventListener("click", close);
   $("#huntinfo-cancel").addEventListener("click", close);
   $("#huntinfo-back").addEventListener("click", () => { openHuntsModal(); });
@@ -1221,7 +1222,7 @@ function openHuntFloorSelection(id) {
   $("#hunt-floor-close").addEventListener("click", close);
   $("#hunt-floor-back").addEventListener("click", () => { openHuntsModal(); });
   $$("#modal-body [data-start-floor]").forEach((btn) => {
-    btn.addEventListener("click", () => { close(); startHunt(btn.dataset.startFloor); });
+    btn.addEventListener("click", () => { openHuntInfoModal(btn.dataset.startFloor); });
   });
   $("#modal").classList.add("show");
   if (floors.length > 1) $("#modal").classList.add("wide");

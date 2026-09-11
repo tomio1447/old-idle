@@ -12,7 +12,7 @@
  */
 "use strict";
 
-let _mTab = "buy";        // buy | sell | mine | coins | history
+let _mTab = "browse";     // browse | sell | mine | coins | history
 let _mQ = "";
 let _mCat = "";
 let _mTier = "";
@@ -30,23 +30,114 @@ let _mCoinsAnon = false;
 let _mMarketT = null;
 let _mOffersCache = null;
 let _mPendingRefund = {}; // ofertaId -> {slug, inst?, qty} p/ devolver ao cancelar
-let _mBank = 0;           // saldo do banco do market
+let _mBank = 0;           // cache do accountGold() no market (compartilhado)
+let _mBrowseCat = "all";  // categoria selecionada no browser
+let _mBrowseItem = null;  // slug do item selecionado
+let _mBrowseView = "sell"; // sell | buy ofertas do item selecionado
+let _mBrowseOffers = [];  // ofertas do item selecionado
+let _mBrowseLoading = false;
+let _mBrowseLvl = "";     // nível máximo do filtro (vazio = todos)
+let _mBrowseVoc = "";     // vocação do filtro (vazio = todas)
+let _mBusy = false;
 
+function marketSetBusy(btn, busy) {
+  _mBusy = busy;
+  if (btn) {
+    if (busy && !btn.dataset.origText) btn.dataset.origText = btn.textContent;
+    btn.disabled = busy;
+    btn.textContent = busy ? "Processando..." : (btn.dataset.origText || btn.textContent);
+  }
+}
+
+function marketWithLock(btn, fn) {
+  if (_mBusy) return;
+  marketSetBusy(btn, true);
+  Promise.resolve().then(fn).finally(() => marketSetBusy(btn, false));
+}
+
+function marketRefreshHeader() {
+  _mBank = accountGold();
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  const goldEl = $("#m-header-gold");
+  const coinsEl = $("#m-header-coins");
+  if (goldEl) goldEl.innerHTML = `<img src="assets/item/gold-coin.png?v=${v}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;margin-right:3px" alt="">${fmtFull(accountGold())}`;
+  if (coinsEl) coinsEl.innerHTML = `<img src="assets/ui/coins/tibia-coins.gif?v=${v}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;margin-right:3px" alt="">${fmtFull(accountCoins())}`;
+}
+
+/* Categorias OTC/Canary MarketSystem (MarketCategory.as) */
 const MARKET_CAT_LABEL = {
-  weapon: "Armas", armor: "Armaduras", helmet: "Elmos", legs: "Pernas",
-  boots: "Botas", shield: "Escudos", ring: "Aneis", amulet: "Amuletos",
-  other: "Outros",
+  all: "Todos",
+  armors: "Armors",
+  amulets: "Amulets",
+  boots: "Boots",
+  containers: "Containers",
+  decoration: "Decoration",
+  helmets: "Helmets / Hats",
+  legs: "Legs",
+  others: "Others",
+  rings: "Rings",
+  shields: "Shields",
+  axes: "Axes",
+  clubs: "Clubs",
+  distance: "Distance Weapons",
+  swords: "Swords",
+  wands: "Wands / Rods",
+  premium: "Premium Scrolls",
+  "tibia-coins": "Tibia Coins",
+  imbuements: "Imbuements"
 };
+const MARKET_CAT_ORDER = Object.keys(MARKET_CAT_LABEL);
+const MARKET_BANNED_CATS = new Set(["potions", "runes", "ammunition", "weapons", "valuables", "tools", "food", "decoration"]);
+
+function marketCatLabelHTML(c) {
+  if (c === "tibia-coins") {
+    const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+    return `<img src="assets/ui/coins/tibia-coins.gif?v=${v}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;margin-right:4px" alt="">Tibia Coins`;
+  }
+  return MARKET_CAT_LABEL[c] || c;
+}
 
 /* Fee oficial: 2% (mín 20, máx 1.000.000) */
 function marketFee(price) {
   return Math.max(20, Math.min(1000000, Math.round(price * 0.02)));
 }
 
+/* Determina categoria Canary/OTC a partir de GAMEDATA / MARKETDATA */
 function marketItemCat(slug) {
-  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
-  const s = it.s;
-  return MARKET_CAT_LABEL[s] ? s : "other";
+  const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
+  const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items[slug]) || {};
+  const t = gd.t || md.t || "";
+  const s = gd.s || md.s || "";
+
+  if (t === "armor" || t === "body") {
+    if (s === "helmet") return "helmets";
+    if (s === "legs") return "legs";
+    if (s === "boots") return "boots";
+    return "armors";
+  }
+  if (t === "shield" || s === "shield") return "shields";
+  if (t === "accessory") {
+    if (s === "ring") return "rings";
+    return "amulets";
+  }
+  if (t === "sword") return "swords";
+  if (t === "club") return "clubs";
+  if (t === "axe") return "axes";
+  if (t === "distance") return "distance";
+  if (t === "wand" || t === "magic") return "wands";
+  if (t === "ammo" || s === "ammo") return "ammunition";
+  if (t === "container" || s === "backpack") return "containers";
+  if (t === "imbuement" || s === "imbuement") return "imbuements";
+  if (t === "potion" || s === "potion") return "potions";
+  if (t === "rune") return "runes";
+  if (t === "food") return "food";
+  if (t === "tool") return "tools";
+  if (t === "decoration") return "decoration";
+  if (t === "premium") return "premium";
+  if (t === "weapon" && s === "weapon") return "weapons";
+  if (t === "ammo" || s === "ammo") return "ammunition";
+  if (t === "loot" || t === "valuable") return "valuables";
+  return "others";
 }
 
 function marketOnline() {
@@ -228,38 +319,36 @@ function renderMarket() {
     return;
   }
 
-  // carrega o saldo do banco (assíncrono, não bloqueia)
-  marketBank(tok).then((r) => { if (r.ok) _mBank = r.bank; });
+  // O gold do market passa a ser o account.gold compartilhado (sem banco separado)
+  _mBank = accountGold();
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
 
   $("#modal-body").innerHTML = `
     <div class="panel-title">
       <img src="assets/ui/market/market.png" style="width:20px;height:20px;image-rendering:pixelated">
       <b>Market</b> <span class="tiny dim">player-to-player</span>
       <span style="flex:1"></span>
-      <span class="tiny" style="color:#ffe680">🏦 ${fmtFull(_mBank)} gp</span>
-      <span class="tiny" style="color:#ffe680;margin-left:6px">🪙 ${fmtFull(accountCoins())}</span>
+      <span id="m-header-gold" class="tiny" style="color:#9ce84a;display:inline-flex;align-items:center;gap:3px"><img src="assets/item/gold-coin.png?v=${v}" style="width:16px;height:16px;image-rendering:pixelated" alt="">${fmtFull(accountGold())}</span>
+      <span id="m-header-coins" class="tiny" style="color:#ffe680;margin-left:6px;display:inline-flex;align-items:center;gap:3px"><img src="assets/ui/coins/tibia-coins.gif?v=${v}" style="width:16px;height:16px;image-rendering:pixelated" alt="">${fmtFull(accountCoins())}</span>
       <button class="sm" id="market-close">✕</button>
     </div>
     <div class="panel-body">
       <div class="row mb4" style="gap:4px;flex-wrap:wrap">
-        <button class="sm ${_mTab === "buy" ? "primary" : ""}" data-mtab="buy">🛒 Ofertas</button>
+        <button class="sm ${_mTab === "browse" ? "primary" : ""}" data-mtab="browse">�️ Navegar</button>
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
         <button class="sm ${_mTab === "coins" ? "primary" : ""}" data-mtab="coins">🪙 Tibia Coins</button>
         <button class="sm ${_mTab === "history" ? "primary" : ""}" data-mtab="history">🧾 Histórico</button>
-        <span style="flex:1"></span>
-        <button class="sm" id="m-bank-toggle" title="Depositar/sacar gold do banco">🏦 Banco</button>
       </div>
-      <div id="market-body"></div>
+      <div id="market-body" style="height:520px;overflow:auto"></div>
     </div>`;
 
   $("#market-close").addEventListener("click", () => modal.classList.remove("show", "wide"));
   $$("#modal-body [data-mtab]").forEach((b) =>
     b.addEventListener("click", () => { _mTab = b.dataset.mtab; renderMarket(); }));
-  $("#m-bank-toggle").addEventListener("click", () => renderMarketBank());
 
   const body = $("#market-body");
-  if (_mTab === "buy") renderMarketBuy(body, p);
+  if (_mTab === "browse") renderMarketBrowse(body, p);
   else if (_mTab === "sell") renderMarketSell(body, p);
   else if (_mTab === "mine") renderMarketMine(body, p);
   else if (_mTab === "history") renderMarketHistory(body, p);
@@ -268,121 +357,379 @@ function renderMarket() {
   modal.classList.add("show", "wide");
 }
 
-/* ------------------------------------------------------------- COMPRAR */
-function renderMarketBuy(body, p) {
-  const tok = sessionToken();
-  const cats = Object.keys(MARKET_CAT_LABEL);
-  body.innerHTML = `
-    <div class="row mb4" style="gap:4px;flex-wrap:wrap">
-      <input id="m-buy-q" placeholder="buscar item..." value="${_mQ}"
-        style="width:140px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      <select id="m-buy-cat" style="padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-        <option value="">Todas</option>
-        ${cats.map((c) => `<option value="${c}" ${_mCat === c ? "selected" : ""}>${MARKET_CAT_LABEL[c]}</option>`).join("")}
-      </select>
-      <select id="m-buy-tier" style="padding:3px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-        <option value="">Todos tiers</option>
-        <option value="0" ${_mTier === "0" ? "selected" : ""}>Sem tier</option>
-        <option value="1" ${_mTier === "1" ? "selected" : ""}>T1+</option>
-        <option value="5" ${_mTier === "5" ? "selected" : ""}>T5+</option>
-      </select>
-      <button class="sm" id="m-buy-refresh">⟳</button>
-      <span style="flex:1"></span>
-      <button class="sm" id="m-buy-offer" title="Oferecer um preço para comprar">+ Oferecer compra</button>
-    </div>
-    <div class="tiny dim mb4" style="color:#9ce84a">Ofertas de venda (sell) em cima · Ofertas de compra (buy) embaixo</div>
-    <div class="list" id="m-buy-list" style="max-height:430px"></div>`;
-
-  $("#m-buy-q").addEventListener("input", (e) => {
-    clearTimeout(_mMarketT);
-    _mMarketT = setTimeout(() => { _mQ = e.target.value; renderMarketBuy(body, p); }, 200);
-  });
-  $("#m-buy-cat").addEventListener("change", (e) => { _mCat = e.target.value; renderMarketBuy(body, p); });
-  $("#m-buy-tier").addEventListener("change", (e) => { _mTier = e.target.value; renderMarketBuy(body, p); });
-  $("#m-buy-refresh").addEventListener("click", () => { _mOffersCache = null; renderMarketBuy(body, p); });
-  $("#m-buy-offer").addEventListener("click", () => renderMarketBuyOffer(body, p));
-
-  const list = $("#m-buy-list");
-  list.innerHTML = '<div class="tiny dim">Carregando ofertas...</div>';
-  marketListOffers({ kind: "" }).then((r) => {
-    if (!r.ok) { list.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
-    _mOffersCache = r.offers;
-    let ofertas = r.offers || [];
-    const q = _mQ.trim().toLowerCase();
-    if (q) ofertas = ofertas.filter((o) => (itemName(o.slug) || "").toLowerCase().indexOf(q) !== -1 || o.slug.indexOf(q) !== -1);
-    if (_mCat) ofertas = ofertas.filter((o) => marketItemCat(o.slug) === _mCat);
+/* ---------------------------------------------------------- Filtros do browse */
+function marketFilteredItems(catalog) {
+  const q = _mQ.trim().toLowerCase();
+  return catalog.filter((it) => {
+    if (_mBrowseCat !== "all" && it.category !== _mBrowseCat) return false;
+    if (q && it.name.toLowerCase().indexOf(q) === -1 && it.slug.indexOf(q) === -1) return false;
     if (_mTier) {
       const t = Number(_mTier);
-      ofertas = ofertas.filter((o) => t === 0 ? (o.tier || 0) === 0 : (o.tier || 0) >= t);
+      if (t === 0 ? (it.tier || 0) !== 0 : (it.tier || 0) < t) return false;
     }
-    const sells = ofertas.filter((o) => o.kind === "item");
-    const buys = ofertas.filter((o) => o.kind === "buy");
-    if (!sells.length && !buys.length) {
-      list.innerHTML = '<div class="tiny dim">Nenhuma oferta ativa — use "+ Oferecer compra" ou venda um item.</div>';
-      return;
+    if (_mBrowseVoc) {
+      const voc = _mBrowseVoc.toLowerCase();
+      if (voc === "none") {
+        if (it.vocs && it.vocs.length) return false;
+      } else {
+        if (!it.vocs || !it.vocs.some((v) => v.toLowerCase().indexOf(voc) !== -1)) return false;
+      }
     }
-    const row = (o, isSell) => {
-      const tier = o.tier || 0;
-      const unfair = marketUnfair(o);
-      const cor = unfair ? "color:#ff6a6a" : "";
-      const preco = o.price_tc ? "🪙 " + fmtFull(o.price) : fmtFull(o.price) + " gp";
-      return `<div class="shop-row" style="align-items:center;${cor}">
-        <div style="position:relative">${itemImg(o.slug, 24, null, o.qty || 1)}
-          ${tier ? `<span class="tier-badge" style="position:absolute;top:-2px;right:-2px;font-size:7px;height:11px;min-width:11px;line-height:10px">T${tier}</span>` : ""}</div>
-        <div style="flex:1;min-width:0">
-          <div class="small">${itemName(o.slug)} ${tier ? `<span style="color:#dab0ff">T${tier}</span>` : ""}</div>
-          <div class="tiny dim">${o.seller_name || "Anônimo"} · ${marketTimeLeft(o)} · ${o.qty}x
-            ${unfair ? `<span style="color:#ff6a6a">· ${unfair === "alto" ? "▲ alto" : "▼ baixo"}</span>` : ""}</div>
-        </div>
-        ${isSell
-          ? `<button class="sm primary" data-mbuy="${o.id}" data-price="${o.price}" data-tc="${o.price_tc ? 1 : 0}">${preco}</button>`
-          : `<button class="sm" data-maccept="${o.id}" title="Vender para esta oferta">Aceitar ${preco}</button>`}
-      </div>`;
-    };
-    const secao = (titulo, arr, isSell) =>
-      `<div class="small mb2" style="color:${isSell ? "#9ce84a" : "#7ec8ff"};font-weight:bold;margin-top:6px">${titulo}</div>` +
-      (arr.length ? arr.map((o) => row(o, isSell)).join("") : '<div class="tiny dim">—</div>');
-    list.innerHTML = secao("🛒 Ofertas de venda", sells, true) + secao("🛍 Ofertas de compra", buys, false);
+    if (_mBrowseLvl) {
+      const max = Number(_mBrowseLvl);
+      if (!Number.isFinite(max) || (it.lvl || 0) > max) return false;
+    }
+    return true;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
 
-    // comprar sell offer
-    $$("#m-buy-list [data-mbuy]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        const id = b.dataset.mbuy;
-        const price = Number(b.dataset.price);
-        const priceTc = b.dataset.tc === "1";
-        if (priceTc && accountCoins() < price) { toast("Tibia Coins insuficientes"); return; }
-        if (!priceTc && _mBank < price) { toast("Ouro insuficiente no banco"); return; }
-        const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
-        if (!r.ok) { toast(r.msg || "Falha na compra"); return; }
-        const d = r.data;
-        if (d.item) marketReceiveItem(p, d.item.slug, d.item.tier, d.item.qty);
-        // Saldos já foram debitados/creditados atomicamente no servidor.
-        if(Number.isFinite(Number(d.bank)))_mBank=Number(d.bank);
-        toast(`Comprou <b>${itemName(d.item ? d.item.slug : "")}</b> — foi para o Depot`, "level");
-        addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → Depot`);
-        renderMarket();
-        renderAll && renderAll();
-      }));
-    // aceitar buy offer (vender para a oferta)
-    $$("#m-buy-list [data-maccept]").forEach((b) =>
-      b.addEventListener("click", async () => {
-        const id = b.dataset.maccept;
-        // precisa ter o item no depot
-        const oferta = (buys.find((o) => o.id === Number(id))) || {};
-        if (!marketHaveInDepot(p, oferta.slug)) {
-          toast("Você não tem esse item no Depot para vender");
-          return;
-        }
-        const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name, qty: 1 });
-        if (!r.ok) { toast(r.msg || "Falha"); return; }
-        // remove do depot; o servidor já creditou o banco autoritativo.
-        marketRemoveDepotItem(p, oferta.slug);
-        if(Number.isFinite(Number(r.data.bank)))_mBank=Number(r.data.bank);
-        toast(`Vendeu <b>${itemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
-        renderMarket();
-        renderAll && renderAll();
-      }));
+function marketAttachItemRowEvents(body, p) {
+  $$("#m-item-rows .m-item-row").forEach((el) => el.addEventListener("click", () => {
+    _mBrowseItem = el.dataset.slug;
+    marketUpdateBrowseDetail(body, p);
+    marketLoadItemOffers(p, _mBrowseItem);
+  }));
+}
+
+function marketAttachDetailEvents(body, p) {
+  const createSellBtn = $("#m-create-sell");
+  if (createSellBtn) createSellBtn.addEventListener("click", () => {
+    const slug = createSellBtn.dataset.slug;
+    const depot = (marketDepotItems(p) || []).filter((i) => i.slug === slug);
+    if (!depot.length) { toast("Você não tem esse item no Depot para vender"); return; }
+    const i = depot[0];
+    _mSel = { slug, instId: i.instId || null, qty: i.qty || 1, tier: i.tier || 0, from: "depot" };
+    _mTab = "sell";
+    renderMarket();
   });
+  const createBuyBtn = $("#m-create-buy");
+  if (createBuyBtn) createBuyBtn.addEventListener("click", () => {
+    _mQ = "";
+    renderMarketBuyOffer(body, p, createBuyBtn.dataset.slug);
+  });
+}
+
+function marketUpdateBrowseList(body, p) {
+  const catalog = marketBuildCatalog();
+  const allItems = marketFilteredItems(catalog);
+  const MAX_RENDER_ITEMS = 250;
+  const totalItems = allItems.length;
+  const shownItems = allItems.slice(0, MAX_RENDER_ITEMS);
+
+  const rows = $("#m-item-rows");
+  if (rows) rows.innerHTML = shownItems.length ? shownItems.map((it) => marketItemRowHTML(it)).join("") : '<div class="m-empty">Nenhum item</div>';
+
+  const count = $("#m-item-count");
+  if (count) count.textContent = `${totalItems} itens · mostrando ${shownItems.length}`;
+
+  const more = rows && rows.nextElementSibling;
+  if (more && more.classList.contains("tiny") && more.textContent.indexOf("primeiros") !== -1) {
+    more.style.display = totalItems > MAX_RENDER_ITEMS ? "block" : "none";
+    more.textContent = totalItems > MAX_RENDER_ITEMS ? `Apenas os ${MAX_RENDER_ITEMS} primeiros são exibidos. Refine a busca/filtro.` : "";
+  }
+
+  marketAttachItemRowEvents(body, p);
+}
+
+function marketUpdateBrowseDetail(body, p) {
+  const catalog = marketBuildCatalog();
+  const it = catalog.find((x) => x.slug === _mBrowseItem) || null;
+  const detail = $("#m-detail");
+  if (detail) detail.innerHTML = marketDetailHTML(it);
+  marketAttachDetailEvents(body, p);
+}
+
+/* ------------------------------------------------------------- COMPRAR */
+/* ------------------------------------------------------------- NAVEGAR / BROWSE (OTC MarketSystem) */
+function renderMarketBrowse(body, p) {
+  const tok = sessionToken();
+
+  // Catalogo unificado: MARKETDATA (preços) + GAMEDATA (todos os itens)
+  const catalog = marketBuildCatalog();
+  const cats = MARKET_CAT_ORDER;
+
+  const allItems = marketFilteredItems(catalog);
+
+  const MAX_RENDER_ITEMS = 250;
+  const totalItems = allItems.length;
+  const shownItems = allItems.slice(0, MAX_RENDER_ITEMS);
+
+  body.innerHTML = `
+    <style>
+      #market-browse { display:flex; gap:6px; height:100%; overflow:hidden; }
+      #m-cat-list { width:150px; flex:none; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
+      .m-cat { padding:5px 7px; cursor:pointer; color:#c8c0a8; border-radius:2px; font-size:12px; }
+      .m-cat:hover { background:rgba(255,255,255,.05); }
+      .m-cat.active { background:#3d3830; color:#ffd700; }
+      #m-item-list { width:230px; flex:none; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
+      .m-item-row { display:flex; align-items:center; gap:6px; padding:4px; cursor:pointer; border-bottom:1px solid rgba(0,0,0,.25); }
+      .m-item-row:hover, .m-item-row.active { background:rgba(80,65,18,.35); outline:1px solid rgba(212,175,55,.32); }
+      .m-item-row img, .m-item-row .item-sprite { width:24px; height:24px; object-fit:contain; flex:none; }
+      .m-item-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+      #m-detail { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+      #m-detail-info { background:#14120e; border:1px solid #16140f; padding:8px; }
+      #m-offer-tabs { display:flex; gap:4px; }
+      #m-offer-list { flex:1; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
+      .m-offer-row { display:flex; align-items:center; gap:6px; padding:5px; border-bottom:1px solid rgba(0,0,0,.25); }
+      .m-offer-row:hover { background:rgba(255,255,255,.04); }
+      .m-empty { color:#7d7666; font-size:11px; padding:6px; }
+      .m-section-title { font-size:12px; font-weight:bold; color:#ffd700; margin:6px 0 4px; }
+    </style>
+    <div id="market-browse">
+      <div id="m-cat-list">${cats.map((c) => `<div class="m-cat ${_mBrowseCat === c ? "active" : ""}" data-mcat="${c}">${marketCatLabelHTML(c)}</div>`).join("")}</div>
+      <div id="m-item-list">
+        <div class="row mb2" style="gap:4px;flex-wrap:wrap">
+          <input id="m-browse-q" placeholder="buscar..." value="${_mQ}" style="flex:1;min-width:0;padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
+          <select id="m-browse-tier" style="padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
+            <option value="">Tier</option>
+            <option value="0" ${_mTier === "0" ? "selected" : ""}>T0</option>
+            <option value="1" ${_mTier === "1" ? "selected" : ""}>T1+</option>
+            <option value="5" ${_mTier === "5" ? "selected" : ""}>T5+</option>
+          </select>
+          <input id="m-browse-lvl" type="number" min="0" placeholder="Lv" value="${_mBrowseLvl}" style="width:60px;padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
+          <select id="m-browse-voc" style="padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
+            <option value="">Vocação</option>
+            <option value="none" ${_mBrowseVoc === "none" ? "selected" : ""}>Sem vocação</option>
+            <option value="knight" ${_mBrowseVoc === "knight" ? "selected" : ""}>Knight</option>
+            <option value="paladin" ${_mBrowseVoc === "paladin" ? "selected" : ""}>Paladin</option>
+            <option value="druid" ${_mBrowseVoc === "druid" ? "selected" : ""}>Druid</option>
+            <option value="sorcerer" ${_mBrowseVoc === "sorcerer" ? "selected" : ""}>Sorcerer</option>
+            <option value="monk" ${_mBrowseVoc === "monk" ? "selected" : ""}>Monk</option>
+          </select>
+        </div>
+        <div id="m-item-count" class="tiny dim" style="padding:3px 0">${totalItems} itens · mostrando ${shownItems.length}</div>
+        <div id="m-item-rows">${shownItems.length ? shownItems.map((it) => marketItemRowHTML(it)).join("") : '<div class="m-empty">Nenhum item</div>'}</div>
+        ${totalItems > MAX_RENDER_ITEMS ? `<div class="tiny dim" style="padding:4px">Apenas os ${MAX_RENDER_ITEMS} primeiros são exibidos. Refine a busca/categoria.</div>` : ""}
+      </div>
+      <div id="m-detail">${marketDetailHTML(catalog.find((it) => it.slug === _mBrowseItem) || null)}</div>
+    </div>`;
+
+  // Eventos categoria
+  $$("#m-cat-list .m-cat").forEach((el) => el.addEventListener("click", () => {
+    _mBrowseCat = el.dataset.mcat;
+    _mBrowseItem = null;
+    _mBrowseOffers = [];
+    renderMarketBrowse(body, p);
+  }));
+
+  // Busca, tier, nível e vocação (não re-renderizam o input, apenas a lista)
+  const qInput = $("#m-browse-q");
+  if (qInput) qInput.addEventListener("input", (e) => {
+    clearTimeout(_mMarketT);
+    _mMarketT = setTimeout(() => { _mQ = e.target.value; marketUpdateBrowseList(body, p); }, 150);
+  });
+
+  const tierSel = $("#m-browse-tier");
+  if (tierSel) tierSel.addEventListener("change", (e) => { _mTier = e.target.value; marketUpdateBrowseList(body, p); });
+
+  const lvlEl = $("#m-browse-lvl");
+  if (lvlEl) lvlEl.addEventListener("input", () => {
+    _mBrowseLvl = lvlEl.value;
+    marketUpdateBrowseList(body, p);
+  });
+
+  const vocEl = $("#m-browse-voc");
+  if (vocEl) vocEl.addEventListener("change", () => {
+    _mBrowseVoc = vocEl.value;
+    marketUpdateBrowseList(body, p);
+  });
+
+  // Selecionar item (atualiza detalhe sem recriar a barra de busca)
+  marketAttachItemRowEvents(body, p);
+
+  // Criar ofertas / ações no item selecionado
+  marketAttachDetailEvents(body, p);
+
+  // Se já houver item selecionado, renderiza ofertas (cached)
+  if (_mBrowseItem) marketRenderItemOffers(p, _mBrowseItem);
+}
+
+/* ---------- catálogo unificado do MarketSystem ---------- */
+function marketBuildCatalog() {
+  const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items) || {};
+  const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) || {};
+  const out = [];
+  const seen = new Set();
+
+  function add(slug, src) {
+    if (!slug || seen.has(slug)) return;
+    seen.add(slug);
+    const g = gd[slug] || {};
+    const m = md[slug] || {};
+    const name = g.n || m.n || slug.replace(/-/g, " ");
+    const tier = Number(m.tier || g.tier || 0);
+    const cid = Number(m.cid || g.cid || 0);
+    const item = Object.assign({}, g, m, { slug, name, tier, cid });
+    item.category = marketItemCat(slug);
+    if (MARKET_BANNED_CATS.has(item.category)) return;
+    item.price = Number(m.price || g.price || g.sell || 0);
+    out.push(item);
+  }
+
+  Object.keys(gd).forEach((slug) => add(slug, "g"));
+  Object.keys(md).forEach((slug) => add(slug, "m"));
+  return out;
+}
+
+function marketItemName(slug) {
+  const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
+  const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items[slug]) || {};
+  return gd.n || md.n || itemName(slug);
+}
+
+function marketItemRowHTML(it) {
+  const active = it.slug === _mBrowseItem ? "active" : "";
+  const tier = it.tier ? `T${it.tier}` : "";
+  return `<div class="m-item-row ${active}" data-slug="${it.slug}" title="${it.name}">
+    ${itemImg(it.slug, 24, null, 1)}
+    <span class="m-item-name">${it.name}</span>
+    ${tier ? `<span class="tiny dim" style="color:#dab0ff">${tier}</span>` : ""}
+  </div>`;
+}
+
+function marketDetailHTML(it) {
+  if (!it) {
+    return `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#7d7666;font-size:12px">
+      Selecione um item à esquerda para ver ofertas
+    </div>`;
+  }
+  const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items[it.slug]) || {};
+  const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[it.slug]) || {};
+  const attrs = [];
+  if (it.atk) attrs.push(`Atk ${it.atk}`);
+  if (it.def) attrs.push(`Def ${it.def}`);
+  if (it.lvl) attrs.push(`Lv ${it.lvl}`);
+  if (it.vocs && it.vocs.length) attrs.push(it.vocs.slice(0, 2).join("/"));
+  if (Number(it.imbSlots) > 0) attrs.push(`${it.imbSlots} imb slot${it.imbSlots > 1 ? "s" : ""}`);
+  const price = Number(md.price || gd.sell || 0);
+  const tier = it.tier ? `<span style="color:#dab0ff">T${it.tier}</span>` : "";
+  return `
+    <div id="m-detail-info">
+      <div class="row" style="gap:8px;align-items:flex-start;margin-bottom:8px">
+        <div style="position:relative">${itemImg(it.slug, 40, null, 1)}${it.tier ? `<span class="tier-badge" style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${it.tier}</span>` : ""}</div>
+        <div style="flex:1;min-width:0">
+          <div class="small" style="font-weight:bold;color:#ffd700">${it.name} ${tier}</div>
+          <div class="tiny dim">${MARKET_CAT_LABEL[it.category] || it.category} · CID ${it.cid || 0}</div>
+          ${attrs.length ? `<div class="tiny" style="color:#9ce84a">${attrs.join(" · ")}</div>` : ""}
+          <div class="tiny">Preço base: <b>${fmtFull(price)}</b> gp</div>
+        </div>
+      </div>
+      <div class="row mb2" style="gap:6px">
+        <button class="sm primary" id="m-create-sell" data-slug="${it.slug}" data-tier="${it.tier || 0}">+ Vender</button>
+        <button class="sm" id="m-create-buy" data-slug="${it.slug}">+ Oferta de compra</button>
+      </div>
+    </div>
+    <div id="m-offer-list">${_mBrowseLoading ? '<div class="m-empty">Carregando ofertas...</div>' : marketOfferListHTML()}</div>`;
+}
+
+function marketOfferRowHTML(o, kind) {
+  const tier = o.tier || 0;
+  const unfair = marketUnfair(o);
+  const price = o.price_tc ? `${fmtFull(o.price)} <span style="color:#ffe680">TC</span>` : `${fmtFull(o.price)} gp`;
+  const total = o.price_tc ? `${fmtFull(o.price * o.qty)} <span style="color:#ffe680">TC</span>` : `${fmtFull(o.price * o.qty)} gp`;
+  const action = kind === "sell"
+    ? `<button class="sm primary" data-mbuy="${o.id}" data-price="${o.price}" data-tc="${o.price_tc ? 1 : 0}">Comprar</button>`
+    : `<button class="sm" data-maccept="${o.id}">Vender</button>`;
+  const seller = o.seller_name || "Anônimo";
+  const rowStyle = unfair ? ' style="color:#ff6a6a"' : '';
+  return `<tr${rowStyle}>
+    <td class="m-td-seller">${seller}</td>
+    <td class="m-td-qty">${o.qty}</td>
+    <td class="m-td-price">${price}</td>
+    <td class="m-td-total">${total}</td>
+    <td class="m-td-time">${marketTimeLeft(o)}</td>
+    <td class="m-td-action">${action}</td>
+  </tr>`;
+}
+
+function marketOffersTableHTML(offers, kind) {
+  const title = kind === "sell" ? "Sell Offers" : "Buy Offers";
+  const empty = kind === "sell" ? "Nenhuma oferta de venda" : "Nenhuma oferta de compra";
+  if (!offers.length) return `<div class="m-section-title" style="margin-top:10px">${title}</div><div class="m-empty">${empty}</div>`;
+  const rows = offers.map((o) => marketOfferRowHTML(o, kind)).join("");
+  return `
+    <div class="m-section-title" style="margin-top:10px">${title}</div>
+    <table class="m-offers-table">
+      <thead>
+        <tr>
+          <th class="m-th-seller">Vendedor</th>
+          <th class="m-th-qty">Qtd</th>
+          <th class="m-th-price">Preço unit.</th>
+          <th class="m-th-total">Total</th>
+          <th class="m-th-time">Resta</th>
+          <th class="m-th-action"></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function marketOfferListHTML() {
+  if (!_mBrowseItem || !_mBrowseOffers) return '<div class="m-empty">Selecione um item</div>';
+  const sells = _mBrowseOffers.filter((o) => o.kind === "item");
+  const buys = _mBrowseOffers.filter((o) => o.kind === "buy");
+  return marketOffersTableHTML(sells, "sell") + marketOffersTableHTML(buys, "buy");
+}
+
+async function marketLoadItemOffers(p, slug) {
+  _mBrowseLoading = true;
+  marketRenderItemOffers(p, slug, true);
+  const r = await marketListOffers({ kind: "", slug });
+  _mBrowseLoading = false;
+  if (!r.ok) { toast(r.msg || "Falha ao carregar ofertas"); _mBrowseOffers = []; }
+  else {
+    _mBrowseOffers = (r.offers || []).slice().sort((a, b) => {
+      if (a.kind === b.kind) return a.price - b.price;
+      return (a.kind === "buy" ? -1 : 1);
+    });
+    // separa e ordena: sell (item) asc, buy desc
+    const sells = _mBrowseOffers.filter((o) => o.kind === "item").sort((a, b) => a.price - b.price);
+    const buys = _mBrowseOffers.filter((o) => o.kind === "buy").sort((a, b) => b.price - a.price);
+    _mBrowseOffers = sells.concat(buys);
+  }
+  marketRenderItemOffers(p, slug, false);
+}
+
+function marketRenderItemOffers(p, slug, loading) {
+  if (_mBrowseItem !== slug) return;
+  const list = $("#m-offer-list");
+  if (!list) return;
+  if (loading) list.innerHTML = '<div class="m-empty">Carregando ofertas...</div>';
+  else list.innerHTML = marketOfferListHTML();
+
+  // re-atacha eventos dos botões de compra/aceite
+  const tok = sessionToken();
+  $$("#m-offer-list [data-mbuy]").forEach((b) =>
+    b.addEventListener("click", () => marketWithLock(b, async () => {
+      const id = b.dataset.mbuy;
+      const price = Number(b.dataset.price);
+      const priceTc = b.dataset.tc === "1";
+      if (priceTc && accountCoins() < price) { toast("Tibia Coins insuficientes"); return; }
+      if (!priceTc && _mBank < price) { toast("Ouro insuficiente na conta"); return; }
+      const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
+      if (!r.ok) { toast(r.msg || "Falha na compra"); return; }
+      const d = r.data;
+      if (d.item) marketReceiveItem(p, d.item.slug, d.item.tier, d.item.qty);
+      if (Number.isFinite(Number(d.bank))) { _mBank = Number(d.bank); marketRefreshHeader(); }
+      toast(`Comprou <b>${marketItemName(d.item ? d.item.slug : "")}</b> — foi para o Depot`, "level");
+      addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → Depot`);
+      marketLoadItemOffers(p, slug);
+      renderAll && renderAll();
+    })));
+
+  $$("#m-offer-list [data-maccept]").forEach((b) =>
+    b.addEventListener("click", () => marketWithLock(b, async () => {
+      const id = b.dataset.maccept;
+      const oferta = (_mBrowseOffers.find((o) => o.id === Number(id))) || {};
+      if (!marketHaveInDepot(p, oferta.slug)) { toast("Você não tem esse item no Depot para vender"); return; }
+      const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name, qty: 1 });
+      if (!r.ok) { toast(r.msg || "Falha"); return; }
+      marketRemoveDepotItem(p, oferta.slug);
+      if (Number.isFinite(Number(r.data.bank))) { _mBank = Number(r.data.bank); marketRefreshHeader(); }
+      toast(`Vendeu <b>${marketItemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
+      marketLoadItemOffers(p, slug);
+      renderAll && renderAll();
+    })));
 }
 
 function marketHaveInDepot(p, slug) {
@@ -403,12 +750,13 @@ function marketRemoveDepotItem(p, slug) {
 }
 
 /* Modal de "Oferecer compra" (buy offer). */
-function renderMarketBuyOffer(body, p) {
+function renderMarketBuyOffer(body, p, preSlug) {
   const tok = sessionToken();
+  const slugVal = preSlug || _mQ || "";
   body.innerHTML = `
     <div class="small dim mb4">Oferecer um preço para comprar (buy offer)</div>
     <div class="row mb4" style="gap:6px">
-      <input id="m-bo-slug" placeholder="nome do item (ex: fire sword)" value="${_mQ}"
+      <input id="m-bo-slug" placeholder="nome do item (ex: fire sword)" value="${slugVal}"
         style="flex:1;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
     </div>
     <div class="row mb4" style="gap:6px">
@@ -440,19 +788,20 @@ function renderMarketBuyOffer(body, p) {
   priceEl.addEventListener("input", atualizaFee);
   qtyEl.addEventListener("input", atualizaFee);
   atualizaFee();
-  $("#m-bo-go").addEventListener("click", async () => {
+  const boGo = $("#m-bo-go");
+  boGo.addEventListener("click", () => marketWithLock(boGo, async () => {
     const slugTxt = (slugEl.value || "").trim().toLowerCase().replace(/ /g, "-");
     const price = Math.floor(Number(priceEl.value) || 0);
     const qty = Math.max(1, Math.floor(Number(qtyEl.value) || 1));
     if (!slugTxt || price <= 0) { toast("Informe item e preço"); return; }
     const total = price * qty;
-    if (_mBank < total) { toast("Ouro insuficiente no banco"); return; }
+    if (_mBank < total) { toast("Ouro insuficiente na conta"); return; }
     const r = await marketCreateOffer({
       token: tok, kind: "buy", slug: slugTxt, tier: 0, qty, price,
       price_tc: 0, seller_name: _mBuyAnon ? "Anônimo" : p.name,
     });
     if (!r.ok) { toast(r.msg || "Falha"); return; }
-    if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
+    if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Oferta casada automaticamente! Comprou por ${fmtFull(r.matched.price)} gp`, "level");
       marketReceiveItem(p, slugTxt, 0, r.matched.qty || qty);
@@ -461,7 +810,7 @@ function renderMarketBuyOffer(body, p) {
     }
     _mBuyPrice = ""; _mBuyQty = 1;
     renderMarket();
-  });
+  }));
   $("#m-bo-back").addEventListener("click", () => renderMarket());
 }
 
@@ -475,7 +824,7 @@ function renderMarketSell(body, p) {
 
   body.innerHTML = `
     <div class="small dim mb4">Venda itens do seu <b>Depot</b> (regra do Market).</div>
-    <div class="list mb4" style="max-height:200px" id="m-sell-items">
+    <div class="list mb4" style="max-height:260px" id="m-sell-items">
       ${itens.length ? itens.map((i) => {
         const isSel = selItem && ((sel.instId && i.instId === sel.instId) || (!sel.instId && !i.instId && i.slug === sel.slug));
         return `<div class="shop-row ${isSel ? "selected" : ""}" data-sell-item="${i.slug}" ${i.instId ? `data-sell-inst="${i.instId}"` : ""} data-sell-qty="${i.qty}" data-sell-tier="${i.tier}">
@@ -499,7 +848,7 @@ function renderMarketSell(body, p) {
       <div class="tiny dim mb4" id="m-sell-fee"></div>
       <button class="primary full" id="m-sell-go">Vender no Market (30 dias)</button>
     ` : '<div class="tiny dim">Escolha um item do Depot acima.</div>'}
-    <div class="tiny dim mt8">Oferta dura 30 dias · taxa de 2% (mín 20, máx 1M) paga do banco · ao expirar/cancelar o item volta ao Depot.</div>`;
+    <div class="tiny dim mt8">Oferta dura 30 dias · taxa de 2% (mín 20, máx 1M) paga da conta · ao expirar/cancelar o item volta ao Depot.</div>`;
 
   $$("#m-sell-items [data-sell-item]").forEach((row) =>
     row.addEventListener("click", () => {
@@ -525,11 +874,11 @@ function renderMarketSell(body, p) {
   const anonEl = $("#m-sell-anon");
   if (anonEl) anonEl.addEventListener("change", (e) => { _mAnon = e.target.checked; });
   const go = $("#m-sell-go");
-  if (go) go.addEventListener("click", async () => {
+  if (go) go.addEventListener("click", () => marketWithLock(go, async () => {
     const price = Math.floor(Number(_mPrice) || 0);
     if (price <= 0) { toast("Informe um preço"); return; }
     const fee = marketFee(price);
-    if (_mBank < fee) { toast("Ouro insuficiente no banco para a taxa (2%)"); return; }
+    if (_mBank < fee) { toast("Ouro insuficiente na conta para a taxa (2%)"); return; }
     const qty = selItem.instId ? 1 : selItem.qty;
     const r = await marketCreateOffer({
       token: tok, kind: "item", slug: selItem.slug, tier: selItem.tier || 0,
@@ -538,7 +887,7 @@ function renderMarketSell(body, p) {
     });
     if (!r.ok) { toast(r.msg || "Falha ao vender"); return; }
     marketRemoveForSale(p, { slug: selItem.slug, instId: selItem.instId, qty, tier: selItem.tier || 0, from: "depot" }, r.offer.id);
-    if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
+    if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Vendido na hora por ${fmtFull(r.matched.price)} gp! (match automático)`, "level");
     } else {
@@ -548,7 +897,7 @@ function renderMarketSell(body, p) {
     _mSel = null; _mPrice = "";
     renderMarket();
     renderAll && renderAll();
-  });
+  }));
 }
 
 /* -------------------------------------------------------- MINHAS OFERTAS */
@@ -559,7 +908,7 @@ function renderMarketMine(body, p) {
     if (!r.ok) { body.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
     const ofertas = r.offers || [];
     if (!ofertas.length) { body.innerHTML = '<div class="tiny dim">Você não tem ofertas.</div>'; return; }
-    body.innerHTML = `<div class="list" style="max-height:440px">` + ofertas.map((o) => {
+    body.innerHTML = `<div class="list" style="max-height:420px">` + ofertas.map((o) => {
       const status = o.status === "active" ? `<span style="color:#9ce84a">ativa · ${marketTimeLeft(o)}</span>`
         : o.status === "sold" ? `<span style="color:#ffe680">vendida</span>`
         : o.status === "cancelled" ? `<span style="color:#ff9a6a">cancelada</span>`
@@ -576,16 +925,16 @@ function renderMarketMine(body, p) {
       </div>`;
     }).join("") + `</div>`;
     $$("#market-body [data-mcancel]").forEach((b) =>
-      b.addEventListener("click", async () => {
+      b.addEventListener("click", () => marketWithLock(b, async () => {
         const id = b.dataset.mcancel;
         const r = await marketCancelOffer(tok, id);
         if (!r.ok) { toast(r.msg || "Falha"); return; }
         marketRefundItem(p, id);
-        if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
+        if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
         toast("Oferta cancelada — devolvido", "level");
         renderMarket();
         renderAll && renderAll();
-      }));
+      })));
   });
 }
 
@@ -635,31 +984,33 @@ function renderMarketCoins(body, p) {
       if (f) f.innerHTML = price > 0 ? `Taxa: ${fmtFull(marketFee(price))} gp` : "";
     });
     const anEl = $("#m-c-anon"); if (anEl) anEl.addEventListener("change", (e) => { _mCoinsAnon = e.target.checked; });
-    $("#m-c-sell-go").addEventListener("click", async () => {
+    const coinSellGo = $("#m-c-sell-go");
+    coinSellGo.addEventListener("click", () => marketWithLock(coinSellGo, async () => {
       const qty = Math.floor(Number(_mCoinsQty) || 0);
       const price = Math.floor(Number(_mCoinsPrice) || 0);
       if (qty <= 0 || price <= 0) { toast("Informe quantidade e preço"); return; }
       if (qty > coins) { toast("Tibia Coins insuficientes"); return; }
       const fee = marketFee(price);
-      if (_mBank < fee) { toast("Ouro insuficiente no banco para a taxa"); return; }
+      if (_mBank < fee) { toast("Ouro insuficiente na conta para a taxa"); return; }
       const r = await marketCreateOffer({
         token: tok, kind: "coins", qty, price, price_tc: 0,
         seller_name: _mCoinsAnon ? "Anônimo" : p.name,
       });
       if (!r.ok) { toast(r.msg || "Falha"); return; }
-      if(Number.isFinite(Number(r.bank)))_mBank=Number(r.bank);
+      if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
       toast(`Oferta criada: ${qty} TC por ${fmtFull(price)} gp`, "level");
+      marketRefreshHeader();
       _mCoinsQty = ""; _mCoinsPrice = "";
       renderMarketCoins(body, p);
       renderCoinBalance();
-    });
+    }));
   } else {
     cb.innerHTML = '<div class="tiny dim">Carregando ofertas de TC...</div>';
     marketListOffers({ kind: "coins" }).then((r) => {
       if (!r.ok) { cb.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
       const ofertas = r.offers || [];
       if (!ofertas.length) { cb.innerHTML = '<div class="tiny dim">Nenhuma oferta de TC no momento.</div>'; return; }
-      cb.innerHTML = `<div class="list" style="max-height:300px">` + ofertas.map((o) => `
+      cb.innerHTML = `<div class="list" style="max-height:420px">` + ofertas.map((o) => `
         <div class="shop-row">
           <div style="flex:1;min-width:0">
             <div class="small" style="color:#ffe680">${o.qty} Tibia Coins</div>
@@ -668,18 +1019,19 @@ function renderMarketCoins(body, p) {
           <button class="sm primary" data-mcoinsbuy="${o.id}" data-price="${o.price}">${fmtFull(o.price)} gp</button>
         </div>`).join("") + `</div>`;
       $$("#market-body [data-mcoinsbuy]").forEach((b) =>
-        b.addEventListener("click", async () => {
+        b.addEventListener("click", () => marketWithLock(b, async () => {
           const id = b.dataset.mcoinsbuy;
           const price = Number(b.dataset.price);
-          if (_mBank < price) { toast("Ouro insuficiente no banco"); return; }
+          if (_mBank < price) { toast("Ouro insuficiente na conta"); return; }
           const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
           if (!r.ok) { toast(r.msg || "Falha"); return; }
-          if(Number.isFinite(Number(r.data.bank)))_mBank=Number(r.data.bank);
+          if(Number.isFinite(Number(r.data.bank))){_mBank=Number(r.data.bank);marketRefreshHeader();}
           toast(`Comprou ${r.data.coins} TC por ${fmtFull(price)} gp`, "level");
+          marketRefreshHeader();
           renderMarketCoins(body, p);
           renderStats(p);
           renderCoinBalance();
-        }));
+        })));
     });
   }
 }
@@ -690,37 +1042,12 @@ function renderMarketBank() {
   const p = G.p;
   if (!tok || !p) return;
   $("#market-body").innerHTML = `
-    <div class="small dim mb4">Banco do Market — guarde gold para ofertas e taxas</div>
+    <div class="small dim mb4">O Market usa o saldo de gold compartilhado da conta.</div>
     <div class="shop-row">
-      <div style="flex:1"><b>Saldo no banco:</b> <span style="color:#ffe680">${fmtFull(_mBank)} gp</span></div>
-      <div class="tiny dim">Mochila: ${fmtFull(p.gold)} gp</div>
-    </div>
-    <div class="row mb4 mt4" style="gap:6px">
-      <input id="m-bank-amount" type="number" min="1" placeholder="valor" style="width:120px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-      <button class="sm primary" id="m-bank-deposit">Depositar</button>
-      <button class="sm" id="m-bank-withdraw">Sacar</button>
+      <div style="flex:1"><b>Saldo da conta:</b> <span style="color:#9ce84a">${fmtFull(accountGold())} gp</span></div>
     </div>
     <button class="full mt4" id="m-bank-back">Voltar ao Market</button>
-    <div class="tiny dim mt8">A taxa de 2% e o valor das ofertas de compra saem do banco. Vendas entram no banco.</div>`;
-  const amt = $("#m-bank-amount");
-  $("#m-bank-deposit").addEventListener("click", async () => {
-    const n = Math.floor(Number(amt.value) || 0);
-    if (n <= 0 || n > p.gold) { toast("Valor inválido"); return; }
-    const r = await marketDeposit(tok,n,p);
-    if (!r.ok) { toast(r.msg || "Falha"); return; }
-    _mBank=r.bank;
-    toast("Depositado " + fmtFull(n) + " gp", "level");
-    renderMarketBank();
-  });
-  $("#m-bank-withdraw").addEventListener("click", async () => {
-    const n = Math.floor(Number(amt.value) || 0);
-    if (n <= 0) { toast("Valor inválido"); return; }
-    const r = await marketWithdraw(tok,n,p);
-    if (!r.ok) { toast(r.msg || "Falha"); return; }
-    _mBank=r.bank;
-    toast("Sacou " + fmtFull(r.amount) + " gp", "level");
-    renderMarketBank();
-  });
+    <div class="tiny dim mt8">Taxas de 2% e valores de ofertas de compra saem diretamente da conta. Vendas entram na conta.</div>`;
   $("#m-bank-back").addEventListener("click", () => renderMarket());
 }
 
@@ -752,7 +1079,7 @@ function renderMarketHistory(body, p) {
       return;
     }
     body.innerHTML = `<div class="small dim mb4">Últimas ${hist.length} transações (guia 4.3.3)</div>
-      <div class="list" style="max-height:440px">` + hist.map((h) => {
+      <div class="list" style="max-height:420px">` + hist.map((h) => {
       const nome = h.kind === "coins"
         ? (h.qty + " Tibia Coins")
         : itemName(h.slug || "?") + (h.tier ? " T" + h.tier : "");

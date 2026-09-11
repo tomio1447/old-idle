@@ -50,6 +50,15 @@ function exerciseCharges(p) {
   const s = ensureTraining(p);
   return s.activePlan === "free" ? Infinity : s.balances[s.activePlan];
 }
+function trainingPlanIcon(p, planId) {
+  const skill = (p && p.trainingExercise && p.trainingExercise.skill) || "sword";
+  const w = trainingWeaponForSkill(skill, p);
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  if (planId === "lasting") return `${TRAINING_ICON_PATH}${w.replace("exercise-", "lasting-")}.gif?v=${v}`;
+  if (planId === "free") return `${TRAINING_ICON_PATH}${w}.png?v=${v}`;
+  return `${TRAINING_ICON_PATH}${w}.gif?v=${v}`;
+}
+
 function exerciseSkillName(id) {
   const w = EXERCISE_WEAPONS[id];
   return w ? (w.skill === "magic" ? "Magic Level" : (SKILL_NAMES[w.skill] || w.skill)) : "";
@@ -127,6 +136,9 @@ function startTrainingArea() {
     hideTrainingLoading();
     if (typeof setGridForMap === "function") setGridForMap(map);
     const players=trainingPartyPlayers();
+    for (const member of players) {
+      if (!member.remoteTraining) { member.trainingActive = true; if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(member); }
+    }
     G.training={training:true,mode:"exercise",huntMap:map,members:players.map((p,i)=>buildTrainingMember(p,i,map)),
       dummyItemId:TRAINING_DUMMY_ITEM_ID,dummyPos:trainingLocalPoint(map,TRAINING_DUMMY_ABS),events:[]};
     G.inCity=false;G.p.hunt=null;G.combat=null;G.walkKeys={};

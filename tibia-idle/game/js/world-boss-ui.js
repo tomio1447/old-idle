@@ -228,7 +228,7 @@ function wbBossSpriteHtml(ev, size) {
   return `<img class="world-boss-sprite-img" src="assets/mob/${slug}.png?v=${v}" alt="" width="${px}" height="${px}" style="image-rendering:pixelated;object-fit:contain">`;
 }
 
-const WB_MAX_PER_ACCOUNT = 2;
+const WB_MAX_PER_ACCOUNT = 1;
 
 function wbEnsurePanelShell() {
   wbEnsureDom();
@@ -398,7 +398,7 @@ function wbShowJoinPicker() {
     const ids = Array.from(box.querySelectorAll('input[type="checkbox"]:checked'))
       .map((el) => Number(el.value)).filter((n) => n > 0);
     if (ids.length > WB_MAX_PER_ACCOUNT) {
-      if (status) status.textContent = wbT("wb.pickChars", "Selecione até 2 personagens.");
+      if (status) status.textContent = wbT("wb.pickChars", "Selecione 1 personagem.");
       return;
     }
     wbJoin(ids);
@@ -408,11 +408,11 @@ function wbShowJoinPicker() {
 async function wbJoin(ids) {
   const status = document.getElementById("wb-status");
   if (!ids || !ids.length) {
-    if (status) status.textContent = wbT("wb.pickChars", "Selecione até 2 personagens.");
+    if (status) status.textContent = wbT("wb.pickChars", "Selecione 1 personagem.");
     return;
   }
   if (ids.length > WB_MAX_PER_ACCOUNT) {
-    if (status) status.textContent = wbT("wb.pickChars", "Selecione até 2 personagens.");
+    if (status) status.textContent = wbT("wb.pickChars", "Selecione 1 personagem.");
     return;
   }
   const r = await wbFetch("POST", "/api/world-boss/join", { characterIds: ids });

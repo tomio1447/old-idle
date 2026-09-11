@@ -658,8 +658,10 @@ const AppearanceRenderer = {
     return cv;
   },
 
-  /* Prévia (montaria + personagem) para as telas de selecao */
-  preview(p, dir) {
+  /* Prévia (montaria + personagem) para as telas de selecao.
+   * allowUnmounted=true faz fallback sem montaria quando o asset ainda nao
+   * carregou (evita retrato vazio enquanto espera o bicho). */
+  preview(p, dir, allowUnmounted) {
     const o = currentAppearance(p);
     if (!o) return null;
     const cores = (p.outfit && p.outfit.colors) ||
@@ -669,9 +671,11 @@ const AppearanceRenderer = {
                               cores, dir || "s", 0,
                               mnt ? { mounted: true } : null);
     if (!corpo) return null;
-    const bicho = mnt ? this.mount(mnt.id, dir || "s", 0) : null;
-    if (!bicho) return corpo;
-    return this.montar(corpo, bicho, o, mnt);
+    if (!mnt) return corpo;
+    const bicho = this.mount(mnt.id, dir || "s", 0);
+    if (bicho) return this.montar(corpo, bicho, o, mnt);
+    if (allowUnmounted) return corpo;
+    return null;
   },
 };
 

@@ -3311,9 +3311,9 @@ async function marketCreate(db, body, charName) {
   const ativas = minhas.filter((o) => o.status === "active").length;
   if (ativas >= 100) return { code: 400, body: { ok: false, msg: "Máximo de 100 ofertas ativas" } };
 
-  // ---- fee (2%) pago do banco (market_gold) ----
+  // ---- fee (2%) pago do gold da conta (sem banco separado) ----
   const feePago = await db.payMarketFee(acc.id, fee);
-  if (!feePago) return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco para a taxa (2%)" } };
+  if (!feePago) return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta para a taxa (2%)" } };
 
   // ---- pagamentos/travas conforme o tipo ----
   if (kind === "coins") {
@@ -3328,7 +3328,7 @@ async function marketCreate(db, body, charName) {
     const ok = await db.payMarketGold(acc.id, total);
     if (!ok) {
       await db.refundMarketFee(acc.id, fee);
-      return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco para a oferta" } };
+      return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta para a oferta" } };
     }
     if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
   } else {
@@ -3480,9 +3480,9 @@ async function marketBuyUnlocked(db, body, actorName) {
     const seller = await db.findAccountById(offer.seller_id);
     if (seller) await db.updateCoins(seller.id, (seller.coins || 0) + valor);
   } else {
-    // gold: usa o banco (market_gold) do comprador
+    // gold: usa o gold compartilhado da conta
     const ok = await db.payMarketGold(acc.id, valor);
-    if (!ok) return { code: 400, body: { ok: false, msg: "Ouro insuficiente no banco" } };
+    if (!ok) return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta" } };
     await db.addAccountMarketGold(offer.seller_id, valor);
     if (offer.kind === "coins" && qty > 0) {
       await db.updateCoins(acc.id, (acc.coins || 0) + qty);
@@ -3568,7 +3568,7 @@ async function marketCancelUnlocked(db, body, id) {
   await db.updateMarketOffer(offer.id, { status: "cancelled" });
   // devolve o que estava travado:
   //  - oferta de venda de TC: TC de volta pra conta
-  //  - oferta de COMPRA (buy): dinheiro de volta pro banco (market_gold)
+  //  - oferta de COMPRA (buy): dinheiro de volta ao gold da conta
   if (offer.kind === "coins") {
     await db.updateCoins(acc.id, (acc.coins || 0) + offer.qty);
   } else if (offer.kind === "buy") {
@@ -4248,6 +4248,21 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/world-boss/report"){
         const r=await WORLD_BOSS.reportCombat(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/create"){
+        const limited=rateLimit(req,"wb-create",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.createLobby(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/auto-join"){
+        const limited=rateLimit(req,"wb-join",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.autoJoin(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/world-boss/invite"){
+        const limited=rateLimit(req,"wb-invite",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await WORLD_BOSS.invite(db,bodyWithSessionToken(req,await readBody(req)));
         return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/world-boss/admin/force-open"){

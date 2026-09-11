@@ -27,6 +27,41 @@ function clearBootLoadingFlag() {
   if (typeof document !== "undefined" && document.documentElement)
     document.documentElement.classList.remove("boot-loading");
 }
+let LOADING_HINT_SLUG = "";
+function loadingHintNumber(value) {
+  return Math.max(0, Math.floor(Number(value) || 0)).toLocaleString("pt-BR");
+}
+function loadingHintTip(monster) {
+  if (monster.boss) return "Boss: organize seus recursos antes de enfrentá-lo.";
+  if (monster.ranged) return "Criatura de longa distância: aproxime-se com cautela.";
+  if (monster.element) return "Afinidade elemental: " + String(monster.element).toUpperCase() + ".";
+  if (monster.runAt) return "Esta criatura pode tentar fugir quando estiver ferida.";
+  return "Conhecer seu inimigo é a melhor preparação para a batalha.";
+}
+function renderLoadingMonsterHint(force) {
+  if (typeof GAMEDATA === "undefined" || !GAMEDATA.monsters || typeof MOBSHEETS === "undefined") return;
+  const art = document.getElementById("gl-hint-art");
+  if (!art) return;
+  const available = Object.keys(GAMEDATA.monsters).filter((slug) => {
+    const m = GAMEDATA.monsters[slug];
+    return m && MOBSHEETS[slug] && Number(m.hp) > 0 && Number(m.exp) >= 0;
+  });
+  if (!available.length) return;
+  if (force || !LOADING_HINT_SLUG || !GAMEDATA.monsters[LOADING_HINT_SLUG])
+    LOADING_HINT_SLUG = available[Math.floor(Math.random() * available.length)];
+  const monster = GAMEDATA.monsters[LOADING_HINT_SLUG];
+  art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 72) : "";
+  const name = document.getElementById("gl-hint-name");
+  const hp = document.getElementById("gl-hint-hp");
+  const exp = document.getElementById("gl-hint-exp");
+  const armor = document.getElementById("gl-hint-armor");
+  const tip = document.getElementById("gl-hint-tip");
+  if (name) name.textContent = monster.name || LOADING_HINT_SLUG.replace(/-/g, " ");
+  if (hp) hp.textContent = loadingHintNumber(monster.hp);
+  if (exp) exp.textContent = loadingHintNumber(monster.exp);
+  if (armor) armor.textContent = loadingHintNumber(monster.armor);
+  if (tip) tip.textContent = loadingHintTip(monster);
+}
 function showGameLoading(show, text, pct) {
   const el = document.getElementById("game-loading");
   const login = document.getElementById("login");
@@ -34,6 +69,11 @@ function showGameLoading(show, text, pct) {
     document.documentElement.classList.toggle("game-loading-on", !!show);
   if (el) {
     el.style.display = show ? "flex" : "none";
+    if (show && el.dataset.hintVisible !== "1") {
+      el.dataset.hintVisible = "1";
+      renderLoadingMonsterHint(true);
+    }
+    if (!show) el.dataset.hintVisible = "0";
     const label = el.querySelector(".gl-text"), fill = el.querySelector(".gl-fill");
     if (label && text) label.textContent = text;
     if (fill && pct !== undefined && pct !== null)

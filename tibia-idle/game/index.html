@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=tutorial-v1">
+  <link rel="stylesheet" href="css/layout.css?v=world-boss-lobby-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
@@ -38,7 +38,7 @@
 </head>
 <body>
 
-<div id="game-loading" aria-live="polite"><div class="gl-box"><b>GLOBAL-IDLE</b><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
+<div id="game-loading" aria-live="polite"><div class="gl-box"><div class="gl-brand">GLOBAL-IDLE</div><div class="gl-hint" id="gl-monster-hint"><div class="gl-hint-art" id="gl-hint-art"></div><div class="gl-hint-info"><span class="gl-hint-label">CREATURE HINT</span><strong id="gl-hint-name">Carregando criatura...</strong><div class="gl-hint-stats"><span>HP <b id="gl-hint-hp">—</b></span><span>EXP <b id="gl-hint-exp">—</b></span><span>ARMOR <b id="gl-hint-armor">—</b></span></div><p id="gl-hint-tip">Prepare-se para explorar o mundo.</p></div></div><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
 
 <button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
 
@@ -439,6 +439,9 @@
         <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses" data-i18n-title="title.bosses">
           <span class="bosses-megalomania-icon" aria-hidden="true"></span><span data-i18n="btn.bosses">BOSSES</span>
         </button>
+        <button class="sm catalog-tab-btn" id="btn-world-bosses" title="Abrir catálogo de World Bosses" data-i18n-title="title.world-bosses">
+          <span class="world-bosses-icon" aria-hidden="true"></span><span data-i18n="btn.world-bosses">WORLD BOSSES</span>
+        </button>
         <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
           <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
         </button>
@@ -584,8 +587,8 @@
 <script src="js/cooldown.js?v=cd-bar-v1"></script>
 <script src="js/augments.js"></script>
 <script src="js/supplies.js?v=potion-audit-v1"></script>
-<script src="js/outfit.js?v=sex-looktype-v2"></script>
-<script src="js/appearance.js?v=mount-zpattern-v1"></script>
+<script src="js/outfit.js?v=mount-preview-v1"></script>
+<script src="js/appearance.js?v=mount-preview-v1"></script>
 <script src="js/loyalty.js?v=loyalty-v1"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
 <script src="js/player.js?v=equip-online-v1"></script>
@@ -614,7 +617,7 @@
 <script src="js/yasir-prices.js?v=autosell-cprices-v1"></script>
 <script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=prison-v2"></script>
+<script src="js/ui.js?v=hunt-info-background-v1"></script>
 <script src="js/helper-presets.js?v=helper-live-v1"></script>
 <script src="js/i18n.js?v=store-mp-v1"></script>
 <script src="js/alpha-announce.js?v=store-mp-v1"></script>
@@ -633,26 +636,26 @@
 <script src="js/analyzers.js?v=stack-count-frames-v2"></script>
 <script src="js/wheeldata.js?v=wheel-otc-v2"></script>
 <script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
-<script src="js/wheel.js?v=wheel-otc-v2"></script>
+<script src="js/wheel.js?v=wheel-active-v1"></script>
 <script src="js/wheel-ui.js?v=wheel-otc-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
 <script src="js/account-client.js?v=tutorial-v2"></script>
 <script src="js/chat.js?v=global-chat-v1"></script>
 <script src="js/marketdata.js"></script>
-<script src="js/market-ui.js?v=stack-count-frames-v1"></script>
+<script src="js/market-ui.js?v=market-cats-v1"></script>
 <script src="js/store-ui.js?v=store-mp-v1"></script>
 <script src="js/market-local.js"></script>
 <script src="js/reward-chest.js?v=stack-count-frames-v1"></script>
-<script src="js/training.js?v=party-checkpoint-v1"></script>
-<script src="js/training-ui.js"></script>
+<script src="js/training.js?v=training-active-v1"></script>
+<script src="js/training-ui.js?v=training-icons-v1"></script>
 <script src="js/accessorydata.js?v=charge-stack-destroy-v1"></script>
 <script src="js/supply-stash-data.js?v=charge-stack-destroy-v1"></script>
 <script src="js/supply-stash.js?v=loot-rules-v1"></script>
 <script src="js/admin.js?v=store-mp-v1"></script>
 <script src="js/city-ui.js?v=temple-clear-cond-v1"></script>
-<script src="js/preload.js?v=boot-load-screen-v1"></script>
-<script src="js/game.js?v=helper-live-v1"></script>
+<script src="js/preload.js?v=loading-hint-v1"></script>
+<script src="js/game.js?v=mount-preview-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-v1"></script>
@@ -677,6 +680,12 @@
 <script src="js/exotic-cave.js?v=exotic-cave-v1"></script>
 <script src="js/the-void.js?v=the-void-v1"></script>
 <script src="js/nightmare-isle.js?v=nightmare-isle-v1"></script>
+<script src="js/asura-palace.js?v=asura-palace-v1"></script>
+<script src="js/banuta-deeper.js?v=banuta-deeper-v1"></script>
+<script src="js/feyrist-nightmare.js?v=feyrist-nightmare-v1"></script>
+<script src="js/cemetery-yalahar.js?v=cemetery-yalahar-v1"></script>
+<script src="js/cults-yalahar.js?v=cults-yalahar-v1"></script>
+<script src="js/bog-yalahar.js?v=bog-yalahar-v1"></script>
 <script src="js/lizard-chosen-tower.js?v=lizard-chosen-tower-v1"></script>
 <script src="js/ghastly-dragons.js?v=ghastly-dragons-v1"></script>
 <script src="js/draken-walls.js?v=draken-walls-v1"></script>
@@ -696,6 +705,10 @@
 <script src="js/world-boss-ui.js?v=wb-shared-v1"></script>
 <script src="js/megalomania-lobby.js?v=mega-auth-backoff-v1"></script>
 <script src="js/pale-worm-lobby.js?v=paleworm-auth-backoff-v1"></script>
+<script src="js/world-bosses-modal.js?v=world-boss-flow-v1"></script>
+<script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
+<script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
+<script src="js/wheel-modal.js?v=wheel-modal-active-v1"></script>
 <script src="js/tutorial.js?v=tutorial-v2"></script>
 </body>
 </html>

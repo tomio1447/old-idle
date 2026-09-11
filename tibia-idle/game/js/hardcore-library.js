@@ -109,7 +109,7 @@
     // Recorte editável salvo em beta-maps/livraria_fire.otbm e copiado para
     // maps/ no build. O loader OTBM normaliza o andar Z=2 para a arena idle.
     "library-fire": Object.assign(hunt("Secret Library — Fire Section", 400, ["burning-book", "rage-squid", "biting-book"], "#b64425", 13833, 12950, 752, 79, 95), { otbm: "livraria_fire2", otbmOffsetX: -1 }),
-    "library-energy": hunt("Secret Library — Energy Section", 425, ["energetic-book", "biting-book"], "#7353d0", 12500, 10692, 628, 79, 92),
+    "library-energy": Object.assign(hunt("Secret Library — Energy Section", 425, ["energetic-book", "biting-book"], "#7353d0", 12500, 10692, 628, 79, 92), { otbm: "livraria_energy", otbmFloor: 7, otbmBounds: { x: 1014, y: 1018, w: 19, h: 13, z: 7 }, otbmSpawn: { x: 1024, y: 1024, z: 7 }, otbmMobBounds: { x: 1014, y: 1018, w: 19, h: 13, z: 7 } }),
     // Usa o mapa completo (24×16). A instância agora adota dimensões OTBM
     // dinâmicas, portanto não é mais necessário cortar a primeira linha.
     "library-ice": Object.assign(hunt("Secret Library — Ice Section", 450, ["icecold-book", "squid-warden", "ink-blob"], "#3c9ec4", 15667, 14167, 360, 77, 98), { otbm: "livraria_ice" }),

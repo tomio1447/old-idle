@@ -2038,6 +2038,8 @@ function accountApplyServerBalances(data){
     if(typeof accountSetCoins==="function")accountSetCoins(Math.max(0,coins));
     if(typeof renderCoinBalance==="function")renderCoinBalance();
   }
+  const bank=Number(data.bank);
+  if(Number.isFinite(bank)){try{_mBank=Math.max(0,bank);}catch(e){}if(typeof marketRefreshHeader==="function")marketRefreshHeader();}
   return data;
 }
 

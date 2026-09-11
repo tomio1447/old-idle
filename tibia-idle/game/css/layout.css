@@ -738,6 +738,11 @@ canvas { image-rendering: pixelated; }
   background:rgba(30,22,10,.9); border:1px solid #6a5430; cursor:pointer;
 }
 .mega-lobby-char-shell .panel-body { max-height:60vh; overflow:auto; }
+.wb-lobby-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+.wb-lobby-slots .mega-lobby-slot { min-width:0; }
+#world-bosses-modal-list .wb-boss-open { padding:0; border:0; background:transparent; color:inherit; cursor:pointer; }
+#world-bosses-modal-list .wb-boss-open:hover .mob-img { filter:brightness(1.25) drop-shadow(0 0 4px #d4af37); }
+@media(max-width:620px){.wb-lobby-slots{grid-template-columns:1fr}}
 /* Selo da postura (stance) ativa: quadrado no canto superior esquerdo da
  * cena — mesma ideia da area de icones de condicao do cliente oficial.
  * Sorcerer pode mostrar dois (elemental + aura crippling). */
@@ -1147,6 +1152,12 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background-size:72px 96px; background-position:0 -48px;
   image-rendering:pixelated; animation:hunts-demon-walk .72s steps(1,end) infinite;
 }
+.world-bosses-icon {
+  display:inline-block; width:24px; height:24px; flex:0 0 24px;
+  background-image:url('../assets/mob/goshnar-s-megalomania-purple.png');
+  background-size:contain; background-position:center; background-repeat:no-repeat;
+  image-rendering:pixelated;
+}
 .npcs-btn-icon {
   display:inline-block; width:22px; height:22px; flex:0 0 22px;
   background-image:url('../assets/npc/king-tibianus_s.png');
@@ -1165,7 +1176,42 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background-size:contain; background-repeat:no-repeat; background-position:center;
   image-rendering:pixelated;
 }
-.modal-bg .modal.hunts-modal-shell,
+.modal-bg .modal.hunts-modal-shell {
+  width:min(920px,calc(100vw - 32px));
+  background-image:url('../assets/ui/hunts/hunts-background.png');
+  background-size:100% auto;
+  background-repeat:no-repeat;
+  background-position:center top;
+  background-color:#181410;
+  border:none;
+  box-shadow:none;
+  padding:64px 70px 64px 70px;
+  overflow-y:auto;
+}
+.modal-bg .modal.hunts-modal-shell .panel-title,
+.modal-bg .modal.hunts-modal-shell .panel-body { background:transparent; border-bottom:none; }
+.modal-bg .modal.hunts-modal-shell .panel-title { color:#e8d4a2; padding:4px 0; }
+.modal-bg .modal.hunts-modal-shell .panel-body { padding:0; color:#e8dfd0; }
+.hunts-modal-title #hunts-modal-busca { background:rgba(10,8,6,.9); border-color:#5a4a32; color:#e8dfd0; }
+#hunts-modal-list .hunt-cat-title { color:#d4af37; text-shadow:0 1px 1px #000; background:rgba(20,16,10,.85); padding:6px 8px; border:1px solid #3a3020; border-radius:4px; margin-bottom:4px; }
+#hunts-modal-list .hunts-group { background:rgba(16,12,8,.6); padding:6px; border:1px solid #2a2016; border-radius:4px; }
+#hunts-modal-list .hunt-modal-card { background:rgba(22,18,12,.9); border-color:#3a2e22; }
+#hunts-modal-list .hunt-modal-card:hover { background:rgba(35,28,18,.95); border-color:#5a4a32; }
+#hunts-modal-list .hunt-modal-card .info .nm { color:#e8dfd0; }
+#hunts-modal-list .hunt-modal-card .meta { color:#a8a090; }
+
+/* Tabelas de ofertas do Market (Sell/Buy offers) */
+.m-offers-table { width:100%; border-collapse:collapse; font-size:11px; }
+.m-offers-table th { text-align:left; padding:5px 4px; background:#2a2520; color:#d4af37; border-bottom:1px solid #4a3f2e; }
+.m-offers-table td { padding:5px 4px; border-bottom:1px solid #2a2520; color:#e8dfd0; vertical-align:middle; }
+.m-offers-table tr:hover { background:rgba(255,255,255,.05); }
+.m-th-seller, .m-td-seller { width:120px; min-width:90px; }
+.m-th-qty, .m-td-qty { width:40px; text-align:center; }
+.m-th-price, .m-td-price, .m-th-total, .m-td-total { width:85px; text-align:right; }
+.m-th-time, .m-td-time { width:60px; text-align:center; }
+.m-th-action, .m-td-action { width:60px; text-align:center; }
+#m-offer-list { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
+
 .modal-bg .modal.bosses-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
 .modal-bg .modal.cidade-modal-shell,
@@ -3251,6 +3297,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .tr-plan-title { font-size: 11px; font-weight: bold; color: #ffe680; }
 .tr-plan-bonus { font-size: 10px; color: #9ce84a; font-weight: bold; }
 .tr-plan-meta { font-size: 9px; color: #a8a090; line-height: 1.2; }
+.tr-plan-icon { width: 34px; height: 34px; image-rendering: pixelated; object-fit: contain; }
 .tr-plan-price { font-size: 10px; color: #d4af37; font-weight: bold; margin-top: 2px; }
 
 .tr-now { font-size: 9px; color: #8a8270; text-align: center; }
@@ -3961,7 +4008,7 @@ html.boot-loading #modal,
 html.game-loading-on #modal,
 html.boot-loading #alpha-announce-modal,
 html.boot-loading #ui-mode-modal{display:none !important}
-.gl-box{width:min(360px,85vw);padding:22px;background:#20242c;border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 8px 35px #000}.gl-text{font-size:12px;color:#d8d8dc;margin:14px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}
+.gl-box{width:min(520px,90vw);padding:22px;background:linear-gradient(180deg,#262b34,#171a20);border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 12px 45px #000,inset 0 0 0 1px #343a45}.gl-brand{font:bold 20px Georgia,serif;letter-spacing:3px;text-shadow:0 2px 2px #000}.gl-hint{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;margin:18px 0 15px;padding:13px;background:linear-gradient(90deg,#101319,#1c2028);border:1px solid #4b5059;border-left:3px solid #a88932;text-align:left;box-shadow:inset 0 0 20px #080a0e}.gl-hint-art{width:92px;height:92px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#303641 0,#11141a 70%);border:1px solid #555b64;overflow:hidden}.gl-hint-art .mob-img{image-rendering:pixelated;filter:drop-shadow(0 4px 3px #000)}.gl-hint-info{min-width:0}.gl-hint-label{display:block;margin-bottom:4px;color:#a88932;font:bold 9px Verdana;letter-spacing:1.4px}.gl-hint-info strong{display:block;color:#f5e2a1;font:700 16px Georgia,serif;text-transform:capitalize}.gl-hint-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.gl-hint-stats span{padding:3px 6px;background:#090b0f;border:1px solid #393e47;color:#9da3ad;font:9px Verdana}.gl-hint-stats b{color:#e7d081}.gl-hint-info p{margin:8px 0 0;color:#b8bdc5;font:10px/1.4 Verdana}.gl-text{font-size:11px;color:#d8d8dc;margin:10px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}@media(max-width:480px){.gl-box{padding:16px}.gl-hint{grid-template-columns:72px 1fr;padding:9px;gap:10px}.gl-hint-art{width:68px;height:78px}.gl-hint-art .mob-img{transform:scale(.85)}.gl-hint-info strong{font-size:14px}.gl-hint-stats{gap:4px}}
 /* Background Summer 2026: fixo na viewport; o conteúdo rola sobre ele.
    !important necessário pois otc-complete.css é carregado depois deste
    arquivo e define body/#app com a mesma especificidade. */
@@ -4198,3 +4245,40 @@ body.fullhd .scene-overlay { font-size: 13px; }
 .voc-card.tutorial-voc-used::after {
   content: "já usada"; display: block; font-size: 9px; color: #ff9a6a;
 }
+
+/* Wheel of Destiny */
+.wheel-btn-icon {
+  display: inline-block; width: 22px; height: 22px; flex: 0 0 22px;
+  background-image: url('../assets/wheel/icons-skillwheel-largeperks.png');
+  background-position: 0 0;
+  background-size: 544px 34px; background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.wheel-icon {
+  display: inline-block;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+.wheel-icon-small {
+  width: 16px; height: 16px;
+  background-image: url('../assets/wheel/icons-skillwheel-smallperks.png');
+  background-size: 208px 16px;
+}
+.wheel-icon-medium {
+  width: 30px; height: 30px;
+  background-image: url('../assets/wheel/icons-skillwheel-mediumperks.png');
+  background-size: 1470px 30px;
+}
+.wheel-icon-large {
+  width: 34px; height: 34px;
+  background-image: url('../assets/wheel/icons-skillwheel-largeperks.png');
+  background-size: 544px 34px;
+}
+.wheel-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; border-bottom: 1px solid #2a2520;
+}
+.wheel-row strong { flex: 0 0 auto; }
+.wheel-row .tiny { flex: 1 1 auto; text-align: right; }
