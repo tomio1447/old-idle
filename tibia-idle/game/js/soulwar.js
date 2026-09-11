@@ -75,7 +75,7 @@
  // Mantém o nome bonito; os sprites vêm dos aliases em assets/item.
  const legacySouls=['soul-bastion','soulwalkers','soulcrown'];
  legacySouls.forEach((id)=>{if(!I[id])I[id]={n:id.replace(/-/g,' '),s:'misc',t:'soulwar',sell:25000,w:35};});
- const loot=[{chance:100,max:18,item:'platinum-coin'},{chance:28,max:4,item:'ultimate-health-potion'},{chance:28,max:4,item:'ultimate-mana-potion'},{chance:10,max:1,item:'bag-you-desire'}];
+ const loot=[{chance:100,max:18,item:'platinum-coin'},{chance:28,max:4,item:'ultimate-health-potion'},{chance:28,max:4,item:'ultimate-mana-potion'},{chance:0.015,max:1,item:'bag-you-desire'}];
  const ap=(n,hp,exp,el,skill)=>({name:n,hp,exp,damage:900,armor:85,defense:65,element:el,attackSpeed:2000,mitigation:2.5,resist:{physical:0,fire:10,ice:10,energy:10,earth:10,death:10,holy:10},skills:[{el,min:900,max:1300,int:2000,ch:30,range:6,fx:skill,miss:el},{el,min:800,max:1150,int:3000,ch:22,radius:2,fx:skill}],loot:loot.slice()});
  M['knight-s-apparition']=ap("Knight's Apparition",25000,18500,'physical','hit-area');
  M['paladin-s-apparition']=ap("Paladin's Apparition",24000,19000,'holy','holy-damage');
@@ -141,7 +141,7 @@
   'supreme-health-potion':50,'ultimate-spirit-potion':50};
  for(const drop of maliceLoot)if(maliceMin[drop.item])drop.min=maliceMin[drop.item];
  // Megalomania: Bag You Desire com 50% a mais que os mini-bosses (0.1% → 0.15%).
- const MEGA_BAG_CHANCE=0.15;
+ const MEGA_BAG_CHANCE=0.1;
  for(const slug of ['goshnar-s-megalomania-green','goshnar-s-megalomania-blue']){
   const megaLoot=(M[slug]&&M[slug].loot)||[];
   const megaMin={'crystal-coin':70,'bullseye-potion':10,'mastermind-potion':10,

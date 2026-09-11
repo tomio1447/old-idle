@@ -14,6 +14,8 @@ let WB = {
   chip: null,
   panel: null,
   combat: null,
+  busy: false,
+  panelCollapsed: false,
   lastReportAt: 0,
   pendingDmg: 0,
   pendingHeal: 0,
@@ -212,6 +214,7 @@ function wbWarzoneNumber(ev) {
 }
 
 function wbWarzoneTitle(ev) {
+  if (ev && ev.warzoneNumber == null) return String(ev.bossName || ev.warzoneName || "WORLD BOSS").toUpperCase() + " — LOBBY OPEN";
   return wbT("wb.open", "WARZONE {n} OPEN — JOIN").replace(/\{n\}/gi, wbWarzoneNumber(ev));
 }
 
@@ -233,24 +236,25 @@ const WB_MAX_PER_ACCOUNT = 1;
 function wbEnsurePanelShell() {
   wbEnsureDom();
   if (!WB.panel) return;
-  if (WB.panel.querySelector(".world-boss-head") && WB.panel.querySelector("#wb-boss-sprite")) return;
+  if (WB.panel.querySelector(".wb-lobby-card")) return;
   WB.panel.innerHTML = `
-    <div class="world-boss-head" id="wb-head">
-      <div class="world-boss-sprite" id="wb-boss-sprite" aria-hidden="true"></div>
-      <div class="world-boss-head-text" id="wb-head-text"></div>
-    </div>
-    <div class="world-boss-body">
-      <div id="wb-lobby-line"><b id="wb-wz-name"></b> — <span id="wb-boss-name"></span> · <span id="wb-counts"></span></div>
-      <div class="dim" id="wb-voc-line"></div>
-      <div class="dim" id="wb-timer-line"></div>
-      <div class="ok" id="wb-joined-line" style="display:none"></div>
-      <div class="world-boss-actions">
-        <button type="button" class="sm primary" id="wb-join-btn" style="display:none">${wbT("wb.join", "JOIN")}</button>
-        <button type="button" class="sm" id="wb-leave-btn" style="display:none">${wbT("wb.leave", "LEAVE")}</button>
-        <button type="button" class="sm" id="wb-close-btn">${wbT("wb.cancel", "Cancelar")}</button>
+    <div class="wb-lobby-card">
+      <div class="wb-lobby-header" id="wb-lobby-head">
+        <span class="wb-lobby-title" id="wb-head-text"></span>
+        <span class="spacer"></span>
+        <button type="button" class="sm" id="wb-lobby-min" title="Minimizar">▾</button>
+        <button type="button" class="sm" id="wb-close-btn" title="Cancelar">✕</button>
       </div>
-      <div id="wb-join-picker" class="world-boss-picker" style="display:none"></div>
-      <div class="tiny dim" id="wb-status"></div>
+      <div class="wb-lobby-body" id="wb-lobby-body">
+        <div class="wb-lobby-sub" id="wb-lobby-sub"></div>
+        <div class="wb-lobby-slots" id="wb-participants"></div>
+        <div class="wb-lobby-actions">
+          <button type="button" class="sm primary" id="wb-join-btn" style="display:none">${wbT("wb.join", "JOIN")}</button>
+          <button type="button" class="sm" id="wb-leave-btn" style="display:none">${wbT("wb.leave", "LEAVE")}</button>
+        </div>
+        <div id="wb-join-picker" class="world-boss-picker" style="display:none"></div>
+        <div class="tiny dim" id="wb-status"></div>
+      </div>
     </div>`;
   const joinBtn = document.getElementById("wb-join-btn");
   if (joinBtn) joinBtn.onclick = () => wbShowJoinPicker();
@@ -258,16 +262,48 @@ function wbEnsurePanelShell() {
   if (leaveBtn) leaveBtn.onclick = () => wbLeave();
   const closeBtn = document.getElementById("wb-close-btn");
   if (closeBtn) closeBtn.onclick = () => wbDismissPanel();
+  const minBtn = document.getElementById("wb-lobby-min");
+  if (minBtn) minBtn.onclick = () => { WB.panelCollapsed = !WB.panelCollapsed; wbRenderPanel(); };
+  const head = document.getElementById("wb-lobby-head");
+  if (head) head.onclick = (e) => { if (e.target === head || e.target.id === "wb-head-text") { WB.panelCollapsed = !WB.panelCollapsed; wbRenderPanel(); } };
 }
+
+function wbApplyLobbyAccessLock(locked) {
+  const message = "Indisponível enquanto seu personagem estiver em um lobby de World Boss.";
+  for (const id of ["btn-training", "btn-hunts", "btn-bosses", "btn-world-bosses"]) {
+    const button = document.getElementById(id);
+    if (!button) continue;
+    const currentTitle = button.getAttribute("title") || "";
+    if (!locked && currentTitle && !button.dataset.wbOriginalTitle) button.dataset.wbOriginalTitle = currentTitle;
+    button.classList.toggle("wb-lobby-locked", !!locked);
+    button.setAttribute("aria-disabled", locked ? "true" : "false");
+    button.setAttribute("title", locked ? message : (button.dataset.wbOriginalTitle || currentTitle));
+  }
+}
+
+/* Intercepta cliques nos botões travados antes dos handlers originais. */
+function wbLockedClickInterceptor(e) {
+  const target = e.target.closest(".wb-lobby-locked");
+  if (!target) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (typeof toast === "function") toast(target.getAttribute("title") || "Indisponível no lobby.", "bad");
+}
+
+document.addEventListener("click", wbLockedClickInterceptor, true);
 
 function wbRenderPanel() {
   wbEnsurePanelShell();
   const st = WB.state;
   const ev = st && st.event;
+  const joined = !!(st && st.you && st.you.joined);
+  wbApplyLobbyAccessLock(joined && !!ev && (ev.phase === "lobby" || ev.phase === "countdown"));
   if (!ev || (ev.phase !== "lobby" && ev.phase !== "countdown")) {
     WB.panelDismissed = false;
     WB.panelDismissKey = null;
+    WB.panelCollapsed = false;
     if (WB.panel) WB.panel.style.display = "none";
+    document.body.classList.remove("wb-lobby-open");
     return;
   }
   wbSyncMinimizeKey(ev);
@@ -275,56 +311,28 @@ function wbRenderPanel() {
     if (WB.panel) WB.panel.style.display = "none";
     return;
   }
-  const you = st.you;
-  const joined = !!(you && you.joined);
-  const voc = ev.vocations || {};
-  const vocLine = ["knight", "paladin", "sorcerer", "druid", "monk"]
-    .map((k) => (voc[k] ? wbVocLabel(k) + " " + voc[k] : null))
-    .filter(Boolean).join(" · ") || "—";
   const endsAt = ev.phase === "lobby" ? ev.lobbyEndsAt : ev.countdownEndsAt;
   const leftSec = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
   const title = ev.phase === "lobby"
-    ? wbWarzoneTitle(ev)
-    : wbT("wb.countdownTitle", "WORLD BOSS — COUNTDOWN");
+    ? (ev.bossName || ev.warzoneName || "WORLD BOSS").toUpperCase() + " — LOBBY"
+    : wbT("wb.countdownTitle", "WORLD BOSS — COUNTDOWN").toUpperCase();
+  const typeLabel = ev.lobbyType === "closed" ? "Fechado" : "Aberto";
+  const sub = `${ev.charCount || 0}/${ev.maxChars || 5} · ${typeLabel} · ${leftSec}s`;
 
-  WB.panel.style.display = "block";
+  WB.panel.style.display = "";
 
   const headText = document.getElementById("wb-head-text");
-  const spriteEl = document.getElementById("wb-boss-sprite");
-  const wzName = document.getElementById("wb-wz-name");
-  const bossNameEl = document.getElementById("wb-boss-name");
-  const counts = document.getElementById("wb-counts");
-  const vocEl = document.getElementById("wb-voc-line");
-  const timerEl = document.getElementById("wb-timer-line");
-  const joinedEl = document.getElementById("wb-joined-line");
+  const subEl = document.getElementById("wb-lobby-sub");
   const joinBtn = document.getElementById("wb-join-btn");
   const leaveBtn = document.getElementById("wb-leave-btn");
   const picker = document.getElementById("wb-join-picker");
+  const body = document.getElementById("wb-lobby-body");
+  const minBtn = document.getElementById("wb-lobby-min");
 
   if (headText) headText.textContent = title;
-  if (spriteEl) {
-    const slug = wbBossSpriteSlug(ev);
-    if (spriteEl.dataset.slug !== slug) {
-      spriteEl.dataset.slug = slug;
-      spriteEl.innerHTML = wbBossSpriteHtml(ev, 48);
-    }
-  }
-  if (wzName) wzName.textContent = ev.warzoneName || ("Warzone " + wbWarzoneNumber(ev));
-  if (bossNameEl) bossNameEl.textContent = ev.bossName || "";
-  if (counts) counts.textContent = (ev.charCount || 0) + "/" + (ev.maxChars || 30);
-  if (vocEl) vocEl.textContent = wbT("wb.vocations", "Vocações") + ": " + vocLine;
-  if (timerEl) timerEl.textContent = wbT("wb.timer", "Tempo") + ": " + leftSec + "s";
-
-  if (joinedEl) {
-    if (joined) {
-      joinedEl.style.display = "";
-      joinedEl.textContent = wbT("wb.joined", "Você entrou") + ": "
-        + ((you.chars || []).map((c) => c.name).join(", ") || "—");
-    } else {
-      joinedEl.style.display = "none";
-      joinedEl.textContent = "";
-    }
-  }
+  if (subEl) subEl.textContent = sub;
+  if (body) body.style.display = WB.panelCollapsed ? "none" : "";
+  if (minBtn) minBtn.textContent = WB.panelCollapsed ? "▸" : "▾";
 
   const showJoin = !joined && ev.phase === "lobby";
   const showLeave = joined && ev.phase === "lobby";
@@ -334,6 +342,39 @@ function wbRenderPanel() {
     picker.style.display = "none";
     picker.innerHTML = "";
   }
+
+  const partEl = document.getElementById("wb-participants");
+  if (partEl && !WB.panelCollapsed) {
+    const list = (ev.participants || []);
+    const sorted = list.slice().sort((a, b) => (b.host ? 1 : 0) - (a.host ? 1 : 0));
+    const max = Math.max(sorted.length, ev.maxChars || 5);
+    partEl.style.display = "";
+    partEl.className = "wb-lobby-slots";
+    let html = "";
+    for (let i = 0; i < max; i++) {
+      const c = sorted[i];
+      if (!c) {
+        html += `<div class="mega-lobby-slot empty"><span class="mega-lobby-slot-n">#${i + 1}</span><span class="dim">Vaga livre</span></div>`;
+      } else {
+        const leader = c.host;
+        const you = (st.you && st.you.chars || []).some((x) => Number(x.id) === Number(c.id));
+        html += `<div class="mega-lobby-slot ${leader ? "leader" : ""} ${you ? "you" : ""}" title="${c.name || ""} (${c.level || "?"}) ${c.voc || ""}">
+          <span class="mega-lobby-slot-n">${leader ? "LÍDER" : "#" + (i + 1)}</span>
+          <div class="mega-lobby-slot-body">
+            <b>${(c.name || "?").slice(0, 14)}</b>
+            <span class="dim">${wbVocLabel(c.voc)} · lvl ${c.level || 1}</span>
+          </div>
+        </div>`;
+      }
+    }
+    partEl.innerHTML = html;
+  } else if (partEl) {
+    partEl.style.display = "none";
+    partEl.innerHTML = "";
+  }
+
+  /* Esconde o painel de party enquanto o lobby estiver aberto. */
+  document.body.classList.toggle("wb-lobby-open", joined && !!ev && (ev.phase === "lobby" || ev.phase === "countdown"));
 }
 
 /* Online: mesma fonte do party modal (cache /api/me). Offline: roster local. */
@@ -406,6 +447,9 @@ function wbShowJoinPicker() {
 }
 
 async function wbJoin(ids) {
+  if (WB.busy) return;
+  WB.busy = true;
+  try {
   const status = document.getElementById("wb-status");
   if (!ids || !ids.length) {
     if (status) status.textContent = wbT("wb.pickChars", "Selecione 1 personagem.");
@@ -425,17 +469,22 @@ async function wbJoin(ids) {
   wbRenderPanel();
   wbRenderOverlay();
   if (typeof toast === "function") toast(wbT("wb.joinedToast", "Entrou no World Boss lobby"), "ok");
+  } finally { WB.busy = false; }
 }
 
 async function wbLeave() {
-  const r = await wbFetch("POST", "/api/world-boss/leave", {});
-  if (!r.data.ok && r.status >= 400) {
-    if (typeof toast === "function") toast(r.data.msg || "LEAVE falhou", "bad");
-    return;
-  }
-  WB.state = r.data;
-  wbRenderPanel();
-  wbRenderOverlay();
+  if (WB.busy) return;
+  WB.busy = true;
+  try {
+    const r = await wbFetch("POST", "/api/world-boss/leave", {});
+    if (!r.data.ok && r.status >= 400) {
+      if (typeof toast === "function") toast(r.data.msg || "LEAVE falhou", "bad");
+      return;
+    }
+    WB.state = r.data;
+    wbRenderPanel();
+    wbRenderOverlay();
+  } finally { WB.busy = false; }
 }
 
 function wbRenderOverlay() {
@@ -457,23 +506,13 @@ function wbRenderOverlay() {
     return;
   }
 
-  if (ev.phase === "lobby") {
-    const left = Math.max(0, Math.ceil(((ev.lobbyEndsAt || 0) - Date.now()) / 1000));
-    const msg = (ev.message || wbWarzoneTitle(ev))
-      + (left > 0 ? " (" + left + "s)" : "");
-    if (WB.overlayMinimized) wbShowOverlayChip(msg);
-    else wbShowOverlayExpanded(msg);
+  /* O lobby e countdown agora são exibidos apenas no painel lateral,
+   * sem bloquear a tela com o overlay vermelho. */
+  if (ev.phase === "lobby" || ev.phase === "countdown") {
+    wbHideOverlayUi();
     return;
   }
-  if (ev.phase === "countdown") {
-    const left = Math.max(0, Math.ceil((ev.countdownEndsAt - Date.now()) / 1000));
-    const msg = (ev.message || wbT("wb.prepMsg",
-      "EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!"))
-      + " (" + left + "s)";
-    if (WB.overlayMinimized) wbShowOverlayChip(msg);
-    else wbShowOverlayExpanded(msg);
-    return;
-  }
+
   if (ev.phase === "combat") {
     const now = Date.now();
     if (ev.spawnAt && now < ev.spawnAt) {
@@ -736,7 +775,8 @@ function wbTickLocalTimers() {
     const timerEl = document.getElementById("wb-timer-line");
     if (timerEl) timerEl.textContent = wbT("wb.timer", "Tempo") + ": " + leftSec + "s";
   }
-  wbRenderOverlay();
+  /* Não chama wbRenderOverlay em lobby/countdown — o painel lateral já informa o estado. */
+  if (ev.phase !== "lobby" && ev.phase !== "countdown") wbRenderOverlay();
 }
 
 function wbStart() {

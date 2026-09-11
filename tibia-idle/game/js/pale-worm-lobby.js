@@ -193,16 +193,16 @@ function paleLobbyRenderPanel() {
     <b>PALE WORM LOBBY</b>
     <button type="button" class="sm" id="pale-lobby-close-x">✕</button>
   </div>
-  <div class="mega-lobby-sub">Líder: <b>${lobby.leaderName || "?"}</b> · ${lobby.filled || 0}/${lobby.max || 9}</div>
+  <div class="mega-lobby-sub">Líder: <b>${lobby.leaderName || "?"}</b> · ${lobby.filled || 0}/${lobby.max || 5}</div>
   <div class="mega-lobby-slots">`;
-  for (let i = 0; i < (lobby.max || 9); i++) html += paleLobbySlotHtml(slots[i] || null, i, leader);
+  for (let i = 0; i < (lobby.max || 5); i++) html += paleLobbySlotHtml(slots[i] || null, i, leader);
   html += `</div>`;
   if (leader && lobby.status === "open") {
     html += `<div class="mega-lobby-invite-row">
       <input id="pale-lobby-invite-name" type="text" maxlength="30" placeholder="Nome do personagem">
       <button type="button" class="sm primary" id="pale-lobby-invite-send">Convidar</button>
     </div>
-    <button type="button" class="danger full mt8" id="pale-lobby-start">INICIAR LUTA (1–9)</button>`;
+    <button type="button" class="danger full mt8" id="pale-lobby-start">INICIAR LUTA (1–5)</button>`;
   }
   if (lobby.status === "open") {
     html += `<button type="button" class="sm full mt8" id="pale-lobby-leave">Sair do lobby</button>`;

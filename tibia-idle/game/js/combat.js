@@ -4980,13 +4980,9 @@ function combatTick(c, p, dt, now) {
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
   if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
 
-  // Stamina temporariamente desativada: toda a party permanece em 42h.
-  // A condição de encerramento por stamina continua prevista, mas não pode
-  // ocorrer enquanto este modo de testes estiver ativo.
-  const fullStamina=42*3600;
-  p.stamina=fullStamina;
-  if(c.players&&c.players.length)for(const ent of c.players)
-    if(ent&&ent.p)ent.p.stamina=fullStamina;
+  const staminaPlayers=(c.players&&c.players.length)?c.players:[{p}];
+  for(const ent of staminaPlayers)if(ent&&ent.p)
+    ent.p.stamina=Math.max(0,(Number(ent.p.stamina)||0)-dt/1000);
 
   if (c.dead) return;
 
@@ -5223,7 +5219,8 @@ function combatTick(c, p, dt, now) {
     // Raw XP/HP é registrado antes de stage, PvP, Prey, VIP, taints e party.
     recordRawMonsterStats(c, m);
     // recompensa
-    const staminaMul = 1; // temporário: stamina não altera EXP/loot/kills
+    const staminaNow = Math.max(0, Number(p.stamina) || 0);
+    const staminaMul = staminaNow <= 0 ? 0 : (staminaNow > 40 * 3600 ? 1.5 : (staminaNow <= 14 * 3600 ? 0.5 : 1));
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
     if (typeof soulwarTaintExpMultiplier === "function")
       exp = Math.floor(exp * soulwarTaintExpMultiplier(c, p));

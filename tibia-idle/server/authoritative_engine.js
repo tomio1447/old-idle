@@ -577,8 +577,8 @@ const SKILL_MUL={
   monk:{melee:1.5,dist:2.0,shield:1.2,fist:1.1},
   none:{melee:1.5,dist:2.0,shield:1.5,fist:1.5},
 };
-function serverSkillRate(level){level=Number(level)||10;if(level<=80)return 10;if(level<=100)return 7;if(level<=120)return 4;return 2;}
-function serverMagicRate(ml){ml=Number(ml)||0;if(ml<=80)return 10;if(ml<=100)return 7;if(ml<=120)return 4;if(ml<=130)return 3;return 2;}
+function serverSkillRate(level){return 2;}
+function serverMagicRate(ml){return 2;}
 const START_HP=185,START_MP=5,FULL_STAMINA=42*3600;
 const INFLUENCED_BASE_CHANCE=.004,INFLUENCED_PVP_BONUS=.004,
   FIENDISH_BASE_CHANCE=.0012,FIENDISH_PVP_BONUS=.0008;
@@ -4052,7 +4052,7 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
 }
 function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String(member.id);syncPlayerProgress(p);
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
-  p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.ammo=p.ammo||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=FULL_STAMINA;
+  p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.ammo=p.ammo||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=Number.isFinite(Number(p.stamina))?Math.max(0,Math.min(FULL_STAMINA,Number(p.stamina))):FULL_STAMINA;
   p.conditions=p.conditions&&typeof p.conditions==="object"?p.conditions:{};
   rewardChestEnsure(p);
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));
@@ -4145,10 +4145,7 @@ const SERVER_EXP_STAGES=[
   {min:901,max:1000,rate:3},{min:1001,max:1200,rate:2},{min:1201,max:1400,rate:1.5},
   {min:1401,max:Infinity,rate:1.2},
 ];
-function expStage(level){
-  for(const s of SERVER_EXP_STAGES)if(level>=s.min&&level<=s.max)return s.rate;
-  return 1.2;
-}
+function expStage(level){return 2;}
 /* Prey EXP bonus: p.prey.slots[].selected = {creature, bonus, step, until} */
 const PREY_BONUSES={exp:{base:13,step:3,max:40},damage:{base:7,step:2,max:25},
   defense:{base:12,step:2,max:30},loot:{base:13,step:3,max:40}};
@@ -4194,6 +4191,9 @@ function vipExpBonus(p){
 /* Calcula EXP final com todos os multiplicadores */
 function finalExp(p,mobExp,mobSlug,expMul){
   let exp=Math.max(0,Math.floor(Number(mobExp)||0));
+  const stamina=Math.max(0,Number(p.stamina)||0);
+  const staminaMul=stamina<=0?0:(stamina>40*3600?1.5:(stamina<=14*3600?.5:1));
+  exp=Math.floor(exp*staminaMul);
   // Stage multiplier (rates.js)
   exp=Math.floor(exp*expStage(Number(p.level)||1));
   // Instância PVP do idle: +25% EXP (antes de prey/VIP, como c.expMul).
@@ -6493,7 +6493,7 @@ function step(auth,now,opts){if(auth.ended)return;
   soulwarTaintTick(auth,dt,now);
   tickDelayedHits(auth,now);
   for(const item of auth.players){
-    const p=item.p;p.stamina=FULL_STAMINA;
+    const p=item.p;p.stamina=Math.max(0,(Number(p.stamina)||0)-dt/1000);
     if(item.downUntil&&now>=item.downUntil){
       if(item.permadead||authIsBossFight(auth)){
         item.permadead=true;p.hp=0;

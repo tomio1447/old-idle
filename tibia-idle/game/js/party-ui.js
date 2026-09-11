@@ -380,7 +380,9 @@ function openPartyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
   ensureParty(p);
-  $("#modal-body").innerHTML = `<div class="panel-title">👥 Party
+  const modalBody = $("#modal-body");
+  modalBody.classList.add("forge-pattern-modal-shell");
+  modalBody.innerHTML = `<div class="panel-title">👥 Party
       <span style="flex:1"></span>
       <button class="sm" id="party-analyser-btn" title="Party Hunt Analyser completo">📊 Analyser</button>
       <button class="sm" id="party-close">✕</button>
@@ -389,6 +391,7 @@ function openPartyModal() {
   $("#modal").classList.add("show", "wide");
   $("#party-close").addEventListener("click", () => {
     $("#modal").classList.remove("show", "wide");
+    modalBody.classList.remove("forge-pattern-modal-shell");
   });
   const anal = $("#party-analyser-btn");
   if (anal) anal.addEventListener("click", () => openPartyAnalyserModal());
@@ -908,12 +911,13 @@ function openPartyAnalyserModal() {
   if (!p) return;
   const s = partyAnalyserSession(p);
   const box = $("#modal-body");
+  box.classList.add("forge-pattern-modal-shell");
   box.innerHTML = `<div class="panel-title">📊 Party Hunt Analyser <span class="tiny dim">OTC-style</span><span style="flex:1"></span><button class="sm" id="analyser-close">✕</button></div>
     <div class="party-analyser-tabs">
       <button class="sm primary" data-pa-tab="summary">📈 Hunting</button><button class="sm" data-pa-tab="members">👥 Members</button><button class="sm" data-pa-tab="loot">🎒 Loot</button><button class="sm" data-pa-tab="supply">🧪 Supplies</button><button class="sm" data-pa-tab="impact">⚔ Impact</button>
     </div><div class="panel-body" id="analyser-content"></div>`;
   $("#modal").classList.add("show", "wide");
-  $("#analyser-close").onclick=()=>$("#modal").classList.remove("show", "wide");
+  $("#analyser-close").onclick=()=>{$("#modal").classList.remove("show", "wide");box.classList.remove("forge-pattern-modal-shell");};
   const duration = s ? Math.max(1, Math.floor(((s.endedAt || Date.now()) - s.startedAt) / 1000)) : 1;
   const c = G.combat, st = (c && c.stats) || {};
   const n = (v) => fmtFull(Math.round(v || 0));

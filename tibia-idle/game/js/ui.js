@@ -118,20 +118,25 @@ function bindFullItemTooltip(el, slug, extra, slot, instId) {
  * (assets/ui/damage) + valor assinado (0%, +10%, -5%, 100% imune) + barra.
  * Fraqueza em vermelho, resistência em verde, imune em verde-claro,
  * neutro em cinza. Usada no modal de bosses e nas hunts. */
+function resistPercentInfo(value) {
+  const resistance = Number(value) || 0;
+  const weak = resistance < 0, immune = resistance >= 100, strong = resistance > 0;
+  const percent = 100 + resistance;
+  const color = weak ? "#e85b52" : immune ? "#37d45b" : (strong ? "#80d64a" : "#9a948a");
+  const effect = immune ? "Imune" : weak ? `${Math.abs(resistance)}% mais dano` : strong ? `${resistance}% menos dano` : "Neutro";
+  return { resistance, percent, weak, immune, strong, color, effect };
+}
 function resistRowHtml(el, value) {
   const info = ELEMENTS[el] || ELEMENTS.physical;
-  const v = Number(value) || 0;
-  const weak = v < 0, immune = v >= 100;
-  const pct = (immune ? "" : v > 0 ? "+" : "") + v + "%";
-  const color = weak ? "#e85b52" : immune ? "#37d45b" : (v > 0 ? "#80d64a" : "#9a948a");
-  const width = Math.max(8, Math.min(100, 50 + v / 2));
+  const state = resistPercentInfo(value);
+  const width = Math.max(8, Math.min(100, state.percent / 2));
   const icon = typeof dmgIconImg === "function" ? dmgIconImg(el, 13) : "";
-  const label = `${info.name}: ${pct}` + (immune ? " — imune" : weak ? " — fraqueza" : "");
-  return `<div class="hunt-best-res resist-row ${weak ? "weak" : immune ? "immune" : v > 0 ? "strong" : "neutral"}"
+  const label = `${info.name}: ${state.percent}% — ${state.effect}`;
+  return `<div class="hunt-best-res resist-row ${state.weak ? "weak" : state.immune ? "immune" : state.strong ? "strong" : "neutral"}"
     title="${label}">
     <span class="resist-icon">${icon}</span>
-    <span class="resist-val" style="color:${color}">${pct}</span>
-    <i><b style="width:${width}%;background:${color}"></b></i>
+    <span class="resist-val" style="color:${state.color}">${state.percent}%</span>
+    <i><b style="width:${width}%;background:${state.color}"></b></i>
   </div>`;
 }
 

@@ -4,8 +4,11 @@ const HEART_BOSS_IDS = ["aftershock", "anomaly", "eradicator", "outburst", "real
 const HEART_ROOM = {
   otbm: "hearthboss",
   center: { x: 1026, y: 1026, z: 7 },
-  boss: { x: 1023, y: 1021, z: 7 },
-  spawn: { x: 1029, y: 1030, z: 7 },
+  boss: { x: 1024, y: 1020, z: 7 },
+  spawn: { x: 1024, y: 1031, z: 7 },
+  fovBounds: { x: 1013, y: 1016, w: 26, h: 18, z: 7 },
+  fov: { w: 22, h: 15 },
+  runtime: { w: 30, h: 30 },
 };
 
 (function registerHeartDestructionBosses() {
@@ -32,7 +35,12 @@ const HEART_ROOM = {
       name: `${def.name}'s Room`, hidden: true, level: 150, minLevel: 150,
       monsters: [id], color: "#4d4162", scene: "palace",
       otbm: HEART_ROOM.otbm, otbmFloor: 7,
-      otbmBounds: { x: 1016, y: 1020, w: 21, h: 13, z: 7 },
+      otbmBounds: HEART_ROOM.fovBounds,
+      otbmFovBounds: HEART_ROOM.fovBounds,
+      otbmFovWidth: HEART_ROOM.fov.w,
+      otbmFovHeight: HEART_ROOM.fov.h,
+      otbmRuntimeWidth: HEART_ROOM.runtime.w,
+      otbmRuntimeHeight: HEART_ROOM.runtime.h,
       otbmSpawn: HEART_ROOM.spawn,
       otbmMobBounds: Object.assign({ w: 1, h: 1 }, HEART_ROOM.boss),
       avgHp: def.hp, avgExp: def.exp, avgDamage: def.damage,

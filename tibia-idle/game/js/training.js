@@ -50,8 +50,8 @@ function exerciseCharges(p) {
   const s = ensureTraining(p);
   return s.activePlan === "free" ? Infinity : s.balances[s.activePlan];
 }
-function trainingPlanIcon(p, planId) {
-  const skill = (p && p.trainingExercise && p.trainingExercise.skill) || "sword";
+function trainingPlanIcon(p, planId, skill) {
+  skill = skill || (p && p.trainingExercise && p.trainingExercise.skill) || "sword";
   const w = trainingWeaponForSkill(skill, p);
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
   if (planId === "lasting") return `${TRAINING_ICON_PATH}${w.replace("exercise-", "lasting-")}.gif?v=${v}`;

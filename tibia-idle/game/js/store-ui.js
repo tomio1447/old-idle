@@ -54,7 +54,9 @@ function openStoreModal(tab) {
   if (!modal) return;
   storeStopPoll();
   _storePayView = null;
-  $("#modal-body").innerHTML = `
+  const modalBody = $("#modal-body");
+  modalBody.classList.add("forge-pattern-modal-shell");
+  modalBody.innerHTML = `
     <div class="panel-title">
       <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt="" style="width:20px;height:20px">
       <b>STORE</b>
@@ -71,6 +73,7 @@ function openStoreModal(tab) {
   $("#store-close").addEventListener("click", () => {
     storeStopPoll();
     modal.classList.remove("show", "wide");
+    modalBody.classList.remove("forge-pattern-modal-shell");
   });
   modal.classList.add("show", "wide");
   renderStoreNav();

@@ -324,7 +324,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const row=this.instanceGet(accountId);if(!row||row.status!=="active")return {ok:false,skipped:"inactive"};
   const lease=(this.leases||[]).find((item)=>Number(item.account_id)===Number(accountId));
   if(lease&&new Date(lease.expires_at).getTime()>now)return {ok:false,skipped:"leased"};
-  if(/^world-boss-wz[1-6]$/.test(String(row.boss_id||""))){
+  if(/^(world-boss-wz[1-6]|world-devourer|the-pale-worm|goshnar-s-megalomania)$/.test(String(row.boss_id||""))){
     const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
     const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds():[];
     const memberLeased=ids.some((id)=>{
@@ -1918,7 +1918,7 @@ async function MysqlStore() {
         const row=rows[0];if(!row||row.status!=="active"){
           await conn.rollback();return {ok:false,skipped:"inactive"};
         }
-        if(/^world-boss-wz[1-6]$/.test(String(row.boss_id||""))){
+        if(/^(world-boss-wz[1-6]|world-devourer|the-pale-worm|goshnar-s-megalomania)$/.test(String(row.boss_id||""))){
           const wb=typeof global.__WORLD_BOSS!=="undefined"?global.__WORLD_BOSS:null;
           const ids=wb&&typeof wb.joinedAccountIds==="function"?wb.joinedAccountIds().map(Number).filter((id)=>id>0):[];
           if(ids.length){

@@ -51,6 +51,11 @@ const FEAST_OF_SOULS_ROOMS = {
     name: "The Pale Worm's Room",
     spawn: { x: 1041, y: 1010, z: 7 },
     boss: { x: 1051, y: 1015, z: 7 },
+    fovBounds: { x: 1033, y: 999, w: 32, h: 24, z: 7 },
+    fovWidth: 22,
+    fovHeight: 15,
+    runtimeWidth: 32,
+    runtimeHeight: 24,
   },
 };
 
@@ -125,6 +130,11 @@ const FEAST_UNWELCOME_NEUTRAL_RESIST = {
       scene: "palace",
       otbm: room.otbm,
       otbmFloor: 7,
+      otbmFovBounds: room.fovBounds,
+      otbmFovWidth: room.fovWidth,
+      otbmFovHeight: room.fovHeight,
+      otbmRuntimeWidth: room.runtimeWidth,
+      otbmRuntimeHeight: room.runtimeHeight,
       otbmSpawn: room.spawn,                          // spawn do jogador
       otbmMobBounds: Object.assign({ w: 1, h: 1 }, room.boss), // spawn do boss
       avgHp: 300000,
@@ -172,8 +182,8 @@ const FEAST_UNWELCOME_NEUTRAL_RESIST = {
     hp: 300000,
     exp: 30000,
     damage: 1050,
-    armor: 160,
-    defense: 170,
+    armor: 140,
+    defense: 120,
     speed: 0.00007,
     requirement: { level: 250, text: "Requer nível 250+ (Feast of Souls)" },
     cooldown: FEAST_OF_SOULS_COOLDOWN_MS,

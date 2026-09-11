@@ -14,7 +14,7 @@
 const crypto = require("crypto");
 const LOBBY_TTL_MS = 30 * 60 * 1000;
 const INVITE_TTL_MS = 2 * 60 * 1000;
-const MAX_SLOTS = 9;
+const MAX_SLOTS = 5;
 /* Gate: os 3 bosses anteriores do Feast of Souls. */
 const GATE_BOSSES = ["the-dread-maiden", "the-fear-feaster", "the-unwelcome"];
 const BOSS_ID = "the-pale-worm";
@@ -230,7 +230,7 @@ function createPaleWormLobbyController(opts) {
     if (Number(lobby.leaderAccountId) !== Number(acc.id))
       return { code: 403, body: { ok: false, msg: "Só o líder pode convidar." } };
     if (lobby.slots.filter(Boolean).length >= MAX_SLOTS)
-      return { code: 409, body: { ok: false, msg: "Lobby cheio (máx. 9)." } };
+      return { code: 409, body: { ok: false, msg: "Lobby cheio (máx. 5)." } };
     const target = await db.findCharacterByName(String(inviteeName || "").trim());
     if (!target) return { code: 404, body: { ok: false, msg: "Personagem não encontrado." } };
     if (Number(target.account_id) === Number(acc.id))

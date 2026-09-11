@@ -93,22 +93,13 @@ const SERVER_BESTIARY_RATE = 2;
 /* ── Funções de lookup ── */
 
 function serverExpRate(level) {
-  for (const s of SERVER_EXP_STAGES) {
-    if (level >= s.min && level <= s.max) return s.rate;
-  }
-  return 1.2;
+  return 2;
 }
 
 function serverSkillRate(skillLevel) {
-  for (const s of SERVER_SKILL_STAGES) {
-    if (skillLevel >= s.min && skillLevel <= s.max) return s.rate;
-  }
   return 2;
 }
 
 function serverMagicRate(magicLevel) {
-  for (const s of SERVER_MAGIC_STAGES) {
-    if (magicLevel >= s.min && magicLevel <= s.max) return s.rate;
-  }
   return 2;
 }

@@ -1538,8 +1538,7 @@ async function prepareInstanceState(db,acc,input){
       }
     }
   }
-  const maxMembers=isWorldBossBossId(bossId)?WORLD_BOSS_MAX_MEMBERS:
-    (String(bossId||"")==="the-pale-worm"?9:5);
+  const maxMembers=/^world-boss-wz[1-6]$/.test(String(bossId||""))?WORLD_BOSS_MAX_MEMBERS:5;
   if(!members.length||members.length>maxMembers)return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_MEMBERS",msg:"Membros da instância inválidos"}}};
   let ids=members.map((member)=>Number(member&&member.id));
   if(ids.some((id)=>!Number.isSafeInteger(id)||id<=0)||new Set(ids).size!==ids.length)

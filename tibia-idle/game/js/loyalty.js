@@ -111,6 +111,7 @@ function openLoyaltyModal() {
   const modal = typeof $ === "function" ? $("#modal") : null;
   const body = typeof $ === "function" ? $("#modal-body") : null;
   if (!modal || !body) return;
+  body.classList.add("forge-pattern-modal-shell");
 
   const pts = loyaltyPoints(p);
   const rank = loyaltyRankForPoints(pts);
@@ -181,6 +182,7 @@ function openLoyaltyModal() {
   if (close) {
     close.onclick = () => {
       modal.classList.remove("show", "wide");
+      body.classList.remove("forge-pattern-modal-shell");
     };
   }
 }

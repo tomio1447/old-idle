@@ -621,15 +621,13 @@ function cycloBestiaryDetail(p, el, slug) {
       <div>
         <div class="small dim mb4">Resistências</div>
         ${bestiaryReveals(p, slug, "resistencias")
-          ? (m.resist && Object.keys(m.resist).length
-             ? Object.keys(m.resist).map((e) => `
-                <div class="stat-row">
-                  <span class="k" style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">
-                    ${(ELEMENTS[e] || {}).name || e}</span>
-                  <span class="v" style="color:${m.resist[e] > 0 ? "#9ce84a" : "#ff9090"}">
-                    ${m.resist[e] > 0 ? "+" : ""}${m.resist[e]}%</span>
-                </div>`).join("")
-             : `<div class="tiny dim">Nenhuma resistência.</div>`)
+          ? ["physical","earth","energy","fire","ice","holy","death"].map((e) => {
+              const state = typeof resistPercentInfo === "function" ? resistPercentInfo((m.resist && m.resist[e]) || 0) : { percent:100,color:"#9a948a",effect:"Neutro" };
+              return `<div class="stat-row" title="${state.effect}">
+                <span class="k" style="color:${(ELEMENTS[e] || {}).color || "#ccc"}">${(ELEMENTS[e] || {}).name || e}</span>
+                <span class="v" style="color:${state.color}">${state.percent}%</span>
+              </div>`;
+            }).join("")
           : `<div class="tiny dim">Mate ${bestiaryMarcos(slug)[2]} para revelar.</div>`}
         <div class="small dim mt8 mb4">Loot</div>
         ${bestiaryReveals(p, slug, "loot")
@@ -745,14 +743,12 @@ function cycloBossDetail(p, el, slug) {
   const pr = bosstiaryProgress(p, slug);
   const elements = ["physical","earth","energy","fire","ice","holy","death"];
   const resistRows = elements.map((e) => {
-    const v = (m.resist && m.resist[e]) || 0;
-    if (!v) return "";
-    const c = v > 0 ? "#9ce84a" : "#ff9090";
+    const state = typeof resistPercentInfo === "function" ? resistPercentInfo((m.resist && m.resist[e]) || 0) : { percent:100,color:"#9a948a",effect:"Neutro" };
     const d = (typeof ELEMENTS !== "undefined" && ELEMENTS[e]) || { name: e, color: "#ccc" };
-    return `<div class="stat-row">
+    return `<div class="stat-row" title="${state.effect}">
       <span class="k" style="color:${d.color}">
         ${typeof dmgIconImg === "function" ? dmgIconImg(e, 10) : ""}${d.name}</span>
-      <span class="v" style="color:${c}">${v > 0 ? "+" : ""}${v}%</span>
+      <span class="v" style="color:${state.color}">${state.percent}%</span>
     </div>`;
   }).join("");
   const lootRows = (m.loot || []).filter((l) => l.item).map((l) => {

@@ -346,7 +346,7 @@ function megaLobbyAccountChars() {
   return [];
 }
 
-function megaLobbyConfirmCharModal(preferredId, title) {
+function megaLobbyConfirmCharModal(preferredId, title, infoText) {
   return new Promise((resolve) => {
     const modal = $("#modal"), body = $("#modal-body");
     if (!modal || !body) { resolve(null); return; }
@@ -367,7 +367,7 @@ function megaLobbyConfirmCharModal(preferredId, title) {
     body.innerHTML = `<div class="panel-title">${title || "Escolher personagem"}
       <button class="sm" id="mega-char-cancel">✕</button></div>
       <div class="panel-body">
-        <p class="tiny dim">O personagem deve estar no templo e fora de Party.</p>
+        <p class="tiny dim">${infoText || "O personagem deve estar no templo e fora de Party."}</p>
         <div class="mega-lobby-char-list">${rows}</div>
         <button class="danger full mt8" id="mega-char-confirm">CONFIRMAR</button>
       </div>`;

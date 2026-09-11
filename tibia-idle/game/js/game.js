@@ -91,7 +91,6 @@ function persistActiveInstance() {
     c.blockedCells={};
     for(const key of mapBlockKeys(c))c.blockedCells[key]=true;
   }
-  for(const ent of participants)if(ent.p)ent.p.stamina=FULL_STAMINA_SECONDS;
   const descriptor={
     v:1,savedAt,startedAt:c.instanceStartedAt||(c.instanceStartedAt=savedAt),
     kind:c.boss?"boss":"hunt",huntId:c.huntId||null,
@@ -287,7 +286,6 @@ function resumeIdleInstance(session){
 function save() {
   if (!G.p) return false;
   try {
-    G.p.stamina=FULL_STAMINA_SECONDS;
     if (typeof accountSetLootPouch === "function" && G.p.lootPouch) accountSetLootPouch(G.p.lootPouch);
     saveCharacterToRoster(G.p);
     const activeSession=G.combat?persistActiveInstance():null;
@@ -522,8 +520,8 @@ function normalizePlayer(p) {
   p.missions = p.missions || {};
   p.bosses = p.bosses || {};
   p.instanceMode = p.instanceMode || null;
-  // Stamina temporariamente desativada: todo personagem permanece em 42h.
-  p.stamina = 42 * 3600;
+  if (!Number.isFinite(Number(p.stamina))) p.stamina = FULL_STAMINA_SECONDS;
+  else p.stamina = Math.max(0, Math.min(FULL_STAMINA_SECONDS, Number(p.stamina)));
   // ultima instancia escolhida no modal da hunt (pre-selecao de UI)
   p.lastInstanceChoice = p.lastInstanceChoice || null;
   p.ammo = p.ammo || {};
@@ -638,15 +636,15 @@ function computeOffline(p) {
   if (risk.cls === "mid") effRate = 0.45;
   if (risk.cls === "high") effRate = 0.25;
 
-  // Stamina está temporariamente desativada e permanece sempre em 42h.
-  const staminaSec = eff / 1000;
-  p.stamina = FULL_STAMINA_SECONDS;
+  const staminaStart = Math.max(0, Math.min(FULL_STAMINA_SECONDS, Number(p.stamina) || 0));
+  const staminaSec = Math.min(eff / 1000, staminaStart);
   const hours = staminaSec / 3600;
   if (hours <= 0) return null;
+  const staminaMul = staminaStart > 40 * 3600 ? 1.5 : (staminaStart <= 14 * 3600 ? 0.5 : 1);
 
   const modeMul = p.instanceMode === "pvp" ? 1.25 : 1;
   const kills = Math.floor(est.kills * hours * effRate);
-  let exp = Math.floor(est.exp * hours * effRate * modeMul);
+  let exp = Math.floor(est.exp * hours * effRate * modeMul * staminaMul);
   if (typeof loyaltyExpMultiplier === "function") {
     const loyaltyMul = loyaltyExpMultiplier(p);
     if (loyaltyMul > 1) exp = Math.floor(exp * loyaltyMul);
@@ -680,7 +678,7 @@ function computeOffline(p) {
   const beforeLevel = p.level;
   addExp(p, exp);
   p.gold += gold;
-  p.stamina = FULL_STAMINA_SECONDS;
+  p.stamina = Math.max(0, staminaStart - staminaSec);
   p.totalKills += kills;
   p.playtime += staminaSec * 1000;
 
@@ -3517,7 +3515,7 @@ function advanceIdleInstance(elapsed,startAt,options){
     if(G.combat){
       const members=combatSessionParticipants(G.combat);
       for(const ent of members){
-        if(!ent.p)continue;ent.p.stamina=FULL_STAMINA_SECONDS;
+        if(!ent.p)continue;
         if(typeof tickAccessoryCharges==="function")tickAccessoryCharges(ent.p,processed);
         if(typeof imbTickAll==="function")imbTickAll(ent.p,processed);
       }
@@ -4795,9 +4793,9 @@ function loop(ts) {
   if (!G.paused && G.training) {
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     regenInCity(G.p, dt);
-    // Stamina temporariamente fixa em 42h também durante o treino.
     const tr = G.training;
-    G.p.stamina = FULL_STAMINA_SECONDS;
+    const staminaRegen = tr.weapon ? dt / 3000 : dt / 1000;
+    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + staminaRegen);
     if (tr.members) trainingPartyTick(tr, dt, Date.now());
     else academyTrainingTick(tr, G.p, dt, Date.now());
     drainAcademyEvents();
@@ -4814,8 +4812,7 @@ function loop(ts) {
     // Durante o fetch OTBM ainda não há G.combat, mas a entrada já é válida.
     // Não reverta G.inCity nesse intervalo ou a finalização parecerá corrompida.
     if(!G.huntEntryPendingToken)G.inCity = true;
-    // Na cidade a stamina também permanece temporariamente cheia.
-    G.p.stamina = FULL_STAMINA_SECONDS;
+    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 1000);
     regenInCity(G.p, dt);
     // Soft boots / time rings: duração só com item EQUIPado (Canary stopduration).
     if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);

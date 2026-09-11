@@ -38,6 +38,18 @@ const WARZONES = [
     id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: 12000000,
     bossSprite: "the-duke-of-the-depths", baseMonster: "the-duke-of-the-depths",
   },
+  {
+    id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: 25000,
+    bossSprite: "world-devourer", baseMonster: "world-devourer", maxChars: 5,
+  },
+  {
+    id: "pale-worm", name: "Feast of Souls", bossName: "The Pale Worm", bossHp: 420000,
+    bossSprite: "the-pale-worm", baseMonster: "the-pale-worm", maxChars: 5,
+  },
+  {
+    id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: 620000,
+    bossSprite: "goshnar-s-megalomania-purple", baseMonster: "goshnar-s-megalomania-green", maxChars: 5,
+  },
 ];
 
 const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
@@ -48,13 +60,20 @@ const WORLD_BOSS_MAX_MEMBERS = 20;
 
 function bossIdForWarzone(warzoneId) {
   const id = String(warzoneId || "wz1").toLowerCase();
+  if (id === "devourer") return "world-devourer";
+  if (id === "pale-worm") return "the-pale-worm";
+  if (id === "megalomania") return "goshnar-s-megalomania";
   return /^wz[1-6]$/.test(id) ? "world-boss-" + id : "world-boss-wz1";
 }
 function isWorldBossBossId(id) {
-  return /^world-boss-wz[1-6]$/.test(String(id || ""));
+  return /^world-boss-wz[1-6]$/.test(String(id || "")) || ["world-devourer", "the-pale-worm", "goshnar-s-megalomania"].includes(String(id || ""));
 }
 function warzoneIdFromBossId(bossId) {
-  const m = String(bossId || "").match(/^world-boss-(wz[1-6])$/);
+  const id = String(bossId || "");
+  if (id === "world-devourer") return "devourer";
+  if (id === "the-pale-worm") return "pale-worm";
+  if (id === "goshnar-s-megalomania") return "megalomania";
+  const m = id.match(/^world-boss-(wz[1-6])$/);
   return m ? m[1] : null;
 }
 
@@ -96,8 +115,13 @@ function createWorldBossController(opts) {
   function warzoneById(id) {
     return WARZONES.find((w) => w.id === id) || WARZONES[0];
   }
+  function eventMaxChars() {
+    const wz = event && warzoneById(event.warzoneId);
+    return Math.max(1, Number(wz && wz.maxChars) || maxChars);
+  }
   function pickWarzone() {
-    return WARZONES[Math.floor(Math.random() * WARZONES.length)];
+    const rotation = WARZONES.filter((w) => /^wz[1-6]$/.test(w.id));
+    return rotation[Math.floor(Math.random() * rotation.length)];
   }
   function now() { return Date.now(); }
 
@@ -228,7 +252,7 @@ function createWorldBossController(opts) {
       spawnAt: event.spawnAt || 0,
       combatEndsAt: event.combatEndsAt || 0,
       charCount: chars,
-      maxChars,
+      maxChars: eventMaxChars(),
       maxPerAccount: MAX_CHARS_PER_ACCOUNT,
       minStart,
       vocations: vocationBreakdown(),
@@ -512,7 +536,7 @@ function createWorldBossController(opts) {
     }
     if (event.phase === "lobby") {
       const chars = charCount();
-      if (chars >= maxChars) {
+      if (chars >= eventMaxChars()) {
         beginCountdown();
         return;
       }
@@ -603,8 +627,9 @@ function createWorldBossController(opts) {
     if (!ids.length) {
       return { code: 400, body: { ok: false, error: "NO_CHARS", msg: "Selecione 1 personagem." } };
     }
-    if (charCount() + ids.length > maxChars) {
-      return { code: 409, body: { ok: false, error: "LOBBY_FULL", msg: "Lobby lotado (" + maxChars + "/" + maxChars + ")." } };
+    const lobbyMaxChars = eventMaxChars();
+    if (charCount() + ids.length > lobbyMaxChars) {
+      return { code: 409, body: { ok: false, error: "LOBBY_FULL", msg: "Lobby lotado (" + lobbyMaxChars + "/" + lobbyMaxChars + ")." } };
     }
     const chars = [];
     for (const id of ids) {
@@ -636,7 +661,7 @@ function createWorldBossController(opts) {
       failed: false,
       score: { damage: 0, heal: 0, taken: 0, total: 0 },
     });
-    if (charCount() >= maxChars) beginCountdown();
+    if (charCount() >= eventMaxChars()) beginCountdown();
     else broadcast();
     return { code: 200, body: publicState(acc.id) };
   }
@@ -650,8 +675,13 @@ function createWorldBossController(opts) {
     if (!event.joins.has(Number(acc.id))) {
       return { code: 404, body: { ok: false, error: "NOT_JOINED", msg: "Conta não está no lobby." } };
     }
+    const wasHost = Number(event.hostAccountId) === Number(acc.id);
     event.joins.delete(Number(acc.id));
     leaveCooldownUntil.set(Number(acc.id), now() + timers.leaveCooldownMs);
+    if (wasHost) {
+      cancelLobby("leader-left");
+      return { code: 200, body: publicState(acc.id) };
+    }
     broadcast();
     return { code: 200, body: publicState(acc.id) };
   }
@@ -712,7 +742,14 @@ function createWorldBossController(opts) {
     }
     const r = openLobby(warzoneId || null, "create", lobbyType, acc.id);
     if (!r.ok) return { code: 409, body: r };
-    return { code: 200, body: publicState(acc.id) };
+    const characterIds = Array.isArray(body && body.characterIds) ? body.characterIds : [];
+    if (!characterIds.length) {
+      cancelLobby("creator-character-required");
+      return { code: 400, body: { ok: false, error: "NO_CHARS", msg: "Selecione 1 personagem." } };
+    }
+    const joined = await join(db, { token: body.token, characterIds });
+    if (joined.code !== 200 || !joined.body || !joined.body.ok) cancelLobby("creator-join-failed");
+    return joined;
   }
 
   async function autoJoin(db, body) {

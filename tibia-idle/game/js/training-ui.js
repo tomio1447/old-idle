@@ -83,6 +83,8 @@ function openTrainingModal(charId) {
 
   $("#training-close").onclick = () => $("#modal").classList.remove("show");
 
+  const skillLabel = (skill) => skill === "magic" ? "Magic Level" : (SKILL_NAMES[skill] || skill);
+
   const updateBtn = () => {
     const selSkill = TRAINING_MODAL.pending.skill || state.skill;
     const selPlanId = TRAINING_MODAL.pending.plan || state.activePlan;
@@ -103,9 +105,16 @@ function openTrainingModal(charId) {
       btn.classList.remove("buy");
     }
     const nowEl = $(".tr-now");
-    if (nowEl) nowEl.textContent = `Selecionado: ${selPlan.name} · ${trainingChargesLabel(have)} cargas`;
+    if (nowEl) nowEl.textContent = `Selecionado: ${skillLabel(selSkill)} · ${selPlan.name} · ${trainingChargesLabel(have)} cargas`;
     const titleIcon = $(".tr-title-icon");
     if (titleIcon) titleIcon.src = trainingSkillIcon(selSkill, p);
+
+    /* Atualiza os ícones dos planos abaixo para refletir a arma do skill escolhido. */
+    $$("#modal-body [data-tr-plan] .tr-plan-icon").forEach((img) => {
+      const card = img.closest("[data-tr-plan]");
+      const planId = card && card.dataset.trPlan;
+      if (planId) img.src = trainingPlanIcon(p, planId, selSkill);
+    });
   };
 
   $$("#modal-body [data-tr-skill]").forEach((b) => b.onclick = () => {
