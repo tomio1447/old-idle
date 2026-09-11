@@ -185,25 +185,48 @@ function rewardChestClaimBundle(p, bundleId) {
 
 const REWARD_CLAIM_MAX_ITEMS = 100;
 
-/* Coleta até REWARD_CLAIM_MAX_ITEMS itens (ou até a cap) para a Loot Pouch. */
+/* Coleta até REWARD_CLAIM_MAX_ITEMS itens (ou até a cap) para a Loot Pouch,
+ * UM BOSS POR VEZ na ordem da grade: o boss totalmente recolhido some da
+ * lista; quem ficou parcial continua visível com o restante. */
 function rewardChestClaimAll(p) {
   if (rewardChestIsOnline()) return rewardChestOnlineClaim(p, { all:true });
   if (!p || !p.rewardChest) return 0;
+  rewardChestEnsureShape(p);
   let total = 0;
-  for (const slug of Object.keys(p.rewardChest)) {
-    const count = Number(p.rewardChest[slug]) || 0;
-    if (count <= 0) continue;
-    const want = Math.min(count, REWARD_CLAIM_MAX_ITEMS - total);
-    if (want <= 0) break;
-    let n = 0;
+  const addToPouch = (slug, want) => {
     if (typeof addLootPouch === "function" && typeof itemUnitWeight === "function" && typeof freeCapacity === "function") {
       const fit = Math.floor(freeCapacity(p) / Math.max(0.0001, itemUnitWeight(slug)));
-      n = Math.min(want, fit);
+      const n = Math.min(want, fit);
       if (n > 0) addLootPouch(p, slug, n);
-    } else {
-      n = want;
-      if (typeof addLootPouch === "function") addLootPouch(p, slug, n);
+      return n;
     }
+    if (typeof addLootPouch === "function") addLootPouch(p, slug, want);
+    return want;
+  };
+  const takeFromBundle = (bundle) => {
+    for (const slug of Object.keys(bundle.items || {})) {
+      if (total >= REWARD_CLAIM_MAX_ITEMS) return;
+      const count = Number(bundle.items[slug]) || 0;
+      if (count <= 0) continue;
+      const n = addToPouch(slug, Math.min(count, REWARD_CLAIM_MAX_ITEMS - total));
+      if (n <= 0) continue;
+      bundle.items[slug] = count - n;
+      if (bundle.items[slug] <= 0) delete bundle.items[slug];
+      p.rewardChest[slug] = Math.max(0, (Number(p.rewardChest[slug]) || 0) - n);
+      if (!p.rewardChest[slug]) delete p.rewardChest[slug];
+      total += n;
+    }
+  };
+  for (const bundle of p.rewardChestBundles || []) {
+    if (total >= REWARD_CLAIM_MAX_ITEMS) break;
+    if (bundle && bundle.items) takeFromBundle(bundle);
+  }
+  // Sobra agregada sem bundle (legado): deduz nos bundles na ordem.
+  for (const slug of Object.keys(p.rewardChest)) {
+    if (total >= REWARD_CLAIM_MAX_ITEMS) break;
+    const count = Number(p.rewardChest[slug]) || 0;
+    if (count <= 0) continue;
+    const n = addToPouch(slug, Math.min(count, REWARD_CLAIM_MAX_ITEMS - total));
     if (n <= 0) continue;
     p.rewardChest[slug] = count - n;
     if (!p.rewardChest[slug]) delete p.rewardChest[slug];
@@ -218,7 +241,6 @@ function rewardChestClaimAll(p) {
       remaining -= take;
     }
     total += n;
-    if (total >= REWARD_CLAIM_MAX_ITEMS) break;
   }
   p.rewardChestBundles = (p.rewardChestBundles || []).filter((b) => b && b.items && Object.keys(b.items).some((k) => b.items[k] > 0));
   if (typeof save === "function") save();
@@ -334,9 +356,13 @@ function openRewardChest(bundleId) {
   const collectAll = $("#reward-collect-all");
   if (collectAll) collectAll.addEventListener("click", () => {
     if (typeof hideTip === "function") hideTip();
+    const bossesBefore = rewardChestBundleList(p).length;
     const result = rewardChestClaimAll(p);
     const done = (n) => {
-      toast(`Recolhido <b>${n}</b> item(ns) para a Loot Pouch.`);
+      const cleared = Math.max(0, bossesBefore - rewardChestBundleList(p).length);
+      toast(`Recolhido <b>${n}</b> item(ns)` +
+        (cleared ? ` — <b>${cleared}</b> boss(es) totalmente coletados` : "") +
+        ` para a Loot Pouch.`);
       openRewardChest();
     };
     if (result && typeof result.then === "function") result.then((r) => { if (r && r.ok) done(r.count || 0); });

@@ -4646,14 +4646,37 @@ function rewardChestClaimBundle(p,bundleId){
   return types;
 }
 const REWARD_CLAIM_MAX_ITEMS=100;
+/* COLLECT ALL drena os bundles UM BOSS POR VEZ, na ordem em que entraram no
+ * baú: o boss totalmente recolhido some da lista; o que sobrar parcial fica
+ * visível com o restante. O teto de REWARD_CLAIM_MAX_ITEMS e a cap livre do
+ * personagem (rewardChestAddPouch) limitam a coleta. */
 function rewardChestClaimAll(p){
   if(!p)return 0;
   rewardChestEnsure(p);
-  let types=0,total=0;
+  let total=0;
+  const takeFromBundle=(bundle)=>{
+    for(const slug of Object.keys(bundle.items||{})){
+      if(total>=REWARD_CLAIM_MAX_ITEMS)return;
+      const count=Number(bundle.items[slug])||0;if(count<=0)continue;
+      const want=Math.min(count,REWARD_CLAIM_MAX_ITEMS-total);
+      const n=rewardChestAddPouch(p,slug,want);
+      if(n<=0)continue;
+      bundle.items[slug]=count-n;
+      if(bundle.items[slug]<=0)delete bundle.items[slug];
+      p.rewardChest[slug]=Math.max(0,(Number(p.rewardChest[slug])||0)-n);
+      if(!p.rewardChest[slug])delete p.rewardChest[slug];
+      total+=n;
+    }
+  };
+  for(const bundle of p.rewardChestBundles||[]){
+    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
+    if(bundle&&bundle.items)takeFromBundle(bundle);
+  }
+  // Sobra agregada sem bundle (legado): mesma lógica, deduz na ordem.
   for(const slug of Object.keys(p.rewardChest||{})){
+    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
     const count=Number(p.rewardChest[slug])||0;if(count<=0)continue;
     const want=Math.min(count,REWARD_CLAIM_MAX_ITEMS-total);
-    if(want<=0)break;
     const n=rewardChestAddPouch(p,slug,want);
     if(n<=0)continue;
     p.rewardChest[slug]=count-n;
@@ -4668,8 +4691,7 @@ function rewardChestClaimAll(p){
       if(bundle.items[slug]<=0)delete bundle.items[slug];
       remaining-=take;
     }
-    types++;total+=n;
-    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
+    total+=n;
   }
   p.rewardChestBundles=(p.rewardChestBundles||[]).filter((b)=>b&&b.items&&Object.keys(b.items).some((k)=>b.items[k]>0));
   return total;
