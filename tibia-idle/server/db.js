@@ -741,6 +741,13 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
     a.shared_inventory = s;
     this._save();
   }
+  if (!s.forgeResourcesDone) {
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    SharedInv.mergeCharForgeResources(s, chars);
+    a.shared_inventory = s;
+    this._save();
+  }
   return SharedInv.normalizeSharedInventory(s);
 };
 JsonStore.prototype.setAccountSharedInventory = function (accountId, s) {
@@ -806,12 +813,28 @@ JsonStore.prototype.setAccountTutorial = function (accountId, tutorial) {
   this._save();
   return a;
 };
-/* Soma gold dos personagens para a conta uma vez; espelha o saldo nos chars. */
+/* Soma gold dos personagens para a conta uma vez; espelha o saldo nos chars.
+ * Quando já migrado, verifica se todos os personagens espelham o gold da
+ * conta corretamente — corrige divergências de saves antigos ou contas
+ * excluídas que deixaram data.gold desatualizado. */
 JsonStore.prototype.migrateAccountGold = function (accountId) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
   if (a.gold_migrated) {
     a.gold = Math.max(0, Math.floor(Number(a.gold) || 0));
+    // Garante que todos os personagens espelham o gold correto da conta.
+    const chars = this.charactersOf(accountId);
+    let dirty = false;
+    for (const c of chars) {
+      let data = {};
+      try { data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { data = {}; }
+      if (Math.floor(Number(data.gold) || 0) !== a.gold) {
+        data.gold = a.gold;
+        c.data = JSON.stringify(data);
+        dirty = true;
+      }
+    }
+    if (dirty) this._save();
     return a;
   }
   let total = Math.max(0, Math.floor(Number(a.gold) || 0));
@@ -845,7 +868,16 @@ JsonStore.prototype.syncAccountGoldFromCharacters = function (projections) {
     const gold = Math.max(0, Math.floor(Number(data.gold) || 0));
     const aid = Number(c.account_id);
     const prev = byAccount.get(aid);
-    if (!prev || gold !== prev.gold) byAccount.set(aid, { gold, accountId: aid });
+    // Usa o MÁXIMO entre todos os personagens da mesma conta e o saldo
+    // atual da conta. Evita que um personagem com data.gold antigo
+    // (pré-migração ou snapshot desatualizado) zere o saldo real.
+    if (!prev) {
+      const a = this.findAccountById(aid);
+      const currentGold = a ? Math.max(0, Math.floor(Number(a.gold) || 0)) : 0;
+      byAccount.set(aid, { gold: Math.max(gold, currentGold), accountId: aid });
+    } else {
+      prev.gold = Math.max(prev.gold, gold);
+    }
   }
   for (const entry of byAccount.values()) {
     const a = this.findAccountById(entry.accountId);
@@ -1498,7 +1530,13 @@ async function MysqlStore() {
         s.legacyPouchDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       }
-      return s;
+      if (!s.forgeResourcesDone && SharedInv) {
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        SharedInv.mergeCharForgeResources(s, chars);
+        await this.setAccountSharedInventory(Number(accountId), s);
+      }
+      return SharedInv ? SharedInv.normalizeSharedInventory(s) : s;
     },
     async setAccountSharedInventory(accountId, s) {
       const empty = { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };

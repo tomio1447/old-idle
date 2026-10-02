@@ -165,6 +165,8 @@ async function partySwitchToChar(id) {
     const present=players.some((e)=>String(e&&(e.id||(e.p&&e.p.id)))===String(id));
     return !!(present&&typeof partyCombatSwitchTo==="function"&&partyCombatSwitchTo(id));
   }
+  if (typeof G !== "undefined" && G && G.training && typeof trainingSwitchTo === "function")
+    return trainingSwitchTo(id);
   // Fora de combate (cidade/treino, mesmo em party): recarrega NA SESSÃO
   // com autoload online. Sem essa chave o boot reabre o picker da tela inicial.
   try { localStorage.setItem(ACTIVE_CHARACTER_KEY, id); } catch (e) {}
@@ -726,6 +728,10 @@ function partySwitchToCharacter(id) {
     toast("Você já está neste personagem.");
     $("#modal").classList.remove("show", "wide");
     openHelperPanel();
+    return;
+  }
+  if (G.training && typeof trainingSwitchTo === "function" && trainingSwitchTo(targetId)) {
+    $("#modal").classList.remove("show", "wide");
     return;
   }
   // modo online: nao troca automaticamente (precisa de lease/reload), abre picker

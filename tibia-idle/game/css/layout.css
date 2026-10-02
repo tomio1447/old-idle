@@ -1160,6 +1160,24 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background: rgba(80, 20, 20, .22);
   outline: 1px solid rgba(176,74,74,.22);
 }
+.helper-heal-cats { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:8px; }
+.helper-heal-cat-btn { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; }
+.helper-heal-cat-btn img, .helper-heal-cat-btn .spell-icon { width:20px; height:20px; image-rendering:pixelated; object-fit:contain; }
+.helper-heal-category { display:block; }
+.helper-heal-category .helper-heal-spell-list,
+.helper-heal-category .helper-heal-supply-list { max-height:none; overflow:visible; }
+@media (max-width:600px) {
+  .helper-heal-cats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+  .helper-heal-cat-btn { width:100%; min-width:0; min-height:48px; flex-direction:column; justify-content:center; gap:2px; padding:4px 2px; font-size:9px; line-height:1.15; white-space:normal; text-align:center; }
+  .helper-heal-cat-btn img,.helper-heal-cat-btn .spell-icon { width:22px; height:22px; }
+  [data-panel-group="mid"][data-panel="heal"] { overflow:visible; padding:6px; }
+  .helper-heal-spell-row > .row { display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:5px !important; }
+  .helper-heal-spell-row > .row > .row { flex-wrap:nowrap; gap:3px !important; }
+  .helper-heal-spell-row input[data-heal-spell-at] { width:42px !important; box-sizing:border-box; }
+  .helper-supply-row { gap:5px; }
+  .helper-supply-row > div { min-width:0; overflow-wrap:anywhere; }
+  .helper-supply-row > button { flex:0 0 auto; padding-left:5px; padding-right:5px; }
+}
 .helper-supply-row img {
   width: 26px; height: 26px;
   image-rendering: pixelated;
@@ -1237,12 +1255,14 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   border:none;
   box-shadow:none;
   padding:64px 70px 64px 70px;
-  overflow-y:auto;
+  max-height:calc(100vh - 32px);
+  overflow:hidden;
+  display:flex; flex-direction:column;
 }
 .modal-bg .modal.hunts-modal-shell .panel-title,
 .modal-bg .modal.hunts-modal-shell .panel-body { background:transparent; border-bottom:none; }
-.modal-bg .modal.hunts-modal-shell .panel-title { color:#e8d4a2; padding:4px 0; }
-.modal-bg .modal.hunts-modal-shell .panel-body { padding:0; color:#e8dfd0; }
+.modal-bg .modal.hunts-modal-shell .panel-title { color:#e8d4a2; padding:4px 0; flex:0 0 auto; }
+.modal-bg .modal.hunts-modal-shell .panel-body { padding:0; color:#e8dfd0; overflow-y:auto; flex:1 1 auto; }
 .hunts-modal-title #hunts-modal-busca { background:rgba(10,8,6,.9); border-color:#5a4a32; color:#e8dfd0; }
 #hunts-modal-list .hunt-cat-title { color:#d4af37; text-shadow:0 1px 1px #000; background:rgba(20,16,10,.85); padding:6px 8px; border:1px solid #3a3020; border-radius:4px; margin-bottom:4px; }
 #hunts-modal-list .hunts-group { background:rgba(16,12,8,.6); padding:6px; border:1px solid #2a2016; border-radius:4px; }
@@ -1358,7 +1378,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .ranking-value { text-align:right; font-variant-numeric:tabular-nums; color:#9ce84a; font-weight:700; }
 .ranking-table th:last-child, .ranking-table td.ranking-value { text-align:right; }
 .ranking-status { padding:16px; text-align:center; }
-#hunts-modal-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
+#hunts-modal-list { display:grid; grid-template-columns:1fr; gap:6px; }
 #npcs-modal-list,
 #cidade-modal-list { display:grid; grid-template-columns:1fr; gap:10px; }
 .hunt-modal-section { min-width:0; }
@@ -1366,7 +1386,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .hunt-modal-section .hunts-group { display:grid; gap:4px; }
 .hunt-modal-card { width:100%; margin:0; text-align:left; }
 .hunt-section-empty { padding:12px; color:#8a8270; text-align:center; border:1px dashed #4b493e; background:#17191e; }
-@media (max-width:720px) { #hunts-modal-list { grid-template-columns:1fr; } .hunt-modal-section:last-child:nth-child(odd) { grid-column:auto; } }
+@media (max-width:720px) { .hunt-modal-section:last-child:nth-child(odd) { grid-column:auto; } }
 /* Modal HUNTS: coluna fixa de outfits + texto; outfits não sobrepõem nome/XP. */
 #hunts-modal-list .hunt-modal-card.hunt-card,
 #bosses-modal-list .hunt-modal-card.hunt-card,
@@ -1377,8 +1397,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 }
 #hunts-modal-list .hunt-modal-card .mobs {
   display: flex; align-items: center; justify-content: flex-start; gap: 2px;
-  flex: 0 0 88px; width: 88px; min-width: 88px; max-width: 88px;
-  height: 34px; overflow: hidden; position: relative; z-index: 0;
+  flex: 0 0 72px; width: 72px; min-width: 72px; max-width: 72px;
+  height: 32px; overflow: hidden; position: relative; z-index: 0;
 }
 #bosses-modal-list .hunt-modal-card .mobs {
   display: flex; align-items: center; justify-content: center;
@@ -1462,10 +1482,10 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .umbral-mat-dream-matter { color: #9b59b6; }
 .umbral-mat-cluster-of-solace { color: #f1c40f; }
 #hunts-modal-list .hunt-modal-card .mobs .hunt-modal-mob {
-  flex: 0 0 auto; max-width: 28px; overflow: hidden;
+  flex: 0 0 auto; max-width: 24px; overflow: hidden;
 }
 #hunts-modal-list .hunt-modal-card .mobs .mob-img {
-  max-width: 26px; max-height: 32px;
+  max-width: 22px; max-height: 28px;
 }
 #hunts-modal-list .hunt-modal-card .info,
 #bosses-modal-list .hunt-modal-card .info,
@@ -1522,7 +1542,11 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.ranking-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
 .modal-bg .modal.reward-modal-shell,
-.modal-bg .modal.forge-pattern-modal-shell {
+.modal-bg .modal.forge-pattern-modal-shell,
+.modal-bg .modal.quests-modal-shell,
+.modal-bg .modal.quest-detail-shell,
+.modal-bg .modal.quest-lobby-shell,
+.modal-bg .modal.quest-reward-shell {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,.035) 1px 3px),linear-gradient(180deg,#4b4b49 0%,#30302f 100%);
   border:2px solid;
   border-color:#686868 #171717 #171717 #686868;
@@ -1535,7 +1559,11 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.ranking-modal-shell .panel-title,
 .modal-bg .modal.npcs-modal-shell .panel-title,
 .modal-bg .modal.reward-modal-shell .panel-title,
-.modal-bg .modal.forge-pattern-modal-shell .panel-title {
+.modal-bg .modal.forge-pattern-modal-shell .panel-title,
+.modal-bg .modal.quests-modal-shell .panel-title,
+.modal-bg .modal.quest-detail-shell .panel-title,
+.modal-bg .modal.quest-lobby-shell .panel-title,
+.modal-bg .modal.quest-reward-shell .panel-title {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 1px,rgba(0,0,0,.05) 1px 3px),#454543;
   border-bottom:2px solid #181818;
 }
@@ -1546,7 +1574,11 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.ranking-modal-shell .panel-body,
 .modal-bg .modal.npcs-modal-shell .panel-body,
 .modal-bg .modal.reward-modal-shell .panel-body,
-.modal-bg .modal.forge-pattern-modal-shell .panel-body {
+.modal-bg .modal.forge-pattern-modal-shell .panel-body,
+.modal-bg .modal.quests-modal-shell .panel-body,
+.modal-bg .modal.quest-detail-shell .panel-body,
+.modal-bg .modal.quest-lobby-shell .panel-body,
+.modal-bg .modal.quest-reward-shell .panel-body {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 1px,rgba(0,0,0,.04) 1px 4px),#393937;
 }
 
@@ -1601,6 +1633,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.world-boss-detail-shell { width:min(860px,calc(100vw - 32px)); max-height:none; overflow:visible; }
 .world-boss-detail-shell .wb-detail-body { padding:8px; overflow:visible; }
 .world-boss-detail-shell .boss-detail-summary { margin-bottom:6px; justify-content:center; }
+.wb-detail-description { color:#d4d0c0; font-size:11px; line-height:1.4; padding:6px 8px; background:#1a1915; border:1px solid #414037; margin-bottom:6px; }
 .wb-detail-grid { display:grid; grid-template-columns:180px 230px minmax(260px,1fr); gap:8px; align-items:stretch; }
 .wb-detail-identity,.wb-detail-panel { min-width:0; padding:8px; background:#302f29; border:1px solid #4b493e; box-sizing:border-box; }
 .wb-detail-identity { display:flex; flex-direction:column; justify-content:center; text-align:center; }
@@ -2665,6 +2698,7 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   border: 0 !important;
   box-shadow: none !important;
   overflow: visible;
+  position: relative;
 }
 .forge-client {
   width: 490px;
@@ -2850,6 +2884,24 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
   font-weight: bold;
   text-shadow: 1px 1px #000;
 }
+.forge-fusion-overlay { position:absolute; inset:0; z-index:10; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.78); }
+.forge-fusion-reveal { width:min(360px,calc(100% - 30px)); padding:18px; text-align:center; background:#30302e; border:2px solid #777; box-shadow:0 0 25px #000,inset 0 0 18px rgba(255,255,255,.08); }
+.forge-fusion-overlay.pending .forge-fusion-reveal { animation:forge-fusion-suspense .34s steps(1,end) infinite; }
+.forge-fusion-overlay.success .forge-fusion-reveal { border-color:#63dc70; box-shadow:0 0 28px rgba(60,230,90,.75),inset 0 0 24px rgba(50,190,75,.3); }
+.forge-fusion-overlay.failure .forge-fusion-reveal { border-color:#e45757; box-shadow:0 0 28px rgba(230,45,45,.75),inset 0 0 24px rgba(190,40,40,.3); }
+.forge-fusion-reveal-title { margin-bottom:14px; color:#eee; font-weight:bold; letter-spacing:1px; text-shadow:1px 1px #000; }
+.forge-fusion-reveal-items { display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:14px; }
+.forge-fusion-reveal-items .forge-client-slot,.forge-fusion-final-item .forge-client-slot { margin:auto; width:58px; height:58px; }
+.forge-fusion-reveal-arrow { color:#d9d9d9; font-size:20px; }
+.forge-fusion-bars { display:grid; grid-template-columns:repeat(12,1fr); gap:3px; height:18px; margin:10px 0; }
+.forge-fusion-bars span { background:#181818; border:1px solid #555; animation:forge-fusion-bar .3s linear forwards; animation-delay:var(--forge-delay); }
+.forge-fusion-wait,.forge-fusion-result-msg,.forge-fusion-consumed { margin-top:10px; color:#ddd; font-size:11px; line-height:1.45; }
+.forge-fusion-consumed { padding:7px; background:rgba(0,0,0,.3); border:1px solid #555; }
+.forge-fusion-final-item { margin:10px auto; }
+.forge-fusion-overlay.success .forge-fusion-reveal-title { color:#82f08d; }
+.forge-fusion-overlay.failure .forge-fusion-reveal-title { color:#ff7777; }
+@keyframes forge-fusion-suspense { 0%,49%{border-color:#55df68;box-shadow:0 0 24px rgba(50,220,80,.7)}50%,100%{border-color:#e64d4d;box-shadow:0 0 24px rgba(230,45,45,.7)} }
+@keyframes forge-fusion-bar { 0%{background:#181818}50%{background:#e04b4b}100%{background:#59d36b} }
 .forge-client-further {
   min-height: 110px;
   display: grid;
@@ -4382,3 +4434,90 @@ body.fullhd .scene-overlay { font-size: 13px; }
 }
 .wheel-row strong { flex: 0 0 auto; }
 .wheel-row .tiny { flex: 1 1 auto; text-align: right; }
+
+/* ---- Quest system ---- */
+.quests-btn-icon { vertical-align: middle; margin-right: 4px; image-rendering: pixelated; }
+.modal-bg .modal.quests-modal-shell,
+.modal-bg .modal.quest-detail-shell,
+.modal-bg .modal.quest-reward-shell { width:min(720px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+.modal-bg .modal.quest-lobby-shell { width:min(580px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+.quest-modal-card { cursor:pointer; }
+.quest-modal-card .quest-card-rewards { display:flex; gap:4px; flex-wrap:wrap; align-items:center; margin-left:auto; }
+.quest-reward-thumb { width:30px; height:30px; background:#151515; border:1px solid #555; display:flex; align-items:center; justify-content:center; }
+.quest-reward-thumb img { max-width:28px; max-height:28px; image-rendering:pixelated; }
+.quest-detail-body { display:flex; flex-direction:column; gap:5px; }
+.quest-detail-desc { color:#ddd; line-height:1.3; font-size:11px; }
+.quest-detail-summary { display:flex; flex-wrap:wrap; gap:3px 14px; color:#bbb; font-size:11px; }
+.quest-detail-row { display:flex; gap:5px; align-items:stretch; }
+.quest-boss-col { flex:0 0 auto; min-width:100px; }
+.quest-monsters-col { flex:1 1 0; }
+.quest-detail-panel { background:#2a2a28; border:1px solid #444; border-radius:4px; padding:5px 7px; }
+.quest-boss-preview { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.quest-boss-preview img { image-rendering:pixelated; }
+.quest-boss-preview span { text-transform:capitalize; font-size:12px; }
+.quest-monsters-list { display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+.quest-monster-thumb { display:flex; flex-direction:column; align-items:center; gap:1px; background:#1a1a18; border:1px solid #333; border-radius:3px; padding:2px 4px; }
+.quest-monster-thumb img { max-width:22px; max-height:22px; image-rendering:pixelated; }
+.quest-monster-thumb .tiny { font-size:8px; }
+.quest-rewards-section { margin-top:1px; }
+.quest-rewards-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:3px; }
+.quest-reward-detail-card { display:flex; flex-direction:column; align-items:center; gap:2px; background:#1a1a18; border:1px solid #444; border-radius:4px; padding:4px 3px; text-align:center; cursor:pointer; }
+.quest-reward-detail-card img { image-rendering:pixelated; }
+.quest-reward-name { font-size:10px; color:#efe9d6; }
+.quest-reward-stats { font-size:9px; }
+.quest-detail-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:2px; }
+.quest-lobby-slots { max-height:300px; overflow-y:auto; }
+/* Reward choice modal */
+.quest-reward-body { display:flex; flex-direction:column; align-items:center; gap:14px; }
+.quest-reward-info { text-align:center; color:#ddd; }
+.quest-reward-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; width:100%; }
+.quest-reward-choice-card { display:flex; align-items:center; gap:10px; background:#1a1a18; border:2px solid #444; border-radius:6px; padding:10px; cursor:pointer; transition:border-color .15s, background .15s; }
+.quest-reward-choice-card:hover { border-color:#9ce84a; background:#222220; }
+.quest-reward-choice-card.selected { border-color:#ffd700; background:#2a2a22; box-shadow:0 0 8px rgba(255,215,0,.3); }
+.quest-reward-choice-card img { image-rendering:pixelated; }
+.quest-reward-choice-info { display:flex; flex-direction:column; gap:2px; }
+.quest-reward-selected-preview { display:flex; align-items:center; gap:12px; background:#222; border:1px solid #555; border-radius:6px; padding:12px; }
+.quest-reward-selected-preview img { image-rendering:pixelated; }
+.quest-reward-item-details { display:flex; flex-direction:column; gap:2px; color:#bbb; font-size:12px; }
+/* Outfit reward */
+.quest-outfit-preview { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.quest-outfit-frame { image-rendering:pixelated; border:1px solid #555; background-color:#151515; border-radius:3px; flex-shrink:0; }
+.quest-outfit-info { display:flex; flex-direction:column; gap:0; font-size:10px; }
+.quest-outfit-info b { color:#ffd700; font-size:11px; }
+.quest-outfit-section { margin-top:1px; }
+.modal-bg .modal.quest-detail-shell { width:min(480px,96vw); }
+.modal-bg .modal.quest-detail-shell .panel-body { padding:6px 8px; }
+.quest-outfit-granted { display:flex; flex-direction:column; align-items:center; gap:6px; background:#1a1a18; border:1px solid #444; border-radius:6px; padding:10px; margin-bottom:4px; }
+/* Quest lobby side panel */
+.quest-lobby-box {
+  position:absolute; top:8px; left:8px; z-index:21;
+  width:min(260px, calc(100% - 16px));
+  color:#d8d8d8; font-size:10px;
+}
+.ql-card {
+  background:repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 1px, rgba(0,0,0,.04) 1px 3px), #3e3e3c;
+  border:2px solid; border-color:#686868 #171717 #171717 #686868;
+  box-shadow:0 4px 18px rgba(0,0,0,.75);
+}
+.ql-header {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 7px;
+  background:repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 1px, rgba(0,0,0,.05) 1px 3px), #454543;
+  border-bottom:1px solid #181818;
+  color:#ffe680; font-weight:bold; font-size:11px;
+  cursor:pointer; user-select:none;
+}
+.ql-header .sm { min-width:22px; padding:2px 4px; }
+.ql-title { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ql-body { padding:6px 8px; display:flex; flex-direction:column; gap:6px; }
+.ql-sub { color:#d4d4d4; font-size:10px; text-align:center; }
+.ql-slots { display:flex; flex-direction:column; gap:3px; max-height:calc(60vh - 80px); overflow-y:auto; padding-right:2px; }
+.ql-slots .mega-lobby-slot { padding:4px 6px; gap:6px; align-items:center; background:rgba(30,28,24,.92); border:1px solid #4a4a48; }
+.ql-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-start; }
+/* Block hunts/quests/bosses while in quest lobby */
+body.quest-lobby-open #btn-hunt,
+body.quest-lobby-open #btn-boss,
+body.quest-lobby-open #btn-world-bosses,
+body.quest-lobby-open #btn-quests { opacity:.5; pointer-events:none; }
+body.quest-lobby-open #party-panel { display:none !important; }
+@media (max-width:760px) { .quest-lobby-box { width:min(240px, calc(100% - 12px)); } }

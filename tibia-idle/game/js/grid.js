@@ -104,8 +104,9 @@ function combatViewport(canvasWidth, canvasHeight, combat) {
   const view = centeredGridViewport(canvasWidth, canvasHeight, cols, rows,
     map && map.fovWidth ? map.fovWidth : undefined,
     map && map.fovHeight ? map.fovHeight : undefined);
-  const wb = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss));
-  const focus = wb ? combat.player : null;
+  const followPlayer = combat && (combat.worldBoss || (combat.boss && combat.boss.worldBoss) ||
+    combat.questId || combat.instanceMode === "quest");
+  const focus = followPlayer ? combat.player : null;
   if (focus && Number.isFinite(focus.x) && Number.isFinite(focus.y)) {
     if (view.width > canvasWidth) {
       view.x = Math.max(canvasWidth - view.width,

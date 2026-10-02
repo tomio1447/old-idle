@@ -15,11 +15,13 @@
  */
 "use strict";
 
-const SHARED_CONTAINERS = ["bag", "lootPouch", "depot", "rewardChest", "rewardChestBundles"];
+const SHARED_CONTAINERS = ["bag", "lootPouch", "depot", "rewardChest", "rewardChestBundles",
+  "dust", "dustLimit", "slivers", "exaltedCores"];
 
 function emptySharedInventory() {
   return { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [],
-    itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
+    itemInstances: [], rewardChest: {}, rewardChestBundles: [],
+    dust: 0, dustLimit: 100, slivers: 0, exaltedCores: 0 };
 }
 
 function isSharedInventory(s) {
@@ -35,6 +37,11 @@ function normalizeSharedInventory(s) {
   s.itemInstances = Array.isArray(s.itemInstances) ? s.itemInstances : [];
   s.rewardChest = s.rewardChest && typeof s.rewardChest === "object" && !Array.isArray(s.rewardChest) ? s.rewardChest : {};
   s.rewardChestBundles = Array.isArray(s.rewardChestBundles) ? s.rewardChestBundles : [];
+  s.dust = Math.max(0, Math.floor(Number(s.dust) || 0));
+  s.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(s.dustLimit) || 100)));
+  s.dust = Math.min(s.dust, s.dustLimit);
+  s.slivers = Math.max(0, Math.floor(Number(s.slivers) || 0));
+  s.exaltedCores = Math.max(0, Math.floor(Number(s.exaltedCores) || 0));
   return s;
 }
 
@@ -59,6 +66,10 @@ function mergeCharContainers(shared, characters) {
   for (const character of characters) {
     const p = charDataOf(character);
     if (!p) continue;
+    shared.dust += Math.max(0, Math.floor(Number(p.dust) || 0));
+    shared.dustLimit = Math.max(shared.dustLimit, Math.floor(Number(p.dustLimit) || 100));
+    shared.slivers += Math.max(0, Math.floor(Number(p.slivers) || 0));
+    shared.exaltedCores += Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
     if (p.bag && typeof p.bag === "object") {
       for (const slug of Object.keys(p.bag)) {
         const n = Math.max(0, Math.floor(Number(p.bag[slug]) || 0));
@@ -94,6 +105,7 @@ function mergeCharContainers(shared, characters) {
     for (const bundle of (Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles : []))
       if (bundle && typeof bundle === "object") shared.rewardChestBundles.push(Object.assign({}, bundle));
   }
+  shared.forgeResourcesDone = 1;
   return normalizeSharedInventory(shared);
 }
 
@@ -101,6 +113,21 @@ function mergeCharContainers(shared, characters) {
  * itemInstances vira shared.itemInstances + instâncias equipadas do player.
  * O contador local de instâncias pula para o seq da conta (evita colisão de
  * ids criados no cliente enquanto online). */
+function mergeCharForgeResources(shared, characters) {
+  shared = normalizeSharedInventory(shared);
+  if (shared.forgeResourcesDone) return shared;
+  for (const character of Array.isArray(characters) ? characters : []) {
+    const p = charDataOf(character);
+    if (!p) continue;
+    shared.dust += Math.max(0, Math.floor(Number(p.dust) || 0));
+    shared.dustLimit = Math.max(shared.dustLimit, Math.floor(Number(p.dustLimit) || 100));
+    shared.slivers += Math.max(0, Math.floor(Number(p.slivers) || 0));
+    shared.exaltedCores += Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
+  }
+  shared.forgeResourcesDone = 1;
+  return normalizeSharedInventory(shared);
+}
+
 function applySharedToPlayer(p, shared) {
   shared = normalizeSharedInventory(shared);
   if (!p || typeof p !== "object") p = {};
@@ -109,6 +136,10 @@ function applySharedToPlayer(p, shared) {
   p.depot = shared.depot.slice();
   p.rewardChest = Object.assign({}, shared.rewardChest);
   p.rewardChestBundles = shared.rewardChestBundles.slice();
+  p.dust = shared.dust;
+  p.dustLimit = shared.dustLimit;
+  p.slivers = shared.slivers;
+  p.exaltedCores = shared.exaltedCores;
   const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
     .filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
   p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
@@ -127,6 +158,10 @@ function extractSharedFromPlayer(p, shared) {
   shared.depot = Array.isArray(p.depot) ? p.depot.slice() : [];
   shared.rewardChest = (p.rewardChest && typeof p.rewardChest === "object" && !Array.isArray(p.rewardChest)) ? p.rewardChest : {};
   shared.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles.slice() : [];
+  shared.dust = Math.max(0, Math.floor(Number(p.dust) || 0));
+  shared.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(p.dustLimit) || 100)));
+  shared.slivers = Math.max(0, Math.floor(Number(p.slivers) || 0));
+  shared.exaltedCores = Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
   const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   shared.itemInstances = insts
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
@@ -180,6 +215,10 @@ function mergeSharedFromPlayer(p, shared) {
     shared.itemInstances.push(copy);
   }
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  shared.dust = Math.max(shared.dust, Math.floor(Number(p.dust) || 0));
+  shared.dustLimit = Math.max(shared.dustLimit, Math.floor(Number(p.dustLimit) || 100));
+  shared.slivers = Math.max(shared.slivers, Math.floor(Number(p.slivers) || 0));
+  shared.exaltedCores = Math.max(shared.exaltedCores, Math.floor(Number(p.exaltedCores) || 0));
   return normalizeSharedInventory(shared);
 }
 
@@ -189,6 +228,7 @@ module.exports = {
   isSharedInventory,
   normalizeSharedInventory,
   mergeCharContainers,
+  mergeCharForgeResources,
   applySharedToPlayer,
   extractSharedFromPlayer,
   mergeSharedFromPlayer,

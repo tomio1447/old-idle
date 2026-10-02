@@ -113,10 +113,13 @@
     for (let i = 0; i < ids.length; i++) friend[ids[i]] = 1;
     const out = [];
     spells = spells || {};
+    const skipUtura = (id, s) =>
+      id === "utura" || id === "utura-gran" ||
+      (s && /^utura( gran)?$/i.test(String(s.words || "")));
     for (const id in spells) {
       const s = spells[id];
       if (!s || s.type !== "heal") continue;
-      if (!spellAllowedForVoc(s, voc) || friend[id]) continue;
+      if (!spellAllowedForVoc(s, voc) || friend[id] || skipUtura(id, s)) continue;
       out.push(id);
     }
     return out;

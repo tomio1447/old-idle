@@ -33,6 +33,7 @@ const http = require("http");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const vm = require("vm");
 const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const { YANA_CATALOG, applyYanaPurchase } = require("./yana_catalog");
@@ -51,6 +52,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   destroyAuthBagItem,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
+const { createQuestController, QUEST_DEFS } = require("./quest_controller");
 // Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
 // os personagens). Pure module — db.js persiste accounts.shared_inventory.
 let SharedInv = null;
@@ -58,7 +60,7 @@ try { SharedInv = require("./shared_inventory"); } catch (e) { SharedInv = null;
 const store = require("./store");
 const mailer = require("./mailer");
 
-const PORT = parseInt(process.env.PORT || "3333", 10);
+const PORT = parseInt(process.env.PORT || "8001", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const SALT_ROUNDS = 10;
 const TEST_SERVER = process.env.TEST_SERVER === "1";
@@ -601,12 +603,18 @@ async function register(db, body) {
   return { code: 201, body: { ok: true, id: acc.id, login: acc.login, role: acc.role } };
 }
 
-function accountCharacterSummary(character) {
+function accountCharacterSummary(character, accGold) {
   let data = character && character.data;
   if (typeof data === "string") {
     try { data = JSON.parse(data); } catch (e) { data = {}; }
   }
   data = data && typeof data === "object" ? data : {};
+  // O gold pertence à CONTA, não ao personagem individual. Quando o gold
+  // da conta é fornecido, injeta no snapshot para evitar que saves antigos
+  // (com gold individual pré-migração) sobrescrevam o saldo correto.
+  if (accGold !== undefined && accGold !== null) {
+    data.gold = Math.max(0, Math.floor(Number(accGold) || 0));
+  }
   const wrongId=data.id!==undefined&&String(data.id)!==String(character.id);
   const wrongName=!!(data.name&&String(data.name).toLowerCase()!==String(character.name).toLowerCase());
   return {
@@ -620,6 +628,12 @@ function accountCharacterSummary(character) {
     dataOwnerName:wrongName?String(data.name):null,
     snapshot:data,
   };
+}
+/* Helper: retorna uma função de mapeamento de personagens que injeta
+ * o gold da conta no snapshot (evita divergência individual vs conta). */
+function charSummaryWithGold(acc) {
+  const gold = Math.max(0, Math.floor(Number(acc && acc.gold) || 0));
+  return (character) => accountCharacterSummary(character, gold);
 }
 
 async function login(db, body) {
@@ -642,7 +656,7 @@ async function login(db, body) {
       ok: true,
       token,
       account: accountPublicView(acc),
-      characters: characters.map(accountCharacterSummary),
+      characters: characters.map(charSummaryWithGold(acc)),
     },
   };
 }
@@ -665,7 +679,7 @@ async function me(db, token) {
     body: {
       ok: true,
       account: accountPublicView(acc),
-      characters: characters.map(accountCharacterSummary),
+      characters: characters.map(charSummaryWithGold(acc)),
       ...(sharedInventory ? { sharedInventory } : {}),
     },
   };
@@ -797,7 +811,7 @@ async function createCharacter(db, body) {
     createdCharacter.save_version,"created",createdCharacter,true);
   publishSync(acc.id,"character",{id:Number(createdCharacter.id),saveVersion:Number(createdCharacter.save_version),action:"created"});
   return { code: 201, body: { ok: true,
-    character: accountCharacterSummary(createdCharacter),
+    character: accountCharacterSummary(createdCharacter, acc.gold),
     coins:updatedAccount ? updatedAccount.coins||0 : acc.coins||0 } };
 }
 
@@ -854,7 +868,7 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","quests"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
   if(opts.adminGrant){
@@ -985,9 +999,9 @@ async function loadCityPlayer(db, acc, character) {
   return p;
 }
 
-function saveConflictResponse(result){
+function saveConflictResponse(result,acc){
   if(result.error==="SAVE_VERSION_CONFLICT")return {code:409,body:{ok:false,error:result.error,
-    msg:"O save foi alterado por outra sessão.",characters:(result.characters||[]).map(accountCharacterSummary)}};
+    msg:"O save foi alterado por outra sessão.",characters:(result.characters||[]).map(acc?charSummaryWithGold(acc):accountCharacterSummary)}};
   if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,
     msg:"O controle desta conta foi transferido antes do save terminar."}};
   return {code:result.error==="CHARACTER_NOT_FOUND"?404:409,body:{ok:false,error:result.error,
@@ -1040,7 +1054,7 @@ async function saveCharacter(db, body, id) {
     prepared.save.data=JSON.stringify(player);
   }
   const result=await db.saveCharactersVersioned(acc.id,[prepared.save],lease);
-  if(!result.ok)return saveConflictResponse(result);
+  if(!result.ok)return saveConflictResponse(result,acc);
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,
     adminGrant?"admin-grant":"save",updated,!!adminGrant);
@@ -1049,7 +1063,7 @@ async function saveCharacter(db, body, id) {
   await publishPartyForCharacters(db,[updated.id],adminGrant?"admin-grant":"character-save");
   const account=await ensureAccountWallet(db,acc);
   return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),
-    character:accountCharacterSummary(updated),account:accountPublicView(account),
+    character:accountCharacterSummary(updated,account.gold),account:accountPublicView(account),
     instance:patchedInstance?instanceSummary(patchedInstance,false):null,
     ...(sharedInventory?{sharedInventory}:{})}};
 }
@@ -1074,12 +1088,12 @@ async function buyTrainingPlan(db,body){
   p.trainingExercise={skill:["sword","axe","club","dist","magic","shield","fist"].includes(prior.skill)?prior.skill:"sword",activePlan:String(body.plan),balances,active:true};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   const result=await db.saveCharactersVersioned(acc.id,[{id:Number(character.id),expectedVersion:expected,voc:character.voc,level:Math.max(1,Number(character.level)||1),data:JSON.stringify(p),extra:{hp:Number(p.hp)||0,mp:Number(p.mp)||0}}],lease);
-  if(!result.ok)return saveConflictResponse(result);
+  if(!result.ok)return saveConflictResponse(result,acc);
   if(plan.gold&&typeof db.setAccountGold==="function")await db.setAccountGold(acc.id,gold-plan.gold);
   if(plan.tc)await db.updateCoins(acc.id,coins-plan.tc);
   const updated=result.characters[0],fresh=await ensureAccountWallet(db,await db.findAccountById(acc.id));
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"training-purchase"});
-  return {code:200,body:{ok:true,msg:`${plan.charges} cargas adquiridas.`,trainingExercise:p.trainingExercise,character:accountCharacterSummary(updated),account:accountPublicView(fresh)}};
+  return {code:200,body:{ok:true,msg:`${plan.charges} cargas adquiridas.`,trainingExercise:p.trainingExercise,character:accountCharacterSummary(updated,fresh.gold),account:accountPublicView(fresh)}};
 }
 
 function applyRewardChestClaim(p,body){
@@ -1103,7 +1117,7 @@ async function buyYanaPackage(db,body){
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
   if(Number(character.save_version)!==expected)
-    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character)]}};
+    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character,acc.gold)]}};
   const active=await resolveInstanceRow(db,acc,charId);
   if(active.error)return active.error;
   if(active.row&&active.row.status==="active")
@@ -1129,14 +1143,14 @@ async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
     level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
     extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
   }],lease);
-  if(!result.ok)return saveConflictResponse(result);
+  if(!result.ok)return saveConflictResponse(result,acc);
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"reward-claim",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"reward-claim"});
   await publishPartyForCharacters(db,[updated.id],"reward-claim");
   rewardChestEnsure(p);
   return {code:200,body:{ok:true,claimed:true,claimedCount:Number(claimedCount)||0,saveVersion:Number(updated.save_version),
-    character:accountCharacterSummary(updated),rewardChest:p.rewardChest||{},
+    character:accountCharacterSummary(updated,acc.gold),rewardChest:p.rewardChest||{},
     rewardChestBundles:p.rewardChestBundles||[],lootPouch:p.lootPouch||{},supplyStash:p.supplyStash||{},
     ...(sharedInventory?{sharedInventory}:{})}};
 }
@@ -1174,13 +1188,13 @@ async function persistPromotedPlayer(db,acc,character,p,lease){
     level:Math.max(1,Number(p.level)||Number(character.level)||1),data:JSON.stringify(p),
     extra:{hp:Math.max(0,Number(p.hp)||0),mp:Math.max(0,Number(p.mp)||0)},
   }],lease);
-  if(!result.ok)return saveConflictResponse(result);
+  if(!result.ok)return saveConflictResponse(result,acc);
   const updated=result.characters[0];
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"promote",updated,false);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),source:"promote"});
   await publishPartyForCharacters(db,[updated.id],"promote");
   return {code:200,body:{ok:true,promoted:true,saveVersion:Number(updated.save_version),
-    character:accountCharacterSummary(updated),
+    character:accountCharacterSummary(updated,acc.gold),
     ...(sharedInventory?{sharedInventory}:{})}};
 }
 async function promoteCharacterApi(db,body){
@@ -1325,7 +1339,7 @@ async function savePartyCharacters(db,body){
     for(const id of currentOrder){const character=await db.findCharacter(id);
       if(!character||Number(character.account_id)!==Number(acc.id))return {code:403,body:{ok:false,error:"PARTY_CHARACTER_NOT_OWNED",
         msg:"A party contém um personagem que não pertence à sua conta."}};
-      currentCharacters.push(accountCharacterSummary(character));}
+      currentCharacters.push(accountCharacterSummary(character,acc.gold));}
     return {code:200,body:{ok:true,partyVersion:Number(owned.roster_version),authoritativeInstance:true,
       characters:currentCharacters}};
   }
@@ -1351,7 +1365,7 @@ async function savePartyCharacters(db,body){
         party:current?{id:Number(current.id),version:Number(current.roster_version),
           order:[Number(current.leader_id)].concat(members.map((m)=>Number(m.id)))}:null}};
     }
-    return saveConflictResponse(result);
+    return saveConflictResponse(result,acc);
   }
   if(typeof db.snapshotAdd==="function")for(const character of result.characters)
     await db.snapshotAdd(acc.id,"character",character.id,character.save_version,"party-save",character,false);
@@ -1359,7 +1373,7 @@ async function savePartyCharacters(db,body){
     saveVersions:result.characters.map((c)=>Number(c.save_version)),source:"party-save"});
   await publishPartyForCharacters(db,result.characters.map((c)=>c.id),"party-save");
   return {code:200,body:{ok:true,partyVersion,
-    characters:result.characters.map(accountCharacterSummary)}};
+    characters:result.characters.map(charSummaryWithGold(acc))}};
 }
 
 function instanceSummary(row,includeState){
@@ -1410,8 +1424,10 @@ async function resolveInstanceRow(db,acc,charId){
 async function instanceCharactersForAccount(db,row,accountId){
   let state=null;try{state=typeof row.state==="string"?JSON.parse(row.state):row.state;}catch(e){}
   const ids=((state&&state.authority&&state.authority.players)||[]).map((item)=>Number(item.id)),out=[];
+  const ownerAcc=await db.findAccountById(accountId);
+  const accGold=ownerAcc?Math.max(0,Math.floor(Number(ownerAcc.gold)||0)):undefined;
   for(const id of ids){const character=await db.findCharacter(id);
-    if(character&&Number(character.account_id)===Number(accountId))out.push(accountCharacterSummary(character));}
+    if(character&&Number(character.account_id)===Number(accountId))out.push(accountCharacterSummary(character,accGold));}
   return out;
 }
 async function publishInstanceForRow(db,row,data){
@@ -1451,13 +1467,14 @@ async function loadInstance(db,token,charId){
 async function prepareInstanceState(db,acc,input){
   if(!input||typeof input!=="object"||Array.isArray(input))
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_STATE",msg:"Snapshot da instância inválido"}}};
-  const kind=input.kind==="boss"?"boss":input.kind==="hunt"?"hunt":null;
+  const kind=input.kind==="boss"?"boss":input.kind==="hunt"?"hunt":input.kind==="quest"?"quest":null;
   const idPattern=/^[a-z0-9][a-z0-9_-]{0,63}$/;
   const huntId=input.huntId?String(input.huntId):null,bossId=input.bossId?String(input.bossId):null;
-  if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||"")))
+  if(!kind||(kind==="hunt"&&!idPattern.test(huntId||""))||(kind==="boss"&&!idPattern.test(bossId||""))
+    ||(kind==="quest"&&!idPattern.test(bossId||"")))
     return {error:{code:400,body:{ok:false,error:"INVALID_INSTANCE_KIND",msg:"Hunt/boss inválido"}}};
-  let mode=["non-pvp","pvp","boss"].includes(String(input.instanceMode))?String(input.instanceMode):
-    (kind==="boss"?"boss":"non-pvp");
+  let mode=["non-pvp","pvp","boss","quest"].includes(String(input.instanceMode))?String(input.instanceMode):
+    (kind==="boss"?"boss":kind==="quest"?"quest":"non-pvp");
   // Idle: non-pvp e pvp são instâncias distintas. Após criar, o modo fica
   // travado no registro ativo — não mistura flags no meio da caçada.
   const currentRow=await db.instanceGet(acc.id);
@@ -1772,7 +1789,8 @@ async function createWorldBossSharedInstance(db,event){
   const bossId=bossIdForWarzone(wz.id);
   const hostAccountId=Number(event.hostAccountId||[...event.joins.keys()][0]);
   if(!hostAccountId)return {ok:false,error:"NO_HOST"};
-  const gridW=40,gridH=40,spawn={x:20,y:28},bossCell={x:20,y:16};
+  const gridW=Math.max(1,Number(wz.gridW)||40),gridH=Math.max(1,Number(wz.gridH)||40);
+  const spawn=wz.playerSpawn||{x:20,y:28},bossCell=wz.bossSpawn||{x:20,y:16};
   const members=[],players=[];
   let index=0;
   for(const [accountId,join] of event.joins){
@@ -1810,6 +1828,7 @@ async function createWorldBossSharedInstance(db,event){
     activeCharacterId:String(members[0].id),members,
     state:{
       worldBoss:true,instanceMode:"boss",gridW,gridH,huntId:null,
+      rewardBundleId:"world-boss-"+event.id,
       raidEnabled:false,influencedChance:0,fiendishChance:0,players,
       mobs:[{
         slug,boss:true,worldBoss:true,id:"boss-"+bossId,
@@ -2067,7 +2086,7 @@ async function tickInstance(db,body){
   return {code:200,body:{ok:true,elapsed:result.elapsed||0,terminalReason:result.terminalReason||null,
     instance:responseInstance,account:accountPublicView(await ensureAccountWallet(db,acc)),
     characters:(result.characters||[])
-      .filter((character)=>Number(character.account_id)===Number(acc.id)).map(accountCharacterSummary)}};
+      .filter((character)=>Number(character.account_id)===Number(acc.id)).map(charSummaryWithGold(acc))}};
 }
 
 async function selectInstanceAmmo(db,body){
@@ -3168,7 +3187,7 @@ async function endInstance(db,body){
   // checkpoint do templo com expected_version obsoleto.
   return {code:200,body:{ok:true,instance:instanceSummary(result.instance,false),
     characters:endedCharacters.filter((character)=>Number(character.account_id)===Number(acc.id))
-      .map(accountCharacterSummary)}};
+      .map(charSummaryWithGold(acc))}};
 }
 
 /* Recuperação explícita para saves cruzados por versões antigas. Recria os
@@ -3210,7 +3229,7 @@ async function repairCharacterIdentity(db,body,id){
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",updated.id,updated.save_version,"repair",updated,true);
   publishSync(acc.id,"character",{id:Number(updated.id),saveVersion:Number(updated.save_version),action:"repair"});
   await publishPartyForCharacters(db,[updated.id],"character-repair");
-  return {code:200,body:{ok:true,character:accountCharacterSummary(updated)}};
+  return {code:200,body:{ok:true,character:accountCharacterSummary(updated,acc.gold)}};
 }
 
 async function coins(db, body) {
@@ -3619,8 +3638,8 @@ async function marketGoldTransfer(db,body,direction){
       SAVE_VERSION_CONFLICT:"Personagem atualizado em outra sessão",LEASE_REQUIRED:"Controle da conta foi transferido"};
     return {code:result.error==="LEASE_REQUIRED"?423:result.error==="SAVE_VERSION_CONFLICT"?409:400,
       body:{ok:false,error:result.error,msg:messages[result.error]||"Transferência recusada",
-        character:result.character?accountCharacterSummary(result.character):null}};}
-  const balances=await marketBalances(db,acc.id),character=accountCharacterSummary(result.character);
+        character:result.character?accountCharacterSummary(result.character,acc.gold):null}};}
+  const balances=await marketBalances(db,acc.id),character=accountCharacterSummary(result.character,acc.gold);
   publishSync(acc.id,"character",{id:charId,saveVersion:character.saveVersion,source:"market-bank"});
   return {code:200,body:Object.assign({ok:true,amount,character},balances)};
 }
@@ -3719,7 +3738,13 @@ async function main() {
           row.instance_id,row.version,claim.terminalReason||"worker",row,!!claim.terminalReason);}
       const current=await db.instanceGet(claim.accountId);
       if(current)await publishInstanceForRow(db,current,{id:current.instance_id,version:claim.version,status:current.status,
-        terminalReason:claim.terminalReason||null,source:"worker"});},
+        terminalReason:claim.terminalReason||null,source:"worker"});
+      // Notify quest controller when a quest instance ends
+      if(claim.terminalReason&&global.__QUEST_CTRL&&current){
+        const questCtrl=global.__QUEST_CTRL;
+        const lobby=typeof questCtrl.findLobbyByInstance==="function"?questCtrl.findLobbyByInstance(current.instance_id):null;
+        if(lobby)questCtrl.onSharedEnded(lobby.id,claim.terminalReason).catch((e)=>console.error("[quest] onClaim notify",e&&e.message));
+      }},
   });
 
   const WORLD_BOSS=createWorldBossController({
@@ -3736,6 +3761,132 @@ async function main() {
   });
   global.__WORLD_BOSS=WORLD_BOSS;
   WORLD_BOSS.start();
+
+  /* ---- Quest controller ---- */
+  let questTileFlags=null;
+  function questMapBlockedCells(quest){
+    try{
+      if(!questTileFlags){
+        const sandbox={window:{}};sandbox.window=sandbox;vm.createContext(sandbox);
+        vm.runInContext(fs.readFileSync(path.join(STATIC_DIR,"js","tileflags.js"),"utf8"),sandbox);
+        questTileFlags=sandbox.TILEFLAGS||{};
+      }
+      const OTBM=require(path.join(STATIC_DIR,"js","otbm.js"));
+      const bytes=fs.readFileSync(path.join(STATIC_DIR,"maps",quest.otbm+".otbm"));
+      let parsed=OTBM.read(bytes,{z:quest.otbmFloor});
+      if(quest.otbmFovBounds)parsed=OTBM.crop(parsed,quest.otbmFovBounds);
+      const map=OTBM.huntMapFromOtbm(parsed,questTileFlags),blocked={};
+      for(let y=0;y<map.rows.length;y++)for(let x=0;x<map.rows[y].length;x++){
+        const legend=map.leg[map.rows[y][x]];
+        if(!legend||legend.bloc||map.footprintBlocked&&map.footprintBlocked[x+":"+y])blocked[x+":"+y]=true;
+      }
+      return blocked;
+    }catch(error){console.error("[quest] map collision",error&&error.message);return null;}
+  }
+  async function createQuestSharedInstance(lobby,quest){
+    if(!lobby||!lobby.joins||!lobby.joins.size)return {ok:false,error:"NO_JOINS"};
+    const hostAccountId=Number(lobby.hostAccountId||[...lobby.joins.keys()][0]);
+    if(!hostAccountId)return {ok:false,error:"NO_HOST"};
+    const playerCount=lobby.joins.size;
+    const totalWaves=quest.baseWaves+Math.floor(playerCount/quest.wavesPerPlayers);
+    const monstersPerWave=quest.baseMonstersPerWave+Math.floor(playerCount/quest.monstersPerPlayers);
+    // Grid — dimensões compatíveis com o mapa OTBM (34x32 para yalahar)
+    const gridW=Math.max(1,Number(quest.otbmRuntimeWidth)||34);
+    const gridH=Math.max(1,Number(quest.otbmRuntimeHeight)||32);
+    const sr=quest.spawnRange||{minX:10,maxX:20,minY:10,maxY:20};
+    // spawnRange já contém coordenadas locais (relativas ao mapa)
+    const spawnMinX=Math.max(0,Math.min(gridW-1,sr.minX));
+    const spawnMaxX=Math.max(spawnMinX,Math.min(gridW-1,sr.maxX));
+    const spawnMinY=Math.max(0,Math.min(gridH-1,sr.minY));
+    const spawnMaxY=Math.max(spawnMinY,Math.min(gridH-1,sr.maxY));
+    const blockedSpawn=new Set((quest.spawnBlocked||[]).map((cell)=>Number(cell[0])+":"+Number(cell[1])));
+    const blockedCells=questMapBlockedCells(quest);
+    const spawnCells=[];
+    for(let y=spawnMinY;y<=spawnMaxY;y++)for(let x=spawnMinX;x<=spawnMaxX;x++)
+      if(!blockedSpawn.has(x+":"+y)&&!(blockedCells&&blockedCells[x+":"+y]))spawnCells.push({x,y});
+    if(!spawnCells.length)return {ok:false,error:"NO_QUEST_SPAWN_CELLS"};
+    const spawnOffset=Math.floor(Math.random()*spawnCells.length);
+    const members=[],players=[];
+    let index=0;
+    for(const [accountId,join] of lobby.joins){
+      for(const slot of join.chars||[]){
+        const character=await db.findCharacter(slot.id);
+        if(!character)continue;
+        let data=character.data;
+        if(typeof data==="string"){try{data=JSON.parse(data);}catch(e){data={};}}
+        data=data&&typeof data==="object"?cloneJson(data):{};
+        data.id=String(character.id);
+        data.name=character.name||data.name||slot.name;
+        data.voc=character.voc||data.voc||slot.voc;
+        data.level=Math.max(1,Number(character.level)||Number(data.level)||1);
+        const ownerAcc=await db.findAccountById(character.account_id);
+        data.gold=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.gold)||0));
+        data.accountId=Number(character.account_id);
+        const max=maxStats(data);
+        data.hp=max.hp;data.mp=max.mp;
+        // Spawn aleatório no range
+        const spawnCell=spawnCells[(spawnOffset+index)%spawnCells.length];
+        const cx=spawnCell.x,cy=spawnCell.y;
+        members.push({id:String(character.id),p:data,hp:data.hp,mp:data.mp,accountId:Number(character.account_id)});
+        players.push({
+          id:String(character.id),p:data,hp:data.hp,mp:data.mp,accountId:Number(character.account_id),
+          cx,cy,x:(cx+.5)/gridW,y:(cy+.5)/gridH,dir:"s",
+        });
+        index++;
+      }
+    }
+    if(!members.length)return {ok:false,error:"NO_MEMBERS"};
+    const descriptor={
+      v:1,kind:"quest",huntId:null,bossId:quest.boss,instanceMode:"quest",
+      questId:quest.id,activeCharacterId:String(members[0].id),members,
+      state:{
+        questId:quest.id,instanceMode:"quest",gridW,gridH,huntId:null,blockedCells,
+        raidEnabled:false,influencedChance:0,fiendishChance:0,players,
+        mobs:[],pendingSpawns:[],
+        questWaves:{
+          total:totalWaves,current:0,monstersPerWave,
+          monsterPool:quest.waveMonsters||[],
+          bossSlug:quest.boss,bossSpawned:false,
+          spawnCells,
+          kickOnDeath:!!quest.kickOnDeath,
+          countdownUntil:Date.now()+(quest.countdownSec||30)*1000,
+        },
+      },
+    };
+    for(const accountId of lobby.joins.keys()){
+      try{if(typeof db.instanceEndForced==="function")await db.instanceEndForced(Number(accountId),"quest-prep");}
+      catch(e){console.error("[quest] end hunt",accountId,e&&e.message);}
+    }
+    const instanceId=newToken();
+    const initialized=initializeAuthority(descriptor,instanceId,Date.now());
+    const stamp=new Date();
+    const saved=await db.instanceReplaceForced(hostAccountId,instanceId,{
+      kind:"quest",hunt_id:null,boss_id:quest.boss,instance_mode:"quest",
+      party_id:null,party_version:null,active_character_id:Number(members[0].id),
+      saved_at:stamp,started_at:stamp,
+    },JSON.stringify(initialized));
+    if(!saved||!saved.ok)return {ok:false,error:(saved&&saved.error)||"SAVE_FAILED"};
+    try{
+      await publishInstanceForRow(db,saved.instance,{
+        id:saved.instance.instance_id,version:Number(saved.instance.version)||1,
+        status:"active",source:"quest-create",holderId:"",
+      });
+    }catch(e){/* best-effort */}
+    console.log("[quest] shared instance",String(instanceId).slice(0,12),"host="+hostAccountId,"chars="+members.length);
+    return {ok:true,instanceId,ownerAccountId:hostAccountId,instance:saved.instance};
+  }
+  const QUEST_CTRL=createQuestController({
+    getDb:()=>db,
+    publishAll:(type,data)=>{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll(type,data);},
+    publishAccount:(accountId,type,data)=>publishSync(accountId,type,data),
+    createQuestInstance:(lobby,quest)=>createQuestSharedInstance(lobby,quest),
+    endSharedInstance:async(host,instanceId,reason)=>{
+      if(host&&typeof db.instanceEndForced==="function")
+        await db.instanceEndForced(Number(host),reason||"quest-end");
+    },
+  });
+  global.__QUEST_CTRL=QUEST_CTRL;
+  QUEST_CTRL.start();
 
   const { createMegalomaniaLobbyController }=require("./megalomania_lobby");
   const MEGA_LOBBY=createMegalomaniaLobbyController({
@@ -4299,6 +4450,55 @@ async function main() {
         try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON"});}
         const auth=await authorizeMaintenance(req,body,db);
         const r=await WORLD_BOSS.forceClose(db,body,auth.ok);
+        return send(res,r.code,r.body);
+      }
+
+      /* -------- Quests (lobby + instância compartilhada) -------- */
+      if(req.method==="GET"&&url==="/api/quest/list"){
+        return send(res,200,{ok:true,quests:QUEST_CTRL.listQuests()});
+      }
+      if(req.method==="GET"&&url.startsWith("/api/quest/state")){
+        const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+        const q=new URL(req.url,"http://x").searchParams;
+        const questId=q.get("questId")||"";
+        const r=await QUEST_CTRL.stateFor(db,token||q.get("token")||"",questId);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/create"){
+        const limited=rateLimit(req,"quest-create",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await QUEST_CTRL.apiCreateLobby(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/join"){
+        const limited=rateLimit(req,"quest-join",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await QUEST_CTRL.join(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/leave"){
+        const r=await QUEST_CTRL.leave(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/start"){
+        const limited=rateLimit(req,"quest-start",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await QUEST_CTRL.startFight(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/loaded"){
+        const r=await QUEST_CTRL.markLoaded(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/report"){
+        const r=await QUEST_CTRL.reportCombat(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/auto-join"){
+        const limited=rateLimit(req,"quest-join",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await QUEST_CTRL.autoJoin(db,bodyWithSessionToken(req,await readBody(req)));
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/quest/choose-reward"){
+        const limited=rateLimit(req,"quest-reward",10,60000);if(limited)return send(res,limited.code,limited.body);
+        const r=await QUEST_CTRL.chooseReward(db,bodyWithSessionToken(req,await readBody(req)));
         return send(res,r.code,r.body);
       }
 

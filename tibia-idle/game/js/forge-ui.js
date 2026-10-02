@@ -65,11 +65,12 @@ function forgeClientTabHtml() {
   return html + '</div>';
 }
 
-function forgeClientItemTile(slug, count, cls, attrs, size) {
+function forgeClientItemTile(slug, count, cls, attrs, size, tier) {
   if (!slug) return '<div class="forge-client-slot empty ' + (cls || '') + '" ' + (attrs || '') + '></div>';
   var badge = count ? '<span class="forge-client-count">' + count + '</span>' : '';
+  var tierBadge = tier > 0 ? '<span class="forge-client-tier-badge">' + tier + '</span>' : '';
   return '<div class="forge-client-slot ' + (cls || '') + '" ' + (attrs || '') + '>'
-    + itemImg(slug, size || 34) + badge + '</div>';
+    + itemImg(slug, size || 34) + badge + tierBadge + '</div>';
 }
 
 /* Tile de RECURSO da forja com o sprite OFICIAL animado da TibiaWiki
@@ -105,7 +106,7 @@ function forgeClientItemListHtml(p) {
     var e = items[i];
     var same = forgeBagInstanceRefs(p, e.slug, e.currentTier).length;
     html += forgeClientItemTile(e.slug, same > 1 ? same : '', e.ref === FORGE_UI.slug ? 'sel' : '',
-      'data-forge-ref="' + e.ref + '" title="' + e.it.n + ' - ' + (e.currentTier ? ('T' + e.currentTier) : 'T0') + '"', 34);
+      'data-forge-ref="' + e.ref + '" title="' + e.it.n + ' - ' + (e.currentTier ? ('T' + e.currentTier) : 'T0') + '"', 34, e.currentTier);
   }
   return html + '</div>';
 }
@@ -252,6 +253,42 @@ function forgeRememberHistory(p, msg) {
   if (p.forgeHistory.length > 30) p.forgeHistory.length = 30;
 }
 
+function forgeFusionCostHtml(chk, result) {
+  var parts = [fmtFull(chk.gold) + ' gp', chk.dust + ' Dust'];
+  if (chk.useCore) parts.push('1 Exalted Core');
+  if (result.success) parts.push('1× ' + chk.info.name);
+  else if (/segundo item foi perdido/i.test(result.msg || '')) parts.push('1× ' + chk.info.name);
+  return parts.join(' · ');
+}
+
+function forgeShowFusionSuspense(p, chk, result) {
+  var host = forgeModalBody();
+  if (!host) return;
+  var bars = '';
+  for (var i = 0; i < 12; i++) bars += '<span style="--forge-delay:' + (i * .38).toFixed(2) + 's"></span>';
+  host.innerHTML = '<div class="forge-fusion-overlay pending"><div class="forge-fusion-reveal">'
+    + '<div class="forge-fusion-reveal-title">FUSION</div>'
+    + '<div class="forge-fusion-reveal-items">' + forgeClientItemTile(chk.info.slug, '', '', '', 46, chk.current)
+    + '<span class="forge-fusion-reveal-arrow">▶</span>' + forgeClientItemTile(chk.info.slug, '', '', '', 46, chk.next) + '</div>'
+    + '<div class="forge-fusion-bars">' + bars + '</div>'
+    + '<div class="forge-fusion-wait">Processando fusão...</div>'
+    + '</div></div>';
+  setTimeout(function() {
+    var overlay = host.querySelector('.forge-fusion-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('pending');
+    overlay.classList.add(result.success ? 'success' : 'failure');
+    var reveal = overlay.querySelector('.forge-fusion-reveal');
+    reveal.innerHTML = '<div class="forge-fusion-reveal-title">' + (result.success ? 'FUSION SUCCESSFUL' : 'FUSION FAILED') + '</div>'
+      + '<div class="forge-fusion-final-item">' + forgeClientItemTile(chk.info.slug, '', '', '', 54, result.tier) + '</div>'
+      + '<div class="forge-fusion-result-msg">' + result.msg + '</div>'
+      + '<div class="forge-fusion-consumed"><b>Consumido:</b> ' + forgeFusionCostHtml(chk, result) + '</div>'
+      + '<button class="forge-client-action" id="forge-fusion-continue">Continuar</button>';
+    var btn = host.querySelector('#forge-fusion-continue');
+    if (btn) btn.onclick = openForgeModal;
+  }, 5000);
+}
+
 function renderForgeHistoryPanel(p) {
   var rows = Array.isArray(p.forgeHistory) ? p.forgeHistory : [];
   var html = '<div class="forge-client-section-title">Your Exaltation Forge History</div>'
@@ -338,11 +375,22 @@ function bindForgeModal() {
 
   var fuseBtn = body.querySelector('#forge-fuse-apply');
   if (fuseBtn) fuseBtn.addEventListener('click', function() {
+    var chk = forgeCanFuse(G.p, FORGE_UI.slug, !!FORGE_UI.useCore);
+    if (!chk.ok) {
+      if (typeof toast === 'function') toast(chk.msg, 'err');
+      return;
+    }
+    fuseBtn.disabled = true;
     var r = forgeFuse(G.p, FORGE_UI.slug, !!FORGE_UI.useCore);
-    if (r.ok) forgeRememberHistory(G.p, r.msg);
-    if (typeof toast === 'function') toast(r.msg, r.ok && r.success !== false ? 'ok' : (r.ok ? '' : 'err'));
+    if (!r.ok) {
+      if (typeof toast === 'function') toast(r.msg, 'err');
+      openForgeModal();
+      return;
+    }
+    forgeRememberHistory(G.p, r.msg);
+    if (typeof save === 'function') save();
     if (typeof renderAll === 'function') renderAll();
-    openForgeModal();
+    forgeShowFusionSuspense(G.p, chk, r);
   });
 
   var transferBtn = body.querySelector('#forge-transfer-apply');

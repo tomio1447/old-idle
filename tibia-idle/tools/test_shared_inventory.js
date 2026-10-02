@@ -60,6 +60,7 @@ must(s0.v === 1 && Array.isArray(s0.depot) && Array.isArray(s0.itemInstances), "
       { id: "i-3", slug: "mana-potion", loc: "bag", tier: 0 },
     ],
     _itemInstSeq: 7,
+    dust: 84, dustLimit: 140, slivers: 12, exaltedCores: 3,
   };
   Shared.extractSharedFromPlayer(p2, shared2);
   must(shared2.bag["mana-potion"] === 5 && shared2.bag["steel-helmet"] === 2, "extract copia bag para o shared");
@@ -67,8 +68,12 @@ must(s0.v === 1 && Array.isArray(s0.depot) && Array.isArray(s0.itemInstances), "
   must(shared2.itemInstances.length === 2, "extract só leva instâncias não-equipadas");
   must(p2.itemInstances.length === 1 && p2.itemInstances[0].loc === "equip:weapon", "extract deixa equipada no char");
   must(shared2.seq >= 7, "extract herda o seq do player");
+  must(shared2.dust === 84 && shared2.dustLimit === 140 && shared2.slivers === 12 && shared2.exaltedCores === 3,
+    "extract copia recursos da forja para a conta");
   Shared.applySharedToPlayer(p2, shared2);
   must(p2.bag["mana-potion"] === 5 && p2.itemInstances.length === 3, "apply espelha o shared de volta");
+  must(p2.dust === 84 && p2.dustLimit === 140 && p2.slivers === 12 && p2.exaltedCores === 3,
+    "apply restaura recursos compartilhados da forja");
 }
 
 /* merge de chars (migração lazy) */
@@ -80,12 +85,14 @@ must(s0.v === 1 && Array.isArray(s0.depot) && Array.isArray(s0.itemInstances), "
         lootPouch: { "gold-coin": 50 },
         depot: ["i-a1"],
         itemInstances: [{ id: "i-a1", slug: "sword", loc: "depot" }, { id: "i-e1", slug: "axe", loc: "equip:weapon" }],
+        dust: 25, dustLimit: 120, slivers: 3, exaltedCores: 1,
       }) },
     { data: JSON.stringify({
         bag: { "health-potion": 4, "rope": 1 },
         lootPouch: { "gold-coin": 25 },
         depot: ["i-b1"],
         itemInstances: [{ id: "i-b1", slug: "rope", loc: "depot" }],
+        dust: 35, dustLimit: 150, slivers: 4, exaltedCores: 2,
       }) },
   ];
   Shared.mergeCharContainers(shared, chars);
@@ -95,6 +102,8 @@ must(s0.v === 1 && Array.isArray(s0.depot) && Array.isArray(s0.itemInstances), "
   must(shared.itemInstances.length === 2, "merge só leva bag/depot (equipada fica no char)");
   must(shared.itemInstances.every((i) => /^ai-/.test(String(i.id || ""))), "merge re-numera instâncias no escopo da conta");
   must(new Set(shared.itemInstances.map((i) => i.id)).size === 2, "ids do shared são únicos");
+  must(shared.dust === 60 && shared.dustLimit === 150 && shared.slivers === 7 && shared.exaltedCores === 3,
+    "migração soma recursos da forja dos personagens");
   // cap de 30 slots do depot
   const many = Array.from({ length: 40 }, (_, k) => ({ data: JSON.stringify({ depot: ["slot-" + k] }) }));
   const s2 = Shared.emptySharedInventory();

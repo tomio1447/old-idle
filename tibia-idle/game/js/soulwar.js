@@ -16,6 +16,8 @@
   'crawler-s-essence':{n:"crawler's essence",cid:33982,w:.45},
   'mould-heart':{n:'mould heart',cid:34141,w:.75},
   'mould-robe':{n:'mould robe',cid:34148,w:1.8},
+  'distorted-heart':{n:'distorted heart',cid:34142,w:.75},
+  'distorted-robe':{n:'distorted robe',cid:34149,w:1.8},
   'vial-of-hatred':{n:'vial of Hatred',cid:33927,w:1.1},
   'figurine-of-hatred':{n:'figurine of hatred',cid:34020,w:.44},
   'spectral-horseshoe':{n:'spectral horseshoe',cid:34072,w:1.2},

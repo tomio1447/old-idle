@@ -626,6 +626,8 @@ function addExp(p, amount) {
   if (leveled) {
     const b = maxStats(p);
     p.hp = b.hp; p.mp = b.mp;
+    // Atualiza cap compartilhada da party se este player agora tem mais cap.
+    if (p._sharedCap && b.cap > p._sharedCap.value) p._sharedCap.value = b.cap;
   }
   return leveled;
 }
@@ -994,6 +996,15 @@ function ensureItemInstances(p) {
       const slot = cand.loc.slice(6);
       const e = p.equip[slot];
       if (!e || e.instId !== cand.id) cand.loc = "bag";
+    }
+    if (!p._forgeLegacyTierMigrated && p.forge && typeof p.forge === "object") {
+      for (const slug in p.forge) {
+        const tier = Math.max(0, Math.floor(Number(p.forge[slug]) || 0));
+        if (!tier || p.itemInstances.some((inst) => inst && inst.slug === slug && itemInstanceTier(inst) > 0)) continue;
+        const target = p.itemInstances.find((inst) => inst && inst.slug === slug);
+        if (target) target.tier = tier;
+      }
+      p._forgeLegacyTierMigrated = 1;
     }
     syncBagCountsFromInstances(p);
     return p.itemInstances;
@@ -1549,7 +1560,9 @@ function carriedWeight(p) {
   return w;
 }
 function freeCapacity(p) {
-  const max = typeof maxStats === "function" ? maxStats(p).cap : DEFAULT_PLAYER_CAP;
+  const ownCap = typeof maxStats === "function" ? maxStats(p).cap : DEFAULT_PLAYER_CAP;
+  // Cap compartilhada da party: usa o maior cap entre todos os membros.
+  const max = (p && p._sharedCap) ? Math.max(ownCap, p._sharedCap.value) : ownCap;
   return Math.max(0, max - carriedWeight(p));
 }
 function capacityMessage() {

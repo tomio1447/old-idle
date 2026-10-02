@@ -100,7 +100,12 @@ function accountMergeCharacterCache(characters){
     if(index>=0)cache[index]=Object.assign({},cache[index],character);
     else cache.push(character);
     const snap=character.snapshot||(()=>{try{return typeof character.data==="string"?JSON.parse(character.data):character.data;}catch(e){return null;}})();
-    if(snap&&snap.gold!==undefined)sharedGold=Math.max(0,Math.floor(Number(snap.gold)||0));
+    // O gold pertence à conta (compartilhado). Usa o MÁXIMO entre os
+    // snapshots para não regredir com saves antigos de outro personagem.
+    if(snap&&snap.gold!==undefined){
+      const g=Math.max(0,Math.floor(Number(snap.gold)||0));
+      sharedGold=sharedGold!==null?Math.max(sharedGold,g):g;
+    }
   }
   if(sharedGold!==null&&typeof accountSetGold==="function")accountSetGold(sharedGold);
   accountCharacterCacheWrite(cache);return cache;
@@ -1474,8 +1479,9 @@ async function accountStartSyncNow(token,generation){
       });
     }
     if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
+    if(type==="quest"){accountSyncDispatch("quest",data);return;}
   };
-  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss"])
+  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss","quest"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};
@@ -1777,6 +1783,10 @@ function accountApplySharedInventory(shared) {
   if (Array.isArray(shared.depot)) p.depot = shared.depot.slice();
   if (shared.rewardChest && typeof shared.rewardChest === "object" && !Array.isArray(shared.rewardChest)) p.rewardChest = Object.assign({}, shared.rewardChest);
   if (Array.isArray(shared.rewardChestBundles)) p.rewardChestBundles = shared.rewardChestBundles.slice();
+  if (shared.dust !== undefined) p.dust = Math.max(0, Math.floor(Number(shared.dust) || 0));
+  if (shared.dustLimit !== undefined) p.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(shared.dustLimit) || 100)));
+  if (shared.slivers !== undefined) p.slivers = Math.max(0, Math.floor(Number(shared.slivers) || 0));
+  if (shared.exaltedCores !== undefined) p.exaltedCores = Math.max(0, Math.floor(Number(shared.exaltedCores) || 0));
   if (Array.isArray(shared.itemInstances)) {
     const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
       .filter((i) => i && typeof i === "object" && String(i.loc || "").indexOf("equip:") === 0);
@@ -2030,15 +2040,20 @@ async function accountClaimTutorialReward(token, tutorial) {
 
 function accountApplyServerBalances(data){
   data=data||{};
+  // O gold pertence à CONTA, não ao personagem. Quando account.gold está
+  // presente na resposta, usa ele como fonte canônica e ignora o snapshot
+  // individual (que pode estar desatualizado em saves antigos).
+  const accountGold=data.account&&data.account.gold!==undefined?Math.max(0,Number(data.account.gold)||0):
+    (data.gold!==undefined?Math.max(0,Number(data.gold)||0):null);
   if(data.character){accountMergeCharacterCache([data.character]);
-    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)&&data.character.snapshot){
-      const g=Math.max(0,Number(data.character.snapshot.gold)||0);
-      if(typeof accountSetGold==="function")accountSetGold(g);
-      else G.p.gold=g;
+    try{if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===String(data.character.id)){
+      const g=accountGold!==null?accountGold:
+        (data.character.snapshot?Math.max(0,Number(data.character.snapshot.gold)||0):null);
+      if(g!==null){if(typeof accountSetGold==="function")accountSetGold(g);
+      else G.p.gold=g;}
     }}catch(e){}}
   if(data.account&&typeof syncVipFromAccount==="function")syncVipFromAccount(data.account);
-  const gold=Number(data.gold!==undefined?data.gold:(data.account&&data.account.gold));
-  if(Number.isFinite(gold)&&typeof accountSetGold==="function")accountSetGold(Math.max(0,gold));
+  if(accountGold!==null&&typeof accountSetGold==="function")accountSetGold(accountGold);
   const coins=Number(data.coinBalance);
   if(Number.isFinite(coins)){
     try{const raw=sessionStorage.getItem("tibia-idle-account"),account=raw?JSON.parse(raw):null;

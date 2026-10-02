@@ -176,6 +176,20 @@ const SUPPLIES = {};
     s.price = derivarPreco(e);
     s.tier = Math.round((e.lvl || 1) / 40);
     SUPPLIES[id] = s;
+    if (typeof GAMEDATA !== "undefined" && GAMEDATA.items && [
+      "distilled-superior-mana-potion", "distilled-ultimate-mana-potion",
+      "ultimate-mana-potion", "ultimate-health-potion",
+      "ultimate-spirit-potion", "supreme-health-potion",
+    ].includes(id)) {
+      const frames = id === "distilled-superior-mana-potion" ? 10 : 12;
+      const item = GAMEDATA.items[id] || (GAMEDATA.items[id] = {
+        n: e.nome, s: "potion", t: "loot", cid: e.itemId || 0, sell: 0,
+      });
+      item.af = frames;
+      item.aw = 32;
+      item.ah = 32;
+      delete item.sf;
+    }
   }
 
   // ---- runas

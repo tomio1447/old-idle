@@ -462,7 +462,12 @@ function renderStats(p) {
           return `<b>${v.total}</b>${partes.length
             ? ` <span class="tiny dim">(${partes.join(" · ")})</span>` : ""}`;
         })()]] : []),
-    ["Capacidade", fmt(max.cap - carriedWeight(p)) + " / " + fmt(max.cap)],
+    ["Capacidade", (() => {
+      const effectiveCap = (p._sharedCap) ? Math.max(max.cap, p._sharedCap.value) : max.cap;
+      const free = fmt(effectiveCap - carriedWeight(p));
+      const label = free + " / " + fmt(effectiveCap);
+      return effectiveCap > max.cap ? label + ` <span class="tiny dim">(party)</span>` : label;
+    })()],
     ["Mortes", p.deaths],
     ["Kills totais", fmtFull(p.totalKills)],
   ];
@@ -563,11 +568,12 @@ function renderEquip(p) {
   for (const slot of SLOT_ORDER) {
     if (!slot) { h += `<div></div>`; continue; }
     if (slot === "cap") {
-      const max = typeof maxStats === "function" ? maxStats(p).cap : (p.cap || 5000);
+      const ownCap = typeof maxStats === "function" ? maxStats(p).cap : (p.cap || 5000);
+      const max = (p._sharedCap) ? Math.max(ownCap, p._sharedCap.value) : ownCap;
       const free = typeof freeCapacity === "function" ? freeCapacity(p) : max;
       const label = (typeof t === "function" && t("equip.cap")) || "CAP";
       const full = free <= 0;
-      h += `<div class="slot cap-slot${full ? " cap-full" : ""}" data-slot="cap" title="${label}: ${fmt(free)} / ${fmt(max)}">
+      h += `<div class="slot cap-slot${full ? " cap-full" : ""}" data-slot="cap" title="${label}: ${fmt(free)} / ${fmt(max)}${max > ownCap ? " (party)" : ""}">
         <span class="cap-label">${label}:</span>
         <span class="cap-value">${fmt(free)}</span>
       </div>`;
@@ -1014,7 +1020,7 @@ function renderHunts(p) {
       ? `<div class="tiny" style="color:#e8d24a">Em breve — missão Fear 15× já ativa</div>`
       : (risk.cls === "high"
         ? `<div class="tiny" style="color:#ff9a6a">⚠ Não recomendado para o seu nível</div>` : "");
-    const mobs = (hu.monsters || []).slice(0, 4).map((m) => {
+    const mobs = (hu.monsters || []).slice(0, 3).map((m) => {
       const st = typeof bestiaryStage === "function" ? bestiaryStage(p, m) : 1;
       const charm = typeof charmOnRace === "function" ? charmOnRace(p, m) : null;
       return `<span class="hunt-modal-mob">${mobImg(m, 24, st ? "" : "filter:brightness(0);")}${
@@ -1024,7 +1030,7 @@ function renderHunts(p) {
       <span class="mobs" aria-hidden="true">${mobs}</span>
       <span class="info">
         <span class="nm">${hu.name} ${starsHtml}</span>
-        <span class="meta">Nível recomendado <b>${hu.level}</b> · ${fmt(hu.avgExp)} xp/kill</span>
+        <span class="meta">Nv <b>${hu.level}</b> · ${fmt(hu.avgExp)} xp/kill</span>
         ${aviso}
       </span>
       <span class="risk ${risk.cls}">${risk.txt}</span>
@@ -2713,7 +2719,6 @@ function renderLootPouch(p) {
           style="flex:1" ${asOn ? "" : "disabled"}>
         <span class="tiny" style="width:auto;text-align:right;color:#d4af37">${asPct} itens</span>
       </div>
-      <div class="tiny dim mt4">Sem limite de slots. Ao somar ${asPct} itens, vende apenas itens liberados (a cada 5 min; VIP 2 min); classificações 3 e 4 ficam protegidas.</div>
     </div>`;
   const btnAs = $("#btn-pouch-autosell");
   if (btnAs && !btnAs._bound) {
@@ -3500,11 +3505,15 @@ function renderHelper(p) {
       : ((typeof CanaryVocation !== "undefined" && CanaryVocation.friendHealSpellIds)
         ? CanaryVocation.friendHealSpellIds(p.voc)
         : ["exura-sio", "exura-gran-sio", "exura-gran-mas-res", "exura-tio-sio"]));
+    const isUturaSpell = (id, s) =>
+      id === "utura" || id === "utura-gran" ||
+      (s && /^utura( gran)?$/i.test(String(s.words || "")));
     const heals = (typeof CanaryVocation !== "undefined" && CanaryVocation.selfHealSpellIds)
       ? CanaryVocation.selfHealSpellIds(SPELLS, p.voc)
       : Object.keys(SPELLS).filter((id) => {
           const s = SPELLS[id];
-          return s.type === "heal" && (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) && !friendHealIds.has(id);
+          return s.type === "heal" && !isUturaSpell(id, s) &&
+            (typeof spellForVoc === "function" ? spellForVoc(s, p.voc) : s.vocs.indexOf(p.voc) !== -1) && !friendHealIds.has(id);
         });
     heals.sort((a, b) => SPELLS[a].lvl - SPELLS[b].lvl);
     // potions da vocacao, com nivel e cura reais do canary. suppliesOf ja
@@ -3539,7 +3548,7 @@ function renderHelper(p) {
       return `<div class="helper-supply-row ${selected ? "selected" : disabledMana ? "disabled" : ""}"
                    data-supply-slug="${slug}" data-supply-slot="${slot}"
                    style="opacity:${liberado ? 1 : .45}">
-        <img src="assets/item/${s.sprite}.png" alt="${s.name}">
+        ${typeof itemImg === "function" ? itemImg(s.sprite, 26) : `<img src="assets/item/${s.sprite}.png" alt="${s.name}">`}
         <div style="flex:1;min-width:0">
           <div class="small">${s.name}
             ${s.lvl > 1 ? `<span class="tiny dim">· nv ${s.lvl}</span>` : ""}</div>
@@ -3555,12 +3564,13 @@ function renderHelper(p) {
           ${selected ? "USANDO" : disabledMana ? "DESATIVADO" : "USAR"}</button>
       </div>`;
     };
-    healEl.innerHTML = `
-      <div class="mb8">
-        <div class="small" style="font-weight:bold;color:#d4af37">HEAL CONDITION</div>
-        <div class="tiny dim">Defina a % de HP de cada cura. O Helper usa a primeira da lista pronta, respeitando cooldown.</div>
-      </div>
-      <div class="list helper-heal-spell-list" style="border:1px solid #2a251c;border-radius:4px;padding:4px;margin-bottom:8px">${heals.map((id, idx) => {
+    const helperHealTab = Object.prototype.hasOwnProperty.call(p.config, "helperHealTab")
+      ? p.config.helperHealTab : "spells";
+    const exuraVita = SPELLS && SPELLS["exura-vita"];
+    const catBtn = (id, icon, label) => `<button type="button" class="sm helper-heal-cat-btn ${helperHealTab === id ? "primary" : ""}" data-heal-cat="${id}">${icon}<span>${label}</span></button>`;
+    const spellsContent = `
+      <div class="tiny dim mb4">Defina a % de HP de cada cura. O Helper usa a primeira da lista pronta, respeitando cooldown.</div>
+      <div class="helper-heal-spell-list" style="border:1px solid #2a251c;border-radius:4px;padding:4px">${heals.map((id) => {
         const s = SPELLS[id], ok = p.level >= s.lvl;
         const cfg = (p.config.healSpells || []).find((x) => x && x.id === id);
         const active = !!cfg;
@@ -3580,8 +3590,9 @@ function renderHelper(p) {
             </div>
           </div>
         </div>`;
-      }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>
-      <div class="mt8">
+      }).join("") || `<div class="dim tiny">Nenhuma magia de cura.</div>`}</div>`;
+    const healthContent = `
+      <div class="mt4">
         <label class="small dim">Usar item de cura abaixo de (%)</label>
         <input id="helper-heal-item-at" type="number" min="1" max="99" value="${p.config.healItemAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
@@ -3592,17 +3603,27 @@ function renderHelper(p) {
           ${p.config.noHealthPotions ? "HP OFF — reativar" : "NÃO USAR POTIONS HP"}
         </button>
       </div>
-      <div class="small dim mt8 mb4">Itens de HP (${healSup.length})</div>
-      <div class="list" style="${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map((slug) => supplyRow(slug, "heal")).join("")}</div>
-      <div class="mt8">
+      <div class="small dim mb4">Itens de HP (${healSup.length})</div>
+      <div class="helper-heal-supply-list" style="${p.config.noHealthPotions ? "opacity:.45;pointer-events:none" : ""}">${healSup.map((slug) => supplyRow(slug, "heal")).join("")}</div>`;
+    const manaContent = `
+      <div class="mt4">
         <label class="small dim">Preencher mana abaixo de (%)</label>
         <input id="helper-mana-at" type="number" min="1" max="99" value="${p.config.manaAt === undefined ? 50 : p.config.manaAt}"
           style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
       </div>
       <div class="row mt8 mb4" style="justify-content:space-between"><span class="small ${p.config.noManaPotions ? "" : "dim"}" style="${p.config.noManaPotions ? "color:#ff9090;font-weight:bold" : ""}">🚫 Potions de mana</span><button class="sm ${p.config.noManaPotions ? "danger" : ""}" id="helper-no-mana-potions">${p.config.noManaPotions ? "MANA OFF — reativar" : "NÃO USAR POTIONS MANA"}</button></div>
       <div class="tiny dim mb4">Só 1 potion de mana ativa. Por padrão todas desativadas — escolha qual usar.</div>
-      <div class="small dim mt8 mb4">Itens de mana (${manaSup.length})</div>
-      <div class="list" style="${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map((slug) => supplyRow(slug, "mana")).join("")}</div>`;
+      <div class="small dim mb4">Itens de mana (${manaSup.length})</div>
+      <div class="helper-heal-supply-list" style="${p.config.noManaPotions ? "opacity:.45;pointer-events:none" : ""}">${manaSup.map((slug) => supplyRow(slug, "mana")).join("")}</div>`;
+    healEl.innerHTML = `
+      <div class="helper-heal-cats row">
+        ${catBtn("spells", exuraVita ? spellIcon(exuraVita, "helper-cat-icon") : "", "Healing Spells")}
+        ${catBtn("health", itemImg("great-health-potion", 20), "Health Potions")}
+        ${catBtn("mana", itemImg("ultimate-mana-potion", 20), "Mana Potions")}
+      </div>
+      <div class="helper-heal-category" data-heal-cat-content="spells" style="${helperHealTab === "spells" ? "" : "display:none"}">${spellsContent}</div>
+      <div class="helper-heal-category" data-heal-cat-content="health" style="${helperHealTab === "health" ? "" : "display:none"}">${healthContent}</div>
+      <div class="helper-heal-category" data-heal-cat-content="mana" style="${helperHealTab === "mana" ? "" : "display:none"}">${manaContent}</div>`;
     ["helper-heal-spell-at", "helper-heal-item-at", "helper-mana-at"].forEach((id) => {
       const input = $("#" + id);
       if (!input) return;
@@ -3618,6 +3639,10 @@ function renderHelper(p) {
         if (healVal) healVal.textContent = p.config.healAt + "%";
       });
     });
+    $$("#helper-heal [data-heal-cat]").forEach((b) => b.addEventListener("click", () => {
+      p.config.helperHealTab = helperHealTab === b.dataset.healCat ? "" : b.dataset.healCat;
+      renderHelper(p);
+    }));
     $$("#helper-heal [data-heal-spell-toggle]").forEach((b) => b.addEventListener("click", () => {
       const id = b.dataset.healSpellToggle;
       const spells = p.config.healSpells = p.config.healSpells || [];

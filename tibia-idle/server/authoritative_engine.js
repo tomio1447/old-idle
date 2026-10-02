@@ -693,57 +693,97 @@ function authorityMobHasFollowPath(auth,mob,target){
   return !!step;
 }
 /* Canary Monster::onThink_async + searchTargetImmediate (#3922):
- * melee sem hasFollowPath → searchTarget(NEAREST) excluindo o alvo atual
- * inalcançável; ranged só retargeta se também estiver fora de alcance de
- * ataque. Sticky enquanto o alvo atual for alcançável (anti-flicker).
- * Challenge (Exeta Res) continua forçando o knight. */
+ * O alvo padrão é o personagem vivo MAIS PRÓXIMO (distância Chebyshev).
+ * Challenge/Provoke força o alvo marcado enquanto for alcançável; se não
+ * puder atacá-lo, o monstro muda para o personagem mais próximo alcançável.
+ * Sticky leve evita flicker, mas monstros trocam de alvo aleatoriamente a
+ * cada ~5–10s e também quando outro personagem ficar significativamente mais
+ * perto (>=3 SQM de diferença) ou quando o alvo atual não for alcançável. */
 function authorityMobTarget(auth,mob){
   const alive=(auth.players||[]).filter((item)=>item&&item.p&&item.p.hp>0&&!item.downUntil);
   if(!alive.length){if(mob)delete mob.targetId;return null;}
   const now=Number(auth.clock)||0;
-  if(mob&&Number(mob.challengedUntil||0)>now){
-    const knight=alive.find((item)=>String(item.id)===String(mob.challengeTargetId||""));
-    if(knight){mob.targetId=String(knight.id);mob._hasFollowPath=true;return knight;}
-  }
   const td=authorityTargetDistance(mob,now);
+
   const byDist=()=>alive.slice().sort((a,b)=>authorityVisualDistance(mob,a,auth)-authorityVisualDistance(mob,b,auth)||
     String(a.id).localeCompare(String(b.id)));
-  const pickReachable=(skipId)=>{
-    const list=byDist();
-    for(const cand of list){
-      if(skipId&&String(cand.id)===String(skipId))continue;
-      if(authorityMobHasFollowPath(auth,mob,cand))return cand;
-    }
+  const nearest=byDist()[0];
+  const nearestReachable=()=>{
+    for(const cand of byDist())if(authorityMobHasFollowPath(auth,mob,cand))return cand;
     return null;
   };
+  const canAttack=(p)=>authorityMobCanAttack(auth,mob,p);
+  const hasPath=(p)=>authorityMobHasFollowPath(auth,mob,p);
+
+  // Challenge/Provoke: força o alvo marcado enquanto puder atacá-lo ou
+  // chegar até ele. Se estiver bloqueado/inacessível, cai para o mais próximo.
+  if(mob&&Number(mob.challengedUntil||0)>now){
+    const forced=alive.find((item)=>String(item.id)===String(mob.challengeTargetId||""));
+    if(forced&&forced.p.hp>0&&(td>1?canAttack(forced)||hasPath(forced):hasPath(forced))){
+      mob.targetId=String(forced.id);mob._hasFollowPath=true;delete mob._pathFailCount;delete mob._pathFailAt;return forced;
+    }
+  }
+
   let target=alive.find((item)=>String(item.id)===String(mob.targetId||""));
+
+  // Retarget periódico aleatório: a cada ~5–10s o monstro pode reconsiderar
+  // e escolher o alvo mais próximo (Canary Monster::onThink_async).
+  const lastRetarget=Number(mob._retargetAt)||0;
+  const retargetInterval=5000+Math.floor(random(auth)*5000); // 5–10s
+  if(now-lastRetarget>=retargetInterval){
+    mob._retargetAt=now;
+    if(nearest&&(!target||String(nearest.id)!==String(target.id))){
+      const picked=nearestReachable()||nearest;
+      if(picked){
+        mob.targetId=String(picked.id);delete mob._pathFailCount;delete mob._pathFailAt;
+        mob._hasFollowPath=hasPath(picked);
+        return picked;
+      }
+    }
+  }
+
   if(target){
-    const hasPath=authorityMobHasFollowPath(auth,mob,target);
-    const attackable=authorityMobCanAttack(auth,mob,target);
-    // Melee: !hasFollowPath ⇒ retarget. Ranged: só se também unattackable.
-    const meleeStuck=td<=1&&!hasPath;
-    const rangedStuck=td>1&&!attackable&&!hasPath;
+    const distCur=authorityVisualDistance(mob,target,auth);
+    const distNear=nearest?authorityVisualDistance(mob,nearest,auth):Infinity;
+    const attackable=canAttack(target);
+    const pathOk=hasPath(target);
+    // Se outro personagem ficar muito mais perto, troca imediatamente.
+    if(nearest&&String(nearest.id)!==String(target.id)&&distCur-distNear>=3){
+      const picked=nearestReachable()||nearest;
+      if(picked){
+        mob.targetId=String(picked.id);delete mob._pathFailCount;delete mob._pathFailAt;
+        mob._hasFollowPath=hasPath(picked);
+        return picked;
+      }
+    }
+    // Melee: sem caminho ⇒ stuck. Ranged: só stuck se também não puder atacar.
+    const meleeStuck=td<=1&&!pathOk;
+    const rangedStuck=td>1&&!attackable&&!pathOk;
     if(!meleeStuck&&!rangedStuck){mob._pathFailCount=0;return target;}
-    // Um incremento por clock (movimento+ataque no mesmo tick não contam 2×).
     if((Number(mob._pathFailAt)||0)!==now){
       mob._pathFailAt=now;
       mob._pathFailCount=(Number(mob._pathFailCount)||0)+1;
     }
     mob._hasFollowPath=false;
     if(mob._pathFailCount<2)return target;
-    const alt=pickReachable(target.id);
-    if(alt){
+    // Após 2 ticks presos: pega o alvo mais próximo alcançável.
+    const alt=nearestReachable();
+    if(alt&&String(alt.id)!==String(target.id)){
       mob.targetId=String(alt.id);mob._pathFailCount=0;mob._hasFollowPath=true;
       delete mob._reachKey;
       return alt;
     }
-    // Nenhum outro alcançável: mantém o atual (lista de threat Canary) mas
-    // zera o stick de path para o movimento não insistir no greedy.
     return target;
   }
+
+  // Sem alvo atual: escolhe o personagem mais próximo alcançável; senão,
+  // o absolutamente mais próximo (pode ficar parado esperando path).
   mob._pathFailCount=0;
-  target=pickReachable(null)||byDist()[0];
-  if(target)mob.targetId=String(target.id);
+  target=nearestReachable()||nearest;
+  if(target){
+    mob.targetId=String(target.id);
+    mob._hasFollowPath=hasPath(target);
+  }
   return target||null;
 }
 /* Densidade de pack: quantos vivos no raio Chebyshev do SQM do monstro. */
@@ -1104,8 +1144,30 @@ function carriedWeight(p){
   return w;
 }
 function freeCapacity(p){
-  const max=maxStats(p).cap;
+  // Cap compartilhada da party: usa o maior cap entre todos os membros.
+  const ownCap=maxStats(p).cap;
+  const max=(p&&p._sharedCap)?Math.max(ownCap,p._sharedCap.value):ownCap;
   return Math.max(0,max-carriedWeight(p));
+}
+/* Compartilha a CAP da party: todos os personagens usam o maior cap entre
+ * os membros. O objeto {value} é mutável — quando alguém sobe de level ou
+ * troca equip, recalcular com sharePartyCapacity atualiza todo mundo.
+ * A propriedade _sharedCap é non-enumerable para não poluir JSON.stringify. */
+function sharePartyCapacity(auth){
+  if(!auth||!Array.isArray(auth.players))return;
+  let best=0;
+  for(const item of auth.players){
+    if(!item||!item.p)continue;
+    const cap=maxStats(item.p).cap;
+    if(cap>best)best=cap;
+  }
+  if(auth.players.length<2)return;
+  const shared={value:best};
+  for(const item of auth.players){
+    if(!item||!item.p)continue;
+    try{Object.defineProperty(item.p,"_sharedCap",{configurable:true,writable:true,enumerable:false,value:shared});}
+    catch(e){item.p._sharedCap=shared;}
+  }
 }
 function accountIsVip(p){
   const until=Number(p&&p.vipUntil)||0;
@@ -3164,6 +3226,13 @@ function accessoryNormalizeCharges(e,it){
 function accessoryBreak(auth,p,slot,now){
   const e=p.equip&&p.equip[slot];if(!e||!e.item)return;
   const slug=e.item,it=ITEMS[slug],nome=(it&&it.n)||slug,instId=e.instId||null;
+  // Supply Analyser: contabiliza ring/amulet consumido e seu custo.
+  if(auth&&auth.stats&&it){
+    auth.stats.supplyUsed=auth.stats.supplyUsed||{};
+    auth.stats.supplyUsed[slug]=(auth.stats.supplyUsed[slug]||0)+1;
+    const cost=Number(it.sell)||Number(it.npcSell)||0;
+    if(cost>0)auth.stats.supplyCost=(Number(auth.stats.supplyCost)||0)+cost;
+  }
   // Só limpa ledger legado deste slug — NÃO apaga bag/stash/outras cópias.
   delete accessoryChargesLedger(p)[slug];
   const decay=it&&(it.decayToSlug||(typeof it.decayTo==="string"?it.decayTo:""));
@@ -3261,6 +3330,11 @@ function tryMagicShieldPotion(auth,item,p,now){
   p.gold=Math.max(0,(Number(p.gold)||0)-MAGIC_SHIELD_POTION_COST);
   p.magicShieldPotionUntil=now+MAGIC_SHIELD_POTION_CD_MS;
   applyMagicShieldPool(p,now,"potion");
+  if(auth&&auth.stats){
+    auth.stats.supplyCost=(Number(auth.stats.supplyCost)||0)+MAGIC_SHIELD_POTION_COST;
+    auth.stats.supplyUsed=auth.stats.supplyUsed||{};
+    auth.stats.supplyUsed["magic-shield-potion"]=(auth.stats.supplyUsed["magic-shield-potion"]||0)+1;
+  }
   const pos=playerPosition(auth,p);
   auth.events.push({t:"say",text:"Aaaah...",supply:true,whoId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
   auth.events.push({t:"magic-shield-on",cap:p.magicShieldCap,source:"Magic Shield Potion",
@@ -4275,7 +4349,8 @@ function rewardChestRemoveBundleIfEmpty(p,bundle){
 function rewardChestAddPouch(p,slug,count){
   if(!p||!slug||!(count>0))return 0;
   const unit=itemUnitWeight(slug);
-  const fit=unit>0?Math.floor(freeCapacity(p)/unit):0;
+  // Peso 0 = item sem peso (ex: moeda convertida). Trata como cabendo tudo.
+  const fit=unit>0?Math.floor(freeCapacity(p)/unit):Math.floor(count);
   const n=Math.min(Math.floor(count),fit);
   if(n<=0)return 0;
   p.lootPouch=p.lootPouch||{};
@@ -4645,21 +4720,20 @@ function rewardChestClaimBundle(p,bundleId){
   rewardChestRemoveBundleIfEmpty(p,bundle);
   return types;
 }
-const REWARD_CLAIM_MAX_ITEMS=100;
 /* COLLECT ALL drena os bundles UM BOSS POR VEZ, na ordem em que entraram no
  * baú: o boss totalmente recolhido some da lista; o que sobrar parcial fica
- * visível com o restante. O teto de REWARD_CLAIM_MAX_ITEMS e a cap livre do
- * personagem (rewardChestAddPouch) limitam a coleta. */
+ * visível com o restante. Sem limite artificial — apenas a cap livre do
+ * personagem (rewardChestAddPouch) restringe a coleta. */
 function rewardChestClaimAll(p){
   if(!p)return 0;
   rewardChestEnsure(p);
   let total=0;
+  const noRoom=()=>freeCapacity(p)<0.01;
   const takeFromBundle=(bundle)=>{
     for(const slug of Object.keys(bundle.items||{})){
-      if(total>=REWARD_CLAIM_MAX_ITEMS)return;
+      if(noRoom())return;
       const count=Number(bundle.items[slug])||0;if(count<=0)continue;
-      const want=Math.min(count,REWARD_CLAIM_MAX_ITEMS-total);
-      const n=rewardChestAddPouch(p,slug,want);
+      const n=rewardChestAddPouch(p,slug,count);
       if(n<=0)continue;
       bundle.items[slug]=count-n;
       if(bundle.items[slug]<=0)delete bundle.items[slug];
@@ -4669,15 +4743,14 @@ function rewardChestClaimAll(p){
     }
   };
   for(const bundle of p.rewardChestBundles||[]){
-    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
+    if(noRoom())break;
     if(bundle&&bundle.items)takeFromBundle(bundle);
   }
   // Sobra agregada sem bundle (legado): mesma lógica, deduz na ordem.
   for(const slug of Object.keys(p.rewardChest||{})){
-    if(total>=REWARD_CLAIM_MAX_ITEMS)break;
+    if(noRoom())break;
     const count=Number(p.rewardChest[slug])||0;if(count<=0)continue;
-    const want=Math.min(count,REWARD_CLAIM_MAX_ITEMS-total);
-    const n=rewardChestAddPouch(p,slug,want);
+    const n=rewardChestAddPouch(p,slug,count);
     if(n<=0)continue;
     p.rewardChest[slug]=count-n;
     if(!p.rewardChest[slug])delete p.rewardChest[slug];
@@ -4889,7 +4962,8 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   const bossMeta=monsterDef(mob.slug)||mob.def||{};
   const rewardSource=mob.boss?{
     bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
-    name:bossMeta.name||mob.slug,sprite:auth.kind==="hunt"?mob.slug:(auth.bossId||mob.slug)}:null;
+    name:bossMeta.name||mob.slug,
+    sprite:auth.kind==="hunt"||auth.worldBoss?mob.slug:(auth.bossId||mob.slug)}:null;
   for(const entry of mob.def.loot||[]){
     const chance=Math.min(100,(Number(entry.chance)||0)*chanceMult);
     if(random(auth)*100>chance)continue;
@@ -5945,6 +6019,52 @@ function spawnHuntWave(auth,now,opts){
     auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
   }
 }
+/* ---- Quest wave spawners ---- */
+function spawnQuestWave(auth,now,qw){
+  if(!auth||!qw)return;
+  const pool=qw.monsterPool||[];
+  if(!pool.length)return;
+  const count=Math.max(1,qw.monstersPerWave||8);
+  auth.pendingSpawns=auth.pendingSpawns||[];
+  ensureSpawnIds(auth);
+  const occupied=new Set((auth.mobs||[]).map((m)=>String(m.id)));
+  for(const sp of auth.pendingSpawns)if(sp&&sp.mob&&sp.mob.id)occupied.add(String(sp.mob.id));
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  for(let i=0;i<count;i++){
+    const slug=pool[Math.floor(Math.random()*pool.length)];
+    if(!slug||!monsterDef(slug))continue;
+    const id="qw-"+qw.current+"-"+i;
+    if(occupied.has(id))continue;
+    const m=makeMob(auth,slug,false,id,null,i);
+    if(!m)continue;
+    const cells=Array.isArray(qw.spawnCells)?qw.spawnCells:[];
+    if(cells.length){
+      const cell=cells[Math.floor(random(auth)*cells.length)];
+      m.cx=cell.x;m.cy=cell.y;m.x=(m.cx+.5)/gw;m.y=(m.cy+.5)/gh;m.sx=m.x;m.sy=m.y;
+    }
+    occupied.add(id);
+    auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
+  }
+  auth.events=auth.events||[];
+  auth.events.push({t:"quest-wave",wave:qw.current,total:qw.total,ts:now});
+}
+function spawnQuestBoss(auth,now,qw){
+  if(!auth||!qw||!qw.bossSlug)return;
+  const slug=qw.bossSlug;
+  if(!monsterDef(slug))return;
+  auth.pendingSpawns=auth.pendingSpawns||[];
+  const gw=Number(auth.gridW)||30,gh=Number(auth.gridH)||30;
+  const cells=Array.isArray(qw.spawnCells)?qw.spawnCells:[];
+  const cell=cells.length?cells[Math.floor(random(auth)*cells.length)]:{x:Math.floor(gw/2),y:Math.floor(gh/2)};
+  const cx=cell.x,cy=cell.y;
+  const m=makeMob(auth,slug,true,"quest-boss",null,0);
+  if(!m)return;
+  m.cx=cx;m.cy=cy;m.x=(cx+.5)/gw;m.y=(cy+.5)/gh;m.sx=m.x;m.sy=m.y;
+  auth.pendingSpawns.push({mob:m,cx:m.cx,cy:m.cy,startedAt:now,blink:0,done:false});
+  auth.events=auth.events||[];
+  auth.events.push({t:"quest-boss-spawn",slug,ts:now});
+}
+
 /* 3 piscadas em ~2s (lead de teleporte). */
 const AUTH_SPAWN_BLINK_MS=667,AUTH_SPAWN_BLINKS=3;
 /* Tempo até o monstro nascer após limpar a onda. Blink começa em T-2s. */
@@ -7019,6 +7139,47 @@ function step(auth,now,opts){if(auth.ended)return;
       }else spawnHuntWave(auth,stepTs);
     }else auth._nextWaveAt=0;
   }
+  // Quest wave logic: ondas controladas pelo questWaves descriptor
+  if(!auth.ended&&auth.kind==="quest"&&auth.questWaves){
+    const qw=auth.questWaves;
+    const empty=!auth.mobs.length&&!(auth.pendingSpawns&&auth.pendingSpawns.length);
+    // Countdown antes da primeira wave
+    if(qw.countdownUntil&&stepTs<qw.countdownUntil){/* esperando countdown */}
+    else if(empty&&qw.current<qw.total&&!qw.bossSpawned){
+      if(dead.length&&!qw._nextQWaveAt)qw._nextQWaveAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
+      else if(qw._nextQWaveAt){
+        if(stepTs>=qw._nextQWaveAt-AUTH_WAVE_TELEPORT_LEAD_MS){
+          qw._nextQWaveAt=0;qw.current++;
+          spawnQuestWave(auth,stepTs,qw);
+        }
+      }else{
+        qw.current++;
+        spawnQuestWave(auth,stepTs,qw);
+      }
+    }else if(empty&&qw.current>=qw.total&&!qw.bossSpawned){
+      // Spawn do boss após última wave
+      if(!qw._bossSpawnAt)qw._bossSpawnAt=stepTs+AUTH_WAVE_CLEAR_RESPAWN_MS;
+      else if(stepTs>=qw._bossSpawnAt-AUTH_WAVE_TELEPORT_LEAD_MS){
+        qw.bossSpawned=true;qw._bossSpawnAt=0;
+        spawnQuestBoss(auth,stepTs,qw);
+      }
+    }else if(empty&&qw.bossSpawned){
+      // Boss derrotado — quest completa
+      auth.ended=true;auth.terminalReason="quest-completed";
+    }else{
+      qw._nextQWaveAt=0;qw._bossSpawnAt=0;
+    }
+    // Kick em morte: jogadores mortos numa quest são removidos
+    if(auth.questWaves&&auth.questWaves.kickOnDeath){
+      for(const pl of auth.players){
+        if(pl.p.hp<=0&&!pl._questKicked){
+          pl._questKicked=true;
+          auth.events=auth.events||[];
+          auth.events.push({t:"quest-kick",charId:pl.id,reason:"death",ts:stepTs});
+        }
+      }
+    }
+  }
   if(!auth.ended)tickAuthSpawnQueue(auth,stepTs);
 }
 function initializeAuthority(descriptor,instanceId,now){
@@ -7055,6 +7216,7 @@ function initializeAuthority(descriptor,instanceId,now){
       supplyUsed:{},supplyCost:0,supplyBought:{},deaths:0,blessCost:0,
       deathTrack:{startedAt:Number(now)||Date.now(),byPlayer:{}}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster",wallets:{}};
   shareAccountGoldWallets(auth);
+  sharePartyCapacity(auth);
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
@@ -7165,13 +7327,25 @@ function initializeAuthority(descriptor,instanceId,now){
       arenaBossBindMechanics(auth,auth.clock);
     }
     syncBossImmunityFlags(auth);}
+  // Quest initialization: preserve questWaves from descriptor
+  if(descriptor.kind==="quest"&&combat.questWaves){
+    auth.questWaves=Object.assign({},combat.questWaves);
+    // Populate spawn pool from quest wave monsters
+    for(const slug of auth.questWaves.monsterPool||[]){
+      if(monsterDef(slug)&&!auth.spawnPool.includes(slug))auth.spawnPool.push(slug);
+    }
+    if(auth.questWaves.bossSlug&&monsterDef(auth.questWaves.bossSlug)&&!auth.spawnPool.includes(auth.questWaves.bossSlug))
+      auth.spawnPool.push(auth.questWaves.bossSlug);
+  }
   ensureSpawnIds(auth);
   tickAuthSpawnQueue(auth,Number(now)||auth.clock);
   descriptor.authority=auth;return materializeAuthority(descriptor);
 }
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
   descriptor.members=auth.players.map((item)=>({id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp}));descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
-  descriptor.state=descriptor.state||{};const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
+  descriptor.state=descriptor.state||{};
+  if(auth.questWaves)descriptor.state.questWaves=Object.assign({},auth.questWaves,{spawnCells:(auth.questWaves.spawnCells||[]).map((cell)=>({x:cell.x,y:cell.y}))});
+  const oldPlayers=Array.isArray(descriptor.state.players)?descriptor.state.players:[];
   descriptor.state.players=auth.players.map((item)=>stripStaleVisualStep(Object.assign({},
     oldPlayers.find((x)=>String(x.id)===item.id)||{id:item.id},entityVisual(item),
     {id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp,
@@ -7334,6 +7508,7 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
     if(item&&item.p&&item.p.accountId&&!item.accountId)item.accountId=item.p.accountId;
   }
   shareAccountGoldWallets(auth);
+  sharePartyCapacity(auth);
   // v2 corrige instâncias criadas com HP/MP antigos do banco no checkpoint de
   // entrada. A migração roda uma única vez também para snapshots já ativos.
   if(Number(auth.v||1)<2){for(const item of auth.players||[]){const max=maxStats(item.p);
@@ -7398,7 +7573,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   mobHasExtractedMelee,skillUsesMeleeBlock,creditHuntLoot,carriedWeight,freeCapacity,itemUnitWeight,accountIsVip,
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   CURRENCY_GOLD,
-  shareAccountGoldWallets,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
+  shareAccountGoldWallets,sharePartyCapacity,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
   ensureLootConfig,isAuthNoCollect,isAuthNoSell,tryAuthAutoSell,
   moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,

@@ -336,6 +336,19 @@ function maybeLoadPartyCombat(c, player, spx, spy) {
     c.players[0].p = player;
     c.players[0].id = player.id || c.players[0].id;
     c.player = c.players[0];
+    // Cap compartilhada: todos os membros usam a maior cap da party.
+    if (typeof maxStats === "function") {
+      let bestCap = 0;
+      for (const ent of c.players) {
+        const cap = maxStats(ent.p).cap;
+        if (cap > bestCap) bestCap = cap;
+      }
+      const shared = { value: bestCap };
+      for (const ent of c.players) {
+        try { Object.defineProperty(ent.p, "_sharedCap", { configurable: true, writable: true, enumerable: false, value: shared }); }
+        catch (e) { ent.p._sharedCap = shared; }
+      }
+    }
     if (typeof partyCombatPlace === "function") partyCombatPlace(c, spx, spy);
     if (typeof addLog === "function") {
       addLog("party", `<b style="color:#9ce84a">Party na mesma instância!</b> ${c.players.length} personagens na arena — clique neles no painel para controlar cada um.`);
@@ -344,11 +357,12 @@ function maybeLoadPartyCombat(c, player, spx, spy) {
 }
 
 function newBossCombat(player, boss) {
+  const worldArena = boss && boss.worldBoss && boss.hunt && GAMEDATA.hunts[boss.hunt];
   const c = boss && boss.worldBoss
-    ? newCombat(player, null, "boss", {
-        huntMap: worldBossPlaceholderMap(),
+    ? newCombat(player, boss.hunt || null, "boss", {
+        huntMap: worldArena ? undefined : worldBossPlaceholderMap(),
         skipParty: true,
-        hunt: { name: boss.name || "World Boss", monsters: [], pack: 0, packMin: 0, packMax: 0 },
+        hunt: worldArena || { name: boss.name || "World Boss", monsters: [], pack: 0, packMin: 0, packMax: 0 },
       })
     : newCombat(player, boss.hunt || "rats", "non-pvp");
   const base = (GAMEDATA.monsters && GAMEDATA.monsters[boss.baseMonster || boss.sprite || "cave-rat"]) || {};

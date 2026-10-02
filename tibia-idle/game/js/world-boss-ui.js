@@ -849,8 +849,11 @@ function wbOnSync(detail) {
   if (detail.action === "success") { wbExitCombat("success"); wbRefresh(); return; }
   if (detail.action === "fail" || detail.action === "cancelled") { wbExitCombat("fail"); wbRefresh(); return; }
   if (detail.action === "account-failed") { wbExitCombat("account-failed"); wbRefresh(); return; }
-  if (detail.action === "reward" && typeof toast === "function") {
-    toast(wbT("wb.rewardToast", "World Boss: tokens no Reward Chest"), "ok");
+  if (detail.action === "reward") {
+    if (typeof rewardChestApplyServer === "function" && G && G.p &&
+        String(detail.charId) === String(G.p.id)) rewardChestApplyServer(G.p, detail);
+    if (typeof toast === "function")
+      toast(wbT("wb.rewardToast", "World Boss: recompensa adicionada ao Reward Chest"), "ok");
   }
   wbRefresh();
 }

@@ -293,7 +293,8 @@
         <div class="panel-title">
           <span data-i18n="panel.pouch">Loot Pouch</span>
           <span style="flex:1"></span>
-          <button class="sm primary" id="btn-pouch-sell-all" data-i18n="btn.sellAll">Sell all</button>
+          <button class="sm primary" id="btn-pouch-sell-all" data-i18n="btn.sellAll"
+            title="Sem limite de slots. Ao somar 80 itens, vende apenas itens liberados (a cada 5 min; VIP 2 min); classificações 3 e 4 ficam protegidas.">Sell all</button>
           <button class="sm" id="btn-lootpouch-config" data-i18n="btn.lootConfig">Config</button>
         </div>
         <div class="panel-body">
@@ -312,6 +313,7 @@
         <div id="mission-box" class="mission-box" style="display:none"></div>
         <div id="training-box" class="mission-box training-box" style="display:none"></div>
         <div id="world-boss-box" class="world-boss-box" style="display:none"></div>
+        <div id="quest-lobby-box" class="quest-lobby-box" style="display:none"></div>
         <div id="scarlett-qte" class="scarlett-qte" style="display:none" aria-live="assertive"></div>
         <div id="spite-qte" class="spite-qte" style="display:none" aria-live="assertive"></div>
         <div id="malice-qte" class="malice-qte" style="display:none" aria-live="assertive"></div>
@@ -444,6 +446,9 @@
         </button>
         <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
           <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
+        </button>
+        <button class="sm catalog-tab-btn" id="btn-quests" title="Abrir catálogo de Quests">
+          <img src="assets/item/small-treasure-chest.png" width="18" height="18" alt="" class="quests-btn-icon"><span>QUESTS</span>
         </button>
         <button class="sm catalog-tab-btn" id="btn-ranking" title="Abrir ranking de personagens" data-i18n-title="title.ranking">
           <span class="ranking-btn-icon" aria-hidden="true"></span><span data-i18n="btn.ranking">RANKING</span>
@@ -706,6 +711,8 @@
 <script src="js/megalomania-lobby.js?v=world-boss-char-select-v1"></script>
 <script src="js/pale-worm-lobby.js?v=world-boss-raids-v1"></script>
 <script src="js/world-bosses-modal.js?v=wb-no-central-lobby-v1"></script>
+<script src="js/questdata.js?v=quest-system-v1"></script>
+<script src="js/quest-ui.js?v=quest-system-v1"></script>
 <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
 <script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
 <script src="js/wheel-modal.js?v=wheel-modal-active-v1"></script>

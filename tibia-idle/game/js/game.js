@@ -93,8 +93,9 @@ function persistActiveInstance() {
   }
   const descriptor={
     v:1,savedAt,startedAt:c.instanceStartedAt||(c.instanceStartedAt=savedAt),
-    kind:c.boss?"boss":"hunt",huntId:c.huntId||null,
-    bossId:c.boss&&c.boss.id?c.boss.id:null,
+    kind:c.questId?"quest":(c.boss?"boss":"hunt"),huntId:c.huntId||null,
+    bossId:c.boss&&c.boss.id?c.boss.id:(c.questId&&typeof QUEST_DEFS!=="undefined"&&QUEST_DEFS[c.questId]?QUEST_DEFS[c.questId].boss:null),
+    questId:c.questId||null,
     instanceMode:c.instanceMode||(G.p&&G.p.instanceMode)||"non-pvp",
     activeCharacterId:G.p&&G.p.id?String(G.p.id):null,
     members:participants.map((ent)=>({
@@ -230,12 +231,28 @@ function resumeIdleInstance(session){
     const member=(session.members||[]).find((m)=>String(m.id)===activeId)||(session.members||[])[0];
     if(member&&member.p){G.p=normalizePlayer(member.p);G.p.id=member.id||G.p.id;}
     const boss=session.kind==="boss"&&typeof BOSS_DEFS!=="undefined"?BOSS_DEFS[session.bossId]:null;
-    const hunt=boss?bossArenaDefinition(boss):GAMEDATA.hunts[session.huntId];
-    if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)){
+    let hunt=boss?bossArenaDefinition(boss):GAMEDATA.hunts[session.huntId];
+    // Quest: criar um hunt definition virtual a partir do QUEST_DEFS
+    let questDef=null;
+    if(session.kind==="quest"&&typeof QUEST_DEFS!=="undefined"){
+      questDef=QUEST_DEFS[session.questId]||Object.values(QUEST_DEFS).find(q=>q.boss===session.bossId);
+      if(questDef){
+        hunt={
+          id:"quest-"+questDef.id,name:questDef.name,
+          otbm:questDef.otbm,otbmFloor:questDef.otbmFloor,
+          otbmFovBounds:questDef.otbmFovBounds,
+          otbmFovWidth:questDef.otbmFovWidth,otbmFovHeight:questDef.otbmFovHeight,
+          otbmRuntimeWidth:questDef.otbmRuntimeWidth,otbmRuntimeHeight:questDef.otbmRuntimeHeight,
+          otbmSpawn:questDef.otbmSpawn,
+          monsters:questDef.waveMonsters||[],level:questDef.level||1,
+        };
+      }
+    }
+    if((session.kind==="boss"&&!boss)||(session.kind==="hunt"&&!hunt)||(session.kind==="quest"&&!hunt)){
       clearInstanceSession();resolve({resumed:false,ended:true});return;
     }
     G.p.hunt=session.kind==="hunt"?session.huntId:null;
-    G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
+    G.p.instanceMode=session.kind==="quest"?"quest":(session.kind==="boss"?"boss":session.instanceMode);
     G.inCity=false;
     G.huntMapReady=false;
     if(typeof beginMapLoading==="function")beginMapLoading(`Retomando ${boss?boss.name:hunt.name}...`);
@@ -243,16 +260,18 @@ function resumeIdleInstance(session){
     const build=()=>{
       if(done)return;done=true;if(watchdog)clearTimeout(watchdog);
       try{
-        const fresh=boss?newBossCombat(G.p,boss):newCombat(G.p,session.huntId,session.instanceMode);
+        const fresh=boss?newBossCombat(G.p,boss):newCombat(G.p,session.huntId,session.instanceMode,
+          questDef?{hunt:hunt}:undefined);
         if(typeof markHuntMapReady==="function")markHuntMapReady();
         else G.huntMapReady=true;
-        if(!boss&&!session.state){
+        if(!boss&&!session.state&&!questDef){
           spawnWave(fresh,G.p);
           for(const pending of fresh.pendingSpawns||[])pending.startedAt=session.savedAt;
         }
         G.combat=restoreCombatSessionState(fresh,session);
+        if(questDef)G.combat.questId=questDef.id;
         G.p.hunt=session.kind==="hunt"?session.huntId:null;
-        G.p.instanceMode=session.kind==="boss"?"boss":session.instanceMode;
+        G.p.instanceMode=session.kind==="quest"?"quest":(session.kind==="boss"?"boss":session.instanceMode);
         // O worker já reivindicou intervalos completos sem lease. Soma o
         // pequeno residual após o último checkpoint e aplica cada período uma
         // única vez no mesmo motor de combate usado pela aba ativa.
@@ -1402,6 +1421,36 @@ const BOSS_COOLDOWNS_ENABLED = false;
 // TEMP TEST: remove before release — libera taints/requisitos do Megalomania.
 const MEGA_TEST_BYPASS = true;
 const BOSS_COOLDOWN = 0;
+GAMEDATA.hunts["deathstrike-room"] = {
+  name: "The Deathstrike Room", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["deathstrike"], color: "#574d3d", scene: "cave",
+  otbm: "deathstrikeroom", otbmFloor: 8,
+  otbmBounds: { x: 1011, y: 1029, w: 34, h: 33, z: 8 },
+  otbmSpawn: { x: 1027, y: 1061, z: 8 },
+  otbmMobBounds: { x: 1029, y: 1044, w: 1, h: 1, z: 8 },
+  otbmFovWidth: 25, otbmFovHeight: 17,
+  otbmRuntimeWidth: 34, otbmRuntimeHeight: 33,
+};
+GAMEDATA.hunts["gnomevil-room"] = {
+  name: "Gnomevil Room", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["gnomevil"], color: "#4d5540", scene: "cave",
+  otbm: "gnomevilroom", otbmFloor: 8,
+  otbmBounds: { x: 1016, y: 1029, w: 21, h: 23, z: 8 },
+  otbmSpawn: { x: 1024, y: 1031, z: 8 },
+  otbmMobBounds: { x: 1026, y: 1040, w: 1, h: 1, z: 8 },
+  otbmFovWidth: 21, otbmFovHeight: 17,
+  otbmRuntimeWidth: 21, otbmRuntimeHeight: 23,
+};
+GAMEDATA.hunts["abyssador-room"] = {
+  name: "The Abyssador Room", level: 100, minLevel: 100, cat: "boss",
+  pack: 1, monsters: ["abyssador"], color: "#3f4c58", scene: "cave",
+  otbm: "abyssadorroom", otbmFloor: 8,
+  otbmBounds: { x: 1016, y: 1026, w: 26, h: 26, z: 8 },
+  otbmSpawn: { x: 1029, y: 1029, z: 8 },
+  otbmMobBounds: { x: 1029, y: 1040, w: 1, h: 1, z: 8 },
+  otbmFovWidth: 23, otbmFovHeight: 17,
+  otbmRuntimeWidth: 26, otbmRuntimeHeight: 26,
+};
 const BOSS_DEFS = {
   "the-monster": {
     id: "the-monster",
@@ -1554,23 +1603,24 @@ const BOSS_DEFS = {
   },
   "world-boss-wz1": {
     id: "world-boss-wz1", name: "The Deathstrike", title: "World Boss — Warzone 1",
-    hunt: null, worldBoss: true, baseMonster: "deathstrike", sprite: "deathstrike",
-    hp: 2500000, exp: 0, damage: 312, armor: 80, defense: 80, cooldown: 0, loot: [],
+    hunt: "deathstrike-room", worldBoss: true, baseMonster: "deathstrike", sprite: "deathstrike",
+    hp: 2500, exp: 0, damage: 312, armor: 80, defense: 80, cooldown: 0, loot: [],
     requirement: { text: "Entra pelo lobby da Warzone" },
   },
   "world-boss-wz2": {
     id: "world-boss-wz2", name: "Gnomevil", title: "World Boss — Warzone 2",
-    hunt: null, worldBoss: true, baseMonster: "gnomevil", sprite: "gnomevil",
-    hp: 4000000, exp: 0, damage: 500, armor: 80, defense: 80, cooldown: 0, loot: [],
+    hunt: "gnomevil-room", worldBoss: true, baseMonster: "gnomevil", sprite: "gnomevil",
+    hp: 2500, exp: 0, damage: 500, armor: 80, defense: 80, cooldown: 0, loot: [],
     requirement: { text: "Entra pelo lobby da Warzone" },
   },
   "world-boss-wz3": {
     id: "world-boss-wz3", name: "The Abyssador", title: "World Boss — Warzone 3",
-    hunt: null, worldBoss: true, baseMonster: "abyssador", sprite: "abyssador",
-    hp: 6000000, exp: 0, damage: 750, armor: 80, defense: 80, cooldown: 0, loot: [],
+    hunt: "abyssador-room", worldBoss: true, baseMonster: "abyssador", sprite: "abyssador",
+    hp: 2500, exp: 0, damage: 750, armor: 80, defense: 80, cooldown: 0, loot: [],
     requirement: { text: "Entra pelo lobby da Warzone" },
   },
 };
+window.BOSS_DEFS = BOSS_DEFS;
 
 /* Boss rooms Soul War são rotas imutáveis. Não reutilize `p.hunt`, mapa da
  * missão anterior ou aliases de cache: cada boss sempre resolve seu próprio
@@ -2401,6 +2451,8 @@ function stopHunt(skipMapLoading, opts) {
   if (typeof crueltyBossCleanup === "function" && G.combat) crueltyBossCleanup(G.combat);
   if (typeof megaBossCleanup === "function" && G.combat) megaBossCleanup(G.combat);
   G.combat = null;
+  // Limpa cap compartilhada da party ao voltar para a cidade.
+  if (G.p && G.p._sharedCap) { try { delete G.p._sharedCap; } catch(e) { G.p._sharedCap = undefined; } }
   ONLINE_AUTH_APPLIED_VERSION=0;ONLINE_AUTH_APPLIED_INSTANCE="";
   if(typeof clearInstanceSession==="function")clearInstanceSession("returned-city");
   if (typeof save === "function") save();

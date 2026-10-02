@@ -12,49 +12,74 @@
 
 const { rewardChestAdd } = require("./authoritative_engine");
 
+const WORLD_BOSS_TEST_HP = 2500;
+
 /* Sprites: bosses clássicos das Warzones (assets/mob/*.png). */
 const WARZONES = [
   {
-    id: "wz1", name: "Warzone 1", bossName: "The Deathstrike", bossHp: 2500000,
+    id: "wz1", name: "Warzone 1", bossName: "The Deathstrike", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "deathstrike", baseMonster: "deathstrike",
+    gridW: 34, gridH: 33, playerSpawn: { x: 16, y: 32 }, bossSpawn: { x: 18, y: 15 },
   },
   {
-    id: "wz2", name: "Warzone 2", bossName: "Gnomevil", bossHp: 4000000,
+    id: "wz2", name: "Warzone 2", bossName: "Gnomevil", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "gnomevil", baseMonster: "gnomevil",
+    gridW: 21, gridH: 23, playerSpawn: { x: 8, y: 2 }, bossSpawn: { x: 10, y: 11 },
   },
   {
-    id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: 6000000,
+    id: "wz3", name: "Warzone 3", bossName: "The Abyssador", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "abyssador", baseMonster: "abyssador",
+    gridW: 26, gridH: 26, playerSpawn: { x: 13, y: 3 }, bossSpawn: { x: 13, y: 14 },
   },
   {
-    id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: 8000000,
+    id: "wz4", name: "Warzone 4", bossName: "The Baron from Below", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "the-baron-from-below", baseMonster: "the-baron-from-below",
   },
   {
-    id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: 10000000,
+    id: "wz5", name: "Warzone 5", bossName: "The Count of the Core", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "the-count-of-the-core", baseMonster: "the-count-of-the-core",
   },
   {
-    id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: 12000000,
+    id: "wz6", name: "Warzone 6", bossName: "The Duke of the Depths", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "the-duke-of-the-depths", baseMonster: "the-duke-of-the-depths",
   },
   {
-    id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: 25000,
+    id: "devourer", name: "Heart of Destruction", bossName: "The World Devourer", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "world-devourer", baseMonster: "world-devourer", maxChars: 5,
   },
   {
-    id: "pale-worm", name: "Feast of Souls", bossName: "The Pale Worm", bossHp: 420000,
+    id: "pale-worm", name: "Feast of Souls", bossName: "The Pale Worm", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "the-pale-worm", baseMonster: "the-pale-worm", maxChars: 5,
   },
   {
-    id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: 620000,
+    id: "megalomania", name: "Soul War", bossName: "Goshnar's Megalomania", bossHp: WORLD_BOSS_TEST_HP,
     bossSprite: "goshnar-s-megalomania-purple", baseMonster: "goshnar-s-megalomania-green", maxChars: 5,
   },
 ];
 
 const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
-const MAJOR_CRYSTAL_TOKEN = "major-crystal-token";
+const MAJOR_CRYSTAL_TOKEN = "major-crystalline-token";
 const MAJOR_CRYSTAL_PER_ACCOUNT = 3;
+const FIXED_WORLD_BOSS_LOOT = {
+  wz1: [
+    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+    { item: "gill-necklace", count: 1 },
+    { item: "crystal-coin", count: 3 },
+    { item: "green-crystal-shard", count: 7 },
+  ],
+  wz2: [
+    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+    { item: "prismatic-necklace", count: 1 },
+    { item: "crystal-coin", count: 4 },
+    { item: "blue-crystal-shard", count: 10 },
+  ],
+  wz3: [
+    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+    { item: "prismatic-ring", count: 1 },
+    { item: "crystal-coin", count: 5 },
+    { item: "violet-crystal-shard", count: 12 },
+  ],
+};
 const MAX_CHARS_PER_ACCOUNT = 1;
 const WORLD_BOSS_MAX_MEMBERS = 20;
 
@@ -93,7 +118,7 @@ function createWorldBossController(opts) {
     // Rotação sempre 3h por padrão (mesmo com TEST_SERVER=1). Override: WB_ROTATION_MS.
     rotationMs: envMs("WB_ROTATION_MS", 3 * 3600 * 1000),
     lobbyMs: envMs("WB_LOBBY_MS", testServer ? 75000 : 10 * 60 * 1000),
-    countdownMs: envMs("WB_COUNTDOWN_MS", testServer ? 15000 : 60 * 1000),
+    countdownMs: envMs("WB_COUNTDOWN_MS", 10 * 1000),
     spawnDelayMs: envMs("WB_SPAWN_DELAY_MS", testServer ? 5000 : 10 * 1000),
     bossTimeoutMs: envMs("WB_BOSS_TIMEOUT_MS", testServer ? 10 * 60 * 1000 : 60 * 60 * 1000),
     leaveCooldownMs: envMs("WB_LEAVE_COOLDOWN_MS", 30 * 1000),
@@ -104,7 +129,7 @@ function createWorldBossController(opts) {
   const maxChars = envInt("WB_MAX_CHARS", 20);
 
   let event = null;
-  let nextRotationAt = Date.now() + timers.rotationMs;
+  let nextRotationAt = Infinity; // desabilitado: world bosses só via lobby manual
   let tickHandle = null;
   const leaveCooldownUntil = new Map(); // accountId -> ts
   const charCooldownUntil = new Map(); // "characterId:warzoneId" -> ts
@@ -321,7 +346,8 @@ function createWorldBossController(opts) {
     };
     if (event.lobbyType !== "open" && event.lobbyType !== "closed") event.lobbyType = "open";
     if (event.hostAccountId) event.invited.add(event.hostAccountId);
-    nextRotationAt = now() + 24 * 3600 * 1000;
+    // Rotação automática desabilitada; o evento só acontece via lobby manual
+    nextRotationAt = Infinity;
     console.log("[world-boss] lobby open", wz.id, event.id, "reason=" + event.reason, "type=" + event.lobbyType, "owner=" + event.hostAccountId);
     broadcast();
     return { ok: true, state: publicState(null) };
@@ -335,7 +361,8 @@ function createWorldBossController(opts) {
     }
     const finished = event;
     event = null;
-    nextRotationAt = now() + timers.rotationMs;
+    // Rotas automáticas desabilitadas: world bosses só via lobby manual
+    nextRotationAt = Infinity;
     broadcast();
     return finished;
   }
@@ -435,11 +462,12 @@ function createWorldBossController(opts) {
     notifyTeleport();
   }
 
-  async function grantSuccessRewards(db) {
-    if (!event || !db) return;
-    const wz = warzoneById(event.warzoneId);
-    const bundleId = "world-boss-" + event.id;
-    for (const [accountId, join] of event.joins) {
+  async function grantSuccessRewards(db, rewardEvent) {
+    const current = rewardEvent || event;
+    if (!current || !db) return;
+    const wz = warzoneById(current.warzoneId);
+    const bundleId = "world-boss-" + current.id;
+    for (const [accountId, join] of current.joins) {
       if (join.failed) continue;
       const alive = (join.chars || []).some((c) => !c.dead);
       if (!alive) continue;
@@ -454,11 +482,14 @@ function createWorldBossController(opts) {
           try { p = JSON.parse(p); } catch (e) { p = {}; }
         }
         p = p && typeof p === "object" ? p : {};
-        rewardChestAdd(p, MAJOR_CRYSTAL_TOKEN, MAJOR_CRYSTAL_PER_ACCOUNT, {
+        const fixedLoot = FIXED_WORLD_BOSS_LOOT[current.warzoneId] || [
+          { item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT },
+        ];
+        for (const reward of fixedLoot) rewardChestAdd(p, reward.item, reward.count, {
           bundleId,
-          bossId: event.warzoneId,
+          bossId: current.warzoneId,
           name: wz.bossName + " — World Boss",
-          sprite: event.warzoneId,
+          sprite: wz.bossSprite,
         });
         const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
         const voc = String(p.voc || character.voc || "none");
@@ -467,7 +498,10 @@ function createWorldBossController(opts) {
           action: "reward",
           tokens: MAJOR_CRYSTAL_PER_ACCOUNT,
           item: MAJOR_CRYSTAL_TOKEN,
+          items: fixedLoot,
           charId: character.id,
+          rewardChest: p.rewardChest,
+          rewardChestBundles: p.rewardChestBundles,
         });
         publishAccount(accountId, "character", { action: "world-boss-reward", charId: character.id });
       } catch (e) {
@@ -489,17 +523,18 @@ function createWorldBossController(opts) {
 
   async function finishSuccess(db) {
     if (!event || event.phase !== "combat") return;
-    console.log("[world-boss] success", event.id);
-    const host = event.hostAccountId, instanceId = event.instanceId;
+    const finished = event;
+    console.log("[world-boss] success", finished.id);
+    const host = finished.hostAccountId, instanceId = finished.instanceId;
     applyCharCooldown();
-    await grantSuccessRewards(db);
-    for (const [accountId] of event.joins) {
-      publishAccount(accountId, "world-boss", { action: "success", warzoneId: event.warzoneId });
-    }
-    clearEvent({ status: "success", warzoneId: event && event.warzoneId });
+    clearEvent({ status: "success", warzoneId: finished.warzoneId });
     if (typeof opts.endSharedInstance === "function" && host) {
       try { await opts.endSharedInstance(host, instanceId, "world-boss-success"); }
       catch (e) { console.error("[world-boss] end instance", e && e.message); }
+    }
+    await grantSuccessRewards(db, finished);
+    for (const [accountId] of finished.joins) {
+      publishAccount(accountId, "world-boss", { action: "success", warzoneId: finished.warzoneId });
     }
   }
 

@@ -149,6 +149,14 @@ function accessoryBreak(p, slot) {
   const nome = it && it.n ? it.n : e.item;
   const pretty = nome[0].toUpperCase() + nome.slice(1);
   const slug = e.item;
+  // Supply Analyser: contabiliza ring/amulet consumido e seu custo.
+  const c = (typeof G !== "undefined" && G) ? G.combat : null;
+  if (c && c.stats && it) {
+    c.stats.supplyUsed = c.stats.supplyUsed || {};
+    c.stats.supplyUsed[slug] = (c.stats.supplyUsed[slug] || 0) + 1;
+    const cost = Number(it.sell) || Number(it.npcSell) || 0;
+    if (cost > 0) c.stats.supplyCost = (c.stats.supplyCost || 0) + cost;
+  }
   const instId = e.instId || null;
   const decay = it && (it.decayToSlug || (typeof it.decayTo === "string" ? it.decayTo : ""));
   if (decay && typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[decay]) {
@@ -1210,7 +1218,11 @@ function tryMagicShieldPotion(c, p, now, force) {
   }
   p.magicShieldPotionUntil = now + MAGIC_SHIELD_POTION_CD_MS;
   applyMagicShieldPool(p, now, "potion");
-  if (c && c.stats) c.stats.supplyCost = (c.stats.supplyCost || 0) + MAGIC_SHIELD_POTION_COST;
+  if (c && c.stats) {
+    c.stats.supplyCost = (c.stats.supplyCost || 0) + MAGIC_SHIELD_POTION_COST;
+    c.stats.supplyUsed = c.stats.supplyUsed || {};
+    c.stats.supplyUsed["magic-shield-potion"] = (c.stats.supplyUsed["magic-shield-potion"] || 0) + 1;
+  }
   if (c && c.events) {
     c.events.push({ t: "say", text: "Aaaah..." });
     emitMagicShieldOn(c, p, "Magic Shield Potion");

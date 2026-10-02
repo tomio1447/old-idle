@@ -23,15 +23,30 @@ const EXERCISE_WEAPONS = {
 };
 
 function trainingWeaponForSkill(skill, p) {
-  if (skill === "magic") return p && p.voc === "druid" ? "exercise-rod" : "exercise-wand";
+  if (skill === "magic") return p && /druid/i.test(String(p.voc || "")) ? "exercise-rod" : "exercise-wand";
   return { sword:"exercise-sword", axe:"exercise-axe", club:"exercise-club", dist:"exercise-bow",
     shield:"exercise-shield", fist:"exercise-wraps" }[skill] || "exercise-sword";
+}
+
+function initialTrainingSkill(p) {
+  const voc = String(p && p.voc || "").toLowerCase();
+  if (voc.includes("sorcerer") || voc.includes("druid")) return "magic";
+  if (voc.includes("paladin")) return "dist";
+  if (voc.includes("monk")) return "fist";
+  if (voc.includes("knight")) {
+    const equipped = p && p.equip && p.equip.weapon;
+    const item = equipped && typeof GAMEDATA !== "undefined" && GAMEDATA.items
+      ? GAMEDATA.items[equipped.item] : null;
+    const type = String(item && (item.t || item.type) || "").toLowerCase();
+    if (["sword", "club", "axe"].includes(type)) return type;
+  }
+  return "sword";
 }
 
 function ensureTraining(p) {
   if (!p.trainingExercise || typeof p.trainingExercise !== "object") p.trainingExercise = {};
   const s = p.trainingExercise;
-  if (TRAINING_SKILLS.indexOf(s.skill) < 0) s.skill = "sword";
+  if (TRAINING_SKILLS.indexOf(s.skill) < 0) s.skill = initialTrainingSkill(p);
   if (!TRAINING_PLANS[s.activePlan]) s.activePlan = TRAINING_PLANS[s.plan] ? s.plan : "free";
   if (!s.balances || typeof s.balances !== "object") s.balances = {};
   if (s.plan && s.plan !== "free" && s.charges != null && s.balances[s.plan] == null)
@@ -150,4 +165,34 @@ function startTrainingArea() {
   else enter(null);
   return {ok:true,msg:""};
 }
+function trainingSwitchTo(id) {
+  if (!G.training || !Array.isArray(G.training.members)) return false;
+  const member = G.training.members.find((entry) => String(entry.id) === String(id));
+  if (!member || !member.p || member.p.remoteTraining) return false;
+  const previous = G.p;
+  if (previous && String(previous.id) === String(member.id)) return true;
+  if (typeof saveCharacterToRoster === "function" && previous) saveCharacterToRoster(previous);
+  const shared = previous ? {
+    bag: previous.bag, lootPouch: previous.lootPouch, depot: previous.depot,
+    rewardChest: previous.rewardChest, rewardChestBundles: previous.rewardChestBundles,
+    itemInstances: (previous.itemInstances || []).filter((inst) => inst && !String(inst.loc || "").startsWith("equip:")),
+    seq: previous._itemInstSeq, dust: previous.dust, dustLimit: previous.dustLimit,
+    slivers: previous.slivers, exaltedCores: previous.exaltedCores,
+  } : null;
+  for (const entry of G.training.members) entry.isLocal = entry === member;
+  if (previous && previous._partyOnline && !member.p._partyOnline) member.p._partyOnline = previous._partyOnline;
+  G.p = member.p;
+  if (shared && typeof accountApplySharedInventory === "function") accountApplySharedInventory(shared);
+  try {
+    localStorage.setItem(ACTIVE_CHARACTER_KEY, String(member.id));
+    sessionStorage.setItem(AUTOLOGIN_KEY, String(member.id));
+    sessionStorage.setItem("tibia-idle-char", String(member.id));
+    sessionStorage.removeItem("tibia-idle-online-autoload");
+  } catch (e) {}
+  if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(G.p);
+  if (typeof renderAll === "function") renderAll();
+  if (typeof toast === "function") toast("Controlando: " + (G.p.name || member.id));
+  return true;
+}
+
 function startDummyTraining(){return startTrainingArea();}

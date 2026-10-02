@@ -61,12 +61,14 @@
     "crawlers-essence": { n: "crawler's essence", cid: 33982, w: 0.45, sell: 3700 },
     "roots": { n: "roots", cid: 33938, w: 0.9, sell: 1200 },
     "mould-heart": { n: "mould heart", cid: 34141, w: 0.75, sell: 2100 },
+    "distorted-heart": { n: "distorted heart", cid: 34142, w: 0.75, sell: 2100 },
     // Claustrophobic Inferno (brachiodemon / infernal phantom).
     "hand": { n: "hand", cid: 33936, w: 1.2, sell: 1450 },
     "head": { n: "head", cid: 33937, w: 1.5, sell: 3500 },
     "infernal-heart": { n: "infernal heart", cid: 34139, w: 0.75, sell: 2100 },
     "diabolic-skull": { n: "diabolic skull", cid: 34025, w: 2.1, sell: 19000 },
     "infernal-robe": { n: "infernal robe", cid: 34146, w: 1.8, sell: 1200 },
+    "distorted-robe": { n: "distorted robe", cid: 34149, w: 1.8, sell: 1200 },
   };
 
   const NPC_LOOT_PRICES = {

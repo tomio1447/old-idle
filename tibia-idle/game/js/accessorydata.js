@@ -38,7 +38,7 @@
     },
     "might-ring": {
       desc: "Anel do poder (proteção +20% em todos os elementos). 20 cargas POR GOLPE recebido.",
-      charges: 20, chargeMode: "hits",
+      charges: 20, chargeMode: "hits", sell: 25000,
       res: { physical: 20, fire: 20, earth: 20, energy: 20, ice: 20,
              holy: 20, death: 20 },
     },
@@ -110,19 +110,19 @@
     /* ------------------------------- anéis de plasma (nível 100) */
     "ring-of-blue-plasma": {
       desc: "Anel de plasma azul (distância +3, magic level +1).",
-      dist: 3, mag: 1, lvl: 100, vocs: ["paladin"],
+      dist: 3, mag: 1, sell: 6000, lvl: 100, vocs: ["paladin"],
     },
     "ring-of-green-plasma": {
       desc: "Anel de plasma verde (magic level +2, regeneração mais rápida).",
-      mag: 2, hpreg: 4, mpreg: 6, lvl: 100, vocs: ["sorcerer", "druid"],
+      mag: 2, hpreg: 4, mpreg: 6, sell: 6000, lvl: 100, vocs: ["sorcerer", "druid"],
     },
     "ring-of-orange-plasma": {
       desc: "Anel de plasma laranja (punho +3, magic level +1, proteção física +2%).",
-      fist: 3, mag: 1, res: { physical: 2 }, lvl: 100, vocs: ["monk"],
+      fist: 3, mag: 1, sell: 6000, res: { physical: 2 }, lvl: 100, vocs: ["monk"],
     },
     "ring-of-red-plasma": {
       desc: "Anel de plasma vermelho (espada +3, clava +3, machado +3, proteção física +3%).",
-      sword: 3, club: 3, axe: 3, res: { physical: 3 }, lvl: 100,
+      sword: 3, club: 3, axe: 3, sell: 6000, res: { physical: 3 }, lvl: 100,
       vocs: ["knight"],
     },
     "ring-of-souls": {
@@ -180,7 +180,7 @@
     /* ------------------------------- amuletos básicos (loja) */
     "stone-skin-amulet": {
       desc: "Amuleto de pele de pedra (proteção física +80%, morte +80%). 5 cargas.",
-      charges: 5, res: { physical: 80, death: 80 },
+      charges: 5, sell: 25000, res: { physical: 80, death: 80 },
     },
     "ancient-amulet": {
       desc: "Amuleto antigo (item decorativo — sem atributos, como no items.xml do Canary).",
@@ -354,16 +354,16 @@
   /* ----------------------- itens novos (sprite já em assets/item) */
   const NOVOS = {
     "ring-of-blue-plasma": { cat: "ring", id: 23529, n: "ring of blue plasma",
-      s: "ring", t: "accessory", sell: 8000, w: 0.9, lvl: 100, vocs: ["paladin"],
+      s: "ring", t: "accessory", sell: 6000, w: 0.9, lvl: 100, vocs: ["paladin"],
       dist: 3, mag: 1 },
     "ring-of-green-plasma": { cat: "ring", id: 23530, n: "ring of green plasma",
-      s: "ring", t: "accessory", sell: 8000, w: 0.9, lvl: 100,
+      s: "ring", t: "accessory", sell: 6000, w: 0.9, lvl: 100,
       vocs: ["sorcerer", "druid"], mag: 2, hpreg: 4, mpreg: 6 },
     "ring-of-orange-plasma": { cat: "ring", id: 23531, n: "ring of orange plasma",
-      s: "ring", t: "accessory", sell: 8000, w: 0.9, lvl: 100, vocs: ["monk"],
+      s: "ring", t: "accessory", sell: 6000, w: 0.9, lvl: 100, vocs: ["monk"],
       fist: 3, mag: 1, res: { physical: 2 } },
     "ring-of-red-plasma": { cat: "ring", id: 23532, n: "ring of red plasma",
-      s: "ring", t: "accessory", sell: 8000, w: 0.9, lvl: 100, vocs: ["knight"],
+      s: "ring", t: "accessory", sell: 6000, w: 0.9, lvl: 100, vocs: ["knight"],
       sword: 3, club: 3, axe: 3, res: { physical: 3 } },
     "ring-of-souls": { cat: "ring", id: 32636, n: "ring of souls",
       s: "ring", t: "accessory", sell: 8000, w: 0.8, lvl: 200,

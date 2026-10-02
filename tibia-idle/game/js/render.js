@@ -1160,8 +1160,8 @@ function drawTargetSquare(ctx, x, y, w, h) {
 }
 
 function drawBossBar(ctx, viewportW, combat, offsetX, offsetY, hudScale) {
-  if (!combat || !combat.boss || !combat.mobs.length) return;
-  const boss = combat.mobs.find((m) => m.boss) || combat.mobs[0];
+  if (!combat || !combat.mobs || !combat.mobs.length) return;
+  const boss = combat.mobs.find((m) => m.boss) || (combat.boss ? combat.mobs[0] : null);
   if (!boss || boss.hp <= 0) return;
   const s = Math.max(1, Number(hudScale) || 1);
   offsetX = Number(offsetX) || 0;

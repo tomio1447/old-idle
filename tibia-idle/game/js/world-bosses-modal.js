@@ -1,16 +1,28 @@
 "use strict";
 
+const WORLD_BOSS_TEST_HP = 2500;
+
 const WARZONES = [
-  { id: "wz1", name: "The Deathstrike", title: "Warzone 1", sprite: "deathstrike", hp: 2500000 },
-  { id: "wz2", name: "Gnomevil", title: "Warzone 2", sprite: "gnomevil", hp: 4000000 },
-  { id: "wz3", name: "The Abyssador", title: "Warzone 3", sprite: "abyssador", hp: 6000000 },
-  { id: "wz4", name: "The Baron from Below", title: "Warzone 4", sprite: "the-baron-from-below", hp: 8000000 },
-  { id: "wz5", name: "The Count of the Core", title: "Warzone 5", sprite: "the-count-of-the-core", hp: 10000000 },
-  { id: "wz6", name: "The Duke of the Depths", title: "Warzone 6", sprite: "the-duke-of-the-depths", hp: 12000000 },
-  { id: "devourer", name: "The World Devourer", title: "Heart of Destruction", sprite: "world-devourer", hp: 25000, maxChars: 5 },
-  { id: "pale-worm", name: "The Pale Worm", title: "Feast of Souls", sprite: "the-pale-worm", hp: 420000, maxChars: 5 },
-  { id: "megalomania", name: "Goshnar's Megalomania", title: "Soul War", sprite: "goshnar-s-megalomania-purple", dataMonster: "goshnar-s-megalomania-green", hp: 620000, maxChars: 5 },
+  { id: "wz1", name: "The Deathstrike", title: "Warzone 1", sprite: "deathstrike", hp: WORLD_BOSS_TEST_HP,
+    description: "A máquina de guerra gnome sofreu uma falha catastrófica. O Deathstrike agora esmaga tudo o que se move nas profundezas de Gnomebase Alpha." },
+  { id: "wz2", name: "Gnomevil", title: "Warzone 2", sprite: "gnomevil", hp: WORLD_BOSS_TEST_HP,
+    description: "Gnomevil, o demônio corrompido que assola a Warzone 2. Sua fúria é lendária e apenas guerreiros unidos conseguem contê-lo." },
+  { id: "wz3", name: "The Abyssador", title: "Warzone 3", sprite: "abyssador", hp: WORLD_BOSS_TEST_HP,
+    description: "Criatura abissal que habita as profundezas mais escuras. O Abyssador devora a luz e a esperança dos que ousam enfrentá-lo." },
+  { id: "wz4", name: "The Baron from Below", title: "Warzone 4", sprite: "the-baron-from-below", hp: WORLD_BOSS_TEST_HP,
+    description: "O Barão emergiu das profundezas para conquistar as minhas. Sua força bruta é comparada apenas à sua sede de destruição." },
+  { id: "wz5", name: "The Count of the Core", title: "Warzone 5", sprite: "the-count-of-the-core", hp: WORLD_BOSS_TEST_HP,
+    description: "Guardião do núcleo vulcânico, o Conde controla o fogo e a magma. Apenas equipes preparadas sobrevivem ao seu calor." },
+  { id: "wz6", name: "The Duke of the Depths", title: "Warzone 6", sprite: "the-duke-of-the-depths", hp: WORLD_BOSS_TEST_HP,
+    description: "O Duque das Profundezas é a ameaça final das Warzones. Sua derrota exige coordenação perfeita e coragem inabalável." },
+  { id: "devourer", name: "The World Devourer", title: "Heart of Destruction", sprite: "world-devourer", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+    description: "O Devorador de Mundos é a personificação da destruição. Esta raid de elite permite até 5 personagens e exige estratégia impecável." },
+  { id: "pale-worm", name: "The Pale Worm", title: "Feast of Souls", sprite: "the-pale-worm", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+    description: "A Verme Pálida se alimenta de almas perdidas no banquete dos mortos. Raid de 5 personagens para os mais corajosos." },
+  { id: "megalomania", name: "Goshnar's Megalomania", title: "Soul War", sprite: "goshnar-s-megalomania-purple", dataMonster: "goshnar-s-megalomania-green", hp: WORLD_BOSS_TEST_HP, maxChars: 5,
+    description: "A Megalomania de Goshnar é a culminância da Soul War. Cinco guerreiros devem enfrentar a encarnação do orgulho absoluto." },
 ];
+window.WORLD_BOSS_DEFS = WARZONES;
 
 let WORLD_BOSS_MODAL_BUSY = false;
 let WORLD_BOSS_LOBBY_POLL = null;
@@ -77,14 +89,14 @@ function worldBossResistsHtml(wz) {
 }
 
 function worldBossesCard(wz) {
-  return `<div class="hunt-card hunt-modal-card hunt-canary-card boss-modal-card" data-warzone="${wz.id}">
-    <button type="button" class="mobs wb-boss-open" data-warzone="${wz.id}" title="Ver ${wz.name}" aria-label="Ver ${wz.name}">
+  return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card boss-modal-card wb-boss-card" data-warzone="${wz.id}" title="Ver ${wz.name}" aria-label="Ver ${wz.name}">
+    <span class="mobs wb-boss-open">
       ${worldBossPortrait(wz.sprite, 48)}
-    </button>
+    </span>
     <span class="info"><span class="nm">${wz.name}</span><span class="meta">${wz.title}</span>
       <span class="tiny dim">HP ${wz.hp.toLocaleString("pt-BR")}</span></span>
     <span class="risk low">${wz.maxChars === 5 ? "Raid 5" : "Warzone"}</span>
-  </div>`;
+  </button>`;
 }
 
 function worldBossPrepareModal(shell) {
@@ -109,7 +121,7 @@ function openWorldBossesModal() {
     ui.modal.classList.remove("show");
     ui.body.classList.remove("bosses-modal-shell");
   };
-  $$("#world-bosses-modal-list .wb-boss-open").forEach((btn) => {
+  $$("#world-bosses-modal-list .wb-boss-card").forEach((btn) => {
     btn.onclick = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -130,6 +142,7 @@ function openWorldBossDetail(warzoneId) {
     <span style="flex:1"></span><button class="sm" id="wb-detail-close">✕</button></div>
     <div class="panel-body boss-detail-body wb-detail-body">
       <div class="boss-detail-summary"><span>Lobby: <b style="color:#9ce84a">1–${wz.maxChars || 20} personagens</b></span><span>Cooldown: <b>16 horas por personagem</b></span></div>
+      <div class="wb-detail-description">${wz.description || ""}</div>
       <div class="wb-detail-grid">
         <section class="wb-detail-identity">
           <div class="hunt-best-sprite boss-best-sprite">${worldBossPortrait(wz.sprite, 84)}</div>

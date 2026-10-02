@@ -167,6 +167,7 @@ const TileSprites = {
       // 1x1 ou item em muro (hangable): centralizado na celula
       dx = sx + (size - w) / 2; dy = sy + size - h;
     }
+    if (id === 8979 || id === 8982) dy -= size * .5;
     if (pattern) {
       ctx.drawImage(img, pattern.sx, 0, nW, nH, dx, dy, w, h);
     } else if (a) {
@@ -231,9 +232,10 @@ function drawBlockingTilesInterleaved(ctx, map, W, H, cols, rows, opts) {
       if (row && x < row.length) {
         const L = map.leg[row[x]];
         if (L && L.g) {
+          const cellBlocking = L.g.some(tileItemIsBlocking);
           const cw = tileLegendIsWall(L);
           for (const id of L.g) {
-            if (!tileItemIsBlocking(id)) continue;
+            if (!cellBlocking && !tileItemIsBlocking(id)) continue;
             TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw, x, y);
           }
         }
@@ -273,9 +275,11 @@ function drawTileCharMap(ctx, map, W, H, cols, rows, mode, opts) {
       for (let x = 0; x < cols && x < row.length; x++) {
         const L = map.leg[row[x]];
         if (!L || !L.g) continue;
+        const cellBlocking = L.g.some(tileItemIsBlocking);
         const cw = tileLegendIsWall(L);
         for (const id of L.g) {
-          if (tileItemIsBlocking(id) !== onlyBlocking) continue;
+          const blocking = tileItemIsBlocking(id);
+          if (onlyBlocking ? (!blocking && !cellBlocking) : (blocking || cellBlocking)) continue;
           TileSprites.drawDeco(ctx, id, x * tw, y * th, tw, cw, x, y);
         }
       }

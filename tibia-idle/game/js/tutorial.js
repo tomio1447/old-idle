@@ -314,14 +314,14 @@ function tutorialRenderHelperStep(state, pendingId, chars) {
     tutorialSaveState(state);
     return;
   }
-  const target = tutorialFirstVisible(['[data-collapse="helper"]', '[data-mobile-tab="helper"]']);
+  const target = tutorialFirstVisible(['.helper-heal-cats', '[data-collapse="helper"]', '[data-mobile-tab="helper"]']);
   const doneBtn = { label: "OK, entendi", primary: true, onClick: () => {
     state.helperDone[String(pendingId)] = true;
     tutorialSaveState(state);
   } };
   if (target) {
     tutorialRender(target.getBoundingClientRect(),
-      `Este é o <b>Helper</b> de <b>${G.p.name}</b>. Use OK para confirmar que viu. Depois ele joga sozinho.`,
+      `Esta é a cura do <b>Helper</b> de <b>${G.p.name}</b>. Use <b>Healing Spells</b>, <b>Health Potions</b> e <b>Mana Potions</b> para abrir cada categoria. Clique novamente no botão ativo para fechar. Depois use OK para continuar.`, 
       [doneBtn]);
   } else {
     tutorialRender(null,

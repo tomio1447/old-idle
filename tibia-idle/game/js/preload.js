@@ -42,12 +42,26 @@ function renderLoadingMonsterHint(force) {
   if (typeof GAMEDATA === "undefined" || !GAMEDATA.monsters || typeof MOBSHEETS === "undefined") return;
   const art = document.getElementById("gl-hint-art");
   if (!art) return;
-  const available = Object.keys(GAMEDATA.monsters).filter((slug) => {
+  const registered = new Set();
+  Object.values(GAMEDATA.hunts || {}).forEach((hunt) => {
+    (hunt && hunt.monsters || []).forEach((slug) => registered.add(String(slug)));
+    Object.keys(hunt && hunt.spawnWeights || {}).forEach((slug) => registered.add(String(slug)));
+    (hunt && hunt.bossMobs || []).forEach((slug) => registered.add(String(slug)));
+  });
+  Object.values(window.BOSS_DEFS || {}).forEach((boss) => {
+    if (boss && boss.baseMonster) registered.add(String(boss.baseMonster));
+    else if (boss && boss.sprite) registered.add(String(boss.sprite));
+  });
+  (window.WORLD_BOSS_DEFS || []).forEach((boss) => {
+    if (boss && boss.dataMonster) registered.add(String(boss.dataMonster));
+    else if (boss && boss.sprite) registered.add(String(boss.sprite));
+  });
+  const available = Array.from(registered).filter((slug) => {
     const m = GAMEDATA.monsters[slug];
     return m && MOBSHEETS[slug] && Number(m.hp) > 0 && Number(m.exp) >= 0;
   });
   if (!available.length) return;
-  if (force || !LOADING_HINT_SLUG || !GAMEDATA.monsters[LOADING_HINT_SLUG])
+  if (force || !LOADING_HINT_SLUG || !available.includes(LOADING_HINT_SLUG))
     LOADING_HINT_SLUG = available[Math.floor(Math.random() * available.length)];
   const monster = GAMEDATA.monsters[LOADING_HINT_SLUG];
   art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 72) : "";

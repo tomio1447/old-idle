@@ -93,7 +93,8 @@ function otcAnalyserMetric(label, value, detail, cls) {
 }
 
 function otcAnalyserItemName(id) {
-  const mapped = { dust: "Dust", sliver: "Sliver", slivers: "Slivers", "exalted-core": "Exalted Core" };
+  const mapped = { dust: "Dust", sliver: "Sliver", slivers: "Slivers", "exalted-core": "Exalted Core",
+    "magic-shield-potion": "Magic Shield Potion" };
   if (mapped[id]) return mapped[id];
   const name = typeof itemName === "function" ? itemName(id) : id;
   return otcAnalyserEscape(name || id);
@@ -105,6 +106,7 @@ function otcAnalyserItemIcon(id, amount) {
     sliver: "assets/item/sliver.gif",
     slivers: "assets/item/sliver.gif",
     "exalted-core": "assets/item/exalted-core.gif",
+    "magic-shield-potion": "assets/item/magic-shield-potion.webp",
   };
   const src = OTC_ANALYSER_ITEM_SPRITES[id];
   if (src) {
@@ -675,6 +677,8 @@ function otcAnalyserBody(kind, c) {
 
   if (kind === "hunting") {
     const efficiency = rawHp > 0 ? (rawExp / rawHp).toFixed(3) : "0.000";
+    const questWave = c.questId && c.questWaves
+      ? otcAnalyserMetric("Wave", otcAnalyserNumber(Math.min(c.questWaves.current || 0, c.questWaves.total || 0)) + "/" + otcAnalyserNumber(c.questWaves.total || 0), c.questWaves.bossSpawned ? "Boss" : "Quest") : "";
     return `<div class="otc-session-head">
         <span><b>${otcAnalyserEscape(huntName)}</b><small>${otcAnalyserEscape(mode)}</small></span>
         <em><i></i> AO VIVO</em>
@@ -682,6 +686,7 @@ function otcAnalyserBody(kind, c) {
       <div class="otc-analyser-grid">
         ${otcAnalyserMetric("Sessão", otcAnalyserClock(duration), "tempo de combate")}
         ${otcAnalyserMetric("Kills", otcAnalyserNumber(kills), `${rate(kills)}/h`)}
+        ${questWave}
         ${otcAnalyserMetric("XP obtida", otcAnalyserNumber(exp), "na sessão", "xp-gained")}
         ${otcAnalyserMetric("XP/h", rate(exp), "com bônus", "xp-gained")}
         ${otcAnalyserMetric("Raw XP", otcAnalyserNumber(rawExp), "na sessão", "raw-xp")}
