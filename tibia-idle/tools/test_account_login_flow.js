@@ -22,6 +22,11 @@ must(loginButton&&registerButton&&!/\sdata-i18n=/.test(loginButton[0].split(">")
   fs.existsSync(path.join(game,"assets","login-btn.png"))&&
   fs.existsSync(path.join(game,"assets","create-account-btn.png")),
   "arte dos botões deve permanecer no HTML e não ser substituída pelo applyI18n");
+must(css.includes('max-width: 270px')&&
+  css.includes('../assets/loginbackground.png?v=login-background-fix-v2')&&
+  fs.existsSync(path.join(game,"assets","loginbackground.png"))&&
+  html.includes('css/layout.css?v=login-background-fix-v2'),
+  "fundo do login e tamanho compacto das imagens dos botões devem carregar do caminho servido");
 must(html.includes('id="account-login-form"')&&html.includes('onsubmit="return false;"')&&
   html.includes('action="#"'),
   "form de login deve bloquear navegação nativa (POST / → JSON)");
