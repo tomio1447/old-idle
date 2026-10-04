@@ -1104,7 +1104,16 @@ function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
 }
 
 function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
-  const max = maxStats(player);
+  if (!player) return;
+  if (typeof ensurePlayerEquip === "function") ensurePlayerEquip(player);
+  else if (!player.equip || typeof player.equip !== "object") player.equip = {};
+  let max = { hp: Math.max(1, Number(player.maxHp) || Number(player.hp) || 1), mp: Math.max(0, Number(player.maxMp) || 0) };
+  try { max = maxStats(player) || max; } catch (e) { /* snapshot sem gear */ }
+  // Membro remoto da party não tem o equipamento local: a barra usa o teto
+  // que o servidor já publicou, senão o HP atual estoura a fórmula sem gear.
+  if (player.remoteTraining && Number(player.maxHp) > 0) {
+    max = { hp: Number(player.maxHp), mp: Math.max(0, Number(player.maxMp) || 0) };
+  }
   const hpPct = max.hp ? player.hp / max.hp : 0;
   const mpPct = max.mp ? player.mp / max.mp : 0;
   const shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(player, Date.now()))
@@ -2000,10 +2009,20 @@ Renderer.prototype.drawAcademy = function(training, player, dt) {
   const dummyPos = training.dummyPos || { x: 0.5625, y: 0.472222 };
   drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos);
 
-  const entities = (training.members || []).slice().sort((a, b) => a.playerPos.y - b.playerPos.y);
-  for (const m of entities) drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt);
+  const entities = (training.members || []).slice().sort((a, b) => (a.playerPos && a.playerPos.y || 0) - (b.playerPos && b.playerPos.y || 0));
   for (const m of entities) {
-    if (m.proj) drawAcademyProj(this, ctx, W, H, tile, m, dt);
+    try { drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt); }
+    catch (err) {
+      if (!drawAcademyMember._warned) {
+        drawAcademyMember._warned = true;
+        console.warn("[treino] membro ignorado no desenho", err);
+      }
+    }
+  }
+  for (const m of entities) {
+    if (!m.proj) continue;
+    try { drawAcademyProj(this, ctx, W, H, tile, m, dt); }
+    catch (err) { m.proj = null; }
   }
 
   const fxNow = Date.now();

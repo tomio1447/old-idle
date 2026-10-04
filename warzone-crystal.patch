@@ -1,0 +1,659 @@
+diff --git a/tibia-idle/game/index.html b/tibia-idle/game/index.html
+index 3626192..0a27261 100644
+--- a/tibia-idle/game/index.html
++++ b/tibia-idle/game/index.html
+@@ -598,7 +598,7 @@
+ <script src="js/imbuement.js?v=imbue-slots-v1"></script>
+ <script src="js/player.js?v=equip-online-v1"></script>
+ <script src="js/accessories.js?v=depot-drag-v1"></script>
+-  <script src="js/combat.js?v=stamina-active-v1"></script>
++<script src="js/combat.js?v=wz-crystal-token-v1"></script>
+ <script src="js/city.js?v=npc-sprites-canary-v1"></script>
+ <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
+ <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
+@@ -624,7 +624,7 @@
+ <script src="js/bosstiary.js"></script>
+ <script src="js/ui.js?v=resistance-percent-v1"></script>
+ <script src="js/helper-presets.js?v=helper-live-v1"></script>
+-<script src="js/i18n.js?v=store-mp-v1"></script>
++<script src="js/i18n.js?v=wz-crystal-token-v1"></script>
+ <script src="js/alpha-announce.js?v=store-mp-v1"></script>
+ <script src="js/settings.js?v=settings-click-fix-v1"></script>
+ <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
+@@ -660,7 +660,7 @@
+ <script src="js/admin.js?v=admin-only-v1"></script>
+ <script src="js/city-ui.js?v=temple-clear-cond-v1"></script>
+ <script src="js/preload.js?v=loading-hint-v1"></script>
+-<script src="js/game.js?v=admin-only-v1"></script>
++<script src="js/game.js?v=wz-crystal-token-v1"></script>
+ <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
+ <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
+ <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>
+@@ -707,10 +707,10 @@
+ <script src="js/grandmaster-oberon.js?v=oberon-v1"></script>
+ <script src="js/umbral-creation.js?v=tooltip-v1"></script>
+ <script src="js/doctor-marrow.js?v=marrow-outfit-v1"></script>
+-<script src="js/world-boss-ui.js?v=wb-leader-fight-v2"></script>
++<script src="js/world-boss-ui.js?v=wz-crystal-token-v1"></script>
+ <script src="js/megalomania-lobby.js?v=world-boss-char-select-v1"></script>
+ <script src="js/pale-worm-lobby.js?v=world-boss-raids-v1"></script>
+-<script src="js/world-bosses-modal.js?v=wb-no-central-lobby-v1"></script>
++<script src="js/world-bosses-modal.js?v=wz-crystal-token-v1"></script>
+ <script src="js/questdata.js?v=quest-system-v1"></script>
+ <script src="js/quest-ui.js?v=quest-system-v1"></script>
+ <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
+diff --git a/tibia-idle/game/js/combat.js b/tibia-idle/game/js/combat.js
+index 2bc398a..99b015e 100644
+--- a/tibia-idle/game/js/combat.js
++++ b/tibia-idle/game/js/combat.js
+@@ -4655,9 +4655,32 @@ function rollLoot(c, p, mob) {
+       c.events.push({ t: "dust", dust: 0, slivers: slivers, fiendish: true });
+     }
+   }
++  // Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens para
++  // cada participante, sempre. Online não passa daqui (crédito no servidor).
++  if (mob && mob.boss && warzoneCrystalBoss(mob, c)) {
++    const token = "major-crystalline-token";
++    const participants = (c && c.players && c.players.length)
++      ? c.players.map((ent) => ent && ent.p).filter(Boolean)
++      : (p ? [p] : []);
++    for (const who of participants) {
++      if (typeof rewardChestAdd === "function") rewardChestAdd(who, token, 3, rewardSource);
++      else if (typeof addLootPouch === "function") addLootPouch(who, token, 3);
++    }
++    if (participants.length) {
++      c.stats.loot[token] = (c.stats.loot[token] || 0) + 3 * participants.length;
++      got.push({ item: token, count: 3, eachParticipant: true });
++    }
++  }
+   return got;
+ }
+ 
++function warzoneCrystalBoss(mob, c) {
++  const slug = String(mob && mob.slug || "").toLowerCase();
++  const bossId = String(c && c.boss && c.boss.id || "").toLowerCase();
++  return slug === "deathstrike" || slug === "gnomevil" || slug === "abyssador" ||
++    bossId === "world-boss-wz1" || bossId === "world-boss-wz2" || bossId === "world-boss-wz3";
++}
++
+ /* ======================================================================
+  * PARTY COMBAT — aliados na mesma instância
+  * ====================================================================== */
+diff --git a/tibia-idle/game/js/game.js b/tibia-idle/game/js/game.js
+index ad588a3..1645ffe 100644
+--- a/tibia-idle/game/js/game.js
++++ b/tibia-idle/game/js/game.js
+@@ -3205,7 +3205,7 @@ function drainEvents() {
+           const txt = valid.map((l) => {
+             const it = GAMEDATA.items[l.item];
+             const rare = it && (it.sell || 0) >= 500;
+-            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
++            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}${l.eachParticipant ? " (cada participante)" : ""}`;
+             return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
+           }).join(", ");
+           if (bossName) {
+diff --git a/tibia-idle/game/js/i18n.js b/tibia-idle/game/js/i18n.js
+index 1a0da45..ecad117 100644
+--- a/tibia-idle/game/js/i18n.js
++++ b/tibia-idle/game/js/i18n.js
+@@ -74,10 +74,10 @@ const I18N = {
+     "wb.prepMsg": "EM BREVE VOCÊ IRÁ PARTICIPAR DE UM WORLD BOSS, VERIFIQUE SEU HELPER E AJUSTE PARA A BATALHA!",
+     "wb.spawnSoon": "Boss spawna em",
+     "wb.entered": "Você entrou na arena do World Boss",
+-    "wb.success": "World Boss derrotado! Recompensas no Reward Chest.",
++    "wb.success": "World Boss derrotado! 3 major crystalline tokens para cada participante, no Reward Chest.",
+     "wb.fail": "World Boss falhou.",
+     "wb.accountFail": "Seus personagens morreram — removido do evento.",
+-    "wb.rewardToast": "World Boss: tokens no Reward Chest",
++    "wb.rewardToast": "3 major crystalline tokens para cada participante — Reward Chest",
+     "alpha.title": "⚠ SERVIDOR DE TESTE (ALPHA)",
+     "alpha.warn": "Este é um servidor de testes. Progresso, economia e estabilidade podem mudar a qualquer momento. O beta será anunciado em breve.",
+     "alpha.discord": "Discord:",
+@@ -339,10 +339,10 @@ const I18N = {
+     "wb.prepMsg": "SOON YOU WILL JOIN A WORLD BOSS — CHECK YOUR HELPER AND PREPARE FOR BATTLE!",
+     "wb.spawnSoon": "Boss spawns in",
+     "wb.entered": "You entered the World Boss arena",
+-    "wb.success": "World Boss defeated! Rewards in the Reward Chest.",
++    "wb.success": "World Boss defeated! 3 major crystalline tokens for each participant, in the Reward Chest.",
+     "wb.fail": "World Boss failed.",
+     "wb.accountFail": "Your characters died — removed from the event.",
+-    "wb.rewardToast": "World Boss: tokens in the Reward Chest",
++    "wb.rewardToast": "3 major crystalline tokens for each participant — Reward Chest",
+     "alpha.title": "⚠ TEST SERVER (ALPHA)",
+     "alpha.warn": "This is a test server. Progress, economy and stability may change at any time. Beta will be announced soon.",
+     "alpha.discord": "Discord:",
+diff --git a/tibia-idle/game/js/world-bosses-modal.js b/tibia-idle/game/js/world-bosses-modal.js
+index eb81584..852323d 100644
+--- a/tibia-idle/game/js/world-bosses-modal.js
++++ b/tibia-idle/game/js/world-bosses-modal.js
+@@ -69,16 +69,27 @@ function worldBossMonster(wz) {
+     ? (GAMEDATA.monsters[wz.dataMonster || wz.sprite] || {}) : {};
+ }
+ 
++function worldBossGuaranteedLoot(wz) {
++  if (!wz || (wz.id !== "wz1" && wz.id !== "wz2" && wz.id !== "wz3")) return "";
++  const slug = "major-crystalline-token";
++  const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
++  const name = item && item.n ? item.n : "major crystalline token";
++  const title = `${name} · 3x · 100% · cada participante`;
++  return `<div class="hunt-loot-slot loot-with-chance" data-wb-drop="${slug}" title="${title}">
++    ${typeof itemImg === "function" ? itemImg(slug, 28) : ""}<span class="loot-chance">3x</span></div>`;
++}
++
+ function worldBossLootHtml(wz) {
+   const monster = worldBossMonster(wz);
+-  return (monster.loot || []).map((drop) => {
++  const rows = (monster.loot || []).map((drop) => {
+     const item = GAMEDATA.items[drop.item];
+     const name = item ? item.n : drop.item;
+     const chance = Number(drop.chance) || 0;
+     const title = `${name} · ${chance}% de chance${drop.max > 1 ? ` · até ${drop.max}x` : ""}`;
+     return `<div class="hunt-loot-slot loot-with-chance" data-wb-drop="${drop.item}" title="${title}">
+       ${typeof itemImg === "function" ? itemImg(drop.item, 28) : ""}<span class="loot-chance">${chance}%</span></div>`;
+-  }).join("") || `<span class="tiny dim">Sem loot registrado.</span>`;
++  }).join("");
++  return (worldBossGuaranteedLoot(wz) + rows) || `<span class="tiny dim">Sem loot registrado.</span>`;
+ }
+ 
+ function worldBossResistsHtml(wz) {
+diff --git a/tibia-idle/server/authoritative_engine.js b/tibia-idle/server/authoritative_engine.js
+index 7553511..fad3249 100644
+--- a/tibia-idle/server/authoritative_engine.js
++++ b/tibia-idle/server/authoritative_engine.js
+@@ -34,6 +34,17 @@ function ensureWorldBossMonster(slug,name,hp){
+ ensureWorldBossMonster("deathstrike","The Deathstrike",2500000);
+ ensureWorldBossMonster("gnomevil","Gnomevil",4000000);
+ ensureWorldBossMonster("abyssador","The Abyssador",6000000);
++/* Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens por
++ * participante, sempre. O slug não está no items.json do servidor. */
++const WARZONE_CRYSTAL_TOKEN="major-crystalline-token";
++const WARZONE_CRYSTAL_COUNT=3;
++function isWarzoneCrystalBoss(slug,bossId){
++  const s=String(slug||"").toLowerCase();
++  const id=String(bossId||"").toLowerCase();
++  return s==="deathstrike"||s==="gnomevil"||s==="abyssador"||
++    id==="world-boss-wz1"||id==="world-boss-wz2"||id==="world-boss-wz3"||
++    id==="wz1"||id==="wz2"||id==="wz3";
++}
+ /* Megalomania: Bag You Desire +50% vs mini-bosses (0.1% → 0.15%). */
+ for(const slug of ["goshnar-s-megalomania-green","goshnar-s-megalomania-blue"]){
+   const m=MONSTERS[slug];if(!m||!Array.isArray(m.loot))continue;
+@@ -4997,6 +5008,26 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
+       bundles.push(bundle);
+     }
+   }
++  // Deathstrike / Gnomevil / The Abyssador: 3 major crystalline tokens para
++  // CADA participante (vivo ou morto), não só o líder. Sem isso o loot
++  // aleatório do monstro nunca entrega o token, e o crédito único no líder
++  // deixa o resto da raid sem recompensa.
++  if(mob.boss&&isWarzoneCrystalBoss(mob.slug,auth.bossId)){
++    const tokenSource=rewardSource||{
++      bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
++      name:bossMeta.name||mob.slug,sprite:mob.slug};
++    let tokenPlayers=0;
++    for(const item of players||[]){
++      if(!item||!item.p)continue;
++      rewardChestAdd(item.p,WARZONE_CRYSTAL_TOKEN,WARZONE_CRYSTAL_COUNT,tokenSource);
++      tokenPlayers++;
++    }
++    if(tokenPlayers){
++      lootDrops.push({item:WARZONE_CRYSTAL_TOKEN,count:WARZONE_CRYSTAL_COUNT,eachParticipant:true});
++      auth.stats.loot=auth.stats.loot||{};
++      auth.stats.loot[WARZONE_CRYSTAL_TOKEN]=(Number(auth.stats.loot[WARZONE_CRYSTAL_TOKEN])||0)+WARZONE_CRYSTAL_COUNT*tokenPlayers;
++    }
++  }
+   if(mob.influenced||mob.fiendish){
+     const stacks=mob.fiendish?15:Math.max(1,Number(mob.sinisterStacks)||1);let dust=0;
+     for(let i=0;i<stacks;i++)dust+=roll(auth,1,3);
+@@ -7197,6 +7228,7 @@ function initializeAuthority(descriptor,instanceId,now){
+   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
+     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",
+     worldBoss:!!(descriptor.worldBoss||combat.worldBoss||/^world-boss-wz[123]$/.test(String(descriptor.bossId||""))),
++    rewardBundleId:combat.rewardBundleId?String(combat.rewardBundleId):null,
+     pvp:!!(descriptor.instanceMode==="pvp"),
+     wallets:{},
+     expMul:descriptor.instanceMode==="pvp"?1.25:1,
+@@ -7339,6 +7371,17 @@ function initializeAuthority(descriptor,instanceId,now){
+   }
+   ensureSpawnIds(auth);
+   tickAuthSpawnQueue(auth,Number(now)||auth.clock);
++  // World Boss: a cópia de combate não pode espelhar o reward chest do shared.
++  // O merge terminal SOMA o chest inteiro da cópia. Se ela entrasse com o
++  // espelho, loot antigo (e os 3 tokens) dobraria a cada kill. Drops desta
++  // luta, inclusive os tokens, são o único delta.
++  if(auth.worldBoss){
++    for(const item of auth.players||[]){
++      if(!item||!item.p)continue;
++      item.p.rewardChest={};
++      item.p.rewardChestBundles=[];
++    }
++  }
+   descriptor.authority=auth;return materializeAuthority(descriptor);
+ }
+ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
+diff --git a/tibia-idle/server/world_boss.js b/tibia-idle/server/world_boss.js
+index 4b740dd..17dc2ea 100644
+--- a/tibia-idle/server/world_boss.js
++++ b/tibia-idle/server/world_boss.js
+@@ -60,26 +60,44 @@ const WARZONES = [
+ const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
+ const MAJOR_CRYSTAL_TOKEN = "major-crystalline-token";
+ const MAJOR_CRYSTAL_PER_ACCOUNT = 3;
++/* Tokens NÃO entram nesta lista. Deathstrike, Gnomevil e The Abyssador
++ * entregam 3 major crystalline tokens a CADA participante (vivo ou morto)
++ * pelo motor autoritativo + top-up idempotente abaixo. Colocar o token aqui
++ * creditava só o primeiro vivo e, somado ao grant do motor, dobrava. */
+ const FIXED_WORLD_BOSS_LOOT = {
+   wz1: [
+-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+     { item: "gill-necklace", count: 1 },
+     { item: "crystal-coin", count: 3 },
+     { item: "green-crystal-shard", count: 7 },
+   ],
+   wz2: [
+-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+     { item: "prismatic-necklace", count: 1 },
+     { item: "crystal-coin", count: 4 },
+     { item: "blue-crystal-shard", count: 10 },
+   ],
+   wz3: [
+-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
+     { item: "prismatic-ring", count: 1 },
+     { item: "crystal-coin", count: 5 },
+     { item: "violet-crystal-shard", count: 12 },
+   ],
+ };
++
++function rewardBundleItemCount(holder, bundleId, slug) {
++  const bundles = holder && holder.rewardChestBundles;
++  if (!Array.isArray(bundles)) return 0;
++  const bundle = bundles.find((b) => b && String(b.id) === String(bundleId));
++  if (!bundle || !bundle.items || typeof bundle.items !== "object") return 0;
++  return Math.max(0, Math.floor(Number(bundle.items[slug]) || 0));
++}
++
++/* Sobe o pacote até `need` sem somar de novo se o merge terminal já creditou. */
++function topUpRewardBundle(holder, bundleId, slug, need, source) {
++  const want = Math.max(0, Math.floor(Number(need) || 0));
++  const have = rewardBundleItemCount(holder, bundleId, slug);
++  if (!holder || want <= have) return 0;
++  rewardChestAdd(holder, slug, want - have, source);
++  return want - have;
++}
+ const MAX_CHARS_PER_ACCOUNT = 1;
+ const WORLD_BOSS_MAX_MEMBERS = 20;
+ 
+@@ -467,45 +485,73 @@ function createWorldBossController(opts) {
+     if (!current || !db) return;
+     const wz = warzoneById(current.warzoneId);
+     const bundleId = "world-boss-" + current.id;
++    const crystalBoss = current.warzoneId === "wz1" || current.warzoneId === "wz2" || current.warzoneId === "wz3";
++    const source = {
++      bundleId,
++      bossId: current.warzoneId,
++      name: (wz && wz.bossName ? wz.bossName : "World Boss") + " — World Boss",
++      sprite: wz && wz.bossSprite,
++    };
++    const fixedLoot = FIXED_WORLD_BOSS_LOOT[current.warzoneId] || [];
+     for (const [accountId, join] of current.joins) {
+       if (join.failed) continue;
+-      const alive = (join.chars || []).some((c) => !c.dead);
+-      if (!alive) continue;
+-      // 3 major crystal tokens por conta (stub) no primeiro char vivo
+-      const target = (join.chars || []).find((c) => !c.dead) || join.chars[0];
+-      if (!target) continue;
+-      try {
+-        const character = await db.findCharacter(target.id);
+-        if (!character || Number(character.account_id) !== Number(accountId)) continue;
+-        let p = character.data;
+-        if (typeof p === "string") {
+-          try { p = JSON.parse(p); } catch (e) { p = {}; }
++      const chars = (join.chars || []).filter((c) => c && c.id);
++      if (!chars.length) continue;
++      // Morto também participou. Não pular a conta só porque ninguém ficou vivo.
++      const fixedTarget = chars.find((c) => !c.dead) || null;
++      let shared = null;
++      if (typeof db.accountSharedInventory === "function") {
++        try { shared = await db.accountSharedInventory(accountId); } catch (e) { shared = null; }
++      }
++      if (shared) {
++        if (crystalBoss) {
++          topUpRewardBundle(shared, bundleId, MAJOR_CRYSTAL_TOKEN,
++            MAJOR_CRYSTAL_PER_ACCOUNT * chars.length, source);
++        }
++        for (const reward of fixedLoot) {
++          topUpRewardBundle(shared, bundleId, reward.item, reward.count, source);
++        }
++        if (typeof db.setAccountSharedInventory === "function") {
++          try { await db.setAccountSharedInventory(accountId, shared); }
++          catch (e) { console.error("[world-boss] shared reward account=" + accountId, e && e.message); }
+         }
+-        p = p && typeof p === "object" ? p : {};
+-        const fixedLoot = FIXED_WORLD_BOSS_LOOT[current.warzoneId] || [
+-          { item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT },
+-        ];
+-        for (const reward of fixedLoot) rewardChestAdd(p, reward.item, reward.count, {
+-          bundleId,
+-          bossId: current.warzoneId,
+-          name: wz.bossName + " — World Boss",
+-          sprite: wz.bossSprite,
+-        });
+-        const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
+-        const voc = String(p.voc || character.voc || "none");
+-        await db.updateCharacter(character.id, voc, level, p, {});
+-        publishAccount(accountId, "world-boss", {
+-          action: "reward",
+-          tokens: MAJOR_CRYSTAL_PER_ACCOUNT,
+-          item: MAJOR_CRYSTAL_TOKEN,
+-          items: fixedLoot,
+-          charId: character.id,
+-          rewardChest: p.rewardChest,
+-          rewardChestBundles: p.rewardChestBundles,
+-        });
+-        publishAccount(accountId, "character", { action: "world-boss-reward", charId: character.id });
+-      } catch (e) {
+-        console.error("[world-boss] reward fail account=" + accountId, e && e.message);
++      }
++      for (const target of chars) {
++        try {
++          const character = await db.findCharacter(target.id);
++          if (!character || Number(character.account_id) !== Number(accountId)) continue;
++          let p = character.data;
++          if (typeof p === "string") {
++            try { p = JSON.parse(p); } catch (e) { p = {}; }
++          }
++          p = p && typeof p === "object" ? p : {};
++          if (fixedTarget && String(fixedTarget.id) === String(target.id)) {
++            for (const reward of fixedLoot) rewardChestAdd(p, reward.item, reward.count, source);
++          }
++          if (crystalBoss) {
++            const have = rewardBundleItemCount(p, bundleId, MAJOR_CRYSTAL_TOKEN);
++            const fromShared = shared ? rewardBundleItemCount(shared, bundleId, MAJOR_CRYSTAL_TOKEN) : 0;
++            const want = Math.max(MAJOR_CRYSTAL_PER_ACCOUNT, fromShared);
++            if (have < want) rewardChestAdd(p, MAJOR_CRYSTAL_TOKEN, want - have, source);
++          }
++          const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
++          const voc = String(p.voc || character.voc || "none");
++          await db.updateCharacter(character.id, voc, level, p, {});
++          publishAccount(accountId, "world-boss", {
++            action: "reward",
++            tokens: crystalBoss ? MAJOR_CRYSTAL_PER_ACCOUNT : 0,
++            item: MAJOR_CRYSTAL_TOKEN,
++            items: crystalBoss
++              ? fixedLoot.concat([{ item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT }])
++              : fixedLoot,
++            charId: character.id,
++            rewardChest: p.rewardChest,
++            rewardChestBundles: p.rewardChestBundles,
++          });
++          publishAccount(accountId, "character", { action: "world-boss-reward", charId: character.id });
++        } catch (e) {
++          console.error("[world-boss] reward fail account=" + accountId, e && e.message);
++        }
+       }
+     }
+   }
+@@ -923,6 +969,8 @@ function createWorldBossController(opts) {
+ }
+ 
+ module.exports = {
+-  createWorldBossController, WARZONES, MAJOR_CRYSTAL_TOKEN, SCORE_WEIGHTS,
++  createWorldBossController, WARZONES, MAJOR_CRYSTAL_TOKEN, MAJOR_CRYSTAL_PER_ACCOUNT,
++  SCORE_WEIGHTS, FIXED_WORLD_BOSS_LOOT,
++  rewardBundleItemCount, topUpRewardBundle,
+   bossIdForWarzone, isWorldBossBossId, warzoneIdIdFromBossId, WORLD_BOSS_MAX_MEMBERS,
+ };
+diff --git a/tibia-idle/tools/test_warzone_crystal_tokens.js b/tibia-idle/tools/test_warzone_crystal_tokens.js
+new file mode 100644
+index 0000000..c6cd3c8
+--- /dev/null
++++ b/tibia-idle/tools/test_warzone_crystal_tokens.js
+@@ -0,0 +1,248 @@
++/* Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens
++ * para cada participante, sempre — vivo ou morto, não só o líder. */
++"use strict";
++const path = require("path");
++const root = path.join(__dirname, "..");
++const wb = require(path.join(root, "server", "world_boss.js"));
++const engine = require(path.join(root, "server", "authoritative_engine.js"));
++
++function must(ok, msg) {
++  if (!ok) throw new Error(msg);
++}
++
++function tokenCount(holder, bundleId) {
++  return wb.rewardBundleItemCount(holder, bundleId, wb.MAJOR_CRYSTAL_TOKEN);
++}
++
++function shell(id, accountId, extra) {
++  return {
++    id: String(id),
++    accountId: accountId,
++    p: Object.assign({
++      id: String(id), name: "P" + id, voc: "knight", level: 100,
++      hp: 1000, mp: 100, gold: 0, equip: {}, skills: {},
++      accountId: accountId,
++      rewardChest: { "major-crystalline-token": 9 },
++      rewardChestBundles: [{ id: "old", items: { "major-crystalline-token": 9 } }],
++    }, extra || {}),
++  };
++}
++
++function killBoss(bossId, slug, bundleId) {
++  const members = [shell(1, 11), shell(2, 22, { hp: 0 }), shell(3, 33)];
++  const desc = {
++    v: 1, kind: "boss", huntId: null, bossId: bossId, instanceMode: "boss", worldBoss: true,
++    activeCharacterId: "1",
++    members: members,
++    state: {
++      worldBoss: true, gridW: 40, gridH: 40, rewardBundleId: bundleId,
++      players: members.map((m, i) => Object.assign({ cx: 10 + i, cy: 28 }, m)),
++      mobs: [{
++        slug: slug, boss: true, worldBoss: true, id: "boss-wb",
++        hp: 1, maxHp: 1, cx: 20, cy: 16,
++      }],
++      arenaBossSpawn: { spawned: true },
++    },
++  };
++  const initialized = engine.initializeAuthority(desc, "b".repeat(64), Date.now());
++  const auth = initialized.authority;
++  must(auth.rewardBundleId === bundleId, bossId + " não preservou rewardBundleId");
++  for (const item of auth.players) {
++    must(!item.p.rewardChest || !Object.keys(item.p.rewardChest).length,
++      bossId + " entrou com reward chest espelhado (dobraria o token)");
++  }
++  const deadAtStart = auth.players.find((item) => String(item.id) === "2");
++  deadAtStart.p.hp = 0;
++  deadAtStart.downUntil = Date.now() + 60000;
++  const boss = (auth.mobs || []).find((m) => m && m.boss);
++  must(boss, bossId + " não spawnou o boss");
++  boss.hp = 0;
++  const stepped = engine.advanceAuthorityState(initialized, 200, Date.now());
++  must(stepped && stepped.terminalReason === "boss-defeated", bossId + " não encerrou em boss-defeated");
++  const after = typeof stepped.state === "string" ? JSON.parse(stepped.state) : stepped.state;
++  const players = after.authority.players;
++  must(players.length === 3, bossId + " perdeu participantes");
++  for (const item of players) {
++    const n = tokenCount(item.p, bundleId);
++    must(n === 3, bossId + " char " + item.id + " recebeu " + n + " tokens, esperado 3");
++    must((Number(item.p.rewardChest[wb.MAJOR_CRYSTAL_TOKEN]) || 0) === 3,
++      bossId + " chest total do char " + item.id + " não é 3");
++  }
++  const dead = players.find((item) => String(item.id) === "2");
++  must(dead && Number(dead.p.hp) <= 0, bossId + " o morto reviveu antes do drop");
++  const kill = (after.authority.events || []).find((e) => e && e.t === "kill" && e.boss);
++  // events are drained into descriptor.state.events by materialize
++  const events = (after.state && after.state.events) || [];
++  const killEv = events.find((e) => e && e.t === "kill" && e.boss) || kill;
++  must(killEv, bossId + " sem evento de kill");
++  const drop = (killEv.loot || []).find((l) => l && l.item === wb.MAJOR_CRYSTAL_TOKEN);
++  must(drop && drop.count === 3 && drop.eachParticipant, bossId + " log não marca 3x por participante");
++}
++
++function emptyShared() {
++  return { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
++}
++
++async function controllerGrant() {
++  const accounts = new Map();
++  const chars = new Map();
++  const tokens = new Map();
++  function addAcc(id, token) {
++    const acc = { id: id, token: token, shared: emptyShared() };
++    accounts.set(id, acc);
++    tokens.set(token, acc);
++    return acc;
++  }
++  function addChar(id, accountId, name) {
++    const c = {
++      id: id, account_id: accountId, name: name, voc: "knight", level: 100,
++      data: { id: String(id), name: name, voc: "knight", level: 100, hp: 500, mp: 50 },
++    };
++    chars.set(id, c);
++    return c;
++  }
++  addAcc(1, "tok-1");
++  addAcc(2, "tok-2");
++  addChar(101, 1, "Leader");
++  addChar(202, 2, "DeadMate");
++  process.env.WB_COUNTDOWN_MS = "1";
++  process.env.WB_MIN_START = "1";
++  const published = [];
++  const db = {
++    async findAccountByToken(token) { return tokens.get(token) || null; },
++    async findCharacter(id) { return chars.get(Number(id)) || null; },
++    async accountSharedInventory(id) { return accounts.get(Number(id)).shared; },
++    async setAccountSharedInventory(id, shared) {
++      accounts.get(Number(id)).shared = shared;
++      return accounts.get(Number(id));
++    },
++    async updateCharacter(id, voc, level, data) {
++      const c = chars.get(Number(id));
++      c.voc = voc; c.level = level; c.data = data;
++      return c;
++    },
++  };
++  const ctrl = wb.createWorldBossController({
++    testServer: true,
++    getDb: () => db,
++    publishAll: () => {},
++    publishAccount: (accountId, type, data) => published.push({ accountId, type, data }),
++    createSharedInstance: async (event) => ({
++      ok: true, instanceId: "c".repeat(64), ownerAccountId: event.hostAccountId,
++    }),
++    endSharedInstance: async () => {},
++    syncSharedBoss: async () => {},
++  });
++  const opened = await ctrl.createLobby(db, { token: "tok-1", warzoneId: "wz1", characterIds: [101] });
++  must(opened.code === 200, "createLobby wz1 falhou: " + JSON.stringify(opened.body));
++  const j2 = await ctrl.join(db, { token: "tok-2", characterIds: [202] });
++  must(j2.code === 200, "join participante falhou: " + JSON.stringify(j2.body));
++  const started = await ctrl.startFight(db, { token: "tok-1" });
++  must(started.code === 200, "startFight falhou: " + JSON.stringify(started.body));
++  let st = null;
++  for (let i = 0; i < 25; i++) {
++    await ctrl.tick(db);
++    await new Promise((r) => setTimeout(r, 20));
++    st = await ctrl.stateFor(db, "tok-1");
++    if (st.body && st.body.event && st.body.event.phase === "combat" && ctrl.sharedForAccount(1)) break;
++  }
++  must(st && st.body && st.body.event && st.body.event.phase === "combat",
++    "não entrou em combat: " + JSON.stringify(st && st.body && st.body.event));
++  const eventId = st.body.event.id;
++  const bundleId = "world-boss-" + eventId;
++  await ctrl.reportCombat(db, { token: "tok-2", deadCharIds: [202], damageDealt: 10 });
++  await ctrl.onSharedEnded("boss-defeated");
++  for (const accId of [1, 2]) {
++    const n = tokenCount(accounts.get(accId).shared, bundleId);
++    must(n === 3, "conta " + accId + " shared tem " + n + " tokens, esperado 3");
++  }
++  must(tokenCount(chars.get(202).data, bundleId) === 3, "personagem morto não recebeu 3 tokens");
++  must(tokenCount(chars.get(101).data, bundleId) === 3, "líder não recebeu 3 tokens");
++  const deadReward = published.find((ev) => ev.type === "world-boss" && ev.data && ev.data.action === "reward" &&
++    String(ev.data.charId) === "202");
++  must(deadReward, "SSE de reward não foi para o participante morto");
++
++  // Segunda chamada não pode dobrar: o evento já encerrou, e um top-up
++  // direto no shared com o mesmo bundle permanece em 3.
++  wb.topUpRewardBundle(accounts.get(2).shared, bundleId, wb.MAJOR_CRYSTAL_TOKEN, 3, {
++    bundleId, bossId: "wz1", name: "The Deathstrike — World Boss", sprite: "deathstrike",
++  });
++  must(tokenCount(accounts.get(2).shared, bundleId) === 3, "top-up idempotente dobrou os tokens");
++  ctrl.stop();
++}
++
++async function noDoubleAfterEngineGrant() {
++  process.env.WB_COUNTDOWN_MS = "1";
++  const accounts = new Map();
++  const chars = new Map();
++  const tokens = new Map();
++  const acc = { id: 7, token: "tok-7", shared: emptyShared() };
++  accounts.set(7, acc);
++  tokens.set("tok-7", acc);
++  chars.set(701, {
++    id: 701, account_id: 7, name: "Solo", voc: "druid", level: 80,
++    data: { id: "701", name: "Solo", voc: "druid", level: 80 },
++  });
++  const db = {
++    async findAccountByToken(token) { return tokens.get(token) || null; },
++    async findCharacter(id) { return chars.get(Number(id)) || null; },
++    async accountSharedInventory(id) { return accounts.get(Number(id)).shared; },
++    async setAccountSharedInventory(id, shared) {
++      accounts.get(Number(id)).shared = shared;
++      return accounts.get(Number(id));
++    },
++    async updateCharacter(id, voc, level, data) {
++      const c = chars.get(Number(id));
++      c.data = data; c.voc = voc; c.level = level;
++      return c;
++    },
++  };
++  const ctrl = wb.createWorldBossController({
++    testServer: true,
++    publishAll: () => {},
++    publishAccount: () => {},
++    createSharedInstance: async (event) => ({
++      ok: true, instanceId: "d".repeat(64), ownerAccountId: event.hostAccountId,
++    }),
++    endSharedInstance: async () => {},
++  });
++  const opened = await ctrl.createLobby(db, { token: "tok-7", warzoneId: "wz3", characterIds: [701] });
++  must(opened.code === 200, "lobby wz3 falhou: " + JSON.stringify(opened.body));
++  await ctrl.startFight(db, { token: "tok-7" });
++  let eventId = null;
++  for (let i = 0; i < 25; i++) {
++    await ctrl.tick(db);
++    await new Promise((r) => setTimeout(r, 20));
++    const st = await ctrl.stateFor(db, "tok-7");
++    if (st.body && st.body.event && st.body.event.phase === "combat") {
++      eventId = st.body.event.id;
++      break;
++    }
++  }
++  must(eventId, "wz3 não entrou em combate");
++  const bundleId = "world-boss-" + eventId;
++  const source = { bundleId, bossId: "wz3", name: "The Abyssador — World Boss", sprite: "abyssador" };
++  wb.topUpRewardBundle(acc.shared, bundleId, wb.MAJOR_CRYSTAL_TOKEN, 3, source);
++  chars.get(701).data.rewardChest = { "major-crystalline-token": 3 };
++  chars.get(701).data.rewardChestBundles = [{ id: bundleId, items: { "major-crystalline-token": 3 } }];
++  await ctrl.onSharedEnded("boss-defeated");
++  must(tokenCount(acc.shared, bundleId) === 3, "grantSuccessRewards dobrou o token já persistido pelo motor");
++  must(tokenCount(chars.get(701).data, bundleId) === 3, "personagem ficou com mais de 3 tokens");
++  ctrl.stop();
++}
++
++async function main() {
++  must(!JSON.stringify(wb.FIXED_WORLD_BOSS_LOOT).includes(wb.MAJOR_CRYSTAL_TOKEN),
++    "FIXED_WORLD_BOSS_LOOT ainda inclui o token (dobraria com o grant por participante)");
++  killBoss("world-boss-wz1", "deathstrike", "world-boss-evt-wz1");
++  killBoss("world-boss-wz2", "gnomevil", "world-boss-evt-wz2");
++  killBoss("world-boss-wz3", "abyssador", "world-boss-evt-wz3");
++  await controllerGrant();
++  await noDoubleAfterEngineGrant();
++  console.log("ok: 3 major crystalline tokens por participante");
++}
++
++main().catch((e) => {
++  console.error(e && e.stack || e);
++  process.exit(1);
++});

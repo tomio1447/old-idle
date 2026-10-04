@@ -228,13 +228,30 @@ function ensurePlayerCapacity(p) {
   return p.cap;
 }
 
+/* Snapshots de party/treino online trazem hp/vocação, mas não o inventário.
+ * Sem isso, maxStats/gearStats estouram em p.equip['helmet'] e o frame da
+ * área de treino morre a cada requestAnimationFrame. */
+function ensurePlayerEquip(p) {
+  if (!p) return {};
+  if (!p.equip || typeof p.equip !== "object") p.equip = {};
+  return p.equip;
+}
+
 function maxStats(p) {
   if (!p) return { hp: 150, mp: 0, cap: DEFAULT_PLAYER_CAP };
   ensurePlayerCapacity(p);
-  const b = baseStats(p.voc, p.level);
+  const equip = ensurePlayerEquip(p);
+  let voc = p.voc;
+  if (typeof VOCATIONS !== "undefined" && !VOCATIONS[voc] &&
+      typeof CanaryVocation !== "undefined" && CanaryVocation.baseVocName) {
+    voc = CanaryVocation.baseVocName(voc);
+  }
+  if (typeof VOCATIONS !== "undefined" && !VOCATIONS[voc]) voc = "none";
+  const level = Math.max(1, Math.floor(Number(p.level) || 1));
+  const b = baseStats(voc, level);
   let bonusHp = 0, bonusMp = 0;
   for (const s of SLOTS) {
-    const e = p.equip[s];
+    const e = equip[s];
     if (!e) continue;
     const it = GAMEDATA.items[e.item];
     if (!it) continue;
@@ -256,8 +273,10 @@ function gearStats(p) {
               prot: 0, hpreg: 0, mpreg: 0, speed: 0, weight: 0,
               melee: 0, sword: 0, axe: 0, club: 0, shield: 0, dist: 0,
               fist: 0 };
+  if (!p) return g;
+  const equip = ensurePlayerEquip(p);
   for (const s of SLOTS) {
-    const e = p.equip[s];
+    const e = equip[s];
     if (!e) continue;
     const base = GAMEDATA.items[e.item];
     if (!base) continue;
@@ -477,7 +496,8 @@ function skillGainFor(p, skill, tries) {
 }
 
 function weaponSkill(p) {
-  const w = p.equip.weapon;
+  const equip = ensurePlayerEquip(p);
+  const w = equip.weapon;
   if (!w) return "fist";
   const it = GAMEDATA.items[w.item];
   if (!it) return "fist";
@@ -506,7 +526,8 @@ function playerIdleBaseDmgMul(p) {
 
 /* Dano por golpe do jogador */
 function playerDamage(p) {
-  const w = p.equip.weapon;
+  const equip = ensurePlayerEquip(p);
+  const w = equip.weapon;
   const it = w ? (typeof upgradedStats === "function"
     ? upgradedStats(p, "equip:weapon", w.item) : GAMEDATA.items[w.item]) : null;
   const voc = VOCATIONS[p.voc];
@@ -1542,8 +1563,10 @@ function autoEquip(/* p */) {
  * no peso — senão stock de potions zera a CAP e o loot some em silêncio. */
 function carriedWeight(p) {
   let w = 0;
+  if (!p) return w;
+  const equip = ensurePlayerEquip(p);
   for (const s of SLOTS) {
-    const e = p.equip[s];
+    const e = equip[s];
     if (e && GAMEDATA.items[e.item]) w += GAMEDATA.items[e.item].w || 0;
   }
   const addMap = (map) => {

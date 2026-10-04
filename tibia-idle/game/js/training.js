@@ -95,17 +95,53 @@ async function buyTrainingPlan(p, planId) {
   return { ok:true, msg:`${plan.name}: +${fmtFull(plan.charges)} cargas.`, trainingExercise:s };
 }
 
+/* Snapshot público da party (hp/nome/outfit) não traz inventário. Clonar
+ * evita mutar G.p._partyOnline e dá um player desenhável (equip, skills). */
+function trainingPlayerFromPartyRow(row) {
+  if (!row || row.id == null) return null;
+  if (typeof G !== "undefined" && G && G.p && String(G.p.id) === String(row.id)) return G.p;
+  if (typeof getCharacters === "function") {
+    const local = getCharacters().find((p) => p && String(p.id) === String(row.id));
+    if (local) return local;
+  }
+  const hp = Number(row.hp), mp = Number(row.mp);
+  return {
+    id: row.id,
+    name: row.name || "Personagem",
+    voc: row.voc || "none",
+    level: Math.max(1, Math.floor(Number(row.level) || 1)),
+    sex: row.sex === "female" ? "female" : "male",
+    outfit: row.outfit || null,
+    hp: Number.isFinite(hp) ? hp : 0,
+    mp: Number.isFinite(mp) ? mp : 0,
+    maxHp: Math.max(0, Math.floor(Number(row.maxHp) || 0)),
+    maxMp: Math.max(0, Math.floor(Number(row.maxMp) || 0)),
+    skills: { fist: 10, sword: 10, axe: 10, club: 10, dist: 10, shield: 10 },
+    skillTries: {},
+    ml: Math.max(0, Math.floor(Number(row.ml) || 0)),
+    manaSpent: 0,
+    config: { barMode: "bars", autoWalk: true },
+    stamina: 42 * 3600,
+    equip: {},
+    remoteTraining: true,
+  };
+}
+
 function trainingPartyPlayers() {
   const byId = new Map();
-  const add = (p) => { if (p && p.id != null && !byId.has(String(p.id))) { ensureTraining(p); byId.set(String(p.id), p); } };
+  const add = (p) => {
+    if (!p || p.id == null || byId.has(String(p.id))) return;
+    if (typeof ensurePlayerEquip === "function") ensurePlayerEquip(p);
+    else if (!p.equip || typeof p.equip !== "object") p.equip = {};
+    ensureTraining(p);
+    byId.set(String(p.id), p);
+  };
   add(G.p);
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
     const st = G.p && G.p._partyOnline;
     for (const row of [st && st.leader].concat((st && st.members) || [])) {
       if (!row) continue;
-      const local = typeof getCharacters === "function" ? getCharacters().find((p) => String(p.id) === String(row.id)) : null;
-      add(local || Object.assign({ skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10}, skillTries:{}, ml:0,
-        manaSpent:0, config:{}, stamina:42*3600, remoteTraining:true }, row));
+      add(trainingPlayerFromPartyRow(row));
     }
   } else if (typeof partyLocalData === "function") {
     const d = partyLocalData();

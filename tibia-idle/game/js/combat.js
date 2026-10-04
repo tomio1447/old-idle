@@ -4655,7 +4655,30 @@ function rollLoot(c, p, mob) {
       c.events.push({ t: "dust", dust: 0, slivers: slivers, fiendish: true });
     }
   }
+  // Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens para
+  // cada participante, sempre. Online não passa daqui (crédito no servidor).
+  if (mob && mob.boss && warzoneCrystalBoss(mob, c)) {
+    const token = "major-crystalline-token";
+    const participants = (c && c.players && c.players.length)
+      ? c.players.map((ent) => ent && ent.p).filter(Boolean)
+      : (p ? [p] : []);
+    for (const who of participants) {
+      if (typeof rewardChestAdd === "function") rewardChestAdd(who, token, 3, rewardSource);
+      else if (typeof addLootPouch === "function") addLootPouch(who, token, 3);
+    }
+    if (participants.length) {
+      c.stats.loot[token] = (c.stats.loot[token] || 0) + 3 * participants.length;
+      got.push({ item: token, count: 3, eachParticipant: true });
+    }
+  }
   return got;
+}
+
+function warzoneCrystalBoss(mob, c) {
+  const slug = String(mob && mob.slug || "").toLowerCase();
+  const bossId = String(c && c.boss && c.boss.id || "").toLowerCase();
+  return slug === "deathstrike" || slug === "gnomevil" || slug === "abyssador" ||
+    bossId === "world-boss-wz1" || bossId === "world-boss-wz2" || bossId === "world-boss-wz3";
 }
 
 /* ======================================================================

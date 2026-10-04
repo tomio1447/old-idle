@@ -60,26 +60,44 @@ const WARZONES = [
 const SCORE_WEIGHTS = { damage: 1.0, heal: 0.5, taken: 0.25 };
 const MAJOR_CRYSTAL_TOKEN = "major-crystalline-token";
 const MAJOR_CRYSTAL_PER_ACCOUNT = 3;
+/* Tokens NÃO entram nesta lista. Deathstrike, Gnomevil e The Abyssador
+ * entregam 3 major crystalline tokens a CADA participante (vivo ou morto)
+ * pelo motor autoritativo + top-up idempotente abaixo. Colocar o token aqui
+ * creditava só o primeiro vivo e, somado ao grant do motor, dobrava. */
 const FIXED_WORLD_BOSS_LOOT = {
   wz1: [
-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
     { item: "gill-necklace", count: 1 },
     { item: "crystal-coin", count: 3 },
     { item: "green-crystal-shard", count: 7 },
   ],
   wz2: [
-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
     { item: "prismatic-necklace", count: 1 },
     { item: "crystal-coin", count: 4 },
     { item: "blue-crystal-shard", count: 10 },
   ],
   wz3: [
-    { item: MAJOR_CRYSTAL_TOKEN, count: 3 },
     { item: "prismatic-ring", count: 1 },
     { item: "crystal-coin", count: 5 },
     { item: "violet-crystal-shard", count: 12 },
   ],
 };
+
+function rewardBundleItemCount(holder, bundleId, slug) {
+  const bundles = holder && holder.rewardChestBundles;
+  if (!Array.isArray(bundles)) return 0;
+  const bundle = bundles.find((b) => b && String(b.id) === String(bundleId));
+  if (!bundle || !bundle.items || typeof bundle.items !== "object") return 0;
+  return Math.max(0, Math.floor(Number(bundle.items[slug]) || 0));
+}
+
+/* Sobe o pacote até `need` sem somar de novo se o merge terminal já creditou. */
+function topUpRewardBundle(holder, bundleId, slug, need, source) {
+  const want = Math.max(0, Math.floor(Number(need) || 0));
+  const have = rewardBundleItemCount(holder, bundleId, slug);
+  if (!holder || want <= have) return 0;
+  rewardChestAdd(holder, slug, want - have, source);
+  return want - have;
+}
 const MAX_CHARS_PER_ACCOUNT = 1;
 const WORLD_BOSS_MAX_MEMBERS = 20;
 
@@ -467,45 +485,73 @@ function createWorldBossController(opts) {
     if (!current || !db) return;
     const wz = warzoneById(current.warzoneId);
     const bundleId = "world-boss-" + current.id;
+    const crystalBoss = current.warzoneId === "wz1" || current.warzoneId === "wz2" || current.warzoneId === "wz3";
+    const source = {
+      bundleId,
+      bossId: current.warzoneId,
+      name: (wz && wz.bossName ? wz.bossName : "World Boss") + " — World Boss",
+      sprite: wz && wz.bossSprite,
+    };
+    const fixedLoot = FIXED_WORLD_BOSS_LOOT[current.warzoneId] || [];
     for (const [accountId, join] of current.joins) {
       if (join.failed) continue;
-      const alive = (join.chars || []).some((c) => !c.dead);
-      if (!alive) continue;
-      // 3 major crystal tokens por conta (stub) no primeiro char vivo
-      const target = (join.chars || []).find((c) => !c.dead) || join.chars[0];
-      if (!target) continue;
-      try {
-        const character = await db.findCharacter(target.id);
-        if (!character || Number(character.account_id) !== Number(accountId)) continue;
-        let p = character.data;
-        if (typeof p === "string") {
-          try { p = JSON.parse(p); } catch (e) { p = {}; }
+      const chars = (join.chars || []).filter((c) => c && c.id);
+      if (!chars.length) continue;
+      // Morto também participou. Não pular a conta só porque ninguém ficou vivo.
+      const fixedTarget = chars.find((c) => !c.dead) || null;
+      let shared = null;
+      if (typeof db.accountSharedInventory === "function") {
+        try { shared = await db.accountSharedInventory(accountId); } catch (e) { shared = null; }
+      }
+      if (shared) {
+        if (crystalBoss) {
+          topUpRewardBundle(shared, bundleId, MAJOR_CRYSTAL_TOKEN,
+            MAJOR_CRYSTAL_PER_ACCOUNT * chars.length, source);
         }
-        p = p && typeof p === "object" ? p : {};
-        const fixedLoot = FIXED_WORLD_BOSS_LOOT[current.warzoneId] || [
-          { item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT },
-        ];
-        for (const reward of fixedLoot) rewardChestAdd(p, reward.item, reward.count, {
-          bundleId,
-          bossId: current.warzoneId,
-          name: wz.bossName + " — World Boss",
-          sprite: wz.bossSprite,
-        });
-        const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
-        const voc = String(p.voc || character.voc || "none");
-        await db.updateCharacter(character.id, voc, level, p, {});
-        publishAccount(accountId, "world-boss", {
-          action: "reward",
-          tokens: MAJOR_CRYSTAL_PER_ACCOUNT,
-          item: MAJOR_CRYSTAL_TOKEN,
-          items: fixedLoot,
-          charId: character.id,
-          rewardChest: p.rewardChest,
-          rewardChestBundles: p.rewardChestBundles,
-        });
-        publishAccount(accountId, "character", { action: "world-boss-reward", charId: character.id });
-      } catch (e) {
-        console.error("[world-boss] reward fail account=" + accountId, e && e.message);
+        for (const reward of fixedLoot) {
+          topUpRewardBundle(shared, bundleId, reward.item, reward.count, source);
+        }
+        if (typeof db.setAccountSharedInventory === "function") {
+          try { await db.setAccountSharedInventory(accountId, shared); }
+          catch (e) { console.error("[world-boss] shared reward account=" + accountId, e && e.message); }
+        }
+      }
+      for (const target of chars) {
+        try {
+          const character = await db.findCharacter(target.id);
+          if (!character || Number(character.account_id) !== Number(accountId)) continue;
+          let p = character.data;
+          if (typeof p === "string") {
+            try { p = JSON.parse(p); } catch (e) { p = {}; }
+          }
+          p = p && typeof p === "object" ? p : {};
+          if (fixedTarget && String(fixedTarget.id) === String(target.id)) {
+            for (const reward of fixedLoot) rewardChestAdd(p, reward.item, reward.count, source);
+          }
+          if (crystalBoss) {
+            const have = rewardBundleItemCount(p, bundleId, MAJOR_CRYSTAL_TOKEN);
+            const fromShared = shared ? rewardBundleItemCount(shared, bundleId, MAJOR_CRYSTAL_TOKEN) : 0;
+            const want = Math.max(MAJOR_CRYSTAL_PER_ACCOUNT, fromShared);
+            if (have < want) rewardChestAdd(p, MAJOR_CRYSTAL_TOKEN, want - have, source);
+          }
+          const level = Math.max(1, Math.floor(Number(p.level) || Number(character.level) || 1));
+          const voc = String(p.voc || character.voc || "none");
+          await db.updateCharacter(character.id, voc, level, p, {});
+          publishAccount(accountId, "world-boss", {
+            action: "reward",
+            tokens: crystalBoss ? MAJOR_CRYSTAL_PER_ACCOUNT : 0,
+            item: MAJOR_CRYSTAL_TOKEN,
+            items: crystalBoss
+              ? fixedLoot.concat([{ item: MAJOR_CRYSTAL_TOKEN, count: MAJOR_CRYSTAL_PER_ACCOUNT }])
+              : fixedLoot,
+            charId: character.id,
+            rewardChest: p.rewardChest,
+            rewardChestBundles: p.rewardChestBundles,
+          });
+          publishAccount(accountId, "character", { action: "world-boss-reward", charId: character.id });
+        } catch (e) {
+          console.error("[world-boss] reward fail account=" + accountId, e && e.message);
+        }
       }
     }
   }

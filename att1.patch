@@ -1,0 +1,220 @@
+diff --git a/tibia-idle/game/index.html b/tibia-idle/game/index.html
+index 36261924..cbf49a62 100644
+--- a/tibia-idle/game/index.html
++++ b/tibia-idle/game/index.html
+@@ -596,7 +596,7 @@
+ <script src="js/appearance.js?v=mount-preview-v1"></script>
+ <script src="js/loyalty.js?v=forge-modal-pattern-v1"></script>
+ <script src="js/imbuement.js?v=imbue-slots-v1"></script>
+-<script src="js/player.js?v=equip-online-v1"></script>
++<script src="js/player.js?v=training-equip-guard-v1"></script>
+ <script src="js/accessories.js?v=depot-drag-v1"></script>
+   <script src="js/combat.js?v=stamina-active-v1"></script>
+ <script src="js/city.js?v=npc-sprites-canary-v1"></script>
+@@ -608,7 +608,7 @@
+ <script src="js/tilemap.js?v=wall-depth-v1"></script>
+ <script src="js/effectdata.js?v=block-hit-fix-v1"></script>
+ <script src="js/icondata.js?v=rotten-rooted-v1"></script>
+-<script src="js/render.js?v=fx-under-bars-v1"></script>
++<script src="js/render.js?v=training-bars-guard-v1"></script>
+ <script src="js/city-render.js?v=wall-depth-v1"></script>
+ <script src="js/monsters.js"></script>
+ <!-- patch_imbuement DEPOIS do monsters.js: a fusao do MONSTERDATA recria
+@@ -652,7 +652,7 @@
+ <script src="js/store-ui.js?v=admin-only-v1"></script>
+ <script src="js/market-local.js"></script>
+ <script src="js/reward-chest.js?v=collect-all-per-boss-v1"></script>
+-<script src="js/training.js?v=training-plan-icon-skill-v1"></script>
++<script src="js/training.js?v=training-member-equip-v1"></script>
+ <script src="js/training-ui.js?v=training-skill-preview-v1"></script>
+ <script src="js/accessorydata.js?v=charge-stack-destroy-v1"></script>
+ <script src="js/supply-stash-data.js?v=charge-stack-destroy-v1"></script>
+diff --git a/tibia-idle/game/js/player.js b/tibia-idle/game/js/player.js
+index 9ac257ac..3df6965a 100644
+--- a/tibia-idle/game/js/player.js
++++ b/tibia-idle/game/js/player.js
+@@ -228,13 +228,30 @@ function ensurePlayerCapacity(p) {
+   return p.cap;
+ }
+ 
++/* Snapshots de party/treino online trazem hp/vocação, mas não o inventário.
++ * Sem isso, maxStats/gearStats estouram em p.equip['helmet'] e o frame da
++ * área de treino morre a cada requestAnimationFrame. */
++function ensurePlayerEquip(p) {
++  if (!p) return {};
++  if (!p.equip || typeof p.equip !== "object") p.equip = {};
++  return p.equip;
++}
++
+ function maxStats(p) {
+   if (!p) return { hp: 150, mp: 0, cap: DEFAULT_PLAYER_CAP };
+   ensurePlayerCapacity(p);
+-  const b = baseStats(p.voc, p.level);
++  const equip = ensurePlayerEquip(p);
++  let voc = p.voc;
++  if (typeof VOCATIONS !== "undefined" && !VOCATIONS[voc] &&
++      typeof CanaryVocation !== "undefined" && CanaryVocation.baseVocName) {
++    voc = CanaryVocation.baseVocName(voc);
++  }
++  if (typeof VOCATIONS !== "undefined" && !VOCATIONS[voc]) voc = "none";
++  const level = Math.max(1, Math.floor(Number(p.level) || 1));
++  const b = baseStats(voc, level);
+   let bonusHp = 0, bonusMp = 0;
+   for (const s of SLOTS) {
+-    const e = p.equip[s];
++    const e = equip[s];
+     if (!e) continue;
+     const it = GAMEDATA.items[e.item];
+     if (!it) continue;
+@@ -256,8 +273,10 @@ function gearStats(p) {
+               prot: 0, hpreg: 0, mpreg: 0, speed: 0, weight: 0,
+               melee: 0, sword: 0, axe: 0, club: 0, shield: 0, dist: 0,
+               fist: 0 };
++  if (!p) return g;
++  const equip = ensurePlayerEquip(p);
+   for (const s of SLOTS) {
+-    const e = p.equip[s];
++    const e = equip[s];
+     if (!e) continue;
+     const base = GAMEDATA.items[e.item];
+     if (!base) continue;
+@@ -477,7 +496,8 @@ function skillGainFor(p, skill, tries) {
+ }
+ 
+ function weaponSkill(p) {
+-  const w = p.equip.weapon;
++  const equip = ensurePlayerEquip(p);
++  const w = equip.weapon;
+   if (!w) return "fist";
+   const it = GAMEDATA.items[w.item];
+   if (!it) return "fist";
+@@ -506,7 +526,8 @@ function playerIdleBaseDmgMul(p) {
+ 
+ /* Dano por golpe do jogador */
+ function playerDamage(p) {
+-  const w = p.equip.weapon;
++  const equip = ensurePlayerEquip(p);
++  const w = equip.weapon;
+   const it = w ? (typeof upgradedStats === "function"
+     ? upgradedStats(p, "equip:weapon", w.item) : GAMEDATA.items[w.item]) : null;
+   const voc = VOCATIONS[p.voc];
+@@ -1542,8 +1563,10 @@ function autoEquip(/* p */) {
+  * no peso — senão stock de potions zera a CAP e o loot some em silêncio. */
+ function carriedWeight(p) {
+   let w = 0;
++  if (!p) return w;
++  const equip = ensurePlayerEquip(p);
+   for (const s of SLOTS) {
+-    const e = p.equip[s];
++    const e = equip[s];
+     if (e && GAMEDATA.items[e.item]) w += GAMEDATA.items[e.item].w || 0;
+   }
+   const addMap = (map) => {
+diff --git a/tibia-idle/game/js/render.js b/tibia-idle/game/js/render.js
+index 9e0d1297..4ec27217 100644
+--- a/tibia-idle/game/js/render.js
++++ b/tibia-idle/game/js/render.js
+@@ -1104,7 +1104,16 @@ function drawStatusArcs(ctx, x, y, name, hpPct, mpPct, radius) {
+ }
+ 
+ function drawPlayerStatus(ctx, x, yTop, centerY, player, mode, radius) {
+-  const max = maxStats(player);
++  if (!player) return;
++  if (typeof ensurePlayerEquip === "function") ensurePlayerEquip(player);
++  else if (!player.equip || typeof player.equip !== "object") player.equip = {};
++  let max = { hp: Math.max(1, Number(player.maxHp) || Number(player.hp) || 1), mp: Math.max(0, Number(player.maxMp) || 0) };
++  try { max = maxStats(player) || max; } catch (e) { /* snapshot sem gear */ }
++  // Membro remoto da party não tem o equipamento local: a barra usa o teto
++  // que o servidor já publicou, senão o HP atual estoura a fórmula sem gear.
++  if (player.remoteTraining && Number(player.maxHp) > 0) {
++    max = { hp: Number(player.maxHp), mp: Math.max(0, Number(player.maxMp) || 0) };
++  }
+   const hpPct = max.hp ? player.hp / max.hp : 0;
+   const mpPct = max.mp ? player.mp / max.mp : 0;
+   const shieldPct = (typeof isMagicShieldActive === "function" && isMagicShieldActive(player, Date.now()))
+@@ -2000,10 +2009,20 @@ Renderer.prototype.drawAcademy = function(training, player, dt) {
+   const dummyPos = training.dummyPos || { x: 0.5625, y: 0.472222 };
+   drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos);
+ 
+-  const entities = (training.members || []).slice().sort((a, b) => a.playerPos.y - b.playerPos.y);
+-  for (const m of entities) drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt);
++  const entities = (training.members || []).slice().sort((a, b) => (a.playerPos && a.playerPos.y || 0) - (b.playerPos && b.playerPos.y || 0));
++  for (const m of entities) {
++    try { drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt); }
++    catch (err) {
++      if (!drawAcademyMember._warned) {
++        drawAcademyMember._warned = true;
++        console.warn("[treino] membro ignorado no desenho", err);
++      }
++    }
++  }
+   for (const m of entities) {
+-    if (m.proj) drawAcademyProj(this, ctx, W, H, tile, m, dt);
++    if (!m.proj) continue;
++    try { drawAcademyProj(this, ctx, W, H, tile, m, dt); }
++    catch (err) { m.proj = null; }
+   }
+ 
+   const fxNow = Date.now();
+diff --git a/tibia-idle/game/js/training.js b/tibia-idle/game/js/training.js
+index ac115601..dd56b526 100644
+--- a/tibia-idle/game/js/training.js
++++ b/tibia-idle/game/js/training.js
+@@ -95,17 +95,53 @@ async function buyTrainingPlan(p, planId) {
+   return { ok:true, msg:`${plan.name}: +${fmtFull(plan.charges)} cargas.`, trainingExercise:s };
+ }
+ 
++/* Snapshot público da party (hp/nome/outfit) não traz inventário. Clonar
++ * evita mutar G.p._partyOnline e dá um player desenhável (equip, skills). */
++function trainingPlayerFromPartyRow(row) {
++  if (!row || row.id == null) return null;
++  if (typeof G !== "undefined" && G && G.p && String(G.p.id) === String(row.id)) return G.p;
++  if (typeof getCharacters === "function") {
++    const local = getCharacters().find((p) => p && String(p.id) === String(row.id));
++    if (local) return local;
++  }
++  const hp = Number(row.hp), mp = Number(row.mp);
++  return {
++    id: row.id,
++    name: row.name || "Personagem",
++    voc: row.voc || "none",
++    level: Math.max(1, Math.floor(Number(row.level) || 1)),
++    sex: row.sex === "female" ? "female" : "male",
++    outfit: row.outfit || null,
++    hp: Number.isFinite(hp) ? hp : 0,
++    mp: Number.isFinite(mp) ? mp : 0,
++    maxHp: Math.max(0, Math.floor(Number(row.maxHp) || 0)),
++    maxMp: Math.max(0, Math.floor(Number(row.maxMp) || 0)),
++    skills: { fist: 10, sword: 10, axe: 10, club: 10, dist: 10, shield: 10 },
++    skillTries: {},
++    ml: Math.max(0, Math.floor(Number(row.ml) || 0)),
++    manaSpent: 0,
++    config: { barMode: "bars", autoWalk: true },
++    stamina: 42 * 3600,
++    equip: {},
++    remoteTraining: true,
++  };
++}
++
+ function trainingPartyPlayers() {
+   const byId = new Map();
+-  const add = (p) => { if (p && p.id != null && !byId.has(String(p.id))) { ensureTraining(p); byId.set(String(p.id), p); } };
++  const add = (p) => {
++    if (!p || p.id == null || byId.has(String(p.id))) return;
++    if (typeof ensurePlayerEquip === "function") ensurePlayerEquip(p);
++    else if (!p.equip || typeof p.equip !== "object") p.equip = {};
++    ensureTraining(p);
++    byId.set(String(p.id), p);
++  };
+   add(G.p);
+   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+     const st = G.p && G.p._partyOnline;
+     for (const row of [st && st.leader].concat((st && st.members) || [])) {
+       if (!row) continue;
+-      const local = typeof getCharacters === "function" ? getCharacters().find((p) => String(p.id) === String(row.id)) : null;
+-      add(local || Object.assign({ skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10}, skillTries:{}, ml:0,
+-        manaSpent:0, config:{}, stamina:42*3600, remoteTraining:true }, row));
++      add(trainingPlayerFromPartyRow(row));
+     }
+   } else if (typeof partyLocalData === "function") {
+     const d = partyLocalData();

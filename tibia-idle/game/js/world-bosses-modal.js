@@ -69,16 +69,27 @@ function worldBossMonster(wz) {
     ? (GAMEDATA.monsters[wz.dataMonster || wz.sprite] || {}) : {};
 }
 
+function worldBossGuaranteedLoot(wz) {
+  if (!wz || (wz.id !== "wz1" && wz.id !== "wz2" && wz.id !== "wz3")) return "";
+  const slug = "major-crystalline-token";
+  const item = typeof GAMEDATA !== "undefined" && GAMEDATA.items ? GAMEDATA.items[slug] : null;
+  const name = item && item.n ? item.n : "major crystalline token";
+  const title = `${name} · 3x · 100% · cada participante`;
+  return `<div class="hunt-loot-slot loot-with-chance" data-wb-drop="${slug}" title="${title}">
+    ${typeof itemImg === "function" ? itemImg(slug, 28) : ""}<span class="loot-chance">3x</span></div>`;
+}
+
 function worldBossLootHtml(wz) {
   const monster = worldBossMonster(wz);
-  return (monster.loot || []).map((drop) => {
+  const rows = (monster.loot || []).map((drop) => {
     const item = GAMEDATA.items[drop.item];
     const name = item ? item.n : drop.item;
     const chance = Number(drop.chance) || 0;
     const title = `${name} · ${chance}% de chance${drop.max > 1 ? ` · até ${drop.max}x` : ""}`;
     return `<div class="hunt-loot-slot loot-with-chance" data-wb-drop="${drop.item}" title="${title}">
       ${typeof itemImg === "function" ? itemImg(drop.item, 28) : ""}<span class="loot-chance">${chance}%</span></div>`;
-  }).join("") || `<span class="tiny dim">Sem loot registrado.</span>`;
+  }).join("");
+  return (worldBossGuaranteedLoot(wz) + rows) || `<span class="tiny dim">Sem loot registrado.</span>`;
 }
 
 function worldBossResistsHtml(wz) {

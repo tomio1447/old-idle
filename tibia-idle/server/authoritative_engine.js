@@ -34,6 +34,17 @@ function ensureWorldBossMonster(slug,name,hp){
 ensureWorldBossMonster("deathstrike","The Deathstrike",2500000);
 ensureWorldBossMonster("gnomevil","Gnomevil",4000000);
 ensureWorldBossMonster("abyssador","The Abyssador",6000000);
+/* Deathstrike, Gnomevil e The Abyssador: 3 major crystalline tokens por
+ * participante, sempre. O slug não está no items.json do servidor. */
+const WARZONE_CRYSTAL_TOKEN="major-crystalline-token";
+const WARZONE_CRYSTAL_COUNT=3;
+function isWarzoneCrystalBoss(slug,bossId){
+  const s=String(slug||"").toLowerCase();
+  const id=String(bossId||"").toLowerCase();
+  return s==="deathstrike"||s==="gnomevil"||s==="abyssador"||
+    id==="world-boss-wz1"||id==="world-boss-wz2"||id==="world-boss-wz3"||
+    id==="wz1"||id==="wz2"||id==="wz3";
+}
 /* Megalomania: Bag You Desire +50% vs mini-bosses (0.1% → 0.15%). */
 for(const slug of ["goshnar-s-megalomania-green","goshnar-s-megalomania-blue"]){
   const m=MONSTERS[slug];if(!m||!Array.isArray(m.loot))continue;
@@ -5011,6 +5022,26 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
       stacks:stacks,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,targetId:String(mob.id),
       fiendish:!!mob.fiendish,screen:true,ts:stepTs+900});
   }
+  // Deathstrike / Gnomevil / The Abyssador: 3 major crystalline tokens para
+  // CADA participante (vivo ou morto), não só o líder. Sem isso o loot
+  // aleatório do monstro nunca entrega o token, e o crédito único no líder
+  // deixa o resto da raid sem recompensa.
+  if(mob.boss&&isWarzoneCrystalBoss(mob.slug,auth.bossId)){
+    const tokenSource=rewardSource||{
+      bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
+      name:bossMeta.name||mob.slug,sprite:mob.slug};
+    let tokenPlayers=0;
+    for(const item of players||[]){
+      if(!item||!item.p)continue;
+      rewardChestAdd(item.p,WARZONE_CRYSTAL_TOKEN,WARZONE_CRYSTAL_COUNT,tokenSource);
+      tokenPlayers++;
+    }
+    if(tokenPlayers){
+      lootDrops.push({item:WARZONE_CRYSTAL_TOKEN,count:WARZONE_CRYSTAL_COUNT,eachParticipant:true});
+      auth.stats.loot=auth.stats.loot||{};
+      auth.stats.loot[WARZONE_CRYSTAL_TOKEN]=(Number(auth.stats.loot[WARZONE_CRYSTAL_TOKEN])||0)+WARZONE_CRYSTAL_COUNT*tokenPlayers;
+    }
+  }
   auth.stats.exp+=totalShare;auth.stats.partyExpBonusPct=split.bonusPct;auth.stats.kills++;
   return lootDrops;
 }
@@ -7197,6 +7228,7 @@ function initializeAuthority(descriptor,instanceId,now){
   const auth={v:2,rngState:seedFor(instanceId),nextMobId:1,clock:Number(now)||Date.now(),carryMs:0,kind:descriptor.kind,
     huntId:descriptor.huntId||null,bossId:descriptor.bossId||null,instanceMode:descriptor.instanceMode||"non-pvp",
     worldBoss:!!(descriptor.worldBoss||combat.worldBoss||/^world-boss-wz[123]$/.test(String(descriptor.bossId||""))),
+    rewardBundleId:combat.rewardBundleId?String(combat.rewardBundleId):null,
     pvp:!!(descriptor.instanceMode==="pvp"),
     wallets:{},
     expMul:descriptor.instanceMode==="pvp"?1.25:1,
@@ -7339,6 +7371,17 @@ function initializeAuthority(descriptor,instanceId,now){
   }
   ensureSpawnIds(auth);
   tickAuthSpawnQueue(auth,Number(now)||auth.clock);
+  // World Boss: a cópia de combate não pode espelhar o reward chest do shared.
+  // O merge terminal SOMA o chest inteiro da cópia. Se ela entrasse com o
+  // espelho, loot antigo (e os 3 tokens) dobraria a cada kill. Drops desta
+  // luta, inclusive os tokens, são o único delta.
+  if(auth.worldBoss){
+    for(const item of auth.players||[]){
+      if(!item||!item.p)continue;
+      item.p.rewardChest={};
+      item.p.rewardChestBundles=[];
+    }
+  }
   descriptor.authority=auth;return materializeAuthority(descriptor);
 }
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;

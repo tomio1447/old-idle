@@ -3205,7 +3205,7 @@ function drainEvents() {
           const txt = valid.map((l) => {
             const it = GAMEDATA.items[l.item];
             const rare = it && (it.sell || 0) >= 500;
-            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}`;
+            const nm = `${l.count > 1 ? l.count + "x " : ""}${itemName(l.item)}${l.eachParticipant ? " (cada participante)" : ""}`;
             return rare ? `<b style="color:#dab0ff">${nm}</b>` : nm;
           }).join(", ");
           if (bossName) {

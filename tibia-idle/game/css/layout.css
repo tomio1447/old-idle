@@ -1812,7 +1812,16 @@ button.full { width: 100%; }
      com um vinheta escura por cima para manter a legibilidade do formulário. */
   background: radial-gradient(ellipse at center, rgba(26,23,18,.55) 0%, rgba(6,5,5,.85) 75%);
 }
-#login .box { width: min(470px, 96vw); }
+#login .box {
+  width: min(470px, 96vw);
+  background: url(../assets/loginbackground.png) center/cover no-repeat;
+  background-color: var(--panel);
+  position: relative;
+}
+#login .box .panel-body {
+  background: rgba(35, 30, 24, 0.85);
+  backdrop-filter: blur(2px);
+}
 .field { margin-bottom: 10px; }
 .field label { display: block; font-size: 10px; color: #9a9078; margin-bottom: 3px; }
 .field input, .field select {
@@ -1822,6 +1831,29 @@ button.full { width: 100%; }
   font: 12px Verdana, sans-serif;
 }
 .field input:focus, .field select:focus { outline: 1px solid var(--gold); }
+
+/* Botões de imagem para login */
+#acc-btn-login, #acc-open-register {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+#acc-btn-login img, #acc-open-register img {
+  display: block;
+  width: 100%;
+  max-width: 350px;
+  height: auto;
+  object-fit: contain;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+#acc-btn-login:hover img, #acc-open-register:hover img {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+}
+#acc-btn-login:active img, #acc-open-register:active img {
+  transform: scale(0.98);
+}
 
 /* Fluxo online: cadastro/criação em modal e seletor de personagens. */
 .account-flow-body { padding: 12px; }
