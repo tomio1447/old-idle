@@ -64,7 +64,7 @@ function renderLoadingMonsterHint(force) {
   if (force || !LOADING_HINT_SLUG || !available.includes(LOADING_HINT_SLUG))
     LOADING_HINT_SLUG = available[Math.floor(Math.random() * available.length)];
   const monster = GAMEDATA.monsters[LOADING_HINT_SLUG];
-  art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 72) : "";
+  art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 220) : "";
   const name = document.getElementById("gl-hint-name");
   const hp = document.getElementById("gl-hint-hp");
   const exp = document.getElementById("gl-hint-exp");

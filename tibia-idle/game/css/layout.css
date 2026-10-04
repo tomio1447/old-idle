@@ -1814,13 +1814,17 @@ button.full { width: 100%; }
 }
 #login .box {
   width: min(470px, 96vw);
-  background: url(../assets/loginbackground.png) center/cover no-repeat;
+  background: url("../imagens/loginbackground.png?v=shared-images-v1") center / 100% 100% no-repeat;
   background-color: var(--panel);
   position: relative;
 }
+#login .box > .panel-title {
+  background: rgba(5, 11, 20, 0.38);
+  border-bottom-color: rgba(30, 58, 82, 0.55);
+}
 #login .box .panel-body {
-  background: rgba(35, 30, 24, 0.85);
-  backdrop-filter: blur(2px);
+  background: rgba(5, 10, 18, 0.48);
+  backdrop-filter: blur(1px);
 }
 .field { margin-bottom: 10px; }
 .field label { display: block; font-size: 10px; color: #9a9078; margin-bottom: 3px; }
@@ -1837,7 +1841,26 @@ button.full { width: 100%; }
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 12px;
+  width: 100%;
+  margin: 12px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 0;
+  position: relative;
+  cursor: pointer;
+}
+.login-button-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 #acc-btn-login img, #acc-open-register img {
   display: block;
@@ -1845,7 +1868,12 @@ button.full { width: 100%; }
   max-width: 350px;
   height: auto;
   object-fit: contain;
+  image-rendering: auto;
   transition: transform 0.2s ease, filter 0.2s ease;
+}
+#acc-btn-login:focus-visible, #acc-open-register:focus-visible {
+  outline: 2px solid #f3c95e;
+  outline-offset: 3px;
 }
 #acc-btn-login:hover img, #acc-open-register:hover img {
   transform: scale(1.02);
@@ -4177,22 +4205,135 @@ a:hover { color: #aab6f7; }
 .outfit-palette-compact { grid-template-columns:repeat(16, 18px); gap:1px; width:max-content; padding:3px; }
 .outfit-palette-compact .swatch { width:18px; height:18px; aspect-ratio:auto; }
 
-#game-loading{display:none;position:fixed;inset:0;z-index:10050;background:#080a0e;align-items:center;justify-content:center}
+#game-loading {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  padding: 12px;
+  background: #080a0e;
+  align-items: center;
+  justify-content: center;
+}
 html.boot-loading #game-loading,
-html.game-loading-on #game-loading{display:flex}
+html.game-loading-on #game-loading { display: flex; }
 html.boot-loading #login,
 html.game-loading-on #login,
 html.boot-loading #btn-config-login,
 html.game-loading-on #btn-config-login,
 html.boot-loading #client-version-label,
-html.game-loading-on #client-version-label{display:none !important}
+html.game-loading-on #client-version-label { display: none !important; }
 html.boot-loading #app,
-html.game-loading-on #app{visibility:hidden}
+html.game-loading-on #app { visibility: hidden; }
 html.boot-loading #modal,
 html.game-loading-on #modal,
 html.boot-loading #alpha-announce-modal,
-html.boot-loading #ui-mode-modal{display:none !important}
-.gl-box{width:min(520px,90vw);padding:22px;background:linear-gradient(180deg,#262b34,#171a20);border:1px solid #8b742d;color:#ffe680;text-align:center;box-shadow:0 12px 45px #000,inset 0 0 0 1px #343a45}.gl-brand{font:bold 20px Georgia,serif;letter-spacing:3px;text-shadow:0 2px 2px #000}.gl-hint{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;margin:18px 0 15px;padding:13px;background:linear-gradient(90deg,#101319,#1c2028);border:1px solid #4b5059;border-left:3px solid #a88932;text-align:left;box-shadow:inset 0 0 20px #080a0e}.gl-hint-art{width:92px;height:92px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#303641 0,#11141a 70%);border:1px solid #555b64;overflow:hidden}.gl-hint-art .mob-img{image-rendering:pixelated;filter:drop-shadow(0 4px 3px #000)}.gl-hint-info{min-width:0}.gl-hint-label{display:block;margin-bottom:4px;color:#a88932;font:bold 9px Verdana;letter-spacing:1.4px}.gl-hint-info strong{display:block;color:#f5e2a1;font:700 16px Georgia,serif;text-transform:capitalize}.gl-hint-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.gl-hint-stats span{padding:3px 6px;background:#090b0f;border:1px solid #393e47;color:#9da3ad;font:9px Verdana}.gl-hint-stats b{color:#e7d081}.gl-hint-info p{margin:8px 0 0;color:#b8bdc5;font:10px/1.4 Verdana}.gl-text{font-size:11px;color:#d8d8dc;margin:10px 0 8px}.gl-bar{height:8px;background:#0b0d11;border:1px solid #555}.gl-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b742d,#ffe680);transition:width .12s}@media(max-width:480px){.gl-box{padding:16px}.gl-hint{grid-template-columns:72px 1fr;padding:9px;gap:10px}.gl-hint-art{width:68px;height:78px}.gl-hint-art .mob-img{transform:scale(.85)}.gl-hint-info strong{font-size:14px}.gl-hint-stats{gap:4px}}
+html.boot-loading #ui-mode-modal { display: none !important; }
+.gl-box {
+  position: relative;
+  width: min(1200px, 96vw, calc((100dvh - 24px) * 1.8846));
+  aspect-ratio: 1568 / 832;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border: 0;
+  background: url("../imagens/monsterload.png?v=monsterload-v1") center / 100% 100% no-repeat,
+              linear-gradient(180deg, #262b34, #171a20);
+  color: #ffe680;
+  text-align: center;
+  box-shadow: none;
+}
+.gl-brand {
+  position: absolute;
+  left: 46%; top: 20%; width: 39%; height: 10%;
+  display: flex; align-items: center; justify-content: center;
+  font: bold clamp(12px, 1.6vw, 20px) Georgia, serif;
+  letter-spacing: 3px;
+  text-shadow: 0 2px 2px #000;
+}
+.gl-hint { display: contents; }
+.gl-hint-art {
+  position: absolute;
+  left: 15.5%; top: 31%; width: 24.5%; height: 43%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+}
+.gl-hint-art .mob-img {
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 5px #000);
+  transform: scale(.92);
+}
+.gl-hint-info { display: contents; }
+.gl-hint-label {
+  position: absolute;
+  left: 47%; top: 34.5%; width: 37%;
+  margin: 0;
+  color: #d8bd79;
+  font: bold clamp(8px, .85vw, 11px) Verdana, sans-serif;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.gl-hint-info strong {
+  position: absolute;
+  left: 47%; top: 39%; width: 37%; height: 7%;
+  display: flex; align-items: center; justify-content: center;
+  color: #f5e2a1;
+  font: 700 clamp(11px, 1.35vw, 18px) Georgia, serif;
+  text-align: center;
+  text-transform: capitalize;
+}
+.gl-hint-stats {
+  position: absolute;
+  left: 46.5%; top: 53%; width: 38.5%; height: 11%;
+  display: flex; align-items: center; justify-content: space-evenly;
+  gap: 4px; flex-wrap: wrap;
+  margin: 0;
+}
+.gl-hint-stats span {
+  padding: 3px 5px;
+  background: rgba(4, 7, 11, .28);
+  border: 0;
+  color: #c3c5ca;
+  font: clamp(8px, .85vw, 11px) Verdana, sans-serif;
+}
+.gl-hint-stats b { color: #ffe3a0; }
+.gl-hint-info p {
+  position: absolute;
+  left: 47%; top: 71.5%; width: 37%; height: 7%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0;
+  color: #e1d6be;
+  font: clamp(8px, .85vw, 11px)/1.25 Verdana, sans-serif;
+  text-align: center;
+}
+.gl-text {
+  position: absolute;
+  left: 47%; top: 78.5%; width: 37%; height: 3%;
+  margin: 0;
+  color: #f0dfb1;
+  font: clamp(8px, .85vw, 11px) Verdana, sans-serif;
+}
+.gl-bar {
+  position: absolute;
+  left: 48%; top: 82.5%; width: 35%; height: 8px;
+  overflow: hidden;
+  background: rgba(7, 9, 13, .85);
+  border: 1px solid rgba(212, 175, 55, .75);
+}
+.gl-fill {
+  display: block;
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, #8b742d, #ffe680);
+  transition: width .12s;
+}
+@media (max-width: 480px) {
+  .gl-box { width: min(96vw, calc((100dvh - 16px) * 1.8846)); }
+  .gl-hint-art .mob-img { transform: scale(.4); }
+  .gl-hint-stats { gap: 0; }
+  .gl-hint-stats span { padding: 2px; }
+  .gl-brand { letter-spacing: 1px; }
+}
 /* Background Summer 2026: fixo na viewport; o conteúdo rola sobre ele.
    !important necessário pois otc-complete.css é carregado depois deste
    arquivo e define body/#app com a mesma especificidade. */

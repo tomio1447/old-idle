@@ -10,8 +10,18 @@ function must(ok,msg){if(!ok)throw Error(msg);}
 must(html.includes('id="account-login-form"')&&html.includes('id="acc-login"')&&
   html.includes('id="acc-password"')&&html.includes('id="acc-btn-login"')&&
   html.includes('id="acc-open-register"')&&html.includes('type="submit"')&&
-  html.includes(">Entrar</button>"),
+  html.includes('class="login-button-label" data-i18n="login.submit">Entrar</span>')&&
+  html.includes('class="login-button-label" data-i18n="login.createAccount">Criar conta</span>'),
   "tela inicial não contém o formulário de login/criar conta");
+const loginButton=html.match(/<button\b[^>]*id="acc-btn-login"[^>]*>([\s\S]*?)<\/button>/);
+const registerButton=html.match(/<button\b[^>]*id="acc-open-register"[^>]*>([\s\S]*?)<\/button>/);
+must(loginButton&&registerButton&&!/\sdata-i18n=/.test(loginButton[0].split(">")[0])&&
+  !/\sdata-i18n=/.test(registerButton[0].split(">")[0])&&
+  loginButton[1].includes('src="assets/login-btn.png?v=login-artwork-v2"')&&
+  registerButton[1].includes('src="assets/create-account-btn.png?v=login-artwork-v2"')&&
+  fs.existsSync(path.join(game,"assets","login-btn.png"))&&
+  fs.existsSync(path.join(game,"assets","create-account-btn.png")),
+  "arte dos botões deve permanecer no HTML e não ser substituída pelo applyI18n");
 must(html.includes('id="account-login-form"')&&html.includes('onsubmit="return false;"')&&
   html.includes('action="#"'),
   "form de login deve bloquear navegação nativa (POST / → JSON)");

@@ -4,6 +4,12 @@ Servidor de contas/personagens do Global-Idle para o jogo **online**.
 Guarda contas (login/senha bcrypt, Tibia Coins, role) e personagens
 (save completo em JSON) num banco MySQL ou storage JSON local.
 
+## Imagens compartilhadas
+
+Os arquivos em `tibia-idle/imagens/` são servidos pela rota `/imagens/<arquivo>`.
+No pacote implantável, a pasta `imagens/` fica ao lado de `game/` e `server/`;
+`STATIC_IMAGES_DIR` permite substituir seu diretório físico sem alterar as URLs.
+
 ## Test server em uma única URL
 
 O processo serve o frontend e a API na mesma porta; o navegador não acessa

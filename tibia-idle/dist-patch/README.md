@@ -194,7 +194,6 @@ node tools/test_hard_loot_npc_prices.js
 | Path | Why |
 |------|-----|
 | `game/data/areas.json` | **WIP wipe** (~23k lines - stub). Would break hunts/spells on VM. |
-| `logof.png`, `logos..png` (repo root) | Branding junk / not app assets |
 | `server/_cf_check.txt`, `start-cf-tunnel.vbs`, `start-cloudflared-quick.bat`, `start-server-8001.bat` | Local CF tunnel / Windows helpers |
 | `tools/_wheel_src/**` | Extracted OTC wheel sources |
 | `game/maps/nagas_marapur-*.xml` | Unrelated map WIP unless intentional |

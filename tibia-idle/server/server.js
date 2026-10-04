@@ -81,6 +81,7 @@ const INSTANCE_WORKER_STARTUP_GRACE_MS=Math.max(0,parseInt(process.env.INSTANCE_
 const SERVER_BOOT_ID=crypto.randomBytes(16).toString("hex");
 const SERVER_STARTED_AT=Date.now();
 const STATIC_DIR = path.resolve(process.env.STATIC_DIR || path.join(__dirname, "..", "game"));
+const STATIC_IMAGES_DIR = path.resolve(process.env.STATIC_IMAGES_DIR || path.join(__dirname, "..", "imagens"));
 const SYNC_PROTOCOL="sse-v2";
 const ALLOWED_ORIGINS=new Set(String(process.env.ALLOWED_ORIGINS||"").split(",").map((x)=>x.trim()).filter(Boolean));
 const MAINTENANCE_TOKEN=String(process.env.MAINTENANCE_TOKEN||"").trim();
@@ -517,8 +518,17 @@ function serveStatic(req, res, pathname) {
   }
   const relative = normalizeStaticPath(pathname);
   if (relative == null) { sendText(res, 400, "URL inválida"); return; }
-  const file = path.resolve(STATIC_DIR, relative.replace(/^\/+/, ""));
-  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) {
+  // Assets compartilhados do pacote (fora do diretório público do jogo).
+  // URL /imagens/... é mapeada apenas para STATIC_IMAGES_DIR — o resto do
+  // servidor continua restrito a STATIC_DIR.
+  const imagePrefix = "/imagens/";
+  const isSharedImage = relative.startsWith(imagePrefix);
+  const staticRoot = isSharedImage ? STATIC_IMAGES_DIR : STATIC_DIR;
+  const staticRelative = isSharedImage
+    ? relative.slice(imagePrefix.length)
+    : relative.replace(/^\/+/, "");
+  const file = path.resolve(staticRoot, staticRelative);
+  if (file !== staticRoot && !file.startsWith(staticRoot + path.sep)) {
     sendText(res, 403, "Acesso negado"); return;
   }
   fs.stat(file, (statErr, stat) => {
@@ -4835,6 +4845,7 @@ async function main() {
   server.listen(PORT, HOST, () => {
     console.log("[server] Global-Idle em http://" + HOST + ":" + PORT);
     console.log("[server] estáticos:", STATIC_DIR);
+    console.log("[server] imagens (/imagens):", STATIC_IMAGES_DIR);
     console.log("[server] bootId:", SERVER_BOOT_ID, "startedAt:", new Date(SERVER_STARTED_AT).toISOString());
     console.log("[server] registre/login: POST /api/register e /api/login");
     if (TEST_SERVER) console.log("[server] TEST SERVER ativo — Admin liberado para testers");

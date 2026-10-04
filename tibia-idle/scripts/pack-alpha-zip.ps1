@@ -55,6 +55,10 @@ $gameSrc = Join-Path $tibiaIdle "game"
 if (-not (Test-Path $gameSrc)) {
   throw "Pasta game nao encontrada: $gameSrc"
 }
+$imagesSrc = Join-Path $tibiaIdle "imagens"
+if (-not (Test-Path $imagesSrc)) {
+  throw "Pasta imagens nao encontrada: $imagesSrc"
+}
 
 if (Test-Path $zipPath) {
   Remove-Item -Force $zipPath
@@ -73,6 +77,7 @@ try {
   ) | Out-Null
   Add-DirectoryToZip -Archive $archive -SourceDir $serverDst -EntryPrefix "server"
   Add-DirectoryToZip -Archive $archive -SourceDir $gameSrc -EntryPrefix "game"
+  Add-DirectoryToZip -Archive $archive -SourceDir $imagesSrc -EntryPrefix "imagens"
 }
 finally {
   $archive.Dispose()
