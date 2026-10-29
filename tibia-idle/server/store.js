@@ -490,7 +490,10 @@ function sanitizeCosmetics(raw) {
   if (c.mounts && typeof c.mounts === "object" && !Array.isArray(c.mounts))
     for (const k of Object.keys(c.mounts))
       if (c.mounts[k]) mounts[String(k).slice(0, 80)] = true;
-  return { outfits, mounts };
+  // bless: cargas de proteção de wipe compradas na store (TC). Consumidas
+  // pelo motor autoritativo quando a PT inteira morre (sem perda de XP/gold).
+  const bless = Math.max(0, Math.min(999, Math.floor(Number(c.bless) || 0)));
+  return { outfits, mounts, bless };
 }
 
 async function buyCosmetic(db, body) {
@@ -529,6 +532,45 @@ async function buyCosmetic(db, body) {
   } };
 }
 
+const BLESS_PRICE = 150;
+
+async function buyBless(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+
+  const cosmetics = sanitizeCosmetics(acc.cosmetics);
+  const coins = Math.max(0, Number(acc.coins) || 0);
+  if (coins < BLESS_PRICE)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins, cosmetics } };
+
+  // Débito atômico + incremento atômico de bless: sem read-modify-write para
+  // não correr com o checkpoint das instâncias (que aplica blessSpent).
+  if (typeof db.debitCoins === "function") {
+    if (!await db.debitCoins(acc.id, BLESS_PRICE))
+      return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins, cosmetics } };
+  } else {
+    await db.updateCoins(acc.id, coins - BLESS_PRICE);
+  }
+  if (typeof db.bumpAccountBless === "function")
+    cosmetics.bless = await db.bumpAccountBless(acc.id, 1);
+  else {
+    cosmetics.bless = (cosmetics.bless || 0) + 1;
+    if (typeof db.setAccountCosmetics === "function")
+      await db.setAccountCosmetics(acc.id, cosmetics);
+  }
+  const fresh = typeof db.findAccountById === "function" ? await db.findAccountById(acc.id) : null;
+  const novo = fresh ? Math.max(0, Number(fresh.coins) || 0) : Math.max(0, coins - BLESS_PRICE);
+  await addLedger(db, {
+    accountId: acc.id, login: acc.login, kind: "bless",
+    delta: -BLESS_PRICE, coinsAfter: novo, brlCents: 0,
+    ref: "cosmetic:bless", note: "Store bless: proteção de party wipe",
+  });
+  return { code: 200, body: {
+    ok: true, coins: novo, cosmetics, bless: cosmetics.bless,
+    msg: "Bless ativa! Ela será consumida automaticamente quando a party toda morrer — sem perda de XP ou gold.",
+  } };
+}
+
 async function recordGrant(db, acc, amount, after) {
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: amount >= 0 ? "grant" : "grant",
@@ -539,6 +581,6 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured,
-  COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless,
+  COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
 };

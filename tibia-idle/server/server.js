@@ -4499,6 +4499,11 @@ async function main() {
         const r = await store.buyCosmetic(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/store/bless") {
+        const body = await readBody(req);
+        const r = await store.buyBless(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/store/voucher") {
         const body = await readBody(req);
         const r = await store.redeemVoucher(db, body);

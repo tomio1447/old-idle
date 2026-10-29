@@ -3311,6 +3311,18 @@ function drainEvents() {
         toast("Você morreu — bless perdida!", "death");
         break;
       }
+      case "store-bless": {
+        addLog("level","A party toda caiu — <b>1 Bless da store foi consumida</b>. Todos revivem sem perda de XP nem gold!");
+        toast("Bless consumida — party protegida!","level");
+        try{
+          const acc=(typeof sessionAccount==="function")?sessionAccount():null;
+          if(acc&&acc.cosmetics&&Number(acc.cosmetics.bless)>0){
+            acc.cosmetics.bless=Math.max(0,Math.floor(Number(acc.cosmetics.bless)||0)-1);
+            sessionStorage.setItem("tibia-idle-account",JSON.stringify(acc));
+          }
+        }catch(err){}
+        break;
+      }
 
       case "spawn-blink": {
         // Piscada do teleporte no ponto de respawn (o monstro ainda nao

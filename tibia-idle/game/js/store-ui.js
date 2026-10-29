@@ -89,6 +89,7 @@ function renderStoreNav() {
     { id: "sell", nome: "Vender Coins", beta: true },
     { id: "outfits", nome: "Outfits" },
     { id: "mounts", nome: "Mounts" },
+    { id: "bless", nome: "BLESS" },
     { id: "vouchers", nome: "Vouchers" },
     { id: "history", nome: "Histórico" },
   ];
@@ -124,6 +125,7 @@ async function renderStoreTab() {
   if (_storeTab === "sell") return renderStoreSell(main);
   if (_storeTab === "outfits") return renderStoreCosmetics(main, "outfit");
   if (_storeTab === "mounts") return renderStoreCosmetics(main, "mount");
+  if (_storeTab === "bless") return renderStoreBless(main);
   if (_storeTab === "vouchers") return renderStoreVouchers(main);
   if (_storeTab === "history") return renderStoreHistory(main);
   if (_storeTab === "admin") return renderStoreAdmin(main);
@@ -603,6 +605,84 @@ function renderStoreCosmetics(main, kind) {
   });
 
   renderGrid();
+}
+
+/* -------------------------------- BLESS --------------------------------
+ * Proteção de wipe comprada com TC (acc.cosmetics.bless). Quando a PT
+ * inteira morre numa hunt, 1 carga é consumida pela conta de algum membro
+ * e todos revivem sem custo de gold e sem perda de XP. */
+const STORE_BLESS_PRICE = 150;
+
+function storeBlessCount() {
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    const c = acc && acc.cosmetics && typeof acc.cosmetics === "object" ? acc.cosmetics : {};
+    return Math.max(0, Math.floor(Number(c.bless) || 0));
+  } catch (e) { return 0; }
+}
+
+function renderStoreBless(main) {
+  const bless = storeBlessCount();
+  main.innerHTML = `
+    <div class="store-hero">
+      <img src="assets/spell/icon-39.png" alt="" class="coin-gif" style="width:28px;height:28px;image-rendering:pixelated">
+      <div>
+        <div class="small" style="color:#ffe680">Bless — ${STORE_BLESS_PRICE} TC cada</div>
+        <div class="tiny dim">Proteção de <b>conta</b>: vale para todos os personagens.</div>
+      </div>
+    </div>
+    <div class="store-voucher-box">
+      <div class="tiny" style="margin-bottom:8px">
+        Se a <b>party inteira morrer</b> numa hunt, <b>1 bless é consumida</b> e todos revivem na hora:
+        <b>nenhum personagem perde experiência nem gold</b> (nem o custo normal das bênçãos).
+        Sem bless, a party paga o bless tradicional em gold — ou volta ao templo se não tiver saldo.
+      </div>
+      <div class="tiny" style="margin-bottom:8px">
+        Blesses disponíveis: <b id="store-bless-count" style="color:#8fd18f">${bless}</b>
+      </div>
+      <button type="button" id="store-bless-buy" class="cos-buy">
+        Comprar 1 bless — ${STORE_BLESS_PRICE} TC
+      </button>
+      <div id="store-bless-msg" class="tiny" style="min-height:16px;margin-top:6px"></div>
+    </div>
+    <div class="tiny dim" style="margin-top:10px">
+      Funciona em hunts comuns (não vale para arenas de boss nem World Boss).
+    </div>`;
+
+  const btn = $("#store-bless-buy");
+  const msgEl = $("#store-bless-msg");
+  const setMsg = (text, color) => {
+    msgEl.textContent = text || "";
+    msgEl.style.color = color || "#a49b84";
+  };
+
+  btn.addEventListener("click", async () => {
+    if (btn.dataset.confirm !== "1") {
+      btn.dataset.confirm = "1";
+      const old = btn.textContent;
+      btn.textContent = "Confirmar compra?";
+      setTimeout(() => { if (btn.isConnected && btn.dataset.confirm === "1") { btn.dataset.confirm = ""; btn.textContent = old; } }, 3000);
+      return;
+    }
+    if (btn.dataset.busy === "1") return;
+    btn.dataset.busy = "1";
+    btn.disabled = true;
+    btn.textContent = "...";
+    const r = await storeBuyBless(sessionToken());
+    btn.dataset.busy = "";
+    btn.disabled = false;
+    btn.dataset.confirm = "";
+    btn.textContent = "Comprar 1 bless — " + STORE_BLESS_PRICE + " TC";
+    if (r && r.ok) {
+      const cnt = $("#store-bless-count");
+      if (cnt) cnt.textContent = String(storeBlessCount());
+      const cc = $("#store-coin-count");
+      if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+      setMsg("✔ " + (r.msg || "Bless ativa na conta!"), "#8fd18f");
+    } else {
+      setMsg("✖ " + ((r && r.msg) || "Falha na compra"), "#ff9a6a");
+    }
+  });
 }
 
 /* ------------------------------ VOUCHERS ------------------------------

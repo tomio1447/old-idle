@@ -2268,6 +2268,23 @@ async function storeBuyCosmetic(token, kind, id) {
   }
   return r.data || { ok: false, msg: "Falha na compra" };
 }
+async function storeBuyBless(token) {
+  const r = await _api("POST", "/api/store/bless", { token });
+  if (r.data && r.data.ok) {
+    if (r.data.coins != null) storeApplyCoins(r.data.coins);
+    if (r.data.cosmetics) {
+      try {
+        const raw = sessionStorage.getItem("tibia-idle-account");
+        const acc = raw ? JSON.parse(raw) : null;
+        if (acc) {
+          acc.cosmetics = r.data.cosmetics;
+          sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+        }
+      } catch (e) {}
+    }
+  }
+  return r.data || { ok: false, msg: "Falha na compra" };
+}
 
 /* ------------------------------ PARTY (multiplayer) ------------------------------
  * Convites assíncronos + follow. API crua (accountParty*) — os wrappers de

@@ -302,6 +302,7 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
     row.started_at=meta.started_at||meta.startedAt||meta.saved_at||new Date().toISOString();
     row.worker_total_ms=0;
   }
+  if(typeof this._syncBlessWallets==="function")state=this._syncBlessWallets(state);
   Object.assign(row,meta,{state,status:"active",ended_at:null,terminal_reason:null,
     worker_cursor_at:new Date(meta.saved_at).toISOString(),worker_total_ms:Number(row.worker_total_ms)||0,
     updated_at:new Date(lease.now).toISOString()});
@@ -340,6 +341,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   if(elapsed<Math.max(1,Number(minStep)||500))return {ok:false,skipped:"not-due"};
   const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
   const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+  if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
@@ -384,6 +386,7 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
   if(elapsed<50)return {ok:true,instance:row,characters:[],elapsed:0};
   const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+  if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
@@ -578,6 +581,61 @@ JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   a.cosmetics = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
   this._save();
   return a;
+};
+JsonStore.prototype.debitCoins = function (accountId, amount) {
+  const a = this.findAccountById(accountId);
+  const cost = Math.max(0, Math.floor(Number(amount) || 0));
+  if (!a || (Number(a.coins) || 0) < cost) return false;
+  a.coins = Math.max(0, (Number(a.coins) || 0) - cost);
+  this._save();
+  return true;
+};
+JsonStore.prototype.bumpAccountBless = function (accountId, delta) {
+  const a = this.findAccountById(accountId);
+  if (!a) return 0;
+  let cos = a.cosmetics;
+  if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
+  cos = cos && typeof cos === "object" && !Array.isArray(cos) ? cos : {};
+  cos.bless = Math.max(0, (Math.floor(Number(cos.bless) || 0)) + Math.floor(Number(delta) || 0));
+  a.cosmetics = cos;
+  this._save();
+  return cos.bless;
+};
+/* Store BLESS: sincroniza state.authority.wallets[].bless com
+ * accounts.cosmetics.bless. Cada wallet acumula blessSpent quando o motor
+ * consome uma carga no wipe; aqui o gasto é descontado da conta e o
+ * saldo do wallet é re-semeado (cobre compras feitas durante a instância).
+ * Recebe/devolve o state serializado (string) da instância. */
+JsonStore.prototype._syncBlessWallets = function (stateJson) {
+  let st;
+  try { st = typeof stateJson === "string" ? JSON.parse(stateJson) : stateJson; }
+  catch (e) { return stateJson; }
+  const wallets = st && st.authority && st.authority.wallets;
+  if (!wallets || typeof wallets !== "object") return stateJson;
+  let dirty = false;
+  for (const key of Object.keys(wallets)) {
+    const w = wallets[key];
+    const aid = Number(key);
+    if (!w || !aid) continue;
+    let cos = null;
+    const a = this.findAccountById(aid);
+    if (a) {
+      cos = a.cosmetics;
+      if (typeof cos === "string") { try { cos = JSON.parse(cos); } catch (e) { cos = null; } }
+      cos = cos && typeof cos === "object" && !Array.isArray(cos) ? cos : {};
+    }
+    let have = cos ? Math.max(0, Math.floor(Number(cos.bless) || 0)) : 0;
+    const spent = Math.max(0, Math.floor(Number(w.blessSpent) || 0));
+    if (spent && a) {
+      have = Math.max(0, have - spent);
+      cos.bless = have;
+      a.cosmetics = cos;
+      this._save();
+    }
+    if (Number(w.bless) !== have || spent) { w.bless = have; w.blessSpent = 0; dirty = true; }
+  }
+  if (!dirty) return stateJson;
+  return JSON.stringify(st);
 };
 JsonStore.prototype.voucherClaim = function (accountId, code) {
   const key = Number(accountId) + ":" + String(code || "").toUpperCase();
@@ -1456,6 +1514,41 @@ async function MysqlStore() {
     return !!(row&&row.holder_id===lease.holderId&&row.secret_hash===lease.secretHash&&
       new Date(row.expires_at).getTime()>lease.now);
   }
+  /* Store BLESS: state.authority.wallets[].bless espelha
+   * accounts.cosmetics.bless. O motor consome uma carga no party wipe e
+   * marca blessSpent; aqui o gasto é descontado da conta (dentro da mesma
+   * transação do checkpoint) e o wallet é re-semeado — cobrindo compras
+   * feitas no meio da instância. Recebe/devolve o state serializado. */
+  async function syncBlessWallets(conn,stateJson){
+    let st;
+    try{st=typeof stateJson==="string"?JSON.parse(stateJson):stateJson;}
+    catch(e){return stateJson;}
+    const wallets=st&&st.authority&&st.authority.wallets;
+    if(!wallets||typeof wallets!=="object")return stateJson;
+    let dirty=false;
+    for(const key of Object.keys(wallets)){
+      const w=wallets[key],aid=Number(key);
+      if(!w||!aid)continue;
+      const spent=Math.max(0,Math.floor(Number(w.blessSpent)||0));
+      if(spent)await conn.query(
+        `UPDATE accounts SET cosmetics = JSON_SET(
+           CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END,
+           '$.bless',
+           GREATEST(0, COALESCE(CASE WHEN JSON_VALID(cosmetics)
+             THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(cosmetics, '$.bless')) AS SIGNED)
+             ELSE 0 END, 0) - ?))
+         WHERE id = ?`,
+        [spent,aid]);
+      const [rows]=await conn.query("SELECT cosmetics FROM accounts WHERE id=?",[aid]);
+      let cos=null;
+      if(rows[0]&&rows[0].cosmetics){
+        try{cos=typeof rows[0].cosmetics==="string"?JSON.parse(rows[0].cosmetics):rows[0].cosmetics;}catch(e){cos=null;}
+      }
+      const have=Math.max(0,Math.floor(Number(cos&&cos.bless)||0));
+      if(Number(w.bless)!==have||spent){w.bless=have;w.blessSpent=0;dirty=true;}
+    }
+    return dirty?JSON.stringify(st):stateJson;
+  }
   async function persistVersionedRows(conn,accountId,saves){
     if(!saves.length)return {ok:true,characters:[]};
     const ids=saves.map((save)=>Number(save.id));
@@ -1570,6 +1663,32 @@ async function MysqlStore() {
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
+    },
+    async debitCoins(id, amount) {
+      const cost = Math.max(0, Math.floor(Number(amount) || 0));
+      const r = await this.run(
+        "UPDATE accounts SET coins = coins - ? WHERE id = ? AND coins >= ?",
+        [cost, Number(id), cost]);
+      return !!(r && r.affectedRows > 0);
+    },
+    async bumpAccountBless(id, delta) {
+      // Incremento atômico em accounts.cosmetics.bless (JSON em MEDIUMTEXT).
+      await this.run(
+        `UPDATE accounts SET cosmetics = JSON_SET(
+           CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END,
+           '$.bless',
+           GREATEST(0, COALESCE(CASE WHEN JSON_VALID(cosmetics)
+             THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(cosmetics, '$.bless')) AS SIGNED)
+             ELSE 0 END, 0) + ?))
+         WHERE id = ?`,
+        [Math.floor(Number(delta) || 0), Number(id)]);
+      const rows = await this.query("SELECT cosmetics FROM accounts WHERE id = ?", [Number(id)]);
+      const row = rows && rows[0];
+      let cos = null;
+      if (row && row.cosmetics) {
+        try { cos = typeof row.cosmetics === "string" ? JSON.parse(row.cosmetics) : row.cosmetics; } catch (e) { cos = null; }
+      }
+      return Math.max(0, Math.floor(Number(cos && cos.bless) || 0));
     },
     async storeOrderInsert(row) {
       const r = await this.run(
@@ -1919,6 +2038,7 @@ async function MysqlStore() {
         }
         const [rows]=await conn.query("SELECT * FROM account_instances WHERE account_id=? FOR UPDATE",[Number(accountId)]);
         const current=rows[0]||null;
+        state=await syncBlessWallets(conn,state);
         if(current&&current.status==="active"){
           if(Number(current.version)!==Number(expectedVersion)||String(current.instance_id)!==String(instanceId||"")){
             await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:current};
@@ -2009,6 +2129,7 @@ async function MysqlStore() {
         }
         const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        next.state=await syncBlessWallets(conn,next.state);
         // Inventário da conta: tick terminal extrai containers para o shared
         // (o worker só roda sem lease; instância própria concorrente é rara,
         // mas contas de convidados com instância ativa são preservadas).
@@ -2071,6 +2192,7 @@ async function MysqlStore() {
         const elapsed=Math.min(Math.max(0,now-cursor),Math.max(100,Number(maxStep)||10000));
         if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
         const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
+        next.state=await syncBlessWallets(conn,next.state);
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
         // personagens para accounts.shared_inventory e espelha o shared no data
         // salvo de cada um (containers são da conta, não do personagem).

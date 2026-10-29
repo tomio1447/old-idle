@@ -6142,6 +6142,21 @@ function fullWipe(auth){
     }
     auth.ended=true;auth.terminalReason="party-wipe";return;
   }
+  // Store BLESS: carga comprada com TC espelhada no wallet da conta
+  // (accounts.cosmetics.bless, sincronizada pelo checkpoint do db). Se a PT
+  // inteira morre, uma carga de qualquer conta presente é consumida e todos
+  // revivem sem custo de gold e sem perda de XP (inclusive em PvP).
+  const blessItem=(auth.players||[]).find((item)=>{
+    const w=item&&auth.wallets&&auth.wallets[String(item.accountId||"")];
+    return w&&Math.floor(Number(w.bless)||0)>0;
+  });
+  if(blessItem){
+    const w=auth.wallets[String(blessItem.accountId)];
+    w.bless=Math.max(0,Math.floor(Number(w.bless)||0)-1);
+    w.blessSpent=Math.max(0,Math.floor(Number(w.blessSpent)||0))+1;
+    for(const item of auth.players){const max=maxStats(item.p);item.p.hp=max.hp;item.p.mp=max.mp;item.p.blessed=true;item.downUntil=0;item.permadead=false;}
+    auth.events.push({t:"store-bless",accountId:Number(blessItem.accountId)||0,screen:true,ts:auth.clock});
+    auth.wipes++;auth.mobs=[];spawnHuntWave(auth,auth.clock,{force:true});return;}
   const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players)applyPvpLoss(item.p,auth.lastDamageSource||"monster");
   const byPlayer={};let cost=0;
   for(const item of auth.players||[]){
