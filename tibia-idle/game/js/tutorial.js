@@ -96,6 +96,7 @@ function tutorialEnsureOverlayDom() {
     '<div class="tutorial-mask" data-m="left"></div>' +
     '<div class="tutorial-mask" data-m="right"></div>' +
     '<div class="tutorial-ring"></div>' +
+    '<div class="tutorial-arrow"></div>' +
     '<div class="tutorial-hint">' +
       '<div class="tutorial-hint-badge">TUTORIAL</div>' +
       '<div class="tutorial-hint-text"></div>' +
@@ -118,32 +119,10 @@ function tutorialRender(rect, html, actions) {
   const left = root.querySelector('[data-m="left"]');
   const right = root.querySelector('[data-m="right"]');
   const ring = root.querySelector(".tutorial-ring");
+  const arrow = root.querySelector(".tutorial-arrow");
+  const hint = root.querySelector(".tutorial-hint");
   const pad = 6;
-  if (rect && rect.width > 0 && rect.height > 0) {
-    const x0 = Math.max(0, rect.left - pad), y0 = Math.max(0, rect.top - pad);
-    const x1 = Math.min(vw, rect.right + pad), y1 = Math.min(vh, rect.bottom + pad);
-    top.style.cssText = `left:0;top:0;width:${vw}px;height:${Math.max(0, y0)}px`;
-    bottom.style.cssText = `left:0;top:${y1}px;width:${vw}px;height:${Math.max(0, vh - y1)}px`;
-    left.style.cssText = `left:0;top:${y0}px;width:${Math.max(0, x0)}px;height:${Math.max(0, y1 - y0)}px`;
-    right.style.cssText = `left:${x1}px;top:${y0}px;width:${Math.max(0, vw - x1)}px;height:${Math.max(0, y1 - y0)}px`;
-    ring.style.cssText = `display:block;left:${x0}px;top:${y0}px;width:${x1 - x0}px;height:${y1 - y0}px`;
-    const hint = root.querySelector(".tutorial-hint");
-    // balao abaixo do alvo; se nao couber, tenta acima; clamp horizontal.
-    let hx = Math.min(Math.max(8, x0), vw - 316);
-    let hy = y1 + 10;
-    hint.style.maxHeight = "";
-    if (hy + 140 > vh) hy = Math.max(8, y0 - 150);
-    hint.style.cssText += `left:${hx}px;top:${hy}px`;
-  } else {
-    // sem alvo: cobre tudo, balao centralizado.
-    top.style.cssText = `left:0;top:0;width:${vw}px;height:${vh}px`;
-    bottom.style.cssText = "left:0;top:0;width:0;height:0";
-    left.style.cssText = "left:0;top:0;width:0;height:0";
-    right.style.cssText = "left:0;top:0;width:0;height:0";
-    ring.style.display = "none";
-    const hint = root.querySelector(".tutorial-hint");
-    hint.style.cssText = `left:${Math.max(8, vw / 2 - 160)}px;top:${Math.max(8, vh / 2 - 90)}px`;
-  }
+  // Texto/ações primeiro: a altura real do balão define a posição da seta.
   root.querySelector(".tutorial-hint-text").innerHTML = html;
   const actBox = root.querySelector(".tutorial-hint-actions");
   actBox.innerHTML = "";
@@ -154,6 +133,37 @@ function tutorialRender(rect, html, actions) {
     btn.addEventListener("click", a.onClick);
     actBox.appendChild(btn);
   });
+  if (rect && rect.width > 0 && rect.height > 0) {
+    const x0 = Math.max(0, rect.left - pad), y0 = Math.max(0, rect.top - pad);
+    const x1 = Math.min(vw, rect.right + pad), y1 = Math.min(vh, rect.bottom + pad);
+    top.style.cssText = `left:0;top:0;width:${vw}px;height:${Math.max(0, y0)}px`;
+    bottom.style.cssText = `left:0;top:${y1}px;width:${vw}px;height:${Math.max(0, vh - y1)}px`;
+    left.style.cssText = `left:0;top:${y0}px;width:${Math.max(0, x0)}px;height:${Math.max(0, y1 - y0)}px`;
+    right.style.cssText = `left:${x1}px;top:${y0}px;width:${Math.max(0, vw - x1)}px;height:${Math.max(0, y1 - y0)}px`;
+    ring.style.cssText = `display:block;left:${x0}px;top:${y0}px;width:${x1 - x0}px;height:${y1 - y0}px`;
+    // balao abaixo do alvo (com folga para a seta); se nao couber, acima.
+    const hintH = hint.offsetHeight || 150;
+    let hx = Math.min(Math.max(8, x0), vw - 316);
+    let hy = y1 + 22, below = true;
+    if (hy + hintH > vh) { hy = Math.max(8, y0 - hintH - 22); below = false; }
+    hint.style.maxHeight = "";
+    hint.style.cssText += `left:${hx}px;top:${hy}px`;
+    // seta aponta do balão para o alvo, centralizada nele.
+    const ax = Math.min(Math.max(rect.left + rect.width / 2 - 11, x0 + 8), x1 - 30);
+    arrow.className = "tutorial-arrow " + (below ? "up" : "down");
+    arrow.style.cssText = below
+      ? `display:block;left:${ax}px;top:${hy - 16}px`
+      : `display:block;left:${ax}px;top:${hy + hintH + 4}px`;
+  } else {
+    // sem alvo: cobre tudo, balao centralizado, sem seta.
+    top.style.cssText = `left:0;top:0;width:${vw}px;height:${vh}px`;
+    bottom.style.cssText = "left:0;top:0;width:0;height:0";
+    left.style.cssText = "left:0;top:0;width:0;height:0";
+    right.style.cssText = "left:0;top:0;width:0;height:0";
+    ring.style.display = "none";
+    arrow.style.display = "none";
+    hint.style.cssText = `left:${Math.max(8, vw / 2 - 160)}px;top:${Math.max(8, vh / 2 - 90)}px`;
+  }
 }
 /* Primeiro elemento visivel (offsetParent existe e tem tamanho) dentre
  * os seletores — util quando ha versao desktop/mobile do mesmo botao. */
@@ -314,6 +324,11 @@ function tutorialRenderHelperStep(state, pendingId, chars) {
     tutorialSaveState(state);
     return;
   }
+  /* Modal aberto (party, etc.) cobre o painel Helper: sem spotlight —
+   * o overlay volta sozinho no próximo tick quando o modal fechar. */
+  const modalShown = document.getElementById("modal") &&
+    document.getElementById("modal").classList.contains("show");
+  if (modalShown) { tutorialHideOverlay(); return; }
   const target = tutorialFirstVisible(['.helper-heal-cats', '[data-collapse="helper"]', '[data-mobile-tab="helper"]']);
   const doneBtn = { label: "OK, entendi", primary: true, onClick: () => {
     state.helperDone[String(pendingId)] = true;

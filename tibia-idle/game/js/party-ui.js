@@ -734,8 +734,11 @@ function partySwitchToCharacter(id) {
     $("#modal").classList.remove("show", "wide");
     return;
   }
-  // modo online: nao troca automaticamente (precisa de lease/reload), abre picker
+  // modo online: nao troca automaticamente (precisa de lease/reload), abre picker.
+  // Fecha o modal da party primeiro — senão ele fica aberto por trás do
+  // picker e, após a troca sem reload, cobre o painel Helper alvo do tutorial.
   if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    $("#modal").classList.remove("show", "wide");
     if (typeof window.openAccountCharacterPicker === "function") window.openAccountCharacterPicker();
     return;
   }

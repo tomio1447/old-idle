@@ -4550,6 +4550,29 @@ body.fullhd .scene-overlay { font-size: 13px; }
   0%, 100% { box-shadow: 0 0 4px #000, 0 0 12px rgba(255, 214, 90, .7); }
   50% { box-shadow: 0 0 4px #000, 0 0 22px rgba(255, 214, 90, 1); }
 }
+/* Seta que aponta do balão para o elemento-alvo do tutorial. */
+#tutorial-overlay .tutorial-arrow {
+  position: fixed; z-index: 2; width: 0; height: 0;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .6));
+  animation: tutorial-arrow-bounce .8s ease-in-out infinite;
+}
+#tutorial-overlay .tutorial-arrow.up {
+  border-left: 11px solid transparent; border-right: 11px solid transparent;
+  border-bottom: 13px solid #ffd65a;
+}
+#tutorial-overlay .tutorial-arrow.down {
+  border-left: 11px solid transparent; border-right: 11px solid transparent;
+  border-top: 13px solid #ffd65a;
+  animation-name: tutorial-arrow-bounce-down;
+}
+@keyframes tutorial-arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes tutorial-arrow-bounce-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
 #tutorial-overlay .tutorial-hint {
   position: fixed; z-index: 2; max-width: 300px; pointer-events: auto;
   background: #1b1812; border: 1px solid #4a3e26; border-radius: 8px;
