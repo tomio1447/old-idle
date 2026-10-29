@@ -393,6 +393,41 @@ function load() {
   } catch (e) { return null; }
 }
 
+/* Migracao: personagens criados antes do ajuste do set inicial (wiki
+ * Dawnport/Rookgaard) ficaram sem backpack de 20 slots, torch e as armas
+ * da vocacao. Concede o que faltar na mochila — sem tocar nos equipamentos.
+ * Knights recebem o trio de armas do set graduate (sword/club/axe).
+ * Idempotente: se a bag estiver cheia, o que nao couber tenta de novo no
+ * proximo load; a flag so marca quando o personagem ja tem tudo. */
+function grantMissingStarterItems(p) {
+  if (!p || p._starterKitV2) return;
+  if (typeof addItem !== "function") return;
+  const has = (slug) => {
+    if (p.equip) for (const s in p.equip) if (p.equip[s] && p.equip[s].item === slug) return true;
+    return !!(p.bag && p.bag[slug]);
+  };
+  const kit = {
+    knight: ["jagged-sword", "daramian-mace", "steel-axe"],
+    druid: ["chiller", "spellbook-of-the-novice"],
+    sorcerer: ["scorcher", "spellbook-of-the-novice"],
+    paladin: ["bow"],
+    monk: ["simple-jo-staff"],
+  };
+  const faltam = ["torch"].concat(kit[p.voc] || []).filter((slug) => !has(slug));
+  let completo = true;
+  for (const slug of faltam) {
+    // item ainda nao registrado no GAMEDATA (ex.: scorcher/chiller do
+    // supplies.js) — tenta de novo no proximo load em vez de marcar feito
+    if (!GAMEDATA.items[slug] || !addItem(p, slug, 1)) completo = false;
+  }
+  // backpack de 20 slots so substitui a bag antiga — nunca rebaixa container
+  if (!p.equip) p.equip = {};
+  if (!p.equip.backpack || p.equip.backpack.item === "bag") {
+    p.equip.backpack = { item: "backpack", count: 1 };
+  }
+  if (completo) p._starterKitV2 = true;
+}
+
 function normalizePlayer(p) {
   // Migracao: o quiver tinha um slot proprio inventado. No Tibia ele ocupa a
   // mao secundaria, entao saves antigos precisam mover o item para `shield`
@@ -616,6 +651,7 @@ function normalizePlayer(p) {
   migrateAmmoToCounter(p);   // saves antigos guardavam munição na bag
   if (typeof ensurePlayerCapacity === "function") ensurePlayerCapacity(p);
   ensureOutfit(p);
+  grantMissingStarterItems(p);  // set inicial retroativo (chars pré-ajuste)
   return p;
 }
 
