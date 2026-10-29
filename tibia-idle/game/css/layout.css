@@ -4504,6 +4504,25 @@ body.fullhd .scene-overlay { font-size: 13px; }
   width: 100%; min-height: 64px; font-size: 10px; font-family: inherit;
   background: #0f0d0a; color: #c8c0a8; border: 1px solid #2a2620; padding: 6px;
 }
+.store-voucher-box {
+  background: #14120e; border: 1px solid #2a2620; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px; max-width: 420px;
+}
+.store-voucher-row { display: flex; gap: 8px; }
+.store-voucher-row input {
+  flex: 1; padding: 7px 8px;
+  background: #0f0d0a; color: var(--text-bright, #e8e2d0);
+  border: 2px solid; border-color: #16140f #5a5348 #5a5348 #16140f;
+  font: 13px Verdana, sans-serif; text-transform: uppercase; letter-spacing: .08em;
+}
+.store-voucher-row input:focus { outline: 1px solid var(--gold, #d4af37); }
+.store-voucher-row button {
+  flex: none; padding: 7px 16px; cursor: pointer;
+  font: 700 11px Verdana, sans-serif; letter-spacing: .04em;
+  background: #35301f; color: #ffe680; border: 1px solid var(--gold, #d4af37);
+}
+.store-voucher-row button:hover { background: #423c26; }
+.store-voucher-row button:disabled { opacity: .55; cursor: default; }
 .store-admin-kpis {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px; margin-bottom: 10px;

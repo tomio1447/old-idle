@@ -14,7 +14,7 @@
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
  *   POST /api/coins      { token, amount }             -> Admin altera Tibia Coins
- *   GET/POST /api/store/*  catálogo, checkout MP, VIP, ledger, webhook
+ *   GET/POST /api/store/*  catálogo, checkout MP, VIP, voucher, ledger, webhook
  *   GET  /api/chat/history + POST /api/chat/send       -> chat global
  *   POST /api/chat/ticket + GET /api/chat/events       -> SSE do chat
  *   GET  /api/online-count                            -> PLAYER ON (leases/instâncias)
@@ -4491,6 +4491,11 @@ async function main() {
       if (req.method === "POST" && url === "/api/store/vip") {
         const body = await readBody(req);
         const r = await store.buyVip(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/store/voucher") {
+        const body = await readBody(req);
+        const r = await store.redeemVoucher(db, body);
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/store/history") {

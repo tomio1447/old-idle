@@ -61,7 +61,7 @@ function openStoreModal(tab) {
       <b>STORE</b>
       <span class="tiny dim" style="margin-left:6px">Gamestore</span>
       <span style="flex:1"></span>
-      <span class="tiny" style="color:#ffe680">🪙 ${typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins()}</span>
+      <span class="tiny" id="store-coin-count" style="color:#ffe680">🪙 ${typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins()}</span>
       <span class="tiny dim" style="margin-left:8px">${storeEsc(storeVipLabel())}</span>
       <button class="sm" id="store-close">✕</button>
     </div>
@@ -87,6 +87,7 @@ function renderStoreNav() {
     { id: "vip", nome: "VIP" },
     { id: "coins", nome: "Obter Coins" },
     { id: "sell", nome: "Vender Coins", beta: true },
+    { id: "vouchers", nome: "Vouchers" },
     { id: "history", nome: "Histórico" },
   ];
   if (storeIsAdmin()) tabs.push({ id: "admin", nome: "Faturamento" });
@@ -119,6 +120,7 @@ async function renderStoreTab() {
   if (_storeTab === "vip") return renderStoreVip(main);
   if (_storeTab === "coins") return renderStoreBuy(main);
   if (_storeTab === "sell") return renderStoreSell(main);
+  if (_storeTab === "vouchers") return renderStoreVouchers(main);
   if (_storeTab === "history") return renderStoreHistory(main);
   if (_storeTab === "admin") return renderStoreAdmin(main);
 }
@@ -448,6 +450,77 @@ async function renderStoreAdmin(main) {
         ${ledger.map((l) => `<tr><td>${storeEsc(l.login)}</td><td>${storeEsc(l.kind)}</td><td>${l.delta}</td><td>${storeBrl((l.brlCents || 0) / 100)}</td><td>${storeEsc(l.note)}</td></tr>`).join("")}
       </tbody></table>
     </div>`;
+}
+
+/* ------------------------------ VOUCHERS ------------------------------
+ * Códigos de brinde divulgados nas redes. Cada voucher tem limite de uso por
+ * conta — o servidor valida e entrega a recompensa (coins na conta / itens no
+ * depot da conta). */
+function renderStoreVouchers(main) {
+  main.innerHTML = `
+    <div class="store-hero">
+      <img src="assets/ui/coins/tibia-coins.gif" alt="" class="coin-gif" style="width:28px;height:28px">
+      <div>
+        <div class="small" style="color:#ffe680">Vouchers de brinde</div>
+        <div class="tiny dim">Digite o código e confira. Itens são entregues no <b>depot da conta</b> — qualquer personagem pode pegar.</div>
+      </div>
+    </div>
+    <div class="store-voucher-box">
+      <label class="tiny dim" for="store-voucher-code">Código do voucher</label>
+      <div class="store-voucher-row">
+        <input type="text" id="store-voucher-code" maxlength="40" autocomplete="off"
+               spellcheck="false" placeholder="EX: FREETC" />
+        <button type="button" id="store-voucher-btn">CONFERIR</button>
+      </div>
+      <div id="store-voucher-msg" class="tiny" style="min-height:16px"></div>
+    </div>
+    <div class="tiny dim" style="margin-top:10px">
+      Fique de olho nos códigos postados no <b>Discord</b>, <b>Instagram</b> e no <b>grupo do WhatsApp</b>. Cada voucher pode ser usado <b>1 vez por conta</b>.
+    </div>`;
+
+  const input = $("#store-voucher-code");
+  const btn = $("#store-voucher-btn");
+  const msgEl = $("#store-voucher-msg");
+  let busy = false;
+
+  const setMsg = (text, color) => {
+    msgEl.textContent = text || "";
+    msgEl.style.color = color || "#a49b84";
+  };
+
+  const redeem = async () => {
+    if (busy) return;
+    const code = String(input.value || "").trim();
+    if (!code) { setMsg("Digite um código de voucher.", "#ff9a6a"); input.focus(); return; }
+    busy = true;
+    btn.disabled = true;
+    btn.textContent = "CONFERINDO...";
+    setMsg("Verificando no servidor...", "#a49b84");
+    try {
+      const r = await storeRedeemVoucher(sessionToken(), code);
+      if (r && r.ok) {
+        const parts = [r.label || "Brinde resgatado"];
+        if (r.items && r.items.length) parts.push(r.items.length + " item(ns) no depot da conta");
+        setMsg("✔ " + parts.join(" — "), "#9ce84a");
+        input.value = "";
+        const cc = $("#store-coin-count");
+        if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+      } else {
+        setMsg("✖ " + ((r && r.msg) || "Falha ao resgatar voucher"), "#ff9a6a");
+      }
+    } catch (e) {
+      setMsg("✖ Erro de rede — tente de novo", "#ff9a6a");
+    } finally {
+      busy = false;
+      btn.disabled = false;
+      btn.textContent = "CONFERIR";
+      input.focus();
+    }
+  };
+
+  btn.addEventListener("click", redeem);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") redeem(); });
+  input.focus();
 }
 
 function bootStoreFromQuery() {

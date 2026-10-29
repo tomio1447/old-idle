@@ -355,6 +355,85 @@ async function adminSummary(db, token, opts) {
   } };
 }
 
+/* ------------------------------- VOUCHERS -------------------------------
+ * Códigos de brinde resgatados na aba VOUCHERS da STORE. Cada voucher é
+ * limitado a 1 uso por conta (voucher_redemptions garante o unique). A
+ * recompensa pode ser coins (creditados na conta) e/ou itens entregues no
+ * DEPOT da conta (shared_inventory). */
+const VOUCHERS = {
+  FREETC: { coins: 1500, label: "1500 Tibia Coins" },
+  // futuros: { items: [{ slug: "x", qty: 1, instanced: false, tier: 0 }], label: "..." }
+};
+
+async function redeemVoucher(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const code = String((body && body.code) || "").trim().toUpperCase().slice(0, 40);
+  const v = code && VOUCHERS[code];
+  if (!v) return { code: 400, body: { ok: false, msg: "Voucher inválido" } };
+
+  // Reserva o resgate ANTES de creditar: o UNIQUE (code, account_id) decide
+  // corridas entre requisições simultâneas — só um ganha.
+  if (typeof db.voucherClaim === "function") {
+    const claimed = await db.voucherClaim(acc.id, code);
+    if (!claimed) return { code: 400, body: { ok: false, msg: "Voucher já resgatado nesta conta" } };
+  }
+
+  let coins = Math.max(0, Number(acc.coins) || 0);
+  if (v.coins) {
+    coins += Math.floor(Number(v.coins));
+    await db.updateCoins(acc.id, coins);
+    await addLedger(db, {
+      accountId: acc.id, login: acc.login, kind: "grant",
+      delta: v.coins, coinsAfter: coins, brlCents: 0,
+      ref: "voucher:" + code, note: "Voucher " + code + " — " + (v.label || "brinde"),
+    });
+  }
+
+  // Itens do voucher vão para o DEPOT da conta (shared_inventory), no mesmo
+  // formato que o market usa: instanciados viram itemInstances loc "depot" +
+  // id na lista; stackáveis entram como slug por unidade. Cap de 30 slots.
+  const entregues = [];
+  if (Array.isArray(v.items) && v.items.length &&
+      typeof db.accountSharedInventory === "function" &&
+      typeof db.setAccountSharedInventory === "function") {
+    const shared = await db.accountSharedInventory(acc.id);
+    shared.seq = Math.max(0, Math.floor(Number(shared.seq) || 0));
+    shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
+    shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
+    const usedIds = new Set(shared.itemInstances.map((i) => String(i && i.id)));
+    const nextId = () => {
+      let id;
+      do { id = "ai-" + (++shared.seq).toString(36); } while (usedIds.has(id));
+      usedIds.add(id);
+      return id;
+    };
+    for (const it of v.items) {
+      const slug = String((it && it.slug) || "");
+      const qty = Math.max(1, Math.floor(Number(it && it.qty) || 1));
+      if (!slug) continue;
+      for (let k = 0; k < qty && shared.depot.length < 30; k++) {
+        if (it.instanced) {
+          const id = nextId();
+          shared.itemInstances.push({ id, slug, loc: "depot", tier: Math.max(0, Number(it.tier) || 0) });
+          shared.depot.push(id);
+        } else {
+          shared.depot.push(slug);
+        }
+        entregues.push(slug);
+      }
+    }
+    if (entregues.length) await db.setAccountSharedInventory(acc.id, shared);
+  }
+
+  return { code: 200, body: {
+    ok: true, code, coins,
+    label: v.label || "brinde",
+    items: entregues,
+    msg: (v.label || "Brinde") + " resgatado!",
+  } };
+}
+
 async function recordGrant(db, acc, amount, after) {
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: amount >= 0 ? "grant" : "grant",
@@ -365,5 +444,5 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, mpConfigured, COIN_PACKS, VIP_PACKS,
+  recordGrant, redeemVoucher, mpConfigured, COIN_PACKS, VIP_PACKS, VOUCHERS,
 };

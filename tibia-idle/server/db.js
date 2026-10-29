@@ -99,6 +99,7 @@ function JsonStore() {
   const storeData = this._load("store.json", null);
   this.storeOrders = Array.isArray(storeData && storeData.orders) ? storeData.orders : [];
   this.coinLedger = Array.isArray(storeData && storeData.ledger) ? storeData.ledger : [];
+  this.vouchers = Array.isArray(storeData && storeData.vouchers) ? storeData.vouchers : [];
   this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
@@ -136,7 +137,8 @@ JsonStore.prototype._save = function () {
 };
 JsonStore.prototype._saveStore = function () {
   fs.writeFileSync(path.join(DATA_DIR, "store.json"),
-    JSON.stringify({ orders: this.storeOrders || [], ledger: this.coinLedger || [] }, null, 1));
+    JSON.stringify({ orders: this.storeOrders || [], ledger: this.coinLedger || [],
+                     vouchers: this.vouchers || [] }, null, 1));
 };
 JsonStore.prototype._pruneSnapshots = function () {
   const list = Array.isArray(this.snapshots) ? this.snapshots : [];
@@ -569,6 +571,14 @@ JsonStore.prototype.storeOrdersByAccount = function (accountId, limit) {
   const n = Math.max(1, Math.min(200, Number(limit) || 40));
   return (this.storeOrders || []).filter((o) => Number(o.accountId) === Number(accountId))
     .sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
+};
+JsonStore.prototype.voucherClaim = function (accountId, code) {
+  const key = Number(accountId) + ":" + String(code || "").toUpperCase();
+  this.vouchers = this.vouchers || [];
+  if (this.vouchers.indexOf(key) !== -1) return false;
+  this.vouchers.push(key);
+  this._saveStore();
+  return true;
 };
 JsonStore.prototype.coinLedgerAdd = function (row) {
   const entry = Object.assign({ id: ++this._coinLedgerSeq }, row || {});
@@ -1582,6 +1592,16 @@ async function MysqlStore() {
       const rows = await this.query("SELECT * FROM store_orders WHERE account_id=? ORDER BY id DESC LIMIT ?",
         [Number(accountId), n]);
       return rows.map(hydrateStoreOrder);
+    },
+    async voucherClaim(accountId, code) {
+      try {
+        await this.run("INSERT INTO voucher_redemptions (account_id, code) VALUES (?, ?)",
+          [Number(accountId), String(code || "")]);
+        return true;
+      } catch (e) {
+        if (e && (e.code === "ER_DUP_ENTRY" || e.errno === 1062)) return false;
+        throw e;
+      }
     },
     async coinLedgerAdd(row) {
       const r = await this.run(
@@ -2716,6 +2736,13 @@ async function ensureSchema(pool) {
     token CHAR(64) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NULL
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS voucher_redemptions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    code VARCHAR(40) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_voucher_account (account_id, code)
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS account_leases (
     account_id INT UNSIGNED PRIMARY KEY,

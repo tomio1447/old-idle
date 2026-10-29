@@ -2246,6 +2246,11 @@ async function storeAdminSummary(token) {
   const r = await _api("GET", "/api/store/admin", null, token);
   return r.data || { ok: false, msg: "Falha ao carregar o faturamento" };
 }
+async function storeRedeemVoucher(token, code) {
+  const r = await _api("POST", "/api/store/voucher", { token, code });
+  if (r.data && r.data.ok && r.data.coins != null) storeApplyCoins(r.data.coins);
+  return r.data || { ok: false, msg: "Falha ao resgatar voucher" };
+}
 
 /* ------------------------------ PARTY (multiplayer) ------------------------------
  * Convites assíncronos + follow. API crua (accountParty*) — os wrappers de
