@@ -1836,6 +1836,10 @@ button.full { width: 100%; }
 }
 .field input:focus, .field select:focus { outline: 1px solid var(--gold); }
 
+/* Campos do form de conta: reduzidos e centralizados para ficarem
+   dentro da área útil do artwork do modal (bordas laterais do frame). */
+#account-login .field { width: 84%; margin: 0 auto 10px; }
+
 /* Botões de imagem para login */
 #acc-btn-login, #acc-open-register {
   display: flex;
