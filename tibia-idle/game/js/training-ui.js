@@ -13,8 +13,35 @@ function bindTrainingButton() {
 function trainingCharacters() {
   return G.training && G.training.members ? G.training.members.map((m) => m.p) : trainingPartyPlayers();
 }
+/* Todos os personagens da conta — membros da área de treino primeiro
+ * (objetos vivos da sessão), depois os demais do roster/cache online.
+ * Permite configurar o treino de qualquer char sem trocar o ativo. */
+function trainingAccountCharacters() {
+  const byId = new Map();
+  const add = (p) => {
+    if (!p || p.id == null || byId.has(String(p.id))) return;
+    if (typeof ensurePlayerEquip === "function") ensurePlayerEquip(p);
+    ensureTraining(p);
+    byId.set(String(p.id), p);
+  };
+  for (const m of (G.training && G.training.members) || []) add(m.p);
+  const all = typeof promotionAccountCharacters === "function"
+    ? promotionAccountCharacters()
+    : (typeof getCharacters === "function" ? getCharacters() : []);
+  for (const p of all) add(p);
+  return Array.from(byId.values());
+}
 function trainingCharacter(id) {
-  return trainingCharacters().find((p) => String(p.id) === String(id)) || G.p;
+  return trainingAccountCharacters().find((p) => String(p.id) === String(id)) || G.p;
+}
+/* saveCharacterToRoster marca o char como ativo no storage — restaura o
+ * ativo da sessão quando o alvo editado é outro personagem. */
+function saveTrainingRosterChar(p) {
+  if (!p || typeof saveCharacterToRoster !== "function") return;
+  let active = null;
+  try { active = localStorage.getItem(typeof ACTIVE_CHARACTER_KEY !== "undefined" ? ACTIVE_CHARACTER_KEY : "tibia-idle-active-character-v1"); } catch (e) {}
+  saveCharacterToRoster(p);
+  try { if (active) localStorage.setItem(typeof ACTIVE_CHARACTER_KEY !== "undefined" ? ACTIVE_CHARACTER_KEY : "tibia-idle-active-character-v1", active); } catch (e) {}
 }
 
 function trainingSkillIcon(skill, p) {
@@ -35,12 +62,14 @@ function openTrainingModal(charId) {
   TRAINING_MODAL.pending = {};
   const state = ensureTraining(p);
 
+  const lastingCount = Math.max(0, Math.floor(Number(state.balances.lasting) || 0));
   const skillCells = TRAINING_SKILLS.map((skill) => {
     const active = state.skill === skill;
     const label = skill === "magic" ? "Magic Level" : (SKILL_NAMES[skill] || skill);
     const lvl = skill === "magic" ? (p.ml || 0) : ((p.skills && p.skills[skill]) || 10);
     return `<button class="tr-skill-cell ${active ? "sel" : ""}" data-tr-skill="${skill}" type="button">
-      <img src="${trainingSkillIcon(skill, p)}" alt="">
+      <span class="tr-icon-wrap"><img src="${trainingSkillIcon(skill, p)}" alt="">
+        <span class="tr-charge-badge" title="Cargas de Lasting Exercise Weapon">${fmtFull(lastingCount)}</span></span>
       <span class="tr-skill-name">${label}</span>
       <span class="tr-skill-lvl">${fmtFull(lvl)}</span>
     </button>`;
@@ -131,9 +160,8 @@ function openTrainingModal(charId) {
   $("#training-apply").onclick = async () => {
     const skill = TRAINING_MODAL.pending.skill || state.skill;
     const planId = TRAINING_MODAL.pending.plan || state.activePlan;
-    state.skill = skill;
-    state.weapon = trainingWeaponForSkill(skill, p);
-    state.active = true;
+    const online = typeof partyOnlineMode === "function" && partyOnlineMode()
+      && typeof accountSetTrainingConfig === "function" && typeof sessionToken === "function" && sessionToken();
 
     let result = { ok: true, msg: "Treino atualizado." };
     if (planId === "free") {
@@ -146,7 +174,19 @@ function openTrainingModal(charId) {
     if (result.trainingExercise) Object.assign(state, result.trainingExercise);
     if (!result.ok) { toast(result.msg); return; }
 
-    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+    state.skill = skill;
+    state.weapon = trainingWeaponForSkill(skill, p);
+    state.active = true;
+
+    /* Online: a config de treino é autoritativa no servidor — vale para
+     * qualquer char da conta, inclusive fora da party/instância. */
+    if (online) {
+      const r = await accountSetTrainingConfig(sessionToken(), p.id, skill, state.activePlan);
+      if (r && r.trainingExercise) Object.assign(state, r.trainingExercise);
+      if (r && !r.ok) { toast(r.msg || "Treino salvo apenas localmente.", "bad"); return; }
+    }
+
+    saveTrainingRosterChar(p);
     const member = G.training && G.training.members.find((m) => String(m.id) === String(p.id));
     if (member) { member.skill = state.skill; member.weapon = state.weapon; }
     toast(result.msg, "level");
@@ -162,14 +202,19 @@ function renderTrainingPanel() {
   const box = $("#training-box");
   if (!box) return;
   if (!G.training) { box.style.display = "none"; return; }
-  const rows = (G.training.members || []).map((m) => {
-    const s = ensureTraining(m.p), plan = trainingPlan(m.p);
-    const disabled = m.p.remoteTraining ? "disabled" : "";
+  const memberIds = new Set((G.training.members || []).map((m) => String(m.id)));
+  const rows = trainingAccountCharacters().map((p) => {
+    const s = ensureTraining(p), plan = trainingPlan(p);
+    const disabled = p.remoteTraining ? "disabled" : "";
+    const inArea = memberIds.has(String(p.id));
     const charges = plan.id === "free" ? "∞" : fmtFull(s.balances[plan.id] || 0);
+    const lasting = Math.max(0, Math.floor(Number(s.balances.lasting) || 0));
     const skillLabel = s.skill === "magic" ? "Magic Level" : (SKILL_NAMES[s.skill] || s.skill);
-    return `<button class="training-char" data-training-char="${m.id}" ${disabled} type="button">
-      <img src="${TRAINING_ICON_PATH + EXERCISE_WEAPONS[s.weapon].icon}" class="tr-char-icon" alt="">
-      <span class="tr-char-info"><b>${m.p.name}</b><small>${skillLabel}</small></span>
+    return `<button class="training-char ${inArea ? "" : "outside"}" data-training-char="${p.id}" ${disabled}
+        title="${p.remoteTraining ? "Configurado no cliente do jogador" : (inArea ? "" : "Fora da área de treino — clique para configurar")}" type="button">
+      <span class="tr-icon-wrap"><img src="${TRAINING_ICON_PATH + EXERCISE_WEAPONS[s.weapon].icon}" class="tr-char-icon" alt="">
+        <span class="tr-charge-badge" title="Cargas de Lasting Exercise Weapon">${fmtFull(lasting)}</span></span>
+      <span class="tr-char-info"><b>${p.name}</b><small>${skillLabel}</small></span>
       <span class="tr-char-plan"><span>${plan.name}</span><small>${charges} cargas</small></span>
     </button>`;
   }).join("");

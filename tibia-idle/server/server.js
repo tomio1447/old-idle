@@ -240,12 +240,10 @@ function applyDailyExerciseReward(p,weaponId){
   const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
   const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
   if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
-  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0))+DAILY_EXERCISE_CHARGES;
-  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0));
-  // O bônus é uma Exercise Weapon: ativa o plano para o jogador já sair
-  // treinando, a menos que ele tenha uma Lasting ativa comprada.
-  const activePlan=prior.activePlan==="lasting"&&(balances.lasting>0)?"lasting":"exercise";
-  p.trainingExercise={skill,weapon:String(weaponId),activePlan,balances,active:true};
+  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0));
+  // O bônus cai no pool Lasting — acumula com as cargas compradas na store.
+  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0))+DAILY_EXERCISE_CHARGES;
+  p.trainingExercise={skill,weapon:String(weaponId),activePlan:"lasting",balances,active:true};
   p.dailyRewardDay=info.rewardDay;
   return {charges:DAILY_EXERCISE_CHARGES,trainingExercise:p.trainingExercise};
 }
@@ -1461,7 +1459,7 @@ async function claimDailyExerciseReward(db,body){
         if(persisted.code!==200)return persisted;
         persisted.body.trainingExercise=claimedPlayer.trainingExercise;
         persisted.body.dailyReward=dailyRewardInfo(claimedPlayer);
-        persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Exercise Weapon coletadas.`;
+        persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Lasting Exercise Weapon coletadas.`;
         return persisted;
       }
       if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
@@ -1479,7 +1477,90 @@ async function claimDailyExerciseReward(db,body){
   if(persisted.code!==200)return persisted;
   persisted.body.trainingExercise=p.trainingExercise;
   persisted.body.dailyReward=dailyRewardInfo(p);
-  persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Exercise Weapon coletadas.`;
+  persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Lasting Exercise Weapon coletadas.`;
+  return persisted;
+}
+
+/* Configuração de treino por personagem — skill + modalidade de qualquer
+ * char da conta sem trocar o ativo. Mesma autoridade do buyTrainingPlan:
+ * lease + expected_version; instância ativa recebe patch no snapshot. */
+const TRAINING_CONFIG_SKILLS=["sword","axe","club","dist","magic","shield","fist"];
+function applyTrainingConfig(p,skill,planId){
+  if(TRAINING_CONFIG_SKILLS.indexOf(skill)<0)
+    return {code:400,body:{ok:false,error:"TRAINING_INVALID_SKILL",msg:"Skill de treino inválido."}};
+  if(planId!=="free"&&!TRAINING_STORE[planId])
+    return {code:400,body:{ok:false,error:"TRAINING_INVALID_PLAN",msg:"Modalidade inválida."}};
+  const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
+  const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
+  if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
+  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0));
+  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0));
+  if(planId!=="free"&&(balances[planId]||0)<=0)
+    return {code:409,body:{ok:false,error:"TRAINING_NO_CHARGES",msg:"Sem cargas desta modalidade — compre um pacote."}};
+  const weapon=skill==="magic"?(/druid/i.test(String(p.voc||""))?"exercise-rod":"exercise-wand")
+    :({"sword":"exercise-sword","axe":"exercise-axe","club":"exercise-club","dist":"exercise-bow",
+      "shield":"exercise-shield","fist":"exercise-wraps"})[skill]||"exercise-sword";
+  p.trainingExercise={skill,weapon,activePlan:planId,balances,active:true};
+  return {ok:true,trainingExercise:p.trainingExercise};
+}
+async function setTrainingConfig(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id!==undefined?body.char_id:body.id);
+  if(!Number.isSafeInteger(charId)||charId<=0)
+    return {code:400,body:{ok:false,error:"TRAINING_INVALID",msg:"Personagem inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const skill=String(body.skill||""),planId=String(body.plan||"free");
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);
+  if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active")break;
+      let applied=null,patchedPlayer=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p)return null;
+        applied=applyTrainingConfig(item.p,skill,planId);
+        if(!applied.ok)return null;
+        patchedPlayer=cloneJson(item.p);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(applied&&!applied.ok)return {code:applied.code,body:applied.body};
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+          status:result.instance.status,source:"training-config",holderId:String(body.holder_id||"")});
+        const fresh=await db.findCharacter(charId);
+        const persisted=await persistClaimedPlayer(db,acc,fresh||character,patchedPlayer,lease);
+        if(persisted.code!==200)return persisted;
+        persisted.body.trainingExercise=patchedPlayer.trainingExercise;
+        persisted.body.msg="Treino atualizado.";
+        return persisted;
+      }
+      if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a configuração"}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+    }
+    if(last&&last.error==="INSTANCE_NOT_ACTIVE"){/* cai no save do personagem */}
+    else if(last&&!last.ok)
+      return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível configurar o treino",
+        instance:instanceSummary(last.instance,true)}};
+  }
+  const p=await loadCityPlayer(db,acc,character);
+  const applied=applyTrainingConfig(p,skill,planId);
+  if(!applied.ok)return {code:applied.code,body:applied.body};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  persisted.body.trainingExercise=p.trainingExercise;
+  persisted.body.msg="Treino atualizado.";
   return persisted;
 }
 
@@ -4357,6 +4438,9 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/training/config") {
+        const r = await setTrainingConfig(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/training/daily-reward") {
         const q=new URL(req.url,"http://x").searchParams;

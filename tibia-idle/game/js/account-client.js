@@ -838,6 +838,27 @@ function accountBuyTrainingPlan(token,charId,plan){
   });
 }
 
+/* Configura skill + modalidade de treino de qualquer char da conta, sem
+ * trocar o personagem ativo — o servidor aplica no save (ou no snapshot
+ * da instância, se o alvo estiver dentro dela). */
+function accountSetTrainingConfig(token,charId,skill,plan){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),skill:String(skill),plan:String(plan||"free"),
+      expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/training/config",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id&&r.data.trainingExercise)
+        G.p.trainingExercise=r.data.trainingExercise;
+      return {ok:true,msg:r.data.msg,trainingExercise:r.data.trainingExercise};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível configurar o treino",code:r.code};
+  });
+}
+
 function accountDailyRewardStatus(token,charId){
   if(typeof accountApiConfigured!=="function"||!accountApiConfigured())
     return Promise.resolve({ok:false});
@@ -845,9 +866,10 @@ function accountDailyRewardStatus(token,charId){
     .then((r)=>(r&&r.data&&r.data.ok)?r.data:{ok:false})
     .catch(()=>({ok:false}));
 }
-/* Coleta o bônus do server save diário (3000 cargas de Exercise Weapon).
- * A escolha da arma define o skill treinado; claimedDay é server-owned —
- * não acumula se o jogador deixar passar um ciclo. */
+/* Coleta o bônus do server save diário (3000 cargas de Lasting Exercise
+ * Weapon — acumula com as compradas na store). A escolha da arma define
+ * o skill treinado; claimedDay é server-owned — não acumula se o
+ * jogador deixar passar um ciclo. */
 function accountClaimDailyReward(token,charId,weapon){
   return accountQueueSave(async()=>{
     if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};

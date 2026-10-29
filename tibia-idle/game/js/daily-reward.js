@@ -1,10 +1,11 @@
 "use strict";
 /* daily-reward.js — coleta do bônus do server save diário (00h, Brasília).
  *
- * O servidor libera +3000 cargas de Exercise Weapon para TODOS os
- * personagens a cada server save. O jogador escolhe a arma (define o skill
- * treinado) e coleta pelo modal. claimedDay é server-owned — o bônus não
- * acumula: sem coletar, o próximo server save o substitui.
+ * O servidor libera +3000 cargas de Lasting Exercise Weapon para TODOS os
+ * personagens a cada server save — acumulam com as cargas compradas na
+ * store. O jogador escolhe a arma (define o skill treinado) e coleta pelo
+ * modal. claimedDay é server-owned — o bônus não acumula: sem coletar, o
+ * próximo server save o substitui.
  */
 
 const DAILY_REWARD_STATE = { checking: false, shownDay: "", timer: null };
@@ -68,7 +69,7 @@ function openDailyRewardModal(p, status) {
     const meta = (typeof EXERCISE_WEAPONS !== "undefined" && EXERCISE_WEAPONS[id]) || {};
     const isVoc = vocWeapons.includes(id);
     return `<button class="dr-card ${isVoc ? "voc" : "off"}" data-dr-weapon="${id}" type="button">
-      <img src="${TRAINING_ICON_PATH}${meta.icon || "exercise-sword.gif"}" alt="${meta.name || id}">
+      <img src="${TRAINING_ICON_PATH}${String(meta.icon || "exercise-sword.gif").replace("exercise-", "lasting-")}" alt="${meta.name || id}">
       <span class="dr-name">${meta.name || id}</span>
       <span class="dr-tag ${isVoc ? "in" : "out"}">${isVoc ? "sua vocação" : "fora da vocação"}</span>
     </button>`;
@@ -81,7 +82,8 @@ function openDailyRewardModal(p, status) {
     <div class="panel-body daily-reward-body">
       <div class="tiny dim center mb8">
         O servidor executou o <b>server save</b> diário (00h — Brasília).
-        Colete <b style="color:#9ce84a">${fmt(charges)}</b> cargas de Exercise Weapon.
+        Colete <b style="color:#9ce84a">${fmt(charges)}</b> cargas de Lasting Exercise Weapon
+        (somam com as compradas na store).
       </div>
       <div class="dr-grid">${cards}</div>
       <div class="dr-note">
