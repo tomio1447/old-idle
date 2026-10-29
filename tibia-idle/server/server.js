@@ -14,7 +14,7 @@
  *   PUT  /api/characters/:id { token, expected_version, data } -> save versionado
  *   POST /api/party/save { token, party_version, characters } -> save transacional
  *   POST /api/coins      { token, amount }             -> Admin altera Tibia Coins
- *   GET/POST /api/store/*  catálogo, checkout MP, VIP, voucher, ledger, webhook
+ *   GET/POST /api/store/*  catálogo, checkout MP, VIP, voucher, cosmetics, ledger, webhook
  *   GET  /api/chat/history + POST /api/chat/send       -> chat global
  *   POST /api/chat/ticket + GET /api/chat/events       -> SSE do chat
  *   GET  /api/online-count                            -> PLAYER ON (leases/instâncias)
@@ -635,6 +635,7 @@ function accountPublicView(acc){
     vipUntil, vip:vipUntil>Date.now(),
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
     tutorial:acc.tutorial||{},
+    cosmetics:(acc.cosmetics&&typeof acc.cosmetics==="object"&&!Array.isArray(acc.cosmetics))?acc.cosmetics:{},
   };
 }
 async function ensureAccountWallet(db,acc){
@@ -4491,6 +4492,11 @@ async function main() {
       if (req.method === "POST" && url === "/api/store/vip") {
         const body = await readBody(req);
         const r = await store.buyVip(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/store/cosmetic") {
+        const body = await readBody(req);
+        const r = await store.buyCosmetic(db, body);
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/store/voucher") {

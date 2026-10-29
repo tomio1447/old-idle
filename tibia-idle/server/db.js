@@ -535,7 +535,7 @@ JsonStore.prototype.createAccount = function (login, hash, role, coins, email) {
                 email: String(email || "").slice(0, 120),
                 email_verified: 0, email_code: "", email_code_expires: 0,
                 role: role || "user", coins: coins || 0, gold: 0, gold_migrated: true,
-                vip_until: 0, market_gold: 0,
+                vip_until: 0, market_gold: 0, cosmetics: {},
                 created_at: new Date().toISOString() };
   this.accounts.push(acc);
   this._save();
@@ -571,6 +571,13 @@ JsonStore.prototype.storeOrdersByAccount = function (accountId, limit) {
   const n = Math.max(1, Math.min(200, Number(limit) || 40));
   return (this.storeOrders || []).filter((o) => Number(o.accountId) === Number(accountId))
     .sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
+};
+JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.cosmetics = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
+  this._save();
+  return a;
 };
 JsonStore.prototype.voucherClaim = function (accountId, code) {
   const key = Number(accountId) + ":" + String(code || "").toUpperCase();
@@ -1411,7 +1418,7 @@ async function MysqlStore() {
   function hydrateAccount(row) {
     if (!row) return null;
     const out = Object.assign({}, row);
-    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"], ["tutorial", "tutorial"]]) {
+    for (const [col, key] of [["missions", "missions"], ["missions_done", "missionsDone"], ["tutorial", "tutorial"], ["cosmetics", "cosmetics"]]) {
       let v = row[col];
       if (typeof v === "string") {
         try { v = JSON.parse(v); } catch (e) { v = {}; }
@@ -1498,12 +1505,18 @@ async function MysqlStore() {
     async createAccount(login, hash, role, coins, email) {
       const em = String(email || "").slice(0, 120);
       const r = await this.run(
-        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done, tutorial) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}', '{}')",
+        "INSERT INTO accounts (login, password_hash, email, role, coins, gold, gold_migrated, vip_until, missions, missions_done, tutorial, cosmetics) VALUES (?, ?, ?, ?, ?, 0, 1, 0, '{}', '{}', '{}', '{}')",
         [login, hash, em, role || "user", coins || 0]);
       return { id: r.insertId, login, password_hash: hash, email: em,
         email_verified: 0, email_code: "", email_code_expires: 0,
         role: role || "user", coins: coins || 0,
-        gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {} };
+        gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {}, cosmetics: {} };
+    },
+    async setAccountCosmetics(accountId, cosmetics) {
+      const c = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
+      await this.run("UPDATE accounts SET cosmetics = ? WHERE id = ?",
+        [JSON.stringify(c), Number(accountId)]);
+      return this.findAccountById(accountId);
     },
     async setAccountMissions(accountId, missions, missionsDone) {
       const m = missions && typeof missions === "object" && !Array.isArray(missions) ? missions : {};
@@ -1793,7 +1806,7 @@ async function MysqlStore() {
       const rows = await this.query(
         `SELECT a.* FROM accounts a JOIN sessions s ON s.account_id=a.id
          WHERE s.token=? AND (s.expires_at IS NULL OR s.expires_at>NOW())`,[token]);
-      return rows[0] || null;
+      return hydrateAccount(rows[0] || null);
     },
     async createSession(accountId, token, expiresAt) {
       await this.run("DELETE FROM sessions WHERE account_id=?",[Number(accountId)]);
@@ -2967,6 +2980,8 @@ async function ensureSchema(pool) {
   try { await pool.query("ALTER TABLE accounts ADD COLUMN shared_inventory MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN tutorial MEDIUMTEXT NULL"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN cosmetics MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -434,6 +434,101 @@ async function redeemVoucher(db, body) {
   } };
 }
 
+/* --------------------------- COSMETICS (wardrobe) -----------------------
+ * Outfits e mounts comprados por TC ficam na CONTA (accounts.cosmetics) e
+ * valem para todos os personagens — modelo account-wide da Store real.
+ * O catálogo é o mesmo do cliente (appearancedata.js): outfits por id base
+ * (sem sufixo -m/-f, pares de nome distinto viram uma entrada só — ex.
+ * Noblewoman/Nobleman). */
+const COSMETIC_PRICE = 125;
+const COS_SEX_BASE_PAIR = {
+  noblewoman: "nobleman", nobleman: "noblewoman",
+  norsewoman: "norseman", norseman: "norsewoman",
+  "retro-noblewoman": "retro-nobleman", "retro-nobleman": "retro-noblewoman",
+};
+function cosmeticBaseName(id) {
+  return String(id || "").replace(/-[mf](-\d+)?$/, "").replace(/-\d+$/, "");
+}
+function cosmeticCanonical(id) {
+  const base = cosmeticBaseName(id);
+  const pair = COS_SEX_BASE_PAIR[base];
+  return pair && pair < base ? pair : base;
+}
+let _cosmeticCatalog = null;
+function cosmeticCatalog() {
+  if (_cosmeticCatalog) return _cosmeticCatalog;
+  _cosmeticCatalog = { outfits: {}, mounts: {} };
+  try {
+    const fs = require("fs"), path = require("path");
+    const src = fs.readFileSync(path.join(__dirname, "..", "game", "js", "appearancedata.js"), "utf8");
+    const window = {};
+    new Function("window", src)(window);
+    const A = window.APPEARANCES || {};
+    for (const o of A.outfits || []) {
+      if (!o || o.sexo === "avatar") continue;
+      const key = cosmeticCanonical(o.id);
+      if (!key) continue;
+      const cur = _cosmeticCatalog.outfits[key];
+      if (!cur) _cosmeticCatalog.outfits[key] = { nome: o.nome, premium: !!o.premium };
+      else if (o.premium) cur.premium = true;
+    }
+    for (const m of A.mounts || []) {
+      if (!m || !m.id) continue;
+      _cosmeticCatalog.mounts[String(m.id)] = { nome: m.nome, premium: !!m.premium };
+    }
+  } catch (e) {
+    console.warn("[store] falha ao carregar catálogo de cosméticos:", e.message);
+  }
+  return _cosmeticCatalog;
+}
+function sanitizeCosmetics(raw) {
+  const c = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const outfits = {}, mounts = {};
+  if (c.outfits && typeof c.outfits === "object" && !Array.isArray(c.outfits))
+    for (const k of Object.keys(c.outfits))
+      outfits[String(k).slice(0, 80)] = Math.max(0, Math.min(3, Math.floor(Number(c.outfits[k]) || 0)));
+  if (c.mounts && typeof c.mounts === "object" && !Array.isArray(c.mounts))
+    for (const k of Object.keys(c.mounts))
+      if (c.mounts[k]) mounts[String(k).slice(0, 80)] = true;
+  return { outfits, mounts };
+}
+
+async function buyCosmetic(db, body) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const kind = String((body && body.kind) || "");
+  const id = String((body && body.id) || "").slice(0, 80);
+  const cat = cosmeticCatalog();
+  const table = kind === "outfit" ? cat.outfits : kind === "mount" ? cat.mounts : null;
+  const entry = table && table[id];
+  if (!entry) return { code: 400, body: { ok: false, msg: "Item cosmético inválido" } };
+
+  const cosmetics = sanitizeCosmetics(acc.cosmetics);
+  const owned = kind === "outfit" ? cosmetics.outfits[id] !== undefined : !!cosmetics.mounts[id];
+  if (owned) return { code: 400, body: { ok: false, msg: "Você já possui esse item", cosmetics } };
+
+  const coins = Math.max(0, Number(acc.coins) || 0);
+  if (coins < COSMETIC_PRICE)
+    return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes", coins } };
+
+  const novo = coins - COSMETIC_PRICE;
+  await db.updateCoins(acc.id, novo);
+  if (kind === "outfit") cosmetics.outfits[id] = 0;
+  else cosmetics.mounts[id] = true;
+  if (typeof db.setAccountCosmetics === "function")
+    await db.setAccountCosmetics(acc.id, cosmetics);
+  await addLedger(db, {
+    accountId: acc.id, login: acc.login, kind: "cosmetic",
+    delta: -COSMETIC_PRICE, coinsAfter: novo, brlCents: 0,
+    ref: "cosmetic:" + kind + ":" + id,
+    note: "Store " + kind + ": " + (entry.nome || id),
+  });
+  return { code: 200, body: {
+    ok: true, kind, id, nome: entry.nome, coins: novo, cosmetics,
+    msg: (entry.nome || id) + " desbloqueado para todos os personagens da conta!",
+  } };
+}
+
 async function recordGrant(db, acc, amount, after) {
   await addLedger(db, {
     accountId: acc.id, login: acc.login, kind: amount >= 0 ? "grant" : "grant",
@@ -444,5 +539,6 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, mpConfigured, COIN_PACKS, VIP_PACKS, VOUCHERS,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured,
+  COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE,
 };

@@ -87,6 +87,8 @@ function renderStoreNav() {
     { id: "vip", nome: "VIP" },
     { id: "coins", nome: "Obter Coins" },
     { id: "sell", nome: "Vender Coins", beta: true },
+    { id: "outfits", nome: "Outfits" },
+    { id: "mounts", nome: "Mounts" },
     { id: "vouchers", nome: "Vouchers" },
     { id: "history", nome: "Histórico" },
   ];
@@ -120,6 +122,8 @@ async function renderStoreTab() {
   if (_storeTab === "vip") return renderStoreVip(main);
   if (_storeTab === "coins") return renderStoreBuy(main);
   if (_storeTab === "sell") return renderStoreSell(main);
+  if (_storeTab === "outfits") return renderStoreCosmetics(main, "outfit");
+  if (_storeTab === "mounts") return renderStoreCosmetics(main, "mount");
   if (_storeTab === "vouchers") return renderStoreVouchers(main);
   if (_storeTab === "history") return renderStoreHistory(main);
   if (_storeTab === "admin") return renderStoreAdmin(main);
@@ -450,6 +454,155 @@ async function renderStoreAdmin(main) {
         ${ledger.map((l) => `<tr><td>${storeEsc(l.login)}</td><td>${storeEsc(l.kind)}</td><td>${l.delta}</td><td>${storeBrl((l.brlCents || 0) / 100)}</td><td>${storeEsc(l.note)}</td></tr>`).join("")}
       </tbody></table>
     </div>`;
+}
+
+/* ------------------------- OUTFITS & MOUNTS (cosméticos) ----------------
+ * Cada item custa COS_PRICE TC e desbloqueia na CONTA (acc.cosmetics) para
+ * todos os personagens. Outfits são listados pelo id base canônico (mesma
+ * regra do servidor) e exibidos com o sprite do sexo do personagem ativo. */
+const STORE_COS_PRICE = 125;
+let _storeCosBusca = "";
+
+function storeCosmetics() {
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    const c = acc && acc.cosmetics && typeof acc.cosmetics === "object" ? acc.cosmetics : {};
+    return { outfits: c.outfits || {}, mounts: c.mounts || {} };
+  } catch (e) { return { outfits: {}, mounts: {} }; }
+}
+
+function storeCosList(kind) {
+  const p = (typeof G !== "undefined" && G && G.p) ? G.p : null;
+  const sexo = p ? (typeof sexSuffix === "function" ? sexSuffix(p)
+    : (p.sex === "female" ? "f" : "m")) : "m";
+  const data = (typeof APPEARANCE_DATA !== "undefined" ? APPEARANCE_DATA
+    : (typeof window !== "undefined" && window.APPEARANCES) || {});
+  if (kind === "outfit") {
+    const byBase = {};
+    for (const o of data.outfits || []) {
+      if (!o || o.sexo === "avatar") continue;
+      const key = (typeof cosmeticOutfitKey === "function" ? cosmeticOutfitKey(o.id)
+        : String(o.id).replace(/-[mf](-\d+)?$/, "").replace(/-\d+$/, ""));
+      if (!key) continue;
+      const cur = byBase[key] || (byBase[key] = { key, nome: o.nome, premium: !!o.premium, ids: {} });
+      cur.ids[o.sexo] = o.id;
+      if (o.premium) cur.premium = true;
+    }
+    return Object.values(byBase)
+      .map((e) => Object.assign({}, e, { displayId: e.ids[sexo] || e.ids.m || e.ids.f }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+  return (data.mounts || [])
+    .filter((m) => m && m.id)
+    .map((m) => ({ key: String(m.id), nome: m.nome, displayId: m.id, premium: !!m.premium }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function renderStoreCosmetics(main, kind) {
+  const label = kind === "outfit" ? "Outfits" : "Montarias";
+  main.innerHTML = `
+    <div class="store-hero">
+      <img src="assets/ui/coins/tibia-coins.gif" alt="" class="coin-gif" style="width:28px;height:28px">
+      <div>
+        <div class="small" style="color:#ffe680">${label} — ${STORE_COS_PRICE} TC cada</div>
+        <div class="tiny dim">Desbloqueio por <b>conta</b>: vale para todos os personagens. Use no Cyclopedia &gt; Aparência.</div>
+      </div>
+    </div>
+    <div class="store-voucher-row" style="max-width:340px;margin-bottom:8px">
+      <input type="text" id="store-cos-busca" maxlength="40" autocomplete="off"
+             spellcheck="false" placeholder="Buscar ${label.toLowerCase()}..."
+             value="${storeEsc(_storeCosBusca)}" />
+    </div>
+    <div class="tiny dim mb4" id="store-cos-count"></div>
+    <div class="app-grid store-cos-grid" id="store-cos-grid"></div>`;
+
+  const paintOutfits = () => {
+    const p = (typeof G !== "undefined" && G && G.p) ? G.p : null;
+    const cores = (p && p.outfit && p.outfit.colors) ||
+      (typeof DEFAULT_OUTFIT_COLORS !== "undefined" &&
+        (DEFAULT_OUTFIT_COLORS[p && p.voc] || DEFAULT_OUTFIT_COLORS.none)) || [78, 68, 58, 76];
+    const alvos = $$(".store-cos-grid [data-cos-paint]");
+    let i = 0;
+    const lote = () => {
+      if (!document.body.contains(main)) return;
+      let feitos = 0;
+      while (i < alvos.length && feitos < 12) {
+        const box = alvos[i];
+        const cv = (typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.outfit)
+          ? AppearanceRenderer.outfit(box.dataset.cosPaint, 0, cores) : null;
+        if (!cv) break;
+        cv.style.width = "48px"; cv.style.height = "52px";
+        cv.style.imageRendering = "pixelated"; cv.style.objectFit = "contain";
+        box.innerHTML = "";
+        box.appendChild(cv);
+        i++; feitos++;
+      }
+      if (i < alvos.length) requestAnimationFrame(lote);
+    };
+    requestAnimationFrame(lote);
+  };
+
+  const renderGrid = () => {
+    const grid = $("#store-cos-grid");
+    if (!grid) return;
+    const cos = storeCosmetics();
+    const busca = (_storeCosBusca || "").toLowerCase();
+    let lista = storeCosList(kind);
+    if (busca) lista = lista.filter((e) => (e.nome || "").toLowerCase().indexOf(busca) !== -1);
+    const cnt = $("#store-cos-count");
+    if (cnt) cnt.textContent = lista.length + " " + label.toLowerCase();
+    grid.innerHTML = lista.map((e) => {
+      const tem = kind === "outfit" ? cos.outfits[e.key] !== undefined : !!cos.mounts[e.key];
+      return `<div class="app-card ${tem ? "" : "bloq"}">
+        <div class="app-img" ${kind === "outfit" ? `data-cos-paint="${storeEsc(e.displayId)}"` : ""}>
+          ${kind === "mount" ? `<img src="assets/appearance/mount/${storeEsc(e.displayId)}.base.png" alt="${storeEsc(e.nome)}" loading="lazy">`
+                             : `<div class="tiny dim app-img-loading">…</div>`}
+        </div>
+        <div class="tiny">${storeEsc(e.nome)}</div>
+        <button class="sm cos-buy" data-cos-kind="${kind}" data-cos-key="${storeEsc(e.key)}"
+          ${tem ? "disabled" : ""}>${tem ? "Adquirido" : STORE_COS_PRICE + " TC"}</button>
+      </div>`;
+    }).join("");
+    if (kind === "outfit") paintOutfits();
+  };
+
+  // Busca: re-renderiza só o grid (mantém foco no input)
+  const inp = $("#store-cos-busca");
+  inp.addEventListener("input", () => { _storeCosBusca = inp.value; renderGrid(); });
+  inp.addEventListener("keydown", (e) => e.stopPropagation());
+
+  // Compra com confirmação em 2 cliques no próprio botão (delegação: o grid
+  // é re-renderizado pela busca, então listener no container pai)
+  $("#store-cos-grid").addEventListener("click", async (e) => {
+    const b = e.target.closest(".cos-buy");
+    if (!b || b.disabled) return;
+    if (b.dataset.confirm !== "1") {
+      b.dataset.confirm = "1";
+      const old = b.textContent;
+      b.textContent = "Confirmar?";
+      setTimeout(() => { if (b.isConnected && b.dataset.confirm === "1") { b.dataset.confirm = ""; b.textContent = old; } }, 3000);
+      return;
+    }
+    if (b.dataset.busy === "1") return;
+    b.dataset.busy = "1";
+    b.disabled = true;
+    b.textContent = "...";
+    const k = b.dataset.cosKind, key = b.dataset.cosKey;
+    const r = await storeBuyCosmetic(sessionToken(), k, key);
+    if (r && r.ok) {
+      if (typeof toast === "function") toast(`<b>${storeEsc(r.nome || key)}</b> desbloqueado na conta!`);
+      const cc = $("#store-coin-count");
+      if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+      renderGrid();
+    } else {
+      b.dataset.busy = "";
+      b.disabled = false;
+      b.textContent = STORE_COS_PRICE + " TC";
+      if (typeof toast === "function") toast((r && r.msg) || "Falha na compra");
+    }
+  });
+
+  renderGrid();
 }
 
 /* ------------------------------ VOUCHERS ------------------------------

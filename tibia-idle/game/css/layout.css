@@ -4523,6 +4523,9 @@ body.fullhd .scene-overlay { font-size: 13px; }
 }
 .store-voucher-row button:hover { background: #423c26; }
 .store-voucher-row button:disabled { opacity: .55; cursor: default; }
+.store-cos-grid .app-card { cursor: default; }
+.store-cos-grid .cos-buy { width: 100%; margin-top: 3px; }
+.store-cos-grid .cos-buy:disabled { opacity: .6; cursor: default; }
 .store-admin-kpis {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px; margin-bottom: 10px;

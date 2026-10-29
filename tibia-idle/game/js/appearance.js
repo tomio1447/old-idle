@@ -239,14 +239,37 @@ function ensureWardrobe(p) {
   return p.wardrobe;
 }
 
+/* Chave account-level da outfit no acc.cosmetics (compras da STORE).
+ * Pares com nome distinto por sexo (Noblewoman/Nobleman…) dividem a mesma
+ * chave canônica — a menor lexicografica — como no servidor. */
+function cosmeticOutfitKey(id) {
+  const base = appearanceBaseName(id);
+  const pair = APP_SEX_BASE_PAIR[base];
+  return pair && pair < base ? pair : base;
+}
+
+function accountCosmetics() {
+  try {
+    const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
+    return (acc && acc.cosmetics && typeof acc.cosmetics === "object") ? acc.cosmetics : null;
+  } catch (e) { return null; }
+}
+
 function ownsOutfit(p, id) {
   ensureWardrobe(p);
-  return p.wardrobe.outfits[id] !== undefined;
+  if (p.wardrobe.outfits[id] !== undefined) return true;
+  const cos = accountCosmetics();
+  if (cos && cos.outfits && cos.outfits[cosmeticOutfitKey(id)] !== undefined) return true;
+  return false;
 }
 
 function ownedAddons(p, id) {
   ensureWardrobe(p);
-  return p.wardrobe.outfits[id] || 0;
+  if (p.wardrobe.outfits[id] !== undefined) return p.wardrobe.outfits[id] || 0;
+  const cos = accountCosmetics();
+  if (cos && cos.outfits && cos.outfits[cosmeticOutfitKey(id)] !== undefined)
+    return cos.outfits[cosmeticOutfitKey(id)] || 0;
+  return 0;
 }
 
 function ownsMount(p, id) {
@@ -255,6 +278,7 @@ function ownsMount(p, id) {
   try {
     const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
     if (acc && acc.mounts && acc.mounts[id]) return true;
+    if (acc && acc.cosmetics && acc.cosmetics.mounts && acc.cosmetics.mounts[id]) return true;
   } catch (e) { /* offline */ }
   return false;
 }
