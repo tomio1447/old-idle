@@ -518,28 +518,43 @@ function renderStoreCosmetics(main, kind) {
     <div class="tiny dim mb4" id="store-cos-count"></div>
     <div class="app-grid store-cos-grid" id="store-cos-grid"></div>`;
 
-  const paintOutfits = () => {
+  const paintSprites = () => {
     const p = (typeof G !== "undefined" && G && G.p) ? G.p : null;
     const cores = (p && p.outfit && p.outfit.colors) ||
       (typeof DEFAULT_OUTFIT_COLORS !== "undefined" &&
         (DEFAULT_OUTFIT_COLORS[p && p.voc] || DEFAULT_OUTFIT_COLORS.none)) || [78, 68, 58, 76];
-    const alvos = $$(".store-cos-grid [data-cos-paint]");
-    let i = 0;
+    const pend = $$(".store-cos-grid [data-cos-paint], .store-cos-grid [data-mount-paint]").slice();
+    const started = Date.now();
     const lote = () => {
-      if (!document.body.contains(main)) return;
+      if (!document.body.contains(main) || !pend.length) return;
+      const rest = [];
       let feitos = 0;
-      while (i < alvos.length && feitos < 12) {
-        const box = alvos[i];
-        const cv = (typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.outfit)
-          ? AppearanceRenderer.outfit(box.dataset.cosPaint, 0, cores) : null;
-        if (!cv) break;
+      for (const box of pend) {
+        if (feitos >= 12) { rest.push(box); continue; }
+        const mountId = box.dataset.mountPaint;
+        // Asset falhou de vez (404 em Sprites): marca e nao retenta.
+        if (mountId && typeof Sprites !== "undefined" && Sprites.cache &&
+            Sprites.cache["assets/appearance/mount/" + mountId + ".base.png"] === null) {
+          box.innerHTML = '<div class="tiny dim" style="padding-top:20px">?</div>';
+          feitos++;
+          continue;
+        }
+        const cv = mountId
+          ? ((typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.mount)
+              ? AppearanceRenderer.mount(mountId, "s", 0) : null)
+          : ((typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.outfit)
+              ? AppearanceRenderer.outfit(box.dataset.cosPaint, 0, cores) : null);
+        if (!cv) { rest.push(box); continue; }
         cv.style.width = "48px"; cv.style.height = "52px";
         cv.style.imageRendering = "pixelated"; cv.style.objectFit = "contain";
         box.innerHTML = "";
         box.appendChild(cv);
-        i++; feitos++;
+        feitos++;
       }
-      if (i < alvos.length) requestAnimationFrame(lote);
+      pend.length = 0;
+      pend.push.apply(pend, rest);
+      // Sprites carregam sob demanda: retenta enquanto houver pendente.
+      if (pend.length && Date.now() - started < 30000) requestAnimationFrame(lote);
     };
     requestAnimationFrame(lote);
   };
@@ -556,16 +571,15 @@ function renderStoreCosmetics(main, kind) {
     grid.innerHTML = lista.map((e) => {
       const tem = kind === "outfit" ? cos.outfits[e.key] !== undefined : !!cos.mounts[e.key];
       return `<div class="app-card ${tem ? "" : "bloq"}">
-        <div class="app-img" ${kind === "outfit" ? `data-cos-paint="${storeEsc(e.displayId)}"` : ""}>
-          ${kind === "mount" ? `<img src="assets/appearance/mount/${storeEsc(e.displayId)}.base.png" alt="${storeEsc(e.nome)}" loading="lazy">`
-                             : `<div class="tiny dim app-img-loading">…</div>`}
+        <div class="app-img" ${kind === "outfit" ? `data-cos-paint="${storeEsc(e.displayId)}"` : `data-mount-paint="${storeEsc(e.displayId)}"`}>
+          <div class="tiny dim app-img-loading">…</div>
         </div>
         <div class="tiny">${storeEsc(e.nome)}</div>
         <button class="sm cos-buy" data-cos-kind="${kind}" data-cos-key="${storeEsc(e.key)}"
           ${tem ? "disabled" : ""}>${tem ? "Adquirido" : STORE_COS_PRICE + " TC"}</button>
       </div>`;
     }).join("");
-    if (kind === "outfit") paintOutfits();
+    paintSprites();
   };
 
   // Busca: re-renderiza só o grid (mantém foco no input)
