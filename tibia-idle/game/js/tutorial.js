@@ -38,7 +38,8 @@ let TUTORIAL_CLAIMING = false;
 /* ------------------------------------------------------------- estado */
 function tutorialDefaultState() {
   return { charIds: [], partyDone: false, huntEntered: false,
-    helperDone: {}, helperHintShown: false, rewardGranted: false };
+    helperDone: {}, helperHintShown: false, rewardGranted: false,
+    skipped: false, choice: null };
 }
 function tutorialLoadState() {
   const acc = (typeof sessionAccount === "function") ? sessionAccount() : null;
@@ -178,11 +179,75 @@ function tutorialFirstVisible(selectors) {
   return null;
 }
 
+/* ------------------------------------------------- escolha inicial */
+/* Ao entrar no jogo a conta decide: fazer o tutorial (com recompensa de
+ * VIP + exercise weapons) ou pular. Skip marca state.skipped — o tick
+ * para de guiar e cada personagem recebe o Helper pré-configurado na
+ * primeira vez que carregar (tutorialApplyHelperDefaults). */
+function tutorialRenderChoiceStep(state) {
+  tutorialRender(null,
+    `<b>Bem-vindo ao Global-Idle!</b><br><br>
+     O tutorial te guia para criar <b>4 personagens de vocações diferentes</b>,
+     montar a party, entrar na primeira hunt e configurar o <b>Helper</b> de
+     cada um — com recompensa de <b>${TUTORIAL_VIP_DAYS} dias de VIP</b> e
+     exercise weapons no final.<br><br>
+     Se pular, o Helper dos seus personagens já vem pré-configurado
+     (cura, potions de HP e mana), mas <b>sem a recompensa</b>.`,
+    [
+      { label: "Fazer tutorial", primary: true, onClick: () => {
+        state.choice = "tutorial";
+        tutorialSaveState(state);
+      } },
+      { label: "Pular tutorial", onClick: () => {
+        state.skipped = true;
+        state.choice = "skip";
+        tutorialSaveState(state);
+        if (typeof G !== "undefined" && G && G.p) {
+          if (tutorialApplyHelperDefaults(G.p) && typeof save === "function") save();
+          if (typeof helperSyncLiveCombat === "function") helperSyncLiveCombat(G.p);
+        }
+        tutorialHideOverlay();
+        if (typeof toast === "function")
+          toast("Tutorial pulado — Helper pré-configurado.", "info");
+      } },
+    ]);
+}
+
+/* ------------------------------------------- helper pré-configurado */
+/* Aplica ao personagem a configuração que o tutorial ensina (categorias
+ * Healing Spells / Health Potions / Mana Potions) e cria o preset HUNT —
+ * mesmo estado final esperado de quem conclui o tutorial. Roda no load
+ * de cada personagem de conta com tutorial pulado; idempotente via flag. */
+function tutorialApplyHelperDefaults(p) {
+  if (!p || p._tutorialHelperApplied) return false;
+  const state = tutorialLoadState();
+  if (!state.skipped) return false;
+  p._tutorialHelperApplied = true;
+  if (tutorialHelperConfigured(p)) return false; // já configurado manualmente
+  p.config = p.config || {};
+  const healId = p.voc === "knight" ? "exura-ico" : "exura";
+  p.config.healSpells = [{ id: healId, at: 80 }];
+  p.config.healItemAt = 70;
+  p.config.healAt = 80;
+  p.config.healSupply = "health-potion";
+  p.config.manaSupply = "mana-potion";
+  p.config.manaAt = 50;
+  p.config.useRunes = true;
+  if (typeof helperPresetCreate === "function") helperPresetCreate(p, "HUNT");
+  return true;
+}
+
 /* --------------------------------------------------- tela de vocacoes */
 /* Tela de criacao de personagem (conta): so orienta (nao bloqueia) —
  * escurece as vocacoes ja usadas por outro personagem da conta e mostra
  * uma faixa com o progresso "X/4". Roda sempre (independe de fase). */
 function tutorialPatchVocationScreen() {
+  const state = tutorialLoadState();
+  if (state.skipped || state.rewardGranted || !state.choice) {
+    const old = document.getElementById("tutorial-voc-banner");
+    if (old) old.remove();
+    return;
+  }
   const grid = document.getElementById("acc-voc-grid");
   const nameInput = document.getElementById("new-char-name") || document.getElementById("acc-char-name");
   if (!grid || !nameInput) return;
@@ -418,6 +483,8 @@ function tutorialTick() {
 
   const state = tutorialLoadState();
   if (state.rewardGranted) { tutorialHideOverlay(); tutorialGrantExerciseIfDue(G.p); return; }
+  if (state.skipped) { tutorialHideOverlay(); return; }
+  if (!state.choice) { tutorialRenderChoiceStep(state); return; }
 
   const chars = tutorialCharacters();
   const vocMap = tutorialDistinctVocMap(chars);

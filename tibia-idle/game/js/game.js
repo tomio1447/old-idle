@@ -652,6 +652,7 @@ function normalizePlayer(p) {
   if (typeof ensurePlayerCapacity === "function") ensurePlayerCapacity(p);
   ensureOutfit(p);
   grantMissingStarterItems(p);  // set inicial retroativo (chars pré-ajuste)
+  if (typeof tutorialApplyHelperDefaults === "function") tutorialApplyHelperDefaults(p);
   return p;
 }
 
