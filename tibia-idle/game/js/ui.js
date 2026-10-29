@@ -1142,18 +1142,20 @@ function openHuntInfoModal(id) {
       <span class="risk ${soon ? "mid" : risk.cls}" style="margin-right:6px">${soon ? "em breve" : risk.txt}</span>
       <button class="sm" id="huntinfo-close">✕</button>
     </div>
-    <div class="panel-body">
-      ${soon ? `<div class="tiny mb8" style="color:#e8d24a">Mapa em breve. A missão de Fear (15×) já está pré-setada para liberar Goshnar's Spite.</div>` : ""}
-      ${!soon && risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
-      <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
-        <span class="tiny dim">Dificuldade <b>${stars}/5</b></span>
-        <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
-        <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>
-        <span class="tiny dim">Pack: <b>${packLabel}</b> criaturas</span>
-        <span class="tiny dim">Respawn: <b>${hu.respawn || 0.8}s</b></span>
+    <div class="panel-body huntinfo-body">
+      <div class="hunt-monsters-wrap">
+        ${soon ? `<div class="tiny mb8" style="color:#e8d24a">Mapa em breve. A missão de Fear (15×) já está pré-setada para liberar Goshnar's Spite.</div>` : ""}
+        ${!soon && risk.cls === "high" ? `<div class="tiny mb8" style="color:#ff9a6a">⚠ Local não recomendado para a sua faixa de nível — risco alto de morte.</div>` : ""}
+        <div class="huntinfo-summary row wrap" style="gap:10px;margin-bottom:8px">
+          <span class="tiny dim">Dificuldade <b>${stars}/5</b></span>
+          <span class="tiny dim">XP/h ~ <b style="color:#9ce84a">${fmt(hu.avgExp * 3600 / 60)}</b></span>
+          <span class="tiny dim">Instância: <b style="color:${modo === "pvp" ? "#ff9a6a" : "#9ce84a"}">${modo}</b></span>
+          <span class="tiny dim">Pack: <b>${packLabel}</b> criaturas</span>
+          <span class="tiny dim">Respawn: <b>${hu.respawn || 0.8}s</b></span>
+        </div>
+        <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
       </div>
-      <div class="hunt-monsters">${hu.monsters.map(monsterCard).join("")}</div>
-      <div class="row mt8" style="gap:6px;justify-content:flex-end">
+      <div class="row mt8 huntinfo-actions" style="gap:6px;justify-content:flex-end">
         <button class="sm" id="huntinfo-cancel">Cancelar</button>
         <button class="primary sm" id="huntinfo-go" ${soon ? "disabled" : ""}>${soon ? "Em breve" : `⚔ Caçar em ${hu.name}`}</button>
       </div>

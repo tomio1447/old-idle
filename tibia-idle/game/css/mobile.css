@@ -443,6 +443,11 @@ html[data-ui-mode="mobile"] .imb-col-center,
 html[data-ui-mode="mobile"] .imb-col-right {
   max-height: 42vh;
 }
+/* Modal de hunts limitado à viewport: o conteúdo rola internamente e o
+   botão Caçar permanece alcançável em telas verticais. */
+html[data-ui-mode="mobile"] .modal-bg .modal.hunts-modal-shell {
+  max-height: calc(100dvh - var(--mobile-safe-t) - var(--mobile-safe-b)) !important;
+}
 html[data-ui-mode="mobile"] #hunts-modal-list {
   grid-template-columns: 1fr !important;
 }

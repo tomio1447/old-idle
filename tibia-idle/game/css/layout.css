@@ -1295,13 +1295,30 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   box-shadow:none;
   padding:64px 70px 64px 70px;
   max-height:calc(100vh - 32px);
+  max-height:calc(100dvh - 32px);
   overflow:hidden;
   display:flex; flex-direction:column;
 }
 .modal-bg .modal.hunts-modal-shell .panel-title,
 .modal-bg .modal.hunts-modal-shell .panel-body { background:transparent; border-bottom:none; }
 .modal-bg .modal.hunts-modal-shell .panel-title { color:#e8d4a2; padding:4px 0; flex:0 0 auto; }
-.modal-bg .modal.hunts-modal-shell .panel-body { padding:0; color:#e8dfd0; overflow-y:auto; flex:1 1 auto; }
+.modal-bg .modal.hunts-modal-shell .panel-body { padding:0; color:#e8dfd0; overflow-y:auto; flex:1 1 auto; min-height:0; }
+
+/* Detalhe da hunt: os cards de criaturas rolam, o botão Caçar fica sempre visível. */
+.modal-bg .modal.hunts-modal-shell .huntinfo-body { display:flex; flex-direction:column; overflow:hidden; }
+.huntinfo-body .hunt-monsters-wrap { flex:1 1 auto; min-height:0; overflow-y:auto; }
+.huntinfo-body .huntinfo-actions { flex:0 0 auto; padding-top:6px; }
+
+@media (max-width:640px) {
+  .modal-bg .modal.hunts-modal-shell {
+    width:calc(100vw - 12px);
+    max-height:calc(100vh - 12px);
+    max-height:calc(100dvh - 12px);
+    padding:44px 12px 14px;
+  }
+  .modal-bg .modal.hunts-modal-shell .panel-title { flex-wrap:wrap; gap:4px; }
+  .hunt-best-card { width:150px; min-width:150px; padding:6px; }
+}
 .hunts-modal-title #hunts-modal-busca { background:rgba(10,8,6,.9); border-color:#5a4a32; color:#e8dfd0; }
 #hunts-modal-list .hunt-cat-title { color:#d4af37; text-shadow:0 1px 1px #000; background:rgba(20,16,10,.85); padding:6px 8px; border:1px solid #3a3020; border-radius:4px; margin-bottom:4px; }
 #hunts-modal-list .hunts-group { background:rgba(16,12,8,.6); padding:6px; border:1px solid #2a2016; border-radius:4px; }
