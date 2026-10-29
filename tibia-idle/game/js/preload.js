@@ -43,10 +43,23 @@ function renderLoadingMonsterHint(force) {
   const art = document.getElementById("gl-hint-art");
   if (!art) return;
   const registered = new Set();
-  Object.values(GAMEDATA.hunts || {}).forEach((hunt) => {
-    (hunt && hunt.monsters || []).forEach((slug) => registered.add(String(slug)));
-    Object.keys(hunt && hunt.spawnWeights || {}).forEach((slug) => registered.add(String(slug)));
-    (hunt && hunt.bossMobs || []).forEach((slug) => registered.add(String(slug)));
+  // Apenas criaturas realmente caçáveis: hunts presentes no catálogo do
+  // modal HUNTS (e não marcadas "em breve"), bosses e world bosses.
+  // GAMEDATA.hunts também guarda arenas legadas e salas de boss que o
+  // jogador não escolhe — ficam fora do hint.
+  const catalog = new Set();
+  if (typeof HUNT_MODAL_SECTIONS !== "undefined") {
+    (HUNT_MODAL_SECTIONS || []).forEach((section) => {
+      ((section && section.ids) || []).forEach((id) => catalog.add(id));
+    });
+  }
+  Object.keys(GAMEDATA.hunts || {}).forEach((id) => {
+    const hunt = GAMEDATA.hunts[id];
+    if (!hunt || hunt.comingSoon) return;
+    if (catalog.size && !catalog.has(id)) return;
+    (hunt.monsters || []).forEach((slug) => registered.add(String(slug)));
+    Object.keys(hunt.spawnWeights || {}).forEach((slug) => registered.add(String(slug)));
+    (hunt.bossMobs || []).forEach((slug) => registered.add(String(slug)));
   });
   Object.values(window.BOSS_DEFS || {}).forEach((boss) => {
     if (boss && boss.baseMonster) registered.add(String(boss.baseMonster));
@@ -64,7 +77,7 @@ function renderLoadingMonsterHint(force) {
   if (force || !LOADING_HINT_SLUG || !available.includes(LOADING_HINT_SLUG))
     LOADING_HINT_SLUG = available[Math.floor(Math.random() * available.length)];
   const monster = GAMEDATA.monsters[LOADING_HINT_SLUG];
-  art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 220) : "";
+  art.innerHTML = typeof mobImg === "function" ? mobImg(LOADING_HINT_SLUG, 84) : "";
   const name = document.getElementById("gl-hint-name");
   const hp = document.getElementById("gl-hint-hp");
   const exp = document.getElementById("gl-hint-exp");
