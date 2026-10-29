@@ -4,7 +4,7 @@
  */
 "use strict";
 const BG={el:null,versionLabel:null,particlesEl:null,_loopId:null,_toggle:true,LOOP_MS:5000,PARTICLE_COUNT:28,PARTICLE_DUR_MS:9000,
-init(){this._buildDOM();this.versionLabel=document.getElementById("client-version-label");if(this.versionLabel)this.versionLabel.textContent="Global-Idle v1.0 · "+new Date().toISOString().slice(0,10);if(!this._isGameActive())setTimeout(()=>{if(this.versionLabel)this.versionLabel.classList.add("show")},400);this._hookGameLifecycle();this._startEffectLoop()},
+init(){this._buildDOM();this.versionLabel=document.getElementById("client-version-label");if(this.versionLabel)this.versionLabel.textContent="Global-Idle Beta v1.0 · "+new Date().toISOString().slice(0,10);if(!this._isGameActive())setTimeout(()=>{if(this.versionLabel)this.versionLabel.classList.add("show")},400);this._hookGameLifecycle();this._startEffectLoop()},
 terminate(){this._stopEffectLoop();if(this.el)this.el.remove();if(this.versionLabel)this.versionLabel.remove();if(this.particlesEl)this.particlesEl.remove();this.el=this.versionLabel=this.particlesEl=null},
 hide(){
   // esconde TUDO do fundo de login (bg, overlay escuro, grid e partículas).

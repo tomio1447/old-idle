@@ -3,21 +3,20 @@
 "use strict";
 
 const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
+const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "BETA OFICIAL — obrigado a todos que testaram o alpha!",
+  "Server Save diário às 00h (Brasília): reinício aplica atualizações pendentes",
+  "Recompensa diária: +3.000 cargas de Lasting Exercise (colete no login — não acumula)",
+  "Treino: configure skill e modalidade de qualquer personagem, sem trocar",
+  "Contador de cargas Lasting nos ícones de skill e no painel TREINO",
+  "Loading screen corrigida: só criaturas caçáveis (hunts, bosses, world bosses)",
   "Templo multiplayer: veja outros jogadores na cidade, convide com clique",
-  "Presets do Helper: salve até 5 configurações e troque rapidamente",
+  "STORE: compre Tibia Coins (Pix ou cartão), VIP e venda coins",
   "Feast of Souls: bosses The Dread Maiden, Fear Feaster, Unwelcome e Pale Worm",
-  "Loot Pouch com autoseller (5 min; VIP 2 min) e Sell All ajustado",
-  "Chance de drop sempre visível; Naga Katar (0.2%) e Cobra BO (1%)",
-  "Resists de boss com ícones/valores e tooltip de loot com nome + chance",
-  "Melee não ataca à distância; modais de hunts/bosses em abas",
-  "STORE: compre Tibia Coins (Pix ou cartão), VIP e venda coins (beta)",
   "Soul War: Ebb and Flow, Rotten Wasteland, Claustrophobic Inferno",
-  "Bosses Soul War: Greed, Hatred, Spite e Malice",
-  "Hunts 1-100: Ankrahmun Tombs e Mutateds Yalahar",
-  "Hunts 100-150: Lizard Chosen Tower e Elder Wyrm Darashia",
 ];
 
 function alphaDiscordLinkHtml(label) {

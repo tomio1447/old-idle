@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=training-all-chars-v1">
+  <link rel="stylesheet" href="css/layout.css?v=beta-launch-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
@@ -45,17 +45,30 @@
 <!-- Aviso alpha (pré-login, todo page load) -->
 <div class="modal-bg" id="alpha-announce-modal" role="dialog" aria-modal="true" aria-labelledby="alpha-announce-title" aria-hidden="true">
   <div class="modal panel alpha-announce-box">
-    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">⚠ SERVIDOR DE TESTE (ALPHA)</div>
+    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">🚀 BETA OFICIAL — GLOBAL-IDLE</div>
     <div class="panel-body">
       <div class="brand-logo-wrap alpha-brand-logo">
         <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
       </div>
       <p class="small center mb8" data-i18n="alpha.warn">
-        Este é um servidor de testes. Progresso, economia e estabilidade podem mudar a qualquer momento. O beta será anunciado em breve.
+        Bem-vindo ao beta oficial! Reporte bugs e sugira melhorias no Discord ou no grupo do WhatsApp.
       </p>
-      <div class="small center mb8">
-        <span data-i18n="alpha.discord">Discord:</span>
-        <a id="alpha-announce-discord" class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">https://discord.gg/bnbh3jtvBf</a>
+      <div class="alpha-social mb8">
+        <div class="alpha-social-links">
+          <div class="small">
+            <span data-i18n="alpha.discord">Discord:</span>
+            <a id="alpha-announce-discord" class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">https://discord.gg/bnbh3jtvBf</a>
+          </div>
+          <div class="small">
+            <span data-i18n="alpha.instagram">Instagram:</span>
+            <a class="alpha-ig-link" href="https://www.instagram.com/global_idle_ot" target="_blank" rel="noopener noreferrer">@global_idle_ot</a>
+          </div>
+          <div class="small alpha-wa-line">
+            <img class="alpha-wa-logo" src="/imagens/whatsapp1.png" alt="WhatsApp">
+            <span data-i18n="alpha.whatsapp">Participe do nosso grupo no WhatsApp</span>
+          </div>
+        </div>
+        <img class="alpha-wa-qr" src="/imagens/qrwhatsapp.png" alt="QR Code — grupo do Global-Idle no WhatsApp" title="Aponte a câmera para entrar no grupo">
       </div>
       <div class="small dim mb4" data-i18n="alpha.updatesTitle">Atualizações recentes</div>
       <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
@@ -175,8 +188,9 @@
 <div id="app">
 
   <div id="alpha-test-banner" class="alpha-test-banner" role="status">
-    <span class="alpha-test-banner-text">ALPHA-TEST // O BETA IRÁ SER ANUNCIADO EM BREVE // ACESSE NOSSO DISCORD PARA DUVIDAS/REPORTS/SUGESTÕES;</span>
+    <span class="alpha-test-banner-text">BETA OFICIAL // SIGA @global_idle_ot NO INSTAGRAM // DUVIDAS/REPORTS/SUGESTÕES NO DISCORD E NO GRUPO DO WHATSAPP;</span>
     <a class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">Discord</a>
+    <a class="alpha-ig-link" href="https://www.instagram.com/global_idle_ot" target="_blank" rel="noopener noreferrer">Instagram</a>
   </div>
 
   <div class="topbar">
@@ -547,7 +561,7 @@
 <script src="js/gamedata.js?v=minotaur-oramond-east-v1"></script>
 <script src="js/gamelib-const.js"></script>
 <script src="js/modulelib.js"></script>
-<script src="js/client-background.js"></script>
+<script src="js/client-background.js?v=beta-launch-v1"></script>
 <script src="js/canarydata.js"></script>
 <script src="js/spelldata.js"></script>
 <script src="js/appearancedata.js?v=mount-zpattern-v1"></script>
@@ -630,8 +644,8 @@
 <script src="js/bosstiary.js"></script>
 <script src="js/ui.js?v=resistance-percent-v1"></script>
 <script src="js/helper-presets.js?v=helper-live-v1"></script>
-<script src="js/i18n.js?v=wz-crystal-token-v1"></script>
-<script src="js/alpha-announce.js?v=store-mp-v1"></script>
+<script src="js/i18n.js?v=beta-launch-v1"></script>
+<script src="js/alpha-announce.js?v=beta-launch-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
