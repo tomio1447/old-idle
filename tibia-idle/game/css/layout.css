@@ -802,6 +802,19 @@ canvas { image-rendering: pixelated; }
   box-shadow: 0 4px 18px rgba(0,0,0,.75);
   color: var(--text); font-size: 10px;
 }
+/* Minimizada: só o cabeçalho-pílula fica visível — sem o box escuro de
+ * 285px nem a borda que cobriam o jogo atrás do painel. */
+.mission-box.collapsed {
+  width: auto;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.mission-box.collapsed .mission-head {
+  border: 1px solid #6b5a2e;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.45);
+}
 .mission-box.survive-compact {
   width: auto;
   min-width: 0;
