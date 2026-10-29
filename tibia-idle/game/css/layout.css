@@ -1314,7 +1314,12 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .m-th-price, .m-td-price, .m-th-total, .m-td-total { width:85px; text-align:right; }
 .m-th-time, .m-td-time { width:60px; text-align:center; }
 .m-th-action, .m-td-action { width:60px; text-align:center; }
-#m-offer-list { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
+#m-offer-list { display:flex; flex-direction:column; gap:8px; flex:1; }
+.market-tabs {
+  display:flex; gap:4px; flex-wrap:wrap;
+  padding:5px; margin-bottom:6px;
+  background:#14120e; border:1px solid #16140f;
+}
 
 .modal-bg .modal.bosses-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
@@ -2311,6 +2316,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 /* ------------------------------------------------- Cyclopedia
  * Layout do cliente: coluna de abas a esquerda, conteudo a direita. */
 .modal-bg .modal.wide, .modal-bg.wide .modal { width: min(940px, 97vw); }
+.modal-bg .modal.panel.market-shell { width: min(1100px, 97vw); }
 .cyclo-wrap { display: flex; gap: 8px; align-items: stretch; min-height: 420px; }
 .cyclo-tabs {
   display: flex; flex-direction: column; gap: 2px; flex: none; width: 132px;

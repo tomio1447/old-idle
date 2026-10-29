@@ -323,7 +323,9 @@ function renderMarket() {
   _mBank = accountGold();
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
 
-  $("#modal-body").innerHTML = `
+  const modalBody = $("#modal-body");
+  modalBody.className = "modal panel market-shell";
+  modalBody.innerHTML = `
     <div class="panel-title">
       <img src="assets/ui/market/market.png" style="width:20px;height:20px;image-rendering:pixelated">
       <b>Market</b> <span class="tiny dim">player-to-player</span>
@@ -333,8 +335,8 @@ function renderMarket() {
       <button class="sm" id="market-close">✕</button>
     </div>
     <div class="panel-body">
-      <div class="row mb4" style="gap:4px;flex-wrap:wrap">
-        <button class="sm ${_mTab === "browse" ? "primary" : ""}" data-mtab="browse">�️ Navegar</button>
+      <div class="market-tabs">
+        <button class="sm ${_mTab === "browse" ? "primary" : ""}" data-mtab="browse">🔍 Navegar</button>
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
         <button class="sm ${_mTab === "coins" ? "primary" : ""}" data-mtab="coins">🪙 Tibia Coins</button>
@@ -392,20 +394,26 @@ function marketAttachItemRowEvents(body, p) {
 }
 
 function marketAttachDetailEvents(body, p) {
-  const createSellBtn = $("#m-create-sell");
-  if (createSellBtn) createSellBtn.addEventListener("click", () => {
-    const slug = createSellBtn.dataset.slug;
-    const depot = (marketDepotItems(p) || []).filter((i) => i.slug === slug);
-    if (!depot.length) { toast("Você não tem esse item no Depot para vender"); return; }
-    const i = depot[0];
-    _mSel = { slug, instId: i.instId || null, qty: i.qty || 1, tier: i.tier || 0, from: "depot" };
-    _mTab = "sell";
-    renderMarket();
-  });
-  const createBuyBtn = $("#m-create-buy");
-  if (createBuyBtn) createBuyBtn.addEventListener("click", () => {
-    _mQ = "";
-    renderMarketBuyOffer(body, p, createBuyBtn.dataset.slug);
+  const detail = $("#m-detail");
+  if (!detail || detail._mDelegated) return;
+  detail._mDelegated = true;
+  detail.addEventListener("click", (e) => {
+    const sellBtn = e.target.closest && e.target.closest("#m-create-sell");
+    if (sellBtn) {
+      const slug = sellBtn.dataset.slug;
+      const depot = (marketDepotItems(p) || []).filter((i) => i.slug === slug);
+      if (!depot.length) { toast("Você não tem esse item no Depot para vender"); return; }
+      const i = depot[0];
+      _mSel = { slug, instId: i.instId || null, qty: i.qty || 1, tier: i.tier || 0, from: "depot" };
+      _mTab = "sell";
+      renderMarket();
+      return;
+    }
+    const buyBtn = e.target.closest && e.target.closest("#m-create-buy");
+    if (buyBtn) {
+      _mQ = "";
+      renderMarketBuyOffer(body, p, buyBtn.dataset.slug);
+    }
   });
 }
 
@@ -456,50 +464,91 @@ function renderMarketBrowse(body, p) {
 
   body.innerHTML = `
     <style>
-      #market-browse { display:flex; gap:6px; height:100%; overflow:hidden; }
-      #m-cat-list { width:150px; flex:none; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
-      .m-cat { padding:5px 7px; cursor:pointer; color:#c8c0a8; border-radius:2px; font-size:12px; }
+      #market-browse { display:flex; gap:8px; height:100%; overflow:hidden; }
+      #m-side {
+        width:300px; flex:none; display:flex; flex-direction:column;
+        background:#14120e; border:1px solid #16140f; overflow:hidden;
+      }
+      .m-side-block { padding:6px; border-bottom:1px solid #1e1a12; }
+      .m-side-block:last-child { border-bottom:none; }
+      .m-side-label { font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:#8a8270; margin-bottom:4px; }
+      #m-browse-q { width:100%; box-sizing:border-box; padding:5px 7px; background:#1b1813; color:#c8c0a8; border:1px solid #16140f; }
+      .m-side-cats { max-height:128px; overflow-y:auto; }
+      .m-cat { padding:4px 7px; cursor:pointer; color:#c8c0a8; border-radius:2px; font-size:11px; }
       .m-cat:hover { background:rgba(255,255,255,.05); }
       .m-cat.active { background:#3d3830; color:#ffd700; }
-      #m-item-list { width:230px; flex:none; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
+      .m-side-filters { display:flex; gap:4px; }
+      .m-side-filters select, .m-side-filters input { flex:1; min-width:0; padding:3px; background:#1b1813; color:#c8c0a8; border:1px solid #16140f; }
+      .m-side-items { flex:1; min-height:0; overflow-y:auto; }
       .m-item-row { display:flex; align-items:center; gap:6px; padding:4px; cursor:pointer; border-bottom:1px solid rgba(0,0,0,.25); }
       .m-item-row:hover, .m-item-row.active { background:rgba(80,65,18,.35); outline:1px solid rgba(212,175,55,.32); }
       .m-item-row img, .m-item-row .item-sprite { width:24px; height:24px; object-fit:contain; flex:none; }
       .m-item-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+      .m-item-lv {
+        flex:none; font-size:9px; color:#8fd0ff;
+        background:rgba(60,90,120,.22); border:1px solid rgba(120,160,200,.3);
+        border-radius:3px; padding:0 4px; line-height:14px;
+      }
       #m-detail { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
       #m-detail-info { background:#14120e; border:1px solid #16140f; padding:8px; }
-      #m-offer-tabs { display:flex; gap:4px; }
-      #m-offer-list { flex:1; overflow-y:auto; background:#14120e; border:1px solid #16140f; padding:4px; }
-      .m-offer-row { display:flex; align-items:center; gap:6px; padding:5px; border-bottom:1px solid rgba(0,0,0,.25); }
-      .m-offer-row:hover { background:rgba(255,255,255,.04); }
+      #m-offer-list { flex:1; min-height:0; overflow:hidden; }
+      .m-offer-cols { display:flex; gap:8px; height:100%; }
+      .m-offer-col { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; background:#14120e; border:1px solid #16140f; }
+      .m-offer-head { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid #2a2520; }
+      .m-offer-title { flex:1; font-size:11px; font-weight:bold; letter-spacing:.4px; text-transform:uppercase; }
+      .m-offer-head.buy .m-offer-title { color:#9ce84a; }
+      .m-offer-head.sell .m-offer-title { color:#ffd700; }
+      .m-offer-scroll { flex:1; min-height:0; overflow-y:auto; padding:2px 4px 4px; }
+      .m-offer-col .m-offers-table { table-layout:fixed; font-size:10px; }
+      .m-offer-col .m-offers-table th, .m-offer-col .m-offers-table td { padding:4px 3px; }
+      .m-offer-col .m-th-seller, .m-offer-col .m-td-seller { width:auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .m-offer-col .m-th-qty, .m-offer-col .m-td-qty { width:32px; }
+      .m-offer-col .m-th-price, .m-offer-col .m-td-price { width:70px; }
+      .m-offer-col .m-th-total, .m-offer-col .m-td-total { width:82px; }
+      .m-offer-col .m-th-time, .m-offer-col .m-td-time { width:44px; }
+      .m-offer-col .m-th-action, .m-offer-col .m-td-action { width:64px; }
       .m-empty { color:#7d7666; font-size:11px; padding:6px; }
-      .m-section-title { font-size:12px; font-weight:bold; color:#ffd700; margin:6px 0 4px; }
+      @media (max-width: 940px) {
+        #market-browse { flex-direction:column; }
+        #m-side { width:100%; max-height:42%; }
+        .m-offer-cols { flex-direction:column; }
+      }
     </style>
     <div id="market-browse">
-      <div id="m-cat-list">${cats.map((c) => `<div class="m-cat ${_mBrowseCat === c ? "active" : ""}" data-mcat="${c}">${marketCatLabelHTML(c)}</div>`).join("")}</div>
-      <div id="m-item-list">
-        <div class="row mb2" style="gap:4px;flex-wrap:wrap">
-          <input id="m-browse-q" placeholder="buscar..." value="${_mQ}" style="flex:1;min-width:0;padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
-          <select id="m-browse-tier" style="padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
-            <option value="">Tier</option>
-            <option value="0" ${_mTier === "0" ? "selected" : ""}>T0</option>
-            <option value="1" ${_mTier === "1" ? "selected" : ""}>T1+</option>
-            <option value="5" ${_mTier === "5" ? "selected" : ""}>T5+</option>
-          </select>
-          <input id="m-browse-lvl" type="number" min="0" placeholder="Lv" value="${_mBrowseLvl}" style="width:60px;padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
-          <select id="m-browse-voc" style="padding:3px;background:#1b1813;color:#c8c0a8;border:1px solid #16140f">
-            <option value="">Vocação</option>
-            <option value="none" ${_mBrowseVoc === "none" ? "selected" : ""}>Sem vocação</option>
-            <option value="knight" ${_mBrowseVoc === "knight" ? "selected" : ""}>Knight</option>
-            <option value="paladin" ${_mBrowseVoc === "paladin" ? "selected" : ""}>Paladin</option>
-            <option value="druid" ${_mBrowseVoc === "druid" ? "selected" : ""}>Druid</option>
-            <option value="sorcerer" ${_mBrowseVoc === "sorcerer" ? "selected" : ""}>Sorcerer</option>
-            <option value="monk" ${_mBrowseVoc === "monk" ? "selected" : ""}>Monk</option>
-          </select>
+      <div id="m-side">
+        <div class="m-side-block">
+          <input id="m-browse-q" placeholder="Buscar itens..." value="${_mQ}">
         </div>
-        <div id="m-item-count" class="tiny dim" style="padding:3px 0">${totalItems} itens · mostrando ${shownItems.length}</div>
-        <div id="m-item-rows">${shownItems.length ? shownItems.map((it) => marketItemRowHTML(it)).join("") : '<div class="m-empty">Nenhum item</div>'}</div>
-        ${totalItems > MAX_RENDER_ITEMS ? `<div class="tiny dim" style="padding:4px">Apenas os ${MAX_RENDER_ITEMS} primeiros são exibidos. Refine a busca/categoria.</div>` : ""}
+        <div class="m-side-block m-side-cats">
+          <div class="m-side-label">Categorias</div>
+          <div id="m-cat-list">${cats.map((c) => `<div class="m-cat ${_mBrowseCat === c ? "active" : ""}" data-mcat="${c}">${marketCatLabelHTML(c)}</div>`).join("")}</div>
+        </div>
+        <div class="m-side-block">
+          <div class="m-side-label">Filtros</div>
+          <div class="m-side-filters">
+            <select id="m-browse-tier">
+              <option value="">Tier</option>
+              <option value="0" ${_mTier === "0" ? "selected" : ""}>T0</option>
+              <option value="1" ${_mTier === "1" ? "selected" : ""}>T1+</option>
+              <option value="5" ${_mTier === "5" ? "selected" : ""}>T5+</option>
+            </select>
+            <input id="m-browse-lvl" type="number" min="0" placeholder="Lv máx" value="${_mBrowseLvl}">
+            <select id="m-browse-voc">
+              <option value="">Vocação</option>
+              <option value="none" ${_mBrowseVoc === "none" ? "selected" : ""}>Sem vocação</option>
+              <option value="knight" ${_mBrowseVoc === "knight" ? "selected" : ""}>Knight</option>
+              <option value="paladin" ${_mBrowseVoc === "paladin" ? "selected" : ""}>Paladin</option>
+              <option value="druid" ${_mBrowseVoc === "druid" ? "selected" : ""}>Druid</option>
+              <option value="sorcerer" ${_mBrowseVoc === "sorcerer" ? "selected" : ""}>Sorcerer</option>
+              <option value="monk" ${_mBrowseVoc === "monk" ? "selected" : ""}>Monk</option>
+            </select>
+          </div>
+        </div>
+        <div class="m-side-block m-side-items">
+          <div id="m-item-count" class="tiny dim" style="padding:3px 0">${totalItems} itens · mostrando ${shownItems.length}</div>
+          <div id="m-item-rows">${shownItems.length ? shownItems.map((it) => marketItemRowHTML(it)).join("") : '<div class="m-empty">Nenhum item</div>'}</div>
+          ${totalItems > MAX_RENDER_ITEMS ? `<div class="tiny dim" style="padding:4px">Apenas os ${MAX_RENDER_ITEMS} primeiros são exibidos. Refine a busca/categoria.</div>` : ""}
+        </div>
       </div>
       <div id="m-detail">${marketDetailHTML(catalog.find((it) => it.slug === _mBrowseItem) || null)}</div>
     </div>`;
@@ -580,10 +629,12 @@ function marketItemName(slug) {
 function marketItemRowHTML(it) {
   const active = it.slug === _mBrowseItem ? "active" : "";
   const tier = it.tier ? `T${it.tier}` : "";
+  const lvl = Number(it.lvl || 0);
   return `<div class="m-item-row ${active}" data-slug="${it.slug}" title="${it.name}">
     ${itemImg(it.slug, 24, null, 1)}
     <span class="m-item-name">${it.name}</span>
     ${tier ? `<span class="tiny dim" style="color:#dab0ff">${tier}</span>` : ""}
+    ${lvl > 0 ? `<span class="m-item-lv">Lv ${lvl}</span>` : ""}
   </div>`;
 }
 
@@ -614,10 +665,6 @@ function marketDetailHTML(it) {
           <div class="tiny">Preço base: <b>${fmtFull(price)}</b> gp</div>
         </div>
       </div>
-      <div class="row mb2" style="gap:6px">
-        <button class="sm primary" id="m-create-sell" data-slug="${it.slug}" data-tier="${it.tier || 0}">+ Vender</button>
-        <button class="sm" id="m-create-buy" data-slug="${it.slug}">+ Oferta de compra</button>
-      </div>
     </div>
     <div id="m-offer-list">${_mBrowseLoading ? '<div class="m-empty">Carregando ofertas...</div>' : marketOfferListHTML()}</div>`;
 }
@@ -643,18 +690,17 @@ function marketOfferRowHTML(o, kind) {
 }
 
 function marketOffersTableHTML(offers, kind) {
-  const title = kind === "sell" ? "Sell Offers" : "Buy Offers";
-  const empty = kind === "sell" ? "Nenhuma oferta de venda" : "Nenhuma oferta de compra";
-  if (!offers.length) return `<div class="m-section-title" style="margin-top:10px">${title}</div><div class="m-empty">${empty}</div>`;
+  const empty = kind === "sell" ? "Nenhuma oferta de venda" : "Nenhuma ordem de compra";
+  if (!offers.length) return `<div class="m-empty">${empty}</div>`;
+  const who = kind === "sell" ? "Vendedor" : "Comprador";
   const rows = offers.map((o) => marketOfferRowHTML(o, kind)).join("");
   return `
-    <div class="m-section-title" style="margin-top:10px">${title}</div>
     <table class="m-offers-table">
       <thead>
         <tr>
-          <th class="m-th-seller">Vendedor</th>
+          <th class="m-th-seller">${who}</th>
           <th class="m-th-qty">Qtd</th>
-          <th class="m-th-price">Preço unit.</th>
+          <th class="m-th-price">Preço</th>
           <th class="m-th-total">Total</th>
           <th class="m-th-time">Resta</th>
           <th class="m-th-action"></th>
@@ -668,7 +714,23 @@ function marketOfferListHTML() {
   if (!_mBrowseItem || !_mBrowseOffers) return '<div class="m-empty">Selecione um item</div>';
   const sells = _mBrowseOffers.filter((o) => o.kind === "item");
   const buys = _mBrowseOffers.filter((o) => o.kind === "buy");
-  return marketOffersTableHTML(sells, "sell") + marketOffersTableHTML(buys, "buy");
+  return `
+    <div class="m-offer-cols">
+      <div class="m-offer-col">
+        <div class="m-offer-head buy">
+          <span class="m-offer-title">Ordens de compra</span>
+          <button class="sm" id="m-create-buy" data-slug="${_mBrowseItem}">+ Criar ordem de compra</button>
+        </div>
+        <div class="m-offer-scroll">${marketOffersTableHTML(buys, "buy")}</div>
+      </div>
+      <div class="m-offer-col">
+        <div class="m-offer-head sell">
+          <span class="m-offer-title">Ofertas de venda</span>
+          <button class="sm primary" id="m-create-sell" data-slug="${_mBrowseItem}">+ Vender algo</button>
+        </div>
+        <div class="m-offer-scroll">${marketOffersTableHTML(sells, "sell")}</div>
+      </div>
+    </div>`;
 }
 
 async function marketLoadItemOffers(p, slug) {
