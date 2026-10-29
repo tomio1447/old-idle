@@ -5099,6 +5099,10 @@ async function startGameReady(p) {
       addLog("info",`Instância retomada após <b>${fmtTime(Math.floor(resumeResult.elapsed/1000))}</b> em segundo plano.`);
     }
     if(off)showOfflineModal(off);
+    // Server save diário: se houver bônus de exercise weapon pendente,
+    // abre o modal de coleta (depois de eventuais modais de boot).
+    if(typeof dailyRewardCheck==="function")dailyRewardCheck(p);
+    if(typeof dailyRewardEnsureTimer==="function")dailyRewardEnsureTimer(p);
     G.last=performance.now();G.bgLast=Date.now();G.bgAcc=0;
     requestAnimationFrame(loop);
     window.addEventListener("beforeunload",save);

@@ -838,6 +838,35 @@ function accountBuyTrainingPlan(token,charId,plan){
   });
 }
 
+function accountDailyRewardStatus(token,charId){
+  if(typeof accountApiConfigured!=="function"||!accountApiConfigured())
+    return Promise.resolve({ok:false});
+  return _api("GET","/api/training/daily-reward?char_id="+encodeURIComponent(charId),null,token)
+    .then((r)=>(r&&r.data&&r.data.ok)?r.data:{ok:false})
+    .catch(()=>({ok:false}));
+}
+/* Coleta o bônus do server save diário (3000 cargas de Exercise Weapon).
+ * A escolha da arma define o skill treinado; claimedDay é server-owned —
+ * não acumula se o jogador deixar passar um ciclo. */
+function accountClaimDailyReward(token,charId,weapon){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),weapon:String(weapon),expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/training/daily-claim",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof G!=="undefined"&&G&&G.p&&String(G.p.id)===id){
+        if(r.data.trainingExercise)G.p.trainingExercise=r.data.trainingExercise;
+        if(r.data.dailyReward)G.p.dailyRewardDay=r.data.dailyReward.claimedDay;
+      }
+      return {ok:true,msg:r.data.msg,trainingExercise:r.data.trainingExercise};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível coletar a recompensa",code:r.code};
+  });
+}
+
 function accountBuyYanaPackage(token,charId,offerId){
   return accountQueueSave(async()=>{
     if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};

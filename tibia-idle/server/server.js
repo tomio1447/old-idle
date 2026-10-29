@@ -167,6 +167,89 @@ async function authorizeMaintenance(req,body,db){
   if(TEST_SERVER&&!MAINTENANCE_TOKEN)return {ok:true,via:"test-server"};
   return {ok:false};
 }
+
+/* ---------------------------------------------------------- server save
+ * Todo dia às 00:00 no fuso SERVER_SAVE_TZ o processo agenda manutenção,
+ * executa o server save (libera a recompensa diária de exercise weapon) e
+ * sai — o supervisor externo (docker --restart, pm2, systemd) sobe de novo
+ * já com as atualizações pendentes do código. SERVER_SAVE_NOEXIT=1 apenas
+ * marca o save sem reiniciar (dev local sem supervisor). */
+const SERVER_SAVE_TZ=String(process.env.SERVER_SAVE_TZ||"America/Sao_Paulo").trim()||"America/Sao_Paulo";
+const SERVER_SAVE_WARN_MS=Math.max(10000,parseInt(process.env.SERVER_SAVE_WARN_MS||"60000",10)||60000);
+const DAILY_EXERCISE_CHARGES=Math.max(1,parseInt(process.env.DAILY_EXERCISE_CHARGES||"3000",10)||3000);
+const SERVER_META_FILE=path.join(
+  process.env.GLOBAL_IDLE_DATA_DIR?path.resolve(process.env.GLOBAL_IDLE_DATA_DIR):path.join(__dirname,"data"),
+  "server-meta.json");
+function loadServerMeta(){try{return JSON.parse(fs.readFileSync(SERVER_META_FILE,"utf8"))||{};}catch(e){return{};}}
+function saveServerMeta(meta){try{fs.mkdirSync(path.dirname(SERVER_META_FILE),{recursive:true});
+  fs.writeFileSync(SERVER_META_FILE,JSON.stringify(meta));}catch(e){console.error("[server-save] meta:",e&&e.message);}}
+const SERVER_META=loadServerMeta();
+// Dia (yyyy-mm-dd no fuso do save) em que a recompensa diária foi liberada
+// pela última vez. Persistido: reinícios fora do horário não renovam bônus.
+let DAILY_REWARD_DAY=String(SERVER_META.rewardDay||"");
+function serverSaveWall(date){
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:SERVER_SAVE_TZ,hour12:false,
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+    .formatToParts(date).filter((p)=>p.type!=="literal")
+    .reduce((o,p)=>(o[p.type]=p.value,o),{});
+  return {day:`${parts.year}-${parts.month}-${parts.day}`,
+    seconds:((+parts.hour)%24)*3600+(+parts.minute)*60+(+parts.second)};
+}
+function msToServerSaveMidnight(date){
+  const wall=serverSaveWall(date);
+  return (86400-wall.seconds)*1000-Math.max(0,date.getMilliseconds());
+}
+async function runServerSave(db,day){
+  DAILY_REWARD_DAY=day;SERVER_META.rewardDay=day;SERVER_META.lastSaveAt=new Date().toISOString();
+  saveServerMeta(SERVER_META);
+  console.log("[server-save] 00:00 "+SERVER_SAVE_TZ+" — recompensa diária liberada ("+day+")");
+  try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("server-save",{day,charges:DAILY_EXERCISE_CHARGES});}catch(e){}
+  if(process.env.SERVER_SAVE_NOEXIT==="1"){console.log("[server-save] SERVER_SAVE_NOEXIT=1 — sem restart");return;}
+  // Respiro para o instance worker comitar o tick corrente antes da saída.
+  setTimeout(()=>{console.log("[server-save] reiniciando processo (pending updates)");process.exit(0);},2500);
+}
+function startServerSaveScheduler(db){
+  // Primeiro boot da feature: libera a recompensa já no deploy para todos
+  // poderem coletar. Saves seguintes só no 00:00 do fuso.
+  if(!DAILY_REWARD_DAY){DAILY_REWARD_DAY=serverSaveWall(new Date()).day;
+    SERVER_META.rewardDay=DAILY_REWARD_DAY;saveServerMeta(SERVER_META);}
+  let lastDay=serverSaveWall(new Date()).day,warned=false;
+  const timer=setInterval(()=>{
+    const now=new Date(),wall=serverSaveWall(now);
+    if(wall.day!==lastDay){lastDay=wall.day;runServerSave(db,wall.day);return;}
+    if(!warned&&msToServerSaveMidnight(now)<=SERVER_SAVE_WARN_MS){
+      warned=true;scheduleMaintenance(Math.ceil(msToServerSaveMidnight(now)/1000));}
+  },5000);
+  if(timer.unref)timer.unref();
+  console.log("[server-save] agendado — 00:00 "+SERVER_SAVE_TZ+" (rewardDay="+DAILY_REWARD_DAY+")");
+}
+const EXERCISE_REWARD_WEAPONS={"exercise-sword":"sword","exercise-axe":"axe","exercise-club":"club",
+  "exercise-bow":"dist","exercise-rod":"magic","exercise-wand":"magic","exercise-shield":"shield",
+  "exercise-wraps":"fist"};
+function dailyRewardInfo(p){
+  const claimedDay=String(p&&p.dailyRewardDay||"");
+  return {rewardDay:DAILY_REWARD_DAY,claimedDay,charges:DAILY_EXERCISE_CHARGES,
+    available:!!DAILY_REWARD_DAY&&claimedDay<DAILY_REWARD_DAY};
+}
+function applyDailyExerciseReward(p,weaponId){
+  const skill=EXERCISE_REWARD_WEAPONS[String(weaponId||"")];
+  if(!skill)return {error:{code:400,body:{ok:false,error:"INVALID_EXERCISE_WEAPON",msg:"Arma de treino inválida."}}};
+  const info=dailyRewardInfo(p);
+  if(!info.available)return {error:{code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+    msg:"Recompensa já coletada neste ciclo.",dailyReward:info}}};
+  const prior=p.trainingExercise&&typeof p.trainingExercise==="object"?p.trainingExercise:{};
+  const balances=prior.balances&&typeof prior.balances==="object"?prior.balances:{};
+  if(prior.plan&&prior.plan!=="free"&&prior.charges!=null&&balances[prior.plan]==null)balances[prior.plan]=prior.charges;
+  balances.exercise=Math.max(0,Math.floor(Number(balances.exercise)||0))+DAILY_EXERCISE_CHARGES;
+  balances.lasting=Math.max(0,Math.floor(Number(balances.lasting)||0));
+  // O bônus é uma Exercise Weapon: ativa o plano para o jogador já sair
+  // treinando, a menos que ele tenha uma Lasting ativa comprada.
+  const activePlan=prior.activePlan==="lasting"&&(balances.lasting>0)?"lasting":"exercise";
+  p.trainingExercise={skill,weapon:String(weaponId),activePlan,balances,active:true};
+  p.dailyRewardDay=info.rewardDay;
+  return {charges:DAILY_EXERCISE_CHARGES,trainingExercise:p.trainingExercise};
+}
+
 function allowedOrigin(req){const origin=req.headers.origin;if(!origin)return null;
   // ALLOWED_ORIGINS=* permite qualquer origem (deploy Cloudflare/testes)
   if(ALLOWED_ORIGINS.has("*"))return origin;
@@ -878,7 +961,7 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","quests"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","dailyRewardDay","quests"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
   if(opts.adminGrant){
@@ -1314,6 +1397,90 @@ async function claimRewardChest(db,body){
   let p=await loadCityPlayer(db,acc,character);
   claimedCount=applyRewardChestClaim(p,body);
   return persistClaimedPlayer(db,acc,character,p,lease,claimedCount);
+}
+
+async function getDailyReward(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.char_id);
+  if(!Number.isSafeInteger(charId)||charId<=0)return {code:400,body:{ok:false,msg:"Personagem inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  let p={};try{p=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+  return {code:200,body:Object.assign({ok:true},dailyRewardInfo(p))};
+}
+
+/* Server save diário: coleta das 3000 cargas de Exercise Weapon. Segue o
+ * fluxo do reward chest — instância ativa recebe patch autoritativo; char
+ * no templo persiste direto. Não acumula: claimedDay vs rewardDay. */
+async function claimDailyExerciseReward(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id!==undefined?body.char_id:body.id);
+  if(!Number.isSafeInteger(charId)||charId<=0)
+    return {code:400,body:{ok:false,error:"INVALID_REWARD_CLAIM",msg:"Personagem inválido"}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  const weaponId=String(body.weapon||"");
+  if(!EXERCISE_REWARD_WEAPONS[weaponId])
+    return {code:400,body:{ok:false,error:"INVALID_EXERCISE_WEAPON",msg:"Arma de treino inválida."}};
+  let preData={};try{preData=typeof character.data==="string"?JSON.parse(character.data):(character.data||{});}catch(e){}
+  const preInfo=dailyRewardInfo(preData);
+  if(!preInfo.available)return {code:409,body:{ok:false,error:"DAILY_REWARD_ALREADY_CLAIMED",
+    msg:"Recompensa já coletada neste ciclo.",dailyReward:preInfo}};
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const resolved=await resolveInstanceRow(db,acc,charId);
+  if(resolved.error)return resolved.error;
+  const row=resolved.row;
+  if(row&&row.status==="active"){
+    let last=null;
+    for(let attempt=0;attempt<4;attempt++){
+      const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
+      if(!current||current.status!=="active")break;
+      let claimedPlayer=null,applied=null;
+      const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+        let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
+        const item=descriptor.authority&&descriptor.authority.players&&
+          descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
+        if(!item||!item.p)return null;
+        applied=applyDailyExerciseReward(item.p,weaponId);
+        if(applied.error)return null;
+        claimedPlayer=cloneJson(item.p);
+        descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
+      },lease);
+      last=result;
+      if(applied&&applied.error)return applied.error;
+      if(result.ok){
+        await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
+          status:result.instance.status,source:"daily-reward",holderId:String(body.holder_id||"")});
+        const fresh=await db.findCharacter(charId);
+        const persisted=await persistClaimedPlayer(db,acc,fresh||character,claimedPlayer,lease);
+        if(persisted.code!==200)return persisted;
+        persisted.body.trainingExercise=claimedPlayer.trainingExercise;
+        persisted.body.dailyReward=dailyRewardInfo(claimedPlayer);
+        persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Exercise Weapon coletadas.`;
+        return persisted;
+      }
+      if(result.error==="LEASE_REQUIRED")return {code:423,body:{ok:false,error:result.error,msg:"Controle transferido durante a coleta"}};
+      if(result.error!=="INSTANCE_VERSION_CONFLICT")break;
+    }
+    if(last&&last.error==="INSTANCE_NOT_ACTIVE"){/* cai no save do personagem */}
+    else if(last&&!last.ok)
+      return {code:409,body:{ok:false,error:last.error,msg:"Não foi possível coletar a recompensa",
+        instance:instanceSummary(last.instance,true)}};
+  }
+  let p=await loadCityPlayer(db,acc,character);
+  const applied=applyDailyExerciseReward(p,weaponId);
+  if(applied.error)return applied.error;
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  persisted.body.trainingExercise=p.trainingExercise;
+  persisted.body.dailyReward=dailyRewardInfo(p);
+  persisted.body.msg=`+${DAILY_EXERCISE_CHARGES} cargas de Exercise Weapon coletadas.`;
+  return persisted;
 }
 
 async function savePartyCharacters(db,body){
@@ -3932,6 +4099,8 @@ async function main() {
     if(SYNC_BUS)SYNC_BUS.cleanup(Date.now());
     if(CHAT_BUS)CHAT_BUS.cleanup(Date.now());},3600000);if(maintenance.unref)maintenance.unref();
 
+  startServerSaveScheduler(db);
+
   const server = http.createServer(async (req, res) => {
     const url=req.url.split("?")[0],cors=allowedOrigin(req);
     if(cors===false&&url.startsWith("/api/"))return send(res,403,{ok:false,error:"ORIGIN_DENIED",msg:"Origem não autorizada"});
@@ -4188,6 +4357,16 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/training/daily-reward") {
+        const q=new URL(req.url,"http://x").searchParams;
+        const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"").trim()||q.get("token")||"";
+        const r=await getDailyReward(db,{token,char_id:q.get("char_id")});
+        return send(res,r.code,r.body);
+      }
+      if (req.method === "POST" && url === "/api/training/daily-claim") {
+        const limited=rateLimit(req,"daily-claim",30,60000);if(limited)return send(res,limited.code,limited.body);
+        const r = await claimDailyExerciseReward(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/npcs/yana/catalog") {
         return send(res,200,{ok:true,offers:YANA_CATALOG});
