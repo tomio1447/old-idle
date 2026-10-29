@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=market-rework-v1">
+  <link rel="stylesheet" href="css/layout.css?v=social-modal-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-otc-v1">
@@ -53,6 +53,28 @@
       <p class="small center mb8" data-i18n="alpha.warn">
         Bem-vindo ao beta oficial! Reporte bugs e sugira melhorias no Discord ou no grupo do WhatsApp.
       </p>
+      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Patch notes — atualizações recentes</div>
+      <div id="alpha-announce-update-at" class="alpha-update-at tiny"></div>
+      <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
+      <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
+      <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
+        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Redes sociais (abre após o modal de patch notes) -->
+<div class="modal-bg" id="social-announce-modal" role="dialog" aria-modal="true" aria-labelledby="social-announce-title" aria-hidden="true">
+  <div class="modal panel alpha-announce-box">
+    <div class="panel-title" id="social-announce-title" data-i18n="alpha.socialTitle">📣 SIGA-NOS — GLOBAL-IDLE</div>
+    <div class="panel-body">
+      <div class="brand-logo-wrap alpha-brand-logo">
+        <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
+      </div>
+      <p class="small center mb8" data-i18n="alpha.socialWarn">
+        Acompanhe as novidades, reporte bugs e participe da comunidade:
+      </p>
       <div class="alpha-social mb8">
         <div class="alpha-social-links">
           <div class="small">
@@ -70,9 +92,7 @@
         </div>
         <img class="alpha-wa-qr" src="/imagens/qrwhatsapp.png" alt="QR Code — grupo do Global-Idle no WhatsApp" title="Aponte a câmera para entrar no grupo">
       </div>
-      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Atualizações recentes</div>
-      <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
-      <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
+      <button class="primary full mt8" id="social-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
       <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
         © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
       </p>
@@ -644,8 +664,8 @@
 <script src="js/bosstiary.js"></script>
 <script src="js/ui.js?v=resistance-percent-v1"></script>
 <script src="js/helper-presets.js?v=helper-live-v1"></script>
-<script src="js/i18n.js?v=beta-launch-v1"></script>
-<script src="js/alpha-announce.js?v=beta-launch-v1"></script>
+<script src="js/i18n.js?v=social-modal-v1"></script>
+<script src="js/alpha-announce.js?v=social-modal-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>

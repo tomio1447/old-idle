@@ -217,8 +217,14 @@ canvas { image-rendering: pixelated; }
   display: none !important;
   pointer-events: none !important;
 }
-#alpha-announce-modal .alpha-announce-box {
+#alpha-announce-modal .alpha-announce-box,
+#social-announce-modal .alpha-announce-box {
   width: min(460px, 96vw);
+}
+.alpha-update-at {
+  color: #9ce84a;
+  padding: 4px 8px; margin-bottom: 6px;
+  background: rgba(10, 12, 16, .5); border: 1px solid #33373f; border-radius: 4px;
 }
 .alpha-announce-updates { max-height: 180px; overflow-y: auto; }
 .alpha-announce-list {

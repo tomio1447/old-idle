@@ -5,6 +5,9 @@
 const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
+/** Data e hora (Brasília) da atualização descrita nos patch notes. */
+const ALPHA_UPDATE_AT = "29/10/2026 às 17:12";
+
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
   "BETA OFICIAL — obrigado a todos que testaram o alpha!",
@@ -42,15 +45,32 @@ function closeAlphaAnnounceModal() {
 function openAlphaAnnounceModal() {
   const modal = document.getElementById("alpha-announce-modal");
   if (!modal) return false;
+  const at = document.getElementById("alpha-announce-update-at");
+  if (at) at.textContent = `🕐 Atualizado em ${ALPHA_UPDATE_AT} (horário de Brasília)`;
+  renderAlphaAnnounceUpdates(document.getElementById("alpha-announce-updates"));
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+  return true;
+}
+
+function openSocialAnnounceModal() {
+  const modal = document.getElementById("social-announce-modal");
+  if (!modal) return false;
   const link = document.getElementById("alpha-announce-discord");
   if (link) {
     link.href = ALPHA_DISCORD_URL;
     link.textContent = ALPHA_DISCORD_URL;
   }
-  renderAlphaAnnounceUpdates(document.getElementById("alpha-announce-updates"));
   modal.classList.add("show");
   modal.setAttribute("aria-hidden", "false");
   return true;
+}
+
+function closeSocialAnnounceModal() {
+  const el = document.getElementById("social-announce-modal");
+  if (!el) return;
+  el.classList.remove("show");
+  el.setAttribute("aria-hidden", "true");
 }
 
 function bindAlphaAnnounceModal() {
@@ -58,7 +78,13 @@ function bindAlphaAnnounceModal() {
   if (!modal || modal.dataset.bound === "1") return;
   modal.dataset.bound = "1";
   const ok = document.getElementById("alpha-announce-ok");
-  if (ok) ok.addEventListener("click", () => closeAlphaAnnounceModal());
+  // o segundo modal (redes sociais) abre logo após fechar o de patch notes
+  if (ok) ok.addEventListener("click", () => {
+    closeAlphaAnnounceModal();
+    openSocialAnnounceModal();
+  });
+  const socialOk = document.getElementById("social-announce-ok");
+  if (socialOk) socialOk.addEventListener("click", () => closeSocialAnnounceModal());
 }
 
 function bindAlphaTestBanner() {
