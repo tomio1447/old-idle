@@ -700,7 +700,7 @@ function restPrice(p, hours) {
 }
 
 function buyRest(p, hours) {
-  const MAX = 42 * 3600;
+  const MAX = 15 * 3600;
   const missing = MAX - p.stamina;
   if (missing <= 60) return { ok: false, msg: "Sua stamina já está cheia." };
   const secs = Math.min(hours * 3600, missing);

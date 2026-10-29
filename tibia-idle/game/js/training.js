@@ -121,7 +121,7 @@ function trainingPlayerFromPartyRow(row) {
     ml: Math.max(0, Math.floor(Number(row.ml) || 0)),
     manaSpent: 0,
     config: { barMode: "bars", autoWalk: true },
-    stamina: 42 * 3600,
+    stamina: 15 * 3600,
     equip: {},
     remoteTraining: true,
   };

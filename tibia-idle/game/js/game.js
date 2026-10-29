@@ -11,7 +11,7 @@ const CHARACTERS_KEY = "tibia-idle-characters-v1";
 const ACTIVE_CHARACTER_KEY = "tibia-idle-active-character-v1";
 const AUTOLOGIN_KEY = "tibia-idle-autologin-v1";
 const INSTANCE_SESSION_KEY = "tibia-idle-active-instance-v1";
-const FULL_STAMINA_SECONDS = 42 * 3600;
+const FULL_STAMINA_SECONDS = 15 * 3600;
 
 const G = {
   p: null,
@@ -695,7 +695,8 @@ function computeOffline(p) {
   const staminaSec = Math.min(eff / 1000, staminaStart);
   const hours = staminaSec / 3600;
   if (hours <= 0) return null;
-  const staminaMul = staminaStart > 40 * 3600 ? 1.5 : (staminaStart <= 14 * 3600 ? 0.5 : 1);
+  const vipStamina = Number(p.vipUntil) > Date.now() || (typeof isVip === "function" && isVip());
+  const staminaMul = staminaStart < 3 * 3600 ? 0.5 : (staminaStart > 13 * 3600 && vipStamina ? 1.5 : 1);
 
   const modeMul = p.instanceMode === "pvp" ? 1.25 : 1;
   const kills = Math.floor(est.kills * hours * effRate);
@@ -3579,7 +3580,14 @@ function finishIdleInstance(reason,silent){
   if(reason==="stamina"&&!silent&&typeof addLog==="function")
     addLog("death","A stamina de um membro acabou. A instância foi encerrada.");
   // O templo é checkpoint seguro e regenera toda a party, sem devolver bless.
-  stopHunt(!!silent);save();return true;
+  stopHunt(!!silent);save();
+  // Stamina zerada: a PT toda é transferida para a ala de treino.
+  if(reason==="stamina"&&typeof startTrainingArea==="function"){
+    if(!silent&&typeof addLog==="function")
+      addLog("info","A party foi transferida para a <b>Área de Treino</b> para recuperar stamina.");
+    startTrainingArea();
+  }
+  return true;
 }
 
 /* Avança combate por relógio real. É usado pelo timer de aba oculta e pelo
@@ -4631,6 +4639,12 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
       if(!G.combat)return;
       if(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))return;
       stopHunt(true,{skipMegaLeave:true});
+      // Stamina zerada: a PT toda vai para a ala de treino (não para o templo).
+      if(terminalReason==="stamina"&&typeof startTrainingArea==="function"){
+        if(typeof addLog==="function")
+          addLog("info","A stamina de um membro acabou — a party foi transferida para a <b>Área de Treino</b>.");
+        startTrainingArea();
+      }
     },0);
   }
   // O loop redesenha canvas/HUD; não reconstrua party/modal a cada snapshot.
@@ -4647,7 +4661,10 @@ function requestOnlineAuthorityTick(){
       result.version);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       if(combatInstanceEntryPending())return;
-      clearInstanceSession(result.terminalReason,true);setTimeout(()=>{if(G.combat)stopHunt(true);},0);
+      clearInstanceSession(result.terminalReason,true);setTimeout(()=>{
+        if(G.combat)stopHunt(true);
+        if(result.terminalReason==="stamina"&&typeof startTrainingArea==="function")startTrainingArea();
+      },0);
     }else if(!result||!result.ok)requestOnlineRuntimeRecovery();
   }).catch(()=>{requestOnlineRuntimeRecovery();}).finally(()=>{ONLINE_AUTH_TICKING=false;});
 }

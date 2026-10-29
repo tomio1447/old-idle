@@ -4545,9 +4545,11 @@ function rollLoot(c, p, mob) {
   }
   // Rate de loot do servidor: multiplica a chance de drop
   const lootRate = (typeof SERVER_LOOT_RATE !== "undefined") ? SERVER_LOOT_RATE : 1;
+  // Abaixo de 3h de stamina o loot cai pela metade (só a chance, como no auth).
+  const staminaLootMul = Math.max(0, Number(p && p.stamina) || 0) < 3 * 3600 ? 0.5 : 1;
   for (const l of (mob.def.loot || [])) {
     // Chance efetiva = chance base * lootRate (cap 100%)
-    const effectiveChance = Math.min(100, l.chance * lootRate * (c.lootMul || 1));
+    const effectiveChance = Math.min(100, l.chance * lootRate * (c.lootMul || 1) * staminaLootMul);
     if (Math.random() * 100 > effectiveChance) continue;
     // Multiplicadores aumentam SOMENTE a chance. A quantidade respeita o
     // max original do Canary; não multiplicar aqui evita 15 blank runes.
@@ -5257,7 +5259,10 @@ function combatTick(c, p, dt, now) {
     recordRawMonsterStats(c, m);
     // recompensa
     const staminaNow = Math.max(0, Number(p.stamina) || 0);
-    const staminaMul = staminaNow <= 0 ? 0 : (staminaNow > 40 * 3600 ? 1.5 : (staminaNow <= 14 * 3600 ? 0.5 : 1));
+    // Regras: 0 -> sem exp; <3h -> metade; 13h~15h -> VIP +50%; demais -> 1x.
+    const vipStamina = Number(p.vipUntil) > Date.now() || (typeof isVip === "function" && isVip());
+    const staminaMul = staminaNow <= 0 ? 0 : (staminaNow < 3 * 3600 ? 0.5 :
+      (staminaNow > 13 * 3600 && vipStamina ? 1.5 : 1));
     let exp = Math.floor(m.def.exp * staminaMul * expStage(p.level) * (c.expMul || 1));
     if (typeof soulwarTaintExpMultiplier === "function")
       exp = Math.floor(exp * soulwarTaintExpMultiplier(c, p));

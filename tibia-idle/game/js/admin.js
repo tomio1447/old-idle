@@ -382,7 +382,7 @@ function renderAdminChar(p, el) {
         <label class="admin-chk"><input type="checkbox" id="adm-blessed"
           ${p.blessed ? "checked" : ""}> Bênção ativa</label>
         <div class="admin-quick">
-          <button class="sm" id="adm-stamina">Stamina cheia (42h)</button>
+          <button class="sm" id="adm-stamina">Stamina cheia (15h)</button>
           <button class="sm" id="adm-cure">Curar condições</button>
         </div>
         <div class="tiny dim mt4">condições ativas:
@@ -525,7 +525,7 @@ function renderAdminChar(p, el) {
     adminAplicar(p.blessed ? "bênção ativa" : "bênção removida");
   });
   $("#adm-stamina").addEventListener("click", () => {
-    p.stamina = 42 * 3600;
+    p.stamina = 15 * 3600;
     adminAplicar("stamina cheia");
   });
   $("#adm-cure").addEventListener("click", () => {

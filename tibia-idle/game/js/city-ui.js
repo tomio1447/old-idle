@@ -1161,24 +1161,24 @@ function npcTrain(p) {
 
 /* ---------------------------------------------------------- estalagem */
 function npcInn(p) {
-  const MAX = 42 * 3600;
+  const MAX = 15 * 3600;
   const pct = (p.stamina / MAX) * 100;
   return `
     <div class="mb8">
       <div class="row small mb4" style="justify-content:space-between">
         <span class="dim">Stamina</span>
-        <span class="v">${fmtTime(p.stamina)} / 42h</span>
+        <span class="v">${fmtTime(p.stamina)} / 15h</span>
       </div>
       <div class="bar"><div class="fill sta" style="width:${pct}%"></div></div>
     </div>
     ${goldLine(p)}
     <div class="row wrap" style="gap:4px">
-      ${[1, 5, 12, 42].map((h) => `<button class="sm" data-rest="${h}"
+      ${[1, 5, 10, 15].map((h) => `<button class="sm" data-rest="${h}"
         ${p.gold < restPrice(p, h) ? "disabled" : ""}>
         ${h}h · ${fmtFull(restPrice(p, h))}</button>`).join("")}
     </div>
     <div class="tiny dim mt8">
-      Stamina temporariamente desativada: todos permanecem com <b style="color:#9ce84a">42h</b>.</div>`;
+      Abaixo de <b>3h</b> a party recebe <b>metade</b> da exp e do loot; ao zerar, todos vão para a Área de Treino.</div>`;
 }
 
 /* ---------------------------------------------------------- viagens */

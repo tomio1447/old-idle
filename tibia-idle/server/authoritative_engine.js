@@ -593,7 +593,7 @@ const SKILL_MUL={
 };
 function serverSkillRate(level){return 2;}
 function serverMagicRate(ml){return 2;}
-const START_HP=185,START_MP=5,FULL_STAMINA=42*3600;
+const START_HP=185,START_MP=5,FULL_STAMINA=15*3600;
 const INFLUENCED_BASE_CHANCE=.004,INFLUENCED_PVP_BONUS=.004,
   FIENDISH_BASE_CHANCE=.0012,FIENDISH_PVP_BONUS=.0008;
 const ELEMENT_FX={physical:"draw-blood",fire:"hit-by-fire",ice:"ice-attack",energy:"energy-damage",
@@ -4305,7 +4305,8 @@ function vipExpBonus(p){
 function finalExp(p,mobExp,mobSlug,expMul){
   let exp=Math.max(0,Math.floor(Number(mobExp)||0));
   const stamina=Math.max(0,Number(p.stamina)||0);
-  const staminaMul=stamina<=0?0:(stamina>40*3600?1.5:(stamina<=14*3600?.5:1));
+  // Regras: 0 -> sem exp; <3h -> metade; 13h~15h -> VIP +50%; demais -> 1x.
+  const staminaMul=stamina<=0?0:(stamina<3*3600?.5:(stamina>13*3600&&accountIsVip(p)?1.5:1));
   exp=Math.floor(exp*staminaMul);
   // Stage multiplier (rates.js)
   exp=Math.floor(exp*expStage(Number(p.level)||1));
@@ -4964,8 +4965,11 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   // Nunca count*rate — isso gerava Timira com 14*2.5=35 potions / rares qty 2–3.
   const lootRate=2.5;
   const preyLoot=preyLootBonus(leader,mob.slug);
+  // Abaixo de 3h de stamina o loot cai pela metade (stamina do líder, que
+  // é quem recebe os drops). Chance é multiplicada, nunca a quantidade.
+  const staminaLoot=Math.max(0,Number(leader.stamina)||0)<3*3600?.5:1;
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
-  const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100);
+  const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot;
   if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
   // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada
@@ -6759,6 +6763,10 @@ function step(auth,now,opts){if(auth.ended)return;
     if(p.hp>0&&!item.downUntil)usePotion(auth,p);
     tickPlayerConditions(auth,p,item);
   }
+  // Stamina zerada em QUALQUER membro: a PT é enviada para a ala de treino
+  // (terminal "stamina" — o cliente transfere a sala de treino).
+  if((auth.players||[]).some((item)=>item&&item.p&&Math.max(0,Number(item.p.stamina)||0)<=0)){
+    auth.ended=true;auth.terminalReason="stamina";return;}
   for(const mob of auth.mobs||[])tickEntityConditions(auth,mob,"mob");
   healPlayers(auth,now);
   for(const item of auth.players){

@@ -861,7 +861,7 @@ function sanitizeNewPlayer(payload,voc){
     skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
     skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
     kills:{},totalKills:0,bosses:{},missions:{},lootPouch:{},supplyStash:{},rewardChest:{},rewardChestBundles:[],bag:{},ammo:{},
-    supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:42*3600,cap:5000};
+    supplies:{"health-potion":20,"mana-potion":20},equip:{},stamina:15*3600,cap:5000};
   if(voc==="knight")safe.equip={weapon:{item:"sword",count:1},shield:{item:"wooden-shield",count:1}};
   else if(voc==="paladin")safe.equip={weapon:{item:"bow",count:1},shield:{item:"quiver",count:1},ammo:{item:"simple-arrow",count:1}};
   else if(voc==="monk")safe.equip={weapon:{item:"simple-jo-staff",count:1}};

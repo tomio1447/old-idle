@@ -160,7 +160,7 @@ function newPlayer(name, voc, sex) {
     cap: 5000,              // capacidade base (oz); piso se a fórmula por nível for menor
     supplies: { "mana-potion": 0 }, // slug -> count/carga selecionada
     hunt: null,             // id da hunt ativa
-    stamina: 42 * 3600,     // segundos (42h cheio)
+    stamina: 15 * 3600,     // segundos (15h cheio)
     deaths: 0,
     kills: {},              // slug -> total
     totalKills: 0,

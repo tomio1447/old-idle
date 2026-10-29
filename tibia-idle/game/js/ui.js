@@ -438,7 +438,7 @@ function renderStats(p) {
   setBar("#bar-mp", max.mp ? p.mp / max.mp : 0,
          max.mp ? `${Math.floor(p.mp)} / ${Math.floor(max.mp)}` : "");
   setBar("#bar-exp", expProgress(p) / 100, expProgress(p).toFixed(1) + "%");
-  setBar("#bar-sta", p.stamina / (42 * 3600), fmtTime(p.stamina));
+  setBar("#bar-sta", p.stamina / (15 * 3600), fmtTime(p.stamina));
 
   const rows = [
     ["Experiência", fmtFull(p.exp)],
