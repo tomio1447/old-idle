@@ -145,7 +145,7 @@ function newPlayer(name, voc, sex) {
     blessed: false,
     promoted: false,
     promotedAt: null,
-    equip: { backpack: { item: "bag", count: 1 } }, // slot -> {item, count, instId?}
+    equip: { backpack: { item: "backpack", count: 1 } }, // slot -> {item, count, instId?}
     bag: {},                // slug -> count (espelho agregado para não-equipáveis e instâncias em bag)
     itemInstances: [],      // itens não-stackáveis/equipáveis rastreados por instância
     ammo: {},               // slug -> unidades (munição não ocupa slot)
@@ -153,7 +153,7 @@ function newPlayer(name, voc, sex) {
     imbuements: {},         // "equip:<slot>" -> [{cat, tier, sub}]
     conditions: {},         // veneno/fogo/energia... ativos no jogador
     buffs: {},              // buff de vocacao -> timestamp de expiracao
-    bagSlots: 8,            // bag padrão: 8 slots/tipos de item
+    bagSlots: 20,           // backpack inicial: 20 slots/tipos de item (set Dawnport)
     lootPouch: {},          // loot de hunt para auto-seller
     supplyStash: {},        // rings/amulets com cargas (Auto Supply Stash)
     lootConfig: { noCollect: [], noSell: [] },

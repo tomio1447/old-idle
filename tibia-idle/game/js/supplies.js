@@ -350,7 +350,7 @@ const START_SLUG = {
   3350: "bow", 35562: "quiver", 21470: "simple-arrow",
   21348: "scorcher", 21350: "chiller", 50166: "simple-jo-staff",
   21400: "spellbook-of-the-novice", 7876: "small-health-potion",
-  268: "mana-potion", 3577: "meat",
+  268: "mana-potion", 3577: "meat", 2920: "torch",
   21352: "lightest-missile-rune", 21351: "light-stone-shower-rune",
 };
 
