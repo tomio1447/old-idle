@@ -388,6 +388,10 @@ function renderStats(p) {
   if (!p) return;
   // faixa de conditions/buffs ativos (ícones OTC, mesma fonte da status-bar)
   if (typeof paintConditionBar === "function") paintConditionBar($("#cond-bar"), p, false);
+  // retrato do personagem no botão da topbar (abre Detalhes do personagem)
+  if (typeof paintSwitchPortrait === "function") paintSwitchPortrait(p);
+  // retrato do personagem no botão da topbar (abre Detalhes do personagem)
+  if (typeof paintSwitchPortrait === "function") paintSwitchPortrait(p);
 
   // faixa exclusiva do Monk: harmonia, mantra e o estado sereno
   const mbox = $("#monk-bar");

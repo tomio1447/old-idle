@@ -45,6 +45,7 @@ function openCyclopedia(aba) {
   ensureWardrobe(p);
   if (aba) CYCLO.aba = aba;
 
+  $("#modal-body").classList.remove("chard-modal-shell");
   $("#modal-body").innerHTML = `
     <div class="panel-title">📖 Cyclopedia
       <span style="flex:1"></span>
@@ -281,7 +282,12 @@ function cycloItems(p, el) {
 
 /* ------------------------------------------------------------ aparências */
 
-function cycloAppearance(p, el) {
+function cycloAppearance(p, el, opts) {
+  /* opts.minimal (usado pela janela de Detalhes do personagem): esconde o
+   * bloco de prévia/addons/montaria do topo — a aba Outfit desenha o seu
+   * proprio. Persiste no elemento para os re-renders internos. */
+  if (opts) el._cycloOpts = opts;
+  opts = el._cycloOpts || {};
   const modo = CYCLO.appModo || (CYCLO.appModo = "outfit");
   const filtro = CYCLO.filtro || "all";
   const atual = currentAppearance(p);
@@ -314,8 +320,9 @@ function cycloAppearance(p, el) {
     const ativo = mnt && mnt.id === m.id;
     return `<div class="app-card ${ativo ? "ativo" : ""} ${tem ? "" : "bloq"}"
                  data-app-mount="${m.id}">
-      <div class="app-img"><img src="assets/appearance/mount/${m.id}.base.png"
-        alt="${m.nome}" loading="lazy"></div>
+      <div class="app-img" data-pintar-mount="${m.id}">
+        <div class="tiny dim app-img-loading">…</div>
+      </div>
       <div class="tiny">${m.nome}</div>
       <div class="tiny dim">
         ${tem ? `+${m.speed} vel` : `<span class="gold-txt">${fmtFull(mountPrice(m))} gp</span>`}
@@ -324,7 +331,7 @@ function cycloAppearance(p, el) {
   };
 
   el.innerHTML = `
-    <div class="row mb8" style="gap:10px;align-items:flex-start">
+    ${opts.minimal ? "" : `<div class="row mb8" style="gap:10px;align-items:flex-start">
       <div>
         <div id="app-preview" class="outfit-preview"></div>
         <div class="tiny dim center mt4" style="max-width:110px">
@@ -357,7 +364,7 @@ function cycloAppearance(p, el) {
             Montado em <b>${mnt.nome}</b> (+${mnt.speed} velocidade)</span>` : ""}
         </div>
       </div>
-    </div>
+    </div>`}
 
     <div class="row wrap mb4" style="gap:4px">
       <button class="sm ${modo === "outfit" ? "primary" : ""}"
@@ -378,7 +385,7 @@ function cycloAppearance(p, el) {
    * Feito em lotes com requestAnimationFrame: colorir 127 sprites de uma vez
    * congela a aba, porque cada um percorre a mascara pixel a pixel. */
   const pintarCards = () => {
-    const alvos = $$("#cyclo-content [data-pintar]");
+    const alvos = $$("#cyclo-content [data-pintar], #cyclo-content [data-pintar-mount]");
     let i = 0;
     const cores = (p.outfit && p.outfit.colors) ||
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
@@ -386,8 +393,11 @@ function cycloAppearance(p, el) {
       let feitos = 0;
       while (i < alvos.length && feitos < 12) {
         const box = alvos[i];
-        const id = box.dataset.pintar;
-        const cv = AppearanceRenderer.outfit(id, 0, cores);
+        // outfits usam as cores do personagem; montarias saem sem recolorir
+        // (o .base.png e um spritesheet — exibir a imagem inteira buga o card)
+        const cv = box.dataset.pintarMount
+          ? AppearanceRenderer.mount(box.dataset.pintarMount, "s", 0)
+          : AppearanceRenderer.outfit(box.dataset.pintar, 0, cores);
         if (cv) {
           // Esconde o <img> do spritesheet inteiro e substitui pelo canvas
           // de uma celula so, com tamanho explicito para caber no card.
@@ -407,7 +417,7 @@ function cycloAppearance(p, el) {
     };
     requestAnimationFrame(lote);
   };
-  if (modo === "outfit") pintarCards();
+  pintarCards();
 
   // prévia com montaria e addons
   const desenhar = () => {

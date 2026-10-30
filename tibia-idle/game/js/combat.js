@@ -4086,6 +4086,7 @@ function mobSkillHit(c, p, mob, sk, dmg) {
     }
     return drenado;
   }
+  if (mob.def && mob.def.name) p._lastHitBy = mob.def.name;
   p.hp -= raw;
   c.stats.taken += raw;
   if (tgt) tgt.taken = (tgt.taken || 0) + raw;
@@ -4491,6 +4492,7 @@ function mobAttack(c, p, mob) {
     }
   }
 
+  if (mob.def && mob.def.name) p._lastHitBy = mob.def.name;
   p.hp -= raw;
   c.stats.taken += raw;
   if (tgt) tgt.taken = (tgt.taken || 0) + raw;
@@ -4795,6 +4797,20 @@ function applyCharacterDeathConsequences(c, p, cause) {
     p.exp = Math.max(0, p.exp - lostExp);
     while (p.level > 1 && p.exp < expForLevel(p.level)) p.level--;
   }
+  // Histórico de mortes (aba Deaths): campo protegido no save do servidor,
+  // alimentado aqui (combate local) e pelo motor autoritativo (hunts online).
+  if (!Array.isArray(p.deathLog)) p.deathLog = [];
+  p.deathLog.unshift({
+    at: Date.now(),
+    by: p._lastHitBy || null,
+    where: (c && (c.bossName || (c.boss && (c.boss.name || c.boss.id)) ||
+      c.huntId || (c.hunt && (c.hunt.name || c.hunt)))) || null,
+    level: p.level || 1,
+    blessed: hadBless,
+    lost: lostExp,
+  });
+  if (p.deathLog.length > 20) p.deathLog.length = 20;
+  p._lastHitBy = null;
   return {exp:lostExp,rate,cause,blessed:hadBless};
 }
 

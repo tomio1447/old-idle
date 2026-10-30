@@ -265,11 +265,10 @@ function ownsOutfit(p, id) {
 
 function ownedAddons(p, id) {
   ensureWardrobe(p);
-  if (p.wardrobe.outfits[id] !== undefined) return p.wardrobe.outfits[id] || 0;
   const cos = accountCosmetics();
   if (cos && cos.outfits && cos.outfits[cosmeticOutfitKey(id)] !== undefined)
-    return cos.outfits[cosmeticOutfitKey(id)] || 0;
-  return 0;
+    return (APP_OUTFIT[id] && APP_OUTFIT[id].addons) || 0;
+  return p.wardrobe.outfits[id] || 0;
 }
 
 function ownsMount(p, id) {
@@ -402,7 +401,8 @@ function setAppearance(p, id) {
   ensureOutfit(p);
   p.outfit.appearance = id;
   // o addon ativo nao pode passar do que foi comprado
-  const max = Math.min(ownedAddons(p, id), APP_OUTFIT[id].addons || 0);
+  const owned = Math.min(ownedAddons(p, id), APP_OUTFIT[id].addons || 0);
+  const max = owned >= 2 ? 3 : owned;
   if ((p.outfit.addons || 0) > max) p.outfit.addons = max;
   syncOutfitLook(p);
   return true;

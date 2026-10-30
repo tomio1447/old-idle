@@ -2401,6 +2401,168 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .app-img-loading { color: #6b6455; font-size: 11px; }
 .app-card canvas { image-rendering: pixelated; }
 
+/* ================== Detalhes do personagem (janela única com abas) ==========
+ * Mesma moldura para todas as abas: largura de modal wide, conteúdo com
+ * rolagem interna, abas horizontais sob o título (padrão das telas de
+ * referência). */
+.modal-bg .modal.chard-modal-shell {
+  display: flex; flex-direction: column; height: min(72vh, 640px); min-height: 340px;
+  padding: 6px 8px 8px;
+}
+.chard-title { display: flex; align-items: center; gap: 8px; }
+.chard-title-portrait {
+  width: 32px; height: 32px; flex: none; display: flex;
+  align-items: center; justify-content: center;
+  background: #0d0b08; border: 1px solid var(--border-in, #3a3428);
+}
+.chard-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chard-tabs {
+  display: flex; gap: 2px; flex: none; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-in, #3a3428); margin-bottom: 6px;
+}
+.chard-tab {
+  padding: 4px 10px; font-size: 11px; color: #a49b84; cursor: pointer;
+  background: #14120e; border: 1px solid transparent; border-bottom: 0;
+}
+.chard-tab:hover { background: #26221a; }
+.chard-tab.active { background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37); }
+.chard-body {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 2px;
+}
+
+/* faixa de personagens (troca) — topo da aba Personagem */
+.chard-chars-row {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
+}
+.chard-char-card {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  min-width: 150px; padding: 4px 6px; text-align: left;
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  color: inherit; cursor: pointer;
+}
+.chard-char-card:hover:not(:disabled) { background: #26221a; border-color: #6b6455; }
+.chard-char-card.is-current { border-color: var(--gold, #d4af37); background: #35301f; cursor: default; }
+.chard-char-portrait {
+  width: 40px; height: 40px; flex: none; display: flex;
+  align-items: center; justify-content: center;
+  background: #0d0b08; border: 1px solid var(--border-in, #3a3428);
+}
+.chard-char-info { display: flex; flex-direction: column; min-width: 0; }
+.chard-char-info b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chard-char-info i { font-style: normal; font-size: 10px; color: #9a9078; }
+.chard-char-level { font-size: 12px; font-weight: bold; color: #ffe680; margin-left: 4px; }
+.chard-char-tag { font-size: 9px; color: #9ce84a; margin-left: 2px; }
+.chard-char-enter { font-size: 10px; color: var(--gold, #d4af37); margin-left: 2px; }
+.chard-char-plus { font-size: 20px; color: #9a9078; width: 40px; text-align: center; }
+.chard-chars-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 8px; }
+
+/* cabeçalho do personagem ativo */
+.chard-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 6px 8px; margin-bottom: 8px;
+}
+.chard-head-portrait {
+  width: 66px; height: 66px; flex: none; display: flex;
+  align-items: center; justify-content: center;
+  background: #0d0b08; border: 1px solid var(--border-in, #3a3428);
+}
+.chard-head-name { display: flex; flex-direction: column; min-width: 0; }
+.chard-head-name b { font-size: 13px; color: #ffe680; }
+.chard-head-name span { font-size: 11px; color: #c8c0a8; }
+.chard-head-stats {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin-left: auto;
+  font-size: 11px; color: #9a9078;
+}
+.chard-head-stats b { color: var(--text-bright, #e8e0c8); }
+
+/* caixas de conteúdo */
+.chard-cols-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chard-cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.chard-box {
+  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  padding: 6px 8px; min-width: 0;
+}
+.chard-box-title {
+  font-size: 10px; letter-spacing: .08em; color: #d4af37;
+  font-weight: bold; border-bottom: 1px solid #3a3428;
+  padding-bottom: 3px; margin-bottom: 4px;
+}
+.chard-skill-head, .chard-skill-row {
+  display: grid; grid-template-columns: 1fr 44px minmax(70px, 90px);
+  gap: 6px; align-items: center; font-size: 11px; padding: 1px 0;
+}
+.chard-skill-head { color: #9a9078; font-size: 10px; border-bottom: 1px solid #26221a; }
+.chard-skill-row .lv { text-align: right; color: var(--text-bright, #e8e0c8); font-weight: bold; }
+.chard-skill-row .lv i { font-style: normal; color: #9ce84a; font-size: 9px; margin-left: 2px; }
+.chard-skill-row .pg { display: flex; align-items: center; gap: 4px; }
+.chard-skill-row .pg i { font-style: normal; font-size: 9px; color: #9a9078; }
+.chard-prog { height: 5px; background: #0d0b08; flex: 1; border: 1px solid #26221a; }
+.chard-prog > div { height: 100%; background: var(--gold, #d4af37); }
+.chard-duo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 10px; }
+
+/* aba Outfit */
+.chard-outfit-grid {
+  display: grid; grid-template-columns: 170px 1fr; gap: 10px; height: 100%;
+}
+.chard-outfit-side { min-width: 0; }
+.chard-outfit-preview { margin: 0 auto; }
+.chard-outfit-main { min-width: 0; display: flex; flex-direction: column; }
+.chard-outfit-catalog { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* aba Roda do Destino */
+.chard-wheel-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 10px; height: 100%;
+}
+.chard-wheel-left { min-width: 0; overflow: auto; }
+.chard-wheel-visual { display: flex; justify-content: center; }
+.chard-wheel-visual svg { max-width: 100%; height: auto; }
+.chard-wheel-side {
+  min-width: 0; overflow-y: auto; background: #14120e;
+  border: 1px solid var(--border-in, #3a3428); padding: 6px 8px;
+}
+.chard-wheel-side h4 {
+  margin: 8px 0 4px; font-size: 10px; letter-spacing: .08em;
+  color: #d4af37; border-top: 1px solid #3a3428; padding-top: 6px;
+}
+.chard-wheel-selinfo {
+  font-size: 11px; color: #ffe680; background: #26221a;
+  border: 1px solid #3a3428; padding: 4px 6px; margin-bottom: 8px;
+}
+
+/* aba Deaths */
+.chard-deaths-summary { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 6px; }
+.chard-deaths-wrap { overflow: auto; }
+.chard-deaths-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.chard-deaths-table th {
+  text-align: left; font-size: 10px; letter-spacing: .06em; color: #9a9078;
+  border-bottom: 1px solid #3a3428; padding: 3px 6px;
+}
+.chard-deaths-table td { padding: 3px 6px; border-bottom: 1px solid #1c1913; }
+.chard-deaths-table tr:hover td { background: #1c1913; }
+.chard-deaths-table .num, .chard-deaths-table th.num { text-align: right; }
+
+/* botão da topbar: retrato do personagem no lugar do texto (o label fica
+ * só para acessibilidade e para o menu mobile, que lê textContent) */
+#btn-switch.btn-switch-portrait { display: inline-flex; align-items: center; gap: 5px; }
+#btn-switch .topbar-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+#btn-switch-portrait {
+  width: 22px; height: 22px; flex: none; display: inline-flex;
+  align-items: center; justify-content: center; overflow: hidden;
+  background: #0d0b08; border: 1px solid var(--border-in, #3a3428);
+}
+#btn-switch-portrait canvas { width: 20px; height: 20px; image-rendering: pixelated; }
+
+@media (max-width: 900px) {
+  .chard-cols-3 { grid-template-columns: 1fr; }
+  .chard-cols-2 { grid-template-columns: 1fr; }
+  .chard-outfit-grid { grid-template-columns: 1fr; }
+  .chard-outfit-side { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  .chard-outfit-side > * { min-width: 140px; }
+  .chard-wheel-grid { grid-template-columns: 1fr; }
+}
+
 /* barra de progresso do bestiario */
 .best-bar { height: 3px; background: #0d0b08; margin-top: 3px; }
 .best-bar.big { height: 7px; }
@@ -3515,7 +3677,11 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .training-btn-gif { width: 22px; height: 22px; vertical-align: middle; margin-right: 3px; image-rendering: pixelated; }
 
 /* Painel lateral compacto */
-.training-box { left: 8px; right: auto; width: min(310px, calc(100% - 16px)); }
+.mission-box.training-box {
+  left: 8px; right: auto; bottom: auto;
+  width: min(310px, calc(100% - 16px)); height: auto;
+  max-height: calc(100% - 16px); overflow-y: auto;
+}
 .training-box.collapsed { width: auto; background: transparent; border-color: transparent; }
 .training-panel-body { padding: 6px; display: flex; flex-direction: column; gap: 4px; }
 .training-char {

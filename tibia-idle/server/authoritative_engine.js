@@ -4024,6 +4024,7 @@ function runMobSkills(auth,mob,victim,now,stepTs,mobHitIdx){
     }
     if(el!=="agony"&&skillUsesMeleeBlock(sk))dmg=mitigateIncoming(auth,dmg,item.p);
     dmg=absorbIncomingDamage(auth,item,item.p,dmg,now,pos,el==="agony"?"agony":el,mob);
+    if(dmg>0&&mob.def)item.p._lastHitBy=mob.def.name||mob.slug||null;
     item.p.hp-=dmg;
     if(lifeDrain&&dmg>0)mob.hp=Math.min(mob.maxHp||mob.hp,mob.hp+dmg);
     auth.events.push({t:"taken",dmg:dmg,x:pos.x,y:pos.y,targetId:String(item.id),
@@ -4149,6 +4150,9 @@ function canPlayerDamagePlayer(auth,attacker,victim){
 function livingHostilePlayers(auth,attacker){
   return (auth.players||[]).filter((item)=>canPlayerDamagePlayer(auth,attacker,item));
 }
+function playerReviveDelay(p, now) {
+  return (Number(p && p.vipUntil) || 0) > (Number(now) || Date.now()) ? 15000 : 30000;
+}
 function playerCombatProxy(item){
   const proxy={
     id:String(item.id),slug:"player",_playerEnt:item,
@@ -4165,7 +4169,7 @@ function playerCombatProxy(item){
       if(next<=0&&prev>0){
         const at=Number(proxy._auth&&proxy._auth.clock)||Number(item._pvpDeathAt)||Date.now();
         if(proxy._auth)authMarkPlayerDeath(proxy._auth,item,at);
-        else{item.p.blessed=false;item.downUntil=at+30000;}
+        else{item.p.blessed=false;item.downUntil=at+playerReviveDelay(item.p,at);}
         if(proxy._auth){
           const pos=entityPosition(item,.13,.6);
           proxy._auth.events=proxy._auth.events||[];
@@ -4200,6 +4204,7 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
   const element=el||"physical";
   if(element==="physical")dmg=mitigateIncoming(auth,dmg,victim.p);
   dmg=absorbIncomingDamage(auth,victim,victim.p,dmg,now,pos,element,null);
+  if(dmg>0)victim.p._lastHitBy=(attacker&&attacker.p&&attacker.p.name)||"Player";
   victim.p.hp=Math.max(0,(Number(victim.p.hp)||0)-dmg);
   auth.lastDamageSource="player-raid";
   auth.events=auth.events||[];
@@ -5433,6 +5438,7 @@ function maliceApplyCurse(auth,now){
   auth.events=auth.events||[];
   for(const item of auth.players||[]){
     if(!item||!item.p||item.p.hp<=0||item.downUntil||item.permadead)continue;
+    item.p._lastHitBy="Goshnar's Malice";
     item.p.hp=Math.max(0,item.p.hp-dmg);
     const pos=entityPosition(item,.13,.6);
     auth.events.push({t:"taken",dmg,el:"death",fx:"mort-area",screen:true,
@@ -5700,6 +5706,7 @@ function megaResolvePersonal(auth,playerId,success,now){
     const dmg=megaFailDmg(auth);
     const item=(auth.players||[]).find((p)=>String(p.id)===String(playerId));
     if(item&&item.p&&item.p.hp>0&&!item.downUntil&&!item.permadead){
+      item.p._lastHitBy=kind==="scarlett"?"Scarlett Etzel":"Goshnar's Spite";
       item.p.hp=Math.max(0,item.p.hp-dmg);
       const pos=entityPosition(item,.5,.5);
       auth.events=auth.events||[];
@@ -5767,16 +5774,28 @@ function authMarkPlayerDeath(auth,item,now,opts){
   if(!item||!item.p)return false;
   const ts=Number(now)||Number(auth&&auth.clock)||Date.now();
   const wasDown=item.p.hp<=0&&(item.permadead||item.downUntil);
+  const hadBless=!!item.p.blessed;
   item.p.hp=0;item.p.blessed=false;
   if(opts.permadead||(authIsBossFight(auth)&&!authIsWorldBoss(auth))){
     item.permadead=true;
     item.downUntil=ts+365*86400000;
   }else{
-    item.downUntil=ts+30000;
+    item.downUntil=ts+playerReviveDelay(item.p,ts);
   }
   if(!item.downedAt)item.downedAt=ts;
   if(!item.deathPos)item.deathPos={x:item.x,y:item.y,dir:item.dir||"e"};
-  if(!wasDown)recordAuthSessionDeath(auth,item);
+  if(!wasDown){
+    recordAuthSessionDeath(auth,item);
+    // Histórico de mortes (aba Deaths do cliente): campo protegido no save,
+    // só o motor escreve. Cap em 20 entradas, mais novas primeiro.
+    item.p.deaths=(Number(item.p.deaths)||0)+1;
+    if(!Array.isArray(item.p.deathLog))item.p.deathLog=[];
+    item.p.deathLog.unshift({at:ts,by:item.p._lastHitBy||opts.by||null,
+      where:(auth&&(auth.bossId||auth.huntId))||null,level:item.p.level||1,
+      blessed:hadBless,lost:0});
+    if(item.p.deathLog.length>20)item.p.deathLog.length=20;
+    item.p._lastHitBy=null;
+  }
   return true;
 }
 const SCARLETT_KEYS=["up","down","left","right"];
@@ -6208,7 +6227,7 @@ function fullWipe(auth){
     for(const item of auth.players){const max=maxStats(item.p);item.p.hp=max.hp;item.p.mp=max.mp;item.p.blessed=true;item.downUntil=0;item.permadead=false;}
     auth.events.push({t:"store-bless",accountId:Number(blessItem.accountId)||0,screen:true,ts:auth.clock});
     auth.wipes++;auth.mobs=[];spawnHuntWave(auth,auth.clock,{force:true});return;}
-  const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players)applyPvpLoss(item.p,auth.lastDamageSource||"monster");
+  const pvp=auth.instanceMode==="pvp";if(pvp)for(const item of auth.players){const loss=applyPvpLoss(item.p,auth.lastDamageSource||"monster");if(loss&&item.p&&Array.isArray(item.p.deathLog)&&item.p.deathLog[0])item.p.deathLog[0].lost=loss;}
   const byPlayer={};let cost=0;
   for(const item of auth.players||[]){
     if(!item||!item.p)continue;
@@ -7204,6 +7223,7 @@ function step(auth,now,opts){if(auth.ended)return;
               screen:true,ts:mobVisualTs});
           }
         }else{
+        victim.p._lastHitBy=(mob.def&&mob.def.name)||mob.slug||null;
         victim.p.hp-=damage;
         auth.events.push({t:"taken",dmg:damage,x:target.x,y:target.y,targetId:String(victim.id),
           sx:source.x,sy:source.y,sourceId:String(mob.id),el,fx:ELEMENT_FX[el]||ELEMENT_FX.physical,

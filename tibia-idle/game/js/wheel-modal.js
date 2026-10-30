@@ -49,7 +49,7 @@ function openWheelModal(startVocation) {
   body.classList.remove(
     "hunts-modal-shell", "boss-modal-shell", "bosses-modal-shell",
     "reward-modal-shell", "npcs-modal-shell", "cidade-modal-shell",
-    "ranking-modal-shell"
+    "ranking-modal-shell", "chard-modal-shell"
   );
   body.classList.add("hunts-modal-shell");
 
@@ -236,7 +236,11 @@ function wheelAttach() {
   const btn = $("#btn-wheel");
   if (btn && !btn.dataset.wAttached) {
     btn.dataset.wAttached = "1";
-    btn.addEventListener("click", () => openWheelModal());
+    // a Roda do Destino agora vive como aba da janela Detalhes do personagem
+    btn.addEventListener("click", () => {
+      if (typeof openCharDetails === "function") openCharDetails("roda");
+      else openWheelModal();
+    });
   }
 }
 

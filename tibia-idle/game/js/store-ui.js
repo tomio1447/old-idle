@@ -14,6 +14,13 @@ function storeEsc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+function storeCoinIcon() {
+  return '<img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt="Tibia Coin" style="width:16px;height:16px;vertical-align:middle">';
+}
+function storeCoinBalanceHtml() {
+  const coins = accountCoins();
+  return storeCoinIcon() + " " + storeEsc(typeof fmtFull === "function" ? fmtFull(coins) : coins);
+}
 function storeBrl(n) {
   const v = Number(n) || 0;
   return "R$ " + v.toFixed(2).replace(".", ",");
@@ -61,7 +68,7 @@ function openStoreModal(tab) {
       <b>STORE</b>
       <span class="tiny dim" style="margin-left:6px">Gamestore</span>
       <span style="flex:1"></span>
-      <span class="tiny" id="store-coin-count" style="color:#ffe680">🪙 ${typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins()}</span>
+      <span class="tiny" id="store-coin-count" style="color:#ffe680">${storeCoinBalanceHtml()}</span>
       <span class="tiny dim" style="margin-left:8px">${storeEsc(storeVipLabel())}</span>
       <button class="sm" id="store-close">✕</button>
     </div>
@@ -202,7 +209,7 @@ async function renderStorePreys(main) {
       <div class="store-pack">
         <img src="assets/ui/prey/prey_wildcard.png" width="32" height="32" alt="Prey Card">
         <div class="store-pack-label">${p.cards} cards</div>
-        <div class="store-pack-price">${p.coins} TC</div>
+        <div class="store-pack-price">${storeCoinIcon()} ${p.coins} TC</div>
         <button type="button" class="sm primary full" data-store-preys="${storeEsc(p.id)}">Comprar</button>
       </div>`).join("")}</div>`;
   main.querySelectorAll("[data-store-preys]").forEach((button) => {
@@ -240,7 +247,7 @@ async function renderStoreVip(main) {
       ${packs.map((p) => `
         <div class="store-pack">
           <div class="store-pack-label">${storeEsc(p.label)}</div>
-          <div class="store-pack-price">🪙 ${p.coins} TC</div>
+          <div class="store-pack-price">${storeCoinIcon()} ${p.coins} TC</div>
           <button type="button" class="sm primary full" data-store-vip="${storeEsc(p.id)}">Comprar</button>
         </div>`).join("")}
     </div>`;
@@ -267,7 +274,7 @@ async function renderStoreBuy(main) {
       ${packs.map((p) => `
         <div class="store-pack ${p.best ? "best" : ""}">
           ${p.best ? '<div class="store-best">Melhor valor</div>' : ""}
-          <div class="store-pack-label">${storeEsc(p.label)}</div>
+          <div class="store-pack-label">${storeCoinIcon()} ${storeEsc(p.label)}</div>
           ${p.bonus ? `<div class="tiny" style="color:#9ce84a">+${p.bonus} bônus · ${p.total} TC</div>` : `<div class="tiny dim">${p.total} TC</div>`}
           <div class="store-pack-price">${storeBrl(p.brl)}</div>
           <button type="button" class="sm primary full" data-store-pack="${storeEsc(p.id)}">Comprar</button>
@@ -565,7 +572,7 @@ function renderStoreCosmetics(main, kind) {
       <img src="assets/ui/coins/tibia-coins.gif" alt="" class="coin-gif" style="width:28px;height:28px">
       <div>
         <div class="small" style="color:#ffe680">${label} — ${STORE_COS_PRICE} TC cada</div>
-        <div class="tiny dim">Desbloqueio por <b>conta</b>: vale para todos os personagens. Use no Cyclopedia &gt; Aparência.</div>
+        <div class="tiny dim">Desbloqueio por <b>conta</b>: vale para todos os personagens atuais e futuros.${kind === "outfit" ? " Inclui o visual base e todos os addons disponíveis, nas versões masculina e feminina. Compras antigas também recebem os addons, sem custo adicional." : " A montaria pode ser usada por qualquer personagem da conta."} Use no Cyclopedia &gt; Aparência.</div>
       </div>
     </div>
     <div class="store-voucher-row" style="max-width:340px;margin-bottom:8px">
@@ -601,7 +608,7 @@ function renderStoreCosmetics(main, kind) {
           ? ((typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.mount)
               ? AppearanceRenderer.mount(mountId, "s", 0) : null)
           : ((typeof AppearanceRenderer !== "undefined" && AppearanceRenderer.outfit)
-              ? AppearanceRenderer.outfit(box.dataset.cosPaint, 0, cores) : null);
+              ? AppearanceRenderer.outfit(box.dataset.cosPaint, 3, cores) : null);
         if (!cv) { rest.push(box); continue; }
         cv.style.width = "48px"; cv.style.height = "52px";
         cv.style.imageRendering = "pixelated"; cv.style.objectFit = "contain";
@@ -666,7 +673,7 @@ function renderStoreCosmetics(main, kind) {
     if (r && r.ok) {
       if (typeof toast === "function") toast(`<b>${storeEsc(r.nome || key)}</b> desbloqueado na conta!`);
       const cc = $("#store-coin-count");
-      if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+      if (cc) cc.innerHTML = storeCoinBalanceHtml();
       renderGrid();
     } else {
       b.dataset.busy = "";
@@ -749,7 +756,7 @@ function renderStoreBless(main) {
       const cnt = $("#store-bless-count");
       if (cnt) cnt.textContent = String(storeBlessCount());
       const cc = $("#store-coin-count");
-      if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+      if (cc) cc.innerHTML = storeCoinBalanceHtml();
       setMsg("✔ " + (r.msg || "Bless ativa na conta!"), "#8fd18f");
     } else {
       setMsg("✖ " + ((r && r.msg) || "Falha na compra"), "#ff9a6a");
@@ -809,7 +816,7 @@ function renderStoreVouchers(main) {
         setMsg("✔ " + parts.join(" — "), "#9ce84a");
         input.value = "";
         const cc = $("#store-coin-count");
-        if (cc) cc.textContent = "🪙 " + (typeof fmtFull === "function" ? fmtFull(accountCoins()) : accountCoins());
+        if (cc) cc.innerHTML = storeCoinBalanceHtml();
       } else {
         setMsg("✖ " + ((r && r.msg) || "Falha ao resgatar voucher"), "#ff9a6a");
       }

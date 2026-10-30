@@ -376,6 +376,7 @@ html[data-ui-mode="mobile"] .modal-bg .modal.cidade-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.ranking-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.boss-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg .modal.reward-modal-shell,
+html[data-ui-mode="mobile"] .modal-bg .modal.chard-modal-shell,
 html[data-ui-mode="mobile"] .modal-bg.modal-otc .modal,
 html[data-ui-mode="mobile"] .modal-bg.modal-cyclo .modal,
 html[data-ui-mode="mobile"] .modal-bg.forge-modal-shell .modal,
@@ -448,6 +449,25 @@ html[data-ui-mode="mobile"] .imb-col-right {
 html[data-ui-mode="mobile"] .modal-bg .modal.hunts-modal-shell {
   max-height: calc(100dvh - var(--mobile-safe-t) - var(--mobile-safe-b)) !important;
 }
+/* Detalhes do personagem: mesma regra — a moldura ocupa quase a tela toda
+   e cada aba rola internamente, sem estourar a viewport em pé. */
+html[data-ui-mode="mobile"] .modal-bg .modal.chard-modal-shell {
+  height: auto;
+  min-height: 60%;
+  max-height: calc(100dvh - var(--mobile-safe-t) - var(--mobile-safe-b)) !important;
+}
+html[data-ui-mode="mobile"] .chard-cols-3,
+html[data-ui-mode="mobile"] .chard-cols-2,
+html[data-ui-mode="mobile"] .chard-outfit-grid,
+html[data-ui-mode="mobile"] .chard-wheel-grid {
+  grid-template-columns: 1fr;
+}
+html[data-ui-mode="mobile"] .chard-outfit-side {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+}
+html[data-ui-mode="mobile"] .chard-outfit-side > * { min-width: 140px; }
+html[data-ui-mode="mobile"] .chard-tabs { overflow-x: auto; flex-wrap: nowrap; }
+html[data-ui-mode="mobile"] .chard-tab { min-height: 40px; white-space: nowrap; }
 html[data-ui-mode="mobile"] #hunts-modal-list {
   grid-template-columns: 1fr !important;
 }

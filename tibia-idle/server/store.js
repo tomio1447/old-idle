@@ -508,7 +508,7 @@ function sanitizeCosmetics(raw) {
   const outfits = {}, mounts = {};
   if (c.outfits && typeof c.outfits === "object" && !Array.isArray(c.outfits))
     for (const k of Object.keys(c.outfits))
-      outfits[String(k).slice(0, 80)] = Math.max(0, Math.min(3, Math.floor(Number(c.outfits[k]) || 0)));
+      outfits[String(k).slice(0, 80)] = 3;
   if (c.mounts && typeof c.mounts === "object" && !Array.isArray(c.mounts))
     for (const k of Object.keys(c.mounts))
       if (c.mounts[k]) mounts[String(k).slice(0, 80)] = true;
@@ -538,7 +538,7 @@ async function buyCosmetic(db, body) {
 
   const novo = coins - COSMETIC_PRICE;
   await db.updateCoins(acc.id, novo);
-  if (kind === "outfit") cosmetics.outfits[id] = 0;
+  if (kind === "outfit") cosmetics.outfits[id] = 3;
   else cosmetics.mounts[id] = true;
   if (typeof db.setAccountCosmetics === "function")
     await db.setAccountCosmetics(acc.id, cosmetics);

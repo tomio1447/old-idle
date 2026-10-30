@@ -5519,159 +5519,21 @@ function paintCharPortraits(chars, tries) {
 }
 
 /* -------------------------------------------------- change outfit */
+/* O editor de outfit e a troca de personagem vivem na janela "Detalhes do
+ * personagem" (char-details.js): mesma moldura, abas e o mesmo catálogo da
+ * Cyclopedia. Estas funções só delegam — callers antigos continuam valendo. */
 function openOutfitModal() {
-  const p = G.p;
-  ensureOutfit(p);
-  // As cores são pré-visualizadas no personagem vivo, mas o Cancelar
-  // restaura esta cópia antes de voltar ao seletor.
-  const originalColors = p.outfit.colors.slice();
-  const draft = { type: p.outfit.type, colors: originalColors.slice() };
-  const PARTS = [["Cabeça", 0], ["Corpo", 1], ["Pernas", 2], ["Pés", 3]];
-  let part = 0;
-  const render = () => {
-    $$("#outfit-parts [data-opart]").forEach((b) => b.classList.toggle("primary", +b.dataset.opart === part));
-    $$("#outfit-palette [data-ocolor]").forEach((s) => s.classList.toggle("sel", +s.dataset.ocolor === draft.colors[part]));
-    // O renderer e o Wardrobe leem p.outfit.colors. Aplicar o draft aqui
-    // faz cada clique da paleta atualizar imediatamente base + addons.
-    p.outfit.colors = draft.colors.slice();
-    const preview=$("#outfit-color-preview");
-    if(preview&&typeof AppearanceRenderer!=="undefined"){
-      const cv=AppearanceRenderer.preview(p,"s");
-      if(cv){cv.style.width="72px";cv.style.height="72px";cv.style.imageRendering="pixelated";
-        preview.innerHTML="";preview.appendChild(cv);}
-    }
-    const ward = $("#cyclo-content");
-    if (ward && typeof cycloAppearance === "function") cycloAppearance(p, ward);
-  };
-
-  $("#modal-body").innerHTML = `
-    <div class="panel-title">Change Outfit
-      <span style="flex:1"></span><button class="sm" id="outfit-close">✕</button>
-    </div>
-    <div class="panel-body">
-      <div class="outfit-color-editor mb8">
-        <div style="min-width:0;flex:1">
-          <div class="small dim mb4">Cores do visual</div>
-          <div class="row wrap mb4" id="outfit-parts" style="gap:4px">
-            ${PARTS.map(([n, i]) => `<button class="sm" data-opart="${i}">${n}</button>`).join("")}
-          </div>
-          <div id="outfit-palette" class="outfit-palette outfit-palette-compact">
-        ${OUTFIT_PALETTE.map((c, i) =>
-          `<span class="swatch" data-ocolor="${i}" style="background:${c}" title="cor ${i}"></span>`).join("")}
-        </div>
-      </div>
-      <div id="outfit-color-preview" class="outfit-preview" style="width:84px;height:84px;flex:none"></div>
-      </div>
-      <div class="small dim mt8 mb4">Wardrobe — outfits, addons e montarias</div>
-      <div id="cyclo-content" class="outfit-wardrobe" style="max-height:330px;overflow:auto"></div>
-      <div class="row" style="gap:6px;margin-top:8px">
-        <button class="primary" style="flex:1" id="outfit-save">Salvar outfit</button>
-        <button style="flex:none" id="outfit-cancel">Cancelar</button>
-      </div>
-    </div>`;
-  $("#modal").classList.add("show", "wide");
-  // A antiga tela Aparências da Cyclopedia passa a viver dentro do Change Outfit.
-  if (typeof CYCLO !== "undefined") { CYCLO.appModo = "outfit"; CYCLO.filtro = "all"; }
-
-  $$("#outfit-parts [data-opart]").forEach((b) => b.addEventListener("click", () => {
-    part = +b.dataset.opart; render();
-  }));
-  $$("#outfit-palette [data-ocolor]").forEach((s) => s.addEventListener("click", () => {
-    draft.colors[part] = +s.dataset.ocolor; render();
-  }));
-  const close = () => {
-    p.outfit.colors=originalColors.slice();
-    save();renderAll();openCharacterModal();
-  };
-  $("#outfit-close").addEventListener("click", close);
-  $("#outfit-cancel").addEventListener("click", close);
-  $("#outfit-save").addEventListener("click", () => {
-    p.outfit = Object.assign({}, p.outfit || {}, { type: draft.type, colors: draft.colors.slice() });
-    save();
-    toast("Outfit atualizado!");
-    renderAll();
-    openCharacterModal();
-  });
-  render();
+  if (typeof openCharDetails === "function") { openCharDetails("outfit"); return; }
 }
 
 function openCharacterModal() {
-  save();
+  if (typeof openCharDetails === "function") { openCharDetails("personagem"); return; }
+  // fallback sem o módulo carregado: comportamento antigo (picker online)
   if (typeof accountApiConfigured === "function" && accountApiConfigured() &&
       typeof sessionToken === "function" && sessionToken() &&
       typeof window.openAccountCharacterPicker === "function") {
     window.openAccountCharacterPicker();
-    return;
   }
-  const chars = getCharacters();
-  const currentId = G.p ? characterId(G.p) : localStorage.getItem(ACTIVE_CHARACTER_KEY);
-  $("#modal-body").innerHTML = `
-    <div class="panel-title">Trocar personagem
-      <span style="flex:1"></span><button class="sm" id="char-close">✕</button>
-    </div>
-    <div class="panel-body">
-      <div class="small dim mb4">Personagens salvos neste navegador</div>
-      <div class="account-character-list mb8">
-        ${chars.length ? `<div class="account-character-list-head">
-          <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
-        </div>` + chars.map((p) => `
-          <div class="account-character-card ${p.id === currentId ? "is-current" : ""}">
-            <span class="account-character-outfit char-portrait" data-portrait="${p.id}"></span>
-            <span class="account-character-name"><b>${p.name}${p.id === currentId ? " · atual" : ""}</b></span>
-            <span class="account-character-voc">${vocationName(p)}</span>
-            <span class="account-character-level">${p.level}</span>
-            <button class="sm primary" data-load-char="${p.id}" ${p.id === currentId ? "disabled" : ""}>Entrar</button>
-          </div>`).join("") : `<div class="account-character-empty">Nenhum personagem salvo.</div>`}
-      </div>
-      <button class="full mb8" id="char-outfit">👕 Change Outfit</button>
-      <button class="primary full mb8" id="char-new-toggle">Criar novo personagem</button>
-      <div id="char-new-box" class="panel-inset" style="display:none;padding:8px">
-        <div class="field"><label>Nome</label><input id="new-char-name" maxlength="20" autocomplete="off"></div>
-        <div class="field"><label>Sexo</label><select id="new-char-sex"><option value="male">Masculino</option><option value="female">Feminino</option></select></div>
-        <div class="field"><label>Vocação</label><select id="new-char-voc">
-          <option value="knight">Knight</option><option value="paladin">Paladin</option>
-          <option value="druid">Druid</option><option value="sorcerer">Sorcerer</option>
-          <option value="monk">Monk</option>
-        </select></div>
-        <button class="primary full" id="char-create">Criar e entrar</button>
-      </div>
-      <div class="tiny dim mt8">Ao trocar/criar personagem a página recarrega para iniciar a sessão limpa.</div>
-    </div>`;
-  $("#modal").classList.add("show");
-  paintCharPortraits(chars);
-  $("#char-close").addEventListener("click", () => $("#modal").classList.remove("show"));
-  $("#char-outfit").addEventListener("click", () => openOutfitModal());
-  $$("#modal-body [data-load-char]").forEach((b) => b.addEventListener("click", () => {
-    const id = b.dataset.loadChar;
-    // Party em hunt: a entidade já existe nesta instância. Nunca recarregue
-    // para a cidade, pois isso criava uma cópia do membro ainda em combate.
-    if (G.combat && G.combat.players && G.combat.players.some((e) => String(e.id) === String(id))) {
-      if (typeof partyCombatSwitchTo === "function" && partyCombatSwitchTo(id)) {
-        $("#modal").classList.remove("show");
-        renderAll();
-      }
-      return;
-    }
-    const roster = readRoster();
-    if (!roster[id] || !roster[id].p) { toast("Personagem não encontrado."); return; }
-    save();
-    localStorage.setItem(ACTIVE_CHARACTER_KEY, id);
-    sessionStorage.setItem(AUTOLOGIN_KEY, id);
-    if (typeof armBootLoading === "function") armBootLoading("Carregando personagem...");
-    location.reload();
-  }));
-  $("#char-new-toggle").addEventListener("click", () => {
-    const box = $("#char-new-box");
-    box.style.display = box.style.display === "none" ? "" : "none";
-  });
-  $("#char-create").addEventListener("click", () => {
-    const name = ($("#new-char-name").value || "").trim();
-    if (name.length < 2) { toast("Digite um nome válido"); return; }
-    const np = createCharacter(name, $("#new-char-voc").value, $("#new-char-sex").value);
-    sessionStorage.setItem(AUTOLOGIN_KEY, characterId(np));
-    if (typeof armBootLoading === "function") armBootLoading("Carregando personagem...");
-    location.reload();
-  });
 }
 
 /* ------------------------------------------------------------ login */
@@ -5697,12 +5559,14 @@ function initAccountLogin() {
     }
   }catch(e){}
   function closeAccountModal() {
-    const modal = $("#modal");
+    const modal = $("#modal"), body = $("#modal-body");
     if (modal) modal.classList.remove("show", "wide", "login-modal");
+    if (body) body.classList.remove("chard-modal-shell");
   }
   function openAccountModal(html, wide) {
     const body = $("#modal-body"), modal = $("#modal");
     if (!body || !modal) return false;
+    body.classList.remove("chard-modal-shell");
     body.innerHTML = html;
     modal.classList.add("show");
     modal.classList.toggle("wide", !!wide);
@@ -6262,6 +6126,15 @@ function initAccountLogin() {
     if (!result.ok) { logoutAccount(); return false; }
     showPicker(currentToken, result.account, result.characters || []);
     return true;
+  };
+  // A janela "Detalhes do personagem" (char-details.js) reutiliza o fluxo
+  // completo de entrar/criar personagem da conta — lease, autoload e reload
+  // continuam sendo tratados aqui.
+  window.accountCharOps = {
+    enter: enterCharacter,
+    create: showCharacterCreator,
+    picker: showPicker,
+    logout: logoutAccount,
   };
 }
 function initLogin() {
