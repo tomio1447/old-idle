@@ -210,12 +210,13 @@ function renderTrainingPanel() {
     const charges = plan.id === "free" ? "∞" : fmtFull(s.balances[plan.id] || 0);
     const lasting = Math.max(0, Math.floor(Number(s.balances.lasting) || 0));
     const skillLabel = s.skill === "magic" ? "Magic Level" : (SKILL_NAMES[s.skill] || s.skill);
+    const eta = (inArea && typeof trainingSkillEtaText === "function") ? trainingSkillEtaText(p) : "";
     return `<button class="training-char ${inArea ? "" : "outside"}" data-training-char="${p.id}" ${disabled}
         title="${p.remoteTraining ? "Configurado no cliente do jogador" : (inArea ? "" : "Fora da área de treino — clique para configurar")}" type="button">
       <span class="tr-icon-wrap"><img src="${TRAINING_ICON_PATH + EXERCISE_WEAPONS[s.weapon].icon}" class="tr-char-icon" alt="">
         <span class="tr-charge-badge" title="Cargas de Lasting Exercise Weapon">${fmtFull(lasting)}</span></span>
       <span class="tr-char-info"><b>${p.name}</b><small>${skillLabel}</small></span>
-      <span class="tr-char-plan"><span>${plan.name}</span><small>${charges} cargas</small></span>
+      <span class="tr-char-plan"><span>${plan.name}</span><small>${charges} cargas</small>${eta ? `<small class="tr-eta" title="Tempo estimado até o próximo nível de ${skillLabel}">⏱ ${eta}</small>` : ""}</span>
     </button>`;
   }).join("");
   box.style.display = "block";

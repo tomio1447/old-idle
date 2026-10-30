@@ -629,20 +629,24 @@ function academyTrainingTick(t, p, dt, now, dummyPos) {
   t.skill = state.skill;
   t.weapon = state.weapon = trainingWeaponForSkill(state.skill, p);
   const online = typeof accountApiConfigured === "function" && accountApiConfigured();
-  if (!online && activePlan.id !== "free") state.balances[activePlan.id] = Math.max(0, state.balances[activePlan.id] - 1);
+  // Cobrança/tentativas por golpe: offline aplica em definitivo; online é
+  // previsão visual — o checkpoint do servidor reconcilia com o valor
+  // autoritativo (skills/skillTries/ml/manaSpent/trainingExercise).
+  if (activePlan.id !== "free")
+    state.balances[activePlan.id] = Math.max(0, (Number(state.balances[activePlan.id]) || 0) - 1);
   const rate = activePlan.bonus;
   let skillUp = false, shieldUp = false;
-  if (!online) {
-    if (t.skill === "magic") {
-      const gain = Math.floor(EXERCISE_MANA * rate);
-      t.stats.manaSpent += gain;
-      skillUp = addManaSpent(p, gain);
-    } else {
-      skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
-    }
-    shieldUp = t.skill === "shield" ? false : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
-    if ((skillUp || shieldUp) && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+  if (t.skill === "magic") {
+    const gain = Math.floor(EXERCISE_MANA * rate);
+    t.stats.manaSpent += gain;
+    skillUp = addManaSpent(p, gain);
+  } else {
+    skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
   }
+  shieldUp = t.skill === "shield" ? false : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
+  if ((skillUp || shieldUp) && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+  t.uiDirty = true;
+  if (typeof G !== "undefined" && G.p === p && typeof renderSkills === "function") renderSkills(p);
   t.stats.hits++; if (skillUp) t.stats.skillUps++; if (shieldUp) t.stats.shieldUps++;
   const target = dummyPos || t.dummyPos;
   if (t.playerPos && target) {
@@ -659,7 +663,12 @@ function academyTrainingTick(t, p, dt, now, dummyPos) {
 
 function trainingPartyTick(training, dt, now) {
   if (typeof trainingCheckpointTick === "function") trainingCheckpointTick(training, now);
-  for (const member of training.members || []) academyTrainingTick(member, member.p, dt, now, training.dummyPos);
+  let dirty = false;
+  for (const member of training.members || []) {
+    academyTrainingTick(member, member.p, dt, now, training.dummyPos);
+    if (member.uiDirty) { member.uiDirty = false; dirty = true; }
+  }
+  if (dirty && typeof renderTrainingPanel === "function") renderTrainingPanel();
 }
 
 /* ------------------------------------------------------------ acoes */

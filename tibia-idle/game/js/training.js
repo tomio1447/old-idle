@@ -136,10 +136,53 @@ function trainingCheckpointTick(training, now) {
   accountTrainingCheckpoint(training, false).then((ok) => {
     if (!ok && !training.checkpointWarned && typeof toast === "function") {
       training.checkpointWarned = true;
-      toast("Treino aguardando confirmação do servidor. Nenhum avanço será exibido sem salvar.", "bad");
+      toast("Treino aguardando confirmação do servidor — o progresso exibido será corrigido se não for salvo.", "bad");
     }
     if (ok) training.checkpointWarned = false;
   }).catch(() => {}).finally(() => { training.checkpointPending = false; });
+}
+
+/* Tempo estimado (min) até o próximo nível da skill em treino, seguindo a
+ * mesma fórmula do servidor: tries/mana por golpe * rate * bônus do plano,
+ * no intervalo da vocation (VIP acelera). Retorna null quando indisponível
+ * (remoto, sem dados de progresso ou treino pausado). */
+function trainingSkillEtaMinutes(p) {
+  if (!p || p.remoteTraining) return null;
+  const s = ensureTraining(p);
+  if (s.active === false) return null;
+  const skill = s.skill;
+  const plan = trainingPlan(p);
+  const interval = (typeof exerciseInterval === "function" ? exerciseInterval(p) : 2000);
+  let remaining, perHit;
+  if (skill === "magic") {
+    const factor = (typeof VOCATIONS !== "undefined" && VOCATIONS[p.voc] && VOCATIONS[p.voc].magicFactor) || 1;
+    const need = (typeof mlCost === "function" ? mlCost(p.ml, factor) : Infinity);
+    remaining = Math.max(0, need - (Number(p.manaSpent) || 0));
+    perHit = Math.floor(Math.floor(600 * plan.bonus) *
+      (typeof serverMagicRate === "function" ? serverMagicRate(p.ml) : 1));
+  } else {
+    const voc = (typeof SKILL_CONST !== "undefined" && (SKILL_CONST[p.voc] || SKILL_CONST.none)) || { melee: 1, dist: 1, shield: 1, fist: 1 };
+    const isShield = skill === "shield", isDist = skill === "dist";
+    const factor = isShield ? voc.shield : isDist ? voc.dist : skill === "fist" ? voc.fist : voc.melee;
+    const base = isShield ? 100 : isDist ? 30 : 50;
+    const lvl = Math.max(10, Math.floor(Number(p.skills && p.skills[skill]) || 10));
+    const need = (typeof skillCost === "function" ? skillCost(lvl, base, factor) : Infinity);
+    remaining = Math.max(0, need - ((p.skillTries && Number(p.skillTries[skill])) || 0));
+    perHit = Math.floor(7 * plan.bonus *
+      (typeof serverSkillRate === "function" ? serverSkillRate(lvl) : 1));
+  }
+  if (!Number.isFinite(remaining) || !(perHit > 0)) return null;
+  const hits = Math.max(1, Math.ceil(remaining / perHit));
+  return hits * interval / 60000;
+}
+
+function trainingSkillEtaText(p) {
+  const m = trainingSkillEtaMinutes(p);
+  if (m == null) return "";
+  if (m < 1) return "<1min";
+  if (m < 60) return `~${Math.ceil(m)}min`;
+  const h = Math.floor(m / 60), rest = Math.ceil(m % 60);
+  return `~${h}h${rest ? String(rest).padStart(2, "0") + "min" : ""}`;
 }
 
 function trainingPartyPlayers() {

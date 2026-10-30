@@ -4923,7 +4923,10 @@ function loop(ts) {
     const staminaRegen = tr.weapon ? dt / 3000 : dt / 1000;
     G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + staminaRegen);
     if (tr.members) trainingPartyTick(tr, dt, Date.now());
-    else academyTrainingTick(tr, G.p, dt, Date.now());
+    else {
+      academyTrainingTick(tr, G.p, dt, Date.now());
+      if (tr.uiDirty) { tr.uiDirty = false; if (typeof renderTrainingPanel === "function") renderTrainingPanel(); }
+    }
     drainAcademyEvents();
     if (JSON.stringify(G.p.skills) + G.p.ml !== beforeSkills) {
       renderSkills(G.p);
