@@ -4,21 +4,19 @@
  * Fonte de verdade online: account.vipUntil (timestamp ms) vindo do login/me.
  * Offline/local: localStorage oti_vip (legado).
  *
- * Benefícios VIP:
+ * Benefícios VIP ativos (todos usados no jogo — ver pontos de uso):
  *   - Fast Revive: 15s (vs 30s normal)
- *   - Cooldown Wheel: 30% menos CD em Gift of Life e Avatar
- *   - Imbuement Protegido: não consome em zonas de proteção
- *   - Familiar Otimizado: +30% dano de familiar
  *   - Bônus EXP: +10% em cada kill
+ *   - Bônus Stamina: +50% EXP enquanto stamina entre 13h e 15h
  *   - Crítico Adicional: +3% chance de crítico
- *   - Velocidade Exercise: +10% velocidade
- *   - Full Bless: recebe todas as 7 bênçãos ao comprar
  *   - Regeneração: +10 HP e +20 MP a cada 3s
- *   - Prioridade de Login: fila prioritária
- *   - Ausência de Casa: 10 dias (vs 7 normal)
- *   - Bônus Proficiência: +10% EXP de arma
+ *   - Velocidade Exercise: +10% velocidade
+ *   - Cooldown Wheel: 30% menos CD em Gift of Life e Avatar
+ *   - Full Bless: a bênção do templo protege 7 mortes
  *   - Autoseller da Loot Pouch
  *   - Controle manual SQM (AUTO off / WASD / clique)
+ * Planejados (helpers existem, sem uso ainda): Familiar +30% dano,
+ * Imbuement Protegido, Ausência de Casa 10d, Proficiência +10%.
  */
 "use strict";
 

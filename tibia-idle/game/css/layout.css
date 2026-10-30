@@ -4512,6 +4512,13 @@ body.fullhd .scene-overlay { font-size: 13px; }
 }
 .store-pack-label { color: #ffe680; font-size: 13px; font-weight: 700; }
 .store-pack-price { color: #9ce84a; font-size: 14px; }
+.store-vip-benefits {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 10px; margin-bottom: 10px; padding: 8px;
+  background: #14120e; border: 1px solid #2a2620;
+}
+.store-vip-benefit { display: flex; align-items: flex-start; gap: 6px; }
+.store-vip-benefit-ico { flex: 0 0 16px; text-align: center; }
 .store-pix { display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
 .store-pix-qr {
   width: 180px; height: 180px; image-rendering: pixelated;

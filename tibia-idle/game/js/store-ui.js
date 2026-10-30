@@ -171,13 +171,32 @@ async function ensureStoreCatalog() {
   return _storeCatalog;
 }
 
+/* Benefícios efetivos do VIP — cada item precisa estar implementado no
+ * jogo antes de entrar nesta lista (ver vip.js e pontos de uso). */
+const STORE_VIP_BENEFITS = [
+  ["✚", "<b>+10% de EXP</b> em cada criatura eliminada"],
+  ["🔥", "<b>+50% de EXP</b> enquanto a stamina estiver entre 15h e 13h"],
+  ["⚡", "Revive na hunt em <b>15s</b> (30s sem VIP)"],
+  ["🎯", "<b>+3% de chance</b> de acerto crítico"],
+  ["💚", "Regeneração passiva de <b>+10 HP e +20 MP</b> a cada 3s"],
+  ["🏋", "Exercise weapons treinam <b>10% mais rápido</b>"],
+  ["⏱", "<b>−30% de cooldown</b> em Gift of Life e Avatar (Wheel of Destiny)"],
+  ["🙏", "<b>Full Bless</b>: a bênção do templo protege <b>7 mortes</b>"],
+  ["💰", "<b>Autoseller da Loot Pouch</b> desbloqueado"],
+  ["🕹", "<b>Controle manual de SQM</b> desbloqueado (andar com WASD/clique)"],
+];
+
 async function renderStoreVip(main) {
   main.innerHTML = `<div class="tiny dim">Carregando VIP...</div>`;
   const cat = await ensureStoreCatalog();
   if (!cat.ok) { main.innerHTML = `<div class="tiny" style="color:#ff9a6a">${storeEsc(cat.msg)}</div>`; return; }
   const packs = cat.vip || [];
   main.innerHTML = `
-    <div class="tiny dim mb4">VIP é pago com Tibia Coins da conta. ${storeEsc(storeVipLabel())}.</div>
+    <div class="tiny dim mb4">${storeEsc(storeVipLabel())} · VIP é pago com Tibia Coins e vale para <b>todos os personagens da conta</b>.</div>
+    <div class="store-vip-benefits">
+      ${STORE_VIP_BENEFITS.map(([icon, txt]) => `
+        <div class="store-vip-benefit"><span class="store-vip-benefit-ico">${icon}</span><span class="tiny">${txt}</span></div>`).join("")}
+    </div>
     <div class="store-pack-grid">
       ${packs.map((p) => `
         <div class="store-pack">
