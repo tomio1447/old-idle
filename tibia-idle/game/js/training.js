@@ -127,6 +127,21 @@ function trainingPlayerFromPartyRow(row) {
   };
 }
 
+function trainingCheckpointTick(training, now) {
+  if (typeof accountApiConfigured !== "function" || !accountApiConfigured() || typeof accountTrainingCheckpoint !== "function") return;
+  if (training.checkpointPending || now - (training.checkpointAt || 0) < 1000) return;
+  if (!training.checkpointSession) training.checkpointSession = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  training.checkpointAt = now;
+  training.checkpointPending = true;
+  accountTrainingCheckpoint(training, false).then((ok) => {
+    if (!ok && !training.checkpointWarned && typeof toast === "function") {
+      training.checkpointWarned = true;
+      toast("Treino aguardando confirmação do servidor. Nenhum avanço será exibido sem salvar.", "bad");
+    }
+    if (ok) training.checkpointWarned = false;
+  }).catch(() => {}).finally(() => { training.checkpointPending = false; });
+}
+
 function trainingPartyPlayers() {
   const byId = new Map();
   const add = (p) => {

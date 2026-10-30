@@ -2545,6 +2545,8 @@ function startAcademy() {
 
 function stopAcademy(log) {
   if (!G.training) return;
+  if (G.training.checkpointSession && typeof accountTrainingCheckpoint === "function")
+    accountTrainingCheckpoint(G.training, true).catch(() => {});
   const returningToTemple = log !== false;
   if (returningToTemple && typeof partyCombatRestoreAll === "function")
     partyCombatRestoreAll("retorno do treino");

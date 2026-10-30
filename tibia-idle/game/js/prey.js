@@ -240,12 +240,36 @@ function preySelect(p, slotIdx, creature, tipoForcado) {
 }
 
 /* Usa um Prey Wildcard: melhora o step (+1) e pode trocar o tipo. */
-function preyUseWildcard(p, slotIdx) {
+function preyCardCount(p) {
+  const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+  const shared = typeof accountApiConfigured === "function" && accountApiConfigured()
+    ? Math.max(0, Math.floor(Number(acc && acc.cosmetics && acc.cosmetics.preyCards) || 0)) : 0;
+  return Math.max(0, Math.floor(Number(p && p.prey && p.prey.wildcards) || 0)) + shared;
+}
+const PREY_CARD_PENDING = new Set();
+async function preyUseAvailableCard(p, slotIdx) {
+  if (PREY_CARD_PENDING.has(p)) return { ok: false, msg: "Aguarde a utilização do card." };
+  ensurePrey(p);
+  if (!p.prey.slots[slotIdx] || !p.prey.slots[slotIdx].selected)
+    return { ok: false, msg: "Sem prey ativa." };
+  if (p.prey.wildcards > 0) return preyUseWildcard(p, slotIdx);
+  if (typeof accountPreyCardsRequest !== "function" || typeof accountApiConfigured !== "function" || !accountApiConfigured())
+    return { ok: false, msg: "Sem wildcards." };
+  PREY_CARD_PENDING.add(p);
+  try {
+    const result = await accountPreyCardsRequest(sessionToken());
+    if (!result.ok) return result;
+    return preyUseWildcard(p, slotIdx, true);
+  } catch (e) {
+    return { ok: false, msg: "Não foi possível confirmar o uso do card. Atualize o saldo antes de tentar novamente." };
+  } finally { PREY_CARD_PENDING.delete(p); }
+}
+function preyUseWildcard(p, slotIdx, paid) {
   ensurePrey(p);
   const slot = p.prey.slots[slotIdx];
   if (!slot || !slot.selected) return { ok: false, msg: "Sem prey ativa." };
-  if ((p.prey.wildcards || 0) < 1) return { ok: false, msg: "Sem wildcards." };
-  p.prey.wildcards--;
+  if (!paid && (p.prey.wildcards || 0) < 1) return { ok: false, msg: "Sem wildcards." };
+  if (!paid) p.prey.wildcards--;
   const sel = slot.selected;
   if (sel.step >= 9) {
     // já no máximo: o tipo muda com garantia

@@ -58,3 +58,72 @@ must(!/type\s*=\s*["']radio["']/i.test(uiSrc), "training-ui.js não deve conter 
 must(!/\btabs\b/.test(uiSrc), "training-ui.js não deve usar tabs");
 
 console.log("OK: treino multi-personagem, planos, cargas, posições, conversão local e estrutura visual.");
+
+ctx.accountApiConfigured = () => true;
+const online = mk(3); ctx.ensureTraining(online);
+online.trainingExercise.activePlan = "lasting"; online.trainingExercise.balances.lasting = 3;
+const mo = ctx.buildTrainingMember(online, 0, map); mo.hitCd = 0;
+ctx.academyTrainingTick(mo, online, 100, Date.now(), tr.dummyPos);
+must(online.trainingExercise.balances.lasting === 3 && !online.gains, "online não pode consumir cargas ou conceder skills no navegador");
+must(!!mo.proj, "animações online devem continuar funcionando");
+
+async function testTrainingCheckpoints() {
+  const assert = require("assert"), os = require("os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "idle-training-test-"));
+  const oldDir = process.env.GLOBAL_IDLE_DATA_DIR, oldHost = process.env.MYSQL_HOST;
+  process.env.GLOBAL_IDLE_DATA_DIR = dir; process.env.MYSQL_HOST = "";
+  const dbPath = require.resolve("../server/db");
+  try {
+    delete require.cache[dbPath];
+    const db = await require(dbPath).getDb();
+    const { advanceTrainingPlayer } = require("../server/authoritative_engine");
+    db.accounts.push({ id: 1, login: "training-test", vip_until: 0, coins: 0 });
+    const account = db.accounts[0], aid = account.id, now = Date.now();
+    const lease = { holderId: "training-test", secretHash: "test-hash", now };
+    db.leaseAcquire(aid, lease.holderId, "", "", lease.secretHash, now, now + 120000);
+    const p = mk(1); p.trainingExercise = { skill: "sword", activePlan: "lasting", balances: { lasting: 3, exercise: 0 }, active: true };
+    p.skillTries.sword = 49;
+    const row = db.createCharacter(aid, "Training test", "knight", 1, JSON.stringify(p));
+    const tick = (at, session = "test-session", stop = false) => db.trainingCheckpoint(aid, [row.id], session, at,
+      Object.assign({}, lease, { now: at }), advanceTrainingPlayer, stop);
+    let result = tick(now);
+    assert(result.ok); assert.equal(JSON.parse(row.data).skills.sword, 10);
+    result = tick(now + 2000);
+    assert(result.ok); assert(result.advances.some((a) => a.type === "sword"));
+    const saved = JSON.parse(row.data), version = row.save_version;
+    assert(saved.skills.sword > 10); assert.equal(saved.trainingExercise.balances.lasting, 2);
+    const disk = JSON.parse(fs.readFileSync(path.join(dir, "characters.json"), "utf8")).find((c) => c.id === row.id);
+    assert.equal(JSON.parse(disk.data).skills.sword, saved.skills.sword);
+    tick(now + 2000);
+    assert.equal(JSON.parse(row.data).trainingExercise.balances.lasting, 2);
+    tick(now + 3000, "different-session");
+    assert.equal(JSON.parse(row.data).trainingExercise.balances.lasting, 2);
+    tick(now + 60000, "different-session");
+    assert.equal(JSON.parse(row.data).trainingExercise.balances.lasting, 2);
+    const stale = db.saveCharactersVersioned(aid, [{ id: row.id, expectedVersion: version - 1, voc: "knight", level: 1, data: JSON.stringify(p) }], lease);
+    assert.equal(stale.error, "SAVE_VERSION_CONFLICT");
+    const denied = db.trainingCheckpoint(aid, [row.id], "test-session", now + 61000,
+      Object.assign({}, lease, { secretHash: "invalid" }), advanceTrainingPlayer, false);
+    assert.equal(denied.error, "LEASE_REQUIRED");
+    const missing = db.trainingCheckpoint(aid, [row.id, 999999], "test-session", now + 61000, lease, advanceTrainingPlayer, false);
+    assert.equal(missing.error, "CHARACTER_NOT_FOUND");
+    const mage = mk(4); mage.voc = "druid"; mage.ml = 0; mage.manaSpent = 1599;
+    mage.trainingExercise = { skill: "magic", activePlan: "lasting", balances: { lasting: 1 }, active: true };
+    advanceTrainingPlayer(mage, now, "mage-session", false, lease.holderId, false);
+    const magic = advanceTrainingPlayer(mage, now + 2000, "mage-session", false, lease.holderId, false);
+    assert(magic.advances.some((a) => a.type === "magic")); assert(mage.ml > 0);
+    assert.equal(mage.trainingExercise.balances.lasting, 0);
+    advanceTrainingPlayer(mage, now + 4000, "mage-session", false, lease.holderId, true);
+    assert.equal(mage.trainingExercise.activePlan, "free"); assert.equal(mage.trainingClock, null);
+    delete require.cache[dbPath];
+    const restarted = await require(dbPath).getDb();
+    assert.equal(JSON.parse(restarted.findCharacter(row.id).data).skills.sword, saved.skills.sword);
+    console.log("OK: avanço salvo antes da resposta, restart preserva skill, carga atômica, sem replay, lease e versão stale rejeitadas, ML e fallback free.");
+  } finally {
+    if (oldDir === undefined) delete process.env.GLOBAL_IDLE_DATA_DIR; else process.env.GLOBAL_IDLE_DATA_DIR = oldDir;
+    if (oldHost === undefined) delete process.env.MYSQL_HOST; else process.env.MYSQL_HOST = oldHost;
+    delete require.cache[dbPath];
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+testTrainingCheckpoints().catch((error) => { console.error(error); process.exitCode = 1; });

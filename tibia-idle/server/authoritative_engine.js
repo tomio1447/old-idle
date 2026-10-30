@@ -2011,6 +2011,53 @@ function addManaSpent(p,mana,auth){
   while(p.manaSpent>=need){p.manaSpent-=need;p.ml=(Number(p.ml)||0)+1;up=true;need=mlTriesNeeded(p);}
   return up;
 }
+function advanceTrainingPlayer(p, now, sessionId, vip, holderId, stop) {
+  p.ml = Math.max(0, Math.floor(Number(p.ml) || 0));
+  p.manaSpent = Math.max(0, Number(p.manaSpent) || 0);
+  p.skills = p.skills || {};
+  p.skillTries = p.skillTries || {};
+  for (const skill of ["fist", "sword", "axe", "club", "dist", "shield"])
+    p.skills[skill] = Math.max(10, Math.floor(Number(p.skills[skill]) || 10));
+  const previous = p.trainingClock;
+  const same = previous && previous.sessionId === sessionId && previous.holderId === holderId;
+  const elapsed = same ? Math.max(0, now - Number(previous.at || now)) : 0;
+  const clock = { sessionId, holderId, at: same ? Math.max(now, Number(previous.at) || now) : now,
+    carry: same && elapsed <= 15000 ? Number(previous.carry) || 0 : 0 };
+  p.trainingClock = stop ? null : clock;
+  if (!same || elapsed > 15000) return { hits: 0, advances: [] };
+  const state = p.trainingExercise = p.trainingExercise || {};
+  const balances = state.balances = state.balances || {};
+  if (state.plan && state.charges != null && balances[state.plan] == null) balances[state.plan] = state.charges;
+  if (!state.activePlan) state.activePlan = state.plan || "free";
+  delete state.plan;
+  delete state.charges;
+  for (const plan of ["exercise", "lasting"]) balances[plan] = Math.max(0, Math.floor(Number(balances[plan]) || 0));
+  const skill = ["sword", "axe", "club", "dist", "magic", "shield", "fist"].includes(state.skill) ? state.skill :
+    /druid|sorcerer/.test(p.voc) ? "magic" : p.voc === "paladin" ? "dist" : p.voc === "monk" ? "fist" : "sword";
+  state.skill = skill;
+  if (state.active === false) { clock.carry = 0; return { hits: 0, advances: [] }; }
+  const interval = 2000 / (vip ? 1.1 : 1);
+  const available = clock.carry + elapsed;
+  const hits = Math.floor(available / interval);
+  clock.carry = available - hits * interval;
+  const before = { ml: Number(p.ml) || 0, skills: Object.assign({}, p.skills || {}) };
+  for (let i = 0; i < hits; i++) {
+    let plan = ["exercise", "lasting"].includes(state.activePlan) ? state.activePlan : "free";
+    if (plan !== "free" && balances[plan] <= 0) plan = "free";
+    state.activePlan = plan;
+    if (plan !== "free") balances[plan]--;
+    const bonus = plan === "lasting" ? 1.5 : plan === "exercise" ? 1.25 : 1;
+    if (skill === "magic") addManaSpent(p, Math.floor(600 * bonus));
+    else addSkillTries(p, skill, 7 * bonus);
+    if (skill !== "shield") addSkillTries(p, "shield", 7 * bonus);
+  }
+  const advances = [];
+  if ((Number(p.ml) || 0) > before.ml) advances.push({ type: "magic", from: before.ml, to: p.ml });
+  for (const key of Object.keys(p.skills || {}))
+    if (Number(p.skills[key]) > (Number(before.skills[key]) || 10))
+      advances.push({ type: key, from: Number(before.skills[key]) || 10, to: p.skills[key] });
+  return { hits, advances };
+}
 function progressWeaponSkill(p,auth){
   const which=attackSkillName(p);
   if(which==="magic")return false;
@@ -7632,7 +7679,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   stanceTotals,stanceConvert,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
   imbAllowedCats,imbCombatTotals,tryChallenge,playerAttackInterval,addExp,syncPlayerProgress,
   consumeDistanceAmmo,tryUseRune,RUNEDATA,
-  meleeDamage,distanceDamage,addSkillTries,addManaSpent,playerDamage,playerSkill,attackSkillName,
+  meleeDamage,distanceDamage,addSkillTries,addManaSpent,advanceTrainingPlayer,playerDamage,playerSkill,attackSkillName,
   skillTriesNeeded,mlTriesNeeded,SKILL_MUL,VOC,gearSkillBonus,progressAttack,progressWeaponSkill,
   weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,ammoMatrixCells,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
   rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,

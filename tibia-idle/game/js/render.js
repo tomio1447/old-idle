@@ -1992,33 +1992,38 @@ Renderer.prototype.drawAcademy = function(training, player, dt) {
 
   const map = training.huntMap;
   const temMapa = !!(map && map.rows);
+  const cols = Number(map && map.w) || (typeof GRID_W !== "undefined" ? GRID_W : 21);
+  const rows = Number(map && map.h) || (typeof GRID_H !== "undefined" ? GRID_H : 13);
+  const dummyPos = training.dummyPos || { x: 0.5625, y: 0.472222 };
+  const zoom = training.mode === "exercise" && temMapa ? 1.6 : 1;
+  ctx.save();
+  ctx.translate(zoom === 1 ? 0 : W / 2 - dummyPos.x * W * zoom,
+    zoom === 1 ? 0 : H / 2 - dummyPos.y * H * zoom);
+  ctx.scale(zoom, zoom);
   if (temMapa) {
-    const cols = Number(map.w) || (typeof GRID_W !== "undefined" ? GRID_W : 21);
-    const rows = Number(map.h) || (typeof GRID_H !== "undefined" ? GRID_H : 13);
-    drawTileCharMap(ctx, map, W, H, cols, rows);
+    drawTileCharMap(ctx, map, W, H, cols, rows, "ground");
   } else {
     ctx.fillStyle = "#171719";
     ctx.fillRect(0, 0, W, H);
   }
 
-  ctx.textAlign = "left";
-  ctx.font = hudFont(14, hudS, true);
-  ctx.fillStyle = "#ffe680";
-  ctx.fillText("Área de Treino", 12 * hudS, 24 * hudS);
-
-  const dummyPos = training.dummyPos || { x: 0.5625, y: 0.472222 };
-  drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos);
-
   const entities = (training.members || []).slice().sort((a, b) => (a.playerPos && a.playerPos.y || 0) - (b.playerPos && b.playerPos.y || 0));
-  for (const m of entities) {
-    try { drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt); }
-    catch (err) {
-      if (!drawAcademyMember._warned) {
-        drawAcademyMember._warned = true;
-        console.warn("[treino] membro ignorado no desenho", err);
+  const drawables = entities.map((m) => ({
+    tx: Math.floor(m.playerPos.x * cols),
+    ty: Math.floor(m.playerPos.y * rows),
+    draw: () => {
+      try { drawAcademyMember(this, ctx, W, H, tile, hudS, training, m, player, dt); }
+      catch (err) {
+        if (!drawAcademyMember._warned) {
+          drawAcademyMember._warned = true;
+          console.warn("[treino] membro ignorado no desenho", err);
+        }
       }
-    }
-  }
+    },
+  }));
+  if (temMapa) drawTileCharMap(ctx, map, W, H, cols, rows, "objects", { drawables });
+  else for (const drawable of drawables) drawable.draw();
+  drawAcademyDummy(ctx, W, H, tile, hudS, training, dummyPos);
   for (const m of entities) {
     if (!m.proj) continue;
     try { drawAcademyProj(this, ctx, W, H, tile, m, dt); }
@@ -2057,6 +2062,11 @@ Renderer.prototype.drawAcademy = function(training, player, dt) {
     ctx.fillText(f.text, (f.x + f.vx * p * 60) * W, (f.y + f.vy * p * 22) * H);
     ctx.globalAlpha = 1;
   }
+  ctx.restore();
+  ctx.textAlign = "left";
+  ctx.font = hudFont(14, hudS, true);
+  ctx.fillStyle = "#ffe680";
+  ctx.fillText("Área de Treino", 12 * hudS, 24 * hudS);
 };
 
 /* Corpse de player conforme Player::getLookCorpse() do Canary. */

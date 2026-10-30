@@ -90,6 +90,7 @@ function renderStoreNav() {
     { id: "outfits", nome: "Outfits" },
     { id: "mounts", nome: "Mounts" },
     { id: "bless", nome: "BLESS" },
+    { id: "preys", nome: "Preys" },
     { id: "vouchers", nome: "Vouchers" },
     { id: "history", nome: "Histórico" },
   ];
@@ -126,6 +127,7 @@ async function renderStoreTab() {
   if (_storeTab === "outfits") return renderStoreCosmetics(main, "outfit");
   if (_storeTab === "mounts") return renderStoreCosmetics(main, "mount");
   if (_storeTab === "bless") return renderStoreBless(main);
+  if (_storeTab === "preys") return renderStorePreys(main);
   if (_storeTab === "vouchers") return renderStoreVouchers(main);
   if (_storeTab === "history") return renderStoreHistory(main);
   if (_storeTab === "admin") return renderStoreAdmin(main);
@@ -185,6 +187,43 @@ const STORE_VIP_BENEFITS = [
   ["💰", "<b>Autoseller da Loot Pouch</b> desbloqueado"],
   ["🕹", "<b>Controle manual de SQM</b> desbloqueado (andar com WASD/clique)"],
 ];
+
+async function renderStorePreys(main) {
+  main.innerHTML = `<div class="tiny dim">Carregando Preys...</div>`;
+  const cat = await ensureStoreCatalog();
+  if (!main.isConnected || _storeTab !== "preys") return;
+  if (!cat.ok) { main.textContent = cat.msg || "Não foi possível carregar os pacotes."; return; }
+  const acc = sessionAccount();
+  const cards = Math.max(0, Number(acc && acc.cosmetics && acc.cosmetics.preyCards) || 0);
+  main.innerHTML = `<div class="tiny mb8">Prey Cards da conta: <b>${cards}</b>.
+    Saldo compartilhado entre todos os personagens. Cada utilização de Wildcard ou Bonus Reroll consome 1 card.
+    Wildcards antigos do personagem são utilizados primeiro.</div>
+    <div class="store-pack-grid">${(cat.preys || []).map((p) => `
+      <div class="store-pack">
+        <img src="assets/ui/prey/prey_wildcard.png" width="32" height="32" alt="Prey Card">
+        <div class="store-pack-label">${p.cards} cards</div>
+        <div class="store-pack-price">${p.coins} TC</div>
+        <button type="button" class="sm primary full" data-store-preys="${storeEsc(p.id)}">Comprar</button>
+      </div>`).join("")}</div>`;
+  main.querySelectorAll("[data-store-preys]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (button.dataset.confirm !== "yes") {
+        button.dataset.confirm = "yes";
+        button.textContent = "Confirmar compra";
+        return;
+      }
+      button.disabled = true;
+      try {
+        const r = await accountPreyCardsRequest(sessionToken(), button.dataset.storePreys);
+        toast(r.msg || (r.ok ? "Compra concluída." : "Falha na compra."), r.ok ? "level" : "bad");
+        if (main.isConnected && _storeTab === "preys") openStoreModal("preys");
+      } catch (e) {
+        toast("Não foi possível confirmar a compra. Confira o saldo antes de tentar novamente.", "bad");
+        button.disabled = false;
+      }
+    });
+  });
+}
 
 async function renderStoreVip(main) {
   main.innerHTML = `<div class="tiny dim">Carregando VIP...</div>`;

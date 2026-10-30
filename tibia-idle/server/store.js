@@ -29,6 +29,27 @@ const VIP_PACKS = [
   { id: "vip30", days: 30, coins: 150, label: "VIP 30 dias" },
 ];
 
+const PREY_PACKS = [
+  { id: "prey25", cards: 25, coins: 35 },
+  { id: "prey50", cards: 50, coins: 60 },
+  { id: "prey100", cards: 100, coins: 100 },
+];
+
+async function changePreys(db, body, consume) {
+  const acc = await db.findAccountByToken(body && body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const pack = consume ? null : PREY_PACKS.find((p) => p.id === String(body.packId || ""));
+  if (!consume && !pack) return { code: 400, body: { ok: false, msg: "Pacote inválido" } };
+  if (!await db.changePreyCards(acc.id, consume ? -1 : pack.cards, consume ? 0 : pack.coins))
+    return { code: 409, body: { ok: false, msg: consume ? "Sem Prey Cards na conta." : "Tibia Coins insuficientes." } };
+  const fresh = await db.findAccountById(acc.id);
+  if (!consume) await addLedger(db, { accountId: acc.id, login: acc.login, kind: "purchase",
+    delta: -pack.coins, coinsAfter: fresh.coins, brlCents: 0, ref: "preys:" + pack.id,
+    note: pack.cards + " Prey Cards" });
+  return { code: 200, body: { ok: true, coins: fresh.coins, cosmetics: fresh.cosmetics,
+    msg: consume ? "Prey Card utilizado." : pack.cards + " Prey Cards adicionados à conta!" } };
+}
+
 function mpConfigured() { return !!MP_ACCESS_TOKEN; }
 function packById(id) { return COIN_PACKS.find((p) => p.id === String(id || "")) || null; }
 function vipById(id) { return VIP_PACKS.find((p) => p.id === String(id || "")) || null; }
@@ -42,6 +63,7 @@ function catalog() {
     cardSurcharge: CARD_SURCHARGE,
     packs: COIN_PACKS.map((p) => Object.assign({}, p, { total: packTotalCoins(p) })),
     vip: VIP_PACKS.slice(),
+    preys: PREY_PACKS.map((p) => Object.assign({}, p)),
   };
 }
 
@@ -493,7 +515,7 @@ function sanitizeCosmetics(raw) {
   // bless: cargas de proteção de wipe compradas na store (TC). Consumidas
   // pelo motor autoritativo quando a PT inteira morre (sem perda de XP/gold).
   const bless = Math.max(0, Math.min(999, Math.floor(Number(c.bless) || 0)));
-  return { outfits, mounts, bless };
+  return { outfits, mounts, bless, preyCards: Math.max(0, Math.floor(Number(c.preyCards) || 0)) };
 }
 
 async function buyCosmetic(db, body) {
@@ -581,6 +603,6 @@ async function recordGrant(db, acc, amount, after) {
 
 module.exports = {
   catalog, checkout, orderStatus, webhook, simulatePay, buyVip, myHistory, adminSummary,
-  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless,
+  recordGrant, redeemVoucher, buyCosmetic, cosmeticCatalog, mpConfigured, buyBless, changePreys, PREY_PACKS,
   COIN_PACKS, VIP_PACKS, VOUCHERS, COSMETIC_PRICE, BLESS_PRICE,
 };

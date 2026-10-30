@@ -578,9 +578,24 @@ JsonStore.prototype.storeOrdersByAccount = function (accountId, limit) {
 JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
-  a.cosmetics = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
+  const prior = typeof a.cosmetics === "string" ? JSON.parse(a.cosmetics) : (a.cosmetics || {});
+  a.cosmetics = Object.assign({}, cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {},
+    { preyCards: Math.max(0, Math.floor(Number(prior.preyCards) || 0)) });
   this._save();
   return a;
+};
+JsonStore.prototype.changePreyCards = function (accountId, delta, cost) {
+  const a = this.findAccountById(accountId);
+  if (!a || !Number.isSafeInteger(delta) || !Number.isSafeInteger(cost) || cost < 0) return false;
+  let cos = a.cosmetics;
+  if (typeof cos === "string") cos = JSON.parse(cos);
+  cos = cos && typeof cos === "object" ? cos : {};
+  const cards = Math.max(0, Math.floor(Number(cos.preyCards) || 0));
+  if ((Number(a.coins) || 0) < cost || cards + delta < 0) return false;
+  a.coins = (Number(a.coins) || 0) - cost;
+  a.cosmetics = Object.assign({}, cos, { preyCards: cards + delta });
+  this._save();
+  return true;
 };
 JsonStore.prototype.debitCoins = function (accountId, amount) {
   const a = this.findAccountById(accountId);
@@ -1002,6 +1017,30 @@ JsonStore.prototype.updateCharacter = function (id, voc, level, data, extra) {
     this._save();
   }
   return c;
+};
+JsonStore.prototype.trainingCheckpoint = function (accountId, ids, sessionId, now, lease, advance, stop) {
+  if (!lease || !this.leaseValidate(accountId, lease.holderId, lease.secretHash, lease.now))
+    return { ok: false, error: "LEASE_REQUIRED" };
+  const instance = this.instanceGet(accountId);
+  if (instance && instance.status === "active") return { ok: false, error: "TRAINING_IN_COMBAT" };
+  const rows = ids.map((id) => this.findCharacter(id));
+  if (rows.some((row) => !row || Number(row.account_id) !== Number(accountId)))
+    return { ok: false, error: "CHARACTER_NOT_FOUND" };
+  if (rows.some((row) => ["hunt", "boss"].includes(row.zone))) return { ok: false, error: "TRAINING_IN_COMBAT" };
+  const account = this.findAccountById(accountId);
+  const staged = rows.map((row) => {
+    const p = typeof row.data === "string" ? JSON.parse(row.data) : JSON.parse(JSON.stringify(row.data || {}));
+    p.voc = row.voc;
+    const result = advance(p, now, sessionId, Number(account.vip_until) > now, lease.holderId, stop);
+    return { row, p, result };
+  });
+  for (const item of staged) {
+    item.row.data = JSON.stringify(item.p);
+    item.row.save_version = Number(item.row.save_version || 0) + 1;
+    item.row.updated_at = new Date(now).toISOString();
+  }
+  this._save();
+  return { ok: true, characters: rows, advances: staged.flatMap((item) => item.result.advances.map((a) => Object.assign({ id: item.row.id }, a))) };
 };
 JsonStore.prototype.saveCharactersVersioned = function (accountId, saves, lease) {
   if(lease&&!this.leaseValidate(accountId,lease.holderId,lease.secretHash,lease.now))
@@ -1607,7 +1646,9 @@ async function MysqlStore() {
     },
     async setAccountCosmetics(accountId, cosmetics) {
       const c = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
-      await this.run("UPDATE accounts SET cosmetics = ? WHERE id = ?",
+      await this.run(`UPDATE accounts SET cosmetics = JSON_SET(?, '$.preyCards',
+        GREATEST(0, COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(
+          CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END, '$.preyCards')) AS SIGNED), 0))) WHERE id = ?`,
         [JSON.stringify(c), Number(accountId)]);
       return this.findAccountById(accountId);
     },
@@ -1663,6 +1704,16 @@ async function MysqlStore() {
     async updateCoins(id, coins) {
       await this.run("UPDATE accounts SET coins = ? WHERE id = ?", [Math.max(0, coins), Number(id)]);
       return this.findAccountById(id);
+    },
+    async changePreyCards(id, delta, cost) {
+      if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(cost) || cost < 0) return false;
+      const json = "CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END";
+      const count = `GREATEST(0, COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(${json}, '$.preyCards')) AS SIGNED), 0))`;
+      const r = await this.run(
+        `UPDATE accounts SET coins = coins - ?, cosmetics = JSON_SET(${json}, '$.preyCards', ${count} + ?)
+         WHERE id = ? AND coins >= ? AND ${count} + ? >= 0`,
+        [cost, delta, Number(id), cost, delta]);
+      return !!(r && r.affectedRows > 0);
     },
     async debitCoins(id, amount) {
       const cost = Math.max(0, Math.floor(Number(amount) || 0));
@@ -1867,6 +1918,40 @@ async function MysqlStore() {
          extra.max_mp !== undefined ? extra.max_mp : 0,
          Number(id)]);
       return this.findCharacter(id);
+    },
+    async trainingCheckpoint(accountId, ids, sessionId, now, lease, advance, stop) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        if (!lease || !await lockValidLease(conn, accountId, lease)) {
+          await conn.rollback(); return { ok: false, error: "LEASE_REQUIRED" };
+        }
+        const [instances] = await conn.query("SELECT status FROM account_instances WHERE account_id=? FOR UPDATE", [Number(accountId)]);
+        if (instances.some((row) => row.status === "active")) {
+          await conn.rollback(); return { ok: false, error: "TRAINING_IN_COMBAT" };
+        }
+        const marks = ids.map(() => "?").join(",");
+        const [rows] = await conn.query(`SELECT * FROM characters WHERE account_id=? AND id IN (${marks}) ORDER BY id FOR UPDATE`, [Number(accountId), ...ids]);
+        if (rows.length !== ids.length) { await conn.rollback(); return { ok: false, error: "CHARACTER_NOT_FOUND" }; }
+        if (rows.some((row) => ["hunt", "boss"].includes(row.zone))) {
+          await conn.rollback(); return { ok: false, error: "TRAINING_IN_COMBAT" };
+        }
+        const [accounts] = await conn.query("SELECT vip_until FROM accounts WHERE id=?", [Number(accountId)]);
+        const advances = [];
+        for (const row of rows) {
+          const p = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+          p.voc = row.voc;
+          const result = advance(p, now, sessionId, Number(accounts[0].vip_until) > now, lease.holderId, stop);
+          row.data = JSON.stringify(p);
+          row.save_version = Number(row.save_version || 0) + 1;
+          await conn.query("UPDATE characters SET data=?,save_version=save_version+1 WHERE id=? AND account_id=?",
+            [row.data, Number(row.id), Number(accountId)]);
+          advances.push(...result.advances.map((a) => Object.assign({ id: row.id }, a)));
+        }
+        await conn.commit();
+        return { ok: true, characters: rows, advances };
+      } catch (error) { try { await conn.rollback(); } catch (e) {} throw error; }
+      finally { conn.release(); }
     },
     async saveCharactersVersioned(accountId,saves,lease){
       const conn=await pool.getConnection();

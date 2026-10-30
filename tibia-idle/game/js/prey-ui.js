@@ -177,7 +177,7 @@ function renderPreyModal(p) {
   ensurePrey(p);
   const agora = Date.now();
   let h = `<div class="prey-wallet">
-      <span><img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Prey Wildcards: <b style="color:#ffd65a">${p.prey.wildcards}</b></span>
+      <span><img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Prey Wildcards: <b style="color:#ffd65a">${preyCardCount(p)}</b></span>
       <span class="dim tiny">3 slots de prey · bônus por 2h · reroll grátis a cada 20h</span>
     </div>
     <div class="prey-slots">`;
@@ -208,7 +208,7 @@ function renderPreyModal(p) {
       <div class="prey-slot-head">
         <b>Prey Slot ${i + 1}</b>
         <span style="flex:1"></span>
-        <button class="sm" id="prey-wildcard-${i}" ${ativa && p.prey.wildcards > 0 ? "" : "disabled"}
+        <button class="sm" id="prey-wildcard-${i}" ${ativa && preyCardCount(p) > 0 ? "" : "disabled"}
           title="Prey Wildcard: melhora o bônus (+1 passo) e pode trocar o tipo">
           <img class="prey-wc-icon" src="assets/ui/prey/prey_wildcard.png" alt=""> Wildcard</button>
       </div>`;
@@ -302,11 +302,11 @@ function renderPreyModal(p) {
     });
     // Bonus Reroll (prey_bonus_reroll): rerolla o bônus da prey ativa
     const br = $("#prey-bonusreroll-" + i);
-    if (br) br.addEventListener("click", () => {
+    if (br) br.addEventListener("click", async () => {
       const slot = p.prey.slots[i];
       if (!slot.selected) { toast("Sem prey ativa."); return; }
       // usa um wildcard como custo do bonus reroll (regra da casa)
-      const r = preyUseWildcard(p, i);
+      const r = await preyUseAvailableCard(p, i);
       if (!r.ok) { toast(r.msg, "bad"); return; }
       toast(`Bônus rerrollado: ${PREY_BONUSES[r.bonus].nome} +${r.value}%`);
       renderPreyModal(p);
@@ -314,8 +314,8 @@ function renderPreyModal(p) {
     });
     // Wildcard
     const wc = $("#prey-wildcard-" + i);
-    if (wc) wc.addEventListener("click", () => {
-      const r = preyUseWildcard(p, i);
+    if (wc) wc.addEventListener("click", async () => {
+      const r = await preyUseAvailableCard(p, i);
       if (!r.ok) { toast(r.msg, "bad"); return; }
       toast(`Wildcard: ${PREY_BONUSES[r.bonus].nome} +${r.value}%`);
       renderPreyModal(p);

@@ -628,17 +628,21 @@ function academyTrainingTick(t, p, dt, now, dummyPos) {
   const activePlan = trainingPlan(p);
   t.skill = state.skill;
   t.weapon = state.weapon = trainingWeaponForSkill(state.skill, p);
-  if (activePlan.id !== "free") state.balances[activePlan.id] = Math.max(0, state.balances[activePlan.id] - 1);
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  if (!online && activePlan.id !== "free") state.balances[activePlan.id] = Math.max(0, state.balances[activePlan.id] - 1);
   const rate = activePlan.bonus;
-  let skillUp = false;
-  if (t.skill === "magic") {
-    const gain = Math.floor(EXERCISE_MANA * rate);
-    t.stats.manaSpent += gain;
-    skillUp = addManaSpent(p, gain);
-  } else {
-    skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
+  let skillUp = false, shieldUp = false;
+  if (!online) {
+    if (t.skill === "magic") {
+      const gain = Math.floor(EXERCISE_MANA * rate);
+      t.stats.manaSpent += gain;
+      skillUp = addManaSpent(p, gain);
+    } else {
+      skillUp = addSkillTries(p, t.skill, EXERCISE_TRIES * rate);
+    }
+    shieldUp = t.skill === "shield" ? false : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
+    if ((skillUp || shieldUp) && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   }
-  const shieldUp = t.skill === "shield" ? false : addSkillTries(p, "shield", EXERCISE_TRIES * rate);
   t.stats.hits++; if (skillUp) t.stats.skillUps++; if (shieldUp) t.stats.shieldUps++;
   const target = dummyPos || t.dummyPos;
   if (t.playerPos && target) {
@@ -654,6 +658,7 @@ function academyTrainingTick(t, p, dt, now, dummyPos) {
 }
 
 function trainingPartyTick(training, dt, now) {
+  if (typeof trainingCheckpointTick === "function") trainingCheckpointTick(training, now);
   for (const member of training.members || []) academyTrainingTick(member, member.p, dt, now, training.dummyPos);
 }
 

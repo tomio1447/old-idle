@@ -45,7 +45,7 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
-  sanitizeHelperPresets,
+  sanitizeHelperPresets, advanceTrainingPlayer,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
@@ -960,8 +960,9 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","dailyRewardDay","quests"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
+  delete payload.trainingClock;
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
   if(opts.adminGrant){
     const allowed=["knight","paladin","druid","sorcerer","monk"];
@@ -970,7 +971,10 @@ function prepareCharacterSave(c,body,opts){
     payload.voc=voc;payload.level=level;
   }else{
     payload.voc=c.voc;
-    for(const key of protectedKeys)if(current[key]!==undefined)payload[key]=cloneJson(current[key]);
+    for(const key of protectedKeys){
+      if(current[key]!==undefined)payload[key]=cloneJson(current[key]);
+      else delete payload[key];
+    }
     payload.level=level;
   }
   return {save:{
@@ -1503,6 +1507,30 @@ function applyTrainingConfig(p,skill,planId){
       "shield":"exercise-shield","fist":"exercise-wraps"})[skill]||"exercise-sword";
   p.trainingExercise={skill,weapon,activePlan:planId,balances,active:true};
   return {ok:true,trainingExercise:p.trainingExercise};
+}
+async function checkpointTraining(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  const denied = await requireLease(db, acc, body); if (denied) return denied;
+  const ids = Array.isArray(body.char_ids) ? body.char_ids.map(Number) : [];
+  const sessionId = String(body.session_id || "");
+  if (!ids.length || ids.length > 4 || new Set(ids).size !== ids.length || ids.some((id) => !Number.isSafeInteger(id) || id <= 0) ||
+      !/^[a-zA-Z0-9-]{8,80}$/.test(sessionId))
+    return { code: 400, body: { ok: false, msg: "Sessão de treino inválida" } };
+  for (const id of ids) {
+    const resolved = await resolveInstanceRow(db, acc, id);
+    if (resolved.error) return resolved.error;
+    if (resolved.row && resolved.row.status === "active")
+      return { code: 409, body: { ok: false, msg: "Encerre a hunt antes de treinar." } };
+  }
+  const now = Date.now();
+  const lease = { holderId: String(body.holder_id), secretHash: leaseHash(body.lease_token), now };
+  const result = await db.trainingCheckpoint(acc.id, ids.sort((a, b) => a - b), sessionId, now, lease, advanceTrainingPlayer, body.stop === true);
+  if (!result.ok) return { code: result.error === "LEASE_REQUIRED" ? 423 : 409,
+    body: { ok: false, error: result.error, msg: "Treino não confirmado. Atualize a sessão antes de continuar." } };
+  if (result.advances.length)
+    publishSync(acc.id, "character", { ids: result.characters.map((row) => Number(row.id)), source: "training-checkpoint" });
+  return { code: 200, body: { ok: true, characters: result.characters.map((row) => accountCharacterSummary(row, acc.gold)), advances: result.advances } };
 }
 async function setTrainingConfig(db,body){
   const acc=await db.findAccountByToken(body.token);
@@ -4440,6 +4468,10 @@ async function main() {
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/training/checkpoint") {
+        const limited = rateLimit(req, "training-checkpoint", 120, 60000); if (limited) return send(res, limited.code, limited.body);
+        const r = await checkpointTraining(db, await readBody(req)); return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/training/config") {
         const r = await setTrainingConfig(db, await readBody(req));return send(res, r.code, r.body);
       }
@@ -4497,6 +4529,11 @@ async function main() {
       if (req.method === "POST" && url === "/api/store/cosmetic") {
         const body = await readBody(req);
         const r = await store.buyCosmetic(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && (url === "/api/store/preys" || url === "/api/prey/card")) {
+        const body = await readBody(req);
+        const r = await store.changePreys(db, body, url === "/api/prey/card");
         return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/store/bless") {

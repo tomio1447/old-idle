@@ -859,6 +859,44 @@ function accountSetTrainingConfig(token,charId,skill,plan){
   });
 }
 
+function accountTrainingCheckpoint(training, stop) {
+  return accountQueueSave(async () => {
+    if (!accountLeaseAllowsSimulation()) return false;
+    if (typeof accountLastInstancePromise === "function") await accountLastInstancePromise();
+    const owned = new Set(accountCharacterCacheRead().map((c) => String(c.id)));
+    const ids = ((training && training.members) || []).filter((m) => m.p && !m.p.remoteTraining && owned.has(String(m.id))).map((m) => Number(m.id));
+    if (!ids.length) return false;
+    const r = await _api("POST", "/api/training/checkpoint", Object.assign({ token: sessionToken(),
+      char_ids: ids, session_id: training.checkpointSession, stop: !!stop }, accountLeaseFields()));
+    if (!r.data || !r.data.ok) {
+      if (r.code === 423) accountLeaseMarkLost(r.data && r.data.msg);
+      return false;
+    }
+    const current = accountCharacterCacheRead();
+    const confirmed = (r.data.characters || []).filter((row) => {
+      const cached = current.find((c) => String(c.id) === String(row.id));
+      return !cached || Number(cached.saveVersion) <= Number(row.saveVersion);
+    });
+    accountMergeCharacterCache(confirmed);
+    for (const row of confirmed) {
+      const snapshot = row.snapshot || (typeof row.data === "string" ? JSON.parse(row.data) : row.data);
+      if (!snapshot) continue;
+      const member = training.members.find((m) => String(m.id) === String(row.id));
+      const targets = [member && member.p, typeof G !== "undefined" && G.p && String(G.p.id) === String(row.id) ? G.p : null];
+      for (const p of targets) {
+        if (!p) continue;
+        for (const key of ["skills", "skillTries", "ml", "manaSpent", "trainingExercise", "trainingClock"])
+          if (snapshot[key] !== undefined) p[key] = helperPresetClone(snapshot[key]);
+        if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
+      }
+    }
+    for (const advance of r.data.advances || []) {
+      if (typeof addLog === "function") addLog("level", `Avanço de ${advance.type}: ${advance.from} → ${advance.to} — salvo no servidor.`);
+    }
+    if (typeof renderSkills === "function" && typeof G !== "undefined" && G.p) renderSkills(G.p);
+    return true;
+  });
+}
 function accountDailyRewardStatus(token,charId){
   if(typeof accountApiConfigured!=="function"||!accountApiConfigured())
     return Promise.resolve({ok:false});
@@ -2267,6 +2305,19 @@ async function storeBuyCosmetic(token, kind, id) {
     }
   }
   return r.data || { ok: false, msg: "Falha na compra" };
+}
+async function accountPreyCardsRequest(token, packId) {
+  const consume = !packId;
+  const r = await _api("POST", consume ? "/api/prey/card" : "/api/store/preys", { token, packId });
+  if (r.data && r.data.ok) {
+    if (!consume && r.data.coins != null) storeApplyCoins(r.data.coins);
+    const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+    if (acc && r.data.cosmetics) {
+      acc.cosmetics = Object.assign({}, acc.cosmetics || {}, { preyCards: r.data.cosmetics.preyCards || 0 });
+      sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc));
+    }
+  }
+  return r.data || { ok: false, msg: "Falha ao processar Prey Cards." };
 }
 async function storeBuyBless(token) {
   const r = await _api("POST", "/api/store/bless", { token });
