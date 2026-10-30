@@ -20,23 +20,19 @@
 
 /* ── WHEEL BODY ── */
 .wheel-body { display: flex; gap: 10px; padding: 10px; align-items: flex-start; }
-.wheel-canvas-area { position: relative; flex-shrink: 0; width: 522px; height: 522px; }
-.wheel-stage-img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
-
-/* fatias: mascaras brancas tingidas pela cor do quadrante */
-.wheel-slice-fill, .wheel-slice-border {
-  position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
-  -webkit-mask-size:100% 100%; mask-size:100% 100%;
-  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+.wheel-canvas-wrap { position: relative; flex: 0 0 auto; width: 522px; height: 522px; overflow: hidden; }
+.wheel-canvas-area { position: absolute; left: 0; top: 0; width: 522px; height: 522px; transform-origin: 0 0; }
+.wheel-stage-img, .wheel-voc-img,
+.wheel-slice-track, .wheel-slice-fill, .wheel-slice-focus, .wheel-slice-selb {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  image-rendering: pixelated; pointer-events: none; user-select: none;
 }
-.wheel-slice-fill { z-index:1; transition:opacity .15s; }
-.wheel-slice-fill.w-green  { background: linear-gradient(180deg, #5cc96b, #2e7d3b); }
-.wheel-slice-fill.w-red    { background: linear-gradient(180deg, #d95f5f, #8f3434); }
-.wheel-slice-fill.w-blue   { background: linear-gradient(180deg, #5f8fd9, #2f4f8f); }
-.wheel-slice-fill.w-purple { background: linear-gradient(180deg, #a76fd9, #5f348f); }
-.wheel-slice-border { z-index:2; background:#d4af37; opacity:.95; }
-.wheel-slice-border.locked { background:#6b6152; opacity:.45; }
-
+.wheel-stage-img { z-index: 0; }
+/* fatias: trilha escura (20%) + preenchimento progressivo (60%) — arte do OTC */
+.wheel-slice-track { z-index: 1; opacity: .2; }
+.wheel-slice-fill  { z-index: 1; opacity: .6; }
+/* moldura dourada da vocacao por cima das fatias (ordem do cliente) */
+.wheel-voc-img     { z-index: 2; }
 .wheel-largebonus { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; pointer-events:none; z-index:3; }
 .wheel-largebonus-light { opacity:.85; mix-blend-mode:screen; }
 .wheel-socket-art { position:absolute; width:18%; height:18%; image-rendering:pixelated; pointer-events:none; z-index:3; }
@@ -44,43 +40,35 @@
 .wheel-socket-art.ws-red { right:4%; top:4%; left:auto; }
 .wheel-socket-art.ws-blue { left:4%; bottom:4%; top:auto; }
 .wheel-socket-art.ws-purple { right:4%; bottom:4%; left:auto; top:auto; }
-.wheel-svg-links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:4; }
-.wheel-svg-links line { stroke: rgba(255,255,255,.14); stroke-width: 2; }
+/* hover = wedge highlight; selecao = moldura dourada */
+.wheel-slice-focus { z-index: 4; opacity: .3; }
+.wheel-slice-selb  { z-index: 4; }
 
-/* ── NODES ── */
+/* ── NODES: icones 30x30 da sheet mediumperks (clip por vocacao) ── */
 .wheel-node {
   position: absolute; transform: translate(-50%,-50%);
-  width: 40px; height: 46px;
-  display: flex; flex-direction: column; align-items: center;
-  cursor: pointer; border: none; background: transparent; padding: 0;
+  width: 30px; height: 30px; padding: 0;
+  cursor: pointer; border: none; background: transparent;
   z-index: 5;
   transition: transform .12s, filter .12s;
 }
-.wn-iconbox {
-  width: 28px; height: 28px; flex: none; border-radius: 50%;
-  background: rgba(13,15,20,.92); border: 1.5px solid #8a7a50;
-  display: flex; align-items: center; justify-content: center; overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.7);
+.wn-med {
+  position: absolute; inset: 0; width: 30px; height: 30px;
+  background-image: url('../assets/wheel/icons-skillwheel-mediumperks.png');
+  background-size: 1470px 30px; background-repeat: no-repeat;
+  image-rendering: pixelated;
 }
-.wheel-node.w-green  .wn-iconbox { border-color:#4ade80; }
-.wheel-node.w-red    .wn-iconbox { border-color:#f87171; }
-.wheel-node.w-blue   .wn-iconbox { border-color:#60a5fa; }
-.wheel-node.w-purple .wn-iconbox { border-color:#c084fc; }
-.wheel-node.full .wn-iconbox { border-color:#ffe680; box-shadow:0 0 6px rgba(255,230,128,.6); }
-.wn-icon { width: 22px; height: 22px; image-rendering: pixelated; object-fit: contain; }
 .wn-small {
+  position: absolute; width: 16px; height: 16px;
+  transform: translate(-50%,-50%);
   background-image: url('../assets/wheel/icons-skillwheel-smallperks.png');
-  background-size: 286px 22px; background-repeat: no-repeat;
+  background-size: 208px 16px; background-repeat: no-repeat;
+  image-rendering: pixelated; pointer-events: none;
 }
-.wn-glyph { font-size: 14px; color:#ffe680; line-height:1; text-shadow:0 0 3px #000; }
-.wn-pts {
-  margin-top: 1px; font-size: 8px; font-weight: bold; color: #fff; line-height: 1.1;
-  text-shadow: 1px 1px 0 #000, 0 0 4px #000;
-}
-.wheel-node.full .wn-pts { color:#ffe680; }
-.wheel-node.locked { opacity:.55; }
-.wheel-node.locked .wn-icon { filter: grayscale(.7); }
-.wheel-node.can:hover { transform: translate(-50%,-50%) scale(1.2); filter: drop-shadow(0 0 6px #ffe680); }
+.wheel-node.locked { opacity: .5; }
+.wheel-node.locked .wn-med { filter: grayscale(.75); }
+.wheel-node.can:hover,
+.wheel-node.sel { transform: translate(-50%,-50%) scale(1.22); filter: drop-shadow(0 0 5px #ffe680); }
 
 /* ── RIGHT PANEL (summary) ── */
 .wheel-right { flex: 1; min-width: 0; max-height: 522px; overflow-y: auto; font-size: 10px; }
@@ -151,24 +139,21 @@
 .wheel-sel .wsel-name { font-weight:bold; font-size:12px; margin-top:4px; }
 .wheel-sel .wsel-label { color:#d4af37; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; margin-top:8px; border-bottom:1px solid #2a2d34; padding-bottom:2px; }
 .wheel-sel .wsel-line { font-size:10px; color:#c8c0b0; line-height:1.5; }
-.wheel-node.sel { transform: translate(-50%,-50%) scale(1.2); filter: drop-shadow(0 0 6px #ffe680) !important; }
-
 /* ── Responsivo / embutido ── */
-.wheel-canvas-area { width:100%; max-width:522px; aspect-ratio:1; height:auto; }
 .wheel-body { flex-wrap:wrap; }
-
-/* no modal standalone: limita a roda à altura da janela */
-.modal .wheel-canvas-area { max-width:min(522px, calc(100vh - 300px)); }
-.modal .wheel-right { max-height:min(522px, calc(100vh - 300px)); }
 
 /* embutido em Detalhes do personagem: roda inteira dentro da aba */
 .chard-wheel-embed { height:100%; display:flex; flex-direction:column; overflow:hidden; }
 .chard-wheel-embed .wheel-window { max-width:100%; border:none; background:transparent; display:flex; flex-direction:column; flex:1; min-height:0; }
-.chard-wheel-embed .wheel-body { flex:1; min-height:0; flex-wrap:nowrap; padding:6px; }
-.chard-wheel-embed .wheel-canvas-area { flex:0 0 auto; width:min(430px, 46vw, calc(72vh - 190px)); }
+.chard-wheel-embed .wheel-body { flex:1; min-height:0; flex-wrap:nowrap; padding:6px; overflow:hidden; }
 .chard-wheel-embed .wheel-right { flex:1; min-width:200px; max-height:100%; overflow-y:auto; }
 @media (max-width: 900px) {
   .chard-wheel-embed .wheel-body { flex-wrap:wrap; overflow-y:auto; }
-  .chard-wheel-embed .wheel-canvas-area { width:min(430px, calc(100vh - 300px), 92vw); }
   .chard-wheel-embed .wheel-right { min-width:0; width:100%; }
 }
+
+/* modal standalone: painel direito limitado pela viewport */
+.modal .wheel-right { max-height:min(560px, calc(100vh - 280px)); }
+
+/* quando a aba Roda esta ativa, a janela do personagem ganha altura */
+.modal-bg .modal.chard-modal-shell.wheel-open { height: min(88vh, 760px); }

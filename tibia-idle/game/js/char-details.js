@@ -128,6 +128,8 @@ function chardRender() {
   const el = $("#chard-body");
   const p = (typeof G !== "undefined" && G) ? G.p : null;
   if (!el || !p) return;
+  const shell = el.closest(".modal") || $("#modal-body");
+  if (shell) shell.classList.toggle("wheel-open", CHARD.tab === "roda");
   ({
     personagem: chardTabPersonagem,
     outfit: chardTabOutfit,

@@ -12,24 +12,10 @@ function wheelColorCss(c) {
   return { green: "#4ade80", red: "#f87171", blue: "#60a5fa", purple: "#c084fc" }[c];
 }
 
-function wheelBackgroundImg(voc) {
+function wheelVocImage(voc) {
   var map = { knight: "knight", paladin: "paladin", sorcerer: "sorcerer",
               druid: "druid", monk: "monk" };
   return "assets/wheel/vocations/backdrop_skillwheel_" + (map[voc] || "knight") + ".png";
-}
-
-function wheelSvgConnections() {
-  var lines = [], seen = {};
-  for (var id in WHEEL_CONNECTED) {
-    var p = WHEEL_POS[id], conn = WHEEL_CONNECTED[id];
-    for (var i = 0; i < conn.length; i++) {
-      var c = conn[i], key = [id, c].sort().join("|");
-      if (seen[key]) continue; seen[key] = 1;
-      var q = WHEEL_POS[c];
-      lines.push('<line x1="' + p[0] + '" y1="' + p[1] + '" x2="' + q[0] + '" y2="' + q[1] + '" />');
-    }
-  }
-  return '<svg class="wheel-svg-links" viewBox="0 0 522 522" preserveAspectRatio="none">' + lines.join("") + '</svg>';
 }
 
 function wheelSlotLabel(spec, voc) {
@@ -57,55 +43,39 @@ function wheelBorderUrl(spec) {
   return "assets/wheel/border/" + spec.border[0] + "/" + spec.border[1] + ".png";
 }
 
-/* As fatias (wheel-colors e border) sao mascaras BRANCAS 522x522 do client —
- * a cor vem de uma camada CSS colorida recortada pelo mask-image. */
-var WHEEL_QUAD_FILES = { top_left: "TopLeft", top_right: "TopRight",
-  bottom_left: "BottonLeft", bottom_right: "BottonRight" };
-
+/* Composicao identica ao OTClient (game_wheel):
+ *   backdrop_skillwheel (base escura)
+ *   + fullColorWheel_i: fatia cheia `slot<N>/<frames>.png` a 20% (trilha)
+ *   + colorWheel_i: fill progressivo `slot<N>/<frame>.png` a 60%
+ *   + vocationWheel (moldura dourada por vocacao) por cima das fatias
+ *   + icon_i: celula 30x30 da sheet mediumperks (retangulo por vocacao)
+ *   + smallicon_i: celula 16x16 da sheet smallperks
+ *   hover -> focusImageBase (wedge highlight), selecao -> wheel-border. */
 function wheelSliceHtml(p, slotId) {
+  var o = (typeof WHEEL_OTC !== "undefined") ? WHEEL_OTC[slotId] : null;
+  if (!o) return "";
   var spec = WHEEL_SLOTS[slotId];
-  if (!spec || !spec.border) return "";
-  var dir = spec.border[0], n = spec.border[1];
   var pts = wheelSlotPoints(p, slotId);
-  var prog = spec.max > 0 ? Math.min(1, pts / spec.max) : 0;
-  var can = wheelCanAllocate(p, slotId);
-  var fillUrl = "assets/wheel/wheel-colors/" + dir + "/" +
-    (WHEEL_QUAD_FILES[dir] || dir) + "_" + n + ".png?v=wheel-otc-v1";
-  var bordUrl = "assets/wheel/border/" + dir + "/" + n + ".png?v=wheel-otc-v1";
-  var mask = "-webkit-mask-image:url('" + fillUrl + "');mask-image:url('" + fillUrl + "');";
-  var bmask = "-webkit-mask-image:url('" + bordUrl + "');mask-image:url('" + bordUrl + "');";
-  return '<div class="wheel-slice-fill w-' + spec.color + '" data-slice="' + slotId + '"' +
-    ' style="' + mask + 'opacity:' + (0.22 + 0.78 * prog).toFixed(2) + '"></div>' +
-    '<div class="wheel-slice-border' + (can || pts > 0 ? "" : " locked") + '" style="' + bmask + '"></div>';
+  var root = WHEEL_ROOTS.indexOf(slotId) >= 0;
+  var h = "";
+  if (pts > 0 || root)
+    h += '<img class="wheel-slice-track" src="assets/wheel/wheel-colors/' + o.color +
+      '/' + o.frames + '.png?v=wheel-otc-v1" alt="" draggable="false">';
+  if (pts > 0) {
+    var frame = pts >= spec.max ? o.frames : Math.max(1, Math.min(o.frames, Math.floor(pts / 10) + 1));
+    h += '<img class="wheel-slice-fill" src="assets/wheel/wheel-colors/' + o.color +
+      '/' + frame + '.png?v=wheel-otc-v1" alt="" draggable="false">';
+  }
+  return h;
 }
 
-/* Icone do no: magia real (otc), arma para +skill, smallperks para stats. */
-function wheelNodeIconHtml(spec, voc) {
-  if (spec.spell && spec.spell[voc]) {
-    var sid = spec.spell[voc];
-    if (sid !== "__focus__") {
-      var s = (typeof SPELLS !== "undefined") ? SPELLS[sid] : null;
-      var p = s && (typeof spellIconPath === "function") ? spellIconPath(s) : null;
-      if (p) return '<img class="wn-icon" src="' + p + '" alt="" draggable="false">';
-    }
-    return '<span class="wn-glyph">\u2726</span>';
-  }
-  if (spec.instant && spec.instant[voc]) return '<span class="wn-glyph">\u2605</span>';
-  if (spec.skill) {
-    var item = { melee: "sword", distance: "bow", magic: "wand-of-might",
-      fist: "fists-of-enlightenment" }[WHEEL_SKILL[voc]] || "sword";
-    return '<img class="wn-icon" src="assets/item/' + item + '.png" alt="" draggable="false">';
-  }
-  var cell = -1;
-  if (spec.leech) cell = spec.leech === "life" ? 11 : 12;
-  else if (spec.hp && spec.mana) cell = 2;
-  else if (spec.hp) cell = 0;
-  else if (spec.mana) cell = 1;
-  else if (spec.cap) cell = 3;
-  else if (spec.mit) cell = 5;
-  if (cell >= 0)
-    return '<span class="wn-icon wn-small" style="background-position:' + (-cell * 22) + 'px 0"></span>';
-  return '<span class="wn-glyph">+</span>';
+/* Overlay de hover/selecao (uma camada so, trocada via JS). */
+function wheelFocusOverlays(p) {
+  var h = '<img class="wheel-slice-focus" alt="" style="display:none" draggable="false">';
+  if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_OTC[WHEEL_UI.sel])
+    h += '<img class="wheel-slice-selb" src="assets/wheel/wheel-border/' +
+      WHEEL_OTC[WHEEL_UI.sel].border + '.png?v=wheel-otc-v1" alt="" draggable="false">';
+  return h;
 }
 
 function wheelStageOverlays(p) {
@@ -133,18 +103,22 @@ function wheelStageOverlays(p) {
 
 function wheelNodeHtml(p, slotId) {
   var spec = WHEEL_SLOTS[slotId], voc = p.voc || "knight";
+  var o = (typeof WHEEL_OTC !== "undefined") ? WHEEL_OTC[slotId] : null;
+  if (!o) return "";
   var pts = wheelSlotPoints(p, slotId);
   var can = wheelCanAllocate(p, slotId);
   var full = pts >= spec.max;
-  var pos = WHEEL_POS[slotId];
   var sel = (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel === slotId);
-  var cls = "wheel-node w-" + spec.color + (full ? " full" : "") + (can ? " can" : " locked") + (sel ? " sel" : "");
-  var left = (pos[0] / WHEEL_SIZE * 100) + "%";
-  var top = (pos[1] / WHEEL_SIZE * 100) + "%";
-  return '<div class="' + cls + '" data-slot="' + slotId + '" title="' + slotId + ' \u2014 ' + wheelSlotLabel(spec, voc) + '"' +
+  var ic = o.icons[voc] || o.icons.knight || [0, 0];
+  var cls = "wheel-node w-" + spec.color + (full ? " full" : "") + (can || pts > 0 ? " can" : " locked") + (sel ? " sel" : "");
+  var left = (o.x / WHEEL_SIZE * 100) + "%";
+  var top = (o.y / WHEEL_SIZE * 100) + "%";
+  return '<div class="' + cls + '" data-slot="' + slotId + '" title="' + wheelNodeTitle(spec, voc) +
+    ' \u2014 ' + pts + '/' + spec.max + ' \u2014 ' + wheelSlotLabel(spec, voc) + '"' +
     ' style="left:' + left + ';top:' + top + '">' +
-    '<span class="wn-iconbox">' + wheelNodeIconHtml(spec, voc) + '</span>' +
-    '<span class="wn-pts">' + pts + '/' + spec.max + '</span>' +
+    '<span class="wn-med" style="background-position:' + (-ic[0] * 30) + 'px 0"></span>' +
+    '<span class="wn-small" style="left:calc(50% + ' + o.sdx + 'px);top:calc(50% + ' + o.sdy + 'px);' +
+      'background-position:' + (-ic[1] * 16) + 'px 0"></span>' +
     '</div>';
 }
 
@@ -343,13 +317,14 @@ function renderWheelModal(p, opts) {
     if (locked) h += '<div class="tiny" style="padding:4px 10px;color:#f87171">Locked until level <b>' + WHEEL_CONFIG.minLevel + '</b>. You are level ' + p.level + '.</div>';
 
     h += '<div class="wheel-body">' +
-      '<div class="wheel-canvas-area">' +
-        '<img class="wheel-stage-img" src="' + wheelBackgroundImg(p.voc) + '?v=wheel-otc-v1" alt="">';
+      '<div class="wheel-canvas-wrap"><div class="wheel-canvas-area">' +
+        '<img class="wheel-stage-img" src="assets/wheel/backdrop_skillwheel.png?v=wheel-otc-v1" alt="" draggable="false">';
     for (var sid0 in WHEEL_SLOTS) h += wheelSliceHtml(p, sid0);
-    h += wheelStageOverlays(p) +
-        wheelSvgConnections();
+    h += '<img class="wheel-voc-img" src="' + wheelVocImage(p.voc) + '?v=wheel-otc-v1" alt="" draggable="false">' +
+        wheelStageOverlays(p) +
+        wheelFocusOverlays(p);
     for (var id in WHEEL_SLOTS) h += wheelNodeHtml(p, id);
-    h += '</div><div class="wheel-right">';
+    h += '</div></div><div class="wheel-right">';
     if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_SLOTS[WHEEL_UI.sel])
       h += wheelSelectionHtml(p, WHEEL_UI.sel);
     if (showSummary) {
@@ -513,9 +488,46 @@ function renderScrollSection(p) {
   return h;
 }
 
+/* Escala o canvas 522x522 (transform) para caber no container, mantendo a
+ * composicao do cliente intacta em qualquer tamanho. */
+function wheelFitCanvas(root) {
+  var wrap = root && root.querySelector ? root.querySelector(".wheel-canvas-wrap") : null;
+  if (!wrap) return;
+  var cv = wrap.querySelector(".wheel-canvas-area");
+  if (!cv) return;
+  var host = wrap.parentElement; // .wheel-body
+  var embedded = !!(root.closest && root.closest(".chard-wheel-embed")) ||
+    (wrap.closest && wrap.closest(".chard-wheel-embed"));
+  var rightW = 0;
+  var rp = host && host.querySelector ? host.querySelector(".wheel-right") : null;
+  if (rp && host.clientWidth > 900) rightW = rp.offsetWidth + 16;
+  var availW = host && host.clientWidth > 0 ? host.clientWidth - rightW : 0;
+  var availH = 0;
+  if (embedded) {
+    availH = host && host.clientHeight > 0 ? host.clientHeight : 0;
+  } else {
+    availH = Math.max(0, (window.innerHeight || 900) - 300);
+  }
+  var s = 1;
+  if (availW > 0) s = Math.min(s, availW / 522);
+  if (availH > 0) s = Math.min(s, availH / 522);
+  s = Math.max(0.45, Math.min(1, s));
+  wrap.style.width = Math.round(522 * s) + "px";
+  wrap.style.height = Math.round(522 * s) + "px";
+  cv.style.transform = "scale(" + s + ")";
+}
+
 function bindWheel(root, rerender) {
   var body = root || $("#modal-body"); if (!body) return;
   rerender = rerender || openWheelModal;
+  wheelFitCanvas(body);
+  if (typeof window !== "undefined" && !window._wheelFitBound) {
+    window._wheelFitBound = true;
+    window.addEventListener("resize", function () {
+      var c = document.querySelector(".chard-wheel-embed .wheel-canvas-wrap, #modal-body .wheel-canvas-wrap");
+      if (c) wheelFitCanvas(c.parentElement && c.parentElement.parentElement || c);
+    });
+  }
   body.querySelectorAll("[data-wtab]").forEach(function(el){
     el.addEventListener("click", function(){
       if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
@@ -545,6 +557,15 @@ function bindWheel(root, rerender) {
   });
   body.querySelectorAll("[data-slot]").forEach(function(el){
     var slotId = el.dataset.slot;
+    var o = (typeof WHEEL_OTC !== "undefined") ? WHEEL_OTC[slotId] : null;
+    el.addEventListener("mouseenter", function(){
+      var f = body.querySelector(".wheel-slice-focus");
+      if (f && o) { f.src = "assets/wheel/wheel-colors/" + o.focus + ".png?v=wheel-otc-v1"; f.style.display = "block"; }
+    });
+    el.addEventListener("mouseleave", function(){
+      var f = body.querySelector(".wheel-slice-focus");
+      if (f) f.style.display = "none";
+    });
     el.addEventListener("click", function(){
       if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
       WHEEL_UI.sel = slotId;
