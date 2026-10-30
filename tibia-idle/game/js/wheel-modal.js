@@ -41,7 +41,7 @@ function wheelIcon(type, index, tip) {
   return `<span class="${cls}" style="background-position:${pos}px 0;" title="${tip || ""}"></span>`;
 }
 
-function openWheelModal(startVocation) {
+function openWheelPlannerModal(startVocation) {
   const modal = $("#modal");
   const body = $("#modal-body");
   if (!modal || !body || !window.WHEEL_DATA || !window.WheelPlanner) return;
@@ -141,7 +141,7 @@ function openWheelModal(startVocation) {
   });
 
   $$('[data-wv]').forEach((btn) =>
-    btn.addEventListener("click", () => openWheelModal(btn.dataset.wv))
+    btn.addEventListener("click", () => openWheelPlannerModal(btn.dataset.wv))
   );
 
   wheelAttachSliceClicks(voc);
@@ -219,9 +219,9 @@ function wheelAttachSliceClicks(vocation) {
         return;
       }
       if (e.shiftKey) {
-        wheelRemoveModal(p, index) && openWheelModal(vocation);
+        wheelRemoveModal(p, index) && openWheelPlannerModal(vocation);
       } else {
-        wheelAllocateModal(p, index) && openWheelModal(vocation);
+        wheelAllocateModal(p, index) && openWheelPlannerModal(vocation);
       }
     });
     el.addEventListener("mouseenter", () => { el.querySelectorAll('path').forEach((p) => p.setAttribute('opacity', '0.7')); });
@@ -239,7 +239,8 @@ function wheelAttach() {
     // a Roda do Destino agora vive como aba da janela Detalhes do personagem
     btn.addEventListener("click", () => {
       if (typeof openCharDetails === "function") openCharDetails("roda");
-      else openWheelModal();
+      else if (typeof openWheelModal === "function") openWheelModal();
+      else openWheelPlannerModal();
     });
   }
 }
@@ -251,5 +252,5 @@ if (document.readyState === "loading") {
 }
 
 if (typeof window !== "undefined") {
-  window.openWheelModal = openWheelModal;
+  window.openWheelPlannerModal = openWheelPlannerModal;
 }

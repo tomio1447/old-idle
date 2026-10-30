@@ -120,3 +120,16 @@
 
 /* Gift of Life badge */
 .wheel-gift-badge { display: inline-block; padding: 1px 5px; background: #2a5a2a; border: 1px solid #4ade80; border-radius: 2px; color: #4ade80; font-size: 8px; margin-left: 4px; }
+
+/* ── SELEÇÃO (painel da fatia clicada) ── */
+.wheel-sel { background:#12151a; border:1px solid #2a2d34; border-radius:4px; padding:8px; margin-bottom:8px; }
+.wheel-sel .wsel-name { font-weight:bold; font-size:12px; margin-top:4px; }
+.wheel-sel .wsel-label { color:#d4af37; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; margin-top:8px; border-bottom:1px solid #2a2d34; padding-bottom:2px; }
+.wheel-sel .wsel-line { font-size:10px; color:#c8c0b0; line-height:1.5; }
+.wheel-node.sel { transform: translate(-50%,-50%) scale(1.18); filter: drop-shadow(0 0 8px #ffe680) !important; }
+
+/* ── Responsivo / embutido ── */
+.wheel-canvas-area { width:100%; max-width:522px; aspect-ratio:1; height:auto; }
+.wheel-body { flex-wrap:wrap; }
+.chard-wheel-embed { overflow:auto; }
+.chard-wheel-embed .wheel-window { max-width:100%; border:none; background:transparent; }

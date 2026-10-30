@@ -86,7 +86,8 @@ function wheelNodeHtml(p, slotId) {
   var can = wheelCanAllocate(p, slotId);
   var full = pts >= spec.max;
   var pos = WHEEL_POS[slotId];
-  var cls = "wheel-node w-" + spec.color + (full ? " full" : "") + (can ? " can" : " locked");
+  var sel = (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel === slotId);
+  var cls = "wheel-node w-" + spec.color + (full ? " full" : "") + (can ? " can" : " locked") + (sel ? " sel" : "");
   var left = (pos[0] / WHEEL_SIZE * 100) + "%";
   var top = (pos[1] / WHEEL_SIZE * 100) + "%";
   var border = wheelBorderUrl(spec);
@@ -170,7 +171,97 @@ function openWheelModal() {
   bindWheelModal();
 }
 
-function renderWheelModal(p) {
+/* Nome amigavel da fatia: prioriza o desbloqueio (magia/habilidade/leech/
+ * skill); sem desbloqueio, nomeia pelo bonus por ponto. */
+function wheelNodeTitle(spec, voc) {
+  if (!spec) return "Fatia";
+  if (spec.instant && spec.instant[voc]) return spec.instant[voc];
+  if (spec.spell && spec.spell[voc]) {
+    var sid = spec.spell[voc];
+    return sid === "__focus__" ? "Focus Spells" : (typeof SPELLS !== "undefined" && SPELLS[sid] ? SPELLS[sid].name : sid);
+  }
+  if (spec.leech) return spec.leech === "life" ? "Life Leech" : "Mana Leech";
+  if (spec.skill) {
+    var sk = WHEEL_SKILL[voc];
+    return "+" + (sk === "melee" ? "Melee" : sk === "distance" ? "Distance" : sk === "magic" ? "Magic Level" : "Fist");
+  }
+  var parts = [];
+  if (spec.hp) parts.push("HP");
+  if (spec.mana) parts.push("Mana");
+  if (spec.cap) parts.push("Capacidade");
+  if (spec.mit) parts.push("Mitigação");
+  return parts.length ? "Perk de " + parts.join("/") : "Perk de Dedicação";
+}
+
+/* Painel "SELEÇÃO" (padrão Huntera): o que cada ponto da fatia dá e o que
+ * ela desbloqueia ao completar, mais o progresso do quadrante para o
+ * próximo estágio de Revelation. */
+function wheelSelectionHtml(p, slotId) {
+  var spec = WHEEL_SLOTS[slotId];
+  if (!spec) return "";
+  var voc = p.voc || "knight";
+  var pts = wheelSlotPoints(p, slotId);
+  var color = WHEEL_COLORS[spec.color] || { nome: spec.color };
+  var css = wheelColorCss(spec.color) || "#888";
+
+  var ded = [], acc = [];
+  if (spec.hp) { ded.push("+" + WHEEL_HP[voc] + " HP por ponto"); acc.push("+" + WHEEL_HP[voc] * pts + " HP"); }
+  if (spec.mana) { ded.push("+" + WHEEL_MP[voc] + " Mana por ponto"); acc.push("+" + WHEEL_MP[voc] * pts + " Mana"); }
+  if (spec.cap) { ded.push("+" + WHEEL_CAP[voc] + " Cap por ponto"); acc.push("+" + WHEEL_CAP[voc] * pts + " Cap"); }
+  if (spec.mit) { ded.push("+3% Mitigação por ponto"); acc.push("+" + (Math.round(WHEEL_MIT_PER_POINT * pts * 1000) / 10) + "% Mitigação"); }
+
+  var conv = [];
+  if (spec.skill) {
+    var sk = WHEEL_SKILL[voc];
+    conv.push("+1 " + (sk === "melee" ? "sword/axe/club" : sk === "distance" ? "distance" : sk === "magic" ? "magic level" : "fist"));
+  }
+  if (spec.leech) conv.push("+" + wheelPct(WHEEL_LEECH[spec.leech]) + " " + (spec.leech === "life" ? "Life Leech" : "Mana Leech"));
+  if (spec.spell && spec.spell[voc]) {
+    var sid = spec.spell[voc];
+    conv.push("Desbloqueia " + (sid === "__focus__" ? "Focus Spells" : (typeof SPELLS !== "undefined" && SPELLS[sid] ? SPELLS[sid].name : sid)));
+  }
+  if (spec.instant && spec.instant[voc]) conv.push("Desbloqueia " + spec.instant[voc]);
+
+  var cpts = wheelColorPoints(p, spec.color);
+  var stage = wheelStage(p, spec.color);
+  var nextThr = null;
+  for (var ti = 0; ti < WHEEL_CONFIG.stageThresholds.length; ti++)
+    if (cpts < WHEEL_CONFIG.stageThresholds[ti]) { nextThr = WHEEL_CONFIG.stageThresholds[ti]; break; }
+  var ability = (WHEEL_STAGE_ABILITY[spec.color] || {})[voc];
+  var revReward = stage > 0 ? WHEEL_CONFIG.revelation[stage - 1] : WHEEL_CONFIG.revelation[0];
+  var nextReward = stage < 3 ? WHEEL_CONFIG.revelation[stage] : null;
+
+  var h = '<div class="wheel-sel wsel-' + spec.color + '">' +
+    '<div class="wheel-sec-title">Seleção</div>' +
+    '<div class="tiny dim">Clique: +1 ponto · Botão direito: −1 ponto</div>' +
+    '<div class="wsel-name" style="color:' + css + '">' + wheelNodeTitle(spec, voc) + '</div>' +
+    '<div class="tiny dim">' + color.nome + ' · máx ' + spec.max + ' pts</div>';
+  if (ded.length) {
+    h += '<div class="wsel-label">Perk de Dedicação</div>' +
+      ded.map(function (d) { return '<div class="wsel-line">' + d + '</div>'; }).join("") +
+      '<div class="tiny dim">' + pts + ' ponto' + (pts === 1 ? "" : "s") + ' colocado' + (pts === 1 ? "" : "s") +
+      (pts > 0 && acc.length ? ' · <span style="color:#9ce84a">' + acc.join(", ") + '</span>' : "") + '</div>';
+  }
+  if (conv.length) {
+    h += '<div class="wsel-label">Perk de Convicção</div>' +
+      conv.map(function (d) { return '<div class="wsel-line" style="color:' + (pts >= spec.max ? "#9ce84a" : "#c8c0b0") + '">' + d + '</div>'; }).join("") +
+      (pts >= spec.max
+        ? '<div class="tiny" style="color:#9ce84a">Desbloqueado.</div>'
+        : '<div class="tiny dim">Desbloqueado quando a fatia estiver cheia.</div>');
+  }
+  h += '<div class="wsel-label">Quadrante ' + color.nome + ' — Estágio ' + stage + '/3</div>' +
+    '<div class="tiny dim">' + cpts + ' pts no quadrante' +
+      (nextThr ? ' · faltam <b>' + (nextThr - cpts) + '</b> p/ o próximo estágio' : ' · completo') + '</div>';
+  if (nextReward)
+    h += '<div class="wsel-line">Próximo estágio: +' + nextReward.damage + '% dano e +' + nextReward.healing + '% cura' +
+      (ability ? ' · <b>' + ability + '</b>' : '') + '</div>';
+  else if (ability) h += '<div class="wsel-line" style="color:#9ce84a">' + ability + ' ativo · +' + revReward.damage + '% dano / +' + revReward.healing + '% cura</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderWheelModal(p, opts) {
+  opts = opts || {};
   var locked = p.level < WHEEL_CONFIG.minLevel;
   var avail = wheelAvail(p), spent = wheelSpent(p), total = wheelPoints(p);
   var tab = (typeof WHEEL_UI !== "undefined" && WHEEL_UI.tab) || "wheel";
@@ -198,6 +289,7 @@ function renderWheelModal(p) {
         '<span><i class="wl-dot" style="background:#c084fc"></i>Purple</span>' +
       '</div>' +
       '<span class="tiny dim" style="margin-left:auto">Click=+1pt | RightClick=-1pt</span>' +
+      '<button class="sm" id="wheel-reset" title="Remove todos os pontos da roda">Reset</button>' +
       '</div>';
 
     if (locked) h += '<div class="tiny" style="padding:4px 10px;color:#f87171">Locked until level <b>' + WHEEL_CONFIG.minLevel + '</b>. You are level ' + p.level + '.</div>';
@@ -209,6 +301,8 @@ function renderWheelModal(p) {
         wheelSvgConnections();
     for (var id in WHEEL_SLOTS) h += wheelNodeHtml(p, id);
     h += '</div><div class="wheel-right">';
+    if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_SLOTS[WHEEL_UI.sel])
+      h += wheelSelectionHtml(p, WHEEL_UI.sel);
     if (showSummary) {
       h += wheelSummaryHtml(p);
       h += '<div class="wheel-summary-toggle"><button class="sm" data-wsummary="0">Hide summary</button></div>';
@@ -230,9 +324,10 @@ function renderWheelModal(p) {
     '<span class="wheel-money-item" style="color:#66c7ff"><img src="assets/wheel/fragmentIcon.png" alt=""> Lesser: ' + fmtFull(p.wheel.lesserFrags || 0) + '</span>' +
     '<span class="wheel-money-item" style="color:#c084fc"><img src="assets/wheel/fragmentIcon.png" alt=""> Greater: ' + fmtFull(p.wheel.greaterFrags || 0) + '</span>' +
     '<span style="flex:1"></span>' +
+    (opts.embedded ? '' :
     '<div class="wheel-actions-bar">' +
       '<button class="sm" id="wheel-close">Close</button>' +
-    '</div></div>';
+    '</div>') + '</div>';
 
   h += '</div>';
   return h;
@@ -369,30 +464,50 @@ function renderScrollSection(p) {
   return h;
 }
 
-function bindWheelModal() {
-  var body = $("#modal-body"); if (!body) return;
+function bindWheel(root, rerender) {
+  var body = root || $("#modal-body"); if (!body) return;
+  rerender = rerender || openWheelModal;
   body.querySelectorAll("[data-wtab]").forEach(function(el){
     el.addEventListener("click", function(){
       if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
-      WHEEL_UI.tab = el.dataset.wtab; openWheelModal();
+      WHEEL_UI.tab = el.dataset.wtab; rerender();
     });
   });
   body.querySelectorAll("[data-wsummary]").forEach(function(el){
     el.addEventListener("click", function(){
       if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
-      WHEEL_UI.summary = el.dataset.wsummary === "1"; openWheelModal();
+      WHEEL_UI.summary = el.dataset.wsummary === "1"; rerender();
     });
   });
   var close = $("#wheel-close");
   if (close) close.addEventListener("click", function(){ $("#modal").classList.remove("show","wide"); });
+  var resetBtn = body.querySelector("#wheel-reset");
+  if (resetBtn) resetBtn.addEventListener("click", function(){
+    var p = G.p;
+    if (!p || !p.wheel || !p.wheel.slots) { toast("A roda já está vazia."); return; }
+    if (!Object.keys(p.wheel.slots).some(function(id){ return (p.wheel.slots[id] || 0) > 0; })) {
+      toast("A roda já está vazia."); return;
+    }
+    p.wheel.slots = {};
+    save();
+    toast("Pontos da roda removidos — disponíveis para realocar.");
+    if (typeof WHEEL_UI !== "undefined") WHEEL_UI.sel = null;
+    rerender();
+  });
   body.querySelectorAll("[data-slot]").forEach(function(el){
     var slotId = el.dataset.slot;
     el.addEventListener("click", function(){
-      if (wheelAllocate(G.p, slotId)) { save(); openWheelModal(); }
+      if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
+      WHEEL_UI.sel = slotId;
+      if (wheelAllocate(G.p, slotId)) save();
+      rerender();
     });
     el.addEventListener("contextmenu", function(e){
       e.preventDefault();
-      if (wheelRemove(G.p, slotId)) { save(); openWheelModal(); }
+      if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
+      WHEEL_UI.sel = slotId;
+      if (wheelRemove(G.p, slotId)) save();
+      rerender();
     });
   });
   body.querySelectorAll("[data-buy-scroll]").forEach(function(el){
@@ -404,17 +519,17 @@ function bindWheelModal() {
       if (G.p.level < 51) { toast("Level 51+ required."); return; }
       if (!spendGold(G.p, price)) { toast("Not enough gold."); return; }
       G.p.wheel.scrolls[id] = 1;
-      toast("Deciphered <b>" + sc.item + "</b>: +" + sc.pontos + " points!"); save(); openWheelModal();
+      toast("Deciphered <b>" + sc.item + "</b>: +" + sc.pontos + " points!"); save(); rerender();
     });
   });
   function gemToast(res, okMsg) {
     if (!res || !res.ok) { toast((res && res.err) || "Failed."); return; }
-    toast(okMsg); save(); openWheelModal();
+    toast(okMsg); save(); rerender();
   }
   body.querySelectorAll("[data-sel-gem]").forEach(function(el){
     el.addEventListener("click", function(){
       if (typeof WHEEL_UI === "undefined") window.WHEEL_UI = {};
-      WHEEL_UI.gemId = parseInt(el.dataset.selGem, 10); openWheelModal();
+      WHEEL_UI.gemId = parseInt(el.dataset.selGem, 10); rerender();
     });
   });
   body.querySelectorAll("[data-buy-gem]").forEach(function(el){
@@ -450,7 +565,7 @@ function bindWheelModal() {
       var r = wheelDestroyGem(G.p, parseInt(el.dataset.destroyGem, 10));
       if (!r.ok) { toast(r.err); return; }
       if (typeof WHEEL_UI !== "undefined") WHEEL_UI.gemId = null;
-      toast("Dismantled: +" + r.amount + " " + r.kind + " fragments."); save(); openWheelModal();
+      toast("Dismantled: +" + r.amount + " " + r.kind + " fragments."); save(); rerender();
     });
   });
   body.querySelectorAll("[data-buy-frag]").forEach(function(el){
@@ -464,4 +579,8 @@ function bindWheelModal() {
       gemToast(r, r && r.ok ? "Enhanced to Grade " + wheelGradeName(r.grade) + "." : "");
     });
   });
+}
+
+function bindWheelModal() {
+  bindWheel($("#modal-body"), openWheelModal);
 }

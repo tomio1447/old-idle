@@ -83,7 +83,9 @@ const cd = fs.readFileSync(path.join(root, "game/js/char-details.js"), "utf8");
 for (const t of ["personagem", "outfit", "montarias", "proficiencia", "roda", "deaths"])
   assert(cd.includes(`"${t}"`), `aba ${t}`);
 assert(cd.includes("cycloAppearance(p, box, { minimal: true })"), "catálogo minimal");
-assert(cd.includes("wheelAllocateModal"), "roda reusa alocador");
+assert(cd.includes('renderWheelModal(p, { embedded: true })'), "roda usa a wheel real (p.wheel.slots)");
+assert(cd.includes("bindWheel(el, chardRender)"), "roda embutida é interativa");
+assert(!cd.includes("wheelVoc"), "sem seletor de vocação — a roda é a do personagem");
 assert(!/Proficiência[\s\S]{0,400}\d+%\s*<\/div>/.test(cd.split("chardTabProficiencia")[1].split("/* ----")[0]),
   "proficiência não inventa números");
 const html = fs.readFileSync(path.join(root, "game/index.html"), "utf8");

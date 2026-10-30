@@ -24,8 +24,6 @@
 
 const CHARD = {
   tab: "personagem",
-  wheelVoc: null,          // vocação aberta na roda (default = do personagem)
-  selInfo: "",             // texto da fatia clicada na roda
   outfitPart: 0,           // parte da cor selecionada (0 cabeça .. 3 pés)
   outfitBusca: "",         // filtro de texto do catálogo
   chars: null,             // {mode:"online"|"local", loading, account, characters, chars}
@@ -58,8 +56,6 @@ function openCharDetails(tab) {
   }
   if (typeof save === "function") save();
   if (tab) CHARD.tab = tab;
-  CHARD.wheelVoc = null;
-  CHARD.selInfo = "";
   chardShell(p);
   chardRender();
   chardRefreshChars();
@@ -101,7 +97,6 @@ function chardShell(p) {
   $$("#chard-tabs [data-chard-tab]").forEach((b) =>
     b.addEventListener("click", () => {
       CHARD.tab = b.dataset.chardTab;
-      CHARD.selInfo = "";
       $$("#chard-tabs .chard-tab").forEach((x) =>
         x.classList.toggle("active", x === b));
       chardRender();
@@ -700,130 +695,15 @@ function chardTabProficiencia(p, el) {
 /* ------------------------------------------------- aba Roda do Destino */
 
 function chardTabRoda(p, el) {
-  if (!window.WHEEL_DATA || !window.WheelPlanner) {
+  if (typeof renderWheelModal !== "function" || typeof WHEEL_SLOTS === "undefined") {
     el.innerHTML = `<div class="cyclo-vazio"><div class="tiny dim">Roda do Destino indisponível.</div></div>`;
     return;
   }
   ensureWheel(p);
-  const wd = window.WHEEL_DATA;
-  const voc = CHARD.wheelVoc || p.voc || "knight";
-  const total = wheelPoints(p);
-  const spent = wheelSpent(p) + (Array.isArray(p.wheel.uiSlots) ? p.wheel.uiSlots.reduce((a, b) => a + b, 0) : 0);
-  const avail = Math.max(0, total - spent);
-
-  let dedication = "";
-  for (let i = 0; i < wd.dedication.length; i++) {
-    const d = wd.dedication[i];
-    if (!d) continue;
-    dedication += `<div class="wheel-row">
-      ${wheelIcon("small", d.icon, d.name)}
-      <strong>${d.name}</strong>
-      <span class="tiny dim">${wheelResolveEffect(d, voc)}</span></div>`;
-  }
-  let convictionSet = [];
-  for (const idx of wd.perks.conviction[voc]) {
-    if (convictionSet.indexOf(idx) === -1) convictionSet.push(idx);
-  }
-  let conviction = "";
-  for (const idx of convictionSet) {
-    const c = wd.conviction[idx];
-    if (!c) continue;
-    conviction += `<div class="wheel-row">
-      ${wheelIcon("medium", idx, c.name || c.template)}
-      <strong>${c.name || c.template || "Perk"}</strong>
-      <span class="tiny dim">${wheelResolveEffect(c, voc)}</span></div>`;
-  }
-  let revelation = "";
-  for (let i = 0; i < wd.perks.revelation[voc].length; i++) {
-    const idx = wd.perks.revelation[voc][i];
-    const r = wd.revelation[idx];
-    if (!r) continue;
-    const tiers = (r.tiers || []).map((t) => wheelFillTemplate(r.template, t)).join("</li><li>");
-    revelation += `<div class="wheel-row" style="align-items:flex-start;flex-wrap:wrap;">
-      ${wheelIcon("large", idx, r.name)}
-      <strong>${r.name}</strong>
-      <ul class="tiny dim" style="margin:2px 0 4px 22px;flex-basis:100%;">${tiers ? "<li>" + tiers + "</li>" : ""}</ul></div>`;
-  }
-
-  el.innerHTML = `
-    <div class="chard-wheel-grid">
-      <div class="chard-wheel-left">
-        <div class="row wrap mb8" style="gap:5px;justify-content:center">
-          ${window.WHEEL_VOCATIONS.map((v) =>
-            `<button class="sm ${v === voc ? "active" : ""}" data-chard-wv="${v}" style="text-transform:uppercase">${v}</button>`).join("")}
-        </div>
-        <div id="chard-wheel-visual" class="chard-wheel-visual"></div>
-      </div>
-      <div class="chard-wheel-side">
-        <div class="chard-box-title">Roda do Destino</div>
-        ${chardStatRow("Promotion points", `${spent} / ${total}`)}
-        ${chardStatRow("Disponíveis", `<span style="color:#9ce84a">${avail}</span>`)}
-        <div class="row wrap mt4 mb8" style="gap:5px">
-          <button class="sm" id="chard-wheel-reset" title="Remove todos os pontos da roda">Resetar</button>
-        </div>
-        ${CHARD.selInfo ? `<div class="chard-wheel-selinfo">${CHARD.selInfo}</div>` : `
-          <div class="tiny dim mb8">Clique numa fatia para alocar 1 ponto; Shift+clique remove. O círculo seguinte libera quando o anterior estiver cheio.</div>`}
-        <h4>Dedication</h4>
-        <div class="wheel-section">${dedication}</div>
-        <h4>Conviction</h4>
-        <div class="wheel-section">${conviction}</div>
-        <h4>Revelation</h4>
-        <div class="wheel-section">${revelation}</div>
-      </div>
-    </div>`;
-
-  $("#chard-wheel-visual").appendChild(window.WheelPlanner.render(voc, p));
-  chardWheelAttach(voc);
-
-  $$("#chard-body [data-chard-wv]").forEach((b) =>
-    b.addEventListener("click", () => {
-      CHARD.wheelVoc = b.dataset.chardWv;
-      CHARD.selInfo = "";
-      chardRender();
-    }));
-  $("#chard-wheel-reset").addEventListener("click", () => {
-    if (!Array.isArray(p.wheel.uiSlots)) return;
-    if (!p.wheel.uiSlots.some((n) => n > 0)) { toast("A roda já está vazia."); return; }
-    p.wheel.uiSlots.fill(0);
-    save();
-    toast("Pontos da roda removidos.");
-    chardRender();
-  });
-}
-
-/* Mesma interação do openWheelModal, mas re-renderiza a aba em vez do modal. */
-function chardWheelAttach(vocation) {
-  const root = $("#chard-wheel-visual");
-  const p = G.p;
-  if (!root) return;
-  root.querySelectorAll(".wheel-slice-clickable").forEach((el) => {
-    el.style.cursor = "pointer";
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const index = Number(el.dataset.index);
-      const kind = el.dataset.kind || "slice";
-      if (kind !== "slice") {
-        CHARD.selInfo = "Revelation " + (index + 1) + ": " +
-          wheelSliceInfo(index, kind, el.dataset.vocation || vocation);
-        chardRender();
-        return;
-      }
-      if (e.shiftKey) {
-        if (wheelRemoveModal(p, index)) chardRender();
-      } else {
-        if (wheelAllocateModal(p, index)) chardRender();
-      }
-    });
-    el.addEventListener("mouseenter", () => {
-      el.querySelectorAll("path").forEach((x) => x.setAttribute("opacity", "0.7"));
-    });
-    el.addEventListener("mouseleave", () => {
-      el.querySelectorAll("path").forEach((x) => {
-        if (x.classList && x.classList.contains("wheel-slice-inner")) x.setAttribute("opacity", "0.1");
-        else x.setAttribute("opacity", "0.25");
-      });
-    });
-  });
+  // A roda é da vocação do personagem — sem seletor. O módulo real
+  // (WHEEL_SLOTS -> p.wheel.slots) é o que alimenta os bônus de combate.
+  el.innerHTML = `<div class="chard-wheel-embed">${renderWheelModal(p, { embedded: true })}</div>`;
+  if (typeof bindWheel === "function") bindWheel(el, chardRender);
 }
 
 /* ------------------------------------------------- aba Deaths */
