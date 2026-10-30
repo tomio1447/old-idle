@@ -401,7 +401,11 @@ function chardTabPersonagem(p, el) {
   const expBonusRows = [
     ["VIP", vip ? "+10%" : "—"],
     ["Stamina" + (vip && sta > 13 * 3600 ? " (VIP 13h+)" : ""), stBonus],
-    ["Party (exp compartilhada)", (typeof partyExpBonusPct === "function" ? partyExpBonusPct(p) : 100) + "%"],
+    ["Party (exp compartilhada)", (() => {
+      const pct = typeof partyExpBonusPct === "function" ? partyExpBonusPct(p) : 100;
+      const bonus = pct - 100;
+      return bonus > 0 ? "+" + bonus + "%" : "0%";
+    })()],
   ];
 
   el.innerHTML = `
