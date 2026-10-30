@@ -57,6 +57,57 @@ function wheelBorderUrl(spec) {
   return "assets/wheel/border/" + spec.border[0] + "/" + spec.border[1] + ".png";
 }
 
+/* As fatias (wheel-colors e border) sao mascaras BRANCAS 522x522 do client —
+ * a cor vem de uma camada CSS colorida recortada pelo mask-image. */
+var WHEEL_QUAD_FILES = { top_left: "TopLeft", top_right: "TopRight",
+  bottom_left: "BottonLeft", bottom_right: "BottonRight" };
+
+function wheelSliceHtml(p, slotId) {
+  var spec = WHEEL_SLOTS[slotId];
+  if (!spec || !spec.border) return "";
+  var dir = spec.border[0], n = spec.border[1];
+  var pts = wheelSlotPoints(p, slotId);
+  var prog = spec.max > 0 ? Math.min(1, pts / spec.max) : 0;
+  var can = wheelCanAllocate(p, slotId);
+  var fillUrl = "assets/wheel/wheel-colors/" + dir + "/" +
+    (WHEEL_QUAD_FILES[dir] || dir) + "_" + n + ".png?v=wheel-otc-v1";
+  var bordUrl = "assets/wheel/border/" + dir + "/" + n + ".png?v=wheel-otc-v1";
+  var mask = "-webkit-mask-image:url('" + fillUrl + "');mask-image:url('" + fillUrl + "');";
+  var bmask = "-webkit-mask-image:url('" + bordUrl + "');mask-image:url('" + bordUrl + "');";
+  return '<div class="wheel-slice-fill w-' + spec.color + '" data-slice="' + slotId + '"' +
+    ' style="' + mask + 'opacity:' + (0.22 + 0.78 * prog).toFixed(2) + '"></div>' +
+    '<div class="wheel-slice-border' + (can || pts > 0 ? "" : " locked") + '" style="' + bmask + '"></div>';
+}
+
+/* Icone do no: magia real (otc), arma para +skill, smallperks para stats. */
+function wheelNodeIconHtml(spec, voc) {
+  if (spec.spell && spec.spell[voc]) {
+    var sid = spec.spell[voc];
+    if (sid !== "__focus__") {
+      var s = (typeof SPELLS !== "undefined") ? SPELLS[sid] : null;
+      var p = s && (typeof spellIconPath === "function") ? spellIconPath(s) : null;
+      if (p) return '<img class="wn-icon" src="' + p + '" alt="" draggable="false">';
+    }
+    return '<span class="wn-glyph">\u2726</span>';
+  }
+  if (spec.instant && spec.instant[voc]) return '<span class="wn-glyph">\u2605</span>';
+  if (spec.skill) {
+    var item = { melee: "sword", distance: "bow", magic: "wand-of-might",
+      fist: "fists-of-enlightenment" }[WHEEL_SKILL[voc]] || "sword";
+    return '<img class="wn-icon" src="assets/item/' + item + '.png" alt="" draggable="false">';
+  }
+  var cell = -1;
+  if (spec.leech) cell = spec.leech === "life" ? 11 : 12;
+  else if (spec.hp && spec.mana) cell = 2;
+  else if (spec.hp) cell = 0;
+  else if (spec.mana) cell = 1;
+  else if (spec.cap) cell = 3;
+  else if (spec.mit) cell = 5;
+  if (cell >= 0)
+    return '<span class="wn-icon wn-small" style="background-position:' + (-cell * 22) + 'px 0"></span>';
+  return '<span class="wn-glyph">+</span>';
+}
+
 function wheelStageOverlays(p) {
   var quads = [
     { color: "green", q: "TL" },
@@ -90,13 +141,10 @@ function wheelNodeHtml(p, slotId) {
   var cls = "wheel-node w-" + spec.color + (full ? " full" : "") + (can ? " can" : " locked") + (sel ? " sel" : "");
   var left = (pos[0] / WHEEL_SIZE * 100) + "%";
   var top = (pos[1] / WHEEL_SIZE * 100) + "%";
-  var border = wheelBorderUrl(spec);
-  var style = "left:" + left + ";top:" + top + ";";
-  if (border) style += "background-image:url('" + border + "?v=wheel-otc-v1');";
   return '<div class="' + cls + '" data-slot="' + slotId + '" title="' + slotId + ' \u2014 ' + wheelSlotLabel(spec, voc) + '"' +
-    ' style="' + style + '">' +
+    ' style="left:' + left + ';top:' + top + '">' +
+    '<span class="wn-iconbox">' + wheelNodeIconHtml(spec, voc) + '</span>' +
     '<span class="wn-pts">' + pts + '/' + spec.max + '</span>' +
-    (full ? '<span class="wn-max">\u2726</span>' : '') +
     '</div>';
 }
 
@@ -296,8 +344,9 @@ function renderWheelModal(p, opts) {
 
     h += '<div class="wheel-body">' +
       '<div class="wheel-canvas-area">' +
-        '<img class="wheel-stage-img" src="' + wheelBackgroundImg(p.voc) + '?v=wheel-otc-v1" alt="">' +
-        wheelStageOverlays(p) +
+        '<img class="wheel-stage-img" src="' + wheelBackgroundImg(p.voc) + '?v=wheel-otc-v1" alt="">';
+    for (var sid0 in WHEEL_SLOTS) h += wheelSliceHtml(p, sid0);
+    h += wheelStageOverlays(p) +
         wheelSvgConnections();
     for (var id in WHEEL_SLOTS) h += wheelNodeHtml(p, id);
     h += '</div><div class="wheel-right">';
