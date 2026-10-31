@@ -62,6 +62,11 @@ const GUILD_TEMP_BONUS_DEFS = [
   { id: "skill",    label: "Skill/ML",           pct: 25 },
   { id: "loot",     label: "Loot de monstros",   pct: 25 },
 ];
+/* Ícones em imagens/guildicons/1..N.png — troca com cooldown de 24h. */
+const GUILD_ICON_COUNT = 10;
+const GUILD_ICON_COOLDOWN_MS = 24 * 3600 * 1000;
+/* Renomear a guild custa Tibia Coins do caixa de coins da guild. */
+const GUILD_RENAME_COST_COINS = 250;
 
 const SERVER_SAVE_TZ = String(process.env.SERVER_SAVE_TZ || "America/Sao_Paulo").trim() || "America/Sao_Paulo";
 
@@ -203,6 +208,8 @@ function guildPublic(guild, membersCount) {
     members: Number(membersCount) || 0,
     points: Math.max(0, Number(guild.points) || 0),
     bonuses: guildBonusLevels(guild.bonuses),
+    icon: Math.max(1, Math.min(GUILD_ICON_COUNT, Math.floor(Number(guild.icon) || 1))),
+    iconAt: Math.max(0, Number(guild.icon_at) || 0),
     createdAt: guild.created_at || null,
   };
 }
@@ -247,12 +254,17 @@ async function guildState(db, token, charId) {
   const pub = guild ? guildPublic(guild, members.length) : null;
   if (pub) {
     pub.balance = Math.max(0, Number(guild.balance) || 0);
+    pub.coins = Math.max(0, Number(guild.coins) || 0);
     pub.tempBonuses = guildTempBonusUntil(guild.temp_bonuses);
   }
   return { code: 200, body: { ok: true,
     guild: pub, myRank, members, invites, tasks,
     shop: guildShopDefs(), tempShop: guildTempShopDefs(),
     insignias: Math.max(0, Number(auth.account.pvp_insignias) || 0),
+    accountCoins: Math.max(0, Number(auth.account.coins) || 0),
+    iconCooldownMs: GUILD_ICON_COOLDOWN_MS,
+    renameCostCoins: GUILD_RENAME_COST_COINS,
+    iconCount: GUILD_ICON_COUNT,
     day: guildTaskDay() } };
 }
 
@@ -278,12 +290,17 @@ async function guildDetail(db, token, guildId, charId) {
   /* Caixa, bônus temporários e contabilidade são restritos a membros. */
   if (myRank) {
     pub.balance = Math.max(0, Number(guild.balance) || 0);
+    pub.coins = Math.max(0, Number(guild.coins) || 0);
     pub.tempBonuses = guildTempBonusUntil(guild.temp_bonuses);
   }
   return { code: 200, body: { ok: true,
     guild: pub, myRank, members, tasks, logTotals,
     shop: guildShopDefs(), tempShop: guildTempShopDefs(),
     insignias: myRank ? Math.max(0, Number(auth.account.pvp_insignias) || 0) : 0,
+    accountCoins: myRank ? Math.max(0, Number(auth.account.coins) || 0) : 0,
+    iconCooldownMs: GUILD_ICON_COOLDOWN_MS,
+    renameCostCoins: GUILD_RENAME_COST_COINS,
+    iconCount: GUILD_ICON_COUNT,
     day: guildTaskDay() } };
 }
 
@@ -310,8 +327,9 @@ async function guildCreate(db, body) {
   if (gold < GUILD_CREATE_COST_GOLD)
     return { code: 403, body: { ok: false, error: "GUILD_GOLD_LOW",
       msg: `Fundar uma guild custa ${GUILD_CREATE_COST_GOLD.toLocaleString("pt-BR")} gold.` } };
+  const icon = Math.max(1, Math.min(GUILD_ICON_COUNT, Math.floor(Number(body.icon) || 1)));
   const created = await db.guildCreate({
-    name, leader_account_id: account.id, leader_character_id: char.id,
+    name, icon, leader_account_id: account.id, leader_character_id: char.id,
     cost_gold: GUILD_CREATE_COST_GOLD,
   });
   if (!created || !created.ok)
@@ -561,6 +579,92 @@ async function guildBuyTempBonus(db, body) {
     balance: r.balance, tempBonuses: r.tempBonuses } };
 }
 
+/* POST /api/guild/donate-coins — membro doa Tibia Coins da conta para o
+ * caixa de coins da guild (reservado a futuras batalhas PvP). */
+async function guildDonateCoins(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
+  if (!amount || amount <= 0)
+    return { code: 400, body: { ok: false, msg: "Informe uma quantia válida." } };
+  const r = await db.guildDonateCoins(member.guild_id, auth.account.id,
+    auth.char.name, amount);
+  if (!r || !r.ok) {
+    const err = r && r.error;
+    return { code: 409, body: { ok: false, error: err || "DONATE_FAILED",
+      msg: err === "COINS_LOW" ? "Tibia Coins insuficientes na conta."
+        : "Não foi possível doar." } };
+  }
+  return { code: 200, body: { ok: true,
+    msg: `Doação de ${amount} Tibia Coins registrada!`,
+    coins: r.coins, accountCoins: r.accountCoins } };
+}
+
+/* POST /api/guild/rename — líder renomeia a guild por 250 Tibia Coins do
+ * caixa de coins da guild. Nome revalidado (regras + unicidade). */
+async function guildRename(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  if (rankOf(member) !== "leader")
+    return { code: 403, body: { ok: false, error: "LEADER_ONLY",
+      msg: "Apenas líderes podem renomear a guild." } };
+  const name = String(body.name || "").trim().replace(/\s+/g, " ");
+  if (name.length < GUILD_NAME_MIN || name.length > GUILD_NAME_MAX || !GUILD_NAME_RE.test(name))
+    return { code: 400, body: { ok: false, error: "GUILD_NAME_INVALID",
+      msg: `Nome inválido (${GUILD_NAME_MIN}–${GUILD_NAME_MAX} letras).` } };
+  const guild = await db.guildById(member.guild_id);
+  if (!guild) return { code: 404, body: { ok: false, msg: "Guild não encontrada." } };
+  if (String(guild.name).toLowerCase() === name.toLowerCase())
+    return { code: 409, body: { ok: false, error: "GUILD_SAME_NAME",
+      msg: "A guild já tem esse nome." } };
+  if (Number(guild.coins) < GUILD_RENAME_COST_COINS)
+    return { code: 409, body: { ok: false, error: "COINS_LOW",
+      msg: `A guild precisa de ${GUILD_RENAME_COST_COINS} Tibia Coins no caixa para renomear.` } };
+  const r = await db.guildRename(member.guild_id, auth.account.id,
+    auth.char.name, name, GUILD_RENAME_COST_COINS);
+  if (!r || !r.ok) {
+    const err = r && r.error;
+    return { code: 409, body: { ok: false, error: err || "RENAME_FAILED",
+      msg: err === "GUILD_NAME_TAKEN" ? "Já existe uma guild com esse nome."
+        : err === "COINS_LOW" ? "Tibia Coins insuficientes no caixa da guild."
+        : "Não foi possível renomear." } };
+  }
+  return { code: 200, body: { ok: true, msg: `Guild renomeada para "${name}"!` } };
+}
+
+/* POST /api/guild/icon — líder troca o ícone (máx 1x a cada 24h). */
+async function guildSetIcon(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  if (rankOf(member) !== "leader")
+    return { code: 403, body: { ok: false, error: "LEADER_ONLY",
+      msg: "Apenas líderes podem trocar o ícone." } };
+  const icon = Math.floor(Number(body.icon) || 0);
+  if (icon < 1 || icon > GUILD_ICON_COUNT)
+    return { code: 400, body: { ok: false, msg: "Ícone inválido." } };
+  const guild = await db.guildById(member.guild_id);
+  if (!guild) return { code: 404, body: { ok: false, msg: "Guild não encontrada." } };
+  const last = Math.max(0, Number(guild.icon_at) || 0);
+  const wait = last + GUILD_ICON_COOLDOWN_MS - Date.now();
+  if (wait > 0) {
+    const mins = Math.ceil(wait / 60000);
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return { code: 409, body: { ok: false, error: "ICON_COOLDOWN",
+      msg: `O ícone pode ser trocado novamente em ${h}h${String(m).padStart(2, "0")}m.` } };
+  }
+  await db.guildSetIcon(member.guild_id, icon, Date.now(), {
+    account_id: auth.account.id, char_name: auth.char.name, category: "purchase",
+    detail: `Ícone da guild alterado para #${icon}`,
+    gold_delta: 0, points_delta: 0, coins_delta: 0 });
+  return { code: 200, body: { ok: true, msg: "Ícone da guild atualizado!", icon } };
+}
+
 /* GET /api/guild/log — histórico de doações/compras (só membros). */
 async function guildLog(db, token, charId, category) {
   const auth = await authChar(db, token, charId);
@@ -591,4 +695,5 @@ module.exports = {
   guildDecline: (db, body) => guildInviteReply(db, body, false),
   guildLeave, guildKick, guildPromote, guildDemote,
   guildDonate, guildBuyBonus, guildBuyTempBonus, guildLog,
+  guildDonateCoins, guildRename, guildSetIcon,
 };

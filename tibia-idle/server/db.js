@@ -1655,7 +1655,9 @@ JsonStore.prototype.guildCreate = function (opts) {
   account.gold = Number(account.gold) - cost;
   const now = new Date().toISOString();
   const guild = { id: this._nextGuildId(), name: opts.name, level: 1, exp: 0,
-    points: 0, balance: 0, bonuses: {}, temp_bonuses: {}, created_at: now };
+    points: 0, balance: 0, bonuses: {}, temp_bonuses: {},
+    icon: Math.max(1, Math.floor(Number(opts.icon) || 1)), icon_at: 0,
+    coins: 0, created_at: now };
   this.guilds.push(guild);
   this.guildMembers.push({ guild_id: guild.id, account_id: Number(opts.leader_account_id),
     character_id: Number(opts.leader_character_id), rank: "leader",
@@ -1824,6 +1826,7 @@ JsonStore.prototype.guildLogAdd = function (_exec, entry) {
     account_id: Number(entry.account_id), char_name: String(entry.char_name || ""),
     category: String(entry.category), detail: String(entry.detail || ""),
     gold_delta: Number(entry.gold_delta) || 0, points_delta: Number(entry.points_delta) || 0,
+    coins_delta: Number(entry.coins_delta) || 0,
     created_at: new Date().toISOString() };
   (this.guildLog = this.guildLog || []).push(rec);
   this._guildSave();
@@ -1837,13 +1840,19 @@ JsonStore.prototype.guildLogList = function (guildId, category, limit) {
     .slice(0, Math.max(1, Math.min(500, Number(limit) || 200)));
 };
 JsonStore.prototype.guildLogTotals = function (guildId) {
-  const out = { donated: 0, spentGold: 0, spentPoints: 0, donations: 0, purchases: 0 };
+  const out = { donated: 0, coinsDonated: 0, spentGold: 0, spentPoints: 0,
+    spentCoins: 0, donations: 0, purchases: 0 };
   for (const r of this.guildLog || []) {
     if (Number(r.guild_id) !== Number(guildId)) continue;
-    if (r.category === "donation") { out.donated += Math.max(0, Number(r.gold_delta) || 0); out.donations++; }
+    if (r.category === "donation") {
+      out.donated += Math.max(0, Number(r.gold_delta) || 0);
+      out.coinsDonated += Math.max(0, Number(r.coins_delta) || 0);
+      out.donations++;
+    }
     if (r.category === "purchase") {
       out.spentGold += Math.abs(Number(r.gold_delta) || 0);
       out.spentPoints += Math.abs(Number(r.points_delta) || 0);
+      out.spentCoins += Math.abs(Number(r.coins_delta) || 0);
       out.purchases++;
     }
   }
@@ -1928,6 +1937,43 @@ JsonStore.prototype.guildTempBonusBuy = function (guildId, accountId, charName, 
 JsonStore.prototype.guildClearBonusForAccount = function (accountId) {
   for (const c of this.charactersOf(accountId)) this._charSetGuildBonus(c, null);
   this._save();
+};
+JsonStore.prototype.guildDonateCoins = function (guildId, accountId, charName, amount) {
+  const guild = this.guildById(guildId);
+  const account = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  const amt = Math.max(1, Math.floor(Number(amount) || 0));
+  if (!guild || !account || Number(account.coins) < amt) return { ok: false, error: "COINS_LOW" };
+  account.coins = Number(account.coins) - amt;
+  guild.coins = (Number(guild.coins) || 0) + amt;
+  this.guildLogAdd(null, { guild_id: guildId, account_id: accountId, char_name: charName,
+    category: "donation", detail: "Doação de Tibia Coins",
+    gold_delta: 0, points_delta: 0, coins_delta: amt });
+  this._save(); this._guildSave();
+  return { ok: true, coins: guild.coins, accountCoins: account.coins };
+};
+JsonStore.prototype.guildRename = function (guildId, accountId, charName, newName, costCoins) {
+  const guild = this.guildById(guildId);
+  const cost = Math.max(0, Math.floor(Number(costCoins) || 0));
+  if (!guild) return { ok: false, error: "NOT_FOUND" };
+  const dup = (this.guilds || []).find((g) =>
+    Number(g.id) !== Number(guildId) && String(g.name || "").toLowerCase() === String(newName).toLowerCase());
+  if (dup) return { ok: false, error: "GUILD_NAME_TAKEN" };
+  if (Number(guild.coins) < cost) return { ok: false, error: "COINS_LOW" };
+  guild.coins = Number(guild.coins) - cost;
+  guild.name = String(newName);
+  this.guildLogAdd(null, { guild_id: guildId, account_id: accountId, char_name: charName,
+    category: "purchase", detail: `Guild renomeada para "${String(newName).slice(0, 120)}"`,
+    gold_delta: 0, points_delta: 0, coins_delta: -cost });
+  this._guildSave();
+  return { ok: true };
+};
+JsonStore.prototype.guildSetIcon = function (guildId, icon, now, logEntry) {
+  const guild = this.guildById(guildId);
+  if (!guild) return;
+  guild.icon = Math.max(1, Math.floor(Number(icon) || 1));
+  guild.icon_at = Number(now) || Date.now();
+  if (logEntry) this.guildLogAdd(null, { ...logEntry, guild_id: guildId });
+  this._guildSave();
 };
 
 /* Wrapper MySQL (mysql2/promise) — mesma API do JsonStore */
@@ -3245,7 +3291,9 @@ async function MysqlStore() {
         const [g] = await conn.query("UPDATE accounts SET gold=gold-? WHERE id=? AND gold>=?",
           [cost, Number(opts.leader_account_id), cost]);
         if (!g.affectedRows) { await conn.rollback(); return { ok: false, error: "GUILD_GOLD_LOW" }; }
-        const [ins] = await conn.query("INSERT INTO guilds (name,level,exp) VALUES (?,1,0)", [opts.name]);
+        const [ins] = await conn.query(
+          "INSERT INTO guilds (name,level,exp,icon) VALUES (?,1,0,?)",
+          [opts.name, Math.max(1, Math.floor(Number(opts.icon) || 1))]);
         await conn.query(
           "INSERT INTO guild_members (guild_id,account_id,character_id,rank) VALUES (?,?,?,'leader')",
           [ins.insertId, Number(opts.leader_account_id), Number(opts.leader_character_id)]);
@@ -3413,11 +3461,12 @@ async function MysqlStore() {
     // ---- GUILD POINTS / SHOP / CAIXA / HISTÓRICO ----
     async guildLogAdd(exec, entry) {
       await exec.query(
-        `INSERT INTO guild_log (guild_id,account_id,char_name,category,detail,gold_delta,points_delta)
-         VALUES (?,?,?,?,?,?,?)`,
+        `INSERT INTO guild_log (guild_id,account_id,char_name,category,detail,gold_delta,points_delta,coins_delta)
+         VALUES (?,?,?,?,?,?,?,?)`,
         [Number(entry.guild_id), Number(entry.account_id), String(entry.char_name || "").slice(0, 48),
          String(entry.category), String(entry.detail || "").slice(0, 200),
-         Number(entry.gold_delta) || 0, Number(entry.points_delta) || 0]);
+         Number(entry.gold_delta) || 0, Number(entry.points_delta) || 0,
+         Number(entry.coins_delta) || 0]);
     },
     async guildLogList(guildId, category, limit) {
       const cat = ["donation", "purchase"].includes(String(category)) ? String(category) : null;
@@ -3430,14 +3479,21 @@ async function MysqlStore() {
     },
     async guildLogTotals(guildId) {
       const rows = await this.query(
-        `SELECT category, SUM(gold_delta) gold, SUM(points_delta) points, COUNT(*) n
+        `SELECT category, SUM(gold_delta) gold, SUM(points_delta) points,
+           SUM(coins_delta) coins, COUNT(*) n
          FROM guild_log WHERE guild_id=? GROUP BY category`, [Number(guildId)]);
-      const out = { donated: 0, spentGold: 0, spentPoints: 0, donations: 0, purchases: 0 };
+      const out = { donated: 0, coinsDonated: 0, spentGold: 0, spentPoints: 0,
+        spentCoins: 0, donations: 0, purchases: 0 };
       for (const r of rows) {
-        if (r.category === "donation") { out.donated = Math.max(0, Number(r.gold) || 0); out.donations = Number(r.n) || 0; }
+        if (r.category === "donation") {
+          out.donated = Math.max(0, Number(r.gold) || 0);
+          out.coinsDonated = Math.max(0, Number(r.coins) || 0);
+          out.donations = Number(r.n) || 0;
+        }
         if (r.category === "purchase") {
           out.spentGold = Math.abs(Number(r.gold) || 0);
           out.spentPoints = Math.abs(Number(r.points) || 0);
+          out.spentCoins = Math.abs(Number(r.coins) || 0);
           out.purchases = Number(r.n) || 0;
         }
       }
@@ -3534,6 +3590,63 @@ async function MysqlStore() {
         const r = rows[0] || {};
         return { ok: true, balance: Number(r.balance) || 0,
           tempBonuses: Guild ? Guild.guildTempBonusUntil(r.temp_bonuses) : r.temp_bonuses };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    /* Doação de Tibia Coins: debita coins da conta, credita no caixa de
+     * coins da guild (reservado a futuras batalhas PvP) e loga. */
+    async guildDonateCoins(guildId, accountId, charName, amount) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const amt = Math.max(1, Math.floor(Number(amount) || 0));
+        const [a] = await conn.query(
+          "UPDATE accounts SET coins=coins-? WHERE id=? AND coins>=?",
+          [amt, Number(accountId), amt]);
+        if (!a.affectedRows) { await conn.rollback(); return { ok: false, error: "COINS_LOW" }; }
+        await conn.query("UPDATE guilds SET coins=coins+? WHERE id=?", [amt, Number(guildId)]);
+        await this.guildLogAdd(conn, { guild_id: guildId, account_id: accountId,
+          char_name: charName, category: "donation", detail: "Doação de Tibia Coins",
+          gold_delta: 0, points_delta: 0, coins_delta: amt });
+        const [rows] = await conn.query(
+          "SELECT (SELECT coins FROM guilds WHERE id=?) gc, (SELECT coins FROM accounts WHERE id=?) ac",
+          [Number(guildId), Number(accountId)]);
+        await conn.commit();
+        const r = rows[0] || {};
+        return { ok: true, coins: Number(r.gc) || 0, accountCoins: Number(r.ac) || 0 };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    /* Renomear guild: 250 Tibia Coins do caixa de coins (só líder). */
+    async guildRename(guildId, accountId, charName, newName, costCoins) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [dup] = await conn.query(
+          "SELECT id FROM guilds WHERE LOWER(name)=LOWER(?) AND id<>?", [newName, Number(guildId)]);
+        if (dup.length) { await conn.rollback(); return { ok: false, error: "GUILD_NAME_TAKEN" }; }
+        const cost = Math.max(0, Math.floor(Number(costCoins) || 0));
+        const [u] = await conn.query(
+          "UPDATE guilds SET coins=coins-?, name=? WHERE id=? AND coins>=?",
+          [cost, String(newName), Number(guildId), cost]);
+        if (!u.affectedRows) { await conn.rollback(); return { ok: false, error: "COINS_LOW" }; }
+        await this.guildLogAdd(conn, { guild_id: guildId, account_id: accountId,
+          char_name: charName, category: "purchase",
+          detail: `Guild renomeada para "${String(newName).slice(0, 120)}"`,
+          gold_delta: 0, points_delta: 0, coins_delta: -cost });
+        await conn.commit();
+        return { ok: true };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async guildSetIcon(guildId, icon, now, logEntry) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("UPDATE guilds SET icon=?, icon_at=? WHERE id=?",
+          [Math.max(1, Math.floor(Number(icon) || 1)), Number(now) || Date.now(), Number(guildId)]);
+        if (logEntry) await this.guildLogAdd(conn, { ...logEntry, guild_id: Number(guildId) });
+        await conn.commit();
       } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
       finally { conn.release(); }
     },
@@ -4014,6 +4127,9 @@ async function ensureSchema(pool) {
     "ADD COLUMN balance BIGINT UNSIGNED NOT NULL DEFAULT 0",
     "ADD COLUMN bonuses JSON NULL",
     "ADD COLUMN temp_bonuses JSON NULL",
+    "ADD COLUMN icon TINYINT UNSIGNED NOT NULL DEFAULT 1",
+    "ADD COLUMN icon_at BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN coins BIGINT UNSIGNED NOT NULL DEFAULT 0",
   ]) { try { await pool.query("ALTER TABLE guilds " + col); } catch (e) { /* já existe */ } }
   // Insígnia PvP (moeda de conta — o sistema PvP credita aqui no futuro)
   try { await pool.query("ALTER TABLE accounts ADD COLUMN pvp_insignias INT UNSIGNED NOT NULL DEFAULT 0"); }
@@ -4031,6 +4147,8 @@ async function ensureSchema(pool) {
     INDEX idx_glog_guild (guild_id, created_at),
     INDEX idx_glog_cat (guild_id, category)
   ) ENGINE=InnoDB`);
+  try { await pool.query("ALTER TABLE guild_log ADD COLUMN coins_delta BIGINT NOT NULL DEFAULT 0"); }
+  catch (e) { /* já existe */ }
 
   // Migração das parties anteriores ao modelo account-owned. A conta do
   // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.

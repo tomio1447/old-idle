@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -6,10 +6,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Global-Idle — caçada automática</title>
+<title>Global-Idle â€” caÃ§ada automÃ¡tica</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=guild-temp-v1">
+  <link rel="stylesheet" href="css/layout.css?v=guild-icons-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
@@ -39,14 +39,14 @@
 </head>
 <body>
 
-<div id="game-loading" aria-live="polite"><div class="gl-box"><div class="gl-brand">GLOBAL-IDLE</div><div class="gl-hint" id="gl-monster-hint"><div class="gl-hint-art" id="gl-hint-art"></div><div class="gl-hint-info"><span class="gl-hint-label">CREATURE HINT</span><strong id="gl-hint-name">Carregando criatura...</strong><div class="gl-hint-stats"><span>HP <b id="gl-hint-hp">—</b></span><span>EXP <b id="gl-hint-exp">—</b></span><span>ARMOR <b id="gl-hint-armor">—</b></span></div><p id="gl-hint-tip">Prepare-se para explorar o mundo.</p></div></div><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
+<div id="game-loading" aria-live="polite"><div class="gl-box"><div class="gl-brand">GLOBAL-IDLE</div><div class="gl-hint" id="gl-monster-hint"><div class="gl-hint-art" id="gl-hint-art"></div><div class="gl-hint-info"><span class="gl-hint-label">CREATURE HINT</span><strong id="gl-hint-name">Carregando criatura...</strong><div class="gl-hint-stats"><span>HP <b id="gl-hint-hp">â€”</b></span><span>EXP <b id="gl-hint-exp">â€”</b></span><span>ARMOR <b id="gl-hint-armor">â€”</b></span></div><p id="gl-hint-tip">Prepare-se para explorar o mundo.</p></div></div><div class="gl-text" data-i18n="loading">Carregando...</div><div class="gl-bar"><i class="gl-fill"></i></div></div></div>
 
-<button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
+<button class="sm config-fab" id="btn-config-login" type="button" data-i18n-title="config.title">âš™ <span data-i18n="config.btn">CONFIG</span></button>
 
-<!-- Aviso alpha (pré-login, todo page load) -->
+<!-- Aviso alpha (prÃ©-login, todo page load) -->
 <div class="modal-bg" id="alpha-announce-modal" role="dialog" aria-modal="true" aria-labelledby="alpha-announce-title" aria-hidden="true">
   <div class="modal panel alpha-announce-box">
-    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">🚀 BETA OFICIAL — GLOBAL-IDLE</div>
+    <div class="panel-title" id="alpha-announce-title" data-i18n="alpha.title">ðŸš€ BETA OFICIAL â€” GLOBAL-IDLE</div>
     <div class="panel-body">
       <div class="brand-logo-wrap alpha-brand-logo">
         <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
@@ -54,21 +54,21 @@
       <p class="small center mb8" data-i18n="alpha.warn">
         Bem-vindo ao beta oficial! Reporte bugs e sugira melhorias no Discord ou no grupo do WhatsApp.
       </p>
-      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Patch notes — atualizações recentes</div>
+      <div class="small dim mb4" data-i18n="alpha.updatesTitle">Patch notes â€” atualizaÃ§Ãµes recentes</div>
       <div id="alpha-announce-update-at" class="alpha-update-at tiny"></div>
       <div id="alpha-announce-updates" class="alpha-announce-updates"></div>
       <button class="primary full mt8" id="alpha-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
       <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
-        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+        Â© Matheus S Tomio / Equipe zamba-old â€” Todos os direitos reservados
       </p>
     </div>
   </div>
 </div>
 
-<!-- Redes sociais (abre após o modal de patch notes) -->
+<!-- Redes sociais (abre apÃ³s o modal de patch notes) -->
 <div class="modal-bg" id="social-announce-modal" role="dialog" aria-modal="true" aria-labelledby="social-announce-title" aria-hidden="true">
   <div class="modal panel alpha-announce-box">
-    <div class="panel-title" id="social-announce-title" data-i18n="alpha.socialTitle">📣 SIGA-NOS — GLOBAL-IDLE</div>
+    <div class="panel-title" id="social-announce-title" data-i18n="alpha.socialTitle">ðŸ“£ SIGA-NOS â€” GLOBAL-IDLE</div>
     <div class="panel-body">
       <div class="brand-logo-wrap alpha-brand-logo">
         <img class="brand-logo" src="assets/brand-logo.png?v=brand-v2" width="96" height="96" alt="Global Idle">
@@ -91,11 +91,11 @@
             <span data-i18n="alpha.whatsapp">Participe do nosso grupo no WhatsApp</span>
           </div>
         </div>
-        <img class="alpha-wa-qr" src="/imagens/qrwhatsapp.png" alt="QR Code — grupo do Global-Idle no WhatsApp" title="Aponte a câmera para entrar no grupo">
+        <img class="alpha-wa-qr" src="/imagens/qrwhatsapp.png" alt="QR Code â€” grupo do Global-Idle no WhatsApp" title="Aponte a cÃ¢mera para entrar no grupo">
       </div>
       <button class="primary full mt8" id="social-announce-ok" type="button" data-i18n="alpha.ok">OK</button>
       <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
-        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+        Â© Matheus S Tomio / Equipe zamba-old â€” Todos os direitos reservados
       </p>
     </div>
   </div>
@@ -104,21 +104,21 @@
 <!-- Escolha Mobile / Desktop (primeira visita) -->
 <div class="modal-bg" id="ui-mode-modal" role="dialog" aria-modal="true" aria-labelledby="ui-mode-title">
   <div class="modal panel ui-mode-box">
-    <div class="panel-title" id="ui-mode-title" data-i18n="uimode.title">Versão do jogo</div>
+    <div class="panel-title" id="ui-mode-title" data-i18n="uimode.title">VersÃ£o do jogo</div>
     <div class="panel-body">
-      <div class="small dim center mb8" data-i18n="uimode.ask">Como você quer jogar neste dispositivo?</div>
+      <div class="small dim center mb8" data-i18n="uimode.ask">Como vocÃª quer jogar neste dispositivo?</div>
       <div class="ui-mode-choices">
         <button type="button" class="sm" data-ui-mode-pick="mobile">
-          <span class="ui-mode-icon" aria-hidden="true">📱</span>
+          <span class="ui-mode-icon" aria-hidden="true">ðŸ“±</span>
           <span data-i18n="uimode.mobile">Mobile</span>
         </button>
         <button type="button" class="sm" data-ui-mode-pick="desktop">
-          <span class="ui-mode-icon" aria-hidden="true">🖥</span>
+          <span class="ui-mode-icon" aria-hidden="true">ðŸ–¥</span>
           <span data-i18n="uimode.desktop">Desktop</span>
         </button>
       </div>
       <div class="tiny dim center mt8" id="ui-mode-suggest"></div>
-      <div class="tiny dim center mt4" data-i18n="uimode.hint">Você pode trocar depois em CONFIG.</div>
+      <div class="tiny dim center mt4" data-i18n="uimode.hint">VocÃª pode trocar depois em CONFIG.</div>
     </div>
   </div>
 </div>
@@ -148,8 +148,8 @@
 
       <!-- Conta (primeira tela no boot). O create local legado fica oculto. -->
       <div id="account-login">
-        <!-- method=post + action=# + onsubmit: evita navegação nativa se
-             o JS ainda não anexou preventDefault (senão o browser POST em /). -->
+        <!-- method=post + action=# + onsubmit: evita navegaÃ§Ã£o nativa se
+             o JS ainda nÃ£o anexou preventDefault (senÃ£o o browser POST em /). -->
         <form id="account-login-form" method="post" action="#" onsubmit="return false;">
           <div class="small dim center mb8" data-i18n="login.enter">Entre com sua conta para acessar seus personagens.</div>
           <div class="field">
@@ -158,7 +158,7 @@
           </div>
           <div class="field">
             <label for="acc-password" data-i18n="login.pass">Senha</label>
-            <input id="acc-password" name="password" type="password" maxlength="64" placeholder="••••••" autocomplete="current-password">
+            <input id="acc-password" name="password" type="password" maxlength="64" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢" autocomplete="current-password">
           </div>
           <button class="primary full mt8" id="acc-btn-login" type="submit" data-i18n-title="login.submit">
             <img src="assets/login-btn.png?v=login-artwork-v2" alt="">
@@ -172,7 +172,7 @@
         </form>
       </div>
 
-      <!-- Legado offline (só se !accountApiConfigured). Nunca no primeiro paint. -->
+      <!-- Legado offline (sÃ³ se !accountApiConfigured). Nunca no primeiro paint. -->
       <div id="local-login" style="display:none" hidden>
         <div class="field">
           <label data-i18n="login.charName">Nome do personagem</label>
@@ -188,18 +188,18 @@
         </div>
 
         <div class="field">
-          <label data-i18n="login.vocation">Vocação</label>
+          <label data-i18n="login.vocation">VocaÃ§Ã£o</label>
           <div class="voc-grid" id="voc-grid"></div>
         </div>
 
-        <button class="primary full mt8" id="btn-create" data-i18n="login.createChar">Criar personagem e caçar</button>
+        <button class="primary full mt8" id="btn-create" data-i18n="login.createChar">Criar personagem e caÃ§ar</button>
         <div class="tiny dim center mt8" data-i18n="login.localHint">
-          Identidade visual Global-Idle · progresso salvo no seu navegador
+          Identidade visual Global-Idle Â· progresso salvo no seu navegador
         </div>
       </div>
 
       <p class="brand-credits tiny dim center mt8" data-i18n="brand.credits">
-        © Matheus S Tomio / Equipe zamba-old — Todos os direitos reservados
+        Â© Matheus S Tomio / Equipe zamba-old â€” Todos os direitos reservados
       </p>
     </div>
   </div>
@@ -209,7 +209,7 @@
 <div id="app">
 
   <div id="alpha-test-banner" class="alpha-test-banner" role="status">
-    <span class="alpha-test-banner-text">BETA OFICIAL // SIGA @global_idle_ot NO INSTAGRAM // DUVIDAS/REPORTS/SUGESTÕES NO DISCORD E NO GRUPO DO WHATSAPP;</span>
+    <span class="alpha-test-banner-text">BETA OFICIAL // SIGA @global_idle_ot NO INSTAGRAM // DUVIDAS/REPORTS/SUGESTÃ•ES NO DISCORD E NO GRUPO DO WHATSAPP;</span>
     <a class="alpha-discord-link" href="https://discord.gg/bnbh3jtvBf" target="_blank" rel="noopener noreferrer">Discord</a>
     <a class="alpha-ig-link" href="https://www.instagram.com/global_idle_ot" target="_blank" rel="noopener noreferrer">Instagram</a>
   </div>
@@ -223,7 +223,7 @@
       <img src="assets/item/gold-coin.png" style="width:16px;height:16px">
       <span class="gold-txt" id="gold">0</span>
     </div>
-    <div class="row small" id="tibia-coins" title="Tibia Coins — saldo da conta (vale para todos os personagens)" data-i18n-title="title.tc">
+    <div class="row small" id="tibia-coins" title="Tibia Coins â€” saldo da conta (vale para todos os personagens)" data-i18n-title="title.tc">
       <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt="Tibia Coins">
       <span class="coin-txt" id="tibia-coins-n">0</span>
     </div>
@@ -233,7 +233,7 @@
       <b id="server-status-text" data-i18n="server.on">SERVIDOR ON</b>
       <button class="sm" id="btn-reconnect" type="button" hidden data-i18n="server.reconnect">Reconnect</button>
     </div>
-    <div class="players-online" id="players-online" hidden title="Personagens online ou em caçada offline" data-i18n-title="players.onTitle">
+    <div class="players-online" id="players-online" hidden title="Personagens online ou em caÃ§ada offline" data-i18n-title="players.onTitle">
       <span data-i18n="players.onLabel">PLAYER ON:</span>
       <b id="players-online-count">0</b>
     </div>
@@ -242,45 +242,45 @@
       <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.wheel">WHEEL</span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-prof" title="Weapon Proficiency — progressão e perks de cada arma" data-i18n-title="title.proficiency">
+    <button class="sm topbar-sys-btn" id="btn-prof" title="Weapon Proficiency â€” progressÃ£o e perks de cada arma" data-i18n-title="title.proficiency">
       <img src="assets/ui/proficiency-icon.png" alt="" class="topbar-btn-icon" width="18" height="18">
-      <span data-i18n="btn.proficiency">PROFICIÊNCIA</span>
+      <span data-i18n="btn.proficiency">PROFICIÃŠNCIA</span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
+    <button class="sm topbar-sys-btn" id="btn-charms" title="Abrir Charms â€” desbloquear e atribuir runas" data-i18n-title="title.charms">
       <img src="assets/ui/cyclopedia/charms/low-blow.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.charms">CHARMS</span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-prey" title="Sistema de Prey — bônus ao caçar uma criatura" data-i18n-title="title.prey">
-      <img src="assets/ui/prey/prey_bigxp.png" alt="Bônus de EXP da Prey" class="topbar-btn-icon prey-btn-gif">
+    <button class="sm topbar-sys-btn" id="btn-prey" title="Sistema de Prey â€” bÃ´nus ao caÃ§ar uma criatura" data-i18n-title="title.prey">
+      <img src="assets/ui/prey/prey_bigxp.png" alt="BÃ´nus de EXP da Prey" class="topbar-btn-icon prey-btn-gif">
       <span data-i18n="btn.prey">PREY</span><span id="prey-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party — compartilhe XP e veja o Analisador de Caçada" data-i18n-title="title.party">
-      <span class="topbar-btn-emoji" aria-hidden="true">👥</span>
+    <button class="sm topbar-sys-btn" id="btn-party" title="Sistema de Party â€” compartilhe XP e veja o Analisador de CaÃ§ada" data-i18n-title="title.party">
+      <span class="topbar-btn-emoji" aria-hidden="true">ðŸ‘¥</span>
       <span data-i18n="btn.party">PARTY</span><span id="party-badge" style="display:none;color:#9ce84a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-loyalty" title="Loyalty — pontos e ranks de lealdade" data-i18n-title="title.loyalty">
-      <span class="topbar-btn-emoji" aria-hidden="true">🏆</span>
+    <button class="sm topbar-sys-btn" id="btn-loyalty" title="Loyalty â€” pontos e ranks de lealdade" data-i18n-title="title.loyalty">
+      <span class="topbar-btn-emoji" aria-hidden="true">ðŸ†</span>
       <span data-i18n="btn.loyalty">LOYALTY</span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-reward" title="Reward Chest — drops de boss" data-i18n-title="title.reward">
+    <button class="sm topbar-sys-btn" id="btn-reward" title="Reward Chest â€” drops de boss" data-i18n-title="title.reward">
       <img src="assets/item/reward-chest.png" alt="Reward Chest" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.reward">REWARD</span><span id="reward-badge" style="display:none;color:#ffd65a;font-weight:bold;margin-left:3px"></span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-store" title="STORE — Tibia Coins, VIP e vender coins" data-i18n-title="title.store">
+    <button class="sm topbar-sys-btn" id="btn-store" title="STORE â€” Tibia Coins, VIP e vender coins" data-i18n-title="title.store">
       <img src="assets/ui/coins/tibia-coins.gif" alt="" class="topbar-btn-icon coin-gif" width="18" height="18">
       <span data-i18n="btn.store">STORE</span>
     </button>
-    <button class="sm topbar-sys-btn btn-switch-portrait" id="btn-switch" title="Detalhes do personagem — trocar, outfit e roda" data-i18n-title="btn.switch">
+    <button class="sm topbar-sys-btn btn-switch-portrait" id="btn-switch" title="Detalhes do personagem â€” trocar, outfit e roda" data-i18n-title="btn.switch">
       <span id="btn-switch-portrait" class="btn-switch-avatar" aria-hidden="true"></span>
       <span class="topbar-btn-label" data-i18n="btn.switch">Personagem</span>
     </button>
-    <button class="sm topbar-sys-btn" id="btn-guild" title="Guilds — clãs por conta com tasks diárias" data-i18n-title="title.guild">
+    <button class="sm topbar-sys-btn" id="btn-guild" title="Guilds â€” clÃ£s por conta com tasks diÃ¡rias" data-i18n-title="title.guild">
       <span class="topbar-btn-icon guild-btn-icon" aria-hidden="true"></span><span class="topbar-btn-label">Guild</span>
     </button>
     <button class="sm" id="btn-cyclo"><img src="assets/item/spellbook-of-ancient-arcana.png?v=guild-v1" alt="" class="topbar-btn-icon" width="18" height="18"> <span data-i18n="btn.cyclo">Cyclopedia</span></button>
-    <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">🛠 <span data-i18n="btn.admin">Admin</span></button>
-    <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
-    <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
+    <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">ðŸ›  <span data-i18n="btn.admin">Admin</span></button>
+    <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">âš™ <span data-i18n="config.btn">CONFIG</span></button>
+    <button class="sm primary" id="btn-city" data-i18n-title="btn.city">ðŸ› <span data-i18n="btn.city">Ir para a cidade</span></button>
   </div>
   <div class="layout">
 
@@ -289,20 +289,20 @@
 
       <div class="panel" data-collapse="char">
         <div class="panel-title">
-          <span id="p-name">—</span>
+          <span id="p-name">â€”</span>
           <span class="spacer" style="flex:1"></span>
           <span class="tiny dim" id="p-voc"></span>
         </div>
         <div class="panel-body">
           <div class="row mb4" style="justify-content:space-between">
-            <span class="small dim" data-i18n="char.level">Nível</span>
+            <span class="small dim" data-i18n="char.level">NÃ­vel</span>
             <b style="color:#ffe680;font-size:15px" id="p-level">1</b>
           </div>
           <div class="tiny dim" data-i18n="char.hp">Vida</div>
           <div class="bar mb4" id="bar-hp"><div class="fill hp"></div><div class="label"></div></div>
           <div class="tiny dim" data-i18n="char.mp">Mana</div>
           <div class="bar mb4" id="bar-mp"><div class="fill mp"></div><div class="label"></div></div>
-          <div class="tiny dim" data-i18n="char.exp">Experiência</div>
+          <div class="tiny dim" data-i18n="char.exp">ExperiÃªncia</div>
           <div class="bar mb4" id="bar-exp"><div class="fill exp"></div><div class="label"></div></div>
           <div class="tiny dim" data-i18n="char.stamina">Stamina</div>
           <div class="bar" id="bar-sta"><div class="fill sta"></div><div class="label"></div></div>
@@ -311,7 +311,7 @@
 
       <div id="sqm-walk-hud" class="sqm-walk-hud" title="Movimento por SQM">
         <button type="button" class="sm primary" id="btn-auto-walk" data-i18n="btn.autoWalk" aria-pressed="true">AUTO</button>
-        <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chão / WASD</span>
+        <span class="sqm-walk-hint" data-i18n="hint.autoWalk">OFF = clique no chÃ£o / WASD</span>
       </div>
 
       <div class="panel" data-collapse="equip">
@@ -345,7 +345,7 @@
           <span data-i18n="panel.pouch">Loot Pouch</span>
           <span style="flex:1"></span>
           <button class="sm primary" id="btn-pouch-sell-all" data-i18n="btn.sellAll"
-            title="Sem limite de slots. Ao somar 80 itens, vende apenas itens liberados (a cada 5 min; VIP 2 min); classificações 3 e 4 ficam protegidas.">Sell all</button>
+            title="Sem limite de slots. Ao somar 80 itens, vende apenas itens liberados (a cada 5 min; VIP 2 min); classificaÃ§Ãµes 3 e 4 ficam protegidas.">Sell all</button>
           <button class="sm" id="btn-lootpouch-config" data-i18n="btn.lootConfig">Config</button>
         </div>
         <div class="panel-body">
@@ -375,14 +375,14 @@
         <div id="malice-minigame" class="malice-minigame" style="display:none" aria-live="polite"></div>
         <div id="mega-minigame" class="mega-minigame" style="display:none" aria-live="polite"></div>
         <!-- PARTY (OTC): painel fixo no canto superior direito da tela do
-             jogo — lista os personagens da party com level, outfit, HP e
+             jogo â€” lista os personagens da party com level, outfit, HP e
              mana; clicar num membro da sua conta troca de personagem. -->
         <div id="party-panel" class="party-panel" style="display:none">
           <div class="party-panel-head" id="party-panel-head">
-            <span>👥 PARTY</span>
+            <span>ðŸ‘¥ PARTY</span>
             <span class="spacer" style="flex:1"></span>
             <span class="party-panel-count" id="party-panel-count"></span>
-            <span class="party-panel-arrow" id="party-panel-arrow">▾</span>
+            <span class="party-panel-arrow" id="party-panel-arrow">â–¾</span>
           </div>
           <div class="party-panel-body" id="party-panel-body"></div>
         </div>
@@ -398,7 +398,7 @@
       </div>
 
       <div class="panel" data-collapse="log">
-        <div class="panel-title" data-i18n="panel.log">Registro da caçada</div>
+        <div class="panel-title" data-i18n="panel.log">Registro da caÃ§ada</div>
         <div class="panel-body" style="padding:2px">
           <div class="list" id="log" style="max-height:230px"></div>
         </div>
@@ -409,7 +409,7 @@
         <div class="tabs">
           <div class="tab active" data-group="mid" data-panel="heal" data-i18n="tab.heal">Helper: Cura</div>
           <div class="tab" data-group="mid" data-panel="heal-friend" style="display:none" data-i18n="tab.healFriend">Curar aliado</div>
-          <div class="tab" data-group="mid" data-panel="magic-shield" data-i18n="tab.magicShield">Escudo mágico</div>
+          <div class="tab" data-group="mid" data-panel="magic-shield" data-i18n="tab.magicShield">Escudo mÃ¡gico</div>
           <div class="tab" data-group="mid" data-panel="equipment" data-i18n="tab.equipment">Equipamento</div>
           <div class="tab" data-group="mid" data-panel="atk" data-i18n="tab.attack">Ataque</div>
           <div class="tab" data-group="mid" data-panel="combo" data-i18n="tab.combo">Combo</div>
@@ -421,8 +421,8 @@
         <div class="panel-body" data-panel-group="mid" data-panel="heal">
           <div id="helper-heal"></div>
         </div>
-        <!-- Cura de aliados é isolada para Druid/Monk; nunca mistura as
-             magias exura sio com a configuração de autocura. -->
+        <!-- Cura de aliados Ã© isolada para Druid/Monk; nunca mistura as
+             magias exura sio com a configuraÃ§Ã£o de autocura. -->
         <div class="panel-body" data-panel-group="mid" data-panel="heal-friend" style="display:none">
           <div id="helper-heal-friend-panel"></div>
         </div>
@@ -460,20 +460,20 @@
           <label class="toggle"><input type="checkbox" id="cfg-spell">
             <span data-i18n="helper.useSpells">Usar magias de ataque</span></label>
           <label class="toggle"><input type="checkbox" id="cfg-runes">
-            <span data-i18n="helper.useRunes">Usar runas e poções automaticamente</span></label>
+            <span data-i18n="helper.useRunes">Usar runas e poÃ§Ãµes automaticamente</span></label>
           <div class="mt8">
             <label class="small dim" data-i18n="helper.barMode">Modo das barras do personagem</label>
             <select id="bar-mode" style="width:100%;padding:4px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
-              <option value="bars" data-i18n="helper.bars">BARMODE — nick + HP/Mana em barras</option>
-              <option value="arcs" data-i18n="helper.arcs">ARCS MODE — arcos de HP/Mana estilo Tibia Global</option>
+              <option value="bars" data-i18n="helper.bars">BARMODE â€” nick + HP/Mana em barras</option>
+              <option value="arcs" data-i18n="helper.arcs">ARCS MODE â€” arcos de HP/Mana estilo Tibia Global</option>
             </select>
           </div>
           <div class="mt8">
             <label class="small dim" data-i18n="helper.lootFilter">Filtro de loot</label>
             <select id="loot-filter" style="width:100%;padding:4px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
               <option value="all" data-i18n="helper.lootAll">Pegar tudo</option>
-              <option value="valuable" data-i18n="helper.lootValuable">Só itens valiosos (20+ gp)</option>
-              <option value="equip" data-i18n="helper.lootEquip">Só equipamentos</option>
+              <option value="valuable" data-i18n="helper.lootValuable">SÃ³ itens valiosos (20+ gp)</option>
+              <option value="equip" data-i18n="helper.lootEquip">SÃ³ equipamentos</option>
             </select>
           </div>
           <button class="danger full mt12" id="btn-reset" data-i18n="helper.reset">Apagar personagem</button>
@@ -485,29 +485,29 @@
     <!-- ============================ ESQUERDA DA TELA -->
     <div class="col col-right">
 
-      <nav class="left-side-actions" aria-label="Acessos de caçada" data-i18n-title="nav.hunts">
-        <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catálogo de Hunts" data-i18n-title="title.hunts">
+      <nav class="left-side-actions" aria-label="Acessos de caÃ§ada" data-i18n-title="nav.hunts">
+        <button class="sm catalog-tab-btn" id="btn-hunts" title="Abrir catÃ¡logo de Hunts" data-i18n-title="title.hunts">
           <span class="hunts-demon-icon" aria-hidden="true"></span><span data-i18n="btn.hunts">HUNTS</span>
         </button>
-        <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catálogo de Bosses" data-i18n-title="title.bosses">
+        <button class="sm catalog-tab-btn" id="btn-bosses" title="Abrir catÃ¡logo de Bosses" data-i18n-title="title.bosses">
           <span class="bosses-megalomania-icon" aria-hidden="true"></span><span data-i18n="btn.bosses">BOSSES</span>
         </button>
-        <button class="sm catalog-tab-btn" id="btn-world-bosses" title="Abrir catálogo de World Bosses" data-i18n-title="title.world-bosses">
+        <button class="sm catalog-tab-btn" id="btn-world-bosses" title="Abrir catÃ¡logo de World Bosses" data-i18n-title="title.world-bosses">
           <span class="world-bosses-icon" aria-hidden="true"></span><span data-i18n="btn.world-bosses">WORLD BOSSES</span>
         </button>
-        <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviços da cidade" data-i18n-title="title.cidade">
+        <button class="sm catalog-tab-btn" id="btn-cidade" title="Abrir serviÃ§os da cidade" data-i18n-title="title.cidade">
           <span class="cidade-btn-icon" aria-hidden="true"></span><span data-i18n="btn.cidade">CIDADE</span>
         </button>
-        <button class="sm catalog-tab-btn" id="btn-quests" title="Abrir catálogo de Quests">
+        <button class="sm catalog-tab-btn" id="btn-quests" title="Abrir catÃ¡logo de Quests">
           <img src="assets/item/small-treasure-chest.png" width="18" height="18" alt="" class="quests-btn-icon"><span>QUESTS</span>
         </button>
         <button class="sm catalog-tab-btn" id="btn-ranking" title="Abrir ranking de personagens" data-i18n-title="title.ranking">
           <span class="ranking-btn-icon" aria-hidden="true"></span><span data-i18n="btn.ranking">RANKING</span>
         </button>
-        <button class="sm catalog-tab-btn" id="btn-npcs" title="Abrir catálogo de NPCs" data-i18n-title="title.npcs">
+        <button class="sm catalog-tab-btn" id="btn-npcs" title="Abrir catÃ¡logo de NPCs" data-i18n-title="title.npcs">
           <span class="npcs-btn-icon" aria-hidden="true"></span><span data-i18n="btn.npcs">NPCS</span>
         </button>
-        <button class="sm" id="btn-training" title="Entrar na Área de Treino da party">
+        <button class="sm" id="btn-training" title="Entrar na Ãrea de Treino da party">
           <img src="assets/ui/training/skill-trainer-all.gif" alt="" class="training-btn-gif">
           <span data-i18n="btn.training">TREINO</span>
         </button>
@@ -518,18 +518,18 @@
         <div class="panel-body" id="skills"></div>
       </div>
 
-      <!-- Analytics permanecem na lateral e acompanham a caça sem abrir o
-           modal global nem cobrir a visão do jogador. -->
+      <!-- Analytics permanecem na lateral e acompanham a caÃ§a sem abrir o
+           modal global nem cobrir a visÃ£o do jogador. -->
       <div class="panel hunt-analytics-panel" data-collapse="analysers">
         <div class="panel-title">
-          <span id="otc-analyser-title">📈 Hunt Session Analyser</span>
+          <span id="otc-analyser-title">ðŸ“ˆ Hunt Session Analyser</span>
           <span class="spacer" style="flex:1"></span>
-          <span class="otc-live-badge" title="Atualização em tempo real"><i></i> LIVE</span>
+          <span class="otc-live-badge" title="AtualizaÃ§Ã£o em tempo real"><i></i> LIVE</span>
           <button type="button" class="otc-dmg-reset otc-session-reset" id="otc-analyser-session-reset"
-            data-otc-session-reset title="Resetar sessão" aria-label="Resetar sessão">↻</button>
+            data-otc-session-reset title="Resetar sessÃ£o" aria-label="Resetar sessÃ£o">â†»</button>
         </div>
         <div class="panel-body otc-analytics-shell">
-          <div id="otc-analysers" class="otc-analyser-tabs" role="tablist" aria-label="Analytics da caçada"></div>
+          <div id="otc-analysers" class="otc-analyser-tabs" role="tablist" aria-label="Analytics da caÃ§ada"></div>
           <div id="otc-analyser-content" class="otc-analyser-result" role="tabpanel" aria-live="polite"></div>
         </div>
       </div>
@@ -539,30 +539,30 @@
   </div>
 </div>
 
-<!-- Dock / menu mobile (visível só com data-ui-mode=mobile) -->
-<nav id="mobile-dock" hidden aria-label="Navegação mobile">
+<!-- Dock / menu mobile (visÃ­vel sÃ³ com data-ui-mode=mobile) -->
+<nav id="mobile-dock" hidden aria-label="NavegaÃ§Ã£o mobile">
   <button type="button" class="sm" data-mobile-tab="game" aria-pressed="true">
-    <span class="dock-ico" aria-hidden="true">⚔</span><span data-i18n="mobile.tab.game">Jogo</span>
+    <span class="dock-ico" aria-hidden="true">âš”</span><span data-i18n="mobile.tab.game">Jogo</span>
   </button>
   <button type="button" class="sm" data-mobile-tab="inv" aria-pressed="false">
-    <span class="dock-ico" aria-hidden="true">🎒</span><span data-i18n="mobile.tab.inv">Itens</span>
+    <span class="dock-ico" aria-hidden="true">ðŸŽ’</span><span data-i18n="mobile.tab.inv">Itens</span>
   </button>
   <button type="button" class="sm" data-mobile-tab="helper" aria-pressed="false">
-    <span class="dock-ico" aria-hidden="true">♥</span><span data-i18n="mobile.tab.helper">Helper</span>
+    <span class="dock-ico" aria-hidden="true">â™¥</span><span data-i18n="mobile.tab.helper">Helper</span>
   </button>
   <button type="button" class="sm" data-mobile-tab="analyse" aria-pressed="false">
-    <span class="dock-ico" aria-hidden="true">📈</span><span data-i18n="mobile.tab.analyse">Stats</span>
+    <span class="dock-ico" aria-hidden="true">ðŸ“ˆ</span><span data-i18n="mobile.tab.analyse">Stats</span>
   </button>
   <button type="button" class="sm" data-mobile-tab="menu" aria-pressed="false">
-    <span class="dock-ico" aria-hidden="true">☰</span><span data-i18n="mobile.tab.menu">Menu</span>
+    <span class="dock-ico" aria-hidden="true">â˜°</span><span data-i18n="mobile.tab.menu">Menu</span>
   </button>
 </nav>
 <div id="mobile-menu-sheet" aria-hidden="true">
   <div class="panel mobile-menu-panel">
     <div class="panel-title">
-      <span data-i18n="mobile.menu.title">Funções</span>
+      <span data-i18n="mobile.menu.title">FunÃ§Ãµes</span>
       <span style="flex:1"></span>
-      <button type="button" class="sm" id="mobile-menu-close">✕</button>
+      <button type="button" class="sm" id="mobile-menu-close">âœ•</button>
     </div>
     <div class="mobile-menu-actions" id="mobile-menu-actions"></div>
   </div>
@@ -573,16 +573,16 @@
 <div id="server-reconnect-banner" class="server-reconnect-banner" hidden>
   <div class="server-reconnect-banner-inner">
     <div class="server-power-badge off" id="server-power-badge" data-i18n="server.off">SERVIDOR OFF</div>
-    <strong id="server-reconnect-title" data-i18n="server.lostTitle">Conexão perdida</strong>
-    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponível. A caçada permanece pausada nesta aba — use Reconnect quando a API voltar.</p>
+    <strong id="server-reconnect-title" data-i18n="server.lostTitle">ConexÃ£o perdida</strong>
+    <p id="server-reconnect-msg" data-i18n="server.lostMsg">Servidor indisponÃ­vel. A caÃ§ada permanece pausada nesta aba â€” use Reconnect quando a API voltar.</p>
     <button class="primary" id="btn-reconnect-banner" type="button" data-i18n="server.reconnect">Reconnect</button>
     <div class="tiny dim mt8" id="server-reconnect-error" hidden></div>
   </div>
 </div>
 <div id="maintenance-countdown" class="maintenance-countdown" hidden>
   <div class="maintenance-countdown-inner panel">
-    <strong data-i18n="maint.title">Manutenção em breve</strong>
-    <p class="small" data-i18n="maint.msg">O servidor será desligado para atualização. Conecte-se novamente após o restart.</p>
+    <strong data-i18n="maint.title">ManutenÃ§Ã£o em breve</strong>
+    <p class="small" data-i18n="maint.msg">O servidor serÃ¡ desligado para atualizaÃ§Ã£o. Conecte-se novamente apÃ³s o restart.</p>
     <div class="maintenance-countdown-num" id="maintenance-countdown-num">30</div>
     <div class="tiny dim" data-i18n="maint.unit">segundos</div>
   </div>
@@ -666,7 +666,7 @@
      GAMEDATA.monsters e apagaria os drops injetados se o patch viesse antes. -->
 <script src="js/patch_imbuement.js?v=imb-mat-sell-v1"></script>
 <script src="js/patch_amazon.js"></script>
-<!-- Conteúdo da Secret Library: precisa vir após monsters.js/patches. -->
+<!-- ConteÃºdo da Secret Library: precisa vir apÃ³s monsters.js/patches. -->
 <script src="js/hardcore-library.js?v=loot-prices-v1"></script>
 <script src="js/hard-hunts.js?v=catacombs-align-v1"></script>
 <script src="js/soulwar.js?v=soulbag-standard-v1"></script>
@@ -714,7 +714,7 @@
 <script src="js/supply-stash.js?v=loot-rules-v1"></script>
 <script src="js/admin.js?v=stamina-15h-v1"></script>
 <script src="js/city-ui.js?v=hunt-mobile-v1"></script>
-<script src="js/guild-ui.js?v=guild-temp-v1"></script>
+<script src="js/guild-ui.js?v=guild-icons-v1"></script>
 <script src="js/preload.js?v=loading-hint-v2"></script>
 <script src="js/game.js?v=bag-own-slots-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>

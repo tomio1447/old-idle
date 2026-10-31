@@ -4848,6 +4848,21 @@ async function main() {
         const r = await guild.guildBuyTempBonus(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/guild/donate-coins") {
+        const body = await readBody(req);
+        const r = await guild.guildDonateCoins(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/rename") {
+        const body = await readBody(req);
+        const r = await guild.guildRename(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/icon") {
+        const body = await readBody(req);
+        const r = await guild.guildSetIcon(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "GET" && url === "/api/guild/log") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const q = new URL(req.url, "http://x").searchParams;

@@ -37,6 +37,20 @@ function guildEsc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+const GUILD_ICON_COUNT_UI = 10;
+function guildIconSrc(n) {
+  const i = Math.max(1, Math.min(GUILD_ICON_COUNT_UI, Math.floor(Number(n) || 1)));
+  return `/imagens/guildicons/${i}.png`;
+}
+function guildIconImg(n, cls) {
+  return `<img class="guild-icon-img${cls ? " " + cls : ""}" src="${guildIconSrc(n)}" alt="" draggable="false" />`;
+}
+function guildIconPickHtml(sel, idAttr) {
+  return `<div class="guild-icon-pick"${idAttr ? ` id="${idAttr}"` : ""}>${
+    Array.from({ length: GUILD_ICON_COUNT_UI }, (_, i) => i + 1).map((n) =>
+      `<button type="button" class="guild-icon-opt${n === sel ? " on" : ""}" data-guild-icon="${n}"
+        title="Ícone ${n}">${guildIconImg(n)}</button>`).join("")}</div>`;
+}
 function guildVocLabel(voc) {
   return (typeof VOCATIONS !== "undefined" && VOCATIONS[voc] && VOCATIONS[voc].name) || voc || "—";
 }
@@ -132,7 +146,7 @@ async function loadGuildList() {
   const myBanner = myGuild ? `<section class="guild-section">
     <div class="hunt-cat-title">Sua guild</div>
     <button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card" data-guild-open="${myGuild.id}">
-      <span class="mobs" aria-hidden="true"><span class="guild-btn-icon guild-card-icon"></span></span>
+      <span class="mobs" aria-hidden="true">${guildIconImg(myGuild.icon, "guild-card-icon")}</span>
       <span class="info">
         <span class="nm">${guildEsc(myGuild.name)} <b>Nv ${myGuild.level}</b></span>
         <span class="meta">${myGuild.members}/${myGuild.slots} vagas · ${myGuild.freeSlots} livres</span>
@@ -145,6 +159,8 @@ async function loadGuildList() {
     <div class="hunt-cat-title">Fundar guild</div>
     <div class="guild-create-box">
       <input id="guild-create-name" maxlength="30" placeholder="Nome da guild" />
+      <div class="tiny dim">Escolha o ícone da guild:</div>
+      ${guildIconPickHtml(GUILD_UI.createIcon || 1, "guild-create-icons")}
       <button class="sm primary" id="guild-create-btn">CRIAR GUILD</button>
       <div class="tiny dim">Requisitos: nível ${typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_MIN_LEVEL : 100}+ e
         ${(typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_COST_GOLD : 100000).toLocaleString("pt-BR")} gold da conta.</div>
@@ -156,7 +172,7 @@ async function loadGuildList() {
     <div class="hunt-cat-title">Guilds ativas (${guilds.length})</div>
     <div class="hunts-group">${guilds.length ? guilds.map((g) => `
       <button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card" data-guild-open="${g.id}">
-        <span class="mobs" aria-hidden="true"><span class="guild-btn-icon guild-card-icon"></span></span>
+        <span class="mobs" aria-hidden="true">${guildIconImg(g.icon, "guild-card-icon")}</span>
         <span class="info">
           <span class="nm">${guildEsc(g.name)} <b>Nv ${g.level}</b></span>
           <span class="meta">${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
@@ -188,12 +204,19 @@ async function loadGuildList() {
       loadGuildModal();
     });
   });
+  $$("#guild-create-icons [data-guild-icon]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      GUILD_UI.createIcon = Number(btn.dataset.guildIcon);
+      $$("#guild-create-icons .guild-icon-opt").forEach((b) =>
+        b.classList.toggle("on", Number(b.dataset.guildIcon) === GUILD_UI.createIcon));
+    });
+  });
   const createBtn = $("#guild-create-btn");
   if (createBtn) createBtn.addEventListener("click", async () => {
     const name = ($("#guild-create-name") || {}).value || "";
     createBtn.disabled = true;
     const r = await guildApi("POST", "/api/guild/create",
-      { char_id: Number(sessionCharId()), name });
+      { char_id: Number(sessionCharId()), name, icon: GUILD_UI.createIcon || 1 });
     createBtn.disabled = false;
     const msg = $("#guild-create-msg");
     const text = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao criar guild.";
@@ -274,32 +297,40 @@ function guildShopHtml(g, shop, isLeader, tempShop, insignias) {
     </div>`;
   }).join("")}</div>`;
 }
-/* GUILD BALANCE — caixa + doação (qualquer membro). */
-function guildBalanceHtml(g, totals) {
-  const t = totals || { donated: 0, spentGold: 0, spentPoints: 0 };
+/* GUILD BALANCE — caixa + doações de gold e Tibia Coins (qualquer
+ * membro). Coins ficam reservados a futuras batalhas PvP. */
+function guildBalanceHtml(g, totals, accountCoins) {
+  const t = totals || { donated: 0, spentGold: 0, spentPoints: 0, coinsDonated: 0, spentCoins: 0 };
   return `<div class="guild-balance-head">
-      <span>Caixa da guild: <b>${guildGoldFmt(g.balance)}</b></span>
+      <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
       <span><b>${Number(g.points) || 0}</b> guild points</span>
+      <span><b>${Number(g.coins) || 0}</b> Tibia Coins</span>
     </div>
     <div class="tiny dim" style="margin:4px 0 8px">
       O caixa é restrito a líderes (até 3) — usado nas compras do GUILD SHOP.
+      Os Tibia Coins da guild ficam reservados para futuras batalhas PvP.
       Doações são irreversíveis.</div>
     <div class="guild-donate-box">
       <input id="guild-donate-amount" type="number" min="1" step="1" placeholder="Quantidade de gold" />
       <button class="sm primary" id="guild-donate-btn">Doar</button>
       <span class="tiny" id="guild-donate-msg"></span>
     </div>
+    <div class="guild-donate-box">
+      <input id="guild-donate-coins-amount" type="number" min="1" step="1" placeholder="Tibia Coins (você tem ${Number(accountCoins) || 0})" />
+      <button class="sm primary" id="guild-donate-coins-btn">Doar TC</button>
+      <span class="tiny" id="guild-donate-coins-msg"></span>
+    </div>
     <div class="guild-balance-stats">
-      <span>Total doado: <b>${guildGoldFmt(t.donated)}</b></span>
-      <span>Total gasto: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b></span>
+      <span>Total doado: <b>${guildGoldFmt(t.donated)}</b> · <b>${Number(t.coinsDonated) || 0} TC</b></span>
+      <span>Total gasto: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> · <b>${Number(t.spentCoins) || 0} TC</b></span>
     </div>`;
 }
 /* HISTÓRICO — contabilidade (só membros). */
 function guildLogHtml(entries, totals) {
   const t = totals || {};
   const sum = `<div class="guild-balance-stats" style="margin-bottom:6px">
-    <span>Doações: <b>${guildGoldFmt(t.donated)}</b> (${Number(t.donations) || 0})</span>
-    <span>Gastos: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> (${Number(t.purchases) || 0})</span>
+    <span>Doações: <b>${guildGoldFmt(t.donated)}</b> · <b>${Number(t.coinsDonated) || 0} TC</b> (${Number(t.donations) || 0})</span>
+    <span>Gastos: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> · <b>${Number(t.spentCoins) || 0} TC</b> (${Number(t.purchases) || 0})</span>
   </div>`;
   const filter = `<select id="guild-log-filter" class="guild-log-filter">
     <option value=""${GUILD_UI.logFilter === "" ? " selected" : ""}>Todas</option>
@@ -310,11 +341,12 @@ function guildLogHtml(entries, totals) {
     const when = e.created_at ? new Date(e.created_at).toLocaleString("pt-BR",
       { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
     const gold = Number(e.gold_delta) || 0, pts = Number(e.points_delta) || 0;
+    const cns = Number(e.coins_delta) || 0;
     return `<div class="guild-log-row ${e.category}">
       <span class="guild-log-when">${when}</span>
       <span class="guild-log-cat">${e.category === "donation" ? "Doação" : "Compra"}</span>
       <span class="guild-log-info"><b>${guildEsc(e.char_name)}</b> ${guildEsc(e.detail)}</span>
-      <span class="guild-log-val">${gold ? (gold > 0 ? "+" : "−") + guildGoldFmt(Math.abs(gold)) : ""}${pts ? ` ${pts > 0 ? "+" : "−"}${Math.abs(pts)} GP` : ""}</span>
+      <span class="guild-log-val">${gold ? (gold > 0 ? "+" : "−") + guildGoldFmt(Math.abs(gold)) : ""}${pts ? ` ${pts > 0 ? "+" : "−"}${Math.abs(pts)} GP` : ""}${cns ? ` ${cns > 0 ? "+" : "−"}${Math.abs(cns)} TC` : ""}</span>
     </div>`;
   }).join("");
   return sum + filter + `<div class="guild-log-list">${rows ||
@@ -393,7 +425,7 @@ async function loadGuildDetail() {
         guilds e recompensas em insígnias PvP.</span>
     </div>`;
   } else if (GUILD_UI.tab === "balance" && isMember) {
-    contentHtml = guildBalanceHtml(g, logTotals);
+    contentHtml = guildBalanceHtml(g, logTotals, data.accountCoins);
   } else if (GUILD_UI.tab === "history" && isMember) {
     contentHtml = `<div class="guild-log-host">
       <div class="tiny dim" style="padding:8px">Carregando histórico…</div></div>`;
@@ -433,17 +465,67 @@ async function loadGuildDetail() {
   const leaveBtn = isMember ? `<button class="sm" id="guild-leave-btn">
       ${myRank === "leader" ? "Sair / passar liderança" : "Sair da guild"}</button>` : "";
 
+  /* GERENCIAMENTO (só líder): troca de ícone 1x/24h + renomear por
+   * Tibia Coins do caixa de coins da guild. */
+  const iconCooldown = Number(data.iconCooldownMs) || 24 * 3600 * 1000;
+  const renameCost = Number(data.renameCostCoins) || 250;
+  const iconWait = (Number(g.iconAt) || 0) + iconCooldown - Date.now();
+  const guildCoins = Number(g.coins) || 0;
+  const manageBox = isLeader ? `<section class="guild-section guild-manage-box">
+    <div class="hunt-cat-title">Gerenciamento</div>
+    <div class="guild-manage-row">
+      <span class="tiny">Ícone:</span>
+      ${iconWait > 0
+        ? `${guildIconImg(g.icon)}<span class="tiny dim">troca liberada em ${guildTimeLeft(Number(g.iconAt) + iconCooldown)}</span>`
+        : guildIconPickHtml(Math.max(1, Number(g.icon) || 1), "guild-manage-icons")}
+    </div>
+    <div class="guild-manage-row">
+      <input id="guild-rename-input" maxlength="30" placeholder="Novo nome da guild" />
+      <button class="sm" id="guild-rename-btn"${guildCoins >= renameCost ? "" : " disabled"}>Renomear (${renameCost} TC)</button>
+      <span class="tiny" id="guild-rename-msg"></span>
+    </div>
+    <div class="tiny dim">Renomear usa ${renameCost} Tibia Coins do caixa de coins da guild
+      (atual: <b>${guildCoins}</b>) — membros doam na aba GUILD BALANCE.</div>
+  </section>` : "";
+
   root.innerHTML = `<section class="guild-section guild-head">
-      <div class="hunt-cat-title">${guildEsc(g.name)} — Nível ${g.level}</div>
-      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP${isMember ? ` · <b>${Number(g.points) || 0} GP</b>` : ""}</div>
+      <div class="hunt-cat-title">${guildIconImg(g.icon)} ${guildEsc(g.name)} — Nível ${g.level}</div>
+      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP${isMember ? ` · <b>${Number(g.points) || 0} GP</b> · <b>${guildCoins} TC</b>` : ""}</div>
       ${guildExpBarHtml(g)}
     </section>
+    ${manageBox}
     <div class="guild-tabs">${tabs.map((tab) =>
       `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}"
         data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
     ${contentHtml}
     ${inviteBox}${leaveBtn}`;
 
+  $$("#guild-manage-icons [data-guild-icon]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const icon = Number(btn.dataset.guildIcon);
+      if (icon === Number(g.icon)) return;
+      btn.disabled = true;
+      const r = await guildApi("POST", "/api/guild/icon",
+        { char_id: Number(sessionCharId()), icon });
+      btn.disabled = false;
+      if (r && r.data) guildToast(r.data.msg);
+      loadGuildDetail();
+    });
+  });
+  const renameBtn = $("#guild-rename-btn");
+  if (renameBtn) renameBtn.addEventListener("click", async () => {
+    const name = (($("#guild-rename-input") || {}).value || "").trim();
+    if (!name) return;
+    if (typeof confirm === "function" &&
+      !confirm(`Renomear a guild para "${name}" por ${renameCost} Tibia Coins do caixa?`)) return;
+    renameBtn.disabled = true;
+    const r = await guildApi("POST", "/api/guild/rename",
+      { char_id: Number(sessionCharId()), name });
+    renameBtn.disabled = false;
+    const msg = $("#guild-rename-msg");
+    if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao renomear.";
+    if (r && r.data && r.data.ok) loadGuildDetail();
+  });
   $$("#guild-modal-list [data-guild-tab]").forEach((btn) => {
     btn.addEventListener("click", () => { GUILD_UI.tab = btn.dataset.guildTab; loadGuildDetail(); });
   });
@@ -500,6 +582,17 @@ async function loadGuildDetail() {
       { char_id: Number(sessionCharId()), amount });
     donateBtn.disabled = false;
     const msg = $("#guild-donate-msg");
+    if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao doar.";
+    if (r && r.data && r.data.ok) loadGuildDetail();
+  });
+  const donateCoinsBtn = $("#guild-donate-coins-btn");
+  if (donateCoinsBtn) donateCoinsBtn.addEventListener("click", async () => {
+    const amount = Math.max(0, Math.floor(Number((($("#guild-donate-coins-amount") || {}).value) || 0)));
+    donateCoinsBtn.disabled = true;
+    const r = await guildApi("POST", "/api/guild/donate-coins",
+      { char_id: Number(sessionCharId()), amount });
+    donateCoinsBtn.disabled = false;
+    const msg = $("#guild-donate-coins-msg");
     if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao doar.";
     if (r && r.data && r.data.ok) loadGuildDetail();
   });
