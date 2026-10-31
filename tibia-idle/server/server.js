@@ -4873,6 +4873,21 @@ async function main() {
         const r = await guild.guildBuyTempBonus(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/guild/request-join") {
+        const body = await readBody(req);
+        const r = await guild.guildRequestJoin(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/request-cancel") {
+        const body = await readBody(req);
+        const r = await guild.guildRequestCancel(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/request-respond") {
+        const body = await readBody(req);
+        const r = await guild.guildRequestRespond(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/guild/donate-coins") {
         const body = await readBody(req);
         const r = await guild.guildDonateCoins(db, body);

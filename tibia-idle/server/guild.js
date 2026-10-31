@@ -288,13 +288,18 @@ async function guildDetail(db, token, guildId, charId) {
   }
   const pub = guildPublic(guild, members.length);
   /* Caixa, bônus temporários e contabilidade são restritos a membros. */
+  let requests = [], myRequest = false;
   if (myRank) {
     pub.balance = Math.max(0, Number(guild.balance) || 0);
     pub.coins = Math.max(0, Number(guild.coins) || 0);
     pub.tempBonuses = guildTempBonusUntil(guild.temp_bonuses);
+    if (CAN_INVITE.has(myRank) && typeof db.guildRequests === "function")
+      requests = await db.guildRequests(guild.id);
+  } else if (typeof db.guildRequestByAccount === "function") {
+    myRequest = !!(await db.guildRequestByAccount(auth.account.id, guild.id));
   }
   return { code: 200, body: { ok: true,
-    guild: pub, myRank, members, tasks, logTotals,
+    guild: pub, myRank, members, tasks, logTotals, requests, myRequest,
     shop: guildShopDefs(), tempShop: guildTempShopDefs(),
     insignias: myRank ? Math.max(0, Number(auth.account.pvp_insignias) || 0) : 0,
     accountCoins: myRank ? Math.max(0, Number(auth.account.coins) || 0) : 0,
@@ -391,10 +396,82 @@ async function guildInviteReply(db, body, accept) {
       msg: "Guild sem vagas no momento." } };
   await db.guildMemberAdd(guild.id, auth.account.id, invitee.id, "member");
   await db.guildInviteSetStatus(invite.id, "accepted");
+  if (typeof db.guildRequestsClearAccount === "function")
+    await db.guildRequestsClearAccount(auth.account.id);
   /* bônus ativos da guild passam a valer nos chars da conta que entrou */
   if (typeof db.guildApplyBonuses === "function")
     try { await db.guildApplyBonuses(guild.id); } catch (e) {}
   return { code: 200, body: { ok: true, msg: `Você entrou na guild ${guild.name}!` } };
+}
+
+/* POST /api/guild/request-join — conta sem guild pede entrada. Uma
+ * pendente por guild; aceita pelo líder/vice no painel da guild. */
+async function guildRequestJoin(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  if (await db.guildMemberByAccount(auth.account.id))
+    return { code: 409, body: { ok: false, error: "GUILD_ALREADY_MEMBER",
+      msg: "Sua conta já está em uma guild." } };
+  const guild = await db.guildById(Number(body.guild_id));
+  if (!guild) return { code: 404, body: { ok: false, msg: "Guild não encontrada." } };
+  const members = await db.guildMembers(guild.id);
+  if (members.length >= guildSlotsForLevel(guildLevelForExp(guild.exp)))
+    return { code: 409, body: { ok: false, error: "GUILD_FULL",
+      msg: "Guild sem vagas no momento." } };
+  const r = await db.guildRequestAdd(guild.id, auth.account.id, auth.char.id);
+  if (!r || !r.ok)
+    return { code: 409, body: { ok: false, error: r && r.error,
+      msg: r && r.error === "REQUEST_PENDING"
+        ? "Solicitação já enviada — aguarde um líder decidir."
+        : "Não foi possível solicitar." } };
+  return { code: 200, body: { ok: true,
+    msg: `Solicitação enviada para ${guild.name}!` } };
+}
+
+/* POST /api/guild/request-cancel — cancela a própria solicitação. */
+async function guildRequestCancel(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const req = await db.guildRequestByAccount(auth.account.id, Number(body.guild_id));
+  if (!req) return { code: 404, body: { ok: false, msg: "Nenhuma solicitação pendente." } };
+  await db.guildRequestDelete(req.id);
+  return { code: 200, body: { ok: true, msg: "Solicitação cancelada." } };
+}
+
+/* POST /api/guild/request-respond — líder/vice aceita ou recusa uma
+ * solicitação. Ao aceitar, a conta entra como membro comum e as demais
+ * solicitações dela são limpas. */
+async function guildRequestRespond(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member || !CAN_INVITE.has(rankOf(member)))
+    return { code: 403, body: { ok: false, msg: "Sem permissão." } };
+  const req = await db.guildRequestFind(Number(body.request_id));
+  if (!req || Number(req.guild_id) !== Number(member.guild_id))
+    return { code: 404, body: { ok: false, msg: "Solicitação não encontrada." } };
+  if (!body.accept) {
+    await db.guildRequestDelete(req.id);
+    return { code: 200, body: { ok: true, msg: "Solicitação recusada." } };
+  }
+  if (await db.guildMemberByAccount(req.account_id)) {
+    await db.guildRequestDelete(req.id);
+    return { code: 409, body: { ok: false, error: "GUILD_ALREADY_MEMBER",
+      msg: "Essa conta já entrou em uma guild." } };
+  }
+  const guild = await db.guildById(member.guild_id);
+  const members = await db.guildMembers(member.guild_id);
+  if (members.length >= guildSlotsForLevel(guildLevelForExp(guild.exp)))
+    return { code: 409, body: { ok: false, error: "GUILD_FULL",
+      msg: "Guild sem vagas no momento." } };
+  await db.guildMemberAdd(member.guild_id, req.account_id, req.character_id, "member");
+  if (typeof db.guildRequestsClearAccount === "function")
+    await db.guildRequestsClearAccount(req.account_id);
+  else await db.guildRequestDelete(req.id);
+  if (typeof db.guildApplyBonuses === "function")
+    try { await db.guildApplyBonuses(member.guild_id); } catch (e) {}
+  return { code: 200, body: { ok: true,
+    msg: `${guild ? guild.name : "Guild"}: novo membro aceito!` } };
 }
 
 /* POST /api/guild/leave — líder sai: vice assume; sem vice, o membro mais
@@ -694,6 +771,7 @@ module.exports = {
   guildAccept: (db, body) => guildInviteReply(db, body, true),
   guildDecline: (db, body) => guildInviteReply(db, body, false),
   guildLeave, guildKick, guildPromote, guildDemote,
+  guildRequestJoin, guildRequestCancel, guildRequestRespond,
   guildDonate, guildBuyBonus, guildBuyTempBonus, guildLog,
   guildDonateCoins, guildRename, guildSetIcon,
 };

@@ -465,6 +465,35 @@ async function loadGuildDetail() {
   const leaveBtn = isMember ? `<button class="sm" id="guild-leave-btn">
       ${myRank === "leader" ? "Sair / passar liderança" : "Sair da guild"}</button>` : "";
 
+  /* SOLICITAÇÕES DE ENTRADA — líder/vice veem o botão; pisca verde↔vermelho
+   * enquanto houver pedido pendente. */
+  const reqs = data.requests || [];
+  const requestsBox = canManage ? `<section class="guild-section">
+    <button type="button" class="sm guild-req-toggle${reqs.length ? " has-pending" : ""}"
+      id="guild-req-toggle">SOLICITAÇÕES${reqs.length ? ` (${reqs.length})` : ""}</button>
+    <div class="guild-req-list" id="guild-req-list" style="display:none">
+      ${reqs.map((r) => `<div class="guild-req-row">
+        <span class="guild-member-name">${guildEsc(r.name)}</span>
+        <span class="tiny dim">${guildVocLabel(r.voc)} · Nv ${r.level}</span>
+        <span class="guild-invite-actions">
+          <button class="sm primary" data-guild-req-accept="${r.id}">Aceitar</button>
+          <button class="sm" data-guild-req-decline="${r.id}">Recusar</button>
+        </span>
+      </div>`).join("") || `<div class="tiny dim" style="padding:6px 0">Sem solicitações pendentes.</div>`}
+    </div>
+  </section>` : "";
+
+  /* Não-membro: botão para pedir entrada (ou cancelar o pedido). */
+  const joinBox = !isMember ? `<div class="guild-join-box">
+      ${data.myRequest
+        ? `<button class="sm" id="guild-req-cancel">Cancelar solicitação</button>
+           <span class="tiny dim">Aguardando um líder decidir.</span>`
+        : (Number(g.freeSlots) || 0) > 0
+          ? `<button class="sm primary" id="guild-req-join">Solicitar entrada na guild</button>`
+          : `<span class="tiny dim">Guild sem vagas no momento.</span>`}
+      <span class="tiny" id="guild-req-msg"></span>
+    </div>` : "";
+
   /* GERENCIAMENTO (só líder): troca de ícone 1x/24h + renomear por
    * Tibia Coins do caixa de coins da guild. */
   const iconCooldown = Number(data.iconCooldownMs) || 24 * 3600 * 1000;
@@ -488,16 +517,18 @@ async function loadGuildDetail() {
       (atual: <b>${guildCoins}</b>) — membros doam na aba GUILD BALANCE.</div>
   </section>` : "";
 
-  root.innerHTML = `<section class="guild-section guild-head">
+  root.innerHTML = `<div class="guild-tabs">${tabs.map((tab) =>
+      `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}"
+        data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
+    <section class="guild-section guild-head">
       <div class="hunt-cat-title">${guildIconImg(g.icon)} ${guildEsc(g.name)} — Nível ${g.level}</div>
       <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP${isMember ? ` · <b>${Number(g.points) || 0} GP</b> · <b>${guildCoins} TC</b>` : ""}</div>
       ${guildExpBarHtml(g)}
     </section>
     ${manageBox}
-    <div class="guild-tabs">${tabs.map((tab) =>
-      `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}"
-        data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
+    ${requestsBox}
     ${contentHtml}
+    ${joinBox}
     ${inviteBox}${leaveBtn}`;
 
   $$("#guild-manage-icons [data-guild-icon]").forEach((btn) => {
@@ -525,6 +556,46 @@ async function loadGuildDetail() {
     const msg = $("#guild-rename-msg");
     if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao renomear.";
     if (r && r.data && r.data.ok) loadGuildDetail();
+  });
+  const reqToggle = $("#guild-req-toggle");
+  if (reqToggle) reqToggle.addEventListener("click", () => {
+    const list = $("#guild-req-list");
+    if (list) list.style.display = list.style.display === "none" ? "" : "none";
+  });
+  $$("#guild-modal-list [data-guild-req-accept]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const r = await guildApi("POST", "/api/guild/request-respond",
+        { char_id: Number(sessionCharId()), request_id: Number(btn.dataset.guildReqAccept), accept: true });
+      if (r && r.data) guildToast(r.data.msg);
+      loadGuildDetail();
+    });
+  });
+  $$("#guild-modal-list [data-guild-req-decline]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      await guildApi("POST", "/api/guild/request-respond",
+        { char_id: Number(sessionCharId()), request_id: Number(btn.dataset.guildReqDecline), accept: false });
+      loadGuildDetail();
+    });
+  });
+  const reqJoin = $("#guild-req-join");
+  if (reqJoin) reqJoin.addEventListener("click", async () => {
+    reqJoin.disabled = true;
+    const r = await guildApi("POST", "/api/guild/request-join",
+      { char_id: Number(sessionCharId()), guild_id: Number(GUILD_UI.guildId) });
+    reqJoin.disabled = false;
+    const msg = $("#guild-req-msg");
+    if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro.";
+    if (r && r.data && r.data.ok) loadGuildDetail();
+  });
+  const reqCancel = $("#guild-req-cancel");
+  if (reqCancel) reqCancel.addEventListener("click", async () => {
+    reqCancel.disabled = true;
+    const r = await guildApi("POST", "/api/guild/request-cancel",
+      { char_id: Number(sessionCharId()), guild_id: Number(GUILD_UI.guildId) });
+    if (r && r.data) guildToast(r.data.msg);
+    loadGuildDetail();
   });
   $$("#guild-modal-list [data-guild-tab]").forEach((btn) => {
     btn.addEventListener("click", () => { GUILD_UI.tab = btn.dataset.guildTab; loadGuildDetail(); });

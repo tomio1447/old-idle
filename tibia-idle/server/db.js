@@ -101,6 +101,7 @@ function JsonStore() {
   this.guildInvites = Array.isArray(guildData && guildData.invites) ? guildData.invites : [];
   this.guildTasks = Array.isArray(guildData && guildData.tasks) ? guildData.tasks : [];
   this.guildLog = Array.isArray(guildData && guildData.log) ? guildData.log : [];
+  this.guildRequests = Array.isArray(guildData && guildData.requests) ? guildData.requests : [];
   // market (ofertas + stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
@@ -1596,7 +1597,7 @@ JsonStore.prototype._guildSave = function () {
       JSON.stringify({
         guilds: this.guilds || [], members: this.guildMembers || [],
         invites: this.guildInvites || [], tasks: this.guildTasks || [],
-        log: this.guildLog || [],
+        log: this.guildLog || [], requests: this.guildRequests || [],
       }, null, 1));
   } catch (e) { /* não bloqueia o jogo */ }
 };
@@ -1973,6 +1974,43 @@ JsonStore.prototype.guildSetIcon = function (guildId, icon, now, logEntry) {
   guild.icon = Math.max(1, Math.floor(Number(icon) || 1));
   guild.icon_at = Number(now) || Date.now();
   if (logEntry) this.guildLogAdd(null, { ...logEntry, guild_id: guildId });
+  this._guildSave();
+};
+/* Solicitações de entrada (jogador → guild) — espelha o MySQL. */
+JsonStore.prototype.guildRequestAdd = function (guildId, accountId, characterId) {
+  this.guildRequests = this.guildRequests || [];
+  if (this.guildRequests.find((r) => Number(r.guild_id) === Number(guildId) &&
+    Number(r.account_id) === Number(accountId))) return { ok: false, error: "REQUEST_PENDING" };
+  const id = this.guildRequests.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) + 1;
+  this.guildRequests.push({ id, guild_id: Number(guildId), account_id: Number(accountId),
+    character_id: Number(characterId), created_at: new Date().toISOString() });
+  this._guildSave();
+  return { ok: true };
+};
+JsonStore.prototype.guildRequestFind = function (id) {
+  return (this.guildRequests || []).find((r) => Number(r.id) === Number(id)) || null;
+};
+JsonStore.prototype.guildRequestByAccount = function (accountId, guildId) {
+  return (this.guildRequests || []).find((r) => Number(r.account_id) === Number(accountId) &&
+    Number(r.guild_id) === Number(guildId)) || null;
+};
+JsonStore.prototype.guildRequests = function (guildId) {
+  return (this.guildRequests || [])
+    .filter((r) => Number(r.guild_id) === Number(guildId))
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    .map((r) => {
+      const c = (this.characters || []).find((x) => Number(x.id) === Number(r.character_id)) || {};
+      return { id: r.id, account_id: r.account_id, character_id: r.character_id,
+        created_at: r.created_at, name: c.name, voc: c.voc, level: c.level };
+    });
+};
+JsonStore.prototype.guildRequestDelete = function (id) {
+  this.guildRequests = (this.guildRequests || []).filter((r) => Number(r.id) !== Number(id));
+  this._guildSave();
+};
+JsonStore.prototype.guildRequestsClearAccount = function (accountId) {
+  this.guildRequests = (this.guildRequests || []).filter((r) =>
+    Number(r.account_id) !== Number(accountId));
   this._guildSave();
 };
 
@@ -3650,6 +3688,43 @@ async function MysqlStore() {
       } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
       finally { conn.release(); }
     },
+    /* Solicitações de entrada (jogador → guild). Uma pendente por guild/
+     * conta; ao entrar em qualquer guild as demais são limpas. */
+    async guildRequestAdd(guildId, accountId, characterId) {
+      try {
+        await this.run(
+          "INSERT INTO guild_requests (guild_id,account_id,character_id) VALUES (?,?,?)",
+          [Number(guildId), Number(accountId), Number(characterId)]);
+        return { ok: true };
+      } catch (e) {
+        if (String(e && e.code) === "ER_DUP_ENTRY") return { ok: false, error: "REQUEST_PENDING" };
+        throw e;
+      }
+    },
+    async guildRequestFind(id) {
+      const rows = await this.query("SELECT * FROM guild_requests WHERE id=?", [Number(id)]);
+      return rows[0] || null;
+    },
+    async guildRequestByAccount(accountId, guildId) {
+      const rows = await this.query(
+        "SELECT * FROM guild_requests WHERE account_id=? AND guild_id=?",
+        [Number(accountId), Number(guildId)]);
+      return rows[0] || null;
+    },
+    async guildRequests(guildId) {
+      const rows = await this.query(
+        `SELECT r.id, r.account_id, r.character_id, r.created_at,
+           c.name, c.voc, c.level
+         FROM guild_requests r JOIN characters c ON c.id=r.character_id
+         WHERE r.guild_id=? ORDER BY r.created_at ASC`, [Number(guildId)]);
+      return rows;
+    },
+    async guildRequestDelete(id) {
+      await this.run("DELETE FROM guild_requests WHERE id=?", [Number(id)]);
+    },
+    async guildRequestsClearAccount(accountId) {
+      await this.run("DELETE FROM guild_requests WHERE account_id=?", [Number(accountId)]);
+    },
     /* Propaga data.guildBonus da guild para todos os chars das contas
      * membro (usado ao entrar membro e após compra de bônus). */
     async guildApplyBonuses(guildId) {
@@ -4120,6 +4195,15 @@ async function ensureSchema(pool) {
     completed_at TIMESTAMP NULL DEFAULT NULL,
     UNIQUE KEY uq_gtask (guild_id, account_id, day, slot),
     INDEX idx_gtask_member (account_id, day)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS guild_requests (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    guild_id INT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
+    character_id INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_greq (guild_id, account_id),
+    INDEX idx_greq_account (account_id)
   ) ENGINE=InnoDB`);
   // GUILD POINTS + caixa + bônus comprados (níveis por chave)
   for (const col of [
