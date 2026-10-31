@@ -1686,6 +1686,12 @@ function playerMitigationPct(p) {
     // arma cobre a defesa quando não há escudo — two-handed vale menos
     defEquip = (weapon.def || 0) * (duasMaos ? 0.6 : 1);
   }
+  // Weapon Proficiency: perk Defence/Weapon Shield Mod soma na defesa do
+  // equipamento que alimenta a mitigation.
+  if (typeof proficiencyTotals === "function") {
+    const pr = proficiencyTotals(p);
+    defEquip += (pr.defense || 0) + (pr.weaponDef || 0);
+  }
   // shielding: usa playerDefense quando o personagem está completo (tem
   // skills); senão cai no valor cru da skill para players parciais.
   let sh = 0;
@@ -1769,6 +1775,10 @@ function playerPiercePct(p, element) {
     const it = GAMEDATA.items[e.item];
     if (!it || !it.pierce) continue;
     total += Number(it.pierce[element]) || 0;
+  }
+  // Weapon Proficiency: perk Elemental Pierce da arma empunhada
+  if (typeof proficiencyTotals === "function") {
+    total += proficiencyTotals(p).pierce[element] || 0;
   }
   return total;
 }
@@ -1915,6 +1925,15 @@ function playerAttack(c, p, target) {
         : Math.round(pointDistance(c.player, target) / 0.085);
       if (sqm === src.shotRange) perfeito = src.shotDmg;
     }
+    // Proficiency: perk Perfect Shot da arma (dano fixo na distância exata)
+    if (!perfeito && typeof proficiencyTotals === "function") {
+      const sqm = (typeof sqmDistance === "function" && c.player.cx !== undefined
+                   && target.cx !== undefined)
+        ? sqmDistance(c.player, target)
+        : Math.round(pointDistance(c.player, target) / 0.085);
+      const prf = proficiencyTotals(p).perfectShot;
+      for (const ps of prf) if (sqm === ps.range) perfeito = ps.dmg;
+    }
   }
 
   // Rolagem de acerto da distancia, com a tabela real do weapons.cpp: a
@@ -1938,9 +1957,13 @@ function playerAttack(c, p, target) {
     // testes antigos, que so usam coordenada de tela); arredondar para cima
     // com minimo 1 mantem esse caminho valendo em vez de virar distancia 0.
     const sqm = Math.max(1, Math.ceil(sqmDist(c.player || pos, target)));
-    const chance = (typeof hitChanceDistance === "function")
+    let chance = (typeof hitChanceDistance === "function")
       ? hitChanceDistance(effSkill(p, "dist"), sqm, maxHit)
       : 90;
+    // Proficiency: perk ranged hit chance soma à chance de acerto
+    if (typeof proficiencyTotals === "function") {
+      chance += proficiencyTotals(p).hitChance || 0;
+    }
     if (chance < Math.floor(Math.random() * 100) + 1) {
       errou = true;
       // desvia para uma casa vizinha, como o destList do servidor
@@ -1957,15 +1980,20 @@ function playerAttack(c, p, target) {
   }
 
   const element = ammo && ammo.el ? ammo.el : d.element;
+  // Weapon Proficiency: totais dos perks ativos da arma empunhada.
+  const prof = (typeof proficiencyTotals === "function") ? proficiencyTotals(p) : null;
   const rollDamage = (alvoPrincipal) => {
     let v = d.min + Math.random() * (d.max - d.min);
     // Agony é true damage: a Armor do alvo não reduz (TibiaWiki).
     if (!isMagic && element !== "agony") {
+      // Proficiency: armor penetration ignora X% da armor do alvo
+      const armor = (prof && prof.armorPen > 0)
+        ? target.def.armor * (1 - Math.min(1, prof.armorPen)) : target.def.armor;
       // Mitigation dos MONSTROS foi aumentada no 15.25 ("Mitigation foi
       // ajustada... Mitigation dos monstros foi aumentada"): o redutor de
       // armadura sobe de 30-70% para 45-95% e o teto de 55% para 62%.
       const red = Math.min(v * 0.62,
-                           target.def.armor * (0.45 + Math.random() * 0.5));
+                           armor * (0.45 + Math.random() * 0.5));
       v -= red;
     }
     // charm da Cyclopedia aumenta o golpe antes da resistencia — mas desde
@@ -2012,6 +2040,29 @@ function playerAttack(c, p, target) {
     const mul = bosstiaryDamageBonus(p);
     if (mul !== 1) raw = Math.max(1, Math.floor(raw * mul));
   }
+  // ---- Weapon Proficiency: multiplicadores condicionais do golpe
+  //   alpha  : +X% contra alvos com >= 95% HP
+  //   omega  : +X% contra alvos com <= 30% HP
+  //   bossDmg: +X% contra bosses E influenced/fiendish (Sinister Embraced)
+  //   bestiary: +X% contra a classe de bestiario especifica
+  if (prof && raw > 0) {
+    const maxHpT = target.maxHp || (target.def && target.def.hp) || 0;
+    const hpT = target.hp != null ? target.hp : maxHpT;
+    if (prof.alpha > 0 && maxHpT > 0 && hpT >= maxHpT * 0.95) {
+      raw = Math.max(1, Math.floor(raw * (1 + prof.alpha)));
+    }
+    if (prof.omega > 0 && maxHpT > 0 && hpT <= maxHpT * 0.30) {
+      raw = Math.max(1, Math.floor(raw * (1 + prof.omega)));
+    }
+    if (prof.bossDmg > 0 &&
+        ((target.def && target.def.boss) || target.influenced || target.fiendish)) {
+      raw = Math.max(1, Math.floor(raw * (1 + prof.bossDmg / 100)));
+    }
+    const classe = target.def && target.def.best && target.def.best.classe;
+    if (classe && prof.bestiary[classe]) {
+      raw = Math.max(1, Math.floor(raw * (1 + prof.bestiary[classe] / 100)));
+    }
+  }
   if (typeof spiteIncomingDamageMultiplier === "function") {
     const spiteMul = spiteIncomingDamageMultiplier(c, target);
     if (spiteMul !== 1 && raw > 0) raw = Math.max(1, Math.floor(raw * spiteMul));
@@ -2048,7 +2099,7 @@ function playerAttack(c, p, target) {
   let critou = false;
   let fatalou = false;
   let extraPct = 0;
-  const critRoll = typeof rollPlayerCrit === "function" ? rollPlayerCrit(p) : { crit: false, extraPct: 0 };
+  const critRoll = typeof rollPlayerCrit === "function" ? rollPlayerCrit(p, "auto") : { crit: false, extraPct: 0 };
   if (critRoll.crit) {
     extraPct += critRoll.extraPct;
     critou = true;
@@ -2116,6 +2167,41 @@ function playerAttack(c, p, target) {
       const max = maxStats(p);
       const mana = Math.max(1, Math.floor(raw * wl.manaLeech / 100));
       p.mp = Math.min(max.mp, p.mp + mana);
+    }
+  }
+  // Weapon Proficiency: skill% como dano flat, leech e ganhos por hit.
+  // Mesma mecanica do servidor: bonus = skillLevel * percentual.
+  if (prof) {
+    for (const sk in prof.skillPctAuto) {
+      const lvl = (sk === "magic")
+        ? ((typeof effMagic === "function") ? effMagic(p) : (p.ml || 0))
+        : ((typeof effSkill === "function") ? effSkill(p, sk)
+           : (p.skills ? p.skills[sk] || 0 : 0));
+      raw += Math.ceil(lvl * prof.skillPctAuto[sk]);
+    }
+    if (prof.lifeLeech || prof.manaLeech || prof.lifeOnHit || prof.manaOnHit) {
+      const max = maxStats(p);
+      if (prof.lifeLeech) {
+        p.hp = Math.min(max.hp, p.hp + Math.max(1, Math.floor(raw * prof.lifeLeech / 100)));
+      }
+      if (prof.manaLeech) {
+        p.mp = Math.min(max.mp, p.mp + Math.max(1, Math.floor(raw * prof.manaLeech / 100)));
+      }
+      if (prof.lifeOnHit) p.hp = Math.min(max.hp, p.hp + prof.lifeOnHit);
+      if (prof.manaOnHit) p.mp = Math.min(max.mp, p.mp + prof.manaOnHit);
+    }
+    // Homing Missile (perk 32): chance de míssil elemental =
+    // multiplicador * level do jogador, como no player.cpp.
+    for (const pr of prof.procs) {
+      if (pr.prob > 0 && pr.mult > 0 && Math.random() < pr.prob) {
+        const mDmg = Math.max(1, Math.floor(pr.mult * (p.level || 1)));
+        const mFinal = Math.max(1, applyMonsterMitigation(target, pr.el,
+          applyResist(target, pr.el, mDmg, playerPiercePct(p, pr.el))));
+        target.hp -= mFinal;
+        c.stats.damage += mFinal;
+        c.events.push({ t: "hit", dmg: mFinal, x: target.x, y: target.y,
+                        targetId: target.id, el: pr.el, fx: pr.el });
+      }
     }
   }
 
@@ -2692,7 +2778,7 @@ function castSpellById(c, p, target, now, id) {
     }
   }
   if (!castCrit && typeof rollPlayerCrit === "function") {
-    const critSpell = rollPlayerCrit(p);
+    const critSpell = rollPlayerCrit(p, "spell", elemento);
     if (critSpell.crit) {
       castExtraPct += critSpell.extraPct;
       castCrit = true;
@@ -2719,6 +2805,20 @@ function castSpellById(c, p, target, now, id) {
         Math.random() * 100 < wbCast.critChance) {
       castCrit = true;
       castExtraPct += (wbCast.critDamage || 0);
+    }
+  }
+
+  // Weapon Proficiency: skill% como dano flat nas spells — uma vez por
+  // cast, somado DEPOIS de todas as reduções, como no combat.cpp.
+  let profSpellFlat = 0;
+  if (typeof proficiencyTotals === "function" && s && s.type === "attack") {
+    const prt = proficiencyTotals(p);
+    for (const sk in prt.skillPctSpell) {
+      const lvl = (sk === "magic")
+        ? ((typeof effMagic === "function") ? effMagic(p) : (p.ml || 0))
+        : ((typeof effSkill === "function") ? effSkill(p, sk)
+           : (p.skills ? p.skills[sk] || 0 : 0));
+      profSpellFlat += Math.ceil(lvl * prt.skillPctSpell[sk]);
     }
   }
 
@@ -2800,11 +2900,11 @@ function castSpellById(c, p, target, now, id) {
         applyMonsterMitigation(t, armaEl.el,
           applyResist(t, armaEl.el, applyCharmDamage(p, armaEl.el, ele),
                       playerPiercePct(p, armaEl.el)))), c);
-      t.hp -= fisFinal + eleFinal;
-      c.stats.damage += fisFinal + eleFinal;
+      t.hp -= fisFinal + eleFinal + profSpellFlat;
+      c.stats.damage += fisFinal + eleFinal + profSpellFlat;
       // Augments de life/mana leech (TibiaWiki): leech extra da spell.
       if (aug && (aug.lifeLeech > 0 || aug.manaLeech > 0)) {
-        augmentApplyLeech(c, p, aug, fisFinal + eleFinal);
+        augmentApplyLeech(c, p, aug, fisFinal + eleFinal + profSpellFlat);
       }
       if (s.cond && typeof applyCondition === "function") {
         applyCondition(t, s.cond.tipo, s.cond.dano, s.cond.golpes);
@@ -2842,6 +2942,7 @@ function castSpellById(c, p, target, now, id) {
     }
     dmg = shareKnightArea ? dmg : unwelcomeAbsorbDeath(t, elemento,
       applyMonsterMitigation(t, elemento, applyResist(t, elemento, dmg, playerPiercePct(p, elemento))), c);
+    dmg += profSpellFlat;
     t.hp -= dmg;
     c.stats.damage += dmg;
     // Augments de life/mana leech (TibiaWiki): leech extra da spell.
@@ -3008,7 +3109,7 @@ function tryUseRune(c, p, target, now, forcada) {
     ? forgeTranscendenceDamagePct(p, now) : 0;
   // Crit/Fatal da runa: um roll por uso — em área vale para todos os alvos.
   const rolledRuneCrit = (typeof rollPlayerCrit === "function")
-    ? rollPlayerCrit(p) : { crit: false, extraPct: 0 };
+    ? rollPlayerCrit(p, "rune", s.el) : { crit: false, extraPct: 0 };
   let runeCastExtra = 0;
   let runeCastCrit = false;
   let runeCastFatal = false;
@@ -3126,7 +3227,11 @@ function tryUseRune(c, p, target, now, forcada) {
  */
 function playerCritChancePct(p) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
-  const base = 5 + ((imb && imb.critChance) ? imb.critChance : 0);
+  let base = 5 + ((imb && imb.critChance) ? imb.critChance : 0);
+  // Weapon Proficiency: chance de crítico genérica da arma empunhada
+  if (typeof proficiencyTotals === "function") {
+    base += proficiencyTotals(p).crit.chance || 0;
+  }
   return base + (typeof vipCritBonus === "function" ? vipCritBonus() * 100 : 0);
 }
 
@@ -3134,14 +3239,34 @@ function playerCritExtraPct(p) {
   const imb = typeof imbTotals === "function" ? imbTotals(p) : null;
   let extra = 10 + ((imb && imb.crit) ? imb.crit : 0);
   if (typeof wheelTotals === "function" && p && p.wheel) extra += wheelTotals(p).critDamage || 0;
+  if (typeof proficiencyTotals === "function") {
+    extra += proficiencyTotals(p).crit.dmg || 0;
+  }
   return extra;
 }
 
-/* Rola o crítico do golpe: { crit, extraPct }. */
-function rollPlayerCrit(p) {
-  const chance = playerCritChancePct(p);
+/* Rola o crítico do golpe: { crit, extraPct }.
+ * kind: "auto" | "spell" | "rune" — soma os perks específicos do contexto
+ * (auto-attack, runas ofensivas e crítico por elemento). */
+function rollPlayerCrit(p, kind, element) {
+  let chance = playerCritChancePct(p);
+  let extra = playerCritExtraPct(p);
+  if (typeof proficiencyTotals === "function") {
+    const pr = proficiencyTotals(p);
+    if (kind === "auto") {
+      chance += pr.critAuto.chance || 0;
+      extra += pr.critAuto.dmg || 0;
+    } else if (kind === "rune") {
+      chance += pr.critRune.chance || 0;
+      extra += pr.critRune.dmg || 0;
+    }
+    if ((kind === "spell" || kind === "rune") && element) {
+      chance += pr.critEl.chance[element] || 0;
+      extra += pr.critEl.dmg[element] || 0;
+    }
+  }
   if (chance <= 0 || Math.random() * 100 >= chance) return { crit: false, extraPct: 0 };
-  return { crit: true, extraPct: playerCritExtraPct(p) };
+  return { crit: true, extraPct: extra };
 }
 
 /* O critical heal é exclusivo do Druid (Blessing of the Grove). O toggle
@@ -3223,6 +3348,18 @@ function tryHeal(c, p, now) {
     if (chosenHeal) {
       const [idCura, s] = chosenHeal;
       let amount = Math.max(1, rollSpell(p, s));
+      // Weapon Proficiency: skill% como cura flat nas spells de cura
+      // (perk Healing Skill Percentage — soma statLevel * % ao final).
+      if (typeof proficiencyTotals === "function") {
+        const prt = proficiencyTotals(p);
+        for (const sk in prt.skillPctHeal) {
+          const lvl = (sk === "magic")
+            ? ((typeof effMagic === "function") ? effMagic(p) : (p.ml || 0))
+            : ((typeof effSkill === "function") ? effSkill(p, sk)
+               : (p.skills ? p.skills[sk] || 0 : 0));
+          amount += Math.ceil(lvl * prt.skillPctHeal[sk]);
+        }
+      }
       // Augment "base healing" (TibiaWiki): +% sobre a cura base da spell,
       // antes de stances/crítico (regra oficial de 17/05/2024).
       if (typeof augmentTotals === "function") {
@@ -5337,6 +5474,12 @@ function combatTick(c, p, dt, now) {
     }
     if (m.boss && c.boss && typeof soulwarGrantBossTaint === "function")
       soulwarGrantBossTaint(p, c.boss.id);
+    // Weapon Proficiency: XP por abate vai para a arma empunhada (tabela
+    // oficial por estrelas do bestiario); aplica tambem life/mana on kill.
+    let profKill = null;
+    if (typeof proficiencyOnKill === "function") {
+      profKill = proficiencyOnKill(c, p, m);
+    }
     const loot = rollLoot(c, p, m);
     if (typeof partyRecordKill === "function" && partyShare) {
       partyRecordKill(p, null, 0, loot.length, 0);
@@ -5344,7 +5487,10 @@ function combatTick(c, p, dt, now) {
     c.events.push({ t: "kill", mob: m.slug, name: displayMonsterName(m.def.name),
                     exp: exp, loot: loot, x: m.x, y: m.y, screen: true,
                     charm: charmGanho, bossPts: bossGanho, boss: !!m.boss,
-                    fiendish: !!m.fiendish, influenced: !!m.influenced });
+                    fiendish: !!m.fiendish, influenced: !!m.influenced,
+                    profXp: profKill ? profKill.xp : 0,
+                    profSlug: profKill ? profKill.slug : null,
+                    profUps: profKill ? profKill.ups : 0 });
   }
   c.mobs = alive;
   // Wave clear: agenda o blink/respawn da próxima onda (evita spawnWave /

@@ -9,10 +9,11 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=training-eta-v1">
+  <link rel="stylesheet" href="css/layout.css?v=combo-diag-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
-  <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-real-v1">
+  <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
+  <link rel="stylesheet" href="css/proficiency.css?v=proficiency-v4">
   <link rel="stylesheet" href="css/client-background.css">
   <link rel="stylesheet" href="css/mobile.css?v=char-details-v1">
   <link rel="stylesheet" href="css/chat.css?v=global-chat-v1">
@@ -240,6 +241,10 @@
     <button class="sm topbar-sys-btn" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
       <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.wheel">WHEEL</span>
+    </button>
+    <button class="sm topbar-sys-btn" id="btn-prof" title="Weapon Proficiency — progressão e perks de cada arma" data-i18n-title="title.proficiency">
+      <img src="assets/ui/proficiency-icon.png" alt="" class="topbar-btn-icon" width="18" height="18">
+      <span data-i18n="btn.proficiency">PROFICIÊNCIA</span>
     </button>
     <button class="sm topbar-sys-btn" id="btn-charms" title="Abrir Charms — desbloquear e atribuir runas" data-i18n-title="title.charms">
       <img src="assets/ui/cyclopedia/charms/low-blow.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
@@ -621,27 +626,27 @@
 <script src="js/otbmhunt.js?v=cobra-loading-v17"></script>
 <script src="js/weapons.js?v=item-anim-missing-v1"></script>
 <script src="js/ammo.js?v=caldera-diamond-dmg-v1"></script>
-  <script src="js/combo.js?v=monk-chain-flood-v1"></script>
+  <script src="js/combo.js?v=combo-diag-v2"></script>
 <script src="js/speed.js"></script>
 <script src="js/grid.js?v=wb-camera-v1"></script>
 <script src="js/area.js?v=wave-aim-target-v1"></script>
-  <script src="js/gridai.js?v=rotten-rooted-v1"></script>
+  <script src="js/gridai.js?v=proficiency-v1"></script>
 <script src="js/buffs.js"></script>
 <script src="js/stances.js"></script>
 <script src="js/monk.js?v=monk-chain-flood-v1"></script>
 <script src="js/canary-vocation.js?v=knight-spell-lvl-aoe-v1"></script>
 <script src="js/core.js?v=forked-chain-v1"></script>
-<script src="js/spells.js?v=knight-spell-lvl-aoe-v1"></script>
+<script src="js/spells.js?v=proficiency-v1"></script>
 <script src="js/cooldown.js?v=cd-bar-v1"></script>
-<script src="js/augments.js"></script>
+<script src="js/augments.js?v=proficiency-v1"></script>
 <script src="js/supplies.js?v=start-set-v1"></script>
 <script src="js/outfit.js?v=mount-preview-v1"></script>
 <script src="js/appearance.js?v=store-full-addons-v1"></script>
 <script src="js/loyalty.js?v=forge-modal-pattern-v1"></script>
 <script src="js/imbuement.js?v=imbue-slots-v1"></script>
-<script src="js/player.js?v=stamina-15h-v1"></script>
+<script src="js/player.js?v=proficiency-v1"></script>
 <script src="js/accessories.js?v=depot-drag-v1"></script>
-  <script src="js/combat.js?v=char-details-v1"></script>
+  <script src="js/combat.js?v=proficiency-v2"></script>
 <script src="js/city.js?v=training-eta-v1"></script>
 <script src="js/npc-shops.js?v=enpa-lvl-sort-v1"></script>
 <script src="js/citymap.js?v=npc-sprites-canary-v1"></script>
@@ -665,10 +670,10 @@
 <script src="js/yasir-prices.js?v=autosell-cprices-v1"></script>
 <script src="js/cyclopedia.js?v=npc-sprites-canary-v1"></script>
 <script src="js/bosstiary.js"></script>
-<script src="js/ui.js?v=char-details-v1"></script>
+<script src="js/ui.js?v=combo-area-v1"></script>
 <script src="js/helper-presets.js?v=helper-live-v1"></script>
-<script src="js/i18n.js?v=social-modal-v1"></script>
-<script src="js/alpha-announce.js?v=social-modal-v1"></script>
+<script src="js/i18n.js?v=proficiency-v1"></script>
+<script src="js/alpha-announce.js?v=prof-wheel-notes-v1"></script>
 <script src="js/settings.js?v=settings-click-fix-v1"></script>
 <script src="js/ui-mode.js?v=settings-click-fix-v1"></script>
 <script src="js/otc-hud.js?v=cond-bar-viewport-off-v1"></script>
@@ -682,11 +687,13 @@
 <script src="js/party.js?v=temple-clear-cond-v1"></script>
 <script src="js/party-ui.js?v=tutorial-arrow-v1"></script>
 <script src="js/analyzers.js?v=stack-count-frames-v2"></script>
-<script src="js/wheeldata.js?v=wheel-otc-v2"></script>
+<script src="js/wheeldata.js?v=wheel-seq-v1"></script>
 <script src="js/wheelotcdata.js?v=wheel-otc-v1"></script>
 <script src="js/wheel-gems.js?v=wheel-otc-v2"></script>
 <script src="js/wheel.js?v=wheel-active-v1"></script>
-<script src="js/wheel-ui.js?v=wheel-real-v1"></script>
+<script src="js/wheel-ui.js?v=wheel-scroll-v1"></script>
+<script src="js/proficiencydata.js?v=proficiency-v4"></script>
+<script src="js/proficiency.js?v=proficiency-v2"></script>
 <script src="js/tibiacoin.js"></script>
 <script src="js/server-config.js"></script>
 <script src="js/account-client.js?v=training-checkpoint-v1"></script>
@@ -704,7 +711,7 @@
 <script src="js/admin.js?v=stamina-15h-v1"></script>
 <script src="js/city-ui.js?v=hunt-mobile-v1"></script>
 <script src="js/preload.js?v=loading-hint-v2"></script>
-<script src="js/game.js?v=training-eta-v1"></script>
+<script src="js/game.js?v=combo-diag-v1"></script>
 <script src="js/scarlett-boss.js?v=scarlett-fluid-v2"></script>
 <script src="js/brain-head-boss.js?v=brain-head-v1"></script>
 <script src="js/feast-of-souls.js?v=paleworm-fov-v1"></script>
@@ -760,7 +767,7 @@
 <script src="js/wheel-data.js?v=wheel-data-monk-v1"></script>
 <script src="js/wheel-planner.js?v=wheel-planner-active-v1"></script>
 <script src="js/wheel-modal.js?v=wheel-real-v1"></script>
-<script src="js/char-details.js?v=wheel-real-v1"></script>
+<script src="js/char-details.js?v=proficiency-v6"></script>
 <script src="js/tutorial.js?v=tutorial-choice-v1"></script>
 <script src="js/daily-reward.js?v=training-all-chars-v1"></script>
 </body>

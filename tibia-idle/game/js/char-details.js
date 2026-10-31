@@ -17,8 +17,9 @@
  *   Deaths     — histórico de mortes (p.deathLog, campo protegido do save:
  *                só o motor autoritativo e o combate local gravam).
  *
- * A aba Proficiência existe no cliente de referência, mas o jogo não tem
- * sistema de proficiência de arma — aparece como placeholder honesto.
+ *   Proficiência — Weapon Proficiency estilo OTC: grid de armas, badge de
+ *                mastery, barra de XP, 7 colunas de nível com 1 perk
+ *                escolhido por nível (sem custo) e reset dos picks.
  */
 "use strict";
 
@@ -129,7 +130,10 @@ function chardRender() {
   const p = (typeof G !== "undefined" && G) ? G.p : null;
   if (!el || !p) return;
   const shell = el.closest(".modal") || $("#modal-body");
-  if (shell) shell.classList.toggle("wheel-open", CHARD.tab === "roda");
+  if (shell) {
+    shell.classList.toggle("wheel-open", CHARD.tab === "roda");
+    shell.classList.toggle("prof-open", CHARD.tab === "proficiencia");
+  }
   ({
     personagem: chardTabPersonagem,
     outfit: chardTabOutfit,
@@ -387,7 +391,7 @@ function chardTabPersonagem(p, el) {
 
   const lifeLeech = (eqLeech.lifeLeech || 0) + ((imb && imb.lifeLeech) || 0) + ((w && w.lifeLeech) || 0);
   const manaLeech = (eqLeech.manaLeech || 0) + ((imb && imb.manaLeech) || 0) + ((w && w.manaLeech) || 0);
-  const mit = ((w && w.mitigation) || 0) + ((w && w.gemMitigation) || 0);
+  const mit = ((w && w.mitigation) || 0) * 100 + ((w && w.gemMitigation) || 0);
 
   const PROTS = ["physical", "fire", "ice", "earth", "energy", "death", "holy"];
 
@@ -679,19 +683,295 @@ function chardApplyOutfitSearch() {
   });
 }
 
-/* ------------------------------------------------- aba Proficiência */
+/* ------------------------------------------------- aba Proficiência
+ *
+ * Weapon Proficiency no molde do módulo game_proficiency do cliente de
+ * referência: lista de armas à esquerda (grid 34px + filtros), e à direita
+ * o badge de mastery, a barra de XP, as 7 colunas de nível com os perks
+ * (1 escolhido por nível, sem custo — só o requisito de level da arma) e
+ * o detalhe do perk sob cada coluna.
+ */
+
+const PROF_CATS = [
+  { id: "",        nome: "Todas" },
+  { id: "sword",   nome: "Espadas" },
+  { id: "axe",     nome: "Machados" },
+  { id: "club",    nome: "Clavas" },
+  { id: "distance",nome: "Distância" },
+  { id: "fist",    nome: "Punhos" },
+  { id: "wand",    nome: "Wands/Rods" },
+];
+
+function profCatOf(it) {
+  if (it.cat === "wand" || it.cat === "rod") return "wand";
+  return it.cat;
+}
+
+/* mini fileira de estrelas (5x5) sob o item no grid, como o MiniStar do OTC */
+function chardProfMiniStars(lanes, level) {
+  let s = "";
+  for (let i = 0; i < lanes; i++) {
+    s += `<i class="prof-star-mini${i < level ? " on" : ""}"></i>`;
+  }
+  return `<div class="prof-stars-mini">${s}</div>`;
+}
+
+/* 64px do atlas oficial; locked/unpicked sai em grayscale como no OTC */
+function chardProfIconHtml(pk, locked, picked) {
+  const ic = profPerkIcon(pk);
+  const cls = (picked && !locked) ? "" : " grey";
+  /* ic.src já vem completo ("assets/proficiency/icons-N.png"); o aug é só
+   * o nome do atlas ("augment-icons") e precisa do caminho montado aqui. */
+  const aug = ic.aug
+    ? `<i class="prof-aug-ic${cls}"
+         style="background-image:url('assets/proficiency/${ic.aug.src}.png');
+                background-position:-${ic.aug.x}px -${ic.aug.y}px"></i>`
+    : "";
+  return `<div class="prof-perk-ic${cls}"
+    style="background-image:url('${ic.src}');
+           background-position:-${ic.x}px -${ic.y}px">${aug}
+    ${locked ? `<i class="prof-lock"></i>` : ""}</div>`;
+}
+
+/* célula de estrela do topo (108x20): fill = progresso DENTRO daquele nível */
+function chardProfStarCell(p, slug, i, lvl, lanes) {
+  const xp = profXp(p, slug);
+  const prev = i === 0 ? 0 : profXpNeed(slug, i);
+  const need = profXpNeed(slug, i + 1);
+  const done = lvl >= i + 1;
+  const frac = done ? 1 : Math.max(0, Math.min(1,
+    need > prev ? (xp - prev) / (need - prev) : 0));
+  const picks = profPicked(p, slug);
+  const masteredAll = lvl >= lanes &&
+    Object.keys(picks).length >= lanes;
+  const starCls = done ? (masteredAll ? " gold" : " silver") : "";
+  const fmt = (n) => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `<div class="prof-star-cell" title="Nível ${i + 1}: ${fmt(Math.min(xp, need))} / ${fmt(need)} XP">
+    <div class="prof-star-fill" style="width:${Math.round(frac * 100)}%"></div>
+    <i class="prof-star${starCls}"></i>
+  </div>`;
+}
 
 function chardTabProficiencia(p, el) {
-  el.innerHTML = `
-    <div class="cyclo-vazio">
-      <div class="small mt8" style="color:#d4af37">Proficiência</div>
-      <div class="tiny dim mt4" style="max-width:380px;line-height:1.6">
-        Existe no cliente de referência (perícia com cada arma), mas ainda
-        não há sistema de proficiência no jogo.<br><br>
-        <b>O que falta:</b> progresso de proficiência por arma e os perks
-        associados — ainda não implementados no servidor.
+  if (typeof profWeaponList !== "function" || typeof profData !== "function" ||
+      !profData()) {
+    el.innerHTML = `<div class="cyclo-vazio"><div class="tiny dim">
+      Dados de proficiência indisponíveis.</div></div>`;
+    return;
+  }
+  ensureProf(p);
+  if (CHARD.profCat === undefined) CHARD.profCat = "";
+  if (CHARD.profSearch === undefined) CHARD.profSearch = "";
+  if (CHARD.profVoc === undefined) CHARD.profVoc = false;
+  if (CHARD.profLvl === undefined) CHARD.profLvl = false;
+
+  const list = profWeaponList(p, { cat: CHARD.profCat });
+  const q = (CHARD.profSearch || "").trim().toLowerCase();
+  const vis = list.filter((w) => {
+    if (q && !(w.it.n || w.slug).toLowerCase().includes(q) &&
+        !w.slug.toLowerCase().includes(q)) return false;
+    if (CHARD.profVoc && !w.usable) return false;
+    if (CHARD.profLvl && (w.it.lvl || 0) > p.level) return false;
+    return true;
+  });
+  if (!CHARD.profSel || !list.some((w) => w.slug === CHARD.profSel)) {
+    CHARD.profSel = (list.find((w) => w.equipped) || vis[0] || list[0] || {}).slug;
+  }
+  const sel = list.find((w) => w.slug === CHARD.profSel);
+  /* Rascunho de escolhas por arma: clicar num perk só altera o rascunho;
+   * o botão OK confirma e salva em p.prof.perks. */
+  if (sel && CHARD.profDraftFor !== sel.slug) {
+    CHARD.profDraftFor = sel.slug;
+    CHARD.profDraft = Object.assign({}, profPicked(p, sel.slug));
+  }
+
+  /* ---------------- coluna esquerda: badge + filtros + grid -------------- */
+  const fmt = (n) => String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  let leftHtml = "";
+  if (sel) {
+    const prog = profProgress(p, sel.slug);
+    const picks = profPicked(p, sel.slug);
+    const masteredAll = prog.level > 0 && prog.level >= prog.lanes &&
+      Object.keys(picks).length >= prog.lanes;
+    const badge = prog.level === 0 ? "icon-masterylevel-0"
+      : `icon-masterylevel-${prog.level}-${masteredAll ? "gold" : "silver"}`;
+    const nextTxt = prog.mastered
+      ? "Nível máximo atingido"
+      : `${fmt(Math.max(0, prog.next - prog.xp))} XP para o próximo nível`;
+    leftHtml = `
+      <div class="prof-item-name">${chardEsc(sel.it.n || sel.slug)}</div>
+      <div class="prof-badge" style="background-image:url('assets/proficiency/${badge}.png')">
+        <div class="prof-badge-item">${itemImg(sel.slug, 40)}</div>
       </div>
+      <div class="prof-xp-txt">${fmt(prog.xp)} / ${fmt(prog.next)}</div>
+      <div class="prof-next-txt">${nextTxt}</div>`;
+  }
+  const catChips = PROF_CATS.map((c) =>
+    `<button type="button" class="prof-cat${CHARD.profCat === c.id ? " on" : ""}"
+       data-cat="${c.id}">${c.nome}</button>`).join("");
+  const gridCells = vis.map((w) => `
+    <button type="button" class="prof-cell${w.slug === CHARD.profSel ? " sel" : ""}"
+      data-slug="${w.slug}"
+      title="${chardEsc(w.it.n || w.slug)} — nível ${w.level}/${w.lanes}${w.equipped ? " (equipada)" : ""}">
+      ${itemImg(w.slug, 32)}
+      ${chardProfMiniStars(w.lanes, w.level)}
+      ${w.equipped ? `<i class="prof-eq" title="Equipada"></i>` : ""}
+    </button>`).join("");
+
+  /* ---------------- coluna direita: estrelas + XP + lanes ---------------- */
+  let rightHtml = `<div class="cyclo-vazio" style="flex:1">
+      <div class="tiny dim mt8">Selecione uma arma à esquerda.</div></div>`;
+  if (sel) {
+    const prog = profProgress(p, sel.slug);
+    const tr = profTree(sel.slug);
+    const picks = CHARD.profDraft || {};
+    const saved = profPicked(p, sel.slug);
+    const lanes = prog.lanes;
+    const stars = Array.from({ length: lanes }, (_, i) =>
+      chardProfStarCell(p, sel.slug, i, prog.level, lanes)).join("");
+    const xpPct = Math.round(prog.frac * 100);
+    const warn = !sel.usable
+      ? `<div class="prof-vocwarn" style="width:${lanes * 108 - 2}px">Perks inativos: você não cumpre os requisitos para usar esta arma.</div>` : "";
+
+    const lanesHtml = tr.lv.map((perks, lane) => {
+      const unlocked = lane < prog.level;
+      const cells = perks.map((pk, idx) => {
+        const picked = picks[lane] === idx;
+        const confirmed = saved[lane] === idx;
+        const st = !unlocked ? " locked"
+          : picked ? (confirmed ? " picked" : " picked pending") : " avail";
+        return `<button type="button" class="prof-perk${st}"
+          data-lane="${lane}" data-idx="${idx}"
+          title="${chardEsc(proficiencyPerkName(pk))} — ${chardEsc(proficiencyPerkDesc(pk))}${unlocked ? "" : " (travado)"}">
+          ${chardProfIconHtml(pk, !unlocked, picked)}
+        </button>`;
+      }).join("");
+      const selPk = picks[lane] !== undefined ? perks[picks[lane]] : null;
+      const detail = !unlocked
+        ? `<div class="prof-detail locked"><i class="prof-lock-sm"></i></div>`
+        : selPk
+          ? `<div class="prof-detail sel"><div>
+              <div class="prof-detail-name">${chardEsc(proficiencyPerkName(selPk))}</div>
+              <div>${chardEsc(proficiencyPerkDesc(selPk))}</div>
+            </div></div>`
+          : `<div class="prof-detail">Escolha 1 perk</div>`;
+      return `<div class="prof-lane${unlocked ? "" : " locked"}">
+        <div class="prof-lane-perks n${perks.length}">${cells}</div>
+        ${detail}
+      </div>`;
+    }).join("");
+
+    const hasPicks = Object.keys(picks).length > 0;
+    const laneW = `width:${lanes * 108}px`;
+    const laneGrid = `grid-template-columns:repeat(${lanes},108px);${laneW}`;
+    /* rascunho != salvo -> OK habilita. "Limpar" também só afeta o rascunho. */
+    const dirty = Object.keys(picks).length !== Object.keys(saved).length ||
+      Object.keys(picks).some((k) => saved[k] !== picks[k]);
+    const sumRows = Object.keys(picks).map(Number).sort((a, b) => a - b)
+      .map((lane) => {
+        const pk = tr.lv[lane] && tr.lv[lane][picks[lane]];
+        return pk ? `<div class="prof-sum-row"><span class="k">Nv${lane + 1}</span>` +
+          `${chardEsc(proficiencyPerkName(pk))} — ` +
+          `${chardEsc(proficiencyPerkDesc(pk))}</div>` : "";
+      }).join("") ||
+      `<div class="tiny dim" style="padding:2px 0">Nenhum perk escolhido ainda.</div>`;
+    rightHtml = `
+      <div class="prof-stars-row" style="${laneGrid}">${stars}</div>
+      <div class="prof-xpbar" style="${laneW}"
+        title="${fmt(prog.xp)} XP (nível ${prog.level}/${lanes})">
+        <div class="prof-xpbar-fill" style="width:${xpPct}%"></div>
+      </div>
+      ${warn}
+      <div class="prof-lanes" style="${laneGrid}">${lanesHtml}</div>
+      <div class="prof-summary" style="${laneW}">
+        <div class="prof-sec-title">Bônus escolhidos</div>
+        <div class="prof-sum-list">${sumRows}</div>
+      </div>
+      <div class="prof-foot" style="${laneW}">
+        <div class="tiny dim prof-hint">
+          Nível ${prog.level}/${lanes} — clique num perk desbloqueado (1 por
+          nível, sem custo) e confirme com OK. Perks valem com a arma equipada.
+        </div>
+        <button type="button" id="prof-reset" class="btn small"
+          ${hasPicks ? "" : "disabled"}>Limpar perks</button>
+        <button type="button" id="prof-ok" class="btn small prof-ok"
+          ${dirty ? "" : "disabled"}>OK</button>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="prof-root">
+      <div class="prof-left">
+        <div class="prof-panel">${leftHtml}</div>
+        <div class="prof-filters">
+          <label class="prof-chk"><input type="checkbox" id="prof-f-lvl"${CHARD.profLvl ? " checked" : ""}> Level</label>
+          <label class="prof-chk"><input type="checkbox" id="prof-f-voc"${CHARD.profVoc ? " checked" : ""}> Voc.</label>
+        </div>
+        <div class="prof-cats">${catChips}</div>
+        <input id="prof-search" class="prof-search" type="text"
+          placeholder="Buscar arma..." value="${chardEsc(CHARD.profSearch)}">
+        <div class="prof-grid">${gridCells ||
+          `<div class="tiny dim" style="padding:8px">Nenhuma arma.</div>`}</div>
+      </div>
+      <div class="prof-right">${rightHtml}</div>
     </div>`;
+
+  /* ---------------- bindings ---------------- */
+  el.querySelectorAll(".prof-cat").forEach((b) =>
+    b.addEventListener("click", () => {
+      CHARD.profCat = b.dataset.cat || "";
+      chardRender();
+    }));
+  el.querySelector("#prof-search").addEventListener("input", (e) => {
+    CHARD.profSearch = e.target.value;
+    /* re-render mantendo o foco do input */
+    const pos = e.target.selectionStart;
+    chardRender();
+    const inp = el.querySelector("#prof-search");
+    if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
+  });
+  el.querySelector("#prof-f-voc").addEventListener("change", (e) => {
+    CHARD.profVoc = e.target.checked; chardRender();
+  });
+  el.querySelector("#prof-f-lvl").addEventListener("change", (e) => {
+    CHARD.profLvl = e.target.checked; chardRender();
+  });
+  el.querySelectorAll(".prof-cell").forEach((b) =>
+    b.addEventListener("click", () => {
+      CHARD.profSel = b.dataset.slug;
+      chardRender();
+    }));
+  el.querySelectorAll(".prof-perk").forEach((b) =>
+    b.addEventListener("click", () => {
+      /* Rascunho: só altera CHARD.profDraft — nada é salvo até o OK. */
+      const lane = +b.dataset.lane, idx = +b.dataset.idx;
+      const tr = profTree(CHARD.profSel);
+      if (!tr || !tr.lv[lane] || !tr.lv[lane][idx]) return;
+      if (typeof profCanPick === "function" &&
+          !profCanPick(p, CHARD.profSel, lane)) return;
+      if (!CHARD.profDraft) CHARD.profDraft = {};
+      if (CHARD.profDraft[lane] === idx) delete CHARD.profDraft[lane];
+      else CHARD.profDraft[lane] = idx;
+      chardRender();
+    }));
+  const okBtn = el.querySelector("#prof-ok");
+  if (okBtn) okBtn.addEventListener("click", () => {
+    ensureProf(p);
+    const draft = CHARD.profDraft || {};
+    if (Object.keys(draft).length) {
+      p.prof.perks[CHARD.profSel] = Object.assign({}, draft);
+    } else {
+      delete p.prof.perks[CHARD.profSel];
+    }
+    if (typeof save === "function") save();
+    if (typeof toast === "function") toast("Perks de proficiência confirmados.");
+    chardRender();
+  });
+  const resetBtn = el.querySelector("#prof-reset");
+  if (resetBtn) resetBtn.addEventListener("click", () => {
+    CHARD.profDraft = {};
+    chardRender();
+  });
 }
 
 /* ------------------------------------------------- aba Roda do Destino */

@@ -6,10 +6,15 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "29/10/2026 às 17:12";
+const ALPHA_UPDATE_AT = "30/10/2026 às 22:30";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Proficiência de Armas: ganhe XP por kill, 1 perk por nível e confirme com OK",
+  "Perks oficiais por arma e vocação: mana/life on kill, penetração, leech, augments de spell",
+  "NOVO — Roda do Destino: arte oficial do cliente, scroll na roda, botão MAX e sequência de perks",
+  "Helper: aba Área mostra só magias multi-alvo; runas ficam na aba Runas",
+  "Helper: badges mostram o motivo do bloqueio de cada slot (mana, cooldown, alvos)",
   "BETA OFICIAL — obrigado a todos que testaram o alpha!",
   "Server Save diário às 00h (Brasília): reinício aplica atualizações pendentes",
   "Recompensa diária: +3.000 cargas de Lasting Exercise (colete no login — não acumula)",

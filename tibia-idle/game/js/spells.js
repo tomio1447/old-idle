@@ -117,19 +117,22 @@ function spellAttackValue(p, s) {
     ? upgradedStats(p, "equip:weapon", w.item)
     : (typeof GAMEDATA !== "undefined" ? GAMEDATA.items[w.item] : null);
   if (!it) return 7;
+  // Weapon Proficiency: perk Attack Damage soma no ataque usado pelas magias
+  const profAtk = (typeof proficiencyTotals === "function")
+    ? (proficiencyTotals(p).atk || 0) : 0;
   if (it.t === "distance") {
     const ammo = it.inf ? null
       : (p.equip.ammo && typeof GAMEDATA !== "undefined"
          ? GAMEDATA.items[p.equip.ammo.item] : null);
     // +20% attack value (15.25) sobre arma + municao
-    return Math.floor(((it.atk || 0) + (ammo ? (ammo.atk || 0) : 0)) * 1.2) || 7;
+    return Math.floor(((it.atk || 0) + profAtk + (ammo ? (ammo.atk || 0) : 0)) * 1.2) || 7;
   }
   // O dano elemental da arma conta no ataque das magias de skill: o
   // COMBAT_FORMULA_SKILL do servidor chama getWeaponDamage, que soma
   // physicalAttack + elementalAttack. Sem isso um knight com naga sword
   // (atk 8, elDmg 44) lancava exori como se tivesse ataque 8.
   const elDmg = (it.el && it.el !== "physical") ? (it.elDmg || 0) : 0;
-  return Math.floor(((it.atk || 0) + elDmg) * 1.2) || 7;  // +20% (15.25)
+  return Math.floor(((it.atk || 0) + profAtk + elDmg) * 1.2) || 7;  // +20% (15.25)
 }
 
 /* Elemento secundario que a arma equipada adiciona as magias de skill.
@@ -179,6 +182,11 @@ function spellValues(p, s) {
   let lo, hi;
   if (f.modo === "magic") {
     let ml = typeof effMagic === "function" ? effMagic(p) : (p.ml || 0);
+    // Weapon Proficiency: Special Magic Level — ML extra só p/ o elemento
+    // da spell sendo rolada (perk elementado da arma empunhada).
+    if (typeof proficiencyMagicBonus === "function" && s && s.element) {
+      ml += proficiencyMagicBonus(p, s.element);
+    }
     // 15.25: stances que concedem ML extra (Divine Defiance = ML sagrado/
     // cura a partir da distance; Elemental Synthesis = ML gelo/terra)
     if (typeof stanceMLBonus === "function") ml = stanceMLBonus(p, s, ml);

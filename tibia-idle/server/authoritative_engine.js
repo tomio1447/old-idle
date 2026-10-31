@@ -346,6 +346,14 @@ MONKSPELLDATA["exori-mas-amp-pug"]={
 MONKSPELLDATA["exori-infir-amp-pug"]={
   cd:20000,element:"physical",fx:"blow-white",gcd:2000,lvl:6,mana:30,
   monk:"builder",nome:"Lesser Mystic Repulse",pow:25,range:7,words:"exori infir amp pug"};
+/* Weapon Proficiency: árvores + tabela de XP oficiais (mesmo arquivo do
+ * cliente, gerado por tools/build_proficiency.js). */
+let PROFDATA=null;
+try{
+  const ctx={window:{}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,"..","game","js","proficiencydata.js"),"utf8"),ctx);
+  PROFDATA=ctx.window.PROFDATA||null;
+}catch(e){PROFDATA=null;}
 if(ALL_SPELLS["exori-med-pug"]&&MONKSPELLDATA["exori-med-pug"]&&MONKSPELLDATA["exori-med-pug"].chain){
   const ch=MONKSPELLDATA["exori-med-pug"].chain;
   ALL_SPELLS["exori-med-pug"].chain=ch.alvos;
@@ -510,6 +518,28 @@ try{
   WHEEL_SKILL_VOC=wd.WHEEL_SKILL||{};WHEEL_LEECH=wd.WHEEL_LEECH||WHEEL_LEECH;
   WHEEL_FN=require(path.join(__dirname,"..","game","js","wheel.js"));
 }catch(e){/* wheel opcional */}
+/* Weapon Proficiency: o módulo do cliente (proficiency.js) tem
+ * module.exports — basta ligar os globals que ele consulta (PROFDATA,
+ * GAMEDATA.items, SPELLS, itemLiberado com o campo `level` do servidor). */
+let PROF_FN=null;
+try{
+  global.window=global.window||{};
+  global.window.PROFDATA=PROFDATA;
+  global.GAMEDATA=global.GAMEDATA||{items:ITEMS};
+  if(!global.GAMEDATA.items)global.GAMEDATA.items=ITEMS;
+  global.SPELLS=global.SPELLS||ALL_SPELLS;
+  global.itemLiberado=(p,it)=>{
+    if(!it)return false;
+    const lvl=it.lvl!==undefined?it.lvl:it.level;
+    if(lvl&&Number(p&&p.level)<lvl)return false;
+    if(it.vocs&&it.vocs.length&&it.vocs.indexOf(p&&p.voc)===-1)return false;
+    return true;
+  };
+  global.bagCount=global.bagCount||(()=>0);
+  /* proficiency.js consulta maxStats via global (life/mana on kill) */
+  global.maxStats=global.maxStats||maxStats;
+  PROF_FN=require(path.join(__dirname,"..","game","js","proficiency.js"));
+}catch(e){PROF_FN=null;}
 for(const slug of Object.keys(AMMO)){
   const raw=AMMO[slug],it=ITEMS[slug]||(ITEMS[slug]={});
   if(raw.areaMatrix)it.areaMatrix=raw.areaMatrix;
@@ -2146,7 +2176,19 @@ function applyMonsterMitigation(mob,element,dmg){
   if(!(mit>0))return dmg;
   return Math.max(1,Math.floor(dmg*(1-mit/100)));
 }
-function applyOutgoingDamage(mob,element,dmg,now){
+/* Weapon Proficiency: elemental pierce (perk tipo 31) — % da resistencia
+ * elemental do alvo ignorada para o elemento do perk. */
+function profPiercePctFor(p,el){
+  if(!PROF_FN||typeof PROF_FN.proficiencyTotals!=="function"||!p)return 0;
+  const pr=PROF_FN.proficiencyTotals(p);
+  return Number(pr&&pr.pierce&&pr.pierce[el])||0;
+}
+/* Armor penetration (perk tipo 30): % da armor do alvo ignorada (0..1). */
+function profArmorPenFrac(p){
+  if(!PROF_FN||typeof PROF_FN.proficiencyTotals!=="function"||!p)return 0;
+  return Math.min(1,Math.max(0,Number(PROF_FN.proficiencyTotals(p).armorPen)||0));
+}
+function applyOutgoingDamage(mob,element,dmg,now,piercePct){
   if(mob&&mob._playerEnt){
     let out=Math.max(0,Math.floor(Number(dmg)||0));
     const auth=mob._auth,ent=mob._playerEnt;
@@ -2196,7 +2238,7 @@ function applyOutgoingDamage(mob,element,dmg,now){
       return 0;
     }
   }
-  let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,0,now));
+  let out=applyMonsterMitigation(mob,element,applyResist(dmg,mob,element,piercePct||0,now));
   if(mob&&mob.boss&&Number(mob.spiteDamageTakenMul)>0&&Number(mob.spiteDamageTakenMul)!==1)
     out=Math.max(1,Math.floor(out*Number(mob.spiteDamageTakenMul)));
   return out;
@@ -2860,7 +2902,7 @@ function tryCharmOffensive(auth,p,mob,now){
       dmg=Math.min(Math.ceil(level*2),Math.ceil(maxHp*(c.percent||5)/100));
     }
     if(!(dmg>0))continue;
-    const dealt=applyOutgoingDamage(mob,c.elemento,dmg,now);
+    const dealt=applyOutgoingDamage(mob,c.elemento,dmg,now,profPiercePctFor(p,c.elemento));
     if(dealt>0){mob.hp-=dealt;total+=dealt;}
     const pos=mob.x!=null?{x:mob.x,y:mob.y}:playerPosition(auth,p);
     auth.events.push({t:"charm",id:id,element:c.elemento,dmg:dealt,slug:slug,
@@ -3117,6 +3159,12 @@ function playerMitigationPct(p){
   let defEquip=0;
   if(temEscudo)defEquip=Number(shield.def||shield.defense)||0;
   else if(weapon)defEquip=(Number(weapon.def||weapon.defense)||0)*(duasMaos?0.6:1);
+  /* Weapon Proficiency: perks Defence / Weapon Shield Mod somam na
+   * defesa de equipamento que alimenta a mitigation (espelho do cliente). */
+  if(PROF_FN&&typeof PROF_FN.proficiencyTotals==="function"){
+    const pr=PROF_FN.proficiencyTotals(p);
+    defEquip+=(Number(pr.defense)||0)+(Number(pr.weaponDef)||0);
+  }
   const st=stanceTotals(p);
   if(st.noBlock)return Math.min(50,Math.max(0,defEquip*0.2));
   let sh=st.noBlock?0:stanceSkill(p,"shield");
@@ -5004,7 +5052,11 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     addExp(item.p,share);item.p.totalKills=(Number(item.p.totalKills)||0)+1;item.p.kills[mob.slug]=(Number(item.p.kills[mob.slug])||0)+1;
     bestiaryKill(item.p,mob.slug,1);
     if(mob.boss||(mob.def&&mob.def.boss))bosstiaryKill(item.p,mob.slug,1);
-    shares.push({id:String(item.id),exp:share,level:item.p.level,leveled:item.p.level>beforeLevel});
+    // Weapon Proficiency: XP por abate na arma empunhada + life/mana on kill.
+    const profK=(PROF_FN&&typeof PROF_FN.proficiencyOnKill==="function")
+      ?PROF_FN.proficiencyOnKill(auth,item.p,mob):null;
+    shares.push({id:String(item.id),exp:share,level:item.p.level,leveled:item.p.level>beforeLevel,
+      profXp:profK?profK.xp:0,profSlug:profK?profK.slug:null,profUps:profK?profK.ups:0});
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
       mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
   auth._lastKillExp=shares[0]?shares[0].exp:0;auth._lastKillShares=shares;
@@ -6722,7 +6774,7 @@ function tickDelayedHits(auth,now){
     if(!mob||!(mob.hp>0)||mob.greedImmune||mob.qteImmune)continue;
     const who=(auth.players||[]).find((x)=>String(x.id)===String(h.whoId));
     let dmg=Math.max(1,Number(h.dmg)||0);
-    dmg=applyOutgoingDamage(mob,h.el||"death",dmg,now);
+    dmg=applyOutgoingDamage(mob,h.el||"death",dmg,now,profPiercePctFor(who&&who.p,h.el||"death"));
     if(dmg>0){
       mob.hp-=dmg;if(who&&who.p)applyOutgoingLeech(who.p,dmg);
       const pos=entityPosition(mob,.5,.5);
@@ -6784,7 +6836,7 @@ function tryUseRune(auth,item,p,now,id,primary,living,visualTs){
     if(!tgt||tgt.hp<=0||tgt.greedImmune||tgt.qteImmune)continue;
     let raw=Math.max(1,roll(auth,Math.floor(lo),Math.floor(hi)));
     if(runeExtra)raw=Math.max(1,Math.floor(raw*(1+runeExtra/100)));
-    const dmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
+    const dmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now,profPiercePctFor(p,el));
     if(dmg>0){tgt.hp-=dmg;afterPlayerHit(auth,p,tgt,dmg,now);
       const pos=entityPosition(tgt,.5,.5);
       auth.events.push({t:"hit",dmg,el,fx,projectile:tgt===primary,missile:tgt===primary?missile:null,rune:rd.nome||id,
@@ -6940,14 +6992,14 @@ function step(auth,now,opts){if(auth.ended)return;
                 exori:KNIGHT_EXORI.has(s.id)?1:0,chain:hop?1:0,fromId:hop?String(prev.id):undefined,screen:true};
               if(armaEl&&!elementalBond(p)){
                 const parts=splitDualParts(finalDmg,armaEl.propFisica);
-                const fisFinal=knightAreaShare?parts.fis:applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now);
-                const eleFinal=knightAreaShare?parts.ele:applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now);
+                const fisFinal=knightAreaShare?parts.fis:applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,parts.fis,now),now,profPiercePctFor(p,el));
+                const eleFinal=knightAreaShare?parts.ele:applyOutgoingDamage(tgt,armaEl.el,scalePlayerDamage(p,tgt,armaEl.el,parts.ele,now),now,profPiercePctFor(p,armaEl.el));
                 const dealt=fisFinal+eleFinal;tgt.hp-=dealt;afterPlayerHit(auth,p,tgt,dealt,now);
                 auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
                 if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:armaEl.el,fx:ELEMENT_FX[armaEl.el]||fx,dual:1,projectile:false,missile:null},hitBase,{crit:false,fatal:false}));
                 if(echoFrac&&dealt>0){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(dealt*echoFrac)),el,fx,whoId:item.id});}
               }else{
-                if(!knightAreaShare)finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now);
+                if(!knightAreaShare)finalDmg=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,finalDmg,now),now,profPiercePctFor(p,el));
                 if(finalDmg>0){tgt.hp-=finalDmg;afterPlayerHit(auth,p,tgt,finalDmg,now);
                   if(echoFrac){auth.delayedHits=auth.delayedHits||[];auth.delayedHits.push({at:now+1000,mobId:tgt.id,dmg:Math.max(1,Math.floor(finalDmg*echoFrac)),el,fx,whoId:item.id});}}
                 auth.events.push(Object.assign({t:"hit",dmg:finalDmg,el,fx,projectile:fireProj,missile:fireProj?missile:null},hitBase));
@@ -7054,6 +7106,18 @@ function step(auth,now,opts){if(auth.ended)return;
         if(transPct>0)hitExtraPct+=transPct;
         if(isFatal)hitExtraPct+=FORGE_ONSLAUGHT_BONUS_PCT;
         if(hitExtraPct)finalDmg=Math.floor(finalDmg*(1+hitExtraPct/100));
+        /* Weapon Proficiency (perk tipo 25): skill% como dano flat no
+         * auto-attack — somado depois de rolagem e multiplicadores, como o
+         * combat.cpp. sk "magic" usa p.ml + bonus de equipamento. */
+        if(PROF_FN&&typeof PROF_FN.proficiencyTotals==="function"){
+          const prt=PROF_FN.proficiencyTotals(p);
+          for(const sk in prt.skillPctAuto){
+            const lvl=(sk==="magic")
+              ?((Number(p.ml)||0)+gearSkillBonus(p,"mag"))
+              :stanceSkill(p,sk);
+            if(lvl>0)finalDmg+=Math.ceil(lvl*prt.skillPctAuto[sk]);
+          }
+        }
         const imbConv=(!profile.elemento2&&profile.element==="physical")?imbElementalConvert(p):null;
         const convEl=profile.elemento2||(imbConv&&imbConv.el)||null;
         const convProp=profile.elemento2?profile.propFisica:(imbConv?imbConv.propFisica:1);
@@ -7069,19 +7133,28 @@ function step(auth,now,opts){if(auth.ended)return;
           const strike=(tgt,splash)=>{
             if(!tgt||tgt.hp<=0||tgt.greedImmune||tgt.qteImmune)return;
             let raw=splash?Math.max(1,Math.floor(finalDmg)):finalDmg;
+            /* Armor do monstro no auto-attack: roll 45-95% capado em 62% do
+             * dano (mesma formula do cliente — estat era morta no engine).
+             * Armor Penetration (perk t:30) ignora X% da armor alvo. */
+            const mobArmor=Number(tgt.armor)||Number(tgt.def&&tgt.def.armor)||0;
+            if(mobArmor>0&&profile.type!=="magic"&&el!=="agony"){
+              const effArmor=mobArmor*(1-profArmorPenFrac(p));
+              const red=Math.min(raw*0.62,effArmor*(0.45+random(auth)*0.5));
+              raw=Math.max(1,Math.floor(raw-red));
+            }
             const tpos=entityPosition(tgt,.5,.5);
             const base=Object.assign({},hitBase,{x:tpos.x,y:tpos.y,mobId:String(tgt.id),targetId:String(tgt.id),mobSlug:tgt.slug});
             if(convEl&&!profile.bond){
               const parts=splitDualParts(raw,convProp);
-              const fisFinal=applyOutgoingDamage(tgt,"physical",scalePlayerDamage(p,tgt,"physical",parts.fis,now),now);
-              const eleFinal=applyOutgoingDamage(tgt,convEl,scalePlayerDamage(p,tgt,convEl,parts.ele,now),now);
+              const fisFinal=applyOutgoingDamage(tgt,"physical",scalePlayerDamage(p,tgt,"physical",parts.fis,now),now,profPiercePctFor(p,"physical"));
+              const eleFinal=applyOutgoingDamage(tgt,convEl,scalePlayerDamage(p,tgt,convEl,parts.ele,now),now,profPiercePctFor(p,convEl));
               const dealt=fisFinal+eleFinal;tgt.hp-=dealt;afterPlayerHit(auth,p,tgt,dealt,now);
               if(fisFinal>0)auth.events.push(Object.assign({t:"hit",dmg:fisFinal,el:"physical",fx:physicalHitFx(tgt.def&&tgt.def.race),
                 projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));
               if(eleFinal>0)auth.events.push(Object.assign({t:"hit",dmg:eleFinal,el:convEl,fx:ELEMENT_FX[convEl]||ELEMENT_FX.physical,
                 dual:1,projectile:false,missile:null},base,{crit:false,fatal:false}));
             }else{
-              raw=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now);
+              raw=applyOutgoingDamage(tgt,el,scalePlayerDamage(p,tgt,el,raw,now),now,profPiercePctFor(p,el));
               if(raw>0){tgt.hp-=raw;afterPlayerHit(auth,p,tgt,raw,now);
                 auth.events.push(Object.assign({t:"hit",dmg:raw,el,fx:basicHitFx(p,profile,tgt,el,ammoIt),
                   projectile:!!profile.projectile&&!splash,missile:splash?null:(profile.missile||null)},base));}
@@ -7303,6 +7376,49 @@ function step(auth,now,opts){if(auth.ended)return;
   }
   if(!auth.ended)tickAuthSpawnQueue(auth,stepTs);
 }
+/* Containers DA CONTA (bag/lootPouch) chegam como CÓPIAS por personagem na
+ * hidratação. Em instância toda mutação precisa valer para a conta: o loot
+ * cai na pouch do líder, mas o personagem visto pode ser outro membro da
+ * mesma conta — cópias separadas deixavam a pouch dos demais congelada e o
+ * merge terminal podia ressuscitar itens vendidos. Unifica a REFERÊNCIA do
+ * objeto entre os membros da mesma conta: qualquer mutação (loot, supplies,
+ * autosell, destroy) aparece em todas as cópias na hora. */
+function shareInstanceContainers(auth){
+  const canon={};
+  for(const entry of (auth&&auth.players)||[]){
+    if(!entry||!entry.p)continue;
+    const acc=Number(entry.accountId||(entry.p&&entry.p.accountId)||0);
+    if(!acc)continue;
+    const first=canon[acc]||(canon[acc]=entry);
+    if(entry===first)continue;
+    for(const key of ["bag","lootPouch","depot","rewardChest","rewardChestBundles"]){
+      const a=first.p[key],b=entry.p[key];
+      if(Array.isArray(a)||Array.isArray(b)){
+        if(a===undefined&&Array.isArray(b)){first.p[key]=b;continue;}
+        if(a!==undefined){
+          /* Arrays (depot/bundles): une pelo id/valor antes de unificar —
+           * mesmo critério do merge terminal para snapshots divergentes. */
+          if(Array.isArray(b)&&b!==a){
+            const seen=new Set(a.map((x)=>String(x&&(x.id||x.bundleId)||x)));
+            for(const x of b){const k=String(x&&(x.id||x.bundleId)||x);if(!seen.has(k)){a.push(x);seen.add(k);}}
+          }
+          entry.p[key]=a;
+        }
+        continue;
+      }
+      if(a!==undefined){
+        /* Snapshots legados podem ter slugs só numa cópia: une pelo máximo
+         * (mesmo resultado do merge terminal) ANTES de unificar a ref. */
+        if(b&&b!==a)for(const slug of Object.keys(b)){
+          const n=Math.max(0,Math.floor(Number(b[slug])||0));
+          if(n>(Number(a[slug])||0))a[slug]=n;
+        }
+        entry.p[key]=a;
+      }
+      else if(b!==undefined)first.p[key]=b;
+    }
+  }
+}
 function initializeAuthority(descriptor,instanceId,now){
   const combat=descriptor.state||{},active=Array.isArray(combat.mobs)?combat.mobs:[];
   // HARD hunts come in with teleport-blink entries in pendingSpawns. Keep
@@ -7339,6 +7455,7 @@ function initializeAuthority(descriptor,instanceId,now){
       deathTrack:{startedAt:Number(now)||Date.now(),byPlayer:{}}},wipes:0,ended:false,terminalReason:null,lastDamageSource:"monster",wallets:{}};
   shareAccountGoldWallets(auth);
   sharePartyCapacity(auth);
+  shareInstanceContainers(auth);
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
@@ -7642,6 +7759,10 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
   }
   shareAccountGoldWallets(auth);
   sharePartyCapacity(auth);
+  // O descriptor vem de JSON a cada tick (refs se perdem). Re-unifica os
+  // containers da conta antes do step: o 1º membro da conta é a fonte
+  // canônica (líder = destino do loot e das mutações de pouch).
+  shareInstanceContainers(auth);
   // v2 corrige instâncias criadas com HP/MP antigos do banco no checkpoint de
   // entrada. A migração roda uma única vez também para snapshots já ativos.
   if(Number(auth.v||1)<2){for(const item of auth.players||[]){const max=maxStats(item.p);

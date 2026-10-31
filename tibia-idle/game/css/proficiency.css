@@ -1,0 +1,346 @@
+/* proficiency.css — Weapon Proficiency (aba do char-details)
+ *
+ * Recria o layout do módulo game_proficiency do cliente OTC:
+ *   - esquerda (202px): painel do item com badge de mastery, filtros
+ *     (Level/Voc), chips de categoria, busca e grid 5x34 de armas;
+ *   - direita (756px): fileira de 7 estrelas, barra de XP, 7 colunas de
+ *     nível (até 3 perks cada), detalhe do perk sob cada coluna e o
+ *     rodapé com "Limpar perks".
+ * Atlas/ícones: assets/proficiency/ (mesmas imagens do cliente, células
+ * de 64px; estado travado sai via CSS grayscale).
+ */
+
+.prof-root {
+  display: flex;
+  gap: 11px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------ coluna esquerda */
+.prof-left {
+  width: 202px;
+  flex: 0 0 202px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 4px;
+}
+
+.prof-panel {
+  border: 1px solid #4a4a55;
+  border-radius: 3px;
+  background: #1a1b1e;
+  padding: 2px 4px 6px;
+  text-align: center;
+}
+.prof-item-name {
+  color: #909090;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prof-badge {
+  position: relative;
+  width: 190px;
+  height: 84px;
+  margin: 0 auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  image-rendering: pixelated;
+}
+.prof-badge-item {
+  position: absolute;
+  left: 0; right: 0; top: 22px;
+  display: flex; justify-content: center;
+}
+.prof-xp-txt {
+  color: #c0c0c0;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.prof-next-txt {
+  color: #c0c0c0;
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.prof-filters { display: flex; gap: 10px; padding: 0 2px; }
+.prof-chk {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #c0c0c0; cursor: pointer; user-select: none;
+}
+
+.prof-cats { display: flex; flex-wrap: wrap; gap: 3px; }
+.prof-cat {
+  flex: 1 1 30%;
+  background: #232428;
+  border: 1px solid #4a4a55;
+  border-radius: 3px;
+  color: #b8b8b8;
+  font-size: 9.5px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.prof-cat:hover { border-color: #8a8a95; color: #e8e8e8; }
+.prof-cat.on { border-color: #d4af37; color: #ffd75e; background: #2b2413; }
+
+.prof-search {
+  width: 100%;
+  background: #101114;
+  border: 1px solid #4a4a55;
+  border-radius: 3px;
+  color: #d8d8d8;
+  font-size: 11px;
+  padding: 3px 6px;
+  box-sizing: border-box;
+}
+
+.prof-grid {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(5, 34px);
+  grid-auto-rows: 34px;
+  gap: 3px;
+  align-content: start;
+  padding: 4px;
+  border: 1px solid #34353c;
+  border-radius: 3px;
+  background: rgba(0,0,0,.25);
+}
+.prof-cell {
+  position: relative;
+  width: 34px; height: 34px;
+  padding: 0;
+  background: #232428;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.prof-cell:hover { border-color: #fff; }
+.prof-cell.sel { border-color: #fff; background: #2e2f35; }
+.prof-cell .item-sprite { pointer-events: none; }
+.prof-eq {
+  position: absolute; top: -4px; right: -4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ffd75e;
+  border: 1px solid #6b5410;
+}
+.prof-stars-mini {
+  position: absolute; left: 1px; right: 1px; bottom: 1px;
+  display: flex; justify-content: center; gap: 0;
+  pointer-events: none;
+}
+.prof-star-mini {
+  width: 5px; height: 5px;
+  background: url("../assets/proficiency/icon-star-tiny-silver.png") center/contain no-repeat;
+  image-rendering: pixelated;
+  opacity: .45;
+}
+.prof-star-mini.on { opacity: 1;
+  background-image: url("../assets/proficiency/icon-star-tiny-gold.png"); }
+
+/* ------------------------------------------------ coluna direita */
+.prof-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.prof-stars-row {
+  display: grid;
+  height: 20px;
+  flex: 0 0 20px;  /* colunas/largura definidas inline (1..7 lanes) */
+}
+.prof-star-cell {
+  position: relative;
+  background: url("../assets/proficiency/star-progress-bg.png") center/100% 100% no-repeat;
+  border-right: 1px solid rgba(0,0,0,.35);
+  overflow: hidden;
+}
+.prof-star-fill {
+  position: absolute; left: 1px; top: 1px; bottom: 1px;
+  background: url("../assets/proficiency/star-progress.png") left/cover no-repeat;
+  max-width: calc(100% - 2px);
+}
+.prof-star {
+  position: absolute; left: 50%; top: 50%;
+  width: 9px; height: 10px;
+  transform: translate(-50%, -50%);
+  background: url("../assets/proficiency/icon-star-dark.png") center/contain no-repeat;
+}
+.prof-star.silver {
+  background-image: url("../assets/proficiency/icon-star-tiny-silver.png");
+  width: 5px; height: 5px;
+  filter: drop-shadow(0 0 2px #fff);
+}
+.prof-star.gold {
+  background-image: url("../assets/proficiency/icon-star-tiny-gold.png");
+  width: 5px; height: 5px;
+  filter: drop-shadow(0 0 3px #ffd75e);
+}
+
+.prof-xpbar {
+  position: relative;
+  height: 14px;
+  background: url("../assets/proficiency/progress-bg.png") left/100% 100% no-repeat #15161a;
+  border-radius: 2px;
+  overflow: hidden;
+  flex: 0 0 14px;
+}
+.prof-xpbar-fill {
+  height: 100%;
+  background: url("../assets/proficiency/proficiency-progress.png") left/cover no-repeat;
+  max-width: 100%;
+}
+
+.prof-vocwarn {
+  background: #ff9854;
+  color: #201509;
+  font-size: 11px;
+  padding: 2px 7px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
+
+.prof-lanes {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+}
+.prof-lane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(0,0,0,.3);
+}
+.prof-lane-perks {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  background: url("../assets/proficiency/bonus-select-bg.png") center/100% 100% no-repeat rgba(10,10,14,.45);
+  padding: 6px 0;
+}
+.prof-lane.locked .prof-lane-perks { opacity: .55; }
+
+.prof-perk {
+  position: relative;
+  width: 80px; height: 80px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+/* Enquadramento por quantidade de perks no nível: a célula de 80px é
+ * pensada para 1 perk; com 2+ elas vazam da coluna e o ícone de augment
+ * (32px, -16px) cobre o perk de cima. zoom reduz layout+render juntos. */
+.prof-lane-perks.n2 .prof-perk { zoom: .82; }
+.prof-lane-perks.n3 .prof-perk { zoom: .66; }
+.prof-lane-perks.n4 .prof-perk { zoom: .54; }
+.prof-lane-perks.n2 .prof-perk,
+.prof-lane-perks.n3 .prof-perk,
+.prof-lane-perks.n4 .prof-perk { margin: -4px 0; }
+/* ícone de augment sai 16px p/ cima do botão — recolhe para não cruzar
+ * a moldura do perk acima quando a coluna está apertada */
+.prof-lane-perks.n2 .prof-aug-ic,
+.prof-lane-perks.n3 .prof-aug-ic,
+.prof-lane-perks.n4 .prof-aug-ic { top: -10px; right: -10px; zoom: .85; }
+.prof-perk.locked { cursor: not-allowed; }
+.prof-perk-ic {
+  position: absolute; inset: 8px;
+  width: 64px; height: 64px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  z-index: 1;
+}
+.prof-perk-ic.grey { filter: grayscale(1) brightness(.55); }
+.prof-perk::before {
+  content: "";
+  position: absolute; inset: 2px;
+  background: url("../assets/proficiency/border-weaponmasterytreeicons-inactive.png") center/contain no-repeat;
+  pointer-events: none;
+  z-index: 2;
+}
+.prof-perk.picked::before {
+  background-image: url("../assets/proficiency/border-weaponmasterytreeicons-active.png");
+}
+.prof-perk.picked::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: url("../assets/proficiency/backdrop_weaponmastery_highlight.png") center/contain no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+.prof-aug-ic {
+  position: absolute; top: -16px; right: -16px;
+  width: 32px; height: 32px;
+  background-repeat: no-repeat;   /* células nativas de 32px do atlas */
+  image-rendering: pixelated;
+}
+.prof-aug-ic.grey { filter: grayscale(1) brightness(.55); }
+.prof-lock {
+  position: absolute; left: 50%; bottom: -2px;
+  width: 18px; height: 28px;
+  transform: translateX(-50%);
+  background: url("../assets/proficiency/big-icon-lock-grey.png") center/contain no-repeat;
+}
+.prof-lock-sm {
+  display: inline-block;
+  width: 9px; height: 14px;
+  background: url("../assets/proficiency/icon-lock-grey.png") center/contain no-repeat;
+}
+
+.prof-detail {
+  height: 77px;
+  flex: 0 0 77px;
+  background: #404040;
+  border: 1px solid #606060;
+  border-left: none;
+  color: #c0c0c0;
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+}
+.prof-detail.sel { color: #ffd75e; }
+.prof-detail-name { color: #ffd75e; font-weight: bold; margin-bottom: 2px; }
+.prof-detail.sel div + div { color: #c8e08a; }
+.prof-detail.locked { align-items: center; }
+
+/* escolhido no rascunho, aguardando OK: moldura branca tracejada */
+.prof-perk.pending::before { border: 2px dashed #ffe680; border-radius: 4px; }
+
+/* ── soma dos bônus escolhidos (lado direito) ── */
+.prof-summary { margin-top: 6px; background: #1b1e24; border: 1px solid #2a2d34; border-radius: 4px; padding: 6px 8px; max-height: 110px; overflow-y: auto; }
+.prof-sec-title { color: #d4af37; font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #2a2d34; padding-bottom: 3px; margin-bottom: 4px; }
+.prof-sum-row { font-size: 10px; color: #c8e08a; line-height: 1.5; }
+.prof-sum-row .k { display: inline-block; min-width: 30px; color: #888; }
+.prof-ok { font-weight: bold; color: #9ce84a; border-color: #3f7a2a; }
+.prof-ok:disabled { color: #666; opacity: .6; border-color: #2a2d34; }
+
+.prof-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.prof-hint { flex: 1; }

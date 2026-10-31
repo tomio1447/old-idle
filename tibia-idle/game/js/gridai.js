@@ -255,13 +255,17 @@ function fearThinkStep(c, p, pl, occ, now) {
 function playerRangeSQM(p) {
   if (typeof playerDamage !== "function") return 1;
   const d = playerDamage(p);
+  // Weapon Proficiency: perk Attack Range soma alcance (oficial: armas de
+  // arremesso ganham SQMs extras — aqui vale para todo tipo de ataque)
+  const profR = (typeof proficiencyTotals === "function")
+    ? (proficiencyTotals(p).range || 0) : 0;
   if (d.type === "distance") {
     const w = p.equip && p.equip.weapon
       ? GAMEDATA.items[p.equip.weapon.item] : null;
-    return (w && w.range) ? Math.min(7, w.range) : 6;
+    return ((w && w.range) ? Math.min(7, w.range) : 6) + profR;
   }
-  if (d.type === "magic") return 6;   // 15.25: wands/rods alcancam mais
-  return 1;
+  if (d.type === "magic") return 6 + profR;   // 15.25: wands/rods alcancam mais
+  return 1 + profR;
 }
 
 /* ======================================================================

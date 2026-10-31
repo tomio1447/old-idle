@@ -20,7 +20,7 @@ const WHEEL_MP =  { knight: 1, paladin: 3, sorcerer: 6, druid: 6, monk: 2 };
 const WHEEL_CAP = { knight: 5, paladin: 4, sorcerer: 2, druid: 2, monk: 5 };
 const WHEEL_SKILL = { knight: "melee", paladin: "distance", sorcerer: "magic", druid: "magic", monk: "fist" };
 const WHEEL_LEECH = { life: 0.75, mana: 0.25 };
-const WHEEL_MIT_PER_POINT = 0.03;
+const WHEEL_MIT_PER_POINT = 0.00075; // fracao por ponto -> 0,075% (valor oficial pos Vocation Adjustments 2026 / crystalserver MITIGATION_INCREASE)
 
 /* Configuracao de pontos (player_wheel.cpp / configmanager) */
 const WHEEL_CONFIG = {

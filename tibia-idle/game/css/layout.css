@@ -2849,6 +2849,14 @@ div.item-sprite { background-repeat: no-repeat; }
   background: #0f0d0a; color: #ffe680; border: 1px solid #3a3428;
   font-size: 10px; padding: 1px 2px; font-family: inherit; cursor: pointer;
 }
+/* Motivo do bloqueio do slot ("2+ alvos", "mana 180", "cd"...): explica ao
+ * jogador por que a rotacao caiu na runa/ataque basico. */
+.combo-warn {
+  font-size: 9px; line-height: 1.1; padding: 1px 3px; border-radius: 3px;
+  color: #ffb050; background: rgba(80, 40, 8, .55);
+  border: 1px solid rgba(255, 176, 80, .35); max-width: 100%;
+}
+.combo-slot:has(.combo-warn:not([hidden])) { border-color: rgba(255, 176, 80, .5); }
 @media (max-width: 1100px) {
   .combo-bar { grid-template-columns: repeat(3, 1fr); }
 }

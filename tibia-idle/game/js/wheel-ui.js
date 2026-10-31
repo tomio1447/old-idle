@@ -23,7 +23,7 @@ function wheelSlotLabel(spec, voc) {
   if (spec.hp) parts.push("+" + WHEEL_HP[voc] + " HP/pt");
   if (spec.mana) parts.push("+" + WHEEL_MP[voc] + " Mana/pt");
   if (spec.cap) parts.push("+" + WHEEL_CAP[voc] + " Cap/pt");
-  if (spec.mit) parts.push("+3% Mitig/pt");
+  if (spec.mit) parts.push("+" + wheelPct(WHEEL_MIT_PER_POINT * 100) + " Mitig/pt");
   if (spec.leech) parts.push("+" + wheelPct(WHEEL_LEECH[spec.leech]) + " " + (spec.leech === "life" ? "Life" : "Mana") + " leech (max)");
   if (spec.skill) parts.push("+" + (WHEEL_SKILL[voc] === "distance" ? "Dist" : WHEEL_SKILL[voc]) + " (max)");
   if (spec.spell) {
@@ -78,6 +78,59 @@ function wheelFocusOverlays(p) {
   return h;
 }
 
+/* Menor caminho do no ate uma raiz pelo grafo de conexoes (BFS) —
+ * retorna [raiz, ..., slotId] ou null. Os nos intermediarios sao a
+ * sequencia de fatias que precisam ser completadas para evoluir. */
+function wheelPathToRoot(slotId) {
+  var prev = {}, queue = [slotId], seen = {};
+  seen[slotId] = true;
+  while (queue.length) {
+    var cur = queue.shift();
+    if (WHEEL_ROOTS.indexOf(cur) !== -1) {
+      var path = [];
+      for (var n = cur; n != null; n = prev[n]) path.push(n);
+      return path;
+    }
+    var nb = WHEEL_CONNECTED[cur] || [];
+    for (var i = 0; i < nb.length; i++) {
+      if (!seen[nb[i]]) { seen[nb[i]] = true; prev[nb[i]] = cur; queue.push(nb[i]); }
+    }
+  }
+  return null;
+}
+
+/* Camadas de sequencia: SVG com as arestas do grafo (trilha da evolucao)
+ * + caixas numeradas na ordem que a fatia selecionada exige completar. */
+function wheelPathsHtml(p) {
+  var sel = (typeof WHEEL_UI !== "undefined") ? WHEEL_UI.sel : null;
+  var path = (sel && WHEEL_OTC[sel] && WHEEL_ROOTS.indexOf(sel) === -1) ? wheelPathToRoot(sel) : null;
+  var inPath = {};
+  if (path) path.forEach(function (id) { inPath[id] = true; });
+  var lines = "", seen = {};
+  for (var a in WHEEL_CONNECTED) {
+    var oa = WHEEL_OTC[a]; if (!oa) continue;
+    var nb = WHEEL_CONNECTED[a] || [];
+    for (var i = 0; i < nb.length; i++) {
+      var b = nb[i], ob = WHEEL_OTC[b]; if (!ob) continue;
+      var key = a < b ? a + "|" + b : b + "|" + a;
+      if (seen[key]) continue; seen[key] = 1;
+      var cls = "wp-edge" + ((inPath[a] && inPath[b]) ? " wp-on" : "");
+      lines += '<line x1="' + oa.x + '" y1="' + oa.y + '" x2="' + ob.x + '" y2="' + ob.y + '" class="' + cls + '"/>';
+    }
+  }
+  var h = '<svg class="wheel-paths" viewBox="0 0 ' + WHEEL_SIZE + ' ' + WHEEL_SIZE + '" preserveAspectRatio="none">' + lines + '</svg>';
+  if (path) {
+    for (var s = 1; s < path.length; s++) {
+      var id = path[s], o = WHEEL_OTC[id];
+      if (!o) continue;
+      h += '<div class="wheel-step' + (wheelIsFull(p, id) ? " done" : "") +
+        '" style="left:calc(' + (o.x / WHEEL_SIZE * 100) + '% + 14px);top:calc(' +
+        (o.y / WHEEL_SIZE * 100) + '% - 16px)">' + s + '</div>';
+    }
+  }
+  return h;
+}
+
 function wheelStageOverlays(p) {
   var quads = [
     { color: "green", q: "TL" },
@@ -128,7 +181,7 @@ function wheelSummaryHtml(p) {
   if (t.hp) rows.push(["HP extra", "+" + t.hp]);
   if (t.mp) rows.push(["Mana extra", "+" + t.mp]);
   if (t.cap) rows.push(["Capacidade", "+" + t.cap]);
-  if (t.mitigation > 0) rows.push(["Mitigacao", "+" + Math.round(t.mitigation * 100) + "%"]);
+  if (t.mitigation > 0) rows.push(["Mitigacao", "+" + wheelPct(t.mitigation * 100)]);
   if (t.melee) rows.push(["Skill Melee", "+" + t.melee]);
   if (t.distance) rows.push(["Skill Distancia", "+" + t.distance]);
   if (t.magic) rows.push(["Magic Level", "+" + t.magic]);
@@ -174,10 +227,6 @@ function wheelSummaryHtml(p) {
   }
   h += '</div>';
   return h;
-}
-
-function wheelScrollPrice(scroll) {
-  return Math.floor(5000 * Math.pow(2, WHEEL_CONFIG.scrolls.indexOf(scroll)));
 }
 
 function openWheelModal() {
@@ -230,7 +279,7 @@ function wheelSelectionHtml(p, slotId) {
   if (spec.hp) { ded.push("+" + WHEEL_HP[voc] + " HP por ponto"); acc.push("+" + WHEEL_HP[voc] * pts + " HP"); }
   if (spec.mana) { ded.push("+" + WHEEL_MP[voc] + " Mana por ponto"); acc.push("+" + WHEEL_MP[voc] * pts + " Mana"); }
   if (spec.cap) { ded.push("+" + WHEEL_CAP[voc] + " Cap por ponto"); acc.push("+" + WHEEL_CAP[voc] * pts + " Cap"); }
-  if (spec.mit) { ded.push("+3% Mitigação por ponto"); acc.push("+" + (Math.round(WHEEL_MIT_PER_POINT * pts * 1000) / 10) + "% Mitigação"); }
+  if (spec.mit) { ded.push("+" + wheelPct(WHEEL_MIT_PER_POINT * 100) + " Mitigação por ponto"); acc.push("+" + wheelPct(WHEEL_MIT_PER_POINT * pts * 100) + " Mitigação"); }
 
   var conv = [];
   if (spec.skill) {
@@ -255,7 +304,6 @@ function wheelSelectionHtml(p, slotId) {
 
   var h = '<div class="wheel-sel wsel-' + spec.color + '">' +
     '<div class="wheel-sec-title">Seleção</div>' +
-    '<div class="tiny dim">Clique: +1 ponto · Botão direito: −1 ponto</div>' +
     '<div class="wsel-name" style="color:' + css + '">' + wheelNodeTitle(spec, voc) + '</div>' +
     '<div class="tiny dim">' + color.nome + ' · máx ' + spec.max + ' pts</div>';
   if (ded.length) {
@@ -302,15 +350,25 @@ function renderWheelModal(p, opts) {
       '<button class="wheel-preset-btn">Presets</button>' +
       '<span class="wheel-preset-name">Predefinido</span></div>';
 
+    var selId = (typeof WHEEL_UI !== "undefined") ? WHEEL_UI.sel : null;
+    var selSpec = selId && WHEEL_SLOTS[selId] ? WHEEL_SLOTS[selId] : null;
+    var selPts = selSpec ? wheelSlotPoints(p, selId) : 0;
+    var canAdd = !!(selSpec && wheelCanAllocate(p, selId));
+    var canSub = !!(selSpec && selPts > 0);
+    var ctl = '<div class="wheel-ctl-col">' +
+      '<button class="sm wheel-add-btn" id="wheel-add-sel" title="Adicionar +1 ponto na fatia selecionada"' +
+        (canAdd ? '' : ' disabled') + '>' +
+        (selSpec ? selPts + '/' + selSpec.max + ' +1' : '+1') + '</button>' +
+      '<button class="sm wheel-sub-btn" id="wheel-sub-sel" title="Remover 1 ponto da fatia selecionada"' +
+        (canSub ? '' : ' disabled') + '>\u22121</button>' +
+      '<button class="sm wheel-max-btn" id="wheel-max-sel" title="Gastar todos os pontos disponíveis nesta fatia até o limite"' +
+        (canAdd ? '' : ' disabled') + '>MAX</button>' +
+      '</div>';
+
     h += '<div class="wheel-top-info">' +
       '<span class="wheel-avail">Available: ' + fmtFull(avail) + ' / ' + fmtFull(total) + ' (' + fmtFull(spent) + ' spent)</span>' +
-      '<div class="wheel-legend">' +
-        '<span><i class="wl-dot" style="background:#4ade80"></i>Green</span>' +
-        '<span><i class="wl-dot" style="background:#f87171"></i>Red</span>' +
-        '<span><i class="wl-dot" style="background:#60a5fa"></i>Blue</span>' +
-        '<span><i class="wl-dot" style="background:#c084fc"></i>Purple</span>' +
-      '</div>' +
-      '<span class="tiny dim" style="margin-left:auto">Click=+1pt | RightClick=-1pt</span>' +
+      '<span style="flex:1"></span>' +
+      ctl +
       '<button class="sm" id="wheel-reset" title="Remove todos os pontos da roda">Reset</button>' +
       '</div>';
 
@@ -322,7 +380,8 @@ function renderWheelModal(p, opts) {
     for (var sid0 in WHEEL_SLOTS) h += wheelSliceHtml(p, sid0);
     h += '<img class="wheel-voc-img" src="' + wheelVocImage(p.voc) + '?v=wheel-otc-v1" alt="" draggable="false">' +
         wheelStageOverlays(p) +
-        wheelFocusOverlays(p);
+        wheelFocusOverlays(p) +
+        wheelPathsHtml(p);
     for (var id in WHEEL_SLOTS) h += wheelNodeHtml(p, id);
     h += '</div></div><div class="wheel-right">';
     if (typeof WHEEL_UI !== "undefined" && WHEEL_UI.sel && WHEEL_SLOTS[WHEEL_UI.sel])
@@ -332,9 +391,8 @@ function renderWheelModal(p, opts) {
       h += '<div class="wheel-summary-toggle"><button class="sm" data-wsummary="0">Hide summary</button></div>';
     } else {
       h += '<div class="wheel-summary-toggle"><button class="sm" data-wsummary="1">Show bonus summary</button></div>';
-      h += '<div class="tiny dim" style="padding:10px;text-align:center">Click nodes to allocate points.<br>Green=available | Dim=locked | Full=completed</div>';
+      h += '<div class="tiny dim" style="padding:10px;text-align:center">Select a slice to allocate points.</div>';
     }
-    h += renderScrollSection(p);
     h += '</div></div>';
   } else if (tab === "gem") {
     h += renderGemAtelier(p);
@@ -473,23 +531,9 @@ function renderFragmentWorkshop(p) {
   return h;
 }
 
-function renderScrollSection(p) {
-  var h = '<div class="wheel-sec" style="margin-top:8px"><div class="wheel-sec-title">Promotion Scrolls</div>';
-  for (var i = 0; i < WHEEL_CONFIG.scrolls.length; i++) {
-    var sc = WHEEL_CONFIG.scrolls[i], done = !!p.wheel.scrolls[sc.id];
-    var price = wheelScrollPrice(sc);
-    h += '<div class="stat-row"><span class="k">' + sc.item + '</span>' +
-      '<span class="v">' + (done
-        ? '<span style="color:#9ce84a">deciphered</span>'
-        : '<button class="sm" data-buy-scroll="' + sc.id + '">+ ' + sc.pontos + ' pts \u00b7 ' + fmtFull(price) + ' gp</button>') +
-      '</span></div>';
-  }
-  h += '<div class="tiny dim mt4">Scrolls grant extra permanent points (level 51+).</div></div>';
-  return h;
-}
-
-/* Escala o canvas 522x522 (transform) para caber no container, mantendo a
- * composicao do cliente intacta em qualquer tamanho. */
+/* Escala o canvas 522x522 (transform) para ocupar o espaco livre do
+ * container — reduz em telas apertadas e amplia (ate 1.45x) quando ha
+ * folga, mantendo a composicao do cliente intacta em qualquer tamanho. */
 function wheelFitCanvas(root) {
   var wrap = root && root.querySelector ? root.querySelector(".wheel-canvas-wrap") : null;
   if (!wrap) return;
@@ -498,22 +542,39 @@ function wheelFitCanvas(root) {
   var host = wrap.parentElement; // .wheel-body
   var embedded = !!(root.closest && root.closest(".chard-wheel-embed")) ||
     (wrap.closest && wrap.closest(".chard-wheel-embed"));
+  var cs = host && typeof getComputedStyle === "function" ? getComputedStyle(host) : null;
+  var padX = cs ? (parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)) || 0 : 0;
+  var padY = cs ? (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)) || 0 : 0;
+  var gapX = cs ? (parseFloat(cs.columnGap) || parseFloat(cs.gap) || 0) : 0;
+  // so desconta o painel direito quando ele esta lado a lado (mesma linha)
   var rightW = 0;
   var rp = host && host.querySelector ? host.querySelector(".wheel-right") : null;
-  if (rp && host.clientWidth > 900) rightW = rp.offsetWidth + 16;
-  var availW = host && host.clientWidth > 0 ? host.clientWidth - rightW : 0;
+  if (rp && Math.abs(rp.offsetTop - wrap.offsetTop) < 10) rightW = rp.offsetWidth + gapX;
+  var availW = host && host.clientWidth > 0 ? host.clientWidth - padX - rightW : 0;
   var availH = 0;
   if (embedded) {
-    availH = host && host.clientHeight > 0 ? host.clientHeight : 0;
+    availH = host && host.clientHeight > 0 ? host.clientHeight - padY : 0;
   } else {
     availH = Math.max(0, (window.innerHeight || 900) - 300);
   }
-  var s = 1;
-  if (availW > 0) s = Math.min(s, availW / 522);
-  if (availH > 0) s = Math.min(s, availH / 522);
-  s = Math.max(0.45, Math.min(1, s));
+  var s;
+  if (embedded) {
+    // embutida: a roda e dimensionada pela largura livre; a altura do wrap
+    // e clipada no espaco livre -> o scroll aparece so na area da roda e o
+    // painel de informacoes permanece fixo
+    s = availW > 0 ? availW / 522 : 1;
+    s = Math.max(0.45, Math.min(1.6, s));
+  } else {
+    s = 99;
+    if (availW > 0) s = Math.min(s, availW / 522);
+    if (availH > 0) s = Math.min(s, availH / 522);
+    if (s === 99) s = 1;
+    s = Math.max(0.45, Math.min(1.25, s));
+  }
   wrap.style.width = Math.round(522 * s) + "px";
-  wrap.style.height = Math.round(522 * s) + "px";
+  var scaledH = Math.round(522 * s);
+  wrap.style.height = (embedded && availH > 0
+    ? Math.min(scaledH, availH) : scaledH) + "px";
   cv.style.transform = "scale(" + s + ")";
 }
 
@@ -542,6 +603,27 @@ function bindWheel(root, rerender) {
   });
   var close = $("#wheel-close");
   if (close) close.addEventListener("click", function(){ $("#modal").classList.remove("show","wide"); });
+  var addSelBtn = body.querySelector("#wheel-add-sel");
+  if (addSelBtn) addSelBtn.addEventListener("click", function(){
+    if (typeof WHEEL_UI === "undefined" || !WHEEL_UI.sel) { toast("Selecione uma fatia da roda."); return; }
+    if (wheelAllocate(G.p, WHEEL_UI.sel)) save();
+    rerender();
+  });
+  var subSelBtn = body.querySelector("#wheel-sub-sel");
+  if (subSelBtn) subSelBtn.addEventListener("click", function(){
+    if (typeof WHEEL_UI === "undefined" || !WHEEL_UI.sel) { toast("Selecione uma fatia da roda."); return; }
+    if (wheelRemove(G.p, WHEEL_UI.sel)) save();
+    else toast("Remoção bloqueada: quebraria o caminho de fatias dependentes.");
+    rerender();
+  });
+  var maxSelBtn = body.querySelector("#wheel-max-sel");
+  if (maxSelBtn) maxSelBtn.addEventListener("click", function(){
+    if (typeof WHEEL_UI === "undefined" || !WHEEL_UI.sel) { toast("Selecione uma fatia da roda."); return; }
+    var n = 0;
+    while (wheelAllocate(G.p, WHEEL_UI.sel)) n++;
+    if (n > 0) { save(); toast("+" + n + " ponto" + (n === 1 ? "" : "s") + " na fatia."); }
+    rerender();
+  });
   var resetBtn = body.querySelector("#wheel-reset");
   if (resetBtn) resetBtn.addEventListener("click", function(){
     var p = G.p;
@@ -580,18 +662,7 @@ function bindWheel(root, rerender) {
       rerender();
     });
   });
-  body.querySelectorAll("[data-buy-scroll]").forEach(function(el){
-    el.addEventListener("click", function(){
-      var id = parseInt(el.dataset.buyScroll, 10);
-      var sc = WHEEL_CONFIG.scrolls.filter(function(x){return x.id===id;})[0];
-      if (!sc || G.p.wheel.scrolls[id]) return;
-      var price = wheelScrollPrice(sc);
-      if (G.p.level < 51) { toast("Level 51+ required."); return; }
-      if (!spendGold(G.p, price)) { toast("Not enough gold."); return; }
-      G.p.wheel.scrolls[id] = 1;
-      toast("Deciphered <b>" + sc.item + "</b>: +" + sc.pontos + " points!"); save(); rerender();
-    });
-  });
+
   function gemToast(res, okMsg) {
     if (!res || !res.ok) { toast((res && res.err) || "Failed."); return; }
     toast(okMsg); save(); rerender();

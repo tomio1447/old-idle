@@ -4588,6 +4588,7 @@ function renderComboBar(p, el) {
     save();
     renderComboBar(p, el);
   });
+  if (typeof updateComboDiags === "function") updateComboDiags();
 }
 
 function desenhaComboSlot(p, entrada, i) {
@@ -4625,7 +4626,41 @@ return `<div class="combo-slot vazio" data-combo-slot="${i}" draggable="true">
     <div class="combo-nome small">${info.nome}</div>
     <div class="tiny dim">${info.tipo}${info.lvl ? " · nv " + info.lvl : ""}</div>
     <div class="combo-alvos">${seletor}</div>
+    <div class="combo-warn" data-combo-warn="${i}" hidden></div>
   </div>`;
+}
+
+/* Badge "por que nao sai" em cada slot da rotacao: cooldown, mana,
+ * alvos insuficientes... Usa a mesma logica do motor (comboSlotDiag). */
+function updateComboDiags() {
+  const p = G && G.p;
+  const box = $("#helper-combo");
+  if (!p || !box || typeof comboSlotDiag !== "function") return;
+  const c = G.combat || null;
+  const now = Date.now();
+  const alvo = c && c.target && c.target.hp > 0 ? c.target
+    : c && Array.isArray(c.mobs)
+      ? c.mobs.find((m) => m && m.hp > 0) : null;
+  const lista = typeof ensureCombo === "function" ? ensureCombo(p)
+    : (p.config && p.config.combo) || [];
+  $$("#helper-combo [data-combo-warn]").forEach((el) => {
+    const i = Number(el.dataset.comboWarn) || 0;
+    const entrada = lista[i];
+    const motivo = entrada ? comboSlotDiag(c, p, entrada, alvo, now) : null;
+    if (motivo) {
+      el.hidden = false;
+      el.textContent = motivo;
+      el.title = "Bloqueada: " + motivo +
+        (/\d\+ alvos/.test(motivo)
+          ? " — a área/corrente só dispara com " + motivo.replace("+ alvos", "+") +
+            " dentro do alcance. Reduza o seletor para 1 se quiser em alvo único."
+          : "");
+    } else {
+      el.hidden = true;
+      el.textContent = "";
+      el.title = "";
+    }
+  });
 }
 
 /* ------------------------------------------------- modal de escolha */
@@ -4648,8 +4683,9 @@ function comboOpcoes(p) {
     if (s.type !== "attack") continue;
     if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
         : (s.vocs.indexOf(p.voc) === -1)) continue;
+    // multi-alvo = matriz de área OU cadeia (chain): ambos entram na aba Área
     out.push({ kind: "spell", id: id, s: s, lvl: s.lvl || 1,
-               area: !!s.area });
+               area: !!(s.area || Number(s.chain) > 1) });
   }
   const runas = typeof suppliesOf === "function"
     ? suppliesOf(p, "attack").map((x) => x[0])
@@ -4674,7 +4710,8 @@ function desenhaComboPicker() {
 
   let itens = comboOpcoes(p);
   if (COMBO_MODAL.cat === "ataque") itens = itens.filter((o) => o.kind === "spell" && !o.area);
-  else if (COMBO_MODAL.cat === "area") itens = itens.filter((o) => o.area);
+  // Área = só MAGIAS multi-alvo (matriz/cadeia). Runas nunca aqui — aba própria.
+  else if (COMBO_MODAL.cat === "area") itens = itens.filter((o) => o.kind === "spell" && o.area);
   else if (COMBO_MODAL.cat === "runas") itens = itens.filter((o) => o.kind === "rune");
   if (busca) {
     itens = itens.filter((o) => {

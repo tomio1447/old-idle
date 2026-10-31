@@ -454,6 +454,11 @@ function effSkill(p, which) {
   if (typeof wheelSkillBonus === "function" && p.wheel) {
     v += wheelSkillBonus(p, which);
   }
+  // Weapon Proficiency: perk Skill Bonus da arma empunhada (flat, antes
+  // dos multiplicadores percentuais como no servidor)
+  if (typeof proficiencySkillBonus === "function") {
+    v += proficiencySkillBonus(p, which);
+  }
   // Loyalty: flat +N em skills efetivas (não altera o save)
   if (typeof loyaltySkillBonus === "function") {
     v += loyaltySkillBonus(p);
@@ -552,7 +557,10 @@ function playerDamage(p) {
     // armas de munição infinita (spear) usam só o próprio ataque
     const throwW = !!(it.inf || (typeof weaponAmmoKind === "function" && !weaponAmmoKind(it, w.item)));
     const ammo = throwW ? null : (p.equip.ammo ? GAMEDATA.items[p.equip.ammo.item] : null);
-    let atk = (it.atk || 0) + (ammo ? (ammo.atk || 0) : 0);
+    // Weapon Proficiency: perk Attack Damage soma no ataque da arma
+    const profAtk = (typeof proficiencyTotals === "function")
+      ? (proficiencyTotals(p).atk || 0) : 0;
+    let atk = (it.atk || 0) + profAtk + (ammo ? (ammo.atk || 0) : 0);
     atk = Math.floor(atk * 1.2);            // +20% attack value (15.25)
     // municao elemental corta o dano pela metade contra monstro (o resto
     // vira dano do elemento), como no getWeaponDamage do servidor
@@ -574,8 +582,11 @@ function playerDamage(p) {
     return { min: min, max: max, element: el, type: "distance" };
   }
   const sk = weaponSkill(p);
+  // Weapon Proficiency: perk Attack Damage soma no ataque da arma
+  const profAtk = (typeof proficiencyTotals === "function")
+    ? (proficiencyTotals(p).atk || 0) : 0;
   // +20% attack value (15.25) sobre o ataque da arma
-  let fis = it ? Math.floor((it.atk || 0) * 1.2) : 7;         // punho = attack 7 no canary
+  let fis = it ? Math.floor(((it.atk || 0) + profAtk) * 1.2) : 7;         // punho = attack 7 no canary
   // KNIGHT: dano base +30% (pedido do dono do jogo) — multiplica o ataque
   // da arma antes da rolagem, então vale para o dano físico de melee.
   // Elite Knight usa a mesma base (CanaryVocation.baseVocName).

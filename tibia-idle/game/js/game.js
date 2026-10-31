@@ -3232,6 +3232,29 @@ function drainEvents() {
         r.addFloater(x, y - 0.06, "+" + fmtDmg(shownExp) + " xp", "#ffffff");
         r.addEffect(x, y, "poff");
         addLog("exp", `Matou <b>${e.name}</b> · <span style="color:#9ce84a">+${fmtFull(shownExp)} xp</span>`);
+        // Weapon Proficiency: XP da arma empunhada + aviso de level up.
+        // No online o valor chega dentro do share do próprio jogador.
+        const profMe = (Array.isArray(e.shares) && G.p)
+          ? e.shares.find((row) => row && String(row.id) === String(G.p.id))
+          : null;
+        const profXpEv = profMe && profMe.profXp !== undefined
+          ? profMe.profXp : (Number(e.profXp) || 0);
+        const profSlugEv = (profMe && profMe.profSlug) || e.profSlug || null;
+        const profUpsEv = (profMe && profMe.profUps) || e.profUps || 0;
+        if (profXpEv > 0) {
+          r.addFloater(x, y - 0.13, "+" + fmtDmg(profXpEv) + " prof",
+            "#6fc3ff");
+        }
+        if (profUpsEv > 0 && profSlugEv && G.p) {
+          const itP = GAMEDATA.items[profSlugEv];
+          const nmP = (itP && itP.n) || profSlugEv;
+          const lvP = (typeof profLevel === "function")
+            ? profLevel(G.p, profSlugEv) : 0;
+          addLog("level", `Proficiência: <b>${nmP}</b> subiu para o nível ${lvP}.`);
+          if (typeof toast === "function") {
+            toast(`Proficiência: <b>${nmP}</b> nível ${lvP} — escolha um perk na aba Proficiência.`, "level");
+          }
+        }
         // v27 — pedido do dono: sem toast de "loot raro" (flutuante à
         // esquerda) e sem a mensagem verde que sobe na tela para loot comum.
         // Para BOSS o dono pediu a mensagem NA TELA informando o loot, no
@@ -4266,7 +4289,7 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
         localHelperPresets=playerRef.helperPresets,localHelperActivePreset=playerRef.helperActivePreset,
         localCharms=playerRef.charms,localCharmRace=playerRef.charmRace,
         localCharmPoints=playerRef.charmPoints,localCharmsPagos=playerRef.charmsPagos,
-        localBestiary=playerRef.bestiary,
+        localBestiary=playerRef.bestiary,localProf=playerRef.prof,
         localLootConfig=(playerRef.lootConfig&&typeof playerRef.lootConfig==="object"&&
           !Array.isArray(playerRef.lootConfig))?{
             noCollect:Array.isArray(playerRef.lootConfig.noCollect)?playerRef.lootConfig.noCollect.slice():[],
@@ -4326,6 +4349,22 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
         playerRef.missions=mergeMissionMaps(remote.p.missions,localMissions);
       if(localMissionsDone&&typeof localMissionsDone==="object")
         playerRef.missionsDone=Object.assign({},remote.p.missionsDone||{},localMissionsDone);
+      /* Weapon Proficiency: remote.prof vem do descriptor da instância
+       * (hidratado no início do combate). XP é autoritativo do servidor
+       * (ele credita por kill) -> fica o MAIOR valor por arma. As escolhas
+       * de perk são client-owned -> a cópia local sempre vence, senão um
+       * tick gerado antes do save apagaria o perk recém-escolhido. */
+      if(localProf||remote.p.prof){
+        const rProf=(remote.p.prof&&typeof remote.p.prof==="object")?remote.p.prof:{},
+          lProf=(localProf&&typeof localProf==="object")?localProf:{};
+        const xp=Object.assign({},rProf.xp||{});
+        if(lProf.xp)for(const s of Object.keys(lProf.xp))
+          xp[s]=Math.max(Number(xp[s])||0,Number(lProf.xp[s])||0);
+        const perks=Object.assign({},rProf.perks||{});
+        if(lProf.perks)for(const s of Object.keys(lProf.perks))
+          perks[s]=lProf.perks[s];
+        playerRef.prof={xp:xp,perks:perks};
+      }
       for(const key of Object.keys(playerVisual))playerRef[key]=playerVisual[key];
       if(typeof rewardChestEnsureShape==="function")rewardChestEnsureShape(playerRef);
       if(typeof renderRewardButton==="function")renderRewardButton(playerRef);}
@@ -4765,6 +4804,15 @@ function loop(ts) {
   // cooldown nao pausa ao voltar para a cidade
   if (typeof renderCooldownBar === "function") renderCooldownBar(G.p);
   if (typeof avatarTick === "function") avatarTick(G.p, Date.now());
+  // Badge "por que nao sai" nos slots do combo: throttle leve, so quando a
+  // barra de rotacao esta na tela.
+  if (typeof updateComboDiags === "function") {
+    const _cdt = Date.now();
+    if (!G._comboDiagAt || _cdt - G._comboDiagAt >= 500) {
+      G._comboDiagAt = _cdt;
+      updateComboDiags();
+    }
+  }
 
   if (!G.paused && G.combat) {
     // Level/skill up detection funciona nos dois modos (online e local).
@@ -5400,6 +5448,10 @@ function bindControls() {
     });
   });
   $("#btn-switch").addEventListener("click", openCharacterModal);
+  const btnProf = $("#btn-prof");
+  if (btnProf) btnProf.addEventListener("click", () => {
+    if (typeof openCharDetails === "function") openCharDetails("proficiencia");
+  });
   $("#btn-reset").addEventListener("click", () => {
     if (confirm("Apagar o personagem e recomeçar? Isso não pode ser desfeito."))
       wipeSave();

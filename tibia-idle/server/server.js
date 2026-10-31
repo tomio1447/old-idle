@@ -2688,8 +2688,13 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
   if(leader&&leader.p&&leader!==seller&&
      Number(leader.accountId||(leader.p&&leader.p.accountId)||0)===sellerAcc){
     live=leader;
-    leader.p.lootPouch=applyDelta(leader.p.lootPouch||{},pouchDelta);
-    leader.p.bag=applyDelta(leader.p.bag||{},bagDelta);
+    /* Containers compartilhados por REFERÊNCIA (shareInstanceContainers): a
+     * mutação do executor já atingiu a cópia do líder — aplicar o delta de
+     * novo cobraria o item duas vezes (ex.: vender 5 descontaria 10). */
+    if(leader.p.lootPouch!==seller.p.lootPouch)
+      leader.p.lootPouch=applyDelta(leader.p.lootPouch||{},pouchDelta);
+    if(leader.p.bag!==seller.p.bag)
+      leader.p.bag=applyDelta(leader.p.bag||{},bagDelta);
   }
   const finalPouch=Object.assign({},live.p.lootPouch||{});
   const finalBag=Object.assign({},live.p.bag||{});
@@ -2701,8 +2706,12 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
   for(const entry of players){
     if(!entry||!entry.p)continue;
     if(Number(entry.accountId||(entry.p&&entry.p.accountId)||0)!==sellerAcc)continue;
-    entry.p.lootPouch=Object.assign({},finalPouch);
-    entry.p.bag=Object.assign({},finalBag);
+    /* Mantém a referência ÚNICA por conta (shareInstanceContainers): clones
+     * separados por membro voltariam a divergir na próxima mutação. */
+    live.p.lootPouch=live.p.lootPouch||{};
+    live.p.bag=live.p.bag||{};
+    entry.p.lootPouch=live.p.lootPouch;
+    entry.p.bag=live.p.bag;
     const ownEquip=(Array.isArray(entry.p.itemInstances)?entry.p.itemInstances:[])
       .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")===0);
     entry.p.itemInstances=finalInsts.map((i)=>Object.assign({},i)).concat(ownEquip);

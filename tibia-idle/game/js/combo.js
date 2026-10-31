@@ -300,6 +300,70 @@ function comboEscolhe(c, p, alvo, now, skipIds) {
   return null;
 }
 
+/* Por que a entrada NAO esta pronta agora? Devolve null quando pronta ou uma
+ * string curta com o motivo — alimenta o badge dos slots da rotacao para o
+ * jogador enxergar o motivo de a runa/spell nao sair. */
+function comboSlotDiag(c, p, entrada, alvo, now) {
+  if (!entrada) return null;
+  now = now || Date.now();
+  const need = Math.max(1, Number(entrada.min) || 1);
+  if (entrada.kind === "spell") {
+    const s = SPELLS[entrada.id];
+    if (!s || s.type !== "attack") return "indisponível";
+    if (typeof spellForVoc === "function" ? !spellForVoc(s, p.voc)
+        : s.vocs.indexOf(p.voc) === -1) return "vocação";
+    if (p.level < s.lvl) return "nv " + s.lvl;
+    if (s.ml && effMagic(p) < s.ml) return "ml " + s.ml;
+    if (p.mp < s.mana) return "mana " + s.mana;
+    if (typeof cdReady === "function" && !cdReady(p, entrada.id, now)) return "cd";
+    // Formato do engine online (timestamps crus): _spellCd[id]/_groupCd[g].
+    if (p._spellCd && p._spellCd[entrada.id] > now) return "cd";
+    if (s.grupos && p._groupCd) {
+      for (const g of Object.keys(s.grupos))
+        if ((p._groupCd[g] || 0) > now) return "cd";
+    }
+    if (s.needWeapon && !(p.equip && p.equip.weapon)) return "arma";
+    if (c && typeof entCd === "function" && entCd(c, p, "offensiveCd") > now)
+      return "exaustão";
+    if (p._offensiveCd > now) return "exaustão";
+    if (comboEhArea(entrada) && need > 1) {
+      if (!comboDiagAlvos(c, entrada, alvo)) return need + "+ alvos";
+    }
+    return null;
+  }
+  const s = SUPPLIES[entrada.id];
+  if (!s || s.type !== "attack") return "indisponível";
+  if (typeof supplyAllowed === "function" && !supplyAllowed(p, entrada.id))
+    return "vocação";
+  if (typeof canRechargeSupply === "function" &&
+      !canRechargeSupply(p, entrada.id)) return "sem runa";
+  if (c && c.runeCd > now) return "cd";
+  if (p._runeCd > now) return "cd";
+  if (c && typeof entCd === "function" && entCd(c, p, "offensiveCd") > now)
+    return "exaustão";
+  if (p._offensiveCd > now) return "exaustão";
+  if (p._groupCd && (p._groupCd["1"] || 0) > now) return "cd";
+  if (comboEhArea(entrada) && need > 1 && !comboDiagAlvos(c, entrada, alvo))
+    return need + "+ alvos";
+  return null;
+}
+
+/* A area/chain pegaria `min` alvos em ALGUM mob vivo como alvo (nao so no
+ * alvo atual) — o motor so dispara no alvo perseguido, entao isto e uma
+ * aproximacao otimista: se nem no melhor alvo atinge `min`, falta alvo. */
+function comboDiagAlvos(c, entrada, alvo) {
+  if (!c || !Array.isArray(c.mobs)) return true;
+  const need = Math.max(1, Number(entrada.min) || 1);
+  const vivos = c.mobs.filter((m) => m && m.hp > 0);
+  if (vivos.length < need) return false;
+  const testar = alvo && alvo.hp > 0
+    ? [alvo].concat(vivos.filter((m) => m !== alvo)) : vivos;
+  for (const cand of testar) {
+    if (comboAlvosSuficientes(c, entrada, cand)) return true;
+  }
+  return false;
+}
+
 /* O combo tem pelo menos um slot preenchido? */
 function comboAtivo(p) {
   return ensureCombo(p).some((s) => s);

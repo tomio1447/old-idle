@@ -122,6 +122,22 @@ function augmentTotals(p, spellId) {
       }
     }
   }
+  // Weapon Proficiency: perks de augment da arma empunhada somam aos dos
+  // itens (mesmo formato — % para dano/leech/crit, ms para cooldown).
+  if (typeof proficiencyAugTotals === "function") {
+    const pa = proficiencyAugTotals(p, spellId);
+    if (pa) {
+      t.baseDmg += pa.baseDmg || 0;
+      t.baseHeal += pa.baseHeal || 0;
+      t.critDmg += pa.critDmg || 0;
+      t.critChance += pa.critChance || 0;
+      t.cdReduction += pa.cdReduction || 0;
+      t.lifeLeech += pa.lifeLeech || 0;
+      t.manaLeech += pa.manaLeech || 0;
+      if (pa.targets) t.chain += pa.targets;
+      t.total++;
+    }
+  }
   return t;
 }
 
