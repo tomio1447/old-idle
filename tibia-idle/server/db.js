@@ -3275,13 +3275,28 @@ let _db = null;
 async function getDb() {
   if (_db) return _db;
   if (MYSQL_HOST) {
-    try {
-      _db = await MysqlStore();
-      console.log("[db] MySQL conectado em", MYSQL_HOST + ":" + MYSQL_PORT + "/" + MYSQL_DB);
-      return _db;
-    } catch (e) {
-      console.warn("[db] falha no MySQL (" + e.message + ") — usando storage JSON local");
+    /* MYSQL_HOST configurado = backend fixo MySQL. O fallback silencioso
+     * para o JsonStore fazia o servidor subir com OUTRO dataset (conta 1/1
+     * aparecia com personagens diferentes conforme o MySQL local estava de
+     * pé). Tenta por ~30s (cobre o XAMPP subindo junto no boot) e falha de
+     * forma explícita em vez de trocar de banco sem avisar. */
+    const attempts = Math.max(1, Number(process.env.DB_CONNECT_ATTEMPTS) || 12);
+    let lastErr = null;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        _db = await MysqlStore();
+        console.log("[db] MySQL conectado em", MYSQL_HOST + ":" + MYSQL_PORT + "/" + MYSQL_DB);
+        return _db;
+      } catch (e) {
+        lastErr = e;
+        console.warn("[db] MySQL indisponível (" + e.message + ") — tentativa " + i + "/" + attempts);
+        if (i < attempts) await new Promise((r) => setTimeout(r, 2500));
+      }
     }
+    throw new Error(
+      "[db] MySQL configurado (" + MYSQL_HOST + ":" + MYSQL_PORT + "/" + MYSQL_DB +
+      ") mas inacessível: " + (lastErr && lastErr.message) +
+      ". Inicie o MySQL local (XAMPP) ou remova MYSQL_* do .env para usar o storage JSON.");
   }
   _db = new JsonStore();
   console.log("[db] storage JSON local em", DATA_DIR);
