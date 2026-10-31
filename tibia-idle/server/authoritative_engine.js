@@ -4666,17 +4666,20 @@ function equipFromContainerAuth(p,slug,source,opts){
   if(fromPouch){
     const n=Number(p.lootPouch&&p.lootPouch[slug])||0;
     if(n<=0)return {ok:false,msg:"Item não está na Loot Pouch"};
+  }else if(authItemNeedsBagInstance(slug)){
+    // Itens instanciados: a presença é o itemInstances (loc "bag"), não o
+    // contador p.bag[slug] — o contador diverge quando a bag vem do shared
+    // inventory (instância compartilhada sem entrada no mapa de stacks),
+    // e o equip falhava com "Item não está na mochila" estando visível.
+    const arr=p.itemInstances||[];
+    const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
+      (!opts.instId||String(inst.id)===String(opts.instId)));
+    if(idx<0)return {ok:false,msg:"Item não está na mochila"};
+    takenInst=arr[idx];
+    p.itemInstances=arr.filter((_,i)=>i!==idx);
   }else{
     const n=Number(p.bag&&p.bag[slug])||0;
     if(n<=0)return {ok:false,msg:"Item não está na mochila"};
-    if(authItemNeedsBagInstance(slug)){
-      const arr=p.itemInstances||[];
-      const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
-        (!opts.instId||String(inst.id)===String(opts.instId)));
-      if(idx<0)return {ok:false,msg:"Item não está na mochila"};
-      takenInst=arr[idx];
-      p.itemInstances=arr.filter((_,i)=>i!==idx);
-    }
   }
   const lvl=Number(it.lvl!==undefined?it.lvl:it.level)||0;
   if(lvl>(Number(p.level)||1))return {ok:false,msg:"Nível insuficiente"};
