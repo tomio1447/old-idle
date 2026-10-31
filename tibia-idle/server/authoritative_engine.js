@@ -1492,7 +1492,14 @@ function authBagUsedSlots(p){
   used+=Object.keys(p.bag||{}).filter((s)=>(Number(p.bag[s])||0)>0&&!authItemNeedsBagInstance(s)).length;
   return used;
 }
-function authBagSlots(p){return Math.max(1,Math.floor(Number(p.bagSlots)||8));}
+/* Mesma regra do cliente (bagSlots): capacidade = slots da backpack
+ * equipada do próprio personagem — nunca a soma da party. */
+function authBagSlots(p){
+  const bp=p&&p.equip&&p.equip.backpack;
+  const slug=(bp&&(bp.item||bp.slug))||"bag";
+  const it=ITEMS[slug];
+  return Math.max(1,Math.floor(Number(it&&it.slots)||8));
+}
 function authAddItemToBag(p,slug,count){
   if(!p||!slug)return false;
   count=Math.max(1,Math.floor(Number(count)||1));
@@ -6100,8 +6107,36 @@ function ensureSpawnIds(auth){
   }
   while(auth.spawnIds.length<pack)auth.spawnIds.push("srv-slot-"+auth.spawnIds.length);
 }
+/* Hunts OTBM/externas não existem em HUNTS: o cliente serializa combat.hunt
+ * no descriptor e a autoridade guarda os campos relevantes em auth.hunt*.
+ * Sem isso o spawnPool ficava CONGELADO com as espécies da 1ª leva hidratada
+ * (ex.: instância hidratada sem mutated-human nunca mais o spawnava). */
+function captureAuthHuntDef(auth,hunt){
+  if(!auth||!hunt||typeof hunt!=="object")return;
+  if(Array.isArray(hunt.monsters)&&hunt.monsters.length)auth.huntMonsters=hunt.monsters.slice();
+  if(Array.isArray(hunt.bossMobs)&&hunt.bossMobs.length)auth.huntBossMobs=hunt.bossMobs.slice();
+  if(hunt.spawnWeights&&typeof hunt.spawnWeights==="object")auth.huntSpawnWeights=Object.assign({},hunt.spawnWeights);
+  if(Number(hunt.packMin)>0)auth.huntPackMin=Number(hunt.packMin);
+  if(Number(hunt.packMax)>0)auth.huntPackMax=Number(hunt.packMax);
+  if(Number(hunt.pack)>0)auth.huntPack=Number(hunt.pack);
+  if(hunt.cat)auth.huntCat=String(hunt.cat);
+}
+function authHuntDef(auth){
+  if(!auth)return null;
+  const hunt=HUNTS[auth.huntId];
+  if(hunt)return hunt;
+  const out={};
+  if(Array.isArray(auth.huntMonsters)&&auth.huntMonsters.length)out.monsters=auth.huntMonsters;
+  if(Array.isArray(auth.huntBossMobs)&&auth.huntBossMobs.length)out.bossMobs=auth.huntBossMobs;
+  if(auth.huntSpawnWeights&&typeof auth.huntSpawnWeights==="object")out.spawnWeights=auth.huntSpawnWeights;
+  if(Number(auth.huntPackMin)>0)out.packMin=Number(auth.huntPackMin);
+  if(Number(auth.huntPackMax)>0)out.packMax=Number(auth.huntPackMax);
+  if(Number(auth.huntPack)>0)out.pack=Number(auth.huntPack);
+  if(auth.huntCat)out.cat=String(auth.huntCat);
+  return (out.monsters||out.spawnWeights||out.packMin)?out:null;
+}
 function huntWaveSize(auth){
-  const hunt=HUNTS[auth&&auth.huntId]||{};
+  const hunt=authHuntDef(auth)||{};
   const cat=String(hunt.cat||"");
   const hard=cat==="hard"||cat==="hardcore";
   const minPack=Number(hunt.packMin)||(hard?6:0);
@@ -6110,7 +6145,7 @@ function huntWaveSize(auth){
   return Math.max(1,Number(hunt.pack)||Number(auth&&auth.pack)||3);
 }
 function pickHuntSpawnSlug(auth){
-  const hunt=HUNTS[auth&&auth.huntId],pool=auth&&auth.spawnPool||[];
+  const hunt=authHuntDef(auth),pool=auth&&auth.spawnPool||[];
   const weights=hunt&&hunt.spawnWeights;
   if(weights&&typeof weights==="object"){
     // Inclui os bossMobs da hunt (ex.: 4 mini bosses do Falcon Bastion com
@@ -6139,7 +6174,7 @@ function spawnHuntWave(auth,now,opts){
   // 1ª leva do cliente e ficava CONGELADO pelo resto da instância — monstro
   // ausente da primeira leva (ex.: paladin-s-apparition na Mirrored
   // Nightmare) nunca mais spawnava, mesmo estando na lista do hunt.
-  const hunt=HUNTS[auth.huntId];
+  const hunt=authHuntDef(auth);
   if(hunt&&Array.isArray(hunt.monsters)){
     for(const slug of hunt.monsters){
       if(!auth.spawnPool.includes(slug)&&monsterDef(slug))auth.spawnPool.push(slug);
@@ -7459,6 +7494,7 @@ function initializeAuthority(descriptor,instanceId,now){
   shareAccountGoldWallets(auth);
   sharePartyCapacity(auth);
   shareInstanceContainers(auth);
+  captureAuthHuntDef(auth,combat.hunt);
   for(const old of visual){const slug=String(old.slug||""),m=makeMob(auth,slug,!!old.boss,String(old.id||""),old);if(m){
       for(const key of ["cx","cy","x","y","sx","sy"])if(old[key]!==undefined)m[key]=old[key];
       if(old.cx!==undefined&&old.cy!==undefined&&!auth.spawnPoints.some((p)=>p.cx===old.cx&&p.cy===old.cy))
@@ -7484,7 +7520,7 @@ function initializeAuthority(descriptor,instanceId,now){
       blink:Number(sp.blink)||0,done:false
     });
   }
-  if(!auth.spawnPool.length){const hunt=HUNTS[auth.huntId];for(const slug of (hunt&&hunt.monsters)||[])if(monsterDef(slug))auth.spawnPool.push(slug);}
+  if(!auth.spawnPool.length){const hunt=authHuntDef(auth);for(const slug of (hunt&&hunt.monsters)||[])if(monsterDef(slug))auth.spawnPool.push(slug);}
   if(descriptor.kind==="boss"){
     let boss=auth.mobs.find((m)=>m.boss);
     // Cliente pode ter adiado o boss (arenaBossSpawn.pending) antes do PUT.
@@ -7595,6 +7631,9 @@ function initializeAuthority(descriptor,instanceId,now){
   descriptor.authority=auth;return materializeAuthority(descriptor);
 }
 function materializeAuthority(descriptor){const auth=descriptor.authority;if(!auth)return descriptor;
+  // Checkpoints trazem state.hunt fresco do cliente: reidrata a def de
+  // hunts OTBM em instâncias criadas antes do auth.hunt* existir.
+  captureAuthHuntDef(auth,descriptor.state&&descriptor.state.hunt);
   descriptor.members=auth.players.map((item)=>({id:item.id,p:clonePlayerState(item.p),hp:item.p.hp,mp:item.p.mp}));descriptor.activeCharacterId=descriptor.activeCharacterId||auth.players[0]&&auth.players[0].id;
   descriptor.state=descriptor.state||{};
   if(auth.questWaves)descriptor.state.questWaves=Object.assign({},auth.questWaves,{spawnCells:(auth.questWaves.spawnCells||[]).map((cell)=>({x:cell.x,y:cell.y}))});

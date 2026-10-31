@@ -166,8 +166,9 @@ function displayMonsterName(name) {
  * bosses com definição própria usam os valores oficiais da própria instância. */
 function recordRawMonsterStats(c, mob) {
   if (!c || !c.stats || !mob) return { exp: 0, hp: 0 };
-  const catalog = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters)
-    ? GAMEDATA.monsters[mob.slug] : null;
+  const catalog = (typeof GAMEDATA !== "undefined" && GAMEDATA.monsters && GAMEDATA.monsters[mob.slug])
+    ? GAMEDATA.monsters[mob.slug]
+    : ((typeof MONSTERDATA !== "undefined" && MONSTERDATA[mob.slug]) || null);
   const source = mob.boss ? (mob.def || catalog || {}) : (catalog || mob.def || {});
   const rawExp = Math.max(0, Math.floor(Number(source.exp) || 0));
   const rawHp = Math.max(0, Math.floor(Number(source.hp) || Number(mob.maxHp) || 0));

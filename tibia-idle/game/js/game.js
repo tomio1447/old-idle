@@ -539,7 +539,7 @@ function normalizePlayer(p) {
     p.supplies[p.config.healSupply] = 0;
   if (p.config.autoWalk === undefined) p.config.autoWalk = true;
   p.bag = p.bag || {};
-  p.bagSlots = p.bagSlots || 8;
+  p.bagSlots = p.bagSlots || 20;
   p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   p.lootPouch = p.lootPouch || {};
   p.supplyStash = p.supplyStash || {};
@@ -4251,7 +4251,8 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
 
   const hydrateMobDef=(ent)=>{
     if(!ent)return ent;
-    const slug=ent.slug,catalog=typeof GAMEDATA!=="undefined"&&GAMEDATA.monsters&&slug?GAMEDATA.monsters[slug]:null;
+    const slug=ent.slug,catalog=(typeof GAMEDATA!=="undefined"&&GAMEDATA.monsters&&slug&&GAMEDATA.monsters[slug])||
+      (typeof MONSTERDATA!=="undefined"&&slug&&MONSTERDATA[slug])||null;
     // Sempre amarra o def ao slug atual. ID reciclado (Demon → Floating
     // Savant) não pode conservar looktype/nome da espécie anterior.
     if(catalog)ent.def=catalog;
