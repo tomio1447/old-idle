@@ -4850,7 +4850,7 @@ async function main() {
         return send(res, r.code, r.body);
       }
       /* GET /api/character/profile?char_id — perfil público do personagem
-       * (nome/voc/level, skills e a PT dele). Exige sessão válida. */
+       * (nome/voc/level, skills, equipamento e a PT dele). Sessão válida. */
       if (req.method === "GET" && url === "/api/character/profile") {
         const token=(req.headers.authorization||"").replace("Bearer ","");
         const acc=token?await db.findAccountByToken(token):null;
@@ -4860,6 +4860,14 @@ async function main() {
         if(!c)return send(res,404,{ok:false,msg:"Personagem não encontrado"});
         let d={};try{d=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){d={};}
         const sk=(d.skills&&typeof d.skills==="object")?d.skills:{};
+        /* Equipamento equipado — mesmos slots do renderEquip do cliente. */
+        const eq=(d.equip&&typeof d.equip==="object")?d.equip:{};
+        const equipment={};
+        for(const s of ["amulet","helmet","backpack","weapon","armor","shield",
+                        "ring","legs","extra","boots","ammo"]){
+          const e=eq[s];
+          if(e&&e.item)equipment[s]={item:String(e.item),count:Number(e.count)||1};
+        }
         const p=await db.partyFindByCharacter(c.id);
         let partyInfo=null;
         if(p){
@@ -4876,6 +4884,7 @@ async function main() {
           skills:{fist:sk.fist||10,sword:sk.sword||10,axe:sk.axe||10,
             club:sk.club||10,dist:sk.dist||10,shield:sk.shield||10},
           magicLevel:Number(d.ml)||0,
+          equipment,
           party:partyInfo}});
       }
       if (req.method === "GET" && url === "/api/party/state") {

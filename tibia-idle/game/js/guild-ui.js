@@ -461,11 +461,17 @@ async function loadGuildDetail() {
   const canManage = myRank === "leader" || myRank === "vice";
   const isLeader = myRank === "leader";
   const isMember = !!myRank;
+  const reqs = data.requests || [];
 
   const tabs = [
     { id: "members", label: "MEMBROS" },
     { id: "ranking", label: "RANKING TASK" },
   ];
+  /* SOLICITAÇÕES: aba própria, só para líder e vice-líderes. */
+  if (canManage) tabs.push({
+    id: "requests",
+    label: `SOLICITAÇÕES${reqs.length ? ` (${reqs.length})` : ""}`,
+  });
   if (isMember) tabs.push(
     { id: "tasks", label: "TASK GUILD" },
     { id: "shop", label: "GUILD SHOP" },
@@ -474,7 +480,19 @@ async function loadGuildDetail() {
     { id: "pvp", label: "PVP" });
 
   let contentHtml = "";
-  if (GUILD_UI.tab === "ranking") {
+  if (GUILD_UI.tab === "requests" && canManage) {
+    contentHtml = `<div class="tiny dim" style="margin-bottom:6px">
+      Clique no nome do personagem para ver o perfil antes de aceitar —
+      líder e vice-líderes podem aceitar ou recusar.</div>
+      <div class="guild-member-list">${reqs.map((r) => `<div class="guild-req-row">
+        <span class="guild-member-name guild-profile-link" data-char-profile="${r.character_id}">${guildEsc(r.name)}</span>
+        <span class="tiny dim">${guildVocLabel(r.voc)} · Nv ${r.level}</span>
+        <span class="guild-invite-actions">
+          <button class="sm primary" data-guild-req-accept="${r.id}">Aceitar</button>
+          <button class="sm" data-guild-req-decline="${r.id}">Recusar</button>
+        </span>
+      </div>`).join("") || `<div class="hunt-section-empty">Sem solicitações pendentes.</div>`}</div>`;
+  } else if (GUILD_UI.tab === "ranking") {
     const ranked = members.slice().sort((a, b) =>
       (Number(b.contribution) || 0) - (Number(a.contribution) || 0));
     contentHtml = `<div class="guild-member-list">${ranked.map((m, i) => `
@@ -540,23 +558,7 @@ async function loadGuildDetail() {
   const leaveBtn = isMember ? `<button class="sm" id="guild-leave-btn">
       ${myRank === "leader" ? "Sair / passar liderança" : "Sair da guild"}</button>` : "";
 
-  /* SOLICITAÇÕES DE ENTRADA — líder/vice veem o botão; pisca verde↔vermelho
-   * enquanto houver pedido pendente. */
-  const reqs = data.requests || [];
-  const requestsBox = canManage ? `<section class="guild-section">
-    <button type="button" class="sm guild-req-toggle${reqs.length ? " has-pending" : ""}"
-      id="guild-req-toggle">SOLICITAÇÕES${reqs.length ? ` (${reqs.length})` : ""}</button>
-    <div class="guild-req-list" id="guild-req-list" style="display:none">
-      ${reqs.map((r) => `<div class="guild-req-row">
-        <span class="guild-member-name guild-profile-link" data-char-profile="${r.character_id}">${guildEsc(r.name)}</span>
-        <span class="tiny dim">${guildVocLabel(r.voc)} · Nv ${r.level}</span>
-        <span class="guild-invite-actions">
-          <button class="sm primary" data-guild-req-accept="${r.id}">Aceitar</button>
-          <button class="sm" data-guild-req-decline="${r.id}">Recusar</button>
-        </span>
-      </div>`).join("") || `<div class="tiny dim" style="padding:6px 0">Sem solicitações pendentes.</div>`}
-    </div>
-  </section>` : "";
+  /* Solicitações de entrada agora têm aba própria (só líder/vice). */
 
   /* Não-membro: botão para pedir entrada (ou cancelar o pedido). */
   const joinBox = !isMember ? `<div class="guild-join-box">
@@ -593,7 +595,7 @@ async function loadGuildDetail() {
   </section>` : "";
 
   root.innerHTML = `<div class="guild-tabs">${tabs.map((tab) =>
-      `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}"
+      `<button type="button" class="guild-tab${GUILD_UI.tab === tab.id ? " active" : ""}${tab.id === "requests" && reqs.length ? " has-pending" : ""}"
         data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
     <section class="guild-section guild-head">
       <div class="hunt-cat-title">${guildIconImg(g.icon)} ${guildEsc(g.name)} — Nível ${g.level}</div>
@@ -601,7 +603,6 @@ async function loadGuildDetail() {
       ${guildExpBarHtml(g)}
     </section>
     ${manageBox}
-    ${requestsBox}
     ${contentHtml}
     ${joinBox}
     ${inviteBox}${leaveBtn}`;
@@ -631,11 +632,6 @@ async function loadGuildDetail() {
     const msg = $("#guild-rename-msg");
     if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao renomear.";
     if (r && r.data && r.data.ok) loadGuildDetail();
-  });
-  const reqToggle = $("#guild-req-toggle");
-  if (reqToggle) reqToggle.addEventListener("click", () => {
-    const list = $("#guild-req-list");
-    if (list) list.style.display = list.style.display === "none" ? "" : "none";
   });
   $$("#guild-modal-list [data-guild-req-accept]").forEach((btn) => {
     btn.addEventListener("click", async () => {
