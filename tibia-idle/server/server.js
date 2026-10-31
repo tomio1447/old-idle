@@ -1065,11 +1065,13 @@ async function splitSharedInventory(db, acc, p, authoritative) {
   } else {
     const keep = {
       lootPouch: Object.assign({}, shared.lootPouch),
+      supplyStash: Object.assign({}, shared.supplyStash),
       rewardChest: Object.assign({}, shared.rewardChest),
       rewardChestBundles: shared.rewardChestBundles.slice(),
     };
     SharedInv.extractSharedFromPlayer(p, shared);
     shared.lootPouch = keep.lootPouch;
+    shared.supplyStash = keep.supplyStash;
     shared.rewardChest = keep.rewardChest;
     shared.rewardChestBundles = keep.rewardChestBundles;
   }
@@ -2657,7 +2659,9 @@ async function setLootConfigPreference(db,body){
  * - espelha pouch/bag/instâncias (não equipadas) finais em TODAS as cópias
  *   dos membros da mesma conta — a pouch é DA CONTA, então trocar de
  *   personagem no meio da instância não pode mostrar os itens vendidos;
- * - devolve {pouch,bag,instances} finais para gravar no shared da conta.
+ * - unifica a Supply Stash (também DA CONTA) por referência, unindo por
+ *   máximo stashes legadas divergentes — nunca descarta itens de outra cópia;
+ * - devolve {pouch,bag,supplyStash,instances} finais para gravar no shared.
  * preSnapshot: {pouch:{slug:qtd}, bag:{slug:qtd}} da cópia do executor ANTES
  * da mutação. Roda dentro do patch da instância (síncrono). */
 function syncInstancePouchCopies(players,charId,preSnapshot){
@@ -2710,13 +2714,24 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
      * separados por membro voltariam a divergir na próxima mutação. */
     live.p.lootPouch=live.p.lootPouch||{};
     live.p.bag=live.p.bag||{};
+    live.p.supplyStash=live.p.supplyStash||{};
     entry.p.lootPouch=live.p.lootPouch;
     entry.p.bag=live.p.bag;
+    if(entry.p.supplyStash!==live.p.supplyStash){
+      // Stashes legadas por personagem podem divergir: une por máximo antes
+      // de unificar a referência (mesma regra do shareInstanceContainers).
+      const b=entry.p.supplyStash;
+      if(b)for(const slug of Object.keys(b)){
+        const n=Math.max(0,Math.floor(Number(b[slug])||0));
+        if(n>(Number(live.p.supplyStash[slug])||0))live.p.supplyStash[slug]=n;
+      }
+      entry.p.supplyStash=live.p.supplyStash;
+    }
     const ownEquip=(Array.isArray(entry.p.itemInstances)?entry.p.itemInstances:[])
       .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")===0);
     entry.p.itemInstances=finalInsts.map((i)=>Object.assign({},i)).concat(ownEquip);
   }
-  return {pouch:finalPouch,bag:finalBag,instances:finalInsts};
+  return {pouch:finalPouch,bag:finalBag,supplyStash:Object.assign({},live.p.supplyStash||{}),instances:finalInsts};
 }
 
 /* Grava o resultado sincronizado de uma mutação de pouch no shared da conta
@@ -2730,6 +2745,7 @@ async function persistSharedPouchSync(db,acc,synced){
     const shared=await db.accountSharedInventory(acc.id);
     shared.lootPouch=Object.assign({},synced.pouch||{});
     if(synced.bag)shared.bag=Object.assign({},synced.bag||{});
+    if(synced.supplyStash)shared.supplyStash=Object.assign({},synced.supplyStash);
     if(Array.isArray(synced.instances))
       shared.itemInstances=synced.instances.map((i)=>Object.assign({},i));
     await db.setAccountSharedInventory(acc.id,shared);
@@ -2871,21 +2887,35 @@ async function moveToSupplyStash(db,body){
       return {code:400,body:{ok:false,error:"INVALID_STASH_MOVE",msg:"Instância inválida para o movimento"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null;
+    let rejection=null,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
       if(!moveItemToSupplyStash(item.p,{source,slug})){rejection="Não foi possível mover o item (stash cheia ou item ausente)";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível mover para a Supply Stash",
         instance:instanceSummary(result.instance,true)}};
+    // Espelha pouch/bag/stash no shared da conta IMEDIATAMENTE — sem isso o
+    // item movido "ressuscitava" na Loot Pouch no próximo load (a pouch
+    // compartilhada ainda o tinha).
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"stash-move",holderId:String(body.holder_id||"")});
-    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   if(!moveItemToSupplyStash(p,{source,slug}))
@@ -2923,21 +2953,32 @@ async function withdrawFromSupplyStash(db,body){
       return {code:400,body:{ok:false,error:"INVALID_STASH_WITHDRAW",msg:"Instância inválida para a retirada"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null;
+    let rejection=null,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
       if(!moveItemFromSupplyStash(item.p,payload)){rejection="Não foi possível retirar o item (ausente ou mochila cheia)";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível retirar da Supply Stash",
         instance:instanceSummary(result.instance,true)}};
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"stash-withdraw",holderId:String(body.holder_id||"")});
-    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   if(!moveItemFromSupplyStash(p,payload))
@@ -2968,21 +3009,32 @@ async function equipSupplyStashItem(db,body){
       return {code:400,body:{ok:false,error:"INVALID_STASH_EQUIP",msg:"Instância inválida para equipar"}};
     if(String(row.instance_id)!==instanceId)
       return {code:409,body:{ok:false,error:"INSTANCE_NOT_ACTIVE",msg:"Instância ativa não encontrada"}};
-    let rejection=null;
+    let rejection=null,synced=null;
     const result=await db.instancePatchState(row.account_id,acc.id,instanceId,expected,(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
       if(!item||!item.p){rejection="Personagem não participa desta instância";return null;}
+      const preSnapshot={
+        pouch:Object.assign({},item.p.lootPouch||{}),
+        bag:Object.assign({},item.p.bag||{}),
+      };
       if(!equipFromSupplyStash(item.p,slug,slot||undefined)){rejection="Não foi possível equipar (stash vazia, vocação ou nível)";return null;}
+      synced=syncInstancePouchCopies(descriptor.authority.players,charId,preSnapshot);
       descriptor=materializeAuthority(descriptor);return JSON.stringify(descriptor);
     },lease);
     if(!result.ok)return {code:result.error==="LEASE_REQUIRED"?423:result.error==="INSTANCE_PATCH_REJECTED"?400:409,
       body:{ok:false,error:result.error,msg:rejection||"Não foi possível equipar da Supply Stash",
         instance:instanceSummary(result.instance,true)}};
+    let sharedSync=null;
+    if(synced){
+      await persistSharedPouchSync(db,acc,synced);
+      try{sharedSync=await db.accountSharedInventory(acc.id);}catch(e){/* opcional */}
+    }
     await publishInstanceForRow(db,result.instance,{id:result.instance.instance_id,version:Number(result.instance.version),
       status:result.instance.status,source:"stash-equip",holderId:String(body.holder_id||"")});
-    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true)}};
+    return {code:200,body:{ok:true,instance:instanceSummary(result.instance,true),
+      ...(sharedSync?{sharedInventory:sharedSync}:{})}};
   }
   let p=await loadCityPlayer(db,acc,character);
   if(!equipFromSupplyStash(p,slug,slot||undefined))

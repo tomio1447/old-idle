@@ -1,25 +1,25 @@
 /* shared_inventory.js — inventário DA CONTA (não por personagem).
  *
- * Os 4 containers compartilhados entre todos os personagens da conta:
- *   bag (backpack), lootPouch, depot e rewardChest/rewardChestBundles.
+ * Os containers compartilhados entre todos os personagens da conta:
+ *   bag (backpack), lootPouch, supplyStash, depot e rewardChest/rewardChestBundles.
  * Junto deles, as instâncias de item (itemInstances) com loc bag/depot —
  * instâncias EQUIPADAS (loc "equip:*") continuam por personagem, porque o
  * equipamento é individual.
  *
  * Formato do shared (gravado em accounts.shared_inventory):
- *   { v:1, seq:0, bag:{}, lootPouch:{}, depot:[], itemInstances:[],
- *     rewardChest:{}, rewardChestBundles:[] }
+ *   { v:1, seq:0, bag:{}, lootPouch:{}, supplyStash:{}, depot:[],
+ *     itemInstances:[], rewardChest:{}, rewardChestBundles:[] }
  *
  * Pure module (sem I/O): o db.js persiste, o server.js aplica/extrai e os
  * testes exercitam as funções diretamente.
  */
 "use strict";
 
-const SHARED_CONTAINERS = ["bag", "lootPouch", "depot", "rewardChest", "rewardChestBundles",
+const SHARED_CONTAINERS = ["bag", "lootPouch", "supplyStash", "depot", "rewardChest", "rewardChestBundles",
   "dust", "dustLimit", "slivers", "exaltedCores"];
 
 function emptySharedInventory() {
-  return { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [],
+  return { v: 1, seq: 0, bag: {}, lootPouch: {}, supplyStash: {}, depot: [],
     itemInstances: [], rewardChest: {}, rewardChestBundles: [],
     dust: 0, dustLimit: 100, slivers: 0, exaltedCores: 0 };
 }
@@ -33,6 +33,7 @@ function normalizeSharedInventory(s) {
   s.seq = Math.max(0, Math.floor(Number(s.seq) || 0));
   s.bag = s.bag && typeof s.bag === "object" && !Array.isArray(s.bag) ? s.bag : {};
   s.lootPouch = s.lootPouch && typeof s.lootPouch === "object" && !Array.isArray(s.lootPouch) ? s.lootPouch : {};
+  s.supplyStash = s.supplyStash && typeof s.supplyStash === "object" && !Array.isArray(s.supplyStash) ? s.supplyStash : {};
   s.depot = Array.isArray(s.depot) ? s.depot : [];
   s.itemInstances = Array.isArray(s.itemInstances) ? s.itemInstances : [];
   s.rewardChest = s.rewardChest && typeof s.rewardChest === "object" && !Array.isArray(s.rewardChest) ? s.rewardChest : {};
@@ -80,6 +81,12 @@ function mergeCharContainers(shared, characters) {
       for (const slug of Object.keys(p.lootPouch)) {
         const n = Math.max(0, Math.floor(Number(p.lootPouch[slug]) || 0));
         if (n > 0) shared.lootPouch[slug] = (Number(shared.lootPouch[slug]) || 0) + n;
+      }
+    }
+    if (p.supplyStash && typeof p.supplyStash === "object") {
+      for (const slug of Object.keys(p.supplyStash)) {
+        const n = Math.max(0, Math.floor(Number(p.supplyStash[slug]) || 0));
+        if (n > 0) shared.supplyStash[slug] = (Number(shared.supplyStash[slug]) || 0) + n;
       }
     }
     if (Array.isArray(p.itemInstances)) {
@@ -133,6 +140,7 @@ function applySharedToPlayer(p, shared) {
   if (!p || typeof p !== "object") p = {};
   p.bag = Object.assign({}, shared.bag);
   p.lootPouch = Object.assign({}, shared.lootPouch);
+  p.supplyStash = Object.assign({}, shared.supplyStash);
   p.depot = shared.depot.slice();
   p.rewardChest = Object.assign({}, shared.rewardChest);
   p.rewardChestBundles = shared.rewardChestBundles.slice();
@@ -155,6 +163,7 @@ function extractSharedFromPlayer(p, shared) {
   if (!p || typeof p !== "object") return shared;
   shared.bag = (p.bag && typeof p.bag === "object" && !Array.isArray(p.bag)) ? p.bag : {};
   shared.lootPouch = (p.lootPouch && typeof p.lootPouch === "object" && !Array.isArray(p.lootPouch)) ? p.lootPouch : {};
+  shared.supplyStash = (p.supplyStash && typeof p.supplyStash === "object" && !Array.isArray(p.supplyStash)) ? p.supplyStash : {};
   shared.depot = Array.isArray(p.depot) ? p.depot.slice() : [];
   shared.rewardChest = (p.rewardChest && typeof p.rewardChest === "object" && !Array.isArray(p.rewardChest)) ? p.rewardChest : {};
   shared.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles.slice() : [];
@@ -169,6 +178,7 @@ function extractSharedFromPlayer(p, shared) {
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
   p.bag = {};
   p.lootPouch = {};
+  p.supplyStash = {};
   p.depot = [];
   p.rewardChest = {};
   p.rewardChestBundles = [];
@@ -186,16 +196,16 @@ function extractSharedFromPlayer(p, shared) {
  * outras cópias (ex.: item desequipado) SUMIAM ao final da boss fight.
  *
  * Regras do merge:
- *   - bag/lootPouch: por slug, fica o MAIOR valor (nunca perde o que foi
- *     adicionado em qualquer cópia; com a sincronização em tempo real das
- *     cópias, removidos/equipados também não ressuscitam);
+ *   - bag/lootPouch/supplyStash: por slug, fica o MAIOR valor (nunca perde o
+ *     que foi adicionado em qualquer cópia; com a sincronização em tempo real
+ *     das cópias, removidos/equipados também não ressuscitam);
  *   - itemInstances compartilhadas (loc != equip:*): união por id;
  *   - depot/rewardChest são server-owned e preservados do shared.
  */
 function mergeSharedFromPlayer(p, shared) {
   shared = normalizeSharedInventory(shared);
   if (!p || typeof p !== "object") return shared;
-  for (const key of ["bag", "lootPouch"]) {
+  for (const key of ["bag", "lootPouch", "supplyStash"]) {
     const src = (p[key] && typeof p[key] === "object" && !Array.isArray(p[key])) ? p[key] : {};
     const dst = (shared[key] && typeof shared[key] === "object" && !Array.isArray(shared[key])) ? shared[key] : {};
     for (const slug of Object.keys(src)) {

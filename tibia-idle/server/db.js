@@ -696,6 +696,7 @@ function sharedInvMergeChars(store, accountId) {
   try { chars = store.charactersOf(accountId); } catch (e) { chars = []; }
   const s = SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars);
   s.legacyPouchDone = 1;
+  s.stashSharedDone = 1;
   return s;
 }
 /* Consolida lootPouches legadas de personagens ANTIGOS na pouch ÚNICA da
@@ -728,6 +729,36 @@ function mergeLegacyCharPouches(shared, chars) {
       const n = Math.max(0, Math.floor(Number(pouch[slug]) || 0));
       if (!n) continue;
       shared.lootPouch[slug] = (Number(shared.lootPouch[slug]) || 0) + n;
+      changed = true;
+    }
+  }
+  return changed;
+}
+/* Consolida as Supply Stashes legadas por personagem na stash ÚNICA da conta
+ * (mesma regra do merge de pouches: espelho pula, resto soma — flag
+ * stashSharedDone no shared torna idempotente). */
+function mergeLegacyCharStashes(shared, chars) {
+  if (!SharedInv || !shared || typeof shared !== "object") return false;
+  shared.supplyStash = shared.supplyStash && typeof shared.supplyStash === "object" && !Array.isArray(shared.supplyStash)
+    ? shared.supplyStash : {};
+  const stashEq = (a, b) => {
+    const ka = Object.keys(a || {}).filter((k) => (Number(a[k]) || 0) > 0).sort();
+    const kb = Object.keys(b || {}).filter((k) => (Number(b[k]) || 0) > 0).sort();
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => Number(a[k]) === Number(b[k]));
+  };
+  let changed = false;
+  for (const c of Array.isArray(chars) ? chars : []) {
+    let d = null;
+    try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = null; }
+    if (!d || typeof d !== "object" || Array.isArray(d)) continue;
+    const stash = d.supplyStash;
+    if (!stash || typeof stash !== "object" || Array.isArray(stash)) continue;
+    if (stashEq(stash, shared.supplyStash)) continue; // espelho — nada a fazer
+    for (const slug of Object.keys(stash)) {
+      const n = Math.max(0, Math.floor(Number(stash[slug]) || 0));
+      if (!n) continue;
+      shared.supplyStash[slug] = (Number(shared.supplyStash[slug]) || 0) + n;
       changed = true;
     }
   }
@@ -835,6 +866,15 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
     let chars = [];
     try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
     SharedInv.mergeCharForgeResources(s, chars);
+    a.shared_inventory = s;
+    this._save();
+  }
+  if (!s.stashSharedDone) {
+    // Supply Stash entrou no shared depois: une as stashes por personagem.
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    mergeLegacyCharStashes(s, chars);
+    s.stashSharedDone = 1;
     a.shared_inventory = s;
     this._save();
   }
@@ -1677,6 +1717,7 @@ async function MysqlStore() {
         s = SharedInv ? SharedInv.mergeCharContainers(SharedInv.emptySharedInventory(), chars)
           : { v: 1, seq: 0, bag: {}, lootPouch: {}, depot: [], itemInstances: [], rewardChest: {}, rewardChestBundles: [] };
         s.legacyPouchDone = 1;
+        s.stashSharedDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       } else if (!s.legacyPouchDone) {
         // Conta antiga: une pouches legadas dos personagens na pouch única da
@@ -1691,6 +1732,14 @@ async function MysqlStore() {
         let chars = [];
         try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
         SharedInv.mergeCharForgeResources(s, chars);
+        await this.setAccountSharedInventory(Number(accountId), s);
+      }
+      if (!s.stashSharedDone) {
+        // Supply Stash entrou no shared depois: une as stashes por personagem.
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        mergeLegacyCharStashes(s, chars);
+        s.stashSharedDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       }
       return SharedInv ? SharedInv.normalizeSharedInventory(s) : s;

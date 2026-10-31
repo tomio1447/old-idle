@@ -7459,7 +7459,7 @@ function shareInstanceContainers(auth){
     if(!acc)continue;
     const first=canon[acc]||(canon[acc]=entry);
     if(entry===first)continue;
-    for(const key of ["bag","lootPouch","depot","rewardChest","rewardChestBundles"]){
+    for(const key of ["bag","lootPouch","supplyStash","depot","rewardChest","rewardChestBundles"]){
       const a=first.p[key],b=entry.p[key];
       if(Array.isArray(a)||Array.isArray(b)){
         if(a===undefined&&Array.isArray(b)){first.p[key]=b;continue;}

@@ -1111,6 +1111,7 @@ function accountMoveToSupplyStash(token,charId,opts){
         instance_id:ACCOUNT_INSTANCE.id,expected_version:ACCOUNT_INSTANCE.version},accountLeaseFields());
       const r=await _api("POST","/api/instance/stash-move",body);
       if(r.data.ok){
+        accountMaybeApplyShared(r.data);
         accountInstanceApply(r.data.instance);
         return {ok:true,state:r.data.instance&&r.data.instance.state,
           version:r.data.instance&&r.data.instance.version};
@@ -1161,6 +1162,7 @@ function accountWithdrawFromSupplyStash(token,charId,opts){
       if(qty!=null&&Number.isFinite(qty))body.qty=qty;
       const r=await _api("POST","/api/instance/stash-withdraw",body);
       if(r.data.ok){
+        accountMaybeApplyShared(r.data);
         accountInstanceApply(r.data.instance);
         return {ok:true,state:r.data.instance&&r.data.instance.state,
           version:r.data.instance&&r.data.instance.version};
@@ -1211,6 +1213,7 @@ function accountEquipFromSupplyStash(token,charId,opts){
       if(slot)body.slot=slot;
       const r=await _api("POST","/api/instance/stash-equip",body);
       if(r.data.ok){
+        accountMaybeApplyShared(r.data);
         accountInstanceApply(r.data.instance);
         return {ok:true,state:r.data.instance&&r.data.instance.state,
           version:r.data.instance&&r.data.instance.version};
@@ -1869,6 +1872,7 @@ function accountApplySharedInventory(shared) {
   const p = G.p;
   if (shared.bag && typeof shared.bag === "object" && !Array.isArray(shared.bag)) p.bag = Object.assign({}, shared.bag);
   if (shared.lootPouch && typeof shared.lootPouch === "object" && !Array.isArray(shared.lootPouch)) p.lootPouch = Object.assign({}, shared.lootPouch);
+  if (shared.supplyStash && typeof shared.supplyStash === "object" && !Array.isArray(shared.supplyStash)) p.supplyStash = Object.assign({}, shared.supplyStash);
   if (Array.isArray(shared.depot)) p.depot = shared.depot.slice();
   if (shared.rewardChest && typeof shared.rewardChest === "object" && !Array.isArray(shared.rewardChest)) p.rewardChest = Object.assign({}, shared.rewardChest);
   if (Array.isArray(shared.rewardChestBundles)) p.rewardChestBundles = shared.rewardChestBundles.slice();
