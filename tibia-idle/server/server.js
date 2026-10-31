@@ -4378,6 +4378,12 @@ async function main() {
         const playersOnline = await onlineCountPayload(db);
         return send(res, 200, { ok: true, ...playersOnline });
       }
+      /* Daily Monster (+25% EXP) e Daily Boss (+25% loot) — escolha
+       * determinística por data (Brasília), vira no server save das 00h. */
+      if (req.method === "GET" && url === "/api/daily-boost") {
+        const daily = require("./dailyboost").dailyBoost();
+        return send(res, 200, { ok: true, ...daily });
+      }
       if(req.method==="POST"&&url==="/api/maintenance/schedule"){
         const limited=rateLimit(req,"maintenance-schedule",10,60000);if(limited)return send(res,limited.code,limited.body);
         let body={};
