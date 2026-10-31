@@ -5267,8 +5267,20 @@ function healPlayers(auth,now){
       if(!s||!spellAllowedForVoc(s,healer.p.voc)||Number(s.lvl||0)>Number(healer.p.level||1)||healer.p.mp<Number(s.mana||0))continue;
       if((healer.p._spellCd&&healer.p._spellCd[sid])>now||spellGroupBusy(healer.p,s,now))continue;
       const below=Number(rule&&(rule.hpBelow!==undefined?rule.hpBelow:rule.at))||70;
-      const hurt=living.filter((x)=>x!==healer&&(x.p.hp/maxStats(x.p).hp)*100<below)
-        .sort((a,b)=>a.p.hp/maxStats(a.p).hp-b.p.hp/maxStats(b.p).hp);
+      /* healFriendTargets (UI "curar"/prio por aliado): desmarcado = nunca
+       * curado; prioridade menor entra primeiro (empate: menor % de HP). */
+      const targetsCfg=healer.p.config&&healer.p.config.healFriendTargets||{};
+      const hurt=living.filter((x)=>{
+        if(x===healer)return false;
+        const t=targetsCfg[String(x.id)];
+        if(t&&t.enabled===false)return false;
+        return (x.p.hp/maxStats(x.p).hp)*100<below;
+      }).sort((a,b)=>{
+        const pa=Number((targetsCfg[String(a.id)]||{}).priority)||99;
+        const pb=Number((targetsCfg[String(b.id)]||{}).priority)||99;
+        if(pa!==pb)return pa-pb;
+        return a.p.hp/maxStats(a.p).hp-b.p.hp/maxStats(b.p).hp;
+      });
       const mass=sid==="exura-gran-mas-res";
       if(!hurt.length||(mass&&hurt.length<(Number(rule&&rule.minTargets)||2)))continue;
       const amount=Math.max(1,rollSpell(auth,healer.p,s));

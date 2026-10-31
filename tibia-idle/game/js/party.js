@@ -749,19 +749,9 @@ async function partyApplyFollow(f) {
 function partyHealTargets(p) {
   if (!p) return [];
   const out = [];
-  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
-    const st = p._partyOnline || null;
-    if (st) {
-      for (const m of [st.leader].concat(st.members || [])) {
-        if (Number(m.id) === Number(characterId(p))) continue;   // não cura a si
-        out.push({ id: m.id, name: m.name, voc: m.voc, level: m.level || 1,
-                   sex: m.sex, outfit: m.outfit, hp: m.hp || 0, maxHp: m.maxHp || 0 });
-      }
-    }
-    return out;
-  }
-  // party combat ativo: o HP VIVO vem das entidades em cena (o roster é
-  // cópia e não acompanha o combate em tempo real)
+  // Instância viva primeiro: HP/nv/outfit reais das entidades em cena. O
+  // snapshot _partyOnline só traz o último save dos membros (mostrava
+  // aliado vivo como hp 0, nv antigo e sem outfit).
   if (typeof G !== "undefined" && G && G.combat &&
       Array.isArray(G.combat.players) && G.combat.players.length > 1) {
     const me = String(p.id || characterId(p));
@@ -772,6 +762,18 @@ function partyHealTargets(p) {
       out.push({ id: pp.id || characterId(pp), name: pp.name, voc: pp.voc,
                  level: pp.level || 1, sex: pp.sex, outfit: pp.outfit, colors: pp.outfit && pp.outfit.colors,
                  hp: Math.max(0, pp.hp || 0), maxHp: mx.hp || 1 });
+    }
+    return out;
+  }
+  // Fora de combate mas online: usa o snapshot da party do servidor.
+  if (typeof partyOnlineMode === "function" && partyOnlineMode()) {
+    const st = p._partyOnline || null;
+    if (st) {
+      for (const m of [st.leader].concat(st.members || [])) {
+        if (Number(m.id) === Number(characterId(p))) continue;   // não cura a si
+        out.push({ id: m.id, name: m.name, voc: m.voc, level: m.level || 1,
+                   sex: m.sex, outfit: m.outfit, hp: m.hp || 0, maxHp: m.maxHp || 0 });
+      }
     }
     return out;
   }

@@ -37,6 +37,7 @@ const HELPER_PRESET_CONFIG_FIELDS = [
   "refillArrow", "refillBolt", "ammoAuto", "autoSupplyStash", "autoRestock",
   // Curar aliado (druid/monk)
   "healFriend", "healFriendPriority", "criticalHeal", "autoCure",
+  "healFriendSpells", "healFriendTargets", "healFriendAt", "healFriendSpell",
   // Configurar (barras do personagem e filtro de loot)
   "barMode", "lootFilter",
 ];
