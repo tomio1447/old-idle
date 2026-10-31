@@ -2698,33 +2698,26 @@ function renderLootPouch(p) {
     .sort((a, b) => pouchUnitSellPrice(GAMEDATA.items[b]) * p.lootPouch[b] -
                     pouchUnitSellPrice(GAMEDATA.items[a]) * p.lootPouch[a]);
   const sellBtn = $("#btn-pouch-sell-all");
-  if (sellBtn) sellBtn.disabled = !entries.some((s) =>
-    typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
-  // Autoseller: vende TUDO automaticamente quando a pouch atingir o total de
-  // itens configurado. Respeita as regras do seller (lista "NÃO VENDER" e
-  // itens sem valor). Cooldown entre vendas: 5 min; VIP 2 min.
+  // SELL ALL manual: só na Área de Treino ou no Templo/cidade — em hunt o
+  // botão fica desabilitado (o autoseller continua vendendo no tempo).
+  const sellAllZoneOk = !!(G.training || G.inCity);
+  if (sellBtn) {
+    sellBtn.disabled = !sellAllZoneOk || !entries.some((s) =>
+      typeof canSellLootPouchItem === "function" && canSellLootPouchItem(p, s));
+    sellBtn.title = sellAllZoneOk
+      ? "Vende apenas itens liberados (respeita 'Não vender'; classes 3/4 protegidas)"
+      : "Sell All só funciona na Área de Treino ou no Templo.";
+  }
+  // Autoseller automático por tempo: 5 min VIP, 15 min FREE. Vende apenas
+  // itens liberados (respeita "Não vender" e itens sem valor).
   const vipOk = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
   const asOn = !!p.config.pouchAutoSell;
-  const asPct = p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct;
-  const asFill = pouchFillPct(p);
-  const pouchSlots = typeof lootPouchSlotsUsed === "function" ? lootPouchSlotsUsed(p) : entries.length;
-  const cdMs = typeof pouchAutoSellCooldownMs === "function" ? pouchAutoSellCooldownMs(p) : POUCH_AUTOSELL_CD_MS;
-  const lastAt = Number(p._pouchAutoSellAt) || 0;
-  const restante = Math.max(0, cdMs - (Date.now() - lastAt));
-  const cdTxt = restante > 0
-    ? `próxima venda em ${restante >= 60000 ? Math.ceil(restante / 60000) + "m" : Math.max(1, Math.ceil(restante / 1000)) + "s"}`
-    : `entre vendas: ${vipOk ? "2 min" : "5 min"}`;
   const asBox = `
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
         <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "VIP" : ""}</span>
-        <span class="tiny dim">${pouchSlots} stacks · ${asFill} itens · vende em ${asPct} itens · ${cdTxt}</span>
+        <span class="tiny dim">a cada ${vipOk ? "5" : "15"} min</span>
         <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
-      </div>
-      <div class="row mt4" style="align-items:center;gap:6px">
-        <input type="range" id="pouch-autosell-pct" min="10" max="100" step="5" value="${asPct}"
-          style="flex:1" ${asOn ? "" : "disabled"}>
-        <span class="tiny" style="width:auto;text-align:right;color:#d4af37">${asPct} itens</span>
       </div>
     </div>`;
   const btnAs = $("#btn-pouch-autosell");
@@ -2926,28 +2919,14 @@ function openSupplyStashItemMenu(p, slug, x, y) {
 
 function bindPouchAutoseller(p) {
   const btn = $("#btn-pouch-autosell");
-  const slider = $("#pouch-autosell-pct");
   if (btn && !btn._bound) {
     btn._bound = true;
     btn.addEventListener("click", () => {
       p.config.pouchAutoSell = !p.config.pouchAutoSell;
       const vipOk = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
       toast(p.config.pouchAutoSell
-        ? `Autoseller LIGADO — vende itens liberados quando a pouch somar ${p.config.pouchAutoSellPct === undefined ? 80 : p.config.pouchAutoSellPct} itens (a cada ${vipOk ? "2" : "5"} min; classes 3/4 protegidas)`
+        ? `Autoseller LIGADO — vende os itens liberados a cada ${vipOk ? "5 min (VIP)" : "15 min"}; classes 3/4 protegidas`
         : "Autoseller desligado");
-      renderLootPouch(p);
-    });
-  }
-  if (slider && !slider._bound) {
-    slider._bound = true;
-    slider.addEventListener("input", () => {
-      p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;
-      // atualiza o rótulo sem re-renderizar (evita perder o arrasto)
-      const label = slider.parentElement && slider.parentElement.querySelector("span.tiny");
-      if (label) label.textContent = p.config.pouchAutoSellPct + " itens";
-    });
-    slider.addEventListener("change", () => {
-      p.config.pouchAutoSellPct = parseInt(slider.value, 10) || 80;
       renderLootPouch(p);
     });
   }

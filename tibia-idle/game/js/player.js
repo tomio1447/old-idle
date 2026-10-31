@@ -198,7 +198,6 @@ function newPlayer(name, voc, sex) {
       missionCollapsed: false,
       noPotions: false,
       pouchAutoSell: false,
-      pouchAutoSellPct: 80,
       autoWalk: true,       // AUTO: IA anda sozinha; off = WASD/clique por SQM
       refillArrow: "",      // arrow selecionada
       refillBolt: "",       // bolt selecionada
@@ -1348,9 +1347,9 @@ function pouchItemCount(p) {
   return n;
 }
 
-/* Cooldown entre vendas automáticas da Loot Pouch: 5 min normal, 2 min VIP. */
-const POUCH_AUTOSELL_CD_MS = 5 * 60 * 1000;
-const POUCH_AUTOSELL_CD_VIP_MS = 2 * 60 * 1000;
+/* Cooldown entre vendas automáticas da Loot Pouch: 15 min FREE, 5 min VIP. */
+const POUCH_AUTOSELL_CD_MS = 15 * 60 * 1000;
+const POUCH_AUTOSELL_CD_VIP_MS = 5 * 60 * 1000;
 function pouchAutoSellCooldownMs(p) {
   const vip = typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed();
   return vip ? POUCH_AUTOSELL_CD_VIP_MS : POUCH_AUTOSELL_CD_MS;

@@ -1581,15 +1581,14 @@ function lootPouchFillPct(p){
   let n=0;for(const slug of Object.keys(p.lootPouch||{}))n+=Math.max(0,Math.floor(Number(p.lootPouch[slug])||0));
   return n;
 }
-/* Autoseller da Loot Pouch: cooldown entre vendas — 5 min normal, 2 min VIP.
+/* Autoseller da Loot Pouch: automático por TEMPO — 5 min VIP, 15 min FREE.
  * O timestamp fica no save do personagem, então o cooldown sobrevive a
  * reload do servidor/reconexão. */
 function tryAuthAutoSell(auth,item,now){
   const p=item&&item.p;if(!p||!p.config||!p.config.pouchAutoSell)return;
-  const cd=accountIsVip(p)?2*60*1000:5*60*1000;
+  const cd=accountIsVip(p)?5*60*1000:15*60*1000;
   if((Number(p._pouchAutoSellAt)||0)+cd>(now||Date.now()))return;
-  const pct=lootPouchFillPct(p),need=Math.max(10,Math.min(100,Number(p.config.pouchAutoSellPct)||80));
-  if(pct<need)return;
+  if(!lootPouchFillPct(p))return;
   const gold=sellAuthAllPouch(p);
   if(gold>0){p._pouchAutoSellAt=now||Date.now();auth.events.push({t:"sell",gold,msg:"Autoseller",targetId:String(item.id),ts:now});}
 }

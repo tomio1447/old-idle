@@ -463,8 +463,7 @@ function normalizePlayer(p) {
     hasteSpell: "",           // magia de velocidade escolhida no helper (vazia = nao usa)
     missionCollapsed: false,
     noPotions: false,          // Helper: "NÃO USAR POTIONS"
-    pouchAutoSell: false,     // Loot Pouch: autoseller ligado/desligado
-    pouchAutoSellPct: 80,     // Loot Pouch: gatilho do autoseller (total de itens)
+    pouchAutoSell: false,     // Loot Pouch: autoseller ligado/desligado (5 min VIP, 15 min FREE)
     spellAttack: true,
     autoRetreat: true,
     autoWalk: true,
@@ -4770,8 +4769,9 @@ function startBackgroundTick() {
   }, 200);
 }
 
-/* Loot Pouch: sem limite de slots. O autoseller dispara pela QUANTIDADE
- * total de itens (pouchAutoSellPct vira um piso de itens, ex.: 80). */
+/* Loot Pouch: infinita (sem limite de slots nem de itens) — o único
+ * limite é a capacidade (peso) do personagem. O autoseller dispara por
+ * TEMPO: 5 min VIP, 15 min FREE. */
 function pouchFillPct(p) {
   return typeof pouchItemCount === "function"
     ? pouchItemCount(p)
@@ -4908,10 +4908,10 @@ function loop(ts) {
       }
     }
     }
-    // Autoseller da Loot Pouch. Online a venda precisa passar pela API
-    // (instância ou cidade — sem isso a pouch "voltava" cheia e o ouro não
-    // persistia). Offline vende local + save. Cooldown: 5 min; VIP 2 min.
-    // Durante combate online a autoridade vende no tick — não duplica aqui.
+    // Autoseller da Loot Pouch: automático por TEMPO — 5 min VIP, 15 min
+    // FREE. Online a venda passa pela API (instância ou cidade — sem isso a
+    // pouch "voltava" cheia e o ouro não persistia). Offline vende local +
+    // save. Durante combate online a autoridade vende no tick.
     if (G.p && G.p.config && G.p.config.pouchAutoSell &&
         !(typeof onlineAuthorityCombat === "function" && onlineAuthorityCombat())) {
       const onlineAccount = typeof accountApiConfigured === "function" && accountApiConfigured() &&
@@ -4921,7 +4921,9 @@ function loop(ts) {
         if (G._pouchTick >= 2000) {
           G._pouchTick = 0;
           const itens = pouchFillPct(G.p);
-          if (itens >= (G.p.config.pouchAutoSellPct || 80) &&
+          const hasSellable = itens > 0 && Object.keys(G.p.lootPouch || {}).some((s) =>
+            typeof canSellLootPouchItem !== "function" || canSellLootPouchItem(G.p, s));
+          if (hasSellable &&
               (typeof pouchAutoSellReady !== "function" || pouchAutoSellReady(G.p, Date.now()))) {
             G.p._pouchAutoSellAt = Date.now();
             if (onlineAccount && typeof sellAllPouchAndPersist === "function") {
@@ -5438,6 +5440,11 @@ function bindControls() {
   });
   $("#btn-lootpouch-config").addEventListener("click", openLootPouchConfigModal);
   $("#btn-pouch-sell-all").addEventListener("click", () => {
+    // SELL ALL só na Área de Treino ou no Templo/cidade — em hunt é bloqueado.
+    if (!(G.training || G.inCity)) {
+      toast("Sell All só funciona na Área de Treino ou no Templo.", "bad");
+      return;
+    }
     const run = typeof sellAllPouchAndPersist === "function"
       ? sellAllPouchAndPersist(p)
       : Promise.resolve((() => {
