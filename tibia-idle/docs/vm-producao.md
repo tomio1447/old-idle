@@ -2,6 +2,10 @@
 
 > **VM oficial a partir de 31/10/2026.** Todos os deploys devem ir para este IP.
 > A VM Oracle (`204.216.132.197`) fica como ambiente legado/secundário.
+>
+> ⚠️ **Workflow atual: APENAS desenvolvimento/testes LOCAIS.**
+> Não fazer deploy nesta VM até o usuário pedir explicitamente.
+> (Decisão do usuário em 31/10/2026 — "apenas alterações locais agora".)
 
 ## Acesso
 
