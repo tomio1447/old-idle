@@ -1788,6 +1788,13 @@ function openBagItemMenu(p, slug, x, y, after, instId) {
   }
   }
   opts.push({
+    label: "Mostrar no market",
+    hint: "ofertas",
+    action: () => {
+      if (typeof openMarketForItem === "function") openMarketForItem(slug);
+    },
+  });
+  opts.push({
     label: "Destruir",
     danger: true,
     action: () => {
@@ -2894,6 +2901,13 @@ function openSupplyStashItemMenu(p, slug, x, y) {
       },
     },
     {
+      label: "Mostrar no market",
+      hint: "ofertas",
+      action: () => {
+        if (typeof openMarketForItem === "function") openMarketForItem(slug);
+      },
+    },
+    {
       label: "Destruir",
       danger: true,
       action: () => {
@@ -3131,6 +3145,13 @@ function openPouchItemMenu(p, slug, x, y) {
       hint: "NPC não compra — use Destruir",
       disabled: true,
     }] : [])),
+    {
+      label: "Mostrar no market",
+      hint: "ofertas",
+      action: () => {
+        if (typeof openMarketForItem === "function") openMarketForItem(slug);
+      },
+    },
     {
       label: "Destruir",
       danger: true,

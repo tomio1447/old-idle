@@ -617,6 +617,9 @@ function openDepotItemMenu(p, ref, el) {
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
     }},
+    { label: 'Mostrar no market', hint: 'ofertas', action: function() {
+      if (typeof openMarketForItem === 'function') openMarketForItem(slug);
+    }},
   ];
   if (typeof showContextMenu === 'function') {
     var rect = el.getBoundingClientRect();
@@ -640,6 +643,9 @@ function openLegacyExaItemMenu(p, ref, el) {
       if (typeof toast === 'function') toast(r.msg, r.ok ? 'ok' : 'err');
       if (typeof renderAll === 'function') renderAll();
       openDepotModal();
+    }},
+    { label: 'Mostrar no market', hint: 'ofertas', action: function() {
+      if (typeof openMarketForItem === 'function') openMarketForItem(slug);
     }},
   ];
   if (typeof showContextMenu === 'function') {

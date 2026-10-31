@@ -152,6 +152,24 @@ function openMarket() {
   renderMarket();
 }
 
+/* Abre o Market na aba Navegar com o item já selecionado — usado pelo
+ * menu de contexto ("Mostrar no market") de bag/pouch/supply stash. */
+function openMarketForItem(slug) {
+  slug = String(slug || "");
+  const p = G && G.p;
+  if (!slug || !p) return;
+  _mTab = "browse";
+  _mBrowseCat = "all";
+  _mTier = "";
+  _mBrowseLvl = "";
+  _mBrowseVoc = "";
+  _mQ = marketItemName(slug);
+  _mBrowseItem = slug;
+  _mBrowseOffers = [];
+  renderMarket();
+  marketLoadItemOffers(p, slug);
+}
+
 /* ---------- itens vendáveis (depot + bag) ---------- */
 function marketDepotItems(p) {
   ensureForge(p);
