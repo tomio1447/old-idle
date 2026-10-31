@@ -23,7 +23,7 @@ const selfHealSpellIds=CanaryVocation.selfHealSpellIds;
 const sanitizePlayerSpells=(p,spells)=>CanaryVocation.sanitizePlayerSpells(p,spells||ALL_SPELLS);
 function read(name){return JSON.parse(fs.readFileSync(path.join(DATA,name),"utf8"));}
 const MONSTERS=Object.assign({},read("monsters.json"),read("canarymonsters.json"));
-const {isDailyMonster,isDailyBoss}=require("./dailyboost");
+const {isDailyMonster,isDailyBoss,dailyMonsterExpMul,dailyBossLootMul}=require("./dailyboost");
 function ensureWorldBossMonster(slug,name,hp){
   const cur=MONSTERS[slug];
   if(cur&&Number(cur.hp)>0)return;
@@ -4453,8 +4453,8 @@ function finalExp(p,mobExp,mobSlug,expMul){
   const gExp=guildBonusLevel(p,"exp");
   if(gExp>0)exp=Math.floor(exp*(1+gExp*0.01));
   if(guildTempBonusOn(p,"exp"))exp=Math.floor(exp*1.25);
-  // DAILY MONSTER: +25% EXP no monstro do dia.
-  if(isDailyMonster(mobSlug))exp=Math.floor(exp*1.25);
+  // DAILY MONSTER: +15%–35% EXP no monstro do dia (sorteado por dia).
+  if(isDailyMonster(mobSlug))exp=Math.floor(exp*dailyMonsterExpMul());
   return exp;
 }
 
@@ -5128,8 +5128,8 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   const staminaLoot=Math.max(0,Number(leader.stamina)||0)<3*3600?.5:1;
   // GUILD TEMP: +25% loot de monstros / +25% loot de boss (24h cada)
   const gTempLoot=guildTempBonusOn(leader,mob&&mob.boss?"bossLoot":"loot")?1.25:1;
-  // DAILY BOSS: +25% chance de loot no boss do dia.
-  const dailyLoot=(mob&&mob.boss&&isDailyBoss(mob.slug))?1.25:1;
+  // DAILY BOSS: +15%–35% chance de loot no boss do dia (sorteado por dia).
+  const dailyLoot=(mob&&mob.boss&&isDailyBoss(mob.slug))?dailyBossLootMul():1;
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
   const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot*dailyLoot;
   if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))

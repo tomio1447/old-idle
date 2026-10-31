@@ -4378,8 +4378,8 @@ async function main() {
         const playersOnline = await onlineCountPayload(db);
         return send(res, 200, { ok: true, ...playersOnline });
       }
-      /* Daily Monster (+25% EXP) e Daily Boss (+25% loot) — escolha
-       * determinística por data (Brasília), vira no server save das 00h. */
+      /* Daily Monster (+15–35% EXP) e Daily Boss (+15–35% loot) — escolha
+       * e percentuais determinísticos por data (Brasília), viram nas 00h. */
       if (req.method === "GET" && url === "/api/daily-boost") {
         const daily = require("./dailyboost").dailyBoost();
         return send(res, 200, { ok: true, ...daily });

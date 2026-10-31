@@ -5,10 +5,10 @@
  * qualquer boot, então não precisa persistir nem sincronizar. O dia é
  * calculado em America/Sao_Paulo — alinhado com o SERVER SAVE IN da topbar.
  *
- * - Daily Monster: +25% EXP (finalExp no engine). Pool = monstros que
- *   realmente spawnam nas hunts (hunts.json) e têm def + não são boss.
- * - Daily Boss: +25% chance de loot (reward no engine). Pool = bosses
- *   lutáveis das arenas (mesma lista do catálogo BOSSES do cliente).
+ * - Daily Monster: +15%–35% EXP (finalExp no engine), sorteado por dia.
+ *   Pool = monstros que realmente spawnam nas hunts (hunts.json).
+ * - Daily Boss: +15%–35% chance de loot (reward no engine), sorteado por
+ *   dia e independente do % de EXP. Pool = bosses das arenas.
  */
 const fs = require("fs");
 const path = require("path");
@@ -63,10 +63,15 @@ function dailyBoost() {
     const slug = pool[hashSeed(`${date}|${tag}`) % pool.length];
     return { slug, name: (MONSTERS[slug] && MONSTERS[slug].name) || slug };
   };
+  /* Bônus aleatório do dia: 15%–35% cada, independentes (seeds distintas).
+   * Determinístico — mesmo valor para todo mundo no mesmo dia. */
+  const roll = (tag) => 15 + (hashSeed(`${date}|bonus|${tag}`) % 21);
   _cache = {
     date,
     monster: pick(DAILY_MONSTER_POOL, "monster"),
     boss: pick(DAILY_BOSS_POOL, "boss"),
+    expBonus: roll("exp"),     // % de EXP no monstro do dia
+    lootBonus: roll("loot"),   // % de chance de loot no boss do dia
   };
   return _cache;
 }
@@ -79,6 +84,10 @@ function isDailyBoss(slug) {
   const d = dailyBoost();
   return !!(d.boss && String(slug) === d.boss.slug);
 }
+/* Multiplicadores prontos p/ o engine (1.15–1.35). */
+function dailyMonsterExpMul() { return 1 + (dailyBoost().expBonus || 0) / 100; }
+function dailyBossLootMul() { return 1 + (dailyBoost().lootBonus || 0) / 100; }
 
 module.exports = { dailyBoost, isDailyMonster, isDailyBoss, saoPauloDateKey,
+  dailyMonsterExpMul, dailyBossLootMul,
   DAILY_MONSTER_POOL, DAILY_BOSS_POOL };

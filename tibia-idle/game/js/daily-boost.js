@@ -1,19 +1,32 @@
-/* daily-boost.js — painel DAILY BOOST na coluna esquerda.
+/* daily-boost.js — painel DAILY BOOST acima do menu de caçadas.
  *
- * Mostra o Daily Monster (+25% EXP) e o Daily Boss (+25% loot) do dia,
- * com a sprite animada (idle real ou ciclo de caminhada via mobImg).
- * A escolha é do servidor (/api/daily-boost) e vira no server save das
- * 00h (Brasília) — o painel refaz o fetch quando a data muda.
+ * Mostra o Daily Monster e o Daily Boss do dia, com a sprite animada
+ * (idle real ou ciclo de caminhada via mobImg) e o bônus sorteado do dia
+ * (15%–35% cada, independente — vem do servidor em /api/daily-boost).
+ * A escolha vira no server save das 00h (Brasília); o painel refaz o
+ * fetch quando a data muda. Minimizar fica salvo no localStorage.
  */
 (function () {
   "use strict";
 
   var current = null;
+  var COLLAPSE_KEY = "tibia-idle-daily-boost-collapsed";
 
   function apiBase() {
     return (typeof ACCOUNT_API_URL === "string" && ACCOUNT_API_URL) || "";
   }
   function tt(key) { return typeof t === "function" ? t(key) : key; }
+
+  function isCollapsed() {
+    try { return localStorage.getItem(COLLAPSE_KEY) === "1"; } catch (e) { return false; }
+  }
+  function applyCollapsed(collapsed) {
+    var body = document.getElementById("daily-boost-body");
+    var btn = document.getElementById("daily-boost-toggle");
+    if (body) body.style.display = collapsed ? "none" : "";
+    if (btn) { btn.textContent = collapsed ? "+" : "−"; btn.title = collapsed ? "Expandir" : "Minimizar"; }
+    try { localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0"); } catch (e) {}
+  }
 
   function spriteHtml(slug) {
     if (typeof bossMobImg === "function") return bossMobImg(slug, 52);
@@ -21,15 +34,16 @@
     return '<div class="mob-img" style="width:52px;height:52px"></div>';
   }
 
-  function cellHtml(entry, labelKey, bonusKey) {
+  function cellHtml(entry, labelKey, bonusPct, bonusLabel) {
     if (!entry) return "";
     var name = String(entry.name || entry.slug || "?");
+    var pct = Math.max(0, Math.floor(Number(bonusPct) || 0));
     return '<div class="daily-boost-cell">' +
       '<div class="daily-boost-sprite">' + spriteHtml(entry.slug) + "</div>" +
       '<div class="daily-boost-info">' +
         '<div class="daily-boost-kind">' + tt(labelKey) + "</div>" +
         '<div class="daily-boost-name" title="' + name.replace(/"/g, "&quot;") + '">' + name + "</div>" +
-        '<div class="daily-boost-bonus">' + tt(bonusKey) + "</div>" +
+        '<div class="daily-boost-bonus">+' + pct + "% " + bonusLabel + "</div>" +
       "</div></div>";
   }
 
@@ -40,8 +54,8 @@
     var body = panel.querySelector(".daily-boost-body");
     if (!body) return;
     body.innerHTML =
-      cellHtml(data.monster, "daily.monster", "daily.exp") +
-      cellHtml(data.boss, "daily.boss", "daily.loot");
+      cellHtml(data.monster, "daily.monster", data.expBonus, "EXP") +
+      cellHtml(data.boss, "daily.boss", data.lootBonus, "LOOT");
     panel.hidden = false;
   }
 
@@ -58,7 +72,16 @@
   }
 
   /* Poll a cada 60s — barato e resolve a virada de 00h sem timer complicado. */
-  function start() { fetchDaily(); setInterval(fetchDaily, 60000); }
+  function start() {
+    var btn = document.getElementById("daily-boost-toggle");
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener("click", function () { applyCollapsed(!isCollapsed()); });
+    }
+    applyCollapsed(isCollapsed());
+    fetchDaily();
+    setInterval(fetchDaily, 60000);
+  }
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", start);
   else start();
