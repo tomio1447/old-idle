@@ -6,10 +6,18 @@ const ALPHA_DISCORD_URL = "https://discord.gg/bnbh3jtvBf";
 const ALPHA_INSTAGRAM_URL = "https://www.instagram.com/global_idle_ot";
 
 /** Data e hora (Brasília) da atualização descrita nos patch notes. */
-const ALPHA_UPDATE_AT = "30/10/2026 às 22:30";
+const ALPHA_UPDATE_AT = "31/10/2026 às 18:10";
 
 /** Lista editável de updates recentes (bullets do modal pré-login). */
 const ALPHA_ANNOUNCE_UPDATES = [
+  "NOVO — Guilds: crie ou entre numa guild, tasks diárias, loja de bônus, chat e ranking",
+  "NOVO — Daily Boost: Monstro do Dia (+EXP) e Boss do Dia (+loot) sorteados a cada server save",
+  "NOVO — Party automática: seus 4 personagens já formam PT — arraste na seleção para escolher o líder",
+  "NOVO — Perfil do personagem: clique num nome e veja skills, equipamento e a PT",
+  "NOVO — Missão Lizards Town: mate 50 de cada lagarto e ganhe set Zaoan + EXP para a party",
+  "NOVO — Market pelo botão direito: 'Mostrar no market' em qualquer item",
+  "Loot Pouch infinita + autoseller por tempo (5 min VIP / 15 min free) e SELL ALL na cidade/treino",
+  "Topbar: SERVER TIME e SERVER SAVE IN no horário de Brasília",
   "NOVO — Proficiência de Armas: ganhe XP por kill, 1 perk por nível e confirme com OK",
   "Perks oficiais por arma e vocação: mana/life on kill, penetração, leech, augments de spell",
   "NOVO — Roda do Destino: arte oficial do cliente, scroll na roda, botão MAX e sequência de perks",
