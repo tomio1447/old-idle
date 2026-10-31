@@ -2118,6 +2118,22 @@ button.full { width: 100%; }
 .account-character-card.identity-mismatch { border-color:#c85a5a #5c2020 #5c2020 #c85a5a; }
 .account-character-card.is-current { border-color: #5a7a3a #243018 #243018 #5a7a3a; }
 .account-character-card .identity-error { display:block; color:#ff8585; font-weight:bold; font-size:9px; }
+/* Party automática: badge de posição (1º = líder) + estado de arraste. */
+.account-character-card { position: relative; }
+.account-character-pos {
+  position: absolute; top: -8px; right: -6px; z-index: 2;
+  padding: 1px 5px; font-size: 8px; font-weight: 700; letter-spacing: .4px;
+  color: #cfd0c8; background: #23211a; border: 1px solid #4a4636;
+  pointer-events: none;
+}
+.account-character-card.is-leader .account-character-pos {
+  color: #14130f; background: linear-gradient(180deg,#ffe680,#d4af37);
+  border-color: #8a6d1d;
+}
+.account-character-card.dragging { opacity: .45; filter: grayscale(.4); }
+.account-character-card[draggable="true"] { cursor: grab; }
+.account-character-card[draggable="true"]:active { cursor: grabbing; }
+.account-party-hint { color: #b9ad7a; }
 .account-identity-warning { margin-bottom:10px; padding:9px; color:#ffd0d0; background:#321717; border:1px solid #9e4343; }
 .account-sex-choice .acc-sex { flex:1; min-height:42px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .account-sex-choice .acc-sex b { color:#ffe680; font-size:11px; }

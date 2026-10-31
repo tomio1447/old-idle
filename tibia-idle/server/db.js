@@ -1494,6 +1494,40 @@ JsonStore.prototype.partyDelete = function (partyId) {
   });
   this._partySave();
 };
+/* PARTY AUTOMÁTICA — ordem dos chars da conta (espelha o MySQL). */
+JsonStore.prototype.accountPartyOrderGet = function (accountId) {
+  const acc = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  const arr = acc && acc.party_order;
+  return Array.isArray(arr) ? arr.map(Number).filter((n) => n > 0) : [];
+};
+JsonStore.prototype.accountPartyOrderSet = function (accountId, ids) {
+  const acc = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  const list = (Array.isArray(ids) ? ids : []).map(Number).filter((n) => n > 0);
+  if (acc) { acc.party_order = list; this._save(); }
+  return list;
+};
+JsonStore.prototype.partySyncRoster = function (partyId, leaderChar, memberIds, ownCharIds) {
+  const p = (this.parties || []).find((x) => x.id === Number(partyId));
+  if (!p) return false;
+  if (leaderChar) { p.leader_id = Number(leaderChar.id); p.leader_name = String(leaderChar.name); }
+  const own = new Set((ownCharIds || []).map(Number));
+  const wanted = (memberIds || []).map(Number);
+  p.members = p.members || [];
+  p.members = p.members.filter((m) => !own.has(Number(m.character_id)) || wanted.includes(Number(m.character_id)));
+  const curIds = p.members.map((m) => Number(m.character_id));
+  const allOrder = wanted.concat(curIds.filter((id) => !wanted.includes(id)));
+  const next = [];
+  allOrder.forEach((id, i) => {
+    const ex = p.members.find((m) => Number(m.character_id) === id);
+    next.push(ex ? Object.assign(ex, { position: i + 1 })
+      : { character_id: id, position: i + 1, joined_at: new Date().toISOString() });
+  });
+  p.members = next;
+  p.roster_version = (Number(p.roster_version) || 1) + 1;
+  p.updated_at = new Date().toISOString();
+  this._partySave();
+  return true;
+};
 JsonStore.prototype.partySetZone = function (partyId, zone, opts) {
   const p = (this.parties || []).find((x) => x.id === Number(partyId));
   if (!p) return null;
@@ -3860,6 +3894,67 @@ async function MysqlStore() {
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}
       finally{conn.release();}
     },
+    /* PARTY AUTOMÁTICA — ordem dos chars da conta (party_order JSON).
+     * O 1º da lista é sempre o líder da party. */
+    async accountPartyOrderGet(accountId) {
+      const rows = await this.query(
+        "SELECT party_order FROM accounts WHERE id=?", [Number(accountId)]);
+      const raw = rows[0] && rows[0].party_order;
+      let arr = raw;
+      if (typeof raw === "string") { try { arr = JSON.parse(raw); } catch (e) { arr = null; } }
+      return Array.isArray(arr) ? arr.map(Number).filter((n) => n > 0) : [];
+    },
+    async accountPartyOrderSet(accountId, ids) {
+      const list = (Array.isArray(ids) ? ids : []).map(Number).filter((n) => n > 0);
+      await this.run("UPDATE accounts SET party_order=? WHERE id=?",
+        [JSON.stringify(list), Number(accountId)]);
+      return list;
+    },
+    /* Converge parties/party_members ao roster desejado, numa transação:
+     * líder=leaderChar, membros próprios=memberIds (na ordem), membros de
+     * outras contas são preservados. ownCharIds = ids de chars da conta. */
+    async partySyncRoster(partyId, leaderChar, memberIds, ownCharIds) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.query("SELECT id FROM parties WHERE id=? FOR UPDATE", [Number(partyId)]);
+        if (leaderChar) {
+          await conn.query("UPDATE parties SET leader_id=?, leader_name=? WHERE id=?",
+            [Number(leaderChar.id), String(leaderChar.name), Number(partyId)]);
+        }
+        const own = new Set((ownCharIds || []).map(Number));
+        const wanted = (memberIds || []).map(Number);
+        const [current] = await conn.query(
+          "SELECT character_id FROM party_members WHERE party_id=?", [Number(partyId)]);
+        const curIds = current.map((r) => Number(r.character_id));
+        const toRemove = curIds.filter((id) => own.has(id) && !wanted.includes(id));
+        const toAdd = wanted.filter((id) => !curIds.includes(id));
+        for (const id of toRemove) {
+          await conn.query("DELETE FROM party_members WHERE party_id=? AND character_id=?",
+            [Number(partyId), id]);
+        }
+        let pos = 0;
+        const allOrder = wanted.concat(
+          curIds.filter((id) => !wanted.includes(id) && !toRemove.includes(id)));
+        for (const id of allOrder) {
+          pos += 1;
+          if (toAdd.includes(id)) {
+            await conn.query(
+              "INSERT IGNORE INTO party_members (party_id,character_id,position) VALUES (?,?,?)",
+              [Number(partyId), id, pos]);
+          } else if (curIds.includes(id)) {
+            await conn.query(
+              "UPDATE party_members SET position=? WHERE party_id=? AND character_id=?",
+              [pos, Number(partyId), id]);
+          }
+        }
+        await conn.query("UPDATE parties SET roster_version=roster_version+1 WHERE id=?",
+          [Number(partyId)]);
+        await conn.commit();
+        return true;
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
     async partySetZone(partyId, zone, opts) {
       opts = opts || {};
       await this.run(
@@ -4217,6 +4312,9 @@ async function ensureSchema(pool) {
   ]) { try { await pool.query("ALTER TABLE guilds " + col); } catch (e) { /* já existe */ } }
   // Insígnia PvP (moeda de conta — o sistema PvP credita aqui no futuro)
   try { await pool.query("ALTER TABLE accounts ADD COLUMN pvp_insignias INT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch (e) { /* já existe */ }
+  // Ordem da party da conta (party automática: o 1º char é o líder)
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN party_order JSON NULL"); }
   catch (e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS guild_log (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

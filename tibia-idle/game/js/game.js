@@ -5984,6 +5984,15 @@ function initAccountLogin() {
   }
   function showPicker(token, account, characters) {
     characters = Array.isArray(characters) ? characters : [];
+    /* Party automática: exibe os personagens na ordem da conta
+     * (accounts.party_order) — o 1º é o líder da party. */
+    const _partyOrder=Array.isArray(account&&account.partyOrder)?account.partyOrder.map(Number):[];
+    if(_partyOrder.length)characters=characters.slice().sort((a,b)=>{
+      const ia=_partyOrder.indexOf(Number(a.id)),ib=_partyOrder.indexOf(Number(b.id));
+      if(ia<0&&ib<0)return 0;
+      return (ia<0?_partyOrder.length+characters.indexOf(a):ia)
+           -(ib<0?_partyOrder.length+characters.indexOf(b):ib);
+    });
     if(typeof accountCharacterCacheWrite==="function")accountCharacterCacheWrite(characters);
     try {
       sessionStorage.setItem("tibia-idle-token", token);
@@ -6016,6 +6025,7 @@ function initAccountLogin() {
         <div class="account-character-list">${characters.length ? `<div class="account-character-list-head">
           <span></span><span>Nome</span><span>Vocação</span><span>Level</span><span></span>
         </div>` : ""}${cards}</div>
+        ${characters.length>1?`<div class="tiny dim center mt4 account-party-hint">Arraste os personagens para ordenar a party — o 1º da lista é o líder.</div>`:""}
         <button class="primary full mt8" id="acc-open-create-char">Criar personagem</button>
         ${account.emailVerified ? "" : `<button class="full mt8" id="acc-verify-email">📧 Confirmar e-mail</button>`}
         <button class="full mt8" id="acc-customize-char" ${typeof G!=="undefined"&&G&&G.p?"":"disabled"}>👕 Personalizar personagem</button>
@@ -6030,6 +6040,58 @@ function initAccountLogin() {
       const summary=characters.find(c=>String(c.id)===String(row.dataset.repairChar));
       if(summary)showIdentityRepair(token,account,characters,summary);
     }));
+    /* ---- Party automática: arraste para ordenar — o 1º vira líder ---- */
+    const _partyList=$("#modal-body .account-character-list");
+    if(_partyList&&characters.length>1){
+      let _dragCard=null,_dragMoved=false;
+      const _paintOrder=()=>{
+        $$("#modal-body .account-character-card").forEach((el,i)=>{
+          el.classList.toggle("is-leader",i===0);
+          let badge=el.querySelector(".account-character-pos");
+          if(!badge){badge=document.createElement("span");badge.className="account-character-pos";el.prepend(badge);}
+          badge.textContent=i===0?"1º · LÍDER":(i+1)+"º";
+        });
+      };
+      const _submitOrder=async()=>{
+        const ids=$$("#modal-body .account-character-card")
+          .map((el)=>Number(el.dataset.accChar||el.dataset.repairChar)).filter((n)=>n>0);
+        _paintOrder();
+        try{
+          const r=await accountPartySetOrder(ids);
+          if(!r.ok)msg(r.msg||"Falha ao salvar a ordem da party.");
+          else if(account){
+            account.partyOrder=r.order||ids;
+            try{sessionStorage.setItem("tibia-idle-account",JSON.stringify(account));}catch(e){}
+          }
+        }catch(e){}
+      };
+      $$("#modal-body .account-character-card").forEach((el)=>{
+        el.setAttribute("draggable","true");
+        el.addEventListener("dragstart",(e)=>{
+          _dragCard=el;_dragMoved=true;e.dataTransfer.effectAllowed="move";
+          try{e.dataTransfer.setData("text/plain",String(el.dataset.accChar||""));}catch(_){}
+          el.classList.add("dragging");
+        });
+        el.addEventListener("dragend",()=>{
+          el.classList.remove("dragging");_dragCard=null;
+          setTimeout(()=>{_dragMoved=false;},0);
+        });
+        /* Suprime o click "ENTRAR" disparado logo após um arraste. */
+        el.addEventListener("click",(e)=>{
+          if(_dragMoved){e.preventDefault();e.stopPropagation();}
+        },true);
+        el.addEventListener("dragover",(e)=>{
+          if(!_dragCard||_dragCard===el)return;
+          e.preventDefault();e.dataTransfer.dropEffect="move";
+          const r=el.getBoundingClientRect();
+          _partyList.insertBefore(_dragCard,e.clientX<r.left+r.width/2?el:el.nextSibling);
+        });
+        el.addEventListener("drop",(e)=>{e.preventDefault();});
+      });
+      _partyList.addEventListener("drop",(e)=>{e.preventDefault();if(_dragCard)_submitOrder();});
+      _partyList.addEventListener("dragover",(e)=>{if(_dragCard)e.preventDefault();});
+      _paintOrder();
+    }
     $("#acc-open-create-char").onclick = () => showCharacterCreator(token, account, characters);
     const verifyEmail = $("#acc-verify-email");
     if (verifyEmail) verifyEmail.onclick = () => showEmailVerify(token, account, characters);

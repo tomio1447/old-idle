@@ -661,6 +661,10 @@ function accountPublicView(acc){
     missions:acc.missions||{}, missionsDone:acc.missionsDone||{},
     tutorial:acc.tutorial||{},
     cosmetics:(acc.cosmetics&&typeof acc.cosmetics==="object"&&!Array.isArray(acc.cosmetics))?acc.cosmetics:{},
+    /* Party automática: ordem dos chars da conta (1º = líder). */
+    partyOrder:(()=>{const raw=acc&&acc.party_order;
+      const arr=typeof raw==="string"?(function(){try{return JSON.parse(raw);}catch(e){return null;}})():raw;
+      return Array.isArray(arr)?arr.map(Number).filter((n)=>n>0):[];})(),
   };
 }
 async function ensureAccountWallet(db,acc){
@@ -922,6 +926,12 @@ async function createCharacter(db, body) {
   // Bônus inicial é concedido pelo servidor uma única vez, no primeiro char.
   // O cliente nunca recebe permissão para fabricar saldo premium.
   if(!existingCharacters.length)await db.updateCoins(acc.id,(acc.coins||0)+25);
+  /* PARTY AUTOMÁTICA — o sync normaliza a ordem (o novo char entra no
+   * fim de accounts.party_order) e cria/converge a party da conta;
+   * o 1º da ordem é o líder. */
+  try{
+    if(typeof party.partySyncAccount==="function")await party.partySyncAccount(db,acc.id);
+  }catch(e){console.warn("[party] auto-sync pós-criação falhou:",e&&e.message);}
   const updatedAccount=await db.findAccountById(acc.id);
   const createdCharacter=normalized||Object.assign({},c,{data,save_version:1});
   if(typeof db.snapshotAdd==="function")await db.snapshotAdd(acc.id,"character",createdCharacter.id,
@@ -4779,8 +4789,20 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/party/reorder") {
         const body = await readBody(req);
-        const r = await party.partyReorder(db, body);
+        /* Compat: o reorder antigo (character_ids dos membros) agora
+         * converte para a ordem completa da conta. */
+        if(!Array.isArray(body.order)&&Array.isArray(body.character_ids))
+          body.order=body.character_ids;
+        const r = await party.partyOrderSet(db, body);
         if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"reorder");}
+        return send(res, r.code, r.body);
+      }
+      /* PARTY AUTOMÁTICA — ordenação por arraste na seleção de personagem.
+       * O 1º da lista vira líder da party da conta. */
+      if (req.method === "POST" && url === "/api/party/order") {
+        const body = await readBody(req);
+        const r = await party.partyOrderSet(db, body);
+        if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"order");}
         return send(res, r.code, r.body);
       }
       if (req.method === "GET" && url === "/api/party/state") {

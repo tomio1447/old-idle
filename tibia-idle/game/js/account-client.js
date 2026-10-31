@@ -2418,6 +2418,16 @@ async function accountPartyReorder(charId, expectedVersion, characterIds) {
   return r.data.ok?{ok:true,state:r.data.state}:{ok:false,msg:r.data.msg,error:r.data.error};
 }
 
+/* PARTY AUTOMÁTICA — grava a ordem dos chars da conta (arraste na
+ * seleção de personagem). O 1º vira líder da party. */
+async function accountPartySetOrder(charIds) {
+  const r = await _api("POST", "/api/party/order", {
+    token: sessionToken(), order: charIds,
+  });
+  return r.data.ok ? { ok: true, order: r.data.order, party: r.data.party }
+    : { ok: false, msg: r.data.msg };
+}
+
 async function accountPartyState(charId) {
   const r = await _api("GET", "/api/party/state?char_id=" + encodeURIComponent(charId), null, sessionToken());
   return r.data.ok ? { ok: true, state: r.data.state } : { ok: false, msg: r.data.msg };

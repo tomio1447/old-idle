@@ -425,6 +425,9 @@ async function partyState(db, token, charId) {
   const { char, error } = await authChar(db, token, charId);
   if (error) return error;
   if (!char) return { code: 400, body: { ok: false, msg: "Selecione um personagem" } };
+  /* Autocorreção da party automática (throttled): cria/converge a party
+   * da conta conforme accounts.party_order. */
+  await partySyncThrottled(db, char.account_id);
   const party = await partyOf(db, char.id);
   if (!party) return { code: 200, body: { ok: true, state: null } };
   return { code: 200, body: await partyStateFor(db, party, char.id) };
@@ -624,6 +627,110 @@ async function partyFollow(db, body) {
   return { code: 200, body: { ok: true, msg: "Follow confirmado" } };
 }
 
+/* ------------------------- PARTY AUTOMÁTICA -------------------------
+ * A party da conta é gerada sozinha a partir dos personagens dela — não
+ * é mais preciso criar/convidar os próprios chars. accounts.party_order
+ * guarda a ordem escolhida na seleção de personagem (arraste); o 1º é
+ * sempre o líder.
+ *
+ * Regras:
+ *  - chars da conta em party de OUTRA conta não são tocados (seguem
+ *    disponíveis para parties de amigos);
+ *  - membros de outras contas dentro da party da conta são preservados;
+ *  - personagem novo entra no fim da ordem automaticamente;
+ *  - o sync é idempotente: só escreve quando há divergência real. */
+
+/* Ordem final = party_order salvo (filtrado aos ids válidos) + chars
+ * faltantes no fim, na ordem natural de charactersOf. */
+function normalizeOrder(chars, stored) {
+  const ids = new Set(chars.map((c) => Number(c.id)));
+  const out = [];
+  for (const id of stored || []) {
+    if (ids.has(Number(id)) && !out.includes(Number(id))) out.push(Number(id));
+  }
+  for (const c of chars) if (!out.includes(Number(c.id))) out.push(Number(c.id));
+  return out;
+}
+
+const _partySyncAt = new Map(); // accountId -> ts (throttle do auto-sync)
+const PARTY_SYNC_MIN_MS = 15 * 1000;
+
+/* Converge parties/party_members ao roster desejado pela ordem da conta.
+ * Retorna a party (ou null). */
+async function partySyncAccount(db, accountId) {
+  const chars = await db.charactersOf(accountId);
+  if (!chars.length) return null;
+  const stored = typeof db.accountPartyOrderGet === "function"
+    ? await db.accountPartyOrderGet(accountId) : [];
+  const orderIds = normalizeOrder(chars, stored);
+  if (typeof db.accountPartyOrderSet === "function" &&
+      JSON.stringify(orderIds) !== JSON.stringify(stored)) {
+    await db.accountPartyOrderSet(accountId, orderIds);
+  }
+  const byId = new Map(chars.map((c) => [Number(c.id), c]));
+  const ownParty = await db.partyFindByAccount(accountId);
+  /* Disponível p/ a party da conta = char dela que não está em party
+   * de outra conta (a própria conta pode ser o party atual). */
+  const available = [];
+  for (const id of orderIds) {
+    const cur = await db.partyFindByCharacter(id);
+    if (cur && (!ownParty || Number(cur.id) !== Number(ownParty.id))) continue;
+    available.push(id);
+  }
+  if (!ownParty && available.length < 2) return null; // solo: sem party
+  let party = ownParty;
+  if (!party) {
+    const leader = byId.get(available[0]);
+    if (!leader) return null;
+    party = await db.partyCreate(leader);
+  }
+  if (!available.length) return party; // todos fora (em parties alheias)
+  /* O 1º da ordem disponível é o líder — sempre. */
+  const leaderId = available[0];
+  const leaderChar = byId.get(leaderId);
+  const memberIds = available.slice(1, PARTY_MAX_MEMBERS);
+  /* Detecta divergência antes de escrever (sync idempotente). */
+  const curMembers = await db.partyMembers(party.id);
+  const curOwn = curMembers.filter((m) => byId.has(Number(m.id))).map((m) => Number(m.id));
+  const diverged = Number(party.leader_id) !== Number(leaderId) ||
+    curOwn.length !== memberIds.length ||
+    curOwn.some((id, i) => Number(id) !== Number(memberIds[i]));
+  if (diverged && typeof db.partySyncRoster === "function")
+    await db.partySyncRoster(party.id, leaderChar, memberIds, orderIds);
+  return party;
+}
+
+/* Sync com throttle — usado nos GETs (partyState) para autocorreção. */
+async function partySyncThrottled(db, accountId) {
+  const id = Number(accountId);
+  const last = _partySyncAt.get(id) || 0;
+  if (Date.now() - last < PARTY_SYNC_MIN_MS) return null;
+  _partySyncAt.set(id, Date.now());
+  try { return await partySyncAccount(db, id); }
+  catch (e) { return null; }
+}
+
+/* POST /api/party/order — arraste na seleção de personagem define a
+ * ordem da party da conta; o 1º vira líder. */
+async function partyOrderSet(db, body) {
+  const { account, error } = await authChar(db, body.token, 0);
+  if (error) return error;
+  const chars = await db.charactersOf(account.id);
+  const own = new Set(chars.map((c) => Number(c.id)));
+  const order = [];
+  for (const id of (Array.isArray(body.order) ? body.order : []).map(Number)) {
+    if (own.has(id) && !order.includes(id)) order.push(id);
+  }
+  for (const c of chars) if (!order.includes(Number(c.id))) order.push(Number(c.id));
+  if (typeof db.accountPartyOrderSet === "function")
+    await db.accountPartyOrderSet(account.id, order);
+  _partySyncAt.set(Number(account.id), Date.now());
+  await partySyncAccount(db, account.id);
+  const party = await db.partyFindByAccount(account.id);
+  return { code: 200, body: { ok: true, order,
+    party: party ? { id: Number(party.id), leader_id: Number(party.leader_id) } : null } };
+}
+
 module.exports = {
   ZONES_CONVIDAR,
   PARTY_MAX_MEMBERS,
@@ -637,4 +744,7 @@ module.exports = {
   partyState,
   partyReportZone,
   partyFollow,
+  partySyncAccount,
+  partySyncThrottled,
+  partyOrderSet,
 };
