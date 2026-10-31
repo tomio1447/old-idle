@@ -1278,6 +1278,64 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background-size:contain; background-repeat:no-repeat; background-position:center;
   image-rendering:pixelated;
 }
+/* Ícone da guild: recorta a casa do tab "Houses" da Cyclopedia (a arte do
+ * tab traz ícone + texto; aqui só o ícone, encostado à esquerda). */
+.guild-btn-icon {
+  display:inline-block; width:22px; height:22px; flex:0 0 22px;
+  background-image:url('../assets/ui/cyclopedia/houses_on.png?v=guild-v1');
+  background-size:auto 22px; background-repeat:no-repeat; background-position:left center;
+  image-rendering:pixelated;
+}
+.guild-card-icon { width:44px; height:44px; background-size:auto 44px; }
+
+/* Modal de GUILDS — mesma casca do modal CIDADE. */
+.modal-bg .modal.guild-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.guild-modal-title { display:flex; align-items:center; gap:7px; }
+.guild-modal-title #guild-modal-close { margin-left:auto; }
+.guild-modal-title .guild-btn-icon { transform:scale(1.1); margin:0 2px; }
+.guild-section { margin-bottom:12px; }
+.guild-section .hunt-cat-title { margin-bottom:6px; }
+.guild-card .guild-card-icon { display:block; }
+.guild-create-box { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  background:rgba(16,12,8,.6); padding:8px; border:1px solid #2a2016; border-radius:4px; }
+.guild-create-box input { flex:1 1 200px; padding:6px 8px; background:#14120e;
+  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-invite-list { display:flex; flex-direction:column; gap:4px; }
+.guild-invite-row { display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:6px 8px; }
+.guild-invite-actions { display:flex; gap:6px; }
+.guild-tabs { display:flex; gap:4px; margin:8px 0; }
+.guild-tab { flex:0 0 auto; padding:5px 12px; background:#14120e; color:#a8a090;
+  border:1px solid #2a2016; cursor:pointer; font-size:11px; font-weight:bold; }
+.guild-tab.active { background:#3a2e22; color:#e8d4a2; border-color:#5a4a32; }
+.guild-member-list { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+.guild-member-row { display:flex; align-items:center; gap:10px;
+  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:6px 8px; }
+.guild-member-pos { width:34px; color:#d4af37; font-weight:bold; }
+.guild-member-name { flex:1 1 auto; color:#e8dfd0; }
+.guild-member-rank { width:90px; font-size:10px; color:#a8a090; }
+.guild-member-contrib { width:80px; text-align:right; font-size:10px; color:#a8a090; }
+.guild-member-actions { display:flex; gap:4px; }
+.guild-exp-bar { position:relative; height:16px; margin-top:6px; background:#14120e;
+  border:1px solid #3a3020; border-radius:3px; overflow:hidden; }
+.guild-exp-bar i { display:block; height:100%; background:linear-gradient(90deg,#6a4a10,#d4af37); }
+.guild-exp-bar span { position:absolute; inset:0; display:flex; align-items:center;
+  justify-content:center; font-size:9px; color:#fff; text-shadow:0 1px 1px #000; }
+.guild-task-list { display:flex; flex-direction:column; gap:6px; }
+.guild-task-card { display:flex; align-items:center; gap:10px;
+  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:8px; }
+.guild-task-card.done { border-color:#3a5a32; background:rgba(18,28,14,.9); }
+.guild-task-img { flex:0 0 44px; text-align:center; }
+.guild-task-info { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.guild-task-info .nm { color:#e8dfd0; }
+.guild-task-info .meta { font-size:10px; color:#a8a090; }
+.guild-task-bar { height:8px; background:#14120e; border:1px solid #2a2016; border-radius:2px; overflow:hidden; }
+.guild-task-bar i { display:block; height:100%; background:linear-gradient(90deg,#2a6a2a,#7ae87a); }
+.guild-task-status { flex:0 0 70px; text-align:right; font-size:10px; color:#a8a090; }
+.guild-task-card.done .guild-task-status { color:#7ae87a; }
+.guild-invite-box { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.guild-invite-box input { flex:1 1 160px; padding:5px 8px; background:#14120e;
+  color:#c8c0a8; border:1px solid #3a3020; }
 .ranking-btn-icon {
   display:inline-block; width:22px; height:22px; flex:0 0 22px;
   background-image:url('../assets/ui/prey/prey_bigxp.png');

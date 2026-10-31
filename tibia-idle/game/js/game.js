@@ -5270,6 +5270,10 @@ function bindControls() {
     if (typeof openNpcsModal === "function") openNpcsModal();
   });
   $("#btn-cyclo").addEventListener("click", () => openCyclopedia());
+  const btnGuild = $("#btn-guild");
+  if (btnGuild) btnGuild.addEventListener("click", () => {
+    if (typeof openGuildModal === "function") openGuildModal("list");
+  });
   const btnStore = $("#btn-store");
   if (btnStore) btnStore.addEventListener("click", () => {
     if (typeof openStoreModal === "function") openStoreModal();

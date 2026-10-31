@@ -7876,8 +7876,16 @@ function advanceAuthorityState(serialized,elapsed,checkpointAt,visualState){let 
   const requested=Math.floor(total/AUTH_STEP_MS),steps=Math.min(250000,requested);auth.carryMs=total-steps*AUTH_STEP_MS;
   for(let i=0;i<steps;i++){auth.clock+=AUTH_STEP_MS;step(auth,auth.clock,{freezeVisual,dt:AUTH_STEP_MS});if(auth.ended){auth.carryMs=0;break;}}
   auth.clock=Math.max(auth.clock,Number(checkpointAt)||auth.clock);descriptor=materializeAuthority(descriptor);
-  return {state:JSON.stringify(descriptor),characters:auth.players.map((item)=>({id:Number(item.id),data:JSON.stringify(item.p),level:item.p.level,voc:item.p.voc,
-    hp:item.p.hp,mp:item.p.mp,max_hp:maxStats(item.p).hp,max_mp:maxStats(item.p).mp})),terminalReason:auth.ended?auth.terminalReason:null};
+  return {state:JSON.stringify(descriptor),characters:auth.players.map((item)=>{
+    // Guild tasks: delta de kills desde a última projeção persistida. A
+    // marca (_guildKillsMark) vive dentro de p — serializa no mesmo
+    // checkpoint que os próprios kills, então nunca conta duas vezes.
+    const kills=item.p.kills||{},marks=item.p._guildKillsMark||{},taskKills={};
+    for(const slug in kills){const d=(Number(kills[slug])||0)-(Number(marks[slug])||0);if(d>0)taskKills[slug]=d;}
+    item.p._guildKillsMark=Object.assign({},kills);
+    return {id:Number(item.id),data:JSON.stringify(item.p),level:item.p.level,voc:item.p.voc,
+      hp:item.p.hp,mp:item.p.mp,max_hp:maxStats(item.p).hp,max_mp:maxStats(item.p).mp,
+      taskKills:Object.keys(taskKills).length?taskKills:null};}),terminalReason:auth.ended?auth.terminalReason:null};
 }
 function protectedPlayer(descriptor,id){const auth=descriptor&&descriptor.authority;const item=auth&&auth.players.find((x)=>String(x.id)===String(id));return item?clone(item.p):null;}
 module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,protectedPlayer,applyPvpLoss,expForLevel,maxStats,

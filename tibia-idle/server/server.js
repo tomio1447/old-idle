@@ -38,6 +38,7 @@ const bcrypt = require("bcryptjs");
 const { getDb } = require("./db");
 const { YANA_CATALOG, applyYanaPurchase } = require("./yana_catalog");
 const party = require("./party");   // lógica de PARTY multiplayer
+const guild = require("./guild");   // lógica de GUILDS (por conta)
 const { startInstanceWorker } = require("./instance_worker");
 const { SyncBus } = require("./sync_bus");
 const {
@@ -4772,6 +4773,59 @@ async function main() {
       if (req.method === "POST" && url === "/api/party/follow") {
         const body = await readBody(req);
         const r = await party.partyFollow(db, body);
+        return send(res, r.code, r.body);
+      }
+      // ---- GUILD ----
+      if (req.method === "GET" && url === "/api/guilds") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const r = await guild.guildList(db, token);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/guild/state") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await guild.guildState(db, token, q.get("char_id"));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/guild/detail") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await guild.guildDetail(db, token, q.get("id"), q.get("char_id"));
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/create") {
+        const body = await readBody(req);
+        const r = await guild.guildCreate(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/invite") {
+        const body = await readBody(req);
+        const r = await guild.guildInvite(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/accept") {
+        const body = await readBody(req);
+        const r = await guild.guildAccept(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/decline") {
+        const body = await readBody(req);
+        const r = await guild.guildDecline(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/leave") {
+        const body = await readBody(req);
+        const r = await guild.guildLeave(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/kick") {
+        const body = await readBody(req);
+        const r = await guild.guildKick(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/promote") {
+        const body = await readBody(req);
+        const r = await guild.guildPromote(db, body);
         return send(res, r.code, r.body);
       }
       // ---- WORLD BOSS / WARZONE ----

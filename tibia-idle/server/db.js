@@ -13,6 +13,16 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+/* guild.js é usado para dia de server save, defs das tasks e nível.
+ * Lazy: ele não require db.js de volta, então não há ciclo. */
+let _guildMod = null;
+function guildModule() {
+  if (_guildMod === null) {
+    try { _guildMod = require("./guild"); } catch (e) { _guildMod = false; }
+  }
+  return _guildMod || null;
+}
+
 // ---- configuração via .env (MYSQL_HOST, MYSQL_USER, ...) ----
 const MYSQL_HOST = process.env.MYSQL_HOST || "";
 const MYSQL_USER = process.env.MYSQL_USER || "root";
@@ -83,6 +93,13 @@ function JsonStore() {
     validParties.push(p);
   });
   this.parties=validParties;
+  // guilds persistem em data/guilds.json (convites/tasks precisam
+  // sobreviver a reinícios do servidor)
+  const guildData = this._load("guilds.json", null);
+  this.guilds = Array.isArray(guildData && guildData.guilds) ? guildData.guilds : [];
+  this.guildMembers = Array.isArray(guildData && guildData.members) ? guildData.members : [];
+  this.guildInvites = Array.isArray(guildData && guildData.invites) ? guildData.invites : [];
+  this.guildTasks = Array.isArray(guildData && guildData.tasks) ? guildData.tasks : [];
   // market (ofertas + stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
@@ -108,6 +125,7 @@ function JsonStore() {
   if ((this.snapshots || []).length !== snapBefore) this._snapshotsDirty = true;
   this._save();
   this._partySave();
+  this._guildSave();
 }
 JsonStore.prototype._load = function (file, dft) {
   try {
@@ -372,6 +390,13 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
     if(!c)continue;c.data=sharedMirror.get(Number(projection.id))||projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=new Date(now).toISOString();}
+  // Guild tasks: idem ao tick — instância ociosa também credita kills.
+  for(const projection of next.characters||[]){
+    const tk=projection&&projection.taskKills;
+    if(!tk||typeof tk!=="object")continue;
+    const c=this.findCharacter(projection.id);if(!c)continue;
+    try{this.guildCreditKills(Number(c.account_id),tk);}catch(e){console.error("[guild] credit kills:",e&&e.message);}
+  }
   if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
   row.updated_at=new Date(now).toISOString();this._saveRuntime(true);
   return {ok:true,accountId:Number(accountId),elapsed,version:Number(row.version),terminalReason:next.terminalReason||null};
@@ -416,6 +441,14 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
     if(!c)continue;c.data=sharedMirror.get(Number(projection.id))||projection.data;c.level=projection.level;c.voc=projection.voc;
     c.hp=projection.hp;c.mp=projection.mp;c.max_hp=projection.max_hp;c.max_mp=projection.max_mp;
     c.save_version=(Number(c.save_version)||0)+1;c.updated_at=row.saved_at;changed.push(c);}
+  // Guild tasks: o engine emite taskKills por projeção (delta da janela) —
+  // credita nas tasks do dia da conta junto com o checkpoint.
+  for(const projection of next.characters||[]){
+    const tk=projection&&projection.taskKills;
+    if(!tk||typeof tk!=="object")continue;
+    const c=this.findCharacter(projection.id);if(!c)continue;
+    try{this.guildCreditKills(Number(c.account_id),tk);}catch(e){console.error("[guild] credit kills:",e&&e.message);}
+  }
   if(typeof this.syncAccountGoldFromCharacters==="function")this.syncAccountGoldFromCharacters(next.characters||[]);
   row.updated_at=row.saved_at;this._saveRuntime(true);return {ok:true,instance:row,characters:changed,elapsed,
     terminalReason:next.terminalReason||null};
@@ -1553,6 +1586,219 @@ JsonStore.prototype.invitesFor = function (inviteeId, status) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 };
 
+/* ------------------------------- GUILDS --------------------------------
+ * Guild é por CONTA: guild_members.account_id é único (1 personagem
+ * representa a conta inteira — bônus valem para a conta toda). */
+JsonStore.prototype._guildSave = function () {
+  try {
+    fs.writeFileSync(path.join(DATA_DIR, "guilds.json"),
+      JSON.stringify({
+        guilds: this.guilds || [], members: this.guildMembers || [],
+        invites: this.guildInvites || [], tasks: this.guildTasks || [],
+      }, null, 1));
+  } catch (e) { /* não bloqueia o jogo */ }
+};
+JsonStore.prototype._nextGuildId = function () {
+  return (this.guilds || []).reduce((m, g) => Math.max(m, Number(g.id) || 0), 0) + 1;
+};
+JsonStore.prototype._nextGuildInviteId = function () {
+  return (this.guildInvites || []).reduce((m, i) => Math.max(m, Number(i.id) || 0), 0) + 1;
+};
+JsonStore.prototype._nextGuildTaskId = function () {
+  return (this.guildTasks || []).reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
+};
+JsonStore.prototype.guildList = function () {
+  return (this.guilds || []).map((g) => Object.assign({}, g, {
+    members: (this.guildMembers || []).filter((m) => Number(m.guild_id) === Number(g.id)).length,
+  })).sort((a, b) => (Number(b.level) - Number(a.level)) || (Number(b.exp) - Number(a.exp)) ||
+    (Number(a.id) - Number(b.id)));
+};
+JsonStore.prototype.guildById = function (id) {
+  return (this.guilds || []).find((g) => Number(g.id) === Number(id)) || null;
+};
+JsonStore.prototype.guildByName = function (name) {
+  const n = String(name || "").toLowerCase();
+  return (this.guilds || []).find((g) => String(g.name || "").toLowerCase() === n) || null;
+};
+JsonStore.prototype.guildMemberByAccount = function (accountId) {
+  return (this.guildMembers || []).find((m) => Number(m.account_id) === Number(accountId)) || null;
+};
+JsonStore.prototype.guildMemberByChar = function (charId) {
+  return (this.guildMembers || []).find((m) => Number(m.character_id) === Number(charId)) || null;
+};
+JsonStore.prototype.guildMembers = function (guildId) {
+  const rankOrder = { leader: 0, vice: 1, member: 2 };
+  return (this.guildMembers || [])
+    .filter((m) => Number(m.guild_id) === Number(guildId))
+    .map((m) => {
+      const c = this.findCharacter(m.character_id);
+      return Object.assign({}, m, {
+        name: c ? c.name : "?", voc: c ? c.voc : "none", level: c ? c.level : 1,
+      });
+    })
+    .sort((a, b) => (rankOrder[a.rank] !== undefined ? rankOrder[a.rank] : 3) -
+      (rankOrder[b.rank] !== undefined ? rankOrder[b.rank] : 3) ||
+      new Date(a.joined_at) - new Date(b.joined_at));
+};
+JsonStore.prototype.guildCreate = function (opts) {
+  if (this.guildByName(opts.name)) return { ok: false, error: "GUILD_NAME_TAKEN" };
+  const account = (this.accounts || []).find((a) => Number(a.id) === Number(opts.leader_account_id));
+  const cost = Math.max(0, Number(opts.cost_gold) || 0);
+  if (!account || Number(account.gold) < cost) return { ok: false, error: "GUILD_GOLD_LOW" };
+  if (this.guildMemberByAccount(opts.leader_account_id))
+    return { ok: false, error: "GUILD_ALREADY_MEMBER" };
+  account.gold = Number(account.gold) - cost;
+  const now = new Date().toISOString();
+  const guild = { id: this._nextGuildId(), name: opts.name, level: 1, exp: 0, created_at: now };
+  this.guilds.push(guild);
+  this.guildMembers.push({ guild_id: guild.id, account_id: Number(opts.leader_account_id),
+    character_id: Number(opts.leader_character_id), rank: "leader",
+    contribution: 0, joined_at: now });
+  // espelha o novo saldo no data.gold dos chars (mesma regra do wallet sync)
+  for (const c of this.charactersOf(account.id)) {
+    let d = {}; try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = {}; }
+    d.gold = account.gold; c.data = JSON.stringify(d);
+  }
+  this._save(); this._guildSave();
+  return { ok: true, id: guild.id };
+};
+JsonStore.prototype.guildInviteAdd = function (guildId, inviterCharId, inviteeCharId) {
+  const pending = (this.guildInvites || []).find((i) =>
+    Number(i.invitee_character_id) === Number(inviteeCharId) && i.status === "pending");
+  if (pending) return { ok: false, error: "GUILD_INVITE_PENDING" };
+  const inv = { id: this._nextGuildInviteId(), guild_id: Number(guildId),
+    inviter_character_id: Number(inviterCharId), invitee_character_id: Number(inviteeCharId),
+    status: "pending", created_at: new Date().toISOString() };
+  this.guildInvites.push(inv);
+  this._guildSave();
+  return { ok: true, id: inv.id };
+};
+JsonStore.prototype.guildInviteFind = function (id) {
+  return (this.guildInvites || []).find((i) => Number(i.id) === Number(id)) || null;
+};
+JsonStore.prototype.guildInviteSetStatus = function (id, status) {
+  const inv = this.guildInviteFind(id);
+  if (inv) { inv.status = String(status); this._guildSave(); }
+};
+JsonStore.prototype.guildInvitesForAccount = function (accountId) {
+  return (this.guildInvites || [])
+    .filter((i) => {
+      if (i.status !== "pending") return false;
+      const c = this.findCharacter(i.invitee_character_id);
+      return c && Number(c.account_id) === Number(accountId);
+    })
+    .map((i) => {
+      const g = this.guildById(i.guild_id);
+      const inv = this.findCharacter(i.inviter_character_id);
+      return Object.assign({}, i, {
+        guild_name: g ? g.name : "?", inviter_name: inv ? inv.name : "?",
+      });
+    })
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+};
+JsonStore.prototype.guildMemberAdd = function (guildId, accountId, charId, rank) {
+  this.guildMembers.push({ guild_id: Number(guildId), account_id: Number(accountId),
+    character_id: Number(charId), rank: String(rank || "member"),
+    contribution: 0, joined_at: new Date().toISOString() });
+  this._guildSave();
+};
+/* Remove membro. Líder sai → vice assume; sem vice, o mais antigo; sem
+ * ninguém → guild dissolvida. */
+JsonStore.prototype.guildMemberRemove = function (guildId, accountId) {
+  const id = Number(guildId), aid = Number(accountId);
+  const me = (this.guildMembers || []).find((m) =>
+    Number(m.guild_id) === id && Number(m.account_id) === aid);
+  if (!me) return { ok: false, error: "NOT_MEMBER" };
+  const rest = (this.guildMembers || []).filter((m) =>
+    Number(m.guild_id) === id && Number(m.account_id) !== aid);
+  let disbanded = false, guildName = null;
+  if (!rest.length) {
+    const g = this.guildById(id); guildName = g ? g.name : null;
+    this.guildInvites = (this.guildInvites || []).filter((i) => Number(i.guild_id) !== id);
+    this.guildTasks = (this.guildTasks || []).filter((t) => Number(t.guild_id) !== id);
+    this.guildMembers = rest;
+    this.guilds = (this.guilds || []).filter((g) => Number(g.id) !== id);
+    disbanded = true;
+  } else {
+    this.guildMembers = (this.guildMembers || []).filter((m) =>
+      !(Number(m.guild_id) === id && Number(m.account_id) === aid));
+    if (me.rank === "leader") {
+      const successor = rest.find((m) => m.rank === "vice") ||
+        rest.slice().sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0];
+      this.guildMembers.forEach((m) => {
+        if (Number(m.guild_id) !== id) return;
+        m.rank = Number(m.account_id) === Number(successor.account_id) ? "leader" : "member";
+      });
+    }
+  }
+  this._guildSave();
+  return { ok: true, disbanded, guildName };
+};
+JsonStore.prototype.guildMemberSetRank = function (guildId, accountId, rank) {
+  const id = Number(guildId);
+  if (String(rank) === "vice") {
+    (this.guildMembers || []).forEach((m) => {
+      if (Number(m.guild_id) === id && m.rank === "vice") m.rank = "member";
+    });
+  }
+  const m = (this.guildMembers || []).find((x) =>
+    Number(x.guild_id) === id && Number(x.account_id) === Number(accountId));
+  if (m) { m.rank = String(rank); this._guildSave(); }
+};
+JsonStore.prototype.guildTasksEnsure = function (guildId, accountId, day, defs) {
+  let dirty = false;
+  for (const def of defs || []) {
+    const exists = (this.guildTasks || []).some((t) =>
+      Number(t.guild_id) === Number(guildId) && Number(t.account_id) === Number(accountId) &&
+      String(t.day) === String(day) && Number(t.slot) === Number(def.slot));
+    if (exists) continue;
+    this.guildTasks.push({ id: this._nextGuildTaskId(), guild_id: Number(guildId),
+      account_id: Number(accountId), day: String(day), slot: Number(def.slot),
+      monster_slug: String(def.monster_slug), target: Number(def.target),
+      progress: 0, done: 0, completed_at: null });
+    dirty = true;
+  }
+  if (dirty) this._guildSave();
+};
+JsonStore.prototype.guildTasksFor = function (guildId, accountId, day) {
+  return (this.guildTasks || [])
+    .filter((t) => Number(t.guild_id) === Number(guildId) &&
+      Number(t.account_id) === Number(accountId) && String(t.day) === String(day))
+    .sort((a, b) => Number(a.slot) - Number(b.slot));
+};
+/* Chamado pelo tick da instância com os kills da janela: soma progresso
+ * nas tasks abertas do membro (por conta) e fecha task ao bater o alvo —
+ * cada task completada dá +1 EXP à guild e +1 contribuição ao membro. */
+JsonStore.prototype.guildCreditKills = function (accountId, kills) {
+  const member = this.guildMemberByAccount(accountId);
+  if (!member || !kills || typeof kills !== "object") return { credited: 0 };
+  const Guild = guildModule();
+  if (!Guild) return { credited: 0 };
+  const day = Guild.guildTaskDay();
+  this.guildTasksEnsure(member.guild_id, accountId, day,
+    Guild.guildDailyTaskDefs(member.guild_id, day));
+  let credited = 0, completed = 0;
+  for (const t of this.guildTasksFor(member.guild_id, accountId, day)) {
+    if (Number(t.done)) continue;
+    const n = Math.max(0, Math.floor(Number(kills[t.monster_slug]) || 0));
+    if (!n) continue;
+    t.progress = Math.min(Number(t.target), Number(t.progress) + n);
+    credited += n;
+    if (t.progress >= t.target && !Number(t.done)) {
+      t.done = 1; t.completed_at = new Date().toISOString();
+      member.contribution = (Number(member.contribution) || 0) + 1;
+      const guild = this.guildById(t.guild_id);
+      if (guild) {
+        guild.exp = (Number(guild.exp) || 0) + 1;
+        guild.level = Guild.guildLevelForExp(guild.exp);
+      }
+      completed++;
+    }
+  }
+  if (credited || completed) this._guildSave();
+  return { credited, completed };
+};
+
 /* Wrapper MySQL (mysql2/promise) — mesma API do JsonStore */
 async function MysqlStore() {
   const mysql = require("mysql2/promise");
@@ -2307,6 +2553,16 @@ async function MysqlStore() {
            WHERE id=?`,
           [sharedMirror.get(Number(projection.id))||projection.data,projection.level,projection.voc,projection.hp,
            projection.mp,projection.max_hp,projection.max_mp,Number(projection.id)]);
+        // Guild tasks: instância ociosa também credita kills (mesma txn).
+        for(const projection of next.characters||[]){
+          const tk=projection&&projection.taskKills;
+          if(!tk||typeof tk!=="object")continue;
+          try{
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const aid=accRows[0]&&Number(accRows[0].account_id);
+            if(aid)await this.guildCreditKills(aid,tk,conn);
+          }catch(e){console.error("[guild] credit kills:",e&&e.message);}
+        }
         for(const [aid,shared] of sharedByAcc.entries())
           await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
         await conn.query(
@@ -2372,6 +2628,17 @@ async function MysqlStore() {
            WHERE id=?`,
           [sharedMirror.get(Number(projection.id))||projection.data,projection.level,projection.voc,projection.hp,projection.mp,
            projection.max_hp,projection.max_mp,Number(projection.id)]);
+        // Guild tasks: o engine emite taskKills por projeção (delta da
+        // janela) — credita nas tasks do dia da conta, mesma transação.
+        for(const projection of next.characters||[]){
+          const tk=projection&&projection.taskKills;
+          if(!tk||typeof tk!=="object")continue;
+          try{
+            const [accRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
+            const aid=accRows[0]&&Number(accRows[0].account_id);
+            if(aid)await this.guildCreditKills(aid,tk,conn);
+          }catch(e){console.error("[guild] credit kills:",e&&e.message);}
+        }
         for(const [aid,shared] of sharedByAcc.entries())
           await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",[JSON.stringify(shared),aid]);
         // Gold é por conta: propaga o saldo autoritativo para accounts.gold.
@@ -2787,6 +3054,208 @@ async function MysqlStore() {
       };
     },
 
+    // ---- GUILDS ----
+    async guildList() {
+      return this.query(
+        `SELECT g.*, (SELECT COUNT(*) FROM guild_members m WHERE m.guild_id=g.id) members
+         FROM guilds g ORDER BY g.level DESC, g.exp DESC, g.id ASC`);
+    },
+    async guildById(id) {
+      const rows = await this.query("SELECT * FROM guilds WHERE id=?", [Number(id)]);
+      return rows[0] || null;
+    },
+    async guildByName(name) {
+      const rows = await this.query("SELECT * FROM guilds WHERE LOWER(name)=LOWER(?)", [String(name)]);
+      return rows[0] || null;
+    },
+    async guildMemberByAccount(accountId) {
+      const rows = await this.query("SELECT * FROM guild_members WHERE account_id=?", [Number(accountId)]);
+      return rows[0] || null;
+    },
+    async guildMembers(guildId) {
+      return this.query(
+        `SELECT m.*, c.name, c.voc, c.level
+         FROM guild_members m LEFT JOIN characters c ON c.id=m.character_id
+         WHERE m.guild_id=?
+         ORDER BY FIELD(m.rank,'leader','vice','member'), m.joined_at ASC`, [Number(guildId)]);
+    },
+    async guildCreate(opts) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [dup] = await conn.query("SELECT id FROM guilds WHERE LOWER(name)=LOWER(?)", [opts.name]);
+        if (dup.length) { await conn.rollback(); return { ok: false, error: "GUILD_NAME_TAKEN" }; }
+        const [member] = await conn.query("SELECT account_id FROM guild_members WHERE account_id=?",
+          [Number(opts.leader_account_id)]);
+        if (member.length) { await conn.rollback(); return { ok: false, error: "GUILD_ALREADY_MEMBER" }; }
+        const cost = Math.max(0, Number(opts.cost_gold) || 0);
+        const [g] = await conn.query("UPDATE accounts SET gold=gold-? WHERE id=? AND gold>=?",
+          [cost, Number(opts.leader_account_id), cost]);
+        if (!g.affectedRows) { await conn.rollback(); return { ok: false, error: "GUILD_GOLD_LOW" }; }
+        const [ins] = await conn.query("INSERT INTO guilds (name,level,exp) VALUES (?,1,0)", [opts.name]);
+        await conn.query(
+          "INSERT INTO guild_members (guild_id,account_id,character_id,rank) VALUES (?,?,?,'leader')",
+          [ins.insertId, Number(opts.leader_account_id), Number(opts.leader_character_id)]);
+        // espelha o novo saldo no data.gold dos chars (mesma regra do wallet sync)
+        const [acc] = await conn.query("SELECT gold FROM accounts WHERE id=?", [Number(opts.leader_account_id)]);
+        const newGold = acc[0] ? Math.max(0, Number(acc[0].gold) || 0) : 0;
+        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=?",
+          [Number(opts.leader_account_id)]);
+        for (const ch of chars) {
+          let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }
+          d.gold = newGold;
+          await conn.query("UPDATE characters SET data=? WHERE id=?", [JSON.stringify(d), Number(ch.id)]);
+        }
+        await conn.commit();
+        return { ok: true, id: ins.insertId };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async guildInviteAdd(guildId, inviterCharId, inviteeCharId) {
+      try {
+        const r = await this.run(
+          `INSERT INTO guild_invites (guild_id,inviter_character_id,invitee_character_id,status)
+           VALUES (?,?,?,'pending')`,
+          [Number(guildId), Number(inviterCharId), Number(inviteeCharId)]);
+        return { ok: true, id: r.insertId };
+      } catch (e) {
+        if (String(e && e.code) === "ER_DUP_ENTRY") return { ok: false, error: "GUILD_INVITE_PENDING" };
+        throw e;
+      }
+    },
+    async guildInviteFind(id) {
+      const rows = await this.query("SELECT * FROM guild_invites WHERE id=?", [Number(id)]);
+      return rows[0] || null;
+    },
+    async guildInviteSetStatus(id, status) {
+      await this.run("UPDATE guild_invites SET status=? WHERE id=?", [String(status), Number(id)]);
+    },
+    async guildInvitesForAccount(accountId) {
+      return this.query(
+        `SELECT i.*, g.name guild_name, ic2.name inviter_name
+         FROM guild_invites i
+         JOIN guilds g ON g.id=i.guild_id
+         JOIN characters ic ON ic.id=i.invitee_character_id
+         LEFT JOIN characters ic2 ON ic2.id=i.inviter_character_id
+         WHERE ic.account_id=? AND i.status='pending'
+         ORDER BY i.created_at DESC`, [Number(accountId)]);
+    },
+    async guildMemberAdd(guildId, accountId, charId, rank) {
+      await this.run(
+        "INSERT INTO guild_members (guild_id,account_id,character_id,rank) VALUES (?,?,?,?)",
+        [Number(guildId), Number(accountId), Number(charId), String(rank || "member")]);
+    },
+    /* Remove membro. Líder sai → vice assume; sem vice, o mais antigo; sem
+     * ninguém → guild dissolvida. */
+    async guildMemberRemove(guildId, accountId) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query("SELECT * FROM guild_members WHERE guild_id=? FOR UPDATE",
+          [Number(guildId)]);
+        const me = rows.find((m) => Number(m.account_id) === Number(accountId));
+        if (!me) { await conn.rollback(); return { ok: false, error: "NOT_MEMBER" }; }
+        const rest = rows.filter((m) => Number(m.account_id) !== Number(accountId));
+        let disbanded = false, guildName = null;
+        if (!rest.length) {
+          const [g] = await conn.query("SELECT name FROM guilds WHERE id=?", [Number(guildId)]);
+          guildName = g[0] ? g[0].name : null;
+          await conn.query("DELETE FROM guild_invites WHERE guild_id=?", [Number(guildId)]);
+          await conn.query("DELETE FROM guild_tasks WHERE guild_id=?", [Number(guildId)]);
+          await conn.query("DELETE FROM guild_members WHERE guild_id=?", [Number(guildId)]);
+          await conn.query("DELETE FROM guilds WHERE id=?", [Number(guildId)]);
+          disbanded = true;
+        } else {
+          await conn.query("DELETE FROM guild_members WHERE guild_id=? AND account_id=?",
+            [Number(guildId), Number(accountId)]);
+          if (String(me.rank) === "leader") {
+            const successor = rest.find((m) => m.rank === "vice") || rest[0];
+            await conn.query("UPDATE guild_members SET rank='member' WHERE guild_id=? AND rank IN ('leader','vice')",
+              [Number(guildId)]);
+            await conn.query("UPDATE guild_members SET rank='leader' WHERE guild_id=? AND account_id=?",
+              [Number(guildId), Number(successor.account_id)]);
+          }
+        }
+        await conn.commit();
+        return { ok: true, disbanded, guildName };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async guildMemberSetRank(guildId, accountId, rank) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        if (String(rank) === "vice")
+          await conn.query("UPDATE guild_members SET rank='member' WHERE guild_id=? AND rank='vice'",
+            [Number(guildId)]);
+        await conn.query("UPDATE guild_members SET rank=? WHERE guild_id=? AND account_id=?",
+          [String(rank), Number(guildId), Number(accountId)]);
+        await conn.commit();
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    async guildTasksEnsure(guildId, accountId, day, defs) {
+      for (const def of defs || []) {
+        await this.run(
+          `INSERT IGNORE INTO guild_tasks (guild_id,account_id,day,slot,monster_slug,target)
+           VALUES (?,?,?,?,?,?)`,
+          [Number(guildId), Number(accountId), String(day), Number(def.slot),
+           String(def.monster_slug), Number(def.target)]);
+      }
+    },
+    async guildTasksFor(guildId, accountId, day) {
+      return this.query(
+        "SELECT * FROM guild_tasks WHERE guild_id=? AND account_id=? AND day=? ORDER BY slot ASC",
+        [Number(guildId), Number(accountId), String(day)]);
+    },
+    /* Chamado pelo tick da instância com os kills da janela: soma progresso
+     * nas tasks abertas do membro (por conta) e fecha task ao bater o alvo —
+     * cada task completada dá +1 EXP à guild e +1 contribuição ao membro.
+     * `exec` permite rodar dentro da transação do tick (conn) — sem ele cai
+     * no pool (rotas). */
+    async guildCreditKills(accountId, kills, exec) {
+      if (!kills || typeof kills !== "object") return { credited: 0 };
+      exec = exec || pool;
+      const [members] = await exec.query(
+        "SELECT guild_id, contribution FROM guild_members WHERE account_id=?", [Number(accountId)]);
+      const member = members[0];
+      if (!member) return { credited: 0 };
+      const Guild = guildModule();
+      if (!Guild) return { credited: 0 };
+      const day = Guild.guildTaskDay();
+      for (const def of Guild.guildDailyTaskDefs(member.guild_id, day)) {
+        await exec.query(
+          `INSERT IGNORE INTO guild_tasks (guild_id,account_id,day,slot,monster_slug,target)
+           VALUES (?,?,?,?,?,?)`,
+          [Number(member.guild_id), Number(accountId), String(day), Number(def.slot),
+           String(def.monster_slug), Number(def.target)]);
+      }
+      const [tasks] = await exec.query(
+        "SELECT * FROM guild_tasks WHERE guild_id=? AND account_id=? AND day=? AND done=0",
+        [Number(member.guild_id), Number(accountId), String(day)]);
+      let credited = 0, completed = 0;
+      for (const t of tasks) {
+        const n = Math.max(0, Math.floor(Number(kills[t.monster_slug]) || 0));
+        if (!n) continue;
+        const newProgress = Math.min(Number(t.target), Number(t.progress) + n);
+        const done = newProgress >= Number(t.target) ? 1 : 0;
+        await exec.query("UPDATE guild_tasks SET progress=?, done=?, completed_at=? WHERE id=?",
+          [newProgress, done, done ? new Date() : null, Number(t.id)]);
+        credited += n;
+        if (done) {
+          await exec.query(
+            "UPDATE guild_members SET contribution=contribution+1 WHERE account_id=?",
+            [Number(accountId)]);
+          await exec.query("UPDATE guilds SET exp=exp+1 WHERE id=?", [Number(t.guild_id)]);
+          const [g] = await exec.query("SELECT exp FROM guilds WHERE id=?", [Number(t.guild_id)]);
+          if (g[0]) await exec.query("UPDATE guilds SET level=? WHERE id=?",
+            [Guild.guildLevelForExp(g[0].exp), Number(t.guild_id)]);
+          completed++;
+        }
+      }
+      return { credited, completed };
+    },
+
     // ---- SNAPSHOT HISTORY ----
     async snapshotAdd(accountId,entityType,entityId,version,reason,data,force){
       const serialized=typeof data==="string"?data:JSON.stringify(data||{});
@@ -3199,6 +3668,55 @@ async function ensureSchema(pool) {
     await pool.query(
       "ALTER TABLE party_invites ADD UNIQUE KEY uq_invite_pending (pending_invitee_id)");
   } catch (e) { /* já existe */ }
+
+  // ---- GUILDS ----
+  // Guild é por CONTA: account_id é PK em guild_members (1 char representa
+  // a conta inteira; bônus valem para a conta toda).
+  await pool.query(`CREATE TABLE IF NOT EXISTS guilds (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(48) NOT NULL,
+    level TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    exp INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_guilds_name (name)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS guild_members (
+    guild_id INT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
+    character_id INT UNSIGNED NOT NULL,
+    rank ENUM('leader','vice','member') NOT NULL DEFAULT 'member',
+    contribution INT UNSIGNED NOT NULL DEFAULT 0,
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (account_id),
+    UNIQUE KEY uq_gmember_character (character_id),
+    INDEX idx_gmembers_guild (guild_id)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS guild_invites (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    guild_id INT UNSIGNED NOT NULL,
+    inviter_character_id INT UNSIGNED NOT NULL,
+    invitee_character_id INT UNSIGNED NOT NULL,
+    status ENUM('pending','accepted','declined','cancelled') NOT NULL DEFAULT 'pending',
+    pending_invitee_id INT UNSIGNED
+      GENERATED ALWAYS AS (IF(status = 'pending', invitee_character_id, NULL)) STORED,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_ginv_pending (pending_invitee_id),
+    INDEX idx_ginv_guild (guild_id, status)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS guild_tasks (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    guild_id INT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
+    day CHAR(10) NOT NULL,
+    slot TINYINT UNSIGNED NOT NULL,
+    monster_slug VARCHAR(80) NOT NULL,
+    target INT UNSIGNED NOT NULL,
+    progress INT UNSIGNED NOT NULL DEFAULT 0,
+    done TINYINT(1) NOT NULL DEFAULT 0,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE KEY uq_gtask (guild_id, account_id, day, slot),
+    INDEX idx_gtask_member (account_id, day)
+  ) ENGINE=InnoDB`);
 
   // Migração das parties anteriores ao modelo account-owned. A conta do
   // líder vira a dona; em legado inconsistente, mantém-se a party mais antiga.
