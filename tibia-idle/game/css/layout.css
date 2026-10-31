@@ -1354,6 +1354,30 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .guild-member-rank { width:90px; font-size:10px; color:#a8a090; }
 .guild-member-contrib { width:80px; text-align:right; font-size:10px; color:#a8a090; }
 .guild-member-actions { display:flex; gap:4px; }
+/* Lista de guilds lado a lado: esquerda = guilds, direita = preview. */
+.guild-browser { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px; align-items:start; }
+.guild-browser-left { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.guild-list-col { display:flex; flex-direction:column; gap:5px;
+  max-height:52vh; overflow-y:auto; padding-right:2px; }
+.guild-card-select.on { border-color:#d4af37 #6b5715 #6b5715 #d4af37;
+  box-shadow:0 0 0 1px rgba(212,175,55,.35), 0 0 12px rgba(212,175,55,.15); }
+.guild-mine-tag { display:inline-block; margin-left:6px; padding:1px 5px;
+  font-size:8px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+  color:#14130f; background:linear-gradient(180deg,#ffe680,#d4af37);
+  border:1px solid #8a6d1d; border-radius:2px; vertical-align:middle; }
+.guild-browser-right { min-width:0; background:rgba(16,12,8,.6);
+  border:1px solid #2a2016; border-radius:4px; padding:10px;
+  max-height:56vh; overflow-y:auto; }
+.guild-preview-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.guild-preview-name { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.guild-preview-name b { color:#f1db7a; font-size:14px; }
+.guild-preview-members { max-height:34vh; overflow-y:auto; }
+.guild-preview-actions { margin-top:10px; }
+@media (max-width:720px) {
+  .guild-browser { grid-template-columns:minmax(0,1fr); }
+  .guild-list-col, .guild-browser-right { max-height:none; }
+}
 .guild-exp-bar { position:relative; height:16px; margin-top:6px; background:#14120e;
   border:1px solid #3a3020; border-radius:3px; overflow:hidden; }
 .guild-exp-bar i { display:block; height:100%; background:linear-gradient(90deg,#6a4a10,#d4af37); }

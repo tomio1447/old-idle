@@ -12,7 +12,7 @@
 "use strict";
 
 const GUILD_UI = { view: "list", guildId: null, tab: "members", loading: false,
-  logFilter: "", logData: null };
+  logFilter: "", logData: null, selectedGuildId: null, myGuildId: null };
 const GUILD_RANK_LABEL = { leader: "Líder", vice: "Vice-líder", member: "Membro" };
 const GUILD_BONUS_LEVEL_GOLD_UI = 50000000; /* 50kk por nível (server: guild.js) */
 /* Mesmas regras do servidor (guild.js) — exibidas no painel de criação. */
@@ -119,6 +119,8 @@ async function loadGuildModal() {
 }
 
 /* ------------------------------ LISTA DE GUILDS ------------------------------ */
+/* Layout lado a lado: coluna esquerda = todas as guilds (a do jogador
+ * sempre no topo); metade direita = preview da guild selecionada. */
 async function loadGuildList() {
   const root = $("#guild-modal-list");
   if (!root) return;
@@ -143,21 +145,38 @@ async function loadGuildList() {
       </div>`).join("")}</div>
   </section>` : "";
 
-  const myBanner = myGuild ? `<section class="guild-section">
-    <div class="hunt-cat-title">Sua guild</div>
-    <button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card" data-guild-open="${myGuild.id}">
-      <span class="mobs" aria-hidden="true">${guildIconImg(myGuild.icon, "guild-card-icon")}</span>
-      <span class="info">
-        <span class="nm">${guildEsc(myGuild.name)} <b>Nv ${myGuild.level}</b></span>
-        <span class="meta">${myGuild.members}/${myGuild.slots} vagas · ${myGuild.freeSlots} livres</span>
-      </span>
-      <span class="risk low">Abrir</span>
-    </button>
-  </section>` : "";
+  /* Minha guild sempre no topo da lista. */
+  const ordered = myGuild
+    ? guilds.slice().sort((a, b) =>
+        (Number(a.id) === Number(myGuild.id) ? -1 : 0) -
+        (Number(b.id) === Number(myGuild.id) ? -1 : 0))
+    : guilds;
 
-  const createHtml = !myGuild ? `<section class="guild-section">
-    <div class="hunt-cat-title">Fundar guild</div>
-    <div class="guild-create-box">
+  /* Seleção: mantém a anterior se ainda existir; senão a minha guild,
+   * senão a primeira da lista. */
+  const selId = GUILD_UI.selectedGuildId &&
+      ordered.some((g) => Number(g.id) === Number(GUILD_UI.selectedGuildId))
+    ? Number(GUILD_UI.selectedGuildId)
+    : (myGuild ? Number(myGuild.id) : (ordered[0] ? Number(ordered[0].id) : null));
+  GUILD_UI.selectedGuildId = selId;
+  GUILD_UI.myGuildId = myGuild ? Number(myGuild.id) : null;
+
+  const listCards = ordered.length ? ordered.map((g) => {
+    const isMine = myGuild && Number(g.id) === Number(myGuild.id);
+    return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card guild-card-select${Number(g.id) === selId ? " on" : ""}"
+        data-guild-select="${g.id}">
+      <span class="mobs" aria-hidden="true">${guildIconImg(g.icon, "guild-card-icon")}</span>
+      <span class="info">
+        <span class="nm">${guildEsc(g.name)} <b>Nv ${g.level}</b>
+          ${isMine ? `<span class="guild-mine-tag">sua guild</span>` : ""}</span>
+        <span class="meta">${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
+      </span>
+      <span class="risk ${g.freeSlots > 0 ? "low" : "high"}">${g.freeSlots > 0 ? "recrutando" : "cheia"}</span>
+    </button>`;
+  }).join("") : `<div class="hunt-section-empty">Nenhuma guild criada ainda.</div>`;
+
+  const createHtml = !myGuild ? `<div class="guild-create-box">
+      <div class="hunt-cat-title">Fundar guild</div>
       <input id="guild-create-name" maxlength="30" placeholder="Nome da guild" />
       <div class="tiny dim">Escolha o ícone da guild:</div>
       ${guildIconPickHtml(GUILD_UI.createIcon || 1, "guild-create-icons")}
@@ -165,29 +184,32 @@ async function loadGuildList() {
       <div class="tiny dim">Requisitos: nível ${typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_MIN_LEVEL : 100}+ e
         ${(typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_COST_GOLD : 100000).toLocaleString("pt-BR")} gold da conta.</div>
       <div class="tiny" id="guild-create-msg"></div>
-    </div>
-  </section>` : "";
+    </div>` : "";
 
-  const listHtml = `<section class="guild-section">
-    <div class="hunt-cat-title">Guilds ativas (${guilds.length})</div>
-    <div class="hunts-group">${guilds.length ? guilds.map((g) => `
-      <button type="button" class="hunt-card hunt-modal-card hunt-canary-card guild-card" data-guild-open="${g.id}">
-        <span class="mobs" aria-hidden="true">${guildIconImg(g.icon, "guild-card-icon")}</span>
-        <span class="info">
-          <span class="nm">${guildEsc(g.name)} <b>Nv ${g.level}</b></span>
-          <span class="meta">${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
-        </span>
-        <span class="risk ${g.freeSlots > 0 ? "low" : "high"}">${g.freeSlots > 0 ? "recrutando" : "cheia"}</span>
-      </button>`).join("") : `<div class="hunt-section-empty">Nenhuma guild criada ainda.</div>`}</div>
-  </section>`;
+  root.innerHTML = inviteHtml + `<section class="guild-section guild-browser">
+      <div class="guild-browser-left">
+        <div class="hunt-cat-title">Guilds (${ordered.length})</div>
+        <div class="guild-list-col">${listCards}</div>
+        ${myGuild ? `<button class="primary full" id="guild-open-mine">Acessar minha guild</button>` : ""}
+        ${createHtml}
+      </div>
+      <div class="guild-browser-right" id="guild-preview">
+        <div class="tiny dim" style="padding:12px;text-align:center">Selecione uma guild.</div>
+      </div>
+    </section>`;
 
-  root.innerHTML = inviteHtml + myBanner + createHtml + listHtml;
-
-  $$("#guild-modal-list [data-guild-open]").forEach((btn) => {
+  $$("#guild-modal-list [data-guild-select]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      GUILD_UI.view = "detail"; GUILD_UI.guildId = Number(btn.dataset.guildOpen);
-      GUILD_UI.tab = "members"; loadGuildModal();
+      GUILD_UI.selectedGuildId = Number(btn.dataset.guildSelect);
+      $$("#guild-modal-list .guild-card-select").forEach((b) =>
+        b.classList.toggle("on", Number(b.dataset.guildSelect) === GUILD_UI.selectedGuildId));
+      loadGuildPreview(GUILD_UI.selectedGuildId);
     });
+  });
+  const openMine = $("#guild-open-mine");
+  if (openMine) openMine.addEventListener("click", () => {
+    GUILD_UI.view = "detail"; GUILD_UI.guildId = Number(myGuild.id);
+    GUILD_UI.tab = "members"; loadGuildModal();
   });
   $$("#guild-modal-list [data-guild-accept]").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -222,6 +244,59 @@ async function loadGuildList() {
     const text = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao criar guild.";
     if (r && r.data && r.data.ok) { loadGuildModal(); return; }
     if (msg) msg.textContent = text;
+  });
+  if (selId) loadGuildPreview(selId);
+}
+
+/* Preview da guild selecionada (metade direita): nível, exp, vagas e a
+ * lista de membros — os nomes abrem o perfil do personagem. */
+async function loadGuildPreview(guildId) {
+  const host = $("#guild-preview");
+  if (!host || !guildId) return;
+  host.innerHTML = `<div class="tiny dim" style="padding:12px">Carregando…</div>`;
+  const r = await guildApi("GET",
+    `/api/guild/detail?id=${encodeURIComponent(guildId)}&char_id=${encodeURIComponent(sessionCharId())}`);
+  const data = r && r.data;
+  if (!data || !data.ok || !data.guild) {
+    host.innerHTML = `<div class="tiny dim" style="padding:12px;text-align:center">Guild indisponível.</div>`;
+    return;
+  }
+  const g = data.guild, members = data.members || [];
+  const isMine = Number(GUILD_UI.myGuildId) === Number(g.id);
+  const expHtml = guildExpBarHtml(g);
+  const memberRows = members.map((m) => {
+    const rank = m.rank;
+    return `<div class="guild-member-row">
+      <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${rank === "leader" ? "👑 " : rank === "vice" ? "⭐ " : ""}${guildEsc(m.name)}</span>
+      <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
+      <span class="guild-member-rank">${GUILD_RANK_LABEL[rank] || "Membro"}</span>
+    </div>`;
+  }).join("") || `<div class="tiny dim" style="padding:6px">Sem membros.</div>`;
+  host.innerHTML = `<div class="guild-preview-head">
+      ${guildIconImg(g.icon, "guild-card-icon")}
+      <span class="guild-preview-name">
+        <b>${guildEsc(g.name)}</b>
+        <span class="tiny dim">Nível ${g.level} · ${g.members}/${g.slots} vagas · ${g.freeSlots} livres</span>
+      </span>
+    </div>
+    ${expHtml}
+    <div class="hunt-cat-title" style="margin-top:8px">Membros (${members.length})</div>
+    <div class="guild-member-list guild-preview-members">${memberRows}</div>
+    <div class="guild-preview-actions">
+      ${isMine
+        ? `<button class="primary full" id="guild-preview-open">Acessar minha guild</button>`
+        : `<button class="sm full" id="guild-preview-open">Ver guild completa</button>`}
+    </div>`;
+  const openBtn = $("#guild-preview-open");
+  if (openBtn) openBtn.addEventListener("click", () => {
+    GUILD_UI.view = "detail"; GUILD_UI.guildId = Number(g.id);
+    GUILD_UI.tab = "members"; loadGuildModal();
+  });
+  $$("#guild-preview [data-char-profile]").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (typeof openPlayerProfile === "function")
+        openPlayerProfile(el.dataset.charProfile);
+    });
   });
 }
 
