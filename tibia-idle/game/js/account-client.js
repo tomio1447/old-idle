@@ -1666,6 +1666,31 @@ function applyPlayersOnlineCount(payload){
   try{window.dispatchEvent(new CustomEvent("tibia-idle-players-online",{detail:online}));}catch(e){}
 }
 
+/* SERVER TIME (Brasília) + SERVER SAVE IN (contagem p/ 00h) na topbar. */
+const SERVER_TZ="America/Sao_Paulo";
+let _serverClockTimer=null,_serverClockFmt=null;
+function _serverSaoPauloParts(){
+  _serverClockFmt=_serverClockFmt||new Intl.DateTimeFormat("pt-BR",{timeZone:SERVER_TZ,
+    hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const parts={};
+  for(const p of _serverClockFmt.formatToParts(new Date()))parts[p.type]=p.value;
+  return parts;
+}
+function updateServerClock(){
+  const timeEl=document.getElementById("server-time-text");
+  const saveEl=document.getElementById("server-save-text");
+  if(!timeEl&&!saveEl)return;
+  const p=_serverSaoPauloParts();
+  const h=Number(p.hour)%24,m=Number(p.minute)||0,s=Number(p.second)||0;
+  if(timeEl)timeEl.textContent=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  if(saveEl){
+    const rest=24*3600-(h*3600+m*60+s);
+    const rh=Math.floor(rest/3600),rm=Math.floor((rest%3600)/60),rs=rest%60;
+    saveEl.textContent=`${String(rh).padStart(2,"0")}:${String(rm).padStart(2,"0")}:${String(rs).padStart(2,"0")}`;
+  }
+}
+if(!_serverClockTimer){_serverClockTimer=setInterval(updateServerClock,1000);updateServerClock();}
+
 async function accountFetchOnlineCount(){
   if(!accountApiConfigured())return null;
   try{

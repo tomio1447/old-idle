@@ -9,7 +9,7 @@
 <title>Global-Idle — caçada automática</title>
   <link rel="icon" type="image/png" href="assets/brand-logo.png?v=brand-v2">
   <link rel="apple-touch-icon" href="assets/brand-logo.png?v=brand-v2">
-  <link rel="stylesheet" href="css/layout.css?v=guild-browser-v1">
+  <link rel="stylesheet" href="css/layout.css?v=topbar-clock-v1">
   <link rel="stylesheet" href="css/otc-complete.css?v=prey-close-v1">
   <link rel="stylesheet" href="css/otc-hud.css?v=cond-bar-viewport-off-v1">
   <link rel="stylesheet" href="css/wheel-otc.css?v=wheel-voc-v1">
@@ -237,7 +237,16 @@
       <span data-i18n="players.onLabel">PLAYER ON:</span>
       <b id="players-online-count">0</b>
     </div>
+    <div class="topbar-clock" id="server-time" title="Horário do servidor (Brasília)">
+      <span>SERVER TIME:</span>
+      <b id="server-time-text">--:--:--</b>
+    </div>
+    <div class="topbar-clock" id="server-save" title="Tempo até o server save (00h)">
+      <span>SERVER SAVE IN:</span>
+      <b id="server-save-text">--:--:--</b>
+    </div>
     <span class="spacer"></span>
+    <div class="topbar-btns">
     <button class="sm topbar-sys-btn" id="btn-wheel" title="Abrir Wheel of Destiny (Roda do Destino)" data-i18n-title="title.wheel">
       <img src="assets/ui/wheel-of-destiny-icon.png?v=topbar-wod-charms-v1" alt="" class="topbar-btn-icon" width="18" height="18">
       <span data-i18n="btn.wheel">WHEEL</span>
@@ -281,6 +290,7 @@
     <button class="sm" id="btn-admin" title="Painel de testes" data-i18n-title="title.admin">🛠 <span data-i18n="btn.admin">Admin</span></button>
     <button class="sm" id="btn-config" type="button" data-i18n-title="config.title">⚙ <span data-i18n="config.btn">CONFIG</span></button>
     <button class="sm primary" id="btn-city" data-i18n-title="btn.city">🏛 <span data-i18n="btn.city">Ir para a cidade</span></button>
+    </div>
   </div>
   <div class="layout">
 
@@ -702,7 +712,7 @@
 <script src="js/server-config.js"></script>
 <script src="js/announce.js?v=announce-v1"></script>
 <script src="js/player-profile.js?v=player-profile-v1"></script>
-<script src="js/account-client.js?v=party-auto-v1"></script>
+<script src="js/account-client.js?v=topbar-clock-v1"></script>
 <script src="js/chat.js?v=chat-badge-v1"></script>
 <script src="js/marketdata.js"></script>
 <script src="js/market-ui.js?v=market-rework-v1"></script>
