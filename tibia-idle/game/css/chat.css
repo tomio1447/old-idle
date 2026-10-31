@@ -141,6 +141,17 @@
   color: #c4a8e8;
 }
 
+/* Chat de guild — cor da fala por rank:
+ * líder vermelho, vice amarelo, membro verde. */
+.gc-guild.gc-rank-leader .gc-name,
+.gc-guild.gc-rank-leader .gc-text { color: #ff5a4a; }
+.gc-guild.gc-rank-vice .gc-name,
+.gc-guild.gc-rank-vice .gc-text { color: #ffd94a; }
+.gc-guild.gc-rank-member .gc-name,
+.gc-guild.gc-rank-member .gc-text { color: #5ee06a; }
+.gc-guild .gc-meta { color: #8a9478; }
+.global-chat-tab.guild-tab { color: #d8b25a; border-color: #5a4a20; }
+
 .global-chat-input-row {
   display: flex;
   gap: 4px;

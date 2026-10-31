@@ -83,13 +83,14 @@ class ChatBus {
     this.sendWindowMs = Number(options.sendWindowMs) || 10000;
   }
 
-  issueTicket(accountId, sessionToken, viewerName) {
+  issueTicket(accountId, sessionToken, viewerName, guildId) {
     const ticket = crypto.randomBytes(32).toString("hex");
     const now = Date.now();
     this.tickets.set(ticket, {
       accountId: Number(accountId),
       sessionToken: String(sessionToken),
       viewerName: String(viewerName || "").toLowerCase(),
+      guildId: Number(guildId) || 0,
       expiresAt: now + this.ticketTtlMs,
     });
     this.cleanup(now);
@@ -129,7 +130,7 @@ class ChatBus {
     return { ok: true };
   }
 
-  history(channel, sinceId, limit, viewerName) {
+  history(channel, sinceId, limit, viewerName, viewerGuildId) {
     channel = String(channel || "geral").toLowerCase();
     sinceId = Math.max(0, Number(sinceId) || 0);
     limit = Math.min(100, Math.max(1, Number(limit) || 50));
@@ -139,14 +140,16 @@ class ChatBus {
       const msg = this.messages[i];
       if (msg.id <= sinceId) break;
       if (channel && msg.channel !== channel) continue;
-      if (!this.visibleTo(msg, viewer)) continue;
+      if (!this.visibleTo(msg, viewer, viewerGuildId)) continue;
       out.push(msg);
     }
     out.reverse();
     return out;
   }
 
-  visibleTo(msg, viewerLower) {
+  visibleTo(msg, viewerLower, viewerGuildId) {
+    /* Mensagens de guild só chegam a quem é membro daquela guild. */
+    if (msg.guildId) return Number(viewerGuildId) === Number(msg.guildId);
     if (msg.type !== "pm") return true;
     if (!viewerLower) return false;
     const from = String(msg.nickname || "").toLowerCase();
@@ -168,6 +171,9 @@ class ChatBus {
       charId: payload.charId,
       text: payload.text,
       toName: payload.toName || null,
+      guildId: payload.guildId || 0,
+      guildRank: payload.guildRank || null,
+      guildName: payload.guildName || null,
     };
     this.messages.push(msg);
     while (this.messages.length > this.historyLimit) this.messages.shift();
@@ -176,7 +182,7 @@ class ChatBus {
   }
 
   writeClient(client, msg) {
-    if (!this.visibleTo(msg, client.viewerName)) return;
+    if (!this.visibleTo(msg, client.viewerName, client.guildId)) return;
     this.write(client.res, msg);
   }
 
@@ -193,6 +199,7 @@ class ChatBus {
       accountId: Number(meta.accountId) || 0,
       sessionToken: String(meta.sessionToken || ""),
       viewerName: String(meta.viewerName || "").toLowerCase(),
+      guildId: Number(meta.guildId) || 0,
       expiresAt: meta.expiresAt || 0,
     };
     this.clients.add(client);

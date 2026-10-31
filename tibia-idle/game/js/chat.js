@@ -32,7 +32,18 @@
     generation: 0,
     collapsed: false,
     prefs: { filterObscene: true, opacity: 0.72 },
+    guild: null,       // {id, name} da guild da conta — vira aba própria
+    guildTimer: null,
   };
+
+  /* Canais ativos: fixos + aba da guild (dinâmica, nome da guild). */
+  function channels() {
+    const list = CHANNELS.slice();
+    if (ChatUI.guild && ChatUI.guild.id) {
+      list.push({ id: "guild:" + ChatUI.guild.id, label: ChatUI.guild.name, guild: true });
+    }
+    return list;
+  }
 
   function tt(key, fallback) {
     if (typeof t === "function") {
@@ -145,10 +156,10 @@
   function paintTabs() {
     const box = document.getElementById("global-chat-tabs");
     if (!box) return;
-    box.innerHTML = CHANNELS.map((c) => {
+    box.innerHTML = channels().map((c) => {
       const active = c.id === ChatUI.channel ? " active" : "";
-      const label = tt(c.labelKey, c.id);
-      return `<button type="button" class="global-chat-tab${active}" data-chat-channel="${c.id}">${escapeHtml(label)}</button>`;
+      const label = c.guild ? String(c.label || "GUILD") : tt(c.labelKey, c.id);
+      return `<button type="button" class="global-chat-tab${active}${c.guild ? " guild-tab" : ""}" data-chat-channel="${c.id}">${escapeHtml(label)}</button>`;
     }).join("");
   }
 
@@ -195,7 +206,7 @@
   }
 
   function setChannel(id) {
-    const meta = CHANNELS.find((c) => c.id === id) || CHANNELS[0];
+    const meta = channels().find((c) => c.id === id) || channels()[0];
     ChatUI.channel = meta.id;
     paintTabs();
     renderMessages();
@@ -214,6 +225,7 @@
       if (form) form.style.display = "";
       if (msgs) msgs.style.display = "";
     }
+    if (meta.guild) loadHistory();
   }
 
   function renderMessages() {
@@ -243,6 +255,12 @@
     const who = escapeHtml(m.nickname || "?");
     const voc = escapeHtml(m.vocShort || "");
     const lvl = escapeHtml(String(m.level || ""));
+    /* Chat de guild: cor do nome+texto pelo rank — líder vermelho,
+     * vice amarelo, membro verde. */
+    if (m.guildId) {
+      const rk = m.guildRank === "leader" ? "leader" : m.guildRank === "vice" ? "vice" : "member";
+      return `<div class="gc-line gc-guild gc-rank-${rk}">${time} <span class="gc-name">${who}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+    }
     return `<div class="gc-line">${time} <span class="gc-name">${who}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
   }
 
@@ -297,7 +315,8 @@
       toastChat(tt("chat.needLogin", "Faça login para usar o chat."));
       return;
     }
-    if (ChatUI.channel !== "geral") {
+    const isGuild = /^guild:\d+$/.test(ChatUI.channel);
+    if (ChatUI.channel !== "geral" && !isGuild) {
       toastChat(tt("chat.soon", "Canal em breve."));
       return;
     }
@@ -392,11 +411,44 @@
     const token = sessionToken();
     if (!token) return;
     const id = charId();
-    const q = `/api/chat/history?channel=geral&since=${ChatUI.lastId}&limit=50&charId=${id}`;
-    const r = await api("GET", q, null, token);
-    if (generation !== ChatUI.generation) return;
-    if (!r.data || !r.data.ok || !Array.isArray(r.data.messages)) return;
-    for (const msg of r.data.messages) ingest(msg);
+    const qs = [`/api/chat/history?channel=geral&since=${ChatUI.lastId}&limit=50&charId=${id}`];
+    if (ChatUI.guild && ChatUI.guild.id) {
+      qs.push(`/api/chat/history?channel=guild:${ChatUI.guild.id}&since=${ChatUI.lastId}&limit=50&charId=${id}`);
+    }
+    for (const q of qs) {
+      const r = await api("GET", q, null, token);
+      if (generation !== ChatUI.generation) return;
+      if (!r.data || !r.data.ok || !Array.isArray(r.data.messages)) continue;
+      for (const msg of r.data.messages) ingest(msg);
+    }
+  }
+
+  /* Estado da guild → aba dinâmica com o nome dela (só membros). */
+  async function loadGuildChannel() {
+    const token = sessionToken();
+    const id = charId();
+    const prev = ChatUI.guild;
+    if (!token || !id) { ChatUI.guild = null; }
+    else {
+      const r = await api("GET", `/api/guild/state?char_id=${encodeURIComponent(id)}`, null, token);
+      const g = r && r.data && r.data.ok ? r.data.guild : null;
+      ChatUI.guild = g && g.id ? { id: Number(g.id), name: String(g.name || "GUILD") } : null;
+    }
+    const changed = (prev && prev.id) !== (ChatUI.guild && ChatUI.guild.id);
+    const tabsBox = document.getElementById("global-chat-tabs");
+    if (changed || (tabsBox && !tabsBox.children.length)) paintTabs();
+    /* Se a aba atual era uma guild da qual a conta saiu, volta ao geral. */
+    if (!channels().some((c) => c.id === ChatUI.channel)) {
+      ChatUI.channel = "geral";
+      setChannel("geral");
+    }
+  }
+  function startGuildWatch() {
+    stopGuildWatch();
+    ChatUI.guildTimer = setInterval(loadGuildChannel, 30000);
+  }
+  function stopGuildWatch() {
+    if (ChatUI.guildTimer) { clearInterval(ChatUI.guildTimer); ChatUI.guildTimer = null; }
   }
 
   function scheduleReconnect(generation) {
@@ -462,6 +514,11 @@
     ChatUI.generation += 1;
     const gen = ChatUI.generation;
     ChatUI.ready = true;
+    loadGuildChannel().then(() => {
+      /* Se a aba atual é a da guild, carrega o histórico dela também. */
+      if (/^guild:\d+$/.test(ChatUI.channel)) loadHistory();
+    });
+    startGuildWatch();
     loadHistory().then(() => startSse(gen));
   }
 
@@ -470,6 +527,7 @@
     ChatUI.ready = false;
     stopSse();
     stopPoll();
+    stopGuildWatch();
     clearTimeout(ChatUI.reconnectTimer);
     const root = document.getElementById("global-chat");
     if (root) root.style.display = "none";

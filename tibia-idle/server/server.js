@@ -502,7 +502,9 @@ async function issueChatTicket(db,body){
     const character=await db.findCharacter(charId);
     if(character&&Number(character.account_id)===Number(acc.id))viewerName=String(character.name||"");
   }
-  const issued=CHAT_BUS.issueTicket(acc.id,body.token,viewerName);
+  const member=await db.guildMemberByAccount(acc.id);
+  const issued=CHAT_BUS.issueTicket(acc.id,body.token,viewerName,
+    member?Number(member.guild_id):0);
   return {code:200,body:{ok:true,ticket:issued.ticket,
     expiresAt:new Date(issued.expiresAt).toISOString(),cursor:CHAT_BUS.cursor(),viewerName}};
 }
@@ -511,7 +513,14 @@ async function chatHistory(db,token,query){
   const acc=await db.findAccountByToken(token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   const channel=String(query.get("channel")||"geral").toLowerCase();
-  if(!CHAT_CHANNELS.includes(channel))
+  let viewerGuildId=0;
+  const gm=channel.match(/^guild:(\d+)$/);
+  if(gm){
+    const member=await db.guildMemberByAccount(acc.id);
+    if(!member||Number(member.guild_id)!==Number(gm[1]))
+      return {code:403,body:{ok:false,error:"NOT_GUILD_MEMBER",msg:"Este chat é exclusivo para membros da guild."}};
+    viewerGuildId=Number(member.guild_id);
+  }else if(!CHAT_CHANNELS.includes(channel))
     return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
   const charId=Number(query.get("charId")||query.get("char_id")||0);
   let viewerName="";
@@ -522,7 +531,7 @@ async function chatHistory(db,token,query){
   const sinceId=Number(query.get("since")||0);
   const limit=Number(query.get("limit")||50);
   return {code:200,body:{ok:true,channel,cursor:CHAT_BUS.cursor(),
-    messages:CHAT_BUS.history(channel,sinceId,limit,viewerName)}};
+    messages:CHAT_BUS.history(channel,sinceId,limit,viewerName,viewerGuildId)}};
 }
 
 async function chatSend(db,body){
@@ -535,10 +544,22 @@ async function chatSend(db,body){
   if(!character||Number(character.account_id)!==Number(acc.id))
     return {code:403,body:{ok:false,error:"CHAR_DENIED",msg:"Personagem inválido"}};
   let channel=String(body.channel||"geral").toLowerCase();
-  if(!CHAT_CHANNELS.includes(channel))
-    return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
-  if(channel!=="geral")
-    return {code:400,body:{ok:false,error:"CHANNEL_LOCKED",msg:"Este canal ainda não está aberto para mensagens."}};
+  /* Canal de guild "guild:<id>" — exclusivo a membros daquela guild;
+   * líder/vice/membro recebem o rank na mensagem para o cliente colorir. */
+  let guildMember=null,guildRow=null;
+  const gm=channel.match(/^guild:(\d+)$/);
+  if(gm){
+    guildMember=await db.guildMemberByAccount(acc.id);
+    if(!guildMember||Number(guildMember.guild_id)!==Number(gm[1]))
+      return {code:403,body:{ok:false,error:"NOT_GUILD_MEMBER",msg:"Este chat é exclusivo para membros da guild."}};
+    guildRow=await db.guildById(guildMember.guild_id);
+    if(!guildRow)return {code:404,body:{ok:false,error:"GUILD_GONE",msg:"Guild não encontrada."}};
+  }else{
+    if(!CHAT_CHANNELS.includes(channel))
+      return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
+    if(channel!=="geral")
+      return {code:400,body:{ok:false,error:"CHANNEL_LOCKED",msg:"Este canal ainda não está aberto para mensagens."}};
+  }
   const rate=CHAT_BUS.checkRate(Number(acc.id));
   if(!rate.ok)return {code:429,body:{ok:false,error:"RATE_LIMITED",msg:"Muitas mensagens. Aguarde um momento.",
     retryAfterMs:rate.retryAfterMs}};
@@ -559,6 +580,9 @@ async function chatSend(db,body){
   const msg=CHAT_BUS.post({
     channel,type,nickname:String(character.name||"?"),voc,vocShort:vocShort(voc),
     level,accountId:Number(acc.id),charId:Number(character.id),text,toName,
+    guildId:guildMember?Number(guildMember.guild_id):0,
+    guildRank:guildMember?String(guildMember.rank||"member"):null,
+    guildName:guildRow?String(guildRow.name||""):null,
   });
   return {code:200,body:{ok:true,message:msg}};
 }
@@ -4359,6 +4383,7 @@ async function main() {
         res.write("retry: 1500\n\n");
         CHAT_BUS.subscribe(res,req.headers["last-event-id"]||q.get("lastEventId"),{
           accountId:ticket.accountId,sessionToken:ticket.sessionToken,viewerName:ticket.viewerName||"",
+          guildId:ticket.guildId||0,
           expiresAt:ticket.expiresAt,
         });return;
       }
