@@ -1304,6 +1304,19 @@ JsonStore.prototype.onlineCount = function () {
       if (c && leasedAccounts.has(Number(c.account_id))) charIds.add(id);
     }
   }
+  // Personagens na área de treino também contam como online — um a um.
+  // O trainingClock.at renova a cada checkpoint (~1s) e a conta precisa
+  // de lease ativa, mesma regra dos personagens em instância.
+  const trainingCutoff = now - 15000;
+  for (const c of this.characters || []) {
+    const id = Number(c && c.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || charIds.has(id)) continue;
+    if (!leasedAccounts.has(Number(c.account_id))) continue;
+    let d = null;
+    try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = null; }
+    const clockAt = d && d.trainingClock && Number(d.trainingClock.at);
+    if (clockAt && clockAt > trainingCutoff) charIds.add(id);
+  }
   const accountsWithChars = new Set();
   for (const id of charIds) {
     const c = this.findCharacter(id);
@@ -2741,6 +2754,19 @@ async function MysqlStore() {
           const c = await this.findCharacter(id);
           if (c && leasedAccounts.has(Number(c.account_id))) charIds.add(id);
         }
+      }
+      // Personagens na área de treino também contam como online — um a um.
+      // O trainingClock.at renova a cada checkpoint (~1s) e a conta precisa
+      // de lease ativa, mesma regra dos personagens em instância.
+      const trainingRows = await this.query(
+        `SELECT id, account_id FROM characters
+         WHERE data LIKE '%"trainingClock"%'
+           AND CAST(JSON_EXTRACT(data,'$.trainingClock.at') AS DECIMAL(20,4)) > ?`,
+        [Date.now() - 15000]);
+      for (const row of trainingRows) {
+        const id = Number(row && row.id);
+        if (!Number.isSafeInteger(id) || id <= 0 || charIds.has(id)) continue;
+        if (leasedAccounts.has(Number(row.account_id))) charIds.add(id);
       }
       const accountsWithChars = new Set();
       for (const id of charIds) {
