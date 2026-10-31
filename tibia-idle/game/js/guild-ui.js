@@ -314,10 +314,11 @@ function guildExpBarHtml(guild) {
   </div>`;
 }
 
+/* Gold sempre no valor real com separador de milhar (35.000.000 gp),
+ * sem abreviar em "kk" — pedido do usuário. */
 function guildGoldFmt(n) {
   const v = Math.max(0, Number(n) || 0);
-  if (v >= 1e6) return (v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " kk";
-  return v.toLocaleString("pt-BR") + " gp";
+  return fmtFull(v) + " gp";
 }
 function guildTimeLeft(until) {
   const ms = Math.max(0, Number(until) - Date.now());
@@ -378,8 +379,8 @@ function guildBalanceHtml(g, totals, accountCoins) {
   const t = totals || { donated: 0, spentGold: 0, spentPoints: 0, coinsDonated: 0, spentCoins: 0 };
   return `<div class="guild-balance-head">
       <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
-      <span><b>${Number(g.points) || 0}</b> guild points</span>
-      <span><b>${Number(g.coins) || 0}</b> Tibia Coins</span>
+      <span><b>${fmtFull(Number(g.points) || 0)}</b> guild points</span>
+      <span><b>${fmtFull(Number(g.coins) || 0)}</b> Tibia Coins</span>
     </div>
     <div class="tiny dim" style="margin:4px 0 8px">
       O caixa é restrito a líderes (até 3) — usado nas compras do GUILD SHOP.
@@ -391,21 +392,21 @@ function guildBalanceHtml(g, totals, accountCoins) {
       <span class="tiny" id="guild-donate-msg"></span>
     </div>
     <div class="guild-donate-box">
-      <input id="guild-donate-coins-amount" type="number" min="1" step="1" placeholder="Tibia Coins (você tem ${Number(accountCoins) || 0})" />
+      <input id="guild-donate-coins-amount" type="number" min="1" step="1" placeholder="Tibia Coins (você tem ${fmtFull(Number(accountCoins) || 0)})" />
       <button class="sm primary" id="guild-donate-coins-btn">Doar TC</button>
       <span class="tiny" id="guild-donate-coins-msg"></span>
     </div>
     <div class="guild-balance-stats">
-      <span>Total doado: <b>${guildGoldFmt(t.donated)}</b> · <b>${Number(t.coinsDonated) || 0} TC</b></span>
-      <span>Total gasto: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> · <b>${Number(t.spentCoins) || 0} TC</b></span>
+      <span>Total doado: <b>${guildGoldFmt(t.donated)}</b> · <b>${fmtFull(Number(t.coinsDonated) || 0)} TC</b></span>
+      <span>Total gasto: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${fmtFull(Number(t.spentPoints) || 0)} GP</b> · <b>${fmtFull(Number(t.spentCoins) || 0)} TC</b></span>
     </div>`;
 }
 /* HISTÓRICO — contabilidade (só membros). */
 function guildLogHtml(entries, totals) {
   const t = totals || {};
   const sum = `<div class="guild-balance-stats" style="margin-bottom:6px">
-    <span>Doações: <b>${guildGoldFmt(t.donated)}</b> · <b>${Number(t.coinsDonated) || 0} TC</b> (${Number(t.donations) || 0})</span>
-    <span>Gastos: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> · <b>${Number(t.spentCoins) || 0} TC</b> (${Number(t.purchases) || 0})</span>
+    <span>Doações: <b>${guildGoldFmt(t.donated)}</b> · <b>${fmtFull(Number(t.coinsDonated) || 0)} TC</b> (${Number(t.donations) || 0})</span>
+    <span>Gastos: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${fmtFull(Number(t.spentPoints) || 0)} GP</b> · <b>${fmtFull(Number(t.spentCoins) || 0)} TC</b> (${Number(t.purchases) || 0})</span>
   </div>`;
   const filter = `<select id="guild-log-filter" class="guild-log-filter">
     <option value=""${GUILD_UI.logFilter === "" ? " selected" : ""}>Todas</option>
@@ -421,7 +422,7 @@ function guildLogHtml(entries, totals) {
       <span class="guild-log-when">${when}</span>
       <span class="guild-log-cat">${e.category === "donation" ? "Doação" : "Compra"}</span>
       <span class="guild-log-info"><b>${guildEsc(e.char_name)}</b> ${guildEsc(e.detail)}</span>
-      <span class="guild-log-val">${gold ? (gold > 0 ? "+" : "−") + guildGoldFmt(Math.abs(gold)) : ""}${pts ? ` ${pts > 0 ? "+" : "−"}${Math.abs(pts)} GP` : ""}${cns ? ` ${cns > 0 ? "+" : "−"}${Math.abs(cns)} TC` : ""}</span>
+      <span class="guild-log-val">${gold ? (gold > 0 ? "+" : "−") + guildGoldFmt(Math.abs(gold)) : ""}${pts ? ` ${pts > 0 ? "+" : "−"}${fmtFull(Math.abs(pts))} GP` : ""}${cns ? ` ${cns > 0 ? "+" : "−"}${fmtFull(Math.abs(cns))} TC` : ""}</span>
     </div>`;
   }).join("");
   return sum + filter + `<div class="guild-log-list">${rows ||
@@ -587,11 +588,11 @@ async function loadGuildDetail() {
     </div>
     <div class="guild-manage-row">
       <input id="guild-rename-input" maxlength="30" placeholder="Novo nome da guild" />
-      <button class="sm" id="guild-rename-btn"${guildCoins >= renameCost ? "" : " disabled"}>Renomear (${renameCost} TC)</button>
+      <button class="sm" id="guild-rename-btn"${guildCoins >= renameCost ? "" : " disabled"}>Renomear (${fmtFull(renameCost)} TC)</button>
       <span class="tiny" id="guild-rename-msg"></span>
     </div>
-    <div class="tiny dim">Renomear usa ${renameCost} Tibia Coins do caixa de coins da guild
-      (atual: <b>${guildCoins}</b>) — membros doam na aba GUILD BALANCE.</div>
+    <div class="tiny dim">Renomear usa ${fmtFull(renameCost)} Tibia Coins do caixa de coins da guild
+      (atual: <b>${fmtFull(guildCoins)}</b>) — membros doam na aba GUILD BALANCE.</div>
   </section>` : "";
 
   root.innerHTML = `<div class="guild-tabs">${tabs.map((tab) =>
@@ -599,7 +600,7 @@ async function loadGuildDetail() {
         data-guild-tab="${tab.id}">${tab.label}</button>`).join("")}</div>
     <section class="guild-section guild-head">
       <div class="hunt-cat-title">${guildIconImg(g.icon)} ${guildEsc(g.name)} — Nível ${g.level}</div>
-      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP${isMember ? ` · <b>${Number(g.points) || 0} GP</b> · <b>${guildCoins} TC</b>` : ""}</div>
+      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${fmtFull(Number(g.exp) || 0)} EXP${isMember ? ` · <b>${fmtFull(Number(g.points) || 0)} GP</b> · <b>${fmtFull(guildCoins)} TC</b>` : ""}</div>
       ${guildExpBarHtml(g)}
     </section>
     ${manageBox}
