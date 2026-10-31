@@ -1345,17 +1345,17 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background:none; }
 .guild-head .hunt-cat-title .guild-icon-img { width:26px; height:26px; }
 .guild-icon-pick { display:flex; flex-wrap:wrap; gap:4px; }
-.guild-icon-opt { width:38px; height:38px; padding:2px; background:#14120e;
-  border:1px solid #3a3020; border-radius:4px; cursor:pointer; }
+.guild-icon-opt { width:38px; height:38px; padding:2px; background:#1c1a16;
+  border:1px solid #4b493e; cursor:pointer; }
 .guild-icon-opt .guild-icon-img { width:100%; height:100%; }
 .guild-icon-opt.on { border-color:#d8b25a; box-shadow:0 0 6px rgba(216,178,90,.55); }
 .guild-icon-opt:disabled { opacity:.55; cursor:default; }
-.guild-manage-box { background:rgba(16,12,8,.6); padding:8px;
-  border:1px solid #2a2016; border-radius:4px; }
+.guild-manage-box { background:rgba(0,0,0,.18); padding:8px;
+  border:1px solid #16140f; }
 .guild-manage-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   margin:6px 0; }
-.guild-manage-row input { flex:1 1 180px; padding:6px 8px; background:#14120e;
-  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-manage-row input { flex:1 1 180px; padding:6px 8px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; }
 
 /* Solicitações de entrada — a aba pisca verde↔vermelho com pendências. */
 @keyframes guildReqBlink {
@@ -1366,36 +1366,40 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 }
 .guild-tab.has-pending { animation:guildReqBlink 1.1s steps(1) infinite; }
 .guild-req-list { margin-top:6px; display:flex; flex-direction:column; gap:4px; }
-.guild-req-row { display:flex; align-items:center; gap:8px; padding:5px 7px;
-  background:rgba(16,12,8,.6); border:1px solid #2a2016; border-radius:4px; }
+.guild-req-row { display:flex; align-items:center; gap:8px; padding:6px 8px;
+  background:#24221e; border:1px solid #16140f; }
 .guild-req-row .guild-member-name { flex:1 1 auto; }
 .guild-join-box { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-  margin:8px 0; padding:8px; background:rgba(16,12,8,.6);
-  border:1px solid #2a2016; border-radius:4px; }
+  margin:8px 0; padding:8px; background:rgba(0,0,0,.18);
+  border:1px solid #16140f; }
 
-/* Modal de GUILDS — mesma casca do modal CIDADE. */
-.modal-bg .modal.guild-modal-shell { width:min(920px,calc(100vw - 32px)); }
+/* Modal de GUILDS — mesma casca do modal CIDADE (o shell cinza listrado
+ * vem do grupo compartilhado .guild-modal-shell mais abaixo). */
 .guild-modal-title { display:flex; align-items:center; gap:7px; }
 .guild-modal-title #guild-modal-close { margin-left:auto; }
 .guild-modal-title .guild-btn-icon { transform:scale(1.1); margin:0 2px; }
 .guild-section { margin-bottom:12px; }
+#guild-modal-list .guild-section { margin-bottom:0; }
 .guild-section .hunt-cat-title { margin-bottom:6px; }
 .guild-card .guild-card-icon { display:block; }
 .guild-create-box { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
-  background:rgba(16,12,8,.6); padding:8px; border:1px solid #2a2016; border-radius:4px; }
-.guild-create-box input { flex:1 1 200px; padding:6px 8px; background:#14120e;
-  color:#c8c0a8; border:1px solid #3a3020; }
+  background:rgba(0,0,0,.18); padding:8px; border:1px solid #16140f; }
+.guild-create-box input { flex:1 1 200px; padding:6px 8px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; }
 .guild-invite-list { display:flex; flex-direction:column; gap:4px; }
 .guild-invite-row { display:flex; align-items:center; justify-content:space-between; gap:8px;
-  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:6px 8px; }
+  background:#24221e; border:1px solid #16140f; padding:6px 8px; }
 .guild-invite-actions { display:flex; gap:6px; }
-.guild-tabs { display:flex; gap:4px; margin:8px 0; }
-.guild-tab { flex:0 0 auto; padding:5px 12px; background:#14120e; color:#a8a090;
-  border:1px solid #2a2016; cursor:pointer; font-size:11px; font-weight:bold; }
-.guild-tab.active { background:#3a2e22; color:#e8d4a2; border-color:#5a4a32; }
+.guild-tabs { display:flex; flex-wrap:wrap; gap:4px; padding:0 0 8px;
+  margin:0 0 8px; border-bottom:1px solid #3a372f; }
+.guild-tab { flex:0 0 auto; min-height:28px; padding:0 10px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; cursor:pointer;
+  font:inherit; font-size:11px; font-weight:700; letter-spacing:.3px; }
+.guild-tab:hover { color:#fff; border-color:#6a6558; }
+.guild-tab.active { background:#2a2618; color:#ffe680; border-color:#8a7a40; }
 .guild-member-list { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
 .guild-member-row { display:flex; align-items:center; gap:10px;
-  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:6px 8px; }
+  background:#24221e; border:1px solid #16140f; padding:6px 8px; }
 .guild-member-pos { width:34px; color:#d4af37; font-weight:bold; }
 .guild-member-name { flex:1 1 auto; color:#e8dfd0; }
 .guild-profile-link { cursor:pointer; }
@@ -1415,8 +1419,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   font-size:8px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
   color:#14130f; background:linear-gradient(180deg,#ffe680,#d4af37);
   border:1px solid #8a6d1d; border-radius:2px; vertical-align:middle; }
-.guild-browser-right { min-width:0; background:rgba(16,12,8,.6);
-  border:1px solid #2a2016; border-radius:4px; padding:10px;
+.guild-browser-right { min-width:0; background:rgba(0,0,0,.18);
+  border:1px solid #16140f; padding:10px;
   max-height:56vh; overflow-y:auto; }
 .guild-preview-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
 .guild-preview-name { display:flex; flex-direction:column; gap:2px; min-width:0; }
@@ -1427,48 +1431,48 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   .guild-browser { grid-template-columns:minmax(0,1fr); }
   .guild-list-col, .guild-browser-right { max-height:none; }
 }
-.guild-exp-bar { position:relative; height:16px; margin-top:6px; background:#14120e;
-  border:1px solid #3a3020; border-radius:3px; overflow:hidden; }
+.guild-exp-bar { position:relative; height:16px; margin-top:6px; background:#1c1a16;
+  border:1px solid #4b493e; overflow:hidden; }
 .guild-exp-bar i { display:block; height:100%; background:linear-gradient(90deg,#6a4a10,#d4af37); }
 .guild-exp-bar span { position:absolute; inset:0; display:flex; align-items:center;
   justify-content:center; font-size:9px; color:#fff; text-shadow:0 1px 1px #000; }
 .guild-task-list { display:flex; flex-direction:column; gap:6px; }
 .guild-task-card { display:flex; align-items:center; gap:10px;
-  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:8px; }
+  background:#24221e; border:1px solid #16140f; padding:8px; }
 .guild-task-card.done { border-color:#3a5a32; background:rgba(18,28,14,.9); }
 .guild-task-img { flex:0 0 44px; text-align:center; }
 .guild-task-info { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
 .guild-task-info .nm { color:#e8dfd0; }
 .guild-task-info .meta { font-size:10px; color:#a8a090; }
-.guild-task-bar { height:8px; background:#14120e; border:1px solid #2a2016; border-radius:2px; overflow:hidden; }
+.guild-task-bar { height:8px; background:#1c1a16; border:1px solid #4b493e; overflow:hidden; }
 .guild-task-bar i { display:block; height:100%; background:linear-gradient(90deg,#2a6a2a,#7ae87a); }
 .guild-task-status { flex:0 0 70px; text-align:right; font-size:10px; color:#a8a090; }
 .guild-task-card.done .guild-task-status { color:#7ae87a; }
 /* GUILD SHOP / BALANCE / HISTÓRICO */
 .guild-balance-head { display:flex; justify-content:space-between; gap:10px;
-  background:rgba(22,18,12,.9); border:1px solid #5a4a32; border-radius:4px;
+  background:#24221e; border:1px solid #8a7a40;
   padding:7px 10px; margin-bottom:8px; color:#e8d4a2; }
 .guild-shop-list { display:flex; flex-direction:column; gap:5px; }
 .guild-shop-row { display:flex; align-items:center; gap:10px;
-  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:7px 9px; }
+  background:#24221e; border:1px solid #16140f; padding:7px 9px; }
 .guild-shop-row.maxed { border-color:#3a5a32; }
 .guild-shop-info { flex:1 1 auto; display:flex; flex-direction:column; gap:3px; }
 .guild-shop-info .nm { color:#e8dfd0; }
 .guild-shop-info .meta { font-size:10px; color:#a8a090; }
 .guild-pips { display:flex; gap:2px; }
-.guild-pip { width:14px; height:6px; background:#14120e; border:1px solid #2a2016; border-radius:2px; }
-.guild-pip.on { background:linear-gradient(90deg,#6a4a10,#d4af37); border-color:#5a4a32; }
+.guild-pip { width:14px; height:6px; background:#1c1a16; border:1px solid #16140f; }
+.guild-pip.on { background:linear-gradient(90deg,#6a4a10,#d4af37); border-color:#8a7a40; }
 .guild-donate-box { display:flex; align-items:center; gap:6px; margin:8px 0; }
-.guild-donate-box input { flex:1 1 160px; padding:6px 8px; background:#14120e;
-  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-donate-box input { flex:1 1 160px; padding:6px 8px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; }
 .guild-balance-stats { display:flex; justify-content:space-between; gap:10px;
   font-size:10px; color:#a8a090; padding:4px 2px; }
 .guild-balance-stats b { color:#d4af37; }
-.guild-log-filter { width:100%; padding:5px 8px; margin-bottom:6px; background:#14120e;
-  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-log-filter { width:100%; padding:5px 8px; margin-bottom:6px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; }
 .guild-log-list { display:flex; flex-direction:column; gap:3px; }
 .guild-log-row { display:flex; align-items:center; gap:8px; font-size:10px;
-  background:rgba(22,18,12,.9); border:1px solid #2a2016; border-radius:3px; padding:5px 8px; }
+  background:#24221e; border:1px solid #16140f; padding:5px 8px; }
 .guild-log-row.donation { border-left:2px solid #3a5a32; }
 .guild-log-row.purchase { border-left:2px solid #6a3a2a; }
 .guild-log-when { width:70px; color:#8a8070; flex:0 0 auto; }
@@ -1478,7 +1482,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .guild-temp-active { color:#7ae87a; font-size:10px; font-weight:bold; flex:0 0 auto; }
 .guild-pvp-locked { display:flex; flex-direction:column; align-items:center; gap:8px;
   padding:32px 16px; text-align:center;
-  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; }
+  background:#24221e; border:1px solid #16140f; }
 .guild-pvp-icon { font-size:34px; opacity:.45; filter:grayscale(1); }
 .guild-pvp-locked .nm { color:#e8d4a2; font-weight:bold; letter-spacing:1px; }
 .guild-pvp-locked .meta { font-size:11px; color:#a8a090; max-width:340px; }
@@ -1496,8 +1500,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   filter:drop-shadow(0 0 4px rgba(255,214,90,.9));
 }
 .guild-invite-box { display:flex; align-items:center; gap:6px; margin-top:8px; }
-.guild-invite-box input { flex:1 1 160px; padding:5px 8px; background:#14120e;
-  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-invite-box input { flex:1 1 160px; padding:5px 8px; background:#1c1a16;
+  color:#c8c0a8; border:1px solid #4b493e; }
 .ranking-btn-icon {
   display:inline-block; width:22px; height:22px; flex:0 0 22px;
   background-image:url('../assets/ui/prey/prey_bigxp.png');
@@ -1567,6 +1571,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.bosses-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
 .modal-bg .modal.cidade-modal-shell,
+.modal-bg .modal.guild-modal-shell,
 .modal-bg .modal.ranking-modal-shell { width:min(920px,calc(100vw - 32px)); }
 .bosses-modal-title { display:flex; align-items:center; gap:7px; }
 .bosses-modal-title #bosses-modal-close { margin-left:auto; }
@@ -1661,7 +1666,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .ranking-status { padding:16px; text-align:center; }
 #hunts-modal-list { display:grid; grid-template-columns:1fr; gap:6px; }
 #npcs-modal-list,
-#cidade-modal-list { display:grid; grid-template-columns:1fr; gap:10px; }
+#cidade-modal-list,
+#guild-modal-list { display:grid; grid-template-columns:1fr; gap:10px; }
 .hunt-modal-section { min-width:0; }
 .hunt-modal-section:last-child:nth-child(odd) { grid-column:1/-1; }
 .hunt-modal-section .hunts-group { display:grid; gap:4px; }
@@ -1672,7 +1678,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 #hunts-modal-list .hunt-modal-card.hunt-card,
 #bosses-modal-list .hunt-modal-card.hunt-card,
 #npcs-modal-list .hunt-modal-card.hunt-card,
-#cidade-modal-list .hunt-modal-card.hunt-card {
+#cidade-modal-list .hunt-modal-card.hunt-card,
+#guild-modal-list .hunt-modal-card.hunt-card {
   display: flex; flex-direction: row; align-items: center; gap: 8px;
   overflow: hidden; position: relative;
 }
@@ -1687,7 +1694,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   height: 44px; overflow: hidden; position: relative; z-index: 0;
 }
 #npcs-modal-list .hunt-modal-card .mobs,
-#cidade-modal-list .hunt-modal-card .mobs {
+#cidade-modal-list .hunt-modal-card .mobs,
+#guild-modal-list .hunt-modal-card .mobs {
   display: flex; align-items: center; justify-content: center;
   flex: 0 0 56px; width: 56px; min-width: 56px; max-width: 56px;
   height: 48px; overflow: hidden; position: relative; z-index: 0;
@@ -1771,7 +1779,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 #hunts-modal-list .hunt-modal-card .info,
 #bosses-modal-list .hunt-modal-card .info,
 #npcs-modal-list .hunt-modal-card .info,
-#cidade-modal-list .hunt-modal-card .info {
+#cidade-modal-list .hunt-modal-card .info,
+#guild-modal-list .hunt-modal-card .info {
   flex: 1 1 auto; min-width: 0; position: relative; z-index: 1;
   padding-left: 2px;
 }
@@ -1782,7 +1791,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 #hunts-modal-list .hunt-modal-card .risk,
 #bosses-modal-list .hunt-modal-card .risk,
 #npcs-modal-list .hunt-modal-card .risk,
-#cidade-modal-list .hunt-modal-card .risk {
+#cidade-modal-list .hunt-modal-card .risk,
+#guild-modal-list .hunt-modal-card .risk {
   flex: 0 0 auto; position: relative; z-index: 1; margin-left: 4px;
 }
 .hunt-card {
@@ -1820,6 +1830,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.boss-modal-shell,
 .modal-bg .modal.mega-lobby-char-shell,
 .modal-bg .modal.cidade-modal-shell,
+.modal-bg .modal.guild-modal-shell,
 .modal-bg .modal.ranking-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
 .modal-bg .modal.reward-modal-shell,
@@ -1837,6 +1848,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.boss-modal-shell .panel-title,
 .modal-bg .modal.mega-lobby-char-shell .panel-title,
 .modal-bg .modal.cidade-modal-shell .panel-title,
+.modal-bg .modal.guild-modal-shell .panel-title,
 .modal-bg .modal.ranking-modal-shell .panel-title,
 .modal-bg .modal.npcs-modal-shell .panel-title,
 .modal-bg .modal.reward-modal-shell .panel-title,
@@ -1852,6 +1864,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.boss-modal-shell .panel-body,
 .modal-bg .modal.mega-lobby-char-shell .panel-body,
 .modal-bg .modal.cidade-modal-shell .panel-body,
+.modal-bg .modal.guild-modal-shell .panel-body,
 .modal-bg .modal.ranking-modal-shell .panel-body,
 .modal-bg .modal.npcs-modal-shell .panel-body,
 .modal-bg .modal.reward-modal-shell .panel-body,
