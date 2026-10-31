@@ -34,6 +34,7 @@
     prefs: { filterObscene: true, opacity: 0.72 },
     guild: null,       // {id, name} da guild da conta — vira aba própria
     guildTimer: null,
+    unread: {},        // canal -> nº de mensagens não lidas (badge, teto 99/+99)
   };
 
   /* Canais ativos: fixos + aba da guild (dinâmica, nome da guild). */
@@ -161,6 +162,22 @@
       const label = c.guild ? String(c.label || "GUILD") : tt(c.labelKey, c.id);
       return `<button type="button" class="global-chat-tab${active}${c.guild ? " guild-tab" : ""}" data-chat-channel="${c.id}">${escapeHtml(label)}</button>`;
     }).join("");
+    paintBadges();
+  }
+
+  /* Badge de não-lidas por aba — máx "+99". */
+  function paintBadges() {
+    const box = document.getElementById("global-chat-tabs");
+    if (!box) return;
+    box.querySelectorAll("[data-chat-channel]").forEach((btn) => {
+      const ch = btn.getAttribute("data-chat-channel");
+      const n = ch === ChatUI.channel ? 0 : (ChatUI.unread[ch] || 0);
+      let b = btn.querySelector(".chat-badge");
+      if (n > 0) {
+        if (!b) { b = document.createElement("i"); b.className = "chat-badge"; btn.appendChild(b); }
+        b.textContent = n > 99 ? "+99" : String(n);
+      } else if (b) b.remove();
+    });
   }
 
   function bindDom() {
@@ -208,6 +225,7 @@
   function setChannel(id) {
     const meta = channels().find((c) => c.id === id) || channels()[0];
     ChatUI.channel = meta.id;
+    ChatUI.unread[meta.id] = 0;
     paintTabs();
     renderMessages();
     const soon = document.getElementById("global-chat-soon");
@@ -274,6 +292,10 @@
     }
     if (msg.id > ChatUI.lastId) ChatUI.lastId = msg.id;
     if (msg.channel === ChatUI.channel) renderMessages();
+    else if (msg.channel) {
+      ChatUI.unread[msg.channel] = (ChatUI.unread[msg.channel] || 0) + 1;
+      paintBadges();
+    }
   }
 
   async function api(method, path, body, token) {

@@ -152,6 +152,23 @@
 .gc-guild .gc-meta { color: #8a9478; }
 .global-chat-tab.guild-tab { color: #d8b25a; border-color: #5a4a20; }
 
+/* Badge de mensagens não lidas nas abas do chat. */
+.global-chat-tab .chat-badge {
+  font-style: normal;
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 3px;
+  margin-left: 4px;
+  background: #c03a2e;
+  color: #fff;
+  border-radius: 7px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
 .global-chat-input-row {
   display: flex;
   gap: 4px;
