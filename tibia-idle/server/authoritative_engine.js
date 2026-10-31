@@ -5223,16 +5223,31 @@ function healPlayers(auth,now){
     const dt=Math.max(1,Number(auth._stepDt)||AUTH_STEP_MS);
     applyVocationRegenTo(item,p,dt,max);
     const spellAt=Math.max(1,Math.min(99,Number(p.config&&(p.config.healSpellAt!==undefined?p.config.healSpellAt:p.config.healAt))||90));
+    const itemAt=Number(p.config&&(p.config.healItemAt!==undefined?p.config.healItemAt:p.config.healAt))||60;
     const hpPct=max.hp?(p.hp/max.hp)*100:100;
     item.healAcc=(Number(item.healAcc)||0)+dt;
-    if(item.healAcc>=1000&&hpPct<=spellAt){
-      // Só cura com magia se o Helper tiver healSpell marcado — sem fallback
-      // de vocação (exura-vita etc. “de graça”).
-      const sid=p.config&&p.config.healSpell;
-      const s=sid&&ALL_SPELLS[sid];
-      const friendOnly=friendHealSpellIds(p.voc).indexOf(String(sid||""))!==-1||/sio$/.test(String(sid||""));
-      if(s&&s.type==="heal"&&!friendOnly&&spellAllowedForVoc(s,p.voc)&&Number(s.lvl||0)<=Number(p.level||1)&&p.mp>=Number(s.mana||0)&&
-         !((p._spellCd&&p._spellCd[s.id])>now)&&!spellGroupBusy(p,s,now)){
+    // HEAL CONDITION igual ao cliente: a lista healSpells ({id,at}) é
+    // percorrida por threshold crescente — a primeira cuja % de HP foi
+    // atingida e que esteja pronta (vocação, nível, mana, cooldown) é
+    // lançada. Se a mais forte estiver em cooldown, cai para a próxima.
+    // healSpell (singular) permanece só como compat de saves antigos.
+    const healList=Array.isArray(p.config&&p.config.healSpells)?p.config.healSpells.slice():[];
+    if(!healList.length&&p.config&&p.config.healSpell&&ALL_SPELLS[p.config.healSpell])
+      healList.push({id:p.config.healSpell,at:spellAt});
+    healList.sort((a,b)=>(Number(a&&a.at)||99)-(Number(b&&b.at)||99));
+    // a janela de cura considera o maior "at" da lista — healSpellAt guarda
+    // só o último input editado e pode ficar abaixo de uma spell ativa.
+    const gateAt=healList.reduce((m,c)=>Math.max(m,Number(c&&c.at)||0),spellAt);
+    if(item.healAcc>=1000&&hpPct<=gateAt){
+      const friendIds=friendHealSpellIds(p.voc);
+      let casted=false;
+      for(const cfg of healList){
+        if(!cfg||!cfg.id||hpPct>(Number(cfg.at)||99))continue;
+        const sid=String(cfg.id),s=ALL_SPELLS[sid];
+        if(!s||s.type!=="heal")continue;
+        if(friendIds.indexOf(sid)!==-1||/sio$/.test(sid))continue;
+        if(!spellAllowedForVoc(s,p.voc)||Number(s.lvl||0)>Number(p.level||1)||p.mp<Number(s.mana||0))continue;
+        if((p._spellCd&&p._spellCd[sid])>now||spellGroupBusy(p,s,now))continue;
         const amount=boostHealAmount(auth,p,s,stanceHealAmount(p,rollSpell(auth,p,s)));
         let manaCost=Number(s.mana||0);
         const wh=wheelApplySpellBoost(p,s.id);
@@ -5244,11 +5259,14 @@ function healPlayers(auth,now){
         const pos=playerPosition(auth,p);
         auth.events.push({t:"heal",amount,targetId:String(item.id),spell:s.name,x:pos.x,y:pos.y,screen:true,ts:now});
         auth.events.push({t:"say",text:s.words||s.name,whoId:String(item.id),x:pos.x,y:pos.y,screen:true,ts:now});
-        item.healAcc=0;
-      }else{
-        usePotion(auth,p);item.healAcc=0;
+        casted=true;
+        break;
       }
-    }else if(hpPct<=Math.max(20,Number(p.config&&p.config.healItemAt)||60))usePotion(auth,p);
+      // magia nenhuma pronta: item de cura só no limite de item (mesma regra
+      // do cliente — acima dele a espera é pelo cooldown da spell).
+      if(!casted&&hpPct<=Math.max(20,itemAt))usePotion(auth,p);
+      item.healAcc=0;
+    }else if(hpPct<=Math.max(20,itemAt))usePotion(auth,p);
   }
   for(const healer of auth.players){
     const voc=String(healer.p.voc||"");

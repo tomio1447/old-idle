@@ -3318,7 +3318,11 @@ function tryHeal(c, p, now) {
   const pct = (p.hp / max.hp) * 100;
   const spellAt = p.config.healSpellAt === undefined ? (p.config.healAt || 90) : p.config.healSpellAt;
   const itemAt = p.config.healItemAt === undefined ? (p.config.healAt || 90) : p.config.healItemAt;
-  if (pct > Math.max(spellAt, itemAt)) return false;
+  // healSpellAt guarda só o último input editado — a janela precisa abrir
+  // também no maior "at" configurado na lista, senão a spell mais alta morre.
+  const listMaxAt = Array.isArray(p.config.healSpells)
+    ? p.config.healSpells.reduce((m, c) => Math.max(m, Number(c && c.at) || 0), 0) : 0;
+  if (pct > Math.max(spellAt, itemAt, listMaxAt)) return false;
 
   // 1. magia de cura: HEAL CONDITION — percorre a lista de spells configurada
   // (healSpells) ordenada por threshold crescente. A primeira cuja % de HP seja
