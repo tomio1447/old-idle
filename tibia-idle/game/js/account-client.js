@@ -1572,8 +1572,12 @@ async function accountStartSyncNow(token,generation){
     }
     if(type==="world-boss"){accountSyncDispatch("world-boss",data);return;}
     if(type==="quest"){accountSyncDispatch("quest",data);return;}
+    if(type==="announce"){
+      try{window.dispatchEvent(new CustomEvent("tibia-idle-announce",{detail:data}));}catch(e){}
+      return;
+    }
   };
-  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss","quest"])
+  for(const type of ["lease","instance","character","party","party-inbox","mega-lobby","pale-lobby","snapshot-required","sync-expired","maintenance","world-boss","quest","announce"])
     source.addEventListener(type,(event)=>receive(type,event));
   const connected=(event)=>{if(event&&event.lastEventId)accountSyncCursor(event.lastEventId);
     ACCOUNT_SYNC.errors=0;ACCOUNT_SYNC.totalFailures=0;accountSyncStopFallback();accountSyncDispatch("connected",{});};

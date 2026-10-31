@@ -152,6 +152,15 @@ function scheduleMaintenance(seconds){
   console.log("[server] maintenance scheduled:", state.remainingSec+"s", "endsAt="+new Date(state.endsAt).toISOString());
   return state;
 }
+/* Anúncio global com popup: state leve devolvido em /api/health (TTL)
+ * e empurrado por SSE — o cliente mostra o modal uma vez por anúncio. */
+const ANNOUNCE_STATE={current:null};
+function getAnnounceState(){
+  const a=ANNOUNCE_STATE.current;
+  if(!a)return null;
+  if(a.until&&Date.now()>Number(a.until)){ANNOUNCE_STATE.current=null;return null;}
+  return a;
+}
 async function authorizeMaintenance(req,body,db){
   const headerToken=String(req.headers["x-maintenance-token"]||"").trim();
   const bodyToken=String((body&&body.token)||"").trim();
@@ -4359,6 +4368,7 @@ async function main() {
           bootId:SERVER_BOOT_ID,startedAt:SERVER_STARTED_AT,
           serverPower:"on",
           maintenance:getMaintenanceState(),
+          announce:getAnnounceState(),
           playersOnline,
           worker:instanceWorker.stats(),sync:{protocol:SYNC_PROTOCOL,cursor:SYNC_BUS.cursor(),clients:SYNC_BUS.clientCount()},
           chat:{cursor:CHAT_BUS.cursor(),clients:CHAT_BUS.clientCount(),channels:CHAT_CHANNELS},
@@ -4380,6 +4390,34 @@ async function main() {
       }
       if(req.method==="GET"&&url==="/api/maintenance"){
         return send(res,200,{ok:true,maintenance:getMaintenanceState(),serverPower:"on"});
+      }
+      /* POST /api/admin/announce — popup global (SSE + health/TTL).
+       * Auth igual à manutenção: X-Maintenance-Token ou sessão admin. */
+      if(req.method==="POST"&&url==="/api/admin/announce"){
+        const limited=rateLimit(req,"admin-announce",10,60000);if(limited)return send(res,limited.code,limited.body);
+        let body={};
+        try{body=await readBody(req);}catch(e){return send(res,400,{ok:false,error:"BAD_JSON",msg:"JSON inválido"});}
+        const auth=await authorizeMaintenance(req,body,db);
+        if(!auth.ok)return send(res,403,{ok:false,error:"FORBIDDEN",msg:"Token de manutenção ou admin necessário"});
+        const title=String(body.title||"Aviso").slice(0,80);
+        const message=String(body.message||"").slice(0,2000);
+        if(!message.trim())return send(res,400,{ok:false,error:"EMPTY",msg:"Mensagem vazia"});
+        const ttlSec=Math.max(30,Math.min(86400,Math.floor(Number(body.ttlSec)||900)));
+        const button=String(body.button||"OK").slice(0,30)||"OK";
+        ANNOUNCE_STATE.current={id:String(Date.now()),title,message,button,
+          at:Date.now(),until:Date.now()+ttlSec*1000};
+        try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("announce",ANNOUNCE_STATE.current);}catch(e){}
+        console.log("[announce] publicado:",JSON.stringify(title),"ttl="+ttlSec+"s","via="+auth.via);
+        return send(res,200,{ok:true,announce:ANNOUNCE_STATE.current});
+      }
+      if(req.method==="POST"&&url==="/api/admin/announce/clear"){
+        const limited=rateLimit(req,"admin-announce",10,60000);if(limited)return send(res,limited.code,limited.body);
+        let body={};
+        try{body=await readBody(req);}catch(e){body={};}
+        const auth=await authorizeMaintenance(req,body,db);
+        if(!auth.ok)return send(res,403,{ok:false,error:"FORBIDDEN",msg:"Token de manutenção ou admin necessário"});
+        ANNOUNCE_STATE.current=null;
+        return send(res,200,{ok:true});
       }
       if(req.method==="POST"&&url==="/api/chat/ticket"){
         const limited=rateLimit(req,"chat-ticket",60,60000);if(limited)return send(res,limited.code,limited.body);
