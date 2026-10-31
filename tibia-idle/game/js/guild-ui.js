@@ -488,6 +488,7 @@ async function loadGuildDetail() {
         { char_id: Number(sessionCharId()), bonus_id: btn.dataset.guildBuyTemp });
       btn.disabled = false;
       if (r && r.data) guildToast(r.data.msg);
+      guildTopbarSync();
       loadGuildDetail();
     });
   });
@@ -530,3 +531,39 @@ function guildToast(msg) {
   if (typeof toast === "function") { toast(msg); return; }
   try { console.log("[guild]", msg); } catch (e) {}
 }
+
+/* ------------------------- TOPBAR: bônus temporário -------------------------
+ * Enquanto houver bônus temporário ativo, o botão GUILD pulsa em amarelo;
+ * o tooltip lista os bônus e o tempo restante (sync a cada 30s). */
+const GUILD_TEMP_LABELS = { bossLoot: "Boss Loot", exp: "EXP", skill: "Skill/ML", loot: "Loot" };
+let _guildTopbarTimer = null;
+async function guildTopbarSync() {
+  const btn = document.getElementById("btn-guild");
+  if (!btn) return;
+  if (!guildOnlineMode()) { btn.classList.remove("guild-temp-on"); return; }
+  try {
+    const r = await guildApi("GET",
+      `/api/guild/state?char_id=${encodeURIComponent(sessionCharId())}`);
+    const d = r && r.data;
+    const temp = (d && d.ok && d.guild && d.guild.tempBonuses) || {};
+    const active = Object.keys(temp)
+      .map((id) => ({ id, until: Number(temp[id]) || 0 }))
+      .filter((t) => t.until > Date.now())
+      .sort((a, b) => a.until - b.until);
+    if (active.length) {
+      btn.classList.add("guild-temp-on");
+      btn.title = "Bônus temporário ativo:\n" +
+        active.map((t) => `• ${GUILD_TEMP_LABELS[t.id] || t.id} +25% — restam ${guildTimeLeft(t.until)}`).join("\n");
+      btn.removeAttribute("data-i18n-title");
+    } else {
+      btn.classList.remove("guild-temp-on");
+      btn.setAttribute("data-i18n-title", "title.guild");
+      btn.title = "Guilds — clãs por conta com tasks diárias";
+    }
+  } catch (e) { /* silencioso — o botão só reflete o último estado conhecido */ }
+}
+(function guildTopbarWatch() {
+  if (_guildTopbarTimer || typeof window === "undefined") return;
+  _guildTopbarTimer = setInterval(guildTopbarSync, 30000);
+  try { guildTopbarSync(); } catch (e) {}
+})();
