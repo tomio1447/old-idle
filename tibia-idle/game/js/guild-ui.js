@@ -11,8 +11,10 @@
  */
 "use strict";
 
-const GUILD_UI = { view: "list", guildId: null, tab: "members", loading: false };
+const GUILD_UI = { view: "list", guildId: null, tab: "members", loading: false,
+  logFilter: "", logData: null };
 const GUILD_RANK_LABEL = { leader: "Líder", vice: "Vice-líder", member: "Membro" };
+const GUILD_BONUS_LEVEL_GOLD_UI = 50000000; /* 50kk por nível (server: guild.js) */
 /* Mesmas regras do servidor (guild.js) — exibidas no painel de criação. */
 const GUILD_RULES = { CREATE_MIN_LEVEL: 100, CREATE_COST_GOLD: 100000 };
 const GUILD_LEVEL_EXP_CLIENT = [0, 10, 25, 40, 60, 85, 120, 160, 250, 400];
@@ -214,6 +216,101 @@ function guildExpBarHtml(guild) {
   </div>`;
 }
 
+function guildGoldFmt(n) {
+  const v = Math.max(0, Number(n) || 0);
+  if (v >= 1e6) return (v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " kk";
+  return v.toLocaleString("pt-BR") + " gp";
+}
+/* GUILD SHOP — bônus por nível (nível N custa N GP + 50kk do caixa). */
+function guildShopHtml(g, shop, isLeader) {
+  const levels = g.bonuses || {};
+  const head = `<div class="guild-balance-head">
+    <span><b>${Number(g.points) || 0}</b> guild points</span>
+    <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
+  </div>
+  ${!isLeader ? `<div class="tiny dim" style="margin:4px 0">Apenas líderes podem comprar com o caixa da guild.</div>` : ""}`;
+  return head + `<div class="guild-shop-list">${shop.map((def) => {
+    const lv = Math.max(0, Math.min(def.maxLevel || 10, Number(levels[def.id]) || 0));
+    const maxed = lv >= (def.maxLevel || 10);
+    const next = lv + 1;
+    const costPts = next;
+    const val = (def.perLevel * lv).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    const nextVal = (def.perLevel * next).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+    const pips = Array.from({ length: def.maxLevel || 10 }, (_, i) =>
+      `<i class="guild-pip${i < lv ? " on" : ""}"></i>`).join("");
+    const afford = (Number(g.points) || 0) >= costPts && (Number(g.balance) || 0) >= GUILD_BONUS_LEVEL_GOLD_UI;
+    return `<div class="guild-shop-row${maxed ? " maxed" : ""}">
+      <span class="guild-shop-info">
+        <span class="nm">${guildEsc(def.label)} <b>${val}${def.unit}</b></span>
+        <span class="guild-pips">${pips}</span>
+        <span class="meta">${maxed ? "nível máximo"
+          : `Nv ${next} → ${nextVal}${def.unit} · custo: ${costPts} GP + ${guildGoldFmt(GUILD_BONUS_LEVEL_GOLD_UI)}`}</span>
+      </span>
+      ${isLeader && !maxed ? `<button class="sm primary" data-guild-buy="${def.id}"${afford ? "" : " disabled"}>Comprar</button>` : ""}
+    </div>`;
+  }).join("")}</div>`;
+}
+/* GUILD BALANCE — caixa + doação (qualquer membro). */
+function guildBalanceHtml(g, totals) {
+  const t = totals || { donated: 0, spentGold: 0, spentPoints: 0 };
+  return `<div class="guild-balance-head">
+      <span>Caixa da guild: <b>${guildGoldFmt(g.balance)}</b></span>
+      <span><b>${Number(g.points) || 0}</b> guild points</span>
+    </div>
+    <div class="tiny dim" style="margin:4px 0 8px">
+      O caixa é restrito a líderes (até 3) — usado nas compras do GUILD SHOP.
+      Doações são irreversíveis.</div>
+    <div class="guild-donate-box">
+      <input id="guild-donate-amount" type="number" min="1" step="1" placeholder="Quantidade de gold" />
+      <button class="sm primary" id="guild-donate-btn">Doar</button>
+      <span class="tiny" id="guild-donate-msg"></span>
+    </div>
+    <div class="guild-balance-stats">
+      <span>Total doado: <b>${guildGoldFmt(t.donated)}</b></span>
+      <span>Total gasto: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b></span>
+    </div>`;
+}
+/* HISTÓRICO — contabilidade (só membros). */
+function guildLogHtml(entries, totals) {
+  const t = totals || {};
+  const sum = `<div class="guild-balance-stats" style="margin-bottom:6px">
+    <span>Doações: <b>${guildGoldFmt(t.donated)}</b> (${Number(t.donations) || 0})</span>
+    <span>Gastos: <b>${guildGoldFmt(t.spentGold)}</b> · <b>${Number(t.spentPoints) || 0} GP</b> (${Number(t.purchases) || 0})</span>
+  </div>`;
+  const filter = `<select id="guild-log-filter" class="guild-log-filter">
+    <option value=""${GUILD_UI.logFilter === "" ? " selected" : ""}>Todas</option>
+    <option value="donation"${GUILD_UI.logFilter === "donation" ? " selected" : ""}>Doações</option>
+    <option value="purchase"${GUILD_UI.logFilter === "purchase" ? " selected" : ""}>Compras</option>
+  </select>`;
+  const rows = (entries || []).map((e) => {
+    const when = e.created_at ? new Date(e.created_at).toLocaleString("pt-BR",
+      { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    const gold = Number(e.gold_delta) || 0, pts = Number(e.points_delta) || 0;
+    return `<div class="guild-log-row ${e.category}">
+      <span class="guild-log-when">${when}</span>
+      <span class="guild-log-cat">${e.category === "donation" ? "Doação" : "Compra"}</span>
+      <span class="guild-log-info"><b>${guildEsc(e.char_name)}</b> ${guildEsc(e.detail)}</span>
+      <span class="guild-log-val">${gold ? (gold > 0 ? "+" : "−") + guildGoldFmt(Math.abs(gold)) : ""}${pts ? ` ${pts > 0 ? "+" : "−"}${Math.abs(pts)} GP` : ""}</span>
+    </div>`;
+  }).join("");
+  return sum + filter + `<div class="guild-log-list">${rows ||
+    `<div class="hunt-section-empty">Sem movimentações.</div>`}</div>`;
+}
+async function loadGuildLog() {
+  if (GUILD_UI.tab !== "history") return;
+  const cat = GUILD_UI.logFilter ? `&category=${GUILD_UI.logFilter}` : "";
+  const r = await guildApi("GET",
+    `/api/guild/log?char_id=${encodeURIComponent(sessionCharId())}${cat}`);
+  const data = r && r.data;
+  const host = document.querySelector("#guild-modal-list .guild-log-host");
+  if (!host) return;
+  host.innerHTML = data && data.ok
+    ? guildLogHtml(data.entries, data.totals)
+    : `<div class="hunt-section-empty">${guildEsc(data && data.msg || "Erro ao carregar.")}</div>`;
+  const sel = $("#guild-log-filter");
+  if (sel) sel.addEventListener("change", () => { GUILD_UI.logFilter = sel.value; loadGuildLog(); });
+}
+
 async function loadGuildDetail() {
   const root = $("#guild-modal-list");
   if (!root) return;
@@ -226,15 +323,21 @@ async function loadGuildDetail() {
     return;
   }
   const g = data.guild, members = data.members || [], tasks = data.tasks || [];
+  const shop = data.shop || [], logTotals = data.logTotals || null;
   const myRank = data.myRank;
   const canManage = myRank === "leader" || myRank === "vice";
+  const isLeader = myRank === "leader";
   const isMember = !!myRank;
 
   const tabs = [
     { id: "members", label: "MEMBROS" },
     { id: "ranking", label: "RANKING TASK" },
   ];
-  if (isMember) tabs.push({ id: "tasks", label: "TASK GUILD" });
+  if (isMember) tabs.push(
+    { id: "tasks", label: "TASK GUILD" },
+    { id: "shop", label: "GUILD SHOP" },
+    { id: "balance", label: "GUILD BALANCE" },
+    { id: "history", label: "HISTÓRICO" });
 
   let contentHtml = "";
   if (GUILD_UI.tab === "ranking") {
@@ -250,23 +353,38 @@ async function loadGuildDetail() {
       </div>`).join("") || `<div class="hunt-section-empty">Sem membros.</div>`}</div>`;
   } else if (GUILD_UI.tab === "tasks" && isMember) {
     contentHtml = `<div class="tiny dim" style="margin-bottom:6px">
-      3 tasks por server save · cada task completada dá <b>+1 EXP</b> à guild.</div>
+      3 tasks por server save · cada task completada dá <b>+1 EXP</b> e <b>+1 GUILD POINT</b> à guild.</div>
       <div class="guild-task-list">${tasks.map(guildTaskCard).join("") ||
         `<div class="hunt-section-empty">Sem tasks hoje.</div>`}</div>`;
+  } else if (GUILD_UI.tab === "shop" && isMember) {
+    contentHtml = guildShopHtml(g, shop, isLeader);
+  } else if (GUILD_UI.tab === "balance" && isMember) {
+    contentHtml = guildBalanceHtml(g, logTotals);
+  } else if (GUILD_UI.tab === "history" && isMember) {
+    contentHtml = `<div class="guild-log-host">
+      <div class="tiny dim" style="padding:8px">Carregando histórico…</div></div>`;
   } else {
     contentHtml = `<div class="guild-member-list">${members.map((m) => {
-      const isLeader = m.rank === "leader", isVice = m.rank === "vice";
-      const actions = canManage && !isLeader ? `
+      const rank = m.rank, isLeaderRow = rank === "leader", isVice = rank === "vice";
+      const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+      const isSelf = acc && Number(m.account_id) === Number(acc.id);
+      /* Servidor: líder promove/rebaixa/expulsa não-líderes (e rebaixa
+       * outros líderes); vice só expulsa membros comuns. */
+      const actions = isLeader ? `
         <span class="guild-member-actions">
-          ${myRank === "leader" ? `<button class="sm" data-guild-promote="${m.account_id}"
-            title="${isVice ? "Rebaixar a membro" : "Promover a vice-líder"}">${isVice ? "⬇" : "⭐"}</button>` : ""}
-          ${(myRank === "leader" || (myRank === "vice" && m.rank === "member")) ? `
-            <button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>` : ""}
-        </span>` : "";
+          ${!isLeaderRow ? `<button class="sm" data-guild-promote="${m.account_id}"
+            title="${isVice ? "Promover a líder" : "Promover a vice-líder"}">⭐</button>` : ""}
+          ${!isSelf && rank !== "member" ? `<button class="sm" data-guild-demote="${m.account_id}"
+            title="${isLeaderRow ? "Rebaixar a vice-líder" : "Rebaixar a membro"}">⬇</button>` : ""}
+          ${!isSelf && !isLeaderRow ? `<button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>` : ""}
+        </span>` : (myRank === "vice" && rank === "member" ? `
+        <span class="guild-member-actions">
+          <button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>
+        </span>` : "");
       return `<div class="guild-member-row">
-        <span class="guild-member-name">${isLeader ? "👑 " : isVice ? "⭐ " : ""}${guildEsc(m.name)}</span>
+        <span class="guild-member-name">${isLeaderRow ? "👑 " : isVice ? "⭐ " : ""}${guildEsc(m.name)}</span>
         <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
-        <span class="guild-member-rank">${GUILD_RANK_LABEL[m.rank] || "Membro"}</span>
+        <span class="guild-member-rank">${GUILD_RANK_LABEL[rank] || "Membro"}</span>
         <span class="guild-member-contrib">${Number(m.contribution) || 0} tasks</span>
         ${actions}
       </div>`;
@@ -283,7 +401,7 @@ async function loadGuildDetail() {
 
   root.innerHTML = `<section class="guild-section guild-head">
       <div class="hunt-cat-title">${guildEsc(g.name)} — Nível ${g.level}</div>
-      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP</div>
+      <div class="tiny dim">${g.members}/${g.slots} vagas · ${g.freeSlots} livres · ${g.exp} EXP${isMember ? ` · <b>${Number(g.points) || 0} GP</b>` : ""}</div>
       ${guildExpBarHtml(g)}
     </section>
     <div class="guild-tabs">${tabs.map((tab) =>
@@ -305,11 +423,42 @@ async function loadGuildDetail() {
   });
   $$("#guild-modal-list [data-guild-promote]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      await guildApi("POST", "/api/guild/promote",
+      const r = await guildApi("POST", "/api/guild/promote",
         { char_id: Number(sessionCharId()), member_account_id: Number(btn.dataset.guildPromote) });
+      if (r && r.data && !r.data.ok) guildToast(r.data.msg);
       loadGuildDetail();
     });
   });
+  $$("#guild-modal-list [data-guild-demote]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const r = await guildApi("POST", "/api/guild/demote",
+        { char_id: Number(sessionCharId()), member_account_id: Number(btn.dataset.guildDemote) });
+      if (r && r.data && !r.data.ok) guildToast(r.data.msg);
+      loadGuildDetail();
+    });
+  });
+  $$("#guild-modal-list [data-guild-buy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const r = await guildApi("POST", "/api/guild/buy",
+        { char_id: Number(sessionCharId()), bonus_id: btn.dataset.guildBuy });
+      btn.disabled = false;
+      if (r && r.data) guildToast(r.data.msg);
+      loadGuildDetail();
+    });
+  });
+  const donateBtn = $("#guild-donate-btn");
+  if (donateBtn) donateBtn.addEventListener("click", async () => {
+    const amount = Math.max(0, Math.floor(Number((($("#guild-donate-amount") || {}).value) || 0)));
+    donateBtn.disabled = true;
+    const r = await guildApi("POST", "/api/guild/donate",
+      { char_id: Number(sessionCharId()), amount });
+    donateBtn.disabled = false;
+    const msg = $("#guild-donate-msg");
+    if (msg) msg.textContent = (r && r.data && (r.data.msg || r.data.error)) || "Erro ao doar.";
+    if (r && r.data && r.data.ok) loadGuildDetail();
+  });
+  if (GUILD_UI.tab === "history") loadGuildLog();
   const invBtn = $("#guild-invite-btn");
   if (invBtn) invBtn.addEventListener("click", async () => {
     const name = ($("#guild-invite-name") || {}).value || "";

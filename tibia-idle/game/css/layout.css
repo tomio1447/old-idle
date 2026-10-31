@@ -1333,6 +1333,37 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .guild-task-bar i { display:block; height:100%; background:linear-gradient(90deg,#2a6a2a,#7ae87a); }
 .guild-task-status { flex:0 0 70px; text-align:right; font-size:10px; color:#a8a090; }
 .guild-task-card.done .guild-task-status { color:#7ae87a; }
+/* GUILD SHOP / BALANCE / HISTÓRICO */
+.guild-balance-head { display:flex; justify-content:space-between; gap:10px;
+  background:rgba(22,18,12,.9); border:1px solid #5a4a32; border-radius:4px;
+  padding:7px 10px; margin-bottom:8px; color:#e8d4a2; }
+.guild-shop-list { display:flex; flex-direction:column; gap:5px; }
+.guild-shop-row { display:flex; align-items:center; gap:10px;
+  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:7px 9px; }
+.guild-shop-row.maxed { border-color:#3a5a32; }
+.guild-shop-info { flex:1 1 auto; display:flex; flex-direction:column; gap:3px; }
+.guild-shop-info .nm { color:#e8dfd0; }
+.guild-shop-info .meta { font-size:10px; color:#a8a090; }
+.guild-pips { display:flex; gap:2px; }
+.guild-pip { width:14px; height:6px; background:#14120e; border:1px solid #2a2016; border-radius:2px; }
+.guild-pip.on { background:linear-gradient(90deg,#6a4a10,#d4af37); border-color:#5a4a32; }
+.guild-donate-box { display:flex; align-items:center; gap:6px; margin:8px 0; }
+.guild-donate-box input { flex:1 1 160px; padding:6px 8px; background:#14120e;
+  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-balance-stats { display:flex; justify-content:space-between; gap:10px;
+  font-size:10px; color:#a8a090; padding:4px 2px; }
+.guild-balance-stats b { color:#d4af37; }
+.guild-log-filter { width:100%; padding:5px 8px; margin-bottom:6px; background:#14120e;
+  color:#c8c0a8; border:1px solid #3a3020; }
+.guild-log-list { display:flex; flex-direction:column; gap:3px; }
+.guild-log-row { display:flex; align-items:center; gap:8px; font-size:10px;
+  background:rgba(22,18,12,.9); border:1px solid #2a2016; border-radius:3px; padding:5px 8px; }
+.guild-log-row.donation { border-left:2px solid #3a5a32; }
+.guild-log-row.purchase { border-left:2px solid #6a3a2a; }
+.guild-log-when { width:70px; color:#8a8070; flex:0 0 auto; }
+.guild-log-cat { width:44px; color:#a8a090; flex:0 0 auto; }
+.guild-log-info { flex:1 1 auto; color:#c8c0a8; }
+.guild-log-val { text-align:right; color:#d4af37; flex:0 0 auto; }
 .guild-invite-box { display:flex; align-items:center; gap:6px; margin-top:8px; }
 .guild-invite-box input { flex:1 1 160px; padding:5px 8px; background:#14120e;
   color:#c8c0a8; border:1px solid #3a3020; }

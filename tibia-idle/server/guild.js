@@ -36,6 +36,22 @@ const GUILD_NAME_MIN = 3;
 const GUILD_NAME_MAX = 30;
 const GUILD_NAME_RE = /^[A-Za-z][A-Za-z0-9 .\-']+$/;
 
+/* GUILD POINTS + SHOP — cada task completada dá +1 EXP e +1 GUILD POINT.
+ * Bônus comprados com pontos + caixa da guild valem para TODOS os
+ * personagens das contas membro (persistidos em data.guildBonus). */
+const GUILD_MAX_LEADERS = 3;
+const GUILD_BONUS_MAX_LEVEL = 10;
+const GUILD_BONUS_LEVEL_GOLD = 50000000; // 50kk por nível comprado
+const GUILD_BONUS_DEFS = [
+  { id: "lifeLeech",  label: "Life Leech",          perLevel: 0.1, unit: "%" },
+  { id: "manaLeech",  label: "Mana Leech",          perLevel: 0.1, unit: "%" },
+  { id: "critChance", label: "Critical Chance",     perLevel: 0.1, unit: "%" },
+  { id: "critDamage", label: "Critical Damage",     perLevel: 0.1, unit: "%" },
+  { id: "dodge",      label: "Dodge",               perLevel: 0.1, unit: "%" },
+  { id: "exp",        label: "Bônus de EXP",        perLevel: 1,   unit: "%" },
+  { id: "skill",      label: "Bônus de Skill/ML",   perLevel: 1,   unit: "%" },
+];
+
 const SERVER_SAVE_TZ = String(process.env.SERVER_SAVE_TZ || "America/Sao_Paulo").trim() || "America/Sao_Paulo";
 
 function guildLevelForExp(exp) {
@@ -51,6 +67,24 @@ function guildSlotsForLevel(level) {
 function guildNextLevelExp(level) {
   const l = Math.max(1, Number(level) || 1);
   return l >= GUILD_MAX_LEVEL ? null : GUILD_LEVEL_EXP[l];
+}
+/* Comprar o nível N (1..10) custa N guild points + 50kk do caixa. */
+function guildBonusCost(nextLevel) {
+  const l = Math.max(1, Math.min(GUILD_BONUS_MAX_LEVEL, Number(nextLevel) || 1));
+  return { points: l, gold: GUILD_BONUS_LEVEL_GOLD };
+}
+function guildBonusDef(id) {
+  return GUILD_BONUS_DEFS.find((d) => d.id === String(id)) || null;
+}
+/* Normaliza o mapa de níveis persistido (0..10 por chave conhecida). */
+function guildBonusLevels(raw) {
+  let src = raw;
+  if (typeof src === "string") { try { src = JSON.parse(src); } catch (e) { src = null; } }
+  const out = {};
+  for (const d of GUILD_BONUS_DEFS)
+    out[d.id] = Math.max(0, Math.min(GUILD_BONUS_MAX_LEVEL,
+      Math.floor(Number(src && src[d.id]) || 0)));
+  return out;
 }
 
 /* Dia do server save (00:00 no fuso) — mesma regra de server.js. */
@@ -138,11 +172,17 @@ function guildPublic(guild, membersCount) {
     nextLevelExp: guildNextLevelExp(level),
     slots, freeSlots: Math.max(0, slots - (Number(membersCount) || 0)),
     members: Number(membersCount) || 0,
+    points: Math.max(0, Number(guild.points) || 0),
+    bonuses: guildBonusLevels(guild.bonuses),
     createdAt: guild.created_at || null,
   };
 }
 function rankOf(member) { return member ? String(member.rank || "member") : null; }
 const CAN_INVITE = new Set(["leader", "vice"]);
+/* Metadados do shop para o cliente renderizar sem hardcode. */
+function guildShopDefs() {
+  return GUILD_BONUS_DEFS.map((d) => Object.assign({ maxLevel: GUILD_BONUS_MAX_LEVEL }, d));
+}
 
 /* ------------------------------- handlers ------------------------------ */
 /* GET /api/guilds — todas as guilds (nome, nível, vagas livres). */
@@ -170,9 +210,11 @@ async function guildState(db, token, charId) {
       guildDailyTaskDefs(member.guild_id, day));
     tasks = await db.guildTasksFor(member.guild_id, auth.account.id, day);
   }
+  const pub = guild ? guildPublic(guild, members.length) : null;
+  if (pub) pub.balance = Math.max(0, Number(guild.balance) || 0);
   return { code: 200, body: { ok: true,
-    guild: guild ? guildPublic(guild, members.length) : null,
-    myRank, members, invites, tasks, day: guildTaskDay() } };
+    guild: pub, myRank, members, invites, tasks,
+    shop: guildShopDefs(), day: guildTaskDay() } };
 }
 
 /* GET /api/guild/detail — painel público da guild + ranking de tasks. */
@@ -184,16 +226,21 @@ async function guildDetail(db, token, guildId, charId) {
   const members = await db.guildMembers(guild.id);
   const member = await db.guildMemberByAccount(auth.account.id);
   const myRank = member && Number(member.guild_id) === Number(guild.id) ? rankOf(member) : null;
-  let tasks = [];
+  let tasks = [], logTotals = null;
   if (myRank) {
     const day = guildTaskDay();
     await db.guildTasksEnsure(guild.id, auth.account.id, day,
       guildDailyTaskDefs(guild.id, day));
     tasks = await db.guildTasksFor(guild.id, auth.account.id, day);
+    if (typeof db.guildLogTotals === "function")
+      logTotals = await db.guildLogTotals(guild.id);
   }
+  const pub = guildPublic(guild, members.length);
+  /* Caixa e contabilidade são restritos a membros. */
+  if (myRank) pub.balance = Math.max(0, Number(guild.balance) || 0);
   return { code: 200, body: { ok: true,
-    guild: guildPublic(guild, members.length), myRank, members, tasks,
-    day: guildTaskDay() } };
+    guild: pub, myRank, members, tasks, logTotals,
+    shop: guildShopDefs(), day: guildTaskDay() } };
 }
 
 /* POST /api/guild/create — mesmo espírito das regras do crystal server:
@@ -282,6 +329,9 @@ async function guildInviteReply(db, body, accept) {
       msg: "Guild sem vagas no momento." } };
   await db.guildMemberAdd(guild.id, auth.account.id, invitee.id, "member");
   await db.guildInviteSetStatus(invite.id, "accepted");
+  /* bônus ativos da guild passam a valer nos chars da conta que entrou */
+  if (typeof db.guildApplyBonuses === "function")
+    try { await db.guildApplyBonuses(guild.id); } catch (e) {}
   return { code: 200, body: { ok: true, msg: `Você entrou na guild ${guild.name}!` } };
 }
 
@@ -315,23 +365,130 @@ async function guildKick(db, body) {
   return { code: 200, body: { ok: true, msg: "Membro expulso da guild." } };
 }
 
-/* POST /api/guild/promote — líder promove membro a vice (o vice atual
- * volta a membro) ou rebaixa o vice a membro. */
+/* POST /api/guild/promote — líder sobe um membro um rank:
+ * member → vice → leader (máx. GUILD_MAX_LEADERS líderes). */
 async function guildPromote(db, body) {
   const auth = await authChar(db, token(body), body.char_id);
   if (auth.error) return auth.error;
   const member = await db.guildMemberByAccount(auth.account.id);
   if (!member || rankOf(member) !== "leader")
-    return { code: 403, body: { ok: false, msg: "Apenas o líder pode promover." } };
+    return { code: 403, body: { ok: false, msg: "Apenas líderes podem promover." } };
   const target = await db.guildMemberByAccount(Number(body.member_account_id));
   if (!target || Number(target.guild_id) !== Number(member.guild_id))
     return { code: 404, body: { ok: false, msg: "Conta não é membro desta guild." } };
-  if (rankOf(target) === "leader")
-    return { code: 400, body: { ok: false, msg: "O líder não pode ser rebaixado." } };
-  const newRank = rankOf(target) === "vice" ? "member" : "vice";
-  await db.guildMemberSetRank(member.guild_id, target.account_id, newRank);
+  const rank = rankOf(target);
+  if (rank === "leader")
+    return { code: 400, body: { ok: false, msg: "O membro já é líder." } };
+  if (rank === "vice") {
+    const members = await db.guildMembers(member.guild_id);
+    const leaders = members.filter((m) => rankOf(m) === "leader").length;
+    if (leaders >= GUILD_MAX_LEADERS)
+      return { code: 409, body: { ok: false, error: "GUILD_LEADERS_FULL",
+        msg: `A guild já tem ${GUILD_MAX_LEADERS} líderes (máximo).` } };
+    await db.guildMemberSetRank(member.guild_id, target.account_id, "leader");
+    return { code: 200, body: { ok: true, msg: "Vice promovido a líder." } };
+  }
+  await db.guildMemberSetRank(member.guild_id, target.account_id, "vice");
+  return { code: 200, body: { ok: true, msg: "Membro promovido a vice-líder." } };
+}
+
+/* POST /api/guild/demote — líder desce um rank: leader → vice → member.
+ * O último líder não pode ser rebaixado (a guild precisa de um líder). */
+async function guildDemote(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member || rankOf(member) !== "leader")
+    return { code: 403, body: { ok: false, msg: "Apenas líderes podem rebaixar." } };
+  const target = await db.guildMemberByAccount(Number(body.member_account_id));
+  if (!target || Number(target.guild_id) !== Number(member.guild_id))
+    return { code: 404, body: { ok: false, msg: "Conta não é membro desta guild." } };
+  const rank = rankOf(target);
+  if (rank === "member")
+    return { code: 400, body: { ok: false, msg: "O membro já está no rank mais baixo." } };
+  if (rank === "leader") {
+    const members = await db.guildMembers(member.guild_id);
+    if (members.filter((m) => rankOf(m) === "leader").length <= 1)
+      return { code: 400, body: { ok: false, msg: "A guild precisa manter ao menos um líder." } };
+    await db.guildMemberSetRank(member.guild_id, target.account_id, "vice");
+    return { code: 200, body: { ok: true, msg: "Líder rebaixado a vice-líder." } };
+  }
+  await db.guildMemberSetRank(member.guild_id, target.account_id, "member");
+  return { code: 200, body: { ok: true, msg: "Vice rebaixado a membro." } };
+}
+
+/* POST /api/guild/donate — membro doa gold da conta para o caixa da
+ * guild. O caixa só pode ser gasto por líderes (compras do shop). */
+async function guildDonate(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  const amount = Math.max(0, Math.floor(Number(body.amount) || 0));
+  if (!amount || amount <= 0)
+    return { code: 400, body: { ok: false, msg: "Informe uma quantia válida." } };
+  const r = await db.guildDonate(member.guild_id, auth.account.id,
+    auth.char.name, amount);
+  if (!r || !r.ok) {
+    const err = r && r.error;
+    return { code: 409, body: { ok: false, error: err || "DONATE_FAILED",
+      msg: err === "GOLD_LOW" ? "Gold insuficiente na conta." : "Não foi possível doar." } };
+  }
   return { code: 200, body: { ok: true,
-    msg: newRank === "vice" ? "Membro promovido a vice-líder." : "Vice rebaixado a membro." } };
+    msg: `Doação de ${amount.toLocaleString("pt-BR")} gold registrada!`,
+    balance: r.balance, gold: r.gold } };
+}
+
+/* POST /api/guild/buy — líder compra 1 nível de bônus com guild points
+ * + gold do caixa. Aplica a todos os personagens das contas membro. */
+async function guildBuyBonus(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  if (rankOf(member) !== "leader")
+    return { code: 403, body: { ok: false, error: "LEADER_ONLY",
+      msg: "Apenas líderes podem usar o caixa da guild." } };
+  const def = guildBonusDef(body.bonus_id);
+  if (!def) return { code: 400, body: { ok: false, msg: "Bônus inválido." } };
+  const guild = await db.guildById(member.guild_id);
+  if (!guild) return { code: 404, body: { ok: false, msg: "Guild não encontrada." } };
+  const levels = guildBonusLevels(guild.bonuses);
+  const level = levels[def.id] || 0;
+  if (level >= GUILD_BONUS_MAX_LEVEL)
+    return { code: 409, body: { ok: false, error: "BONUS_MAXED",
+      msg: "Este bônus já está no nível máximo." } };
+  const cost = guildBonusCost(level + 1);
+  if (Number(guild.points) < cost.points)
+    return { code: 409, body: { ok: false, error: "POINTS_LOW",
+      msg: `Guild points insuficientes (precisa ${cost.points}).` } };
+  if (Number(guild.balance) < cost.gold)
+    return { code: 409, body: { ok: false, error: "BALANCE_LOW",
+      msg: `Caixa insuficiente — precisa ${cost.gold.toLocaleString("pt-BR")} gold.` } };
+  const r = await db.guildBonusBuy(member.guild_id, auth.account.id,
+    auth.char.name, def.id, level + 1, cost);
+  if (!r || !r.ok) {
+    const err = r && r.error;
+    return { code: 409, body: { ok: false, error: err || "BUY_FAILED",
+      msg: err === "POINTS_LOW" ? "Guild points insuficientes."
+        : err === "BALANCE_LOW" ? "Caixa insuficiente."
+        : "Não foi possível comprar." } };
+  }
+  return { code: 200, body: { ok: true,
+    msg: `${def.label} Nv ${level + 1} ativado para toda a guild!`,
+    points: r.points, balance: r.balance, bonuses: r.bonuses } };
+}
+
+/* GET /api/guild/log — histórico de doações/compras (só membros). */
+async function guildLog(db, token, charId, category) {
+  const auth = await authChar(db, token, charId);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  const cat = ["donation", "purchase"].includes(String(category)) ? String(category) : null;
+  const entries = await db.guildLogList(member.guild_id, cat, 200);
+  const totals = await db.guildLogTotals(member.guild_id);
+  return { code: 200, body: { ok: true, entries, totals } };
 }
 
 function token(body) { return body && body.token; }
@@ -340,10 +497,13 @@ module.exports = {
   GUILD_BASE_SLOTS, GUILD_SLOTS_PER_LEVEL, GUILD_MAX_LEVEL, GUILD_LEVEL_EXP,
   GUILD_TASKS_PER_DAY, GUILD_TASK_MIN_KILLS, GUILD_TASK_MAX_KILLS,
   GUILD_CREATE_MIN_LEVEL, GUILD_CREATE_COST_GOLD,
+  GUILD_MAX_LEADERS, GUILD_BONUS_MAX_LEVEL, GUILD_BONUS_LEVEL_GOLD, GUILD_BONUS_DEFS,
   guildLevelForExp, guildSlotsForLevel, guildNextLevelExp,
+  guildBonusCost, guildBonusDef, guildBonusLevels, guildShopDefs,
   guildTaskDay, guildTaskMonsterPool, guildDailyTaskDefs,
   guildList, guildState, guildDetail, guildCreate, guildInvite,
   guildAccept: (db, body) => guildInviteReply(db, body, true),
   guildDecline: (db, body) => guildInviteReply(db, body, false),
-  guildLeave, guildKick, guildPromote,
+  guildLeave, guildKick, guildPromote, guildDemote,
+  guildDonate, guildBuyBonus, guildLog,
 };

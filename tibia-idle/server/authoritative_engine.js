@@ -2032,7 +2032,7 @@ function addSkillTries(p,which,tries){
   if(!p||!which||which==="magic")return false;
   p.skills=p.skills||{};p.skillTries=p.skillTries||{};
   p.skills[which]=Math.max(10,Number(p.skills[which])||10);
-  const rate=serverSkillRate(p.skills[which]);
+  const rate=serverSkillRate(p.skills[which])*(1+guildBonusLevel(p,"skill")*0.01);
   p.skillTries[which]=(Number(p.skillTries[which])||0)+Math.max(0,Math.floor((Number(tries)||0)*rate));
   let up=false,need=skillTriesNeeded(p,which);
   while(p.skillTries[which]>=need){p.skillTries[which]-=need;p.skills[which]++;up=true;need=skillTriesNeeded(p,which);}
@@ -2042,7 +2042,7 @@ function addSkillTries(p,which,tries){
 function addManaSpent(p,mana,auth){
   if(!p)return false;
   const gained=Math.max(0,Math.floor((Number(mana)||0)*instanceSkillMul(auth)));
-  const rate=serverMagicRate(Number(p.ml)||0);
+  const rate=serverMagicRate(Number(p.ml)||0)*(1+guildBonusLevel(p,"skill")*0.01);
   p.manaSpent=(Number(p.manaSpent)||0)+Math.max(0,Math.floor(gained*rate));
   let up=false,need=mlTriesNeeded(p);
   while(p.manaSpent>=need){p.manaSpent-=need;p.ml=(Number(p.ml)||0)+1;up=true;need=mlTriesNeeded(p);}
@@ -3048,9 +3048,18 @@ function augmentTotals(p,spellId){
   }
   return t;
 }
-function playerCritChancePct(p){return 5+(imbCombatTotals(p).critChance||0);}
+/* GUILD SHOP — data.guildBonus guarda NÍVEIS (0..10) por chave; cada
+ * nível vale 0.1% (leech/crit/dodge) ou 1% (exp/skill). Os níveis são
+ * propagados pela DB a todos os chars das contas membro. */
+function guildBonusLevel(p,key){
+  let g=p&&p.guildBonus;
+  if(typeof g==="string"){try{g=JSON.parse(g);}catch(e){g=null;}}
+  if(!g||typeof g!=="object")return 0;
+  return Math.max(0,Math.min(10,Math.floor(Number(g[key])||0)));
+}
+function playerCritChancePct(p){return 5+(imbCombatTotals(p).critChance||0)+guildBonusLevel(p,"critChance")*0.1;}
 function playerCritExtraPct(p){
-  let extra=10+(imbCombatTotals(p).crit||0);
+  let extra=10+(imbCombatTotals(p).crit||0)+guildBonusLevel(p,"critDamage")*0.1;
   if(WHEEL_FN)extra+=Number(WHEEL_FN.wheelTotals(p).critDamage)||0;
   return extra;
 }
@@ -3153,6 +3162,9 @@ function applyOutgoingLeech(p,dmg,slug){
   const ch=charmTotals(p,slug);
   if(ch.vampirismo>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*ch.vampirismo/100)));
   if(ch.manaLeech>0)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*ch.manaLeech/100)));
+  const gl=guildBonusLevel(p,"lifeLeech"),gm=guildBonusLevel(p,"manaLeech");
+  if(gl>0)p.hp=Math.min(max.hp,p.hp+Math.max(1,Math.floor(dmg*gl*0.1/100)));
+  if(gm>0)p.mp=Math.min(max.mp,p.mp+Math.max(1,Math.floor(dmg*gm*0.1/100)));
 }
 function afterPlayerHit(auth,p,tgt,dealt,now){
   if(!(dealt>0)||!p)return;
@@ -3511,7 +3523,8 @@ function absorbIncomingDamage(auth,item,p,dmg,now,pos,element,mob){
   dmg=Math.max(0,Math.floor(Number(dmg)||0));
   if(dmg<=0)return 0;
   const attackerSlug=mob&&mob.slug||null;
-  const dodge=charmTotals(p,attackerSlug).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0);
+  const dodge=charmTotals(p,attackerSlug).esquiva+(WHEEL_FN?Number(WHEEL_FN.wheelTotals(p).dodge)||0:0)
+    +guildBonusLevel(p,"dodge")*0.1;
   if(dodge>0&&random(auth)*100<dodge){
     auth.events.push({t:"miss",x:pos.x,y:pos.y,reason:"dodge",targetId:String(item.id),screen:true,fx:"poff",ts:now});
     return 0;
@@ -4427,6 +4440,9 @@ function finalExp(p,mobExp,mobSlug,expMul){
   // Loyalty EXP bonus (rank %)
   const loyaltyMul=loyaltyExpMultiplier(p);
   if(loyaltyMul>1)exp=Math.floor(exp*loyaltyMul);
+  // GUILD SHOP: +1% EXP por nível do bônus "exp"
+  const gExp=guildBonusLevel(p,"exp");
+  if(gExp>0)exp=Math.floor(exp*(1+gExp*0.01));
   return exp;
 }
 

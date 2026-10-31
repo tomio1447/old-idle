@@ -100,6 +100,7 @@ function JsonStore() {
   this.guildMembers = Array.isArray(guildData && guildData.members) ? guildData.members : [];
   this.guildInvites = Array.isArray(guildData && guildData.invites) ? guildData.invites : [];
   this.guildTasks = Array.isArray(guildData && guildData.tasks) ? guildData.tasks : [];
+  this.guildLog = Array.isArray(guildData && guildData.log) ? guildData.log : [];
   // market (ofertas + stats + histórico) persiste em data/market.json
   const marketData = this._load("market.json", null);
   if (marketData && typeof marketData === "object") {
@@ -1595,6 +1596,7 @@ JsonStore.prototype._guildSave = function () {
       JSON.stringify({
         guilds: this.guilds || [], members: this.guildMembers || [],
         invites: this.guildInvites || [], tasks: this.guildTasks || [],
+        log: this.guildLog || [],
       }, null, 1));
   } catch (e) { /* não bloqueia o jogo */ }
 };
@@ -1606,6 +1608,9 @@ JsonStore.prototype._nextGuildInviteId = function () {
 };
 JsonStore.prototype._nextGuildTaskId = function () {
   return (this.guildTasks || []).reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
+};
+JsonStore.prototype._nextGuildLogId = function () {
+  return (this.guildLog || []).reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
 };
 JsonStore.prototype.guildList = function () {
   return (this.guilds || []).map((g) => Object.assign({}, g, {
@@ -1649,7 +1654,8 @@ JsonStore.prototype.guildCreate = function (opts) {
     return { ok: false, error: "GUILD_ALREADY_MEMBER" };
   account.gold = Number(account.gold) - cost;
   const now = new Date().toISOString();
-  const guild = { id: this._nextGuildId(), name: opts.name, level: 1, exp: 0, created_at: now };
+  const guild = { id: this._nextGuildId(), name: opts.name, level: 1, exp: 0,
+    points: 0, balance: 0, bonuses: {}, created_at: now };
   this.guilds.push(guild);
   this.guildMembers.push({ guild_id: guild.id, account_id: Number(opts.leader_account_id),
     character_id: Number(opts.leader_character_id), rank: "leader",
@@ -1716,31 +1722,41 @@ JsonStore.prototype.guildMemberRemove = function (guildId, accountId) {
     const g = this.guildById(id); guildName = g ? g.name : null;
     this.guildInvites = (this.guildInvites || []).filter((i) => Number(i.guild_id) !== id);
     this.guildTasks = (this.guildTasks || []).filter((t) => Number(t.guild_id) !== id);
+    this.guildLog = (this.guildLog || []).filter((t) => Number(t.guild_id) !== id);
     this.guildMembers = rest;
     this.guilds = (this.guilds || []).filter((g) => Number(g.id) !== id);
+    // dissolveu → limpa data.guildBonus da conta do último membro
+    for (const c of this.charactersOf(aid)) this._charSetGuildBonus(c, null);
     disbanded = true;
   } else {
     this.guildMembers = (this.guildMembers || []).filter((m) =>
       !(Number(m.guild_id) === id && Number(m.account_id) === aid));
+    for (const c of this.charactersOf(aid)) this._charSetGuildBonus(c, null);
     if (me.rank === "leader") {
-      const successor = rest.find((m) => m.rank === "vice") ||
-        rest.slice().sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0];
-      this.guildMembers.forEach((m) => {
-        if (Number(m.guild_id) !== id) return;
-        m.rank = Number(m.account_id) === Number(successor.account_id) ? "leader" : "member";
-      });
+      const remainingLeaders = rest.filter((m) => m.rank === "leader");
+      if (!remainingLeaders.length) {
+        const successor = rest.find((m) => m.rank === "vice") ||
+          rest.slice().sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0];
+        this.guildMembers.forEach((m) => {
+          if (Number(m.guild_id) === id && Number(m.account_id) === Number(successor.account_id))
+            m.rank = "leader";
+        });
+      }
     }
   }
-  this._guildSave();
+  this._save(); this._guildSave();
   return { ok: true, disbanded, guildName };
+};
+/* Grava/limpa data.guildBonus num char (níveis por chave do shop). */
+JsonStore.prototype._charSetGuildBonus = function (char, bonuses) {
+  if (!char) return;
+  let d = {}; try { d = typeof char.data === "string" ? JSON.parse(char.data) : (char.data || {}); } catch (e) { d = {}; }
+  if (bonuses && typeof bonuses === "object") d.guildBonus = bonuses;
+  else delete d.guildBonus;
+  char.data = JSON.stringify(d);
 };
 JsonStore.prototype.guildMemberSetRank = function (guildId, accountId, rank) {
   const id = Number(guildId);
-  if (String(rank) === "vice") {
-    (this.guildMembers || []).forEach((m) => {
-      if (Number(m.guild_id) === id && m.rank === "vice") m.rank = "member";
-    });
-  }
   const m = (this.guildMembers || []).find((x) =>
     Number(x.guild_id) === id && Number(x.account_id) === Number(accountId));
   if (m) { m.rank = String(rank); this._guildSave(); }
@@ -1790,6 +1806,7 @@ JsonStore.prototype.guildCreditKills = function (accountId, kills) {
       const guild = this.guildById(t.guild_id);
       if (guild) {
         guild.exp = (Number(guild.exp) || 0) + 1;
+        guild.points = (Number(guild.points) || 0) + 1;
         guild.level = Guild.guildLevelForExp(guild.exp);
       }
       completed++;
@@ -1797,6 +1814,91 @@ JsonStore.prototype.guildCreditKills = function (accountId, kills) {
   }
   if (credited || completed) this._guildSave();
   return { credited, completed };
+};
+
+// ---- GUILD POINTS / SHOP / CAIXA / HISTÓRICO (JSON) ----
+JsonStore.prototype.guildLogAdd = function (_exec, entry) {
+  const rec = { id: this._nextGuildLogId(), guild_id: Number(entry.guild_id),
+    account_id: Number(entry.account_id), char_name: String(entry.char_name || ""),
+    category: String(entry.category), detail: String(entry.detail || ""),
+    gold_delta: Number(entry.gold_delta) || 0, points_delta: Number(entry.points_delta) || 0,
+    created_at: new Date().toISOString() };
+  (this.guildLog = this.guildLog || []).push(rec);
+  this._guildSave();
+  return rec;
+};
+JsonStore.prototype.guildLogList = function (guildId, category, limit) {
+  return (this.guildLog || [])
+    .filter((r) => Number(r.guild_id) === Number(guildId) &&
+      (!category || r.category === category))
+    .sort((a, b) => Number(b.id) - Number(a.id))
+    .slice(0, Math.max(1, Math.min(500, Number(limit) || 200)));
+};
+JsonStore.prototype.guildLogTotals = function (guildId) {
+  const out = { donated: 0, spentGold: 0, spentPoints: 0, donations: 0, purchases: 0 };
+  for (const r of this.guildLog || []) {
+    if (Number(r.guild_id) !== Number(guildId)) continue;
+    if (r.category === "donation") { out.donated += Math.max(0, Number(r.gold_delta) || 0); out.donations++; }
+    if (r.category === "purchase") {
+      out.spentGold += Math.abs(Number(r.gold_delta) || 0);
+      out.spentPoints += Math.abs(Number(r.points_delta) || 0);
+      out.purchases++;
+    }
+  }
+  return out;
+};
+JsonStore.prototype.guildDonate = function (guildId, accountId, charName, amount) {
+  const guild = this.guildById(guildId);
+  const account = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  const amt = Math.max(1, Math.floor(Number(amount) || 0));
+  if (!guild || !account || Number(account.gold) < amt) return { ok: false, error: "GOLD_LOW" };
+  account.gold = Number(account.gold) - amt;
+  guild.balance = (Number(guild.balance) || 0) + amt;
+  this.guildLogAdd(null, { guild_id: guildId, account_id: accountId, char_name: charName,
+    category: "donation", detail: "Doação ao caixa", gold_delta: amt, points_delta: 0 });
+  for (const c of this.charactersOf(accountId)) {
+    let d = {}; try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = {}; }
+    d.gold = account.gold; c.data = JSON.stringify(d);
+  }
+  this._save(); this._guildSave();
+  return { ok: true, balance: guild.balance, gold: account.gold };
+};
+JsonStore.prototype.guildBonusBuy = function (guildId, accountId, charName, bonusId, newLevel, cost) {
+  const guild = this.guildById(guildId);
+  const Guild = guildModule();
+  const lvl = Math.max(1, Math.min(10, Math.floor(Number(newLevel) || 1)));
+  const pts = Math.max(0, Math.floor(Number(cost && cost.points) || 0));
+  const gold = Math.max(0, Math.floor(Number(cost && cost.gold) || 0));
+  if (!guild) return { ok: false, error: "NOT_FOUND" };
+  if (Number(guild.points) < pts || Number(guild.balance) < gold)
+    return { ok: false, error: "POINTS_OR_BALANCE_LOW" };
+  guild.points = Number(guild.points) - pts;
+  guild.balance = Number(guild.balance) - gold;
+  guild.bonuses = guild.bonuses && typeof guild.bonuses === "object" ? guild.bonuses : {};
+  guild.bonuses[bonusId] = lvl;
+  this.guildLogAdd(null, { guild_id: guildId, account_id: accountId, char_name: charName,
+    category: "purchase",
+    detail: `${(Guild && Guild.guildBonusDef(bonusId) || {}).label || bonusId} Nv ${lvl}`,
+    gold_delta: -gold, points_delta: -pts });
+  this.guildApplyBonuses(guildId);
+  this._save(); this._guildSave();
+  return { ok: true, points: guild.points, balance: guild.balance,
+    bonuses: Guild ? Guild.guildBonusLevels(guild.bonuses) : guild.bonuses };
+};
+JsonStore.prototype.guildApplyBonuses = function (guildId) {
+  const guild = this.guildById(guildId);
+  const Guild = guildModule();
+  const bonuses = Guild ? Guild.guildBonusLevels(guild && guild.bonuses)
+    : (guild && guild.bonuses) || {};
+  for (const m of this.guildMembers || []) {
+    if (Number(m.guild_id) !== Number(guildId)) continue;
+    for (const c of this.charactersOf(m.account_id)) this._charSetGuildBonus(c, bonuses);
+  }
+  this._save();
+};
+JsonStore.prototype.guildClearBonusForAccount = function (accountId) {
+  for (const c of this.charactersOf(accountId)) this._charSetGuildBonus(c, null);
+  this._save();
 };
 
 /* Wrapper MySQL (mysql2/promise) — mesma API do JsonStore */
@@ -1851,6 +1953,24 @@ async function MysqlStore() {
     const row=rows[0];
     return !!(row&&row.holder_id===lease.holderId&&row.secret_hash===lease.secretHash&&
       new Date(row.expires_at).getTime()>lease.now);
+  }
+  /* Propaga guilds.bonuses → data.guildBonus de todos os chars das contas
+   * membro. Feito em JS porque o MariaDB não tem CAST(... AS JSON) —
+   * JSON_SET com string gravaria o objeto como texto. */
+  async function guildBonusToChars(exec, guildId) {
+    const [grows] = await exec.query("SELECT bonuses FROM guilds WHERE id=?", [Number(guildId)]);
+    const Guild = guildModule();
+    const bonuses = Guild ? Guild.guildBonusLevels(grows[0] && grows[0].bonuses)
+      : (grows[0] && grows[0].bonuses) || {};
+    const [chars] = await exec.query(
+      `SELECT c.id, c.data FROM characters c
+       JOIN guild_members m ON m.account_id=c.account_id WHERE m.guild_id=?`,
+      [Number(guildId)]);
+    for (const ch of chars) {
+      let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }
+      d.guildBonus = bonuses;
+      await exec.query("UPDATE characters SET data=? WHERE id=?", [JSON.stringify(d), Number(ch.id)]);
+    }
   }
   /* Store BLESS: state.authority.wallets[].bless espelha
    * accounts.cosmetics.bless. O motor consome uma carga no party wipe e
@@ -3162,18 +3282,27 @@ async function MysqlStore() {
           guildName = g[0] ? g[0].name : null;
           await conn.query("DELETE FROM guild_invites WHERE guild_id=?", [Number(guildId)]);
           await conn.query("DELETE FROM guild_tasks WHERE guild_id=?", [Number(guildId)]);
+          await conn.query("DELETE FROM guild_log WHERE guild_id=?", [Number(guildId)]);
           await conn.query("DELETE FROM guild_members WHERE guild_id=?", [Number(guildId)]);
           await conn.query("DELETE FROM guilds WHERE id=?", [Number(guildId)]);
+          // dissolveu → limpa data.guildBonus de TODOS os ex-membros
+          for (const m of rows)
+            await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+              [Number(m.account_id)]);
           disbanded = true;
         } else {
           await conn.query("DELETE FROM guild_members WHERE guild_id=? AND account_id=?",
             [Number(guildId), Number(accountId)]);
+          await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+            [Number(accountId)]);
           if (String(me.rank) === "leader") {
-            const successor = rest.find((m) => m.rank === "vice") || rest[0];
-            await conn.query("UPDATE guild_members SET rank='member' WHERE guild_id=? AND rank IN ('leader','vice')",
-              [Number(guildId)]);
-            await conn.query("UPDATE guild_members SET rank='leader' WHERE guild_id=? AND account_id=?",
-              [Number(guildId), Number(successor.account_id)]);
+            const remainingLeaders = rest.filter((m) => m.rank === "leader");
+            if (!remainingLeaders.length) {
+              // nenhum líder sobrou → vice mais antigo (senão membro mais antigo) assume
+              const successor = rest.find((m) => m.rank === "vice") || rest[0];
+              await conn.query("UPDATE guild_members SET rank='leader' WHERE guild_id=? AND account_id=?",
+                [Number(guildId), Number(successor.account_id)]);
+            }
           }
         }
         await conn.commit();
@@ -3182,17 +3311,8 @@ async function MysqlStore() {
       finally { conn.release(); }
     },
     async guildMemberSetRank(guildId, accountId, rank) {
-      const conn = await pool.getConnection();
-      try {
-        await conn.beginTransaction();
-        if (String(rank) === "vice")
-          await conn.query("UPDATE guild_members SET rank='member' WHERE guild_id=? AND rank='vice'",
-            [Number(guildId)]);
-        await conn.query("UPDATE guild_members SET rank=? WHERE guild_id=? AND account_id=?",
-          [String(rank), Number(guildId), Number(accountId)]);
-        await conn.commit();
-      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
-      finally { conn.release(); }
+      await this.run("UPDATE guild_members SET rank=? WHERE guild_id=? AND account_id=?",
+        [String(rank), Number(guildId), Number(accountId)]);
     },
     async guildTasksEnsure(guildId, accountId, day, defs) {
       for (const def of defs || []) {
@@ -3246,7 +3366,8 @@ async function MysqlStore() {
           await exec.query(
             "UPDATE guild_members SET contribution=contribution+1 WHERE account_id=?",
             [Number(accountId)]);
-          await exec.query("UPDATE guilds SET exp=exp+1 WHERE id=?", [Number(t.guild_id)]);
+          await exec.query("UPDATE guilds SET exp=exp+1, points=points+1 WHERE id=?",
+            [Number(t.guild_id)]);
           const [g] = await exec.query("SELECT exp FROM guilds WHERE id=?", [Number(t.guild_id)]);
           if (g[0]) await exec.query("UPDATE guilds SET level=? WHERE id=?",
             [Guild.guildLevelForExp(g[0].exp), Number(t.guild_id)]);
@@ -3254,6 +3375,109 @@ async function MysqlStore() {
         }
       }
       return { credited, completed };
+    },
+
+    // ---- GUILD POINTS / SHOP / CAIXA / HISTÓRICO ----
+    async guildLogAdd(exec, entry) {
+      await exec.query(
+        `INSERT INTO guild_log (guild_id,account_id,char_name,category,detail,gold_delta,points_delta)
+         VALUES (?,?,?,?,?,?,?)`,
+        [Number(entry.guild_id), Number(entry.account_id), String(entry.char_name || "").slice(0, 48),
+         String(entry.category), String(entry.detail || "").slice(0, 200),
+         Number(entry.gold_delta) || 0, Number(entry.points_delta) || 0]);
+    },
+    async guildLogList(guildId, category, limit) {
+      const cat = ["donation", "purchase"].includes(String(category)) ? String(category) : null;
+      const rows = await this.query(
+        `SELECT * FROM guild_log WHERE guild_id=? ${cat ? "AND category=?" : ""}
+         ORDER BY id DESC LIMIT ?`,
+        cat ? [Number(guildId), cat, Math.max(1, Math.min(500, Number(limit) || 200))]
+            : [Number(guildId), Math.max(1, Math.min(500, Number(limit) || 200))]);
+      return rows;
+    },
+    async guildLogTotals(guildId) {
+      const rows = await this.query(
+        `SELECT category, SUM(gold_delta) gold, SUM(points_delta) points, COUNT(*) n
+         FROM guild_log WHERE guild_id=? GROUP BY category`, [Number(guildId)]);
+      const out = { donated: 0, spentGold: 0, spentPoints: 0, donations: 0, purchases: 0 };
+      for (const r of rows) {
+        if (r.category === "donation") { out.donated = Math.max(0, Number(r.gold) || 0); out.donations = Number(r.n) || 0; }
+        if (r.category === "purchase") {
+          out.spentGold = Math.abs(Number(r.gold) || 0);
+          out.spentPoints = Math.abs(Number(r.points) || 0);
+          out.purchases = Number(r.n) || 0;
+        }
+      }
+      return out;
+    },
+    /* Doação: debita gold da conta, credita no caixa e loga — tudo na
+     * mesma transação; espelha data.gold dos chars (wallet sync). */
+    async guildDonate(guildId, accountId, charName, amount) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const amt = Math.max(1, Math.floor(Number(amount) || 0));
+        const [g] = await conn.query("UPDATE accounts SET gold=gold-? WHERE id=? AND gold>=?",
+          [amt, Number(accountId), amt]);
+        if (!g.affectedRows) { await conn.rollback(); return { ok: false, error: "GOLD_LOW" }; }
+        await conn.query("UPDATE guilds SET balance=balance+? WHERE id=?",
+          [amt, Number(guildId)]);
+        await this.guildLogAdd(conn, { guild_id: guildId, account_id: accountId,
+          char_name: charName, category: "donation", detail: "Doação ao caixa",
+          gold_delta: amt, points_delta: 0 });
+        const [acc] = await conn.query("SELECT gold FROM accounts WHERE id=?", [Number(accountId)]);
+        const newGold = acc[0] ? Math.max(0, Number(acc[0].gold) || 0) : 0;
+        const [chars] = await conn.query("SELECT id, data FROM characters WHERE account_id=?",
+          [Number(accountId)]);
+        for (const ch of chars) {
+          let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }
+          d.gold = newGold;
+          await conn.query("UPDATE characters SET data=? WHERE id=?", [JSON.stringify(d), Number(ch.id)]);
+        }
+        const [bal] = await conn.query("SELECT balance FROM guilds WHERE id=?", [Number(guildId)]);
+        await conn.commit();
+        return { ok: true, balance: bal[0] ? Number(bal[0].balance) : 0, gold: newGold };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    /* Compra de bônus: debita pontos + caixa atomicamente, grava o nível
+     * no JSON bonuses, loga e aplica aos chars de todas as contas. */
+    async guildBonusBuy(guildId, accountId, charName, bonusId, newLevel, cost) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const key = "$." + String(bonusId).replace(/[^a-zA-Z]/g, "");
+        const lvl = Math.max(1, Math.min(10, Math.floor(Number(newLevel) || 1)));
+        const pts = Math.max(0, Math.floor(Number(cost && cost.points) || 0));
+        const gold = Math.max(0, Math.floor(Number(cost && cost.gold) || 0));
+        const [u] = await conn.query(
+          `UPDATE guilds SET points=points-?, balance=balance-?,
+             bonuses=JSON_SET(COALESCE(bonuses,JSON_OBJECT()), ?, ?)
+           WHERE id=? AND points>=? AND balance>=?`,
+          [pts, gold, key, lvl, Number(guildId), pts, gold]);
+        if (!u.affectedRows) { await conn.rollback(); return { ok: false, error: "POINTS_OR_BALANCE_LOW" }; }
+        const Guild = guildModule();
+        await this.guildLogAdd(conn, { guild_id: guildId, account_id: accountId,
+          char_name: charName, category: "purchase",
+          detail: `${(Guild && Guild.guildBonusDef(bonusId) || {}).label || bonusId} Nv ${lvl}`,
+          gold_delta: -gold, points_delta: -pts });
+        await guildBonusToChars(conn, guildId);
+        const [rows] = await conn.query("SELECT points,balance,bonuses FROM guilds WHERE id=?", [Number(guildId)]);
+        await conn.commit();
+        const r = rows[0] || {};
+        return { ok: true, points: Number(r.points) || 0, balance: Number(r.balance) || 0,
+          bonuses: Guild ? Guild.guildBonusLevels(r.bonuses) : r.bonuses };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
+    /* Propaga data.guildBonus da guild para todos os chars das contas
+     * membro (usado ao entrar membro e após compra de bônus). */
+    async guildApplyBonuses(guildId) {
+      await guildBonusToChars(pool, guildId);
+    },
+    async guildClearBonusForAccount(accountId) {
+      await this.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+        [Number(accountId)]);
     },
 
     // ---- SNAPSHOT HISTORY ----
@@ -3716,6 +3940,25 @@ async function ensureSchema(pool) {
     completed_at TIMESTAMP NULL DEFAULT NULL,
     UNIQUE KEY uq_gtask (guild_id, account_id, day, slot),
     INDEX idx_gtask_member (account_id, day)
+  ) ENGINE=InnoDB`);
+  // GUILD POINTS + caixa + bônus comprados (níveis por chave)
+  for (const col of [
+    "ADD COLUMN points INT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN balance BIGINT UNSIGNED NOT NULL DEFAULT 0",
+    "ADD COLUMN bonuses JSON NULL",
+  ]) { try { await pool.query("ALTER TABLE guilds " + col); } catch (e) { /* já existe */ } }
+  await pool.query(`CREATE TABLE IF NOT EXISTS guild_log (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    guild_id INT UNSIGNED NOT NULL,
+    account_id INT UNSIGNED NOT NULL,
+    char_name VARCHAR(48) NOT NULL DEFAULT '',
+    category ENUM('donation','purchase') NOT NULL,
+    detail VARCHAR(200) NOT NULL DEFAULT '',
+    gold_delta BIGINT NOT NULL DEFAULT 0,
+    points_delta INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_glog_guild (guild_id, created_at),
+    INDEX idx_glog_cat (guild_id, category)
   ) ENGINE=InnoDB`);
 
   // Migração das parties anteriores ao modelo account-owned. A conta do

@@ -4828,6 +4828,27 @@ async function main() {
         const r = await guild.guildPromote(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/guild/demote") {
+        const body = await readBody(req);
+        const r = await guild.guildDemote(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/donate") {
+        const body = await readBody(req);
+        const r = await guild.guildDonate(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/guild/buy") {
+        const body = await readBody(req);
+        const r = await guild.guildBuyBonus(db, body);
+        return send(res, r.code, r.body);
+      }
+      if (req.method === "GET" && url === "/api/guild/log") {
+        const token = (req.headers.authorization || "").replace("Bearer ", "");
+        const q = new URL(req.url, "http://x").searchParams;
+        const r = await guild.guildLog(db, token, q.get("char_id"), q.get("category"));
+        return send(res, r.code, r.body);
+      }
       // ---- WORLD BOSS / WARZONE ----
       if(req.method==="GET"&&url==="/api/world-boss/state"){
         const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
