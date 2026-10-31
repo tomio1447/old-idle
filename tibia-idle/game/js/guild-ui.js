@@ -405,7 +405,7 @@ async function loadGuildDetail() {
     contentHtml = `<div class="guild-member-list">${ranked.map((m, i) => `
       <div class="guild-member-row">
         <span class="guild-member-pos">#${i + 1}</span>
-        <span class="guild-member-name">${guildEsc(m.name)}</span>
+        <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${guildEsc(m.name)}</span>
         <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
         <span class="guild-member-rank">${GUILD_RANK_LABEL[m.rank] || "Membro"}</span>
         <span class="guild-member-contrib"><b>${Number(m.contribution) || 0}</b> tasks</span>
@@ -448,7 +448,7 @@ async function loadGuildDetail() {
           <button class="sm" data-guild-kick="${m.account_id}" title="Expulsar">✖</button>
         </span>` : "");
       return `<div class="guild-member-row">
-        <span class="guild-member-name">${isLeaderRow ? "👑 " : isVice ? "⭐ " : ""}${guildEsc(m.name)}</span>
+        <span class="guild-member-name guild-profile-link" data-char-profile="${m.character_id}">${isLeaderRow ? "👑 " : isVice ? "⭐ " : ""}${guildEsc(m.name)}</span>
         <span class="tiny dim">${guildVocLabel(m.voc)} · Nv ${m.level}</span>
         <span class="guild-member-rank">${GUILD_RANK_LABEL[rank] || "Membro"}</span>
         <span class="guild-member-contrib">${Number(m.contribution) || 0} tasks</span>
@@ -473,7 +473,7 @@ async function loadGuildDetail() {
       id="guild-req-toggle">SOLICITAÇÕES${reqs.length ? ` (${reqs.length})` : ""}</button>
     <div class="guild-req-list" id="guild-req-list" style="display:none">
       ${reqs.map((r) => `<div class="guild-req-row">
-        <span class="guild-member-name">${guildEsc(r.name)}</span>
+        <span class="guild-member-name guild-profile-link" data-char-profile="${r.character_id}">${guildEsc(r.name)}</span>
         <span class="tiny dim">${guildVocLabel(r.voc)} · Nv ${r.level}</span>
         <span class="guild-invite-actions">
           <button class="sm primary" data-guild-req-accept="${r.id}">Aceitar</button>
@@ -632,6 +632,13 @@ async function loadGuildDetail() {
       btn.disabled = false;
       if (r && r.data) guildToast(r.data.msg);
       loadGuildDetail();
+    });
+  });
+  /* Perfil do personagem — clique no nome (membros, ranking, solicitações). */
+  $$("#guild-modal-list [data-char-profile]").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (typeof openPlayerProfile === "function")
+        openPlayerProfile(el.dataset.charProfile);
     });
   });
   $$("#guild-modal-list [data-guild-buy-temp]").forEach((btn) => {

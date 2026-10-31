@@ -4843,6 +4843,35 @@ async function main() {
         if(r.body&&r.body.ok){const acc=await db.findAccountByToken(body.token);if(acc)await publishPartyState(db,acc.id,"order");}
         return send(res, r.code, r.body);
       }
+      /* GET /api/character/profile?char_id — perfil público do personagem
+       * (nome/voc/level, skills e a PT dele). Exige sessão válida. */
+      if (req.method === "GET" && url === "/api/character/profile") {
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const acc=token?await db.findAccountByToken(token):null;
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const q=new URL(req.url,"http://x").searchParams;
+        const c=await db.findCharacter(Number(q.get("char_id")));
+        if(!c)return send(res,404,{ok:false,msg:"Personagem não encontrado"});
+        let d={};try{d=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){d={};}
+        const sk=(d.skills&&typeof d.skills==="object")?d.skills:{};
+        const p=await db.partyFindByCharacter(c.id);
+        let partyInfo=null;
+        if(p){
+          const members=await db.partyMembers(p.id);
+          const lc=await db.findCharacter(p.leader_id);
+          partyInfo={id:Number(p.id),members:[{
+            id:Number(p.leader_id),name:lc?lc.name:(p.leader_name||"?"),
+            voc:lc?lc.voc:"none",level:lc?Number(lc.level)||1:1,leader:true}]
+            .concat(members.map((m)=>({id:Number(m.id),name:m.name,
+              voc:m.voc,level:Number(m.level)||1,leader:false})))};
+        }
+        return send(res,200,{ok:true,profile:{
+          id:Number(c.id),name:c.name,voc:c.voc,level:Number(c.level)||1,
+          skills:{fist:sk.fist||10,sword:sk.sword||10,axe:sk.axe||10,
+            club:sk.club||10,dist:sk.dist||10,shield:sk.shield||10},
+          magicLevel:Number(d.ml)||0,
+          party:partyInfo}});
+      }
       if (req.method === "GET" && url === "/api/party/state") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const q = new URL(req.url, "http://x").searchParams;

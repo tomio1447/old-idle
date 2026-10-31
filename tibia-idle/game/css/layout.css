@@ -1349,6 +1349,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
   background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; padding:6px 8px; }
 .guild-member-pos { width:34px; color:#d4af37; font-weight:bold; }
 .guild-member-name { flex:1 1 auto; color:#e8dfd0; }
+.guild-profile-link { cursor:pointer; }
+.guild-profile-link:hover { color:#ffe680; text-decoration:underline dotted; }
 .guild-member-rank { width:90px; font-size:10px; color:#a8a090; }
 .guild-member-contrib { width:80px; text-align:right; font-size:10px; color:#a8a090; }
 .guild-member-actions { display:flex; gap:4px; }
