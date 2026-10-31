@@ -100,6 +100,21 @@ async function buyTrainingPlan(p, planId) {
 function trainingPlayerFromPartyRow(row) {
   if (!row || row.id == null) return null;
   if (typeof G !== "undefined" && G && G.p && String(G.p.id) === String(row.id)) return G.p;
+  if (typeof accountCharacterCacheRead === "function") {
+    const summary = accountCharacterCacheRead().find((c) => c && String(c.id) === String(row.id));
+    if (summary) {
+      let raw = summary.snapshot || {};
+      if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (e) { raw = {}; } }
+      const merged = Object.assign({}, raw, {
+        id: String(summary.id), name: summary.name || row.name, voc: summary.voc || row.voc,
+        level: Number(summary.level) || Number(row.level) || Number(raw.level) || 1,
+        sex: summary.sex || raw.sex || "male", outfit: summary.outfit || raw.outfit || row.outfit || null,
+      });
+      const p = typeof normalizePlayer === "function" ? normalizePlayer(merged) : merged;
+      p.id = String(row.id);
+      return p;
+    }
+  }
   if (typeof getCharacters === "function") {
     const local = getCharacters().find((p) => p && String(p.id) === String(row.id));
     if (local) return local;
