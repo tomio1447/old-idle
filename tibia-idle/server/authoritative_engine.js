@@ -5069,6 +5069,21 @@ function soulwarTaintTick(auth,dt,now){
   }
 }
 
+/* Missão Lizards Town (autoridade): 50 de cada lizard → +25k EXP para CADA
+ * membro da party — o progresso é individual por player, então cada um
+ * recebe ao completar. Flag permanente: uma vez por personagem. Os itens
+ * (zaoan set) ficam a cargo do claim no cliente. */
+const MISSION_PARTY_EXP={
+  "lizardstown":{mobs:["lizard-high-guard","lizard-zaogun","lizard-legionnaire","lizard-dragon-priest"],target:50,exp:25000},
+};
+function missionPartyExpReward(p,huntId){
+  const def=MISSION_PARTY_EXP[huntId];if(!def||!p||!p.missions)return;
+  const st=p.missions[huntId];if(!st||st.partyExpGranted)return;
+  const prog=st.progress||{};
+  if(!def.mobs.every((s)=>(Number(prog[s])||0)>=def.target))return;
+  st.partyExpGranted=true;
+  addExp(p,def.exp);
+}
 function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&&x.p.hp>0);
   const receivers=alive.length?alive:(players[0]?[players[0]]:[]);
   const eligible=partyCanShareExp(players);
@@ -5096,7 +5111,8 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     shares.push({id:String(item.id),exp:share,level:item.p.level,leveled:item.p.level>beforeLevel,
       profXp:profK?profK.xp:0,profSlug:profK?profK.slug:null,profUps:profK?profK.ups:0});
     if(auth.huntId){item.p.missions=item.p.missions||{};const mission=item.p.missions[auth.huntId]||(item.p.missions[auth.huntId]={progress:{},claimed:{},completeClaimed:false});
-      mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;}}
+      mission.progress=mission.progress||{};mission.progress[mob.slug]=(Number(mission.progress[mob.slug])||0)+1;
+      missionPartyExpReward(item.p,auth.huntId);}}
   auth._lastKillExp=shares[0]?shares[0].exp:0;auth._lastKillShares=shares;
   // Loot: UM crédito por kill no líder (players[0]). Nunca por membro da party.
   const leader=players[0]&&players[0].p;if(!leader)return [];

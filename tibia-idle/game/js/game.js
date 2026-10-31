@@ -845,6 +845,27 @@ const MISSION_DEFS = {
     ],
     completeReward: { gold: 5000, items: [{ slug: "small-diamond", count: 2 }] },
   },
+  // Missão da Lizards Town: 50 de cada lizard de Zao. A recompensa final é
+  // o set Zaoan + 25k de EXP para TODOS os personagens da party — a EXP é
+  // concedida com autoridade pelo engine (cada membro recebe a sua); os
+  // itens caem na Loot Pouch da conta no claim.
+  "lizardstown": {
+    title: "Missão: Lizards Town",
+    tasks: [
+      { monster: "lizard-high-guard", target: 50 },
+      { monster: "lizard-zaogun", target: 50 },
+      { monster: "lizard-legionnaire", target: 50 },
+      { monster: "lizard-dragon-priest", target: 50 },
+    ],
+    completeReward: {
+      items: [
+        { slug: "zaoan-shoes", count: 1 },
+        { slug: "zaoan-legs", count: 1 },
+        { slug: "zaoan-armor", count: 1 },
+      ],
+      partyExp: 25000,
+    },
+  },
   "dark-thais": {
     title: "Missão: Mirrored Nightmare",
     tasks: [
@@ -978,6 +999,7 @@ function rewardText(reward) {
   if (reward.gold) out.push(fmtFull(reward.gold) + " gp");
   (reward.items || []).forEach((r) => out.push((r.count || 1) + "x " + itemName(r.slug)));
   (reward.supplies || []).forEach((r) => out.push((r.count || 1) + " carga(s) " + (SUPPLIES[r.slug] ? SUPPLIES[r.slug].name : itemName(r.slug))));
+  if (reward.partyExp) out.push(fmtFull(reward.partyExp) + " EXP para a party");
   if (reward.bossAccess)
     out.push("Acesso ao boss " + (reward.bossName || reward.bossAccess));
   if (reward.mount || reward.accountMount) {
@@ -996,6 +1018,19 @@ function grantMissionReward(p, reward) {
   }
   for (const r of reward.supplies || [])
     p.supplies[r.slug] = (p.supplies[r.slug] || 0) + (r.count || 1);
+  if (reward.partyExp) {
+    // Online o engine concede a EXP a cada membro da party no kill
+    // (autoridade). Offline aplica local em todos os membros em combate.
+    const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+    if (!online && typeof addExp === "function") {
+      const members = (G.combat && G.combat.players && G.combat.players.length)
+        ? G.combat.players : [{ p }];
+      for (const m of members) {
+        const mp = m && (m.p || m);
+        if (mp) addExp(mp, reward.partyExp);
+      }
+    }
+  }
   if (reward.gold) p.gold += reward.gold;
   if (reward.bossAccess) {
     p.bossAccess = p.bossAccess || {};
@@ -1039,8 +1074,12 @@ function tryCompleteMissionRewards(p, huntId) {
     if ((st.progress[key] || 0) >= task.target && !st.claimed[key]) {
       grantMissionReward(p, task.reward);
       st.claimed[key] = true;
-      addLog("level", `Missão: ${task.target}× <b>${taskLabel(task)}</b>. Recompensa: ${rewardText(task.reward)}.`);
-      toast(`Missão concluída: <b>${rewardText(task.reward)}</b>`, "level");
+      // Task sem recompensa própria (ex.: Lizards Town — tudo no reward
+      // final) não mostra log/toast de "Recompensa: —".
+      if (task.reward) {
+        addLog("level", `Missão: ${task.target}× <b>${taskLabel(task)}</b>. Recompensa: ${rewardText(task.reward)}.`);
+        toast(`Missão concluída: <b>${rewardText(task.reward)}</b>`, "level");
+      }
     }
   }
   const all = def.tasks.every((t) => st.claimed[taskKey(t)]);
