@@ -30,7 +30,7 @@ const GUILD_TASKS_PER_DAY = 3;
 const GUILD_TASK_MIN_KILLS = 100;
 const GUILD_TASK_MAX_KILLS = 400;
 /* Criação — regras do crystal server (ajustáveis): */
-const GUILD_CREATE_MIN_LEVEL = 100;
+const GUILD_CREATE_MIN_LEVEL = 30;
 const GUILD_CREATE_COST_GOLD = 100000;
 const GUILD_NAME_MIN = 3;
 const GUILD_NAME_MAX = 30;
@@ -319,6 +319,10 @@ async function guildCreate(db, body) {
   if (name.length < GUILD_NAME_MIN || name.length > GUILD_NAME_MAX || !GUILD_NAME_RE.test(name))
     return { code: 400, body: { ok: false, error: "GUILD_NAME_INVALID",
       msg: `Nome inválido (${GUILD_NAME_MIN}–${GUILD_NAME_MAX} letras).` } };
+  /* Fundar guild exige conta VIP (vip_until em ms). */
+  if (!(Number(account.vip_until) > Date.now()))
+    return { code: 403, body: { ok: false, error: "GUILD_VIP_REQUIRED",
+      msg: "Fundar uma guild exige conta VIP." } };
   if (Number(char.level) < GUILD_CREATE_MIN_LEVEL)
     return { code: 403, body: { ok: false, error: "GUILD_LEVEL_LOW",
       msg: `É preciso nível ${GUILD_CREATE_MIN_LEVEL}+ para fundar uma guild.` } };

@@ -16,7 +16,7 @@ const GUILD_UI = { view: "list", guildId: null, tab: "members", loading: false,
 const GUILD_RANK_LABEL = { leader: "Líder", vice: "Vice-líder", member: "Membro" };
 const GUILD_BONUS_LEVEL_GOLD_UI = 50000000; /* 50kk por nível (server: guild.js) */
 /* Mesmas regras do servidor (guild.js) — exibidas no painel de criação. */
-const GUILD_RULES = { CREATE_MIN_LEVEL: 100, CREATE_COST_GOLD: 100000 };
+const GUILD_RULES = { CREATE_MIN_LEVEL: 30, CREATE_COST_GOLD: 100000, CREATE_VIP: true };
 const GUILD_LEVEL_EXP_CLIENT = [0, 10, 25, 40, 60, 85, 120, 160, 250, 400];
 
 function guildOnlineMode() {
@@ -175,14 +175,18 @@ async function loadGuildList() {
     </button>`;
   }).join("") : `<div class="hunt-section-empty">Nenhuma guild criada ainda.</div>`;
 
+  const _acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+  const isVip = !!(_acc && (_acc.vip === true || Number(_acc.vipUntil) > Date.now()));
   const createHtml = !myGuild ? `<div class="guild-create-box">
       <div class="hunt-cat-title">Fundar guild</div>
       <input id="guild-create-name" maxlength="30" placeholder="Nome da guild" />
       <div class="tiny dim">Escolha o ícone da guild:</div>
       ${guildIconPickHtml(GUILD_UI.createIcon || 1, "guild-create-icons")}
-      <button class="sm primary" id="guild-create-btn">CRIAR GUILD</button>
-      <div class="tiny dim">Requisitos: nível ${typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_MIN_LEVEL : 100}+ e
+      <button class="sm primary" id="guild-create-btn"${isVip ? "" : " disabled"}>CRIAR GUILD</button>
+      <div class="tiny dim">Requisitos: <b>conta VIP</b>, nível
+        ${typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_MIN_LEVEL : 30}+ e
         ${(typeof GUILD_RULES !== "undefined" ? GUILD_RULES.CREATE_COST_GOLD : 100000).toLocaleString("pt-BR")} gold da conta.</div>
+      ${isVip ? "" : `<div class="tiny" style="color:#ff9a6a">Sua conta não é VIP — VIP é obrigatório para fundar guild.</div>`}
       <div class="tiny" id="guild-create-msg"></div>
     </div>` : "";
 
