@@ -1325,14 +1325,38 @@ JsonStore.prototype.onlineCount = function () {
   const leasedAccounts = new Set(leases.map((l) => Number(l.account_id)));
   const activeInstances = (this.instances || []).filter((r) => r && r.status === "active");
   const charIds = new Set();
+  /* Contas com char dentro de alguma instância ativa — VIVO ou morto.
+   * Serve para não contar "morto esperando revive" como idle na cidade. */
+  const accountsInInstances = new Set();
   for (const row of activeInstances) {
     let state = null;
     try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
-    const fromAuth = ((state && state.authority && state.authority.players) || [])
+    const authPlayers = (state && state.authority && state.authority.players) || [];
+    /* Mortos (ressurreição) NÃO contam como online: hp<=0, downUntil no
+     * futuro (aguardando revive) ou permadead (boss). */
+    const fromAuth = authPlayers
+      .filter((item) => {
+        if (!item || !item.p) return false;
+        if (item.permadead) return false;
+        if (Number(item.p.hp) <= 0) return false;
+        if (Number(item.downUntil) > now) return false;
+        return true;
+      })
       .map((p) => Number(p && p.id));
     const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
-    const ids = fromAuth.length ? fromAuth : fromMembers;
-    if (!ids.length && row.active_character_id) ids.push(Number(row.active_character_id));
+    /* Sem authority.players → fallback nos members (sem info de HP).
+     * Com authority mas todos mortos → ninguém conta, mas a presença
+     * na instância segue registrada. */
+    const ids = authPlayers.length ? fromAuth : fromMembers;
+    const presence = authPlayers.length
+      ? authPlayers.map((p) => Number(p && p.id)) : fromMembers.slice();
+    if (!presence.length && row.active_character_id)
+      presence.push(Number(row.active_character_id));
+    for (const id of presence) {
+      if (!Number.isSafeInteger(id) || id <= 0) continue;
+      const c = this.findCharacter(id);
+      if (c) accountsInInstances.add(Number(c.account_id));
+    }
     for (const id of ids) {
       if (!Number.isSafeInteger(id) || id <= 0) continue;
       const c = this.findCharacter(id);
@@ -1359,7 +1383,8 @@ JsonStore.prototype.onlineCount = function () {
   }
   let cityOnline = 0;
   for (const accId of leasedAccounts) {
-    if (!accountsWithChars.has(accId)) cityOnline++;
+    /* Com char em instância (vivo ou morto) não é "idle na cidade". */
+    if (!accountsWithChars.has(accId) && !accountsInInstances.has(accId)) cityOnline++;
   }
   const onlineChars = charIds.size + cityOnline;
   return {
@@ -3279,14 +3304,35 @@ async function MysqlStore() {
       const activeInstances = await this.query(
         "SELECT account_id, active_character_id, state FROM account_instances WHERE status='active'");
       const charIds = new Set();
+      /* Contas com char dentro de alguma instância ativa — VIVO ou morto. */
+      const accountsInInstances = new Set();
+      const nowMs = Date.now();
       for (const row of activeInstances) {
         let state = null;
         try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
-        const fromAuth = ((state && state.authority && state.authority.players) || [])
+        const authPlayers = (state && state.authority && state.authority.players) || [];
+        /* Mortos (ressurreição) NÃO contam como online: hp<=0, downUntil
+         * no futuro (aguardando revive) ou permadead (boss). */
+        const fromAuth = authPlayers
+          .filter((item) => {
+            if (!item || !item.p) return false;
+            if (item.permadead) return false;
+            if (Number(item.p.hp) <= 0) return false;
+            if (Number(item.downUntil) > nowMs) return false;
+            return true;
+          })
           .map((p) => Number(p && p.id));
         const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
-        const ids = fromAuth.length ? fromAuth : fromMembers;
-        if (!ids.length && row.active_character_id) ids.push(Number(row.active_character_id));
+        const ids = authPlayers.length ? fromAuth : fromMembers;
+        const presence = authPlayers.length
+          ? authPlayers.map((p) => Number(p && p.id)) : fromMembers.slice();
+        if (!presence.length && row.active_character_id)
+          presence.push(Number(row.active_character_id));
+        for (const id of presence) {
+          if (!Number.isSafeInteger(id) || id <= 0) continue;
+          const c = await this.findCharacter(id);
+          if (c) accountsInInstances.add(Number(c.account_id));
+        }
         for (const id of ids) {
           if (!Number.isSafeInteger(id) || id <= 0) continue;
           const c = await this.findCharacter(id);
@@ -3313,7 +3359,8 @@ async function MysqlStore() {
       }
       let cityOnline = 0;
       for (const accId of leasedAccounts) {
-        if (!accountsWithChars.has(accId)) cityOnline++;
+        /* Com char em instância (vivo ou morto) não é "idle na cidade". */
+        if (!accountsWithChars.has(accId) && !accountsInInstances.has(accId)) cityOnline++;
       }
       const onlineChars = charIds.size + cityOnline;
       return {
