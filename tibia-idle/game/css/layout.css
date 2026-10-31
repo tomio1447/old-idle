@@ -2636,7 +2636,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
 }
 .app-card {
-  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  background: #24221e; border: 1px solid #16140f;
   padding: 4px; text-align: center; cursor: pointer; overflow: hidden;
 }
 .app-card:hover { background: #26221a; border-color: #6b6455; }
@@ -2665,16 +2665,10 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   background: #0d0b08; border: 1px solid var(--border-in, #3a3428);
 }
 .chard-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chard-tabs {
-  display: flex; gap: 2px; flex: none; flex-wrap: wrap;
-  border-bottom: 1px solid var(--border-in, #3a3428); margin-bottom: 6px;
-}
-.chard-tab {
-  padding: 4px 10px; font-size: 11px; color: #a49b84; cursor: pointer;
-  background: #14120e; border: 1px solid transparent; border-bottom: 0;
-}
-.chard-tab:hover { background: #26221a; }
-.chard-tab.active { background: #35301f; color: #ffe680; border-color: var(--gold, #d4af37); }
+/* abas no padrão do Market (.market-tabs): faixa escura + botões .sm
+ * com .primary na ativa — os visuais vêm dos seletores globais de button. */
+.chard-tabs { flex: none; }
+.chard-tab { flex: none; }
 .chard-body {
   flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
   padding: 2px;
@@ -2751,14 +2745,25 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
 .chard-prog > div { height: 100%; background: var(--gold, #d4af37); }
 .chard-duo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 10px; }
 
-/* aba Outfit */
+/* aba Outfit — recessos escuros + cards erguidos, padrão do Market */
 .chard-outfit-grid {
   display: grid; grid-template-columns: 170px 1fr; gap: 10px; height: 100%;
 }
-.chard-outfit-side { min-width: 0; }
+.chard-outfit-side {
+  min-width: 0; background: #14120e; border: 1px solid #16140f;
+  padding: 6px 8px; overflow-y: auto;
+}
 .chard-outfit-preview { margin: 0 auto; }
+.chard-sec-title {
+  font-size: 10px; letter-spacing: .08em; color: #d4af37; font-weight: bold;
+  border-bottom: 1px solid #2a2520; padding-bottom: 3px; margin: 8px 0 4px;
+}
+.chard-sec-title:first-child { margin-top: 0; }
 .chard-outfit-main { min-width: 0; display: flex; flex-direction: column; }
-.chard-outfit-catalog { flex: 1; min-height: 0; overflow-y: auto; }
+.chard-outfit-catalog {
+  flex: 1; min-height: 0; overflow-y: auto;
+  background: #14120e; border: 1px solid #16140f; padding: 6px;
+}
 
 /* aba Roda do Destino */
 .chard-wheel-grid {

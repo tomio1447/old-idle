@@ -285,11 +285,14 @@ function cycloItems(p, el) {
 function cycloAppearance(p, el, opts) {
   /* opts.minimal (usado pela janela de Detalhes do personagem): esconde o
    * bloco de prévia/addons/montaria do topo — a aba Outfit desenha o seu
-   * proprio. Persiste no elemento para os re-renders internos. */
+   * proprio. Persiste no elemento para os re-renders internos.
+   * opts.ownedOnly (janela de personalização): só mostra itens obtidos —
+   * sem preço, sem filtros de loja, sem fluxo de compra. */
   if (opts) el._cycloOpts = opts;
   opts = el._cycloOpts || {};
+  const ownedOnly = !!opts.ownedOnly;
   const modo = CYCLO.appModo || (CYCLO.appModo = "outfit");
-  const filtro = CYCLO.filtro || "all";
+  const filtro = ownedOnly ? "owned" : (CYCLO.filtro || "all");
   const atual = currentAppearance(p);
   const mnt = currentMount(p);
 
@@ -351,7 +354,7 @@ function cycloAppearance(p, el, opts) {
                 title="${ok ? "" : "Compre o addon primeiro"}">${t}</button>`;
             }).join("")}
         </div>
-        ${atual && (atual.addons || 0) > ownedAddons(p, atual.id) ? `
+        ${!ownedOnly && atual && (atual.addons || 0) > ownedAddons(p, atual.id) ? `
           <button class="sm mb8" data-buy-addon="${atual.id}">
             Comprar addon ${ownedAddons(p, atual.id) + 1} ·
             <span class="gold-txt">${fmtFull(addonPrice(atual))} gp</span>
@@ -372,14 +375,17 @@ function cycloAppearance(p, el, opts) {
       <button class="sm ${modo === "mount" ? "primary" : ""}"
         data-app-modo="mount">Montarias</button>
       <span style="flex:1"></span>
-      ${[["all", "Todos"], ["owned", "Meus"], ["locked", "À venda"],
+      ${ownedOnly ? "" : [["all", "Todos"], ["owned", "Meus"], ["locked", "À venda"],
          ["premium", "Premium"]].map(([f, t]) =>
         `<button class="sm ${filtro === f ? "primary" : ""}"
           data-app-filtro="${f}">${t}</button>`).join("")}
     </div>
     <div class="tiny dim mb4">${lista.length} ${modo === "outfit" ? "visuais" : "montarias"}
-      · clique para ${modo === "outfit" ? "vestir" : "montar"} ou comprar</div>
-    <div class="app-grid">${lista.map(modo === "outfit" ? cardOutfit : cardMount).join("")}</div>`;
+      · clique para ${modo === "outfit" ? "vestir" : "montar"}${ownedOnly ? "" : " ou comprar"}</div>
+    <div class="app-grid">${lista.map(modo === "outfit" ? cardOutfit : cardMount).join("") ||
+      (ownedOnly ? `<div class="tiny dim" style="padding:10px;grid-column:1/-1">
+        Nenhum ${modo === "outfit" ? "visual" : "montaria"} obtido — novos visuais e
+        montarias são adquiridos na Store.</div>` : "")}</div>`;
 
   /* Troca o PNG neutro de cada card pelo canvas colorido.
    * Feito em lotes com requestAnimationFrame: colorir 127 sprites de uma vez

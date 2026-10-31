@@ -899,7 +899,7 @@ input[type=range] { width: 100%; accent-color: var(--gold); }
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
 }
 .app-card {
-  background: #14120e; border: 1px solid var(--border-in, #3a3428);
+  background: #24221e; border: 1px solid #16140f;
   padding: 4px; text-align: center; cursor: pointer; overflow: hidden;
 }
 .app-card:hover { background: #26221a; border-color: #6b6455; }

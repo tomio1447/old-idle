@@ -85,9 +85,9 @@ function chardShell(p) {
       <span style="flex:1"></span>
       <button class="sm" id="chard-close" title="Fechar">✕</button>
     </div>
-    <div class="chard-tabs" id="chard-tabs">
+    <div class="chard-tabs market-tabs" id="chard-tabs">
       ${CHARD_TABS.map((t) => `
-        <button class="chard-tab ${CHARD.tab === t.id ? "active" : ""}"
+        <button class="sm chard-tab ${CHARD.tab === t.id ? "primary" : ""}"
                 data-chard-tab="${t.id}">${t.nome}</button>`).join("")}
     </div>
     <div class="panel-body chard-body" id="chard-body"></div>`;
@@ -99,7 +99,7 @@ function chardShell(p) {
     b.addEventListener("click", () => {
       CHARD.tab = b.dataset.chardTab;
       $$("#chard-tabs .chard-tab").forEach((x) =>
-        x.classList.toggle("active", x === b));
+        x.classList.toggle("primary", x === b));
       chardRender();
     }));
   chardPaintTitlePortrait(p);
@@ -541,10 +541,10 @@ function chardTabOutfit(p, el) {
   el.innerHTML = `
     <div class="chard-outfit-grid">
       <div class="chard-outfit-side">
-        <div class="tiny dim mb4">Prévia</div>
+        <div class="chard-sec-title">Prévia</div>
         <div class="outfit-preview chard-outfit-preview" id="chard-outfit-preview"></div>
         <div class="tiny dim center mt4" id="chard-outfit-name">${atual ? chardEsc(atual.nome) : "—"}${mnt ? "<br>+ " + chardEsc(mnt.nome) : ""}</div>
-        <div class="tiny dim mt8 mb4">Addons</div>
+        <div class="chard-sec-title">Addons</div>
         <div class="row wrap" style="gap:4px" id="chard-outfit-addons">
           ${[[0, "Nenhum"], [1, "Addon 1"], [2, "Addon 2"], [3, "Os dois"]]
             .map(([n, t]) => {
@@ -552,19 +552,15 @@ function chardTabOutfit(p, el) {
               const ok = n === 0 || (n === 3 ? donos >= 2 : donos >= n);
               return `<button class="sm ${(p.outfit.addons || 0) === n ? "primary" : ""}"
                 data-chard-addon="${n}" ${ok ? "" : "disabled"}
-                title="${ok ? "" : "Compre o addon primeiro"}">${t}</button>`;
+                title="${ok ? "" : "Adquirido na Store"}">${t}</button>`;
             }).join("")}
         </div>
-        ${atual && (atual.addons || 0) > donos ? `
-          <button class="sm mt4" data-chard-buy-addon="${atual.id}">
-            Comprar addon ${donos + 1} · <span class="gold-txt">${fmtFull(addonPrice(atual))} gp</span>
-          </button>` : ""}
-        <div class="tiny dim mt8 mb4">Montaria</div>
+        <div class="chard-sec-title">Montaria</div>
         <div class="row wrap" style="gap:4px">
           <button class="sm ${!mnt ? "primary" : ""}" data-chard-mount-off>A pé</button>
           ${mnt ? `<span class="tiny dim" style="align-self:center">Montado em <b>${chardEsc(mnt.nome)}</b></span>` : ""}
         </div>
-        <div class="tiny dim mt8 mb4">Cores</div>
+        <div class="chard-sec-title">Cores</div>
         <div class="row wrap mb4" id="chard-outfit-parts" style="gap:4px">
           ${PARTS.map(([n, i]) => `<button class="sm ${CHARD.outfitPart === i ? "primary" : ""}" data-chard-part="${i}">${n}</button>`).join("")}
         </div>
@@ -608,7 +604,7 @@ function chardTabOutfit(p, el) {
   const catalog = () => {
     const box = $("#cyclo-content");
     if (box && typeof cycloAppearance === "function")
-      cycloAppearance(p, box, { minimal: true });
+      cycloAppearance(p, box, { minimal: true, ownedOnly: true });
     chardApplyOutfitSearch();
   };
   // a aba decide o modo inicial do catálogo (Visuais x Montarias)
@@ -637,15 +633,6 @@ function chardTabOutfit(p, el) {
       setAddons(p, +b.dataset.chardAddon);
       save(); renderAll(); refresh();
     }));
-  const buyAd = $("#chard-body [data-chard-buy-addon]");
-  if (buyAd) buyAd.addEventListener("click", () => {
-    const r = buyAddon(p, buyAd.dataset.chardBuyAddon);
-    if (!r.ok) { toast(r.erro); return; }
-    toast(`Addon ${r.addon} comprado por <span class="gold-txt">${fmtFull(r.preco)} gp</span>`);
-    setAddons(p, ownedAddons(p, buyAd.dataset.chardBuyAddon) >= 2 ? 3
-              : ownedAddons(p, buyAd.dataset.chardBuyAddon));
-    save(); renderAll(); refresh();
-  });
   const off = $("#chard-body [data-chard-mount-off]");
   if (off) off.addEventListener("click", () => {
     setMount(p, null); save(); renderAll(); refresh();
