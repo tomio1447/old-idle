@@ -51,6 +51,17 @@ const GUILD_BONUS_DEFS = [
   { id: "exp",        label: "Bônus de EXP",        perLevel: 1,   unit: "%" },
   { id: "skill",      label: "Bônus de Skill/ML",   perLevel: 1,   unit: "%" },
 ];
+/* BÔNUS TEMPORÁRIO — 24h para a guild toda; custa 125kk do caixa +
+ * 1 insígnia PvP da conta compradora. */
+const GUILD_TEMP_BONUS_HOURS = 24;
+const GUILD_TEMP_BONUS_GOLD = 125000000; // 125kk
+const GUILD_TEMP_INSIGNIA_COST = 1;
+const GUILD_TEMP_BONUS_DEFS = [
+  { id: "bossLoot", label: "Boss Loot",          pct: 25 },
+  { id: "exp",      label: "EXP",                pct: 25 },
+  { id: "skill",    label: "Skill/ML",           pct: 25 },
+  { id: "loot",     label: "Loot de monstros",   pct: 25 },
+];
 
 const SERVER_SAVE_TZ = String(process.env.SERVER_SAVE_TZ || "America/Sao_Paulo").trim() || "America/Sao_Paulo";
 
@@ -85,6 +96,24 @@ function guildBonusLevels(raw) {
     out[d.id] = Math.max(0, Math.min(GUILD_BONUS_MAX_LEVEL,
       Math.floor(Number(src && src[d.id]) || 0)));
   return out;
+}
+function guildTempBonusDef(id) {
+  return GUILD_TEMP_BONUS_DEFS.find((d) => d.id === String(id)) || null;
+}
+/* Normaliza o mapa de expirações persistido {key: untilMs}. */
+function guildTempBonusUntil(raw) {
+  let src = raw;
+  if (typeof src === "string") { try { src = JSON.parse(src); } catch (e) { src = null; } }
+  const out = {};
+  for (const d of GUILD_TEMP_BONUS_DEFS) {
+    const until = Math.max(0, Number(src && src[d.id]) || 0);
+    if (until > 0) out[d.id] = until;
+  }
+  return out;
+}
+function guildTempBonusActive(tempBonuses, id, now) {
+  const until = guildTempBonusUntil(tempBonuses)[id] || 0;
+  return until > (now || Date.now());
 }
 
 /* Dia do server save (00:00 no fuso) — mesma regra de server.js. */
@@ -183,6 +212,11 @@ const CAN_INVITE = new Set(["leader", "vice"]);
 function guildShopDefs() {
   return GUILD_BONUS_DEFS.map((d) => Object.assign({ maxLevel: GUILD_BONUS_MAX_LEVEL }, d));
 }
+function guildTempShopDefs() {
+  return GUILD_TEMP_BONUS_DEFS.map((d) => Object.assign({}, d,
+    { hours: GUILD_TEMP_BONUS_HOURS, gold: GUILD_TEMP_BONUS_GOLD,
+      insignias: GUILD_TEMP_INSIGNIA_COST }));
+}
 
 /* ------------------------------- handlers ------------------------------ */
 /* GET /api/guilds — todas as guilds (nome, nível, vagas livres). */
@@ -211,10 +245,15 @@ async function guildState(db, token, charId) {
     tasks = await db.guildTasksFor(member.guild_id, auth.account.id, day);
   }
   const pub = guild ? guildPublic(guild, members.length) : null;
-  if (pub) pub.balance = Math.max(0, Number(guild.balance) || 0);
+  if (pub) {
+    pub.balance = Math.max(0, Number(guild.balance) || 0);
+    pub.tempBonuses = guildTempBonusUntil(guild.temp_bonuses);
+  }
   return { code: 200, body: { ok: true,
     guild: pub, myRank, members, invites, tasks,
-    shop: guildShopDefs(), day: guildTaskDay() } };
+    shop: guildShopDefs(), tempShop: guildTempShopDefs(),
+    insignias: Math.max(0, Number(auth.account.pvp_insignias) || 0),
+    day: guildTaskDay() } };
 }
 
 /* GET /api/guild/detail — painel público da guild + ranking de tasks. */
@@ -236,11 +275,16 @@ async function guildDetail(db, token, guildId, charId) {
       logTotals = await db.guildLogTotals(guild.id);
   }
   const pub = guildPublic(guild, members.length);
-  /* Caixa e contabilidade são restritos a membros. */
-  if (myRank) pub.balance = Math.max(0, Number(guild.balance) || 0);
+  /* Caixa, bônus temporários e contabilidade são restritos a membros. */
+  if (myRank) {
+    pub.balance = Math.max(0, Number(guild.balance) || 0);
+    pub.tempBonuses = guildTempBonusUntil(guild.temp_bonuses);
+  }
   return { code: 200, body: { ok: true,
     guild: pub, myRank, members, tasks, logTotals,
-    shop: guildShopDefs(), day: guildTaskDay() } };
+    shop: guildShopDefs(), tempShop: guildTempShopDefs(),
+    insignias: myRank ? Math.max(0, Number(auth.account.pvp_insignias) || 0) : 0,
+    day: guildTaskDay() } };
 }
 
 /* POST /api/guild/create — mesmo espírito das regras do crystal server:
@@ -479,6 +523,44 @@ async function guildBuyBonus(db, body) {
     points: r.points, balance: r.balance, bonuses: r.bonuses } };
 }
 
+/* POST /api/guild/buy-temp — líder ativa bônus temporário (24h) com
+ * gold do caixa + insígnia PvP da própria conta. */
+async function guildBuyTempBonus(db, body) {
+  const auth = await authChar(db, token(body), body.char_id);
+  if (auth.error) return auth.error;
+  const member = await db.guildMemberByAccount(auth.account.id);
+  if (!member) return { code: 404, body: { ok: false, msg: "Sua conta não está em uma guild." } };
+  if (rankOf(member) !== "leader")
+    return { code: 403, body: { ok: false, error: "LEADER_ONLY",
+      msg: "Apenas líderes podem usar o caixa da guild." } };
+  const def = guildTempBonusDef(body.bonus_id);
+  if (!def) return { code: 400, body: { ok: false, msg: "Bônus inválido." } };
+  const guild = await db.guildById(member.guild_id);
+  if (!guild) return { code: 404, body: { ok: false, msg: "Guild não encontrada." } };
+  const until = guildTempBonusUntil(guild.temp_bonuses)[def.id] || 0;
+  if (until > Date.now())
+    return { code: 409, body: { ok: false, error: "BONUS_ACTIVE",
+      msg: "Este bônus já está ativo." } };
+  const cost = { gold: GUILD_TEMP_BONUS_GOLD, insignias: GUILD_TEMP_INSIGNIA_COST };
+  if (Number(guild.balance) < cost.gold)
+    return { code: 409, body: { ok: false, error: "BALANCE_LOW",
+      msg: `Caixa insuficiente — precisa ${cost.gold.toLocaleString("pt-BR")} gold.` } };
+  if (Number(auth.account.pvp_insignias) < cost.insignias)
+    return { code: 409, body: { ok: false, error: "INSIGNIA_LOW",
+      msg: `Insígnias PvP insuficientes (precisa ${cost.insignias}).` } };
+  const r = await db.guildTempBonusBuy(member.guild_id, auth.account.id,
+    auth.char.name, def.id, Date.now() + GUILD_TEMP_BONUS_HOURS * 3600 * 1000, cost);
+  if (!r || !r.ok) {
+    const err = r && r.error;
+    return { code: 409, body: { ok: false, error: err || "BUY_FAILED",
+      msg: err === "INSIGNIA_LOW" ? "Insígnias PvP insuficientes."
+        : err === "BALANCE_LOW" ? "Caixa insuficiente." : "Não foi possível ativar." } };
+  }
+  return { code: 200, body: { ok: true,
+    msg: `${def.label} +${def.pct}% ativo por ${GUILD_TEMP_BONUS_HOURS}h para toda a guild!`,
+    balance: r.balance, tempBonuses: r.tempBonuses } };
+}
+
 /* GET /api/guild/log — histórico de doações/compras (só membros). */
 async function guildLog(db, token, charId, category) {
   const auth = await authChar(db, token, charId);
@@ -498,12 +580,15 @@ module.exports = {
   GUILD_TASKS_PER_DAY, GUILD_TASK_MIN_KILLS, GUILD_TASK_MAX_KILLS,
   GUILD_CREATE_MIN_LEVEL, GUILD_CREATE_COST_GOLD,
   GUILD_MAX_LEADERS, GUILD_BONUS_MAX_LEVEL, GUILD_BONUS_LEVEL_GOLD, GUILD_BONUS_DEFS,
+  GUILD_TEMP_BONUS_HOURS, GUILD_TEMP_BONUS_GOLD, GUILD_TEMP_INSIGNIA_COST,
+  GUILD_TEMP_BONUS_DEFS,
   guildLevelForExp, guildSlotsForLevel, guildNextLevelExp,
   guildBonusCost, guildBonusDef, guildBonusLevels, guildShopDefs,
+  guildTempBonusDef, guildTempBonusUntil, guildTempBonusActive, guildTempShopDefs,
   guildTaskDay, guildTaskMonsterPool, guildDailyTaskDefs,
   guildList, guildState, guildDetail, guildCreate, guildInvite,
   guildAccept: (db, body) => guildInviteReply(db, body, true),
   guildDecline: (db, body) => guildInviteReply(db, body, false),
   guildLeave, guildKick, guildPromote, guildDemote,
-  guildDonate, guildBuyBonus, guildLog,
+  guildDonate, guildBuyBonus, guildBuyTempBonus, guildLog,
 };

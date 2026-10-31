@@ -1364,6 +1364,13 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .guild-log-cat { width:44px; color:#a8a090; flex:0 0 auto; }
 .guild-log-info { flex:1 1 auto; color:#c8c0a8; }
 .guild-log-val { text-align:right; color:#d4af37; flex:0 0 auto; }
+.guild-temp-active { color:#7ae87a; font-size:10px; font-weight:bold; flex:0 0 auto; }
+.guild-pvp-locked { display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:32px 16px; text-align:center;
+  background:rgba(22,18,12,.9); border:1px solid #3a2e22; border-radius:4px; }
+.guild-pvp-icon { font-size:34px; opacity:.45; filter:grayscale(1); }
+.guild-pvp-locked .nm { color:#e8d4a2; font-weight:bold; letter-spacing:1px; }
+.guild-pvp-locked .meta { font-size:11px; color:#a8a090; max-width:340px; }
 .guild-invite-box { display:flex; align-items:center; gap:6px; margin-top:8px; }
 .guild-invite-box input { flex:1 1 160px; padding:5px 8px; background:#14120e;
   color:#c8c0a8; border:1px solid #3a3020; }

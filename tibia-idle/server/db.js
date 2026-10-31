@@ -1655,7 +1655,7 @@ JsonStore.prototype.guildCreate = function (opts) {
   account.gold = Number(account.gold) - cost;
   const now = new Date().toISOString();
   const guild = { id: this._nextGuildId(), name: opts.name, level: 1, exp: 0,
-    points: 0, balance: 0, bonuses: {}, created_at: now };
+    points: 0, balance: 0, bonuses: {}, temp_bonuses: {}, created_at: now };
   this.guilds.push(guild);
   this.guildMembers.push({ guild_id: guild.id, account_id: Number(opts.leader_account_id),
     character_id: Number(opts.leader_character_id), rank: "leader",
@@ -1747,12 +1747,14 @@ JsonStore.prototype.guildMemberRemove = function (guildId, accountId) {
   this._save(); this._guildSave();
   return { ok: true, disbanded, guildName };
 };
-/* Grava/limpa data.guildBonus num char (níveis por chave do shop). */
-JsonStore.prototype._charSetGuildBonus = function (char, bonuses) {
+/* Grava/limpa data.guildBonus + data.guildTempBonus num char. */
+JsonStore.prototype._charSetGuildBonus = function (char, bonuses, tempBonuses) {
   if (!char) return;
   let d = {}; try { d = typeof char.data === "string" ? JSON.parse(char.data) : (char.data || {}); } catch (e) { d = {}; }
   if (bonuses && typeof bonuses === "object") d.guildBonus = bonuses;
   else delete d.guildBonus;
+  if (tempBonuses && typeof tempBonuses === "object") d.guildTempBonus = tempBonuses;
+  else delete d.guildTempBonus;
   char.data = JSON.stringify(d);
 };
 JsonStore.prototype.guildMemberSetRank = function (guildId, accountId, rank) {
@@ -1890,11 +1892,38 @@ JsonStore.prototype.guildApplyBonuses = function (guildId) {
   const Guild = guildModule();
   const bonuses = Guild ? Guild.guildBonusLevels(guild && guild.bonuses)
     : (guild && guild.bonuses) || {};
+  const tempBonuses = Guild ? Guild.guildTempBonusUntil(guild && guild.temp_bonuses)
+    : (guild && guild.temp_bonuses) || {};
   for (const m of this.guildMembers || []) {
     if (Number(m.guild_id) !== Number(guildId)) continue;
-    for (const c of this.charactersOf(m.account_id)) this._charSetGuildBonus(c, bonuses);
+    for (const c of this.charactersOf(m.account_id))
+      this._charSetGuildBonus(c, bonuses, tempBonuses);
   }
   this._save();
+};
+/* Bônus TEMPORÁRIO (24h): caixa + insígnia PvP da conta. */
+JsonStore.prototype.guildTempBonusBuy = function (guildId, accountId, charName, bonusId, until, cost) {
+  const guild = this.guildById(guildId);
+  const account = (this.accounts || []).find((a) => Number(a.id) === Number(accountId));
+  const gold = Math.max(0, Math.floor(Number(cost && cost.gold) || 0));
+  const ins = Math.max(0, Math.floor(Number(cost && cost.insignias) || 0));
+  if (!guild || !account) return { ok: false, error: "NOT_FOUND" };
+  if (Number(account.pvp_insignias) < ins) return { ok: false, error: "INSIGNIA_LOW" };
+  if (Number(guild.balance) < gold) return { ok: false, error: "BALANCE_LOW" };
+  const Guild = guildModule();
+  account.pvp_insignias = Number(account.pvp_insignias) - ins;
+  guild.balance = Number(guild.balance) - gold;
+  guild.temp_bonuses = guild.temp_bonuses && typeof guild.temp_bonuses === "object"
+    ? guild.temp_bonuses : {};
+  guild.temp_bonuses[bonusId] = Number(until);
+  this.guildLogAdd(null, { guild_id: guildId, account_id: accountId, char_name: charName,
+    category: "purchase",
+    detail: `${(Guild && Guild.guildTempBonusDef(bonusId) || {}).label || bonusId} (24h)`,
+    gold_delta: -gold, points_delta: 0 });
+  this.guildApplyBonuses(guildId);
+  this._save(); this._guildSave();
+  return { ok: true, balance: guild.balance,
+    tempBonuses: Guild ? Guild.guildTempBonusUntil(guild.temp_bonuses) : guild.temp_bonuses };
 };
 JsonStore.prototype.guildClearBonusForAccount = function (accountId) {
   for (const c of this.charactersOf(accountId)) this._charSetGuildBonus(c, null);
@@ -1958,10 +1987,13 @@ async function MysqlStore() {
    * membro. Feito em JS porque o MariaDB não tem CAST(... AS JSON) —
    * JSON_SET com string gravaria o objeto como texto. */
   async function guildBonusToChars(exec, guildId) {
-    const [grows] = await exec.query("SELECT bonuses FROM guilds WHERE id=?", [Number(guildId)]);
+    const [grows] = await exec.query("SELECT bonuses, temp_bonuses FROM guilds WHERE id=?",
+      [Number(guildId)]);
     const Guild = guildModule();
     const bonuses = Guild ? Guild.guildBonusLevels(grows[0] && grows[0].bonuses)
       : (grows[0] && grows[0].bonuses) || {};
+    const tempBonuses = Guild ? Guild.guildTempBonusUntil(grows[0] && grows[0].temp_bonuses)
+      : (grows[0] && grows[0].temp_bonuses) || {};
     const [chars] = await exec.query(
       `SELECT c.id, c.data FROM characters c
        JOIN guild_members m ON m.account_id=c.account_id WHERE m.guild_id=?`,
@@ -1969,6 +2001,7 @@ async function MysqlStore() {
     for (const ch of chars) {
       let d = {}; try { d = typeof ch.data === "string" ? JSON.parse(ch.data) : (ch.data || {}); } catch (e) { d = {}; }
       d.guildBonus = bonuses;
+      d.guildTempBonus = tempBonuses;
       await exec.query("UPDATE characters SET data=? WHERE id=?", [JSON.stringify(d), Number(ch.id)]);
     }
   }
@@ -3287,13 +3320,13 @@ async function MysqlStore() {
           await conn.query("DELETE FROM guilds WHERE id=?", [Number(guildId)]);
           // dissolveu → limpa data.guildBonus de TODOS os ex-membros
           for (const m of rows)
-            await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+            await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus','$.guildTempBonus') WHERE account_id=?",
               [Number(m.account_id)]);
           disbanded = true;
         } else {
           await conn.query("DELETE FROM guild_members WHERE guild_id=? AND account_id=?",
             [Number(guildId), Number(accountId)]);
-          await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+          await conn.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus','$.guildTempBonus') WHERE account_id=?",
             [Number(accountId)]);
           if (String(me.rank) === "leader") {
             const remainingLeaders = rest.filter((m) => m.rank === "leader");
@@ -3470,13 +3503,47 @@ async function MysqlStore() {
       } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
       finally { conn.release(); }
     },
+    /* Bônus TEMPORÁRIO (24h): debita gold do caixa + insígnia PvP da
+     * conta, ativa/prorroga o bônus no JSON temp_bonuses e propaga. */
+    async guildTempBonusBuy(guildId, accountId, charName, bonusId, until, cost) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const key = "$." + String(bonusId).replace(/[^a-zA-Z]/g, "");
+        const gold = Math.max(0, Math.floor(Number(cost && cost.gold) || 0));
+        const ins = Math.max(0, Math.floor(Number(cost && cost.insignias) || 0));
+        const [a] = await conn.query(
+          "UPDATE accounts SET pvp_insignias=pvp_insignias-? WHERE id=? AND pvp_insignias>=?",
+          [ins, Number(accountId), ins]);
+        if (!a.affectedRows) { await conn.rollback(); return { ok: false, error: "INSIGNIA_LOW" }; }
+        const [u] = await conn.query(
+          `UPDATE guilds SET balance=balance-?,
+             temp_bonuses=JSON_SET(COALESCE(temp_bonuses,JSON_OBJECT()), ?, ?)
+           WHERE id=? AND balance>=?`,
+          [gold, key, Number(until), Number(guildId), gold]);
+        if (!u.affectedRows) { await conn.rollback(); return { ok: false, error: "BALANCE_LOW" }; }
+        const Guild = guildModule();
+        await this.guildLogAdd(conn, { guild_id: guildId, account_id: accountId,
+          char_name: charName, category: "purchase",
+          detail: `${(Guild && Guild.guildTempBonusDef(bonusId) || {}).label || bonusId} (24h)`,
+          gold_delta: -gold, points_delta: 0 });
+        await guildBonusToChars(conn, guildId);
+        const [rows] = await conn.query(
+          "SELECT balance,temp_bonuses FROM guilds WHERE id=?", [Number(guildId)]);
+        await conn.commit();
+        const r = rows[0] || {};
+        return { ok: true, balance: Number(r.balance) || 0,
+          tempBonuses: Guild ? Guild.guildTempBonusUntil(r.temp_bonuses) : r.temp_bonuses };
+      } catch (e) { try { await conn.rollback(); } catch (e2) {} throw e; }
+      finally { conn.release(); }
+    },
     /* Propaga data.guildBonus da guild para todos os chars das contas
      * membro (usado ao entrar membro e após compra de bônus). */
     async guildApplyBonuses(guildId) {
       await guildBonusToChars(pool, guildId);
     },
     async guildClearBonusForAccount(accountId) {
-      await this.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus') WHERE account_id=?",
+      await this.query("UPDATE characters SET data=JSON_REMOVE(data,'$.guildBonus','$.guildTempBonus') WHERE account_id=?",
         [Number(accountId)]);
     },
 
@@ -3946,7 +4013,11 @@ async function ensureSchema(pool) {
     "ADD COLUMN points INT UNSIGNED NOT NULL DEFAULT 0",
     "ADD COLUMN balance BIGINT UNSIGNED NOT NULL DEFAULT 0",
     "ADD COLUMN bonuses JSON NULL",
+    "ADD COLUMN temp_bonuses JSON NULL",
   ]) { try { await pool.query("ALTER TABLE guilds " + col); } catch (e) { /* já existe */ } }
+  // Insígnia PvP (moeda de conta — o sistema PvP credita aqui no futuro)
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN pvp_insignias INT UNSIGNED NOT NULL DEFAULT 0"); }
+  catch (e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS guild_log (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     guild_id INT UNSIGNED NOT NULL,

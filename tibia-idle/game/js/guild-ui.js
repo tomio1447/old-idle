@@ -221,12 +221,20 @@ function guildGoldFmt(n) {
   if (v >= 1e6) return (v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " kk";
   return v.toLocaleString("pt-BR") + " gp";
 }
-/* GUILD SHOP — bônus por nível (nível N custa N GP + 50kk do caixa). */
-function guildShopHtml(g, shop, isLeader) {
+function guildTimeLeft(until) {
+  const ms = Math.max(0, Number(until) - Date.now());
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${Math.max(1, m)}m`;
+}
+/* GUILD SHOP — bônus por nível (nível N custa N GP + 50kk do caixa)
+ * + BÔNUS TEMPORÁRIO (24h; 125kk do caixa + 1 insígnia PvP da conta). */
+function guildShopHtml(g, shop, isLeader, tempShop, insignias) {
   const levels = g.bonuses || {};
+  const temp = g.tempBonuses || {};
   const head = `<div class="guild-balance-head">
     <span><b>${Number(g.points) || 0}</b> guild points</span>
     <span>Caixa: <b>${guildGoldFmt(g.balance)}</b></span>
+    <span><b>${Number(insignias) || 0}</b> insígnias PvP</span>
   </div>
   ${!isLeader ? `<div class="tiny dim" style="margin:4px 0">Apenas líderes podem comprar com o caixa da guild.</div>` : ""}`;
   return head + `<div class="guild-shop-list">${shop.map((def) => {
@@ -247,6 +255,22 @@ function guildShopHtml(g, shop, isLeader) {
           : `Nv ${next} → ${nextVal}${def.unit} · custo: ${costPts} GP + ${guildGoldFmt(GUILD_BONUS_LEVEL_GOLD_UI)}`}</span>
       </span>
       ${isLeader && !maxed ? `<button class="sm primary" data-guild-buy="${def.id}"${afford ? "" : " disabled"}>Comprar</button>` : ""}
+    </div>`;
+  }).join("")}</div>
+  <div class="hunt-cat-title" style="margin-top:10px">Bônus temporário (24h)</div>
+  <div class="guild-shop-list">${(tempShop || []).map((def) => {
+    const until = Number(temp[def.id]) || 0, active = until > Date.now();
+    const afford = (Number(g.balance) || 0) >= def.gold &&
+      (Number(insignias) || 0) >= def.insignias;
+    return `<div class="guild-shop-row${active ? " maxed" : ""}">
+      <span class="guild-shop-info">
+        <span class="nm">${guildEsc(def.label)} <b>+${def.pct}%</b></span>
+        <span class="meta">${active ? `ativo — restam ${guildTimeLeft(until)}`
+          : `dura ${def.hours}h · custo: ${guildGoldFmt(def.gold)} + ${def.insignias} insígnia PvP`}</span>
+      </span>
+      ${isLeader ? (active
+        ? `<span class="guild-temp-active">ATIVO</span>`
+        : `<button class="sm primary" data-guild-buy-temp="${def.id}"${afford ? "" : " disabled"}>Ativar</button>`) : ""}
     </div>`;
   }).join("")}</div>`;
 }
@@ -323,7 +347,9 @@ async function loadGuildDetail() {
     return;
   }
   const g = data.guild, members = data.members || [], tasks = data.tasks || [];
-  const shop = data.shop || [], logTotals = data.logTotals || null;
+  const shop = data.shop || [], tempShop = data.tempShop || [];
+  const logTotals = data.logTotals || null;
+  const insignias = Number(data.insignias) || 0;
   const myRank = data.myRank;
   const canManage = myRank === "leader" || myRank === "vice";
   const isLeader = myRank === "leader";
@@ -337,7 +363,8 @@ async function loadGuildDetail() {
     { id: "tasks", label: "TASK GUILD" },
     { id: "shop", label: "GUILD SHOP" },
     { id: "balance", label: "GUILD BALANCE" },
-    { id: "history", label: "HISTÓRICO" });
+    { id: "history", label: "HISTÓRICO" },
+    { id: "pvp", label: "PVP" });
 
   let contentHtml = "";
   if (GUILD_UI.tab === "ranking") {
@@ -357,7 +384,14 @@ async function loadGuildDetail() {
       <div class="guild-task-list">${tasks.map(guildTaskCard).join("") ||
         `<div class="hunt-section-empty">Sem tasks hoje.</div>`}</div>`;
   } else if (GUILD_UI.tab === "shop" && isMember) {
-    contentHtml = guildShopHtml(g, shop, isLeader);
+    contentHtml = guildShopHtml(g, shop, isLeader, tempShop, insignias);
+  } else if (GUILD_UI.tab === "pvp" && isMember) {
+    contentHtml = `<div class="guild-pvp-locked">
+      <span class="guild-pvp-icon" aria-hidden="true">⚔</span>
+      <span class="nm">PVP DA GUILD</span>
+      <span class="meta">Sistema em desenvolvimento — em breve guerras entre
+        guilds e recompensas em insígnias PvP.</span>
+    </div>`;
   } else if (GUILD_UI.tab === "balance" && isMember) {
     contentHtml = guildBalanceHtml(g, logTotals);
   } else if (GUILD_UI.tab === "history" && isMember) {
@@ -442,6 +476,16 @@ async function loadGuildDetail() {
       btn.disabled = true;
       const r = await guildApi("POST", "/api/guild/buy",
         { char_id: Number(sessionCharId()), bonus_id: btn.dataset.guildBuy });
+      btn.disabled = false;
+      if (r && r.data) guildToast(r.data.msg);
+      loadGuildDetail();
+    });
+  });
+  $$("#guild-modal-list [data-guild-buy-temp]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const r = await guildApi("POST", "/api/guild/buy-temp",
+        { char_id: Number(sessionCharId()), bonus_id: btn.dataset.guildBuyTemp });
       btn.disabled = false;
       if (r && r.data) guildToast(r.data.msg);
       loadGuildDetail();

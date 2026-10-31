@@ -2032,7 +2032,8 @@ function addSkillTries(p,which,tries){
   if(!p||!which||which==="magic")return false;
   p.skills=p.skills||{};p.skillTries=p.skillTries||{};
   p.skills[which]=Math.max(10,Number(p.skills[which])||10);
-  const rate=serverSkillRate(p.skills[which])*(1+guildBonusLevel(p,"skill")*0.01);
+  const rate=serverSkillRate(p.skills[which])*(1+guildBonusLevel(p,"skill")*0.01)
+    *(guildTempBonusOn(p,"skill")?1.25:1);
   p.skillTries[which]=(Number(p.skillTries[which])||0)+Math.max(0,Math.floor((Number(tries)||0)*rate));
   let up=false,need=skillTriesNeeded(p,which);
   while(p.skillTries[which]>=need){p.skillTries[which]-=need;p.skills[which]++;up=true;need=skillTriesNeeded(p,which);}
@@ -2042,7 +2043,8 @@ function addSkillTries(p,which,tries){
 function addManaSpent(p,mana,auth){
   if(!p)return false;
   const gained=Math.max(0,Math.floor((Number(mana)||0)*instanceSkillMul(auth)));
-  const rate=serverMagicRate(Number(p.ml)||0)*(1+guildBonusLevel(p,"skill")*0.01);
+  const rate=serverMagicRate(Number(p.ml)||0)*(1+guildBonusLevel(p,"skill")*0.01)
+    *(guildTempBonusOn(p,"skill")?1.25:1);
   p.manaSpent=(Number(p.manaSpent)||0)+Math.max(0,Math.floor(gained*rate));
   let up=false,need=mlTriesNeeded(p);
   while(p.manaSpent>=need){p.manaSpent-=need;p.ml=(Number(p.ml)||0)+1;up=true;need=mlTriesNeeded(p);}
@@ -3056,6 +3058,13 @@ function guildBonusLevel(p,key){
   if(typeof g==="string"){try{g=JSON.parse(g);}catch(e){g=null;}}
   if(!g||typeof g!=="object")return 0;
   return Math.max(0,Math.min(10,Math.floor(Number(g[key])||0)));
+}
+/* Bônus temporário da guild (24h): data.guildTempBonus {key: untilMs}. */
+function guildTempBonusOn(p,key){
+  let g=p&&p.guildTempBonus;
+  if(typeof g==="string"){try{g=JSON.parse(g);}catch(e){g=null;}}
+  if(!g||typeof g!=="object")return false;
+  return Number(g[key])>Date.now();
 }
 function playerCritChancePct(p){return 5+(imbCombatTotals(p).critChance||0)+guildBonusLevel(p,"critChance")*0.1;}
 function playerCritExtraPct(p){
@@ -4440,9 +4449,10 @@ function finalExp(p,mobExp,mobSlug,expMul){
   // Loyalty EXP bonus (rank %)
   const loyaltyMul=loyaltyExpMultiplier(p);
   if(loyaltyMul>1)exp=Math.floor(exp*loyaltyMul);
-  // GUILD SHOP: +1% EXP por nível do bônus "exp"
+  // GUILD SHOP: +1% EXP por nível do bônus "exp" + 25% temporário
   const gExp=guildBonusLevel(p,"exp");
   if(gExp>0)exp=Math.floor(exp*(1+gExp*0.01));
+  if(guildTempBonusOn(p,"exp"))exp=Math.floor(exp*1.25);
   return exp;
 }
 
@@ -5098,8 +5108,10 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
   // Abaixo de 3h de stamina o loot cai pela metade (stamina do líder, que
   // é quem recebe os drops). Chance é multiplicada, nunca a quantidade.
   const staminaLoot=Math.max(0,Number(leader.stamina)||0)<3*3600?.5:1;
+  // GUILD TEMP: +25% loot de monstros / +25% loot de boss (24h cada)
+  const gTempLoot=guildTempBonusOn(leader,mob&&mob.boss?"bossLoot":"loot")?1.25:1;
   // idle: l.chance * lootRate * (c.lootMul || 1) — PVP usa lootMul 1.25
-  const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot;
+  const chanceMult=lootRate*(Number(auth.lootMul)||1)*(1+preyLoot/100)*staminaLoot*gTempLoot;
   if(mob.boss&&(auth.kind==="hunt"||!auth.rewardBundleId))
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
   // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada

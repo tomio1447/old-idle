@@ -4843,6 +4843,11 @@ async function main() {
         const r = await guild.guildBuyBonus(db, body);
         return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/guild/buy-temp") {
+        const body = await readBody(req);
+        const r = await guild.guildBuyTempBonus(db, body);
+        return send(res, r.code, r.body);
+      }
       if (req.method === "GET" && url === "/api/guild/log") {
         const token = (req.headers.authorization || "").replace("Bearer ", "");
         const q = new URL(req.url, "http://x").searchParams;
