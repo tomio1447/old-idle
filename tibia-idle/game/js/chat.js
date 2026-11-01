@@ -279,8 +279,9 @@
 
   function nameSpan(m) {
     const who = escapeHtml(m.nickname || "?");
-    if (!isAdmin() || !m.id) return `<span class="gc-name">${who}</span>`;
-    return `<span class="gc-name gc-mod" data-gc-mid="${m.id}" data-gc-name="${who}"
+    const cls = "gc-name" + (m.admin ? " gc-sender" : "");
+    if (!isAdmin() || !m.id) return `<span class="${cls}">${who}</span>`;
+    return `<span class="${cls} gc-mod" data-gc-mid="${m.id}" data-gc-name="${who}"
       title="Clique para moderar">${who}</span>`;
   }
 
@@ -289,11 +290,12 @@
     if (m.type === "system") {
       return `<div class="gc-line gc-system">${time} <span class="gc-sys">${escapeHtml(filterText(m.text))}</span></div>`;
     }
+    const adm = m.admin ? " gc-admin" : "";
     if (m.type === "pm") {
       const to = escapeHtml(m.toName || "?");
       const voc = escapeHtml(m.vocShort || "");
       const lvl = escapeHtml(String(m.level || ""));
-      return `<div class="gc-line gc-pm">${time} <span class="gc-tag">[PM]</span> ${nameSpan(m)} → <span class="gc-name">${to}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+      return `<div class="gc-line gc-pm${adm}">${time} <span class="gc-tag">[PM]</span> ${nameSpan(m)} → <span class="gc-name">${to}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
     }
     const voc = escapeHtml(m.vocShort || "");
     const lvl = escapeHtml(String(m.level || ""));
@@ -301,9 +303,9 @@
      * vice amarelo, membro verde. */
     if (m.guildId) {
       const rk = m.guildRank === "leader" ? "leader" : m.guildRank === "vice" ? "vice" : "member";
-      return `<div class="gc-line gc-guild gc-rank-${rk}">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+      return `<div class="gc-line gc-guild gc-rank-${rk}${adm}">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
     }
-    return `<div class="gc-line">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+    return `<div class="gc-line${adm}">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
   }
 
   function removeLocal(id) {

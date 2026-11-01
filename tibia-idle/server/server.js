@@ -599,6 +599,7 @@ async function chatSend(db,body){
     guildId:guildMember?Number(guildMember.guild_id):0,
     guildRank:guildMember?String(guildMember.rank||"member"):null,
     guildName:guildRow?String(guildRow.name||""):null,
+    admin:acc.role==="admin",
   });
   return {code:200,body:{ok:true,message:msg}};
 }

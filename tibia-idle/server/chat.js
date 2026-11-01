@@ -176,6 +176,7 @@ class ChatBus {
       guildId: payload.guildId || 0,
       guildRank: payload.guildRank || null,
       guildName: payload.guildName || null,
+      admin: !!payload.admin,
     };
     this.messages.push(msg);
     while (this.messages.length > this.historyLimit) this.messages.shift();
