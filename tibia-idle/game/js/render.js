@@ -1580,7 +1580,6 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
   //  - alterna frames de caminhada 1/2 durante o gesto.
   let lungeX = 0, lungeY = 0, atkFrame = 0;
   if (training.lungeT > 0) {
-    const prog = 1 - training.lungeT / 230;
     const mag = W * 0.02 * ((training.proj && training.proj.lunge) || 1);
     const alvo = (training.proj && training.proj.to) ||
       (training.dummyPos || { x: 0.70, y: 0.62 });
@@ -1589,7 +1588,7 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     const len = Math.max(1e-4, Math.sqrt(dx * dx + dy * dy));
     lungeX = (dx / len) * mag;
     lungeY = (dy / len) * mag;
-    atkFrame = (Math.floor(prog * 6) % 2) + 1;  // alterna frames 1 e 2
+    atkFrame = 1;  // gesto único — alternar frames 1/2 tremia o personagem
     training.lungeT -= dt;
   }
   const pxF = px + lungeX, pyF = py + lungeY;
@@ -1857,8 +1856,7 @@ function drawAcademyMember(renderer, ctx, W, H, tile, hudS, training, member, lo
   const px = m.playerPos.x * W, py = m.playerPos.y * H;
   let atkFrame = 0;
   if (m.lungeT > 0) {
-    const prog = 1 - m.lungeT / 230;
-    atkFrame = (Math.floor(prog * 6) % 2) + 1;
+    atkFrame = 1;  // gesto único — alternar frames 1/2 tremia o personagem
     m.lungeT = Math.max(0, m.lungeT - dt);
   }
   const pxF = px, pyF = py;

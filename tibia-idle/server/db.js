@@ -3114,7 +3114,8 @@ async function MysqlStore() {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [offer.seller_id, offer.seller_name, offer.kind, offer.slug || null,
          offer.tier || 0, offer.data || null, offer.qty || 1,
-         offer.price, offer.price_tc ? 1 : 0, offer.expires_at || null]);
+         offer.price, offer.price_tc ? 1 : 0,
+         offer.expires_at ? new Date(offer.expires_at) : null]);
       return this.findMarketOffer(r.insertId);
     },
     async marketOffers(filter) {
@@ -3136,7 +3137,13 @@ async function MysqlStore() {
     },
     async updateMarketOffer(id, patch) {
       const set = [], params = [];
-      for (const k in patch) { set.push(k + "=?"); params.push(patch[k]); }
+      for (const k in patch) {
+        set.push(k + "=?");
+        const v = patch[k];
+        // Colunas TIMESTAMP/DATETIME rejeitam ISO-8601 (MySQL strict):
+        // converte para Date, que o driver serializa corretamente.
+        params.push(/_at$/.test(k) && typeof v === "string" ? new Date(v) : v);
+      }
       if (!set.length) return this.findMarketOffer(id);
       params.push(Number(id));
       await this.run("UPDATE market_offers SET " + set.join(", ") + " WHERE id = ?", params);
