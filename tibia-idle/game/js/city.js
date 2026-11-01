@@ -726,6 +726,7 @@ function buyRest(p, hours) {
   if (p.gold < price) return { ok: false, msg: "Ouro insuficiente." };
   spendGold(p, price);
   p.stamina = Math.min(MAX, p.stamina + secs);
+  p.staminaAt = Date.now();
   return { ok: true, msg: `Descansou ${(secs / 3600).toFixed(1)}h de stamina.`,
            price: price };
 }

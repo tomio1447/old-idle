@@ -5178,8 +5178,12 @@ function combatTick(c, p, dt, now) {
   if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
 
   const staminaPlayers=(c.players&&c.players.length)?c.players:[{p}];
-  for(const ent of staminaPlayers)if(ent&&ent.p)
+  for(const ent of staminaPlayers)if(ent&&ent.p){
+    // Caça só drena; o carimbo avança para o tempo caçando não contar como
+    // "ocioso" no próximo regen do load/save.
     ent.p.stamina=Math.max(0,(Number(ent.p.stamina)||0)-dt/1000);
+    ent.p.staminaAt=Date.now();
+  }
 
   if (c.dead) return;
 

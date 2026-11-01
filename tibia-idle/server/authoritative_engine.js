@@ -2063,6 +2063,11 @@ function advanceTrainingPlayer(p, now, sessionId, vip, holderId, stop) {
   const clock = { sessionId, holderId, at: same ? Math.max(now, Number(previous.at) || now) : now,
     carry: same && elapsed <= 15000 ? Number(previous.carry) || 0 : 0 };
   p.trainingClock = stop ? null : clock;
+  // Stamina: sessão ativa regenera 1s/s (1:1); gap, pausa ou stop contam
+  // como tempo ocioso (0,5s/s). Aplica antes dos early-returns.
+  const stActive = same && elapsed <= 15000 && !stop &&
+    !(p.trainingExercise && p.trainingExercise.active === false);
+  staminaRegenPlayer(p, now, stActive ? 1 : 0.5);
   if (!same || elapsed > 15000) return { hits: 0, advances: [] };
   const state = p.trainingExercise = p.trainingExercise || {};
   const balances = state.balances = state.balances || {};
@@ -4292,9 +4297,20 @@ function applyPlayerPvpDamage(auth,attacker,victim,rawDmg,el,now){
       permadead:!!victim.permadead,screen:true,pvp:true,ts:now});}
   return dmg;
 }
+/* Stamina: regenera pelo RELÓGIO — `staminaAt` marca a última contagem.
+ * Treino ativo = 1s/s (1min → +1min); fora de caça/treino (templo, offline)
+ * = 0,5s/s (2min → +1min). Em caça a stamina só drena (tick da instância). */
+function staminaRegenPlayer(p,now,perSec){
+  if(!p)return;
+  p.stamina=Number.isFinite(Number(p.stamina))?Math.max(0,Math.min(FULL_STAMINA,Number(p.stamina))):FULL_STAMINA;
+  const at=Number(p.staminaAt)||0;
+  if(at>0&&now>at&&perSec>0)p.stamina=Math.min(FULL_STAMINA,p.stamina+(now-at)/1000*perSec);
+  p.staminaAt=now;
+}
 function canonicalPlayer(member){const p=clone(member&&member.p||{});p.id=String(member.id);syncPlayerProgress(p);
   p.gold=Math.max(0,Number(p.gold)||0);p.skills=p.skills||{fist:10,sword:10,axe:10,club:10,dist:10,shield:10};
-  p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.ammo=p.ammo||{};p.kills=p.kills||{};p.bosses=p.bosses||{};p.stamina=Number.isFinite(Number(p.stamina))?Math.max(0,Math.min(FULL_STAMINA,Number(p.stamina))):FULL_STAMINA;
+  p.skillTries=p.skillTries||{};p.supplies=p.supplies||{};p.lootPouch=p.lootPouch||{};p.ammo=p.ammo||{};p.kills=p.kills||{};p.bosses=p.bosses||{};
+  staminaRegenPlayer(p,Date.now(),0.5);
   p.conditions=p.conditions&&typeof p.conditions==="object"?p.conditions:{};
   rewardChestEnsure(p);
   const max=maxStats(p);p.hp=Math.min(max.hp,Math.max(1,Number(p.hp)||max.hp));p.mp=Math.min(max.mp,Math.max(0,Number(p.mp)||max.mp));
@@ -6985,7 +7001,9 @@ function step(auth,now,opts){if(auth.ended)return;
   soulwarTaintTick(auth,dt,now);
   tickDelayedHits(auth,now);
   for(const item of auth.players){
-    const p=item.p;p.stamina=Math.max(0,(Number(p.stamina)||0)-dt/1000);
+    // Caça não regenera: só drena — mas o carimbo avança para o tempo de
+    // caça não ser creditado depois como "ocioso" no load/save seguinte.
+    const p=item.p;p.stamina=Math.max(0,(Number(p.stamina)||0)-dt/1000);p.staminaAt=now;
     if(item.downUntil&&now>=item.downUntil){
       if(item.permadead||authIsBossFight(auth)){
         item.permadead=true;p.hp=0;
@@ -7948,7 +7966,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   stanceTotals,stanceConvert,monkSpellElement,mantraAbsorve,mantraTotal,elementalBond,sanitizeStances,
   imbAllowedCats,imbCombatTotals,tryChallenge,playerAttackInterval,addExp,syncPlayerProgress,
   consumeDistanceAmmo,tryUseRune,RUNEDATA,
-  meleeDamage,distanceDamage,addSkillTries,addManaSpent,advanceTrainingPlayer,playerDamage,playerSkill,attackSkillName,
+  meleeDamage,distanceDamage,addSkillTries,addManaSpent,advanceTrainingPlayer,staminaRegenPlayer,FULL_STAMINA,playerDamage,playerSkill,attackSkillName,
   skillTriesNeeded,mlTriesNeeded,SKILL_MUL,VOC,gearSkillBonus,progressAttack,progressWeaponSkill,
   weaponAmmoKind,ammoCompatibleWithWeapon,ammoMatrixTargets,ammoMatrixCells,quiverPerfectShot,wandPerfectShot,weaponPerfectShot,distanceHitChance,
   rewardChestEnsure,rewardChestAdd,rewardChestClaimOne,rewardChestClaimBundle,rewardChestClaimAll,

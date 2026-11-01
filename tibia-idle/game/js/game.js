@@ -5047,8 +5047,10 @@ function loop(ts) {
     const beforeSkills = JSON.stringify(G.p.skills) + G.p.ml;
     regenInCity(G.p, dt);
     const tr = G.training;
-    const staminaRegen = tr.weapon ? dt / 3000 : dt / 1000;
-    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + staminaRegen);
+    // Treino: 1s de stamina por segundo treinando (1:1) — o checkpoint do
+    // servidor é a autoridade; isto só adianta a barra visualmente.
+    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 1000);
+    G.p.staminaAt = Date.now();
     if (tr.members) trainingPartyTick(tr, dt, Date.now());
     else {
       academyTrainingTick(tr, G.p, dt, Date.now());
@@ -5068,7 +5070,9 @@ function loop(ts) {
     // Durante o fetch OTBM ainda não há G.combat, mas a entrada já é válida.
     // Não reverta G.inCity nesse intervalo ou a finalização parecerá corrompida.
     if(!G.huntEntryPendingToken)G.inCity = true;
-    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 1000);
+    // Ocioso no templo/cidade: 0,5s de stamina por segundo (2min → +1min).
+    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 2000);
+    G.p.staminaAt = Date.now();
     regenInCity(G.p, dt);
     // Soft boots / time rings: duração só com item EQUIPado (Canary stopduration).
     if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);

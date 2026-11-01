@@ -46,7 +46,7 @@ const {
   filterHardObscenity, sanitizeText, vocShort, parsePm,
 } = require("./chat");
 const { initializeAuthority, materializeAuthority, advanceAuthorityState, protectedPlayer, maxStats, ITEMS,
-  sanitizeHelperPresets, advanceTrainingPlayer,
+  sanitizeHelperPresets, advanceTrainingPlayer, staminaRegenPlayer,
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
@@ -962,6 +962,9 @@ async function loadCharacter(db, token, id) {
   let sharedInventory = null;
   try {
     const parsed = typeof data === "string" ? JSON.parse(data) : (data || {});
+    // Stamina: credita o tempo ocioso (0,5s/s) desde a última contagem —
+    // virtual até o próximo save (idempotente em loads repetidos).
+    staminaRegenPlayer(parsed, Date.now(), 0.5);
     parsed.gold = Math.max(0, Math.floor(Number(acc.gold) || 0));
     parsed.vipUntil = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
     // Inventário da conta: bag/lootPouch/depot/reward chest são compartilhados
@@ -1132,6 +1135,8 @@ async function loadCityPlayer(db, acc, character) {
   let p = character.data;
   if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
   p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
+  // Stamina: o personagem estava ocioso desde a última contagem (0,5s/s).
+  staminaRegenPlayer(p, Date.now(), 0.5);
   if (SharedInv && typeof db.accountSharedInventory === "function") {
     try {
       const shared = await db.accountSharedInventory(acc.id);
@@ -1163,6 +1168,10 @@ async function saveCharacter(db, body, id) {
   if(adminGrant&&!accountCanSelfAdmin(acc))return {code:403,body:{ok:false,error:"ADMIN_ONLY",
     msg:"Grants administrativos exigem conta admin (ou TEST_SERVER)."}};
   let prepared=prepareCharacterSave(c,body,{adminGrant});if(prepared.error)return prepared.error;
+  // Stamina: credita o tempo ocioso (0,5s/s) acumulado desde a última
+  // contagem (cidade/parado). Com instância ativa o enforce substitui o
+  // player pelo snapshot autoritativo — o credit vira no-op.
+  try{const _st=JSON.parse(prepared.save.data);staminaRegenPlayer(_st,Date.now(),0.5);prepared.save.data=JSON.stringify(_st);}catch(e){}
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   let patchedInstance=null;
   if(adminGrant){
