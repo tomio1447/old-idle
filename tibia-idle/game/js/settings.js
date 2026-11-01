@@ -6,6 +6,7 @@ const SETTINGS_KEY = "global-idle-settings-v1";
 const ClientSettings = {
   lang: "pt",
   fullhd: false,
+  autoReconnect: false,
 };
 
 function loadClientSettings() {
@@ -15,6 +16,7 @@ function loadClientSettings() {
     const data = JSON.parse(raw);
     if (data.lang === "en" || data.lang === "pt") ClientSettings.lang = data.lang;
     ClientSettings.fullhd = !!data.fullhd;
+    ClientSettings.autoReconnect = !!data.autoReconnect;
   } catch (e) {}
 }
 
@@ -23,6 +25,7 @@ function saveClientSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       lang: ClientSettings.lang,
       fullhd: !!ClientSettings.fullhd,
+      autoReconnect: !!ClientSettings.autoReconnect,
     }));
   } catch (e) {}
 }
@@ -80,6 +83,12 @@ function openConfigModal() {
         <b>${t("config.fullhd")}</b>
       </label>
       <div class="tiny dim mt8">${t("config.fullhd.hint")}</div>
+      <div class="small dim mt12 mb4">${t("config.online")}</div>
+      <label class="toggle cfg-autoreconnect">
+        <input type="checkbox" id="cfg-autoreconnect" ${ClientSettings.autoReconnect ? "checked" : ""}>
+        <b>${t("config.autoreconnect")}</b>
+      </label>
+      <div class="tiny dim mt8">${t("config.autoreconnect.hint")}</div>
       <button type="button" class="primary full mt12" id="cfg-done">${t("config.close")}</button>
     </div>`;
   modal.classList.add("show");
@@ -112,6 +121,13 @@ function openConfigModal() {
       ClientSettings.fullhd = !!e.target.checked;
       saveClientSettings();
       applyClientSettings();
+    });
+  }
+  const autoRc = document.getElementById("cfg-autoreconnect");
+  if (autoRc) {
+    autoRc.addEventListener("change", (e) => {
+      ClientSettings.autoReconnect = !!e.target.checked;
+      saveClientSettings();
     });
   }
 }

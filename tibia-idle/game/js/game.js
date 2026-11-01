@@ -302,6 +302,21 @@ function resumeIdleInstance(session){
   });
 }
 
+/* Auto-save no ON-ADVANCE: toda vez que uma skill, magic level ou level
+ * sobe, agenda um save() em debounce (~2s) — lote de avanços simultâneos
+ * (skill+shield+ml+level na mesma kill) vira um único save. Cobre o save
+ * local (roster/localStorage), o checkpoint da instância online
+ * (persistActiveInstance) e o save do personagem fora de combate. */
+let _advanceSaveTimer=null;
+function markAdvanceSave(){
+  if(_advanceSaveTimer)return;
+  _advanceSaveTimer=setTimeout(()=>{
+    _advanceSaveTimer=null;
+    try{save();}catch(e){}
+  },2000);
+}
+window.markAdvanceSave=markAdvanceSave;
+
 function save() {
   if (!G.p) return false;
   try {
@@ -3969,6 +3984,10 @@ function bindServerStatusControls(){
       hint.textContent=typeof t==="function"?t("server.readyHint"):"SERVIDOR ON — clique em Reconnect.";
       hint.classList.remove("bad");hint.classList.add("good");
     }
+    // AUTO-RECONNECT (opt-in no CONFIG): com o servidor saudável de novo,
+    // dispara o mesmo fluxo do botão — health check + reload. O boot normal
+    // reassume lease/login e retoma a instância (caçada/treino) de onde parou.
+    maybeAutoReconnect();
   });
   window.addEventListener("tibia-idle-server-power",(event)=>{
     const on=!(event&&event.detail&&event.detail.on===false);
@@ -4007,6 +4026,24 @@ function hardReloadBypassCache(){
     try{location.reload();}catch(e2){}
   }
 }
+/* AUTO-RECONNECT: quando ativado no CONFIG, o evento tibia-idle-server-ready
+ * (health OK com a sessão ainda desconectada) dispara o mesmo Reconnect do
+ * botão. Limita tentativas para não entrar em loop de reload se a sessão
+ * estiver morta. */
+let _autoReconnectAt=0;
+function maybeAutoReconnect(){
+  if(typeof ClientSettings==="undefined"||!ClientSettings.autoReconnect)return;
+  if(SERVER_CONNECTION_ONLINE)return;
+  if(typeof ONLINE_SESSION_INVALID!=="undefined"&&ONLINE_SESSION_INVALID)return;
+  // anti-loop: no máx. 1 tentativa a cada 15s (o reload reseta o relógio)
+  if(Date.now()-_autoReconnectAt<15000)return;
+  _autoReconnectAt=Date.now();
+  if(typeof toast==="function")
+    toast(typeof t==="function"?t("server.autoReconnect"):"Auto-reconnect: voltando ao jogo...","level");
+  setTimeout(()=>{reconnectOnlineRuntime();},1200);
+}
+window.maybeAutoReconnect=maybeAutoReconnect;
+
 async function reconnectOnlineRuntime(){
   const btn=$("#btn-reconnect"),bannerBtn=$("#btn-reconnect-banner");
   const err=$("#server-reconnect-error");

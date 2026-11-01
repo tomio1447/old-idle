@@ -659,6 +659,7 @@ function addExp(p, amount) {
     p.hp = b.hp; p.mp = b.mp;
     // Atualiza cap compartilhada da party se este player agora tem mais cap.
     if (p._sharedCap && b.cap > p._sharedCap.value) p._sharedCap.value = b.cap;
+    if (typeof markAdvanceSave === "function") markAdvanceSave();
   }
   return leveled;
 }
@@ -688,6 +689,7 @@ function addSkillTries(p, which, tries) {
     up = true;
     need = skillCost(p.skills[which], base, factor);
   }
+  if (up && typeof markAdvanceSave === "function") markAdvanceSave();
   return up;
 }
 
@@ -720,6 +722,7 @@ function addManaSpent(p, mana) {
     up = true;
     need = mlCost(p.ml, voc.magicFactor);
   }
+  if (up && typeof markAdvanceSave === "function") markAdvanceSave();
   return up;
 }
 
