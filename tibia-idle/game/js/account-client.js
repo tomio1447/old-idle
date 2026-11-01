@@ -2153,6 +2153,72 @@ async function accountRepairCharacter(token,charId,voc,data){
   return {ok:false,msg:r.data.msg||"Falha ao reparar personagem"};
 }
 
+/* ------------------------- painel GM (cross-account) --------------------
+ * Endpoints /api/admin/* — só respondem para contas role=admin. O grant em
+ * terceiros grava o `data` inteiro do char alvo (com wallet da conta dona)
+ * e injeta na instância ativa antes do save. */
+async function adminApiSearchCharacters(token, query) {
+  const r = await _api("GET", "/api/admin/characters?search=" + encodeURIComponent(query || ""), null, token);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Busca falhou", characters: [] };
+  return { ok: true, characters: r.data.characters || [] };
+}
+async function adminApiGetCharacter(token, charId) {
+  const r = await _api("GET", "/api/admin/character/" + encodeURIComponent(charId), null, token);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Personagem não encontrado" };
+  return { ok: true, character: r.data.character };
+}
+async function adminApiSaveCharacter(token, charId, p) {
+  const max = typeof maxStats === "function" ? maxStats(p) : { hp: 0, mp: 0 };
+  const body = Object.assign({ token, data: JSON.stringify(p || {}),
+    maxHp: max.hp || 0, maxMp: max.mp || 0 }, accountLeaseFields());
+  const r = await _api("PUT", "/api/admin/character/" + encodeURIComponent(charId), body);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && (r.data.msg || r.data.error)) || "Grant recusado" };
+  return { ok: true, saveVersion: r.data.saveVersion };
+}
+async function adminApiBan(token, fields) {
+  const r = await _api("POST", "/api/admin/ban", Object.assign({ token }, fields || {}));
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao banir" };
+  return { ok: true, ban: r.data.ban };
+}
+async function adminApiUnban(token, banId) {
+  const r = await _api("POST", "/api/admin/unban", { token, ban_id: banId });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao desbanir" };
+  return { ok: true };
+}
+async function adminApiBans(token) {
+  const r = await _api("GET", "/api/admin/bans", null, token);
+  if (!r.data || !r.data.ok) return { ok: false, bans: [] };
+  return { ok: true, bans: r.data.bans || [] };
+}
+async function adminApiServerSave(token) {
+  const r = await _api("POST", "/api/admin/server-save", { token });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Server save falhou" };
+  return { ok: true };
+}
+async function adminApiTeleportTemple(token, charName) {
+  const r = await _api("POST", "/api/admin/teleport-temple", { token, char_name: charName });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Teleporte falhou" };
+  return { ok: true, teleported: r.data.teleported };
+}
+async function adminApiInstances(token) {
+  const r = await _api("GET", "/api/admin/instances", null, token);
+  if (!r.data || !r.data.ok) return { ok: false, instances: [] };
+  return { ok: true, instances: r.data.instances || [] };
+}
+async function adminApiSpectate(token, opts) {
+  let url = "/api/admin/spectate?";
+  if (opts && opts.char) url += "char=" + encodeURIComponent(opts.char);
+  else url += "instance=" + encodeURIComponent(opts && opts.instance || "");
+  const r = await _api("GET", url, null, token);
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Nada para assistir" };
+  return { ok: true, instance: r.data.instance, target: r.data.target };
+}
+async function adminApiAnnounce(token, fields) {
+  const r = await _api("POST", "/api/admin/announce", Object.assign({ token }, fields || {}));
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Anúncio falhou" };
+  return { ok: true };
+}
+
 async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });
   if(!r.data.ok)return { ok: false, msg:r.data.msg||r.data.error||"Falha ao alterar Tibia Coins" };

@@ -45,6 +45,13 @@
       "text-transform:uppercase;margin-bottom:10px}" +
       ".announce-msg{color:#e8dfc8;font-size:12px;line-height:1.6;margin-bottom:14px;" +
       "max-height:50vh;overflow-y:auto;text-align:left}" +
+      ".announce-from{color:#b8a878;font-size:11px;font-style:italic;" +
+      "margin:-6px 0 10px;text-align:right}" +
+      ".announce-modal.letter{background:linear-gradient(180deg,#efe4bd,#dccb96);" +
+      "border-color:#8a6d3b #5c4520 #5c4520 #8a6d3b;border-radius:2px}" +
+      ".announce-modal.letter .announce-title{color:#5c4520}" +
+      ".announce-modal.letter .announce-msg{color:#3d2f16;font-family:Georgia,serif}" +
+      ".announce-modal.letter .announce-from{color:#6b5429}" +
       ".announce-ok{min-width:120px}";
     document.head.appendChild(st);
   }
@@ -62,9 +69,10 @@
     bg.id = "announce-modal";
     bg.className = "announce-modal-bg";
     bg.innerHTML =
-      '<div class="announce-modal panel">' +
+      '<div class="announce-modal panel' + (a.from ? " letter" : "") + '">' +
         '<div class="announce-title">' + esc(a.title || "Aviso") + '</div>' +
         '<div class="announce-msg">' + esc(a.message).replace(/\n/g, "<br>") + '</div>' +
+        (a.from ? '<div class="announce-from">— ' + esc(a.from) + '</div>' : "") +
         '<button class="primary announce-ok" id="announce-ok">' + esc(a.button || "OK") + '</button>' +
       '</div>';
     document.body.appendChild(bg);

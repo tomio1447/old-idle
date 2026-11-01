@@ -358,6 +358,8 @@ async function adminSummary(db, token, opts) {
   const orders = typeof db.storeOrderList === "function" ? await db.storeOrderList(200) : [];
   const accounts = typeof db.listAccountCoinSummaries === "function"
     ? await db.listAccountCoinSummaries() : [];
+  const vouchers = typeof db.voucherRedemptionList === "function"
+    ? await db.voucherRedemptionList(200) : [];
   let revenueCents = 0, coinsSold = 0, coinsSpent = 0, coinsGranted = 0;
   for (const row of ledger) {
     if (row.kind === "purchase") { coinsSold += row.delta; revenueCents += Number(row.brlCents) || 0; }
@@ -372,8 +374,9 @@ async function adminSummary(db, token, opts) {
       coinsSold, coinsSpent, coinsGranted,
       accounts: accounts.length,
       pendingOrders: orders.filter((o) => o.status === "pending").length,
+      vouchersUsed: vouchers.length,
     },
-    accounts, ledger, orders,
+    accounts, ledger, orders, vouchers,
   } };
 }
 

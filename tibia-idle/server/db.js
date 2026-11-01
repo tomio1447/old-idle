@@ -119,6 +119,8 @@ function JsonStore() {
   this.storeOrders = Array.isArray(storeData && storeData.orders) ? storeData.orders : [];
   this.coinLedger = Array.isArray(storeData && storeData.ledger) ? storeData.ledger : [];
   this.vouchers = Array.isArray(storeData && storeData.vouchers) ? storeData.vouchers : [];
+  // Punições administrativas persistem em data/bans.json
+  this.bans = Array.isArray(this._load("bans.json", [])) ? this._load("bans.json", []) : [];
   this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
@@ -159,6 +161,10 @@ JsonStore.prototype._saveStore = function () {
   fs.writeFileSync(path.join(DATA_DIR, "store.json"),
     JSON.stringify({ orders: this.storeOrders || [], ledger: this.coinLedger || [],
                      vouchers: this.vouchers || [] }, null, 1));
+};
+JsonStore.prototype._saveBans = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "bans.json"),
+    JSON.stringify(this.bans || [], null, 1));
 };
 JsonStore.prototype._pruneSnapshots = function () {
   const list = Array.isArray(this.snapshots) ? this.snapshots : [];
@@ -329,13 +335,14 @@ JsonStore.prototype.instanceSave = function(accountId,instanceId,expectedVersion
   this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.instancePatchState = function(ownerAccountId,requesterAccountId,instanceId,expectedVersion,patchState,lease){
-  if(!this.leaseValidate(requesterAccountId,lease.holderId,lease.secretHash,lease.now))
+  // lease=null = bypass administrativo (grants GM em chars de terceiros).
+  if(lease&&!this.leaseValidate(requesterAccountId,lease.holderId,lease.secretHash,lease.now))
     return {ok:false,error:"LEASE_REQUIRED"};
   const row=this.instanceGet(ownerAccountId);if(!row||row.status!=="active")return {ok:false,error:"INSTANCE_NOT_ACTIVE"};
   if(String(row.instance_id)!==String(instanceId||"")||Number(row.version)!==Number(expectedVersion))
     return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};
   const next=patchState(row.state);if(!next)return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};
-  row.state=next;row.version=Number(row.version)+1;row.updated_at=new Date(lease.now).toISOString();
+  row.state=next;row.version=Number(row.version)+1;row.updated_at=new Date(lease?lease.now:Date.now()).toISOString();
   this._saveRuntime(false);return {ok:true,instance:row};
 };
 JsonStore.prototype.instanceWorkerCandidates = function(limit){
@@ -704,6 +711,27 @@ JsonStore.prototype.voucherClaim = function (accountId, code) {
   this.vouchers.push(key);
   this._saveStore();
   return true;
+};
+/* Vouchers resgatados — o JsonStore guarda só "accountId:CODE" (sem data),
+ * então o createdAt vem do ledger "voucher:CODE" quando existir. */
+JsonStore.prototype.voucherRedemptionList = function (limit) {
+  const n = Math.max(1, Math.min(500, Number(limit) || 200));
+  const ledgerAt = {};
+  for (const row of this.coinLedger || []) {
+    const ref = String(row && row.ref || "");
+    if (ref.indexOf("voucher:") === 0 && row.accountId != null)
+      ledgerAt[Number(row.accountId) + ":" + ref.slice(8).toUpperCase()] =
+        row.at || row.createdAt || null;
+  }
+  const loginOf = {};
+  for (const acc of this.accounts || []) loginOf[Number(acc.id)] = acc.login || "";
+  return (this.vouchers || []).map((key) => {
+    const i = String(key).indexOf(":");
+    const accountId = Number(String(key).slice(0, i)) || 0;
+    const code = String(key).slice(i + 1);
+    return { accountId, login: loginOf[accountId] || "", code,
+      createdAt: ledgerAt[accountId + ":" + code] || null };
+  }).slice(-n).reverse();
 };
 JsonStore.prototype.coinLedgerAdd = function (row) {
   const entry = Object.assign({ id: ++this._coinLedgerSeq }, row || {});
@@ -1125,6 +1153,85 @@ JsonStore.prototype.findCharacterByName = function (name) {
 };
 JsonStore.prototype.findCharacter = function (id) {
   return this.characters.find((c) => c.id === Number(id)) || null;
+};
+
+/* ------------------------------------------------------- admin (bans) --- */
+/* Busca cross-account: o painel admin escolhe QUALQUER personagem pelo nome
+ * para inspeção/edição. */
+JsonStore.prototype.adminSearchCharacters = function (query, limit) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return [];
+  const byAcc = new Map(this.accounts.map((a) => [Number(a.id), a]));
+  return this.characters
+    .filter((c) => String(c.name).toLowerCase().indexOf(q) !== -1)
+    .sort((a, b) => (Number(b.level) || 0) - (Number(a.level) || 0))
+    .slice(0, Math.max(1, Math.min(50, Number(limit) || 25)))
+    .map((c) => ({ id: c.id, name: c.name, voc: c.voc, level: c.level,
+      account_id: Number(c.account_id),
+      login: (byAcc.get(Number(c.account_id)) || {}).login || "" }));
+};
+
+JsonStore.prototype.banList = function () {
+  return (this.bans || []).slice().sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 200);
+};
+/* Ban ativo = não levantado e (sem prazo = permanente OU until futuro). */
+JsonStore.prototype.banActiveForAccount = function (accountId, now) {
+  now = now || Date.now();
+  return (this.bans || []).find((b) => Number(b.account_id) === Number(accountId)
+    && !b.lifted_at && (!b.until || new Date(b.until).getTime() > now)) || null;
+};
+JsonStore.prototype.banCreate = function (entry) {
+  this.bans = this.bans || [];
+  const ban = { id: this._nextId(this.bans),
+    account_id: Number(entry.accountId),
+    character_id: entry.characterId ? Number(entry.characterId) : null,
+    char_name: String(entry.charName || "").slice(0, 40),
+    reason: String(entry.reason || "").slice(0, 300),
+    until: entry.until || null,             // null = tempo indeterminado
+    banned_by: String(entry.by || "admin").slice(0, 80),
+    created_at: new Date().toISOString(), lifted_at: null, lifted_by: null };
+  this.bans.push(ban);
+  this._saveBans();
+  return ban;
+};
+JsonStore.prototype.banLift = function (banId, by) {
+  const ban = (this.bans || []).find((b) => Number(b.id) === Number(banId) && !b.lifted_at);
+  if (!ban) return null;
+  ban.lifted_at = new Date().toISOString();
+  ban.lifted_by = String(by || "admin");
+  this._saveBans();
+  return ban;
+};
+JsonStore.prototype.revokeAccountSessions = function (accountId) {
+  const before = (this.sessions || []).length;
+  this.sessions = (this.sessions || []).filter((s) => Number(s.account_id) !== Number(accountId));
+  if (this.sessions.length !== before) this._saveSessions();
+  return before - this.sessions.length;
+};
+
+/* Lista as instâncias ativas (hunts, bosses, world bosses) com os membros —
+ * alimenta a aba RAID do painel admin. */
+JsonStore.prototype.instanceListActive = function () {
+  const chars = new Map(this.characters.map((c) => [Number(c.id), c]));
+  const accs = new Map(this.accounts.map((a) => [Number(a.id), a]));
+  return (this.instances || []).filter((row) => row.status === "active").map((row) => {
+    let state = null;
+    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    const members = (((state || {}).members) || []).map((m) => {
+      const ch = chars.get(Number(m && m.id));
+      return { id: Number(m && m.id) || null,
+        name: (m && m.p && m.p.name) || (ch && ch.name) || "#" + m.id,
+        level: Number((m && m.p && m.p.level) || (ch && ch.level)) || 0,
+        hp: Number(m && m.hp) || 0 };
+    });
+    return { instance_id: row.instance_id, account_id: Number(row.account_id),
+      kind: row.kind, hunt_id: row.hunt_id || null, boss_id: row.boss_id || null,
+      party_id: row.party_id ? Number(row.party_id) : null,
+      started_at: row.started_at, saved_at: row.saved_at,
+      version: Number(row.version) || 0,
+      login: (accs.get(Number(row.account_id)) || {}).login || "",
+      members };
+  });
 };
 JsonStore.prototype.createCharacter = function (accountId, name, voc, level, data) {
   const c = { id: this._nextId(this.characters), account_id: Number(accountId),
@@ -2470,6 +2577,14 @@ async function MysqlStore() {
         throw e;
       }
     },
+    async voucherRedemptionList(limit) {
+      const n = Math.max(1, Math.min(500, Number(limit) || 200));
+      return await this.query(
+        `SELECT v.account_id AS accountId, a.login AS login, v.code AS code,
+                v.created_at AS createdAt
+         FROM voucher_redemptions v LEFT JOIN accounts a ON a.id=v.account_id
+         ORDER BY v.id DESC LIMIT ?`, [n]);
+    },
     async coinLedgerAdd(row) {
       const r = await this.run(
         `INSERT INTO coin_ledger (account_id, login, kind, delta, coins_after, brl_cents, ref, note)
@@ -2581,6 +2696,79 @@ async function MysqlStore() {
     async findCharacter(id) {
       const rows = await this.query("SELECT * FROM characters WHERE id = ?", [Number(id)]);
       return rows[0] || null;
+    },
+    /* Busca cross-account para o painel admin (edição de terceiros). */
+    async adminSearchCharacters(query, limit) {
+      return this.query(
+        `SELECT c.id, c.name, c.voc, c.level, c.account_id, a.login
+           FROM characters c JOIN accounts a ON a.id = c.account_id
+          WHERE LOWER(c.name) LIKE LOWER(?)
+          ORDER BY c.level DESC LIMIT ?`,
+        ["%" + String(query || "") + "%", Math.max(1, Math.min(50, Number(limit) || 25))]);
+    },
+    async banList() {
+      return this.query("SELECT * FROM bans ORDER BY id DESC LIMIT 200");
+    },
+    async banActiveForAccount(accountId, now) {
+      const rows = await this.query(
+        `SELECT * FROM bans WHERE account_id=? AND lifted_at IS NULL
+           AND (until IS NULL OR until > ?) ORDER BY id DESC LIMIT 1`,
+        [Number(accountId), new Date(now || Date.now())]);
+      return rows[0] || null;
+    },
+    async banCreate(entry) {
+      const r = await this.run(
+        `INSERT INTO bans (account_id, character_id, char_name, reason, until, banned_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [Number(entry.accountId), entry.characterId ? Number(entry.characterId) : null,
+         String(entry.charName || "").slice(0, 40), String(entry.reason || "").slice(0, 300),
+         entry.until ? new Date(entry.until) : null,
+         String(entry.by || "admin").slice(0, 80)]);
+      const rows = await this.query("SELECT * FROM bans WHERE id=?", [r.insertId]);
+      return rows[0] || null;
+    },
+    async banLift(banId, by) {
+      await this.run("UPDATE bans SET lifted_at=NOW(3), lifted_by=? WHERE id=? AND lifted_at IS NULL",
+        [String(by || "admin").slice(0, 80), Number(banId)]);
+      const rows = await this.query("SELECT * FROM bans WHERE id=?", [Number(banId)]);
+      return rows[0] || null;
+    },
+    async revokeAccountSessions(accountId) {
+      const result = await this.run("DELETE FROM sessions WHERE account_id=?", [Number(accountId)]);
+      return result.affectedRows || 0;
+    },
+    /* Instâncias ativas com nomes de membros — alimenta a aba RAID do admin. */
+    async instanceListActive() {
+      const rows = await this.query(
+        "SELECT * FROM account_instances WHERE status='active' ORDER BY started_at DESC LIMIT 200");
+      const out = [];
+      for (const row of rows) {
+        let state = null;
+        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        const memberIds = (((state || {}).members) || []).map((m) => Number(m && m.id)).filter((id) => id > 0);
+        let members = [];
+        if (memberIds.length) {
+          const marks = memberIds.map(() => "?").join(",");
+          const chars = await this.query(
+            `SELECT id, name, level FROM characters WHERE id IN (${marks})`, memberIds);
+          const byId = new Map(chars.map((c) => [Number(c.id), c]));
+          members = ((state || {}).members || []).map((m) => {
+            const ch = byId.get(Number(m && m.id));
+            return { id: Number(m && m.id) || null,
+              name: (m && m.p && m.p.name) || (ch && ch.name) || "#" + m.id,
+              level: Number((m && m.p && m.p.level) || (ch && ch.level)) || 0,
+              hp: Number(m && m.hp) || 0 };
+          });
+        }
+        const [accRows] = [await this.query("SELECT login FROM accounts WHERE id=?", [Number(row.account_id)])];
+        out.push({ instance_id: row.instance_id, account_id: Number(row.account_id),
+          kind: row.kind, hunt_id: row.hunt_id || null, boss_id: row.boss_id || null,
+          party_id: row.party_id ? Number(row.party_id) : null,
+          started_at: row.started_at, saved_at: row.saved_at,
+          version: Number(row.version) || 0,
+          login: (accRows[0] || {}).login || "", members });
+      }
+      return out;
     },
     async createCharacter(accountId, name, voc, level, data) {
       const r = await this.run(
@@ -2866,7 +3054,7 @@ async function MysqlStore() {
           await conn.rollback();return {ok:false,error:"INSTANCE_VERSION_CONFLICT",instance:row};}
         const next=patchState(row.state);if(!next){await conn.rollback();return {ok:false,error:"INSTANCE_PATCH_REJECTED",instance:row};}
         await conn.query("UPDATE account_instances SET state=?,version=version+1,updated_at=? WHERE account_id=?",
-          [next,new Date(lease.now),Number(ownerAccountId)]);
+          [next,new Date(lease?lease.now:Date.now()),Number(ownerAccountId)]);
         const [saved]=await conn.query("SELECT * FROM account_instances WHERE account_id=?",[Number(ownerAccountId)]);
         await conn.commit();return {ok:true,instance:saved[0]};
       }catch(error){try{await conn.rollback();}catch(e){}throw error;}finally{conn.release();}
@@ -4239,6 +4427,19 @@ async function ensureSchema(pool) {
     code VARCHAR(40) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_voucher_account (account_id, code)
+  ) ENGINE=InnoDB`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS bans (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    account_id INT UNSIGNED NOT NULL,
+    character_id INT UNSIGNED DEFAULT NULL,
+    char_name VARCHAR(40) NOT NULL DEFAULT '',
+    reason VARCHAR(300) NOT NULL DEFAULT '',
+    until DATETIME(3) DEFAULT NULL,
+    banned_by VARCHAR(80) NOT NULL DEFAULT 'admin',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    lifted_at DATETIME(3) DEFAULT NULL,
+    lifted_by VARCHAR(80) DEFAULT NULL,
+    INDEX idx_bans_account (account_id, lifted_at, until)
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS account_leases (
     account_id INT UNSIGNED PRIMARY KEY,

@@ -773,6 +773,14 @@ async function login(db, body) {
   if (!acc || !bcrypt.compareSync(password, acc.password_hash)) {
     return { code: 401, body: { ok: false, msg: "Login ou senha inválidos" } };
   }
+  // Ban ativo bloqueia o login (until=null = suspensão por tempo indeterminado).
+  if (typeof db.banActiveForAccount === "function") {
+    const ban = await db.banActiveForAccount(acc.id);
+    if (ban) return { code: 403, body: { ok: false, error: "ACCOUNT_BANNED",
+      msg: "Conta suspensa" + (ban.until ? " até " + new Date(ban.until).toLocaleDateString("pt-BR")
+        : " por tempo indeterminado") + (ban.reason ? ". Motivo: " + ban.reason : ""),
+      ban: { until: ban.until, reason: ban.reason } } };
+  }
   acc = await ensureAccountWallet(db, acc);
   const token = newToken();
   // Novo login transfere a sessão e encerra streams/tickets anteriores antes
@@ -795,6 +803,13 @@ async function me(db, token) {
   if (!token) return { code: 401, body: { ok: false, msg: "Sem token" } };
   let acc = await db.findAccountByToken(token);
   if (!acc) return { code: 401, body: { ok: false, msg: "Sessão inválida" } };
+  if (typeof db.banActiveForAccount === "function") {
+    const ban = await db.banActiveForAccount(acc.id);
+    if (ban) return { code: 403, body: { ok: false, error: "ACCOUNT_BANNED",
+      msg: "Conta suspensa" + (ban.until ? " até " + new Date(ban.until).toLocaleDateString("pt-BR")
+        : " por tempo indeterminado") + (ban.reason ? ". Motivo: " + ban.reason : ""),
+      ban: { until: ban.until, reason: ban.reason } } };
+  }
   acc = await ensureAccountWallet(db, acc);
   const characters = await db.charactersOf(acc.id);
   // Inventário DA CONTA (pouch única etc.): inclui no /api/me para o SSE
@@ -1042,16 +1057,17 @@ function prepareCharacterSave(c,body,opts){
 
 /* Admin grant: injeta o snapshot no authority ativo para o próximo tick não
  * materializar o personagem antigo por cima do MySQL. */
-async function applyAdminPlayerToInstance(db,acc,charId,player,lease){
+async function applyAdminPlayerToInstance(db,acc,charId,player,lease,requesterAccountId){
   const resolved=await resolveInstanceRow(db,acc,charId);
   if(resolved.error)return {ok:false,http:resolved.error};
   const row=resolved.row;
   if(!row||row.status!=="active")return {ok:true,instance:null};
+  const requester=Number(requesterAccountId)||acc.id;
   let last=null;
   for(let attempt=0;attempt<4;attempt++){
     const current=attempt===0?row:await resolveInstanceRow(db,acc,charId).then((r)=>r.row);
     if(!current||current.status!=="active")return {ok:true,instance:null};
-    const result=await db.instancePatchState(current.account_id,acc.id,current.instance_id,Number(current.version),(serialized)=>{
+    const result=await db.instancePatchState(current.account_id,requester,current.instance_id,Number(current.version),(serialized)=>{
       let descriptor=null;try{descriptor=typeof serialized==="string"?JSON.parse(serialized):cloneJson(serialized);}catch(e){return null;}
       const item=descriptor.authority&&descriptor.authority.players&&
         descriptor.authority.players.find((entry)=>String(entry.id)===String(charId));
@@ -4233,6 +4249,194 @@ async function onlineCountPayload(db) {
   }
   return { onlineChars: 0, offlineHunting: 0, total: 0, leases: 0, instances: 0 };
 }
+/* ------------------------------------------------- painel admin (GM) ---
+ * Ferramentas cross-account da conta @admin (role=admin). Tudo exige sessão
+ * admin; edição de terceiros grava direto no char alvo e, se ele estiver em
+ * combate, injeta o snapshot na instância (o tick autoritativo não desfaz). */
+async function adminSession(db,token){
+  const acc=await db.findAccountByToken(String(token||""));
+  if(!acc)return {error:{code:401,body:{ok:false,msg:"Sessão inválida"}}};
+  if(acc.role!=="admin")return {error:{code:403,body:{ok:false,error:"ADMIN_ONLY",msg:"Acesso administrativo"}}};
+  return {acc};
+}
+
+async function adminSearchChars(db,token,query){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  if(typeof db.adminSearchCharacters!=="function")
+    return {code:500,body:{ok:false,msg:"Backend sem busca de personagens"}};
+  const chars=await db.adminSearchCharacters(query,25);
+  return {code:200,body:{ok:true,characters:chars}};
+}
+
+async function adminGetCharacter(db,token,charId){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  const c=await db.findCharacter(Number(charId));
+  if(!c)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const owner=await db.findAccountById(c.account_id);
+  let data={};try{data=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
+  return {code:200,body:{ok:true,character:{
+    id:c.id,name:c.name,voc:c.voc,level:c.level,save_version:Number(c.save_version)||0,
+    account_id:Number(c.account_id),account_login:owner?owner.login:"",
+    data}}};
+}
+
+/* Grant em personagem de terceiros: mesma máquina do admin_grant (sanitiza,
+ * wallet da CONTA do dono, patch na instância) mas sem exigir ownership —
+ * a autoridade é o role=admin da sessão, não a posse do char. */
+async function adminGrantCharacter(db,body,charId){
+  const auth=await adminSession(db,body.token);if(auth.error)return auth.error;
+  const c=await db.findCharacter(Number(charId));
+  if(!c)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const targetAcc=await db.findAccountById(c.account_id);
+  if(!targetAcc)return {code:404,body:{ok:false,msg:"Conta do personagem não encontrada"}};
+  const prepared=prepareCharacterSave(c,Object.assign({},body,{expected_version:Number(c.save_version)||0}),{adminGrant:true});
+  if(prepared.error)return prepared.error;
+  let player={};try{player=JSON.parse(prepared.save.data);}catch(e){player={};}
+  if(typeof db.setAccountGold==="function"&&player.gold!==undefined){
+    const gold=Math.max(0,Math.floor(Number(player.gold)||0));
+    await db.setAccountGold(targetAcc.id,gold);player.gold=gold;
+    prepared.save.data=JSON.stringify(player);
+  }
+  // Inventário da conta ANTES do patch na instância: extrai bag/pouch/depot/
+  // reward chest do grant para o shared e espelha de volta — assim a instância
+  // ativa e o MySQL recebem o MESMO player canônico (sem o split, itens do
+  // grant ficavam só no char e o próximo save do dono os apagava com o shared
+  // antigo).
+  if(SharedInv&&typeof db.accountSharedInventory==="function"){
+    try{await splitSharedInventory(db,targetAcc,player,false);
+      prepared.save.data=JSON.stringify(player);}catch(e){}
+  }
+  // Injeta no authority ANTES do MySQL — senão o próximo tick sobrescreve.
+  // O lease validado é o da SESSÃO ADMIN (requester), não o do dono.
+  const adminLease={holderId:String(body.holder_id||"admin"),secretHash:leaseHash(String(body.lease_token||"")),now:Date.now()};
+  const patched=await applyAdminPlayerToInstance(db,targetAcc,Number(charId),player,
+    body.lease_token?adminLease:null,auth.acc.id);
+  if(patched&&patched.error&&patched.error!=="INSTANCE_NOT_ACTIVE")
+    return {code:409,body:{ok:false,error:patched.error||"INSTANCE_PATCH_FAILED",
+      msg:"Não foi possível aplicar o grant na instância ativa."}};
+  const updated=await db.updateCharacter(c.id,prepared.save.voc,prepared.save.level,
+    prepared.save.data,Object.assign({},prepared.save.extra,{zone:c.zone}));
+  if(typeof db.snapshotAdd==="function")await db.snapshotAdd(targetAcc.id,"character",
+    updated.id,updated.save_version,"admin-grant-gm",updated,true);
+  publishSync(targetAcc.id,"character",{id:Number(updated.id),
+    saveVersion:Number(updated.save_version),source:"admin-grant-gm"});
+  await publishPartyForCharacters(db,[updated.id],"admin-grant-gm");
+  return {code:200,body:{ok:true,saveVersion:Number(updated.save_version),
+    character:{id:updated.id,name:updated.name,saveVersion:Number(updated.save_version)}}};
+}
+
+/* ------------------------------------------------------------ bans --- */
+async function adminBanCreate(db,body){
+  const auth=await adminSession(db,body.token);if(auth.error)return auth.error;
+  const name=String(body.char_name||body.name||"").trim();
+  const c=name?await db.findCharacterByName(name):await db.findCharacter(Number(body.char_id));
+  if(!c)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  // Conta admin nunca pode ser banida — evita o GM se trancar para fora.
+  const targetAcc=await db.findAccountById(c.account_id);
+  if(targetAcc&&String(targetAcc.role)==="admin")
+    return {code:403,body:{ok:false,error:"CANNOT_BAN_ADMIN",msg:"Não é possível banir uma conta administradora"}};
+  const days=Number(body.days);
+  // days<=0 ou ausente => tempo indeterminado (until=null)
+  const until=Number.isFinite(days)&&days>0?new Date(Date.now()+days*86400000).toISOString():null;
+  const already=typeof db.banActiveForAccount==="function"
+    ?await db.banActiveForAccount(c.account_id):null;
+  if(already)return {code:409,body:{ok:false,error:"ALREADY_BANNED",
+    msg:c.name+" já está banido ("+(already.until?"até "+already.until:"permanente")+")",ban:already}};
+  const ban=await db.banCreate({accountId:c.account_id,characterId:c.id,charName:c.name,
+    reason:String(body.reason||"").slice(0,300)||"Sem motivo informado",
+    until,by:String(body.by||auth.acc.login||"admin")});
+  // Derruba a sessão/lease na hora: o próximo request do banido já nega.
+  try{if(SYNC_BUS)SYNC_BUS.revokeAccount(c.account_id);}catch(e){}
+  try{if(typeof db.revokeAccountSessions==="function")await db.revokeAccountSessions(c.account_id);}catch(e){}
+  return {code:200,body:{ok:true,ban}};
+}
+async function adminBanLift(db,body){
+  const auth=await adminSession(db,body.token);if(auth.error)return auth.error;
+  const ban=await db.banLift(Number(body.ban_id),String(body.by||auth.acc.login||"admin"));
+  if(!ban)return {code:404,body:{ok:false,msg:"Ban não encontrado ou já levantado"}};
+  return {code:200,body:{ok:true,ban}};
+}
+async function adminBanList(db,token){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  const bans=typeof db.banList==="function"?await db.banList():[];
+  return {code:200,body:{ok:true,bans}};
+}
+
+/* --------------------------------------------------- server actions --- */
+/* Server save manual: flusha runtime/characters no JsonStore e avisa os
+ * clientes pelo mesmo evento do save diário (broadcast "server-save"). */
+async function adminServerSave(db,token){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  let flushed=false;
+  try{if(typeof db._flushRuntime==="function"){db._flushRuntime();flushed=true;}}catch(e){}
+  try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")
+    SYNC_BUS.broadcastAll("server-save",{day:new Date().toISOString().slice(0,10),manual:true});}catch(e){}
+  return {code:200,body:{ok:true,flushed}};
+}
+
+/* TEMPLO: encerra a instância da party do personagem — a PT inteira volta
+ * pro templo (o cliente detecta instance.ended e sai do combate). */
+async function adminTeleportTemple(db,body){
+  const auth=await adminSession(db,body.token);if(auth.error)return auth.error;
+  const c=await db.findCharacterByName(String(body.char_name||body.name||"").trim());
+  if(!c)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const party=await db.partyFindByCharacter(c.id);
+  let instance=null;
+  if(party&&typeof db.instanceGetByParty==="function")instance=await db.instanceGetByParty(party.id);
+  if(!instance)instance=await db.instanceGet(c.account_id);
+  // World boss compartilhado: a sala vive na conta DONA, não na do alvo.
+  if(!instance){
+    const wb=global.__WORLD_BOSS&&global.__WORLD_BOSS.sharedForAccount
+      ?global.__WORLD_BOSS.sharedForAccount(c.account_id):null;
+    if(wb&&wb.ownerAccountId)instance=await db.instanceGet(wb.ownerAccountId);
+  }
+  if(!instance||instance.status!=="active")
+    return {code:404,body:{ok:false,msg:c.name+" não está em combate"}};
+  const ended=await db.instanceEndForced(Number(instance.account_id),"gm-temple-teleport");
+  try{publishSync(Number(instance.account_id),"instance",{status:"ended",
+    terminalReason:"gm-temple-teleport"});}catch(e){}
+  let memberCount=0;
+  try{const st=typeof instance.state==="string"?JSON.parse(instance.state):(instance.state||{});
+    memberCount=Array.isArray(st.members)?st.members.length:0;}catch(e){}
+  return {code:200,body:{ok:true,instance:instanceSummary(ended&&ended.instance||instance,false),
+    teleported:memberCount}};
+}
+
+async function adminInstancesList(db,token){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  const list=typeof db.instanceListActive==="function"?await db.instanceListActive():[];
+  return {code:200,body:{ok:true,instances:list}};
+}
+
+/* Espectador: devolve o estado vivo da instância do personagem para o GM
+ * assistir (players+mobs+grid). O GM nunca entra no estado — não ataca,
+ * não é alvo e não bloqueia porque não existe para o servidor. */
+async function adminSpectate(db,token,charName,instanceId){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  let row=null,target=null;
+  if(charName){
+    target=await db.findCharacterByName(String(charName).trim());
+    if(!target)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+    const party=await db.partyFindByCharacter(target.id);
+    if(party&&typeof db.instanceGetByParty==="function")row=await db.instanceGetByParty(party.id);
+    if(!row)row=await db.instanceGet(target.account_id);
+    // World boss compartilhado: a sala vive na conta dona.
+    if(!row){
+      const wb=global.__WORLD_BOSS&&global.__WORLD_BOSS.sharedForAccount
+        ?global.__WORLD_BOSS.sharedForAccount(target.account_id):null;
+      if(wb&&wb.ownerAccountId)row=await db.instanceGet(wb.ownerAccountId);
+    }
+  }else if(instanceId){
+    const all=typeof db.instanceListActive==="function"?await db.instanceListActive():[];
+    const found=all.find((r)=>String(r.instance_id)===String(instanceId));
+    if(found)row=await db.instanceGet(found.account_id);
+  }
+  if(!row||row.status!=="active")
+    return {code:404,body:{ok:false,msg:"Nenhum combate ativo para assistir"}};
+  return {code:200,body:{ok:true,instance:instanceSummary(row,true),
+    target:target?{id:target.id,name:target.name}:null}};
+}
+
 async function adminAccountBundle(db,token,accountId,limit){
   const admin=await db.findAccountByToken(token);if(!admin)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
   if(admin.role!=="admin")return {code:403,body:{ok:false,error:"ADMIN_ONLY",msg:"Acesso administrativo"}};
@@ -4697,6 +4901,7 @@ async function main() {
         const ttlSec=Math.max(30,Math.min(86400,Math.floor(Number(body.ttlSec)||900)));
         const button=String(body.button||"OK").slice(0,30)||"OK";
         ANNOUNCE_STATE.current={id:String(Date.now()),title,message,button,
+          from:String(body.from||"").slice(0,60)||null,
           at:Date.now(),until:Date.now()+ttlSec*1000};
         try{if(SYNC_BUS&&typeof SYNC_BUS.broadcastAll==="function")SYNC_BUS.broadcastAll("announce",ANNOUNCE_STATE.current);}catch(e){}
         console.log("[announce] publicado:",JSON.stringify(title),"ttl="+ttlSec+"s","via="+auth.via);
@@ -5056,6 +5261,41 @@ async function main() {
           checksum:bundle.body.checksum,snapshots:bundle.body.payload.snapshots});
         return send(res,bundle.code,bundle.body);
       }
+      /* -------- painel GM (@admin): edição/punição cross-account -------- */
+      if(req.method==="GET"&&url==="/api/admin/characters"){
+        const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
+        const r=await adminSearchChars(db,token,q.get("search")||q.get("q")||"");
+        return send(res,r.code,r.body);
+      }
+      const adminCharMatch=url.match(/^\/api\/admin\/character\/(\d+)$/);
+      if(adminCharMatch&&req.method==="GET"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminGetCharacter(db,token,adminCharMatch[1]);
+        return send(res,r.code,r.body);
+      }
+      if(adminCharMatch&&req.method==="PUT"){
+        const r=await adminGrantCharacter(db,await readBody(req),adminCharMatch[1]);
+        return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/admin/ban"){
+        const r=await adminBanCreate(db,await readBody(req));return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/unban"){
+        const r=await adminBanLift(db,await readBody(req));return send(res,r.code,r.body);}
+      if(req.method==="GET"&&url==="/api/admin/bans"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminBanList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/server-save"){
+        const token=(req.headers.authorization||"").replace("Bearer ","")||String((await readBody(req)).token||"");
+        const r=await adminServerSave(db,token);return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/teleport-temple"){
+        const r=await adminTeleportTemple(db,await readBody(req));return send(res,r.code,r.body);}
+      if(req.method==="GET"&&url==="/api/admin/instances"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminInstancesList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="GET"&&url==="/api/admin/spectate"){
+        const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
+        const r=await adminSpectate(db,token,q.get("char"),q.get("instance"));
+        return send(res,r.code,r.body);}
       // ---- RANKINGS (DB expandida) ----
       if (req.method === "GET" && url === "/api/rankings") {
         const q = new URL(req.url, "http://x").searchParams;

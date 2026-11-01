@@ -3070,6 +3070,31 @@ div.item-sprite { background-repeat: no-repeat; }
   margin-top: 8px; padding: 6px 8px; background: #0f0d0a;
   border: 1px solid #2a2620; min-height: 26px; color: #9ce84a;
 }
+/* Seletor de personagem de terceiros do painel GM */
+.admin-targetbar {
+  padding: 6px 8px; margin-bottom: 6px;
+  background: #14120e; border: 1px solid #2a2620;
+}
+/* Modal espectador (WATCH / FOLLOW / RAID) — canvas próprio, fora do jogo */
+.spec-modal-bg {
+  position: fixed; inset: 0; z-index: 99990;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .72);
+}
+.spec-modal {
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #2b2820, #171512);
+  border: 2px solid; border-color: #d4af37 #6b5715 #6b5715 #d4af37;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, .7);
+}
+.spec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.spec-head b { color: #ffe680; font-size: 13px; letter-spacing: .5px; }
+#spec-canvas {
+  display: block; background: #050605;
+  border: 1px solid #3a372f; image-rendering: pixelated;
+  max-width: 92vw; max-height: 70vh;
+}
+.spec-foot { margin-top: 6px; }
 
 /* ------------------------------------------------------- Monk: Mantra e Harmony
  * A faixa fica logo abaixo das barras do personagem, so para o Monk. */
@@ -5413,3 +5438,13 @@ body.quest-lobby-open #party-panel { display:none !important; }
 .layout .inv-item { background:#1c1a16; border-color:#3a372f; }
 .layout .inv-item.empty { background:#14120e; }
 .layout .inv-item.empty:hover { border-color:#3a372f; }
+
+/* ------- modo espectador do GM (admin-spectate.js) ------- */
+.spec-modal-bg{position:fixed;inset:0;z-index:99998;display:flex;align-items:center;
+  justify-content:center;background:rgba(0,0,0,.74)}
+.spec-modal{background:#171512;border:2px solid #6b5715;padding:10px;max-width:96vw}
+.spec-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;color:#ffe680}
+.spec-head #spec-info{flex:1;text-align:center}
+.spec-modal canvas{display:block;max-width:92vw;max-height:70vh;width:auto;height:auto;
+  background:#050605;border:1px solid #3a372f;cursor:crosshair}
+.spec-foot{margin-top:6px;text-align:center}

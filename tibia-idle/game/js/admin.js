@@ -22,6 +22,12 @@ const ADMIN = {
   forgeMobBusca: "",
   forgeStacks: 5,
   logs: [],
+  /* Personagem de TERCEIRO selecionado pelo GM para edição
+   * ({id,name,account_login,data}). null = o próprio char logado. */
+  target: null,
+  charBusca: "",
+  charResults: [],
+  targetLoading: false,
 };
 
 /* Abas do painel */
@@ -35,8 +41,22 @@ const ADMIN_TABS = [
   { id: "equip", nome: "🛡 Equipamento" },
   { id: "forge", nome: "⚒ FORJE" },
   { id: "mobs", nome: "👹 Invocar" },
-  { id: "store", nome: "💰 Faturamento" },
+  { id: "store", nome: "💰 Financeiro" },
+  { id: "ban", nome: "🔨 Banimento" },
+  { id: "server", nome: "💾 Server" },
+  { id: "popup", nome: "📜 Popup" },
+  { id: "templo", nome: "🏛 Templo" },
+  { id: "raid", nome: "⚔ Raids" },
+  { id: "spec", nome: "👁 Watch" },
 ];
+
+/* Objeto que as abas de edição devem mexer: o char remoto selecionado ou o
+ * próprio logado. Abas que dependem de G.combat/conta seguem no char local. */
+function adminTargetP() {
+  return (ADMIN.target && ADMIN.target.data) ? ADMIN.target.data : G.p;
+}
+/* Abas que editam o `p` diretamente — funcionam no alvo remoto. */
+const ADMIN_TARGETED_TABS = { char: 1, skills: 1, items: 1, loot: 1, imb: 1, equip: 1 };
 
 /* Registra o que foi feito, para o usuario ver que a acao pegou */
 function adminLog(msg) {
@@ -60,7 +80,21 @@ function adminAplicar(msg) {
 }
 
 async function adminPersist() {
-  const p = typeof G !== "undefined" && G ? G.p : null;
+  const p = adminTargetP();
+  // Alvo remoto: grant cross-account no servidor (sem tocar no save local).
+  if (ADMIN.target) {
+    if (typeof adminApiSaveCharacter === "function" && typeof sessionToken === "function") {
+      const r = await adminApiSaveCharacter(sessionToken(), ADMIN.target.id, p);
+      if (!r.ok && typeof toast === "function")
+        toast(r.msg || "Servidor recusou o grant no personagem alvo", "bad");
+      else if (r.ok) {
+        ADMIN.target.save_version = r.saveVersion;
+        adminLog(`grant aplicado em ${ADMIN.target.name} (v${r.saveVersion})`);
+      }
+    }
+    renderAdminContent();
+    return true;
+  }
   if (p && typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
   try {
     if (p) {
@@ -109,6 +143,7 @@ function openAdmin(aba) {
       <button class="sm" id="admin-close">✕</button>
     </div>
     <div class="panel-body">
+      <div class="admin-targetbar" id="admin-targetbar"></div>
       <div class="admin-tabs" id="admin-tabs"></div>
       <div class="admin-content" id="admin-content"></div>
       <div class="admin-log" id="admin-log"></div>
@@ -117,8 +152,58 @@ function openAdmin(aba) {
   $("#admin-close").addEventListener("click", () => {
     $("#modal").classList.remove("show", "wide");
   });
+  renderAdminTargetBar();
   renderAdminTabs();
   renderAdminContent();
+}
+
+/* ---- seletor de personagem de terceiros (edição cross-account) ---- */
+function renderAdminTargetBar() {
+  const el = $("#admin-targetbar");
+  if (!el) return;
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  if (!online) { el.innerHTML = ""; return; }
+  const t = ADMIN.target;
+  el.innerHTML = `
+    <div class="row" style="gap:6px;align-items:center;margin-bottom:8px">
+      <span class="tiny dim">Alvo:</span>
+      <b class="small" style="color:${t ? "#ffe680" : "#9ce84a"}">${t ? t.name + " · @" + t.account_login : (G.p ? G.p.name : "—") + " (você)"}</b>
+      <input id="adm-charbusca" class="admin-in" style="flex:1;max-width:220px"
+             placeholder="Nome do personagem…" value="${ADMIN.charBusca || ""}">
+      <button class="sm" id="adm-charsearch">Buscar</button>
+      ${t ? `<button class="sm" id="adm-charclear">Voltar ao meu char</button>` : ""}
+    </div>
+    ${ADMIN.charResults.length ? `
+    <div class="admin-quick mb8">
+      ${ADMIN.charResults.map((c) => `<button class="sm" data-pickchar="${c.id}">
+        ${c.name} · ${c.voc} nv${c.level} · @${c.login}</button>`).join("")}
+    </div>` : ""}`;
+  const inp = $("#adm-charbusca");
+  const doSearch = async () => {
+    ADMIN.charBusca = inp.value;
+    if (typeof adminApiSearchCharacters !== "function") return;
+    const r = await adminApiSearchCharacters(sessionToken(), ADMIN.charBusca);
+    ADMIN.charResults = (r && r.characters) || [];
+    renderAdminTargetBar();
+  };
+  $("#adm-charsearch").addEventListener("click", doSearch);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+  const clear = $("#adm-charclear");
+  if (clear) clear.addEventListener("click", () => {
+    ADMIN.target = null; ADMIN.charResults = [];
+    renderAdminTargetBar(); renderAdminContent();
+  });
+  $$("#admin-targetbar [data-pickchar]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      const r = await adminApiGetCharacter(sessionToken(), b.dataset.pickchar);
+      if (!r || !r.ok) { toast((r && r.msg) || "Falha ao carregar personagem", "bad"); return; }
+      const c = r.character;
+      ADMIN.target = { id: c.id, name: c.name, account_login: c.account_login,
+        save_version: c.save_version, data: c.data || {} };
+      ADMIN.charResults = [];
+      adminLog("alvo: " + c.name + " (@" + c.account_login + ")");
+      renderAdminTargetBar(); renderAdminContent();
+    }));
 }
 
 function renderAdminTabs() {
@@ -146,12 +231,16 @@ function renderAdminLog() {
 function renderAdminContent() {
   const el = $("#admin-content");
   if (!el) return;
-  const p = G.p;
+  // Abas de edição operam no ALVO (remoto ou próprio); as demais sempre usam
+  // o char logado/conta (combat local, wallet da sessão, ferramentas GM).
+  const p = ADMIN_TARGETED_TABS[ADMIN.aba] ? adminTargetP() : G.p;
   const fn = {
     char: renderAdminChar, coins: renderAdminCoins,
     skills: renderAdminSkills,
     items: renderAdminItems, loot: renderAdminLoot, imb: renderAdminImbuements, equip: renderAdminEquip,
     forge: renderAdminForge, mobs: renderAdminMobs, store: renderAdminStore,
+    ban: renderAdminBan, server: renderAdminServer, popup: renderAdminPopup,
+    templo: renderAdminTemplo, raid: renderAdminRaid, spec: renderAdminSpec,
   }[ADMIN.aba] || renderAdminChar;
   fn(p, el);
   renderAdminLog();
@@ -248,16 +337,25 @@ async function renderAdminStore(p, el) {
   const accounts = r.accounts || [];
   const orders = r.orders || [];
   const ledger = r.ledger || [];
+  const vouchers = r.vouchers || [];
   el.innerHTML = `
-    <div class="tiny dim mb4">Controle de Tibia Coins: compras Mercado Pago, gastos de VIP e ajustes manuais.</div>
+    <div class="tiny dim mb4">Controle de Tibia Coins: compras Mercado Pago, gastos de VIP, vouchers resgatados e ajustes manuais.</div>
     <div class="admin-grid mb4">
       <div class="admin-card"><div class="admin-card-t">Faturamento</div><b style="color:#ffe680">${storeFmtBrl(t.revenueBrl)}</b></div>
       <div class="admin-card"><div class="admin-card-t">TC vendidos</div><b>${t.coinsSold || 0}</b></div>
       <div class="admin-card"><div class="admin-card-t">TC gastos (VIP)</div><b>${t.coinsSpent || 0}</b></div>
       <div class="admin-card"><div class="admin-card-t">Ajustes admin</div><b>${t.coinsGranted || 0}</b></div>
+      <div class="admin-card"><div class="admin-card-t">Vouchers usados</div><b>${t.vouchersUsed || vouchers.length}</b></div>
       <div class="admin-card"><div class="admin-card-t">Pendentes</div><b>${t.pendingOrders || 0}</b></div>
       <div class="admin-card"><div class="admin-card-t">Mercado Pago</div><b>${r.mpConfigured ? "ligado" : "off"}</b></div>
     </div>
+    ${vouchers.length ? `
+    <div class="admin-card-t">Vouchers resgatados</div>
+    <div style="max-height:140px;overflow:auto" class="mb4">
+      <table class="admin-tbl"><thead><tr><th>Login</th><th>Código</th><th>Quando</th></tr></thead><tbody>
+        ${vouchers.map((v) => `<tr><td>${String(v.login || "").replace(/[<>]/g, "")}</td><td><b>${String(v.code || "").replace(/[<>]/g, "")}</b></td><td>${storeFmtWhen(v.createdAt)}</td></tr>`).join("")}
+      </tbody></table>
+    </div>` : ""}
     <div class="admin-card-t">Saldos por conta</div>
     <div style="max-height:180px;overflow:auto" class="mb4">
       <table class="admin-tbl"><thead><tr><th>Login</th><th>TC</th><th>VIP</th></tr></thead><tbody>
@@ -1491,3 +1589,231 @@ function renderAdminMobs(p, el) {
     }));
 }
 
+
+/* ================================================== abas do painel GM ===
+ * Ferramentas da conta @admin (role=admin) — operam cross-account via
+ * /api/admin/*. Diferente das abas de debug (que editam o char alvo), estas
+ * agem no servidor/terceiros diretamente. */
+
+/* ----------------------------------------------------- 🔨 BANIMENTO --- */
+function renderAdminBan(p, el) {
+  el.innerHTML = `
+    <div class="admin-grid">
+      <div class="admin-card">
+        <div class="admin-card-t">Banir personagem</div>
+        <div class="row" style="gap:6px;align-items:center;margin-bottom:6px">
+          <input id="adm-ban-name" class="admin-in" style="flex:1" placeholder="Nome do jogador">
+        </div>
+        <div class="row" style="gap:6px;align-items:center;margin-bottom:6px">
+          <input id="adm-ban-reason" class="admin-in" style="flex:1" placeholder="Motivo">
+        </div>
+        <div class="row" style="gap:6px;align-items:center">
+          <input id="adm-ban-days" type="number" class="admin-in" style="width:90px"
+                 min="0" placeholder="Dias" title="0 ou vazio = tempo indeterminado">
+          <button class="sm primary" id="adm-ban-go">Banir</button>
+        </div>
+        <div class="tiny dim mt4">Dias 0 ou vazio = suspensão por tempo indeterminado.
+          O ban derruba a sessão do jogador na hora e bloqueia o login da conta.</div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-t">Bans ativos</div>
+        <div id="adm-ban-list" class="tiny dim">carregando…</div>
+      </div>
+    </div>`;
+  const loadBans = async () => {
+    const box = $("#adm-ban-list"); if (!box) return;
+    const r = await adminApiBans(sessionToken());
+    const active = (r.bans || []).filter((b) => !b.lifted_at);
+    box.innerHTML = active.length ? active.map((b) => `
+      <div class="stat-row" style="align-items:flex-start">
+        <span class="k">${b.char_name} <span class="dim">#${b.id} · por ${b.banned_by}</span></span>
+        <span class="v" style="text-align:right">
+          <div class="tiny">${b.until ? "até " + new Date(b.until).toLocaleString("pt-BR") : "<b style='color:#ff9a6a'>PERMANENTE</b>"}</div>
+          <div class="tiny dim">${String(b.reason || "").replace(/[<>]/g, "")}</div>
+          <button class="sm" data-unban="${b.id}">desbanir</button>
+        </span>
+      </div>`).join("") : `<span class="dim">Nenhum ban ativo.</span>`;
+    $$("#adm-ban-list [data-unban]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const r2 = await adminApiUnban(sessionToken(), b.dataset.unban);
+        if (!r2.ok) { toast(r2.msg || "Falha ao desbanir", "bad"); return; }
+        adminAplicar("ban #" + b.dataset.unban + " levantado"); loadBans();
+      }));
+  };
+  $("#adm-ban-go").addEventListener("click", async () => {
+    const name = $("#adm-ban-name").value.trim();
+    if (!name) { toast("Nome do jogador obrigatório", "bad"); return; }
+    const r = await adminApiBan(sessionToken(), {
+      char_name: name,
+      reason: $("#adm-ban-reason").value.trim(),
+      days: Math.max(0, parseInt($("#adm-ban-days").value, 10) || 0),
+      by: (G.p && G.p.name) || "admin",
+    });
+    if (!r.ok) { toast(r.msg || "Falha ao banir", "bad"); return; }
+    adminAplicar(name + " banido"); loadBans();
+  });
+  loadBans();
+}
+
+/* ---------------------------------------------------- 💾 SERVER SAVE --- */
+async function renderAdminServer(p, el) {
+  let health = null;
+  try {
+    const base = (typeof ACCOUNT_API_URL === "string" && ACCOUNT_API_URL) || "";
+    health = await fetch(base + "/api/health").then((r) => r.json());
+  } catch (e) {}
+  const on = health && health.playersOnline || {};
+  el.innerHTML = `
+    <div class="admin-grid">
+      <div class="admin-card">
+        <div class="admin-card-t">Server Save</div>
+        <div class="tiny dim mb8">Grava o estado do servidor (flush de
+          instâncias/personagens) e avisa todos os clientes — igual ao save
+          diário das 00:00, mas disparado manualmente.</div>
+        <button class="sm primary" id="adm-ssave">Salvar agora</button>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-t">Status</div>
+        <div class="stat-row"><span class="k">Online (combat)</span><span class="v">${on.onlineChars || 0}</span></div>
+        <div class="stat-row"><span class="k">Caçando offline</span><span class="v">${on.offlineHunting || 0}</span></div>
+        <div class="stat-row"><span class="k">Instâncias ativas</span><span class="v">${on.instances || 0}</span></div>
+        <div class="stat-row"><span class="k">Boot</span><span class="v tiny dim">${health && health.bootId ? String(health.bootId).slice(0, 10) : "—"}</span></div>
+      </div>
+    </div>`;
+  $("#adm-ssave").addEventListener("click", async () => {
+    const btn = $("#adm-ssave"); btn.disabled = true;
+    const r = await adminApiServerSave(sessionToken());
+    btn.disabled = false;
+    if (!r.ok) { toast(r.msg || "Server save falhou", "bad"); return; }
+    adminAplicar("server save executado");
+    toast("Server save concluído", "good");
+  });
+}
+
+/* --------------------------------------------------------- 📜 POPUP --- */
+function renderAdminPopup(p, el) {
+  el.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-t">Popup global — carta para todos os jogadores</div>
+      <div class="row mb8" style="gap:6px;align-items:center">
+        <input id="adm-pop-title" class="admin-in" style="flex:1" placeholder="Título (ex.: Aviso do Reino)" value="Carta do Reino">
+        <input id="adm-pop-btn" class="admin-in" style="width:110px" placeholder="Botão" value="Entendido">
+      </div>
+      <textarea id="adm-pop-msg" class="admin-in" rows="6" style="width:100%;resize:vertical"
+        placeholder="Mensagem que todos os jogadores receberão…"></textarea>
+      <div class="row mt8" style="gap:6px;align-items:center">
+        <span class="tiny dim">Assinatura:</span>
+        <input id="adm-pop-from" class="admin-in" style="flex:1" value="${(G.p && G.p.name) || "ADM"}">
+        <input id="adm-pop-ttl" type="number" class="admin-in" style="width:110px" value="900" title="Segundos que o popup fica disponível">
+        <button class="sm primary" id="adm-pop-send">Enviar</button>
+      </div>
+      <div class="tiny dim mt4">Chega na hora para quem está online (SSE) e por
+        TTL para quem logar em seguida — formato de carta com o remetente.</div>
+    </div>`;
+  $("#adm-pop-send").addEventListener("click", async () => {
+    const msg = $("#adm-pop-msg").value.trim();
+    if (!msg) { toast("Mensagem vazia", "bad"); return; }
+    const r = await adminApiAnnounce(sessionToken(), {
+      title: $("#adm-pop-title").value.trim() || "Aviso",
+      message: msg,
+      button: $("#adm-pop-btn").value.trim() || "OK",
+      from: $("#adm-pop-from").value.trim(),
+      ttlSec: Math.max(30, parseInt($("#adm-pop-ttl").value, 10) || 900),
+    });
+    if (!r.ok) { toast(r.msg || "Anúncio falhou", "bad"); return; }
+    adminAplicar("popup enviado para todos");
+    toast("Carta enviada a todos os jogadores", "good");
+    $("#adm-pop-msg").value = "";
+  });
+}
+
+/* -------------------------------------------------------- 🏛 TEMPLO --- */
+function renderAdminTemplo(p, el) {
+  el.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-t">Teleportar para o templo</div>
+      <div class="tiny dim mb8">Encerra a instância da party do jogador — a
+        PT inteira volta para o templo. Útil para destravar world bosses
+        bugados ou tirar gente presa em sala.</div>
+      <div class="row" style="gap:6px;align-items:center">
+        <input id="adm-tp-name" class="admin-in" style="flex:1" placeholder="Nome do jogador">
+        <button class="sm primary" id="adm-tp-go">Teleportar PT → templo</button>
+      </div>
+    </div>`;
+  $("#adm-tp-go").addEventListener("click", async () => {
+    const name = $("#adm-tp-name").value.trim();
+    if (!name) { toast("Nome do jogador obrigatório", "bad"); return; }
+    const r = await adminApiTeleportTemple(sessionToken(), name);
+    if (!r.ok) { toast(r.msg || "Teleporte falhou", "bad"); return; }
+    adminAplicar(name + " e PT teleportados para o templo (" + (r.teleported || 0) + " membros)");
+    toast("PT teleportada para o templo", "good");
+  });
+}
+
+/* ---------------------------------------------------------- ⚔ RAIDS --- */
+async function renderAdminRaid(p, el) {
+  el.innerHTML = `<div class="tiny dim">Carregando instâncias ativas…</div>`;
+  const r = await adminApiInstances(sessionToken());
+  const list = (r.instances || []);
+  const fmtKind = (i) => i.boss_id ? "👑 boss " + i.boss_id : (i.kind === "boss" ? "👑 boss" : "🗺 " + (i.hunt_id || i.kind));
+  el.innerHTML = `
+    <div class="admin-card">
+      <div class="admin-card-t">Raids e hunts ativas (${list.length})
+        <button class="sm" id="adm-raid-reload" style="float:right">↻</button></div>
+      ${list.length ? `<div style="max-height:420px;overflow:auto">
+        <table class="admin-tbl"><thead><tr><th>Local</th><th>Membros</th><th>Início</th><th></th></tr></thead><tbody>
+        ${list.map((i) => `<tr>
+          <td>${fmtKind(i)}<div class="tiny dim">@${i.login}</div></td>
+          <td class="tiny">${(i.members || []).map((m) => m.name + " (" + m.level + ")").join(", ") || "—"}</td>
+          <td class="tiny">${i.started_at ? new Date(i.started_at).toLocaleTimeString("pt-BR") : "—"}</td>
+          <td><button class="sm" data-raid-watch="${i.instance_id}">Assistir</button></td>
+        </tr>`).join("")}
+        </tbody></table></div>`
+      : `<div class="tiny dim">Nenhum combate ativo no momento.</div>`}
+      <div class="tiny dim mt4">Assistir abre a visão espectador com o
+        fantasma do GM: você anda pela sala sem atacar, sem tomar dano,
+        sem bloquear e sem ser alvo.</div>
+    </div>`;
+  $("#adm-raid-reload").addEventListener("click", () => renderAdminContent());
+  $$("#admin-content [data-raid-watch]").forEach((b) =>
+    b.addEventListener("click", () => {
+      if (typeof adminSpecOpen === "function")
+        adminSpecOpen({ mode: "raid", instanceId: b.dataset.raidWatch });
+    }));
+}
+
+/* ---------------------------------------------------------- 👁 WATCH --- */
+function renderAdminSpec(p, el) {
+  el.innerHTML = `
+    <div class="admin-grid">
+      <div class="admin-card">
+        <div class="admin-card-t">WATCH — acompanhar personagem</div>
+        <div class="tiny dim mb8">Visão do combate do jogador como se você
+          estivesse logado — somente leitura, nada pode ser alterado.</div>
+        <div class="row" style="gap:6px;align-items:center">
+          <input id="adm-watch-name" class="admin-in" style="flex:1" placeholder="Nome do personagem">
+          <button class="sm primary" id="adm-watch-go">Assistir</button>
+        </div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-t">FOLLOW — entrar como fantasma</div>
+        <div class="tiny dim mb8">Teleporta o GM para a instância do jogador:
+          você anda pela área (fantasma), assiste a luta e verifica bugs —
+          não ataca, não toma dano, não bloqueia caminho e não é alvo.</div>
+        <div class="row" style="gap:6px;align-items:center">
+          <input id="adm-follow-name" class="admin-in" style="flex:1" placeholder="Nome do jogador">
+          <button class="sm primary" id="adm-follow-go">Seguir</button>
+        </div>
+      </div>
+    </div>`;
+  $("#adm-watch-go").addEventListener("click", () => {
+    const name = $("#adm-watch-name").value.trim();
+    if (!name) { toast("Nome do personagem obrigatório", "bad"); return; }
+    if (typeof adminSpecOpen === "function") adminSpecOpen({ mode: "watch", charName: name });
+  });
+  $("#adm-follow-go").addEventListener("click", () => {
+    const name = $("#adm-follow-name").value.trim();
+    if (!name) { toast("Nome do jogador obrigatório", "bad"); return; }
+    if (typeof adminSpecOpen === "function") adminSpecOpen({ mode: "follow", charName: name });
+  });
+}
