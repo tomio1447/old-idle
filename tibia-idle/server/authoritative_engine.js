@@ -1590,7 +1590,11 @@ function tryAuthAutoSell(auth,item,now){
   if((Number(p._pouchAutoSellAt)||0)+cd>(now||Date.now()))return;
   if(!lootPouchFillPct(p))return;
   const gold=sellAuthAllPouch(p);
-  if(gold>0){p._pouchAutoSellAt=now||Date.now();auth.events.push({t:"sell",gold,msg:"Autoseller",targetId:String(item.id),ts:now});}
+  // _pouchDirty: o tick do db faz flush do delta da pouch pro shared sem
+  // esperar o terminal — itens autosold não podem "reaparecer" nem ser
+  // revendidos por outra sessão da conta antes do fim da caçada.
+  if(gold>0){p._pouchAutoSellAt=now||Date.now();p._pouchDirty=1;
+    auth.events.push({t:"sell",gold,msg:"Autoseller",targetId:String(item.id),ts:now});}
 }
 function blessingPrice(level){level=Math.max(1,Math.floor(Number(level)||1));return level*(level<=120?500:level<400?700:1000);}
 function recordAuthSessionDeath(auth,item){

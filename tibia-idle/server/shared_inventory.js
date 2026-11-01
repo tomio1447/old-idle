@@ -152,8 +152,35 @@ function applySharedToPlayer(p, shared) {
     .filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
   p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
+  // Baseline da pouch: o conteúdo compartilhado no momento da hidratação.
+  // A extração usa (cópia − base) como DELTA sobre o shared atual — assim
+  // mudanças externas (venda em outra aba/personagem) não são revertidas e
+  // o loot da instância não ressuscita itens já vendidos.
+  p._pouchBase = Object.assign({}, shared.lootPouch);
   p._sharedInv = 1;
   return p;
+}
+
+/* Merge da Loot Pouch por DELTA contra a baseline hidratada:
+ *   shared[s] = max(0, shared[s] + cópia[s] − base[s])
+ * - loot adicionado na instância entra (+delta);
+ * - venda/destruição dentro da instância sai (−delta), mesmo sem sync;
+ * - mudança externa no shared entre hidratação e extração é preservada.
+ * Retorna null quando o player não tem baseline (chamador decide fallback). */
+function pouchDelta(sharedPouch, player) {
+  const base = player && player._pouchBase && typeof player._pouchBase === "object" &&
+    !Array.isArray(player._pouchBase) ? player._pouchBase : null;
+  if (!base) return null;
+  const copy = player && player.lootPouch && typeof player.lootPouch === "object" &&
+    !Array.isArray(player.lootPouch) ? player.lootPouch : {};
+  const out = Object.assign({}, sharedPouch);
+  const slugs = new Set(Object.keys(out).concat(Object.keys(copy), Object.keys(base)));
+  for (const slug of slugs) {
+    const n = Math.max(0, Math.floor((Number(out[slug]) || 0) +
+      (Number(copy[slug]) || 0) - (Number(base[slug]) || 0)));
+    if (n > 0) out[slug] = n; else delete out[slug];
+  }
+  return out;
 }
 
 /* Extrai os containers de um player para o shared (oposto do apply). O
@@ -202,10 +229,15 @@ function extractSharedFromPlayer(p, shared) {
  *   - itemInstances compartilhadas (loc != equip:*): união por id;
  *   - depot/rewardChest são server-owned e preservados do shared.
  */
-function mergeSharedFromPlayer(p, shared) {
+function mergeSharedFromPlayer(p, shared, opts) {
   shared = normalizeSharedInventory(shared);
   if (!p || typeof p !== "object") return shared;
-  for (const key of ["bag", "lootPouch", "supplyStash"]) {
+  // Loot Pouch: merge por DELTA contra a baseline (preserva mudanças
+  // externas no shared). Uma vez por conta — as cópias são idênticas após
+  // shareInstanceContainers unificar as referências.
+  const pouchMerged = opts && opts.pouchDelta !== false ? pouchDelta(shared.lootPouch, p) : null;
+  if (pouchMerged) shared.lootPouch = pouchMerged;
+  for (const key of pouchMerged ? ["bag", "supplyStash"] : ["bag", "lootPouch", "supplyStash"]) {
     const src = (p[key] && typeof p[key] === "object" && !Array.isArray(p[key])) ? p[key] : {};
     const dst = (shared[key] && typeof shared[key] === "object" && !Array.isArray(shared[key])) ? shared[key] : {};
     for (const slug of Object.keys(src)) {
@@ -241,6 +273,7 @@ module.exports = {
   mergeCharForgeResources,
   applySharedToPlayer,
   extractSharedFromPlayer,
+  pouchDelta,
   mergeSharedFromPlayer,
   charDataOf,
 };

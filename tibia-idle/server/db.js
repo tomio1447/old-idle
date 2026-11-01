@@ -362,12 +362,13 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
   const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
   if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
+  const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
   const sharedByAcc=new Map(),sharedMirror=new Map();
-  if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+  if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
     for(const projection of next.characters||[]){
       const c=this.findCharacter(projection.id);if(!c)continue;
@@ -377,6 +378,7 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
         if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
       }
       let shared=sharedByAcc.get(aid);
+      const firstAcc=!shared;
       if(!shared){
         const a=this.findAccountById(aid);
         let s=a&&a.shared_inventory;
@@ -385,7 +387,10 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
         if(a)a.shared_inventory=shared;
         sharedByAcc.set(aid,shared);
       }
-      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+      if(next.terminalReason)
+        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+      else if(pouchDirtyIds.has(Number(projection.id)))
+        sharedInvPouchDirtyFlush(shared,projection.data);
     }
   }
   for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -414,11 +419,12 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   if(elapsed<50)return {ok:true,instance:row,characters:[],elapsed:0};
   const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
   if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
+  const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
   const sharedByAcc=new Map(),sharedMirror=new Map();
-  if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+  if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
     for(const projection of next.characters||[]){
       const c=this.findCharacter(projection.id);if(!c)continue;
@@ -428,6 +434,7 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
         if(ownInst&&ownInst.status==="active"&&String(ownInst.instance_id)!==tickInstanceId)continue;
       }
       let shared=sharedByAcc.get(aid);
+      const firstAcc=!shared;
       if(!shared){
         const a=this.findAccountById(aid);
         let s=a&&a.shared_inventory;
@@ -436,7 +443,10 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
         if(a)a.shared_inventory=shared;
         sharedByAcc.set(aid,shared);
       }
-      sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+      if(next.terminalReason)
+        sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+      else if(pouchDirtyIds.has(Number(projection.id)))
+        sharedInvPouchDirtyFlush(shared,projection.data);
     }
   }
   const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -839,7 +849,44 @@ function mergeTerminalRewardChest(shared, fromPlayer) {
  * rewardChest é sempre server-owned (muda só via /api/reward/claim), então é
  * preservado do shared. lootPouch é autoritativo no tick terminal da instância
  * (loot do combate) e preservado nos saves de cidade (muda via APIs de pouch). */
-function sharedInvExtractMirror(shared, data, terminal) {
+/* Flush de pouch "suja" fora do terminal: mutações internas da instância
+ * (autoseller) marcam p._pouchDirty no state. O tick detecta, aplica o
+ * delta no shared e remove a marca + rebasa _pouchBase no state — roda
+ * uma única vez por mutação (a extração terminal vê só o delta posterior). */
+function pouchDirtyScan(next) {
+  const ids = new Set();
+  for (const projection of (next && next.characters) || []) {
+    let d = projection && projection.data;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { d = null; } }
+    if (d && d._pouchDirty) ids.add(Number(projection.id));
+  }
+  if (ids.size) {
+    let st = null;
+    try { st = typeof next.state === "string" ? JSON.parse(next.state) : next.state; } catch (e) { st = null; }
+    const players = st && st.authority && st.authority.players;
+    if (Array.isArray(players)) {
+      let changed = false;
+      for (const entry of players) {
+        if (entry && entry.p && entry.p._pouchDirty) {
+          delete entry.p._pouchDirty;
+          entry.p._pouchBase = Object.assign({}, entry.p.lootPouch || {});
+          changed = true;
+        }
+      }
+      if (changed) next.state = typeof next.state === "string" ? JSON.stringify(st) : st;
+    }
+  }
+  return ids;
+}
+/* Aplica só o delta da pouch (fora do terminal — sem tocar nos demais
+ * containers, que continuam pertencendo à instância até o fim). */
+function sharedInvPouchDirtyFlush(shared, data) {
+  let p = typeof data === "string" ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })() : data;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return;
+  const merged = SharedInv.pouchDelta(shared.lootPouch, p);
+  shared.lootPouch = merged || Object.assign({}, p.lootPouch || {});
+}
+function sharedInvExtractMirror(shared, data, terminal, mergePouch) {
   if (!SharedInv) return data;
   const p = typeof data === "string"
     ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })()
@@ -866,7 +913,9 @@ function sharedInvExtractMirror(shared, data, terminal) {
     // em outras cópias (ex.: item desequipado) SUMIAM ao final da boss
     // fight. O merge preserva o maior valor por slug e une instâncias por
     // id; o loot do combate (lootPouch da cópia) é somado ao que já havia.
-    SharedInv.mergeSharedFromPlayer(p, shared);
+    /* Loot Pouch: merge por delta só na PRIMEIRA projeção da conta —
+     * as cópias compartilham referência; repetir dobraria o delta. */
+    SharedInv.mergeSharedFromPlayer(p, shared, { pouchDelta: mergePouch !== false });
   } else {
     SharedInv.extractSharedFromPlayer(p, shared);
     shared.lootPouch = keep.lootPouch;
@@ -2819,11 +2868,12 @@ async function MysqlStore() {
         const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         next.state=await syncBlessWallets(conn,next.state);
+        const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
         // Inventário da conta: tick terminal extrai containers para o shared
         // (o worker só roda sem lease; instância própria concorrente é rara,
         // mas contas de convidados com instância ativa são preservadas).
         const sharedByAcc=new Map(),sharedMirror=new Map();
-        if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+        if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
             const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
@@ -2834,6 +2884,7 @@ async function MysqlStore() {
               if(instRows.length&&String(instRows[0].instance_id)!==tickInstanceId)continue;
             }
             let shared=sharedByAcc.get(aid);
+            const firstAcc=!shared;
             if(!shared){
               let s=null;
               const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
@@ -2841,7 +2892,10 @@ async function MysqlStore() {
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
             }
-            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+            if(next.terminalReason)
+              sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+            else if(pouchDirtyIds.has(Number(projection.id)))
+              sharedInvPouchDirtyFlush(shared,projection.data);
           }
         }
         for(const projection of next.characters||[])await conn.query(
@@ -2892,11 +2946,12 @@ async function MysqlStore() {
         if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
         const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         next.state=await syncBlessWallets(conn,next.state);
+        const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
         // personagens para accounts.shared_inventory e espelha o shared no data
         // salvo de cada um (containers são da conta, não do personagem).
         const sharedByAcc=new Map(),sharedMirror=new Map();
-        if(next.terminalReason&&SharedInv&&(next.characters||[]).length){
+        if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
             const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
@@ -2909,6 +2964,7 @@ async function MysqlStore() {
               if(instRows.length&&String(instRows[0].instance_id)!==tickInstanceId)continue;
             }
             let shared=sharedByAcc.get(aid);
+            const firstAcc=!shared;
             if(!shared){
               let s=null;
               const [srows]=await conn.query("SELECT shared_inventory FROM accounts WHERE id=?",[aid]);
@@ -2916,7 +2972,10 @@ async function MysqlStore() {
               shared=s&&s.v===1?s:SharedInv.emptySharedInventory();
               sharedByAcc.set(aid,shared);
             }
-            sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true));
+            if(next.terminalReason)
+              sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
+            else if(pouchDirtyIds.has(Number(projection.id)))
+              sharedInvPouchDirtyFlush(shared,projection.data);
           }
         }
         for(const projection of next.characters||[])await conn.query(

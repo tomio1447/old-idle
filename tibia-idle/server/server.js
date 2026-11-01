@@ -1007,7 +1007,7 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests"];
+    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   delete payload.trainingClock;
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
@@ -1108,7 +1108,13 @@ async function splitSharedInventory(db, acc, p, authoritative) {
   if (!SharedInv || typeof db.accountSharedInventory !== "function") return null;
   const shared = await db.accountSharedInventory(acc.id);
   if (authoritative) {
+    /* Loot Pouch é DA CONTA: extrai por DELTA contra a baseline hidratada
+     * (o extract sobrescreveria o shared com a cópia — ressuscitando itens
+     * vendidos fora da instância). Demais containers seguem extract. */
+    const prevPouch = Object.assign({}, shared.lootPouch || {});
+    const mergedPouch = SharedInv.pouchDelta ? SharedInv.pouchDelta(prevPouch, p) : null;
     SharedInv.extractSharedFromPlayer(p, shared);
+    if (mergedPouch) shared.lootPouch = mergedPouch;
   } else {
     const keep = {
       lootPouch: Object.assign({}, shared.lootPouch),
@@ -1137,6 +1143,12 @@ async function loadCityPlayer(db, acc, character) {
   p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
   // Stamina: o personagem estava ocioso desde a última contagem (0,5s/s).
   staminaRegenPlayer(p, Date.now(), 0.5);
+  /* Gold é WALLET da conta: hidrata com acc.gold e marca _walletSynced —
+   * persistClaimedPlayer grava o saldo resultante em accounts.gold. Sem
+   * isto a venda na cidade creditava só o espelho data.gold e o dinheiro
+   * sumia no próximo load (que reinjeta acc.gold). */
+  p.gold = Math.max(0, Math.floor(Number(acc.gold) || 0));
+  p._walletSynced = 1;
   if (SharedInv && typeof db.accountSharedInventory === "function") {
     try {
       const shared = await db.accountSharedInventory(acc.id);
@@ -1283,7 +1295,18 @@ async function buyYanaPackage(db,body){
     goldTokens:purchase.goldTokens,lootPouch:p.lootPouch||{},bag:p.bag||{}})};
 }
 
+/* Wallet da conta: quando o player veio de loadCityPlayer (flag
+ * _walletSynced), o p.gold final É o saldo da conta — grava antes de
+ * persistir. Players vindos da instância não carregam a flag: o wallet
+ * deles já é propagado pelo tick (wallets→accounts.gold). */
+async function syncCityWallet(db,acc,p){
+  if(!p||p._walletSynced!==1)return;
+  delete p._walletSynced;
+  if(typeof db.setAccountGold==="function")
+    await db.setAccountGold(acc.id,Math.max(0,Math.floor(Number(p.gold)||0)));
+}
 async function persistClaimedPlayer(db,acc,character,p,lease,claimedCount){
+  await syncCityWallet(db,acc,p);
   // Inventário da conta: operações de cidade mudam o shared (pouch/depot/
   // reward); o save do personagem vira mirror do shared.
   let sharedInventory=null;
@@ -1331,6 +1354,7 @@ function applyCharacterPromotion(p,goldSource){
   return {ok:true};
 }
 async function persistPromotedPlayer(db,acc,character,p,lease){
+  await syncCityWallet(db,acc,p);
   let sharedInventory=null;
   if(SharedInv&&typeof db.accountSharedInventory==="function")
     sharedInventory=await splitSharedInventory(db,acc,p,true);
@@ -2783,6 +2807,10 @@ function syncInstancePouchCopies(players,charId,preSnapshot){
     const ownEquip=(Array.isArray(entry.p.itemInstances)?entry.p.itemInstances:[])
       .filter((i)=>i&&i.loc&&String(i.loc).indexOf("equip:")===0);
     entry.p.itemInstances=finalInsts.map((i)=>Object.assign({},i)).concat(ownEquip);
+    /* Baseline da pouch acompanha o estado sincronizado: a extração
+     * terminal só aplica o delta POSTERIOR a este sync (loot novo), sem
+     * descontar de novo o que já foi gravado no shared. */
+    entry.p._pouchBase=Object.assign({},finalPouch);
   }
   return {pouch:finalPouch,bag:finalBag,supplyStash:Object.assign({},live.p.supplyStash||{}),instances:finalInsts};
 }
