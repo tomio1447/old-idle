@@ -338,6 +338,37 @@ function createPaleWormLobbyController(opts) {
     return { code: 200, body: { ok: true, lobby: lobbyPublic(lobby, acc.id) } };
   }
 
+  /* Entrada direta via SOCIAL: um amigo vê o lobby aberto de outro na
+   * friendlist e entra sem convite. Mesmas regras do acceptInvite. */
+  async function joinOpen(db, acc, hostAccountId, character, optsIn) {
+    optsIn = optsIn || {};
+    const lobby = getLobbyForAccount(Number(hostAccountId));
+    if (!lobby || lobby.status !== "open")
+      return { code: 404, body: { ok: false, msg: "Lobby não está aberto." } };
+    if (lobby.slots.some((s) => s && Number(s.accountId) === Number(acc.id)))
+      return { code: 409, body: { ok: false, msg: "Você já está no lobby." } };
+    const empty = lobby.slots.findIndex((s) => !s);
+    if (empty < 0) return { code: 409, body: { ok: false, msg: "Lobby cheio." } };
+    if (!optsIn.inTemple)
+      return { code: 403, body: { ok: false, msg: "É obrigatório estar no templo para entrar no lobby." } };
+    const party = await db.partyFindByCharacter(Number(character.id));
+    if (party) return { code: 409, body: { ok: false, msg: "Saia da Party antes de entrar no lobby." } };
+    if (Number(character.account_id) !== Number(acc.id))
+      return { code: 403, body: { ok: false, msg: "Personagem não pertence à conta." } };
+    const can = assertCanEnter(character);
+    if (!can.ok) return { code: 403, body: { ok: false, msg: can.msg } };
+    detachAccount(acc.id);
+    lobby.slots[empty] = slotPayload(acc.id, optsIn.playerName || character.name, character);
+    byAccount.set(Number(acc.id), lobby.id);
+    publishLobby(lobby);
+    publishAccount(lobby.leaderAccountId, "pale-lobby", {
+      action: "friend-joined",
+      msg: `${character.name} entrou no lobby.`,
+      lobby: lobbyPublic(lobby, lobby.leaderAccountId),
+    });
+    return { code: 200, body: { ok: true, lobby: lobbyPublic(lobby, acc.id) } };
+  }
+
   async function leave(db, acc) {
     const lobby = getLobbyForAccount(acc.id);
     if (!lobby) return { code: 200, body: { ok: true, lobby: null } };
@@ -545,7 +576,7 @@ function createPaleWormLobbyController(opts) {
   if (handle.unref) handle.unref();
 
   return {
-    createLobby, invite, acceptInvite, declineInvite, leave, leaveFight, kick, start,
+    createLobby, invite, acceptInvite, declineInvite, joinOpen, leave, leaveFight, kick, start,
     bindShare, sharedForAccount, stateFor, listInbox,
     getLobbyForAccount, getLobbyByInstanceOwner, membersForStart, closeLobby, lobbies,
     assertCanEnter, gateStatus, gateLabel,

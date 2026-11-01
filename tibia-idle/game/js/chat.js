@@ -357,12 +357,14 @@
   function ingest(msg) {
     if (!msg || !msg.id || ChatUI.seen.has(msg.id)) return;
     ChatUI.seen.add(msg.id);
+    if (msg.id > ChatUI.lastId) ChatUI.lastId = msg.id;
+    // Amigo "mutado" no SOCIAL: recebemos e deduplicamos, mas não exibimos.
+    if (typeof isSocialMuted === "function" && isSocialMuted(msg.nickname)) return;
     ChatUI.messages.push(msg);
     if (ChatUI.messages.length > 250) {
       const drop = ChatUI.messages.shift();
       if (drop) ChatUI.seen.delete(drop.id);
     }
-    if (msg.id > ChatUI.lastId) ChatUI.lastId = msg.id;
     if (msg.channel === ChatUI.channel) renderMessages();
     else if (msg.channel) {
       ChatUI.unread[msg.channel] = (ChatUI.unread[msg.channel] || 0) + 1;

@@ -401,6 +401,146 @@ async function updateAccountTutorial(db,body){
   }
   return {code:200,body:{ok:true,tutorial}};
 }
+/* ------------------------- SOCIAL (friendlist) -------------------------
+ * Amigos ficam na conta (acc.friends = [{charId,name,muted}]) — mesmo
+ * padrão de missions/tutorial. Presença via db.socialPresence: lease válida
+ * ou personagem em instância ativa. Ações de lobby reutilizam os
+ * controllers mega/pale (convite = fluxo normal de invite; entrar = joinOpen
+ * direto no lobby aberto do amigo). */
+function socialLobbyControllers(){
+  const out=[];
+  if(global.__MEGA_LOBBY)out.push(["mega",global.__MEGA_LOBBY]);
+  if(global.__PALE_LOBBY)out.push(["pale",global.__PALE_LOBBY]);
+  return out;
+}
+function socialFriendsArray(acc){
+  return Array.isArray(acc.friends)?acc.friends.filter((f)=>f&&Number(f.charId)>0):[];
+}
+async function socialList(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const friends=socialFriendsArray(acc);
+  const resolved=[],stale=new Set();
+  for(const f of friends){
+    const c=await db.findCharacter(f.charId);
+    if(!c){stale.add(Number(f.charId));continue;}
+    resolved.push({f,c});
+  }
+  if(stale.size){
+    await db.setAccountFriends(acc.id,friends.filter((f)=>!stale.has(Number(f.charId))));
+  }
+  const accIds=[...new Set(resolved.map((x)=>Number(x.c.account_id)))];
+  const presence=(typeof db.socialPresence==="function")?await db.socialPresence(accIds):{};
+  const ctrls=socialLobbyControllers();
+  const out=resolved.map(({f,c})=>{
+    const p=presence[Number(c.account_id)]||{online:false,inInstance:false};
+    let lobbyType=null;
+    for(const [key,ctrl] of ctrls){
+      const lob=ctrl.getLobbyForAccount(Number(c.account_id));
+      if(lob&&lob.status==="open"){lobbyType=key;break;}
+    }
+    return {charId:Number(c.id),name:String(c.name),voc:String(c.voc||"none"),
+      level:Math.max(1,Number(c.level)||1),accountId:Number(c.account_id),
+      muted:!!f.muted,online:!!p.online,inInstance:!!p.inInstance,
+      lastSeen:c.updated_at||null,lobby:lobbyType};
+  });
+  out.sort((a,b)=>((b.online?1:0)-(a.online?1:0))||a.name.localeCompare(b.name));
+  let myLobby=null;
+  for(const [key,ctrl] of ctrls){
+    const lob=ctrl.getLobbyForAccount(Number(acc.id));
+    if(lob&&lob.status==="open"){
+      myLobby={type:key,leader:Number(lob.leaderAccountId)===Number(acc.id)};
+      break;
+    }
+  }
+  return {code:200,body:{ok:true,friends:out,myLobby}};
+}
+async function socialSearch(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const q=String(body.query||body.q||"").trim();
+  if(q.length<3)return {code:400,body:{ok:false,msg:"Digite ao menos 3 letras"}};
+  const rows=(typeof db.adminSearchCharacters==="function")?await db.adminSearchCharacters(q,12):[];
+  const friends=socialFriendsArray(acc);
+  const results=rows.filter((c)=>Number(c.account_id)!==Number(acc.id)).map((c)=>({
+    charId:Number(c.id),name:String(c.name),voc:String(c.voc||"none"),
+    level:Math.max(1,Number(c.level)||1),
+    isFriend:friends.some((f)=>Number(f.charId)===Number(c.id)),
+  }));
+  return {code:200,body:{ok:true,results}};
+}
+async function socialFriendAdd(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const name=String(body.name||"").trim();
+  if(!name)return {code:400,body:{ok:false,msg:"Nome obrigatório"}};
+  const target=await db.findCharacterByName(name);
+  if(!target)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  if(Number(target.account_id)===Number(acc.id))
+    return {code:400,body:{ok:false,msg:"Este personagem já é da sua conta"}};
+  const friends=socialFriendsArray(acc);
+  if(friends.some((f)=>Number(f.charId)===Number(target.id)))
+    return {code:409,body:{ok:false,msg:"Já está na sua lista de amigos"}};
+  friends.push({charId:Number(target.id),name:String(target.name),muted:false});
+  await db.setAccountFriends(acc.id,friends);
+  return {code:200,body:{ok:true}};
+}
+async function socialFriendRemove(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.friendCharId||body.friend_char_id||body.charId||0);
+  const friends=socialFriendsArray(acc);
+  const next=friends.filter((f)=>Number(f.charId)!==charId);
+  if(next.length===friends.length)return {code:404,body:{ok:false,msg:"Amigo não encontrado"}};
+  await db.setAccountFriends(acc.id,next);
+  return {code:200,body:{ok:true}};
+}
+async function socialFriendMute(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.friendCharId||body.friend_char_id||body.charId||0);
+  const friends=socialFriendsArray(acc);
+  const entry=friends.find((f)=>Number(f.charId)===charId);
+  if(!entry)return {code:404,body:{ok:false,msg:"Amigo não encontrado"}};
+  entry.muted=body.muted===undefined?true:!!body.muted;
+  await db.setAccountFriends(acc.id,friends);
+  return {code:200,body:{ok:true,muted:entry.muted}};
+}
+/* Convite para o MEU lobby aberto (eu preciso ser o líder — regra já
+ * existente nos controllers). */
+async function socialLobbyInvite(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const name=String(body.name||"").trim();
+  if(!name)return {code:400,body:{ok:false,msg:"Nome obrigatório"}};
+  for(const [,ctrl] of socialLobbyControllers()){
+    const lob=ctrl.getLobbyForAccount(Number(acc.id));
+    if(lob&&lob.status==="open")return ctrl.invite(db,acc,name);
+  }
+  return {code:404,body:{ok:false,msg:"Você não está em um lobby aberto"}};
+}
+/* Entrar no lobby aberto do amigo (joinOpen — sem convite). */
+async function socialLobbyJoin(db,body){
+  const acc=await db.findAccountByToken(body.token);
+  if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const charId=Number(body.charId||body.char_id||0);
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,msg:"Personagem inválido"}};
+  const friendCharId=Number(body.friendCharId||body.friend_char_id||0);
+  const friends=socialFriendsArray(acc);
+  if(!friends.some((f)=>Number(f.charId)===friendCharId))
+    return {code:403,body:{ok:false,msg:"Só é possível entrar no lobby de amigos"}};
+  const friendChar=await db.findCharacter(friendCharId);
+  if(!friendChar)return {code:404,body:{ok:false,msg:"Personagem não encontrado"}};
+  const hostAcc=Number(friendChar.account_id);
+  for(const [,ctrl] of socialLobbyControllers()){
+    const lob=ctrl.getLobbyForAccount(hostAcc);
+    if(lob&&lob.status==="open")
+      return ctrl.joinOpen(db,acc,hostAcc,character,{inTemple:!!body.inTemple,playerName:body.playerName});
+  }
+  return {code:404,body:{ok:false,msg:"Nenhum lobby aberto para este jogador"}};
+}
 const TUTORIAL_VOCATIONS=["knight","paladin","druid","sorcerer","monk"];
 const TUTORIAL_VIP_DAYS=3;
 const TUTORIAL_EXERCISE_CHARGES=1500;
@@ -4990,6 +5130,27 @@ async function main() {
       }
       if(req.method==="POST"&&url==="/api/account/missions"){
         const r=await updateAccountMissions(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/friends"){
+        const r=await socialList(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/search"){
+        const r=await socialSearch(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/friend/add"){
+        const r=await socialFriendAdd(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/friend/remove"){
+        const r=await socialFriendRemove(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/friend/mute"){
+        const r=await socialFriendMute(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/lobby-invite"){
+        const r=await socialLobbyInvite(db,await readBody(req));return send(res,r.code,r.body);
+      }
+      if(req.method==="POST"&&url==="/api/social/lobby-join"){
+        const r=await socialLobbyJoin(db,await readBody(req));return send(res,r.code,r.body);
       }
       if(req.method==="POST"&&url==="/api/account/tutorial"){
         const r=await updateAccountTutorial(db,await readBody(req));return send(res,r.code,r.body);

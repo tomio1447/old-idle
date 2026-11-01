@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   email         VARCHAR(128) DEFAULT NULL,
   role          ENUM('user','admin') NOT NULL DEFAULT 'user',
   coins         INT UNSIGNED NOT NULL DEFAULT 0,   -- Tibia Coins da conta
+  friends       MEDIUMTEXT   DEFAULT NULL,          -- friendlist social [{charId,name,muted}]
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                    ON UPDATE CURRENT_TIMESTAMP

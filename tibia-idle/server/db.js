@@ -1065,6 +1065,46 @@ JsonStore.prototype.setAccountTutorial = function (accountId, tutorial) {
   this._save();
   return a;
 };
+/* Friendlist SOCIAL por conta: [{charId, name, muted}] — mesmo padrão de
+ * missions/tutorial, o servidor é autoridade (endpoints /api/social/*). */
+JsonStore.prototype.setAccountFriends = function (accountId, friends) {
+  const a = this.findAccountById(accountId);
+  if (!a) return null;
+  a.friends = Array.isArray(friends) ? friends : [];
+  this._save();
+  return a;
+};
+/* Presença por conta para a friendlist: {accId:{online,inInstance}}.
+ * online = lease válida (navegador aberto) OU personagem da conta em
+ * instância ativa (caçada continua sem navegador). */
+JsonStore.prototype.socialPresence = function (accountIds) {
+  const ids = new Set((accountIds || []).map(Number).filter((n) => n > 0));
+  const out = {};
+  for (const id of ids) out[id] = { online: false, inInstance: false };
+  if (!ids.size) return out;
+  const now = Date.now();
+  for (const l of this.leases || []) {
+    const accId = Number(l.account_id);
+    if (!ids.has(accId)) continue;
+    const exp = Date.parse(l.expires_at || "") || 0;
+    if (exp > now) out[accId].online = true;
+  }
+  const owner = new Map();
+  for (const c of this.characters || []) {
+    if (ids.has(Number(c.account_id))) owner.set(Number(c.id), Number(c.account_id));
+  }
+  for (const row of this.instances || []) {
+    if (row.status !== "active") continue;
+    let st = null;
+    try { st = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { st = null; }
+    const members = (st && st.members) || [];
+    for (const m of members) {
+      const accId = owner.get(Number(m && m.id));
+      if (accId) { out[accId].inInstance = true; out[accId].online = true; }
+    }
+  }
+  return out;
+};
 /* Soma gold dos personagens para a conta uma vez; espelha o saldo nos chars.
  * Quando já migrado, verifica se todos os personagens espelham o gold da
  * conta corretamente — corrige divergências de saves antigos ou contas
@@ -2274,6 +2314,10 @@ async function MysqlStore() {
       }
       out[key] = v && typeof v === "object" && !Array.isArray(v) ? v : {};
     }
+    // friends é lista [{charId,name,muted}] — fica fora do loop de objetos.
+    let f = row.friends;
+    if (typeof f === "string") { try { f = JSON.parse(f); } catch (e) { f = []; } }
+    out.friends = Array.isArray(f) ? f : [];
     return out;
   }
   function hydrateStoreOrder(row) {
@@ -2439,6 +2483,45 @@ async function MysqlStore() {
       await this.run("UPDATE accounts SET tutorial = ? WHERE id = ?",
         [JSON.stringify(t), Number(accountId)]);
       return this.findAccountById(accountId);
+    },
+    /* Friendlist SOCIAL por conta: [{charId, name, muted}] — endpoints /api/social/*. */
+    async setAccountFriends(accountId, friends) {
+      const f = Array.isArray(friends) ? friends : [];
+      await this.run("UPDATE accounts SET friends = ? WHERE id = ?",
+        [JSON.stringify(f), Number(accountId)]);
+      return this.findAccountById(accountId);
+    },
+    /* Presença por conta para a friendlist: {accId:{online,inInstance}}.
+     * online = lease válida (navegador aberto) OU personagem da conta em
+     * instância ativa (caçada continua sem navegador). */
+    async socialPresence(accountIds) {
+      const ids = [...new Set((accountIds || []).map(Number).filter((n) => n > 0))];
+      const out = {};
+      for (const id of ids) out[id] = { online: false, inInstance: false };
+      if (!ids.length) return out;
+      const ph = ids.map(() => "?").join(",");
+      const leases = await this.query(
+        `SELECT account_id, expires_at FROM account_leases WHERE account_id IN (${ph})`, ids);
+      const now = new Date();
+      for (const l of leases) {
+        if (l.expires_at && new Date(l.expires_at) > now)
+          out[Number(l.account_id)].online = true;
+      }
+      const chars = await this.query(
+        `SELECT id, account_id FROM characters WHERE account_id IN (${ph})`, ids);
+      const owner = new Map(chars.map((c) => [Number(c.id), Number(c.account_id)]));
+      const insts = await this.query(
+        "SELECT state FROM account_instances WHERE status = 'active'");
+      for (const row of insts) {
+        let st = null;
+        try { st = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { st = null; }
+        const members = (st && st.members) || [];
+        for (const m of members) {
+          const accId = owner.get(Number(m && m.id));
+          if (accId) { out[accId].inInstance = true; out[accId].online = true; }
+        }
+      }
+      return out;
     },
     /* ---- inventário compartilhado da conta (bag/pouch/depot/reward) ---- */
     async accountSharedInventory(accountId) {
@@ -4755,6 +4838,8 @@ async function ensureSchema(pool) {
   try { await pool.query("ALTER TABLE accounts ADD COLUMN tutorial MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   try { await pool.query("ALTER TABLE accounts ADD COLUMN cosmetics MEDIUMTEXT NULL"); }
+  catch(e) { /* já existe */ }
+  try { await pool.query("ALTER TABLE accounts ADD COLUMN friends MEDIUMTEXT NULL"); }
   catch(e) { /* já existe */ }
   await pool.query(`CREATE TABLE IF NOT EXISTS market_offers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
