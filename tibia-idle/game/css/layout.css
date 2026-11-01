@@ -1935,8 +1935,15 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .boss-best-card { max-width:none; margin:0 auto; }
 .boss-best-sprite { height:82px; }
 .boss-best-resists { display:grid; grid-template-columns:1fr 1fr; gap:1px 18px; }
+/* Loot do boss: colunas de ATÉ 6 itens (grid-auto-flow:column) — a caixa
+ * cresce na horizontal conforme a quantidade de drops e a altura fica
+ * travada em 6 slots, evitando quebrar/esticar o modal em bosses com muito
+ * loot (Plagueroot, Megalomania...). */
 .boss-best-loot {
-  grid-template-columns:repeat(auto-fill,32px); justify-content:center;
+  grid-template-columns:none;
+  grid-template-rows:repeat(6,32px);
+  grid-auto-flow:column; grid-auto-columns:32px;
+  justify-content:center;
   max-height:none; overflow:visible; padding:5px; background:#191915;
   border:1px solid #454238;
 }
