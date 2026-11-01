@@ -212,6 +212,17 @@
         savePrefs();
       });
     }
+    const msgs = document.getElementById("global-chat-messages");
+    if (msgs && !msgs._bound) {
+      msgs._bound = true;
+      msgs.addEventListener("click", (e) => {
+        const el = e.target.closest("[data-gc-mid]");
+        if (!el || !isAdmin()) return;
+        openModMenu(e.clientX, e.clientY,
+          Number(el.getAttribute("data-gc-mid")) || 0,
+          el.getAttribute("data-gc-name") || "");
+      });
+    }
   }
 
   function applyCollapsed() {
@@ -258,28 +269,87 @@
     if (atBottom || list.length < 3) box.scrollTop = box.scrollHeight;
   }
 
+  /* Moderação: nomes clicáveis só para contas role=admin. */
+  function isAdmin() {
+    try {
+      const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+      return !!(acc && acc.role === "admin");
+    } catch (e) { return false; }
+  }
+
+  function nameSpan(m) {
+    const who = escapeHtml(m.nickname || "?");
+    if (!isAdmin() || !m.id) return `<span class="gc-name">${who}</span>`;
+    return `<span class="gc-name gc-mod" data-gc-mid="${m.id}" data-gc-name="${who}"
+      title="Clique para moderar">${who}</span>`;
+  }
+
   function formatLine(m) {
     const time = `<span class="gc-time">${escapeHtml(fmtTime(m.ts))}</span>`;
     if (m.type === "system") {
       return `<div class="gc-line gc-system">${time} <span class="gc-sys">${escapeHtml(filterText(m.text))}</span></div>`;
     }
     if (m.type === "pm") {
-      const who = escapeHtml(m.nickname || "?");
       const to = escapeHtml(m.toName || "?");
       const voc = escapeHtml(m.vocShort || "");
       const lvl = escapeHtml(String(m.level || ""));
-      return `<div class="gc-line gc-pm">${time} <span class="gc-tag">[PM]</span> <span class="gc-name">${who}</span> → <span class="gc-name">${to}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+      return `<div class="gc-line gc-pm">${time} <span class="gc-tag">[PM]</span> ${nameSpan(m)} → <span class="gc-name">${to}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
     }
-    const who = escapeHtml(m.nickname || "?");
     const voc = escapeHtml(m.vocShort || "");
     const lvl = escapeHtml(String(m.level || ""));
     /* Chat de guild: cor do nome+texto pelo rank — líder vermelho,
      * vice amarelo, membro verde. */
     if (m.guildId) {
       const rk = m.guildRank === "leader" ? "leader" : m.guildRank === "vice" ? "vice" : "member";
-      return `<div class="gc-line gc-guild gc-rank-${rk}">${time} <span class="gc-name">${who}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+      return `<div class="gc-line gc-guild gc-rank-${rk}">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
     }
-    return `<div class="gc-line">${time} <span class="gc-name">${who}</span> <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+    return `<div class="gc-line">${time} ${nameSpan(m)} <span class="gc-meta">[${voc}][${lvl}]</span>: <span class="gc-text">${escapeHtml(filterText(m.text))}</span></div>`;
+  }
+
+  function removeLocal(id) {
+    const i = ChatUI.messages.findIndex((m) => Number(m.id) === Number(id));
+    if (i < 0) return;
+    ChatUI.messages.splice(i, 1);
+    ChatUI.seen.delete(Number(id));
+    renderMessages();
+  }
+
+  function openModMenu(x, y, mid, nick) {
+    if (typeof showContextMenu !== "function") return;
+    const opts = [{
+      label: "Apagar mensagem", danger: true,
+      action: async () => {
+        if (typeof adminApiChatDelete !== "function") return;
+        const r = await adminApiChatDelete(sessionToken(), mid);
+        if (!r.ok) { toastChat(r.msg || "Falha ao apagar"); return; }
+        removeLocal(mid);
+      },
+    }];
+    [5, 15, 60, 1440].forEach((mins) => {
+      opts.push({
+        label: `Silenciar ${mins >= 1440 ? "1 dia" : mins + " min"}`,
+        action: () => muteUser(nick, mins),
+      });
+    });
+    opts.push({
+      label: "Silenciar por X min…",
+      action: () => {
+        const raw = window.prompt(`Silenciar ${nick} por quantos minutos?`, "30");
+        const mins = Math.floor(Number(raw) || 0);
+        if (mins > 0) muteUser(nick, mins);
+      },
+    });
+    showContextMenu(x, y, "⚖ " + nick, opts);
+  }
+
+  async function muteUser(nick, minutes) {
+    if (typeof adminApiChatMute !== "function") return;
+    const reason = window.prompt(`Motivo do silêncio de ${nick} (${minutes} min):`, "") || "";
+    const r = await adminApiChatMute(sessionToken(), {
+      char_name: nick, minutes, reason,
+    });
+    if (!r.ok) { toastChat(r.msg || "Falha ao silenciar"); return; }
+    toastChat(`${nick} silenciado por ${minutes} min.`);
   }
 
   function ingest(msg) {
@@ -323,6 +393,7 @@
     const r = await api("GET", q, null, token);
     if (!r.data || !r.data.ok || !Array.isArray(r.data.messages)) return;
     for (const msg of r.data.messages) ingest(msg);
+    if (Array.isArray(r.data.deleted)) for (const id of r.data.deleted) removeLocal(id);
     renderMessages();
   }
 
@@ -389,6 +460,13 @@
         ingest(msg);
       } catch (e) {}
     });
+    source.addEventListener("chat-delete", (ev) => {
+      if (generation !== ChatUI.generation) return;
+      try {
+        const d = JSON.parse(ev.data);
+        if (d && d.id) removeLocal(d.id);
+      } catch (e) {}
+    });
     source.addEventListener("ready", () => {
       stopPoll();
     });
@@ -442,6 +520,7 @@
       if (generation !== ChatUI.generation) return;
       if (!r.data || !r.data.ok || !Array.isArray(r.data.messages)) continue;
       for (const msg of r.data.messages) ingest(msg);
+      if (Array.isArray(r.data.deleted)) for (const id of r.data.deleted) removeLocal(id);
     }
   }
 

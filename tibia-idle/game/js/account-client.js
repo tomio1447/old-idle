@@ -2218,6 +2218,26 @@ async function adminApiAnnounce(token, fields) {
   if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Anúncio falhou" };
   return { ok: true };
 }
+async function adminApiChatDelete(token, messageId) {
+  const r = await _api("POST", "/api/admin/chat-delete", { token, id: messageId });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao apagar" };
+  return { ok: true };
+}
+async function adminApiChatMute(token, fields) {
+  const r = await _api("POST", "/api/admin/chat-mute", Object.assign({ token }, fields || {}));
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao silenciar" };
+  return { ok: true, mute: r.data.mute };
+}
+async function adminApiChatUnmute(token, charName) {
+  const r = await _api("POST", "/api/admin/chat-unmute", { token, char_name: charName });
+  if (!r.data || !r.data.ok) return { ok: false, msg: (r.data && r.data.msg) || "Falha ao dessilenciar" };
+  return { ok: true };
+}
+async function adminApiChatMutes(token) {
+  const r = await _api("GET", "/api/admin/chat-mutes", null, token);
+  if (!r.data || !r.data.ok) return { ok: false, mutes: [] };
+  return { ok: true, mutes: r.data.mutes || [] };
+}
 
 async function accountAddCoins(token, amount) {
   const r = await _api("POST", "/api/coins", { token, amount });

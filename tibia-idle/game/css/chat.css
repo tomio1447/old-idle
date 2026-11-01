@@ -119,6 +119,15 @@
   font-weight: 600;
 }
 
+/* Nome clicável de moderação (só renderizado para contas admin). */
+.gc-name.gc-mod {
+  cursor: pointer;
+}
+.gc-name.gc-mod:hover {
+  color: #ffe680;
+  text-decoration: underline;
+}
+
 .gc-meta {
   color: #7a92b0;
 }

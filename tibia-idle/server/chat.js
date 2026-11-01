@@ -81,6 +81,8 @@ class ChatBus {
     this.rateByAccount = new Map();
     this.sendLimit = Number(options.sendLimit) || 8;
     this.sendWindowMs = Number(options.sendWindowMs) || 10000;
+    this.mutes = new Map();       // accountId -> {until, by, reason, charName, at}
+    this.deletedIds = [];         // ids apagados pela moderação (sync do poll)
   }
 
   issueTicket(accountId, sessionToken, viewerName, guildId) {
@@ -178,6 +180,63 @@ class ChatBus {
     this.messages.push(msg);
     while (this.messages.length > this.historyLimit) this.messages.shift();
     for (const client of this.clients) this.writeClient(client, msg);
+    return msg;
+  }
+
+  /* ------------------------- moderação (admin) ------------------------- */
+
+  mute(accountId, info) {
+    info = info || {};
+    const m = {
+      accountId: Number(accountId),
+      until: Number(info.until) || 0,
+      by: String(info.by || "admin"),
+      reason: String(info.reason || ""),
+      charName: String(info.charName || ""),
+      at: Date.now(),
+    };
+    this.mutes.set(Number(accountId), m);
+    return m;
+  }
+
+  unmute(accountId) {
+    return this.mutes.delete(Number(accountId));
+  }
+
+  muteStatus(accountId) {
+    const m = this.mutes.get(Number(accountId));
+    if (!m) return null;
+    if (m.until && m.until <= Date.now()) {
+      this.mutes.delete(Number(accountId));
+      return null;
+    }
+    return m;
+  }
+
+  listMutes() {
+    const out = [];
+    for (const m of this.mutes.values()) {
+      if (m.until && m.until <= Date.now()) {
+        this.mutes.delete(Number(m.accountId));
+        continue;
+      }
+      out.push(m);
+    }
+    return out;
+  }
+
+  /* Apaga a mensagem do histórico e avisa todos os clientes via SSE. */
+  remove(id) {
+    id = Number(id);
+    const idx = this.messages.findIndex((m) => m.id === id);
+    if (idx < 0) return null;
+    const msg = this.messages.splice(idx, 1)[0];
+    this.deletedIds.push(id);
+    while (this.deletedIds.length > 200) this.deletedIds.shift();
+    for (const client of this.clients) {
+      if (client.res.destroyed || client.res.writableEnded) continue;
+      client.res.write(`event: chat-delete\ndata: ${JSON.stringify({ id })}\n\n`);
+    }
     return msg;
   }
 

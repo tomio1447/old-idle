@@ -5525,7 +5525,8 @@ function bindControls() {
   };
   G.walkKeys = G.walkKeys || {};
   document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" ||
+        e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
     const k = KEYMAP[e.key];
     if (!k) return;
     // Labirinto Malice QTE: WASD/setas são do minigame (handler em capture).

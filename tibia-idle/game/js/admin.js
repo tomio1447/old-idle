@@ -1619,6 +1619,25 @@ function renderAdminBan(p, el) {
         <div class="admin-card-t">Bans ativos</div>
         <div id="adm-ban-list" class="tiny dim">carregando…</div>
       </div>
+      <div class="admin-card">
+        <div class="admin-card-t">Silenciar no chat</div>
+        <div class="row" style="gap:6px;align-items:center;margin-bottom:6px">
+          <input id="adm-mute-name" class="admin-in" style="flex:1" placeholder="Nome do jogador">
+          <input id="adm-mute-min" type="number" class="admin-in" style="width:90px"
+                 min="1" placeholder="Min" title="Minutos de silêncio">
+        </div>
+        <div class="row" style="gap:6px;align-items:center">
+          <input id="adm-mute-reason" class="admin-in" style="flex:1" placeholder="Motivo (opcional)">
+          <button class="sm primary" id="adm-mute-go">Silenciar</button>
+        </div>
+        <div class="tiny dim mt4">O jogador não consegue enviar mensagens no
+          chat enquanto durar. Também dá para silenciar clicando no nome dele
+          direto no chat.</div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-t">Silenciados no chat</div>
+        <div id="adm-mute-list" class="tiny dim">carregando…</div>
+      </div>
     </div>`;
   const loadBans = async () => {
     const box = $("#adm-ban-list"); if (!box) return;
@@ -1652,7 +1671,39 @@ function renderAdminBan(p, el) {
     if (!r.ok) { toast(r.msg || "Falha ao banir", "bad"); return; }
     adminAplicar(name + " banido"); loadBans();
   });
+  const loadMutes = async () => {
+    const box = $("#adm-mute-list"); if (!box) return;
+    if (typeof adminApiChatMutes !== "function") { box.innerHTML = "indisponível"; return; }
+    const r = await adminApiChatMutes(sessionToken());
+    const mutes = r.mutes || [];
+    box.innerHTML = mutes.length ? mutes.map((m) => `
+      <div class="stat-row" style="align-items:flex-start">
+        <span class="k">${m.charName || "@" + m.accountId} <span class="dim">por ${m.by}</span></span>
+        <span class="v" style="text-align:right">
+          <div class="tiny">até ${new Date(m.until).toLocaleString("pt-BR")}</div>
+          <div class="tiny dim">${String(m.reason || "").replace(/[<>]/g, "")}</div>
+          <button class="sm" data-unmute="${m.charName}">dessilenciar</button>
+        </span>
+      </div>`).join("") : `<span class="dim">Ninguém silenciado.</span>`;
+    $$("#adm-mute-list [data-unmute]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const r2 = await adminApiChatUnmute(sessionToken(), b.dataset.unmute);
+        if (!r2.ok) { toast(r2.msg || "Falha ao dessilenciar", "bad"); return; }
+        adminAplicar(b.dataset.unmute + " dessilenciado"); loadMutes();
+      }));
+  };
+  $("#adm-mute-go").addEventListener("click", async () => {
+    const name = $("#adm-mute-name").value.trim();
+    const mins = Math.max(1, parseInt($("#adm-mute-min").value, 10) || 0);
+    if (!name) { toast("Nome do jogador obrigatório", "bad"); return; }
+    const r = await adminApiChatMute(sessionToken(), {
+      char_name: name, minutes: mins, reason: $("#adm-mute-reason").value.trim(),
+    });
+    if (!r.ok) { toast(r.msg || "Falha ao silenciar", "bad"); return; }
+    adminAplicar(name + " silenciado por " + mins + " min"); loadMutes();
+  });
   loadBans();
+  loadMutes();
 }
 
 /* ---------------------------------------------------- 💾 SERVER SAVE --- */

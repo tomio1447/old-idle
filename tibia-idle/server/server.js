@@ -540,7 +540,8 @@ async function chatHistory(db,token,query){
   const sinceId=Number(query.get("since")||0);
   const limit=Number(query.get("limit")||50);
   return {code:200,body:{ok:true,channel,cursor:CHAT_BUS.cursor(),
-    messages:CHAT_BUS.history(channel,sinceId,limit,viewerName,viewerGuildId)}};
+    messages:CHAT_BUS.history(channel,sinceId,limit,viewerName,viewerGuildId),
+    deleted:CHAT_BUS.deletedIds||[]}};
 }
 
 async function chatSend(db,body){
@@ -568,6 +569,12 @@ async function chatSend(db,body){
       return {code:400,body:{ok:false,error:"BAD_CHANNEL",msg:"Canal inválido"}};
     if(channel!=="geral")
       return {code:400,body:{ok:false,error:"CHANNEL_LOCKED",msg:"Este canal ainda não está aberto para mensagens."}};
+  }
+  const mute=CHAT_BUS.muteStatus(Number(acc.id));
+  if(mute){
+    const mins=Math.max(1,Math.ceil((mute.until-Date.now())/60000));
+    return {code:403,body:{ok:false,error:"MUTED",
+      msg:`Você está silenciado por mais ${mins} min.${mute.reason?" Motivo: "+mute.reason:""}`}};
   }
   const rate=CHAT_BUS.checkRate(Number(acc.id));
   if(!rate.ok)return {code:429,body:{ok:false,error:"RATE_LIMITED",msg:"Muitas mensagens. Aguarde um momento.",
@@ -5284,6 +5291,38 @@ async function main() {
       if(req.method==="GET"&&url==="/api/admin/bans"){
         const token=(req.headers.authorization||"").replace("Bearer ","");
         const r=await adminBanList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/chat-delete"){
+        const body=await readBody(req);
+        const auth=await adminSession(db,String(body.token||""));if(auth.error)return send(res,auth.error.code,auth.error.body);
+        const mid=Number(body.id||body.message_id||0);
+        const msg=CHAT_BUS.remove(mid);
+        if(!msg)return send(res,404,{ok:false,msg:"Mensagem não encontrada (expirada?)"});
+        return send(res,200,{ok:true,id:mid});}
+      if(req.method==="POST"&&url==="/api/admin/chat-mute"){
+        const body=await readBody(req);
+        const auth=await adminSession(db,String(body.token||""));if(auth.error)return send(res,auth.error.code,auth.error.body);
+        const name=String(body.char_name||"").trim();
+        const minutes=Math.max(1,Math.min(10080,Math.floor(Number(body.minutes)||0)));
+        if(!name)return send(res,400,{ok:false,msg:"Nome do jogador obrigatório"});
+        const found=await db.findCharacterByName(name);
+        if(!found)return send(res,404,{ok:false,msg:"Personagem não encontrado"});
+        const owner=await db.findAccountById(found.account_id);
+        if(owner&&owner.role==="admin")return send(res,400,{ok:false,error:"CANNOT_MUTE_ADMIN",msg:"Não é possível silenciar um administrador"});
+        const m=CHAT_BUS.mute(found.account_id,{until:Date.now()+minutes*60000,
+          by:String(auth.acc.login||"admin"),reason:String(body.reason||""),charName:String(found.name||name)});
+        return send(res,200,{ok:true,mute:{account_id:m.accountId,char_name:m.charName,until:m.until,reason:m.reason}});}
+      if(req.method==="POST"&&url==="/api/admin/chat-unmute"){
+        const body=await readBody(req);
+        const auth=await adminSession(db,String(body.token||""));if(auth.error)return send(res,auth.error.code,auth.error.body);
+        const name=String(body.char_name||"").trim();
+        const found=name?await db.findCharacterByName(name):null;
+        if(!found)return send(res,404,{ok:false,msg:"Personagem não encontrado"});
+        CHAT_BUS.unmute(found.account_id);
+        return send(res,200,{ok:true});}
+      if(req.method==="GET"&&url==="/api/admin/chat-mutes"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const auth=await adminSession(db,token);if(auth.error)return send(res,auth.error.code,auth.error.body);
+        return send(res,200,{ok:true,mutes:CHAT_BUS.listMutes()});}
       if(req.method==="POST"&&url==="/api/admin/server-save"){
         const token=(req.headers.authorization||"").replace("Bearer ","")||String((await readBody(req)).token||"");
         const r=await adminServerSave(db,token);return send(res,r.code,r.body);}
