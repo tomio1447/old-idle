@@ -7,7 +7,7 @@
  */
 "use strict";
 
-const CYCLO = { aba: "character", sub: "stats", filtro: "all", busca: "",
+const CYCLO = { aba: "bestiary", sub: "stats", filtro: "all", busca: "",
                 sel: null };
 
 function cycloIcon(aba, ativo) {

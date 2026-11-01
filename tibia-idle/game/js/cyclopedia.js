@@ -8,7 +8,6 @@
 "use strict";
 
 const CYCLO_ABAS = [
-  { id: "character", nome: "Personagem", icone: "character", pronta: true },
   { id: "bestiary", nome: "Bestiário", icone: "bestiary", pronta: true },
   { id: "bosstiary", nome: "Bosstiário", icone: "bosstiary", pronta: true },
   { id: "charms", nome: "Charms", icone: "charms", pronta: true },
