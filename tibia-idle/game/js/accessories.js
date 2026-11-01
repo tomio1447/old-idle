@@ -744,6 +744,7 @@ function accessoryHelperPickSource(p, slug) {
         instId: inst.id,
         charges: Number.isFinite(ch) ? ch : full,
         ratio: accessoryHelperRemainRatio(slug, ch),
+        tier: typeof itemInstanceTier === "function" ? itemInstanceTier(inst) : (inst.tier || 0),
         locPri: 0,
       });
     }
@@ -776,6 +777,7 @@ function accessoryHelperPickSource(p, slug) {
   cands.sort((a, b) =>
     a.ratio - b.ratio ||
     (Math.floor(Number(a.charges) || 0) - Math.floor(Number(b.charges) || 0)) ||
+    ((b.tier || 0) - (a.tier || 0)) ||
     a.locPri - b.locPri);
   return cands[0];
 }
@@ -810,7 +812,7 @@ function accessoryPickerTriggerHtml(p, slot, value, kind) {
     meta = "clique para escolher";
   }
   return `<button type="button" class="helper-equip-pick-btn" data-helper-equip-pick="${kind}"
-      title="Escolher ${kind === "emergency" ? "emergencial" : "padrão"}">
+      title="Escolher ${kind === "emergency" ? "emergencial" : kind === "normal" ? "padrão" : kind === "wsingle" ? "arma single" : "arma de área"}">
     <span class="helper-equip-pick-icon">${icon}</span>
     <span class="helper-equip-pick-text">
       <span class="small">${nome}</span>
@@ -821,16 +823,19 @@ function accessoryPickerTriggerHtml(p, slot, value, kind) {
 }
 
 function accessoryPickerKindLabel(kind) {
+  if (kind === "wsingle") return "Single target";
+  if (kind === "warea") return "Área";
   return kind === "emergency" ? "Emergencial" : "Padrão";
 }
 
 function accessoryPickerSlotLabel(slot) {
+  if (slot === "weapon") return "Arma";
   return slot === "ring" ? "Anel" : "Amuleto";
 }
 
 function openAccessoryHelperPicker(kind) {
   const p = typeof G !== "undefined" ? G.p : null;
-  if (!p || (kind !== "emergency" && kind !== "normal")) return;
+  if (!p || ["emergency", "normal", "wsingle", "warea"].indexOf(kind) === -1) return;
   HELPER_EQUIP_PICKER.kind = kind;
   HELPER_EQUIP_PICKER.busca = "";
   desenhaAccessoryHelperPicker();
@@ -843,13 +848,18 @@ function desenhaAccessoryHelperPicker() {
   const body = document.getElementById("modal-body");
   if (!p || !body || !HELPER_EQUIP_PICKER.kind) return;
   ensureAccessoryConfig(p);
-  const slot = HELPER_EQUIP_UI.slot || "amulet";
-  const cfg = p.config.equipHelper[slot];
   const kind = HELPER_EQUIP_PICKER.kind;
-  const atual = kind === "emergency" ? (cfg.emergency || "") : (cfg.normal || "");
+  const wsKind = kind === "wsingle" || kind === "warea";
+  const slot = wsKind ? "weapon" : (HELPER_EQUIP_UI.slot || "amulet");
+  const cfg = p.config.equipHelper[wsKind ? "amulet" : slot];
+  const wsCfg = wsKind ? ensureWeaponSwitchConfig(p) : null;
+  const atual = wsKind
+    ? (kind === "wsingle" ? wsCfg.singleItem : wsCfg.areaItem)
+    : (kind === "emergency" ? (cfg.emergency || "") : (cfg.normal || ""));
   const busca = (HELPER_EQUIP_PICKER.busca || "").trim().toLowerCase();
   const counts = accessoryAvailableCounts(p, slot);
   let list = accessoryItemList(p, slot, atual);
+  if (wsKind) list = list.filter((slug) => isBowOrCrossbow(slug));
   if (busca) {
     list = list.filter((slug) => {
       const it = GAMEDATA.items[slug];
@@ -908,9 +918,13 @@ function desenhaAccessoryHelperPicker() {
           ? `<div class="dim tiny" style="padding:10px">Nada com esse filtro.</div>` : "")}
       </div>
       <div class="row mt8" style="gap:6px;align-items:center">
-        <span class="tiny dim">${cfg.enabled
-          ? "Ativo: Usar aplica o item agora conforme a vida."
-          : "Ativo desligado: só configura — marque Ativo para vestir."}</span>
+        <span class="tiny dim">${wsKind
+          ? (wsCfg.enabled
+            ? "Ativo: troca a arma conforme os monstros na tela."
+            : "Ativo desligado: só configura — marque Ativo para vestir.")
+          : (cfg.enabled
+            ? "Ativo: Usar aplica o item agora conforme a vida."
+            : "Ativo desligado: só configura — marque Ativo para vestir.")}</span>
         <span style="flex:1"></span>
         <button type="button" class="sm primary" id="helper-equip-pick-fechar">Fechar</button>
       </div>
@@ -937,9 +951,15 @@ function desenhaAccessoryHelperPicker() {
   body.querySelectorAll("[data-helper-equip-choose]").forEach((b) => {
     b.addEventListener("click", () => {
       const slug = b.getAttribute("data-helper-equip-choose") || "";
-      if (kind === "emergency") cfg.emergency = slug;
+      if (kind === "wsingle") wsCfg.singleItem = slug;
+      else if (kind === "warea") wsCfg.areaItem = slug;
+      else if (kind === "emergency") cfg.emergency = slug;
       else cfg.normal = slug;
-      if (cfg.enabled) applyAccessoryHelperSlotNow(p, slot);
+      if (wsKind) {
+        if (wsCfg.enabled && typeof G !== "undefined" && G.combat) {
+          tryWeaponSwitch(G.combat, p, Date.now());
+        }
+      } else if (cfg.enabled) applyAccessoryHelperSlotNow(p, slot);
       if (typeof save === "function") save();
       refreshAccessoryHelperVisuals(p);
       desenhaAccessoryHelperPicker();
@@ -984,6 +1004,58 @@ function tryAccessoryHelper(c, p, now) {
       if (cfg.normal || cur === cfg.emergency) accessoryEquipConfigured(p, slot, cfg.normal);
     }
   }
+  try { tryWeaponSwitch(c, p, now); } catch (e) { /* segue */ }
+}
+
+/* ------------------------------------------------- troca single ⇄ área (RP)
+ * Paladino alterna bow/crossbow conforme a quantidade de monstros vivos na
+ * tela: até `singleMax` monstros → arma single; `areaMin` ou mais → arma de
+ * área. Entre os dois valores mantém a arma atual (sem ficar trocando). */
+function ensureWeaponSwitchConfig(p) {
+  if (!p.config) p.config = {};
+  const c = p.config.weaponSwitch || {};
+  const num = (v, d) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(30, n)) : d;
+  };
+  p.config.weaponSwitch = {
+    enabled: !!c.enabled,
+    singleItem: c.singleItem || "",
+    singleMax: num(c.singleMax, 2),
+    areaItem: c.areaItem || "",
+    areaMin: num(c.areaMin, 3),
+  };
+  return p.config.weaponSwitch;
+}
+
+function isBowOrCrossbow(slug) {
+  const it = (typeof GAMEDATA !== "undefined" && GAMEDATA.items && GAMEDATA.items[slug]) || null;
+  if (!it || it.s !== "weapon" || it.t !== "distance") return false;
+  if (typeof weaponAmmoKind === "function") return !!weaponAmmoKind(it, slug);
+  return /bow|crossbow|bolter|arbalest|devileye|ironworker|spitter/i.test(slug);
+}
+
+function weaponSwitchMobCount(c) {
+  return ((c && c.mobs) || []).filter((m) => m && m.hp > 0).length;
+}
+
+function tryWeaponSwitch(c, p, now) {
+  if (!p) return false;
+  if (typeof canUseQuiver !== "function" || !canUseQuiver(p)) return false;
+  const cfg = ensureWeaponSwitchConfig(p);
+  if (!cfg.enabled) return false;
+  now = now || Date.now();
+  if ((p._wsNextTry || 0) > now) return false;
+  const n = weaponSwitchMobCount(c);
+  let want = "";
+  if (cfg.areaItem && n >= cfg.areaMin) want = cfg.areaItem;
+  else if (cfg.singleItem && n <= cfg.singleMax) want = cfg.singleItem;
+  if (!want) return false;
+  const cur = p.equip && p.equip.weapon ? p.equip.weapon.item : "";
+  if (cur === want) return false;
+  const ok = accessoryEquipConfigured(p, "weapon", want);
+  if (!ok) p._wsNextTry = now + 8000;
+  return ok;
 }
 
 /* Aplica imediatamente o item certo do helper (toggle Ativo ON / picker).
@@ -1087,6 +1159,44 @@ function renderEquipmentHelper(p) {
       <div class="small dim mt10 mb4">Na mochila / Loot Pouch / Supply Stash</div>
       <div class="row wrap" style="gap:5px">${pouchIcons || `<div class="tiny dim">Nenhum ${slot === "amulet" ? "amuleto" : "anel"} disponível.</div>`}</div>
       <div class="tiny dim mt8">Veste o item emergencial quando a vida cai e devolve o padrão quando recupera. Os itens podem estar na mochila, Loot Pouch ou Supply Stash.</div>
+    </div>
+    ${renderWeaponSwitchBlock(p)}`;
+}
+
+function renderWeaponSwitchBlock(p) {
+  if (typeof canUseQuiver !== "function" || !canUseQuiver(p)) return "";
+  const ws = ensureWeaponSwitchConfig(p);
+  const counts = accessoryAvailableCounts(p, "weapon");
+  const icons = Object.keys(counts).filter((slug) => isBowOrCrossbow(slug)).slice(0, 12)
+    .map((slug) =>
+      `<div class="inv-item ${itemClsBorder(slug)}" style="width:34px;height:34px;cursor:default" title="${itemName(slug)} · ${counts[slug]}x">
+        ${itemImg(slug, 0, null, counts[slug])}${counts[slug] > 1 ? `<span class="cnt">${counts[slug]}</span>` : ""}</div>`).join("");
+  return `
+    <div class="panel-inset" style="padding:10px;margin-top:8px">
+      <div class="row mb8" style="align-items:center;gap:8px">
+        <div class="small" style="color:#d4af37;font-weight:bold">Bow ⇄ Crossbow por monstros</div>
+        <span style="flex:1"></span>
+        <label class="toggle tiny"><input type="checkbox" id="helper-ws-enabled" ${ws.enabled ? "checked" : ""}> Ativo</label>
+      </div>
+      <div class="row" style="gap:12px;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div class="tiny" style="color:#7ae8a8;font-weight:bold">SINGLE TARGET</div>
+          ${accessoryPickerTriggerHtml(p, "weapon", ws.singleItem, "wsingle")}
+          <label class="small dim mt8">Equipar com X monstros ou menos</label>
+          <input id="helper-ws-single-max" type="number" min="0" max="30" value="${ws.singleMax}"
+            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="tiny" style="color:#ffb060;font-weight:bold">ÁREA</div>
+          ${accessoryPickerTriggerHtml(p, "weapon", ws.areaItem, "warea")}
+          <label class="small dim mt8">Equipar com X monstros ou mais</label>
+          <input id="helper-ws-area-min" type="number" min="0" max="30" value="${ws.areaMin}"
+            style="width:100%;padding:5px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        </div>
+      </div>
+      <div class="small dim mt10 mb4">Bows e crossbows na mochila / Loot Pouch / Supply Stash</div>
+      <div class="row wrap" style="gap:5px">${icons || `<div class="tiny dim">Nenhum bow ou crossbow disponível.</div>`}</div>
+      <div class="tiny dim mt8">Conta os monstros vivos na tela: até X → arma single (ex.: bow); X+ → arma de área (ex.: crossbow com burst arrow). Entre os dois valores, mantém a arma atual. Só vale para paladinos com quiver.</div>
     </div>`;
 }
 
@@ -1120,6 +1230,31 @@ function bindEquipmentHelper(p) {
     cfg.restoreAbove = Math.max(1, Math.min(99, parseInt(above.value, 10) || 80));
     if (cfg.restoreAbove < cfg.equipBelow) cfg.restoreAbove = cfg.equipBelow;
     above.value = cfg.restoreAbove;
+    if (typeof save === "function") save(); rer();
+  });
+  const wsEnabled = document.getElementById("helper-ws-enabled");
+  if (wsEnabled) wsEnabled.addEventListener("change", () => {
+    const ws = ensureWeaponSwitchConfig(p);
+    ws.enabled = wsEnabled.checked;
+    if (ws.enabled && typeof G !== "undefined" && G.combat) {
+      tryWeaponSwitch(G.combat, p, Date.now());
+    }
+    if (typeof save === "function") save();
+    refreshAccessoryHelperVisuals(p);
+    rer();
+  });
+  const wsSingleMax = document.getElementById("helper-ws-single-max");
+  if (wsSingleMax) wsSingleMax.addEventListener("change", () => {
+    const ws = ensureWeaponSwitchConfig(p);
+    ws.singleMax = Math.max(0, Math.min(30, parseInt(wsSingleMax.value, 10) || 0));
+    wsSingleMax.value = ws.singleMax;
+    if (typeof save === "function") save(); rer();
+  });
+  const wsAreaMin = document.getElementById("helper-ws-area-min");
+  if (wsAreaMin) wsAreaMin.addEventListener("change", () => {
+    const ws = ensureWeaponSwitchConfig(p);
+    ws.areaMin = Math.max(0, Math.min(30, parseInt(wsAreaMin.value, 10) || 3));
+    wsAreaMin.value = ws.areaMin;
     if (typeof save === "function") save(); rer();
   });
 }

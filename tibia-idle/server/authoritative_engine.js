@@ -3432,9 +3432,9 @@ function tickAccessoryCharges(auth,p,dt,now){
 }
 function tryAccessoryHelper(auth,p,now){
   if(!p)return false;
-  const helper=p.config&&p.config.equipHelper;if(!helper)return false;
+  let swapped=tryWeaponSwitch(auth,p,now);
+  const helper=p.config&&p.config.equipHelper;if(!helper)return swapped;
   const max=maxStats(p),hpPct=max.hp?(p.hp/max.hp)*100:100;
-  let swapped=false;
   for(const slot of ["amulet","ring"]){
     const cfg=helper[slot];if(!cfg||cfg.enabled===false)continue;
     const below=Math.max(1,Math.min(99,Number(cfg.equipBelow)||50));
@@ -3446,6 +3446,89 @@ function tryAccessoryHelper(auth,p,now){
     }
   }
   return swapped;
+}
+/* Troca single ⇄ área (paladino): conta monstros vivos na instância e veste a
+ * arma configurada — até singleMax → arma single; areaMin+ → arma de área.
+ * Preserva instâncias (tier/imbuement) das armas: inst volta com loc="bag" e
+ * a nova assume loc="equip:weapon" + equip.instId. */
+function weaponSwitchCfg(p){
+  const c=p&&p.config&&p.config.weaponSwitch||{};
+  const num=(v,d)=>{const n=parseInt(v,10);return Number.isFinite(n)?Math.max(0,Math.min(30,n)):d;};
+  return{enabled:!!c.enabled,singleItem:c.singleItem||"",singleMax:num(c.singleMax,2),
+    areaItem:c.areaItem||"",areaMin:num(c.areaMin,3)};
+}
+function weaponSwitchStashCurrent(p){
+  const e=p.equip&&p.equip.weapon;if(!e||!e.item)return;
+  p.bag=p.bag||{};p.itemInstances=Array.isArray(p.itemInstances)?p.itemInstances:[];
+  let inst=null;
+  if(e.instId)inst=p.itemInstances.find((i)=>i&&i.id===e.instId)||null;
+  if(inst){inst.loc="bag";}
+  else if(authItemNeedsBagInstance(e.item)){
+    // Arma de imbuement sem instância vinculada: cria uma (preserva a peça).
+    p.itemInstances.push({id:"srv-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36),
+      slug:e.item,loc:"bag",tier:(p.forge&&p.forge[e.item])||0});
+  }else{
+    p.bag[e.item]=(Number(p.bag[e.item])||0)+1;
+  }
+  delete p.equip.weapon;
+}
+function weaponSwitchEquip(p,slug){
+  const cur=p.equip&&p.equip.weapon&&p.equip.weapon.item||"";
+  if(cur===slug)return true;
+  const it=ITEMS[slug];
+  if(!it||it.s!=="weapon")return false;
+  if(!accessoryVocOk(p,it))return false;
+  if(it.lvl&&(Number(p.level)||1)<Number(it.lvl))return false;
+  p.bag=p.bag||{};p.lootPouch=p.lootPouch||{};p.supplyStash=p.supplyStash||{};p.supplies=p.supplies||{};
+  p.itemInstances=Array.isArray(p.itemInstances)?p.itemInstances:[];
+  let inst=null;
+  for(const cand of p.itemInstances){
+    if(cand&&cand.loc==="bag"&&cand.slug===slug&&(!inst||(Number(cand.tier)||0)>(Number(inst.tier)||0)))inst=cand;
+  }
+  if(!inst){
+    let found=false;
+    for(const src of["bag","lootPouch","supplyStash","supplies"]){
+      const m=p[src];if(m&&(Number(m[slug])||0)>0){found=true;break;}
+    }
+    if(!found)return false;
+  }
+  weaponSwitchStashCurrent(p);
+  p.equip=p.equip||{};
+  const needsInst=authItemNeedsBagInstance(slug);
+  if(inst){
+    inst.loc="equip:weapon";
+    p.equip.weapon={item:slug,count:1,instId:inst.id};
+  }else{
+    for(const src of["bag","lootPouch","supplyStash","supplies"]){
+      const m=p[src];
+      if(m&&(Number(m[slug])||0)>0){m[slug]--;if(!m[slug])delete m[slug];break;}
+    }
+    if(needsInst){
+      // Stack legado de item-instanciado: vira instância ao equipar.
+      const ni={id:"srv-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36),
+        slug,loc:"equip:weapon",tier:(p.forge&&p.forge[slug])||0};
+      p.itemInstances.push(ni);
+      p.equip.weapon={item:slug,count:1,instId:ni.id};
+    }else{
+      p.equip.weapon={item:slug,count:1};
+    }
+  }
+  authSyncBagCountsFromInstances(p);
+  return true;
+}
+function tryWeaponSwitch(auth,p,now){
+  if(!p||String(p.voc||"")!=="paladin")return false;
+  const cfg=weaponSwitchCfg(p);if(!cfg.enabled)return false;
+  now=now||(auth&&auth.clock)||0;
+  if((p._wsNextTry||0)>now)return false;
+  const n=((auth&&auth.mobs)||[]).filter((m)=>m&&m.hp>0).length;
+  let want="";
+  if(cfg.areaItem&&n>=cfg.areaMin)want=cfg.areaItem;
+  else if(cfg.singleItem&&n<=cfg.singleMax)want=cfg.singleItem;
+  if(!want)return false;
+  const ok=weaponSwitchEquip(p,want);
+  if(!ok)p._wsNextTry=now+8000;
+  return ok;
 }
 function magicShieldActive(p,now){
   if(energyRingOn(p))return true;
