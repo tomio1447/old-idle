@@ -2,7 +2,8 @@
  *
  * Regras implementadas (guia oficial):
  *  - vendedor usa itens da MOCHILA (o servidor verifica e retira na criação);
- *    comprado vai pro DEPOT/inbox;
+ *    comprado vai pro DEPOT/inbox; Tibia Coin é pseudo-item — escrow/entrega
+ *    acontecem no SALDO DE COINS da conta, nunca na mochila;
  *  - fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000) pago da CONTA;
  *  - buy offers (oferta de compra) e sell offers (oferta de venda);
  *  - MATCH AUTOMATICO: criar oferta casa com contra-oferta na hora;
@@ -13,7 +14,7 @@
  */
 "use strict";
 
-let _mTab = "browse";     // browse | sell | mine | coins | history
+let _mTab = "browse";     // browse | sell | mine | history
 let _mQ = "";
 let _mCat = "";
 let _mTier = "";
@@ -25,9 +26,6 @@ let _mAnon = false;
 let _mBuyPrice = "";
 let _mBuyQty = 1;
 let _mBuyAnon = false;
-let _mCoinsQty = "";
-let _mCoinsPrice = "";
-let _mCoinsAnon = false;
 let _mMarketT = null;
 let _mOffersCache = null;
 let _mPendingRefund = {}; // ofertaId -> {slug, inst?, qty} p/ devolver ao cancelar
@@ -89,6 +87,19 @@ const MARKET_CAT_LABEL = {
 };
 const MARKET_CAT_ORDER = Object.keys(MARKET_CAT_LABEL);
 const MARKET_BANNED_CATS = new Set(["potions", "runes", "ammunition", "weapons", "valuables", "tools", "food", "decoration"]);
+
+/* Tibia Coin circula no market como item normal (slug pseudo-item), mas o
+ * escrow/entrega acontece no SALDO DE COINS da conta — nunca na mochila. */
+const MARKET_COIN_SLUG = "tibia-coin";
+function marketIsCoinSlug(slug) { return String(slug || "") === MARKET_COIN_SLUG; }
+
+/* Ícone do item no market — TC usa o gif de coins (não existe sprite de item). */
+function marketIconHTML(slug, size) {
+  const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
+  if (marketIsCoinSlug(slug))
+    return `<img src="assets/ui/coins/tibia-coins.gif?v=${v}" style="width:${size}px;height:${size}px;image-rendering:pixelated" alt="">`;
+  return itemImg(slug, size, null, 1);
+}
 
 function marketCatLabelHTML(c) {
   if (c === "tibia-coins") {
@@ -209,7 +220,7 @@ function marketApplyEscrowState(d) {
  * para quando o servidor não devolveu o estado da mochila. */
 function marketRefundItem(p, offerId) {
   const pend = _mPendingRefund[offerId];
-  if (!pend) return false;
+  if (!pend || marketIsCoinSlug(pend.slug)) return false;
   if (pend.inst) {
     if (pend.to === "depot") {
       pend.inst.loc = "depot";
@@ -324,7 +335,6 @@ function renderMarket() {
         <button class="sm ${_mTab === "browse" ? "primary" : ""}" data-mtab="browse">🔍 Navegar</button>
         <button class="sm ${_mTab === "sell" ? "primary" : ""}" data-mtab="sell">💰 Vender</button>
         <button class="sm ${_mTab === "mine" ? "primary" : ""}" data-mtab="mine">📋 Minhas ofertas</button>
-        <button class="sm ${_mTab === "coins" ? "primary" : ""}" data-mtab="coins">🪙 Tibia Coins</button>
         <button class="sm ${_mTab === "history" ? "primary" : ""}" data-mtab="history">🧾 Histórico</button>
       </div>
       <div id="market-body" style="height:520px;overflow:auto"></div>
@@ -335,11 +345,10 @@ function renderMarket() {
     b.addEventListener("click", () => { _mTab = b.dataset.mtab; renderMarket(); }));
 
   const body = $("#market-body");
-  if (_mTab === "browse") renderMarketBrowse(body, p);
-  else if (_mTab === "sell") renderMarketSell(body, p);
+  if (_mTab === "sell") renderMarketSell(body, p);
   else if (_mTab === "mine") renderMarketMine(body, p);
   else if (_mTab === "history") renderMarketHistory(body, p);
-  else renderMarketCoins(body, p);
+  else { _mTab = "browse"; renderMarketBrowse(body, p); }
 
   modal.classList.add("show", "wide");
 }
@@ -386,6 +395,13 @@ function marketAttachDetailEvents(body, p) {
     const sellBtn = e.target.closest && e.target.closest("#m-create-sell");
     if (sellBtn) {
       const slug = sellBtn.dataset.slug;
+      if (marketIsCoinSlug(slug)) {
+        if (accountCoins() <= 0) { toast("Você não tem Tibia Coins na conta"); return; }
+        _mSel = { slug, instId: null, qty: accountCoins(), tier: 0, from: "account" };
+        _mTab = "sell";
+        renderMarket();
+        return;
+      }
       const bag = (marketBagItems(p) || []).filter((i) => i.slug === slug);
       if (!bag.length) { toast("Você não tem esse item na mochila para vender"); return; }
       const i = bag[0];
@@ -602,10 +618,15 @@ function marketBuildCatalog() {
 
   Object.keys(gd).forEach((slug) => add(slug, "g"));
   Object.keys(md).forEach((slug) => add(slug, "m"));
+  // pseudo-item: Tibia Coin (escrow/entrega no saldo de coins da conta)
+  if (!seen.has(MARKET_COIN_SLUG))
+    out.push({ slug: MARKET_COIN_SLUG, name: "Tibia Coin",
+      category: "tibia-coins", tier: 0, cid: 0, price: 25000 });
   return out;
 }
 
 function marketItemName(slug) {
+  if (marketIsCoinSlug(slug)) return "Tibia Coin";
   const gd = (typeof GAMEDATA !== "undefined" && GAMEDATA.items[slug]) || {};
   const md = (typeof MARKETDATA !== "undefined" && MARKETDATA.items[slug]) || {};
   return gd.n || md.n || itemName(slug);
@@ -616,7 +637,7 @@ function marketItemRowHTML(it) {
   const tier = it.tier ? `T${it.tier}` : "";
   const lvl = Number(it.lvl || 0);
   return `<div class="m-item-row ${active}" data-slug="${it.slug}" title="${it.name}">
-    ${itemImg(it.slug, 24, null, 1)}
+    ${marketIconHTML(it.slug, 24)}
     <span class="m-item-name">${it.name}</span>
     ${tier ? `<span class="tiny dim" style="color:#dab0ff">${tier}</span>` : ""}
     ${lvl > 0 ? `<span class="m-item-lv">Lv ${lvl}</span>` : ""}
@@ -639,13 +660,15 @@ function marketDetailHTML(it) {
   if (Number(it.imbSlots) > 0) attrs.push(`${it.imbSlots} imb slot${it.imbSlots > 1 ? "s" : ""}`);
   const price = Number(md.price || gd.sell || 0);
   const tier = it.tier ? `<span style="color:#dab0ff">T${it.tier}</span>` : "";
+  const isCoin = marketIsCoinSlug(it.slug);
   return `
     <div id="m-detail-info">
       <div class="row" style="gap:8px;align-items:flex-start;margin-bottom:8px">
-        <div style="position:relative">${itemImg(it.slug, 40, null, 1)}${it.tier ? `<span class="tier-badge" style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${it.tier}</span>` : ""}</div>
+        <div style="position:relative">${marketIconHTML(it.slug, 40)}${it.tier ? `<span class="tier-badge" style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${it.tier}</span>` : ""}</div>
         <div style="flex:1;min-width:0">
           <div class="small" style="font-weight:bold;color:#ffe680">${it.name} ${tier}</div>
-          <div class="tiny dim">${MARKET_CAT_LABEL[it.category] || it.category} · CID ${it.cid || 0}</div>
+          <div class="tiny dim">${MARKET_CAT_LABEL[it.category] || it.category}${it.cid ? " · CID " + it.cid : ""}</div>
+          ${isCoin ? `<div class="tiny" style="color:#ffe680">Saldo na conta: <b>${fmtFull(accountCoins())} TC</b> · compra/venda altera o saldo da conta direto</div>` : ""}
           ${attrs.length ? `<div class="tiny" style="color:#9ce84a">${attrs.join(" · ")}</div>` : ""}
           <div class="tiny">Preço base: <b>${fmtFull(price)}</b> gp</div>
         </div>
@@ -756,10 +779,11 @@ function marketRenderItemOffers(p, slug, loading) {
       const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
       if (!r.ok) { toast(r.msg || "Falha na compra"); return; }
       const d = r.data;
+      const dest = Number(d.coins) > 0 ? "saldo de TC da conta" : "Depot";
       if (d.item) marketReceiveItem(p, d.item.slug, d.item.tier, d.item.qty);
-      if (Number.isFinite(Number(d.bank))) { _mBank = Number(d.bank); marketRefreshHeader(); }
-      toast(`Comprou <b>${marketItemName(d.item ? d.item.slug : "")}</b> — foi para o Depot`, "level");
-      addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → Depot`);
+      if (Number.isFinite(Number(d.bank)) || Number.isFinite(Number(d.coinBalance))) { _mBank = Number(d.bank); marketRefreshHeader(); }
+      toast(`Comprou <b>${marketItemName(d.item ? d.item.slug : _mBrowseItem)}</b> — foi para o ${dest}`, "level");
+      addLog("sell", `Market: comprou de <b>${d.seller_name}</b> por ${fmtFull(d.total || d.price)}${d.price_tc ? " TC" : " gp"} → ${dest}`);
       marketLoadItemOffers(p, slug);
       renderAll && renderAll();
     })));
@@ -768,14 +792,17 @@ function marketRenderItemOffers(p, slug, loading) {
     b.addEventListener("click", () => marketWithLock(b, async () => {
       const id = b.dataset.maccept;
       const oferta = (_mBrowseOffers.find((o) => o.id === Number(id))) || {};
-      const naBag = (marketBagItems(p) || []).find((i) => i.slug === oferta.slug);
-      if (!naBag) { toast("Você não tem esse item na mochila para vender"); return; }
+      const isCoin = marketIsCoinSlug(oferta.slug);
+      const naBag = isCoin
+        ? (accountCoins() > 0 ? { slug: oferta.slug, instId: null } : null)
+        : (marketBagItems(p) || []).find((i) => i.slug === oferta.slug);
+      if (!naBag) { toast(isCoin ? "Você não tem Tibia Coins na conta" : "Você não tem esse item na mochila para vender"); return; }
       const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name,
-        qty: 1, inst_id: naBag.instId || undefined });
+        qty: isCoin ? oferta.qty : 1, inst_id: naBag.instId || undefined });
       if (!r.ok) { toast(r.msg || "Falha"); marketApplyEscrowState(r.data); return; }
       marketApplyEscrowState(r.data);
       if (Number.isFinite(Number(r.data.bank))) { _mBank = Number(r.data.bank); marketRefreshHeader(); }
-      toast(`Vendeu <b>${marketItemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
+      toast(`Vendeu <b>${r.data.item ? r.data.item.qty + "x " : ""}${marketItemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
       marketLoadItemOffers(p, slug);
       renderAll && renderAll();
     })));
@@ -836,7 +863,8 @@ function renderMarketBuyOffer(body, p, preSlug) {
     if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Oferta casada automaticamente! Comprou por ${fmtFull(r.matched.price)} gp`, "level");
-      marketReceiveItem(p, slugTxt, Number(r.matched.tier) || 0, r.matched.qty || qty);
+      if (!marketIsCoinSlug(slugTxt))
+        marketReceiveItem(p, slugTxt, Number(r.matched.tier) || 0, r.matched.qty || qty);
     } else {
       toast(`Oferta de compra criada (${fmtFull(total)} gp travados)`, "level");
     }
@@ -849,32 +877,39 @@ function renderMarketBuyOffer(body, p, preSlug) {
 /* -------------------------------------------------------------- VENDER */
 function renderMarketSell(body, p) {
   const tok = sessionToken();
-  // itens da MOCHILA de quem cria a oferta (o servidor verifica e retira)
+  // itens da MOCHILA de quem cria a oferta (o servidor verifica e retira);
+  // Tibia Coin aparece junto, mas o escrow é o saldo de coins da conta
   const itens = marketBagItems(p);
+  if (accountCoins() > 0)
+    itens.unshift({ slug: MARKET_COIN_SLUG, instId: null, qty: accountCoins(),
+                    tier: 0, n: "Tibia Coin", from: "account" });
   const sel = _mSel;
   const selItem = sel ? itens.find((i) => sel.instId ? i.instId === sel.instId : (i.from === sel.from && i.slug === sel.slug)) : null;
+  const selIsCoin = selItem && marketIsCoinSlug(selItem.slug);
 
   body.innerHTML = `
-    <div class="small dim mb4">Venda itens da sua <b>mochila</b> — o item sai da backpack de quem cria a oferta.</div>
+    <div class="small dim mb4">Venda itens da sua <b>mochila</b> — o item sai da backpack de quem cria a oferta. <b>Tibia Coin</b> sai do saldo da conta.</div>
     <div class="list mb4" style="max-height:260px" id="m-sell-items">
       ${itens.length ? itens.map((i) => {
         const isSel = selItem && ((sel.instId && i.instId === sel.instId) || (!sel.instId && !i.instId && i.slug === sel.slug));
         return `<div class="shop-row ${isSel ? "selected" : ""}" data-sell-item="${i.slug}" ${i.instId ? `data-sell-inst="${i.instId}"` : ""} data-sell-qty="${i.qty}" data-sell-tier="${i.tier}">
-          <div style="position:relative">${itemImg(i.slug, 24, null, i.qty || 1)}
+          <div style="position:relative">${marketIconHTML(i.slug, 24)}
             ${i.tier ? `<span class="tier-badge" style="position:absolute;top:-2px;right:-2px;font-size:7px;height:11px;min-width:11px;line-height:10px">T${i.tier}</span>` : ""}</div>
           <div style="flex:1;min-width:0"><div class="small">${i.n}</div>
-            <div class="tiny dim">Mochila · ${i.instId ? "único" : i.qty + "x"}${i.tier ? " · T" + i.tier : ""}</div></div>
+            <div class="tiny dim">${i.from === "account" ? "Saldo da conta" : "Mochila"} · ${i.instId ? "único" : i.qty + "x"}${i.tier ? " · T" + i.tier : ""}</div></div>
         </div>`;
       }).join("") : '<div class="tiny dim">Mochila vazia — coloque itens na backpack para vender.</div>'}
     </div>
     ${selItem ? `
       <div class="row mb4" style="gap:6px;align-items:center">
         <span class="small">${selItem.n}${selItem.tier ? " · T" + selItem.tier : ""}</span>
+        ${selIsCoin ? `<label class="small dim">Qtd</label>
+          <input id="m-sell-qty" type="number" min="1" max="${selItem.qty}" value="${selItem.qty}" style="width:80px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">` : ""}
       </div>
       <div class="row mb4" style="gap:6px">
         <label class="small dim">Preço unitário</label>
         <input id="m-sell-price" type="number" min="1" value="${_mPrice}" style="width:110px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
-        <label class="toggle" title="Cobrar em Tibia Coins"><input type="checkbox" id="m-sell-tc" ${_mPriceTc ? "checked" : ""}> TC</label>
+        ${selIsCoin ? "" : `<label class="toggle" title="Cobrar em Tibia Coins"><input type="checkbox" id="m-sell-tc" ${_mPriceTc ? "checked" : ""}> TC</label>`}
         <label class="toggle" title="Não mostrar seu nome"><input type="checkbox" id="m-sell-anon" ${_mAnon ? "checked" : ""}> Anônimo</label>
       </div>
       <div class="tiny dim mb4" id="m-sell-fee"></div>
@@ -911,28 +946,34 @@ function renderMarketSell(body, p) {
     if (price <= 0) { toast("Informe um preço"); return; }
     const fee = marketFee(price);
     if (_mBank < fee) { toast("Ouro insuficiente na conta para a taxa (2%)"); return; }
-    const qty = selItem.instId ? 1 : selItem.qty;
+    const isCoin = marketIsCoinSlug(selItem.slug);
+    const qtyEl = $("#m-sell-qty");
+    const qty = selItem.instId ? 1
+      : isCoin ? Math.min(Math.max(0, Math.floor(Number(qtyEl && qtyEl.value) || 0)), accountCoins())
+      : selItem.qty;
+    if (qty <= 0) { toast(isCoin ? "Informe a quantidade de TC" : "Quantidade inválida"); return; }
     // inst local p/ refund legado (quando o servidor não devolve estado)
     const instLocal = selItem.instId && typeof findItemInstance === "function"
       ? findItemInstance(p, selItem.instId) : null;
     const r = await marketCreateOffer({
       token: tok, kind: "item", slug: selItem.slug, tier: selItem.tier || 0,
       inst_id: selItem.instId || undefined,
-      qty, price, price_tc: _mPriceTc ? 1 : 0,
+      qty, price, price_tc: (!isCoin && _mPriceTc) ? 1 : 0,
       seller_name: _mAnon ? "Anônimo" : p.name,
     });
     if (!r.ok) { toast(r.msg || "Falha ao vender"); marketApplyEscrowState(r.data); return; }
     marketApplyEscrowState(r.data);
-    // o servidor já retirou o item da mochila; guarda só o registro de refund
-    _mPendingRefund[r.offer.id] = { slug: selItem.slug, inst: instLocal,
-      qty: (r.offer && r.offer.qty) || qty, to: "bag" };
+    // o servidor já fez o escrow (mochila ou saldo de coins); guarda refund só de itens
+    if (!isCoin)
+      _mPendingRefund[r.offer.id] = { slug: selItem.slug, inst: instLocal,
+        qty: (r.offer && r.offer.qty) || qty, to: "bag" };
     if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Vendido na hora por ${fmtFull(r.matched.price)} gp! (match automático)`, "level");
     } else {
-      toast(`Oferta criada: <b>${selItem.n}</b> por ${fmtFull(price)}${_mPriceTc ? " TC" : " gp"} (30d)`, "level");
+      toast(`Oferta criada: <b>${isCoin ? qty + "x " : ""}${selItem.n}</b> por ${fmtFull(price)}${!isCoin && _mPriceTc ? " TC" : " gp"} (30d)`, "level");
     }
-    addLog("sell", `Market: ofertou <b>${selItem.n}</b> por ${fmtFull(price)}${_mPriceTc ? " TC" : " gp"}`);
+    addLog("sell", `Market: ofertou <b>${selItem.n}</b> por ${fmtFull(price)}${!isCoin && _mPriceTc ? " TC" : " gp"}`);
     _mSel = null; _mPrice = "";
     renderMarket();
     renderAll && renderAll();
@@ -953,8 +994,8 @@ function renderMarketMine(body, p) {
         : o.status === "cancelled" ? `<span style="color:#ff9a6a">cancelada</span>`
         : `<span style="color:#ff9a6a">expirada</span>`;
       const nome = o.kind === "coins" ? (o.qty + " Tibia Coins")
-        : o.kind === "buy" ? "Comprar " + itemName(o.slug) + (o.tier ? " T" + o.tier : "")
-        : itemName(o.slug) + (o.tier ? " T" + o.tier : "");
+        : o.kind === "buy" ? "Comprar " + marketItemName(o.slug) + (o.tier ? " T" + o.tier : "")
+        : marketItemName(o.slug) + (o.tier ? " T" + o.tier : "");
       return `<div class="shop-row">
         <div style="flex:1;min-width:0">
           <div class="small">${nome}</div>
@@ -976,124 +1017,11 @@ function renderMarketMine(body, p) {
           marketRefundItem(p, id);
         }
         if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
-        toast("Oferta cancelada — devolvido à mochila", "level");
+        toast(`Oferta cancelada — ${Number(r.refundCoins) > 0 ? "TC devolvidos à conta" : "devolvido à mochila"}`, "level");
         renderMarket();
         renderAll && renderAll();
       })));
   });
-}
-
-/* -------------------------------------------------------------- TC P2P */
-function renderMarketCoins(body, p) {
-  const tok = sessionToken();
-  const coins = accountCoins();
-  if (!window._mCoinsTab) window._mCoinsTab = "list";
-  body.innerHTML = `
-    <div class="shop-row" style="align-items:flex-start">
-      <img src="assets/ui/coins/tibia-coins.gif" class="coin-gif" alt="" style="width:22px;height:22px">
-      <div style="flex:1">
-        <div class="small" style="color:#ffe680">${fmtFull(coins)} Tibia Coins na conta</div>
-        <div class="tiny dim">Venda TC por gold para outros jogadores, ou compre TC de ofertas ativas.</div>
-      </div>
-    </div>
-    <div class="row mb4" style="gap:4px;flex-wrap:wrap">
-      <button class="sm ${window._mCoinsTab === "list" ? "primary" : ""}" data-mcoinstab="list">Comprar TC</button>
-      <button class="sm ${window._mCoinsTab === "sell" ? "primary" : ""}" data-mcoinstab="sell">Vender TC</button>
-    </div>
-    <div id="m-coins-body"></div>`;
-  $$("#modal-body [data-mcoinstab]").forEach((b) =>
-    b.addEventListener("click", () => { window._mCoinsTab = b.dataset.mcoinstab; renderMarketCoins(body, p); }));
-
-  const cb = $("#m-coins-body");
-  if (window._mCoinsTab === "sell") {
-    cb.innerHTML = `
-      <div class="small dim mb4">Vender Tibia Coins (por gold)</div>
-      <div class="row mb4" style="gap:6px">
-        <input id="m-c-sell-qty" type="number" min="1" placeholder="Qtd TC" value="${_mCoinsQty}" style="width:90px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
-        <span class="tiny dim">TC por</span>
-        <input id="m-c-sell-price" type="number" min="1" placeholder="gp total" value="${_mCoinsPrice}" style="width:110px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
-        <span class="tiny dim">gp</span>
-      </div>
-      <div class="row mb4" style="gap:6px;align-items:center">
-        <label class="toggle"><input type="checkbox" id="m-c-anon" ${_mCoinsAnon ? "checked" : ""}> Anônimo</label>
-        <span style="flex:1"></span>
-        <span class="tiny dim" id="m-c-fee"></span>
-      </div>
-      <button class="primary full" id="m-c-sell-go">Ofertar TC (30 dias)</button>
-      <div class="tiny dim mt8">Ao ofertar, os TC ficam retidos; se cancelar/expirar, voltam para a conta.</div>`;
-    const qEl = $("#m-c-sell-qty"); if (qEl) qEl.addEventListener("input", (e) => { _mCoinsQty = e.target.value; });
-    const pEl = $("#m-c-sell-price"); if (pEl) pEl.addEventListener("input", (e) => {
-      _mCoinsPrice = e.target.value;
-      const price = Math.floor(Number(e.target.value) || 0);
-      const f = $("#m-c-fee");
-      if (f) f.innerHTML = price > 0 ? `Taxa: ${fmtFull(marketFee(price))} gp` : "";
-    });
-    const anEl = $("#m-c-anon"); if (anEl) anEl.addEventListener("change", (e) => { _mCoinsAnon = e.target.checked; });
-    const coinSellGo = $("#m-c-sell-go");
-    coinSellGo.addEventListener("click", () => marketWithLock(coinSellGo, async () => {
-      const qty = Math.floor(Number(_mCoinsQty) || 0);
-      const price = Math.floor(Number(_mCoinsPrice) || 0);
-      if (qty <= 0 || price <= 0) { toast("Informe quantidade e preço"); return; }
-      if (qty > coins) { toast("Tibia Coins insuficientes"); return; }
-      const fee = marketFee(price);
-      if (_mBank < fee) { toast("Ouro insuficiente na conta para a taxa"); return; }
-      const r = await marketCreateOffer({
-        token: tok, kind: "coins", qty, price, price_tc: 0,
-        seller_name: _mCoinsAnon ? "Anônimo" : p.name,
-      });
-      if (!r.ok) { toast(r.msg || "Falha"); return; }
-      if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
-      toast(`Oferta criada: ${qty} TC por ${fmtFull(price)} gp`, "level");
-      marketRefreshHeader();
-      _mCoinsQty = ""; _mCoinsPrice = "";
-      renderMarketCoins(body, p);
-      renderCoinBalance();
-    }));
-  } else {
-    cb.innerHTML = '<div class="tiny dim">Carregando ofertas de TC...</div>';
-    marketListOffers({ kind: "coins" }).then((r) => {
-      if (!r.ok) { cb.innerHTML = `<div class="tiny" style="color:#ff9a6a">${r.msg || "Falha"}</div>`; return; }
-      const ofertas = r.offers || [];
-      if (!ofertas.length) { cb.innerHTML = '<div class="tiny dim">Nenhuma oferta de TC no momento.</div>'; return; }
-      cb.innerHTML = `<div class="list" style="max-height:420px">` + ofertas.map((o) => `
-        <div class="shop-row">
-          <div style="flex:1;min-width:0">
-            <div class="small" style="color:#ffe680">${o.qty} Tibia Coins</div>
-            <div class="tiny dim">${o.seller_name} · ${marketTimeLeft(o)} restante</div>
-          </div>
-          <button class="sm primary" data-mcoinsbuy="${o.id}" data-price="${o.price}">${fmtFull(o.price)} gp</button>
-        </div>`).join("") + `</div>`;
-      $$("#market-body [data-mcoinsbuy]").forEach((b) =>
-        b.addEventListener("click", () => marketWithLock(b, async () => {
-          const id = b.dataset.mcoinsbuy;
-          const price = Number(b.dataset.price);
-          if (_mBank < price) { toast("Ouro insuficiente na conta"); return; }
-          const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name });
-          if (!r.ok) { toast(r.msg || "Falha"); return; }
-          if(Number.isFinite(Number(r.data.bank))){_mBank=Number(r.data.bank);marketRefreshHeader();}
-          toast(`Comprou ${r.data.coins} TC por ${fmtFull(price)} gp`, "level");
-          marketRefreshHeader();
-          renderMarketCoins(body, p);
-          renderStats(p);
-          renderCoinBalance();
-        })));
-    });
-  }
-}
-
-/* ----------------------------------------------------------- BANCO */
-function renderMarketBank() {
-  const tok = sessionToken();
-  const p = G.p;
-  if (!tok || !p) return;
-  $("#market-body").innerHTML = `
-    <div class="small dim mb4">O Market usa o saldo de gold compartilhado da conta.</div>
-    <div class="shop-row">
-      <div style="flex:1"><b>Saldo da conta:</b> <span style="color:#9ce84a">${fmtFull(accountGold())} gp</span></div>
-    </div>
-    <button class="full mt4" id="m-bank-back">Voltar ao Market</button>
-    <div class="tiny dim mt8">Taxas de 2% e valores de ofertas de compra saem diretamente da conta. Vendas entram na conta.</div>`;
-  $("#m-bank-back").addEventListener("click", () => renderMarket());
 }
 
 /* ---------------------------------------------------------- HISTÓRICO */
@@ -1127,7 +1055,7 @@ function renderMarketHistory(body, p) {
       <div class="list" style="max-height:420px">` + hist.map((h) => {
       const nome = h.kind === "coins"
         ? (h.qty + " Tibia Coins")
-        : itemName(h.slug || "?") + (h.tier ? " T" + h.tier : "");
+        : marketItemName(h.slug || "?") + (h.tier ? " T" + h.tier : "");
       const preco = h.price_tc ? "🪙 " + fmtFull(h.price) : fmtFull(h.price) + " gp";
       const quando = h.created_at ? new Date(h.created_at).toLocaleString() : "";
       return `<div class="shop-row">

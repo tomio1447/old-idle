@@ -3717,6 +3717,11 @@ function marketFee(price) {
   return Math.max(20, Math.min(1000000, Math.round(price * 0.02)));
 }
 
+/* Slug pseudo-item para Tibia Coin: circula como item normal no market, mas
+ * o "escrow/entrega" acontece no saldo de coins da conta — nunca na mochila. */
+const MARKET_COIN_SLUG = "tibia-coin";
+function marketIsCoinSlug(slug) { return String(slug || "") === MARKET_COIN_SLUG; }
+
 /* ---- escrow do item na MOCHILA de quem cria a oferta ----
  * A oferta de venda sai da backpack do personagem (verificação autoritativa):
  * instâncias (equips com tier/imb) removem 1 instId; stacks removem `qty`.
@@ -3899,6 +3904,18 @@ async function marketCreate(db, body, charName) {
       return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta para a oferta" } };
     }
     if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
+  } else if (marketIsCoinSlug(body.slug)) {
+    // ---- escrow: Tibia Coin sai do SALDO DE COINS da conta ----
+    if (body.price_tc) {
+      await db.refundMarketFee(acc.id, fee);
+      return { code: 400, body: { ok: false, msg: "Tibia Coin não pode ser vendida por TC" } };
+    }
+    if (qty > (acc.coins || 0)) {
+      await db.refundMarketFee(acc.id, fee);
+      return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
+    }
+    await db.updateCoins(acc.id, (acc.coins || 0) - qty);
+    offerQty = qty; offerTier = 0;
   } else {
     if (!body.slug) {
       await db.refundMarketFee(acc.id, fee);
@@ -3958,14 +3975,21 @@ async function marketTryMatch(db, nova, acc, charName) {
   await db.recordSale(slug, tier, melhor.price);
   if (isSell) {
     // vendedor (nova) recebe no banco; comprador (melhor) recebe o item —
-    // entrega server-side no depot compartilhado (pode estar offline)
+    // entrega server-side no depot compartilhado (pode estar offline).
+    // Tibia Coin credita o saldo de coins da conta do comprador.
     await db.addAccountMarketGold(acc.id, valor);
-    await marketDeliverToDepot(db, melhor.seller_id, slug, tier, q);
-    return { mode: "sell-matched", qty: q, price: melhor.price, tier, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+    if (marketIsCoinSlug(slug)) {
+      const buyer = await db.findAccountById(melhor.seller_id);
+      if (buyer) await db.updateCoins(buyer.id, (buyer.coins || 0) + q);
+    } else await marketDeliverToDepot(db, melhor.seller_id, slug, tier, q);
+    return { mode: "sell-matched", qty: q, price: melhor.price, tier, coins: marketIsCoinSlug(slug) ? q : 0,
+      against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
   } else {
     // comprador (nova) recebe o item; vendedor (melhor) recebe no banco
     await db.addAccountMarketGold(melhor.seller_id, valor);
-    return { mode: "buy-matched", qty: q, price: melhor.price, tier: melhor.tier || 0, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+    if (marketIsCoinSlug(slug)) await db.updateCoins(acc.id, (acc.coins || 0) + q);
+    return { mode: "buy-matched", qty: q, price: melhor.price, tier: melhor.tier || 0, coins: marketIsCoinSlug(slug) ? q : 0,
+      against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
   }
 }
 
@@ -4027,17 +4051,33 @@ async function marketBuyUnlocked(db, body, actorName) {
     // o item sai da MOCHILA de quem aceita (mesmo escrow da venda);
     // o dinheiro da oferta já está travado no banco do comprador (seller_id)
     // -> credita ao vendedor (actor) e "entrega" o item
-    const actor = await marketBagActor(db, body);
-    if (actor.error) return actor.error;
-    const debit = await marketMutateBag(db, acc, actor.character, body,
-      (p) => marketTakeFromBag(p, offer.slug, body.inst_id ? String(body.inst_id) : null, qty),
-      "market-accept-buy");
-    if (debit.code) return debit;
-    qty = debit.output.qty; // instâncias saem 1 por vez
+    let escrow = null;
+    if (marketIsCoinSlug(offer.slug)) {
+      // Tibia Coin: debita o saldo de coins de quem aceita e credita o
+      // saldo do dono da ordem — sem mochila nem depot.
+      qty = Math.min(qty, Math.max(0, Math.floor(Number(acc.coins) || 0)));
+      if (qty <= 0)
+        return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
+      await db.updateCoins(acc.id, (acc.coins || 0) - qty);
+    } else {
+      const actor = await marketBagActor(db, body);
+      if (actor.error) return actor.error;
+      const debit = await marketMutateBag(db, acc, actor.character, body,
+        (p) => marketTakeFromBag(p, offer.slug, body.inst_id ? String(body.inst_id) : null, qty),
+        "market-accept-buy");
+      if (debit.code) return debit;
+      qty = debit.output.qty; // instâncias saem 1 por vez
+      escrow = debit.extra || null;
+    }
     const valor = offer.price * qty;
     await db.addAccountMarketGold(acc.id, valor);
-    // o item vai para o depot do dono da ordem de compra (pode estar offline)
-    await marketDeliverToDepot(db, offer.seller_id, offer.slug, offer.tier || 0, qty);
+    if (marketIsCoinSlug(offer.slug)) {
+      const buyer = await db.findAccountById(offer.seller_id);
+      if (buyer) await db.updateCoins(buyer.id, (buyer.coins || 0) + qty);
+    } else {
+      // o item vai para o depot do dono da ordem de compra (pode estar offline)
+      await marketDeliverToDepot(db, offer.seller_id, offer.slug, offer.tier || 0, qty);
+    }
     await db.recordSale(offer.slug, offer.tier || 0, offer.price);
     // histórico de trade (v36: DB expandida)
     await db.addMarketHistory({
@@ -4061,7 +4101,7 @@ async function marketBuyUnlocked(db, body, actorName) {
         price: offer.price,
         total: valor,
         buyer_name: offer.seller_name,
-      },balances,debit.extra||{}),
+      },balances,escrow||{}),
     };
   }
 
@@ -4078,7 +4118,7 @@ async function marketBuyUnlocked(db, body, actorName) {
     const ok = await db.payMarketGold(acc.id, valor);
     if (!ok) return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta" } };
     await db.addAccountMarketGold(offer.seller_id, valor);
-    if (offer.kind === "coins" && qty > 0) {
+    if ((offer.kind === "coins" || marketIsCoinSlug(offer.slug)) && qty > 0) {
       await db.updateCoins(acc.id, (acc.coins || 0) + qty);
     }
     if (offer.kind === "item") await db.recordSale(offer.slug, offer.tier || 0, offer.price);
@@ -4101,10 +4141,10 @@ async function marketBuyUnlocked(db, body, actorName) {
     code: 200,
     body: Object.assign({
       ok: true,
-      item: offer.kind === "item"
+      item: (offer.kind === "item" && !marketIsCoinSlug(offer.slug))
         ? { slug: offer.slug, tier: offer.tier, data: offer.data, qty }
         : null,
-      coins: offer.kind === "coins" ? qty : 0,
+      coins: (offer.kind === "coins" || marketIsCoinSlug(offer.slug)) ? qty : 0,
       seller_name: offer.seller_name,
       price: offer.price,
       total: valor,
@@ -4165,7 +4205,10 @@ async function marketCancelUnlocked(db, body, id) {
   //  - oferta de venda de TC: TC de volta pra conta
   //  - oferta de COMPRA (buy): dinheiro de volta ao gold da conta
   let escrow = null;
-  if (offer.kind === "item" && body.char_id) {
+  const refundCoinsQty = offer.kind === "coins"
+    ? offer.qty
+    : (offer.kind === "item" && marketIsCoinSlug(offer.slug) ? offer.qty : 0);
+  if (offer.kind === "item" && !refundCoinsQty && body.char_id) {
     const actor = await marketBagActor(db, body);
     if (actor.error) return actor.error;
     const back = await marketMutateBag(db, acc, actor.character, body,
@@ -4175,8 +4218,8 @@ async function marketCancelUnlocked(db, body, id) {
     escrow = back.extra || null;
   }
   await db.updateMarketOffer(offer.id, { status: "cancelled" });
-  if (offer.kind === "coins") {
-    await db.updateCoins(acc.id, (acc.coins || 0) + offer.qty);
+  if (refundCoinsQty) {
+    await db.updateCoins(acc.id, (acc.coins || 0) + refundCoinsQty);
   } else if (offer.kind === "buy") {
     await db.addAccountMarketGold(acc.id, offer.price * offer.qty);
   }
@@ -4185,8 +4228,8 @@ async function marketCancelUnlocked(db, body, id) {
     code: 200,
     body: Object.assign({
       ok: true,
-      refunded: !!escrow,
-      refundCoins: offer.kind === "coins" ? offer.qty : 0,
+      refunded: !!escrow || !!refundCoinsQty,
+      refundCoins: refundCoinsQty,
       refundGold: offer.kind === "buy" ? offer.price * offer.qty : 0,
     },balances,escrow||{}),
   };
