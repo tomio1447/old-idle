@@ -577,7 +577,11 @@ const AppearanceRenderer = {
   /* Canvas da montaria (sem cor de outfit: o bicho tem cor propria) */
   mount(id, dir, frame) {
     const m = APP_MOUNT[id];
-    if (!m || !m.cw) return null;
+    // _mountDead marca montarias cujo asset falhou de vez (404/sem meta):
+    // preview/forPlayer caem na pose a pe imediatamente em vez de devolver
+    // null para sempre (a caixa ficava vazia).
+    this._mountDead = this._mountDead || {};
+    if (!m || !m.cw) { this._mountDead[id] = true; return null; }
     const linha = appDirRow(dir);
     const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
     const idleMeta = idleRequest ? idleAnimationMeta("mounts", id) : null;
@@ -590,9 +594,9 @@ const AppearanceRenderer = {
       (idleMeta ? "idle:" : "walk:") + col;
     if (this.cache[k] !== undefined) return this.cache[k];
     const base = Sprites.get(`assets/appearance/mount/${id}${idleMeta ? ".idle" : ""}.base.png`);
-    if (!base) { this.cache[k] = null; return null; }
+    if (!base) { this._mountDead[id] = true; this.cache[k] = null; return null; }
     if (!base.complete) return null;
-    if (!base.naturalWidth) { this.cache[k] = null; return null; }
+    if (!base.naturalWidth) { this._mountDead[id] = true; this.cache[k] = null; return null; }
     const cv = document.createElement("canvas");
     cv.width = renderMeta.cw; cv.height = renderMeta.ch;
     cv.getContext("2d").drawImage(base,
@@ -618,12 +622,23 @@ const AppearanceRenderer = {
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
     const addons = (p.outfit && p.outfit.addons) || 0;
     const mnt = currentMount(p);
-    const corpo = this.outfit(o.id, addons, cores, dir, frame,
-                              mnt ? { mounted: true } : null);
+    const corpoPe = this.outfit(o.id, addons, cores, dir, frame, null);
+    const corpoMontado = mnt
+      ? this.outfit(o.id, addons, cores, dir, frame, { mounted: true })
+      : null;
+    // Sheet montado ainda em download (ou 404): mostra a pose a pe em vez
+    // de sumir da cena por alguns frames (era o "personagem piscando").
+    // Quando o sheet montado falha, outfit() devolve o MESMO canvas da pose
+    // a pe — a identidade do objeto distingue pose montada de verdade, e o
+    // corpo a pe nunca e embarcado no bicho.
+    const poseMontada = !!(corpoMontado && corpoMontado !== corpoPe);
+    const corpo = corpoMontado || corpoPe;
     if (!corpo) return null;
-    if (!mnt) return corpo;
+    if (!mnt || !poseMontada) return corpo;
     const bicho = this.mount(mnt.id, dir, frame);
-    if (!bicho) return corpo;
+    // Bicho ainda baixando: pose a pe (o corpo montado sozinho parecia o
+    // boneco flutuando de pernas abertas).
+    if (!bicho) return corpoPe || corpo;
     const linha = appDirRow(dir);
     const idleRequest = !!(frame && typeof frame === "object" && frame.idle);
     let frameKey;
@@ -684,21 +699,49 @@ const AppearanceRenderer = {
 
   /* Prévia (montaria + personagem) para as telas de selecao.
    * allowUnmounted=true faz fallback sem montaria quando o asset ainda nao
-   * carregou (evita retrato vazio enquanto espera o bicho). */
+   * carregou (evita retrato vazio enquanto espera o bicho).
+   *
+   * O canvas devolvido e SEMPRE um clone: outfit()/mount() entregam o
+   * MESMO canvas cacheado para looks iguais, e appendChild move o no —
+   * duas caixas (painel party + helper, retratos duplicados) roubavam o
+   * canvas uma da outra e a caixa ficava vazia/piscando. */
   preview(p, dir, allowUnmounted) {
+    const cv = this._previewCanvas(p, dir, allowUnmounted);
+    if (!cv) return null;
+    const clone = document.createElement("canvas");
+    clone.width = cv.width; clone.height = cv.height;
+    clone.getContext("2d").drawImage(cv, 0, 0);
+    if (cv._spriteAnchor) clone._spriteAnchor = cv._spriteAnchor;
+    return clone;
+  },
+
+  _previewCanvas(p, dir, allowUnmounted) {
     const o = currentAppearance(p);
     if (!o) return null;
     const cores = (p.outfit && p.outfit.colors) ||
                   DEFAULT_OUTFIT_COLORS[p.voc] || DEFAULT_OUTFIT_COLORS.none;
     const mnt = currentMount(p);
-    const corpo = this.outfit(o.id, (p.outfit && p.outfit.addons) || 0,
-                              cores, dir || "s", 0,
-                              mnt ? { mounted: true } : null);
+    const corpoPe = this.outfit(o.id, (p.outfit && p.outfit.addons) || 0,
+                              cores, dir || "s", 0, null);
+    const corpoMontado = mnt
+      ? this.outfit(o.id, (p.outfit && p.outfit.addons) || 0,
+                    cores, dir || "s", 0, { mounted: true })
+      : null;
+    // Pose montada de verdade so quando o canvas nao e o fallback a pe.
+    const poseMontada = !!(corpoMontado && corpoMontado !== corpoPe);
+    const corpo = corpoMontado || corpoPe;
     if (!corpo) return null;
     if (!mnt) return corpo;
+    if (!poseMontada) {
+      // Sheet montado baixando: devolve a pose a pe so se o chamador
+      // tolerar (caixa nao fica vazia); o 404 interno ja caiu na pose a pe.
+      return (allowUnmounted || corpoMontado) ? corpo : null;
+    }
     const bicho = this.mount(mnt.id, dir || "s", 0);
-    if (bicho) return this.montar(corpo, bicho, o, mnt);
-    if (allowUnmounted) return corpo;
+    if (bicho) return this.montar(corpoMontado, bicho, o, mnt);
+    // Montaria que nunca vai compor (404/sem meta) nao pode travar a preview.
+    if (allowUnmounted || (this._mountDead && this._mountDead[mnt.id]))
+      return corpoMontado;
     return null;
   },
 };

@@ -579,15 +579,18 @@ function chardTabOutfit(p, el) {
       </div>
     </div>`;
 
+  let repaintEspera = 0;
   const repaint = () => {
-    const cv = (typeof AppearanceRenderer !== "undefined") ? AppearanceRenderer.preview(p, "s") : null;
+    const cv = (typeof AppearanceRenderer !== "undefined")
+      ? AppearanceRenderer.preview(p, "s", repaintEspera >= 10) : null;
     const box = $("#chard-outfit-preview");
     if (box) {
       if (cv) {
         cv.style.width = "76px"; cv.style.height = "76px";
         cv.style.imageRendering = "pixelated";
         box.innerHTML = ""; box.appendChild(cv);
-      } else {
+      } else if (repaintEspera < 60) {
+        repaintEspera++;
         box.innerHTML = `<div class="tiny dim">carregando…</div>`;
         setTimeout(repaint, 140);
         return;
@@ -1052,14 +1055,17 @@ function paintSwitchPortrait(p) {
     (p._avatar && p._avatar.active) ? "av" : "",
   ].join("|");
   if (box.dataset.key === key && box.firstChild) return;
-  const cv = AppearanceRenderer.preview(p, "s");
+  const espera = Number(box.dataset.espera) || 0;
+  const cv = AppearanceRenderer.preview(p, "s", espera >= 8);
   if (!cv) {
     if (!box.dataset.pending) {
       box.dataset.pending = "1";
+      box.dataset.espera = String(espera + 1);
       setTimeout(() => { delete box.dataset.pending; paintSwitchPortrait(p); }, 160);
     }
     return;
   }
+  delete box.dataset.espera;
   cv.style.width = "20px"; cv.style.height = "20px";
   cv.style.imageRendering = "pixelated";
   box.innerHTML = ""; box.appendChild(cv);

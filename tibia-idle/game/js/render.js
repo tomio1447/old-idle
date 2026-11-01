@@ -6,6 +6,16 @@
 /* escala do sprite do jogador na cena de caca (monstro comum usa 2.0) */
 const PLAYER_SCALE = 1.8;
 
+/* Ultimo sprite pronto por entidade/personagem. Enquanto os sheets 15x
+ * baixam (ou a pose montada compoe), a cena repete o ultimo frame valido
+ * em vez de deixar o boneco invisivel — era o "outfit piscando/caixa vazia".
+ * WeakMap: nao serializa no save e o GC limpa entidades que morreram. */
+const _lastGoodSprite = new WeakMap();
+function recallSprite(keyObj) {
+  const img = keyObj ? _lastGoodSprite.get(keyObj) : null;
+  return spriteReady(img) ? img : null;
+}
+
 /* ---------------------------------------------------- escala por SQM
  *
  * O canvas exibe GRID_W SQMs de largura (dinâmico nas instâncias OTBM),
@@ -1561,7 +1571,9 @@ Renderer.prototype.drawAcademy = function (training, player, dt) {
     ctx.fillText("Treiner padrão · sem custo · regen stamina 1:1 · conjure disponível", 12 * hudS, 40 * hudS);
   }
 
-  const pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);
+  let pimg = OutfitRenderer.forPlayer(player, training.facing || "e", 0);
+  if (spriteReady(pimg)) _lastGoodSprite.set(player, pimg);
+  else pimg = recallSprite(player) || pimg;
   // Posição do player: com mapa .otbm ele fica no spawn do mapa; sem mapa
   // usa a baia procedural. playerPos/dummyPos sempre existem no modo dummy
   // (o fallback tem posições fixas), então a animação sempre mira o dummy.
@@ -1861,7 +1873,11 @@ function drawAcademyMember(renderer, ctx, W, H, tile, hudS, training, member, lo
   }
   const pxF = px, pyF = py;
   const facing = m.facing || "s";
-  const pimg = OutfitRenderer.forPlayer(p, facing, 0);
+  let pimg = OutfitRenderer.forPlayer(p, facing, 0);
+  // Asset ainda baixando: repete o ultimo frame bom do membro em vez de
+  // deixar a caixa vazia (WeakMap nao polui o estado salvo).
+  if (spriteReady(pimg)) _lastGoodSprite.set(m, pimg);
+  else pimg = recallSprite(m) || pimg;
   const pimgAtk = (atkFrame && spriteReady(pimg))
     ? (OutfitRenderer.forPlayer(p, facing, atkFrame) || pimg) : pimg;
 
@@ -2307,8 +2323,10 @@ Renderer.prototype.draw = function (combat, player, dt) {
         ? Math.max(0, Math.min(1, (e.p.magicShieldPool || 0) / (e.p.magicShieldCap || 1))) : 0;
     }
     if (!spriteReady(img)) {
-      let fallback = null;
-      if (e.kind === "monster") {
+      // Ultimo frame valido da entidade (players/montarias em download)
+      // antes do fallback de monstro — evita o boneco sumir da cena.
+      let fallback = recallSprite(ent);
+      if (!spriteReady(fallback) && e.kind === "monster") {
         fallback = Sprites.mob(ent.slug, "s") || Sprites.mob(ent.slug, "w") || Sprites.mob(ent.slug, "e") || Sprites.mob(ent.slug, "n");
       }
       if (spriteReady(fallback)) {
@@ -2316,6 +2334,8 @@ Renderer.prototype.draw = function (combat, player, dt) {
       } else {
         return;
       }
+    } else {
+      _lastGoodSprite.set(ent, img);
     }
     const sc = creatureScale(W); w = spriteW(img) * sc; h = spriteH(img) * sc;
     const cx = ent.x * W, cy = ent.y * H, tile = tilePx(W);

@@ -425,12 +425,15 @@ function cycloAppearance(p, el, opts) {
   };
   pintarCards();
 
-  // prévia com montaria e addons
+  // prévia com montaria e addons — espera o bicho por ~1,4s; depois
+  // mostra a pose a pe (montaria lenta/404 nao deixava a caixa vazia)
+  let previewEspera = 0;
   const desenhar = () => {
-    const cv = AppearanceRenderer.preview(p);
+    const cv = AppearanceRenderer.preview(p, "s", previewEspera >= 10);
     const box = $("#app-preview");
     if (!box) return;
-    if (!cv) { box.innerHTML = `<div class="tiny dim">carregando…</div>`;
+    if (!cv) { previewEspera++;
+               box.innerHTML = `<div class="tiny dim">carregando…</div>`;
                setTimeout(desenhar, 140); return; }
     // Canvas da preview precisa receber tamanho CSS; sem isso outfits sem
     // addon podiam ficar em 1:1 minúsculo/transparente no quadro do modal.

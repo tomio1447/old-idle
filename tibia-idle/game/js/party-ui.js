@@ -103,12 +103,15 @@ function partyApplyOutfitPreview(host, member, size, tries) {
   }
   const cached = typeof accountCharacterCacheRead === "function" ? accountCharacterCacheRead() : [];
   const summary = (cached || []).find((c) => String(c.id) === id) || null;
-  // Ordem: fonte viva → snapshot local salvo (save() atualiza na hora) →
-  // membro → summary do servidor. O summary.outfit do /api/me pode ficar
-  // atrás do save local e travava a miniatura na outfit antiga.
-  const outfit = source.outfit
-    || (summary && summary.snapshot && summary.snapshot.outfit) || member.outfit
-    || summary&&summary.outfit || null;
+  // Candidatos: fonte viva → snapshot local salvo → membro → summary. Um
+  // snapshot que so traz {type} (sem appearance) NUNCA pode derrubar um
+  // outfit 15x completo — era o que fazia a miniatura alternar entre a
+  // outfit real e a generica (o "piscar").
+  const cand = [source.outfit,
+    summary && summary.snapshot && summary.snapshot.outfit,
+    member.outfit, summary && summary.outfit]
+    .filter((o) => o && typeof o === "object");
+  const outfit = cand.find((o) => o.appearance) || cand[0] || null;
   const preview = {
     id: source.id || member.id,
     name: source.name || member.name,
@@ -123,19 +126,36 @@ function partyApplyOutfitPreview(host, member, size, tries) {
   member.outfit = preview.outfit;
   const key = partyLookKey(preview);
   if (host.dataset.look === key && host.querySelector("canvas")) return true;
-  const cv = (typeof AppearanceRenderer !== "undefined")
-    ? AppearanceRenderer.preview(member, "s") : null;
+  const temMontaria = !!(preview.outfit &&
+    (preview.outfit.mount || preview.outfit.lookMount));
+  let cv = null, parcial = false;
+  if (typeof AppearanceRenderer !== "undefined") {
+    cv = AppearanceRenderer.preview(member, "s");
+    if (!cv && temMontaria) {
+      // Montaria ainda carregando: preenche com a pose a pe MESMO visual
+      // ja pintado — sem trocar o canvas de novo a cada tick (thrash).
+      cv = AppearanceRenderer.preview(member, "s", true);
+      parcial = !!cv;
+      if (parcial && host.dataset.partial === key &&
+          host.querySelector("canvas")) return true;
+    }
+  }
   if (cv) {
     cv.style.width = size + "px";
     cv.style.height = size + "px";
     cv.style.imageRendering = "pixelated";
     host.innerHTML = "";
     host.appendChild(cv);
-    host.dataset.look = key;
+    host.dataset.look = parcial ? "" : key;
+    host.dataset.partial = parcial ? key : "";
     return true;
   }
   if (tries > 0) {
-    setTimeout(() => partyApplyOutfitPreview(host, member, size, tries - 1), 90);
+    setTimeout(() => {
+      // Host destruido por um re-render do painel: aborta — a pintura nova
+      // do painel cuida da linha (retry em nó solto deixava a caixa vazia).
+      if (host.isConnected) partyApplyOutfitPreview(host, member, size, tries - 1);
+    }, 90);
     return false;
   }
   if (!host.querySelector("img,canvas")) {
@@ -867,11 +887,11 @@ function renderHealFriend(p) {
     (exura gran mas res) só dispara com <b>2+ aliados feridos</b> ao alcance.</div>`;
   box.innerHTML = h;
   // Preview 15x colorida no próprio painel Heal Friend (não usa sheet base).
+  // Reutiliza partyApplyOutfitPreview: retry enquanto os sprites baixam e
+  // fallback a pe — a caixa não fica mais vazia quando a montaria demora.
   for (const m of alvos) {
     const host = box.querySelector(`[data-party-preview="${m.id}"]`);
-    if (!host || typeof AppearanceRenderer === "undefined") continue;
-    const cv = AppearanceRenderer.preview(m, "s");
-    if (cv) { cv.style.width="32px"; cv.style.height="32px"; cv.style.imageRendering="pixelated"; host.innerHTML=""; host.appendChild(cv); }
+    if (host) partyApplyOutfitPreview(host, m, 32);
   }
 
   // handlers
