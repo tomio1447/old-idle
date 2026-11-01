@@ -107,6 +107,7 @@
     "collar-of-blue-plasma": { n: "collar of blue plasma", cid: 23542, sell: 6000 },
     "collar-of-green-plasma": { n: "collar of green plasma", cid: 23543, sell: 6000 },
     "collar-of-red-plasma": { n: "collar of red plasma", cid: 23544, sell: 6000 },
+    "collar-of-orange-plasma": { n: "collar of orange plasma", cid: 23545, sell: 6000 },
     "crowbar": { n: "crowbar", cid: 3304, w: 21, sell: 50 },
     "crystal-sword": { n: "crystal sword", cid: 7449, w: 69, sell: 600 },
     "crystallized-anger": { n: "crystallized anger", cid: 23507, sell: 400 },

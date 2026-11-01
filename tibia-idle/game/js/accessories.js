@@ -200,6 +200,20 @@ function accessoryBreak(p, slot) {
  * 1 carga a cada 3s. A última carga (1→0) DEVE destruir o item. */
 function tickAccessoryCharges(p, dt) {
   if (!p || !p.equip || !(dt > 0)) return;
+  // Migração: collars of plasma eram registrados com s:"neck" (slot
+  // inexistente). Saves antigos podem ter p.equip.neck — move para o slot
+  // real "amulet" (ou para a bag se o amulet estiver ocupado).
+  const neck = p.equip.neck;
+  if (neck && neck.item) {
+    if (!p.equip.amulet || !p.equip.amulet.item) {
+      p.equip.amulet = neck;
+      delete p.equip.neck;
+    } else if (typeof unequipToContainer === "function") {
+      unequipToContainer(p, "neck", "bag");
+    } else {
+      delete p.equip.neck;
+    }
+  }
   for (const slot of ACCESSORY_TIME_SLOTS) {
     const e = p.equip[slot];
     if (!e || !e.item) continue;

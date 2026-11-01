@@ -22,9 +22,14 @@
     "curious-matter": { n: "curious matter", s: null, t: "loot", cid: 23511, sell: 430, npcSell: 430 },
     "volatile-proto-matter": { n: "volatile proto matter", s: null, t: "loot", cid: 23514, sell: 300, npcSell: 300 },
     "spark-sphere": { n: "spark sphere", s: null, t: "loot", cid: 23518, sell: 350, npcSell: 350 },
-    "collar-of-blue-plasma": { n: "collar of blue plasma", s: "neck", t: "amulet", cid: 23542, sell: 6000, npcSell: 6000 },
-    "collar-of-green-plasma": { n: "collar of green plasma", s: "neck", t: "amulet", cid: 23543, sell: 6000, npcSell: 6000 },
-    "collar-of-red-plasma": { n: "collar of red plasma", s: "neck", t: "amulet", cid: 23544, sell: 6000, npcSell: 6000 },
+    /* Collars of Plasma: amuletos consumíveis de 30 min (Canary duration
+     * 1800 → 600 cargas de 3s). Equipam no slot "amulet"; quebram ao zerar —
+     * NÃO são recarregáveis (diferente de colares recarregáveis tipo turtle
+     * amulet). Os stats ficam em accessorydata.js (PATCHES/NOVOS). */
+    "collar-of-blue-plasma": { n: "collar of blue plasma", s: "amulet", t: "accessory", cid: 23542, sell: 6000, npcSell: 6000, w: 1.5, lvl: 100, charges: 600, chargeMode: "time", durationSec: 1800 },
+    "collar-of-green-plasma": { n: "collar of green plasma", s: "amulet", t: "accessory", cid: 23543, sell: 6000, npcSell: 6000, w: 1.5, lvl: 100, charges: 600, chargeMode: "time", durationSec: 1800 },
+    "collar-of-orange-plasma": { n: "collar of orange plasma", s: "amulet", t: "accessory", cid: 23545, sell: 6000, npcSell: 6000, w: 1.5, lvl: 100, charges: 600, chargeMode: "time", durationSec: 1800 },
+    "collar-of-red-plasma": { n: "collar of red plasma", s: "amulet", t: "accessory", cid: 23544, sell: 6000, npcSell: 6000, w: 1.5, lvl: 100, charges: 600, chargeMode: "time", durationSec: 1800 },
     "ring-of-blue-plasma": { n: "ring of blue plasma", s: "ring", t: "ring", cid: 23529, sell: 8000, npcSell: 8000 },
     "ring-of-green-plasma": { n: "ring of green plasma", s: "ring", t: "ring", cid: 23531, sell: 8000, npcSell: 8000 },
     "ring-of-red-plasma": { n: "ring of red plasma", s: "ring", t: "ring", cid: 23533, sell: 8000, npcSell: 8000 },

@@ -100,6 +100,24 @@
       chargeMode: "time", durationSec: 1800, charges: durCharges(1800),
       fist: 3, mag: 1, res: { physical: 2 }, lvl: 100, vocs: ["monk"],
     },
+    /* Collars of Plasma: mesma duração dos rings (30 min equipados → 600
+     * cargas). Consumíveis — quebram ao zerar; NÃO recarregáveis. */
+    "collar-of-blue-plasma": {
+      chargeMode: "time", durationSec: 1800, charges: durCharges(1800),
+      dist: 4, mag: 2, res: { physical: 5 }, lvl: 100, vocs: ["paladin"],
+    },
+    "collar-of-green-plasma": {
+      chargeMode: "time", durationSec: 1800, charges: durCharges(1800),
+      mag: 3, res: { physical: 5 }, lvl: 100, vocs: ["sorcerer", "druid"],
+    },
+    "collar-of-orange-plasma": {
+      chargeMode: "time", durationSec: 1800, charges: durCharges(1800),
+      fist: 4, mag: 2, res: { physical: 5 }, lvl: 100, vocs: ["monk"],
+    },
+    "collar-of-red-plasma": {
+      chargeMode: "time", durationSec: 1800, charges: durCharges(1800),
+      sword: 4, axe: 4, club: 4, res: { physical: 5 }, lvl: 100, vocs: ["knight"],
+    },
     "enchanted-blister-ring": {
       chargeMode: "time", durationSec: 3600, charges: durCharges(3600),
       transformEquipTo: 31616, res: { fire: 6 }, lvl: 250,

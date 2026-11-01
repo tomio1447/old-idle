@@ -3412,6 +3412,30 @@ function consumeAccessoryHitCharge(auth,p,now){
 }
 function tickAccessoryCharges(auth,p,dt,now){
   if(!p||!p.equip||!(dt>0))return;
+  // Migração: saves antigos podem ter collar of plasma no slot fantasma
+  // "neck" (o def antigo usava s:"neck"). Move para "amulet" ou bag.
+  const neck=p.equip.neck;
+  if(neck&&neck.item){
+    if(!p.equip.amulet||!p.equip.amulet.item){p.equip.amulet=neck;delete p.equip.neck;}
+    else{
+      p.bag=p.bag||{};p.itemInstances=Array.isArray(p.itemInstances)?p.itemInstances:[];
+      const full=accessoryCatalogCharges(neck.item);
+      const ch=neck.charges;
+      const partial=full&&ch!==undefined&&Math.floor(Number(ch))>0&&Math.floor(Number(ch))<full;
+      let inst=null;
+      if(neck.instId)inst=p.itemInstances.find((i)=>i&&i.id===neck.instId)||null;
+      if(inst){inst.loc="bag";}
+      else if(partial){
+        // Carga parcial: instância isolada na bag (não empilha).
+        p.itemInstances.push({id:"srv-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36),
+          slug:neck.item,loc:"bag",tier:0,charges:Math.floor(Number(ch))});
+      }else{
+        p.bag[neck.item]=(Number(p.bag[neck.item])||0)+(Math.floor(Number(neck.count))||1);
+      }
+      delete p.equip.neck;
+      authSyncBagCountsFromInstances(p);
+    }
+  }
   for(const slot of ["ring","amulet","boots"]){
     const e=p.equip[slot];if(!e||!e.item)continue;
     const it=ITEMS[e.item];if(!it||!it.charges||it.chargeMode!=="time")continue;
