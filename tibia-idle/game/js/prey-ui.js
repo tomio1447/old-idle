@@ -1,15 +1,15 @@
 /* =========================================================================
- * prey-ui.js — Interface do Sistema de Prey (layout e botões OFICIAIS do otclient)
+ * prey-ui.js — Interface do Sistema de Prey (padrão cidade)
  *
- * Upgrade visual completo replicando o layout real do cliente (prey.otui):
- *   - painel de 195px por slot (LockedPreyPanel / InactivePreyPanel /
- *     ActivePreyPanel);
+ * Mesma casca dos modais da cidade (market/guild/ranking) por dentro:
  *   - card CreatureAndBonus: criatura + caixa de bônus com ícone grande;
  *   - estrelas reais (prey_star/prey_nostar) em grade 5x2;
  *   - barra de tempo (ProgressBar #C28400);
- *   - BOTÕES OFICIAIS de imagem: Reroll (prey_reroll), Choose (prey_choose),
- *     Select (prey_select), Bonus Reroll (prey_bonus_reroll), e os botões de
- *     loja Perm/Temp (prey_perm_test / prey_temp_test) no slot bloqueado.
+ *   - ações em CAIXAS SEPARADAS: REROLL (nova lista) e ESCOLHER (ativa a
+ *     criatura marcada na grade) — clique na criatura só marca;
+ *   - slot ativo: BONUS REROLL (1 wildcard) + REROLL de lista;
+ *   - botões de loja Perm/Temp (prey_perm_test / prey_temp_test) no slot
+ *     bloqueado.
  * ========================================================================= */
 "use strict";
 
@@ -92,40 +92,39 @@ function preyStarsHtml(step) {
 }
 
 /* ----------------------------------------------------------------------
- * Botões oficiais de imagem (replicando o layout do otclient)
+ * Caixas de ação separadas no padrão cidade (substituem os dois botões
+ * iguais de dado que confundiam: um é REROLL de lista, outro ESCOLHER a
+ * criatura marcada).
  * ---------------------------------------------------------------------- */
 
-/* Botão Reroll (prey_reroll) com barra de tempo embaixo. */
-function preyRerollBtnHtml(i, custoReroll) {
-  return `<div class="prey-official-btn prey-reroll-btn" id="prey-reroll-${i}"
-      title="${custoReroll ? `Reroll por ${fmtFull(preyRerollCost(G.p))} gp` : "Reroll grátis"}">
-      <img class="prey-btn-img" src="assets/ui/prey/prey_reroll.png" alt="Reroll">
-      <span class="prey-btn-label">${custoReroll ? fmtFull(preyRerollCost(G.p)) + " gp" : "grátis"}</span>
-    </div>`;
+/* Caixa REROLL: nova lista de 9 criaturas (grátis a cada 20h ou pago). */
+function preyRerollBoxHtml(i, custoReroll) {
+  return `<button type="button" class="prey-act-box" id="prey-reroll-${i}"
+      title="${custoReroll ? `Nova lista por ${fmtFull(preyRerollCost(G.p))} gp` : "Nova lista grátis"}">
+      <img class="prey-act-img" src="assets/ui/prey/prey_reroll.png" alt="Reroll">
+      <span class="prey-act-title">REROLL</span>
+      <span class="prey-act-sub">${custoReroll ? fmtFull(preyRerollCost(G.p)) + " gp" : "grátis"} · nova lista</span>
+    </button>`;
 }
 
-/* Botão Choose (prey_choose) para escolher criatura. */
-function preyChooseBtnHtml(i) {
-  return `<div class="prey-official-btn prey-choose-btn" id="prey-choose-${i}"
-      title="Escolher criatura da lista">
-      <img class="prey-btn-img" src="assets/ui/prey/prey_choose.png" alt="Escolher">
-    </div>`;
+/* Caixa ESCOLHER: ativa a prey da criatura marcada na grade. */
+function preyChooseBoxHtml(i, pending) {
+  return `<button type="button" class="prey-act-box" id="prey-choose-${i}" ${pending ? "" : "disabled"}
+      title="${pending ? "Ativar prey: " + preyMonsterName(pending) : "Clique numa criatura da grade primeiro"}">
+      <img class="prey-act-img" src="assets/ui/prey/prey_choose.png" alt="Escolher">
+      <span class="prey-act-title">ESCOLHER</span>
+      <span class="prey-act-sub">${pending ? preyMonsterName(pending) : "marque uma criatura"}</span>
+    </button>`;
 }
 
-/* Botão Select (prey_select) para a criatura selecionada no preview. */
-function preySelectBtnHtml(i) {
-  return `<div class="prey-official-btn prey-select-btn" id="prey-select-${i}"
-      title="Selecionar criatura marcada">
-      <img class="prey-btn-img" src="assets/ui/prey/prey_select_blocked.png" alt="Selecionar">
-    </div>`;
-}
-
-/* Botão Bonus Reroll (prey_bonus_reroll) no card de bônus ativo. */
-function preyBonusRerollBtnHtml(i) {
-  return `<div class="prey-official-btn prey-bonusreroll-btn" id="prey-bonusreroll-${i}"
-      title="Rerrollar o bônus da prey ativa">
-      <img class="prey-btn-img" src="assets/ui/prey/prey_bonus_reroll.png" alt="Reroll bônus">
-    </div>`;
+/* Caixa BONUS REROLL: rerola o bônus da prey ativa (custa 1 wildcard). */
+function preyBonusRerollBoxHtml(i) {
+  return `<button type="button" class="prey-act-box" id="prey-bonusreroll-${i}"
+      title="Rerrollar o bônus da prey ativa (1 wildcard)">
+      <img class="prey-act-img" src="assets/ui/prey/prey_bonus_reroll.png" alt="Reroll bônus">
+      <span class="prey-act-title">BONUS REROLL</span>
+      <span class="prey-act-sub">1 wildcard</span>
+    </button>`;
 }
 
 /* Botões de loja Perm / Temp (slot bloqueado) — replicam o LockedPreyPanel. */
@@ -146,22 +145,26 @@ function preyStoreBtnHtml(i) {
 function closePreyModal() {
   const modal = $("#modal");
   if (!modal) return;
-  modal.classList.remove("show", "wide", "modal-otc");
+  modal.classList.remove("show", "wide");
+  const body = $("#modal-body");
+  if (body) body.classList.remove("cidade-modal-shell", "prey-modal-shell");
 }
 
 function openPreyModal() {
   const p = G.p;
   if (!p) { toast("Crie um personagem primeiro"); return; }
   ensurePrey(p);
-  // Janela estilo OTClient: título na faixa superior do modal (border-top)
-  // e conteúdo com fundo de painel próprio — legível e fiel ao client.
-  $("#modal-body").innerHTML = `<div class="otc-win-title">🐾 Prey
+  // Mesma casca cinza listrada dos modais da cidade (market/guild/ranking).
+  const modalBody = $("#modal-body");
+  if (typeof clearCityModalShells === "function") clearCityModalShells(modalBody);
+  modalBody.className = "modal panel cidade-modal-shell prey-modal-shell";
+  modalBody.innerHTML = `<div class="panel-title"><b>🐾 Prey</b>
       <span style="flex:1"></span>
       <span class="tiny dim" id="prey-hint">bônus por 2h · reroll grátis a cada 20h</span>
-      <button type="button" class="otc-win-x" id="prey-close" title="Fechar">✕</button>
+      <button type="button" class="sm" id="prey-close" title="Fechar">✕</button>
     </div>
-    <div class="otc-win-body"><div id="prey-content"></div></div>`;
-  $("#modal").classList.add("show", "wide", "modal-otc");
+    <div class="panel-body"><div id="prey-content"></div></div>`;
+  $("#modal").classList.add("show", "wide");
   const closeBtn = $("#prey-close");
   if (closeBtn) closeBtn.addEventListener("click", (ev) => {
     ev.preventDefault();
@@ -231,15 +234,15 @@ function renderPreyModal(p) {
         <div class="prey-timer-fill" style="width:${preyTimerPct(sel)}%"></div>
         <span>${preyTempoRestante(sel)}</span>
       </div>
-      <!-- botões oficiais: bonus reroll / select / reroll (rodapé do slot) -->
-      <div class="prey-actions">
-        ${preyBonusRerollBtnHtml(i)}
-        ${preySelectBtnHtml(i)}
-        ${preyRerollBtnHtml(i, custoReroll)}
+      <!-- caixas de ação: bonus reroll / reroll de lista -->
+      <div class="prey-act-boxes">
+        ${preyBonusRerollBoxHtml(i)}
+        ${preyRerollBoxHtml(i, custoReroll)}
       </div>`;
     } else {
-      // ---- InactivePreyPanel: grade de criaturas + botões de escolha
-      h += `<div class="prey-select-hint tiny dim">Selecione uma criatura:</div>
+      // ---- InactivePreyPanel: grade de criaturas + caixas de escolha
+      // Clique na criatura apenas MARCA (o ESCOLHER ativa) — como no client.
+      h += `<div class="prey-select-hint tiny dim">Marque uma criatura e clique em ESCOLHER:</div>
         <div class="prey-grid">` + slot.creatures.map((slug) => {
           const marcada = slot._pending === slug;
           return `<div class="prey-creature ${marcada ? "sel" : ""}" data-prey-slot="${i}" data-prey-creature="${slug}">
@@ -247,9 +250,9 @@ function renderPreyModal(p) {
             <span class="tiny">${preyMonsterName(slug)}</span>
           </div>`;
         }).join("") + `</div>
-        <div class="prey-actions">
-          ${preyChooseBtnHtml(i)}
-          ${preyRerollBtnHtml(i, custoReroll)}
+        <div class="prey-act-boxes">
+          ${preyRerollBoxHtml(i, custoReroll)}
+          ${preyChooseBoxHtml(i, slot._pending)}
         </div>`;
     }
     h += `</div>`;
@@ -269,30 +272,23 @@ function renderPreyModal(p) {
 
   // ---- Handlers dos botões oficiais
   for (let i = 0; i < PREY_SLOT_COUNT; i++) {
-    // Reroll (prey_reroll)
+    // Reroll (caixa REROLL): nova lista de criaturas
     const rr = $("#prey-reroll-" + i);
     if (rr) rr.addEventListener("click", () => {
       const slot = p.prey.slots[i];
       const pago = slot.rerollAt > Date.now();
       const r = preyReroll(p, i, pago);
       if (!r.ok) { toast(r.msg, "bad"); return; }
+      slot._pending = null;
       toast(pago ? `Nova lista (${fmtFull(preyRerollCost(p))} gp).` : "Nova lista grátis!");
       renderPreyModal(p);
     });
-    // Choose (prey_choose): marca a próxima criatura da lista como pendente
+    // Escolher (caixa ESCOLHER): ativa a prey da criatura marcada
     const ch = $("#prey-choose-" + i);
     if (ch) ch.addEventListener("click", () => {
       const slot = p.prey.slots[i];
-      const next = slot.creatures[0];
-      slot._pending = next;
-      renderPreyModal(p);
-    });
-    // Select (prey_select): seleciona a criatura pendente (ativa a prey)
-    const sl = $("#prey-select-" + i);
-    if (sl) sl.addEventListener("click", () => {
-      const slot = p.prey.slots[i];
       const pend = slot._pending;
-      if (!pend) { toast("Escolha uma criatura primeiro."); return; }
+      if (!pend) { toast("Marque uma criatura da grade primeiro."); return; }
       const r = preySelect(p, i, pend);
       if (!r.ok) { toast(r.msg, "bad"); return; }
       slot._pending = null;
@@ -343,16 +339,14 @@ function renderPreyModal(p) {
     });
   }
 
-  // ---- Clique numa criatura: ativa a prey diretamente (como no client)
+  // ---- Clique numa criatura: apenas MARCA — a caixa ESCOLHER ativa
   $$("#prey-content [data-prey-creature]").forEach((el) => {
     el.addEventListener("click", () => {
       const i = +el.dataset.preySlot;
-      const slug = el.dataset.preyCreature;
-      const r = preySelect(p, i, slug);
-      if (!r.ok) { toast(r.msg, "bad"); return; }
-      toast(`Prey ativa: ${PREY_BONUSES[r.bonus].nome} +${r.value}% por 2h!`);
+      const slot = p.prey.slots[i];
+      if (!slot) return;
+      slot._pending = el.dataset.preyCreature;
       renderPreyModal(p);
-      renderAll();
     });
   });
 }

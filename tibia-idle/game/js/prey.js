@@ -118,27 +118,30 @@ function preyIsEligibleSlug(slug) {
   return preyIsEligible(preyMonsterLookup(slug));
 }
 
-/* Pool de prey = bestiário elegível do Canary (não o catálogo inteiro). */
+/* Pool de prey = SOMENTE monstros que aparecem nas hunts do jogo (o
+ * jogador só deve receber presa do que dá pra caçar de fato). O bestiário
+ * inteiro ficava sugerindo criatura sem hunt (Efreet, Cult Believer...).
+ * A elegibilidade do Canary segue valendo: sem boss, exp>0, preyable. */
 function preyMonsterPool() {
   const slugs = [];
+  const seen = new Set();
+  const hunts = (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts) || {};
+  for (const huntId in hunts) {
+    for (const entry of (hunts[huntId].monsters || [])) {
+      const slug = typeof entry === "string" ? entry : (entry && entry.slug);
+      if (!slug || seen.has(slug) || !preyIsEligibleSlug(slug)) continue;
+      seen.add(slug);
+      slugs.push(slug);
+    }
+  }
+  if (slugs.length) return slugs;
+  // fallback defensivo: bestiário elegível inteiro (hunts vazias/indisponíveis)
   const src = (typeof MONSTERDATA !== "undefined" && MONSTERDATA)
     ? MONSTERDATA
     : (typeof GAMEDATA !== "undefined" ? GAMEDATA.monsters : null);
   if (src) {
     for (const slug in src) {
-      if (!preyIsEligible(src[slug])) continue;
-      slugs.push(slug);
-    }
-    if (slugs.length) return slugs;
-  }
-  // fallback: monstros das hunts (já jogáveis; ainda filtra elegibilidade)
-  const seen = new Set();
-  for (const huntId in (typeof GAMEDATA !== "undefined" ? GAMEDATA.hunts : {})) {
-    const hu = GAMEDATA.hunts[huntId];
-    for (const slug of (hu.monsters || [])) {
-      if (seen.has(slug) || !preyIsEligibleSlug(slug)) continue;
-      seen.add(slug);
-      slugs.push(slug);
+      if (preyIsEligible(src[slug])) slugs.push(slug);
     }
   }
   return slugs;

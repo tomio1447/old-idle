@@ -3820,33 +3820,49 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .prey-creature-sprite { height: 44px; display: flex; align-items: center; justify-content: center; }
 .prey-creature-sprite .mob-img, .prey-creature-sprite img { image-rendering: pixelated; }
 
-/* ---- Botões OFICIAIS de imagem (replicam o layout do otclient) ---- */
-.prey-actions {
-  display: flex; align-items: flex-end; justify-content: center; gap: 6px;
-  margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1);
+/* ---- Caixas de ação separadas no padrão cidade (REROLL vs ESCOLHER) ---- */
+.prey-act-boxes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid #16140f;
 }
-.prey-official-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  cursor: pointer; user-select: none;
+.prey-act-box {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 4px; cursor: pointer;
+  background: #24221e; border: 1px solid #16140f;
+  box-shadow: inset 0 0 0 1px #3a372f;
+  color: #ddd; font-family: inherit; font-size: 12px;
 }
-.prey-official-btn .prey-btn-img {
-  image-rendering: pixelated;
-  transition: filter .12s, transform .12s;
+.prey-act-box:hover:not(:disabled) { background: #2a2618; border-color: #8a7a40; }
+.prey-act-box:disabled { opacity: .45; cursor: default; }
+.prey-act-box .prey-act-img { image-rendering: pixelated; height: 40px; width: auto; }
+.prey-act-title { font-size: 11px; font-weight: bold; letter-spacing: .5px; color: #e8d189; }
+.prey-act-sub { font-size: 9px; color: #a89f8c; text-align: center; line-height: 1.2; }
+
+/* ---- Prey com a casca cidade: cards internos na mesma paleta ---- */
+.cidade-modal-shell .prey-wallet {
+  background: #24221e; border: 1px solid #16140f;
+  box-shadow: inset 0 0 0 1px #3a372f; border-radius: 0;
 }
-.prey-official-btn:hover .prey-btn-img { filter: brightness(1.2); }
-.prey-official-btn:active .prey-btn-img { transform: translateY(1px); }
-.prey-official-btn .prey-btn-label {
-  font-size: 9px; color: #ffd65a; text-shadow: 1px 1px 0 #000;
-  white-space: nowrap;
+.cidade-modal-shell .prey-slot {
+  background: #24221e; border: 1px solid #16140f;
+  box-shadow: inset 0 0 0 1px #3a372f; border-radius: 0;
 }
-/* Reroll (60x92) */
-.prey-reroll-btn .prey-btn-img { width: 58px; height: 90px; }
-/* Choose (46x73) */
-.prey-choose-btn .prey-btn-img { width: 44px; height: 70px; }
-/* Select (64x64) */
-.prey-select-btn .prey-btn-img { width: 64px; height: 64px; }
-/* Bonus Reroll (40x55) */
-.prey-bonusreroll-btn .prey-btn-img { width: 38px; height: 52px; }
+.cidade-modal-shell .prey-slot.active { border-color: #8a7a40; box-shadow: inset 0 0 0 1px #8a7a40; }
+.cidade-modal-shell .prey-creature {
+  background: #1c1a16; border: 1px solid #16140f;
+  box-shadow: inset 0 0 0 1px #2e2c25; border-radius: 0;
+}
+.cidade-modal-shell .prey-creature:hover { background: #2a2618; border-color: #8a7a40; }
+.cidade-modal-shell .prey-creature.sel { background: #2a2618; border-color: #e8d189; box-shadow: inset 0 0 0 1px #8a7a40; }
+.cidade-modal-shell .prey-preview-creature,
+.cidade-modal-shell .prey-bonus-box {
+  background: #1c1a16; border-color: #16140f;
+  box-shadow: inset 0 0 0 1px #2e2c25; border-radius: 0;
+}
+.cidade-modal-shell .prey-timer-bar { border-radius: 0; background: #16140f; }
+.cidade-modal-shell .prey-store-btn { border: 1px solid #16140f; box-shadow: inset 0 0 0 1px #3a372f; }
+.cidade-modal-shell .prey-help { color: #a89f8c; }
+.prey-modal-shell .panel-body { max-height: 78vh; overflow-y: auto; }
 
 /* Slot bloqueado: painel estilo LockedPreyPanel com botões de loja */
 .prey-locked-head {
