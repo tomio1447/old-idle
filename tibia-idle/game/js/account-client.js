@@ -889,6 +889,15 @@ function accountTrainingCheckpoint(training, stop) {
           if (snapshot[key] !== undefined) p[key] = helperPresetClone(snapshot[key]);
         if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(p);
       }
+      // Alinha a fase do golpe visual ao relógio do servidor: o próximo hit
+      // acontece em (intervalo − carry) ms após clock.at. Sem isso o cliente
+      // ficava ~1 golpe à frente e a barra de % oscilava a cada checkpoint.
+      const clock = snapshot.trainingClock;
+      if (member && clock && typeof exerciseInterval === "function") {
+        const interval = exerciseInterval(member.p);
+        const carry = Math.max(0, Number(clock.carry) || 0);
+        member.hitCd = Math.max(0, Math.floor(interval - carry));
+      }
     }
     for (const advance of r.data.advances || []) {
       if (typeof addLog === "function") addLog("level", `Avanço de ${advance.type}: ${advance.from} → ${advance.to} — salvo no servidor.`);

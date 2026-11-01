@@ -515,9 +515,13 @@ function newAcademyTraining(p, mode, weapon, huntMap) {
 }
 
 function academyAttackDelay(t, p) {
-  // baseAttackSpeed / rateExerciseTrainingSpeed, como no servidor
+  // baseAttackSpeed / rateExerciseTrainingSpeed, como no servidor.
+  // Online o servidor (advanceTrainingPlayer) não aplica haste — acelerar o
+  // golpe aqui fazia o cliente ganhar tries que nunca existiam e a barra de
+  // % voltava a cada checkpoint. O haste segue valendo no treino offline.
   const base = p ? exerciseInterval(p) : 2000;
-  return t.hasteUntil > Date.now() ? base * 0.75 : base;
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured();
+  return (!online && t.hasteUntil > Date.now()) ? base * 0.75 : base;
 }
 
 function academyConjuresFor(p) {
