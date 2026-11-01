@@ -5176,6 +5176,7 @@ function combatTick(c, p, dt, now) {
   if (typeof oberonBossTick === "function") oberonBossTick(c, p, dt, now);
   if (typeof soulwarTaintTick === "function") soulwarTaintTick(c, p, dt, now);
   if (typeof surviveMissionTick === "function") surviveMissionTick(c, p, dt);
+  if (typeof huntTimeMissionTick === "function") huntTimeMissionTick(c, p, dt);
 
   const staminaPlayers=(c.players&&c.players.length)?c.players:[{p}];
   for(const ent of staminaPlayers)if(ent&&ent.p){

@@ -939,6 +939,19 @@ const MISSION_DEFS = {
     ],
     completeReward:{bossAccess:"goshnar-s-cruelty",bossName:"Goshnar's Cruelty"},
   },
+  // Missão de acesso ao Heart of Destruction: CAÇAR por 20 minutos dentro
+  // de The Void (tempo cumulativo — morte não zera, diferente do survive).
+  // Concluir libera os bosses do grupo via access "heart-of-destruction".
+  "the-void": {
+    title: "Missão: The Void",
+    compact: true,
+    tasks: [
+      { counter:"hunt-time", target:1200, huntTimeSec:1200,
+        label:"Caçar por 20 minutos em The Void",
+        reward:{ items:[{slug:"gold-token",count:6}] } },
+    ],
+    completeReward:{bossAccess:"heart-of-destruction",bossName:"Heart of Destruction"},
+  },
 };
 
 function missionForHunt(id) {
@@ -1280,7 +1293,7 @@ function renderMission() {
     }
     return;
   }
-  // Counter compacto genérico (ex: fiendish/influenced).
+  // Counter compacto genérico (ex: fiendish/influenced, tempo de caça).
   const counterTask = def.compact && def.tasks && def.tasks.find((t) => t.counter && t.counter !== "survive" && t.counter !== "fear");
   if (counterTask) {
     const key = counterTask.counter;
@@ -1290,6 +1303,9 @@ function renderMission() {
     const title = counterTask.label || key;
     const shortLabel = title.length > 22 ? title.slice(0, 22) + "…" : title;
     const collapsed = !!G.p.config.missionCollapsed;
+    const isTime = !!(counterTask.huntTimeSec || counterTask.counter === "hunt-time" || counterTask.surviveSec);
+    const curText = isTime ? formatSurviveClock(cur) : Math.floor(cur);
+    const targetText = isTime ? formatSurviveClock(target) : target;
     box.style.display = "block";
     box.classList.add("fear-compact");
     box.classList.remove("survive-compact");
@@ -1297,7 +1313,7 @@ function renderMission() {
     const arrow = collapsed ? "▸" : "▾";
     const counterHtml = collapsed
       ? ""
-      : `<span class="survive-clock ${done ? "done" : ""}">${cur} / ${target}</span>`;
+      : `<span class="survive-clock ${done ? "done" : ""}">${curText} / ${targetText}</span>`;
     box.innerHTML = `
       <div class="mission-head survive-head" id="mission-toggle" title="${title}">
         <span>${arrow}</span>
@@ -1502,6 +1518,60 @@ function surviveMissionOnDeath(p, huntId) {
     toast("Missão Inferno: alguém morreu — timer zerado.", "bad");
   if (typeof renderMission === "function") renderMission();
   if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
+}
+
+function huntTimeMissionDef(huntId) {
+  const def = MISSION_DEFS[huntId];
+  if (!def || !def.tasks) return null;
+  return def.tasks.find((t) => t.huntTimeSec || t.counter === "hunt-time") || null;
+}
+
+/* Missão The Void: acumula segundos CAÇANDO dentro da hunt (counter
+ * "hunt-time"). Diferente do survive, morte NÃO zera — é tempo cumulativo
+ * de caçada. O progresso vai no save do personagem e sobe pra conta no
+ * syncMissionsToAccount do fim (o autosave também o persiste). */
+function huntTimeMissionTick(c, p, dt) {
+  if (!c || !p || c.boss || c.dead) return;
+  const huntId = c.huntId;
+  const task = huntTimeMissionDef(huntId);
+  if (!task) return;
+  p.missionsDone = p.missionsDone || {};
+  if (p.missionsDone[huntId]) return;
+  const st = missionState(p, huntId);
+  if (st.completeClaimed) return;
+  const target = task.huntTimeSec || task.target || 1200;
+  const before = Number(st.progress["hunt-time"]) || 0;
+  if (before >= target) {
+    tryCompleteMissionRewards(p, huntId);
+    return;
+  }
+  const next = Math.min(target, before + Math.max(0, Number(dt) || 0) / 1000);
+  st.progress["hunt-time"] = next;
+  // Sync com throttle: online o progresso vive em account.missions (o save
+  // do personagem tem "missions" protegido) — 30s basta para não perder
+  // a janela se a sessão cair no meio dos 20 min.
+  const nowMs = Date.now();
+  if (next >= target || !G._huntTimeSyncAt || nowMs - G._huntTimeSyncAt >= 30000) {
+    G._huntTimeSyncAt = nowMs;
+    if (typeof syncMissionsToAccount === "function") syncMissionsToAccount(p);
+  }
+  if (next >= target) {
+    tryCompleteMissionRewards(p, huntId);
+    if (typeof toast === "function")
+      toast("Missão The Void completa! Acesso aos bosses de Heart of Destruction liberado.", "level");
+  }
+  const shown = Math.floor(next);
+  if (shown !== Math.floor(before) && typeof renderMission === "function") {
+    if (typeof requestAnimationFrame === "function") {
+      if (!G._missionRenderQueued) {
+        G._missionRenderQueued = true;
+        requestAnimationFrame(() => {
+          G._missionRenderQueued = false;
+          renderMission();
+        });
+      }
+    } else renderMission();
+  }
 }
 
 /* ------------------------------------------------------------ bosses */
@@ -1846,8 +1916,8 @@ function bossAccessChecklist(p, boss) {
         const task = def.tasks[0];
         const key = task.monster || task.counter;
         const cur = key ? (st.progress[key] || 0) : 0;
-        if (task.surviveSec || task.counter === "survive") {
-          const target = task.surviveSec || task.target || 300;
+        if (task.surviveSec || task.huntTimeSec || task.counter === "survive" || task.counter === "hunt-time") {
+          const target = task.surviveSec || task.huntTimeSec || task.target || 300;
           progress = ` (${formatSurviveClock(cur)}/${formatSurviveClock(target)})`;
         } else {
           progress = ` (${Math.min(cur, task.target)}/${task.target})`;
@@ -2230,7 +2300,7 @@ function startBoss(id, force, arenaReady) {
       const mdef = missionForHunt(boss.requirement.mission);
       if (mdef && mdef.tasks) {
         info.missionTargets = {};
-        for (const t of mdef.tasks) info.missionTargets[t.monster] = t.target;
+        for (const t of mdef.tasks) if (t.monster) info.missionTargets[t.monster] = t.target;
       }
     }
     partyReportZone(info);
@@ -4934,6 +5004,7 @@ function loop(ts) {
       // Missão sobrevivência (Claustrophobic Inferno): no online o combate
       // autoritativo não chama combatTick local — avança o timer aqui.
       if (typeof surviveMissionTick === "function") surviveMissionTick(G.combat, G.p, dt);
+      if (typeof huntTimeMissionTick === "function") huntTimeMissionTick(G.combat, G.p, dt);
       G._partyHudAt=(G._partyHudAt||0)+dt;
       if(G._partyHudAt>=250){G._partyHudAt=0;if(typeof updatePartyPanelLiveBars==="function")updatePartyPanelLiveBars();}
     }else{

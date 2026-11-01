@@ -50,7 +50,8 @@ const HEART_ROOM = {
       BOSS_DEFS[id] = Object.assign({
         id, title: id === "world-devourer" ? "Boss final Heart of Destruction" : "Heart of Destruction",
         hunt: huntId, sprite: id, baseMonster: id, speed: 0.000055, loot: [],
-        requirement: { level: 150, text: "Requer nível 150+" },
+        requirement: { level: 150, text: "Requer nível 150+ e a missão de The Void",
+          mission: "the-void", access: "heart-of-destruction", enforced: true },
         cooldown: 16 * 60 * 60 * 1000,
       }, def);
     }
