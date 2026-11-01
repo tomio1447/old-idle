@@ -121,6 +121,8 @@ function JsonStore() {
   this.vouchers = Array.isArray(storeData && storeData.vouchers) ? storeData.vouchers : [];
   // Punições administrativas persistem em data/bans.json
   this.bans = Array.isArray(this._load("bans.json", [])) ? this._load("bans.json", []) : [];
+  // Silenciamentos de chat persistem em data/chat_mutes.json (restarts não limpam)
+  this.chatMutes = Array.isArray(this._load("chat_mutes.json", [])) ? this._load("chat_mutes.json", []) : [];
   this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
@@ -165,6 +167,34 @@ JsonStore.prototype._saveStore = function () {
 JsonStore.prototype._saveBans = function () {
   fs.writeFileSync(path.join(DATA_DIR, "bans.json"),
     JSON.stringify(this.bans || [], null, 1));
+};
+JsonStore.prototype._saveChatMutes = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "chat_mutes.json"),
+    JSON.stringify(this.chatMutes || [], null, 1));
+};
+/* Mutes de chat persistidos — o CHAT_BUS hidrata no boot e grava a cada
+ * mute/unmute. until é ms epoch (0/vencido = removido na listagem). */
+JsonStore.prototype.chatMuteList = function () {
+  const now = Date.now();
+  const keep = (this.chatMutes || []).filter((m) => !m.until || Number(m.until) > now);
+  if (keep.length !== (this.chatMutes || []).length) {
+    this.chatMutes = keep; this._saveChatMutes();
+  }
+  return keep.slice();
+};
+JsonStore.prototype.chatMuteSet = function (m) {
+  this.chatMutes = (this.chatMutes || []).filter((x) => Number(x.accountId) !== Number(m.accountId));
+  this.chatMutes.push({ accountId: Number(m.accountId), until: Number(m.until) || 0,
+    by: String(m.by || "admin"), reason: String(m.reason || ""),
+    charName: String(m.charName || ""), at: Number(m.at) || Date.now() });
+  this._saveChatMutes();
+  return m;
+};
+JsonStore.prototype.chatMuteDelete = function (accountId) {
+  const before = (this.chatMutes || []).length;
+  this.chatMutes = (this.chatMutes || []).filter((x) => Number(x.accountId) !== Number(accountId));
+  if (this.chatMutes.length !== before) this._saveChatMutes();
+  return before - this.chatMutes.length;
 };
 JsonStore.prototype._pruneSnapshots = function () {
   const list = Array.isArray(this.snapshots) ? this.snapshots : [];
@@ -2820,6 +2850,27 @@ async function MysqlStore() {
       const result = await this.run("DELETE FROM sessions WHERE account_id=?", [Number(accountId)]);
       return result.affectedRows || 0;
     },
+    /* Mutes de chat persistidos — CHAT_BUS hidrata no boot e grava a cada
+     * mute/unmute. `until` é BIGINT ms epoch (mesmo formato do CHAT_BUS). */
+    async chatMuteList() {
+      const rows = await this.query(
+        "SELECT account_id AS accountId, until, `by`, reason, char_name AS charName, at FROM chat_mutes WHERE `until` > ?", [Date.now()]);
+      return rows;
+    },
+    async chatMuteSet(m) {
+      await this.run(
+        `INSERT INTO chat_mutes (account_id, \`until\`, \`by\`, reason, char_name, at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE \`until\`=VALUES(\`until\`), \`by\`=VALUES(\`by\`),
+           reason=VALUES(reason), char_name=VALUES(char_name), at=VALUES(at)`,
+        [Number(m.accountId), Number(m.until) || 0, String(m.by || "admin"),
+         String(m.reason || ""), String(m.charName || ""), Number(m.at) || Date.now()]);
+      return m;
+    },
+    async chatMuteDelete(accountId) {
+      const result = await this.run("DELETE FROM chat_mutes WHERE account_id=?", [Number(accountId)]);
+      return result.affectedRows || 0;
+    },
     /* Instâncias ativas com nomes de membros — alimenta a aba RAID do admin. */
     async instanceListActive() {
       const rows = await this.query(
@@ -4523,6 +4574,15 @@ async function ensureSchema(pool) {
     lifted_at DATETIME(3) DEFAULT NULL,
     lifted_by VARCHAR(80) DEFAULT NULL,
     INDEX idx_bans_account (account_id, lifted_at, until)
+  ) ENGINE=InnoDB`);
+  /* Silenciamentos de chat — persistem entre restarts (CHAT_BUS hidrata). */
+  await pool.query(`CREATE TABLE IF NOT EXISTS chat_mutes (
+    account_id INT UNSIGNED PRIMARY KEY,
+    \`until\` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    \`by\` VARCHAR(80) NOT NULL DEFAULT 'admin',
+    reason VARCHAR(300) NOT NULL DEFAULT '',
+    char_name VARCHAR(40) NOT NULL DEFAULT '',
+    at BIGINT UNSIGNED NOT NULL DEFAULT 0
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS account_leases (
     account_id INT UNSIGNED PRIMARY KEY,

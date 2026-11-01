@@ -4755,6 +4755,11 @@ async function main() {
 
   SYNC_BUS=new SyncBus({historyLimit:256,ticketTtlMs:10*60*1000});
   CHAT_BUS=new ChatBus({historyLimit:200,ticketTtlMs:10*60*1000,sendLimit:8,sendWindowMs:10000});
+  // Mutes de chat persistem no DB — hidrata no boot (restart não limpa mais).
+  try{
+    const persisted=(typeof db.chatMuteList==="function")?await db.chatMuteList():[];
+    if(persisted.length)CHAT_BUS.hydrateMutes(persisted);
+  }catch(e){console.warn("[chat] hydrate mutes falhou:",e&&e.message);}
   CHAT_BUS.post({
     channel:"geral",type:"system",nickname:"Sistema",voc:"none",vocShort:"SYS",
     level:0,accountId:0,charId:0,text:"Chat global ativo. Digite /pm nick texto para mensagem privada.",
@@ -5472,6 +5477,7 @@ async function main() {
         if(owner&&owner.role==="admin")return send(res,400,{ok:false,error:"CANNOT_MUTE_ADMIN",msg:"Não é possível silenciar um administrador"});
         const m=CHAT_BUS.mute(found.account_id,{until:Date.now()+minutes*60000,
           by:String(auth.acc.login||"admin"),reason:String(body.reason||""),charName:String(found.name||name)});
+        if(typeof db.chatMuteSet==="function")await db.chatMuteSet(m);
         return send(res,200,{ok:true,mute:{account_id:m.accountId,char_name:m.charName,until:m.until,reason:m.reason}});}
       if(req.method==="POST"&&url==="/api/admin/chat-unmute"){
         const body=await readBody(req);
@@ -5480,6 +5486,7 @@ async function main() {
         const found=name?await db.findCharacterByName(name):null;
         if(!found)return send(res,404,{ok:false,msg:"Personagem não encontrado"});
         CHAT_BUS.unmute(found.account_id);
+        if(typeof db.chatMuteDelete==="function")await db.chatMuteDelete(found.account_id);
         return send(res,200,{ok:true});}
       if(req.method==="GET"&&url==="/api/admin/chat-mutes"){
         const token=(req.headers.authorization||"").replace("Bearer ","");

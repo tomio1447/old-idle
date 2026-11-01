@@ -146,6 +146,7 @@ async function socialRefresh() {
   SOCIAL_UI.myLobby = r.data.myLobby || null;
   SOCIAL_MUTED.clear();
   for (const f of SOCIAL_UI.friends) if (f.muted) SOCIAL_MUTED.add(String(f.name).toLowerCase());
+  if (typeof window.chatApplyMuteFilter === "function") window.chatApplyMuteFilter();
   socialRenderLists();
 }
 
@@ -335,6 +336,7 @@ async function socialLoadMuted() {
   if (!r.data || !r.data.ok || !Array.isArray(r.data.friends)) return;
   SOCIAL_MUTED.clear();
   for (const f of r.data.friends) if (f.muted) SOCIAL_MUTED.add(String(f.name).toLowerCase());
+  if (typeof window.chatApplyMuteFilter === "function") window.chatApplyMuteFilter();
 }
 
 function socialInitButton() {

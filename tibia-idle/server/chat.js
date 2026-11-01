@@ -204,6 +204,19 @@ class ChatBus {
     return this.mutes.delete(Number(accountId));
   }
 
+  /* Boot: recarrega mutes persistidos no DB (restart não limpa mais). */
+  hydrateMutes(list) {
+    const now = Date.now();
+    for (const m of list || []) {
+      if (!m || Number(m.until) <= now) continue;
+      this.mutes.set(Number(m.accountId), {
+        accountId: Number(m.accountId), until: Number(m.until),
+        by: String(m.by || "admin"), reason: String(m.reason || ""),
+        charName: String(m.charName || ""), at: Number(m.at) || now,
+      });
+    }
+  }
+
   muteStatus(accountId) {
     const m = this.mutes.get(Number(accountId));
     if (!m) return null;

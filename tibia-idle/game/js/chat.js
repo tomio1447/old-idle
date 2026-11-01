@@ -316,6 +316,16 @@
     renderMessages();
   }
 
+  /* Social mute: ao alternar "mutado" num amigo, purga as mensagens dele
+   * já exibidas (além do filtro em ingest para as novas). */
+  function purgeMutedNow() {
+    if (typeof isSocialMuted !== "function") return;
+    const before = ChatUI.messages.length;
+    ChatUI.messages = ChatUI.messages.filter((m) => !isSocialMuted(m.nickname));
+    if (ChatUI.messages.length !== before) renderMessages();
+  }
+  window.chatApplyMuteFilter = purgeMutedNow;
+
   function openModMenu(x, y, mid, nick) {
     if (typeof showContextMenu !== "function") return;
     const opts = [{
