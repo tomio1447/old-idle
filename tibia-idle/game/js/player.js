@@ -660,6 +660,8 @@ function addExp(p, amount) {
     // Atualiza cap compartilhada da party se este player agora tem mais cap.
     if (p._sharedCap && b.cap > p._sharedCap.value) p._sharedCap.value = b.cap;
     if (typeof markAdvanceSave === "function") markAdvanceSave();
+    // Party toda nível 20+: aviso único da promotion (King Tibianus).
+    if (typeof promotionHintCheck === "function") promotionHintCheck();
   }
   return leveled;
 }

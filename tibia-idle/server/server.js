@@ -4892,6 +4892,9 @@ async function main() {
       if (req.method === "POST" && url === "/api/reward/claim") {
         const r = await claimRewardChest(db, await readBody(req));return send(res, r.code, r.body);
       }
+      if (req.method === "POST" && url === "/api/character/promote") {
+        const r = await promoteCharacterApi(db, await readBody(req));return send(res, r.code, r.body);
+      }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
       }

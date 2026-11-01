@@ -594,6 +594,25 @@ function accountClaimRewardChest(token,charId,opts){
     return {ok:false,msg:r.data.msg||"Não foi possível recolher",code:r.code,error:r.data.error};
   });
 }
+/* Promoção do King Tibianus — autoritativa no servidor: debita o wallet da
+ * conta e persiste data.promoted mesmo com o personagem fora do ativo (o
+ * caminho antigo só mutava o clone local e a promoção sumia no refresh). */
+function accountPromoteCharacter(token,charId){
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false,msg:"Controle da conta indisponível."};
+    const id=String(charId||""),cache=await accountEnsureVersions(token,[id]),summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/character/promote",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      if(typeof accountMaybeApplyShared==="function")accountMaybeApplyShared(r.data);
+      return {ok:true,promoted:true,character:r.data.character,saveVersion:r.data.saveVersion,
+        gold:r.data.character&&r.data.character.snapshot&&r.data.character.snapshot.gold};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"Não foi possível promover",code:r.code,error:r.data.error};
+  });
+}
 function accountSelectInstanceAmmo(token,charId,slug,automatic){
   return accountQueueInstance(async()=>{
     if(!accountLeaseAllowsSimulation()||!ACCOUNT_INSTANCE.id||ACCOUNT_INSTANCE.status!=="active")return {ok:false};

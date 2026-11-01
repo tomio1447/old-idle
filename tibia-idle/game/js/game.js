@@ -5372,6 +5372,10 @@ async function startGameReady(p) {
       addLog("info",`Instância retomada após <b>${fmtTime(Math.floor(resumeResult.elapsed/1000))}</b> em segundo plano.`);
     }
     if(off)showOfflineModal(off);
+    // Party toda nível 20+: popup único da promotion (King Tibianus).
+    // Delayado para não disputar com o offline gains/daily reward — o
+    // próprio check re-tenta se houver modal aberto.
+    setTimeout(()=>{if(typeof promotionHintCheck==="function")promotionHintCheck();},4000);
     // Server save diário: se houver bônus de exercise weapon pendente,
     // abre o modal de coleta (depois de eventuais modais de boot).
     if(typeof dailyRewardCheck==="function")dailyRewardCheck(p);

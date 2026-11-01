@@ -1112,7 +1112,7 @@ function promotionEligibility(p) {
   return { ok: true, msg: "Pronto" };
 }
 
-function promoteCharacterById(id) {
+async function promoteCharacterById(id) {
   const currentId = G.p ? characterId(G.p) : null;
   const wanted = String(id);
   let target = null;
@@ -1121,12 +1121,92 @@ function promoteCharacterById(id) {
   if (!target) return { ok: false, msg: "Personagem não encontrado." };
   const check = promotionEligibility(target);
   if (!check.ok) return check;
+  const online = typeof accountApiConfigured === "function" && accountApiConfigured() &&
+    typeof sessionToken === "function" && !!sessionToken() &&
+    typeof accountPromoteCharacter === "function";
+  if (online) {
+    // Autoritativo: o servidor debita o wallet da conta e grava
+    // data.promoted no save do personagem — funciona para QUALQUER char da
+    // conta, não só o ativo (o caminho local revertia no refresh).
+    const r = await accountPromoteCharacter(sessionToken(), wanted);
+    if (!r.ok) return r;
+    target.promoted = true;
+    target.promotedAt = Date.now();
+    if (r.gold !== undefined) target.gold = Math.max(0, Number(r.gold) || 0);
+    if (String(currentId) === wanted) {
+      G.p = target;
+      if (r.gold !== undefined) G.p.gold = Math.max(0, Number(r.gold) || 0);
+    } else if (G.p && r.gold !== undefined) {
+      // O wallet é da conta: a promoção de outro char também debita o
+      // saldo que o ativo exibe.
+      G.p.gold = Math.max(0, Number(r.gold) || 0);
+    }
+    saveCharacterToRoster(target);
+    return { ok: true, msg: `${target.name} agora é ${vocationName(target)}!` };
+  }
   if (!spendGold(target, PROMOTION_PRICE)) return { ok: false, msg: "Ouro insuficiente." };
   target.promoted = true;
   target.promotedAt = Date.now();
   saveCharacterToRoster(target);
   if (String(currentId) === wanted) G.p = target;
   return { ok: true, msg: `${target.name} agora é ${vocationName(target)}!` };
+}
+
+/* Popup único: quando TODOS os personagens da party chegam ao nível 20,
+ * avisa para falar com o King Tibianus (promotion por 20k). Fica aberto
+ * até clicar em OK ou NPCS (abre o catálogo de NPCs). A flag
+ * p.config.promoHint20 garante que nunca mais abra após o clique. */
+function promotionHintEligible() {
+  if (!G.p) return false;
+  const members = (typeof trainingPartyPlayers === "function" ? trainingPartyPlayers() : [])
+    .filter((m) => m && m.id != null);
+  const chars = members.length ? members : [G.p];
+  if (!chars.length) return false;
+  if (!chars.every((c) => (Number(c.level) || 0) >= PROMOTION_LEVEL)) return false;
+  // Se já está todo mundo promovido, o aviso não faz sentido.
+  return chars.some((c) => !c.promoted);
+}
+
+function promotionHintCheck() {
+  if (!G.p) return;
+  G.p.config = G.p.config || {};
+  if (G.p.config.promoHint20) return;
+  if (!promotionHintEligible()) return;
+  const modal = $("#modal");
+  if (modal && modal.classList.contains("show")) {
+    // Outro modal aberto (offline gains, daily reward…): tenta de novo.
+    if (!G._promoHintRetry) {
+      G._promoHintRetry = true;
+      setTimeout(() => { G._promoHintRetry = false; promotionHintCheck(); }, 6000);
+    }
+    return;
+  }
+  const body = $("#modal-body");
+  if (!modal || !body) return;
+  if (typeof clearCityModalShells === "function") clearCityModalShells(body);
+  body.classList.add("cidade-modal-shell");
+  body.innerHTML = `<div class="panel-title">Parabéns!</div>
+    <div class="panel-body">
+      <div class="small mb8">Parabéns! Todos os personagens da sua party alcançaram o <b>nível ${PROMOTION_LEVEL}</b>.</div>
+      <div class="small mb8">Vá até os <b>NPCS</b> e fale com o <b>King Tibianus</b> para adquirir sua
+        <b>promotion</b> por <b class="gold-txt">${fmtFull(PROMOTION_PRICE)} gp</b>.</div>
+      <div class="tiny dim mb8">Promoções: Elite Knight, Royal Paladin, Elder Druid e Master Sorcerer.</div>
+      <div class="row" style="gap:8px;justify-content:flex-end">
+        <button class="sm" id="promo-hint-ok">OK</button>
+        <button class="sm primary" id="promo-hint-npcs">NPCS</button>
+      </div>
+    </div>`;
+  modal.classList.add("show");
+  const dismiss = (openNpcs) => {
+    G.p.config.promoHint20 = 1;
+    if (typeof saveCharacterToRoster === "function") saveCharacterToRoster(G.p);
+    if (typeof save === "function") save();
+    modal.classList.remove("show");
+    body.classList.remove("cidade-modal-shell");
+    if (openNpcs) openNpcsModal();
+  };
+  $("#promo-hint-ok").addEventListener("click", () => dismiss(false));
+  $("#promo-hint-npcs").addEventListener("click", () => dismiss(true));
 }
 
 function npcPromotion() {
@@ -1378,8 +1458,9 @@ function bindNpc(id, type) {
 
   // promoção King Tibianus
   $$("#npc-content [data-promote-char]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const r = promoteCharacterById(b.dataset.promoteChar);
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      const r = await promoteCharacterById(b.dataset.promoteChar);
       toast(r.msg, r.ok ? "level" : "");
       if (r.ok) addLog("level", r.msg);
       refreshNpc(id);
