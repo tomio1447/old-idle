@@ -1924,6 +1924,20 @@ function accountApplySharedInventory(shared) {
     p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
   }
   if (shared.seq > (Number(p._itemInstSeq) || 0)) p._itemInstSeq = shared.seq;
+  // Stamina DA CONTA: espelha o pool — a guarda de carimbo impede que um
+  // valor atrasado role por cima de dreno/regen mais recente, e o relógio
+  // local avança para não recreditar a janela já materializada.
+  if (shared.stamina && typeof shared.stamina === "object" &&
+      Number.isFinite(Number(shared.stamina.v))) {
+    const at = Number(shared.stamina.at) || 0;
+    if (at > (Number(p._accStaminaAt) || 0)) {
+      const full = Number.isFinite(Number(FULL_STAMINA_SECONDS)) ? Number(FULL_STAMINA_SECONDS) : 54000;
+      p.stamina = Math.max(0, Math.min(full, Number(shared.stamina.v)));
+      p._accStaminaAt = at;
+      if (at > (Number(p.staminaAt) || 0)) p.staminaAt = at;
+      if (typeof updateStaminaDisplay === "function") { try { updateStaminaDisplay(); } catch (e) {} }
+    }
+  }
   p._sharedInv = 1;
   // Reward Chest é DA CONTA: ao aplicar o shared (troca de personagem,
   // SSE de outra aba, /api/me), atualiza o badge "!" — todos os personagens

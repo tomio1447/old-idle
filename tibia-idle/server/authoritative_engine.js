@@ -7004,10 +7004,22 @@ function step(auth,now,opts){if(auth.ended)return;
   syncBossImmunityFlags(auth);
   soulwarTaintTick(auth,dt,now);
   tickDelayedHits(auth,now);
+  // Stamina é da CONTA: pool único por accountId em auth.accountStamina.
+  // Party multi-char da mesma conta drena UMA vez por tick; os demais
+  // membros só espelham o pool. Carimbo avança junto — o tempo de caça não
+  // é creditado depois como "ocioso" no load/save seguinte.
+  const staminaPools=auth.accountStamina&&typeof auth.accountStamina==="object"
+    ?auth.accountStamina:(auth.accountStamina={});
   for(const item of auth.players){
-    // Caça não regenera: só drena — mas o carimbo avança para o tempo de
-    // caça não ser creditado depois como "ocioso" no load/save seguinte.
-    const p=item.p;p.stamina=Math.max(0,(Number(p.stamina)||0)-dt/1000);p.staminaAt=now;
+    const p=item.p;
+    const key=String(item.accountId||(p&&p.accountId)||("char:"+item.id));
+    let pool=staminaPools[key];
+    if(!pool){
+      pool=staminaPools[key]={v:Number.isFinite(Number(p&&p.stamina))
+        ?Math.max(0,Math.min(FULL_STAMINA,Number(p.stamina))):FULL_STAMINA,at:now};
+    }
+    if(now>pool.at){pool.v=Math.max(0,pool.v-(now-pool.at)/1000);pool.at=now;}
+    p.stamina=pool.v;p.staminaAt=now;
     if(item.downUntil&&now>=item.downUntil){
       if(item.permadead||authIsBossFight(auth)){
         item.permadead=true;p.hp=0;

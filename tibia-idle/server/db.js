@@ -962,6 +962,16 @@ JsonStore.prototype.accountSharedInventory = function (accountId) {
     a.shared_inventory = s;
     this._save();
   }
+  if (!s.staminaSharedDone) {
+    // Stamina era por personagem: o pool da conta nasce do MAIOR espelho
+    // entre os personagens (não soma — não multiplica regen por char).
+    let chars = [];
+    try { chars = this.charactersOf(accountId); } catch (e) { chars = []; }
+    if (SharedInv) SharedInv.seedSharedStamina(s, chars);
+    s.staminaSharedDone = 1;
+    a.shared_inventory = s;
+    this._save();
+  }
   return SharedInv.normalizeSharedInventory(s);
 };
 JsonStore.prototype.setAccountSharedInventory = function (accountId, s) {
@@ -1152,12 +1162,25 @@ JsonStore.prototype.trainingCheckpoint = function (accountId, ids, sessionId, no
     return { ok: false, error: "CHARACTER_NOT_FOUND" };
   if (rows.some((row) => ["hunt", "boss"].includes(row.zone))) return { ok: false, error: "TRAINING_IN_COMBAT" };
   const account = this.findAccountById(accountId);
+  /* Stamina da CONTA: o pool (shared.stamina) entra em cada p ANTES do
+   * advance — o regen interno (1s/s treinando, 0,5 ocioso) materializa a
+   * janela no pool e a extração devolve com guarda de carimbo. Como cada p
+   * recebe o pool já materializado pelo anterior, a janela não dobra. */
+  const shared = SharedInv ? this.accountSharedInventory(accountId) : null;
+  if (shared && !shared.stamina) {
+    const seedRow = rows.map((r) => SharedInv.charDataOf(r))
+      .find((d) => d && Number.isFinite(Number(d.stamina)));
+    if (seedRow) SharedInv.regenSharedStamina(shared, Number(seedRow.staminaAt) || now, 0, seedRow.stamina);
+  }
   const staged = rows.map((row) => {
     const p = typeof row.data === "string" ? JSON.parse(row.data) : JSON.parse(JSON.stringify(row.data || {}));
     p.voc = row.voc;
+    if (shared && shared.stamina) SharedInv.applySharedStamina(p, shared);
     const result = advance(p, now, sessionId, Number(account.vip_until) > now, lease.holderId, stop);
+    if (shared) SharedInv.extractSharedStamina(p, shared);
     return { row, p, result };
   });
+  if (shared) this.setAccountSharedInventory(accountId, shared);
   for (const item of staged) {
     item.row.data = JSON.stringify(item.p);
     item.row.save_version = Number(item.row.save_version || 0) + 1;
@@ -2346,6 +2369,14 @@ async function MysqlStore() {
         s.stashSharedDone = 1;
         await this.setAccountSharedInventory(Number(accountId), s);
       }
+      if (!s.staminaSharedDone && SharedInv) {
+        // Stamina era por personagem: o pool da conta nasce do MAIOR espelho.
+        let chars = [];
+        try { chars = await this.charactersOf(Number(accountId)); } catch (e) { chars = []; }
+        SharedInv.seedSharedStamina(s, chars);
+        s.staminaSharedDone = 1;
+        await this.setAccountSharedInventory(Number(accountId), s);
+      }
       return SharedInv ? SharedInv.normalizeSharedInventory(s) : s;
     },
     async setAccountSharedInventory(accountId, s) {
@@ -2590,17 +2621,31 @@ async function MysqlStore() {
           await conn.rollback(); return { ok: false, error: "TRAINING_IN_COMBAT" };
         }
         const [accounts] = await conn.query("SELECT vip_until FROM accounts WHERE id=?", [Number(accountId)]);
+        /* Stamina da CONTA: pool (shared.stamina) espelhado em cada p antes
+         * do advance — o regen interno materializa a janela uma única vez
+         * (1s/s ativo, 0,5 ocioso) e a extração devolve com carimbo. */
+        const shared = SharedInv ? await this.accountSharedInventory(Number(accountId)) : null;
+        if (shared && !shared.stamina) {
+          const seedRow = rows.map((r) => SharedInv.charDataOf(r))
+            .find((d) => d && Number.isFinite(Number(d.stamina)));
+          if (seedRow) SharedInv.regenSharedStamina(shared, Number(seedRow.staminaAt) || now, 0, seedRow.stamina);
+        }
         const advances = [];
         for (const row of rows) {
           const p = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
           p.voc = row.voc;
+          if (shared && shared.stamina) SharedInv.applySharedStamina(p, shared);
           const result = advance(p, now, sessionId, Number(accounts[0].vip_until) > now, lease.holderId, stop);
+          if (shared) SharedInv.extractSharedStamina(p, shared);
           row.data = JSON.stringify(p);
           row.save_version = Number(row.save_version || 0) + 1;
           await conn.query("UPDATE characters SET data=?,save_version=save_version+1 WHERE id=? AND account_id=?",
             [row.data, Number(row.id), Number(accountId)]);
           advances.push(...result.advances.map((a) => Object.assign({ id: row.id }, a)));
         }
+        if (shared)
+          await conn.query("UPDATE accounts SET shared_inventory=? WHERE id=?",
+            [JSON.stringify(SharedInv.normalizeSharedInventory(shared)), Number(accountId)]);
         await conn.commit();
         return { ok: true, characters: rows, advances };
       } catch (error) { try { await conn.rollback(); } catch (e) {} throw error; }

@@ -962,16 +962,21 @@ async function loadCharacter(db, token, id) {
   let sharedInventory = null;
   try {
     const parsed = typeof data === "string" ? JSON.parse(data) : (data || {});
-    // Stamina: credita o tempo ocioso (0,5s/s) desde a última contagem —
-    // virtual até o próximo save (idempotente em loads repetidos).
-    staminaRegenPlayer(parsed, Date.now(), 0.5);
     parsed.gold = Math.max(0, Math.floor(Number(acc.gold) || 0));
     parsed.vipUntil = Math.max(0, Math.floor(Number(acc.vip_until) || 0));
     // Inventário da conta: bag/lootPouch/depot/reward chest são compartilhados
     // por todos os personagens — injeta o shared por cima do save individual.
+    // Stamina é DA CONTA: materializa o tempo ocioso (0,5s/s) no pool e
+    // persiste; o apply espelha o pool no personagem (todos compartilham).
     if (SharedInv && typeof db.accountSharedInventory === "function") {
       sharedInventory = await db.accountSharedInventory(acc.id);
+      SharedInv.regenSharedStamina(sharedInventory, Date.now(), 0.5, parsed.stamina);
+      if (typeof db.setAccountSharedInventory === "function")
+        await db.setAccountSharedInventory(acc.id, sharedInventory);
       SharedInv.applySharedToPlayer(parsed, sharedInventory);
+    } else {
+      // Fallback sem shared: stamina individual (legado).
+      staminaRegenPlayer(parsed, Date.now(), 0.5);
     }
     data = JSON.stringify(parsed);
   } catch (e) {}
@@ -1128,6 +1133,9 @@ async function splitSharedInventory(db, acc, p, authoritative) {
     shared.rewardChest = keep.rewardChest;
     shared.rewardChestBundles = keep.rewardChestBundles;
   }
+  // Stamina da conta: a extração gravou o espelho (com guarda de carimbo);
+  // materializa a cauda ociosa até agora e espelha o pool de volta no save.
+  SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
   if (typeof db.setAccountSharedInventory === "function")
     await db.setAccountSharedInventory(acc.id, shared);
   SharedInv.applySharedToPlayer(p, shared);
@@ -1141,8 +1149,6 @@ async function loadCityPlayer(db, acc, character) {
   let p = character.data;
   if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = {}; } }
   p = p && typeof p === "object" && !Array.isArray(p) ? cloneJson(p) : {};
-  // Stamina: o personagem estava ocioso desde a última contagem (0,5s/s).
-  staminaRegenPlayer(p, Date.now(), 0.5);
   /* Gold é WALLET da conta: hidrata com acc.gold e marca _walletSynced —
    * persistClaimedPlayer grava o saldo resultante em accounts.gold. Sem
    * isto a venda na cidade creditava só o espelho data.gold e o dinheiro
@@ -1152,8 +1158,16 @@ async function loadCityPlayer(db, acc, character) {
   if (SharedInv && typeof db.accountSharedInventory === "function") {
     try {
       const shared = await db.accountSharedInventory(acc.id);
+      // Stamina da conta: tempo ocioso (0,5s/s) materializado no pool; o
+      // apply espelha — todos os personagens veem o mesmo saldo.
+      SharedInv.regenSharedStamina(shared, Date.now(), 0.5, p.stamina);
+      if (typeof db.setAccountSharedInventory === "function")
+        await db.setAccountSharedInventory(acc.id, shared);
       SharedInv.applySharedToPlayer(p, shared);
     } catch (e) { /* shared opcional */ }
+  } else {
+    // Fallback sem shared: stamina individual (legado).
+    staminaRegenPlayer(p, Date.now(), 0.5);
   }
   return p;
 }
@@ -1180,10 +1194,11 @@ async function saveCharacter(db, body, id) {
   if(adminGrant&&!accountCanSelfAdmin(acc))return {code:403,body:{ok:false,error:"ADMIN_ONLY",
     msg:"Grants administrativos exigem conta admin (ou TEST_SERVER)."}};
   let prepared=prepareCharacterSave(c,body,{adminGrant});if(prepared.error)return prepared.error;
-  // Stamina: credita o tempo ocioso (0,5s/s) acumulado desde a última
-  // contagem (cidade/parado). Com instância ativa o enforce substitui o
-  // player pelo snapshot autoritativo — o credit vira no-op.
-  try{const _st=JSON.parse(prepared.save.data);staminaRegenPlayer(_st,Date.now(),0.5);prepared.save.data=JSON.stringify(_st);}catch(e){}
+  // Stamina compartilhada: a reconciliação (espelho do save → pool, com
+  // guarda de carimbo e cauda ociosa 0,5s/s) acontece em
+  // splitSharedInventory. Sem shared, cai no regen individual legado.
+  try{if(!(SharedInv&&typeof db.accountSharedInventory==="function")){
+    const _st=JSON.parse(prepared.save.data);staminaRegenPlayer(_st,Date.now(),0.5);prepared.save.data=JSON.stringify(_st);}}catch(e){}
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
   let patchedInstance=null;
   if(adminGrant){
@@ -2000,6 +2015,11 @@ async function prepareInstanceState(db,acc,input){
     if(SharedInv&&typeof db.accountSharedInventory==="function"){
       try{
         const shared=await db.accountSharedInventory(Number(c.account_id));
+        // Stamina da conta: materializa o gap ocioso (0,5s/s) no pool antes
+        // de espelhar — o tick da instância drena o pool por conta.
+        SharedInv.regenSharedStamina(shared,Date.now(),0.5,canonical.stamina);
+        if(typeof db.setAccountSharedInventory==="function")
+          await db.setAccountSharedInventory(Number(c.account_id),shared);
         SharedInv.applySharedToPlayer(canonical,shared);
       }catch(e){/* shared opcional */}
     }

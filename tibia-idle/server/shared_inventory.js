@@ -18,6 +18,71 @@
 const SHARED_CONTAINERS = ["bag", "lootPouch", "supplyStash", "depot", "rewardChest", "rewardChestBundles",
   "dust", "dustLimit", "slivers", "exaltedCores"];
 
+/* Stamina é DA CONTA: pool único em shared.stamina {v:segundos, at:ms}.
+ * Cada personagem carrega só um ESPELHO (p.stamina/p.staminaAt). A
+ * materialização é por relógio — a taxa depende do estado no momento da
+ * contagem (1s/s treinando, 0,5s/s ocioso/offline, dreno no tick da hunt). */
+const SHARED_STAMINA_FULL = 54000;
+
+function regenSharedStamina(shared, now, perSec, seed) {
+  shared = shared || {};
+  const st = shared.stamina && typeof shared.stamina === "object" ? shared.stamina : null;
+  now = Number(now) || Date.now();
+  if (!st) {
+    const v = Number.isFinite(Number(seed))
+      ? Math.max(0, Math.min(SHARED_STAMINA_FULL, Number(seed))) : SHARED_STAMINA_FULL;
+    shared.stamina = { v: v, at: now };
+    return shared.stamina;
+  }
+  let v = Number.isFinite(Number(st.v)) ? Number(st.v) : SHARED_STAMINA_FULL;
+  const at = Number(st.at) || 0;
+  if (at > 0 && now > at && perSec > 0)
+    v = Math.min(SHARED_STAMINA_FULL, v + (now - at) / 1000 * perSec);
+  shared.stamina = { v: Math.max(0, v), at: now };
+  return shared.stamina;
+}
+
+/* Migração: o pool nasce do MAIOR espelho entre os personagens da conta,
+ * com o carimbo mais recente (nunca soma — os espelhos herdados já eram do
+ * mesmo pool lógico). Uma vez por conta via flag staminaSharedDone. */
+function seedSharedStamina(shared, characters) {
+  shared = shared || {};
+  if (shared.stamina && typeof shared.stamina === "object") return shared.stamina;
+  let v = null, at = 0;
+  for (const c of Array.isArray(characters) ? characters : []) {
+    const p = charDataOf(c);
+    if (!p || !Number.isFinite(Number(p.stamina))) continue;
+    const sv = Math.max(0, Math.min(SHARED_STAMINA_FULL, Number(p.stamina)));
+    if (v === null || sv > v) v = sv;
+    at = Math.max(at, Number(p.staminaAt) || 0);
+  }
+  if (v !== null) shared.stamina = { v: v, at: at || Date.now() };
+  return shared.stamina;
+}
+
+/* Espelha o pool da conta no player (só quando o pool existe — personagem
+ * legado sem shared fica com o próprio espelho até a primeira extração). */
+function applySharedStamina(p, shared) {
+  const st = shared && shared.stamina;
+  if (p && st && Number.isFinite(Number(st.v))) {
+    p.stamina = Math.max(0, Math.min(SHARED_STAMINA_FULL, Number(st.v)));
+    p.staminaAt = Number(st.at) || Date.now();
+  }
+}
+
+/* Grava o espelho do player no pool — com GUARDA de carimbo: um save
+ * atrasado de outro personagem não pode rolar o relógio da conta pra trás. */
+function extractSharedStamina(p, shared) {
+  shared = shared || {};
+  if (!p || !Number.isFinite(Number(p.stamina))) return;
+  const at = Number(p.staminaAt) || 0;
+  const cur = shared.stamina && typeof shared.stamina === "object" ? shared.stamina : null;
+  if (!cur || !Number.isFinite(Number(cur.at)) || at >= Number(cur.at)) {
+    shared.stamina = { v: Math.max(0, Math.min(SHARED_STAMINA_FULL, Number(p.stamina))),
+      at: at || Date.now() };
+  }
+}
+
 function emptySharedInventory() {
   return { v: 1, seq: 0, bag: {}, lootPouch: {}, supplyStash: {}, depot: [],
     itemInstances: [], rewardChest: {}, rewardChestBundles: [],
@@ -157,6 +222,7 @@ function applySharedToPlayer(p, shared) {
   // mudanças externas (venda em outra aba/personagem) não são revertidas e
   // o loot da instância não ressuscita itens já vendidos.
   p._pouchBase = Object.assign({}, shared.lootPouch);
+  applySharedStamina(p, shared);
   p._sharedInv = 1;
   return p;
 }
@@ -203,6 +269,7 @@ function extractSharedFromPlayer(p, shared) {
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
     .map((i) => Object.assign({}, i));
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
+  extractSharedStamina(p, shared);
   p.bag = {};
   p.lootPouch = {};
   p.supplyStash = {};
@@ -261,11 +328,17 @@ function mergeSharedFromPlayer(p, shared, opts) {
   shared.dustLimit = Math.max(shared.dustLimit, Math.floor(Number(p.dustLimit) || 100));
   shared.slivers = Math.max(shared.slivers, Math.floor(Number(p.slivers) || 0));
   shared.exaltedCores = Math.max(shared.exaltedCores, Math.floor(Number(p.exaltedCores) || 0));
+  extractSharedStamina(p, shared);
   return normalizeSharedInventory(shared);
 }
 
 module.exports = {
   SHARED_CONTAINERS,
+  SHARED_STAMINA_FULL,
+  regenSharedStamina,
+  seedSharedStamina,
+  applySharedStamina,
+  extractSharedStamina,
   emptySharedInventory,
   isSharedInventory,
   normalizeSharedInventory,
