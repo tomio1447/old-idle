@@ -1,8 +1,9 @@
 /* market-ui.js — Market player-to-player, fiel ao manual do Tibia (4.3.3).
  *
  * Regras implementadas (guia oficial):
- *  - vendedor usa itens do DEPOT; comprado vai pro DEPOT/inbox;
- *  - fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000) pago do BANCO;
+ *  - vendedor usa itens da MOCHILA (o servidor verifica e retira na criação);
+ *    comprado vai pro DEPOT/inbox;
+ *  - fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000) pago da CONTA;
  *  - buy offers (oferta de compra) e sell offers (oferta de venda);
  *  - MATCH AUTOMATICO: criar oferta casa com contra-oferta na hora;
  *  - ofertas duram 30 dias (fixo); item/dinheiro voltam ao dono;
@@ -17,7 +18,7 @@ let _mQ = "";
 let _mCat = "";
 let _mTier = "";
 let _mSel = null;         // item selecionado p/ vender: {slug, instId?, qty, tier, from}
-let _mSellSrc = "depot";  // de onde vende: depot | bag
+let _mSellSrc = "bag";    // ofertas de venda saem da mochila
 let _mPrice = "";
 let _mPriceTc = false;
 let _mAnon = false;
@@ -170,28 +171,7 @@ function openMarketForItem(slug) {
   marketLoadItemOffers(p, slug);
 }
 
-/* ---------- itens vendáveis (depot + bag) ---------- */
-function marketDepotItems(p) {
-  ensureForge(p);
-  const out = [];
-  const dep = p.depot || [];
-  for (const entry of dep) {
-    const slug = forgeStoredSlug(p, entry);
-    if (!slug) continue;
-    // instância? acha no itemInstances
-    const inst = (typeof findItemInstance === "function") ? findItemInstance(p, entry) : null;
-    out.push({
-      slug,
-      instId: inst ? inst.id : null,
-      qty: 1,
-      tier: inst ? itemInstanceTier(inst) : (p.forge && p.forge[slug]) || 0,
-      n: itemName(slug),
-      from: "depot",
-    });
-  }
-  return out;
-}
-
+/* ---------- itens vendáveis (mochila) ---------- */
 function marketBagItems(p) {
   ensureItemInstances(p);
   const out = [];
@@ -208,38 +188,25 @@ function marketBagItems(p) {
   return out;
 }
 
-/* Remove o item vendido do depot/bag e guarda p/ refund. */
-function marketRemoveForSale(p, sel, offerId) {
-  if (sel.from === "depot") {
-    // depot: remove a entrada (instância: loc=null; stackável: remove slug)
-    if (sel.instId) {
-      const inst = findItemInstance(p, sel.instId);
-      if (inst) {
-        inst.loc = null;
-        const idx = (p.depot || []).indexOf(sel.instId);
-        if (idx >= 0) p.depot.splice(idx, 1);
-        syncBagCountsFromInstances(p);
-        _mPendingRefund[offerId] = { slug: sel.slug, inst, qty: 1, to: "depot" };
-      }
-    } else {
-      const idx = (p.depot || []).indexOf(sel.slug);
-      if (idx >= 0) p.depot.splice(idx, 1);
-      _mPendingRefund[offerId] = { slug: sel.slug, inst: null, qty: sel.qty || 1, to: "depot" };
-    }
-  } else if (sel.instId) {
-    const inst = findItemInstance(p, sel.instId);
-    if (inst) {
-      inst.loc = null;
-      syncBagCountsFromInstances(p);
-      _mPendingRefund[offerId] = { slug: sel.slug, inst, qty: 1, to: "bag" };
-    }
-  } else {
-    removeItem(p, sel.slug, sel.qty || 1);
-    _mPendingRefund[offerId] = { slug: sel.slug, inst: null, qty: sel.qty || 1, to: "bag" };
+/* Aplica o estado de mochila/instância devolvido pelas rotas do market
+ * (o servidor retira o item da backpack na criação da oferta). */
+function marketApplyEscrowState(d) {
+  if (!d) return;
+  if (d.instance && typeof accountInstanceApply === "function") {
+    accountInstanceApply(d.instance);
+    return;
   }
+  const p = (typeof G !== "undefined" && G) ? G.p : null;
+  if (p) {
+    if (d.bag) p.bag = d.bag;
+    if (d.itemInstances) p.itemInstances = d.itemInstances;
+  }
+  if (d.character && typeof accountMergeCharacterCache === "function")
+    accountMergeCharacterCache([d.character]);
 }
 
-/* Devolve o item ao depot/bag (cancelamento/expiração). */
+/* Devolve o item ao depot/bag (cancelamento/expiração) — fallback local
+ * para quando o servidor não devolveu o estado da mochila. */
 function marketRefundItem(p, offerId) {
   const pend = _mPendingRefund[offerId];
   if (!pend) return false;
@@ -342,7 +309,7 @@ function renderMarket() {
   const v = typeof ASSET_VERSION !== "undefined" ? ASSET_VERSION : "1";
 
   const modalBody = $("#modal-body");
-  modalBody.className = "modal panel market-shell";
+  modalBody.className = "modal panel cidade-modal-shell market-shell";
   modalBody.innerHTML = `
     <div class="panel-title">
       <img src="assets/ui/market/market.png" style="width:20px;height:20px;image-rendering:pixelated">
@@ -419,10 +386,10 @@ function marketAttachDetailEvents(body, p) {
     const sellBtn = e.target.closest && e.target.closest("#m-create-sell");
     if (sellBtn) {
       const slug = sellBtn.dataset.slug;
-      const depot = (marketDepotItems(p) || []).filter((i) => i.slug === slug);
-      if (!depot.length) { toast("Você não tem esse item no Depot para vender"); return; }
-      const i = depot[0];
-      _mSel = { slug, instId: i.instId || null, qty: i.qty || 1, tier: i.tier || 0, from: "depot" };
+      const bag = (marketBagItems(p) || []).filter((i) => i.slug === slug);
+      if (!bag.length) { toast("Você não tem esse item na mochila para vender"); return; }
+      const i = bag[0];
+      _mSel = { slug, instId: i.instId || null, qty: i.qty || 1, tier: i.tier || 0, from: "bag" };
       _mTab = "sell";
       renderMarket();
       return;
@@ -485,21 +452,21 @@ function renderMarketBrowse(body, p) {
       #market-browse { display:flex; gap:8px; height:100%; overflow:hidden; }
       #m-side {
         width:300px; flex:none; display:flex; flex-direction:column;
-        background:#14120e; border:1px solid #16140f; overflow:hidden;
+        background:#24221e; border:1px solid #16140f; overflow:hidden;
       }
-      .m-side-block { padding:6px; border-bottom:1px solid #1e1a12; }
+      .m-side-block { padding:6px; border-bottom:1px solid #2a2822; }
       .m-side-block:last-child { border-bottom:none; }
       .m-side-label { font-size:9px; letter-spacing:.5px; text-transform:uppercase; color:#8a8270; margin-bottom:4px; }
-      #m-browse-q { width:100%; box-sizing:border-box; padding:5px 7px; background:#1b1813; color:#c8c0a8; border:1px solid #16140f; }
+      #m-browse-q { width:100%; box-sizing:border-box; padding:5px 7px; background:#1c1a16; color:#c8c0a8; border:1px solid #3a372f; }
       .m-side-cats { max-height:128px; overflow-y:auto; }
       .m-cat { padding:4px 7px; cursor:pointer; color:#c8c0a8; border-radius:2px; font-size:11px; }
       .m-cat:hover { background:rgba(255,255,255,.05); }
-      .m-cat.active { background:#3d3830; color:#ffd700; }
+      .m-cat.active { background:#2a2618; color:#ffe680; }
       .m-side-filters { display:flex; gap:4px; }
-      .m-side-filters select, .m-side-filters input { flex:1; min-width:0; padding:3px; background:#1b1813; color:#c8c0a8; border:1px solid #16140f; }
+      .m-side-filters select, .m-side-filters input { flex:1; min-width:0; padding:3px; background:#1c1a16; color:#c8c0a8; border:1px solid #3a372f; }
       .m-side-items { flex:1; min-height:0; overflow-y:auto; }
-      .m-item-row { display:flex; align-items:center; gap:6px; padding:4px; cursor:pointer; border-bottom:1px solid rgba(0,0,0,.25); }
-      .m-item-row:hover, .m-item-row.active { background:rgba(80,65,18,.35); outline:1px solid rgba(212,175,55,.32); }
+      .m-item-row { display:flex; align-items:center; gap:6px; padding:4px; cursor:pointer; border-bottom:1px solid #2a2822; }
+      .m-item-row:hover, .m-item-row.active { background:#2a2618; outline:1px solid #8a7a40; }
       .m-item-row img, .m-item-row .item-sprite { width:24px; height:24px; object-fit:contain; flex:none; }
       .m-item-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
       .m-item-lv {
@@ -508,14 +475,14 @@ function renderMarketBrowse(body, p) {
         border-radius:3px; padding:0 4px; line-height:14px;
       }
       #m-detail { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
-      #m-detail-info { background:#14120e; border:1px solid #16140f; padding:8px; }
+      #m-detail-info { background:#24221e; border:1px solid #16140f; padding:8px; }
       #m-offer-list { flex:1; min-height:0; overflow:hidden; }
       .m-offer-cols { display:flex; gap:8px; height:100%; }
-      .m-offer-col { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; background:#14120e; border:1px solid #16140f; }
-      .m-offer-head { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid #2a2520; }
+      .m-offer-col { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; background:#24221e; border:1px solid #16140f; }
+      .m-offer-head { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid #3a372f; }
       .m-offer-title { flex:1; font-size:11px; font-weight:bold; letter-spacing:.4px; text-transform:uppercase; }
       .m-offer-head.buy .m-offer-title { color:#9ce84a; }
-      .m-offer-head.sell .m-offer-title { color:#ffd700; }
+      .m-offer-head.sell .m-offer-title { color:#ffe680; }
       .m-offer-scroll { flex:1; min-height:0; overflow-y:auto; padding:2px 4px 4px; }
       .m-offer-col .m-offers-table { table-layout:fixed; font-size:10px; }
       .m-offer-col .m-offers-table th, .m-offer-col .m-offers-table td { padding:4px 3px; }
@@ -525,7 +492,7 @@ function renderMarketBrowse(body, p) {
       .m-offer-col .m-th-total, .m-offer-col .m-td-total { width:82px; }
       .m-offer-col .m-th-time, .m-offer-col .m-td-time { width:44px; }
       .m-offer-col .m-th-action, .m-offer-col .m-td-action { width:64px; }
-      .m-empty { color:#7d7666; font-size:11px; padding:6px; }
+      .m-empty { color:#8a8270; font-size:11px; padding:6px; }
       @media (max-width: 940px) {
         #market-browse { flex-direction:column; }
         #m-side { width:100%; max-height:42%; }
@@ -677,7 +644,7 @@ function marketDetailHTML(it) {
       <div class="row" style="gap:8px;align-items:flex-start;margin-bottom:8px">
         <div style="position:relative">${itemImg(it.slug, 40, null, 1)}${it.tier ? `<span class="tier-badge" style="position:absolute;top:-4px;right:-4px;font-size:8px;height:14px;min-width:14px;line-height:12px">T${it.tier}</span>` : ""}</div>
         <div style="flex:1;min-width:0">
-          <div class="small" style="font-weight:bold;color:#ffd700">${it.name} ${tier}</div>
+          <div class="small" style="font-weight:bold;color:#ffe680">${it.name} ${tier}</div>
           <div class="tiny dim">${MARKET_CAT_LABEL[it.category] || it.category} · CID ${it.cid || 0}</div>
           ${attrs.length ? `<div class="tiny" style="color:#9ce84a">${attrs.join(" · ")}</div>` : ""}
           <div class="tiny">Preço base: <b>${fmtFull(price)}</b> gp</div>
@@ -801,32 +768,17 @@ function marketRenderItemOffers(p, slug, loading) {
     b.addEventListener("click", () => marketWithLock(b, async () => {
       const id = b.dataset.maccept;
       const oferta = (_mBrowseOffers.find((o) => o.id === Number(id))) || {};
-      if (!marketHaveInDepot(p, oferta.slug)) { toast("Você não tem esse item no Depot para vender"); return; }
-      const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name, qty: 1 });
-      if (!r.ok) { toast(r.msg || "Falha"); return; }
-      marketRemoveDepotItem(p, oferta.slug);
+      const naBag = (marketBagItems(p) || []).find((i) => i.slug === oferta.slug);
+      if (!naBag) { toast("Você não tem esse item na mochila para vender"); return; }
+      const r = await marketBuyOffer({ token: tok, offer_id: id, buyer_name: p.name,
+        qty: 1, inst_id: naBag.instId || undefined });
+      if (!r.ok) { toast(r.msg || "Falha"); marketApplyEscrowState(r.data); return; }
+      marketApplyEscrowState(r.data);
       if (Number.isFinite(Number(r.data.bank))) { _mBank = Number(r.data.bank); marketRefreshHeader(); }
       toast(`Vendeu <b>${marketItemName(oferta.slug)}</b> por ${fmtFull(r.data.total || r.data.price)} gp`, "level");
       marketLoadItemOffers(p, slug);
       renderAll && renderAll();
     })));
-}
-
-function marketHaveInDepot(p, slug) {
-  ensureForge(p);
-  return (p.depot || []).some((e) => forgeStoredSlug(p, e) === slug);
-}
-function marketRemoveDepotItem(p, slug) {
-  ensureForge(p);
-  const idx = (p.depot || []).findIndex((e) => forgeStoredSlug(p, e) === slug);
-  if (idx < 0) return false;
-  const entry = p.depot[idx];
-  p.depot.splice(idx, 1);
-  if (typeof entry === "string" === false && (typeof findItemInstance === "function")) {
-    const inst = findItemInstance(p, entry);
-    if (inst) { inst.loc = null; syncBagCountsFromInstances(p); }
-  }
-  return true;
 }
 
 /* Modal de "Oferecer compra" (buy offer). */
@@ -837,13 +789,13 @@ function renderMarketBuyOffer(body, p, preSlug) {
     <div class="small dim mb4">Oferecer um preço para comprar (buy offer)</div>
     <div class="row mb4" style="gap:6px">
       <input id="m-bo-slug" placeholder="nome do item (ex: fire sword)" value="${slugVal}"
-        style="flex:1;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        style="flex:1;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
     </div>
     <div class="row mb4" style="gap:6px">
       <label class="small dim">Preço unitário</label>
-      <input id="m-bo-price" type="number" min="1" value="${_mBuyPrice}" style="width:110px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      <input id="m-bo-price" type="number" min="1" value="${_mBuyPrice}" style="width:110px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
       <label class="small dim">Qtd</label>
-      <input id="m-bo-qty" type="number" min="1" value="${_mBuyQty}" style="width:60px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+      <input id="m-bo-qty" type="number" min="1" value="${_mBuyQty}" style="width:60px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
     </div>
     <div class="row mb4" style="gap:6px;align-items:center">
       <label class="toggle"><input type="checkbox" id="m-bo-anon" ${_mBuyAnon ? "checked" : ""}> Anônimo</label>
@@ -884,7 +836,7 @@ function renderMarketBuyOffer(body, p, preSlug) {
     if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Oferta casada automaticamente! Comprou por ${fmtFull(r.matched.price)} gp`, "level");
-      marketReceiveItem(p, slugTxt, 0, r.matched.qty || qty);
+      marketReceiveItem(p, slugTxt, Number(r.matched.tier) || 0, r.matched.qty || qty);
     } else {
       toast(`Oferta de compra criada (${fmtFull(total)} gp travados)`, "level");
     }
@@ -897,13 +849,13 @@ function renderMarketBuyOffer(body, p, preSlug) {
 /* -------------------------------------------------------------- VENDER */
 function renderMarketSell(body, p) {
   const tok = sessionToken();
-  // itens do DEPOT (regra oficial: vende do depot)
-  const itens = marketDepotItems(p);
+  // itens da MOCHILA de quem cria a oferta (o servidor verifica e retira)
+  const itens = marketBagItems(p);
   const sel = _mSel;
   const selItem = sel ? itens.find((i) => sel.instId ? i.instId === sel.instId : (i.from === sel.from && i.slug === sel.slug)) : null;
 
   body.innerHTML = `
-    <div class="small dim mb4">Venda itens do seu <b>Depot</b> (regra do Market).</div>
+    <div class="small dim mb4">Venda itens da sua <b>mochila</b> — o item sai da backpack de quem cria a oferta.</div>
     <div class="list mb4" style="max-height:260px" id="m-sell-items">
       ${itens.length ? itens.map((i) => {
         const isSel = selItem && ((sel.instId && i.instId === sel.instId) || (!sel.instId && !i.instId && i.slug === sel.slug));
@@ -911,9 +863,9 @@ function renderMarketSell(body, p) {
           <div style="position:relative">${itemImg(i.slug, 24, null, i.qty || 1)}
             ${i.tier ? `<span class="tier-badge" style="position:absolute;top:-2px;right:-2px;font-size:7px;height:11px;min-width:11px;line-height:10px">T${i.tier}</span>` : ""}</div>
           <div style="flex:1;min-width:0"><div class="small">${i.n}</div>
-            <div class="tiny dim">Depot · ${i.instId ? "único" : i.qty + "x"}${i.tier ? " · T" + i.tier : ""}</div></div>
+            <div class="tiny dim">Mochila · ${i.instId ? "único" : i.qty + "x"}${i.tier ? " · T" + i.tier : ""}</div></div>
         </div>`;
-      }).join("") : '<div class="tiny dim">Depot vazio — guarde itens no Depot (botão 📦) para vender.</div>'}
+      }).join("") : '<div class="tiny dim">Mochila vazia — coloque itens na backpack para vender.</div>'}
     </div>
     ${selItem ? `
       <div class="row mb4" style="gap:6px;align-items:center">
@@ -921,14 +873,14 @@ function renderMarketSell(body, p) {
       </div>
       <div class="row mb4" style="gap:6px">
         <label class="small dim">Preço unitário</label>
-        <input id="m-sell-price" type="number" min="1" value="${_mPrice}" style="width:110px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <input id="m-sell-price" type="number" min="1" value="${_mPrice}" style="width:110px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
         <label class="toggle" title="Cobrar em Tibia Coins"><input type="checkbox" id="m-sell-tc" ${_mPriceTc ? "checked" : ""}> TC</label>
         <label class="toggle" title="Não mostrar seu nome"><input type="checkbox" id="m-sell-anon" ${_mAnon ? "checked" : ""}> Anônimo</label>
       </div>
       <div class="tiny dim mb4" id="m-sell-fee"></div>
       <button class="primary full" id="m-sell-go">Vender no Market (30 dias)</button>
-    ` : '<div class="tiny dim">Escolha um item do Depot acima.</div>'}
-    <div class="tiny dim mt8">Oferta dura 30 dias · taxa de 2% (mín 20, máx 1M) paga da conta · ao expirar/cancelar o item volta ao Depot.</div>`;
+    ` : '<div class="tiny dim">Escolha um item da mochila acima.</div>'}
+    <div class="tiny dim mt8">Oferta dura 30 dias · taxa de 2% (mín 20, máx 1M) paga da conta · ao expirar/cancelar o item volta à mochila.</div>`;
 
   $$("#m-sell-items [data-sell-item]").forEach((row) =>
     row.addEventListener("click", () => {
@@ -937,7 +889,7 @@ function renderMarketSell(body, p) {
         instId: row.dataset.sellInst || null,
         qty: Number(row.dataset.sellQty || 1),
         tier: Number(row.dataset.sellTier || 0),
-        from: "depot",
+        from: "bag",
       };
       _mPrice = "";
       renderMarketSell(body, p);
@@ -960,13 +912,20 @@ function renderMarketSell(body, p) {
     const fee = marketFee(price);
     if (_mBank < fee) { toast("Ouro insuficiente na conta para a taxa (2%)"); return; }
     const qty = selItem.instId ? 1 : selItem.qty;
+    // inst local p/ refund legado (quando o servidor não devolve estado)
+    const instLocal = selItem.instId && typeof findItemInstance === "function"
+      ? findItemInstance(p, selItem.instId) : null;
     const r = await marketCreateOffer({
       token: tok, kind: "item", slug: selItem.slug, tier: selItem.tier || 0,
+      inst_id: selItem.instId || undefined,
       qty, price, price_tc: _mPriceTc ? 1 : 0,
       seller_name: _mAnon ? "Anônimo" : p.name,
     });
-    if (!r.ok) { toast(r.msg || "Falha ao vender"); return; }
-    marketRemoveForSale(p, { slug: selItem.slug, instId: selItem.instId, qty, tier: selItem.tier || 0, from: "depot" }, r.offer.id);
+    if (!r.ok) { toast(r.msg || "Falha ao vender"); marketApplyEscrowState(r.data); return; }
+    marketApplyEscrowState(r.data);
+    // o servidor já retirou o item da mochila; guarda só o registro de refund
+    _mPendingRefund[r.offer.id] = { slug: selItem.slug, inst: instLocal,
+      qty: (r.offer && r.offer.qty) || qty, to: "bag" };
     if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
     if (r.matched) {
       toast(`Vendido na hora por ${fmtFull(r.matched.price)} gp! (match automático)`, "level");
@@ -1008,10 +967,16 @@ function renderMarketMine(body, p) {
       b.addEventListener("click", () => marketWithLock(b, async () => {
         const id = b.dataset.mcancel;
         const r = await marketCancelOffer(tok, id);
-        if (!r.ok) { toast(r.msg || "Falha"); return; }
-        marketRefundItem(p, id);
+        if (!r.ok) { toast(r.msg || "Falha"); marketApplyEscrowState(r.data || r); return; }
+        // servidor devolveu o item à mochila? aplica o estado; senão, refund local
+        if (r.refunded || (r.data && (r.data.instance || r.data.bag))) {
+          marketApplyEscrowState(r.data || r);
+          delete _mPendingRefund[id];
+        } else {
+          marketRefundItem(p, id);
+        }
         if(Number.isFinite(Number(r.bank))){_mBank=Number(r.bank);marketRefreshHeader();}
-        toast("Oferta cancelada — devolvido", "level");
+        toast("Oferta cancelada — devolvido à mochila", "level");
         renderMarket();
         renderAll && renderAll();
       })));
@@ -1044,9 +1009,9 @@ function renderMarketCoins(body, p) {
     cb.innerHTML = `
       <div class="small dim mb4">Vender Tibia Coins (por gold)</div>
       <div class="row mb4" style="gap:6px">
-        <input id="m-c-sell-qty" type="number" min="1" placeholder="Qtd TC" value="${_mCoinsQty}" style="width:90px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <input id="m-c-sell-qty" type="number" min="1" placeholder="Qtd TC" value="${_mCoinsQty}" style="width:90px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
         <span class="tiny dim">TC por</span>
-        <input id="m-c-sell-price" type="number" min="1" placeholder="gp total" value="${_mCoinsPrice}" style="width:110px;padding:3px 6px;background:#14120e;color:#c8c0a8;border:1px solid #16140f">
+        <input id="m-c-sell-price" type="number" min="1" placeholder="gp total" value="${_mCoinsPrice}" style="width:110px;padding:3px 6px;background:#1c1a16;color:#c8c0a8;border:1px solid #3a372f">
         <span class="tiny dim">gp</span>
       </div>
       <div class="row mb4" style="gap:6px;align-items:center">

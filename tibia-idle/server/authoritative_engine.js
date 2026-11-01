@@ -7956,6 +7956,7 @@ module.exports={initializeAuthority,materializeAuthority,advanceAuthorityState,p
   ensurePlayerCapacity,DEFAULT_PLAYER_CAP,
   CURRENCY_GOLD,
   shareAccountGoldWallets,sharePartyCapacity,sellAuthAllPouch,sellAuthPouchItem,sellAuthAllBag,sellAuthBagItem,destroyAuthPouchItem,destroyAuthBagItem,setAuthAutoSupplyStash,setAuthLootConfig,
+  authItemNeedsBagInstance,authSyncBagCountsFromInstances,
   ensureLootConfig,isAuthNoCollect,isAuthNoSell,tryAuthAutoSell,
   moveLootPouchToBag,moveBagToPouchAuth,authAddItemToBag,
   tryHaste,tryBuff,tryCureCondition,hasteActive,HASTEDATA,BUFFS,CHARMS,

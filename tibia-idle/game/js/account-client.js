@@ -2190,14 +2190,28 @@ function accountApplyServerBalances(data){
 
 /* ------------------------------ MARKET P2P ------------------------------ */
 
+/* Injeta char_id + lease + instância nos bodies do market — as rotas de
+ * venda/aceite/cancelamento mutam a mochila do personagem no servidor. */
+function marketAugmentAuthBody(body){
+  const b=Object.assign({},body||{});
+  const cid=(typeof sessionCharId==="function")?Number(sessionCharId()||0):0;
+  if(cid>0&&!b.char_id)b.char_id=cid;
+  if(typeof onlineAuthorityCombat==="function"&&onlineAuthorityCombat()&&
+     typeof ACCOUNT_INSTANCE!=="undefined"&&ACCOUNT_INSTANCE.id&&ACCOUNT_INSTANCE.status==="active"){
+    if(!b.instance_id)b.instance_id=ACCOUNT_INSTANCE.id;
+    if(b.expected_version==null)b.expected_version=ACCOUNT_INSTANCE.version;
+  }
+  return Object.assign(b,accountLeaseFields());
+}
+
 /* Cria oferta de venda (item ou Tibia Coins).
  * body: { token, kind, slug?, tier?, data?, qty?, price, price_tc?, days?,
- *        seller_name? } */
+ *        seller_name?, char_id?, inst_id? } */
 async function marketCreateOffer(body) {
-  const r = await _api("POST", "/api/market/offers", body);
+  const r = await _api("POST", "/api/market/offers", marketAugmentAuthBody(body));
   if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,offer:r.data.offer,matched:r.data.matched,
-    bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg||"Falha ao criar oferta"};
+    bank:r.data.bank,coinBalance:r.data.coinBalance,data:r.data};}
+  return {ok:false,msg:r.data.msg||"Falha ao criar oferta",data:r.data};
 }
 
 /* Lista ofertas ativas. filtro: { kind?, tier?, slug? } */
@@ -2217,19 +2231,21 @@ async function marketMineOffers(token) {
   return r.data.ok ? { ok: true, offers: r.data.offers } : { ok: false, msg: r.data.msg };
 }
 
-/* Compra uma oferta. body: { token, offer_id, buyer_name? } */
+/* Compra uma oferta. body: { token, offer_id, buyer_name?, inst_id? }
+ * (aceitar ordem de compra = vender item da própria mochila, no servidor) */
 async function marketBuyOffer(body) {
-  const r = await _api("POST", "/api/market/buy", body);
+  const r = await _api("POST", "/api/market/buy", marketAugmentAuthBody(body));
   if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,data:r.data};}
-  return {ok:false,msg:r.data.msg||"Falha na compra"};
+  return {ok:false,msg:r.data.msg||"Falha na compra",data:r.data};
 }
 
-/* Cancela oferta. body: { token } */
+/* Cancela oferta. body: { token } — o item volta à mochila (char_id+lease). */
 async function marketCancelOffer(token, offerId) {
-  const r = await _api("DELETE", "/api/market/offers/" + offerId, { token });
-  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,refundCoins:r.data.refundCoins||0,
-    refundGold:r.data.refundGold||0,bank:r.data.bank,coinBalance:r.data.coinBalance};}
-  return {ok:false,msg:r.data.msg};
+  const r = await _api("DELETE", "/api/market/offers/" + offerId, marketAugmentAuthBody({ token }));
+  if(r.data.ok){accountApplyServerBalances(r.data);return {ok:true,refunded:!!r.data.refunded,
+    refundCoins:r.data.refundCoins||0,refundGold:r.data.refundGold||0,
+    bank:r.data.bank,coinBalance:r.data.coinBalance,data:r.data};}
+  return {ok:false,msg:r.data.msg,data:r.data};
 }
 
 /* Coleta o gold pendente de vendas do market. */

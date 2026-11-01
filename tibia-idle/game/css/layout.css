@@ -1551,21 +1551,38 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 #hunts-modal-list .hunt-modal-card .info .nm { color:#e8dfd0; }
 #hunts-modal-list .hunt-modal-card .meta { color:#a8a090; }
 
-/* Tabelas de ofertas do Market (Sell/Buy offers) */
+/* Tabelas de ofertas do Market (Sell/Buy offers) — paleta .ranking-table (CIDADE) */
 .m-offers-table { width:100%; border-collapse:collapse; font-size:11px; }
-.m-offers-table th { text-align:left; padding:5px 4px; background:#2a2520; color:#d4af37; border-bottom:1px solid #4a3f2e; }
-.m-offers-table td { padding:5px 4px; border-bottom:1px solid #2a2520; color:#e8dfd0; vertical-align:middle; }
-.m-offers-table tr:hover { background:rgba(255,255,255,.05); }
+.m-offers-table th { text-align:left; padding:5px 4px; background:#1c1a16; color:#a89f88; border-bottom:1px solid #3a372f; }
+.m-offers-table td { padding:5px 4px; border-bottom:1px solid #2a2822; color:#d8d0bc; vertical-align:middle; }
+.m-offers-table tr:hover { background:rgba(255,255,255,.03); }
 .m-th-seller, .m-td-seller { width:120px; min-width:90px; }
 .m-th-qty, .m-td-qty { width:40px; text-align:center; }
 .m-th-price, .m-td-price, .m-th-total, .m-td-total { width:85px; text-align:right; }
 .m-th-time, .m-td-time { width:60px; text-align:center; }
 .m-th-action, .m-td-action { width:60px; text-align:center; }
 #m-offer-list { display:flex; flex-direction:column; gap:8px; flex:1; }
+/* Abas no padrão da CIDADE (.ranking-tabs): faixa escura + botões quadrados
+ * #1c1a16/#4b493e, ativa em dourado — usado pelo Market e por Detalhes do
+ * personagem. */
 .market-tabs {
   display:flex; gap:4px; flex-wrap:wrap;
-  padding:5px; margin-bottom:6px;
-  background:#14120e; border:1px solid #16140f;
+  padding:4px 6px; margin-bottom:6px;
+  background:#24221e; border:1px solid #16140f;
+}
+.market-tabs button, .market-tabs .sm {
+  min-height:26px; padding:3px 10px; font:bold 11px Verdana,sans-serif;
+  letter-spacing:.3px; text-shadow:none;
+  background:#1c1a16; border:1px solid #4b493e; color:#c8c0a8;
+}
+.market-tabs button:hover:not(:disabled) {
+  background:#1c1a16; color:#fff; border-color:#6a6558;
+}
+.market-tabs button.primary, .market-tabs .sm.primary {
+  background:#2a2618; border-color:#8a7a40; color:#ffe680;
+}
+.market-tabs button.primary:hover:not(:disabled) {
+  background:#2a2618; color:#ffe680;
 }
 
 .modal-bg .modal.bosses-modal-shell,

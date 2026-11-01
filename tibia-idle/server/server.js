@@ -50,7 +50,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   rewardChestEnsure, rewardChestClaimOne, rewardChestClaimBundle, rewardChestClaimAll,
   sellAuthAllPouch, sellAuthPouchItem, sellAuthAllBag, sellAuthBagItem, destroyAuthPouchItem, openAuthBagYouDesire, setAuthAutoSupplyStash, setAuthLootConfig,
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
-  destroyAuthBagItem,
+  destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authAddItemToBag,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createQuestController, QUEST_DEFS } = require("./quest_controller");
@@ -3700,8 +3700,9 @@ async function verifyEmailCode(db, body) {
 /* ====================== REGRAS OFICIAIS DO MARKET ======================
  * (manual do Tibia, secao 4.3.3 The Market)
  *  - fee de 2% ao criar oferta (mín 20 gp, máx 1.000.000), pago do banco;
- *  - ofertas duram 30 dias (item volta pro depot/inbox, dinheiro pro banco);
- *  - vendedor usa itens do DEPOT; comprador recebe no depot/inbox;
+ *  - ofertas duram 30 dias (item volta para a mochila, dinheiro pro banco);
+ *  - vendedor usa itens da MOCHILA (escrow autoritativo); comprador recebe
+ *    no depot compartilhado da conta (mesmo offline);
  *  - buy offers: quem quer comprar deixa oferta com o preço que paga;
  *  - MATCH AUTOMATICO: ao criar oferta, se existir contra-oferta compativel
  *    (sell <= buy) a venda acontece na hora;
@@ -3714,6 +3715,150 @@ async function marketBalances(db,accountId){const account=await db.findAccountBy
 /* Fee de 2% (mín 20, máx 1.000.000) */
 function marketFee(price) {
   return Math.max(20, Math.min(1000000, Math.round(price * 0.02)));
+}
+
+/* ---- escrow do item na MOCHILA de quem cria a oferta ----
+ * A oferta de venda sai da backpack do personagem (verificação autoritativa):
+ * instâncias (equips com tier/imb) removem 1 instId; stacks removem `qty`.
+ * Retorna {qty, tier} realmente removido, ou {error} quando não há na mochila. */
+function marketTakeFromBag(p, slug, instId, qty) {
+  if (!p || !slug) return { error: "Item inválido" };
+  p.bag = p.bag || {};
+  p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
+  if (authItemNeedsBagInstance(slug)) {
+    const want = instId ? String(instId) : null;
+    const inst = p.itemInstances.find((i) => i && i.loc === "bag" &&
+      String(i.slug) === String(slug) && (!want || String(i.id) === want));
+    if (!inst) return { error: "Item não encontrado na mochila do personagem" };
+    const tier = Math.max(0, Math.floor(Number(inst.tier) || 0));
+    p.itemInstances = p.itemInstances.filter((i) => i !== inst);
+    p.bag[slug] = Math.max(0, (Number(p.bag[slug]) || 0) - 1);
+    if (!p.bag[slug]) delete p.bag[slug];
+    return { qty: 1, tier };
+  }
+  const have = Math.max(0, Math.floor(Number(p.bag[slug]) || 0));
+  const take = Math.min(have, Math.max(1, Math.floor(Number(qty) || 1)));
+  if (take <= 0) return { error: "Item não encontrado na mochila do personagem" };
+  p.bag[slug] -= take;
+  if (p.bag[slug] <= 0) delete p.bag[slug];
+  return { qty: take, tier: 0 };
+}
+
+/* Devolve o item à mochila (cancelamento de oferta). Instâncias voltam com o
+ * tier guardado na oferta; stacks usam a regra normal de capacidade. */
+function marketPutBackBagItem(p, slug, qty, tier) {
+  if (!p || !slug) return { error: "Item inválido" };
+  qty = Math.max(1, Math.floor(Number(qty) || 1));
+  p.bag = p.bag || {};
+  p.itemInstances = Array.isArray(p.itemInstances) ? p.itemInstances : [];
+  if (authItemNeedsBagInstance(slug)) {
+    for (let i = 0; i < qty; i++) {
+      p.itemInstances.push({
+        id: "srv-" + Date.now().toString(36) + "-" +
+          Math.floor(Math.random() * 1e6).toString(36) + "-" + i,
+        slug, loc: "bag", tier: Math.max(0, Math.floor(Number(tier) || 0)),
+      });
+      p.bag[slug] = (Number(p.bag[slug]) || 0) + 1;
+    }
+    return { qty };
+  }
+  if (!authAddItemToBag(p, slug, qty))
+    return { error: "Mochila sem espaço para devolver o item" };
+  return { qty };
+}
+
+/* Muta a mochila do personagem pelo caminho autoritativo (mesmo de bag-sell):
+ * instância ativa → instancePatchState; cidade → loadCityPlayer+persist. */
+async function marketMutateBag(db, acc, character, body, mutate, source) {
+  const lease = { holderId: String(body.holder_id), secretHash: leaseHash(body.lease_token), now: Date.now() };
+  const resolved = await resolveInstanceRow(db, acc, character.id);
+  if (resolved.error) return resolved.error;
+  const row = resolved.row;
+  if (row && row.status === "active") {
+    const expected = Number(body.expected_version), instanceId = String(body.instance_id || "");
+    if (!Number.isSafeInteger(expected) || expected < 1 || !/^[a-f0-9]{64}$/.test(instanceId))
+      return { code: 400, body: { ok: false, error: "INVALID_MARKET_SELL",
+        msg: "Instância inválida para operação do market" } };
+    if (String(row.instance_id) !== instanceId)
+      return { code: 409, body: { ok: false, error: "INSTANCE_NOT_ACTIVE",
+        msg: "Instância ativa não encontrada" } };
+    let rejection = null, output = null;
+    const result = await db.instancePatchState(row.account_id, acc.id, instanceId, expected, (serialized) => {
+      let descriptor = null;
+      try { descriptor = typeof serialized === "string" ? JSON.parse(serialized) : cloneJson(serialized); }
+      catch (e) { return null; }
+      const item = descriptor.authority && descriptor.authority.players &&
+        descriptor.authority.players.find((e) => String(e.id) === String(character.id));
+      if (!item || !item.p) { rejection = "Personagem não participa desta instância"; return null; }
+      const r = mutate(item.p);
+      if (!r || r.error) { rejection = (r && r.error) || "Item não encontrado na mochila"; return null; }
+      output = r;
+      descriptor = materializeAuthority(descriptor);
+      return JSON.stringify(descriptor);
+    }, lease);
+    if (!result.ok)
+      return { code: result.error === "LEASE_REQUIRED" ? 423 : result.error === "INSTANCE_PATCH_REJECTED" ? 400 : 409,
+        body: { ok: false, error: result.error, msg: rejection || "Não foi possível atualizar a mochila",
+          instance: instanceSummary(result.instance, true) } };
+    await publishInstanceForRow(db, result.instance, { id: result.instance.instance_id,
+      version: Number(result.instance.version), status: result.instance.status,
+      source: source || "market-bag", holderId: String(body.holder_id || "") });
+    return { ok: true, output, extra: { instance: instanceSummary(result.instance, true) } };
+  }
+  let p = await loadCityPlayer(db, acc, character);
+  const r = mutate(p);
+  if (!r || r.error)
+    return { code: 400, body: { ok: false, error: "MARKET_BAG",
+      msg: (r && r.error) || "Item não encontrado na mochila" } };
+  const persisted = await persistClaimedPlayer(db, acc, character, p, lease);
+  if (persisted.code !== 200) return persisted;
+  return { ok: true, output: r, extra: { bag: p.bag || {},
+    itemInstances: p.itemInstances || [], saveVersion: persisted.body.saveVersion,
+    character: persisted.body.character } };
+}
+
+/* Entrega um item comprado no DEPOT compartilhado da conta do comprador —
+ * funciona com o comprador offline (o cliente do próprio comprador aplica o
+ * item via `marketReceiveItem` quando ele mesmo compra; isto cobre o caso em
+ * que a contra-parte da oferta não é quem disparou a request). */
+async function marketDeliverToDepot(db, accountId, slug, tier, qty) {
+  if (!slug || !SharedInv || typeof db.accountSharedInventory !== "function" ||
+      typeof db.setAccountSharedInventory !== "function") return false;
+  const shared = await db.accountSharedInventory(accountId);
+  shared.depot = Array.isArray(shared.depot) ? shared.depot : [];
+  shared.itemInstances = Array.isArray(shared.itemInstances) ? shared.itemInstances : [];
+  qty = Math.max(1, Math.floor(Number(qty) || 1));
+  if (authItemNeedsBagInstance(slug)) {
+    for (let i = 0; i < qty; i++) {
+      shared.seq = (Number(shared.seq) || 0) + 1;
+      const inst = { id: "mk-" + shared.seq.toString(36) + "-" + i,
+        slug, loc: "depot", tier: Math.max(0, Math.floor(Number(tier) || 0)) };
+      shared.itemInstances.push(inst);
+      shared.depot.push(inst.id);
+    }
+  } else {
+    for (let i = 0; i < qty; i++) shared.depot.push(slug);
+  }
+  await db.setAccountSharedInventory(accountId, shared);
+  publishSync(accountId, "character", { action: "market-delivery", slug, qty });
+  return true;
+}
+
+/* Valida token + lease + posse do personagem para operações de mochila. */
+async function marketBagActor(db, body) {
+  const acc = await db.findAccountByToken(body.token);
+  if (!acc) return { error: { code: 401, body: { ok: false, msg: "Sessão inválida" } } };
+  const denied = await requireLease(db, acc, body);
+  if (denied) return { error: denied };
+  const charId = Number(body.char_id);
+  if (!Number.isSafeInteger(charId) || charId <= 0)
+    return { error: { code: 400, body: { ok: false, error: "MARKET_CHAR",
+      msg: "Personagem inválido para o market" } } };
+  const character = await db.findCharacter(charId);
+  if (!character || Number(character.account_id) !== Number(acc.id))
+    return { error: { code: 403, body: { ok: false, error: "MARKET_CHAR_NOT_OWNED",
+      msg: "Personagem não pertence à conta" } } };
+  return { acc, character };
 }
 
 /* Cria uma oferta (venda de item/TC, ou COMPRA de item). */
@@ -3737,6 +3882,8 @@ async function marketCreate(db, body, charName) {
   if (!feePago) return { code: 400, body: { ok: false, msg: "Ouro insuficiente na conta para a taxa (2%)" } };
 
   // ---- pagamentos/travas conforme o tipo ----
+  let escrow = null; // estado extra p/ o cliente reconciliar (instância/bag)
+  let offerQty = qty, offerTier = Math.max(0, Math.floor(Number(body.tier) || 0));
   if (kind === "coins") {
     if (qty > (acc.coins || 0)) {
       await db.refundMarketFee(acc.id, fee);
@@ -3753,7 +3900,20 @@ async function marketCreate(db, body, charName) {
     }
     if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
   } else {
-    if (!body.slug) return { code: 400, body: { ok: false, msg: "Item inválido" } };
+    if (!body.slug) {
+      await db.refundMarketFee(acc.id, fee);
+      return { code: 400, body: { ok: false, msg: "Item inválido" } };
+    }
+    // ---- escrow: o item sai da MOCHILA do personagem que cria a oferta ----
+    const actor = await marketBagActor(db, body);
+    if (actor.error) { await db.refundMarketFee(acc.id, fee); return actor.error; }
+    const debit = await marketMutateBag(db, acc, actor.character, body,
+      (p) => marketTakeFromBag(p, String(body.slug), body.inst_id ? String(body.inst_id) : null, qty),
+      "market-sell");
+    if (debit.code) { await db.refundMarketFee(acc.id, fee); return debit; }
+    offerQty = debit.output.qty;
+    offerTier = debit.output.tier;
+    escrow = debit.extra || null;
   }
 
   // duração fixa: 30 dias (regra oficial)
@@ -3763,9 +3923,9 @@ async function marketCreate(db, body, charName) {
     seller_name: charName || acc.login,
     kind,
     slug: (kind === "item" || kind === "buy") ? body.slug : null,
-    tier: Math.max(0, Math.floor(Number(body.tier) || 0)),
+    tier: offerTier,
     data: (kind === "item" || kind === "buy") ? (body.data || null) : null,
-    qty,
+    qty: offerQty,
     price,
     price_tc: body.price_tc ? 1 : 0,
     expires_at: expires,
@@ -3773,7 +3933,7 @@ async function marketCreate(db, body, charName) {
 
   // ---- MATCH AUTOMATICO: casa com contra-oferta existente ----
   const matched = await marketTryMatch(db, offer, acc, charName),balances=await marketBalances(db,acc.id);
-  return { code: 201, body: Object.assign({ ok: true, offer, fee, matched },balances) };
+  return { code: 201, body: Object.assign({ ok: true, offer, fee, matched },balances,escrow||{}) };
 }
 
 /* Tenta casar uma oferta nova com contra-ofertas ativas.
@@ -3797,13 +3957,15 @@ async function marketTryMatch(db, nova, acc, charName) {
   // registra a venda nas stats
   await db.recordSale(slug, tier, melhor.price);
   if (isSell) {
-    // vendedor (nova) recebe no banco; comprador (melhor) recebe o item
+    // vendedor (nova) recebe no banco; comprador (melhor) recebe o item —
+    // entrega server-side no depot compartilhado (pode estar offline)
     await db.addAccountMarketGold(acc.id, valor);
-    return { mode: "sell-matched", qty: q, price: melhor.price, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+    await marketDeliverToDepot(db, melhor.seller_id, slug, tier, q);
+    return { mode: "sell-matched", qty: q, price: melhor.price, tier, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
   } else {
     // comprador (nova) recebe o item; vendedor (melhor) recebe no banco
     await db.addAccountMarketGold(melhor.seller_id, valor);
-    return { mode: "buy-matched", qty: q, price: melhor.price, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
+    return { mode: "buy-matched", qty: q, price: melhor.price, tier: melhor.tier || 0, against: melhor.seller_name || melhor.seller_id, fee: marketFee(nova.price) };
   }
 }
 
@@ -3858,14 +4020,24 @@ async function marketBuyUnlocked(db, body, actorName) {
   if (offer.expires_at && new Date(offer.expires_at).getTime() < Date.now())
     return { code: 410, body: { ok: false, msg: "Oferta expirada" } };
 
-  const qty = Math.min(offer.qty, Math.max(1, Math.floor(Number(body.qty) || offer.qty)));
-  const valor = offer.price * qty;
+  let qty = Math.min(offer.qty, Math.max(1, Math.floor(Number(body.qty) || offer.qty)));
 
   if (offer.kind === "buy") {
     // -------- ACEITAR OFERTA DE COMPRA: quem aceita VENDE -------
+    // o item sai da MOCHILA de quem aceita (mesmo escrow da venda);
     // o dinheiro da oferta já está travado no banco do comprador (seller_id)
     // -> credita ao vendedor (actor) e "entrega" o item
+    const actor = await marketBagActor(db, body);
+    if (actor.error) return actor.error;
+    const debit = await marketMutateBag(db, acc, actor.character, body,
+      (p) => marketTakeFromBag(p, offer.slug, body.inst_id ? String(body.inst_id) : null, qty),
+      "market-accept-buy");
+    if (debit.code) return debit;
+    qty = debit.output.qty; // instâncias saem 1 por vez
+    const valor = offer.price * qty;
     await db.addAccountMarketGold(acc.id, valor);
+    // o item vai para o depot do dono da ordem de compra (pode estar offline)
+    await marketDeliverToDepot(db, offer.seller_id, offer.slug, offer.tier || 0, qty);
     await db.recordSale(offer.slug, offer.tier || 0, offer.price);
     // histórico de trade (v36: DB expandida)
     await db.addMarketHistory({
@@ -3889,11 +4061,12 @@ async function marketBuyUnlocked(db, body, actorName) {
         price: offer.price,
         total: valor,
         buyer_name: offer.seller_name,
-      },balances),
+      },balances,debit.extra||{}),
     };
   }
 
   // -------- COMPRA NORMAL (sell offer / TC) -------
+  const valor = offer.price * qty;
   if (offer.price_tc) {
     if ((acc.coins || 0) < valor)
       return { code: 400, body: { ok: false, msg: "Tibia Coins insuficientes" } };
@@ -3986,10 +4159,22 @@ async function marketCancelUnlocked(db, body, id) {
     return { code: 404, body: { ok: false, msg: "Oferta não encontrada" } };
   if (offer.status !== "active")
     return { code: 400, body: { ok: false, msg: "Oferta já finalizada" } };
-  await db.updateMarketOffer(offer.id, { status: "cancelled" });
   // devolve o que estava travado:
+  //  - oferta de venda de ITEM: item volta à mochila do dono (quando o cliente
+  //    informa char_id; o escrow foi tirado dela na criação)
   //  - oferta de venda de TC: TC de volta pra conta
   //  - oferta de COMPRA (buy): dinheiro de volta ao gold da conta
+  let escrow = null;
+  if (offer.kind === "item" && body.char_id) {
+    const actor = await marketBagActor(db, body);
+    if (actor.error) return actor.error;
+    const back = await marketMutateBag(db, acc, actor.character, body,
+      (p) => marketPutBackBagItem(p, offer.slug, offer.qty, offer.tier || 0),
+      "market-cancel");
+    if (back.code) return back; // mochila cheia etc. — oferta segue ativa
+    escrow = back.extra || null;
+  }
+  await db.updateMarketOffer(offer.id, { status: "cancelled" });
   if (offer.kind === "coins") {
     await db.updateCoins(acc.id, (acc.coins || 0) + offer.qty);
   } else if (offer.kind === "buy") {
@@ -4000,9 +4185,10 @@ async function marketCancelUnlocked(db, body, id) {
     code: 200,
     body: Object.assign({
       ok: true,
+      refunded: !!escrow,
       refundCoins: offer.kind === "coins" ? offer.qty : 0,
       refundGold: offer.kind === "buy" ? offer.price * offer.qty : 0,
-    },balances),
+    },balances,escrow||{}),
   };
 }
 
