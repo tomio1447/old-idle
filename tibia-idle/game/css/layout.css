@@ -1590,6 +1590,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.cidade-modal-shell,
 .modal-bg .modal.guild-modal-shell,
 .modal-bg .modal.ranking-modal-shell { width:min(920px,calc(100vw - 32px)); }
+.modal-bg .modal.social-modal-shell { width:min(560px,calc(100vw - 32px)); }
 .bosses-modal-title { display:flex; align-items:center; gap:7px; }
 .bosses-modal-title #bosses-modal-close { margin-left:auto; }
 .bosses-modal-title .bosses-megalomania-icon { transform:scale(1.1); margin:0 2px; }
@@ -1855,7 +1856,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quests-modal-shell,
 .modal-bg .modal.quest-detail-shell,
 .modal-bg .modal.quest-lobby-shell,
-.modal-bg .modal.quest-reward-shell {
+.modal-bg .modal.quest-reward-shell,
+.modal-bg .modal.social-modal-shell {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,.035) 1px 3px),linear-gradient(180deg,#4b4b49 0%,#30302f 100%);
   border:2px solid;
   border-color:#686868 #171717 #171717 #686868;
@@ -1873,7 +1875,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quests-modal-shell .panel-title,
 .modal-bg .modal.quest-detail-shell .panel-title,
 .modal-bg .modal.quest-lobby-shell .panel-title,
-.modal-bg .modal.quest-reward-shell .panel-title {
+.modal-bg .modal.quest-reward-shell .panel-title,
+.modal-bg .modal.social-modal-shell .panel-title {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 1px,rgba(0,0,0,.05) 1px 3px),#454543;
   border-bottom:2px solid #181818;
 }
@@ -1889,7 +1892,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quests-modal-shell .panel-body,
 .modal-bg .modal.quest-detail-shell .panel-body,
 .modal-bg .modal.quest-lobby-shell .panel-body,
-.modal-bg .modal.quest-reward-shell .panel-body {
+.modal-bg .modal.quest-reward-shell .panel-body,
+.modal-bg .modal.social-modal-shell .panel-body {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 1px,rgba(0,0,0,.04) 1px 4px),#393937;
 }
 
@@ -5449,32 +5453,65 @@ body.quest-lobby-open #party-panel { display:none !important; }
   background:#050605;border:1px solid #3a372f;cursor:crosshair}
 .spec-foot{margin-top:6px;text-align:center}
 
-/* ------- SOCIAL (friendlist — social.js) ------- */
+/* ------- SOCIAL (friendlist — social.js) — paleta da CIDADE ------- */
+.social-modal-title { display:flex; align-items:center; gap:7px; }
+.social-modal-title #social-modal-close { margin-left:auto; }
+.social-btn-icon {
+  display:inline-block; width:22px; height:22px; flex:0 0 22px;
+  background-image:url('../assets/item/friendship-amulet.png');
+  background-size:contain; background-repeat:no-repeat; background-position:center;
+  image-rendering:pixelated;
+}
+.social-modal-title .social-btn-icon { transform:scale(1.1); margin:0 2px; }
 .social-body { display:flex; flex-direction:column; gap:8px; }
 .social-search { position:relative; }
-.social-search input { width:100%; }
+.social-search input {
+  width:100%; background:rgba(10,8,6,.9); border:1px solid #5a4a32;
+  color:#e8dfd0; padding:5px 8px;
+}
+.social-search input:focus { border-color:#8a7a40; outline:none; }
 .social-search-results { position:absolute; left:0; right:0; top:100%; z-index:50;
   background:#1c1a16; border:1px solid #4b493e; border-top:0; max-height:180px; overflow-y:auto; }
 .social-search-row { display:flex; align-items:center; gap:8px; padding:5px 8px;
   border-bottom:1px solid #2a2822; }
 .social-search-row:last-child { border-bottom:0; }
-.social-search-row .social-row-name { flex:1; font-weight:bold; }
-.social-section-head { font-weight:bold; padding:4px 6px; letter-spacing:.06em; }
-.social-head-on { color:#8bd35a; }
-.social-head-off { color:#8a8676; }
-.social-section { border:1px solid #35322a; border-radius:4px; overflow:hidden; }
-.social-row { display:flex; align-items:center; gap:8px; padding:5px 8px; cursor:pointer;
-  border-top:1px solid #26241e; }
-.social-row:hover { background:#26241e; }
-.social-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+.social-search-row .social-row-name { flex:1; font-weight:bold; color:#ffe680; }
+.social-search-row button.social-add-btn {
+  background:#1c1a16; border:1px solid #4b493e; color:#c8c0a8;
+}
+.social-search-row button.social-add-btn:hover:not(:disabled) {
+  color:#ffe680; border-color:#8a7a40; background:#2a2618;
+}
+.social-search-row button.social-add-btn:disabled { color:#9ce84a; opacity:.8; }
+.social-lists { display:flex; flex-direction:column; gap:10px; }
+.social-table-wrap { overflow:auto; max-height:min(45vh,340px); border:1px solid #3a372f; }
+.social-table { width:100%; border-collapse:collapse; font-size:12px; color:#d8d0bc; }
+.social-table th, .social-table td {
+  padding:6px 8px; border-bottom:1px solid #2a2822; text-align:left;
+}
+.social-table th {
+  position:sticky; top:0; background:#1c1a16; color:#a89f88;
+  font-size:11px; letter-spacing:.4px; z-index:1;
+}
+.social-table th.social-head-on { color:#8bd35a; }
+.social-table th.social-head-off { color:#c8c0a8; }
+.social-table tbody tr.social-row { cursor:pointer; }
+.social-table tbody tr.social-row:hover { background:rgba(255,255,255,.03); }
+.social-td-dot { width:18px; }
+.social-dot { display:inline-block; width:8px; height:8px; border-radius:50%; }
 .social-dot.on { background:#6ee05a; box-shadow:0 0 4px #6ee05a; }
 .social-dot.off { background:#5a564a; }
-.social-row-main { flex:1; display:flex; flex-direction:column; line-height:1.25; }
-.social-tag { font-size:.72rem; padding:1px 6px; border-radius:3px; }
+.social-td-name { color:#ffe680; font-weight:700; }
+.social-td-voc { color:#a8c0d8; }
+.social-td-lvl { color:#9ce84a; font-weight:700; font-variant-numeric:tabular-nums; }
+.social-td-status { color:#8a8270; white-space:nowrap; }
+.social-status-on { color:#8bd35a; font-weight:700; }
+.social-status-off { color:#8a8270; }
+.social-tag { font-size:.72rem; padding:1px 6px; border-radius:3px; margin-left:4px; }
 .social-tag-hunt { background:#3d3320; color:#e8c66a; }
 .social-tag-lobby { background:#2b3a4d; color:#7fc4ff; }
 .social-tag-muted { background:#4d2b2b; color:#ff8f8f; }
-.social-empty { padding:8px; }
+.social-empty { padding:10px; text-align:center; color:#8a8270; }
 .social-foot { text-align:center; }
 .social-menu { position:fixed; z-index:100000; min-width:190px; background:#1c1a16;
   border:1px solid #6b5715; border-radius:4px; padding:3px; box-shadow:0 4px 14px rgba(0,0,0,.6); }

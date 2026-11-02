@@ -54,9 +54,14 @@ function socialAgo(ts) {
 function socialRenderShell() {
   const body = $("#modal-body");
   if (!body) return;
+  if (typeof clearCityModalShells === "function") clearCityModalShells(body);
+  body.classList.add("social-modal-shell");
   body.innerHTML = `
-    <div class="panel-title">👥 SOCIAL
-      <button class="sm" id="social-close" type="button">✕</button></div>
+    <div class="panel-title social-modal-title">
+      <span class="social-btn-icon" aria-hidden="true"></span>
+      <span>SOCIAL</span>
+      <button class="sm" id="social-modal-close" type="button">Fechar</button>
+    </div>
     <div class="panel-body social-body">
       <div class="social-search">
         <input id="social-search-input" type="text" maxlength="32"
@@ -64,9 +69,9 @@ function socialRenderShell() {
         <div id="social-search-results" class="social-search-results" hidden></div>
       </div>
       <div class="social-lists" id="social-lists"></div>
-      <div class="tiny dim social-foot">Atualiza a cada 10s enquanto aberto.</div>
+      <div class="tiny dim social-foot">Atualiza em tempo real enquanto aberto.</div>
     </div>`;
-  $("#social-close").onclick = socialClose;
+  $("#social-modal-close").onclick = socialClose;
   const input = $("#social-search-input");
   input.addEventListener("input", () => {
     clearTimeout(SOCIAL_UI.searchTimer);
@@ -160,23 +165,30 @@ function socialRenderLists() {
     if (f.inInstance) tags.push(`<span class="social-tag social-tag-hunt">em caçada</span>`);
     if (f.lobby) tags.push(`<span class="social-tag social-tag-lobby">lobby ${socialEsc(f.lobby)}</span>`);
     if (f.muted) tags.push(`<span class="social-tag social-tag-muted">mutado</span>`);
-    const sub = f.online
-      ? `${socialEsc(f.voc)} · nv ${Number(f.level) || 1}`
-      : `${socialEsc(f.voc)} · nv ${Number(f.level) || 1} · ${socialAgo(f.lastSeen)}`;
+    const status = f.online
+      ? `<span class="social-status-on">online</span>${tags.length ? " " + tags.join(" ") : ""}`
+      : `<span class="social-status-off">${socialAgo(f.lastSeen)}</span>${tags.length ? " " + tags.join(" ") : ""}`;
     return `
-      <div class="social-row" data-char="${Number(f.charId)}">
-        <span class="social-dot ${f.online ? "on" : "off"}"></span>
-        <span class="social-row-main">
-          <span class="social-row-name">${socialEsc(f.name)}</span>
-          <span class="tiny dim">${sub}</span>
-        </span>
-        ${tags.join("")}
-      </div>`;
+      <tr class="social-row" data-char="${Number(f.charId)}">
+        <td class="social-td-dot"><span class="social-dot ${f.online ? "on" : "off"}"></span></td>
+        <td class="social-td-name">${socialEsc(f.name)}</td>
+        <td class="social-td-voc">${socialEsc(f.voc)}</td>
+        <td class="social-td-lvl">${Number(f.level) || 1}</td>
+        <td class="social-td-status">${status}</td>
+      </tr>`;
   };
   const section = (title, cls, rows, emptyTxt) => `
-    <div class="social-section">
-      <div class="social-section-head ${cls}">${title} <span class="tiny dim">(${rows.length})</span></div>
-      ${rows.length ? rows.map(rowHtml).join("") : `<div class="social-empty tiny dim">${emptyTxt}</div>`}
+    <div class="social-table-wrap">
+      <table class="social-table">
+        <thead><tr>
+          <th colspan="2" class="${cls}">${title} <span class="dim">(${rows.length})</span></th>
+          <th>VOC</th><th>NV</th><th>STATUS</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length ? rows.map(rowHtml).join("")
+            : `<tr><td colspan="5" class="social-empty tiny dim">${emptyTxt}</td></tr>`}
+        </tbody>
+      </table>
     </div>`;
   root.innerHTML =
     section("ONLINE", "social-head-on", online, "Nenhum amigo online.") +
@@ -315,7 +327,7 @@ function socialOpen() {
   $("#modal").classList.add("show");
   socialRefresh();
   clearInterval(SOCIAL_UI.pollTimer);
-  SOCIAL_UI.pollTimer = setInterval(socialRefresh, 10000);
+  SOCIAL_UI.pollTimer = setInterval(socialRefresh, 3000);
 }
 
 function socialClose() {
@@ -325,6 +337,8 @@ function socialClose() {
   socialCloseMenu();
   const modal = document.getElementById("modal");
   if (modal) modal.classList.remove("show");
+  const body = document.getElementById("modal-body");
+  if (body) body.classList.remove("social-modal-shell");
 }
 
 /* O mute precisa valer mesmo sem abrir o modal: carrega a lista uma vez
