@@ -123,6 +123,8 @@ function JsonStore() {
   this.bans = Array.isArray(this._load("bans.json", [])) ? this._load("bans.json", []) : [];
   // Silenciamentos de chat persistem em data/chat_mutes.json (restarts não limpam)
   this.chatMutes = Array.isArray(this._load("chat_mutes.json", [])) ? this._load("chat_mutes.json", []) : [];
+  // Eventos do calendário global em data/calendar_events.json
+  this.calendarEvents = Array.isArray(this._load("calendar_events.json", [])) ? this._load("calendar_events.json", []) : [];
   this._storeOrderSeq = this.storeOrders.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   this._coinLedgerSeq = this.coinLedger.reduce((m, o) => Math.max(m, Number(o.id) || 0), 0);
   // Cap histórico inchado de runs anteriores antes do primeiro _save do boot.
@@ -195,6 +197,39 @@ JsonStore.prototype.chatMuteDelete = function (accountId) {
   this.chatMutes = (this.chatMutes || []).filter((x) => Number(x.accountId) !== Number(accountId));
   if (this.chatMutes.length !== before) this._saveChatMutes();
   return before - this.chatMutes.length;
+};
+
+/* ------------------------- CALENDÁRIO GLOBAL (eventos/metas) -----------
+ * day = "YYYY-MM-DD". kind: "evento" | "meta". Escrita só via admin. */
+JsonStore.prototype._saveCalendar = function () {
+  fs.writeFileSync(path.join(DATA_DIR, "calendar_events.json"),
+    JSON.stringify(this.calendarEvents || [], null, 1));
+};
+JsonStore.prototype.calendarList = function () {
+  return (this.calendarEvents || []).slice()
+    .sort((a, b) => String(a.day).localeCompare(String(b.day)) || Number(a.id) - Number(b.id));
+};
+JsonStore.prototype.calendarAdd = function (ev) {
+  const row = { id: this._nextId(this.calendarEvents),
+    day: String(ev.day || "").slice(0, 10), title: String(ev.title || "").slice(0, 80),
+    body: String(ev.body || "").slice(0, 500), kind: ev.kind === "meta" ? "meta" : "evento",
+    created_by: String(ev.created_by || "admin"), created_at: Date.now() };
+  this.calendarEvents.push(row); this._saveCalendar(); return row;
+};
+JsonStore.prototype.calendarUpdate = function (id, ev) {
+  const row = (this.calendarEvents || []).find((x) => Number(x.id) === Number(id));
+  if (!row) return null;
+  if (ev.day != null) row.day = String(ev.day).slice(0, 10);
+  if (ev.title != null) row.title = String(ev.title).slice(0, 80);
+  if (ev.body != null) row.body = String(ev.body).slice(0, 500);
+  if (ev.kind != null) row.kind = ev.kind === "meta" ? "meta" : "evento";
+  this._saveCalendar(); return row;
+};
+JsonStore.prototype.calendarDelete = function (id) {
+  const before = (this.calendarEvents || []).length;
+  this.calendarEvents = (this.calendarEvents || []).filter((x) => Number(x.id) !== Number(id));
+  if (this.calendarEvents.length !== before) this._saveCalendar();
+  return before - this.calendarEvents.length;
 };
 JsonStore.prototype._pruneSnapshots = function () {
   const list = Array.isArray(this.snapshots) ? this.snapshots : [];
@@ -2946,6 +2981,36 @@ async function MysqlStore() {
       const result = await this.run("DELETE FROM chat_mutes WHERE account_id=?", [Number(accountId)]);
       return result.affectedRows || 0;
     },
+    /* Calendário global — um evento por linha, escrita só via admin. */
+    async calendarList() {
+      return this.query(
+        "SELECT id, DATE_FORMAT(day,'%Y-%m-%d') AS day, title, body, kind, created_by, created_at FROM calendar_events ORDER BY day ASC, id ASC");
+    },
+    async calendarAdd(ev) {
+      const result = await this.run(
+        "INSERT INTO calendar_events (day,title,body,kind,created_by,created_at) VALUES (?,?,?,?,?,?)",
+        [String(ev.day || "").slice(0, 10), String(ev.title || "").slice(0, 80),
+         String(ev.body || "").slice(0, 500), ev.kind === "meta" ? "meta" : "evento",
+         String(ev.created_by || "admin"), Date.now()]);
+      return { id: result.insertId, day: String(ev.day || "").slice(0, 10),
+        title: String(ev.title || ""), body: String(ev.body || ""),
+        kind: ev.kind === "meta" ? "meta" : "evento" };
+    },
+    async calendarUpdate(id, ev) {
+      const sets = [], vals = [];
+      if (ev.day != null) { sets.push("day=?"); vals.push(String(ev.day).slice(0, 10)); }
+      if (ev.title != null) { sets.push("title=?"); vals.push(String(ev.title).slice(0, 80)); }
+      if (ev.body != null) { sets.push("body=?"); vals.push(String(ev.body).slice(0, 500)); }
+      if (ev.kind != null) { sets.push("kind=?"); vals.push(ev.kind === "meta" ? "meta" : "evento"); }
+      if (!sets.length) return null;
+      vals.push(Number(id));
+      const result = await this.run(`UPDATE calendar_events SET ${sets.join(",")} WHERE id=?`, vals);
+      return result.affectedRows ? { id: Number(id) } : null;
+    },
+    async calendarDelete(id) {
+      const result = await this.run("DELETE FROM calendar_events WHERE id=?", [Number(id)]);
+      return result.affectedRows || 0;
+    },
     /* Instâncias ativas com nomes de membros — alimenta a aba RAID do admin. */
     async instanceListActive() {
       const rows = await this.query(
@@ -4745,6 +4810,17 @@ async function ensureSchema(pool) {
     reason VARCHAR(300) NOT NULL DEFAULT '',
     char_name VARCHAR(40) NOT NULL DEFAULT '',
     at BIGINT UNSIGNED NOT NULL DEFAULT 0
+  ) ENGINE=InnoDB`);
+  /* Calendário global — eventos/metas por dia, editáveis por admin. */
+  await pool.query(`CREATE TABLE IF NOT EXISTS calendar_events (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    day DATE NOT NULL,
+    title VARCHAR(80) NOT NULL DEFAULT '',
+    body VARCHAR(500) NOT NULL DEFAULT '',
+    kind ENUM('evento','meta') NOT NULL DEFAULT 'evento',
+    created_by VARCHAR(80) NOT NULL DEFAULT 'admin',
+    created_at BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    INDEX idx_calendar_day (day)
   ) ENGINE=InnoDB`);
   await pool.query(`CREATE TABLE IF NOT EXISTS account_leases (
     account_id INT UNSIGNED PRIMARY KEY,

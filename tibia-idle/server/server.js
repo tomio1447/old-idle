@@ -4556,6 +4556,32 @@ async function adminInstancesList(db,token){
   return {code:200,body:{ok:true,instances:list}};
 }
 
+/* Calendário global — GET público; escrita exige role=admin.
+ * action: "add" (day/title/body/kind), "update" (id + campos), "delete" (id). */
+async function adminCalendarWrite(db,body){
+  const auth=await adminSession(db,body.token);if(auth.error)return auth.error;
+  const action=String(body.action||"");
+  if(action==="add"){
+    const day=String(body.day||"");
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return {code:400,body:{ok:false,msg:"Dia inválido"}};
+    if(!String(body.title||"").trim())return {code:400,body:{ok:false,msg:"Título obrigatório"}};
+    const ev=await db.calendarAdd({day,title:body.title,body:body.body,
+      kind:body.kind,created_by:auth.acc.login});
+    return {code:200,body:{ok:true,event:ev}};
+  }
+  if(action==="update"){
+    const ev=await db.calendarUpdate(Number(body.id),{day:body.day,title:body.title,
+      body:body.body,kind:body.kind});
+    if(!ev)return {code:404,body:{ok:false,msg:"Evento não encontrado"}};
+    return {code:200,body:{ok:true}};
+  }
+  if(action==="delete"){
+    await db.calendarDelete(Number(body.id));
+    return {code:200,body:{ok:true}};
+  }
+  return {code:400,body:{ok:false,msg:"Ação inválida"}};
+}
+
 /* Lista de quem está online — mesma regra do contador "PLAYER ON" da
  * topbar (lease válida + instância/treino/cidade), com nome e status. */
 async function adminOnlineList(db,token){
@@ -5511,10 +5537,18 @@ async function main() {
       if(req.method==="GET"&&url==="/api/admin/online"){
         const token=(req.headers.authorization||"").replace("Bearer ","");
         const r=await adminOnlineList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="POST"&&url==="/api/admin/calendar"){
+        const body=await readBody(req);
+        const r=await adminCalendarWrite(db,body);return send(res,r.code,r.body);}
       if(req.method==="GET"&&url==="/api/admin/spectate"){
         const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
         const r=await adminSpectate(db,token,q.get("char"),q.get("instance"));
         return send(res,r.code,r.body);}
+      // ---- CALENDÁRIO (leitura pública; escrita em /api/admin/calendar) ----
+      if (req.method === "GET" && url === "/api/calendar") {
+        const rows = typeof db.calendarList === "function" ? await db.calendarList() : [];
+        return send(res, 200, { ok: true, events: rows });
+      }
       // ---- RANKINGS (DB expandida) ----
       if (req.method === "GET" && url === "/api/rankings") {
         const q = new URL(req.url, "http://x").searchParams;
