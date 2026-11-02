@@ -2716,10 +2716,11 @@ function renderLootPouch(p) {
     <div class="pouch-autoseller ${asOn ? "on" : ""}" style="grid-column:1/-1">
       <div class="row" style="justify-content:space-between;align-items:center;gap:6px">
         <span class="small" style="${asOn ? "color:#9ce84a;font-weight:bold" : ""}">⚡ Autoseller ${vipOk ? "VIP" : ""}</span>
-        <span class="tiny dim">a cada ${vipOk ? "5" : "15"} min</span>
+        <span class="tiny dim" id="pouch-autosell-cd">${pouchAutosellCdText(p, vipOk)}</span>
         <button class="sm ${asOn ? "primary" : ""}" id="btn-pouch-autosell">${asOn ? "ATIVO — desligar" : "LIGAR"}</button>
       </div>
     </div>`;
+  pouchAutosellCdEnsureTimer();
   const btnAs = $("#btn-pouch-autosell");
   if (btnAs && !btnAs._bound) {
     btnAs._bound = true;
@@ -2763,6 +2764,29 @@ function renderLootPouch(p) {
     el.addEventListener("contextmenu", openMenu);
   });
   bindPouchAutoseller(p);
+}
+
+/* Countdown do Autoseller: texto inicial no render + tick de 1s enquanto
+ * o painel existir. O relógio vem de _pouchAutoSellAt — em caçada online o
+ * valor espelha a autoridade (ela é quem vende de verdade). */
+function pouchAutosellCdText(p, vipOk) {
+  vipOk = vipOk !== undefined ? vipOk
+    : (typeof vipAutoSellAllowed === "function" && vipAutoSellAllowed());
+  if (!p || !p.config || !p.config.pouchAutoSell)
+    return `a cada ${vipOk ? "5" : "15"} min`;
+  const at = Number(p._pouchAutoSellAt) || 0;
+  const rem = at + pouchAutoSellCooldownMs(p) - Date.now();
+  return rem > 0 ? `vende em ${fmtShortDuration(rem / 1000)}` : "vendendo…";
+}
+let _pouchAutosellCdTimer = null;
+function pouchAutosellCdEnsureTimer() {
+  if (_pouchAutosellCdTimer) return;
+  _pouchAutosellCdTimer = setInterval(() => {
+    const el = document.getElementById("pouch-autosell-cd");
+    if (!el) return; // painel re-renderiza — o próximo tick reencontra o span
+    const p = (typeof G !== "undefined" && G) ? G.p : null;
+    el.textContent = pouchAutosellCdText(p);
+  }, 1000);
 }
 
 /* Liga o toggle + slider do Autoseller da Loot Pouch. */
