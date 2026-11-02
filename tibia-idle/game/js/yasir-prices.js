@@ -61,6 +61,7 @@
     "crawlers-essence": { n: "crawler's essence", cid: 33982, w: 0.45, sell: 3700 },
     "roots": { n: "roots", cid: 33938, w: 0.9, sell: 1200 },
     "mould-heart": { n: "mould heart", cid: 34141, w: 0.75, sell: 2100 },
+    "mould-robe": { n: "mould robe", cid: 34148, w: 1.8, sell: 1200 },
     "distorted-heart": { n: "distorted heart", cid: 34142, w: 0.75, sell: 2100 },
     // Claustrophobic Inferno (brachiodemon / infernal phantom).
     "hand": { n: "hand", cid: 33936, w: 1.2, sell: 1450 },
