@@ -137,6 +137,36 @@ async function partyStateFor(db, party, charId) {
     const s = await charSnapshot(db, m.id);
     if (s) memberSnaps.push(s);
   }
+  // Zona congelada: char marcado hunt/boss sem nenhuma instância ativa na
+  // conta (aba fechada no meio da caçada, restart do servidor). Sem esta
+  // reconciliação o marcador fica eterno — bloqueia treino (TRAINING_IN_
+  // COMBAT), exibe o líder "caçando" numa instância morta e pode reemitir
+  // follows para um destino que já não existe.
+  const healStaleZone = async (snap) => {
+    if (!snap || !snap.account_id) return;
+    if (["hunt", "boss"].indexOf(String(snap.zone)) === -1) return;
+    const inst = typeof db.instanceGet === "function"
+      ? await db.instanceGet(snap.account_id) : null;
+    if (inst && inst.status === "active") return;
+    if (typeof db.setCharacterZone === "function")
+      await db.setCharacterZone(snap.id, "city");
+    snap.zone = "city";
+  };
+  await healStaleZone(leaderSnap);
+  for (const s of memberSnaps) await healStaleZone(s);
+  // Líder curado: a zona da party volta para city e os follows pendentes
+  // (partySetZone limpa ao entrar em safe zone) são descartados.
+  if (leaderSnap && leaderSnap.zone === "city" &&
+      ["hunt", "boss"].indexOf(String(party.leader_zone)) !== -1) {
+    const inst = typeof db.instanceGet === "function"
+      ? await db.instanceGet(party.owner_account_id) : null;
+    if (!(inst && inst.status === "active")) {
+      await db.partySetZone(party.id, "city");
+      party.leader_zone = "city";
+      party.leader_hunt = party.leader_instance = party.leader_otbm =
+        party.leader_boss = null;
+    }
+  }
   return {
     ok: true,
     state: {
