@@ -1645,7 +1645,82 @@ JsonStore.prototype.onlineCount = function () {
   };
 };
 
-/* --------------------------- SNAPSHOT HISTORY --------------------------- */
+/* Lista detalhada para o painel admin — mesma regra do onlineCount, mas
+ * devolve um item por personagem/conta online com status e local. */
+JsonStore.prototype.onlineList = function () {
+  const now = Date.now();
+  const leases = (this.leases || []).filter((l) => l && l.expires_at &&
+    new Date(l.expires_at).getTime() > now);
+  const leasedAccounts = new Set(leases.map((l) => Number(l.account_id)));
+  const activeInstances = (this.instances || []).filter((r) => r && r.status === "active");
+  const tagged = new Map(); // charId -> {status, where}
+  const accountsInInstances = new Set();
+  for (const row of activeInstances) {
+    let state = null;
+    try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+    const authPlayers = (state && state.authority && state.authority.players) || [];
+    const alive = authPlayers
+      .filter((item) => {
+        if (!item || !item.p) return false;
+        if (item.permadead) return false;
+        if (Number(item.p.hp) <= 0) return false;
+        if (Number(item.downUntil) > now) return false;
+        return true;
+      })
+      .map((p) => Number(p && p.id));
+    const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
+    const ids = authPlayers.length ? alive : fromMembers;
+    const presence = authPlayers.length ? authPlayers.map((p) => Number(p && p.id)) : fromMembers.slice();
+    if (!presence.length && row.active_character_id)
+      presence.push(Number(row.active_character_id));
+    const where = row.boss_id ? "boss:" + row.boss_id : (row.hunt_id || row.kind || "");
+    for (const id of presence) {
+      if (!Number.isSafeInteger(id) || id <= 0) continue;
+      const c = this.findCharacter(id);
+      if (c) accountsInInstances.add(Number(c.account_id));
+    }
+    for (const id of ids) {
+      if (!Number.isSafeInteger(id) || id <= 0) continue;
+      const c = this.findCharacter(id);
+      if (c && leasedAccounts.has(Number(c.account_id))) tagged.set(id, { status: "hunt", where });
+    }
+  }
+  const trainingCutoff = now - 15000;
+  for (const c of this.characters || []) {
+    const id = Number(c && c.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || tagged.has(id)) continue;
+    if (!leasedAccounts.has(Number(c.account_id))) continue;
+    let d = null;
+    try { d = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {}); } catch (e) { d = null; }
+    const clockAt = d && d.trainingClock && Number(d.trainingClock.at);
+    if (clockAt && clockAt > trainingCutoff) tagged.set(id, { status: "training", where: "" });
+  }
+  const accountsWithChars = new Set();
+  const players = [];
+  for (const [id, tag] of tagged) {
+    const c = this.findCharacter(id);
+    if (!c) continue;
+    accountsWithChars.add(Number(c.account_id));
+    const acc = this.findAccountById(c.account_id);
+    players.push({ id: c.id, name: c.name, voc: c.voc, level: c.level,
+      account_id: Number(c.account_id), account_login: acc ? acc.login : "",
+      status: tag.status, where: tag.where });
+  }
+  for (const accId of leasedAccounts) {
+    if (accountsWithChars.has(accId) || accountsInInstances.has(accId)) continue;
+    const acc = this.findAccountById(accId);
+    const order = acc && acc.party_order;
+    let rep = (Array.isArray(order) && order.length) ? this.findCharacter(Number(order[0])) : null;
+    if (!rep) rep = (this.characters || [])
+      .filter((c) => Number(c.account_id) === accId)
+      .sort((a, b) => Number(b.id) - Number(a.id))[0] || null;
+    players.push({ id: rep ? rep.id : 0, name: rep ? rep.name : (acc ? acc.login : "conta " + accId),
+      voc: rep ? rep.voc : "", level: rep ? rep.level : 0,
+      account_id: accId, account_login: acc ? acc.login : "", status: "city", where: "" });
+  }
+  players.sort((a, b) => Number(b.level) - Number(a.level) || String(a.name).localeCompare(String(b.name)));
+  return { players, total: players.length };
+};
 JsonStore.prototype.snapshotAdd=function(accountId,entityType,entityId,version,reason,data,force){
   this.snapshots=this.snapshots||[];const now=Date.now(),type=String(entityType),id=String(entityId);
   const recent=[...this.snapshots].reverse().find((s)=>Number(s.account_id)===Number(accountId)&&s.entity_type===type&&s.entity_id===id);
@@ -3803,6 +3878,93 @@ async function MysqlStore() {
         leases: leases.length,
         instances: activeInstances.length,
       };
+    },
+
+    /* Lista detalhada para o painel admin — mesma regra do onlineCount, mas
+     * devolve um item por personagem/conta online com status e local. */
+    async onlineList() {
+      const leases = await this.query(
+        "SELECT account_id FROM account_leases WHERE expires_at > ?",
+        [new Date()]);
+      const leasedAccounts = new Set(leases.map((l) => Number(l.account_id)));
+      const activeInstances = await this.query(
+        "SELECT account_id, active_character_id, kind, hunt_id, boss_id, state FROM account_instances WHERE status='active'");
+      const tagged = new Map(); // charId -> {status, where}
+      const accountsInInstances = new Set();
+      const nowMs = Date.now();
+      for (const row of activeInstances) {
+        let state = null;
+        try { state = typeof row.state === "string" ? JSON.parse(row.state) : row.state; } catch (e) { state = null; }
+        const authPlayers = (state && state.authority && state.authority.players) || [];
+        const alive = authPlayers
+          .filter((item) => {
+            if (!item || !item.p) return false;
+            if (item.permadead) return false;
+            if (Number(item.p.hp) <= 0) return false;
+            if (Number(item.downUntil) > nowMs) return false;
+            return true;
+          })
+          .map((p) => Number(p && p.id));
+        const fromMembers = ((state && state.members) || []).map((m) => Number(m && m.id));
+        const ids = authPlayers.length ? alive : fromMembers;
+        const presence = authPlayers.length
+          ? authPlayers.map((p) => Number(p && p.id)) : fromMembers.slice();
+        if (!presence.length && row.active_character_id)
+          presence.push(Number(row.active_character_id));
+        const where = row.boss_id ? "boss:" + row.boss_id : (row.hunt_id || row.kind || "");
+        for (const id of presence) {
+          if (!Number.isSafeInteger(id) || id <= 0) continue;
+          const c = await this.findCharacter(id);
+          if (c) accountsInInstances.add(Number(c.account_id));
+        }
+        for (const id of ids) {
+          if (!Number.isSafeInteger(id) || id <= 0) continue;
+          const c = await this.findCharacter(id);
+          if (c && leasedAccounts.has(Number(c.account_id))) tagged.set(id, { status: "hunt", where });
+        }
+      }
+      const trainingRows = await this.query(
+        `SELECT id, account_id FROM characters
+         WHERE data LIKE '%"trainingClock"%'
+           AND CAST(JSON_EXTRACT(data,'$.trainingClock.at') AS DECIMAL(20,4)) > ?`,
+        [Date.now() - 15000]);
+      for (const row of trainingRows) {
+        const id = Number(row && row.id);
+        if (!Number.isSafeInteger(id) || id <= 0 || tagged.has(id)) continue;
+        if (leasedAccounts.has(Number(row.account_id))) tagged.set(id, { status: "training", where: "" });
+      }
+      const accountsWithChars = new Set();
+      const players = [];
+      for (const [id, tag] of tagged) {
+        const c = await this.findCharacter(id);
+        if (!c) continue;
+        accountsWithChars.add(Number(c.account_id));
+        const acc = await this.findAccountById(c.account_id);
+        players.push({ id: c.id, name: c.name, voc: c.voc, level: c.level,
+          account_id: Number(c.account_id), account_login: acc ? acc.login : "",
+          status: tag.status, where: tag.where });
+      }
+      for (const accId of leasedAccounts) {
+        if (accountsWithChars.has(accId) || accountsInInstances.has(accId)) continue;
+        const acc = await this.findAccountById(accId);
+        let rep = null;
+        try {
+          const order = acc && acc.party_order;
+          const list = typeof order === "string" ? JSON.parse(order) : order;
+          if (Array.isArray(list) && list.length) rep = await this.findCharacter(Number(list[0]));
+        } catch (e) {}
+        if (!rep) {
+          const rows = await this.query(
+            "SELECT id, name, voc, level FROM characters WHERE account_id=? ORDER BY updated_at DESC LIMIT 1",
+            [accId]);
+          rep = rows[0] || null;
+        }
+        players.push({ id: rep ? rep.id : 0, name: rep ? rep.name : (acc ? acc.login : "conta " + accId),
+          voc: rep ? rep.voc : "", level: rep ? rep.level : 0,
+          account_id: accId, account_login: acc ? acc.login : "", status: "city", where: "" });
+      }
+      players.sort((a, b) => Number(b.level) - Number(a.level) || String(a.name).localeCompare(String(b.name)));
+      return { players, total: players.length };
     },
 
     // ---- GUILDS ----

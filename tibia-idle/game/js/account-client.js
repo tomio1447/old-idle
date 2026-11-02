@@ -1722,6 +1722,17 @@ function applyPlayersOnlineCount(payload){
   const box=document.getElementById("players-online");
   const countEl=document.getElementById("players-online-count");
   if(!box||!countEl)return;
+  /* Contas admin clicam no contador para ver quem está online. */
+  if(!box.dataset.bound){
+    box.dataset.bound="1";
+    box.addEventListener("click",()=>{
+      const acc=typeof sessionAccount==="function"?sessionAccount():null;
+      if(!(acc&&acc.role==="admin"))return;
+      if(typeof openAdminOnlineModal==="function")openAdminOnlineModal();
+    });
+  }
+  const _acc=typeof sessionAccount==="function"?sessionAccount():null;
+  box.classList.toggle("admin-clickable",!!(_acc&&_acc.role==="admin"));
   const online=payload&&typeof payload==="object"?payload:null;
   const total=online&&online.total!=null?Number(online.total)
     :(online&&online.onlineChars!=null?Number(online.onlineChars)+Number(online.offlineHunting||0):NaN);
@@ -2246,6 +2257,11 @@ async function adminApiInstances(token) {
   const r = await _api("GET", "/api/admin/instances", null, token);
   if (!r.data || !r.data.ok) return { ok: false, instances: [] };
   return { ok: true, instances: r.data.instances || [] };
+}
+async function adminApiOnline(token) {
+  const r = await _api("GET", "/api/admin/online", null, token);
+  if (!r.data || !r.data.ok) return { ok: false, players: [] };
+  return { ok: true, players: r.data.players || [], total: r.data.total || 0 };
 }
 async function adminApiSpectate(token, opts) {
   let url = "/api/admin/spectate?";

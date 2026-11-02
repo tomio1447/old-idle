@@ -4556,6 +4556,14 @@ async function adminInstancesList(db,token){
   return {code:200,body:{ok:true,instances:list}};
 }
 
+/* Lista de quem está online — mesma regra do contador "PLAYER ON" da
+ * topbar (lease válida + instância/treino/cidade), com nome e status. */
+async function adminOnlineList(db,token){
+  const auth=await adminSession(db,token);if(auth.error)return auth.error;
+  const list=typeof db.onlineList==="function"?await db.onlineList():{players:[],total:0};
+  return {code:200,body:{ok:true,players:list.players||[],total:list.total||0}};
+}
+
 /* Espectador: devolve o estado vivo da instância do personagem para o GM
  * assistir (players+mobs+grid). O GM nunca entra no estado — não ataca,
  * não é alvo e não bloqueia porque não existe para o servidor. */
@@ -5500,6 +5508,9 @@ async function main() {
       if(req.method==="GET"&&url==="/api/admin/instances"){
         const token=(req.headers.authorization||"").replace("Bearer ","");
         const r=await adminInstancesList(db,token);return send(res,r.code,r.body);}
+      if(req.method==="GET"&&url==="/api/admin/online"){
+        const token=(req.headers.authorization||"").replace("Bearer ","");
+        const r=await adminOnlineList(db,token);return send(res,r.code,r.body);}
       if(req.method==="GET"&&url==="/api/admin/spectate"){
         const token=(req.headers.authorization||"").replace("Bearer ",""),q=new URL(req.url,"http://x").searchParams;
         const r=await adminSpectate(db,token,q.get("char"),q.get("instance"));

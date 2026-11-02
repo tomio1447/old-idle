@@ -1868,3 +1868,79 @@ function renderAdminSpec(p, el) {
     if (typeof adminSpecOpen === "function") adminSpecOpen({ mode: "follow", charName: name });
   });
 }
+
+/* ----------------------------------------- PLAYERS ON — quem está online
+ * Aberto pelo clique no contador "PLAYER ON" da topbar (contas admin). */
+let _adminOnlineTimer = null;
+
+function _adminOnlineStatus(p) {
+  if (p.status === "training") return "Treinando";
+  if (p.status === "city") return "Na cidade";
+  if (p.status === "hunt") {
+    const w = String(p.where || "");
+    if (w.startsWith("boss:")) {
+      const id = w.slice(5);
+      const name = (typeof BOSS_DEFS !== "undefined" && BOSS_DEFS[id] && BOSS_DEFS[id].name) || id;
+      return "Boss: " + name;
+    }
+    if (w) {
+      const h = (typeof GAMEDATA !== "undefined" && GAMEDATA.hunts && GAMEDATA.hunts[w]);
+      return "Caçando: " + ((h && h.name) || w);
+    }
+    return "Em instância";
+  }
+  return "Online";
+}
+
+async function openAdminOnlineModal() {
+  const modal = document.getElementById("modal");
+  const body = document.getElementById("modal-body");
+  if (!modal || !body) return;
+  const acc = typeof sessionAccount === "function" ? sessionAccount() : null;
+  if (!(acc && acc.role === "admin")) {
+    if (typeof toast === "function") toast("Acesso administrativo", "bad");
+    return;
+  }
+  body.innerHTML = `
+    <div class="panel-title">👥 Players Online
+      <span style="flex:1"></span>
+      <button type="button" class="sm" id="adm-online-close">✕</button>
+    </div>
+    <div class="panel-body" id="adm-online-body">
+      <div class="tiny dim">Carregando…</div>
+    </div>`;
+  modal.classList.add("show");
+  const close = () => {
+    modal.classList.remove("show");
+    if (_adminOnlineTimer) { clearInterval(_adminOnlineTimer); _adminOnlineTimer = null; }
+  };
+  document.getElementById("adm-online-close").addEventListener("click", close);
+
+  const render = async () => {
+    const holder = document.getElementById("adm-online-body");
+    if (!holder || !modal.classList.contains("show")) { close(); return; }
+    if (typeof adminApiOnline !== "function") return;
+    const r = await adminApiOnline(sessionToken());
+    if (!holder.isConnected) return;
+    if (!r.ok) {
+      holder.innerHTML = `<div class="tiny dim">Falha ao carregar.</div>`;
+      return;
+    }
+    const esc = (s) => String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    holder.innerHTML = `
+      <div class="tiny dim mb8">${r.players.length} online</div>
+      <div class="adm-online-list">
+        ${r.players.map((p) => `
+          <div class="adm-online-row">
+            <b class="adm-online-name">${esc(p.name)}</b>
+            <span class="tiny dim">${esc(p.voc)} nv ${esc(p.level)}</span>
+            <span class="tiny adm-online-status">${esc(_adminOnlineStatus(p))}</span>
+            <span class="tiny dim">${esc(p.account_login)}</span>
+          </div>`).join("")}
+      </div>`;
+  };
+  await render();
+  _adminOnlineTimer = setInterval(render, 5000);
+}
+window.openAdminOnlineModal = openAdminOnlineModal;

@@ -160,6 +160,17 @@ canvas { image-rendering: pixelated; }
 }
 .players-online[hidden] { display: none !important; }
 .players-online b { color: #9ce84a; font-variant-numeric: tabular-nums; }
+.players-online.admin-clickable { cursor: pointer; }
+.players-online.admin-clickable:hover { border-color: #9ce84a; }
+
+/* Lista "quem está online" do admin (clique no contador da topbar) */
+.adm-online-list { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.adm-online-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 4px 8px; background: #211e1a; border: 1px solid #3a352c;
+}
+.adm-online-name { color: #ffd761; min-width: 140px; }
+.adm-online-status { color: #9ce84a; flex: 1; }
 
 .topbar-clock {
   display: flex; align-items: center; gap: 6px;
