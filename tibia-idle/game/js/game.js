@@ -750,6 +750,7 @@ function computeOffline(p) {
   addExp(p, exp);
   p.gold += gold;
   p.stamina = Math.max(0, staminaStart - staminaSec);
+  if (typeof accountStaminaPoolWrite === "function") accountStaminaPoolWrite(p.stamina);
   p.totalKills += kills;
   p.playtime += staminaSec * 1000;
 
@@ -5136,8 +5137,16 @@ function loop(ts) {
     const tr = G.training;
     // Treino: 1s de stamina por segundo treinando (1:1) — o checkpoint do
     // servidor é a autoridade; isto só adianta a barra visualmente.
-    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 1000);
-    G.p.staminaAt = Date.now();
+    // Stamina é DA CONTA: materializa o pool compartilhado e espelha em
+    // TODOS os membros do treino — não pode haver stamina diferente entre
+    // personagens da mesma conta.
+    if (!(typeof accountStaminaSync === "function" && accountStaminaSync(G.p, 1))) {
+      G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 1000);
+      G.p.staminaAt = Date.now();
+    }
+    if (Array.isArray(G.training.members) && typeof accountStaminaSync === "function")
+      for (const ent of G.training.members)
+        if (ent && ent.p && ent.p !== G.p) accountStaminaSync(ent.p, 0);
     if (tr.members) trainingPartyTick(tr, dt, Date.now());
     else {
       academyTrainingTick(tr, G.p, dt, Date.now());
@@ -5158,8 +5167,10 @@ function loop(ts) {
     // Não reverta G.inCity nesse intervalo ou a finalização parecerá corrompida.
     if(!G.huntEntryPendingToken)G.inCity = true;
     // Ocioso no templo/cidade: 0,5s de stamina por segundo (2min → +1min).
-    G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 2000);
-    G.p.staminaAt = Date.now();
+    if (!(typeof accountStaminaSync === "function" && accountStaminaSync(G.p, 0.5))) {
+      G.p.stamina = Math.min(FULL_STAMINA_SECONDS, Math.max(0, Number(G.p.stamina) || 0) + dt / 2000);
+      G.p.staminaAt = Date.now();
+    }
     regenInCity(G.p, dt);
     // Soft boots / time rings: duração só com item EQUIPado (Canary stopduration).
     if (typeof tickAccessoryCharges === "function") tickAccessoryCharges(G.p, dt);

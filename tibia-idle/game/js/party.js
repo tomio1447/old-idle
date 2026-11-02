@@ -1336,6 +1336,9 @@ function partyCombatSwitchTo(id) {
     else if (typeof saveCharacterToRoster === "function" && G.p) saveCharacterToRoster(G.p);
     c.player = ent;
     G.p = ent.p;
+    // Stamina é da conta: espelha o pool no personagem assumido — o espelho
+    // individual estaria congelado desde a última vez que ele foi o ativo.
+    if (typeof accountStaminaSync === "function") accountStaminaSync(ent.p, 0);
     const activeId=String(ent.id||(ent.p&&ent.p.id)||id);
     // Todos os seletores precisam apontar para a mesma entidade. Em especial,
     // tibia-idle-char define o char_id do próximo tick autoritativo online.

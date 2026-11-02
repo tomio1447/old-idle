@@ -1973,6 +1973,29 @@ async function accountMe(token) {
 async function accountLogout(token){
   const r=await _api("POST","/api/logout",{token});return !!r.data.ok;
 }
+/* Stamina é DA CONTA: pool único espelhado do shared.stamina do servidor.
+ * O loop materializa o pool pelo relógio (0,5s/s ocioso, 1s/s treinando —
+ * dreno em caça é autoritativo no servidor) e TODOS os personagens da
+ * conta leem o mesmo valor. Antes cada p.stamina era um espelho que só
+ * andava quando o char era o ativo — personagens da mesma conta exibiam
+ * staminas diferentes na troca de controle/detalhes. */
+let ACCOUNT_STAMINA_POOL=null;
+function accountStaminaPoolWrite(v,at,create){
+  if(!ACCOUNT_STAMINA_POOL&&!create)return;
+  const full=Number.isFinite(Number(FULL_STAMINA_SECONDS))?Number(FULL_STAMINA_SECONDS):54000;
+  ACCOUNT_STAMINA_POOL={v:Math.max(0,Math.min(full,Number(v)||0)),at:Number(at)||Date.now()};
+}
+function accountStaminaSync(p,perSec){
+  const pool=ACCOUNT_STAMINA_POOL;if(!pool||!p)return false;
+  const now=Date.now();
+  const full=Number.isFinite(Number(FULL_STAMINA_SECONDS))?Number(FULL_STAMINA_SECONDS):54000;
+  if(now>pool.at){
+    if(perSec>0)pool.v=Math.min(full,pool.v+(now-pool.at)/1000*perSec);
+    pool.at=now;
+  }
+  p.stamina=Math.max(0,Math.min(full,pool.v));p.staminaAt=now;
+  return true;
+}
 
 /* Aplica o inventário da conta (bag/lootPouch/depot/reward chest) no player
  * atual. Espelha o applySharedToPlayer do servidor: instâncias equipadas
@@ -2002,9 +2025,12 @@ function accountApplySharedInventory(shared) {
   if (shared.stamina && typeof shared.stamina === "object" &&
       Number.isFinite(Number(shared.stamina.v))) {
     const at = Number(shared.stamina.at) || 0;
-    if (at > (Number(p._accStaminaAt) || 0)) {
-      const full = Number.isFinite(Number(FULL_STAMINA_SECONDS)) ? Number(FULL_STAMINA_SECONDS) : 54000;
-      p.stamina = Math.max(0, Math.min(full, Number(shared.stamina.v)));
+    // O servidor é a autoridade do pool: substitui o espelho local mesmo
+    // quando o carimbo é mais velho (o relógio local materializa o delta
+    // entre syncs — ver accountStaminaSync).
+    accountStaminaPoolWrite(shared.stamina.v, at, true);
+    if (at >= (Number(p._accStaminaAt) || 0)) {
+      p.stamina = ACCOUNT_STAMINA_POOL.v;
       p._accStaminaAt = at;
       if (at > (Number(p.staminaAt) || 0)) p.staminaAt = at;
       if (typeof updateStaminaDisplay === "function") { try { updateStaminaDisplay(); } catch (e) {} }

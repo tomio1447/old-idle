@@ -5185,6 +5185,11 @@ function combatTick(c, p, dt, now) {
     ent.p.stamina=Math.max(0,(Number(ent.p.stamina)||0)-dt/1000);
     ent.p.staminaAt=Date.now();
   }
+  // O pool da conta acompanha o dreno local — sem isto o sync de cidade
+  // "ressuscitaria" a stamina gasta na caça (modo online o dreno é
+  // autoritativo no engine e este trecho nem executa).
+  if(typeof accountStaminaPoolWrite==="function"&&staminaPlayers[0]&&staminaPlayers[0].p)
+    accountStaminaPoolWrite(staminaPlayers[0].p.stamina);
 
   if (c.dead) return;
 

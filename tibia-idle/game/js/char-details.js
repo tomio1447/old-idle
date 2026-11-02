@@ -397,6 +397,8 @@ function chardTabPersonagem(p, el) {
 
   // Bônus de experiência — só fontes reais do jogo
   const vip = typeof isVip === "function" && isVip();
+  // Stamina é da conta: lê o pool compartilhado, não o espelho do char.
+  if (typeof accountStaminaSync === "function") accountStaminaSync(p, 0);
   const sta = Number(p.stamina) || 0;
   const stBonus = vip && sta > 13 * 3600 ? "+50%" : (sta < 3 * 3600 ? "−50%" : "0%");
   const expBonusRows = [

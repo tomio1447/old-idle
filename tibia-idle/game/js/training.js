@@ -287,11 +287,17 @@ function trainingSwitchTo(id) {
     itemInstances: (previous.itemInstances || []).filter((inst) => inst && !String(inst.loc || "").startsWith("equip:")),
     seq: previous._itemInstSeq, dust: previous.dust, dustLimit: previous.dustLimit,
     slivers: previous.slivers, exaltedCores: previous.exaltedCores,
+    // Stamina é DA CONTA: sem o pool aqui o char de destino mostrava o
+    // espelho congelado da sessão anterior (stamina diferente por char).
+    stamina: { v: Number(previous.stamina) || 0, at: Date.now() },
   } : null;
   for (const entry of G.training.members) entry.isLocal = entry === member;
   if (previous && previous._partyOnline && !member.p._partyOnline) member.p._partyOnline = previous._partyOnline;
   G.p = member.p;
   if (shared && typeof accountApplySharedInventory === "function") accountApplySharedInventory(shared);
+  // Espelhos alinhados ao pool: nenhum membro pode exibir stamina diferente.
+  if (typeof accountStaminaSync === "function")
+    for (const entry of G.training.members) if (entry && entry.p) accountStaminaSync(entry.p, 0);
   try {
     localStorage.setItem(ACTIVE_CHARACTER_KEY, String(member.id));
     sessionStorage.setItem(AUTOLOGIN_KEY, String(member.id));
