@@ -270,10 +270,11 @@ function preloadHuntMapAssets(hunt, label) {
     const paths = new Set();
     const map = resolveHuntMap(hunt);
     addTileMapAssetPaths(paths, map);
+    const av = typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '1';
     for (const slug of (hunt && hunt.monsters) || []) {
-      paths.add('assets/mob/' + slug + '.png');
+      paths.add('assets/mob/' + slug + '.png?v=' + av);
       if (typeof IDLE_ANIMATIONS !== 'undefined' && IDLE_ANIMATIONS.monsters &&
-          IDLE_ANIMATIONS.monsters[slug]) paths.add('assets/mob/' + slug + '.idle.png');
+          IDLE_ANIMATIONS.monsters[slug]) paths.add('assets/mob/' + slug + '.idle.png?v=' + av);
     }
     const huntTimeout = Math.max(6000, Number(
       typeof window !== 'undefined' && window.MAP_ASSET_TIMEOUT_MS
@@ -344,7 +345,8 @@ function preloadGameAssets(p, label) {
     }
   }
   const hunt = p && typeof GAMEDATA !== 'undefined' && GAMEDATA.hunts && GAMEDATA.hunts[p.hunt];
-  if (hunt) for (const slug of hunt.monsters || []) paths.add('assets/mob/' + slug + '.png');
+  if (hunt) for (const slug of hunt.monsters || [])
+    paths.add('assets/mob/' + slug + '.png?v=' + (typeof ASSET_VERSION !== 'undefined' ? ASSET_VERSION : '1'));
   // O templo é a primeira cena exibida: carregue todos os tiles antes de
   // remover o overlay para o mapa oficial não aparecer aos poucos.
   if (typeof CITY !== 'undefined' && CITY.officialTemple && CITY.map)
