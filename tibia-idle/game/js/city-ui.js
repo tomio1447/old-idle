@@ -1088,21 +1088,31 @@ function promotionAccountCharacters() {
   return cache.map((summary) => {
     const id = String(summary.id);
     if (currentId && id === currentId) return G.p;
-    if (byId.has(id)) return byId.get(id);
-    let raw = summary.snapshot || {};
+    let raw = byId.get(id) || summary.snapshot || {};
     if (typeof raw === "string") {
       try { raw = JSON.parse(raw); } catch (e) { raw = {}; }
     }
     raw = raw && typeof raw === "object" ? raw : {};
+    let snap = summary.snapshot || {};
+    if (typeof snap === "string") {
+      try { snap = JSON.parse(snap); } catch (e) { snap = {}; }
+    }
     const merged = Object.assign({}, raw, {
       id,
       name: summary.name || raw.name,
       voc: summary.voc || raw.voc || "knight",
       level: Number(summary.level) || Number(raw.level) || 1,
       sex: summary.sex || raw.sex || "male",
+      // O servidor é a fonte da promoção: o roster local pode estar velho
+      // (promoção autoritativa em outra aba/dispositivo) e mostrava "Pronto"
+      // para char já promovido — cada clique virava um 409 ALREADY_PROMOTED.
       promoted: summary.promoted !== undefined ? !!summary.promoted : !!raw.promoted,
       outfit: summary.outfit || raw.outfit || null,
     });
+    // O gold avaliado é o wallet da conta: o snapshot do servidor já vem
+    // hidratado com acc.gold — sem isto a linha lia o espelho local stale.
+    if (snap && typeof snap === "object" && snap.gold !== undefined)
+      merged.gold = Math.max(0, Math.floor(Number(snap.gold) || 0));
     const p = typeof normalizePlayer === "function" ? normalizePlayer(merged) : merged;
     p.id = id;
     return p;
