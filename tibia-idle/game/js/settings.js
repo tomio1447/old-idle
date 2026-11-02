@@ -60,6 +60,7 @@ function openConfigModal() {
   const lang = ClientSettings.lang === "en" ? "en" : "pt";
   const uiMode = (typeof getUiMode === "function" && getUiMode()) ||
     (document.documentElement.getAttribute("data-ui-mode") === "mobile" ? "mobile" : "desktop");
+  const hasSession = typeof sessionToken === "function" && !!sessionToken();
   body.innerHTML = `
     <div class="panel-title">${t("config.title")}
       <span style="flex:1"></span>
@@ -89,7 +90,8 @@ function openConfigModal() {
         <b>${t("config.autoreconnect")}</b>
       </label>
       <div class="tiny dim mt8">${t("config.autoreconnect.hint")}</div>
-      <button type="button" class="primary full mt12" id="cfg-done">${t("config.close")}</button>
+      ${hasSession ? `<button type="button" class="danger full mt12" id="cfg-logout">${t("config.logout")}</button>` : ""}
+      <button type="button" class="primary full ${hasSession ? "mt8" : "mt12"}" id="cfg-done">${t("config.close")}</button>
     </div>`;
   modal.classList.add("show");
   const close = () => modal.classList.remove("show");
@@ -98,6 +100,15 @@ function openConfigModal() {
   const fullhd = document.getElementById("cfg-fullhd");
   if (closeBtn) closeBtn.addEventListener("click", close);
   if (doneBtn) doneBtn.addEventListener("click", close);
+  const logoutBtn = document.getElementById("cfg-logout");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      close();
+      if (window.accountCharOps && typeof window.accountCharOps.logout === "function") {
+        window.accountCharOps.logout();
+      }
+    });
+  }
   body.querySelectorAll("[data-cfg-lang]").forEach((btn) => {
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
