@@ -1598,6 +1598,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 
 .modal-bg .modal.bosses-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
+.modal-bg .modal.npc-modal-shell,
 .modal-bg .modal.cidade-modal-shell,
 .modal-bg .modal.guild-modal-shell,
 .modal-bg .modal.ranking-modal-shell { width:min(920px,calc(100vw - 32px)); }
@@ -1640,6 +1641,9 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .npcs-modal-title { display:flex; align-items:center; gap:7px; }
 .npcs-modal-title #npcs-modal-close { margin-left:auto; }
 .npcs-modal-title .npcs-btn-icon { transform:scale(1.15); margin:0 2px; }
+.npc-modal-title { display:flex; align-items:center; gap:7px; }
+.npc-modal-title #npc-close { margin-left:auto; }
+.npc-modal-title .npc-modal-title-sprite { height:26px; width:auto; image-rendering:pixelated; }
 .cidade-modal-title { display:flex; align-items:center; gap:7px; }
 .cidade-modal-title #cidade-modal-close { margin-left:auto; }
 .cidade-modal-title .cidade-btn-icon { transform:scale(1.15); margin:0 2px; }
@@ -1862,6 +1866,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.guild-modal-shell,
 .modal-bg .modal.ranking-modal-shell,
 .modal-bg .modal.npcs-modal-shell,
+.modal-bg .modal.npc-modal-shell,
 .modal-bg .modal.reward-modal-shell,
 .modal-bg .modal.forge-pattern-modal-shell,
 .modal-bg .modal.quests-modal-shell,
@@ -1881,6 +1886,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.guild-modal-shell .panel-title,
 .modal-bg .modal.ranking-modal-shell .panel-title,
 .modal-bg .modal.npcs-modal-shell .panel-title,
+.modal-bg .modal.npc-modal-shell .panel-title,
 .modal-bg .modal.reward-modal-shell .panel-title,
 .modal-bg .modal.forge-pattern-modal-shell .panel-title,
 .modal-bg .modal.quests-modal-shell .panel-title,
@@ -1898,6 +1904,7 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.guild-modal-shell .panel-body,
 .modal-bg .modal.ranking-modal-shell .panel-body,
 .modal-bg .modal.npcs-modal-shell .panel-body,
+.modal-bg .modal.npc-modal-shell .panel-body,
 .modal-bg .modal.reward-modal-shell .panel-body,
 .modal-bg .modal.forge-pattern-modal-shell .panel-body,
 .modal-bg .modal.quests-modal-shell .panel-body,

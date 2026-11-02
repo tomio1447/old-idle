@@ -104,7 +104,7 @@ const CIDADE_MODAL_CATALOG = [
 ];
 
 const CITY_MODAL_SHELLS = [
-  "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
+  "npcs-modal-shell", "npc-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
   "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
   "social-modal-shell",
 ];
@@ -456,13 +456,14 @@ function openNpc(id) {
 
   const npcTitleSprite = npc.sprite === "umbral-creation"
     ? `<span class="npc-anim-guzzlemaw" role="img" aria-label="${npc.name}" style="transform:scale(0.4);width:40px;height:40px;display:inline-block"></span>`
-    : `<img src="assets/npc/${npc.sprite}_s.png" style="height:22px" alt="">`;
-  $("#modal-body").innerHTML = `
-    <div class="panel-title">
+    : `<img src="assets/npc/${npc.sprite}_s.png" class="npc-modal-title-sprite" alt="">`;
+  const mbody = $("#modal-body");
+  mbody.classList.add("npc-modal-shell");
+  mbody.innerHTML = `
+    <div class="panel-title npc-modal-title">
       ${npcTitleSprite}
-      ${npc.name} — <span class="dim" style="font-weight:normal">${npc.role}</span>
-      <span style="flex:1"></span>
-      <button class="sm" id="npc-close">✕</button>
+      <span>${npc.name} — <span class="dim" style="font-weight:normal">${npc.role}</span></span>
+      <button class="sm" id="npc-close">Fechar</button>
     </div>
     <div class="panel-body">
       <div class="npc-greet mb8">"${npc.greet}"</div>
@@ -476,6 +477,8 @@ function openNpc(id) {
 function closeNpc() {
   G.activeNpc = null;
   $("#modal").classList.remove("show");
+  const b = $("#modal-body");
+  if (b) b.classList.remove("npc-modal-shell");
   renderAll();
 }
 
