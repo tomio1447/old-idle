@@ -1220,6 +1220,43 @@ function accountMoveToSupplyStash(token,charId,opts){
     return {ok:false,msg:r.data.msg||"Não foi possível mover para a Supply Stash",code:r.code};
   });
 }
+/** Fusion da Exaltation Forge — autoritativa no servidor. O caminho antigo
+ * fundia no espelho local: um sync do shared_inventory chegando antes do
+ * save sobrescrevia p.itemInstances com a cópia velha (o tier sumia do item
+ * e o parceiro/consumo ressuscitavam). Só na cidade. */
+function accountForgeFuse(token,charId,opts){
+  opts=opts||{};
+  return accountQueueSave(async()=>{
+    if(!accountLeaseAllowsSimulation())return {ok:false};
+    const id=String(charId||"");
+    const cache=await accountEnsureVersions(token,[id]);
+    const summary=cache.find((c)=>String(c.id)===id);
+    const body=Object.assign({token,char_id:Number(charId),
+      inst_id:String(opts.instId||""),use_core:!!opts.useCore,
+      expected_version:Number(summary&&summary.saveVersion)||0},accountLeaseFields());
+    const r=await _api("POST","/api/forge/fuse",body);
+    if(r.data.ok){
+      if(r.data.character)accountMergeCharacterCache([r.data.character]);
+      accountMaybeApplyShared(r.data);
+      if(typeof G!=="undefined"&&G.p&&String(G.p.id)===id){
+        if(r.data.bag)G.p.bag=r.data.bag||{};
+        if(r.data.itemInstances)G.p.itemInstances=r.data.itemInstances||[];
+        if(r.data.dust!==undefined)G.p.dust=Math.max(0,Number(r.data.dust)||0);
+        if(r.data.slivers!==undefined)G.p.slivers=Math.max(0,Number(r.data.slivers)||0);
+        if(r.data.exaltedCores!==undefined)G.p.exaltedCores=Math.max(0,Number(r.data.exaltedCores)||0);
+        if(r.data.gold!==undefined){
+          G.p.gold=Math.max(0,Math.floor(Number(r.data.gold)||0));
+          if(typeof accountSetGold==="function")accountSetGold(G.p.gold);
+        }
+      }
+      return {ok:true,success:!!r.data.success,tier:Number(r.data.tier)||0,msg:r.data.msg,
+        saveVersion:r.data.saveVersion};
+    }
+    if(r.code===423)accountLeaseMarkLost(r.data.msg);
+    if(r.code===409)accountSaveConflict([id],r.data.characters||[],r.data.msg);
+    return {ok:false,msg:r.data.msg||"A fusão falhou",code:r.code};
+  });
+}
 /** Retira da Supply Stash (bag/pouch/destroy). supplyStash é protected no PUT. */
 function accountWithdrawFromSupplyStash(token,charId,opts){
   opts=opts||{};

@@ -264,15 +264,24 @@ function forgeFusionCostHtml(chk, result) {
 function forgeShowFusionSuspense(p, chk, result) {
   var host = forgeModalBody();
   if (!host) return;
+  /* O overlay vai DENTRO do .forge-client (position:relative, largura fixa):
+   * esvaziar o #modal-body colapsava o .modal (width:auto no forge-modal-
+   * shell) e o reveal caía para ~100px com o texto quebrando letra a letra. */
+  var client = host.querySelector('.forge-client');
+  if (!client) {
+    host.innerHTML = renderForgeModal();
+    client = host.querySelector('.forge-client');
+  }
+  if (!client) return;
   var bars = '';
   for (var i = 0; i < 12; i++) bars += '<span style="--forge-delay:' + (i * .38).toFixed(2) + 's"></span>';
-  host.innerHTML = '<div class="forge-fusion-overlay pending"><div class="forge-fusion-reveal">'
+  client.insertAdjacentHTML('beforeend', '<div class="forge-fusion-overlay pending"><div class="forge-fusion-reveal">'
     + '<div class="forge-fusion-reveal-title">FUSION</div>'
     + '<div class="forge-fusion-reveal-items">' + forgeClientItemTile(chk.info.slug, '', '', '', 46, chk.current)
     + '<span class="forge-fusion-reveal-arrow">▶</span>' + forgeClientItemTile(chk.info.slug, '', '', '', 46, chk.next) + '</div>'
     + '<div class="forge-fusion-bars">' + bars + '</div>'
     + '<div class="forge-fusion-wait">Processando fusão...</div>'
-    + '</div></div>';
+    + '</div></div>');
   setTimeout(function() {
     var overlay = host.querySelector('.forge-fusion-overlay');
     if (!overlay) return;
@@ -381,6 +390,26 @@ function bindForgeModal() {
       return;
     }
     fuseBtn.disabled = true;
+    /* Conta online: a fusão é AUTORITATIVA no servidor — mutar o espelho
+     * local e salvar assíncrono deixava um sync do shared_inventory reverter
+     * tier/parceiro/consumo no intervalo ("o tier não ficou na arma"). */
+    var token = typeof accountSessionToken === 'function' ? accountSessionToken() : '';
+    if (token && typeof accountForgeFuse === 'function' && G.p && G.p.id) {
+      accountForgeFuse(token, G.p.id, { instId: chk.info.instanceId, useCore: chk.useCore }).then(function(r) {
+        if (!r.ok) {
+          if (typeof toast === 'function') toast(r.msg || 'A fusão falhou', 'err');
+          openForgeModal();
+          return;
+        }
+        forgeRememberHistory(G.p, r.msg);
+        if (typeof renderAll === 'function') renderAll();
+        forgeShowFusionSuspense(G.p, chk, r);
+      }).catch(function() {
+        if (typeof toast === 'function') toast('Falha de conexão na fusão.', 'err');
+        openForgeModal();
+      });
+      return;
+    }
     var r = forgeFuse(G.p, FORGE_UI.slug, !!FORGE_UI.useCore);
     if (!r.ok) {
       if (typeof toast === 'function') toast(r.msg, 'err');

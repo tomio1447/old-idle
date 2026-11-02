@@ -52,6 +52,7 @@ const { initializeAuthority, materializeAuthority, advanceAuthorityState, protec
   moveItemToSupplyStash, moveItemFromSupplyStash, equipFromSupplyStash, moveLootPouchToBag, moveBagToPouchAuth,
   destroyAuthBagItem, authItemNeedsBagInstance, authSyncBagCountsFromInstances, authAddItemToBag,
   equipFromContainerAuth, unequipFromContainerAuth } = require("./authoritative_engine");
+const { forgeCanFuse, forgeFuseAuth } = require("./forge");
 const { createWorldBossController, bossIdForWarzone, isWorldBossBossId, WARZONES, WORLD_BOSS_MAX_MEMBERS } = require("./world_boss");
 const { createQuestController, QUEST_DEFS } = require("./quest_controller");
 // Inventário DA CONTA (bag/lootPouch/depot/reward chest compartilhados entre
@@ -1472,6 +1473,43 @@ async function buyYanaPackage(db,body){
   if(persisted.code!==200)return persisted;
   return {code:200,body:Object.assign({},persisted.body,{ok:true,offerId:purchase.offer.id,
     goldTokens:purchase.goldTokens,lootPouch:p.lootPouch||{},bag:p.bag||{}})};
+}
+
+/* Fusão da Exaltation Forge — autoritativa no SERVIDOR. O client antigo
+ * fundia no espelho local e salvava assíncrono: um sync do shared_inventory
+ * chegando no intervalo sobrescrevia p.itemInstances com a cópia velha — o
+ * tier sumia do item, o parceiro voltava e o consumo (gold/Dust/Core)
+ * revertia. Só na cidade (mesmo padrão da Yana): a cópia de instância
+ * diverge do shared até o merge do fim da luta. */
+async function forgeFuseApi(db,body){
+  const acc=await db.findAccountByToken(body.token);if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
+  const denied=await requireLease(db,acc,body);if(denied)return denied;
+  const charId=Number(body.char_id),expected=Number(body.expected_version);
+  const instId=String(body.inst_id||"");
+  if(!Number.isSafeInteger(charId)||charId<=0||!Number.isSafeInteger(expected)||expected<1||!instId)
+    return {code:400,body:{ok:false,error:"FORGE_INVALID_FUSION",msg:"Fusão inválida."}};
+  const character=await db.findCharacter(charId);
+  if(!character||Number(character.account_id)!==Number(acc.id))
+    return {code:403,body:{ok:false,error:"INSTANCE_CHARACTER_NOT_OWNED",msg:"Personagem não pertence à conta"}};
+  if(Number(character.save_version)!==expected)
+    return {code:409,body:{ok:false,error:"SAVE_CONFLICT",msg:"Save alterado em outra sessão.",characters:[accountCharacterSummary(character,acc.gold)]}};
+  const active=await resolveInstanceRow(db,acc,charId);
+  if(active.error)return active.error;
+  if(active.row&&active.row.status==="active")
+    return {code:409,body:{ok:false,error:"FORGE_IN_INSTANCE",msg:"A Exaltation Forge só funciona na cidade."}};
+  const p=await loadCityPlayer(db,acc,character);
+  const result=forgeFuseAuth(p,instId,!!body.use_core,ITEMS);
+  if(!result.ok)return {code:400,body:Object.assign({error:"FORGE_FUSION_DENIED"},result)};
+  /* O parceiro saiu do itemInstances sem recalcular o espelho — recria o
+   * invariante bag[slug] = nº de instâncias (mesmo padrão do pouch move). */
+  authSyncBagCountsFromInstances(p);
+  const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
+  const persisted=await persistClaimedPlayer(db,acc,character,p,lease);
+  if(persisted.code!==200)return persisted;
+  return {code:200,body:Object.assign({},persisted.body,{ok:true,
+    success:!!result.success,tier:result.tier,slug:result.slug,msg:result.msg,
+    gold:p.gold,dust:p.dust,slivers:p.slivers,exaltedCores:p.exaltedCores,
+    bag:p.bag||{},itemInstances:p.itemInstances||[]})};
 }
 
 /* Wallet da conta: quando o player veio de loadCityPlayer (flag
@@ -5307,6 +5345,9 @@ async function main() {
       }
       if (req.method === "POST" && url === "/api/character/promote") {
         const r = await promoteCharacterApi(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/forge/fuse") {
+        const r = await forgeFuseApi(db, await readBody(req));return send(res, r.code, r.body);
       }
       if (req.method === "POST" && url === "/api/training/buy") {
         const r = await buyTrainingPlan(db, await readBody(req));return send(res, r.code, r.body);
