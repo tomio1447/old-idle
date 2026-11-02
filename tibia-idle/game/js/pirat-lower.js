@@ -1,7 +1,7 @@
 ﻿/* pirat-lower.js — HUNT PIRAT LOWER (nível 100–150).
  *
  * Monstros do Canary:
- *   pirat-bombardier, pirat-cutthroat, pirat-mate, pirat-scoundrel, elite-pirat.
+ *   pirat-bombardier, pirat-cutthroat, pirat-mate, pirat-scoundrel.
  *
  * Mapa: piratlower.otbm
  *   bounds: {1018,1016,7} .. {1038,1030,7}
@@ -76,7 +76,7 @@
     pack: 6,
     packMin: 5,
     packMax: 8,
-    monsters: ["pirat-bombardier", "pirat-cutthroat", "pirat-mate", "pirat-scoundrel", "elite-pirat"],
+    monsters: ["pirat-bombardier", "pirat-cutthroat", "pirat-mate", "pirat-scoundrel"],
     color: "#4a5a6a",
     scene: "cave",
     otbm: "piratlower",
@@ -88,11 +88,11 @@
     otbmRuntimeHeight: 13,
     otbmSpawn: { x: 1028, y: 1022, z: 7 },
     otbmMobBounds: { x: 1020, y: 1017, w: 15, h: 10, z: 7 },
-    avgHp: 6060,
-    avgExp: 5100,
-    avgDamage: 360,
-    avgArmor: 60,
-    avgGold: 120,
+    avgHp: 2575,
+    avgExp: 1875,
+    avgDamage: 400,
+    avgArmor: 68,
+    avgGold: 874,
     respawn: 0.9,
   };
 

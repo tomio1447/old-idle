@@ -119,6 +119,14 @@ CANARY_COLORS = {
     "pirate-cutthroat": None,
     "pirate-buccaneer": None,
     "pirate-corsair":   None,
+    # --- A Pirate's Tail: todos dividem looktype 1346; o que diferencia é a
+    # cor + addon de cada .lua do Canary (elite usa looktype 534).
+    "pirat-bombardier":  (57, 125, 86, 67),
+    "pirat-cutthroat":   (2, 96, 78, 96),
+    "pirat-mate":        (0, 95, 95, 113),
+    "pirat-scoundrel":   (97, 119, 80, 80),
+    "pirat-artillerist": (126, 94, 86, 94),
+    "elite-pirat":       (79, 79, 94, 0),
     # --- misc hunts
     "hunter":        (113, 114, 39, 115),
     "wild-warrior":  (113, 39, 113, 115),
@@ -185,7 +193,10 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "orc-rider", "orc-leader", "orc-warlord", "minotaur",
                "minotaur-archer", "minotaur-guard", "minotaur-mage",
                "pirate-marauder", "pirate-cutthroat", "pirate-buccaneer",
-               "pirate-corsair", "knight-s-apparition", "paladin-s-apparition",
+               "pirate-corsair",
+               "pirat-bombardier", "pirat-cutthroat", "pirat-mate",
+               "pirat-scoundrel", "pirat-artillerist", "elite-pirat",
+               "knight-s-apparition", "paladin-s-apparition",
                "sorcerer-s-apparition", "druid-s-apparition", "monk-s-apparition",
                "rage-squid", "squid-warden", "soulsnatcher", "floating-savant", "fury",
                "cobra-vizier", "cobra-scout",
@@ -202,7 +213,9 @@ FORCE_REGEN = {"amazon", "valkyrie", "naga-warrior", "naga-archer",
                "acolyte-of-the-cult", "adept-of-the-cult", "enlightened-of-the-cult"}
 
 # lookAddons oficial. Scout usa addon 2; Assassin addon 1; Vizier sem addon.
-CANARY_ADDONS = {"cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
+CANARY_ADDONS = {"pirat-bombardier": 2, "pirat-cutthroat": 1, "pirat-mate": 3,
+                 "pirat-scoundrel": 0, "pirat-artillerist": 2, "elite-pirat": 0,
+                 "cobra-vizier": 0, "cobra-scout": 2, "cobra-assassin": 1,
                   "fury": 1,
                   "falcon-knight": 1, "falcon-paladin": 2,
                   "grand-commander-soeren": 2,
