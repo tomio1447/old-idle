@@ -6,10 +6,11 @@ let WAND_SHOOT={};
 try{WAND_SHOOT=require(path.join(__dirname,"..","game","js","wandshootdata.js"))||{};}
 catch(e){WAND_SHOOT={};}
 const CanaryVocation=require(path.join(__dirname,"..","game","js","canary-vocation.js"));
-let HELPER_PRESET_CONFIG_FIELDS=[],HELPER_PRESETS_MAX=5;
+let HELPER_PRESET_CONFIG_FIELDS=[],HELPER_PRESETS_MAX=5,AUTHORITY_CONFIG_EXTRA_FIELDS=[];
 try{const hp=require(path.join(__dirname,"..","game","js","helper-presets.js"));
   HELPER_PRESET_CONFIG_FIELDS=Array.isArray(hp.HELPER_PRESET_CONFIG_FIELDS)?hp.HELPER_PRESET_CONFIG_FIELDS:[];
   HELPER_PRESETS_MAX=Math.max(1,Math.floor(Number(hp.HELPER_PRESETS_MAX)||5));
+  AUTHORITY_CONFIG_EXTRA_FIELDS=Array.isArray(hp.AUTHORITY_CONFIG_EXTRA_FIELDS)?hp.AUTHORITY_CONFIG_EXTRA_FIELDS:[];
 }catch(e){HELPER_PRESET_CONFIG_FIELDS=[];}
 const Loyalty=require(path.join(__dirname,"..","game","js","loyalty.js"));
 const loyaltySkillBonus=Loyalty.loyaltySkillBonus;
@@ -1081,7 +1082,7 @@ function syncAuthorityVisualState(auth,raw){const visual=normalizeVisualState(ra
      * Whitelist evita que campos estranhos entrem na autoridade. */
     if(pos.cfg&&typeof pos.cfg==="object"){
       item.p=item.p||{};item.p.config=item.p.config||{};
-      const allowed=new Set(HELPER_PRESET_CONFIG_FIELDS);
+      const allowed=new Set([...HELPER_PRESET_CONFIG_FIELDS,...AUTHORITY_CONFIG_EXTRA_FIELDS]);
       for(const k of Object.keys(pos.cfg)){
         if(!allowed.has(k))continue;
         const v=pos.cfg[k];

@@ -491,6 +491,15 @@ function accountAuthorityVisualState(){
           if(skip[k])continue;
           if(cfgSrc.config[k]!==undefined)cfg[k]=helperPresetClone(cfgSrc.config[k]);
         }
+        /* pouchAutoSell e cia.: configs fora do Helper que a autoridade
+         * precisa ver ao vivo (o autoseller do servidor vende mesmo com o
+         * cliente desligado se o flag não chegar no tick). */
+        if(typeof AUTHORITY_CONFIG_EXTRA_FIELDS!=="undefined"&&
+           Array.isArray(AUTHORITY_CONFIG_EXTRA_FIELDS)){
+          for(const k of AUTHORITY_CONFIG_EXTRA_FIELDS){
+            if(cfgSrc.config[k]!==undefined)cfg[k]=helperPresetClone(cfgSrc.config[k]);
+          }
+        }
         if(Object.keys(cfg).length)visual.cfg=cfg;
       }
       /* Presets do Helper são salvos no personagem, mas a autoridade só os

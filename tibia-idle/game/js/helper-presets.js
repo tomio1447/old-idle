@@ -42,6 +42,14 @@ const HELPER_PRESET_CONFIG_FIELDS = [
   "barMode", "lootFilter",
 ];
 
+/* Campos do p.config que NÃO pertencem ao Helper/presets, mas precisam
+ * chegar à autoridade pelo visual.cfg do tick — sem eles a cópia do
+ * servidor fica com o valor do início da instância (o autoseller podia
+ * ficar ligado na autoridade mesmo desligado no cliente). */
+const AUTHORITY_CONFIG_EXTRA_FIELDS = [
+  "pouchAutoSell",
+];
+
 function helperPresetClone(value) {
   if (Array.isArray(value)) return value.map(helperPresetClone);
   if (value && typeof value === "object") {
@@ -256,5 +264,5 @@ function renderHelperPresets(p) {
 
 /* Exporta constantes para o servidor Node poder manter a mesma whitelist. */
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { HELPER_PRESET_CONFIG_FIELDS, HELPER_PRESETS_MAX };
+  module.exports = { HELPER_PRESET_CONFIG_FIELDS, HELPER_PRESETS_MAX, AUTHORITY_CONFIG_EXTRA_FIELDS };
 }
