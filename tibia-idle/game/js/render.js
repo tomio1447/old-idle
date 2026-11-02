@@ -2345,6 +2345,15 @@ Renderer.prototype.draw = function (combat, player, dt) {
       ctx.globalAlpha = .92; drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug); ctx.restore();
     }
     if (e.kind === "monster") drawMonsterSprite(ctx, img, origin.x, origin.y, w, h, ent.slug);
+    else if (ent.ghost) {
+      // Espectador GM: translúcido com brilho — visualmente intangível.
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.shadowColor = "#7fd4ff";
+      ctx.shadowBlur = 12;
+      ctx.drawImage(img, origin.x, origin.y, w, h);
+      ctx.restore();
+    }
     else ctx.drawImage(img, origin.x, origin.y, w, h);
     entityInfo.push({ e, ent, cx, cy, top:origin.y, w, h, name, hpPct, mpPct, shieldPct, tile });
   };

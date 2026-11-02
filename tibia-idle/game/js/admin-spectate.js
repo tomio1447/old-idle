@@ -6,10 +6,9 @@
  * NUNCA entra no estado autoritativo: não ataca, não recebe dano, não
  * bloqueia caminhos e não pode ser alvo — para o servidor ele não existe.
  *
- * FOLLOW/RAID: o avatar do GM é um fantasma client-side (ghost) que anda
- * pela cena com WASD/setas/clique — posição local, nunca enviada.
- *
- * WATCH: mesma cena, sem fantasma, trancada no personagem alvo.
+ * WATCH/FOLLOW/RAID: o avatar do GM é um fantasma client-side (ghost) que
+ * anda pela cena com WASD/setas/clique — posição local, nunca enviada.
+ * No WATCH ele aparece como espectador ao lado do alvo.
  */
 "use strict";
 
@@ -75,7 +74,7 @@ function adminSpecGhostP() {
   // Clone leve do char admin — o Renderer precisa de outfit/sex/voc e de
   // hp>0 para desenhar; o objeto original NÃO é tocado.
   const src = (typeof G !== "undefined" && G && G.p) || {};
-  return {
+  const ghostP = {
     id: "gm-ghost", name: src.name || "ADM", voc: src.voc || "knight",
     level: Number(src.level) || 8, exp: 0, sex: src.sex || "male",
     outfit: src.outfit ? JSON.parse(JSON.stringify(src.outfit)) : null,
@@ -83,6 +82,11 @@ function adminSpecGhostP() {
     hp: 1, mp: 1, skills: Object.assign({}, src.skills || {}),
     ml: 0, conditions: {}, gamemaster: true, specGhost: true,
   };
+  // Barra de HP cheia no espectador (1/x ficaria visualmente "morrendo").
+  const mx = (typeof maxStats === "function") ? maxStats(ghostP) : null;
+  ghostP.hp = Math.max(1, Math.floor((mx && mx.hp) || 100));
+  ghostP.mp = Math.max(0, Math.floor((mx && mx.mp) || 0));
+  return ghostP;
 }
 
 async function adminSpecFetch() {
@@ -102,9 +106,21 @@ async function adminSpecFetch() {
     }
     ADMIN_SPEC.error = "";
     const inst = r.data.instance;
-    const ghostP = (ADMIN_SPEC.mode !== "watch") ? adminSpecGhostP() : null;
+    const ghostP = ADMIN_SPEC.ghost ? adminSpecGhostP() : null;
     ADMIN_SPEC.combat = adminSpecBuildCombat(inst, ghostP);
     if (r.data.target) ADMIN_SPEC.targetId = String(r.data.target.id);
+    // Spawn do espectador: primeira resposta boa coloca o fantasma do GM
+    // ao lado do alvo (ou do primeiro player) — depois ele anda livre.
+    const g = ADMIN_SPEC.ghost;
+    if (g && !g.placed && ADMIN_SPEC.combat) {
+      const ent = ADMIN_SPEC.combat.players.find((p) => String(p.id) === String(ADMIN_SPEC.targetId))
+        || ADMIN_SPEC.combat.players.find((p) => !p.ghost);
+      if (ent) {
+        g.x = Math.max(0, Math.min(1, (Number(ent.x) || 0.5) + 0.03));
+        g.y = Math.max(0, Math.min(1, Number(ent.y) || 0.5));
+      }
+      g.placed = true;
+    }
     adminSpecRenderInfo(inst, r.data.target);
   } catch (e) { /* rede — mantém o último frame */ }
   ADMIN_SPEC.lastPollAt = Date.now();
@@ -183,9 +199,10 @@ function adminSpecOpen(opts) {
   ADMIN_SPEC.targetId = "";
   ADMIN_SPEC.combat = null;
   ADMIN_SPEC.error = "";
-  ADMIN_SPEC.ghost = (ADMIN_SPEC.mode !== "watch")
-    ? { x: 0.5, y: 0.5, dir: "s", tx: null, ty: null, moving: false, frame: 1 }
-    : null;
+  // O GM sempre vira espectador-fantasma na cena (client-side). No WATCH
+  // ele surge ao lado do alvo; nos demais modos começa no centro.
+  ADMIN_SPEC.ghost = { x: 0.5, y: 0.5, dir: "s", tx: null, ty: null,
+    moving: false, frame: 1, placed: false };
 
   const old = document.getElementById("spec-modal");
   if (old) old.remove();
@@ -201,7 +218,7 @@ function adminSpecOpen(opts) {
         '<button class="sm" id="spec-close">✕</button></div>' +
       '<canvas id="spec-canvas" width="840" height="520"></canvas>' +
       '<div class="tiny dim spec-foot">' +
-        (ADMIN_SPEC.ghost ? "WASD/setas ou clique: move o GM (fantasma — invisível e intangível para o servidor)."
+        (ADMIN_SPEC.ghost ? "WASD/setas ou clique: move o GM espectador (fantasma — invisível e intangível para o servidor)."
           : "Visão somente leitura do combate do personagem.") +
       '</div>' +
     '</div>';
