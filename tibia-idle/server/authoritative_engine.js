@@ -1541,6 +1541,9 @@ function moveLootPouchToBag(p,slug,qty){
     p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+count;
     return false;
   }
+  /* Mesmo resync: aproveita para curar contagens fantasmas deixadas por
+   * movimentos anteriores (bag[slug] sempre igual ao nº de instâncias). */
+  authSyncBagCountsFromInstances(p);
   return true;
 }
 /* MOVE backpack → Loot Pouch (autoritativo, espelho do moveLootPouchToBag).
@@ -1549,16 +1552,23 @@ function moveLootPouchToBag(p,slug,qty){
 function moveBagToPouchAuth(p,slug,qty,instId){
   if(!p||!slug)return false;
   p.bag=p.bag||{};p.lootPouch=p.lootPouch||{};
-  if(authItemNeedsBagInstance(slug)){
+  if(authItemNeedsBagInstance(slug)||instId){
     const arr=p.itemInstances||[];
     const idx=arr.findIndex((inst)=>inst&&inst.loc==="bag"&&String(inst.slug)===String(slug)&&
       (!instId||String(inst.id)===String(instId)));
-    if(idx<0)return false;
-    const inst=arr[idx];
-    if(Number(inst.tier)>0)return false;
-    p.itemInstances=arr.filter((_,i)=>i!==idx);
-    p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+1;
-    return true;
+    if(idx<0){
+      if(authItemNeedsBagInstance(slug))return false;
+    }else{
+      const inst=arr[idx];
+      if(Number(inst.tier)>0)return false;
+      p.itemInstances=arr.filter((_,i)=>i!==idx);
+      /* bag[slug] espelha o nº de instâncias do slug (mesmo invariante do
+       * syncBagCountsFromInstances do cliente): sem o resync, o count ficava
+       * para trás — fantasma invisível na bag e o item parecia "sumir". */
+      authSyncBagCountsFromInstances(p);
+      p.lootPouch[slug]=(Number(p.lootPouch[slug])||0)+1;
+      return true;
+    }
   }
   const have=Math.max(0,Math.floor(Number(p.bag[slug])||0));
   if(have<=0)return false;
