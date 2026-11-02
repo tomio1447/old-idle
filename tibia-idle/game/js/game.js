@@ -4351,7 +4351,7 @@ function scheduleOnlineAuthorityEvents(events,receivedAt){
     return{event,index};
   }).sort((a,b)=>a.event.ts-b.event.ts||a.index-b.index).map((item)=>item.event);
 }
-function applyOnlineAuthorityState(descriptor,terminalReason,version){
+function applyOnlineAuthorityState(descriptor,terminalReason,version,instanceIdHint){
   if(!descriptor||!G.combat)return false;
   const previous=G.combat;
   const incomingProbe=(descriptor.state&&(descriptor.state.players||descriptor.state.mobs||
@@ -4362,9 +4362,25 @@ function applyOnlineAuthorityState(descriptor,terminalReason,version){
   if(incomingWb&&!localWb)return false;
   if(localWb&&!incomingWb&&!terminalReason)return false;
   const incomingVersion=Number(version!==undefined&&version!==null?version:descriptor.version);
-  const instanceId=String(descriptor.id||descriptor.instanceId||
-    (typeof ACCOUNT_INSTANCE!=="undefined"&&ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.id)||
-    ONLINE_AUTH_APPLIED_INSTANCE||"");
+  const explicitId=String(instanceIdHint||descriptor.id||descriptor.instanceId||"");
+  const boundId=(typeof ACCOUNT_INSTANCE!=="undefined"&&ACCOUNT_INSTANCE)?String(ACCOUNT_INSTANCE.id||""):"";
+  const instanceId=explicitId||boundId||ONLINE_AUTH_APPLIED_INSTANCE||"";
+  // Snapshot de OUTRA instância nunca entra neste combate: uma resposta de
+  // tick ou um refresh GET da hunt anterior chegando após startBoss fundia
+  // os monstros velhos na arena e apagava arenaBossSpawn.pending (os
+  // "monstros teleportaram e o boss não nasceu" da transição hunt→boss).
+  if(explicitId&&boundId&&explicitId!==boundId)return false;
+  const incomingBossId=String(incomingProbe&&incomingProbe.boss&&incomingProbe.boss.id||
+    descriptor.bossId||""),incomingHuntId=String(incomingProbe&&incomingProbe.huntId||
+    descriptor.huntId||""),localBossId=String(previous.boss&&previous.boss.id||""),
+    localHuntId=String(previous.huntId||"");
+  if(localBossId){
+    if(incomingBossId&&incomingBossId!==localBossId)return false;
+    if(!incomingBossId&&incomingHuntId&&incomingHuntId!==localHuntId)return false;
+  }else if(localHuntId&&!previous.questId){
+    if(incomingBossId)return false;
+    if(incomingHuntId&&incomingHuntId!==localHuntId)return false;
+  }
   if(!terminalReason&&Number.isFinite(incomingVersion)&&incomingVersion>0&&
      incomingVersion<=ONLINE_AUTH_APPLIED_VERSION&&
      (!ONLINE_AUTH_APPLIED_INSTANCE||!instanceId||instanceId===ONLINE_AUTH_APPLIED_INSTANCE))
@@ -4846,7 +4862,7 @@ function requestOnlineAuthorityTick(){
   ONLINE_AUTH_TICKING=true;
   accountTickInstance(sessionToken()).then((result)=>{
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason,
-      result.version);
+      result.version,result.instanceId);
     else if(result&&result.ok&&!result.state&&result.terminalReason&&G.combat){
       if(combatInstanceEntryPending())return;
       clearInstanceSession(result.terminalReason,true);setTimeout(()=>{
@@ -4885,7 +4901,7 @@ if(typeof window!=="undefined"){
     }
     const belongs=G.p&&instanceIncludesCharacter(state,G.p.id);
     if(G.combat&&belongs)applyOnlineAuthorityState(state,detail.event&&detail.event.terminalReason,
-      detail.meta&&detail.meta.version);
+      detail.meta&&detail.meta.version,detail.meta&&detail.meta.id||detail.event&&detail.event.id);
     else if(G.foreignInstance&&!belongs)G.foreignInstance.memberNames=(state.members||[]).map((m)=>m.p&&m.p.name||m.id);
   });
   window.addEventListener("tibia-idle-sync-party",()=>{

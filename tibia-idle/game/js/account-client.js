@@ -348,8 +348,25 @@ function accountInstanceCreating(){
 }
 function accountInstanceApply(instance){
   if(!instance){ACCOUNT_INSTANCE={id:"",version:0,status:null};ACCOUNT_INSTANCE_CAN_CREATE=false;return;}
-  ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active"};
+  ACCOUNT_INSTANCE={id:String(instance.id||""),version:Number(instance.version)||0,status:instance.status||"active",
+    kind:String(instance.kind||"")||null,
+    huntId:String(instance.huntId||"")||null,
+    bossId:String(instance.bossId||"")||null};
   ACCOUNT_INSTANCE_CAN_CREATE=false;
+}
+/* A linha remota precisa descrever o combate que a aba está rodando. Durante
+ * a transição hunt→boss (end enfileirado, create em voo) um GET concorrente
+ * ainda enxerga a linha anterior: vinculá-la fazia o save seguinte sair como
+ * checkpoint DELA — o estado do boss era escrito dentro da hunt (monstros
+ * "teleportando" e o boss nunca nascia). */
+function accountRemoteInstanceMatchesCombat(inst){
+  const c=typeof G!=="undefined"&&G&&G.combat;
+  if(!c||!inst)return true;
+  const instBoss=String(inst.bossId||""),instHunt=String(inst.huntId||"");
+  const localBoss=String(c.boss&&c.boss.id||""),localHunt=String(c.huntId||"");
+  if(instBoss)return instBoss===localBoss;
+  if(instHunt)return instHunt===localHunt;
+  return true;
 }
 function accountBeginInstance(){ACCOUNT_INSTANCE_EPOCH+=1;ACCOUNT_INSTANCE_CAN_CREATE=true;}
 async function accountLoadInstance(token){
@@ -358,7 +375,19 @@ async function accountLoadInstance(token){
   const activeChar=typeof sessionCharId==="function"?sessionCharId():"";
   let r=await _api("GET","/api/instance?char_id="+encodeURIComponent(activeChar||""),null,token);
   if(!r.data.ok)return {ok:false,msg:r.data.msg||"Falha ao carregar instância"};
-  if(!r.data.instance){accountInstanceApply(null);return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};}
+  if(!r.data.instance){
+    // Create em voo (transição hunt→boss): o "null" é só a janela entre o end
+    // e o create enfileirados — limpar CAN_CREATE cancelaria esse PUT.
+    if(ACCOUNT_INSTANCE_CAN_CREATE)ACCOUNT_INSTANCE={id:"",version:0,status:null};
+    else accountInstanceApply(null);
+    return {ok:true,instance:null,lastStatus:r.data.lastStatus||null};
+  }
+  if(!accountRemoteInstanceMatchesCombat(r.data.instance)){
+    // Linha da geração anterior ainda ativa no servidor: vinculá-la faria o
+    // create seguinte ser aceito como checkpoint dela, corrompendo o boss.
+    return {ok:true,instance:null,stale:true,meta:r.data.instance,
+      lastStatus:r.data.instance.status||"active"};
+  }
   accountInstanceApply(r.data.instance);
   const viewerMember=!!(r.data.instance.state&&Array.isArray(r.data.instance.state.members)&&
     r.data.instance.state.members.some((member)=>String(member.id)===String(activeChar)));
@@ -400,9 +429,16 @@ function accountSaveInstance(token,state){
     if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
     if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
     if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
+    // A linha vinculada precisa descrever o combate sendo salvo. Se um GET
+    // concorrente a reatou a outra instância (a hunt que está sendo
+    // encerrada, por ex.), o PUT sai como CREATE — nunca como checkpoint
+    // dela, que gravaria o estado do boss dentro da linha errada.
+    const boundOk=ACCOUNT_INSTANCE.status==="active"&&ACCOUNT_INSTANCE.id&&
+      String(ACCOUNT_INSTANCE.bossId||"")===String(state.bossId||"")&&
+      String(ACCOUNT_INSTANCE.huntId||"")===String(state.huntId||"");
     const r=await _api("PUT","/api/instance",Object.assign({token,char_id:state.activeCharacterId||
-      (typeof sessionCharId==="function"?sessionCharId():null),instance_id:ACCOUNT_INSTANCE.id||null,
-      expected_version:ACCOUNT_INSTANCE.status==="active"?ACCOUNT_INSTANCE.version:0,state},accountLeaseFields()));
+      (typeof sessionCharId==="function"?sessionCharId():null),instance_id:boundOk?ACCOUNT_INSTANCE.id:null,
+      expected_version:boundOk?ACCOUNT_INSTANCE.version:0,state},accountLeaseFields()));
     if(r.data.ok){accountInstanceApply(r.data.instance);return true;}
     if(r.code===423)accountLeaseMarkLost(r.data.msg);
     if(r.code===409){
@@ -1471,7 +1507,13 @@ function accountRefreshInstance(token){
     const charId=typeof sessionCharId==="function"?sessionCharId():"";
     const r=await _api("GET","/api/instance?char_id="+encodeURIComponent(charId||""),null,token);
     if(!r.data.ok)return {ok:false};
-    if(!r.data.instance){accountInstanceApply(null);return {ok:true,state:null,lastStatus:r.data.lastStatus||null};}
+    if(!r.data.instance){
+      if(ACCOUNT_INSTANCE_CAN_CREATE)ACCOUNT_INSTANCE={id:"",version:0,status:null};
+      else accountInstanceApply(null);
+      return {ok:true,state:null,lastStatus:r.data.lastStatus||null};
+    }
+    if(!accountRemoteInstanceMatchesCombat(r.data.instance))
+      return {ok:true,state:null,stale:true,lastStatus:r.data.instance.status||"active"};
     accountInstanceApply(r.data.instance);return {ok:true,state:r.data.instance.state,meta:r.data.instance};
   });
 }
