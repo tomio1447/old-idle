@@ -3209,11 +3209,18 @@ function clearLootPouchWithConfirm(p) {
 
 function openLootPouchConfigModal() {
   const p = G.p;
-  const renderList = (key) => lootConfigList(p, key).map((rule, i) => `
-    <div class="stat-row">
-      <span class="k">${rule}</span>
+  const renderList = (key) => lootConfigList(p, key).map((rule, i) => {
+    const slug = typeof lootRuleItemSlug === "function" ? lootRuleItemSlug(rule) : null;
+    const icon = slug ? itemImg(slug, 22)
+      : `<span class="dim" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;font-weight:bold">?</span>`;
+    const itemLabel = slug ? itemDisplayName(slug) : "";
+    return `<div class="stat-row">
+      <span class="k row" style="gap:7px;align-items:center;min-width:0" ${itemLabel ? `title="${itemLabel}"` : ""}>
+        ${icon}<span style="overflow:hidden;text-overflow:ellipsis">${rule}</span>
+      </span>
       <button class="sm danger" data-remove-rule="${key}:${i}">x</button>
-    </div>`).join("") || `<div class="dim tiny" style="padding:8px">Nenhum item configurado.</div>`;
+    </div>`;
+  }).join("") || `<div class="dim tiny" style="padding:8px">Nenhum item configurado.</div>`;
 
   $("#modal-body").innerHTML = `
     <div class="panel-title">Configurar Loot Pouch

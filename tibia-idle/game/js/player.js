@@ -1252,6 +1252,23 @@ function removeLootRule(p, key, index) {
   list.splice(index, 1);
 }
 
+/* Resolve uma regra de loot (slug, nome ou substring) para o slug do item —
+ * usado pela UI para desenhar o ícone da regra na config da Loot Pouch. */
+function lootRuleItemSlug(rule) {
+  const r = normalizeLootRule(rule);
+  if (!r) return null;
+  const items = (typeof GAMEDATA !== "undefined" && GAMEDATA.items) || {};
+  if (items[r]) return r;
+  for (const slug in items) {
+    if (normalizeLootRule(items[slug] && items[slug].n) === r) return slug;
+  }
+  for (const slug in items) {
+    const name = normalizeLootRule(items[slug] && items[slug].n);
+    if (slug.indexOf(r) !== -1 || name.indexOf(r) !== -1) return slug;
+  }
+  return null;
+}
+
 /* Remove a regra que casa exatamente com o texto/slug informado */
 function removeLootRuleByText(p, key, text) {
   const rule = normalizeLootRule(text);
