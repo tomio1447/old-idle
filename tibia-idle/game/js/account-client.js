@@ -1718,11 +1718,18 @@ async function _api(method, path, body, token, options) {
   // Lease/renew/tick mandam token no body; Bearer espelha o mesmo segredo para
   // endpoints que só leem Authorization e para proxies que exigem o header.
   if (requestToken) headers["Authorization"] = "Bearer " + requestToken;
+  // Timeout: fetch não tem limite nativo — um request travado (rede/restart
+  // do processo) congelava ACCOUNT_SAVE_QUEUE e, por cascata, a fila de
+  // instância: o PUT de create nunca saía e a arena ficava órfã pra sempre.
+  const apiTimeoutMs=Math.max(1000,Number(options&&options.timeoutMs)||25000);
+  const apiSignal=(typeof AbortSignal!=="undefined"&&typeof AbortSignal.timeout==="function")
+    ?AbortSignal.timeout(apiTimeoutMs):undefined;
   try {
     const r = await fetch(ACCOUNT_API_URL + path, {
       method: method,
       headers: headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: apiSignal,
     });
     let data = {};
     try { data = await r.json(); } catch (e) { data = {}; }

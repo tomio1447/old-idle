@@ -4198,9 +4198,13 @@ async function requestOnlineRuntimeRecovery(options){
     if(remote&&remote.ok&&remote.lastStatus==="ended"){
       // Instância nova ainda em PUT: ignore o "ended" da anterior e recria.
       if(combatInstanceEntryPending()){
-        if(typeof accountBeginInstance==="function"&&typeof persistActiveInstance==="function"){
-          accountBeginInstance();persistActiveInstance();
-        }
+        // Sem accountBeginInstance() quando o create já está pendente: o
+        // epoch bump deste ciclo invalidava o PUT ainda enfileirado do
+        // anterior (epoch mismatch → drop silencioso) e a arena ficava sem
+        // instância para sempre — o boss nunca nascia.
+        if(typeof accountInstanceCreating==="function"&&!accountInstanceCreating()&&
+           typeof accountBeginInstance==="function")accountBeginInstance();
+        if(typeof persistActiveInstance==="function")persistActiveInstance();
         return false;
       }
       if(G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))){
@@ -4215,9 +4219,12 @@ async function requestOnlineRuntimeRecovery(options){
     // Storage reiniciado sem tombstone: restaure o checkpoint que permaneceu
     // aberto na aba, usando o lease recém-readquirido e a mesma party/runtime.
     if(remote&&remote.ok&&!remote.instance&&G.combat&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))&&
-       typeof accountBeginInstance==="function"&&
        typeof persistActiveInstance==="function"){
-      accountBeginInstance();persistActiveInstance();
+      // Mesma regra do branch acima: não re-bump o epoch de um create já
+      // pendente — só inicia nova geração se o CAN_CREATE não estiver ativo.
+      if(typeof accountInstanceCreating==="function"&&!accountInstanceCreating()&&
+         typeof accountBeginInstance==="function")accountBeginInstance();
+      persistActiveInstance();
       const saved=typeof accountLastInstancePromise==="function"?await accountLastInstancePromise():false;
       if(saved){
         remote=await accountLoadInstance(token);
@@ -4859,7 +4866,25 @@ function requestOnlineAuthorityTick(){
   if(ONLINE_AUTH_TICKING||!onlineAuthorityCombat())return;
   const leaseReady=typeof accountLeaseAllowsSimulation!=="function"||accountLeaseAllowsSimulation(),
     instanceReady=typeof accountInstanceActive!=="function"||accountInstanceActive();
-  if(!leaseReady||!instanceReady||G.instanceReconnectPending){requestOnlineRuntimeRecovery();return;}
+  if(instanceReady&&G._instanceLostSince)G._instanceLostSince=0;
+  if(!leaseReady||!instanceReady||G.instanceReconnectPending){
+    // Watchdog: combate online SEM instância ativa no servidor não tem
+    // autoridade para spawnar o boss — a arena fica órfã ("Boss nasce em
+    // 0s" para sempre). 45s+ sem o create confirmar = encerra e volta ao
+    // templo em vez de congelar sem feedback.
+    if(G.combat&&!instanceReady&&!(G.combat.worldBoss||(G.combat.boss&&G.combat.boss.worldBoss))){
+      if(!G._instanceLostSince)G._instanceLostSince=Date.now();
+      else if(Date.now()-G._instanceLostSince>45000){
+        G._instanceLostSince=0;
+        const orphan=G.combat;
+        if(typeof clearInstanceSession==="function")clearInstanceSession("instance-create-timeout",true);
+        if(typeof toast==="function")toast("O servidor não confirmou a instância. Retornando ao templo.","bad");
+        setTimeout(()=>{if(G.combat===orphan)stopHunt(true);},0);
+        return;
+      }
+    }else if(G._instanceLostSince)G._instanceLostSince=0;
+    requestOnlineRuntimeRecovery();return;
+  }
   ONLINE_AUTH_TICKING=true;
   accountTickInstance(sessionToken()).then((result)=>{
     if(result&&result.ok&&result.state)applyOnlineAuthorityState(result.state,result.terminalReason,

@@ -2485,7 +2485,12 @@ async function saveInstance(db,body){
   const expected=Number(body.expected_version);
   if(!Number.isSafeInteger(expected)||expected<0)return {code:428,body:{ok:false,error:"INSTANCE_VERSION_REQUIRED",msg:"Atualize a instância antes de salvar"}};
   const lease={holderId:String(body.holder_id),secretHash:leaseHash(body.lease_token),now:Date.now()};
-  const activeId=Number(body.state&&body.state.activeCharacterId),active=await db.findCharacter(activeId);
+  const activeId=Number(body.state&&body.state.activeCharacterId);
+  // Sem early-return: findCharacter(NaN) gera `WHERE id = NaN` → 500
+  // (mysql2 serializa NaN como identificador, não como NULL).
+  if(!Number.isSafeInteger(activeId)||activeId<=0)
+    return {code:400,body:{ok:false,error:"INVALID_ACTIVE_CHARACTER",msg:"Personagem ativo inválido"}};
+  const active=await db.findCharacter(activeId);
   if(active&&Number(active.account_id)===Number(acc.id)){
     const party=await db.partyFindByCharacter(activeId),shared=party&&typeof db.instanceGetByParty==="function"?await db.instanceGetByParty(party.id):null;
     // Boss novo (create, não checkpoint): arena própria, nunca "espelha" a
