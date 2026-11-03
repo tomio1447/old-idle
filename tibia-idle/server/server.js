@@ -2488,9 +2488,14 @@ async function saveInstance(db,body){
   const activeId=Number(body.state&&body.state.activeCharacterId),active=await db.findCharacter(activeId);
   if(active&&Number(active.account_id)===Number(acc.id)){
     const party=await db.partyFindByCharacter(activeId),shared=party&&typeof db.instanceGetByParty==="function"?await db.instanceGetByParty(party.id):null;
-    if(party&&shared&&(activeId!==Number(party.leader_id)||expected===0||String(body.instance_id||"")!==String(shared.instance_id)))
+    // Boss novo (create, não checkpoint): arena própria, nunca "espelha" a
+    // hunt do líder nem fica pending — senão o membro/líder abria a sala e o
+    // boss nunca nascia (instância nunca criada). A shared ativa é encerrada
+    // com extração terminal mais abaixo, no branch do create.
+    const bossCreate=expected===0&&String(body.state&&body.state.kind||"")==="boss";
+    if(party&&shared&&!bossCreate&&(activeId!==Number(party.leader_id)||expected===0||String(body.instance_id||"")!==String(shared.instance_id)))
       return {code:200,body:{ok:true,shared:true,instance:instanceSummary(shared,false)}};
-    if(party&&Number(party.leader_id)!==activeId&&!shared)
+    if(party&&Number(party.leader_id)!==activeId&&!shared&&!bossCreate)
       return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
     if(party&&Number(party.owner_account_id)!==Number(acc.id)){
       if(!shared)return {code:200,body:{ok:true,pending:true,instance:null,msg:"Aguardando a instância do líder"}};
@@ -2524,6 +2529,19 @@ async function saveInstance(db,body){
       return {code:200,body:{ok:true,shared:true,instance:instanceSummary(megaShared,false)}};
     }
   }
+  // Create de boss: a sala substitui uma HUNT ativa da conta (a do líder da
+  // party ou sobra de luta anterior). Tem que encerrar ANTES do prepare —
+  // a trava de instance_mode do prepare rejeitaria boss sobre hunt ativa.
+  // Tick terminal extrai pouch/chest para não perder loot — sem isto o
+  // instanceSave esbarrava no INSTANCE_VERSION_CONFLICT do slot ocupado e o
+  // boss nunca nascia. Se a linha viva já é boss (PUT duplicado/corrido),
+  // deixa o conflito de versão amarrar o cliente na sala existente em vez de
+  // destruir uma luta em andamento.
+  if(expected===0&&String(body.state&&body.state.kind||"")==="boss"){
+    const live=await db.instanceGet(acc.id);
+    if(live&&live.status==="active"&&String(live.kind||"")!=="boss")
+      await endOwnActiveInstance(db,acc.id,"boss-entry",lease);
+  }
   const prepared=await prepareInstanceState(db,acc,body.state);
   if(prepared.error){
     // Death→save: lobby já fechou e o PUT (checkpoint) ainda carrega convidados.
@@ -2554,7 +2572,8 @@ async function saveInstance(db,body){
   }
   let instanceId=String(body.instance_id||"");
   if(expected===0){
-    instanceId=newToken();prepared.state=restoreAuthoritativeEntry(prepared.state);
+    instanceId=newToken();
+    prepared.state=restoreAuthoritativeEntry(prepared.state);
     prepared.state=initializeAuthority(prepared.state,instanceId,Date.now());
   }else{
     if(!/^[a-f0-9]{64}$/.test(instanceId))return {code:400,body:{ok:false,error:"INVALID_INSTANCE_ID",msg:"Instância inválida"}};
@@ -3718,6 +3737,40 @@ async function movePouchToBag(db,body){
     lootPouch:p.lootPouch||{},bag:p.bag||{},itemInstances:p.itemInstances||[]})};
 }
 
+/* Encerramento NORMAL (sem terminalReason da autoridade — ex.: "returned-city"
+ * ou substituição por boss novo) precisa extrair os containers finais (loot
+ * da Loot Pouch, bag etc.) para o shared da conta. Sem isso o loot ficava só
+ * no save do personagem e o shared antigo o "mascarava" ao trocar de
+ * personagem/reload (e a venda da pouch parecia nunca acontecer). */
+function finalizeEndStateTick(serialized,elapsed,checkpointAt){
+  const out=advanceAuthorityState(serialized,elapsed,checkpointAt);
+  if(out&&!out.terminalReason){
+    try{
+      let descriptor=typeof out.state==="string"?JSON.parse(out.state):out.state;
+      const auth=descriptor&&descriptor.authority;
+      if(auth&&!auth.ended){
+        auth.ended=true;
+        auth.terminalReason="finished";
+        descriptor=materializeAuthority(descriptor);
+        out.state=JSON.stringify(descriptor);
+        out.terminalReason="finished";
+      }
+    }catch(e){/* sem extração final é aceitável (end continua) */}
+  }
+  return out;
+}
+/* Encerra a linha ativa da conta com o tick terminal (extrai pouch/chest →
+ * shared da conta) para liberar o slot antes de um create novo. */
+async function endOwnActiveInstance(db,accountId,reason,lease){
+  const live=await db.instanceGet(accountId);
+  if(!live||live.status!=="active")return null;
+  try{
+    const tick=await db.instanceAuthorityTick(accountId,Number(live.version),Date.now(),3600000,finalizeEndStateTick,lease);
+    if(tick&&tick.ok&&tick.instance&&Number(tick.instance.version)!==Number(live.version))live.version=Number(tick.instance.version);
+  }catch(e){/* tick final best-effort */}
+  try{return await db.instanceEnd(accountId,live.instance_id,live.version,reason||"replaced",lease);}
+  catch(e){return null;}
+}
 async function endInstance(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
@@ -3779,30 +3832,7 @@ async function endInstance(db,body){
   let endedCharacters=[];
   if(resolved.row&&resolved.row.status==="active"){
     try{
-      // Tick final: além de avançar o estado, um encerramento NORMAL (sem
-      // terminalReason da autoridade — ex.: "returned-city") precisa extrair
-      // os containers finais (loot da Loot Pouch, bag etc.) para o shared da
-      // conta. Sem isso o loot ficava só no save do personagem e o shared
-      // antigo o "mascarava" ao trocar de personagem/reload (e a venda da
-      // pouch parecia nunca acontecer).
-      const finalizeEndState=(serialized,elapsed,checkpointAt)=>{
-        const out=advanceAuthorityState(serialized,elapsed,checkpointAt);
-        if(out&&!out.terminalReason){
-          try{
-            let descriptor=typeof out.state==="string"?JSON.parse(out.state):out.state;
-            const auth=descriptor&&descriptor.authority;
-            if(auth&&!auth.ended){
-              auth.ended=true;
-              auth.terminalReason="finished";
-              descriptor=materializeAuthority(descriptor);
-              out.state=JSON.stringify(descriptor);
-              out.terminalReason="finished";
-            }
-          }catch(e){/* sem extração final é aceitável (end continua) */}
-        }
-        return out;
-      };
-      const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,finalizeEndState,lease);
+      const tickResult=await db.instanceAuthorityTick(ownerId,expected,Date.now(),3600000,finalizeEndStateTick,lease);
       if(tickResult.ok&&tickResult.instance){
         // Atualiza expected version para o end usar a versão pós-tick
         const ticked=await db.instanceGet(ownerId);
@@ -3814,7 +3844,7 @@ async function endInstance(db,body){
         // relógio +100ms — 0 steps de simulação, mas o fluxo de extração
         // executa (terminalReason "finished" via finalizeEndState).
         if(!endedCharacters.length){
-          const retry=await db.instanceAuthorityTick(ownerId,expected,Date.now()+100,3600000,finalizeEndState,lease);
+          const retry=await db.instanceAuthorityTick(ownerId,expected,Date.now()+100,3600000,finalizeEndStateTick,lease);
           if(retry.ok&&retry.instance){
             const ticked2=await db.instanceGet(ownerId);
             if(ticked2)expected=Number(ticked2.version);

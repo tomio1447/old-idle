@@ -903,7 +903,12 @@ function mergeLegacyCharStashes(shared, chars) {
   return changed;
 }
 /* Une drops reais de boss no shared. Só conta numérica + pacotes com itens —
- * ignora lixo stale (ex.: { fake:"stale" }) de projections de cidade. */
+ * ignora lixo stale (ex.: { fake:"stale" }) de projections de cidade.
+ * O p da instância já nasce ESPELHADO no chest da conta e cada projeção da
+ * mesma party carrega o mesmo espelho — somar (+=) duplicaria o baú inteiro
+ * a cada luta e multiplicaria por membro. O merge por max é idempotente:
+ * cobre o delta da luta tanto se a cópia veio espelhada (chest velho+novo)
+ * quanto se veio limpa (só o delta, ex.: cópia temporária de world boss). */
 function mergeTerminalRewardChest(shared, fromPlayer) {
   if (!shared || !fromPlayer) return;
   shared.rewardChest = shared.rewardChest && typeof shared.rewardChest === "object" && !Array.isArray(shared.rewardChest)
@@ -914,7 +919,7 @@ function mergeTerminalRewardChest(shared, fromPlayer) {
     for (const slug of Object.keys(chest)) {
       const n = Math.max(0, Math.floor(Number(chest[slug]) || 0));
       if (!n) continue;
-      shared.rewardChest[slug] = (Number(shared.rewardChest[slug]) || 0) + n;
+      shared.rewardChest[slug] = Math.max(Number(shared.rewardChest[slug]) || 0, n);
     }
   }
   for (const bundle of Array.isArray(fromPlayer.rewardChestBundles) ? fromPlayer.rewardChestBundles : []) {
@@ -925,9 +930,11 @@ function mergeTerminalRewardChest(shared, fromPlayer) {
       const n = Math.max(0, Math.floor(Number(items[slug]) || 0));
       if (n) live[slug] = n;
     }
-    if (!Object.keys(live).length) continue;
     const id = String(bundle.id || bundle.bundleId || "");
-    const existing = id ? shared.rewardChestBundles.find((b) => b && String(b.id) === id) : null;
+    // Bundle vazio também entra: é o marcador "boss derrotado sem drops" que
+    // a autoridade cria de propósito — o jogador precisa vê-lo no baú.
+    if (!id) continue;
+    const existing = shared.rewardChestBundles.find((b) => b && String(b.id) === id);
     if (existing) {
       existing.items = existing.items && typeof existing.items === "object" ? existing.items : {};
       for (const slug of Object.keys(live))

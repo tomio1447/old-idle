@@ -4457,7 +4457,31 @@ function claimSpawnCell(auth,cx,cy){
   }
   return {cx,cy};
 }
-function makeMob(auth,slug,boss,id,source,slot){const def=monsterDef(slug);if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
+function makeMob(auth,slug,boss,id,source,slot){
+  // Boss de arena: a definição real (stats + loot próprio) vive no BOSS_DEFS
+  // do cliente e chega em source.def. Sem este merge a autoridade lutava com
+  // o def do sprite-base: Leiden (slug próprio, sem MONSTERS.loot) não
+  // dropava NADA no reward chest, e The Monster (sprite cave-rat) entregava
+  // a tabela do rato em vez da do boss. Campos numéricos inválidos voltam ao
+  // def base; entradas de loot são sanitizadas.
+  const bossSrc=boss&&source&&source.def&&typeof source.def==="object"&&!Array.isArray(source.def)?source.def:null;
+  let def=monsterDef(slug);
+  if(bossSrc){
+    const base=def||{};
+    def=Object.assign({},base,bossSrc);
+    const srcLoot=Array.isArray(bossSrc.loot)&&bossSrc.loot.length?bossSrc.loot:(Array.isArray(base.loot)?base.loot:[]);
+    def.loot=srcLoot.map((e)=>e&&typeof e==="object"?{
+      item:String(e.item||""),
+      chance:Math.max(0,Math.min(100,Number(e.chance)||0)),
+      min:Math.max(1,Math.floor(Number(e.min)||1)),
+      max:Math.max(1,Math.floor(Number(e.max)||1)),
+    }:null).filter((e)=>e&&e.item&&e.chance>0&&e.max>=e.min);
+    for(const k of ["hp","exp","armor","defense","damage","attackSpeed","mitigation","speed"])
+      if(!Number.isFinite(Number(def[k])))def[k]=base[k];
+    if(def.damage&&typeof def.damage==="object")
+      def.damage=Number(def.damage.max)||Number(def.damage.min)||0;
+  }
+  if(!def)return null;const greedAdd=["dreadful-harvester","soulsnatcher","greedbeast","powerful-soul"].includes(String(slug));
   const stripGreedDef=!!(auth&&auth.greed&&greedAdd&&!boss);
   const hasSlot=Number.isFinite(Number(slot));
   const sequence=hasSlot?Number(slot)+1:Math.max(1,Number(auth.nextMobId)||1);
@@ -5274,7 +5298,7 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     auth.rewardBundleId=String(auth.bossId||mob.slug)+"-"+String(auth.clock||stepTs||Date.now());
   // Mini boss de hunt: bundle PRÓPRIO por morte (o reward chest lista cada
   // boss derrotado separadamente). Boss de arena mantém o bundle da luta.
-  const bossMeta=monsterDef(mob.slug)||mob.def||{};
+  const bossMeta=mob.def||monsterDef(mob.slug)||{};
   const rewardSource=mob.boss?{
     bundleId:auth.rewardBundleId,bossId:auth.bossId||mob.slug,
     name:bossMeta.name||mob.slug,
