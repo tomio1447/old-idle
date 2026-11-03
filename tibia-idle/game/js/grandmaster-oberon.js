@@ -165,7 +165,7 @@ const OBERON_ITEMS = {
       level: 250,
       text: "Requer nível 250+ (Falcon Bastion)",
     },
-    cooldown: 0,
+    cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 0,
     mechanic: "oberon-debate",
   };
 })();

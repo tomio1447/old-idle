@@ -1579,10 +1579,10 @@ function huntTimeMissionTick(c, p, dt) {
 // Temporariamente todos os bosses ficam livres: sem requisitos e sem cooldown.
 // Os dados originais continuam nas definições para serem reativados depois.
 const BOSS_REQUIREMENTS_ENABLED = false;
-const BOSS_COOLDOWNS_ENABLED = false;
+const BOSS_COOLDOWNS_ENABLED = true;
 // TEMP TEST: remove before release — libera taints/requisitos do Megalomania.
 const MEGA_TEST_BYPASS = true;
-const BOSS_COOLDOWN = 0;
+const BOSS_COOLDOWN = 16 * 60 * 60 * 1000;
 GAMEDATA.hunts["deathstrike-room"] = {
   name: "The Deathstrike Room", level: 100, minLevel: 100, cat: "boss",
   pack: 1, monsters: ["deathstrike"], color: "#574d3d", scene: "cave",
@@ -1654,7 +1654,7 @@ const BOSS_DEFS = {
     title:"Boss de Rotten Wasteland",hunt:"goshnars-hatred-room",
     baseMonster:"goshnar-s-hatred",sprite:"goshnar-s-hatred",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
-    cooldown:0,
+    cooldown:BOSS_COOLDOWN,
     requirement:{
       level:400, mission:"rotten-wasteland",access:"goshnar-s-hatred",enforced:false,
       text:"Elimine 50 Rotten Golems em Rotten Wasteland para liberar Goshnar's Hatred",
@@ -1666,7 +1666,7 @@ const BOSS_DEFS = {
     title:"Boss Soul War — Spite",hunt:"goshnars-spite-room",
     baseMonster:"goshnar-s-spite",sprite:"goshnar-s-spite",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
-    cooldown:0,
+    cooldown:BOSS_COOLDOWN,
     requirement:{
       level:400, enforced:false,
       text:"Requer nível 400+ (Soul War)",
@@ -1678,7 +1678,7 @@ const BOSS_DEFS = {
     title:"Boss de Mirrored Nightmare",hunt:"goshnars-malice-room",
     baseMonster:"goshnar-s-malice",sprite:"goshnar-s-malice",
     hp:300000,exp:75000,damage:5000,armor:160,defense:160,
-    cooldown:0,
+    cooldown:BOSS_COOLDOWN,
     requirement:{
       level:400, mission:"dark-thais", access:"goshnar-s-malice", enforced:false,
       text:"Complete a missão Mirrored Nightmare para acessar Goshnar's Malice",
@@ -1690,7 +1690,7 @@ const BOSS_DEFS = {
     title:"Boss de Furious Crate", hunt:"goshnars-cruelty-room",
     baseMonster:"goshnar-s-cruelty", sprite:"goshnar-s-cruelty",
     hp:300000, exp:75000, damage:5000, armor:160, defense:160,
-    cooldown:0,
+    cooldown:BOSS_COOLDOWN,
     requirement:{
       level:400, mission:"furious-crate", access:"goshnar-s-cruelty", enforced:false,
       text:"Elimine 10 monstros fiendish/influenced em Furious Crate para acessar Goshnar's Cruelty",
@@ -1703,7 +1703,7 @@ const BOSS_DEFS = {
     baseMonster:"goshnar-s-megalomania-green",
     sprite:"goshnar-s-megalomania-purple",
     hp:620000,exp:3000000,damage:2500,armor:55,defense:55,
-    cooldown:0,
+    cooldown:BOSS_COOLDOWN,
     requirement:{
       level:400,
       mission:"claustrophobic-inferno",
@@ -1864,7 +1864,10 @@ function bossReadyInfo(p, boss) {
   const left = BOSS_COOLDOWNS_ENABLED
     ? Math.max(0, (st.lastFight || 0) + (boss.cooldown || 0) - Date.now())
     : 0;
-  if (left > 0) return { ok: false, reason: "Cooldown", left: left };
+  if (left > 0) {
+    const rem = typeof fmtTime === "function" ? fmtTime(Math.ceil(left / 1000)) : "";
+    return { ok: false, reason: "Cooldown" + (rem ? " · " + rem : ""), left: left };
+  }
   return { ok: true, reason: "Disponível", left: 0 };
 }
 

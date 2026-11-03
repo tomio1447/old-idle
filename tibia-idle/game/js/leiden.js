@@ -112,7 +112,7 @@ const LEIDEN_LOOT = [
       level: 150,
       text: "Requer nível 150+",
     },
-    cooldown: 0,
+    cooldown: typeof BOSS_COOLDOWN !== "undefined" ? BOSS_COOLDOWN : 0,
     loot: LEIDEN_LOOT,
   };
 
