@@ -423,10 +423,14 @@ function accountNormalizeInstanceMembers(state){
 }
 function accountSaveInstance(token,state){
   const epoch=ACCOUNT_INSTANCE_EPOCH;state=accountNormalizeInstanceMembers(state);
-  return accountQueueInstance(async()=>{
-    // Grants admin (e outros PUTs) podem estar na fila de save: espere para
-    // prepareInstanceState ler o snapshot MySQL já atualizado.
+  return (async()=>{
+    // Grants admin (e outros PUTs) podem estar na fila de save: espere ANTES
+    // de entrar na fila de instância para prepareInstanceState ler o snapshot
+    // MySQL atualizado. Task enfileirado aguardando o rabo da fila oposta
+    // fecha espera circular (save espera instância, instância espera save) e
+    // congela as duas — o PUT create do boss nunca saía do navegador.
     if(typeof accountLastSavePromise==="function")await accountLastSavePromise();
+    return accountQueueInstance(async()=>{
     if(epoch!==ACCOUNT_INSTANCE_EPOCH||!accountLeaseAllowsSimulation()||!state)return false;
     if(ACCOUNT_INSTANCE.status!=="active"&&!ACCOUNT_INSTANCE_CAN_CREATE)return false;
     // A linha vinculada precisa descrever o combate sendo salvo. Se um GET
@@ -449,7 +453,8 @@ function accountSaveInstance(token,state){
       console.warn("[instance] save recusado",r.code,r.data.error||"",r.data.msg||"");
     }
     return false;
-  });
+    });
+  })();
 }
 /* Posições são apenas apresentação/predição: HP, alcance e dano continuam
  * autoritativos. Enviá-las no tick mantém projéteis, efeitos e floaters junto
@@ -924,9 +929,12 @@ function accountSetTrainingConfig(token,charId,skill,plan){
 }
 
 function accountTrainingCheckpoint(training, stop) {
-  return accountQueueSave(async () => {
-    if (!accountLeaseAllowsSimulation()) return false;
+  return (async () => {
+    // A espera da fila de instância fica FORA da fila de save: enfileirado,
+    // o await do rabo oposto fecha espera circular e congela as duas filas.
     if (typeof accountLastInstancePromise === "function") await accountLastInstancePromise();
+    return accountQueueSave(async () => {
+    if (!accountLeaseAllowsSimulation()) return false;
     const owned = new Set(accountCharacterCacheRead().map((c) => String(c.id)));
     const ids = ((training && training.members) || []).filter((m) => m.p && !m.p.remoteTraining && owned.has(String(m.id))).map((m) => Number(m.id));
     if (!ids.length) return false;
@@ -968,7 +976,8 @@ function accountTrainingCheckpoint(training, stop) {
     }
     if (typeof renderSkills === "function" && typeof G !== "undefined" && G.p) renderSkills(G.p);
     return true;
-  });
+    });
+  })();
 }
 function accountDailyRewardStatus(token,charId){
   if(typeof accountApiConfigured!=="function"||!accountApiConfigured())
@@ -2130,12 +2139,13 @@ async function accountCreateCharacter(token, name, voc, data) {
 
 async function accountSaveCharacter(token, charId, p) {
   const id=String(charId);
+  // Mesma regra do party-save: tick/end autoritativo materializa o char e
+  // avança save_version. Esperar a fila da instância evita PUT com versão
+  // stale logo após stopHunt — mas a espera fica FORA da fila de save: um
+  // task enfileirado aguardando o rabo oposto fecha ciclo e congela as duas.
+  if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
   return accountQueueSave(async()=>{
     if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation())return false;
-    // Mesma regra do party-save: tick/end autoritativo materializa o char e
-    // avança save_version. Esperar a fila da instância evita PUT com versão
-    // stale logo após stopHunt (end + save em filas distintas).
-    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
     if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
     let cache=await accountEnsureVersions(token,[id]);
     let summary=cache.find((c)=>String(c.id)===id);
@@ -2175,12 +2185,14 @@ function accountAdminGrantLastError(){return ACCOUNT_ADMIN_GRANT_LAST_ERROR||"";
 async function accountAdminSaveCharacter(token, charId, p) {
   const id=String(charId);
   ACCOUNT_ADMIN_GRANT_LAST_ERROR="";
+  // Espera da fila de instância FORA da fila de save — enfileirado, o await
+  // do rabo oposto fecha ciclo e congela as duas filas.
+  if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
   return accountQueueSave(async()=>{
     if(ACCOUNT_SAVE_CONFLICTS.has(id)||!accountLeaseAllowsSimulation()){
       ACCOUNT_ADMIN_GRANT_LAST_ERROR="Sessão sem controle (lease) para gravar o grant.";
       return false;
     }
-    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
     let cache=await accountEnsureVersions(token,[id]);
     let summary=cache.find((c)=>String(c.id)===id);
     if(!summary||!Number.isSafeInteger(Number(summary.saveVersion))){
@@ -2237,14 +2249,16 @@ async function accountAdminSaveCharacter(token, charId, p) {
 
 async function accountSaveParty(token,state,players){
   const ids=(players||[]).filter((ent)=>ent&&ent.p).map((ent)=>String(ent.id));
+  // O tick da instância já materializa todos os membros atomicamente e
+  // incrementa seus save_versions. Espera qualquer tick/end já enfileirado:
+  // durante combate o party-save seria redundante (e disputaria a versão);
+  // após stopHunt, o end conclui primeiro e o checkpoint curado é salvo.
+  // A espera fica FORA da fila de save — enfileirado, o await do rabo oposto
+  // fecha ciclo e congela as duas filas.
+  if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
   return accountQueueSave(async()=>{
     if(!accountLeaseAllowsSimulation()||!state||!state.id||!Number.isSafeInteger(Number(state.version))||
        ids.some((id)=>ACCOUNT_SAVE_CONFLICTS.has(id)))return false;
-    // O tick da instância já materializa todos os membros atomicamente e
-    // incrementa seus save_versions. Espera qualquer tick/end já enfileirado:
-    // durante combate o party-save seria redundante (e disputaria a versão);
-    // após stopHunt, o end conclui primeiro e o checkpoint curado é salvo.
-    if(typeof accountLastInstancePromise==="function")await accountLastInstancePromise();
     if(ACCOUNT_INSTANCE&&ACCOUNT_INSTANCE.status==="active")return true;
     let account=null;try{account=typeof sessionAccount==="function"?sessionAccount():null;}catch(e){}
     if(state.ownedByAccount&&account&&Number(state.ownedByAccount)!==Number(account.id))return true;
