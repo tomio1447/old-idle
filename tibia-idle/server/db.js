@@ -1495,7 +1495,28 @@ JsonStore.prototype.savePartyCharactersVersioned = function (accountId, partyId,
 };
 JsonStore.prototype.setCharacterZone = function (id, zone) {
   const c = this.findCharacter(id);
-  if (c) { c.zone = zone; this._save(); return c; }
+  if (c) {
+    c.zone = zone;
+    // Templo/treino: personagem recupera todo o HP e mana ao entrar.
+    if (zone === "city" || zone === "training") {
+      const maxHp = Number(c.max_hp) || Number(c.hp) || 0;
+      const maxMp = Number(c.max_mp) || Number(c.mp) || 0;
+      if (maxHp > 0) c.hp = maxHp;
+      if (maxMp > 0) c.mp = maxMp;
+      try {
+        let data = typeof c.data === "string" ? JSON.parse(c.data) : (c.data || {});
+        if (data && typeof data === "object") {
+          const dMax = Number(data.maxHp) || Number(data.max_hp) || maxHp;
+          const mMax = Number(data.maxMp) || Number(data.max_mp) || maxMp;
+          if (dMax > 0) data.hp = dMax;
+          if (mMax > 0) data.mp = mMax;
+          c.data = data;
+        }
+      } catch (e) { /* data opcional */ }
+    }
+    this._save();
+    return c;
+  }
   return null;
 };
 JsonStore.prototype._marketSeq = 1;
