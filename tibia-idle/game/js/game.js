@@ -1911,6 +1911,12 @@ function bossReadyInfo(p, boss) {
       return { ok: false, reason: boss.requirement.text || ("Requer nível " + boss.requirement.level), left: 0 };
     if (boss.requirement.mission && !isMissionComplete(p, boss.requirement.mission))
       return { ok: false, reason: boss.requirement.text, left: 0 };
+    if (Array.isArray(boss.requirement.missions)) {
+      for (const mId of boss.requirement.missions) {
+        if (!isMissionComplete(p, mId))
+          return { ok: false, reason: boss.requirement.text, left: 0 };
+      }
+    }
     if (boss.requirement.allSoulWarTaints) {
       const ok = typeof soulwarHasAllBossTaints === "function" && soulwarHasAllBossTaints(p);
       if (!ok) return { ok: false, reason: boss.requirement.text, left: 0 };
@@ -2005,6 +2011,23 @@ function bossAccessChecklist(p, boss) {
       }
     }
     items.push({ ok: done, label: title + progress });
+  }
+  if (Array.isArray(req.missions)) {
+    for (const mId of req.missions) {
+      const def = MISSION_DEFS[mId];
+      const title = def && def.title ? def.title.replace(/^Missão:\s*/i, "") : mId;
+      const done = !!(p.missionsDone && p.missionsDone[mId]) || isMissionComplete(p, mId);
+      let progress = "";
+      if (def && def.tasks && def.tasks.length && !done) {
+        const st = missionState(p, mId);
+        const doneTasks = def.tasks.filter((t) => {
+          const key = t.monster || t.counter;
+          return key && (st.progress[key] || 0) >= t.target;
+        }).length;
+        progress = ` (${doneTasks}/${def.tasks.length})`;
+      }
+      items.push({ ok: done, label: title + progress });
+    }
   }
   if (req.access) {
     p.bossAccess = p.bossAccess || {};
