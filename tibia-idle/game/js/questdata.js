@@ -91,6 +91,9 @@ var QUEST_DEFS = {
     spawnRange:   { minX: 16, maxX: 19, minY: 23, maxY: 23, z: 7 },
     kickOnDeath:  false,
     countdownSec: 0,
+    // Ids de chão do .otbm marcados como bloqueio no .dat — liberados para o
+    // jogador poder andar pela sala (ver questMapBlockedCells).
+    walkFloors:   [101, 377, 381],
     /* Encontro único: 6 Demons (a mecânica de preparo/alavanca/saída do
      * server/annihilator.js é refinada depois — por ora roda como quest
      * padrão de 1 wave com todos os demons). */

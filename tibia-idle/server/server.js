@@ -4945,6 +4945,20 @@ async function main() {
         const legend=map.leg[map.rows[y][x]];
         if(!legend||legend.bloc||map.footprintBlocked&&map.footprintBlocked[x+":"+y])blocked[x+":"+y]=true;
       }
+      // Pisos funcionais por quest: certos .otbm usam ids de chão marcados como
+      // bloqueio no .dat (piso de pedra 101, lava 377/381 da Annihilator) —
+      // `quest.walkFloors` libera células cujo chão é um desses ids e cujos
+      // itens não bloqueiam por si só (paredes/deco continuam bloqueando).
+      if(Array.isArray(quest.walkFloors)){
+        const floors=new Set(quest.walkFloors.map(Number));
+        for(let y=0;y<map.rows.length;y++)for(let x=0;x<map.rows[y].length;x++){
+          const key=x+":"+y;if(!blocked[key])continue;
+          const legend=map.leg[map.rows[y][x]];
+          if(!legend||!(legend.v||[]).some((id)=>floors.has(id)))continue;
+          const hardItem=(legend.g||[]).some((id)=>questTileFlags[id]&&questTileFlags[id][1]);
+          if(!hardItem)delete blocked[key];
+        }
+      }
       return blocked;
     }catch(error){console.error("[quest] map collision",error&&error.message);return null;}
   }
