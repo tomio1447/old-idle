@@ -899,7 +899,11 @@ function npcSweatyHtml(p) {
     const can = have >= 1;
     const qty = t.qty > 1 ? t.qty + "x " : "";
     return `<div class="shop-row npc-shop-row">
-      ${itemImg(t.src, 30)}
+      <div class="row" style="gap:4px;align-items:center;flex-shrink:0">
+        ${itemImg(t.src, 30)}
+        <span class="tiny dim" style="font-size:14px">→</span>
+        ${itemImg(t.dst, 30)}
+      </div>
       <div class="npc-shop-item-text" style="flex:1;min-width:0">
         <div class="small">${srcName} → <b style="color:#ffe680">${qty}${dstName}</b></div>
         <div class="tiny dim">na bag: ${fmtFull(have)}</div>
