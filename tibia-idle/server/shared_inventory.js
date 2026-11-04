@@ -213,6 +213,14 @@ function applySharedToPlayer(p, shared) {
   p.dustLimit = shared.dustLimit;
   p.slivers = shared.slivers;
   p.exaltedCores = shared.exaltedCores;
+  // Baseline dos recursos da forja (mesma ideia do _pouchBase): o delta
+  // (espelho − base) é o que ESTE player mudou — a extração soma o delta ao
+  // shared atual em vez de sobrescrever, então um espelho atrasado não
+  // reverte ganhos feitos por outra cópia/caminho.
+  p._forgeBase = {
+    dust: shared.dust, dustLimit: shared.dustLimit,
+    slivers: shared.slivers, exaltedCores: shared.exaltedCores,
+  };
   const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
     .filter((i) => i && typeof i === "object" && String(i.loc || "").startsWith("equip:"));
   p.itemInstances = shared.itemInstances.map((i) => Object.assign({}, i)).concat(equipped);
@@ -249,6 +257,30 @@ function pouchDelta(sharedPouch, player) {
   return out;
 }
 
+/* Merge dos recursos da forja (dust/slivers/exaltedCores são da conta):
+ * com baseline _forgeBase, aplica o DELTA (shared += espelho − base) —
+ * espelho atrasado vira delta 0 (não reverte a conta), ganhos entram e
+ * gastos saem. dustLimit só cresce (convergência) — sempre pelo maior.
+ * Sem baseline (saves legados), fallbackMax usa o maior valor (merge
+ * terminal) ou sobrescreve (save comum — comportamento antigo). */
+function forgeResourcesDelta(shared, p, fallbackMax) {
+  if (!p || typeof p !== "object") return;
+  shared.dustLimit = Math.max(shared.dustLimit,
+    Math.max(100, Math.min(325, Math.floor(Number(p.dustLimit) || 100))));
+  const base = p._forgeBase && typeof p._forgeBase === "object" && !Array.isArray(p._forgeBase)
+    ? p._forgeBase : null;
+  for (const key of ["dust", "slivers", "exaltedCores"]) {
+    const cur = Math.max(0, Math.floor(Number(p[key]) || 0));
+    if (!base) {
+      if (fallbackMax) shared[key] = Math.max(Number(shared[key]) || 0, cur);
+      else shared[key] = cur;
+      continue;
+    }
+    const b = Math.max(0, Math.floor(Number(base[key]) || 0));
+    shared[key] = Math.max(0, (Number(shared[key]) || 0) + cur - b);
+  }
+}
+
 /* Extrai os containers de um player para o shared (oposto do apply). O
  * player fica com os containers zerados e só as instâncias equipadas. */
 function extractSharedFromPlayer(p, shared) {
@@ -260,10 +292,7 @@ function extractSharedFromPlayer(p, shared) {
   shared.depot = Array.isArray(p.depot) ? p.depot.slice() : [];
   shared.rewardChest = (p.rewardChest && typeof p.rewardChest === "object" && !Array.isArray(p.rewardChest)) ? p.rewardChest : {};
   shared.rewardChestBundles = Array.isArray(p.rewardChestBundles) ? p.rewardChestBundles.slice() : [];
-  shared.dust = Math.max(0, Math.floor(Number(p.dust) || 0));
-  shared.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(p.dustLimit) || 100)));
-  shared.slivers = Math.max(0, Math.floor(Number(p.slivers) || 0));
-  shared.exaltedCores = Math.max(0, Math.floor(Number(p.exaltedCores) || 0));
+  forgeResourcesDelta(shared, p, false);
   const insts = Array.isArray(p.itemInstances) ? p.itemInstances : [];
   shared.itemInstances = insts
     .filter((i) => i && typeof i === "object" && !String(i.loc || "").startsWith("equip:"))
@@ -324,10 +353,7 @@ function mergeSharedFromPlayer(p, shared, opts) {
     shared.itemInstances.push(copy);
   }
   shared.seq = Math.max(shared.seq, Math.floor(Number(p._itemInstSeq) || 0));
-  shared.dust = Math.max(shared.dust, Math.floor(Number(p.dust) || 0));
-  shared.dustLimit = Math.max(shared.dustLimit, Math.floor(Number(p.dustLimit) || 100));
-  shared.slivers = Math.max(shared.slivers, Math.floor(Number(p.slivers) || 0));
-  shared.exaltedCores = Math.max(shared.exaltedCores, Math.floor(Number(p.exaltedCores) || 0));
+  forgeResourcesDelta(shared, p, true);
   extractSharedStamina(p, shared);
   return normalizeSharedInventory(shared);
 }
@@ -346,6 +372,7 @@ module.exports = {
   mergeCharForgeResources,
   applySharedToPlayer,
   extractSharedFromPlayer,
+  forgeResourcesDelta,
   pouchDelta,
   mergeSharedFromPlayer,
   charDataOf,

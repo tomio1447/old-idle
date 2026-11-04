@@ -434,13 +434,13 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
   const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
   const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
   if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
-  const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
+  const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(checkpoint).toISOString();
   row.worker_cursor_at=row.saved_at;row.worker_total_ms=(Number(row.worker_total_ms)||0)+elapsed;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
   const sharedByAcc=new Map(),sharedMirror=new Map();
-  if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
+  if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
     for(const projection of next.characters||[]){
       const c=this.findCharacter(projection.id);if(!c)continue;
@@ -461,8 +461,10 @@ JsonStore.prototype.instanceWorkerClaim = function(accountId,now,maxStep,minStep
       }
       if(next.terminalReason)
         sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
-      else if(pouchDirtyIds.has(Number(projection.id)))
-        sharedInvPouchDirtyFlush(shared,projection.data);
+      else{
+        if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
+        if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
+      }
     }
   }
   for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -491,12 +493,12 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
   if(elapsed<50)return {ok:true,instance:row,characters:[],elapsed:0};
   const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
   if(typeof this._syncBlessWallets==="function")next.state=this._syncBlessWallets(next.state);
-  const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
+  const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
   row.state=next.state;row.version=Number(row.version)+1;row.saved_at=new Date(now).toISOString();row.worker_cursor_at=row.saved_at;
   if(next.terminalReason){row.status="ended";row.terminal_reason=next.terminalReason;row.ended_at=row.saved_at;}
   // Inventário da conta: tick terminal extrai containers para o shared.
   const sharedByAcc=new Map(),sharedMirror=new Map();
-  if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
+  if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
     const tickInstanceId=String(row.instance_id||"");
     for(const projection of next.characters||[]){
       const c=this.findCharacter(projection.id);if(!c)continue;
@@ -517,8 +519,10 @@ JsonStore.prototype.instanceAuthorityTick = function(accountId,expectedVersion,n
       }
       if(next.terminalReason)
         sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
-      else if(pouchDirtyIds.has(Number(projection.id)))
-        sharedInvPouchDirtyFlush(shared,projection.data);
+      else{
+        if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
+        if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
+      }
     }
   }
   const changed=[];for(const projection of next.characters||[]){const c=this.findCharacter(projection.id);
@@ -954,29 +958,42 @@ function mergeTerminalRewardChest(shared, fromPlayer) {
  * delta no shared e remove a marca + rebasa _pouchBase no state — roda
  * uma única vez por mutação (a extração terminal vê só o delta posterior). */
 function pouchDirtyScan(next) {
-  const ids = new Set();
+  const pouchIds = new Set(), forgeIds = new Set();
   for (const projection of (next && next.characters) || []) {
     let d = projection && projection.data;
     if (typeof d === "string") { try { d = JSON.parse(d); } catch (e) { d = null; } }
-    if (d && d._pouchDirty) ids.add(Number(projection.id));
+    if (!d) continue;
+    if (d._pouchDirty) pouchIds.add(Number(projection.id));
+    if (d._forgeDirty) forgeIds.add(Number(projection.id));
   }
-  if (ids.size) {
+  if (pouchIds.size || forgeIds.size) {
     let st = null;
     try { st = typeof next.state === "string" ? JSON.parse(next.state) : next.state; } catch (e) { st = null; }
     const players = st && st.authority && st.authority.players;
     if (Array.isArray(players)) {
       let changed = false;
       for (const entry of players) {
-        if (entry && entry.p && entry.p._pouchDirty) {
+        if (!entry || !entry.p) continue;
+        if (entry.p._pouchDirty) {
           delete entry.p._pouchDirty;
           entry.p._pouchBase = Object.assign({}, entry.p.lootPouch || {});
+          changed = true;
+        }
+        if (entry.p._forgeDirty) {
+          delete entry.p._forgeDirty;
+          entry.p._forgeBase = {
+            dust: Math.max(0, Math.floor(Number(entry.p.dust) || 0)),
+            dustLimit: Math.max(100, Math.min(325, Math.floor(Number(entry.p.dustLimit) || 100))),
+            slivers: Math.max(0, Math.floor(Number(entry.p.slivers) || 0)),
+            exaltedCores: Math.max(0, Math.floor(Number(entry.p.exaltedCores) || 0)),
+          };
           changed = true;
         }
       }
       if (changed) next.state = typeof next.state === "string" ? JSON.stringify(st) : st;
     }
   }
-  return ids;
+  return { pouch: pouchIds, forge: forgeIds };
 }
 /* Aplica só o delta da pouch (fora do terminal — sem tocar nos demais
  * containers, que continuam pertencendo à instância até o fim). */
@@ -985,6 +1002,16 @@ function sharedInvPouchDirtyFlush(shared, data) {
   if (!p || typeof p !== "object" || Array.isArray(p)) return;
   const merged = SharedInv.pouchDelta(shared.lootPouch, p);
   shared.lootPouch = merged || Object.assign({}, p.lootPouch || {});
+}
+/* Flush dos recursos da forja "sujos" fora do terminal: o kill de mob
+ * influenced/fiendish marca p._forgeDirty na cópia da instância. O tick
+ * aplica o DELTA (espelho − _forgeBase) no shared da conta e o scan rebasa
+ * _forgeBase no state — o dust entra na conta em tempo real e o merge
+ * terminal vê só o delta posterior (sem contar duas vezes). */
+function sharedInvForgeDirtyFlush(shared, data) {
+  let p = typeof data === "string" ? (() => { try { return JSON.parse(data); } catch (e) { return null; } })() : data;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return;
+  SharedInv.forgeResourcesDelta(shared, p, true);
 }
 function sharedInvExtractMirror(shared, data, terminal, mergePouch) {
   if (!SharedInv) return data;
@@ -3382,12 +3409,12 @@ async function MysqlStore() {
         const checkpoint=cursor+elapsed,advanced=advanceState(row.state,elapsed,checkpoint);
         const next=advanced&&typeof advanced==="object"&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         next.state=await syncBlessWallets(conn,next.state);
-        const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
+        const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
         // Inventário da conta: tick terminal extrai containers para o shared
         // (o worker só roda sem lease; instância própria concorrente é rara,
         // mas contas de convidados com instância ativa são preservadas).
         const sharedByAcc=new Map(),sharedMirror=new Map();
-        if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
+        if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
             const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
@@ -3408,8 +3435,10 @@ async function MysqlStore() {
             }
             if(next.terminalReason)
               sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
-            else if(pouchDirtyIds.has(Number(projection.id)))
-              sharedInvPouchDirtyFlush(shared,projection.data);
+            else{
+              if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
+              if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
+            }
           }
         }
         for(const projection of next.characters||[])await conn.query(
@@ -3460,12 +3489,12 @@ async function MysqlStore() {
         if(elapsed<50){await conn.commit();return {ok:true,instance:row,characters:[],elapsed:0};}
         const advanced=advanceState(row.state,elapsed,now),next=advanced&&advanced.state!==undefined?advanced:{state:advanced,characters:[]};
         next.state=await syncBlessWallets(conn,next.state);
-        const pouchDirtyIds=SharedInv?pouchDirtyScan(next):new Set();
+        const dirty=SharedInv?pouchDirtyScan(next):{pouch:new Set(),forge:new Set()};
         // Inventário da conta: no tick TERMINAL, extrai bag/lootPouch/depot dos
         // personagens para accounts.shared_inventory e espelha o shared no data
         // salvo de cada um (containers são da conta, não do personagem).
         const sharedByAcc=new Map(),sharedMirror=new Map();
-        if((next.terminalReason||pouchDirtyIds.size)&&SharedInv&&(next.characters||[]).length){
+        if((next.terminalReason||dirty.pouch.size||dirty.forge.size)&&SharedInv&&(next.characters||[]).length){
           const tickInstanceId=String(row.instance_id||"");
           for(const projection of next.characters||[]){
             const [acctRows]=await conn.query("SELECT account_id FROM characters WHERE id=?",[Number(projection.id)]);
@@ -3488,8 +3517,10 @@ async function MysqlStore() {
             }
             if(next.terminalReason)
               sharedMirror.set(Number(projection.id),sharedInvExtractMirror(shared,projection.data,true,firstAcc));
-            else if(pouchDirtyIds.has(Number(projection.id)))
-              sharedInvPouchDirtyFlush(shared,projection.data);
+            else{
+              if(dirty.pouch.has(Number(projection.id)))sharedInvPouchDirtyFlush(shared,projection.data);
+              if(dirty.forge.has(Number(projection.id)))sharedInvForgeDirtyFlush(shared,projection.data);
+            }
           }
         }
         for(const projection of next.characters||[])await conn.query(

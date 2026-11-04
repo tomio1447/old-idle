@@ -2075,6 +2075,14 @@ function accountApplySharedInventory(shared) {
   if (shared.dustLimit !== undefined) p.dustLimit = Math.max(100, Math.min(325, Math.floor(Number(shared.dustLimit) || 100)));
   if (shared.slivers !== undefined) p.slivers = Math.max(0, Math.floor(Number(shared.slivers) || 0));
   if (shared.exaltedCores !== undefined) p.exaltedCores = Math.max(0, Math.floor(Number(shared.exaltedCores) || 0));
+  /* Baseline dos recursos da forja: o servidor faz merge por DELTA
+   * (espelho − _forgeBase). Sem rebasar aqui, um shared que mudou por
+   * outro caminho faria o próximo save reenviar o delta antigo (duplicar
+   * ganho) ou descontar de novo (duplicar gasto). */
+  p._forgeBase = {
+    dust: Number(p.dust) || 0, dustLimit: Number(p.dustLimit) || 100,
+    slivers: Number(p.slivers) || 0, exaltedCores: Number(p.exaltedCores) || 0,
+  };
   if (Array.isArray(shared.itemInstances)) {
     const equipped = (Array.isArray(p.itemInstances) ? p.itemInstances : [])
       .filter((i) => i && typeof i === "object" && String(i.loc || "").indexOf("equip:") === 0);

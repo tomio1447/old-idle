@@ -5345,6 +5345,10 @@ function reward(auth,mob,players,stepTs){const alive=players.filter((x)=>x&&x.p&
     let sliversGained=0;
     if(mob.fiendish){const stars=Math.max(1,Number(mob.def&&mob.def.best&&mob.def.best.stars)||3);sliversGained=roll(auth,1,stars);
       leader.slivers=(Number(leader.slivers)||0)+sliversGained;auth.stats.loot.slivers=(Number(auth.stats.loot.slivers)||0)+sliversGained;}
+    // _forgeDirty: o tick do db faz flush do delta dos recursos da forja pro
+    // shared da conta no MESMO tick (sem esperar o fim da luta) — o dust do
+    // kill entra na conta imediatamente e sobrevive a ends forçados.
+    if(gained||sliversGained)leader._forgeDirty=1;
     // Evento de dust para o cliente mostrar o floater
     if(gained||sliversGained)auth.events.push({t:"dust",dust:gained,slivers:sliversGained,
       stacks:stacks,x:Number(mob.x)||0.5,y:Number(mob.y)||0.5,targetId:String(mob.id),
