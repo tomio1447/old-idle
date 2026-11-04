@@ -142,12 +142,19 @@ function openQuestsModal() {
   const ui = questPrepareModal("quests-modal-shell");
   if (!ui) return;
   const quests = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS : {};
-  const cards = Object.values(quests).map(questCard).join("");
+  const worldCards = Object.values(quests).filter((q) => q.questType !== "party").map(questCard).join("");
+  const partyCards = Object.values(quests).filter((q) => q.questType === "party").map(questCard).join("");
+  const section = (title, cards) => cards
+    ? `<div class="small mb4 mt8" style="color:#d4af37;font-weight:bold;letter-spacing:.5px">${title}</div>
+       <div style="display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px 14px;">${cards}</div>`
+    : "";
   ui.body.innerHTML = `<div class="panel-title quest-modal-title">
     <img src="assets/item/small-treasure-chest.png" width="20" height="20" style="vertical-align:middle;margin-right:6px" alt="">
     <span>QUESTS</span><button class="sm" id="quests-modal-close">Fechar</button></div>
-    <div class="panel-body" id="quests-modal-list" style="display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px 14px;">
-      ${cards || '<span class="dim">Nenhuma quest disponível.</span>'}</div>`;
+    <div class="panel-body" id="quests-modal-list">
+      ${section("WORLD QUESTS", worldCards)}
+      ${section("PARTY QUESTS", partyCards)}
+      ${(!worldCards && !partyCards) ? '<span class="dim">Nenhuma quest disponível.</span>' : ""}</div>`;
   $("#quests-modal-close").onclick = () => {
     ui.modal.classList.remove("show");
     ui.body.classList.remove("quests-modal-shell");
@@ -238,8 +245,10 @@ function openQuestDetail(questId) {
         <button type="button" class="sm" id="quest-detail-back">← Voltar</button>
         ${q.playable === false
           ? `<span class="tiny dim" style="margin-left:auto">EM BREVE — mecânica dedicada em implementação</span>`
-          : `<button type="button" class="sm primary quest-action" id="quest-detail-auto">AUTO JOIN</button>
-             <button type="button" class="danger sm quest-action" id="quest-detail-create">CREATE LOBBY</button>`}
+          : q.questType === "party"
+            ? `<button type="button" class="danger sm quest-action" id="quest-detail-start">INICIAR — 4 personagens</button>`
+            : `<button type="button" class="sm primary quest-action" id="quest-detail-auto">AUTO JOIN</button>
+               <button type="button" class="danger sm quest-action" id="quest-detail-create">CREATE LOBBY</button>`}
       </div>
     </div>`;
   // Bind item tooltips
@@ -253,9 +262,11 @@ function openQuestDetail(questId) {
     ui.body.classList.remove("quest-detail-shell");
   };
   $("#quest-detail-back").onclick = openQuestsModal;
-  const autoBtn = $("#quest-detail-auto"), createBtn = $("#quest-detail-create");
+  const autoBtn = $("#quest-detail-auto"), createBtn = $("#quest-detail-create"),
+    startBtn = $("#quest-detail-start");
   if (autoBtn) autoBtn.onclick = () => questAutoJoin(questId);
   if (createBtn) createBtn.onclick = () => questCreateLobby(questId);
+  if (startBtn) startBtn.onclick = () => questStartParty(questId);
 }
 
 /* ---- Character picker (reuse megaLobbyConfirmCharModal) ---- */
@@ -324,6 +335,81 @@ async function questAutoJoin(questId) {
     openQuestLobby(r.data);
   } catch (e) {
     questToast("Falha de conexão.");
+  } finally {
+    questSetBusy(false);
+  }
+}
+
+/* ---- Party quest: seletor de N personagens da própria conta ---- */
+
+function questPickPartyChars(questId) {
+  const q = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS[questId] : null;
+  if (!q) return Promise.resolve(null);
+  const need = Math.max(1, Number(q.maxPlayers) || 1);
+  return new Promise((resolve) => {
+    const modal = $("#modal"), body = $("#modal-body");
+    if (!modal || !body) { resolve(null); return; }
+    const chars = typeof megaLobbyAccountChars === "function" ? megaLobbyAccountChars() : [];
+    const rows = chars.map((c) => {
+      const id = Number(c.id || (c.p && c.p.id));
+      const name = c.name || (c.p && c.p.name) || "?";
+      const voc = c.voc || (c.p && c.p.voc) || "none";
+      const level = Number(c.level || (c.p && c.p.level) || 1);
+      const ok = level >= q.level;
+      return `<label class="mega-lobby-char-row" style="${ok ? "" : "opacity:.45"}">
+        <input type="checkbox" value="${id}" ${ok ? "" : "disabled"}>
+        <span><b>${name}</b> · ${voc} · lvl ${level}</span></label>`;
+    }).join("") || `<div class="dim">Nenhum personagem.</div>`;
+    body.innerHTML = `<div class="panel-title">${q.name} — <span class="dim" style="font-weight:normal">Party Quest</span>
+      <button class="sm" id="quest-party-cancel">✕</button></div>
+      <div class="panel-body">
+        <p class="tiny dim">Selecione <b>${need}</b> personagens lvl ${q.level}+ da conta.</p>
+        <div class="mega-lobby-char-list">${rows}</div>
+        <button class="danger full mt8" id="quest-party-confirm" disabled>INICIAR (0/${need})</button>
+      </div>`;
+    modal.classList.add("show");
+    const close = () => { modal.classList.remove("show"); };
+    const update = () => {
+      const n = body.querySelectorAll('input[type="checkbox"]:checked').length;
+      const btn = $("#quest-party-confirm");
+      if (btn) { btn.disabled = n !== need; btn.textContent = `INICIAR (${n}/${need})`; }
+    };
+    body.querySelectorAll('input[type="checkbox"]').forEach((i) => i.addEventListener("change", update));
+    const cancel = $("#quest-party-cancel");
+    if (cancel) cancel.onclick = () => { close(); resolve(null); };
+    const confirm = $("#quest-party-confirm");
+    if (confirm) confirm.onclick = () => {
+      const ids = Array.from(body.querySelectorAll('input[type="checkbox"]:checked')).map((i) => Number(i.value));
+      if (ids.length !== need) return;
+      close();
+      resolve(ids);
+    };
+  });
+}
+
+/* ---- Party quest: inicia direto com os chars escolhidos (sem lobby público) ---- */
+
+async function questStartParty(questId) {
+  if (QUEST_MODAL_BUSY) return;
+  const picked = await questPickPartyChars(questId);
+  if (!picked) { openQuestDetail(questId); return; }
+  questSetBusy(true);
+  try {
+    const r = await questFetch("POST", "/api/quest/create", { questId, characterIds: picked });
+    if (r.status !== 200 || !r.data || !r.data.ok) {
+      openQuestDetail(questId);
+      return questToast((r.data && r.data.msg) || "Não foi possível iniciar a quest.");
+    }
+    const lobbyId = r.data.lobbyId;
+    QUEST_ACTIVE_LOBBY = { lobbyId, questId };
+    const s = await questFetch("POST", "/api/quest/start", { lobbyId });
+    if (s.status !== 200 || !s.data || !s.data.ok) {
+      openQuestLobby(r.data);
+      return questToast((s.data && s.data.msg) || "Falha ao iniciar a luta.");
+    }
+    openQuestLobby((s.data && s.data.lobbyId) ? s.data : r.data);
+  } catch (e) {
+    questToast("Falha de conexão ao iniciar a quest.");
   } finally {
     questSetBusy(false);
   }

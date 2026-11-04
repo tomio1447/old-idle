@@ -73,6 +73,7 @@ var QUEST_DEFS = {
     maxPlayers:   4,
     maxPerAccount: 4,
     playable:     true,
+    questType:    "party",
     flow:         "annihilator",
     icon:         "demon-armor",
     description:  "Posicione seus 4 personagens nos SQMs de preparo, acione a alavanca e sobreviva aos 6 Demons. Cada sobrevivente que chegar à saída escolhe 1 recompensa lendária (máx. 4 por conta).",

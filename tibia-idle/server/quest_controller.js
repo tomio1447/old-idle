@@ -157,6 +157,7 @@ function createQuestController(opts) {
       countdownEndsAt: 0,
       combatStartedAt: 0,
       joins: new Map(),
+      lobbyType: quest.questType === "party" ? "private" : "open",
       instanceId: null,
       invited: new Set([Number(ownerAccountId)]),
       result: null,
@@ -204,7 +205,9 @@ function createQuestController(opts) {
     if (cd > t) {
       return { code: 429, body: { ok: false, error: "LEAVE_COOLDOWN", msg: "Aguarde o cooldown.", retryAfterMs: cd - t } };
     }
-    if (lobby.joins.has(Number(acc.id))) {
+    const maxPerAccount = Math.max(1, Number(quest.maxPerAccount) || 1);
+    const existing = lobby.joins.get(Number(acc.id));
+    if (existing && (existing.chars || []).length >= maxPerAccount) {
       return { code: 409, body: { ok: false, error: "ALREADY_JOINED", msg: "Conta já está no lobby." } };
     }
 
@@ -240,6 +243,20 @@ function createQuestController(opts) {
       }
     }
 
+    if (existing && (existing.chars || []).some((c) => Number(c.id) === charId)) {
+      return { code: 409, body: { ok: false, error: "CHAR_BUSY", msg: "Personagem já está neste lobby." } };
+    }
+    if (existing) {
+      existing.chars.push({
+        id: Number(character.id),
+        name: String((data && data.name) || character.name || "?"),
+        voc: String((data && data.voc) || character.voc || "none"),
+        level,
+        dead: false,
+      });
+      broadcastLobby(lobby);
+      return { code: 200, body: publicLobbyState(lobby, acc.id) };
+    }
     lobby.joins.set(Number(acc.id), {
       accountId: Number(acc.id),
       chars: [{
@@ -679,17 +696,20 @@ function createQuestController(opts) {
     }
     const r = createLobby(questId, acc.id);
     if (!r.ok) return { code: 409, body: r };
-    // Auto-join creator
-    const charId = Number(body && (body.characterId || body.character_id || (body.characterIds && body.characterIds[0])));
-    if (charId > 0) {
+    // Auto-join creator: aceita 1+ personagens (party quests usam todos da conta).
+    const ids = [body && body.characterId, body && body.character_id]
+      .concat(Array.isArray(body && body.characterIds) ? body.characterIds : [])
+      .map((n) => Number(n)).filter((n) => Number.isSafeInteger(n) && n > 0);
+    let last = null;
+    for (const charId of ids) {
       const joined = await join(db, { token: body.token, lobbyId: r.lobbyId, characterId: charId });
       if (joined.code !== 200 || !joined.body || !joined.body.ok) {
         cancelLobby(r.lobbyId, "creator-join-failed");
         return joined;
       }
-      return joined;
+      last = joined;
     }
-    return { code: 200, body: publicLobbyState(r.lobby, acc.id) };
+    return last || { code: 200, body: publicLobbyState(r.lobby, acc.id) };
   }
 
   /* ---- Auto join (find open lobby or wait) ---- */
@@ -701,6 +721,9 @@ function createQuestController(opts) {
     const q = questDef(questId);
     if (!q || q.playable === false) {
       return { code: 400, body: { ok: false, error: "INVALID_QUEST" } };
+    }
+    if (q.questType === "party") {
+      return { code: 404, body: { ok: false, error: "NO_OPEN_LOBBY", msg: "Quest de party: inicie com seus personagens." } };
     }
     // Encontra lobby aberto
     for (const [lobbyId, lobby] of lobbys) {
