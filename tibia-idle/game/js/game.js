@@ -1851,6 +1851,16 @@ const BOSS_DEFS = {
     hp: 2500, exp: 0, damage: 750, armor: 80, defense: 80, cooldown: 0, loot: [],
     requirement: { text: "Entra pelo lobby da Warzone" },
   },
+
+  // ---- EM BREVE (preview, não jogáveis) ----
+  "the-primal-menace": { id: "the-primal-menace", name: "The Primal Menace", title: "EM BREVE", unavailable: true, sprite: "the-primal-menace" },
+  "magma-bubble":      { id: "magma-bubble", name: "Magma Bubble", title: "EM BREVE", unavailable: true, sprite: "magma-bubble" },
+  "court-warlock":     { id: "court-warlock", name: "Court Warlock", title: "EM BREVE", unavailable: true, sprite: "court-warlock", portraitImage: "assets/mob/court-warlock-preview.gif" },
+  "maior-domus":       { id: "maior-domus", name: "Maior Domus", title: "EM BREVE", unavailable: true, sprite: "maior-domus", portraitImage: "assets/mob/maior-domus-preview.gif" },
+  "phosphorus":        { id: "phosphorus", name: "Phosphorus", title: "EM BREVE", unavailable: true, sprite: "phosphorus", portraitImage: "assets/mob/phosphorus-preview.gif" },
+  "mitmah-vanguard":   { id: "mitmah-vanguard", name: "Mitmah Vanguard", title: "EM BREVE", unavailable: true, sprite: "mitmah-vanguard" },
+  "bakragore":         { id: "bakragore", name: "Bakragore", title: "EM BREVE", unavailable: true, sprite: "bakragore" },
+  "vladrukh":          { id: "vladrukh", name: "Vladrukh", title: "EM BREVE", unavailable: true, sprite: "vladrukh" },
 };
 window.BOSS_DEFS = BOSS_DEFS;
 
@@ -1902,6 +1912,7 @@ function bossState(p, id) {
 }
 
 function bossReadyInfo(p, boss) {
+  if (boss.unavailable) return { ok: false, reason: "Em breve", left: 0 };
   const enforceRequirement = boss.requirement &&
     (BOSS_REQUIREMENTS_ENABLED || boss.requirement.enforced) &&
     // TEMP TEST: remove before release
@@ -2130,6 +2141,22 @@ function renderBosses(p) {
       <div class="hunts-group collapsed">${cards || `<div class="hunt-section-empty">Em breve</div>`}</div>
     </section>`;
   }).join("");
+  const soonIds = Object.keys(BOSS_DEFS).filter((id) => BOSS_DEFS[id].unavailable);
+  if (soonIds.length) {
+    const soonCard = (id) => {
+      const b = BOSS_DEFS[id];
+      const portrait = b.portraitImage
+        ? `<img class="boss-soon-portrait" src="${b.portraitImage}" width="40" height="40" alt="">`
+        : (typeof bossMobImg === "function" ? bossMobImg(b.sprite, 40) : mobImg(b.sprite, 40));
+      return `<button type="button" class="hunt-card hunt-modal-card hunt-canary-card boss-modal-card locked" data-boss-info="${id}">
+        <span class="mobs" aria-hidden="true">${portrait}</span>
+        <span class="info"><span class="nm">${b.name}</span><span class="meta">${b.title || ""}</span></span>
+        <span class="risk high">Em breve</span></button>`;
+    };
+    el.innerHTML += `<section class="hunt-modal-section boss-modal-section accordion-section">
+      <div class="hunt-cat-title accordion-head" role="button" tabindex="0" aria-expanded="false">EM BREVE</div>
+      <div class="hunts-group collapsed">${soonIds.map(soonCard).join("")}</div></section>`;
+  }
   if (typeof bindCatalogAccordion === "function") bindCatalogAccordion(el, "accordion");
   $$("#bosses-modal-list [data-boss-info]").forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -2178,6 +2205,10 @@ function bossStats(boss) {
 function openBossModal(id) {
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  if (boss.unavailable) {
+    toast(boss.name + " chega em breve.", "bad");
+    return;
+  }
   const ready = bossReadyInfo(G.p, boss);
   const st = bossState(G.p, id);
   const drops = bossLootReal(boss);
@@ -2288,6 +2319,10 @@ function startBoss(id, force, arenaReady) {
   window.FORGE_DEBUG_COUNT = { fatal: 0, momentum: 0, ruse: 0, transcendence: 0 };
   const boss = BOSS_DEFS[id];
   if (!boss) return;
+  if (boss.unavailable) {
+    toast(boss.name + " ainda não está disponível (em breve).", "bad");
+    return;
+  }
   if (boss.worldBoss) {
     toast("World Boss entra pelo lobby da Warzone.", "bad");
     return;

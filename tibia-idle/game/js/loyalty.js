@@ -120,15 +120,9 @@ function fmtLoyaltyPoints(pts) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "");
 }
 
-function openLoyaltyModal() {
-  const p = typeof G !== "undefined" && G ? G.p : null;
-  if (!p) return;
-  if (typeof ensureWardrobe === "function") ensureWardrobe(p);
-  const modal = typeof $ === "function" ? $("#modal") : null;
-  const body = typeof $ === "function" ? $("#modal-body") : null;
-  if (!modal || !body) return;
-  body.classList.add("forge-pattern-modal-shell");
-
+/* Conteúdo embutível: usado pelo modal standalone e pela aba Loyalty
+ * do modal do personagem (char-details.js). */
+function renderLoyaltyHtml(p) {
   const pts = loyaltyPoints(p);
   const rank = loyaltyRankForPoints(pts);
   const next = loyaltyNextRank(p);
@@ -167,10 +161,7 @@ function openLoyaltyModal() {
       `</tr>`;
   }).join("");
 
-  body.innerHTML =
-    `<div class="panel-title">🏆 Loyalty` +
-    `<button class="sm" id="loyalty-close" style="margin-left:auto">Fechar</button></div>` +
-    `<div class="loyalty-modal">` +
+  return `<div class="loyalty-modal">` +
     `<div class="loyalty-summary">` +
     `<div class="loyalty-stat"><span class="dim">Pontos</span><b class="loyalty-pts">${fmtLoyaltyPoints(pts)}</b></div>` +
     `<div class="loyalty-stat"><span class="dim">Rank atual</span><b class="loyalty-rank">${rank.title}</b></div>` +
@@ -192,7 +183,20 @@ function openLoyaltyModal() {
     `<div class="tiny dim mt8">O bônus de skill soma nas skills efetivas (como a Wheel) sem alterar o save. ` +
     `O bônus de EXP multiplica a experiência de caçada/combate.</div>` +
     `</div>`;
+}
 
+function openLoyaltyModal() {
+  const p = typeof G !== "undefined" && G ? G.p : null;
+  if (!p) return;
+  if (typeof ensureWardrobe === "function") ensureWardrobe(p);
+  const modal = typeof $ === "function" ? $("#modal") : null;
+  const body = typeof $ === "function" ? $("#modal-body") : null;
+  if (!modal || !body) return;
+  body.classList.add("forge-pattern-modal-shell");
+  body.innerHTML =
+    `<div class="panel-title">🏆 Loyalty` +
+    `<button class="sm" id="loyalty-close" style="margin-left:auto">Fechar</button></div>` +
+    renderLoyaltyHtml(p);
   modal.classList.add("show", "wide");
   const close = typeof $ === "function" ? $("#loyalty-close") : null;
   if (close) {

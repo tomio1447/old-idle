@@ -36,6 +36,8 @@ const CHARD_TABS = [
   { id: "montarias",  nome: "Montarias" },
   { id: "proficiencia", nome: "Proficiência" },
   { id: "roda",       nome: "Roda do Destino" },
+  { id: "charms",     nome: "Charms" },
+  { id: "loyalty",    nome: "Loyalty" },
   { id: "deaths",     nome: "Deaths" },
 ];
 
@@ -141,6 +143,8 @@ function chardRender() {
     montarias: chardTabMontarias,
     proficiencia: chardTabProficiencia,
     roda: chardTabRoda,
+    charms: chardTabCharms,
+    loyalty: chardTabLoyalty,
     deaths: chardTabDeaths,
   }[CHARD.tab] || chardTabPersonagem)(p, el);
 }
@@ -979,6 +983,27 @@ function chardTabRoda(p, el) {
   // (WHEEL_SLOTS -> p.wheel.slots) é o que alimenta os bônus de combate.
   el.innerHTML = `<div class="chard-wheel-embed">${renderWheelModal(p, { embedded: true })}</div>`;
   if (typeof bindWheel === "function") bindWheel(el, chardRender);
+}
+
+/* ------------------------------------------------- aba Charms */
+
+function chardTabCharms(p, el) {
+  if (typeof renderCycloCharms !== "function") {
+    el.innerHTML = `<div class="cyclo-vazio"><div class="tiny dim">Charms indisponível.</div></div>`;
+    return;
+  }
+  renderCycloCharms(p, el);
+}
+
+/* ------------------------------------------------- aba Loyalty */
+
+function chardTabLoyalty(p, el) {
+  if (typeof renderLoyaltyHtml !== "function") {
+    el.innerHTML = `<div class="cyclo-vazio"><div class="tiny dim">Loyalty indisponível.</div></div>`;
+    return;
+  }
+  if (typeof ensureWardrobe === "function") ensureWardrobe(p);
+  el.innerHTML = `<div class="chard-loyalty-embed">${renderLoyaltyHtml(p)}</div>`;
 }
 
 /* ------------------------------------------------- aba Deaths */

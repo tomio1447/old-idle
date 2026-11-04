@@ -3791,7 +3791,7 @@ function renderHelper(p) {
       ${challengeHtml}
       ${renderBuffPicker(p)}
       ${renderHastePicker(p)}
-      <div class="small mb4 mt8" style="color:#d4af37;font-weight:bold"><canvas id="helper-echo-raid-icon" width="22" height="22" style="vertical-align:middle;margin-right:4px"></canvas>Echo Raid</div>
+      <div class="small mb4 mt8" style="color:#d4af37;font-weight:bold"><img src="assets/ui/echo-raid-portal.gif" width="22" height="22" style="vertical-align:middle;margin-right:4px" alt="">Echo Raid</div>
       <div class="row wrap" style="gap:8px;align-items:center">
         <label class="row" style="gap:6px;align-items:center;cursor:pointer" title="Se ativo, o personagem pisa no portal da Echo Raid para ativá-la">
           <input type="checkbox" id="helper-echo-raid" ${p.config.echoRaid ? "checked" : ""}>
@@ -3876,23 +3876,7 @@ function renderHelper(p) {
       p.config.echoRaidMode = b.dataset.echoRaidMode;
       renderHelper(p);
     }));
-    // Ícone animado: mesmo anel dourado pulsante do portal no mapa (render.js).
-    const echoIcon = $("#helper-echo-raid-icon");
-    if (echoIcon && !echoIcon._echoAnim) {
-      echoIcon._echoAnim = true;
-      const ctx = echoIcon.getContext("2d");
-      const paint = () => {
-        if (!document.body.contains(echoIcon)) { echoIcon._echoAnim = false; return; }
-        const t = performance.now();
-        ctx.clearRect(0, 0, 22, 22);
-        ctx.strokeStyle = "rgba(255,215,0," + (0.65 + 0.35 * Math.sin(t / 220)).toFixed(3) + ")";
-        ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(11, 11, 8, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "rgba(255,200,40," + (0.25 + 0.15 * Math.sin(t / 220 + 1.4)).toFixed(3) + ")";
-        ctx.beginPath(); ctx.arc(11, 11, 5.5, 0, Math.PI * 2); ctx.fill();
-        requestAnimationFrame(paint);
-      };
-      requestAnimationFrame(paint);
-    }
+    // Ícone animado: sprite original do portal da Echo Raid (GIF oficial).
     const kd = $("#kite-distance");
     if (kd) kd.addEventListener("change", () => {
       p.config.kiteDistance = Math.max(1, Math.min(5, parseInt(kd.value, 10) || 3));
