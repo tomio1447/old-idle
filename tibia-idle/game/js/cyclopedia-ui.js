@@ -838,17 +838,11 @@ function cycloBossDetail(p, el, slug) {
 function renderCycloCharms(p, el) {
   ensureCyclopedia(p);
   const pts = p.charmPoints || 0;
-  const filtro = CYCLO.charmFiltro || "all";
+  const tab = CYCLO.charmTab === "minor" ? "minor" : "major";
   const sel = CYCLO.charmSel && CHARMS[CYCLO.charmSel] ? CYCLO.charmSel : null;
   const finished = typeof bestiaryFinishedList === "function"
     ? bestiaryFinishedList(p) : [];
-  const ids = Object.keys(CHARMS).filter((id) => {
-    const c = CHARMS[id];
-    if (filtro === "major") return c.cat === "major";
-    if (filtro === "minor") return c.cat === "minor";
-    if (filtro === "owned") return charmOwned(p, id);
-    return true;
-  });
+  const ids = Object.keys(CHARMS).filter((id) => CHARMS[id].cat === tab);
 
   el.innerHTML = `
     <div class="charm-otc-head">
@@ -864,10 +858,10 @@ function renderCycloCharms(p, el) {
         <span class="tiny dim">pts</span>
       </div>
     </div>
-    <div class="app-filters mb8">
-      ${[["all", "Todos"], ["major", "Major"], ["minor", "Minor"], ["owned", "Meus"]]
-        .map(([f, t]) => `<button class="sm ${filtro === f ? "on" : ""}"
-          data-charm-filtro="${f}">${t}</button>`).join("")}
+    <div class="charm-tabs mb8" style="display:flex;gap:6px">
+      ${[["major", "Major Charms"], ["minor", "Minor Charms"]]
+        .map(([t, l]) => `<button class="sm charm-tab-btn ${tab === t ? "on" : ""}"
+          data-charm-tab="${t}">${l}</button>`).join("")}
     </div>
     <div class="charm-otc-layout">
       <div class="charm-otc-list">
@@ -880,8 +874,7 @@ function renderCycloCharms(p, el) {
                        data-charm-sel="${id}">
             ${charmIconHtml(id, 32)}
             <div class="charm-otc-meta">
-              <div class="small">${c.nome}
-                <span class="tiny dim">· ${c.cat}</span></div>
+              <div class="small">${c.nome}</div>
               <div class="tiny dim">${race
                 ? `→ ${mob ? mob.name : race}`
                 : (tem ? "sem assign" : fmtFull(c.custo) + " pts")}</div>
@@ -897,11 +890,18 @@ function renderCycloCharms(p, el) {
       </div>
     </div>`;
 
-  $$("#cyclo-content [data-charm-filtro]").forEach((b) =>
+  $$("#cyclo-content [data-charm-tab]").forEach((b) =>
     b.addEventListener("click", () => {
-      CYCLO.charmFiltro = b.dataset.charmFiltro;
+      CYCLO.charmTab = b.dataset.charmTab;
+      if (CYCLO.charmSel && CHARMS[CYCLO.charmSel] &&
+          CHARMS[CYCLO.charmSel].cat !== CYCLO.charmTab) CYCLO.charmSel = null;
       renderCycloCharms(p, el);
     }));
+  const raceSel = $("#charm-race-sel");
+  if (raceSel) raceSel.addEventListener("change", () => {
+    const prev = $("#charm-race-preview");
+    if (prev && typeof mobImg === "function") prev.innerHTML = mobImg(raceSel.value, 36);
+  });
   $$("#cyclo-content [data-charm-sel]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.charmSel = b.dataset.charmSel;
@@ -967,16 +967,24 @@ function cycloCharmDetail(p, id, finished) {
            ${pode ? "" : "disabled"}>${pode ? "Desbloquear" : "Pontos insuficientes"}</button>`
       : `<div class="tiny" style="color:#9ce84a;margin-bottom:6px">Desbloqueado</div>
          ${race
-           ? `<div class="row" style="gap:6px;align-items:center;margin-bottom:6px">
-                ${mobImg(race, 36)}
-                <div class="tiny">Assign: <b>${GAMEDATA.monsters[race].name}</b></div>
-              </div>
-              <button class="sm" id="charm-clear" data-charm-id="${id}">Remover assign</button>`
+           ? `<div class="charm-assign-box" style="border:1px solid #3a3324;border-radius:4px;padding:8px;margin-bottom:6px">
+                <div class="tiny dim mb4">Criatura assignada:</div>
+                <div class="row" style="gap:8px;align-items:center">
+                  ${mobImg(race, 36)}
+                  <div class="tiny"><b>${GAMEDATA.monsters[race].name}</b></div>
+                </div>
+                <button class="sm mt8" id="charm-clear" data-charm-id="${id}">Remover assign</button>
+              </div>`
            : (finished.length
-              ? `<label class="tiny dim">Criatura (bestiário completo)</label>
-                 <select id="charm-race-sel" class="charm-race-sel">${opts}</select>
-                 <button class="primary sm mt4" id="charm-assign" data-charm-id="${id}">
-                   Assignar runa</button>`
+              ? `<div class="charm-assign-box" style="border:1px solid #3a3324;border-radius:4px;padding:8px;margin-bottom:6px">
+                   <div class="tiny dim mb4">Assignar a uma criatura (bestiário completo):</div>
+                   <div class="row" style="gap:8px;align-items:center">
+                     <span id="charm-race-preview">${race ? mobImg(race, 36) : mobImg(finished[0], 36)}</span>
+                     <select id="charm-race-sel" class="charm-race-sel" style="flex:1">${opts}</select>
+                   </div>
+                   <button class="primary sm mt8" id="charm-assign" data-charm-id="${id}">
+                     Assignar runa</button>
+                 </div>`
               : `<div class="tiny dim">Complete o bestiário de uma criatura para assignar.</div>`)}`
     }`;
 }
