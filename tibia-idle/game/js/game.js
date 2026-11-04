@@ -2046,7 +2046,8 @@ function openBossesCatalogModal() {
   const modal = $("#modal"), body = $("#modal-body");
   body.classList.remove(
     "hunts-modal-shell", "boss-modal-shell", "reward-modal-shell",
-    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
+    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
+    "lootcfg-modal-shell"
   );
   body.classList.add("bosses-modal-shell");
   body.innerHTML = `<div class="panel-title bosses-modal-title">
@@ -5628,7 +5629,8 @@ function bindControls() {
       if (modalBody) {
         modalBody.classList.remove(
           "hunts-modal-shell", "bosses-modal-shell",
-          "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
+          "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
+          "lootcfg-modal-shell"
         );
       }
       if (typeof closeModal === "function") closeModal();

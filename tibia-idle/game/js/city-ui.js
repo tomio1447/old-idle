@@ -107,6 +107,7 @@ const CITY_MODAL_SHELLS = [
   "npcs-modal-shell", "npc-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
   "hunts-modal-shell", "bosses-modal-shell", "boss-modal-shell", "reward-modal-shell",
   "social-modal-shell", "calendar-modal-shell", "chard-modal-shell",
+  "lootcfg-modal-shell",
 ];
 
 const RANKING_TABS = [

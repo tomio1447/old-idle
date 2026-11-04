@@ -1062,7 +1062,8 @@ function openHuntsModal() {
   const modal = $("#modal"), body = $("#modal-body");
   body.classList.remove(
     "boss-modal-shell", "reward-modal-shell",
-    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell"
+    "npcs-modal-shell", "cidade-modal-shell", "ranking-modal-shell",
+    "lootcfg-modal-shell"
   );
   body.classList.add("hunts-modal-shell");
   body.innerHTML = `<div class="panel-title hunts-modal-title">
@@ -3203,6 +3204,8 @@ function clearLootPouchWithConfirm(p) {
     save();
   }
   $("#modal").classList.remove("show");
+  const _mb = $("#modal-body");
+  if (_mb) _mb.classList.remove("lootcfg-modal-shell");
   if (typeof renderAll === "function") renderAll();
   else if (typeof renderLootPouch === "function") renderLootPouch(p);
 }
@@ -3222,7 +3225,10 @@ function openLootPouchConfigModal() {
     </div>`;
   }).join("") || `<div class="dim tiny" style="padding:8px">Nenhum item configurado.</div>`;
 
-  $("#modal-body").innerHTML = `
+  const modalBody = $("#modal-body");
+  if (typeof clearCityModalShells === "function") clearCityModalShells(modalBody);
+  modalBody.classList.add("lootcfg-modal-shell");
+  modalBody.innerHTML = `
     <div class="panel-title">Configurar Loot Pouch
       <span style="flex:1"></span><button class="sm" id="lootcfg-close">✕</button>
     </div>
@@ -3255,7 +3261,7 @@ function openLootPouchConfigModal() {
       <div class="tiny dim mt8">Você pode digitar parte do nome ou slug do item. Ex: meat, gold coin, leather armor.</div>
     </div>`;
   $("#modal").classList.add("show");
-  $("#lootcfg-close").addEventListener("click", () => { $("#modal").classList.remove("show"); renderLootPouch(p); });
+  $("#lootcfg-close").addEventListener("click", () => { $("#modal").classList.remove("show"); modalBody.classList.remove("lootcfg-modal-shell"); renderLootPouch(p); });
   const clearBtn = $("#lootcfg-clear");
   if (clearBtn) clearBtn.addEventListener("click", () => clearLootPouchWithConfirm(p));
   $$("#modal-body [data-add-rule]").forEach((b) => b.addEventListener("click", () => {

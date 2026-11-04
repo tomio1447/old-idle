@@ -1876,7 +1876,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quest-reward-shell,
 .modal-bg .modal.calendar-modal-shell,
 .modal-bg .modal.social-modal-shell,
-.modal-bg .modal.chard-modal-shell {
+.modal-bg .modal.chard-modal-shell,
+.modal-bg .modal.lootcfg-modal-shell {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,rgba(0,0,0,.035) 1px 3px),linear-gradient(180deg,#4b4b49 0%,#30302f 100%);
   border:2px solid;
   border-color:#686868 #171717 #171717 #686868;
@@ -1898,7 +1899,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quest-reward-shell .panel-title,
 .modal-bg .modal.calendar-modal-shell .panel-title,
 .modal-bg .modal.social-modal-shell .panel-title,
-.modal-bg .modal.chard-modal-shell .panel-title {
+.modal-bg .modal.chard-modal-shell .panel-title,
+.modal-bg .modal.lootcfg-modal-shell .panel-title {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 1px,rgba(0,0,0,.05) 1px 3px),#454543;
   border-bottom:2px solid #181818;
 }
@@ -1918,7 +1920,8 @@ button.reward-boss-card:hover { border-color:#d4af37 #675514 #675514 #d4af37; fi
 .modal-bg .modal.quest-reward-shell .panel-body,
 .modal-bg .modal.calendar-modal-shell .panel-body,
 .modal-bg .modal.social-modal-shell .panel-body,
-.modal-bg .modal.chard-modal-shell .panel-body {
+.modal-bg .modal.chard-modal-shell .panel-body,
+.modal-bg .modal.lootcfg-modal-shell .panel-body {
   background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 1px,rgba(0,0,0,.04) 1px 4px),#393937;
 }
 
