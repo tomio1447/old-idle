@@ -369,6 +369,7 @@ function renderWheelModal(p, opts) {
       '<span class="wheel-avail">Available: ' + fmtFull(avail) + ' / ' + fmtFull(total) + ' (' + fmtFull(spent) + ' spent)</span>' +
       '<span style="flex:1"></span>' +
       ctl +
+      '<button class="sm" id="wheel-ok" title="Salvar os pontos alocados na roda">OK</button>' +
       '<button class="sm" id="wheel-reset" title="Remove todos os pontos da roda">Reset</button>' +
       '</div>';
 
@@ -622,6 +623,14 @@ function bindWheel(root, rerender) {
     var n = 0;
     while (wheelAllocate(G.p, WHEEL_UI.sel)) n++;
     if (n > 0) { save(); toast("+" + n + " ponto" + (n === 1 ? "" : "s") + " na fatia."); }
+    rerender();
+  });
+  var okBtn = body.querySelector("#wheel-ok");
+  if (okBtn) okBtn.addEventListener("click", function(){
+    var p = G.p;
+    if (!p || !p.wheel) return;
+    save();
+    toast("Pontos da roda salvos.");
     rerender();
   });
   var resetBtn = body.querySelector("#wheel-reset");

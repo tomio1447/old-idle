@@ -2500,8 +2500,53 @@ Renderer.prototype.draw = function (combat, player, dt) {
                   origin.x, origin.y, drawW, drawH);
   }
 
-  // Ordem visual solicitada: arena/grounds < bossbar < healthbars dos players.
-  // A bossbar vem depois de chão, paredes e sprites, mas antes dos labels.
+  // Membros inconscientes / permadead: corpse oficial imóvel (sem outfit).
+  // Desenhado ANTES da bossbar — a barra fica por cima do corpo.
+  if (combat && !combat.dead) {
+    const downed = (combat.players && combat.players.length)
+      ? combat.players
+      : (combat.player ? [combat.player] : []);
+    for (const ent of downed) {
+      if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
+      const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
+      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
+    }
+  }
+
+  // --- morte do player (hunt): corpse oficial Canary e contador de respawn.
+  // Também antes da bossbar.
+  if (combat && combat.dead && !combat.boss) {
+    const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
+    const px = dp.x * W, py = dp.y * H;
+    // Canary Player::getLookCorpse(): masculino 4240, feminino 4247.
+    const sex = String((player && (player.sex || player.gender)) || "").toLowerCase();
+    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
+    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
+    const ts = tilePx(W);
+    if (corpse && corpse.complete && corpse.naturalWidth) {
+      const scale = ts / 32;
+      const cw = corpse.naturalWidth * scale, ch = corpse.naturalHeight * scale;
+      // Item corpse ancora pelo pé/base do SQM, como o client.
+      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
+    }
+    const now = Date.now();
+    const left = Math.max(0, Math.ceil((combat.deadUntil - now) / 1000));
+    const total = Math.max(1, combat.deadUntil - (combat.deadAt || now));
+    const elapsed = Math.max(0, Math.min(1, 1 - (combat.deadUntil - now) / total));
+    // Contador vermelho sobe continuamente sobre o corpo até o respawn.
+    const labelY = py - ts * 0.85 - elapsed * ts * 0.7;
+    ctx.font = hudFont(16, canvasHudScale(this.c), true);
+    ctx.textAlign = "center";
+    ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 3 * canvasHudScale(this.c);
+    ctx.strokeText(left + "s", px, labelY);
+    ctx.fillStyle = "#ff3b30";
+    ctx.fillText(left + "s", px, labelY);
+    ctx.globalAlpha = 1;
+  }
+
+  // Ordem visual solicitada: arena/grounds < corpses < bossbar < healthbars dos players.
+  // A bossbar vem depois de chão, paredes, sprites e corpses, mas antes dos labels.
   drawBossBar(ctx, canvasW, combat, -view.x, -view.y, canvasHudScale(this.c));
 
   // --- informações: segunda passagem, sempre acima de TODAS as sprites.
@@ -2584,51 +2629,6 @@ Renderer.prototype.draw = function (combat, player, dt) {
     ctx.globalAlpha = 1;
   }
   ctx.textAlign = "center";
-
-  // Membros inconscientes / permadead: corpse oficial imóvel (sem outfit).
-  // Solo em boss também usa o mesmo path (players pode estar ausente).
-  if (combat && !combat.dead) {
-    const downed = (combat.players && combat.players.length)
-      ? combat.players
-      : (combat.player ? [combat.player] : []);
-    for (const ent of downed) {
-      if (!ent || !ent.p || ent.p.hp > 0 || (!ent.reviveAt && !ent.permadead)) continue;
-      const pos = ent.deathPos ? Object.assign({}, ent, ent.deathPos) : ent;
-      drawPlayerCorpse(ctx, W, H, pos, ent.p, ent.reviveAt, ent.downedAt, !!ent.permadead);
-    }
-  }
-
-  // --- morte do player (hunt): corpse oficial Canary e contador de respawn.
-  // Boss wipe NÃO usa este path (sem contador — só corpses permadead acima).
-  if (combat && combat.dead && !combat.boss) {
-    const dp = combat.deathPos || { x: 0.18, y: 0.62, dir: "e" };
-    const px = dp.x * W, py = dp.y * H;
-    // Canary Player::getLookCorpse(): masculino 4240, feminino 4247.
-    const sex = String((player && (player.sex || player.gender)) || "").toLowerCase();
-    const corpseId = /female|femin|^f$/.test(sex) ? 4247 : 4240;
-    const corpse = (typeof TileSprites !== "undefined") ? TileSprites.get(corpseId) : null;
-    const ts = tilePx(W);
-    if (corpse && corpse.complete && corpse.naturalWidth) {
-      const scale = ts / 32;
-      const cw = corpse.naturalWidth * scale, ch = corpse.naturalHeight * scale;
-      // Item corpse ancora pelo pé/base do SQM, como o client.
-      ctx.drawImage(corpse, px - cw / 2, py - ch, cw, ch);
-    }
-    const now = Date.now();
-    const left = Math.max(0, Math.ceil((combat.deadUntil - now) / 1000));
-    const total = Math.max(1, combat.deadUntil - (combat.deadAt || now));
-    const elapsed = Math.max(0, Math.min(1, 1 - (combat.deadUntil - now) / total));
-    // Contador vermelho sobe continuamente sobre o corpo até o respawn.
-    const labelY = py - ts * 0.85 - elapsed * ts * 0.7;
-    ctx.font = hudFont(16, canvasHudScale(this.c), true);
-    ctx.textAlign = "center";
-    ctx.globalAlpha = Math.max(.35, 1 - elapsed * .55);
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 3 * canvasHudScale(this.c);
-    ctx.strokeText(left + "s", px, labelY);
-    ctx.fillStyle = "#ff3b30";
-    ctx.fillText(left + "s", px, labelY);
-    ctx.globalAlpha = 1;
-  }
 
   // --- sem hunt
   if (!combat) {

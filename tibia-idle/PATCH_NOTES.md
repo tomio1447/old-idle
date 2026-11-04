@@ -4,6 +4,47 @@ Histórico de alterações do jogo, mais recentes primeiro.
 
 ---
 
+## 2026-11-04 (b) — Annihilator jogável, abas no personagem, bosses em breve
+
+### Quests
+
+- **Annihilator vira Party Quest** — sem lobby: INICIAR entra direto com os
+  4 personagens elegíveis da conta (sem seletor, sem countdown).
+- **Modal de explicação** ao entrar na quest com os 5 passos
+  (preparo → alavanca → 6 Demons → saída → recompensa).
+- Correções: `kind:'quest'` aceito no schema de instâncias (bug que fazia a
+  quest falhar instantaneamente), spawnCells com fallback, lobbys órfãs
+  removidas ao criar nova.
+- **Sprites do mapa**: 25 tiles faltantes extraídos (pisos de fogo, paredes)
+  — os SQMs "quebrados" agora renderizam.
+
+### Personagem (UI)
+
+- **LOYALTY, CHARMS, PROFICIÊNCIA e WHEEL** saíram da topbar e viraram
+  **abas** do modal do personagem (junto de Proficiência, Roda do Destino).
+- Botão **Personagem** ampliado na topbar.
+- **Wheel**: botões **OK** (salva pontos) e **RESET** (zera a roda).
+- Helper → Ataque → Echo Raid: ícone agora usa a **sprite oficial** do
+  portal (Exploraid_Trigger.gif).
+
+### Bosses
+
+- Nova seção **EM BREVE** no modal: The Primal Menace, Magma Bubble,
+  Court Warlock, Maior Domus, Phosphorus, Mitmah Vanguard, Bakragore e
+  Vladrukh (preview, entrada bloqueada).
+- **GRIMVALE 100+** é a segunda seção do modal de bosses.
+- Bosses da Grimvale exigem nível 100 + as 2 missões da hunt — o botão
+  fica travado sem os requisitos (sem cooldown indevido).
+
+### Correções
+
+- **Bossbar não fica mais sob o corpse** — corpos de jogadores mortos
+  passam a desenhar antes da barra do boss.
+- **Templo/treino curam** — ao entrar na cidade ou área de treino, o
+  personagem recupera HP e mana completos.
+
+---
+
 ## 2026-11-04 — Echo Raid, Oberon sem falas, Annihilator no modal
 
 ### Novidades
