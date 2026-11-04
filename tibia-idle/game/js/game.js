@@ -2028,6 +2028,11 @@ const BOSS_MODAL_SECTIONS = [
     ids: ["leiden", "tentugly-s-head"],
   },
   {
+    title: "GRIMVALE 100+",
+    minLevel: 100,
+    ids: ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"],
+  },
+  {
     title: "HEART OF DESTRUCTION 150+",
     minLevel: 150,
     ids: ["aftershock", "anomaly", "eradicator", "outburst", "realityquake", "rupture"],
@@ -2041,11 +2046,6 @@ const BOSS_MODAL_SECTIONS = [
     title: "DREAM COURTS 200+",
     minLevel: 200,
     ids: ["plagueroot", "alptramun", "izcandar-champion-of-summer", "izcandar-champion-of-winter", "malofur-mangrinder", "maxxenius"],
-  },
-  {
-    title: "GRIMVALE 100+",
-    minLevel: 100,
-    ids: ["black-vixen", "bloodback", "darkfang", "shadowpelt", "sharpclaw"],
   },
   {
     title: "BOSSES 250+",
