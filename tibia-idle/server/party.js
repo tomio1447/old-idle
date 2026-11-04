@@ -485,6 +485,11 @@ async function bossRequirementsOk(db, party, opts) {
   const checar = async (charId, nome) => {
     const c = await db.findCharacter(charId);
     const p = charPlayerData(c);
+    const grimvale = require("../game/js/grimvale-bosses");
+    if (grimvale.ids.includes(opts.boss)) {
+      const reason = grimvale.accessError(c && await db.findAccountById(c.account_id), c && c.level);
+      if (reason) return nome + ": " + reason;
+    }
     // cooldown do boss (p.bosses[id].lastFight + cooldown)
     if (cooldownMs > 0) {
       const b = p.bosses && p.bosses[opts.boss];

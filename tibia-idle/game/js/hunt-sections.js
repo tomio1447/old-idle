@@ -3,6 +3,7 @@
  * hunts visíveis): carregar antes de ui.js. */
 "use strict";
 window.HUNT_MODAL_SECTIONS = [
+  { title: "HUNTS 0–100 — GRIMVALE", ids: ["grimvale-1st-floor", "grimvale-2nd-floor"] },
   { title: "HUNTS 1–50", ids: ["rats", "amazon-camp", "elf-yalahar", "salamander-cave", "meriana-island"] },
   { title: "HUNTS 50–100", ids: ["stonerefiner", "cave-cave-edron", "ankrahmun-tombs", "mutateds-yalahar", "lizardstown", "feyrist-nightmare", "cemetery-yalahar", "cults-yalahar", "bog-yalahar"] },
   { title: "HUNTS 100–250", ids: ["the-void", "exotic-cave", "pirat-lower", "lizard-chosen-tower", "ghastly-dragons", "draken-walls", "drakens-castle", "elder-wyrm-darashia", "minotaur-oramond-east", "deeplings-deeper"] },

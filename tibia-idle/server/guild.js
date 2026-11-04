@@ -143,6 +143,8 @@ function guildTaskMonsterPool() {
     try { vm.runInNewContext(fs.readFileSync(path.join(js, file), "utf8"), sandbox); }
     catch (e) { console.error("[guild] falha ao ler", file, "-", e && e.message); }
   }
+  sandbox.GAMEDATA = sandbox.window.GAMEDATA;
+  vm.runInNewContext(fs.readFileSync(path.join(js, "grimvale.js"), "utf8"), sandbox);
   const G = sandbox.window.GAMEDATA || {}, M = sandbox.window.MONSTERDATA || {};
   const catalog = new Set();
   (sandbox.window.HUNT_MODAL_SECTIONS || []).forEach((section) =>

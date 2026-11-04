@@ -314,7 +314,7 @@ function cycloAppearance(p, el, opts) {
       <div class="tiny">${o.nome}</div>
       <div class="tiny dim">
         ${tem ? (o.addons ? `addons ${ads}/${o.addons}` : "sem addon")
-              : `<span class="gold-txt">${fmtFull(outfitPrice(o))} gp</span>`}
+              : `<span class="gold-txt">ADDONER / Store</span>`}
       </div>
     </div>`;
   };
@@ -328,7 +328,7 @@ function cycloAppearance(p, el, opts) {
       </div>
       <div class="tiny">${m.nome}</div>
       <div class="tiny dim">
-        ${tem ? `+${m.speed} vel` : `<span class="gold-txt">${fmtFull(mountPrice(m))} gp</span>`}
+        ${tem ? `+${m.speed} vel` : `<span class="gold-txt">Lothar / Store</span>`}
       </div>
     </div>`;
   };
@@ -348,7 +348,8 @@ function cycloAppearance(p, el, opts) {
             .map(([n, t]) => {
               const donos = atual ? ownedAddons(p, atual.id) : 0;
               const temAddons = atual ? (atual.addons || 0) : 0;
-              const ok = n === 0 || (n === 3 ? donos >= 2 : donos >= n);
+              const mask = atual ? ownedAddonMask(p, atual.id) : 0;
+              const ok = (mask & n) === n;
               return `<button class="sm ${(p.outfit.addons || 0) === n ? "primary" : ""}"
                 data-set-addon="${n}" ${ok ? "" : "disabled"}
                 title="${ok ? "" : "Compre o addon primeiro"}">${t}</button>`;
@@ -356,8 +357,7 @@ function cycloAppearance(p, el, opts) {
         </div>
         ${!ownedOnly && atual && (atual.addons || 0) > ownedAddons(p, atual.id) ? `
           <button class="sm mb8" data-buy-addon="${atual.id}">
-            Comprar addon ${ownedAddons(p, atual.id) + 1} ·
-            <span class="gold-txt">${fmtFull(addonPrice(atual))} gp</span>
+            Obter addons no ADDONER
           </button>` : ""}
         <div class="small dim mb4">Montaria</div>
         <div class="row wrap" style="gap:4px">
@@ -462,6 +462,7 @@ function cycloAppearance(p, el, opts) {
     }));
   $$("#cyclo-content [data-buy-addon]").forEach((b) =>
     b.addEventListener("click", () => {
+      if (accountApiConfigured()) return openCosmeticNpc("addoner");
       const r = buyAddon(p, b.dataset.buyAddon);
       if (!r.ok) { toast(r.erro); return; }
       toast(`Addon ${r.addon} comprado por <span class="gold-txt">${fmtFull(r.preco)} gp</span>`);
@@ -483,6 +484,7 @@ function cycloAppearance(p, el, opts) {
         setAppearance(p, id);
         toast(`Visual: <b>${APP_OUTFIT[id].nome}</b>`);
       } else {
+        if (accountApiConfigured()) return openCosmeticNpc("addoner");
         const r = buyOutfit(p, id);
         if (!r.ok) { toast(r.erro); return; }
         setAppearance(p, id);
@@ -498,6 +500,7 @@ function cycloAppearance(p, el, opts) {
       if (ownsMount(p, id)) {
         setMount(p, currentMount(p) && currentMount(p).id === id ? null : id);
       } else {
+        if (accountApiConfigured()) return openCosmeticNpc("lothar");
         const r = buyMount(p, id);
         if (!r.ok) { toast(r.erro); return; }
         setMount(p, id);

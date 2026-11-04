@@ -511,14 +511,14 @@ function sanitizeCosmetics(raw) {
   const outfits = {}, mounts = {};
   if (c.outfits && typeof c.outfits === "object" && !Array.isArray(c.outfits))
     for (const k of Object.keys(c.outfits))
-      outfits[String(k).slice(0, 80)] = 3;
+      outfits[String(k).slice(0, 80)] = Math.max(0, Math.min(3, Math.floor(Number(c.outfits[k]) || 0)));
   if (c.mounts && typeof c.mounts === "object" && !Array.isArray(c.mounts))
     for (const k of Object.keys(c.mounts))
       if (c.mounts[k]) mounts[String(k).slice(0, 80)] = true;
   // bless: cargas de proteção de wipe compradas na store (TC). Consumidas
   // pelo motor autoritativo quando a PT inteira morre (sem perda de XP/gold).
   const bless = Math.max(0, Math.min(999, Math.floor(Number(c.bless) || 0)));
-  return { outfits, mounts, bless, preyCards: Math.max(0, Math.floor(Number(c.preyCards) || 0)) };
+  return { outfits, mounts, addonBits: Object.assign({}, c.addonBits || {}), bless, preyCards: Math.max(0, Math.floor(Number(c.preyCards) || 0)) };
 }
 
 async function buyCosmetic(db, body) {
@@ -532,7 +532,7 @@ async function buyCosmetic(db, body) {
   if (!entry) return { code: 400, body: { ok: false, msg: "Item cosmético inválido" } };
 
   const cosmetics = sanitizeCosmetics(acc.cosmetics);
-  const owned = kind === "outfit" ? cosmetics.outfits[id] !== undefined : !!cosmetics.mounts[id];
+  const owned = kind === "outfit" ? Number(cosmetics.outfits[id]) >= 3 : !!cosmetics.mounts[id];
   if (owned) return { code: 400, body: { ok: false, msg: "Você já possui esse item", cosmetics } };
 
   const coins = Math.max(0, Number(acc.coins) || 0);

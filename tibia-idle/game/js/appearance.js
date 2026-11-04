@@ -263,12 +263,21 @@ function ownsOutfit(p, id) {
   return false;
 }
 
-function ownedAddons(p, id) {
+function ownedAddonMask(p, id) {
   ensureWardrobe(p);
-  const cos = accountCosmetics();
-  if (cos && cos.outfits && cos.outfits[cosmeticOutfitKey(id)] !== undefined)
-    return (APP_OUTFIT[id] && APP_OUTFIT[id].addons) || 0;
-  return p.wardrobe.outfits[id] || 0;
+  const cos = accountCosmetics(), key = cosmeticOutfitKey(id);
+  if (cos && cos.outfits && cos.outfits[key] !== undefined) {
+    const count = Number(cos.outfits[key]) || 0;
+    const mask = (count >= 2 ? 3 : count >= 1 ? 1 : 0) | ((cos.addonBits && cos.addonBits[key]) || 0);
+    return id === "hunter-f" ? ((mask & 1) << 1) | ((mask & 2) >> 1) : mask;
+  }
+  const count = p.wardrobe.outfits[id] || 0;
+  return count >= 2 ? 3 : count >= 1 ? 1 : 0;
+}
+
+function ownedAddons(p, id) {
+  const mask = ownedAddonMask(p, id);
+  return (mask & 1 ? 1 : 0) + (mask & 2 ? 1 : 0);
 }
 
 function ownsMount(p, id) {
@@ -284,6 +293,8 @@ function ownsMount(p, id) {
 
 /* Compra: devolve {ok, erro} para a UI mostrar o motivo */
 function buyOutfit(p, id) {
+  if (typeof accountApiConfigured === "function" && accountApiConfigured())
+    return { ok: false, erro: "Obtenha outfits na Store ou no ADDONER." };
   const o = APP_OUTFIT[id];
   if (!o) return { ok: false, erro: "Visual desconhecido." };
   if (ownsOutfit(p, id)) return { ok: false, erro: "Você já tem esse visual." };
@@ -295,6 +306,8 @@ function buyOutfit(p, id) {
 }
 
 function buyAddon(p, id) {
+  if (typeof accountApiConfigured === "function" && accountApiConfigured())
+    return { ok: false, erro: "Troque os itens necessários no ADDONER." };
   const o = APP_OUTFIT[id];
   if (!o) return { ok: false, erro: "Visual desconhecido." };
   if (!ownsOutfit(p, id))
@@ -310,6 +323,8 @@ function buyAddon(p, id) {
 }
 
 function buyMount(p, id) {
+  if (typeof accountApiConfigured === "function" && accountApiConfigured())
+    return { ok: false, erro: "Obtenha montarias no Lothar ou na Store." };
   const m = APP_MOUNT[id];
   if (!m) return { ok: false, erro: "Montaria desconhecida." };
   if (ownsMount(p, id)) return { ok: false, erro: "Você já tem essa montaria." };
@@ -401,9 +416,7 @@ function setAppearance(p, id) {
   ensureOutfit(p);
   p.outfit.appearance = id;
   // o addon ativo nao pode passar do que foi comprado
-  const owned = Math.min(ownedAddons(p, id), APP_OUTFIT[id].addons || 0);
-  const max = owned >= 2 ? 3 : owned;
-  if ((p.outfit.addons || 0) > max) p.outfit.addons = max;
+  p.outfit.addons = (p.outfit.addons || 0) & ownedAddonMask(p, id);
   syncOutfitLook(p);
   return true;
 }
@@ -412,12 +425,10 @@ function setAppearance(p, id) {
 function setAddons(p, n) {
   ensureOutfit(p);
   const o = currentAppearance(p);
-  const donos = o ? ownedAddons(p, o.id) : 0;
+  const donos = o ? ownedAddonMask(p, o.id) : 0;
   n = Math.max(0, Math.min(3, n | 0));
   // nao deixa ligar um addon que nao foi comprado
-  if (donos < 2 && n === 3) n = donos >= 1 ? 1 : 0;
-  if (donos < 1) n = 0;
-  if (donos === 1 && n === 2) n = 1;
+  n &= donos;
   p.outfit.addons = n;
   syncOutfitLook(p);
   return n;

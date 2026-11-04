@@ -696,11 +696,28 @@ JsonStore.prototype.storeOrdersByAccount = function (accountId, limit) {
   return (this.storeOrders || []).filter((o) => Number(o.accountId) === Number(accountId))
     .sort((a, b) => Number(b.id) - Number(a.id)).slice(0, n);
 };
+JsonStore.prototype.accountWardrobe = function (accountId, recipeId, alternative) {
+  const W = require("./wardrobe"), account = this.findAccountById(accountId);
+  if (!account) return { ok: false, msg: "Conta não encontrada." };
+  const characters = this.charactersOf(accountId);
+  const shared = this.accountSharedInventory(accountId);
+  W.migrate(account, characters);
+  let result = { ok: true };
+  if (recipeId) {
+    const active = (this.instances || []).some((i) => Number(i.account_id) === Number(accountId) && i.status === "active");
+    if (active || characters.some((c) => ["hunt", "boss"].includes(c.zone)))
+      return { ok: false, msg: "Saia do combate antes de realizar a troca." };
+    result = W.exchange(account, characters, shared, recipeId, alternative);
+    if (result.ok) this.setAccountSharedInventory(accountId, shared);
+  }
+  this._save();
+  return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters), sharedInventory: shared });
+};
 JsonStore.prototype.setAccountCosmetics = function (accountId, cosmetics) {
   const a = this.findAccountById(accountId);
   if (!a) return null;
   const prior = typeof a.cosmetics === "string" ? JSON.parse(a.cosmetics) : (a.cosmetics || {});
-  a.cosmetics = Object.assign({}, cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {},
+  a.cosmetics = Object.assign(require("./wardrobe").mergeCosmetics(prior, cosmetics),
     { preyCards: Math.max(0, Math.floor(Number(prior.preyCards) || 0)) });
   this._save();
   return a;
@@ -2636,12 +2653,49 @@ async function MysqlStore() {
         role: role || "user", coins: coins || 0,
         gold: 0, gold_migrated: 1, vip_until: 0, missions: {}, missionsDone: {}, tutorial: {}, cosmetics: {} };
     },
+    async accountWardrobe(accountId, recipeId, alternative) {
+      const W = require("./wardrobe");
+      await this.accountSharedInventory(accountId);
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [accounts] = await conn.query("SELECT * FROM accounts WHERE id=? FOR UPDATE", [Number(accountId)]);
+        const account = accounts[0];
+        if (!account) { await conn.rollback(); return { ok: false, msg: "Conta não encontrada." }; }
+        const [characters] = await conn.query("SELECT * FROM characters WHERE account_id=? ORDER BY id", [Number(accountId)]);
+        const shared = W.object(account.shared_inventory);
+        W.migrate(account, characters);
+        let result = { ok: true };
+        if (recipeId) {
+          const [instances] = await conn.query("SELECT status FROM account_instances WHERE account_id=?", [Number(accountId)]);
+          if (instances.some((i) => i.status === "active") || characters.some((c) => ["hunt", "boss"].includes(c.zone))) {
+            await conn.rollback(); return { ok: false, msg: "Saia do combate antes de realizar a troca." };
+          }
+          result = W.exchange(account, characters, shared, recipeId, alternative);
+        }
+        if (recipeId && result.ok) {
+          await conn.query("UPDATE accounts SET cosmetics=?,shared_inventory=? WHERE id=?",
+            [JSON.stringify(account.cosmetics), JSON.stringify(shared), Number(accountId)]);
+        } else {
+          await conn.query("UPDATE accounts SET cosmetics=? WHERE id=?", [JSON.stringify(account.cosmetics), Number(accountId)]);
+        }
+        await conn.commit();
+        return Object.assign(result, { cosmetics: account.cosmetics, catalog: W.catalog(account, characters), sharedInventory: shared });
+      } catch (error) { await conn.rollback(); throw error; }
+      finally { conn.release(); }
+    },
     async setAccountCosmetics(accountId, cosmetics) {
-      const c = cosmetics && typeof cosmetics === "object" && !Array.isArray(cosmetics) ? cosmetics : {};
-      await this.run(`UPDATE accounts SET cosmetics = JSON_SET(?, '$.preyCards',
-        GREATEST(0, COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(
-          CASE WHEN JSON_VALID(cosmetics) THEN cosmetics ELSE '{}' END, '$.preyCards')) AS SIGNED), 0))) WHERE id = ?`,
-        [JSON.stringify(c), Number(accountId)]);
+      const conn = await pool.getConnection(), W = require("./wardrobe");
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.query("SELECT cosmetics FROM accounts WHERE id=? FOR UPDATE", [Number(accountId)]);
+        const prior = W.object(rows[0] && rows[0].cosmetics);
+        const merged = W.mergeCosmetics(prior, cosmetics);
+        merged.preyCards = Math.max(0, Math.floor(Number(prior.preyCards) || 0));
+        await conn.query("UPDATE accounts SET cosmetics=? WHERE id=?", [JSON.stringify(merged), Number(accountId)]);
+        await conn.commit();
+      } catch (error) { await conn.rollback(); throw error; }
+      finally { conn.release(); }
       return this.findAccountById(accountId);
     },
     async setAccountMissions(accountId, missions, missionsDone) {

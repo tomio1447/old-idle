@@ -39,7 +39,22 @@ function loyaltyAddonUnits(raw) {
   return v;
 }
 
+function loyaltyAccountCosmetics(p) {
+  const cosmetics = typeof accountCosmetics === "function" ? accountCosmetics() : null;
+  return cosmetics || (p && p._accountCosmetics) || null;
+}
+
 function loyaltyAddonCount(p) {
+  const cosmetics = loyaltyAccountCosmetics(p);
+  if (cosmetics) {
+    let count = 0;
+    for (const id of new Set([...Object.keys(cosmetics.outfits || {}), ...Object.keys(cosmetics.addonBits || {})])) {
+      const legacy = Number(cosmetics.outfits && cosmetics.outfits[id]) || 0;
+      const bits = (legacy >= 2 ? 3 : legacy >= 1 ? 1 : 0) | ((cosmetics.addonBits && cosmetics.addonBits[id]) || 0);
+      count += (bits & 1 ? 1 : 0) + (bits & 2 ? 1 : 0);
+    }
+    return count;
+  }
   const outfits = p && p.wardrobe && p.wardrobe.outfits;
   if (!outfits || typeof outfits !== "object") return 0;
   let n = 0;
@@ -48,7 +63,8 @@ function loyaltyAddonCount(p) {
 }
 
 function loyaltyMountCount(p) {
-  const mounts = p && p.wardrobe && p.wardrobe.mounts;
+  const cosmetics = loyaltyAccountCosmetics(p);
+  const mounts = cosmetics ? cosmetics.mounts : p && p.wardrobe && p.wardrobe.mounts;
   if (!mounts || typeof mounts !== "object") return 0;
   let n = 0;
   for (const id of Object.keys(mounts)) if (mounts[id]) n++;

@@ -10,6 +10,8 @@ let yanaTier = 0;
 
 /* Catálogo do modal NPCS (mesmo estilo de cards do modal HUNTS). */
 const NPC_MODAL_CATALOG = [
+  { shop: "addoner", name: "ADDONER", role: "Outfits e Addons", sprite: "addoner", desc: "Troque itens por outfits e addons para toda a conta." },
+  { shop: "lothar", name: "Lothar", role: "Montarias", sprite: "lothar", desc: "Troque itens e confira objetivos para desbloquear montarias na conta." },
   {
     shop: "tibianus",
     name: "King Tibianus",
@@ -406,7 +408,9 @@ function renderNpcsCatalog() {
     <div class="hunt-cat-title">${typeof t === "function" ? t("npc.catalogTitle") : "Serviços"}</div>
     <div class="hunts-group">${NPC_MODAL_CATALOG.map((entry) => {
       const desc = entry.desc || (typeof t === "function" ? t(entry.descKey) : entry.descKey);
-      const spriteHtml = entry.sprite === "oberon-trader"
+      const spriteHtml = ["addoner", "lothar"].includes(entry.sprite)
+        ? cosmeticNpcPortrait(entry.sprite)
+        : entry.sprite === "oberon-trader"
         ? `<span class="npc-anim-oberon" role="img" aria-label="${entry.name}"></span>`
         : entry.sprite === "umbral-creation"
         ? `<span class="npc-anim-guzzlemaw" role="img" aria-label="${entry.name}"></span>`
@@ -427,9 +431,11 @@ function renderNpcsCatalog() {
   $$("#npcs-modal-list [data-npc-shop]").forEach((btn) => {
     btn.addEventListener("click", () => openNpcShop(btn.dataset.npcShop));
   });
+  paintCosmeticNpcPortraits();
 }
 
 function openNpc(id) {
+  if (id === "addoner" || id === "lothar") return openCosmeticNpc(id);
   const npc = NPCS[id];
   if (!npc) return;
   G.activeNpc = id;

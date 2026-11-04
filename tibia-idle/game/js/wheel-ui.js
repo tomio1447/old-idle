@@ -562,14 +562,14 @@ function wheelFitCanvas(root) {
     // embutida: a roda e dimensionada pela largura livre; a altura do wrap
     // e clipada no espaco livre -> o scroll aparece so na area da roda e o
     // painel de informacoes permanece fixo
-    s = availW > 0 ? availW / 522 : 1;
-    s = Math.max(0.45, Math.min(1.6, s));
+    s = Math.min(availW > 0 ? availW / 522 : 1, availH > 0 ? availH / 522 : 1);
+    s = Math.min(1.6, s);
   } else {
     s = 99;
     if (availW > 0) s = Math.min(s, availW / 522);
     if (availH > 0) s = Math.min(s, availH / 522);
     if (s === 99) s = 1;
-    s = Math.max(0.45, Math.min(1.25, s));
+    s = Math.min(1.25, s);
   }
   wrap.style.width = Math.round(522 * s) + "px";
   var scaledH = Math.round(522 * s);
