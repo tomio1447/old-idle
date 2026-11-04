@@ -235,6 +235,62 @@ function applySharedToPlayer(p, shared) {
   return p;
 }
 
+/* Merge de missão por CONTA (missions são account-level, não por char).
+ * progress = maior valor por task; claimed/completeClaimed/partyExpGranted
+ * = união; missionsDone = união de flags. surviveReset é o epoch marcado
+ * quando a party morre na Claustrophobic Inferno — entradas anteriores ao
+ * último reset são stale para os campos "survive" (um espelho velho não
+ * pode reviver o timer nem o claim zerados pela morte). */
+function mergeMissionEntry(a, b) {
+  a = a && typeof a === "object" ? a : {};
+  b = b && typeof b === "object" ? b : {};
+  const reset = Math.max(Number(a.surviveReset) || 0, Number(b.surviveReset) || 0);
+  const fresh = (st) => reset <= 0 || (Number(st.surviveReset) || 0) >= reset;
+  const out = { progress: {}, claimed: {} };
+  for (const st of [a, b]) {
+    const ok = fresh(st);
+    for (const [k, v] of Object.entries(st.progress || {})) {
+      if (!ok && k === "survive") continue;
+      const n = Number(v) || 0;
+      if (n > (Number(out.progress[k]) || 0)) out.progress[k] = n;
+    }
+    for (const k of Object.keys(st.claimed || {})) {
+      if (!ok && k === "survive") continue;
+      if (st.claimed[k]) out.claimed[k] = true;
+    }
+    if (st.completeClaimed) out.completeClaimed = true;
+    if (st.partyExpGranted) out.partyExpGranted = true;
+  }
+  if (reset) out.surviveReset = reset;
+  return out;
+}
+
+function mergeMissionMaps(a, b) {
+  a = a && typeof a === "object" ? a : {};
+  b = b && typeof b === "object" ? b : {};
+  const out = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+    out[k] = mergeMissionEntry(a[k], b[k]);
+  return out;
+}
+
+function mergeFlagMap(a, b) {
+  const out = Object.assign({}, a && typeof a === "object" ? a : {});
+  for (const [k, v] of Object.entries(b && typeof b === "object" ? b : {}))
+    if (v) out[k] = v;
+  return out;
+}
+
+/* Semeia as missões da conta no espelho do personagem (hidratação): qualquer
+ * char passa a ver o progresso/claims que outro char da conta já fez — e o
+ * engine (missionPartyExpReward, progress por kill) parte do estado real. */
+function applyAccountMissionsToPlayer(p, acc) {
+  if (!p || typeof p !== "object" || !acc || typeof acc !== "object") return p;
+  p.missions = mergeMissionMaps(p.missions, acc.missions);
+  p.missionsDone = mergeFlagMap(p.missionsDone, acc.missionsDone);
+  return p;
+}
+
 /* Merge da Loot Pouch por DELTA contra a baseline hidratada:
  *   shared[s] = max(0, shared[s] + cópia[s] − base[s])
  * - loot adicionado na instância entra (+delta);
@@ -375,5 +431,9 @@ module.exports = {
   forgeResourcesDelta,
   pouchDelta,
   mergeSharedFromPlayer,
+  mergeMissionEntry,
+  mergeMissionMaps,
+  mergeFlagMap,
+  applyAccountMissionsToPlayer,
   charDataOf,
 };

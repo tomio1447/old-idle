@@ -376,17 +376,20 @@ async function releaseLease(db,body){
 async function updateAccountMissions(db,body){
   const acc=await db.findAccountByToken(body.token);
   if(!acc)return {code:401,body:{ok:false,msg:"Sessão inválida"}};
-  // Missões são por conta: qualquer personagem pode progredir as mesmas
-  // missões. O cliente envia o estado completo (missions + missionsDone).
+  // Missões são por conta: qualquer personagem progride as mesmas missões.
+  // Merge (não overwrite): um char com espelho velho não pode apagar
+  // progresso/claims feitos por outro char da mesma conta.
   const missions=body.missions&&typeof body.missions==="object"?body.missions:{};
   const missionsDone=body.missionsDone&&typeof body.missionsDone==="object"?body.missionsDone:{};
+  const mergedMissions=SharedInv?SharedInv.mergeMissionMaps(acc.missions,missions):missions;
+  const mergedDone=SharedInv?SharedInv.mergeFlagMap(acc.missionsDone,missionsDone):missionsDone;
   if(typeof db.setAccountMissions==="function"){
-    await db.setAccountMissions(acc.id,missions,missionsDone);
+    await db.setAccountMissions(acc.id,mergedMissions,mergedDone);
   }else{
-    acc.missions=missions;acc.missionsDone=missionsDone;
+    acc.missions=mergedMissions;acc.missionsDone=mergedDone;
     if(typeof db._save==="function")db._save();
   }
-  return {code:200,body:{ok:true,missions,missionsDone}};
+  return {code:200,body:{ok:true,missions:mergedMissions,missionsDone:mergedDone}};
 }
 async function updateAccountTutorial(db,body){
   const acc=await db.findAccountByToken(body.token);
@@ -1138,6 +1141,7 @@ async function loadCharacter(db, token, id) {
       if (typeof db.setAccountSharedInventory === "function")
         await db.setAccountSharedInventory(acc.id, sharedInventory);
       SharedInv.applySharedToPlayer(parsed, sharedInventory);
+      SharedInv.applyAccountMissionsToPlayer(parsed, acc);
     } else {
       // Fallback sem shared: stamina individual (legado).
       staminaRegenPlayer(parsed, Date.now(), 0.5);
@@ -1329,6 +1333,7 @@ async function loadCityPlayer(db, acc, character) {
       if (typeof db.setAccountSharedInventory === "function")
         await db.setAccountSharedInventory(acc.id, shared);
       SharedInv.applySharedToPlayer(p, shared);
+      SharedInv.applyAccountMissionsToPlayer(p, acc);
     } catch (e) { /* shared opcional */ }
   } else {
     // Fallback sem shared: stamina individual (legado).
@@ -2223,6 +2228,9 @@ async function prepareInstanceState(db,acc,input){
         if(typeof db.setAccountSharedInventory==="function")
           await db.setAccountSharedInventory(Number(c.account_id),shared);
         SharedInv.applySharedToPlayer(canonical,shared);
+        if(typeof db.findAccountById==="function"){
+          try{SharedInv.applyAccountMissionsToPlayer(canonical,await db.findAccountById(Number(c.account_id)));}catch(e){}
+        }
       }catch(e){/* shared opcional */}
     }
     // Preferências de loot do snapshot do cliente: o DB pode estar atrasado

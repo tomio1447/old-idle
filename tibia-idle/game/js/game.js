@@ -987,21 +987,67 @@ function mergeMissionMaps(remote, local) {
   return out;
 }
 
-function missionState(p, huntId) {
-  p.missions = p.missions || {};
-  // Modo online: missões são por conta. Sincroniza do account data para o
-  // personagem antes de acessar, assim qualquer char vê o mesmo progresso.
-  if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
-    const acc = sessionAccount();
-    if (acc && acc.missions) {
-      if (!p.missions[huntId] && acc.missions[huntId])
-        p.missions[huntId] = acc.missions[huntId];
+/* Merge de missão por CONTA. progress = maior valor por task; claimed,
+ * completeClaimed e partyExpGranted = união. surviveReset é um epoch marcado
+ * quando a party morre na Claustrophobic Inferno — entradas mais antigas que
+ * o último reset são stale para os campos "survive" (senão um espelho velho
+ * reviveria o timer e o claim zerados pela morte). */
+function mergeMissionEntry(a, b) {
+  a = a && typeof a === "object" ? a : {};
+  b = b && typeof b === "object" ? b : {};
+  const reset = Math.max(Number(a.surviveReset) || 0, Number(b.surviveReset) || 0);
+  const fresh = (st) => reset <= 0 || (Number(st.surviveReset) || 0) >= reset;
+  const out = { progress: {}, claimed: {} };
+  for (const st of [a, b]) {
+    const ok = fresh(st);
+    for (const [k, v] of Object.entries(st.progress || {})) {
+      if (!ok && k === "survive") continue;
+      const n = Number(v) || 0;
+      if (n > (Number(out.progress[k]) || 0)) out.progress[k] = n;
     }
-    if (acc && acc.missionsDone) {
-      p.missionsDone = p.missionsDone || {};
-      for (const k of Object.keys(acc.missionsDone)) p.missionsDone[k] = acc.missionsDone[k];
+    for (const k of Object.keys(st.claimed || {})) {
+      if (!ok && k === "survive") continue;
+      if (st.claimed[k]) out.claimed[k] = true;
     }
+    if (st.completeClaimed) out.completeClaimed = true;
+    if (st.partyExpGranted) out.partyExpGranted = true;
   }
+  if (reset) out.surviveReset = reset;
+  return out;
+}
+
+function mergeMissionMaps(a, b) {
+  a = a && typeof a === "object" ? a : {};
+  b = b && typeof b === "object" ? b : {};
+  const out = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+    out[k] = mergeMissionEntry(a[k], b[k]);
+  return out;
+}
+
+function mergeFlagMap(a, b) {
+  const out = Object.assign({}, a && typeof a === "object" ? a : {});
+  for (const [k, v] of Object.entries(b && typeof b === "object" ? b : {}))
+    if (v) out[k] = v;
+  return out;
+}
+
+/* Modo online: missões são por conta. Puxa o estado da conta para o espelho
+ * do personagem (merge — a conta sempre ganha em ties), para que qualquer
+ * char veja o mesmo progresso/claims e nenhum espelho velho reaproveite
+ * recompensa já resgatada por outro char. */
+function pullAccountMissions(p) {
+  if (!p) return;
+  if (!(typeof accountApiConfigured === "function" && accountApiConfigured())) return;
+  const acc = sessionAccount();
+  if (!acc) return;
+  p.missions = mergeMissionMaps(p.missions, acc.missions);
+  p.missionsDone = mergeFlagMap(p.missionsDone, acc.missionsDone);
+}
+
+function missionState(p, huntId) {
+  pullAccountMissions(p);
+  p.missions = p.missions || {};
   if (!p.missions[huntId])
     p.missions[huntId] = { progress: {}, claimed: {}, completeClaimed: false };
   return p.missions[huntId];
@@ -1013,12 +1059,26 @@ function syncMissionsToAccount(p) {
   if (typeof accountApiConfigured === "function" && accountApiConfigured()) {
     const acc = sessionAccount();
     if (!acc) return;
-    acc.missions = p.missions || {};
-    acc.missionsDone = p.missionsDone || {};
+    acc.missions = mergeMissionMaps(acc.missions, p.missions);
+    acc.missionsDone = mergeFlagMap(acc.missionsDone, p.missionsDone);
     try { sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc)); } catch (e) {}
     const token = sessionToken();
-    if (token && typeof accountUpdateMissions === "function")
-      accountUpdateMissions(token, p.missions, p.missionsDone).catch(() => {});
+    if (token && typeof accountUpdateMissions === "function") {
+      accountUpdateMissions(token, acc.missions, acc.missionsDone)
+        .then((r) => {
+          if (!r || !r.ok || !r.missions) return;
+          // O servidor devolve o estado mergeado de verdade — espelha no
+          // cache da sessão e no char ativo para convergir com outros chars.
+          acc.missions = r.missions;
+          acc.missionsDone = r.missionsDone || acc.missionsDone;
+          try { sessionStorage.setItem("tibia-idle-account", JSON.stringify(acc)); } catch (e) {}
+          if (p) {
+            p.missions = mergeMissionMaps(p.missions, acc.missions);
+            p.missionsDone = mergeFlagMap(p.missionsDone, acc.missionsDone);
+          }
+        })
+        .catch(() => {});
+    }
   }
 }
 
@@ -1142,6 +1202,7 @@ function handleMissionKill(p, huntId, monster, meta) {
     (t.counter && t.counter === "fiendish-influenced" &&
       meta && (meta.fiendish || meta.influenced)));
   if (!matches.length) return;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
@@ -1169,6 +1230,7 @@ function handleMissionCounter(p, huntId, counter, amount) {
   if (!def || !def.tasks) return;
   const matches = def.tasks.filter((t) => t.counter === counter);
   if (!matches.length) return;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
@@ -1201,6 +1263,7 @@ function renderMission() {
   const def = missionForHunt(huntId);
   if (!def) { box.style.display = "none"; return; }
   // missão já finalizada: some de vez da tela
+  pullAccountMissions(G.p);
   G.p.missionsDone = G.p.missionsDone || {};
   if (G.p.missionsDone[huntId]) { box.style.display = "none"; return; }
   const st = missionState(G.p, huntId);
@@ -1431,6 +1494,7 @@ function recordFearHit(p, count) {
   const huntId = "ebb-and-flow";
   const def = MISSION_DEFS[huntId];
   if (!def) return false;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return false;
   const st = missionState(p, huntId);
@@ -1467,6 +1531,7 @@ function surviveMissionTick(c, p, dt) {
   const huntId = c.huntId;
   const task = surviveMissionDef(huntId);
   if (!task) return;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
@@ -1508,6 +1573,7 @@ function surviveMissionOnDeath(p, huntId) {
   const id = huntId || (typeof G !== "undefined" && G.combat && G.combat.huntId);
   const task = surviveMissionDef(id);
   if (!task) return;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[id]) return;
   const st = missionState(p, id);
@@ -1515,6 +1581,9 @@ function surviveMissionOnDeath(p, huntId) {
   const had = Number(st.progress.survive) || 0;
   st.progress.survive = 0;
   if (st.claimed) delete st.claimed.survive;
+  // Epoch do reset: impede que um espelho de conta/personagem mais velho
+  // reviva o timer (ver mergeMissionEntry).
+  st.surviveReset = Date.now();
   if (had > 0 && typeof toast === "function")
     toast("Missão Inferno: alguém morreu — timer zerado.", "bad");
   if (typeof renderMission === "function") renderMission();
@@ -1536,6 +1605,7 @@ function huntTimeMissionTick(c, p, dt) {
   const huntId = c.huntId;
   const task = huntTimeMissionDef(huntId);
   if (!task) return;
+  pullAccountMissions(p);
   p.missionsDone = p.missionsDone || {};
   if (p.missionsDone[huntId]) return;
   const st = missionState(p, huntId);
