@@ -146,6 +146,12 @@ function createQuestController(opts) {
   function createLobby(questId, ownerAccountId) {
     const quest = questDef(questId);
     if (!quest) return { ok: false, error: "INVALID_QUEST", msg: "Quest inválida." };
+    // Remove lobbys antigas do mesmo dono (evita publish "fail" de lobbys
+    // órfãs quando a instância antiga é encerrada pelo novo start).
+    for (const [lid, old] of lobbys) {
+      if (Number(old.hostAccountId) === Number(ownerAccountId) || old.joins.has(Number(ownerAccountId)))
+        removeLobby(lid, { status: "replaced", reason: "new-lobby" });
+    }
     const id = nextLobbyId(questId);
     const lobby = {
       id,
@@ -303,6 +309,11 @@ function createQuestController(opts) {
     const quest = questDef(lobby.questId);
     lobby.phase = "countdown";
     lobby.countdownEndsAt = now() + (quest ? quest.countdownSec * 1000 : 30000);
+    // Quest sem countdown (party quest): começa o combate na hora.
+    if (lobby.countdownEndsAt <= now()) {
+      beginCombat(lobby).catch((e) => console.error("[quest] beginCombat", e));
+      return;
+    }
     console.log("[quest] countdown", lobby.id, "chars=" + charCount(lobby));
     for (const [accountId] of lobby.joins) {
       publishAccount(accountId, "quest", {

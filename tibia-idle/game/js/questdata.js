@@ -90,7 +90,7 @@ var QUEST_DEFS = {
     /* Spawn nos 4 SQMs de preparo (abs 1023..1026,1038 → local 16..19,23) */
     spawnRange:   { minX: 16, maxX: 19, minY: 23, maxY: 23, z: 7 },
     kickOnDeath:  false,
-    countdownSec: 10,
+    countdownSec: 0,
     /* Encontro único: 6 Demons (a mecânica de preparo/alavanca/saída do
      * server/annihilator.js é refinada depois — por ora roda como quest
      * padrão de 1 wave com todos os demons). */

@@ -387,12 +387,23 @@ function questPickPartyChars(questId) {
   });
 }
 
-/* ---- Party quest: inicia direto com os chars escolhidos (sem lobby público) ---- */
+/* ---- Party quest: inicia direto com todos os chars elegíveis da conta ---- */
 
 async function questStartParty(questId) {
   if (QUEST_MODAL_BUSY) return;
-  const picked = await questPickPartyChars(questId);
-  if (!picked) { openQuestDetail(questId); return; }
+  const q = typeof QUEST_DEFS !== "undefined" ? QUEST_DEFS[questId] : null;
+  if (!q) return;
+  const need = Math.max(1, Number(q.maxPlayers) || 1);
+  const chars = typeof megaLobbyAccountChars === "function" ? megaLobbyAccountChars() : [];
+  const picked = chars
+    .map((c) => ({ id: Number(c.id || (c.p && c.p.id)), level: Number(c.level || (c.p && c.p.level) || 1) }))
+    .filter((c) => c.id > 0 && c.level >= q.level)
+    .slice(0, need)
+    .map((c) => c.id);
+  if (!picked.length) {
+    openQuestDetail(questId);
+    return questToast(`Nenhum personagem lvl ${q.level}+ na conta para a quest.`, "bad");
+  }
   questSetBusy(true);
   try {
     const r = await questFetch("POST", "/api/quest/create", { questId, characterIds: picked });
