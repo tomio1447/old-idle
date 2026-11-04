@@ -4966,9 +4966,14 @@ async function main() {
     const spawnMaxY=Math.max(spawnMinY,Math.min(gridH-1,sr.maxY));
     const blockedSpawn=new Set((quest.spawnBlocked||[]).map((cell)=>Number(cell[0])+":"+Number(cell[1])));
     const blockedCells=questMapBlockedCells(quest);
-    const spawnCells=[];
+    let spawnCells=[];
     for(let y=spawnMinY;y<=spawnMaxY;y++)for(let x=spawnMinX;x<=spawnMaxX;x++)
       if(!blockedSpawn.has(x+":"+y)&&!(blockedCells&&blockedCells[x+":"+y]))spawnCells.push({x,y});
+    // Fallback: células marcadas como bloqueadas no OTBM mas jogáveis por
+    // design (SQMs de preparo da Annihilator) — sem elas a quest nem nasce.
+    if(!spawnCells.length)
+      for(let y=spawnMinY;y<=spawnMaxY;y++)for(let x=spawnMinX;x<=spawnMaxX;x++)
+        if(!blockedSpawn.has(x+":"+y))spawnCells.push({x,y});
     if(!spawnCells.length)return {ok:false,error:"NO_QUEST_SPAWN_CELLS"};
     const spawnOffset=Math.floor(Math.random()*spawnCells.length);
     const members=[],players=[];

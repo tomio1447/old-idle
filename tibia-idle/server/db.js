@@ -4930,7 +4930,7 @@ async function ensureSchema(pool) {
     instance_id CHAR(64) NOT NULL,
     version BIGINT UNSIGNED NOT NULL DEFAULT 1,
     status ENUM('active','ended') NOT NULL DEFAULT 'active',
-    kind ENUM('hunt','boss') NOT NULL,
+    kind ENUM('hunt','boss','quest') NOT NULL,
     hunt_id VARCHAR(64) DEFAULT NULL,
     boss_id VARCHAR(64) DEFAULT NULL,
     instance_mode VARCHAR(24) NOT NULL DEFAULT 'non-pvp',
@@ -4954,6 +4954,8 @@ async function ensureSchema(pool) {
     "ADD COLUMN worker_cursor_at DATETIME(3) DEFAULT NULL AFTER started_at",
     "ADD COLUMN worker_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER worker_cursor_at",
   ]){try{await pool.query("ALTER TABLE account_instances "+col);}catch(e){/* já existe */}}
+  // kind: 'quest' entrou depois do schema inicial — alarga o enum nas VMs antigas.
+  try{await pool.query("ALTER TABLE account_instances MODIFY kind ENUM('hunt','boss','quest') NOT NULL");}catch(e){}
   try{await pool.query("UPDATE account_instances SET worker_cursor_at=saved_at WHERE worker_cursor_at IS NULL");}catch(e){}
   await pool.query(`CREATE TABLE IF NOT EXISTS snapshot_history (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
