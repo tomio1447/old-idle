@@ -31,11 +31,14 @@ Histórico de alterações do jogo, mais recentes primeiro.
   A quarta morte é a morte real. Sem invulnerabilidade/debate.
   - `spawnMobAt` implementado no cliente (helpers agora nascem de verdade
     também no modo offline).
-- **Annihilator Quest listada no modal QUESTS** (nível 100, até 4
+- **Annihilator Quest jogável no modal QUESTS** (nível 100, até 4
   jogadores, rewards: demon armor / magic sword / stonecutter axe /
-  demonbone). Jogável pelo fluxo padrão de quests (lobby → instância → 6
-  Demons → recompensa). O mapa `annihilator.otbm` foi copiado para
-  `game/maps/`. A mecânica bespoke (preparo nos SQMs + alavanca + saída,
-  do módulo `server/annihilator.js`) fica como refinamento futuro.
+  demonbone). Mecânica dedicada implementada no servidor: os personagens
+  nascem nos **4 SQMs de preparo** — quando todos ficam parados neles por
+  3s a **alavanca dispara**: o grupo é teleportado para a entrada e
+  **6 Demons** nascem em posições fixas. Mortos todos, fase de **saída**:
+  os sobreviventes caminham para os SQMs ao norte e a quest termina
+  (`quest-completed` → escolha de recompensa por personagem). O mapa
+  `annihilator.otbm` foi copiado para `game/maps/`.
 
 ---

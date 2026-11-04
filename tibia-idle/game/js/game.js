@@ -3595,6 +3595,20 @@ function drainEvents() {
         }
         break;
       }
+      case "annihilator-lever": {
+        addLog("info", `A alavanca foi acionada — <b>6 Demons</b> nasceram!`);
+        if (typeof toast === "function") toast(`Annihilator: <b>6 Demons</b>!`, "level");
+        break;
+      }
+      case "annihilator-exit": {
+        addLog("info", `Todos os Demons caíram — <b>vá para a saída</b> ao norte!`);
+        if (typeof toast === "function") toast(`Demons mortos — vá para a <b>saída</b>!`, "level");
+        break;
+      }
+      case "annihilator-rewards": {
+        addLog("level", `Annihilator completa — escolha sua recompensa!`);
+        break;
+      }
 
     }
   }

@@ -6329,6 +6329,60 @@ function tickEchoRaid(auth,now){
   for(let i=st.armed.length-1;i>=0;i--){const ar=st.armed[i];
     if(now<ar.spawnAt)continue;st.armed.splice(i,1);echoRunRaidAuth(auth,ar,now);}
 }
+/* ============================ Annihilator =============================
+ * Mecânica dedicada (server/annihilator.js + annihilator-data.js):
+ * preparo nos 4 SQMs → alavanca automática (3s) → 6 Demons → caminhada de
+ * saída → rewards (o fluxo genérico de questWaves é ignorado). */
+const ANNIHILATOR_CELLS={
+  prep:[[16,23],[17,23],[18,23],[19,23]],
+  entrance:[[13,11],[14,11],[15,11],[16,11]],
+  demons:[[17,11],[18,11],[16,13],[14,13],[13,9],[15,9]],
+  exit:[[22,11],[23,11],[24,11],[25,11]],
+};
+function annihilatorInit(auth){
+  auth.annihilator={phase:"prep",arrived:[],demonIds:[],prepSince:0};
+}
+function annihilatorTick(auth,now){
+  const st=auth.annihilator;if(!st)return;
+  const alive=(auth.players||[]).filter((pl)=>pl&&pl.p&&Number(pl.p.hp)>0);
+  auth.events=auth.events||[];
+  if(st.phase==="prep"){
+    const prepSet=new Set(ANNIHILATOR_CELLS.prep.map((c)=>c[0]+":"+c[1]));
+    const ready=alive.length>0&&alive.every((pl)=>prepSet.has(Math.round(pl.cx)+":"+Math.round(pl.cy)));
+    if(!ready){st.prepSince=0;return;}
+    if(!st.prepSince){st.prepSince=now;return;}
+    if(now-st.prepSince<3000)return;
+    // Alavanca: players teleportados para a entrada + 6 demons nascem.
+    st.phase="combat";st.prepSince=0;
+    alive.forEach((pl,i)=>{
+      const e=ANNIHILATOR_CELLS.entrance[i%ANNIHILATOR_CELLS.entrance.length];
+      pl.cx=e[0];pl.cy=e[1];pl.x=(e[0]+0.5)/auth.gridW;pl.y=(e[1]+0.5)/auth.gridH;
+    });
+    st.demonIds=[];
+    ANNIHILATOR_CELLS.demons.forEach(([cx,cy],i)=>{
+      const mob=makeMob(auth,"demon",false);if(!mob)return;
+      mob.id="annihilator-demon-"+i;mob.cx=cx;mob.cy=cy;
+      mob.x=(cx+0.5)/auth.gridW;mob.y=(cy+0.5)/auth.gridH;
+      auth.mobs.unshift(mob);st.demonIds.push(mob.id);
+    });
+    auth.events.push({t:"annihilator-lever",screen:true,ts:now});
+  }else if(st.phase==="combat"){
+    if(st.demonIds.length&&st.demonIds.every((id)=>!(auth.mobs||[]).some((m)=>m&&m.id===id&&m.hp>0))){
+      st.phase="exit";
+      auth.events.push({t:"annihilator-exit",screen:true,ts:now});
+    }
+  }else if(st.phase==="exit"){
+    const exitSet=new Set(ANNIHILATOR_CELLS.exit.map((c)=>c[0]+":"+c[1]));
+    for(const pl of alive){
+      if(exitSet.has(Math.round(pl.cx)+":"+Math.round(pl.cy))&&!st.arrived.includes(String(pl.id)))
+        st.arrived.push(String(pl.id));
+    }
+    if(alive.length>0&&alive.every((pl)=>st.arrived.includes(String(pl.id)))){
+      st.phase="rewards";
+      auth.ended=true;auth.terminalReason="quest-completed";
+    }
+  }
+}
 function tryFerumbrasSummon(auth,mob,now,stepTs){
   if(auth.bossId!=="ferumbras-mortal-shell"||!mob||!mob.boss)return false;
   const living=(auth.mobs||[]).filter((m)=>m.ferumbrasSummon&&m.hp>0).length;
@@ -7626,8 +7680,10 @@ function step(auth,now,opts){if(auth.ended)return;
       }else spawnHuntWave(auth,stepTs);
     }else auth._nextWaveAt=0;
   }
+  // Annihilator: mecânica dedicada substitui o sistema genérico de waves.
+  if(!auth.ended&&auth.questId==="annihilator")annihilatorTick(auth,stepTs);
   // Quest wave logic: ondas controladas pelo questWaves descriptor
-  if(!auth.ended&&auth.kind==="quest"&&auth.questWaves){
+  else if(!auth.ended&&auth.kind==="quest"&&auth.questWaves){
     const qw=auth.questWaves;
     const empty=!auth.mobs.length&&!(auth.pendingSpawns&&auth.pendingSpawns.length);
     // Countdown antes da primeira wave
@@ -7861,6 +7917,10 @@ function initializeAuthority(descriptor,instanceId,now){
     }
     syncBossImmunityFlags(auth);}
   // Quest initialization: preserve questWaves from descriptor
+  if(descriptor.kind==="quest"){
+    auth.questId=String(descriptor.questId||combat.questId||"");
+    if(auth.questId==="annihilator"&&!auth.annihilator)annihilatorInit(auth);
+  }
   if(descriptor.kind==="quest"&&combat.questWaves){
     auth.questWaves=Object.assign({},combat.questWaves);
     // Populate spawn pool from quest wave monsters
@@ -7960,6 +8020,7 @@ function materializeAuthority(descriptor){const auth=descriptor.authority;if(!au
     blocks:Array.isArray(auth.malice.blocks)?auth.malice.blocks.map((b)=>({
       x:Number(b.x)||0,y:Number(b.y)||0,len:Number(b.len)||1})):[]}:null;
   descriptor.state.oberon=auth.oberon?{lives:Number(auth.oberon.lives)||0}:null;
+  descriptor.state.annihilator=auth.annihilator?{phase:String(auth.annihilator.phase||"prep")}:null;
   // Echo Raid: portais visíveis + raids armadas (countdown de 60s no tile).
   descriptor.state.echo=auth.echo?{
     portals:(auth.echo.portals||[]).map((po)=>({id:String(po.id||""),slug:String(po.slug||""),

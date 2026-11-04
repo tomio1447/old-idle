@@ -834,6 +834,10 @@ async function ensureAccountWallet(db,acc){
     const migrated=await db.migrateAccountGold(acc.id);
     if(migrated)Object.assign(acc,migrated);
   }
+  if(typeof db.accountWardrobe==="function"){
+    const wardrobe=await db.accountWardrobe(acc.id);
+    if(wardrobe.ok)acc.cosmetics=wardrobe.cosmetics;
+  }
   return acc;
 }
 
@@ -1061,7 +1065,7 @@ function sanitizeNewPlayer(payload,voc){
   const sex=payload.sex==="female"?"female":"male";
   const safe={id:payload.id,name:payload.name,voc,sex,
     outfit:sanitizeOutfit(payload.outfit,sex,voc),
-    wardrobe:sanitizeWardrobe(payload.wardrobe),
+    wardrobe:{outfits:{},mounts:{}},
     config:payload.config&&typeof payload.config==="object"?payload.config:{},level:1,exp:0,
     skills:{fist:10,sword:10,axe:10,club:10,dist:10,shield:10},
     skillTries:{fist:0,sword:0,axe:0,club:0,dist:0,shield:0},ml:0,manaSpent:0,gold:0,
@@ -1142,6 +1146,7 @@ async function loadCharacter(db, token, id) {
         await db.setAccountSharedInventory(acc.id, sharedInventory);
       SharedInv.applySharedToPlayer(parsed, sharedInventory);
       SharedInv.applyAccountMissionsToPlayer(parsed, acc);
+      require("./wardrobe").applyToPlayer(parsed, acc);
     } else {
       // Fallback sem shared: stamina individual (legado).
       staminaRegenPlayer(parsed, Date.now(), 0.5);
@@ -1180,7 +1185,7 @@ function prepareCharacterSave(c,body,opts){
   // transações autoritativas (ou das ferramentas Admin explícitas).
   let current={};try{current=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
   const protectedKeys=["exp","skills","skillTries","ml","manaSpent","gold","kills","totalKills",
-    "bosses","missions","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
+    "bosses","missions","wardrobe","_accountCosmetics","lootPouch","supplyStash","rewardChest","rewardChestBundles","blessed","deathLog","trainingExercise","trainingClock","dailyRewardDay","quests","_pouchBase","_walletSynced"];
   payload=Object.assign({},payload,{id:String(c.id),name:c.name});
   delete payload.trainingClock;
   let voc=c.voc,level=Math.max(1,Number(c.level)||1);
@@ -1334,6 +1339,7 @@ async function loadCityPlayer(db, acc, character) {
         await db.setAccountSharedInventory(acc.id, shared);
       SharedInv.applySharedToPlayer(p, shared);
       SharedInv.applyAccountMissionsToPlayer(p, acc);
+      require("./wardrobe").applyToPlayer(p, acc);
     } catch (e) { /* shared opcional */ }
   } else {
     // Fallback sem shared: stamina individual (legado).
@@ -2211,6 +2217,11 @@ async function prepareInstanceState(db,acc,input){
       if(typeof db.migrateAccountGold==="function")ownerAcc=await db.migrateAccountGold(c.account_id)||ownerAcc;
       accountCache.set(Number(c.account_id),ownerAcc);
     }
+    const grimvaleBosses=require("../game/js/grimvale-bosses");
+    if(grimvaleBosses.ids.some((slug)=>bossId===slug||huntId==="grimvale-"+slug+"-room")){
+      const reason=grimvaleBosses.accessError(ownerAcc,c.level);
+      if(reason)return {error:{code:403,body:{ok:false,error:"GRIMVALE_BOSS_REQUIREMENTS",msg:c.name+": "+reason}}};
+    }
     let canonical={};try{canonical=typeof c.data==="string"?JSON.parse(c.data):(c.data||{});}catch(e){}
     canonical=Object.assign({},canonical,{id:String(c.id),name:c.name,voc:c.voc,level:Number(c.level)||1});
     canonical.gold=Math.max(0,Math.floor(Number(ownerAcc&&ownerAcc.gold)||0));
@@ -2229,7 +2240,11 @@ async function prepareInstanceState(db,acc,input){
           await db.setAccountSharedInventory(Number(c.account_id),shared);
         SharedInv.applySharedToPlayer(canonical,shared);
         if(typeof db.findAccountById==="function"){
-          try{SharedInv.applyAccountMissionsToPlayer(canonical,await db.findAccountById(Number(c.account_id)));}catch(e){}
+          try{
+            const owner=await ensureAccountWallet(db,await db.findAccountById(Number(c.account_id)));
+            SharedInv.applyAccountMissionsToPlayer(canonical,owner);
+            require("./wardrobe").applyToPlayer(canonical,owner);
+          }catch(e){}
         }
       }catch(e){/* shared opcional */}
     }
@@ -4986,14 +5001,15 @@ async function main() {
       }
     }
     if(!members.length)return {ok:false,error:"NO_MEMBERS"};
+    const customFlow=quest.flow==="annihilator";
     const descriptor={
-      v:1,kind:"quest",huntId:null,bossId:quest.boss,instanceMode:"quest",
+      v:1,kind:"quest",huntId:null,bossId:customFlow?null:quest.boss,instanceMode:"quest",
       questId:quest.id,activeCharacterId:String(members[0].id),members,
       state:{
         questId:quest.id,instanceMode:"quest",gridW,gridH,huntId:null,blockedCells,
         raidEnabled:false,influencedChance:0,fiendishChance:0,players,
         mobs:[],pendingSpawns:[],
-        questWaves:{
+        questWaves:customFlow?null:{
           total:totalWaves,current:0,monstersPerWave,
           monsterPool:quest.waveMonsters||[],
           bossSlug:quest.boss,bossSpawned:false,
@@ -5411,6 +5427,15 @@ async function main() {
       if (req.method === "POST" && url === "/api/training/daily-claim") {
         const limited=rateLimit(req,"daily-claim",30,60000);if(limited)return send(res,limited.code,limited.body);
         const r = await claimDailyExerciseReward(db, await readBody(req));return send(res, r.code, r.body);
+      }
+      if (req.method === "POST" && url === "/api/account/wardrobe") {
+        const limited=rateLimit(req,"wardrobe",60,60000);if(limited)return send(res,limited.code,limited.body);
+        const body=await readBody(req),acc=await db.findAccountByToken(body.token);
+        if(!acc)return send(res,401,{ok:false,msg:"Sessão inválida"});
+        const recipe=typeof body.recipe==="string"?body.recipe:null;
+        const alternative=Number.isSafeInteger(body.alternative)&&body.alternative>=0?body.alternative:0;
+        const result=await db.accountWardrobe(acc.id,recipe,alternative);
+        return send(res,result.ok?200:400,result);
       }
       if (req.method === "GET" && url === "/api/npcs/yana/catalog") {
         return send(res,200,{ok:true,offers:YANA_CATALOG});

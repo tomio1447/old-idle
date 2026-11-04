@@ -73,6 +73,7 @@ var QUEST_DEFS = {
     maxPlayers:   4,
     maxPerAccount: 4,
     playable:     true,
+    flow:         "annihilator",
     icon:         "demon-armor",
     description:  "Posicione seus 4 personagens nos SQMs de preparo, acione a alavanca e sobreviva aos 6 Demons. Cada sobrevivente que chegar à saída escolhe 1 recompensa lendária (máx. 4 por conta).",
     otbm:         "annihilator",
@@ -84,8 +85,10 @@ var QUEST_DEFS = {
     otbmFovHeight:     13,
     otbmRuntimeWidth:  39,
     otbmRuntimeHeight: 34,
-    otbmSpawn:         { x: 1021, y: 1026, z: 7 },
-    spawnRange:   { minX: 13, maxX: 16, minY: 11, maxY: 11, z: 7 },
+    otbmSpawn:         { x: 1024, y: 1038, z: 7 },
+    /* Spawn nos 4 SQMs de preparo (abs 1023..1026,1038 → local 16..19,23) */
+    spawnRange:   { minX: 16, maxX: 19, minY: 23, maxY: 23, z: 7 },
+    kickOnDeath:  false,
     countdownSec: 10,
     /* Encontro único: 6 Demons (a mecânica de preparo/alavanca/saída do
      * server/annihilator.js é refinada depois — por ora roda como quest
