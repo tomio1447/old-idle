@@ -890,11 +890,16 @@ function renderCycloCharms(p, el) {
       </div>
     </div>`;
 
-  $$("#cyclo-content [data-charm-tab]").forEach((b) =>
+  el.querySelectorAll("[data-charm-tab]").forEach((b) =>
     b.addEventListener("click", () => {
       CYCLO.charmTab = b.dataset.charmTab;
       if (CYCLO.charmSel && CHARMS[CYCLO.charmSel] &&
           CHARMS[CYCLO.charmSel].cat !== CYCLO.charmTab) CYCLO.charmSel = null;
+      renderCycloCharms(p, el);
+    }));
+  el.querySelectorAll("[data-charm-sel]").forEach((b) =>
+    b.addEventListener("click", () => {
+      CYCLO.charmSel = b.dataset.charmSel;
       renderCycloCharms(p, el);
     }));
   const raceSel = $("#charm-race-sel");
@@ -902,11 +907,6 @@ function renderCycloCharms(p, el) {
     const prev = $("#charm-race-preview");
     if (prev && typeof mobImg === "function") prev.innerHTML = mobImg(raceSel.value, 36);
   });
-  $$("#cyclo-content [data-charm-sel]").forEach((b) =>
-    b.addEventListener("click", () => {
-      CYCLO.charmSel = b.dataset.charmSel;
-      renderCycloCharms(p, el);
-    }));
   const player = (typeof G !== "undefined" && G && G.p) ? G.p : p;
   ensureCyclopedia(player);
   const buy = $("#charm-buy");
