@@ -2104,6 +2104,27 @@ const BOSS_MODAL_SECTIONS = [
   },
 ];
 
+function openAnnihilatorIntro() {
+  const modal = $("#modal"), body = $("#modal-body");
+  if (!modal || !body) return;
+  body.innerHTML = `<div class="panel-title">Annihilator Quest
+    <button class="sm" id="ann-intro-close" style="margin-left:auto">Fechar</button></div>
+    <div class="panel-body" style="max-width:460px">
+      <p class="small"><b style="color:#ffe680">1 · Preparo:</b> posicione os 4 personagens nos
+        <b>SQMs de preparo</b> marcados na sala.</p>
+      <p class="small"><b style="color:#ffe680">2 · Alavanca:</b> mantendo todos nos SQMs por
+        <b>3 segundos</b>, a alavanca ativa — o grupo é teleportado para a entrada.</p>
+      <p class="small"><b style="color:#ffe680">3 · Luta:</b> elimine os <b>6 Demons</b>.</p>
+      <p class="small"><b style="color:#ffe680">4 · Saída:</b> os sobreviventes caminham até os
+        SQMs de saída ao norte.</p>
+      <p class="small"><b style="color:#ffe680">5 · Recompensa:</b> cada sobrevivente escolhe
+        <b>1 item</b> — demon armor, magic sword, stonecutter axe ou demonbone (máx. 4 por conta).</p>
+    </div>`;
+  modal.classList.add("show");
+  const close = $("#ann-intro-close");
+  if (close) close.onclick = () => modal.classList.remove("show");
+}
+
 function renderBosses(p) {
   const el = $("#bosses-modal-list");
   if (!el || !p) return;
@@ -3656,6 +3677,10 @@ function drainEvents() {
           addLog("level", `Echo Warden abatido: <b>+${pts} charm points</b>.`);
           if (typeof toast === "function") toast(`Echo Warden: <b>+${pts} charm points</b>`, "level");
         }
+        break;
+      }
+      case "annihilator-start": {
+        if (typeof openAnnihilatorIntro === "function") openAnnihilatorIntro();
         break;
       }
       case "annihilator-lever": {

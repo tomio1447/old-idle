@@ -6341,6 +6341,7 @@ const ANNIHILATOR_CELLS={
 };
 function annihilatorInit(auth){
   auth.annihilator={phase:"prep",arrived:[],demonIds:[],prepSince:0};
+  if(auth.events)auth.events.push({t:"annihilator-start"});
 }
 function annihilatorTick(auth,now){
   const st=auth.annihilator;if(!st)return;
